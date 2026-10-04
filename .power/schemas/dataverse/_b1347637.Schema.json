@@ -231,6 +231,14 @@
           "x-ms-schema-name": "cr854_instructionsangle",
           "maxLength": 200
         },
+        "cr854_layoutkey": {
+          "type": "string",
+          "title": "layoutkey",
+          "x-ms-dataverse-attribute": "cr854_layoutkey",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "cr854_layoutkey",
+          "maxLength": 100
+        },
         "cr854_name": {
           "type": "string",
           "title": "配信名",
