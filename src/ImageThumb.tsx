@@ -35,6 +35,7 @@ export function ImageThumb({ src, alt, width = 56, height = 72, aspectRatio }: {
       relationship="description"
       positioning="after"
       showDelay={150}
+      hideDelay={0}
       content={{ children: <img src={src} alt={alt} draggable={false} className={s.big} />, style: { maxWidth: 'none', padding: 4 } }}
     >
       {box}

@@ -89,7 +89,8 @@ const useStyles = makeStyles({
   },
   featureFrame: { display: 'flex', gap: '12px' },
   featureBody: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px' },
-  img: { objectFit: 'cover', borderRadius: '8px', backgroundColor: '#eee', display: 'block' },
+  // 商品の写真は、縦長でも横長でも、全体を枠に収める(長い辺を、枠の辺に合わせる。切り取らない)。余白は、薄い灰色
+  img: { objectFit: 'contain', borderRadius: '8px', backgroundColor: '#f1f1f4', display: 'block' },
   noWrap: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   slot: {
     border: '2px dashed #bbb',
@@ -323,14 +324,14 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     )
   }
 
-  // 写真を枠いっぱいに敷き、名前・価格を左下に重ねる(大きく 1 点・モザイク)。
+  // 写真を枠いっぱいに敷き、名前・価格を、下端の白い帯に載せる(ぼかさない。大きく 1 点・モザイク)。
   // fill: 枠の高さに合わせる(モザイクのマス)。そうでなければ正方形
   const overlayTile = (it: Item, idx: number, fill: boolean, small = false) => {
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, ...(fill ? { height: '100%' } : {}) }}>
         <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.cr854_name} style={{ width: '100%', ...(fill ? { height: '100%' } : { aspectRatio: '1 / 1' }) }} />
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: small ? '14px 6px 4px' : '28px 12px 10px', borderRadius: '0 0 8px 8px', background: 'linear-gradient(rgba(255,255,255,0), rgba(255,255,255,0.9))' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: small ? '4px 6px' : '8px 12px', borderRadius: '0 0 8px 8px', background: 'rgba(255,255,255,0.92)' }}>
           <div className={classes.noWrap} style={{ fontSize: small ? '0.7rem' : '0.9rem', fontWeight: 600, color: INK }}>{p?.cr854_name}</div>
           {!small && priceEl(p?.cr854_price, productMarket(p))}
         </div>

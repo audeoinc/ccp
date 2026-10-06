@@ -231,6 +231,7 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
       relationship="description"
       positioning="after"
       showDelay={150}
+      hideDelay={0}
       withArrow
       content={{ children: <FitThumb layout={layout} free={free} width={190} maxHeight={560} />, style: { maxWidth: 'none', padding: 6 } }}
     >

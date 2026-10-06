@@ -125,7 +125,7 @@ function OptionSelect({ label, value, options, onChange }: {
 
 // 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない
 const ZOOM_KEY = 'cardDetail.previewZoom.v2'
-const ZOOM_MIN = 0.4
+const ZOOM_MIN = 0.15  // 長いテンプレートも、「全体」で収まるように、小さくできる
 const ZOOM_MAX = 1.2
 
 /** プレビューの倍率: 数値(1 = 現在のサイズ)または 'fit'(メール全体を画面の高さに収める) */
@@ -307,7 +307,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, onBa
     card?.cr854_channelname === 'プッシュ' ? 'push' : 'email',
   )
   const [showHeadings, setShowHeadings] = useState(true)
-  // プレビューの倍率(40〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
+  // プレビューの倍率(15〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
   const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
   const [fitZoom, setFitZoom] = useState(1)
   // 「すべてAIで下書き」の進み具合(実行中だけ、画面全体に「推論中」を出す)
