@@ -3,7 +3,7 @@
 置き場所(リポジトリには入れない。.gitignore 済み):
   import/products/jp/*  import/products/us/*   商品の画像(日本向け / US 向け)
   import/heroes/jp/*    import/heroes/us/*     メイン(ヒーロー)画像
-  jpg / png / webp。商品コードは、6 桁の数字(4 から始まる。画像の内容から決まる)。ヒーロー画像は、ファイル名の順に H01.. / UH01..
+  jpg / png / webp / avif。商品コードは、6 桁の数字(4 から始まる。画像の内容から決まる)。ヒーロー画像は、ファイル名の順に H01.. / UH01..
 
 手順(それぞれ、結果を import/out/ に残す。やり直しても、解析済みの画像は、再度 Gemini に頼まない):
   python -m ccp.importer analyze          Gemini が画像を見て、名前・カテゴリ・季節・説明などを作る
@@ -35,8 +35,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]  # server/ の 1 つ上 = アプリのルート
 MODELS = ROOT / "src" / "generated" / "models"
-IMG_EXT = {".jpg", ".jpeg", ".png", ".webp"}
-MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 NS = uuid.UUID("6f1c2f3e-7a54-4b8e-9a77-0c6b8a1d2e10")  # 画像由来のデータの ID 用(同じコードなら、同じ ID)
 
 # 週次実績の週(既存のデモデータと同じ 12 週)
@@ -108,9 +107,10 @@ def prompt_for(group: str, enums: dict[str, dict[str, int]]) -> str:
             f"{lang}\ncategory・season・weather は、上の日本語の候補から、そのまま選ぶ。画像にない情報(ブランド名・価格)は書かない。"
         )
     lang = (
-        "name は英語の画像名(25 文字以内)、tags は英語の単語を、カンマ区切りで 3〜5 個、description は英語で 60〜140 文字。"
+        "name は、人が読む自然な英語のタイトル(例: Autumn Trench Walk。各単語の先頭は大文字、区切りは空白。ハイフン・アンダースコア・小文字だけの書き方は使わない。25 文字以内)、"
+        "tags は英語の単語を、カンマ区切りで 3〜5 個、description は英語で 60〜140 文字。"
         if us
-        else "name は日本語の画像名(全角 20 文字以内)、tags は日本語の単語を、カンマ区切りで 3〜5 個、description は日本語で 40〜80 文字。"
+        else "name は、人が読む自然な日本語のタイトル(全角 20 文字以内。英字の羅列やファイル名のような書き方は使わない)、tags は日本語の単語を、カンマ区切りで 3〜5 個、description は日本語で 40〜80 文字。"
     )
     return (
         "あなたは、ファッション通販の、メール・プッシュ用のメイン(ヒーロー)画像を管理する担当者です。画像について、次の JSON だけを返してください。\n"
@@ -120,13 +120,24 @@ def prompt_for(group: str, enums: dict[str, dict[str, int]]) -> str:
     )
 
 
+def to_jpeg(path: Path, max_side: int = 1024, quality: int = 88) -> bytes:
+    """どの形式(jpg / png / webp / avif。拡張子と中身が違っていても、中身で判定)でも、Gemini に渡せる JPEG にする"""
+    from PIL import Image, ImageOps
+
+    with Image.open(path) as im:
+        im = ImageOps.exif_transpose(im).convert("RGB")
+        im.thumbnail((max_side, max_side))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=quality)
+        return buf.getvalue()
+
+
 def analyze_one(client: Any, model: str, path: Path, group: str, enums: dict[str, dict[str, int]]) -> dict[str, Any]:
     from google.genai import types
 
-    data = path.read_bytes()
     resp = client.models.generate_content(
         model=model,
-        contents=[types.Part.from_bytes(data=data, mime_type=MIME[path.suffix.lower()]), prompt_for(group, enums)],
+        contents=[types.Part.from_bytes(data=to_jpeg(path), mime_type="image/jpeg"), prompt_for(group, enums)],
         config=types.GenerateContentConfig(response_mime_type="application/json", thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)),
     )
     return json.loads(resp.text or "{}")
