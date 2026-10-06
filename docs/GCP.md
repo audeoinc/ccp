@@ -1,7 +1,7 @@
 # CCP の GCP 版(Cloud Run + Cloud SQL + Gemini)
 
 Power Apps 版と**同じ画面のコード**を、GCP でも動かす仕組み。方針・進み具合・使い方をまとめる。
-**このリポジトリは公開**なので、プロジェクト ID・URL・パスワードは、ここにも書かない(`<…>` で示す)。
+このリポジトリは非公開だが、プロジェクト ID・URL・パスワードは、ここにも書かない(`<…>` で示す)。
 
 ## 方針(決定済み)
 
@@ -121,7 +121,7 @@ gcloud scheduler jobs create http ccp-idle-check --project <プロジェクトID
 ## 画像の差し替え(商品・ヒーロー画像)
 
 GCP 版だけの機能。用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。
-画像は **Git には入れない**(公開リポジトリのため。`import/` は `.gitignore` 済み)。GCS のバケット(`images/products/…`、`images/heroes/…`)に置き、サーバーの `/img/…` が配信する(バケットは非公開で、サイトと同じ Basic 認証がかかる)。DB の画像 URL は `/img/products/417352.jpg` の形。
+画像は **Git には入れない**(権利のある素材のため。`import/` は `.gitignore` 済み)。GCS のバケット(`images/products/…`、`images/heroes/…`)に置き、サーバーの `/img/…` が配信する(バケットは非公開で、サイトと同じ Basic 認証がかかる)。DB の画像 URL は `/img/products/417352.jpg` の形。
 
 **置き場所**(アプリのルートの `import/`。jpg / png / webp。ファイル名の順に、コードを付ける)
 
