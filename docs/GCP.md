@@ -118,6 +118,13 @@ gcloud scheduler jobs create http ccp-idle-check --project <プロジェクトID
 
 **DB の自動起動**: 画面が `/api/data` を呼んだとき DB が停止中なら、サーバーが起動を依頼して 503(`db_starting`)を返し、画面に「準備中」を出す(**実測で 10〜13 分**。準備ができると自動で読み込み直す)。手動で止める・起動するときは、`gcloud sql instances patch contents-planner-db --activation-policy=NEVER`(停止)/ `ALWAYS`(起動)。
 
+**一時的に、自動停止させない(作業中など)**: バケットに `state/keep_until.json`(`{"ts": <UNIX 秒>}`)を置くと、その時刻までは、アクセスがなくても停止しない。時刻が過ぎれば、自然に効かなくなる(消す必要はない)。
+
+```bash
+python -c "import datetime as d;print(int(d.datetime(2026,10,6,12,0,tzinfo=d.timezone.utc).timestamp()))"   # 例: 2026-10-06 21:00(日本時間)
+echo '{"ts": 1791288000}' | gcloud storage cp - gs://<バケット名>/state/keep_until.json
+```
+
 ## 画像の差し替え(商品・ヒーロー画像)
 
 GCP 版だけの機能。用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。

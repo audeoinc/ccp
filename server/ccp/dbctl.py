@@ -26,6 +26,7 @@ log = logging.getLogger("ccp.dbctl")
 SQL_API = "https://sqladmin.googleapis.com/sql/v1beta4"
 GCS_API = "https://storage.googleapis.com"
 ACTIVITY_OBJECT = "state/last_activity.json"
+KEEP_OBJECT = "state/keep_until.json"  # この時刻(UNIX 秒)まで、自動停止しない(作業中に止まらないようにする。時刻が過ぎれば、自然に効かなくなる)
 TOUCH_INTERVAL_S = 60  # 最後のアクセスの時刻の書き込みは、1 分に 1 回まで
 STATUS_CACHE_S = 4
 
@@ -87,6 +88,13 @@ class DbController:
         r.raise_for_status()
         return float(json.loads(r.text)["ts"])
 
+    def _read_keep_until(self) -> float | None:
+        r = self._http().get(f"{GCS_API}/storage/v1/b/{self.bucket}/o/{quote(KEEP_OBJECT, safe='')}?alt=media", timeout=15)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return float(json.loads(r.text)["ts"])
+
     def _write_activity(self, ts: float) -> None:
         r = self._http().post(
             f"{GCS_API}/upload/storage/v1/b/{self.bucket}/o?uploadType=media&name={quote(ACTIVITY_OBJECT, safe='')}",
@@ -137,8 +145,11 @@ class DbController:
         state = await self.status(fresh=True)
         if state != "running":
             return {"action": "none", "state": state}
-        last = await asyncio.to_thread(self._read_activity) if self.bucket else None
         now = time.time()
+        keep = await asyncio.to_thread(self._read_keep_until) if self.bucket else None
+        if keep is not None and now < keep:
+            return {"action": "none", "state": state, "note": "保持中(keep_until)", "keepMinutesLeft": round((keep - now) / 60)}
+        last = await asyncio.to_thread(self._read_activity) if self.bucket else None
         if last is None:
             # 時刻が残っていない(手動で起動した直後など)。今を起点にして、猶予を与える
             await asyncio.to_thread(self._write_activity, now)

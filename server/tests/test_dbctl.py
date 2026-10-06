@@ -26,6 +26,7 @@ class Fake(dbctl.DbController):
         self.bucket = "b"
         self.inst = inst
         self.last = last
+        self.keep: float | None = None
         self.policies: list[str] = []
 
     def _get_instance(self) -> dict[str, Any]:
@@ -36,6 +37,9 @@ class Fake(dbctl.DbController):
 
     def _read_activity(self) -> float | None:
         return self.last
+
+    def _read_keep_until(self) -> float | None:
+        return self.keep
 
     def _write_activity(self, ts: float) -> None:
         self.last = ts
@@ -92,6 +96,17 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
         r = await c.idle_check(30)
         self.assertEqual(r["action"], "none")
         self.assertEqual(c.policies, [])
+
+    async def test_keep_until_blocks_the_idle_stop_until_the_time_passes(self) -> None:
+        c = Fake(instance("RUNNABLE", "ALWAYS"), last=time.time() - 999 * 60)
+        c.keep = time.time() + 60 * 60  # あと 1 時間は、止めない
+        r = await c.idle_check(30)
+        self.assertEqual(r["action"], "none")
+        self.assertEqual(c.policies, [])
+        c.keep = time.time() - 60  # 過ぎたら、通常どおり止める
+        r = await c.idle_check(30)
+        self.assertEqual(r["action"], "stop")
+        self.assertEqual(c.policies, ["NEVER"])
 
     async def test_touch_is_throttled(self) -> None:
         c = Fake(instance("RUNNABLE", "ALWAYS"))
