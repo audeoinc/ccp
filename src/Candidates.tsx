@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Avatar, Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
+import { Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
 import { AddRegular, DismissRegular, SearchRegular } from '@fluentui/react-icons'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { DND_PRODUCT, yen } from './items'
 import { productMarket } from './market'
 import { optionLabel, useT } from './i18n'
+import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 
 interface Props {
@@ -116,7 +117,7 @@ export function Candidates({ products, usedIds, onAdd }: Props) {
             }}
             className={mergeClasses(styles.item, used && styles.itemUsed)}
           >
-            <Avatar shape="square" size={48} name={p.cr854_name} image={{ src: productImage(p), alt: p.cr854_name }} />
+            <ImageThumb src={productImage(p)} alt={p.cr854_name} width={48} height={64} />
             <div className={styles.body}>
               <Text weight="semibold" size={300} truncate wrap={false} block>{p.cr854_name}</Text>
               <Caption1 className={styles.line}>

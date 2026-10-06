@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Avatar, Badge, Button, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { yen } from './items'
 import { optionLabel, useT } from './i18n'
@@ -16,7 +17,6 @@ const useStyles = makeStyles({
   // タブを切り替えても、フロートの大きさが変わらないよう、高さを揃える(はみ出すときは、中でスクロール)
   root: { width: '420px', maxWidth: '90vw', minHeight: '400px', maxHeight: '80vh', overflowY: 'auto', display: 'grid', rowGap: '10px', padding: '4px', minWidth: 0, alignContent: 'start' },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px', minWidth: 0 },
-  avatar: { flexShrink: 0, width: '48px', height: '48px', borderRadius: tokens.borderRadiusMedium },
   title: { minWidth: 0, display: 'grid', flexGrow: 1 },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '8px' },
@@ -61,7 +61,7 @@ export function ProductDetail({ product: p, onClose }: { product: Cr854_products
   return (
     <div className={s.root}>
       <div className={s.head}>
-        <Avatar shape="square" image={{ src: productImage(p), alt: p.cr854_name }} name={p.cr854_name} className={s.avatar} />
+        <ImageThumb src={productImage(p)} alt={p.cr854_name} width={48} height={64} />
         <div className={s.title}>
           <Text weight="semibold" size={300}>{p.cr854_name}</Text>
           <span className={s.sub}>{p.cr854_productcode} ・ {optionLabel(p.cr854_categoryname)} ・ {yen(p.cr854_price, market)}</span>

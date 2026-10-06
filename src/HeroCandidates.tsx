@@ -4,6 +4,7 @@ import { SearchRegular } from '@fluentui/react-icons'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { DND_HERO } from './items'
 import { optionLabel, useT } from './i18n'
+import { ImageThumb } from './ImageThumb'
 import { heroImage } from './images'
 
 interface Props {
@@ -34,7 +35,6 @@ const useStyles = makeStyles({
     ...shorthands.borderColor(tokens.colorBrandStroke1),
     ':hover': { backgroundColor: tokens.colorBrandBackground2, ...shorthands.borderColor(tokens.colorBrandStroke1) },
   },
-  img: { width: '100%', aspectRatio: '8 / 3', objectFit: 'cover', display: 'block', backgroundColor: tokens.colorNeutralBackground3 },
   badge: { position: 'absolute', top: '6px', right: '6px' },
   info: { padding: '8px', minWidth: 0 },
   line: {
@@ -107,7 +107,7 @@ export function HeroCandidates({ heroes, selectedId, onSelect }: Props) {
               }}
               className={mergeClasses(styles.card, used && styles.cardUsed)}
             >
-              <img draggable={false} src={heroImage(h)} alt={h.cr854_name} className={styles.img} />
+              <ImageThumb src={heroImage(h)} alt={h.cr854_name} aspectRatio="4 / 3" />
               {used && <Badge appearance="filled" color="brand" className={styles.badge}>{t('設定中', 'In use')}</Badge>}
               <div className={styles.info}>
                 <Text weight="semibold" size={300} truncate wrap={false} block>{h.cr854_name}</Text>

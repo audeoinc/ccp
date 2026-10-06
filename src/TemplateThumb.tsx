@@ -1,4 +1,5 @@
-import { makeStyles, tokens } from '@fluentui/react-components'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { makeStyles, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
 
@@ -21,7 +22,6 @@ const useStyles = makeStyles({
     overflow: 'hidden',
   },
   body: { display: 'grid', alignContent: 'start' },
-  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, background: 'linear-gradient(rgba(255,255,255,0), #fff)', pointerEvents: 'none' },
   free: { color: '#888', textAlign: 'center' },
 })
 
@@ -31,10 +31,10 @@ const BASE_WIDTH = 84
 /**
  * メールの構成の見取り図。ヘッダー、お知らせ帯、ヒーロー(ヘッドラインの見せ方・ボタン)、各セクション、フッターを、
  * 実際のメールに近い縦横比で描く(縦長になる)。free は、自由な並びを示す。
- * width で大きく描ける(管理画面のプレビュー用)。maxHeight を指定すると、上の部分だけを見せて、下をぼかす(一覧用)。
+ * width で大きく描ける(管理画面のプレビュー用)。
  * CSS の zoom ではなく寸法を掛け算するのは、zoom だと枠の幅の計算がずれるため
  */
-export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHeight }: { layout: TemplateLayout; free?: boolean; width?: number; maxHeight?: number }) {
+function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateLayout; free?: boolean; width?: number }) {
   const s = useStyles()
   const t = useT()
   const k = width / BASE_WIDTH
@@ -185,7 +185,7 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
   }
 
   return (
-    <div className={s.thumb} style={{ width, ...(maxHeight ? { maxHeight } : {}) }}>
+    <div className={s.thumb} style={{ width }}>
       <div className={s.body} style={{ padding: px(3), rowGap: px(3) }}>
         <div style={{ height: px(5), background: '#222' }} />
         {layout.topBar && <div style={{ height: px(4), background: '#555' }} />}
@@ -198,7 +198,43 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
         )}
         <div style={{ height: px(12), background: PANEL, marginTop: px(4) }} />
       </div>
-      {maxHeight && <div className={s.fade} style={{ height: px(20) }} />}
     </div>
+  )
+}
+
+/** 全体が、高さ maxHeight に収まるように、縮小して描く(切り取らない)。縮小は transform(寸法は、縮小後の大きさで確保する) */
+function FitThumb({ layout, free, width, maxHeight }: { layout: TemplateLayout; free: boolean; width: number; maxHeight: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [natural, setNatural] = useState(0)
+  useLayoutEffect(() => {
+    if (ref.current) setNatural(ref.current.offsetHeight)
+  }, [layout, free, width])
+  const scale = natural > 0 ? Math.min(1, maxHeight / natural) : 1
+  return (
+    <div style={{ flexShrink: 0, width: Math.round(width * scale), height: natural > 0 ? Math.round(natural * scale) : undefined }}>
+      <div ref={ref} style={{ width, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+        <Thumb layout={layout} free={free} width={width} />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * メールの構成の見取り図。maxHeight を指定すると(一覧用)、全体が、その高さに収まるように縮小して見せる。
+ * zoom を付けると、マウスを重ねたときに、大きい見取り図を、横に表示する。
+ */
+export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHeight, zoom = false }: { layout: TemplateLayout; free?: boolean; width?: number; maxHeight?: number; zoom?: boolean }) {
+  const small = maxHeight ? <FitThumb layout={layout} free={free} width={width} maxHeight={maxHeight} /> : <Thumb layout={layout} free={free} width={width} />
+  if (!zoom) return small
+  return (
+    <Tooltip
+      relationship="description"
+      positioning="after"
+      showDelay={150}
+      withArrow
+      content={{ children: <FitThumb layout={layout} free={free} width={190} maxHeight={560} />, style: { maxWidth: 'none', padding: 6 } }}
+    >
+      <div style={{ flexShrink: 0 }}>{small}</div>
+    </Tooltip>
   )
 }

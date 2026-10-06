@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { Avatar, Badge, Field, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Field, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ReOrderDotsVerticalRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
+import { ImageThumb } from './ImageThumb'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { productMarket } from './market'
 import { SOURCE_AI, yen } from './items'
@@ -41,8 +42,6 @@ const useStyles = makeStyles({
   rowDim: { opacity: 0.8 },
   rowDraggable: { cursor: 'grab' },
   dragIcon: { alignSelf: 'center', marginLeft: '-4px', marginRight: '-4px', color: tokens.colorNeutralForegroundDisabled, flexShrink: 0 },
-  avatar: { flexShrink: 0, height: '44px', width: '44px', borderRadius: tokens.borderRadiusMedium },
-  avatarWide: { width: '72px', height: '40px' },
   rowBody: { flexGrow: 1, minWidth: 0, display: 'grid', rowGap: '2px' },
   noWrap: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   rowActions: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', flexShrink: 0 },
@@ -118,7 +117,7 @@ export function Row({ image, wide, title, meta, reason, onReason, source, badge,
       className={mergeClasses(s.row, selected && s.rowSelected, highlight && s.rowHighlight, dim && s.rowDim, drag?.draggable && s.rowDraggable, onClick && !drag?.draggable && s.rowClickable)}
     >
       {drag?.draggable && <ReOrderDotsVerticalRegular className={s.dragIcon} />}
-      <Avatar shape="square" image={{ src: image, alt: title }} name={title} className={mergeClasses(s.avatar, wide && s.avatarWide)} />
+      <ImageThumb src={image} alt={title} width={wide ? 80 : 56} height={72} />
       <div className={s.rowBody}>
         <div className={s.flexRowTight}>
           <Text weight="semibold" size={300}>{title}</Text>

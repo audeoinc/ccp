@@ -316,7 +316,7 @@ export function TemplateManager() {
 
   const renderItem = (o: (typeof options)[number]) => (
     <div key={o.id} className={mergeClasses(s.item, !editing && o.id === selected?.id && s.itemSelected)} onClick={() => choose(o.id)} role="button" tabIndex={0}>
-      <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={150} />
+      <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={150} zoom />
       <div className={s.itemText}>
         <span className={s.itemName}>{o.label}</span>
         <span className={mergeClasses(s.caption, s.clamp)} title={o.description}>{o.description}</span>
