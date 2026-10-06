@@ -23,6 +23,33 @@ class ImporterTest(unittest.TestCase):
         edge = im.product_code("f" * 40, set())
         self.assertRegex(edge, r"^4\d{5}$")
 
+    def test_jp_uses_the_us_images_when_the_jp_folder_is_empty(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            (base / "products" / "us").mkdir(parents=True)
+            (base / "products" / "jp").mkdir(parents=True)
+            (base / "products" / "us" / "b.png").write_bytes(b"1")
+            (base / "products" / "us" / "a.png").write_bytes(b"2")
+            got = im.list_images(base)
+            self.assertEqual([p.name for p in got["products/jp"]], ["a.png", "b.png"])  # 共有(名前順)
+            self.assertEqual([p.name for p in got["products/us"]], ["a.png", "b.png"])
+            # JP 用のフォルダに画像があれば、そちらを使う
+            (base / "products" / "jp" / "x.png").write_bytes(b"3")
+            self.assertEqual([p.name for p in im.list_images(base)["products/jp"]], ["x.png"])
+
+    def test_same_image_gets_different_digests_per_market(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "a.png"
+            f.write_bytes(b"image-bytes")
+            us, jp = im.digest_for(f, "products/us"), im.digest_for(f, "products/jp")
+            self.assertNotEqual(us, jp)
+            self.assertEqual(us, im.digest_for(f, "products/us"))
+            self.assertNotEqual(im.product_code(us, set()), im.product_code(jp, set()))
+
     def test_hero_codes(self) -> None:
         self.assertEqual(im.code_for("heroes/jp", 2), "H03")
         self.assertEqual(im.code_for("heroes/us", 19), "UH20")

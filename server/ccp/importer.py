@@ -3,6 +3,7 @@
 置き場所(リポジトリには入れない。.gitignore 済み):
   import/products/jp/*  import/products/us/*   商品の画像(日本向け / US 向け)
   import/heroes/jp/*    import/heroes/us/*     メイン(ヒーロー)画像
+  jp のフォルダが空なら、us の画像を日本向けにも使う(画像が共通のとき。日本語の名前・説明で、別の商品として作る)。
   jpg / png / webp / avif。商品コードは、6 桁の数字(4 から始まる。画像の内容から決まる)。ヒーロー画像は、ファイル名の順に H01.. / UH01..
 
 手順(それぞれ、結果を import/out/ に残す。やり直しても、解析済みの画像は、再度 Gemini に頼まない):
@@ -67,15 +68,32 @@ def load_enums() -> dict[str, dict[str, int]]:
 
 # ---------------------------------------------------------------- 画像の一覧
 def list_images(base: Path, only: str | None = None) -> dict[str, list[Path]]:
-    """画像の一覧(グループごと)。only='us' / 'jp' なら、その市場のグループだけ"""
-    groups = {"products/jp": "P", "products/us": "U", "heroes/jp": "H", "heroes/us": "UH"}
+    """画像の一覧(グループごと)。only='us' / 'jp' なら、その市場のグループだけ。
+
+    jp のフォルダが空なら、同じ種類の us のフォルダの画像を、日本向けにも使う(画像が、US / JP 共通のとき。
+    日本向けは、同じ画像から、日本語の名前・説明で、別の商品・ヒーロー画像として作る)。
+    """
+    groups = ["products/jp", "products/us", "heroes/jp", "heroes/us"]
     out: dict[str, list[Path]] = {}
+
+    def files(g: str) -> list[Path]:
+        d = base / g
+        return sorted([p for p in d.glob("*") if p.suffix.lower() in IMG_EXT], key=lambda p: p.name.lower()) if d.is_dir() else []
+
     for g in groups:
         if only and not g.endswith(f"/{only}"):
             continue
-        d = base / g
-        out[g] = sorted([p for p in d.glob("*") if p.suffix.lower() in IMG_EXT], key=lambda p: p.name.lower()) if d.is_dir() else []
+        found = files(g)
+        if not found and g.endswith("/jp"):
+            found = files(g[: -len("/jp")] + "/us")  # 共通の画像
+        out[g] = found
     return out
+
+
+def digest_for(path: Path, group: str) -> str:
+    """解析結果・商品コードの元になる値。US は画像の内容のハッシュ。JP は、それに市場の印を足したもの(同じ画像でも、別の商品にするため)"""
+    h = hashlib.sha1(path.read_bytes()).hexdigest()
+    return hashlib.sha1((h + ":jp").encode()).hexdigest() if group.endswith("/jp") else h
 
 
 def product_code(digest: str, used: set[str]) -> str:
@@ -168,7 +186,7 @@ def cmd_analyze(base: Path, out: Path) -> None:
     todo: list[tuple[str, Path, str]] = []
     for group, paths in list_images(base).items():
         for p in paths:
-            key = hashlib.sha1(p.read_bytes()).hexdigest()
+            key = digest_for(p, group)
             if key not in cache:
                 todo.append((group, p, key))
     print(f"解析する画像: {len(todo)} 点(解析済み: {len(cache)} 点)")
@@ -268,7 +286,7 @@ def cmd_build(base: Path, out: Path, only: str | None = None) -> None:
         us = group.endswith("/us")
         market = enums["market"]["US" if us else "JP"]
         for i, p in enumerate(paths):
-            key = hashlib.sha1(p.read_bytes()).hexdigest()
+            key = digest_for(p, group)
             a = cache.get(key)
             if a is None:
                 print(f"  未解析: {p} (先に analyze を実行してください)")
