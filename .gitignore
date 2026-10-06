@@ -26,3 +26,6 @@ dist-ssr
 dist-gcp/
 server/.venv/
 __pycache__/
+
+# 取り込む画像(権利のある素材。公開リポジトリには入れない)と、取り込みの作業ファイル
+/import/

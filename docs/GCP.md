@@ -118,6 +118,35 @@ gcloud scheduler jobs create http ccp-idle-check --project <プロジェクトID
 
 **DB の自動起動**: 画面が `/api/data` を呼んだとき DB が停止中なら、サーバーが起動を依頼して 503(`db_starting`)を返し、画面に「準備中」を出す(**実測で 10〜13 分**。準備ができると自動で読み込み直す)。手動で止める・起動するときは、`gcloud sql instances patch contents-planner-db --activation-policy=NEVER`(停止)/ `ALWAYS`(起動)。
 
+## 画像の差し替え(商品・ヒーロー画像)
+
+GCP 版だけの機能。用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。
+画像は **Git には入れない**(公開リポジトリのため。`import/` は `.gitignore` 済み)。GCS のバケット(`images/products/…`、`images/heroes/…`)に置き、サーバーの `/img/…` が配信する(バケットは非公開で、サイトと同じ Basic 認証がかかる)。DB の画像 URL は `/img/products/P01.jpg` の形。
+
+**置き場所**(アプリのルートの `import/`。jpg / png / webp。ファイル名の順に、コードを付ける)
+
+| フォルダ | コード | 想定の点数 |
+|---|---|---|
+| `import/products/jp/` | P01〜 | 30 |
+| `import/products/us/` | U01〜 | 30 |
+| `import/heroes/jp/` | H01〜 | 20 |
+| `import/heroes/us/` | UH01〜 | 20 |
+
+**手順**(`server/` で、手元の環境変数を設定してから。`pip install -r requirements-tools.txt` が、初回に必要)
+
+```bash
+python -m ccp.importer analyze         # Gemini が画像を見て、名前・カテゴリ・季節・天候・説明(ヒーローは、用途・季節・タグ・説明)を作る
+python -m ccp.importer build           # 価格・在庫・売上・評価・週次実績・販売方針を、デモ用に作って、import/out/data.json に組み立てる(ここで内容を確認・修正できる)
+python -m ccp.importer upload          # 画像を縮小(商品 1000px・ヒーロー 1920px)して、GCS に置く
+python -m ccp.importer apply           # 置き換える内容の確認だけ
+python -m ccp.importer apply --yes     # DB の、商品・ヒーロー画像・週次実績・販売方針を置き換える
+```
+
+- 日本向けは日本語、US 向けは英語で、名前・説明を作る。カテゴリ・季節・天候・用途は、アプリの選択肢(カテゴリ 7 種、季節は 秋 / 冬 / 秋冬 / 通年、天候は 晴れ / 雨の日 / 寒い日、用途は 新作 / 特集 / セール / 会員 / イベント)から選ぶ。
+- 画像から分からない数値(価格・在庫・売上トレンド・評価・週次実績・販売方針)は、**デモ用の値**を、コードごとに決まった乱数で作る(同じ入力なら、同じ結果)。
+- 解析した結果は `import/out/analysis.json` に残り、画像を足して再実行しても、解析済みの画像は、再度 Gemini に頼まない。
+- `apply` は、配信カードの**商品の選択**(`delivery_products`)と、**メイン画像の選択**も外す(カードの文章・日時・状態はそのまま)。元の初期データに戻すときは `python -m ccp.cli seed --reset`。
+
 ## 進み具合
 
 | 段階 | 内容 | 状態 |
