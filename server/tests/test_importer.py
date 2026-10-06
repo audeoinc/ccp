@@ -12,9 +12,18 @@ from ccp import importer as im  # noqa: E402
 
 
 class ImporterTest(unittest.TestCase):
-    def test_codes(self) -> None:
-        self.assertEqual(im.code_for("products/jp", 0), "P01")
-        self.assertEqual(im.code_for("products/us", 11), "U12")
+    def test_product_codes_are_six_digits_starting_with_4_and_stable(self) -> None:
+        used: set[str] = set()
+        a = im.product_code("ab" * 20, used)
+        self.assertRegex(a, r"^4\d{5}$")
+        self.assertEqual(im.product_code("ab" * 20, set()), a)  # 同じ画像 → 同じコード
+        b = im.product_code("ab" * 20, used)  # 重なったら、次の番号
+        self.assertNotEqual(a, b)
+        self.assertRegex(b, r"^4\d{5}$")
+        edge = im.product_code("f" * 40, set())
+        self.assertRegex(edge, r"^4\d{5}$")
+
+    def test_hero_codes(self) -> None:
         self.assertEqual(im.code_for("heroes/jp", 2), "H03")
         self.assertEqual(im.code_for("heroes/us", 19), "UH20")
 

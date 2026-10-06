@@ -3,7 +3,7 @@
 置き場所(リポジトリには入れない。.gitignore 済み):
   import/products/jp/*  import/products/us/*   商品の画像(日本向け / US 向け)
   import/heroes/jp/*    import/heroes/us/*     メイン(ヒーロー)画像
-  jpg / png / webp。ファイル名の順に、P01.. / U01.. / H01.. / UH01.. のコードを付ける。
+  jpg / png / webp。商品コードは、6 桁の数字(4 から始まる。画像の内容から決まる)。ヒーロー画像は、ファイル名の順に H01.. / UH01..
 
 手順(それぞれ、結果を import/out/ に残す。やり直しても、解析済みの画像は、再度 Gemini に頼まない):
   python -m ccp.importer analyze          Gemini が画像を見て、名前・カテゴリ・季節・説明などを作る
@@ -73,6 +73,17 @@ def list_images(base: Path) -> dict[str, list[Path]]:
         d = base / g
         out[g] = sorted([p for p in d.glob("*") if p.suffix.lower() in IMG_EXT], key=lambda p: p.name.lower()) if d.is_dir() else []
     return out
+
+
+def product_code(digest: str, used: set[str]) -> str:
+    """商品コード: 6 桁の数字で、4 から始まる(400000〜499999)。画像の内容(ハッシュ)から決まるので、画像を足しても、既存のコードは変わらない"""
+    n = int(digest, 16) % 100000
+    while True:
+        code = f"4{n:05d}"
+        if code not in used:
+            used.add(code)
+            return code
+        n = (n + 1) % 100000  # 重なったときは、次の番号
 
 
 def code_for(group: str, index: int) -> str:
@@ -237,6 +248,7 @@ def cmd_build(base: Path, out: Path) -> None:
     policies: list[dict[str, Any]] = []
     manifest: list[dict[str, Any]] = []
     missing = 0
+    used_codes: set[str] = set()
     for group, paths in list_images(base).items():
         us = group.endswith("/us")
         market = enums["market"]["US" if us else "JP"]
@@ -247,8 +259,8 @@ def cmd_build(base: Path, out: Path) -> None:
                 print(f"  未解析: {p} (先に analyze を実行してください)")
                 missing += 1
                 continue
-            code = code_for(group, i)
             kind = "products" if group.startswith("products") else "heroes"
+            code = product_code(key, used_codes) if kind == "products" else code_for(group, i)
             url = f"/img/{kind}/{code}.jpg"
             manifest.append({"src": str(p), "kind": kind, "code": code})
             rng = random.Random(f"ccp-import:{code}")

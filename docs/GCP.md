@@ -121,16 +121,18 @@ gcloud scheduler jobs create http ccp-idle-check --project <プロジェクトID
 ## 画像の差し替え(商品・ヒーロー画像)
 
 GCP 版だけの機能。用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。
-画像は **Git には入れない**(公開リポジトリのため。`import/` は `.gitignore` 済み)。GCS のバケット(`images/products/…`、`images/heroes/…`)に置き、サーバーの `/img/…` が配信する(バケットは非公開で、サイトと同じ Basic 認証がかかる)。DB の画像 URL は `/img/products/P01.jpg` の形。
+画像は **Git には入れない**(公開リポジトリのため。`import/` は `.gitignore` 済み)。GCS のバケット(`images/products/…`、`images/heroes/…`)に置き、サーバーの `/img/…` が配信する(バケットは非公開で、サイトと同じ Basic 認証がかかる)。DB の画像 URL は `/img/products/417352.jpg` の形。
 
 **置き場所**(アプリのルートの `import/`。jpg / png / webp。ファイル名の順に、コードを付ける)
 
 | フォルダ | コード | 想定の点数 |
 |---|---|---|
-| `import/products/jp/` | P01〜 | 30 |
-| `import/products/us/` | U01〜 | 30 |
-| `import/heroes/jp/` | H01〜 | 20 |
-| `import/heroes/us/` | UH01〜 | 20 |
+| `import/products/jp/` | 6 桁の数字(4 から始まる。例: 417352) | 30 |
+| `import/products/us/` | 同上 | 30 |
+| `import/heroes/jp/` | H01〜(ファイル名の順) | 20 |
+| `import/heroes/us/` | UH01〜(ファイル名の順) | 20 |
+
+商品コードは、画像の内容から決まる(同じ画像なら、同じコード。画像を足しても、既存のコードは変わらない。重なったときは、次の番号)。
 
 **手順**(`server/` で、手元の環境変数を設定してから。`pip install -r requirements-tools.txt` が、初回に必要)
 
