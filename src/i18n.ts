@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-// 画面の言語(日本語 / English)。ブラウザごとに保存し、初期値はブラウザの言語。
+// 画面の言語(日本語 / English)。ブラウザごとに保存し、初期値はビルドの設定(VITE_DEFAULT_LANG)、なければブラウザの言語。
 // 文言は、その場に「日本語, English」の組で書く: tr('保存', 'Save')。React の外(AI の処理など)でも使える。
 export type Lang = 'ja' | 'en'
 
@@ -13,6 +13,9 @@ function detect(): Lang {
   } catch {
     // 保存を読めないときは、ブラウザの言語に従う
   }
+  // ビルドの設定(GCP 版は English)があれば、それを初期値にする。なければ、ブラウザの言語
+  const preset = import.meta.env.VITE_DEFAULT_LANG
+  if (preset === 'ja' || preset === 'en') return preset
   return navigator.language?.toLowerCase().startsWith('ja') ? 'ja' : 'en'
 }
 

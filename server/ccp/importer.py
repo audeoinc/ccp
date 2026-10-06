@@ -11,6 +11,7 @@
   python -m ccp.importer upload           画像を縮小して、GCS に置く(images/products/<コード>.jpg など)
   python -m ccp.importer apply --yes      DB の、商品・ヒーロー画像・週次実績・販売方針を置き換える(配信カードの、商品の選択も外す)
   python -m ccp.importer all --yes        上の 4 つを続けて実行
+  --only us / --only jp                  build と apply で、その市場の画像・データだけを扱う(もう一方の市場は、そのまま)
 
 画像から分かるのは、見た目の情報だけ(名前・カテゴリ・季節・天候・説明)。価格・在庫・売上・評価・販売方針は、
 カテゴリと売上トレンドに合う、もっともらしいデモ用の値を、コードごとに決まった乱数で作る(同じ入力なら、同じ結果)。
@@ -65,10 +66,13 @@ def load_enums() -> dict[str, dict[str, int]]:
 
 
 # ---------------------------------------------------------------- 画像の一覧
-def list_images(base: Path) -> dict[str, list[Path]]:
+def list_images(base: Path, only: str | None = None) -> dict[str, list[Path]]:
+    """画像の一覧(グループごと)。only='us' / 'jp' なら、その市場のグループだけ"""
     groups = {"products/jp": "P", "products/us": "U", "heroes/jp": "H", "heroes/us": "UH"}
     out: dict[str, list[Path]] = {}
     for g in groups:
+        if only and not g.endswith(f"/{only}"):
+            continue
         d = base / g
         out[g] = sorted([p for p in d.glob("*") if p.suffix.lower() in IMG_EXT], key=lambda p: p.name.lower()) if d.is_dir() else []
     return out
@@ -246,11 +250,11 @@ def weekly_rows(rng: random.Random, code: str, category: str, price: float, stoc
     rows = []
     for i, w in enumerate(WEEKS):
         stock = stock_now + sum(units[i + 1 :])  # 今の在庫から、さかのぼる(週ごとに、売れた分だけ減っている)
-        rows.append({"cr854_name": f"{code} {w.isoformat()}", "cr854_productcode": code, "cr854_weekstart": w.isoformat(), "cr854_units": units[i], "cr854_revenue": round(units[i] * price, 2), "cr854_stock": stock})
+        rows.append({"cr854_weeklyperformanceid": str(uuid.uuid5(NS, f"weekly:{code}:{w.isoformat()}")), "cr854_name": f"{code} {w.isoformat()}", "cr854_productcode": code, "cr854_weekstart": w.isoformat(), "cr854_units": units[i], "cr854_revenue": round(units[i] * price, 2), "cr854_stock": stock})
     return rows
 
 
-def cmd_build(base: Path, out: Path) -> None:
+def cmd_build(base: Path, out: Path, only: str | None = None) -> None:
     enums = load_enums()
     cache = json.loads((out / "analysis.json").read_text(encoding="utf-8"))
     products: list[dict[str, Any]] = []
@@ -260,7 +264,7 @@ def cmd_build(base: Path, out: Path) -> None:
     manifest: list[dict[str, Any]] = []
     missing = 0
     used_codes: set[str] = set()
-    for group, paths in list_images(base).items():
+    for group, paths in list_images(base, only).items():
         us = group.endswith("/us")
         market = enums["market"]["US" if us else "JP"]
         for i, p in enumerate(paths):
@@ -353,7 +357,7 @@ def cmd_upload(out: Path) -> None:
 
 
 # ---------------------------------------------------------------- 4. DB の置き換え
-async def cmd_apply(out: Path, yes: bool) -> None:
+async def cmd_apply(out: Path, yes: bool, only: str | None = None) -> None:
     from sqlalchemy import text
 
     from . import schema as sc
@@ -361,18 +365,36 @@ async def cmd_apply(out: Path, yes: bool) -> None:
 
     data = json.loads((out / "data.json").read_text(encoding="utf-8"))
     schema = sc.load()
+    enums = load_enums()
+    market = enums["market"]["US" if only == "us" else "JP"] if only else None
+    if only:
+        # --only で作ったデータ(その市場だけ)かを確かめる(別の市場を、巻き込んで消さないため)
+        for dv in ("cr854_products", "cr854_heroimages"):
+            if any(r["cr854_market"] != market for r in data.get(dv, [])):
+                raise SystemExit(f"data.json に、{only.upper()} 以外の市場のデータがあります。build --only {only} でやり直してください")
     counts = ", ".join(f"{schema.table(k).pg} {len(v)} 件" for k, v in data.items())
-    print(f"置き換える内容: {counts}")
-    print("あわせて、配信カードの、商品の選択(delivery_products)と、メイン画像の選択を外します(カードの文章・日時などは、そのまま)")
+    scope = f"{only.upper()} 向けだけ" if only else "全市場"
+    print(f"置き換える範囲: {scope}")
+    print(f"新しい内容: {counts}")
+    print(f"あわせて、{scope}の商品・メイン画像を選んでいる配信カードの、選択を外します(カードの文章・日時・状態は、そのまま)")
     if not yes:
         print("--yes を付けると、実行します(いまは、確認だけ)")
         return
     engine = await get_engine()
     async with engine.begin() as conn:
-        await conn.execute(text("DELETE FROM delivery_products"))
-        await conn.execute(text("UPDATE delivery_cards SET hero_image_id = NULL, hero_reason = NULL, modified_on = now()"))
-        for dv in ("cr854_weeklyperformances", "cr854_productpolicies", "cr854_products", "cr854_heroimages"):
-            await conn.execute(text(f"DELETE FROM {schema.table(dv).pg}"))
+        if only:
+            p = {"m": market}
+            await conn.execute(text("DELETE FROM delivery_products WHERE product_id IN (SELECT id FROM products WHERE market = :m)"), p)
+            await conn.execute(text("UPDATE delivery_cards SET hero_image_id = NULL, hero_reason = NULL, modified_on = now() WHERE hero_image_id IN (SELECT id FROM hero_images WHERE market = :m)"), p)
+            await conn.execute(text("DELETE FROM weekly_performances WHERE product_code IN (SELECT product_code FROM products WHERE market = :m)"), p)
+            await conn.execute(text("DELETE FROM product_policies WHERE product_code IN (SELECT product_code FROM products WHERE market = :m)"), p)
+            await conn.execute(text("DELETE FROM products WHERE market = :m"), p)
+            await conn.execute(text("DELETE FROM hero_images WHERE market = :m"), p)
+        else:
+            await conn.execute(text("DELETE FROM delivery_products"))
+            await conn.execute(text("UPDATE delivery_cards SET hero_image_id = NULL, hero_reason = NULL, modified_on = now()"))
+            for dv in ("cr854_weeklyperformances", "cr854_productpolicies", "cr854_products", "cr854_heroimages"):
+                await conn.execute(text(f"DELETE FROM {schema.table(dv).pg}"))
         for dv in ("cr854_heroimages", "cr854_products", "cr854_weeklyperformances", "cr854_productpolicies"):
             t = schema.table(dv)
             for rec in data.get(dv, []):
@@ -389,6 +411,7 @@ def main() -> None:
     p.add_argument("step", choices=["analyze", "build", "upload", "apply", "all"])
     p.add_argument("--dir", default=str(ROOT / "import"), help="画像のフォルダ(既定: アプリのルートの import/)")
     p.add_argument("--yes", action="store_true", help="apply で、DB を実際に置き換える")
+    p.add_argument("--only", choices=["jp", "us"], help="その市場の画像・データだけを扱う(build / apply)。もう一方の市場のデータは、そのまま残す")
     args = p.parse_args()
     base = Path(args.dir)
     out = base / "out"
@@ -397,11 +420,11 @@ def main() -> None:
         if s == "analyze":
             cmd_analyze(base, out)
         elif s == "build":
-            cmd_build(base, out)
+            cmd_build(base, out, args.only)
         elif s == "upload":
             cmd_upload(out)
         else:
-            asyncio.run(cmd_apply(out, args.yes))
+            asyncio.run(cmd_apply(out, args.yes, args.only))
 
 
 if __name__ == "__main__":

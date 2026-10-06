@@ -26,6 +26,11 @@ export const ${name} = makeAiRequestService()
 
 export default defineConfig({
   plugins: [gcpServices(), react()],
+  // GCP 版の、開いたときの初期値(Power Apps 版には、影響しない)。国の絞り込みは US、画面の言語は English
+  define: {
+    'import.meta.env.VITE_DEFAULT_COUNTRY': JSON.stringify('US'),
+    'import.meta.env.VITE_DEFAULT_LANG': JSON.stringify('en'),
+  },
   build: {
     outDir: 'dist-gcp',
     // Power Apps 版と同じ(SVG は、アプリの中に埋め込む)

@@ -47,6 +47,7 @@ class ImporterTest(unittest.TestCase):
         rows = im.weekly_rows(random.Random("x"), "P01", "アウター", 9800, 120, "上昇")
         self.assertEqual(len(rows), len(im.WEEKS))
         self.assertEqual(rows[-1]["cr854_stock"], 120)
+        self.assertEqual(len({r["cr854_weeklyperformanceid"] for r in rows}), len(rows))  # 行ごとに、別の ID
         for a, b in zip(rows, rows[1:]):
             self.assertEqual(a["cr854_stock"] - b["cr854_units"], b["cr854_stock"])
         self.assertEqual(rows[0]["cr854_revenue"], rows[0]["cr854_units"] * 9800)

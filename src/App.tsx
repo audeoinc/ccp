@@ -41,6 +41,11 @@ interface Filters {
   status: string
 }
 const noFilter: Filters = { country: '', channel: '', department: '', status: '' }
+// 開いたときの絞り込み: ビルドの設定(VITE_DEFAULT_COUNTRY。GCP 版は US)の国。なければ、絞り込まない
+const initialFilters: Filters = {
+  ...noFilter,
+  country: String(countryOptions.find((o) => o.label === import.meta.env.VITE_DEFAULT_COUNTRY)?.value ?? ''),
+}
 
 const useStyles = makeStyles({
   header: {
@@ -219,7 +224,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [month, setMonth] = useState<Date | null>(null)
-  const [filters, setFilters] = useState<Filters>(noFilter)
+  const [filters, setFilters] = useState<Filters>(initialFilters)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
