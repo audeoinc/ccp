@@ -106,7 +106,7 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1   --allow-unauthenticated --concurrency=8 --max-instances=1 --min-instances=0 --memory=512Mi --cpu=1 --timeout=300   --service-account=<実行サービスアカウント>   --set-env-vars "GOOGLE_CLOUD_PROJECT=<プロジェクトID>,GOOGLE_CLOUD_LOCATION=global,GEMINI_MODEL=gemini-3.8-flash,GEMINI_THINKING=low,CLOUD_SQL_INSTANCE=<プロジェクトID>:asia-northeast1:contents-planner-db,DB_USER=ccp_app,DB_NAME=ccp,DB_CONTROL=1,DB_IDLE_MINUTES=30,STATE_BUCKET=<バケット名>,IDLE_CHECK_AUDIENCE=<サービスの URL>,IDLE_CHECK_SA_EMAIL=ccp-scheduler@<プロジェクトID>.iam.gserviceaccount.com"   --set-secrets "DB_PASSWORD=contents-planner-db-app-password:latest,APP_PASSWORD=contents-planner-app-password:latest"
 ```
 
-2 回目以降は、環境変数とシークレットが残るので、`gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1` だけでよい(コードを変えても、Cloud Run は自動では更新されない)。
+チームメンバーが反映する手順(権限と、`npm run deploy:gcp`)は、[ONBOARDING.md](ONBOARDING.md) の「GCP 版への反映」。2 回目以降は、環境変数とシークレットが残るので、`gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1` だけでよい(コードを変えても、Cloud Run は自動では更新されない)。
 
 **自動停止(Cloud Scheduler)**: 数分おきに `/internal/idle-check` を、Scheduler 用のサービスアカウントの署名つきトークン(OIDC。宛先はサービスの URL)で呼ぶ。サーバーが、最後のアクセスから `DB_IDLE_MINUTES`(既定 30)分たっていれば、DB の停止を依頼する。
 

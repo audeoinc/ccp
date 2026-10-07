@@ -87,6 +87,30 @@ GitHub の**非公開**リポジトリ(`audeoinc/ccp`)。ただし、参加者�
 - 自動で反映しない理由: `pa` CLI のサインインは、ブラウザ(または端末コード)でのユーザーのサインインのみで、サービスアカウントでの自動サインインがないため。
 - 利用者に見せるデモの直前は、反映しない期間(凍結)を決めておく。
 
+**GCP 版への反映(`npm run deploy:gcp`)**
+- 対象は、Cloud Run のサービス `contents-planner`(GCP 版)。Power Apps 版(`npm run deploy`)とは別で、**それぞれ、反映する**。
+- `npm run deploy` と同じ安全装置: `main` にいて、リモートと同じで、未コミットの変更がないときだけ動く。型チェック・lint・GCP 版のビルドを通してから、`gcloud run deploy`(クラウドでビルド。数分かかる)で反映し、**タグ `deployed-gcp/日時`** を GitHub に送る。
+- 環境変数・シークレット(DB のパスワードなど)は、サービスに設定済みで、再反映でも引き継がれる(変えるときは、[GCP.md](GCP.md))。
+- **事前に必要なこと**:
+  1. **gcloud CLI** をインストールする(https://cloud.google.com/sdk/docs/install)。
+  2. `gcloud auth login` で、Google アカウントにサインインする。
+  3. `gcloud config set project <プロジェクトID>`(プロジェクト ID は、管理者に聞く。リポジトリには書かない)。
+- **反映する人に必要な権限**(プロジェクトの管理者が、**その人の Google アカウント**に付ける)。`<…>` は、管理者に聞く値:
+  ```bash
+  # サービスの更新(このサービスだけに限定。営業支援など、ほかのサービスには、触れない)
+  gcloud run services add-iam-policy-binding contents-planner --region asia-northeast1 --project <プロジェクトID> --member="user:<メールアドレス>" --role="roles/run.admin"
+  # クラウドでのビルド・イメージの保存
+  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/cloudbuild.builds.editor"
+  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/artifactregistry.writer"
+  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/storage.objectAdmin"
+  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/serviceusage.serviceUsageConsumer"
+  # サービスが動くときのサービスアカウントとして、反映する権限
+  gcloud iam service-accounts add-iam-policy-binding <実行サービスアカウント> --project <プロジェクトID> --member="user:<メールアドレス>" --role="roles/iam.serviceAccountUser"
+  ```
+  最初の反映で、権限が足りないと、エラーに、足りない権限の名前が出る。その権限を、同じ要領で足す。
+- 反映の履歴は、`git tag --list "deployed-gcp/*"` で見られる。
+- DB は、普段は停止している(毎日 21:00 に停止。アクセスで自動起動、約 11 分)。反映のときは、DB が停止していても、問題ない。
+
 **Dataverse(テーブル・列・フロー)を変えるとき**
 - テーブルや列の変更は、環境全体に効く。変更の前に、チームに知らせる。
 - 変更したら、`npx pa app add data-source --connector dataverse --table <論理名> --org-url <組織の URL>` で、生成コード(`src/generated/`)を更新し、**その差分もコミットする**。
