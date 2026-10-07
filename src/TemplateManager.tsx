@@ -21,15 +21,69 @@ import {
 import { AddRegular, ArrowDownRegular, ArrowUpRegular, CopyRegular, DeleteRegular, DismissRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { useT } from './i18n'
-import { MAX_SECTIONS, MAX_SLOTS, deleteTemplate, fitSlots, saveTemplate } from './layoutTemplates'
+import { MAX_BUTTON_BLOCKS, MAX_BUTTON_LABEL, MAX_SECTIONS, MAX_SLOTS, deleteTemplate, fitSlots, saveTemplate } from './layoutTemplates'
 import { TemplateThumb } from './TemplateThumb'
-import { gridColumns, sectionKindLabel, setTemplateManagerOpen, slotStep, templateOptions, useTemplateManagerOpen, useTemplates, type HeroKind, type HeroText, type Section, type TemplateLayout } from './templates'
+import {
+  LINK_KINDS,
+  MAX_BUTTONS_PER_BLOCK,
+  buttonsAt,
+  defaultButtonLabel,
+  gridColumns,
+  linkKindLabel,
+  newButtonId,
+  placedButtons,
+  sectionKindLabel,
+  setTemplateManagerOpen,
+  slotStep,
+  templateOptions,
+  useTemplateManagerOpen,
+  useTemplates,
+  type ButtonBlock,
+  type ButtonSpec,
+  type HeroKind,
+  type HeroText,
+  type LinkKind,
+  type Section,
+  type TemplateLayout,
+} from './templates'
 
-interface Draft extends TemplateLayout {
+/**
+ * 編集中の構成は、上から順の部品(セクション・ボタン)の並びで持つ。
+ * 保存するときに、セクションの並び(商品の枠の計算に使う)と、ボタンの置く位置(at)に分ける。
+ * key は、並べ替えても入力欄の状態が入れ替わらないようにするための、画面だけの ID
+ */
+type Part = { key: string; type: 'section'; sec: Section } | { key: string; type: 'buttons'; buttons: ButtonSpec[] }
+
+interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'heroLink'> {
   /** 保存済みの行の ID(新規は undefined) */
   id?: string
   name: string
   description: string
+  parts: Part[]
+}
+
+let partSeq = 0
+const partKey = () => `p${++partSeq}`
+
+/**
+ * テンプレートを、部品の並びに直す。以前の形のボタン(ヒーローのボタンの数、セクションの後のボタンの数)は、
+ * ここで独立したボタンの部品に置き換える(保存すると、以後は部品として持つ)
+ */
+function toParts(layout: TemplateLayout): Part[] {
+  const blocks = placedButtons(layout)
+  const at = (i: number): Part[] => buttonsAt(blocks, i, layout.sections.length).map((buttons) => ({ key: partKey(), type: 'buttons', buttons: buttons.map((x) => ({ ...x })) }))
+  return [...at(0), ...layout.sections.flatMap((sec, i): Part[] => [{ key: partKey(), type: 'section', sec: { ...sec, buttons: undefined } }, ...at(i + 1)])]
+}
+
+/** 部品の並びから、保存・見取り図に使う構成を作る */
+function fromParts(d: Draft): TemplateLayout {
+  const sections: Section[] = []
+  const buttonBlocks: ButtonBlock[] = []
+  for (const p of d.parts) {
+    if (p.type === 'section') sections.push(p.sec)
+    else if (p.buttons.length > 0) buttonBlocks.push({ at: sections.length, buttons: p.buttons })
+  }
+  return { hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections, buttonBlocks }
 }
 
 /**
@@ -57,27 +111,48 @@ const layoutSection = (v: SectionLayout): Section => {
 }
 const layoutPatch = (v: SectionLayout, sec: Section): Section => {
   const next = layoutSection(v)
-  // 種類だけを変える。見出し・ボタンは、そのまま残す
-  return { ...next, categoryHeading: sec.categoryHeading, buttons: sec.buttons }
+  // 並び方だけを変える。見出し・コピーの設定は、そのまま残す
+  return { ...next, categoryHeading: sec.categoryHeading, copy: sec.copy }
 }
 
 /** 構成のプレビューの幅。一覧の見取り図(84px)では、枠の数や列が読み取りにくいため、大きく描く */
 const PREVIEW_WIDTH = 220
 
-const NEW_DRAFT: Draft = { name: '', description: '', hero: 'standard', heroText: 'below', heroButtons: 1, sections: [{ kind: 'grid', slots: 4 }] }
+const newDraft = (): Draft => ({
+  name: '',
+  description: '',
+  hero: 'standard',
+  heroText: 'below',
+  parts: [
+    { key: partKey(), type: 'buttons', buttons: [{ id: newButtonId() }] },
+    { key: partKey(), type: 'section', sec: { kind: 'grid', slots: 4 } },
+  ],
+})
 
 const useStyles = makeStyles({
-  surface: { width: '1120px', maxWidth: '96vw', height: '82vh', maxHeight: '82vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' },
+  surface: { width: '1360px', maxWidth: '96vw', height: '86vh', maxHeight: '86vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' },
   body: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1, padding: 0, rowGap: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '12px 16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   grow: { flexGrow: 1 },
-  split: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)' },
-  list: { minHeight: 0, overflowY: 'auto', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, padding: '12px', display: 'grid', rowGap: '8px', alignContent: 'start', backgroundColor: tokens.colorNeutralBackground2 },
+  split: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(360px, 520px) minmax(0, 1fr)' },
+  // 一覧は 2 列。見比べやすいように、見取り図と説明を、同じ高さのカードに並べる
+  list: {
+    minHeight: 0,
+    overflowY: 'auto',
+    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    padding: '12px',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '8px',
+    alignContent: 'start',
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  fullRow: { gridColumn: '1 / -1' },
   listHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   groupLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, marginTop: '6px' },
   item: {
     display: 'flex',
-    columnGap: '10px',
+    columnGap: '8px',
     padding: '8px',
     borderRadius: tokens.borderRadiusMedium,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -89,6 +164,8 @@ const useStyles = makeStyles({
   itemSelected: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   itemText: { minWidth: 0, display: 'grid', rowGap: '2px', alignContent: 'start' },
   itemName: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
+  // カードの高さをそろえるため、説明は 5 行で省略する(全文は、選ぶと右に出る)
+  clamp: { display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, lineHeight: '16px' },
   editor: { minHeight: 0, overflowY: 'auto', padding: '16px', display: 'grid', rowGap: '14px', alignContent: 'start', minWidth: 0 },
   // プレビューの欄は、見取り図の大きさ(枠線・余白を含む)に合わせる。固定の幅だと、見取り図の右端が欠ける
@@ -97,22 +174,23 @@ const useStyles = makeStyles({
   // 縦長の見取り図をスクロールしても、編集欄と並べて見られるように、上に貼り付ける
   preview: { display: 'grid', rowGap: '6px', justifyItems: 'start', position: 'sticky', top: 0 },
   // 縦長の見取り図は、それだけでスクロールできるようにする(長いテンプレートでも、編集しながら下まで見られる)
-  previewScroll: { maxHeight: 'calc(82vh - 150px)', overflowY: 'auto', paddingRight: '4px' },
-  heroRow: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
-  sectionRow: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    columnGap: '6px',
-    rowGap: '4px',
-    padding: '6px 8px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-  },
-  sectionNo: { width: '18px', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  slotSelect: { width: '68px' },
-  kindSelect: { width: '138px' },
-  buttonsSelect: { width: '96px' },
+  previewScroll: { maxHeight: 'calc(86vh - 150px)', overflowY: 'auto', paddingRight: '4px' },
+  row: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'end' },
+  // 部品(ヒーロー・セクション・ボタン)のカード
+  card: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },
+  cardButtons: { backgroundColor: tokens.colorNeutralBackground2 },
+  cardHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '4px 6px 4px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, minHeight: '32px' },
+  cardTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  // セクションの 4 つの設定を、1 行に並べる(狭いときは折り返す)
+  sectionBody: { padding: '10px', display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr)', gap: '10px 12px', alignItems: 'start' },
+  // Select の既定の最小幅で、隣の欄に重ならないようにする
+  fill: { width: '100%', minWidth: 0 },
+  heroBody: { padding: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'start' },
+  heroSelect: { width: '180px' },
+  buttonRows: { padding: '10px', display: 'grid', rowGap: '8px' },
+  buttonRow: { display: 'grid', gridTemplateColumns: '18px minmax(120px, 1fr) 96px minmax(130px, 160px) 28px', columnGap: '6px', alignItems: 'center' },
+  partList: { display: 'grid', rowGap: '8px' },
+  num: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
 
@@ -142,7 +220,7 @@ export function TemplateManager() {
     below: t('写真の下に置く', 'Below the photo'),
   }
   const layoutLabel = (v: SectionLayout) => sectionKindLabel(layoutSection(v))
-  const layoutOf = (o: TemplateLayout): TemplateLayout => ({ hero: o.hero, heroText: o.heroText, heroButtons: o.heroButtons, topBar: o.topBar, sections: o.sections.map((x) => ({ ...x })) })
+  const styleLabel = (b: ButtonSpec) => (b.style === 'outline' ? t('枠線', 'Outline') : t('塗り', 'Filled'))
 
   const close = () => {
     setTemplateManagerOpen(false)
@@ -160,7 +238,7 @@ export function TemplateManager() {
   const startNew = () => {
     setError(null)
     setSelectedId('')
-    setDraft({ ...NEW_DRAFT, sections: NEW_DRAFT.sections.map((x) => ({ ...x })) })
+    setDraft(newDraft())
   }
   const startDuplicate = () => {
     if (!selected) return
@@ -168,35 +246,47 @@ export function TemplateManager() {
     setDraft({
       name: t(`${selected.label} のコピー`, `Copy of ${selected.label}`),
       description: selected.description,
-      ...layoutOf(selected),
+      hero: selected.hero,
+      heroText: selected.heroText,
+      topBar: selected.topBar,
+      heroLink: selected.heroLink,
+      parts: toParts(selected),
     })
     setSelectedId('')
   }
   const startEdit = () => {
     if (!selected || selected.builtin) return
     setError(null)
-    setDraft({ id: selected.id, name: selected.label, description: selected.description, ...layoutOf(selected) })
+    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected) })
   }
 
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d))
-  const patchSection = (i: number, p: Partial<Section>) => patch({ sections: (draft?.sections ?? []).map((sec, k) => (k === i ? { ...sec, ...p } : sec)) })
-  const moveSection = (i: number, delta: number) => {
-    const list = [...(draft?.sections ?? [])]
-    const j = i + delta
-    if (j < 0 || j >= list.length) return
-    ;[list[i], list[j]] = [list[j], list[i]]
-    patch({ sections: list })
-  }
+  const setParts = (fn: (parts: Part[]) => Part[]) => setDraft((d) => (d ? { ...d, parts: fn(d.parts) } : d))
+  const patchSection = (key: string, p: Partial<Section>) => setParts((list) => list.map((x) => (x.key === key && x.type === 'section' ? { ...x, sec: { ...x.sec, ...p } } : x)))
+  const setButtons = (key: string, fn: (buttons: ButtonSpec[]) => ButtonSpec[]) =>
+    setParts((list) => list.map((x) => (x.key === key && x.type === 'buttons' ? { ...x, buttons: fn(x.buttons) } : x)))
+  const patchButton = (key: string, id: string, p: Partial<ButtonSpec>) => setButtons(key, (list) => list.map((b) => (b.id === id ? { ...b, ...p } : b)))
+  const movePart = (i: number, delta: number) =>
+    setParts((list) => {
+      const j = i + delta
+      if (j < 0 || j >= list.length) return list
+      const next = [...list]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  const removePart = (key: string) => setParts((list) => list.filter((x) => x.key !== key))
 
-  const totalSlots = (draft?.sections ?? []).reduce((n, x) => n + x.slots, 0)
-  const valid = !!draft && draft.name.trim() !== '' && draft.sections.length > 0
+  const sectionCount = draft?.parts.filter((p) => p.type === 'section').length ?? 0
+  const blockCount = draft?.parts.filter((p) => p.type === 'buttons').length ?? 0
+  const totalSlots = (draft?.parts ?? []).reduce((n, p) => n + (p.type === 'section' ? p.sec.slots : 0), 0)
+  const valid = !!draft && draft.name.trim() !== '' && sectionCount > 0
 
   const save = async () => {
     if (!draft || !valid) return
     setBusy(true)
     setError(null)
     try {
-      const id = await saveTemplate({ ...draft })
+      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...fromParts(draft) })
       setSelectedId(id)
       setDraft(null)
     } catch (e) {
@@ -226,10 +316,129 @@ export function TemplateManager() {
 
   const renderItem = (o: (typeof options)[number]) => (
     <div key={o.id} className={mergeClasses(s.item, !editing && o.id === selected?.id && s.itemSelected)} onClick={() => choose(o.id)} role="button" tabIndex={0}>
-      <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={170} />
+      <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={150} />
       <div className={s.itemText}>
         <span className={s.itemName}>{o.label}</span>
-        <span className={s.caption}>{o.description}</span>
+        <span className={mergeClasses(s.caption, s.clamp)} title={o.description}>{o.description}</span>
+      </div>
+    </div>
+  )
+
+  /** 構成の要約(上から順に。ボタンも、置いた位置に並べる) */
+  const summary = (layout: TemplateLayout) =>
+    toParts(layout)
+      .map((p) =>
+        p.type === 'section'
+          ? `${sectionKindLabel(p.sec)}${t(` ${p.sec.slots}点`, ` ×${p.sec.slots}`)}${p.sec.categoryHeading ? t('(見出し付き)', ' (heading)') : ''}${p.sec.copy === false ? t('(コピーなし)', ' (no copy)') : ''}`
+          : t(`ボタン ${p.buttons.length}`, `${p.buttons.length} button(s)`),
+      )
+      .join(' → ')
+
+  // ---- 部品のカード
+  const partActions = (i: number, p: Part) => (
+    <>
+      <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={() => movePart(i, -1)} aria-label={t('上へ', 'Move up')} />
+      <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === (draft?.parts.length ?? 0) - 1} onClick={() => movePart(i, 1)} aria-label={t('下へ', 'Move down')} />
+      <Button
+        size="small"
+        appearance="subtle"
+        icon={<DeleteRegular />}
+        disabled={p.type === 'section' && sectionCount <= 1}
+        onClick={() => removePart(p.key)}
+        aria-label={p.type === 'section' ? t('このセクションを削除', 'Remove this section') : t('このボタンの部品を削除', 'Remove these buttons')}
+      />
+    </>
+  )
+
+  const sectionCard = (p: Extract<Part, { type: 'section' }>, i: number, no: number) => {
+    const sec = p.sec
+    return (
+      <div key={p.key} className={s.card}>
+        <div className={s.cardHead}>
+          <Badge size="small" appearance="tint" color="brand">{t(`セクション ${no}`, `Section ${no}`)}</Badge>
+          <span className={s.caption}>{`${sectionKindLabel(sec)} · ${t(`${sec.slots} 点`, `${sec.slots} items`)}`}</span>
+          <span className={s.grow} />
+          {partActions(i, p)}
+        </div>
+        <div className={s.sectionBody}>
+          <Field label={t('商品の並び方', 'Product layout')}>
+            <Select size="small" className={s.fill} value={layoutValue(sec)} onChange={(_, d) => patchSection(p.key, layoutPatch(d.value as SectionLayout, sec))}>
+              {LAYOUTS.map((v) => (
+                <option key={v} value={v}>{layoutLabel(v)}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t('商品の枠の数', 'Product slots')}>
+            <Select size="small" className={s.fill} value={String(sec.slots)} onChange={(_, d) => patchSection(p.key, { slots: fitSlots(sec.kind, Number(d.value)) })}>
+              {Array.from({ length: Math.floor(MAX_SLOTS / slotStep(sec.kind)) }, (_, k) => (k + 1) * slotStep(sec.kind)).map((n) => (
+                <option key={n} value={n}>{t(`${n} 点`, `${n} items`)}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t('見出し', 'Heading')}>
+            <Checkbox label={t('AI で付ける', 'Add (AI)')} checked={!!sec.categoryHeading} onChange={(_, d) => patchSection(p.key, { categoryHeading: d.checked === true })} />
+          </Field>
+          <Field label={t('コピー', 'Copy')}>
+            <Checkbox label={t('置く', 'Show')} checked={sec.copy !== false} onChange={(_, d) => patchSection(p.key, { copy: d.checked === true ? undefined : false })} />
+          </Field>
+        </div>
+      </div>
+    )
+  }
+
+  const buttonsCard = (p: Extract<Part, { type: 'buttons' }>, i: number) => (
+    <div key={p.key} className={mergeClasses(s.card, s.cardButtons)}>
+      <div className={s.cardHead}>
+        <Badge size="small" appearance="tint" color="informative">{t('ボタン', 'Buttons')}</Badge>
+        <span className={s.caption}>{p.buttons.map((b, k) => t(`${b.label?.trim() || defaultButtonLabel(k)}(${styleLabel(b)})`, `${b.label?.trim() || defaultButtonLabel(k)} (${styleLabel(b)})`)).join(t('、', ', '))}</span>
+        <span className={s.grow} />
+        {partActions(i, p)}
+      </div>
+      <div className={s.buttonRows}>
+        <div className={s.buttonRow}>
+          <span />
+          <span className={s.caption}>{t('文言', 'Label')}</span>
+          <span className={s.caption}>{t('見た目', 'Style')}</span>
+          <span className={s.caption}>{t('リンク先(既定)', 'Link (default)')}</span>
+          <span />
+        </div>
+        {p.buttons.map((b, k) => (
+          <div key={b.id} className={s.buttonRow}>
+            <span className={s.num}>{k + 1}</span>
+            <Input
+              size="small"
+              value={b.label ?? ''}
+              placeholder={defaultButtonLabel(k)}
+              maxLength={MAX_BUTTON_LABEL}
+              aria-label={t(`ボタン ${k + 1} の文言`, `Button ${k + 1} label`)}
+              onChange={(_, d) => patchButton(p.key, b.id, { label: d.value })}
+            />
+            <Select size="small" value={b.style ?? 'fill'} aria-label={t('見た目', 'Style')} onChange={(_, d) => patchButton(p.key, b.id, { style: d.value === 'outline' ? 'outline' : undefined })}>
+              <option value="fill">{t('塗り', 'Filled')}</option>
+              <option value="outline">{t('枠線', 'Outline')}</option>
+            </Select>
+            <Select size="small" value={b.link ?? 'campaign'} aria-label={t('リンク先', 'Link')} onChange={(_, d) => patchButton(p.key, b.id, { link: d.value as LinkKind })}>
+              {LINK_KINDS.map((k2) => (
+                <option key={k2} value={k2}>{linkKindLabel(k2)}</option>
+              ))}
+            </Select>
+            <Button
+              size="small"
+              appearance="subtle"
+              icon={<DismissRegular />}
+              disabled={p.buttons.length <= 1}
+              onClick={() => setButtons(p.key, (list) => list.filter((x) => x.id !== b.id))}
+              aria-label={t('このボタンを外す', 'Remove this button')}
+            />
+          </div>
+        ))}
+        {p.buttons.length < MAX_BUTTONS_PER_BLOCK && (
+          <div>
+            <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => setButtons(p.key, (list) => [...list, { id: newButtonId(), style: 'outline' }])}>
+              {t('横にボタンを追加', 'Add a button beside')}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -244,14 +453,14 @@ export function TemplateManager() {
           </div>
           <DialogContent className={s.split} style={{ padding: 0 }}>
             <div className={s.list}>
-              <div className={s.listHead}>
+              <div className={mergeClasses(s.listHead, s.fullRow)}>
                 <Button size="small" appearance="primary" icon={<AddRegular />} onClick={startNew}>{t('新規作成', 'New')}</Button>
                 <Button size="small" appearance="outline" icon={<CopyRegular />} onClick={startDuplicate} disabled={!selected || (editing && !draft?.id && selectedId === '')}>{t('複製', 'Duplicate')}</Button>
               </div>
-              <span className={s.groupLabel}>{t('作成したテンプレート', 'Your templates')}</span>
-              {customs.length === 0 && <span className={s.caption}>{t('まだありません。「新規作成」か、標準のテンプレートの「複製」から作れます。', 'None yet. Create one with "New", or duplicate a standard template.')}</span>}
+              <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('作成したテンプレート', 'Your templates')}</span>
+              {customs.length === 0 && <span className={mergeClasses(s.caption, s.fullRow)}>{t('まだありません。「新規作成」か、標準のテンプレートの「複製」から作れます。', 'None yet. Create one with "New", or duplicate a standard template.')}</span>}
               {customs.map(renderItem)}
-              <span className={s.groupLabel}>{t('標準', 'Standard')}</span>
+              <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('標準', 'Standard')}</span>
               {builtins.map(renderItem)}
             </div>
 
@@ -271,82 +480,68 @@ export function TemplateManager() {
                     <Field label={t('説明', 'Description')}>
                       <AutoTextarea rows={2} size="small" value={draft.description} onChange={(_, d) => patch({ description: d.value })} />
                     </Field>
-                    <Field label={t('ヒーローの種類', 'Hero type')}>
-                      <div className={s.heroRow}>
-                        {(['standard', 'collab', 'offer'] as HeroKind[]).map((h) => (
-                          <Button key={h} size="small" appearance={draft.hero === h ? 'primary' : 'outline'} aria-pressed={draft.hero === h} onClick={() => patch({ hero: h })}>
-                            {heroLabels[h]}
-                          </Button>
-                        ))}
+
+                    <div className={s.card}>
+                      <div className={s.cardHead}>
+                        <span className={s.cardTitle}>{t('ヒーロー(メイン画像)', 'Hero (main image)')}</span>
                       </div>
-                    </Field>
-                    <div className={s.heroRow}>
-                      <Field label={t('ヘッドラインの見せ方', 'Headline placement')}>
-                        <Select size="small" value={draft.heroText ?? 'band'} onChange={(_, d) => patch({ heroText: d.value as HeroText })}>
-                          {(['below', 'overlay', 'band'] as HeroText[]).map((h) => (
-                            <option key={h} value={h}>{heroTextLabels[h]}</option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field label={t('ヒーローのボタン', 'Hero buttons')}>
-                        <Select size="small" value={String(draft.heroButtons ?? 0)} onChange={(_, d) => patch({ heroButtons: Number(d.value) as 0 | 1 | 2 })}>
-                          <option value="0">{t('なし', 'None')}</option>
-                          <option value="1">{t('1 つ', '1 button')}</option>
-                          <option value="2">{t('2 つ', '2 buttons')}</option>
-                        </Select>
-                      </Field>
-                      <Field label={t('お知らせ帯', 'Top bar')}>
-                        <Checkbox label={t('メールの最上部に置く', 'Show at the very top')} checked={!!draft.topBar} onChange={(_, d) => patch({ topBar: d.checked === true || undefined })} />
-                      </Field>
-                    </div>
-                    <Field label={t(`セクション(商品の枠は合計 ${totalSlots} 点)`, `Sections (${totalSlots} product slots in total)`)}>
-                      <div style={{ display: 'grid', rowGap: 6 }}>
-                        {draft.sections.map((sec, i) => (
-                          <div key={i} className={s.sectionRow}>
-                            <span className={s.sectionNo}>{i + 1}</span>
-                            <Select
-                              size="small"
-                              className={s.kindSelect}
-                              value={layoutValue(sec)}
-                              aria-label={t('種類', 'Type')}
-                              onChange={(_, d) => patchSection(i, layoutPatch(d.value as SectionLayout, sec))}
-                            >
-                              {LAYOUTS.map((v) => (
-                                <option key={v} value={v}>{layoutLabel(v)}</option>
-                              ))}
-                            </Select>
-                            <Select
-                              size="small"
-                              className={s.slotSelect}
-                              value={String(sec.slots)}
-                              aria-label={t('商品の枠の数', 'Product slots')}
-                              onChange={(_, d) => patchSection(i, { slots: fitSlots(sec.kind, Number(d.value)) })}
-                            >
-                              {Array.from({ length: Math.floor(MAX_SLOTS / slotStep(sec.kind)) }, (_, k) => (k + 1) * slotStep(sec.kind)).map((n) => (
-                                <option key={n} value={n}>{t(`${n} 点`, `${n} items`)}</option>
-                              ))}
-                            </Select>
-                            <Select
-                              size="small"
-                              className={s.buttonsSelect}
-                              value={String(sec.buttons ?? 0)}
-                              aria-label={t('セクションの後のボタン', 'Buttons after the section')}
-                              onChange={(_, d) => patchSection(i, { buttons: Number(d.value) ? (Number(d.value) as 1 | 2) : undefined })}
-                            >
-                              <option value="0">{t('ボタンなし', 'No buttons')}</option>
-                              <option value="1">{t('ボタン 1', '1 button')}</option>
-                              <option value="2">{t('ボタン 2', '2 buttons')}</option>
-                            </Select>
-                            <Checkbox label={t('見出し', 'Heading')} checked={!!sec.categoryHeading} onChange={(_, d) => patchSection(i, { categoryHeading: d.checked === true })} />
-                            <span className={s.grow} />
-                            <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={() => moveSection(i, -1)} aria-label={t('上へ', 'Move up')} />
-                            <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === draft.sections.length - 1} onClick={() => moveSection(i, 1)} aria-label={t('下へ', 'Move down')} />
-                            <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={draft.sections.length <= 1} onClick={() => patch({ sections: draft.sections.filter((_, k) => k !== i) })} aria-label={t('このセクションを削除', 'Remove this section')} />
+                      <div className={s.heroBody}>
+                        <Field label={t('種類', 'Type')}>
+                          <div className={s.row} style={{ flexWrap: 'nowrap' }}>
+                            {(['standard', 'collab', 'offer'] as HeroKind[]).map((h) => (
+                              <Button key={h} size="small" appearance={draft.hero === h ? 'primary' : 'outline'} aria-pressed={draft.hero === h} onClick={() => patch({ hero: h })}>
+                                {heroLabels[h]}
+                              </Button>
+                            ))}
                           </div>
-                        ))}
-                        <div>
-                          <Button size="small" appearance="outline" icon={<AddRegular />} disabled={draft.sections.length >= MAX_SECTIONS} onClick={() => patch({ sections: [...draft.sections, { kind: 'grid', slots: 2 }] })}>
+                        </Field>
+                        <Field label={t('ヘッドラインの見せ方', 'Headline placement')}>
+                          <Select size="small" className={s.heroSelect} value={draft.heroText ?? 'band'} onChange={(_, d) => patch({ heroText: d.value as HeroText })}>
+                            {(['below', 'overlay', 'band'] as HeroText[]).map((h) => (
+                              <option key={h} value={h}>{heroTextLabels[h]}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label={t('画像のリンク先(既定)', 'Image link (default)')}>
+                          <Select size="small" className={s.heroSelect} value={draft.heroLink ?? 'campaign'} onChange={(_, d) => patch({ heroLink: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
+                            {LINK_KINDS.map((k) => (
+                              <option key={k} value={k}>{linkKindLabel(k)}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label={t('お知らせ帯', 'Top bar')}>
+                          <Checkbox label={t('メールの最上部に置く', 'Show at the very top')} checked={!!draft.topBar} onChange={(_, d) => patch({ topBar: d.checked === true || undefined })} />
+                        </Field>
+                      </div>
+                    </div>
+
+                    <Field
+                      label={t(`構成(上から順に。商品の枠は合計 ${totalSlots} 点)`, `Layout (top to bottom; ${totalSlots} product slots in total)`)}
+                      hint={t('ボタンは、セクションとは別の部品です。上下の矢印で、好きな位置に置けます。リンク先は既定の種類で、実際の URL は配信ごとに決めます。', 'Buttons are separate parts; move them anywhere with the arrows. Links are default kinds; the actual URLs are set per delivery.')}
+                    >
+                      <div className={s.partList}>
+                        {(() => {
+                          let no = 0
+                          return draft.parts.map((p, i) => (p.type === 'section' ? sectionCard(p, i, ++no) : buttonsCard(p, i)))
+                        })()}
+                        <div className={s.row}>
+                          <Button
+                            size="small"
+                            appearance="outline"
+                            icon={<AddRegular />}
+                            disabled={sectionCount >= MAX_SECTIONS}
+                            onClick={() => setParts((list) => [...list, { key: partKey(), type: 'section', sec: { kind: 'grid', slots: 2 } }])}
+                          >
                             {t('セクションを追加', 'Add a section')}
+                          </Button>
+                          <Button
+                            size="small"
+                            appearance="outline"
+                            icon={<AddRegular />}
+                            disabled={blockCount >= MAX_BUTTON_BLOCKS}
+                            onClick={() => setParts((list) => [...list, { key: partKey(), type: 'buttons', buttons: [{ id: newButtonId(), style: 'outline' }] }])}
+                          >
+                            {t('ボタンを追加', 'Add buttons')}
                           </Button>
                         </div>
                       </div>
@@ -355,7 +550,7 @@ export function TemplateManager() {
                   <div className={s.preview}>
                     <Text size={200} weight="semibold">{t('構成のプレビュー', 'Layout preview')}</Text>
                     <div className={s.previewScroll}>
-                      <TemplateThumb layout={draft} width={PREVIEW_WIDTH} />
+                      <TemplateThumb layout={fromParts(draft)} width={PREVIEW_WIDTH} />
                     </div>
                   </div>
                 </div>
@@ -370,20 +565,13 @@ export function TemplateManager() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 12, rowGap: 4 }}>
                       <span className={s.caption}>{t('ヒーロー', 'Hero')}</span>
                       <span style={{ fontSize: tokens.fontSizeBase200 }}>
-                        {[
-                          heroLabels[selected.hero],
-                          heroTextLabels[selected.heroText ?? 'band'],
-                          selected.heroButtons ? t(`ボタン ${selected.heroButtons}`, `${selected.heroButtons} button(s)`) : '',
-                          selected.topBar ? t('お知らせ帯あり', 'top bar') : '',
-                        ]
+                        {[heroLabels[selected.hero], heroTextLabels[selected.heroText ?? 'band'], selected.topBar ? t('お知らせ帯あり', 'top bar') : '']
                           .filter(Boolean)
                           .join(t('、', ', '))}
                       </span>
-                      <span className={s.caption}>{t('セクション', 'Sections')}</span>
+                      <span className={s.caption}>{t('構成', 'Layout')}</span>
                       <span style={{ fontSize: tokens.fontSizeBase200 }}>
-                        {selected.id === 'free'
-                          ? t('自由な並び(枠の数は決まっていません)', 'Free-form (no fixed number of slots)')
-                          : selected.sections.map((x) => `${sectionKindLabel(x)}${t(` ${x.slots}点`, ` ×${x.slots}`)}${x.categoryHeading ? t('(見出し付き)', ' (heading)') : ''}${x.buttons ? t(`(ボタン ${x.buttons})`, ` (${x.buttons} btn)`) : ''}`).join(' → ')}
+                        {selected.id === 'free' ? t('自由な並び(枠の数は決まっていません)', 'Free-form (no fixed number of slots)') : summary(selected)}
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>

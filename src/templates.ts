@@ -32,9 +32,83 @@ export interface Section {
   flip?: boolean
   /** true のとき、セクションに見出しを付ける(AI が文言を作る。名前は、以前のデータとの互換のため) */
   categoryHeading?: boolean
-  /** セクションの後に置くボタンの数(省略は 0) */
+  /** false のとき、セクションのコピーを置かない(省略は置く。以前のテンプレートは、すべてコピーあり) */
+  copy?: boolean
+  /**
+   * セクションの後に置くボタンの数(以前の形。読むだけ)。
+   * 今は、ボタンは独立した部品(ButtonBlock)。管理画面で開くと、部品に置き換える
+   */
   buttons?: 1 | 2
 }
+
+/**
+ * リンク先の種類。テンプレートには種類(既定値)だけを持ち、実際の URL は、配信カードで決める(未実装。BACKLOG)。
+ * campaign: その配信のページ / category: セクションのカテゴリのページ / top: ショップのトップ / custom: 配信カードで個別に指定
+ */
+export type LinkKind = 'campaign' | 'category' | 'top' | 'custom'
+export const LINK_KINDS: LinkKind[] = ['campaign', 'category', 'top', 'custom']
+
+export function linkKindLabel(kind: LinkKind): string {
+  switch (kind) {
+    case 'category':
+      return tr('カテゴリのページ', 'Category page')
+    case 'top':
+      return tr('ショップのトップ', 'Shop top page')
+    case 'custom':
+      return tr('配信カードで指定', 'Set on the card')
+    default:
+      return tr('配信のページ', 'Campaign page')
+  }
+}
+
+export interface ButtonSpec {
+  /**
+   * テンプレートの中で変わらない ID。配信カードで、ボタンごとの URL を持つときの鍵にする
+   * (文言や位置を変えても、設定した URL が外れないように)
+   */
+  id: string
+  /** 文言(空は、既定の文言) */
+  label?: string
+  /** fill: 塗り / outline: 枠線(省略は fill) */
+  style?: 'fill' | 'outline'
+  /** リンク先の種類(省略は campaign) */
+  link?: LinkKind
+}
+
+/** 独立したボタンの部品。at = その前にあるセクションの数(0 はヒーローの直後、セクションの数と同じなら最後) */
+export interface ButtonBlock {
+  at: number
+  buttons: ButtonSpec[]
+}
+
+/** 1 つの部品に並べるボタンの上限(メールの幅で、読める数) */
+export const MAX_BUTTONS_PER_BLOCK = 2
+
+export const newButtonId = () => `b${Math.random().toString(36).slice(2, 10)}`
+
+/** 文言が空のボタンの、既定の文言(並びの位置で決める。以前のボタンと同じ文言) */
+export const defaultButtonLabel = (i: number) => (i === 0 ? tr('商品を見る', 'Shop now') : tr('もっと見る', 'See more'))
+
+/**
+ * 置く位置ごとのボタン。以前の形(ヒーローのボタンの数、セクションの後のボタンの数)も、同じ形に直して返す。
+ * 以前の形のボタンの ID は、位置から決める(同じテンプレートなら、いつも同じ ID になる)
+ */
+export function placedButtons(layout: TemplateLayout): ButtonBlock[] {
+  const legacy = (n: number | undefined, style: ButtonSpec['style'], prefix: string): ButtonSpec[] =>
+    Array.from({ length: n ?? 0 }, (_, i) => ({ id: `${prefix}-${i + 1}`, style }))
+  const blocks: ButtonBlock[] = []
+  if (layout.heroButtons) blocks.push({ at: 0, buttons: legacy(layout.heroButtons, 'fill', 'hero') })
+  layout.sections.forEach((sec, i) => {
+    if (sec.buttons) blocks.push({ at: i + 1, buttons: legacy(sec.buttons, 'outline', `s${i + 1}`) })
+  })
+  blocks.push(...(layout.buttonBlocks ?? []))
+  // 同じ位置では、以前の形のボタンを先に置く(並べ替えても、並びの順は保つ)
+  return blocks.map((b, i) => ({ b, i })).sort((x, y) => x.b.at - y.b.at || x.i - y.i).map((x) => x.b)
+}
+
+/** 位置 at(0 はヒーローの直後、i はセクション i の後)に置くボタンを、1 つの部品ごとに返す(範囲外の位置は、端に寄せる) */
+export const buttonsAt = (blocks: ButtonBlock[], at: number, sectionCount: number): ButtonSpec[][] =>
+  blocks.filter((b) => Math.max(0, Math.min(b.at, sectionCount)) === at).map((b) => b.buttons)
 
 /** グリッド・写真タイルの列の数(以前のテンプレートや、列を持たない種類は 2 として扱う) */
 export const gridColumns = (sec: Section): 2 | 3 => ((sec.kind === 'grid' || sec.kind === 'photos') && sec.columns === 3 ? 3 : 2)
@@ -66,17 +140,21 @@ export interface EmailTemplate {
   hero: HeroKind
   /** ヘッドラインの見せ方(省略は band。以前のテンプレートと同じ見た目) */
   heroText?: HeroText
-  /** ヒーローの下に置くボタンの数(省略は 0) */
+  /** ヒーローの下に置くボタンの数(省略は 0。以前の形。今は、位置 0 の ButtonBlock で表す) */
   heroButtons?: 0 | 1 | 2
   /** メールの最上部に、お知らせの帯を置く */
   topBar?: boolean
+  /** メイン画像のリンク先の種類(省略は campaign) */
+  heroLink?: LinkKind
   sections: Section[]
+  /** 独立したボタンの部品(セクションとは別に持つ。商品の枠の位置の計算に関わらないように) */
+  buttonBlocks?: ButtonBlock[]
   /** 標準のテンプレート(編集・削除できない) */
   builtin: boolean
 }
 
 /** 構成の見た目に関わる部分(見取り図、プレビュー、編集中の内容で共通に使う) */
-export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'sections'>
+export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'>
 
 // ---- 標準のテンプレート ----
 
@@ -286,7 +364,9 @@ export function templateOptions(): ({ id: EmailTemplateId; label: string; descri
       heroText: tpl.heroText,
       heroButtons: tpl.heroButtons,
       topBar: tpl.topBar,
+      heroLink: tpl.heroLink,
       sections: tpl.sections,
+      buttonBlocks: tpl.buttonBlocks,
     }
   })
 }

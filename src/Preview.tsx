@@ -13,7 +13,7 @@ import { AutoTextarea } from './AutoTextarea'
 import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
 import { productMarket } from './market'
-import { getTemplate, gridColumns, type EmailTemplateId, type Section } from './templates'
+import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section } from './templates'
 import { HEADLINE_FONT } from './fonts'
 import { locale, optionLabel, useT } from './i18n'
 
@@ -558,26 +558,32 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
   )
 
   // ---- ヒーローの下(写真の下に置くヘッドライン・コピーと、ボタン)
-  const buttonLabels = [t('商品を見る', 'Shop now'), t('もっと見る', 'See more')]
-  const buttonRow = (n: number | undefined, outline: boolean) =>
-    n ? (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 10, padding: n === 1 ? '4px 25%' : '4px 16px' }}>
-        {buttonLabels.slice(0, n).map((label) => (
-          <div
-            key={label}
-            style={{
-              textAlign: 'center',
-              padding: '8px 0',
-              borderRadius: 999,
-              fontSize: '0.8rem',
-              ...(outline ? { border: `1px solid ${INK}`, color: INK } : { backgroundColor: offer ? '#d32f2f' : '#222', color: '#fff' }),
-            }}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
-    ) : null
+  // ボタンの部品。1 つの部品のボタンを横に並べる。文言が空のボタンは、既定の文言(並びの位置で決まる)
+  const blocks = placedButtons(tpl)
+  const buttonRow = (buttons: ButtonSpec[], key: number) => (
+    <div key={key} style={{ display: 'grid', gridTemplateColumns: `repeat(${buttons.length}, 1fr)`, gap: 10, padding: buttons.length === 1 ? '4px 25%' : '4px 16px' }}>
+      {buttons.map((b, i) => (
+        <div
+          key={b.id}
+          className={classes.noWrap}
+          style={{
+            textAlign: 'center',
+            padding: '8px 4px',
+            borderRadius: 999,
+            fontSize: '0.8rem',
+            ...(b.style === 'outline' ? { border: `1px solid ${INK}`, color: INK } : { backgroundColor: offer ? '#d32f2f' : '#222', color: '#fff' }),
+          }}
+        >
+          {b.label || defaultButtonLabel(i)}
+        </div>
+      ))}
+    </div>
+  )
+  const buttonsAfter = (at: number, paddingTop: number) => {
+    const rows = buttonsAt(blocks, at, tpl.sections.length)
+    return rows.length > 0 ? <div style={{ paddingTop, display: 'grid', rowGap: 8 }}>{rows.map(buttonRow)}</div> : null
+  }
+
   const heroAfter = (
     <>
       {heroText === 'below' && (
@@ -590,7 +596,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
       {heroText !== 'band' && (
         <div style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
       )}
-      {tpl.heroButtons ? <div style={{ paddingTop: 12 }}>{buttonRow(tpl.heroButtons, false)}</div> : null}
+      {buttonsAfter(0, 12)}
       <div style={{ height: 8 }} />
     </>
   )
@@ -686,9 +692,9 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
           return (
             <div key={start} style={{ padding: '0 16px 16px' }}>
               {sec.categoryHeading && editableHeading(si, category ? optionLabel(category) : `CATEGORY ${si + 1}`)}
-              {sectionCopyEl(si, !!sec.categoryHeading)}
+              {sec.copy !== false && sectionCopyEl(si, !!sec.categoryHeading)}
               {sectionBody(sec, start, list)}
-              {sec.buttons ? <div style={{ paddingTop: 14 }}>{buttonRow(sec.buttons, true)}</div> : null}
+              {buttonsAfter(si + 1, 14)}
             </div>
           )
         })}

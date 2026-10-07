@@ -1,6 +1,6 @@
 import { makeStyles, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
-import { gridColumns, type HeroKind, type Section, type TemplateLayout } from './templates'
+import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
 
 // 見取り図は、受信側のメールの見た目を写したものなので、テーマに依らず固定の配色にする
 const HERO_COLOR: Record<HeroKind, string> = { standard: '#cfd2dc', collab: '#b9a9d6', offer: '#f0a5a0' }
@@ -43,14 +43,16 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
   const heroText = layout.heroText ?? 'band'
 
   const line = (w: string, h = 2, color = LINE) => <div style={{ height: px(h), width: w, margin: '0 auto', background: color }} />
-  const pills = (n: number | undefined, outline: boolean) =>
-    n ? (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: px(3), padding: `${px(1)}px ${px(n === 1 ? 24 : 8)}px` }}>
-        {Array.from({ length: n }, (_, i) => (
-          <div key={i} style={{ height: px(5), borderRadius: 99, background: outline ? '#fff' : offer ? RED : '#222', border: outline ? '1px solid #222' : 'none' }} />
-        ))}
-      </div>
-    ) : null
+  // ボタンの部品。1 つの部品のボタンを横に並べる(塗り / 枠線は、ボタンごと)
+  const blocks = placedButtons(layout)
+  const pills = (buttons: ButtonSpec[], key: number) => (
+    <div key={key} style={{ display: 'grid', gridTemplateColumns: `repeat(${buttons.length}, 1fr)`, gap: px(3), padding: `${px(1)}px ${px(buttons.length === 1 ? 24 : 8)}px` }}>
+      {buttons.map((b) => (
+        <div key={b.id} style={{ height: px(5), borderRadius: 99, background: b.style === 'outline' ? '#fff' : offer ? RED : '#222', border: b.style === 'outline' ? '1px solid #222' : 'none' }} />
+      ))}
+    </div>
+  )
+  const pillsAt = (at: number) => buttonsAt(blocks, at, layout.sections.length).map(pills)
   // 名前・価格の 2 行(価格は、セールのヒーローのとき赤)
   const caption = (color = LINE) => (
     <div style={{ display: 'grid', gap: px(1), paddingTop: px(1) }}>
@@ -175,8 +177,9 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
     return (
       <div key={i} style={{ display: 'grid', gap: px(2), paddingTop: px(3) }}>
         {sec.categoryHeading && line('40%', 2.5, INK)}
+        {sec.copy !== false && line('55%', 1.5, '#c7ccd4')}
         {body}
-        {pills(sec.buttons, true)}
+        {pillsAt(i + 1)}
       </div>
     )
   }
@@ -187,7 +190,7 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
         <div style={{ height: px(5), background: '#222' }} />
         {layout.topBar && <div style={{ height: px(4), background: '#555' }} />}
         {hero}
-        {pills(layout.heroButtons, false)}
+        {pillsAt(0)}
         {free ? (
           <span className={s.free} style={{ fontSize: px(10), padding: px(6) }}>{t('自由', 'Free')}</span>
         ) : (
