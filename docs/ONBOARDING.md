@@ -95,19 +95,21 @@ GitHub の**非公開**リポジトリ(`audeoinc/ccp`)。ただし、参加者�
   1. **gcloud CLI** をインストールする(https://cloud.google.com/sdk/docs/install)。
   2. `gcloud auth login` で、Google アカウントにサインインする。
   3. `gcloud config set project <プロジェクトID>`(プロジェクト ID は、管理者に聞く。リポジトリには書かない)。
-- **反映する人に必要な権限**(プロジェクトの管理者が、**その人の Google アカウント**に付ける)。`<…>` は、管理者に聞く値:
+- **反映する人に必要な権限**(プロジェクトの管理者が、**その人の Google アカウント**に付ける)。`<…>` は、管理者に聞く値。**この構成で、実際に反映できることを確認済み**(`--condition=None` は、プロジェクトに、条件つきの権限があるときに、聞き返されないようにするため)。
   ```bash
-  # サービスの更新(このサービスだけに限定。営業支援など、ほかのサービスには、触れない)
+  # (1) ソースからのデプロイ(gcloud run deploy --source)に必要な権限をまとめた、Google の役割
+  #     (ソース用バケットの一覧・作成・読み書き、Cloud Build、Artifact Registry)
+  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/run.sourceDeveloper" --condition=None
+  # (2) API の利用
+  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/serviceusage.serviceUsageConsumer" --condition=None
+  # (3) サービスの更新(このサービスだけに限定。営業支援など、ほかのサービスには、触れない)
   gcloud run services add-iam-policy-binding contents-planner --region asia-northeast1 --project <プロジェクトID> --member="user:<メールアドレス>" --role="roles/run.admin"
-  # クラウドでのビルド・イメージの保存
-  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/cloudbuild.builds.editor"
-  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/artifactregistry.writer"
-  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/storage.objectAdmin"
-  gcloud projects add-iam-policy-binding <プロジェクトID> --member="user:<メールアドレス>" --role="roles/serviceusage.serviceUsageConsumer"
-  # サービスが動くときのサービスアカウントとして、反映する権限
+  # (4) サービスが動くときのサービスアカウントとして、反映する権限
   gcloud iam service-accounts add-iam-policy-binding <実行サービスアカウント> --project <プロジェクトID> --member="user:<メールアドレス>" --role="roles/iam.serviceAccountUser"
   ```
-  最初の反映で、権限が足りないと、エラーに、足りない権限の名前が出る。その権限を、同じ要領で足す。
+  - 1 つずつ足す方式(バケットの権限だけ、など)は、`storage.buckets.get`、次に `storage.buckets.list` と、別の権限で順に止まった。(1) の役割なら、まとめて足りる。`roles/storage.admin` は、プロジェクトの全バケットが対象になるので、付けない。
+  - 初回の確認では、(1)〜(4) のほかに、`cloudbuild.builds.editor`、`artifactregistry.writer`、ソース用バケットへの `legacyBucketReader`・`objectAdmin` も付いていた。(1) と重なる可能性が高い(外して反映できるかは、未検証)。
+  - 足りない権限があると、エラーに、権限の名前が出る。同じ要領で足す。
 - 反映の履歴は、`git tag --list "deployed-gcp/*"` で見られる。
 - DB は、普段は停止している(毎日 21:00 に停止。アクセスで自動起動、約 11 分)。反映のときは、DB が停止していても、問題ない。
 
