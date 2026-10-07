@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Avatar, Badge, Popover, PopoverSurface, PopoverTrigger, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { productImage } from './images'
@@ -116,8 +117,15 @@ function ProductItem({ product: p, itemKey, onHover }: { product: Cr854_products
   const market = productMarket(p)
   const trend = trendMark(p.cr854_salestrendname)
   const low = p.cr854_stock !== undefined && p.cr854_stock < LOW_STOCK
+  // 開閉を自分で持つ: フロートの中の「閉じる」ボタンから閉じられるようにするため(外側のクリック・Esc でも閉じる)
+  const [open, setOpen] = useState(false)
   return (
-    <Popover positioning={{ position: 'before', align: 'top', pinned: true, overflowBoundaryPadding: 8 }} openOnHover={false}>
+    <Popover
+      positioning={{ position: 'before', align: 'top', pinned: true, overflowBoundaryPadding: 8 }}
+      openOnHover={false}
+      open={open}
+      onOpenChange={(_, d) => setOpen(d.open)}
+    >
       <PopoverTrigger disableButtonEnhancement>
         <div className={mergeClasses(s.item)} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
           <Avatar shape="square" image={{ src: productImage(p), alt: p.cr854_name }} name={p.cr854_name} className={s.avatar} />
@@ -132,7 +140,7 @@ function ProductItem({ product: p, itemKey, onHover }: { product: Cr854_products
         </div>
       </PopoverTrigger>
       <PopoverSurface>
-        <ProductDetail product={p} />
+        <ProductDetail product={p} onClose={() => setOpen(false)} />
       </PopoverSurface>
     </Popover>
   )

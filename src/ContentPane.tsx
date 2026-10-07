@@ -23,6 +23,7 @@ import {
   ArrowDownRegular,
   ArrowUpRegular,
   ChevronDownRegular,
+  ChevronRightRegular,
   DismissRegular,
 } from '@fluentui/react-icons'
 import { AiIcon } from './AiMark'
@@ -90,6 +91,8 @@ const useStyles = makeStyles({
   // グリッドの子は、中身が長くても列を押し広げない(帯や長い文がペインからはみ出さないように)
   // 中ペイン全体: 上は内容(スクロール)、下は AI チャット(固定)
   shell: { flexGrow: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' },
+  // 見出しとタブは、内容をスクロールしても見えるように、スクロールの外に固定する
+  head: { display: 'grid', rowGap: '8px', minWidth: 0, padding: '16px 16px 0', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   scroll: { flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: '16px' },
   grid12: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '12px', minWidth: 0 },
   grid8: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -145,6 +148,28 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
   blockHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
+  // ブロックの見出し行(押すと開閉する)
+  blockToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    columnGap: '4px',
+    minWidth: 0,
+    padding: 0,
+    border: 'none',
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    color: tokens.colorNeutralForeground1,
+  },
+  blockSummary: {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+  },
   // Idea cards
   card: {
     padding: '12px',
@@ -272,14 +297,26 @@ function LanguageToggle({ value, onChange }: { value: CopyLanguage; onChange: (v
   )
 }
 
-/** セクションの中の 1 つのブロック(見出し / コピー / 商品)。右上に、そのブロックの AI ボタンなどを置く */
-function Block({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+/**
+ * セクションの中の 1 つのブロック(見出し / コピー / 商品)。右上に、そのブロックの AI ボタンなどを置く。
+ * 見出しの行を押すと、中身を折りたたむ(商品の一覧が長いとき、他のブロックを見やすくするため)。折りたたみ中は、summary を 1 行で出す
+ */
+function Block({ title, right, children, open = true, onToggle, summary }: { title: string; right?: ReactNode; children: ReactNode; open?: boolean; onToggle?: () => void; summary?: string }) {
   const s = useStyles()
+  const t = useT()
   return (
     <div className={s.block}>
-      <span className={s.bold}>{title}</span>
-      {right && <div className={s.flexRow}>{right}</div>}
-      {children}
+      {onToggle ? (
+        <button type="button" className={s.blockToggle} onClick={onToggle} aria-expanded={open} title={open ? t('折りたたむ', 'Collapse') : t('開く', 'Expand')}>
+          {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
+          <span className={s.bold}>{title}</span>
+          {!open && summary && <span className={s.blockSummary}>— {summary}</span>}
+        </button>
+      ) : (
+        <span className={s.bold}>{title}</span>
+      )}
+      {open && right && <div className={s.flexRow}>{right}</div>}
+      {open && children}
     </div>
   )
 }
@@ -492,6 +529,18 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
   const { template, sectionTitles, products, heroes, items, setItems, candidates, setCandidates, drafts, disabled } = p
   const { sections, listOf, isFull, moveInSection, demote, dropKey, setDropKey, startDrag, overTarget, leaveTarget, dropOnSelected, dropOnSelectedArea, dropOnCandidates, promote, addManual, setItemReason, setCandReason, toItems } = useSelection({ template, items, setItems, candidates, setCandidates })
   const [sub, setSub] = useState<number | 'hero' | 'copy'>(p.mode === 'hero' ? 'hero' : 0)
+  // 折りたたんだブロック(「セクション番号:ブロック」)。セクションを切り替えても、それぞれの開閉を覚えておく
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const fold = (key: string) => ({
+    open: !collapsed.has(key),
+    onToggle: () =>
+      setCollapsed((prev) => {
+        const next = new Set(prev)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        return next
+      }),
+  })
   const active: number | 'hero' | 'copy' =
     p.mode === 'hero' ? (sub === 'copy' ? 'copy' : 'hero') : typeof sub === 'number' ? Math.min(sub, sections.length - 1) : 0
   const productById = new Map(products.map((x) => [x.cr854_productid, x]))
@@ -696,6 +745,8 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
 
         {sec.wantTitle && (
           <Block
+            {...fold(`${i}:title`)}
+            summary={currentTitle || t('(未設定)', '(Not set)')}
             title={t('① 見出し(切り口)', '1. Heading (angle)')}
             right={
               <AiButton busy={busyTitle} disabled={noTheme || disabled || anyBusy} onClick={() => selectTitles(sec)}>
@@ -721,6 +772,8 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
         )}
 
         <Block
+          {...fold(`${i}:copy`)}
+          summary={currentCopy || t('(未設定)', '(Not set)')}
           title={`${sec.wantTitle ? '② ' : '① '}${t('コピー', 'Copy')}`}
           right={
             <>
@@ -750,6 +803,12 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
         </Block>
 
         <Block
+          {...fold(`${i}:products`)}
+          summary={
+            list.length
+              ? `${list.map((it) => productById.get(it.productId)?.cr854_name ?? '').filter(Boolean).join(' / ')}${Number.isFinite(sec.slots) ? `(${list.length} / ${sec.slots})` : ''}`
+              : t('(未選定)', '(None selected)')
+          }
           title={`${sec.wantTitle ? '③ ' : '② '}${t('商品', 'Products')}`}
           right={
             <AiButton busy={busyProducts} disabled={noTheme || disabled || anyBusy} onClick={() => selectProducts(sec)}>
@@ -1075,8 +1134,7 @@ export function ContentPane(props: Props) {
 
   return (
     <div className={s.shell}>
-    <div className={s.scroll}>
-    <div className={s.grid12}>
+    <div className={s.head}>
       <Text weight="semibold" size={300}>{t('コンテンツ生成', 'Content generation')}</Text>
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TopTab)}>
         <Tab value="theme" onClick={revealTab}>{`${mark(pr.theme, drafts.themeIdeas.length > 0)}${t('① テーマ', '1. Theme')}`}</Tab>
@@ -1085,6 +1143,9 @@ export function ContentPane(props: Props) {
         <Tab value="sections" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ セクション', '4. Sections')}`}</Tab>
         <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑤ 制作指示', '5. Production notes')}`}</Tab>
       </TabList>
+    </div>
+    <div className={s.scroll}>
+    <div className={s.grid12}>
 
       {tab === 'theme' && (
         <IdeaTab

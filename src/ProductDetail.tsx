@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Avatar, Badge, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Avatar, Badge, Button, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { DismissRegular } from '@fluentui/react-icons'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { productImage } from './images'
 import { yen } from './items'
@@ -41,7 +42,7 @@ const weekLabel = (iso: string) => {
 }
 
 /** 商品の詳細(クリックで開くフロートの中身): 売上・在庫の推移、MD の販売方針と販促計画、商品の基本情報 */
-export function ProductDetail({ product: p }: { product: Cr854_products }) {
+export function ProductDetail({ product: p, onClose }: { product: Cr854_products; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void }) {
   const t = useT()
   const s = useStyles()
   const [tab, setTab] = useState<TabId>('trend')
@@ -66,6 +67,7 @@ export function ProductDetail({ product: p }: { product: Cr854_products }) {
           <span className={s.sub}>{p.cr854_productcode} ・ {optionLabel(p.cr854_categoryname)} ・ {yen(p.cr854_price, market)}</span>
         </div>
         {data?.policy?.stage && <Badge size="small" appearance="tint" color="brand">{data.policy.stage}</Badge>}
+        {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
       </div>
 
       <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabId)}>
