@@ -118,6 +118,8 @@ gcloud scheduler jobs create http ccp-idle-check --project <プロジェクトID
 
 **DB の自動起動**: 画面が `/api/data` を呼んだとき DB が停止中なら、サーバーが起動を依頼して 503(`db_starting`)を返し、画面に「準備中」を出す(**実測で 10〜13 分**。準備ができると自動で読み込み直す)。手動で止める・起動するときは、`gcloud sql instances patch contents-planner-db --activation-policy=NEVER`(停止)/ `ALWAYS`(起動)。
 
+**毎日 21:00(日本時間)に、必ず停止する**: Cloud Scheduler のジョブ `ccp-stop-db-nightly`(`0 21 * * *`、タイムゾーン Asia/Tokyo)が、Cloud SQL の稼働ポリシーを `NEVER` にして、DB を停止する(止め忘れ防止)。**この停止は、下の `keep_until` を見ない**(無条件)。21:00 以降も作業する日は、ジョブを一時停止する(`gcloud scheduler jobs pause ccp-stop-db-nightly --location asia-northeast1 --project <プロジェクトID>`。終わったら `resume`)。止まったあとは、次のアクセスで自動起動する(約 11 分)。
+
 **一時的に、自動停止させない(作業中など)**: バケットに `state/keep_until.json`(`{"ts": <UNIX 秒>}`)を置くと、その時刻までは、アクセスがなくても停止しない。時刻が過ぎれば、自然に効かなくなる(消す必要はない)。
 
 ```bash
