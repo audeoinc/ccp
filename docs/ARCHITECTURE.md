@@ -50,7 +50,7 @@ Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエ�
 | 左 | 配信情報、テーマ・ヘッドライン・コピー・制作指示(AI の理由・切り口つき)、「すべてAIで下書き」 |
 | 中 | `ContentPane.tsx`: テーマ / テンプレート / ヒーロー / セクション / 制作指示のタブ。下半分に `ChatPanel`(AI チャット) |
 | プレビュー | `Preview.tsx`: メール・プッシュのプレビュー。ドラッグ&ドロップで商品を並べ替え |
-| 右端(既定は折りたたみ) | `ProductInfoPane.tsx`: 参照専用の商品の一覧。行を押すと、`ProductDetail.tsx` のフロート(売上・在庫のグラフ、MD 方針) |
+| 右端(既定は開く) | `ProductInfoPane.tsx`: 参照専用の商品の一覧。行を押すと、`ProductDetail.tsx` のフロート(売上・在庫のグラフ、MD 方針。右上の × で閉じる) |
 
 - **選定した商品の操作は、中ペインだけ**(並べ替え、外す、理由の編集)。右端の商品情報は、**参照専用で、操作する部品を置かない**。
 - 選定のロジックは、`useSelection.ts` に集約している。
@@ -100,8 +100,8 @@ Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエ�
 | `ui.lang` | 画面の言語(ja / en) |
 | `cardDetail.autoDraft` | 「開いたとき自動で下書き」のオン・オフ |
 | `cardDetail.paneWidths.v5` | ペインの幅 |
-| `cardDetail.infoOpen` | 商品情報ペインの開閉 |
-| `cardDetail.previewZoom` | プレビューの倍率 |
+| `cardDetail.infoOpen.v2` | 商品情報ペインの開閉(既定は開く) |
+| `cardDetail.previewZoom.v2` | プレビューの倍率(既定は全体 = `fit`) |
 | `chat.paneHeight` | AI チャットの高さ |
 
 形式を変えるときは、キーの版(`.v5`)を上げて、古い値を捨てる。

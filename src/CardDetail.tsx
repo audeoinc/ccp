@@ -123,7 +123,8 @@ function OptionSelect({ label, value, options, onChange }: {
   )
 }
 
-const ZOOM_KEY = 'cardDetail.previewZoom'
+// 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない
+const ZOOM_KEY = 'cardDetail.previewZoom.v2'
 const ZOOM_MIN = 0.4
 const ZOOM_MAX = 1.2
 
@@ -136,26 +137,28 @@ function loadZoom(): number | 'fit' {
   } catch {
     // 読めなければ既定値を使う
   }
-  return 0.7
+  // 既定は、メール全体が見える倍率(作り始めに、構成の全体を見渡せるように)
+  return 'fit'
 }
 
 /** 自動下書きを済ませたカード(同じカードを開き直しても、再実行しない) */
 const autoDrafted = new Set<string>()
 
 const WIDTH_KEY = 'cardDetail.paneWidths.v5'
-const INFO_KEY = 'cardDetail.infoOpen'
+// 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
+const INFO_KEY = 'cardDetail.infoOpen.v2'
 const RAIL_W = 32
 
-/** 商品情報ペインを開くか。保存がなければ、折りたたんでおく */
+/** 商品情報ペインを開くか。保存がなければ、開いておく(選んだ商品の売上・在庫を、すぐ確かめられるように) */
 function loadInfoOpen(): boolean {
   try {
     const v = localStorage.getItem(INFO_KEY)
     if (v === 'open') return true
     if (v === 'closed') return false
   } catch {
-    // 保存を読めないときは、既定(折りたたみ)にする
+    // 保存を読めないときは、既定(開く)にする
   }
-  return false // 既定では折りたたむ
+  return true
 }
 const MIN_W = 220
 const MAX_W = 640
