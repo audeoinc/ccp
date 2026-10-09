@@ -1,0 +1,225 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="Yu Gothic UI, Meiryo, sans-serif">
+<rect x="0.0" y="0.0" width="1440.0" height="900.0" rx="0" fill="#D6D6D6" stroke="#D6D6D6"/>
+<rect x="14.0" y="36.0" width="1411.0" height="828.0" rx="3" fill="#FFFFFF" stroke="#666666"/>
+<text x="32.0" y="70.0" font-size="18" fill="#333333" text-anchor="start" font-weight="bold">秋の新作ニット</text>
+<rect x="1256.0" y="58.0" width="78.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="1295.0" y="73.8" font-size="11" fill="#333333" text-anchor="middle">工程 5 / 5</text>
+<rect x="1344.0" y="58.0" width="28.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1358.0" y="74.2" font-size="12" fill="#333333" text-anchor="middle">…</text>
+<rect x="1384.0" y="56.0" width="28.0" height="28.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1398.0" y="74.2" font-size="12" fill="#333333" text-anchor="middle">×</text>
+<line x1="14.0" y1="104.0" x2="1425.0" y2="104.0" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="326.0" y1="104.0" x2="326.0" y2="804.0" stroke="#BBBBBB" stroke-width="1"/>
+<rect x="31.0" y="116.0" width="268.0" height="32.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
+<text x="165.0" y="136.2" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">✦ すべてAIで下書き</text>
+<text x="31.0" y="162.0" font-size="10" fill="#666666" text-anchor="start">テーマ〜制作指示を、まとめてAIが下書きします</text>
+<text x="31.0" y="192.0" font-size="14" fill="#333333" text-anchor="start" font-weight="bold">配信情報</text>
+<text x="31.0" y="213.0" font-size="11" fill="#333333" text-anchor="start">配信名 *</text>
+<rect x="31.0" y="218.0" width="268.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="234.2" font-size="12" fill="#333333" text-anchor="start">秋の新作ニット</text>
+<text x="31.0" y="259.0" font-size="11" fill="#333333" text-anchor="start">配信日時 *</text>
+<rect x="31.0" y="264.0" width="268.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="280.2" font-size="12" fill="#333333" text-anchor="start">2026/10/02 10:00</text>
+<rect x="277.0" y="270.0" width="14.0" height="12.0" rx="0" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="31.0" y="305.0" font-size="11" fill="#333333" text-anchor="start">国</text>
+<text x="171.0" y="305.0" font-size="11" fill="#333333" text-anchor="start">チャネル</text>
+<rect x="31.0" y="310.0" width="128.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="326.2" font-size="12" fill="#333333" text-anchor="start">JP</text>
+<text x="141.0" y="324.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<rect x="171.0" y="310.0" width="128.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="177.0" y="326.2" font-size="12" fill="#333333" text-anchor="start">メール</text>
+<text x="281.0" y="324.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<text x="31.0" y="355.0" font-size="11" fill="#333333" text-anchor="start">部署</text>
+<text x="171.0" y="355.0" font-size="11" fill="#333333" text-anchor="start">ステータス</text>
+<rect x="31.0" y="360.0" width="128.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="376.2" font-size="12" fill="#333333" text-anchor="start">販促</text>
+<text x="141.0" y="374.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<rect x="171.0" y="360.0" width="128.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="177.0" y="376.2" font-size="12" fill="#333333" text-anchor="start">承認済み</text>
+<text x="281.0" y="374.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<text x="31.0" y="405.0" font-size="11" fill="#333333" text-anchor="start">担当者</text>
+<text x="171.0" y="405.0" font-size="11" fill="#333333" text-anchor="start">制作の締め切り</text>
+<rect x="31.0" y="410.0" width="128.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="426.2" font-size="12" fill="#333333" text-anchor="start">(選択)</text>
+<text x="141.0" y="424.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<rect x="171.0" y="410.0" width="128.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
+<text x="177.0" y="426.2" font-size="12" fill="#333333" text-anchor="start">2026/09/28</text>
+<text x="281.0" y="424.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<text x="31.0" y="462.0" font-size="14" fill="#333333" text-anchor="start" font-weight="bold">工程</text>
+<text x="31.0" y="483.0" font-size="11" fill="#333333" text-anchor="start">テーマ(配信全体の前提。メールには出ない)</text>
+<rect x="31.0" y="488.0" width="268.0" height="34.0" rx="0" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="504.0" font-size="12" fill="#333333" text-anchor="start">ニットで重ねる、秋の新作</text>
+<text x="31.0" y="536.0" font-size="10" fill="#666666" text-anchor="start">AIの理由: 10月初旬で肌寒くなる時期…</text>
+<text x="31.0" y="559.0" font-size="11" fill="#333333" text-anchor="start">掲載商品: 4件(中央の「セクション」で選ぶ)</text>
+<text x="31.0" y="583.0" font-size="11" fill="#333333" text-anchor="start">ヘッドライン(メイン画像に載せる大見出し)</text>
+<rect x="31.0" y="588.0" width="268.0" height="34.0" rx="0" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="604.0" font-size="12" fill="#333333" text-anchor="start">ぬくもりを纏う、秋のニット</text>
+<text x="31.0" y="639.0" font-size="11" fill="#333333" text-anchor="start">コピー(ヘッドラインの下の導入文)</text>
+<rect x="31.0" y="644.0" width="268.0" height="40.0" rx="0" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="660.0" font-size="12" fill="#333333" text-anchor="start">重ねるほどに表情が変わる…</text>
+<text x="31.0" y="698.0" font-size="10" fill="#666666" text-anchor="start">切り口: 商品の魅力</text>
+<text x="31.0" y="723.0" font-size="11" fill="#333333" text-anchor="start">制作指示</text>
+<rect x="31.0" y="728.0" width="268.0" height="60.0" rx="0" fill="#FFFFFF" stroke="#999999"/>
+<text x="37.0" y="744.0" font-size="12" fill="#333333" text-anchor="start">(制作担当への指示)</text>
+<rect x="316.0" y="112.0" width="4.0" height="160.0" rx="0" fill="#616161" stroke="#616161"/>
+<line x1="749.0" y1="104.0" x2="749.0" y2="804.0" stroke="#BBBBBB" stroke-width="1"/>
+<text x="342.0" y="130.0" font-size="14" fill="#333333" text-anchor="start" font-weight="bold">コンテンツ生成</text>
+<rect x="342.0" y="144.0" width="77.0" height="28.0" rx="0" fill="#9E9E9E" stroke="#666666"/>
+<text x="380.5" y="161.5" font-size="10" fill="#FFFFFF" text-anchor="middle">✓ ①テーマ</text>
+<rect x="421.0" y="144.0" width="77.0" height="28.0" rx="0" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="459.5" y="161.5" font-size="10" fill="#333333" text-anchor="middle">✓ ②テンプレート</text>
+<rect x="500.0" y="144.0" width="77.0" height="28.0" rx="0" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="538.5" y="161.5" font-size="10" fill="#333333" text-anchor="middle">✓ ③ヒーロー</text>
+<rect x="579.0" y="144.0" width="77.0" height="28.0" rx="0" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="617.5" y="161.5" font-size="10" fill="#333333" text-anchor="middle">✓ ④セクション</text>
+<rect x="658.0" y="144.0" width="77.0" height="28.0" rx="0" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="696.5" y="161.5" font-size="10" fill="#333333" text-anchor="middle">✓ ⑤制作指示</text>
+<rect x="342.0" y="186.0" width="114.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="399.0" y="202.2" font-size="12" fill="#333333" text-anchor="middle">✦ AIで案を出す</text>
+<text x="342.0" y="233.0" font-size="11" fill="#333333" text-anchor="start">採用中のテーマ(配信全体の前提)</text>
+<rect x="560.0" y="222.0" width="44.0" height="18.0" rx="3" fill="#616161" stroke="#616161"/>
+<text x="582.0" y="234.5" font-size="10" fill="#FFFFFF" text-anchor="middle">採用中</text>
+<rect x="342.0" y="244.0" width="391.0" height="40.0" rx="0" fill="#FFFFFF" stroke="#999999"/>
+<text x="348.0" y="260.0" font-size="12" fill="#333333" text-anchor="start">ニットで重ねる、秋の新作</text>
+<text x="342.0" y="300.0" font-size="10" fill="#666666" text-anchor="start">AIの理由: 10月初旬で肌寒くなる時期。売上上昇中のニット類が主役になる、季節感重視のテーマ。</text>
+<rect x="342.0" y="330.0" width="391.0" height="50.0" rx="0" fill="#FFFFFF" stroke="#BBBBBB"/>
+<text x="352.0" y="348.0" font-size="12" fill="#333333" text-anchor="start" font-weight="bold">案 1: (テーマの案)</text>
+<text x="352.0" y="366.0" font-size="10" fill="#666666" text-anchor="start">理由: (この時期に、このテーマを選ぶ理由)</text>
+<rect x="673.0" y="343.0" width="50.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="698.0" y="359.2" font-size="12" fill="#333333" text-anchor="middle">採用</text>
+<rect x="342.0" y="388.0" width="391.0" height="50.0" rx="0" fill="#FFFFFF" stroke="#BBBBBB"/>
+<text x="352.0" y="406.0" font-size="12" fill="#333333" text-anchor="start" font-weight="bold">案 2: (テーマの案)</text>
+<text x="352.0" y="424.0" font-size="10" fill="#666666" text-anchor="start">理由: (この時期に、このテーマを選ぶ理由)</text>
+<rect x="673.0" y="401.0" width="50.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="698.0" y="417.2" font-size="12" fill="#333333" text-anchor="middle">採用</text>
+<rect x="342.0" y="446.0" width="391.0" height="50.0" rx="0" fill="#FFFFFF" stroke="#BBBBBB"/>
+<text x="352.0" y="464.0" font-size="12" fill="#333333" text-anchor="start" font-weight="bold">案 3: (テーマの案)</text>
+<text x="352.0" y="482.0" font-size="10" fill="#666666" text-anchor="start">理由: (この時期に、このテーマを選ぶ理由)</text>
+<rect x="673.0" y="459.0" width="50.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="698.0" y="475.2" font-size="12" fill="#333333" text-anchor="middle">採用</text>
+<rect x="326.0" y="560.0" width="423.0" height="30.0" rx="0" fill="#F2F2F2" stroke="#BBBBBB"/>
+<text x="332.0" y="579.2" font-size="12" fill="#333333" text-anchor="start">✦ AIチャット — テーマ</text>
+<text x="726.0" y="577.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
+<text x="342.0" y="611.0" font-size="11" fill="#666666" text-anchor="start">このタブの案づくりに、指示を加えられます。</text>
+<rect x="342.0" y="626.0" width="160.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="422.0" y="641.9" font-size="11" fill="#333333" text-anchor="middle">もっとカジュアルな切り口で</text>
+<rect x="510.0" y="626.0" width="110.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="565.0" y="641.9" font-size="11" fill="#333333" text-anchor="middle">季節感を強めて</text>
+<rect x="342.0" y="656.0" width="160.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
+<text x="422.0" y="671.9" font-size="11" fill="#333333" text-anchor="middle">売れ筋の商品を主役にして</text>
+<rect x="342.0" y="748.0" width="351.0" height="40.0" rx="0" fill="#FFFFFF" stroke="#999999"/>
+<text x="348.0" y="763.0" font-size="11" fill="#333333" text-anchor="start">AIへの指示を入力(Enterで送信、Shift+Enterで改行)</text>
+<rect x="701.0" y="752.0" width="32.0" height="32.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="717.0" y="772.2" font-size="12" fill="#333333" text-anchor="middle">➤</text>
+<rect x="766.0" y="116.0" width="58.0" height="30.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
+<text x="795.0" y="135.2" font-size="12" fill="#FFFFFF" text-anchor="middle">メール</text>
+<rect x="824.0" y="116.0" width="72.0" height="30.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="860.0" y="135.2" font-size="12" fill="#333333" text-anchor="middle">プッシュ</text>
+<rect x="1040.0" y="120.0" width="50.0" height="24.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
+<text x="1065.0" y="135.8" font-size="11" fill="#FFFFFF" text-anchor="middle">PC</text>
+<rect x="1090.0" y="120.0" width="50.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1115.0" y="135.8" font-size="11" fill="#333333" text-anchor="middle">スマホ</text>
+<rect x="1158.0" y="120.0" width="24.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1170.0" y="136.2" font-size="12" fill="#333333" text-anchor="middle">−</text>
+<rect x="1188.0" y="130.0" width="80.0" height="4.0" rx="0" fill="#616161" stroke="#616161"/>
+<rect x="1274.0" y="120.0" width="24.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1286.0" y="136.2" font-size="12" fill="#333333" text-anchor="middle">＋</text>
+<text x="1302.0" y="134.0" font-size="11" fill="#333333" text-anchor="start">70%</text>
+<rect x="1336.0" y="120.0" width="48.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1360.0" y="135.8" font-size="11" fill="#333333" text-anchor="middle">全体</text>
+<text x="934.0" y="170.0" font-size="10" fill="#333333" text-anchor="start">件名: 秋の新作ニット</text>
+<text x="934.0" y="186.0" font-size="10" fill="#666666" text-anchor="start">プリヘッダー: 重ねるほどに表情が変わる…</text>
+<rect x="934.0" y="196.0" width="277.0" height="604.0" rx="0" fill="#FFFFFF" stroke="#BBBBBB"/>
+<rect x="934.0" y="196.0" width="277.0" height="22.0" rx="0" fill="#616161" stroke="#616161"/>
+<text x="1072.5" y="210.5" font-size="10" fill="#FFFFFF" text-anchor="middle">SHOP</text>
+<rect x="934.0" y="218.0" width="277.0" height="120.0" rx="0" fill="#E0E0E0" stroke="#999999"/>
+<text x="1072.5" y="281.9" font-size="11" fill="#333333" text-anchor="middle">メイン画像</text>
+<line x1="934.0" y1="218.0" x2="1211.0" y2="338.0" stroke="#BDBDBD" stroke-width="1"/>
+<line x1="1211.0" y1="218.0" x2="934.0" y2="338.0" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="934.0" y="338.0" width="277.0" height="44.0" rx="0" fill="#CCCCCC" stroke="#757575"/>
+<text x="1072.5" y="356.7" font-size="11" fill="#333333" text-anchor="middle">ヘッドライン</text>
+<text x="1072.5" y="371.0" font-size="11" fill="#333333" text-anchor="middle">コピー</text>
+<text x="1072.5" y="398.0" font-size="10" fill="#333333" text-anchor="middle">セクションの見出し・コピー</text>
+<rect x="944.0" y="408.0" width="125.0" height="110.0" rx="0" fill="#E0E0E0" stroke="#999999"/>
+<text x="1006.5" y="466.9" font-size="11" fill="#333333" text-anchor="middle">商品画像</text>
+<line x1="944.0" y1="408.0" x2="1069.0" y2="518.0" stroke="#BDBDBD" stroke-width="1"/>
+<line x1="1069.0" y1="408.0" x2="944.0" y2="518.0" stroke="#BDBDBD" stroke-width="1"/>
+<text x="944.0" y="532.0" font-size="10" fill="#333333" text-anchor="start">商品名</text>
+<text x="944.0" y="545.0" font-size="10" fill="#333333" text-anchor="start">¥0,000</text>
+<rect x="944.0" y="554.0" width="125.0" height="16.0" rx="0" fill="#616161" stroke="#616161"/>
+<text x="1006.5" y="565.1" font-size="9" fill="#FFFFFF" text-anchor="middle">詳細はこちら</text>
+<rect x="1077.0" y="408.0" width="125.0" height="110.0" rx="0" fill="#E0E0E0" stroke="#999999"/>
+<text x="1139.5" y="466.9" font-size="11" fill="#333333" text-anchor="middle">商品画像</text>
+<line x1="1077.0" y1="408.0" x2="1202.0" y2="518.0" stroke="#BDBDBD" stroke-width="1"/>
+<line x1="1202.0" y1="408.0" x2="1077.0" y2="518.0" stroke="#BDBDBD" stroke-width="1"/>
+<text x="1077.0" y="532.0" font-size="10" fill="#333333" text-anchor="start">商品名</text>
+<text x="1077.0" y="545.0" font-size="10" fill="#333333" text-anchor="start">¥0,000</text>
+<rect x="1077.0" y="554.0" width="125.0" height="16.0" rx="0" fill="#616161" stroke="#616161"/>
+<text x="1139.5" y="565.1" font-size="9" fill="#FFFFFF" text-anchor="middle">詳細はこちら</text>
+<rect x="944.0" y="578.0" width="125.0" height="110.0" rx="0" fill="#E0E0E0" stroke="#999999"/>
+<text x="1006.5" y="636.9" font-size="11" fill="#333333" text-anchor="middle">商品画像</text>
+<line x1="944.0" y1="578.0" x2="1069.0" y2="688.0" stroke="#BDBDBD" stroke-width="1"/>
+<line x1="1069.0" y1="578.0" x2="944.0" y2="688.0" stroke="#BDBDBD" stroke-width="1"/>
+<text x="944.0" y="702.0" font-size="10" fill="#333333" text-anchor="start">商品名</text>
+<text x="944.0" y="715.0" font-size="10" fill="#333333" text-anchor="start">¥0,000</text>
+<rect x="944.0" y="724.0" width="125.0" height="16.0" rx="0" fill="#616161" stroke="#616161"/>
+<text x="1006.5" y="735.1" font-size="9" fill="#FFFFFF" text-anchor="middle">詳細はこちら</text>
+<rect x="1077.0" y="578.0" width="125.0" height="110.0" rx="0" fill="#E0E0E0" stroke="#999999"/>
+<text x="1139.5" y="636.9" font-size="11" fill="#333333" text-anchor="middle">商品画像</text>
+<line x1="1077.0" y1="578.0" x2="1202.0" y2="688.0" stroke="#BDBDBD" stroke-width="1"/>
+<line x1="1202.0" y1="578.0" x2="1077.0" y2="688.0" stroke="#BDBDBD" stroke-width="1"/>
+<text x="1077.0" y="702.0" font-size="10" fill="#333333" text-anchor="start">商品名</text>
+<text x="1077.0" y="715.0" font-size="10" fill="#333333" text-anchor="start">¥0,000</text>
+<rect x="1077.0" y="724.0" width="125.0" height="16.0" rx="0" fill="#616161" stroke="#616161"/>
+<text x="1139.5" y="735.1" font-size="9" fill="#FFFFFF" text-anchor="middle">詳細はこちら</text>
+<line x1="1395.0" y1="104.0" x2="1395.0" y2="804.0" stroke="#BBBBBB" stroke-width="1"/>
+<rect x="1395.0" y="104.0" width="30.0" height="700.0" rx="0" fill="#F2F2F2" stroke="#BBBBBB"/>
+<text x="1410.0" y="119.0" font-size="11" fill="#333333" text-anchor="middle">‹</text>
+<text x="1410.0" y="133.3" font-size="11" fill="#333333" text-anchor="middle">商</text>
+<text x="1410.0" y="147.6" font-size="11" fill="#333333" text-anchor="middle">品</text>
+<text x="1410.0" y="161.9" font-size="11" fill="#333333" text-anchor="middle">情</text>
+<text x="1410.0" y="176.2" font-size="11" fill="#333333" text-anchor="middle">報</text>
+<line x1="14.0" y1="804.0" x2="1425.0" y2="804.0" stroke="#BBBBBB" stroke-width="1"/>
+<rect x="1213.0" y="818.0" width="90.0" height="30.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
+<text x="1258.0" y="837.2" font-size="12" fill="#333333" text-anchor="middle">キャンセル</text>
+<rect x="1313.0" y="818.0" width="96.0" height="30.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
+<text x="1361.0" y="837.2" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">保存</text>
+<circle cx="191" cy="63" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="191" y="67" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
+<circle cx="1295" cy="95" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1295" y="99" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2</text>
+<circle cx="1358" cy="95" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1358" y="99" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">3</text>
+<circle cx="1398" cy="97" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1398" y="101" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">4</text>
+<circle cx="299" cy="117" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="299" y="121" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">5</text>
+<circle cx="111" cy="187" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="111" y="191" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">6</text>
+<circle cx="77" cy="457" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="77" y="461" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">7</text>
+<circle cx="463" cy="125" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="463" y="129" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">8</text>
+<circle cx="473" cy="197" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="473" y="201" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">9</text>
+<circle cx="623" cy="231" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="623" y="235" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">10</text>
+<circle cx="341" cy="331" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="341" y="335" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">11</text>
+<circle cx="531" cy="575" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="531" y="579" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">12</text>
+<circle cx="911" cy="131" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="911" y="135" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">13</text>
+<circle cx="1041" cy="107" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1041" y="111" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">14</text>
+<circle cx="1159" cy="107" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1159" y="111" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">15</text>
+<circle cx="911" cy="171" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="911" y="175" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">16</text>
+<circle cx="919" cy="211" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="919" y="215" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">17</text>
+<circle cx="1381" cy="171" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1381" y="175" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">18</text>
+<circle cx="1199" cy="833" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1199" y="837" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">19</text>
+</svg>
