@@ -1,69 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="Yu Gothic UI, Meiryo, sans-serif">
-<rect x="0.0" y="0.0" width="1440.0" height="900.0" rx="0" fill="#FFFFFF" stroke="#BBBBBB"/>
-<rect x="0.0" y="0.0" width="1440.0" height="44.0" rx="0" fill="#F2F2F2" stroke="#BBBBBB"/>
-<rect x="14.0" y="12.0" width="20.0" height="20.0" rx="0" fill="#E0E0E0" stroke="#999999"/>
-<text x="42.0" y="27.0" font-size="16" fill="#333333" text-anchor="start" font-weight="bold">配信カレンダー</text>
-<rect x="841.0" y="10.0" width="114.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="898.0" y="26.2" font-size="12" fill="#333333" text-anchor="middle">テンプレート</text>
-<rect x="970.0" y="10.0" width="52.0" height="24.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
-<text x="996.0" y="26.2" font-size="12" fill="#FFFFFF" text-anchor="middle">日本語</text>
-<rect x="1022.0" y="10.0" width="60.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="1052.0" y="26.2" font-size="12" fill="#333333" text-anchor="middle">English</text>
-<rect x="1096.0" y="13.0" width="34.0" height="18.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
-<text x="1136.0" y="24.0" font-size="11" fill="#333333" text-anchor="start">開いたとき自動で下書き  オン</text>
-<rect x="1330.0" y="10.0" width="90.0" height="24.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
-<text x="1375.0" y="26.2" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">＋ 新規作成</text>
-<text x="136.0" y="79.0" font-size="11" fill="#333333" text-anchor="start">国</text>
-<rect x="136.0" y="89.0" width="130.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
-<text x="142.0" y="105.2" font-size="12" fill="#333333" text-anchor="start">すべて</text>
-<text x="248.0" y="103.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
-<text x="278.0" y="79.0" font-size="11" fill="#333333" text-anchor="start">チャネル</text>
-<rect x="278.0" y="89.0" width="130.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
-<text x="284.0" y="105.2" font-size="12" fill="#333333" text-anchor="start">すべて</text>
-<text x="390.0" y="103.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
-<text x="420.0" y="79.0" font-size="11" fill="#333333" text-anchor="start">部署</text>
-<rect x="420.0" y="89.0" width="130.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
-<text x="426.0" y="105.2" font-size="12" fill="#333333" text-anchor="start">すべて</text>
-<text x="532.0" y="103.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
-<text x="562.0" y="79.0" font-size="11" fill="#333333" text-anchor="start">ステータス</text>
-<rect x="562.0" y="89.0" width="130.0" height="24.0" rx="3" fill="#FFFFFF" stroke="#999999"/>
-<text x="568.0" y="105.2" font-size="12" fill="#333333" text-anchor="start">すべて</text>
-<text x="674.0" y="103.0" font-size="11" fill="#666666" text-anchor="start">▾</text>
-<text x="1302.0" y="104.0" font-size="12" fill="#333333" text-anchor="end">30 / 30 件</text>
-<rect x="136.0" y="130.0" width="24.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="148.0" y="146.2" font-size="12" fill="#333333" text-anchor="middle">‹</text>
-<text x="228.0" y="145.0" font-size="16" fill="#333333" text-anchor="middle" font-weight="bold">2026年10月</text>
-<rect x="296.0" y="130.0" width="24.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="308.0" y="146.2" font-size="12" fill="#333333" text-anchor="middle">›</text>
-<rect x="340.0" y="130.0" width="48.0" height="24.0" rx="3" fill="#9E9E9E" stroke="#666666"/>
-<text x="364.0" y="146.2" font-size="12" fill="#FFFFFF" text-anchor="middle">月</text>
-<rect x="388.0" y="130.0" width="48.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="412.0" y="146.2" font-size="12" fill="#333333" text-anchor="middle">週</text>
-<rect x="436.0" y="130.0" width="48.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="460.0" y="146.2" font-size="12" fill="#333333" text-anchor="middle">一覧</text>
-<rect x="498.0" y="130.0" width="84.0" height="24.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="540.0" y="146.2" font-size="12" fill="#333333" text-anchor="middle">書き出し</text>
-<rect x="1006.0" y="130.0" width="70.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
-<rect x="1014.0" y="137.0" width="10.0" height="10.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="1028.0" y="145.0" font-size="11" fill="#333333" text-anchor="start">未起案</text>
-<rect x="1080.0" y="130.0" width="70.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
-<rect x="1088.0" y="137.0" width="10.0" height="10.0" rx="0" fill="#E0E0E0" stroke="#9E9E9E"/>
-<text x="1102.0" y="145.0" font-size="11" fill="#333333" text-anchor="start">検討中</text>
-<rect x="1154.0" y="130.0" width="70.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
-<rect x="1162.0" y="137.0" width="10.0" height="10.0" rx="0" fill="#CCCCCC" stroke="#757575"/>
-<text x="1176.0" y="145.0" font-size="11" fill="#333333" text-anchor="start">承認済み</text>
-<rect x="1228.0" y="130.0" width="70.0" height="24.0" rx="3" fill="#F5F5F5" stroke="#AAAAAA"/>
-<rect x="1236.0" y="137.0" width="10.0" height="10.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="1250.0" y="145.0" font-size="11" fill="#333333" text-anchor="start">確定</text>
-<rect x="136.0" y="163.0" width="1166.0" height="637.0" rx="0" fill="#FFFFFF" stroke="#666666"/>
-<text x="219.3" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">日</text>
-<text x="385.9" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">月</text>
-<text x="552.4" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">火</text>
-<text x="719.0" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">水</text>
-<text x="885.6" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">木</text>
-<text x="1052.1" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">金</text>
-<text x="1218.7" y="183.0" font-size="12" fill="#333333" text-anchor="middle" font-weight="bold">土</text>
-<line x1="136.0" y1="195.0" x2="1302.0" y2="195.0" stroke="#BBBBBB" stroke-width="1"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="Segoe UI, Arial, sans-serif">
+<rect x="0" y="0" width="1440" height="900" fill="#FFFFFF"/>
+<rect x="0.0" y="0.0" width="1440.0" height="900.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="0.0" y1="44.0" x2="1440.0" y2="44.0" stroke="#888888" stroke-width="1"/>
+<rect x="14.0" y="12.0" width="20.0" height="20.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="24.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">▦</text>
+<text x="42.0" y="27.0" font-size="16" fill="#222222" text-anchor="start" font-weight="bold">Delivery Calendar</text>
+<rect x="841.0" y="10.0" width="114.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="898.0" y="26.2" font-size="12" fill="#222222" text-anchor="middle">Templates</text>
+<rect x="970.0" y="10.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="998.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">日本語</text>
+<rect x="1026.0" y="10.0" width="60.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="1056.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">English</text>
+<rect x="1096.0" y="13.0" width="34.0" height="18.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1126.0" y="25.5" font-size="10" fill="#222222" text-anchor="end">●</text>
+<text x="1136.0" y="24.0" font-size="11" fill="#222222" text-anchor="start">Auto-draft on open: On</text>
+<rect x="1330.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="1375.0" y="26.2" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">+ New</text>
+<text x="136.0" y="79.0" font-size="11" fill="#222222" text-anchor="start">Channel</text>
+<rect x="136.0" y="89.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="142.0" y="105.2" font-size="12" fill="#222222" text-anchor="start">All</text>
+<text x="248.0" y="103.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="278.0" y="79.0" font-size="11" fill="#222222" text-anchor="start">Department</text>
+<rect x="278.0" y="89.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="284.0" y="105.2" font-size="12" fill="#222222" text-anchor="start">All</text>
+<text x="390.0" y="103.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="420.0" y="79.0" font-size="11" fill="#222222" text-anchor="start">Status</text>
+<rect x="420.0" y="89.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="426.0" y="105.2" font-size="12" fill="#222222" text-anchor="start">All</text>
+<text x="532.0" y="103.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="1302.0" y="104.0" font-size="12" fill="#222222" text-anchor="end">30 / 30 items</text>
+<rect x="136.0" y="130.0" width="24.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="148.0" y="146.2" font-size="12" fill="#222222" text-anchor="middle">‹</text>
+<text x="228.0" y="145.0" font-size="16" fill="#222222" text-anchor="middle" font-weight="bold">October 2026</text>
+<rect x="296.0" y="130.0" width="24.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="308.0" y="146.2" font-size="12" fill="#222222" text-anchor="middle">›</text>
+<rect x="340.0" y="130.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="368.0" y="145.8" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">Month</text>
+<rect x="396.0" y="130.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="424.0" y="145.8" font-size="11" fill="#222222" text-anchor="middle">Week</text>
+<rect x="452.0" y="130.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="480.0" y="145.8" font-size="11" fill="#222222" text-anchor="middle">List</text>
+<rect x="522.0" y="130.0" width="76.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="560.0" y="145.8" font-size="11" fill="#222222" text-anchor="middle">Export</text>
+<text x="1302.0" y="145.0" font-size="11" fill="#777777" text-anchor="end">Status:  Not started · In review · Approved · Confirmed</text>
+<rect x="136.0" y="163.0" width="1166.0" height="637.0" rx="0" fill="none" stroke="#222222" stroke-width="1"/>
+<text x="219.3" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Sun</text>
+<text x="385.9" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Mon</text>
+<text x="552.4" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Tue</text>
+<text x="719.0" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Wed</text>
+<text x="885.6" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Thu</text>
+<text x="1052.1" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Fri</text>
+<text x="1218.7" y="183.0" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Sat</text>
+<line x1="136.0" y1="195.0" x2="1302.0" y2="195.0" stroke="#888888" stroke-width="1"/>
 <line x1="136.0" y1="316.0" x2="1302.0" y2="316.0" stroke="#BBBBBB" stroke-width="1"/>
 <line x1="136.0" y1="437.0" x2="1302.0" y2="437.0" stroke="#BBBBBB" stroke-width="1"/>
 <line x1="136.0" y1="558.0" x2="1302.0" y2="558.0" stroke="#BBBBBB" stroke-width="1"/>
@@ -74,190 +62,160 @@
 <line x1="802.3" y1="163.0" x2="802.3" y2="800.0" stroke="#BBBBBB" stroke-width="1"/>
 <line x1="968.9" y1="163.0" x2="968.9" y2="800.0" stroke="#BBBBBB" stroke-width="1"/>
 <line x1="1135.4" y1="163.0" x2="1135.4" y2="800.0" stroke="#BBBBBB" stroke-width="1"/>
-<text x="144.0" y="214.0" font-size="12" fill="#999999" text-anchor="start">27</text>
-<text x="310.6" y="214.0" font-size="12" fill="#999999" text-anchor="start">28</text>
-<text x="477.1" y="214.0" font-size="12" fill="#999999" text-anchor="start">29</text>
-<text x="643.7" y="214.0" font-size="12" fill="#999999" text-anchor="start">30</text>
-<text x="810.3" y="214.0" font-size="12" fill="#333333" text-anchor="start">1</text>
-<rect x="807.3" y="228.0" width="156.6" height="34.0" rx="0" fill="#CCCCCC" stroke="#757575"/>
-<text x="813.3" y="241.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="813.3" y="256.0" font-size="11" fill="#333333" text-anchor="start">Fall Arrivals</text>
-<rect x="807.3" y="228.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="976.9" y="214.0" font-size="12" fill="#333333" text-anchor="start">2</text>
-<rect x="973.9" y="228.0" width="156.6" height="34.0" rx="0" fill="#CCCCCC" stroke="#757575"/>
-<text x="979.9" y="241.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="979.9" y="256.0" font-size="11" fill="#333333" text-anchor="start">秋の新作ニット</text>
-<rect x="973.9" y="228.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="1143.4" y="214.0" font-size="12" fill="#333333" text-anchor="start">3</text>
-<rect x="1140.4" y="228.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="1146.4" y="241.7" font-size="11" fill="#333333" text-anchor="start">09:00 ・</text>
-<text x="1146.4" y="256.0" font-size="11" fill="#333333" text-anchor="start">Weekend Sale</text>
-<rect x="1140.4" y="228.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<rect x="1140.4" y="266.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="1146.4" y="279.7" font-size="11" fill="#333333" text-anchor="start">18:00 ・</text>
-<text x="1146.4" y="294.0" font-size="11" fill="#333333" text-anchor="start">Flash Deal</text>
-<rect x="1140.4" y="266.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="144.0" y="335.0" font-size="12" fill="#333333" text-anchor="start">4</text>
-<rect x="141.0" y="349.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="147.0" y="362.7" font-size="11" fill="#333333" text-anchor="start">09:00 ・</text>
-<text x="147.0" y="377.0" font-size="11" fill="#333333" text-anchor="start">週末セール</text>
-<rect x="141.0" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<rect x="141.0" y="387.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="147.0" y="400.7" font-size="11" fill="#333333" text-anchor="start">18:00 ・</text>
-<text x="147.0" y="415.0" font-size="11" fill="#333333" text-anchor="start">タイムセール</text>
-<rect x="141.0" y="387.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<rect x="306.6" y="321.0" width="22.0" height="22.0" rx="3" fill="#616161" stroke="#616161"/>
-<text x="317.6" y="335.9" font-size="11" fill="#FFFFFF" text-anchor="middle">5</text>
-<rect x="307.6" y="349.0" width="156.6" height="34.0" rx="0" fill="#E0E0E0" stroke="#9E9E9E"/>
-<text x="313.6" y="362.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="313.6" y="377.0" font-size="11" fill="#333333" text-anchor="start">秋の新作を先取り</text>
-<rect x="307.6" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="477.1" y="335.0" font-size="12" fill="#333333" text-anchor="start">6</text>
-<rect x="474.1" y="349.0" width="156.6" height="34.0" rx="0" fill="#E0E0E0" stroke="#9E9E9E"/>
-<text x="480.1" y="362.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="480.1" y="377.0" font-size="11" fill="#333333" text-anchor="start">アウター特集</text>
-<rect x="474.1" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="643.7" y="335.0" font-size="12" fill="#333333" text-anchor="start">7</text>
-<rect x="640.7" y="349.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="646.7" y="362.7" font-size="11" fill="#333333" text-anchor="start">12:00 ・</text>
-<text x="646.7" y="377.0" font-size="11" fill="#333333" text-anchor="start">Rainy Day Picks</text>
-<rect x="640.7" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="810.3" y="335.0" font-size="12" fill="#333333" text-anchor="start">8</text>
-<rect x="807.3" y="349.0" width="156.6" height="34.0" rx="0" fill="#E0E0E0" stroke="#9E9E9E"/>
-<text x="813.3" y="362.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="813.3" y="377.0" font-size="11" fill="#333333" text-anchor="start">Outerwear Guide</text>
-<rect x="807.3" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="976.9" y="335.0" font-size="12" fill="#333333" text-anchor="start">9</text>
-<rect x="973.9" y="349.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="979.9" y="362.7" font-size="11" fill="#333333" text-anchor="start">12:00 ・</text>
-<text x="979.9" y="377.0" font-size="11" fill="#333333" text-anchor="start">雨の日のおすすめ</text>
-<rect x="973.9" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="1143.4" y="335.0" font-size="12" fill="#333333" text-anchor="start">10</text>
-<rect x="1140.4" y="349.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="1146.4" y="362.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="1146.4" y="377.0" font-size="11" fill="#333333" text-anchor="start">Member Week</text>
-<rect x="1140.4" y="349.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<rect x="1140.4" y="387.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="1146.4" y="400.7" font-size="11" fill="#333333" text-anchor="start">18:00 ・</text>
-<text x="1146.4" y="415.0" font-size="11" fill="#333333" text-anchor="start">Reminder</text>
-<rect x="1140.4" y="387.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="144.0" y="456.0" font-size="12" fill="#333333" text-anchor="start">11</text>
-<rect x="141.0" y="470.0" width="156.6" height="34.0" rx="0" fill="#B0B0B0" stroke="#424242"/>
-<text x="147.0" y="483.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="147.0" y="498.0" font-size="11" fill="#333333" text-anchor="start">会員感謝ウィーク</text>
-<rect x="141.0" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="310.6" y="456.0" font-size="12" fill="#333333" text-anchor="start">12</text>
-<rect x="307.6" y="470.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="313.6" y="483.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="313.6" y="498.0" font-size="11" fill="#333333" text-anchor="start">New Knits</text>
-<rect x="307.6" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="477.1" y="456.0" font-size="12" fill="#333333" text-anchor="start">13</text>
-<rect x="474.1" y="470.0" width="156.6" height="34.0" rx="0" fill="#E0E0E0" stroke="#9E9E9E"/>
-<text x="480.1" y="483.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="480.1" y="498.0" font-size="11" fill="#333333" text-anchor="start">ブーツ特集</text>
-<rect x="474.1" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="643.7" y="456.0" font-size="12" fill="#333333" text-anchor="start">14</text>
-<rect x="640.7" y="470.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="646.7" y="483.7" font-size="11" fill="#333333" text-anchor="start">12:00 ・</text>
-<text x="646.7" y="498.0" font-size="11" fill="#333333" text-anchor="start">Price Drop</text>
-<rect x="640.7" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="810.3" y="456.0" font-size="12" fill="#333333" text-anchor="start">15</text>
-<rect x="807.3" y="470.0" width="156.6" height="34.0" rx="0" fill="#E0E0E0" stroke="#9E9E9E"/>
-<text x="813.3" y="483.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="813.3" y="498.0" font-size="11" fill="#333333" text-anchor="start">Boots Edit</text>
-<rect x="807.3" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="976.9" y="456.0" font-size="12" fill="#333333" text-anchor="start">16</text>
-<rect x="973.9" y="470.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="979.9" y="483.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="979.9" y="498.0" font-size="11" fill="#333333" text-anchor="start">ハロウィン企画</text>
-<rect x="973.9" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="1143.4" y="456.0" font-size="12" fill="#333333" text-anchor="start">17</text>
-<rect x="1140.4" y="470.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="1146.4" y="483.7" font-size="11" fill="#333333" text-anchor="start">09:00 ・</text>
-<text x="1146.4" y="498.0" font-size="11" fill="#333333" text-anchor="start">Weekend Sale</text>
-<rect x="1140.4" y="470.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="144.0" y="577.0" font-size="12" fill="#333333" text-anchor="start">18</text>
-<text x="310.6" y="577.0" font-size="12" fill="#333333" text-anchor="start">19</text>
-<rect x="307.6" y="591.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="313.6" y="604.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="313.6" y="619.0" font-size="11" fill="#333333" text-anchor="start">Holiday Preview</text>
-<rect x="307.6" y="591.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="477.1" y="577.0" font-size="12" fill="#333333" text-anchor="start">20</text>
-<rect x="474.1" y="591.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="480.1" y="604.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="480.1" y="619.0" font-size="11" fill="#333333" text-anchor="start">冬支度スタート</text>
-<rect x="474.1" y="591.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="643.7" y="577.0" font-size="12" fill="#333333" text-anchor="start">21</text>
-<text x="810.3" y="577.0" font-size="12" fill="#333333" text-anchor="start">22</text>
-<rect x="807.3" y="591.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="813.3" y="604.7" font-size="11" fill="#333333" text-anchor="start">18:00 ・</text>
-<text x="813.3" y="619.0" font-size="11" fill="#333333" text-anchor="start">Flash Deal</text>
-<rect x="807.3" y="591.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="976.9" y="577.0" font-size="12" fill="#333333" text-anchor="start">23</text>
-<rect x="973.9" y="591.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="979.9" y="604.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="979.9" y="619.0" font-size="11" fill="#333333" text-anchor="start">ルームウェア特集</text>
-<rect x="973.9" y="591.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="1143.4" y="577.0" font-size="12" fill="#333333" text-anchor="start">24</text>
-<rect x="1140.4" y="591.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="1146.4" y="604.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="1146.4" y="619.0" font-size="11" fill="#333333" text-anchor="start">Halloween</text>
-<rect x="1140.4" y="591.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="144.0" y="698.0" font-size="12" fill="#333333" text-anchor="start">25</text>
-<text x="310.6" y="698.0" font-size="12" fill="#333333" text-anchor="start">26</text>
-<rect x="307.6" y="712.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="313.6" y="725.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="313.6" y="740.0" font-size="11" fill="#333333" text-anchor="start">Cozy Home</text>
-<rect x="307.6" y="712.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="477.1" y="698.0" font-size="12" fill="#333333" text-anchor="start">27</text>
-<rect x="474.1" y="712.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="480.1" y="725.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="480.1" y="740.0" font-size="11" fill="#333333" text-anchor="start">ブラックフライデー予告</text>
-<rect x="474.1" y="712.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="643.7" y="698.0" font-size="12" fill="#333333" text-anchor="start">28</text>
-<text x="810.3" y="698.0" font-size="12" fill="#333333" text-anchor="start">29</text>
-<rect x="807.3" y="712.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="813.3" y="725.7" font-size="11" fill="#333333" text-anchor="start">10:00 ・</text>
-<text x="813.3" y="740.0" font-size="11" fill="#333333" text-anchor="start">Early Black Friday</text>
-<rect x="807.3" y="712.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="976.9" y="698.0" font-size="12" fill="#333333" text-anchor="start">30</text>
-<rect x="973.9" y="712.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="979.9" y="725.7" font-size="11" fill="#333333" text-anchor="start">12:00 ・</text>
-<text x="979.9" y="740.0" font-size="11" fill="#333333" text-anchor="start">ラストコール</text>
-<rect x="973.9" y="712.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<text x="1143.4" y="698.0" font-size="12" fill="#333333" text-anchor="start">31</text>
-<rect x="1140.4" y="712.0" width="156.6" height="34.0" rx="0" fill="#F5F5F5" stroke="#BDBDBD"/>
-<text x="1146.4" y="725.7" font-size="11" fill="#333333" text-anchor="start">12:00 ・</text>
-<text x="1146.4" y="740.0" font-size="11" fill="#333333" text-anchor="start">Last Call</text>
-<rect x="1140.4" y="712.0" width="4.0" height="34.0" rx="0" fill="#616161" stroke="#616161"/>
-<rect x="774.3" y="563.0" width="22.0" height="22.0" rx="3" fill="#EEEEEE" stroke="#888888"/>
-<text x="785.3" y="578.2" font-size="12" fill="#333333" text-anchor="middle">＋</text>
-<circle cx="171" cy="22" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
-<text x="171" y="26" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
-<circle cx="841" cy="11" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="144.0" y="214.0" font-size="12" fill="#777777" text-anchor="start">27</text>
+<text x="310.6" y="214.0" font-size="12" fill="#777777" text-anchor="start">28</text>
+<text x="477.1" y="214.0" font-size="12" fill="#777777" text-anchor="start">29</text>
+<text x="643.7" y="214.0" font-size="12" fill="#777777" text-anchor="start">30</text>
+<text x="810.3" y="214.0" font-size="12" fill="#222222" text-anchor="start">1</text>
+<rect x="807.3" y="228.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="813.3" y="240.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Approved</text>
+<text x="813.3" y="256.0" font-size="11" fill="#222222" text-anchor="start">Fall Arrivals</text>
+<text x="976.9" y="214.0" font-size="12" fill="#222222" text-anchor="start">2</text>
+<rect x="973.9" y="228.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="979.9" y="240.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Approved</text>
+<text x="979.9" y="256.0" font-size="11" fill="#222222" text-anchor="start">Fall Knits</text>
+<text x="1143.4" y="214.0" font-size="12" fill="#222222" text-anchor="start">3</text>
+<rect x="1140.4" y="228.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="240.0" font-size="10" fill="#777777" text-anchor="start">09:00 · Confirmed</text>
+<text x="1146.4" y="256.0" font-size="11" fill="#222222" text-anchor="start">Weekend Sale</text>
+<rect x="1140.4" y="266.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="278.0" font-size="10" fill="#777777" text-anchor="start">18:00 · Confirmed</text>
+<text x="1146.4" y="294.0" font-size="11" fill="#222222" text-anchor="start">Flash Deal</text>
+<text x="144.0" y="335.0" font-size="12" fill="#222222" text-anchor="start">4</text>
+<rect x="141.0" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="147.0" y="361.0" font-size="10" fill="#777777" text-anchor="start">09:00 · Confirmed</text>
+<text x="147.0" y="377.0" font-size="11" fill="#222222" text-anchor="start">Sunday Picks</text>
+<rect x="141.0" y="387.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="147.0" y="399.0" font-size="10" fill="#777777" text-anchor="start">18:00 · Confirmed</text>
+<text x="147.0" y="415.0" font-size="11" fill="#222222" text-anchor="start">Time Sale</text>
+<rect x="306.6" y="321.0" width="22.0" height="22.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="317.6" y="335.9" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">5</text>
+<rect x="307.6" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="313.6" y="361.0" font-size="10" fill="#777777" text-anchor="start">10:00 · In review</text>
+<text x="313.6" y="377.0" font-size="11" fill="#222222" text-anchor="start">Fall Preview</text>
+<text x="477.1" y="335.0" font-size="12" fill="#222222" text-anchor="start">6</text>
+<rect x="474.1" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="480.1" y="361.0" font-size="10" fill="#777777" text-anchor="start">10:00 · In review</text>
+<text x="480.1" y="377.0" font-size="11" fill="#222222" text-anchor="start">Outerwear Edit</text>
+<text x="643.7" y="335.0" font-size="12" fill="#222222" text-anchor="start">7</text>
+<rect x="640.7" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="646.7" y="361.0" font-size="10" fill="#777777" text-anchor="start">12:00 · Not started</text>
+<text x="646.7" y="377.0" font-size="11" fill="#222222" text-anchor="start">Rainy Day Picks</text>
+<text x="810.3" y="335.0" font-size="12" fill="#222222" text-anchor="start">8</text>
+<rect x="807.3" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="813.3" y="361.0" font-size="10" fill="#777777" text-anchor="start">10:00 · In review</text>
+<text x="813.3" y="377.0" font-size="11" fill="#222222" text-anchor="start">Outerwear Guide</text>
+<text x="976.9" y="335.0" font-size="12" fill="#222222" text-anchor="start">9</text>
+<rect x="973.9" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="979.9" y="361.0" font-size="10" fill="#777777" text-anchor="start">12:00 · Not started</text>
+<text x="979.9" y="377.0" font-size="11" fill="#222222" text-anchor="start">Cozy Layers</text>
+<text x="1143.4" y="335.0" font-size="12" fill="#222222" text-anchor="start">10</text>
+<rect x="1140.4" y="349.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="361.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Confirmed</text>
+<text x="1146.4" y="377.0" font-size="11" fill="#222222" text-anchor="start">Member Week</text>
+<rect x="1140.4" y="387.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="399.0" font-size="10" fill="#777777" text-anchor="start">18:00 · Confirmed</text>
+<text x="1146.4" y="415.0" font-size="11" fill="#222222" text-anchor="start">Reminder</text>
+<text x="144.0" y="456.0" font-size="12" fill="#222222" text-anchor="start">11</text>
+<rect x="141.0" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="147.0" y="482.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Confirmed</text>
+<text x="147.0" y="498.0" font-size="11" fill="#222222" text-anchor="start">Member Thanks</text>
+<text x="310.6" y="456.0" font-size="12" fill="#222222" text-anchor="start">12</text>
+<rect x="307.6" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="313.6" y="482.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="313.6" y="498.0" font-size="11" fill="#222222" text-anchor="start">New Knits</text>
+<text x="477.1" y="456.0" font-size="12" fill="#222222" text-anchor="start">13</text>
+<rect x="474.1" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="480.1" y="482.0" font-size="10" fill="#777777" text-anchor="start">10:00 · In review</text>
+<text x="480.1" y="498.0" font-size="11" fill="#222222" text-anchor="start">Boots Feature</text>
+<text x="643.7" y="456.0" font-size="12" fill="#222222" text-anchor="start">14</text>
+<rect x="640.7" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="646.7" y="482.0" font-size="10" fill="#777777" text-anchor="start">12:00 · Not started</text>
+<text x="646.7" y="498.0" font-size="11" fill="#222222" text-anchor="start">Price Drop</text>
+<text x="810.3" y="456.0" font-size="12" fill="#222222" text-anchor="start">15</text>
+<rect x="807.3" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="813.3" y="482.0" font-size="10" fill="#777777" text-anchor="start">10:00 · In review</text>
+<text x="813.3" y="498.0" font-size="11" fill="#222222" text-anchor="start">Boots Edit</text>
+<text x="976.9" y="456.0" font-size="12" fill="#222222" text-anchor="start">16</text>
+<rect x="973.9" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="979.9" y="482.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="979.9" y="498.0" font-size="11" fill="#222222" text-anchor="start">Halloween Prep</text>
+<text x="1143.4" y="456.0" font-size="12" fill="#222222" text-anchor="start">17</text>
+<rect x="1140.4" y="470.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="482.0" font-size="10" fill="#777777" text-anchor="start">09:00 · Not started</text>
+<text x="1146.4" y="498.0" font-size="11" fill="#222222" text-anchor="start">Weekend Sale</text>
+<text x="144.0" y="577.0" font-size="12" fill="#222222" text-anchor="start">18</text>
+<text x="310.6" y="577.0" font-size="12" fill="#222222" text-anchor="start">19</text>
+<rect x="307.6" y="591.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="313.6" y="603.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="313.6" y="619.0" font-size="11" fill="#222222" text-anchor="start">Holiday Preview</text>
+<text x="477.1" y="577.0" font-size="12" fill="#222222" text-anchor="start">20</text>
+<rect x="474.1" y="591.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="480.1" y="603.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="480.1" y="619.0" font-size="11" fill="#222222" text-anchor="start">Winter Ready</text>
+<text x="643.7" y="577.0" font-size="12" fill="#222222" text-anchor="start">21</text>
+<text x="810.3" y="577.0" font-size="12" fill="#222222" text-anchor="start">22</text>
+<rect x="807.3" y="591.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="813.3" y="603.0" font-size="10" fill="#777777" text-anchor="start">18:00 · Not started</text>
+<text x="813.3" y="619.0" font-size="11" fill="#222222" text-anchor="start">Flash Deal</text>
+<text x="976.9" y="577.0" font-size="12" fill="#222222" text-anchor="start">23</text>
+<rect x="973.9" y="591.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="979.9" y="603.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="979.9" y="619.0" font-size="11" fill="#222222" text-anchor="start">Loungewear</text>
+<text x="1143.4" y="577.0" font-size="12" fill="#222222" text-anchor="start">24</text>
+<rect x="1140.4" y="591.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="603.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="1146.4" y="619.0" font-size="11" fill="#222222" text-anchor="start">Halloween</text>
+<text x="144.0" y="698.0" font-size="12" fill="#222222" text-anchor="start">25</text>
+<text x="310.6" y="698.0" font-size="12" fill="#222222" text-anchor="start">26</text>
+<rect x="307.6" y="712.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="313.6" y="724.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="313.6" y="740.0" font-size="11" fill="#222222" text-anchor="start">Cozy Home</text>
+<text x="477.1" y="698.0" font-size="12" fill="#222222" text-anchor="start">27</text>
+<rect x="474.1" y="712.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="480.1" y="724.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="480.1" y="740.0" font-size="11" fill="#222222" text-anchor="start">Black Friday Teaser</text>
+<text x="643.7" y="698.0" font-size="12" fill="#222222" text-anchor="start">28</text>
+<text x="810.3" y="698.0" font-size="12" fill="#222222" text-anchor="start">29</text>
+<rect x="807.3" y="712.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="813.3" y="724.0" font-size="10" fill="#777777" text-anchor="start">10:00 · Not started</text>
+<text x="813.3" y="740.0" font-size="11" fill="#222222" text-anchor="start">Early Black Friday</text>
+<text x="976.9" y="698.0" font-size="12" fill="#222222" text-anchor="start">30</text>
+<rect x="973.9" y="712.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="979.9" y="724.0" font-size="10" fill="#777777" text-anchor="start">12:00 · Not started</text>
+<text x="979.9" y="740.0" font-size="11" fill="#222222" text-anchor="start">Last Call</text>
+<text x="1143.4" y="698.0" font-size="12" fill="#222222" text-anchor="start">31</text>
+<rect x="1140.4" y="712.0" width="156.6" height="34.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1146.4" y="724.0" font-size="10" fill="#777777" text-anchor="start">12:00 · Not started</text>
+<text x="1146.4" y="740.0" font-size="11" fill="#222222" text-anchor="start">Last Chance</text>
+<rect x="774.3" y="563.0" width="22.0" height="22.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="785.3" y="578.2" font-size="12" fill="#222222" text-anchor="middle">+</text>
+<circle cx="211" cy="22" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="211" y="26" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
+<circle cx="841" cy="11" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="841" y="15" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2</text>
-<circle cx="969" cy="11" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="969" cy="11" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="969" y="15" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">3</text>
-<circle cx="1095" cy="11" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="1095" cy="11" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="1095" y="15" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">4</text>
-<circle cx="1329" cy="11" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="1329" cy="11" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="1329" y="15" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">5</text>
-<circle cx="165" cy="75" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
-<text x="165" y="79" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">6</text>
-<circle cx="1227" cy="101" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
-<text x="1227" y="105" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">7</text>
-<circle cx="119" cy="142" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="205" cy="75" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="205" y="79" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">6</text>
+<circle cx="1217" cy="101" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1217" y="105" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">7</text>
+<circle cx="119" cy="142" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="119" y="146" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">8</text>
-<circle cx="339" cy="133" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="339" cy="133" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="339" y="137" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">9</text>
-<circle cx="497" cy="133" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
-<text x="497" y="137" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">10</text>
-<circle cx="1005" cy="133" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
-<text x="1005" y="137" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">11</text>
-<circle cx="773.2857142857143" cy="565" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="521" cy="133" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="521" y="137" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">10</text>
+<circle cx="1029" cy="142" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1029" y="146" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">11</text>
+<circle cx="773.2857142857143" cy="565" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="773.2857142857143" y="569" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">12</text>
-<circle cx="458.14285714285717" cy="347" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="458.14285714285717" cy="347" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="458.14285714285717" y="351" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">13</text>
-<circle cx="343.57142857142856" cy="332" r="11" fill="#212121" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="343.57142857142856" cy="332" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="343.57142857142856" y="336" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">14</text>
 </svg>
