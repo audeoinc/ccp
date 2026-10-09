@@ -170,11 +170,6 @@ def chat_collapsed(p, step):
     p.text(726, 779, 14, "▸", size=11, color=MUTED)
 
 
-def product_rail(p):
-    p.vline(1395, 104, 804)
-    p.text(1404, 112, 14, "‹", size=12)
-    p.text(1395, 140, 30, "Product info", size=11, h=120, rot=True)
-
 
 def email_preview(p, x0, x1, badges=None, sel=None, top=116):
     """右のプレビュー(メール)。badges: {(行, 列): 文字}、sel: 太枠にする商品 (行, 列)"""
@@ -208,6 +203,47 @@ def email_preview(p, x0, x1, badges=None, sel=None, top=116):
             if badges and (r, c) in badges:
                 p.rect(x + 4, y + 4, 117, 18, badges[(r, c)], kind="box", size=9, rounded=False)
     return ex
+
+
+def product_panel(p, px1=1110):
+    """右端の商品情報(開いた状態)。どの配信カードでも開いたまま表示する"""
+    p.vline(px1, 104, 804)
+    qx = px1 + 12
+    p.text(qx, 112, 240, "Product info", size=14, bold=True)
+    p.rect(1394, 112, 22, 22, "›", size=12)
+    p.text(qx, 140, 290, "Products in this delivery (email order)", size=10, color=MUTED)
+    rows = [("Crewneck Knit", "$98.00"), ("Cable Knit", "$118.00"), ("Cardigan", "$108.00"), ("Turtleneck", "$88.00")]
+    for i, (nm, pr) in enumerate(rows):
+        y = 158 + i * 40
+        p.rect(qx, y, 292, 36, "", kind="sel" if i == 0 else "input", rounded=False)
+        p.image(qx + 4, y + 4, 28, 28, "")
+        p.text(qx + 40, y + 4, 180, nm, size=11, bold=(i == 0))
+        p.text(qx + 40, y + 19, 180, pr, size=10, color=MUTED)
+        p.text(qx + 220, y + 10, 66, f"Sec. {1 + i // 2}", size=10, align="right", color=MUTED)
+    y0 = 326
+    p.hline(qx, qx + 292, y0)
+    p.text(qx, y0 + 8, 292, "Crewneck Knit", size=13, bold=True)
+    for i, (k, v, d) in enumerate([("Sales, last 4 wks", "1,240", "▲ 12%"), ("Stock covers", "6.5 wks", ""), ("12-wk sales", "$121.5K", "")]):
+        x = qx + i * 99
+        p.rect(x, y0 + 32, 94, 54, "", kind="input", rounded=False)
+        p.text(x + 6, y0 + 36, 86, k, size=9, color=MUTED)
+        p.text(x + 6, y0 + 52, 86, v, size=14, bold=True)
+        if d:
+            p.text(x + 52, y0 + 56, 40, d, size=9)
+    cy0 = y0 + 98
+    p.text(qx, cy0, 292, "Weekly sales (bars) / stock (line), 12 wks", size=10, color=MUTED)
+    p.rect(qx, cy0 + 18, 292, 120, "", kind="input", rounded=False)
+    base = cy0 + 128
+    for i, hgt in enumerate([30, 36, 34, 42, 48, 46, 55, 60, 58, 66, 72, 78]):
+        p.rect(qx + 12 + i * 23, base - hgt, 12, hgt, "", kind="box", rounded=False)
+    stock = [96, 92, 90, 84, 80, 77, 70, 66, 62, 56, 50, 46]
+    for i in range(len(stock) - 1):
+        p.line(qx + 18 + i * 23, base - stock[i], qx + 18 + (i + 1) * 23, base - stock[i + 1], INK, 1.5)
+    ty = cy0 + 150
+    p.text(qx, ty, 292, "MD plan", size=11, bold=True)
+    p.text(qx, ty + 18, 292, "Policy: lead item for fall\nPromotion: 10/01 – 10/31\nThis week: feature in email + push", size=10, h=48)
+    p.text(qx, ty + 74, 292, "Attributes", size=11, bold=True)
+    p.text(qx, ty + 92, 292, "Rating 4.6 (212) · Season: fall–winter\nWeather: cold days · New arrival", size=10, h=32)
 
 
 def phone(p, x, y, w=170, h=330, caption=""):
@@ -312,45 +348,9 @@ def card_theme():
     p.rect(701, 752, 32, 32, "➤")
 
     px1 = 1110
-    p.vline(px1, 104, 804)
     email_preview(p, 749, px1, sel=(0, 0))
 
-    qx = px1 + 12
-    p.text(qx, 112, 240, "Product info", size=14, bold=True)
-    p.rect(1394, 112, 22, 22, "›", size=12)
-    p.text(qx, 140, 290, "Products in this delivery (email order)", size=10, color=MUTED)
-    rows = [("Crewneck Knit", "$98.00"), ("Cable Knit", "$118.00"), ("Cardigan", "$108.00"), ("Turtleneck", "$88.00")]
-    for i, (nm, pr) in enumerate(rows):
-        y = 158 + i * 40
-        p.rect(qx, y, 292, 36, "", kind="sel" if i == 0 else "input", rounded=False)
-        p.image(qx + 4, y + 4, 28, 28, "")
-        p.text(qx + 40, y + 4, 180, nm, size=11, bold=(i == 0))
-        p.text(qx + 40, y + 19, 180, pr, size=10, color=MUTED)
-        p.text(qx + 220, y + 10, 66, f"Sec. {1 + i // 2}", size=10, align="right", color=MUTED)
-    y0 = 326
-    p.hline(qx, qx + 292, y0)
-    p.text(qx, y0 + 8, 292, "Crewneck Knit", size=13, bold=True)
-    for i, (k, v, d) in enumerate([("Sales, last 4 wks", "1,240", "▲ 12%"), ("Stock covers", "6.5 wks", ""), ("12-wk sales", "$121.5K", "")]):
-        x = qx + i * 99
-        p.rect(x, y0 + 32, 94, 54, "", kind="input", rounded=False)
-        p.text(x + 6, y0 + 36, 86, k, size=9, color=MUTED)
-        p.text(x + 6, y0 + 52, 86, v, size=14, bold=True)
-        if d:
-            p.text(x + 52, y0 + 56, 40, d, size=9)
-    cy0 = y0 + 98
-    p.text(qx, cy0, 292, "Weekly sales (bars) / stock (line), 12 wks", size=10, color=MUTED)
-    p.rect(qx, cy0 + 18, 292, 120, "", kind="input", rounded=False)
-    base = cy0 + 128
-    for i, hgt in enumerate([30, 36, 34, 42, 48, 46, 55, 60, 58, 66, 72, 78]):
-        p.rect(qx + 12 + i * 23, base - hgt, 12, hgt, "", kind="box", rounded=False)
-    stock = [96, 92, 90, 84, 80, 77, 70, 66, 62, 56, 50, 46]
-    for i in range(len(stock) - 1):
-        p.line(qx + 18 + i * 23, base - stock[i], qx + 18 + (i + 1) * 23, base - stock[i + 1], INK, 1.5)
-    ty = cy0 + 150
-    p.text(qx, ty, 292, "MD plan", size=11, bold=True)
-    p.text(qx, ty + 18, 292, "Policy: lead item for fall\nPromotion: 10/01 – 10/31\nThis week: feature in email + push", size=10, h=48)
-    p.text(qx, ty + 74, 292, "Attributes", size=11, bold=True)
-    p.text(qx, ty + 92, 292, "Rating 4.6 (212) · Season: fall–winter\nWeather: cold days · New arrival", size=10, h=32)
+    product_panel(p, px1)
 
     p.nums([(120, 52), (1284, 84), (1347, 84), (1387, 86), (288, 106), (128, 176), (80, 446), (412, 114), (478, 186), (650, 219),
             (330, 320), (470, 565), (888, 116), (1092, 116), (990, 152), (766, 184), (766, 220), (1236, 112), (1396, 140),
@@ -365,7 +365,7 @@ def card_step(name, slug, tab):
     p = Page(name, slug)
     card_frame(p, "Fall Knits", TABS, tab)
     left_email(p)
-    product_rail(p)
+    product_panel(p)
     return p
 
 
@@ -398,8 +398,8 @@ def card_template():
         p.text(x + 8, y + 108, 176, use, size=10)
         p.rect(x + 8, y + 128, 80, 22, "Selected" if i == 0 else "Select", kind="sel" if i == 0 else "box", size=10)
     chat_collapsed(p, "Template")
-    email_preview(p, 749, 1395)
-    p.nums([(478, 186), (318, 220), (318, 258), (512, 262), (318, 362), (430, 386), (908, 228)])
+    email_preview(p, 749, 1110)
+    p.nums([(478, 186), (318, 220), (318, 258), (512, 262), (318, 362), (430, 386), (766, 228)])
     return p
 
 
@@ -427,8 +427,8 @@ def card_hero():
         p.image(342 + i * 79, 668, 74, 54, "", size=9)
     p.text(342, 728, 391, "Drag an image onto the preview to place it.", size=10, color=MUTED)
     chat_collapsed(p, "Hero")
-    email_preview(p, 749, 1395)
-    p.nums([(478, 186), (318, 238), (318, 384), (318, 410), (532, 434), (318, 490), (318, 636), (722, 626), (908, 252)])
+    email_preview(p, 749, 1110)
+    p.nums([(478, 186), (318, 238), (318, 384), (318, 410), (532, 434), (318, 490), (318, 636), (722, 626), (766, 252)])
     return p
 
 
@@ -467,8 +467,8 @@ def card_sections():
     p.select(648, 598, 85, "Category", size=10)
     p.text(342, 630, 391, "AI keeps a product in one section only within a delivery.", size=10, color=MUTED)
     chat_collapsed(p, "Sections")
-    email_preview(p, 749, 1395, badges={(0, 0): "3rd this week", (0, 1): "1st this week"}, sel=(0, 0))
-    p.nums([(318, 184), (318, 240), (318, 294), (548, 292), (318, 334), (634, 364), (722, 312), (318, 508), (318, 598), (908, 416)])
+    email_preview(p, 749, 1110, badges={(0, 0): "3rd this week", (0, 1): "1st this week"}, sel=(0, 0))
+    p.nums([(318, 184), (318, 240), (318, 294), (548, 292), (318, 334), (634, 364), (722, 312), (318, 508), (318, 598), (766, 416)])
     return p
 
 
@@ -501,7 +501,7 @@ def card_production():
     p.rect(342, 668, 391, 44, "Q: Use the cable knit close-up for the hero?\nA: (reply)", kind="input", align="left", valign="top", size=10, rounded=False)
     p.rect(663, 716, 70, 22, "Reply", size=10)
     chat_collapsed(p, "Production notes")
-    email_preview(p, 749, 1395)
+    email_preview(p, 749, 1110)
     p.nums([(478, 186), (318, 238), (318, 328), (318, 466), (722, 494), (318, 556), (318, 668)])
     return p
 
@@ -554,23 +554,23 @@ def card_push():
     p.text(766, 118, 56, "Email", align="center")
     p.text(826, 118, 56, "Push", bold=True, align="center")
     p.line(826, 140, 882, 140, INK, 2)
-    p.rect(1225, 116, 74, 24, "iOS", kind="sel", size=11)
-    p.rect(1299, 116, 74, 24, "Android", kind="input", size=11)
-    phone(p, 830, 170, caption="Lock screen")
-    p.text(830, 200, 170, "9:41", size=20, bold=True, align="center")
-    p.rect(838, 250, 154, 64, "", kind="box")
-    p.text(846, 256, 140, "SHOP · now", size=8, color=MUTED)
-    p.text(846, 270, 140, "New fall knits just landed", size=10, bold=True)
-    p.text(846, 285, 140, "Soft layers for cool mornings. Tap…", size=9)
-    p.text(838, 318, 154, "Cut off after 2 lines on this device", size=8, color=MUTED)
-    phone(p, 1060, 170, caption="After tap")
-    p.rect(1068, 190, 154, 22, "Fall Knits", kind="box", size=10, rounded=False)
+    p.rect(950, 116, 74, 24, "iOS", kind="sel", size=11)
+    p.rect(1024, 116, 74, 24, "Android", kind="input", size=11)
+    phone(p, 766, 170, w=156, caption="Lock screen")
+    p.text(766, 200, 156, "9:41", size=20, bold=True, align="center")
+    p.rect(772, 250, 144, 64, "", kind="box")
+    p.text(778, 256, 132, "SHOP · now", size=8, color=MUTED)
+    p.text(778, 270, 132, "New fall knits just landed", size=10, bold=True)
+    p.text(778, 285, 132, "Soft layers for cool morn… Tap", size=9)
+    p.text(772, 318, 144, "Cut off after 2 lines on this device", size=8, color=MUTED)
+    phone(p, 938, 170, w=156, caption="After tap")
+    p.rect(944, 190, 144, 22, "Fall Knits", kind="box", size=10, rounded=False)
     for r in range(2):
         for c in range(2):
-            p.image(1072 + c * 76, 220 + r * 92, 70, 66, "", size=8)
-            p.text(1072 + c * 76, 288 + r * 92, 70, "Name  $00", size=8)
-    product_rail(p)
-    p.nums([(240, 400), (300, 470), (300, 512), (478, 186), (318, 238), (318, 344), (318, 532), (906, 106), (1212, 106), (804, 250), (1036, 190)])
+            p.image(948 + c * 70, 220 + r * 92, 64, 66, "", size=8)
+            p.text(948 + c * 70, 288 + r * 92, 64, "Name  $00", size=8)
+    product_panel(p)
+    p.nums([(240, 400), (300, 470), (300, 512), (478, 186), (318, 238), (318, 344), (318, 532), (886, 110), (926, 106), (752, 250), (924, 190)])
     return p
 
 
