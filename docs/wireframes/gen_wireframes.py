@@ -1,7 +1,7 @@
 # ワイヤーフレームの生成(draw.io の図と、確認用の PNG)。英語版・US 向け
 #   python docs/wireframes/gen_wireframes.py
 # 出力:
-#   docs/wireframes/ccp-wireframes.drawio  … draw.io(Confluence の draw.io マクロで取り込む)。1 画面 = 1 ページ
+#   docs/wireframes/drawio/NN-*.drawio     … draw.io(Confluence の draw.io マクロで取り込む)。1 画面 = 1 ファイル
 #   docs/wireframes/img/NN-*.svg / .png    … 確認用の画像(PNG は Edge で変換。Edge がなければ SVG だけ)
 # 図は、線と文字だけで描く(塗りなし)。黒い丸の番号は、WIREFRAMES.md の表の番号と対応する。
 
@@ -991,7 +991,12 @@ def edge():
 def main():
     pages = [calendar(), card_theme(), card_template(), card_hero(), card_sections(), card_production(), card_push(),
              week_review(), compare_weeks(), templates(), results(), alerts(), list_view()]
-    (HERE / "ccp-wireframes.drawio").write_text(drawio(pages), encoding="utf-8")
+    out = HERE / "drawio"  # 1 画面 = 1 ファイル
+    out.mkdir(exist_ok=True)
+    for old in out.glob("*.drawio"):
+        old.unlink()
+    for p in pages:
+        (out / f"{p.slug}.drawio").write_text(drawio([p]), encoding="utf-8")
     img = HERE / "img"
     img.mkdir(exist_ok=True)
     for old in img.glob("*"):
