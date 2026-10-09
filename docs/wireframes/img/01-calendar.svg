@@ -5,8 +5,12 @@
 <rect x="14.0" y="12.0" width="20.0" height="20.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
 <text x="24.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">▦</text>
 <text x="42.0" y="27.0" font-size="16" fill="#222222" text-anchor="start" font-weight="bold">Delivery Calendar</text>
+<rect x="636.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="681.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Alerts  2</text>
+<rect x="736.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="781.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Results</text>
 <rect x="841.0" y="10.0" width="114.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
-<text x="898.0" y="26.2" font-size="12" fill="#222222" text-anchor="middle">Templates</text>
+<text x="898.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Templates</text>
 <rect x="970.0" y="10.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
 <text x="998.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">日本語</text>
 <rect x="1026.0" y="10.0" width="60.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
@@ -218,4 +222,8 @@
 <text x="458.14285714285717" y="351" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">13</text>
 <circle cx="343.57142857142856" cy="332" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
 <text x="343.57142857142856" y="336" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">14</text>
+<circle cx="635" cy="11" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="635" y="15" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">15</text>
+<circle cx="735" cy="11" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="735" y="15" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">16</text>
 </svg>

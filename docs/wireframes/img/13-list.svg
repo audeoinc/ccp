@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="Segoe UI, Arial, sans-serif">
+<rect x="0" y="0" width="1440" height="900" fill="#FFFFFF"/>
+<rect x="0.0" y="0.0" width="1440.0" height="900.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="0.0" y1="44.0" x2="1440.0" y2="44.0" stroke="#888888" stroke-width="1"/>
+<rect x="14.0" y="12.0" width="20.0" height="20.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="24.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">▦</text>
+<text x="42.0" y="27.0" font-size="16" fill="#222222" text-anchor="start" font-weight="bold">Delivery Calendar</text>
+<rect x="636.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="681.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Alerts  2</text>
+<rect x="736.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="781.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Results</text>
+<rect x="841.0" y="10.0" width="114.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="898.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Templates</text>
+<rect x="970.0" y="10.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="998.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">日本語</text>
+<rect x="1026.0" y="10.0" width="60.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="1056.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">English</text>
+<rect x="1096.0" y="13.0" width="34.0" height="18.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1126.0" y="25.5" font-size="10" fill="#222222" text-anchor="end">●</text>
+<text x="1136.0" y="24.0" font-size="11" fill="#222222" text-anchor="start">Auto-draft on open: On</text>
+<rect x="1330.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="1375.0" y="26.2" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">+ New</text>
+<text x="16.0" y="65.0" font-size="11" fill="#222222" text-anchor="start">Channel</text>
+<rect x="16.0" y="72.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="88.2" font-size="12" fill="#222222" text-anchor="start">All</text>
+<text x="128.0" y="86.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="158.0" y="65.0" font-size="11" fill="#222222" text-anchor="start">Department</text>
+<rect x="158.0" y="72.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="164.0" y="88.2" font-size="12" fill="#222222" text-anchor="start">All</text>
+<text x="270.0" y="86.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="300.0" y="65.0" font-size="11" fill="#222222" text-anchor="start">Status</text>
+<rect x="300.0" y="72.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="306.0" y="88.2" font-size="12" fill="#222222" text-anchor="start">All</text>
+<text x="412.0" y="86.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="450.0" y="72.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="478.0" y="87.8" font-size="11" fill="#222222" text-anchor="middle">Month</text>
+<rect x="506.0" y="72.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="534.0" y="87.8" font-size="11" fill="#222222" text-anchor="middle">Week</text>
+<rect x="562.0" y="72.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="590.0" y="87.8" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">List</text>
+<rect x="640.0" y="72.0" width="170.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="646.0" y="87.8" font-size="11" fill="#222222" text-anchor="start">October 2026</text>
+<text x="792.0" y="86.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="1220.0" y="72.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1265.0" y="87.8" font-size="11" fill="#222222" text-anchor="middle">Columns</text>
+<rect x="1320.0" y="72.0" width="100.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1370.0" y="87.8" font-size="11" fill="#222222" text-anchor="middle">Export CSV</text>
+<rect x="16.0" y="112.0" width="1404.0" height="30.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="22.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Date ▲</text>
+<text x="112.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Time</text>
+<text x="172.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Name</text>
+<text x="372.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Channel</text>
+<text x="452.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Department</text>
+<text x="552.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Status</text>
+<text x="652.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Owner</text>
+<text x="762.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Theme</text>
+<text x="982.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Products</text>
+<text x="1052.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Production due</text>
+<text x="1172.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Steps</text>
+<text x="1252.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold"></text>
+<rect x="16.0" y="142.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">10/01</text>
+<text x="112.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">10:00</text>
+<text x="172.0" y="162.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Fall Arrivals</text>
+<text x="372.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">Promotion</text>
+<text x="552.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">Approved</text>
+<text x="652.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">Owner A</text>
+<text x="762.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">New season, new layers</text>
+<text x="982.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">4</text>
+<text x="1052.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">09/26</text>
+<text x="1172.0" y="162.0" font-size="10" fill="#222222" text-anchor="start">5 / 5</text>
+<rect x="16.0" y="176.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">10/02</text>
+<text x="112.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">10:00</text>
+<text x="172.0" y="196.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Fall Knits</text>
+<text x="372.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">Promotion</text>
+<text x="552.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">Approved</text>
+<text x="652.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">Owner B</text>
+<text x="762.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">Layer up in new fall knits</text>
+<text x="982.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">4</text>
+<text x="1052.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">09/28</text>
+<text x="1172.0" y="196.0" font-size="10" fill="#222222" text-anchor="start">5 / 5</text>
+<rect x="16.0" y="210.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">10/02</text>
+<text x="112.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">11:00</text>
+<text x="172.0" y="230.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Fall Knits — Push</text>
+<text x="372.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">Push</text>
+<text x="452.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">Promotion</text>
+<text x="552.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">In review</text>
+<text x="652.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">Owner B</text>
+<text x="762.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">Layer up in new fall knits</text>
+<text x="982.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">—</text>
+<text x="1052.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">—</text>
+<text x="1172.0" y="230.0" font-size="10" fill="#222222" text-anchor="start">1 / 3</text>
+<rect x="16.0" y="244.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">10/03</text>
+<text x="112.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">09:00</text>
+<text x="172.0" y="264.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Weekend Sale</text>
+<text x="372.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">EC</text>
+<text x="552.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">Confirmed</text>
+<text x="652.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">Owner C</text>
+<text x="762.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">Weekend savings</text>
+<text x="982.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">6</text>
+<text x="1052.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">09/29</text>
+<text x="1172.0" y="264.0" font-size="10" fill="#222222" text-anchor="start">5 / 5</text>
+<rect x="16.0" y="278.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">10/03</text>
+<text x="112.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">18:00</text>
+<text x="172.0" y="298.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Flash Deal</text>
+<text x="372.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">Push</text>
+<text x="452.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">EC</text>
+<text x="552.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">Confirmed</text>
+<text x="652.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">Owner C</text>
+<text x="762.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">Last hours</text>
+<text x="982.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">—</text>
+<text x="1052.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">—</text>
+<text x="1172.0" y="298.0" font-size="10" fill="#222222" text-anchor="start">3 / 3</text>
+<rect x="16.0" y="312.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">10/04</text>
+<text x="112.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">09:00</text>
+<text x="172.0" y="332.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Sunday Picks</text>
+<text x="372.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">CRM</text>
+<text x="552.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">Confirmed</text>
+<text x="652.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">Owner A</text>
+<text x="762.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">Outerwear for the weekend</text>
+<text x="982.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">4</text>
+<text x="1052.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">09/30</text>
+<text x="1172.0" y="332.0" font-size="10" fill="#222222" text-anchor="start">5 / 5</text>
+<rect x="16.0" y="346.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">10/05</text>
+<text x="112.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">10:00</text>
+<text x="172.0" y="366.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Fall Preview</text>
+<text x="372.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">Promotion</text>
+<text x="552.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">In review</text>
+<text x="652.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">Owner B</text>
+<text x="762.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">First look at fall</text>
+<text x="982.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">4</text>
+<text x="1052.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">10/01</text>
+<text x="1172.0" y="366.0" font-size="10" fill="#222222" text-anchor="start">4 / 5</text>
+<rect x="16.0" y="380.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">10/06</text>
+<text x="112.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">10:00</text>
+<text x="172.0" y="400.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Outerwear Edit</text>
+<text x="372.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">Promotion</text>
+<text x="552.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">In review</text>
+<text x="652.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">Owner A</text>
+<text x="762.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">Outerwear for cool days</text>
+<text x="982.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">4</text>
+<text x="1052.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">10/02</text>
+<text x="1172.0" y="400.0" font-size="10" fill="#222222" text-anchor="start">4 / 5</text>
+<rect x="16.0" y="414.0" width="1404.0" height="34.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="22.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">10/07</text>
+<text x="112.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">12:00</text>
+<text x="172.0" y="434.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Rainy Day Picks</text>
+<text x="372.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">Email</text>
+<text x="452.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">CRM</text>
+<text x="552.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">Not started</text>
+<text x="652.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">—</text>
+<text x="762.0" y="434.0" font-size="10" fill="#222222" text-anchor="start"></text>
+<text x="982.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">0</text>
+<text x="1052.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">10/03</text>
+<text x="1172.0" y="434.0" font-size="10" fill="#222222" text-anchor="start">0 / 5</text>
+<text x="1252.0" y="434.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Due soon — not started</text>
+<text x="16.0" y="471.0" font-size="11" fill="#777777" text-anchor="start">30 deliveries · select a row to open its delivery card</text>
+<circle cx="75" cy="63" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="75" y="67" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
+<circle cx="451" cy="59" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="451" y="63" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2</text>
+<circle cx="639" cy="59" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="639" y="63" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">3</text>
+<circle cx="1219" cy="59" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1219" y="63" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">4</text>
+<circle cx="1319" cy="59" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1319" y="63" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">5</text>
+<circle cx="1425" cy="131" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1425" y="135" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">6</text>
+<circle cx="1403" cy="435" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1403" y="439" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">7</text>
+</svg>

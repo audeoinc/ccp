@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="Segoe UI, Arial, sans-serif">
+<rect x="0" y="0" width="1440" height="900" fill="#FFFFFF"/>
+<rect x="0.0" y="0.0" width="1440.0" height="900.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="0.0" y1="44.0" x2="1440.0" y2="44.0" stroke="#888888" stroke-width="1"/>
+<rect x="14.0" y="10.0" width="84.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="56.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">‹ Calendar</text>
+<rect x="110.0" y="12.0" width="20.0" height="20.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="120.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">▦</text>
+<text x="138.0" y="27.0" font-size="16" fill="#222222" text-anchor="start" font-weight="bold">Templates</text>
+<rect x="636.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="681.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Alerts  2</text>
+<rect x="736.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="781.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Results</text>
+<rect x="841.0" y="10.0" width="114.0" height="24.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="898.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">Templates</text>
+<rect x="970.0" y="10.0" width="56.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="998.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle">日本語</text>
+<rect x="1026.0" y="10.0" width="60.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="1056.0" y="25.9" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">English</text>
+<rect x="1096.0" y="13.0" width="34.0" height="18.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1126.0" y="25.5" font-size="10" fill="#222222" text-anchor="end">●</text>
+<text x="1136.0" y="24.0" font-size="11" fill="#222222" text-anchor="start">Auto-draft on open: On</text>
+<rect x="1330.0" y="10.0" width="90.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="1375.0" y="26.2" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">+ New</text>
+<rect x="16.0" y="58.0" width="70.0" height="24.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="51.0" y="73.8" font-size="11" fill="#222222" text-anchor="middle" font-weight="bold">Email</text>
+<rect x="86.0" y="58.0" width="70.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="121.0" y="73.8" font-size="11" fill="#222222" text-anchor="middle">Push</text>
+<text x="16.0" y="107.0" font-size="11" fill="#222222" text-anchor="start" font-weight="bold">Standard (read-only)</text>
+<rect x="16.0" y="116.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="132.8" font-size="11" fill="#222222" text-anchor="start">Grid 2×2   (locked)</text>
+<rect x="16.0" y="146.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="162.8" font-size="11" fill="#222222" text-anchor="start">Feature + list   (locked)</text>
+<rect x="16.0" y="176.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="192.8" font-size="11" fill="#222222" text-anchor="start">Story   (locked)</text>
+<rect x="16.0" y="206.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="222.8" font-size="11" fill="#222222" text-anchor="start">Sale grid 3×2   (locked)</text>
+<text x="16.0" y="257.0" font-size="11" fill="#222222" text-anchor="start" font-weight="bold">Custom</text>
+<rect x="16.0" y="266.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="22.0" y="282.9" font-size="11" fill="#222222" text-anchor="start">Two sections</text>
+<rect x="16.0" y="296.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="312.9" font-size="11" fill="#222222" text-anchor="start">Lookbook</text>
+<rect x="16.0" y="326.0" width="260.0" height="26.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="22.0" y="342.9" font-size="11" fill="#222222" text-anchor="start">Holiday gift grid</text>
+<rect x="16.0" y="366.0" width="126.0" height="26.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="79.0" y="382.9" font-size="11" fill="#222222" text-anchor="middle">+ New template</text>
+<rect x="150.0" y="366.0" width="126.0" height="26.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="213.0" y="382.9" font-size="11" fill="#222222" text-anchor="middle">Duplicate</text>
+<line x1="292.0" y1="44.0" x2="292.0" y2="900.0" stroke="#888888" stroke-width="1"/>
+<text x="322.0" y="74.0" font-size="16" fill="#222222" text-anchor="start" font-weight="bold">Two sections</text>
+<text x="982.0" y="73.0" font-size="11" fill="#777777" text-anchor="end">Used by 5 deliveries</text>
+<text x="322.0" y="103.0" font-size="11" fill="#222222" text-anchor="start">Name</text>
+<rect x="322.0" y="108.0" width="660.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="328.0" y="124.2" font-size="12" fill="#222222" text-anchor="start">Two sections</text>
+<text x="322.0" y="151.0" font-size="11" fill="#222222" text-anchor="start">Description</text>
+<rect x="322.0" y="156.0" width="660.0" height="40.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="328.0" y="171.0" font-size="11" fill="#222222" text-anchor="start">Two themes, two products each. For deliveries that pair two ideas.</text>
+<text x="322.0" y="222.0" font-size="12" fill="#222222" text-anchor="start" font-weight="bold">Hero</text>
+<text x="322.0" y="242.0" font-size="10" fill="#222222" text-anchor="start">Image frame</text>
+<rect x="322.0" y="248.0" width="200.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="328.0" y="263.9" font-size="11" fill="#222222" text-anchor="start">Wide (3:1)</text>
+<text x="504.0" y="262.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="542.0" y="242.0" font-size="10" fill="#222222" text-anchor="start">Headline style</text>
+<rect x="542.0" y="248.0" width="200.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="548.0" y="263.9" font-size="11" fill="#222222" text-anchor="start">Overlay, bottom</text>
+<text x="724.0" y="262.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="322.0" y="304.0" font-size="12" fill="#222222" text-anchor="start" font-weight="bold">Sections</text>
+<rect x="322.0" y="314.0" width="660.0" height="62.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="330.0" y="348.0" font-size="12" fill="#777777" text-anchor="start">≡</text>
+<text x="350.0" y="334.0" font-size="12" fill="#222222" text-anchor="start" font-weight="bold">Section 1</text>
+<rect x="350.0" y="344.0" width="160.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="356.0" y="359.5" font-size="10" fill="#222222" text-anchor="start">Grid 2 columns</text>
+<text x="492.0" y="358.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="518.0" y="344.0" width="110.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="524.0" y="359.5" font-size="10" fill="#222222" text-anchor="start">2 products</text>
+<text x="610.0" y="358.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="642.0" y="358.0" font-size="10" fill="#222222" text-anchor="start">Heading ✓  Copy ✓</text>
+<text x="963.0" y="334.0" font-size="12" fill="#222222" text-anchor="middle">⋯</text>
+<rect x="322.0" y="384.0" width="660.0" height="62.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="330.0" y="418.0" font-size="12" fill="#777777" text-anchor="start">≡</text>
+<text x="350.0" y="404.0" font-size="12" fill="#222222" text-anchor="start" font-weight="bold">Section 2</text>
+<rect x="350.0" y="414.0" width="160.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="356.0" y="429.5" font-size="10" fill="#222222" text-anchor="start">Grid 2 columns</text>
+<text x="492.0" y="428.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="518.0" y="414.0" width="110.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="524.0" y="429.5" font-size="10" fill="#222222" text-anchor="start">2 products</text>
+<text x="610.0" y="428.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="642.0" y="428.0" font-size="10" fill="#222222" text-anchor="start">Heading ✓  Copy —</text>
+<text x="963.0" y="404.0" font-size="12" fill="#222222" text-anchor="middle">⋯</text>
+<rect x="322.0" y="458.0" width="140.0" height="26.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="392.0" y="474.9" font-size="11" fill="#222222" text-anchor="middle">+ Add section</text>
+<text x="322.0" y="512.0" font-size="12" fill="#222222" text-anchor="start" font-weight="bold">Buttons</text>
+<rect x="322.0" y="522.0" width="120.0" height="28.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="328.0" y="539.9" font-size="11" fill="#222222" text-anchor="start">Shop now</text>
+<rect x="450.0" y="524.0" width="170.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="456.0" y="539.5" font-size="10" fill="#222222" text-anchor="start">Below each product</text>
+<text x="602.0" y="538.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="628.0" y="524.0" width="110.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="634.0" y="539.5" font-size="10" fill="#222222" text-anchor="start">Outline</text>
+<text x="720.0" y="538.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="746.0" y="524.0" width="160.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="752.0" y="539.5" font-size="10" fill="#222222" text-anchor="start">Product page</text>
+<text x="888.0" y="538.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="963.0" y="540.0" font-size="12" fill="#222222" text-anchor="middle">⋯</text>
+<rect x="322.0" y="556.0" width="120.0" height="28.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="328.0" y="573.9" font-size="11" fill="#222222" text-anchor="start">See all knits</text>
+<rect x="450.0" y="558.0" width="170.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="456.0" y="573.5" font-size="10" fill="#222222" text-anchor="start">End of Section 2</text>
+<text x="602.0" y="572.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="628.0" y="558.0" width="110.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="634.0" y="573.5" font-size="10" fill="#222222" text-anchor="start">Filled</text>
+<text x="720.0" y="572.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<rect x="746.0" y="558.0" width="160.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="752.0" y="573.5" font-size="10" fill="#222222" text-anchor="start">Category page</text>
+<text x="888.0" y="572.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
+<text x="963.0" y="574.0" font-size="12" fill="#222222" text-anchor="middle">⋯</text>
+<rect x="322.0" y="596.0" width="120.0" height="26.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="382.0" y="612.9" font-size="11" fill="#222222" text-anchor="middle">+ Add button</text>
+<text x="322.0" y="642.0" font-size="10" fill="#777777" text-anchor="start">Link URLs are set per delivery (in Production notes).</text>
+<rect x="322.0" y="812.0" width="100.0" height="30.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="372.0" y="830.9" font-size="11" fill="#222222" text-anchor="middle">Delete</text>
+<rect x="782.0" y="812.0" width="90.0" height="30.0" rx="3" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="827.0" y="831.2" font-size="12" fill="#222222" text-anchor="middle">Cancel</text>
+<rect x="882.0" y="812.0" width="100.0" height="30.0" rx="3" fill="none" stroke="#222222" stroke-width="2"/>
+<text x="932.0" y="831.2" font-size="12" fill="#222222" text-anchor="middle" font-weight="bold">Save</text>
+<line x1="990.0" y1="44.0" x2="990.0" y2="900.0" stroke="#888888" stroke-width="1"/>
+<text x="1006.0" y="70.0" font-size="12" fill="#222222" text-anchor="start" font-weight="bold">Layout preview</text>
+<rect x="1060.0" y="90.0" width="300.0" height="680.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<rect x="1070.0" y="100.0" width="280.0" height="100.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<line x1="1070.0" y1="100.0" x2="1350.0" y2="200.0" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="1350.0" y1="100.0" x2="1070.0" y2="200.0" stroke="#BBBBBB" stroke-width="1"/>
+<text x="1210.0" y="152.8" font-size="11" fill="#777777" text-anchor="middle">Hero (wide)</text>
+<rect x="1070.0" y="200.0" width="280.0" height="30.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1210.0" y="218.5" font-size="10" fill="#222222" text-anchor="middle">Headline overlay</text>
+<rect x="1070.0" y="246.0" width="280.0" height="20.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1210.0" y="259.5" font-size="10" fill="#222222" text-anchor="middle">Section 1 heading</text>
+<rect x="1070.0" y="270.0" width="280.0" height="16.0" rx="0" fill="none" stroke="#BBBBBB" stroke-width="1"/>
+<text x="1210.0" y="281.1" font-size="9" fill="#222222" text-anchor="middle">Copy</text>
+<rect x="1070.0" y="292.0" width="135.0" height="130.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<line x1="1070.0" y1="292.0" x2="1205.0" y2="422.0" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="1205.0" y1="292.0" x2="1070.0" y2="422.0" stroke="#BBBBBB" stroke-width="1"/>
+<text x="1137.5" y="359.5" font-size="10" fill="#777777" text-anchor="middle">Product</text>
+<rect x="1070.0" y="428.0" width="135.0" height="18.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1137.5" y="440.1" font-size="9" fill="#222222" text-anchor="middle">Shop now</text>
+<rect x="1215.0" y="292.0" width="135.0" height="130.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<line x1="1215.0" y1="292.0" x2="1350.0" y2="422.0" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="1350.0" y1="292.0" x2="1215.0" y2="422.0" stroke="#BBBBBB" stroke-width="1"/>
+<text x="1282.5" y="359.5" font-size="10" fill="#777777" text-anchor="middle">Product</text>
+<rect x="1215.0" y="428.0" width="135.0" height="18.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1282.5" y="440.1" font-size="9" fill="#222222" text-anchor="middle">Shop now</text>
+<rect x="1070.0" y="496.0" width="280.0" height="20.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1210.0" y="509.5" font-size="10" fill="#222222" text-anchor="middle">Section 2 heading</text>
+<rect x="1070.0" y="542.0" width="135.0" height="130.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<line x1="1070.0" y1="542.0" x2="1205.0" y2="672.0" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="1205.0" y1="542.0" x2="1070.0" y2="672.0" stroke="#BBBBBB" stroke-width="1"/>
+<text x="1137.5" y="609.5" font-size="10" fill="#777777" text-anchor="middle">Product</text>
+<rect x="1070.0" y="678.0" width="135.0" height="18.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1137.5" y="690.1" font-size="9" fill="#222222" text-anchor="middle">Shop now</text>
+<rect x="1215.0" y="542.0" width="135.0" height="130.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<line x1="1215.0" y1="542.0" x2="1350.0" y2="672.0" stroke="#BBBBBB" stroke-width="1"/>
+<line x1="1350.0" y1="542.0" x2="1215.0" y2="672.0" stroke="#BBBBBB" stroke-width="1"/>
+<text x="1282.5" y="609.5" font-size="10" fill="#777777" text-anchor="middle">Product</text>
+<rect x="1215.0" y="678.0" width="135.0" height="18.0" rx="0" fill="none" stroke="#888888" stroke-width="1"/>
+<text x="1282.5" y="690.1" font-size="9" fill="#222222" text-anchor="middle">Shop now</text>
+<rect x="1130.0" y="740.0" width="160.0" height="22.0" rx="0" fill="none" stroke="#444444" stroke-width="1"/>
+<text x="1210.0" y="754.5" font-size="10" fill="#222222" text-anchor="middle">See all knits</text>
+<circle cx="171" cy="69" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="171" y="73" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
+<circle cx="161" cy="103" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="161" y="107" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2</text>
+<circle cx="81" cy="253" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="81" y="257" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">3</text>
+<circle cx="292" cy="379" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="292" y="383" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">4</text>
+<circle cx="309" cy="69" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="73" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">5</text>
+<circle cx="933" cy="51" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="933" y="55" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">6</text>
+<circle cx="309" cy="119" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="123" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">7</text>
+<circle cx="309" cy="259" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="263" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">8</text>
+<circle cx="309" cy="325" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="329" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">9</text>
+<circle cx="309" cy="471" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="475" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">10</text>
+<circle cx="309" cy="533" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="537" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">11</text>
+<circle cx="309" cy="827" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="309" y="831" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">12</text>
+<circle cx="1123" cy="65" r="11" fill="#222222" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1123" y="69" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">13</text>
+</svg>
