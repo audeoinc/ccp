@@ -1,5 +1,5 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular } from '@fluentui/react-icons'
+import { AddRegular, WarningFilled } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import { statusColor } from './status'
 import { locale, optionLabel, useT } from './i18n'
@@ -7,6 +7,8 @@ import { locale, optionLabel, useT } from './i18n'
 interface Props {
   month: Date
   cards: Cr854_deliverycards[]
+  /** 配信日が近いのに未着手の配信(印を付ける) */
+  dueSoon?: Set<string>
   onSelect: (id: string) => void
   /** 日付のマスの空いているところ(または「＋」)を押したとき。その日付で新規作成する(値は YYYY-MM-DD) */
   onCreate: (day: string) => void
@@ -120,6 +122,7 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     '@media (min-width: 900px)': { display: 'block' },
   },
+  warn: { color: tokens.colorPaletteDarkOrangeForeground1, verticalAlign: 'text-bottom', marginRight: '2px' },
   pillName: {
     display: 'block',
     fontSize: tokens.fontSizeBase200,
@@ -131,7 +134,7 @@ const useStyles = makeStyles({
   },
 })
 
-export function Calendar({ month, cards, onSelect, onCreate }: Props) {
+export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -195,7 +198,7 @@ export function Calendar({ month, cards, onSelect, onCreate }: Props) {
                     e.stopPropagation()
                     onSelect(c.cr854_deliverycardid)
                   }}
-                  title={`${c.cr854_name}(${optionLabel(c.cr854_statusname)})`}
+                  title={`${c.cr854_name}(${optionLabel(c.cr854_statusname)})${dueSoon?.has(c.cr854_deliverycardid) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
                   className={styles.pill}
                   style={{
                     backgroundColor: `color-mix(in srgb, ${statusColor(c.cr854_status)} 16%, var(--colorNeutralBackground1))`,
@@ -206,7 +209,10 @@ export function Calendar({ month, cards, onSelect, onCreate }: Props) {
                     {new Date(c.cr854_scheduledat!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
                     {' '}{optionLabel(c.cr854_countryname)}・{optionLabel(c.cr854_channelname)}
                   </span>
-                  <span className={styles.pillName}>{c.cr854_name}</span>
+                  <span className={styles.pillName}>
+                    {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
+                    {c.cr854_name}
+                  </span>
                 </button>
               ))}
             </div>

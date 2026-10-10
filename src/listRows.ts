@@ -1,0 +1,71 @@
+import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
+import { locale, optionLabel, tr } from './i18n'
+import { cardProgress, isDueSoonNotStarted } from './progress'
+import { channelOptions, countryOptions, departmentOptions, statusOptions } from './status'
+
+// 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
+
+/** 一覧の列。順番は、この並び。CSV の書き出しも、この定義を使う */
+export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'theme' | 'products' | 'steps'
+
+export interface Row {
+  card: Cr854_deliverycards
+  products: number
+  done: number
+  total: number
+  dueSoon: boolean
+}
+
+export interface Column {
+  key: ColumnKey
+  label: () => string
+  /** 表示と CSV の値 */
+  text: (r: Row) => string
+  /** 並べ替えの値(なければ text) */
+  sort?: (r: Row) => string | number
+}
+
+// 選択肢の表示名は、値から求める(〜name の列は、データの入れ方によっては空のため)
+const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
+const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) : '')
+const date = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' }) : '')
+
+export const COLUMNS: Column[] = [
+  { key: 'date', label: () => tr('配信日', 'Date'), text: (r) => date(r.card.cr854_scheduledat), sort: (r) => r.card.cr854_scheduledat ?? '' },
+  { key: 'time', label: () => tr('時刻', 'Time'), text: (r) => time(r.card.cr854_scheduledat), sort: (r) => time(r.card.cr854_scheduledat) },
+  { key: 'name', label: () => tr('配信名', 'Name'), text: (r) => r.card.cr854_name },
+  { key: 'country', label: () => tr('国', 'Country'), text: (r) => label(countryOptions, r.card.cr854_country) },
+  { key: 'channel', label: () => tr('チャネル', 'Channel'), text: (r) => label(channelOptions, r.card.cr854_channel) },
+  { key: 'department', label: () => tr('種別', 'Type'), text: (r) => label(departmentOptions, r.card.cr854_department) },
+  { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => label(statusOptions, r.card.cr854_status), sort: (r) => r.card.cr854_status ?? 0 },
+  { key: 'theme', label: () => tr('テーマ', 'Theme'), text: (r) => r.card.cr854_theme ?? '' },
+  { key: 'products', label: () => tr('商品数', 'Products'), text: (r) => String(r.products), sort: (r) => r.products },
+  { key: 'steps', label: () => tr('工程', 'Steps'), text: (r) => `${r.done} / ${r.total}`, sort: (r) => r.done },
+]
+
+export const DEFAULT_COLUMNS: ColumnKey[] = COLUMNS.map((c) => c.key)
+
+/** 配信カードと掲載商品の数から、一覧の行を作る(締め切りの警告も、ここで決める) */
+export function toRows(cards: Cr854_deliverycards[], productCounts: Map<string, number>): Row[] {
+  const now = new Date()
+  return cards.map((card) => {
+    const products = productCounts.get(card.cr854_deliverycardid) ?? 0
+    const p = cardProgress(card, products)
+    return { card, products, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(card.cr854_scheduledat, p, now) }
+  })
+}
+
+/** 一覧の行を CSV にして、ダウンロードさせる(Excel で開けるよう、BOM と CRLF を付ける) */
+export function downloadCsv(rows: Row[], columns: ColumnKey[], fileName: string) {
+  const shown = COLUMNS.filter((c) => columns.includes(c.key))
+  const esc = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+  const sorted = [...rows].sort((a, b) => (a.card.cr854_scheduledat ?? '').localeCompare(b.card.cr854_scheduledat ?? ''))
+  const lines = [shown.map((c) => esc(c.label())).join(','), ...sorted.map((r) => shown.map((c) => esc(c.text(r))).join(','))]
+  const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(url)
+}

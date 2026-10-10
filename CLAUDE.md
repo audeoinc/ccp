@@ -2,6 +2,8 @@
 
 Power Apps Code App(React 19 + TypeScript + Vite + Fluent UI v9)。全体像は [README.md](README.md)、設計の約束事は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、Dataverse の定義は [docs/DATAVERSE.md](docs/DATAVERSE.md)。作業の前に、この 3 つと [docs/BACKLOG.md](docs/BACKLOG.md) を読むこと。
 
+**2026-10-10 から、開発は GCP 版(Cloud Run。[docs/GCP.md](docs/GCP.md))だけで行う。** 新しい機能は Power Apps 版に入れない(Dataverse は変えない)。データの列・テーブルは、GCP 版のデータベース(`server/ccp/schema.json`)に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。確かめるときは、`npm run build:gcp` も通す。
+
 ## 作業の約束
 
 1. **確認してから終わる。** 変更のあとは、必ず次を通す。通らないまま、完了と言わない。

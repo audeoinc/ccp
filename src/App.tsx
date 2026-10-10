@@ -2,10 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Button,
   Field,
+  Menu,
+  MenuItemCheckbox,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   MessageBar,
   MessageBarBody,
   Select,
   Spinner,
+  ToggleButton,
   Tooltip,
   makeStyles,
   mergeClasses,
@@ -13,7 +19,9 @@ import {
 } from '@fluentui/react-components'
 import {
   AddRegular,
+  ArrowDownloadRegular,
   CalendarLtrRegular,
+  ColumnTripleRegular,
   LayoutColumnTwoRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -24,15 +32,24 @@ import { Cr854_productsService } from './generated/services/Cr854_productsServic
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { Cr854_heroimagesService } from './generated/services/Cr854_heroimagesService'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
 import { Calendar } from './Calendar'
+import { ListView } from './ListView'
+import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
+import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
 import { loadCustomTemplates } from './layoutTemplates'
 import { TemplateManager } from './TemplateManager'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
-import { loadAutoDraft, saveAutoDraft } from './settings'
+import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
+
+// 表示の切り替え(月のカレンダー / 表の一覧)。ブラウザごとに覚える
+type View = 'month' | 'list'
+const VIEW_KEY = 'calendar.view'
+const COLUMNS_KEY = 'list.columns'
 
 interface Filters {
   country: string
@@ -192,6 +209,7 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   legendDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
+  viewSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: tokens.spacingHorizontalM },
 })
 
 function FilterSelect({ label, value, options, onChange }: {
@@ -229,8 +247,25 @@ function App() {
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
 
+  // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
+  const [productCounts, setProductCounts] = useState<Map<string, number>>(new Map())
+  const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
+  const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
+
   const load = useCallback(async () => {
     try {
+      Cr854_deliveryproductsService.getAll()
+        .then((res) => {
+          if (!res.success) return // 数が出ないだけで、画面は使える
+          const counts = new Map<string, number>()
+          for (const r of res.data ?? []) {
+            const id = r._cr854_deliverycard_value
+            if (!id || r.cr854_state === STATE_CANDIDATE) continue
+            counts.set(id, (counts.get(id) ?? 0) + 1)
+          }
+          setProductCounts(counts)
+        })
+        .catch(() => undefined)
       const res = await Cr854_deliverycardsService.getAll({ orderBy: ['cr854_scheduledat asc'] })
       if (!res.success) throw new Error(res.error?.message ?? tr('配信カードの取得に失敗しました', 'Failed to load delivery cards'))
       const data = res.data ?? []
@@ -278,6 +313,35 @@ function App() {
     )
   }, [cards, filters])
 
+  // 表示中の月の配信(一覧と CSV の対象)。締め切りの警告は、月をまたいで求める(カレンダーの前後の月の日付にも出す)
+  const rows = useMemo(() => toRows(filtered, productCounts), [filtered, productCounts])
+  const monthRows = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (!month || !r.card.cr854_scheduledat) return false
+        const d = new Date(r.card.cr854_scheduledat)
+        return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth()
+      }),
+    [rows, month],
+  )
+  const dueSoon = useMemo(() => new Set(rows.filter((r) => r.dueSoon).map((r) => r.card.cr854_deliverycardid)), [rows])
+  const changeView = (v: View) => {
+    setView(v)
+    savePref(VIEW_KEY, v)
+  }
+  const toggleColumn = (key: ColumnKey, on: boolean) => {
+    // 少なくとも 1 列は残す(配信名は、行を見分けるために外せない)
+    const next = COLUMNS.map((c) => c.key).filter((k) => k === 'name' || (k === key ? on : columns.includes(k)))
+    setColumns(next)
+    savePref(COLUMNS_KEY, next)
+  }
+  const exportCsv = () => {
+    if (!month) return
+    const pad = (n: number) => String(n).padStart(2, '0')
+    // 書き出す列: 一覧では、表示中の列。カレンダーでは、すべての列
+    downloadCsv(monthRows, view === 'list' ? columns : DEFAULT_COLUMNS, `deliveries-${month.getFullYear()}-${pad(month.getMonth() + 1)}.csv`)
+  }
+
   const selected = cards.find((c) => c.cr854_deliverycardid === selectedId)
   const shift = (n: number) => month && setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
   const setFilter = (k: keyof Filters) => (v: string) => setFilters({ ...filters, [k]: v })
@@ -288,7 +352,7 @@ function App() {
     loadCustomTemplates().catch(() => undefined)
   }, [])
   const filtering = Object.values(filters).some((v) => v !== '')
-  // 新規作成の初期値: 絞り込み中の国・チャネル・部署を引き継ぐ(その条件の配信を作ることが多いため)
+  // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
     ...(filters.country ? { country: filters.country } : {}),
@@ -356,7 +420,7 @@ function App() {
             <div className={styles.filterRow}>
               <FilterSelect label={t('国', 'Country')} value={filters.country} options={countryOptions} onChange={setFilter('country')} />
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
-              <FilterSelect label={t('部署', 'Department')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
+              <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
               <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />
               {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters(noFilter)}>{t('クリア', 'Clear')}</Button>}
               <span className={styles.count}>{t(`${filtered.length} / ${cards.length} 件`, `${filtered.length} / ${cards.length} items`)}</span>
@@ -365,6 +429,43 @@ function App() {
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={t('前の月', 'Previous month')} />
               <span className={styles.monthLabel}>{lang === 'ja' ? `${month.getFullYear()}年${month.getMonth() + 1}月` : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}</span>
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} onClick={() => shift(1)} aria-label={t('次の月', 'Next month')} />
+              <div className={styles.viewSwitch} role="group" aria-label={t('表示', 'View')}>
+                <ToggleButton size="small" checked={view === 'month'} appearance={view === 'month' ? 'primary' : 'subtle'} onClick={() => changeView('month')}>
+                  {t('月', 'Month')}
+                </ToggleButton>
+                <ToggleButton size="small" checked={view === 'list'} appearance={view === 'list' ? 'primary' : 'subtle'} onClick={() => changeView('list')}>
+                  {t('一覧', 'List')}
+                </ToggleButton>
+              </div>
+              {view === 'list' && (
+                <Menu
+                  checkedValues={{ columns }}
+                  onCheckedValueChange={(_, d) => {
+                    const added = d.checkedItems.find((k) => !columns.includes(k as ColumnKey))
+                    const removed = columns.find((k) => !d.checkedItems.includes(k))
+                    if (added) toggleColumn(added as ColumnKey, true)
+                    else if (removed) toggleColumn(removed, false)
+                  }}
+                >
+                  <MenuTrigger disableButtonEnhancement>
+                    <Button size="small" appearance="subtle" icon={<ColumnTripleRegular />}>{t('列', 'Columns')}</Button>
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      {COLUMNS.map((c) => (
+                        <MenuItemCheckbox key={c.key} name="columns" value={c.key} disabled={c.key === 'name'}>
+                          {c.label()}
+                        </MenuItemCheckbox>
+                      ))}
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
+              )}
+              <Tooltip content={t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")} relationship="description">
+                <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={monthRows.length === 0}>
+                  {t('CSV で書き出す', 'Export CSV')}
+                </Button>
+              </Tooltip>
               <div className={styles.legend}>
                 {statusOptions.map((o) => (
                   <span key={o.value} className={styles.legendPill}>
@@ -375,7 +476,11 @@ function App() {
               </div>
             </div>
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
-            <Calendar month={month} cards={filtered} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
+            {view === 'list' ? (
+              <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} />
+            ) : (
+              <Calendar month={month} cards={filtered} dueSoon={dueSoon} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
+            )}
           </>
         )}
       </div>

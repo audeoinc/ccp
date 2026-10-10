@@ -1,6 +1,6 @@
 import type { Item } from './items'
 import { tr } from './i18n'
-import { sectionRange, sectionsOf, type EmailTemplateId } from './templates'
+import { sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
 
 const labelsNow = (): string[] => [
   tr('① テーマ', '1. Theme'),
@@ -65,4 +65,32 @@ export function progressOf(a: {
     total: flags.length,
     remaining: labelsNow().filter((_, i) => !flags[i]),
   }
+}
+
+/**
+ * 一覧・カレンダー用の進み具合。配信カードの列と、掲載商品の数だけで求める
+ * (セクションの判定は、商品の数しか使わないため、中身のない配列で足りる)。
+ */
+export function cardProgress(
+  card: { cr854_theme?: string; cr854_headline?: string; cr854_instructions?: string; cr854_layoutkey?: string; cr854_emailtemplate?: number; _cr854_heroimage_value?: string },
+  productCount: number,
+): Progress {
+  return progressOf({
+    theme: card.cr854_theme ?? '',
+    template: card.cr854_layoutkey || templateFromValue(card.cr854_emailtemplate),
+    heroId: card._cr854_heroimage_value,
+    headline: card.cr854_headline ?? '',
+    items: Array.from({ length: productCount }, () => ({}) as Item),
+    instructions: card.cr854_instructions ?? '',
+  })
+}
+
+/** 締め切りの警告の日数(配信日がこの日数以内で、まだ何も作っていない配信に印を付ける) */
+export const DUE_SOON_DAYS = 7
+
+/** 配信日が近いのに、まだ着手していない(テンプレート以外の工程が 1 つも終わっていない)か */
+export function isDueSoonNotStarted(scheduledAt: string | undefined, progress: Progress, now = new Date()): boolean {
+  if (!scheduledAt) return false
+  const days = (new Date(scheduledAt).getTime() - now.getTime()) / 86_400_000
+  return days >= 0 && days <= DUE_SOON_DAYS && progress.done <= 1
 }

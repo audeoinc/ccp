@@ -16,3 +16,21 @@ export function saveAutoDraft(on: boolean) {
     // 保存できなくても動作には影響しない
   }
 }
+
+/** 画面の表示の好み(表示の切り替え・列の選択など)を、ブラウザごとに覚える。読めないときは既定値 */
+export function loadPref<T>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key)
+    return v === null ? fallback : (JSON.parse(v) as T)
+  } catch {
+    return fallback
+  }
+}
+
+export function savePref<T>(key: string, value: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // 保存できなくても動作には影響しない
+  }
+}
