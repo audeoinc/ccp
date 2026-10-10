@@ -23,7 +23,7 @@ import {
   tokens,
 } from '@fluentui/react-components'
 import { AddRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
-import { optionLabel, tr, useT } from './i18n'
+import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
 import { cardMarket, heroMarket, productMarket } from './market'
@@ -863,6 +863,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 </Field>
                 <Field label={t('制作の締め切り', 'Production due')}>
                   <Input size="small" type="date" value={form.productionDue} onChange={(_, d) => set('productionDue')(d.value)} />
+                </Field>
+                {/* 制作の担当者は、中央の「⑤ 制作指示」と同じ値。引き継ぐ操作は、制作指示とリンク先を確かめてから行うよう、中央だけに置く */}
+                <Field label={t('制作の担当者', 'Production assignee')}>
+                  <Input size="small" list="ccp-owners" value={form.productionOwner} onChange={(_, d) => set('productionOwner')(d.value)} />
+                </Field>
+                <Field label={t('制作への引き継ぎ', 'Handed off')}>
+                  <Input
+                    size="small"
+                    readOnly
+                    value={form.handedOffAt ? new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : t('まだ', 'Not yet')}
+                  />
                 </Field>
               </div>
               <Text weight="semibold" size={300} className={styles.sectionHead}>{t('工程', 'Steps')}</Text>
