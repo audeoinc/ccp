@@ -3,7 +3,7 @@ import { CheckmarkCircleRegular, SendRegular } from '@fluentui/react-icons'
 import { locale, useT } from './i18n'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  root: { display: 'grid', rowGap: '8px', minWidth: 0 },
   head: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase200 },
   row: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '12px', alignItems: 'end' },

@@ -8,7 +8,7 @@ import { defaultUtm, isUrl, productUrl, withUtm, type LinkSlot, type Links } fro
 import { linkKindLabel } from './templates'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', rowGap: '12px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  root: { display: 'grid', rowGap: '12px', minWidth: 0 },
   head: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase200 },
   slot: { display: 'grid', rowGap: '2px', minWidth: 0 },

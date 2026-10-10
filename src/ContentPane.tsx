@@ -46,9 +46,11 @@ import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { HandoffPanel } from './HandoffPanel'
 import { QuestionsPanel } from './QuestionsPanel'
+import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { linkSlots, type Links } from './links'
 
-type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions'
+// links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
+type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -155,6 +157,8 @@ const useStyles = makeStyles({
     columnGap: '4px',
     '& button': { flexShrink: 0, whiteSpace: 'nowrap' },
   },
+  // 工程ではないタブ(リンク先・引き継ぎ)の前の区切り
+  extraTab: { marginLeft: '12px', '::before': { content: '""', position: 'absolute', left: '-8px', top: '25%', bottom: '25%', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` } },
   // Block
   block: {
     display: 'grid',
@@ -1114,6 +1118,23 @@ export function ContentPane(props: Props) {
   const pr = progressOf({ theme, template, heroId: props.heroId, headline, items: props.items, instructions })
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
+  // リンク先: 「配信カードで指定」のボタンで、URL が空のものがあれば、タブに「!」を付ける
+  const slots = linkSlots(template, props.items, props.products, props.campaign)
+  const linksMissing = slots.some((sl) => !sl.defaultUrl && !(sl.kind === 'hero' ? props.links.hero : props.links.buttons?.[sl.key])?.trim())
+  // 引き継ぎのタブに出す、未解決の質問の数(開いたときに数え、質問の欄で変わったら合わせる)
+  const [openQuestions, setOpenQuestions] = useState(0)
+  useEffect(() => {
+    if (!props.cardId) return
+    let alive = true
+    Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${props.cardId}` })
+      .then((res) => {
+        if (alive && res.success) setOpenQuestions((res.data ?? []).filter((n) => !n.cr854_resolved && (n.cr854_kind ?? 'question') === 'question').length)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [props.cardId])
   const needTheme = theme.trim() ? undefined : t('先にテーマを決めてください', 'Set a theme first')
 
   // テーマ・テンプレート・制作指示のタブの対象(ヒーロー・セクションは、各タブ(ProductsTab)が知らせる)
@@ -1121,7 +1142,7 @@ export function ContentPane(props: Props) {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
     else if (tab === 'instructions') registerChat({ key: 'instructions', title: t('制作指示', 'Production notes') }, () => drafts.runInstructions())
-    else if (tab === 'template') registerChat(null)
+    else if (tab === 'template' || tab === 'links' || tab === 'handoff') registerChat(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   })
 
@@ -1160,6 +1181,10 @@ export function ContentPane(props: Props) {
         <Tab value="hero" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ ヒーロー', '3. Hero')}`}</Tab>
         <Tab value="sections" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ セクション', '4. Sections')}`}</Tab>
         <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑤ 制作指示', '5. Production notes')}`}</Tab>
+        <Tab value="links" onClick={revealTab} className={s.extraTab}>{`${linksMissing ? '! ' : ''}${t('リンク先', 'Links')}`}</Tab>
+        <Tab value="handoff" onClick={revealTab}>
+          {`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}${openQuestions ? t(`(${openQuestions})`, ` (${openQuestions})`) : ''}`}
+        </Tab>
       </TabList>
     </div>
     <div className={s.scroll}>
@@ -1205,7 +1230,7 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runInstructions}
         />
       )}
-      {tab === 'instructions' && (
+      {tab === 'handoff' && (
         <HandoffPanel
           productionOwner={props.handoff.productionOwner}
           onProductionOwner={(v) => props.onHandoff('productionOwner', v)}
@@ -1216,12 +1241,14 @@ export function ContentPane(props: Props) {
           people={props.people}
         />
       )}
-      {tab === 'instructions' && <QuestionsPanel cardId={props.cardId} owner={props.owner} productionOwner={props.handoff.productionOwner} />}
-      {tab === 'instructions' && (
+      {tab === 'handoff' && (
+        <QuestionsPanel cardId={props.cardId} owner={props.owner} productionOwner={props.handoff.productionOwner} onOpenCount={setOpenQuestions} />
+      )}
+      {tab === 'links' && (
         <LinksEditor
           links={props.links}
           onLinks={props.onLinks}
-          slots={linkSlots(template, props.items, props.products, props.campaign)}
+          slots={slots}
           items={props.items}
           products={props.products}
           campaign={props.campaign}
