@@ -1357,6 +1357,7 @@
    "cr854_instructions": "Lead with a full-width autumn outfit visual in warm brown and terracotta tones. Present outerwear first (Light Jacket, Trench Coat), then knits (Crewneck, Cable Knit) in a clean two-by-two rhythm. Keep generous white space and a calm, premium mood; make the call-to-action buttons quiet and dark.",
    "cr854_owner": "Mika Tanaka",
    "cr854_productiondue": "2026-09-27",
+   "cr854_productionowner": "Alex Kim",
    "cr854_themereason": "Early October brings cooler mornings and evenings; light jackets and knits are well stocked and trending up.",
    "cr854_headline": "Embrace the Autumn Layers",
    "cr854_copyangle": "Seasonal feel",
@@ -1380,7 +1381,9 @@
    "cr854_copy": "Two days only. Save on fall favorites.",
    "cr854_instructions": "セール訴求。価格を大きく表示",
    "cr854_owner": "Jordan Lee",
-   "cr854_productiondue": "2026-09-29"
+   "cr854_productiondue": "2026-09-29",
+   "cr854_productionowner": "Sam Ito",
+   "cr854_handedoffat": "2026-09-28T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "5df16248-d1fe-4ac7-aa11-377207d5e549",
@@ -1394,7 +1397,9 @@
    "cr854_copy": "Flash deal ends tonight.",
    "cr854_instructions": "短文。緊急感を出す",
    "cr854_owner": "Ken Sato",
-   "cr854_productiondue": "2026-09-29"
+   "cr854_productiondue": "2026-09-29",
+   "cr854_productionowner": "Alex Kim",
+   "cr854_handedoffat": "2026-09-28T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "ae81cdcb-c8ec-4380-a78f-13a5803c9842",
@@ -1450,7 +1455,9 @@
    "cr854_copy": "Member Week: extra perks, just for you.",
    "cr854_instructions": "会員限定バッジを入れる",
    "cr854_owner": "Mika Tanaka",
-   "cr854_productiondue": "2026-10-06"
+   "cr854_productiondue": "2026-10-06",
+   "cr854_productionowner": "Alex Kim",
+   "cr854_handedoffat": "2026-10-05T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "e5b0a3f6-aafe-41e1-acfc-a9f82e691923",
@@ -1464,7 +1471,9 @@
    "cr854_copy": "Member Week is almost over.",
    "cr854_instructions": "短文",
    "cr854_owner": "Jordan Lee",
-   "cr854_productiondue": "2026-10-06"
+   "cr854_productiondue": "2026-10-06",
+   "cr854_productionowner": "Sam Ito",
+   "cr854_handedoffat": "2026-10-05T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "e722bf61-a979-4d08-a81e-a98b14a13f62",
@@ -1619,6 +1628,7 @@
    "cr854_instructions": "メインビジュアルはニットの質感が伝わる近接のカットを全幅で配置し、温かみのあるベージュ〜ブラウン系で統一する。商品は上から順に、クルーネック、ケーブル、カーディガン、タートルの4点を2×2のグリッドで表示。余白を多めに取り、ボタンは落ち着いた濃色にして、素材の魅力を前面に出す。",
    "cr854_owner": "Mika Tanaka",
    "cr854_productiondue": "2026-09-28",
+   "cr854_productionowner": "Alex Kim",
    "cr854_themereason": "10月初旬で肌寒くなる時期。売上上昇中のニット類が主役になる、季節感重視のテーマ。",
    "cr854_headline": "ぬくもりを纏う、秋のニット",
    "cr854_copyangle": "商品の魅力",
@@ -1641,7 +1651,9 @@
    "cr854_copy": "",
    "cr854_instructions": "",
    "cr854_owner": "Jordan Lee",
-   "cr854_productiondue": "2026-09-30"
+   "cr854_productiondue": "2026-09-30",
+   "cr854_productionowner": "Sam Ito",
+   "cr854_handedoffat": "2026-09-29T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "08c00848-23d3-47c3-a165-a4721f7937ad",
@@ -1655,7 +1667,9 @@
    "cr854_copy": "",
    "cr854_instructions": "",
    "cr854_owner": "Ken Sato",
-   "cr854_productiondue": "2026-09-30"
+   "cr854_productiondue": "2026-09-30",
+   "cr854_productionowner": "Alex Kim",
+   "cr854_handedoffat": "2026-09-29T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "dc0b932f-3e5b-444c-aebd-fbd12fae6a4e",
@@ -1697,7 +1711,9 @@
    "cr854_copy": "",
    "cr854_instructions": "",
    "cr854_owner": "Ken Sato",
-   "cr854_productiondue": "2026-10-07"
+   "cr854_productiondue": "2026-10-07",
+   "cr854_productionowner": "Sam Ito",
+   "cr854_handedoffat": "2026-10-06T06:00:00.000Z"
   },
   {
    "cr854_deliverycardid": "16a9fd3c-2cd2-4afd-ab1f-9caa322662a3",

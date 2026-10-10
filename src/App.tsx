@@ -494,7 +494,7 @@ function App() {
           products={products}
           heroes={heroes}
           otherThemes={cards.filter((c) => c.cr854_deliverycardid !== selected?.cr854_deliverycardid && c.cr854_theme).map((c) => c.cr854_theme!)}
-          owners={[...new Set(cards.map((c) => c.cr854_owner?.trim()).filter((o): o is string => !!o))].sort()}
+          owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()}
           onBack={() => {
             setSelectedId(null)
             setCreating(null)

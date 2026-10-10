@@ -86,9 +86,10 @@ const iso = (s: string) => new Date(`${s.replace(' ', 'T')}:00+09:00`).toISOStri
 
 // 担当者と制作の締め切りは、元のデータにないので、それらしい値を作る(担当者は 3 人で順に。締め切りは配信日の 4 日前)
 const OWNERS = ['Mika Tanaka', 'Jordan Lee', 'Ken Sato']
-const dueOf = (s: string) => {
+const PRODUCTION = ['Alex Kim', 'Sam Ito']
+const dueOf = (s: string, extraDays = 0) => {
   const d = new Date(`${s.slice(0, 10)}T00:00:00+09:00`)
-  d.setUTCDate(d.getUTCDate() - 4)
+  d.setUTCDate(d.getUTCDate() - 4 - extraDays)
   return new Date(d.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
 
@@ -105,6 +106,9 @@ export const cards: Row[] = [...csv('delivery_cards.csv'), ...csv('delivery_card
   cr854_instructions: r['制作指示'],
   cr854_owner: OWNERS[i % OWNERS.length],
   cr854_productiondue: dueOf(r['配信日']),
+  // 制作の担当は、承認済み・確定の配信だけに入れる。確定の配信は、締め切りの前日に引き継いだことにする
+  ...(['承認済み', '確定'].includes(r['ステータス']) ? { cr854_productionowner: PRODUCTION[i % PRODUCTION.length] } : {}),
+  ...(r['ステータス'] === '確定' ? { cr854_handedoffat: `${dueOf(r['配信日'], 1)}T06:00:00.000Z` } : {}),
 }))
 
 export const deliveryProducts: Row[] = []

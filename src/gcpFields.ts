@@ -11,5 +11,9 @@ declare module './generated/models/Cr854_deliverycardsModel' {
     cr854_productiondue?: string
     /** リンク先の URL と計測用のパラメーター(JSON。src/links.ts) */
     cr854_links?: string
+    /** 制作の担当者 */
+    cr854_productionowner?: string
+    /** 制作に引き継いだ日時(ISO。空は、まだ) */
+    cr854_handedoffat?: string
   }
 }

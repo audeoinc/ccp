@@ -26,7 +26,9 @@
         ["cr854_products", "products", "text"],
         ["cr854_owner", "owner", "text", {"gcpOnly": true}],
         ["cr854_productiondue", "production_due", "date", {"gcpOnly": true}],
-        ["cr854_links", "links", "text", {"gcpOnly": true}]
+        ["cr854_links", "links", "text", {"gcpOnly": true}],
+        ["cr854_productionowner", "production_owner", "text", {"gcpOnly": true}],
+        ["cr854_handedoffat", "handed_off_at", "timestamptz", {"gcpOnly": true}]
       ],
       "lookups": [
         ["cr854_heroimage", "hero_image_id", "cr854_heroimages", {"onDelete": "SET NULL"}]

@@ -44,6 +44,7 @@ import { progressOf } from './progress'
 import { openTemplateManager, sectionRange, templateOptions, type EmailTemplateId, type SectionInfo } from './templates'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
+import { HandoffPanel } from './HandoffPanel'
 import { linkSlots, type Links } from './links'
 
 type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions'
@@ -90,6 +91,11 @@ interface Props {
   onLinks: (l: Links) => void
   /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
   campaign: string
+  /** 制作への引き継ぎ(制作指示のタブ) */
+  handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
+  onHandoff: (key: 'productionOwner' | 'handedOffAt', value: string) => void
+  /** これまでに入れた人の名前(入力の候補) */
+  people: string[]
 }
 
 // ------------------------------------------------------------------ スタイル
@@ -1192,6 +1198,17 @@ export function ContentPane(props: Props) {
           busy={!!drafts.busy.instructions}
           blocked={needTheme}
           onGenerate={drafts.runInstructions}
+        />
+      )}
+      {tab === 'instructions' && (
+        <HandoffPanel
+          productionOwner={props.handoff.productionOwner}
+          onProductionOwner={(v) => props.onHandoff('productionOwner', v)}
+          handedOffAt={props.handoff.handedOffAt}
+          onHandedOffAt={(v) => props.onHandoff('handedOffAt', v)}
+          productionDue={props.handoff.productionDue}
+          remaining={pr.remaining}
+          people={props.people}
         />
       )}
       {tab === 'instructions' && (

@@ -83,6 +83,9 @@ interface Form {
   owner: string
   /** 制作の締め切り(YYYY-MM-DD) */
   productionDue: string
+  productionOwner: string
+  /** 制作に引き継いだ日時(ISO。空は、まだ) */
+  handedOffAt: string
   theme: string
   headline: string
   copy: string
@@ -104,6 +107,8 @@ const toForm = (c?: Cr854_deliverycards): Form => ({
   status: c?.cr854_status === undefined ? String(statusOptions[0].value) : String(c.cr854_status),
   owner: c?.cr854_owner ?? '',
   productionDue: c?.cr854_productiondue?.slice(0, 10) ?? '',
+  productionOwner: c?.cr854_productionowner ?? '',
+  handedOffAt: c?.cr854_handedoffat ?? '',
   theme: c?.cr854_theme ?? '',
   headline: c?.cr854_headline ?? '',
   copy: c?.cr854_copy ?? '',
@@ -719,6 +724,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         cr854_owner: form.owner.trim(),
         cr854_productiondue: form.productionDue || (null as never),
         cr854_links: encodeLinks(links),
+        cr854_productionowner: form.productionOwner.trim(),
+        cr854_handedoffat: form.handedOffAt || (null as never),
         cr854_theme: form.theme,
         cr854_headline: form.headline,
         cr854_products: items.map((i) => productName(i.productId)).filter(Boolean).join(' / '),
@@ -942,6 +949,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 disabled={saving}
                 links={links}
                 onLinks={setLinks}
+                handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
+                onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
+                people={owners}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
               />
             </div>

@@ -6,7 +6,7 @@ import { channelOptions, countryOptions, departmentOptions, statusOptions } from
 // 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
 
 /** 一覧の列。順番は、この並び。CSV の書き出しも、この定義を使う */
-export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'theme' | 'products' | 'steps'
+export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'handoff' | 'theme' | 'products' | 'steps'
 
 export interface Row {
   card: Cr854_deliverycards
@@ -53,6 +53,15 @@ export const COLUMNS: Column[] = [
   { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => label(statusOptions, r.card.cr854_status), sort: (r) => r.card.cr854_status ?? 0 },
   { key: 'owner', label: () => tr('担当者', 'Owner'), text: (r) => r.card.cr854_owner ?? '' },
   { key: 'due', label: () => tr('制作の締め切り', 'Production due'), text: (r) => dueText(r.card.cr854_productiondue), sort: (r) => r.card.cr854_productiondue ?? '' },
+  {
+    key: 'handoff',
+    label: () => tr('制作への引き継ぎ', 'Handoff'),
+    text: (r) =>
+      r.card.cr854_handedoffat
+        ? `${new Date(r.card.cr854_handedoffat).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })}${r.card.cr854_productionowner ? ` · ${r.card.cr854_productionowner}` : ''}`
+        : '',
+    sort: (r) => r.card.cr854_handedoffat ?? '',
+  },
   { key: 'theme', label: () => tr('テーマ', 'Theme'), text: (r) => r.card.cr854_theme ?? '' },
   { key: 'products', label: () => tr('商品数', 'Products'), text: (r) => String(r.products), sort: (r) => r.products },
   { key: 'steps', label: () => tr('工程', 'Steps'), text: (r) => `${r.done} / ${r.total}`, sort: (r) => r.done },
