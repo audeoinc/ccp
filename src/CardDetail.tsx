@@ -45,7 +45,7 @@ import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 
-/** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・部署) */
+/** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
 export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'channel' | 'department'>>
 
 interface Props {
@@ -779,7 +779,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, onBa
               <div className={styles.twoCol}>
                 <OptionSelect label={t('国', 'Country')} value={form.country} options={countryOptions} onChange={set('country')} />
                 <OptionSelect label={t('チャネル', 'Channel')} value={form.channel} options={channelOptions} onChange={set('channel')} />
-                <OptionSelect label={t('部署', 'Department')} value={form.department} options={departmentOptions} onChange={set('department')} />
+                <OptionSelect label={t('種別', 'Type')} value={form.department} options={departmentOptions} onChange={set('department')} />
                 <Field label={t('ステータス', 'Status')}>
                   <div className={styles.statusRow}>
                     <span className={styles.dot} style={{ backgroundColor: statusColor(Number(form.status)) }} />

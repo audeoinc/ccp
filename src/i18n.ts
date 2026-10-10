@@ -77,7 +77,7 @@ const OPTION_EN: Record<string, string> = {
   // チャネル
   メール: 'Email',
   プッシュ: 'Push',
-  // 部署
+  // 配信種別(部署)
   販促: 'Promotion',
   // 商品カテゴリ
   アウター: 'Outerwear',
