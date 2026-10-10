@@ -41,6 +41,7 @@ import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
+import { NotesEditor } from './NotesEditor'
 import { campaignSlug, encodeLinks, parseLinks, type Links } from './links'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
@@ -910,13 +911,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </Field>
               {(form.headline || form.copy) && form.copyAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.copyAngle}`}</Caption1>}
               <Field label={t('制作指示', 'Production notes')}>
-                <AutoTextarea
-                  size="small"
-                  rows={2}
-                                    className={form.instructions ? styles.filled : undefined}
-                  value={form.instructions}
-                  onChange={(_, d) => set('instructions')(d.value)}
-                />
+                {/* 中央の「⑤ 制作指示」と同じエディタ(値は 1 つ。どちらで書き換えても、両方が変わる) */}
+                <NotesEditor value={form.instructions} onChange={set('instructions')} minHeight="120px" />
               </Field>
               {form.instructions && form.instructionsAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.instructionsAngle}`}</Caption1>}
             </div>
