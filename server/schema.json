@@ -23,7 +23,9 @@
         ["cr854_heroreason", "hero_reason", "text"],
         ["cr854_sectiontitles", "section_titles", "text"],
         ["cr854_sectioncopies", "section_copies", "text"],
-        ["cr854_products", "products", "text"]
+        ["cr854_products", "products", "text"],
+        ["cr854_owner", "owner", "text", {"gcpOnly": true}],
+        ["cr854_productiondue", "production_due", "date", {"gcpOnly": true}]
       ],
       "lookups": [
         ["cr854_heroimage", "hero_image_id", "cr854_heroimages", {"onDelete": "SET NULL"}]

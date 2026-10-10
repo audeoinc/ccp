@@ -57,6 +57,8 @@ interface Props {
   heroes: Cr854_heroimages[]
   /** 他の配信で使われているテーマ(テーマ案の重複回避用) */
   otherThemes: string[]
+  /** これまでに入れた担当者の名前(入力の候補) */
+  owners?: string[]
   onBack: () => void
   onSaved: () => Promise<void>
 }
@@ -76,6 +78,9 @@ interface Form {
   channel: string
   department: string
   status: string
+  owner: string
+  /** 制作の締め切り(YYYY-MM-DD) */
+  productionDue: string
   theme: string
   headline: string
   copy: string
@@ -95,6 +100,8 @@ const toForm = (c?: Cr854_deliverycards): Form => ({
   channel: str(c?.cr854_channel),
   department: str(c?.cr854_department),
   status: c?.cr854_status === undefined ? String(statusOptions[0].value) : String(c.cr854_status),
+  owner: c?.cr854_owner ?? '',
+  productionDue: c?.cr854_productiondue?.slice(0, 10) ?? '',
   theme: c?.cr854_theme ?? '',
   headline: c?.cr854_headline ?? '',
   copy: c?.cr854_copy ?? '',
@@ -293,7 +300,7 @@ const useStyles = makeStyles({
   actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, onBack, onSaved }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], onBack, onSaved }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -676,6 +683,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, onBa
         cr854_channel: num(form.channel),
         cr854_department: num(form.department),
         cr854_status: num(form.status),
+        cr854_owner: form.owner.trim(),
+        cr854_productiondue: form.productionDue || (null as never),
         cr854_theme: form.theme,
         cr854_headline: form.headline,
         cr854_products: items.map((i) => productName(i.productId)).filter(Boolean).join(' / '),
@@ -789,6 +798,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, onBa
                       ))}
                     </Select>
                   </div>
+                </Field>
+              </div>
+              <div className={styles.twoCol}>
+                <Field label={t('担当者', 'Owner')}>
+                  <Input size="small" list="ccp-owners" value={form.owner} onChange={(_, d) => set('owner')(d.value)} />
+                  <datalist id="ccp-owners">
+                    {owners.map((o) => <option key={o} value={o} />)}
+                  </datalist>
+                </Field>
+                <Field label={t('制作の締め切り', 'Production due')}>
+                  <Input size="small" type="date" value={form.productionDue} onChange={(_, d) => set('productionDue')(d.value)} />
                 </Field>
               </div>
               <Text weight="semibold" size={300} className={styles.sectionHead}>{t('工程', 'Steps')}</Text>

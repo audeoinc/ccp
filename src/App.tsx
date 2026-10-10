@@ -161,6 +161,8 @@ const useStyles = makeStyles({
     margin: '0 auto',
     padding: `${tokens.spacingVerticalXXL} ${tokens.spacingHorizontalL}`,
   },
+  // 一覧は列が多いので、画面の幅いっぱいまで使う
+  containerWide: { maxWidth: '1600px' },
   center: { textAlign: 'center', padding: `${tokens.spacingVerticalXXXL} 0` },
   alert: { marginBottom: tokens.spacingVerticalL },
   filterRow: {
@@ -408,7 +410,7 @@ function App() {
           {t('新規作成', 'New')}
         </Button>
       </header>
-      <div className={styles.container}>
+      <div className={mergeClasses(styles.container, view === 'list' && styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
         {error && (
           <MessageBar layout="multiline" intent="error" className={styles.alert}>
@@ -492,6 +494,7 @@ function App() {
           products={products}
           heroes={heroes}
           otherThemes={cards.filter((c) => c.cr854_deliverycardid !== selected?.cr854_deliverycardid && c.cr854_theme).map((c) => c.cr854_theme!)}
+          owners={[...new Set(cards.map((c) => c.cr854_owner?.trim()).filter((o): o is string => !!o))].sort()}
           onBack={() => {
             setSelectedId(null)
             setCreating(null)

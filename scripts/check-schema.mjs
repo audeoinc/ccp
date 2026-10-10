@@ -26,7 +26,8 @@ for (const [table, def] of Object.entries(schema.tables)) {
     if (m[2]) lookups.add(m[1])
     else if (m[1] !== def.pk) fields.add(m[1])
   }
-  const defined = new Set(def.columns.map((c) => c[0]))
+  // GCP 版だけの列(gcpOnly)は、生成モデルにないのが正しいので、突き合わせない
+  const defined = new Set(def.columns.filter((c) => !c[3]?.gcpOnly).map((c) => c[0]))
   const definedLookups = new Set(def.lookups.map((l) => l[0]))
   for (const f of fields) if (!defined.has(f)) problems.push(`${table}: 生成モデルにある列 ${f} が、schema.json にありません`)
   for (const f of defined) if (!fields.has(f)) problems.push(`${table}: schema.json にある列 ${f} が、生成モデルにありません`)

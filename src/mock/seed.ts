@@ -84,7 +84,15 @@ const heroId = (code: string) => guid(`hero:${code}`)
 // ---- 配信カード
 const iso = (s: string) => new Date(`${s.replace(' ', 'T')}:00+09:00`).toISOString()
 
-export const cards: Row[] = [...csv('delivery_cards.csv'), ...csv('delivery_cards_jp.csv')].map((r) => ({
+// 担当者と制作の締め切りは、元のデータにないので、それらしい値を作る(担当者は 3 人で順に。締め切りは配信日の 4 日前)
+const OWNERS = ['Mika Tanaka', 'Jordan Lee', 'Ken Sato']
+const dueOf = (s: string) => {
+  const d = new Date(`${s.slice(0, 10)}T00:00:00+09:00`)
+  d.setUTCDate(d.getUTCDate() - 4)
+  return new Date(d.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+export const cards: Row[] = [...csv('delivery_cards.csv'), ...csv('delivery_cards_jp.csv')].map((r, i) => ({
   cr854_deliverycardid: guid(`card:${r['配信名']}:${r['配信日']}`),
   cr854_name: r['配信名'],
   cr854_scheduledat: iso(r['配信日']),
@@ -95,6 +103,8 @@ export const cards: Row[] = [...csv('delivery_cards.csv'), ...csv('delivery_card
   cr854_theme: r['テーマ'],
   cr854_copy: r['コピー'],
   cr854_instructions: r['制作指示'],
+  cr854_owner: OWNERS[i % OWNERS.length],
+  cr854_productiondue: dueOf(r['配信日']),
 }))
 
 export const deliveryProducts: Row[] = []

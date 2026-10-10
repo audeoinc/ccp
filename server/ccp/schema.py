@@ -44,6 +44,8 @@ class Column:
     type: str
     required: bool = False
     index: bool = False
+    # GCP 版だけの列(Dataverse・生成モデルにはない。scripts/check-schema.mjs の突き合わせから外す)
+    gcpOnly: bool = False
 
 
 @dataclass

@@ -6,7 +6,7 @@ import { channelOptions, countryOptions, departmentOptions, statusOptions } from
 // 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
 
 /** 一覧の列。順番は、この並び。CSV の書き出しも、この定義を使う */
-export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'theme' | 'products' | 'steps'
+export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'theme' | 'products' | 'steps'
 
 export interface Row {
   card: Cr854_deliverycards
@@ -25,6 +25,12 @@ export interface Column {
   sort?: (r: Row) => string | number
 }
 
+// 制作の締め切り(YYYY-MM-DD)。時差でずれないよう、日付の文字列から、その日のローカルの日付として作る
+const dueText = (ymd?: string) => {
+  if (!ymd) return ''
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString(locale(), { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
 // 選択肢の表示名は、値から求める(〜name の列は、データの入れ方によっては空のため)
 const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) : '')
@@ -45,6 +51,8 @@ export const COLUMNS: Column[] = [
   { key: 'channel', label: () => tr('チャネル', 'Channel'), text: (r) => label(channelOptions, r.card.cr854_channel) },
   { key: 'department', label: () => tr('種別', 'Type'), text: (r) => label(departmentOptions, r.card.cr854_department) },
   { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => label(statusOptions, r.card.cr854_status), sort: (r) => r.card.cr854_status ?? 0 },
+  { key: 'owner', label: () => tr('担当者', 'Owner'), text: (r) => r.card.cr854_owner ?? '' },
+  { key: 'due', label: () => tr('制作の締め切り', 'Production due'), text: (r) => dueText(r.card.cr854_productiondue), sort: (r) => r.card.cr854_productiondue ?? '' },
   { key: 'theme', label: () => tr('テーマ', 'Theme'), text: (r) => r.card.cr854_theme ?? '' },
   { key: 'products', label: () => tr('商品数', 'Products'), text: (r) => String(r.products), sort: (r) => r.products },
   { key: 'steps', label: () => tr('工程', 'Steps'), text: (r) => `${r.done} / ${r.total}`, sort: (r) => r.done },
@@ -52,13 +60,20 @@ export const COLUMNS: Column[] = [
 
 export const DEFAULT_COLUMNS: ColumnKey[] = COLUMNS.map((c) => c.key)
 
+/** 警告の基準の日時: 制作の締め切りがあれば、その日の終わり。なければ、配信日時 */
+const deadlineOf = (card: Cr854_deliverycards): string | undefined => {
+  if (!card.cr854_productiondue) return card.cr854_scheduledat
+  const [y, m, d] = card.cr854_productiondue.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d, 23, 59).toISOString()
+}
+
 /** 配信カードと掲載商品の数から、一覧の行を作る(締め切りの警告も、ここで決める) */
 export function toRows(cards: Cr854_deliverycards[], productCounts: Map<string, number>): Row[] {
   const now = new Date()
   return cards.map((card) => {
     const products = productCounts.get(card.cr854_deliverycardid) ?? 0
     const p = cardProgress(card, products)
-    return { card, products, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(card.cr854_scheduledat, p, now) }
+    return { card, products, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(deadlineOf(card), p, now, card.cr854_scheduledat) }
   })
 }
 

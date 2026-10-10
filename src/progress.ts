@@ -85,12 +85,14 @@ export function cardProgress(
   })
 }
 
-/** 締め切りの警告の日数(配信日がこの日数以内で、まだ何も作っていない配信に印を付ける) */
+/** 締め切りの警告の日数(制作の締め切り、なければ配信日が、この日数以内で、まだ何も作っていない配信に印を付ける) */
 export const DUE_SOON_DAYS = 7
 
-/** 配信日が近いのに、まだ着手していない(テンプレート以外の工程が 1 つも終わっていない)か */
-export function isDueSoonNotStarted(scheduledAt: string | undefined, progress: Progress, now = new Date()): boolean {
-  if (!scheduledAt) return false
-  const days = (new Date(scheduledAt).getTime() - now.getTime()) / 86_400_000
-  return days >= 0 && days <= DUE_SOON_DAYS && progress.done <= 1
+/** 締め切り(制作の締め切り、なければ配信日)が近いのに、まだ着手していない(テンプレート以外の工程が 1 つも終わっていない)か */
+export function isDueSoonNotStarted(deadline: string | undefined, progress: Progress, now = new Date(), scheduledAt = deadline): boolean {
+  if (!deadline || !scheduledAt) return false
+  // 締め切りを過ぎていても、まだ配信していなければ警告する(過ぎているほうが急ぐ)
+  if (new Date(scheduledAt).getTime() < now.getTime()) return false
+  const days = (new Date(deadline).getTime() - now.getTime()) / 86_400_000
+  return days <= DUE_SOON_DAYS && progress.done <= 1
 }

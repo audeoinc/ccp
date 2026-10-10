@@ -1355,6 +1355,8 @@
    "cr854_theme": "Layered Comfort for Crisp Days",
    "cr854_copy": "Discover cozy blends and structured essentials that redefine effortless warmth.",
    "cr854_instructions": "Lead with a full-width autumn outfit visual in warm brown and terracotta tones. Present outerwear first (Light Jacket, Trench Coat), then knits (Crewneck, Cable Knit) in a clean two-by-two rhythm. Keep generous white space and a calm, premium mood; make the call-to-action buttons quiet and dark.",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-09-27",
    "cr854_themereason": "Early October brings cooler mornings and evenings; light jackets and knits are well stocked and trending up.",
    "cr854_headline": "Embrace the Autumn Layers",
    "cr854_copyangle": "Seasonal feel",
@@ -1376,7 +1378,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "週末セール",
    "cr854_copy": "Two days only. Save on fall favorites.",
-   "cr854_instructions": "セール訴求。価格を大きく表示"
+   "cr854_instructions": "セール訴求。価格を大きく表示",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-09-29"
   },
   {
    "cr854_deliverycardid": "5df16248-d1fe-4ac7-aa11-377207d5e549",
@@ -1388,7 +1392,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "タイムセール",
    "cr854_copy": "Flash deal ends tonight.",
-   "cr854_instructions": "短文。緊急感を出す"
+   "cr854_instructions": "短文。緊急感を出す",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-09-29"
   },
   {
    "cr854_deliverycardid": "ae81cdcb-c8ec-4380-a78f-13a5803c9842",
@@ -1400,7 +1406,9 @@
    "cr854_status": 588230001,
    "cr854_theme": "秋の新作を先取り",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-01"
   },
   {
    "cr854_deliverycardid": "d370ef63-878d-4d2e-a9a7-8d59c9a27194",
@@ -1412,7 +1420,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-03"
   },
   {
    "cr854_deliverycardid": "6b186c57-6607-4baa-a9e2-3e952bb26180",
@@ -1424,7 +1434,9 @@
    "cr854_status": 588230001,
    "cr854_theme": "アウター特集",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-04"
   },
   {
    "cr854_deliverycardid": "1e57cab8-19a3-4825-a20f-437af5b2d41f",
@@ -1436,7 +1448,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "会員感謝週間",
    "cr854_copy": "Member Week: extra perks, just for you.",
-   "cr854_instructions": "会員限定バッジを入れる"
+   "cr854_instructions": "会員限定バッジを入れる",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-06"
   },
   {
    "cr854_deliverycardid": "e5b0a3f6-aafe-41e1-acfc-a9f82e691923",
@@ -1448,7 +1462,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "会員週間リマインド",
    "cr854_copy": "Member Week is almost over.",
-   "cr854_instructions": "短文"
+   "cr854_instructions": "短文",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-06"
   },
   {
    "cr854_deliverycardid": "e722bf61-a979-4d08-a81e-a98b14a13f62",
@@ -1460,7 +1476,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-08"
   },
   {
    "cr854_deliverycardid": "f81243b0-2849-4443-a05a-99e2be211a1d",
@@ -1472,7 +1490,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-10"
   },
   {
    "cr854_deliverycardid": "f21fb26a-de2c-4b49-afab-b478c9dbc327",
@@ -1484,7 +1504,9 @@
    "cr854_status": 588230001,
    "cr854_theme": "ブーツ特集",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-11"
   },
   {
    "cr854_deliverycardid": "c5551907-d429-4fdc-af6e-f0395ac3a49e",
@@ -1496,7 +1518,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-13"
   },
   {
    "cr854_deliverycardid": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
@@ -1508,7 +1532,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-15"
   },
   {
    "cr854_deliverycardid": "376737d5-28cd-42fa-a786-88ab32cf7410",
@@ -1520,7 +1546,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-18"
   },
   {
    "cr854_deliverycardid": "351724bc-67c5-4a39-ac7a-b64e4466cadb",
@@ -1532,7 +1560,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-20"
   },
   {
    "cr854_deliverycardid": "25248639-1c20-4130-a083-c3f39e0f498a",
@@ -1544,7 +1574,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-22"
   },
   {
    "cr854_deliverycardid": "59b45759-9246-4fae-af9b-4ca3b88e1da0",
@@ -1556,7 +1588,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-25"
   },
   {
    "cr854_deliverycardid": "8df68365-5c60-41d0-a021-96f7e32a0062",
@@ -1568,7 +1602,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-27"
   },
   {
    "cr854_deliverycardid": "302f65b2-130b-4b77-a0dd-ef6857507a0d",
@@ -1581,6 +1617,8 @@
    "cr854_theme": "ニットで重ねる、秋の新作",
    "cr854_copy": "重ねるほどに表情が変わる、やさしい手ざわりの新作ニットが届きました。",
    "cr854_instructions": "メインビジュアルはニットの質感が伝わる近接のカットを全幅で配置し、温かみのあるベージュ〜ブラウン系で統一する。商品は上から順に、クルーネック、ケーブル、カーディガン、タートルの4点を2×2のグリッドで表示。余白を多めに取り、ボタンは落ち着いた濃色にして、素材の魅力を前面に出す。",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-09-28",
    "cr854_themereason": "10月初旬で肌寒くなる時期。売上上昇中のニット類が主役になる、季節感重視のテーマ。",
    "cr854_headline": "ぬくもりを纏う、秋のニット",
    "cr854_copyangle": "商品の魅力",
@@ -1601,7 +1639,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-09-30"
   },
   {
    "cr854_deliverycardid": "08c00848-23d3-47c3-a165-a4721f7937ad",
@@ -1613,7 +1653,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-09-30"
   },
   {
    "cr854_deliverycardid": "dc0b932f-3e5b-444c-aebd-fbd12fae6a4e",
@@ -1625,7 +1667,9 @@
    "cr854_status": 588230001,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-02"
   },
   {
    "cr854_deliverycardid": "9d394c2a-ac56-46b1-a20c-10601fad6b37",
@@ -1637,7 +1681,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-05"
   },
   {
    "cr854_deliverycardid": "57bfa61a-8e55-4ce1-a8cf-2c1c5c1c9feb",
@@ -1649,7 +1695,9 @@
    "cr854_status": 588230003,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-07"
   },
   {
    "cr854_deliverycardid": "16a9fd3c-2cd2-4afd-ab1f-9caa322662a3",
@@ -1661,7 +1709,9 @@
    "cr854_status": 588230001,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-09"
   },
   {
    "cr854_deliverycardid": "f37066c0-1e5d-4269-ad1a-b23242b3ac63",
@@ -1673,7 +1723,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-12"
   },
   {
    "cr854_deliverycardid": "07286ba6-9bb4-498f-a2e8-08989caa6dd1",
@@ -1685,7 +1737,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-16"
   },
   {
    "cr854_deliverycardid": "4c51690b-9817-4358-aea2-f045a2be05c2",
@@ -1697,7 +1751,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Mika Tanaka",
+   "cr854_productiondue": "2026-10-19"
   },
   {
    "cr854_deliverycardid": "1846c242-b765-402f-a47f-c6e029c70905",
@@ -1709,7 +1765,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Jordan Lee",
+   "cr854_productiondue": "2026-10-23"
   },
   {
    "cr854_deliverycardid": "f315868a-f9f9-4c5d-ad62-9e20377c400b",
@@ -1721,7 +1779,9 @@
    "cr854_status": 588230000,
    "cr854_theme": "",
    "cr854_copy": "",
-   "cr854_instructions": ""
+   "cr854_instructions": "",
+   "cr854_owner": "Ken Sato",
+   "cr854_productiondue": "2026-10-26"
   }
  ],
  "cr854_deliveryproducts": [
