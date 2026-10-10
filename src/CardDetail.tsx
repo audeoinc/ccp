@@ -41,6 +41,7 @@ import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
+import { campaignSlug, encodeLinks, parseLinks, type Links } from './links'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
@@ -349,6 +350,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [heroId, setHeroId] = useState<string | undefined>(card?._cr854_heroimage_value)
   const [heroReason, setHeroReason] = useState(card?.cr854_heroreason ?? '')
   const [widths, setWidths] = useState<[number, number, number]>(loadWidths)
+  const [links, setLinks] = useState<Links>(() => parseLinks(card?.cr854_links))
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
   const resizeDialog = (dw: number, dh: number) =>
@@ -716,6 +718,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         cr854_status: num(form.status),
         cr854_owner: form.owner.trim(),
         cr854_productiondue: form.productionDue || (null as never),
+        cr854_links: encodeLinks(links),
         cr854_theme: form.theme,
         cr854_headline: form.headline,
         cr854_products: items.map((i) => productName(i.productId)).filter(Boolean).join(' / '),
@@ -937,6 +940,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 onLanguage={setLanguage}
                 drafts={drafts}
                 disabled={saving}
+                links={links}
+                onLinks={setLinks}
+                campaign={campaignSlug(form.name, form.scheduledAt)}
               />
             </div>
 

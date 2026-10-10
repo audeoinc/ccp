@@ -9,5 +9,7 @@ declare module './generated/models/Cr854_deliverycardsModel' {
     cr854_owner?: string
     /** 制作の締め切り(YYYY-MM-DD) */
     cr854_productiondue?: string
+    /** リンク先の URL と計測用のパラメーター(JSON。src/links.ts) */
+    cr854_links?: string
   }
 }

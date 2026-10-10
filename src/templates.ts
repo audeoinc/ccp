@@ -42,7 +42,7 @@ export interface Section {
 }
 
 /**
- * リンク先の種類。テンプレートには種類(既定値)だけを持ち、実際の URL は、配信カードで決める(未実装。BACKLOG)。
+ * リンク先の種類。テンプレートには種類(既定値)だけを持ち、実際の URL は、配信カードで決める(src/links.ts。制作指示のタブ)。
  * campaign: その配信のページ / category: セクションのカテゴリのページ / top: ショップのトップ / custom: 配信カードで個別に指定
  */
 export type LinkKind = 'campaign' | 'category' | 'top' | 'custom'

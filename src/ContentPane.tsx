@@ -43,6 +43,8 @@ import { useSelection } from './useSelection'
 import { progressOf } from './progress'
 import { openTemplateManager, sectionRange, templateOptions, type EmailTemplateId, type SectionInfo } from './templates'
 import type { AiDrafts } from './useAiDrafts'
+import { LinksEditor } from './LinksEditor'
+import { linkSlots, type Links } from './links'
 
 type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
@@ -83,6 +85,11 @@ interface Props {
   onLanguage: (v: CopyLanguage) => void
   drafts: AiDrafts
   disabled: boolean
+  /** 配信ごとのリンク先(制作指示のタブで設定する) */
+  links: Links
+  onLinks: (l: Links) => void
+  /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
+  campaign: string
 }
 
 // ------------------------------------------------------------------ スタイル
@@ -1185,6 +1192,16 @@ export function ContentPane(props: Props) {
           busy={!!drafts.busy.instructions}
           blocked={needTheme}
           onGenerate={drafts.runInstructions}
+        />
+      )}
+      {tab === 'instructions' && (
+        <LinksEditor
+          links={props.links}
+          onLinks={props.onLinks}
+          slots={linkSlots(template, props.items, props.products, props.campaign)}
+          items={props.items}
+          products={props.products}
+          campaign={props.campaign}
         />
       )}
     </div>
