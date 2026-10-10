@@ -8966,5 +8966,40 @@
    "cr854_herokind": "collab",
    "cr854_sections": "[{\"kind\":\"feature\",\"slots\":1},{\"kind\":\"grid\",\"slots\":3,\"columns\":3}]"
   }
+ ],
+ "cr854_cardnotes": [
+  {
+   "cr854_cardnoteid": "965e737e-fe7d-499f-a6ad-4f98f9075bd9",
+   "_cr854_deliverycard_value": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "cr854_kind": "question",
+   "cr854_author": "Alex Kim",
+   "cr854_body": "Can we use the close-up of the cable knit for the hero instead of the full look?",
+   "createdon": "2026-09-25T02:10:00.000Z",
+   "cr854_reply": "Yes, but keep the warm tone. The full look can go in Section 1.",
+   "cr854_repliedby": "Mika Tanaka",
+   "cr854_repliedat": "2026-09-25T04:30:00.000Z",
+   "cr854_resolved": 1
+  },
+  {
+   "cr854_cardnoteid": "ab07cd19-9e16-4cf0-adaf-1f73df5daa0a",
+   "_cr854_deliverycard_value": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "cr854_kind": "question",
+   "cr854_author": "Sam Ito",
+   "cr854_body": "Is the price in the email the sale price or the regular price?",
+   "createdon": "2026-09-26T01:00:00.000Z",
+   "cr854_resolved": 0
+  },
+  {
+   "cr854_cardnoteid": "995f00d2-9513-41ff-a9cd-68e01b5da7a5",
+   "_cr854_deliverycard_value": "5400a216-eb9b-42cd-a91b-9f981e1c462f",
+   "cr854_kind": "question",
+   "cr854_author": "Sam Ito",
+   "cr854_body": "Should the countdown banner show hours or just \"Ends Sunday\"?",
+   "createdon": "2026-09-27T06:00:00.000Z",
+   "cr854_reply": "Just \"Ends Sunday\" — the banner is too small for a timer.",
+   "cr854_repliedby": "Jordan Lee",
+   "cr854_repliedat": "2026-09-27T07:15:00.000Z",
+   "cr854_resolved": 1
+  }
  ]
 }

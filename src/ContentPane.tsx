@@ -45,6 +45,7 @@ import { openTemplateManager, sectionRange, templateOptions, type EmailTemplateI
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { HandoffPanel } from './HandoffPanel'
+import { QuestionsPanel } from './QuestionsPanel'
 import { linkSlots, type Links } from './links'
 
 type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions'
@@ -96,6 +97,10 @@ interface Props {
   onHandoff: (key: 'productionOwner' | 'handedOffAt', value: string) => void
   /** これまでに入れた人の名前(入力の候補) */
   people: string[]
+  /** 保存済みの配信カードの ID(新規作成中は undefined) */
+  cardId?: string
+  /** 企画の担当者(制作からの質問に返信する人) */
+  owner: string
 }
 
 // ------------------------------------------------------------------ スタイル
@@ -1211,6 +1216,7 @@ export function ContentPane(props: Props) {
           people={props.people}
         />
       )}
+      {tab === 'instructions' && <QuestionsPanel cardId={props.cardId} owner={props.owner} productionOwner={props.handoff.productionOwner} />}
       {tab === 'instructions' && (
         <LinksEditor
           links={props.links}

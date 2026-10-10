@@ -238,3 +238,30 @@ export const layoutTemplates: Row[] = [
     ]),
   },
 ]
+
+// ---- 配信カードのメモ(制作からの質問と返信。GCP 版だけのテーブル)
+const cardIdOf = (name: string) => cards.find((c) => c.cr854_name === name)?.cr854_deliverycardid
+const note = (card: string, author: string, body: string, at: string, reply?: { by: string; text: string; at: string }, resolved = false): Row => ({
+  cr854_cardnoteid: guid(`note:${card}:${body}`),
+  _cr854_deliverycard_value: cardIdOf(card),
+  cr854_kind: 'question',
+  cr854_author: author,
+  cr854_body: body,
+  createdon: at,
+  ...(reply ? { cr854_reply: reply.text, cr854_repliedby: reply.by, cr854_repliedat: reply.at } : {}),
+  cr854_resolved: resolved ? 1 : 0,
+})
+
+export const cardNotes: Row[] = [
+  note('Fall Arrivals', 'Alex Kim', 'Can we use the close-up of the cable knit for the hero instead of the full look?', '2026-09-25T02:10:00.000Z', {
+    by: 'Mika Tanaka',
+    text: 'Yes, but keep the warm tone. The full look can go in Section 1.',
+    at: '2026-09-25T04:30:00.000Z',
+  }, true),
+  note('Fall Arrivals', 'Sam Ito', 'Is the price in the email the sale price or the regular price?', '2026-09-26T01:00:00.000Z'),
+  note('Weekend Sale', 'Sam Ito', 'Should the countdown banner show hours or just "Ends Sunday"?', '2026-09-27T06:00:00.000Z', {
+    by: 'Jordan Lee',
+    text: 'Just "Ends Sunday" — the banner is too small for a timer.',
+    at: '2026-09-27T07:15:00.000Z',
+  }, true),
+].filter((n) => n._cr854_deliverycard_value)

@@ -131,6 +131,23 @@
         ["cr854_status", "status", "choice"]
       ],
       "lookups": []
+    },
+    "cr854_cardnotes": {
+      "gcpOnly": true,
+      "pg": "card_notes",
+      "pk": "cr854_cardnoteid",
+      "columns": [
+        ["cr854_kind", "kind", "text"],
+        ["cr854_author", "author", "text"],
+        ["cr854_body", "body", "text"],
+        ["cr854_reply", "reply", "text"],
+        ["cr854_repliedby", "replied_by", "text"],
+        ["cr854_repliedat", "replied_at", "timestamptz"],
+        ["cr854_resolved", "resolved", "int"]
+      ],
+      "lookups": [
+        ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}]
+      ]
     }
   }
 }

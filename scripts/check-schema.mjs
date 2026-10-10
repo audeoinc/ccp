@@ -10,6 +10,7 @@ const schema = JSON.parse(readFileSync(join(root, 'server', 'schema.json'), 'utf
 const problems = []
 
 for (const [table, def] of Object.entries(schema.tables)) {
+  if (def.gcpOnly) continue // GCP 版だけのテーブル(生成モデルがない)
   const file = join(root, 'src', 'generated', 'models', `${table[0].toUpperCase()}${table.slice(1)}Model.ts`)
   let text
   try {

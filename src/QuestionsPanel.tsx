@@ -1,0 +1,179 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Badge, Button, Field, Input, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { CheckmarkCircleRegular, ChatRegular } from '@fluentui/react-icons'
+import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
+import { locale, tr, useT } from './i18n'
+
+const useStyles = makeStyles({
+  root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  head: { display: 'flex', alignItems: 'center', columnGap: '8px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
+  caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase200 },
+  card: { display: 'grid', rowGap: '6px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  cardOpen: { borderLeft: `3px solid ${tokens.colorPaletteDarkOrangeBorderActive}` },
+  meta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  body: { fontSize: tokens.fontSizeBase200, whiteSpace: 'pre-wrap', color: tokens.colorNeutralForeground1 },
+  reply: { display: 'grid', rowGap: '2px', paddingLeft: '10px', borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
+  actions: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
+  form: { display: 'grid', rowGap: '6px' },
+  error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
+})
+
+interface Props {
+  /** 保存済みの配信カードの ID(新規作成中は undefined。質問は、保存してから) */
+  cardId?: string
+  /** 返信する人の既定値(企画の担当者) */
+  owner: string
+  /** 質問する人の既定値(制作の担当者) */
+  productionOwner: string
+  /** 未解決の数が変わったとき(一覧の表示を、閉じなくても合わせるため) */
+  onOpenCount?: (n: number) => void
+}
+
+const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
+
+/**
+ * 制作からの質問と返信。会話なので、配信カードの「保存」を待たずに、その場で保存する。
+ * 解決済みにしたものは、薄く表示する(消さない。あとで経緯を追えるように)。
+ */
+export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: Props) {
+  const styles = useStyles()
+  const t = useT()
+  const [notes, setNotes] = useState<Cr854_cardnotes[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [author, setAuthor] = useState(productionOwner)
+  const [body, setBody] = useState('')
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!cardId) return
+    const res = await Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${cardId}`, orderBy: ['createdon asc'] })
+    if (!res.success) {
+      setError(res.error?.message ?? tr('質問を読み込めませんでした', 'Could not load the questions'))
+      return
+    }
+    setNotes((res.data ?? []).filter((n) => (n.cr854_kind ?? 'question') === 'question'))
+  }, [cardId])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+  }, [load])
+
+  const open = (notes ?? []).filter((n) => !n.cr854_resolved).length
+  useEffect(() => {
+    if (notes) onOpenCount?.(open)
+  }, [notes, open, onOpenCount])
+
+  const run = async (f: () => Promise<{ success: boolean; error?: { message: string } }>) => {
+    setBusy(true)
+    setError(null)
+    const res = await f()
+    if (!res.success) setError(res.error?.message ?? tr('保存できませんでした', 'Could not save'))
+    await load()
+    setBusy(false)
+  }
+
+  const ask = () =>
+    run(async () => {
+      const res = await Cr854_cardnotesService.create({
+        'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
+        cr854_kind: 'question',
+        cr854_author: author.trim(),
+        cr854_body: body.trim(),
+        cr854_resolved: 0,
+      })
+      if (res.success) setBody('')
+      return res
+    })
+
+  const reply = (n: Cr854_cardnotes) =>
+    run(async () => {
+      const res = await Cr854_cardnotesService.update(n.cr854_cardnoteid, {
+        cr854_reply: (drafts[n.cr854_cardnoteid] ?? '').trim(),
+        cr854_repliedby: owner.trim(),
+        cr854_repliedat: new Date().toISOString(),
+      })
+      if (res.success) setDrafts((d) => ({ ...d, [n.cr854_cardnoteid]: '' }))
+      return res
+    })
+
+  const resolve = (n: Cr854_cardnotes, resolved: boolean) => run(() => Cr854_cardnotesService.update(n.cr854_cardnoteid, { cr854_resolved: resolved ? 1 : 0 }))
+
+  return (
+    <div className={styles.root}>
+      <div>
+        <div className={styles.head}>
+          <ChatRegular />
+          {t('制作からの質問', 'Questions from production')}
+          {open > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未解決 ${open}`, `${open} open`)}</Badge>}
+        </div>
+        <div className={styles.caption}>
+          {t('質問・返信は、その場で保存します(配信カードの「保存」は不要です)。', 'Questions and replies are saved right away (no need to press Save).')}
+        </div>
+      </div>
+      {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、質問を受け付けられます。', 'Save the delivery card to take questions.')}</div>}
+      {cardId && notes === null && <Spinner size="tiny" />}
+      {error && <div className={styles.error}>{error}</div>}
+      {(notes ?? []).map((n) => (
+        <div key={n.cr854_cardnoteid} className={mergeClasses(styles.card, !n.cr854_resolved && styles.cardOpen)} style={n.cr854_resolved ? { opacity: 0.7 } : undefined}>
+          <div className={styles.meta}>
+            {n.cr854_author || t('(名前なし)', '(no name)')} · {when(n.createdon)}
+          </div>
+          <div className={styles.body}>{n.cr854_body}</div>
+          {n.cr854_reply ? (
+            <div className={styles.reply}>
+              <div className={styles.meta}>
+                {t('返信', 'Reply')} · {n.cr854_repliedby || t('(名前なし)', '(no name)')} · {when(n.cr854_repliedat)}
+              </div>
+              <div className={styles.body}>{n.cr854_reply}</div>
+            </div>
+          ) : (
+            !n.cr854_resolved && (
+              <div className={styles.form}>
+                <Textarea
+                  size="small"
+                  resize="vertical"
+                  placeholder={t(`${owner || '企画の担当者'}として返信する`, `Reply as ${owner || 'the planner'}`)}
+                  value={drafts[n.cr854_cardnoteid] ?? ''}
+                  onChange={(_, d) => setDrafts((x) => ({ ...x, [n.cr854_cardnoteid]: d.value }))}
+                />
+              </div>
+            )
+          )}
+          <div className={styles.actions}>
+            {!n.cr854_reply && !n.cr854_resolved && (
+              <Button size="small" appearance="primary" disabled={busy || !(drafts[n.cr854_cardnoteid] ?? '').trim()} onClick={() => void reply(n)}>
+                {t('返信する', 'Reply')}
+              </Button>
+            )}
+            {n.cr854_resolved ? (
+              <>
+                <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>{t('解決済み', 'Resolved')}</Badge>
+                <Button size="small" appearance="subtle" disabled={busy} onClick={() => void resolve(n, false)}>{t('未解決に戻す', 'Reopen')}</Button>
+              </>
+            ) : (
+              <Button size="small" appearance="subtle" icon={<CheckmarkCircleRegular />} disabled={busy} onClick={() => void resolve(n, true)}>
+                {t('解決済みにする', 'Mark resolved')}
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+      {cardId && notes?.length === 0 && <div className={styles.caption}>{t('まだ質問はありません。', 'No questions yet.')}</div>}
+      {cardId && (
+        <div className={styles.form}>
+          <Field label={t('質問する人', 'Asked by')} size="small">
+            <Input size="small" list="ccp-people" value={author} onChange={(_, d) => setAuthor(d.value)} />
+          </Field>
+          <Textarea size="small" resize="vertical" placeholder={t('制作から企画への質問', 'A question from production to the planner')} value={body} onChange={(_, d) => setBody(d.value)} />
+          <div className={styles.actions}>
+            <Button size="small" disabled={busy || !body.trim() || !author.trim()} onClick={() => void ask()}>
+              {t('質問を追加', 'Add question')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

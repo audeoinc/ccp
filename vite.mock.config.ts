@@ -8,7 +8,8 @@ const mockServices = (): Plugin => ({
   name: 'mock-services',
   enforce: 'pre',
   resolveId(source) {
-    const m = source.match(/generated\/services\/(Cr854_\w+Service)$/)
+    // GCP 版だけのテーブルのサービス(src/gcpdata)も、同じように差し替える
+    const m = source.match(/(?:generated\/services|gcpdata)\/(Cr854_\w+Service)$/)
     if (m) return `\0mock:${m[1]}`
   },
   load(id) {

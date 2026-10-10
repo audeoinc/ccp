@@ -963,6 +963,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
                 onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
                 people={owners}
+                cardId={card?.cr854_deliverycardid}
+                owner={form.owner}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
               />
             </div>
