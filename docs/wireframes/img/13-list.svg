@@ -24,7 +24,7 @@
 <rect x="16.0" y="72.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
 <text x="22.0" y="88.2" font-size="12" fill="#222222" text-anchor="start">All</text>
 <text x="128.0" y="86.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
-<text x="158.0" y="65.0" font-size="11" fill="#222222" text-anchor="start">Department</text>
+<text x="158.0" y="65.0" font-size="11" fill="#222222" text-anchor="start">Type</text>
 <rect x="158.0" y="72.0" width="130.0" height="24.0" rx="3" fill="none" stroke="#888888" stroke-width="1"/>
 <text x="164.0" y="88.2" font-size="12" fill="#222222" text-anchor="start">All</text>
 <text x="270.0" y="86.0" font-size="11" fill="#777777" text-anchor="start">▾</text>
@@ -50,7 +50,7 @@
 <text x="112.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Time</text>
 <text x="172.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Name</text>
 <text x="372.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Channel</text>
-<text x="452.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Department</text>
+<text x="452.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Type</text>
 <text x="552.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Status</text>
 <text x="652.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Owner</text>
 <text x="762.0" y="130.0" font-size="10" fill="#222222" text-anchor="start" font-weight="bold">Theme</text>

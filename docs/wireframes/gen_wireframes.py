@@ -142,7 +142,7 @@ def left_email(p):
     p.text(31, 248, 200, "Date & time *", size=11)
     p.rect(31, 264, 268, 24, "10/02/2026 10:00 AM", kind="input", align="left")
     p.rect(277, 270, 14, 12, "", kind="input", rounded=False)
-    for row, pair in enumerate([(("Channel", "Email"), ("Department", "Promotion")), (("Status", AP), ("Owner", "(select)")),
+    for row, pair in enumerate([(("Channel", "Email"), ("Type", "Promotion")), (("Status", AP), ("Owner", "(select)")),
                                 (("Production due", "09/28/2026"),)]):
         y = 294 + row * 50
         for col, (lab, val) in enumerate(pair):
@@ -258,7 +258,7 @@ def calendar():
     p = Page("01 Delivery calendar", "01-calendar")
     app_header(p, "Delivery Calendar")
 
-    for i, lab in enumerate(["Channel", "Department", "Status"]):
+    for i, lab in enumerate(["Channel", "Type", "Status"]):
         x = 136 + i * 142
         p.text(x, 68, 130, lab, size=11)
         p.select(x, 89, 130, "All")
@@ -516,7 +516,7 @@ def card_push():
     p.rect(31, 218, 268, 24, "Fall Knits — Push", kind="input", align="left")
     p.text(31, 248, 200, "Date & time *", size=11)
     p.rect(31, 264, 268, 24, "10/02/2026 11:00 AM", kind="input", align="left")
-    for row, pair in enumerate([(("Channel", "Push"), ("Department", "Promotion")), (("Status", IR), ("Owner", "(select)"))]):
+    for row, pair in enumerate([(("Channel", "Push"), ("Type", "Promotion")), (("Status", IR), ("Owner", "(select)"))]):
         y = 294 + row * 50
         for col, (lab, val) in enumerate(pair):
             x = 31 + col * 140
@@ -880,7 +880,7 @@ def alerts():
 def list_view():
     p = Page("13 List view", "13-list")
     app_header(p, "Delivery Calendar")
-    for i, lab in enumerate(["Channel", "Department", "Status"]):
+    for i, lab in enumerate(["Channel", "Type", "Status"]):
         x = 16 + i * 142
         p.text(x, 54, 130, lab, size=11)
         p.select(x, 72, 130, "All")
@@ -890,7 +890,7 @@ def list_view():
     p.select(640, 72, 170, "October 2026", size=11)
     p.rect(1220, 72, 90, 24, "Columns", size=11)
     p.rect(1320, 72, 100, 24, "Export CSV", size=11)
-    cols = [("Date ▲", 0, 90), ("Time", 90, 60), ("Name", 150, 200), ("Channel", 350, 80), ("Department", 430, 100), ("Status", 530, 100),
+    cols = [("Date ▲", 0, 90), ("Time", 90, 60), ("Name", 150, 200), ("Channel", 350, 80), ("Type", 430, 100), ("Status", 530, 100),
             ("Owner", 630, 110), ("Theme", 740, 220), ("Products", 960, 70), ("Production due", 1030, 120), ("Steps", 1150, 80), ("", 1230, 174)]
     x0 = 16
     p.rect(x0, 112, 1404, 30, "", kind="box", rounded=False)
