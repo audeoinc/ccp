@@ -179,11 +179,15 @@ function loadInfoOpen(): boolean {
 const MIN_W = 220
 const MAX_W = 640
 const clamp = (v: number) => Math.min(MAX_W, Math.max(MIN_W, v))
+// 中央(コンテンツ生成)は、プレビューと商品情報がつぶれない範囲で、いくらでも広げられる
+// (上限は、ドラッグのときに、その時のダイアログの幅から求める。CSS でも、プレビューの最小幅を残すよう抑える)
+const MIN_PREVIEW = 320
+const clampMid = (v: number, max = 4000) => Math.min(Math.max(MIN_W, max), Math.max(MIN_W, v))
 
 function loadWidths(): [number, number, number] {
   try {
     const v = JSON.parse(localStorage.getItem(WIDTH_KEY) ?? 'null')
-    if (Array.isArray(v) && v.length === 3) return [clamp(Number(v[0])), clamp(Number(v[1])), clamp(Number(v[2]))]
+    if (Array.isArray(v) && v.length === 3) return [clamp(Number(v[0])), clampMid(Number(v[1])), clamp(Number(v[2]))]
   } catch {
     // 保存値が読めなければ既定値を使う
   }
@@ -259,7 +263,7 @@ const useStyles = makeStyles({
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     overflow: 'auto',
     '@media (min-width: 900px)': {
-      gridTemplateColumns: 'var(--w0) 1px var(--w1) 1px minmax(0, 1fr) 1px var(--w2)',
+      gridTemplateColumns: `var(--w0) 1px min(var(--w1), max(${MIN_W}px, calc(100% - var(--w0) - var(--w2) - 3px - ${MIN_PREVIEW}px))) 1px minmax(0, 1fr) 1px var(--w2)`,
       gridTemplateRows: 'minmax(0, 1fr)',
       overflow: 'hidden',
     },
@@ -496,10 +500,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const shownZoom = zoom === 'fit' ? fitZoom : zoom
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
+  const panesRef = useRef<HTMLDivElement>(null)
+  // 中央の上限: ダイアログの中の幅から、左・商品情報・境界線・プレビューの最小幅を引いた残り
+  const midMax = (w: [number, number, number]) => {
+    const total = panesRef.current?.clientWidth ?? window.innerWidth
+    return total - w[0] - (infoOpen ? w[2] : RAIL_W) - 3 - MIN_PREVIEW
+  }
   const resize = (i: 0 | 1 | 2) => (dx: number) =>
     setWidths((w) => {
       const next: [number, number, number] = [w[0], w[1], w[2]]
-      next[i] = clamp(next[i] + dx)
+      if (i === 1) next[1] = clampMid(Math.min(next[1], midMax(w)) + dx, midMax(w))
+      else next[i] = clamp(next[i] + dx)
       return next
     })
   const resizeInfo = (dx: number) => setWidths((w) => [w[0], w[1], clamp(w[2] - dx)])
@@ -796,7 +807,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
 
-          <div className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px` } as React.CSSProperties}>
+          <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px` } as React.CSSProperties}>
             {/* 左: 配信の情報 */}
             <div className={styles.pane}>
               <Button
