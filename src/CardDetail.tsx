@@ -40,7 +40,8 @@ import { Splitter } from './Splitter'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
-import { loadAutoDraft } from './settings'
+import { ResizeHandles } from './ResizeHandles'
+import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
@@ -152,6 +153,14 @@ function loadZoom(): number | 'fit' {
 const autoDrafted = new Set<string>()
 
 const WIDTH_KEY = 'cardDetail.paneWidths.v5'
+// ダイアログの大きさ(辺・角のドラッグで変える。null は既定の大きさ)
+const SIZE_KEY = 'cardDetail.size'
+const MIN_DIALOG = { w: 900, h: 560 }
+type DialogSize = { w: number; h: number }
+const clampSize = (s: DialogSize): DialogSize => ({
+  w: Math.round(Math.min(window.innerWidth, Math.max(MIN_DIALOG.w, s.w))),
+  h: Math.round(Math.min(window.innerHeight, Math.max(MIN_DIALOG.h, s.h))),
+})
 // 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
 const INFO_KEY = 'cardDetail.infoOpen.v2'
 const RAIL_W = 32
@@ -336,6 +345,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [heroId, setHeroId] = useState<string | undefined>(card?._cr854_heroimage_value)
   const [heroReason, setHeroReason] = useState(card?.cr854_heroreason ?? '')
   const [widths, setWidths] = useState<[number, number, number]>(loadWidths)
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
+  const resizeDialog = (dw: number, dh: number) =>
+    setSize((s) => {
+      // まだ既定の大きさなら、今の大きさから始める
+      const r = surfaceRef.current?.getBoundingClientRect()
+      const cur = s ?? (r ? { w: r.width, h: r.height } : null)
+      return cur ? clampSize({ w: cur.w + dw, h: cur.h + dh }) : s
+    })
+  // 画面より大きく保存されていても、画面に収める(狭い画面では、既定の全画面表示のまま)
+  const sizeStyle = size && window.innerWidth >= 900 ? (() => { const c = clampSize(size); return { width: `${c.w}px`, height: `${c.h}px`, maxHeight: `${c.h}px` } })() : undefined
   // 商品情報の行にマウスが乗っている商品(プレビューで光らせる)と、商品情報ペインの開閉
   const [hoverKey, setHoverKey] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState<boolean>(loadInfoOpen)
@@ -727,7 +747,20 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
 
   return (
     <Dialog open onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
-      <DialogSurface className={styles.surface} aria-label={card ? card.cr854_name : t('配信カードの新規作成', 'New delivery card')}>
+      <DialogSurface ref={surfaceRef} className={styles.surface} style={sizeStyle} aria-label={card ? card.cr854_name : t('配信カードの新規作成', 'New delivery card')}>
+        <ResizeHandles
+          onResize={resizeDialog}
+          onDone={() =>
+            setSize((s) => {
+              savePref(SIZE_KEY, s)
+              return s
+            })
+          }
+          onReset={() => {
+            setSize(null)
+            savePref(SIZE_KEY, null)
+          }}
+        />
         <form onSubmit={submit} className={styles.form}>
           {auto && (
             <div className={styles.overlay}>
