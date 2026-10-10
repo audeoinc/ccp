@@ -46,6 +46,8 @@ import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { HandoffPanel } from './HandoffPanel'
 import { QuestionsPanel } from './QuestionsPanel'
+import { NotesEditor } from './NotesEditor'
+import { MarkdownLite } from './MarkdownLite'
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { linkSlots, type Links } from './links'
 
@@ -364,10 +366,12 @@ function IdeaTab(props: {
   busy: boolean
   blocked?: string
   onGenerate: () => void
+  /** 見たまま編集の入力欄(見出し・箇条書き。保存は Markdown)。制作指示で使う */
+  rich?: boolean
 }) {
   const s = useStyles()
   const t = useT()
-  const { label, value, onChange, ideas, savedNote, savedChip, onAdopt, busy, blocked, onGenerate } = props
+  const { label, value, onChange, ideas, savedNote, savedChip, onAdopt, busy, blocked, onGenerate, rich } = props
   const current = ideas.find((i) => i.text === value)
   const note = savedNote || current?.note
   const chip = savedChip || current?.chip
@@ -389,7 +393,15 @@ function IdeaTab(props: {
           }
           size="small"
         >
-          <AutoTextarea rows={2} value={value} onChange={(_, d) => onChange(d.value)} />
+          {rich ? (
+            <NotesEditor
+              value={value}
+              onChange={onChange}
+              placeholder={t('「- 」で箇条書き、「1. 」で番号つき、「### 」で見出し', 'Type "- " for bullets, "1. " for numbers, "### " for a heading')}
+            />
+          ) : (
+            <AutoTextarea rows={2} value={value} onChange={(_, d) => onChange(d.value)} />
+          )}
         </Field>
         {(note || chip) && value && (
           <div className={s.noteBox}>
@@ -404,7 +416,7 @@ function IdeaTab(props: {
         return (
           <div key={idea.text} className={mergeClasses(s.card, adopted && s.cardAdopted)}>
             {idea.chip && <Badge className={s.chipStart} size="small" appearance="tint" color="informative">{idea.chip}</Badge>}
-            <span className={idea.text.length > 40 ? s.preBody : s.pre}>{idea.text}</span>
+            {rich ? <MarkdownLite text={idea.text} /> : <span className={idea.text.length > 40 ? s.preBody : s.pre}>{idea.text}</span>}
             {idea.note && <span className={s.caption}>{idea.note}</span>}
             <div className={s.flexEnd}>
               {adopted ? (
@@ -1214,6 +1226,7 @@ export function ContentPane(props: Props) {
       {tab === 'instructions' && (
         <IdeaTab
           label={t('制作指示', 'Production notes')}
+          rich
           value={instructions}
           onChange={(v) => {
             onField('instructions', v)

@@ -75,16 +75,17 @@ export function mockAgent(message: string): string {
   }
 
   if (task === 'suggest_instructions') {
+    // 制作指示は、見出し(###)と箇条書きの Markdown(aiDraft.ts の指示と同じ形)
     return en
       ? J({ instructions: [
-          { text: 'Lead with a full-width autumn outfit visual in warm brown and terracotta tones. Present the four products in a calm two-by-two grid with generous white space, short product notes, and quiet dark call-to-action buttons.', angle: 'Classic layout' },
-          { text: 'Make the products the heroes: use slightly larger product images with natural crops that show texture. Keep text minimal and let the materials speak, with a soft beige background.', angle: 'Product first' },
-          { text: 'Build a mood-driven story: a golden-hour street scene as the hero, layered outfits below, and gold accents for the call-to-action. Keep typography refined and spacious.', angle: 'Mood-driven' },
+          { text: '### Layout\n- Full-width hero, then 4 products in a 2×2 grid\n- Generous white space between blocks\n### Main image\n- Autumn outfit, natural light, full look\n### Color & tone\n- Warm brown to terracotta; quiet dark buttons\n### Products\n- Lead with the light jacket; short notes under each\n### Buttons & notes\n- One "Shop now" under the hero; keep prices visible', angle: 'Classic layout' },
+          { text: '### Layout\n- Larger product images, minimal text\n### Main image\n- Close crop that shows the knit texture\n### Color & tone\n- Soft beige background, muted accents\n### Products\n- Let materials speak; one line per product\n### Buttons & notes\n- Outline buttons; avoid sale-style red', angle: 'Product first' },
+          { text: '### Layout\n- Story flow: hero, then layered outfits\n### Main image\n- Golden-hour street scene\n### Color & tone\n- Warm neutrals with gold accents\n### Products\n- Show items as part of complete outfits\n### Buttons & notes\n- Refined, spacious typography', angle: 'Mood-driven' },
         ] })
       : J({ instructions: [
-          { text: 'メインビジュアルは秋のコーディネートを全幅で配置し、温かみのあるブラウン〜テラコッタ系で季節感を演出。商品は4点を2×2のグリッドで表示し、各商品の特徴を短く添える。余白を多めに取り、ボタンは落ち着いた濃色に統一する。', angle: '王道構成' },
-          { text: '商品を主役にする。商品画像をやや大きめに配置し、質感が伝わるクロップにする。文字は控えめにして、素材の魅力を前面に出す。背景は淡いベージュで統一する。', angle: '商品を主役に' },
-          { text: '世界観を重視する。夕暮れの街角をヒーローにして、下に重ね着のコーディネートを並べる。ボタンはゴールド系のアクセントにし、タイポグラフィは上品で余白のあるものにする。', angle: '世界観重視' },
+          { text: '### レイアウト\n- メインビジュアルを全幅、その下に商品 4 点を 2×2 のグリッド\n- ブロックの間の余白を多めに取る\n### メイン画像\n- 秋のコーディネートを、自然光で全身\n### 色とトーン\n- ブラウン〜テラコッタの温かみ。ボタンは落ち着いた濃色\n### 商品の見せ方\n- ライトジャケットを先頭に。各商品に短い説明\n### ボタン・注意点\n- メイン画像の下に「商品を見る」を 1 つ。価格は必ず見せる', angle: '王道構成' },
+          { text: '### レイアウト\n- 商品画像を大きめに、文字は控えめ\n### メイン画像\n- ニットの質感が分かる寄りのクロップ\n### 色とトーン\n- 淡いベージュの背景、差し色は控えめ\n### 商品の見せ方\n- 素材の魅力を前面に。説明は 1 行\n### ボタン・注意点\n- 枠線のボタン。セール調の赤は使わない', angle: '商品を主役に' },
+          { text: '### レイアウト\n- 物語の流れ: メインビジュアル → 重ね着のコーディネート\n### メイン画像\n- 夕暮れの街角\n### 色とトーン\n- 温かみのある中間色に、ゴールドの差し色\n### 商品の見せ方\n- 単品ではなく、コーディネートの一部として見せる\n### ボタン・注意点\n- 上品で、余白のあるタイポグラフィ', angle: '世界観重視' },
         ] })
   }
 
