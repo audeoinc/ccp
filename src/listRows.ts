@@ -28,7 +28,14 @@ export interface Column {
 // 選択肢の表示名は、値から求める(〜name の列は、データの入れ方によっては空のため)
 const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) : '')
-const date = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' }) : '')
+// 日付は、数字を先・曜日を後ろにする(曜日の文字の幅で、数字の位置がずれないように)
+const date = (iso?: string) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const ymd = d.toLocaleDateString(locale(), { year: 'numeric', month: '2-digit', day: '2-digit' })
+  const wd = d.toLocaleDateString(locale(), { weekday: 'short' })
+  return locale() === 'ja-JP' ? `${ymd}(${wd})` : `${ymd} ${wd}`
+}
 
 export const COLUMNS: Column[] = [
   { key: 'date', label: () => tr('配信日', 'Date'), text: (r) => date(r.card.cr854_scheduledat), sort: (r) => r.card.cr854_scheduledat ?? '' },

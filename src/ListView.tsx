@@ -8,6 +8,7 @@ import {
   TableHeaderCell,
   TableRow,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components'
 import { WarningRegular } from '@fluentui/react-icons'
@@ -24,8 +25,18 @@ const useStyles = makeStyles({
     boxShadow: tokens.shadow2,
   },
   // 列の幅は中身に合わせる(Fluent の表は、既定で列の幅を均等にする)
-  table: { tableLayout: 'auto' },
-  head: { backgroundColor: tokens.colorNeutralBackground2, fontWeight: tokens.fontWeightSemibold },
+  // 文字は 12px、数字は等幅(日付・時刻・数の桁がそろい、縦に読みやすい)。行の上下にゆとりを持たせる
+  table: {
+    tableLayout: 'auto',
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  head: {
+    backgroundColor: tokens.colorNeutralBackground2,
+    '& th': { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  },
+  cell: { paddingTop: tokens.spacingVerticalS, paddingBottom: tokens.spacingVerticalS },
   row: { cursor: 'pointer' },
   name: { fontWeight: tokens.fontWeightSemibold },
   nowrap: { whiteSpace: 'nowrap' },
@@ -116,7 +127,7 @@ export function ListView({ rows, columns, onSelect }: Props) {
           {sorted.map((r) => (
             <TableRow key={r.card.cr854_deliverycardid} className={styles.row} onClick={() => onSelect(r.card.cr854_deliverycardid)}>
               {shown.map((c) => (
-                <TableCell key={c.key} className={c.key === 'theme' ? undefined : styles.nowrap}>
+                <TableCell key={c.key} className={mergeClasses(styles.cell, c.key !== 'theme' && styles.nowrap)}>
                   {cell(c, r)}
                 </TableCell>
               ))}
