@@ -1,6 +1,6 @@
 import type { Item } from './items'
 import { tr } from './i18n'
-import { sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
 
 const labelsNow = (): string[] => [
   tr('① テーマ', '1. Theme'),
@@ -8,6 +8,15 @@ const labelsNow = (): string[] => [
   tr('③ ヒーロー', '3. Hero'),
   tr('④ セクション', '4. Sections'),
   tr('⑤ 制作指示', '5. Production notes'),
+]
+
+// アプリ(プッシュ通知)の配信カードの工程
+const pushLabelsNow = (): string[] => [
+  tr('① テーマ', '1. Theme'),
+  tr('② テンプレート', '2. Template'),
+  tr('③ 文面', '3. Message'),
+  tr('④ 画像・商品', '4. Image & product'),
+  tr('⑤ 時刻・相手', '5. Timing & audience'),
 ]
 
 /** 工程の名前。読むたびに現在の言語で返す(インデックスのゲッター) */
@@ -37,7 +46,26 @@ export function progressOf(a: {
   headline: string
   items: Item[]
   instructions: string
+  /** アプリの配信カードのとき: 本文と、送る時刻・開く画面・送る相手がそろっているか */
+  push?: { copy: string; timing: boolean }
 }): Progress {
+  if (a.push) {
+    // アプリ: テーマ / テンプレート / 文面(タイトル・本文)/ 画像・商品(テンプレートが求めるもの)/ 時刻・相手
+    const spec = getTemplate(a.template).push ?? getTemplate(DEFAULT_PUSH_TEMPLATE).push!
+    const visual = (!spec.image || !!a.heroId) && (!spec.product || a.items.length > 0)
+    const flags = [!!a.theme.trim(), true, !!a.headline.trim() && !!a.push.copy.trim(), visual, a.push.timing]
+    const [theme, template, hero, sectionsOk, instructions] = flags
+    return {
+      theme,
+      template,
+      hero,
+      sections: sectionsOk,
+      instructions,
+      done: flags.filter(Boolean).length,
+      total: flags.length,
+      remaining: pushLabelsNow().filter((_, i) => !flags[i]),
+    }
+  }
   const sections = sectionsOf(a.template)
   const sectionsDone =
     a.template === 'free'
@@ -72,12 +100,24 @@ export function progressOf(a: {
  * (セクションの判定は、商品の数しか使わないため、中身のない配列で足りる)。
  */
 export function cardProgress(
-  card: { cr854_theme?: string; cr854_headline?: string; cr854_instructions?: string; cr854_layoutkey?: string; cr854_emailtemplate?: number; _cr854_heroimage_value?: string },
+  card: {
+    cr854_theme?: string
+    cr854_headline?: string
+    cr854_copy?: string
+    cr854_instructions?: string
+    cr854_layoutkey?: string
+    cr854_emailtemplate?: number
+    _cr854_heroimage_value?: string
+    cr854_channel?: number
+    cr854_pushlink?: string
+    cr854_audience?: string
+  },
   productCount: number,
 ): Progress {
   return progressOf({
+    push: card.cr854_channel === 588230001 ? { copy: card.cr854_copy ?? '', timing: !!card.cr854_pushlink && !!card.cr854_audience } : undefined,
     theme: card.cr854_theme ?? '',
-    template: card.cr854_layoutkey || templateFromValue(card.cr854_emailtemplate),
+    template: card.cr854_layoutkey || (card.cr854_channel === 588230001 ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card.cr854_emailtemplate)),
     heroId: card._cr854_heroimage_value,
     headline: card.cr854_headline ?? '',
     items: Array.from({ length: productCount }, () => ({}) as Item),

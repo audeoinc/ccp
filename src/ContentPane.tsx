@@ -39,7 +39,7 @@ import { optionLabel, tr, useT } from './i18n'
 import { Row, productMeta } from './ProductRow'
 import { useSelection } from './useSelection'
 import { progressOf } from './progress'
-import { openTemplateManager, sectionRange, templateOptions, type EmailTemplateId, type SectionInfo } from './templates'
+import { getTemplate, openTemplateManager, sectionRange, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel } from './templates'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { HandoffPanel } from './HandoffPanel'
@@ -47,12 +47,15 @@ import { QuestionsPanel } from './QuestionsPanel'
 import { AiButton } from './AiButton'
 import { TasksPanel } from './TasksPanel'
 import { NotesEditor } from './NotesEditor'
+import { PushThumb } from './PushThumb'
+import { PushTimingPanel } from './PushTimingPanel'
+import { PUSH_BODY_MAX, PUSH_TITLE_MAX, type Audience, type PushLink } from './pushLink'
 import { MarkdownLite } from './MarkdownLite'
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { linkSlots, type Links } from './links'
 
 // links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
-type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks'
+type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'message' | 'visual' | 'timing'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -107,6 +110,14 @@ interface Props {
   owner: string
   /** 配信名(AI にタスクの案を頼むときに渡す) */
   cardName: string
+  /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③文面 ④画像・商品 ⑤時刻・相手) */
+  channel: TemplateChannel
+  pushLink: PushLink | null
+  onPushLink: (l: PushLink) => void
+  audience: string
+  onAudience: (v: Audience) => void
+  /** 送る日時(datetime-local の値) */
+  scheduledAt: string
 }
 
 // ------------------------------------------------------------------ スタイル
@@ -435,10 +446,15 @@ function CopyTab(props: {
   language: CopyLanguage
   onLanguage: (v: CopyLanguage) => void
   onGenerate: () => void
+  /** アプリ(プッシュ通知)の文面: ヘッドライン = 通知のタイトル、コピー = 本文。文字数の目安を出す */
+  push?: boolean
 }) {
   const s = useStyles()
   const t = useT()
-  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, language, onLanguage, onGenerate } = props
+  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, language, onLanguage, onGenerate, push } = props
+  // 通知に収まる文字数の目安(端末で切れ方が違うので、目安として出す)
+  const count = (text: string, max: number) =>
+    push ? <span className={text.length > max ? s.warn : s.caption}>{` ${text.length} / ${max}`}</span> : null
   return (
     <div className={s.grid12}>
       <div className={s.flexRow}>
@@ -452,8 +468,9 @@ function CopyTab(props: {
       <Field
         label={
           <span className={s.flexRowTight}>
-            {t('現在のヘッドライン(メイン画像に載ります)', 'Current headline (shown on the main image)')}
+            {push ? t('通知のタイトル', 'Notification title') : t('現在のヘッドライン(メイン画像に載ります)', 'Current headline (shown on the main image)')}
             <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
+            {count(headline, PUSH_TITLE_MAX)}
           </span>
         }
         size="small"
@@ -463,8 +480,9 @@ function CopyTab(props: {
       <Field
         label={
           <span className={s.flexRowTight}>
-            {t('現在のコピー(ヘッドラインの下に入ります)', 'Current copy (placed below the headline)')}
+            {push ? t('通知の本文', 'Notification body') : t('現在のコピー(ヘッドラインの下に入ります)', 'Current copy (placed below the headline)')}
             <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
+            {count(lead, PUSH_BODY_MAX)}
           </span>
         }
         size="small"
@@ -507,23 +525,25 @@ function CopyTab(props: {
 
 // ------------------------------------------------------------------ テンプレート
 
-function TemplateTab({ template, onTemplate, hasCandidates }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean }) {
+function TemplateTab({ template, onTemplate, hasCandidates, channel }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel }) {
   const s = useStyles()
   const t = useT()
   return (
     <div className={s.grid12}>
       <span className={s.caption}>
-        {t('メールの構成を選びます。選んだテンプレートの枠に、商品が順に入ります。', 'Choose the email layout. Products fill the slots of the chosen template in order.')}
+        {channel === 'push'
+          ? t('アプリの通知の形を選びます。', 'Choose the notification format.')
+          : t('メールの構成を選びます。選んだテンプレートの枠に、商品が順に入ります。', 'Choose the email layout. Products fill the slots of the chosen template in order.')}
         {hasCandidates && t(' テンプレートを変えると、セクションの構成が変わるため、選定候補は破棄されます(選定済みの商品は残ります)。', ' Changing the template changes the section layout, so the candidates will be discarded (selected products are kept).')}
       </span>
       <div>
         <Button size="small" appearance="outline" onClick={openTemplateManager}>{t('テンプレートを管理(作成・編集)', 'Manage templates (create / edit)')}</Button>
       </div>
-      {templateOptions().map((o) => {
+      {templateOptions(channel).map((o) => {
         const selected = o.id === template
         return (
           <div key={o.id} onClick={() => onTemplate(o.id)} className={mergeClasses(s.tplCard, selected && s.tplCardSelected)}>
-            <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={170} zoom />
+            {o.push ? <PushThumb spec={o.push} width={110} /> : <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={170} zoom />}
             <div style={{ minWidth: 0 }}>
               <div className={s.flexRowTight}>
                 <span className={s.bold}>{o.label}</span>
@@ -544,12 +564,12 @@ function TemplateTab({ template, onTemplate, hasCandidates }: { template: EmailT
 type ChatTargetInfo = { key: string; title: string }
 type RegisterChat = (target: ChatTargetInfo | null, run?: () => Promise<unknown>) => void
 
-function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: RegisterChat }) {
+function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: RegisterChat; only?: 'hero' | 'copy' }) {
   const s = useStyles()
   const t = useT()
   const { template, sectionTitles, products, heroes, items, setItems, candidates, setCandidates, drafts, disabled } = p
   const { sections, listOf, isFull, moveInSection, demote, dropKey, setDropKey, startDrag, overTarget, leaveTarget, dropOnSelected, dropOnSelectedArea, dropOnCandidates, promote, addManual, setItemReason, setCandReason, toItems } = useSelection({ template, items, setItems, candidates, setCandidates })
-  const [sub, setSub] = useState<number | 'hero' | 'copy'>(p.mode === 'hero' ? 'hero' : 0)
+  const [sub, setSub] = useState<number | 'hero' | 'copy'>(p.only ?? (p.mode === 'hero' ? 'hero' : 0))
   // 折りたたんだブロック(「セクション番号:ブロック」)。セクションを切り替えても、それぞれの開閉を覚えておく
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const fold = (key: string) => ({
@@ -1076,12 +1096,13 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
       language={p.language}
       onLanguage={p.onLanguage}
       onGenerate={drafts.runCopy}
+      push={p.channel === 'push'}
     />
   )
 
   return (
     <div className={s.grid12}>
-      {subTabs}
+      {!p.only && !(p.channel === 'push' && p.mode === 'sections') && subTabs}
       {active === 'hero' ? heroView() : active === 'copy' ? copyView : sectionView(sections[active])}
     </div>
   )
@@ -1114,7 +1135,17 @@ export function ContentPane(props: Props) {
     chatRun.current = run ?? null
     setChatTarget((prev) => (prev?.key === target?.key && prev?.title === target?.title ? prev : target))
   }, [])
-  const pr = progressOf({ theme, template, heroId: props.heroId, headline, items: props.items, instructions })
+  const isPush = props.channel === 'push'
+  const pr = progressOf({
+    theme,
+    template,
+    heroId: props.heroId,
+    headline,
+    items: props.items,
+    instructions,
+    push: isPush ? { copy: props.copy, timing: !!props.pushLink && !!props.audience } : undefined,
+  })
+  const pushSpec = isPush ? getTemplate(template).push : undefined
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
   // リンク先: 「配信カードで指定」のボタンで、URL が空のものがあれば、タブに「!」を付ける
@@ -1147,7 +1178,7 @@ export function ContentPane(props: Props) {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
     else if (tab === 'instructions') registerChat({ key: 'instructions', title: t('制作指示', 'Production notes') }, () => drafts.runInstructions())
-    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks') registerChat(null)
+    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks' || tab === 'timing') registerChat(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   })
 
@@ -1183,11 +1214,21 @@ export function ContentPane(props: Props) {
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TopTab)}>
         <Tab value="theme" onClick={revealTab}>{`${mark(pr.theme, drafts.themeIdeas.length > 0)}${t('① テーマ', '1. Theme')}`}</Tab>
         <Tab value="template" onClick={revealTab}>{`${mark(pr.template, false)}${t('② テンプレート', '2. Template')}`}</Tab>
-        <Tab value="hero" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ ヒーロー', '3. Hero')}`}</Tab>
-        <Tab value="sections" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ セクション', '4. Sections')}`}</Tab>
-        <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑤ 制作指示', '5. Production notes')}`}</Tab>
-        <Tab value="links" onClick={revealTab} className={s.extraTab}>{`${linksMissing ? '! ' : ''}${t('リンク先', 'Links')}`}</Tab>
-        <Tab value="handoff" onClick={revealTab}>
+        {isPush ? (
+          <>
+            <Tab value="message" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ 文面', '3. Message')}`}</Tab>
+            <Tab value="visual" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ 画像・商品', '4. Image & product')}`}</Tab>
+            <Tab value="timing" onClick={revealTab}>{`${mark(pr.instructions, false)}${t('⑤ 時刻・相手', '5. Timing & audience')}`}</Tab>
+          </>
+        ) : (
+          <>
+            <Tab value="hero" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ ヒーロー', '3. Hero')}`}</Tab>
+            <Tab value="sections" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ セクション', '4. Sections')}`}</Tab>
+            <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑤ 制作指示', '5. Production notes')}`}</Tab>
+          </>
+        )}
+        {!isPush && <Tab value="links" onClick={revealTab} className={s.extraTab}>{`${linksMissing ? '! ' : ''}${t('リンク先', 'Links')}`}</Tab>}
+        <Tab value="handoff" onClick={revealTab} className={isPush ? s.extraTab : undefined}>
           {`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}${openQuestions ? t(`(${openQuestions})`, ` (${openQuestions})`) : ''}`}
         </Tab>
         <Tab value="tasks" onClick={revealTab}>
@@ -1216,7 +1257,20 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runTheme}
         />
       )}
-      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} />}
+      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} />}
+      {tab === 'message' && <ProductsTab {...props} mode="hero" only="copy" registerChat={registerChat} />}
+      {tab === 'visual' && (
+        <>
+          {pushSpec?.image && <ProductsTab {...props} mode="hero" only="hero" registerChat={registerChat} />}
+          {pushSpec?.product && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
+          {pushSpec && !pushSpec.image && !pushSpec.product && (
+            <span className={s.caption}>{t('このテンプレートは、画像も商品も使いません(タイトルと本文だけの通知です)。', 'This template uses no image or product (title and body only).')}</span>
+          )}
+        </>
+      )}
+      {tab === 'timing' && (
+        <PushTimingPanel scheduledAt={props.scheduledAt} link={props.pushLink} onLink={props.onPushLink} audience={props.audience} onAudience={props.onAudience} />
+      )}
       {tab === 'hero' && <ProductsTab {...props} mode="hero" registerChat={registerChat} />}
       {tab === 'sections' && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
       {tab === 'instructions' && (

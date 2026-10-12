@@ -134,9 +134,26 @@ export function sectionKindLabel(sec: Section): string {
   }
 }
 
+/** テンプレートのチャネル。配信カードはチャネルごとに作るので、テンプレートも、そのチャネルのものだけを選ぶ */
+export type TemplateChannel = 'email' | 'push'
+
+/** アプリ(プッシュ通知)のテンプレートの中身 */
+export interface PushSpec {
+  /** 通知に画像を付ける(メイン画像) */
+  image: boolean
+  /** 商品 1 点を紹介する(画像は商品の画像。セクションは feature 1 枠) */
+  product: boolean
+  /** 通知のボタン(アクション)の文言。空なら、ボタンなし */
+  buttons: string[]
+}
+
 export interface EmailTemplate {
   label: string
   description: string
+  /** チャネル(省略はメール。以前のテンプレートは、すべてメール) */
+  channel?: TemplateChannel
+  /** アプリのテンプレートだけ: 通知の中身 */
+  push?: PushSpec
   hero: HeroKind
   /** ヘッドラインの見せ方(省略は band。以前のテンプレートと同じ見た目) */
   heroText?: HeroText
@@ -320,8 +337,55 @@ const BUILTIN: Record<string, EmailTemplate> = {
   },
 }
 
+// ---- アプリ(プッシュ通知)の標準のテンプレート。メールのテンプレートとは、選べる場所を分ける
+BUILTIN['push-text'] = {
+  get label() {
+    return tr('テキストだけ', 'Text only')
+  },
+  get description() {
+    return tr('タイトルと本文だけの通知。お知らせ・リマインドに。', 'A notification with just a title and body. For announcements and reminders.')
+  },
+  channel: 'push',
+  push: { image: false, product: false, buttons: [] },
+  hero: 'standard',
+  sections: [],
+  builtin: true,
+}
+BUILTIN['push-image'] = {
+  get label() {
+    return tr('画像つき', 'With image')
+  },
+  get description() {
+    return tr('タイトル・本文に、メイン画像を付けた通知(開くと画像が大きく出ます)。特集・新作の告知に。', 'Title and body with a main image (shown large when expanded). For features and new arrivals.')
+  },
+  channel: 'push',
+  push: { image: true, product: false, buttons: [] },
+  hero: 'standard',
+  sections: [],
+  builtin: true,
+}
+BUILTIN['push-product'] = {
+  get label() {
+    return tr('商品の紹介 + ボタン 2 つ', 'Product spotlight + 2 buttons')
+  },
+  get description() {
+    return tr('商品 1 点の画像と、タイトル・本文、ボタン 2 つ(見る / あとで)の通知。値下げ・再入荷に。', 'One product image, title and body, and two buttons (View / Later). For price drops and restocks.')
+  },
+  channel: 'push',
+  get push() {
+    return { image: false, product: true, buttons: [tr('見る', 'View'), tr('あとで', 'Later')] }
+  },
+  hero: 'standard',
+  sections: [{ kind: 'feature', slots: 1 }],
+  builtin: true,
+}
+
 const BUILTIN_IDS = Object.keys(BUILTIN)
 export const DEFAULT_TEMPLATE: EmailTemplateId = 'standard4'
+/** アプリの配信カードの既定のテンプレート */
+export const DEFAULT_PUSH_TEMPLATE: EmailTemplateId = 'push-image'
+/** テンプレートのチャネル(省略はメール) */
+export const channelOf = (id: EmailTemplateId): TemplateChannel => getTemplate(id).channel ?? 'email'
 
 // ---- 登録(標準 + ユーザーが作ったもの) ----
 
@@ -351,15 +415,17 @@ export const getTemplate = (id: EmailTemplateId): EmailTemplate => custom[id] ??
 /** 登録にあるテンプレートか */
 export const hasTemplate = (id: string): boolean => id in custom || id in BUILTIN
 
-/** 選べるテンプレートの一覧(標準 → ユーザーが作ったもの) */
-export function templateOptions(): ({ id: EmailTemplateId; label: string; description: string; builtin: boolean } & TemplateLayout)[] {
-  return [...BUILTIN_IDS, ...Object.keys(custom)].map((id) => {
+/** 選べるテンプレートの一覧(標準 → ユーザーが作ったもの)。channel を渡すと、そのチャネルのものだけ */
+export function templateOptions(channel?: TemplateChannel): ({ id: EmailTemplateId; label: string; description: string; builtin: boolean; channel: TemplateChannel; push?: PushSpec } & TemplateLayout)[] {
+  return [...BUILTIN_IDS, ...Object.keys(custom)].filter((id) => !channel || (getTemplate(id).channel ?? 'email') === channel).map((id) => {
     const tpl = getTemplate(id)
     return {
       id,
       label: tpl.label,
       description: tpl.description,
       builtin: tpl.builtin,
+      channel: tpl.channel ?? 'email',
+      push: tpl.push,
       hero: tpl.hero,
       heroText: tpl.heroText,
       heroButtons: tpl.heroButtons,

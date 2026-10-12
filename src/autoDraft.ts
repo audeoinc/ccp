@@ -19,7 +19,7 @@ import {
   type ThemeSuggestion,
 } from './aiDraft'
 import { tr } from './i18n'
-import { FREE_DEFAULT_SLOTS, sectionsOf, type EmailTemplateId } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, FREE_DEFAULT_SLOTS, getTemplate, sectionsOf, type EmailTemplateId, type TemplateChannel } from './templates'
 
 /** 「すべてAIで下書き」の入力。内容(テーマなど)は空から作るので、配信の基本情報だけを渡す */
 export interface AutoDraftInput {
@@ -28,6 +28,8 @@ export interface AutoDraftInput {
   otherThemes: string[]
   products: Cr854_products[]
   heroes: Cr854_heroimages[]
+  /** 配信カードのチャネル(アプリのときは、アプリのテンプレートから選び、制作指示は作らない) */
+  channel?: TemplateChannel
 }
 
 export interface AutoDraftResult {
@@ -91,7 +93,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
 
   // ② テンプレートとメイン画像(互いに独立なので、並行して実行する)
   const [tpl, hero] = await Promise.all([
-    step(tr('テンプレートとメイン画像を選んでいます', 'Choosing a template and hero image'), () => suggestTemplate({ card: withTheme })),
+    step(tr('テンプレートとメイン画像を選んでいます', 'Choosing a template and hero image'), () => suggestTemplate({ card: withTheme, channel: input.channel })),
     (async () => {
       try {
         return await proposeHero({ card: withTheme, heroes, productNames: [] })
@@ -102,14 +104,16 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
     })(),
   ])
   if (isCancelled()) return finish()
-  result.template = tpl?.template ?? 'standard4'
+  const isPush = input.channel === 'push'
+  result.template = tpl?.template ?? (isPush ? DEFAULT_PUSH_TEMPLATE : 'standard4')
   result.templateReason = tpl?.reason
-  result.hero = hero
+  // アプリで、画像を使わないテンプレートなら、メイン画像は付けない
+  result.hero = isPush && !getTemplate(result.template).push?.image ? undefined : hero
   const heroRow = hero?.hero ? heroes.find((h) => h.cr854_heroimageid === hero.hero!.heroId) : undefined
   const heroReason = hero?.hero?.reason
 
   const sections = sectionsOf(result.template)
-  total = 4 + sections.length
+  total = (isPush ? 3 : 4) + sections.length
 
   // ③ ヘッドラインとコピー(組)
   const copies = await step(tr('ヘッドラインとコピーを考えています', 'Writing headline and copy'), () =>
@@ -153,7 +157,11 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
     })
   }
 
-  // ⑤ 制作指示(選ばれた商品とメイン画像を踏まえる)
+  // ⑤ 制作指示(選ばれた商品とメイン画像を踏まえる)。アプリは、制作指示の工程がない
+  if (isPush) {
+    onStep(tr('完了', 'Done'), total, total)
+    return finish()
+  }
   const instructions = await step(tr('制作指示を考えています', 'Writing production instructions'), () =>
     suggestInstructions({
       card: withCopy,

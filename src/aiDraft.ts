@@ -2,7 +2,7 @@ import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { askAgent, type AiCard, type CopyLanguage } from './aiSelect'
 import { tr } from './i18n'
-import { hasTemplate, templateOptions, type EmailTemplateId } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, hasTemplate, templateOptions, type EmailTemplateId, type TemplateChannel } from './templates'
 
 // テーマ・コピー・制作指示の「案」の生成。出力形式はメッセージ内で毎回指定する(aiSelect.ts と同じ理由)
 
@@ -38,6 +38,7 @@ const COPY_PROMPT = `あなたは、ファッション通販の配信(メール�
 4. ヘッドラインとコピーは、組として自然につながるようにする。3 案は、切り口を変える(例: 季節感、商品の魅力、行動の呼びかけ)。angle には、その切り口を日本語 10 文字以内で書く。
 5. 商品名や価格を、そのまま羅列しない。誇大な表現や、根拠のない断定(「最安値」「絶対」など)は使わない。
 6. 既存のヘッドライン(card.headline)やコピー(card.copy)がある場合は、それとは別の案にする。
+7. card.channel が「プッシュ」(アプリの通知)のときは、headline を通知のタイトル(40 文字以内。英語も文字数で数える)、lead を通知の本文(120 文字以内。2〜3 行で読み切れる長さ)として書く。タイトルは、開きたくなる具体的な一言にし、本文で、何が・いつまでかを伝える。
 
 # 入力
 `
@@ -179,15 +180,18 @@ export interface TemplateChoice {
   reason: string
 }
 
-/** テーマなどから、メールのテンプレートを選ばせる */
-export async function suggestTemplate(args: { card: AiCard }): Promise<TemplateChoice> {
+/** テーマなどから、テンプレートを選ばせる(配信カードのチャネルのテンプレートだけから) */
+export async function suggestTemplate(args: { card: AiCard; channel?: TemplateChannel }): Promise<TemplateChoice> {
+  const channel = args.channel ?? 'email'
+  const options = templateOptions(channel)
   const parsed = (await askAgent(TEMPLATE_PROMPT, {
     task: 'suggest_template',
     today: new Date().toISOString().slice(0, 10),
     card: args.card,
-    templates: templateOptions().map((o) => ({ id: o.id, name: o.label, description: o.description, hero: o.hero, heroText: o.heroText ?? 'band', sections: o.sections })),
+    templates: options.map((o) => ({ id: o.id, name: o.label, description: o.description, hero: o.hero, heroText: o.heroText ?? 'band', sections: o.sections, push: o.push })),
   })) as { template?: string; reason?: string }
   const id = String(parsed.template ?? '') as EmailTemplateId
-  // 想定外の値は、標準にする
-  return { template: hasTemplate(id) ? id : 'standard4', reason: String(parsed.reason ?? '') }
+  // 想定外の値・別のチャネルのテンプレートは、そのチャネルの標準にする
+  const fallback = channel === 'push' ? DEFAULT_PUSH_TEMPLATE : 'standard4'
+  return { template: hasTemplate(id) && options.some((o) => o.id === id) ? id : fallback, reason: String(parsed.reason ?? '') }
 }

@@ -21,9 +21,10 @@ import { heroImage, productImage } from './images'
 import { locale, optionLabel, useT } from './i18n'
 import { SOURCE_MANUAL, type Item } from './items'
 import { Preview } from './Preview'
+import { parsePushLink } from './pushLink'
 import { cardProgress } from './progress'
 import { statusColor, statusOptions } from './status'
-import { getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
 
 /** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る */
 export type WeekLens = 'products' | 'progress'
@@ -245,7 +246,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
     const heroRow = heroes.find((h) => h.cr854_heroimageid === c._cr854_heroimage_value)
     const hero = heroImage(heroRow)
     const time = new Date(c.cr854_scheduledat!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-    const templateId = c.cr854_layoutkey || templateFromValue(c.cr854_emailtemplate)
+    const templateId = c.cr854_layoutkey || (c.cr854_channel === PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.cr854_emailtemplate))
     const progress = cardProgress(c, ids.length)
     const questions = questionCounts.get(id) ?? 0
     const tasks = taskCounts.get(id) ?? 0
@@ -309,6 +310,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
             <div className={styles.previewInner}>
               <Preview
                 channel={isPush ? 'push' : 'email'}
+                pushLinkKind={parsePushLink(c.cr854_pushlink)?.kind}
                 subject={c.cr854_name}
                 headline={c.cr854_headline ?? ''}
                 copy={c.cr854_copy ?? ''}

@@ -50,6 +50,8 @@ interface Props {
   onMove: (key: string, delta: number) => void
   /** index の位置へドロップされた(末尾は items.length) */
   onDropAt: (index: number, dt: DataTransfer) => void
+  /** アプリ: 通知を押したときに開く画面の種類(未設定は undefined) */
+  pushLinkKind?: string
 }
 
 // メール・プッシュは受信側の見た目なので、テーマに依らず固定の配色にする
@@ -734,16 +736,18 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
 }
 
 function PushPreview(props: Props) {
-  const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt } = props
+  const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind } = props
+  // アプリのテンプレートの中身(画像・商品・ボタン)。アプリのテンプレートでなければ、以前と同じ(画像つき)
+  const spec = getTemplate(template).push ?? { image: true, product: false, buttons: [] }
   const t = useT()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
   const [style, setStyle] = useState<'ios' | 'android'>('ios')
   const byId = new Map(products.map((p) => [p.cr854_productid, p]))
   const firstProduct = items[0] && byId.get(items[0].productId)
-  // メイン画像が設定されていればそれを、なければ先頭の商品の画像を通知の画像にする
-  const heroSrc = pickedHero ? heroImage(pickedHero) : productImage(firstProduct)
-  const heroAlt = pickedHero?.cr854_name ?? firstProduct?.cr854_name
+  // 通知の画像: 「画像つき」はメイン画像、「商品の紹介」は商品の画像。「テキストだけ」は画像なし
+  const heroSrc = spec.product ? productImage(firstProduct) : spec.image ? (pickedHero ? heroImage(pickedHero) : undefined) : undefined
+  const heroAlt = spec.product ? firstProduct?.cr854_name : pickedHero?.cr854_name
 
   const when = scheduledAt ? new Date(scheduledAt) : null
   const clock = when ? `${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')}` : '9:41'
@@ -758,7 +762,17 @@ function PushPreview(props: Props) {
     textTransform: HEADLINE_FONT.upper ? ('uppercase' as const) : ('none' as const),
   }
   const bodyFont = { fontFamily: HEADLINE_FONT.family, letterSpacing: '0.04em' }
-  const more = items.length > 1 ? t(`ほか${items.length - 1}点の商品`, `+${items.length - 1} more products`) : ''
+  const more = ''
+  // 通知のボタン(アクション)。テンプレートが決める
+  const actions = spec.buttons.length > 0 && (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${spec.buttons.length}, 1fr)`, gap: 6, marginTop: 8 }}>
+      {spec.buttons.map((b) => (
+        <div key={b} style={{ textAlign: 'center', padding: '6px 0', borderRadius: style === 'ios' ? 10 : 18, backgroundColor: 'rgba(0,0,0,0.06)', fontSize: '0.8rem', fontWeight: 600 }}>
+          {b}
+        </div>
+      ))}
+    </div>
+  )
 
   const appIcon = (size: number) => (
     <div style={{ width: size, height: size, borderRadius: style === 'ios' ? '22%' : '50%', backgroundColor: '#222', color: '#fff', display: 'grid', placeItems: 'center', fontSize: size * 0.5, fontWeight: 800, flexShrink: 0 }}>
@@ -787,6 +801,7 @@ function PushPreview(props: Props) {
         <div style={{ ...bodyFont, fontSize: '0.85rem', color: INK, whiteSpace: 'pre-wrap' }}>{bodyText}</div>
         {image}
         {more && <div style={{ fontSize: '0.7rem', color: SUB, marginTop: 6 }}>{more}</div>}
+        {actions}
       </div>
     ) : (
       <div style={{ backgroundColor: '#f3edf7', color: INK, borderRadius: 24, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
@@ -799,6 +814,7 @@ function PushPreview(props: Props) {
         <div style={{ ...bodyFont, fontSize: '0.85rem', color: '#444', whiteSpace: 'pre-wrap' }}>{bodyText}</div>
         {image}
         {more && <div style={{ fontSize: '0.7rem', color: SUB, marginTop: 6 }}>{more}</div>}
+        {actions}
       </div>
     )
 
@@ -831,12 +847,27 @@ function PushPreview(props: Props) {
         {notification}
         <div style={{ width: 96, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)', margin: '24px auto 0' }} />
       </div>
-      <span style={{ fontSize: 12, color: tokens.colorNeutralForeground2 }}>
-        {t('通知の画像には、メイン画像(なければ先頭の商品)を使います。下のリストで、商品の順序を入れ替えられます。', 'The notification image uses the main image (or the first product if none). You can reorder products in the list below.')}
-      </span>
-      {/* 通知をタップしたあとのメッセージ本文。メールと同じレイアウトで、画像を小さくしたもの */}
-      <div style={{ fontSize: 14, fontWeight: 700 }}>{t('タップ後のメッセージ(メールと同じレイアウト)', 'Message after tapping (same layout as the email)')}</div>
-      <EmailPreview {...props} compact />
+      {/* 通知を押したあとに開く画面(「⑤ 時刻・相手」の「開く画面」で決める) */}
+      <div style={{ fontSize: 14, fontWeight: 700 }}>{t('通知を押したあとに開く画面', 'Screen opened by the notification')}</div>
+      {pushLinkKind === 'product' && firstProduct ? (
+        <div style={{ border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: 16, padding: 12, display: 'grid', gap: 8, ...scaled }}>
+          <img draggable={false} src={productImage(firstProduct)} alt={firstProduct.cr854_name} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'contain', borderRadius: 12, backgroundColor: '#f1f1f4' }} />
+          <div style={{ fontWeight: 700 }}>{firstProduct.cr854_name}</div>
+          <div style={{ color: SUB }}>{t('商品のページ', 'Product page')}</div>
+        </div>
+      ) : pushLinkKind === 'campaign' ? (
+        <EmailPreview {...props} compact />
+      ) : (
+        <div style={{ border: `1px dashed ${tokens.colorNeutralStroke1}`, borderRadius: 16, padding: 16, textAlign: 'center', color: tokens.colorNeutralForeground3, fontSize: 13 }}>
+          {pushLinkKind === 'category'
+            ? t('カテゴリのページが開きます', 'Opens the category page')
+            : pushLinkKind === 'home'
+              ? t('アプリのホームが開きます', 'Opens the app home')
+              : pushLinkKind === 'custom'
+                ? t('指定した URL の画面が開きます', 'Opens the screen at the custom URL')
+                : t('「⑤ 時刻・相手」で、開く画面を決めてください', 'Choose where it opens in “5. Timing & audience”')}
+        </div>
+      )}
       <div style={{ display: 'grid', gap: 6 }}>
         {items.map((it, idx) => {
           const p = byId.get(it.productId)

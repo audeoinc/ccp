@@ -15,5 +15,9 @@ declare module './generated/models/Cr854_deliverycardsModel' {
     cr854_productionowner?: string
     /** 制作に引き継いだ日時(ISO。空は、まだ) */
     cr854_handedoffat?: string
+    /** アプリ: 通知を押したときに開く画面(JSON。{"kind": "campaign" | "product" | "category" | "home" | "custom", "url"?: string}) */
+    cr854_pushlink?: string
+    /** アプリ: 送る相手(all / members / inactive30 / notOpenedEmail) */
+    cr854_audience?: string
   }
 }

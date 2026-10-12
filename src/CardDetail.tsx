@@ -33,7 +33,8 @@ import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
-import { TEMPLATE_VALUES, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
+import { parsePushLink, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
@@ -345,7 +346,19 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const previewInnerRef = useRef<HTMLDivElement>(null)
   // コピー・ヘッドラインの言語(AI に渡す。保存はしない)
   const [language, setLanguage] = useState<CopyLanguage>('auto')
-  const [template, setTemplate] = useState<EmailTemplateId>(() => card?.cr854_layoutkey || templateFromValue(card?.cr854_emailtemplate))
+  const [template, setTemplate] = useState<EmailTemplateId>(
+    () => card?.cr854_layoutkey || (card?.cr854_channel === CHANNEL_PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card?.cr854_emailtemplate)),
+  )
+  // アプリ: 通知を押したときに開く画面と、送る相手
+  const [pushLink, setPushLink] = useState<PushLink | null>(() => parsePushLink(card?.cr854_pushlink))
+  const [audience, setAudience] = useState<string>(card?.cr854_audience ?? '')
+  const templateChannel: TemplateChannel = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
+  // チャネルを変えたら、テンプレートも、そのチャネルのものにする(メールのテンプレートでアプリの通知は作れないため)
+  useEffect(() => {
+    if (channelOf(template) === templateChannel) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTemplate(templateChannel === 'push' ? DEFAULT_PUSH_TEMPLATE : DEFAULT_TEMPLATE)
+  }, [templateChannel, template])
   // カテゴリ系テンプレートの見出し(セクションの順。保存は 1 行 1 見出し)
   const [sectionTitles, setSectionTitles] = useState<string[]>(() => (card?.cr854_sectiontitles ? card.cr854_sectiontitles.split('\n') : []))
   // 各セクションのコピー(セクションの順)
@@ -605,7 +618,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     setError(null)
     setAuto({ label: t('準備しています', 'Getting ready'), done: 0, total: 7 })
     const res = await runAutoDraft(
-      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes },
+      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel },
       (label, done, total) => setAuto({ label, done, total }),
       () => cancelRef.current || !aliveRef.current,
     )
@@ -724,6 +737,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         cr854_owner: form.owner.trim(),
         cr854_productiondue: form.productionDue || (null as never),
         cr854_links: encodeLinks(links),
+        cr854_pushlink: pushLink ? JSON.stringify(pushLink) : '',
+        cr854_audience: audience,
         cr854_productionowner: form.productionOwner.trim(),
         cr854_handedoffat: form.handedOffAt || (null as never),
         cr854_theme: form.theme,
@@ -763,7 +778,15 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     }
   }
 
-  const progress = progressOf({ theme: form.theme, template, heroId, headline: form.headline, items, instructions: form.instructions })
+  const progress = progressOf({
+    theme: form.theme,
+    template,
+    heroId,
+    headline: form.headline,
+    items,
+    instructions: form.instructions,
+    push: templateChannel === 'push' ? { copy: form.copy, timing: !!pushLink && !!audience } : undefined,
+  })
   const hero = heroes.find((h) => h.cr854_heroimageid === heroId)
 
   return (
@@ -961,6 +984,12 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 cardId={card?.cr854_deliverycardid}
                 owner={form.owner}
                 cardName={form.name}
+                channel={templateChannel}
+                pushLink={pushLink}
+                onPushLink={setPushLink}
+                audience={audience}
+                onAudience={setAudience}
+                scheduledAt={form.scheduledAt}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
               />
             </div>
@@ -1011,6 +1040,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
                   <Preview
                     channel={previewTab}
+                    pushLinkKind={pushLink?.kind}
                     subject={form.name}
                     headline={form.headline}
                     copy={form.copy}
