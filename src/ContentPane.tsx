@@ -39,7 +39,7 @@ import { optionLabel, tr, useT } from './i18n'
 import { Row, productMeta } from './ProductRow'
 import { useSelection } from './useSelection'
 import { progressOf } from './progress'
-import { getTemplate, openTemplateManager, sectionRange, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel } from './templates'
+import { openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel } from './templates'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { HandoffPanel } from './HandoffPanel'
@@ -55,7 +55,7 @@ import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { linkSlots, type Links } from './links'
 
 // links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
-type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'message' | 'visual' | 'timing'
+type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'notice' | 'message' | 'timing'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -118,6 +118,10 @@ interface Props {
   onAudience: (v: Audience) => void
   /** 送る日時(datetime-local の値) */
   scheduledAt: string
+  /** アプリ: 通知のタイトル・本文(メッセージのヘッドライン・コピーとは別) */
+  pushTitle: string
+  pushBody: string
+  onPush: (key: 'pushTitle' | 'pushBody', value: string) => void
 }
 
 // ------------------------------------------------------------------ スタイル
@@ -1096,13 +1100,12 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
       language={p.language}
       onLanguage={p.onLanguage}
       onGenerate={drafts.runCopy}
-      push={p.channel === 'push'}
     />
   )
 
   return (
     <div className={s.grid12}>
-      {!p.only && !(p.channel === 'push' && p.mode === 'sections') && subTabs}
+      {!p.only && subTabs}
       {active === 'hero' ? heroView() : active === 'copy' ? copyView : sectionView(sections[active])}
     </div>
   )
@@ -1143,9 +1146,8 @@ export function ContentPane(props: Props) {
     headline,
     items: props.items,
     instructions,
-    push: isPush ? { copy: props.copy, timing: !!props.pushLink && !!props.audience } : undefined,
+    push: isPush ? { title: props.pushTitle, body: props.pushBody, timing: !!props.pushLink && !!props.audience } : undefined,
   })
-  const pushSpec = isPush ? getTemplate(template).push : undefined
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
   // リンク先: 「配信カードで指定」のボタンで、URL が空のものがあれば、タブに「!」を付ける
@@ -1178,7 +1180,8 @@ export function ContentPane(props: Props) {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
     else if (tab === 'instructions') registerChat({ key: 'instructions', title: t('制作指示', 'Production notes') }, () => drafts.runInstructions())
-    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks' || tab === 'timing') registerChat(null)
+    else if (tab === 'notice') registerChat({ key: 'push', title: t('通知', 'Notification') }, () => drafts.runPush())
+    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks' || tab === 'timing' || tab === 'message') registerChat(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   })
 
@@ -1216,8 +1219,8 @@ export function ContentPane(props: Props) {
         <Tab value="template" onClick={revealTab}>{`${mark(pr.template, false)}${t('② テンプレート', '2. Template')}`}</Tab>
         {isPush ? (
           <>
-            <Tab value="message" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ 文面', '3. Message')}`}</Tab>
-            <Tab value="visual" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ 画像・商品', '4. Image & product')}`}</Tab>
+            <Tab value="notice" onClick={revealTab}>{`${mark(pr.hero, drafts.pushIdeas.length > 0)}${t('③ 通知', '3. Notification')}`}</Tab>
+            <Tab value="message" onClick={revealTab}>{`${mark(pr.sections, drafts.copyIdeas.length > 0)}${t('④ メッセージ', '4. Message')}`}</Tab>
             <Tab value="timing" onClick={revealTab}>{`${mark(pr.instructions, false)}${t('⑤ 時刻・相手', '5. Timing & audience')}`}</Tab>
           </>
         ) : (
@@ -1258,14 +1261,32 @@ export function ContentPane(props: Props) {
         />
       )}
       {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} />}
-      {tab === 'message' && <ProductsTab {...props} mode="hero" only="copy" registerChat={registerChat} />}
-      {tab === 'visual' && (
+      {tab === 'notice' && (
+        <CopyTab
+          push
+          headline={props.pushTitle}
+          lead={props.pushBody}
+          onHeadline={(v) => props.onPush('pushTitle', v)}
+          onLead={(v) => props.onPush('pushBody', v)}
+          ideas={drafts.pushIdeas}
+          onAdopt={(idea) => {
+            props.onPush('pushTitle', idea.headline)
+            props.onPush('pushBody', idea.lead)
+          }}
+          busy={!!drafts.busy.push}
+          blocked={needTheme}
+          language={props.language}
+          onLanguage={props.onLanguage}
+          onGenerate={drafts.runPush}
+        />
+      )}
+      {tab === 'message' && (
         <>
-          {pushSpec?.image && <ProductsTab {...props} mode="hero" only="hero" registerChat={registerChat} />}
-          {pushSpec?.product && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
-          {pushSpec && !pushSpec.image && !pushSpec.product && (
-            <span className={s.caption}>{t('このテンプレートは、画像も商品も使いません(タイトルと本文だけの通知です)。', 'This template uses no image or product (title and body only).')}</span>
-          )}
+          <span className={s.caption}>
+            {t('通知を押すと、アプリの中で開くメッセージです。メールと同じ部品(メイン画像・見出し・セクション)で組みます。', 'The message opened in the app when the notification is tapped. It uses the same parts as an email (main image, headline, sections).')}
+          </span>
+          <ProductsTab {...props} mode="hero" registerChat={registerChat} />
+          {sectionsOf(template).length > 0 && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
         </>
       )}
       {tab === 'timing' && (

@@ -139,9 +139,9 @@ export type TemplateChannel = 'email' | 'push'
 
 /** アプリ(プッシュ通知)のテンプレートの中身 */
 export interface PushSpec {
-  /** 通知に画像を付ける(メイン画像) */
+  /** 通知に画像を付ける(メッセージのメイン画像) */
   image: boolean
-  /** 商品 1 点を紹介する(画像は商品の画像。セクションは feature 1 枠) */
+  /** 商品 1 点を紹介する(通知の画像は、メッセージの先頭の商品の画像) */
   product: boolean
   /** 通知のボタン(アクション)の文言。空なら、ボタンなし */
   buttons: string[]
@@ -337,46 +337,73 @@ const BUILTIN: Record<string, EmailTemplate> = {
   },
 }
 
-// ---- アプリ(プッシュ通知)の標準のテンプレート。メールのテンプレートとは、選べる場所を分ける
+// ---- アプリの標準のテンプレート。アプリの配信 = 通知 + アプリの中で開くメッセージ。
+// 通知の形(push)と、メッセージの本文(メールと同じ部品: メイン画像・セクション・ボタン)を組み合わせる。
+// ID は、以前の版(通知だけのテンプレート)と同じものを残す(保存済みの配信カードが指しているため)
 BUILTIN['push-text'] = {
   get label() {
-    return tr('テキストだけ', 'Text only')
+    return tr('お知らせ', 'Announcement')
   },
   get description() {
-    return tr('タイトルと本文だけの通知。お知らせ・リマインドに。', 'A notification with just a title and body. For announcements and reminders.')
+    return tr('通知はテキストだけ。メッセージは、メイン画像 + 見出し・コピー + ボタン。お知らせ・リマインドに。', 'Text-only notification. Message: main image, headline and copy, and a button. For announcements and reminders.')
   },
   channel: 'push',
   push: { image: false, product: false, buttons: [] },
   hero: 'standard',
+  heroText: 'below',
+  heroButtons: 1,
   sections: [],
   builtin: true,
 }
 BUILTIN['push-image'] = {
   get label() {
-    return tr('画像つき', 'With image')
+    return tr('特集', 'Feature')
   },
   get description() {
-    return tr('タイトル・本文に、メイン画像を付けた通知(開くと画像が大きく出ます)。特集・新作の告知に。', 'Title and body with a main image (shown large when expanded). For features and new arrivals.')
+    return tr('通知は画像つき。メッセージは、メイン画像 + 2 列のグリッド 4 点 + ボタン。特集・新作の告知に。', 'Notification with image. Message: main image, a 2-column grid of 4, and a button. For features and new arrivals.')
   },
   channel: 'push',
   push: { image: true, product: false, buttons: [] },
   hero: 'standard',
-  sections: [],
+  heroText: 'below',
+  sections: [{ kind: 'grid', slots: 4, buttons: 1 }],
   builtin: true,
 }
 BUILTIN['push-product'] = {
   get label() {
-    return tr('商品の紹介 + ボタン 2 つ', 'Product spotlight + 2 buttons')
+    return tr('商品の紹介', 'Product spotlight')
   },
   get description() {
-    return tr('商品 1 点の画像と、タイトル・本文、ボタン 2 つ(見る / あとで)の通知。値下げ・再入荷に。', 'One product image, title and body, and two buttons (View / Later). For price drops and restocks.')
+    return tr('通知は商品 1 点の画像 + ボタン 2 つ(見る / あとで)。メッセージは、大きく 1 点 + 関連の商品 2 点。値下げ・再入荷に。', 'Notification with one product and two buttons (View / Later). Message: one large product and two related items. For price drops and restocks.')
   },
   channel: 'push',
   get push() {
     return { image: false, product: true, buttons: [tr('見る', 'View'), tr('あとで', 'Later')] }
   },
   hero: 'standard',
-  sections: [{ kind: 'feature', slots: 1 }],
+  heroText: 'below',
+  sections: [
+    { kind: 'wide', slots: 1 },
+    { kind: 'grid', slots: 2, buttons: 1 },
+  ],
+  builtin: true,
+}
+BUILTIN['push-sale'] = {
+  get label() {
+    return tr('セール', 'Sale')
+  },
+  get description() {
+    return tr('通知は画像つき。メッセージは、お知らせ帯 + 大きく 1 点 + グリッド 4 点 + ボタン 2 つ。期間限定のセールに。', 'Notification with image. Message: a top bar, one large item, a grid of 4, and two buttons. For limited-time sales.')
+  },
+  channel: 'push',
+  push: { image: true, product: false, buttons: [] },
+  hero: 'offer',
+  heroText: 'overlay',
+  topBar: true,
+  sections: [
+    { kind: 'wide', slots: 1 },
+    { kind: 'grid', slots: 4, buttons: 2 },
+  ],
   builtin: true,
 }
 

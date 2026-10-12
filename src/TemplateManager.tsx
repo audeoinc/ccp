@@ -47,6 +47,7 @@ import {
   type HeroKind,
   type HeroText,
   type TemplateChannel,
+  type PushSpec,
   type LinkKind,
   type Section,
   type TemplateLayout,
@@ -65,6 +66,8 @@ interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'h
   name: string
   description: string
   parts: Part[]
+  /** アプリのテンプレート: 通知の形(メールのテンプレートでは undefined) */
+  push?: PushSpec
 }
 
 let partSeq = 0
@@ -245,7 +248,7 @@ export function TemplateManager() {
   const startNew = () => {
     setError(null)
     setSelectedId('')
-    setDraft(newDraft())
+    setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, product: false, buttons: [] } } : newDraft())
   }
   const startDuplicate = () => {
     if (!selected) return
@@ -258,13 +261,14 @@ export function TemplateManager() {
       topBar: selected.topBar,
       heroLink: selected.heroLink,
       parts: toParts(selected),
+      push: selected.push ? { ...selected.push, buttons: [...selected.push.buttons] } : undefined,
     })
     setSelectedId('')
   }
   const startEdit = () => {
     if (!selected || selected.builtin) return
     setError(null)
-    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected) })
+    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected), push: selected.push })
   }
 
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d))
@@ -286,14 +290,14 @@ export function TemplateManager() {
   const sectionCount = draft?.parts.filter((p) => p.type === 'section').length ?? 0
   const blockCount = draft?.parts.filter((p) => p.type === 'buttons').length ?? 0
   const totalSlots = (draft?.parts ?? []).reduce((n, p) => n + (p.type === 'section' ? p.sec.slots : 0), 0)
-  const valid = !!draft && draft.name.trim() !== '' && sectionCount > 0
+  const valid = !!draft && draft.name.trim() !== '' && (sectionCount > 0 || !!draft.push)
 
   const save = async () => {
     if (!draft || !valid) return
     setBusy(true)
     setError(null)
     try {
-      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...fromParts(draft) })
+      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...fromParts(draft), push: draft.push })
       setSelectedId(id)
       setDraft(null)
     } catch (e) {
@@ -475,19 +479,14 @@ export function TemplateManager() {
                 <Tab value="email" icon={<MailRegular />}>{t('メール', 'Email')}</Tab>
                 <Tab value="push" icon={<PhoneRegular />}>{t('アプリ', 'App')}</Tab>
               </TabList>
-              {channel === 'email' ? (
-                <>
-                  <div className={mergeClasses(s.listHead, s.fullRow)}>
-                    <Button size="small" appearance="primary" icon={<AddRegular />} onClick={startNew}>{t('新規作成', 'New')}</Button>
-                    <Button size="small" appearance="outline" icon={<CopyRegular />} onClick={startDuplicate} disabled={!selected || (editing && !draft?.id && selectedId === '')}>{t('複製', 'Duplicate')}</Button>
-                  </div>
-                  <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('作成したテンプレート', 'Your templates')}</span>
-                  {customs.length === 0 && <span className={mergeClasses(s.caption, s.fullRow)}>{t('まだありません。「新規作成」か、標準のテンプレートの「複製」から作れます。', 'None yet. Create one with "New", or duplicate a standard template.')}</span>}
-                  {customs.map(renderItem)}
-                </>
-              ) : (
-                <span className={mergeClasses(s.caption, s.fullRow)}>{t('アプリ(プッシュ通知)のテンプレートは、いまは標準の 3 つから選びます。', 'For app (push) deliveries, choose one of the three standard templates for now.')}</span>
-              )}
+              <div className={mergeClasses(s.listHead, s.fullRow)}>
+                <Button size="small" appearance="primary" icon={<AddRegular />} onClick={startNew}>{t('新規作成', 'New')}</Button>
+                <Button size="small" appearance="outline" icon={<CopyRegular />} onClick={startDuplicate} disabled={!selected || (editing && !draft?.id && selectedId === '')}>{t('複製', 'Duplicate')}</Button>
+              </div>
+              <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('作成したテンプレート', 'Your templates')}</span>
+              {customs.length === 0 && <span className={mergeClasses(s.caption, s.fullRow)}>{t('まだありません。「新規作成」か、標準のテンプレートの「複製」から作れます。', 'None yet. Create one with "New", or duplicate a standard template.')}</span>}
+              {customs.map(renderItem)}
+
               <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('標準', 'Standard')}</span>
               {builtins.map(renderItem)}
             </div>
@@ -509,9 +508,62 @@ export function TemplateManager() {
                       <AutoTextarea rows={2} size="small" value={draft.description} onChange={(_, d) => patch({ description: d.value })} />
                     </Field>
 
+                    {draft.push && (
+                      <div className={s.card}>
+                        <div className={s.cardHead}>
+                          <span className={s.cardTitle}>{t('通知', 'Notification')}</span>
+                          <span className={s.caption}>{t('アプリの通知の形。メッセージの本文は、下の部品で組みます', 'The notification format. Build the in-app message with the parts below.')}</span>
+                        </div>
+                        <div className={s.heroBody}>
+                          <Field label={t('通知の形', 'Format')}>
+                            <div className={s.row} style={{ flexWrap: 'nowrap' }}>
+                              {(
+                                [
+                                  ['text', t('テキストだけ', 'Text only')],
+                                  ['image', t('画像つき', 'With image')],
+                                  ['product', t('商品 1 点', 'One product')],
+                                ] as const
+                              ).map(([k, label]) => {
+                                const on = k === 'product' ? draft.push!.product : k === 'image' ? draft.push!.image && !draft.push!.product : !draft.push!.image && !draft.push!.product
+                                return (
+                                  <Button
+                                    key={k}
+                                    size="small"
+                                    appearance={on ? 'primary' : 'outline'}
+                                    aria-pressed={on}
+                                    onClick={() => patch({ push: { ...draft.push!, image: k === 'image', product: k === 'product' } })}
+                                  >
+                                    {label}
+                                  </Button>
+                                )
+                              })}
+                            </div>
+                          </Field>
+                          <Field label={t('通知のボタン(最大 2 つ。空なら、ボタンなし)', 'Notification buttons (up to 2; empty = none)')}>
+                            <div className={s.row}>
+                              {[0, 1].map((i) => (
+                                <Input
+                                  key={i}
+                                  size="small"
+                                  value={draft.push!.buttons[i] ?? ''}
+                                  placeholder={i === 0 ? t('例: 見る', 'e.g. View') : t('例: あとで', 'e.g. Later')}
+                                  maxLength={MAX_BUTTON_LABEL}
+                                  onChange={(_, d) => {
+                                    const b = [draft.push!.buttons[0] ?? '', draft.push!.buttons[1] ?? '']
+                                    b[i] = d.value
+                                    patch({ push: { ...draft.push!, buttons: b } }) // 空の欄は、保存のときに外す
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </Field>
+                        </div>
+                      </div>
+                    )}
+
                     <div className={s.card}>
                       <div className={s.cardHead}>
-                        <span className={s.cardTitle}>{t('ヒーロー(メイン画像)', 'Hero (main image)')}</span>
+                        <span className={s.cardTitle}>{draft.push ? t('メッセージ: ヒーロー(メイン画像)', 'Message: hero (main image)') : t('ヒーロー(メイン画像)', 'Hero (main image)')}</span>
                       </div>
                       <div className={s.heroBody}>
                         <Field label={t('種類', 'Type')}>
@@ -590,7 +642,7 @@ export function TemplateManager() {
                       <Badge size="small" appearance="tint" color={selected.builtin ? 'informative' : 'brand'}>{selected.builtin ? t('標準', 'Standard') : t('作成したテンプレート', 'Your template')}</Badge>
                     </div>
                     <span className={s.caption}>{selected.description || t('(説明なし)', '(No description)')}</span>
-                    {selected.push ? (
+                    {selected.push && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 12, rowGap: 4 }}>
                         <span className={s.caption}>{t('通知の中身', 'Contents')}</span>
                         <span style={{ fontSize: tokens.fontSizeBase200 }}>
@@ -601,7 +653,8 @@ export function TemplateManager() {
                         <span className={s.caption}>{t('ボタン', 'Buttons')}</span>
                         <span style={{ fontSize: tokens.fontSizeBase200 }}>{selected.push.buttons.length ? selected.push.buttons.join(t('、', ', ')) : t('なし', 'None')}</span>
                       </div>
-                    ) : (
+                    )}
+                    {(
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 12, rowGap: 4 }}>
                       <span className={s.caption}>{t('ヒーロー', 'Hero')}</span>
                       <span style={{ fontSize: tokens.fontSizeBase200 }}>
@@ -616,7 +669,7 @@ export function TemplateManager() {
                     </div>
                     )}
                     <div style={{ display: 'flex', gap: 8 }}>
-                      {selected.push ? null : selected.builtin ? (
+                      {selected.builtin ? (
                         <Button size="small" appearance="primary" icon={<CopyRegular />} onClick={startDuplicate}>{t('複製して編集', 'Duplicate to edit')}</Button>
                       ) : (
                         <>
@@ -625,12 +678,13 @@ export function TemplateManager() {
                         </>
                       )}
                     </div>
-                    {selected.builtin && !selected.push && <span className={s.caption}>{t('標準のテンプレートは、編集・削除できません。複製して、自分用に作り変えてください。', 'Standard templates cannot be edited or deleted. Duplicate one to make your own version.')}</span>}
+                    {selected.builtin && <span className={s.caption}>{t('標準のテンプレートは、編集・削除できません。複製して、自分用に作り変えてください。', 'Standard templates cannot be edited or deleted. Duplicate one to make your own version.')}</span>}
                   </div>
                   <div className={s.preview}>
                     <Text size={200} weight="semibold">{t('構成のプレビュー', 'Layout preview')}</Text>
                     <div className={s.previewScroll}>
-                      {selected.push ? <PushThumb spec={selected.push} width={200} /> : <TemplateThumb layout={selected} free={selected.id === 'free'} width={PREVIEW_WIDTH} />}
+                      {selected.push && <PushThumb spec={selected.push} width={160} />}
+                      <TemplateThumb layout={selected} free={selected.id === 'free'} width={PREVIEW_WIDTH} />
                     </div>
                   </div>
                 </div>

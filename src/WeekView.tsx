@@ -262,7 +262,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       })
       .filter((g) => g.ids.length > 0)
     const hasVisual = !!hero || ids.length > 0
-    const hasPushText = isPush && !!(c.cr854_headline || c.cr854_copy)
+    const hasPushText = isPush && !!(c.cr854_pushtitle || c.cr854_pushbody || c.cr854_headline || c.cr854_copy)
     const items: Item[] = ids.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
     const ratio = progress.total ? progress.done / progress.total : 0
 
@@ -292,8 +292,8 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
 
     const pushBox = hasPushText && (
       <div className={styles.push}>
-        <span className={styles.pushTitle}>{c.cr854_headline || c.cr854_name}</span>
-        {c.cr854_copy && <span className={styles.pushBody}>{c.cr854_copy}</span>}
+        <span className={styles.pushTitle}>{c.cr854_pushtitle || c.cr854_headline || c.cr854_name}</span>
+        {(c.cr854_pushbody || c.cr854_copy) && <span className={styles.pushBody}>{c.cr854_pushbody || c.cr854_copy}</span>}
       </div>
     )
 
@@ -311,6 +311,8 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
               <Preview
                 channel={isPush ? 'push' : 'email'}
                 pushLinkKind={parsePushLink(c.cr854_pushlink)?.kind}
+                pushTitle={c.cr854_pushtitle}
+                pushBody={c.cr854_pushbody}
                 subject={c.cr854_name}
                 headline={c.cr854_headline ?? ''}
                 copy={c.cr854_copy ?? ''}

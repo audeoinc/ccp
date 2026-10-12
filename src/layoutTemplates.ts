@@ -15,6 +15,8 @@ import {
   type Section,
   type SectionKind,
   type TemplateLayout,
+  type PushSpec,
+  type TemplateChannel,
 } from './templates'
 import { tr } from './i18n'
 
@@ -60,6 +62,18 @@ type HeroMeta = { kind: 'hero'; text?: HeroText; buttons?: 1 | 2; topBar?: true;
  * slots を持たないので、以前の版のアプリは読み飛ばす(ボタンが出ないだけで、商品の枠の位置はずれない)
  */
 type StoredButtons = { kind: 'buttons'; buttons: ButtonSpec[] }
+/**
+ * アプリのテンプレートの印と、通知の形。テーブルに列がないので、セクションの JSON に { "kind": "app", ... } として入れる。
+ * slots を持たないので、以前の版のアプリは読み飛ばす
+ */
+type AppMeta = { kind: 'app'; push: PushSpec }
+
+const parsePush = (raw: unknown): PushSpec | undefined => {
+  const o = raw as { image?: unknown; product?: unknown; buttons?: unknown } | undefined
+  if (!o || typeof o !== 'object') return undefined
+  const buttons = Array.isArray(o.buttons) ? o.buttons.filter((b): b is string => typeof b === 'string' && !!b.trim()).map((b) => b.trim().slice(0, MAX_BUTTON_LABEL)).slice(0, 2) : []
+  return { image: !!o.image, product: !!o.product, buttons }
+}
 
 /** ボタンを保存する形に整える。既定の値(塗り、配信のページ、既定の文言)は書かない */
 function toStoredButton(b: ButtonSpec): ButtonSpec {
@@ -88,19 +102,21 @@ function parseButtons(raw: unknown): ButtonSpec[] {
 }
 
 /** 保存されている JSON から、ヒーローの見せ方と、セクションの一覧を読む(壊れていても、読める分だけ) */
-function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'> {
+function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'> & { channel?: TemplateChannel; push?: PushSpec } {
   const empty = { sections: [] }
   if (!text) return empty
   try {
     const raw = JSON.parse(text) as unknown
     if (!Array.isArray(raw)) return empty
     const meta = raw.find((r) => (r as { kind?: string })?.kind === 'hero') as HeroMeta | undefined
+    const app = raw.find((r) => (r as { kind?: string })?.kind === 'app') as AppMeta | undefined
+    const push = app ? parsePush(app.push) : undefined
     // 並びの順に読む。ボタンの部品の位置は、それまでに読んだセクションの数で表す
     const sections: Section[] = []
     const buttonBlocks: ButtonBlock[] = []
     for (const r of raw) {
       const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown }
-      if (o?.kind === 'hero') continue
+      if (o?.kind === 'hero' || o?.kind === 'app') continue
       if (o?.kind === 'buttons') {
         const buttons = parseButtons(o.buttons)
         if (buttons.length > 0 && buttonBlocks.length < MAX_BUTTON_BLOCKS) buttonBlocks.push({ at: sections.length, buttons })
@@ -123,6 +139,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
       )
     }
     return {
+      ...(push ? { channel: 'push' as const, push } : {}),
       sections,
       buttonBlocks: buttonBlocks.length > 0 ? buttonBlocks : undefined,
       heroText: meta && HERO_TEXTS.includes(meta.text as HeroText) ? meta.text : undefined,
@@ -139,7 +156,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
  * セクションの JSON を作る。ボタンの部品は、置く位置(at)に挟む。
  * ヒーローの見せ方が既定(帯・ボタンなし・お知らせ帯なし・配信のページ)で、ボタンの部品もないときは、以前と同じ形(セクションの配列だけ)
  */
-function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'>): string {
+function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'> & { push?: PushSpec }): string {
   const meta: HeroMeta = {
     kind: 'hero',
     ...(layout.heroText && layout.heroText !== 'band' ? { text: layout.heroText } : {}),
@@ -151,7 +168,8 @@ function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons'
   const buttonsAt = (at: number): StoredButtons[] =>
     blocks.filter((b) => Math.max(0, Math.min(b.at, layout.sections.length)) === at).map((b) => ({ kind: 'buttons', buttons: b.buttons.slice(0, MAX_BUTTONS_PER_BLOCK).map(toStoredButton) }))
   const parts = [...buttonsAt(0), ...layout.sections.flatMap((sec, i) => [toStored(sec), ...buttonsAt(i + 1)])]
-  return JSON.stringify(Object.keys(meta).length > 1 ? [meta, ...parts] : parts)
+  const app: AppMeta[] = layout.push ? [{ kind: 'app', push: { image: layout.push.image, product: layout.push.product, buttons: layout.push.buttons.map((b) => b.trim()).filter(Boolean).slice(0, 2) } }] : []
+  return JSON.stringify(Object.keys(meta).length > 1 || app.length ? [...app, ...(Object.keys(meta).length > 1 ? [meta] : []), ...parts] : parts)
 }
 
 export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'buttonBlocks'> {
@@ -160,6 +178,8 @@ export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroBu
   description: string
   hero: HeroKind
   sections: Section[]
+  /** アプリのテンプレートのとき: 通知の形 */
+  push?: PushSpec
 }
 
 /** Dataverse から、ユーザーが作ったテンプレートを読み込み、登録に反映する */
@@ -175,8 +195,8 @@ export async function loadCustomTemplates(): Promise<void> {
         hero: (HERO_KINDS.includes(r.cr854_herokind as HeroKind) ? r.cr854_herokind : 'standard') as HeroKind,
         ...parseLayout(r.cr854_sections),
       }))
-      // セクションが 1 つもない行は、メールを組めないので、一覧に出さない
-      .filter((t) => t.sections.length > 0),
+      // セクションが 1 つもない行は、メールを組めないので、一覧に出さない(アプリは、メイン画像とコピーだけのメッセージもある)
+      .filter((t) => t.sections.length > 0 || t.channel === 'push'),
   )
 }
 

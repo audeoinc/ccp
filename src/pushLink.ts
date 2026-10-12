@@ -1,5 +1,5 @@
-/** アプリ: 通知を押したときに開く画面 */
-export type PushLinkKind = 'campaign' | 'product' | 'category' | 'home' | 'custom'
+/** アプリ: 通知を押したときに開く画面(message = この配信のメッセージ。既定) */
+export type PushLinkKind = 'message' | 'campaign' | 'product' | 'category' | 'home' | 'custom'
 export interface PushLink {
   kind: PushLinkKind
   /** custom のときの URL(アプリ内の画面の URL・ディープリンク) */

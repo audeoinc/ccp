@@ -19,6 +19,7 @@ import {
 } from './aiSelect'
 import {
   suggestCopies,
+  suggestPushNotifications,
   suggestInstructions,
   suggestThemes,
   type CopyIdea,
@@ -54,6 +55,8 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
   const [themeIdeas, setThemeIdeas] = useState<ThemeSuggestion[]>([])
   const [copyIdeas, setCopyIdeas] = useState<CopyIdea[]>([])
   const [instructionIdeas, setInstructionIdeas] = useState<InstructionIdea[]>([])
+  // アプリ: 通知のタイトル・本文の案
+  const [pushIdeas, setPushIdeas] = useState<CopyIdea[]>([])
   // セクションの見出し・コピーの候補(AI が作ったときの分。保存はしない)
   const [titleCandidates, setTitleCandidates] = useState<Record<number, TitleCandidate[]>>({})
   const [sectionCopyCandidates, setSectionCopyCandidates] = useState<Record<number, CopyCandidate[]>>({})
@@ -98,6 +101,14 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
       const ctx = context()
       if (!ctx.card.theme.trim()) throw new Error(tr('コピー案を出すには、先にテーマを決めてください', 'Set a theme before requesting copy ideas'))
       setCopyIdeas(await suggestCopies(ctx))
+      return true
+    })
+
+  const runPush = () =>
+    withBusy('push', async () => {
+      const ctx = context()
+      if (!ctx.card.theme.trim()) throw new Error(tr('通知の案を出すには、先にテーマを決めてください', 'Set a theme before requesting notification ideas'))
+      setPushIdeas(await suggestPushNotifications(ctx))
       return true
     })
 
@@ -194,12 +205,14 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     themeIdeas: ThemeSuggestion[]
     copyIdeas: CopyIdea[]
     instructionIdeas: InstructionIdea[]
+    pushIdeas?: CopyIdea[]
     titleCandidates: Record<number, TitleCandidate[]>
     sectionCopyCandidates: Record<number, CopyCandidate[]>
   }) => {
     setThemeIdeas(r.themeIdeas)
     setCopyIdeas(r.copyIdeas)
     setInstructionIdeas(r.instructionIdeas)
+    setPushIdeas(r.pushIdeas ?? [])
     setTitleCandidates(r.titleCandidates)
     setSectionCopyCandidates(r.sectionCopyCandidates)
   }
@@ -214,12 +227,14 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     themeIdeas,
     copyIdeas,
     instructionIdeas,
+    pushIdeas,
     titleCandidates,
     sectionCopyCandidates,
     busy,
     runTheme,
     runCopy,
     runInstructions,
+    runPush,
     runHero,
     runSection,
     runSectionTitles,

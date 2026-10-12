@@ -19,5 +19,9 @@ declare module './generated/models/Cr854_deliverycardsModel' {
     cr854_pushlink?: string
     /** アプリ: 送る相手(all / members / inactive30 / notOpenedEmail) */
     cr854_audience?: string
+    /** アプリ: 通知のタイトル(メッセージのヘッドラインとは別) */
+    cr854_pushtitle?: string
+    /** アプリ: 通知の本文(メッセージのコピーとは別) */
+    cr854_pushbody?: string
   }
 }

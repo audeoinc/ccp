@@ -24,6 +24,7 @@ export function PushTimingPanel({ scheduledAt, link, onLink, audience, onAudienc
   const t = useT()
   const when = scheduledAt ? new Date(scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
   const kinds: { v: PushLinkKind; label: string }[] = [
+    { v: 'message', label: t('このメッセージ(アプリの中で開く)', 'This in-app message') },
     { v: 'campaign', label: t('配信のページ(特集)', 'Campaign page') },
     { v: 'product', label: t('紹介する商品のページ', 'Featured product page') },
     { v: 'category', label: t('カテゴリのページ', 'Category page') },

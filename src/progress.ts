@@ -1,6 +1,6 @@
 import type { Item } from './items'
 import { tr } from './i18n'
-import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
 
 const labelsNow = (): string[] => [
   tr('① テーマ', '1. Theme'),
@@ -14,8 +14,8 @@ const labelsNow = (): string[] => [
 const pushLabelsNow = (): string[] => [
   tr('① テーマ', '1. Theme'),
   tr('② テンプレート', '2. Template'),
-  tr('③ 文面', '3. Message'),
-  tr('④ 画像・商品', '4. Image & product'),
+  tr('③ 通知', '3. Notification'),
+  tr('④ メッセージ', '4. Message'),
   tr('⑤ 時刻・相手', '5. Timing & audience'),
 ]
 
@@ -46,14 +46,18 @@ export function progressOf(a: {
   headline: string
   items: Item[]
   instructions: string
-  /** アプリの配信カードのとき: 本文と、送る時刻・開く画面・送る相手がそろっているか */
-  push?: { copy: string; timing: boolean }
+  /** アプリの配信カードのとき: 通知のタイトル・本文と、送る時刻・開く画面・送る相手がそろっているか */
+  push?: { title: string; body: string; timing: boolean }
 }): Progress {
   if (a.push) {
-    // アプリ: テーマ / テンプレート / 文面(タイトル・本文)/ 画像・商品(テンプレートが求めるもの)/ 時刻・相手
-    const spec = getTemplate(a.template).push ?? getTemplate(DEFAULT_PUSH_TEMPLATE).push!
-    const visual = (!spec.image || !!a.heroId) && (!spec.product || a.items.length > 0)
-    const flags = [!!a.theme.trim(), true, !!a.headline.trim() && !!a.push.copy.trim(), visual, a.push.timing]
+    // アプリ: テーマ / テンプレート / 通知(タイトル・本文)/ メッセージ(メイン画像・ヘッドライン・セクションの枠)/ 時刻・相手
+    const secs = sectionsOf(a.template)
+    const filled = secs.every((sec) => {
+      const [from, to] = sectionRange(secs, sec, a.items.length)
+      return Math.max(0, to - from) >= sec.slots
+    })
+    const message = !!a.heroId && !!a.headline.trim() && filled
+    const flags = [!!a.theme.trim(), true, !!a.push.title.trim() && !!a.push.body.trim(), message, a.push.timing]
     const [theme, template, hero, sectionsOk, instructions] = flags
     return {
       theme,
@@ -111,11 +115,16 @@ export function cardProgress(
     cr854_channel?: number
     cr854_pushlink?: string
     cr854_audience?: string
+    cr854_pushtitle?: string
+    cr854_pushbody?: string
   },
   productCount: number,
 ): Progress {
   return progressOf({
-    push: card.cr854_channel === 588230001 ? { copy: card.cr854_copy ?? '', timing: !!card.cr854_pushlink && !!card.cr854_audience } : undefined,
+    push:
+      card.cr854_channel === 588230001
+        ? { title: card.cr854_pushtitle ?? '', body: card.cr854_pushbody ?? '', timing: !!card.cr854_pushlink && !!card.cr854_audience }
+        : undefined,
     theme: card.cr854_theme ?? '',
     template: card.cr854_layoutkey || (card.cr854_channel === 588230001 ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card.cr854_emailtemplate)),
     heroId: card._cr854_heroimage_value,

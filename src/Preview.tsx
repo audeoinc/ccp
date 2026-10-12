@@ -50,8 +50,11 @@ interface Props {
   onMove: (key: string, delta: number) => void
   /** index の位置へドロップされた(末尾は items.length) */
   onDropAt: (index: number, dt: DataTransfer) => void
-  /** アプリ: 通知を押したときに開く画面の種類(未設定は undefined) */
+  /** アプリ: 通知を押したときに開く画面の種類(未設定は undefined。この配信のメッセージとして見せる) */
   pushLinkKind?: string
+  /** アプリ: 通知のタイトル・本文(空なら、メッセージのヘッドライン・コピーで仮に見せる) */
+  pushTitle?: string
+  pushBody?: string
 }
 
 // メール・プッシュは受信側の見た目なので、テーマに依らず固定の配色にする
@@ -736,7 +739,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
 }
 
 function PushPreview(props: Props) {
-  const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind } = props
+  const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind, pushTitle, pushBody } = props
   // アプリのテンプレートの中身(画像・商品・ボタン)。アプリのテンプレートでなければ、以前と同じ(画像つき)
   const spec = getTemplate(template).push ?? { image: true, product: false, buttons: [] }
   const t = useT()
@@ -752,8 +755,8 @@ function PushPreview(props: Props) {
   const when = scheduledAt ? new Date(scheduledAt) : null
   const clock = when ? `${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')}` : '9:41'
   const dateText = when ? when.toLocaleDateString(locale(), { month: 'long', day: 'numeric', weekday: 'long' }) : ''
-  const title = headline || subject || t('(ヘッドライン未入力)', '(No headline)')
-  const bodyText = copy || t('(コピー未入力)', '(No copy)')
+  const title = pushTitle || headline || subject || t('(通知のタイトル未入力)', '(No notification title)')
+  const bodyText = pushBody || copy || t('(通知の本文未入力)', '(No notification body)')
   const hasJa = /[\u3000-\u9fff\uff00-\uffef]/.test(title)
   const titleFont = {
     fontFamily: HEADLINE_FONT.family,
@@ -849,12 +852,19 @@ function PushPreview(props: Props) {
         <div style={{ width: 96, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)', margin: '24px auto 0' }} />
       </div>
       {/* 通知を押したあとに開く画面(「⑤ 時刻・相手」の「開く画面」で決める) */}
-      <div style={{ fontSize: 14, fontWeight: 700 }}>{t('通知を押したあとに開く画面', 'Screen opened by the notification')}</div>
+      <div style={{ fontSize: 14, fontWeight: 700 }}>
+        {!pushLinkKind || pushLinkKind === 'message' ? t('通知を押すと開く、アプリのメッセージ', 'In-app message opened by the notification') : t('通知を押したあとに開く画面', 'Screen opened by the notification')}
+      </div>
       {pushLinkKind === 'product' && firstProduct ? (
         <div style={{ border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: 16, padding: 12, display: 'grid', gap: 8, ...scaled }}>
           <img draggable={false} src={productImage(firstProduct)} alt={firstProduct.cr854_name} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'contain', borderRadius: 12, backgroundColor: '#f1f1f4' }} />
           <div style={{ fontWeight: 700 }}>{firstProduct.cr854_name}</div>
           <div style={{ color: SUB }}>{t('商品のページ', 'Product page')}</div>
+        </div>
+      ) : !pushLinkKind || pushLinkKind === 'message' ? (
+        // アプリの中のメッセージ: メールと同じ部品を、スマートフォンの幅で
+        <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
+          <EmailPreview {...props} compact />
         </div>
       ) : pushLinkKind === 'campaign' ? (
         <EmailPreview {...props} compact />
@@ -866,7 +876,7 @@ function PushPreview(props: Props) {
               ? t('アプリのホームが開きます', 'Opens the app home')
               : pushLinkKind === 'custom'
                 ? t('指定した URL の画面が開きます', 'Opens the screen at the custom URL')
-                : t('「⑤ 時刻・相手」で、開く画面を決めてください', 'Choose where it opens in “5. Timing & audience”')}
+                : ''}
         </div>
       )}
       <div style={{ display: 'grid', gap: 6 }}>

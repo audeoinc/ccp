@@ -38,7 +38,6 @@ const COPY_PROMPT = `あなたは、ファッション通販の配信(メール�
 4. ヘッドラインとコピーは、組として自然につながるようにする。3 案は、切り口を変える(例: 季節感、商品の魅力、行動の呼びかけ)。angle には、その切り口を日本語 10 文字以内で書く。
 5. 商品名や価格を、そのまま羅列しない。誇大な表現や、根拠のない断定(「最安値」「絶対」など)は使わない。
 6. 既存のヘッドライン(card.headline)やコピー(card.copy)がある場合は、それとは別の案にする。
-7. card.channel が「プッシュ」(アプリの通知)のときは、headline を通知のタイトル(40 文字以内。英語も文字数で数える)、lead を通知の本文(120 文字以内。2〜3 行で読み切れる長さ)として書く。タイトルは、開きたくなる具体的な一言にし、本文で、何が・いつまでかを伝える。
 
 # 入力
 `
@@ -136,6 +135,32 @@ export async function suggestCopies(ctx: DraftContext): Promise<CopyIdea[]> {
     .filter((c) => c.headline)
     .map((c) => ({ headline: String(c.headline), lead: String(c.lead ?? ''), angle: String(c.angle ?? '') }))
   if (list.length === 0) throw new Error(tr('ヘッドラインとコピーの案を取得できませんでした', 'Could not get headline and copy ideas'))
+  return list
+}
+
+const PUSH_PROMPT = `あなたは、ファッション通販のアプリの通知(プッシュ通知)のコピーライターです。
+下の「入力」の JSON を読み、アプリの通知の「タイトル」と「本文」の組を、3 案、JSON だけで返してください。
+通知を押すと、アプリの中で、この配信のメッセージ(card.headline と card.copy が見出しの画面)が開きます。
+
+# 出力の形式(厳守)
+次の JSON オブジェクト 1 つだけを返す。JSON の外には、説明文、コードフェンス、前置き、あとがきを一切付けない。
+{"notifications":[{"title":"...","body":"...","angle":"..."}]}
+
+# ルール
+1. 言語は language に従う('ja' は日本語、'en' は英語)。'auto' のときは card.country に合わせる(US は英語、JP は日本語)。
+2. title は 40 文字以内(英語も文字数で数える)。開きたくなる、具体的な一言。メッセージの見出し(card.headline)の言い換えだけにしない。
+3. body は 120 文字以内。2〜3 行で読み切れる長さで、何が・いつまでか・押すと何が見られるかを伝える。
+4. 3 案は、切り口を変える(例: 季節感、商品の魅力、期限の呼びかけ)。angle には、その切り口を日本語 10 文字以内で書く。
+5. 誇大な表現や、根拠のない断定(「最安値」「絶対」など)は使わない。絵文字は使わない。
+
+# 入力
+`
+
+/** アプリの通知のタイトル・本文の案(メッセージのヘッドライン・コピーと同じ形で返す。案の画面を共通にするため) */
+export async function suggestPushNotifications(ctx: DraftContext): Promise<CopyIdea[]> {
+  const parsed = (await askAgent(PUSH_PROMPT, { task: 'suggest_push', ...contextPayload(ctx) })) as { notifications?: { title?: string; body?: string; angle?: string }[] }
+  const list = (parsed.notifications ?? []).filter((n) => n.title).map((n) => ({ headline: String(n.title), lead: String(n.body ?? ''), angle: String(n.angle ?? '') }))
+  if (list.length === 0) throw new Error(tr('通知の案を取得できませんでした', 'Could not get notification ideas'))
   return list
 }
 

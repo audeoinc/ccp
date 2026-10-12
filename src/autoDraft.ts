@@ -11,6 +11,7 @@ import {
 } from './aiSelect'
 import {
   suggestCopies,
+  suggestPushNotifications,
   suggestInstructions,
   suggestTemplate,
   suggestThemes,
@@ -45,6 +46,10 @@ export interface AutoDraftResult {
   sections: SectionProposal[]
   instructions?: string
   instructionIdeas: InstructionIdea[]
+  /** アプリ: 通知のタイトル・本文の案と、採用したもの */
+  pushIdeas?: CopyIdea[]
+  pushTitle?: string
+  pushBody?: string
   /** 途中で失敗した工程のメッセージ(成功した工程の結果は残る) */
   errors: string[]
   cancelled: boolean
@@ -113,7 +118,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   const heroReason = hero?.hero?.reason
 
   const sections = sectionsOf(result.template)
-  total = (isPush ? 3 : 4) + sections.length
+  total = 4 + sections.length
 
   // ③ ヘッドラインとコピー(組)
   const copies = await step(tr('ヘッドラインとコピーを考えています', 'Writing headline and copy'), () =>
@@ -157,8 +162,21 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
     })
   }
 
-  // ⑤ 制作指示(選ばれた商品とメイン画像を踏まえる)。アプリは、制作指示の工程がない
+  // ⑤ アプリは、制作指示の代わりに、通知のタイトル・本文(メッセージの中身を踏まえる)
   if (isPush) {
+    const notes = await step(tr('通知の文面を考えています', 'Writing the notification'), () =>
+      suggestPushNotifications({
+        card: withCopy,
+        language,
+        items: result.sections.flatMap((s) => s.selected).map((r) => ({ product: products.find((p) => p.cr854_productid === r.productId), reason: r.reason })),
+        hero: heroRow,
+      }),
+    )
+    if (notes?.length) {
+      result.pushIdeas = notes
+      result.pushTitle = notes[0].headline
+      result.pushBody = notes[0].lead
+    }
     onStep(tr('完了', 'Done'), total, total)
     return finish()
   }

@@ -81,6 +81,9 @@ interface Form {
   department: string
   status: string
   owner: string
+  /** アプリ: 通知のタイトル・本文 */
+  pushTitle: string
+  pushBody: string
   /** 制作の締め切り(YYYY-MM-DD) */
   productionDue: string
   productionOwner: string
@@ -106,6 +109,8 @@ const toForm = (c?: Cr854_deliverycards): Form => ({
   department: str(c?.cr854_department),
   status: c?.cr854_status === undefined ? String(statusOptions[0].value) : String(c.cr854_status),
   owner: c?.cr854_owner ?? '',
+  pushTitle: c?.cr854_pushtitle ?? '',
+  pushBody: c?.cr854_pushbody ?? '',
   productionDue: c?.cr854_productiondue?.slice(0, 10) ?? '',
   productionOwner: c?.cr854_productionowner ?? '',
   handedOffAt: c?.cr854_handedoffat ?? '',
@@ -581,6 +586,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       copyAngle: res.headline ? (res.copyIdeas[0]?.angle ?? '') : f.copyAngle,
       instructions: res.instructions ?? f.instructions,
       instructionsAngle: res.instructions ? (res.instructionIdeas[0]?.angle ?? '') : f.instructionsAngle,
+      pushTitle: res.pushTitle ?? f.pushTitle,
+      pushBody: res.pushBody ?? f.pushBody,
     }))
     const toItem = (r: { productId: string; reason: string }): Item => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })
     if (res.sections.some((sec) => sec.selected.length > 0)) {
@@ -602,6 +609,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       themeIdeas: res.themeIdeas,
       copyIdeas: res.copyIdeas,
       instructionIdeas: res.instructionIdeas,
+      pushIdeas: res.pushIdeas,
       titleCandidates: Object.fromEntries(res.sections.map((sec, i) => [i, sec.titles])),
       sectionCopyCandidates: Object.fromEntries(res.sections.map((sec, i) => [i, sec.copies])),
     })
@@ -739,6 +747,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         cr854_links: encodeLinks(links),
         cr854_pushlink: pushLink ? JSON.stringify(pushLink) : '',
         cr854_audience: audience,
+        cr854_pushtitle: form.pushTitle,
+        cr854_pushbody: form.pushBody,
         cr854_productionowner: form.productionOwner.trim(),
         cr854_handedoffat: form.handedOffAt || (null as never),
         cr854_theme: form.theme,
@@ -785,7 +795,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     headline: form.headline,
     items,
     instructions: form.instructions,
-    push: templateChannel === 'push' ? { copy: form.copy, timing: !!pushLink && !!audience } : undefined,
+    push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody, timing: !!pushLink && !!audience } : undefined,
   })
   const hero = heroes.find((h) => h.cr854_heroimageid === heroId)
 
@@ -989,6 +999,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 onPushLink={setPushLink}
                 audience={audience}
                 onAudience={setAudience}
+                pushTitle={form.pushTitle}
+                pushBody={form.pushBody}
+                onPush={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
                 scheduledAt={form.scheduledAt}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
               />
@@ -1041,6 +1054,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                   <Preview
                     channel={previewTab}
                     pushLinkKind={pushLink?.kind}
+                    pushTitle={form.pushTitle}
+                    pushBody={form.pushBody}
                     subject={form.name}
                     headline={form.headline}
                     copy={form.copy}

@@ -74,6 +74,21 @@ export function mockAgent(message: string): string {
         ] })
   }
 
+  if (task === 'suggest_push') {
+    const name = String(card.name ?? '')
+    return en
+      ? J({ notifications: [
+          { title: `${name}: new picks are in`, body: 'Tap to see this week’s picks, chosen for cool mornings. Ends Sunday.', angle: 'Product appeal' },
+          { title: 'Cozy layers for chilly days', body: 'Fresh fall layers just landed. See the full edit in the app.', angle: 'Seasonal' },
+          { title: 'Last chance this week', body: 'Our picks are going fast — check them out before Sunday.', angle: 'Urgency' },
+        ] })
+      : J({ notifications: [
+          { title: `${name}: 新しいおすすめが届きました`, body: '肌寒い朝に合う、今週のおすすめをアプリでチェック。日曜まで。', angle: '商品の魅力' },
+          { title: '肌寒い日の、重ね着の新作', body: '秋の新作が入荷しました。特集をアプリで見られます。', angle: '季節感' },
+          { title: '今週のおすすめは日曜まで', body: '人気の商品から売り切れています。お早めにチェックしてください。', angle: '期限' },
+        ] })
+  }
+
   if (task === 'suggest_tasks') {
     // 返信の文を、そのまま「やること」にする(撮影用の簡単な身代わり)
     const reply = String(p.reply ?? '')
