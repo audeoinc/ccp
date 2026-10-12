@@ -785,7 +785,8 @@ function PushPreview(props: Props) {
       draggable={false}
       src={heroSrc}
       alt={heroAlt}
-      style={{ width: '100%', aspectRatio: style === 'ios' ? '16 / 9' : '2 / 1', objectFit: 'cover', borderRadius: style === 'ios' ? 16 : 24, display: 'block', backgroundColor: '#e9e9ee', marginTop: 8 }}
+      // 写真は切らずに、全体を見せる(縦長の商品の写真でも、頭や裾が切れないように)。商品は縦長が多いので、枠も少し高くする
+      style={{ width: '100%', aspectRatio: spec.product ? '4 / 3' : style === 'ios' ? '16 / 9' : '2 / 1', objectFit: 'contain', borderRadius: style === 'ios' ? 16 : 24, display: 'block', backgroundColor: '#e9e9ee', marginTop: 8 }}
     />
   )
 
