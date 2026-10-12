@@ -36,7 +36,7 @@ import { Cr854_deliveryproductsService } from './generated/services/Cr854_delive
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
-import { WeekView } from './WeekView'
+import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -59,6 +59,7 @@ const weekLabel = (start: Date) => {
 // 表示の切り替え(月のカレンダー / 週 / 表の一覧)。ブラウザごとに覚える
 type View = 'month' | 'week' | 'list'
 const VIEW_KEY = 'calendar.view'
+const LENS_KEY = 'week.lens'
 const COLUMNS_KEY = 'list.columns'
 
 interface Filters {
@@ -276,6 +277,10 @@ function App() {
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未完了のタスクの数(一覧の列・週の表示)
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
+  // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
+  const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
+  // 週の表示の見方: 商品のバランス / 進み具合。ブラウザごとに覚える
+  const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
 
@@ -300,14 +305,21 @@ function App() {
           if (!res.success) return
           const counts = new Map<string, number>()
           const tasks = new Map<string, number>()
+          const overdue = new Map<string, number>()
+          const d = new Date()
+          const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           for (const n of res.data ?? []) {
             const id = n._cr854_deliverycard_value
             if (!id || n.cr854_resolved) continue
-            if (n.cr854_kind === 'task') tasks.set(id, (tasks.get(id) ?? 0) + 1)
+            if (n.cr854_kind === 'task') {
+              tasks.set(id, (tasks.get(id) ?? 0) + 1)
+              if (n.cr854_due && n.cr854_due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
+            }
             else counts.set(id, (counts.get(id) ?? 0) + 1)
           }
           setQuestionCounts(counts)
           setTaskCounts(tasks)
+          setOverdueTasks(overdue)
         })
         .catch(() => undefined)
       const res = await Cr854_deliverycardsService.getAll({ orderBy: ['cr854_scheduledat asc'] })
@@ -518,6 +530,24 @@ function App() {
                   {t('一覧', 'List')}
                 </ToggleButton>
               </div>
+              {view === 'week' && (
+                <div className={styles.viewSwitch} role="group" aria-label={t('見方', 'Lens')}>
+                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
+                    <ToggleButton
+                      key={v}
+                      size="small"
+                      checked={lens === v}
+                      appearance={lens === v ? 'primary' : 'subtle'}
+                      onClick={() => {
+                        setLens(v)
+                        savePref(LENS_KEY, v)
+                      }}
+                    >
+                      {name}
+                    </ToggleButton>
+                  ))}
+                </div>
+              )}
               {view === 'list' && (
                 <Menu
                   checkedValues={{ columns }}
@@ -569,6 +599,8 @@ function App() {
                 cardProducts={cardProducts}
                 questionCounts={questionCounts}
                 taskCounts={taskCounts}
+                overdueTasks={overdueTasks}
+                lens={lens}
                 products={products}
                 heroes={heroes}
                 dueSoon={dueSoon}

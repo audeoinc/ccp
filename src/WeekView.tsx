@@ -1,6 +1,19 @@
 import { useState } from 'react'
 import { Popover, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, CheckmarkCircleFilled, EyeRegular, MailRegular, PhoneRegular, QuestionCircleRegular, TaskListLtrRegular, WarningFilled } from '@fluentui/react-icons'
+import {
+  AddRegular,
+  CalendarRegular,
+  CheckmarkCircleFilled,
+  CircleRegular,
+  EyeRegular,
+  MailRegular,
+  PersonRegular,
+  PhoneRegular,
+  QuestionCircleFilled,
+  TaskListLtrRegular,
+  WarningFilled,
+  WrenchRegular,
+} from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
@@ -12,6 +25,9 @@ import { cardProgress } from './progress'
 import { statusColor, statusOptions } from './status'
 import { getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
 
+/** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る */
+export type WeekLens = 'products' | 'progress'
+
 interface Props {
   /** 週の初め(日曜日) */
   start: Date
@@ -22,6 +38,9 @@ interface Props {
   questionCounts: Map<string, number>
   /** 配信カードごとの、未完了のタスクの数 */
   taskCounts: Map<string, number>
+  /** 配信カードごとの、期日を過ぎた未完了のタスクの数 */
+  overdueTasks: Map<string, number>
+  lens: WeekLens
   products: Cr854_products[]
   heroes: Cr854_heroimages[]
   dueSoon?: Set<string>
@@ -54,6 +73,7 @@ const parseCopies = (v?: string): string[] => {
   }
   return v.split('\n')
 }
+const firstName = (name?: string) => (name ?? '').trim().split(/\s+/)[0] ?? ''
 
 const useStyles = makeStyles({
   root: {
@@ -103,7 +123,6 @@ const useStyles = makeStyles({
   card: {
     flexShrink: 0,
     display: 'grid',
-    rowGap: '4px',
     textAlign: 'left',
     padding: 0,
     overflow: 'hidden',
@@ -121,18 +140,31 @@ const useStyles = makeStyles({
   stripPush: { backgroundColor: tokens.colorPaletteBerryBackground2, color: tokens.colorPaletteBerryForeground2 },
   stripNone: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground3 },
   stripTime: { marginLeft: 'auto', fontWeight: tokens.fontWeightRegular },
-  inner: { display: 'grid', rowGap: '4px', padding: '2px 8px 8px', minWidth: 0 },
-  line: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden' },
-  dot: { width: '7px', height: '7px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
+  inner: { display: 'grid', rowGap: '5px', padding: '6px 8px 8px', minWidth: 0 },
+  nameRow: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
+  dot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   name: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  sub: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  subLabel: { color: tokens.colorNeutralForeground3 },
-  warn: { color: tokens.colorPaletteDarkOrangeForeground1, verticalAlign: 'text-bottom', marginRight: '2px' },
-  // メイン画像と、掲載商品の全点(セクションごと)。画像は切らずに全体を見せる
+  // 問題があるときだけ出す印(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)
+  issues: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
+  issue: { display: 'inline-flex', alignItems: 'center', columnGap: '3px', padding: '1px 6px', borderRadius: tokens.borderRadiusCircular, fontSize: '10px', fontWeight: tokens.fontWeightSemibold, lineHeight: '16px', whiteSpace: 'nowrap' },
+  issueWarn: { backgroundColor: tokens.colorPaletteDarkOrangeBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
+  issueBad: { backgroundColor: tokens.colorPaletteRedBackground1, color: tokens.colorPaletteRedForeground1 },
+  // 進み具合: 工程の棒
+  progressRow: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  bar: { flexGrow: 1, height: '4px', borderRadius: '2px', backgroundColor: tokens.colorNeutralBackground5, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: '2px' },
+  text: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  textStrong: { color: tokens.colorNeutralForeground1, fontWeight: tokens.fontWeightSemibold },
+  // 進み具合: アイコンと短い値の並び
+  facts: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '6px', rowGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2 },
+  fact: { display: 'inline-flex', alignItems: 'center', columnGap: '3px', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '& svg': { flexShrink: 0, color: tokens.colorNeutralForeground3 } },
+  faint: { color: tokens.colorNeutralForeground4, '& svg': { color: tokens.colorNeutralForeground4 } },
+  good: { color: tokens.colorPaletteGreenForeground1, '& svg': { color: tokens.colorPaletteGreenForeground1 } },
+  // 商品: メイン画像と、掲載商品の全点(セクションごと)。画像は切らずに全体を見せる
   hero: { width: '100%', aspectRatio: '16 / 9', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3, overflow: 'hidden' },
   img: { display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
-  secLabel: { fontSize: '10px', color: tokens.colorNeutralForeground3, marginTop: '2px' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '3px' },
+  secLabel: { fontSize: '10px', color: tokens.colorNeutralForeground3 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '3px' },
   thumb: {
     aspectRatio: '3 / 4',
     borderRadius: tokens.borderRadiusSmall,
@@ -158,11 +190,7 @@ const useStyles = makeStyles({
   pushTitle: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   pushBody: { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   empty: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, fontStyle: 'italic' },
-  foot: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '8px', rowGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, paddingTop: '2px', borderTop: `1px solid ${tokens.colorNeutralStroke3}` },
-  footItem: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', whiteSpace: 'nowrap' },
-  done: { color: tokens.colorPaletteGreenForeground1 },
-  open: { color: tokens.colorPaletteDarkOrangeForeground1 },
-  peek: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', marginLeft: 'auto', color: tokens.colorBrandForeground1, cursor: 'zoom-in' },
+  peek: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', justifySelf: 'end', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1, cursor: 'zoom-in' },
   // マウスを重ねたときに出す、実際のメールの見た目
   previewBox: { width: '360px', maxHeight: 'min(80vh, 900px)', overflowY: 'auto', backgroundColor: '#ffffff' },
   previewInner: { zoom: 0.6 },
@@ -170,8 +198,13 @@ const useStyles = makeStyles({
 
 const noop = () => undefined
 
-/** 1 週間の配信を横に並べる。週の計画を、まとめて見比べる(商品のかぶり・バランス、メールとアプリ、進み具合)ため */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, products, heroes, dueSoon, onSelect, onCreate }: Props) {
+/**
+ * 1 週間の配信を横に並べる。見方(lens)を切り替えて、目的に合う情報だけを出す。
+ * - 商品: メイン画像と掲載商品の全点(かぶり・バランスを見る)
+ * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
+ * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
+ */
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, overdueTasks, lens, products, heroes, dueSoon, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -207,17 +240,18 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
   )
 
   const card = (c: Cr854_deliverycards) => {
-    const ids = cardProducts.get(c.cr854_deliverycardid) ?? []
+    const id = c.cr854_deliverycardid
+    const ids = cardProducts.get(id) ?? []
     const heroRow = heroes.find((h) => h.cr854_heroimageid === c._cr854_heroimage_value)
     const hero = heroImage(heroRow)
     const time = new Date(c.cr854_scheduledat!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
     const templateId = c.cr854_layoutkey || templateFromValue(c.cr854_emailtemplate)
     const progress = cardProgress(c, ids.length)
-    const questions = questionCounts.get(c.cr854_deliverycardid) ?? 0
-    const tasks = taskCounts.get(c.cr854_deliverycardid) ?? 0
+    const questions = questionCounts.get(id) ?? 0
+    const tasks = taskCounts.get(id) ?? 0
+    const overdue = overdueTasks.get(id) ?? 0
     const isPush = c.cr854_channel === PUSH
     const channel = c.cr854_channel === EMAIL ? 'email' : isPush ? 'push' : 'none'
-    // セクションごとに、商品を分ける(テンプレートの構成どおり)
     const sections = sectionsOf(templateId)
     const titles = (c.cr854_sectiontitles ?? '').split('\n')
     const groups = sections
@@ -227,118 +261,153 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       })
       .filter((g) => g.ids.length > 0)
     const hasVisual = !!hero || ids.length > 0
-    const items: Item[] = ids.map((id, i) => ({ key: `${id}-${i}`, productId: id, reason: '', source: SOURCE_MANUAL }))
+    const hasPushText = isPush && !!(c.cr854_headline || c.cr854_copy)
+    const items: Item[] = ids.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
+    const ratio = progress.total ? progress.done / progress.total : 0
+
+    const issues = (
+      <>
+        {dueSoon?.has(id) && (
+          <span className={mergeClasses(styles.issue, styles.issueWarn)}>
+            <WarningFilled />
+            {t('締切間近・未着手', 'Due soon, not started')}
+          </span>
+        )}
+        {overdue > 0 && (
+          <span className={mergeClasses(styles.issue, styles.issueBad)}>
+            <TaskListLtrRegular />
+            {t(`期日超過 ${overdue}`, `${overdue} overdue`)}
+          </span>
+        )}
+        {questions > 0 && (
+          <span className={mergeClasses(styles.issue, styles.issueWarn)}>
+            <QuestionCircleFilled />
+            {t(`未解決 ${questions}`, `${questions} open Q`)}
+          </span>
+        )}
+      </>
+    )
+    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0
+
+    const pushBox = hasPushText && (
+      <div className={styles.push}>
+        <span className={styles.pushTitle}>{c.cr854_headline || c.cr854_name}</span>
+        {c.cr854_copy && <span className={styles.pushBody}>{c.cr854_copy}</span>}
+      </div>
+    )
+
+    const peek = hasVisual && (
+      <Popover openOnHover mouseLeaveDelay={100} positioning="after" withArrow>
+        <PopoverTrigger disableButtonEnhancement>
+          <span className={styles.peek} onClick={(e) => e.stopPropagation()}>
+            <EyeRegular />
+            {t('プレビュー', 'Preview')}
+          </span>
+        </PopoverTrigger>
+        <PopoverSurface>
+          <div className={styles.previewBox}>
+            <div className={styles.previewInner}>
+              <Preview
+                channel={isPush ? 'push' : 'email'}
+                subject={c.cr854_name}
+                headline={c.cr854_headline ?? ''}
+                copy={c.cr854_copy ?? ''}
+                items={items}
+                products={products}
+                selectedKey={null}
+                showHeadings
+                template={templateId}
+                scheduledAt={c.cr854_scheduledat ?? ''}
+                sectionTitles={titles}
+                onSectionTitle={noop}
+                sectionCopies={parseCopies(c.cr854_sectioncopies)}
+                onSectionCopy={noop}
+                hero={heroRow}
+                onDropHero={noop}
+                onClearHero={noop}
+                onSelect={noop}
+                onRemove={noop}
+                onMove={noop}
+                onDropAt={noop}
+              />
+            </div>
+          </div>
+        </PopoverSurface>
+      </Popover>
+    )
 
     return (
-      <button key={c.cr854_deliverycardid} type="button" className={styles.card} onClick={() => onSelect(c.cr854_deliverycardid)} title={c.cr854_name}>
+      <button key={id} type="button" className={styles.card} onClick={() => onSelect(id)} title={c.cr854_name}>
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
           {channel === 'push' ? <PhoneRegular /> : <MailRegular />}
           {channel === 'email' ? t('メール', 'Email') : channel === 'push' ? t('アプリ', 'App') : t('チャネル未設定', 'No channel')}
           <span className={styles.stripTime}>{time}</span>
         </div>
         <div className={styles.inner}>
-          <div className={styles.line}>
-            <span className={styles.dot} style={{ backgroundColor: statusColor(c.cr854_status) }} />
-            {label(statusOptions, c.cr854_status)}
-            <span>· {t(`工程 ${progress.done}/${progress.total}`, `Steps ${progress.done}/${progress.total}`)}</span>
-            {!isPush && <span>· {getTemplate(templateId).label}</span>}
+          <div className={styles.nameRow}>
+            <span className={styles.dot} style={{ backgroundColor: statusColor(c.cr854_status) }} title={label(statusOptions, c.cr854_status)} />
+            <span className={styles.name}>{c.cr854_name}</span>
           </div>
-          <span className={styles.name}>
-            {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('締め切りが近いのに未着手', 'Due soon — not started')} />}
-            {c.cr854_name}
-          </span>
-          {c.cr854_theme && (
-            <span className={styles.sub} title={c.cr854_theme}>
-              <span className={styles.subLabel}>{t('テーマ: ', 'Theme: ')}</span>
-              {c.cr854_theme}
-            </span>
-          )}
-          {!isPush && c.cr854_headline && (
-            <span className={styles.sub} title={c.cr854_headline}>
-              <span className={styles.subLabel}>{t('ヘッドライン: ', 'Headline: ')}</span>
-              {c.cr854_headline}
-            </span>
-          )}
-          {isPush && (c.cr854_headline || c.cr854_copy) && (
-            <div className={styles.push}>
-              <span className={styles.pushTitle}>{c.cr854_headline || c.cr854_name}</span>
-              {c.cr854_copy && <span className={styles.pushBody}>{c.cr854_copy}</span>}
-            </div>
-          )}
-          {hasVisual ? (
+          {hasIssues && <div className={styles.issues}>{issues}</div>}
+
+          {lens === 'products' ? (
             <>
-              {hero && <div className={styles.hero}><img className={styles.img} src={hero} alt="" draggable={false} /></div>}
-              {groups.map((g, i) => (
-                <div key={i}>
-                  <div className={styles.secLabel}>{`${g.label} · ${g.ids.length}`}</div>
-                  {thumbs(g.ids)}
-                </div>
-              ))}
+              {pushBox}
+              {hasVisual ? (
+                <>
+                  {hero && <div className={styles.hero}><img className={styles.img} src={hero} alt="" draggable={false} /></div>}
+                  {groups.map((g, i) => (
+                    <div key={i}>
+                      <div className={styles.secLabel}>{`${g.label} · ${g.ids.length}`}</div>
+                      {thumbs(g.ids)}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                !hasPushText && <span className={styles.empty}>{t('まだ中身がありません', 'No content yet')}</span>
+              )}
             </>
           ) : (
-            !(isPush && (c.cr854_headline || c.cr854_copy)) && <span className={styles.empty}>{t('まだ中身がありません', 'No content yet')}</span>
+            <>
+              <div className={styles.progressRow}>
+                {label(statusOptions, c.cr854_status)}
+                <span className={styles.bar} aria-hidden>
+                  <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(ratio * 100)}%`, backgroundColor: statusColor(c.cr854_status) }} />
+                </span>
+                {`${progress.done}/${progress.total}`}
+              </div>
+              {c.cr854_theme && <span className={styles.text} title={c.cr854_theme}>{c.cr854_theme}</span>}
+              {c.cr854_headline && (
+                <span className={mergeClasses(styles.text, styles.textStrong)} title={c.cr854_headline}>
+                  {c.cr854_headline}
+                </span>
+              )}
+              {!isPush && <span className={styles.text}>{`${getTemplate(templateId).label} · ${t(`商品 ${ids.length}`, `${ids.length} products`)}`}</span>}
+              <div className={styles.facts}>
+                <span className={mergeClasses(styles.fact, !c.cr854_owner && styles.faint)} title={t('企画の担当者', 'Owner')}>
+                  <PersonRegular />
+                  {firstName(c.cr854_owner) || '—'}
+                </span>
+                <span className={mergeClasses(styles.fact, !c.cr854_productionowner && styles.faint)} title={t('制作の担当者', 'Production assignee')}>
+                  <WrenchRegular />
+                  {firstName(c.cr854_productionowner) || '—'}
+                </span>
+                <span className={mergeClasses(styles.fact, !c.cr854_productiondue && styles.faint)} title={t('制作の締め切り', 'Production due')}>
+                  <CalendarRegular />
+                  {shortDate(c.cr854_productiondue) || '—'}
+                </span>
+                <span className={mergeClasses(styles.fact, c.cr854_handedoffat ? styles.good : styles.faint)} title={t('制作への引き継ぎ', 'Handoff')}>
+                  {c.cr854_handedoffat ? <CheckmarkCircleFilled /> : <CircleRegular />}
+                  {c.cr854_handedoffat ? t('引き継ぎ済', 'Handed off') : t('未引き継ぎ', 'Not handed off')}
+                </span>
+                <span className={mergeClasses(styles.fact, !tasks && styles.faint)} title={t('未完了のタスク', 'Open tasks')}>
+                  <TaskListLtrRegular />
+                  {tasks ? t(`タスク ${tasks}`, `${tasks} task${tasks === 1 ? '' : 's'}`) : t('タスクなし', 'No tasks')}
+                </span>
+              </div>
+            </>
           )}
-          <div className={styles.foot}>
-            {c.cr854_owner && <span className={styles.footItem}>{c.cr854_owner}</span>}
-            {c.cr854_productiondue && <span className={styles.footItem}>{t(`締切 ${shortDate(c.cr854_productiondue)}`, `Due ${shortDate(c.cr854_productiondue)}`)}</span>}
-            {c.cr854_handedoffat && (
-              <span className={mergeClasses(styles.footItem, styles.done)}>
-                <CheckmarkCircleFilled />
-                {t('引き継ぎ済み', 'Handed off')}
-              </span>
-            )}
-            {questions > 0 && (
-              <span className={mergeClasses(styles.footItem, styles.open)}>
-                <QuestionCircleRegular />
-                {questions}
-              </span>
-            )}
-            {tasks > 0 && (
-              <span className={mergeClasses(styles.footItem, styles.open)} title={t('未完了のタスク', 'Open tasks')}>
-                <TaskListLtrRegular />
-                {tasks}
-              </span>
-            )}
-            {hasVisual && (
-              <Popover openOnHover mouseLeaveDelay={100} positioning="after" withArrow>
-                <PopoverTrigger disableButtonEnhancement>
-                  <span className={styles.peek} onClick={(e) => e.stopPropagation()}>
-                    <EyeRegular />
-                    {t('プレビュー', 'Preview')}
-                  </span>
-                </PopoverTrigger>
-                <PopoverSurface>
-                  <div className={styles.previewBox}>
-                    <div className={styles.previewInner}>
-                      <Preview
-                        channel={isPush ? 'push' : 'email'}
-                        subject={c.cr854_name}
-                        headline={c.cr854_headline ?? ''}
-                        copy={c.cr854_copy ?? ''}
-                        items={items}
-                        products={products}
-                        selectedKey={null}
-                        showHeadings
-                        template={templateId}
-                        scheduledAt={c.cr854_scheduledat ?? ''}
-                        sectionTitles={titles}
-                        onSectionTitle={noop}
-                        sectionCopies={parseCopies(c.cr854_sectioncopies)}
-                        onSectionCopy={noop}
-                        hero={heroRow}
-                        onDropHero={noop}
-                        onClearHero={noop}
-                        onSelect={noop}
-                        onRemove={noop}
-                        onMove={noop}
-                        onDropAt={noop}
-                      />
-                    </div>
-                  </div>
-                </PopoverSurface>
-              </Popover>
-            )}
-          </div>
+          {peek}
         </div>
       </button>
     )
