@@ -232,7 +232,31 @@ const useStyles = makeStyles({
   // 週の見出しの幅は、言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
   weekLabelJa: { width: '236px' },
-  weekTop: { display: 'flex', alignItems: 'center', columnGap: '12px', marginBottom: '8px', '& > :first-child': { flexGrow: 1, marginBottom: 0 } },
+  // 「週」の隣の、見方の小さな切り替え(週の下位の選択だと分かるよう、枠で囲んで小さく)
+  lensSwitch: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '2px',
+    padding: '2px',
+    marginLeft: '2px',
+    marginRight: '6px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorBrandStroke2}`,
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  lensBtn: {
+    border: 'none',
+    borderRadius: tokens.borderRadiusSmall,
+    padding: `1px ${tokens.spacingHorizontalS}`,
+    backgroundColor: 'transparent',
+    color: tokens.colorBrandForeground2,
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  lensBtnOn: { backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold, boxShadow: tokens.shadow2 },
   viewSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: tokens.spacingHorizontalM },
 })
 
@@ -574,6 +598,25 @@ function App() {
                 <ToggleButton size="small" checked={view === 'week'} appearance={view === 'week' ? 'primary' : 'subtle'} onClick={() => changeView('week')}>
                   {t('週', 'Week')}
                 </ToggleButton>
+                {/* 週の見方(週の表示だけのもの)は、「週」のすぐ隣に置く(週を選んだあと、そのまま切り替えられるように) */}
+                {view === 'week' && (
+                  <div className={styles.lensSwitch} role="group" aria-label={t('見方', 'Lens')}>
+                    {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={lens === v}
+                        className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
+                        onClick={() => {
+                          setLens(v)
+                          savePref(LENS_KEY, v)
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <ToggleButton size="small" checked={view === 'list'} appearance={view === 'list' ? 'primary' : 'subtle'} onClick={() => changeView('list')}>
                   {t('一覧', 'List')}
                 </ToggleButton>
@@ -624,26 +667,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <div className={styles.weekTop}>
-                <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />
-                {/* 見方(週の表示だけのもの)は、週の帯の右に置く */}
-                <div className={styles.viewSwitch} role="group" aria-label={t('見方', 'Lens')}>
-                    {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
-                      <ToggleButton
-                        key={v}
-                        size="small"
-                        checked={lens === v}
-                        appearance={lens === v ? 'primary' : 'subtle'}
-                        onClick={() => {
-                          setLens(v)
-                          savePref(LENS_KEY, v)
-                        }}
-                      >
-                        {name}
-                      </ToggleButton>
-                    ))}
-                  </div>
-              </div>
+              <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
