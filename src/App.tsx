@@ -175,7 +175,7 @@ const useStyles = makeStyles({
     margin: '0 auto',
     padding: `${tokens.spacingVerticalXXL} ${tokens.spacingHorizontalL}`,
   },
-  // 週・一覧は、横に情報が多いので、画面の幅いっぱいまで使う
+  // 横に情報が多いので、画面の幅を広く使う(月・週・一覧で、表の幅をそろえる)
   containerWide: { maxWidth: '1600px' },
   center: { textAlign: 'center', padding: `${tokens.spacingVerticalXXXL} 0` },
   alert: { marginBottom: tokens.spacingVerticalL },
@@ -232,6 +232,7 @@ const useStyles = makeStyles({
   // 週の見出しの幅は、言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
   weekLabelJa: { width: '236px' },
+  weekTop: { display: 'flex', alignItems: 'center', columnGap: '12px', marginBottom: '8px', '& > :first-child': { flexGrow: 1, marginBottom: 0 } },
   viewSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: tokens.spacingHorizontalM },
 })
 
@@ -539,7 +540,7 @@ function App() {
           {t('新規作成', 'New')}
         </Button>
       </header>
-      <div className={mergeClasses(styles.container, view !== 'month' && styles.containerWide)}>
+      <div className={mergeClasses(styles.container, styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
         {error && (
           <MessageBar layout="multiline" intent="error" className={styles.alert}>
@@ -577,24 +578,6 @@ function App() {
                   {t('一覧', 'List')}
                 </ToggleButton>
               </div>
-              {view === 'week' && (
-                <div className={styles.viewSwitch} role="group" aria-label={t('見方', 'Lens')}>
-                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
-                    <ToggleButton
-                      key={v}
-                      size="small"
-                      checked={lens === v}
-                      appearance={lens === v ? 'primary' : 'subtle'}
-                      onClick={() => {
-                        setLens(v)
-                        savePref(LENS_KEY, v)
-                      }}
-                    >
-                      {name}
-                    </ToggleButton>
-                  ))}
-                </div>
-              )}
               {view === 'list' && (
                 <Menu
                   checkedValues={{ columns }}
@@ -641,7 +624,26 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />
+              <div className={styles.weekTop}>
+                <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />
+                {/* 見方(週の表示だけのもの)は、週の帯の右に置く */}
+                <div className={styles.viewSwitch} role="group" aria-label={t('見方', 'Lens')}>
+                    {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
+                      <ToggleButton
+                        key={v}
+                        size="small"
+                        checked={lens === v}
+                        appearance={lens === v ? 'primary' : 'subtle'}
+                        onClick={() => {
+                          setLens(v)
+                          savePref(LENS_KEY, v)
+                        }}
+                      >
+                        {name}
+                      </ToggleButton>
+                    ))}
+                  </div>
+              </div>
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
