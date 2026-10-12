@@ -139,10 +139,8 @@ export type TemplateChannel = 'email' | 'push'
 
 /** アプリ(プッシュ通知)のテンプレートの中身 */
 export interface PushSpec {
-  /** 通知に画像を付ける(メッセージのメイン画像) */
+  /** 通知に画像を付ける。画像は、メッセージのメイン画像(通知と、開いたメッセージの見た目をつなげるため) */
   image: boolean
-  /** 商品 1 点を紹介する(通知の画像は、メッセージの先頭の商品の画像) */
-  product: boolean
   /** 通知のボタン(アクション)の文言。空なら、ボタンなし */
   buttons: string[]
 }
@@ -348,7 +346,7 @@ BUILTIN['push-text'] = {
     return tr('通知はテキストだけ。メッセージは、メイン画像 + 見出し・コピー + ボタン。お知らせ・リマインドに。', 'Text-only notification. Message: main image, headline and copy, and a button. For announcements and reminders.')
   },
   channel: 'push',
-  push: { image: false, product: false, buttons: [] },
+  push: { image: false, buttons: [] },
   hero: 'standard',
   heroText: 'below',
   heroButtons: 1,
@@ -363,7 +361,7 @@ BUILTIN['push-image'] = {
     return tr('通知は画像つき。メッセージは、メイン画像 + 2 列のグリッド 4 点 + ボタン。特集・新作の告知に。', 'Notification with image. Message: main image, a 2-column grid of 4, and a button. For features and new arrivals.')
   },
   channel: 'push',
-  push: { image: true, product: false, buttons: [] },
+  push: { image: true, buttons: [] },
   hero: 'standard',
   heroText: 'below',
   sections: [{ kind: 'grid', slots: 4, buttons: 1 }],
@@ -374,11 +372,11 @@ BUILTIN['push-product'] = {
     return tr('商品の紹介', 'Product spotlight')
   },
   get description() {
-    return tr('通知は商品 1 点の画像 + ボタン 2 つ(見る / あとで)。メッセージは、大きく 1 点 + 関連の商品 2 点。値下げ・再入荷に。', 'Notification with one product and two buttons (View / Later). Message: one large product and two related items. For price drops and restocks.')
+    return tr('通知は画像つき + ボタン 2 つ(見る / あとで)。メッセージは、大きく 1 点 + 関連の商品 2 点。値下げ・再入荷に。商品の写真をメイン画像に選ぶと、通知にも出ます。', 'Notification with image and two buttons (View / Later). Message: one large product and two related items. For price drops and restocks. Pick the product photo as the main image to show it in the notification too.')
   },
   channel: 'push',
   get push() {
-    return { image: false, product: true, buttons: [tr('見る', 'View'), tr('あとで', 'Later')] }
+    return { image: true, buttons: [tr('見る', 'View'), tr('あとで', 'Later')] }
   },
   hero: 'standard',
   heroText: 'below',
@@ -396,7 +394,7 @@ BUILTIN['push-sale'] = {
     return tr('通知は画像つき。メッセージは、お知らせ帯 + 大きく 1 点 + グリッド 4 点 + ボタン 2 つ。期間限定のセールに。', 'Notification with image. Message: a top bar, one large item, a grid of 4, and two buttons. For limited-time sales.')
   },
   channel: 'push',
-  push: { image: true, product: false, buttons: [] },
+  push: { image: true, buttons: [] },
   hero: 'offer',
   heroText: 'overlay',
   topBar: true,

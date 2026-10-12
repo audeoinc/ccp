@@ -72,7 +72,8 @@ const parsePush = (raw: unknown): PushSpec | undefined => {
   const o = raw as { image?: unknown; product?: unknown; buttons?: unknown } | undefined
   if (!o || typeof o !== 'object') return undefined
   const buttons = Array.isArray(o.buttons) ? o.buttons.filter((b): b is string => typeof b === 'string' && !!b.trim()).map((b) => b.trim().slice(0, MAX_BUTTON_LABEL)).slice(0, 2) : []
-  return { image: !!o.image, product: !!o.product, buttons }
+  // 以前の「商品 1 点」の形は、画像つき(メイン画像)として読む
+  return { image: !!o.image || !!o.product, buttons }
 }
 
 /** ボタンを保存する形に整える。既定の値(塗り、配信のページ、既定の文言)は書かない */
@@ -168,7 +169,7 @@ function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons'
   const buttonsAt = (at: number): StoredButtons[] =>
     blocks.filter((b) => Math.max(0, Math.min(b.at, layout.sections.length)) === at).map((b) => ({ kind: 'buttons', buttons: b.buttons.slice(0, MAX_BUTTONS_PER_BLOCK).map(toStoredButton) }))
   const parts = [...buttonsAt(0), ...layout.sections.flatMap((sec, i) => [toStored(sec), ...buttonsAt(i + 1)])]
-  const app: AppMeta[] = layout.push ? [{ kind: 'app', push: { image: layout.push.image, product: layout.push.product, buttons: layout.push.buttons.map((b) => b.trim()).filter(Boolean).slice(0, 2) } }] : []
+  const app: AppMeta[] = layout.push ? [{ kind: 'app', push: { image: layout.push.image, buttons: layout.push.buttons.map((b) => b.trim()).filter(Boolean).slice(0, 2) } }] : []
   return JSON.stringify(Object.keys(meta).length > 1 || app.length ? [...app, ...(Object.keys(meta).length > 1 ? [meta] : []), ...parts] : parts)
 }
 

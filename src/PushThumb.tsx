@@ -19,8 +19,6 @@ const useStyles = makeStyles({
   title: { height: '5px', width: '70%', borderRadius: '2px', backgroundColor: '#333' },
   body: { height: '4px', borderRadius: '2px', backgroundColor: '#888' },
   image: { aspectRatio: '16 / 9', borderRadius: '4px', backgroundColor: '#c9b8a6' },
-  product: { display: 'grid', gridTemplateColumns: '30% 1fr', columnGap: '4px', alignItems: 'center' },
-  productImg: { aspectRatio: '3 / 4', borderRadius: '3px', backgroundColor: '#c9b8a6' },
   buttons: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '3px' },
   button: { height: '8px', borderRadius: '3px', backgroundColor: '#d6d6dc' },
 })
@@ -42,14 +40,7 @@ export function PushThumb({ spec, width = 120 }: { spec: PushSpec; width?: numbe
           <span className={s.icon} />
           <span className={s.bar} style={{ width: '30%' }} />
         </div>
-        {spec.product ? (
-          <div className={s.product}>
-            <div className={s.productImg} />
-            <div style={{ display: 'grid', rowGap: 3 }}>{text}</div>
-          </div>
-        ) : (
-          text
-        )}
+        {text}
         {spec.image && <div className={s.image} />}
         {spec.buttons.length > 0 && (
           <div className={s.buttons}>

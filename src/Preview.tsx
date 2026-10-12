@@ -741,16 +741,16 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
 function PushPreview(props: Props) {
   const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind, pushTitle, pushBody } = props
   // アプリのテンプレートの中身(画像・商品・ボタン)。アプリのテンプレートでなければ、以前と同じ(画像つき)
-  const spec = getTemplate(template).push ?? { image: true, product: false, buttons: [] }
+  const spec = getTemplate(template).push ?? { image: true, buttons: [] }
   const t = useT()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
   const [style, setStyle] = useState<'ios' | 'android'>('ios')
   const byId = new Map(products.map((p) => [p.cr854_productid, p]))
   const firstProduct = items[0] && byId.get(items[0].productId)
-  // 通知の画像: 「画像つき」はメイン画像、「商品の紹介」は商品の画像。「テキストだけ」は画像なし
-  const heroSrc = spec.product ? productImage(firstProduct) : spec.image ? (pickedHero ? heroImage(pickedHero) : undefined) : undefined
-  const heroAlt = spec.product ? firstProduct?.cr854_name : pickedHero?.cr854_name
+  // 通知の画像: 「画像つき」は、メッセージのメイン画像(押して開いたメッセージの一番上と、同じ画像)。「テキストだけ」は画像なし
+  const heroSrc = spec.image && pickedHero ? heroImage(pickedHero) : undefined
+  const heroAlt = pickedHero?.cr854_name
 
   const when = scheduledAt ? new Date(scheduledAt) : null
   const clock = when ? `${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')}` : '9:41'
@@ -788,8 +788,9 @@ function PushPreview(props: Props) {
       draggable={false}
       src={heroSrc}
       alt={heroAlt}
-      // 写真は切らずに、全体を見せる(縦長の商品の写真でも、頭や裾が切れないように)。商品は縦長が多いので、枠も少し高くする
-      style={{ width: '100%', aspectRatio: spec.product ? '4 / 3' : style === 'ios' ? '16 / 9' : '2 / 1', objectFit: 'contain', borderRadius: style === 'ios' ? 16 : 24, display: 'block', backgroundColor: '#e9e9ee', marginTop: 8 }}
+      // 写真は、元の縦横の比率のまま、切らずに見せる(決まった枠に入れると、縦長の写真の左右に大きな余白ができるため)。
+      // 縦長の写真が通知を押し広げすぎないよう、高さに上限を付け、その場合は中央に置く
+      style={{ display: 'block', maxWidth: '100%', maxHeight: 300, width: 'auto', height: 'auto', margin: '8px auto 0', borderRadius: style === 'ios' ? 14 : 20 }}
     />
   )
 

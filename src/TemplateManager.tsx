@@ -248,7 +248,7 @@ export function TemplateManager() {
   const startNew = () => {
     setError(null)
     setSelectedId('')
-    setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, product: false, buttons: [] } } : newDraft())
+    setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, buttons: [] } } : newDraft())
   }
   const startDuplicate = () => {
     if (!selected) return
@@ -520,18 +520,17 @@ export function TemplateManager() {
                               {(
                                 [
                                   ['text', t('テキストだけ', 'Text only')],
-                                  ['image', t('画像つき', 'With image')],
-                                  ['product', t('商品 1 点', 'One product')],
+                                  ['image', t('画像つき(メイン画像)', 'With image (main image)')],
                                 ] as const
                               ).map(([k, label]) => {
-                                const on = k === 'product' ? draft.push!.product : k === 'image' ? draft.push!.image && !draft.push!.product : !draft.push!.image && !draft.push!.product
+                                const on = k === 'image' ? draft.push!.image : !draft.push!.image
                                 return (
                                   <Button
                                     key={k}
                                     size="small"
                                     appearance={on ? 'primary' : 'outline'}
                                     aria-pressed={on}
-                                    onClick={() => patch({ push: { ...draft.push!, image: k === 'image', product: k === 'product' } })}
+                                    onClick={() => patch({ push: { ...draft.push!, image: k === 'image' } })}
                                   >
                                     {label}
                                   </Button>
@@ -646,7 +645,7 @@ export function TemplateManager() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 12, rowGap: 4 }}>
                         <span className={s.caption}>{t('通知の中身', 'Contents')}</span>
                         <span style={{ fontSize: tokens.fontSizeBase200 }}>
-                          {[t('タイトル', 'Title'), t('本文', 'Body'), selected.push.image ? t('メイン画像', 'Main image') : '', selected.push.product ? t('商品 1 点', 'One product') : '']
+                          {[t('タイトル', 'Title'), t('本文', 'Body'), selected.push.image ? t('メイン画像', 'Main image') : '']
                             .filter(Boolean)
                             .join(t('、', ', '))}
                         </span>
