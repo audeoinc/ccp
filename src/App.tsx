@@ -195,8 +195,12 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     marginBottom: tokens.spacingVerticalS,
   },
+  // 幅を固定する(日付の長さで幅が変わると、「‹ ›」の位置がずれて、続けて押しにくいため)
   monthLabel: {
-    minWidth: '120px',
+    width: '150px',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    fontVariantNumeric: 'tabular-nums',
     textAlign: 'center',
     fontSize: tokens.fontSizeBase400,
     fontWeight: tokens.fontWeightSemibold,
@@ -221,6 +225,7 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   legendDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
+  weekLabel: { width: '250px' },
   viewSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: tokens.spacingHorizontalM },
 })
 
@@ -486,7 +491,7 @@ function App() {
             </div>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
-              <span className={styles.monthLabel}>
+              <span className={mergeClasses(styles.monthLabel, view === 'week' && styles.weekLabel)}>
                 {view === 'week'
                   ? weekLabel(weekStart)
                   : lang === 'ja'
