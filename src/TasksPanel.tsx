@@ -22,7 +22,10 @@ const useStyles = makeStyles({
   meta: { display: 'flex', flexWrap: 'wrap', columnGap: '10px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, marginTop: '2px' },
   overdue: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
   source: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', border: 'none', padding: 0, background: 'none', color: tokens.colorBrandForeground1, cursor: 'pointer', fontSize: tokens.fontSizeBase100, fontFamily: 'inherit' },
-  form: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 140px 140px', columnGap: '8px', alignItems: 'end' },
+  // 入力欄は既定の最小幅を持つので、列の幅に合わせて縮める(隣の欄と重ならないように)
+  // タスクの文は 1 行目に広く、担当と期日は 2 行目に並べる(中央のペインが狭くても、文が読めるように)
+  form: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', rowGap: '6px', alignItems: 'end', '& .fui-Input': { minWidth: 0, width: '100%' } },
+  wide: { gridColumn: '1 / -1' },
   actions: { display: 'flex', columnGap: '8px' },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
@@ -160,7 +163,7 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
       {cardId && notes && tasks.length === 0 && <div className={styles.caption}>{t('まだタスクはありません。', 'No tasks yet.')}</div>}
       {cardId && (
         <div className={styles.form}>
-          <Field label={t('タスク', 'Task')} size="small">
+          <Field label={t('タスク', 'Task')} size="small" className={styles.wide}>
             <Input size="small" value={text} onChange={(_, d) => setText(d.value)} />
           </Field>
           <Field label={t('担当', 'Assignee')} size="small">

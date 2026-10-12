@@ -20,7 +20,9 @@ const useStyles = makeStyles({
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   // AI のタスクの案(採用するまで保存しない)
   ideas: { display: 'grid', rowGap: '6px', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  idea: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px 130px auto auto', columnGap: '6px', alignItems: 'center' },
+  // 案の文は 1 行目に広く、担当・期日・採用は 2 行目に並べる
+  idea: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto auto', columnGap: '6px', rowGap: '4px', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}`, '& .fui-Input': { minWidth: 0, width: '100%' } },
+  ideaText: { gridColumn: '1 / -1' },
   taskChip: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1 },
 })
 
@@ -250,7 +252,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
               </div>
               {(ideas[n.cr854_cardnoteid] as TaskIdea[]).map((idea, i) => (
                 <div key={i} className={styles.idea}>
-                  <Input size="small" value={idea.text} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
+                  <Input size="small" className={styles.ideaText} value={idea.text} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
                   <Input size="small" list="ccp-people" value={idea.assignee} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { assignee: d.value })} aria-label={t('担当', 'Assignee')} />
                   <Input size="small" type="date" value={idea.due} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { due: d.value })} aria-label={t('期日', 'Due')} />
                   <Button size="small" appearance="primary" disabled={busy || !idea.text.trim()} onClick={() => void adopt(n.cr854_cardnoteid, i, idea)}>
