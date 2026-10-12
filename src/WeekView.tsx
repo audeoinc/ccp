@@ -22,6 +22,10 @@ interface Props {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
+const PUSH = 588230001 // チャネル: プッシュ
+// 1 日の並び: メールを上、プッシュを下にそろえる(週を横に見比べやすく)。同じチャネルの中は時刻順
+const order = (a: Cr854_deliverycards, b: Cr854_deliverycards) =>
+  Number(a.cr854_channel === PUSH) - Number(b.cr854_channel === PUSH) || (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? '')
 const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
 
@@ -60,8 +64,18 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorBrandBackground2 },
   },
-  body: { display: 'grid', alignContent: 'start', rowGap: '8px', padding: '8px', minHeight: '420px' },
+  // 1 日 2 本(メール 1 + プッシュ 1)が、スクロールなしで収まる高さにする。3 本以上は、その日の列だけスクロールする
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+    rowGap: '8px',
+    padding: '8px',
+    height: 'max(480px, calc(100vh - 250px))',
+    boxSizing: 'border-box',
+    overflowY: 'auto',
+  },
   card: {
+    flexShrink: 0,
     display: 'grid',
     rowGap: '4px',
     textAlign: 'left',
@@ -83,6 +97,20 @@ const useStyles = makeStyles({
   grid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', columnGap: '3px' },
   thumb: { aspectRatio: '3 / 4', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3, overflow: 'hidden' },
   more: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  // プッシュは、通知の形の小さなプレビュー(タイトルと本文)
+  push: {
+    display: 'grid',
+    rowGap: '2px',
+    padding: '6px 8px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground3,
+    fontSize: tokens.fontSizeBase100,
+    lineHeight: tokens.lineHeightBase100,
+    color: tokens.colorNeutralForeground2,
+    minWidth: 0,
+  },
+  pushTitle: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  pushBody: { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   empty: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, fontStyle: 'italic' },
 })
 
@@ -98,7 +126,7 @@ export function WeekView({ start, cards, cardProducts, products, heroes, dueSoon
     const k = dayKey(new Date(c.cr854_scheduledat))
     byDay.set(k, [...(byDay.get(k) ?? []), c])
   }
-  for (const list of byDay.values()) list.sort((a, b) => (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? ''))
+  for (const list of byDay.values()) list.sort(order)
   const productOf = (id: string) => products.find((p) => p.cr854_productid === id)
 
   return (
@@ -134,7 +162,16 @@ export function WeekView({ start, cards, cardProducts, products, heroes, dueSoon
                       {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('締め切りが近いのに未着手', 'Due soon — not started')} />}
                       {c.cr854_name}
                     </span>
-                    {hero || ids.length ? (
+                    {c.cr854_channel === PUSH ? (
+                      c.cr854_headline || c.cr854_copy ? (
+                        <div className={styles.push}>
+                          <span className={styles.pushTitle}>{c.cr854_headline || c.cr854_name}</span>
+                          {c.cr854_copy && <span className={styles.pushBody}>{c.cr854_copy}</span>}
+                        </div>
+                      ) : (
+                        <span className={styles.empty}>{t('まだ中身がありません', 'No content yet')}</span>
+                      )
+                    ) : hero || ids.length ? (
                       <>
                         <div className={styles.hero}>{hero && <img className={styles.img} src={hero} alt="" draggable={false} />}</div>
                         {ids.length > 0 && (
