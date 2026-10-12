@@ -62,7 +62,8 @@ const weekLabel = (start: Date) => {
 type View = 'month' | 'week' | 'list'
 const VIEW_KEY = 'calendar.view'
 const LENS_KEY = 'week.lens'
-const COLUMNS_KEY = 'list.columns'
+// 列を足したら、版を上げる(以前に選んだ列の設定では、新しい列が出ないため)
+const COLUMNS_KEY = 'list.columns.v2'
 
 interface Filters {
   country: string
@@ -637,7 +638,7 @@ function App() {
             </div>
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {view === 'list' ? (
-              <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} />
+              <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
               <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />

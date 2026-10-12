@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Popover, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   AddRegular,
   CalendarRegular,
@@ -19,9 +19,7 @@ import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { heroImage, productImage } from './images'
 import { locale, optionLabel, useT } from './i18n'
-import { SOURCE_MANUAL, type Item } from './items'
-import { Preview } from './Preview'
-import { parsePushLink } from './pushLink'
+import { DeliveryPeek } from './DeliveryPeek'
 import { cardProgress } from './progress'
 import { statusColor, statusOptions } from './status'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
@@ -62,17 +60,6 @@ const shortDate = (ymd?: string) => {
   if (!ymd) return ''
   const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })
-}
-/** セクションのコピー(JSON の配列。古い形式の改行区切りも読む) */
-const parseCopies = (v?: string): string[] => {
-  if (!v) return []
-  try {
-    const a = JSON.parse(v)
-    if (Array.isArray(a)) return a.map(String)
-  } catch {
-    // JSON でなければ、改行区切りとして読む
-  }
-  return v.split('\n')
 }
 const firstName = (name?: string) => (name ?? '').trim().split(/\s+/)[0] ?? ''
 
@@ -192,12 +179,7 @@ const useStyles = makeStyles({
   pushBody: { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   empty: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, fontStyle: 'italic' },
   peek: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', justifySelf: 'end', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1, cursor: 'zoom-in' },
-  // マウスを重ねたときに出す、実際のメールの見た目
-  previewBox: { width: '360px', maxHeight: 'min(80vh, 900px)', overflowY: 'auto', backgroundColor: '#ffffff' },
-  previewInner: { zoom: 0.6 },
 })
-
-const noop = () => undefined
 
 /**
  * 1 週間の配信を横に並べる。見方(lens)を切り替えて、目的に合う情報だけを出す。
@@ -263,7 +245,6 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       .filter((g) => g.ids.length > 0)
     const hasVisual = !!hero || ids.length > 0
     const hasPushText = isPush && !!(c.cr854_pushtitle || c.cr854_pushbody || c.cr854_headline || c.cr854_copy)
-    const items: Item[] = ids.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
     const ratio = progress.total ? progress.done / progress.total : 0
 
     const issues = (
@@ -298,46 +279,12 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
     )
 
     const peek = hasVisual && (
-      <Popover openOnHover mouseLeaveDelay={100} positioning="after" withArrow>
-        <PopoverTrigger disableButtonEnhancement>
-          <span className={styles.peek} onClick={(e) => e.stopPropagation()}>
-            <EyeRegular />
-            {t('プレビュー', 'Preview')}
-          </span>
-        </PopoverTrigger>
-        <PopoverSurface>
-          <div className={styles.previewBox}>
-            <div className={styles.previewInner}>
-              <Preview
-                channel={isPush ? 'push' : 'email'}
-                pushLinkKind={parsePushLink(c.cr854_pushlink)?.kind}
-                pushTitle={c.cr854_pushtitle}
-                pushBody={c.cr854_pushbody}
-                subject={c.cr854_name}
-                headline={c.cr854_headline ?? ''}
-                copy={c.cr854_copy ?? ''}
-                items={items}
-                products={products}
-                selectedKey={null}
-                showHeadings
-                template={templateId}
-                scheduledAt={c.cr854_scheduledat ?? ''}
-                sectionTitles={titles}
-                onSectionTitle={noop}
-                sectionCopies={parseCopies(c.cr854_sectioncopies)}
-                onSectionCopy={noop}
-                hero={heroRow}
-                onDropHero={noop}
-                onClearHero={noop}
-                onSelect={noop}
-                onRemove={noop}
-                onMove={noop}
-                onDropAt={noop}
-              />
-            </div>
-          </div>
-        </PopoverSurface>
-      </Popover>
+      <DeliveryPeek card={c} productIds={ids} products={products} heroes={heroes}>
+        <span className={styles.peek} onClick={(e) => e.stopPropagation()}>
+          <EyeRegular />
+          {t('プレビュー', 'Preview')}
+        </span>
+      </DeliveryPeek>
     )
 
     return (

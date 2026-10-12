@@ -6,7 +6,7 @@ import { channelOptions, countryOptions, departmentOptions, statusOptions } from
 // 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
 
 /** 一覧の列。順番は、この並び。CSV の書き出しも、この定義を使う */
-export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'handoff' | 'questions' | 'tasks' | 'theme' | 'products' | 'steps'
+export type ColumnKey = 'image' | 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'handoff' | 'questions' | 'tasks' | 'theme' | 'products' | 'steps'
 
 export interface Row {
   card: Cr854_deliverycards
@@ -48,6 +48,8 @@ const date = (iso?: string) => {
 }
 
 export const COLUMNS: Column[] = [
+  // 画像(メイン画像のサムネイル。マウスを重ねると全体を見せる)。CSV には、メイン画像の有無だけを書く
+  { key: 'image', label: () => tr('画像', 'Image'), text: (r) => (r.card._cr854_heroimage_value ? tr('あり', 'yes') : '') },
   { key: 'date', label: () => tr('配信日', 'Date'), text: (r) => date(r.card.cr854_scheduledat), sort: (r) => r.card.cr854_scheduledat ?? '' },
   { key: 'time', label: () => tr('時刻', 'Time'), text: (r) => time(r.card.cr854_scheduledat), sort: (r) => time(r.card.cr854_scheduledat) },
   { key: 'name', label: () => tr('配信名', 'Name'), text: (r) => r.card.cr854_name },

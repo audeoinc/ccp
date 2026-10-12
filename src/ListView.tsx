@@ -14,6 +14,10 @@ import { WarningRegular } from '@fluentui/react-icons'
 import { locale, useT } from './i18n'
 import { COLUMNS, type Column, type ColumnKey, type Row } from './listRows'
 import { statusColor } from './status'
+import { DeliveryPeek } from './DeliveryPeek'
+import { heroImage, productImage } from './images'
+import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 
 const useStyles = makeStyles({
   root: {
@@ -42,6 +46,8 @@ const useStyles = makeStyles({
   status: { display: 'inline-flex', alignItems: 'center', columnGap: tokens.spacingHorizontalXS, whiteSpace: 'nowrap' },
   dot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   steps: { display: 'inline-flex', alignItems: 'center', columnGap: tokens.spacingHorizontalS, whiteSpace: 'nowrap' },
+  thumb: { display: 'block', width: '56px', height: '40px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3, cursor: 'zoom-in' },
+  noThumb: { display: 'block', width: '56px', height: '40px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground2 },
   empty: { padding: tokens.spacingVerticalXXL, textAlign: 'center', color: tokens.colorNeutralForeground3 },
 })
 
@@ -49,10 +55,14 @@ interface Props {
   rows: Row[]
   columns: ColumnKey[]
   onSelect: (id: string) => void
+  /** 画像の列: 配信カードごとの掲載商品と、商品・メイン画像 */
+  cardProducts: Map<string, string[]>
+  products: Cr854_products[]
+  heroes: Cr854_heroimages[]
 }
 
 /** 配信の一覧(表)。列見出しを押すと並べ替える。行を押すと、配信カードを開く */
-export function ListView({ rows, columns, onSelect }: Props) {
+export function ListView({ rows, columns, onSelect, cardProducts, products, heroes }: Props) {
   const styles = useStyles()
   const t = useT()
   const [sort, setSort] = useState<{ key: ColumnKey; dir: 'ascending' | 'descending' }>({ key: 'date', dir: 'ascending' })
@@ -76,6 +86,17 @@ export function ListView({ rows, columns, onSelect }: Props) {
 
   const cell = (c: Column, r: Row) => {
     switch (c.key) {
+      case 'image': {
+        // メイン画像(なければ先頭の商品)のサムネイル。マウスを重ねると、配信の全体を、スクロールなしで見せる
+        const ids = cardProducts.get(r.card.cr854_deliverycardid) ?? []
+        const src = heroImage(heroes.find((h) => h.cr854_heroimageid === r.card._cr854_heroimage_value)) ?? productImage(products.find((p) => p.cr854_productid === ids[0]))
+        if (!src) return <span className={styles.noThumb} />
+        return (
+          <DeliveryPeek card={r.card} productIds={ids} products={products} heroes={heroes}>
+            <img className={styles.thumb} src={src} alt="" draggable={false} onClick={(e) => e.stopPropagation()} />
+          </DeliveryPeek>
+        )
+      }
       case 'name':
         return <span className={styles.name}>{c.text(r)}</span>
       case 'status':
