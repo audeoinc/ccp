@@ -554,6 +554,7 @@ function App() {
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
                 cardProducts={cardProducts}
+                questionCounts={questionCounts}
                 products={products}
                 heroes={heroes}
                 dueSoon={dueSoon}
