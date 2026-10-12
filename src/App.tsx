@@ -229,7 +229,7 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   legendDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
-  // 週の見出しの幅は、言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
+  // 見出しの幅は、月・週・一覧で同じにする(切り替えで、右のボタンがずれないように)。言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
   weekLabelJa: { width: '236px' },
   // 「週」の隣の、見方の小さな切り替え(週の下位の選択だと分かるよう、枠で囲んで小さく)
@@ -255,6 +255,13 @@ const useStyles = makeStyles({
     lineHeight: tokens.lineHeightBase200,
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  // 月・一覧では、選べないことが分かるよう、灰色にする(選んでいた見方は、薄く残す)
+  lensOff: {
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    '& button': { color: tokens.colorNeutralForegroundDisabled, cursor: 'not-allowed', ':hover': { backgroundColor: 'transparent' } },
+    '& button[class]': { boxShadow: 'none' },
   },
   lensBtnOn: { backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold, boxShadow: tokens.shadow2 },
   viewSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: tokens.spacingHorizontalM },
@@ -583,7 +590,7 @@ function App() {
             </div>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
-              <span className={mergeClasses(styles.monthLabel, view === 'week' && (lang === 'ja' ? styles.weekLabelJa : styles.weekLabel))}>
+              <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel)}>
                 {view === 'week'
                   ? weekLabel(weekStart)
                   : lang === 'ja'
@@ -598,14 +605,17 @@ function App() {
                 <ToggleButton size="small" checked={view === 'week'} appearance={view === 'week' ? 'primary' : 'subtle'} onClick={() => changeView('week')}>
                   {t('週', 'Week')}
                 </ToggleButton>
-                {/* 週の見方(週の表示だけのもの)は、「週」のすぐ隣に置く(週を選んだあと、そのまま切り替えられるように) */}
-                {view === 'week' && (
-                  <div className={styles.lensSwitch} role="group" aria-label={t('見方', 'Lens')}>
+                {/* 週の見方は、「週」のすぐ隣に置く(週を選んだあと、そのまま切り替えられるように)。
+                    月・一覧でも出したままにして、選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
+                {(
+                  <div className={mergeClasses(styles.lensSwitch, view !== 'week' && styles.lensOff)} role="group" aria-label={t('見方', 'Lens')} aria-disabled={view !== 'week'}>
                     {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
                       <button
                         key={v}
                         type="button"
-                        aria-pressed={lens === v}
+                        aria-pressed={view === 'week' && lens === v}
+                        disabled={view !== 'week'}
+                        title={view !== 'week' ? t('週の表示で使えます', 'Available in the week view') : undefined}
                         className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
                         onClick={() => {
                           setLens(v)
@@ -621,6 +631,14 @@ function App() {
                   {t('一覧', 'List')}
                 </ToggleButton>
               </div>
+              <Tooltip
+                content={view === 'week' ? t('表示中の週の配信を、CSV で書き出します(絞り込みを反映)', "Export this week's deliveries as CSV (filters applied)") : t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")}
+                relationship="description"
+              >
+                <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={(view === 'week' ? weekRows : monthRows).length === 0}>
+                  {t('CSV で書き出す', 'Export CSV')}
+                </Button>
+              </Tooltip>
               {view === 'list' && (
                 <Menu
                   checkedValues={{ columns }}
@@ -645,14 +663,6 @@ function App() {
                   </MenuPopover>
                 </Menu>
               )}
-              <Tooltip
-                content={view === 'week' ? t('表示中の週の配信を、CSV で書き出します(絞り込みを反映)', "Export this week's deliveries as CSV (filters applied)") : t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")}
-                relationship="description"
-              >
-                <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={(view === 'week' ? weekRows : monthRows).length === 0}>
-                  {t('CSV で書き出す', 'Export CSV')}
-                </Button>
-              </Tooltip>
               <div className={styles.legend}>
                 {statusOptions.map((o) => (
                   <span key={o.value} className={styles.legendPill}>
