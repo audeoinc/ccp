@@ -36,6 +36,7 @@ import { Cr854_deliveryproductsService } from './generated/services/Cr854_delive
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
+import { WeekView } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -47,8 +48,16 @@ import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 
-// 表示の切り替え(月のカレンダー / 表の一覧)。ブラウザごとに覚える
-type View = 'month' | 'list'
+// 週の初め(日曜日)
+const sundayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay())
+const weekLabel = (start: Date) => {
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
+  const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })
+  return locale() === 'ja-JP' ? `${end.getFullYear()}年 ${f(start)} – ${f(end)}` : `${f(start)} – ${f(end)}, ${end.getFullYear()}`
+}
+
+// 表示の切り替え(月のカレンダー / 週 / 表の一覧)。ブラウザごとに覚える
+type View = 'month' | 'week' | 'list'
 const VIEW_KEY = 'calendar.view'
 const COLUMNS_KEY = 'list.columns'
 
@@ -162,7 +171,7 @@ const useStyles = makeStyles({
     margin: '0 auto',
     padding: `${tokens.spacingVerticalXXL} ${tokens.spacingHorizontalL}`,
   },
-  // 一覧は列が多いので、画面の幅いっぱいまで使う
+  // 週・一覧は、横に情報が多いので、画面の幅いっぱいまで使う
   containerWide: { maxWidth: '1600px' },
   center: { textAlign: 'center', padding: `${tokens.spacingVerticalXXXL} 0` },
   alert: { marginBottom: tokens.spacingVerticalL },
@@ -251,7 +260,11 @@ function App() {
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
 
   // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
-  const [productCounts, setProductCounts] = useState<Map<string, number>>(new Map())
+  // 配信カードごとの掲載商品(メールの並び順の商品 ID。候補の行は入れない)。数は、一覧の「商品数」「工程」と、締め切りの警告に使う
+  const [cardProducts, setCardProducts] = useState<Map<string, string[]>>(new Map())
+  const productCounts = useMemo(() => new Map([...cardProducts].map(([k, v]) => [k, v.length])), [cardProducts])
+  // 週の表示の、週の初め(日曜日)
+  const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(new Date()))
   // 配信カードごとの、制作からの質問の未解決の数(一覧の列)
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
@@ -262,13 +275,15 @@ function App() {
       Cr854_deliveryproductsService.getAll()
         .then((res) => {
           if (!res.success) return // 数が出ないだけで、画面は使える
-          const counts = new Map<string, number>()
-          for (const r of res.data ?? []) {
-            const id = r._cr854_deliverycard_value
-            if (!id || r.cr854_state === STATE_CANDIDATE) continue
-            counts.set(id, (counts.get(id) ?? 0) + 1)
+          const rows = (res.data ?? [])
+            .filter((r) => r._cr854_deliverycard_value && r.cr854_state !== STATE_CANDIDATE)
+            .sort((a, b) => (a.cr854_sortorder ?? 0) - (b.cr854_sortorder ?? 0))
+          const byCard = new Map<string, string[]>()
+          for (const r of rows) {
+            const id = r._cr854_deliverycard_value!
+            if (r._cr854_product_value) byCard.set(id, [...(byCard.get(id) ?? []), r._cr854_product_value])
           }
-          setProductCounts(counts)
+          setCardProducts(byCard)
         })
         .catch(() => undefined)
       Cr854_cardnotesService.getAll()
@@ -341,7 +356,21 @@ function App() {
     [rows, month],
   )
   const dueSoon = useMemo(() => new Set(rows.filter((r) => r.dueSoon).map((r) => r.card.cr854_deliverycardid)), [rows])
+  // 週の表示の対象(週の初めから 7 日間)
+  const weekRows = useMemo(() => {
+    const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+    return rows.filter((r) => {
+      if (!r.card.cr854_scheduledat) return false
+      const d = new Date(r.card.cr854_scheduledat)
+      return d >= weekStart && d < end
+    })
+  }, [rows, weekStart])
   const changeView = (v: View) => {
+    // 週の表示に切り替えたら: 表示中の月に今日があれば今週、なければ、その月の最初の週
+    if (v === 'week' && view !== 'week' && month) {
+      const now = new Date()
+      setWeekStart(sundayOf(now.getFullYear() === month.getFullYear() && now.getMonth() === month.getMonth() ? now : month))
+    }
     setView(v)
     savePref(VIEW_KEY, v)
   }
@@ -355,11 +384,25 @@ function App() {
     if (!month) return
     const pad = (n: number) => String(n).padStart(2, '0')
     // 書き出す列: 一覧では、表示中の列。カレンダーでは、すべての列
+    if (view === 'week') {
+      downloadCsv(weekRows, DEFAULT_COLUMNS, `deliveries-week-${weekStart.getFullYear()}-${pad(weekStart.getMonth() + 1)}-${pad(weekStart.getDate())}.csv`)
+      return
+    }
     downloadCsv(monthRows, view === 'list' ? columns : DEFAULT_COLUMNS, `deliveries-${month.getFullYear()}-${pad(month.getMonth() + 1)}.csv`)
   }
 
   const selected = cards.find((c) => c.cr854_deliverycardid === selectedId)
-  const shift = (n: number) => month && setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
+  const shift = (n: number) => {
+    if (view === 'week') {
+      // 週を動かし、月も、その週の真ん中(水曜日)の月に合わせる(月の表示に戻ったときに、同じあたりを見せる)
+      const next = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7 * n)
+      setWeekStart(next)
+      const mid = new Date(next.getFullYear(), next.getMonth(), next.getDate() + 3)
+      setMonth(new Date(mid.getFullYear(), mid.getMonth(), 1))
+      return
+    }
+    if (month) setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
+  }
   const setFilter = (k: keyof Filters) => (v: string) => setFilters({ ...filters, [k]: v })
   const [autoDraft, setAutoDraft] = useState(loadAutoDraft)
   useTemplates() // テンプレートの登録が変わったら、画面全体を描き直す
@@ -424,7 +467,7 @@ function App() {
           {t('新規作成', 'New')}
         </Button>
       </header>
-      <div className={mergeClasses(styles.container, view === 'list' && styles.containerWide)}>
+      <div className={mergeClasses(styles.container, view !== 'month' && styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
         {error && (
           <MessageBar layout="multiline" intent="error" className={styles.alert}>
@@ -442,12 +485,21 @@ function App() {
               <span className={styles.count}>{t(`${filtered.length} / ${cards.length} 件`, `${filtered.length} / ${cards.length} items`)}</span>
             </div>
             <div className={styles.monthRow}>
-              <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={t('前の月', 'Previous month')} />
-              <span className={styles.monthLabel}>{lang === 'ja' ? `${month.getFullYear()}年${month.getMonth() + 1}月` : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}</span>
-              <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} onClick={() => shift(1)} aria-label={t('次の月', 'Next month')} />
+              <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
+              <span className={styles.monthLabel}>
+                {view === 'week'
+                  ? weekLabel(weekStart)
+                  : lang === 'ja'
+                    ? `${month.getFullYear()}年${month.getMonth() + 1}月`
+                    : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}
+              </span>
+              <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
               <div className={styles.viewSwitch} role="group" aria-label={t('表示', 'View')}>
                 <ToggleButton size="small" checked={view === 'month'} appearance={view === 'month' ? 'primary' : 'subtle'} onClick={() => changeView('month')}>
                   {t('月', 'Month')}
+                </ToggleButton>
+                <ToggleButton size="small" checked={view === 'week'} appearance={view === 'week' ? 'primary' : 'subtle'} onClick={() => changeView('week')}>
+                  {t('週', 'Week')}
                 </ToggleButton>
                 <ToggleButton size="small" checked={view === 'list'} appearance={view === 'list' ? 'primary' : 'subtle'} onClick={() => changeView('list')}>
                   {t('一覧', 'List')}
@@ -477,8 +529,11 @@ function App() {
                   </MenuPopover>
                 </Menu>
               )}
-              <Tooltip content={t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")} relationship="description">
-                <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={monthRows.length === 0}>
+              <Tooltip
+                content={view === 'week' ? t('表示中の週の配信を、CSV で書き出します(絞り込みを反映)', "Export this week's deliveries as CSV (filters applied)") : t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")}
+                relationship="description"
+              >
+                <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={(view === 'week' ? weekRows : monthRows).length === 0}>
                   {t('CSV で書き出す', 'Export CSV')}
                 </Button>
               </Tooltip>
@@ -494,6 +549,17 @@ function App() {
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} />
+            ) : view === 'week' ? (
+              <WeekView
+                start={weekStart}
+                cards={weekRows.map((r) => r.card)}
+                cardProducts={cardProducts}
+                products={products}
+                heroes={heroes}
+                dueSoon={dueSoon}
+                onSelect={setSelectedId}
+                onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
+              />
             ) : (
               <Calendar month={month} cards={filtered} dueSoon={dueSoon} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
             )}
