@@ -19,3 +19,7 @@ export const statusColor = (v?: number) => {
   const idx = statusOptions.findIndex((o) => o.value === v)
   return statusColors[idx < 0 ? 0 : idx]
 }
+
+/** チャネルの値(選択肢)。配信カードはチャネルごとに作る(プレビュー・テンプレートを、チャネルで分ける) */
+export const CHANNEL_EMAIL = 588230000
+export const CHANNEL_PUSH = 588230001

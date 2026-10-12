@@ -14,15 +14,13 @@ import {
   Slider,
   Spinner,
   Switch,
-  Tab,
-  TabList,
   Text,
   Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -46,7 +44,7 @@ import { campaignSlug, encodeLinks, parseLinks, type Links } from './links'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
-import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
+import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
 export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'channel' | 'department'>>
@@ -306,6 +304,7 @@ const useStyles = makeStyles({
   success: { color: tokens.colorPaletteGreenForeground1 },
   fullWidth: { width: '100%', flexShrink: 0, minHeight: '32px' },
   sectionHead: { marginTop: '12px' },
+  previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
   statusRow: { display: 'flex', alignItems: 'center', columnGap: '6px' },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
@@ -330,9 +329,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   // 読み込み時点の配信商品(保存時に差分を取る)。読み込めなかったときは保存で消さないよう null のまま
   const [original, setOriginal] = useState<Map<string, RowSnap> | null>(card ? null : new Map())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const [previewTab, setPreviewTab] = useState<'email' | 'push'>(() =>
-    card?.cr854_channelname === 'プッシュ' ? 'push' : 'email',
-  )
+  // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
+  // チャネルが未設定のときは、メールで表示する
+  const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
   const [showHeadings, setShowHeadings] = useState(true)
   // プレビューの倍率(15〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
   const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
@@ -971,15 +970,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             {/* 右: プレビュー */}
             <div className={mergeClasses(styles.pane, styles.panePreview)}>
               <div className={styles.toolbar}>
-                <TabList
-                  size="small"
-                  className={styles.grow}
-                  selectedValue={previewTab}
-                  onTabSelect={(_, d) => setPreviewTab(d.value as 'email' | 'push')}
-                >
-                  <Tab value="email">{t('メール', 'Email')}</Tab>
-                  <Tab value="push">{t('プッシュ', 'Push')}</Tab>
-                </TabList>
+                <div className={mergeClasses(styles.grow, styles.previewHead)}>
+                  {previewTab === 'push' ? <PhoneRegular /> : <MailRegular />}
+                  <Text weight="semibold" size={300}>{previewTab === 'push' ? t('アプリのプレビュー', 'App preview') : t('メールのプレビュー', 'Email preview')}</Text>
+                  {!form.channel && <Caption1 className={styles.caption}>{t('チャネルが未設定のため、メールで表示しています', 'No channel set — showing the email')}</Caption1>}
+                </div>
                 <div className={styles.zoomBox}>
                   <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
                   <Slider
