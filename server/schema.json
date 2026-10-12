@@ -155,6 +155,18 @@
       "lookups": [
         ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}]
       ]
+    },
+    "cr854_weeks": {
+      "gcpOnly": true,
+      "pg": "weeks",
+      "pk": "cr854_weekid",
+      "columns": [
+        ["cr854_weekstart", "week_start", "date", {"index": true}],
+        ["cr854_status", "status", "text"],
+        ["cr854_submittedat", "submitted_at", "timestamptz"],
+        ["cr854_confirmedat", "confirmed_at", "timestamptz"]
+      ],
+      "lookups": []
     }
   }
 }

@@ -34,6 +34,8 @@ import { Cr854_heroimagesService } from './generated/services/Cr854_heroimagesSe
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
+import { Cr854_weeksService, type Cr854_weeks, type WeekStatus } from './gcpdata/Cr854_weeksService'
+import { WeekReviewBar } from './WeekReviewBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { WeekView, type WeekLens } from './WeekView'
@@ -277,6 +279,8 @@ function App() {
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未完了のタスクの数(一覧の列・週の表示)
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
+  // 週の計画(週のレビューの状態)
+  const [weeks, setWeeks] = useState<Cr854_weeks[]>([])
   // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
   const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
   // 週の表示の見方: 商品のバランス / 進み具合。ブラウザごとに覚える
@@ -320,6 +324,11 @@ function App() {
           setQuestionCounts(counts)
           setTaskCounts(tasks)
           setOverdueTasks(overdue)
+        })
+        .catch(() => undefined)
+      Cr854_weeksService.getAll()
+        .then((res) => {
+          if (res.success) setWeeks(res.data ?? [])
         })
         .catch(() => undefined)
       const res = await Cr854_deliverycardsService.getAll({ orderBy: ['cr854_scheduledat asc'] })
@@ -390,6 +399,43 @@ function App() {
       return d >= weekStart && d < end
     })
   }, [rows, weekStart])
+  // 週の状態: この週の行と、この週のすべての配信(絞り込みに関係なく、週の単位で進める)
+  const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
+  const thisWeek = weeks.find((w) => w.cr854_weekstart?.slice(0, 10) === weekKey)
+  const weekCards = useMemo(() => {
+    const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+    return cards.filter((c) => c.cr854_scheduledat && new Date(c.cr854_scheduledat) >= weekStart && new Date(c.cr854_scheduledat) < end)
+  }, [cards, weekStart])
+  const changeWeek = async (next: WeekStatus) => {
+    setError(null)
+    try {
+      // 配信のステータスを、週の操作に合わせて進める(戻す)
+      const target = (c: Cr854_deliverycards): number | undefined => {
+        const s = c.cr854_status ?? 588230000
+        if (next === 'review' && thisWeek?.cr854_status !== 'confirmed') return s === 588230000 ? 588230001 : undefined // 未起案 → 検討中
+        if (next === 'review' && thisWeek?.cr854_status === 'confirmed') return s === 588230003 ? 588230002 : undefined // 確定の取り消し: 確定 → 承認済み
+        if (next === 'confirmed') return s !== 588230003 ? 588230003 : undefined // すべて → 確定
+        return undefined
+      }
+      for (const c of weekCards) {
+        const v = target(c)
+        if (v === undefined) continue
+        const r = await Cr854_deliverycardsService.update(c.cr854_deliverycardid, { cr854_status: v as Cr854_deliverycards['cr854_status'] })
+        if (!r.success) throw new Error(r.error?.message ?? tr('配信のステータスを変えられませんでした', 'Could not update a delivery status'))
+      }
+      const now = new Date().toISOString()
+      const fields = {
+        cr854_status: next,
+        ...(next === 'review' && thisWeek?.cr854_status !== 'confirmed' ? { cr854_submittedat: now } : {}),
+        ...(next === 'confirmed' ? { cr854_confirmedat: now } : {}),
+      }
+      const res = thisWeek ? await Cr854_weeksService.update(thisWeek.cr854_weekid, fields) : await Cr854_weeksService.create({ cr854_weekstart: weekKey, ...fields })
+      if (!res.success) throw new Error(res.error?.message ?? tr('週の状態を保存できませんでした', 'Could not save the week status'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    await load()
+  }
   const changeView = (v: View) => {
     // 週の表示に切り替えたら: 表示中の月に今日があれば今週、なければ、その月の最初の週
     if (v === 'week' && view !== 'week' && month) {
@@ -593,6 +639,8 @@ function App() {
             {view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} />
             ) : view === 'week' ? (
+              <>
+              <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
@@ -607,6 +655,7 @@ function App() {
                 onSelect={setSelectedId}
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
               />
+              </>
             ) : (
               <Calendar month={month} cards={filtered} dueSoon={dueSoon} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
             )}
