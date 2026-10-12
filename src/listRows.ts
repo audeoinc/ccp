@@ -6,13 +6,15 @@ import { channelOptions, countryOptions, departmentOptions, statusOptions } from
 // 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
 
 /** 一覧の列。順番は、この並び。CSV の書き出しも、この定義を使う */
-export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'handoff' | 'questions' | 'theme' | 'products' | 'steps'
+export type ColumnKey = 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'handoff' | 'questions' | 'tasks' | 'theme' | 'products' | 'steps'
 
 export interface Row {
   card: Cr854_deliverycards
   products: number
   /** 制作からの質問の、未解決の数 */
   questions: number
+  /** 未完了のタスクの数 */
+  tasks: number
   done: number
   total: number
   dueSoon: boolean
@@ -65,6 +67,7 @@ export const COLUMNS: Column[] = [
     sort: (r) => r.card.cr854_handedoffat ?? '',
   },
   { key: 'questions', label: () => tr('未解決の質問', 'Open questions'), text: (r) => (r.questions ? String(r.questions) : ''), sort: (r) => r.questions },
+  { key: 'tasks', label: () => tr('未完了のタスク', 'Open tasks'), text: (r) => (r.tasks ? String(r.tasks) : ''), sort: (r) => r.tasks },
   { key: 'theme', label: () => tr('テーマ', 'Theme'), text: (r) => r.card.cr854_theme ?? '' },
   { key: 'products', label: () => tr('商品数', 'Products'), text: (r) => String(r.products), sort: (r) => r.products },
   { key: 'steps', label: () => tr('工程', 'Steps'), text: (r) => `${r.done} / ${r.total}`, sort: (r) => r.done },
@@ -80,12 +83,12 @@ const deadlineOf = (card: Cr854_deliverycards): string | undefined => {
 }
 
 /** 配信カードと掲載商品の数から、一覧の行を作る(締め切りの警告も、ここで決める) */
-export function toRows(cards: Cr854_deliverycards[], productCounts: Map<string, number>, questionCounts: Map<string, number> = new Map()): Row[] {
+export function toRows(cards: Cr854_deliverycards[], productCounts: Map<string, number>, questionCounts: Map<string, number> = new Map(), taskCounts: Map<string, number> = new Map()): Row[] {
   const now = new Date()
   return cards.map((card) => {
     const products = productCounts.get(card.cr854_deliverycardid) ?? 0
     const p = cardProgress(card, products)
-    return { card, products, questions: questionCounts.get(card.cr854_deliverycardid) ?? 0, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(deadlineOf(card), p, now, card.cr854_scheduledat) }
+    return { card, products, questions: questionCounts.get(card.cr854_deliverycardid) ?? 0, tasks: taskCounts.get(card.cr854_deliverycardid) ?? 0, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(deadlineOf(card), p, now, card.cr854_scheduledat) }
   })
 }
 

@@ -265,3 +265,23 @@ export const cardNotes: Row[] = [
     at: '2026-09-27T07:15:00.000Z',
   }, true),
 ].filter((n) => n._cr854_deliverycard_value)
+
+// 質問のやり取りから採用したタスク(1 件は完了、1 件は未完了)
+const taskFrom = (q: Row, text: string, assignee: string, due: string, done: boolean): Row => ({
+  cr854_cardnoteid: guid(`task:${q.cr854_cardnoteid}:${text}`),
+  _cr854_deliverycard_value: q._cr854_deliverycard_value,
+  cr854_kind: 'task',
+  cr854_body: text,
+  cr854_assignee: assignee,
+  cr854_due: due,
+  cr854_sourcenote: q.cr854_cardnoteid,
+  cr854_resolved: done ? 1 : 0,
+  createdon: q.cr854_repliedat ?? q.createdon,
+})
+const heroQuestion = cardNotes.find((n) => String(n.cr854_body).startsWith('Can we use the close-up'))
+if (heroQuestion) {
+  cardNotes.push(
+    taskFrom(heroQuestion, 'Swap the hero to the cable knit close-up (keep the warm tone)', 'Alex Kim', '2026-09-27', true),
+    taskFrom(heroQuestion, 'Move the full-look photo into Section 1', 'Alex Kim', '2026-09-27', false),
+  )
+}

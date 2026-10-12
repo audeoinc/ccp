@@ -961,6 +961,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 people={owners}
                 cardId={card?.cr854_deliverycardid}
                 owner={form.owner}
+                cardName={form.name}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
               />
             </div>

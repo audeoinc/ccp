@@ -143,7 +143,10 @@
         ["cr854_reply", "reply", "text"],
         ["cr854_repliedby", "replied_by", "text"],
         ["cr854_repliedat", "replied_at", "timestamptz"],
-        ["cr854_resolved", "resolved", "int"]
+        ["cr854_resolved", "resolved", "int"],
+        ["cr854_assignee", "assignee", "text"],
+        ["cr854_due", "due", "date"],
+        ["cr854_sourcenote", "source_note", "text"]
       ],
       "lookups": [
         ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}]

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Badge, Button, Field, Input, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { CheckmarkCircleRegular, ChatRegular } from '@fluentui/react-icons'
+import { CheckmarkCircleRegular, ChatRegular, DismissRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
 import { locale, tr, useT } from './i18n'
+import { AiButton } from './AiButton'
+import { suggestTasks, type TaskIdea } from './aiTasks'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -16,6 +18,10 @@ const useStyles = makeStyles({
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
   form: { display: 'grid', rowGap: '6px' },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
+  // AI のタスクの案(採用するまで保存しない)
+  ideas: { display: 'grid', rowGap: '6px', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  idea: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px 130px auto auto', columnGap: '6px', alignItems: 'center' },
+  taskChip: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1 },
 })
 
 interface Props {
@@ -25,8 +31,13 @@ interface Props {
   owner: string
   /** 質問する人の既定値(制作の担当者) */
   productionOwner: string
+  /** 制作の締め切り(タスクの期日の既定値。YYYY-MM-DD) */
+  productionDue: string
+  cardName: string
   /** 未解決の数が変わったとき(一覧の表示を、閉じなくても合わせるため) */
   onOpenCount?: (n: number) => void
+  /** タスクを採用したとき(タスクのタブの数を合わせる) */
+  onTasksChanged?: () => void
 }
 
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
@@ -35,7 +46,7 @@ const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { m
  * 制作からの質問と返信。会話なので、配信カードの「保存」を待たずに、その場で保存する。
  * 解決済みにしたものは、薄く表示する(消さない。あとで経緯を追えるように)。
  */
-export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: Props) {
+export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, cardName, onOpenCount, onTasksChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [notes, setNotes] = useState<Cr854_cardnotes[] | null>(null)
@@ -44,6 +55,8 @@ export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: 
   const [body, setBody] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  // 質問ごとの、AI のタスクの案('busy' は作成中)
+  const [ideas, setIdeas] = useState<Record<string, TaskIdea[] | 'busy'>>({})
 
   const load = useCallback(async () => {
     if (!cardId) return
@@ -52,7 +65,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: 
       setError(res.error?.message ?? tr('質問を読み込めませんでした', 'Could not load the questions'))
       return
     }
-    setNotes((res.data ?? []).filter((n) => (n.cr854_kind ?? 'question') === 'question'))
+    setNotes(res.data ?? [])
   }, [cardId])
 
   useEffect(() => {
@@ -60,7 +73,9 @@ export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: 
     void load()
   }, [load])
 
-  const open = (notes ?? []).filter((n) => !n.cr854_resolved).length
+  const questions = (notes ?? []).filter((n) => (n.cr854_kind ?? 'question') === 'question')
+  const tasksFrom = (id: string) => (notes ?? []).filter((n) => n.cr854_kind === 'task' && n.cr854_sourcenote === id)
+  const open = questions.filter((n) => !n.cr854_resolved).length
   useEffect(() => {
     if (notes) onOpenCount?.(open)
   }, [notes, open, onOpenCount])
@@ -94,7 +109,64 @@ export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: 
         cr854_repliedby: owner.trim(),
         cr854_repliedat: new Date().toISOString(),
       })
-      if (res.success) setDrafts((d) => ({ ...d, [n.cr854_cardnoteid]: '' }))
+      if (res.success) {
+        setDrafts((d) => ({ ...d, [n.cr854_cardnoteid]: '' }))
+        // 返信したら、そのやり取りから、やることの案を出す(採用するまで保存しない)
+        void propose({ ...n, cr854_reply: (drafts[n.cr854_cardnoteid] ?? '').trim(), cr854_repliedby: owner.trim() })
+      }
+      return res
+    })
+
+  const propose = async (n: Cr854_cardnotes) => {
+    const id = n.cr854_cardnoteid
+    setIdeas((x) => ({ ...x, [id]: 'busy' }))
+    try {
+      const list = await suggestTasks({
+        question: n.cr854_body ?? '',
+        reply: n.cr854_reply ?? '',
+        asker: n.cr854_author ?? productionOwner,
+        replier: n.cr854_repliedby ?? owner,
+        card: { name: cardName, productionDue },
+        existing: tasksFrom(id).map((x) => x.cr854_body ?? ''),
+      })
+      setIdeas((x) => ({ ...x, [id]: list }))
+    } catch (e) {
+      setIdeas((x) => {
+        const next = { ...x }
+        delete next[id]
+        return next
+      })
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const editIdea = (qid: string, i: number, patch: Partial<TaskIdea>) =>
+    setIdeas((x) => {
+      const list = x[qid]
+      if (!Array.isArray(list)) return x
+      return { ...x, [qid]: list.map((it, k) => (k === i ? { ...it, ...patch } : it)) }
+    })
+  const dropIdea = (qid: string, i: number) =>
+    setIdeas((x) => {
+      const list = x[qid]
+      if (!Array.isArray(list)) return x
+      return { ...x, [qid]: list.filter((_, k) => k !== i) }
+    })
+  const adopt = (qid: string, i: number, idea: TaskIdea) =>
+    run(async () => {
+      const res = await Cr854_cardnotesService.create({
+        'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
+        cr854_kind: 'task',
+        cr854_body: idea.text.trim(),
+        cr854_assignee: idea.assignee.trim(),
+        cr854_due: idea.due || undefined,
+        cr854_sourcenote: qid,
+        cr854_resolved: 0,
+      })
+      if (res.success) {
+        dropIdea(qid, i)
+        onTasksChanged?.()
+      }
       return res
     })
 
@@ -115,7 +187,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: 
       {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、質問を受け付けられます。', 'Save the delivery card to take questions.')}</div>}
       {cardId && notes === null && <Spinner size="tiny" />}
       {error && <div className={styles.error}>{error}</div>}
-      {(notes ?? []).map((n) => (
+      {questions.map((n) => (
         <div key={n.cr854_cardnoteid} className={mergeClasses(styles.card, !n.cr854_resolved && styles.cardOpen)} style={n.cr854_resolved ? { opacity: 0.7 } : undefined}>
           <div className={styles.meta}>
             {n.cr854_author || t('(名前なし)', '(no name)')} · {when(n.createdon)}
@@ -157,10 +229,41 @@ export function QuestionsPanel({ cardId, owner, productionOwner, onOpenCount }: 
                 {t('解決済みにする', 'Mark resolved')}
               </Button>
             )}
+            {n.cr854_reply && (
+              <AiButton busy={ideas[n.cr854_cardnoteid] === 'busy'} disabled={busy} onClick={() => void propose(n)}>
+                {t('AIでタスクを出す', 'Suggest tasks with AI')}
+              </AiButton>
+            )}
+            {tasksFrom(n.cr854_cardnoteid).length > 0 && (
+              <span className={styles.taskChip}>
+                <TaskListLtrRegular />
+                {t(`タスク ${tasksFrom(n.cr854_cardnoteid).length} 件`, `${tasksFrom(n.cr854_cardnoteid).length} task(s)`)}
+              </span>
+            )}
           </div>
+          {Array.isArray(ideas[n.cr854_cardnoteid]) && (
+            <div className={styles.ideas}>
+              <div className={styles.meta}>
+                {(ideas[n.cr854_cardnoteid] as TaskIdea[]).length
+                  ? t('AI のタスクの案(「採用」で、タスクのタブに入ります)', 'AI task ideas (Adopt adds them to the Tasks tab)')
+                  : t('このやり取りから、新しいタスクは見つかりませんでした。', 'No new tasks found in this exchange.')}
+              </div>
+              {(ideas[n.cr854_cardnoteid] as TaskIdea[]).map((idea, i) => (
+                <div key={i} className={styles.idea}>
+                  <Input size="small" value={idea.text} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
+                  <Input size="small" list="ccp-people" value={idea.assignee} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { assignee: d.value })} aria-label={t('担当', 'Assignee')} />
+                  <Input size="small" type="date" value={idea.due} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { due: d.value })} aria-label={t('期日', 'Due')} />
+                  <Button size="small" appearance="primary" disabled={busy || !idea.text.trim()} onClick={() => void adopt(n.cr854_cardnoteid, i, idea)}>
+                    {t('採用', 'Adopt')}
+                  </Button>
+                  <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('外す', 'Dismiss')} onClick={() => dropIdea(n.cr854_cardnoteid, i)} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
-      {cardId && notes?.length === 0 && <div className={styles.caption}>{t('まだ質問はありません。', 'No questions yet.')}</div>}
+      {cardId && notes && questions.length === 0 && <div className={styles.caption}>{t('まだ質問はありません。', 'No questions yet.')}</div>}
       {cardId && (
         <div className={styles.form}>
           <Field label={t('質問する人', 'Asked by')} size="small">

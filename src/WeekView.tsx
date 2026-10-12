@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Popover, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, CheckmarkCircleFilled, EyeRegular, MailRegular, PhoneRegular, QuestionCircleRegular, WarningFilled } from '@fluentui/react-icons'
+import { AddRegular, CheckmarkCircleFilled, EyeRegular, MailRegular, PhoneRegular, QuestionCircleRegular, TaskListLtrRegular, WarningFilled } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
@@ -20,6 +20,8 @@ interface Props {
   cardProducts: Map<string, string[]>
   /** 配信カードごとの、制作からの質問の未解決の数 */
   questionCounts: Map<string, number>
+  /** 配信カードごとの、未完了のタスクの数 */
+  taskCounts: Map<string, number>
   products: Cr854_products[]
   heroes: Cr854_heroimages[]
   dueSoon?: Set<string>
@@ -169,7 +171,7 @@ const useStyles = makeStyles({
 const noop = () => undefined
 
 /** 1 週間の配信を横に並べる。週の計画を、まとめて見比べる(商品のかぶり・バランス、メールとアプリ、進み具合)ため */
-export function WeekView({ start, cards, cardProducts, questionCounts, products, heroes, dueSoon, onSelect, onCreate }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, products, heroes, dueSoon, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -212,6 +214,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, products,
     const templateId = c.cr854_layoutkey || templateFromValue(c.cr854_emailtemplate)
     const progress = cardProgress(c, ids.length)
     const questions = questionCounts.get(c.cr854_deliverycardid) ?? 0
+    const tasks = taskCounts.get(c.cr854_deliverycardid) ?? 0
     const isPush = c.cr854_channel === PUSH
     const channel = c.cr854_channel === EMAIL ? 'email' : isPush ? 'push' : 'none'
     // セクションごとに、商品を分ける(テンプレートの構成どおり)
@@ -288,6 +291,12 @@ export function WeekView({ start, cards, cardProducts, questionCounts, products,
               <span className={mergeClasses(styles.footItem, styles.open)}>
                 <QuestionCircleRegular />
                 {questions}
+              </span>
+            )}
+            {tasks > 0 && (
+              <span className={mergeClasses(styles.footItem, styles.open)} title={t('未完了のタスク', 'Open tasks')}>
+                <TaskListLtrRegular />
+                {tasks}
               </span>
             )}
             {hasVisual && (

@@ -274,6 +274,8 @@ function App() {
   const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(new Date()))
   // 配信カードごとの、制作からの質問の未解決の数(一覧の列)
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
+  // 配信カードごとの、未完了のタスクの数(一覧の列・週の表示)
+  const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
 
@@ -297,11 +299,15 @@ function App() {
         .then((res) => {
           if (!res.success) return
           const counts = new Map<string, number>()
+          const tasks = new Map<string, number>()
           for (const n of res.data ?? []) {
             const id = n._cr854_deliverycard_value
-            if (id && !n.cr854_resolved && (n.cr854_kind ?? 'question') === 'question') counts.set(id, (counts.get(id) ?? 0) + 1)
+            if (!id || n.cr854_resolved) continue
+            if (n.cr854_kind === 'task') tasks.set(id, (tasks.get(id) ?? 0) + 1)
+            else counts.set(id, (counts.get(id) ?? 0) + 1)
           }
           setQuestionCounts(counts)
+          setTaskCounts(tasks)
         })
         .catch(() => undefined)
       const res = await Cr854_deliverycardsService.getAll({ orderBy: ['cr854_scheduledat asc'] })
@@ -352,7 +358,7 @@ function App() {
   }, [cards, filters])
 
   // 表示中の月の配信(一覧と CSV の対象)。締め切りの警告は、月をまたいで求める(カレンダーの前後の月の日付にも出す)
-  const rows = useMemo(() => toRows(filtered, productCounts, questionCounts), [filtered, productCounts, questionCounts])
+  const rows = useMemo(() => toRows(filtered, productCounts, questionCounts, taskCounts), [filtered, productCounts, questionCounts, taskCounts])
   const monthRows = useMemo(
     () =>
       rows.filter((r) => {
@@ -562,6 +568,7 @@ function App() {
                 cards={weekRows.map((r) => r.card)}
                 cardProducts={cardProducts}
                 questionCounts={questionCounts}
+                taskCounts={taskCounts}
                 products={products}
                 heroes={heroes}
                 dueSoon={dueSoon}

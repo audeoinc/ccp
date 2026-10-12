@@ -11,7 +11,6 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
-  Spinner,
   Tab,
   TabList,
   Text,
@@ -26,7 +25,6 @@ import {
   ChevronRightRegular,
   DismissRegular,
 } from '@fluentui/react-icons'
-import { AiIcon } from './AiMark'
 import { TemplateThumb } from './TemplateThumb'
 import { ChatPanel, type ChatMsg } from './ChatPanel'
 import { AutoTextarea } from './AutoTextarea'
@@ -46,13 +44,15 @@ import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { HandoffPanel } from './HandoffPanel'
 import { QuestionsPanel } from './QuestionsPanel'
+import { AiButton } from './AiButton'
+import { TasksPanel } from './TasksPanel'
 import { NotesEditor } from './NotesEditor'
 import { MarkdownLite } from './MarkdownLite'
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { linkSlots, type Links } from './links'
 
 // links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
-type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff'
+type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -105,6 +105,8 @@ interface Props {
   cardId?: string
   /** 企画の担当者(制作からの質問に返信する人) */
   owner: string
+  /** 配信名(AI にタスクの案を頼むときに渡す) */
+  cardName: string
 }
 
 // ------------------------------------------------------------------ スタイル
@@ -273,21 +275,6 @@ const useStyles = makeStyles({
 const revealTab = (e: React.MouseEvent<HTMLElement>) => {
   const el = e.currentTarget
   requestAnimationFrame(() => el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }))
-}
-
-function AiButton({ busy, disabled, onClick, children }: { busy: boolean; disabled?: boolean; onClick: () => void; children: ReactNode }) {
-  const t = useT()
-  return (
-    <Button
-      appearance="outline"
-      size="small"
-      onClick={onClick}
-      disabled={busy || disabled}
-      icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />}
-    >
-      {busy ? t('考え中...', 'Thinking...') : children}
-    </Button>
-  )
 }
 
 const heroMeta = (h?: Cr854_heroimages) => (h ? `${h.cr854_imagecode} ・ ${optionLabel(h.cr854_purposename)} ・ ${optionLabel(h.cr854_seasonname)} ・ ${h.cr854_tags ?? ''}` : '')
@@ -1133,20 +1120,26 @@ export function ContentPane(props: Props) {
   // リンク先: 「配信カードで指定」のボタンで、URL が空のものがあれば、タブに「!」を付ける
   const slots = linkSlots(template, props.items, props.products, props.campaign)
   const linksMissing = slots.some((sl) => !sl.defaultUrl && !(sl.kind === 'hero' ? props.links.hero : props.links.buttons?.[sl.key])?.trim())
-  // 引き継ぎのタブに出す、未解決の質問の数(開いたときに数え、質問の欄で変わったら合わせる)
+  // 引き継ぎ・タスクのタブに出す、未解決の質問・未完了のタスクの数(開いたときに数え、質問・タスクの欄で変わったら数え直す)
   const [openQuestions, setOpenQuestions] = useState(0)
+  const [openTasks, setOpenTasks] = useState(0)
+  const [noteVersion, setNoteVersion] = useState(0)
+  const notesChanged = useCallback(() => setNoteVersion((v) => v + 1), [])
   useEffect(() => {
     if (!props.cardId) return
     let alive = true
     Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${props.cardId}` })
       .then((res) => {
-        if (alive && res.success) setOpenQuestions((res.data ?? []).filter((n) => !n.cr854_resolved && (n.cr854_kind ?? 'question') === 'question').length)
+        if (!alive || !res.success) return
+        const notes = res.data ?? []
+        setOpenQuestions(notes.filter((n) => !n.cr854_resolved && (n.cr854_kind ?? 'question') === 'question').length)
+        setOpenTasks(notes.filter((n) => !n.cr854_resolved && n.cr854_kind === 'task').length)
       })
       .catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [props.cardId])
+  }, [props.cardId, noteVersion])
   const needTheme = theme.trim() ? undefined : t('先にテーマを決めてください', 'Set a theme first')
 
   // テーマ・テンプレート・制作指示のタブの対象(ヒーロー・セクションは、各タブ(ProductsTab)が知らせる)
@@ -1154,7 +1147,7 @@ export function ContentPane(props: Props) {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
     else if (tab === 'instructions') registerChat({ key: 'instructions', title: t('制作指示', 'Production notes') }, () => drafts.runInstructions())
-    else if (tab === 'template' || tab === 'links' || tab === 'handoff') registerChat(null)
+    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks') registerChat(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   })
 
@@ -1196,6 +1189,9 @@ export function ContentPane(props: Props) {
         <Tab value="links" onClick={revealTab} className={s.extraTab}>{`${linksMissing ? '! ' : ''}${t('リンク先', 'Links')}`}</Tab>
         <Tab value="handoff" onClick={revealTab}>
           {`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}${openQuestions ? t(`(${openQuestions})`, ` (${openQuestions})`) : ''}`}
+        </Tab>
+        <Tab value="tasks" onClick={revealTab}>
+          {`${t('タスク', 'Tasks')}${openTasks ? t(`(${openTasks})`, ` (${openTasks})`) : ''}`}
         </Tab>
       </TabList>
     </div>
@@ -1255,7 +1251,24 @@ export function ContentPane(props: Props) {
         />
       )}
       {tab === 'handoff' && (
-        <QuestionsPanel cardId={props.cardId} owner={props.owner} productionOwner={props.handoff.productionOwner} onOpenCount={setOpenQuestions} />
+        <QuestionsPanel
+          cardId={props.cardId}
+          owner={props.owner}
+          productionOwner={props.handoff.productionOwner}
+          productionDue={props.handoff.productionDue}
+          cardName={props.cardName}
+          onOpenCount={setOpenQuestions}
+          onTasksChanged={notesChanged}
+        />
+      )}
+      {tab === 'tasks' && (
+        <TasksPanel
+          cardId={props.cardId}
+          productionOwner={props.handoff.productionOwner}
+          productionDue={props.handoff.productionDue}
+          onOpenSource={() => setTab('handoff')}
+          onChanged={notesChanged}
+        />
       )}
       {tab === 'links' && (
         <LinksEditor
@@ -1274,7 +1287,7 @@ export function ContentPane(props: Props) {
       messages={chatTarget ? (chats[chatTarget.key] ?? []) : []}
       busy={chatBusy}
       suggestions={suggestions}
-      idleHint={t('テンプレートは、AIチャットの対象ではありません。他のタブを開いてください', 'The template is not an AI chat target. Open another tab.')}
+      idleHint={t('このタブは、AIチャットの対象ではありません。テーマ・ヒーロー・セクション・制作指示のタブで使えます', 'This tab is not an AI chat target. Use it on the Theme, Hero, Sections, or Production notes tab.')}
       onSend={(text) => void sendChat(text)}
       onClear={() => chatTarget && setChats((prev) => ({ ...prev, [chatTarget.key]: [] }))}
     />

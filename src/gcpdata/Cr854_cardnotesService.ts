@@ -3,8 +3,8 @@
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、このファイルの読み込みを、サンプルデータに差し替える。
 import { makeService } from '../gcp/services'
 
-/** メモの種類。question = 制作からの質問(返信を付ける) */
-export type NoteKind = 'question'
+/** メモの種類。question = 制作からの質問(返信を付ける) / task = やること(質問のやり取りなどから生まれる) */
+export type NoteKind = 'question' | 'task'
 
 export interface Cr854_cardnotes {
   cr854_cardnoteid: string
@@ -17,8 +17,14 @@ export interface Cr854_cardnotes {
   cr854_repliedby?: string
   /** 返信した日時(ISO) */
   cr854_repliedat?: string
-  /** 1 = 解決済み */
+  /** 1 = 解決済み(task では、完了) */
   cr854_resolved?: number
+  /** task: 担当 */
+  cr854_assignee?: string
+  /** task: 期日(YYYY-MM-DD) */
+  cr854_due?: string
+  /** task: 生まれた元のメモ(質問)の ID */
+  cr854_sourcenote?: string
   createdon?: string
 }
 

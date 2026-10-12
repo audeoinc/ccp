@@ -9000,6 +9000,28 @@
    "cr854_repliedby": "Jordan Lee",
    "cr854_repliedat": "2026-09-27T07:15:00.000Z",
    "cr854_resolved": 1
+  },
+  {
+   "cr854_cardnoteid": "2253f22f-f09f-4022-a891-e25530a61cd8",
+   "_cr854_deliverycard_value": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "cr854_kind": "task",
+   "cr854_body": "Swap the hero to the cable knit close-up (keep the warm tone)",
+   "cr854_assignee": "Alex Kim",
+   "cr854_due": "2026-09-27",
+   "cr854_sourcenote": "965e737e-fe7d-499f-a6ad-4f98f9075bd9",
+   "cr854_resolved": 1,
+   "createdon": "2026-09-25T04:30:00.000Z"
+  },
+  {
+   "cr854_cardnoteid": "b1d6808d-f240-4bd0-ac8e-7577bf1459e2",
+   "_cr854_deliverycard_value": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "cr854_kind": "task",
+   "cr854_body": "Move the full-look photo into Section 1",
+   "cr854_assignee": "Alex Kim",
+   "cr854_due": "2026-09-27",
+   "cr854_sourcenote": "965e737e-fe7d-499f-a6ad-4f98f9075bd9",
+   "cr854_resolved": 0,
+   "createdon": "2026-09-25T04:30:00.000Z"
   }
  ]
 }

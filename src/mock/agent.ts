@@ -74,6 +74,15 @@ export function mockAgent(message: string): string {
         ] })
   }
 
+  if (task === 'suggest_tasks') {
+    // 返信の文を、そのまま「やること」にする(撮影用の簡単な身代わり)
+    const reply = String(p.reply ?? '')
+    const asker = String(p.asker ?? '')
+    const due = String((p.card as Obj | undefined)?.productionDue ?? '')
+    const sentences = reply.split(/(?<=[.。!！])\s*/).map((s) => s.trim()).filter((s) => s.length > 3).slice(0, 2)
+    return J({ tasks: sentences.map((s) => ({ text: (en ? 'Apply: ' : '反映: ') + s.replace(/[.。]$/, ''), assignee: asker, due })) })
+  }
+
   if (task === 'suggest_instructions') {
     // 制作指示は、見出し(###)と箇条書きの Markdown(aiDraft.ts の指示と同じ形)
     return en
