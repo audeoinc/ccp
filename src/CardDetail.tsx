@@ -45,6 +45,9 @@ import { campaignSlug, encodeLinks, parseLinks, type Links } from './links'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
+import { Cr854_weeksService, type Cr854_weeks } from './gcpdata/Cr854_weeksService'
+import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
+import { confirmedWeekOf } from './weekLock'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
@@ -61,6 +64,8 @@ interface Props {
   otherThemes: string[]
   /** これまでに入れた担当者の名前(入力の候補) */
   owners?: string[]
+  /** 週の計画(確定した週の配信は、理由を残さないと保存できない。GCP 版だけ。Power Apps 版では空) */
+  weeks?: Cr854_weeks[]
   onBack: () => void
   onSaved: () => Promise<void>
 }
@@ -322,10 +327,14 @@ const useStyles = makeStyles({
   zoomLabel: { width: '34px', textAlign: 'right' },
   previewBox: { overflow: 'auto', minHeight: 0, paddingTop: '8px', paddingBottom: '8px' },
   error: { margin: '12px 12px 0' },
+  // 確定した週の配信: 上の知らせと、保存の前の理由の入力欄
+  locked: { margin: '0 24px 8px' },
+  reasonBox: { display: 'grid', rowGap: '8px', margin: '12px 24px 0', padding: '12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorPaletteMarigoldBorder2}`, backgroundColor: tokens.colorPaletteMarigoldBackground1 },
+  reasonActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
   actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], onBack, onSaved }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -398,6 +407,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       return !open
     })
   const [saving, setSaving] = useState(false)
+  // 確定した週の変更: 保存の前に、理由を入力してもらう(null = 入力欄を出していない)
+  const [changeReason, setChangeReason] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -730,8 +741,29 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     }
   }
 
-  async function submit(e: React.FormEvent) {
+  // 確定した週に入っている配信か(配信日時を変えるときは、移す前と移したあとの両方の週)。同じ週は 1 つにまとめる
+  const lockedWeeks = [confirmedWeekOf(weeks, card?.cr854_scheduledat), confirmedWeekOf(weeks, form.scheduledAt)].filter(
+    (w, i, all): w is Cr854_weeks => !!w && all.findIndex((x) => x?.cr854_weekid === w.cr854_weekid) === i,
+  )
+  const weekRange = (w: Cr854_weeks) => {
+    const s = new Date(`${w.cr854_weekstart?.slice(0, 10)}T00:00:00`)
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6)
+    const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })
+    return `${f(s)}–${f(e)}`
+  }
+
+  function submit(e: React.FormEvent) {
     e.preventDefault()
+    // 確定した週の配信は、すぐには保存しない。理由を入力してもらってから、保存して、週をレビューに戻す
+    if (lockedWeeks.length > 0) {
+      setChangeReason((r) => r ?? '')
+      return
+    }
+    void save()
+  }
+
+  /** 保存する。reason を渡したとき(確定した週の変更)は、配信を「検討中」に戻し、週をレビュー中に戻して、理由を記録する */
+  async function save(reason?: string) {
     setSaving(true)
     setError(null)
     try {
@@ -741,7 +773,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         cr854_country: num(form.country),
         cr854_channel: num(form.channel),
         cr854_department: num(form.department),
-        cr854_status: num(form.status),
+        // 確定後に変えた配信は、もう一度レビューを受けるので「検討中」にする
+        cr854_status: reason !== undefined ? (588230001 as Cr854_deliverycards['cr854_status']) : num(form.status),
         cr854_owner: form.owner.trim(),
         cr854_productiondue: form.productionDue || (null as never),
         cr854_links: encodeLinks(links),
@@ -779,6 +812,20 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       const cardId = card?.cr854_deliverycardid ?? res.data?.cr854_deliverycardid
       if (!cardId) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
       if (original) await syncItems(cardId, form.name, original)
+      if (reason !== undefined) {
+        const now = new Date().toISOString()
+        for (const w of lockedWeeks) {
+          const r = await Cr854_weeksService.update(w.cr854_weekid, { cr854_status: 'review', cr854_submittedat: now })
+          if (!r.success) throw new Error(r.error?.message ?? tr('週をレビュー中に戻せませんでした', 'Could not put the week back in review'))
+        }
+        const n = await Cr854_cardnotesService.create({
+          cr854_kind: 'change',
+          cr854_body: reason.trim(),
+          cr854_author: form.owner.trim(),
+          'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
+        })
+        if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
+      }
       await onSaved()
       onBack()
     } catch (err) {
@@ -849,6 +896,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </Tooltip>
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
+
+          {lockedWeeks.length > 0 && (
+            <MessageBar layout="multiline" intent="warning" className={styles.locked}>
+              <MessageBarBody>
+                {t(
+                  `この配信の週(${lockedWeeks.map(weekRange).join('、')})は確定済みです。変更を保存するときは、理由を入力します。保存すると、この配信は「検討中」に、週は「レビュー中」に戻ります。`,
+                  `The week of this delivery (${lockedWeeks.map(weekRange).join(', ')}) is confirmed. To save changes, enter a reason. Saving puts this delivery back to In review and the week back to review.`,
+                )}
+              </MessageBarBody>
+            </MessageBar>
+          )}
 
           <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px` } as React.CSSProperties}>
             {/* 左: 配信の情報 */}
@@ -1108,10 +1166,30 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               <MessageBarBody>{error}</MessageBarBody>
             </MessageBar>
           )}
+          {changeReason !== null && lockedWeeks.length > 0 && (
+            <div className={styles.reasonBox}>
+              <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
+                <AutoTextarea
+                  rows={2}
+                  size="small"
+                  autoFocus
+                  value={changeReason}
+                  onChange={(_, d) => setChangeReason(d.value)}
+                  placeholder={t('例: 在庫切れのため、商品を差し替え', 'e.g. Swapped a product that went out of stock')}
+                />
+              </Field>
+              <div className={styles.reasonActions}>
+                <Button type="button" size="small" onClick={() => setChangeReason(null)} disabled={saving}>{t('やめる', 'Back')}</Button>
+                <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => void save(changeReason)}>
+                  {t('保存して、レビューに戻す', 'Save and send back to review')}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className={styles.actions}>
             <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
-            <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving}>
-              {saving ? t('保存中...', 'Saving...') : t('保存', 'Save')}
+            <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)}>
+              {saving ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
             </Button>
           </div>
         </form>

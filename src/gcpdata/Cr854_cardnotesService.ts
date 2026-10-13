@@ -3,8 +3,11 @@
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、このファイルの読み込みを、サンプルデータに差し替える。
 import { makeService } from '../gcp/services'
 
-/** メモの種類。question = 制作からの質問(返信を付ける) / task = やること(質問のやり取りなどから生まれる) */
-export type NoteKind = 'question' | 'task'
+/**
+ * メモの種類。question = 制作からの質問(返信を付ける) / task = やること(質問のやり取りなどから生まれる) /
+ * change = 確定した週の配信を変えたときの理由(本文が理由。週をレビューに戻した記録)
+ */
+export type NoteKind = 'question' | 'task' | 'change'
 
 export interface Cr854_cardnotes {
   cr854_cardnoteid: string

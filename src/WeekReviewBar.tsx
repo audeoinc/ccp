@@ -3,6 +3,7 @@ import { Badge, Button, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/r
 import { ArrowUndoRegular, CheckmarkCircleRegular, SendRegular } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_weeks, WeekStatus } from './gcpdata/Cr854_weeksService'
+import type { Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
 import { locale, optionLabel, useT } from './i18n'
 import { statusColor, statusOptions } from './status'
 
@@ -25,6 +26,10 @@ const useStyles = makeStyles({
   count: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
   dot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular },
   actions: { display: 'flex', columnGap: '8px', marginLeft: 'auto' },
+  // 確定後の変更(理由つき)の一覧。帯の下の行に出す
+  changes: { flexBasis: '100%', display: 'grid', rowGap: '2px', paddingTop: '6px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
+  changesHead: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
+  changeRow: { color: tokens.colorNeutralForeground2, overflowWrap: 'anywhere' },
 })
 
 interface Props {
@@ -32,6 +37,8 @@ interface Props {
   week?: Cr854_weeks
   /** この週の配信(絞り込みを反映しない、すべての配信) */
   cards: Cr854_deliverycards[]
+  /** 確定した週の配信を変えたときの理由(すべての配信の分。この週の、最後の確定より後のものだけを出す) */
+  changes?: Cr854_cardnotes[]
   /** 状態を変える(週の配信のステータスも、まとめて進める。App 側で行う) */
   onChange: (status: WeekStatus) => Promise<void>
 }
@@ -43,7 +50,7 @@ const STATUS_APPROVED = 588230002
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
  * 確定は、週のすべての配信を「確定」にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, onChange }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], onChange }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -51,6 +58,17 @@ export function WeekReviewBar({ week, cards, onChange }: Props) {
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const counts = statusOptions.map((o) => ({ ...o, n: cards.filter((c) => (c.cr854_status ?? STATUS_NOT_STARTED) === o.value).length }))
   const notApproved = cards.filter((c) => (c.cr854_status ?? STATUS_NOT_STARTED) < STATUS_APPROVED).length
+  // 確定後の変更: この週の配信の、最後に確定した日時より後の理由。もう一度確定すると、それより前のものは出なくなる
+  const cardName = new Map(cards.map((c) => [c.cr854_deliverycardid, c.cr854_name]))
+  // 日時は、文字列ではなく時刻で比べる(サーバーとブラウザで、ISO の書き方が違うことがあるため)
+  const ms = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
+  const since = ms(week?.cr854_confirmedat)
+  const reopened =
+    status !== 'confirmed' && since > 0
+      ? changes
+          .filter((n) => n._cr854_deliverycard_value && cardName.has(n._cr854_deliverycard_value) && ms(n.createdon) > since)
+          .sort((a, b) => ms(a.createdon) - ms(b.createdon))
+      : []
 
   const run = async (next: WeekStatus, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return
@@ -134,6 +152,16 @@ export function WeekReviewBar({ week, cards, onChange }: Props) {
           </Button>
         )}
       </span>
+      {reopened.length > 0 && (
+        <div className={styles.changes}>
+          <span className={styles.changesHead}>{t(`確定後の変更 ${reopened.length} 件(もう一度確定してください)`, `${reopened.length} change(s) after confirmation (confirm the week again)`)}</span>
+          {reopened.map((n) => (
+            <span key={n.cr854_cardnoteid} className={styles.changeRow}>
+              {`${when(n.createdon)} ・ ${cardName.get(n._cr854_deliverycard_value!) ?? ''}${n.cr854_author ? `(${n.cr854_author})` : ''}: ${n.cr854_body ?? ''}`}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

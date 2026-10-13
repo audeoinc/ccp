@@ -33,7 +33,7 @@ import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { Cr854_heroimagesService } from './generated/services/Cr854_heroimagesService'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
-import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
+import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
 import { Cr854_weeksService, type Cr854_weeks, type WeekStatus } from './gcpdata/Cr854_weeksService'
 import { WeekReviewBar } from './WeekReviewBar'
 import { Calendar } from './Calendar'
@@ -49,9 +49,8 @@ import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
+import { sundayOf } from './weekLock'
 
-// 週の初め(日曜日)
-const sundayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay())
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
   const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })
@@ -314,6 +313,8 @@ function App() {
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
   // 週の計画(週のレビューの状態)
   const [weeks, setWeeks] = useState<Cr854_weeks[]>([])
+  // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
+  const [changeNotes, setChangeNotes] = useState<Cr854_cardnotes[]>([])
   // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
   const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
   // 週の表示の見方: 商品のバランス / 進み具合。ブラウザごとに覚える
@@ -345,9 +346,12 @@ function App() {
           const overdue = new Map<string, number>()
           const d = new Date()
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          setChangeNotes((res.data ?? []).filter((n) => n.cr854_kind === 'change'))
           for (const n of res.data ?? []) {
             const id = n._cr854_deliverycard_value
             if (!id || n.cr854_resolved) continue
+            // 変更の理由は記録なので、質問・タスクの数には入れない
+            if (n.cr854_kind === 'change') continue
             if (n.cr854_kind === 'task') {
               tasks.set(id, (tasks.get(id) ?? 0) + 1)
               if (n.cr854_due && n.cr854_due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
@@ -677,7 +681,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} onChange={changeWeek} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onChange={changeWeek} />
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
@@ -707,6 +711,7 @@ function App() {
           products={products}
           heroes={heroes}
           otherThemes={cards.filter((c) => c.cr854_deliverycardid !== selected?.cr854_deliverycardid && c.cr854_theme).map((c) => c.cr854_theme!)}
+          weeks={weeks}
           owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()}
           onBack={() => {
             setSelectedId(null)
