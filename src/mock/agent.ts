@@ -46,6 +46,51 @@ export function mockAgent(message: string): string {
     return { mode: 'update', reply: hasJa(last) ? jaDefault : enDefault }
   }
 
+  // 並べた配信の評価: 1 通あたりの売上の高い・低い配信と、ばらつきの大きい位置から、決まった形の文を作る
+  if (task === 'compare_results') {
+    type D = { id: string; date: string; name: string; slots?: string[]; kpis: { revenuePerRecipient?: number; clickRate?: number }; positions?: Record<string, number> }
+    const ds = (p.deliveries as D[] | undefined) ?? []
+    if (ds.length === 0) return J({ summary: '', best: [], worst: [], findings: [], next: [], confidence: '' })
+    const rpr = (d: D) => d.kpis.revenuePerRecipient ?? 0
+    const sorted = [...ds].sort((a, b) => rpr(b) - rpr(a))
+    const best = sorted[0]
+    const worst = sorted[sorted.length - 1]
+    const avg = ds.reduce((s, d) => s + rpr(d), 0) / ds.length
+    const diff = (d: D) => Math.round((rpr(d) / (avg || 1) - 1) * 100)
+    // 位置のばらつき: いちばん差の大きい位置
+    const keys = Object.keys(ds[0].positions ?? {})
+    const spread = keys
+      .map((k) => {
+        const vs = ds.map((d) => d.positions?.[k] ?? 0)
+        return { k, hi: Math.max(...vs), lo: Math.min(...vs), at: ds[vs.indexOf(Math.max(...vs))] }
+      })
+      .sort((a, b) => b.hi - b.lo - (a.hi - a.lo))[0]
+    const pname = (k: string, d?: D) => {
+      const [kind, i] = k.split(':')
+      if (k === 'hero') return en ? 'the hero' : 'メイン画像'
+      if (kind === 'button') return en ? `button ${Number(i) + 1}` : `ボタン ${Number(i) + 1}`
+      const prod = d?.slots?.[Number(i)]
+      return en ? `slot ${Number(i) + 1}${prod ? ` (${prod})` : ''}` : `商品の枠 ${Number(i) + 1}${prod ? `(${prod})` : ''}`
+    }
+    return en
+      ? J({
+          summary: `Across ${ds.length} deliveries, revenue per recipient ranged from ${rpr(worst).toFixed(2)} to ${rpr(best).toFixed(2)}.`,
+          best: [{ id: best.id, why: `Revenue per recipient ${diff(best)}% above the average.` }],
+          worst: best === worst ? [] : [{ id: worst.id, why: `${Math.abs(diff(worst))}% below the average.` }],
+          findings: spread ? [`${pname(spread.k)} varied the most: ${(spread.lo * 100).toFixed(0)}–${(spread.hi * 100).toFixed(0)}% of clicks.`] : [],
+          next: spread ? [`Reuse what was in ${pname(spread.k, spread.at)} on ${spread.at.date}.`] : [],
+          confidence: ds.length < 5 ? `Weak: only ${ds.length} deliveries.` : `Moderate: ${ds.length} deliveries compared.`,
+        })
+      : J({
+          summary: `${ds.length} 本の配信で、1 通あたりの売上は ${rpr(worst).toFixed(2)} 〜 ${rpr(best).toFixed(2)} の幅があった。`,
+          best: [{ id: best.id, why: `1 通あたりの売上が、平均より ${diff(best)}% 高い。` }],
+          worst: best === worst ? [] : [{ id: worst.id, why: `平均より ${Math.abs(diff(worst))}% 低い。` }],
+          findings: spread ? [`${pname(spread.k)}のクリックの割合が、${(spread.lo * 100).toFixed(0)}〜${(spread.hi * 100).toFixed(0)}% といちばんばらついた。`] : [],
+          next: spread ? [`${spread.at.date} の${pname(spread.k, spread.at)}の載せ方を、次も試す。`] : [],
+          confidence: ds.length < 5 ? `弱い: ${ds.length} 本だけ。` : `中くらい: ${ds.length} 本を比べた。`,
+        })
+  }
+
   // 結果の振り返り: 過去の平均との差が大きい位置・数字から、決まった形の文を作る
   if (task === 'review_results') {
     type Pos = { key: string; now: number; past: number }

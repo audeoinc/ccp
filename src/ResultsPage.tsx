@@ -25,6 +25,7 @@ import { AiIcon } from './AiMark'
 import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
 import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
+import { ResultsCompareView } from './ResultsCompareView'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -70,7 +71,7 @@ interface Props {
   /** 配信カードごとの掲載商品(メールの並び順の商品 ID。プレビューに使う) */
   cardProducts: Map<string, string[]>
   /** 見せ方・月・週は、計画の面と共通(切り替えても、同じ期間・見せ方のまま) */
-  view: 'month' | 'week' | 'list'
+  view: 'month' | 'week' | 'list' | 'compare'
   month: Date
   weekStart: Date
   /** 結果の面の操作を差し込む、共通のツールバーの場所 */
@@ -354,6 +355,20 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           <Spinner />
         ) : view === 'month' ? (
           <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} />
+        ) : view === 'compare' ? (
+          <ResultsCompareView
+            rows={allRows}
+            cardProducts={cardProducts}
+            products={products}
+            heroes={heroes}
+            money={money}
+            onOpen={onDetail}
+            onAdopt={async (r, text) => {
+              const now = r.result.cr854_notes?.trim()
+              const res = await Cr854_deliveryresultsService.update(r.result.cr854_deliveryresultid, { cr854_notes: now ? `${now}\n${text}` : text })
+              if (res.success) await load()
+            }}
+          />
         ) : view === 'week' ? (
           <ResultsWeek weekStart={weekStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} cardProducts={cardProducts} products={products} heroes={heroes} />
         ) : rows.length === 0 ? (

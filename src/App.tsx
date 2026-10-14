@@ -72,7 +72,8 @@ const weekLabel = (start: Date) => {
 }
 
 // 表示の切り替え(月のカレンダー / 週 / 表の一覧)。ブラウザごとに覚える
-type View = 'month' | 'week' | 'list'
+// compare(比べる)は、結果の面だけの見せ方
+type View = 'month' | 'week' | 'list' | 'compare'
 const VIEW_KEY = 'calendar.view'
 const LENS_KEY = 'week.lens'
 // 列を足したら、版を上げる(以前に選んだ列の設定では、新しい列が出ないため)
@@ -316,10 +317,16 @@ function App() {
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
   const showFace = (p: 'calendar' | 'results') => {
     setResultDetail(null)
+    // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
+    if (p === 'calendar' && view === 'compare') setView('month')
     setPage(p)
   }
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
-  const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
+  // 最初は計画の面なので、「比べる」を覚えていても、月で始める
+  const [view, setView] = useState<View>(() => {
+    const v = loadPref<View>(VIEW_KEY, 'month')
+    return v === 'compare' ? 'month' : v
+  })
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
 
   const load = useCallback(async () => {
@@ -683,15 +690,17 @@ function App() {
               <span className={styles.count}>{t(`${filtered.length} / ${cards.length} 件`, `${filtered.length} / ${cards.length} items`)}</span>
             </div>
             <div className={styles.monthRow}>
-              <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
+              <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
               <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel)}>
-                {view === 'week'
+                {view === 'compare'
+                  ? t('絞り込んで比べる', 'Filter and compare')
+                  : view === 'week'
                   ? weekLabel(weekStart)
                   : lang === 'ja'
                     ? `${month.getFullYear()}年${month.getMonth() + 1}月`
                     : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}
               </span>
-              <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
+              <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
               <div className={styles.viewSwitch} role="group" aria-label={t('表示', 'View')}>
                 <ToggleButton size="small" checked={view === 'month'} appearance={view === 'month' ? 'primary' : 'subtle'} onClick={() => changeView('month')}>
                   {t('月', 'Month')}
@@ -724,6 +733,17 @@ function App() {
                 )}
                 <ToggleButton size="small" checked={view === 'list'} appearance={view === 'list' ? 'primary' : 'subtle'} onClick={() => changeView('list')}>
                   {t('一覧', 'List')}
+                </ToggleButton>
+                {/* 比べる: 結果の面だけ。計画の面では、選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
+                <ToggleButton
+                  size="small"
+                  checked={view === 'compare'}
+                  appearance={view === 'compare' ? 'primary' : 'subtle'}
+                  disabled={page !== 'results'}
+                  title={page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('配信カードの項目で絞り込み、直近の配信を並べて比べます', 'Filter by delivery card fields and compare recent deliveries side by side')}
+                  onClick={() => changeView('compare')}
+                >
+                  {t('比べる', 'Compare')}
                 </ToggleButton>
               </div>
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
