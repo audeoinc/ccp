@@ -16,7 +16,6 @@ import {
   MessageBarBody,
   Select,
   Spinner,
-  ToggleButton,
   Tooltip,
   makeStyles,
   mergeClasses,
@@ -218,8 +217,6 @@ const useStyles = makeStyles({
     alignItems: 'center',
     columnGap: '2px',
     padding: '2px',
-    marginLeft: '2px',
-    marginRight: '6px',
     borderRadius: tokens.borderRadiusMedium,
     border: `1px solid ${tokens.colorBrandStroke2}`,
     backgroundColor: tokens.colorBrandBackground2,
@@ -244,7 +241,24 @@ const useStyles = makeStyles({
     '& button[class]': { boxShadow: 'none' },
   },
   lensBtnOn: { backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold, boxShadow: tokens.shadow2 },
-  viewSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: tokens.spacingHorizontalM },
+  // 見せ方の切り替え(ヘッダーの計画 / 結果と同じ形の、枠で囲んだ切り替え)
+  viewSwitch: {
+    display: 'inline-flex',
+    padding: '2px',
+    columnGap: '2px',
+    marginLeft: tokens.spacingHorizontalM,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  viewBtn: {
+    padding: `3px ${tokens.spacingHorizontalM}`,
+    ':disabled': { color: tokens.colorNeutralForegroundDisabled, cursor: 'not-allowed', backgroundColor: 'transparent' },
+  },
+  lensGroup: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', marginLeft: tokens.spacingHorizontalS },
+  lensLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  lensLabelOff: { color: tokens.colorNeutralForegroundDisabled },
+  toolbarDivider: { width: '1px', alignSelf: 'stretch', margin: `2px ${tokens.spacingHorizontalS}`, backgroundColor: tokens.colorNeutralStroke2 },
 })
 
 function FilterSelect({ label, value, options, onChange }: {
@@ -701,51 +715,60 @@ function App() {
                     : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}
               </span>
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
-              <div className={styles.viewSwitch} role="group" aria-label={t('表示', 'View')}>
-                <ToggleButton size="small" checked={view === 'month'} appearance={view === 'month' ? 'primary' : 'subtle'} onClick={() => changeView('month')}>
-                  {t('月', 'Month')}
-                </ToggleButton>
-                <ToggleButton size="small" checked={view === 'week'} appearance={view === 'week' ? 'primary' : 'subtle'} onClick={() => changeView('week')}>
-                  {t('週', 'Week')}
-                </ToggleButton>
-                {/* 週の見方は、「週」のすぐ隣に置く(週を選んだあと、そのまま切り替えられるように)。
-                    月・一覧でも出したままにして、選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
-                {/* 結果の面では、計画の見方は使わない(選べないだけにして、位置は変えない) */}
+              {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
+                  比べるは結果の面だけ。計画の面では選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
+              <div className={styles.viewSwitch} role="tablist" aria-label={t('見せ方', 'View')}>
                 {(
-                  <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('見方', 'Lens')} aria-disabled={!lensOn}>
-                    {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
-                      <button
-                        key={v}
-                        type="button"
-                        aria-pressed={lensOn && lens === v}
-                        disabled={!lensOn}
-                        title={!lensOn ? (page === 'results' ? t('計画の面で使えます', 'Available on the Plan side') : t('週の表示で使えます', 'Available in the week view')) : undefined}
-                        className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
-                        onClick={() => {
-                          setLens(v)
-                          savePref(LENS_KEY, v)
-                        }}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <ToggleButton size="small" checked={view === 'list'} appearance={view === 'list' ? 'primary' : 'subtle'} onClick={() => changeView('list')}>
-                  {t('一覧', 'List')}
-                </ToggleButton>
-                {/* 比べる: 結果の面だけ。計画の面では、選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
-                <ToggleButton
-                  size="small"
-                  checked={view === 'compare'}
-                  appearance={view === 'compare' ? 'primary' : 'subtle'}
-                  disabled={page !== 'results'}
-                  title={page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('配信カードの項目で絞り込み、直近の配信を並べて比べます', 'Filter by delivery card fields and compare recent deliveries side by side')}
-                  onClick={() => changeView('compare')}
-                >
-                  {t('比べる', 'Compare')}
-                </ToggleButton>
+                  [
+                    ['month', t('月', 'Month'), false, undefined],
+                    ['week', t('週', 'Week'), false, undefined],
+                    ['list', t('一覧', 'List'), false, undefined],
+                    [
+                      'compare',
+                      t('比べる', 'Compare'),
+                      page !== 'results',
+                      page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('配信カードの項目で絞り込み、直近の配信を並べて比べます', 'Filter by delivery card fields and compare recent deliveries side by side'),
+                    ],
+                  ] as const
+                ).map(([v, label, off, title]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="tab"
+                    aria-selected={view === v}
+                    disabled={off}
+                    title={title}
+                    className={mergeClasses(styles.faceBtn, styles.viewBtn, view === v && styles.faceBtnOn)}
+                    onClick={() => changeView(v)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
+              {/* 週の見方: 見せ方の切り替えのすぐ外に、ラベルを付けて置く。計画の面の週の表示だけで使い、ほかでは選べないだけにする */}
+              <span className={styles.lensGroup}>
+                <span className={mergeClasses(styles.lensLabel, !lensOn && styles.lensLabelOff)}>{t('週の見方', 'Week lens')}</span>
+                <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('週の見方', 'Week lens')} aria-disabled={!lensOn}>
+                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={lensOn && lens === v}
+                      disabled={!lensOn}
+                      title={!lensOn ? (page === 'results' ? t('計画の面で使えます', 'Available on the Plan side') : t('週の表示で使えます', 'Available in the week view')) : undefined}
+                      className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
+                      onClick={() => {
+                        setLens(v)
+                        savePref(LENS_KEY, v)
+                      }}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </span>
+              {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
+              <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
               {page === 'calendar' && (
               <Tooltip

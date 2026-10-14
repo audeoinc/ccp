@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Button,
   MessageBar,
   MessageBarBody,
+  Menu,
+  MenuButton,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   Spinner,
   ToggleButton,
   Tooltip,
@@ -11,7 +17,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowUploadRegular } from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowUploadRegular, DatabaseRegular } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
@@ -288,34 +294,32 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           ))}
         </div>
       )}
-      <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={rows.length === 0}>
-        {t('CSV で書き出す', 'Export CSV')}
-      </Button>
-      <Tooltip
-        content={t(
-          `テーマの種類(値下げ・セール・新作 など)がまだ決まっていない配信 ${untyped.length} 件を、AI が分けます。過去の配信と比べるときに、同じ種類の配信を集めるのに使います(詳しい結果で直せます)`,
-          `AI sorts the ${untyped.length} deliveries without a theme type (price drop, sale, new arrivals, ...). Used to find past deliveries of the same type (you can fix it in the details).`,
-        )}
-        relationship="description"
-      >
-        <Button size="small" appearance="subtle" icon={classifying ? <Spinner size="extra-tiny" /> : <AiIcon size={16} />} onClick={() => void classify()} disabled={classifying || untyped.length === 0}>
-          {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
-        </Button>
-      </Tooltip>
-      <Tooltip
-        content={t(
-          `配信の仕組みから出した結果の CSV を取り込みます。列: ${IMPORT_COLUMNS.join(', ')}(配信は、配信名と配信日で探します)`,
-          `Imports a results CSV from the delivery service. Columns: ${IMPORT_COLUMNS.join(', ')} (deliveries are matched by name and date)`,
-        )}
-        relationship="description"
-      >
-        <Button size="small" appearance="subtle" icon={<ArrowUploadRegular />} onClick={() => fileRef.current?.click()}>
-          {t('結果を取り込む', 'Import results')}
-        </Button>
-      </Tooltip>
-      <Button size="small" appearance="transparent" onClick={downloadSample}>
-        {t('取り込みの見本', 'Sample CSV')}
-      </Button>
+      {/* 操作(書き出し・取り込み・AI で分ける)は、1 つのメニューにまとめる(見せ方の切り替えと、見分けやすくするため) */}
+      <Menu>
+        <MenuTrigger disableButtonEnhancement>
+          <MenuButton size="small" appearance="subtle" icon={classifying ? <Spinner size="extra-tiny" /> : <DatabaseRegular />}>
+            {t('データ', 'Data')}
+          </MenuButton>
+        </MenuTrigger>
+        <MenuPopover>
+          <MenuList>
+            <MenuItem icon={<ArrowDownloadRegular />} disabled={rows.length === 0} onClick={exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
+              {t('CSV で書き出す', 'Export CSV')}
+            </MenuItem>
+            <MenuDivider />
+            <MenuItem icon={<ArrowUploadRegular />} onClick={() => fileRef.current?.click()}>
+              {t('結果を取り込む(CSV)', 'Import results (CSV)')}
+            </MenuItem>
+            <MenuItem onClick={downloadSample} secondaryContent={IMPORT_COLUMNS.length + t(' 列', ' columns')}>
+              {t('取り込みの見本を書き出す', 'Download a sample CSV')}
+            </MenuItem>
+            <MenuDivider />
+            <MenuItem icon={<AiIcon size={16} />} disabled={classifying || untyped.length === 0} onClick={() => void classify()} secondaryContent={t(`${untyped.length} 件`, `${untyped.length}`)}>
+              {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
+            </MenuItem>
+          </MenuList>
+        </MenuPopover>
+      </Menu>
       <input
         ref={fileRef}
         type="file"

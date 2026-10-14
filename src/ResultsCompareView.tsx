@@ -13,7 +13,9 @@ import { THEME_TYPES, themeTypeLabel, themeTypeOf } from './themeTypes'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '14px' },
-  filters: { display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', columnGap: '12px', rowGap: '8px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  // 比べる条件: ツールバー(画面の切り替え)ではなく、画面の中身の一部に見えるよう、枠と見出しを付ける
+  filters: { display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', columnGap: '12px', rowGap: '8px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  filtersTitle: { flexBasis: '100%', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   field: { minWidth: '180px' },
   ns: { display: 'flex', alignItems: 'center', columnGap: '4px' },
   count: { marginLeft: 'auto', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -203,6 +205,7 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
   return (
     <div className={styles.root}>
       <div className={styles.filters}>
+        <span className={styles.filtersTitle}>{t('比べる配信の条件', 'Which deliveries to compare')}</span>
         <Field label={t('テンプレート', 'Template')} size="small" className={styles.field}>
           <Select size="small" value={tpl} onChange={(_, d) => { setTemplate(d.value); setVerdict(null) }}>
             <option value="">{t('すべて', 'All')}</option>
