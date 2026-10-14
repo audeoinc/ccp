@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Badge,
   Button,
   Field,
   Menu,
@@ -23,6 +24,7 @@ import {
 } from '@fluentui/react-components'
 import {
   AddRegular,
+  AlertRegular,
   ArrowDownloadRegular,
   CalendarLtrRegular,
   ColumnTripleRegular,
@@ -46,6 +48,8 @@ import { WeekReviewBar } from './WeekReviewBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
+import { AlertsPage } from './AlertsPage'
+import { useStockAlerts } from './alerts'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -322,14 +326,17 @@ function App() {
   // 週の確認の一覧で選んだ項目。週を移ったら、選んでいないことにする(週ごとに中身が違うため)
   const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
   // 開いている画面: カレンダー / 配信結果(振り返り)
-  const [page, setPage] = useState<'calendar' | 'results'>('calendar')
+  // アラートは、計画・結果とは別の画面(ヘッダーの「アラート」から開く)
+  const [page, setPage] = useState<'calendar' | 'results' | 'alerts'>('calendar')
   // 結果の面で、詳しい結果(フロート)を開いている配信
   const [resultDetail, setResultDetail] = useState<string | null>(null)
   // 計画の面で、配信カードの上に重ねて見ている結果(閉じると、配信カードに戻る)
   const [peekResult, setPeekResult] = useState<string | null>(null)
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
-  const showFace = (p: 'calendar' | 'results') => {
+  // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
+  const alerts = useStockAlerts(cards, products, cards)
+  const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
     if (p === 'calendar' && view === 'compare') setView('month')
@@ -647,6 +654,22 @@ function App() {
           ))}
         </div>
         <span className={styles.headerSpacer} />
+        {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
+        <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少)', 'Changes that affect deliveries (out of stock, low stock)')} relationship="description">
+          <Button
+            appearance={page === 'alerts' ? 'primary' : 'subtle'}
+            size="small"
+            icon={<AlertRegular />}
+            onClick={() => showFace(page === 'alerts' ? 'calendar' : 'alerts')}
+          >
+            {t('アラート', 'Alerts')}
+            {alerts.length > 0 && (
+              <Badge size="small" appearance="filled" color={alerts.some((a) => a.kind === 'outOfStock') ? 'danger' : 'warning'} style={{ marginLeft: 6 }}>
+                {alerts.length}
+              </Badge>
+            )}
+          </Button>
+        </Tooltip>
         <Button appearance="primary" size="small" icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
           {t('新規作成', 'New')}
         </Button>
@@ -695,6 +718,9 @@ function App() {
         )}
         {!loading && !error && month && (
           <>
+            {/* アラートの画面は、期間・見せ方を使わないので、ツールバーを出さない */}
+            {page !== 'alerts' && (
+            <>
             <div className={styles.filterRow}>
               <FilterSelect label={t('国', 'Country')} value={filters.country} options={countryOptions} onChange={setFilter('country')} />
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
@@ -815,8 +841,12 @@ function App() {
               </div>
               )}
             </div>
+            </>
+            )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
-            {page === 'results' ? (
+            {page === 'alerts' ? (
+              <AlertsPage alerts={alerts} onOpenCard={setSelectedId} />
+            ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}
                 products={products}

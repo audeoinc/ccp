@@ -334,6 +334,35 @@ if (guideComment) {
   )
 }
 
+// ---- これから送る US の配信に載せる商品(アラートの見本)
+// 在庫の少ないダウンジャケット(U02・在庫 60)とケーブルニット(U09・在庫 70)を、何本もの配信に載せる
+// (配信を重ねると在庫が持たない、という見本。ほかは在庫に余裕のある商品)
+const UPCOMING_PICKS: [string, string[]][] = [
+  ['Weekend Sale', ['U02', 'U07', 'U09', 'U12']],
+  ['Holiday Preview', ['U01', 'U02', 'U06', 'U11']],
+  ['Halloween', ['U02', 'U09', 'U10', 'U03']],
+  ['Cozy Home', ['U09', 'U06', 'U11', 'U12']],
+  ['Early Black Friday', ['U02', 'U05', 'U07', 'U03']],
+]
+for (const [name, codes] of UPCOMING_PICKS) {
+  const card = cards.find((c) => c.cr854_name === name && c.cr854_country === COUNTRY['US'] && String(c.cr854_scheduledat ?? '') >= '2026-10-15')
+  if (!card) continue
+  const id = card.cr854_deliverycardid as string
+  codes.forEach((code, i) => {
+    deliveryProducts.push({
+      cr854_deliveryproductid: guid(`dp:upcoming:${id}:${code}`),
+      cr854_name: code,
+      _cr854_deliverycard_value: id,
+      _cr854_product_value: productId(code),
+      cr854_sortorder: i,
+      cr854_reason: '',
+      cr854_source: 588230000,
+      cr854_state: 588230000,
+      cr854_section: i < 2 ? 0 : 1,
+    })
+  })
+}
+
 // ---- 過去の配信(結果を、同じテンプレートの過去の配信と比べるため)
 // 2026-10-14 より前に送った US の配信を、1〜5 週前にも送ったことにする。テンプレート・テーマは同じで、商品とメイン画像を入れ替える
 // (同じ型の配信を、毎週くり返している、という想定)。その週は、確定済みにする

@@ -2609,6 +2609,226 @@
    "cr854_section": 0
   },
   {
+   "cr854_deliveryproductid": "197055fa-3ea1-4de9-aca3-32aca1628553",
+   "cr854_name": "U02",
+   "_cr854_deliverycard_value": "c5551907-d429-4fdc-af6e-f0395ac3a49e",
+   "_cr854_product_value": "22599c37-e733-4426-aa7a-69ad26908b84",
+   "cr854_sortorder": 0,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "16705141-41a1-42a2-a9a3-2df3a4628a0c",
+   "cr854_name": "U07",
+   "_cr854_deliverycard_value": "c5551907-d429-4fdc-af6e-f0395ac3a49e",
+   "_cr854_product_value": "1d599458-ec33-4c05-a57a-61ce239086cb",
+   "cr854_sortorder": 1,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "107047cf-43a1-45c8-a7a3-43fdaa62937e",
+   "cr854_name": "U09",
+   "_cr854_deliverycard_value": "c5551907-d429-4fdc-af6e-f0395ac3a49e",
+   "_cr854_product_value": "1b599132-ee33-4f2b-af7a-585c219083a5",
+   "cr854_sortorder": 2,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "1b7297b7-549f-41f4-a6a5-81019f604396",
+   "cr854_name": "U12",
+   "_cr854_deliverycard_value": "c5551907-d429-4fdc-af6e-f0395ac3a49e",
+   "_cr854_product_value": "20575a7a-6936-4f63-a077-51d81092a779",
+   "cr854_sortorder": 3,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "92772dc1-4d6e-4c02-af18-59937f3b5cd4",
+   "cr854_name": "U01",
+   "_cr854_deliverycard_value": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
+   "_cr854_product_value": "23599dca-e633-4293-a77a-64f42990903d",
+   "cr854_sortorder": 0,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "8f772908-4c6e-4a6f-a018-5b26823b618d",
+   "cr854_name": "U02",
+   "_cr854_deliverycard_value": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
+   "_cr854_product_value": "22599c37-e733-4426-aa7a-69ad26908b84",
+   "cr854_sortorder": 1,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "93772f54-486e-4423-a418-61727e3b5b41",
+   "cr854_name": "U06",
+   "_cr854_deliverycard_value": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
+   "_cr854_product_value": "1e5995eb-eb33-4a72-a67a-636122908538",
+   "cr854_sortorder": 2,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "967972a4-c96b-4d9f-a31b-67f67b3917f1",
+   "cr854_name": "U11",
+   "_cr854_deliverycard_value": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
+   "_cr854_product_value": "1f5758e7-6a36-40f6-a377-56910d92a2c0",
+   "cr854_sortorder": 3,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "1c1b3d6e-f68a-4675-ae9a-48b0018f5707",
+   "cr854_name": "U02",
+   "_cr854_deliverycard_value": "351724bc-67c5-4a39-ac7a-b64e4466cadb",
+   "_cr854_product_value": "22599c37-e733-4426-aa7a-69ad26908b84",
+   "cr854_sortorder": 0,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "131b2f43-fb8a-4e54-a99a-5a01fa8f4c02",
+   "cr854_name": "U09",
+   "_cr854_deliverycard_value": "351724bc-67c5-4a39-ac7a-b64e4466cadb",
+   "_cr854_product_value": "1b599132-ee33-4f2b-af7a-585c219083a5",
+   "cr854_sortorder": 1,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "201d8251-ee88-4b46-a69c-93df7d8c48a4",
+   "cr854_name": "U10",
+   "_cr854_deliverycard_value": "351724bc-67c5-4a39-ac7a-b64e4466cadb",
+   "_cr854_product_value": "1e575754-6b36-4289-a277-54fe0e92a453",
+   "cr854_sortorder": 2,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "1d1b3f01-f58a-44e2-af9a-4a43008f5574",
+   "cr854_name": "U03",
+   "_cr854_deliverycard_value": "351724bc-67c5-4a39-ac7a-b64e4466cadb",
+   "_cr854_product_value": "21599aa4-e833-45b9-a97a-681a27908d17",
+   "cr854_sortorder": 3,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "4571238b-67a6-4cc8-a7a2-26c9dfabac1e",
+   "cr854_name": "U09",
+   "_cr854_deliverycard_value": "25248639-1c20-4130-a083-c3f39e0f498a",
+   "_cr854_product_value": "1b599132-ee33-4f2b-af7a-585c219083a5",
+   "cr854_sortorder": 0,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "42711ed2-66a6-4b35-a0a2-34f4daaba43f",
+   "cr854_name": "U06",
+   "_cr854_deliverycard_value": "25248639-1c20-4130-a083-c3f39e0f498a",
+   "_cr854_product_value": "1e5995eb-eb33-4a72-a67a-636122908538",
+   "cr854_sortorder": 1,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "41735bd6-7ba4-4dad-a3a4-7844d3a95aa3",
+   "cr854_name": "U11",
+   "_cr854_deliverycard_value": "25248639-1c20-4130-a083-c3f39e0f498a",
+   "_cr854_product_value": "1f5758e7-6a36-40f6-a377-56910d92a2c0",
+   "cr854_sortorder": 2,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "40735a43-78a4-48f4-a6a4-7cfdd4a95c36",
+   "cr854_name": "U12",
+   "_cr854_deliverycard_value": "25248639-1c20-4130-a083-c3f39e0f498a",
+   "_cr854_product_value": "20575a7a-6936-4f63-a077-51d81092a779",
+   "cr854_sortorder": 3,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "1585b3ad-1997-4556-a9f8-d95b0776a46c",
+   "cr854_name": "U02",
+   "_cr854_deliverycard_value": "59b45759-9246-4fae-af9b-4ca3b88e1da0",
+   "_cr854_product_value": "22599c37-e733-4426-aa7a-69ad26908b84",
+   "cr854_sortorder": 0,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "0e85a8a8-1c97-4a0f-aef8-e13a0676a2d9",
+   "cr854_name": "U05",
+   "_cr854_deliverycard_value": "59b45759-9246-4fae-af9b-4ca3b88e1da0",
+   "_cr854_product_value": "1f59977e-ea33-48df-a37a-5ea8259089f1",
+   "cr854_sortorder": 1,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 0
+  },
+  {
+   "cr854_deliveryproductid": "1085abce-1e97-4d35-acf8-de1404769fb3",
+   "cr854_name": "U07",
+   "_cr854_deliverycard_value": "59b45759-9246-4fae-af9b-4ca3b88e1da0",
+   "_cr854_product_value": "1d599458-ec33-4c05-a57a-61ce239086cb",
+   "cr854_sortorder": 2,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
+   "cr854_deliveryproductid": "1485b21a-1a97-46e9-a8f8-d7c80876a5ff",
+   "cr854_name": "U03",
+   "_cr854_deliverycard_value": "59b45759-9246-4fae-af9b-4ca3b88e1da0",
+   "_cr854_product_value": "21599aa4-e833-45b9-a97a-681a27908d17",
+   "cr854_sortorder": 3,
+   "cr854_reason": "",
+   "cr854_source": 588230000,
+   "cr854_state": 588230000,
+   "cr854_section": 1
+  },
+  {
    "cr854_deliveryproductid": "f669144f-7ca5-4ae0-a8c6-810935b61702",
    "cr854_name": "U05",
    "_cr854_deliverycard_value": "e6c42998-11ee-41ff-adf8-8c3a77d5c151",
@@ -9938,6 +10158,24 @@
    "cr854_repliedby": "Jordan Lee",
    "cr854_repliedat": "2026-10-01T05:00:00.000Z",
    "cr854_resolved": 1
+  },
+  {
+   "cr854_cardnoteid": "1a005ce9-05db-4d6a-ad6e-00a70c6a0ff8",
+   "_cr854_deliverycard_value": "6b186c57-6607-4baa-a9e2-3e952bb26180",
+   "cr854_kind": "reply",
+   "cr854_sourcenote": "b8584d57-4bd0-44cc-a492-5afd0e9aeb02",
+   "cr854_author": "Ken Sato",
+   "cr854_body": "Good point. Would \"how to layer for chilly mornings\" work as the angle?",
+   "createdon": "2026-10-02T05:00:00.000Z"
+  },
+  {
+   "cr854_cardnoteid": "12292cb7-2114-495c-a575-398d224015f2",
+   "_cr854_deliverycard_value": "6b186c57-6607-4baa-a9e2-3e952bb26180",
+   "cr854_kind": "reply",
+   "cr854_sourcenote": "b8584d57-4bd0-44cc-a492-5afd0e9aeb02",
+   "cr854_author": "Mika Tanaka",
+   "cr854_body": "Yes, that works. Please also move the coat to the second section.",
+   "createdon": "2026-10-02T06:30:00.000Z"
   }
  ],
  "cr854_weeks": [
