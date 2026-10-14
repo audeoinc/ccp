@@ -47,6 +47,7 @@ import { WeekReviewBar } from './WeekReviewBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
+import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
@@ -309,6 +310,8 @@ function App() {
   const [page, setPage] = useState<'calendar' | 'results'>('calendar')
   // 結果の面で、詳しい結果(フロート)を開いている配信
   const [resultDetail, setResultDetail] = useState<string | null>(null)
+  // 計画の面で、配信カードの上に重ねて見ている結果(閉じると、配信カードに戻る)
+  const [peekResult, setPeekResult] = useState<string | null>(null)
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
   const showFace = (p: 'calendar' | 'results') => {
@@ -826,19 +829,12 @@ function App() {
             void load()
           }}
           onSaved={load}
-          onOpenResults={(id) => {
-            const at = cards.find((c) => c.cr854_deliverycardid === id)?.cr854_scheduledat
-            if (at) {
-              const d = new Date(at)
-              setMonth(new Date(d.getFullYear(), d.getMonth(), 1))
-              setWeekStart(sundayOf(d))
-            }
-            setSelectedId(null)
-            setCreating(null)
-            setResultDetail(id)
-            setPage('results')
-          }}
+          // 結果は、面を切り替えずに、配信カードの上に重ねて見る。結果の面で、その結果から開いた配信カードでは出さない(下に結果があるため)
+          onOpenResults={page === 'results' && resultDetail === selected?.cr854_deliverycardid ? undefined : setPeekResult}
         />
+      )}
+      {peekResult && (
+        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} />
       )}
     </>
   )

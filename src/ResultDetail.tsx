@@ -40,7 +40,8 @@ interface Props {
   weekly: Cr854_weeklyperformances[]
   money: (v?: number) => string
   onClose: () => void
-  onOpenCard: (id: string) => void
+  /** 制作の詳細(配信カード)を、上に重ねて開く。配信カードから開いたときは渡さない(下に配信カードがあるため) */
+  onOpenCard?: (id: string) => void
   onSaved: () => Promise<void>
 }
 
@@ -67,9 +68,13 @@ export function ResultDetail({ row, productIds, products, heroes, weekly, money,
             <h2 className={styles.title}>{card.cr854_name}</h2>
             <span className={styles.sub}>{`${sentText} · ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
             <span className={styles.headActions}>
-              <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
-                <Button appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(card.cr854_deliverycardid)} />
-              </Tooltip>
+              {onOpenCard && (
+                <Tooltip content={t('この配信を作ったときの内容(配信カード)を、上に重ねて開きます。閉じると、この結果に戻ります', 'Opens the delivery card on top. Close it to come back to these results.')} relationship="description">
+                  <Button appearance="secondary" size="small" icon={<OpenRegular />} onClick={() => onOpenCard(card.cr854_deliverycardid)}>
+                    {t('制作の詳細', 'Production details')}
+                  </Button>
+                </Tooltip>
+              )}
               <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
             </span>
           </div>

@@ -69,7 +69,7 @@ interface Props {
   weeks?: Cr854_weeks[]
   onBack: () => void
   onSaved: () => Promise<void>
-  /** 配信結果の画面で、この配信の詳しい結果を開く(送ったあとの配信だけ、ボタンを出す) */
+  /** この配信の結果を、上に重ねて見る(送ったあとの配信だけ、ボタンを出す) */
   onOpenResults?: (id: string) => void
 }
 
@@ -961,7 +961,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </Tooltip>
             {card && onOpenResults && card.cr854_scheduledat && new Date(card.cr854_scheduledat) < new Date() && (
               <Button type="button" size="small" appearance="secondary" icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.cr854_deliverycardid)}>
-                {t('配信結果', 'Results')}
+                {t('結果を見る', 'View results')}
               </Button>
             )}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
