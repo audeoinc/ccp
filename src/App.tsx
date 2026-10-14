@@ -3,7 +3,12 @@ import {
   Button,
   Field,
   Menu,
+  MenuDivider,
+  MenuGroup,
+  MenuGroupHeader,
+  MenuItem,
   MenuItemCheckbox,
+  MenuItemRadio,
   MenuList,
   MenuPopover,
   MenuTrigger,
@@ -23,6 +28,7 @@ import {
   CalendarLtrRegular,
   ColumnTripleRegular,
   DataBarVerticalRegular,
+  SettingsRegular,
   LayoutColumnTwoRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -98,80 +104,46 @@ const useStyles = makeStyles({
   },
   headerIcon: { color: tokens.colorBrandForeground1, flexShrink: 0 },
   title: {
-    flexGrow: 1,
     margin: 0,
     fontSize: tokens.fontSizeBase400,
     fontWeight: tokens.fontWeightSemibold,
     lineHeight: tokens.lineHeightBase400,
     letterSpacing: '0.01em',
   },
-  // Fluent の標準スイッチは文字の色などを細かく変えにくいので、ヘッダーの設定だけ、自前のスイッチで描く
-  autoDraft: {
-    display: 'flex',
-    alignItems: 'center',
-    columnGap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
-    border: 'none',
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: 'transparent',
-    color: tokens.colorNeutralForeground2,
-    fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
-    cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground2 },
-  },
-  track: {
-    position: 'relative',
-    flexShrink: 0,
-    width: '32px',
-    height: '18px',
-    boxSizing: 'border-box',
-    borderRadius: tokens.borderRadiusCircular,
-    border: `1.5px solid ${tokens.colorNeutralStrokeAccessible}`,
-    backgroundColor: 'transparent',
-    transitionProperty: 'background-color, border-color',
-    transitionDuration: tokens.durationFast,
-  },
-  trackOn: { backgroundColor: tokens.colorBrandBackground, borderTopColor: tokens.colorBrandBackground, borderRightColor: tokens.colorBrandBackground, borderBottomColor: tokens.colorBrandBackground, borderLeftColor: tokens.colorBrandBackground },
-  thumb: {
-    position: 'absolute',
-    top: '2px',
-    left: '2px',
-    width: '11px',
-    height: '11px',
-    borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: tokens.colorNeutralStrokeAccessible,
-    transitionProperty: 'left, background-color',
-    transitionDuration: tokens.durationFast,
-  },
-  thumbOn: { left: '16px', backgroundColor: tokens.colorNeutralForegroundOnBrand },
-  langSwitch: {
+  // 表(計画)と裏(結果)の切り替え。題名のすぐ横に固定して、どちらの面でも位置が動かないようにする
+  faceSwitch: {
     display: 'inline-flex',
     padding: '2px',
     columnGap: '2px',
     borderRadius: tokens.borderRadiusMedium,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
+    backgroundColor: tokens.colorNeutralBackground2,
   },
-  langBtn: {
+  faceBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '6px',
     border: 'none',
     borderRadius: tokens.borderRadiusSmall,
-    padding: `2px ${tokens.spacingHorizontalS}`,
+    padding: `4px ${tokens.spacingHorizontalM}`,
     backgroundColor: 'transparent',
     color: tokens.colorNeutralForeground2,
     fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
     cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground2 },
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
-  langBtnOn: {
-    backgroundColor: tokens.colorBrandBackground,
-    color: tokens.colorNeutralForegroundOnBrand,
+  faceBtnOn: {
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorBrandForeground1,
     fontWeight: tokens.fontWeightSemibold,
-    ':hover': { backgroundColor: tokens.colorBrandBackground },
+    boxShadow: tokens.shadow2,
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1 },
   },
-  autoDraftState: { fontWeight: tokens.fontWeightSemibold, minWidth: '2.2em', color: tokens.colorNeutralForeground1 },
+  headerSpacer: { flexGrow: 1 },
+  // 結果の面だけの操作(まとめ方・書き出し・取り込み)を、共通のツールバーのこの場所に差し込む
+  toolbarSlot: { display: 'contents' },
   container: {
     width: '100%',
     boxSizing: 'border-box',
@@ -331,8 +303,14 @@ function App() {
   const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
   // 開いている画面: カレンダー / 配信結果(振り返り)
   const [page, setPage] = useState<'calendar' | 'results'>('calendar')
-  // 配信カードの「配信結果」から来たときの、詳しい結果を出す配信
-  const [resultsFor, setResultsFor] = useState<string | null>(null)
+  // 結果の面で、詳しい結果を開いている配信(開いている間は、共通のツールバーを隠す)
+  const [resultDetail, setResultDetail] = useState<string | null>(null)
+  // 結果の面の操作を差し込む、ツールバーの場所
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
+  const showFace = (p: 'calendar' | 'results') => {
+    setResultDetail(null)
+    setPage(p)
+  }
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
@@ -520,6 +498,8 @@ function App() {
     }
     await load()
   }
+  // 週の見方(商品 / 進み具合)は、計画の面の、週の表示だけで使う
+  const lensOn = page === 'calendar' && view === 'week'
   const changeView = (v: View) => {
     // 週の表示に切り替えたら: 表示中の月に今日があれば今週、なければ、その月の最初の週
     if (v === 'week' && view !== 'week' && month) {
@@ -579,68 +559,61 @@ function App() {
       <TemplateManager />
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
-        <h1 className={styles.title}>{t('配信カレンダー', 'Delivery Calendar')}</h1>
-        <Button appearance="subtle" size="small" icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
-          {t('テンプレート', 'Templates')}
-        </Button>
-        <ToggleButton appearance={page === 'results' ? 'primary' : 'subtle'} size="small" checked={page === 'results'} icon={<DataBarVerticalRegular />} onClick={() => {
-            setResultsFor(null)
-            setPage(page === 'results' ? 'calendar' : 'results')
-          }}>
-          {t('配信結果', 'Results')}
-        </ToggleButton>
-        <div className={styles.langSwitch} role="group" aria-label={t('言語', 'Language')}>
-          {([['ja', '日本語'], ['en', 'English']] as const).map(([l, name]) => (
-            <button
-              key={l}
-              type="button"
-              lang={l}
-              aria-pressed={lang === l}
-              className={mergeClasses(styles.langBtn, lang === l && styles.langBtnOn)}
-              onClick={() => setLang(l)}
-            >
-              {name}
+        <h1 className={styles.title}>{t('コンテンツプランナー', 'Contents Planner')}</h1>
+        {/* 計画(表)と結果(裏)。同じ期間・見せ方・絞り込みのまま、面だけを切り替える */}
+        <div className={styles.faceSwitch} role="tablist" aria-label={t('計画と結果', 'Plan and results')}>
+          {(
+            [
+              ['calendar', t('計画', 'Plan'), <CalendarLtrRegular key="i" />],
+              ['results', t('結果', 'Results'), <DataBarVerticalRegular key="i" />],
+            ] as const
+          ).map(([p, label, icon]) => (
+            <button key={p} type="button" role="tab" aria-selected={page === p} className={mergeClasses(styles.faceBtn, page === p && styles.faceBtnOn)} onClick={() => showFace(p)}>
+              {icon}
+              {label}
             </button>
           ))}
         </div>
-        <Tooltip
-          content={t('内容が空の配信カードを開いたとき、AIが自動で下書きを作ります(同じカードでは1回だけ)', 'When you open an empty delivery card, AI drafts its content automatically (once per card)')}
-          relationship="description"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoDraft}
-            className={styles.autoDraft}
-            onClick={() => {
-              setAutoDraft(!autoDraft)
-              saveAutoDraft(!autoDraft)
-            }}
-          >
-            <span className={mergeClasses(styles.track, autoDraft && styles.trackOn)}>
-              <span className={mergeClasses(styles.thumb, autoDraft && styles.thumbOn)} />
-            </span>
-            {t('開いたとき自動で下書き', 'Auto-draft on open')}
-            <span className={styles.autoDraftState}>{autoDraft ? t('オン', 'On') : t('オフ', 'Off')}</span>
-          </button>
-        </Tooltip>
+        <span className={styles.headerSpacer} />
         <Button appearance="primary" size="small" icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
           {t('新規作成', 'New')}
         </Button>
+        {/* 管理系(テンプレート・言語・自動の下書き)は、毎日の作業と分けて、設定のメニューにまとめる */}
+        <Menu
+          checkedValues={{ lang: [lang], auto: autoDraft ? ['on'] : [] }}
+          onCheckedValueChange={(_, d) => {
+            if (d.name === 'lang' && (d.checkedItems[0] === 'ja' || d.checkedItems[0] === 'en')) setLang(d.checkedItems[0])
+            if (d.name === 'auto') {
+              const on = d.checkedItems.includes('on')
+              setAutoDraft(on)
+              saveAutoDraft(on)
+            }
+          }}
+        >
+          <MenuTrigger disableButtonEnhancement>
+            <Tooltip content={t('設定(テンプレート・言語・自動の下書き)', 'Settings (templates, language, auto-draft)')} relationship="label">
+              <Button appearance="subtle" size="small" icon={<SettingsRegular />} />
+            </Tooltip>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
+                {t('テンプレートの管理', 'Manage templates')}
+              </MenuItem>
+              <MenuDivider />
+              <MenuGroup>
+                <MenuGroupHeader>{t('言語', 'Language')}</MenuGroupHeader>
+                <MenuItemRadio name="lang" value="ja">日本語</MenuItemRadio>
+                <MenuItemRadio name="lang" value="en">English</MenuItemRadio>
+              </MenuGroup>
+              <MenuDivider />
+              <MenuItemCheckbox name="auto" value="on" secondaryContent={autoDraft ? t('オン', 'On') : t('オフ', 'Off')}>
+                {t('開いたとき自動で下書き', 'Auto-draft on open')}
+              </MenuItemCheckbox>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
       </header>
-      {page === 'results' && !loading ? (
-        <ResultsPage
-          key={resultsFor ?? 'results'}
-          cards={cards}
-          products={products}
-          heroes={heroes}
-          cardProducts={cardProducts}
-          initialDetailId={resultsFor}
-          defaultCountry={filters.country}
-          onBack={() => setPage('calendar')}
-          onOpenCard={setSelectedId}
-        />
-      ) : (
       <div className={mergeClasses(styles.container, styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
         {error && (
@@ -650,6 +623,8 @@ function App() {
         )}
         {!loading && !error && month && (
           <>
+            {!(page === 'results' && resultDetail) && (
+            <>
             <div className={styles.filterRow}>
               <FilterSelect label={t('国', 'Country')} value={filters.country} options={countryOptions} onChange={setFilter('country')} />
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
@@ -677,15 +652,16 @@ function App() {
                 </ToggleButton>
                 {/* 週の見方は、「週」のすぐ隣に置く(週を選んだあと、そのまま切り替えられるように)。
                     月・一覧でも出したままにして、選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
+                {/* 結果の面では、計画の見方は使わない(選べないだけにして、位置は変えない) */}
                 {(
-                  <div className={mergeClasses(styles.lensSwitch, view !== 'week' && styles.lensOff)} role="group" aria-label={t('見方', 'Lens')} aria-disabled={view !== 'week'}>
+                  <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('見方', 'Lens')} aria-disabled={!lensOn}>
                     {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
                       <button
                         key={v}
                         type="button"
-                        aria-pressed={view === 'week' && lens === v}
-                        disabled={view !== 'week'}
-                        title={view !== 'week' ? t('週の表示で使えます', 'Available in the week view') : undefined}
+                        aria-pressed={lensOn && lens === v}
+                        disabled={!lensOn}
+                        title={!lensOn ? (page === 'results' ? t('計画の面で使えます', 'Available on the Plan side') : t('週の表示で使えます', 'Available in the week view')) : undefined}
                         className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
                         onClick={() => {
                           setLens(v)
@@ -701,6 +677,8 @@ function App() {
                   {t('一覧', 'List')}
                 </ToggleButton>
               </div>
+              <span ref={setToolbarSlot} className={styles.toolbarSlot} />
+              {page === 'calendar' && (
               <Tooltip
                 content={view === 'week' ? t('表示中の週の配信を、CSV で書き出します(絞り込みを反映)', "Export this week's deliveries as CSV (filters applied)") : t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")}
                 relationship="description"
@@ -709,7 +687,8 @@ function App() {
                   {t('CSV で書き出す', 'Export CSV')}
                 </Button>
               </Tooltip>
-              {view === 'list' && (
+              )}
+              {page === 'calendar' && view === 'list' && (
                 <Menu
                   checkedValues={{ columns }}
                   onCheckedValueChange={(_, d) => {
@@ -733,6 +712,7 @@ function App() {
                   </MenuPopover>
                 </Menu>
               )}
+              {page === 'calendar' && (
               <div className={styles.legend}>
                 {statusOptions.map((o) => (
                   <span key={o.value} className={styles.legendPill}>
@@ -741,9 +721,26 @@ function App() {
                   </span>
                 ))}
               </div>
+              )}
             </div>
+            </>
+            )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
-            {view === 'list' ? (
+            {page === 'results' ? (
+              <ResultsPage
+                cards={filtered}
+                products={products}
+                heroes={heroes}
+                cardProducts={cardProducts}
+                view={view}
+                month={month}
+                weekStart={weekStart}
+                toolbarSlot={toolbarSlot}
+                detailId={resultDetail}
+                onDetail={setResultDetail}
+                onOpenCard={setSelectedId}
+              />
+            ) : view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
@@ -772,7 +769,6 @@ function App() {
           </>
         )}
       </div>
-      )}
       {(selected || creating) && (
         <CardDetail
           key={selected?.cr854_deliverycardid ?? 'new'}
@@ -791,9 +787,15 @@ function App() {
           }}
           onSaved={load}
           onOpenResults={(id) => {
+            const at = cards.find((c) => c.cr854_deliverycardid === id)?.cr854_scheduledat
+            if (at) {
+              const d = new Date(at)
+              setMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+              setWeekStart(sundayOf(d))
+            }
             setSelectedId(null)
             setCreating(null)
-            setResultsFor(id)
+            setResultDetail(id)
             setPage('results')
           }}
         />

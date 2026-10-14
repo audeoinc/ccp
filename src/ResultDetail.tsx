@@ -11,7 +11,7 @@ import { ResultSummary } from './ResultSummary'
 import { isPush, parseLinkResults, parseProductResults, type ResultRow } from './results'
 
 const useStyles = makeStyles({
-  root: { padding: '12px 16px' },
+  root: {},
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', marginBottom: '12px' },
   title: { margin: 0, fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
   body: { display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', columnGap: '16px', alignItems: 'start' },

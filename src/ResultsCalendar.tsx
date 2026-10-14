@@ -67,7 +67,8 @@ interface Props {
   cards: Cr854_deliverycards[]
   /** 配信カード ID → 結果の行 */
   results: Map<string, ResultRow>
-  money: (v?: number) => string
+  /** 金額の表記(配信の国の通貨) */
+  money: (v: number | undefined, card: Cr854_deliverycards) => string
   /** 押したとき(結果があれば詳しい結果、なければ配信カード) */
   onOpen: (cardId: string) => void
 }
@@ -123,7 +124,7 @@ export function ResultsMonth({ month, cards, results, money, onOpen }: Props & {
                   <span className={styles.chipName} title={c.cr854_name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.cr854_name}`}</span>
                   {r ? (
                     <span className={styles.chipNums}>
-                      <span>{money(r.revenue)}</span>
+                      <span>{money(r.revenue, c)}</span>
                       <span>{isPush(c) ? t(`タップ ${pct(r.clickRate)}`, `Tap ${pct(r.clickRate)}`) : t(`開封 ${pct(r.openRate)}`, `Open ${pct(r.openRate)}`)}</span>
                       {delta(r.vsLastYear)}
                     </span>
@@ -184,7 +185,7 @@ export function ResultsWeek({
                   {r ? (
                     <span className={styles.kv}>
                       <span className={styles.k}>{t('売上', 'Revenue')}</span>
-                      <span className={styles.v}>{money(r.revenue)}</span>
+                      <span className={styles.v}>{money(r.revenue, c)}</span>
                       <span className={styles.k}>{isPush(c) ? t('タップ', 'Tap') : t('開封', 'Open')}</span>
                       <span className={styles.v}>{pct(isPush(c) ? r.clickRate : r.openRate)}</span>
                       {!isPush(c) && (

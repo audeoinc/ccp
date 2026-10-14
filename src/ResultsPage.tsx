@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Button,
-  Field,
   MessageBar,
   MessageBarBody,
-  Select,
   Spinner,
   ToggleButton,
   Tooltip,
@@ -12,32 +11,29 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowUploadRegular, ChevronLeftRegular, ChevronRightRegular } from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowUploadRegular } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
 import { Cr854_weeklyperformancesService } from './generated/services/Cr854_weeklyperformancesService'
 import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpdata/Cr854_deliveryresultsService'
-import { locale, optionLabel, priceText, useT, type Market } from './i18n'
-import { channelOptions, countryOptions } from './status'
+import { locale, priceText, useT, type Market } from './i18n'
 import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
 import { ResultDetail } from './ResultDetail'
 import { ResultSummary } from './ResultSummary'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
-import { sundayOf } from './weekLock'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', columnGap: '16px', padding: '12px 16px', alignItems: 'start' },
+  root: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', columnGap: '16px', alignItems: 'start' },
   // 月・週の表示は、右の欄を置かずに、横幅をすべて使う
   rootWide: { gridTemplateColumns: 'minmax(0, 1fr)' },
-  nav: { display: 'flex', alignItems: 'center', columnGap: '2px' },
-  navLabel: { minWidth: '150px', textAlign: 'center', fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
-  views: { display: 'flex', columnGap: '4px' },
+  // 月・週の表示の凡例(左・上の線の色)。カレンダーの凡例と同じく、右の端に置く
+  legend: { display: 'flex', columnGap: '10px', marginLeft: 'auto', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
+  legendItem: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
+  legendBar: { width: '3px', height: '12px', borderRadius: '1px' },
   sideEmpty: { padding: '12px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, color: tokens.colorNeutralForeground3 },
   main: { minWidth: 0 },
-  toolbar: { display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', columnGap: '12px', rowGap: '8px', marginBottom: '12px' },
-  field: { minWidth: '140px' },
   group: { display: 'flex', alignItems: 'center', columnGap: '4px' },
   groupLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: '4px' },
   tableWrap: { overflowX: 'auto', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium },
@@ -66,30 +62,23 @@ const useStyles = makeStyles({
 })
 
 type GroupBy = 'delivery' | 'theme' | 'template' | 'product'
-/** 見せ方: カレンダーと同じく、月 / 週 / 一覧 */
-type ResultsView = 'month' | 'week' | 'list'
-const VIEW_KEY = 'results.view'
-const loadView = (): ResultsView => {
-  try {
-    const v = localStorage.getItem(VIEW_KEY)
-    return v === 'week' || v === 'list' ? v : 'month'
-  } catch {
-    return 'month'
-  }
-}
 
 interface Props {
-  /** すべての配信 */
+  /** 配信(計画の面と同じ絞り込みをかけたもの。期間は、この中で絞る) */
   cards: Cr854_deliverycards[]
   products: Cr854_products[]
   heroes: Cr854_heroimages[]
   /** 配信カードごとの掲載商品(メールの並び順の商品 ID。プレビューに使う) */
   cardProducts: Map<string, string[]>
-  /** 開いたときに、詳しい結果を出す配信(配信カードの「結果」から来たとき) */
-  initialDetailId?: string | null
-  /** 最初に選んでおく国(カレンダーの絞り込みを引き継ぐ。空なら US) */
-  defaultCountry?: string
-  onBack: () => void
+  /** 見せ方・月・週は、計画の面と共通(切り替えても、同じ期間・見せ方のまま) */
+  view: 'month' | 'week' | 'list'
+  month: Date
+  weekStart: Date
+  /** 結果の面の操作を差し込む、共通のツールバーの場所 */
+  toolbarSlot: HTMLElement | null
+  /** 詳しい結果を開いている配信(App が持つ。配信カードの「配信結果」からも開く) */
+  detailId: string | null
+  onDetail: (id: string | null) => void
   /** 配信カードを開く */
   onOpenCard: (id: string) => void
 }
@@ -100,23 +89,15 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, initialDetailId, defaultCountry, onBack, onOpenCard }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<Cr854_deliveryresults[] | null>(null)
   const [weekly, setWeekly] = useState<Cr854_weeklyperformances[]>([])
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [country, setCountry] = useState(defaultCountry || String(COUNTRY_US))
-  const [channel, setChannel] = useState('')
-  const [view, setView] = useState<ResultsView>(loadView)
-  // 表示する月・週を決める日。配信カードから来たときは、その配信の日
-  const initialAt = cards.find((c) => c.cr854_deliverycardid === initialDetailId)?.cr854_scheduledat
-  const [anchor, setAnchor] = useState<Date>(() => (initialAt ? new Date(initialAt) : new Date()))
   const [groupBy, setGroupBy] = useState<GroupBy>('delivery')
-  const [selectedId, setSelectedId] = useState<string | null>(initialDetailId ?? null)
-  // 詳しい結果を開いている配信
-  const [detailId, setDetailId] = useState<string | null>(initialDetailId ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(detailId)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
@@ -137,12 +118,9 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
     // 最初の 1 回だけ読む
   }, [])
 
-  const market: Market = country === String(COUNTRY_US) ? 'US' : 'JP'
-  const money = (v?: number) => priceText(v === undefined ? undefined : Math.round(v), market)
   const allRows = useMemo(() => toResultRows(cards, results ?? []), [cards, results])
-  const scoped = allRows.filter((r) => (!country || String(r.card.cr854_country) === country) && (!channel || String(r.card.cr854_channel) === channel))
-  const month = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}`
-  const weekStart = sundayOf(anchor)
+  const scoped = allRows
+  const month = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`
   const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
   const inPeriod = (iso?: string) => {
     if (view !== 'week') return monthKey(iso) === month
@@ -151,22 +129,18 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
   }
   const rows = scoped.filter((r) => inPeriod(sentAtOf(r)))
   // 月・週の表示には、結果がまだの配信も出す(その期間の計画の全体の中で、結果を見るため)
-  const periodCards = cards.filter(
-    (c) => (!country || String(c.cr854_country) === country) && (!channel || String(c.cr854_channel) === channel) && inPeriod(c.cr854_scheduledat),
-  )
+  const periodCards = cards.filter((c) => inPeriod(c.cr854_scheduledat))
   const resultByCard = new Map(allRows.map((r) => [r.card.cr854_deliverycardid, r]))
-  const shift = (n: number) =>
-    setAnchor((a) => (view === 'week' ? new Date(a.getFullYear(), a.getMonth(), a.getDate() + 7 * n) : new Date(a.getFullYear(), a.getMonth() + n, 1)))
-  const changeView = (v: ResultsView) => {
-    setView(v)
-    try {
-      localStorage.setItem(VIEW_KEY, v)
-    } catch {
-      // 覚えられなくても、表示は切り替える
-    }
-  }
   // 押した配信: 結果があれば詳しい結果、なければ配信カード
-  const openDelivery = (id: string) => (resultByCard.has(id) ? setDetailId(id) : onOpenCard(id))
+  const openDelivery = (id: string) => (resultByCard.has(id) ? onDetail(id) : onOpenCard(id))
+  // 金額は、配信の国の通貨で。まとめた数字は、期間の配信がすべて同じ国のときだけ通貨を付ける(国が混ざると足せないため)
+  const marketOf = (c: Cr854_deliverycards): Market => (c.cr854_country === COUNTRY_US ? 'US' : 'JP')
+  const markets = new Set(rows.map((r) => marketOf(r.card)))
+  const single: Market | undefined = markets.size <= 1 ? ([...markets][0] ?? 'US') : undefined
+  const money = (v?: number, c?: Cr854_deliverycards) =>
+    c || single
+      ? priceText(v === undefined ? undefined : Math.round(v), c ? marketOf(c) : single)
+      : t(`${Math.round(v ?? 0).toLocaleString(locale())}(国が混在)`, `${Math.round(v ?? 0).toLocaleString(locale())} (mixed countries)`)
   const prevMonth = (() => {
     if (!month) return ''
     const [y, m] = month.split('-').map(Number)
@@ -189,10 +163,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
 
   const selected = rows.find((r) => r.card.cr854_deliverycardid === selectedId) ?? (groupBy === 'delivery' ? rows[0] : undefined)
 
-  const periodLabel =
-    view === 'week'
-      ? `${weekStart.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' })} – ${new Date(weekEnd.getTime() - 86400_000).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' })}`
-      : anchor.toLocaleDateString(locale(), { year: 'numeric', month: 'long' })
   const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' }) : '')
   const delta = (v?: number) =>
     v === undefined ? (
@@ -275,100 +245,76 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
         products={products}
         heroes={heroes}
         weekly={weekly}
-        money={(v) => priceText(v === undefined ? undefined : Math.round(v), detail.card.cr854_country === COUNTRY_US ? 'US' : 'JP')}
-        onBack={() => setDetailId(null)}
+        money={(v) => money(v, detail.card)}
+        onBack={() => onDetail(null)}
         onOpenCard={onOpenCard}
         onSaved={load}
       />
     )
   }
 
+  // 共通のツールバーに差し込む、結果の面の操作(まとめ方は、一覧のときだけ)
+  const tools = (
+    <>
+      {view === 'list' && (
+        <div className={styles.group} role="group" aria-label={t('まとめ方', 'Group by')}>
+          <span className={styles.groupLabel}>{t('まとめ方', 'Group by')}</span>
+          {(
+            [
+              ['delivery', t('配信', 'Delivery')],
+              ['theme', t('テーマ', 'Theme')],
+              ['template', t('テンプレート', 'Template')],
+              ['product', t('商品', 'Product')],
+            ] as const
+          ).map(([k, label]) => (
+            <ToggleButton key={k} size="small" checked={groupBy === k} appearance={groupBy === k ? 'primary' : 'subtle'} onClick={() => setGroupBy(k)}>
+              {label}
+            </ToggleButton>
+          ))}
+        </div>
+      )}
+      <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={rows.length === 0}>
+        {t('CSV で書き出す', 'Export CSV')}
+      </Button>
+      <Tooltip
+        content={t(
+          `配信の仕組みから出した結果の CSV を取り込みます。列: ${IMPORT_COLUMNS.join(', ')}(配信は、配信名と配信日で探します)`,
+          `Imports a results CSV from the delivery service. Columns: ${IMPORT_COLUMNS.join(', ')} (deliveries are matched by name and date)`,
+        )}
+        relationship="description"
+      >
+        <Button size="small" appearance="subtle" icon={<ArrowUploadRegular />} onClick={() => fileRef.current?.click()}>
+          {t('結果を取り込む', 'Import results')}
+        </Button>
+      </Tooltip>
+      <Button size="small" appearance="transparent" onClick={downloadSample}>
+        {t('取り込みの見本', 'Sample CSV')}
+      </Button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv,text/csv"
+        className={styles.hidden}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (f) void importCsv(f)
+        }}
+      />
+      {view !== 'list' && (
+        <span className={styles.legend}>
+          <span className={styles.legendItem}><span className={styles.legendBar} style={{ backgroundColor: tokens.colorPaletteGreenBorderActive }} />{t('前年より上', 'Above last year')}</span>
+          <span className={styles.legendItem}><span className={styles.legendBar} style={{ backgroundColor: tokens.colorPaletteRedBorderActive }} />{t('前年より下', 'Below last year')}</span>
+          <span className={styles.legendItem}><span className={styles.legendBar} style={{ backgroundColor: tokens.colorNeutralStroke1 }} />{t('結果なし', 'No results')}</span>
+        </span>
+      )}
+    </>
+  )
+
   return (
     <div className={mergeClasses(styles.root, view !== 'list' && styles.rootWide)}>
+      {toolbarSlot && createPortal(tools, toolbarSlot)}
       <div className={styles.main}>
-        <div className={styles.toolbar}>
-          <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={onBack}>
-            {t('カレンダー', 'Calendar')}
-          </Button>
-          <div className={styles.nav}>
-            <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
-            <span className={styles.navLabel}>{periodLabel}</span>
-            <Button size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
-          </div>
-          <div className={styles.views} role="group" aria-label={t('表示', 'View')}>
-            {(
-              [
-                ['month', t('月', 'Month')],
-                ['week', t('週', 'Week')],
-                ['list', t('一覧', 'List')],
-              ] as const
-            ).map(([k, label]) => (
-              <ToggleButton key={k} size="small" checked={view === k} appearance={view === k ? 'primary' : 'subtle'} onClick={() => changeView(k)}>
-                {label}
-              </ToggleButton>
-            ))}
-          </div>
-          <Field label={t('国', 'Country')} size="small" className={styles.field}>
-            <Select size="small" value={country} onChange={(_, d) => setCountry(d.value)}>
-              {countryOptions.map((o) => (
-                <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t('チャネル', 'Channel')} size="small" className={styles.field}>
-            <Select size="small" value={channel} onChange={(_, d) => setChannel(d.value)}>
-              <option value="">{t('すべて', 'All')}</option>
-              {channelOptions.map((o) => (
-                <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
-              ))}
-            </Select>
-          </Field>
-          {view === 'list' && (
-          <div className={styles.group} role="group" aria-label={t('まとめ方', 'Group by')}>
-            <span className={styles.groupLabel}>{t('まとめ方', 'Group by')}</span>
-            {(
-              [
-                ['delivery', t('配信', 'Delivery')],
-                ['theme', t('テーマ', 'Theme')],
-                ['template', t('テンプレート', 'Template')],
-                ['product', t('商品', 'Product')],
-              ] as const
-            ).map(([k, label]) => (
-              <ToggleButton key={k} size="small" checked={groupBy === k} appearance={groupBy === k ? 'primary' : 'subtle'} onClick={() => setGroupBy(k)}>
-                {label}
-              </ToggleButton>
-            ))}
-          </div>
-          )}
-          <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={rows.length === 0}>
-            {t('書き出し', 'Export')}
-          </Button>
-          <Tooltip
-            content={t(
-              `配信の仕組みから出した結果の CSV を取り込みます。列: ${IMPORT_COLUMNS.join(', ')}(配信は、配信名と配信日で探します)`,
-              `Imports a results CSV from the delivery service. Columns: ${IMPORT_COLUMNS.join(', ')} (deliveries are matched by name and date)`,
-            )}
-            relationship="description"
-          >
-            <Button size="small" appearance="subtle" icon={<ArrowUploadRegular />} onClick={() => fileRef.current?.click()}>
-              {t('結果を取り込む', 'Import results')}
-            </Button>
-          </Tooltip>
-          <Button size="small" appearance="transparent" onClick={downloadSample}>
-            {t('取り込みの見本', 'Sample CSV')}
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            className={styles.hidden}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) void importCsv(f)
-            }}
-          />
-        </div>
         {error && (
           <MessageBar intent="error">
             <MessageBarBody>{error}</MessageBarBody>
@@ -382,7 +328,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
         {results === null && !error ? (
           <Spinner />
         ) : view === 'month' ? (
-          <ResultsMonth month={new Date(anchor.getFullYear(), anchor.getMonth(), 1)} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} />
+          <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} />
         ) : view === 'week' ? (
           <ResultsWeek weekStart={weekStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} cardProducts={cardProducts} products={products} heroes={heroes} />
         ) : rows.length === 0 ? (
@@ -426,7 +372,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
                           <td className={mergeClasses(styles.td, styles.clip)} title={templateName(r.card)}>{templateName(r.card)}</td>
                           <td className={mergeClasses(styles.td, styles.num)}>{pct(r.openRate)}</td>
                           <td className={mergeClasses(styles.td, styles.num)}>{pct(r.clickRate)}</td>
-                          <td className={mergeClasses(styles.td, styles.num)}>{money(r.revenue)}</td>
+                          <td className={mergeClasses(styles.td, styles.num)}>{money(r.revenue, r.card)}</td>
                           <td className={mergeClasses(styles.td, styles.num)}>{delta(r.vsPrevWeek)}</td>
                           <td className={mergeClasses(styles.td, styles.num)}>{delta(r.vsLastYear)}</td>
                         </tr>
@@ -493,9 +439,9 @@ export function ResultsPage({ cards, products, heroes, cardProducts, initialDeta
           weekly={weekly}
           productName={productName}
           productCode={productCode}
-          money={money}
+          money={(v) => money(v, selected.card)}
           onOpenCard={onOpenCard}
-          onOpenDetail={() => setDetailId(selected.card.cr854_deliverycardid)}
+          onOpenDetail={() => onDetail(selected.card.cr854_deliverycardid)}
           onSaved={load}
         />
       ) : (
