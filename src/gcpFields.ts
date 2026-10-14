@@ -23,5 +23,7 @@ declare module './generated/models/Cr854_deliverycardsModel' {
     cr854_pushtitle?: string
     /** アプリ: 通知の本文(メッセージのコピーとは別) */
     cr854_pushbody?: string
+    /** テーマの種類(src/themeTypes.ts の THEME_TYPES のキー。空は、まだ分けていない) */
+    cr854_themetype?: string
   }
 }

@@ -1,6 +1,8 @@
 // 撮影・デモ用の、AI エージェントの身代わり。実際の AI ではなく、依頼の内容(task、商品の一覧、チャットの指示)から、
 // それらしい返答(JSON の文字列)を、決まった形で作る。AI の画面の撮影のためだけに使う。
 
+import { guessThemeType } from '../themeGuess'
+
 type Obj = Record<string, unknown>
 type ProductIn = { code: string; name: string; category?: string; price?: number; stock?: number; salesTrend?: string; rating?: number }
 type HeroIn = { code: string; name: string; season?: string; purpose?: string }
@@ -42,6 +44,12 @@ export function mockAgent(message: string): string {
   const reply = (jaDefault: string, enDefault: string) => {
     if (chat.length === 0) return {}
     return { mode: 'update', reply: hasJa(last) ? jaDefault : enDefault }
+  }
+
+  // テーマの種類: 言葉から推し量った種類を、そのまま返す
+  if (task === 'classify_theme_types') {
+    const list = (p.deliveries as { id: string; name?: string; theme?: string; headline?: string }[] | undefined) ?? []
+    return J({ types: list.map((d) => ({ id: d.id, type: guessThemeType({ cr854_name: d.name, cr854_theme: d.theme, cr854_headline: d.headline }) })) })
   }
 
   if (task === 'suggest_themes') {

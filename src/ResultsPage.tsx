@@ -21,6 +21,9 @@ import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpd
 import { locale, priceText, useT, type Market } from './i18n'
 import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
 import { ResultDetail } from './ResultDetail'
+import { AiIcon } from './AiMark'
+import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
+import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
 
 const useStyles = makeStyles({
@@ -57,7 +60,7 @@ const useStyles = makeStyles({
   hidden: { display: 'none' },
 })
 
-type GroupBy = 'delivery' | 'theme' | 'template' | 'product'
+type GroupBy = 'delivery' | 'theme' | 'themeType' | 'template' | 'product'
 
 interface Props {
   /** 配信(計画の面と同じ絞り込みをかけたもの。期間は、この中で絞る) */
@@ -77,6 +80,8 @@ interface Props {
   onDetail: (id: string | null) => void
   /** 配信カードを開く */
   onOpenCard: (id: string) => void
+  /** 配信カードを書き換えたあと(テーマの種類など)、読み直す */
+  onCardsChanged: () => Promise<void>
 }
 
 const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
@@ -85,7 +90,7 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<Cr854_deliveryresults[] | null>(null)
@@ -149,6 +154,11 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const groups: GroupRow[] =
     groupBy === 'theme'
       ? groupRows(rows, 'theme', (r) => r.card.cr854_theme ?? '')
+      : groupBy === 'themeType'
+        ? groupRows(rows, 'theme', (r) => {
+            const tt = themeTypeOf(r.card)
+            return `${themeTypeLabel(tt.type)}${tt.guessed ? t('(推定)', ' (guessed)') : ''}`
+          })
       : groupBy === 'template'
         ? groupRows(rows, 'template', (r) => templateName(r.card))
         : groupBy === 'product'
@@ -202,6 +212,31 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     }
   }
 
+  // テーマの種類を、AI で分ける(まだ決まっていない、送った配信だけ。決まっているものは、人が直した結果かもしれないので触らない)
+  const untyped = cards.filter((c) => !c.cr854_themetype && resultByCard.has(c.cr854_deliverycardid))
+  const [classifying, setClassifying] = useState(false)
+  const classify = async () => {
+    setClassifying(true)
+    setMessage(null)
+    try {
+      let done = 0
+      // 一度に多く渡すと、返答が途中で切れることがあるので、20 件ずつ
+      for (let i = 0; i < untyped.length; i += 20) {
+        const types = await classifyThemeTypes(untyped.slice(i, i + 20))
+        for (const [id, type] of types) {
+          const res = await Cr854_deliverycardsService.update(id, { cr854_themetype: type })
+          if (res.success) done++
+        }
+      }
+      await onCardsChanged()
+      setMessage(t(`${done} 件の配信のテーマの種類を、AI が分けました`, `AI sorted theme types for ${done} deliveries`))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setClassifying(false)
+    }
+  }
+
   // CSV の取り込み: 配信ごとに、結果があれば上書き、なければ作る
   const importCsv = async (file: File) => {
     setMessage(null)
@@ -241,6 +276,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
             [
               ['delivery', t('配信', 'Delivery')],
               ['theme', t('テーマ', 'Theme')],
+              ['themeType', t('テーマの種類', 'Theme type')],
               ['template', t('テンプレート', 'Template')],
               ['product', t('商品', 'Product')],
             ] as const
@@ -254,6 +290,17 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={rows.length === 0}>
         {t('CSV で書き出す', 'Export CSV')}
       </Button>
+      <Tooltip
+        content={t(
+          `テーマの種類(値下げ・セール・新作 など)がまだ決まっていない配信 ${untyped.length} 件を、AI が分けます。過去の配信と比べるときに、同じ種類の配信を集めるのに使います(詳しい結果で直せます)`,
+          `AI sorts the ${untyped.length} deliveries without a theme type (price drop, sale, new arrivals, ...). Used to find past deliveries of the same type (you can fix it in the details).`,
+        )}
+        relationship="description"
+      >
+        <Button size="small" appearance="subtle" icon={classifying ? <Spinner size="extra-tiny" /> : <AiIcon size={16} />} onClick={() => void classify()} disabled={classifying || untyped.length === 0}>
+          {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
+        </Button>
+      </Tooltip>
       <Tooltip
         content={t(
           `配信の仕組みから出した結果の CSV を取り込みます。列: ${IMPORT_COLUMNS.join(', ')}(配信は、配信名と配信日で探します)`,
@@ -363,7 +410,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th className={styles.th}>{groupBy === 'theme' ? t('テーマ', 'Theme') : groupBy === 'template' ? t('テンプレート', 'Template') : t('商品', 'Product')}</th>
+                      <th className={styles.th}>{groupBy === 'theme' ? t('テーマ', 'Theme') : groupBy === 'themeType' ? t('テーマの種類', 'Theme type') : groupBy === 'template' ? t('テンプレート', 'Template') : t('商品', 'Product')}</th>
                       <th className={mergeClasses(styles.th, styles.num)}>{t('配信数', 'Deliveries')}</th>
                       {groupBy === 'product' ? (
                         <>
@@ -426,6 +473,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           onClose={() => onDetail(null)}
           onOpenCard={onOpenCard}
           onSaved={load}
+          onCardChanged={onCardsChanged}
         />
       )}
     </div>

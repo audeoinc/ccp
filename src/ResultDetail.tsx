@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Dialog, DialogSurface, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogSurface, Select, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
@@ -7,6 +7,8 @@ import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklype
 import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
 import { ResultCompare } from './ResultCompare'
+import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
+import { THEME_TYPES, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
 
@@ -49,13 +51,15 @@ interface Props {
   /** 制作の詳細(配信カード)を、上に重ねて開く。配信カードから開いたときは渡さない(下に配信カードがあるため) */
   onOpenCard?: (id: string) => void
   onSaved: () => Promise<void>
+  /** 配信カードを書き換えたあと(テーマの種類)、読み直す。渡さないときは、テーマの種類を直せない */
+  onCardChanged?: () => Promise<void>
 }
 
 /**
  * 配信 1 本の詳しい結果(フロート。計画の面の配信カードと同じ開き方)。
  * 上に主な数字、下に、クリックを重ねたプレビュー・リンクの表・メモと商品と AI の案を並べる
  */
-export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved }: Props) {
+export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved, onCardChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const { card } = row
@@ -66,6 +70,11 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   const sent = sentAtOf(row)
   const sentText = sent ? new Date(sent).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
   const previewH = Math.max(480, window.innerHeight * 0.94 - 220)
+  const themeType = themeTypeOf(card)
+  const setThemeType = async (v: ThemeType) => {
+    const res = await Cr854_deliverycardsService.update(card.cr854_deliverycardid, { cr854_themetype: v })
+    if (res.success) await onCardChanged?.()
+  }
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       <DialogSurface className={styles.surface}>
@@ -73,6 +82,23 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
           <div className={styles.head}>
             <h2 className={styles.title}>{card.cr854_name}</h2>
             <span className={styles.sub}>{`${sentText} · ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
+            <Tooltip
+              content={t('テーマの種類。過去の配信と比べるときに、同じ種類の配信を集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type. Used to find past deliveries of the same type. "guessed" is a provisional type inferred from the wording.')}
+              relationship="description"
+            >
+              <Select
+                size="small"
+                aria-label={t('テーマの種類', 'Theme type')}
+                value={themeType.guessed ? '' : themeType.type}
+                disabled={!onCardChanged}
+                onChange={(_, d) => d.value && void setThemeType(d.value as ThemeType)}
+              >
+                {themeType.guessed && <option value="">{t(`${themeTypeLabel(themeType.type)}(推定)`, `${themeTypeLabel(themeType.type)} (guessed)`)}</option>}
+                {THEME_TYPES.map((v) => (
+                  <option key={v} value={v}>{themeTypeLabel(v)}</option>
+                ))}
+              </Select>
+            </Tooltip>
             <span className={styles.headActions}>
               {onOpenCard && (
                 <Tooltip content={t('この配信を作ったときの内容(配信カード)を、上に重ねて開きます。閉じると、この結果に戻ります', 'Opens the delivery card on top. Close it to come back to these results.')} relationship="description">

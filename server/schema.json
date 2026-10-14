@@ -32,7 +32,8 @@
         ["cr854_pushlink", "push_link", "text", {"gcpOnly": true}],
         ["cr854_audience", "audience", "text", {"gcpOnly": true}],
         ["cr854_pushtitle", "push_title", "text", {"gcpOnly": true}],
-        ["cr854_pushbody", "push_body", "text", {"gcpOnly": true}]
+        ["cr854_pushbody", "push_body", "text", {"gcpOnly": true}],
+        ["cr854_themetype", "theme_type", "text", {"gcpOnly": true}]
       ],
       "lookups": [
         ["cr854_heroimage", "hero_image_id", "cr854_heroimages", {"onDelete": "SET NULL"}]

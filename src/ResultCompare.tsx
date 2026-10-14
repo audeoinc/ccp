@@ -4,7 +4,8 @@ import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
-import { isPush, pastSame, pct, positionLabel, positionShares, sentAtOf, templateName, type ResultRow } from './results'
+import { isPush, pastSame, pct, positionLabel, positionShares, sentAtOf, templateIdOf, templateName, type CompareBy, type ResultRow } from './results'
+import { themeTypeLabel, themeTypeOf } from './themeTypes'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '12px', paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -68,7 +69,9 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
   const styles = useStyles()
   const t = useT()
   const [n, setN] = useState<number>(5)
-  const past = pastSame(history, row, n)
+  const [by, setBy] = useState<CompareBy>('template')
+  const past = pastSame(history, row, n, by)
+  const myType = themeTypeOf(row.card)
   const push = isPush(row.card)
   const idsOf = (r: ResultRow) => cardProducts.get(r.card.cr854_deliverycardid) ?? []
 
@@ -99,6 +102,8 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
   const pastShares = past.map((p) => positionShares(p, idsOf(p)))
   const keys = [...nowShares.keys()].filter((k) => k !== 'other')
   const positions = keys.map((k) => ({ key: k, now: nowShares.get(k) ?? 0, base: avg(pastShares.map((m) => m.get(k)).filter((v): v is number => v !== undefined)) }))
+  // 位置で比べられるのは、テンプレートが同じときだけ(テンプレートが違うと、同じ番号の枠でも、大きさ・場所が違う)
+  const sameTemplate = past.every((p) => templateIdOf(p.card) === templateIdOf(row.card))
 
   const dateText = (r: ResultRow) => {
     const s = sentAtOf(r)
@@ -109,9 +114,19 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
     <section className={styles.root}>
       <div className={styles.head}>
         <h3 className={styles.h3}>{t('過去の配信と比べる', 'Compare with past deliveries')}</h3>
-        <span className={styles.sub}>
-          {t(`同じテンプレート(${templateName(row.card)})・同じ国とチャネルで、この配信より前に送ったもの`, `Same template (${templateName(row.card)}), country and channel, sent before this one`)}
+        <span className={styles.ns} style={{ marginLeft: 0 }} role="group" aria-label={t('比べる相手', 'Compare with')}>
+          {(
+            [
+              ['template', t(`同じテンプレート(${templateName(row.card)})`, `Same template (${templateName(row.card)})`)],
+              ['themeType', t(`同じテーマの種類(${themeTypeLabel(myType.type)}${myType.guessed ? '・推定' : ''})`, `Same theme type (${themeTypeLabel(myType.type)}${myType.guessed ? ', guessed' : ''})`)],
+            ] as const
+          ).map(([k, label]) => (
+            <ToggleButton key={k} size="small" checked={by === k} appearance={by === k ? 'primary' : 'subtle'} onClick={() => setBy(k)}>
+              {label}
+            </ToggleButton>
+          ))}
         </span>
+        <span className={styles.sub}>{t('同じ国とチャネルで、この配信より前に送ったもの', 'Same country and channel, sent before this one')}</span>
         <span className={styles.ns} role="group" aria-label={t('比べる回数', 'How many')}>
           <span className={styles.sub}>{t('過去', 'Last')}</span>
           {NS.map((v) => (
@@ -122,7 +137,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
         </span>
       </div>
       {past.length === 0 ? (
-        <div className={styles.muted}>{t('同じテンプレートの、過去の配信の結果がまだありません', 'No past results with the same template yet')}</div>
+        <div className={styles.muted}>{t('同じ条件の、過去の配信の結果がまだありません', 'No past results that match yet')}</div>
       ) : (
         <>
           <div className={styles.grid}>
@@ -146,6 +161,9 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
                 ))}
               </tbody>
             </table>
+            {!sameTemplate ? (
+              <div className={styles.muted}>{t('テンプレートが違う配信が混ざっているので、位置ごとの比べは出しません(同じ番号の枠でも、大きさ・場所が違うため)', 'Templates differ, so positions are not compared (the same slot number can be a different size and place)')}</div>
+            ) : (
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -173,6 +191,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
                 ))}
               </tbody>
             </table>
+            )}
           </div>
           <div className={styles.strip}>
             {past.map((p) => (
@@ -181,6 +200,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
                   <span>{dateText(p)}</span>
                   <span>{money(p.revenue)}</span>
                 </span>
+                {by === 'themeType' && <span className={styles.sub}>{p.card.cr854_name}</span>}
                 <span className={styles.heat}>
                   <HeatPreview row={p} productIds={idsOf(p)} products={products} heroes={heroes} width={150} maxHeight={320} compact />
                 </span>

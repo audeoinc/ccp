@@ -384,11 +384,15 @@ function App() {
       const data = res.data ?? []
       setCards(data)
       setError(null)
-      // 初回のみ、最初の配信がある月(なければ今月)を表示する
+      // 初回のみ、今月以降で最初に配信がある月を表示する(過去の配信が多くても、今の計画から見られるように)。
+      // 今月以降に配信がなければ、いちばん古い配信の月、配信がなければ今月
       setMonth((m) => {
         if (m) return m
-        const first = data.find((c) => c.cr854_scheduledat)?.cr854_scheduledat
-        const base = first ? new Date(first) : new Date()
+        const now = new Date()
+        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+        const dated = data.filter((c) => c.cr854_scheduledat)
+        const first = (dated.find((c) => new Date(c.cr854_scheduledat!).getTime() >= thisMonth) ?? dated[0])?.cr854_scheduledat
+        const base = first ? new Date(first) : now
         return new Date(base.getFullYear(), base.getMonth(), 1)
       })
     } catch (e) {
@@ -782,6 +786,7 @@ function App() {
                 detailId={resultDetail}
                 onDetail={setResultDetail}
                 onOpenCard={setSelectedId}
+                onCardsChanged={load}
               />
             ) : view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
@@ -834,7 +839,7 @@ function App() {
         />
       )}
       {peekResult && (
-        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} />
+        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} onCardChanged={load} />
       )}
     </>
   )

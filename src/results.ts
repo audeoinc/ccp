@@ -4,6 +4,7 @@ import type { Cr854_deliveryresults, LinkResults, ProductResult } from './gcpdat
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, templateFromValue } from './templates'
 import { parseCsv } from './csv'
+import { themeTypeOf } from './themeTypes'
 
 export const COUNTRY_US = 588230000
 
@@ -93,20 +94,21 @@ export function positionLabel(key: string, t: (ja: string, en: string) => string
   return kind === 'button' ? t(`ボタン ${i}`, `Button ${i}`) : t(`商品の枠 ${i}`, `Product slot ${i}`)
 }
 
-/** 比べる相手の選び方 */
-export type CompareBy = 'template'
+/** 比べる相手の選び方: 同じテンプレート / 同じテーマの種類 */
+export type CompareBy = 'template' | 'themeType'
 
-/** 同じ条件(いまは、同じ国・チャネル・テンプレート)で、この配信より前に送った配信を、新しい順に n 本 */
-export function pastSame(all: ResultRow[], row: ResultRow, n: number): ResultRow[] {
+/** 同じ条件(同じ国・チャネルと、同じテンプレートか、同じテーマの種類)で、この配信より前に送った配信を、新しい順に n 本 */
+export function pastSame(all: ResultRow[], row: ResultRow, n: number, by: CompareBy = 'template'): ResultRow[] {
   const at = new Date(sentAtOf(row) ?? 0).getTime()
-  const tpl = templateIdOf(row.card)
+  const key = (c: Cr854_deliverycards) => (by === 'template' ? templateIdOf(c) : themeTypeOf(c).type)
+  const mine = key(row.card)
   return all
     .filter(
       (o) =>
         o !== row &&
         o.card.cr854_country === row.card.cr854_country &&
         o.card.cr854_channel === row.card.cr854_channel &&
-        templateIdOf(o.card) === tpl &&
+        key(o.card) === mine &&
         new Date(sentAtOf(o) ?? 0).getTime() < at,
     )
     .sort((a, b) => new Date(sentAtOf(b) ?? 0).getTime() - new Date(sentAtOf(a) ?? 0).getTime())
