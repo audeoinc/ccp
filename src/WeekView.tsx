@@ -5,6 +5,7 @@ import {
   CalendarRegular,
   CheckmarkCircleFilled,
   CircleRegular,
+  CommentRegular,
   EyeRegular,
   MailRegular,
   PersonRegular,
@@ -37,6 +38,8 @@ interface Props {
   questionCounts: Map<string, number>
   /** 配信カードごとの、未完了のタスクの数 */
   taskCounts: Map<string, number>
+  /** 配信カードごとの、未対応のレビューのコメントの数 */
+  commentCounts?: Map<string, number>
   /** 配信カードごとの、期日を過ぎた未完了のタスクの数 */
   overdueTasks: Map<string, number>
   lens: WeekLens
@@ -192,7 +195,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, overdueTasks, lens, products, heroes, dueSoon, focus, onSelect, onCreate }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -237,6 +240,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
     const progress = cardProgress(c, ids.length)
     const questions = questionCounts.get(id) ?? 0
     const tasks = taskCounts.get(id) ?? 0
+    const comments = commentCounts?.get(id) ?? 0
     const overdue = overdueTasks.get(id) ?? 0
     const isPush = c.cr854_channel === PUSH
     const channel = c.cr854_channel === EMAIL ? 'email' : isPush ? 'push' : 'none'
@@ -272,9 +276,15 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
             {t(`未解決 ${questions}`, `${questions} open Q`)}
           </span>
         )}
+        {comments > 0 && (
+          <span className={mergeClasses(styles.issue, styles.issueWarn)}>
+            <CommentRegular />
+            {t(`コメント ${comments}`, `${comments} comment${comments === 1 ? '' : 's'}`)}
+          </span>
+        )}
       </>
     )
-    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0
+    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0 || comments > 0
 
     const pushBox = hasPushText && (
       <div className={styles.push}>

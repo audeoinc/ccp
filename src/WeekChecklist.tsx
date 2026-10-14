@@ -67,6 +67,7 @@ export function WeekChecklist({ items, selected, onSelect }: Props) {
       pushAlign: t('メールとプッシュのテーマ違い', 'Email / push to align'),
       leadMissing: t('載っていない主力の商品', 'Lead items not featured'),
       repeat: t('テーマ・メイン画像の連続', 'Same main image or theme in a row'),
+      openComments: t('未対応のコメント', 'Open comments'),
       openQuestions: t('未解決の質問', 'Open questions'),
       approved: t('承認済みの配信', 'Approved deliveries'),
     })[k]
@@ -76,6 +77,7 @@ export function WeekChecklist({ items, selected, onSelect }: Props) {
       pushAlign: t('同じ日のメールと、テーマがそろっていないプッシュ', 'Pushes whose theme differs from the same-day email'),
       leadMissing: t('販促の期間が、この週にかかる主力の商品', 'Lead items whose promotion period covers this week'),
       repeat: t('同じチャネルで、すぐ前の配信と同じ(前の週の最後の配信を含む)', 'Same as the previous delivery on the same channel (including the last one of the previous week)'),
+      openComments: t('レビューのコメントで、まだ対応済みにしていないもの', 'Review comments not marked resolved yet'),
       openQuestions: t('制作からの質問で、まだ解決していないもの', 'Questions from production that are not resolved yet'),
       approved: t('まだ承認されていない配信', 'Deliveries not approved yet'),
     })[k]

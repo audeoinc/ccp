@@ -292,3 +292,20 @@ if (heroQuestion) {
     taskFrom(heroQuestion, 'Move the full-look photo into Section 1', 'Alex Kim', '2026-09-27', false),
   )
 }
+
+// レビューのコメント(配信全体への指摘。1 件は未対応、1 件は対応済み)
+const comment = (card: string, author: string, body: string, at: string, fix?: { by: string; text: string; at: string }): Row => ({
+  ...note(card, author, body, at, fix, !!fix),
+  cr854_cardnoteid: guid(`comment:${card}:${body}`),
+  cr854_kind: 'comment',
+})
+cardNotes.push(
+  ...[
+    comment('Outerwear Guide', 'Mika Tanaka', 'The theme overlaps with the outerwear email two days earlier. Shift the angle to layering?', '2026-10-02T03:00:00.000Z'),
+    comment('アウター特集', 'Mika Tanaka', 'メイン画像が前週と同じなので、別のカットにしてください。', '2026-10-01T02:00:00.000Z', {
+      by: 'Jordan Lee',
+      text: 'メイン画像を、屋外のカットに差し替えました。',
+      at: '2026-10-01T05:00:00.000Z',
+    }),
+  ].filter((n) => n._cr854_deliverycard_value),
+)

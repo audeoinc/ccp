@@ -46,6 +46,7 @@ import { HandoffPanel } from './HandoffPanel'
 import { QuestionsPanel } from './QuestionsPanel'
 import { AiButton } from './AiButton'
 import { TasksPanel } from './TasksPanel'
+import { CommentsPanel } from './CommentsPanel'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { PushTimingPanel } from './PushTimingPanel'
@@ -55,7 +56,7 @@ import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { linkSlots, type Links } from './links'
 
 // links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
-type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'notice' | 'message' | 'timing'
+type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'comments' | 'notice' | 'message' | 'timing'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -1156,6 +1157,7 @@ export function ContentPane(props: Props) {
   // 引き継ぎ・タスクのタブに出す、未解決の質問・未完了のタスクの数(開いたときに数え、質問・タスクの欄で変わったら数え直す)
   const [openQuestions, setOpenQuestions] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
+  const [openComments, setOpenComments] = useState(0)
   const [noteVersion, setNoteVersion] = useState(0)
   const notesChanged = useCallback(() => setNoteVersion((v) => v + 1), [])
   useEffect(() => {
@@ -1167,6 +1169,7 @@ export function ContentPane(props: Props) {
         const notes = res.data ?? []
         setOpenQuestions(notes.filter((n) => !n.cr854_resolved && (n.cr854_kind ?? 'question') === 'question').length)
         setOpenTasks(notes.filter((n) => !n.cr854_resolved && n.cr854_kind === 'task').length)
+        setOpenComments(notes.filter((n) => !n.cr854_resolved && n.cr854_kind === 'comment').length)
       })
       .catch(() => undefined)
     return () => {
@@ -1181,7 +1184,7 @@ export function ContentPane(props: Props) {
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
     else if (tab === 'instructions') registerChat({ key: 'instructions', title: t('制作指示', 'Production notes') }, () => drafts.runInstructions())
     else if (tab === 'notice') registerChat({ key: 'push', title: t('通知', 'Notification') }, () => drafts.runPush())
-    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks' || tab === 'timing' || tab === 'message') registerChat(null)
+    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks' || tab === 'comments' || tab === 'timing' || tab === 'message') registerChat(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   })
 
@@ -1236,6 +1239,9 @@ export function ContentPane(props: Props) {
         </Tab>
         <Tab value="tasks" onClick={revealTab}>
           {`${t('タスク', 'Tasks')}${openTasks ? t(`(${openTasks})`, ` (${openTasks})`) : ''}`}
+        </Tab>
+        <Tab value="comments" onClick={revealTab}>
+          {`${t('コメント', 'Comments')}${openComments ? t(`(${openComments})`, ` (${openComments})`) : ''}`}
         </Tab>
       </TabList>
     </div>
@@ -1343,6 +1349,16 @@ export function ContentPane(props: Props) {
           productionDue={props.handoff.productionDue}
           onOpenSource={() => setTab('handoff')}
           onChanged={notesChanged}
+        />
+      )}
+      {tab === 'comments' && (
+        <CommentsPanel
+          cardId={props.cardId}
+          productIds={props.items.map((it) => it.productId)}
+          products={props.products}
+          owner={props.owner}
+          people={props.people}
+          onOpenCount={setOpenComments}
         />
       )}
       {tab === 'links' && (

@@ -314,6 +314,8 @@ function App() {
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未完了のタスクの数(一覧の列・週の表示)
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
+  // 配信カードごとの、未対応のレビューのコメントの数(週の表示・確認の一覧)
+  const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map())
   // 週の計画(週のレビューの状態)
   const [weeks, setWeeks] = useState<Cr854_weeks[]>([])
   // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
@@ -351,6 +353,7 @@ function App() {
           const counts = new Map<string, number>()
           const tasks = new Map<string, number>()
           const overdue = new Map<string, number>()
+          const comments = new Map<string, number>()
           const d = new Date()
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           setChangeNotes((res.data ?? []).filter((n) => n.cr854_kind === 'change'))
@@ -359,6 +362,10 @@ function App() {
             if (!id || n.cr854_resolved) continue
             // 変更の理由は記録なので、質問・タスクの数には入れない
             if (n.cr854_kind === 'change') continue
+            if (n.cr854_kind === 'comment') {
+              comments.set(id, (comments.get(id) ?? 0) + 1)
+              continue
+            }
             if (n.cr854_kind === 'task') {
               tasks.set(id, (tasks.get(id) ?? 0) + 1)
               if (n.cr854_due && n.cr854_due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
@@ -368,6 +375,7 @@ function App() {
           setQuestionCounts(counts)
           setTaskCounts(tasks)
           setOverdueTasks(overdue)
+          setCommentCounts(comments)
         })
         .catch(() => undefined)
       Cr854_weeksService.getAll()
@@ -466,11 +474,12 @@ function App() {
         products,
         policies,
         questionCounts,
+        commentCounts,
         cardLabel: (c) => `${c.cr854_scheduledat ? new Date(c.cr854_scheduledat).toLocaleDateString(locale(), { weekday: 'short' }) : ''} ${c.cr854_name}`.trim(),
       }),
     // 言語を変えたら、説明(曜日・種類)を作り直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, lang],
+    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, commentCounts, lang],
   )
   const checkKey = check?.week === weekKey ? check.key : null
   const focusItem = checklist.find((i) => i.key === checkKey)
@@ -721,6 +730,7 @@ function App() {
                 cardProducts={cardProducts}
                 questionCounts={questionCounts}
                 taskCounts={taskCounts}
+                commentCounts={commentCounts}
                 overdueTasks={overdueTasks}
                 lens={lens}
                 products={products}

@@ -5,13 +5,16 @@ import { makeService } from '../gcp/services'
 
 /**
  * メモの種類。question = 制作からの質問(返信を付ける) / task = やること(質問のやり取りなどから生まれる) /
- * change = 確定した週の配信を変えたときの理由(本文が理由。週をレビューに戻した記録)
+ * change = 確定した週の配信を変えたときの理由(本文が理由。週をレビューに戻した記録) /
+ * comment = レビューの指摘(配信全体、または載せた商品 1 つへの。対応した内容は reply に残し、resolved で対応済み)
  */
-export type NoteKind = 'question' | 'task' | 'change'
+export type NoteKind = 'question' | 'task' | 'change' | 'comment'
 
 export interface Cr854_cardnotes {
   cr854_cardnoteid: string
   _cr854_deliverycard_value?: string
+  /** comment: 指摘の対象の商品(配信全体への指摘なら、なし) */
+  _cr854_product_value?: string
   cr854_kind?: NoteKind
   /** 書いた人 */
   cr854_author?: string
@@ -37,8 +40,9 @@ interface Result<T> {
   error?: { message: string }
 }
 
-type Fields = Partial<Omit<Cr854_cardnotes, 'cr854_cardnoteid' | '_cr854_deliverycard_value' | 'createdon'>> & {
+type Fields = Partial<Omit<Cr854_cardnotes, 'cr854_cardnoteid' | '_cr854_deliverycard_value' | '_cr854_product_value' | 'createdon'>> & {
   'cr854_deliverycard@odata.bind'?: string
+  'cr854_product@odata.bind'?: string
 }
 
 const svc = makeService('cr854_cardnotes')

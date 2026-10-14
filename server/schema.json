@@ -153,7 +153,8 @@
         ["cr854_sourcenote", "source_note", "text"]
       ],
       "lookups": [
-        ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}]
+        ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}],
+        ["cr854_product", "product_id", "cr854_products", {"onDelete": "SET NULL"}]
       ]
     },
     "cr854_weeks": {

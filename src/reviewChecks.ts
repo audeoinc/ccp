@@ -19,7 +19,7 @@ export interface PolicyLite {
   promoPeriod?: string
 }
 
-export type CheckKey = 'overLimit' | 'pushAlign' | 'leadMissing' | 'repeat' | 'openQuestions' | 'approved'
+export type CheckKey = 'overLimit' | 'pushAlign' | 'leadMissing' | 'repeat' | 'openComments' | 'openQuestions' | 'approved'
 
 export interface CheckItem {
   key: CheckKey
@@ -65,11 +65,13 @@ export interface ChecklistInput {
   policies: Map<string, PolicyLite>
   /** 配信ごとの、未解決の質問の数 */
   questionCounts: Map<string, number>
+  /** 配信ごとの、未対応のレビューのコメントの数 */
+  commentCounts: Map<string, number>
   /** 配信を、説明の中で呼ぶ名前(曜日つき など)。画面の言語に合わせて、画面側で作る */
   cardLabel: (c: Cr854_deliverycards) => string
 }
 
-export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, products, policies, questionCounts, cardLabel }: ChecklistInput): CheckItem[] {
+export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, products, policies, questionCounts, commentCounts, cardLabel }: ChecklistInput): CheckItem[] {
   const start = ymd(weekStart)
   const end = ymd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6))
   const productById = new Map(products.map((p) => [p.cr854_productid, p]))
@@ -162,17 +164,21 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
     }),
   }
 
-  // ---- 未解決の質問(レビューのコメント(W5)ができたら、それも数える)
-  const asked = weekCards.filter((c) => (questionCounts.get(c.cr854_deliverycardid) ?? 0) > 0)
-  const openCount = asked.reduce((n, c) => n + (questionCounts.get(c.cr854_deliverycardid) ?? 0), 0)
-  const openQuestions: CheckItem = {
-    key: 'openQuestions',
-    count: openCount,
-    ok: openCount === 0,
-    cardIds: asked.map((c) => c.cr854_deliverycardid),
-    productIds: [],
-    details: asked.map((c) => `${cardLabel(c)} ×${questionCounts.get(c.cr854_deliverycardid)}`),
+  // ---- 未対応のレビューのコメント・未解決の質問(配信ごとの数を足す)
+  const openOf = (key: 'openComments' | 'openQuestions', counts: Map<string, number>): CheckItem => {
+    const hit = weekCards.filter((c) => (counts.get(c.cr854_deliverycardid) ?? 0) > 0)
+    const n = hit.reduce((sum, c) => sum + (counts.get(c.cr854_deliverycardid) ?? 0), 0)
+    return {
+      key,
+      count: n,
+      ok: n === 0,
+      cardIds: hit.map((c) => c.cr854_deliverycardid),
+      productIds: [],
+      details: hit.map((c) => `${cardLabel(c)} ×${counts.get(c.cr854_deliverycardid)}`),
+    }
   }
+  const openComments = openOf('openComments', commentCounts)
+  const openQuestions = openOf('openQuestions', questionCounts)
 
   // ---- 承認の数: 選んだときは、まだ承認されていない配信を出す(残りの作業が分かるように)
   const notApproved = weekCards.filter((c) => (c.cr854_status ?? 0) < STATUS_APPROVED)
@@ -186,5 +192,5 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
     details: notApproved.map(cardLabel),
   }
 
-  return [overLimit, pushAlign, leadMissing, repeat, openQuestions, approved]
+  return [overLimit, pushAlign, leadMissing, repeat, openComments, openQuestions, approved]
 }
