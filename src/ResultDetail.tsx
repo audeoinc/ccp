@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Switch, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronLeftRegular } from '@fluentui/react-icons'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
@@ -28,11 +28,10 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2,
   },
   previewBox: { position: 'relative', flexShrink: 0, boxShadow: tokens.shadow8 },
-  // 重ねる枠: クリックの割合が大きいほど濃い
+  // 重ねる枠: いちばん押されたリンクを最も濃くして、少ないリンクは、ほとんど色を付けない(色と線の濃さは、描くときに決める)
   spot: {
     position: 'absolute',
     boxSizing: 'border-box',
-    border: '2px solid rgba(230, 81, 0, 0.9)',
     borderRadius: '4px',
     pointerEvents: 'auto',
     cursor: 'default',
@@ -44,15 +43,22 @@ const useStyles = makeStyles({
     position: 'absolute',
     top: '2px',
     left: '2px',
-    padding: '1px 6px',
-    borderRadius: '10px',
-    backgroundColor: 'rgba(230, 81, 0, 0.95)',
-    color: '#fff',
-    fontSize: '11px',
+    padding: '0 5px',
+    borderRadius: '8px',
+    border: '1px solid rgba(230, 81, 0, 0.9)',
+    backgroundColor: '#fff',
+    color: '#b23c00',
+    fontSize: '10px',
+    lineHeight: '14px',
     fontWeight: 600,
     whiteSpace: 'nowrap',
     fontVariantNumeric: 'tabular-nums',
   },
+  // 上位のリンクのラベルは、塗りつぶして目立たせる
+  tagTop: { backgroundColor: 'rgba(230, 81, 0, 0.95)', color: '#fff' },
+  // ボタンのような薄い部品は、ラベルを外(上)に出して、文字を隠さない
+  tagOut: { top: '-16px', left: '0' },
+  sideHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '8px' },
   side: { flexGrow: 1, minWidth: '280px', maxWidth: '520px', display: 'grid', rowGap: '8px' },
   h3: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -109,6 +115,8 @@ export function ResultDetail({ row, productIds, products, heroes, weekly, money,
   const box = useRef<HTMLDivElement>(null)
   const [spots, setSpots] = useState<Spot[]>([])
   const [hover, setHover] = useState<string | null>(null)
+  // プレビューにクリックを重ねる(外すと、元の見た目で確かめられる)
+  const [overlay, setOverlay] = useState(true)
 
   // プレビューの中の、リンクの部品(data-link と、商品の枠の data-item-key)の位置を測る。画像の読み込みで位置が変わるので、測り直す
   useLayoutEffect(() => {
@@ -163,6 +171,9 @@ export function ResultDetail({ row, productIds, products, heroes, weekly, money,
   const byKey = new Map(rows.map((r) => [r.key, r]))
   const n = (v: number) => v.toLocaleString(locale())
 
+  // 濃さは、メッセージの中で、いちばん押されたリンクに対する割合(通知のタップは、別の物差しなので、中くらいの濃さに固定)
+  const maxClicks = Math.max(1, ...rows.filter((r) => r.key !== 'push').map((r) => r.clicks))
+  const rel = (r: LinkRow) => (r.key === 'push' ? 0.5 : r.clicks / maxClicks)
   const maxH = Math.max(420, window.innerHeight - 170)
   return (
     <div className={styles.root}>
@@ -179,27 +190,38 @@ export function ResultDetail({ row, productIds, products, heroes, weekly, money,
             <FitPreview maxWidth={push ? 560 : 460} maxHeight={maxH}>
               <CardPreview card={card} productIds={productIds} products={products} heroes={heroes} />
             </FitPreview>
-            {spots.map((s, i) => {
+            {overlay && spots.map((s, i) => {
               const r = byKey.get(s.key)
               if (!r) return null
               const v = share(r)
+              const k = rel(r)
               const on = hover === s.key
               return (
                 <div
                   key={`${s.key}-${i}`}
                   className={mergeClasses(styles.spot, on && styles.spotOn)}
-                  style={{ left: s.x, top: s.y, width: s.w, height: s.h, backgroundColor: `rgba(230, 81, 0, ${Math.min(0.5, 0.08 + v * 1.2)})` }}
+                  style={{
+                    left: s.x,
+                    top: s.y,
+                    width: s.w,
+                    height: s.h,
+                    backgroundColor: `rgba(230, 81, 0, ${(0.45 * k * k).toFixed(3)})`,
+                    border: `1.5px solid rgba(230, 81, 0, ${(0.25 + 0.7 * k).toFixed(3)})`,
+                  }}
                   title={`${r.label}: ${n(r.clicks)}`}
                   onMouseEnter={() => setHover(s.key)}
                   onMouseLeave={() => setHover(null)}
                 >
-                  <span className={styles.tag}>{`${n(r.clicks)} · ${(v * 100).toFixed(r.key === 'push' ? 1 : 0)}%`}</span>
+                  <span className={mergeClasses(styles.tag, k >= 0.6 && styles.tagTop, s.h < 40 && styles.tagOut)}>{`${n(r.clicks)} · ${(v * 100).toFixed(r.key === 'push' ? 1 : 0)}%`}</span>
                 </div>
               )
             })}
           </div>
           <div className={styles.side}>
-            <h3 className={styles.h3}>{t('リンクごとのクリック', 'Clicks by link')}</h3>
+            <div className={styles.sideHead}>
+              <h3 className={styles.h3}>{t('リンクごとのクリック', 'Clicks by link')}</h3>
+              <Switch checked={overlay} onChange={(_, d) => setOverlay(d.checked)} label={t('プレビューに重ねる', 'Show on preview')} />
+            </div>
             <div className={styles.note}>
               {t(
                 'クリックは延べ回数(1 人が何度も押すと、その分数えます)。割合は、メッセージの中のクリックの合計に対して。通知のタップは、送った数に対する割合です',
