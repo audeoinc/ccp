@@ -10217,7 +10217,8 @@
    "cr854_revenue": 33796,
    "cr854_lastyearrevenue": 40139,
    "cr854_products": "[{\"productId\":\"1b57529b-6e36-4742-a777-5cdd1192a90c\",\"clicks\":1477,\"units\":165,\"revenue\":13530},{\"productId\":\"8a5c7e86-773b-429b-a672-c4ec228e46a1\",\"clicks\":1620,\"units\":146,\"revenue\":6424},{\"productId\":\"8d5ec1d6-6c39-42b3-a575-01f0a38b401d\",\"clicks\":1905,\"units\":43,\"revenue\":2322},{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1494,\"units\":90,\"revenue\":11520}]",
-   "cr854_links": "{\"hero\":3455,\"buttons\":[787,502,119],\"other\":356}"
+   "cr854_links": "{\"hero\":3455,\"buttons\":[787,502,119],\"other\":356}",
+   "cr854_notes": "Worked: the warm-tone hero drew 31% of clicks.\nTry next: put the best-selling knit in slot 1; slot 4 was weak."
   },
   {
    "cr854_deliveryresultid": "b56ede2e-9bd9-436b-a96d-eb4845aff35d",
@@ -10243,7 +10244,8 @@
    "cr854_revenue": 32892,
    "cr854_lastyearrevenue": 37216,
    "cr854_products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1162,\"units\":158,\"revenue\":20224},{\"productId\":\"20575a7a-6936-4f63-a077-51d81092a779\",\"clicks\":825,\"units\":67,\"revenue\":5896},{\"productId\":\"1a575108-6f36-48d5-a677-5b4a1292aa9f\",\"clicks\":1189,\"units\":29,\"revenue\":2262},{\"productId\":\"1b57529b-6e36-4742-a777-5cdd1192a90c\",\"clicks\":918,\"units\":55,\"revenue\":4510}]",
-   "cr854_links": "{\"hero\":2207,\"buttons\":[712,117,114],\"other\":150}"
+   "cr854_links": "{\"hero\":2207,\"buttons\":[712,117,114],\"other\":150}",
+   "cr854_notes": "Did not work: two similar jackets side by side split the clicks."
   },
   {
    "cr854_deliveryresultid": "d23b7857-8c90-4f66-a9a3-6655aecc0c0c",
@@ -10282,7 +10284,8 @@
    "cr854_revenue": 25218,
    "cr854_lastyearrevenue": 29085,
    "cr854_products": "[{\"productId\":\"17574c4f-7236-4d8e-ab77-49f91592af58\",\"clicks\":2188,\"units\":122,\"revenue\":16836},{\"productId\":\"1b57529b-6e36-4742-a777-5cdd1192a90c\",\"clicks\":970,\"units\":66,\"revenue\":5412},{\"productId\":\"8d5ec1d6-6c39-42b3-a575-01f0a38b401d\",\"clicks\":908,\"units\":55,\"revenue\":2970}]",
-   "cr854_links": "{\"hero\":1518,\"buttons\":[701,115,87],\"other\":121}"
+   "cr854_links": "{\"hero\":1518,\"buttons\":[701,115,87],\"other\":121}",
+   "cr854_notes": "Worked: \"Ends Sunday\" in the headline lifted the click rate by 0.8pt.\nTry next: show the discount on the product tiles."
   },
   {
    "cr854_deliveryresultid": "c8a845a7-3df5-4eea-ab69-6249a4ab3b04",
@@ -10555,7 +10558,8 @@
    "cr854_revenue": 31378,
    "cr854_lastyearrevenue": 37557,
    "cr854_products": "[{\"productId\":\"20599911-e933-474c-a47a-603b2490885e\",\"clicks\":4978,\"units\":225,\"revenue\":22050},{\"productId\":\"1f5758e7-6a36-40f6-a377-56910d92a2c0\",\"clicks\":3009,\"units\":85,\"revenue\":5440},{\"productId\":\"975ed194-7a39-48bd-a375-17fa958b2a13\",\"clicks\":3607,\"units\":72,\"revenue\":3888}]",
-   "cr854_links": "{\"hero\":4390,\"buttons\":[1632,221,207],\"other\":408}"
+   "cr854_links": "{\"hero\":4390,\"buttons\":[1632,221,207],\"other\":408}",
+   "cr854_notes": "Did not work: the hero without a model photo got fewer clicks than usual."
   },
   {
    "cr854_deliveryresultid": "6030369c-ab0e-4771-a074-b12e7aba47d3",

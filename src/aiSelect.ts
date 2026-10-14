@@ -208,6 +208,17 @@ export interface ChatTurn {
 
 // withChat の実行中だけ有効な、対話の履歴。askAgent が、依頼に加える
 let activeChat: ChatTurn[] | null = null
+
+// 開いている配信カードの「これまでの学び」(同じ条件の過去の配信の、次に生かすメモ)。
+// 案を作る依頼(suggest_ / select_)に、askAgent が加える。配信カードの「これまでの学び」の帯が、開いている間だけ入れる
+let activeLearnings: string[] = []
+export function setActiveLearnings(lines: string[]) {
+  activeLearnings = lines
+}
+const usesLearnings = (task: unknown) => typeof task === 'string' && (task.startsWith('suggest_') || task.startsWith('select_')) && task !== 'suggest_tasks'
+const LEARNINGS_NOTE =
+  '【これまでの学び】入力の learnings は、同じテンプレートか同じテーマの種類の、過去の配信の振り返りメモ(新しい順)。' +
+  '案を考えるときの参考にする。うまくいったことは生かし、悪かったことは繰り返さない。ただし、learnings に合わせるために、ほかのルールを破らない。\n\n'
 let lastReply = ''
 let lastAnswered = false
 
@@ -268,8 +279,11 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
   let lastError: unknown
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
-    const body = chat && chat.length > 0 ? { ...(payload as object), chat } : payload
-    const text = await askText((getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + localizePrompt(prompt) + JSON.stringify(body))
+    const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
+    const body = { ...(payload as object), ...(chat && chat.length > 0 ? { chat } : {}), ...(learnings ? { learnings } : {}) }
+    const text = await askText(
+      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + localizePrompt(prompt) + JSON.stringify(body),
+    )
     try {
       const parsed = extractJson(text) as Record<string, unknown>
       // 理由のないエラーは、モデルの一時的な取りこぼし。やり直す(理由があるエラーは、入力の不備なので、そのまま知らせる)

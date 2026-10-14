@@ -422,3 +422,16 @@ export const deliveryResults: Row[] = cards
       }),
     }
   })
+
+// 過去の配信の、次に生かすメモ(配信カードの「これまでの学び」の見本)
+const NOTES: [string, string, string][] = [
+  ['Fall Arrivals', '2026-09-24', 'Worked: the warm-tone hero drew 31% of clicks.\nTry next: put the best-selling knit in slot 1; slot 4 was weak.'],
+  ['Fall Arrivals', '2026-09-10', 'Did not work: two similar jackets side by side split the clicks.'],
+  ['Weekend Sale', '2026-09-26', 'Worked: "Ends Sunday" in the headline lifted the click rate by 0.8pt.\nTry next: show the discount on the product tiles.'],
+  ['Member Week', '2026-09-26', 'Did not work: the hero without a model photo got fewer clicks than usual.'],
+]
+for (const [name, date, notes] of NOTES) {
+  const c = cards.find((x) => x.cr854_name === name && String(x.cr854_scheduledat ?? '').slice(0, 10) === date)
+  const r = c && deliveryResults.find((x) => x._cr854_deliverycard_value === c.cr854_deliverycardid)
+  if (r) r.cr854_notes = notes
+}

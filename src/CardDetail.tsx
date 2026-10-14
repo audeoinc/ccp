@@ -50,6 +50,7 @@ import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { confirmedWeekOf } from './weekLock'
 import { logEvent, myName, setMyName } from './history'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
+import { LearningsBar } from './LearningsBar'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
 export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'channel' | 'department'>>
@@ -986,6 +987,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 )}
               </MessageBarBody>
             </MessageBar>
+          )}
+
+          {/* これまでの学び(同じテンプレート・テーマの種類の、過去の配信のメモ)。保存済みの配信だけ */}
+          {card && (
+            <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} />
           )}
 
           <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px` } as React.CSSProperties}>
