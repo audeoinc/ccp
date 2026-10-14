@@ -8,6 +8,7 @@ import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
 import { ResultCompare } from './ResultCompare'
 import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
+import { Cr854_deliveryresultsService } from './gcpdata/Cr854_deliveryresultsService'
 import { THEME_TYPES, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
@@ -71,6 +72,12 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   const sentText = sent ? new Date(sent).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
   const previewH = Math.max(480, window.innerHeight * 0.94 - 220)
   const themeType = themeTypeOf(card)
+  // AI の振り返りを、次に生かすメモの末尾に足す
+  const adopt = async (text: string) => {
+    const now = row.result.cr854_notes?.trim()
+    const res = await Cr854_deliveryresultsService.update(row.result.cr854_deliveryresultid, { cr854_notes: now ? `${now}\n${text}` : text })
+    if (res.success) await onSaved()
+  }
   const setThemeType = async (v: ThemeType) => {
     const res = await Cr854_deliverycardsService.update(card.cr854_deliverycardid, { cr854_themetype: v })
     if (res.success) await onCardChanged?.()
@@ -160,7 +167,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               )}
             />
             <ResultInsights
-              key={row.result.cr854_deliveryresultid}
+              key={`${row.result.cr854_deliveryresultid}:${row.result.cr854_notes ?? ''}`}
               row={row}
               weekly={weekly}
               productName={(id) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? id}
@@ -169,7 +176,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               onSaved={onSaved}
             />
           </div>
-          <ResultCompare row={row} history={history} cardProducts={cardProducts} products={products} heroes={heroes} money={money} onOpenOther={onOpenOther} />
+          <ResultCompare row={row} history={history} cardProducts={cardProducts} products={products} heroes={heroes} money={money} onOpenOther={onOpenOther} onAdopt={adopt} />
         </div>
       </DialogSurface>
     </Dialog>

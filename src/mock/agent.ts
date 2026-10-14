@@ -46,6 +46,53 @@ export function mockAgent(message: string): string {
     return { mode: 'update', reply: hasJa(last) ? jaDefault : enDefault }
   }
 
+  // 結果の振り返り: 過去の平均との差が大きい位置・数字から、決まった形の文を作る
+  if (task === 'review_results') {
+    type Pos = { key: string; now: number; past: number }
+    const positions = ((p.positions as Pos[] | undefined) ?? []).filter((x) => x.key !== 'other')
+    const kpis = (p.kpis as { name: string; now: number; past: number; rate?: boolean }[] | undefined) ?? []
+    const slots = (p.slots as string[] | undefined) ?? []
+    const n = Number(p.past ?? 0)
+    const name = (key: string) => {
+      const [kind, i] = key.split(':')
+      if (key === 'hero') return en ? 'the hero image' : 'メイン画像'
+      if (kind === 'button') return en ? `button ${Number(i) + 1}` : `ボタン ${Number(i) + 1}`
+      const prod = slots[Number(i)]
+      return en ? `product slot ${Number(i) + 1}${prod ? ` (${prod})` : ''}` : `商品の枠 ${Number(i) + 1}${prod ? `(${prod})` : ''}`
+    }
+    const pt = (x: Pos) => ((x.now - x.past) * 100).toFixed(1)
+    const sorted = [...positions].sort((a, b) => b.now - b.past - (a.now - a.past))
+    const best = sorted[0]
+    const worst = sorted[sorted.length - 1]
+    const click = kpis.find((k) => /click|tap/i.test(k.name))
+    const clickPt = click ? ((click.now - click.past) * 100).toFixed(1) : '0'
+    return en
+      ? J({
+          good: best ? [`${name(best.key)} drew ${pt(best)}pt more of the clicks than the past average.`] : [],
+          bad: [
+            ...(worst ? [`${name(worst.key)} fell ${Math.abs(Number(pt(worst)))}pt below the past average.`] : []),
+            ...(Number(clickPt) < 0 ? [`Click rate was ${Math.abs(Number(clickPt))}pt below the past average.`] : []),
+          ],
+          next: [
+            ...(worst ? [`Swap what sits in ${name(worst.key)} for a stronger seller, or move it lower.`] : []),
+            ...(best ? [`Keep the approach used for ${name(best.key)} next time.`] : []),
+          ],
+          confidence: n < 5 ? `Weak: compared with only ${n} past deliveries.` : `Moderate: compared with ${n} past deliveries.`,
+        })
+      : J({
+          good: best ? [`${name(best.key)}が、過去の平均よりクリックの割合で ${pt(best)}pt 多かった。`] : [],
+          bad: [
+            ...(worst ? [`${name(worst.key)}は、過去の平均より ${Math.abs(Number(pt(worst)))}pt 少なかった。`] : []),
+            ...(Number(clickPt) < 0 ? [`クリック率が、過去の平均より ${Math.abs(Number(clickPt))}pt 低かった。`] : []),
+          ],
+          next: [
+            ...(worst ? [`${name(worst.key)}に載せるものを、売れ筋に替えるか、下の枠に移す。`] : []),
+            ...(best ? [`${name(best.key)}の見せ方は、次回も続ける。`] : []),
+          ],
+          confidence: n < 5 ? `弱い: 比べた過去の配信が ${n} 回だけ。` : `中くらい: 過去 ${n} 回と比べた。`,
+        })
+  }
+
   // テーマの種類: 言葉から推し量った種類を、そのまま返す
   if (task === 'classify_theme_types') {
     const list = (p.deliveries as { id: string; name?: string; theme?: string; headline?: string }[] | undefined) ?? []

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, MessageBar, MessageBarBody, Spinner, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AiIcon } from './AiMark'
+import { reviewResult, type ResultReview } from './aiReview'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { HeatPreview } from './HeatPreview'
@@ -43,6 +45,14 @@ const useStyles = makeStyles({
   },
   cardHead: { display: 'flex', justifyContent: 'space-between', columnGap: '6px', fontSize: tokens.fontSizeBase200, fontVariantNumeric: 'tabular-nums' },
   heat: { display: 'flex', justifyContent: 'center' },
+  // AI の振り返り
+  review: { display: 'grid', rowGap: '10px', padding: '12px 14px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  reviewHead: { display: 'flex', alignItems: 'center', columnGap: '10px', flexWrap: 'wrap' },
+  reviewCols: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '16px', rowGap: '10px' },
+  reviewH: { margin: '0 0 4px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  reviewItem: { display: 'flex', alignItems: 'flex-start', columnGap: '6px', fontSize: tokens.fontSizeBase300, paddingBottom: '4px' },
+  reviewText: { flexGrow: 1, overflowWrap: 'anywhere' },
+  adopted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, whiteSpace: 'nowrap' },
 })
 
 const NS = [3, 5, 10] as const
@@ -57,6 +67,8 @@ interface Props {
   money: (v?: number) => string
   /** 過去の配信の結果を開く */
   onOpenOther?: (cardId: string) => void
+  /** AI の振り返りを「次に生かすメモ」に入れる */
+  onAdopt?: (text: string) => Promise<void>
 }
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : undefined)
@@ -65,7 +77,7 @@ const avg = (xs: number[]) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.le
  * 同じテンプレートの、過去の配信と比べる。数字(開封率・クリック率・1 通あたりの売上)と、位置ごとのクリックの割合を、
  * 過去 n 回の平均と並べる。同じテンプレートなら、枠の位置が同じなので、「どの位置が、いつもより押された / 押されなかった」がわかる
  */
-export function ResultCompare({ row, history, cardProducts, products, heroes, money, onOpenOther }: Props) {
+export function ResultCompare({ row, history, cardProducts, products, heroes, money, onOpenOther, onAdopt }: Props) {
   const styles = useStyles()
   const t = useT()
   const [n, setN] = useState<number>(5)
@@ -104,6 +116,46 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
   const positions = keys.map((k) => ({ key: k, now: nowShares.get(k) ?? 0, base: avg(pastShares.map((m) => m.get(k)).filter((v): v is number => v !== undefined)) }))
   // 位置で比べられるのは、テンプレートが同じときだけ(テンプレートが違うと、同じ番号の枠でも、大きさ・場所が違う)
   const sameTemplate = past.every((p) => templateIdOf(p.card) === templateIdOf(row.card))
+
+  // AI の振り返り(保存しない。採用したものだけ、メモに入れる)
+  const [review, setReview] = useState<ResultReview | null>(null)
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [adopted, setAdopted] = useState<Set<string>>(new Set())
+  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? ''
+  const runReview = async () => {
+    setReviewing(true)
+    setReviewError(null)
+    try {
+      const tt = themeTypeOf(row.card)
+      setReview(
+        await reviewResult({
+          delivery: {
+            name: row.card.cr854_name,
+            theme: row.card.cr854_theme,
+            themeType: tt.type,
+            template: templateName(row.card),
+            headline: push ? row.card.cr854_pushtitle : row.card.cr854_headline,
+            channel: push ? 'push' : 'email',
+          },
+          compareBy: by,
+          past: past.length,
+          kpis: kpis.map((k) => ({ name: k.label, now: k.now ?? 0, past: k.base ?? 0, rate: k.unit === 'pt' })),
+          positions: sameTemplate ? positions.map((p) => ({ key: p.key, now: p.now, past: p.base ?? 0 })) : [],
+          slots: idsOf(row).map(productName),
+        }),
+      )
+      setAdopted(new Set())
+    } catch (e) {
+      setReviewError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setReviewing(false)
+    }
+  }
+  const adopt = async (text: string) => {
+    await onAdopt?.(text)
+    setAdopted((s) => new Set(s).add(text))
+  }
 
   const dateText = (r: ResultRow) => {
     const s = sentAtOf(r)
@@ -191,6 +243,57 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
                 ))}
               </tbody>
             </table>
+            )}
+          </div>
+          <div className={styles.review}>
+            <div className={styles.reviewHead}>
+              <h3 className={styles.reviewH} style={{ margin: 0 }}>{t('AI の振り返り', 'AI review')}</h3>
+              <Button size="small" appearance="primary" icon={reviewing ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" size={16} />} onClick={() => void runReview()} disabled={reviewing}>
+                {review ? t('もう一度振り返る', 'Review again') : t('AI で振り返る', 'Review with AI')}
+              </Button>
+              <span className={styles.sub}>
+                {t('上の比べ(今の比べる相手・回数)を、AI が言葉にします。振り返りは保存しません。残したいものは「メモに採用」してください', 'AI puts the comparison above into words. The review is not saved; adopt what you want to keep into the notes.')}
+              </span>
+            </div>
+            {reviewError && (
+              <MessageBar intent="error">
+                <MessageBarBody>{reviewError}</MessageBarBody>
+              </MessageBar>
+            )}
+            {review && (
+              <>
+                <div className={styles.reviewCols}>
+                  {(
+                    [
+                      [t('良かったこと', 'What worked'), review.good, t('良かった', 'Worked')],
+                      [t('悪かったこと', 'What did not'), review.bad, t('悪かった', 'Did not work')],
+                      [t('次に試すこと', 'Try next'), review.next, t('次に試す', 'Try next')],
+                    ] as const
+                  ).map(([title, items, tag]) => (
+                    <div key={title}>
+                      <h4 className={styles.reviewH}>{title}</h4>
+                      {items.length === 0 && <span className={styles.muted}>—</span>}
+                      {items.map((x) => {
+                        const text = `${tag}: ${x}`
+                        return (
+                          <div key={x} className={styles.reviewItem}>
+                            <span className={styles.reviewText}>{x}</span>
+                            {onAdopt &&
+                              (adopted.has(text) ? (
+                                <span className={styles.adopted}>{t('採用済み', 'Adopted')}</span>
+                              ) : (
+                                <Button size="small" appearance="subtle" onClick={() => void adopt(text)}>
+                                  {t('メモに採用', 'Adopt')}
+                                </Button>
+                              ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+                {review.confidence && <span className={styles.sub}>{t(`根拠の強さ: ${review.confidence}`, `Confidence: ${review.confidence}`)}</span>}
+              </>
             )}
           </div>
           <div className={styles.strip}>
