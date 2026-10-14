@@ -6,6 +6,7 @@ import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
 import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
+import { ResultCompare } from './ResultCompare'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
 
@@ -34,6 +35,11 @@ const useStyles = makeStyles({
 
 interface Props {
   row: ResultRow
+  /** すべての配信の結果(過去の配信と比べるため) */
+  history: ResultRow[]
+  cardProducts: Map<string, string[]>
+  /** 過去の配信の結果に切り替える */
+  onOpenOther?: (cardId: string) => void
   productIds: string[]
   products: Cr854_products[]
   heroes: Cr854_heroimages[]
@@ -49,7 +55,7 @@ interface Props {
  * 配信 1 本の詳しい結果(フロート。計画の面の配信カードと同じ開き方)。
  * 上に主な数字、下に、クリックを重ねたプレビュー・リンクの表・メモと商品と AI の案を並べる
  */
-export function ResultDetail({ row, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved }: Props) {
+export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved }: Props) {
   const styles = useStyles()
   const t = useT()
   const { card } = row
@@ -137,6 +143,7 @@ export function ResultDetail({ row, productIds, products, heroes, weekly, money,
               onSaved={onSaved}
             />
           </div>
+          <ResultCompare row={row} history={history} cardProducts={cardProducts} products={products} heroes={heroes} money={money} onOpenOther={onOpenOther} />
         </div>
       </DialogSurface>
     </Dialog>

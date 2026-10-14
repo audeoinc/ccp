@@ -30,11 +30,13 @@ interface Props {
  * 計画の面から、配信 1 本の結果を、いまの画面の上に重ねて見る(配信カードの「結果を見る」)。
  * 閉じると、元の配信カード(計画の面)に戻る
  */
-export function ResultPeek({ cardId, cards, cardProducts, products, heroes, onClose }: Props) {
+export function ResultPeek({ cardId: firstId, cards, cardProducts, products, heroes, onClose }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<Cr854_deliveryresults[] | null>(null)
   const [weekly, setWeekly] = useState<Cr854_weeklyperformances[]>([])
+  // 過去の配信の結果に切り替えられる(閉じると、元の配信カードに戻る)
+  const [cardId, setCardId] = useState(firstId)
 
   const load = async () => {
     const res = await Cr854_deliveryresultsService.getAll()
@@ -49,7 +51,8 @@ export function ResultPeek({ cardId, cards, cardProducts, products, heroes, onCl
       .catch(() => undefined)
   }, [])
 
-  const row = results ? toResultRows(cards, results).find((r) => r.card.cr854_deliverycardid === cardId) : undefined
+  const history = results ? toResultRows(cards, results) : []
+  const row = history.find((r) => r.card.cr854_deliverycardid === cardId)
   if (!row) {
     return (
       <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
@@ -62,7 +65,11 @@ export function ResultPeek({ cardId, cards, cardProducts, products, heroes, onCl
   }
   return (
     <ResultDetail
+      key={cardId}
       row={row}
+      history={history}
+      cardProducts={cardProducts}
+      onOpenOther={setCardId}
       productIds={cardProducts.get(cardId) ?? []}
       products={products}
       heroes={heroes}

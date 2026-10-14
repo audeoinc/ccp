@@ -57,10 +57,60 @@ export const sentAtOf = (r: ResultRow) => r.result.cr854_sentat ?? r.card.cr854_
 
 export const isPush = (c: Cr854_deliverycards) => c.cr854_channel === CHANNEL_PUSH
 
+/** 配信のテンプレートの ID */
+export const templateIdOf = (c: Cr854_deliverycards): string => c.cr854_layoutkey || (isPush(c) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.cr854_emailtemplate))
+
 /** 配信のテンプレートの名前 */
 export function templateName(c: Cr854_deliverycards): string {
-  const id = c.cr854_layoutkey || (isPush(c) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.cr854_emailtemplate))
-  return getTemplate(id).label
+  return getTemplate(templateIdOf(c)).label
+}
+
+// ---- 過去の配信と比べる
+
+/**
+ * 位置ごとのクリックの割合(メッセージの中のクリックの合計に対して)。
+ * 商品は、載せた商品ではなく「何番目の枠か」で数える(同じテンプレートなら、枠の位置が同じなので、回をまたいで比べられる)。
+ * キー: hero / button:番号 / slot:番号(0 から)/ other
+ */
+export function positionShares(row: ResultRow, productIds: string[]): Map<string, number> {
+  const links = parseLinkResults(row.result.cr854_links)
+  const prod = new Map(parseProductResults(row.result.cr854_products).map((p) => [p.productId, p.clicks]))
+  const raw = new Map<string, number>()
+  if (links.hero !== undefined) raw.set('hero', links.hero)
+  ;(links.buttons ?? []).forEach((v, i) => raw.set(`button:${i}`, v))
+  productIds.forEach((id, i) => raw.set(`slot:${i}`, prod.get(id) ?? 0))
+  if (links.other) raw.set('other', links.other)
+  const total = [...raw.values()].reduce((s, v) => s + v, 0)
+  return new Map([...raw].map(([k, v]) => [k, total ? v / total : 0]))
+}
+
+/** 位置のキーの、画面の名前 */
+export function positionLabel(key: string, t: (ja: string, en: string) => string): string {
+  if (key === 'hero') return t('メイン画像', 'Hero image')
+  if (key === 'other') return t('その他(フッターなど)', 'Other (footer, etc.)')
+  const [kind, n] = key.split(':')
+  const i = Number(n) + 1
+  return kind === 'button' ? t(`ボタン ${i}`, `Button ${i}`) : t(`商品の枠 ${i}`, `Product slot ${i}`)
+}
+
+/** 比べる相手の選び方 */
+export type CompareBy = 'template'
+
+/** 同じ条件(いまは、同じ国・チャネル・テンプレート)で、この配信より前に送った配信を、新しい順に n 本 */
+export function pastSame(all: ResultRow[], row: ResultRow, n: number): ResultRow[] {
+  const at = new Date(sentAtOf(row) ?? 0).getTime()
+  const tpl = templateIdOf(row.card)
+  return all
+    .filter(
+      (o) =>
+        o !== row &&
+        o.card.cr854_country === row.card.cr854_country &&
+        o.card.cr854_channel === row.card.cr854_channel &&
+        templateIdOf(o.card) === tpl &&
+        new Date(sentAtOf(o) ?? 0).getTime() < at,
+    )
+    .sort((a, b) => new Date(sentAtOf(b) ?? 0).getTime() - new Date(sentAtOf(a) ?? 0).getTime())
+    .slice(0, n)
 }
 
 /** 結果のある配信を、行にする(前の週との比較は、同じ国・チャネルの、7 日前までの配信と比べる) */

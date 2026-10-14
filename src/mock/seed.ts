@@ -317,9 +317,9 @@ cardNotes.push(
   ].filter((n) => n._cr854_deliverycard_value),
 )
 
-// ---- 配信結果(配信のあとに取り込む結果。GCP 版だけのテーブル)
-// 2026-10-14 より前に送った配信に、それっぽい数字を入れる。同じ配信なら、同じ数字になる(乱数は、配信 ID から作る)
-const RESULTS_BEFORE = '2026-10-14'
+// ---- 過去の配信(結果を、同じテンプレートの過去の配信と比べるため)
+// 2026-10-14 より前に送った US の配信を、1〜5 週前にも送ったことにする。テンプレート・テーマは同じで、商品とメイン画像を入れ替える
+// (同じ型の配信を、毎週くり返している、という想定)。その週は、確定済みにする
 function rand(key: string) {
   let h = 2166136261
   for (let i = 0; i < key.length; i++) {
@@ -333,6 +333,49 @@ function rand(key: string) {
     return (h >>> 0) / 4294967296
   }
 }
+const PAST_WEEKS = 5
+const pastOf = cards.filter((c) => c.cr854_country === COUNTRY['US'] && String(c.cr854_scheduledat ?? '') < '2026-10-14')
+for (const orig of pastOf) {
+  const oid = orig.cr854_deliverycardid as string
+  const picked = deliveryProducts.filter((d) => d._cr854_deliverycard_value === oid && d.cr854_state === 588230000)
+  for (let k = 1; k <= PAST_WEEKS; k++) {
+    const r = rand(`past:${oid}:${k}`)
+    const id = guid(`card:past:${oid}:${k}`)
+    const at = new Date(String(orig.cr854_scheduledat))
+    at.setUTCDate(at.getUTCDate() - 7 * k)
+    const iso = at.toISOString()
+    const usHeroes = heroes.filter((h) => h.cr854_market === US_MARKET)
+    const pool = products.filter((p) => p.cr854_market === US_MARKET)
+    cards.push({
+      ...orig,
+      cr854_deliverycardid: id,
+      cr854_scheduledat: iso,
+      cr854_status: 588230003,
+      cr854_productiondue: iso.slice(0, 10),
+      cr854_handedoffat: iso,
+      ...(orig._cr854_heroimage_value && usHeroes.length > 0 ? { _cr854_heroimage_value: usHeroes[Math.floor(r() * usHeroes.length)].cr854_heroimageid } : {}),
+    })
+    picked.forEach((d, i) => {
+      deliveryProducts.push({
+        ...d,
+        cr854_deliveryproductid: guid(`dp:past:${id}:${i}`),
+        _cr854_deliverycard_value: id,
+        _cr854_product_value: pool[Math.floor(r() * pool.length)]?.cr854_productid ?? d._cr854_product_value,
+      })
+    })
+    // 週の計画: その週(日曜日から)を確定にする
+    const sun = new Date(at.getTime() + 9 * 3600_000)
+    sun.setUTCDate(sun.getUTCDate() - sun.getUTCDay())
+    const ws = sun.toISOString().slice(0, 10)
+    if (!weeks.some((w) => w.cr854_weekstart === ws)) {
+      weeks.push({ cr854_weekid: guid(`week:${ws}`), cr854_weekstart: ws, cr854_status: 'confirmed', cr854_submittedat: `${ws}T00:00:00.000Z`, cr854_confirmedat: `${ws}T00:00:00.000Z` })
+    }
+  }
+}
+
+// ---- 配信結果(配信のあとに取り込む結果。GCP 版だけのテーブル)
+// 2026-10-14 より前に送った配信に、それっぽい数字を入れる。同じ配信なら、同じ数字になる(乱数は、配信 ID から作る)
+const RESULTS_BEFORE = '2026-10-14'
 export const deliveryResults: Row[] = cards
   .filter((c) => String(c.cr854_scheduledat ?? '') < RESULTS_BEFORE)
   .map((c) => {
@@ -356,7 +399,8 @@ export const deliveryResults: Row[] = cards
       const share = i === ids.length - 1 ? 1 : 0.3 + r() * 0.3
       const units = i === ids.length - 1 ? left : Math.round(left * share)
       left -= units
-      return { productId: pid, clicks: Math.round((clicks / ids.length) * (0.6 + r() * 0.8)), units, revenue: Math.round(units * Number(p?.cr854_price ?? 0)) }
+      // 上の枠ほど押されやすい(位置で比べたときに、傾向が見えるように)
+      return { productId: pid, clicks: Math.round((clicks / ids.length) * (1.3 / (1 + 0.2 * i)) * (0.6 + r() * 0.8)), units, revenue: Math.round(units * Number(p?.cr854_price ?? 0)) }
     })
     const revenue = items.reduce((s, x) => s + x.revenue, 0) || Math.round(orders * (us ? 80 : 9000))
     return {

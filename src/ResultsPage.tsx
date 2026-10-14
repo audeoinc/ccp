@@ -415,6 +415,9 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         <ResultDetail
           key={detailId}
           row={detail}
+          history={allRows}
+          cardProducts={cardProducts}
+          onOpenOther={onDetail}
           productIds={cardProducts.get(detail.card.cr854_deliverycardid) ?? []}
           products={products}
           heroes={heroes}
