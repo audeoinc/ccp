@@ -1356,7 +1356,6 @@ export function ContentPane(props: Props) {
           cardId={props.cardId}
           productIds={props.items.map((it) => it.productId)}
           products={props.products}
-          owner={props.owner}
           people={props.people}
           onOpenCount={setOpenComments}
         />

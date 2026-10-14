@@ -351,8 +351,8 @@ function App() {
           for (const n of res.data ?? []) {
             const id = n._cr854_deliverycard_value
             if (!id || n.cr854_resolved) continue
-            // 変更の理由は記録なので、質問・タスクの数には入れない
-            if (n.cr854_kind === 'change') continue
+            // 変更の理由は記録、コメントへの返信はスレッドの一部なので、質問・タスクの数には入れない
+            if (n.cr854_kind === 'change' || n.cr854_kind === 'reply') continue
             if (n.cr854_kind === 'comment') {
               comments.set(id, (comments.get(id) ?? 0) + 1)
               continue

@@ -6,9 +6,10 @@ import { makeService } from '../gcp/services'
 /**
  * メモの種類。question = 制作からの質問(返信を付ける) / task = やること(質問のやり取りなどから生まれる) /
  * change = 確定した週の配信を変えたときの理由(本文が理由。週をレビューに戻した記録) /
- * comment = レビューの指摘(配信全体、または載せた商品 1 つへの。対応した内容は reply に残し、resolved で対応済み)
+ * comment = レビューの指摘(配信全体、または載せた商品 1 つへの。resolved で対応済み。repliedby / repliedat は、対応済みにした人・日時) /
+ * reply = 指摘への返信(cr854_sourcenote が、元の指摘の ID。指摘ごとのスレッドになる)
  */
-export type NoteKind = 'question' | 'task' | 'change' | 'comment'
+export type NoteKind = 'question' | 'task' | 'change' | 'comment' | 'reply'
 
 export interface Cr854_cardnotes {
   cr854_cardnoteid: string

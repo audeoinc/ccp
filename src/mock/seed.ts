@@ -316,6 +316,23 @@ cardNotes.push(
     }),
   ].filter((n) => n._cr854_deliverycard_value),
 )
+// 指摘への返信(スレッドのやり取り)
+const guideComment = cardNotes.find((n) => n.cr854_kind === 'comment' && String(n.cr854_body).startsWith('The theme overlaps'))
+const reply = (to: Row, author: string, body: string, at: string): Row => ({
+  cr854_cardnoteid: guid(`reply:${to.cr854_cardnoteid}:${body}`),
+  _cr854_deliverycard_value: to._cr854_deliverycard_value,
+  cr854_kind: 'reply',
+  cr854_sourcenote: to.cr854_cardnoteid,
+  cr854_author: author,
+  cr854_body: body,
+  createdon: at,
+})
+if (guideComment) {
+  cardNotes.push(
+    reply(guideComment, 'Ken Sato', 'Good point. Would "how to layer for chilly mornings" work as the angle?', '2026-10-02T05:00:00.000Z'),
+    reply(guideComment, 'Mika Tanaka', 'Yes, that works. Please also move the coat to the second section.', '2026-10-02T06:30:00.000Z'),
+  )
+}
 
 // ---- 過去の配信(結果を、同じテンプレートの過去の配信と比べるため)
 // 2026-10-14 より前に送った US の配信を、1〜5 週前にも送ったことにする。テンプレート・テーマは同じで、商品とメイン画像を入れ替える
