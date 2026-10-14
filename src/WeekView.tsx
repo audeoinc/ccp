@@ -43,6 +43,8 @@ interface Props {
   products: Cr854_products[]
   heroes: Cr854_heroimages[]
   dueSoon?: Set<string>
+  /** 確認の一覧(W4)で選んだ項目の、目立たせる配信と商品。配信が空なら、配信は薄くしない */
+  focus?: { cards: Set<string>; products: Set<string> }
   onSelect: (id: string) => void
   /** その日付で新規作成する(値は YYYY-MM-DD) */
   onCreate: (day: string) => void
@@ -122,6 +124,9 @@ const useStyles = makeStyles({
     minWidth: 0,
     ':hover': { boxShadow: tokens.shadow4 },
   },
+  // 確認の一覧で選んだ項目に、かかわる配信と、かかわらない配信
+  cardFocus: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
+  cardDim: { opacity: 0.4 },
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
   strip: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '3px 8px', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   stripEmail: { backgroundColor: tokens.colorPaletteBlueBackground2, color: tokens.colorPaletteBlueForeground2 },
@@ -187,7 +192,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, overdueTasks, lens, products, heroes, dueSoon, onSelect, onCreate }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, overdueTasks, lens, products, heroes, dueSoon, focus, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -210,7 +215,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         return (
           <div
             key={`${id}-${i}`}
-            className={mergeClasses(styles.thumb, hover === id && styles.thumbHit, !!hover && hover !== id && styles.thumbDim)}
+            className={mergeClasses(styles.thumb, (hover ? hover === id : !!focus?.products.has(id)) && styles.thumbHit, !!hover && hover !== id && styles.thumbDim)}
             title={p?.cr854_name}
             onMouseEnter={() => setHover(id)}
             onMouseLeave={() => setHover(null)}
@@ -288,7 +293,13 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
     )
 
     return (
-      <button key={id} type="button" className={styles.card} onClick={() => onSelect(id)} title={c.cr854_name}>
+      <button
+        key={id}
+        type="button"
+        className={mergeClasses(styles.card, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
+        onClick={() => onSelect(id)}
+        title={c.cr854_name}
+      >
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
           {channel === 'push' ? <PhoneRegular /> : <MailRegular />}
           {channel === 'email' ? t('メール', 'Email') : channel === 'push' ? t('アプリ', 'App') : t('チャネル未設定', 'No channel')}

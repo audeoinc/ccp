@@ -31,6 +31,7 @@ import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycards
 import { Cr854_productsService } from './generated/services/Cr854_productsService'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { Cr854_heroimagesService } from './generated/services/Cr854_heroimagesService'
+import { Cr854_productpoliciesService } from './generated/services/Cr854_productpoliciesService'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
 import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
@@ -50,6 +51,8 @@ import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 import { sundayOf } from './weekLock'
+import { WeekChecklist } from './WeekChecklist'
+import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -318,6 +321,10 @@ function App() {
   // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
   const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
   // 週の表示の見方: 商品のバランス / 進み具合。ブラウザごとに覚える
+  // 商品の販売方針(商品コードごと。週の確認の一覧で、主力の漏れを見るため)
+  const [policies, setPolicies] = useState<Map<string, PolicyLite>>(new Map())
+  // 週の確認の一覧で選んだ項目。週を移ったら、選んでいないことにする(週ごとに中身が違うため)
+  const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
@@ -396,6 +403,12 @@ function App() {
         else setError(res.error?.message ?? tr('商品の取得に失敗しました', 'Failed to load products'))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+    Cr854_productpoliciesService.getAll({ select: ['cr854_productcode', 'cr854_stage', 'cr854_promoperiod'] })
+      .then((res) => {
+        if (!res.success) return // 主力の漏れが出ないだけで、画面は使える
+        setPolicies(new Map((res.data ?? []).filter((r) => r.cr854_productcode).map((r) => [r.cr854_productcode!, { stage: r.cr854_stage, promoPeriod: r.cr854_promoperiod }])))
+      })
+      .catch(() => undefined)
     Cr854_heroimagesService.getAll({ orderBy: ['cr854_imagecode asc'] })
       .then((res) => {
         if (res.success) setHeroes((res.data ?? []).map(withHeroLabels))
@@ -443,6 +456,25 @@ function App() {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
     return cards.filter((c) => c.cr854_scheduledat && new Date(c.cr854_scheduledat) >= weekStart && new Date(c.cr854_scheduledat) < end)
   }, [cards, weekStart])
+  const checklist = useMemo(
+    () =>
+      buildChecklist({
+        weekStart,
+        weekCards,
+        allCards: cards,
+        cardProducts,
+        products,
+        policies,
+        questionCounts,
+        cardLabel: (c) => `${c.cr854_scheduledat ? new Date(c.cr854_scheduledat).toLocaleDateString(locale(), { weekday: 'short' }) : ''} ${c.cr854_name}`.trim(),
+      }),
+    // 言語を変えたら、説明(曜日・種類)を作り直す
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, lang],
+  )
+  const checkKey = check?.week === weekKey ? check.key : null
+  const focusItem = checklist.find((i) => i.key === checkKey)
+  const focus = useMemo(() => (focusItem ? { cards: new Set(focusItem.cardIds), products: new Set(focusItem.productIds) } : undefined), [focusItem])
   const changeWeek = async (next: WeekStatus) => {
     setError(null)
     try {
@@ -682,6 +714,7 @@ function App() {
             ) : view === 'week' ? (
               <>
               <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onChange={changeWeek} />
+              <WeekChecklist items={checklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
@@ -693,6 +726,7 @@ function App() {
                 products={products}
                 heroes={heroes}
                 dueSoon={dueSoon}
+                focus={focus}
                 onSelect={setSelectedId}
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
               />
