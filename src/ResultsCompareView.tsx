@@ -57,6 +57,9 @@ const useStyles = makeStyles({
   item: { display: 'flex', alignItems: 'flex-start', columnGap: '6px', fontSize: tokens.fontSizeBase300, paddingBottom: '4px' },
   itemText: { flexGrow: 1, overflowWrap: 'anywhere' },
   adopted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, whiteSpace: 'nowrap' },
+  adoptBtn: { flexShrink: 0, whiteSpace: 'nowrap', minWidth: 'auto' },
+  jump: { border: 'none', background: 'none', padding: 0, font: 'inherit', fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1, textDecoration: 'underline', cursor: 'pointer' },
+  colFlash: { outline: `3px solid ${tokens.colorBrandStroke1}`, outlineOffset: '2px' },
 })
 
 const NS = [5, 10, 20] as const
@@ -187,6 +190,13 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
     const r = lineup.find((x) => x.card.cr854_deliverycardid === id)
     return r ? `${dateText(r)} ${r.card.cr854_name}` : id
   }
+  // 評価の配信名から、その配信の列へ移って、しばらく光らせる
+  const [flash, setFlash] = useState<string | null>(null)
+  const focusCol = (id: string) => {
+    document.getElementById(`cmp-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    setFlash(id)
+    window.setTimeout(() => setFlash((f) => (f === id ? null : f)), 1600)
+  }
   const bestIds = new Set(verdict?.best.map((b) => b.id))
   const worstIds = new Set(verdict?.worst.map((b) => b.id))
 
@@ -227,11 +237,75 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
         <div className={styles.muted}>{t('条件に合う、結果のある配信がありません', 'No deliveries with results match these filters')}</div>
       ) : (
         <>
+          {/* AI の評価は、並びのすぐ上(評価を読みながら、下のヒートマップを見られるように) */}
+          <div className={styles.ai}>
+            <div className={styles.aiHead}>
+              <h3 className={styles.h3}>{t('AI の評価', 'AI evaluation')}</h3>
+              <Button size="small" appearance="primary" icon={evaluating ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" size={16} />} onClick={() => void evaluate()} disabled={evaluating || lineup.length < 2}>
+                {verdict ? t('もう一度評価する', 'Evaluate again') : t('並べた配信を AI で評価する', 'Evaluate this lineup with AI')}
+              </Button>
+              <span className={styles.sub}>
+                {t(
+                  `いま並んでいる ${lineup.length} 本(${describeFilters()})を、AI が見比べます。評価は保存しません。残したいものは「メモに採用」で、最新の配信(${latest ? nameOf(latest.card.cr854_deliverycardid) : ''})の次に生かすメモに入ります`,
+                  `AI compares the ${lineup.length} deliveries shown (${describeFilters()}). Not saved; adopt lines into the notes of the latest delivery (${latest ? nameOf(latest.card.cr854_deliverycardid) : ''}).`,
+                )}
+              </span>
+            </div>
+            {error && (
+              <MessageBar intent="error">
+                <MessageBarBody>{error}</MessageBarBody>
+              </MessageBar>
+            )}
+            {verdict && (
+              <>
+                {verdict.summary && <div>{verdict.summary}</div>}
+                <div className={styles.aiCols}>
+                  {(
+                    [
+                      [t('良かった配信', 'Best'), verdict.best.map((b) => ({ id: b.id, x: b.why })), t('良かった', 'Best')],
+                      [t('悪かった配信', 'Worst'), verdict.worst.map((b) => ({ id: b.id, x: b.why })), t('悪かった', 'Worst')],
+                      [t('傾向', 'Findings'), verdict.findings.map((x) => ({ id: '', x })), t('傾向', 'Finding')],
+                      [t('次に試すこと', 'Try next'), verdict.next.map((x) => ({ id: '', x })), t('次に試す', 'Try next')],
+                    ] as const
+                  ).map(([title, items, tag]) => (
+                    <div key={title}>
+                      <h4 className={styles.h4}>{title}</h4>
+                      {items.length === 0 && <span className={styles.muted}>—</span>}
+                      {items.map(({ id, x }) => {
+                        const text = id ? `${tag}: ${nameOf(id)}: ${x}` : `${tag}: ${x}`
+                        return (
+                          <div key={x} className={styles.item}>
+                            <span className={styles.itemText}>
+                              {/* 配信名を押すと、その配信の列へ移って、光らせる(評価を読みながら、ヒートマップを見るため) */}
+                              {id && (
+                                <button type="button" className={styles.jump} onClick={() => focusCol(id)} title={t('この配信の列へ', 'Go to this delivery')}>
+                                  {nameOf(id)}
+                                </button>
+                              )}
+                              {id ? `: ${x}` : x}
+                            </span>
+                            {adopted.has(text) ? (
+                              <span className={styles.adopted}>{t('採用済み', 'Adopted')}</span>
+                            ) : (
+                              <Button size="small" appearance="subtle" className={styles.adoptBtn} onClick={() => void adopt(text)}>
+                                {t('メモに採用', 'Adopt')}
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+                {verdict.confidence && <span className={styles.sub}>{t(`根拠の強さ: ${verdict.confidence}`, `Confidence: ${verdict.confidence}`)}</span>}
+              </>
+            )}
+          </div>
           <div className={styles.lineup}>
             {lineup.map((r) => {
               const id = r.card.cr854_deliverycardid
               return (
-                <button key={r.result.cr854_deliveryresultid} type="button" className={mergeClasses(styles.col, bestIds.has(id) && styles.colBest, worstIds.has(id) && styles.colWorst)} onClick={() => onOpen(id)} title={t('詳しい結果を開く', 'Open the details')}>
+                <button key={r.result.cr854_deliveryresultid} id={`cmp-${id}`} type="button" className={mergeClasses(styles.col, bestIds.has(id) && styles.colBest, worstIds.has(id) && styles.colWorst, flash === id && styles.colFlash)} onClick={() => onOpen(id)} title={t('詳しい結果を開く', 'Open the details')}>
                   <span className={styles.colHead}>
                     <span className={styles.colSub}>{`${dateText(r)} · ${isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
                     <span className={styles.colName}>{r.card.cr854_name}</span>
@@ -287,61 +361,6 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
             <span className={styles.sub}>{t('テンプレートが違う配信が混ざっているので、位置ごとの比べは出していません。テンプレートで絞り込むと出ます', 'Templates differ, so positions are not compared. Filter by template to see them.')}</span>
           )}
 
-          <div className={styles.ai}>
-            <div className={styles.aiHead}>
-              <h3 className={styles.h3}>{t('AI の評価', 'AI evaluation')}</h3>
-              <Button size="small" appearance="primary" icon={evaluating ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" size={16} />} onClick={() => void evaluate()} disabled={evaluating || lineup.length < 2}>
-                {verdict ? t('もう一度評価する', 'Evaluate again') : t('並べた配信を AI で評価する', 'Evaluate this lineup with AI')}
-              </Button>
-              <span className={styles.sub}>
-                {t(
-                  `いま並んでいる ${lineup.length} 本(${describeFilters()})を、AI が見比べます。評価は保存しません。残したいものは「メモに採用」で、最新の配信(${latest ? nameOf(latest.card.cr854_deliverycardid) : ''})の次に生かすメモに入ります`,
-                  `AI compares the ${lineup.length} deliveries shown (${describeFilters()}). Not saved; adopt lines into the notes of the latest delivery (${latest ? nameOf(latest.card.cr854_deliverycardid) : ''}).`,
-                )}
-              </span>
-            </div>
-            {error && (
-              <MessageBar intent="error">
-                <MessageBarBody>{error}</MessageBarBody>
-              </MessageBar>
-            )}
-            {verdict && (
-              <>
-                {verdict.summary && <div>{verdict.summary}</div>}
-                <div className={styles.aiCols}>
-                  {(
-                    [
-                      [t('良かった配信', 'Best'), verdict.best.map((b) => `${nameOf(b.id)}: ${b.why}`), t('良かった', 'Best')],
-                      [t('悪かった配信', 'Worst'), verdict.worst.map((b) => `${nameOf(b.id)}: ${b.why}`), t('悪かった', 'Worst')],
-                      [t('傾向', 'Findings'), verdict.findings, t('傾向', 'Finding')],
-                      [t('次に試すこと', 'Try next'), verdict.next, t('次に試す', 'Try next')],
-                    ] as const
-                  ).map(([title, items, tag]) => (
-                    <div key={title}>
-                      <h4 className={styles.h4}>{title}</h4>
-                      {items.length === 0 && <span className={styles.muted}>—</span>}
-                      {items.map((x) => {
-                        const text = `${tag}: ${x}`
-                        return (
-                          <div key={x} className={styles.item}>
-                            <span className={styles.itemText}>{x}</span>
-                            {adopted.has(text) ? (
-                              <span className={styles.adopted}>{t('採用済み', 'Adopted')}</span>
-                            ) : (
-                              <Button size="small" appearance="subtle" onClick={() => void adopt(text)}>
-                                {t('メモに採用', 'Adopt')}
-                              </Button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ))}
-                </div>
-                {verdict.confidence && <span className={styles.sub}>{t(`根拠の強さ: ${verdict.confidence}`, `Confidence: ${verdict.confidence}`)}</span>}
-              </>
-            )}
-          </div>
         </>
       )}
     </div>
