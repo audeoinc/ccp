@@ -58,7 +58,7 @@ body {
   display: none;
 }
 @page {
-  size: A4 landscape;
+  size: A4 portrait;
   margin: 10mm;
 }
 body.printing-report > *:not(:has([data-print-report])) {
@@ -67,7 +67,8 @@ body.printing-report > *:not(:has([data-print-report])) {
 body.printing-report [data-print-report] {
   position: static !important;
   inset: auto !important;
-  width: 100% !important;
+  /* 幅を固定して、縦向きの並びに組み替えてから、printReport が A4 縦 1 枚に収まる倍率で縮める */
+  width: 920px !important;
   max-width: none !important;
   max-height: none !important;
   overflow: visible !important;
@@ -99,4 +100,24 @@ body.printing-report [data-print-wrap] {
   flex-wrap: wrap !important;
   overflow: visible !important;
   row-gap: 12px;
+}
+/* 詳しい結果の 3 列(プレビュー | リンクの表 | メモ・商品・AI の案)を、縦向きに組み替える:
+   上の段に、プレビューとリンクの表。下の段に、メモ・商品・AI の案を横 3 列で(縦に間延びしないように)。
+   プレビューと、過去の配信のヒートマップは、少し小さく出す(枠も一緒に縮むので、ずれない) */
+body.printing-report [data-print-grid] {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  row-gap: 16px;
+}
+body.printing-report [data-print-grid] > :first-child {
+  zoom: 0.8;
+}
+body.printing-report [data-print-grid] > :nth-child(3) {
+  grid-column: 1 / -1;
+}
+body.printing-report [data-print-cols] {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  column-gap: 20px;
+}
+body.printing-report [data-print-wrap] {
+  zoom: 0.75;
 }

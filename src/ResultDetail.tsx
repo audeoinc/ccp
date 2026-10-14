@@ -138,7 +138,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
             </span>
           </div>
           <ResultKpis row={row} money={money} />
-          <div className={styles.grid}>
+          <div className={styles.grid} data-print-grid>
             <HeatPreview
               row={row}
               productIds={productIds}

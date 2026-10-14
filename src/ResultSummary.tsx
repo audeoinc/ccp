@@ -125,7 +125,7 @@ export function ResultInsights({
   ].filter((x) => x.value)
 
   return (
-    <div className={styles.col}>
+    <div className={styles.col} data-print-cols>
       <section>
         <h3 className={styles.h3}>{t('次に生かすメモ', 'Notes for next time')}</h3>
         {/* 印刷では、入力欄ではなく、文章として出す */}
