@@ -6,9 +6,11 @@ import { makeService } from '../gcp/services'
 /**
  * 操作の種類。
  * submit = 週をレビューに出した / draft = 週を下書きに戻した / confirm = 週を確定した / unconfirm = 週の確定を取り消した /
- * status = 配信のステータスを変えた(配信カードで) / reopen = 確定した週の配信を、理由を残して変えた(週はレビューに戻る)
+ * status = 配信のステータスを変えた(配信カードで) / reopen = 確定した週の配信を、理由を残して変えた(週はレビューに戻る) /
+ * approve = 承認した(配信 1 本、または週の検討中の配信をまとめて) / reject = 差し戻した(理由つき) /
+ * revoke = 承認済みの配信の内容が変わったので、検討中に戻した(再承認が必要)
  */
-export type EventAction = 'submit' | 'draft' | 'confirm' | 'unconfirm' | 'status' | 'reopen'
+export type EventAction = 'submit' | 'draft' | 'confirm' | 'unconfirm' | 'status' | 'reopen' | 'approve' | 'reject' | 'revoke'
 
 export interface Cr854_events {
   cr854_eventid: string

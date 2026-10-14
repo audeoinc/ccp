@@ -20,7 +20,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PersonRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -48,7 +48,7 @@ import { useAiDrafts } from './useAiDrafts'
 import { Cr854_weeksService, type Cr854_weeks } from './gcpdata/Cr854_weeksService'
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { confirmedWeekOf } from './weekLock'
-import { logEvent } from './history'
+import { logEvent, myName, setMyName } from './history'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
@@ -74,6 +74,10 @@ interface Props {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
+// 配信のステータス(選択肢の値)。承認・差し戻し・再承認の判定に使う
+const STATUS_NOT_STARTED = 588230000
+const STATUS_REVIEW = 588230001
+const STATUS_APPROVED = 588230002
 // ISO文字列 → datetime-local の値(ローカル時刻)
 const toLocalInput = (v?: string) => {
   if (!v) return ''
@@ -335,6 +339,9 @@ const useStyles = makeStyles({
   reasonBox: { display: 'grid', rowGap: '8px', margin: '12px 24px 0', padding: '12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorPaletteMarigoldBorder2}`, backgroundColor: tokens.colorPaletteMarigoldBackground1 },
   reasonActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
   actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
+  // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
+  review: { display: 'flex', alignItems: 'center', columnGap: '8px', marginRight: 'auto' },
+  actor: { width: '160px' },
 })
 
 export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults }: Props) {
@@ -412,6 +419,10 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [saving, setSaving] = useState(false)
   // 確定した週の変更: 保存の前に、理由を入力してもらう(null = 入力欄を出していない)
   const [changeReason, setChangeReason] = useState<string | null>(null)
+  // 差し戻しの理由(null = 入力欄を出していない)
+  const [rejectReason, setRejectReason] = useState<string | null>(null)
+  // 承認・差し戻しの履歴に残す名前(週の状態の帯・コメントと共通)
+  const [actor, setActor] = useState(myName)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -765,19 +776,14 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     void save()
   }
 
-  /** 保存する。reason を渡したとき(確定した週の変更)は、配信を「検討中」に戻し、週をレビュー中に戻して、理由を記録する */
-  async function save(reason?: string) {
-    setSaving(true)
-    setError(null)
-    try {
-      const fields = {
+  /** 保存する内容(ステータスを除く)。保存と、承認済みの配信の内容が変わったかの判定(再承認)の両方で使う */
+  function buildContent() {
+    return {
         cr854_name: form.name,
         cr854_scheduledat: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
         cr854_country: num(form.country),
         cr854_channel: num(form.channel),
         cr854_department: num(form.department),
-        // 確定後に変えた配信は、もう一度レビューを受けるので「検討中」にする
-        cr854_status: reason !== undefined ? (588230001 as Cr854_deliverycards['cr854_status']) : num(form.status),
         cr854_owner: form.owner.trim(),
         cr854_productiondue: form.productionDue || (null as never),
         cr854_links: encodeLinks(links),
@@ -807,7 +813,42 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
           : card?._cr854_heroimage_value
             ? (null as never)
             : undefined,
-      }
+    }
+  }
+  // 再承認の判定に使う、内容の要約。商品の名前の列は、商品の一覧の読み込みで変わるので、商品 ID の並びで比べる。
+  // 開いたときの値(下の baseline)と比べる(保存済みの行と比べると、表し方の違いだけで「変わった」になるため)
+  const contentKey = () => {
+    const { cr854_products: _names, ...rest } = buildContent()
+    void _names
+    return JSON.stringify({ ...rest, items: items.map((i) => i.productId) })
+  }
+  const baseline = useRef<string | null>(null)
+  useEffect(() => {
+    // 掲載商品を読み込んだ時点(自動の下書きより前)の内容を、基準にする
+    if (card && original !== null && baseline.current === null) baseline.current = contentKey()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card, original])
+  const savedStatus = card?.cr854_status ?? STATUS_NOT_STARTED
+  const approvedBefore = !!card && savedStatus >= STATUS_APPROVED
+  // 承認・差し戻しを出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
+  const canReview = !!card && lockedWeeks.length === 0 && savedStatus <= STATUS_APPROVED
+
+  /**
+   * 保存する。reason を渡したとき(確定した週の変更)は、配信を「検討中」に戻し、週をレビュー中に戻して、理由を記録する。
+   * approve = 保存して承認する。reject = 差し戻す(理由を、コメントにも残す)。
+   * 承認済みの配信の内容を変えたときは、再承認が必要なので「検討中」に戻す
+   */
+  async function save(reason?: string, opts?: { approve?: boolean; reject?: string }) {
+    setSaving(true)
+    setError(null)
+    try {
+      const formStatus = num(form.status) as number | undefined
+      const revoke =
+        reason === undefined && !opts?.approve && opts?.reject === undefined && approvedBefore && formStatus === card?.cr854_status && baseline.current !== null && baseline.current !== contentKey()
+      const status =
+        // 確定後に変えた配信・差し戻した配信・承認済みの内容を変えた配信は、もう一度レビューを受けるので「検討中」にする
+        reason !== undefined || opts?.reject !== undefined || revoke ? STATUS_REVIEW : opts?.approve ? STATUS_APPROVED : formStatus
+      const fields = { ...buildContent(), cr854_status: status as Cr854_deliverycards['cr854_status'] }
       const res = card
         ? await Cr854_deliverycardsService.update(card.cr854_deliverycardid, fields)
         : await Cr854_deliverycardsService.create({ ...fields, statecode: 0 })
@@ -829,14 +870,25 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         })
         if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
       }
-      // 承認の履歴(W6): 保存済みの配信のステータスが変わったら、誰が・いつ・何から何にしたかを残す
-      if (card && (reason !== undefined || card.cr854_status !== fields.cr854_status)) {
+      // 差し戻しの理由は、レビューのコメント(W5)にも残す(対応済みにするまで、未対応として数える)
+      if (opts?.reject !== undefined) {
+        const c = await Cr854_cardnotesService.create({
+          'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
+          cr854_kind: 'comment',
+          cr854_author: myName(),
+          cr854_body: opts.reject.trim(),
+          cr854_resolved: 0,
+        })
+        if (!c.success) throw new Error(c.error?.message ?? tr('差し戻しの理由を記録できませんでした', 'Could not record the reason for sending back'))
+      }
+      // 承認の履歴(W6): 保存済みの配信のステータスが変わったら(承認・差し戻しは、変わらなくても)、誰が・いつ・何から何にしたかを残す
+      if (card && (reason !== undefined || opts?.approve || opts?.reject !== undefined || card.cr854_status !== fields.cr854_status)) {
         await logEvent({
-          action: reason !== undefined ? 'reopen' : 'status',
+          action: reason !== undefined ? 'reopen' : opts?.approve ? 'approve' : opts?.reject !== undefined ? 'reject' : revoke ? 'revoke' : 'status',
           card: { id: cardId, name: form.name, scheduledAt: fields.cr854_scheduledat },
           from: card.cr854_status,
           to: fields.cr854_status,
-          note: reason?.trim(),
+          note: (reason ?? opts?.reject)?.trim(),
         })
       }
       await onSaved()
@@ -915,6 +967,16 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
 
+          {approvedBefore && lockedWeeks.length === 0 && (
+            <MessageBar layout="multiline" intent="info" className={styles.locked}>
+              <MessageBarBody>
+                {t(
+                  'この配信は承認済みです。内容を変えて保存すると「検討中」に戻り、もう一度承認が必要になります。',
+                  'This delivery is approved. If you change the content and save, it goes back to In review and needs approval again.',
+                )}
+              </MessageBarBody>
+            </MessageBar>
+          )}
           {lockedWeeks.length > 0 && (
             <MessageBar layout="multiline" intent="warning" className={styles.locked}>
               <MessageBarBody>
@@ -1204,7 +1266,61 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </div>
             </div>
           )}
+          {rejectReason !== null && (
+            <div className={styles.reasonBox}>
+              <Field label={t('差し戻しの理由(コメントにも残ります)', 'Reason for sending back (also saved as a comment)')} required size="small">
+                <AutoTextarea
+                  rows={2}
+                  size="small"
+                  autoFocus
+                  value={rejectReason}
+                  onChange={(_, d) => setRejectReason(d.value)}
+                  placeholder={t('例: 前日のメールと商品がかぶっているので、入れ替えてください', 'e.g. Same products as the previous day. Please swap some.')}
+                />
+              </Field>
+              <div className={styles.reasonActions}>
+                <Button type="button" size="small" onClick={() => setRejectReason(null)} disabled={saving}>{t('やめる', 'Back')}</Button>
+                <Button
+                  type="button"
+                  size="small"
+                  appearance="primary"
+                  icon={<ArrowUndoRegular />}
+                  disabled={saving || !rejectReason.trim() || !actor.trim()}
+                  onClick={() => void save(undefined, { reject: rejectReason })}
+                >
+                  {t('保存して、差し戻す', 'Save and send back')}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className={styles.actions}>
+            {/* 承認・差し戻し(配信 1 本ずつ)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
+            {canReview && (
+              <div className={styles.review}>
+                <Input
+                  size="small"
+                  className={styles.actor}
+                  contentBefore={<PersonRegular />}
+                  placeholder={t('あなたの名前', 'Your name')}
+                  aria-label={t('承認・差し戻しの履歴に残す名前', 'Your name for the approval history')}
+                  value={actor}
+                  onChange={(_, d) => {
+                    setActor(d.value)
+                    setMyName(d.value)
+                  }}
+                />
+                {savedStatus < STATUS_APPROVED && (
+                  <Button type="button" icon={<CheckmarkCircleRegular />} disabled={saving || !actor.trim() || rejectReason !== null} onClick={() => void save(undefined, { approve: true })}>
+                    {t('保存して承認', 'Save and approve')}
+                  </Button>
+                )}
+                {savedStatus >= STATUS_REVIEW && (
+                  <Button type="button" icon={<ArrowUndoRegular />} disabled={saving || rejectReason !== null} onClick={() => setRejectReason('')}>
+                    {t('差し戻す', 'Send back')}
+                  </Button>
+                )}
+              </div>
+            )}
             <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
             <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)}>
               {saving ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}

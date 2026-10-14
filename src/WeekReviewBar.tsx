@@ -51,18 +51,21 @@ interface Props {
   changes?: Cr854_cardnotes[]
   /** この週の承認の履歴(新しい順) */
   events?: Cr854_events[]
+  /** 週の「検討中」の配信を、まとめて承認する(App 側で行う) */
+  onApproveAll?: () => Promise<void>
   /** 状態を変える(週の配信のステータスも、まとめて進める。App 側で行う) */
   onChange: (status: WeekStatus) => Promise<void>
 }
 
 const STATUS_NOT_STARTED = 588230000
+const STATUS_REVIEW = 588230001
 const STATUS_APPROVED = 588230002
 
 /**
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
  * 確定は、週のすべての配信を「確定」にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onChange }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onChange }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -72,6 +75,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onChange
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const counts = statusOptions.map((o) => ({ ...o, n: cards.filter((c) => (c.cr854_status ?? STATUS_NOT_STARTED) === o.value).length }))
   const notApproved = cards.filter((c) => (c.cr854_status ?? STATUS_NOT_STARTED) < STATUS_APPROVED).length
+  const inReview = cards.filter((c) => c.cr854_status === STATUS_REVIEW).length
   // 確定後の変更: この週の配信の、最後に確定した日時より後の理由。もう一度確定すると、それより前のものは出なくなる
   const cardName = new Map(cards.map((c) => [c.cr854_deliverycardid, c.cr854_name]))
   // 日時は、文字列ではなく時刻で比べる(サーバーとブラウザで、ISO の書き方が違うことがあるため)
@@ -103,6 +107,9 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onChange
       unconfirm: t('週の確定を取り消した', 'Undid the week confirmation'),
       status: t('ステータスを変えた', 'Changed the status'),
       reopen: t('確定後に変えた(週をレビューに戻した)', 'Changed after confirmation (week back to review)'),
+      approve: t('承認した', 'Approved'),
+      reject: t('差し戻した', 'Sent back'),
+      revoke: t('承認後に内容が変わったので、検討中に戻した', 'Content changed after approval, back to In review'),
     })[a ?? 'status'] ?? ''
   const history = (
     <Popover withArrow positioning="below-end">
@@ -121,7 +128,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onChange
               <span className={styles.historyText}>
                 {e.cr854_cardname ? `${e.cr854_cardname}: ` : ''}
                 {actionText(e.cr854_action)}
-                {e.cr854_tostatus !== undefined && e.cr854_tostatus !== null ? `(${statusName(e.cr854_fromstatus) ? `${statusName(e.cr854_fromstatus)} ` : ''}→ ${statusName(e.cr854_tostatus)})` : ''}
+                {e.cr854_tostatus !== undefined && e.cr854_tostatus !== null && e.cr854_tostatus !== e.cr854_fromstatus ? `(${statusName(e.cr854_fromstatus) ? `${statusName(e.cr854_fromstatus)} ` : ''}→ ${statusName(e.cr854_tostatus)})` : ''}
               </span>
               {e.cr854_note && <span className={styles.historyNote}>{e.cr854_note}</span>}
             </div>
@@ -182,6 +189,22 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onChange
         )}
         {status === 'review' && (
           <>
+            {onApproveAll && (
+              <Tooltip content={t('この週の「検討中」の配信を、まとめて「承認済み」にします', 'Sets every In review delivery in this week to Approved.')} relationship="description">
+                <Button
+                  size="small"
+                  icon={<CheckmarkCircleRegular />}
+                  disabled={busy || inReview === 0 || !name.trim()}
+                  onClick={() => {
+                    if (!window.confirm(t(`検討中の配信 ${inReview} 件を、まとめて承認します。よろしいですか?`, `Approve ${inReview} delivery(ies) in review?`))) return
+                    setBusy(true)
+                    void onApproveAll().finally(() => setBusy(false))
+                  }}
+                >
+                  {t(`まとめて承認(${inReview})`, `Approve all (${inReview})`)}
+                </Button>
+              </Tooltip>
+            )}
             <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={busy} onClick={() => void run('draft')}>
               {t('下書きに戻す', 'Back to draft')}
             </Button>

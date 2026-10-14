@@ -526,6 +526,22 @@ function App() {
     }
     await load()
   }
+  // 週の「検討中」の配信を、まとめて承認する(承認の単位は、1 本ずつと週まとめての両方。2026-10-14 決定)
+  const approveWeek = async () => {
+    setError(null)
+    try {
+      const moved: string[] = []
+      for (const c of weekCards.filter((x) => x.cr854_status === 588230001)) {
+        const r = await Cr854_deliverycardsService.update(c.cr854_deliverycardid, { cr854_status: 588230002 as Cr854_deliverycards['cr854_status'] })
+        if (!r.success) throw new Error(r.error?.message ?? tr('配信のステータスを変えられませんでした', 'Could not update a delivery status'))
+        moved.push(c.cr854_name)
+      }
+      if (moved.length) await logEvent({ action: 'approve', weekStart: weekKey, from: 588230001, to: 588230002, note: moved.join(' / ') })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    await load()
+  }
   // 週の見方(商品 / 進み具合)は、計画の面の、週の表示だけで使う
   const lensOn = page === 'calendar' && view === 'week'
   const changeView = (v: View) => {
@@ -768,7 +784,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)} onChange={changeWeek} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onChange={changeWeek} />
               <WeekChecklist items={checklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />
               <WeekView
                 start={weekStart}
