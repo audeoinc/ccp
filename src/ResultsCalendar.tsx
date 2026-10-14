@@ -1,10 +1,9 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
-import { CardPreview } from './CardPreview'
-import { DeliveryPeek } from './DeliveryPeek'
-import { FitPreview } from './FitPreview'
+import { HeatPreview } from './HeatPreview'
 import { locale, useLang, useT } from './i18n'
 import { isPush, localDate, pct, type ResultRow } from './results'
 
@@ -53,12 +52,9 @@ const useStyles = makeStyles({
     minWidth: 0,
     ':hover': { boxShadow: tokens.shadow4 },
   },
-  // 縮小は、幅に合わせて、上の部分(メイン画像のあたり)だけを見せる。全体は、マウスを重ねて見る
-  thumb: { display: 'flex', justifyContent: 'center', maxHeight: '180px', backgroundColor: tokens.colorNeutralBackground3, borderRadius: tokens.borderRadiusSmall, overflow: 'hidden', pointerEvents: 'none' },
-  thumbWrap: { display: 'block' },
-  kv: { display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: '6px', fontSize: tokens.fontSizeBase100, fontVariantNumeric: 'tabular-nums' },
-  k: { color: tokens.colorNeutralForeground3 },
-  v: { textAlign: 'right' },
+  nums: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', columnGap: '6px', flexWrap: 'wrap', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, fontVariantNumeric: 'tabular-nums' },
+  big: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
+  heat: { display: 'flex', justifyContent: 'center', paddingTop: '2px' },
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground4, padding: '8px 0' },
 })
 
@@ -141,7 +137,7 @@ export function ResultsMonth({ month, cards, results, money, onOpen }: Props & {
   )
 }
 
-/** 週の表示: 日ごとに、配信のプレビューの縮小と、主な数字を並べる。プレビューは、マウスを重ねると大きく出る */
+/** 週の表示: 日ごとに、クリックを重ねたプレビューと、主な数字を並べる。1 週間の配信で、どこに載せた何が押されたかを、比べて見るため。押すと、詳しい結果 */
 export function ResultsWeek({
   weekStart,
   cards,
@@ -156,9 +152,20 @@ export function ResultsWeek({
   const t = useT()
   const delta = useDelta()
   const days = byDay(cards)
-  const n = (v?: number) => (v ?? 0).toLocaleString(locale())
+  // プレビューは、日の列の幅に合わせて縮める(列の幅は、画面の幅で変わる)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [colW, setColW] = useState(160)
+  useLayoutEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    const measure = () => setColW(Math.max(100, Math.floor((el.clientWidth - 8 * 6) / 7) - 14))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   return (
-    <div className={styles.week}>
+    <div ref={gridRef} className={styles.week}>
       {Array.from({ length: 7 }, (_, i) => {
         const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i)
         const key = localDate(d.toISOString())
@@ -173,32 +180,20 @@ export function ResultsWeek({
               return (
                 <button key={c.cr854_deliverycardid} type="button" className={mergeClasses(styles.tile, !r && styles.chipNone)} style={{ borderTopColor: trendColor(r) }} onClick={() => onOpen(c.cr854_deliverycardid)}>
                   <span className={styles.chipName} title={c.cr854_name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.cr854_name}`}</span>
-                  <DeliveryPeek card={c} productIds={ids} products={products} heroes={heroes}>
-                    <span className={styles.thumbWrap}>
-                      <span className={styles.thumb}>
-                        <FitPreview maxWidth={170} maxHeight={100000}>
-                          <CardPreview card={c} productIds={ids} products={products} heroes={heroes} />
-                        </FitPreview>
-                      </span>
-                    </span>
-                  </DeliveryPeek>
                   {r ? (
-                    <span className={styles.kv}>
-                      <span className={styles.k}>{t('売上', 'Revenue')}</span>
-                      <span className={styles.v}>{money(r.revenue, c)}</span>
-                      <span className={styles.k}>{isPush(c) ? t('タップ', 'Tap') : t('開封', 'Open')}</span>
-                      <span className={styles.v}>{pct(isPush(c) ? r.clickRate : r.openRate)}</span>
-                      {!isPush(c) && (
-                        <>
-                          <span className={styles.k}>{t('クリック', 'Click')}</span>
-                          <span className={styles.v}>{pct(r.clickRate)}</span>
-                        </>
-                      )}
-                      <span className={styles.k}>{t('注文', 'Orders')}</span>
-                      <span className={styles.v}>{n(r.result.cr854_orders)}</span>
-                      <span className={styles.k}>{t('前年比', 'vs LY')}</span>
-                      <span className={styles.v}>{delta(r.vsLastYear) ?? '—'}</span>
-                    </span>
+                    <>
+                      <span className={styles.nums}>
+                        <span className={styles.big}>{money(r.revenue, c)}</span>
+                        {delta(r.vsLastYear)}
+                      </span>
+                      <span className={styles.nums}>
+                        <span>{isPush(c) ? t(`タップ ${pct(r.clickRate)}`, `Tap ${pct(r.clickRate)}`) : t(`開封 ${pct(r.openRate)}`, `Open ${pct(r.openRate)}`)}</span>
+                        {!isPush(c) && <span>{t(`クリック ${pct(r.clickRate)}`, `Click ${pct(r.clickRate)}`)}</span>}
+                      </span>
+                      <span className={styles.heat}>
+                        <HeatPreview row={r} productIds={ids} products={products} heroes={heroes} width={colW} compact />
+                      </span>
+                    </>
                   ) : (
                     <span className={styles.chipNums}>{t('結果なし', 'No results')}</span>
                   )}

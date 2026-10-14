@@ -21,18 +21,14 @@ import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpd
 import { locale, priceText, useT, type Market } from './i18n'
 import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
 import { ResultDetail } from './ResultDetail'
-import { ResultSummary } from './ResultSummary'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', columnGap: '16px', alignItems: 'start' },
-  // 月・週の表示は、右の欄を置かずに、横幅をすべて使う
-  rootWide: { gridTemplateColumns: 'minmax(0, 1fr)' },
+  root: { minWidth: 0 },
   // 月・週の表示の凡例(左・上の線の色)。カレンダーの凡例と同じく、右の端に置く
   legend: { display: 'flex', columnGap: '10px', marginLeft: 'auto', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   legendItem: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
   legendBar: { width: '3px', height: '12px', borderRadius: '1px' },
-  sideEmpty: { padding: '12px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, color: tokens.colorNeutralForeground3 },
   main: { minWidth: 0 },
   group: { display: 'flex', alignItems: 'center', columnGap: '4px' },
   groupLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: '4px' },
@@ -97,7 +93,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('delivery')
-  const [selectedId, setSelectedId] = useState<string | null>(detailId)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
@@ -149,7 +144,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   })()
   const prevRevenue = scoped.filter((r) => monthKey(r.result.cr854_sentat ?? r.card.cr854_scheduledat) === prevMonth).reduce((s, r) => s + r.revenue, 0)
   const total = rows.reduce((s, r) => s + r.revenue, 0)
-  const productCode = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_productcode
   const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? t('(削除された商品)', '(deleted product)')
 
   const groups: GroupRow[] =
@@ -161,7 +155,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           ? productRows(rows, productName, parseProductResults)
           : []
 
-  const selected = rows.find((r) => r.card.cr854_deliverycardid === selectedId) ?? (groupBy === 'delivery' ? rows[0] : undefined)
 
   const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' }) : '')
   const delta = (v?: number) =>
@@ -235,23 +228,8 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       'results-import-sample.csv',
     )
 
+  // 詳しい結果(フロート)を開いている配信
   const detail = detailId ? resultByCard.get(detailId) : undefined
-  if (detail) {
-    return (
-      <ResultDetail
-        key={detailId}
-        row={detail}
-        productIds={cardProducts.get(detail.card.cr854_deliverycardid) ?? []}
-        products={products}
-        heroes={heroes}
-        weekly={weekly}
-        money={(v) => money(v, detail.card)}
-        onBack={() => onDetail(null)}
-        onOpenCard={onOpenCard}
-        onSaved={load}
-      />
-    )
-  }
 
   // 共通のツールバーに差し込む、結果の面の操作(まとめ方は、一覧のときだけ)
   const tools = (
@@ -312,7 +290,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   )
 
   return (
-    <div className={mergeClasses(styles.root, view !== 'list' && styles.rootWide)}>
+    <div className={styles.root}>
       {toolbarSlot && createPortal(tools, toolbarSlot)}
       <div className={styles.main}>
         {error && (
@@ -362,9 +340,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
                   </thead>
                   <tbody>
                     {rows.map((r) => {
-                      const on = selected?.card.cr854_deliverycardid === r.card.cr854_deliverycardid
+                      const on = detailId === r.card.cr854_deliverycardid
                       return (
-                        <tr key={r.result.cr854_deliveryresultid} className={mergeClasses(styles.row, on && styles.rowOn)} onClick={() => setSelectedId(r.card.cr854_deliverycardid)} aria-selected={on}>
+                        // 行を押すと、詳しい結果をフロートで開く(計画の面の一覧で、配信カードが開くのと同じ)
+                        <tr key={r.result.cr854_deliveryresultid} className={mergeClasses(styles.row, on && styles.rowOn)} onClick={() => onDetail(r.card.cr854_deliverycardid)} aria-selected={on}>
                           <td className={styles.td}>{dateText(r.result.cr854_sentat ?? r.card.cr854_scheduledat)}</td>
                           <td className={mergeClasses(styles.td, on && styles.name)}>{r.card.cr854_name}</td>
                           <td className={styles.td}>{isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')}</td>
@@ -432,22 +411,19 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           </>
         )}
       </div>
-      {view !== 'list' ? null : selected ? (
-        <ResultSummary
-          key={selected.result.cr854_deliveryresultid}
-          row={selected}
+      {detail && (
+        <ResultDetail
+          key={detailId}
+          row={detail}
+          productIds={cardProducts.get(detail.card.cr854_deliverycardid) ?? []}
+          products={products}
+          heroes={heroes}
           weekly={weekly}
-          productName={productName}
-          productCode={productCode}
-          money={(v) => money(v, selected.card)}
+          money={(v) => money(v, detail.card)}
+          onClose={() => onDetail(null)}
           onOpenCard={onOpenCard}
-          onOpenDetail={() => onDetail(selected.card.cr854_deliverycardid)}
           onSaved={load}
         />
-      ) : (
-        <div className={styles.sideEmpty}>
-          {groupBy === 'delivery' ? t('配信を選ぶと、ここに詳しい結果が出ます', 'Select a delivery to see its details') : t('「配信」でまとめると、配信ごとの詳しい結果を見られます', 'Group by Delivery to see details for each delivery')}
-        </div>
       )}
     </div>
   )

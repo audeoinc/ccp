@@ -1,50 +1,68 @@
-import { useState } from 'react'
-import { Button, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { OpenRegular } from '@fluentui/react-icons'
+import { useState, type ReactNode } from 'react'
+import { Button, Spinner, Textarea, makeStyles, tokens } from '@fluentui/react-components'
 import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
 import { Cr854_deliveryresultsService } from './gcpdata/Cr854_deliveryresultsService'
 import { locale, useT } from './i18n'
 import { isPush, parseProductResults, pct, templateName, type ResultRow } from './results'
 
 const useStyles = makeStyles({
-  side: {
-    display: 'grid',
-    rowGap: '14px',
-    alignContent: 'start',
-    padding: '12px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-  sticky: { position: 'sticky', top: '12px' },
-  sideTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, display: 'flex', alignItems: 'center', columnGap: '6px' },
-  kpis: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', columnGap: '6px', rowGap: '6px' },
-  kpi: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, padding: '6px 8px' },
-  kpiLabel: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
-  kpiValue: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
-  h3: { margin: '0 0 4px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
-  list: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200 },
+  // 主な数字: 横一列に並べる
+  kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', columnGap: '8px', rowGap: '8px' },
+  kpi: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, padding: '8px 12px', backgroundColor: tokens.colorNeutralBackground1 },
+  kpiLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  kpiValue: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
+  up: { color: tokens.colorPaletteGreenForeground1 },
+  down: { color: tokens.colorPaletteRedForeground1 },
+  // 商品・AI の案・メモ
+  col: { display: 'grid', rowGap: '18px', alignContent: 'start', minWidth: 0 },
+  h3: { margin: '0 0 6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  list: { display: 'grid', rowGap: '6px', fontSize: tokens.fontSizeBase300 },
   prodRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '8px' },
   prodName: { fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  prodSub: { gridColumn: '1 / -1', color: tokens.colorNeutralForeground3 },
+  prodSub: { gridColumn: '1 / -1', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   aiItem: { overflowWrap: 'anywhere' },
-  aiReason: { color: tokens.colorNeutralForeground3 },
+  aiReason: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   noteActions: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', columnGap: '8px', marginTop: '6px' },
   muted: { color: tokens.colorNeutralForeground3 },
-  sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  titleActions: { marginLeft: 'auto', display: 'flex', columnGap: '4px' },
 })
 
-/** 配信 1 本の結果のまとめ: 主な数字・商品の売れ方・採用した AI の提案・次に生かすメモ。一覧の右の欄と、詳しい結果のページの左で使う */
-export function ResultSummary({
+/** 配信 1 本の主な数字(開封率・クリック率 / タップ率・売上・注文・送った数・前年比) */
+export function ResultKpis({ row, money }: { row: ResultRow; money: (v?: number) => string }) {
+  const styles = useStyles()
+  const t = useT()
+  const { card, result } = row
+  const push = isPush(card)
+  const n = (v?: number) => (v ?? 0).toLocaleString(locale())
+  const items: [string, ReactNode][] = [
+    ...(push ? [] : ([[t('開封率', 'Open rate'), pct(row.openRate)]] as [string, ReactNode][])),
+    [push ? t('タップ率', 'Tap rate') : t('クリック率', 'Click rate'), pct(row.clickRate)],
+    [t('売上', 'Revenue'), money(row.revenue)],
+    [t('注文', 'Orders'), n(result.cr854_orders)],
+    [t('送った数', 'Sent'), n(result.cr854_recipients)],
+    [
+      t('前年比', 'vs last year'),
+      row.vsLastYear === undefined ? '—' : <span className={row.vsLastYear >= 0 ? styles.up : styles.down}>{`${row.vsLastYear >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(row.vsLastYear * 100))}%`}</span>,
+    ],
+  ]
+  return (
+    <div className={styles.kpis}>
+      {items.map(([label, value]) => (
+        <div key={label} className={styles.kpi}>
+          <div className={styles.kpiLabel}>{label}</div>
+          <div className={styles.kpiValue}>{value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 配信 1 本の、商品の売れ方・採用した AI の提案・次に生かすメモ */
+export function ResultInsights({
   row,
   weekly,
   productName,
   productCode,
   money,
-  onOpenCard,
-  onOpenDetail,
-  sticky = true,
   onSaved,
 }: {
   row: ResultRow
@@ -53,11 +71,6 @@ export function ResultSummary({
   /** 商品 ID → 商品コード(週ごとの実績は、商品コードで持っている) */
   productCode: (id: string) => string | undefined
   money: (v?: number) => string
-  onOpenCard: (id: string) => void
-  /** 詳しい結果のページを開く(詳しい結果のページの中では渡さない) */
-  onOpenDetail?: () => void
-  /** 画面のスクロールについてくる(一覧の右の欄) */
-  sticky?: boolean
   onSaved: () => Promise<void>
 }) {
   const styles = useStyles()
@@ -111,42 +124,19 @@ export function ResultSummary({
         ]),
   ].filter((x) => x.value)
 
-  const sentText = Number.isNaN(sent.getTime()) ? '' : sent.toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })
   return (
-    <aside className={mergeClasses(styles.side, sticky && styles.sticky)} aria-label={t('選んだ配信', 'Selected delivery')}>
-      <div className={styles.sideTitle}>
-        <span>{`${card.cr854_name} · ${sentText} ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
-        <span className={styles.titleActions}>
-          {onOpenDetail && (
-            <Button size="small" appearance="primary" onClick={onOpenDetail}>
-              {t('詳しい結果', 'Details')}
-            </Button>
-          )}
-          <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
-            <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(card.cr854_deliverycardid)} />
-          </Tooltip>
-        </span>
-      </div>
-      <div className={styles.kpis}>
-        <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>{push ? t('タップ率', 'Tap') : t('開封率', 'Open')}</div>
-          <div className={styles.kpiValue}>{pct(push ? row.clickRate : row.openRate)}</div>
+    <div className={styles.col}>
+      <section>
+        <h3 className={styles.h3}>{t('次に生かすメモ', 'Notes for next time')}</h3>
+        <Textarea value={notes} onChange={(_, d) => setNotes(d.value)} resize="vertical" rows={4} style={{ width: '100%' }} placeholder={t('うまくいったこと・次に試すこと', 'What worked, and what to try next')} />
+        <div className={styles.noteActions}>
+          {saving && <Spinner size="extra-tiny" />}
+          {savedAt && !saving && <span className={styles.muted}>{t(`${savedAt} に保存しました`, `Saved at ${savedAt}`)}</span>}
+          <Button size="small" onClick={() => void save()} disabled={saving || notes === (result.cr854_notes ?? '')}>
+            {t('保存', 'Save')}
+          </Button>
         </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>{push ? t('注文', 'Orders') : t('クリック率', 'Click')}</div>
-          <div className={styles.kpiValue}>{push ? (result.cr854_orders ?? 0).toLocaleString(locale()) : pct(row.clickRate)}</div>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>{t('売上', 'Revenue')}</div>
-          <div className={styles.kpiValue}>{money(row.revenue)}</div>
-        </div>
-      </div>
-      <div className={styles.sub}>
-        {t(
-          `送った数 ${(result.cr854_recipients ?? 0).toLocaleString(locale())}・注文 ${(result.cr854_orders ?? 0).toLocaleString(locale())}・前年 ${money(Number(result.cr854_lastyearrevenue ?? 0))}`,
-          `Sent ${(result.cr854_recipients ?? 0).toLocaleString(locale())} · orders ${(result.cr854_orders ?? 0).toLocaleString(locale())} · last year ${money(Number(result.cr854_lastyearrevenue ?? 0))}`,
-        )}
-      </div>
+      </section>
       <section>
         <h3 className={styles.h3}>{t('商品: 配信のあとの売れ方', 'Products: sales after the delivery')}</h3>
         {items.length === 0 ? (
@@ -185,17 +175,6 @@ export function ResultSummary({
           </div>
         )}
       </section>
-      <section>
-        <h3 className={styles.h3}>{t('次に生かすメモ', 'Notes for next time')}</h3>
-        <Textarea value={notes} onChange={(_, d) => setNotes(d.value)} resize="vertical" rows={4} style={{ width: '100%' }} placeholder={t('うまくいったこと・次に試すこと', 'What worked, and what to try next')} />
-        <div className={styles.noteActions}>
-          {saving && <Spinner size="extra-tiny" />}
-          {savedAt && !saving && <span className={styles.muted}>{t(`${savedAt} に保存しました`, `Saved at ${savedAt}`)}</span>}
-          <Button size="small" onClick={() => void save()} disabled={saving || notes === (result.cr854_notes ?? '')}>
-            {t('保存', 'Save')}
-          </Button>
-        </div>
-      </section>
-    </aside>
+    </div>
   )
 }

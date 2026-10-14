@@ -303,7 +303,7 @@ function App() {
   const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
   // 開いている画面: カレンダー / 配信結果(振り返り)
   const [page, setPage] = useState<'calendar' | 'results'>('calendar')
-  // 結果の面で、詳しい結果を開いている配信(開いている間は、共通のツールバーを隠す)
+  // 結果の面で、詳しい結果(フロート)を開いている配信
   const [resultDetail, setResultDetail] = useState<string | null>(null)
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
@@ -623,8 +623,6 @@ function App() {
         )}
         {!loading && !error && month && (
           <>
-            {!(page === 'results' && resultDetail) && (
-            <>
             <div className={styles.filterRow}>
               <FilterSelect label={t('国', 'Country')} value={filters.country} options={countryOptions} onChange={setFilter('country')} />
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
@@ -723,8 +721,6 @@ function App() {
               </div>
               )}
             </div>
-            </>
-            )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'results' ? (
               <ResultsPage
