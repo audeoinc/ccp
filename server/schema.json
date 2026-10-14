@@ -182,6 +182,7 @@
         ["cr854_revenue", "revenue", "numeric"],
         ["cr854_lastyearrevenue", "last_year_revenue", "numeric"],
         ["cr854_products", "products", "text"],
+        ["cr854_links", "links", "text"],
         ["cr854_notes", "notes", "text"]
       ],
       "lookups": [

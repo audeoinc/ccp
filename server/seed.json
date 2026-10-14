@@ -9078,7 +9078,8 @@
    "cr854_orders": 347,
    "cr854_revenue": 46716,
    "cr854_lastyearrevenue": 40289,
-   "cr854_products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1464,\"units\":107,\"revenue\":13696},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":1584,\"units\":133,\"revenue\":22344},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":1705,\"units\":44,\"revenue\":3872},{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":1211,\"units\":63,\"revenue\":6804}]"
+   "cr854_products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1464,\"units\":107,\"revenue\":13696},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":1584,\"units\":133,\"revenue\":22344},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":1705,\"units\":44,\"revenue\":3872},{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":1211,\"units\":63,\"revenue\":6804}]",
+   "cr854_links": "{\"hero\":2898,\"buttons\":[821,193,133],\"other\":215}"
   },
   {
    "cr854_deliveryresultid": "d31c06eb-da42-4472-a4c9-3231b4112018",
@@ -9090,7 +9091,8 @@
    "cr854_orders": 315,
    "cr854_revenue": 52209,
    "cr854_lastyearrevenue": 60802,
-   "cr854_products": "[{\"productId\":\"23599dca-e633-4293-a77a-64f42990903d\",\"clicks\":2899,\"units\":174,\"revenue\":34452},{\"productId\":\"985ed327-7939-472a-a475-198d948b2880\",\"clicks\":2870,\"units\":76,\"revenue\":5472},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":2760,\"units\":65,\"revenue\":12285}]"
+   "cr854_products": "[{\"productId\":\"23599dca-e633-4293-a77a-64f42990903d\",\"clicks\":2899,\"units\":174,\"revenue\":34452},{\"productId\":\"985ed327-7939-472a-a475-198d948b2880\",\"clicks\":2870,\"units\":76,\"revenue\":5472},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":2760,\"units\":65,\"revenue\":12285}]",
+   "cr854_links": "{\"hero\":2898,\"buttons\":[1013,323,96],\"other\":345}"
   },
   {
    "cr854_deliveryresultid": "1770601d-9c56-4f38-af11-304784193a8a",
@@ -9102,7 +9104,8 @@
    "cr854_orders": 115,
    "cr854_revenue": 8596,
    "cr854_lastyearrevenue": 6475,
-   "cr854_products": "[{\"productId\":\"1f5758e7-6a36-40f6-a377-56910d92a2c0\",\"clicks\":683,\"units\":37,\"revenue\":2368},{\"productId\":\"8c5ec043-6d39-4446-a875-06a9a08b3b64\",\"clicks\":568,\"units\":36,\"revenue\":2952},{\"productId\":\"1e5995eb-eb33-4a72-a67a-636122908538\",\"clicks\":885,\"units\":42,\"revenue\":3276}]"
+   "cr854_products": "[{\"productId\":\"1f5758e7-6a36-40f6-a377-56910d92a2c0\",\"clicks\":683,\"units\":37,\"revenue\":2368},{\"productId\":\"8c5ec043-6d39-4446-a875-06a9a08b3b64\",\"clicks\":568,\"units\":36,\"revenue\":2952},{\"productId\":\"1e5995eb-eb33-4a72-a67a-636122908538\",\"clicks\":885,\"units\":42,\"revenue\":3276}]",
+   "cr854_links": "{\"hero\":933,\"buttons\":[342,97,59],\"other\":114}"
   },
   {
    "cr854_deliveryresultid": "33388cc8-a7e3-4ab9-a822-b846d4cf06ef",
@@ -9114,7 +9117,8 @@
    "cr854_orders": 318,
    "cr854_revenue": 4832400,
    "cr854_lastyearrevenue": 3892025,
-   "cr854_products": "[{\"productId\":\"7a35223b-0e61-47a6-a74d-2349da91eed4\",\"clicks\":5473,\"units\":122,\"revenue\":951600},{\"productId\":\"68398313-a066-4aaa-a147-d329c88d5550\",\"clicks\":3395,\"units\":196,\"revenue\":3880800}]"
+   "cr854_products": "[{\"productId\":\"7a35223b-0e61-47a6-a74d-2349da91eed4\",\"clicks\":5473,\"units\":122,\"revenue\":951600},{\"productId\":\"68398313-a066-4aaa-a147-d329c88d5550\",\"clicks\":3395,\"units\":196,\"revenue\":3880800}]",
+   "cr854_links": "{\"hero\":4706,\"buttons\":[1004,254,103],\"other\":195}"
   },
   {
    "cr854_deliveryresultid": "78e37894-2af2-4c89-a3a6-1d36e7ee4aab",
@@ -9126,7 +9130,8 @@
    "cr854_orders": 139,
    "cr854_revenue": 11740,
    "cr854_lastyearrevenue": 13455,
-   "cr854_products": "[{\"productId\":\"8a5c7e86-773b-429b-a672-c4ec228e46a1\",\"clicks\":980,\"units\":44,\"revenue\":1936},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":616,\"units\":41,\"revenue\":6888},{\"productId\":\"8f5ec4fc-7239-4c25-ab75-0b629d8b36ab\",\"clicks\":867,\"units\":54,\"revenue\":2916}]"
+   "cr854_products": "[{\"productId\":\"8a5c7e86-773b-429b-a672-c4ec228e46a1\",\"clicks\":980,\"units\":44,\"revenue\":1936},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":616,\"units\":41,\"revenue\":6888},{\"productId\":\"8f5ec4fc-7239-4c25-ab75-0b629d8b36ab\",\"clicks\":867,\"units\":54,\"revenue\":2916}]",
+   "cr854_links": "{\"hero\":908,\"buttons\":[274,151,27],\"other\":72}"
   },
   {
    "cr854_deliveryresultid": "4cda51df-51d9-4cb6-a568-0aed442cd00c",
@@ -9138,7 +9143,8 @@
    "cr854_orders": 228,
    "cr854_revenue": 20016,
    "cr854_lastyearrevenue": 17932,
-   "cr854_products": "[{\"productId\":\"915ec822-7039-48ff-a975-083c9f8b39d1\",\"clicks\":1994,\"units\":98,\"revenue\":6076},{\"productId\":\"1e575754-6b36-4289-a277-54fe0e92a453\",\"clicks\":1879,\"units\":45,\"revenue\":3060},{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1564,\"units\":85,\"revenue\":10880}]"
+   "cr854_products": "[{\"productId\":\"915ec822-7039-48ff-a975-083c9f8b39d1\",\"clicks\":1994,\"units\":98,\"revenue\":6076},{\"productId\":\"1e575754-6b36-4289-a277-54fe0e92a453\",\"clicks\":1879,\"units\":45,\"revenue\":3060},{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1564,\"units\":85,\"revenue\":10880}]",
+   "cr854_links": "{\"hero\":1844,\"buttons\":[586,353,59],\"other\":180}"
   },
   {
    "cr854_deliveryresultid": "c2296c39-0f7b-4484-aca7-ff5bdb28f88e",
@@ -9150,7 +9156,8 @@
    "cr854_orders": 240,
    "cr854_revenue": 17048,
    "cr854_lastyearrevenue": 18464,
-   "cr854_products": "[{\"productId\":\"20599911-e933-474c-a47a-603b2490885e\",\"clicks\":2150,\"units\":103,\"revenue\":10094},{\"productId\":\"915ec822-7039-48ff-a975-083c9f8b39d1\",\"clicks\":1762,\"units\":82,\"revenue\":5084},{\"productId\":\"925ec9b5-6f39-476c-aa75-09cf9e8b383e\",\"clicks\":1919,\"units\":55,\"revenue\":1870}]"
+   "cr854_products": "[{\"productId\":\"20599911-e933-474c-a47a-603b2490885e\",\"clicks\":2150,\"units\":103,\"revenue\":10094},{\"productId\":\"915ec822-7039-48ff-a975-083c9f8b39d1\",\"clicks\":1762,\"units\":82,\"revenue\":5084},{\"productId\":\"925ec9b5-6f39-476c-aa75-09cf9e8b383e\",\"clicks\":1919,\"units\":55,\"revenue\":1870}]",
+   "cr854_links": "{\"hero\":2208,\"buttons\":[914,158,114],\"other\":218}"
   },
   {
    "cr854_deliveryresultid": "a45d5e7e-9d65-4633-a87a-52f80ba2d105",
@@ -9162,7 +9169,8 @@
    "cr854_orders": 77,
    "cr854_revenue": 7596,
    "cr854_lastyearrevenue": 8795,
-   "cr854_products": "[{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":603,\"units\":44,\"revenue\":4752},{\"productId\":\"1b57529b-6e36-4742-a777-5cdd1192a90c\",\"clicks\":654,\"units\":10,\"revenue\":820},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":590,\"units\":23,\"revenue\":2024}]"
+   "cr854_products": "[{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":603,\"units\":44,\"revenue\":4752},{\"productId\":\"1b57529b-6e36-4742-a777-5cdd1192a90c\",\"clicks\":654,\"units\":10,\"revenue\":820},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":590,\"units\":23,\"revenue\":2024}]",
+   "cr854_links": "{\"hero\":861,\"buttons\":[243,88,62],\"other\":50}"
   },
   {
    "cr854_deliveryresultid": "bc1ed766-77ac-4677-af95-8b3ca1cc174d",
@@ -9174,7 +9182,8 @@
    "cr854_orders": 397,
    "cr854_revenue": 44434,
    "cr854_lastyearrevenue": 54212,
-   "cr854_products": "[{\"productId\":\"915ec822-7039-48ff-a975-083c9f8b39d1\",\"clicks\":1384,\"units\":170,\"revenue\":10540},{\"productId\":\"8b5ebeb0-6e39-45d9-a775-0516a18b3cf7\",\"clicks\":2298,\"units\":77,\"revenue\":5544},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":2534,\"units\":150,\"revenue\":28350}]"
+   "cr854_products": "[{\"productId\":\"915ec822-7039-48ff-a975-083c9f8b39d1\",\"clicks\":1384,\"units\":170,\"revenue\":10540},{\"productId\":\"8b5ebeb0-6e39-45d9-a775-0516a18b3cf7\",\"clicks\":2298,\"units\":77,\"revenue\":5544},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":2534,\"units\":150,\"revenue\":28350}]",
+   "cr854_links": "{\"hero\":2682,\"buttons\":[647,467,164],\"other\":226}"
   },
   {
    "cr854_deliveryresultid": "45080e25-a953-4e70-a992-a3b73e04f612",
@@ -9186,7 +9195,8 @@
    "cr854_orders": 372,
    "cr854_revenue": 3824600,
    "cr854_lastyearrevenue": 3988704,
-   "cr854_products": "[{\"productId\":\"6c39895f-9c66-445e-a547-d975cc8d5b9c\",\"clicks\":1544,\"units\":188,\"revenue\":1842400},{\"productId\":\"723992d1-9666-4aec-a747-dc9bd28d650e\",\"clicks\":1980,\"units\":79,\"revenue\":932200},{\"productId\":\"6b3987cc-9d66-45f1-a447-d7e2cd8d5d2f\",\"clicks\":1450,\"units\":42,\"revenue\":369600},{\"productId\":\"7139913e-9766-4c7f-a647-db08d38d66a1\",\"clicks\":2128,\"units\":63,\"revenue\":680400}]"
+   "cr854_products": "[{\"productId\":\"6c39895f-9c66-445e-a547-d975cc8d5b9c\",\"clicks\":1544,\"units\":188,\"revenue\":1842400},{\"productId\":\"723992d1-9666-4aec-a747-dc9bd28d650e\",\"clicks\":1980,\"units\":79,\"revenue\":932200},{\"productId\":\"6b3987cc-9d66-45f1-a447-d7e2cd8d5d2f\",\"clicks\":1450,\"units\":42,\"revenue\":369600},{\"productId\":\"7139913e-9766-4c7f-a647-db08d38d66a1\",\"clicks\":2128,\"units\":63,\"revenue\":680400}]",
+   "cr854_links": "{\"hero\":2198,\"buttons\":[1012,362,83],\"other\":202}"
   },
   {
    "cr854_deliveryresultid": "1faae891-1486-4274-a23a-49d36e743636",
@@ -9198,7 +9208,8 @@
    "cr854_orders": 124,
    "cr854_revenue": 691200,
    "cr854_lastyearrevenue": 532209,
-   "cr854_products": "[{\"productId\":\"7f352a1a-1161-4c5f-a84d-24dcd991ed41\",\"clicks\":921,\"units\":59,\"revenue\":224200},{\"productId\":\"7c352561-0c61-4480-a54d-2023dc91f1fa\",\"clicks\":1214,\"units\":20,\"revenue\":116000},{\"productId\":\"ef3c962f-9964-410e-a44a-1679458a4880\",\"clicks\":731,\"units\":45,\"revenue\":351000}]"
+   "cr854_products": "[{\"productId\":\"7f352a1a-1161-4c5f-a84d-24dcd991ed41\",\"clicks\":921,\"units\":59,\"revenue\":224200},{\"productId\":\"7c352561-0c61-4480-a54d-2023dc91f1fa\",\"clicks\":1214,\"units\":20,\"revenue\":116000},{\"productId\":\"ef3c962f-9964-410e-a44a-1679458a4880\",\"clicks\":731,\"units\":45,\"revenue\":351000}]",
+   "cr854_links": "{\"hero\":1873,\"buttons\":[700,104,56],\"other\":210}"
   },
   {
    "cr854_deliveryresultid": "195d2b49-b8cb-406c-ae29-79c7dc07f742",
@@ -9210,7 +9221,8 @@
    "cr854_orders": 160,
    "cr854_revenue": 1936000,
    "cr854_lastyearrevenue": 1692170,
-   "cr854_products": "[{\"productId\":\"ea3c8e50-9e64-48ed-a74a-1b324a8a505f\",\"clicks\":760,\"units\":64,\"revenue\":627200},{\"productId\":\"f13c9955-9764-4de8-a24a-1353478a4ba6\",\"clicks\":598,\"units\":50,\"revenue\":490000},{\"productId\":\"7d3526f4-1361-4f85-aa4d-2802d791ea1b\",\"clicks\":776,\"units\":46,\"revenue\":818800}]"
+   "cr854_products": "[{\"productId\":\"ea3c8e50-9e64-48ed-a74a-1b324a8a505f\",\"clicks\":760,\"units\":64,\"revenue\":627200},{\"productId\":\"f13c9955-9764-4de8-a24a-1353478a4ba6\",\"clicks\":598,\"units\":50,\"revenue\":490000},{\"productId\":\"7d3526f4-1361-4f85-aa4d-2802d791ea1b\",\"clicks\":776,\"units\":46,\"revenue\":818800}]",
+   "cr854_links": "{\"hero\":1154,\"buttons\":[293,153,90],\"other\":133}"
   },
   {
    "cr854_deliveryresultid": "64a4677a-f084-4a63-a907-9d6045e39c99",
@@ -9222,7 +9234,8 @@
    "cr854_orders": 537,
    "cr854_revenue": 5196600,
    "cr854_lastyearrevenue": 5501037,
-   "cr854_products": "[{\"productId\":\"80352bad-1061-4acc-a94d-266fd891ebae\",\"clicks\":2640,\"units\":218,\"revenue\":1482400},{\"productId\":\"7f352a1a-1161-4c5f-a84d-24dcd991ed41\",\"clicks\":3841,\"units\":180,\"revenue\":684000},{\"productId\":\"ed3c9309-9b64-4434-a64a-199f4b8a51f2\",\"clicks\":3130,\"units\":139,\"revenue\":3030200}]"
+   "cr854_products": "[{\"productId\":\"80352bad-1061-4acc-a94d-266fd891ebae\",\"clicks\":2640,\"units\":218,\"revenue\":1482400},{\"productId\":\"7f352a1a-1161-4c5f-a84d-24dcd991ed41\",\"clicks\":3841,\"units\":180,\"revenue\":684000},{\"productId\":\"ed3c9309-9b64-4434-a64a-199f4b8a51f2\",\"clicks\":3130,\"units\":139,\"revenue\":3030200}]",
+   "cr854_links": "{\"hero\":4126,\"buttons\":[1499,380,314],\"other\":325}"
   },
   {
    "cr854_deliveryresultid": "b0603864-5e51-4065-a603-fecec862003f",
@@ -9234,7 +9247,8 @@
    "cr854_orders": 92,
    "cr854_revenue": 969600,
    "cr854_lastyearrevenue": 979824,
-   "cr854_products": "[{\"productId\":\"6e398c85-9a66-4138-a347-d64fce8d5ec2\",\"clicks\":523,\"units\":35,\"revenue\":518000},{\"productId\":\"80352bad-1061-4acc-a94d-266fd891ebae\",\"clicks\":511,\"units\":25,\"revenue\":170000},{\"productId\":\"793520a8-0f61-4939-a64d-21b6db91f067\",\"clicks\":739,\"units\":32,\"revenue\":281600}]"
+   "cr854_products": "[{\"productId\":\"6e398c85-9a66-4138-a347-d64fce8d5ec2\",\"clicks\":523,\"units\":35,\"revenue\":518000},{\"productId\":\"80352bad-1061-4acc-a94d-266fd891ebae\",\"clicks\":511,\"units\":25,\"revenue\":170000},{\"productId\":\"793520a8-0f61-4939-a64d-21b6db91f067\",\"clicks\":739,\"units\":32,\"revenue\":281600}]",
+   "cr854_links": "{\"hero\":695,\"buttons\":[332,127,69],\"other\":114}"
   },
   {
    "cr854_deliveryresultid": "565a4ce8-9076-4e15-a511-e9cec70b3433",
@@ -9246,7 +9260,8 @@
    "cr854_orders": 492,
    "cr854_revenue": 7605600,
    "cr854_lastyearrevenue": 5732973,
-   "cr854_products": "[{\"productId\":\"7a35223b-0e61-47a6-a74d-2349da91eed4\",\"clicks\":4252,\"units\":178,\"revenue\":1388400},{\"productId\":\"68398313-a066-4aaa-a147-d329c88d5550\",\"clicks\":3118,\"units\":314,\"revenue\":6217200}]"
+   "cr854_products": "[{\"productId\":\"7a35223b-0e61-47a6-a74d-2349da91eed4\",\"clicks\":4252,\"units\":178,\"revenue\":1388400},{\"productId\":\"68398313-a066-4aaa-a147-d329c88d5550\",\"clicks\":3118,\"units\":314,\"revenue\":6217200}]",
+   "cr854_links": "{\"hero\":2569,\"buttons\":[1226,370,79],\"other\":215}"
   },
   {
    "cr854_deliveryresultid": "576cdb5a-f346-4f4f-af52-db8876f91add",
@@ -9258,7 +9273,8 @@
    "cr854_orders": 241,
    "cr854_revenue": 2722800,
    "cr854_lastyearrevenue": 2595365,
-   "cr854_products": "[{\"productId\":\"eb3c8fe3-9d64-475a-a84a-1cc5498a4ecc\",\"clicks\":1136,\"units\":119,\"revenue\":1047200},{\"productId\":\"f13c9955-9764-4de8-a24a-1353478a4ba6\",\"clicks\":2038,\"units\":42,\"revenue\":411600},{\"productId\":\"f63ca134-9264-4609-ab4a-217e4e8a56ab\",\"clicks\":1801,\"units\":80,\"revenue\":1264000}]"
+   "cr854_products": "[{\"productId\":\"eb3c8fe3-9d64-475a-a84a-1cc5498a4ecc\",\"clicks\":1136,\"units\":119,\"revenue\":1047200},{\"productId\":\"f13c9955-9764-4de8-a24a-1353478a4ba6\",\"clicks\":2038,\"units\":42,\"revenue\":411600},{\"productId\":\"f63ca134-9264-4609-ab4a-217e4e8a56ab\",\"clicks\":1801,\"units\":80,\"revenue\":1264000}]",
+   "cr854_links": "{\"hero\":2073,\"buttons\":[537,144,120],\"other\":185}"
   }
  ]
 }

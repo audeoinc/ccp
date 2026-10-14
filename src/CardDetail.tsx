@@ -20,7 +20,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -68,6 +68,8 @@ interface Props {
   weeks?: Cr854_weeks[]
   onBack: () => void
   onSaved: () => Promise<void>
+  /** 配信結果の画面で、この配信の詳しい結果を開く(送ったあとの配信だけ、ボタンを出す) */
+  onOpenResults?: (id: string) => void
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -334,7 +336,7 @@ const useStyles = makeStyles({
   actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -894,6 +896,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 {t(`工程 ${progress.done} / ${progress.total}`, `Steps ${progress.done} / ${progress.total}`)}
               </Badge>
             </Tooltip>
+            {card && onOpenResults && card.cr854_scheduledat && new Date(card.cr854_scheduledat) < new Date() && (
+              <Button type="button" size="small" appearance="secondary" icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.cr854_deliverycardid)}>
+                {t('配信結果', 'Results')}
+              </Button>
+            )}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
 

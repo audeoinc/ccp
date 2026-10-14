@@ -6,25 +6,35 @@ import {
   MessageBarBody,
   Select,
   Spinner,
-  Textarea,
   ToggleButton,
   Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowUploadRegular, ChevronLeftRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowUploadRegular, ChevronLeftRegular, ChevronRightRegular } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
 import { Cr854_weeklyperformancesService } from './generated/services/Cr854_weeklyperformancesService'
 import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpdata/Cr854_deliveryresultsService'
 import { locale, optionLabel, priceText, useT, type Market } from './i18n'
 import { channelOptions, countryOptions } from './status'
-import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, productRows, templateName, toResultRows, type GroupRow, type ResultRow } from './results'
+import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
+import { ResultDetail } from './ResultDetail'
+import { ResultSummary } from './ResultSummary'
+import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
+import { sundayOf } from './weekLock'
 
 const useStyles = makeStyles({
   root: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', columnGap: '16px', padding: '12px 16px', alignItems: 'start' },
+  // 月・週の表示は、右の欄を置かずに、横幅をすべて使う
+  rootWide: { gridTemplateColumns: 'minmax(0, 1fr)' },
+  nav: { display: 'flex', alignItems: 'center', columnGap: '2px' },
+  navLabel: { minWidth: '150px', textAlign: 'center', fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
+  views: { display: 'flex', columnGap: '4px' },
+  sideEmpty: { padding: '12px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, color: tokens.colorNeutralForeground3 },
   main: { minWidth: 0 },
   toolbar: { display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', columnGap: '12px', rowGap: '8px', marginBottom: '12px' },
   field: { minWidth: '140px' },
@@ -51,39 +61,32 @@ const useStyles = makeStyles({
   down: { color: tokens.colorPaletteRedForeground1 },
   muted: { color: tokens.colorNeutralForeground3 },
   totals: { marginTop: '8px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  side: {
-    position: 'sticky',
-    top: '12px',
-    display: 'grid',
-    rowGap: '14px',
-    padding: '12px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-  sideTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, display: 'flex', alignItems: 'center', columnGap: '6px' },
-  kpis: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', columnGap: '6px', rowGap: '6px' },
-  kpi: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, padding: '6px 8px' },
-  kpiLabel: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
-  kpiValue: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
-  h3: { margin: '0 0 4px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
-  list: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200 },
-  prodRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '8px' },
-  prodName: { fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  prodSub: { gridColumn: '1 / -1', color: tokens.colorNeutralForeground3 },
-  aiItem: { overflowWrap: 'anywhere' },
-  aiReason: { color: tokens.colorNeutralForeground3 },
-  noteActions: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', columnGap: '8px', marginTop: '6px' },
   empty: { padding: '24px', textAlign: 'center', color: tokens.colorNeutralForeground3 },
   hidden: { display: 'none' },
 })
 
 type GroupBy = 'delivery' | 'theme' | 'template' | 'product'
+/** 見せ方: カレンダーと同じく、月 / 週 / 一覧 */
+type ResultsView = 'month' | 'week' | 'list'
+const VIEW_KEY = 'results.view'
+const loadView = (): ResultsView => {
+  try {
+    const v = localStorage.getItem(VIEW_KEY)
+    return v === 'week' || v === 'list' ? v : 'month'
+  } catch {
+    return 'month'
+  }
+}
 
 interface Props {
   /** すべての配信 */
   cards: Cr854_deliverycards[]
   products: Cr854_products[]
+  heroes: Cr854_heroimages[]
+  /** 配信カードごとの掲載商品(メールの並び順の商品 ID。プレビューに使う) */
+  cardProducts: Map<string, string[]>
+  /** 開いたときに、詳しい結果を出す配信(配信カードの「結果」から来たとき) */
+  initialDetailId?: string | null
   /** 最初に選んでおく国(カレンダーの絞り込みを引き継ぐ。空なら US) */
   defaultCountry?: string
   onBack: () => void
@@ -92,13 +95,12 @@ interface Props {
 }
 
 const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
-const pct = (v?: number) => (v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
 
 /**
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCard }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, initialDetailId, defaultCountry, onBack, onOpenCard }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<Cr854_deliveryresults[] | null>(null)
@@ -107,9 +109,14 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
   const [message, setMessage] = useState<string | null>(null)
   const [country, setCountry] = useState(defaultCountry || String(COUNTRY_US))
   const [channel, setChannel] = useState('')
-  const [period, setPeriod] = useState('')
+  const [view, setView] = useState<ResultsView>(loadView)
+  // 表示する月・週を決める日。配信カードから来たときは、その配信の日
+  const initialAt = cards.find((c) => c.cr854_deliverycardid === initialDetailId)?.cr854_scheduledat
+  const [anchor, setAnchor] = useState<Date>(() => (initialAt ? new Date(initialAt) : new Date()))
   const [groupBy, setGroupBy] = useState<GroupBy>('delivery')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialDetailId ?? null)
+  // 詳しい結果を開いている配信
+  const [detailId, setDetailId] = useState<string | null>(initialDetailId ?? null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
@@ -134,10 +141,32 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
   const money = (v?: number) => priceText(v === undefined ? undefined : Math.round(v), market)
   const allRows = useMemo(() => toResultRows(cards, results ?? []), [cards, results])
   const scoped = allRows.filter((r) => (!country || String(r.card.cr854_country) === country) && (!channel || String(r.card.cr854_channel) === channel))
-  // 期間(月)の選択肢: 結果のある月。最初は、いちばん新しい月
-  const months = [...new Set(scoped.map((r) => monthKey(r.result.cr854_sentat ?? r.card.cr854_scheduledat)))].sort().reverse()
-  const month = period && months.includes(period) ? period : (months[0] ?? '')
-  const rows = scoped.filter((r) => monthKey(r.result.cr854_sentat ?? r.card.cr854_scheduledat) === month)
+  const month = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}`
+  const weekStart = sundayOf(anchor)
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+  const inPeriod = (iso?: string) => {
+    if (view !== 'week') return monthKey(iso) === month
+    const d = iso ? new Date(iso) : null
+    return !!d && d >= weekStart && d < weekEnd
+  }
+  const rows = scoped.filter((r) => inPeriod(sentAtOf(r)))
+  // 月・週の表示には、結果がまだの配信も出す(その期間の計画の全体の中で、結果を見るため)
+  const periodCards = cards.filter(
+    (c) => (!country || String(c.cr854_country) === country) && (!channel || String(c.cr854_channel) === channel) && inPeriod(c.cr854_scheduledat),
+  )
+  const resultByCard = new Map(allRows.map((r) => [r.card.cr854_deliverycardid, r]))
+  const shift = (n: number) =>
+    setAnchor((a) => (view === 'week' ? new Date(a.getFullYear(), a.getMonth(), a.getDate() + 7 * n) : new Date(a.getFullYear(), a.getMonth() + n, 1)))
+  const changeView = (v: ResultsView) => {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      // 覚えられなくても、表示は切り替える
+    }
+  }
+  // 押した配信: 結果があれば詳しい結果、なければ配信カード
+  const openDelivery = (id: string) => (resultByCard.has(id) ? setDetailId(id) : onOpenCard(id))
   const prevMonth = (() => {
     if (!month) return ''
     const [y, m] = month.split('-').map(Number)
@@ -160,10 +189,10 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
 
   const selected = rows.find((r) => r.card.cr854_deliverycardid === selectedId) ?? (groupBy === 'delivery' ? rows[0] : undefined)
 
-  const monthLabel = (k: string) => {
-    const [y, m] = k.split('-').map(Number)
-    return new Date(y, m - 1, 1).toLocaleDateString(locale(), { year: 'numeric', month: 'short' })
-  }
+  const periodLabel =
+    view === 'week'
+      ? `${weekStart.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' })} – ${new Date(weekEnd.getTime() - 86400_000).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' })}`
+      : anchor.toLocaleDateString(locale(), { year: 'numeric', month: 'long' })
   const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' }) : '')
   const delta = (v?: number) =>
     v === undefined ? (
@@ -236,20 +265,49 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
       'results-import-sample.csv',
     )
 
+  const detail = detailId ? resultByCard.get(detailId) : undefined
+  if (detail) {
+    return (
+      <ResultDetail
+        key={detailId}
+        row={detail}
+        productIds={cardProducts.get(detail.card.cr854_deliverycardid) ?? []}
+        products={products}
+        heroes={heroes}
+        weekly={weekly}
+        money={(v) => priceText(v === undefined ? undefined : Math.round(v), detail.card.cr854_country === COUNTRY_US ? 'US' : 'JP')}
+        onBack={() => setDetailId(null)}
+        onOpenCard={onOpenCard}
+        onSaved={load}
+      />
+    )
+  }
+
   return (
-    <div className={styles.root}>
+    <div className={mergeClasses(styles.root, view !== 'list' && styles.rootWide)}>
       <div className={styles.main}>
         <div className={styles.toolbar}>
           <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={onBack}>
             {t('カレンダー', 'Calendar')}
           </Button>
-          <Field label={t('期間', 'Period')} size="small" className={styles.field}>
-            <Select size="small" value={month} onChange={(_, d) => setPeriod(d.value)}>
-              {months.map((m) => (
-                <option key={m} value={m}>{monthLabel(m)}</option>
-              ))}
-            </Select>
-          </Field>
+          <div className={styles.nav}>
+            <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
+            <span className={styles.navLabel}>{periodLabel}</span>
+            <Button size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
+          </div>
+          <div className={styles.views} role="group" aria-label={t('表示', 'View')}>
+            {(
+              [
+                ['month', t('月', 'Month')],
+                ['week', t('週', 'Week')],
+                ['list', t('一覧', 'List')],
+              ] as const
+            ).map(([k, label]) => (
+              <ToggleButton key={k} size="small" checked={view === k} appearance={view === k ? 'primary' : 'subtle'} onClick={() => changeView(k)}>
+                {label}
+              </ToggleButton>
+            ))}
+          </div>
           <Field label={t('国', 'Country')} size="small" className={styles.field}>
             <Select size="small" value={country} onChange={(_, d) => setCountry(d.value)}>
               {countryOptions.map((o) => (
@@ -265,6 +323,7 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
               ))}
             </Select>
           </Field>
+          {view === 'list' && (
           <div className={styles.group} role="group" aria-label={t('まとめ方', 'Group by')}>
             <span className={styles.groupLabel}>{t('まとめ方', 'Group by')}</span>
             {(
@@ -280,6 +339,7 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
               </ToggleButton>
             ))}
           </div>
+          )}
           <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={rows.length === 0}>
             {t('書き出し', 'Export')}
           </Button>
@@ -321,6 +381,10 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
         )}
         {results === null && !error ? (
           <Spinner />
+        ) : view === 'month' ? (
+          <ResultsMonth month={new Date(anchor.getFullYear(), anchor.getMonth(), 1)} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} />
+        ) : view === 'week' ? (
+          <ResultsWeek weekStart={weekStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} cardProducts={cardProducts} products={products} heroes={heroes} />
         ) : rows.length === 0 ? (
           <div className={styles.empty}>{t('この条件の配信結果はまだありません', 'No results for these filters yet')}</div>
         ) : (
@@ -422,165 +486,23 @@ export function ResultsPage({ cards, products, defaultCountry, onBack, onOpenCar
           </>
         )}
       </div>
-      {selected ? (
-        <SelectedResult key={selected.result.cr854_deliveryresultid} row={selected} weekly={weekly} productName={productName} productCode={productCode} money={money} onOpenCard={onOpenCard} onSaved={load} />
+      {view !== 'list' ? null : selected ? (
+        <ResultSummary
+          key={selected.result.cr854_deliveryresultid}
+          row={selected}
+          weekly={weekly}
+          productName={productName}
+          productCode={productCode}
+          money={money}
+          onOpenCard={onOpenCard}
+          onOpenDetail={() => setDetailId(selected.card.cr854_deliverycardid)}
+          onSaved={load}
+        />
       ) : (
-        <div className={mergeClasses(styles.side, styles.muted)}>
+        <div className={styles.sideEmpty}>
           {groupBy === 'delivery' ? t('配信を選ぶと、ここに詳しい結果が出ます', 'Select a delivery to see its details') : t('「配信」でまとめると、配信ごとの詳しい結果を見られます', 'Group by Delivery to see details for each delivery')}
         </div>
       )}
     </div>
-  )
-}
-
-/** 選んだ配信の結果(右の欄): 主な数字・商品の売れ方・採用した AI の提案・次に生かすメモ */
-function SelectedResult({
-  row,
-  weekly,
-  productName,
-  productCode,
-  money,
-  onOpenCard,
-  onSaved,
-}: {
-  row: ResultRow
-  weekly: Cr854_weeklyperformances[]
-  productName: (id: string) => string
-  /** 商品 ID → 商品コード(週ごとの実績は、商品コードで持っている) */
-  productCode: (id: string) => string | undefined
-  money: (v?: number) => string
-  onOpenCard: (id: string) => void
-  onSaved: () => Promise<void>
-}) {
-  const styles = useStyles()
-  const t = useT()
-  const { card, result } = row
-  const [notes, setNotes] = useState(result.cr854_notes ?? '')
-  const [saving, setSaving] = useState(false)
-  const [savedAt, setSavedAt] = useState<string | null>(null)
-  const push = isPush(card)
-  const items = parseProductResults(result.cr854_products)
-
-  // 配信の週と、その前の週の、商品の売れた数(週ごとの実績があれば)
-  const sent = new Date(result.cr854_sentat ?? card.cr854_scheduledat ?? '')
-  const weekOf = (code?: string) => {
-    if (!code || Number.isNaN(sent.getTime())) return undefined
-    const rowsOf = weekly.filter((w) => w.cr854_productcode === code).sort((a, b) => (a.cr854_weekstart ?? '').localeCompare(b.cr854_weekstart ?? ''))
-    const i = rowsOf.findIndex((w) => {
-      const s = new Date(`${w.cr854_weekstart}T00:00:00`)
-      return s.getTime() <= sent.getTime() && sent.getTime() < s.getTime() + 7 * 24 * 3600_000
-    })
-    if (i <= 0) return undefined
-    const now = rowsOf[i]
-    const before = rowsOf[i - 1]
-    return {
-      change: before.cr854_units ? (now.cr854_units ?? 0) / before.cr854_units - 1 : undefined,
-      stockWeeks: now.cr854_units ? (now.cr854_stock ?? 0) / now.cr854_units : undefined,
-    }
-  }
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      const res = await Cr854_deliveryresultsService.update(result.cr854_deliveryresultid, { cr854_notes: notes })
-      if (res.success) {
-        setSavedAt(new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }))
-        await onSaved()
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const ai: { label: string; value?: string; reason?: string }[] = [
-    { label: t('テーマ', 'Theme'), value: card.cr854_theme, reason: card.cr854_themereason },
-    ...(push
-      ? [{ label: t('通知のタイトル', 'Notification title'), value: card.cr854_pushtitle }]
-      : [
-          { label: t('見出し', 'Headline'), value: card.cr854_headline, reason: card.cr854_copyangle ? t(`切り口: ${card.cr854_copyangle}`, `Angle: ${card.cr854_copyangle}`) : undefined },
-          { label: t('テンプレート', 'Template'), value: templateName(card), reason: card.cr854_instructionsangle ? t(`制作指示: ${card.cr854_instructionsangle}`, `Brief: ${card.cr854_instructionsangle}`) : undefined },
-          { label: t('メイン画像', 'Hero'), value: card.cr854_heroreason ? t('AI の提案から選択', 'Picked from AI suggestions') : undefined, reason: card.cr854_heroreason },
-        ]),
-  ].filter((x) => x.value)
-
-  const sentText = Number.isNaN(sent.getTime()) ? '' : sent.toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })
-  return (
-    <aside className={styles.side} aria-label={t('選んだ配信', 'Selected delivery')}>
-      <div className={styles.sideTitle}>
-        <span>{`${card.cr854_name} · ${sentText} ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
-        <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
-          <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(card.cr854_deliverycardid)} />
-        </Tooltip>
-      </div>
-      <div className={styles.kpis}>
-        <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>{push ? t('タップ率', 'Tap') : t('開封率', 'Open')}</div>
-          <div className={styles.kpiValue}>{pct(push ? row.clickRate : row.openRate)}</div>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>{push ? t('注文', 'Orders') : t('クリック率', 'Click')}</div>
-          <div className={styles.kpiValue}>{push ? (result.cr854_orders ?? 0).toLocaleString(locale()) : pct(row.clickRate)}</div>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>{t('売上', 'Revenue')}</div>
-          <div className={styles.kpiValue}>{money(row.revenue)}</div>
-        </div>
-      </div>
-      <div className={styles.muted} style={{ fontSize: tokens.fontSizeBase200 }}>
-        {t(
-          `送った数 ${(result.cr854_recipients ?? 0).toLocaleString(locale())}・注文 ${(result.cr854_orders ?? 0).toLocaleString(locale())}・前年 ${money(Number(result.cr854_lastyearrevenue ?? 0))}`,
-          `Sent ${(result.cr854_recipients ?? 0).toLocaleString(locale())} · orders ${(result.cr854_orders ?? 0).toLocaleString(locale())} · last year ${money(Number(result.cr854_lastyearrevenue ?? 0))}`,
-        )}
-      </div>
-      <section>
-        <h3 className={styles.h3}>{t('商品: 配信のあとの売れ方', 'Products: sales after the delivery')}</h3>
-        {items.length === 0 ? (
-          <div className={styles.muted}>{t('商品ごとの結果はありません', 'No product results')}</div>
-        ) : (
-          <div className={styles.list}>
-            {items.map((p) => {
-              const w = weekOf(productCode(p.productId))
-              return (
-                <div key={p.productId} className={styles.prodRow}>
-                  <span className={styles.prodName}>{productName(p.productId)}</span>
-                  <span>{money(p.revenue)}</span>
-                  <span className={styles.prodSub}>
-                    {t(`クリック ${p.clicks.toLocaleString(locale())}・${p.units} 点`, `${p.clicks.toLocaleString(locale())} clicks · ${p.units} units`)}
-                    {w?.change !== undefined && t(`・その週の販売 ${w.change >= 0 ? '+' : ''}${Math.round(w.change * 100)}%`, ` · week sales ${w.change >= 0 ? '+' : ''}${Math.round(w.change * 100)}%`)}
-                    {w?.stockWeeks !== undefined && t(`・在庫 ${w.stockWeeks.toFixed(1)} 週分`, ` · stock ${w.stockWeeks.toFixed(1)} wks`)}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
-      <section>
-        <h3 className={styles.h3}>{t('採用した AI の提案', 'Adopted AI suggestions')}</h3>
-        {ai.length === 0 ? (
-          <div className={styles.muted}>{t('記録がありません', 'Nothing recorded')}</div>
-        ) : (
-          <div className={styles.list}>
-            {ai.map((x) => (
-              <div key={x.label} className={styles.aiItem}>
-                {`${x.label}: ${x.value}`}
-                {x.reason && <div className={styles.aiReason}>{x.reason}</div>}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-      <section>
-        <h3 className={styles.h3}>{t('次に生かすメモ', 'Notes for next time')}</h3>
-        <Textarea value={notes} onChange={(_, d) => setNotes(d.value)} resize="vertical" rows={4} style={{ width: '100%' }} placeholder={t('うまくいったこと・次に試すこと', 'What worked, and what to try next')} />
-        <div className={styles.noteActions}>
-          {saving && <Spinner size="extra-tiny" />}
-          {savedAt && !saving && <span className={styles.muted}>{t(`${savedAt} に保存しました`, `Saved at ${savedAt}`)}</span>}
-          <Button size="small" onClick={() => void save()} disabled={saving || notes === (result.cr854_notes ?? '')}>
-            {t('保存', 'Save')}
-          </Button>
-        </div>
-      </section>
-    </aside>
   )
 }

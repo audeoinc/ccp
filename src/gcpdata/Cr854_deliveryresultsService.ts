@@ -11,6 +11,14 @@ export interface ProductResult {
   revenue: number
 }
 
+/** 商品以外のリンクのクリック数。buttons は、プレビューの上から順のボタン */
+export interface LinkResults {
+  hero?: number
+  buttons?: number[]
+  /** プレビューに出ないリンク(フッターなど) */
+  other?: number
+}
+
 export interface Cr854_deliveryresults {
   cr854_deliveryresultid: string
   _cr854_deliverycard_value?: string
@@ -30,6 +38,8 @@ export interface Cr854_deliveryresults {
   cr854_lastyearrevenue?: number
   /** 商品ごとの結果(JSON。ProductResult の配列) */
   cr854_products?: string
+  /** リンクごとのクリック数(JSON。LinkResults。商品のリンクは cr854_products の clicks) */
+  cr854_links?: string
   /** 振り返りのメモ(次に生かすこと) */
   cr854_notes?: string
 }

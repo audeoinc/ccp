@@ -454,6 +454,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
   const heroBox = (
     <div
       className={classes.hero}
+      data-link="hero"
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(DND_HERO)) return
         e.preventDefault()
@@ -571,6 +572,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
       {buttons.map((b, i) => (
         <div
           key={b.id}
+          data-link="button"
           className={classes.noWrap}
           style={{
             textAlign: 'center',
@@ -849,7 +851,7 @@ function PushPreview(props: Props) {
           {dateText && <div style={{ fontSize: '0.85rem', opacity: 0.85 }}>{dateText}</div>}
           <div style={{ fontSize: style === 'ios' ? '3.6rem' : '3rem', fontWeight: style === 'ios' ? 300 : 400, lineHeight: 1.1 }}>{clock}</div>
         </div>
-        {notification}
+        <div data-link="push">{notification}</div>
         <div style={{ width: 96, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)', margin: '24px auto 0' }} />
       </div>
       {/* 通知を押したあとに開く画面(「⑤ 時刻・相手」の「開く画面」で決める) */}

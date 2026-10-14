@@ -331,6 +331,8 @@ function App() {
   const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
   // 開いている画面: カレンダー / 配信結果(振り返り)
   const [page, setPage] = useState<'calendar' | 'results'>('calendar')
+  // 配信カードの「配信結果」から来たときの、詳しい結果を出す配信
+  const [resultsFor, setResultsFor] = useState<string | null>(null)
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
@@ -581,7 +583,10 @@ function App() {
         <Button appearance="subtle" size="small" icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
           {t('テンプレート', 'Templates')}
         </Button>
-        <ToggleButton appearance={page === 'results' ? 'primary' : 'subtle'} size="small" checked={page === 'results'} icon={<DataBarVerticalRegular />} onClick={() => setPage(page === 'results' ? 'calendar' : 'results')}>
+        <ToggleButton appearance={page === 'results' ? 'primary' : 'subtle'} size="small" checked={page === 'results'} icon={<DataBarVerticalRegular />} onClick={() => {
+            setResultsFor(null)
+            setPage(page === 'results' ? 'calendar' : 'results')
+          }}>
           {t('配信結果', 'Results')}
         </ToggleButton>
         <div className={styles.langSwitch} role="group" aria-label={t('言語', 'Language')}>
@@ -624,7 +629,17 @@ function App() {
         </Button>
       </header>
       {page === 'results' && !loading ? (
-        <ResultsPage cards={cards} products={products} defaultCountry={filters.country} onBack={() => setPage('calendar')} onOpenCard={setSelectedId} />
+        <ResultsPage
+          key={resultsFor ?? 'results'}
+          cards={cards}
+          products={products}
+          heroes={heroes}
+          cardProducts={cardProducts}
+          initialDetailId={resultsFor}
+          defaultCountry={filters.country}
+          onBack={() => setPage('calendar')}
+          onOpenCard={setSelectedId}
+        />
       ) : (
       <div className={mergeClasses(styles.container, styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
@@ -775,6 +790,12 @@ function App() {
             void load()
           }}
           onSaved={load}
+          onOpenResults={(id) => {
+            setSelectedId(null)
+            setCreating(null)
+            setResultsFor(id)
+            setPage('results')
+          }}
         />
       )}
     </>

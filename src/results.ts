@@ -1,6 +1,6 @@
 // 配信結果の画面(ResultsPage)で使う計算と、CSV の読み書き。画面の部品とは分けておく
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_deliveryresults, ProductResult } from './gcpdata/Cr854_deliveryresultsService'
+import type { Cr854_deliveryresults, LinkResults, ProductResult } from './gcpdata/Cr854_deliveryresultsService'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, templateFromValue } from './templates'
 import { parseCsv } from './csv'
@@ -37,6 +37,23 @@ export function parseProductResults(v?: string): ProductResult[] {
     return []
   }
 }
+
+/** リンクごとのクリック(JSON)を読む */
+export function parseLinkResults(v?: string): LinkResults {
+  if (!v) return {}
+  try {
+    const o = JSON.parse(v) as LinkResults
+    return o && typeof o === 'object' ? o : {}
+  } catch {
+    return {}
+  }
+}
+
+/** 割合の表記(1 桁の小数) */
+export const pct = (v?: number) => (v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
+
+/** 送った日時(結果になければ、配信の予定日時) */
+export const sentAtOf = (r: ResultRow) => r.result.cr854_sentat ?? r.card.cr854_scheduledat
 
 export const isPush = (c: Cr854_deliverycards) => c.cr854_channel === CHANNEL_PUSH
 

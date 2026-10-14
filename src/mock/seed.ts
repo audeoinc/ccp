@@ -363,5 +363,11 @@ export const deliveryResults: Row[] = cards
       cr854_revenue: revenue,
       cr854_lastyearrevenue: Math.round(revenue * (0.75 + r() * 0.5)),
       cr854_products: JSON.stringify(items),
+      // リンクごとのクリック(延べ回数。1 人が何度も押すので、クリックした人の数より多い)
+      cr854_links: JSON.stringify({
+        hero: Math.round(clicks * (0.3 + r() * 0.25)),
+        buttons: [Math.round(clicks * (0.08 + r() * 0.12)), Math.round(clicks * (0.02 + r() * 0.06)), Math.round(clicks * (0.01 + r() * 0.03))],
+        other: Math.round(clicks * (0.02 + r() * 0.04)),
+      }),
     }
   })
