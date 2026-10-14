@@ -22,6 +22,7 @@ import {
   ArrowDownloadRegular,
   CalendarLtrRegular,
   ColumnTripleRegular,
+  DataBarVerticalRegular,
   LayoutColumnTwoRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -39,6 +40,7 @@ import { Cr854_weeksService, type Cr854_weeks, type WeekStatus } from './gcpdata
 import { WeekReviewBar } from './WeekReviewBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
+import { ResultsPage } from './ResultsPage'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
@@ -327,6 +329,8 @@ function App() {
   const [policies, setPolicies] = useState<Map<string, PolicyLite>>(new Map())
   // 週の確認の一覧で選んだ項目。週を移ったら、選んでいないことにする(週ごとに中身が違うため)
   const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
+  // 開いている画面: カレンダー / 配信結果(振り返り)
+  const [page, setPage] = useState<'calendar' | 'results'>('calendar')
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   const [view, setView] = useState<View>(() => loadPref<View>(VIEW_KEY, 'month'))
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
@@ -577,6 +581,9 @@ function App() {
         <Button appearance="subtle" size="small" icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
           {t('テンプレート', 'Templates')}
         </Button>
+        <ToggleButton appearance={page === 'results' ? 'primary' : 'subtle'} size="small" checked={page === 'results'} icon={<DataBarVerticalRegular />} onClick={() => setPage(page === 'results' ? 'calendar' : 'results')}>
+          {t('配信結果', 'Results')}
+        </ToggleButton>
         <div className={styles.langSwitch} role="group" aria-label={t('言語', 'Language')}>
           {([['ja', '日本語'], ['en', 'English']] as const).map(([l, name]) => (
             <button
@@ -616,6 +623,9 @@ function App() {
           {t('新規作成', 'New')}
         </Button>
       </header>
+      {page === 'results' && !loading ? (
+        <ResultsPage cards={cards} products={products} defaultCountry={filters.country} onBack={() => setPage('calendar')} onOpenCard={setSelectedId} />
+      ) : (
       <div className={mergeClasses(styles.container, styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
         {error && (
@@ -747,6 +757,7 @@ function App() {
           </>
         )}
       </div>
+      )}
       {(selected || creating) && (
         <CardDetail
           key={selected?.cr854_deliverycardid ?? 'new'}

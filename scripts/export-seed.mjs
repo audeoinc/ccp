@@ -27,6 +27,7 @@ try {
     cr854_layouttemplates: m.layoutTemplates,
     cr854_cardnotes: m.cardNotes,
     cr854_weeks: m.weeks,
+    cr854_deliveryresults: m.deliveryResults,
   }
   writeFileSync(join(root, 'server', 'seed.json'), JSON.stringify(data, null, 1) + '\n')
   for (const [k, v] of Object.entries(data)) console.log(k, v.length)

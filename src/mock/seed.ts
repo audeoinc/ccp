@@ -309,3 +309,59 @@ cardNotes.push(
     }),
   ].filter((n) => n._cr854_deliverycard_value),
 )
+
+// ---- 配信結果(配信のあとに取り込む結果。GCP 版だけのテーブル)
+// 2026-10-14 より前に送った配信に、それっぽい数字を入れる。同じ配信なら、同じ数字になる(乱数は、配信 ID から作る)
+const RESULTS_BEFORE = '2026-10-14'
+function rand(key: string) {
+  let h = 2166136261
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507)
+    h = Math.imul(h ^ (h >>> 13), 3266489909)
+    h ^= h >>> 16
+    return (h >>> 0) / 4294967296
+  }
+}
+export const deliveryResults: Row[] = cards
+  .filter((c) => String(c.cr854_scheduledat ?? '') < RESULTS_BEFORE)
+  .map((c) => {
+    const id = c.cr854_deliverycardid as string
+    const r = rand(`result:${id}`)
+    const push = c.cr854_channel === 588230001
+    const us = c.cr854_country === COUNTRY['US']
+    const recipients = Math.round((push ? 60000 : 120000) * (0.8 + r() * 0.4))
+    const opens = Math.round(recipients * (push ? 0.06 + r() * 0.06 : 0.18 + r() * 0.14))
+    const clicks = Math.round(opens * (push ? 0.35 + r() * 0.2 : 0.1 + r() * 0.12))
+    const orders = Math.round(clicks * (0.03 + r() * 0.04))
+    // 商品: 選んだ商品があればそれ、なければ同じ市場の商品から 3 点
+    const picked = deliveryProducts
+      .filter((d) => d._cr854_deliverycard_value === id && d.cr854_state === 588230000)
+      .map((d) => d._cr854_product_value as string)
+    const pool = products.filter((p) => p.cr854_market === (us ? US_MARKET : JP_MARKET))
+    const ids = picked.length > 0 ? picked : [0, 1, 2].map(() => pool[Math.floor(r() * pool.length)]?.cr854_productid as string).filter((v, i, a) => v && a.indexOf(v) === i)
+    let left = orders
+    const items = ids.map((pid, i) => {
+      const p = products.find((x) => x.cr854_productid === pid)
+      const share = i === ids.length - 1 ? 1 : 0.3 + r() * 0.3
+      const units = i === ids.length - 1 ? left : Math.round(left * share)
+      left -= units
+      return { productId: pid, clicks: Math.round((clicks / ids.length) * (0.6 + r() * 0.8)), units, revenue: Math.round(units * Number(p?.cr854_price ?? 0)) }
+    })
+    const revenue = items.reduce((s, x) => s + x.revenue, 0) || Math.round(orders * (us ? 80 : 9000))
+    return {
+      cr854_deliveryresultid: guid(`result:${id}`),
+      _cr854_deliverycard_value: id,
+      cr854_sentat: c.cr854_scheduledat,
+      cr854_recipients: recipients,
+      cr854_opens: opens,
+      cr854_clicks: clicks,
+      cr854_orders: orders,
+      cr854_revenue: revenue,
+      cr854_lastyearrevenue: Math.round(revenue * (0.75 + r() * 0.5)),
+      cr854_products: JSON.stringify(items),
+    }
+  })

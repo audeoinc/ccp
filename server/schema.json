@@ -168,6 +168,25 @@
         ["cr854_confirmedat", "confirmed_at", "timestamptz"]
       ],
       "lookups": []
+    },
+    "cr854_deliveryresults": {
+      "gcpOnly": true,
+      "pg": "delivery_results",
+      "pk": "cr854_deliveryresultid",
+      "columns": [
+        ["cr854_sentat", "sent_at", "timestamptz"],
+        ["cr854_recipients", "recipients", "int"],
+        ["cr854_opens", "opens", "int"],
+        ["cr854_clicks", "clicks", "int"],
+        ["cr854_orders", "orders", "int"],
+        ["cr854_revenue", "revenue", "numeric"],
+        ["cr854_lastyearrevenue", "last_year_revenue", "numeric"],
+        ["cr854_products", "products", "text"],
+        ["cr854_notes", "notes", "text"]
+      ],
+      "lookups": [
+        ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}]
+      ]
     }
   }
 }
