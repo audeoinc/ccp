@@ -101,6 +101,9 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
     if (!el) return
     const measure = () => {
       const base = el.getBoundingClientRect()
+      // フロートが開くときの拡大のアニメーションの途中でも、正しい位置になるよう、見た目の拡大・縮小の分を割り戻す
+      // (getBoundingClientRect は拡大・縮小を含み、offsetWidth は含まない)
+      const k = el.offsetWidth > 0 ? base.width / el.offsetWidth : 1
       let button = 0
       const found: Spot[] = []
       el.querySelectorAll<HTMLElement>('[data-link], [data-item-key]').forEach((n) => {
@@ -108,7 +111,7 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
         if (r.width === 0 || r.height === 0) return
         const link = n.dataset.link
         const key = link === 'button' ? `button:${button++}` : link ? link : `product:${(n.dataset.itemKey ?? '').replace(/-\d+$/, '')}`
-        found.push({ key, x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height, text: link === 'button' ? (n.textContent ?? '') : undefined })
+        found.push({ key, x: (r.left - base.left) / k, y: (r.top - base.top) / k, w: r.width / k, h: r.height / k, text: link === 'button' ? (n.textContent ?? '') : undefined })
       })
       setSpots(found)
     }

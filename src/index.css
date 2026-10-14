@@ -50,3 +50,53 @@ body {
   font-weight: 600;
   color: var(--colorNeutralForeground1);
 }
+
+/* ---- レポートの印刷(src/printReport.ts)。印刷のあいだだけ body に printing-report が付く ----
+   印刷するもの(data-print-report の付いたフロート)だけを残し、画面の操作の部品(data-noprint)を消す。
+   印刷のときだけ出すもの(data-print-only)は、ふだんは隠す */
+[data-print-only] {
+  display: none;
+}
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+body.printing-report > *:not(:has([data-print-report])) {
+  display: none !important;
+}
+body.printing-report [data-print-report] {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+body.printing-report .fui-DialogSurface__backdrop {
+  display: none !important;
+}
+body.printing-report [data-noprint] {
+  display: none !important;
+}
+body.printing-report [data-print-only] {
+  display: block !important;
+}
+body.printing-report [data-print-avoid] {
+  break-inside: avoid;
+}
+body.printing-report,
+body.printing-report * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* 横にスクロールする並びは、印刷では折り返す(ページの外に切れないように) */
+body.printing-report [data-print-wrap] {
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+  row-gap: 12px;
+}

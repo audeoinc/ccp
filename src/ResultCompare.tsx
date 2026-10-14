@@ -166,7 +166,13 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
     <section className={styles.root}>
       <div className={styles.head}>
         <h3 className={styles.h3}>{t('過去の配信と比べる', 'Compare with past deliveries')}</h3>
-        <span className={styles.ns} style={{ marginLeft: 0 }} role="group" aria-label={t('比べる相手', 'Compare with')}>
+        {/* 印刷では、切り替えのボタンの代わりに、比べた相手を文字で出す */}
+        <span className={styles.sub} data-print-only>
+          {by === 'template'
+            ? t(`同じテンプレート(${templateName(row.card)})・過去 ${past.length} 回と比べた`, `Compared with the last ${past.length} with the same template (${templateName(row.card)})`)
+            : t(`同じテーマの種類(${themeTypeLabel(myType.type)})・過去 ${past.length} 回と比べた`, `Compared with the last ${past.length} of the same theme type (${themeTypeLabel(myType.type)})`)}
+        </span>
+        <span className={styles.ns} style={{ marginLeft: 0 }} role="group" aria-label={t('比べる相手', 'Compare with')} data-noprint>
           {(
             [
               ['template', t(`同じテンプレート(${templateName(row.card)})`, `Same template (${templateName(row.card)})`)],
@@ -179,7 +185,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
           ))}
         </span>
         <span className={styles.sub}>{t('同じ国とチャネルで、この配信より前に送ったもの', 'Same country and channel, sent before this one')}</span>
-        <span className={styles.ns} role="group" aria-label={t('比べる回数', 'How many')}>
+        <span className={styles.ns} role="group" aria-label={t('比べる回数', 'How many')} data-noprint>
           <span className={styles.sub}>{t('過去', 'Last')}</span>
           {NS.map((v) => (
             <ToggleButton key={v} size="small" checked={n === v} appearance={n === v ? 'primary' : 'subtle'} onClick={() => setN(v)}>
@@ -245,13 +251,14 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
             </table>
             )}
           </div>
-          <div className={styles.review}>
+          {/* 振り返りをまだ出していないときは、印刷しない */}
+          <div className={styles.review} data-print-avoid {...(review ? {} : { 'data-noprint': true })}>
             <div className={styles.reviewHead}>
               <h3 className={styles.reviewH} style={{ margin: 0 }}>{t('AI の振り返り', 'AI review')}</h3>
-              <Button size="small" appearance="primary" icon={reviewing ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" size={16} />} onClick={() => void runReview()} disabled={reviewing}>
+              <Button data-noprint size="small" appearance="primary" icon={reviewing ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" size={16} />} onClick={() => void runReview()} disabled={reviewing}>
                 {review ? t('もう一度振り返る', 'Review again') : t('AI で振り返る', 'Review with AI')}
               </Button>
-              <span className={styles.sub}>
+              <span className={styles.sub} data-noprint>
                 {t('上の比べ(今の比べる相手・回数)を、AI が言葉にします。振り返りは保存しません。残したいものは「メモに採用」してください', 'AI puts the comparison above into words. The review is not saved; adopt what you want to keep into the notes.')}
               </span>
             </div>
@@ -280,9 +287,9 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
                             <span className={styles.reviewText}>{x}</span>
                             {onAdopt &&
                               (adopted.has(text) ? (
-                                <span className={styles.adopted}>{t('採用済み', 'Adopted')}</span>
+                                <span className={styles.adopted} data-noprint>{t('採用済み', 'Adopted')}</span>
                               ) : (
-                                <Button size="small" appearance="subtle" onClick={() => void adopt(text)}>
+                                <Button data-noprint size="small" appearance="subtle" onClick={() => void adopt(text)}>
                                   {t('メモに採用', 'Adopt')}
                                 </Button>
                               ))}
@@ -296,7 +303,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
               </>
             )}
           </div>
-          <div className={styles.strip}>
+          <div className={styles.strip} data-print-wrap>
             {past.map((p) => (
               <button key={p.result.cr854_deliveryresultid} type="button" className={styles.card} onClick={() => onOpenOther?.(p.card.cr854_deliverycardid)} title={t('この配信の結果を開く', 'Open these results')}>
                 <span className={styles.cardHead}>

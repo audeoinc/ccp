@@ -128,8 +128,12 @@ export function ResultInsights({
     <div className={styles.col}>
       <section>
         <h3 className={styles.h3}>{t('次に生かすメモ', 'Notes for next time')}</h3>
-        <Textarea value={notes} onChange={(_, d) => setNotes(d.value)} resize="vertical" rows={4} style={{ width: '100%' }} placeholder={t('うまくいったこと・次に試すこと', 'What worked, and what to try next')} />
-        <div className={styles.noteActions}>
+        {/* 印刷では、入力欄ではなく、文章として出す */}
+        <div data-print-only style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+          {notes.trim() || t('(メモはありません)', '(No notes)')}
+        </div>
+        <Textarea data-noprint value={notes} onChange={(_, d) => setNotes(d.value)} resize="vertical" rows={4} style={{ width: '100%' }} placeholder={t('うまくいったこと・次に試すこと', 'What worked, and what to try next')} />
+        <div className={styles.noteActions} data-noprint>
           {saving && <Spinner size="extra-tiny" />}
           {savedAt && !saving && <span className={styles.muted}>{t(`${savedAt} に保存しました`, `Saved at ${savedAt}`)}</span>}
           <Button size="small" onClick={() => void save()} disabled={saving || notes === (result.cr854_notes ?? '')}>

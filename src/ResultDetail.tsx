@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, Dialog, DialogSurface, Select, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { DismissRegular, OpenRegular } from '@fluentui/react-icons'
+import { DismissRegular, DocumentPdfRegular, OpenRegular } from '@fluentui/react-icons'
+import { printReport } from './printReport'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
@@ -34,6 +35,8 @@ const useStyles = makeStyles({
   rowOn: { backgroundColor: tokens.colorBrandBackground2 },
   bar: { height: '6px', borderRadius: '3px', backgroundColor: 'rgba(230, 81, 0, 0.8)' },
   missing: { color: tokens.colorNeutralForeground3 },
+  // 印刷のときだけ出す、レポートの見出し
+  reportHead: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, paddingBottom: '4px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
 })
 
 interface Props {
@@ -84,8 +87,12 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   }
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={styles.surface}>
+      {/* data-print-report: 「PDF で書き出す」で印刷するのは、このフロートだけ(index.css のレポートの印刷) */}
+      <DialogSurface className={styles.surface} data-print-report>
         <div className={styles.body}>
+          <div className={styles.reportHead} data-print-only>
+            {t(`配信結果のレポート · 作成 ${new Date().toLocaleDateString(locale())}`, `Delivery results report · created ${new Date().toLocaleDateString(locale())}`)}
+          </div>
           <div className={styles.head}>
             <h2 className={styles.title}>{card.cr854_name}</h2>
             <span className={styles.sub}>{`${sentText} · ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
@@ -106,7 +113,20 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
                 ))}
               </Select>
             </Tooltip>
-            <span className={styles.headActions}>
+            <span className={styles.headActions} data-noprint>
+              <Tooltip
+                content={t('この結果を、レポートとして印刷します。印刷の画面で、送り先を「PDF に保存」にすると PDF になります', 'Prints these results as a report. Choose "Save as PDF" in the print dialog to get a PDF.')}
+                relationship="description"
+              >
+                <Button
+                  appearance="secondary"
+                  size="small"
+                  icon={<DocumentPdfRegular />}
+                  onClick={() => printReport(`${card.cr854_name ?? 'results'}_${(sent ?? '').slice(0, 10)}_results`)}
+                >
+                  {t('PDF で書き出す', 'Export PDF')}
+                </Button>
+              </Tooltip>
               {onOpenCard && (
                 <Tooltip content={t('この配信を作ったときの内容(配信カード)を、上に重ねて開きます。閉じると、この結果に戻ります', 'Opens the delivery card on top. Close it to come back to these results.')} relationship="description">
                   <Button appearance="secondary" size="small" icon={<OpenRegular />} onClick={() => onOpenCard(card.cr854_deliverycardid)}>
@@ -131,7 +151,9 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
                 <div className={styles.linkCol}>
                   <div className={styles.linkHead}>
                     <h3 className={styles.h3}>{t('リンクごとのクリック', 'Clicks by link')}</h3>
-                    <Switch checked={overlay} onChange={(_, d) => setOverlay(d.checked)} label={t('プレビューに重ねる', 'Show on preview')} />
+                    <span data-noprint>
+                      <Switch checked={overlay} onChange={(_, d) => setOverlay(d.checked)} label={t('プレビューに重ねる', 'Show on preview')} />
+                    </span>
                   </div>
                   <div className={styles.note}>
                     {t(
