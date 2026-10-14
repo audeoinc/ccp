@@ -246,6 +246,13 @@ export const weeks: Row[] = [
   { cr854_weekid: guid('week:2026-10-11'), cr854_weekstart: '2026-10-11', cr854_status: 'review', cr854_submittedat: '2026-10-07T06:00:00.000Z' },
 ]
 
+// ---- 承認の履歴(GCP 版だけのテーブル)。週の行(weeks)の日時に合わせた、見本の記録
+export const events: Row[] = [
+  { cr854_eventid: guid('event:1004:submit'), cr854_action: 'submit', cr854_weekstart: '2026-10-04', cr854_actor: 'Ken Sato', createdon: '2026-09-29T06:00:00.000Z' },
+  { cr854_eventid: guid('event:1004:confirm'), cr854_action: 'confirm', cr854_weekstart: '2026-10-04', cr854_actor: 'Mika Tanaka', createdon: '2026-10-01T08:00:00.000Z' },
+  { cr854_eventid: guid('event:1011:submit'), cr854_action: 'submit', cr854_weekstart: '2026-10-11', cr854_actor: 'Ken Sato', createdon: '2026-10-07T06:00:00.000Z' },
+]
+
 // ---- 配信カードのメモ(制作からの質問と返信。GCP 版だけのテーブル)
 const cardIdOf = (name: string) => cards.find((c) => c.cr854_name === name)?.cr854_deliverycardid
 const note = (card: string, author: string, body: string, at: string, reply?: { by: string; text: string; at: string }, resolved = false): Row => ({

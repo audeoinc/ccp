@@ -4,7 +4,7 @@ import { CheckmarkCircleRegular, CommentRegular } from '@fluentui/react-icons'
 import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import { locale, tr, useT } from './i18n'
-import { loadPref, savePref } from './settings'
+import { myName, setMyName } from './history'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -36,8 +36,6 @@ interface Props {
   onOpenCount?: (n: number) => void
 }
 
-// コメントを書く人は、配信ごとに変わらない(レビューする人)ので、ブラウザごとに覚えておく
-const AUTHOR_KEY = 'comment.author'
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
 /**
@@ -49,7 +47,8 @@ export function CommentsPanel({ cardId, productIds, products, owner, people, onO
   const t = useT()
   const [notes, setNotes] = useState<Cr854_cardnotes[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [author, setAuthor] = useState(() => loadPref<string>(AUTHOR_KEY, ''))
+  // コメントを書く人は、配信ごとに変わらない(レビューする人)ので、ブラウザごとに覚えた名前(承認の履歴と共通)を使う
+  const [author, setAuthor] = useState(myName)
   const [target, setTarget] = useState('')
   const [body, setBody] = useState('')
   const [fixes, setFixes] = useState<Record<string, string>>({})
@@ -91,7 +90,7 @@ export function CommentsPanel({ cardId, productIds, products, owner, people, onO
 
   const add = () =>
     run(async () => {
-      savePref(AUTHOR_KEY, author.trim())
+      setMyName(author)
       const res = await Cr854_cardnotesService.create({
         'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
         ...(target ? { 'cr854_product@odata.bind': `/cr854_products(${target})` } : {}),

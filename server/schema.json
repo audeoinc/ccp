@@ -188,6 +188,23 @@
       "lookups": [
         ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "CASCADE"}]
       ]
+    },
+    "cr854_events": {
+      "gcpOnly": true,
+      "pg": "events",
+      "pk": "cr854_eventid",
+      "columns": [
+        ["cr854_action", "action", "text"],
+        ["cr854_weekstart", "week_start", "date", {"index": true}],
+        ["cr854_cardname", "card_name", "text"],
+        ["cr854_fromstatus", "from_status", "int"],
+        ["cr854_tostatus", "to_status", "int"],
+        ["cr854_actor", "actor", "text"],
+        ["cr854_note", "note", "text"]
+      ],
+      "lookups": [
+        ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "SET NULL"}]
+      ]
     }
   }
 }

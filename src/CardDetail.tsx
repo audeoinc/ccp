@@ -48,6 +48,7 @@ import { useAiDrafts } from './useAiDrafts'
 import { Cr854_weeksService, type Cr854_weeks } from './gcpdata/Cr854_weeksService'
 import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
 import { confirmedWeekOf } from './weekLock'
+import { logEvent } from './history'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
@@ -827,6 +828,16 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
           'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
         })
         if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
+      }
+      // 承認の履歴(W6): 保存済みの配信のステータスが変わったら、誰が・いつ・何から何にしたかを残す
+      if (card && (reason !== undefined || card.cr854_status !== fields.cr854_status)) {
+        await logEvent({
+          action: reason !== undefined ? 'reopen' : 'status',
+          card: { id: cardId, name: form.name, scheduledAt: fields.cr854_scheduledat },
+          from: card.cr854_status,
+          to: fields.cr854_status,
+          note: reason?.trim(),
+        })
       }
       await onSaved()
       onBack()

@@ -59,6 +59,8 @@ import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 import { sundayOf } from './weekLock'
+import { logEvent } from './history'
+import { Cr854_eventsService, type Cr854_events } from './gcpdata/Cr854_eventsService'
 import { WeekChecklist } from './WeekChecklist'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 
@@ -294,6 +296,8 @@ function App() {
   const [weeks, setWeeks] = useState<Cr854_weeks[]>([])
   // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
   const [changeNotes, setChangeNotes] = useState<Cr854_cardnotes[]>([])
+  // 承認の履歴(週の操作・配信のステータスの変更。週の状態の帯で、週ごとに出す)
+  const [events, setEvents] = useState<Cr854_events[]>([])
   // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
   const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
   // 週の表示の見方: 商品のバランス / 進み具合。ブラウザごとに覚える
@@ -365,6 +369,11 @@ function App() {
       Cr854_weeksService.getAll()
         .then((res) => {
           if (res.success) setWeeks(res.data ?? [])
+        })
+        .catch(() => undefined)
+      Cr854_eventsService.getAll({ orderBy: ['createdon desc'] })
+        .then((res) => {
+          if (res.success) setEvents(res.data ?? [])
         })
         .catch(() => undefined)
       const res = await Cr854_deliverycardsService.getAll({ orderBy: ['cr854_scheduledat asc'] })
@@ -479,11 +488,13 @@ function App() {
         if (next === 'confirmed') return s !== 588230003 ? 588230003 : undefined // すべて → 確定
         return undefined
       }
+      const moved: string[] = []
       for (const c of weekCards) {
         const v = target(c)
         if (v === undefined) continue
         const r = await Cr854_deliverycardsService.update(c.cr854_deliverycardid, { cr854_status: v as Cr854_deliverycards['cr854_status'] })
         if (!r.success) throw new Error(r.error?.message ?? tr('配信のステータスを変えられませんでした', 'Could not update a delivery status'))
+        moved.push(c.cr854_name)
       }
       const now = new Date().toISOString()
       const fields = {
@@ -493,6 +504,23 @@ function App() {
       }
       const res = thisWeek ? await Cr854_weeksService.update(thisWeek.cr854_weekid, fields) : await Cr854_weeksService.create({ cr854_weekstart: weekKey, ...fields })
       if (!res.success) throw new Error(res.error?.message ?? tr('週の状態を保存できませんでした', 'Could not save the week status'))
+      // 承認の履歴(W6)。まとめて状態を変えた配信は、1 本ずつではなく、週の出来事 1 つに名前を並べて残す(履歴が埋もれないように)
+      const wasConfirmed = thisWeek?.cr854_status === 'confirmed'
+      await logEvent({
+        action: next === 'confirmed' ? 'confirm' : next === 'draft' ? 'draft' : wasConfirmed ? 'unconfirm' : 'submit',
+        weekStart: weekKey,
+        // まとめて変えた配信の、変える前と後のステータス(確定は、元がまちまちなので、後だけ)
+        ...(moved.length
+          ? next === 'confirmed'
+            ? { to: 588230003 }
+            : wasConfirmed
+              ? { from: 588230003, to: 588230002 }
+              : next === 'review'
+                ? { from: 588230000, to: 588230001 }
+                : {}
+          : {}),
+        note: moved.join(' / ') || undefined,
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -740,7 +768,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onChange={changeWeek} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)} onChange={changeWeek} />
               <WeekChecklist items={checklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />
               <WeekView
                 start={weekStart}

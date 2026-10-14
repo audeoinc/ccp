@@ -34,7 +34,7 @@ Dataverse の名前(画面が使う `cr854_scheduledat`、`_cr854_heroimage_valu
 2. API の名前・値の変換(サーバーが、画面には従来どおりの Dataverse の形で返す)
 3. 触ってよいテーブル・列の許可リスト(それ以外は 400)
 
-**Dataverse に列を足したら**: `pa app add data-source …` で生成し直す → `server/schema.json` にも追記 → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には `migrate` で反映。
+**Dataverse に列を足したら**: `pa app add data-source …` で生成し直す → `server/schema.json` にも追記 → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には、デプロイ後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される(`server/ccp/data_api.py` の `_ensure_schema`。手で `migrate` を実行してもよい。何度実行しても同じ)。
 
 選択肢の値は、Dataverse と同じ数値(例: 588230000)のまま `integer` で持つ。
 
