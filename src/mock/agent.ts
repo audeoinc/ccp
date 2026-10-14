@@ -46,6 +46,20 @@ export function mockAgent(message: string): string {
     return { mode: 'update', reply: hasJa(last) ? jaDefault : enDefault }
   }
 
+  // 差し替えの候補: 今週・前週の訴求が少なく、在庫に余裕のある順に 3 つ
+  if (task === 'suggest_replacements') {
+    type C = { id: string; name: string; price?: number; weeksLeft: number | null; thisWeek: number; lastWeek: number }
+    const cs = [...((p.candidates as C[] | undefined) ?? [])].sort((a, b) => a.thisWeek + a.lastWeek - (b.thisWeek + b.lastWeek) || (b.weeksLeft ?? 0) - (a.weeksLeft ?? 0)).slice(0, 3)
+    return J({
+      picks: cs.map((c) => ({
+        id: c.id,
+        reason: en
+          ? `${c.weeksLeft ?? '-'} weeks of stock on the day; featured ${c.thisWeek + c.lastWeek} times this/last week.`
+          : `配信日に在庫 ${c.weeksLeft ?? '-'} 週分。今週・前週の訴求は ${c.thisWeek + c.lastWeek} 回。`,
+      })),
+    })
+  }
+
   // 並べた配信の評価: 1 通あたりの売上の高い・低い配信と、ばらつきの大きい位置から、決まった形の文を作る
   if (task === 'compare_results') {
     type D = { id: string; date: string; name: string; slots?: string[]; kpis: { revenuePerRecipient?: number; clickRate?: number }; positions?: Record<string, number> }

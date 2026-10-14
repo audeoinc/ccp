@@ -335,7 +335,8 @@ function App() {
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
-  const alerts = useStockAlerts(cards, products, cards)
+  const alertState = useStockAlerts(cards, products, cards)
+  const alerts = alertState.alerts
   const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
@@ -845,7 +846,7 @@ function App() {
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'alerts' ? (
-              <AlertsPage alerts={alerts} onOpenCard={setSelectedId} />
+              <AlertsPage alerts={alerts} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
             ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}

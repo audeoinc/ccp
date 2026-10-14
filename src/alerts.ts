@@ -22,6 +22,8 @@ export const LOW_STOCK_WEEKS = 2
 
 /** 配信に、商品が載っている場所 */
 export interface Placement {
+  /** 配信の商品の行(cr854_deliveryproducts)の ID */
+  rowId: string
   productId: string
   /** セクションの番号(0 から) */
   section: number
@@ -58,6 +60,71 @@ export interface StockAlert {
 
 const DAY = 24 * 3600_000
 
+/** 在庫の見込みの計算に使う部品(アラートと、差し替えの候補の両方で使う) */
+export interface StockModel {
+  /** 週の販売のペース(直近 4 週の平均。分からなければ 0) */
+  rateOf: (p: Cr854_products) => number
+  /** 1 回の配信で上乗せされる販売の見込み */
+  upliftOf: (p: Cr854_products) => number
+  /** その日時の在庫の見込み(それより前の、まだ送っていない配信の上乗せを引く。except の配信は数えない) */
+  projectAt: (p: Cr854_products, when: string, except?: string) => { projected: number; weeksLeft?: number }
+  /** その日を含む週と、その前の週に、商品を載せた配信の数(差し替えで、訴求が多すぎにならないか) */
+  exposures: (productId: string, when: string) => { thisWeek: number; lastWeek: number }
+}
+
+export function makeStockModel(args: {
+  cards: Cr854_deliverycards[]
+  placements: Map<string, Placement[]>
+  weekly: Cr854_weeklyperformances[]
+  results: Cr854_deliveryresults[]
+  now?: Date
+}): StockModel {
+  const { cards, placements, weekly, results, now = new Date() } = args
+  const byCode = new Map<string, Cr854_weeklyperformances[]>()
+  for (const w of weekly) if (w.cr854_productcode) byCode.set(w.cr854_productcode, [...(byCode.get(w.cr854_productcode) ?? []), w])
+  const rateOf = (p: Cr854_products) => {
+    const code = p.cr854_productcode
+    const rows = (code ? byCode.get(code) : undefined)?.slice().sort((a, b) => (b.cr854_weekstart ?? '').localeCompare(a.cr854_weekstart ?? '')).slice(0, 4) ?? []
+    return rows.length ? rows.reduce((s, r) => s + (r.cr854_units ?? 0), 0) / rows.length : 0
+  }
+  const sold = new Map<string, number[]>()
+  for (const r of results) for (const x of parseProductResults(r.cr854_products)) sold.set(x.productId, [...(sold.get(x.productId) ?? []), x.units])
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : 0)
+  const overall = avg([...sold.values()].flat())
+  const upliftOf = (p: Cr854_products) => {
+    const xs = sold.get(p.cr854_productid)
+    return xs && xs.length ? avg(xs) : overall || rateOf(p) * 0.5
+  }
+  const cardAt = new Map(cards.map((c) => [c.cr854_deliverycardid, c.cr854_scheduledat ?? '']))
+  const projectAt = (p: Cr854_products, when: string, except?: string) => {
+    const t = new Date(when).getTime()
+    const rate = rateOf(p)
+    let earlier = 0
+    for (const [cardId, list] of placements) {
+      const at = new Date(cardAt.get(cardId) || 0).getTime()
+      if (cardId === except || at < now.getTime() || at >= t) continue
+      if (list.some((x) => x.productId === p.cr854_productid)) earlier++
+    }
+    const days = Math.max(0, (t - now.getTime()) / DAY)
+    const projected = Math.round((p.cr854_stock ?? 0) - (rate * days) / 7 - earlier * upliftOf(p))
+    return { projected, weeksLeft: rate > 0 ? Math.max(0, projected) / rate : undefined }
+  }
+  const exposures = (productId: string, when: string) => {
+    const d = new Date(when)
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay()).getTime()
+    let thisWeek = 0
+    let lastWeek = 0
+    for (const [cardId, list] of placements) {
+      if (!list.some((x) => x.productId === productId)) continue
+      const at = new Date(cardAt.get(cardId) || 0).getTime()
+      if (at >= start && at < start + 7 * DAY) thisWeek++
+      else if (at >= start - 7 * DAY && at < start) lastWeek++
+    }
+    return { thisWeek, lastWeek }
+  }
+  return { rateOf, upliftOf, projectAt, exposures }
+}
+
 /** 在庫のアラートを計算する */
 export function computeStockAlerts(args: {
   cards: Cr854_deliverycards[]
@@ -68,24 +135,8 @@ export function computeStockAlerts(args: {
   now?: Date
   lowWeeks?: number
 }): StockAlert[] {
-  const { cards, products, placements, weekly, results, now = new Date(), lowWeeks = LOW_STOCK_WEEKS } = args
-  // 週の販売のペース(商品コードごと。直近 4 週の平均)
-  const byCode = new Map<string, Cr854_weeklyperformances[]>()
-  for (const w of weekly) if (w.cr854_productcode) byCode.set(w.cr854_productcode, [...(byCode.get(w.cr854_productcode) ?? []), w])
-  const rateOf = (code?: string) => {
-    const rows = (code ? byCode.get(code) : undefined)?.slice().sort((a, b) => (b.cr854_weekstart ?? '').localeCompare(a.cr854_weekstart ?? '')).slice(0, 4) ?? []
-    return rows.length ? rows.reduce((s, r) => s + (r.cr854_units ?? 0), 0) / rows.length : 0
-  }
-  // 1 回の配信で上乗せされる販売(過去の配信の結果から)
-  const sold = new Map<string, number[]>()
-  for (const r of results) for (const p of parseProductResults(r.cr854_products)) sold.set(p.productId, [...(sold.get(p.productId) ?? []), p.units])
-  const all = [...sold.values()].flat()
-  const avg = (xs: number[]) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : 0)
-  const overall = avg(all)
-  const upliftOf = (id: string, rate: number) => {
-    const xs = sold.get(id)
-    return xs && xs.length ? avg(xs) : overall || rate * 0.5
-  }
+  const { cards, products, placements, now = new Date(), lowWeeks = LOW_STOCK_WEEKS } = args
+  const model = makeStockModel(args)
 
   // まだ送っていない配信(日付の順)に載っている商品
   const upcoming = cards
@@ -103,8 +154,8 @@ export function computeStockAlerts(args: {
     const product = products.find((p) => p.cr854_productid === pid)
     if (!product) continue
     const stock = product.cr854_stock ?? 0
-    const rate = rateOf(product.cr854_productcode)
-    const uplift = upliftOf(pid, rate)
+    const rate = model.rateOf(product)
+    const uplift = model.upliftOf(product)
     let before = 0 // それより前の配信で上乗せされる販売の合計
     const deliveries: AffectedDelivery[] = list.map(({ card, sections }) => {
       const days = Math.max(0, (new Date(card.cr854_scheduledat!).getTime() - now.getTime()) / DAY)
@@ -146,11 +197,18 @@ export function useStockAlerts(cards: Cr854_deliverycards[], products: Cr854_pro
         const map = new Map<string, Placement[]>()
         for (const r of res.data ?? []) {
           if (!r._cr854_deliverycard_value || !r._cr854_product_value || r.cr854_state !== STATE_SELECTED) continue
-          map.set(r._cr854_deliverycard_value, [...(map.get(r._cr854_deliverycard_value) ?? []), { productId: r._cr854_product_value, section: r.cr854_section ?? 0 }])
+          map.set(r._cr854_deliverycard_value, [...(map.get(r._cr854_deliverycard_value) ?? []), { rowId: r.cr854_deliveryproductid, productId: r._cr854_product_value, section: r.cr854_section ?? 0 }])
         }
         setPlacements(map)
       })
       .catch(() => undefined)
   }, [reloadKey])
-  return useMemo(() => computeStockAlerts({ cards, products, placements, weekly, results }), [cards, products, placements, weekly, results])
+  return useMemo(
+    () => ({
+      alerts: computeStockAlerts({ cards, products, placements, weekly, results }),
+      model: makeStockModel({ cards, placements, weekly, results }),
+      placements,
+    }),
+    [cards, products, placements, weekly, results],
+  )
 }

@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import { Badge, Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { OpenRegular } from '@fluentui/react-icons'
-import { LOW_STOCK_WEEKS, type AffectedDelivery, type StockAlert } from './alerts'
+import { Badge, Button, MessageBar, MessageBarBody, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowSwapRegular, CalendarArrowRightRegular, OpenRegular } from '@fluentui/react-icons'
+import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
+import { AlertActionPanel } from './AlertActionPanel'
+import { LOW_STOCK_WEEKS, type AffectedDelivery, type Placement, type StockAlert, type StockModel } from './alerts'
 import { locale, optionLabel, useT } from './i18n'
 import { CHANNEL_PUSH, statusColor, statusOptions } from './status'
 
@@ -45,13 +48,20 @@ const useStyles = makeStyles({
   bad: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
   warn: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
   empty: { padding: '40px', textAlign: 'center', color: tokens.colorNeutralForeground3 },
+  actions: { display: 'inline-flex', columnGap: '4px' },
   how: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase300 },
 })
 
 interface Props {
   alerts: StockAlert[]
+  products: Cr854_products[]
+  placements: Map<string, Placement[]>
+  model: StockModel
+  weeks: Cr854_weeks[]
   /** 配信カードを開く */
   onOpenCard: (id: string) => void
+  /** 差し替え・延期のあと、配信カードを読み直す(アラートも計算し直す) */
+  onChanged: () => Promise<void>
 }
 
 const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: tokens.colorPaletteDarkOrangeBorderActive }
@@ -60,11 +70,15 @@ const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: t
  * アラートの画面(ワイヤーフレーム 12)。左に、配信に影響する変更(いまは在庫切れ・在庫僅少)の一覧。
  * 選ぶと、右に、影響を受ける、まだ送っていない配信と、商品が載っている場所、配信日の在庫の見込みを出す
  */
-export function AlertsPage({ alerts, onOpenCard }: Props) {
+export function AlertsPage({ alerts, products, placements, model, weeks, onOpenCard, onChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected = alerts.find((a) => a.id === selectedId) ?? alerts[0]
+  // 対応のパネル(差し替え・延期)を開いている配信
+  const [action, setAction] = useState<{ mode: 'replace' | 'postpone'; cardId: string } | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const actionCard = selected?.deliveries.find((d) => d.card.cr854_deliverycardid === action?.cardId)?.card
 
   const kindLabel = (a: StockAlert) => (a.kind === 'outOfStock' ? t('在庫切れの見込み', 'Out of stock (expected)') : t('在庫僅少', 'Low stock'))
   const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' }) : '')
@@ -101,7 +115,7 @@ export function AlertsPage({ alerts, onOpenCard }: Props) {
       <div className={styles.list}>
         <div className={styles.listHead}>{t(`配信に影響する変更(${alerts.length})`, `Changes that affect deliveries (${alerts.length})`)}</div>
         {alerts.map((a) => (
-          <button key={a.id} type="button" className={mergeClasses(styles.item, a.id === selected?.id && styles.itemOn)} style={{ borderLeftColor: KIND_COLOR[a.kind] }} onClick={() => setSelectedId(a.id)}>
+          <button key={a.id} type="button" className={mergeClasses(styles.item, a.id === selected?.id && styles.itemOn)} style={{ borderLeftColor: KIND_COLOR[a.kind] }} onClick={() => { setSelectedId(a.id); setAction(null); setDone(null) }}>
             <span className={styles.itemKind}>
               {kindLabel(a)}
               <Badge size="small" appearance="tint" color={a.kind === 'outOfStock' ? 'danger' : 'warning'}>
@@ -169,19 +183,54 @@ export function AlertsPage({ alerts, onOpenCard }: Props) {
                     </td>
                     <td className={styles.td}>{problemText(d)}</td>
                     <td className={styles.td}>
-                      <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.cr854_deliverycardid)}>
-                        {t('開く', 'Open')}
-                      </Button>
+                      <span className={styles.actions}>
+                        <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.cr854_deliverycardid })}>
+                          {t('差し替え', 'Replace')}
+                        </Button>
+                        {/* 延期・開くは、表が横に長くならないよう、アイコンだけ(名前は、マウスを乗せると出る) */}
+                        <Tooltip content={t('延期', 'Postpone')} relationship="label">
+                          <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.cr854_deliverycardid })} />
+                        </Tooltip>
+                        <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
+                          <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.cr854_deliverycardid)} />
+                        </Tooltip>
+                      </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {done && (
+            <MessageBar intent="success">
+              <MessageBarBody>{done}</MessageBarBody>
+            </MessageBar>
+          )}
+          {action && actionCard && (
+            <AlertActionPanel
+              key={`${action.mode}:${action.cardId}`}
+              mode={action.mode}
+              card={actionCard}
+              product={selected.product}
+              why={summary(selected)}
+              products={products}
+              placements={placements}
+              model={model}
+              weeks={weeks}
+              onClose={() => setAction(null)}
+              onDone={async (message) => {
+                // 対応したアラートを選んだままにする(計算し直すと、一覧の並びが変わるため)
+                setSelectedId(selected.id)
+                setAction(null)
+                setDone(message)
+                await onChanged()
+              }}
+            />
+          )}
           <div className={styles.how}>
             {t(
-              `配信日の在庫の見込み = いまの在庫 − 週の販売 × 配信日までの週数 − それより前の配信で上乗せされる販売。配信日に在庫がなければ「在庫切れの見込み」、その配信で売り切れるか、残りが ${LOW_STOCK_WEEKS} 週分を切れば「在庫僅少」。商品の差し替え・延期・取りやめは、次に作ります`,
-              `Stock on the day = stock now − weekly sales × weeks until then − extra sales from earlier deliveries. None left → "out of stock"; sells out with the delivery or under ${LOW_STOCK_WEEKS} weeks left → "low stock". Replace / postpone / cancel come next.`,
+              `配信日の在庫の見込み = いまの在庫 − 週の販売 × 配信日までの週数 − それより前の配信で上乗せされる販売。配信日に在庫がなければ「在庫切れの見込み」、その配信で売り切れるか、残りが ${LOW_STOCK_WEEKS} 週分を切れば「在庫僅少」。取りやめは、次に作ります`,
+              `Stock on the day = stock now − weekly sales × weeks until then − extra sales from earlier deliveries. None left → "out of stock"; sells out with the delivery or under ${LOW_STOCK_WEEKS} weeks left → "low stock". Cancel comes next.`,
             )}
           </div>
         </div>
