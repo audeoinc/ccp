@@ -4,6 +4,8 @@
 // 数秒おきに /api/db/status を確認して、使えるようになったら画面を読み込み直す。
 // 画面のコード(React)には手を入れず、ここで、画面の上に直接かぶせる(Power Apps 版との同期を保つため)。
 
+import { appPath } from '../appRoot'
+
 const POLL_MS = 4000
 const GIVE_UP_MS = 25 * 60 * 1000
 let shown = false
@@ -40,7 +42,7 @@ export function showDbWake(): void {
   const started = Date.now()
   const timer = window.setInterval(async () => {
     try {
-      const res = await fetch('/api/db/status')
+      const res = await fetch(appPath('/api/db/status'))
       const json = (await res.json()) as { state?: string }
       if (json.state === 'running') {
         window.clearInterval(timer)

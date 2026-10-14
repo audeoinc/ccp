@@ -88,6 +88,8 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 
 画面を直しながら動かすときは、サーバーを 8080 で起動したまま `npm run dev:gcp`(5191。`/api` は 8080 に中継)。
 
+**Vertex AI Workbench(Agent Platform の Workbench)のノートブックで動かすとき**: サーバーを、たとえば 8081 で起動し(`uvicorn ccp.main:app --port 8081`)、Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(**末尾の `/` を付ける**。付けないと、画面のファイルの相対パスがずれる)。画面は、読み込んだ JS の場所から置き場所(`/proxy/8081/`)を求め、`/api/…`・`/img/…` をその下に送るので、ビルドの設定を変える必要はない(`src/appRoot.ts`、`vite.gcp.config.ts` の `base: './'`)。Cloud Run(置き場所が `/`)でも、同じビルドのまま動く。
+
 初期データ(`server/seed.json`)は、撮影用のモックと同じ元データ(`docs/*.csv` → `src/mock/seed.ts`)から作る。`seed.ts` を直したら `npm run seed:export` で書き出し、`seed.json` もコミットする。
 
 ## テスト

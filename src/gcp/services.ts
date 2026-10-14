@@ -4,6 +4,7 @@
 // その import をここに差し替えて、同じ関数名・同じ戻り値の形で、サーバーの /api/data を呼ぶ。
 // 画面のコードは、どちらのビルドでも同じ(同期を保つため、画面側には GCP 用の分岐を入れない)。
 import { showDbWake } from './dbWake'
+import { appPath } from '../appRoot'
 
 interface ErrorBody {
   message: string
@@ -27,7 +28,7 @@ type Rec = Record<string, unknown>
 
 async function call<T>(method: string, path: string, query?: URLSearchParams, body?: unknown): Promise<Result<T>> {
   try {
-    const res = await fetch(`/api/data/${path}${query && [...query].length ? `?${query}` : ''}`, {
+    const res = await fetch(appPath(`/api/data/${path}${query && [...query].length ? `?${query}` : ''}`), {
       method,
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),

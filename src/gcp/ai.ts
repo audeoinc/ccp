@@ -5,6 +5,8 @@
 // 画面側(プロンプトの作成・JSON の解釈・やり直し)は共通のまま。
 
 // aiSelect.ts の STATUS_* と同じ値(AI要求の状態の選択肢)
+import { appPath } from '../appRoot'
+
 const WAITING = 588230000
 const DONE = 588230001
 const ERROR = 588230002
@@ -23,7 +25,7 @@ function ask(prompt: string): Pending {
   const p: Pending = { status: WAITING, response: '', settled: Promise.resolve() }
   p.settled = (async () => {
     try {
-      const res = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
+      const res = await fetch(appPath('/api/ask'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
       const json = (await res.json().catch(() => null)) as { success?: boolean; text?: string; error?: { message?: string } } | null
       if (json?.success && json.text) {
         p.status = DONE

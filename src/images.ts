@@ -1,5 +1,6 @@
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import { appPath } from './appRoot'
 
 // ビルドに同梱するイラスト(商品コード・画像コードと同じファイル名。scripts の生成物)
 const productAssets = import.meta.glob('./assets/products/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
@@ -14,12 +15,12 @@ const isPlaceholder = (url?: string) => !url || url.includes('placehold.co')
 
 export function productImage(p?: Cr854_products): string | undefined {
   if (!p) return undefined
-  if (!isPlaceholder(p.cr854_imageurl)) return p.cr854_imageurl
+  if (!isPlaceholder(p.cr854_imageurl)) return appPath(p.cr854_imageurl!)
   return (productAssets[`./assets/products/${p.cr854_productcode}.svg`] ?? productAssets[`./assets/products/${assetCode(p.cr854_productcode)}.svg`]) ?? p.cr854_imageurl
 }
 
 export function heroImage(h?: Cr854_heroimages): string | undefined {
   if (!h) return undefined
-  if (!isPlaceholder(h.cr854_imageurl)) return h.cr854_imageurl
+  if (!isPlaceholder(h.cr854_imageurl)) return appPath(h.cr854_imageurl!)
   return heroAssets[`./assets/heroes/${assetCode(h.cr854_imagecode)}.svg`] ?? h.cr854_imageurl
 }
