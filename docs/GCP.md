@@ -92,6 +92,8 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 
 ### 外にアクセスできない環境(Workbench)に、本番のデータと画像を持ち込む(引っ越し用のパック)
 
+**Workbench での立ち上げ・更新の手順は、[WORKBENCH.md](WORKBENCH.md)(移行の手順書)にまとめた。** ここは要点だけ。
+
 クライアントの Vertex AI Workbench のように、サーバーから外(本番の DB・GCS)にアクセスできない環境では、初期データ(`seed --reset`)だと、画像がイラストになり、配信のデータも本番と違う。
 本番の**すべてのデータと画像**を 1 つの ZIP(引っ越し用のパック。`server/ccp/pack.py`)にして、ブラウザ経由で持ち込む。
 

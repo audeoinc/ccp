@@ -85,6 +85,8 @@ async def import_pack(path: Path, images: Path, yes: bool) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(content)
     print(f"画像を {images} に展開しました")
+    # テーブルがまだない・列が足りない環境でも取り込めるよう、先にテーブルを作る(何度実行してもよい)
+    await migrate()
     await replace_tables(tables)
     print()
     print(f"取り込みました。サーバーは、環境変数 ASSET_DIR={images} を付けて起動してください(画像をこのフォルダから配る)")

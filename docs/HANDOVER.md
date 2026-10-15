@@ -126,7 +126,7 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 ## 6.5 クライアントの Workbench での運用(2026-10-15)
 
 チームメンバーが、クライアントの Vertex AI Workbench でアプリを動かしている(`f03c9e2` で、Jupyter の中継 `/proxy/8081/` の下でも動くようにした)。
-Workbench のサーバーは外にアクセスできないので、本番のデータと画像は「引っ越し用のパック」で持ち込む(⚙ →「データと画像を書き出す」→ Workbench で `python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けて起動)。手順は [GCP.md](GCP.md) の「外にアクセスできない環境(Workbench)に、本番のデータと画像を持ち込む」。
+Workbench のサーバーは外にアクセスできないので、本番のデータと画像は「引っ越し用のパック」で持ち込む(⚙ →「データと画像を書き出す」→ Workbench で `python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けて起動)。手順は、移行の手順書 [WORKBENCH.md](WORKBENCH.md)(初回の立ち上げ・更新・よくあるつまずき)。
 画像は、クライアントのサービスで使っている画像なので、クライアントの環境に置いてよい(利用者に確認済み)。
 
 ## 7. 落とし穴

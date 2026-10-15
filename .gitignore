@@ -32,3 +32,6 @@ __pycache__/
 
 # 引っ越し用のパックから展開した画像(python -m ccp.cli import-pack)
 server/images/
+
+# Workbench の接続の設定(パスワードを含む。見本は server/workbench.env.example)
+server/workbench.env
