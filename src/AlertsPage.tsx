@@ -82,6 +82,8 @@ interface Props {
   weeks: Cr854_weeks[]
   /** 配信カードを開く */
   onOpenCard: (id: string) => void
+  /** アラートから配信カードを開く(問題の商品を選んで開く) */
+  onOpenAlertCard?: (cardId: string, productId?: string) => void
   /** 差し替え・延期のあと、配信カードを読み直す(アラートも計算し直す) */
   onChanged: () => Promise<void>
 }
@@ -92,7 +94,7 @@ const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: t
  * アラートの画面(ワイヤーフレーム 12)。左に、配信に影響する変更(いまは在庫切れ・在庫僅少)の一覧。
  * 選ぶと、右に、影響を受ける、まだ送っていない配信と、商品が載っている場所、配信日の在庫の見込みを出す
  */
-export function AlertsPage({ alerts, changeAlerts, onResolve, settings, owners, logs, cards, products, placements, model, weeks, onOpenCard, onChanged }: Props) {
+export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, settings, owners, logs, cards, products, placements, model, weeks, onOpenCard, onChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -268,7 +270,7 @@ export function AlertsPage({ alerts, changeAlerts, onResolve, settings, owners, 
           placements={placements}
           model={model}
           weeks={weeks}
-          onOpenCard={onOpenCard}
+          onOpenCard={(id) => (onOpenAlertCard ?? onOpenCard)(id, selectedChange.product?.cr854_productid)}
           onChanged={onChanged}
           onResolve={onResolve}
         />
@@ -341,7 +343,7 @@ export function AlertsPage({ alerts, changeAlerts, onResolve, settings, owners, 
                           <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.cr854_deliverycardid })} />
                         </Tooltip>
                         <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
-                          <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.cr854_deliverycardid)} />
+                          <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => (onOpenAlertCard ?? onOpenCard)(d.card.cr854_deliverycardid, selected.product.cr854_productid)} />
                         </Tooltip>
                       </span>
                     </td>

@@ -7,6 +7,8 @@ import { optionLabel, useT } from './i18n'
 import { productMarket } from './market'
 import { ProductDetail } from './ProductDetail'
 import { sectionRange, sectionsOf, type EmailTemplateId } from './templates'
+import { AlertMark } from './AlertMark'
+import type { CardAlertKind } from './cardAlerts'
 
 interface Props {
   template: EmailTemplateId
@@ -15,6 +17,8 @@ interface Props {
   products: Cr854_products[]
   /** 行にマウスが乗ったとき(プレビューの該当商品を光らせるため)。外れたら null */
   onHover: (key: string | null) => void
+  /** アラートのある商品(商品 ID → いちばん強い種類)。商品名の前に印を付ける */
+  alertKinds?: Map<string, CardAlertKind>
 }
 
 /** 在庫が少ないとみなす数(AI の商品選定の基準と同じ) */
@@ -71,7 +75,7 @@ function trendMark(name?: string): { mark: string; color: string } {
  * 行を押すと、詳細がフロートで開く(今後は、売上・在庫の推移などのグラフもここに載せる)。
  * 操作(選ぶ・並べ替え・直す)は、中ペインで行う。ここには、操作する部品を置かない。
  */
-export function ProductInfoPane({ template, sectionTitles, items, products, onHover }: Props) {
+export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds }: Props) {
   const t = useT()
   const s = useStyles()
   const productById = new Map(products.map((p) => [p.cr854_productid, p]))
@@ -101,7 +105,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
             <div className={s.list}>
               {list.map((it) => {
                 const p = productById.get(it.productId)
-                return p ? <ProductItem key={it.key} product={p} itemKey={it.key} onHover={onHover} /> : null
+                return p ? <ProductItem key={it.key} product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} /> : null
               })}
             </div>
           </section>
@@ -111,7 +115,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
   )
 }
 
-function ProductItem({ product: p, itemKey, onHover }: { product: Cr854_products; itemKey: string; onHover: (key: string | null) => void }) {
+function ProductItem({ product: p, itemKey, onHover, alert }: { product: Cr854_products; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind }) {
   const t = useT()
   const s = useStyles()
   const market = productMarket(p)
@@ -130,7 +134,10 @@ function ProductItem({ product: p, itemKey, onHover }: { product: Cr854_products
         <div className={mergeClasses(s.item)} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
           <Avatar shape="square" image={{ src: productImage(p), alt: p.cr854_name }} name={p.cr854_name} className={s.avatar} />
           <div className={s.main}>
-            <Text size={200} weight="semibold" className={s.name}>{p.cr854_name}</Text>
+            <Text size={200} weight="semibold" className={s.name}>
+              <AlertMark kind={alert} />
+              {p.cr854_name}
+            </Text>
             <span className={s.sub}>
               {p.cr854_productcode} ・ {yen(p.cr854_price, market)} ・ {t('在庫', 'Stock ')}{p.cr854_stock ?? '-'}
             </span>

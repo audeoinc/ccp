@@ -4,12 +4,16 @@ import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycards
 import { CHANNEL_PUSH, countryOptions, statusColor, statusOptions } from './status'
 import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
+import { AlertMark } from './AlertMark'
+import type { CardAlertKind } from './cardAlerts'
 
 interface Props {
   month: Date
   cards: Cr854_deliverycards[]
   /** 配信日が近いのに未着手の配信(印を付ける) */
   dueSoon?: Set<string>
+  /** アラートのある配信(いちばん強い種類。印を付ける) */
+  alertKinds?: Map<string, CardAlertKind>
   onSelect: (id: string) => void
   /** 日付のマスの空いているところ(または「＋」)を押したとき。その日付で新規作成する(値は YYYY-MM-DD) */
   onCreate: (day: string) => void
@@ -138,7 +142,7 @@ const useStyles = makeStyles({
   },
 })
 
-export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
+export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -222,6 +226,7 @@ export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
                     ) : (
                       <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
                     )}
+                    <AlertMark kind={alertKinds?.get(c.cr854_deliverycardid)} />
                     {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
                     {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
                     {c.cr854_name}

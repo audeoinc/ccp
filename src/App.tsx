@@ -50,6 +50,7 @@ import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
 import { AlertsPage } from './AlertsPage'
 import { useChangeAlerts, useStockAlerts } from './alerts'
+import { buildCardAlerts, topKind, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
 import { isCancelled } from './cancel'
@@ -348,6 +349,15 @@ function App() {
   const changeState = useChangeAlerts(activeCards, products, alertState.placements, cards)
   const changeAlerts = filterChangeAlerts(alertSettings, changeState.changeAlerts)
   const alertCount = alerts.length + changeAlerts.length
+  // 配信ごとのアラート(配信カードの帯・カレンダーの印)
+  const cardAlerts = useMemo(() => buildCardAlerts(alerts, changeAlerts), [alerts, changeAlerts])
+  const alertKinds = useMemo(() => new Map([...cardAlerts].map(([id, list]) => [id, topKind(list)]).filter((e): e is [string, CardAlertKind] => !!e[1])), [cardAlerts])
+  // アラートの画面から開いたときに、配信カードで選んでおく商品
+  const [focusProduct, setFocusProduct] = useState<string | undefined>(undefined)
+  const openFromAlert = (cardId: string, productId?: string) => {
+    setFocusProduct(productId)
+    setSelectedId(cardId)
+  }
   const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
@@ -870,7 +880,7 @@ function App() {
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'alerts' ? (
-              <AlertsPage alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+              <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
             ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}
@@ -905,12 +915,13 @@ function App() {
                 heroes={heroes}
                 dueSoon={dueSoon}
                 focus={focus}
+                alertKinds={alertKinds}
                 onSelect={setSelectedId}
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
               />
               </>
             ) : (
-              <Calendar month={month} cards={filtered} dueSoon={dueSoon} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
+              <Calendar month={month} cards={filtered} dueSoon={dueSoon} alertKinds={alertKinds} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
             )}
           </>
         )}
@@ -926,6 +937,7 @@ function App() {
           weeks={weeks}
           owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()}
           onBack={() => {
+            setFocusProduct(undefined)
             setSelectedId(null)
             setCreating(null)
             // 質問・返信は、保存を待たずに書き込むので、閉じたときにも読み直す
@@ -934,6 +946,8 @@ function App() {
           onSaved={load}
           // 結果は、面を切り替えずに、配信カードの上に重ねて見る。結果の面で、その結果から開いた配信カードでは出さない(下に結果があるため)
           onOpenResults={page === 'results' && resultDetail === selected?.cr854_deliverycardid ? undefined : setPeekResult}
+          alerts={selected ? cardAlerts.get(selected.cr854_deliverycardid) : undefined}
+          focusProductId={focusProduct}
         />
       )}
       {peekResult && (

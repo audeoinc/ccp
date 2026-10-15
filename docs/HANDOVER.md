@@ -135,6 +135,7 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 - **取りやめ・削除**: 配信カードの「…」(`src/CardMenu.tsx`)。取りやめは消さずに薄く残し、アラート・週の確認・件数から外す。
 - 本番の見本: 方針の変更(469370 を Core → Clearance)・日程の変更(Cozy Home を 10/26 → 10/24。Halloween と重なる)を入れた(2026-10-15)。
 - **条件(A6)**: アラートの画面の「アラートの条件」(週数・種類・種別・担当)。ブラウザごとに覚える(`src/alertSettings.ts`)。**対応の記録**: 対応済みにした変更の一覧(誰が・いつ・どう)。
+- **配信カード・カレンダーでの表示**: 配信ごとのアラート(`src/cardAlerts.ts`)を、配信カードの帯(`CardAlertsBar`)・右の商品情報・月と週のカレンダーの印(`AlertMark`)に出す。アラートの画面から開くと、問題の商品を選んだ状態で開く(App の `openFromAlert` → CardDetail の `focusProductId`)。
 - アラート(A1〜A6)は、ひととおり完了。
 
 ## 6.5 クライアントの Workbench での運用(2026-10-15)

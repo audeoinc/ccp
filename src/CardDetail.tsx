@@ -52,6 +52,8 @@ import { logEvent, myName, setMyName } from './history'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
+import { CardAlertsBar } from './CardAlertsBar'
+import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
 export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'channel' | 'department'>>
@@ -73,6 +75,10 @@ interface Props {
   onSaved: () => Promise<void>
   /** この配信の結果を、上に重ねて見る(送ったあとの配信だけ、ボタンを出す) */
   onOpenResults?: (id: string) => void
+  /** この配信のアラート(題名の下に帯で出す) */
+  alerts?: CardAlert[]
+  /** 開いたときに選んでおく商品(アラートの画面から開いたとき。問題の商品を、プレビューで強調する) */
+  focusProductId?: string
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -346,7 +352,7 @@ const useStyles = makeStyles({
   actor: { width: '160px' },
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -457,6 +463,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         setItems(sel)
         setCandidates(cands)
         setOriginal(snap)
+        // アラートの画面から開いたときは、問題の商品を選んでおく(プレビューのその枠が強調され、見える位置までスクロールする)
+        const focus = focusProductId ? sel.find((i) => i.productId === focusProductId) : undefined
+        if (focus) setSelectedKey(focus.key)
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
@@ -464,7 +473,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     return () => {
       cancelled = true
     }
-  }, [card])
+    // 選んでおく商品は、開いたときにだけ使う(配信カードは、配信ごとに作り直されるので、ここで読み直すことはない)
+  }, [card, focusProductId])
 
   // 左ペインで手で書き換えたら、採用した案の補足は消す
   const STALE: Partial<Record<keyof Form, keyof Form>> = { theme: 'themeReason', headline: 'copyAngle', copy: 'copyAngle', instructions: 'instructionsAngle' }
@@ -1015,6 +1025,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </MessageBar>
           )}
 
+          {/* この配信のアラート(在庫・方針・日程)。どこに問題があるかを、開いた瞬間にわかるように */}
+          {alerts.length > 0 && (
+            <CardAlertsBar
+              alerts={alerts}
+              selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
+              onSelectProduct={(pid) => {
+                const it = items.find((i) => i.productId === pid)
+                if (it) setSelectedKey(it.key)
+              }}
+            />
+          )}
           {/* これまでの学び(同じテンプレート・テーマの種類の、過去の配信のメモ)。保存済みの配信だけ */}
           {card && (
             <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} />
@@ -1263,7 +1284,14 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 <div className={styles.infoToolbar}>
                   <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleInfo} aria-label={t('商品情報を閉じる', 'Collapse product info')} />
                 </div>
-                <ProductInfoPane template={template} sectionTitles={sectionTitles} items={items} products={products} onHover={setHoverKey} />
+                <ProductInfoPane
+                  template={template}
+                  sectionTitles={sectionTitles}
+                  items={items}
+                  products={products}
+                  onHover={setHoverKey}
+                  alertKinds={new Map(CARD_ALERT_ORDER.slice().reverse().flatMap((k) => alerts.filter((a) => a.kind === k && a.productId).map((a) => [a.productId!, k] as const)))}
+                />
               </div>
             ) : (
               <div className={styles.rail}>

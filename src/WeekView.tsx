@@ -25,6 +25,8 @@ import { cardProgress } from './progress'
 import { statusColor, statusOptions } from './status'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
+import { AlertMark } from './AlertMark'
+import type { CardAlertKind } from './cardAlerts'
 
 /** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る */
 export type WeekLens = 'products' | 'progress'
@@ -49,6 +51,8 @@ interface Props {
   dueSoon?: Set<string>
   /** 確認の一覧(W4)で選んだ項目の、目立たせる配信と商品。配信が空なら、配信は薄くしない */
   focus?: { cards: Set<string>; products: Set<string> }
+  /** アラートのある配信(いちばん強い種類。印を付ける) */
+  alertKinds?: Map<string, CardAlertKind>
   onSelect: (id: string) => void
   /** その日付で新規作成する(値は YYYY-MM-DD) */
   onCreate: (day: string) => void
@@ -196,7 +200,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, onSelect, onCreate }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, onSelect, onCreate }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -321,6 +325,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         <div className={styles.inner}>
           <div className={styles.nameRow}>
             <span className={styles.dot} style={{ backgroundColor: statusColor(c.cr854_status) }} title={label(statusOptions, c.cr854_status)} />
+            <AlertMark kind={alertKinds?.get(id)} />
             <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.cr854_name}` : c.cr854_name}</span>
           </div>
           {hasIssues && <div className={styles.issues}>{issues}</div>}
