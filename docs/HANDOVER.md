@@ -144,6 +144,8 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 Workbench のサーバーは外にアクセスできないので、本番のデータと画像は「引っ越し用のパック」で持ち込む(⚙ →「データと画像を書き出す」→ Workbench で `python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けて起動)。手順は、移行の手順書 [WORKBENCH.md](WORKBENCH.md)(初回の立ち上げ・更新・よくあるつまずき)。
 画像は、利用先の環境に置いてよい(利用者に確認済み)。
 
+**BigQuery の本番データ(2026-10-15 に設計を合意。まだ作っていない)**: 利用先の BigQuery に、本番の商品マスタ・売上・在庫・レビュー・アクセス・天気がある。Workbench の CCP のサーバーが、Workbench の SA で BigQuery を直接読み、PostgreSQL に写す(AI の呼び出しのたびには読まない。在庫は 1〜2 分ごとに更新を確かめる)。設計は [BIGQUERY.md](BIGQUERY.md)、BigQuery 側の SQL の仕様は [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)、作る順番はバックログの B1〜B7。利用先のテーブルの名前などは、リポジトリに書かない。
+
 ## 6.6 週の計画・レビュー・承認(W。2026-10-15 時点)
 
 - **できたこと**: 週の表示(W1)、週の状態とまとめての操作(W2)、確定後の変更の制限(W3)、確認の一覧(W4)、レビューのコメント(W5 → W10 で Confluence のようなスレッド。返信・対応済み・たたむ・自分の書き込みの編集と削除)、承認の履歴(W6。`cr854_events`)、承認と差し戻し(W9)、週の資料の PDF(W7)。
