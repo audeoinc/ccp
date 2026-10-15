@@ -50,6 +50,7 @@ import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
 import { AlertsPage } from './AlertsPage'
 import { useStockAlerts } from './alerts'
+import { appPath } from './appRoot'
 import { isCancelled } from './cancel'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
@@ -698,6 +699,19 @@ function App() {
             <MenuList>
               <MenuItem icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
                 {t('テンプレートの管理', 'Manage templates')}
+              </MenuItem>
+              {/* 引っ越し用のパック: すべてのデータと画像を 1 つの ZIP に書き出す(外にアクセスできない環境へ持ち込むため。server/ccp/pack.py) */}
+              <MenuItem
+                icon={<ArrowDownloadRegular />}
+                secondaryContent={t('ZIP', 'ZIP')}
+                onClick={() => {
+                  const a = document.createElement('a')
+                  a.href = appPath('/api/export')
+                  a.download = ''
+                  a.click()
+                }}
+              >
+                {t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)')}
               </MenuItem>
               <MenuDivider />
               <MenuGroup>

@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from . import dbctl
 from .ai import router as ai_router
 from .assets import router as assets_router
+from .pack import router as pack_router
 from sqlalchemy import text
 
 from .data_api import db, register_errors, router as data_router
@@ -105,6 +106,7 @@ async def _verify_scheduler(request: Request) -> None:
 app.include_router(data_router)
 app.include_router(ai_router)
 app.include_router(assets_router)
+app.include_router(pack_router)
 
 if STATIC_DIR.is_dir():
     # 画面。API より後に登録して、/api が先に処理されるようにする

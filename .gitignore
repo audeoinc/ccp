@@ -29,3 +29,6 @@ __pycache__/
 
 # 取り込む画像(権利のある素材。リポジトリには入れない)と、取り込みの作業ファイル
 /import/
+
+# 引っ越し用のパックから展開した画像(python -m ccp.cli import-pack)
+server/images/
