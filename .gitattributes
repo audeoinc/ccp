@@ -1,0 +1,2 @@
+# シェルスクリプトは、Linux(Workbench)で動かすので、改行は LF のまま(Windows で取り出しても CRLF にしない)
+*.sh text eol=lf

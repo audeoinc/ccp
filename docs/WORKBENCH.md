@@ -35,6 +35,32 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 
 ---
 
+## 1.5 スクリプトで行う(おすすめ)
+
+よく使う操作は、`scripts/workbench.sh` にまとめてあります。設定(`server/workbench.env`)を毎回自分で読み込み、サーバーを裏で動かし続けるので、
+「設定を読み込んだターミナルで起動する」などを気にしなくて済みます。以下の 3〜4 章の手作業は、スクリプトの中で行っていることです。
+
+```bash
+cd ~/ccp
+scripts/workbench.sh setup     # 初回だけ: Python の環境・パッケージ・画面のビルド・設定ファイル(workbench.env)の用意
+scripts/workbench.sh check     # 設定・DB への接続・写真・画面のビルドを確かめる
+scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じても止まらない)
+```
+
+| やりたいこと | コマンド |
+|---|---|
+| **コードを最新にして、起動し直す**(開発が進んだとき。いちばんよく使う) | `scripts/workbench.sh update` |
+| 本番のデータと写真を取り込む(中身を見せて、確認してから。DB は置き換わる) | `scripts/workbench.sh import server/ccp-pack-<日時>.zip` |
+| 起動 / 停止 / 起動し直し | `scripts/workbench.sh start` / `stop` / `restart` |
+| 動いているか(サーバー・PostgreSQL・コードの版) | `scripts/workbench.sh status` |
+| サーバーのログの最後を見る | `scripts/workbench.sh log` |
+| 設定の確認 | `scripts/workbench.sh check` |
+
+- `update` は、`git pull` → (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build:gcp` → 停止 → 起動、の順に行います。
+- ポートは `CCP_PORT`(既定 8081)、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
+- `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
+- `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
+
 ## 2. 用意するもの
 
 | もの | 条件 | 確かめ方 |
@@ -240,6 +266,8 @@ https://<ノートブックの URL>/proxy/8081/
 
 ### 4.1 コードを最新にする
 
+スクリプトなら `scripts/workbench.sh update` の 1 行です(下は、その中身)。
+
 ```bash
 cd ~/ccp
 git pull
@@ -254,7 +282,7 @@ cd server
 
 ### 4.2 データと写真を、本番にそろえる
 
-3.5〜3.8 を繰り返します(書き出す → 上げる → `import-pack --yes` → 起動し直す)。
+3.5〜3.8 を繰り返します(書き出す → 上げる → `import-pack --yes` → 起動し直す)。スクリプトなら、ZIP を上げたあと `scripts/workbench.sh import server/ccp-pack-<日時>.zip`(確認してから取り込み、起動し直す)。
 **Workbench 側で入力したデータは消える**ので、残したいものがないか確かめてから行います。
 
 > コードとデータは、なるべく**同じ時期のもの**にそろえます。本番より古いコードで新しいパックを取り込むと、知らない列があって取り込みが止まることがあります(先に 4.1 でコードを最新にする)。
