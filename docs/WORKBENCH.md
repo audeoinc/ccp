@@ -115,6 +115,30 @@ nano workbench.env     # または Jupyter のエディタで開く
 | `ASSET_DIR` | 写真を置くフォルダ。`/home/jupyter/ccp/server/images` のような**絶対パス** |
 
 > `workbench.env` にはパスワードが入るので、Git には入れません(`.gitignore` 済み)。
+
+#### すでに DB・AI の環境変数を設定してある Workbench のとき
+
+DB(PostgreSQL)と AI(Gemini)の環境変数を、Workbench にすでに設定してあるなら、`workbench.env` の **DB と AI の行は、コメントアウト(先頭に `#`)するか消します**。
+`<…>` が残った行を読み込むと、設定済みの正しい値が、書きかけの値で**上書き**されてしまうためです。その場合、`workbench.env` に残すのは、写真のフォルダ(`ASSET_DIR`)だけで足ります。
+
+```bash
+ASSET_DIR=/home/jupyter/ccp/server/images    # 実際のパスに合わせる
+```
+
+ただし、設定済みの変数の**名前**が、CCP の読む名前と同じであることが条件です。
+
+| 用途 | CCP が読む名前 |
+|---|---|
+| DB | `DATABASE_URL`(Cloud SQL なら `CLOUD_SQL_INSTANCE`・`DB_USER`・`DB_PASSWORD`・`DB_NAME`) |
+| AI | `GOOGLE_CLOUD_PROJECT`(必須)、`GOOGLE_CLOUD_LOCATION`(省略時 `global`)、`GEMINI_MODEL`(省略時 `gemini-3.5-flash`) |
+
+CCP は、Gemini を **Vertex AI の形**(Workbench のサービスアカウントの権限)で呼びます。Gemini の **API キー**(`GEMINI_API_KEY` など)では動かないので、その形で接続しているときは、`GOOGLE_CLOUD_PROJECT` の設定と、Vertex AI の権限が別に要ります。
+
+名前を確かめるコマンド(パスワードの一部が画面に出るので、人に見せない):
+
+```bash
+env | grep -E "^(DATABASE_URL|CLOUD_SQL_INSTANCE|DB_|GOOGLE_CLOUD_|GEMINI_)" | cut -c1-40
+```
 >
 > **`DATABASE_URL` の書き方の注意:** 先頭は `postgresql+asyncpg://`(`postgresql://` だけでは動きません)。パスワードに `@` `:` `/` `#` などの記号があるときは、URL の形に置き換えます(例: `@` → `%40`、`#` → `%23`)。値は `'…'` で囲みます(`$` や `&` を、シェルが別の意味に読まないように)。
 
@@ -160,6 +184,9 @@ set -a; source workbench.env; set +a
 ```
 
 うまくいくと、テーブルごとの件数と「取り込みました」が出ます。
+
+> **`images` のフォルダは、作らなくてよい:** `--yes` を付けた取り込みのときに、`server/images/products/` と `server/images/heroes/` が自動で作られ、写真が入ります(すでにあれば、上書きします)。`--yes` なしの「確認だけ」のときは、何も作りません。
+> 別の場所に展開したいときは、`--images <フォルダ>` を付けます(そのときは `ASSET_DIR` も同じフォルダにする)。
 
 ### 3.8 サーバーを起動する
 
