@@ -50,6 +50,7 @@ import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
 import { AlertsPage } from './AlertsPage'
 import { useChangeAlerts, useStockAlerts } from './alerts'
+import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
 import { isCancelled } from './cancel'
 import { ResultPeek } from './ResultPeek'
@@ -339,11 +340,14 @@ function App() {
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
   const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
-  const alertState = useStockAlerts(activeCards, products, cards)
-  const alerts = alertState.alerts
+  // アラートの条件(人ごと。A6)
+  const alertSettings = useAlertSettings()
+  const alertState = useStockAlerts(activeCards, products, cards, alertSettings.lowWeeks)
+  const alerts = filterStockAlerts(alertSettings, alertState.alerts)
   // 変更のアラート(MD 方針の変更・日程の変更)。件数は、在庫のアラートと合わせて、ヘッダーに出す
   const changeState = useChangeAlerts(activeCards, products, alertState.placements, cards)
-  const alertCount = alerts.length + changeState.changeAlerts.length
+  const changeAlerts = filterChangeAlerts(alertSettings, changeState.changeAlerts)
+  const alertCount = alerts.length + changeAlerts.length
   const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
@@ -866,7 +870,7 @@ function App() {
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'alerts' ? (
-              <AlertsPage alerts={alerts} changeAlerts={changeState.changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+              <AlertsPage alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
             ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}

@@ -18,7 +18,7 @@ import { parseProductResults } from './results'
 
 export type AlertKind = 'outOfStock' | 'lowStock'
 
-/** 残りが何週分を切ったら知らせるか(設定は A6 で作る。それまでは固定) */
+/** 残りが何週分を切ったら知らせるか(既定。人ごとの設定は src/alertSettings.ts) */
 export const LOW_STOCK_WEEKS = 2
 
 /** 配信に、商品が載っている場所 */
@@ -181,7 +181,7 @@ export function computeStockAlerts(args: {
  * アラートを読む(画面を開いたときに計算する)。配信カード・商品は App が持っているものを使い、
  * 週ごとの実績・配信の結果・配信の商品(載っている場所)は、ここで読む。reloadKey が変わったら読み直す
  */
-export function useStockAlerts(cards: Cr854_deliverycards[], products: Cr854_products[], reloadKey: unknown) {
+export function useStockAlerts(cards: Cr854_deliverycards[], products: Cr854_products[], reloadKey: unknown, lowWeeks: number = LOW_STOCK_WEEKS) {
   const [weekly, setWeekly] = useState<Cr854_weeklyperformances[]>([])
   const [results, setResults] = useState<Cr854_deliveryresults[]>([])
   const [placements, setPlacements] = useState<Map<string, Placement[]>>(new Map())
@@ -206,11 +206,11 @@ export function useStockAlerts(cards: Cr854_deliverycards[], products: Cr854_pro
   }, [reloadKey])
   return useMemo(
     () => ({
-      alerts: computeStockAlerts({ cards, products, placements, weekly, results }),
+      alerts: computeStockAlerts({ cards, products, placements, weekly, results, lowWeeks }),
       model: makeStockModel({ cards, placements, weekly, results }),
       placements,
     }),
-    [cards, products, placements, weekly, results],
+    [cards, products, placements, weekly, results, lowWeeks],
   )
 }
 
@@ -338,5 +338,5 @@ export function useChangeAlerts(cards: Cr854_deliverycards[], products: Cr854_pr
     }
     setTick((n) => n + 1)
   }
-  return { changeAlerts, resolve, reload: () => setTick((n) => n + 1) }
+  return { changeAlerts, logs, resolve, reload: () => setTick((n) => n + 1) }
 }
