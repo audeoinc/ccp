@@ -1,7 +1,7 @@
 name: CI
 
 # プルリクエストと main への push のたびに、検証を行う(main を、常に反映できる状態に保つ)。
-# 共有のアプリへの反映は、ここでは行わない(pa CLI は、ブラウザでのサインインが必要なため)。反映は npm run deploy(Power Apps)/ gcloud run deploy(GCP)。
+# 本番への反映は、ここでは行わない(gcloud のサインインが必要なため)。反映は npm run deploy:gcp。
 
 on:
   pull_request:
@@ -19,7 +19,7 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Schema (GCP data definition vs. generated models)
+      - name: Schema (server/schema.json vs. models)
         run: node scripts/check-schema.mjs
       - name: Type check
         run: npx tsc -b
@@ -27,8 +27,6 @@ jobs:
         run: npx eslint . --ignore-pattern "src/generated/**"
       - name: Build
         run: npm run build
-      - name: Build (GCP)
-        run: npm run build:gcp
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

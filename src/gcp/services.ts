@@ -1,8 +1,6 @@
-// GCP 版の、データの入出力(generated/services の互換サービス)。
-//
-// Power Apps 版では、生成された `Cr854_…Service` が Dataverse を呼ぶ。GCP 版のビルド(vite.gcp.config.ts)では、
-// その import をここに差し替えて、同じ関数名・同じ戻り値の形で、サーバーの /api/data を呼ぶ。
-// 画面のコードは、どちらのビルドでも同じ(同期を保つため、画面側には GCP 用の分岐を入れない)。
+// データの入出力。テーブルごとのサービス(src/generated/services/Cr854_…Service、src/gcpdata/…)が、これを使って、
+// サーバーの /api/data/{テーブル} を呼ぶ。
+// 撮影・デモ用のビルド(vite.mock.config.ts)では、テーブルごとのサービスの読み込みを、サンプルデータに差し替える。
 import { showDbWake } from './dbWake'
 
 // 書き換えた人(画面で入れた名前。src/history.ts の myName と同じ記録を読む)。サーバーは、変更の記録(配信日時・商品の方針)に残す。
@@ -83,5 +81,27 @@ export function makeService(table: string) {
     async delete(id: string): Promise<void> {
       await call<null>('DELETE', `${table}/${encodeURIComponent(id)}`)
     },
+  }
+}
+
+/** サーバーの応答(成功なら data に、行または行の一覧が入る) */
+export interface OperationResult<T> {
+  success: boolean
+  data: T
+  error?: ErrorBody
+}
+
+/**
+ * テーブルごとの、型の付いたサービス(T = 読んだ行の型、Base = 書き込む列の型)。
+ * 呼び方は、もとの Dataverse の生成コードと同じ(getAll / get / create / update / delete)。
+ */
+export function tableService<T, Base = T>(table: string) {
+  const svc = makeService(table)
+  return {
+    getAll: (options?: GetAllOptions) => svc.getAll(options) as Promise<OperationResult<T[]>>,
+    get: (id: string) => svc.get(id) as Promise<OperationResult<T>>,
+    create: (record: Partial<Base>) => svc.create(record as Rec) as Promise<OperationResult<T>>,
+    update: (id: string, changedFields: Partial<Base>) => svc.update(id, changedFields as Rec) as Promise<OperationResult<T>>,
+    delete: (id: string) => svc.delete(id),
   }
 }

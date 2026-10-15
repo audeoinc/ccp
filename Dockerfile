@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npx vite build --config vite.gcp.config.ts
+RUN npx vite build
 
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \

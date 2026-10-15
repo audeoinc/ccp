@@ -4,7 +4,7 @@ import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
 import { getLang, tr } from './i18n'
 import type { SectionKind } from './templates'
 
-// AI要求テーブルの状態(選択肢の値)。エージェントは、フロー「AI要求の処理」が呼ぶ。仕様は docs/ai-queue.md、docs/copilot-agent.md
+// AI の依頼の状態(選択肢の値。src/gcp/ai.ts が返す)
 const STATUS_WAITING = 588230000
 const STATUS_DONE = 588230001
 const STATUS_ERROR = 588230002
@@ -307,7 +307,7 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
 
 /** 依頼文をエージェントへ送り、返答のテキストを返す */
 async function askText(message: string): Promise<string> {
-  // ゲストでも使えるよう、Copilot Studio は直接呼ばない。依頼を AI要求テーブルに書き、フロー(Power Automate)の返答を待つ
+  // 依頼を登録し、返答を待つ(サーバーの /api/ask が Gemini に問い合わせる。src/gcp/ai.ts)
   const created = await Cr854_airequestsService.create({
     cr854_name: `req-${new Date().toISOString()}`,
     cr854_prompt: message,
@@ -327,7 +327,7 @@ async function askText(message: string): Promise<string> {
       if (status !== STATUS_DONE) continue
       return got.data.cr854_response ?? ''
     }
-    throw new Error(tr('AI の返答がタイムアウトしました。フロー「AI要求の処理」がオンか確認してください', 'The AI response timed out. Check that the flow "AI要求の処理" is turned on'))
+    throw new Error(tr('AI の返答がタイムアウトしました。しばらくしてから、もう一度試してください', 'The AI response timed out. Please try again in a moment'))
   } finally {
     // 読み取ったあと(失敗時も)、依頼の行は消す
     void Cr854_airequestsService.delete(id).catch(() => undefined)

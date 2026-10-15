@@ -1,10 +1,10 @@
 // GCP 版(Cloud Run のサービス contents-planner)への反映。安全装置つき。
 //   npm run deploy:gcp
 // 反映してよい状態(main で、最新で、変更が残っていない)のときだけ、検証 → gcloud run deploy を行う。
-// Power Apps 版の npm run deploy(scripts/deploy.mjs)と同じ考え方。複数人が反映しても、他の人の変更を消さないための確認。
+// 複数人が反映しても、他の人の変更を消さないための安全装置つき。
 // 反映したあとは、git のタグ(deployed-gcp/日時)を残し、GitHub にも送る。
 //
-// 事前に必要なこと(docs/ONBOARDING.md の「GCP 版への反映」):
+// 事前に必要なこと(docs/ONBOARDING.md の「本番への反映」):
 //   - gcloud CLI のインストールと、`gcloud auth login`(Google アカウントでサインイン)
 //   - GCP プロジェクトの権限(プロジェクトの管理者が付ける)
 //   - プロジェクト ID: 環境変数 GCP_PROJECT、なければ `gcloud config get-value project`

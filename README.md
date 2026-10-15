@@ -1,79 +1,73 @@
 # Campaign Contents Planner(CCP)— 配信コンテンツプランナー
 
-メール・プッシュの**配信コンテンツ**(テーマ、メイン画像、ヘッドライン・コピー、セクションごとの商品、制作指示)を、AI の提案を選びながら企画するアプリ。
-Power Apps **Code App**(React + TypeScript + Vite)で、データは **Dataverse**、AI は **Copilot Studio** のエージェント(Power Automate 経由)。
+メール・アプリの**配信コンテンツ**(テーマ、メイン画像、ヘッドライン・コピー、セクションごとの商品、制作指示)を、AI の提案を選びながら企画し、配信の結果を振り返るアプリ。
+画面は React + TypeScript、サーバーは Python(FastAPI)。Google Cloud の **Cloud Run** で動き、データは **PostgreSQL(Cloud SQL)**、AI は **Gemini(Vertex AI)**。
 US チームと JP チームが、日本語・英語のどちらでも使える。
 
-- 開発環境(Power Platform): `katada_dev`(環境 ID は `power.config.json` の `environmentId`)
-- Dataverse の組織の URL: このリポジトリには書かない(公開リポジトリのため、書かない)。チームの管理者に聞くか、Power Platform 管理センターの環境の詳細で確認する。以降のコマンドの `<組織の URL>` は、これに置き換える。
 - 新しく参加する人は、まず **[docs/ONBOARDING.md](docs/ONBOARDING.md)** を読む。
+- サーバー・DB・AI の仕組みと動かし方は **[docs/GCP.md](docs/GCP.md)**。
+- Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。
 
 ## 主な機能
 
-- 配信カレンダー(月表示。国・チャネル・部署・ステータスで絞り込み。日付のマスから新規作成)
+- 配信カレンダー(月 / 週 / 一覧 / 比べる。国・チャネル・部署・ステータスで絞り込み)
 - 配信カードの編集: 4 ペイン(配信情報 / コンテンツ生成 + AI チャット / プレビュー / 商品情報)
-- AI による案づくり: テーマ、テンプレート、メイン画像、ヘッドライン・コピー、セクションの見出し・コピー・商品、制作指示。「すべてAIで下書き」、開いたときの自動下書き、AI チャット
-- メール・プッシュのプレビュー(ドラッグ&ドロップで商品の並べ替え)
-- 商品情報(売上・在庫の推移のグラフ、MD の販売方針・販促計画)
-- テンプレートの管理(標準 10 種 + ユーザーが作成。セクションの部品: グリッド・写真だけ・大きく・モザイク・ストーリー・特集)
+- AI による案づくり: テーマ、テンプレート、メイン画像、ヘッドライン・コピー、セクションの見出し・コピー・商品、制作指示
+- 週のレビューと承認、配信の結果(ヒートマップ・比較・PDF)、配信前の在庫などのアラート
 - 日本語 / English の切り替え。US / JP の商品を、配信カードの国で自動的に使い分け
 
 ## 技術スタック
 
-React 19 / TypeScript / Vite 7 / **Fluent UI v9**(Fluent 2。MUI は使わない)/ `@microsoft/power-apps`(Dataverse 接続の生成コード)/ フォント: Inter + Noto Sans JP(同梱)
+React 19 / TypeScript / Vite 7 / **Fluent UI v9**(Fluent 2。MUI は使わない)/ フォント: Inter + Noto Sans JP(同梱)
+サーバー: Python 3.12 / FastAPI / SQLAlchemy(asyncpg)/ google-genai
 
 ## 開発の始め方
 
 ```bash
-npm ci                 # 依存関係のインストール
-npm run dev            # Vite の開発サーバー(Dataverse には繋がらない。画面の枠の確認用)
-npx pa app run         # Power Apps のホスト上でローカルのコードを動かす(Dataverse に繋がる。通常の開発はこちら)
+npm ci                                    # 依存関係のインストール
+npx vite --config vite.mock.config.ts     # サンプルデータで動かす(http://localhost:5190。サーバーも DB も要らない)
 ```
 
-確認(コミットの前に、必ず通す):
+本物のサーバー(DB・AI)につないで動かす方法は、[docs/GCP.md](docs/GCP.md) の「手元での動かし方」。
+
+確認(push の前に、必ず通す):
 
 ```bash
-npx tsc -b                                        # 型チェック
-npx eslint . --ignore-pattern "src/generated/**"  # lint
-npm run build                                     # ビルド
+npm run verify     # データ定義の照合・型チェック・lint・ビルド
 ```
 
-## 配信(共有の開発用アプリへの反映)
+## 本番への反映
 
 ```bash
-npm run deploy
+npm run deploy:gcp
 ```
 
-`main` に取り込まれた変更を、共有のアプリ(`power.config.json` の `appId`)に反映する。**反映してよい状態のときだけ**動く安全装置つき(`scripts/deploy.mjs`): `main` にいる / リモートと同じ / 未コミットの変更がない → 型チェック・lint・ビルド → `pa app push`。
-共有のアプリは 1 つで、`pa app push` は上書きになる。反映は、**最新の `main` から、反映の権限を持つ人が行う**(詳しくは [docs/ONBOARDING.md](docs/ONBOARDING.md) の「チームの進め方」)。
-反映後、画面に「古いバージョン」と出たら、「最新の情報に更新」を押す。
+`main` に取り込まれた変更を、Cloud Run のサービスに反映する。**反映してよい状態のときだけ**動く安全装置つき(`scripts/deploy-gcp.mjs`): `main` にいる / リモートと同じ / 未コミットの変更がない → 型チェック・lint・ビルド → `gcloud run deploy`。必要な権限は [docs/ONBOARDING.md](docs/ONBOARDING.md) の「本番への反映」。
 
-GitHub Actions(`.github/workflows/ci.yml`)が、`main` への push とプルリクエストで、型チェック・lint・ビルドを自動で行う。`main` へは、PR なしで直接 push してよい(push の前に `npm run verify`)。自動で反映はしない(`pa` CLI は、ブラウザでのサインインが必要なため)。
+GitHub Actions(`.github/workflows/ci.yml`)が、`main` への push とプルリクエストで、同じ検証とサーバーのテストを自動で行う。
 
 ## ディレクトリ
 
 | パス | 内容 |
 |---|---|
-| `src/App.tsx` | 画面の入口。ヘッダー、フィルター、カレンダー、テンプレート管理の読み込み |
-| `src/CardDetail.tsx` | 配信カードの編集(4 ペイン、保存、AI の下書きの起動) |
-| `src/ContentPane.tsx` | 中ペイン(テーマ・テンプレート・ヒーロー・セクション・制作指示のタブ、AI チャット) |
-| `src/ChatPanel.tsx` | AI チャットの画面 |
-| `src/Preview.tsx` | メール・プッシュのプレビュー |
-| `src/ProductInfoPane.tsx` / `ProductDetail.tsx` / `MiniChart.tsx` | 商品情報の一覧、詳細のフロート、グラフ |
-| `src/TemplateManager.tsx` / `TemplateThumb.tsx` | テンプレートの管理画面と見取り図 |
-| `src/aiSelect.ts` / `aiDraft.ts` / `autoDraft.ts` / `useAiDrafts.ts` | AI の呼び出し、指示文(プロンプト)、結果の整形 |
-| `src/templates.ts` / `layoutTemplates.ts` | テンプレートの登録(標準 + Dataverse)、読み書き |
-| `src/i18n.ts` | 日英の切り替え(`tr` / `useT` / `optionLabel` など) |
-| `src/generated/` | **自動生成**(`pa app add data-source` が作る)。手で編集しない |
+| `src/` | 画面のコード。入口は `src/App.tsx` |
+| `src/generated/` | テーブルの行の型(`models/`)と、テーブルごとのサービス(`services/`)。もとは Dataverse の生成コードで、いまは手で保つ |
+| `src/gcp/` | サーバーの API(`/api/data`・`/api/ask`)を呼ぶ部分 |
+| `src/mock/` | 撮影・デモ用のサンプルデータ(`vite.mock.config.ts` のときだけ使う) |
+| `server/` | サーバー(Python / FastAPI)。データ定義は `server/schema.json` |
+| `scripts/` | 反映・検証・撮影・Workbench の運用などの補助スクリプト |
 | `docs/` | ドキュメントと、サンプルデータ(CSV) |
+
+ファイルごとの役割は [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md)。
 
 ## ドキュメント
 
 - [docs/ONBOARDING.md](docs/ONBOARDING.md) — 新しいメンバーの最初の手順、チームの進め方
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 構成、AI の仕組み、設計の約束事、落とし穴
+- [docs/GCP.md](docs/GCP.md) — サーバー・DB・AI の仕組みと、動かし方・運用
 - [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md) — ソースの地図(ファイルの構造と役割、変更するときに触るところ)
-- [docs/DATAVERSE.md](docs/DATAVERSE.md) — テーブルと列、セキュリティロール、フロー、サンプルデータの取り込み
-- [docs/ai-queue.md](docs/ai-queue.md) — AI 呼び出し(テーブル + フロー)の詳細
-- [docs/copilot-agent.md](docs/copilot-agent.md) — Copilot Studio のエージェントの仕様
-- [docs/BACKLOG.md](docs/BACKLOG.md) — 検討事項と、状況メモ
+- [docs/WORKBENCH.md](docs/WORKBENCH.md) — Vertex AI Workbench で動かす手順
+- [docs/PRINCIPLES.md](docs/PRINCIPLES.md) — デザインの方針(UI/UX ポリシー)
+- [docs/BACKLOG.md](docs/BACKLOG.md) — 機能のバックログと、状況メモ
+- [docs/HANDOVER.md](docs/HANDOVER.md) — 開発の現在地と、次にやること
 - [CLAUDE.md](CLAUDE.md) — AI コーディングアシスタント(Claude Code など)向けの指示書

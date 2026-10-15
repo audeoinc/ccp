@@ -3,27 +3,26 @@
 ## 1. 全体図
 
 ```
-ブラウザ(Power Apps のホスト上で動く React アプリ = Code App)
-   │  生成コード(src/generated)で、Dataverse の表を読み書き
+ブラウザ(React アプリ)
+   │  src/generated/services の Cr854_…Service、src/gcpdata の …Service で読み書き
    ▼
-Dataverse(配信カード / 配信商品 / 商品 / メイン画像 / 週次実績 / 販売方針 / テンプレート / AI要求)
-   ▲                                      │ 行の作成をきっかけに
-   │ 返答を書き戻す                        ▼
-Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエージェント(配信企画エージェント)
+サーバー(Python / FastAPI。Cloud Run、または Workbench)
+   │  /api/data/{テーブル} … PostgreSQL(Cloud SQL)
+   │  /api/ask            … Vertex AI の Gemini
+   │  /img/…              … 画像(GCS、または手元のフォルダ)
 ```
 
-- アプリは、Copilot Studio を**直接は呼ばない**。ゲスト(外部ユーザー)や、接続を作れない人でも使えるようにするため。AI の呼び出しは、すべて、Dataverse の `airequest` テーブルと、フロー(所有者の接続で動く)を経由する。
+- 詳しくは [GCP.md](GCP.md)。撮影・デモ用のビルド(`vite.mock.config.ts`)は、サービスの読み込みを、メモリ上のサンプルデータ(`src/mock`)に差し替える。
 
 ## 2. AI の仕組み
 
 ### 2.1 呼び出し(`src/aiSelect.ts`)
 
-1. `askAgent(prompt, payload)` が、`airequest` に行を作る(`prompt` 列に、指示文 + 入力の JSON、`status` = 待機中)。
-2. フローが、エージェントを呼び、返答を `response` 列に書き、`status` を完了(またはエラー)にする。
-3. アプリは、2 秒ごとに行を読み、完了したら、`response` から JSON を取り出して、行を削除する(最大 3 分でタイムアウト)。
+1. `askAgent(prompt, payload)` が、指示文 + 入力の JSON を、AI の依頼として送る(`Cr854_airequestsService` → `src/gcp/ai.ts` → サーバーの `/api/ask`)。
+2. サーバーが Gemini に問い合わせ、返答のテキストを返す(`server/ccp/ai.py`)。
+3. 画面が、返答から JSON を取り出す。
 - 返答の JSON が壊れていたときは、最大 3 回まで依頼し直す。末尾のカンマは自動で直す。
-- エージェントは、指示に反して説明文を付けることがあるので、**最初の `{` から最後の `}` まで**を取り出して読む(`extractJson`)。
-- 詳しい設定は [ai-queue.md](ai-queue.md)、エージェントの仕様は [copilot-agent.md](copilot-agent.md)。
+- AI は、指示に反して説明文を付けることがあるので、**最初の `{` から最後の `}` まで**を取り出して読む(`extractJson`)。
 
 ### 2.2 指示文(プロンプト)
 
@@ -61,7 +60,7 @@ Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエ�
 - 配信カード: `cr854_deliverycard`。AI の理由・切り口(`themereason` など)、セクションの見出し(`sectiontitles`)・コピー(`sectioncopies`、JSON)も、ここに保存する。
 - 掲載商品: `cr854_deliveryproduct`(1 行 = 1 商品)。`state`(選定 / 候補)、`section`(セクション番号)、`sortorder`、`reason`、`source`(AI / 手動)を持つ。保存時は、読み込み時点との差分で、作成・更新・削除する。
 - 候補(`state` = 候補)は、保存する。AI の案(テーマ・コピー・制作指示の案、セクションの見出し・コピーの候補)は、**保存しない**(画面を開いている間だけ)。
-- 選択肢(ステータス、チャネル、カテゴリなど)は、Dataverse の選択肢の列。表示名(`○○name`)が返らないことがあるので、`labels.ts` が、値(数値)から補う。
+- 選択肢(ステータス、チャネル、カテゴリなど)は、数値(例: 588230000)で持つ。表示名(`○○name`)は、`labels.ts` が、値から補う。
 - **承認の流れ(GCP 版。2026-10-14 決定)**: 配信は 未起案 → 検討中 → 承認済み → 確定、週は 下書き → レビュー中 → 確定。
   - 承認は、配信 1 本ずつ(配信カードの「保存して承認」)と、週まとめて(週の帯の「まとめて承認」= 検討中をすべて承認済みに)の両方。誰でも押せる。
   - 差し戻しは、理由が必須。配信は検討中になり、理由はレビューのコメント(未対応)にも残す。
@@ -81,7 +80,7 @@ Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエ�
 - **ヒーローの見せ方**(テンプレート全体): `heroText`(band: 写真に帯で重ねる / overlay: 写真に大きく重ねる / below: 写真の下)、`heroLink`(画像のリンク先の種類)、`topBar`(お知らせ帯)。
 - **リンク先**は、テンプレートには種類(既定値)だけを持つ。実際の URL と計測用のパラメーターは、配信カードに持たせる予定(未実装。[BACKLOG.md](BACKLOG.md))。
 - 見取り図(`TemplateThumb.tsx`)は、実際のメールに近い縦横比で、縦長に描く。一覧では上の部分だけ(`maxHeight`)、管理画面では全体を表示する。
-- **ユーザーが作ったテンプレート**は、Dataverse の `cr854_layouttemplate` に保存する(名前、説明、ヒーローの種類、セクションの JSON)。アプリの起動時に読み込み、`setCustomTemplates` で登録する。
+- **ユーザーが作ったテンプレート**は、テーブル `cr854_layouttemplates` に保存する(名前、説明、ヒーローの種類、セクションの JSON)。アプリの起動時に読み込み、`setCustomTemplates` で登録する。
   - ヒーローの見せ方は、列がないので、セクションの JSON の先頭に `{"kind":"hero",...}` として入れる(`layoutTemplates.ts`)。ボタンの部品は、置く位置に `{"kind":"buttons","buttons":[...]}` として挟む。どちらも `slots` を持たないので、以前の版のアプリは読み飛ばす(ボタンが出ないだけで、商品の位置はずれない)。知らない部品(`slots` あり)は、グリッドとして読む。
   - 既定の値は書かない。ヒーローが既定で、ボタンの部品もないテンプレートは、以前と同じ形(セクションの配列だけ)になる。
 - 配信カードは、`layoutkey`(標準は ID、作ったものは行の GUID)でテンプレートを指す。標準のテンプレートは、以前の選択肢の列(`emailtemplate`)にも書く(互換)。`layoutkey` が空なら、選択肢の値から決める。
@@ -93,7 +92,7 @@ Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエ�
 - **画面の文言は、その場に `t('日本語', 'English')` と書く**(コンポーネントの先頭で `const t = useT()`)。React の外では `tr('日本語', 'English')`。辞書ファイルは使わない。日本語だけの文言を、画面に書かない。
 - モジュールの最上位に、日本語の文言を持つ定数を置かない(言語を切り替えても変わらなくなる)。関数にするか、getter(`get label() { return tr(...) }`)にする。
 - 日付・数値は `locale()`、価格は `yen(price, market)`(US の商品はドル、JP の商品は円)。
-- Dataverse の選択肢のラベル(日本語)は、`optionLabel(label)` で、表示だけ英語にする(値は変えない)。辞書は `i18n.ts` の `OPTION_EN`。
+- 選択肢のラベル(日本語)は、`optionLabel(label)` で、表示だけ英語にする(値は変えない)。辞書は `i18n.ts` の `OPTION_EN`。
 - 商品・メイン画像は、`market` 列(JP / US)で区別する。空は JP とみなす(`market.ts`)。US の商品の画像は、同じイラストを使い回す(`images.ts`)。
 
 ## 7. 見た目の約束事
@@ -120,12 +119,8 @@ Power Automate フロー「AI要求の処理」 ──▶ Copilot Studio のエ�
 
 ## 9. 落とし穴(過去にはまったこと)
 
-- **Power Apps のホスト上では、アプリは別ドメインの iframe で動く。** 開発者ツールやブラウザの自動操作から、中を操作できないことがある。画面の確認は、`npx pa app run` か、反映後の URL で、人が行う。
-- 反映しても、「古いバージョン」の版が先に出ることがある(「最新の情報に更新」を押す)。
 - CSS の `zoom` を使う箇所(`items.ts` の `scaled`、プレビューの倍率)では、**幅を `%` で補正しない**(現在のブラウザの仕様では、枠より広がる)。
 - Fluent の `Switch` の色は、ヘッダーのような色付きの背景では、効きにくい(ヘッダーのトグルは自作)。
 - Fluent の `Textarea` には最低の高さがある(`AutoTextarea` で解消している)。
-- `src/generated/` は、`pa app add data-source` が作る。手で編集しない。テーブルの列を変えたら、同じコマンドで作り直し、差分をコミットする。
+- `src/generated/` は、もとは Dataverse の生成コード。いまは手で保つ。列を変えたら、`server/schema.json` と `src/generated/models/` を一緒に直す(`npm run verify` が食い違いを見つける)。
 - ファイルの改行コードが、CRLF のものと LF のものが混在している。スクリプトで一括置換するときは、改行コードを保つ。
-- ゲストが開けない(0x80095fcd)ときは、管理センターの「ゲスト アクセスのブロック」を確認する。
-- テーブルの画面(グリッド)で、`airequest` の行を手入力すると、`prompt` が空の状態でフローが動く。手動のテストには使えない(アプリから実行する)。

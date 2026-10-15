@@ -1,9 +1,9 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// 撮影・デモ用の設定: Dataverse と AI を、サンプルデータ(src/mock)に差し替えて、アプリを動かす。
+// 撮影・デモ用の設定: データと AI を、サンプルデータ(src/mock)に差し替えて、アプリを動かす。
 //   npx vite --config vite.mock.config.ts
-// 本番のビルド(vite.config.ts)には、影響しない。Power Apps のホストも、サインインも要らない。
+// 本番のビルド(vite.config.ts)には、影響しない。サーバーも DB も要らない。
 const mockServices = (): Plugin => ({
   name: 'mock-services',
   enforce: 'pre',

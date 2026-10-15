@@ -1,33 +1,25 @@
-import { defineConfig, type Plugin } from "vite";
-import react from "@vitejs/plugin-react";
-import { powerApps } from "@microsoft/power-apps-vite/plugin"
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-/**
- * 開発時だけ、フォントなどの資産の URL に、開発サーバー自身のアドレスを付ける。
- * 付けないと、Power Apps の画面(別のアドレス)から開いたときに、場所の指定(/node_modules/…)が
- * Power Apps のサーバーを指してしまい、フォントが読み込まれない。
- */
-const absoluteDevAssetUrls = (): Plugin => ({
-  name: 'absolute-dev-asset-urls',
-  apply: 'serve',
-  configureServer(server) {
-    server.httpServer?.once('listening', () => {
-      const addr = server.httpServer?.address()
-      if (!addr || typeof addr !== 'object') return
-      const local = ['::1', '::', '0.0.0.0', '127.0.0.1']
-      const host = local.includes(addr.address) ? 'localhost' : addr.address
-      const scheme = server.config.server.https ? 'https' : 'http'
-      server.config.server.origin = `${scheme}://${host}:${addr.port}`
-    })
-  },
-})
-
-// https://vite.dev/config/
+// ビルドの設定(Cloud Run と Workbench で動く版)。
+//   開発:   npm run dev      (別のターミナルで、サーバーを 8080 で起動しておく。/api はそこへ中継する)
+//   ビルド: npm run build    (dist-gcp/ にできる。サーバーがこれを配信する)
+// 撮影・デモ用(サンプルデータで動かす)は、vite.mock.config.ts。
 export default defineConfig({
-  plugins: [react(), powerApps(), absoluteDevAssetUrls()],
+  plugins: [react()],
+  // 開いたときの初期値。国の絞り込みは US、画面の言語は English
+  define: {
+    'import.meta.env.VITE_DEFAULT_COUNTRY': JSON.stringify('US'),
+    'import.meta.env.VITE_DEFAULT_LANG': JSON.stringify('en'),
+    // API・画像のパスを、読み込んだ JS の場所から求める(src/appRoot.ts。Workbench の /proxy/8081/ の下でも動くように)
+    'import.meta.env.VITE_APP_ROOT_FROM_SCRIPT': JSON.stringify('true'),
+  },
+  // 画面のファイル(assets/…)を、相対パスで読み込む(置き場所が「/」でなくても読めるように)
+  base: './',
   build: {
-    // SVG は、大きさにかかわらず、アプリの中に埋め込む(既定は 4KB 以下だけ)。
-    // 別ファイルの URL のままだと、Power Apps の画面(別のアドレス)から開いたときに、画像が壊れて表示されるため。
+    outDir: 'dist-gcp',
+    // SVG は、大きさにかかわらず、アプリの中に埋め込む(既定は 4KB 以下だけ)
     assetsInlineLimit: (file) => (file.endsWith('.svg') ? true : undefined),
   },
-});
+  server: { port: 5191, strictPort: true, proxy: { '/api': 'http://localhost:8080' } },
+})

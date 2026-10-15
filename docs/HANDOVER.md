@@ -90,6 +90,7 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 | 学びを AI に渡すのは、`askAgent` が、依頼の種類(suggest_ / select_)を見て加える(`setActiveLearnings`) | チャットの履歴(withChat)と同じ形。下書きを作る関数の一つ一つを変えなくてよい |
 | ツールバーの見せ方の切り替え(月 / 週 / 一覧 / 比べる)は、枠で囲んだひとかたまりにし、週の見方はラベル付きで外へ。右は区切りの線のあとに操作。結果の面の操作は「データ」のメニューに | 切り替えと操作が同じ見た目で並び、比べるを使ったあと、週に戻る場所がわからなかった(利用者の指摘) |
 | 結果の面の操作は、ツールバーの決まった場所に `createPortal` で差し込む | ツールバーは App が持つ(計画と共通)。結果の画面の部品は、結果の画面のファイルに置いたままにしたい |
+| Power Apps 版を廃止し、ソースも削除した(2026-10-16)。`src/generated/` の名前は残した | 利用者の決定。clone したときに Power Platform の環境と連携されないように(`power.config.json`・`.power/` を削除)。`src/generated/` の名前を変えると、画面の 60 近いファイルの読み込みが変わり、W のメンバーの作業とぶつかるため、中身だけ差し替えた |
 
 ## 5. ファイルの地図(R で作ったもの)
 
@@ -157,6 +158,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **次の候補**: W8(週の状態をチャネルごとに持つか)は、利用者の判断で保留(メールとアプリを誰が・いつ確定するかが決まったら)。
 - **積み残し(2026-10-15 に利用者から)**: W13(ミニカレンダーのボタンが押せると分かるように・文字の見切れ)は ☐ で、指示があってから直す。W14(複数の配信カードをまとめて AI で作る)は ❓ アイデアで、実装は利用者と相談してから。C3(週の上限の設定)は、W4 で 2 本に固定している上限を設定にするもの。
 - 「週の上限」(`WEEKLY_PRODUCT_LIMIT`)・確認の一覧の項目名・履歴の文言は、`src/reviewChecks.ts` と `src/weekLabels.ts`(画面と PDF で共通)。
+
+## 6.7 Power Apps 版の廃止(2026-10-16)
+
+- 削除したもの: `power.config.json`、`.power/`、`scripts/deploy.mjs`(`npm run deploy`)、`vite.gcp.config.ts`(`vite.config.ts` に統合)、`@microsoft/power-apps*` の依存、`docs/DATAVERSE.md`・`docs/ai-queue.md`・`docs/copilot-agent.md`・`docs/copilot-test-message.txt`、使っていなかった `Cr854_table_…` のモデルとサービス、`CommonModels.ts`、`src/generated/index.ts`。
+- `src/generated/services/Cr854_…Service.ts` は、`tableService`(`src/gcp/services.ts`)を使う、数行のファイルに書き換えた。画面のコードの読み込み先は、変えていない。
+- ビルドは 1 つ(`npm run build` = 以前の `build:gcp`。出力は `dist-gcp/` のまま)。`dev:gcp`・`build:gcp` は、Workbench の手順のために、`dev`・`build` と同じ中身で残した。
+- 文書(README・CLAUDE・ONBOARDING・ARCHITECTURE・GCP・SOURCE_MAP・FEATURES)から、Power Apps の手順を外した。BACKLOG・FEATURE_REASONS の古い状況メモには、当時の記述が残っている(経緯として)。
+- Power Platform 側のアプリ・テーブル・フローそのものは、リポジトリの外にある。消すかどうかは、利用者が決める。
 
 ## 7. 落とし穴
 

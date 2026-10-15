@@ -164,7 +164,6 @@
 - **候補の理由の鮮度:** 在庫などが変わると、保存済みの理由が実際とずれる。生成日時の表示や、再生成の促しを検討する。
 - **コラボ相手の名前:** Collaboration テンプレートのヒーローに出す。配信カードに列を足す。
 - **Price: Limited Offer テンプレート:** 期間や割引前価格の表示(列の追加が必要)。
-- **デプロイ:** アプリの表示名(現在 `test_app`)と共有範囲を決めて、`pa app push`。他の利用者は、Copilot Studio の接続を各自作成する。
 - **画像:** 実際の商品画像・メイン画像を、商品テーブルの画像URLに入れる(入れれば、同梱のイラストより優先される)。
 
 ## 状況メモ(2026-09-30 終了時点)
@@ -230,7 +229,6 @@
 
 その他のやり残し:
 
-- `power.config.json` が、`npx pa app run` のたびに「変更あり」になる(CLI が改行コードを LF で書き直すため。中身は同じ)。`npm run deploy` が止まるので、今は `git restore -- power.config.json` で戻している。`.gitattributes` に、このファイルの改行コードを変換しない設定を 1 行入れて直す案(未実施)。
 - `docs/screenshots/` を、新しいテンプレートの画面で撮り直す(`npm run screenshots`)。
 - テンプレートの使用中チェック: 使っている配信カードがあるテンプレートを編集・削除するとき、件数を出して確認する(見出し・商品の位置がずれるため)。
 
@@ -252,4 +250,3 @@
 
 その他:
 
-- `npx pa app run`(Local Play)の URL は、`/play/e/<環境 ID>/a/local?_localAppUrl=<ローカルのアドレス>` で、`appId` を使わない(`@microsoft/power-apps-vite` の `printLocalPlayUrl`)。旧アプリが開くときは、`appId` ではなく、そのアドレスで動いている開発サーバー(旧リポジトリのものが残っていないか)や、開いている URL を確かめる。`appId` が効くのは、`pa app push`(`npm run deploy`)の反映先。

@@ -10,29 +10,27 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 
 ## 1. 全体の形
 
-画面のコード(`src/`)は 1 つで、**データと AI の出入り口だけを差し替えて、3 種類のアプリを作る**。
+画面のコード(`src/`)は 1 つで、**データと AI の出入り口だけを差し替えて、2 種類のアプリを作る**。
 
 ```
-                    画面のコード(src/*.tsx, src/*.ts) ── すべてのビルドで共通
+                    画面のコード(src/*.tsx, src/*.ts) ── どちらのビルドでも共通
                                    │
-               src/generated/services/Cr854_…Service を呼ぶ
+     src/generated/services/Cr854_…Service・src/gcpdata/Cr854_…Service を呼ぶ
                                    │
-       ┌───────────────────────────┼───────────────────────────┐
-       ▼                           ▼                           ▼
- Power Apps 版                 GCP 版(開発の本流)          撮影・デモ用
- vite.config.ts               vite.gcp.config.ts           vite.mock.config.ts
- そのまま Dataverse へ          src/gcp/services.ts に        src/mock/db.ts に
- AI は AI要求テーブル            差し替え → server/ の API     差し替え(メモリ上のデータ)
-   + フロー経由                   AI は /api/ask(Gemini)       AI は src/mock/agent.ts
-                                   │
-                                   ▼
-                          server/(FastAPI)
-                          PostgreSQL・画像・Gemini
+              ┌────────────────────┴────────────────────┐
+              ▼                                         ▼
+ 本番(Cloud Run・Workbench)                      撮影・デモ用
+ vite.config.ts                                  vite.mock.config.ts
+ src/gcp/services.ts → server/ の API            src/mock/db.ts に差し替え(メモリ上のデータ)
+ AI は /api/ask(Gemini)                         AI は src/mock/agent.ts
+              │
+              ▼
+     server/(FastAPI)
+     PostgreSQL・画像・Gemini
 ```
 
-- **2026-10-10 から、開発は GCP 版だけ**(Power Apps 版には新しい機能を入れない)。
-- 差し替えは、各 `vite.*.config.ts` のプラグインが、`src/generated/services/…` の読み込みを置き換えて行う。そのため、画面のコードはビルドの違いを知らない。
-- GCP 版にしかないテーブル(結果・週・メモ・履歴・変更の記録)は、`src/gcpdata/` のサービスを直接呼ぶ。
+- **Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。** `src/generated/` は、もとは Dataverse の生成コード。名前だけ残し、いまは手で保つ。
+- 撮影・デモ用の差し替えは、`vite.mock.config.ts` のプラグインが、サービスの読み込みを置き換えて行う。そのため、画面のコードはビルドの違いを知らない。
 
 ## 2. 一番上の階層
 
@@ -42,13 +40,11 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 | `server/` | GCP 版のサーバー(Python / FastAPI)。画面・データ API・AI・画像を配る |
 | `scripts/` | 反映・検証・撮影・Workbench の運用などの補助スクリプト |
 | `docs/` | 文書、ワイヤーフレーム、スクリーンショット、サンプルデータ(CSV) |
-| `.power/schemas/` | Power Apps の接続の定義(ツールが作る) |
-| `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・2 つのビルド・サーバーのテスト) |
+| `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・ビルド・サーバーのテスト) |
 | `index.html` | 画面の入口の HTML |
-| `vite.config.ts` / `vite.gcp.config.ts` / `vite.mock.config.ts` | ビルドの設定(Power Apps 版 / GCP 版 / 撮影用。1 章) |
-| `package.json` | npm のスクリプト(`build`・`build:gcp`・`dev:gcp`・`verify`・`deploy`・`deploy:gcp`・`screenshots`・`seed:export`) |
-| `Dockerfile` / `.dockerignore` / `.gcloudignore` | GCP 版(Cloud Run)のコンテナ |
-| `power.config.json` | Power Apps の環境・アプリの ID(ツールが使う。ID はここだけに置く) |
+| `vite.config.ts` / `vite.mock.config.ts` | ビルドの設定(本番 / 撮影用。1 章) |
+| `package.json` | npm のスクリプト(`dev`・`build`・`verify`・`deploy:gcp`・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)・`screenshots`・`seed:export`) |
+| `Dockerfile` / `.dockerignore` / `.gcloudignore` | Cloud Run のコンテナ |
 | `tsconfig*.json` / `eslint.config.js` | 型チェック・lint の設定 |
 | `CLAUDE.md` / `README.md` | AI アシスタント向けの約束事 / 全体の紹介 |
 
@@ -200,9 +196,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | パス | 役割 |
 |---|---|
-| `generated/` | **自動生成**(`pa app add data-source`)。Dataverse のテーブルのモデル(`models/`)とサービス(`services/`)。**編集しない** |
-| `gcp/services.ts` | GCP 版で、`generated/services` の代わりになるサービス(サーバーの `/api/data/…` を呼ぶ) |
-| `gcp/ai.ts` | GCP 版で、AI要求のサービスの代わり(サーバーの `/api/ask` を呼ぶ) |
+| `generated/` | テーブルの行の型(`models/`)と、テーブルごとのサービス(`services/`)。もとは Dataverse の生成コードで、いまは手で保つ |
+| `gcp/services.ts` | サーバーの `/api/data/…` を呼ぶ、データの入出力(`tableService`) |
+| `gcp/ai.ts` | AI の依頼のサービス(サーバーの `/api/ask` を呼ぶ) |
 | `gcp/dbWake.ts` | GCP 版の「データベースを準備中」の表示 |
 | `gcpdata/Cr854_*Service.ts` | GCP 版だけのテーブルのサービス(結果・週・メモ・操作の履歴・変更の記録) |
 | `mock/db.ts` ・ `mock/agent.ts` ・ `mock/seed.ts` | 撮影・デモ用の、DB と AI の身代わりと、サンプルデータ(本番のビルドには入らない) |
@@ -235,7 +231,6 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|
 | `workbench.sh` | Workbench の操作(`setup` / `update` / `start` / `stop` / `status` / `check` / `import` / `log`) |
 | `deploy-gcp.mjs` | GCP 版(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) |
-| `deploy.mjs` | Power Apps の共有のアプリへの反映(`npm run deploy`) |
 | `check-schema.mjs` | `server/schema.json` と `src/generated/models` の食い違いの検出(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
 | `gcp-smoke.mjs` | GCP 版の動作確認(画面を開いて、カードが出るか) |

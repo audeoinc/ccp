@@ -1,6 +1,6 @@
-// server/schema.json(GCP 版のデータ定義)と、src/generated/models(Dataverse のテーブル定義)の食い違いを検出する。
+// server/schema.json(データ定義。唯一の正)と、src/generated/models(画面の型)の食い違いを検出する。
 //   node scripts/check-schema.mjs        ← npm run verify に含まれる
-// Dataverse に列を足して `pa app add data-source` で生成し直したのに、schema.json への追記を忘れる事故を防ぐ。
+// 片方にだけ列を足して、もう片方への追記を忘れる事故を防ぐ。
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

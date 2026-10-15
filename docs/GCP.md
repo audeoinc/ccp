@@ -1,6 +1,7 @@
-# CCP の GCP 版(Cloud Run + Cloud SQL + Gemini)
+# CCP のサーバーと動かし方(Cloud Run + Cloud SQL + Gemini)
 
-Power Apps 版と**同じ画面のコード**を、GCP でも動かす仕組み。方針・進み具合・使い方をまとめる。
+CCP を GCP で動かす仕組み。方針・進み具合・使い方をまとめる。
+もとは Power Apps 版と並べて作った「GCP 版」。Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。
 このリポジトリは公開されているため、プロジェクト ID・URL・パスワードは、ここにも書かない(`<…>` で示す)。
 
 ## 方針(決定済み)
@@ -8,52 +9,48 @@ Power Apps 版と**同じ画面のコード**を、GCP でも動かす仕組み�
 - 営業支援システム(`proposal-app`)と**同じ GCP プロジェクト・リージョン(東京)・実行サービスアカウント**の、**別の Cloud Run サービス**(`contents-planner`)。
 - アクセスは **HTTP Basic 認証**(環境変数 `APP_PASSWORD`。ユーザーの識別はしない)。環境は本番(PRD)1 つ。
 - サーバーは **Python / FastAPI**。DB は **Cloud SQL(PostgreSQL)**。画像は **GCS**。
-- AI は **Vertex AI の Gemini**(`google-genai` SDK で直接呼ぶ。ADK は使わない)。プロンプト・JSON の解釈・リトライは**画面側(TypeScript)に残し**、Power Apps 版と共有する。
-- **データは Power Apps 版(Dataverse)と別**。同じ初期データから始める。同期するのは「コードと機能」。
+- AI は **Vertex AI の Gemini**(`google-genai` SDK で直接呼ぶ。ADK は使わない)。プロンプト・JSON の解釈・リトライは**画面側(TypeScript)**に置く。
 - DB は**普段は停止**。アクセス時に自動で起動(画面に「準備中」。起動は**実測で 10〜13 分**かかる。停止は 1 分未満)、最後のアクセスから 30 分で自動停止(Cloud Scheduler。5 分おきに確認)。
 
-## 2 つのビルドを同期させる仕組み
+## ビルド
 
-画面のコード(`src/`)は 1 本。ビルドの設定だけが違う。
-
-| | Power Apps 版 | GCP 版 |
+| | 本番(Cloud Run・Workbench) | 撮影・デモ用 |
 |---|---|---|
-| 設定 | `vite.config.ts` | `vite.gcp.config.ts` |
-| データの入出力 | 生成された `Cr854_…Service`(Dataverse) | `src/gcp/services.ts`(`/api/data` を呼ぶ互換サービス) |
-| AI | `airequest` テーブル + Power Automate + Copilot Studio | `src/gcp/ai.ts` が、同じ呼び出しを `/api/ask`(Vertex AI の Gemini)に置き換える |
-| 出力 | `dist/` | `dist-gcp/` |
+| 設定 | `vite.config.ts` | `vite.mock.config.ts` |
+| データの入出力 | `src/generated/services`・`src/gcpdata` のサービス → `src/gcp/services.ts`(`/api/data` を呼ぶ) | 同じ読み込みを、`src/mock/db.ts`(メモリ上のデータ)に差し替える |
+| AI | `src/gcp/ai.ts`(`/api/ask` → Vertex AI の Gemini) | `src/mock/agent.ts`(サンプルの返答) |
+| 出力 | `dist-gcp/`(サーバーが配信する) | (開発サーバーで動かすだけ) |
 
-- GCP 版は、`generated/services/*` の import を、ビルド時に互換サービスへ差し替える(撮影用のモックと同じ手法)。**画面側に、GCP 用の分岐は入れない**。
-- `npm run verify` は、両方のビルドと、データ定義の突き合わせ(下)を行う。CI も同じ。
+- `npm run verify` は、ビルドと、データ定義の突き合わせ(下)を行う。CI も同じ。
 
 ## データ定義(`server/schema.json`)
 
-Dataverse の名前(画面が使う `cr854_scheduledat`、`_cr854_heroimage_value`)と、PostgreSQL の読みやすい名前(`scheduled_at`、`hero_image_id`)の**対応表**。これが唯一の正で、次の 3 つを作る。
+画面が使う名前(もとは Dataverse の名前。`cr854_scheduledat`、`_cr854_heroimage_value`)と、PostgreSQL の読みやすい名前(`scheduled_at`、`hero_image_id`)の**対応表**。これが唯一の正で、次の 3 つを作る。
 
 1. テーブルを作る SQL(`python -m ccp.cli migrate`)
-2. API の名前・値の変換(サーバーが、画面には従来どおりの Dataverse の形で返す)
+2. API の名前・値の変換(サーバーが、画面には画面が使う名前で返す)
 3. 触ってよいテーブル・列の許可リスト(それ以外は 400)
 
-**Dataverse に列を足したら**: `pa app add data-source …` で生成し直す → `server/schema.json` にも追記 → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には、デプロイ後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される(`server/ccp/data_api.py` の `_ensure_schema`。手で `migrate` を実行してもよい。何度実行しても同じ)。
+**列を足したら**: `server/schema.json` に追記 → 画面の型(`src/generated/models/`、GCP だけのテーブルは `src/gcpdata/`)にも足す → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には、デプロイ後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される(`server/ccp/data_api.py` の `_ensure_schema`。手で `migrate` を実行してもよい。何度実行しても同じ)。
 
-選択肢の値は、Dataverse と同じ数値(例: 588230000)のまま `integer` で持つ。
+選択肢の値は、数値(例: 588230000)のまま `integer` で持つ。
 
 ## `/api/data`(サーバー)
 
-`GET/POST /api/data/{テーブル}`、`GET/PATCH/DELETE /api/data/{テーブル}/{id}`。テーブル名は Dataverse の名前(`cr854_deliverycards`)。
-戻り値は `{success, data}` / `{success:false, error:{message, code?}}`(Power Apps SDK と同じ形)。
+`GET/POST /api/data/{テーブル}`、`GET/PATCH/DELETE /api/data/{テーブル}/{id}`。テーブル名は、画面が使う名前(`cr854_deliverycards`)。
+戻り値は `{success, data}` / `{success:false, error:{message, code?}}`。
 
 - 絞り込み(`filter`): `項目 eq 値` を `and` でつなぐ範囲(`eq/ne/gt/ge/lt/le`、`null`)。値は必ずパラメータとして渡す。
 - 並べ替え(`orderBy`)、`select`、`top`、`skip`。
-- 書き込みの参照は、Dataverse と同じ `cr854_xxx@odata.bind: "/cr854_yyys(<id>)"`(`null` で参照を外す)。
+- 書き込みの参照は `cr854_xxx@odata.bind: "/cr854_yyys(<id>)"`(`null` で参照を外す)。
 - DB に接続できないときは 503 + `code: "db_unavailable"`。
 
 ## AI(`/api/ask`)
 
-- 画面側の `askAgent`(プロンプトの作成・JSON の解釈・やり直し・チャット・英語化)は、**Power Apps 版と共通のまま**。差し替えるのは、依頼文を送って返答のテキストを受け取る部分だけ(`src/gcp/ai.ts`)。
+- 画面側の `askAgent`(プロンプトの作成・JSON の解釈・やり直し・チャット・英語化)は、画面側にある。依頼文を送って返答のテキストを受け取る部分だけが `src/gcp/ai.ts`。
 - サーバーは、依頼文を Gemini に渡して、返答のテキストをそのまま返す(`server/ccp/ai.py`)。返答は JSON 形式で出力させる。
 - 設定(環境変数。営業支援システムと同じ Vertex AI): `GOOGLE_CLOUD_PROJECT`(コードには書かない)、`GOOGLE_CLOUD_LOCATION`(既定 global)、`GEMINI_MODEL`(コードの既定は gemini-3.5-flash。本番は gemini-3.8-flash に設定)、`GEMINI_THINKING`(minimal / low / medium / high。既定 low)。
-- 1 回の「すべてAIで下書き」は、手元の確認で約 40 秒(Power Apps 版の、フロー経由のポーリングより速い)。
+- 1 回の「すべてAIで下書き」は、手元の確認で約 40 秒。
 
 ## 手元での動かし方
 
@@ -77,7 +74,7 @@ cd server && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r 
 .venv/Scripts/python.exe -m ccp.cli counts
 
 # 4. 画面をビルドして、サーバーを起動(http://localhost:8080 。Basic 認証のユーザー名は何でもよい)
-npm run build:gcp
+npm run build
 cd server && .venv/Scripts/python.exe -m uvicorn ccp.main:app --port 8080
 
 # 動作確認(画面を開いて、カードを開けるかを見る)
@@ -86,9 +83,9 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 #   CCP_SMOKE_AI=full … 空のカードを開いて、すべて AI で下書きさせる(約 40 秒。保存はしない)
 ```
 
-画面を直しながら動かすときは、サーバーを 8080 で起動したまま `npm run dev:gcp`(5191。`/api` は 8080 に中継)。
+画面を直しながら動かすときは、サーバーを 8080 で起動したまま `npm run dev`(5191。`/api` は 8080 に中継)。
 
-**Vertex AI Workbench(Agent Platform の Workbench)のノートブックで動かすとき**: サーバーを、たとえば 8081 で起動し(`uvicorn ccp.main:app --port 8081`)、Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(**末尾の `/` を付ける**。付けないと、画面のファイルの相対パスがずれる)。画面は、読み込んだ JS の場所から置き場所(`/proxy/8081/`)を求め、`/api/…`・`/img/…` をその下に送るので、ビルドの設定を変える必要はない(`src/appRoot.ts`、`vite.gcp.config.ts` の `base: './'`)。Cloud Run(置き場所が `/`)でも、同じビルドのまま動く。
+**Vertex AI Workbench(Agent Platform の Workbench)のノートブックで動かすとき**: サーバーを、たとえば 8081 で起動し(`uvicorn ccp.main:app --port 8081`)、Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(**末尾の `/` を付ける**。付けないと、画面のファイルの相対パスがずれる)。画面は、読み込んだ JS の場所から置き場所(`/proxy/8081/`)を求め、`/api/…`・`/img/…` をその下に送るので、ビルドの設定を変える必要はない(`src/appRoot.ts`、`vite.config.ts` の `base: './'`)。Cloud Run(置き場所が `/`)でも、同じビルドのまま動く。
 
 ### 外にアクセスできない環境(Workbench)に、本番のデータと画像を持ち込む(引っ越し用のパック)
 
@@ -199,7 +196,7 @@ python -m ccp.importer apply --yes     # DB の、商品・ヒーロー画像・
 
 ## 開いたときの初期設定(GCP 版)
 
-`vite.gcp.config.ts` の `define` で、GCP 版のビルドだけの初期値を決めている(Power Apps 版には、影響しない): 国の絞り込みは **US**(`VITE_DEFAULT_COUNTRY`)、画面の言語は **English**(`VITE_DEFAULT_LANG`)。言語は、ブラウザごとに保存した選択が、あればそちらを優先する。
+`vite.config.ts` の `define` で、開いたときの初期値を決めている: 国の絞り込みは **US**(`VITE_DEFAULT_COUNTRY`)、画面の言語は **English**(`VITE_DEFAULT_LANG`)。言語は、ブラウザごとに保存した選択が、あればそちらを優先する。
 
 ## 運用メモ
 
