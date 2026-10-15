@@ -40,9 +40,23 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 よく使う操作は、`scripts/workbench.sh` にまとめてあります。設定(`server/workbench.env`)を毎回自分で読み込み、サーバーを裏で動かし続けるので、
 「設定を読み込んだターミナルで起動する」などを気にしなくて済みます。以下の 3〜4 章の手作業は、スクリプトの中で行っていることです。
 
+**すでに CCP を動かしている Workbench で、はじめてスクリプトを使うとき**(スクリプトは 2026-10-15 に足したので、まずそれを取り込む):
+
 ```bash
 cd ~/ccp
-scripts/workbench.sh setup     # 初回だけ: Python の環境・パッケージ・画面のビルド・設定ファイル(workbench.env)の用意
+git pull                       # スクリプトを取り込む(この 1 回だけ、手で)
+scripts/workbench.sh stop      # 手で起動したサーバーが残っていれば止める(なければ「動いていません」と出る)
+scripts/workbench.sh update    # 以後は、これだけで「最新にして起動し直す」
+```
+
+手で起動したサーバーが、ほかのターミナルで動いたままなら、そのターミナルで Ctrl+C で止めてから `update` します(同じポートで、2 つは動かせないため)。
+
+**新しい Workbench で、はじめから立ち上げるとき**(3.1 の `git clone` のあと):
+
+```bash
+cd ~/ccp
+scripts/workbench.sh setup     # Python の環境・パッケージ・画面のビルド・設定ファイル(workbench.env)の用意
+#   → server/workbench.env の <…> を書き換える(DB・AI を設定済みなら、その行は # でコメントアウト)
 scripts/workbench.sh check     # 設定・DB への接続・写真・画面のビルドを確かめる
 scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じても止まらない)
 ```
