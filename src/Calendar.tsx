@@ -1,7 +1,7 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, WarningFilled } from '@fluentui/react-icons'
+import { AddRegular, MailRegular, PhoneRegular, WarningFilled } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import { statusColor } from './status'
+import { CHANNEL_PUSH, countryOptions, statusColor, statusOptions } from './status'
 import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 
@@ -15,6 +15,8 @@ interface Props {
   onCreate: (day: string) => void
 }
 
+// 選択肢の値から、画面の言葉を求める(GCP 版のデータには、Dataverse の表示名(〜name)がないため、値から求める)
+const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 // 日曜始まり。表記は現在の言語に従う(2024-01-07 は日曜日)
@@ -113,6 +115,7 @@ const useStyles = makeStyles({
     transitionDuration: tokens.durationFast,
     ':hover': { boxShadow: tokens.shadow4 },
   },
+  channelIcon: { flexShrink: 0, verticalAlign: '-2px', marginRight: '3px', color: tokens.colorNeutralForeground3 },
   pillMeta: {
     display: 'none',
     color: tokens.colorNeutralForeground3,
@@ -199,7 +202,7 @@ export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
                     e.stopPropagation()
                     onSelect(c.cr854_deliverycardid)
                   }}
-                  title={`${c.cr854_name}(${optionLabel(c.cr854_statusname)})${dueSoon?.has(c.cr854_deliverycardid) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
+                  title={`${c.cr854_name}(${label(statusOptions, c.cr854_status)})${dueSoon?.has(c.cr854_deliverycardid) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
                   className={styles.pill}
                   style={{
                     backgroundColor: `color-mix(in srgb, ${statusColor(c.cr854_status)} 16%, var(--colorNeutralBackground1))`,
@@ -210,9 +213,15 @@ export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
                 >
                   <span className={styles.pillMeta}>
                     {new Date(c.cr854_scheduledat!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
-                    {' '}{optionLabel(c.cr854_countryname)}・{optionLabel(c.cr854_channelname)}
+                    {' '}{label(countryOptions, c.cr854_country)}・{c.cr854_channel === CHANNEL_PUSH ? t('アプリ', 'App') : c.cr854_channel === undefined ? '' : t('メール', 'Email')}
                   </span>
                   <span className={styles.pillName}>
+                    {/* メールかアプリかを、時刻・国の行が出ない狭い画面でも見分けられるよう、名前の前にアイコンを付ける */}
+                    {c.cr854_channel === CHANNEL_PUSH ? (
+                      <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} />
+                    ) : (
+                      <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
+                    )}
                     {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
                     {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
                     {c.cr854_name}
