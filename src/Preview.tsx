@@ -573,6 +573,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
         <div
           key={b.id}
           data-link="button"
+          data-link-id={b.id}
           className={classes.noWrap}
           style={{
             textAlign: 'center',

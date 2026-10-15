@@ -14,6 +14,20 @@ const useStyles = makeStyles({
   slot: { display: 'grid', rowGap: '2px', minWidth: 0 },
   slotHead: { display: 'flex', alignItems: 'baseline', columnGap: '8px', flexWrap: 'wrap', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
   kind: { fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
+  // プレビューの上の番号と同じ印
+  num: {
+    display: 'inline-block',
+    minWidth: '18px',
+    height: '18px',
+    padding: '0 4px',
+    boxSizing: 'border-box',
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    fontSize: '11px',
+    lineHeight: '18px',
+    textAlign: 'center',
+  },
   final: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
   warn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   utm: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '8px' },
@@ -31,10 +45,12 @@ interface Props {
   products: Cr854_products[]
   /** 計測用のパラメーターの campaign の既定値(配信名と日付から作る) */
   campaign: string
+  /** 欄にマウスを重ねた・入力欄を選んだ場所(プレビューで、その場所を光らせる。W12) */
+  onFocusSlot?: (key: string | null) => void
 }
 
 /** 制作指示のタブの下に置く、リンク先の設定(メイン画像・ボタンごとの URL、計測用のパラメーター、商品のリンクの一覧) */
-export function LinksEditor({ links, onLinks, slots, items, products, campaign }: Props) {
+export function LinksEditor({ links, onLinks, slots, items, products, campaign, onFocusSlot }: Props) {
   const styles = useStyles()
   const t = useT()
   const [showProducts, setShowProducts] = useState(false)
@@ -55,14 +71,26 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign }
             '空欄は、テンプレートのリンク先の種類から作った URL(薄い文字)を使います。制作担当は、下の「計測用のパラメーターつき」の URL を使います。',
             'Empty fields use the URL made from the template’s link type (shown in light text). Production uses the URL “with tracking” below each field.',
           )}
+          {t(
+            ' 番号は、プレビューのリンクの場所の番号です。欄にマウスを重ねると、プレビューのその場所が光ります。',
+            ' Numbers match the link spots on the preview. Hover a field to highlight its spot on the preview.',
+          )}
         </div>
       </div>
-      {slots.map((s) => {
+      {slots.map((s, i) => {
         const v = valueOf(s)
         const url = v.trim() || s.defaultUrl
         return (
-          <div key={s.key} className={styles.slot}>
+          <div
+            key={s.key}
+            className={styles.slot}
+            onMouseEnter={() => onFocusSlot?.(s.key)}
+            onMouseLeave={() => onFocusSlot?.(null)}
+            onFocus={() => onFocusSlot?.(s.key)}
+            onBlur={() => onFocusSlot?.(null)}
+          >
             <div className={styles.slotHead}>
+              <span className={styles.num}>{i + 1}</span>
               {s.label}
               <span className={styles.kind}>{linkKindLabel(s.linkKind)}</span>
             </div>

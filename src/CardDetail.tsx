@@ -41,7 +41,8 @@ import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
 import { NotesEditor } from './NotesEditor'
-import { campaignSlug, encodeLinks, parseLinks, type Links } from './links'
+import { campaignSlug, defaultUtm, encodeLinks, linkSlots, parseLinks, productUrl, withUtm, type LinkSlot, type Links } from './links'
+import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
@@ -340,7 +341,8 @@ const useStyles = makeStyles({
   zoomBox: { display: 'flex', alignItems: 'center', columnGap: '2px' },
   slider: { width: '90px', minWidth: '90px' },
   zoomLabel: { width: '34px', textAlign: 'right' },
-  previewBox: { overflow: 'auto', minHeight: 0, paddingTop: '8px', paddingBottom: '8px' },
+  // position: relative は、リンクの場所の番号・URL の吹き出し(LinkOverlay)を、プレビューに重ねて置くため
+  previewBox: { position: 'relative', overflow: 'auto', minHeight: 0, paddingTop: '8px', paddingBottom: '8px' },
   error: { margin: '12px 12px 0' },
   // 確定した週の配信: 上の知らせと、保存の前の理由の入力欄
   locked: { margin: '0 24px 8px' },
@@ -401,6 +403,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [heroReason, setHeroReason] = useState(card?.cr854_heroreason ?? '')
   const [widths, setWidths] = useState<[number, number, number]>(loadWidths)
   const [links, setLinks] = useState<Links>(() => parseLinks(card?.cr854_links))
+  // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
+  const [linksTab, setLinksTab] = useState(false)
+  const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
   const resizeDialog = (dw: number, dh: number) =>
@@ -560,6 +565,20 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   }, [zoom, previewTab, template, items, form.headline, form.copy, sectionTitles, sectionCopies, heroId])
 
   const shownZoom = zoom === 'fit' ? fitZoom : zoom
+
+  // プレビューのリンクの場所と、その URL(リンク先の設定の欄と同じ決め方。W12)
+  const linkCampaign = campaignSlug(form.name, form.scheduledAt)
+  const linkSpots = useMemo(() => linkSlots(template, items, products, linkCampaign), [template, items, products, linkCampaign])
+  const linkUtm = { ...defaultUtm(linkCampaign), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
+  const linkUrlOf = (slot: LinkSlot) => {
+    const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
+    return url ? withUtm(url, linkUtm) : ''
+  }
+  const productLinkOf = (itemKey: string) => {
+    const it = items.find((x) => x.key === itemKey)
+    const p = it && products.find((x) => x.cr854_productid === it.productId)
+    return p ? { name: p.cr854_name, url: withUtm(productUrl(p), linkUtm) } : undefined
+  }
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
   const panesRef = useRef<HTMLDivElement>(null)
@@ -1195,6 +1214,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 onPush={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
                 scheduledAt={form.scheduledAt}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
+                onLinksTab={setLinksTab}
+                onLinkFocus={setLinkFocus}
               />
             </div>
 
@@ -1273,6 +1294,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     onDropAt={dropAt}
                   />
                 </div>
+                {previewTab === 'email' && (
+                  <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
+                )}
               </div>
             </div>
 

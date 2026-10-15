@@ -98,6 +98,10 @@ interface Props {
   /** 配信ごとのリンク先(制作指示のタブで設定する) */
   links: Links
   onLinks: (l: Links) => void
+  /** リンク先のタブを開いた・閉じた(プレビューに、リンクの場所の番号を出すため。W12) */
+  onLinksTab?: (open: boolean) => void
+  /** リンク先の設定の欄で選んでいる場所(プレビューで光らせる。W12) */
+  onLinkFocus?: (key: string | null) => void
   /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
   campaign: string
   /** 制作への引き継ぎ(制作指示のタブ) */
@@ -1129,6 +1133,12 @@ export function ContentPane(props: Props) {
   const t = useT()
   const { theme, headline, instructions, onField, drafts, template, onTemplate, candidates } = props
   const [tab, setTab] = useState<TopTab>('theme')
+  // リンク先のタブを開いている間だけ、プレビューにリンクの場所の番号を出す(タブを離れたら、選んでいた欄も外す)
+  const { onLinksTab, onLinkFocus } = props
+  useEffect(() => {
+    onLinksTab?.(tab === 'links')
+    if (tab !== 'links') onLinkFocus?.(null)
+  }, [tab, onLinksTab, onLinkFocus])
 
   // ---- AI チャット(開いているタブの案づくりに、指示と対話を加える)。会話は、タブ(対象)ごとに持つ。保存はしない
   const [chats, setChats] = useState<Record<string, ChatMsg[]>>({})
@@ -1368,6 +1378,7 @@ export function ContentPane(props: Props) {
           items={props.items}
           products={props.products}
           campaign={props.campaign}
+          onFocusSlot={props.onLinkFocus}
         />
       )}
     </div>
