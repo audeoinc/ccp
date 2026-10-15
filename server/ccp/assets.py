@@ -5,7 +5,7 @@
 バケット名は、ASSET_BUCKET(なければ STATE_BUCKET)。画像は、バケットの images/<種類>/<名前> に置く。
 
 ASSET_DIR があれば、バケットではなく、そのフォルダ(<ASSET_DIR>/<種類>/<名前>)から配る。
-外にアクセスできない環境(クライアントの Workbench など)で、引っ越し用のパック(ccp.pack)から展開した画像を使うため。
+外にアクセスできない環境(利用先の Workbench など)で、引っ越し用のパック(ccp.pack)から展開した画像を使うため。
 """
 from __future__ import annotations
 

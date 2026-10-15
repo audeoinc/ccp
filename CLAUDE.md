@@ -1,6 +1,6 @@
 # CLAUDE.md — Campaign Contents Planner(CCP / 配信コンテンツプランナー)(AI コーディングアシスタント向け)
 
-Power Apps Code App(React 19 + TypeScript + Vite + Fluent UI v9)。全体像は [README.md](README.md)、設計の約束事は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、Dataverse の定義は [docs/DATAVERSE.md](docs/DATAVERSE.md)。作業の前に、この 3 つと [docs/BACKLOG.md](docs/BACKLOG.md)、[docs/HANDOVER.md](docs/HANDOVER.md)(いまどこにいるか・次にやること・落とし穴)を読むこと。**クライアントの Vertex AI Workbench で作業しているなら、下の「Vertex AI Workbench で作業するとき」と [docs/WORKBENCH.md](docs/WORKBENCH.md) を先に読む。**作業を終える前に、HANDOVER.md を更新する。
+Power Apps Code App(React 19 + TypeScript + Vite + Fluent UI v9)。全体像は [README.md](README.md)、設計の約束事は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、Dataverse の定義は [docs/DATAVERSE.md](docs/DATAVERSE.md)。作業の前に、この 3 つと [docs/BACKLOG.md](docs/BACKLOG.md)、[docs/HANDOVER.md](docs/HANDOVER.md)(いまどこにいるか・次にやること・落とし穴)を読むこと。**利用先の Vertex AI Workbench で作業しているなら、下の「Vertex AI Workbench で作業するとき」と [docs/WORKBENCH.md](docs/WORKBENCH.md) を先に読む。**作業を終える前に、HANDOVER.md を更新する。
 
 **2026-10-10 から、開発は GCP 版(Cloud Run。[docs/GCP.md](docs/GCP.md))だけで行う。** 新しい機能は Power Apps 版に入れない(Dataverse は変えない)。データの列・テーブルは、GCP 版のデータベース(`server/ccp/schema.json`)に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。確かめるときは、`npm run build:gcp` も通す。
 
@@ -16,7 +16,7 @@ Power Apps Code App(React 19 + TypeScript + Vite + Fluent UI v9)。全体像は 
 3. **画面の見た目は、確認できていないと正直に伝える。** Power Apps のホスト上では、アプリは別ドメインの iframe の中で動くため、自動操作では確認できないことが多い。「型チェック・lint・ビルドは通った。画面は未確認」のように、確認した範囲を分けて報告する。
 4. 小さい変更は、編集ツールで行う。複数ファイルへの一括置換は、スクリプトでもよいが、**改行コード(CRLF / LF の混在)を保つ**こと。
 5. `src/generated/` は自動生成。編集しない。テーブルの列を変えたら、`npx pa app add data-source --connector dataverse --table <論理名> --org-url <組織の URL>` で作り直す。
-6. **このリポジトリは非公開(`audeoinc/ccp`)だが、秘密は書かない。**(参加者が増えても、設定を間違えても、困らないように)組織の URL、パスワード・鍵・トークン、個人のメールアドレス、顧客の実データを、コード・ドキュメント・サンプルデータ・コミットメッセージに、書かない。環境の ID は、ツールが必要とする `power.config.json` だけに置く。
+6. **このリポジトリは公開されている(`audeoinc/ccp`)。秘密は書かない。**(だれが読んでも困らないように)組織の URL、パスワード・鍵・トークン、個人のメールアドレス、顧客の実データ、利用先の名前や環境の詳細を、コード・ドキュメント・サンプルデータ・コミットメッセージに、書かない。環境の ID は、ツールが必要とする `power.config.json` だけに置く。
 7. 設計や約束事を変えたら、[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)(必要なら、このファイル)を更新する。やり残しは [docs/BACKLOG.md](docs/BACKLOG.md) に書く。
 
 ## コードの約束
@@ -30,15 +30,15 @@ Power Apps Code App(React 19 + TypeScript + Vite + Fluent UI v9)。全体像は 
 - コメントは日本語で、**何をしているかより、なぜそうしているか**を書く。既存のコードの密度・書き方に合わせる。
 - 文字の階層(ラベル 12px 中太・薄いグレー / 値 12px / 見出し 13px 中太)は、[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) の「見た目の約束事」を守る。
 
-## Vertex AI Workbench(クライアントの実行環境)で作業するとき
+## Vertex AI Workbench(利用先の実行環境)で作業するとき
 
-このリポジトリは、クライアントの **Vertex AI Workbench** にも clone して動かしている(チームメンバーが運用。Workbench の上の Claude も、この文書を読む)。
+このリポジトリは、利用先の **Vertex AI Workbench** にも clone して動かしている(チームメンバーが運用。Workbench の上の Claude も、この文書を読む)。
 Workbench で作業するときは、上の「作業の約束」に加えて、次を守る。
 
 - **まず [docs/WORKBENCH.md](docs/WORKBENCH.md)(移行の手順書)を読む。** 立ち上げ・更新・よくあるつまずきが、すべて書いてある。
 - **操作は `scripts/workbench.sh` を使う**(`setup` / `update` / `start` / `stop` / `restart` / `status` / `check` / `import <ZIP>` / `log`。設定の読み込みも、裏での起動も、スクリプトが行う)。
 - **困ったら、最初に `cd server && .venv/bin/python -m ccp.cli check` を実行する**(設定・DB への接続・写真・画面のビルドを確かめる。パスワードは出さず、何も変えない)。`[NG]` の行と、手順書の「よくあるつまずき」の表から直す。
-- **環境の違い:** Linux(Python は `.venv/bin/python`)。サーバーから外(本番の DB・GCS・Cloud SQL の管理の窓口)には**アクセスできない**。DB は Workbench の中の PostgreSQL(conda で入れたもの。`DATABASE_URL` のホストは `localhost`)。AI は Vertex AI の Gemini(`GOOGLE_CLOUD_PROJECT`)。画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(末尾の `/` が必要)。
+- **環境の違い:** Linux(Python は `.venv/bin/python`)。サーバーから外(本番の DB・GCS・Cloud SQL の管理の窓口)には**アクセスできない**。DB は PostgreSQL に直接つなぐ(`DATABASE_URL`。Workbench の中で動かしているなら、ホストは `localhost`)。AI は Vertex AI の Gemini(`GOOGLE_CLOUD_PROJECT`)。画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(末尾の `/` が必要)。
 - **本番のデータと写真は、「引っ越し用のパック」で持ち込む**(本番の画面の ⚙ →「データと画像を書き出す」で ZIP → Workbench にアップロード → `python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けてサーバーを起動)。`import-pack --yes` は、Workbench の DB の中身を**すべて置き換える**ので、人に確認してから実行する。
 - **サーバーは、DB の設定を読み込んだのと同じターミナルで起動する。** 別のターミナルで起動すると、画面に「データベースにつながりません」と出る(サーバーのターミナルにも理由が出る)。
 - **してはいけないこと:** 本番への反映(`npm run deploy:gcp`・`gcloud run deploy`)、Workbench からの `git push`(コードの変更は、開発側のリポジトリで行う)、`server/workbench.env`(パスワードを含む)や `server/images/`(写真)を Git に入れること。

@@ -138,11 +138,11 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 - **配信カード・カレンダーでの表示**: 配信ごとのアラート(`src/cardAlerts.ts`)を、配信カードの帯(`CardAlertsBar`)・右の商品情報・月と週のカレンダーの印(`AlertMark`)に出す。アラートの画面から開くと、問題の商品を選んだ状態で開く(App の `openFromAlert` → CardDetail の `focusProductId`)。
 - アラート(A1〜A6)は、ひととおり完了。
 
-## 6.5 クライアントの Workbench での運用(2026-10-15)
+## 6.5 利用先の Workbench での運用(2026-10-15)
 
-チームメンバーが、クライアントの Vertex AI Workbench でアプリを動かしている(`f03c9e2` で、Jupyter の中継 `/proxy/8081/` の下でも動くようにした)。
+チームメンバーが、利用先の Vertex AI Workbench でアプリを動かしている(`f03c9e2` で、Jupyter の中継 `/proxy/8081/` の下でも動くようにした)。
 Workbench のサーバーは外にアクセスできないので、本番のデータと画像は「引っ越し用のパック」で持ち込む(⚙ →「データと画像を書き出す」→ Workbench で `python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けて起動)。手順は、移行の手順書 [WORKBENCH.md](WORKBENCH.md)(初回の立ち上げ・更新・よくあるつまずき)。
-画像は、クライアントのサービスで使っている画像なので、クライアントの環境に置いてよい(利用者に確認済み)。
+画像は、利用先の環境に置いてよい(利用者に確認済み)。
 
 ## 7. 落とし穴
 

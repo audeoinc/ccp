@@ -1,9 +1,9 @@
 # 移行の手順書: Vertex AI Workbench で CCP を動かす
 
-CCP(配信コンテンツプランナー)の GCP 版を、クライアントの **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
+CCP(配信コンテンツプランナー)の GCP 版を、利用先の **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
 本番(Cloud Run)と同じ**配信のデータ**と**商品・メイン画像の写真**を持ち込むための手順書です。
 
-- 最終更新: 2026-10-15(クライアントの環境は PostgreSQL に直接つなぐ形に合わせた)
+- 最終更新: 2026-10-15(利用先の環境は PostgreSQL に直接つなぐ形に合わせた)
 - 対象: Workbench で CCP を立ち上げる・更新する人
 - 関係する文書: [GCP.md](GCP.md)(GCP 版の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
 
@@ -15,7 +15,7 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 そこで、**コードは Git で**、**データと写真は「引っ越し用のパック」(1 つの ZIP)で、ブラウザ経由で**持ち込みます。
 
 ```
- 本番(Cloud Run)                         クライアントの環境
+ 本番(Cloud Run)                         利用先の環境
  ┌──────────────────┐   ブラウザで ZIP を     ┌────────────────────────────┐
  │ 画面 ⚙ →          │   ダウンロード          │ Workbench(Jupyter)          │
  │「データと画像を    │ ──────────────────▶ │  ① アップロード               │
@@ -83,9 +83,9 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | Node.js | **20.19 以上**(または 22.12 以上)。画面のビルドに使う | `node -v` |
 | Python | **3.12 以上**を推奨(本番は 3.12) | `python3 --version` |
 | Git | リポジトリ `audeoinc/ccp` を取得できる | `git --version` |
-| PostgreSQL | **クライアントの環境は PostgreSQL に直接つなぐ**(Workbench の上や、同じネットワークのサーバー)。CCP 用の DB を 1 つ(本番は PostgreSQL 16) | `psql --version`、または DB の管理者に確認 |
+| PostgreSQL | **利用先の環境は PostgreSQL に直接つなぐ**(Workbench の上や、同じネットワークのサーバー)。CCP 用の DB を 1 つ(本番は PostgreSQL 16) | `psql --version`、または DB の管理者に確認 |
 | 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」(Cloud SQL につなぐときだけ「Cloud SQL クライアント」も) | IAM の画面 |
-| ブラウザ | クライアントの環境から、本番の CCP の画面を開ける | 本番の URL を開く |
+| ブラウザ | 利用先の環境から、本番の CCP の画面を開ける | 本番の URL を開く |
 
 > **パッケージの取得について:** 手順の `npm ci` と `pip install` は、パッケージをインターネット(npm・PyPI、または社内のミラー)から取ります。
 > 取れない環境では、取れる環境で用意したもの(ビルド済みの `dist-gcp/` や、Python のパッケージ)を持ち込む必要があります。そのときは開発担当に相談してください。
@@ -149,7 +149,7 @@ nano workbench.env     # または Jupyter のエディタで開く
 
 | 設定 | 中身 |
 |---|---|
-| `DATABASE_URL` | **PostgreSQL の接続先**(クライアントの環境はこちら)。`postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` |
+| `DATABASE_URL` | **PostgreSQL の接続先**(利用先の環境はこちら)。`postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` |
 | `CLOUD_SQL_INSTANCE` ・ `DB_USER` ・ `DB_PASSWORD` ・ `DB_NAME` | Cloud SQL につなぐときだけ(`DATABASE_URL` の代わり) |
 | `GOOGLE_CLOUD_PROJECT` | AI(Vertex AI)を使うプロジェクト |
 | `ASSET_DIR` | 写真を置くフォルダ。`/home/jupyter/ccp/server/images` のような**絶対パス** |
@@ -217,7 +217,7 @@ psql -h <ホスト> -U postgres -c "CREATE DATABASE ccp OWNER ccp_app;"
 
 ### 3.5 本番のデータと写真を書き出す(ブラウザ)
 
-1. クライアントの環境のブラウザで、本番の CCP の画面を開きます。
+1. 利用先の環境のブラウザで、本番の CCP の画面を開きます。
 2. 右上の **⚙** →「**データと画像を書き出す(別の環境へ移す)**」を押します。
 3. `ccp-pack-<日時>.zip` がダウンロードされます(2026-10 時点で約 4MB。10 秒ほど)。
 
@@ -363,7 +363,7 @@ set -a; source workbench.env; set +a
 
 | 環境変数 | 必須 | 中身 | Workbench での値 |
 |---|---|---|---|
-| `DATABASE_URL` | PostgreSQL に直接つなぐとき | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **クライアントの環境の PostgreSQL** |
+| `DATABASE_URL` | PostgreSQL に直接つなぐとき | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **利用先の環境の PostgreSQL** |
 | `CLOUD_SQL_INSTANCE` | Cloud SQL のとき | `<プロジェクトID>:<リージョン>:<インスタンス名>` | 設定しない(`DATABASE_URL` を使う) |
 | `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Cloud SQL のとき | DB のユーザー・パスワード・DB の名前(既定 `ccp_app` / なし / `ccp`) | 設定しない |
 | `GOOGLE_CLOUD_PROJECT` | AI を使うとき | Vertex AI のプロジェクト | その環境のプロジェクト |
@@ -382,4 +382,4 @@ set -a; source workbench.env; set +a
 | `images/products/…` ・ `images/heroes/…` | 商品・メイン画像の写真(本番の GCS にあるもの) |
 
 書き出しは `server/ccp/pack.py`(`GET /api/export`)、取り込みは `python -m ccp.cli import-pack`。
-写真は、クライアントのサービスで使っている画像で、クライアントの環境に置いてよいことを確認済み(2026-10-15)。
+写真は、利用先の環境に置いてよいことを、利用者に確認済み(2026-10-15)。
