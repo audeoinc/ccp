@@ -121,3 +121,24 @@ body.printing-report [data-print-cols] {
 body.printing-report [data-print-wrap] {
   zoom: 0.75;
 }
+
+/* ---- 週の資料の印刷(src/printWeek.ts。バックログ W7)。印刷のあいだだけ body に printing-week が付く ----
+   週の資料(data-print-week)は、ふだんは隠し、印刷のときだけ、それ以外を消して出す。
+   配信 1 本のレポート(printing-report)と違い、縮めずに、配信ごとに頁を分けて流す */
+[data-print-week] {
+  display: none;
+}
+body.printing-week > *:not(:has([data-print-week])) {
+  display: none !important;
+}
+body.printing-week [data-print-week] {
+  display: block !important;
+}
+body.printing-week,
+body.printing-week * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+body.printing-week tr {
+  break-inside: avoid;
+}

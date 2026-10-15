@@ -15,6 +15,7 @@ import {
   MenuTrigger,
   MessageBar,
   MessageBarBody,
+  Portal,
   Select,
   Spinner,
   Tooltip,
@@ -70,6 +71,8 @@ import { sundayOf } from './weekLock'
 import { logEvent, myName } from './history'
 import { Cr854_eventsService, type Cr854_events } from './gcpdata/Cr854_eventsService'
 import { WeekChecklist } from './WeekChecklist'
+import { WeekReport } from './WeekReport'
+import { printWeek } from './printWeek'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 
 const weekLabel = (start: Date) => {
@@ -316,6 +319,10 @@ function App() {
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未対応のレビューのコメントの数(週の表示・確認の一覧)
   const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map())
+  // 配信カードごとの、未対応のレビューのコメント(週の資料に、本文を載せる)
+  const [openComments, setOpenComments] = useState<Map<string, Cr854_cardnotes[]>>(new Map())
+  // 週の資料(PDF)を印刷している間だけ true(資料を描いて、印刷の画面を開き、閉じたら片付ける)
+  const [printingWeek, setPrintingWeek] = useState(false)
   // 週の計画(週のレビューの状態)
   const [weeks, setWeeks] = useState<Cr854_weeks[]>([])
   // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
@@ -395,6 +402,7 @@ function App() {
           const tasks = new Map<string, number>()
           const overdue = new Map<string, number>()
           const comments = new Map<string, number>()
+          const commentNotes = new Map<string, Cr854_cardnotes[]>()
           const d = new Date()
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           setChangeNotes((res.data ?? []).filter((n) => n.cr854_kind === 'change'))
@@ -405,6 +413,7 @@ function App() {
             if (n.cr854_kind === 'change' || n.cr854_kind === 'reply') continue
             if (n.cr854_kind === 'comment') {
               comments.set(id, (comments.get(id) ?? 0) + 1)
+              commentNotes.set(id, [...(commentNotes.get(id) ?? []), n])
               continue
             }
             if (n.cr854_kind === 'task') {
@@ -417,6 +426,7 @@ function App() {
           setTaskCounts(tasks)
           setOverdueTasks(overdue)
           setCommentCounts(comments)
+          setOpenComments(commentNotes)
         })
         .catch(() => undefined)
       Cr854_weeksService.getAll()
@@ -534,6 +544,11 @@ function App() {
   const checkKey = check?.week === weekKey ? check.key : null
   const focusItem = checklist.find((i) => i.key === checkKey)
   const focus = useMemo(() => (focusItem ? { cards: new Set(focusItem.cardIds), products: new Set(focusItem.productIds) } : undefined), [focusItem])
+  // 週の資料を描いたら、印刷の画面を開く(閉じたら、資料を片付ける)
+  useEffect(() => {
+    if (!printingWeek) return
+    printWeek(`week-plan_${weekKey}`, () => setPrintingWeek(false))
+  }, [printingWeek, weekKey])
   const changeWeek = async (next: WeekStatus) => {
     setError(null)
     try {
@@ -900,7 +915,26 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onChange={changeWeek} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onChange={changeWeek} />
+              {printingWeek && (
+                // 週の資料(W7)。印刷のあいだだけ見える(index.css の「週の資料の印刷」)。Portal なので、画面の並びには影響しない
+                <Portal>
+                  <div data-print-week>
+                    <WeekReport
+                      weekStart={weekStart}
+                      week={thisWeek}
+                      cards={[...weekCards].sort((a, b) => (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? ''))}
+                      cardProducts={cardProducts}
+                      products={products}
+                      heroes={heroes}
+                      checklist={checklist}
+                      events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)}
+                      openComments={openComments}
+                      author={myName()}
+                    />
+                  </div>
+                </Portal>
+              )}
               <WeekChecklist items={checklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />
               <WeekView
                 start={weekStart}

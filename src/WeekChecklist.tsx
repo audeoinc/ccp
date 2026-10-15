@@ -1,7 +1,8 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CheckmarkCircleFilled, ChevronDownRegular, ChevronUpRegular, WarningFilled } from '@fluentui/react-icons'
 import { useT } from './i18n'
-import { WEEKLY_PRODUCT_LIMIT, type CheckItem, type CheckKey } from './reviewChecks'
+import type { CheckItem, CheckKey } from './reviewChecks'
+import { checkHint, checkTitle } from './weekLabels'
 
 const useStyles = makeStyles({
   root: {
@@ -61,26 +62,8 @@ interface Props {
 export function WeekChecklist({ items, selected, onSelect }: Props) {
   const styles = useStyles()
   const t = useT()
-  const title = (k: CheckKey) =>
-    ({
-      overLimit: t(`週の上限(${WEEKLY_PRODUCT_LIMIT} 本)を超えた商品`, `Products over the weekly limit (${WEEKLY_PRODUCT_LIMIT})`),
-      pushAlign: t('メールとプッシュのテーマ違い', 'Email / push to align'),
-      leadMissing: t('載っていない主力の商品', 'Lead items not featured'),
-      repeat: t('テーマ・メイン画像の連続', 'Same main image or theme in a row'),
-      openComments: t('未対応のコメント', 'Open comments'),
-      openQuestions: t('未解決の質問', 'Open questions'),
-      approved: t('承認済みの配信', 'Approved deliveries'),
-    })[k]
-  const hint = (k: CheckKey) =>
-    ({
-      overLimit: t('同じ商品を載せた配信の数', 'Number of deliveries featuring the product'),
-      pushAlign: t('同じ日のメールと、テーマがそろっていないプッシュ', 'Pushes whose theme differs from the same-day email'),
-      leadMissing: t('販促の期間が、この週にかかる主力の商品', 'Lead items whose promotion period covers this week'),
-      repeat: t('同じチャネルで、すぐ前の配信と同じ(前の週の最後の配信を含む)', 'Same as the previous delivery on the same channel (including the last one of the previous week)'),
-      openComments: t('レビューのコメントで、まだ対応済みにしていないもの', 'Review comments not marked resolved yet'),
-      openQuestions: t('制作からの質問で、まだ解決していないもの', 'Questions from production that are not resolved yet'),
-      approved: t('まだ承認されていない配信', 'Deliveries not approved yet'),
-    })[k]
+  const title = (k: CheckKey) => checkTitle(t, k)
+  const hint = (k: CheckKey) => checkHint(t, k)
   const current = items.find((i) => i.key === selected)
 
   return (

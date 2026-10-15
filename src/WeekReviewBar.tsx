@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, CheckmarkCircleRegular, HistoryRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
+import { ArrowUndoRegular, CheckmarkCircleRegular, DocumentPdfRegular, HistoryRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import type { Cr854_weeks, WeekStatus } from './gcpdata/Cr854_weeksService'
 import type { Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
-import type { Cr854_events, EventAction } from './gcpdata/Cr854_eventsService'
+import type { Cr854_events } from './gcpdata/Cr854_eventsService'
+import { actionText } from './weekLabels'
 import { myName, setMyName } from './history'
 import { locale, optionLabel, useT } from './i18n'
 import { statusColor, statusOptions } from './status'
@@ -51,6 +52,8 @@ interface Props {
   changes?: Cr854_cardnotes[]
   /** この週の承認の履歴(新しい順) */
   events?: Cr854_events[]
+  /** 週の資料(PDF)を書き出す(App 側で、資料を描いて印刷の画面を開く) */
+  onExportPdf?: () => void
   /** 週の「検討中」の配信を、まとめて承認する(App 側で行う) */
   onApproveAll?: () => Promise<void>
   /** 状態を変える(週の配信のステータスも、まとめて進める。App 側で行う) */
@@ -65,7 +68,7 @@ const STATUS_APPROVED = 588230002
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
  * 確定は、週のすべての配信を「確定」にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onChange }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onChange }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -99,18 +102,6 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
   }
 
   const statusName = (v?: number) => (v === undefined || v === null ? '' : optionLabel(statusOptions.find((o) => o.value === v)?.label))
-  const actionText = (a?: EventAction) =>
-    ({
-      submit: t('週をレビューに出した', 'Submitted the week for review'),
-      draft: t('週を下書きに戻した', 'Put the week back to draft'),
-      confirm: t('週を確定した', 'Confirmed the week'),
-      unconfirm: t('週の確定を取り消した', 'Undid the week confirmation'),
-      status: t('ステータスを変えた', 'Changed the status'),
-      reopen: t('確定後に変えた(週をレビューに戻した)', 'Changed after confirmation (week back to review)'),
-      approve: t('承認した', 'Approved'),
-      reject: t('差し戻した', 'Sent back'),
-      revoke: t('承認後に内容が変わったので、検討中に戻した', 'Content changed after approval, back to In review'),
-    })[a ?? 'status'] ?? ''
   const history = (
     <Popover withArrow positioning="below-end">
       <PopoverTrigger disableButtonEnhancement>
@@ -127,7 +118,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
               <span className={styles.historyMeta}>{`${when(e.createdon)} · ${e.cr854_actor || t('(名前なし)', '(no name)')}`}</span>
               <span className={styles.historyText}>
                 {e.cr854_cardname ? `${e.cr854_cardname}: ` : ''}
-                {actionText(e.cr854_action)}
+                {actionText(t, e.cr854_action)}
                 {e.cr854_tostatus !== undefined && e.cr854_tostatus !== null && e.cr854_tostatus !== e.cr854_fromstatus ? `(${statusName(e.cr854_fromstatus) ? `${statusName(e.cr854_fromstatus)} ` : ''}→ ${statusName(e.cr854_tostatus)})` : ''}
               </span>
               {e.cr854_note && <span className={styles.historyNote}>{e.cr854_note}</span>}
@@ -180,6 +171,13 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
           />
         </Tooltip>
         {history}
+        {onExportPdf && (
+          <Tooltip content={t('レビューの会議で配る、週の資料を作ります(印刷の画面で「PDF に保存」を選びます)', 'Creates the week handout for the review meeting (choose "Save as PDF" in the print dialog)')} relationship="description">
+            <Button size="small" appearance="subtle" icon={<DocumentPdfRegular />} disabled={busy || cards.length === 0} onClick={onExportPdf}>
+              PDF
+            </Button>
+          </Tooltip>
+        )}
         {status === 'draft' && (
           <Tooltip content={t('週をレビュー中にします。未起案の配信は「検討中」にします', 'Puts the week in review. Not-started deliveries become In review.')} relationship="description">
             <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || cards.length === 0} onClick={() => void run('review')}>
