@@ -149,6 +149,21 @@ set -a; source workbench.env; set +a
 .venv/bin/python -m ccp.cli counts
 ```
 
+#### PostgreSQL を Workbench の中に入れたとき(conda など)
+
+PostgreSQL は Workbench 自身の上で動くので、`DATABASE_URL` のホストは **`localhost`** です。
+
+```bash
+DATABASE_URL='postgresql+asyncpg://<ユーザー>:<パスワード>@localhost:5432/<DB の名前>'
+```
+
+PostgreSQL が動いているかは、conda の環境を有効にしたターミナルで確かめます(`accepting connections` なら動いている)。
+Workbench を止めて起動し直したあとは、PostgreSQL は自動では起動しないことがあるので、入れたときの手順で起動します(例: `pg_ctl -D <データのフォルダ> start`)。
+
+```bash
+pg_isready -h localhost -p 5432
+```
+
 #### (DB がまだないとき)CCP 用の DB を作る
 
 PostgreSQL の管理者のユーザーで、CCP 用のユーザーと DB を作ります(DB の管理者が別にいるときは、依頼してください)。
@@ -253,6 +268,7 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
+| `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる)③ `DATABASE_URL` がなく、Cloud SQL の経路(外への接続)になった | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、下の「接続先の確かめ方」で表示する |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
 | 起動時に `KeyError: 'CLOUD_SQL_INSTANCE'` | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
 | 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli counts` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
@@ -262,6 +278,23 @@ cd server
 | 8081 が使えない(`address already in use`) | 前に起動したサーバーが残っている | `pkill -f "uvicorn ccp.main:app"` で止めてから起動 |
 
 ---
+
+### 接続先の確かめ方(パスワードは出さない)
+
+```bash
+cd ~/ccp/server
+set -a; source workbench.env; set +a
+.venv/bin/python -c "
+import os; from urllib.parse import urlsplit
+u = os.getenv('DATABASE_URL')
+if u:
+    p = urlsplit(u); print('DATABASE_URL: scheme=', p.scheme, ' host=', p.hostname, ' port=', p.port, ' db=', p.path)
+else:
+    print('DATABASE_URL なし / CLOUD_SQL_INSTANCE =', os.getenv('CLOUD_SQL_INSTANCE'))
+"
+```
+
+`host=` に正しいホスト(Workbench の中の PostgreSQL なら `localhost`)が出ていれば、DB の設定は読めています。
 
 ## 付録 A. 環境変数の一覧
 
