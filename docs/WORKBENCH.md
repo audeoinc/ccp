@@ -56,13 +56,27 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 
 以下のコマンドは、Workbench の**ターミナル**で実行します(Linux なので、Python は `.venv/bin/python`)。
 
-### 3.1 リポジトリを取得する
+### 3.1 リポジトリを取得する(または最新にする)
+
+**まだ取得していない**とき:
 
 ```bash
 cd ~
 git clone https://github.com/audeoinc/ccp.git
 cd ccp
 ```
+
+**前に clone したことがある**とき(以前に動かしていた環境など)は、必ず最新にしてから進めます。
+この手順書と、設定の見本(`server/workbench.env.example`)、引っ越し用のパックの取り込み(`import-pack`)は、2026-10-15 に足したものなので、
+古いままだと、ファイルやコマンドが見つからずに止まります。
+
+```bash
+cd ~/ccp
+git pull
+ls server/workbench.env.example docs/WORKBENCH.md    # 2 つのファイル名が出れば OK
+```
+
+最新にしたら、3.2 の画面のビルドも、やり直します(新しい機能が画面に入るように)。
 
 ### 3.2 画面をビルドする
 
@@ -88,6 +102,8 @@ cd ~/ccp/server
 cp workbench.env.example workbench.env
 nano workbench.env     # または Jupyter のエディタで開く
 ```
+
+> `workbench.env.example` が見つからない(`No such file or directory`)ときは、リポジトリが古いままです。3.1 の `git pull` をしてください。
 
 主な設定(全部は [付録 A](#付録-a-環境変数の一覧)):
 
@@ -210,6 +226,7 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
+| `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
 | 起動時に `KeyError: 'CLOUD_SQL_INSTANCE'` | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
 | 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli counts` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
 | AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
