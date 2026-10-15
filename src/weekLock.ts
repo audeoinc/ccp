@@ -7,6 +7,9 @@ const pad = (n: number) => String(n).padStart(2, '0')
 /** その日を含む週の初め(日曜日) */
 export const sundayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay())
 
+/** 日の鍵(YYYY-MM-DD。ローカルの日付) */
+export const dayKeyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
 /** 週の行の鍵(週の初めの日曜日。YYYY-MM-DD)。cr854_weeks の cr854_weekstart と同じ形 */
 export const weekKeyOf = (d: Date) => {
   const s = sundayOf(d)

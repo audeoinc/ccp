@@ -67,11 +67,12 @@ import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
-import { sundayOf } from './weekLock'
+import { dayKeyOf, sundayOf } from './weekLock'
 import { logEvent, myName } from './history'
 import { Cr854_eventsService, type Cr854_events } from './gcpdata/Cr854_eventsService'
 import { WeekChecklist } from './WeekChecklist'
 import { WeekReport } from './WeekReport'
+import { MiniCalendar } from './MiniCalendar'
 import { printWeek } from './printWeek'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 
@@ -654,6 +655,27 @@ function App() {
     }
     if (month) setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
   }
+  /** ミニカレンダーで選んだ所へ移る(W11)。週は、その日を含む週。月の表示も、その週の真ん中の月に合わせる(shift と同じ) */
+  const goTo = (v: 'month' | 'week' | 'list', d: Date) => {
+    const sun = sundayOf(d)
+    const mid = v === 'week' ? new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 3) : d
+    setWeekStart(sun)
+    setMonth(new Date(mid.getFullYear(), mid.getMonth(), 1))
+    if (v !== view) {
+      setView(v)
+      savePref(VIEW_KEY, v)
+    }
+  }
+  // 日ごとの配信の数(ミニカレンダーの印。絞り込みを反映し、取りやめは数えない)
+  const dayCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of filtered) {
+      if (!c.cr854_scheduledat || isCancelled(c)) continue
+      const k = dayKeyOf(new Date(c.cr854_scheduledat))
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return m
+  }, [filtered])
   const setFilter = (k: keyof Filters) => (v: string) => setFilters({ ...filters, [k]: v })
   const [autoDraft, setAutoDraft] = useState(loadAutoDraft)
   useTemplates() // テンプレートの登録が変わったら、画面全体を描き直す
@@ -782,13 +804,27 @@ function App() {
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
               <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel)}>
-                {view === 'compare'
-                  ? t('絞り込んで比べる', 'Filter and compare')
-                  : view === 'week'
-                  ? weekLabel(weekStart)
-                  : lang === 'ja'
-                    ? `${month.getFullYear()}年${month.getMonth() + 1}月`
-                    : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}
+                {view === 'compare' ? (
+                  t('絞り込んで比べる', 'Filter and compare')
+                ) : (
+                  // 期間の文字を押すと、ミニカレンダーで月・週・日を選んで移れる(W11)
+                  <MiniCalendar
+                    label={
+                      view === 'week'
+                        ? weekLabel(weekStart)
+                        : lang === 'ja'
+                          ? `${month.getFullYear()}年${month.getMonth() + 1}月`
+                          : month.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })
+                    }
+                    view={view}
+                    month={month}
+                    weekStart={weekStart}
+                    dayCounts={dayCounts}
+                    onPickMonth={(d) => goTo('month', d)}
+                    onPickWeek={(d) => goTo('week', d)}
+                    onPickDay={(d) => goTo(view === 'week' ? 'week' : view, d)}
+                  />
+                )}
               </span>
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
               {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
