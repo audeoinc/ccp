@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import unquote
 
 import aiohttp
 
@@ -161,14 +162,62 @@ async def create_row(table: str, request: Request):
     return ok(t.to_api(dict(row)))
 
 
+# 変更の記録(アラートの「MD 方針の変更」「日程の変更」のため。バックログ A1)。
+# 配信日時・商品の方針が書き換わったら、変更前と変更後を change_logs に残す。どこから書き換えても漏れないよう、サーバーの側で記録する。
+# テーブル(Dataverse の名前) → (種類, 見張る列(PostgreSQL の名前), 一緒に残す列)
+WATCHED: dict[str, tuple[str, list[str], str]] = {
+    "cr854_deliverycards": ("date", ["scheduled_at"], "name"),
+    "cr854_productpolicies": ("policy", ["stage", "promo_period", "policy"], "product_code"),
+}
+
+
+def _text(v: Any) -> str:
+    s = sc.serialize(v)
+    return "" if s is None else str(s)
+
+
+async def _log_changes(conn: AsyncConnection, t: sc.Table, row_id: Any, before: dict[str, Any], after: dict[str, Any], actor: str) -> None:
+    kind, cols, extra = WATCHED[t.dv]
+    for col in cols:
+        if col not in after or _text(before.get(col)) == _text(after.get(col)):
+            continue
+        is_card = t.dv == "cr854_deliverycards"
+        await conn.execute(
+            text(
+                "INSERT INTO change_logs (kind, field, before_value, after_value, product_code, card_name, actor, delivery_card_id) "
+                "VALUES (:kind, :field, :before, :after, :code, :card_name, :actor, :card_id)"
+            ),
+            {
+                "kind": kind,
+                "field": col,
+                "before": _text(before.get(col)),
+                "after": _text(after.get(col)),
+                "code": None if is_card else after.get(extra) or before.get(extra),
+                "card_name": (after.get(extra) or before.get(extra)) if is_card else None,
+                "actor": actor or None,
+                "card_id": row_id if is_card else None,
+            },
+        )
+
+
 @router.patch("/{table}/{row_id}")
 async def update_row(table: str, row_id: str, request: Request):
     t = SCHEMA.table(table)
     values = t.to_db(await _body(request))
     sets = [f"{c} = :{c}" for c in values] + ["modified_on = now()"]
     sql = f"UPDATE {t.pg} SET {', '.join(sets)} WHERE id = :_id RETURNING {_columns_sql(t, None)}"
+    rid = sc.coerce("uuid", row_id)
+    watched = WATCHED.get(t.dv)
     async with db(write=True) as conn:
-        row = (await conn.execute(text(sql), {**values, "_id": sc.coerce("uuid", row_id)})).mappings().first()
+        before = None
+        if watched and any(c in values for c in watched[1]):
+            cols = ", ".join([*watched[1], watched[2]])
+            before = (await conn.execute(text(f"SELECT {cols} FROM {t.pg} WHERE id = :_id FOR UPDATE"), {"_id": rid})).mappings().first()
+        row = (await conn.execute(text(sql), {**values, "_id": rid})).mappings().first()
+        if row is not None and before is not None:
+            # 書き換えた人(画面で入れた名前。ログインで人を見分けないため、画面が x-ccp-actor で送る)
+            actor = unquote(request.headers.get("x-ccp-actor", ""))[:100]
+            await _log_changes(conn, t, rid, dict(before), {**dict(before), **{k: v for k, v in values.items()}}, actor)
     if row is None:
         return fail(404, "レコードが見つかりません")
     return ok(t.to_api(dict(row)))

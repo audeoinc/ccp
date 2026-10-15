@@ -2,7 +2,7 @@
 // vite.mock.config.ts が、サービスの読み込みを、ここに差し替える。ページを読み込み直すと、データは、最初に戻る。
 
 import { mockAgent } from './agent'
-import { cardNotes, cards, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, weekly, type Row } from './seed'
+import { cardNotes, cards, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, weekly, type Row } from './seed'
 
 const tables: Record<string, Row[]> = {
   Cr854_deliverycardsService: structuredClone(cards),
@@ -17,9 +17,33 @@ const tables: Record<string, Row[]> = {
   Cr854_weeksService: structuredClone(weeks),
   Cr854_deliveryresultsService: structuredClone(deliveryResults),
   Cr854_eventsService: structuredClone(events),
+  Cr854_changelogsService: structuredClone(changeLogs),
 }
 
 const idKey = (name: string) => `${name.replace('Service', '').toLowerCase().replace(/s$/, '').replace('cr854_productpolicie', 'cr854_productpolicy')}id`
+
+// 変更の記録(本番は、サーバーが行う。server/ccp/data_api.py の WATCHED と同じ項目)
+const WATCHED: Record<string, { kind: 'date' | 'policy'; fields: Record<string, string> }> = {
+  Cr854_deliverycardsService: { kind: 'date', fields: { cr854_scheduledat: 'scheduled_at' } },
+  Cr854_productpoliciesService: { kind: 'policy', fields: { cr854_stage: 'stage', cr854_promoperiod: 'promo_period', cr854_policy: 'policy' } },
+}
+function logChange(name: string, before: Row, fields: Row) {
+  const w = WATCHED[name]
+  if (!w) return
+  for (const [dv, col] of Object.entries(w.fields)) {
+    if (!(dv in fields) || String(before[dv] ?? '') === String(fields[dv] ?? '')) continue
+    const card = name === 'Cr854_deliverycardsService'
+    tables.Cr854_changelogsService.push({
+      cr854_changelogid: guid(`change:${Date.now()}:${Math.random()}`),
+      cr854_kind: w.kind,
+      cr854_field: col,
+      cr854_before: String(before[dv] ?? ''),
+      cr854_after: String(fields[dv] ?? ''),
+      ...(card ? { _cr854_deliverycard_value: before.cr854_deliverycardid, cr854_cardname: before.cr854_name } : { cr854_productcode: before.cr854_productcode }),
+      createdon: new Date().toISOString(),
+    })
+  }
+}
 
 interface Options {
   filter?: string
@@ -90,6 +114,7 @@ export function makeService(name: string) {
     async update(id: string, fields: Row) {
       const r = find(id)
       if (!r) return { success: false, error: { message: 'not found' } }
+      logChange(name, r, fields)
       applyBinds(r, fields)
       return { success: true, data: clone(r) }
     },

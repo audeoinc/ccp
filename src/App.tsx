@@ -49,7 +49,7 @@ import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
 import { AlertsPage } from './AlertsPage'
-import { useStockAlerts } from './alerts'
+import { useChangeAlerts, useStockAlerts } from './alerts'
 import { appPath } from './appRoot'
 import { isCancelled } from './cancel'
 import { ResultPeek } from './ResultPeek'
@@ -65,7 +65,7 @@ import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 import { sundayOf } from './weekLock'
-import { logEvent } from './history'
+import { logEvent, myName } from './history'
 import { Cr854_eventsService, type Cr854_events } from './gcpdata/Cr854_eventsService'
 import { WeekChecklist } from './WeekChecklist'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
@@ -341,6 +341,9 @@ function App() {
   const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
   const alertState = useStockAlerts(activeCards, products, cards)
   const alerts = alertState.alerts
+  // 変更のアラート(MD 方針の変更・日程の変更)。件数は、在庫のアラートと合わせて、ヘッダーに出す
+  const changeState = useChangeAlerts(activeCards, products, alertState.placements, cards)
+  const alertCount = alerts.length + changeState.changeAlerts.length
   const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
@@ -660,7 +663,7 @@ function App() {
         </div>
         <span className={styles.headerSpacer} />
         {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
-        <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少)', 'Changes that affect deliveries (out of stock, low stock)')} relationship="description">
+        <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
           <Button
             appearance={page === 'alerts' ? 'primary' : 'subtle'}
             size="small"
@@ -668,9 +671,9 @@ function App() {
             onClick={() => showFace(page === 'alerts' ? 'calendar' : 'alerts')}
           >
             {t('アラート', 'Alerts')}
-            {alerts.length > 0 && (
+            {alertCount > 0 && (
               <Badge size="small" appearance="filled" color={alerts.some((a) => a.kind === 'outOfStock') ? 'danger' : 'warning'} style={{ marginLeft: 6 }}>
-                {alerts.length}
+                {alertCount}
               </Badge>
             )}
           </Button>
@@ -863,7 +866,7 @@ function App() {
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'alerts' ? (
-              <AlertsPage alerts={alerts} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+              <AlertsPage alerts={alerts} changeAlerts={changeState.changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
             ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}

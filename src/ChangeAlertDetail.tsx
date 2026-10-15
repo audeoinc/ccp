@@ -1,0 +1,221 @@
+import { useState } from 'react'
+import { Button, Field, MessageBar, MessageBarBody, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowSwapRegular, CalendarArrowRightRegular, CheckmarkCircleRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
+import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
+import { AlertActionPanel } from './AlertActionPanel'
+import { isLeadStage, type ChangeAlert, type Placement, type StockModel } from './alerts'
+import { myName } from './history'
+import { locale, optionLabel, useT } from './i18n'
+import { CHANNEL_PUSH, statusColor, statusOptions } from './status'
+
+const useStyles = makeStyles({
+  detail: { display: 'grid', rowGap: '12px', minWidth: 0 },
+  title: { margin: 0, fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
+  sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
+  changes: { display: 'grid', rowGap: '6px', padding: '10px 14px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  change: { display: 'grid', gridTemplateColumns: '120px auto auto minmax(0, 1fr)', justifyContent: 'start', columnGap: '10px', alignItems: 'baseline', fontSize: tokens.fontSizeBase300 },
+  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
+  before: { color: tokens.colorNeutralForeground3, textDecoration: 'line-through', overflowWrap: 'anywhere' },
+  after: { fontWeight: tokens.fontWeightSemibold, overflowWrap: 'anywhere' },
+  arrow: { color: tokens.colorNeutralForeground3 },
+  tableWrap: { overflowX: 'auto', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: tokens.fontSizeBase300, fontVariantNumeric: 'tabular-nums' },
+  th: { textAlign: 'left', padding: '6px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: tokens.colorNeutralBackground2, fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
+  td: { padding: '6px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap' },
+  name: { fontWeight: tokens.fontWeightSemibold },
+  dot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', marginRight: '6px' },
+  warn: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
+  actions: { display: 'inline-flex', columnGap: '4px' },
+  resolve: { display: 'grid', rowGap: '8px', padding: '10px 14px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  resolveRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
+  empty: { padding: '16px', color: tokens.colorNeutralForeground3 },
+})
+
+interface Props {
+  alert: ChangeAlert
+  products: Cr854_products[]
+  placements: Map<string, Placement[]>
+  model: StockModel
+  weeks: Cr854_weeks[]
+  onOpenCard: (id: string) => void
+  onChanged: () => Promise<void>
+  /** 対応済みにする */
+  onResolve: (alert: ChangeAlert, note: string) => Promise<void>
+}
+
+/**
+ * 変更のアラート(MD 方針の変更・日程の変更)の詳しい中身。変更前と変更後、影響を受ける配信と、配信ごとの対応、対応済みにする。
+ * 在庫のアラートは、在庫が持つようになれば消えるが、変更のアラートは、確かめたことを人が記録する(対応済み)
+ */
+export function ChangeAlertDetail({ alert, products, placements, model, weeks, onOpenCard, onChanged, onResolve }: Props) {
+  const styles = useStyles()
+  const t = useT()
+  const [action, setAction] = useState<{ mode: 'replace' | 'postpone' | 'cancel'; cardId: string } | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const policy = alert.kind === 'policyChanged'
+  const actionCard = alert.deliveries.find((d) => d.card.cr854_deliverycardid === action?.cardId)?.card
+
+  const dateTime = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '—')
+  const fieldLabel = (f: string) =>
+    ({ stage: t('位置づけ', 'Role'), promo_period: t('販促の期間', 'Promotion period'), policy: t('方針', 'Policy'), scheduled_at: t('配信日時', 'Date and time') })[f] ?? f
+  const valueText = (f: string, v: string) => (f === 'scheduled_at' ? dateTime(v) : v || '—')
+  const statusLabel = (v?: number) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
+  const stage = alert.changes.find((c) => c.field === 'stage')
+  // 変更の説明(理由の最初の文・一覧に使う)
+  const why = policy
+    ? stage
+      ? t(`位置づけが ${stage.before} → ${stage.after} に変わった`, `Role changed: ${stage.before} → ${stage.after}`)
+      : t('MD の方針が変わった', 'MD policy changed')
+    : t(`配信日時が ${dateTime(alert.changes[0]?.before)} → ${dateTime(alert.changes[0]?.after)} に変わった`, `Date changed: ${dateTime(alert.changes[0]?.before)} → ${dateTime(alert.changes[0]?.after)}`)
+
+  const resolve = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onResolve(alert, note.trim())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className={styles.detail}>
+      <div>
+        <h2 className={styles.title}>
+          {policy ? t(`MD 方針の変更: ${alert.product?.cr854_name}`, `MD policy change: ${alert.product?.cr854_name}`) : t(`日程の変更: ${alert.card?.cr854_name}`, `Date change: ${alert.card?.cr854_name}`)}
+        </h2>
+        <div className={styles.sub}>
+          {t(`${dateTime(alert.changedAt)} に変更`, `Changed ${dateTime(alert.changedAt)}`)}
+          {alert.actor ? t(`(${alert.actor})`, ` by ${alert.actor}`) : ''}
+        </div>
+      </div>
+
+      <div className={styles.changes}>
+        {alert.changes.map((c) => (
+          <div key={c.field} className={styles.change}>
+            <span className={styles.label}>{fieldLabel(c.field)}</span>
+            <span className={styles.before}>{valueText(c.field, c.before)}</span>
+            <span className={styles.arrow}>→</span>
+            <span className={styles.after}>{valueText(c.field, c.after)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.sub}>
+        {policy
+          ? alert.deliveries.length > 0
+            ? t('この商品を載せている、まだ送っていない配信。新しい位置づけ・方針に合っているかを確かめ、合わなければ差し替えます', 'Upcoming deliveries that include this product. Check that they still fit the new role; replace the product if not.')
+            : isLeadStage(stage?.after)
+              ? t('主力になりましたが、まだ送っていない配信には、どれにも載っていません。販促の期間の配信に載せることを検討してください', 'It is now a core product but is not in any upcoming delivery. Consider adding it during its promotion period.')
+              : ''
+          : t('移した配信と、移した先の日の、同じ国・チャネルの配信(重なっていないかを確かめる)', 'The moved delivery, and same-day deliveries in the same country and channel (check for overlap).')}
+      </div>
+
+      {alert.deliveries.length > 0 && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>{t('日時', 'Date')}</th>
+                <th className={styles.th}>{t('配信', 'Delivery')}</th>
+                <th className={styles.th}>{t('チャネル', 'Ch.')}</th>
+                <th className={styles.th}>{t('状態', 'Status')}</th>
+                <th className={styles.th}>{policy ? t('載っている場所', 'Where') : t('関係', 'Relation')}</th>
+                <th className={styles.th}>{t('対応', 'Action')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {alert.deliveries.map((d) => (
+                <tr key={d.card.cr854_deliverycardid}>
+                  <td className={styles.td}>{dateTime(d.card.cr854_scheduledat)}</td>
+                  <td className={mergeClasses(styles.td, styles.name)}>{d.card.cr854_name}</td>
+                  <td className={styles.td}>{d.card.cr854_channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
+                  <td className={styles.td}>
+                    <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.cr854_status ?? 588230000) }} />
+                    {statusLabel(d.card.cr854_status ?? 588230000)}
+                  </td>
+                  <td className={styles.td}>
+                    {policy
+                      ? d.sections.map((s) => t(`セクション ${s + 1}`, `Section ${s + 1}`)).join('・')
+                      : d.note === 'moved'
+                        ? t('移した配信', 'Moved')
+                        : <span className={styles.warn}>{t('同じ日・同じチャネル', 'Same day, same channel')}</span>}
+                  </td>
+                  <td className={styles.td}>
+                    <span className={styles.actions}>
+                      {policy && (
+                        <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.cr854_deliverycardid })}>
+                          {t('差し替え', 'Replace')}
+                        </Button>
+                      )}
+                      <Tooltip content={t('延期', 'Postpone')} relationship="label">
+                        <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.cr854_deliverycardid })} />
+                      </Tooltip>
+                      <Tooltip content={t('取りやめ', 'Cancel delivery')} relationship="label">
+                        <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.cr854_deliverycardid })} />
+                      </Tooltip>
+                      <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
+                        <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.cr854_deliverycardid)} />
+                      </Tooltip>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {done && (
+        <MessageBar intent="success">
+          <MessageBarBody>{done}</MessageBarBody>
+        </MessageBar>
+      )}
+      {action && actionCard && (
+        <AlertActionPanel
+          key={`${action.mode}:${action.cardId}`}
+          mode={action.mode}
+          card={actionCard}
+          product={alert.product}
+          why={why}
+          products={products}
+          placements={placements}
+          model={model}
+          weeks={weeks}
+          onClose={() => setAction(null)}
+          onDone={async (message) => {
+            setAction(null)
+            setDone(message)
+            await onChanged()
+          }}
+        />
+      )}
+
+      <div className={styles.resolve}>
+        <Field label={t('確かめた結果(対応済みにするときのメモ。任意)', 'What you checked (note when marking as handled, optional)')} size="small">
+          <Textarea value={note} onChange={(_, d) => setNote(d.value)} rows={2} placeholder={t('例: 2 本とも差し替えた / このままでよいと判断した', 'e.g. Replaced in both / Decided to keep as is')} />
+        </Field>
+        <div className={styles.resolveRow}>
+          <Button appearance="primary" size="small" icon={<CheckmarkCircleRegular />} disabled={busy} onClick={() => void resolve()}>
+            {t('対応済みにする', 'Mark as handled')}
+          </Button>
+          {busy && <Spinner size="extra-tiny" />}
+          <span className={styles.sub}>
+            {t(`対応した人: ${myName() || '(名前が未設定)'}。対応済みにすると、一覧から消えます(記録は残ります)`, `Handled by: ${myName() || '(no name set)'}. It leaves the list (the record is kept).`)}
+          </span>
+        </div>
+        {error && (
+          <MessageBar intent="error">
+            <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
+      </div>
+    </div>
+  )
+}

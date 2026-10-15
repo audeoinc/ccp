@@ -12,6 +12,7 @@ import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklype
 import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
 import { Cr854_weeklyperformancesService } from './generated/services/Cr854_weeklyperformancesService'
 import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpdata/Cr854_deliveryresultsService'
+import { Cr854_changelogsService, type Cr854_changelogs } from './gcpdata/Cr854_changelogsService'
 import { STATE_SELECTED } from './items'
 import { parseProductResults } from './results'
 
@@ -211,4 +212,131 @@ export function useStockAlerts(cards: Cr854_deliverycards[], products: Cr854_pro
     }),
     [cards, products, placements, weekly, results],
   )
+}
+
+// ---- 変更のアラート(MD 方針の変更・日程の変更)。変更の記録(cr854_changelogs)から作る。対応済みにしたものは出さない
+
+/** 変わった項目 1 つ */
+export interface ChangeItem {
+  field: string
+  before: string
+  after: string
+}
+
+export interface ChangeAlert {
+  /** policy:<商品コード> / date:<配信 ID> */
+  id: string
+  kind: 'policyChanged' | 'dateChanged'
+  /** まとめた変更の記録(対応済みにするときに、すべてを対応済みにする) */
+  logs: Cr854_changelogs[]
+  changes: ChangeItem[]
+  /** いちばん新しい変更の日時・人 */
+  changedAt: string
+  actor?: string
+  /** 方針の変更: 商品 */
+  product?: Cr854_products
+  /** 日程の変更: 移した配信 */
+  card?: Cr854_deliverycards
+  /** 影響を受ける配信(まだ送っていないもの。日程の変更は、移した配信と、移した先の日の同じチャネルの配信) */
+  deliveries: { card: Cr854_deliverycards; sections: number[]; note?: 'moved' | 'sameDay' }[]
+}
+
+/** 主力の段階か(日本語・英語のどちらでも入っている) */
+export const isLeadStage = (s?: string) => s === '主力' || s === 'Core'
+
+const localDay = (iso?: string) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+
+export function computeChangeAlerts(args: {
+  logs: Cr854_changelogs[]
+  cards: Cr854_deliverycards[]
+  products: Cr854_products[]
+  placements: Map<string, Placement[]>
+  now?: Date
+}): ChangeAlert[] {
+  const { logs, cards, products, placements, now = new Date() } = args
+  const open = logs.filter((l) => !l.cr854_resolvedat).sort((a, b) => (a.createdon ?? '').localeCompare(b.createdon ?? ''))
+  const upcoming = cards.filter((c) => c.cr854_scheduledat && new Date(c.cr854_scheduledat).getTime() >= now.getTime())
+  const out: ChangeAlert[] = []
+  const group = (key: (l: Cr854_changelogs) => string | undefined, kind: Cr854_changelogs['cr854_kind']) => {
+    const m = new Map<string, Cr854_changelogs[]>()
+    for (const l of open) {
+      const k = l.cr854_kind === kind ? key(l) : undefined
+      if (k) m.set(k, [...(m.get(k) ?? []), l])
+    }
+    return m
+  }
+  // 項目ごとに、最初の変更前と、最後の変更後(何度か変わっても、1 つにまとめる。元に戻ったものは出さない)
+  const merge = (ls: Cr854_changelogs[]): ChangeItem[] => {
+    const by = new Map<string, ChangeItem>()
+    for (const l of ls) {
+      const f = l.cr854_field ?? ''
+      const prev = by.get(f)
+      by.set(f, { field: f, before: prev ? prev.before : (l.cr854_before ?? ''), after: l.cr854_after ?? '' })
+    }
+    return [...by.values()].filter((c) => c.before !== c.after)
+  }
+
+  // MD 方針の変更: 商品ごと。影響 = その商品を載せている、まだ送っていない配信。載せていなくても、主力になったなら出す(推すはずの商品)
+  for (const [code, ls] of group((l) => l.cr854_productcode, 'policy')) {
+    const product = products.find((p) => p.cr854_productcode === code)
+    const changes = merge(ls)
+    if (!product || changes.length === 0) continue
+    const deliveries = upcoming.flatMap((c) => {
+      const sections = (placements.get(c.cr854_deliverycardid) ?? []).filter((p) => p.productId === product.cr854_productid).map((p) => p.section)
+      return sections.length > 0 ? [{ card: c, sections }] : []
+    })
+    const toLead = changes.some((c) => c.field === 'stage' && isLeadStage(c.after))
+    if (deliveries.length === 0 && !toLead) continue
+    const last = ls[ls.length - 1]
+    out.push({ id: `policy:${code}`, kind: 'policyChanged', logs: ls, changes, changedAt: last.createdon ?? '', actor: last.cr854_actor, product, deliveries })
+  }
+
+  // 日程の変更: 配信ごと。影響 = 移した配信と、移した先の日の、同じ国・チャネルの配信(重なり)
+  for (const [cardId, ls] of group((l) => l._cr854_deliverycard_value, 'date')) {
+    const card = upcoming.find((c) => c.cr854_deliverycardid === cardId)
+    const changes = merge(ls)
+    if (!card || changes.length === 0) continue
+    const sameDay = upcoming.filter(
+      (c) => c !== card && localDay(c.cr854_scheduledat) === localDay(card.cr854_scheduledat) && c.cr854_channel === card.cr854_channel && c.cr854_country === card.cr854_country,
+    )
+    const last = ls[ls.length - 1]
+    out.push({
+      id: `date:${cardId}`,
+      kind: 'dateChanged',
+      logs: ls,
+      changes,
+      changedAt: last.createdon ?? '',
+      actor: last.cr854_actor,
+      card,
+      deliveries: [{ card, sections: [], note: 'moved' as const }, ...sameDay.map((c) => ({ card: c, sections: [], note: 'sameDay' as const }))],
+    })
+  }
+  // 新しい変更から
+  return out.sort((a, b) => b.changedAt.localeCompare(a.changedAt))
+}
+
+/** 変更のアラートを読む(変更の記録を読み、計算する)。reloadKey が変わったら読み直す */
+export function useChangeAlerts(cards: Cr854_deliverycards[], products: Cr854_products[], placements: Map<string, Placement[]>, reloadKey: unknown) {
+  const [logs, setLogs] = useState<Cr854_changelogs[]>([])
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    Cr854_changelogsService.getAll()
+      .then((res) => res.success && setLogs(res.data ?? []))
+      .catch(() => undefined)
+  }, [reloadKey, tick])
+  const changeAlerts = useMemo(() => computeChangeAlerts({ logs, cards, products, placements }), [logs, cards, products, placements])
+  /** 対応済みにする(まとめた変更の記録を、すべて) */
+  const resolve = async (alert: ChangeAlert, by: string, note: string) => {
+    const at = new Date().toISOString()
+    for (const l of alert.logs) {
+      const res = await Cr854_changelogsService.update(l.cr854_changelogid, { cr854_resolvedat: at, cr854_resolvedby: by, cr854_resolvenote: note })
+      if (!res.success) throw new Error(res.error?.message ?? 'Could not mark as handled')
+    }
+    setTick((n) => n + 1)
+  }
+  return { changeAlerts, resolve, reload: () => setTick((n) => n + 1) }
 }

@@ -4,7 +4,8 @@ import { ArrowSwapRegular, CalendarArrowRightRegular, OpenRegular, ProhibitedReg
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
 import { AlertActionPanel } from './AlertActionPanel'
-import { LOW_STOCK_WEEKS, type AffectedDelivery, type Placement, type StockAlert, type StockModel } from './alerts'
+import { LOW_STOCK_WEEKS, isLeadStage, type AffectedDelivery, type ChangeAlert, type Placement, type StockAlert, type StockModel } from './alerts'
+import { ChangeAlertDetail } from './ChangeAlertDetail'
 import { locale, optionLabel, useT } from './i18n'
 import { CHANNEL_PUSH, statusColor, statusOptions } from './status'
 
@@ -54,6 +55,10 @@ const useStyles = makeStyles({
 
 interface Props {
   alerts: StockAlert[]
+  /** 変更のアラート(MD 方針の変更・日程の変更) */
+  changeAlerts: ChangeAlert[]
+  /** 変更のアラートを対応済みにする */
+  onResolve: (alert: ChangeAlert, note: string) => Promise<void>
   products: Cr854_products[]
   placements: Map<string, Placement[]>
   model: StockModel
@@ -64,17 +69,20 @@ interface Props {
   onChanged: () => Promise<void>
 }
 
-const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: tokens.colorPaletteDarkOrangeBorderActive }
+const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: tokens.colorPaletteDarkOrangeBorderActive, policyChanged: tokens.colorPalettePurpleBorderActive, dateChanged: tokens.colorPaletteBlueBorderActive }
 
 /**
  * アラートの画面(ワイヤーフレーム 12)。左に、配信に影響する変更(いまは在庫切れ・在庫僅少)の一覧。
  * 選ぶと、右に、影響を受ける、まだ送っていない配信と、商品が載っている場所、配信日の在庫の見込みを出す
  */
-export function AlertsPage({ alerts, products, placements, model, weeks, onOpenCard, onChanged }: Props) {
+export function AlertsPage({ alerts, changeAlerts, onResolve, products, placements, model, weeks, onOpenCard, onChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const selected = alerts.find((a) => a.id === selectedId) ?? alerts[0]
+  // 選んでいるアラート(在庫か、変更のどちらか)。選んでいなければ、一覧のいちばん上
+  const selectedChangeById = changeAlerts.find((a) => a.id === selectedId)
+  const selected = selectedChangeById ? undefined : (alerts.find((a) => a.id === selectedId) ?? alerts[0])
+  const selectedChange = selectedChangeById ?? (selected ? undefined : changeAlerts[0])
   // 対応のパネル(差し替え・延期)を開いている配信
   const [action, setAction] = useState<{ mode: 'replace' | 'postpone' | 'cancel'; cardId: string } | null>(null)
   const [done, setDone] = useState<string | null>(null)
@@ -106,14 +114,14 @@ export function AlertsPage({ alerts, products, placements, model, weeks, onOpenC
     )
   const statusLabel = (v?: number) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
 
-  if (alerts.length === 0) {
+  if (alerts.length === 0 && changeAlerts.length === 0) {
     return <div className={styles.empty}>{t('いま、配信に影響するアラートはありません', 'No alerts affect upcoming deliveries')}</div>
   }
 
   return (
     <div className={styles.root}>
       <div className={styles.list}>
-        <div className={styles.listHead}>{t(`配信に影響する変更(${alerts.length})`, `Changes that affect deliveries (${alerts.length})`)}</div>
+        <div className={styles.listHead}>{t(`配信に影響する変更(${alerts.length + changeAlerts.length})`, `Changes that affect deliveries (${alerts.length + changeAlerts.length})`)}</div>
         {alerts.map((a) => (
           <button key={a.id} type="button" className={mergeClasses(styles.item, a.id === selected?.id && styles.itemOn)} style={{ borderLeftColor: KIND_COLOR[a.kind] }} onClick={() => { setSelectedId(a.id); setAction(null); setDone(null) }}>
             <span className={styles.itemKind}>
@@ -126,7 +134,42 @@ export function AlertsPage({ alerts, products, placements, model, weeks, onOpenC
             <span className={styles.itemSub}>{summary(a)}</span>
           </button>
         ))}
+        {changeAlerts.map((a) => {
+          const stage = a.changes.find((c) => c.field === 'stage')
+          const when = a.changes.find((c) => c.field === 'scheduled_at')
+          return (
+            <button key={a.id} type="button" className={mergeClasses(styles.item, a.id === selectedChange?.id && styles.itemOn)} style={{ borderLeftColor: KIND_COLOR[a.kind] }} onClick={() => { setSelectedId(a.id); setAction(null); setDone(null) }}>
+              <span className={styles.itemKind}>
+                {a.kind === 'policyChanged' ? t('MD 方針の変更', 'MD policy change') : t('日程の変更', 'Date change')}
+                <Badge size="small" appearance="tint" color={a.kind === 'policyChanged' ? 'important' : 'informative'}>
+                  {t(`${a.deliveries.length} 本`, `${a.deliveries.length}`)}
+                </Badge>
+              </span>
+              <span className={styles.itemName} title={a.product?.cr854_name ?? a.card?.cr854_name}>{a.product?.cr854_name ?? a.card?.cr854_name}</span>
+              <span className={styles.itemSub}>
+                {stage
+                  ? `${stage.before} → ${stage.after}${a.deliveries.length === 0 && isLeadStage(stage.after) ? t('(まだ載せていない)', ' (not featured yet)') : ''}`
+                  : when
+                    ? `${dateText(when.before)} → ${dateText(when.after)}`
+                    : t('方針・期間の変更', 'Policy / period changed')}
+              </span>
+            </button>
+          )
+        })}
       </div>
+      {selectedChange && (
+        <ChangeAlertDetail
+          key={selectedChange.id}
+          alert={selectedChange}
+          products={products}
+          placements={placements}
+          model={model}
+          weeks={weeks}
+          onOpenCard={onOpenCard}
+          onChanged={onChanged}
+          onResolve={onResolve}
+        />
+      )}
 
       {selected && (
         <div className={styles.detail}>

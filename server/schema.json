@@ -208,6 +208,26 @@
       "lookups": [
         ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "SET NULL"}]
       ]
+    },
+    "cr854_changelogs": {
+      "gcpOnly": true,
+      "pg": "change_logs",
+      "pk": "cr854_changelogid",
+      "columns": [
+        ["cr854_kind", "kind", "text", {"index": true}],
+        ["cr854_field", "field", "text"],
+        ["cr854_before", "before_value", "text"],
+        ["cr854_after", "after_value", "text"],
+        ["cr854_productcode", "product_code", "text", {"index": true}],
+        ["cr854_cardname", "card_name", "text"],
+        ["cr854_actor", "actor", "text"],
+        ["cr854_resolvedat", "resolved_at", "timestamptz"],
+        ["cr854_resolvedby", "resolved_by", "text"],
+        ["cr854_resolvenote", "resolve_note", "text"]
+      ],
+      "lookups": [
+        ["cr854_deliverycard", "delivery_card_id", "cr854_deliverycards", {"onDelete": "SET NULL"}]
+      ]
     }
   }
 }

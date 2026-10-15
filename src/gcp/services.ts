@@ -4,6 +4,21 @@
 // その import をここに差し替えて、同じ関数名・同じ戻り値の形で、サーバーの /api/data を呼ぶ。
 // 画面のコードは、どちらのビルドでも同じ(同期を保つため、画面側には GCP 用の分岐を入れない)。
 import { showDbWake } from './dbWake'
+
+// 書き換えた人(画面で入れた名前。src/history.ts の myName と同じ記録を読む)。サーバーは、変更の記録(配信日時・商品の方針)に残す。
+// history.ts は、このファイルを使うサービスを読み込むので、ここでは読み込まず、同じ記録を直接読む(読み込みの輪を作らないため)
+const actorName = (): string => {
+  for (const key of ['me.name', 'comment.author']) {
+    try {
+      const v = localStorage.getItem(key)
+      const name = v === null ? '' : (JSON.parse(v) as string)
+      if (name) return name
+    } catch {
+      /* 読めなければ、次の記録を見る */
+    }
+  }
+  return ''
+}
 import { appPath } from '../appRoot'
 
 interface ErrorBody {
@@ -30,7 +45,7 @@ async function call<T>(method: string, path: string, query?: URLSearchParams, bo
   try {
     const res = await fetch(appPath(`/api/data/${path}${query && [...query].length ? `?${query}` : ''}`), {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), 'x-ccp-actor': encodeURIComponent(actorName()) },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     const json = (await res.json().catch(() => null)) as Result<T> | null

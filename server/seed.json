@@ -9860,10 +9860,10 @@
    "cr854_productpolicyid": "6f8d13c7-ce89-4444-a68f-52ad039469da",
    "cr854_name": "U07",
    "cr854_productcode": "U07",
-   "cr854_policy": "Rising best seller: feature in top slots and pair with related items.",
+   "cr854_policy": "Clearance: prioritize selling through stock; stress value and bundle offers.",
    "cr854_promoplan": "Week of 10/05: push announcement\nWeek of 10/19: category feature email\nWeek of 11/09: re-promote in the winter prep campaign",
    "cr854_promoperiod": "2026-10-19 - 2026-12-14",
-   "cr854_stage": "Core"
+   "cr854_stage": "Clearance"
   },
   {
    "cr854_productpolicyid": "648d0276-c589-4619-a78f-3b10f6945563",
@@ -10967,6 +10967,29 @@
    "cr854_lastyearrevenue": 25325,
    "cr854_products": "[{\"productId\":\"21575c0d-6836-4dd0-a177-536b0f92a5e6\",\"clicks\":2805,\"units\":94,\"revenue\":11092},{\"productId\":\"985ed327-7939-472a-a475-198d948b2880\",\"clicks\":2169,\"units\":46,\"revenue\":3312},{\"productId\":\"8b5ebeb0-6e39-45d9-a775-0516a18b3cf7\",\"clicks\":2106,\"units\":86,\"revenue\":6192}]",
    "cr854_links": "{\"hero\":2060,\"buttons\":[1063,319,130],\"other\":130}"
+  }
+ ],
+ "cr854_changelogs": [
+  {
+   "cr854_changelogid": "fe49b807-05c1-4556-a7a1-0971868eeba0",
+   "cr854_kind": "policy",
+   "cr854_field": "stage",
+   "cr854_before": "Core",
+   "cr854_after": "Clearance",
+   "cr854_productcode": "U07",
+   "cr854_actor": "MD: Aya Mori",
+   "createdon": "2026-10-14T02:30:00.000Z"
+  },
+  {
+   "cr854_changelogid": "f86a103a-d75b-440b-af7d-36c023564089",
+   "cr854_kind": "date",
+   "cr854_field": "scheduled_at",
+   "cr854_before": "2026-10-21T01:00:00Z",
+   "cr854_after": "2026-10-19T01:00:00Z",
+   "_cr854_deliverycard_value": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
+   "cr854_cardname": "Holiday Preview",
+   "cr854_actor": "Jordan Lee",
+   "createdon": "2026-10-14T05:10:00.000Z"
   }
  ]
 }

@@ -32,8 +32,8 @@ const useStyles = makeStyles({
 interface Props {
   mode: 'replace' | 'postpone' | 'cancel'
   card: Cr854_deliverycards
-  /** 在庫が持たない商品 */
-  product: Cr854_products
+  /** アラートの商品(在庫・方針の変更)。日程の変更では、ない(差し替えは使えない) */
+  product?: Cr854_products
   /** アラートの説明(変更の理由の、最初の文に使う) */
   why: string
   products: Cr854_products[]
@@ -63,13 +63,14 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const styles = useStyles()
   const t = useT()
   const approved = (card.cr854_status ?? 0) >= STATUS_APPROVED
+  const subject = product ? `${product.cr854_name}: ` : ''
   const locked = !!confirmedWeekOf(weeks, card.cr854_scheduledat)
   const [reason, setReason] = useState(
     mode === 'replace'
-      ? t(`${product.cr854_name}: ${why}。差し替えた`, `${product.cr854_name}: ${why}. Replaced.`)
+      ? t(`${subject}${why}。差し替えた`, `${subject}${why}. Replaced.`)
       : mode === 'postpone'
-        ? t(`${product.cr854_name}: ${why}。延期した`, `${product.cr854_name}: ${why}. Postponed.`)
-        : t(`${product.cr854_name}: ${why}。取りやめた`, `${product.cr854_name}: ${why}. Cancelled.`),
+        ? t(`${subject}${why}。延期した`, `${subject}${why}. Postponed.`)
+        : t(`${subject}${why}。取りやめた`, `${subject}${why}. Cancelled.`),
   )
   // 承認済み・確定の配信は、変えたらもう一度レビューを受けるのを、最初の値にする
   const [backToReview, setBackToReview] = useState(approved)
@@ -82,11 +83,11 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
     return localInput(d)
   })
   const when = card.cr854_scheduledat ?? new Date().toISOString()
-  const rows = (placements.get(card.cr854_deliverycardid) ?? []).filter((p) => p.productId === product.cr854_productid)
+  const rows = (placements.get(card.cr854_deliverycardid) ?? []).filter((p) => p.productId === product?.cr854_productid)
 
   // 差し替えの候補: 配信の国の市場の、同じカテゴリの商品で、配信日に在庫が持つもの(この配信に載っている商品は除く)
   useEffect(() => {
-    if (mode !== 'replace') return
+    if (mode !== 'replace' || !product) return
     const market = card.cr854_country === US ? US_MARKET : JP_MARKET
     const inCard = new Set((placements.get(card.cr854_deliverycardid) ?? []).map((p) => p.productId))
     const candidates: ReplacementCandidate[] = products
@@ -109,7 +110,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
     }
     // 開いたときに 1 回だけ選ぶ(在庫の見込みが読み直されても、提案は変えない)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, card.cr854_deliverycardid, product.cr854_productid])
+  }, [mode, card.cr854_deliverycardid, product?.cr854_productid])
 
   const run = async (fn: () => Promise<void>, message: string) => {
     if (!reason.trim()) {
@@ -130,7 +131,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const use = (to: Cr854_products) =>
     run(async () => {
       for (const r of rows) await replaceProduct({ card, rowId: r.rowId, to, reason, backToReview, weeks })
-    }, t(`${card.cr854_name} の ${product.cr854_name} を、${to.cr854_name} に差し替えました`, `Replaced ${product.cr854_name} with ${to.cr854_name} in ${card.cr854_name}`))
+    }, t(`${card.cr854_name} の ${product?.cr854_name} を、${to.cr854_name} に差し替えました`, `Replaced ${product?.cr854_name} with ${to.cr854_name} in ${card.cr854_name}`))
   const postpone = () =>
     run(() => postponeDelivery({ card, to, reason, backToReview, weeks }), t(`${card.cr854_name} を ${new Date(to).toLocaleDateString(locale())} に延期しました`, `Postponed ${card.cr854_name} to ${new Date(to).toLocaleDateString(locale())}`))
 

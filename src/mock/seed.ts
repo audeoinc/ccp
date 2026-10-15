@@ -481,3 +481,42 @@ for (const [name, date, notes] of NOTES) {
   const r = c && deliveryResults.find((x) => x._cr854_deliverycard_value === c.cr854_deliverycardid)
   if (r) r.cr854_notes = notes
 }
+
+// ---- 変更の記録(アラートの「MD 方針の変更」「日程の変更」の見本。GCP 版だけのテーブル)
+// 本番では、サーバーが、配信日時・商品の方針の書き換えを記録する。撮影用は、ここで見本を作る(src/mock/db.ts も、書き換えを記録する)
+export const changeLogs: Row[] = []
+{
+  // Crewneck Sweater(U07)の位置づけが、主力から在庫調整に変わった
+  const pol = policies.find((p) => p.cr854_productcode === 'U07')
+  if (pol) {
+    changeLogs.push({
+      cr854_changelogid: guid('change:policy:U07'),
+      cr854_kind: 'policy',
+      cr854_field: 'stage',
+      cr854_before: String(pol.cr854_stage),
+      cr854_after: 'Clearance',
+      cr854_productcode: 'U07',
+      cr854_actor: 'MD: Aya Mori',
+      createdon: '2026-10-14T02:30:00.000Z',
+    })
+    pol.cr854_stage = 'Clearance'
+    pol.cr854_policy = 'Clearance: prioritize selling through stock; stress value and bundle offers.'
+  }
+  // Holiday Preview を、10/21 から今の日時(10/19)に前倒しした
+  const hp = cards.find((c) => c.cr854_name === 'Holiday Preview' && c.cr854_country === COUNTRY['US'])
+  if (hp) {
+    const before = new Date(String(hp.cr854_scheduledat))
+    before.setUTCDate(before.getUTCDate() + 2)
+    changeLogs.push({
+      cr854_changelogid: guid('change:date:holiday-preview'),
+      cr854_kind: 'date',
+      cr854_field: 'scheduled_at',
+      cr854_before: before.toISOString().replace('.000Z', 'Z'),
+      cr854_after: String(hp.cr854_scheduledat).replace('.000Z', 'Z'),
+      _cr854_deliverycard_value: hp.cr854_deliverycardid,
+      cr854_cardname: hp.cr854_name,
+      cr854_actor: 'Jordan Lee',
+      createdon: '2026-10-14T05:10:00.000Z',
+    })
+  }
+}
