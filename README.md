@@ -71,6 +71,7 @@ GitHub Actions(`.github/workflows/ci.yml`)が、`main` への push とプルリ�
 
 - [docs/ONBOARDING.md](docs/ONBOARDING.md) — 新しいメンバーの最初の手順、チームの進め方
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 構成、AI の仕組み、設計の約束事、落とし穴
+- [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md) — ソースの地図(ファイルの構造と役割、変更するときに触るところ)
 - [docs/DATAVERSE.md](docs/DATAVERSE.md) — テーブルと列、セキュリティロール、フロー、サンプルデータの取り込み
 - [docs/ai-queue.md](docs/ai-queue.md) — AI 呼び出し(テーブル + フロー)の詳細
 - [docs/copilot-agent.md](docs/copilot-agent.md) — Copilot Studio のエージェントの仕様
