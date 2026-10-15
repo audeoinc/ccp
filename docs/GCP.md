@@ -90,6 +90,29 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 
 **Vertex AI Workbench(Agent Platform の Workbench)のノートブックで動かすとき**: サーバーを、たとえば 8081 で起動し(`uvicorn ccp.main:app --port 8081`)、Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(**末尾の `/` を付ける**。付けないと、画面のファイルの相対パスがずれる)。画面は、読み込んだ JS の場所から置き場所(`/proxy/8081/`)を求め、`/api/…`・`/img/…` をその下に送るので、ビルドの設定を変える必要はない(`src/appRoot.ts`、`vite.gcp.config.ts` の `base: './'`)。Cloud Run(置き場所が `/`)でも、同じビルドのまま動く。
 
+### 外にアクセスできない環境(Workbench)に、本番のデータと画像を持ち込む(引っ越し用のパック)
+
+クライアントの Vertex AI Workbench のように、サーバーから外(本番の DB・GCS)にアクセスできない環境では、初期データ(`seed --reset`)だと、画像がイラストになり、配信のデータも本番と違う。
+本番の**すべてのデータと画像**を 1 つの ZIP(引っ越し用のパック。`server/ccp/pack.py`)にして、ブラウザ経由で持ち込む。
+
+1. **書き出す**(その環境のブラウザで、本番の画面を開く): ⚙ →「データと画像を書き出す(別の環境へ移す)」。`ccp-pack-<日時>.zip` がダウンロードされる(2026-10 時点で約 4MB、画像 142 点)。
+2. **Workbench に上げる**: Jupyter の画面の「アップロード」で、ZIP を `ccp/server/` に置く。
+3. **取り込む**(Workbench のターミナル。Linux なので `.venv/bin/python`):
+   ```bash
+   cd ccp/server
+   .venv/bin/python -m ccp.cli import-pack ccp-pack-<日時>.zip          # 件数を見せるだけ(何も変えない)
+   .venv/bin/python -m ccp.cli import-pack ccp-pack-<日時>.zip --yes    # DB の中身を置き換え、画像を server/images に展開
+   ```
+   DB の中身は、**すべて置き換わる**(Workbench で入力したデータは消える)。作った日時・変えた日時は、元のまま残る。
+4. **画像をフォルダから配る設定で、サーバーを起動する**:
+   ```bash
+   ASSET_DIR=$PWD/images .venv/bin/python -m uvicorn ccp.main:app --port 8081
+   ```
+   `https://<ノートブックの URL>/proxy/8081/` を開く(末尾の `/` を付ける)。
+
+**開発を続けながら、Workbench を最新にする**: コードは `git pull` → `npm ci` → `npm run build:gcp` → サーバーの起動し直し。本番のデータ・画像にそろえたいときだけ、パックを書き出して取り込む(上の 1〜4)。
+画像(`server/images/`)は、権利のある素材なので Git には入れない(`.gitignore` 済み)。
+
 初期データ(`server/seed.json`)は、撮影用のモックと同じ元データ(`docs/*.csv` → `src/mock/seed.ts`)から作る。`seed.ts` を直したら `npm run seed:export` で書き出し、`seed.json` もコミットする。
 
 ## テスト
