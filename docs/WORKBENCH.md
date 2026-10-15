@@ -3,7 +3,7 @@
 CCP(配信コンテンツプランナー)の GCP 版を、クライアントの **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
 本番(Cloud Run)と同じ**配信のデータ**と**商品・メイン画像の写真**を持ち込むための手順書です。
 
-- 最終更新: 2026-10-15
+- 最終更新: 2026-10-15(クライアントの環境は PostgreSQL に直接つなぐ形に合わせた)
 - 対象: Workbench で CCP を立ち上げる・更新する人
 - 関係する文書: [GCP.md](GCP.md)(GCP 版の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
 
@@ -43,8 +43,8 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 | Node.js | **20.19 以上**(または 22.12 以上)。画面のビルドに使う | `node -v` |
 | Python | **3.12 以上**を推奨(本番は 3.12) | `python3 --version` |
 | Git | リポジトリ `audeoinc/ccp` を取得できる | `git --version` |
-| PostgreSQL | Cloud SQL(PostgreSQL 16)か、ほかの PostgreSQL。空の DB を 1 つ | — |
-| 権限(Workbench のサービスアカウント) | Cloud SQL につなぐなら「**Cloud SQL クライアント**」、AI を使うなら「**Vertex AI ユーザー**」 | IAM の画面 |
+| PostgreSQL | **クライアントの環境は PostgreSQL に直接つなぐ**(Workbench の上や、同じネットワークのサーバー)。CCP 用の DB を 1 つ(本番は PostgreSQL 16) | `psql --version`、または DB の管理者に確認 |
+| 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」(Cloud SQL につなぐときだけ「Cloud SQL クライアント」も) | IAM の画面 |
 | ブラウザ | クライアントの環境から、本番の CCP の画面を開ける | 本番の URL を開く |
 
 > **パッケージの取得について:** 手順の `npm ci` と `pip install` は、パッケージをインターネット(npm・PyPI、または社内のミラー)から取ります。
@@ -93,12 +93,32 @@ nano workbench.env     # または Jupyter のエディタで開く
 
 | 設定 | 中身 |
 |---|---|
-| `CLOUD_SQL_INSTANCE` ・ `DB_USER` ・ `DB_PASSWORD` ・ `DB_NAME` | Cloud SQL につなぐとき |
-| `DATABASE_URL` | ほかの PostgreSQL につなぐとき(Cloud SQL の 4 つの代わり) |
+| `DATABASE_URL` | **PostgreSQL の接続先**(クライアントの環境はこちら)。`postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` |
+| `CLOUD_SQL_INSTANCE` ・ `DB_USER` ・ `DB_PASSWORD` ・ `DB_NAME` | Cloud SQL につなぐときだけ(`DATABASE_URL` の代わり) |
 | `GOOGLE_CLOUD_PROJECT` | AI(Vertex AI)を使うプロジェクト |
 | `ASSET_DIR` | 写真を置くフォルダ。`/home/jupyter/ccp/server/images` のような**絶対パス** |
 
 > `workbench.env` にはパスワードが入るので、Git には入れません(`.gitignore` 済み)。
+>
+> **`DATABASE_URL` の書き方の注意:** 先頭は `postgresql+asyncpg://`(`postgresql://` だけでは動きません)。パスワードに `@` `:` `/` `#` などの記号があるときは、URL の形に置き換えます(例: `@` → `%40`、`#` → `%23`)。
+
+設定を書いたら、DB につながるかを確かめます(テーブルの件数が出れば OK。初回は、テーブルがないというエラーでも、つながってはいます)。
+
+```bash
+set -a; source workbench.env; set +a
+.venv/bin/python -m ccp.cli counts
+```
+
+#### (DB がまだないとき)CCP 用の DB を作る
+
+PostgreSQL の管理者のユーザーで、CCP 用のユーザーと DB を作ります(DB の管理者が別にいるときは、依頼してください)。
+
+```bash
+psql -h <ホスト> -U postgres -c "CREATE USER ccp_app WITH PASSWORD '<パスワード>';"
+psql -h <ホスト> -U postgres -c "CREATE DATABASE ccp OWNER ccp_app;"
+```
+
+テーブルは、3.7 の取り込みのときに自動で作られます。
 
 ### 3.5 本番のデータと写真を書き出す(ブラウザ)
 
@@ -191,7 +211,7 @@ cd server
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
 | 起動時に `KeyError: 'CLOUD_SQL_INSTANCE'` | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
-| 画面が「準備中」のまま・DB につながらない | DB の接続先・パスワードの間違い、サービスアカウントの権限不足 | `.venv/bin/python -m ccp.cli counts` で、DB につながるかを確かめる |
+| 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli counts` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
 | AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
 | `npm ci` / `pip install` が止まる | パッケージの取得先(インターネット)にアクセスできない | 2 の「パッケージの取得について」 |
@@ -203,9 +223,9 @@ cd server
 
 | 環境変数 | 必須 | 中身 | Workbench での値 |
 |---|---|---|---|
-| `CLOUD_SQL_INSTANCE` | Cloud SQL のとき | `<プロジェクトID>:<リージョン>:<インスタンス名>` | その環境の Cloud SQL |
-| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Cloud SQL のとき | DB のユーザー・パスワード・DB の名前(既定 `ccp_app` / なし / `ccp`) | その環境の値 |
-| `DATABASE_URL` | ほかの PostgreSQL のとき | `postgresql+asyncpg://user:pass@host:5432/db` | Cloud SQL の代わり |
+| `DATABASE_URL` | PostgreSQL に直接つなぐとき | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **クライアントの環境の PostgreSQL** |
+| `CLOUD_SQL_INSTANCE` | Cloud SQL のとき | `<プロジェクトID>:<リージョン>:<インスタンス名>` | 設定しない(`DATABASE_URL` を使う) |
+| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Cloud SQL のとき | DB のユーザー・パスワード・DB の名前(既定 `ccp_app` / なし / `ccp`) | 設定しない |
 | `GOOGLE_CLOUD_PROJECT` | AI を使うとき | Vertex AI のプロジェクト | その環境のプロジェクト |
 | `GOOGLE_CLOUD_LOCATION` | — | Vertex AI の場所(既定 `global`) | `global` |
 | `GEMINI_MODEL` / `GEMINI_THINKING` | — | AI のモデル・考える量 | 本番と同じなら `gemini-3.8-flash` / `low` |
