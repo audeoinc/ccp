@@ -3,6 +3,7 @@
   python -m ccp.cli migrate          テーブルを作る(なければ作り、足りない列は足す)
   python -m ccp.cli seed [--reset]   初期データ(server/seed.json)を入れる。--reset は、中身を消してから
   python -m ccp.cli counts           各テーブルの件数
+  python -m ccp.cli check            動かす前の確認(設定・DB への接続・写真・画面のビルド。パスワードは出さない。何も変えない)
   python -m ccp.cli import-pack <ZIP> [--images <フォルダ>] [--yes]
                                      引っ越し用のパック(画面の ⚙ →「データと画像を書き出す」)を取り込む。
                                      DB の中身をパックの内容に置き換え、画像をフォルダ(既定: server/images)に展開する。
@@ -100,6 +101,7 @@ def main() -> None:
     s = sub.add_parser("seed")
     s.add_argument("--reset", action="store_true")
     sub.add_parser("counts")
+    sub.add_parser("check")
     ip = sub.add_parser("import-pack")
     ip.add_argument("path", type=Path)
     ip.add_argument("--images", type=Path, default=DEFAULT_IMAGES)
@@ -109,6 +111,10 @@ def main() -> None:
         asyncio.run(migrate())
     elif args.cmd == "seed":
         asyncio.run(seed(args.reset))
+    elif args.cmd == "check":
+        from .check import run
+
+        sys.exit(1 if run() else 0)
     elif args.cmd == "import-pack":
         asyncio.run(import_pack(args.path, args.images, args.yes))
     else:

@@ -142,11 +142,11 @@ env | grep -E "^(DATABASE_URL|CLOUD_SQL_INSTANCE|DB_|GOOGLE_CLOUD_|GEMINI_)" | c
 >
 > **`DATABASE_URL` の書き方の注意:** 先頭は `postgresql+asyncpg://`(`postgresql://` だけでは動きません)。パスワードに `@` `:` `/` `#` などの記号があるときは、URL の形に置き換えます(例: `@` → `%40`、`#` → `%23`)。値は `'…'` で囲みます(`$` や `&` を、シェルが別の意味に読まないように)。
 
-設定を書いたら、DB につながるかを確かめます(テーブルの件数が出れば OK。初回は、テーブルがないというエラーでも、つながってはいます)。
+設定を書いたら、DB につながるかを確かめます(`[NG]` がなければ OK。写真・画面の `[NG]` は、このあとの手順で直るので、この時点では気にしない)。
 
 ```bash
 set -a; source workbench.env; set +a
-.venv/bin/python -m ccp.cli counts
+.venv/bin/python -m ccp.cli check
 ```
 
 #### PostgreSQL を Workbench の中に入れたとき(conda など)
@@ -268,10 +268,10 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
-| `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる)③ `DATABASE_URL` がなく、Cloud SQL の経路(外への接続)になった | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、下の「接続先の確かめ方」で表示する |
+| `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる)③ `DATABASE_URL` がなく、Cloud SQL の経路(外への接続)になった | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
 | 起動時に `KeyError: 'CLOUD_SQL_INSTANCE'` | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
-| 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli counts` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
+| 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli check` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
 | AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
 | `npm ci` / `pip install` が止まる | パッケージの取得先(インターネット)にアクセスできない | 2 の「パッケージの取得について」 |
@@ -279,22 +279,42 @@ cd server
 
 ---
 
-### 接続先の確かめ方(パスワードは出さない)
+### 動かす前の確認(`check`)
+
+設定・DB への接続・写真・画面のビルドを、まとめて確かめるコマンドです。パスワードは表示せず、何も変えません。困ったときは、まずこれを実行し、`[NG]` の行を直します。
 
 ```bash
 cd ~/ccp/server
 set -a; source workbench.env; set +a
-.venv/bin/python -c "
-import os; from urllib.parse import urlsplit
-u = os.getenv('DATABASE_URL')
-if u:
-    p = urlsplit(u); print('DATABASE_URL: scheme=', p.scheme, ' host=', p.hostname, ' port=', p.port, ' db=', p.path)
-else:
-    print('DATABASE_URL なし / CLOUD_SQL_INSTANCE =', os.getenv('CLOUD_SQL_INSTANCE'))
-"
+.venv/bin/python -m ccp.cli check
 ```
 
-`host=` に正しいホスト(Workbench の中の PostgreSQL なら `localhost`)が出ていれば、DB の設定は読めています。
+出力の例(問題がないとき):
+
+```
+■ DB
+  [OK  ] 接続先: DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp_app)
+  [OK  ] ホスト localhost → 127.0.0.1
+  [OK  ] つながりました(PostgreSQL 16.x …)。テーブル 12 個、配信カード 83 件
+■ AI(Vertex AI の Gemini)
+  [OK  ] GOOGLE_CLOUD_PROJECT=… / GOOGLE_CLOUD_LOCATION=global / GEMINI_MODEL=…
+■ 写真
+  [OK  ] ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
+■ 画面
+  [OK  ] ビルドがあります(/home/jupyter/ccp/dist-gcp)
+```
+
+主な `[NG]` と直し方:
+
+| 表示 | 直し方 |
+|---|---|
+| `DATABASE_URL に @ が 2 つ以上あります` / `ホスト ss@localhost が見つかりません` | パスワードの中の `@` を `%40` に置き換える |
+| `接続先の設定がありません` | `DATABASE_URL` を設定する(設定済みのはずなら、変数の名前を確かめる) |
+| `ConnectionRefusedError` | PostgreSQL が止まっている、ポートが違う。`pg_isready -h localhost -p 5432` |
+| `password authentication failed` | ユーザー名・パスワードの違い |
+| `database "…" does not exist` | DB の名前の違い、まだ作っていない(3.4 の「CCP 用の DB を作る」) |
+| `ASSET_DIR=… に写真がありません` | 3.7 の `import-pack … --yes` をする。`ASSET_DIR` を展開先と同じにする |
+| `ビルドがありません` | リポジトリのルートで `npm ci` → `npm run build:gcp` |
 
 ## 付録 A. 環境変数の一覧
 
