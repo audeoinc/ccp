@@ -61,6 +61,14 @@ async def healthz():
 async def db_status():
     """画面の「準備中」表示が、数秒おきに呼ぶ。止まっていれば、起動も依頼する"""
     if not dbctl.enabled():
+        # DB の自動起動を使わない環境(Workbench など): 実際につながるかを確かめ、つながらなければ理由を返す
+        from . import data_api
+
+        try:
+            async with db() as conn:
+                await asyncio.wait_for(conn.execute(text("SELECT 1")), 8)
+        except Exception:  # noqa: BLE001 — 理由は data_api.last_db_error に残っている
+            return {"state": "unreachable", "detail": data_api.last_db_error or "理由は不明"}
         return {"state": "running"}
     c = dbctl.controller()
     try:

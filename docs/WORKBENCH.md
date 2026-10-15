@@ -268,6 +268,7 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
+| 画面に「**データベースにつながりません**」(以前の版では「データベースを起動しています」のまま進まない) | **サーバーを起動したターミナル**に、DB の設定が読み込まれていない(`check` を実行したターミナルとは別のターミナルで起動した、`conda activate` していない など)。画面の赤い文字が、つながらない理由 | サーバーを止め、**同じターミナルで** `set -a; source workbench.env; set +a`(必要なら `conda activate`)→ `check` → 起動 の順に実行する。サーバーのターミナルにも「DB につながりません: …」と理由が出る |
 | `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる)③ `DATABASE_URL` がなく、Cloud SQL の経路(外への接続)になった | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
 | 起動時に `KeyError: 'CLOUD_SQL_INSTANCE'` | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |

@@ -10,6 +10,7 @@ from typing import Any
 import aiohttp
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -54,15 +55,25 @@ async def _ensure_schema(conn: AsyncConnection) -> None:
         _schema_ready = True
 
 
+# 最後に DB につなげなかった理由(本番以外の環境で、画面とサーバーのログに出す)
+last_db_error: str | None = None
+log = logging.getLogger("ccp.db")
+
+
 @asynccontextmanager
 async def db(write: bool = False) -> AsyncIterator[AsyncConnection]:
-    """DB に接続する(write=True なら、トランザクションつき)。起動の途中などで接続できないときは、500 ではなく「準備中」として扱う"""
-    conn = (await get_engine()).connect()
+    """DB に接続する(write=True なら、トランザクションつき)。起動の途中などで接続できないときは、500 ではなく「準備中」として扱う。
+    本番以外(DB の自動起動を使わない環境)では、つながらない理由を残して、画面に「つながりません」と出す(register_errors)"""
+    global last_db_error
     try:
+        conn = (await get_engine()).connect()
         await conn.start()
     except (SQLAlchemyError, OSError, aiohttp.ClientError, asyncio.TimeoutError, KeyError) as e:
+        last_db_error = f"{type(e).__name__}: {e}" if not isinstance(e, KeyError) else f"設定がありません: {e}(DATABASE_URL、または CLOUD_SQL_INSTANCE など)"
+        log.warning("DB につながりません: %s", last_db_error)
         await reset_engine()
         raise dbctl.DbNotReady("starting") from e
+    last_db_error = None
     try:
         await _ensure_schema(conn)
         if write:
@@ -184,6 +195,9 @@ async def _body(request: Request) -> dict[str, Any]:
 def register_errors(app: FastAPI) -> None:
     @app.exception_handler(dbctl.DbNotReady)
     async def _starting(_: Request, e: dbctl.DbNotReady):
+        # DB の自動起動を使わない環境(Workbench など)では、待っても起動しないので、つながらない理由を返す
+        if not dbctl.enabled():
+            return fail(503, f"データベースにつながりません: {last_db_error or '理由は不明'}", "db_unreachable")
         return fail(503, "データベースを起動しています(10 分ほどかかることがあります)", "db_starting")
 
     @app.exception_handler(sc.BadRequest)

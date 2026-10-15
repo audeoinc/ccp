@@ -37,6 +37,8 @@ async function call<T>(method: string, path: string, query?: URLSearchParams, bo
     if (!json) return { success: false, error: { message: `サーバーの応答が正しくありません(${res.status})` } }
     // DB が止まっている(起動中)ときは、準備中の表示を出す(準備ができたら、自動で読み込み直す)
     if (!json.success && (json.error?.code === 'db_starting' || json.error?.code === 'db_unavailable')) showDbWake()
+    // DB の自動起動を使わない環境(Workbench など)で、つながらないときは、理由と直し方を出す(待っても起動しないため)
+    if (!json.success && json.error?.code === 'db_unreachable') showDbWake(json.error.message.replace(/^データベースにつながりません: /, ''))
     return json
   } catch (e) {
     return { success: false, error: { message: e instanceof Error ? e.message : String(e) } }
