@@ -51,6 +51,7 @@ import { confirmedWeekOf } from './weekLock'
 import { logEvent, myName, setMyName } from './history'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 import { LearningsBar } from './LearningsBar'
+import { CardMenu } from './CardMenu'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
 export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'channel' | 'department'>>
@@ -965,8 +966,33 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 {t('結果を見る', 'View results')}
               </Button>
             )}
+            {/* 取りやめ・削除(保存済みの配信だけ) */}
+            {card && (
+              <CardMenu
+                card={card}
+                weeks={weeks}
+                onChanged={async () => {
+                  await onSaved()
+                  onBack()
+                }}
+                onDeleted={async () => {
+                  await onSaved()
+                  onBack()
+                }}
+              />
+            )}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
+          {card?.cr854_cancelledat && (
+            <MessageBar layout="multiline" intent="warning" className={styles.locked}>
+              <MessageBarBody>
+                {t(
+                  `この配信は取りやめ済みです(${new Date(card.cr854_cancelledat).toLocaleString(locale())})。理由: ${card.cr854_cancelreason || '—'}。元に戻すときは、右上の「…」から「取りやめを取り消す」`,
+                  `This delivery was cancelled (${new Date(card.cr854_cancelledat).toLocaleString(locale())}). Reason: ${card.cr854_cancelreason || '—'}. To restore it, use "…" > "Undo cancellation".`,
+                )}
+              </MessageBarBody>
+            </MessageBar>
+          )}
 
           {approvedBefore && lockedWeeks.length === 0 && (
             <MessageBar layout="multiline" intent="info" className={styles.locked}>

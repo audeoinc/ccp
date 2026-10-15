@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowSwapRegular, CalendarArrowRightRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowSwapRegular, CalendarArrowRightRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
 import { AlertActionPanel } from './AlertActionPanel'
@@ -76,7 +76,7 @@ export function AlertsPage({ alerts, products, placements, model, weeks, onOpenC
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected = alerts.find((a) => a.id === selectedId) ?? alerts[0]
   // 対応のパネル(差し替え・延期)を開いている配信
-  const [action, setAction] = useState<{ mode: 'replace' | 'postpone'; cardId: string } | null>(null)
+  const [action, setAction] = useState<{ mode: 'replace' | 'postpone' | 'cancel'; cardId: string } | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const actionCard = selected?.deliveries.find((d) => d.card.cr854_deliverycardid === action?.cardId)?.card
 
@@ -191,6 +191,9 @@ export function AlertsPage({ alerts, products, placements, model, weeks, onOpenC
                         <Tooltip content={t('延期', 'Postpone')} relationship="label">
                           <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.cr854_deliverycardid })} />
                         </Tooltip>
+                        <Tooltip content={t('取りやめ', 'Cancel delivery')} relationship="label">
+                          <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.cr854_deliverycardid })} />
+                        </Tooltip>
                         <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
                           <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.cr854_deliverycardid)} />
                         </Tooltip>
@@ -229,8 +232,8 @@ export function AlertsPage({ alerts, products, placements, model, weeks, onOpenC
           )}
           <div className={styles.how}>
             {t(
-              `配信日の在庫の見込み = いまの在庫 − 週の販売 × 配信日までの週数 − それより前の配信で上乗せされる販売。配信日に在庫がなければ「在庫切れの見込み」、その配信で売り切れるか、残りが ${LOW_STOCK_WEEKS} 週分を切れば「在庫僅少」。取りやめは、次に作ります`,
-              `Stock on the day = stock now − weekly sales × weeks until then − extra sales from earlier deliveries. None left → "out of stock"; sells out with the delivery or under ${LOW_STOCK_WEEKS} weeks left → "low stock". Cancel comes next.`,
+              `配信日の在庫の見込み = いまの在庫 − 週の販売 × 配信日までの週数 − それより前の配信で上乗せされる販売。配信日に在庫がなければ「在庫切れの見込み」、その配信で売り切れるか、残りが ${LOW_STOCK_WEEKS} 週分を切れば「在庫僅少」`,
+              `Stock on the day = stock now − weekly sales × weeks until then − extra sales from earlier deliveries. None left → "out of stock"; sells out with the delivery or under ${LOW_STOCK_WEEKS} weeks left → "low stock"`,
             )}
           </div>
         </div>

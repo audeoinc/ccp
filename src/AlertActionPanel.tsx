@@ -6,6 +6,7 @@ import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
 import { AiIcon } from './AiMark'
 import { postponeDelivery, replaceProduct, suggestReplacements, type ReplacementCandidate } from './alertActions'
+import { cancelDelivery } from './cancel'
 import { LOW_STOCK_WEEKS, type Placement, type StockModel } from './alerts'
 import { locale, priceText, useT } from './i18n'
 import { productImage } from './images'
@@ -29,7 +30,7 @@ const useStyles = makeStyles({
 })
 
 interface Props {
-  mode: 'replace' | 'postpone'
+  mode: 'replace' | 'postpone' | 'cancel'
   card: Cr854_deliverycards
   /** 在庫が持たない商品 */
   product: Cr854_products
@@ -63,7 +64,13 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const t = useT()
   const approved = (card.cr854_status ?? 0) >= STATUS_APPROVED
   const locked = !!confirmedWeekOf(weeks, card.cr854_scheduledat)
-  const [reason, setReason] = useState(mode === 'replace' ? t(`${product.cr854_name}: ${why}。差し替えた`, `${product.cr854_name}: ${why}. Replaced.`) : t(`${product.cr854_name}: ${why}。延期した`, `${product.cr854_name}: ${why}. Postponed.`))
+  const [reason, setReason] = useState(
+    mode === 'replace'
+      ? t(`${product.cr854_name}: ${why}。差し替えた`, `${product.cr854_name}: ${why}. Replaced.`)
+      : mode === 'postpone'
+        ? t(`${product.cr854_name}: ${why}。延期した`, `${product.cr854_name}: ${why}. Postponed.`)
+        : t(`${product.cr854_name}: ${why}。取りやめた`, `${product.cr854_name}: ${why}. Cancelled.`),
+  )
   // 承認済み・確定の配信は、変えたらもう一度レビューを受けるのを、最初の値にする
   const [backToReview, setBackToReview] = useState(approved)
   const [busy, setBusy] = useState(false)
@@ -134,7 +141,9 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
         <h3 className={styles.title}>
           {mode === 'replace'
             ? t(`商品の差し替え — ${card.cr854_name}`, `Replace product — ${card.cr854_name}`)
-            : t(`延期 — ${card.cr854_name}`, `Postpone — ${card.cr854_name}`)}
+            : mode === 'postpone'
+              ? t(`延期 — ${card.cr854_name}`, `Postpone — ${card.cr854_name}`)
+              : t(`取りやめ — ${card.cr854_name}`, `Cancel — ${card.cr854_name}`)}
         </h3>
         <span className={styles.sub}>{new Date(when).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span>
         <Button className={styles.close} size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
@@ -184,10 +193,21 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
         </div>
       )}
 
+      {mode === 'cancel' && (
+        <div className={styles.row}>
+          <span className={styles.sub}>
+            {t('取りやめた配信は、消さずに残ります(カレンダーに薄く出て、アラート・週の確認・件数からは外れます)', 'The delivery is kept (shown faded in the calendar, and left out of alerts, week checks and counts).')}
+          </span>
+          <Button size="small" appearance="primary" disabled={busy} onClick={() => void run(() => cancelDelivery(card, reason, weeks), t(`${card.cr854_name} を取りやめにしました`, `Cancelled ${card.cr854_name}`))}>
+            {t('取りやめにする', 'Cancel delivery')}
+          </Button>
+        </div>
+      )}
+
       <Field label={t('変更の理由(配信の変更の履歴に残ります)', 'Reason for the change (kept in the delivery history)')} size="small">
         <Textarea value={reason} onChange={(_, d) => setReason(d.value)} rows={2} resize="vertical" />
       </Field>
-      <Switch checked={backToReview || locked} disabled={locked} onChange={(_, d) => setBackToReview(d.checked)} label={t('変更のあと、レビューに戻す(承認済み・確定の配信は「検討中」に)', 'Send back to review after the change (approved / confirmed deliveries go back to In review)')} />
+      {mode !== 'cancel' && <Switch checked={backToReview || locked} disabled={locked} onChange={(_, d) => setBackToReview(d.checked)} label={t('変更のあと、レビューに戻す(承認済み・確定の配信は「検討中」に)', 'Send back to review after the change (approved / confirmed deliveries go back to In review)')} />}
       {locked && <span className={styles.note}>{t('この配信の週は確定済みなので、変えると、週はレビュー中に戻ります', 'This week is confirmed, so changing it puts the week back in review')}</span>}
       {busy && <Spinner size="extra-tiny" />}
       {error && (

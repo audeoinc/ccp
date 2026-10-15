@@ -24,6 +24,7 @@ import { DeliveryPeek } from './DeliveryPeek'
 import { cardProgress } from './progress'
 import { statusColor, statusOptions } from './status'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
+import { CANCELLED_STYLE, isCancelled } from './cancel'
 
 /** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る */
 export type WeekLens = 'products' | 'progress'
@@ -309,6 +310,8 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         className={mergeClasses(styles.card, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
         onClick={() => onSelect(id)}
         title={c.cr854_name}
+        // 取りやめた配信は、消さずに薄く、取り消し線で出す
+        style={isCancelled(c) ? CANCELLED_STYLE : undefined}
       >
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
           {channel === 'push' ? <PhoneRegular /> : <MailRegular />}
@@ -318,7 +321,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         <div className={styles.inner}>
           <div className={styles.nameRow}>
             <span className={styles.dot} style={{ backgroundColor: statusColor(c.cr854_status) }} title={label(statusOptions, c.cr854_status)} />
-            <span className={styles.name}>{c.cr854_name}</span>
+            <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.cr854_name}` : c.cr854_name}</span>
           </div>
           {hasIssues && <div className={styles.issues}>{issues}</div>}
 

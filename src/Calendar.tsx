@@ -3,6 +3,7 @@ import { AddRegular, WarningFilled } from '@fluentui/react-icons'
 import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
 import { statusColor } from './status'
 import { locale, optionLabel, useT } from './i18n'
+import { CANCELLED_STYLE, isCancelled } from './cancel'
 
 interface Props {
   month: Date
@@ -203,6 +204,8 @@ export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
                   style={{
                     backgroundColor: `color-mix(in srgb, ${statusColor(c.cr854_status)} 16%, var(--colorNeutralBackground1))`,
                     borderLeft: `3px solid ${statusColor(c.cr854_status)}`,
+                    // 取りやめた配信は、消さずに薄く、取り消し線で出す
+                    ...(isCancelled(c) ? CANCELLED_STYLE : {}),
                   }}
                 >
                   <span className={styles.pillMeta}>
@@ -211,6 +214,7 @@ export function Calendar({ month, cards, dueSoon, onSelect, onCreate }: Props) {
                   </span>
                   <span className={styles.pillName}>
                     {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
+                    {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
                     {c.cr854_name}
                   </span>
                 </button>

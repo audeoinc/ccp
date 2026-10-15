@@ -50,6 +50,7 @@ import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
 import { AlertsPage } from './AlertsPage'
 import { useStockAlerts } from './alerts'
+import { isCancelled } from './cancel'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -335,7 +336,9 @@ function App() {
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
-  const alertState = useStockAlerts(cards, products, cards)
+  // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
+  const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
+  const alertState = useStockAlerts(activeCards, products, cards)
   const alerts = alertState.alerts
   const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
@@ -476,7 +479,7 @@ function App() {
       }),
     [rows, month],
   )
-  const dueSoon = useMemo(() => new Set(rows.filter((r) => r.dueSoon).map((r) => r.card.cr854_deliverycardid)), [rows])
+  const dueSoon = useMemo(() => new Set(rows.filter((r) => r.dueSoon && !isCancelled(r.card)).map((r) => r.card.cr854_deliverycardid)), [rows])
   // 週の表示の対象(週の初めから 7 日間)
   const weekRows = useMemo(() => {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
@@ -491,14 +494,14 @@ function App() {
   const thisWeek = weeks.find((w) => w.cr854_weekstart?.slice(0, 10) === weekKey)
   const weekCards = useMemo(() => {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-    return cards.filter((c) => c.cr854_scheduledat && new Date(c.cr854_scheduledat) >= weekStart && new Date(c.cr854_scheduledat) < end)
-  }, [cards, weekStart])
+    return activeCards.filter((c) => c.cr854_scheduledat && new Date(c.cr854_scheduledat) >= weekStart && new Date(c.cr854_scheduledat) < end)
+  }, [activeCards, weekStart])
   const checklist = useMemo(
     () =>
       buildChecklist({
         weekStart,
         weekCards,
-        allCards: cards,
+        allCards: activeCards,
         cardProducts,
         products,
         policies,
@@ -728,7 +731,7 @@ function App() {
               <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
               <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />
               {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters(noFilter)}>{t('クリア', 'Clear')}</Button>}
-              <span className={styles.count}>{t(`${filtered.length} / ${cards.length} 件`, `${filtered.length} / ${cards.length} items`)}</span>
+              <span className={styles.count}>{t(`${filtered.filter((c) => !isCancelled(c)).length} / ${activeCards.length} 件`, `${filtered.filter((c) => !isCancelled(c)).length} / ${activeCards.length} items`)}</span>
             </div>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />

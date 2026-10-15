@@ -25,5 +25,9 @@ declare module './generated/models/Cr854_deliverycardsModel' {
     cr854_pushbody?: string
     /** テーマの種類(src/themeTypes.ts の THEME_TYPES のキー。空は、まだ分けていない) */
     cr854_themetype?: string
+    /** 取りやめた日時(ISO。空は、取りやめていない)。取りやめた配信は消さずに残す(src/cancel.ts) */
+    cr854_cancelledat?: string
+    /** 取りやめの理由 */
+    cr854_cancelreason?: string
   }
 }

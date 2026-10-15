@@ -18,6 +18,7 @@ import { DeliveryPeek } from './DeliveryPeek'
 import { heroImage, productImage } from './images'
 import type { Cr854_products } from './generated/models/Cr854_productsModel'
 import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import { CANCELLED_STYLE, isCancelled } from './cancel'
 
 const useStyles = makeStyles({
   root: {
@@ -98,7 +99,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
         )
       }
       case 'name':
-        return <span className={styles.name}>{c.text(r)}</span>
+        return <span className={styles.name}>{isCancelled(r.card) ? `${t('取りやめ', 'Cancelled')}・${c.text(r)}` : c.text(r)}</span>
       case 'status':
         return (
           <span className={styles.status}>
@@ -144,7 +145,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
         </TableHeader>
         <TableBody>
           {sorted.map((r) => (
-            <TableRow key={r.card.cr854_deliverycardid} className={styles.row} onClick={() => onSelect(r.card.cr854_deliverycardid)}>
+            <TableRow key={r.card.cr854_deliverycardid} className={styles.row} style={isCancelled(r.card) ? CANCELLED_STYLE : undefined} onClick={() => onSelect(r.card.cr854_deliverycardid)}>
               {shown.map((c) => (
                 <TableCell key={c.key} className={c.key === 'theme' ? undefined : styles.nowrap}>
                   {cell(c, r)}
