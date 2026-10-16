@@ -39,3 +39,6 @@ server/workbench.env
 server/.ccp-server.pid
 server/ccp-server.log
 server/postgres.log
+
+# 写真版のスクリーンショット(利用先の画像が写るので、Git に入れない。手元だけに置く)
+docs/screenshots-photo/
