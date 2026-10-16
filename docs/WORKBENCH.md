@@ -67,6 +67,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | 本番のデータと写真を取り込む(中身を見せて、確認してから。DB は置き換わる) | `scripts/workbench.sh import server/ccp-pack-<日時>.zip` |
 | 起動 / 停止 / 起動し直し | `scripts/workbench.sh start` / `stop` / `restart` |
 | 動いているか(サーバー・PostgreSQL・コードの版) | `scripts/workbench.sh status` |
+| PostgreSQL だけを起動する(Workbench の中の PostgreSQL。`start`・`update`・`restart` でも、止まっていれば自動で起動する) | `scripts/workbench.sh pg-start` |
 | サーバーのログの最後を見る | `scripts/workbench.sh log` |
 | 設定の確認 | `scripts/workbench.sh check` |
 
@@ -198,7 +199,7 @@ DATABASE_URL='postgresql+asyncpg://<ユーザー>:<パスワード>@localhost:54
 ```
 
 PostgreSQL が動いているかは、conda の環境を有効にしたターミナルで確かめます(`accepting connections` なら動いている)。
-Workbench を止めて起動し直したあとは、PostgreSQL は自動では起動しないことがあるので、入れたときの手順で起動します(例: `pg_ctl -D <データのフォルダ> start`)。
+Workbench を止めて起動し直したあとは、PostgreSQL は自動では起動しないことがあります。`scripts/workbench.sh start`(`update`・`restart` も)は、`DATABASE_URL` のホストが `localhost` なら、サーバーの前に PostgreSQL を確かめ、止まっていれば `pg_ctl` で起動します(PostgreSQL だけなら `scripts/workbench.sh pg-start`。ログは `server/postgres.log`)。データのフォルダと `pg_ctl` の場所は、`workbench.env` の `CCP_PGDATA`・`CCP_PG_BIN` に書いておくと確実です(書かなければ、ホームの下と conda の環境から探します)。
 
 ```bash
 pg_isready -h localhost -p 5432

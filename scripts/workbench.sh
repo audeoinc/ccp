@@ -7,12 +7,15 @@
 #   scripts/workbench.sh stop           サーバーを止める
 #   scripts/workbench.sh restart        サーバーを起動し直す
 #   scripts/workbench.sh status         サーバーと PostgreSQL が動いているか
+#   scripts/workbench.sh pg-start       PostgreSQL を起動する(start・update・restart でも、止まっていれば自動で起動する)
 #   scripts/workbench.sh check          設定・DB への接続・写真・画面のビルドを確かめる(python -m ccp.cli check)
 #   scripts/workbench.sh import <ZIP>   引っ越し用のパックを取り込む(中身を見せて、確認してから。DB の中身は置き換わる)
 #   scripts/workbench.sh log            サーバーのログの最後を見る
 #
 # 設定は server/workbench.env から、毎回読み込む(見本は server/workbench.env.example)。
 # ポートは CCP_PORT(既定 8081)。画面は https://<ノートブックの URL>/proxy/<ポート>/ で開く(末尾の / を付ける)。
+# PostgreSQL が Workbench の中(DATABASE_URL のホストが localhost)なら、サーバーを起動する前に、止まっていれば起動する。
+#   データのフォルダは CCP_PGDATA(なければ PGDATA、それもなければホームの下から探す)。pg_ctl の場所は CCP_PG_BIN(なければ PATH と conda の環境から探す)。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -95,6 +98,85 @@ cmd_setup() {
   fi
 }
 
+# ---- PostgreSQL(Workbench の中で動かしているとき)
+PG_LOG="$SERVER/postgres.log"
+
+# DATABASE_URL のホストとポート(例: postgresql+asyncpg://u:p@localhost:5432/ccp → "localhost 5432")
+pg_target() {
+  local url="${DATABASE_URL:-}" rest host port
+  [ -n "$url" ] || return 1
+  rest="${url#*@}"
+  rest="${rest%%/*}"
+  host="${rest%%:*}"
+  port="5432"
+  [ "$rest" != "$host" ] && port="${rest##*:}"
+  echo "$host $port"
+}
+
+pg_is_local() {
+  local t
+  t="$(pg_target)" || return 1
+  case "${t%% *}" in localhost|127.0.0.1|::1) return 0 ;; *) return 1 ;; esac
+}
+
+# pg_ctl・pg_isready のあるフォルダ(CCP_PG_BIN → PATH → conda の環境)
+pg_bin() {
+  if [ -n "${CCP_PG_BIN:-}" ] && [ -x "$CCP_PG_BIN/pg_ctl" ]; then echo "$CCP_PG_BIN"; return 0; fi
+  if command -v pg_ctl > /dev/null; then dirname "$(command -v pg_ctl)"; return 0; fi
+  local d
+  for d in "${CONDA_PREFIX:-}/bin" "$HOME"/miniconda3/envs/*/bin "$HOME"/anaconda3/envs/*/bin "$HOME"/.conda/envs/*/bin /opt/conda/envs/*/bin /opt/conda/bin; do
+    if [ -x "$d/pg_ctl" ]; then echo "$d"; return 0; fi
+  done
+  return 1
+}
+
+# データのフォルダ(CCP_PGDATA → PGDATA → ホームの下で PG_VERSION のあるフォルダが 1 つだけなら、それ)
+pg_data() {
+  if [ -n "${CCP_PGDATA:-}" ]; then echo "$CCP_PGDATA"; return 0; fi
+  if [ -n "${PGDATA:-}" ]; then echo "$PGDATA"; return 0; fi
+  local found
+  found="$(find "$HOME" -maxdepth 4 -name PG_VERSION -not -path '*/base/*' 2>/dev/null | head -n 2)"
+  if [ -n "$found" ] && [ "$(printf '%s\n' "$found" | wc -l)" -eq 1 ]; then dirname "$found"; return 0; fi
+  return 1
+}
+
+pg_ready() {
+  local bin="$1" t
+  t="$(pg_target)"
+  "$bin/pg_isready" -q -h "${t%% *}" -p "${t##* }"
+}
+
+# 止まっていれば起動する。Workbench の外の PostgreSQL(ホストが localhost 以外)には、何もしない
+ensure_pg() {
+  pg_is_local || return 0
+  local bin data
+  if ! bin="$(pg_bin)"; then
+    echo "(PostgreSQL の pg_ctl が見つかりません。起動の確認を飛ばします。場所を workbench.env の CCP_PG_BIN に書くと、自動で起動できます)"
+    return 0
+  fi
+  if pg_ready "$bin"; then
+    echo "PostgreSQL: 動いています"
+    return 0
+  fi
+  if ! data="$(pg_data)"; then
+    die "PostgreSQL が止まっていますが、データのフォルダがわかりません。workbench.env に CCP_PGDATA=<データのフォルダ> を書いてください(PG_VERSION というファイルがあるフォルダ)"
+  fi
+  say "PostgreSQL を起動する($data)"
+  "$bin/pg_ctl" -D "$data" -l "$PG_LOG" -w -t 60 start || {
+    echo "--- PostgreSQL のログの最後"
+    tail -n 20 "$PG_LOG" 2>/dev/null || true
+    die "PostgreSQL を起動できませんでした。上のログを確かめてください"
+  }
+  pg_ready "$bin" || die "PostgreSQL を起動しましたが、まだ接続を受け付けていません。少し待ってから、もう一度実行してください"
+  echo "PostgreSQL: 起動しました"
+}
+
+cmd_pg_start() {
+  load_env
+  pg_is_local || { echo "DATABASE_URL が Workbench の中の PostgreSQL(localhost)ではないので、何もしません"; return 0; }
+  ensure_pg
+}
+
 cmd_check() {
   need_venv
   load_env
@@ -110,6 +192,7 @@ cmd_start() {
     return 0
   fi
   load_env
+  ensure_pg
   [ -f "$ROOT/dist-gcp/index.html" ] || die "画面のビルドがありません。scripts/workbench.sh update(または setup)を実行してください"
   say "サーバーを起動する(ポート $PORT)"
   (cd "$SERVER" && nohup "$PY" -m uvicorn ccp.main:app --port "$PORT" < /dev/null > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
@@ -155,11 +238,16 @@ cmd_status() {
   else
     echo "サーバー: 止まっています(起動: scripts/workbench.sh start)"
   fi
-  if command -v pg_isready > /dev/null; then
+  load_env > /dev/null
+  local bin t
+  if ! pg_is_local; then
+    echo "PostgreSQL: Workbench の外(DATABASE_URL のホスト)。ここでは確かめません"
+  elif bin="$(pg_bin)"; then
+    t="$(pg_target)"
     printf 'PostgreSQL: '
-    pg_isready -h localhost -p 5432 || true
+    "$bin/pg_isready" -h "${t%% *}" -p "${t##* }" || echo "  → 起動: scripts/workbench.sh pg-start"
   else
-    echo "PostgreSQL: (pg_isready が見つかりません。conda の環境を有効にしたターミナルで確かめてください)"
+    echo "PostgreSQL: (pg_isready が見つかりません。場所を workbench.env の CCP_PG_BIN に書いてください)"
   fi
   (cd "$ROOT" && echo "コード: $(git log --oneline -1)")
 }
@@ -205,11 +293,12 @@ case "${1:-}" in
   stop) cmd_stop ;;
   restart) cmd_stop; cmd_start ;;
   status) cmd_status ;;
+  pg-start) cmd_pg_start ;;
   check) cmd_check ;;
   import) cmd_import "${2:-}" ;;
   log) cmd_log "$@" ;;
   *)
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac
