@@ -40,7 +40,7 @@
 
 テーマ → テンプレート + メイン画像 → ヘッドライン・コピー → 各セクション(順に)→ 制作指示。結果は画面に反映するだけで、保存はしない。
 
-まとめて AI で作る(W14。`src/bulkDraft.ts`・`src/BulkCreatePanel.tsx`)も、同じ `runAutoDraft` を使う(作り方を、配信カードとずらさないため)。保存は、配信カードの保存(`buildContent`・`syncItems`)と同じ形にそろえる。配信カードの保存の形を変えたら、`bulkDraft.ts` の `draftFields`・`saveDraft` も直す。
+まとめて AI で下書き(W14。`src/bulkDraft.ts`・`src/useBulkDrafts.ts`。週の表示の下書きモード)も、同じ `runAutoDraft` を使う(作り方を、配信カードとずらさないため)。保存は、配信カードの保存(`buildContent`・`syncItems`)と同じ形にそろえる。配信カードの保存の形を変えたら、`bulkDraft.ts` の `draftFields`・`saveDraft` も直す。
 
 ## 3. 画面の構成
 

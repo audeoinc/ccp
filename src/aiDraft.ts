@@ -20,6 +20,7 @@ const THEME_PROMPT = `あなたは、ファッション通販の配信(メール
 4. products の中で、在庫(stock)が十分あり、売上トレンド(salesTrend)が「上昇」の商品が活きるテーマを優先する。
 5. 3 案は、切り口を変える(例: 季節感、商品カテゴリ、シーンや天候)。
 6. 理由(reason)は日本語で 60 文字以内。時期や商品の傾向など、根拠を具体的に書く。
+7. themeHint(担当者が書いたテーマのヒント)があるときは、それを最優先し、3 案ともその方向に沿わせる(文言をそのまま使わなくてよい)。
 
 # 入力
 `
@@ -75,13 +76,16 @@ export async function suggestThemes(args: {
   card: AiCard
   otherThemes: string[]
   products: Product[]
+  /** 担当者が書いたテーマのヒント(まとめて作るときの行ごと。W14) */
+  themeHint?: string
 }): Promise<ThemeSuggestion[]> {
-  const { card, otherThemes, products } = args
+  const { card, otherThemes, products, themeHint } = args
   const parsed = (await askAgent(THEME_PROMPT, {
     task: 'suggest_themes',
     today: new Date().toISOString().slice(0, 10),
     card,
     otherThemes,
+    ...(themeHint?.trim() ? { themeHint: themeHint.trim() } : {}),
     products: products.map((p) => ({
       name: p.name,
       category: p.category_name,

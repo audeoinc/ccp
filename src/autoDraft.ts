@@ -33,6 +33,8 @@ export interface AutoDraftInput {
   channel?: TemplateChannel
   /** 選ばない商品(まとめて作るとき、同じ週に、もう上限まで載せた商品。W14) */
   avoidProductIds?: string[]
+  /** テーマのヒント(まとめて作るとき、担当者が行ごとに書く。W14) */
+  themeHint?: string
   /** テーマが決まったとき(失敗したときは空)に知らせる。まとめて作るとき、次の下書きが、このテーマを避けられるように */
   onTheme?: (theme: string) => void
 }
@@ -91,7 +93,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   }
 
   // ① テーマ
-  const themes = await step(tr('テーマを考えています', 'Thinking up themes'), () => suggestThemes({ card: base, otherThemes: input.otherThemes, products }))
+  const themes = await step(tr('テーマを考えています', 'Thinking up themes'), () => suggestThemes({ card: base, otherThemes: input.otherThemes, products, themeHint: input.themeHint }))
   if (isCancelled()) return finish()
   if (themes?.length) {
     result.themeIdeas = themes

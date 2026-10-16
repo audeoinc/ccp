@@ -7,6 +7,7 @@ import type { CardNote } from './data/cardNotes'
 import type { CardEvent } from './data/events'
 import { actionText } from './weekLabels'
 import { myName, setMyName } from './history'
+import { AiIcon } from './AiMark'
 import { locale, optionLabel, useT } from './i18n'
 import { statusColor, statusOptions } from './status'
 
@@ -54,6 +55,8 @@ interface Props {
   events?: CardEvent[]
   /** 週の資料(PDF)を書き出す(App 側で、資料を描いて印刷の画面を開く) */
   onExportPdf?: () => void
+  /** この週の配信を、まとめて AI で下書きする(W14。App 側で下書きモードに入る。下書きモードのあいだは undefined で、ボタンを出さない) */
+  onBulkCreate?: () => void
   /** 週の「検討中」の配信を、まとめて承認する(App 側で行う) */
   onApproveAll?: () => Promise<void>
   /** 状態を変える(週の配信のステータスも、まとめて進める。App 側で行う) */
@@ -68,7 +71,7 @@ const STATUS_APPROVED = 'approved'
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
  * 確定は、週のすべての配信を「確定」にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onChange }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onBulkCreate, onChange }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -140,6 +143,21 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
 
   return (
     <div className={styles.root}>
+      {/* まとめて AI で下書き(W14)は、週の計画を作り始める操作なので、帯のいちばん左に置く(利用者の判断 2026-10-16) */}
+      {onBulkCreate && (
+        <Tooltip
+          content={
+            status === 'confirmed'
+              ? t('確定した週には作れません(確定を取り消すと作れます)', 'Cannot create in a confirmed week (undo the confirmation first)')
+              : t('この週の配信を、国・チャネルを決めて、まとめて AI で下書きします(最大 10 本)', 'Choose a country and channel, then draft this week’s deliveries with AI in bulk (up to 10)')
+          }
+          relationship="description"
+        >
+          <Button size="small" icon={<AiIcon />} disabledFocusable={busy || status === 'confirmed'} onClick={onBulkCreate}>
+            {t('まとめて AI で下書き', 'Bulk AI drafts')}
+          </Button>
+        </Tooltip>
+      )}
       <span className={styles.label}>{t('週の状態', 'Week status')}</span>
       {badge}
       {status !== 'draft' && (

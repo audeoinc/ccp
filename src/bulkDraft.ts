@@ -1,4 +1,4 @@
-// 複数の配信カードを、まとめて AI で作る(バックログ W14)。画面(BulkCreatePanel)から使う、React を使わない部分。
+// 複数の配信カードを、まとめて AI で作る(バックログ W14)。下書きモード(useBulkDrafts)から使う、React を使わない部分。
 // 下書きの中身は、配信カードの「すべてAIで下書き」(runAutoDraft)と同じ手順で作り、保存も配信カードの保存と同じ形にする
 // (あとで配信カードを開いて直したとき、AI で 1 本ずつ作ったものと、見分けがつかないように)
 import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
@@ -10,7 +10,7 @@ import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { runAutoDraft, type AutoDraftProgress, type AutoDraftResult } from './autoDraft'
 import { cardMarket, heroMarket, productMarket } from './market'
-import { channelOptions, countryOptions, departmentOptions, CHANNEL_PUSH } from './status'
+import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf } from './templates'
 import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
 import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
@@ -36,6 +36,8 @@ export interface Draft {
   country: string
   channel: string
   department: string
+  /** テーマのヒント(空なら、AI に任せる) */
+  hint?: string
   state: DraftState
   /** 作っている工程(running のときだけ) */
   step?: string
@@ -49,7 +51,7 @@ export interface Draft {
   savedId?: string
 }
 
-export const newDraft = (row: Pick<Draft, 'scheduledAt' | 'country' | 'channel' | 'department'>): Draft => ({ key: crypto.randomUUID(), state: 'idle', ...row })
+export const newDraft = (row: Pick<Draft, 'scheduledAt' | 'country' | 'channel' | 'department' | 'hint'>): Draft => ({ key: crypto.randomUUID(), state: 'idle', ...row })
 
 const label = (opts: { value: string; label: string }[], v: string) => opts.find((o) => String(o.value) === v)?.label ?? ''
 const iso = (local: string) => (local ? new Date(local).toISOString() : '')
@@ -138,7 +140,7 @@ export async function generateDraft(d: Draft, ctx: DraftContext, onStep: AutoDra
     instructions: '',
   }
   return runAutoDraft(
-    { card, language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(d) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme },
+    { card, language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(d) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme, themeHint: d.hint },
     onStep,
     isCancelled,
   )
@@ -195,14 +197,15 @@ export async function saveDraft(d: Draft, products: Product[]): Promise<string> 
 export const lockedWeekOf = (weeks: WeekRow[], d: Pick<Draft, 'scheduledAt'>) => confirmedWeekOf(weeks, d.scheduledAt)
 
 /**
- * 週の、メールの配信がない日(今日より前の日と、確定した週は除く)。最初の行と「空いている日で埋める」に使う。
- * メールを基準にするのは、配信の計画の骨組みが、1 日 1 本のメールだから
+ * 週の、選んだ国・チャネルの配信がない日(今日より前の日と、確定した週は除く)。最初の行と「空いている日で埋める」に使う。
+ * 国・チャネルで見るのは、「今週の US 向けメール」のように、国とチャネルを決めてから、まとめて作るため
  */
-export function emptyDays(weekStart: Date, cards: { scheduled_at?: string; channel?: string }[], weeks: WeekRow[]): string[] {
+export function emptyDays(weekStart: Date, cards: { scheduled_at?: string; channel?: string; country?: string }[], weeks: WeekRow[], channel: string, country: string): string[] {
   const today = dayKeyOf(new Date())
   const start = sundayOf(weekStart)
   if (confirmedWeekOf(weeks, start.toISOString())) return []
-  const used = new Set(cards.filter((c) => c.channel !== CHANNEL_PUSH && c.scheduled_at).map((c) => dayKeyOf(new Date(c.scheduled_at!))))
+  const same = (c: { channel?: string; country?: string }) => (c.channel ?? CHANNEL_EMAIL) === channel && (!country || !c.country || c.country === country)
+  const used = new Set(cards.filter((c) => same(c) && c.scheduled_at).map((c) => dayKeyOf(new Date(c.scheduled_at!))))
   const out: string[] = []
   for (let i = 0; i < 7; i++) {
     const key = dayKeyOf(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))

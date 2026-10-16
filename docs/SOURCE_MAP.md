@@ -191,7 +191,8 @@ flowchart TD
 | `WeekReport.tsx` / `printWeek.ts` | 203 / 48 | 週の資料(A4 の PDF)と、その印刷 |
 | `ListView.tsx` / `listRows.ts` | 160 / 110 | 表の形の一覧と、その列の定義(CSV の書き出しも同じ定義) |
 | `MiniCalendar.tsx` | 166 | ツールバーのミニカレンダー(月・週・日へ移る) |
-| `BulkCreatePanel.tsx` / `bulkDraft.ts` | 989 / 223 | まとめて AI で作るパネル(W14) / その下書きを作る・保存する部分(React を使わない) |
+| `useBulkDrafts.ts` / `bulkDraft.ts` | 337 / 226 | まとめて AI で下書き(W14)の、下書きモードの状態と操作(App が持つ) / 下書きを作る・保存する部分(React を使わない) |
+| `BulkDraftBar.tsx` / `DraftCard.tsx` / `DraftDrawer.tsx` | 170 / 188 / 252 | 下書きモードの帯(国・チャネル、作る・保存・終わる) / 週の列の下書きの札 / 右の引き出し(中身・比べる) |
 | `DeliveryPeek.tsx` / `CardPreview.tsx` | 34 / 68 | 配信にマウスを重ねたときのプレビュー / 保存済みの配信カードのプレビュー |
 | `status.ts` / `progress.ts` | 25 / 147 | 配信のステータスの色・チャネル / 工程(進み具合) |
 
