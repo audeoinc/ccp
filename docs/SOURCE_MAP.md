@@ -34,7 +34,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 
 ### 構成図(ファイルのつながり)
 
-主なファイルと、呼び出しのつながり(2026-10-16 時点。[gitdiagram.com](https://gitdiagram.com/audeoinc/ccp) の図をもとに、コードで確かめて描き直した)。GitHub では、図として表示される。
+主なファイルと、呼び出しのつながり。GitHub では、図として表示される。
 
 ```mermaid
 flowchart LR
