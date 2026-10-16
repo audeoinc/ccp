@@ -14,7 +14,6 @@ import {
   ToggleButton,
   Tooltip,
   makeStyles,
-  mergeClasses,
   tokens,
 } from '@fluentui/react-components'
 import { ArrowDownloadRegular, ArrowUploadRegular, DatabaseRegular } from '@fluentui/react-icons'
@@ -32,6 +31,7 @@ import { DeliveryCardsService } from './data/deliveryCards'
 import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
 import { ResultsCompareView } from './ResultsCompareView'
+import { DataTable, DeliveryThumb, type DataColumn } from './DataTable'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -42,22 +42,6 @@ const useStyles = makeStyles({
   main: { minWidth: 0 },
   group: { display: 'flex', alignItems: 'center', columnGap: '4px' },
   groupLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: '4px' },
-  tableWrap: { overflowX: 'auto', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: tokens.fontSizeBase200, fontVariantNumeric: 'tabular-nums' },
-  th: {
-    textAlign: 'left',
-    fontWeight: tokens.fontWeightSemibold,
-    padding: '6px 8px',
-    borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    whiteSpace: 'nowrap',
-  },
-  td: { padding: '6px 8px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap' },
-  num: { textAlign: 'right' },
-  // 長いテーマ・テンプレート名は、省略して、全体はマウスを乗せたときに出す
-  clip: { maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' },
-  row: { cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
-  rowOn: { backgroundColor: tokens.colorBrandBackground2, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
   name: { fontWeight: tokens.fontWeightSemibold },
   up: { color: tokens.colorPaletteGreenForeground1 },
   down: { color: tokens.colorPaletteRedForeground1 },
@@ -180,6 +164,66 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     ) : (
       <span className={v >= 0 ? styles.up : styles.down}>{`${v >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(v * 100))}%`}</span>
     )
+
+  // 一覧の列(配信ごと)。計画の面の一覧と同じく、左にサムネイル
+  const deliveryColumns: DataColumn<(typeof rows)[number]>[] = [
+    { key: 'image', label: t('画像', 'Image'), cell: (r) => <DeliveryThumb card={r.card} productIds={cardProducts.get(r.card.id) ?? []} products={products} heroes={heroes} /> },
+    { key: 'date', label: t('日付', 'Date'), cell: (r) => dateText(r.result.sent_at ?? r.card.scheduled_at), sort: (r) => sentAtOf(r) },
+    { key: 'name', label: t('配信', 'Delivery'), cell: (r) => <span className={styles.name}>{r.card.name}</span>, sort: (r) => r.card.name },
+    { key: 'channel', label: t('チャネル', 'Ch.'), cell: (r) => (isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')), sort: (r) => (isPush(r.card) ? 1 : 0) },
+    { key: 'theme', label: t('テーマ', 'Theme'), cell: (r) => r.card.theme || '—', sort: (r) => r.card.theme ?? '', wide: true },
+    { key: 'template', label: t('テンプレート', 'Template'), cell: (r) => templateName(r.card), sort: (r) => templateName(r.card) },
+    { key: 'open', label: t('開封率', 'Open'), cell: (r) => pct(r.openRate), sort: (r) => r.openRate, numeric: true },
+    {
+      key: 'click',
+      label: (
+        <Tooltip content={t('メールはリンクのクリック、アプリは通知のタップ(送った数に対する割合)', 'Email: link clicks. App: notification taps (share of recipients)')} relationship="description">
+          <span>{t('クリック率', 'Click')}</span>
+        </Tooltip>
+      ),
+      cell: (r) => pct(r.clickRate),
+      sort: (r) => r.clickRate,
+      numeric: true,
+    },
+    { key: 'revenue', label: t('売上', 'Revenue'), cell: (r) => money(r.revenue, r.card), sort: (r) => r.revenue, numeric: true },
+    {
+      key: 'prev',
+      label: (
+        <Tooltip content={t('同じ国・チャネルの、7 日前までの配信の売上(平均)と比べた増減', 'Revenue vs the average of same-channel deliveries in the previous 7 days')} relationship="description">
+          <span>{t('前週比', 'vs prev wk')}</span>
+        </Tooltip>
+      ),
+      cell: (r) => delta(r.vsPrevWeek),
+      sort: (r) => r.vsPrevWeek,
+      numeric: true,
+    },
+    { key: 'lastYear', label: t('前年比', 'vs last yr'), cell: (r) => delta(r.vsLastYear), sort: (r) => r.vsLastYear, numeric: true },
+  ]
+
+  // 一覧の列(テーマ・テンプレート・商品などでまとめたとき)
+  const groupColumns: DataColumn<GroupRow>[] = [
+    {
+      key: 'label',
+      label: groupBy === 'theme' ? t('テーマ', 'Theme') : groupBy === 'themeType' ? t('テーマの種類', 'Theme type') : groupBy === 'template' ? t('テンプレート', 'Template') : t('商品', 'Product'),
+      cell: (g) => <span className={styles.name}>{g.label}</span>,
+      sort: (g) => g.label,
+      wide: true,
+    },
+    { key: 'deliveries', label: t('配信数', 'Deliveries'), cell: (g) => g.deliveries, sort: (g) => g.deliveries, numeric: true },
+    ...(groupBy === 'product'
+      ? [
+          { key: 'clicks', label: t('クリック数', 'Clicks'), cell: (g: GroupRow) => g.clicks.toLocaleString(locale()), sort: (g: GroupRow) => g.clicks, numeric: true },
+          { key: 'units', label: t('売れた数', 'Units'), cell: (g: GroupRow) => (g.units ?? 0).toLocaleString(locale()), sort: (g: GroupRow) => g.units ?? 0, numeric: true },
+        ]
+      : [
+          { key: 'open', label: t('開封率', 'Open'), cell: (g: GroupRow) => pct(g.emailRecipients ? g.opens / g.emailRecipients : undefined), sort: (g: GroupRow) => (g.emailRecipients ? g.opens / g.emailRecipients : undefined), numeric: true },
+          { key: 'click', label: t('クリック率', 'Click'), cell: (g: GroupRow) => pct(g.recipients ? g.clicks / g.recipients : undefined), sort: (g: GroupRow) => (g.recipients ? g.clicks / g.recipients : undefined), numeric: true },
+        ]),
+    { key: 'revenue', label: t('売上', 'Revenue'), cell: (g) => money(g.revenue), sort: (g) => g.revenue, numeric: true },
+    ...(groupBy !== 'product'
+      ? [{ key: 'lastYear', label: t('前年比', 'vs last yr'), cell: (g: GroupRow) => delta(g.lastYear ? g.revenue / g.lastYear - 1 : undefined), sort: (g: GroupRow) => (g.lastYear ? g.revenue / g.lastYear - 1 : undefined), numeric: true }]
+      : []),
+  ]
 
   const exportCsv = () => {
     if (groupBy === 'delivery') {
@@ -379,97 +423,29 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           <div className={styles.empty}>{t('この条件の配信結果はまだありません', 'No results for these filters yet')}</div>
         ) : (
           <>
-            <div className={styles.tableWrap}>
-              {groupBy === 'delivery' ? (
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th className={styles.th}>{t('日付', 'Date')}</th>
-                      <th className={styles.th}>{t('配信', 'Delivery')}</th>
-                      <th className={styles.th}>{t('チャネル', 'Ch.')}</th>
-                      <th className={styles.th}>{t('テーマ', 'Theme')}</th>
-                      <th className={styles.th}>{t('テンプレート', 'Template')}</th>
-                      <th className={mergeClasses(styles.th, styles.num)}>{t('開封率', 'Open')}</th>
-                      <th className={mergeClasses(styles.th, styles.num)}>
-                        <Tooltip content={t('メールはリンクのクリック、アプリは通知のタップ(送った数に対する割合)', 'Email: link clicks. App: notification taps (share of recipients)')} relationship="description">
-                          <span>{t('クリック率', 'Click')}</span>
-                        </Tooltip>
-                      </th>
-                      <th className={mergeClasses(styles.th, styles.num)}>{t('売上', 'Revenue')}</th>
-                      <th className={mergeClasses(styles.th, styles.num)}>
-                        <Tooltip content={t('同じ国・チャネルの、7 日前までの配信の売上(平均)と比べた増減', 'Revenue vs the average of same-channel deliveries in the previous 7 days')} relationship="description">
-                          <span>{t('前週比', 'vs prev wk')}</span>
-                        </Tooltip>
-                      </th>
-                      <th className={mergeClasses(styles.th, styles.num)}>{t('前年比', 'vs last yr')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => {
-                      const on = detailId === r.card.id
-                      return (
-                        // 行を押すと、詳しい結果をフロートで開く(計画の面の一覧で、配信カードが開くのと同じ)
-                        <tr key={r.result.id} className={mergeClasses(styles.row, on && styles.rowOn)} onClick={() => onDetail(r.card.id)} aria-selected={on}>
-                          <td className={styles.td}>{dateText(r.result.sent_at ?? r.card.scheduled_at)}</td>
-                          <td className={mergeClasses(styles.td, on && styles.name)}>{r.card.name}</td>
-                          <td className={styles.td}>{isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')}</td>
-                          <td className={mergeClasses(styles.td, styles.clip)} title={r.card.theme}>{r.card.theme || '—'}</td>
-                          <td className={mergeClasses(styles.td, styles.clip)} title={templateName(r.card)}>{templateName(r.card)}</td>
-                          <td className={mergeClasses(styles.td, styles.num)}>{pct(r.openRate)}</td>
-                          <td className={mergeClasses(styles.td, styles.num)}>{pct(r.clickRate)}</td>
-                          <td className={mergeClasses(styles.td, styles.num)}>{money(r.revenue, r.card)}</td>
-                          <td className={mergeClasses(styles.td, styles.num)}>{delta(r.vsPrevWeek)}</td>
-                          <td className={mergeClasses(styles.td, styles.num)}>{delta(r.vsLastYear)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th className={styles.th}>{groupBy === 'theme' ? t('テーマ', 'Theme') : groupBy === 'themeType' ? t('テーマの種類', 'Theme type') : groupBy === 'template' ? t('テンプレート', 'Template') : t('商品', 'Product')}</th>
-                      <th className={mergeClasses(styles.th, styles.num)}>{t('配信数', 'Deliveries')}</th>
-                      {groupBy === 'product' ? (
-                        <>
-                          <th className={mergeClasses(styles.th, styles.num)}>{t('クリック数', 'Clicks')}</th>
-                          <th className={mergeClasses(styles.th, styles.num)}>{t('売れた数', 'Units')}</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className={mergeClasses(styles.th, styles.num)}>{t('開封率', 'Open')}</th>
-                          <th className={mergeClasses(styles.th, styles.num)}>{t('クリック率', 'Click')}</th>
-                        </>
-                      )}
-                      <th className={mergeClasses(styles.th, styles.num)}>{t('売上', 'Revenue')}</th>
-                      {groupBy !== 'product' && <th className={mergeClasses(styles.th, styles.num)}>{t('前年比', 'vs last yr')}</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groups.map((g) => (
-                      <tr key={g.key}>
-                        <td className={mergeClasses(styles.td, styles.name, styles.clip)} title={g.label}>{g.label}</td>
-                        <td className={mergeClasses(styles.td, styles.num)}>{g.deliveries}</td>
-                        {groupBy === 'product' ? (
-                          <>
-                            <td className={mergeClasses(styles.td, styles.num)}>{g.clicks.toLocaleString(locale())}</td>
-                            <td className={mergeClasses(styles.td, styles.num)}>{(g.units ?? 0).toLocaleString(locale())}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td className={mergeClasses(styles.td, styles.num)}>{pct(g.emailRecipients ? g.opens / g.emailRecipients : undefined)}</td>
-                            <td className={mergeClasses(styles.td, styles.num)}>{pct(g.recipients ? g.clicks / g.recipients : undefined)}</td>
-                          </>
-                        )}
-                        <td className={mergeClasses(styles.td, styles.num)}>{money(g.revenue)}</td>
-                        {groupBy !== 'product' && <td className={mergeClasses(styles.td, styles.num)}>{delta(g.lastYear ? g.revenue / g.lastYear - 1 : undefined)}</td>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {groupBy === 'delivery' ? (
+              // 配信ごと: 計画の面の一覧と同じ表(DataTable)。左にサムネイル(マウスを重ねるとプレビュー)。行を押すと、詳しい結果をフロートで開く
+              <DataTable
+                rows={rows}
+                columns={deliveryColumns}
+                rowKey={(r) => r.card.id}
+                ariaLabel={t('配信の結果の一覧', 'Delivery results')}
+                empty={t('この条件の配信結果はまだありません', 'No results for these filters yet')}
+                onRowClick={(r) => onDetail(r.card.id)}
+                selectedKey={detailId ?? undefined}
+                defaultSort={{ key: 'date', dir: 'ascending' }}
+                tieBreak={(a, b) => (sentAtOf(a) ?? '').localeCompare(sentAtOf(b) ?? '')}
+              />
+            ) : (
+              <DataTable
+                rows={groups}
+                columns={groupColumns}
+                rowKey={(g) => g.key}
+                ariaLabel={t('まとめた結果', 'Grouped results')}
+                empty={t('この条件の配信結果はまだありません', 'No results for these filters yet')}
+                defaultSort={{ key: 'revenue', dir: 'descending' }}
+              />
+            )}
             <div className={styles.totals}>
               {t(`合計: ${rows.length} 本の配信・売上 ${money(total)}・前月比 `, `Totals: ${rows.length} deliveries · revenue ${money(total)} · vs previous month `)}
               {delta(prevRevenue ? total / prevRevenue - 1 : undefined)}

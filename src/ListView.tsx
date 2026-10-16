@@ -1,55 +1,18 @@
-import { useMemo, useState } from 'react'
-import {
-  Badge,
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableHeaderCell,
-  TableRow,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components'
+import { Badge, makeStyles, tokens } from '@fluentui/react-components'
 import { WarningRegular } from '@fluentui/react-icons'
-import { locale, useT } from './i18n'
+import { useT } from './i18n'
 import { COLUMNS, type Column, type ColumnKey, type Row } from './listRows'
 import { statusColor } from './status'
-import { DeliveryPeek } from './DeliveryPeek'
-import { heroImage, productImage } from './images'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
+import { DataTable, DeliveryThumb, type DataColumn } from './DataTable'
 
 const useStyles = makeStyles({
-  root: {
-    overflowX: 'auto',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusXLarge,
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow2,
-  },
-  // 列の幅は中身に合わせる(Fluent の表は、既定で列の幅を均等にする)
-  // 文字は 12px、数字は等幅(日付・時刻・数の桁がそろい、縦に読みやすい)
-  table: {
-    tableLayout: 'auto',
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    fontVariantNumeric: 'tabular-nums',
-  },
-  head: {
-    backgroundColor: tokens.colorNeutralBackground2,
-    '& th': { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
-  },
-  row: { cursor: 'pointer' },
   name: { fontWeight: tokens.fontWeightSemibold },
-  nowrap: { whiteSpace: 'nowrap' },
-  theme: { minWidth: '220px' },
   status: { display: 'inline-flex', alignItems: 'center', columnGap: tokens.spacingHorizontalXS, whiteSpace: 'nowrap' },
   dot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   steps: { display: 'inline-flex', alignItems: 'center', columnGap: tokens.spacingHorizontalS, whiteSpace: 'nowrap' },
-  thumb: { display: 'block', width: '56px', height: '40px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3, cursor: 'zoom-in' },
-  noThumb: { display: 'block', width: '56px', height: '40px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground2 },
-  empty: { padding: tokens.spacingVerticalXXL, textAlign: 'center', color: tokens.colorNeutralForeground3 },
 })
 
 interface Props {
@@ -62,42 +25,15 @@ interface Props {
   heroes: HeroImage[]
 }
 
-/** 配信の一覧(表)。列見出しを押すと並べ替える。行を押すと、配信カードを開く */
+/** 配信の一覧(表)。列見出しを押すと並べ替える。行を押すと、配信カードを開く。表の見た目は、結果の一覧と共通(DataTable) */
 export function ListView({ rows, columns, onSelect, cardProducts, products, heroes }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [sort, setSort] = useState<{ key: ColumnKey; dir: 'ascending' | 'descending' }>({ key: 'date', dir: 'ascending' })
-  const shown = COLUMNS.filter((c) => columns.includes(c.key))
-
-  const sorted = useMemo(() => {
-    const col = COLUMNS.find((c) => c.key === sort.key) ?? COLUMNS[0]
-    const val = col.sort ?? col.text
-    const sign = sort.dir === 'ascending' ? 1 : -1
-    return [...rows].sort((a, b) => {
-      const x = val(a)
-      const y = val(b)
-      const d = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), locale())
-      // 同じ値なら、配信日時の順
-      return d !== 0 ? d * sign : (a.card.scheduled_at ?? '').localeCompare(b.card.scheduled_at ?? '')
-    })
-  }, [rows, sort])
-
-  const toggle = (key: ColumnKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 'ascending' ? 'descending' : 'ascending' } : { key, dir: 'ascending' }))
 
   const cell = (c: Column, r: Row) => {
     switch (c.key) {
-      case 'image': {
-        // メイン画像(なければ先頭の商品)のサムネイル。マウスを重ねると、配信の全体を、スクロールなしで見せる
-        const ids = cardProducts.get(r.card.id) ?? []
-        const src = heroImage(heroes.find((h) => h.id === r.card.hero_image_id)) ?? productImage(products.find((p) => p.id === ids[0]))
-        if (!src) return <span className={styles.noThumb} />
-        return (
-          <DeliveryPeek card={r.card} productIds={ids} products={products} heroes={heroes}>
-            <img className={styles.thumb} src={src} alt="" draggable={false} onClick={(e) => e.stopPropagation()} />
-          </DeliveryPeek>
-        )
-      }
+      case 'image':
+        return <DeliveryThumb card={r.card} productIds={cardProducts.get(r.card.id) ?? []} products={products} heroes={heroes} />
       case 'name':
         return <span className={styles.name}>{isCancelled(r.card) ? `${t('取りやめ', 'Cancelled')}・${c.text(r)}` : c.text(r)}</span>
       case 'status':
@@ -123,38 +59,26 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
     }
   }
 
-  if (rows.length === 0) return <div className={styles.root}><div className={styles.empty}>{t('この月の配信はありません', 'No deliveries this month')}</div></div>
+  const shown: DataColumn<Row>[] = COLUMNS.filter((c) => columns.includes(c.key)).map((c) => ({
+    key: c.key,
+    label: c.label(),
+    cell: (r) => cell(c, r),
+    sort: c.sort ?? c.text,
+    wide: c.key === 'theme',
+  }))
 
   return (
-    <div className={styles.root}>
-      <Table size="small" className={styles.table} aria-label={t('配信の一覧', 'Deliveries')}>
-        <TableHeader className={styles.head}>
-          <TableRow>
-            {shown.map((c) => (
-              <TableHeaderCell
-                key={c.key}
-                sortable
-                sortDirection={sort.key === c.key ? sort.dir : undefined}
-                onClick={() => toggle(c.key)}
-                className={c.key === 'theme' ? styles.theme : styles.nowrap}
-              >
-                {c.label()}
-              </TableHeaderCell>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((r) => (
-            <TableRow key={r.card.id} className={styles.row} style={isCancelled(r.card) ? CANCELLED_STYLE : undefined} onClick={() => onSelect(r.card.id)}>
-              {shown.map((c) => (
-                <TableCell key={c.key} className={c.key === 'theme' ? undefined : styles.nowrap}>
-                  {cell(c, r)}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <DataTable
+      rows={rows}
+      columns={shown}
+      rowKey={(r) => r.card.id}
+      ariaLabel={t('配信の一覧', 'Deliveries')}
+      empty={t('この月の配信はありません', 'No deliveries this month')}
+      onRowClick={(r) => onSelect(r.card.id)}
+      rowStyle={(r) => (isCancelled(r.card) ? CANCELLED_STYLE : undefined)}
+      defaultSort={{ key: 'date', dir: 'ascending' }}
+      // 同じ値なら、配信日時の順
+      tieBreak={(a, b) => (a.card.scheduled_at ?? '').localeCompare(b.card.scheduled_at ?? '')}
+    />
   )
 }
