@@ -282,7 +282,8 @@ const SCENES = {
     await open(page, CARD(L))
     // 右端の商品情報の、先頭の商品の行(「コード ・ 価格 ・ 在庫」の行)を押す
     const ok = await page.evaluate(() => {
-      const el = [...document.querySelectorAll('[role=dialog] *')].find((e) => e.children.length === 0 && /^[A-Z]?\d{2,6} ・/.test((e.textContent ?? '').trim()) && e.getBoundingClientRect().x > 1000)
+      const hits = [...document.querySelectorAll('[role=dialog] *')].filter((e) => /^[A-Z]?\d{2,6}\s*[・•·]/.test((e.textContent ?? '').trim()) && e.getBoundingClientRect().x > 1000)
+      const el = hits.find((e) => !hits.some((o) => o !== e && e.contains(o)))
       el?.click()
       return !!el
     })
@@ -323,8 +324,11 @@ const SCENES = {
     await view(page, T(L, '結果', 'Results'), 1800)
     await view(page, T(L, '月', 'Month'))
     await fullShot(page, `${L}-31-results-month`)
-    await view(page, T(L, '週', 'Week'), 2500)
+    await view(page, T(L, '週', 'Week'), 1500)
+    // 今週は、まだ結果のない配信が多いので、1 週前を撮る
+    await clickLabel(page, T(L, '前の週', 'Previous week'), 2500)
     await fullShot(page, `${L}-32-results-week`)
+    await clickLabel(page, T(L, '次の週', 'Next week'), 800)
     await view(page, T(L, '一覧', 'List'))
     await fullShot(page, `${L}-33-results-list`)
     // 詳しい結果(一覧の行を押す)
