@@ -1,6 +1,7 @@
+import type { DeliveryCardStatus } from './models/deliveryCards'
 // 承認の履歴(バックログ W6)の、記録の入り口。週の操作・配信のステータスの変更から呼ぶ。
 // 記録に失敗しても、本来の操作(保存・週の確定)は止めない(履歴は、あとから経緯を追うためのもので、操作の条件ではないため)
-import { Cr854_eventsService, type EventAction } from './gcpdata/Cr854_eventsService'
+import { EventsService, type EventAction } from './data/events'
 import { loadPref, savePref } from './settings'
 import { weekKeyOf } from './weekLock'
 
@@ -14,22 +15,22 @@ export interface EventInput {
   /** 週の初め(YYYY-MM-DD)。配信の出来事なら、配信日時から求める */
   weekStart?: string
   card?: { id: string; name?: string; scheduledAt?: string }
-  from?: number
-  to?: number
+  from?: DeliveryCardStatus
+  to?: DeliveryCardStatus
   note?: string
 }
 
 export async function logEvent(e: EventInput): Promise<void> {
   const week = e.weekStart ?? (e.card?.scheduledAt ? weekKeyOf(new Date(e.card.scheduledAt)) : undefined)
   try {
-    await Cr854_eventsService.create({
-      cr854_action: e.action,
-      cr854_weekstart: week,
-      ...(e.card ? { 'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${e.card.id})`, cr854_cardname: e.card.name } : {}),
-      cr854_fromstatus: e.from,
-      cr854_tostatus: e.to,
-      cr854_actor: myName(),
-      cr854_note: e.note,
+    await EventsService.create({
+      action: e.action,
+      week_start: week,
+      ...(e.card ? { delivery_card_id: e.card.id, card_name: e.card.name } : {}),
+      from_status: e.from,
+      to_status: e.to,
+      actor: myName(),
+      note: e.note,
     })
   } catch {
     // 記録できなくても、操作は続ける(上の説明)

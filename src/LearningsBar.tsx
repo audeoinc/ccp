@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Select, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronUpRegular, LightbulbRegular } from '@fluentui/react-icons'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
-import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpdata/Cr854_deliveryresultsService'
+import type { DeliveryCard } from './models/deliveryCards'
+import { DeliveryCardsService } from './data/deliveryCards'
+import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { setActiveLearnings } from './aiSelect'
 import { locale, useT } from './i18n'
 import { templateIdOf } from './results'
@@ -32,7 +32,7 @@ const useStyles = makeStyles({
 
 interface Props {
   /** 開いている配信(保存済みのもの) */
-  card: Cr854_deliverycards
+  card: DeliveryCard
   /** 画面で選んでいる値(保存前でも、選んだテンプレート・国・チャネル・言葉で探す) */
   templateId: string
   country: string
@@ -60,39 +60,39 @@ const MAX = 8
 export function LearningsBar({ card, templateId, country, channel, name, theme, headline }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [cards, setCards] = useState<Cr854_deliverycards[]>([])
-  const [results, setResults] = useState<Cr854_deliveryresults[]>([])
+  const [cards, setCards] = useState<DeliveryCard[]>([])
+  const [results, setResults] = useState<DeliveryResult[]>([])
   const [open, setOpen] = useState(false)
   // テーマの種類: 保存済みの値(ここで直したら、その値)。なければ、いま画面にある言葉から推し量る
-  const [savedType, setSavedType] = useState<string | undefined>(card.cr854_themetype)
+  const [savedType, setSavedType] = useState<string | undefined>(card.theme_type)
   const type: { type: ThemeType; guessed: boolean } = savedType
-    ? themeTypeOf({ ...card, cr854_themetype: savedType })
-    : { type: guessThemeType({ cr854_name: name, cr854_theme: theme, cr854_headline: headline }), guessed: true }
+    ? themeTypeOf({ ...card, theme_type: savedType })
+    : { type: guessThemeType({ name: name, theme: theme, headline: headline }), guessed: true }
 
   useEffect(() => {
-    Cr854_deliveryresultsService.getAll()
+    DeliveryResultsService.getAll()
       .then((res) => res.success && setResults(res.data ?? []))
       .catch(() => undefined)
-    Cr854_deliverycardsService.getAll()
+    DeliveryCardsService.getAll()
       .then((res) => res.success && setCards(res.data ?? []))
       .catch(() => undefined)
   }, [])
 
   const learnings: Learning[] = useMemo(() => {
-    const byId = new Map(cards.map((c) => [c.cr854_deliverycardid, c]))
+    const byId = new Map(cards.map((c) => [c.id, c]))
     return results
-      .filter((r) => r.cr854_notes?.trim() && r._cr854_deliverycard_value && r._cr854_deliverycard_value !== card.cr854_deliverycardid)
+      .filter((r) => r.notes?.trim() && r.delivery_card_id && r.delivery_card_id !== card.id)
       .flatMap((r): Learning[] => {
-        const c = byId.get(r._cr854_deliverycard_value!)
-        if (!c || String(c.cr854_country ?? '') !== country || String(c.cr854_channel ?? '') !== channel) return []
+        const c = byId.get(r.delivery_card_id!)
+        if (!c || String(c.country ?? '') !== country || String(c.channel ?? '') !== channel) return []
         const sameTemplate = templateIdOf(c) === templateId
         const sameType = themeTypeOf(c).type === type.type
         if (!sameTemplate && !sameType) return []
-        return [{ id: r.cr854_deliveryresultid, at: r.cr854_sentat ?? c.cr854_scheduledat ?? '', name: c.cr854_name ?? '', notes: r.cr854_notes!.trim(), sameTemplate, sameType }]
+        return [{ id: r.id, at: r.sent_at ?? c.scheduled_at ?? '', name: c.name ?? '', notes: r.notes!.trim(), sameTemplate, sameType }]
       })
       .sort((a, b) => b.at.localeCompare(a.at))
       .slice(0, MAX)
-  }, [cards, results, card.cr854_deliverycardid, country, channel, templateId, type.type])
+  }, [cards, results, card.id, country, channel, templateId, type.type])
 
   // AI の下書きに、学びを渡す(この帯が出ている間だけ)
   useEffect(() => {
@@ -101,7 +101,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   }, [learnings])
 
   const saveType = async (v: ThemeType) => {
-    const res = await Cr854_deliverycardsService.update(card.cr854_deliverycardid, { cr854_themetype: v })
+    const res = await DeliveryCardsService.update(card.id, { theme_type: v })
     if (res.success) setSavedType(v)
   }
   const dateText = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')

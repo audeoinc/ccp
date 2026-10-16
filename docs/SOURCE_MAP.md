@@ -15,7 +15,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 ```
                     画面のコード(src/*.tsx, src/*.ts) ── どちらのビルドでも共通
                                    │
-     src/generated/services/Cr854_…Service・src/gcpdata/Cr854_…Service を呼ぶ
+            src/data/<表>.ts の …Service を呼ぶ(型は src/models)
                                    │
               ┌────────────────────┴────────────────────┐
               ▼                                         ▼
@@ -29,7 +29,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
      PostgreSQL・画像・Gemini
 ```
 
-- **Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。** `src/generated/` は、もとは Dataverse の生成コード。名前だけ残し、いまは手で保つ。
+- **Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。** 同じ日に、名前(`cr854_…`)と選択肢の数も、読みやすい名前・文字の値に変えた(GCP.md の「データ定義」)。
 - 撮影・デモ用の差し替えは、`vite.mock.config.ts` のプラグインが、サービスの読み込みを置き換えて行う。そのため、画面のコードはビルドの違いを知らない。
 
 ## 2. 一番上の階層
@@ -189,18 +189,17 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `market.ts` | 14 | 商品・メイン画像の市場(JP / US)と、配信カードの国の対応 |
 | `labels.ts` | 29 | 選択肢の表示名を、値から補う |
 | `images.ts` | 26 | 同梱のイラスト(画像の URL が空のとき) |
-| `gcpFields.ts` | 33 | GCP 版だけの列の型(生成モデルを編集しないため、ここで足す) |
 | `assets/products/` ・ `assets/heroes/` | — | 同梱のイラスト(商品・メイン画像) |
 
 ### 3.9 データの出入り口
 
 | パス | 役割 |
 |---|---|
-| `generated/` | テーブルの行の型(`models/`)と、テーブルごとのサービス(`services/`)。もとは Dataverse の生成コードで、いまは手で保つ |
+| `models/` | 表の行の型と、選択肢の値(`export const DeliveryCardStatus = { not_started: '未起案', … }`) |
+| `data/` | 表ごとの読み書きのサービス(`DeliveryCardsService` など)。一部の表は、型もここに持つ |
 | `gcp/services.ts` | サーバーの `/api/data/…` を呼ぶ、データの入出力(`tableService`) |
 | `gcp/ai.ts` | AI の依頼のサービス(サーバーの `/api/ask` を呼ぶ) |
-| `gcp/dbWake.ts` | GCP 版の「データベースを準備中」の表示 |
-| `gcpdata/Cr854_*Service.ts` | GCP 版だけのテーブルのサービス(結果・週・メモ・操作の履歴・変更の記録) |
+| `gcp/dbWake.ts` | 「データベースを準備中」の表示 |
 | `mock/db.ts` ・ `mock/agent.ts` ・ `mock/seed.ts` | 撮影・デモ用の、DB と AI の身代わりと、サンプルデータ(本番のビルドには入らない) |
 
 ## 4. サーバー(`server/`。GCP 版だけ)
@@ -209,7 +208,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|---|
 | `ccp/main.py` | 121 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
 | `ccp/data_api.py` | — | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
-| `ccp/schema.py` | 294 | `schema.json` の読み込みと、Dataverse の名前 ⇔ PostgreSQL の名前・値の変換 |
+| `ccp/schema.py` | 290 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
 | `schema.json` | — | **GCP 版のデータ定義**(テーブル・列)。列を足すときはここ |
 | `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`、または Cloud SQL) |
 | `ccp/dbctl.py` | 173 | Cloud SQL の自動起動・自動停止(本番の Cloud Run だけ) |
@@ -231,7 +230,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|
 | `workbench.sh` | Workbench の操作(`setup` / `update` / `start` / `stop` / `status` / `check` / `import` / `log`) |
 | `deploy-gcp.mjs` | GCP 版(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) |
-| `check-schema.mjs` | `server/schema.json` と `src/generated/models` の食い違いの検出(`npm run verify`) |
+| `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
 | `gcp-smoke.mjs` | GCP 版の動作確認(画面を開いて、カードが出るか) |
 | `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) |
@@ -241,7 +240,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | やりたいこと | 主に触るところ |
 |---|---|
-| データの列・テーブルを足す | `server/schema.json`(サーバーが起動後に自動で足す)。型は `src/gcpFields.ts`、新しいテーブルは `src/gcpdata/` にサービスを足す |
+| データの列・テーブルを足す | `server/schema.json`(サーバーが起動後に自動で足す)。型は `src/models/`、新しいテーブルは `src/data/` にサービスを足す |
 | AI の指示文・選定のしかたを変える | `src/aiSelect.ts`(選定)・`src/aiDraft.ts`(案)・`src/autoDraft.ts`(すべて下書き)。呼び出しは `askAgent` だけを通す |
 | AI のモデル・考える量を変える | 環境変数 `GEMINI_MODEL` / `GEMINI_THINKING`(`server/ccp/ai.py`) |
 | 配信カードの中ペインにタブ・機能を足す | `src/ContentPane.tsx`(保存は `src/CardDetail.tsx`) |

@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { Button, Dialog, DialogSurface, Select, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DismissRegular, DocumentPdfRegular, OpenRegular } from '@fluentui/react-icons'
 import { printReport } from './printReport'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
-import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
+import type { WeeklyPerformance } from './models/weeklyPerformances'
 import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
 import { ResultCompare } from './ResultCompare'
-import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
-import { Cr854_deliveryresultsService } from './gcpdata/Cr854_deliveryresultsService'
+import { DeliveryCardsService } from './data/deliveryCards'
+import { DeliveryResultsService } from './data/deliveryResults'
 import { THEME_TYPES, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
@@ -47,9 +47,9 @@ interface Props {
   /** 過去の配信の結果に切り替える */
   onOpenOther?: (cardId: string) => void
   productIds: string[]
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
-  weekly: Cr854_weeklyperformances[]
+  products: Product[]
+  heroes: HeroImage[]
+  weekly: WeeklyPerformance[]
   money: (v?: number) => string
   onClose: () => void
   /** 制作の詳細(配信カード)を、上に重ねて開く。配信カードから開いたときは渡さない(下に配信カードがあるため) */
@@ -77,12 +77,12 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   const themeType = themeTypeOf(card)
   // AI の振り返りを、次に生かすメモの末尾に足す
   const adopt = async (text: string) => {
-    const now = row.result.cr854_notes?.trim()
-    const res = await Cr854_deliveryresultsService.update(row.result.cr854_deliveryresultid, { cr854_notes: now ? `${now}\n${text}` : text })
+    const now = row.result.notes?.trim()
+    const res = await DeliveryResultsService.update(row.result.id, { notes: now ? `${now}\n${text}` : text })
     if (res.success) await onSaved()
   }
   const setThemeType = async (v: ThemeType) => {
-    const res = await Cr854_deliverycardsService.update(card.cr854_deliverycardid, { cr854_themetype: v })
+    const res = await DeliveryCardsService.update(card.id, { theme_type: v })
     if (res.success) await onCardChanged?.()
   }
   return (
@@ -94,7 +94,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
             {t(`配信結果のレポート · 作成 ${new Date().toLocaleDateString(locale())}`, `Delivery results report · created ${new Date().toLocaleDateString(locale())}`)}
           </div>
           <div className={styles.head}>
-            <h2 className={styles.title}>{card.cr854_name}</h2>
+            <h2 className={styles.title}>{card.name}</h2>
             <span className={styles.sub}>{`${sentText} · ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
             <Tooltip
               content={t('テーマの種類。過去の配信と比べるときに、同じ種類の配信を集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type. Used to find past deliveries of the same type. "guessed" is a provisional type inferred from the wording.')}
@@ -122,14 +122,14 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
                   appearance="secondary"
                   size="small"
                   icon={<DocumentPdfRegular />}
-                  onClick={() => printReport(`${card.cr854_name ?? 'results'}_${(sent ?? '').slice(0, 10)}_results`)}
+                  onClick={() => printReport(`${card.name ?? 'results'}_${(sent ?? '').slice(0, 10)}_results`)}
                 >
                   {t('PDF で書き出す', 'Export PDF')}
                 </Button>
               </Tooltip>
               {onOpenCard && (
                 <Tooltip content={t('この配信を作ったときの内容(配信カード)を、上に重ねて開きます。閉じると、この結果に戻ります', 'Opens the delivery card on top. Close it to come back to these results.')} relationship="description">
-                  <Button appearance="secondary" size="small" icon={<OpenRegular />} onClick={() => onOpenCard(card.cr854_deliverycardid)}>
+                  <Button appearance="secondary" size="small" icon={<OpenRegular />} onClick={() => onOpenCard(card.id)}>
                     {t('制作の詳細', 'Production details')}
                   </Button>
                 </Tooltip>
@@ -189,11 +189,11 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               )}
             />
             <ResultInsights
-              key={`${row.result.cr854_deliveryresultid}:${row.result.cr854_notes ?? ''}`}
+              key={`${row.result.id}:${row.result.notes ?? ''}`}
               row={row}
               weekly={weekly}
-              productName={(id) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? id}
-              productCode={(id) => products.find((p) => p.cr854_productid === id)?.cr854_productcode}
+              productName={(id) => products.find((p) => p.id === id)?.name ?? id}
+              productCode={(id) => products.find((p) => p.id === id)?.product_code}
               money={money}
               onSaved={onSaved}
             />

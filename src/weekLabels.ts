@@ -1,7 +1,7 @@
 // 週のレビューの、項目名・説明・履歴の文言。画面(確認の一覧・週の帯の履歴)と、週の資料(PDF。WeekReport)で同じ言葉にするため、1 か所に置く
 import type { CheckKey } from './reviewChecks'
 import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
-import type { EventAction } from './gcpdata/Cr854_eventsService'
+import type { EventAction } from './data/events'
 import type { tr } from './i18n'
 
 type T = typeof tr

@@ -1,6 +1,6 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, MailRegular, PhoneRegular, WarningFilled } from '@fluentui/react-icons'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
+import type { DeliveryCard } from './models/deliveryCards'
 import { CHANNEL_PUSH, countryOptions, statusColor, statusOptions } from './status'
 import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
@@ -9,7 +9,7 @@ import type { CardAlertKind } from './cardAlerts'
 
 interface Props {
   month: Date
-  cards: Cr854_deliverycards[]
+  cards: DeliveryCard[]
   /** 配信日が近いのに未着手の配信(印を付ける) */
   dueSoon?: Set<string>
   /** アラートのある配信(いちばん強い種類。印を付ける) */
@@ -19,8 +19,8 @@ interface Props {
   onCreate: (day: string) => void
 }
 
-// 選択肢の値から、画面の言葉を求める(GCP 版のデータには、Dataverse の表示名(〜name)がないため、値から求める)
-const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
+// 選択肢の値から、画面の言葉を求める
+const label = (options: { value: string; label: string }[], v?: string) => optionLabel(options.find((o) => o.value === v)?.label)
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 // 日曜始まり。表記は現在の言語に従う(2024-01-07 は日曜日)
@@ -150,14 +150,14 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
   const weeks = Math.ceil((first.getDay() + daysInMonth) / 7)
   const days = Array.from({ length: weeks * 7 }, (_, i) => new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay() + i))
 
-  const byDay = new Map<string, Cr854_deliverycards[]>()
+  const byDay = new Map<string, DeliveryCard[]>()
   for (const c of cards) {
-    if (!c.cr854_scheduledat) continue
-    const k = dayKey(new Date(c.cr854_scheduledat))
+    if (!c.scheduled_at) continue
+    const k = dayKey(new Date(c.scheduled_at))
     byDay.set(k, [...(byDay.get(k) ?? []), c])
   }
   for (const list of byDay.values()) {
-    list.sort((a, b) => (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? ''))
+    list.sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
   }
 
   const today = dayKey(new Date())
@@ -199,37 +199,37 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
               </div>
               {(byDay.get(k) ?? []).map((c) => (
                 <button
-                  key={c.cr854_deliverycardid}
+                  key={c.id}
                   type="button"
                   // マスの「新規作成」まで届かないように止める(既存のカードを開くだけ)
                   onClick={(e) => {
                     e.stopPropagation()
-                    onSelect(c.cr854_deliverycardid)
+                    onSelect(c.id)
                   }}
-                  title={`${c.cr854_name}(${label(statusOptions, c.cr854_status)})${dueSoon?.has(c.cr854_deliverycardid) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
+                  title={`${c.name}(${label(statusOptions, c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
                   className={styles.pill}
                   style={{
-                    backgroundColor: `color-mix(in srgb, ${statusColor(c.cr854_status)} 16%, var(--colorNeutralBackground1))`,
-                    borderLeft: `3px solid ${statusColor(c.cr854_status)}`,
+                    backgroundColor: `color-mix(in srgb, ${statusColor(c.status)} 16%, var(--colorNeutralBackground1))`,
+                    borderLeft: `3px solid ${statusColor(c.status)}`,
                     // 取りやめた配信は、消さずに薄く、取り消し線で出す
                     ...(isCancelled(c) ? CANCELLED_STYLE : {}),
                   }}
                 >
                   <span className={styles.pillMeta}>
-                    {new Date(c.cr854_scheduledat!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
-                    {' '}{label(countryOptions, c.cr854_country)}・{c.cr854_channel === CHANNEL_PUSH ? t('アプリ', 'App') : c.cr854_channel === undefined ? '' : t('メール', 'Email')}
+                    {new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
+                    {' '}{label(countryOptions, c.country)}・{c.channel === CHANNEL_PUSH ? t('アプリ', 'App') : c.channel === undefined ? '' : t('メール', 'Email')}
                   </span>
                   <span className={styles.pillName}>
                     {/* メールかアプリかを、時刻・国の行が出ない狭い画面でも見分けられるよう、名前の前にアイコンを付ける */}
-                    {c.cr854_channel === CHANNEL_PUSH ? (
+                    {c.channel === CHANNEL_PUSH ? (
                       <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} />
                     ) : (
                       <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
                     )}
-                    <AlertMark kind={alertKinds?.get(c.cr854_deliverycardid)} />
-                    {dueSoon?.has(c.cr854_deliverycardid) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
+                    <AlertMark kind={alertKinds?.get(c.id)} />
+                    {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
                     {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
-                    {c.cr854_name}
+                    {c.name}
                   </span>
                 </button>
               ))}

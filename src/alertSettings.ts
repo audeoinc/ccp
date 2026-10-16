@@ -2,14 +2,14 @@
 // ブラウザごとに覚える(人ごとに「自分が知らせてほしいもの」を決める)。ヘッダーの件数にも効く。
 // 在庫の見込みそのものは、すべての配信で計算する(ほかの人の配信も在庫を減らすため)。条件は、出す配信を絞るだけ
 import { useSyncExternalStore } from 'react'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
+import type { DeliveryCard } from './models/deliveryCards'
 import type { ChangeAlert, StockAlert } from './alerts'
 
 export interface AlertSettings {
   /** 在庫が、配信日に何週分を切ったら「在庫僅少」にするか */
   lowWeeks: number
   /** 対象にする種別(配信の部署。空は、すべて) */
-  departments: number[]
+  departments: string[]
   /** 対象にする担当(企画・制作のどちらか。空は、すべて) */
   owners: string[]
   /** 出す種類 */
@@ -32,7 +32,9 @@ function load(): AlertSettings {
     const v = localStorage.getItem(KEY)
     if (!v) return DEFAULT_ALERT_SETTINGS
     const o = JSON.parse(v) as Partial<AlertSettings>
-    return { ...DEFAULT_ALERT_SETTINGS, ...o, kinds: { ...DEFAULT_ALERT_SETTINGS.kinds, ...o.kinds } }
+    // 種別は、以前は数値で覚えていた。文字の値でないものは捨てる(絞り込みが外れるだけ)
+    const departments = (o.departments ?? []).filter((d) => typeof d === 'string')
+    return { ...DEFAULT_ALERT_SETTINGS, ...o, departments, kinds: { ...DEFAULT_ALERT_SETTINGS.kinds, ...o.kinds } }
   } catch {
     return DEFAULT_ALERT_SETTINGS
   }
@@ -62,9 +64,9 @@ export function useAlertSettings(): AlertSettings {
 export const isCustomized = (s: AlertSettings) => JSON.stringify(s) !== JSON.stringify(DEFAULT_ALERT_SETTINGS)
 
 /** 条件に合う配信か(種別・担当) */
-export function inScope(s: AlertSettings, c: Cr854_deliverycards): boolean {
-  if (s.departments.length > 0 && !s.departments.includes(Number(c.cr854_department))) return false
-  if (s.owners.length > 0 && !s.owners.some((o) => o === c.cr854_owner?.trim() || o === c.cr854_productionowner?.trim())) return false
+export function inScope(s: AlertSettings, c: DeliveryCard): boolean {
+  if (s.departments.length > 0 && !s.departments.includes(c.department ?? '')) return false
+  if (s.owners.length > 0 && !s.owners.some((o) => o === c.owner?.trim() || o === c.production_owner?.trim())) return false
   return true
 }
 

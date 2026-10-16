@@ -1,12 +1,11 @@
 import {
-  Cr854_deliverycardscr854_status as Status,
-  Cr854_deliverycardscr854_channel as Channel,
-  Cr854_deliverycardscr854_country as Country,
-  Cr854_deliverycardscr854_department as Department,
-} from './generated/models/Cr854_deliverycardsModel'
+  DeliveryCardStatus as Status,
+  DeliveryCardChannel as Channel,
+  DeliveryCardCountry as Country,
+  DeliveryCardDepartment as Department,
+} from './models/deliveryCards'
 
-type Options = Record<number, string>
-const optionsOf = (o: Options) => Object.entries(o).map(([value, label]) => ({ value: Number(value), label }))
+const optionsOf = <K extends string>(o: Record<K, string>) => (Object.entries(o) as [K, string][]).map(([value, label]) => ({ value, label }))
 
 export const statusOptions = optionsOf(Status)
 export const channelOptions = optionsOf(Channel)
@@ -15,11 +14,14 @@ export const departmentOptions = optionsOf(Department)
 
 // 進行順(未起案→検討中→承認済み→確定)の色分け
 const statusColors = ['#8a8f98', '#d99a1e', '#3b82f6', '#22a06b']
-export const statusColor = (v?: number) => {
+/** 状態の進み具合(未起案 0 → 検討中 1 → 承認済み 2 → 確定 3)。「承認済みより前か」などを比べるときに使う */
+export const statusRank = (v?: string | null) => Math.max(0, statusOptions.findIndex((o) => o.value === v))
+
+export const statusColor = (v?: string) => {
   const idx = statusOptions.findIndex((o) => o.value === v)
   return statusColors[idx < 0 ? 0 : idx]
 }
 
 /** チャネルの値(選択肢)。配信カードはチャネルごとに作る(プレビュー・テンプレートを、チャネルで分ける) */
-export const CHANNEL_EMAIL = 588230000
-export const CHANNEL_PUSH = 588230001
+export const CHANNEL_EMAIL = 'email'
+export const CHANNEL_PUSH = 'app'

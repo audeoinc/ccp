@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
 import { AddRegular, DismissRegular, SearchRegular } from '@fluentui/react-icons'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Product } from './models/products'
 import { DND_PRODUCT, yen } from './items'
 import { productMarket } from './market'
 import { optionLabel, useT } from './i18n'
@@ -9,7 +9,7 @@ import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 
 interface Props {
-  products: Cr854_products[]
+  products: Product[]
   usedIds: Set<string>
   onAdd: (productId: string) => void
 }
@@ -57,15 +57,15 @@ export function Candidates({ products, usedIds, onAdd }: Props) {
   const [category, setCategory] = useState('')
   const [limit, setLimit] = useState(PAGE)
 
-  const categories = useMemo(() => [...new Set(products.map((p) => p.cr854_categoryname).filter(Boolean))] as string[], [products])
+  const categories = useMemo(() => [...new Set(products.map((p) => p.category_name).filter(Boolean))] as string[], [products])
   // 商品が大量にあるので、検索語かカテゴリを指定するまでは、一覧を出さない
   const searching = query.trim() !== '' || category !== ''
   const matched = useMemo(() => {
     if (!searching) return []
     const q = query.trim().toLowerCase()
     return products.filter((p) => {
-      if (category && p.cr854_categoryname !== category) return false
-      return !q || `${p.cr854_name} ${p.cr854_productcode} ${p.cr854_description ?? ''}`.toLowerCase().includes(q)
+      if (category && p.category_name !== category) return false
+      return !q || `${p.name} ${p.product_code} ${p.description ?? ''}`.toLowerCase().includes(q)
     })
   }, [products, query, category, searching])
   const shown = matched.slice(0, limit)
@@ -106,31 +106,31 @@ export function Candidates({ products, usedIds, onAdd }: Props) {
       )}
       {searching && matched.length === 0 && <Caption1 className={styles.caption}>{t('該当する商品がありません。', 'No matching products.')}</Caption1>}
       {shown.map((p) => {
-        const used = usedIds.has(p.cr854_productid)
+        const used = usedIds.has(p.id)
         return (
           <div
-            key={p.cr854_productid}
+            key={p.id}
             draggable={!used}
             onDragStart={(e) => {
-              e.dataTransfer.setData(DND_PRODUCT, p.cr854_productid)
+              e.dataTransfer.setData(DND_PRODUCT, p.id)
               e.dataTransfer.effectAllowed = 'copy'
             }}
             className={mergeClasses(styles.item, used && styles.itemUsed)}
           >
-            <ImageThumb src={productImage(p)} alt={p.cr854_name} width={48} height={64} />
+            <ImageThumb src={productImage(p)} alt={p.name} width={48} height={64} />
             <div className={styles.body}>
-              <Text weight="semibold" size={300} truncate wrap={false} block>{p.cr854_name}</Text>
+              <Text weight="semibold" size={300} truncate wrap={false} block>{p.name}</Text>
               <Caption1 className={styles.line}>
-                {p.cr854_productcode} ・ {yen(p.cr854_price, productMarket(p))} ・ {t('在庫', 'Stock ')}{p.cr854_stock ?? '-'}
+                {p.product_code} ・ {yen(p.price, productMarket(p))} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
               </Caption1>
               <Caption1 className={styles.line}>
-                {trendMark(p.cr854_salestrendname)} ・ ★{p.cr854_rating ?? '-'} ・ {optionLabel(p.cr854_weathername)}
+                {trendMark(p.sales_trend_name)} ・ ★{p.rating ?? '-'} ・ {optionLabel(p.weather_name)}
               </Caption1>
             </div>
             {used ? (
               <Badge appearance="tint" color="informative">{t('掲載中', 'Included')}</Badge>
             ) : (
-              <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => onAdd(p.cr854_productid)} aria-label={t('追加', 'Add')} />
+              <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => onAdd(p.id)} aria-label={t('追加', 'Add')} />
             )}
           </div>
         )

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Badge, Button, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { DismissRegular } from '@fluentui/react-icons'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Product } from './models/products'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { yen } from './items'
@@ -42,11 +42,11 @@ const weekLabel = (iso: string) => {
 }
 
 /** 商品の詳細(クリックで開くフロートの中身): 売上・在庫の推移、MD の販売方針と販促計画、商品の基本情報 */
-export function ProductDetail({ product: p, onClose }: { product: Cr854_products; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void }) {
+export function ProductDetail({ product: p, onClose }: { product: Product; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void }) {
   const t = useT()
   const s = useStyles()
   const [tab, setTab] = useState<TabId>('trend')
-  const { data, loading, error } = useProductData(p.cr854_productcode)
+  const { data, loading, error } = useProductData(p.product_code)
   const market = productMarket(p)
   const weekly = data?.weekly ?? []
 
@@ -54,17 +54,17 @@ export function ProductDetail({ product: p, onClose }: { product: Cr854_products
   const last4 = weekly.slice(-4).reduce((n, w) => n + w.units, 0)
   const prev4 = weekly.slice(-8, -4).reduce((n, w) => n + w.units, 0)
   const change = prev4 > 0 ? Math.round(((last4 - prev4) / prev4) * 100) : undefined
-  const latestStock = weekly.length > 0 ? weekly[weekly.length - 1].stock : p.cr854_stock
+  const latestStock = weekly.length > 0 ? weekly[weekly.length - 1].stock : p.stock
   const cover = last4 > 0 && latestStock !== undefined ? Math.round((latestStock / (last4 / 4)) * 10) / 10 : undefined
   const revenue = weekly.reduce((n, w) => n + w.revenue, 0)
 
   return (
     <div className={s.root}>
       <div className={s.head}>
-        <ImageThumb src={productImage(p)} alt={p.cr854_name} width={48} height={64} />
+        <ImageThumb src={productImage(p)} alt={p.name} width={48} height={64} />
         <div className={s.title}>
-          <Text weight="semibold" size={300}>{p.cr854_name}</Text>
-          <span className={s.sub}>{p.cr854_productcode} ・ {optionLabel(p.cr854_categoryname)} ・ {yen(p.cr854_price, market)}</span>
+          <Text weight="semibold" size={300}>{p.name}</Text>
+          <span className={s.sub}>{p.product_code} ・ {optionLabel(p.category_name)} ・ {yen(p.price, market)}</span>
         </div>
         {data?.policy?.stage && <Badge size="small" appearance="tint" color="brand">{data.policy.stage}</Badge>}
         {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
@@ -150,19 +150,19 @@ export function ProductDetail({ product: p, onClose }: { product: Cr854_products
       {tab === 'details' && (
         <dl className={s.facts}>
           <dt className={s.label}>{t('価格', 'Price')}</dt>
-          <dd className={s.value}>{yen(p.cr854_price, market)}</dd>
+          <dd className={s.value}>{yen(p.price, market)}</dd>
           <dt className={s.label}>{t('在庫', 'Stock')}</dt>
-          <dd className={s.value}>{p.cr854_stock ?? '-'}</dd>
+          <dd className={s.value}>{p.stock ?? '-'}</dd>
           <dt className={s.label}>{t('売上トレンド', 'Sales trend')}</dt>
-          <dd className={s.value}>{optionLabel(p.cr854_salestrendname) || '-'}</dd>
+          <dd className={s.value}>{optionLabel(p.sales_trend_name) || '-'}</dd>
           <dt className={s.label}>{t('評価', 'Rating')}</dt>
-          <dd className={s.value}>{p.cr854_rating !== undefined ? `★${p.cr854_rating}` : '-'}</dd>
+          <dd className={s.value}>{p.rating !== undefined ? `★${p.rating}` : '-'}</dd>
           <dt className={s.label}>{t('季節', 'Season')}</dt>
-          <dd className={s.value}>{optionLabel(p.cr854_seasonname) || '-'}</dd>
+          <dd className={s.value}>{optionLabel(p.season_name) || '-'}</dd>
           <dt className={s.label}>{t('天候適性', 'Weather')}</dt>
-          <dd className={s.value}>{optionLabel(p.cr854_weathername) || '-'}</dd>
+          <dd className={s.value}>{optionLabel(p.weather_name) || '-'}</dd>
           <dt className={s.label}>{t('説明', 'Description')}</dt>
-          <dd className={s.value}>{p.cr854_description || '-'}</dd>
+          <dd className={s.value}>{p.description || '-'}</dd>
         </dl>
       )}
     </div>

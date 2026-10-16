@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Button, Spinner, Textarea, makeStyles, tokens } from '@fluentui/react-components'
-import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
-import { Cr854_deliveryresultsService } from './gcpdata/Cr854_deliveryresultsService'
+import type { WeeklyPerformance } from './models/weeklyPerformances'
+import { DeliveryResultsService } from './data/deliveryResults'
 import { locale, useT } from './i18n'
 import { isPush, parseProductResults, pct, templateName, type ResultRow } from './results'
 
@@ -37,8 +37,8 @@ export function ResultKpis({ row, money }: { row: ResultRow; money: (v?: number)
     ...(push ? [] : ([[t('開封率', 'Open rate'), pct(row.openRate)]] as [string, ReactNode][])),
     [push ? t('タップ率', 'Tap rate') : t('クリック率', 'Click rate'), pct(row.clickRate)],
     [t('売上', 'Revenue'), money(row.revenue)],
-    [t('注文', 'Orders'), n(result.cr854_orders)],
-    [t('送った数', 'Sent'), n(result.cr854_recipients)],
+    [t('注文', 'Orders'), n(result.orders)],
+    [t('送った数', 'Sent'), n(result.recipients)],
     [
       t('前年比', 'vs last year'),
       row.vsLastYear === undefined ? '—' : <span className={row.vsLastYear >= 0 ? styles.up : styles.down}>{`${row.vsLastYear >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(row.vsLastYear * 100))}%`}</span>,
@@ -66,7 +66,7 @@ export function ResultInsights({
   onSaved,
 }: {
   row: ResultRow
-  weekly: Cr854_weeklyperformances[]
+  weekly: WeeklyPerformance[]
   productName: (id: string) => string
   /** 商品 ID → 商品コード(週ごとの実績は、商品コードで持っている) */
   productCode: (id: string) => string | undefined
@@ -76,34 +76,34 @@ export function ResultInsights({
   const styles = useStyles()
   const t = useT()
   const { card, result } = row
-  const [notes, setNotes] = useState(result.cr854_notes ?? '')
+  const [notes, setNotes] = useState(result.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const push = isPush(card)
-  const items = parseProductResults(result.cr854_products)
+  const items = parseProductResults(result.products)
 
   // 配信の週と、その前の週の、商品の売れた数(週ごとの実績があれば)
-  const sent = new Date(result.cr854_sentat ?? card.cr854_scheduledat ?? '')
+  const sent = new Date(result.sent_at ?? card.scheduled_at ?? '')
   const weekOf = (code?: string) => {
     if (!code || Number.isNaN(sent.getTime())) return undefined
-    const rowsOf = weekly.filter((w) => w.cr854_productcode === code).sort((a, b) => (a.cr854_weekstart ?? '').localeCompare(b.cr854_weekstart ?? ''))
+    const rowsOf = weekly.filter((w) => w.product_code === code).sort((a, b) => (a.week_start ?? '').localeCompare(b.week_start ?? ''))
     const i = rowsOf.findIndex((w) => {
-      const s = new Date(`${w.cr854_weekstart}T00:00:00`)
+      const s = new Date(`${w.week_start}T00:00:00`)
       return s.getTime() <= sent.getTime() && sent.getTime() < s.getTime() + 7 * 24 * 3600_000
     })
     if (i <= 0) return undefined
     const now = rowsOf[i]
     const before = rowsOf[i - 1]
     return {
-      change: before.cr854_units ? (now.cr854_units ?? 0) / before.cr854_units - 1 : undefined,
-      stockWeeks: now.cr854_units ? (now.cr854_stock ?? 0) / now.cr854_units : undefined,
+      change: before.units ? (now.units ?? 0) / before.units - 1 : undefined,
+      stockWeeks: now.units ? (now.stock ?? 0) / now.units : undefined,
     }
   }
 
   const save = async () => {
     setSaving(true)
     try {
-      const res = await Cr854_deliveryresultsService.update(result.cr854_deliveryresultid, { cr854_notes: notes })
+      const res = await DeliveryResultsService.update(result.id, { notes: notes })
       if (res.success) {
         setSavedAt(new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }))
         await onSaved()
@@ -114,13 +114,13 @@ export function ResultInsights({
   }
 
   const ai: { label: string; value?: string; reason?: string }[] = [
-    { label: t('テーマ', 'Theme'), value: card.cr854_theme, reason: card.cr854_themereason },
+    { label: t('テーマ', 'Theme'), value: card.theme, reason: card.theme_reason },
     ...(push
-      ? [{ label: t('通知のタイトル', 'Notification title'), value: card.cr854_pushtitle }]
+      ? [{ label: t('通知のタイトル', 'Notification title'), value: card.push_title }]
       : [
-          { label: t('見出し', 'Headline'), value: card.cr854_headline, reason: card.cr854_copyangle ? t(`切り口: ${card.cr854_copyangle}`, `Angle: ${card.cr854_copyangle}`) : undefined },
-          { label: t('テンプレート', 'Template'), value: templateName(card), reason: card.cr854_instructionsangle ? t(`制作指示: ${card.cr854_instructionsangle}`, `Brief: ${card.cr854_instructionsangle}`) : undefined },
-          { label: t('メイン画像', 'Hero'), value: card.cr854_heroreason ? t('AI の提案から選択', 'Picked from AI suggestions') : undefined, reason: card.cr854_heroreason },
+          { label: t('見出し', 'Headline'), value: card.headline, reason: card.copy_angle ? t(`切り口: ${card.copy_angle}`, `Angle: ${card.copy_angle}`) : undefined },
+          { label: t('テンプレート', 'Template'), value: templateName(card), reason: card.instructions_angle ? t(`制作指示: ${card.instructions_angle}`, `Brief: ${card.instructions_angle}`) : undefined },
+          { label: t('メイン画像', 'Hero'), value: card.hero_reason ? t('AI の提案から選択', 'Picked from AI suggestions') : undefined, reason: card.hero_reason },
         ]),
   ].filter((x) => x.value)
 
@@ -136,7 +136,7 @@ export function ResultInsights({
         <div className={styles.noteActions} data-noprint>
           {saving && <Spinner size="extra-tiny" />}
           {savedAt && !saving && <span className={styles.muted}>{t(`${savedAt} に保存しました`, `Saved at ${savedAt}`)}</span>}
-          <Button size="small" onClick={() => void save()} disabled={saving || notes === (result.cr854_notes ?? '')}>
+          <Button size="small" onClick={() => void save()} disabled={saving || notes === (result.notes ?? '')}>
             {t('保存', 'Save')}
           </Button>
         </div>

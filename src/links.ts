@@ -1,10 +1,10 @@
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Product } from './models/products'
 import type { Item } from './items'
 import { optionLabel, tr } from './i18n'
 import { getTemplate, placedButtons, sectionRange, sectionsOf, type EmailTemplateId, type LinkKind } from './templates'
 
 /**
- * 配信ごとのリンク先(配信カードの cr854_links に JSON で保存する。GCP 版だけの列)。
+ * 配信ごとのリンク先(配信カードの links に JSON で保存する)。
  * テンプレートには、リンク先の「種類」だけがある。実際の URL は、種類から既定の URL を作り、配信カードで上書きできる。
  * ボタンの鍵は、テンプレートのボタンの id(文言や位置を変えても、設定が外れないように)。
  */
@@ -68,7 +68,7 @@ export function defaultUrl(kind: LinkKind, campaign: string, category?: string):
   }
 }
 
-export const productUrl = (p?: Cr854_products) => (p?.cr854_productcode ? `${SHOP_URL}/p/${p.cr854_productcode}` : '')
+export const productUrl = (p?: Product) => (p?.product_code ? `${SHOP_URL}/p/${p.product_code}` : '')
 
 /** 計測用のパラメーターを付けた URL(URL として読めないときは、そのまま返す) */
 export function withUtm(url: string, utm: Links['utm']): string {
@@ -104,7 +104,7 @@ export interface LinkSlot {
 }
 
 /** テンプレートと掲載商品から、リンクを付ける場所の一覧を作る(メール上の並び順) */
-export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Cr854_products[], campaign: string): LinkSlot[] {
+export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Product[], campaign: string): LinkSlot[] {
   const tpl = getTemplate(templateId)
   const sections = sectionsOf(templateId)
   // セクションのカテゴリ: そのセクションの商品で、いちばん多いカテゴリ(ボタンのリンク先が「カテゴリのページ」のときに使う)
@@ -114,7 +114,7 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
     const [from, to] = sectionRange(sections, sec, items.length)
     const counts = new Map<string, number>()
     for (const it of items.slice(from, to)) {
-      const name = optionLabel(products.find((p) => p.cr854_productid === it.productId)?.cr854_categoryname)
+      const name = optionLabel(products.find((p) => p.id === it.productId)?.category_name)
       if (name) counts.set(name, (counts.get(name) ?? 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]

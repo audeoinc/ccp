@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Button, Field, MessageBar, MessageBarBody, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowSwapRegular, CalendarArrowRightRegular, CheckmarkCircleRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
+import type { Product } from './models/products'
+import type { WeekRow } from './data/weeks'
 import { AlertActionPanel } from './AlertActionPanel'
 import { isLeadStage, type ChangeAlert, type Placement, type StockModel } from './alerts'
 import { myName } from './history'
@@ -34,10 +34,10 @@ const useStyles = makeStyles({
 
 interface Props {
   alert: ChangeAlert
-  products: Cr854_products[]
+  products: Product[]
   placements: Map<string, Placement[]>
   model: StockModel
-  weeks: Cr854_weeks[]
+  weeks: WeekRow[]
   onOpenCard: (id: string) => void
   onChanged: () => Promise<void>
   /** 対応済みにする */
@@ -57,13 +57,13 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const policy = alert.kind === 'policyChanged'
-  const actionCard = alert.deliveries.find((d) => d.card.cr854_deliverycardid === action?.cardId)?.card
+  const actionCard = alert.deliveries.find((d) => d.card.id === action?.cardId)?.card
 
   const dateTime = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '—')
   const fieldLabel = (f: string) =>
     ({ stage: t('位置づけ', 'Role'), promo_period: t('販促の期間', 'Promotion period'), policy: t('方針', 'Policy'), scheduled_at: t('配信日時', 'Date and time') })[f] ?? f
   const valueText = (f: string, v: string) => (f === 'scheduled_at' ? dateTime(v) : v || '—')
-  const statusLabel = (v?: number) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
+  const statusLabel = (v?: string) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
   const stage = alert.changes.find((c) => c.field === 'stage')
   // 変更の説明(理由の最初の文・一覧に使う)
   const why = policy
@@ -88,7 +88,7 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
     <div className={styles.detail}>
       <div>
         <h2 className={styles.title}>
-          {policy ? t(`MD 方針の変更: ${alert.product?.cr854_name}`, `MD policy change: ${alert.product?.cr854_name}`) : t(`日程の変更: ${alert.card?.cr854_name}`, `Date change: ${alert.card?.cr854_name}`)}
+          {policy ? t(`MD 方針の変更: ${alert.product?.name}`, `MD policy change: ${alert.product?.name}`) : t(`日程の変更: ${alert.card?.name}`, `Date change: ${alert.card?.name}`)}
         </h2>
         <div className={styles.sub}>
           {t(`${dateTime(alert.changedAt)} に変更`, `Changed ${dateTime(alert.changedAt)}`)}
@@ -132,13 +132,13 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
             </thead>
             <tbody>
               {alert.deliveries.map((d) => (
-                <tr key={d.card.cr854_deliverycardid}>
-                  <td className={styles.td}>{dateTime(d.card.cr854_scheduledat)}</td>
-                  <td className={mergeClasses(styles.td, styles.name)}>{d.card.cr854_name}</td>
-                  <td className={styles.td}>{d.card.cr854_channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
+                <tr key={d.card.id}>
+                  <td className={styles.td}>{dateTime(d.card.scheduled_at)}</td>
+                  <td className={mergeClasses(styles.td, styles.name)}>{d.card.name}</td>
+                  <td className={styles.td}>{d.card.channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
                   <td className={styles.td}>
-                    <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.cr854_status ?? 588230000) }} />
-                    {statusLabel(d.card.cr854_status ?? 588230000)}
+                    <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.status ?? 'not_started') }} />
+                    {statusLabel(d.card.status ?? 'not_started')}
                   </td>
                   <td className={styles.td}>
                     {policy
@@ -150,18 +150,18 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
                   <td className={styles.td}>
                     <span className={styles.actions}>
                       {policy && (
-                        <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.cr854_deliverycardid })}>
+                        <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.id })}>
                           {t('差し替え', 'Replace')}
                         </Button>
                       )}
                       <Tooltip content={t('延期', 'Postpone')} relationship="label">
-                        <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.cr854_deliverycardid })} />
+                        <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.id })} />
                       </Tooltip>
                       <Tooltip content={t('取りやめ', 'Cancel delivery')} relationship="label">
-                        <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.cr854_deliverycardid })} />
+                        <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.id })} />
                       </Tooltip>
                       <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
-                        <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.cr854_deliverycardid)} />
+                        <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(d.card.id)} />
                       </Tooltip>
                     </span>
                   </td>

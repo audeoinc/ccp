@@ -3,7 +3,7 @@ import { Badge, Field, Text, makeStyles, mergeClasses, tokens } from '@fluentui/
 import { ReOrderDotsVerticalRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { ImageThumb } from './ImageThumb'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Product } from './models/products'
 import { productMarket } from './market'
 import { SOURCE_AI, yen } from './items'
 import { optionLabel, tr, useT } from './i18n'
@@ -84,7 +84,7 @@ export interface RowProps {
   meta: string
   reason: string
   onReason?: (v: string) => void
-  source?: number
+  source?: string
   badge?: string
   actions?: ReactNode
   dim?: boolean
@@ -135,5 +135,5 @@ export function Row({ image, wide, title, meta, reason, onReason, source, badge,
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const productMeta = (p?: Cr854_products) =>
-  p ? `${p.cr854_productcode} ・ ${yen(p.cr854_price, productMarket(p))} ・ ${tr('在庫', 'Stock ')}${p.cr854_stock ?? '-'} ・ ${optionLabel(p.cr854_salestrendname)} ・ ★${p.cr854_rating ?? '-'}` : ''
+export const productMeta = (p?: Product) =>
+  p ? `${p.product_code} ・ ${yen(p.price, productMarket(p))} ・ ${tr('在庫', 'Stock ')}${p.stock ?? '-'} ・ ${optionLabel(p.sales_trend_name)} ・ ★${p.rating ?? '-'}` : ''

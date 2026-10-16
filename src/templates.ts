@@ -1,8 +1,9 @@
+import type { DeliveryCardEmailTemplate } from './models/deliveryCards'
 // メールのテンプレート。ヒーロー(上部)の種類と、商品を並べる枠(セクション)で定義する。
 // 掲載商品は並び順に、上のセクションの枠から順に流し込む。
 //
-// テンプレートは、「標準」(コードに持つ。常に使える。編集不可)と、「ユーザーが作ったもの」(Dataverse に保存)の登録型。
-// ユーザーが作ったテンプレートの ID は、Dataverse の行の ID。配信カードは、この ID(layoutkey)で、テンプレートを指す。
+// テンプレートは、「標準」(コードに持つ。常に使える。編集不可)と、「ユーザーが作ったもの」(データベースに保存)の登録型。
+// ユーザーが作ったテンプレートの ID は、表 layout_templates の行の ID。配信カードは、この ID(layout_key)で、テンプレートを指す。
 
 import { useSyncExternalStore } from 'react'
 import { tr } from './i18n'
@@ -422,7 +423,7 @@ const subscribe = (fn: () => void) => {
   return () => listeners.delete(fn)
 }
 
-/** Dataverse から読み込んだ、ユーザーが作ったテンプレートに入れ替える */
+/** データベースから読み込んだ、ユーザーが作ったテンプレートに入れ替える */
 export function setCustomTemplates(list: ({ id: string } & Omit<EmailTemplate, 'builtin'>)[]) {
   custom = Object.fromEntries(list.map(({ id, ...rest }) => [id, { ...rest, builtin: false }]))
   version += 1
@@ -479,18 +480,18 @@ export function useTemplateManagerOpen(): boolean {
   return useSyncExternalStore(subscribeManager, () => managerOpen)
 }
 
-// Dataverse の選択肢(配信カードの「emailtemplate」列)の値との対応(標準のテンプレートだけ。以前のカードとの互換)
-export const TEMPLATE_VALUES: Record<string, 588230000 | 588230001 | 588230002 | 588230003 | 588230004 | 588230005> = {
-  free: 588230000,
-  standard4: 588230001,
-  collab: 588230002,
-  offer: 588230003,
-  cat2: 588230004,
-  cat3: 588230005,
+// 配信カードの「email_template」列の値との対応(標準のテンプレートだけ。以前のカードとの互換)
+export const TEMPLATE_VALUES: Record<string, DeliveryCardEmailTemplate> = {
+  free: 'free',
+  standard4: 'standard4',
+  collab: 'collab',
+  offer: 'offer',
+  cat2: 'cat2',
+  cat3: 'cat3',
 }
 
 /** 保存されている選択肢の値から、標準のテンプレートを求める(未設定や不明な値は Standard4) */
-export const templateFromValue = (v?: number): EmailTemplateId => BUILTIN_IDS.find((id) => TEMPLATE_VALUES[id] === v) ?? DEFAULT_TEMPLATE
+export const templateFromValue = (v?: string): EmailTemplateId => BUILTIN_IDS.find((id) => TEMPLATE_VALUES[id] === v) ?? DEFAULT_TEMPLATE
 
 /** テンプレートの商品枠の合計(free は決まっていないので 0) */
 export const slotsOf = (id: EmailTemplateId) => getTemplate(id).sections.reduce((n, s) => n + s.slots, 0)

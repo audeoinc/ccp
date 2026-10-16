@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]  # server/ の 1 つ上 = アプリのルート
-MODELS = ROOT / "src" / "generated" / "models"
+MODELS = ROOT / "src" / "models"
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 NS = uuid.UUID("6f1c2f3e-7a54-4b8e-9a77-0c6b8a1d2e10")  # 画像由来のデータの ID 用(同じコードなら、同じ ID)
 
@@ -44,25 +44,25 @@ NS = uuid.UUID("6f1c2f3e-7a54-4b8e-9a77-0c6b8a1d2e10")  # 画像由来のデー�
 WEEKS = [date(2026, 7, 13) + timedelta(weeks=i) for i in range(12)]
 
 
-# ---------------------------------------------------------------- 選択肢(Dataverse の数値と名前)
-def choices(model: str, const: str) -> dict[str, int]:
-    """src/generated/models/<model>.ts の選択肢(名前 → 数値)"""
+# ---------------------------------------------------------------- 選択肢(表示名と値)
+def choices(model: str, const: str) -> dict[str, str]:
+    """src/models/<model>.ts の選択肢(表示名 → 値)"""
     text = (MODELS / f"{model}.ts").read_text(encoding="utf-8")
     block = re.search(rf"export const {const} = \{{(.*?)\}} as const", text, re.S)
     if not block:
         raise SystemExit(f"選択肢が見つかりません: {model}.{const}")
-    return {name: int(num) for num, name in re.findall(r"(\d+):\s*'([^']*)'", block.group(1))}
+    return {name: code for code, name in re.findall(r"(\w+):\s*'([^']*)'", block.group(1))}
 
 
-def load_enums() -> dict[str, dict[str, int]]:
+def load_enums() -> dict[str, dict[str, str]]:
     return {
-        "category": choices("Cr854_productsModel", "Cr854_productscr854_category"),
-        "season": choices("Cr854_productsModel", "Cr854_productscr854_season"),
-        "weather": choices("Cr854_productsModel", "Cr854_productscr854_weather"),
-        "trend": choices("Cr854_productsModel", "Cr854_productscr854_salestrend"),
-        "market": choices("Cr854_productsModel", "Cr854_productscr854_market"),
-        "purpose": choices("Cr854_heroimagesModel", "Cr854_heroimagescr854_purpose"),
-        "hero_season": choices("Cr854_heroimagesModel", "Cr854_heroimagescr854_season"),
+        "category": choices("products", "ProductCategory"),
+        "season": choices("products", "ProductSeason"),
+        "weather": choices("products", "ProductWeather"),
+        "trend": choices("products", "ProductSalesTrend"),
+        "market": choices("products", "ProductMarket"),
+        "purpose": choices("heroImages", "HeroImagePurpose"),
+        "hero_season": choices("heroImages", "HeroImageSeason"),
     }
 
 
@@ -113,7 +113,7 @@ def code_for(group: str, index: int) -> str:
 
 
 # ---------------------------------------------------------------- 1. 解析(Gemini)
-def prompt_for(group: str, enums: dict[str, dict[str, int]]) -> str:
+def prompt_for(group: str, enums: dict[str, dict[str, str]]) -> str:
     us = group.endswith("/us")
     if group.startswith("products"):
         cats = " / ".join(enums["category"])
@@ -154,7 +154,7 @@ def to_jpeg(path: Path, max_side: int = 1024, quality: int = 88) -> bytes:
         return buf.getvalue()
 
 
-def analyze_one(client: Any, model: str, path: Path, group: str, enums: dict[str, dict[str, int]]) -> dict[str, Any]:
+def analyze_one(client: Any, model: str, path: Path, group: str, enums: dict[str, dict[str, str]]) -> dict[str, Any]:
     from google.genai import types
 
     resp = client.models.generate_content(
@@ -268,7 +268,7 @@ def weekly_rows(rng: random.Random, code: str, category: str, price: float, stoc
     rows = []
     for i, w in enumerate(WEEKS):
         stock = stock_now + sum(units[i + 1 :])  # 今の在庫から、さかのぼる(週ごとに、売れた分だけ減っている)
-        rows.append({"cr854_weeklyperformanceid": str(uuid.uuid5(NS, f"weekly:{code}:{w.isoformat()}")), "cr854_name": f"{code} {w.isoformat()}", "cr854_productcode": code, "cr854_weekstart": w.isoformat(), "cr854_units": units[i], "cr854_revenue": round(units[i] * price, 2), "cr854_stock": stock})
+        rows.append({"id": str(uuid.uuid5(NS, f"weekly:{code}:{w.isoformat()}")), "name": f"{code} {w.isoformat()}", "product_code": code, "week_start": w.isoformat(), "units": units[i], "revenue": round(units[i] * price, 2), "stock": stock})
     return rows
 
 
@@ -304,19 +304,19 @@ def cmd_build(base: Path, out: Path, only: str | None = None) -> None:
                 stock = rng.randint(8, 45) if rng.random() < 0.12 else rng.randint(60, 320)
                 products.append(
                     {
-                        "cr854_productid": str(uuid.uuid5(NS, f"product:{code}")),
-                        "cr854_productcode": code,
-                        "cr854_name": a.get("name", code),
-                        "cr854_category": enums["category"][category],
-                        "cr854_price": price,
-                        "cr854_stock": stock,
-                        "cr854_season": enums["season"].get(a.get("season", ""), enums["season"]["通年"]),
-                        "cr854_salestrend": enums["trend"][trend],
-                        "cr854_rating": round(rng.uniform(3.8, 4.8), 1),
-                        "cr854_weather": enums["weather"].get(a.get("weather", ""), enums["weather"]["晴れ"]),
-                        "cr854_description": a.get("description", ""),
-                        "cr854_imageurl": url,
-                        "cr854_market": market,
+                        "id": str(uuid.uuid5(NS, f"product:{code}")),
+                        "product_code": code,
+                        "name": a.get("name", code),
+                        "category": enums["category"][category],
+                        "price": price,
+                        "stock": stock,
+                        "season": enums["season"].get(a.get("season", ""), enums["season"]["通年"]),
+                        "sales_trend": enums["trend"][trend],
+                        "rating": round(rng.uniform(3.8, 4.8), 1),
+                        "weather": enums["weather"].get(a.get("weather", ""), enums["weather"]["晴れ"]),
+                        "description": a.get("description", ""),
+                        "image_url": url,
+                        "market": market,
                     }
                 )
                 weekly += weekly_rows(rng, code, category, price, stock, trend)
@@ -324,32 +324,32 @@ def cmd_build(base: Path, out: Path, only: str | None = None) -> None:
                 stage_jp, stage_en = STAGE[trend]
                 policies.append(
                     {
-                        "cr854_productpolicyid": str(uuid.uuid5(NS, f"policy:{code}")),
-                        "cr854_name": code,
-                        "cr854_productcode": code,
-                        "cr854_policy": en if us else jp,
-                        "cr854_promoplan": "\n".join(plan_en if us else plan_jp),
-                        "cr854_promoperiod": "2026-10-19 - 2026-12-14",
-                        "cr854_stage": stage_en if us else stage_jp,
+                        "id": str(uuid.uuid5(NS, f"policy:{code}")),
+                        "name": code,
+                        "product_code": code,
+                        "policy": en if us else jp,
+                        "promo_plan": "\n".join(plan_en if us else plan_jp),
+                        "promo_period": "2026-10-19 - 2026-12-14",
+                        "stage": stage_en if us else stage_jp,
                     }
                 )
             else:
                 heroes.append(
                     {
-                        "cr854_heroimageid": str(uuid.uuid5(NS, f"hero:{code}")),
-                        "cr854_imagecode": code,
-                        "cr854_name": a.get("name", code),
-                        "cr854_purpose": enums["purpose"].get(a.get("purpose", ""), enums["purpose"]["特集"]),
-                        "cr854_season": enums["hero_season"].get(a.get("season", ""), enums["hero_season"]["通年"]),
-                        "cr854_tags": a.get("tags", ""),
-                        "cr854_description": a.get("description", ""),
-                        "cr854_imageurl": url,
-                        "cr854_market": market,
+                        "id": str(uuid.uuid5(NS, f"hero:{code}")),
+                        "image_code": code,
+                        "name": a.get("name", code),
+                        "purpose": enums["purpose"].get(a.get("purpose", ""), enums["purpose"]["特集"]),
+                        "season": enums["hero_season"].get(a.get("season", ""), enums["hero_season"]["通年"]),
+                        "tags": a.get("tags", ""),
+                        "description": a.get("description", ""),
+                        "image_url": url,
+                        "market": market,
                     }
                 )
     if missing:
         raise SystemExit(f"未解析の画像が {missing} 点あります。analyze を実行してください")
-    data = {"cr854_products": products, "cr854_heroimages": heroes, "cr854_weeklyperformances": weekly, "cr854_productpolicies": policies}
+    data = {"products": products, "hero_images": heroes, "weekly_performances": weekly, "product_policies": policies}
     (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"組み立て: 商品 {len(products)} / ヒーロー画像 {len(heroes)} / 週次実績 {len(weekly)} / 販売方針 {len(policies)}  →  {out / 'data.json'}")
@@ -387,8 +387,8 @@ async def cmd_apply(out: Path, yes: bool, only: str | None = None) -> None:
     market = enums["market"]["US" if only == "us" else "JP"] if only else None
     if only:
         # --only で作ったデータ(その市場だけ)かを確かめる(別の市場を、巻き込んで消さないため)
-        for dv in ("cr854_products", "cr854_heroimages"):
-            if any(r["cr854_market"] != market for r in data.get(dv, [])):
+        for dv in ("products", "hero_images"):
+            if any(r["market"] != market for r in data.get(dv, [])):
                 raise SystemExit(f"data.json に、{only.upper()} 以外の市場のデータがあります。build --only {only} でやり直してください")
     counts = ", ".join(f"{schema.table(k).pg} {len(v)} 件" for k, v in data.items())
     scope = f"{only.upper()} 向けだけ" if only else "全市場"
@@ -411,13 +411,13 @@ async def cmd_apply(out: Path, yes: bool, only: str | None = None) -> None:
         else:
             await conn.execute(text("DELETE FROM delivery_products"))
             await conn.execute(text("UPDATE delivery_cards SET hero_image_id = NULL, hero_reason = NULL, modified_on = now()"))
-            for dv in ("cr854_weeklyperformances", "cr854_productpolicies", "cr854_products", "cr854_heroimages"):
+            for dv in ("weekly_performances", "product_policies", "products", "hero_images"):
                 await conn.execute(text(f"DELETE FROM {schema.table(dv).pg}"))
-        for dv in ("cr854_heroimages", "cr854_products", "cr854_weeklyperformances", "cr854_productpolicies"):
+        for dv in ("hero_images", "products", "weekly_performances", "product_policies"):
             t = schema.table(dv)
             for rec in data.get(dv, []):
                 values = t.to_db(rec)
-                values["id"] = sc.coerce("uuid", rec[t.pk])
+                values["id"] = sc.coerce("uuid", rec["id"])
                 cols = list(values)
                 await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"), values)
     print("DB を置き換えました")

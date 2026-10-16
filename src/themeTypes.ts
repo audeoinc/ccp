@@ -1,7 +1,7 @@
 // テーマの種類(値下げ・セール・新作 など)。テーマは自由な文なので、そのままでは「同じ種類の過去の配信」を集められない。
-// 配信カードに種類を持たせ(cr854_themetype)、結果を、同じ種類の過去の配信と比べるのに使う。
+// 配信カードに種類を持たせ(theme_type)、結果を、同じ種類の過去の配信と比べるのに使う。
 // 種類は AI が分け(classifyThemeTypes)、人が直せる。まだ分けていない配信は、言葉から推し量った種類(guessThemeType)で扱う。
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
+import type { DeliveryCard } from './models/deliveryCards'
 import { askAgent } from './aiSelect'
 import { tr } from './i18n'
 
@@ -34,8 +34,8 @@ export function themeTypeLabel(v: ThemeType): string {
 const isThemeType = (v: unknown): v is ThemeType => typeof v === 'string' && (THEME_TYPES as string[]).includes(v)
 
 /** 配信の種類(入っていれば、それ。なければ、推し量った種類) */
-export function themeTypeOf(c: Cr854_deliverycards): { type: ThemeType; guessed: boolean } {
-  return isThemeType(c.cr854_themetype) ? { type: c.cr854_themetype, guessed: false } : { type: guessThemeType(c), guessed: true }
+export function themeTypeOf(c: DeliveryCard): { type: ThemeType; guessed: boolean } {
+  return isThemeType(c.theme_type) ? { type: c.theme_type, guessed: false } : { type: guessThemeType(c), guessed: true }
 }
 
 const CLASSIFY_PROMPT = `あなたは、ファッション通販の配信(メール・プッシュ)の企画を手伝うアシスタントです。
@@ -62,8 +62,8 @@ const CLASSIFY_PROMPT = `あなたは、ファッション通販の配信(メー
 `
 
 /** AI で、配信のテーマの種類を分ける。返すのは、配信 ID → 種類 */
-export async function classifyThemeTypes(cards: Cr854_deliverycards[]): Promise<Map<string, ThemeType>> {
-  const deliveries = cards.map((c) => ({ id: c.cr854_deliverycardid, name: c.cr854_name ?? '', theme: c.cr854_theme ?? '', headline: c.cr854_headline ?? '', copy: c.cr854_copy ?? '' }))
+export async function classifyThemeTypes(cards: DeliveryCard[]): Promise<Map<string, ThemeType>> {
+  const deliveries = cards.map((c) => ({ id: c.id, name: c.name ?? '', theme: c.theme ?? '', headline: c.headline ?? '', copy: c.copy ?? '' }))
   const parsed = (await askAgent(CLASSIFY_PROMPT, { task: 'classify_theme_types', deliveries })) as { types?: { id?: string; type?: string }[] }
   if (!parsed.types) throw new Error(tr('テーマの種類を取得できませんでした', 'Could not get theme types'))
   return new Map(parsed.types.filter((x) => x.id && isThemeType(x.type)).map((x) => [String(x.id), x.type as ThemeType]))

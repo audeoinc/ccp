@@ -1,5 +1,5 @@
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { askAgent, type AiCard, type CopyLanguage } from './aiSelect'
 import { tr } from './i18n'
 import { DEFAULT_PUSH_TEMPLATE, hasTemplate, templateOptions, type EmailTemplateId, type TemplateChannel } from './templates'
@@ -74,7 +74,7 @@ export interface ThemeSuggestion {
 export async function suggestThemes(args: {
   card: AiCard
   otherThemes: string[]
-  products: Cr854_products[]
+  products: Product[]
 }): Promise<ThemeSuggestion[]> {
   const { card, otherThemes, products } = args
   const parsed = (await askAgent(THEME_PROMPT, {
@@ -83,12 +83,12 @@ export async function suggestThemes(args: {
     card,
     otherThemes,
     products: products.map((p) => ({
-      name: p.cr854_name,
-      category: p.cr854_categoryname,
-      stock: p.cr854_stock,
-      season: p.cr854_seasonname,
-      salesTrend: p.cr854_salestrendname,
-      weather: p.cr854_weathername,
+      name: p.name,
+      category: p.category_name,
+      stock: p.stock,
+      season: p.season_name,
+      salesTrend: p.sales_trend_name,
+      weather: p.weather_name,
     })),
   })) as { themes?: { theme?: string; reason?: string }[] }
 
@@ -103,21 +103,21 @@ interface DraftContext {
   card: AiCard
   /** コピー・ヘッドラインの言語 */
   language: CopyLanguage
-  items: { product?: Cr854_products; reason: string }[]
-  hero?: Cr854_heroimages
+  items: { product?: Product; reason: string }[]
+  hero?: HeroImage
 }
 
 const contextPayload = ({ card, language, items, hero }: DraftContext) => ({
   card,
   language,
   products: items.map((i) => ({
-    name: i.product?.cr854_name,
-    category: i.product?.cr854_categoryname,
-    price: i.product?.cr854_price,
+    name: i.product?.name,
+    category: i.product?.category_name,
+    price: i.product?.price,
     reason: i.reason,
   })),
   hero: hero
-    ? { name: hero.cr854_name, purpose: hero.cr854_purposename, season: hero.cr854_seasonname, tags: hero.cr854_tags, description: hero.cr854_description }
+    ? { name: hero.name, purpose: hero.purpose_name, season: hero.season_name, tags: hero.tags, description: hero.description }
     : null,
 })
 

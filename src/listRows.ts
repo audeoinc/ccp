@@ -1,7 +1,7 @@
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
+import type { DeliveryCard } from './models/deliveryCards'
 import { locale, optionLabel, tr } from './i18n'
 import { cardProgress, isDueSoonNotStarted } from './progress'
-import { channelOptions, countryOptions, departmentOptions, statusOptions } from './status'
+import { channelOptions, countryOptions, departmentOptions, statusOptions, statusRank } from './status'
 
 // 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
 
@@ -9,7 +9,7 @@ import { channelOptions, countryOptions, departmentOptions, statusOptions } from
 export type ColumnKey = 'image' | 'date' | 'time' | 'name' | 'country' | 'channel' | 'department' | 'status' | 'owner' | 'due' | 'handoff' | 'questions' | 'tasks' | 'theme' | 'products' | 'steps'
 
 export interface Row {
-  card: Cr854_deliverycards
+  card: DeliveryCard
   products: number
   /** 制作からの質問の、未解決の数 */
   questions: number
@@ -36,7 +36,7 @@ const dueText = (ymd?: string) => {
   return new Date(y, m - 1, d).toLocaleDateString(locale(), { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 // 選択肢の表示名は、値から求める(〜name の列は、データの入れ方によっては空のため)
-const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
+const label = (options: { value: string; label: string }[], v?: string) => optionLabel(options.find((o) => o.value === v)?.label)
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) : '')
 // 日付は、数字を先・曜日を後ろにする(曜日の文字の幅で、数字の位置がずれないように)
 const date = (iso?: string) => {
@@ -49,28 +49,28 @@ const date = (iso?: string) => {
 
 export const COLUMNS: Column[] = [
   // 画像(メイン画像のサムネイル。マウスを重ねると全体を見せる)。CSV には、メイン画像の有無だけを書く
-  { key: 'image', label: () => tr('画像', 'Image'), text: (r) => (r.card._cr854_heroimage_value ? tr('あり', 'yes') : '') },
-  { key: 'date', label: () => tr('配信日', 'Date'), text: (r) => date(r.card.cr854_scheduledat), sort: (r) => r.card.cr854_scheduledat ?? '' },
-  { key: 'time', label: () => tr('時刻', 'Time'), text: (r) => time(r.card.cr854_scheduledat), sort: (r) => time(r.card.cr854_scheduledat) },
-  { key: 'name', label: () => tr('配信名', 'Name'), text: (r) => r.card.cr854_name },
-  { key: 'country', label: () => tr('国', 'Country'), text: (r) => label(countryOptions, r.card.cr854_country) },
-  { key: 'channel', label: () => tr('チャネル', 'Channel'), text: (r) => label(channelOptions, r.card.cr854_channel) },
-  { key: 'department', label: () => tr('種別', 'Type'), text: (r) => label(departmentOptions, r.card.cr854_department) },
-  { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => label(statusOptions, r.card.cr854_status), sort: (r) => r.card.cr854_status ?? 0 },
-  { key: 'owner', label: () => tr('担当者', 'Owner'), text: (r) => r.card.cr854_owner ?? '' },
-  { key: 'due', label: () => tr('制作の締め切り', 'Production due'), text: (r) => dueText(r.card.cr854_productiondue), sort: (r) => r.card.cr854_productiondue ?? '' },
+  { key: 'image', label: () => tr('画像', 'Image'), text: (r) => (r.card.hero_image_id ? tr('あり', 'yes') : '') },
+  { key: 'date', label: () => tr('配信日', 'Date'), text: (r) => date(r.card.scheduled_at), sort: (r) => r.card.scheduled_at ?? '' },
+  { key: 'time', label: () => tr('時刻', 'Time'), text: (r) => time(r.card.scheduled_at), sort: (r) => time(r.card.scheduled_at) },
+  { key: 'name', label: () => tr('配信名', 'Name'), text: (r) => r.card.name },
+  { key: 'country', label: () => tr('国', 'Country'), text: (r) => label(countryOptions, r.card.country) },
+  { key: 'channel', label: () => tr('チャネル', 'Channel'), text: (r) => label(channelOptions, r.card.channel) },
+  { key: 'department', label: () => tr('種別', 'Type'), text: (r) => label(departmentOptions, r.card.department) },
+  { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => label(statusOptions, r.card.status), sort: (r) => statusRank(r.card.status) },
+  { key: 'owner', label: () => tr('担当者', 'Owner'), text: (r) => r.card.owner ?? '' },
+  { key: 'due', label: () => tr('制作の締め切り', 'Production due'), text: (r) => dueText(r.card.production_due), sort: (r) => r.card.production_due ?? '' },
   {
     key: 'handoff',
     label: () => tr('制作への引き継ぎ', 'Handoff'),
     text: (r) =>
-      r.card.cr854_handedoffat
-        ? `${new Date(r.card.cr854_handedoffat).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })}${r.card.cr854_productionowner ? ` · ${r.card.cr854_productionowner}` : ''}`
+      r.card.handed_off_at
+        ? `${new Date(r.card.handed_off_at).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })}${r.card.production_owner ? ` · ${r.card.production_owner}` : ''}`
         : '',
-    sort: (r) => r.card.cr854_handedoffat ?? '',
+    sort: (r) => r.card.handed_off_at ?? '',
   },
   { key: 'questions', label: () => tr('未解決の質問', 'Open questions'), text: (r) => (r.questions ? String(r.questions) : ''), sort: (r) => r.questions },
   { key: 'tasks', label: () => tr('未完了のタスク', 'Open tasks'), text: (r) => (r.tasks ? String(r.tasks) : ''), sort: (r) => r.tasks },
-  { key: 'theme', label: () => tr('テーマ', 'Theme'), text: (r) => r.card.cr854_theme ?? '' },
+  { key: 'theme', label: () => tr('テーマ', 'Theme'), text: (r) => r.card.theme ?? '' },
   { key: 'products', label: () => tr('商品数', 'Products'), text: (r) => String(r.products), sort: (r) => r.products },
   { key: 'steps', label: () => tr('工程', 'Steps'), text: (r) => `${r.done} / ${r.total}`, sort: (r) => r.done },
 ]
@@ -78,19 +78,19 @@ export const COLUMNS: Column[] = [
 export const DEFAULT_COLUMNS: ColumnKey[] = COLUMNS.map((c) => c.key)
 
 /** 警告の基準の日時: 制作の締め切りがあれば、その日の終わり。なければ、配信日時 */
-const deadlineOf = (card: Cr854_deliverycards): string | undefined => {
-  if (!card.cr854_productiondue) return card.cr854_scheduledat
-  const [y, m, d] = card.cr854_productiondue.slice(0, 10).split('-').map(Number)
+const deadlineOf = (card: DeliveryCard): string | undefined => {
+  if (!card.production_due) return card.scheduled_at
+  const [y, m, d] = card.production_due.slice(0, 10).split('-').map(Number)
   return new Date(y, m - 1, d, 23, 59).toISOString()
 }
 
 /** 配信カードと掲載商品の数から、一覧の行を作る(締め切りの警告も、ここで決める) */
-export function toRows(cards: Cr854_deliverycards[], productCounts: Map<string, number>, questionCounts: Map<string, number> = new Map(), taskCounts: Map<string, number> = new Map()): Row[] {
+export function toRows(cards: DeliveryCard[], productCounts: Map<string, number>, questionCounts: Map<string, number> = new Map(), taskCounts: Map<string, number> = new Map()): Row[] {
   const now = new Date()
   return cards.map((card) => {
-    const products = productCounts.get(card.cr854_deliverycardid) ?? 0
+    const products = productCounts.get(card.id) ?? 0
     const p = cardProgress(card, products)
-    return { card, products, questions: questionCounts.get(card.cr854_deliverycardid) ?? 0, tasks: taskCounts.get(card.cr854_deliverycardid) ?? 0, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(deadlineOf(card), p, now, card.cr854_scheduledat) }
+    return { card, products, questions: questionCounts.get(card.id) ?? 0, tasks: taskCounts.get(card.id) ?? 0, done: p.done, total: p.total, dueSoon: isDueSoonNotStarted(deadlineOf(card), p, now, card.scheduled_at) }
   })
 }
 
@@ -98,7 +98,7 @@ export function toRows(cards: Cr854_deliverycards[], productCounts: Map<string, 
 export function downloadCsv(rows: Row[], columns: ColumnKey[], fileName: string) {
   const shown = COLUMNS.filter((c) => columns.includes(c.key))
   const esc = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
-  const sorted = [...rows].sort((a, b) => (a.card.cr854_scheduledat ?? '').localeCompare(b.card.cr854_scheduledat ?? ''))
+  const sorted = [...rows].sort((a, b) => (a.card.scheduled_at ?? '').localeCompare(b.card.scheduled_at ?? ''))
   const lines = [shown.map((c) => esc(c.label())).join(','), ...sorted.map((r) => shown.map((c) => esc(c.text(r))).join(','))]
   const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)

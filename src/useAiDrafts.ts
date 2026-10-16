@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { FREE_DEFAULT_SLOTS, sectionRange, sectionsOf, type EmailTemplateId } from './templates'
 import {
   ChatAnswer,
@@ -31,8 +31,8 @@ import type { Candidate, Item } from './items'
 
 export interface DraftInputs {
   buildCard: () => AiCard
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   otherThemes: string[]
   template: EmailTemplateId
   /** 選定済みの商品(並び順) */
@@ -79,13 +79,13 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     [onError],
   )
 
-  const productName = (id: string) => inputs.products.find((p) => p.cr854_productid === id)?.cr854_name ?? ''
+  const productName = (id: string) => inputs.products.find((p) => p.id === id)?.name ?? ''
 
   const context = () => ({
     card: inputs.buildCard(),
     language: inputs.language,
-    items: inputs.items.map((i) => ({ product: inputs.products.find((p) => p.cr854_productid === i.productId), reason: i.reason })),
-    hero: inputs.heroes.find((h) => h.cr854_heroimageid === inputs.heroId),
+    items: inputs.items.map((i) => ({ product: inputs.products.find((p) => p.id === i.productId), reason: i.reason })),
+    hero: inputs.heroes.find((h) => h.id === inputs.heroId),
   })
 
   const runTheme = () =>
@@ -165,7 +165,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
       },
       excludedProductIds: excluded,
       products: inputs.products,
-      hero: inputs.heroes.find((h) => h.cr854_heroimageid === inputs.heroId),
+      hero: inputs.heroes.find((h) => h.id === inputs.heroId),
       heroReason: inputs.heroReason,
       language: inputs.language,
     }

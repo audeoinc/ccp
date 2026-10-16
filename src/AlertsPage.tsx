@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowSwapRegular, CalendarArrowRightRegular, FilterRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
+import type { Product } from './models/products'
+import type { WeekRow } from './data/weeks'
 import { AlertActionPanel } from './AlertActionPanel'
 import { LOW_STOCK_WEEKS, isLeadStage, type AffectedDelivery, type ChangeAlert, type Placement, type StockAlert, type StockModel } from './alerts'
 import { ChangeAlertDetail } from './ChangeAlertDetail'
 import { AlertSettingsDialog } from './AlertSettingsDialog'
 import { isCustomized, type AlertSettings } from './alertSettings'
-import type { Cr854_changelogs } from './gcpdata/Cr854_changelogsService'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
+import type { ChangeLog } from './data/changeLogs'
+import type { DeliveryCard } from './models/deliveryCards'
 import { locale, optionLabel, useT } from './i18n'
 import { CHANNEL_PUSH, statusColor, statusOptions } from './status'
 
@@ -73,13 +73,13 @@ interface Props {
   settings: AlertSettings
   owners: string[]
   /** 変更の記録(対応の記録の一覧に、対応済みのものを出す) */
-  logs: Cr854_changelogs[]
+  logs: ChangeLog[]
   /** すべての配信(対応の記録で、配信名を出すため) */
-  cards: Cr854_deliverycards[]
-  products: Cr854_products[]
+  cards: DeliveryCard[]
+  products: Product[]
   placements: Map<string, Placement[]>
   model: StockModel
-  weeks: Cr854_weeks[]
+  weeks: WeekRow[]
   /** 配信カードを開く */
   onOpenCard: (id: string) => void
   /** アラートから配信カードを開く(問題の商品を選んで開く) */
@@ -105,7 +105,7 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
   // 対応のパネル(差し替え・延期)を開いている配信
   const [action, setAction] = useState<{ mode: 'replace' | 'postpone' | 'cancel'; cardId: string } | null>(null)
   const [done, setDone] = useState<string | null>(null)
-  const actionCard = selected?.deliveries.find((d) => d.card.cr854_deliverycardid === action?.cardId)?.card
+  const actionCard = selected?.deliveries.find((d) => d.card.id === action?.cardId)?.card
 
   const kindLabel = (a: StockAlert) => (a.kind === 'outOfStock' ? t('在庫切れの見込み', 'Out of stock (expected)') : t('在庫僅少', 'Low stock'))
   const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' }) : '')
@@ -114,12 +114,12 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
   const summary = (a: StockAlert) => {
     if (a.stock <= 0) return t('いま在庫がありません', 'Out of stock now')
     const out = a.deliveries.find((d) => d.problem === 'soldOut')
-    if (a.kind === 'outOfStock' && out) return t(`${dateText(out.card.cr854_scheduledat)} の配信の時点で在庫がない見込み`, `None left by ${dateText(out.card.cr854_scheduledat)}`)
+    if (a.kind === 'outOfStock' && out) return t(`${dateText(out.card.scheduled_at)} の配信の時点で在庫がない見込み`, `None left by ${dateText(out.card.scheduled_at)}`)
     const d = a.deliveries.find((x) => x.problem !== 'none')
     if (!d) return ''
     return d.after < 0 || d.weeksLeft === undefined
-      ? t(`${dateText(d.card.cr854_scheduledat)} の配信で売り切れる見込み`, `May sell out with ${dateText(d.card.cr854_scheduledat)}`)
-      : t(`${dateText(d.card.cr854_scheduledat)} に ${d.weeksLeft.toFixed(1)} 週分`, `${d.weeksLeft.toFixed(1)} wks left on ${dateText(d.card.cr854_scheduledat)}`)
+      ? t(`${dateText(d.card.scheduled_at)} の配信で売り切れる見込み`, `May sell out with ${dateText(d.card.scheduled_at)}`)
+      : t(`${dateText(d.card.scheduled_at)} に ${d.weeksLeft.toFixed(1)} 週分`, `${d.weeksLeft.toFixed(1)} wks left on ${dateText(d.card.scheduled_at)}`)
   }
   const problemText = (d: AffectedDelivery) =>
     d.problem === 'soldOut' ? (
@@ -131,7 +131,7 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
     ) : (
       '—'
     )
-  const statusLabel = (v?: number) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
+  const statusLabel = (v?: string) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
 
   // 対応中のアラート / 対応の記録(誰が・いつ・どう対応したか)
   const [tab, setTab] = useState<'open' | 'done'>('open')
@@ -159,12 +159,12 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
   )
 
   if (tab === 'done') {
-    const done = logs.filter((l) => l.cr854_resolvedat).sort((a, b) => (b.cr854_resolvedat ?? '').localeCompare(a.cr854_resolvedat ?? ''))
-    const target = (l: Cr854_changelogs) =>
-      l.cr854_kind === 'policy'
-        ? (products.find((p) => p.cr854_productcode === l.cr854_productcode)?.cr854_name ?? l.cr854_productcode)
-        : (cards.find((c) => c.cr854_deliverycardid === l._cr854_deliverycard_value)?.cr854_name ?? l.cr854_cardname)
-    const value = (l: Cr854_changelogs, v?: string) => (l.cr854_field === 'scheduled_at' && v ? dateText(v) : v || '—')
+    const done = logs.filter((l) => l.resolved_at).sort((a, b) => (b.resolved_at ?? '').localeCompare(a.resolved_at ?? ''))
+    const target = (l: ChangeLog) =>
+      l.kind === 'policy'
+        ? (products.find((p) => p.product_code === l.product_code)?.name ?? l.product_code)
+        : (cards.find((c) => c.id === l.delivery_card_id)?.name ?? l.card_name)
+    const value = (l: ChangeLog, v?: string) => (l.field === 'scheduled_at' && v ? dateText(v) : v || '—')
     return (
       <div className={styles.page}>
         {top}
@@ -185,13 +185,13 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
               </thead>
               <tbody>
                 {done.map((l) => (
-                  <tr key={l.cr854_changelogid}>
-                    <td className={styles.td}>{new Date(l.cr854_resolvedat!).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                    <td className={styles.td}>{l.cr854_resolvedby || '—'}</td>
-                    <td className={styles.td}>{l.cr854_kind === 'policy' ? t('MD 方針の変更', 'MD policy') : t('日程の変更', 'Date')}</td>
+                  <tr key={l.id}>
+                    <td className={styles.td}>{new Date(l.resolved_at!).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className={styles.td}>{l.resolved_by || '—'}</td>
+                    <td className={styles.td}>{l.kind === 'policy' ? t('MD 方針の変更', 'MD policy') : t('日程の変更', 'Date')}</td>
                     <td className={mergeClasses(styles.td, styles.name)}>{target(l)}</td>
-                    <td className={styles.td}>{`${value(l, l.cr854_before)} → ${value(l, l.cr854_after)}`.slice(0, 60)}</td>
-                    <td className={styles.tdWrap}>{l.cr854_resolvenote || '—'}</td>
+                    <td className={styles.td}>{`${value(l, l.before_value)} → ${value(l, l.after_value)}`.slice(0, 60)}</td>
+                    <td className={styles.tdWrap}>{l.resolve_note || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -235,7 +235,7 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
                 {t(`${a.deliveries.length} 本`, `${a.deliveries.length}`)}
               </Badge>
             </span>
-            <span className={styles.itemName} title={a.product.cr854_name}>{a.product.cr854_name}</span>
+            <span className={styles.itemName} title={a.product.name}>{a.product.name}</span>
             <span className={styles.itemSub}>{summary(a)}</span>
           </button>
         ))}
@@ -250,7 +250,7 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
                   {t(`${a.deliveries.length} 本`, `${a.deliveries.length}`)}
                 </Badge>
               </span>
-              <span className={styles.itemName} title={a.product?.cr854_name ?? a.card?.cr854_name}>{a.product?.cr854_name ?? a.card?.cr854_name}</span>
+              <span className={styles.itemName} title={a.product?.name ?? a.card?.name}>{a.product?.name ?? a.card?.name}</span>
               <span className={styles.itemSub}>
                 {stage
                   ? `${stage.before} → ${stage.after}${a.deliveries.length === 0 && isLeadStage(stage.after) ? t('(まだ載せていない)', ' (not featured yet)') : ''}`
@@ -270,7 +270,7 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
           placements={placements}
           model={model}
           weeks={weeks}
-          onOpenCard={(id) => (onOpenAlertCard ?? onOpenCard)(id, selectedChange.product?.cr854_productid)}
+          onOpenCard={(id) => (onOpenAlertCard ?? onOpenCard)(id, selectedChange.product?.id)}
           onChanged={onChanged}
           onResolve={onResolve}
         />
@@ -279,7 +279,7 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
       {selected && (
         <div className={styles.detail}>
           <div>
-            <h2 className={styles.title}>{`${kindLabel(selected)}: ${selected.product.cr854_name}`}</h2>
+            <h2 className={styles.title}>{`${kindLabel(selected)}: ${selected.product.name}`}</h2>
             <div className={styles.sub}>{t('この商品を載せている、まだ送っていない配信', 'Deliveries not yet sent that include this product')}</div>
           </div>
           <div className={styles.facts}>
@@ -317,13 +317,13 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
               </thead>
               <tbody>
                 {selected.deliveries.map((d) => (
-                  <tr key={d.card.cr854_deliverycardid}>
-                    <td className={styles.td}>{dateText(d.card.cr854_scheduledat)}</td>
-                    <td className={mergeClasses(styles.td, styles.name)}>{d.card.cr854_name}</td>
-                    <td className={styles.td}>{d.card.cr854_channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
+                  <tr key={d.card.id}>
+                    <td className={styles.td}>{dateText(d.card.scheduled_at)}</td>
+                    <td className={mergeClasses(styles.td, styles.name)}>{d.card.name}</td>
+                    <td className={styles.td}>{d.card.channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
                     <td className={styles.td}>
-                      <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.cr854_status ?? 588230000) }} />
-                      {statusLabel(d.card.cr854_status ?? 588230000)}
+                      <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.status ?? 'not_started') }} />
+                      {statusLabel(d.card.status ?? 'not_started')}
                     </td>
                     <td className={styles.td}>{d.sections.map((s) => t(`セクション ${s + 1}`, `Section ${s + 1}`)).join('・')}</td>
                     <td className={mergeClasses(styles.td, styles.num)}>
@@ -332,18 +332,18 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
                     <td className={styles.td}>{problemText(d)}</td>
                     <td className={styles.td}>
                       <span className={styles.actions}>
-                        <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.cr854_deliverycardid })}>
+                        <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.id })}>
                           {t('差し替え', 'Replace')}
                         </Button>
                         {/* 延期・開くは、表が横に長くならないよう、アイコンだけ(名前は、マウスを乗せると出る) */}
                         <Tooltip content={t('延期', 'Postpone')} relationship="label">
-                          <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.cr854_deliverycardid })} />
+                          <Button size="small" appearance="subtle" icon={<CalendarArrowRightRegular />} onClick={() => setAction({ mode: 'postpone', cardId: d.card.id })} />
                         </Tooltip>
                         <Tooltip content={t('取りやめ', 'Cancel delivery')} relationship="label">
-                          <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.cr854_deliverycardid })} />
+                          <Button size="small" appearance="subtle" icon={<ProhibitedRegular />} onClick={() => setAction({ mode: 'cancel', cardId: d.card.id })} />
                         </Tooltip>
                         <Tooltip content={t('配信カードを開く', 'Open the delivery card')} relationship="label">
-                          <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => (onOpenAlertCard ?? onOpenCard)(d.card.cr854_deliverycardid, selected.product.cr854_productid)} />
+                          <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => (onOpenAlertCard ?? onOpenCard)(d.card.id, selected.product.id)} />
                         </Tooltip>
                       </span>
                     </td>

@@ -1,8 +1,7 @@
-"""データ定義(schema.json)の読み込みと、名前・値の変換。
+"""データ定義(schema.json)の読み込みと、値の変換。
 
-画面(Power Apps 版と共通のコード)は、Dataverse の名前(cr854_scheduledat、_cr854_heroimage_value など)で
-読み書きする。PostgreSQL 側は、読みやすい名前(scheduled_at、hero_image_id)にする。
-この変換を、ここ 1 か所に集める。テーブルを作る SQL も、触ってよい列の許可リストも、ここから作る。
+表・列の名前は、画面・API・PostgreSQL で同じ(delivery_cards、scheduled_at、hero_image_id など)。
+テーブルを作る SQL も、触ってよい列の許可リストも、選択肢の値の確かめも、ここから作る。
 """
 from __future__ import annotations
 
@@ -16,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.json"
+LEGACY_PATH = Path(__file__).resolve().parent / "legacy_names.json"
 
 SQL_TYPES = {
     "text": "text",
@@ -23,14 +23,14 @@ SQL_TYPES = {
     "numeric": "numeric(14,2)",
     "timestamptz": "timestamptz",
     "date": "date",
-    "choice": "integer",  # Dataverse の選択肢の値は 588230000 など大きい数なので、smallint には入らない
+    "choice": "text",  # 選択肢は、文字の値(email / app など)。使える値は schema.json の choices
 }
 
-# どのテーブルにもある列(画面は、statecode / createdon / modifiedon だけを使う)
-SYSTEM_COLUMNS = [("statecode", "state_code", "int"), ("createdon", "created_on", "timestamptz"), ("modifiedon", "modified_on", "timestamptz")]
+# どの表にもある列
+SYSTEM_COLUMNS = [("state_code", "int"), ("created_on", "timestamptz"), ("modified_on", "timestamptz")]
 
-# 書き込みのときに、あっても無視してよい列(Dataverse の管理用の列)
-IGNORED_ON_WRITE = {"ownerid", "statuscode", "versionnumber", "importsequencenumber", "overriddencreatedon", "timezoneruleversionnumber", "utcconversiontimezonecode", "createdon", "modifiedon"}
+# 書き込みのときに、あっても無視する列(DB が決める・読むだけの列)
+IGNORED_ON_WRITE = {"id", "created_on", "modified_on"}
 
 
 class BadRequest(ValueError):
@@ -39,91 +39,89 @@ class BadRequest(ValueError):
 
 @dataclass
 class Column:
-    dv: str
     pg: str
     type: str
     required: bool = False
     index: bool = False
-    # GCP 版だけの列(Dataverse・生成モデルにはない。scripts/check-schema.mjs の突き合わせから外す)
-    gcpOnly: bool = False
+    # 選択肢の列なら、使える値
+    choices: list[str] | None = None
 
 
 @dataclass
 class Lookup:
-    dv: str  # 例: cr854_heroimage
     pg: str  # 例: hero_image_id
-    ref: str  # 参照先のテーブル(Dataverse の名前)
+    ref: str  # 参照先の表
     on_delete: str = "NO ACTION"
-
-    @property
-    def value_key(self) -> str:
-        return f"_{self.dv}_value"
-
-    @property
-    def bind_key(self) -> str:
-        return f"{self.dv}@odata.bind"
 
 
 @dataclass
 class Table:
-    dv: str
     pg: str
-    pk: str
     columns: list[Column]
     lookups: list[Lookup]
-    by_dv: dict[str, Column] = field(default_factory=dict)
-    by_lookup_key: dict[str, Lookup] = field(default_factory=dict)
+    by_name: dict[str, Column] = field(default_factory=dict)
+    by_lookup: dict[str, Lookup] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        cols = self.columns + [Column(dv, pg, t) for dv, pg, t in SYSTEM_COLUMNS]
-        self.by_dv = {c.dv: c for c in cols}
-        for lk in self.lookups:
-            self.by_lookup_key[lk.value_key] = lk
-            self.by_lookup_key[lk.bind_key] = lk
+        cols = self.columns + [Column(pg, t) for pg, t in SYSTEM_COLUMNS]
+        self.by_name = {c.pg: c for c in cols}
+        self.by_lookup = {lk.pg: lk for lk in self.lookups}
+
+    @property
+    def name(self) -> str:
+        return self.pg
 
     @property
     def all_columns(self) -> list[Column]:
-        return list(self.by_dv.values())
+        return list(self.by_name.values())
 
-    # ---- 列の解決(画面の名前 → PostgreSQL の列名と型)
+    # ---- 列の解決(名前 → 列名と型)
     def resolve(self, name: str) -> tuple[str, str]:
-        if name == self.pk:
+        if name == "id":
             return "id", "uuid"
-        if name in self.by_dv:
-            c = self.by_dv[name]
+        if name in self.by_name:
+            c = self.by_name[name]
             return c.pg, c.type
-        if name in self.by_lookup_key:
-            return self.by_lookup_key[name].pg, "uuid"
+        if name in self.by_lookup:
+            return name, "uuid"
         raise BadRequest(f"不明な項目です: {name}")
 
     # ---- 値の変換(画面から来た値 → PostgreSQL に渡す値)
     def to_db(self, record: dict[str, Any]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for key, value in record.items():
-            if key == self.pk:
-                continue  # 主キーは、DB が決める(指定された値は無視)
-            if key in self.by_lookup_key:
-                out[self.by_lookup_key[key].pg] = _lookup_id(value)
-            elif key in self.by_dv and key not in IGNORED_ON_WRITE:
-                c = self.by_dv[key]
-                out[c.pg] = coerce(c.type, value)
-            elif key in IGNORED_ON_WRITE or not key.startswith("cr854_"):
+            if key in IGNORED_ON_WRITE or self._is_label(key):
                 continue
+            if key in self.by_lookup:
+                out[key] = _lookup_id(value)
+            elif key in self.by_name:
+                c = self.by_name[key]
+                v = coerce(c.type, value)
+                if c.choices is not None and v is not None and v not in c.choices:
+                    raise BadRequest(f"{key} に使えない値です: {value!r}(使える値: {', '.join(c.choices)})")
+                out[key] = v
             else:
                 raise BadRequest(f"不明な項目です: {key}")
         return out
 
-    # ---- 値の変換(PostgreSQL の行 → 画面が使う、Dataverse の形)
+    def _is_label(self, key: str) -> bool:
+        """選択肢の表示名(status_name など。画面が値から求めるもので、保存しない)"""
+        if not key.endswith("_name"):
+            return False
+        c = self.by_name.get(key[: -len("_name")])
+        return c is not None and c.choices is not None
+
+    # ---- 値の変換(PostgreSQL の行 → 画面に返す形)
     def to_api(self, row: dict[str, Any]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         if "id" in row:
-            out[self.pk] = str(row["id"])
+            out["id"] = str(row["id"])
         for c in self.all_columns:
             if c.pg in row:
-                out[c.dv] = serialize(row[c.pg])
+                out[c.pg] = serialize(row[c.pg])
         for lk in self.lookups:
             if lk.pg in row:
-                out[lk.value_key] = serialize(row[lk.pg])
+                out[lk.pg] = serialize(row[lk.pg])
         return out
 
     # ---- テーブルを作る SQL
@@ -140,6 +138,7 @@ class Table:
         for c in self.columns:
             sql.append(f"ALTER TABLE {self.pg} ADD COLUMN IF NOT EXISTS {c.pg} {SQL_TYPES[c.type]}")
             sql.append(f"ALTER TABLE {self.pg} ALTER COLUMN {c.pg} TYPE {SQL_TYPES[c.type]}")  # 型を変えたときに、既存のテーブルにも反映
+        sql += self.legacy_value_sql()
         for lk in self.lookups:
             ref = _schema().tables[lk.ref].pg
             sql.append(f"ALTER TABLE {self.pg} ADD COLUMN IF NOT EXISTS {lk.pg} uuid REFERENCES {ref}(id) ON DELETE {lk.on_delete}")
@@ -149,16 +148,31 @@ class Table:
                 sql.append(f"CREATE INDEX IF NOT EXISTS ix_{self.pg}_{c.pg} ON {self.pg}({c.pg})")
         return sql
 
+    def legacy_value_sql(self) -> list[str]:
+        """以前の選択肢の値(588230000 などの数)を、文字の値に置き換える SQL。
+
+        2026-10-16 に、選択肢を数から文字にした。それより前のデータベースも、サーバーが最初につないだときに、
+        ここで置き換わる(数の値の行だけを書き換えるので、何度実行しても同じ)。
+        """
+        out = []
+        for c in self.columns:
+            old = legacy().get("choices", {}).get(f"{self.pg}.{c.pg}")
+            if not old:
+                continue
+            cases = " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in old.items())
+            out.append(f"UPDATE {self.pg} SET {c.pg} = CASE {c.pg} {cases} ELSE {c.pg} END WHERE {c.pg} ~ '^[0-9]+$'")
+        return out
+
 
 @dataclass
 class Schema:
     tables: dict[str, Table]
 
-    def table(self, dv_name: str) -> Table:
+    def table(self, name: str) -> Table:
         try:
-            return self.tables[dv_name]
+            return self.tables[name]
         except KeyError:
-            raise BadRequest(f"不明なテーブルです: {dv_name}") from None
+            raise BadRequest(f"不明なテーブルです: {name}") from None
 
     def creation_order(self) -> list[Table]:
         """参照される側を先に作る順(並び替えの結果)"""
@@ -166,9 +180,9 @@ class Schema:
         seen: set[str] = set()
 
         def visit(t: Table) -> None:
-            if t.dv in seen:
+            if t.pg in seen:
                 return
-            seen.add(t.dv)
+            seen.add(t.pg)
             for lk in t.lookups:
                 visit(self.tables[lk.ref])
             done.append(t)
@@ -182,17 +196,19 @@ class Schema:
 
 
 _cache: Schema | None = None
+_legacy: dict[str, Any] | None = None
 
 
 def _schema() -> Schema:
     global _cache
     if _cache is None:
         raw = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        choices = raw.get("choices", {})
         tables: dict[str, Table] = {}
-        for dv, t in raw["tables"].items():
-            cols = [Column(c[0], c[1], c[2], **(c[3] if len(c) > 3 else {})) for c in t["columns"]]
-            lks = [Lookup(lk[0], lk[1], lk[2], (lk[3] if len(lk) > 3 else {}).get("onDelete", "NO ACTION")) for lk in t["lookups"]]
-            tables[dv] = Table(dv, t["pg"], t["pk"], cols, lks)
+        for name, t in raw["tables"].items():
+            cols = [Column(c[0], c[1], **(c[2] if len(c) > 2 else {}), choices=choices.get(f"{name}.{c[0]}")) for c in t["columns"]]
+            lks = [Lookup(lk[0], lk[1], (lk[2] if len(lk) > 2 else {}).get("onDelete", "NO ACTION")) for lk in t["lookups"]]
+            tables[name] = Table(name, cols, lks)
         _cache = Schema(tables)
     return _cache
 
@@ -201,13 +217,43 @@ def load() -> Schema:
     return _schema()
 
 
+def legacy() -> dict[str, Any]:
+    """以前の名前(cr854_…)・選択肢の数 → いまの名前・値の対応(引っ越し用のパックの版 1 を読むときと、DB の値の置き換えに使う)"""
+    global _legacy
+    if _legacy is None:
+        _legacy = json.loads(LEGACY_PATH.read_text(encoding="utf-8"))
+    return _legacy
+
+
+def convert_legacy_rows(old_table: str, rows: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """以前の名前の行を、いまの名前・値に直す(引っ越し用のパックの版 1 用)"""
+    lg = legacy()
+    name = lg["tables"][old_table]
+    pk = lg["pk"][old_table]
+    cols = lg["columns"][old_table]
+    out = []
+    for r in rows:
+        n: dict[str, Any] = {}
+        for k, v in r.items():
+            if k == pk:
+                n["id"] = v
+            elif k in cols:
+                col = cols[k]
+                mapping = lg["choices"].get(f"{name}.{col}")
+                n[col] = mapping.get(str(v), v) if mapping and v is not None else v
+        out.append(n)
+    return name, out
+
+
 # ---- 値の変換
 def coerce(type_: str, value: Any) -> Any:
     if value is None or value == "":
         return None if type_ != "text" else ("" if value == "" else None)
     try:
-        if type_ in ("int", "choice"):
+        if type_ == "int":
             return int(value)
+        if type_ == "choice":
+            return str(value)
         if type_ == "numeric":
             return Decimal(str(value))
         if type_ == "timestamptz":
@@ -224,17 +270,16 @@ def coerce(type_: str, value: Any) -> Any:
     return str(value)
 
 
-_GUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+_GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
 def _lookup_id(value: Any) -> uuid.UUID | None:
-    """`/cr854_heroimages(<guid>)` や、guid そのものから、ID を取り出す。空なら、参照を外す"""
+    """参照先の id。空なら、参照を外す"""
     if value is None or value == "":
         return None
-    m = _GUID.search(str(value))
-    if not m:
+    if not _GUID.match(str(value)):
         raise BadRequest(f"参照の形式が正しくありません: {value!r}")
-    return uuid.UUID(m.group(0))
+    return uuid.UUID(str(value))
 
 
 def serialize(v: Any) -> Any:
@@ -249,7 +294,7 @@ def serialize(v: Any) -> Any:
     return v
 
 
-# ---- OData 風の絞り込み(eq / ne / gt / ge / lt / le を and でつなぐ範囲だけ)
+# ---- 絞り込み(eq / ne / gt / ge / lt / le を and でつなぐ範囲だけ)
 _CLAUSE = re.compile(r"\s*(\w+)\s+(eq|ne|gt|ge|lt|le)\s+('(?:[^']|'')*'|[^\s']+)\s*(?:and\b|$)", re.IGNORECASE)
 _OPS = {"eq": "=", "ne": "<>", "gt": ">", "ge": ">=", "lt": "<", "le": "<="}
 
@@ -273,7 +318,7 @@ def parse_filter(table: Table, text: str | None) -> tuple[str, dict[str, Any]]:
         else:
             val = raw[1:-1].replace("''", "'") if raw.startswith("'") else raw
             key = f"f{len(params)}"
-            params[key] = coerce("uuid" if type_ == "uuid" else type_, val)
+            params[key] = coerce(type_, val)
             clauses.append(f"{col} {_OPS[op]} :{key}")
         pos = m.end()
     return " AND ".join(clauses), params

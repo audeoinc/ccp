@@ -16,8 +16,8 @@ import { COLUMNS, type Column, type ColumnKey, type Row } from './listRows'
 import { statusColor } from './status'
 import { DeliveryPeek } from './DeliveryPeek'
 import { heroImage, productImage } from './images'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 
 const useStyles = makeStyles({
@@ -58,8 +58,8 @@ interface Props {
   onSelect: (id: string) => void
   /** 画像の列: 配信カードごとの掲載商品と、商品・メイン画像 */
   cardProducts: Map<string, string[]>
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
 }
 
 /** 配信の一覧(表)。列見出しを押すと並べ替える。行を押すと、配信カードを開く */
@@ -78,7 +78,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
       const y = val(b)
       const d = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), locale())
       // 同じ値なら、配信日時の順
-      return d !== 0 ? d * sign : (a.card.cr854_scheduledat ?? '').localeCompare(b.card.cr854_scheduledat ?? '')
+      return d !== 0 ? d * sign : (a.card.scheduled_at ?? '').localeCompare(b.card.scheduled_at ?? '')
     })
   }, [rows, sort])
 
@@ -89,8 +89,8 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
     switch (c.key) {
       case 'image': {
         // メイン画像(なければ先頭の商品)のサムネイル。マウスを重ねると、配信の全体を、スクロールなしで見せる
-        const ids = cardProducts.get(r.card.cr854_deliverycardid) ?? []
-        const src = heroImage(heroes.find((h) => h.cr854_heroimageid === r.card._cr854_heroimage_value)) ?? productImage(products.find((p) => p.cr854_productid === ids[0]))
+        const ids = cardProducts.get(r.card.id) ?? []
+        const src = heroImage(heroes.find((h) => h.id === r.card.hero_image_id)) ?? productImage(products.find((p) => p.id === ids[0]))
         if (!src) return <span className={styles.noThumb} />
         return (
           <DeliveryPeek card={r.card} productIds={ids} products={products} heroes={heroes}>
@@ -103,7 +103,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
       case 'status':
         return (
           <span className={styles.status}>
-            <span className={styles.dot} style={{ backgroundColor: statusColor(r.card.cr854_status) }} />
+            <span className={styles.dot} style={{ backgroundColor: statusColor(r.card.status) }} />
             {c.text(r)}
           </span>
         )
@@ -145,7 +145,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
         </TableHeader>
         <TableBody>
           {sorted.map((r) => (
-            <TableRow key={r.card.cr854_deliverycardid} className={styles.row} style={isCancelled(r.card) ? CANCELLED_STYLE : undefined} onClick={() => onSelect(r.card.cr854_deliverycardid)}>
+            <TableRow key={r.card.id} className={styles.row} style={isCancelled(r.card) ? CANCELLED_STYLE : undefined} onClick={() => onSelect(r.card.id)}>
               {shown.map((c) => (
                 <TableCell key={c.key} className={c.key === 'theme' ? undefined : styles.nowrap}>
                   {cell(c, r)}

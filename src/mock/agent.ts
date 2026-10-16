@@ -155,7 +155,7 @@ export function mockAgent(message: string): string {
   // テーマの種類: 言葉から推し量った種類を、そのまま返す
   if (task === 'classify_theme_types') {
     const list = (p.deliveries as { id: string; name?: string; theme?: string; headline?: string }[] | undefined) ?? []
-    return J({ types: list.map((d) => ({ id: d.id, type: guessThemeType({ cr854_name: d.name, cr854_theme: d.theme, cr854_headline: d.headline }) })) })
+    return J({ types: list.map((d) => ({ id: d.id, type: guessThemeType({ name: d.name, theme: d.theme, headline: d.headline }) })) })
   }
 
   if (task === 'suggest_themes') {

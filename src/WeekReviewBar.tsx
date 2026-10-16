@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ArrowUndoRegular, CheckmarkCircleRegular, DocumentPdfRegular, HistoryRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_weeks, WeekStatus } from './gcpdata/Cr854_weeksService'
-import type { Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
-import type { Cr854_events } from './gcpdata/Cr854_eventsService'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { WeekRow, WeekStatus } from './data/weeks'
+import type { CardNote } from './data/cardNotes'
+import type { CardEvent } from './data/events'
 import { actionText } from './weekLabels'
 import { myName, setMyName } from './history'
 import { locale, optionLabel, useT } from './i18n'
@@ -45,13 +45,13 @@ const useStyles = makeStyles({
 
 interface Props {
   /** この週の行(まだ行がなければ undefined = 下書き) */
-  week?: Cr854_weeks
+  week?: WeekRow
   /** この週の配信(絞り込みを反映しない、すべての配信) */
-  cards: Cr854_deliverycards[]
+  cards: DeliveryCard[]
   /** 確定した週の配信を変えたときの理由(すべての配信の分。この週の、最後の確定より後のものだけを出す) */
-  changes?: Cr854_cardnotes[]
+  changes?: CardNote[]
   /** この週の承認の履歴(新しい順) */
-  events?: Cr854_events[]
+  events?: CardEvent[]
   /** 週の資料(PDF)を書き出す(App 側で、資料を描いて印刷の画面を開く) */
   onExportPdf?: () => void
   /** 週の「検討中」の配信を、まとめて承認する(App 側で行う) */
@@ -60,9 +60,9 @@ interface Props {
   onChange: (status: WeekStatus) => Promise<void>
 }
 
-const STATUS_NOT_STARTED = 588230000
-const STATUS_REVIEW = 588230001
-const STATUS_APPROVED = 588230002
+const STATUS_NOT_STARTED = 'not_started'
+const STATUS_REVIEW = 'reviewing'
+const STATUS_APPROVED = 'approved'
 
 /**
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
@@ -74,21 +74,21 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
   const [busy, setBusy] = useState(false)
   // 履歴に残す名前(ログインで人を見分けないため。ブラウザごとに覚え、コメントを書く人と共通)
   const [name, setName] = useState(myName)
-  const status: WeekStatus = week?.cr854_status ?? 'draft'
+  const status: WeekStatus = week?.status ?? 'draft'
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
-  const counts = statusOptions.map((o) => ({ ...o, n: cards.filter((c) => (c.cr854_status ?? STATUS_NOT_STARTED) === o.value).length }))
-  const notApproved = cards.filter((c) => (c.cr854_status ?? STATUS_NOT_STARTED) < STATUS_APPROVED).length
-  const inReview = cards.filter((c) => c.cr854_status === STATUS_REVIEW).length
+  const counts = statusOptions.map((o) => ({ ...o, n: cards.filter((c) => (c.status ?? STATUS_NOT_STARTED) === o.value).length }))
+  const notApproved = cards.filter((c) => (c.status ?? STATUS_NOT_STARTED) < STATUS_APPROVED).length
+  const inReview = cards.filter((c) => c.status === STATUS_REVIEW).length
   // 確定後の変更: この週の配信の、最後に確定した日時より後の理由。もう一度確定すると、それより前のものは出なくなる
-  const cardName = new Map(cards.map((c) => [c.cr854_deliverycardid, c.cr854_name]))
+  const cardName = new Map(cards.map((c) => [c.id, c.name]))
   // 日時は、文字列ではなく時刻で比べる(サーバーとブラウザで、ISO の書き方が違うことがあるため)
   const ms = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
-  const since = ms(week?.cr854_confirmedat)
+  const since = ms(week?.confirmed_at)
   const reopened =
     status !== 'confirmed' && since > 0
       ? changes
-          .filter((n) => n._cr854_deliverycard_value && cardName.has(n._cr854_deliverycard_value) && ms(n.createdon) > since)
-          .sort((a, b) => ms(a.createdon) - ms(b.createdon))
+          .filter((n) => n.delivery_card_id && cardName.has(n.delivery_card_id) && ms(n.created_on) > since)
+          .sort((a, b) => ms(a.created_on) - ms(b.created_on))
       : []
 
   const run = async (next: WeekStatus, confirmText?: string) => {
@@ -101,7 +101,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
     }
   }
 
-  const statusName = (v?: number) => (v === undefined || v === null ? '' : optionLabel(statusOptions.find((o) => o.value === v)?.label))
+  const statusName = (v?: string | null) => (v === undefined || v === null ? '' : optionLabel(statusOptions.find((o) => o.value === v)?.label))
   const history = (
     <Popover withArrow positioning="below-end">
       <PopoverTrigger disableButtonEnhancement>
@@ -114,14 +114,14 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
           <span className={styles.historyHead}>{t('承認の履歴', 'Approval history')}</span>
           {events.length === 0 && <span className={styles.historyMeta}>{t('まだ記録はありません', 'Nothing recorded yet')}</span>}
           {events.map((e) => (
-            <div key={e.cr854_eventid} className={styles.historyRow}>
-              <span className={styles.historyMeta}>{`${when(e.createdon)} · ${e.cr854_actor || t('(名前なし)', '(no name)')}`}</span>
+            <div key={e.id} className={styles.historyRow}>
+              <span className={styles.historyMeta}>{`${when(e.created_on)} · ${e.actor || t('(名前なし)', '(no name)')}`}</span>
               <span className={styles.historyText}>
-                {e.cr854_cardname ? `${e.cr854_cardname}: ` : ''}
-                {actionText(t, e.cr854_action)}
-                {e.cr854_tostatus !== undefined && e.cr854_tostatus !== null && e.cr854_tostatus !== e.cr854_fromstatus ? `(${statusName(e.cr854_fromstatus) ? `${statusName(e.cr854_fromstatus)} ` : ''}→ ${statusName(e.cr854_tostatus)})` : ''}
+                {e.card_name ? `${e.card_name}: ` : ''}
+                {actionText(t, e.action)}
+                {e.to_status !== undefined && e.to_status !== null && e.to_status !== e.from_status ? `(${statusName(e.from_status) ? `${statusName(e.from_status)} ` : ''}→ ${statusName(e.to_status)})` : ''}
               </span>
-              {e.cr854_note && <span className={styles.historyNote}>{e.cr854_note}</span>}
+              {e.note && <span className={styles.historyNote}>{e.note}</span>}
             </div>
           ))}
         </div>
@@ -144,7 +144,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
       {badge}
       {status !== 'draft' && (
         <span className={styles.when}>
-          {status === 'confirmed' ? t(`確定 ${when(week?.cr854_confirmedat)}`, `Confirmed ${when(week?.cr854_confirmedat)}`) : t(`レビューに出した日時 ${when(week?.cr854_submittedat)}`, `Submitted ${when(week?.cr854_submittedat)}`)}
+          {status === 'confirmed' ? t(`確定 ${when(week?.confirmed_at)}`, `Confirmed ${when(week?.confirmed_at)}`) : t(`レビューに出した日時 ${when(week?.submitted_at)}`, `Submitted ${when(week?.submitted_at)}`)}
         </span>
       )}
       <span className={styles.counts}>
@@ -242,8 +242,8 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
         <div className={styles.changes}>
           <span className={styles.changesHead}>{t(`確定後の変更 ${reopened.length} 件(もう一度確定してください)`, `${reopened.length} change(s) after confirmation (confirm the week again)`)}</span>
           {reopened.map((n) => (
-            <span key={n.cr854_cardnoteid} className={styles.changeRow}>
-              {`${when(n.createdon)} ・ ${cardName.get(n._cr854_deliverycard_value!) ?? ''}${n.cr854_author ? `(${n.cr854_author})` : ''}: ${n.cr854_body ?? ''}`}
+            <span key={n.id} className={styles.changeRow}>
+              {`${when(n.created_on)} ・ ${cardName.get(n.delivery_card_id!) ?? ''}${n.author ? `(${n.author})` : ''}: ${n.body ?? ''}`}
             </span>
           ))}
         </div>

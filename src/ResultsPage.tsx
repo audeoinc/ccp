@@ -18,17 +18,17 @@ import {
   tokens,
 } from '@fluentui/react-components'
 import { ArrowDownloadRegular, ArrowUploadRegular, DatabaseRegular } from '@fluentui/react-icons'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
-import type { Cr854_weeklyperformances } from './generated/models/Cr854_weeklyperformancesModel'
-import { Cr854_weeklyperformancesService } from './generated/services/Cr854_weeklyperformancesService'
-import { Cr854_deliveryresultsService, type Cr854_deliveryresults } from './gcpdata/Cr854_deliveryresultsService'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
+import type { WeeklyPerformance } from './models/weeklyPerformances'
+import { WeeklyPerformancesService } from './data/weeklyPerformances'
+import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { locale, priceText, useT, type Market } from './i18n'
 import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
 import { ResultDetail } from './ResultDetail'
 import { AiIcon } from './AiMark'
-import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
+import { DeliveryCardsService } from './data/deliveryCards'
 import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
 import { ResultsCompareView } from './ResultsCompareView'
@@ -71,9 +71,9 @@ type GroupBy = 'delivery' | 'theme' | 'themeType' | 'template' | 'product'
 
 interface Props {
   /** 配信(計画の面と同じ絞り込みをかけたもの。期間は、この中で絞る) */
-  cards: Cr854_deliverycards[]
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  cards: DeliveryCard[]
+  products: Product[]
+  heroes: HeroImage[]
   /** 配信カードごとの掲載商品(メールの並び順の商品 ID。プレビューに使う) */
   cardProducts: Map<string, string[]>
   /** 見せ方・月・週は、計画の面と共通(切り替えても、同じ期間・見せ方のまま) */
@@ -100,15 +100,15 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
 export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [results, setResults] = useState<Cr854_deliveryresults[] | null>(null)
-  const [weekly, setWeekly] = useState<Cr854_weeklyperformances[]>([])
+  const [results, setResults] = useState<DeliveryResult[] | null>(null)
+  const [weekly, setWeekly] = useState<WeeklyPerformance[]>([])
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('delivery')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
-    const res = await Cr854_deliveryresultsService.getAll()
+    const res = await DeliveryResultsService.getAll()
     if (!res.success) {
       setError(res.error?.message ?? t('配信結果を読み込めませんでした', 'Could not load results'))
       return
@@ -116,10 +116,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     setResults(res.data ?? [])
   }
   useEffect(() => {
-    Cr854_deliveryresultsService.getAll()
+    DeliveryResultsService.getAll()
       .then((res) => (res.success ? setResults(res.data ?? []) : setError(res.error?.message ?? 'Could not load results')))
       .catch((e: unknown) => setError(String(e)))
-    Cr854_weeklyperformancesService.getAll()
+    WeeklyPerformancesService.getAll()
       .then((res) => res.success && setWeekly(res.data ?? []))
       .catch(() => undefined)
     // 最初の 1 回だけ読む
@@ -136,15 +136,15 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   }
   const rows = scoped.filter((r) => inPeriod(sentAtOf(r)))
   // 月・週の表示には、結果がまだの配信も出す(その期間の計画の全体の中で、結果を見るため)
-  const periodCards = cards.filter((c) => inPeriod(c.cr854_scheduledat))
-  const resultByCard = new Map(allRows.map((r) => [r.card.cr854_deliverycardid, r]))
+  const periodCards = cards.filter((c) => inPeriod(c.scheduled_at))
+  const resultByCard = new Map(allRows.map((r) => [r.card.id, r]))
   // 押した配信: 結果があれば詳しい結果、なければ配信カード
   const openDelivery = (id: string) => (resultByCard.has(id) ? onDetail(id) : onOpenCard(id))
   // 金額は、配信の国の通貨で。まとめた数字は、期間の配信がすべて同じ国のときだけ通貨を付ける(国が混ざると足せないため)
-  const marketOf = (c: Cr854_deliverycards): Market => (c.cr854_country === COUNTRY_US ? 'US' : 'JP')
+  const marketOf = (c: DeliveryCard): Market => (c.country === COUNTRY_US ? 'US' : 'JP')
   const markets = new Set(rows.map((r) => marketOf(r.card)))
   const single: Market | undefined = markets.size <= 1 ? ([...markets][0] ?? 'US') : undefined
-  const money = (v?: number, c?: Cr854_deliverycards) =>
+  const money = (v?: number, c?: DeliveryCard) =>
     c || single
       ? priceText(v === undefined ? undefined : Math.round(v), c ? marketOf(c) : single)
       : t(`${Math.round(v ?? 0).toLocaleString(locale())}(国が混在)`, `${Math.round(v ?? 0).toLocaleString(locale())} (mixed countries)`)
@@ -154,13 +154,13 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     const d = new Date(y, m - 2, 1)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })()
-  const prevRevenue = scoped.filter((r) => monthKey(r.result.cr854_sentat ?? r.card.cr854_scheduledat) === prevMonth).reduce((s, r) => s + r.revenue, 0)
+  const prevRevenue = scoped.filter((r) => monthKey(r.result.sent_at ?? r.card.scheduled_at) === prevMonth).reduce((s, r) => s + r.revenue, 0)
   const total = rows.reduce((s, r) => s + r.revenue, 0)
-  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? t('(削除された商品)', '(deleted product)')
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? t('(削除された商品)', '(deleted product)')
 
   const groups: GroupRow[] =
     groupBy === 'theme'
-      ? groupRows(rows, 'theme', (r) => r.card.cr854_theme ?? '')
+      ? groupRows(rows, 'theme', (r) => r.card.theme ?? '')
       : groupBy === 'themeType'
         ? groupRows(rows, 'theme', (r) => {
             const tt = themeTypeOf(r.card)
@@ -186,15 +186,15 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       downloadTable(
         ['Date', 'Delivery', 'Channel', 'Theme', 'Template', 'Recipients', 'Opens', 'Clicks', 'Orders', 'Open rate', 'Click rate', 'Revenue', 'vs prev week', 'vs last year'],
         rows.map((r) => [
-          localDate(r.result.cr854_sentat ?? r.card.cr854_scheduledat),
-          r.card.cr854_name ?? '',
+          localDate(r.result.sent_at ?? r.card.scheduled_at),
+          r.card.name ?? '',
           isPush(r.card) ? 'Push' : 'Email',
-          r.card.cr854_theme ?? '',
+          r.card.theme ?? '',
           templateName(r.card),
-          r.result.cr854_recipients ?? '',
-          r.result.cr854_opens ?? '',
-          r.result.cr854_clicks ?? '',
-          r.result.cr854_orders ?? '',
+          r.result.recipients ?? '',
+          r.result.opens ?? '',
+          r.result.clicks ?? '',
+          r.result.orders ?? '',
           pct(r.openRate),
           pct(r.clickRate),
           r.revenue,
@@ -220,7 +220,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   }
 
   // テーマの種類を、AI で分ける(まだ決まっていない、送った配信だけ。決まっているものは、人が直した結果かもしれないので触らない)
-  const untyped = cards.filter((c) => !c.cr854_themetype && resultByCard.has(c.cr854_deliverycardid))
+  const untyped = cards.filter((c) => !c.theme_type && resultByCard.has(c.id))
   const [classifying, setClassifying] = useState(false)
   const classify = async () => {
     setClassifying(true)
@@ -231,7 +231,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       for (let i = 0; i < untyped.length; i += 20) {
         const types = await classifyThemeTypes(untyped.slice(i, i + 20))
         for (const [id, type] of types) {
-          const res = await Cr854_deliverycardsService.update(id, { cr854_themetype: type })
+          const res = await DeliveryCardsService.update(id, { theme_type: type })
           if (res.success) done++
         }
       }
@@ -250,10 +250,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     const { rows: imported, errors } = parseResultsCsv(await file.text(), cards)
     let done = 0
     for (const r of imported) {
-      const existing = (results ?? []).find((x) => x._cr854_deliverycard_value === r.cardId)
+      const existing = (results ?? []).find((x) => x.delivery_card_id === r.cardId)
       const res = existing
-        ? await Cr854_deliveryresultsService.update(existing.cr854_deliveryresultid, r.fields)
-        : await Cr854_deliveryresultsService.create({ ...r.fields, 'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${r.cardId})` })
+        ? await DeliveryResultsService.update(existing.id, r.fields)
+        : await DeliveryResultsService.create({ ...r.fields, delivery_card_id: r.cardId })
       if (res.success) done++
       else errors.push(res.error?.message ?? r.cardId)
     }
@@ -266,7 +266,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const downloadSample = () =>
     downloadTable(
       [...IMPORT_COLUMNS],
-      rows.slice(0, 2).map((r) => [r.card.cr854_name ?? '', localDate(r.card.cr854_scheduledat), r.result.cr854_sentat ?? '', 0, 0, 0, 0, 0, 0]),
+      rows.slice(0, 2).map((r) => [r.card.name ?? '', localDate(r.card.scheduled_at), r.result.sent_at ?? '', 0, 0, 0, 0, 0, 0]),
       'results-import-sample.csv',
     )
 
@@ -368,8 +368,8 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
             money={money}
             onOpen={onDetail}
             onAdopt={async (r, text) => {
-              const now = r.result.cr854_notes?.trim()
-              const res = await Cr854_deliveryresultsService.update(r.result.cr854_deliveryresultid, { cr854_notes: now ? `${now}\n${text}` : text })
+              const now = r.result.notes?.trim()
+              const res = await DeliveryResultsService.update(r.result.id, { notes: now ? `${now}\n${text}` : text })
               if (res.success) await load()
             }}
           />
@@ -406,14 +406,14 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
                   </thead>
                   <tbody>
                     {rows.map((r) => {
-                      const on = detailId === r.card.cr854_deliverycardid
+                      const on = detailId === r.card.id
                       return (
                         // 行を押すと、詳しい結果をフロートで開く(計画の面の一覧で、配信カードが開くのと同じ)
-                        <tr key={r.result.cr854_deliveryresultid} className={mergeClasses(styles.row, on && styles.rowOn)} onClick={() => onDetail(r.card.cr854_deliverycardid)} aria-selected={on}>
-                          <td className={styles.td}>{dateText(r.result.cr854_sentat ?? r.card.cr854_scheduledat)}</td>
-                          <td className={mergeClasses(styles.td, on && styles.name)}>{r.card.cr854_name}</td>
+                        <tr key={r.result.id} className={mergeClasses(styles.row, on && styles.rowOn)} onClick={() => onDetail(r.card.id)} aria-selected={on}>
+                          <td className={styles.td}>{dateText(r.result.sent_at ?? r.card.scheduled_at)}</td>
+                          <td className={mergeClasses(styles.td, on && styles.name)}>{r.card.name}</td>
                           <td className={styles.td}>{isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')}</td>
-                          <td className={mergeClasses(styles.td, styles.clip)} title={r.card.cr854_theme}>{r.card.cr854_theme || '—'}</td>
+                          <td className={mergeClasses(styles.td, styles.clip)} title={r.card.theme}>{r.card.theme || '—'}</td>
                           <td className={mergeClasses(styles.td, styles.clip)} title={templateName(r.card)}>{templateName(r.card)}</td>
                           <td className={mergeClasses(styles.td, styles.num)}>{pct(r.openRate)}</td>
                           <td className={mergeClasses(styles.td, styles.num)}>{pct(r.clickRate)}</td>
@@ -484,7 +484,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           history={allRows}
           cardProducts={cardProducts}
           onOpenOther={onDetail}
-          productIds={cardProducts.get(detail.card.cr854_deliverycardid) ?? []}
+          productIds={cardProducts.get(detail.card.id) ?? []}
           products={products}
           heroes={heroes}
           weekly={weekly}

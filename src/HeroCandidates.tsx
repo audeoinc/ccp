@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
 import { SearchRegular } from '@fluentui/react-icons'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { HeroImage } from './models/heroImages'
 import { DND_HERO } from './items'
 import { optionLabel, useT } from './i18n'
 import { ImageThumb } from './ImageThumb'
 import { heroImage } from './images'
 
 interface Props {
-  heroes: Cr854_heroimages[]
+  heroes: HeroImage[]
   selectedId?: string
   onSelect: (id: string) => void
 }
@@ -54,11 +54,11 @@ export function HeroCandidates({ heroes, selectedId, onSelect }: Props) {
   const [query, setQuery] = useState('')
   const [purpose, setPurpose] = useState('')
 
-  const purposes = useMemo(() => [...new Set(heroes.map((h) => h.cr854_purposename).filter(Boolean))] as string[], [heroes])
+  const purposes = useMemo(() => [...new Set(heroes.map((h) => h.purpose_name).filter(Boolean))] as string[], [heroes])
   const shown = heroes.filter((h) => {
-    if (purpose && h.cr854_purposename !== purpose) return false
+    if (purpose && h.purpose_name !== purpose) return false
     const q = query.trim().toLowerCase()
-    return !q || `${h.cr854_name} ${h.cr854_imagecode} ${h.cr854_tags ?? ''} ${h.cr854_description ?? ''}`.toLowerCase().includes(q)
+    return !q || `${h.name} ${h.image_code} ${h.tags ?? ''} ${h.description ?? ''}`.toLowerCase().includes(q)
   })
 
   return (
@@ -83,19 +83,19 @@ export function HeroCandidates({ heroes, selectedId, onSelect }: Props) {
       </Caption1>
       <div className={styles.grid}>
         {shown.map((h) => {
-          const used = h.cr854_heroimageid === selectedId
+          const used = h.id === selectedId
           const select = () => {
-            if (!used) onSelect(h.cr854_heroimageid)
+            if (!used) onSelect(h.id)
           }
           return (
             <div
-              key={h.cr854_heroimageid}
+              key={h.id}
               role="button"
               tabIndex={0}
-              title={[h.cr854_name, h.cr854_tags, h.cr854_description].filter(Boolean).join('\n')}
+              title={[h.name, h.tags, h.description].filter(Boolean).join('\n')}
               draggable
               onDragStart={(e) => {
-                e.dataTransfer.setData(DND_HERO, h.cr854_heroimageid)
+                e.dataTransfer.setData(DND_HERO, h.id)
                 e.dataTransfer.effectAllowed = 'copy'
               }}
               onClick={select}
@@ -107,12 +107,12 @@ export function HeroCandidates({ heroes, selectedId, onSelect }: Props) {
               }}
               className={mergeClasses(styles.card, used && styles.cardUsed)}
             >
-              <ImageThumb src={heroImage(h)} alt={h.cr854_name} aspectRatio="4 / 3" />
+              <ImageThumb src={heroImage(h)} alt={h.name} aspectRatio="4 / 3" />
               {used && <Badge appearance="filled" color="brand" className={styles.badge}>{t('設定中', 'In use')}</Badge>}
               <div className={styles.info}>
-                <Text weight="semibold" size={300} truncate wrap={false} block>{h.cr854_name}</Text>
+                <Text weight="semibold" size={300} truncate wrap={false} block>{h.name}</Text>
                 <Caption1 className={styles.line}>
-                  {h.cr854_imagecode} ・ {optionLabel(h.cr854_purposename)} ・ {optionLabel(h.cr854_seasonname)}
+                  {h.image_code} ・ {optionLabel(h.purpose_name)} ・ {optionLabel(h.season_name)}
                 </Caption1>
               </div>
             </div>

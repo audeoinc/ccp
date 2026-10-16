@@ -4,7 +4,7 @@
 
 ```
 ブラウザ(React アプリ)
-   │  src/generated/services の Cr854_…Service、src/gcpdata の …Service で読み書き
+   │  src/data の …Service で読み書き(型は src/models)
    ▼
 サーバー(Python / FastAPI。Cloud Run、または Workbench)
    │  /api/data/{テーブル} … PostgreSQL(Cloud SQL)
@@ -18,7 +18,7 @@
 
 ### 2.1 呼び出し(`src/aiSelect.ts`)
 
-1. `askAgent(prompt, payload)` が、指示文 + 入力の JSON を、AI の依頼として送る(`Cr854_airequestsService` → `src/gcp/ai.ts` → サーバーの `/api/ask`)。
+1. `askAgent(prompt, payload)` が、指示文 + 入力の JSON を、AI の依頼として送る(`AiRequestsService` → `src/gcp/ai.ts` → サーバーの `/api/ask`)。
 2. サーバーが Gemini に問い合わせ、返答のテキストを返す(`server/ccp/ai.py`)。
 3. 画面が、返答から JSON を取り出す。
 - 返答の JSON が壊れていたときは、最大 3 回まで依頼し直す。末尾のカンマは自動で直す。
@@ -57,16 +57,16 @@
 
 ## 4. データの読み書き(`CardDetail.tsx`)
 
-- 配信カード: `cr854_deliverycard`。AI の理由・切り口(`themereason` など)、セクションの見出し(`sectiontitles`)・コピー(`sectioncopies`、JSON)も、ここに保存する。
-- 掲載商品: `cr854_deliveryproduct`(1 行 = 1 商品)。`state`(選定 / 候補)、`section`(セクション番号)、`sortorder`、`reason`、`source`(AI / 手動)を持つ。保存時は、読み込み時点との差分で、作成・更新・削除する。
+- 配信カード: 表 `delivery_cards`。AI の理由・切り口(`theme_reason` など)、セクションの見出し(`section_titles`)・コピー(`section_copies`、JSON)も、ここに保存する。
+- 掲載商品: 表 `delivery_products`(1 行 = 1 商品)。`state`(`selected` 選定 / `candidate` 候補)、`section`(セクション番号)、`sort_order`、`reason`、`source`(AI / 手動)を持つ。保存時は、読み込み時点との差分で、作成・更新・削除する。
 - 候補(`state` = 候補)は、保存する。AI の案(テーマ・コピー・制作指示の案、セクションの見出し・コピーの候補)は、**保存しない**(画面を開いている間だけ)。
-- 選択肢(ステータス、チャネル、カテゴリなど)は、数値(例: 588230000)で持つ。表示名(`○○name`)は、`labels.ts` が、値から補う。
+- 選択肢(ステータス、チャネル、カテゴリなど)は、文字の値(例: `email` / `app`)で持つ。表示名(`○○_name`)は、`labels.ts` が、値から補う。状態の前後は `statusRank` で比べる(文字のまま `<` で比べない)。
 - **承認の流れ(GCP 版。2026-10-14 決定)**: 配信は 未起案 → 検討中 → 承認済み → 確定、週は 下書き → レビュー中 → 確定。
   - 承認は、配信 1 本ずつ(配信カードの「保存して承認」)と、週まとめて(週の帯の「まとめて承認」= 検討中をすべて承認済みに)の両方。誰でも押せる。
   - 差し戻しは、理由が必須。配信は検討中になり、理由はレビューのコメント(未対応)にも残す。
   - 承認済み・確定の配信の内容を変えて保存すると、検討中に戻る(再承認が必要)。変わったかは、開いた時点の内容と比べる(保存済みの行と比べると、表し方の違いだけで変わったことになるため)。確定した週の配信は、理由つきの確定後の変更(W3)の流れになる。
   - 確定は、週単位(「週を確定」)。「承認済み」(内容が OK)と「確定」(制作に回してよい)は、分けて残す。
-  - 「誰が」は、ログインで人を見分けないので、画面で入れた名前(`me.name`)。操作は、操作の履歴(`cr854_events`)に残す。通知はしない。
+  - 「誰が」は、ログインで人を見分けないので、画面で入れた名前(`me.name`)。操作は、操作の履歴(`events`)に残す。通知はしない。
 
 ## 5. テンプレート(`src/templates.ts`、`layoutTemplates.ts`)
 
@@ -80,7 +80,7 @@
 - **ヒーローの見せ方**(テンプレート全体): `heroText`(band: 写真に帯で重ねる / overlay: 写真に大きく重ねる / below: 写真の下)、`heroLink`(画像のリンク先の種類)、`topBar`(お知らせ帯)。
 - **リンク先**は、テンプレートには種類(既定値)だけを持つ。実際の URL と計測用のパラメーターは、配信カードに持たせる予定(未実装。[BACKLOG.md](BACKLOG.md))。
 - 見取り図(`TemplateThumb.tsx`)は、実際のメールに近い縦横比で、縦長に描く。一覧では上の部分だけ(`maxHeight`)、管理画面では全体を表示する。
-- **ユーザーが作ったテンプレート**は、テーブル `cr854_layouttemplates` に保存する(名前、説明、ヒーローの種類、セクションの JSON)。アプリの起動時に読み込み、`setCustomTemplates` で登録する。
+- **ユーザーが作ったテンプレート**は、テーブル `layout_templates` に保存する(名前、説明、ヒーローの種類、セクションの JSON)。アプリの起動時に読み込み、`setCustomTemplates` で登録する。
   - ヒーローの見せ方は、列がないので、セクションの JSON の先頭に `{"kind":"hero",...}` として入れる(`layoutTemplates.ts`)。ボタンの部品は、置く位置に `{"kind":"buttons","buttons":[...]}` として挟む。どちらも `slots` を持たないので、以前の版のアプリは読み飛ばす(ボタンが出ないだけで、商品の位置はずれない)。知らない部品(`slots` あり)は、グリッドとして読む。
   - 既定の値は書かない。ヒーローが既定で、ボタンの部品もないテンプレートは、以前と同じ形(セクションの配列だけ)になる。
 - 配信カードは、`layoutkey`(標準は ID、作ったものは行の GUID)でテンプレートを指す。標準のテンプレートは、以前の選択肢の列(`emailtemplate`)にも書く(互換)。`layoutkey` が空なら、選択肢の値から決める。
@@ -122,5 +122,5 @@
 - CSS の `zoom` を使う箇所(`items.ts` の `scaled`、プレビューの倍率)では、**幅を `%` で補正しない**(現在のブラウザの仕様では、枠より広がる)。
 - Fluent の `Switch` の色は、ヘッダーのような色付きの背景では、効きにくい(ヘッダーのトグルは自作)。
 - Fluent の `Textarea` には最低の高さがある(`AutoTextarea` で解消している)。
-- `src/generated/` は、もとは Dataverse の生成コード。いまは手で保つ。列を変えたら、`server/schema.json` と `src/generated/models/` を一緒に直す(`npm run verify` が食い違いを見つける)。
+- 列を変えたら、`server/schema.json` と画面の型(`src/models/`、一部の表は `src/data/`)を一緒に直す(`npm run verify` が食い違いを見つける)。
 - ファイルの改行コードが、CRLF のものと LF のものが混在している。スクリプトで一括置換するときは、改行コードを保つ。

@@ -1,8 +1,8 @@
 import { priceText } from './i18n'
-import type { Cr854_deliveryproductscr854_source as Source } from './generated/models/Cr854_deliveryproductsModel'
+import type { DeliveryProductSource as Source } from './models/deliveryProducts'
 
-export const SOURCE_AI: Source = 588230000
-export const SOURCE_MANUAL: Source = 588230001
+export const SOURCE_AI: Source = 'ai'
+export const SOURCE_MANUAL: Source = 'manual'
 
 /** 1カードに掲載する商品1件(配信商品テーブルの1行に対応) */
 export interface Item {
@@ -33,6 +33,6 @@ export interface Candidate extends Item {
 }
 
 // 配信商品テーブルの「state」列(選択肢)の値
-export const STATE_SELECTED = 588230000
-export const STATE_CANDIDATE = 588230001
+export const STATE_SELECTED = 'selected'
+export const STATE_CANDIDATE = 'candidate'
 export const DND_CAND = 'application/x-candidate' // 中ペインの候補の行(値は Candidate.key)

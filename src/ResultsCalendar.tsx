@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { HeatPreview } from './HeatPreview'
 import { locale, useLang, useT } from './i18n'
 import { isPush, localDate, pct, type ResultRow } from './results'
@@ -60,11 +60,11 @@ const useStyles = makeStyles({
 
 interface Props {
   /** 表示する期間の配信(絞り込み済み。結果がまだのものも含む) */
-  cards: Cr854_deliverycards[]
+  cards: DeliveryCard[]
   /** 配信カード ID → 結果の行 */
   results: Map<string, ResultRow>
   /** 金額の表記(配信の国の通貨) */
-  money: (v: number | undefined, card: Cr854_deliverycards) => string
+  money: (v: number | undefined, card: DeliveryCard) => string
   /** 押したとき(結果があれば詳しい結果、なければ配信カード) */
   onOpen: (cardId: string) => void
 }
@@ -80,10 +80,10 @@ function useDelta() {
   return (v?: number) => (v === undefined ? null : <span className={v >= 0 ? styles.up : styles.down}>{`${v >= 0 ? '▲' : '▼'}${Math.abs(Math.round(v * 100))}%`}</span>)
 }
 
-const byDay = (cards: Cr854_deliverycards[]) => {
-  const m = new Map<string, Cr854_deliverycards[]>()
-  for (const c of [...cards].sort((a, b) => (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? ''))) {
-    const k = localDate(c.cr854_scheduledat)
+const byDay = (cards: DeliveryCard[]) => {
+  const m = new Map<string, DeliveryCard[]>()
+  for (const c of [...cards].sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))) {
+    const k = localDate(c.scheduled_at)
     m.set(k, [...(m.get(k) ?? []), c])
   }
   return m
@@ -114,10 +114,10 @@ export function ResultsMonth({ month, cards, results, money, onOpen }: Props & {
           <div key={key} className={mergeClasses(styles.day, !inMonth && styles.dayOut)}>
             <span className={mergeClasses(styles.dayNum, key === today && styles.today)}>{d.getDate()}</span>
             {(days.get(key) ?? []).map((c) => {
-              const r = results.get(c.cr854_deliverycardid)
+              const r = results.get(c.id)
               return (
-                <button key={c.cr854_deliverycardid} type="button" className={mergeClasses(styles.chip, !r && styles.chipNone)} style={{ borderLeftColor: trendColor(r) }} onClick={() => onOpen(c.cr854_deliverycardid)}>
-                  <span className={styles.chipName} title={c.cr854_name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.cr854_name}`}</span>
+                <button key={c.id} type="button" className={mergeClasses(styles.chip, !r && styles.chipNone)} style={{ borderLeftColor: trendColor(r) }} onClick={() => onOpen(c.id)}>
+                  <span className={styles.chipName} title={c.name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.name}`}</span>
                   {r ? (
                     <span className={styles.chipNums}>
                       <span>{money(r.revenue, c)}</span>
@@ -147,7 +147,7 @@ export function ResultsWeek({
   cardProducts,
   products,
   heroes,
-}: Props & { weekStart: Date; cardProducts: Map<string, string[]>; products: Cr854_products[]; heroes: Cr854_heroimages[] }) {
+}: Props & { weekStart: Date; cardProducts: Map<string, string[]>; products: Product[]; heroes: HeroImage[] }) {
   const styles = useStyles()
   const t = useT()
   const delta = useDelta()
@@ -175,11 +175,11 @@ export function ResultsWeek({
             <div className={styles.weekHead}>{d.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })}</div>
             {list.length === 0 && <div className={styles.empty}>—</div>}
             {list.map((c) => {
-              const r = results.get(c.cr854_deliverycardid)
-              const ids = cardProducts.get(c.cr854_deliverycardid) ?? []
+              const r = results.get(c.id)
+              const ids = cardProducts.get(c.id) ?? []
               return (
-                <button key={c.cr854_deliverycardid} type="button" className={mergeClasses(styles.tile, !r && styles.chipNone)} style={{ borderTopColor: trendColor(r) }} onClick={() => onOpen(c.cr854_deliverycardid)}>
-                  <span className={styles.chipName} title={c.cr854_name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.cr854_name}`}</span>
+                <button key={c.id} type="button" className={mergeClasses(styles.tile, !r && styles.chipNone)} style={{ borderTopColor: trendColor(r) }} onClick={() => onOpen(c.id)}>
+                  <span className={styles.chipName} title={c.name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.name}`}</span>
                   {r ? (
                     <>
                       <span className={styles.nums}>

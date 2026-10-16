@@ -1,26 +1,26 @@
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { appPath } from './appRoot'
 
 // ビルドに同梱するイラスト(商品コード・画像コードと同じファイル名。scripts の生成物)
 const productAssets = import.meta.glob('./assets/products/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
 const heroAssets = import.meta.glob('./assets/heroes/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
 
-// Dataverse の画像URLが空、または仮の画像(placehold.co)のときだけ、同梱のイラストを使う。
+// 画像の URL が空、または仮の画像(placehold.co)のときだけ、同梱のイラストを使う。
 // 実際の画像URLを入れれば、そちらが優先される。
 // US 向けの商品(U01..)・メイン画像(UH01..)は、同じ絵柄(P01.., H01..)を使い回す
 const assetCode = (code?: string) => (code ?? '').replace(/^UH/, 'H').replace(/^U/, 'P')
 
 const isPlaceholder = (url?: string) => !url || url.includes('placehold.co')
 
-export function productImage(p?: Cr854_products): string | undefined {
+export function productImage(p?: Product): string | undefined {
   if (!p) return undefined
-  if (!isPlaceholder(p.cr854_imageurl)) return appPath(p.cr854_imageurl!)
-  return (productAssets[`./assets/products/${p.cr854_productcode}.svg`] ?? productAssets[`./assets/products/${assetCode(p.cr854_productcode)}.svg`]) ?? p.cr854_imageurl
+  if (!isPlaceholder(p.image_url)) return appPath(p.image_url!)
+  return (productAssets[`./assets/products/${p.product_code}.svg`] ?? productAssets[`./assets/products/${assetCode(p.product_code)}.svg`]) ?? p.image_url
 }
 
-export function heroImage(h?: Cr854_heroimages): string | undefined {
+export function heroImage(h?: HeroImage): string | undefined {
   if (!h) return undefined
-  if (!isPlaceholder(h.cr854_imageurl)) return appPath(h.cr854_imageurl!)
-  return heroAssets[`./assets/heroes/${assetCode(h.cr854_imagecode)}.svg`] ?? h.cr854_imageurl
+  if (!isPlaceholder(h.image_url)) return appPath(h.image_url!)
+  return heroAssets[`./assets/heroes/${assetCode(h.image_code)}.svg`] ?? h.image_url
 }

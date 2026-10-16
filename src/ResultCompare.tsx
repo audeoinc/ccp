@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Button, MessageBar, MessageBarBody, Spinner, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AiIcon } from './AiMark'
 import { reviewResult, type ResultReview } from './aiReview'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
 import { isPush, pastSame, pct, positionLabel, positionShares, sentAtOf, templateIdOf, templateName, type CompareBy, type ResultRow } from './results'
@@ -62,8 +62,8 @@ interface Props {
   /** すべての配信の結果(この中から、比べる相手を探す) */
   history: ResultRow[]
   cardProducts: Map<string, string[]>
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   money: (v?: number) => string
   /** 過去の配信の結果を開く */
   onOpenOther?: (cardId: string) => void
@@ -85,7 +85,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
   const past = pastSame(history, row, n, by)
   const myType = themeTypeOf(row.card)
   const push = isPush(row.card)
-  const idsOf = (r: ResultRow) => cardProducts.get(r.card.cr854_deliverycardid) ?? []
+  const idsOf = (r: ResultRow) => cardProducts.get(r.card.id) ?? []
 
   const delta = (now?: number, base?: number, unit: 'pt' | 'pct' = 'pct') => {
     if (now === undefined || base === undefined || (unit === 'pct' && !base)) return <span className={styles.muted}>—</span>
@@ -94,7 +94,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
     return <span className={d > 0 ? styles.up : styles.down}>{`${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}${unit === 'pt' ? 'pt' : '%'}`}</span>
   }
 
-  const perRecipient = (r: ResultRow) => (r.result.cr854_recipients ? r.revenue / r.result.cr854_recipients : undefined)
+  const perRecipient = (r: ResultRow) => (r.result.recipients ? r.revenue / r.result.recipients : undefined)
   const kpis: { label: string; now?: number; base?: number; show: (v?: number) => string; unit: 'pt' | 'pct' }[] = [
     ...(push ? [] : [{ label: t('開封率', 'Open rate'), now: row.openRate, base: avg(past.map((p) => p.openRate ?? 0)), show: pct, unit: 'pt' as const }]),
     { label: push ? t('タップ率', 'Tap rate') : t('クリック率', 'Click rate'), now: row.clickRate, base: avg(past.map((p) => p.clickRate ?? 0)), show: pct, unit: 'pt' },
@@ -122,7 +122,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
   const [reviewing, setReviewing] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [adopted, setAdopted] = useState<Set<string>>(new Set())
-  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? ''
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   const runReview = async () => {
     setReviewing(true)
     setReviewError(null)
@@ -131,11 +131,11 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
       setReview(
         await reviewResult({
           delivery: {
-            name: row.card.cr854_name,
-            theme: row.card.cr854_theme,
+            name: row.card.name,
+            theme: row.card.theme,
             themeType: tt.type,
             template: templateName(row.card),
-            headline: push ? row.card.cr854_pushtitle : row.card.cr854_headline,
+            headline: push ? row.card.push_title : row.card.headline,
             channel: push ? 'push' : 'email',
           },
           compareBy: by,
@@ -305,12 +305,12 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
           </div>
           <div className={styles.strip} data-print-wrap>
             {past.map((p) => (
-              <button key={p.result.cr854_deliveryresultid} type="button" className={styles.card} onClick={() => onOpenOther?.(p.card.cr854_deliverycardid)} title={t('この配信の結果を開く', 'Open these results')}>
+              <button key={p.result.id} type="button" className={styles.card} onClick={() => onOpenOther?.(p.card.id)} title={t('この配信の結果を開く', 'Open these results')}>
                 <span className={styles.cardHead}>
                   <span>{dateText(p)}</span>
                   <span>{money(p.revenue)}</span>
                 </span>
-                {by === 'themeType' && <span className={styles.sub}>{p.card.cr854_name}</span>}
+                {by === 'themeType' && <span className={styles.sub}>{p.card.name}</span>}
                 <span className={styles.heat}>
                   <HeatPreview row={p} productIds={idsOf(p)} products={products} heroes={heroes} width={150} maxHeight={320} compact />
                 </span>

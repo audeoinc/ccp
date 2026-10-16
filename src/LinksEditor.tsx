@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Field, Input, makeStyles, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronRightRegular, OpenRegular } from '@fluentui/react-icons'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Product } from './models/products'
 import type { Item } from './items'
 import { useT } from './i18n'
 import { defaultUtm, isUrl, productUrl, withUtm, type LinkSlot, type Links } from './links'
@@ -42,7 +42,7 @@ interface Props {
   onLinks: (l: Links) => void
   slots: LinkSlot[]
   items: Item[]
-  products: Cr854_products[]
+  products: Product[]
   /** 計測用のパラメーターの campaign の既定値(配信名と日付から作る) */
   campaign: string
   /** 欄にマウスを重ねた・入力欄を選んだ場所(プレビューで、その場所を光らせる。W12) */
@@ -127,12 +127,12 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
       {showProducts && (
         <div className={styles.products}>
           {items.map((it) => {
-            const p = products.find((x) => x.cr854_productid === it.productId)
+            const p = products.find((x) => x.id === it.productId)
             const url = withUtm(productUrl(p), utm)
             return (
               <div key={it.key} className={styles.productRow}>
                 <div>
-                  <div>{p?.cr854_name ?? '—'}</div>
+                  <div>{p?.name ?? '—'}</div>
                   <div className={styles.productUrl}>{url || t('商品コードがないため、リンクを作れません', 'No product code, so no link')}</div>
                 </div>
                 {url && <Button size="small" appearance="subtle" icon={<OpenRegular />} as="a" href={url} target="_blank" rel="noreferrer" aria-label={t('開く', 'Open')} />}

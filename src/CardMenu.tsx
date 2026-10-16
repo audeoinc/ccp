@@ -20,9 +20,9 @@ import {
   tokens,
 } from '@fluentui/react-components'
 import { ArrowUndoRegular, DeleteRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
-import type { Cr854_weeks } from './gcpdata/Cr854_weeksService'
+import type { DeliveryCard } from './models/deliveryCards'
+import { DeliveryCardsService } from './data/deliveryCards'
+import type { WeekRow } from './data/weeks'
 import { cancelDelivery, isCancelled, undoCancel } from './cancel'
 import { logEvent } from './history'
 import { useT } from './i18n'
@@ -34,8 +34,8 @@ const useStyles = makeStyles({
 })
 
 interface Props {
-  card: Cr854_deliverycards
-  weeks: Cr854_weeks[]
+  card: DeliveryCard
+  weeks: WeekRow[]
   /** 取りやめ・取り消しのあと(配信カードを読み直す) */
   onChanged: () => Promise<void>
   /** 削除のあと(配信カードを閉じる) */
@@ -71,8 +71,8 @@ export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
   const remove = () =>
     run(async () => {
       // 履歴には、配信名を残す(配信を消しても、何を消したかが読めるように)
-      await logEvent({ action: 'status', card: { id: card.cr854_deliverycardid, name: card.cr854_name, scheduledAt: card.cr854_scheduledat }, from: card.cr854_status, note: t('配信カードを削除した', 'Deleted the delivery card') })
-      await Cr854_deliverycardsService.delete(card.cr854_deliverycardid)
+      await logEvent({ action: 'status', card: { id: card.id, name: card.name, scheduledAt: card.scheduled_at }, from: card.status, note: t('配信カードを削除した', 'Deleted the delivery card') })
+      await DeliveryCardsService.delete(card.id)
     }, onDeleted)
 
   return (
@@ -102,7 +102,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
       <Dialog open={dialog === 'cancel'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
         <DialogSurface>
           <DialogBody>
-            <DialogTitle>{t(`「${card.cr854_name}」を取りやめにする`, `Cancel "${card.cr854_name}"`)}</DialogTitle>
+            <DialogTitle>{t(`「${card.name}」を取りやめにする`, `Cancel "${card.name}"`)}</DialogTitle>
             <DialogContent className={styles.body}>
               <span>
                 {t(
@@ -132,7 +132,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
       <Dialog open={dialog === 'delete'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
         <DialogSurface>
           <DialogBody>
-            <DialogTitle>{t(`「${card.cr854_name}」を削除する`, `Delete "${card.cr854_name}"`)}</DialogTitle>
+            <DialogTitle>{t(`「${card.name}」を削除する`, `Delete "${card.name}"`)}</DialogTitle>
             <DialogContent className={styles.body}>
               <span>
                 {t(

@@ -13,8 +13,8 @@ const RULES: [ThemeType, RegExp][] = [
 ]
 
 /** 配信の言葉(配信名・テーマ・見出し)から、種類を推し量る */
-export function guessThemeType(c: { cr854_name?: string; cr854_theme?: string; cr854_headline?: string }): ThemeType {
-  const text = [c.cr854_name, c.cr854_theme, c.cr854_headline].filter(Boolean).join(' ')
+export function guessThemeType(c: { name?: string; theme?: string; headline?: string }): ThemeType {
+  const text = [c.name, c.theme, c.headline].filter(Boolean).join(' ')
   return RULES.find(([, re]) => re.test(text))?.[0] ?? 'other'
 }
 

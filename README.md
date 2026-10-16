@@ -51,7 +51,8 @@ GitHub Actions(`.github/workflows/ci.yml`)が、`main` への push とプルリ�
 | パス | 内容 |
 |---|---|
 | `src/` | 画面のコード。入口は `src/App.tsx` |
-| `src/generated/` | テーブルの行の型(`models/`)と、テーブルごとのサービス(`services/`)。もとは Dataverse の生成コードで、いまは手で保つ |
+| `src/models/` | 表の行の型と、選択肢の値 |
+| `src/data/` | 表ごとの読み書き(サーバーの `/api/data` を呼ぶ) |
 | `src/gcp/` | サーバーの API(`/api/data`・`/api/ask`)を呼ぶ部分 |
 | `src/mock/` | 撮影・デモ用のサンプルデータ(`vite.mock.config.ts` のときだけ使う) |
 | `server/` | サーバー(Python / FastAPI)。データ定義は `server/schema.json` |

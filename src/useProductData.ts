@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Cr854_weeklyperformancesService } from './generated/services/Cr854_weeklyperformancesService'
-import { Cr854_productpoliciesService } from './generated/services/Cr854_productpoliciesService'
+import { WeeklyPerformancesService } from './data/weeklyPerformances'
+import { ProductPoliciesService } from './data/productPolicies'
 import { tr } from './i18n'
 
 export interface WeeklyPoint {
@@ -29,15 +29,15 @@ const cache = new Map<string, ProductData>()
 async function load(code: string): Promise<ProductData> {
   const safe = code.replace(/'/g, "''")
   const [weekly, policy] = await Promise.all([
-    Cr854_weeklyperformancesService.getAll({
-      filter: `cr854_productcode eq '${safe}'`,
-      orderBy: ['cr854_weekstart asc'],
-      select: ['cr854_weekstart', 'cr854_units', 'cr854_revenue', 'cr854_stock'],
+    WeeklyPerformancesService.getAll({
+      filter: `product_code eq '${safe}'`,
+      orderBy: ['week_start asc'],
+      select: ['week_start', 'units', 'revenue', 'stock'],
       top: 60,
     }),
-    Cr854_productpoliciesService.getAll({
-      filter: `cr854_productcode eq '${safe}'`,
-      select: ['cr854_policy', 'cr854_promoplan', 'cr854_promoperiod', 'cr854_stage'],
+    ProductPoliciesService.getAll({
+      filter: `product_code eq '${safe}'`,
+      select: ['policy', 'promo_plan', 'promo_period', 'stage'],
       top: 1,
     }),
   ])
@@ -45,13 +45,13 @@ async function load(code: string): Promise<ProductData> {
   const pol = policy.success ? policy.data?.[0] : undefined
   return {
     weekly: (weekly.data ?? []).map((w) => ({
-      week: (w.cr854_weekstart ?? '').slice(0, 10),
-      units: w.cr854_units ?? 0,
-      revenue: w.cr854_revenue ?? 0,
-      stock: w.cr854_stock ?? 0,
+      week: (w.week_start ?? '').slice(0, 10),
+      units: w.units ?? 0,
+      revenue: w.revenue ?? 0,
+      stock: w.stock ?? 0,
     })),
     policy: pol
-      ? { policy: pol.cr854_policy ?? '', promoPlan: pol.cr854_promoplan ?? '', promoPeriod: pol.cr854_promoperiod ?? '', stage: pol.cr854_stage ?? '' }
+      ? { policy: pol.policy ?? '', promoPlan: pol.promo_plan ?? '', promoPeriod: pol.promo_period ?? '', stage: pol.stage ?? '' }
       : undefined,
   }
 }

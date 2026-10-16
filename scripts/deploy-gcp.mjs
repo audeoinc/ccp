@@ -77,7 +77,7 @@ console.log(`\n反映先: プロジェクト ${project} / リージョン ${REGI
 console.log('\n[1/4] 型チェック')
 run('npx tsc -b')
 console.log('\n[2/4] lint')
-run('npx eslint . --ignore-pattern "src/generated/**"')
+run('npx eslint .')
 console.log('\n[3/4] ビルド(GCP 版)')
 run('npm run build:gcp')
 console.log('\n[4/4] 反映(gcloud run deploy。クラウドでビルドするので、数分かかります)')

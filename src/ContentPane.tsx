@@ -28,8 +28,8 @@ import {
 import { TemplateThumb } from './TemplateThumb'
 import { ChatPanel, type ChatMsg } from './ChatPanel'
 import { AutoTextarea } from './AutoTextarea'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { Candidates } from './Candidates'
 import { HeroCandidates } from './HeroCandidates'
 import { heroImage, productImage } from './images'
@@ -52,7 +52,7 @@ import { PushThumb } from './PushThumb'
 import { PushTimingPanel } from './PushTimingPanel'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, type Audience, type PushLink } from './pushLink'
 import { MarkdownLite } from './MarkdownLite'
-import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
+import { CardNotesService } from './data/cardNotes'
 import { linkSlots, type Links } from './links'
 
 // links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
@@ -75,11 +75,11 @@ interface Props {
   onSectionTitle: (index: number, text: string) => void
   sectionCopies: string[]
   onSectionCopy: (index: number, text: string) => void
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   /** 選定の対象(配信カードの国に合う市場のもの)。products / heroes は、すでに載せたものの表示用に全件を持つ */
-  poolProducts: Cr854_products[]
-  poolHeroes: Cr854_heroimages[]
+  poolProducts: Product[]
+  poolHeroes: HeroImage[]
   items: Item[]
   setItems: Dispatch<SetStateAction<Item[]>>
   candidates: Candidate[]
@@ -297,7 +297,7 @@ const revealTab = (e: React.MouseEvent<HTMLElement>) => {
   requestAnimationFrame(() => el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }))
 }
 
-const heroMeta = (h?: Cr854_heroimages) => (h ? `${h.cr854_imagecode} ・ ${optionLabel(h.cr854_purposename)} ・ ${optionLabel(h.cr854_seasonname)} ・ ${h.cr854_tags ?? ''}` : '')
+const heroMeta = (h?: HeroImage) => (h ? `${h.image_code} ・ ${optionLabel(h.purpose_name)} ・ ${optionLabel(h.season_name)} ・ ${h.tags ?? ''}` : '')
 
 /** コピー・ヘッドラインの言語の切り替え(auto は、配信の国に合わせる) */
 function LanguageToggle({ value, onChange }: { value: CopyLanguage; onChange: (v: CopyLanguage) => void }) {
@@ -593,8 +593,8 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
   })
   const active: number | 'hero' | 'copy' =
     p.mode === 'hero' ? (sub === 'copy' ? 'copy' : 'hero') : typeof sub === 'number' ? Math.min(sub, sections.length - 1) : 0
-  const productById = new Map(products.map((x) => [x.cr854_productid, x]))
-  const heroById = new Map(heroes.map((x) => [x.cr854_heroimageid, x]))
+  const productById = new Map(products.map((x) => [x.id, x]))
+  const heroById = new Map(heroes.map((x) => [x.id, x]))
   const noTheme = !p.theme.trim()
 
   // ---- AI の選定結果は、そのまま設定する。直前の状態は「元に戻す」で復元できる
@@ -856,7 +856,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
           {...fold(`${i}:products`)}
           summary={
             list.length
-              ? `${list.map((it) => productById.get(it.productId)?.cr854_name ?? '').filter(Boolean).join(' / ')}${Number.isFinite(sec.slots) ? `(${list.length} / ${sec.slots})` : ''}`
+              ? `${list.map((it) => productById.get(it.productId)?.name ?? '').filter(Boolean).join(' / ')}${Number.isFinite(sec.slots) ? `(${list.length} / ${sec.slots})` : ''}`
               : t('(未選定)', '(None selected)')
           }
           title={`${sec.wantTitle ? '③ ' : '② '}${t('商品', 'Products')}`}
@@ -900,7 +900,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
                   }}
                   highlight={dropKey === it.key}
                   image={productImage(prod)}
-                  title={prod?.cr854_name ?? ''}
+                  title={prod?.name ?? ''}
                   meta={productMeta(prod)}
                   reason={it.reason}
                   onReason={(v) => setItemReason(it.key, v)}
@@ -939,7 +939,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
                   drag={{ draggable: true, onDragStart: startDrag('cand', c.key, c.productId) }}
                   dim
                   image={productImage(prod)}
-                  title={prod?.cr854_name ?? ''}
+                  title={prod?.name ?? ''}
                   meta={productMeta(prod)}
                   reason={c.reason}
                   onReason={(v) => setCandReason(c.key, v)}
@@ -982,7 +982,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
   const demoteHero = () => {
     const cur = heroById.get(p.heroId ?? '')
     if (!cur) return
-    p.setHeroCandidates((prev) => [{ heroId: cur.cr854_heroimageid, reason: p.heroReason }, ...prev])
+    p.setHeroCandidates((prev) => [{ heroId: cur.id, reason: p.heroReason }, ...prev])
     p.setHeroId(undefined)
     p.setHeroReason('')
   }
@@ -1009,17 +1009,17 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
             wide
             drag={{
               draggable: true,
-              onDragStart: startHeroDrag(current.cr854_heroimageid),
+              onDragStart: startHeroDrag(current.id),
               onDragOver: overTarget('hero-sel'),
               onDragLeave: leaveTarget('hero-sel'),
               onDrop: dropHero((id) => {
-                if (id === current.cr854_heroimageid) return
+                if (id === current.id) return
                 setHero(id, p.heroCandidates.find((c) => c.heroId === id)?.reason ?? '')
               }),
             }}
             highlight={dropKey === 'hero-sel'}
             image={heroImage(current)}
-            title={current.cr854_name}
+            title={current.name}
             meta={heroMeta(current)}
             reason={p.heroReason}
             onReason={p.setHeroReason}
@@ -1028,7 +1028,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
                 size="small"
                 appearance="subtle"
                 onClick={() => {
-                  p.setHeroCandidates((prev) => [{ heroId: current.cr854_heroimageid, reason: p.heroReason }, ...prev])
+                  p.setHeroCandidates((prev) => [{ heroId: current.id, reason: p.heroReason }, ...prev])
                   p.setHeroId(undefined)
                   p.setHeroReason('')
                 }}
@@ -1066,7 +1066,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
                 dim
                 drag={{ draggable: true, onDragStart: startHeroDrag(c.heroId) }}
                 image={heroImage(h)}
-                title={h?.cr854_name ?? ''}
+                title={h?.name ?? ''}
                 meta={heroMeta(h)}
                 reason={c.reason}
                 source={SOURCE_AI}
@@ -1173,13 +1173,13 @@ export function ContentPane(props: Props) {
   useEffect(() => {
     if (!props.cardId) return
     let alive = true
-    Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${props.cardId}` })
+    CardNotesService.getAll({ filter: `delivery_card_id eq ${props.cardId}` })
       .then((res) => {
         if (!alive || !res.success) return
         const notes = res.data ?? []
-        setOpenQuestions(notes.filter((n) => !n.cr854_resolved && (n.cr854_kind ?? 'question') === 'question').length)
-        setOpenTasks(notes.filter((n) => !n.cr854_resolved && n.cr854_kind === 'task').length)
-        setOpenComments(notes.filter((n) => !n.cr854_resolved && n.cr854_kind === 'comment').length)
+        setOpenQuestions(notes.filter((n) => !n.resolved && (n.kind ?? 'question') === 'question').length)
+        setOpenTasks(notes.filter((n) => !n.resolved && n.kind === 'task').length)
+        setOpenComments(notes.filter((n) => !n.resolved && n.kind === 'comment').length)
       })
       .catch(() => undefined)
     return () => {

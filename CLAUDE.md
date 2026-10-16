@@ -9,13 +9,13 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 1. **確認してから終わる。** 変更のあとは、必ず次を通す。通らないまま、完了と言わない。
    ```bash
    npx tsc -b
-   npx eslint . --ignore-pattern "src/generated/**"
+   npx eslint .
    npm run build
    ```
 2. **勝手に反映・公開しない。** `npm run deploy:gcp`(本番の上書き)、`git push`、本番のデータの削除は、**人が指示したときだけ**行う。コミットも、指示があったときに行う。
 3. **画面の見た目は、確認できていないと正直に伝える。** 画面は、撮影・デモ用のビルド(`npx vite --config vite.mock.config.ts`、5190)で確かめられる。「型チェック・lint・ビルドは通った。画面は未確認」のように、確認した範囲を分けて報告する。
 4. 小さい変更は、編集ツールで行う。複数ファイルへの一括置換は、スクリプトでもよいが、**改行コード(CRLF / LF の混在)を保つ**こと。
-5. `src/generated/` は、もとは Dataverse の生成コードだったが、いまは手で保つ(名前は、画面のコードの読み込み先を変えないために残している)。`models/` はテーブルの行の型、`services/` はサーバーの `/api/data` を呼ぶサービス。列を変えたら、`server/schema.json` と `models/` を一緒に直す(`npm run verify` が食い違いを見つける)。
+5. **データの名前は、画面・API・PostgreSQL で同じ**(表 `delivery_cards`、列 `scheduled_at`、参照 `hero_image_id`、主キー `id`)。選択肢は文字の値(`email` / `app`、`not_started` / `reviewing` / `approved` / `confirmed` など。使える値は `server/schema.json` の `choices`)。状態の前後を比べるときは、文字のまま比べずに `statusRank`(`src/status.ts`)を使う。表の型は `src/models/`(一部の表は `src/data/` のサービスのファイルの中)、読み書きは `src/data/`。列を変えたら、`server/schema.json` と型を一緒に直す(`npm run verify` が食い違いを見つける)。
 6. **このリポジトリは公開されている(`audeoinc/ccp`)。秘密は書かない。**(だれが読んでも困らないように)GCP のプロジェクト ID・本番の URL、パスワード・鍵・トークン、個人のメールアドレス、顧客の実データ、利用先の名前や環境の詳細を、コード・ドキュメント・サンプルデータ・コミットメッセージに、書かない。
 7. 設計や約束事を変えたら、[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)(必要なら、このファイル)を更新する。やり残しは [docs/BACKLOG.md](docs/BACKLOG.md) に書く。
 
@@ -46,7 +46,7 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 
 ## 触る前に知っておくこと
 
-- 標準のテンプレート 10 種はコードに持ち、ユーザーが作ったものはテーブル `cr854_layouttemplates`。`getTemplate(id)` で求める(`EMAIL_TEMPLATES` のような固定の一覧はない)。以前からある標準の 6 種は、**セクションの構成(種類・枠の数・順番)を変えない**(保存済みのカードの、見出し・商品の位置がずれるため。見た目の設定だけ変えてよい)。
+- 標準のテンプレート 10 種はコードに持ち、ユーザーが作ったものはテーブル `layout_templates`。`getTemplate(id)` で求める(`EMAIL_TEMPLATES` のような固定の一覧はない)。以前からある標準の 6 種は、**セクションの構成(種類・枠の数・順番)を変えない**(保存済みのカードの、見出し・商品の位置がずれるため。見た目の設定だけ変えてよい)。
 - AI の案(テーマ・コピー・制作指示の案、見出し・コピーの候補)は保存しない。保存するのは、採用した内容と、その補足(理由・切り口)。
 - チャットの会話は、まだ保存しない(バックログ)。
 - 利用者の画面に出る文言・データに、個人情報や機密を、サンプルとして埋め込まない。

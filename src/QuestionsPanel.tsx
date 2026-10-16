@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Badge, Button, Field, Input, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CheckmarkCircleRegular, ChatRegular, DismissRegular, TaskListLtrRegular } from '@fluentui/react-icons'
-import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
+import { CardNotesService, type CardNote } from './data/cardNotes'
 import { locale, tr, useT } from './i18n'
 import { AiButton } from './AiButton'
 import { suggestTasks, type TaskIdea } from './aiTasks'
@@ -51,7 +51,7 @@ const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { m
 export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, cardName, onOpenCount, onTasksChanged }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [notes, setNotes] = useState<Cr854_cardnotes[] | null>(null)
+  const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [author, setAuthor] = useState(productionOwner)
   const [body, setBody] = useState('')
@@ -62,7 +62,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
 
   const load = useCallback(async () => {
     if (!cardId) return
-    const res = await Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${cardId}`, orderBy: ['createdon asc'] })
+    const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
     if (!res.success) {
       setError(res.error?.message ?? tr('質問を読み込めませんでした', 'Could not load the questions'))
       return
@@ -75,9 +75,9 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
     void load()
   }, [load])
 
-  const questions = (notes ?? []).filter((n) => (n.cr854_kind ?? 'question') === 'question')
-  const tasksFrom = (id: string) => (notes ?? []).filter((n) => n.cr854_kind === 'task' && n.cr854_sourcenote === id)
-  const open = questions.filter((n) => !n.cr854_resolved).length
+  const questions = (notes ?? []).filter((n) => (n.kind ?? 'question') === 'question')
+  const tasksFrom = (id: string) => (notes ?? []).filter((n) => n.kind === 'task' && n.source_note === id)
+  const open = questions.filter((n) => !n.resolved).length
   useEffect(() => {
     if (notes) onOpenCount?.(open)
   }, [notes, open, onOpenCount])
@@ -93,43 +93,43 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
 
   const ask = () =>
     run(async () => {
-      const res = await Cr854_cardnotesService.create({
-        'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-        cr854_kind: 'question',
-        cr854_author: author.trim(),
-        cr854_body: body.trim(),
-        cr854_resolved: 0,
+      const res = await CardNotesService.create({
+        delivery_card_id: cardId,
+        kind: 'question',
+        author: author.trim(),
+        body: body.trim(),
+        resolved: 0,
       })
       if (res.success) setBody('')
       return res
     })
 
-  const reply = (n: Cr854_cardnotes) =>
+  const reply = (n: CardNote) =>
     run(async () => {
-      const res = await Cr854_cardnotesService.update(n.cr854_cardnoteid, {
-        cr854_reply: (drafts[n.cr854_cardnoteid] ?? '').trim(),
-        cr854_repliedby: owner.trim(),
-        cr854_repliedat: new Date().toISOString(),
+      const res = await CardNotesService.update(n.id, {
+        reply: (drafts[n.id] ?? '').trim(),
+        replied_by: owner.trim(),
+        replied_at: new Date().toISOString(),
       })
       if (res.success) {
-        setDrafts((d) => ({ ...d, [n.cr854_cardnoteid]: '' }))
+        setDrafts((d) => ({ ...d, [n.id]: '' }))
         // 返信したら、そのやり取りから、やることの案を出す(採用するまで保存しない)
-        void propose({ ...n, cr854_reply: (drafts[n.cr854_cardnoteid] ?? '').trim(), cr854_repliedby: owner.trim() })
+        void propose({ ...n, reply: (drafts[n.id] ?? '').trim(), replied_by: owner.trim() })
       }
       return res
     })
 
-  const propose = async (n: Cr854_cardnotes) => {
-    const id = n.cr854_cardnoteid
+  const propose = async (n: CardNote) => {
+    const id = n.id
     setIdeas((x) => ({ ...x, [id]: 'busy' }))
     try {
       const list = await suggestTasks({
-        question: n.cr854_body ?? '',
-        reply: n.cr854_reply ?? '',
-        asker: n.cr854_author ?? productionOwner,
-        replier: n.cr854_repliedby ?? owner,
+        question: n.body ?? '',
+        reply: n.reply ?? '',
+        asker: n.author ?? productionOwner,
+        replier: n.replied_by ?? owner,
         card: { name: cardName, productionDue },
-        existing: tasksFrom(id).map((x) => x.cr854_body ?? ''),
+        existing: tasksFrom(id).map((x) => x.body ?? ''),
       })
       setIdeas((x) => ({ ...x, [id]: list }))
     } catch (e) {
@@ -156,14 +156,14 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
     })
   const adopt = (qid: string, i: number, idea: TaskIdea) =>
     run(async () => {
-      const res = await Cr854_cardnotesService.create({
-        'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-        cr854_kind: 'task',
-        cr854_body: idea.text.trim(),
-        cr854_assignee: idea.assignee.trim(),
-        cr854_due: idea.due || undefined,
-        cr854_sourcenote: qid,
-        cr854_resolved: 0,
+      const res = await CardNotesService.create({
+        delivery_card_id: cardId,
+        kind: 'task',
+        body: idea.text.trim(),
+        assignee: idea.assignee.trim(),
+        due: idea.due || undefined,
+        source_note: qid,
+        resolved: 0,
       })
       if (res.success) {
         dropIdea(qid, i)
@@ -172,7 +172,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
       return res
     })
 
-  const resolve = (n: Cr854_cardnotes, resolved: boolean) => run(() => Cr854_cardnotesService.update(n.cr854_cardnoteid, { cr854_resolved: resolved ? 1 : 0 }))
+  const resolve = (n: CardNote, resolved: boolean) => run(() => CardNotesService.update(n.id, { resolved: resolved ? 1 : 0 }))
 
   return (
     <div className={styles.root}>
@@ -190,38 +190,38 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
       {cardId && notes === null && <Spinner size="tiny" />}
       {error && <div className={styles.error}>{error}</div>}
       {questions.map((n) => (
-        <div key={n.cr854_cardnoteid} className={mergeClasses(styles.card, !n.cr854_resolved && styles.cardOpen)} style={n.cr854_resolved ? { opacity: 0.7 } : undefined}>
+        <div key={n.id} className={mergeClasses(styles.card, !n.resolved && styles.cardOpen)} style={n.resolved ? { opacity: 0.7 } : undefined}>
           <div className={styles.meta}>
-            {n.cr854_author || t('(名前なし)', '(no name)')} · {when(n.createdon)}
+            {n.author || t('(名前なし)', '(no name)')} · {when(n.created_on)}
           </div>
-          <div className={styles.body}>{n.cr854_body}</div>
-          {n.cr854_reply ? (
+          <div className={styles.body}>{n.body}</div>
+          {n.reply ? (
             <div className={styles.reply}>
               <div className={styles.meta}>
-                {t('返信', 'Reply')} · {n.cr854_repliedby || t('(名前なし)', '(no name)')} · {when(n.cr854_repliedat)}
+                {t('返信', 'Reply')} · {n.replied_by || t('(名前なし)', '(no name)')} · {when(n.replied_at)}
               </div>
-              <div className={styles.body}>{n.cr854_reply}</div>
+              <div className={styles.body}>{n.reply}</div>
             </div>
           ) : (
-            !n.cr854_resolved && (
+            !n.resolved && (
               <div className={styles.form}>
                 <Textarea
                   size="small"
                   resize="vertical"
                   placeholder={t(`${owner || '企画の担当者'}として返信する`, `Reply as ${owner || 'the planner'}`)}
-                  value={drafts[n.cr854_cardnoteid] ?? ''}
-                  onChange={(_, d) => setDrafts((x) => ({ ...x, [n.cr854_cardnoteid]: d.value }))}
+                  value={drafts[n.id] ?? ''}
+                  onChange={(_, d) => setDrafts((x) => ({ ...x, [n.id]: d.value }))}
                 />
               </div>
             )
           )}
           <div className={styles.actions}>
-            {!n.cr854_reply && !n.cr854_resolved && (
-              <Button size="small" appearance="primary" disabled={busy || !(drafts[n.cr854_cardnoteid] ?? '').trim()} onClick={() => void reply(n)}>
+            {!n.reply && !n.resolved && (
+              <Button size="small" appearance="primary" disabled={busy || !(drafts[n.id] ?? '').trim()} onClick={() => void reply(n)}>
                 {t('返信する', 'Reply')}
               </Button>
             )}
-            {n.cr854_resolved ? (
+            {n.resolved ? (
               <>
                 <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>{t('解決済み', 'Resolved')}</Badge>
                 <Button size="small" appearance="subtle" disabled={busy} onClick={() => void resolve(n, false)}>{t('未解決に戻す', 'Reopen')}</Button>
@@ -231,34 +231,34 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
                 {t('解決済みにする', 'Mark resolved')}
               </Button>
             )}
-            {n.cr854_reply && (
-              <AiButton busy={ideas[n.cr854_cardnoteid] === 'busy'} disabled={busy} onClick={() => void propose(n)}>
+            {n.reply && (
+              <AiButton busy={ideas[n.id] === 'busy'} disabled={busy} onClick={() => void propose(n)}>
                 {t('AIでタスクを出す', 'Suggest tasks with AI')}
               </AiButton>
             )}
-            {tasksFrom(n.cr854_cardnoteid).length > 0 && (
+            {tasksFrom(n.id).length > 0 && (
               <span className={styles.taskChip}>
                 <TaskListLtrRegular />
-                {t(`タスク ${tasksFrom(n.cr854_cardnoteid).length} 件`, `${tasksFrom(n.cr854_cardnoteid).length} task(s)`)}
+                {t(`タスク ${tasksFrom(n.id).length} 件`, `${tasksFrom(n.id).length} task(s)`)}
               </span>
             )}
           </div>
-          {Array.isArray(ideas[n.cr854_cardnoteid]) && (
+          {Array.isArray(ideas[n.id]) && (
             <div className={styles.ideas}>
               <div className={styles.meta}>
-                {(ideas[n.cr854_cardnoteid] as TaskIdea[]).length
+                {(ideas[n.id] as TaskIdea[]).length
                   ? t('AI のタスクの案(「採用」で、タスクのタブに入ります)', 'AI task ideas (Adopt adds them to the Tasks tab)')
                   : t('このやり取りから、新しいタスクは見つかりませんでした。', 'No new tasks found in this exchange.')}
               </div>
-              {(ideas[n.cr854_cardnoteid] as TaskIdea[]).map((idea, i) => (
+              {(ideas[n.id] as TaskIdea[]).map((idea, i) => (
                 <div key={i} className={styles.idea}>
-                  <Input size="small" className={styles.ideaText} value={idea.text} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
-                  <Input size="small" list="ccp-people" value={idea.assignee} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { assignee: d.value })} aria-label={t('担当', 'Assignee')} />
-                  <Input size="small" type="date" value={idea.due} onChange={(_, d) => editIdea(n.cr854_cardnoteid, i, { due: d.value })} aria-label={t('期日', 'Due')} />
-                  <Button size="small" appearance="primary" disabled={busy || !idea.text.trim()} onClick={() => void adopt(n.cr854_cardnoteid, i, idea)}>
+                  <Input size="small" className={styles.ideaText} value={idea.text} onChange={(_, d) => editIdea(n.id, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
+                  <Input size="small" list="ccp-people" value={idea.assignee} onChange={(_, d) => editIdea(n.id, i, { assignee: d.value })} aria-label={t('担当', 'Assignee')} />
+                  <Input size="small" type="date" value={idea.due} onChange={(_, d) => editIdea(n.id, i, { due: d.value })} aria-label={t('期日', 'Due')} />
+                  <Button size="small" appearance="primary" disabled={busy || !idea.text.trim()} onClick={() => void adopt(n.id, i, idea)}>
                     {t('採用', 'Adopt')}
                   </Button>
-                  <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('外す', 'Dismiss')} onClick={() => dropIdea(n.cr854_cardnoteid, i)} />
+                  <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('外す', 'Dismiss')} onClick={() => dropIdea(n.id, i)} />
                 </div>
               ))}
             </div>

@@ -1,17 +1,17 @@
 import type { ReactElement } from 'react'
 import { Popover, PopoverSurface, PopoverTrigger } from '@fluentui/react-components'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { CardPreview } from './CardPreview'
 import { FitPreview } from './FitPreview'
 
 interface Props {
-  card: Cr854_deliverycards
+  card: DeliveryCard
   /** 掲載商品(メールの並び順の商品 ID) */
   productIds: string[]
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   /** マウスを重ねる対象(サムネイルや「プレビュー」の文字) */
   children: ReactElement
 }

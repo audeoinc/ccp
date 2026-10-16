@@ -1,4 +1,4 @@
-// データの入出力。テーブルごとのサービス(src/generated/services/Cr854_…Service、src/gcpdata/…)が、これを使って、
+// データの入出力。表ごとのサービス(src/data)が、これを使って、
 // サーバーの /api/data/{テーブル} を呼ぶ。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、テーブルごとのサービスの読み込みを、サンプルデータに差し替える。
 import { showDbWake } from './dbWake'
@@ -93,7 +93,7 @@ export interface OperationResult<T> {
 
 /**
  * テーブルごとの、型の付いたサービス(T = 読んだ行の型、Base = 書き込む列の型)。
- * 呼び方は、もとの Dataverse の生成コードと同じ(getAll / get / create / update / delete)。
+ * 呼び方は getAll / get / create / update / delete。
  */
 export function tableService<T, Base = T>(table: string) {
   const svc = makeService(table)

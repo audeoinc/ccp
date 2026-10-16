@@ -35,16 +35,16 @@ import {
   ChevronLeftRegular,
   ChevronRightRegular,
 } from '@fluentui/react-icons'
-import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import { Cr854_productsService } from './generated/services/Cr854_productsService'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import { Cr854_heroimagesService } from './generated/services/Cr854_heroimagesService'
-import { Cr854_productpoliciesService } from './generated/services/Cr854_productpoliciesService'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
-import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
-import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
-import { Cr854_weeksService, type Cr854_weeks, type WeekStatus } from './gcpdata/Cr854_weeksService'
+import { DeliveryCardsService } from './data/deliveryCards'
+import type { DeliveryCard } from './models/deliveryCards'
+import { ProductsService } from './data/products'
+import type { Product } from './models/products'
+import { HeroImagesService } from './data/heroImages'
+import { ProductPoliciesService } from './data/productPolicies'
+import type { HeroImage } from './models/heroImages'
+import { DeliveryProductsService } from './data/deliveryProducts'
+import { CardNotesService, type CardNote } from './data/cardNotes'
+import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar } from './WeekReviewBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
@@ -69,7 +69,7 @@ import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
 import { dayKeyOf, sundayOf } from './weekLock'
 import { logEvent, myName } from './history'
-import { Cr854_eventsService, type Cr854_events } from './gcpdata/Cr854_eventsService'
+import { EventsService, type CardEvent } from './data/events'
 import { WeekChecklist } from './WeekChecklist'
 import { WeekReport } from './WeekReport'
 import { MiniCalendar } from './MiniCalendar'
@@ -97,7 +97,7 @@ interface Filters {
   status: string
 }
 const noFilter: Filters = { country: '', channel: '', department: '', status: '' }
-// 開いたときの絞り込み: ビルドの設定(VITE_DEFAULT_COUNTRY。GCP 版は US)の国。なければ、絞り込まない
+// 開いたときの絞り込み: ビルドの設定(VITE_DEFAULT_COUNTRY。US)の国。なければ、絞り込まない
 const initialFilters: Filters = {
   ...noFilter,
   country: String(countryOptions.find((o) => o.label === import.meta.env.VITE_DEFAULT_COUNTRY)?.value ?? ''),
@@ -276,7 +276,7 @@ const useStyles = makeStyles({
 function FilterSelect({ label, value, options, onChange }: {
   label: string
   value: string
-  options: { value: number; label: string }[]
+  options: { value: string; label: string }[]
   onChange: (v: string) => void
 }) {
   const styles = useStyles()
@@ -297,9 +297,9 @@ function App() {
   const styles = useStyles()
   const t = useT()
   const lang = useLang()
-  const [cards, setCards] = useState<Cr854_deliverycards[]>([])
-  const [products, setProducts] = useState<Cr854_products[]>([])
-  const [heroes, setHeroes] = useState<Cr854_heroimages[]>([])
+  const [cards, setCards] = useState<DeliveryCard[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [heroes, setHeroes] = useState<HeroImage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [month, setMonth] = useState<Date | null>(null)
@@ -321,15 +321,15 @@ function App() {
   // 配信カードごとの、未対応のレビューのコメントの数(週の表示・確認の一覧)
   const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未対応のレビューのコメント(週の資料に、本文を載せる)
-  const [openComments, setOpenComments] = useState<Map<string, Cr854_cardnotes[]>>(new Map())
+  const [openComments, setOpenComments] = useState<Map<string, CardNote[]>>(new Map())
   // 週の資料(PDF)を印刷している間だけ true(資料を描いて、印刷の画面を開き、閉じたら片付ける)
   const [printingWeek, setPrintingWeek] = useState(false)
   // 週の計画(週のレビューの状態)
-  const [weeks, setWeeks] = useState<Cr854_weeks[]>([])
+  const [weeks, setWeeks] = useState<WeekRow[]>([])
   // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
-  const [changeNotes, setChangeNotes] = useState<Cr854_cardnotes[]>([])
+  const [changeNotes, setChangeNotes] = useState<CardNote[]>([])
   // 承認の履歴(週の操作・配信のステータスの変更。週の状態の帯で、週ごとに出す)
-  const [events, setEvents] = useState<Cr854_events[]>([])
+  const [events, setEvents] = useState<CardEvent[]>([])
   // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
   const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
   // 週の表示の見方: 商品のバランス / 進み具合。ブラウザごとに覚える
@@ -382,44 +382,44 @@ function App() {
 
   const load = useCallback(async () => {
     try {
-      Cr854_deliveryproductsService.getAll()
+      DeliveryProductsService.getAll()
         .then((res) => {
           if (!res.success) return // 数が出ないだけで、画面は使える
           const rows = (res.data ?? [])
-            .filter((r) => r._cr854_deliverycard_value && r.cr854_state !== STATE_CANDIDATE)
-            .sort((a, b) => (a.cr854_sortorder ?? 0) - (b.cr854_sortorder ?? 0))
+            .filter((r) => r.delivery_card_id && r.state !== STATE_CANDIDATE)
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
           const byCard = new Map<string, string[]>()
           for (const r of rows) {
-            const id = r._cr854_deliverycard_value!
-            if (r._cr854_product_value) byCard.set(id, [...(byCard.get(id) ?? []), r._cr854_product_value])
+            const id = r.delivery_card_id!
+            if (r.product_id) byCard.set(id, [...(byCard.get(id) ?? []), r.product_id])
           }
           setCardProducts(byCard)
         })
         .catch(() => undefined)
-      Cr854_cardnotesService.getAll()
+      CardNotesService.getAll()
         .then((res) => {
           if (!res.success) return
           const counts = new Map<string, number>()
           const tasks = new Map<string, number>()
           const overdue = new Map<string, number>()
           const comments = new Map<string, number>()
-          const commentNotes = new Map<string, Cr854_cardnotes[]>()
+          const commentNotes = new Map<string, CardNote[]>()
           const d = new Date()
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-          setChangeNotes((res.data ?? []).filter((n) => n.cr854_kind === 'change'))
+          setChangeNotes((res.data ?? []).filter((n) => n.kind === 'change'))
           for (const n of res.data ?? []) {
-            const id = n._cr854_deliverycard_value
-            if (!id || n.cr854_resolved) continue
+            const id = n.delivery_card_id
+            if (!id || n.resolved) continue
             // 変更の理由は記録、コメントへの返信はスレッドの一部なので、質問・タスクの数には入れない
-            if (n.cr854_kind === 'change' || n.cr854_kind === 'reply') continue
-            if (n.cr854_kind === 'comment') {
+            if (n.kind === 'change' || n.kind === 'reply') continue
+            if (n.kind === 'comment') {
               comments.set(id, (comments.get(id) ?? 0) + 1)
               commentNotes.set(id, [...(commentNotes.get(id) ?? []), n])
               continue
             }
-            if (n.cr854_kind === 'task') {
+            if (n.kind === 'task') {
               tasks.set(id, (tasks.get(id) ?? 0) + 1)
-              if (n.cr854_due && n.cr854_due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
+              if (n.due && n.due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
             }
             else counts.set(id, (counts.get(id) ?? 0) + 1)
           }
@@ -430,17 +430,17 @@ function App() {
           setOpenComments(commentNotes)
         })
         .catch(() => undefined)
-      Cr854_weeksService.getAll()
+      WeeksService.getAll()
         .then((res) => {
           if (res.success) setWeeks(res.data ?? [])
         })
         .catch(() => undefined)
-      Cr854_eventsService.getAll({ orderBy: ['createdon desc'] })
+      EventsService.getAll({ orderBy: ['created_on desc'] })
         .then((res) => {
           if (res.success) setEvents(res.data ?? [])
         })
         .catch(() => undefined)
-      const res = await Cr854_deliverycardsService.getAll({ orderBy: ['cr854_scheduledat asc'] })
+      const res = await DeliveryCardsService.getAll({ orderBy: ['scheduled_at asc'] })
       if (!res.success) throw new Error(res.error?.message ?? tr('配信カードの取得に失敗しました', 'Failed to load delivery cards'))
       const data = res.data ?? []
       setCards(data)
@@ -451,8 +451,8 @@ function App() {
         if (m) return m
         const now = new Date()
         const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
-        const dated = data.filter((c) => c.cr854_scheduledat)
-        const first = (dated.find((c) => new Date(c.cr854_scheduledat!).getTime() >= thisMonth) ?? dated[0])?.cr854_scheduledat
+        const dated = data.filter((c) => c.scheduled_at)
+        const first = (dated.find((c) => new Date(c.scheduled_at!).getTime() >= thisMonth) ?? dated[0])?.scheduled_at
         const base = first ? new Date(first) : now
         return new Date(base.getFullYear(), base.getMonth(), 1)
       })
@@ -466,19 +466,19 @@ function App() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
-    Cr854_productsService.getAll({ orderBy: ['cr854_productcode asc'] })
+    ProductsService.getAll({ orderBy: ['product_code asc'] })
       .then((res) => {
         if (res.success) setProducts((res.data ?? []).map(withProductLabels))
         else setError(res.error?.message ?? tr('商品の取得に失敗しました', 'Failed to load products'))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-    Cr854_productpoliciesService.getAll({ select: ['cr854_productcode', 'cr854_stage', 'cr854_promoperiod'] })
+    ProductPoliciesService.getAll({ select: ['product_code', 'stage', 'promo_period'] })
       .then((res) => {
         if (!res.success) return // 主力の漏れが出ないだけで、画面は使える
-        setPolicies(new Map((res.data ?? []).filter((r) => r.cr854_productcode).map((r) => [r.cr854_productcode!, { stage: r.cr854_stage, promoPeriod: r.cr854_promoperiod }])))
+        setPolicies(new Map((res.data ?? []).filter((r) => r.product_code).map((r) => [r.product_code!, { stage: r.stage, promoPeriod: r.promo_period }])))
       })
       .catch(() => undefined)
-    Cr854_heroimagesService.getAll({ orderBy: ['cr854_imagecode asc'] })
+    HeroImagesService.getAll({ orderBy: ['image_code asc'] })
       .then((res) => {
         if (res.success) setHeroes((res.data ?? []).map(withHeroLabels))
         else setError(res.error?.message ?? tr('メイン画像の取得に失敗しました', 'Failed to load hero images'))
@@ -487,13 +487,13 @@ function App() {
   }, [load])
 
   const filtered = useMemo(() => {
-    const match = (f: string, v?: number) => f === '' || String(v) === f
+    const match = (f: string, v?: string) => f === '' || String(v) === f
     return cards.filter(
       (c) =>
-        match(filters.country, c.cr854_country) &&
-        match(filters.channel, c.cr854_channel) &&
-        match(filters.department, c.cr854_department) &&
-        match(filters.status, c.cr854_status),
+        match(filters.country, c.country) &&
+        match(filters.channel, c.channel) &&
+        match(filters.department, c.department) &&
+        match(filters.status, c.status),
     )
   }, [cards, filters])
 
@@ -502,28 +502,28 @@ function App() {
   const monthRows = useMemo(
     () =>
       rows.filter((r) => {
-        if (!month || !r.card.cr854_scheduledat) return false
-        const d = new Date(r.card.cr854_scheduledat)
+        if (!month || !r.card.scheduled_at) return false
+        const d = new Date(r.card.scheduled_at)
         return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth()
       }),
     [rows, month],
   )
-  const dueSoon = useMemo(() => new Set(rows.filter((r) => r.dueSoon && !isCancelled(r.card)).map((r) => r.card.cr854_deliverycardid)), [rows])
+  const dueSoon = useMemo(() => new Set(rows.filter((r) => r.dueSoon && !isCancelled(r.card)).map((r) => r.card.id)), [rows])
   // 週の表示の対象(週の初めから 7 日間)
   const weekRows = useMemo(() => {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
     return rows.filter((r) => {
-      if (!r.card.cr854_scheduledat) return false
-      const d = new Date(r.card.cr854_scheduledat)
+      if (!r.card.scheduled_at) return false
+      const d = new Date(r.card.scheduled_at)
       return d >= weekStart && d < end
     })
   }, [rows, weekStart])
   // 週の状態: この週の行と、この週のすべての配信(絞り込みに関係なく、週の単位で進める)
   const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
-  const thisWeek = weeks.find((w) => w.cr854_weekstart?.slice(0, 10) === weekKey)
+  const thisWeek = weeks.find((w) => w.week_start?.slice(0, 10) === weekKey)
   const weekCards = useMemo(() => {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-    return activeCards.filter((c) => c.cr854_scheduledat && new Date(c.cr854_scheduledat) >= weekStart && new Date(c.cr854_scheduledat) < end)
+    return activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= weekStart && new Date(c.scheduled_at) < end)
   }, [activeCards, weekStart])
   const checklist = useMemo(
     () =>
@@ -536,7 +536,7 @@ function App() {
         policies,
         questionCounts,
         commentCounts,
-        cardLabel: (c) => `${c.cr854_scheduledat ? new Date(c.cr854_scheduledat).toLocaleDateString(locale(), { weekday: 'short' }) : ''} ${c.cr854_name}`.trim(),
+        cardLabel: (c) => `${c.scheduled_at ? new Date(c.scheduled_at).toLocaleDateString(locale(), { weekday: 'short' }) : ''} ${c.name}`.trim(),
       }),
     // 言語を変えたら、説明(曜日・種類)を作り直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -554,42 +554,42 @@ function App() {
     setError(null)
     try {
       // 配信のステータスを、週の操作に合わせて進める(戻す)
-      const target = (c: Cr854_deliverycards): number | undefined => {
-        const s = c.cr854_status ?? 588230000
-        if (next === 'review' && thisWeek?.cr854_status !== 'confirmed') return s === 588230000 ? 588230001 : undefined // 未起案 → 検討中
-        if (next === 'review' && thisWeek?.cr854_status === 'confirmed') return s === 588230003 ? 588230002 : undefined // 確定の取り消し: 確定 → 承認済み
-        if (next === 'confirmed') return s !== 588230003 ? 588230003 : undefined // すべて → 確定
+      const target = (c: DeliveryCard): DeliveryCard['status'] => {
+        const s = c.status ?? 'not_started'
+        if (next === 'review' && thisWeek?.status !== 'confirmed') return s === 'not_started' ? 'reviewing' : undefined // 未起案 → 検討中
+        if (next === 'review' && thisWeek?.status === 'confirmed') return s === 'confirmed' ? 'approved' : undefined // 確定の取り消し: 確定 → 承認済み
+        if (next === 'confirmed') return s !== 'confirmed' ? 'confirmed' : undefined // すべて → 確定
         return undefined
       }
       const moved: string[] = []
       for (const c of weekCards) {
         const v = target(c)
         if (v === undefined) continue
-        const r = await Cr854_deliverycardsService.update(c.cr854_deliverycardid, { cr854_status: v as Cr854_deliverycards['cr854_status'] })
+        const r = await DeliveryCardsService.update(c.id, { status: v })
         if (!r.success) throw new Error(r.error?.message ?? tr('配信のステータスを変えられませんでした', 'Could not update a delivery status'))
-        moved.push(c.cr854_name)
+        moved.push(c.name)
       }
       const now = new Date().toISOString()
       const fields = {
-        cr854_status: next,
-        ...(next === 'review' && thisWeek?.cr854_status !== 'confirmed' ? { cr854_submittedat: now } : {}),
-        ...(next === 'confirmed' ? { cr854_confirmedat: now } : {}),
+        status: next,
+        ...(next === 'review' && thisWeek?.status !== 'confirmed' ? { submitted_at: now } : {}),
+        ...(next === 'confirmed' ? { confirmed_at: now } : {}),
       }
-      const res = thisWeek ? await Cr854_weeksService.update(thisWeek.cr854_weekid, fields) : await Cr854_weeksService.create({ cr854_weekstart: weekKey, ...fields })
+      const res = thisWeek ? await WeeksService.update(thisWeek.id, fields) : await WeeksService.create({ week_start: weekKey, ...fields })
       if (!res.success) throw new Error(res.error?.message ?? tr('週の状態を保存できませんでした', 'Could not save the week status'))
       // 承認の履歴(W6)。まとめて状態を変えた配信は、1 本ずつではなく、週の出来事 1 つに名前を並べて残す(履歴が埋もれないように)
-      const wasConfirmed = thisWeek?.cr854_status === 'confirmed'
+      const wasConfirmed = thisWeek?.status === 'confirmed'
       await logEvent({
         action: next === 'confirmed' ? 'confirm' : next === 'draft' ? 'draft' : wasConfirmed ? 'unconfirm' : 'submit',
         weekStart: weekKey,
         // まとめて変えた配信の、変える前と後のステータス(確定は、元がまちまちなので、後だけ)
         ...(moved.length
           ? next === 'confirmed'
-            ? { to: 588230003 }
+            ? { to: 'confirmed' as const }
             : wasConfirmed
-              ? { from: 588230003, to: 588230002 }
+              ? { from: 'confirmed' as const, to: 'approved' as const }
               : next === 'review'
-                ? { from: 588230000, to: 588230001 }
+                ? { from: 'not_started' as const, to: 'reviewing' as const }
                 : {}
           : {}),
         note: moved.join(' / ') || undefined,
@@ -604,12 +604,12 @@ function App() {
     setError(null)
     try {
       const moved: string[] = []
-      for (const c of weekCards.filter((x) => x.cr854_status === 588230001)) {
-        const r = await Cr854_deliverycardsService.update(c.cr854_deliverycardid, { cr854_status: 588230002 as Cr854_deliverycards['cr854_status'] })
+      for (const c of weekCards.filter((x) => x.status === 'reviewing')) {
+        const r = await DeliveryCardsService.update(c.id, { status: 'approved' })
         if (!r.success) throw new Error(r.error?.message ?? tr('配信のステータスを変えられませんでした', 'Could not update a delivery status'))
-        moved.push(c.cr854_name)
+        moved.push(c.name)
       }
-      if (moved.length) await logEvent({ action: 'approve', weekStart: weekKey, from: 588230001, to: 588230002, note: moved.join(' / ') })
+      if (moved.length) await logEvent({ action: 'approve', weekStart: weekKey, from: 'reviewing', to: 'approved', note: moved.join(' / ') })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -643,7 +643,7 @@ function App() {
     downloadCsv(monthRows, view === 'list' ? columns : DEFAULT_COLUMNS, `deliveries-${month.getFullYear()}-${pad(month.getMonth() + 1)}.csv`)
   }
 
-  const selected = cards.find((c) => c.cr854_deliverycardid === selectedId)
+  const selected = cards.find((c) => c.id === selectedId)
   const shift = (n: number) => {
     if (view === 'week') {
       // 週を動かし、月も、その週の真ん中(水曜日)の月に合わせる(月の表示に戻ったときに、同じあたりを見せる)
@@ -670,8 +670,8 @@ function App() {
   const dayCounts = useMemo(() => {
     const m = new Map<string, number>()
     for (const c of filtered) {
-      if (!c.cr854_scheduledat || isCancelled(c)) continue
-      const k = dayKeyOf(new Date(c.cr854_scheduledat))
+      if (!c.scheduled_at || isCancelled(c)) continue
+      const k = dayKeyOf(new Date(c.scheduled_at))
       m.set(k, (m.get(k) ?? 0) + 1)
     }
     return m
@@ -931,7 +931,7 @@ function App() {
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'alerts' ? (
-              <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+              <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={[...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort()} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
             ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}
@@ -951,7 +951,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onChange={changeWeek} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onChange={changeWeek} />
               {printingWeek && (
                 // 週の資料(W7)。印刷のあいだだけ見える(index.css の「週の資料の印刷」)。Portal なので、画面の並びには影響しない
                 <Portal>
@@ -959,12 +959,12 @@ function App() {
                     <WeekReport
                       weekStart={weekStart}
                       week={thisWeek}
-                      cards={[...weekCards].sort((a, b) => (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? ''))}
+                      cards={[...weekCards].sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))}
                       cardProducts={cardProducts}
                       products={products}
                       heroes={heroes}
                       checklist={checklist}
-                      events={events.filter((e) => e.cr854_weekstart?.slice(0, 10) === weekKey)}
+                      events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)}
                       openComments={openComments}
                       author={myName()}
                     />
@@ -998,14 +998,14 @@ function App() {
       </div>
       {(selected || creating) && (
         <CardDetail
-          key={selected?.cr854_deliverycardid ?? 'new'}
+          key={selected?.id ?? 'new'}
           card={selected}
           defaults={creating ?? undefined}
           products={products}
           heroes={heroes}
-          otherThemes={cards.filter((c) => c.cr854_deliverycardid !== selected?.cr854_deliverycardid && c.cr854_theme).map((c) => c.cr854_theme!)}
+          otherThemes={cards.filter((c) => c.id !== selected?.id && c.theme).map((c) => c.theme!)}
           weeks={weeks}
-          owners={[...new Set(cards.flatMap((c) => [c.cr854_owner?.trim(), c.cr854_productionowner?.trim()]).filter((o): o is string => !!o))].sort()}
+          owners={[...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort()}
           onBack={() => {
             setFocusProduct(undefined)
             setSelectedId(null)
@@ -1015,8 +1015,8 @@ function App() {
           }}
           onSaved={load}
           // 結果は、面を切り替えずに、配信カードの上に重ねて見る。結果の面で、その結果から開いた配信カードでは出さない(下に結果があるため)
-          onOpenResults={page === 'results' && resultDetail === selected?.cr854_deliverycardid ? undefined : setPeekResult}
-          alerts={selected ? cardAlerts.get(selected.cr854_deliverycardid) : undefined}
+          onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
+          alerts={selected ? cardAlerts.get(selected.id) : undefined}
           focusProductId={focusProduct}
         />
       )}

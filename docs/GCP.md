@@ -17,7 +17,7 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 | | 本番(Cloud Run・Workbench) | 撮影・デモ用 |
 |---|---|---|
 | 設定 | `vite.config.ts` | `vite.mock.config.ts` |
-| データの入出力 | `src/generated/services`・`src/gcpdata` のサービス → `src/gcp/services.ts`(`/api/data` を呼ぶ) | 同じ読み込みを、`src/mock/db.ts`(メモリ上のデータ)に差し替える |
+| データの入出力 | `src/data` のサービス → `src/gcp/services.ts`(`/api/data` を呼ぶ) | 同じ読み込みを、`src/mock/db.ts`(メモリ上のデータ)に差し替える |
 | AI | `src/gcp/ai.ts`(`/api/ask` → Vertex AI の Gemini) | `src/mock/agent.ts`(サンプルの返答) |
 | 出力 | `dist-gcp/`(サーバーが配信する) | (開発サーバーで動かすだけ) |
 
@@ -25,24 +25,26 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 
 ## データ定義(`server/schema.json`)
 
-画面が使う名前(もとは Dataverse の名前。`cr854_scheduledat`、`_cr854_heroimage_value`)と、PostgreSQL の読みやすい名前(`scheduled_at`、`hero_image_id`)の**対応表**。これが唯一の正で、次の 3 つを作る。
+表・列・選択肢の定義。名前は、画面・API・PostgreSQL で同じ(表 `delivery_cards`、列 `scheduled_at`、参照 `hero_image_id`、主キー `id`)。これが唯一の正で、次の 3 つを作る。
 
 1. テーブルを作る SQL(`python -m ccp.cli migrate`)
-2. API の名前・値の変換(サーバーが、画面には画面が使う名前で返す)
+2. 値の変換(日時・数・参照の id)と、選択肢の値の確かめ(`choices` にない値は 400)
 3. 触ってよいテーブル・列の許可リスト(それ以外は 400)
 
-**列を足したら**: `server/schema.json` に追記 → 画面の型(`src/generated/models/`、GCP だけのテーブルは `src/gcpdata/`)にも足す → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には、デプロイ後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される(`server/ccp/data_api.py` の `_ensure_schema`。手で `migrate` を実行してもよい。何度実行しても同じ)。
+**列を足したら**: `server/schema.json` に追記 → 画面の型(`src/models/`、一部の表は `src/data/`)にも足す → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には、デプロイ後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される(`server/ccp/data_api.py` の `_ensure_schema`。手で `migrate` を実行してもよい。何度実行しても同じ)。
 
-選択肢の値は、数値(例: 588230000)のまま `integer` で持つ。
+選択肢の値は、文字(`text`)で持つ(例: チャネルは `email` / `app`)。使える値は `choices`。
+
+**以前の名前と値(2026-10-16 まで)**: 以前は、Power Apps 版の名前(`cr854_…`)と、選択肢の数(588230000 など)を使っていた。その対応は `server/ccp/legacy_names.json`。古い DB は、サーバーが最初につないだときに、選択肢の数が文字の値に置き換わる(`schema.py` の `legacy_value_sql`。何度実行しても同じ)。古い引っ越し用のパック(版 1)も、取り込むときに直す。
 
 ## `/api/data`(サーバー)
 
-`GET/POST /api/data/{テーブル}`、`GET/PATCH/DELETE /api/data/{テーブル}/{id}`。テーブル名は、画面が使う名前(`cr854_deliverycards`)。
+`GET/POST /api/data/{テーブル}`、`GET/PATCH/DELETE /api/data/{テーブル}/{id}`。テーブル名は、画面が使う名前(`delivery_cards`)。
 戻り値は `{success, data}` / `{success:false, error:{message, code?}}`。
 
 - 絞り込み(`filter`): `項目 eq 値` を `and` でつなぐ範囲(`eq/ne/gt/ge/lt/le`、`null`)。値は必ずパラメータとして渡す。
 - 並べ替え(`orderBy`)、`select`、`top`、`skip`。
-- 書き込みの参照は `cr854_xxx@odata.bind: "/cr854_yyys(<id>)"`(`null` で参照を外す)。
+- 書き込みの参照は、参照の列に、相手の `id` をそのまま入れる(例: `hero_image_id: "<id>"`。`null` で参照を外す)。
 - DB に接続できないときは 503 + `code: "db_unavailable"`。
 
 ## AI(`/api/ask`)
@@ -117,7 +119,7 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 ## テスト
 
 - `python -m unittest discover server/tests`(DB に接続しない。名前・値の変換と、絞り込みの解析)
-- `node scripts/check-schema.mjs`(データ定義と生成モデルの突き合わせ)
+- `node scripts/check-schema.mjs`(データ定義と画面の型の突き合わせ。選択肢の値も)
 - `node scripts/gcp-smoke.mjs`(サーバーと DB をつないだ画面の確認)
 
 ## Cloud Run へのデプロイ(段階 3)

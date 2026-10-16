@@ -5,7 +5,8 @@
   取り込み: python -m ccp.cli import-pack <ZIP> --yes(DB の中身を置き換え、画像をフォルダに展開する)
 
 ZIP の中身:
-  data.json                 {"version": 1, "exportedAt": ..., "tables": {テーブル名(Dataverse の名前): [行, ...]}}
+  data.json                 {"version": 2, "exportedAt": ..., "tables": {テーブル名: [行, ...]}}
+                            (版 1 は、2026-10-16 より前の形。以前の名前(cr854_…)と選択肢の数。取り込むときに、いまの形に直す)
   images/<種類>/<ファイル名>  商品(products)・ヒーロー画像(heroes)の画像。DB の画像 URL(/img/<種類>/<名前>)のもの
 """
 from __future__ import annotations
@@ -26,28 +27,28 @@ from sqlalchemy import text
 from . import assets, schema as sc
 from .data_api import db, require_db
 
-PACK_VERSION = 1
+PACK_VERSION = 2
 IMG_URL = re.compile(r"^/img/(products|heroes)/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
 
 router = APIRouter(dependencies=[Depends(require_db)])
 
 
 async def read_tables() -> dict[str, list[dict[str, Any]]]:
-    """すべてのテーブルの行を、画面と同じ形(Dataverse の名前)で読む"""
+    """すべてのテーブルの行を、画面と同じ形で読む"""
     out: dict[str, list[dict[str, Any]]] = {}
     async with db() as conn:
         for t in sc.load().creation_order():
             rows = (await conn.execute(text(f"SELECT * FROM {t.pg} ORDER BY created_on, id"))).mappings().all()
-            out[t.dv] = [t.to_api(dict(r)) for r in rows]
+            out[t.name] = [t.to_api(dict(r)) for r in rows]
     return out
 
 
 def image_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
     """DB の画像 URL のうち、このサーバーが配っている画像(/img/…)の、種類とファイル名"""
     refs: set[tuple[str, str]] = set()
-    for name in ("cr854_products", "cr854_heroimages"):
+    for name in ("products", "hero_images"):
         for row in tables.get(name, []):
-            m = IMG_URL.match(str(row.get("cr854_imageurl") or ""))
+            m = IMG_URL.match(str(row.get("image_url") or ""))
             if m:
                 refs.add((m.group(1), m.group(2)))
     return sorted(refs)
@@ -83,8 +84,12 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
     """パックを読む。返すのは、data.json の中身と、画像(ZIP の中の名前・中身)"""
     with zipfile.ZipFile(path) as z:
         data = json.loads(z.read("data.json").decode("utf-8"))
+        if data.get("version") == 1:
+            # 以前の形のパック: 名前と選択肢の値を、いまの形に直す
+            data["tables"] = dict(sc.convert_legacy_rows(name, rows) for name, rows in data["tables"].items())
+            data["version"] = PACK_VERSION
         if data.get("version") != PACK_VERSION:
-            raise SystemExit(f"このパックの形式({data.get('version')})には対応していません(対応: {PACK_VERSION})")
+            raise SystemExit(f"このパックの形式({data.get('version')})には対応していません(対応: 1、{PACK_VERSION})")
         images = [(n, z.read(n)) for n in z.namelist() if n.startswith("images/") and not n.endswith("/")]
     return data, images
 
@@ -100,12 +105,12 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
         for t in reversed(order):
             await conn.execute(text(f"DELETE FROM {t.pg}"))
         for t in order:
-            rows = tables.get(t.dv, [])
+            rows = tables.get(t.name, [])
             for rec in rows:
                 values = t.to_db(rec)
-                values["id"] = sc.coerce("uuid", rec[t.pk])
+                values["id"] = sc.coerce("uuid", rec["id"])
                 # 作った日時は、確定後の変更・承認の履歴の並びに使うので、元のまま残す
-                for dv, pg in (("createdon", "created_on"), ("modifiedon", "modified_on")):
+                for dv, pg in (("created_on", "created_on"), ("modified_on", "modified_on")):
                     if rec.get(dv):
                         values[pg] = sc.coerce("timestamptz", rec[dv])
                 cols = list(values)

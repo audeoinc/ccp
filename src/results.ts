@@ -1,17 +1,17 @@
 // 配信結果の画面(ResultsPage)で使う計算と、CSV の読み書き。画面の部品とは分けておく
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_deliveryresults, LinkResults, ProductResult } from './gcpdata/Cr854_deliveryresultsService'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { DeliveryResult, LinkResults, ProductResult } from './data/deliveryResults'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, templateFromValue } from './templates'
 import { parseCsv } from './csv'
 import { themeTypeOf } from './themeTypes'
 
-export const COUNTRY_US = 588230000
+export const COUNTRY_US = 'US'
 
 /** 配信 1 本と、その結果を並べた行 */
 export interface ResultRow {
-  card: Cr854_deliverycards
-  result: Cr854_deliveryresults
+  card: DeliveryCard
+  result: DeliveryResult
   /** 開封率(アプリは出さない) */
   openRate?: number
   /** クリック率(アプリは、通知をタップした率) */
@@ -54,15 +54,15 @@ export function parseLinkResults(v?: string): LinkResults {
 export const pct = (v?: number) => (v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
 
 /** 送った日時(結果になければ、配信の予定日時) */
-export const sentAtOf = (r: ResultRow) => r.result.cr854_sentat ?? r.card.cr854_scheduledat
+export const sentAtOf = (r: ResultRow) => r.result.sent_at ?? r.card.scheduled_at
 
-export const isPush = (c: Cr854_deliverycards) => c.cr854_channel === CHANNEL_PUSH
+export const isPush = (c: DeliveryCard) => c.channel === CHANNEL_PUSH
 
 /** 配信のテンプレートの ID */
-export const templateIdOf = (c: Cr854_deliverycards): string => c.cr854_layoutkey || (isPush(c) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.cr854_emailtemplate))
+export const templateIdOf = (c: DeliveryCard): string => c.layout_key || (isPush(c) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
 
 /** 配信のテンプレートの名前 */
-export function templateName(c: Cr854_deliverycards): string {
+export function templateName(c: DeliveryCard): string {
   return getTemplate(templateIdOf(c)).label
 }
 
@@ -74,8 +74,8 @@ export function templateName(c: Cr854_deliverycards): string {
  * キー: hero / button:番号 / slot:番号(0 から)/ other
  */
 export function positionShares(row: ResultRow, productIds: string[]): Map<string, number> {
-  const links = parseLinkResults(row.result.cr854_links)
-  const prod = new Map(parseProductResults(row.result.cr854_products).map((p) => [p.productId, p.clicks]))
+  const links = parseLinkResults(row.result.links)
+  const prod = new Map(parseProductResults(row.result.products).map((p) => [p.productId, p.clicks]))
   const raw = new Map<string, number>()
   if (links.hero !== undefined) raw.set('hero', links.hero)
   ;(links.buttons ?? []).forEach((v, i) => raw.set(`button:${i}`, v))
@@ -100,14 +100,14 @@ export type CompareBy = 'template' | 'themeType'
 /** 同じ条件(同じ国・チャネルと、同じテンプレートか、同じテーマの種類)で、この配信より前に送った配信を、新しい順に n 本 */
 export function pastSame(all: ResultRow[], row: ResultRow, n: number, by: CompareBy = 'template'): ResultRow[] {
   const at = new Date(sentAtOf(row) ?? 0).getTime()
-  const key = (c: Cr854_deliverycards) => (by === 'template' ? templateIdOf(c) : themeTypeOf(c).type)
+  const key = (c: DeliveryCard) => (by === 'template' ? templateIdOf(c) : themeTypeOf(c).type)
   const mine = key(row.card)
   return all
     .filter(
       (o) =>
         o !== row &&
-        o.card.cr854_country === row.card.cr854_country &&
-        o.card.cr854_channel === row.card.cr854_channel &&
+        o.card.country === row.card.country &&
+        o.card.channel === row.card.channel &&
         key(o.card) === mine &&
         new Date(sentAtOf(o) ?? 0).getTime() < at,
     )
@@ -116,31 +116,31 @@ export function pastSame(all: ResultRow[], row: ResultRow, n: number, by: Compar
 }
 
 /** 結果のある配信を、行にする(前の週との比較は、同じ国・チャネルの、7 日前までの配信と比べる) */
-export function toResultRows(cards: Cr854_deliverycards[], results: Cr854_deliveryresults[]): ResultRow[] {
-  const byCard = new Map(cards.map((c) => [c.cr854_deliverycardid, c]))
+export function toResultRows(cards: DeliveryCard[], results: DeliveryResult[]): ResultRow[] {
+  const byCard = new Map(cards.map((c) => [c.id, c]))
   const rows = results
-    .filter((r) => r._cr854_deliverycard_value && byCard.has(r._cr854_deliverycard_value))
+    .filter((r) => r.delivery_card_id && byCard.has(r.delivery_card_id))
     .map((r): ResultRow => {
-      const card = byCard.get(r._cr854_deliverycard_value!)!
+      const card = byCard.get(r.delivery_card_id!)!
       const push = isPush(card)
       return {
         card,
         result: r,
-        openRate: push ? undefined : ratio(r.cr854_opens, r.cr854_recipients),
-        clickRate: ratio(push ? r.cr854_opens : r.cr854_clicks, r.cr854_recipients),
-        revenue: Number(r.cr854_revenue ?? 0),
-        vsLastYear: change(Number(r.cr854_revenue ?? 0), Number(r.cr854_lastyearrevenue ?? 0) || undefined),
+        openRate: push ? undefined : ratio(r.opens, r.recipients),
+        clickRate: ratio(push ? r.opens : r.clicks, r.recipients),
+        revenue: Number(r.revenue ?? 0),
+        vsLastYear: change(Number(r.revenue ?? 0), Number(r.last_year_revenue ?? 0) || undefined),
       }
     })
   for (const row of rows) {
-    const at = ms(row.result.cr854_sentat ?? row.card.cr854_scheduledat)
+    const at = ms(row.result.sent_at ?? row.card.scheduled_at)
     const before = rows.filter((o) => {
-      const t = ms(o.result.cr854_sentat ?? o.card.cr854_scheduledat)
-      return o !== row && o.card.cr854_channel === row.card.cr854_channel && o.card.cr854_country === row.card.cr854_country && t < at && t >= at - WEEK
+      const t = ms(o.result.sent_at ?? o.card.scheduled_at)
+      return o !== row && o.card.channel === row.card.channel && o.card.country === row.card.country && t < at && t >= at - WEEK
     })
     if (before.length > 0) row.vsPrevWeek = change(row.revenue, before.reduce((s, o) => s + o.revenue, 0) / before.length)
   }
-  return rows.sort((a, b) => ms(a.result.cr854_sentat ?? a.card.cr854_scheduledat) - ms(b.result.cr854_sentat ?? b.card.cr854_scheduledat))
+  return rows.sort((a, b) => ms(a.result.sent_at ?? a.card.scheduled_at) - ms(b.result.sent_at ?? b.card.scheduled_at))
 }
 
 /** まとめた行(テーマ・テンプレート・商品ごと) */
@@ -166,14 +166,14 @@ export function groupRows(rows: ResultRow[], by: 'theme' | 'template', label: (r
     const key = label(r) || '—'
     const g = map.get(key) ?? { key, label: key, deliveries: 0, recipients: 0, emailRecipients: 0, opens: 0, clicks: 0, revenue: 0, lastYear: 0 }
     g.deliveries++
-    g.recipients += r.result.cr854_recipients ?? 0
+    g.recipients += r.result.recipients ?? 0
     if (!isPush(r.card)) {
-      g.emailRecipients += r.result.cr854_recipients ?? 0
-      g.opens += r.result.cr854_opens ?? 0
+      g.emailRecipients += r.result.recipients ?? 0
+      g.opens += r.result.opens ?? 0
     }
-    g.clicks += (isPush(r.card) ? r.result.cr854_opens : r.result.cr854_clicks) ?? 0
+    g.clicks += (isPush(r.card) ? r.result.opens : r.result.clicks) ?? 0
     g.revenue += r.revenue
-    g.lastYear += Number(r.result.cr854_lastyearrevenue ?? 0)
+    g.lastYear += Number(r.result.last_year_revenue ?? 0)
     map.set(key, g)
   }
   void by
@@ -184,7 +184,7 @@ export function groupRows(rows: ResultRow[], by: 'theme' | 'template', label: (r
 export function productRows(rows: ResultRow[], productName: (id: string) => string, parse: (v?: string) => { productId: string; clicks: number; units: number; revenue: number }[]): GroupRow[] {
   const map = new Map<string, GroupRow>()
   for (const r of rows) {
-    for (const p of parse(r.result.cr854_products)) {
+    for (const p of parse(r.result.products)) {
       const g = map.get(p.productId) ?? { key: p.productId, label: productName(p.productId), deliveries: 0, recipients: 0, emailRecipients: 0, opens: 0, clicks: 0, revenue: 0, lastYear: 0, units: 0 }
       g.deliveries++
       g.clicks += p.clicks
@@ -203,32 +203,32 @@ export const IMPORT_COLUMNS = ['delivery', 'date', 'sent_at', 'recipients', 'ope
 
 export interface ImportedResult {
   cardId: string
-  fields: Partial<Cr854_deliveryresults>
+  fields: Partial<DeliveryResult>
 }
 
 /** CSV を読んで、配信ごとの結果にする。配信が見つからない行は、errors に入れる */
-export function parseResultsCsv(text: string, cards: Cr854_deliverycards[]): { rows: ImportedResult[]; errors: string[] } {
+export function parseResultsCsv(text: string, cards: DeliveryCard[]): { rows: ImportedResult[]; errors: string[] } {
   const rows: ImportedResult[] = []
   const errors: string[] = []
   const num = (v?: string) => (v === undefined || v.trim() === '' ? undefined : Number(v.replace(/[,$¥]/g, '')))
   parseCsv(text).forEach((r, i) => {
     const name = (r.delivery ?? '').trim()
     const date = (r.date ?? '').trim().slice(0, 10)
-    const card = cards.find((c) => c.cr854_name === name && (!date || (c.cr854_scheduledat ?? '').slice(0, 10) === date || localDate(c.cr854_scheduledat) === date))
+    const card = cards.find((c) => c.name === name && (!date || (c.scheduled_at ?? '').slice(0, 10) === date || localDate(c.scheduled_at) === date))
     if (!card) {
       errors.push(`${i + 2}: ${name} ${date}`)
       return
     }
-    const fields: Partial<Cr854_deliveryresults> = {
-      cr854_sentat: r.sent_at ? new Date(r.sent_at).toISOString() : card.cr854_scheduledat,
-      cr854_recipients: num(r.recipients),
-      cr854_opens: num(r.opens),
-      cr854_clicks: num(r.clicks),
-      cr854_orders: num(r.orders),
-      cr854_revenue: num(r.revenue),
-      cr854_lastyearrevenue: num(r.last_year_revenue),
+    const fields: Partial<DeliveryResult> = {
+      sent_at: r.sent_at ? new Date(r.sent_at).toISOString() : card.scheduled_at,
+      recipients: num(r.recipients),
+      opens: num(r.opens),
+      clicks: num(r.clicks),
+      orders: num(r.orders),
+      revenue: num(r.revenue),
+      last_year_revenue: num(r.last_year_revenue),
     }
-    rows.push({ cardId: card.cr854_deliverycardid, fields: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && !Number.isNaN(v))) })
+    rows.push({ cardId: card.id, fields: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && !Number.isNaN(v))) })
   })
   return { rows, errors }
 }

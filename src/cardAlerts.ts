@@ -25,10 +25,10 @@ export function buildCardAlerts(stock: StockAlert[], changes: ChangeAlert[]): Ma
   for (const a of stock) {
     for (const d of a.deliveries) {
       if (d.problem === 'none') continue
-      add(d.card.cr854_deliverycardid, {
+      add(d.card.id, {
         kind: d.problem === 'soldOut' ? 'outOfStock' : 'lowStock',
-        productId: a.product.cr854_productid,
-        label: a.product.cr854_name ?? '',
+        productId: a.product.id,
+        label: a.product.name ?? '',
         detail:
           d.problem === 'soldOut'
             ? tr('配信日に在庫がない見込み', 'None left by the delivery day (est.)')
@@ -42,18 +42,18 @@ export function buildCardAlerts(stock: StockAlert[], changes: ChangeAlert[]): Ma
     if (a.kind === 'policyChanged' && a.product) {
       const stage = a.changes.find((c) => c.field === 'stage')
       for (const d of a.deliveries) {
-        add(d.card.cr854_deliverycardid, {
+        add(d.card.id, {
           kind: 'policyChanged',
-          productId: a.product.cr854_productid,
-          label: a.product.cr854_name ?? '',
+          productId: a.product.id,
+          label: a.product.name ?? '',
           detail: stage ? tr(`位置づけが ${stage.before} → ${stage.after} に変わった`, `Role changed: ${stage.before} → ${stage.after}`) : tr('MD の方針が変わった', 'MD policy changed'),
         })
       }
     }
     if (a.kind === 'dateChanged' && a.card) {
       const when = a.changes.find((c) => c.field === 'scheduled_at')
-      const others = a.deliveries.filter((d) => d.note === 'sameDay').map((d) => d.card.cr854_name)
-      add(a.card.cr854_deliverycardid, {
+      const others = a.deliveries.filter((d) => d.note === 'sameDay').map((d) => d.card.name)
+      add(a.card.id, {
         kind: 'dateChanged',
         label: tr('配信日時', 'Date'),
         detail:
@@ -61,10 +61,10 @@ export function buildCardAlerts(stock: StockAlert[], changes: ChangeAlert[]): Ma
           (others.length > 0 ? tr(`。同じ日・同じチャネルに ${others.join('、')}`, `. Same day and channel: ${others.join(', ')}`) : ''),
       })
       for (const d of a.deliveries.filter((x) => x.note === 'sameDay')) {
-        add(d.card.cr854_deliverycardid, {
+        add(d.card.id, {
           kind: 'dateChanged',
           label: tr('同じ日の配信', 'Same-day delivery'),
-          detail: tr(`${a.card.cr854_name} が、同じ日・同じチャネルに移ってきた`, `${a.card.cr854_name} was moved to the same day and channel`),
+          detail: tr(`${a.card.name} が、同じ日・同じチャネルに移ってきた`, `${a.card.name} was moved to the same day and channel`),
         })
       }
     }

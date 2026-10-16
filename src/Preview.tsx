@@ -7,8 +7,8 @@ import {
   ChevronRightRegular,
   DismissRegular,
 } from '@fluentui/react-icons'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { AutoTextarea } from './AutoTextarea'
 import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
@@ -24,7 +24,7 @@ interface Props {
   headline: string
   copy: string
   items: Item[]
-  products: Cr854_products[]
+  products: Product[]
   selectedKey: string | null
   /** 商品リストの行にマウスが乗っている商品(該当商品を光らせる) */
   hoverKey?: string | null
@@ -41,7 +41,7 @@ interface Props {
   sectionCopies: string[]
   onSectionCopy: (index: number, text: string) => void
   /** 設定中のメイン画像 */
-  hero?: Cr854_heroimages
+  hero?: HeroImage
   onDropHero: (heroId: string) => void
   onClearHero: () => void
   onSelect: (key: string) => void
@@ -221,7 +221,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     if (!selectedKey) return
     document.querySelector(`[data-item-key="${selectedKey}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [selectedKey])
-  const byId = new Map(products.map((p) => [p.cr854_productid, p]))
+  const byId = new Map(products.map((p) => [p.id, p]))
   const tpl = getTemplate(template)
   const offer = tpl.hero === 'offer'
   const heroText = tpl.heroText ?? 'band'
@@ -310,9 +310,9 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={frameStyle(it, idx)}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.cr854_name} style={{ width: '100%', aspectRatio: compact ? '1 / 1' : '3 / 4' }} />
-        <div className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 4, color: INK }}>{p?.cr854_name}</div>
-        {priceEl(p?.cr854_price, productMarket(p))}
+        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', aspectRatio: compact ? '1 / 1' : '3 / 4' }} />
+        <div className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 4, color: INK }}>{p?.name}</div>
+        {priceEl(p?.price, productMarket(p))}
         {controls(it, idx)}
       </div>
     )
@@ -323,7 +323,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 2 }}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.cr854_name} style={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 4 }} />
+        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 4 }} />
         {controls(it, idx)}
       </div>
     )
@@ -335,10 +335,10 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, ...(fill ? { height: '100%' } : {}) }}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.cr854_name} style={{ width: '100%', ...(fill ? { height: '100%' } : { aspectRatio: '1 / 1' }) }} />
+        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', ...(fill ? { height: '100%' } : { aspectRatio: '1 / 1' }) }} />
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: small ? '4px 6px' : '8px 12px', borderRadius: '0 0 8px 8px', background: 'rgba(255,255,255,0.92)' }}>
-          <div className={classes.noWrap} style={{ fontSize: small ? '0.7rem' : '0.9rem', fontWeight: 600, color: INK }}>{p?.cr854_name}</div>
-          {!small && priceEl(p?.cr854_price, productMarket(p))}
+          <div className={classes.noWrap} style={{ fontSize: small ? '0.7rem' : '0.9rem', fontWeight: 600, color: INK }}>{p?.name}</div>
+          {!small && priceEl(p?.price, productMarket(p))}
         </div>
         {controls(it, idx)}
       </div>
@@ -350,13 +350,13 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     const p = byId.get(it.productId)
     const text = (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: '12px 14px', minWidth: 0 }}>
-        {p?.cr854_categoryname && <div style={{ fontSize: '0.65rem', letterSpacing: 2, color: SUB }}>{optionLabel(p.cr854_categoryname).toUpperCase()}</div>}
-        <div style={{ fontSize: '1rem', fontWeight: 600, color: INK }}>{p?.cr854_name}</div>
-        {priceEl(p?.cr854_price, productMarket(p))}
-        {p?.cr854_description && <div style={{ fontSize: '0.78rem', color: SUB, lineHeight: 1.5, marginTop: 6 }}>“{p.cr854_description}”</div>}
+        {p?.category_name && <div style={{ fontSize: '0.65rem', letterSpacing: 2, color: SUB }}>{optionLabel(p.category_name).toUpperCase()}</div>}
+        <div style={{ fontSize: '1rem', fontWeight: 600, color: INK }}>{p?.name}</div>
+        {priceEl(p?.price, productMarket(p))}
+        {p?.description && <div style={{ fontSize: '0.78rem', color: SUB, lineHeight: 1.5, marginTop: 6 }}>“{p.description}”</div>}
       </div>
     )
-    const img = <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.cr854_name} style={{ width: '100%', aspectRatio: '3 / 4', borderRadius: 0 }} />
+    const img = <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', aspectRatio: '3 / 4', borderRadius: 0 }} />
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, backgroundColor: over === idx ? ACCENT_BG : '#f1f1f3' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'stretch' }}>
@@ -373,12 +373,12 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={mergeClasses(classes.frame, classes.featureFrame)} style={frameStyle(it, idx)}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.cr854_name} style={{ width: compact ? '30%' : '44%', aspectRatio: compact ? '1 / 1' : '3 / 4', flexShrink: 0 }} />
+        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: compact ? '30%' : '44%', aspectRatio: compact ? '1 / 1' : '3 / 4', flexShrink: 0 }} />
         <div className={classes.featureBody}>
           <div style={{ fontSize: '0.7rem', letterSpacing: 2, color: SUB }}>FEATURE</div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: INK }}>{p?.cr854_name}</div>
-          <div style={{ fontSize: '0.8rem', color: SUB }}>{p?.cr854_description}</div>
-          {priceEl(p?.cr854_price, productMarket(p))}
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: INK }}>{p?.name}</div>
+          <div style={{ fontSize: '0.8rem', color: SUB }}>{p?.description}</div>
+          {priceEl(p?.price, productMarket(p))}
           {cta}
         </div>
         {controls(it, idx)}
@@ -476,7 +476,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     >
       {hero ? (
         <>
-          <img draggable={false} src={heroImage(hero)} alt={hero.cr854_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img draggable={false} src={heroImage(hero)} alt={hero.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           <Button
             className={mergeClasses('hero-clear', classes.heroClear, classes.ctl)}
             appearance="subtle"
@@ -657,7 +657,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
   if (template === 'free') {
     const runs: { category?: string; start: number; items: Item[] }[] = []
     items.forEach((it, idx) => {
-      const category = byId.get(it.productId)?.cr854_categoryname
+      const category = byId.get(it.productId)?.category_name
       const last = runs[runs.length - 1]
       if (last && last.category === category) last.items.push(it)
       else runs.push({ category, start: idx, items: [it] })
@@ -697,7 +697,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     body = (
       <>
         {sections.map(({ sec, start, list }, si) => {
-          const category = sec.categoryHeading ? byId.get(list[0]?.productId ?? '')?.cr854_categoryname : undefined
+          const category = sec.categoryHeading ? byId.get(list[0]?.productId ?? '')?.category_name : undefined
           return (
             <div key={start} style={{ padding: '0 16px 16px' }}>
               {sec.categoryHeading && editableHeading(si, category ? optionLabel(category) : `CATEGORY ${si + 1}`)}
@@ -749,11 +749,11 @@ function PushPreview(props: Props) {
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
   const [style, setStyle] = useState<'ios' | 'android'>('ios')
-  const byId = new Map(products.map((p) => [p.cr854_productid, p]))
+  const byId = new Map(products.map((p) => [p.id, p]))
   const firstProduct = items[0] && byId.get(items[0].productId)
   // 通知の画像: 「画像つき」は、メッセージのメイン画像(押して開いたメッセージの一番上と、同じ画像)。「テキストだけ」は画像なし
   const heroSrc = spec.image && pickedHero ? heroImage(pickedHero) : undefined
-  const heroAlt = pickedHero?.cr854_name
+  const heroAlt = pickedHero?.name
 
   const when = scheduledAt ? new Date(scheduledAt) : null
   const clock = when ? `${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')}` : '9:41'
@@ -861,8 +861,8 @@ function PushPreview(props: Props) {
       </div>
       {pushLinkKind === 'product' && firstProduct ? (
         <div style={{ border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: 16, padding: 12, display: 'grid', gap: 8, ...scaled }}>
-          <img draggable={false} src={productImage(firstProduct)} alt={firstProduct.cr854_name} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'contain', borderRadius: 12, backgroundColor: '#f1f1f4' }} />
-          <div style={{ fontWeight: 700 }}>{firstProduct.cr854_name}</div>
+          <img draggable={false} src={productImage(firstProduct)} alt={firstProduct.name} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'contain', borderRadius: 12, backgroundColor: '#f1f1f4' }} />
+          <div style={{ fontWeight: 700 }}>{firstProduct.name}</div>
           <div style={{ color: SUB }}>{t('商品のページ', 'Product page')}</div>
         </div>
       ) : !pushLinkKind || pushLinkKind === 'message' ? (
@@ -902,7 +902,7 @@ function PushPreview(props: Props) {
             >
               <span style={{ width: 16, fontSize: 12, color: tokens.colorNeutralForeground2 }}>{idx + 1}</span>
               <img draggable={false} src={productImage(p)} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
-              <div className={classes.noWrap} style={{ flexGrow: 1, fontSize: '0.85rem' }}>{p?.cr854_name}</div>
+              <div className={classes.noWrap} style={{ flexGrow: 1, fontSize: '0.85rem' }}>{p?.name}</div>
               <Button
                 appearance="subtle"
                 size="small"

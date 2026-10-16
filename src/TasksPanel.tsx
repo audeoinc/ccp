@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Checkbox, Field, Input, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DeleteRegular, LinkRegular, TaskListLtrRegular } from '@fluentui/react-icons'
-import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
+import { CardNotesService, type CardNote } from './data/cardNotes'
 import { locale, tr, useT } from './i18n'
 
 const useStyles = makeStyles({
@@ -56,7 +56,7 @@ const todayYmd = () => {
 export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSource, onChanged }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [notes, setNotes] = useState<Cr854_cardnotes[] | null>(null)
+  const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [text, setText] = useState('')
@@ -65,7 +65,7 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
 
   const load = useCallback(async () => {
     if (!cardId) return
-    const res = await Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${cardId}`, orderBy: ['createdon asc'] })
+    const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
     if (!res.success) {
       setError(res.error?.message ?? tr('タスクを読み込めませんでした', 'Could not load the tasks'))
       return
@@ -88,21 +88,21 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
     setBusy(false)
   }
 
-  const tasks = (notes ?? []).filter((n) => n.cr854_kind === 'task')
+  const tasks = (notes ?? []).filter((n) => n.kind === 'task')
   // 未完了を上に、期日の早い順。完了は下に
-  tasks.sort((a, b) => (a.cr854_resolved ?? 0) - (b.cr854_resolved ?? 0) || (a.cr854_due || '9999').localeCompare(b.cr854_due || '9999'))
-  const questionOf = (id?: string) => (notes ?? []).find((n) => n.cr854_cardnoteid === id)
+  tasks.sort((a, b) => (a.resolved ?? 0) - (b.resolved ?? 0) || (a.due || '9999').localeCompare(b.due || '9999'))
+  const questionOf = (id?: string) => (notes ?? []).find((n) => n.id === id)
   const today = todayYmd()
 
   const add = () =>
     run(async () => {
-      const res = await Cr854_cardnotesService.create({
-        'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-        cr854_kind: 'task',
-        cr854_body: text.trim(),
-        cr854_assignee: assignee.trim(),
-        cr854_due: due || undefined,
-        cr854_resolved: 0,
+      const res = await CardNotesService.create({
+        delivery_card_id: cardId,
+        kind: 'task',
+        body: text.trim(),
+        assignee: assignee.trim(),
+        due: due || undefined,
+        resolved: 0,
       })
       if (res.success) setText('')
       return res
@@ -123,25 +123,25 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
       {cardId && notes === null && <Spinner size="tiny" />}
       {error && <div className={styles.error}>{error}</div>}
       {tasks.map((n) => {
-        const src = questionOf(n.cr854_sourcenote)
-        const overdue = !n.cr854_resolved && !!n.cr854_due && n.cr854_due.slice(0, 10) < today
+        const src = questionOf(n.source_note)
+        const overdue = !n.resolved && !!n.due && n.due.slice(0, 10) < today
         return (
-          <div key={n.cr854_cardnoteid} className={mergeClasses(styles.row, !!n.cr854_resolved && styles.done)}>
+          <div key={n.id} className={mergeClasses(styles.row, !!n.resolved && styles.done)}>
             <Checkbox
-              checked={!!n.cr854_resolved}
+              checked={!!n.resolved}
               disabled={busy}
               aria-label={t('完了', 'Done')}
-              onChange={(_, d) => void run(() => Cr854_cardnotesService.update(n.cr854_cardnoteid, { cr854_resolved: d.checked ? 1 : 0 }))}
+              onChange={(_, d) => void run(() => CardNotesService.update(n.id, { resolved: d.checked ? 1 : 0 }))}
             />
             <div>
-              <div className={mergeClasses('task-text', styles.text)}>{n.cr854_body}</div>
+              <div className={mergeClasses('task-text', styles.text)}>{n.body}</div>
               <div className={styles.meta}>
-                {n.cr854_assignee && <span>{n.cr854_assignee}</span>}
-                {n.cr854_due && <span className={overdue ? styles.overdue : undefined}>{t(`期日 ${dueText(n.cr854_due)}`, `Due ${dueText(n.cr854_due)}`)}</span>}
+                {n.assignee && <span>{n.assignee}</span>}
+                {n.due && <span className={overdue ? styles.overdue : undefined}>{t(`期日 ${dueText(n.due)}`, `Due ${dueText(n.due)}`)}</span>}
                 {src && (
-                  <button type="button" className={styles.source} onClick={onOpenSource} title={src.cr854_body}>
+                  <button type="button" className={styles.source} onClick={onOpenSource} title={src.body}>
                     <LinkRegular />
-                    {t(`${src.cr854_author || '制作'} の質問から`, `From ${src.cr854_author || 'production'}’s question`)}
+                    {t(`${src.author || '制作'} の質問から`, `From ${src.author || 'production'}’s question`)}
                   </button>
                 )}
               </div>
@@ -153,7 +153,7 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
               disabled={busy}
               aria-label={t('削除', 'Delete')}
               onClick={() => void run(async () => {
-                await Cr854_cardnotesService.delete(n.cr854_cardnoteid)
+                await CardNotesService.delete(n.id)
                 return { success: true }
               })}
             />

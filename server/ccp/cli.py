@@ -46,10 +46,10 @@ async def seed(reset: bool) -> None:
             for t in reversed(order):
                 await conn.execute(text(f"DELETE FROM {t.pg}"))
         for t in order:
-            rows = data.get(t.dv, [])
+            rows = data.get(t.name, [])
             for rec in rows:
                 values = t.to_db(rec)
-                values["id"] = sc.coerce("uuid", rec[t.pk])
+                values["id"] = sc.coerce("uuid", rec["id"])
                 cols = list(values)
                 await conn.execute(
                     text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) ON CONFLICT (id) DO NOTHING"),

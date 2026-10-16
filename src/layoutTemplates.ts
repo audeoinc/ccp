@@ -1,4 +1,4 @@
-import { Cr854_layouttemplatesService } from './generated/services/Cr854_layouttemplatesService'
+import { LayoutTemplatesService } from './data/layoutTemplates'
 import {
   LINK_KINDS,
   MAX_BUTTONS_PER_BLOCK,
@@ -183,18 +183,18 @@ export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroBu
   push?: PushSpec
 }
 
-/** Dataverse から、ユーザーが作ったテンプレートを読み込み、登録に反映する */
+/** データベースから、ユーザーが作ったテンプレートを読み込み、登録に反映する */
 export async function loadCustomTemplates(): Promise<void> {
-  const res = await Cr854_layouttemplatesService.getAll({ orderBy: ['createdon asc'] })
+  const res = await LayoutTemplatesService.getAll({ orderBy: ['created_on asc'] })
   if (!res.success) throw new Error(res.error?.message ?? tr('テンプレートを取得できませんでした', 'Failed to load templates'))
   setCustomTemplates(
     (res.data ?? [])
       .map((r) => ({
-        id: r.cr854_layouttemplateid,
-        label: r.cr854_name,
-        description: r.cr854_description ?? '',
-        hero: (HERO_KINDS.includes(r.cr854_herokind as HeroKind) ? r.cr854_herokind : 'standard') as HeroKind,
-        ...parseLayout(r.cr854_sections),
+        id: r.id,
+        label: r.name,
+        description: r.description ?? '',
+        hero: (HERO_KINDS.includes(r.hero_kind as HeroKind) ? r.hero_kind : 'standard') as HeroKind,
+        ...parseLayout(r.sections),
       }))
       // セクションが 1 つもない行は、メールを組めないので、一覧に出さない(アプリは、メイン画像とコピーだけのメッセージもある)
       .filter((t) => t.sections.length > 0 || t.channel === 'push'),
@@ -204,22 +204,22 @@ export async function loadCustomTemplates(): Promise<void> {
 /** 新規作成(id なし)または更新。保存後に、登録を読み込み直す。保存した行の ID を返す */
 export async function saveTemplate(input: TemplateInput): Promise<string> {
   const fields = {
-    cr854_name: input.name.trim(),
-    cr854_description: input.description.trim(),
-    cr854_herokind: input.hero,
-    cr854_sections: stringifyLayout(input),
+    name: input.name.trim(),
+    description: input.description.trim(),
+    hero_kind: input.hero,
+    sections: stringifyLayout(input),
   }
   const res = input.id
-    ? await Cr854_layouttemplatesService.update(input.id, fields)
-    : await Cr854_layouttemplatesService.create({ ...fields, statecode: 0 })
+    ? await LayoutTemplatesService.update(input.id, fields)
+    : await LayoutTemplatesService.create({ ...fields, state_code: 0 })
   if (!res.success) throw new Error(res.error?.message ?? tr('テンプレートを保存できませんでした', 'Failed to save the template'))
-  const id = input.id ?? res.data?.cr854_layouttemplateid
+  const id = input.id ?? res.data?.id
   await loadCustomTemplates()
   if (!id) throw new Error(tr('保存した行の ID を取得できませんでした', 'Could not get the ID of the saved row'))
   return id
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  await Cr854_layouttemplatesService.delete(id)
+  await LayoutTemplatesService.delete(id)
   await loadCustomTemplates()
 }

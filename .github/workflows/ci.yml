@@ -19,12 +19,12 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Schema (server/schema.json vs. models)
+      - name: Schema (server/schema.json vs. src/models and src/data)
         run: node scripts/check-schema.mjs
       - name: Type check
         run: npx tsc -b
       - name: Lint
-        run: npx eslint . --ignore-pattern "src/generated/**"
+        run: npx eslint .
       - name: Build
         run: npm run build
       - uses: actions/setup-python@v5

@@ -1,5 +1,5 @@
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import {
   proposeHero,
   proposeSection,
@@ -27,8 +27,8 @@ export interface AutoDraftInput {
   card: AiCard
   language: CopyLanguage
   otherThemes: string[]
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   /** 配信カードのチャネル(アプリのときは、アプリのテンプレートから選び、制作指示は作らない) */
   channel?: TemplateChannel
 }
@@ -114,7 +114,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   result.templateReason = tpl?.reason
   // アプリで、画像を使わないテンプレートなら、メイン画像は付けない
   result.hero = isPush && !getTemplate(result.template).push?.image ? undefined : hero
-  const heroRow = hero?.hero ? heroes.find((h) => h.cr854_heroimageid === hero.hero!.heroId) : undefined
+  const heroRow = hero?.hero ? heroes.find((h) => h.id === hero.hero!.heroId) : undefined
   const heroReason = hero?.hero?.reason
 
   const sections = sectionsOf(result.template)
@@ -135,7 +135,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   // ④ 各セクション(見出し・コピー・商品)。前のセクションで使った商品は、あとのセクションで使わない
   const others: OtherSection[] = []
   const excluded = new Set<string>()
-  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? ''
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   for (const sec of sections) {
     const proposal = await step(tr(`セクション ${sec.index + 1} / ${sections.length} を選んでいます`, `Choosing section ${sec.index + 1} / ${sections.length}`), () =>
       proposeSection({
@@ -168,7 +168,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
       suggestPushNotifications({
         card: withCopy,
         language,
-        items: result.sections.flatMap((s) => s.selected).map((r) => ({ product: products.find((p) => p.cr854_productid === r.productId), reason: r.reason })),
+        items: result.sections.flatMap((s) => s.selected).map((r) => ({ product: products.find((p) => p.id === r.productId), reason: r.reason })),
         hero: heroRow,
       }),
     )
@@ -184,7 +184,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
     suggestInstructions({
       card: withCopy,
       language,
-      items: result.sections.flatMap((s) => s.selected).map((r) => ({ product: products.find((p) => p.cr854_productid === r.productId), reason: r.reason })),
+      items: result.sections.flatMap((s) => s.selected).map((r) => ({ product: products.find((p) => p.id === r.productId), reason: r.reason })),
       hero: heroRow,
     }),
   )

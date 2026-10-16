@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowReplyRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, CommentRegular, DeleteRegular, EditRegular } from '@fluentui/react-icons'
-import { Cr854_cardnotesService, type Cr854_cardnotes } from './gcpdata/Cr854_cardnotesService'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import { CardNotesService, type CardNote } from './data/cardNotes'
+import type { Product } from './models/products'
 import { locale, tr, useT } from './i18n'
 import { myName, setMyName } from './history'
 
@@ -56,7 +56,7 @@ interface Props {
   /** 載せた商品(メールの並び順の商品 ID)。商品ごとのコメントの対象 */
   productIds: string[]
   /** 商品名の表示用(全件) */
-  products: Cr854_products[]
+  products: Product[]
   people: string[]
   /** 未対応の数が変わったとき(タブの数を、閉じなくても合わせるため) */
   onOpenCount?: (n: number) => void
@@ -67,13 +67,13 @@ const time = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
 
 /**
  * レビューのコメント(バックログ W5)。Confluence のように、指摘 1 つを 1 つのスレッドにして、返信でやり取りし、決着したら対応済みにする。
- * 指摘は配信全体か、載せた商品 1 つに付ける。返信は、メモの表に種類 reply で入れ、cr854_sourcenote で元の指摘につなぐ。
+ * 指摘は配信全体か、載せた商品 1 つに付ける。返信は、メモの表に種類 reply で入れ、source_note で元の指摘につなぐ。
  * 質問と同じく、配信カードの「保存」を待たずに、その場で保存する。対応済みのスレッドは消さずに、たたんで残す
  */
 export function CommentsPanel({ cardId, productIds, products, people, onOpenCount }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [notes, setNotes] = useState<Cr854_cardnotes[] | null>(null)
+  const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // 書く人は、配信ごとに変わらない(レビューする人)ので、ブラウザごとに覚えた名前(承認の履歴と共通)を使う
   const [author, setAuthor] = useState(myName)
@@ -89,7 +89,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
 
   const load = useCallback(async () => {
     if (!cardId) return
-    const res = await Cr854_cardnotesService.getAll({ filter: `_cr854_deliverycard_value eq ${cardId}`, orderBy: ['createdon asc'] })
+    const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
     if (!res.success) {
       setError(res.error?.message ?? tr('コメントを読み込めませんでした', 'Could not load the comments'))
       return
@@ -104,19 +104,19 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
 
   // 未対応を上に、それぞれ新しい順(Confluence と同じく、いま話している指摘を先に)
   const comments = (notes ?? [])
-    .filter((n) => n.cr854_kind === 'comment')
-    .sort((a, b) => Number(!!a.cr854_resolved) - Number(!!b.cr854_resolved) || time(b.createdon) - time(a.createdon))
-  const repliesOf = (id: string) => (notes ?? []).filter((n) => n.cr854_kind === 'reply' && n.cr854_sourcenote === id).sort((a, b) => time(a.createdon) - time(b.createdon))
-  const open = comments.filter((n) => !n.cr854_resolved).length
+    .filter((n) => n.kind === 'comment')
+    .sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
+  const repliesOf = (id: string) => (notes ?? []).filter((n) => n.kind === 'reply' && n.source_note === id).sort((a, b) => time(a.created_on) - time(b.created_on))
+  const open = comments.filter((n) => !n.resolved).length
   useEffect(() => {
     if (notes) onOpenCount?.(open)
   }, [notes, open, onOpenCount])
 
-  const productName = (id?: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? t('(外した商品)', '(removed product)')
+  const productName = (id?: string) => products.find((p) => p.id === id)?.name ?? t('(外した商品)', '(removed product)')
   // 対象に選べるのは、載せた商品(同じ商品が 2 回あっても 1 つ)
   const targets = [...new Set(productIds)]
   const me = author.trim()
-  const mine = (n: Cr854_cardnotes) => !!me && (n.cr854_author ?? '').trim() === me
+  const mine = (n: CardNote) => !!me && (n.author ?? '').trim() === me
 
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string } }>) => {
     setBusy(true)
@@ -131,13 +131,13 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
   const add = () =>
     run(async () => {
       setMyName(author)
-      const res = await Cr854_cardnotesService.create({
-        'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-        ...(target ? { 'cr854_product@odata.bind': `/cr854_products(${target})` } : {}),
-        cr854_kind: 'comment',
-        cr854_author: me,
-        cr854_body: body.trim(),
-        cr854_resolved: 0,
+      const res = await CardNotesService.create({
+        delivery_card_id: cardId,
+        ...(target ? { product_id: target } : {}),
+        kind: 'comment',
+        author: me,
+        body: body.trim(),
+        resolved: 0,
       })
       if (res.success) setBody('')
       return res
@@ -151,52 +151,52 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
     })
 
   /** 返信する。resolve なら、返信してから対応済みにする(「直しました」と書いて閉じる、よくある流れを 1 回で) */
-  const reply = (root: Cr854_cardnotes, resolve = false) =>
+  const reply = (root: CardNote, resolve = false) =>
     run(async () => {
       setMyName(author)
-      const id = root.cr854_cardnoteid
+      const id = root.id
       const text = (drafts[id] ?? '').trim()
       if (text) {
-        const res = await Cr854_cardnotesService.create({
-          'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-          cr854_kind: 'reply',
-          cr854_sourcenote: id,
-          cr854_author: me,
-          cr854_body: text,
+        const res = await CardNotesService.create({
+          delivery_card_id: cardId,
+          kind: 'reply',
+          source_note: id,
+          author: me,
+          body: text,
         })
         if (!res.success) return res
       }
       if (resolve) {
         // 誰が、いつ対応済みにしたかを残す(以前は、対応した内容もここに入れていた。今は、返信として残す)
-        const res = await Cr854_cardnotesService.update(id, { cr854_resolved: 1, cr854_repliedby: me, cr854_repliedat: new Date().toISOString() })
+        const res = await CardNotesService.update(id, { resolved: 1, replied_by: me, replied_at: new Date().toISOString() })
         if (!res.success) return res
       }
       closeReply(id)
       return { success: true }
     })
 
-  const reopen = (n: Cr854_cardnotes) => run(() => Cr854_cardnotesService.update(n.cr854_cardnoteid, { cr854_resolved: 0 }))
+  const reopen = (n: CardNote) => run(() => CardNotesService.update(n.id, { resolved: 0 }))
 
   const saveEdit = () =>
     editing &&
     run(async () => {
-      const res = await Cr854_cardnotesService.update(editing.id, { cr854_body: editing.text.trim() })
+      const res = await CardNotesService.update(editing.id, { body: editing.text.trim() })
       if (res.success) setEditing(null)
       return res
     })
 
   /** 消す。指摘を消すときは、返信もまとめて消す(返信だけが残っても、読めないため) */
-  const remove = (n: Cr854_cardnotes) => {
-    const replies = n.cr854_kind === 'comment' ? repliesOf(n.cr854_cardnoteid) : []
+  const remove = (n: CardNote) => {
+    const replies = n.kind === 'comment' ? repliesOf(n.id) : []
     const ask =
-      n.cr854_kind === 'comment'
+      n.kind === 'comment'
         ? t(`この指摘を削除します${replies.length ? `(返信 ${replies.length} 件も削除)` : ''}。よろしいですか?`, `Delete this comment${replies.length ? ` and its ${replies.length} replies` : ''}?`)
         : t('この返信を削除します。よろしいですか?', 'Delete this reply?')
     if (!window.confirm(ask)) return
     void run(async () => {
       try {
-        for (const r of replies) await Cr854_cardnotesService.delete(r.cr854_cardnoteid)
-        await Cr854_cardnotesService.delete(n.cr854_cardnoteid)
+        for (const r of replies) await CardNotesService.delete(r.id)
+        await CardNotesService.delete(n.id)
         return { success: true }
       } catch (e) {
         return { success: false, error: { message: e instanceof Error ? e.message : String(e) } }
@@ -213,22 +213,22 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
   }
 
   /** 1 件(指摘・返信)。編集中なら、本文の代わりに入力欄 */
-  const entry = (n: Cr854_cardnotes, size: 24 | 20, extra?: ReactNode, readOnly = false) => (
+  const entry = (n: CardNote, size: 24 | 20, extra?: ReactNode, readOnly = false) => (
     <div className={styles.entry}>
-      <Avatar name={n.cr854_author || '?'} size={size} color="colorful" />
+      <Avatar name={n.author || '?'} size={size} color="colorful" />
       <div className={styles.entryBody}>
         <div className={styles.meta}>
-          <span className={styles.who}>{n.cr854_author || t('(名前なし)', '(no name)')}</span>
-          <span>{when(n.createdon)}</span>
+          <span className={styles.who}>{n.author || t('(名前なし)', '(no name)')}</span>
+          <span>{when(n.created_on)}</span>
           {extra}
-          {!readOnly && mine(n) && editing?.id !== n.cr854_cardnoteid && (
+          {!readOnly && mine(n) && editing?.id !== n.id && (
             <span className={styles.own}>
-              <Button size="small" appearance="transparent" icon={<EditRegular />} aria-label={t('編集', 'Edit')} title={t('編集', 'Edit')} disabled={busy} onClick={() => setEditing({ id: n.cr854_cardnoteid, text: n.cr854_body ?? '' })} />
+              <Button size="small" appearance="transparent" icon={<EditRegular />} aria-label={t('編集', 'Edit')} title={t('編集', 'Edit')} disabled={busy} onClick={() => setEditing({ id: n.id, text: n.body ?? '' })} />
               <Button size="small" appearance="transparent" icon={<DeleteRegular />} aria-label={t('削除', 'Delete')} title={t('削除', 'Delete')} disabled={busy} onClick={() => remove(n)} />
             </span>
           )}
         </div>
-        {editing?.id === n.cr854_cardnoteid ? (
+        {editing?.id === n.id ? (
           <div className={styles.form}>
             <Textarea
               size="small"
@@ -237,48 +237,48 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
               // 書き足すことが多いので、入力の位置を末尾にする(既定では先頭になる)
               onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
               value={editing.text}
-              onChange={(_, d) => setEditing({ id: n.cr854_cardnoteid, text: d.value })} onKeyDown={submitOnCtrlEnter(() => void saveEdit())} />
+              onChange={(_, d) => setEditing({ id: n.id, text: d.value })} onKeyDown={submitOnCtrlEnter(() => void saveEdit())} />
             <div className={styles.actions}>
               <Button size="small" appearance="primary" disabled={busy || !editing.text.trim()} onClick={() => void saveEdit()}>{t('保存', 'Save')}</Button>
               <Button size="small" appearance="subtle" onClick={() => setEditing(null)}>{t('やめる', 'Cancel')}</Button>
             </div>
           </div>
         ) : (
-          <div className={styles.body}>{n.cr854_body}</div>
+          <div className={styles.body}>{n.body}</div>
         )}
       </div>
     </div>
   )
 
-  const thread = (n: Cr854_cardnotes) => {
-    const id = n.cr854_cardnoteid
+  const thread = (n: CardNote) => {
+    const id = n.id
     const replies = repliesOf(id)
-    const resolved = !!n.cr854_resolved
+    const resolved = !!n.resolved
     if (resolved && !expanded.has(id)) {
       return (
         <button key={id} type="button" className={styles.folded} onClick={() => setExpanded((s) => new Set(s).add(id))} aria-expanded={false}>
           <ChevronRightRegular />
           <CheckmarkCircleFilled className={styles.done} />
-          <span className={styles.foldedText}>{`${n.cr854_author || t('(名前なし)', '(no name)')}: ${(n.cr854_body ?? '').split('\n')[0]}`}</span>
+          <span className={styles.foldedText}>{`${n.author || t('(名前なし)', '(no name)')}: ${(n.body ?? '').split('\n')[0]}`}</span>
           {replies.length > 0 && <span className={styles.count}>{t(`返信 ${replies.length}`, `${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}`)}</span>}
         </button>
       )
     }
     const target = (
-      <Badge appearance="outline" color={n._cr854_product_value ? 'brand' : 'informative'} size="small">
-        {n._cr854_product_value ? productName(n._cr854_product_value) : t('配信全体', 'Whole delivery')}
+      <Badge appearance="outline" color={n.product_id ? 'brand' : 'informative'} size="small">
+        {n.product_id ? productName(n.product_id) : t('配信全体', 'Whole delivery')}
       </Badge>
     )
     const replying = drafts[id] !== undefined
     return (
       <div key={id} className={mergeClasses(styles.thread, !resolved && styles.threadOpen)}>
         {entry(n, 24, target)}
-        {(replies.length > 0 || n.cr854_reply) && (
+        {(replies.length > 0 || n.reply) && (
           <div className={styles.replies}>
             {/* 返信の機能より前に、対応済みにしたときに書いた「対応した内容」(返信の 1 件として見せる) */}
-            {n.cr854_reply && entry({ ...n, cr854_author: n.cr854_repliedby, cr854_body: n.cr854_reply, createdon: n.cr854_repliedat, cr854_cardnoteid: `${id}:fix` }, 20, undefined, true)}
+            {n.reply && entry({ ...n, author: n.replied_by, body: n.reply, created_on: n.replied_at, id: `${id}:fix` }, 20, undefined, true)}
             {replies.map((r) => (
-              <div key={r.cr854_cardnoteid}>{entry(r, 20)}</div>
+              <div key={r.id}>{entry(r, 20)}</div>
             ))}
           </div>
         )}
@@ -314,7 +314,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
           {resolved ? (
             <>
               <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>
-                {n.cr854_repliedby ? t(`対応済み(${n.cr854_repliedby}・${when(n.cr854_repliedat)})`, `Resolved (${n.cr854_repliedby}, ${when(n.cr854_repliedat)})`) : t('対応済み', 'Resolved')}
+                {n.replied_by ? t(`対応済み(${n.replied_by}・${when(n.replied_at)})`, `Resolved (${n.replied_by}, ${when(n.replied_at)})`) : t('対応済み', 'Resolved')}
               </Badge>
               <Button size="small" appearance="subtle" disabled={busy} onClick={() => void reopen(n)}>{t('もう一度開く', 'Reopen')}</Button>
               <Button

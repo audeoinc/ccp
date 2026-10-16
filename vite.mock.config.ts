@@ -8,9 +8,9 @@ const mockServices = (): Plugin => ({
   name: 'mock-services',
   enforce: 'pre',
   resolveId(source) {
-    // GCP 版だけのテーブルのサービス(src/gcpdata)も、同じように差し替える
-    const m = source.match(/(?:generated\/services|gcpdata)\/(Cr854_\w+Service)$/)
-    if (m) return `\0mock:${m[1]}`
+    // 表ごとのサービス(src/data/<名前>。書き出す名前は <名前の先頭を大文字>Service)を差し替える
+    const m = source.match(/(?:^|\/)data\/(\w+)$/)
+    if (m) return `\0mock:${m[1][0].toUpperCase()}${m[1].slice(1)}Service`
   },
   load(id) {
     if (!id.startsWith('\0mock:')) return

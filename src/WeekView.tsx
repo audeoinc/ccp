@@ -15,9 +15,9 @@ import {
   WarningFilled,
   WrenchRegular,
 } from '@fluentui/react-icons'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { heroImage, productImage } from './images'
 import { locale, optionLabel, useT } from './i18n'
 import { DeliveryPeek } from './DeliveryPeek'
@@ -34,7 +34,7 @@ export type WeekLens = 'products' | 'progress'
 interface Props {
   /** 週の初め(日曜日) */
   start: Date
-  cards: Cr854_deliverycards[]
+  cards: DeliveryCard[]
   /** 配信カードごとの掲載商品(メールの並び順の商品 ID) */
   cardProducts: Map<string, string[]>
   /** 配信カードごとの、制作からの質問の未解決の数 */
@@ -46,8 +46,8 @@ interface Props {
   /** 配信カードごとの、期日を過ぎた未完了のタスクの数 */
   overdueTasks: Map<string, number>
   lens: WeekLens
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   dueSoon?: Set<string>
   /** 確認の一覧(W4)で選んだ項目の、目立たせる配信と商品。配信が空なら、配信は薄くしない */
   focus?: { cards: Set<string>; products: Set<string> }
@@ -60,12 +60,12 @@ interface Props {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-const EMAIL = 588230000
-const PUSH = 588230001
+const EMAIL = 'email'
+const PUSH = 'app'
 // 1 日の並び: メールを上、プッシュを下にそろえる(週を横に見比べやすく)。同じチャネルの中は時刻順
-const rank = (c: Cr854_deliverycards) => (c.cr854_channel === EMAIL ? 0 : c.cr854_channel === PUSH ? 1 : 2)
-const order = (a: Cr854_deliverycards, b: Cr854_deliverycards) => rank(a) - rank(b) || (a.cr854_scheduledat ?? '').localeCompare(b.cr854_scheduledat ?? '')
-const label = (options: { value: number; label: string }[], v?: number) => optionLabel(options.find((o) => o.value === v)?.label)
+const rank = (c: DeliveryCard) => (c.channel === EMAIL ? 0 : c.channel === PUSH ? 1 : 2)
+const order = (a: DeliveryCard, b: DeliveryCard) => rank(a) - rank(b) || (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? '')
+const label = (options: { value: string; label: string }[], v?: string) => optionLabel(options.find((o) => o.value === v)?.label)
 const shortDate = (ymd?: string) => {
   if (!ymd) return ''
   const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
@@ -206,14 +206,14 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
   const [hover, setHover] = useState<string | null>(null)
   const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
   const today = dayKey(new Date())
-  const byDay = new Map<string, Cr854_deliverycards[]>()
+  const byDay = new Map<string, DeliveryCard[]>()
   for (const c of cards) {
-    if (!c.cr854_scheduledat) continue
-    const k = dayKey(new Date(c.cr854_scheduledat))
+    if (!c.scheduled_at) continue
+    const k = dayKey(new Date(c.scheduled_at))
     byDay.set(k, [...(byDay.get(k) ?? []), c])
   }
   for (const list of byDay.values()) list.sort(order)
-  const productOf = (id: string) => products.find((p) => p.cr854_productid === id)
+  const productOf = (id: string) => products.find((p) => p.id === id)
 
   const thumbs = (ids: string[]) => (
     <div className={styles.grid}>
@@ -224,33 +224,33 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
           <div
             key={`${id}-${i}`}
             className={mergeClasses(styles.thumb, (hover ? hover === id : !!focus?.products.has(id)) && styles.thumbHit, !!hover && hover !== id && styles.thumbDim)}
-            title={p?.cr854_name}
+            title={p?.name}
             onMouseEnter={() => setHover(id)}
             onMouseLeave={() => setHover(null)}
           >
-            {src && <img className={styles.img} src={src} alt={p?.cr854_name ?? ''} draggable={false} />}
+            {src && <img className={styles.img} src={src} alt={p?.name ?? ''} draggable={false} />}
           </div>
         )
       })}
     </div>
   )
 
-  const card = (c: Cr854_deliverycards) => {
-    const id = c.cr854_deliverycardid
+  const card = (c: DeliveryCard) => {
+    const id = c.id
     const ids = cardProducts.get(id) ?? []
-    const heroRow = heroes.find((h) => h.cr854_heroimageid === c._cr854_heroimage_value)
+    const heroRow = heroes.find((h) => h.id === c.hero_image_id)
     const hero = heroImage(heroRow)
-    const time = new Date(c.cr854_scheduledat!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-    const templateId = c.cr854_layoutkey || (c.cr854_channel === PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.cr854_emailtemplate))
+    const time = new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+    const templateId = c.layout_key || (c.channel === PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
     const progress = cardProgress(c, ids.length)
     const questions = questionCounts.get(id) ?? 0
     const tasks = taskCounts.get(id) ?? 0
     const comments = commentCounts?.get(id) ?? 0
     const overdue = overdueTasks.get(id) ?? 0
-    const isPush = c.cr854_channel === PUSH
-    const channel = c.cr854_channel === EMAIL ? 'email' : isPush ? 'push' : 'none'
+    const isPush = c.channel === PUSH
+    const channel = c.channel === EMAIL ? 'email' : isPush ? 'push' : 'none'
     const sections = sectionsOf(templateId)
-    const titles = (c.cr854_sectiontitles ?? '').split('\n')
+    const titles = (c.section_titles ?? '').split('\n')
     const groups = sections
       .map((sec) => {
         const [from, to] = sectionRange(sections, sec, ids.length)
@@ -258,7 +258,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       })
       .filter((g) => g.ids.length > 0)
     const hasVisual = !!hero || ids.length > 0
-    const hasPushText = isPush && !!(c.cr854_pushtitle || c.cr854_pushbody || c.cr854_headline || c.cr854_copy)
+    const hasPushText = isPush && !!(c.push_title || c.push_body || c.headline || c.copy)
     const ratio = progress.total ? progress.done / progress.total : 0
 
     const issues = (
@@ -293,8 +293,8 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
 
     const pushBox = hasPushText && (
       <div className={styles.push}>
-        <span className={styles.pushTitle}>{c.cr854_pushtitle || c.cr854_headline || c.cr854_name}</span>
-        {(c.cr854_pushbody || c.cr854_copy) && <span className={styles.pushBody}>{c.cr854_pushbody || c.cr854_copy}</span>}
+        <span className={styles.pushTitle}>{c.push_title || c.headline || c.name}</span>
+        {(c.push_body || c.copy) && <span className={styles.pushBody}>{c.push_body || c.copy}</span>}
       </div>
     )
 
@@ -313,7 +313,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         type="button"
         className={mergeClasses(styles.card, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
         onClick={() => onSelect(id)}
-        title={c.cr854_name}
+        title={c.name}
         // 取りやめた配信は、消さずに薄く、取り消し線で出す
         style={isCancelled(c) ? CANCELLED_STYLE : undefined}
       >
@@ -324,9 +324,9 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         </div>
         <div className={styles.inner}>
           <div className={styles.nameRow}>
-            <span className={styles.dot} style={{ backgroundColor: statusColor(c.cr854_status) }} title={label(statusOptions, c.cr854_status)} />
+            <span className={styles.dot} style={{ backgroundColor: statusColor(c.status) }} title={label(statusOptions, c.status)} />
             <AlertMark kind={alertKinds?.get(id)} />
-            <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.cr854_name}` : c.cr854_name}</span>
+            <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.name}` : c.name}</span>
           </div>
           {hasIssues && <div className={styles.issues}>{issues}</div>}
 
@@ -350,35 +350,35 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
           ) : (
             <>
               <div className={styles.progressRow}>
-                {label(statusOptions, c.cr854_status)}
+                {label(statusOptions, c.status)}
                 <span className={styles.bar} aria-hidden>
-                  <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(ratio * 100)}%`, backgroundColor: statusColor(c.cr854_status) }} />
+                  <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(ratio * 100)}%`, backgroundColor: statusColor(c.status) }} />
                 </span>
                 {`${progress.done}/${progress.total}`}
               </div>
-              {c.cr854_theme && <span className={styles.text} title={c.cr854_theme}>{c.cr854_theme}</span>}
-              {c.cr854_headline && (
-                <span className={mergeClasses(styles.text, styles.textStrong)} title={c.cr854_headline}>
-                  {c.cr854_headline}
+              {c.theme && <span className={styles.text} title={c.theme}>{c.theme}</span>}
+              {c.headline && (
+                <span className={mergeClasses(styles.text, styles.textStrong)} title={c.headline}>
+                  {c.headline}
                 </span>
               )}
               {!isPush && <span className={styles.text}>{`${getTemplate(templateId).label} · ${t(`商品 ${ids.length}`, `${ids.length} products`)}`}</span>}
               <div className={styles.facts}>
-                <span className={mergeClasses(styles.fact, !c.cr854_owner && styles.faint)} title={t('企画の担当者', 'Owner')}>
+                <span className={mergeClasses(styles.fact, !c.owner && styles.faint)} title={t('企画の担当者', 'Owner')}>
                   <PersonRegular />
-                  {firstName(c.cr854_owner) || '—'}
+                  {firstName(c.owner) || '—'}
                 </span>
-                <span className={mergeClasses(styles.fact, !c.cr854_productionowner && styles.faint)} title={t('制作の担当者', 'Production assignee')}>
+                <span className={mergeClasses(styles.fact, !c.production_owner && styles.faint)} title={t('制作の担当者', 'Production assignee')}>
                   <WrenchRegular />
-                  {firstName(c.cr854_productionowner) || '—'}
+                  {firstName(c.production_owner) || '—'}
                 </span>
-                <span className={mergeClasses(styles.fact, !c.cr854_productiondue && styles.faint)} title={t('制作の締め切り', 'Production due')}>
+                <span className={mergeClasses(styles.fact, !c.production_due && styles.faint)} title={t('制作の締め切り', 'Production due')}>
                   <CalendarRegular />
-                  {shortDate(c.cr854_productiondue) || '—'}
+                  {shortDate(c.production_due) || '—'}
                 </span>
-                <span className={mergeClasses(styles.fact, c.cr854_handedoffat ? styles.good : styles.faint)} title={t('制作への引き継ぎ', 'Handoff')}>
-                  {c.cr854_handedoffat ? <CheckmarkCircleFilled /> : <CircleRegular />}
-                  {c.cr854_handedoffat ? t('引き継ぎ済', 'Handed off') : t('未引き継ぎ', 'Not handed off')}
+                <span className={mergeClasses(styles.fact, c.handed_off_at ? styles.good : styles.faint)} title={t('制作への引き継ぎ', 'Handoff')}>
+                  {c.handed_off_at ? <CheckmarkCircleFilled /> : <CircleRegular />}
+                  {c.handed_off_at ? t('引き継ぎ済', 'Handed off') : t('未引き継ぎ', 'Not handed off')}
                 </span>
                 <span className={mergeClasses(styles.fact, !tasks && styles.faint)} title={t('未完了のタスク', 'Open tasks')}>
                   <TaskListLtrRegular />

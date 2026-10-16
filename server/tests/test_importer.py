@@ -54,10 +54,10 @@ class ImporterTest(unittest.TestCase):
         self.assertEqual(im.code_for("heroes/jp", 2), "H03")
         self.assertEqual(im.code_for("heroes/us", 19), "UH20")
 
-    def test_enums_come_from_generated_models(self) -> None:
+    def test_enums_come_from_models(self) -> None:
         e = im.load_enums()
-        self.assertEqual(e["category"]["アウター"], 588230000)
-        self.assertEqual(e["market"], {"JP": 588230000, "US": 588230001})
+        self.assertEqual(e["category"]["アウター"], "outer")
+        self.assertEqual(e["market"], {"JP": "JP", "US": "US"})
         self.assertIn("特集", e["purpose"])
         self.assertEqual(set(e["trend"]), {"上昇", "横ばい", "下降"})
 
@@ -73,17 +73,17 @@ class ImporterTest(unittest.TestCase):
     def test_weekly_stock_decreases_by_units_and_ends_at_current_stock(self) -> None:
         rows = im.weekly_rows(random.Random("x"), "P01", "アウター", 9800, 120, "上昇")
         self.assertEqual(len(rows), len(im.WEEKS))
-        self.assertEqual(rows[-1]["cr854_stock"], 120)
-        self.assertEqual(len({r["cr854_weeklyperformanceid"] for r in rows}), len(rows))  # 行ごとに、別の ID
+        self.assertEqual(rows[-1]["stock"], 120)
+        self.assertEqual(len({r["id"] for r in rows}), len(rows))  # 行ごとに、別の ID
         for a, b in zip(rows, rows[1:]):
-            self.assertEqual(a["cr854_stock"] - b["cr854_units"], b["cr854_stock"])
-        self.assertEqual(rows[0]["cr854_revenue"], rows[0]["cr854_units"] * 9800)
+            self.assertEqual(a["stock"] - b["units"], b["stock"])
+        self.assertEqual(rows[0]["revenue"], rows[0]["units"] * 9800)
 
     def test_rising_trend_sells_more_at_the_end_than_the_start(self) -> None:
         up = im.weekly_rows(random.Random("a"), "P02", "トップス", 5800, 100, "上昇")
         down = im.weekly_rows(random.Random("a"), "P03", "トップス", 5800, 100, "下降")
-        self.assertGreater(up[-1]["cr854_units"], up[0]["cr854_units"])
-        self.assertLess(down[-1]["cr854_units"], down[0]["cr854_units"])
+        self.assertGreater(up[-1]["units"], up[0]["units"])
+        self.assertLess(down[-1]["units"], down[0]["units"])
 
 
 if __name__ == "__main__":

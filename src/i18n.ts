@@ -13,7 +13,7 @@ function detect(): Lang {
   } catch {
     // 保存を読めないときは、ブラウザの言語に従う
   }
-  // ビルドの設定(GCP 版は English)があれば、それを初期値にする。なければ、ブラウザの言語
+  // ビルドの設定(English)があれば、それを初期値にする。なければ、ブラウザの言語
   const preset = import.meta.env.VITE_DEFAULT_LANG
   if (preset === 'ja' || preset === 'en') return preset
   return navigator.language?.toLowerCase().startsWith('ja') ? 'ja' : 'en'
@@ -67,7 +67,7 @@ export function priceText(v?: number, market: Market = 'JP'): string {
     : `¥${v.toLocaleString('ja-JP')}`
 }
 
-// Dataverse の選択肢のラベル(日本語)の、英語表記。値は変えずに、表示だけを切り替える
+// 選択肢のラベル(日本語)の、英語表記。値は変えずに、表示だけを切り替える
 const OPTION_EN: Record<string, string> = {
   // ステータス
   未起案: 'Not started',

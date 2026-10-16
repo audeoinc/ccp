@@ -105,32 +105,32 @@ export function progressOf(a: {
  */
 export function cardProgress(
   card: {
-    cr854_theme?: string
-    cr854_headline?: string
-    cr854_copy?: string
-    cr854_instructions?: string
-    cr854_layoutkey?: string
-    cr854_emailtemplate?: number
-    _cr854_heroimage_value?: string
-    cr854_channel?: number
-    cr854_pushlink?: string
-    cr854_audience?: string
-    cr854_pushtitle?: string
-    cr854_pushbody?: string
+    theme?: string
+    headline?: string
+    copy?: string
+    instructions?: string
+    layout_key?: string
+    email_template?: string
+    hero_image_id?: string | null
+    channel?: string
+    push_link?: string
+    audience?: string
+    push_title?: string
+    push_body?: string
   },
   productCount: number,
 ): Progress {
   return progressOf({
     push:
-      card.cr854_channel === 588230001
-        ? { title: card.cr854_pushtitle ?? '', body: card.cr854_pushbody ?? '', timing: !!card.cr854_pushlink && !!card.cr854_audience }
+      card.channel === 'app'
+        ? { title: card.push_title ?? '', body: card.push_body ?? '', timing: !!card.push_link && !!card.audience }
         : undefined,
-    theme: card.cr854_theme ?? '',
-    template: card.cr854_layoutkey || (card.cr854_channel === 588230001 ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card.cr854_emailtemplate)),
-    heroId: card._cr854_heroimage_value,
-    headline: card.cr854_headline ?? '',
+    theme: card.theme ?? '',
+    template: card.layout_key || (card.channel === 'app' ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card.email_template)),
+    heroId: card.hero_image_id ?? undefined,
+    headline: card.headline ?? '',
     items: Array.from({ length: productCount }, () => ({}) as Item),
-    instructions: card.cr854_instructions ?? '',
+    instructions: card.instructions ?? '',
   })
 }
 

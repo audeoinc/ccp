@@ -1,46 +1,45 @@
-// 撮影・デモ用の、Dataverse の身代わり(メモリ上のデータ)。生成されたサービス(src/generated/services)と、同じ形で呼べる。
+// 撮影・デモ用の、データベースの身代わり(メモリ上のデータ)。表ごとのサービス(src/data)と、同じ形で呼べる。
 // vite.mock.config.ts が、サービスの読み込みを、ここに差し替える。ページを読み込み直すと、データは、最初に戻る。
 
 import { mockAgent } from './agent'
 import { cardNotes, cards, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, weekly, type Row } from './seed'
 
 const tables: Record<string, Row[]> = {
-  Cr854_deliverycardsService: structuredClone(cards),
-  Cr854_deliveryproductsService: structuredClone(deliveryProducts),
-  Cr854_productsService: structuredClone(products),
-  Cr854_heroimagesService: structuredClone(heroes),
-  Cr854_weeklyperformancesService: structuredClone(weekly),
-  Cr854_productpoliciesService: structuredClone(policies),
-  Cr854_layouttemplatesService: structuredClone(layoutTemplates),
-  Cr854_airequestsService: [],
-  Cr854_cardnotesService: structuredClone(cardNotes),
-  Cr854_weeksService: structuredClone(weeks),
-  Cr854_deliveryresultsService: structuredClone(deliveryResults),
-  Cr854_eventsService: structuredClone(events),
-  Cr854_changelogsService: structuredClone(changeLogs),
+  DeliveryCardsService: structuredClone(cards),
+  DeliveryProductsService: structuredClone(deliveryProducts),
+  ProductsService: structuredClone(products),
+  HeroImagesService: structuredClone(heroes),
+  WeeklyPerformancesService: structuredClone(weekly),
+  ProductPoliciesService: structuredClone(policies),
+  LayoutTemplatesService: structuredClone(layoutTemplates),
+  AiRequestsService: [],
+  CardNotesService: structuredClone(cardNotes),
+  WeeksService: structuredClone(weeks),
+  DeliveryResultsService: structuredClone(deliveryResults),
+  EventsService: structuredClone(events),
+  ChangeLogsService: structuredClone(changeLogs),
 }
 
-const idKey = (name: string) => `${name.replace('Service', '').toLowerCase().replace(/s$/, '').replace('cr854_productpolicie', 'cr854_productpolicy')}id`
 
 // 変更の記録(本番は、サーバーが行う。server/ccp/data_api.py の WATCHED と同じ項目)
 const WATCHED: Record<string, { kind: 'date' | 'policy'; fields: Record<string, string> }> = {
-  Cr854_deliverycardsService: { kind: 'date', fields: { cr854_scheduledat: 'scheduled_at' } },
-  Cr854_productpoliciesService: { kind: 'policy', fields: { cr854_stage: 'stage', cr854_promoperiod: 'promo_period', cr854_policy: 'policy' } },
+  DeliveryCardsService: { kind: 'date', fields: { scheduled_at: 'scheduled_at' } },
+  ProductPoliciesService: { kind: 'policy', fields: { stage: 'stage', promo_period: 'promo_period', policy: 'policy' } },
 }
 function logChange(name: string, before: Row, fields: Row) {
   const w = WATCHED[name]
   if (!w) return
   for (const [dv, col] of Object.entries(w.fields)) {
     if (!(dv in fields) || String(before[dv] ?? '') === String(fields[dv] ?? '')) continue
-    const card = name === 'Cr854_deliverycardsService'
-    tables.Cr854_changelogsService.push({
-      cr854_changelogid: guid(`change:${Date.now()}:${Math.random()}`),
-      cr854_kind: w.kind,
-      cr854_field: col,
-      cr854_before: String(before[dv] ?? ''),
-      cr854_after: String(fields[dv] ?? ''),
-      ...(card ? { _cr854_deliverycard_value: before.cr854_deliverycardid, cr854_cardname: before.cr854_name } : { cr854_productcode: before.cr854_productcode }),
-      createdon: new Date().toISOString(),
+    const card = name === 'DeliveryCardsService'
+    tables.ChangeLogsService.push({
+      id: guid(`change:${Date.now()}:${Math.random()}`),
+      kind: w.kind,
+      field: col,
+      before_value: String(before[dv] ?? ''),
+      after_value: String(fields[dv] ?? ''),
+      ...(card ? { delivery_card_id: before.id, card_name: before.name } : { product_code: before.product_code }),
+      created_on: new Date().toISOString(),
     })
   }
 }
@@ -62,15 +61,9 @@ function matches(row: Row, filter?: string): boolean {
 
 const clone = <T,>(v: T): T => structuredClone(v)
 
-/** `cr854_deliverycard@odata.bind: /cr854_deliverycards(<id>)` を、`_cr854_deliverycard_value` に直す */
+/** 書き込む項目を、行に入れる(参照は、相手の id をそのまま持つ) */
 function applyBinds(row: Row, fields: Row) {
-  for (const [k, v] of Object.entries(fields)) {
-    const m = k.match(/^(.+)@odata\.bind$/)
-    if (m) {
-      const id = typeof v === 'string' ? (v.match(/\(([^)]+)\)/)?.[1] ?? null) : null
-      row[`_${m[1]}_value`] = id ?? undefined
-    } else row[k] = v
-  }
+  Object.assign(row, fields)
 }
 
 const DELAY_MS = 1200
@@ -78,7 +71,7 @@ const waiting = new Map<string, number>()
 
 export function makeService(name: string) {
   const rows = tables[name]
-  const key = idKey(name)
+  const key = 'id'
   const find = (id: string) => rows.find((r) => r[key] === id)
   return {
     async getAll(options?: Options) {
@@ -95,20 +88,20 @@ export function makeService(name: string) {
       const r = find(id)
       if (!r) return { success: false, error: { message: 'not found' } }
       // AI 要求: 少し待ってから、エージェントの返答を返す(実際の待ち時間の代わり)
-      if (name === 'Cr854_airequestsService') {
+      if (name === 'AiRequestsService') {
         const readyAt = waiting.get(id) ?? 0
-        if (Date.now() >= readyAt && r.cr854_status !== 588230001) {
-          r.cr854_response = mockAgent(String(r.cr854_prompt ?? ''))
-          r.cr854_status = 588230001
+        if (Date.now() >= readyAt && r.status !== 'done') {
+          r.response = mockAgent(String(r.prompt ?? ''))
+          r.status = 'done'
         }
       }
       return { success: true, data: clone(r) }
     },
     async create(record: Row) {
-      const row: Row = { [key]: guid(`${name}:${Math.random()}:${Date.now()}`), createdon: new Date().toISOString() }
+      const row: Row = { [key]: guid(`${name}:${Math.random()}:${Date.now()}`), created_on: new Date().toISOString() }
       applyBinds(row, record)
       rows.push(row)
-      if (name === 'Cr854_airequestsService') waiting.set(row[key] as string, Date.now() + DELAY_MS)
+      if (name === 'AiRequestsService') waiting.set(row[key] as string, Date.now() + DELAY_MS)
       return { success: true, data: clone(row) }
     },
     async update(id: string, fields: Row) {

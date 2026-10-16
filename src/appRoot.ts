@@ -1,8 +1,8 @@
-// GCP 版の、アプリの置き場所(末尾は /)。サーバーの API(/api/…)・画像(/img/…)のパスは、ここを基準にする。
+// アプリの置き場所(末尾は /)。サーバーの API(/api/…)・画像(/img/…)のパスは、ここを基準にする。
 // Cloud Run では「/」だが、Vertex AI Workbench のノートブックで手元のサーバーを動かすと、Jupyter の中継(/proxy/8081/)の下になる。
 // そこで「/api/…」を呼ぶと、中継を通らずに Jupyter に届いてしまうため、読み込んだ JS の場所から、置き場所を求める。
 // (画面の JS は <置き場所>/assets/ にあるので、その 1 つ上。ビルドの設定 base: './' と組で動く)
-// Power Apps 版では使わない(VITE_APP_ROOT_FROM_SCRIPT は、GCP 版のビルドだけで定義する)
+// (VITE_APP_ROOT_FROM_SCRIPT は、vite.config.ts で定義する。撮影・デモ用のビルドでは使わない)
 
 const fromScript = import.meta.env.VITE_APP_ROOT_FROM_SCRIPT === 'true'
 // 文字列の定数を new URL に直接書くと、Vite が「同梱するファイル」とみなして解決しようとするので、変数で渡す

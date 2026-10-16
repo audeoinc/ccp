@@ -1,6 +1,6 @@
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { SOURCE_MANUAL, type Item } from './items'
 import { Preview } from './Preview'
 import { parsePushLink } from './pushLink'
@@ -21,11 +21,11 @@ const parseCopies = (v?: string): string[] => {
 const noop = () => undefined
 
 interface Props {
-  card: Cr854_deliverycards
+  card: DeliveryCard
   /** 掲載商品(メールの並び順の商品 ID) */
   productIds: string[]
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
 }
 
 /**
@@ -34,29 +34,29 @@ interface Props {
  * 商品の枠には data-item-key(`商品ID-並び順`)が付くので、外から位置を探せる
  */
 export function CardPreview({ card: c, productIds, products, heroes }: Props) {
-  const isPush = c.cr854_channel === CHANNEL_PUSH
-  const templateId = c.cr854_layoutkey || (isPush ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.cr854_emailtemplate))
+  const isPush = c.channel === CHANNEL_PUSH
+  const templateId = c.layout_key || (isPush ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
   const items: Item[] = productIds.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
   return (
     <Preview
       channel={isPush ? 'push' : 'email'}
-      pushLinkKind={parsePushLink(c.cr854_pushlink)?.kind}
-      pushTitle={c.cr854_pushtitle}
-      pushBody={c.cr854_pushbody}
-      subject={c.cr854_name}
-      headline={c.cr854_headline ?? ''}
-      copy={c.cr854_copy ?? ''}
+      pushLinkKind={parsePushLink(c.push_link)?.kind}
+      pushTitle={c.push_title}
+      pushBody={c.push_body}
+      subject={c.name}
+      headline={c.headline ?? ''}
+      copy={c.copy ?? ''}
       items={items}
       products={products}
       selectedKey={null}
       showHeadings
       template={templateId}
-      scheduledAt={c.cr854_scheduledat ?? ''}
-      sectionTitles={(c.cr854_sectiontitles ?? '').split('\n')}
+      scheduledAt={c.scheduled_at ?? ''}
+      sectionTitles={(c.section_titles ?? '').split('\n')}
       onSectionTitle={noop}
-      sectionCopies={parseCopies(c.cr854_sectioncopies)}
+      sectionCopies={parseCopies(c.section_copies)}
       onSectionCopy={noop}
-      hero={heroes.find((h) => h.cr854_heroimageid === c._cr854_heroimage_value)}
+      hero={heroes.find((h) => h.id === c.hero_image_id)}
       onDropHero={noop}
       onClearHero={noop}
       onSelect={noop}

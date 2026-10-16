@@ -1,6 +1,6 @@
-"""/api/data/{テーブル} — 画面(generated/services の互換サービス)から呼ばれる、データの読み書き。
+"""/api/data/{テーブル} — 画面(src/data の表ごとのサービス)から呼ばれる、データの読み書き。
 
-テーブル名と項目名は、Dataverse の名前(cr854_…)で受け取り、schema.py が PostgreSQL の名前に変換する。
+テーブル名と項目名は、PostgreSQL と同じ名前(delivery_cards、scheduled_at など)。
 受け付けるのは、schema.json にあるテーブルと列だけ。値はすべて、パラメータとして渡す(SQL に直接埋め込まない)。
 """
 from __future__ import annotations
@@ -105,7 +105,7 @@ def _columns_sql(t: sc.Table, names: list[str] | None) -> str:
     if not names:
         cols = ["id"] + [c.pg for c in t.all_columns] + [lk.pg for lk in t.lookups]
     else:
-        cols = ["id"] + [t.resolve(n.strip())[0] for n in names if n.strip() != t.pk]
+        cols = ["id"] + [t.resolve(n.strip())[0] for n in names if n.strip() != "id"]
     return ", ".join(dict.fromkeys(cols))
 
 
@@ -164,10 +164,10 @@ async def create_row(table: str, request: Request):
 
 # 変更の記録(アラートの「MD 方針の変更」「日程の変更」のため。バックログ A1)。
 # 配信日時・商品の方針が書き換わったら、変更前と変更後を change_logs に残す。どこから書き換えても漏れないよう、サーバーの側で記録する。
-# テーブル(Dataverse の名前) → (種類, 見張る列(PostgreSQL の名前), 一緒に残す列)
+# テーブル → (種類, 見張る列, 一緒に残す列)
 WATCHED: dict[str, tuple[str, list[str], str]] = {
-    "cr854_deliverycards": ("date", ["scheduled_at"], "name"),
-    "cr854_productpolicies": ("policy", ["stage", "promo_period", "policy"], "product_code"),
+    "delivery_cards": ("date", ["scheduled_at"], "name"),
+    "product_policies": ("policy", ["stage", "promo_period", "policy"], "product_code"),
 }
 
 
@@ -177,11 +177,11 @@ def _text(v: Any) -> str:
 
 
 async def _log_changes(conn: AsyncConnection, t: sc.Table, row_id: Any, before: dict[str, Any], after: dict[str, Any], actor: str) -> None:
-    kind, cols, extra = WATCHED[t.dv]
+    kind, cols, extra = WATCHED[t.name]
     for col in cols:
         if col not in after or _text(before.get(col)) == _text(after.get(col)):
             continue
-        is_card = t.dv == "cr854_deliverycards"
+        is_card = t.name == "delivery_cards"
         await conn.execute(
             text(
                 "INSERT INTO change_logs (kind, field, before_value, after_value, product_code, card_name, actor, delivery_card_id) "
@@ -207,7 +207,7 @@ async def update_row(table: str, row_id: str, request: Request):
     sets = [f"{c} = :{c}" for c in values] + ["modified_on = now()"]
     sql = f"UPDATE {t.pg} SET {', '.join(sets)} WHERE id = :_id RETURNING {_columns_sql(t, None)}"
     rid = sc.coerce("uuid", row_id)
-    watched = WATCHED.get(t.dv)
+    watched = WATCHED.get(t.name)
     async with db(write=True) as conn:
         before = None
         if watched and any(c in values for c in watched[1]):

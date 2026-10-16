@@ -1,29 +1,29 @@
 import {
-  Cr854_productscr854_category,
-  Cr854_productscr854_salestrend,
-  Cr854_productscr854_season,
-  Cr854_productscr854_weather,
-  type Cr854_products,
-} from './generated/models/Cr854_productsModel'
-import { Cr854_heroimagescr854_purpose, Cr854_heroimagescr854_season, type Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+  ProductCategory,
+  ProductSalesTrend,
+  ProductSeason,
+  ProductWeather,
+  type Product,
+} from './models/products'
+import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
-// Dataverse が選択肢の表示名(○○name の項目)を返さないことがあるので、値(数値)から補う
-const pick = (map: Record<number, string>, value?: number, name?: string) => name || (value === undefined ? undefined : map[value])
+// 選択肢の表示名(○○_name の項目)は、値から求める
+const pick = (map: Record<string, string>, value?: string, name?: string) => name || (value === undefined ? undefined : map[value])
 
-export function withProductLabels(p: Cr854_products): Cr854_products {
+export function withProductLabels(p: Product): Product {
   return {
     ...p,
-    cr854_categoryname: pick(Cr854_productscr854_category, p.cr854_category, p.cr854_categoryname),
-    cr854_salestrendname: pick(Cr854_productscr854_salestrend, p.cr854_salestrend, p.cr854_salestrendname),
-    cr854_seasonname: pick(Cr854_productscr854_season, p.cr854_season, p.cr854_seasonname),
-    cr854_weathername: pick(Cr854_productscr854_weather, p.cr854_weather, p.cr854_weathername),
+    category_name: pick(ProductCategory, p.category, p.category_name),
+    sales_trend_name: pick(ProductSalesTrend, p.sales_trend, p.sales_trend_name),
+    season_name: pick(ProductSeason, p.season, p.season_name),
+    weather_name: pick(ProductWeather, p.weather, p.weather_name),
   }
 }
 
-export function withHeroLabels(h: Cr854_heroimages): Cr854_heroimages {
+export function withHeroLabels(h: HeroImage): HeroImage {
   return {
     ...h,
-    cr854_purposename: pick(Cr854_heroimagescr854_purpose, h.cr854_purpose, h.cr854_purposename),
-    cr854_seasonname: pick(Cr854_heroimagescr854_season, h.cr854_season, h.cr854_seasonname),
+    purpose_name: pick(HeroImagePurpose, h.purpose, h.purpose_name),
+    season_name: pick(HeroImageSeason, h.season, h.season_name),
   }
 }

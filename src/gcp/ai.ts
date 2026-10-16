@@ -1,4 +1,4 @@
-// AI の送受信(Cr854_airequestsService)。
+// AI の送受信(AiRequestsService)。
 //
 // askText(src/aiSelect.ts)は、依頼を create し、返答を get で待ち、delete する。
 // ここでは、その呼び出しを、サーバーの /api/ask(Gemini)への 1 回の問い合わせに置き換える。
@@ -6,12 +6,12 @@
 
 // aiSelect.ts の STATUS_* と同じ値(AI要求の状態の選択肢)
 import { appPath } from '../appRoot'
-import type { Cr854_airequests, Cr854_airequestsBase } from '../generated/models/Cr854_airequestsModel'
+import type { AiRequest, AiRequestFields } from '../models/aiRequests'
 import type { OperationResult } from './services'
 
-const WAITING = 588230000
-const DONE = 588230001
-const ERROR = 588230002
+const WAITING = 'waiting'
+const DONE = 'done'
+const ERROR = 'error'
 
 interface Pending {
   status: typeof WAITING | typeof DONE | typeof ERROR
@@ -46,16 +46,16 @@ function ask(prompt: string): Pending {
 
 export function makeAiRequestService() {
   return {
-    async create(record: Partial<Cr854_airequestsBase>): Promise<OperationResult<Partial<Cr854_airequests>>> {
+    async create(record: Partial<AiRequestFields>): Promise<OperationResult<Partial<AiRequest>>> {
       const id = crypto.randomUUID()
-      requests.set(id, ask(record.cr854_prompt ?? ''))
-      return { success: true, data: { cr854_airequestid: id } }
+      requests.set(id, ask(record.prompt ?? ''))
+      return { success: true, data: { id: id } }
     },
-    async get(id: string): Promise<OperationResult<Partial<Cr854_airequests> | undefined>> {
+    async get(id: string): Promise<OperationResult<Partial<AiRequest> | undefined>> {
       const p = requests.get(id)
       if (!p) return { success: false, data: undefined, error: { message: 'AI の依頼が見つかりません' } }
       if (p.status === WAITING) await Promise.race([p.settled, new Promise((r) => setTimeout(r, WAIT_IN_GET_MS))])
-      return { success: true, data: { cr854_airequestid: id, cr854_status: p.status, cr854_response: p.response } }
+      return { success: true, data: { id: id, status: p.status, response: p.response } }
     },
     async delete(id: string) {
       requests.delete(id)

@@ -1,8 +1,8 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Button, Field, Input, MessageBar, MessageBarBody, Select, Spinner, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { AiIcon } from './AiMark'
 import { evaluateLineup, type CompareVerdict } from './aiCompare'
 import { HeatPreview } from './HeatPreview'
@@ -70,9 +70,9 @@ interface Props {
   /** 結果のある配信(共通のツールバーの絞り込みをかけたもの) */
   rows: ResultRow[]
   cardProducts: Map<string, string[]>
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
-  money: (v: number | undefined, card: Cr854_deliverycards) => string
+  products: Product[]
+  heroes: HeroImage[]
+  money: (v: number | undefined, card: DeliveryCard) => string
   /** 配信の詳しい結果を開く */
   onOpen: (cardId: string) => void
   /** AI の評価を、配信の「次に生かすメモ」に入れる */
@@ -106,15 +106,15 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
 
   const ms = (r: ResultRow) => new Date(sentAtOf(r) ?? 0).getTime()
   const matched = rows
-    .filter((r) => (!tpl || templateIdOf(r.card) === tpl) && (!themeType || themeTypeOf(r.card).type === themeType) && (!query.trim() || (r.card.cr854_name ?? '').toLowerCase().includes(query.trim().toLowerCase())))
+    .filter((r) => (!tpl || templateIdOf(r.card) === tpl) && (!themeType || themeTypeOf(r.card).type === themeType) && (!query.trim() || (r.card.name ?? '').toLowerCase().includes(query.trim().toLowerCase())))
     .sort((a, b) => ms(b) - ms(a))
   // 直近 n 回を、古い順(左から右へ、時間の流れ)に並べる
   const lineup = matched.slice(0, n).reverse()
   const latest = lineup[lineup.length - 1]
   const sameTemplate = lineup.length > 0 && lineup.every((r) => templateIdOf(r.card) === templateIdOf(lineup[0].card))
-  const idsOf = (r: ResultRow) => cardProducts.get(r.card.cr854_deliverycardid) ?? []
-  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? ''
-  const perRecipient = (r: ResultRow) => (r.result.cr854_recipients ? r.revenue / r.result.cr854_recipients : undefined)
+  const idsOf = (r: ResultRow) => cardProducts.get(r.card.id) ?? []
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
+  const perRecipient = (r: ResultRow) => (r.result.recipients ? r.revenue / r.result.recipients : undefined)
   const shares = lineup.map((r) => positionShares(r, idsOf(r)))
 
   // 表の行: 数字と、(テンプレートが揃っているときだけ)位置ごとのクリックの割合
@@ -124,7 +124,7 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
     { key: 'click', label: t('クリック率(アプリはタップ率)', 'Click rate (app: tap rate)'), values: lineup.map((r) => r.clickRate), show: (v) => pct(v) },
     { key: 'revenue', label: t('売上', 'Revenue'), values: lineup.map((r) => r.revenue), show: (v, r) => money(v, r.card) },
     { key: 'rpr', label: t('1 通あたりの売上', 'Revenue per recipient'), values: lineup.map(perRecipient), show: (v) => (v === undefined ? '—' : v.toFixed(2)) },
-    { key: 'orders', label: t('注文', 'Orders'), values: lineup.map((r) => r.result.cr854_orders), show: (v) => (v === undefined ? '—' : Math.round(v).toLocaleString(locale())) },
+    { key: 'orders', label: t('注文', 'Orders'), values: lineup.map((r) => r.result.orders), show: (v) => (v === undefined ? '—' : Math.round(v).toLocaleString(locale())) },
     ...(sameTemplate
       ? [...(shares[0]?.keys() ?? [])]
           .filter((k) => k !== 'other')
@@ -163,15 +163,15 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
         await evaluateLineup({
           filters: describeFilters(),
           deliveries: lineup.map((r, i) => ({
-            id: r.card.cr854_deliverycardid,
+            id: r.card.id,
             date: (sentAtOf(r) ?? '').slice(0, 10),
-            name: r.card.cr854_name,
-            theme: r.card.cr854_theme,
+            name: r.card.name,
+            theme: r.card.theme,
             themeType: themeTypeOf(r.card).type,
             template: templateName(r.card),
-            headline: isPush(r.card) ? r.card.cr854_pushtitle : r.card.cr854_headline,
+            headline: isPush(r.card) ? r.card.push_title : r.card.headline,
             slots: idsOf(r).map(productName),
-            kpis: { openRate: r.openRate, clickRate: r.clickRate, revenue: r.revenue, revenuePerRecipient: perRecipient(r), orders: r.result.cr854_orders },
+            kpis: { openRate: r.openRate, clickRate: r.clickRate, revenue: r.revenue, revenuePerRecipient: perRecipient(r), orders: r.result.orders },
             positions: sameTemplate ? Object.fromEntries([...shares[i]].filter(([k]) => k !== 'other')) : {},
           })),
         }),
@@ -189,8 +189,8 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
     setAdopted((s) => new Set(s).add(text))
   }
   const nameOf = (id: string) => {
-    const r = lineup.find((x) => x.card.cr854_deliverycardid === id)
-    return r ? `${dateText(r)} ${r.card.cr854_name}` : id
+    const r = lineup.find((x) => x.card.id === id)
+    return r ? `${dateText(r)} ${r.card.name}` : id
   }
   // 評価の配信名から、その配信の列へ移って、しばらく光らせる
   const [flash, setFlash] = useState<string | null>(null)
@@ -249,8 +249,8 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
               </Button>
               <span className={styles.sub}>
                 {t(
-                  `いま並んでいる ${lineup.length} 本(${describeFilters()})を、AI が見比べます。評価は保存しません。残したいものは「メモに採用」で、最新の配信(${latest ? nameOf(latest.card.cr854_deliverycardid) : ''})の次に生かすメモに入ります`,
-                  `AI compares the ${lineup.length} deliveries shown (${describeFilters()}). Not saved; adopt lines into the notes of the latest delivery (${latest ? nameOf(latest.card.cr854_deliverycardid) : ''}).`,
+                  `いま並んでいる ${lineup.length} 本(${describeFilters()})を、AI が見比べます。評価は保存しません。残したいものは「メモに採用」で、最新の配信(${latest ? nameOf(latest.card.id) : ''})の次に生かすメモに入ります`,
+                  `AI compares the ${lineup.length} deliveries shown (${describeFilters()}). Not saved; adopt lines into the notes of the latest delivery (${latest ? nameOf(latest.card.id) : ''}).`,
                 )}
               </span>
             </div>
@@ -306,13 +306,13 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
           </div>
           <div className={styles.lineup}>
             {lineup.map((r) => {
-              const id = r.card.cr854_deliverycardid
+              const id = r.card.id
               return (
-                <button key={r.result.cr854_deliveryresultid} id={`cmp-${id}`} type="button" className={mergeClasses(styles.col, bestIds.has(id) && styles.colBest, worstIds.has(id) && styles.colWorst, flash === id && styles.colFlash)} onClick={() => onOpen(id)} title={t('詳しい結果を開く', 'Open the details')}>
+                <button key={r.result.id} id={`cmp-${id}`} type="button" className={mergeClasses(styles.col, bestIds.has(id) && styles.colBest, worstIds.has(id) && styles.colWorst, flash === id && styles.colFlash)} onClick={() => onOpen(id)} title={t('詳しい結果を開く', 'Open the details')}>
                   <span className={styles.colHead}>
                     <span className={styles.colSub}>{`${dateText(r)} · ${isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
-                    <span className={styles.colName}>{r.card.cr854_name}</span>
-                    <span className={styles.colSub} title={r.card.cr854_theme}>{r.card.cr854_theme || '—'}</span>
+                    <span className={styles.colName}>{r.card.name}</span>
+                    <span className={styles.colSub} title={r.card.theme}>{r.card.theme || '—'}</span>
                     {!sameTemplate && <span className={styles.colSub}>{templateName(r.card)}</span>}
                   </span>
                   <span className={styles.heat}>
@@ -329,7 +329,7 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
                 <tr>
                   <th className={styles.th} style={{ textAlign: 'left' }} />
                   {lineup.map((r) => (
-                    <th key={r.result.cr854_deliveryresultid} className={styles.th} title={r.card.cr854_name}>
+                    <th key={r.result.id} className={styles.th} title={r.card.name}>
                       {dateText(r)}
                     </th>
                   ))}
@@ -347,7 +347,7 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
                     <tr>
                       <td className={styles.rowHead}>{l.label}</td>
                       {lineup.map((r, i) => (
-                        <td key={r.result.cr854_deliveryresultid} className={styles.cell} style={{ backgroundColor: shade(l.values, l.values[i]) }}>
+                        <td key={r.result.id} className={styles.cell} style={{ backgroundColor: shade(l.values, l.values[i]) }}>
                           {l.show(l.values[i], r)}
                         </td>
                       ))}

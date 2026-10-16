@@ -1,13 +1,13 @@
-import { Cr854_airequestsService } from './generated/services/Cr854_airequestsService'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import { AiRequestsService } from './data/aiRequests'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
 import type { SectionKind } from './templates'
 
 // AI の依頼の状態(選択肢の値。src/gcp/ai.ts が返す)
-const STATUS_WAITING = 588230000
-const STATUS_DONE = 588230001
-const STATUS_ERROR = 588230002
+const STATUS_WAITING = 'waiting'
+const STATUS_DONE = 'done'
+const STATUS_ERROR = 'error'
 const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 180000
 
@@ -308,45 +308,45 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
 /** 依頼文をエージェントへ送り、返答のテキストを返す */
 async function askText(message: string): Promise<string> {
   // 依頼を登録し、返答を待つ(サーバーの /api/ask が Gemini に問い合わせる。src/gcp/ai.ts)
-  const created = await Cr854_airequestsService.create({
-    cr854_name: `req-${new Date().toISOString()}`,
-    cr854_prompt: message,
-    cr854_status: STATUS_WAITING,
-    statecode: 0,
+  const created = await AiRequestsService.create({
+    name: `req-${new Date().toISOString()}`,
+    prompt: message,
+    status: STATUS_WAITING,
+    state_code: 0,
   })
-  const id = created.data?.cr854_airequestid
+  const id = created.data?.id
   if (!created.success || !id) throw new Error(created.error?.message ?? tr('AI の依頼を登録できませんでした', 'Could not register the AI request'))
   try {
     const deadline = Date.now() + POLL_TIMEOUT_MS
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
-      const got = await Cr854_airequestsService.get(id)
+      const got = await AiRequestsService.get(id)
       if (!got.success || !got.data) continue
-      const status = got.data.cr854_status
-      if (status === STATUS_ERROR) throw new Error(got.data.cr854_response || tr('エージェントの呼び出しに失敗しました', 'Failed to call the agent'))
+      const status = got.data.status
+      if (status === STATUS_ERROR) throw new Error(got.data.response || tr('エージェントの呼び出しに失敗しました', 'Failed to call the agent'))
       if (status !== STATUS_DONE) continue
-      return got.data.cr854_response ?? ''
+      return got.data.response ?? ''
     }
     throw new Error(tr('AI の返答がタイムアウトしました。しばらくしてから、もう一度試してください', 'The AI response timed out. Please try again in a moment'))
   } finally {
     // 読み取ったあと(失敗時も)、依頼の行は消す
-    void Cr854_airequestsService.delete(id).catch(() => undefined)
+    void AiRequestsService.delete(id).catch(() => undefined)
   }
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-const productPayload = (p: Cr854_products) => ({
-  code: p.cr854_productcode,
-  name: p.cr854_name,
-  category: p.cr854_categoryname,
-  price: p.cr854_price,
-  stock: p.cr854_stock,
-  season: p.cr854_seasonname,
-  salesTrend: p.cr854_salestrendname,
-  rating: p.cr854_rating,
-  weather: p.cr854_weathername,
-  description: p.cr854_description,
+const productPayload = (p: Product) => ({
+  code: p.product_code,
+  name: p.name,
+  category: p.category_name,
+  price: p.price,
+  stock: p.stock,
+  season: p.season_name,
+  salesTrend: p.sales_trend_name,
+  rating: p.rating,
+  weather: p.weather_name,
+  description: p.description,
 })
 
 export interface SectionRequest {
@@ -376,21 +376,21 @@ interface SectionArgs {
   others: OtherSection[]
   current?: SectionState
   /** 設定済みのメイン画像とその選定理由(見出し・コピー・商品の材料) */
-  hero?: Cr854_heroimages
+  hero?: HeroImage
   heroReason?: string
   /** コピーの言語 */
   language: CopyLanguage
 }
 
-const heroPayload = (h?: Cr854_heroimages, reason?: string) =>
+const heroPayload = (h?: HeroImage, reason?: string) =>
   h
     ? {
-        code: h.cr854_imagecode,
-        name: h.cr854_name,
-        purpose: h.cr854_purposename,
-        season: h.cr854_seasonname,
-        tags: h.cr854_tags,
-        description: h.cr854_description,
+        code: h.image_code,
+        name: h.name,
+        purpose: h.purpose_name,
+        season: h.season_name,
+        tags: h.tags,
+        description: h.description,
         reason: reason || undefined,
       }
     : null
@@ -439,10 +439,10 @@ async function retryOnMatchError<T>(fn: () => Promise<T>, attempts = 2): Promise
 
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase()
 
-function toSelection(raw: unknown, pool: Cr854_products[], slots: number): ProductSelection {
+function toSelection(raw: unknown, pool: Product[], slots: number): ProductSelection {
   // コードの大文字小文字・前後の空白の違い、code 以外のキー名、商品名での返答も受け付ける
-  const byCode = new Map(pool.map((p) => [norm(p.cr854_productcode), p.cr854_productid]))
-  const byName = new Map(pool.map((p) => [norm(p.cr854_name), p.cr854_productid]))
+  const byCode = new Map(pool.map((p) => [norm(p.product_code), p.id]))
+  const byName = new Map(pool.map((p) => [norm(p.name), p.id]))
   const seen = new Set<string>()
   const rows: ProposedRow[] = []
   type Raw = { code?: string; productCode?: string; product_code?: string; id?: string; name?: string; productName?: string; reason?: string }
@@ -465,11 +465,11 @@ export async function proposeSection(
   args: SectionArgs & {
     /** 他のセクションですでに使っている商品(候補にも出さない) */
     excludedProductIds: Set<string>
-    products: Cr854_products[]
-    hero?: Cr854_heroimages
+    products: Product[]
+    hero?: HeroImage
   },
 ): Promise<SectionProposal> {
-  const pool = args.products.filter((p) => !args.excludedProductIds.has(p.cr854_productid))
+  const pool = args.products.filter((p) => !args.excludedProductIds.has(p.id))
   return retryOnMatchError(async () => {
     const parsed = await askAgent(SECTION_PROMPT, {
       ...sectionPayload('select_section', args),
@@ -505,9 +505,9 @@ export async function proposeSectionCopies(args: SectionArgs): Promise<CopyCandi
 
 /** 商品だけ選び直す */
 export async function proposeSectionProducts(
-  args: SectionArgs & { excludedProductIds: Set<string>; products: Cr854_products[]; hero?: Cr854_heroimages },
+  args: SectionArgs & { excludedProductIds: Set<string>; products: Product[]; hero?: HeroImage },
 ): Promise<ProductSelection> {
-  const pool = args.products.filter((p) => !args.excludedProductIds.has(p.cr854_productid))
+  const pool = args.products.filter((p) => !args.excludedProductIds.has(p.id))
   return retryOnMatchError(async () => {
     const parsed = await askAgent(PRODUCTS_PROMPT, {
       ...sectionPayload('select_section_products', args),
@@ -520,7 +520,7 @@ export async function proposeSectionProducts(
 /** メイン画像(選定 + 候補)を提案させる */
 export async function proposeHero(args: {
   card: AiCard
-  heroes: Cr854_heroimages[]
+  heroes: HeroImage[]
   /** すでに選んでいる商品(画像の雰囲気を合わせるための参考) */
   productNames: string[]
 }): Promise<HeroProposal> {
@@ -531,19 +531,19 @@ export async function proposeHero(args: {
     card,
     products: productNames,
     heroes: heroes.map((h) => ({
-      code: h.cr854_imagecode,
-      name: h.cr854_name,
-      purpose: h.cr854_purposename,
-      season: h.cr854_seasonname,
-      tags: h.cr854_tags,
-      description: h.cr854_description,
+      code: h.image_code,
+      name: h.name,
+      purpose: h.purpose_name,
+      season: h.season_name,
+      tags: h.tags,
+      description: h.description,
     })),
   })) as {
     hero?: { code?: string; reason?: string } | null
     candidates?: { code?: string; reason?: string }[]
   }
 
-  const byCode = new Map(heroes.map((h) => [h.cr854_imagecode, h.cr854_heroimageid]))
+  const byCode = new Map(heroes.map((h) => [h.image_code, h.id]))
   const toHero = (it?: { code?: string; reason?: string } | null): ProposedHero | null => {
     const id = it?.code ? byCode.get(it.code) : undefined
     return id ? { heroId: id, reason: it?.reason ?? '' } : null

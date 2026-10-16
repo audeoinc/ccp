@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Avatar, Badge, Popover, PopoverSurface, PopoverTrigger, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
+import type { Product } from './models/products'
 import { productImage } from './images'
 import { yen, type Item } from './items'
 import { optionLabel, useT } from './i18n'
@@ -14,7 +14,7 @@ interface Props {
   template: EmailTemplateId
   sectionTitles: string[]
   items: Item[]
-  products: Cr854_products[]
+  products: Product[]
   /** 行にマウスが乗ったとき(プレビューの該当商品を光らせるため)。外れたら null */
   onHover: (key: string | null) => void
   /** アラートのある商品(商品 ID → いちばん強い種類)。商品名の前に印を付ける */
@@ -78,7 +78,7 @@ function trendMark(name?: string): { mark: string; color: string } {
 export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds }: Props) {
   const t = useT()
   const s = useStyles()
-  const productById = new Map(products.map((p) => [p.cr854_productid, p]))
+  const productById = new Map(products.map((p) => [p.id, p]))
   const sections = sectionsOf(template)
 
   return (
@@ -115,12 +115,12 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
   )
 }
 
-function ProductItem({ product: p, itemKey, onHover, alert }: { product: Cr854_products; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind }) {
+function ProductItem({ product: p, itemKey, onHover, alert }: { product: Product; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind }) {
   const t = useT()
   const s = useStyles()
   const market = productMarket(p)
-  const trend = trendMark(p.cr854_salestrendname)
-  const low = p.cr854_stock !== undefined && p.cr854_stock < LOW_STOCK
+  const trend = trendMark(p.sales_trend_name)
+  const low = p.stock !== undefined && p.stock < LOW_STOCK
   // 開閉を自分で持つ: フロートの中の「閉じる」ボタンから閉じられるようにするため(外側のクリック・Esc でも閉じる)
   const [open, setOpen] = useState(false)
   return (
@@ -132,18 +132,18 @@ function ProductItem({ product: p, itemKey, onHover, alert }: { product: Cr854_p
     >
       <PopoverTrigger disableButtonEnhancement>
         <div className={mergeClasses(s.item)} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
-          <Avatar shape="square" image={{ src: productImage(p), alt: p.cr854_name }} name={p.cr854_name} className={s.avatar} />
+          <Avatar shape="square" image={{ src: productImage(p), alt: p.name }} name={p.name} className={s.avatar} />
           <div className={s.main}>
             <Text size={200} weight="semibold" className={s.name}>
               <AlertMark kind={alert} />
-              {p.cr854_name}
+              {p.name}
             </Text>
             <span className={s.sub}>
-              {p.cr854_productcode} ・ {yen(p.cr854_price, market)} ・ {t('在庫', 'Stock ')}{p.cr854_stock ?? '-'}
+              {p.product_code} ・ {yen(p.price, market)} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
             </span>
           </div>
           {low && <Badge size="small" appearance="tint" color="warning">{t('残少', 'Low')}</Badge>}
-          <span className={s.trend} style={{ color: trend.color }} title={optionLabel(p.cr854_salestrendname)}>{trend.mark}</span>
+          <span className={s.trend} style={{ color: trend.color }} title={optionLabel(p.sales_trend_name)}>{trend.mark}</span>
         </div>
       </PopoverTrigger>
       <PopoverSurface>

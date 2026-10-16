@@ -12,7 +12,7 @@ export type Audience = 'all' | 'members' | 'inactive30' | 'notOpenedEmail'
 export const PUSH_TITLE_MAX = 40
 export const PUSH_BODY_MAX = 120
 
-/** 配信カードの cr854_pushlink(JSON)を読む */
+/** 配信カードの push_link(JSON)を読む */
 export const parsePushLink = (v?: string): PushLink | null => {
   if (!v) return null
   try {

@@ -26,11 +26,11 @@ import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
-import { Cr854_deliverycardsService } from './generated/services/Cr854_deliverycardsService'
-import type { Cr854_deliverycards } from './generated/models/Cr854_deliverycardsModel'
-import { Cr854_deliveryproductsService } from './generated/services/Cr854_deliveryproductsService'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import { DeliveryCardsService } from './data/deliveryCards'
+import type { DeliveryCard } from './models/deliveryCards'
+import { DeliveryProductsService } from './data/deliveryProducts'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
@@ -46,11 +46,11 @@ import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
-import { Cr854_weeksService, type Cr854_weeks } from './gcpdata/Cr854_weeksService'
-import { Cr854_cardnotesService } from './gcpdata/Cr854_cardnotesService'
+import { WeeksService, type WeekRow } from './data/weeks'
+import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf } from './weekLock'
 import { logEvent, myName, setMyName } from './history'
-import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
+import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
@@ -61,17 +61,17 @@ export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'ch
 
 interface Props {
   /** undefined のときは新規作成 */
-  card?: Cr854_deliverycards
+  card?: DeliveryCard
   /** 新規作成のときだけ使う */
   defaults?: NewCardDefaults
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   /** 他の配信で使われているテーマ(テーマ案の重複回避用) */
   otherThemes: string[]
   /** これまでに入れた担当者の名前(入力の候補) */
   owners?: string[]
-  /** 週の計画(確定した週の配信は、理由を残さないと保存できない。GCP 版だけ。Power Apps 版では空) */
-  weeks?: Cr854_weeks[]
+  /** 週の計画(確定した週の配信は、理由を残さないと保存できない) */
+  weeks?: WeekRow[]
   onBack: () => void
   onSaved: () => Promise<void>
   /** この配信の結果を、上に重ねて見る(送ったあとの配信だけ、ボタンを出す) */
@@ -84,9 +84,9 @@ interface Props {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 // 配信のステータス(選択肢の値)。承認・差し戻し・再承認の判定に使う
-const STATUS_NOT_STARTED = 588230000
-const STATUS_REVIEW = 588230001
-const STATUS_APPROVED = 588230002
+const STATUS_NOT_STARTED = 'not_started'
+const STATUS_REVIEW = 'reviewing'
+const STATUS_APPROVED = 'approved'
 // ISO文字列 → datetime-local の値(ローカル時刻)
 const toLocalInput = (v?: string) => {
   if (!v) return ''
@@ -120,34 +120,34 @@ interface Form {
   instructionsAngle: string
 }
 
-const str = (v?: number) => (v === undefined ? '' : String(v))
+const str = (v?: string) => (v === undefined ? '' : String(v))
 
-const toForm = (c?: Cr854_deliverycards): Form => ({
-  name: c?.cr854_name ?? '',
-  scheduledAt: toLocalInput(c?.cr854_scheduledat),
-  country: str(c?.cr854_country),
-  channel: str(c?.cr854_channel),
-  department: str(c?.cr854_department),
-  status: c?.cr854_status === undefined ? String(statusOptions[0].value) : String(c.cr854_status),
-  owner: c?.cr854_owner ?? '',
-  pushTitle: c?.cr854_pushtitle ?? '',
-  pushBody: c?.cr854_pushbody ?? '',
-  productionDue: c?.cr854_productiondue?.slice(0, 10) ?? '',
-  productionOwner: c?.cr854_productionowner ?? '',
-  handedOffAt: c?.cr854_handedoffat ?? '',
-  theme: c?.cr854_theme ?? '',
-  headline: c?.cr854_headline ?? '',
-  copy: c?.cr854_copy ?? '',
-  instructions: c?.cr854_instructions ?? '',
-  themeReason: c?.cr854_themereason ?? '',
-  copyAngle: c?.cr854_copyangle ?? '',
-  instructionsAngle: c?.cr854_instructionsangle ?? '',
+const toForm = (c?: DeliveryCard): Form => ({
+  name: c?.name ?? '',
+  scheduledAt: toLocalInput(c?.scheduled_at),
+  country: str(c?.country),
+  channel: str(c?.channel),
+  department: str(c?.department),
+  status: c?.status === undefined ? String(statusOptions[0].value) : String(c.status),
+  owner: c?.owner ?? '',
+  pushTitle: c?.push_title ?? '',
+  pushBody: c?.push_body ?? '',
+  productionDue: c?.production_due?.slice(0, 10) ?? '',
+  productionOwner: c?.production_owner ?? '',
+  handedOffAt: c?.handed_off_at ?? '',
+  theme: c?.theme ?? '',
+  headline: c?.headline ?? '',
+  copy: c?.copy ?? '',
+  instructions: c?.instructions ?? '',
+  themeReason: c?.theme_reason ?? '',
+  copyAngle: c?.copy_angle ?? '',
+  instructionsAngle: c?.instructions_angle ?? '',
 })
 
 function OptionSelect({ label, value, options, onChange }: {
   label: string
   value: string
-  options: { value: number; label: string }[]
+  options: { value: string; label: string }[]
   onChange: (v: string) => void
 }) {
   const t = useT()
@@ -231,8 +231,8 @@ function loadWidths(): [number, number, number] {
 /** 読み込み時点の配信商品の行(保存時の差分判定用) */
 interface RowSnap {
   reason: string
-  source: number
-  state: number
+  source: string
+  state: string
   section: number
   order: number
 }
@@ -381,11 +381,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   // コピー・ヘッドラインの言語(AI に渡す。保存はしない)
   const [language, setLanguage] = useState<CopyLanguage>('auto')
   const [template, setTemplate] = useState<EmailTemplateId>(
-    () => card?.cr854_layoutkey || (card?.cr854_channel === CHANNEL_PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card?.cr854_emailtemplate)),
+    () => card?.layout_key || (card?.channel === CHANNEL_PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card?.email_template)),
   )
   // アプリ: 通知を押したときに開く画面と、送る相手
-  const [pushLink, setPushLink] = useState<PushLink | null>(() => parsePushLink(card?.cr854_pushlink))
-  const [audience, setAudience] = useState<string>(card?.cr854_audience ?? '')
+  const [pushLink, setPushLink] = useState<PushLink | null>(() => parsePushLink(card?.push_link))
+  const [audience, setAudience] = useState<string>(card?.audience ?? '')
   const templateChannel: TemplateChannel = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
   // チャネルを変えたら、テンプレートも、そのチャネルのものにする(メールのテンプレートでアプリの通知は作れないため)
   useEffect(() => {
@@ -394,15 +394,15 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     setTemplate(templateChannel === 'push' ? DEFAULT_PUSH_TEMPLATE : DEFAULT_TEMPLATE)
   }, [templateChannel, template])
   // カテゴリ系テンプレートの見出し(セクションの順。保存は 1 行 1 見出し)
-  const [sectionTitles, setSectionTitles] = useState<string[]>(() => (card?.cr854_sectiontitles ? card.cr854_sectiontitles.split('\n') : []))
+  const [sectionTitles, setSectionTitles] = useState<string[]>(() => (card?.section_titles ? card.section_titles.split('\n') : []))
   // 各セクションのコピー(セクションの順)
-  const [sectionCopies, setSectionCopies] = useState<string[]>(() => parseCopies(card?.cr854_sectioncopies))
+  const [sectionCopies, setSectionCopies] = useState<string[]>(() => parseCopies(card?.section_copies))
   // メイン画像の候補(AI が案を出したときの分。保存はしない)
   const [heroCandidates, setHeroCandidates] = useState<ProposedHero[]>([])
-  const [heroId, setHeroId] = useState<string | undefined>(card?._cr854_heroimage_value)
-  const [heroReason, setHeroReason] = useState(card?.cr854_heroreason ?? '')
+  const [heroId, setHeroId] = useState<string | undefined>(card?.hero_image_id ?? undefined)
+  const [heroReason, setHeroReason] = useState(card?.hero_reason ?? '')
   const [widths, setWidths] = useState<[number, number, number]>(loadWidths)
-  const [links, setLinks] = useState<Links>(() => parseLinks(card?.cr854_links))
+  const [links, setLinks] = useState<Links>(() => parseLinks(card?.links))
   // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
   const [linksTab, setLinksTab] = useState(false)
   const [linkFocus, setLinkFocus] = useState<string | null>(null)
@@ -441,9 +441,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   useEffect(() => {
     if (!card) return
     let cancelled = false
-    Cr854_deliveryproductsService.getAll({
-      filter: `_cr854_deliverycard_value eq ${card.cr854_deliverycardid}`,
-      orderBy: ['cr854_sortorder asc'],
+    DeliveryProductsService.getAll({
+      filter: `delivery_card_id eq ${card.id}`,
+      orderBy: ['sort_order asc'],
     })
       .then((res) => {
         if (cancelled) return
@@ -452,16 +452,16 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         const cands: Candidate[] = []
         const snap = new Map<string, RowSnap>()
         for (const r of res.data ?? []) {
-          const state = r.cr854_state ?? STATE_SELECTED
-          const section = r.cr854_section ?? 0
+          const state = r.state ?? STATE_SELECTED
+          const section = r.section ?? 0
           const base: Item = {
-            key: r.cr854_deliveryproductid,
-            rowId: r.cr854_deliveryproductid,
-            productId: r._cr854_product_value ?? '',
-            reason: r.cr854_reason ?? '',
-            source: r.cr854_source ?? SOURCE_MANUAL,
+            key: r.id,
+            rowId: r.id,
+            productId: r.product_id ?? '',
+            reason: r.reason ?? '',
+            source: r.source ?? SOURCE_MANUAL,
           }
-          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.cr854_sortorder ?? 0 })
+          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0 })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
           else sel.push(base)
         }
@@ -487,8 +487,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     const stale = STALE[k]
     setForm({ ...form, [k]: v, ...(stale ? { [stale]: '' } : {}) })
   }
-  const num = (v: string) => (v === '' ? undefined : (Number(v) as never))
-  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? ''
+  const num = (v: string) => (v === '' ? undefined : (v as never))
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
 
   const addProduct = (productId: string, at = items.length) => {
     if (items.some((i) => i.productId === productId)) return
@@ -526,7 +526,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
 
   // 同じカテゴリの商品を隣り合わせにする(カテゴリの並びは、現在の登場順を保つ)
   const groupByCategory = () => {
-    const cat = (i: Item) => products.find((p) => p.cr854_productid === i.productId)?.cr854_categoryname ?? ''
+    const cat = (i: Item) => products.find((p) => p.id === i.productId)?.category_name ?? ''
     const order = [...new Set(items.map(cat))]
     setItems([...items].sort((a, b) => order.indexOf(cat(a)) - order.indexOf(cat(b))))
   }
@@ -576,8 +576,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   }
   const productLinkOf = (itemKey: string) => {
     const it = items.find((x) => x.key === itemKey)
-    const p = it && products.find((x) => x.cr854_productid === it.productId)
-    return p ? { name: p.cr854_name, url: withUtm(productUrl(p), linkUtm) } : undefined
+    const p = it && products.find((x) => x.id === it.productId)
+    return p ? { name: p.name, url: withUtm(productUrl(p), linkUtm) } : undefined
   }
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
@@ -605,7 +605,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
 
   // エージェントに渡す、配信カードの現在の入力内容
   const buildAiCard = (): AiCard => {
-    const label = (opts: { value: number; label: string }[], v: string) => opts.find((o) => String(o.value) === v)?.label ?? ''
+    const label = (opts: { value: string; label: string }[], v: string) => opts.find((o) => String(o.value) === v)?.label ?? ''
     return {
       name: form.name,
       scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : '',
@@ -708,8 +708,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   useEffect(() => {
     if (!card || !autoEnabled || original === null) return
     if (products.length === 0 || heroes.length === 0) return
-    if (autoDrafted.has(card.cr854_deliverycardid)) return
-    autoDrafted.add(card.cr854_deliverycardid)
+    if (autoDrafted.has(card.id)) return
+    autoDrafted.add(card.id)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!hasContent) void startAutoDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -758,28 +758,28 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     ]
     const keep = new Set(desired.map((d) => d.it.rowId).filter((id): id is string => !!id))
     for (const id of before.keys()) {
-      if (!keep.has(id)) await Cr854_deliveryproductsService.delete(id)
+      if (!keep.has(id)) await DeliveryProductsService.delete(id)
     }
     for (const d of desired) {
       const fields = {
-        cr854_sortorder: d.order,
-        cr854_reason: d.it.reason,
-        cr854_source: d.it.source,
-        cr854_state: d.state,
-        cr854_section: d.section,
+        sort_order: d.order,
+        reason: d.it.reason,
+        source: d.it.source,
+        state: d.state,
+        section: d.section,
       }
       let res
       if (d.it.rowId) {
         const old = before.get(d.it.rowId)
         if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order) continue
-        res = await Cr854_deliveryproductsService.update(d.it.rowId, fields)
+        res = await DeliveryProductsService.update(d.it.rowId, fields)
       } else {
-        res = await Cr854_deliveryproductsService.create({
+        res = await DeliveryProductsService.create({
           ...fields,
-          cr854_name: `${cardName} / ${productName(d.it.productId)}`,
-          'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-          'cr854_product@odata.bind': `/cr854_products(${d.it.productId})`,
-          statecode: 0,
+          name: `${cardName} / ${productName(d.it.productId)}`,
+          delivery_card_id: cardId,
+          product_id: d.it.productId,
+          state_code: 0,
         })
       }
       if (!res.success) throw new Error(res.error?.message ?? tr('掲載商品の保存に失敗しました', 'Failed to save the products in this delivery'))
@@ -787,11 +787,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   }
 
   // 確定した週に入っている配信か(配信日時を変えるときは、移す前と移したあとの両方の週)。同じ週は 1 つにまとめる
-  const lockedWeeks = [confirmedWeekOf(weeks, card?.cr854_scheduledat), confirmedWeekOf(weeks, form.scheduledAt)].filter(
-    (w, i, all): w is Cr854_weeks => !!w && all.findIndex((x) => x?.cr854_weekid === w.cr854_weekid) === i,
+  const lockedWeeks = [confirmedWeekOf(weeks, card?.scheduled_at), confirmedWeekOf(weeks, form.scheduledAt)].filter(
+    (w, i, all): w is WeekRow => !!w && all.findIndex((x) => x?.id === w.id) === i,
   )
-  const weekRange = (w: Cr854_weeks) => {
-    const s = new Date(`${w.cr854_weekstart?.slice(0, 10)}T00:00:00`)
+  const weekRange = (w: WeekRow) => {
+    const s = new Date(`${w.week_start?.slice(0, 10)}T00:00:00`)
     const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6)
     const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })
     return `${f(s)}–${f(e)}`
@@ -810,38 +810,38 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   /** 保存する内容(ステータスを除く)。保存と、承認済みの配信の内容が変わったかの判定(再承認)の両方で使う */
   function buildContent() {
     return {
-        cr854_name: form.name,
-        cr854_scheduledat: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
-        cr854_country: num(form.country),
-        cr854_channel: num(form.channel),
-        cr854_department: num(form.department),
-        cr854_owner: form.owner.trim(),
-        cr854_productiondue: form.productionDue || (null as never),
-        cr854_links: encodeLinks(links),
-        cr854_pushlink: pushLink ? JSON.stringify(pushLink) : '',
-        cr854_audience: audience,
-        cr854_pushtitle: form.pushTitle,
-        cr854_pushbody: form.pushBody,
-        cr854_productionowner: form.productionOwner.trim(),
-        cr854_handedoffat: form.handedOffAt || (null as never),
-        cr854_theme: form.theme,
-        cr854_headline: form.headline,
-        cr854_products: items.map((i) => productName(i.productId)).filter(Boolean).join(' / '),
-        cr854_copy: form.copy,
-        cr854_instructions: form.instructions,
-        cr854_themereason: form.themeReason,
-        cr854_copyangle: form.copyAngle,
-        cr854_instructionsangle: form.instructionsAngle,
-        cr854_heroreason: heroReason,
+        name: form.name,
+        scheduled_at: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
+        country: num(form.country),
+        channel: num(form.channel),
+        department: num(form.department),
+        owner: form.owner.trim(),
+        production_due: form.productionDue || (null as never),
+        links: encodeLinks(links),
+        push_link: pushLink ? JSON.stringify(pushLink) : '',
+        audience: audience,
+        push_title: form.pushTitle,
+        push_body: form.pushBody,
+        production_owner: form.productionOwner.trim(),
+        handed_off_at: form.handedOffAt || (null as never),
+        theme: form.theme,
+        headline: form.headline,
+        products: items.map((i) => productName(i.productId)).filter(Boolean).join(' / '),
+        copy: form.copy,
+        instructions: form.instructions,
+        theme_reason: form.themeReason,
+        copy_angle: form.copyAngle,
+        instructions_angle: form.instructionsAngle,
+        hero_reason: heroReason,
         // 標準のテンプレートは、以前の選択肢の列にも書く(互換)。作ったテンプレートは、layoutkey だけ
-        cr854_emailtemplate: TEMPLATE_VALUES[template],
-        cr854_layoutkey: template,
-        cr854_sectiontitles: sectionTitles.join('\n').replace(/\n+$/, ''),
-        cr854_sectioncopies: encodeCopies(sectionCopies),
+        email_template: TEMPLATE_VALUES[template],
+        layout_key: template,
+        section_titles: sectionTitles.join('\n').replace(/\n+$/, ''),
+        section_copies: encodeCopies(sectionCopies),
         // 外したときは null を送ってルックアップを空にする
-        'cr854_heroimage@odata.bind': heroId
-          ? `/cr854_heroimages(${heroId})`
-          : card?._cr854_heroimage_value
+        hero_image_id: heroId
+          ? heroId
+          : card?.hero_image_id
             ? (null as never)
             : undefined,
     }
@@ -849,7 +849,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   // 再承認の判定に使う、内容の要約。商品の名前の列は、商品の一覧の読み込みで変わるので、商品 ID の並びで比べる。
   // 開いたときの値(下の baseline)と比べる(保存済みの行と比べると、表し方の違いだけで「変わった」になるため)
   const contentKey = () => {
-    const { cr854_products: _names, ...rest } = buildContent()
+    const { products: _names, ...rest } = buildContent()
     void _names
     return JSON.stringify({ ...rest, items: items.map((i) => i.productId) })
   }
@@ -859,10 +859,10 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     if (card && original !== null && baseline.current === null) baseline.current = contentKey()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, original])
-  const savedStatus = card?.cr854_status ?? STATUS_NOT_STARTED
-  const approvedBefore = !!card && savedStatus >= STATUS_APPROVED
+  const savedStatus = card?.status ?? STATUS_NOT_STARTED
+  const approvedBefore = !!card && statusRank(savedStatus) >= statusRank(STATUS_APPROVED)
   // 承認・差し戻しを出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
-  const canReview = !!card && lockedWeeks.length === 0 && savedStatus <= STATUS_APPROVED
+  const canReview = !!card && lockedWeeks.length === 0 && statusRank(savedStatus) <= statusRank(STATUS_APPROVED)
 
   /**
    * 保存する。reason を渡したとき(確定した週の変更)は、配信を「検討中」に戻し、週をレビュー中に戻して、理由を記録する。
@@ -873,52 +873,52 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     setSaving(true)
     setError(null)
     try {
-      const formStatus = num(form.status) as number | undefined
+      const formStatus = num(form.status) as DeliveryCard['status']
       const revoke =
-        reason === undefined && !opts?.approve && opts?.reject === undefined && approvedBefore && formStatus === card?.cr854_status && baseline.current !== null && baseline.current !== contentKey()
+        reason === undefined && !opts?.approve && opts?.reject === undefined && approvedBefore && formStatus === card?.status && baseline.current !== null && baseline.current !== contentKey()
       const status =
         // 確定後に変えた配信・差し戻した配信・承認済みの内容を変えた配信は、もう一度レビューを受けるので「検討中」にする
         reason !== undefined || opts?.reject !== undefined || revoke ? STATUS_REVIEW : opts?.approve ? STATUS_APPROVED : formStatus
-      const fields = { ...buildContent(), cr854_status: status as Cr854_deliverycards['cr854_status'] }
+      const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
       const res = card
-        ? await Cr854_deliverycardsService.update(card.cr854_deliverycardid, fields)
-        : await Cr854_deliverycardsService.create({ ...fields, statecode: 0 })
+        ? await DeliveryCardsService.update(card.id, fields)
+        : await DeliveryCardsService.create({ ...fields, state_code: 0 })
       if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
-      const cardId = card?.cr854_deliverycardid ?? res.data?.cr854_deliverycardid
+      const cardId = card?.id ?? res.data?.id
       if (!cardId) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
       if (original) await syncItems(cardId, form.name, original)
       if (reason !== undefined) {
         const now = new Date().toISOString()
         for (const w of lockedWeeks) {
-          const r = await Cr854_weeksService.update(w.cr854_weekid, { cr854_status: 'review', cr854_submittedat: now })
+          const r = await WeeksService.update(w.id, { status: 'review', submitted_at: now })
           if (!r.success) throw new Error(r.error?.message ?? tr('週をレビュー中に戻せませんでした', 'Could not put the week back in review'))
         }
-        const n = await Cr854_cardnotesService.create({
-          cr854_kind: 'change',
-          cr854_body: reason.trim(),
-          cr854_author: form.owner.trim(),
-          'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
+        const n = await CardNotesService.create({
+          kind: 'change',
+          body: reason.trim(),
+          author: form.owner.trim(),
+          delivery_card_id: cardId,
         })
         if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
       }
       // 差し戻しの理由は、レビューのコメント(W5)にも残す(対応済みにするまで、未対応として数える)
       if (opts?.reject !== undefined) {
-        const c = await Cr854_cardnotesService.create({
-          'cr854_deliverycard@odata.bind': `/cr854_deliverycards(${cardId})`,
-          cr854_kind: 'comment',
-          cr854_author: myName(),
-          cr854_body: opts.reject.trim(),
-          cr854_resolved: 0,
+        const c = await CardNotesService.create({
+          delivery_card_id: cardId,
+          kind: 'comment',
+          author: myName(),
+          body: opts.reject.trim(),
+          resolved: 0,
         })
         if (!c.success) throw new Error(c.error?.message ?? tr('差し戻しの理由を記録できませんでした', 'Could not record the reason for sending back'))
       }
       // 承認の履歴(W6): 保存済みの配信のステータスが変わったら(承認・差し戻しは、変わらなくても)、誰が・いつ・何から何にしたかを残す
-      if (card && (reason !== undefined || opts?.approve || opts?.reject !== undefined || card.cr854_status !== fields.cr854_status)) {
+      if (card && (reason !== undefined || opts?.approve || opts?.reject !== undefined || card.status !== fields.status)) {
         await logEvent({
           action: reason !== undefined ? 'reopen' : opts?.approve ? 'approve' : opts?.reject !== undefined ? 'reject' : revoke ? 'revoke' : 'status',
-          card: { id: cardId, name: form.name, scheduledAt: fields.cr854_scheduledat },
-          from: card.cr854_status,
-          to: fields.cr854_status,
+          card: { id: cardId, name: form.name, scheduledAt: fields.scheduled_at },
+          from: card.status,
+          to: fields.status,
           note: (reason ?? opts?.reject)?.trim(),
         })
       }
@@ -940,11 +940,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     instructions: form.instructions,
     push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody, timing: !!pushLink && !!audience } : undefined,
   })
-  const hero = heroes.find((h) => h.cr854_heroimageid === heroId)
+  const hero = heroes.find((h) => h.id === heroId)
 
   return (
     <Dialog open onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
-      <DialogSurface ref={surfaceRef} className={styles.surface} style={sizeStyle} aria-label={card ? card.cr854_name : t('配信カードの新規作成', 'New delivery card')}>
+      <DialogSurface ref={surfaceRef} className={styles.surface} style={sizeStyle} aria-label={card ? card.name : t('配信カードの新規作成', 'New delivery card')}>
         <ResizeHandles
           onResize={resizeDialog}
           onDone={() =>
@@ -981,7 +981,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </div>
           )}
           <div className={styles.titleRow}>
-            <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.cr854_name : t('配信カードの新規作成', 'New delivery card')}</Text>
+            <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
             <Tooltip
               relationship="description"
               content={progress.remaining.length ? t(`未完了: ${progress.remaining.join('、')}`, `Incomplete: ${progress.remaining.join(', ')}`) : t('すべての工程が完了しています', 'All steps are complete')}
@@ -990,8 +990,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 {t(`工程 ${progress.done} / ${progress.total}`, `Steps ${progress.done} / ${progress.total}`)}
               </Badge>
             </Tooltip>
-            {card && onOpenResults && card.cr854_scheduledat && new Date(card.cr854_scheduledat) < new Date() && (
-              <Button type="button" size="small" appearance="secondary" icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.cr854_deliverycardid)}>
+            {card && onOpenResults && card.scheduled_at && new Date(card.scheduled_at) < new Date() && (
+              <Button type="button" size="small" appearance="secondary" icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.id)}>
                 {t('結果を見る', 'View results')}
               </Button>
             )}
@@ -1012,12 +1012,12 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             )}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
-          {card?.cr854_cancelledat && (
+          {card?.cancelled_at && (
             <MessageBar layout="multiline" intent="warning" className={styles.locked}>
               <MessageBarBody>
                 {t(
-                  `この配信は取りやめ済みです(${new Date(card.cr854_cancelledat).toLocaleString(locale())})。理由: ${card.cr854_cancelreason || '—'}。元に戻すときは、右上の「…」から「取りやめを取り消す」`,
-                  `This delivery was cancelled (${new Date(card.cr854_cancelledat).toLocaleString(locale())}). Reason: ${card.cr854_cancelreason || '—'}. To restore it, use "…" > "Undo cancellation".`,
+                  `この配信は取りやめ済みです(${new Date(card.cancelled_at).toLocaleString(locale())})。理由: ${card.cancel_reason || '—'}。元に戻すときは、右上の「…」から「取りやめを取り消す」`,
+                  `This delivery was cancelled (${new Date(card.cancelled_at).toLocaleString(locale())}). Reason: ${card.cancel_reason || '—'}. To restore it, use "…" > "Undo cancellation".`,
                 )}
               </MessageBarBody>
             </MessageBar>
@@ -1088,7 +1088,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 <OptionSelect label={t('種別', 'Type')} value={form.department} options={departmentOptions} onChange={set('department')} />
                 <Field label={t('ステータス', 'Status')}>
                   <div className={styles.statusRow}>
-                    <span className={styles.dot} style={{ backgroundColor: statusColor(Number(form.status)) }} />
+                    <span className={styles.dot} style={{ backgroundColor: statusColor(form.status) }} />
                     <Select size="small" className={styles.grow} value={form.status} onChange={(_, d) => set('status')(d.value)}>
                       {statusOptions.map((o) => (
                         <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
@@ -1201,7 +1201,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
                 onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
                 people={owners}
-                cardId={card?.cr854_deliverycardid}
+                cardId={card?.id}
                 owner={form.owner}
                 cardName={form.name}
                 channel={templateChannel}
@@ -1393,12 +1393,12 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     setMyName(d.value)
                   }}
                 />
-                {savedStatus < STATUS_APPROVED && (
+                {statusRank(savedStatus) < statusRank(STATUS_APPROVED) && (
                   <Button type="button" icon={<CheckmarkCircleRegular />} disabled={saving || !actor.trim() || rejectReason !== null} onClick={() => void save(undefined, { approve: true })}>
                     {t('保存して承認', 'Save and approve')}
                   </Button>
                 )}
-                {savedStatus >= STATUS_REVIEW && (
+                {statusRank(savedStatus) >= statusRank(STATUS_REVIEW) && (
                   <Button type="button" icon={<ArrowUndoRegular />} disabled={saving || rejectReason !== null} onClick={() => setRejectReason('')}>
                     {t('差し戻す', 'Send back')}
                   </Button>

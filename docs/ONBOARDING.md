@@ -36,7 +36,7 @@ GitHub の**公開**リポジトリ(`audeoinc/ccp`)。だれでも読めるの�
    カレンダーに、配信カードが表示されれば成功。本物のサーバー(DB・AI)につないで動かす方法は、[GCP.md](GCP.md) の「手元での動かし方」。
 4. コミット前の確認5. コミット前の確認が通ることを確かめる。
    ```bash
-   npx tsc -b && npx eslint . --ignore-pattern "src/generated/**" && npm run build
+   npx tsc -b && npx eslint . && npm run build
    ```
 
 ## 3. 最初に読むもの
@@ -89,7 +89,7 @@ GitHub の**公開**リポジトリ(`audeoinc/ccp`)。だれでも読めるの�
 - 利用者に見せるデモの直前は、反映しない期間(凍結)を決めておく。
 
 **テーブル・列を変えるとき**
-- 定義は `server/schema.json`(唯一の正)。画面の型(`src/generated/models/`)も、一緒に直す。食い違いは `npm run verify` が見つける。
+- 定義は `server/schema.json`(唯一の正)。画面の型(`src/models/`。一部の表は `src/data/`)も、一緒に直す。食い違いは `npm run verify` が見つける。
 - DB には、反映後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される。詳しくは [GCP.md](GCP.md) の「データ定義」。
 
 **ドキュメントの更新**

@@ -52,23 +52,23 @@
 
 ## 3. データ
 
-GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` の末尾。Postgres では `delivery_results`)。配信ごとに 1 行。
+GCP 版だけのテーブル **`delivery_results`**(`server/schema.json` の末尾。Postgres では `delivery_results`)。配信ごとに 1 行。
 反映(デプロイ)すると、サーバーが最初に DB につないだときに、足りないテーブル・列を自動で作る(`data_api._ensure_schema`)。手で migrate しなくてよい。
 
 | 列 | 中身 |
 |---|---|
-| `_cr854_deliverycard_value` | 配信カード(消すと、結果も消える) |
-| `cr854_sentat` | 送った日時 |
-| `cr854_recipients` / `opens` / `clicks` / `orders` | 送った数 / 開封(アプリは通知のタップ)/ クリックした人 / 注文 |
-| `cr854_revenue` / `cr854_lastyearrevenue` | 売上 / 前年の同じ時期の売上(前年比に使う) |
-| `cr854_products` | 商品ごとの結果。JSON の配列 `[{productId, clicks, units, revenue}]` |
-| `cr854_links` | 商品以外のリンクのクリック(延べ回数)。JSON `{hero, buttons: [..], other}`。`buttons` は、**プレビューの上から順**のボタン |
-| `cr854_notes` | 次に生かすメモ(配信カードの「これまでの学び」に出る) |
+| `delivery_card_id` | 配信カード(消すと、結果も消える) |
+| `sent_at` | 送った日時 |
+| `recipients` / `opens` / `clicks` / `orders` | 送った数 / 開封(アプリは通知のタップ)/ クリックした人 / 注文 |
+| `revenue` / `last_year_revenue` | 売上 / 前年の同じ時期の売上(前年比に使う) |
+| `products` | 商品ごとの結果。JSON の配列 `[{productId, clicks, units, revenue}]` |
+| `links` | 商品以外のリンクのクリック(延べ回数)。JSON `{hero, buttons: [..], other}`。`buttons` は、**プレビューの上から順**のボタン |
+| `notes` | 次に生かすメモ(配信カードの「これまでの学び」に出る) |
 
-配信カードには、GCP 版だけの列 **`cr854_themetype`**(テーマの種類のキー。`src/themeTypes.ts`)を足した。
+配信カードには、GCP 版だけの列 **`theme_type`**(テーマの種類のキー。`src/themeTypes.ts`)を足した。
 
 - **いまの数字はすべてダミー**。本番は、2026-10-14 より前に送った配信 18 本に、決まった計算で入れた(配信 ID を乱数の種にしているので、何度作っても同じ)。サンプルデータ(`src/mock/seed.ts` の `deliveryResults`)も同じ考え方。
-- 本番の週ごとの商品の売上(`cr854_weeklyperformances`)は 9/28 の週まで。10 月の配信では「その週の販売の増減・在庫の週数」が出ない(サンプルデータでは出る)。
+- 本番の週ごとの商品の売上(`weekly_performances`)は 9/28 の週まで。10 月の配信では「その週の販売の増減・在庫の週数」が出ない(サンプルデータでは出る)。
 - **ダミーの過去の配信**: 本番は、2026-10-14 より前に送った US の配信(テンプレートと商品が入った 10 本)を、1〜5 週前にも送ったことにして 50 本足した(テンプレート・テーマは同じ、商品とメイン画像は入れ替え。その週は確定)。作った配信の ID は、作った人の手元(scratchpad の `past_created.json`)にしかないので、消すときは「10/14 より前・US・同じ名前の配信が 5 週分ある」ものを目安にする。サンプルデータも同じ考え方(`src/mock/seed.ts` の「過去の配信」)。
 - 本番の過去の配信のうち 5 本に、次に生かすメモの見本を入れた。本番のテーマの種類は、まだ AI で分けていない(すべて「推定」)。結果の面の「AI でテーマの種類を分ける」を押すと分かれる(実際の AI を呼ぶ)。
 - 商品のクリックは、上の枠ほど多くなるように作った(位置で比べたときに、傾向が見えるように)。数字はダミーなので、AI の振り返りは、もっともらしいだけで中身はない。
@@ -91,6 +91,7 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 | ツールバーの見せ方の切り替え(月 / 週 / 一覧 / 比べる)は、枠で囲んだひとかたまりにし、週の見方はラベル付きで外へ。右は区切りの線のあとに操作。結果の面の操作は「データ」のメニューに | 切り替えと操作が同じ見た目で並び、比べるを使ったあと、週に戻る場所がわからなかった(利用者の指摘) |
 | 結果の面の操作は、ツールバーの決まった場所に `createPortal` で差し込む | ツールバーは App が持つ(計画と共通)。結果の画面の部品は、結果の画面のファイルに置いたままにしたい |
 | Power Apps 版を廃止し、ソースも削除した(2026-10-16)。`src/generated/` の名前は残した | 利用者の決定。clone したときに Power Platform の環境と連携されないように(`power.config.json`・`.power/` を削除)。`src/generated/` の名前を変えると、画面の 60 近いファイルの読み込みが変わり、W のメンバーの作業とぶつかるため、中身だけ差し替えた |
+| 名前(`cr854_…`)・選択肢の数(588230000 など)・参照の書き方(`@odata.bind`)をやめ、DB と同じ読みやすい名前と、文字の値にした(2026-10-16) | 利用者の希望(Power Apps の痕跡をなくす)。DB の列は、もとから読みやすい名前だったので、画面・API をそれに合わせ、名前の変換をなくした。選択肢は、数より文字のほうが、DB・ログ・CSV を見てもわかる |
 
 ## 5. ファイルの地図(R で作ったもの)
 
@@ -109,7 +110,7 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 | `src/results.ts` | 計算(前週比・前年比・まとめ)と、CSV の読み書き、JSON の列の読み方 |
 | `src/CardPreview.tsx` | 保存されている配信カードを、そのままプレビューにする(`DeliveryPeek` と共通) |
 | `src/csv.ts` | CSV の読み方(サンプルデータと、結果の取り込みで共通。もとは `src/mock/csv.ts`) |
-| `src/gcpdata/Cr854_deliveryresultsService.ts` | 結果のテーブルの読み書き |
+| `src/data/deliveryResults.ts` | 結果のテーブルの読み書き |
 
 共有のファイルで、R のために触った所: `src/App.tsx`(ヘッダー・ツールバー・結果の面の切り替え・フロートの重ね方・最初に出す月)、`src/CardDetail.tsx`(「結果を見る」のボタン、受け取る値 1 つ、「これまでの学び」の帯)、`src/aiSelect.ts`(学びを AI に渡す)、`src/mock/agent.ts`(classify_theme_types・review_results の身代わり)、`src/Preview.tsx`(`data-link` の印 3 か所。見た目は変えていない)、`server/schema.json`(末尾のテーブル)、`src/mock/seed.ts`・`src/mock/db.ts`・`scripts/export-seed.mjs`。
 
@@ -124,14 +125,14 @@ GCP 版だけのテーブル **`cr854_deliveryresults`**(`server/schema.json` �
 1. 本番の画面で、R8〜R15 を利用者に触ってもらう(自動では本番の画面を確認していない)。
 2. 週のヒートマップのプレビューは、メール全体を出すので縦に長い。長すぎるという声があれば、高さに上限を付ける。
 3. 本番で「AI でテーマの種類を分ける」と「AI で振り返る」を実際の AI で試し、指示文(`src/themeTypes.ts`・`src/aiReview.ts`)を直す。
-4. 実際の配信の仕組み(メール・アプリの配信サービス)から出せる結果の形を確かめ、取り込みの列(特にリンクごとのクリック)を合わせる。いまの CSV の取り込みは、`cr854_links` と `cr854_products` を入れられない。
+4. 実際の配信の仕組み(メール・アプリの配信サービス)から出せる結果の形を確かめ、取り込みの列(特にリンクごとのクリック)を合わせる。いまの CSV の取り込みは、`links` と `products` を入れられない。
 5. 商品を選ぶときに、その商品の過去の結果(クリック・売れた数)を出す。BACKLOG にはまだない。
 6. W のメンバーと: W8(週の状態をチャネルごとに持つか)は利用者の判断待ち。
 
 ## 6.4 アラート(A。2026-10-15 に着手)
 
 - **在庫**: 配信日の在庫を見込み(いまの在庫 − 週の販売 × 週数 − それより前の配信の上乗せ)、在庫切れの見込み・在庫僅少を出す(`src/alerts.ts`)。
-- **MD 方針の変更・日程の変更**: サーバーが、配信日時と商品の方針(stage・promo_period・policy)の書き換えを、変更前・変更後・書き換えた人で記録する(`cr854_changelogs`、`server/ccp/data_api.py` の `WATCHED`。撮影用は `src/mock/db.ts` の `logChange`)。書き換えた人は、画面が `x-ccp-actor` で送る(画面で入れた名前)。
+- **MD 方針の変更・日程の変更**: サーバーが、配信日時と商品の方針(stage・promo_period・policy)の書き換えを、変更前・変更後・書き換えた人で記録する(`change_logs`、`server/ccp/data_api.py` の `WATCHED`。撮影用は `src/mock/db.ts` の `logChange`)。書き換えた人は、画面が `x-ccp-actor` で送る(画面で入れた名前)。
 - **対応**: 差し替え(AI が在庫のある同じカテゴリから 3 つ提案)・延期・取りやめ・開く。理由は配信のメモ(種類 change)に残し、確定した週はレビューに戻す(`src/alertActions.ts`、`src/cancel.ts`)。変更のアラートは「対応済みにする」で消える。
 - **取りやめ・削除**: 配信カードの「…」(`src/CardMenu.tsx`)。取りやめは消さずに薄く残し、アラート・週の確認・件数から外す。
 - 本番の見本: 方針の変更(469370 を Core → Clearance)・日程の変更(Cozy Home を 10/26 → 10/24。Halloween と重なる)を入れた(2026-10-15)。
@@ -149,7 +150,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 ## 6.6 週の計画・レビュー・承認(W。2026-10-15 時点)
 
-- **できたこと**: 週の表示(W1)、週の状態とまとめての操作(W2)、確定後の変更の制限(W3)、確認の一覧(W4)、レビューのコメント(W5 → W10 で Confluence のようなスレッド。返信・対応済み・たたむ・自分の書き込みの編集と削除)、承認の履歴(W6。`cr854_events`)、承認と差し戻し(W9)、週の資料の PDF(W7)。
+- **できたこと**: 週の表示(W1)、週の状態とまとめての操作(W2)、確定後の変更の制限(W3)、確認の一覧(W4)、レビューのコメント(W5 → W10 で Confluence のようなスレッド。返信・対応済み・たたむ・自分の書き込みの編集と削除)、承認の履歴(W6。`events`)、承認と差し戻し(W9)、週の資料の PDF(W7)。
 - **承認の進め方(2026-10-14 決定。暫定のものは運用して見直す)**: 承認は配信 1 本ずつと週まとめての両方、誰でも押せる、「誰が」は画面で入れた名前(`me.name`)、「承認済み」と「確定」は両方残す、差し戻しは理由が必須(コメントにも残す)、承認済みの内容を変えたら検討中に戻す(再承認)、通知はしない。詳しくは [BACKLOG.md](BACKLOG.md) の「検討中」と [ARCHITECTURE.md](ARCHITECTURE.md) 4 章。
 - **週の資料(W7)**: 週の状態の帯の「PDF」。`src/WeekReport.tsx`(資料)・`src/printWeek.ts`(印刷。画像を待ってから、プレビューを 1 頁に収まる倍率に縮める)・`src/index.css` の「週の資料の印刷」。R16 の `printReport`(1 枚に縮める)とは別にした(週は頁を分けて流すため)。
 - **Workbench**: W の機能は、どれもサーバーの外に頼らない(PDF もブラウザの印刷)。API・画像のパスは `appPath`(`src/appRoot.ts`)を通す。新しいテーブル・列は、サーバーが最初に DB につないだときに自動で足すので、Workbench は `scripts/workbench.sh update` だけで反映できる。
@@ -167,13 +168,21 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 文書(README・CLAUDE・ONBOARDING・ARCHITECTURE・GCP・SOURCE_MAP・FEATURES)から、Power Apps の手順を外した。BACKLOG・FEATURE_REASONS の古い状況メモには、当時の記述が残っている(経緯として)。
 - Power Platform 側のアプリ・テーブル・フローそのものは、リポジトリの外にある。消すかどうかは、利用者が決める。
 
+## 6.8 名前と選択肢の値の変更(2026-10-16)
+
+- 画面・API・PostgreSQL で、名前が同じになった(表 `delivery_cards`、列 `scheduled_at`、参照 `hero_image_id`、主キー `id`、作った日時 `created_on`)。型は `src/models/`、読み書きは `src/data/`(`src/generated/` と `src/gcpdata/` はなくなった)。
+- 選択肢は文字の値(`server/schema.json` の `choices`)。**状態の前後は `statusRank` で比べる**(文字のまま `<` で比べると、`'not_started' >= 'approved'` が真になる。実際に、承認の表示が出てしまった)。
+- 以前の名前・値との対応は `server/ccp/legacy_names.json`。古い DB は、サーバーが最初につないだときに、選択肢の数が文字の値に置き換わる(`schema.py` の `legacy_value_sql`)。引っ越し用のパックは版 2 になり、版 1 も取り込める。
+- ブラウザに覚えた、アラートの条件の「種別」(以前は数)は、読み込むときに捨てる(絞り込みが外れるだけ)。
+- 変換は、スクリプト(名前の置き換え)+ 手の直し で行った。本番の写しを、試験用の DB に入れて、移行の前後で選択肢の件数が一致することを確かめた。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。
 - ヒートマップの枠の位置は、フロートが開くときの拡大のアニメーションの途中で測ると、縮んだ大きさになる(実際にずれていた)。`HeatPreview` は、見た目の拡大・縮小の分(getBoundingClientRect の幅 / offsetWidth)を割り戻して測る。
 - 計画の面で最初に出す月は「今月以降で、最初に配信がある月」。以前は「いちばん古い配信の月」で、過去の配信を足したら 8 月から始まってしまった。
 - `src/mock/agent.ts` は `src/aiSelect.ts` を読み込めない(撮影用のビルドで、読み込みの輪になる)。身代わりで使う関数は、ほかを読み込まないファイル(例: `src/themeGuess.ts`)に置く。
-- **撮影用のビルド(`vite.mock.config.ts`)は、`src/gcpdata/*Service.ts` のファイルを丸ごと差し替える。** サービスのファイルに、サービス以外の関数(JSON の読み方など)を置くと、撮影用のビルドで「その名前がない」と落ちる。そういう関数は `src/results.ts` に置く。
+- **撮影用のビルド(`vite.mock.config.ts`)は、`src/data/*.ts` のファイルを丸ごと差し替える。** サービスのファイルに、サービス以外の関数(JSON の読み方など)を置くと、撮影用のビルドで「その名前がない」と落ちる。そういう関数は `src/results.ts` に置く。
 - **`progress.ts` は改行が CRLF**、ほかの多くは LF(`App.tsx` は、以前は CRLF だったが、いまは LF。2026-10-15 に確認)。スクリプトで書き換えるときは、決めつけずに、読み込んだファイルの改行コードを保つ。
 - ツールで書いた文字列に、目に見えない BOM(`U+FEFF`)の文字がそのまま入ることがある(lint の `no-irregular-whitespace` で落ちる)。コードでは `String.fromCharCode(0xfeff)` と書く。
 - Fluent の `DialogBody` は、中を独自の列に並べる。広いフロートの中を自分で並べるときは、`DialogBody` を使わずに `div` にする。

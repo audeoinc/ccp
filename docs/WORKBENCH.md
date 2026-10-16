@@ -382,4 +382,5 @@ set -a; source workbench.env; set +a
 | `images/products/…` ・ `images/heroes/…` | 商品・メイン画像の写真(本番の GCS にあるもの) |
 
 書き出しは `server/ccp/pack.py`(`GET /api/export`)、取り込みは `python -m ccp.cli import-pack`。
+2026-10-16 から、パックの形は版 2(名前と選択肢の値を変えた)。それより前に書き出したパック(版 1)も、そのまま取り込める(取り込むときに直す)。Workbench の DB も、更新したサーバーが最初につないだときに、自動で新しい値に置き換わる。
 写真は、利用先の環境に置いてよいことを、利用者に確認済み(2026-10-15)。

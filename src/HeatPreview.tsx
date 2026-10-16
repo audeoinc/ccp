@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import type { Cr854_products } from './generated/models/Cr854_productsModel'
-import type { Cr854_heroimages } from './generated/models/Cr854_heroimagesModel'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { CardPreview } from './CardPreview'
 import { FitPreview } from './FitPreview'
 import { locale, useT } from './i18n'
@@ -68,8 +68,8 @@ export interface HeatInfo {
 interface Props {
   row: ResultRow
   productIds: string[]
-  products: Cr854_products[]
-  heroes: Cr854_heroimages[]
+  products: Product[]
+  heroes: HeroImage[]
   /** プレビューの幅(この幅に合わせて縮める) */
   width: number
   /** プレビューの高さの上限(省略は、上限なし) */
@@ -126,16 +126,16 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
       el.removeEventListener('load', measure, true)
       window.clearTimeout(timer)
     }
-  }, [card.cr854_deliverycardid, width])
+  }, [card.id, width])
 
   // リンクごとのクリック。商品は、商品ごとの結果のクリック。アプリは、通知のタップ(開封の数)
-  const links = parseLinkResults(result.cr854_links)
-  const productClicks = new Map(parseProductResults(result.cr854_products).map((p) => [p.productId, p.clicks]))
+  const links = parseLinkResults(result.links)
+  const productClicks = new Map(parseProductResults(result.products).map((p) => [p.productId, p.clicks]))
   const placed = new Set(spots.map((s) => s.key))
   const buttonSpots = spots.filter((s) => s.key.startsWith('button:'))
-  const productName = (id: string) => products.find((p) => p.cr854_productid === id)?.cr854_name ?? id
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id
   const rows: LinkRow[] = [
-    ...(push ? [{ key: 'push', label: t('通知のタップ', 'Notification tap'), clicks: result.cr854_opens ?? 0, placed: placed.has('push') }] : []),
+    ...(push ? [{ key: 'push', label: t('通知のタップ', 'Notification tap'), clicks: result.opens ?? 0, placed: placed.has('push') }] : []),
     ...(links.hero !== undefined ? [{ key: 'hero', label: t('メイン画像', 'Hero image'), clicks: links.hero, placed: placed.has('hero') }] : []),
     // ボタンは、プレビューにある数だけ出す(テンプレートのボタンの数を超える分は「その他」に入れる)
     ...buttonSpots.map((s, i) => ({ key: s.key, label: t(`ボタン ${i + 1}「${s.text}」`, `Button ${i + 1} "${s.text}"`), clicks: links.buttons?.[i] ?? 0, placed: true })),
@@ -145,7 +145,7 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
   const other = (links.other ?? 0) + (links.buttons ?? []).slice(buttonSpots.length).reduce((s, v) => s + v, 0)
   if (other > 0) rows.push({ key: 'other', label: t('その他(フッターなど)', 'Other (footer, etc.)'), clicks: other, placed: false })
   const linkTotal = rows.filter((r) => r.key !== 'push').reduce((s, r) => s + r.clicks, 0)
-  const share = (r: LinkRow) => (r.key === 'push' ? (result.cr854_recipients ? r.clicks / result.cr854_recipients : 0) : linkTotal ? r.clicks / linkTotal : 0)
+  const share = (r: LinkRow) => (r.key === 'push' ? (result.recipients ? r.clicks / result.recipients : 0) : linkTotal ? r.clicks / linkTotal : 0)
   // 濃さは、メッセージの中で、いちばん押されたリンクに対する割合(通知のタップは、別の物差しなので、中くらいの濃さに固定)
   const maxClicks = Math.max(1, ...rows.filter((r) => r.key !== 'push').map((r) => r.clicks))
   const rel = (r: LinkRow) => (r.key === 'push' ? 0.5 : r.clicks / maxClicks)

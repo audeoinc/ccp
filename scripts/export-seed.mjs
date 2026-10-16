@@ -18,17 +18,17 @@ const server = await createServer({
 try {
   const m = await server.ssrLoadModule('/src/mock/seed.ts')
   const data = {
-    cr854_heroimages: m.heroes,
-    cr854_products: m.products,
-    cr854_deliverycards: m.cards,
-    cr854_deliveryproducts: m.deliveryProducts,
-    cr854_weeklyperformances: m.weekly,
-    cr854_productpolicies: m.policies,
-    cr854_layouttemplates: m.layoutTemplates,
-    cr854_cardnotes: m.cardNotes,
-    cr854_weeks: m.weeks,
-    cr854_deliveryresults: m.deliveryResults,
-    cr854_changelogs: m.changeLogs,
+    hero_images: m.heroes,
+    products: m.products,
+    delivery_cards: m.cards,
+    delivery_products: m.deliveryProducts,
+    weekly_performances: m.weekly,
+    product_policies: m.policies,
+    layout_templates: m.layoutTemplates,
+    card_notes: m.cardNotes,
+    weeks: m.weeks,
+    delivery_results: m.deliveryResults,
+    change_logs: m.changeLogs,
   }
   writeFileSync(join(root, 'server', 'seed.json'), JSON.stringify(data, null, 1) + '\n')
   for (const [k, v] of Object.entries(data)) console.log(k, v.length)
