@@ -11,27 +11,35 @@ Campaign Contents Planner(CCP)を、Vertex AI Workbench のインスタンスの
 構成図の draw.io 版: [workbench-architecture.drawio](workbench-architecture.drawio)
 
 ```
- 利用者のブラウザ(CCP の画面)
-   ▲
-   │ HTTPS(Google のログインで守られている)
-   │ https://<ノートブックの URL>/proxy/8081/
-   ▼
-┌──────────────── Vertex AI Workbench のインスタンス ────────────────┐
-│                                                                      │
-│  Jupyter の中継(/proxy/8081/ を localhost:8081 へ)                │
-│   ▲                                                                  │
-│   │ HTTP(インスタンスの中)                                         │
-│   ▼                                                                  │
-│  CCP のサーバー(Python / FastAPI。uvicorn で localhost:8081)       │
-│   ├ 画面の配信 … ビルドした HTML・JS                                 │
-│   ├ /api/data  … データの読み書き ◀─ SQL ─▶ PostgreSQL(localhost:5432)│
-│   ├ /img       … 商品・メイン画像 ◀─ ファイルの読み込み ─ 画像のフォルダ │
-│   └ /api/ask   … AI の依頼 ◀──────────────────────────┐            │
-│                                                          │            │
-└──────────────────────────────────────────────────────────┼────────────┘
-                                                           │ HTTPS(Workbench のサービスアカウントの権限)
-                                                           ▼
-                                                     Vertex AI(Gemini)
+┌─ 利用者のブラウザ ─────────────────────────┐
+│ 画面(HTML・JS)… サーバーから受け取り、表示する │
+│ JS(React)  … 操作に応じて API を呼ぶ(fetch)、 │
+│                返ってきた JSON で画面を書き換える │
+└──────────────┬─────────────────────────────┘
+               │ ① 画面を読み込む / ② API を呼ぶ(HTTPS。Google のログインで守られる)
+               ▼
+┌──────────────── Vertex AI Workbench のインスタンス ─────────────────────────┐
+│ Jupyter の中継 … /proxy/8081/ を、インスタンスの中の localhost:8081 に中継する │
+│   │ ③ HTTP                                                                   │
+│   ▼                                                                          │
+│ ┌ uvicorn(Web サーバー)… localhost:8081 で HTTP を待ち受け、FastAPI に渡す ┐ │
+│ │ ┌ FastAPI(アプリの本体。Python)… URL ごとに処理を振り分ける ───────┐ │ │
+│ │ │ /          … 画面の HTML・JS を返す                                   │ │ │
+│ │ │ /api/data  … データの読み書き ◀── ⑤ SQL ──▶ PostgreSQL(データベース)│ │ │
+│ │ │ /img       … 商品・メイン画像を返す ◀── 画像のフォルダ                │ │ │
+│ │ │ /api/ask   … AI に依頼 ◀── HTTPS ──▶ Vertex AI(Gemini)※インスタンスの外│ │ │
+│ │ └────────────────────────────────────────────────────┘ │ │
+│ └──────────────────────────────────────────────────────┘ │
+│ PostgreSQL(localhost:5432)… データを保存・検索する                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+ 1 回の操作の流れ
+ ① ブラウザが画面(HTML・JS)を読み込む
+ ② 画面を操作すると、JS がサーバーの API を呼ぶ(例: /api/data)
+ ③ Jupyter の中継が、uvicorn に届ける
+ ④ uvicorn が FastAPI に渡し、FastAPI が URL に合う処理を動かす
+ ⑤ FastAPI が PostgreSQL に SQL で読み書きする(AI のときは Vertex AI に依頼する)
+ ⑥ 結果を JSON で返し、JS が画面を書き換える
 ```
 
 ## 2. 構成要素
@@ -40,9 +48,10 @@ Campaign Contents Planner(CCP)を、Vertex AI Workbench のインスタンスの
 |---|---|---|
 | 利用者のブラウザ | CCP の画面を開く。Workbench の Jupyter と同じ URL の下 | `https://<ノートブックの URL>/proxy/8081/`(末尾の `/` が必要) |
 | Jupyter の中継 | Workbench に組み込みの仕組み。ブラウザからの通信を、インスタンスの中のポートに中継する。Google のログインで守られている | `/proxy/<ポート>/` |
-| CCP のサーバー | Python(FastAPI)のアプリを、uvicorn で動かす。画面の配信・データの読み書き・画像の配信・AI の呼び出しを、1 つのプロセスで行う | `localhost:8081`(`CCP_PORT` で変えられる) |
-| 画面 | React で作った画面を、あらかじめビルドしたもの(HTML・JS)。サーバーが配る。中継の下(`/proxy/8081/`)でも動くよう、API・画像のパスは、読み込んだ場所から求める | `dist-gcp/` |
-| PostgreSQL | CCP のデータ(配信・商品・結果・メモ・履歴 など)。Workbench の中に conda で入れたもの | `localhost:5432` |
+| uvicorn | Web サーバー。`localhost:8081` で HTTP の依頼を待ち受け、FastAPI に渡し、返事を送り返す | `localhost:8081`(`CCP_PORT` で変えられる) |
+| FastAPI | CCP のサーバーのアプリの本体(Python)。URL ごとに処理を振り分ける: `/`(画面の HTML・JS)、`/api/data`(データの読み書き)、`/img`(画像)、`/api/ask`(AI)。結果は JSON で返す | uvicorn の中で動く |
+| 画面(HTML・JS) | React で作った画面を、あらかじめビルドしたもの。FastAPI が配り、ブラウザで動く。JS が、操作に応じて `/api/data`・`/api/ask` などを呼び(fetch)、返ってきた JSON で画面を書き換える。中継の下(`/proxy/8081/`)でも動くよう、API・画像のパスは、読み込んだ場所から求める | `dist-gcp/` |
+| PostgreSQL | データベース。CCP のデータ(配信・商品・結果・メモ・履歴 など)を保存・検索する。FastAPI だけが、SQL で読み書きする(ブラウザから直接はつながらない)。Workbench の中に conda で入れたもの | `localhost:5432` |
 | 画像のフォルダ | 商品・メイン画像の写真。サーバーが `/img/…` で配る(外部から直接は見えない) | `server/images/`(`ASSET_DIR`) |
 | Vertex AI(Gemini) | AI の下書き・選定・振り返りなど。Workbench のサービスアカウントの権限で呼ぶ(鍵のファイルは使わない) | Google Cloud の API |
 | 設定ファイル | DB の接続先(`DATABASE_URL`)、AI の設定、画像のフォルダ など | `server/workbench.env`(見本は `workbench.env.example`) |
