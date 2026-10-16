@@ -1,35 +1,18 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { MailRegular, PhoneRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { HeatPreview } from './HeatPreview'
-import { locale, useLang, useT } from './i18n'
+import { Calendar } from './Calendar'
+import { locale, useT } from './i18n'
 import { isPush, localDate, pct, type ResultRow } from './results'
 
 const useStyles = makeStyles({
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden' },
-  dow: { padding: '4px 6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, backgroundColor: tokens.colorNeutralBackground2, borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  day: { minHeight: '96px', padding: '4px', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, display: 'grid', alignContent: 'start', rowGap: '4px', minWidth: 0 },
-  dayOut: { backgroundColor: tokens.colorNeutralBackground3 },
-  dayNum: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, fontVariantNumeric: 'tabular-nums' },
-  today: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
-  // 配信 1 本(押すと、詳しい結果)
-  chip: {
-    display: 'grid',
-    rowGap: '1px',
-    padding: '3px 6px',
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderLeftWidth: '3px',
-    backgroundColor: tokens.colorNeutralBackground1,
-    cursor: 'pointer',
-    textAlign: 'left',
-    font: 'inherit',
-    minWidth: 0,
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-  },
   chipNone: { color: tokens.colorNeutralForeground3, backgroundColor: tokens.colorNeutralBackground2 },
+  noResult: { color: tokens.colorNeutralForeground3 },
+  channelIcon: { flexShrink: 0, verticalAlign: '-2px', marginRight: '3px', color: tokens.colorNeutralForeground3 },
   chipName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   chipNums: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2, fontVariantNumeric: 'tabular-nums' },
   up: { color: tokens.colorPaletteGreenForeground1 },
@@ -69,8 +52,6 @@ interface Props {
   onOpen: (cardId: string) => void
 }
 
-const DOW_JA = ['日', '月', '火', '水', '木', '金', '土']
-const DOW_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 // 前年比の色(左や上の線)。よければ緑、悪ければ赤、比べられなければ灰色
 const trendColor = (r?: ResultRow) =>
   r?.vsLastYear === undefined ? tokens.colorNeutralStroke1 : r.vsLastYear >= 0 ? tokens.colorPaletteGreenBorderActive : tokens.colorPaletteRedBorderActive
@@ -89,51 +70,36 @@ const byDay = (cards: DeliveryCard[]) => {
   return m
 }
 
-/** 月の表示: カレンダーに、配信ごとの売上・開封率・前年比を出す */
+/**
+ * 月の表示: 計画の面と同じカレンダー(Calendar)に、配信ごとの売上・開封率・前年比を出す。
+ * 計画と結果は同じ配信の表と裏なので、カレンダーの形・箱の 1 行目(アイコン + 名前)はそろえ、2 行目と色だけを変える
+ * (左の線 = 前年比。地の色 = 結果があれば白、なければ灰色)
+ */
 export function ResultsMonth({ month, cards, results, money, onOpen }: Props & { month: Date }) {
   const styles = useStyles()
   const t = useT()
-  const lang = useLang()
   const delta = useDelta()
-  const days = byDay(cards)
-  const first = new Date(month.getFullYear(), month.getMonth(), 1)
-  const start = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay())
-  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0)
-  const count = Math.ceil((first.getDay() + last.getDate()) / 7) * 7
-  const today = localDate(new Date().toISOString())
   return (
-    <div className={styles.grid}>
-      {(lang === 'ja' ? DOW_JA : DOW_EN).map((d) => (
-        <div key={d} className={styles.dow}>{d}</div>
-      ))}
-      {Array.from({ length: count }, (_, i) => {
-        const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
-        const key = localDate(d.toISOString())
-        const inMonth = d.getMonth() === month.getMonth()
+    <Calendar
+      month={month}
+      cards={cards}
+      onSelect={onOpen}
+      chipTone={(c) => {
+        const r = results.get(c.id)
+        return { line: trendColor(r), background: r ? tokens.colorNeutralBackground1 : tokens.colorNeutralBackground3 }
+      }}
+      renderMeta={(c) => {
+        const r = results.get(c.id)
+        if (!r) return <span className={styles.noResult}>{t('結果なし', 'No results')}</span>
         return (
-          <div key={key} className={mergeClasses(styles.day, !inMonth && styles.dayOut)}>
-            <span className={mergeClasses(styles.dayNum, key === today && styles.today)}>{d.getDate()}</span>
-            {(days.get(key) ?? []).map((c) => {
-              const r = results.get(c.id)
-              return (
-                <button key={c.id} type="button" className={mergeClasses(styles.chip, !r && styles.chipNone)} style={{ borderLeftColor: trendColor(r) }} onClick={() => onOpen(c.id)}>
-                  <span className={styles.chipName} title={c.name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.name}`}</span>
-                  {r ? (
-                    <span className={styles.chipNums}>
-                      <span>{money(r.revenue, c)}</span>
-                      <span>{isPush(c) ? t(`タップ ${pct(r.clickRate)}`, `Tap ${pct(r.clickRate)}`) : t(`開封 ${pct(r.openRate)}`, `Open ${pct(r.openRate)}`)}</span>
-                      {delta(r.vsLastYear)}
-                    </span>
-                  ) : (
-                    <span className={styles.chipNums}>{t('結果なし', 'No results')}</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+          <>
+            <span>{money(r.revenue, c)}</span>
+            <span>{isPush(c) ? t(`タップ ${pct(r.clickRate)}`, `Tap ${pct(r.clickRate)}`) : t(`開封 ${pct(r.openRate)}`, `Open ${pct(r.openRate)}`)}</span>
+            {delta(r.vsLastYear)}
+          </>
         )
-      })}
-    </div>
+      }}
+    />
   )
 }
 
@@ -179,7 +145,11 @@ export function ResultsWeek({
               const ids = cardProducts.get(c.id) ?? []
               return (
                 <button key={c.id} type="button" className={mergeClasses(styles.tile, !r && styles.chipNone)} style={{ borderTopColor: trendColor(r) }} onClick={() => onOpen(c.id)}>
-                  <span className={styles.chipName} title={c.name}>{`${isPush(c) ? t('アプリ', 'App') : t('メール', 'Email')} · ${c.name}`}</span>
+                  <span className={styles.chipName} title={c.name}>
+                    {/* 計画の面・月の表示と同じく、チャネルはアイコンで示す */}
+                    {isPush(c) ? <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} /> : <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />}
+                    {c.name}
+                  </span>
                   {r ? (
                     <>
                       <span className={styles.nums}>

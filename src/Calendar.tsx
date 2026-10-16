@@ -15,8 +15,15 @@ interface Props {
   /** アラートのある配信(いちばん強い種類。印を付ける) */
   alertKinds?: Map<string, CardAlertKind>
   onSelect: (id: string) => void
-  /** 日付のマスの空いているところ(または「＋」)を押したとき。その日付で新規作成する(値は YYYY-MM-DD) */
-  onCreate: (day: string) => void
+  /** 日付のマスの空いているところ(または「＋」)を押したとき。その日付で新規作成する(値は YYYY-MM-DD)。なければ、作れない(結果の面) */
+  onCreate?: (day: string) => void
+  /**
+   * 配信の箱の 2 行目(既定: 時刻・国・チャネル)。結果の面では、売上・開封率・前年比。
+   * 計画と結果は同じ配信の表と裏なので、箱の形・1 行目(アイコン + 名前)はそろえ、ここと色だけを変える
+   */
+  renderMeta?: (card: DeliveryCard) => React.ReactNode
+  /** 配信の箱の色(左の線と、地の色)。既定は、状態の色 */
+  chipTone?: (card: DeliveryCard) => { line: string; background: string }
 }
 
 // 選択肢の値から、画面の言葉を求める
@@ -61,9 +68,11 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: tokens.spacingVerticalXS,
     minWidth: 0,
-    cursor: 'pointer',
     '@media (min-width: 900px)': { minHeight: '112px' },
-    // マスにマウスを乗せたときだけ「＋」を出して、押せば新規作成できることを示す
+  },
+  // 新規作成できるとき(計画の面)だけ: マスにマウスを乗せたら「＋」を出して、押せば新規作成できることを示す
+  cellCreate: {
+    cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
     ':hover .cal-add': { opacity: 1 },
   },
@@ -130,6 +139,16 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     '@media (min-width: 900px)': { display: 'block' },
   },
+  // 結果の数字は、狭い画面でも出す(結果を見るための面なので)
+  pillMetaAlways: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    columnGap: '6px',
+    color: tokens.colorNeutralForeground2,
+    lineHeight: 1.2,
+    fontSize: tokens.fontSizeBase100,
+    fontVariantNumeric: 'tabular-nums',
+  },
   warn: { color: tokens.colorPaletteDarkOrangeForeground1, verticalAlign: 'text-bottom', marginRight: '2px' },
   pillName: {
     display: 'block',
@@ -142,7 +161,7 @@ const useStyles = makeStyles({
   },
 })
 
-export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate }: Props) {
+export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone }: Props) {
   const styles = useStyles()
   const t = useT()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -179,12 +198,12 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
           return (
             <div
               key={k}
-              className={mergeClasses(styles.cell, d.getMonth() !== month.getMonth() && styles.outside)}
-              onClick={() => onCreate(k)}
+              className={mergeClasses(styles.cell, onCreate && styles.cellCreate, d.getMonth() !== month.getMonth() && styles.outside)}
+              onClick={onCreate ? () => onCreate(k) : undefined}
             >
               <div className={styles.dayHead}>
                 <span className={mergeClasses(styles.dayNum, isToday && styles.today)}>{d.getDate()}</span>
-                <button
+                {onCreate && <button
                   type="button"
                   className={mergeClasses('cal-add', styles.add)}
                   onClick={(e) => {
@@ -195,44 +214,51 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                   title={t('この日に新規作成', 'New delivery on this day')}
                 >
                   <AddRegular />
-                </button>
+                </button>}
               </div>
-              {(byDay.get(k) ?? []).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  // マスの「新規作成」まで届かないように止める(既存のカードを開くだけ)
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelect(c.id)
-                  }}
-                  title={`${c.name}(${label(statusOptions, c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
-                  className={styles.pill}
-                  style={{
-                    backgroundColor: `color-mix(in srgb, ${statusColor(c.status)} 16%, var(--colorNeutralBackground1))`,
-                    borderLeft: `3px solid ${statusColor(c.status)}`,
-                    // 取りやめた配信は、消さずに薄く、取り消し線で出す
-                    ...(isCancelled(c) ? CANCELLED_STYLE : {}),
-                  }}
-                >
-                  <span className={styles.pillMeta}>
-                    {new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
-                    {' '}{label(countryOptions, c.country)}・{c.channel === CHANNEL_PUSH ? t('アプリ', 'App') : c.channel === undefined ? '' : t('メール', 'Email')}
-                  </span>
-                  <span className={styles.pillName}>
-                    {/* メールかアプリかを、時刻・国の行が出ない狭い画面でも見分けられるよう、名前の前にアイコンを付ける */}
-                    {c.channel === CHANNEL_PUSH ? (
-                      <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} />
+              {(byDay.get(k) ?? []).map((c) => {
+                const tone = chipTone ? chipTone(c) : { line: statusColor(c.status), background: `color-mix(in srgb, ${statusColor(c.status)} 16%, var(--colorNeutralBackground1))` }
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    // マスの「新規作成」まで届かないように止める(既存のカードを開くだけ)
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelect(c.id)
+                    }}
+                    title={`${c.name}(${label(statusOptions, c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
+                    className={styles.pill}
+                    style={{
+                      backgroundColor: tone.background,
+                      borderLeft: `3px solid ${tone.line}`,
+                      // 取りやめた配信は、消さずに薄く、取り消し線で出す
+                      ...(isCancelled(c) ? CANCELLED_STYLE : {}),
+                    }}
+                  >
+                    <span className={styles.pillName}>
+                      {/* メールかアプリかを、2 行目が出ない狭い画面でも見分けられるよう、名前の前にアイコンを付ける */}
+                      {c.channel === CHANNEL_PUSH ? (
+                        <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} />
+                      ) : (
+                        <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
+                      )}
+                      <AlertMark kind={alertKinds?.get(c.id)} />
+                      {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
+                      {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
+                      {c.name}
+                    </span>
+                    {renderMeta ? (
+                      <span className={styles.pillMetaAlways}>{renderMeta(c)}</span>
                     ) : (
-                      <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
+                      <span className={styles.pillMeta}>
+                        {new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
+                        {' '}{label(countryOptions, c.country)}・{c.channel === CHANNEL_PUSH ? t('アプリ', 'App') : c.channel === undefined ? '' : t('メール', 'Email')}
+                      </span>
                     )}
-                    <AlertMark kind={alertKinds?.get(c.id)} />
-                    {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
-                    {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
-                    {c.name}
-                  </span>
-                </button>
-              ))}
+                  </button>
+                )
+              })}
             </div>
           )
         })}
