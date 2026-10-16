@@ -379,7 +379,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const previewBoxRef = useRef<HTMLDivElement>(null)
   const previewInnerRef = useRef<HTMLDivElement>(null)
   // コピー・ヘッドラインの言語(AI に渡す。保存はしない)
-  const [language, setLanguage] = useState<CopyLanguage>('auto')
+  // コピー・ヘッドラインの言語は、配信の国に合わせる(US は英語、JP は日本語)。以前は切り替えられたが、2026-10-16 に外した
+  const language: CopyLanguage = 'auto'
   const [template, setTemplate] = useState<EmailTemplateId>(
     () => card?.layout_key || (card?.channel === CHANNEL_PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card?.email_template)),
   )
@@ -1192,8 +1193,6 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 setHeroReason={setHeroReason}
                 heroCandidates={heroCandidates}
                 setHeroCandidates={setHeroCandidates}
-                language={language}
-                onLanguage={setLanguage}
                 drafts={drafts}
                 disabled={saving}
                 links={links}

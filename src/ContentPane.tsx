@@ -34,7 +34,7 @@ import { Candidates } from './Candidates'
 import { HeroCandidates } from './HeroCandidates'
 import { heroImage, productImage } from './images'
 import { DND_HERO, SOURCE_AI, type Candidate, type Item } from './items'
-import { withChat, type CopyLanguage, type ProposedHero } from './aiSelect'
+import { withChat, type ProposedHero } from './aiSelect'
 import { optionLabel, tr, useT } from './i18n'
 import { Row, productMeta } from './ProductRow'
 import { useSelection } from './useSelection'
@@ -91,8 +91,6 @@ interface Props {
   heroCandidates: ProposedHero[]
   setHeroCandidates: Dispatch<SetStateAction<ProposedHero[]>>
   /** コピー・ヘッドラインの言語 */
-  language: CopyLanguage
-  onLanguage: (v: CopyLanguage) => void
   drafts: AiDrafts
   disabled: boolean
   /** 配信ごとのリンク先(制作指示のタブで設定する) */
@@ -299,35 +297,6 @@ const revealTab = (e: React.MouseEvent<HTMLElement>) => {
 
 const heroMeta = (h?: HeroImage) => (h ? `${h.image_code} ・ ${optionLabel(h.purpose_name)} ・ ${optionLabel(h.season_name)} ・ ${h.tags ?? ''}` : '')
 
-/** コピー・ヘッドラインの言語の切り替え(auto は、配信の国に合わせる) */
-function LanguageToggle({ value, onChange }: { value: CopyLanguage; onChange: (v: CopyLanguage) => void }) {
-  const s = useStyles()
-  const t = useT()
-  const opts: { v: CopyLanguage; label: string }[] = [
-    { v: 'auto', label: t('国に合わせる', 'Match country') },
-    { v: 'ja', label: t('日本語', 'Japanese') },
-    { v: 'en', label: 'English' },
-  ]
-  return (
-    <div className={s.flexRow}>
-      <span className={s.caption}>{t('言語', 'Language')}</span>
-      <div role="group" aria-label={t('コピーの言語', 'Copy language')} style={{ display: 'inline-flex' }}>
-        {opts.map((o) => (
-          <Button
-            key={o.v}
-            size="small"
-            appearance={value === o.v ? 'primary' : 'outline'}
-            aria-pressed={value === o.v}
-            onClick={() => onChange(o.v)}
-          >
-            {o.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 /**
  * セクションの中の 1 つのブロック(見出し / コピー / 商品)。右上に、そのブロックの AI ボタンなどを置く。
  * 見出しの行を押すと、中身を折りたたむ(商品の一覧が長いとき、他のブロックを見やすくするため)。折りたたみ中は、summary を 1 行で出す
@@ -452,15 +421,13 @@ function CopyTab(props: {
   onAdopt: (idea: { headline: string; lead: string; angle: string }) => void
   busy: boolean
   blocked?: string
-  language: CopyLanguage
-  onLanguage: (v: CopyLanguage) => void
   onGenerate: () => void
   /** アプリ(プッシュ通知)の文面: ヘッドライン = 通知のタイトル、コピー = 本文。文字数の目安を出す */
   push?: boolean
 }) {
   const s = useStyles()
   const t = useT()
-  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, language, onLanguage, onGenerate, push } = props
+  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, onGenerate, push } = props
   // 通知に収まる文字数の目安(端末で切れ方が違うので、目安として出す)
   const count = (text: string, max: number) =>
     push ? <span className={text.length > max ? s.warn : s.caption}>{` ${text.length} / ${max}`}</span> : null
@@ -471,7 +438,6 @@ function CopyTab(props: {
           {ideas.length ? t('案を作り直す', 'Regenerate ideas') : t('AIで案を出す', 'Suggest with AI')}
         </AiButton>
         {blocked && <span className={s.warn}>{blocked}</span>}
-        <LanguageToggle value={language} onChange={onLanguage} />
       </div>
       <div className={s.group}>
       <Field
@@ -830,7 +796,6 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
               <AiButton busy={busyCopy} disabled={noTheme || disabled || anyBusy} onClick={() => selectCopies(sec)}>
                 {copies.length ? t('作り直す', 'Regenerate') : t('AIで作る', 'Generate with AI')}
               </AiButton>
-              <LanguageToggle value={p.language} onChange={p.onLanguage} />
             </>
           }
         >
@@ -1102,8 +1067,6 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
       }}
       busy={!!drafts.busy.copy}
       blocked={noTheme ? t('先にテーマを決めてください', 'Set a theme first') : undefined}
-      language={p.language}
-      onLanguage={p.onLanguage}
       onGenerate={drafts.runCopy}
     />
   )
@@ -1291,8 +1254,6 @@ export function ContentPane(props: Props) {
           }}
           busy={!!drafts.busy.push}
           blocked={needTheme}
-          language={props.language}
-          onLanguage={props.onLanguage}
           onGenerate={drafts.runPush}
         />
       )}
