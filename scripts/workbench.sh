@@ -57,8 +57,8 @@ server_pid() {
 build() {
   say "画面のパッケージを入れる(npm ci)"
   (cd "$ROOT" && npm ci)
-  say "画面をビルドする(npm run build:gcp)"
-  (cd "$ROOT" && npm run build:gcp)
+  say "画面をビルドする(npm run build)"
+  (cd "$ROOT" && npm run build)
 }
 
 pip_install() {

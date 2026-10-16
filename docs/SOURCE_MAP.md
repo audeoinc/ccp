@@ -3,7 +3,7 @@
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
 - 最終更新: 2026-10-15(`main` の時点のファイル。行数は目安)
-- 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)、GCP 版のサーバーは [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)
+- 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
 ---
@@ -37,7 +37,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 | パス | 役割 |
 |---|---|
 | `src/` | 画面のコード(React 19 + TypeScript + Fluent UI v9) |
-| `server/` | GCP 版のサーバー(Python / FastAPI)。画面・データ API・AI・画像を配る |
+| `server/` | サーバー(Python / FastAPI)。画面・データ API・AI・画像を配る |
 | `scripts/` | 反映・検証・撮影・Workbench の運用などの補助スクリプト |
 | `docs/` | 文書、ワイヤーフレーム、スクリーンショット、サンプルデータ(CSV) |
 | `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・ビルド・サーバーのテスト) |
@@ -61,7 +61,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 | `fonts.ts` | 23 | 同梱のフォント(外部の CDN に頼らない) |
 | `index.css` | — | 全体の CSS と、印刷(週の資料・レポート)のときの見せ方 |
 | `i18n.ts` | 118 | 日本語 / English の切り替え(`t` / `tr` / `useT` / `optionLabel`) |
-| `appRoot.ts` | 22 | GCP 版の、アプリの置き場所。API・画像のパスの基準(Workbench の `/proxy/8081/` の下でも動くように) |
+| `appRoot.ts` | 22 | アプリの置き場所。API・画像のパスの基準(Workbench の `/proxy/8081/` の下でも動くように) |
 | `settings.ts` | 36 | アプリ全体の設定(自動下書きのオン・オフなど。ブラウザごと) |
 
 ### 3.2 計画の面(カレンダー・週・一覧)
@@ -202,14 +202,14 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `gcp/dbWake.ts` | 「データベースを準備中」の表示 |
 | `mock/db.ts` ・ `mock/agent.ts` ・ `mock/seed.ts` | 撮影・デモ用の、DB と AI の身代わりと、サンプルデータ(本番のビルドには入らない) |
 
-## 4. サーバー(`server/`。GCP 版だけ)
+## 4. サーバー(`server/`)
 
 | パス | 行数 | 役割 |
 |---|---|---|
 | `ccp/main.py` | 121 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
 | `ccp/data_api.py` | — | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
 | `ccp/schema.py` | 290 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
-| `schema.json` | — | **GCP 版のデータ定義**(テーブル・列)。列を足すときはここ |
+| `schema.json` | — | **データ定義**(テーブル・列・選択肢の値)。列を足すときはここ |
 | `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`、または Cloud SQL) |
 | `ccp/dbctl.py` | 173 | Cloud SQL の自動起動・自動停止(本番の Cloud Run だけ) |
 | `ccp/ai.py` | 89 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
@@ -229,10 +229,10 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | ファイル | 役割 |
 |---|---|
 | `workbench.sh` | Workbench の操作(`setup` / `update` / `start` / `stop` / `status` / `check` / `import` / `log`) |
-| `deploy-gcp.mjs` | GCP 版(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) |
+| `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) |
 | `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
-| `gcp-smoke.mjs` | GCP 版の動作確認(画面を開いて、カードが出るか) |
+| `gcp-smoke.mjs` | 本番・手元のサーバーの動作確認(画面を開いて、カードが出るか) |
 | `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) |
 | `feature-reasons.py` | 機能の理由の台帳(`docs/FEATURE_REASONS.md`)を作る |
 

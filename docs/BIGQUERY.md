@@ -5,7 +5,7 @@
 
 - 状態: **設計(2026-10-15 に利用者と合意)。まだ作っていない。** 作る順番は [BACKLOG.md](BACKLOG.md) の「8. BigQuery の本番データ」(B1〜B7)
 - BigQuery 側で出してほしい列の仕様: [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)(SQL を書く人向け)
-- 関係する文書: [WORKBENCH.md](WORKBENCH.md)(Workbench の運用)、[GCP.md](GCP.md)(GCP 版の全体)
+- 関係する文書: [WORKBENCH.md](WORKBENCH.md)(Workbench の運用)、[GCP.md](GCP.md)(サーバー・DB・AI の全体)
 - 利用先の名前・プロジェクト・データセット・テーブルの名前は、ここにも、コードにも書かない(設定で渡す)
 
 ---

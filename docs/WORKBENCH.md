@@ -1,11 +1,11 @@
 # 移行の手順書: Vertex AI Workbench で CCP を動かす
 
-CCP(配信コンテンツプランナー)の GCP 版を、利用先の **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
+CCP(配信コンテンツプランナー)を、利用先の **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
 本番(Cloud Run)と同じ**配信のデータ**と**商品・メイン画像の写真**を持ち込むための手順書です。
 
 - 最終更新: 2026-10-15(利用先の環境は PostgreSQL に直接つなぐ形に合わせた)
 - 対象: Workbench で CCP を立ち上げる・更新する人
-- 関係する文書: [GCP.md](GCP.md)(GCP 版の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
+- 関係する文書: [GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
 
 ---
 
@@ -70,7 +70,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | サーバーのログの最後を見る | `scripts/workbench.sh log` |
 | 設定の確認 | `scripts/workbench.sh check` |
 
-- `update` は、`git pull` → (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build:gcp` → 停止 → 起動、の順に行います。
+- `update` は、`git pull` → (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8081)、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
@@ -122,7 +122,7 @@ ls server/workbench.env.example docs/WORKBENCH.md    # 2 つのファイル名�
 
 ```bash
 npm ci
-npm run build:gcp      # dist-gcp/ ができる(1〜2 分)
+npm run build      # dist-gcp/ ができる(1〜2 分)
 ```
 
 ### 3.3 サーバーの Python 環境を作る
@@ -286,7 +286,7 @@ https://<ノートブックの URL>/proxy/8081/
 cd ~/ccp
 git pull
 npm ci                       # パッケージが変わったときに必要。毎回でもよい
-npm run build:gcp
+npm run build
 cd server
 .venv/bin/python -m pip install -r requirements.txt    # requirements.txt が変わったときだけ
 # サーバーを止めて(Ctrl+C か pkill)、3.8 と同じ手順で起動し直す
@@ -357,7 +357,7 @@ set -a; source workbench.env; set +a
 | `password authentication failed` | ユーザー名・パスワードの違い |
 | `database "…" does not exist` | DB の名前の違い、まだ作っていない(3.4 の「CCP 用の DB を作る」) |
 | `ASSET_DIR=… に写真がありません` | 3.7 の `import-pack … --yes` をする。`ASSET_DIR` を展開先と同じにする |
-| `ビルドがありません` | リポジトリのルートで `npm ci` → `npm run build:gcp` |
+| `ビルドがありません` | リポジトリのルートで `npm ci` → `npm run build` |
 
 ## 付録 A. 環境変数の一覧
 

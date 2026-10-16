@@ -1,4 +1,4 @@
-// GCP 版(Cloud Run のサービス contents-planner)への反映。安全装置つき。
+// 本番(Cloud Run のサービス contents-planner)への反映。安全装置つき。
 //   npm run deploy:gcp
 // 反映してよい状態(main で、最新で、変更が残っていない)のときだけ、検証 → gcloud run deploy を行う。
 // 複数人が反映しても、他の人の変更を消さないための安全装置つき。
@@ -78,8 +78,8 @@ console.log('\n[1/4] 型チェック')
 run('npx tsc -b')
 console.log('\n[2/4] lint')
 run('npx eslint .')
-console.log('\n[3/4] ビルド(GCP 版)')
-run('npm run build:gcp')
+console.log('\n[3/4] ビルド')
+run('npm run build')
 console.log('\n[4/4] 反映(gcloud run deploy。クラウドでビルドするので、数分かかります)')
 run(`gcloud run deploy ${SERVICE} --source . --project ${project} --region ${REGION} --quiet`)
 

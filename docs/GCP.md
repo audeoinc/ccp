@@ -111,7 +111,7 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
    ```
    `https://<ノートブックの URL>/proxy/8081/` を開く(末尾の `/` を付ける)。
 
-**開発を続けながら、Workbench を最新にする**: コードは `git pull` → `npm ci` → `npm run build:gcp` → サーバーの起動し直し。本番のデータ・画像にそろえたいときだけ、パックを書き出して取り込む(上の 1〜4)。
+**開発を続けながら、Workbench を最新にする**: コードは `git pull` → `npm ci` → `npm run build` → サーバーの起動し直し(`scripts/workbench.sh update` がまとめて行う)。本番のデータ・画像にそろえたいときだけ、パックを書き出して取り込む(上の 1〜4)。
 画像(`server/images/`)は、権利のある素材なので Git には入れない(`.gitignore` 済み)。
 
 初期データ(`server/seed.json`)は、撮影用のモックと同じ元データ(`docs/*.csv` → `src/mock/seed.ts`)から作る。`seed.ts` を直したら `npm run seed:export` で書き出し、`seed.json` もコミットする。
@@ -132,7 +132,7 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1   --allow-unauthenticated --concurrency=8 --max-instances=1 --min-instances=0 --memory=512Mi --cpu=1 --timeout=300   --service-account=<実行サービスアカウント>   --set-env-vars "GOOGLE_CLOUD_PROJECT=<プロジェクトID>,GOOGLE_CLOUD_LOCATION=global,GEMINI_MODEL=gemini-3.8-flash,GEMINI_THINKING=low,CLOUD_SQL_INSTANCE=<プロジェクトID>:asia-northeast1:contents-planner-db,DB_USER=ccp_app,DB_NAME=ccp,DB_CONTROL=1,DB_IDLE_MINUTES=30,STATE_BUCKET=<バケット名>,IDLE_CHECK_AUDIENCE=<サービスの URL>,IDLE_CHECK_SA_EMAIL=ccp-scheduler@<プロジェクトID>.iam.gserviceaccount.com"   --set-secrets "DB_PASSWORD=contents-planner-db-app-password:latest,APP_PASSWORD=contents-planner-app-password:latest"
 ```
 
-チームメンバーが反映する手順(権限と、`npm run deploy:gcp`)は、[ONBOARDING.md](ONBOARDING.md) の「GCP 版への反映」。2 回目以降は、環境変数とシークレットが残るので、`gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1` だけでよい(コードを変えても、Cloud Run は自動では更新されない)。
+チームメンバーが反映する手順(権限と、`npm run deploy:gcp`)は、[ONBOARDING.md](ONBOARDING.md) の「本番への反映」。2 回目以降は、環境変数とシークレットが残るので、`gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1` だけでよい(コードを変えても、Cloud Run は自動では更新されない)。
 
 **自動停止(Cloud Scheduler)**: 数分おきに `/internal/idle-check` を、Scheduler 用のサービスアカウントの署名つきトークン(OIDC。宛先はサービスの URL)で呼ぶ。サーバーが、最後のアクセスから `DB_IDLE_MINUTES`(既定 30)分たっていれば、DB の停止を依頼する。
 
@@ -155,7 +155,7 @@ echo '{"ts": 1791288000}' | gcloud storage cp - gs://<バケット名>/state/kee
 
 ## 画像の差し替え(商品・ヒーロー画像)
 
-GCP 版だけの機能。用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。
+用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。
 画像は **Git には入れない**(権利のある素材のため。`import/` は `.gitignore` 済み)。GCS のバケット(`images/products/…`、`images/heroes/…`)に置き、サーバーの `/img/…` が配信する(バケットは非公開で、サイトと同じ Basic 認証がかかる)。DB の画像 URL は `/img/products/417352.jpg` の形。
 
 **置き場所**(アプリのルートの `import/`。jpg / png / webp。ファイル名の順に、コードを付ける)
@@ -194,9 +194,9 @@ python -m ccp.importer apply --yes     # DB の、商品・ヒーロー画像・
 | 1 | データ層(定義・変換・`/api/data`・互換サービス・初期データ) | 完了(手元のサーバー + Cloud SQL で確認) |
 | 2 | AI(`/api/ask` → Gemini、画面側の差し替え) | 完了(手元で、テーマ案・すべて AI で下書きまで確認) |
 | 3 | Cloud Run へのデプロイ・Basic 認証・DB の自動起動/停止(画像の GCS 化は、必要になったときに) | 完了(`contents-planner` を公開、Scheduler `ccp-idle-check` を作成。自動停止・自動起動を実機で確認) |
-| 4 | 両ビルドの契約テスト・CI の拡充 | 一部(`verify` と CI に、GCP ビルド・データ定義の突き合わせ・サーバーのテストを追加済み) |
+| 4 | テスト・CI の拡充 | 一部(`verify` と CI に、ビルド・データ定義の突き合わせ・サーバーのテストを追加済み) |
 
-## 開いたときの初期設定(GCP 版)
+## 開いたときの初期設定
 
 `vite.config.ts` の `define` で、開いたときの初期値を決めている: 国の絞り込みは **US**(`VITE_DEFAULT_COUNTRY`)、画面の言語は **English**(`VITE_DEFAULT_LANG`)。言語は、ブラウザごとに保存した選択が、あればそちらを優先する。
 
