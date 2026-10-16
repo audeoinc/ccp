@@ -32,6 +32,119 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 - **Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。** 同じ日に、名前(`cr854_…`)と選択肢の数も、読みやすい名前・文字の値に変えた(GCP.md の「データ定義」)。
 - 撮影・デモ用の差し替えは、`vite.mock.config.ts` のプラグインが、サービスの読み込みを置き換えて行う。そのため、画面のコードはビルドの違いを知らない。
 
+### 構成図(ファイルのつながり)
+
+主なファイルと、呼び出しのつながり(2026-10-16 時点。[gitdiagram.com](https://gitdiagram.com/audeoinc/ccp) の図をもとに、コードで確かめて描き直した)。GitHub では、図として表示される。
+
+```mermaid
+flowchart TD
+    user(("配信の担当者"))
+
+    subgraph plan["計画の面"]
+        app["画面の入口<br/>App.tsx"]
+        cal["月のカレンダー<br/>Calendar.tsx"]
+        week["週の表示<br/>WeekView.tsx"]
+        list["一覧<br/>ListView.tsx"]
+        review["週のレビュー・承認<br/>WeekReviewBar.tsx"]
+    end
+
+    subgraph authoring["配信カード(内容づくり)"]
+        card["配信カード<br/>CardDetail.tsx"]
+        content["コンテンツ生成のペイン<br/>ContentPane.tsx"]
+        preview["プレビュー<br/>Preview.tsx"]
+        drafts["AI の下書きの流れ<br/>useAiDrafts.ts・autoDraft.ts"]
+        aidraft["案(テーマ・コピー・制作指示)<br/>aiDraft.ts"]
+        aiselect["選定(商品・メイン画像)と AI の呼び出し<br/>aiSelect.ts"]
+        tmgr["テンプレートの管理<br/>TemplateManager.tsx"]
+        tdef["テンプレートの定義<br/>templates.ts・layoutTemplates.ts"]
+    end
+
+    subgraph insight["結果とアラート"]
+        results["結果<br/>ResultsPage.tsx・ResultsCalendar.tsx"]
+        resdetail["詳しい結果・比べる<br/>ResultDetail.tsx・ResultsCompareView.tsx"]
+        alerts["アラート<br/>AlertsPage.tsx・alerts.ts"]
+    end
+
+    subgraph data["データの出入り口(画面)"]
+        svc["表ごとのサービス<br/>src/data/*.ts"]
+        models["表の型・選択肢<br/>src/models/*.ts"]
+        client["API の呼び出し<br/>src/gcp/services.ts"]
+        aiclient["AI の呼び出し<br/>src/gcp/ai.ts"]
+    end
+
+    subgraph server["サーバー(server/ccp。Cloud Run・Workbench)"]
+        main["FastAPI の入口・Basic 認証<br/>main.py"]
+        dataapi["データの読み書き /api/data<br/>data_api.py"]
+        schema["データ定義・値の確かめ<br/>schema.py ← schema.json"]
+        db["DB への接続<br/>db.py"]
+        aiapi["AI /api/ask<br/>ai.py"]
+        dbctl["DB の自動起動・停止<br/>dbctl.py"]
+        assets["画像 /img<br/>assets.py"]
+        pack["引っ越し用のパック /api/export<br/>pack.py"]
+    end
+
+    pg[("PostgreSQL<br/>Cloud SQL")]
+    gcs[("GCS<br/>画像・最後のアクセスの時刻")]
+    gemini{{"Gemini<br/>Vertex AI"}}
+
+    user -->|計画する| app
+    app -->|月| cal
+    app -->|週| week
+    app -->|一覧| list
+    app -->|週のレビュー・承認| review
+    app -->|結果の面| results
+    app -->|アラート| alerts
+    cal & week & list -->|配信を開く| card
+    results --> resdetail
+    resdetail -.->|制作の詳細を重ねる| card
+    alerts -.->|問題の商品を選んで開く| card
+
+    card --> content
+    card --> preview
+    content --> drafts
+    drafts --> aidraft
+    drafts --> aiselect
+    aidraft --> aiselect
+    app --> tmgr
+    tmgr --> tdef
+    preview --> tdef
+
+    app & card & results & alerts & review -->|読み書き| svc
+    svc -->|型| models
+    svc --> client
+    aiselect --> aiclient
+
+    client -->|/api/data| main
+    aiclient -->|/api/ask| main
+    main --> dataapi
+    main --> aiapi
+    main --> assets
+    main --> pack
+    main -->|止まっていれば起動| dbctl
+    dataapi --> schema
+    dataapi --> db
+    pack --> db
+    db --> pg
+    aiapi --> gemini
+    assets --> gcs
+    dbctl -->|起動・停止| pg
+    dbctl -->|最後のアクセスの時刻| gcs
+
+    classDef ui fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+    classDef auth fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ins fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef dat fill:#f3e8ff,stroke:#9333ea,color:#581c87
+    classDef srv fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class app,cal,week,list,review ui
+    class card,content,preview,drafts,aidraft,aiselect,tmgr,tdef auth
+    class results,resdetail,alerts ins
+    class svc,models,client,aiclient dat
+    class main,dataapi,schema,db,aiapi,dbctl,assets,pack srv
+```
+
+- 実線は呼び出し、点線は「上に重ねて開く」つながり。
+- 撮影・デモ用のビルドでは、「表ごとのサービス」と「AI の呼び出し」が、`src/mock/`(メモリ上のデータ・サンプルの返答)に差し替わる。サーバー側は使わない。
+
 ## 2. 一番上の階層
 
 | パス | 役割 |
