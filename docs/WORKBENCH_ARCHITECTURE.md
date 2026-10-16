@@ -49,40 +49,7 @@ Campaign Contents Planner(CCP)を、Vertex AI Workbench のインスタンスの
 | 設定ファイル | DB の接続先(`DATABASE_URL`)、AI の設定、画像のフォルダ など | `server/workbench.env`(見本は `workbench.env.example`) |
 | 操作のスクリプト | 起動・停止・状態の確認・更新・パックの取り込み・ログ | `scripts/workbench.sh` |
 
-## 3. 起動のしくみ(`scripts/workbench.sh start`)
-
-1. `server/workbench.env` を読み込む(毎回。ターミナルで設定し直さなくてよい)。
-2. **PostgreSQL を確かめる。** `DATABASE_URL` のホストが `localhost` なら、`pg_isready` で動いているかを見て、止まっていれば `pg_ctl` で起動する(Workbench を止めて起動し直すと、PostgreSQL が止まっていることがあるため)。
-3. 画面のビルドがあることを確かめる。
-4. **CCP のサーバーを、裏で起動する**(`uvicorn ccp.main:app --port 8081`)。ターミナルを閉じても止まらない。ログは `server/ccp-server.log`。
-5. `/ping` が応答するまで待つ(最大 30 秒)。
-6. サーバーは、最初に DB へつないだとき、足りないテーブル・列を自動で作る(データの形が新しくなったときも、自動で合わせる)。
-
-## 4. データ・画像・コードの持ち込み
-
-コードは Git で、データと画像は、1 つの ZIP(引っ越し用のパック)で持ち込む。
-
-| 持ち込むもの | 方法 | 操作 |
-|---|---|---|
-| コード(画面・サーバー) | GitHub から取得 | `git clone`(初回)、`scripts/workbench.sh update`(更新。`git pull` → 必要ならパッケージの追加 → 画面のビルド → 起動し直し) |
-| データと画像 | 引っ越し用のパック(ZIP。CCP の画面の ⚙ →「データと画像を書き出す」で作る)を、Jupyter の画面からアップロード | `scripts/workbench.sh import <ZIP>`(中身を見せて、確認してから取り込む) |
-
-- パックの中身: すべてのテーブルの行(`data.json`)と、商品・メイン画像の写真(`images/`)。
-- **取り込むと、Workbench の DB の中身は、パックの内容に置き換わる**(Workbench で入力したデータは消える)。
-
-## 5. よく使う操作
-
-| やりたいこと | コマンド |
-|---|---|
-| コードを最新にして、起動し直す | `scripts/workbench.sh update` |
-| 起動 / 停止 / 起動し直し | `scripts/workbench.sh start` / `stop` / `restart` |
-| 動いているか(サーバー・PostgreSQL・コードの版) | `scripts/workbench.sh status` |
-| PostgreSQL だけを起動する | `scripts/workbench.sh pg-start` |
-| 設定・DB への接続・写真・画面のビルドを確かめる | `scripts/workbench.sh check` |
-| データと写真を取り込む(パック) | `scripts/workbench.sh import server/ccp-pack-<日時>.zip` |
-| サーバーのログを見る | `scripts/workbench.sh log` |
-
-## 6. 安全のための約束
+## 3. 安全のための約束
 
 - 画面へのアクセスは、Jupyter の中継(Google のログイン)で守られる。CCP の画面のパスワード(`APP_PASSWORD`)は、設定しなくてもよい。
 - DB のパスワードは `server/workbench.env` にだけ書く。このファイルと、展開した画像(`server/images/`)は、Git に入れない(除外の設定済み)。
