@@ -5,7 +5,7 @@ CCP(配信コンテンツプランナー)を、利用先の **Vertex AI Workbenc
 
 - 最終更新: 2026-10-15(利用先の環境は PostgreSQL に直接つなぐ形に合わせた)
 - 対象: Workbench で CCP を立ち上げる・更新する人
-- 関係する文書: [GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
+- 関係する文書: [WORKBENCH_ARCHITECTURE.md](WORKBENCH_ARCHITECTURE.md)(Workbench での構成の解説・構成図)、[GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
 
 ---
 
