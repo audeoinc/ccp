@@ -144,7 +144,14 @@ export function ResultsWeek({
               const r = results.get(c.id)
               const ids = cardProducts.get(c.id) ?? []
               return (
-                <button key={c.id} type="button" className={mergeClasses(styles.tile, !r && styles.chipNone)} style={{ borderTopColor: trendColor(r) }} onClick={() => onOpen(c.id)}>
+                <button
+                  key={c.id}
+                  type="button"
+                  className={mergeClasses(styles.tile, !r && styles.chipNone)}
+                  // アプリの配信は、角を大きく丸めた枠(月のカレンダーと同じく、メールとアプリを形で見分ける。枠の色は前年比)
+                  style={isPush(c) ? { border: `1.5px solid ${trendColor(r)}`, borderRadius: '16px' } : { borderTopColor: trendColor(r) }}
+                  onClick={() => onOpen(c.id)}
+                >
                   <span className={styles.chipName} title={c.name}>
                     {/* 計画の面・月の表示と同じく、チャネルはアイコンで示す */}
                     {isPush(c) ? <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} /> : <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />}

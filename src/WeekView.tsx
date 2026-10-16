@@ -135,6 +135,8 @@ const useStyles = makeStyles({
   // 確認の一覧で選んだ項目に、かかわる配信と、かかわらない配信
   cardFocus: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
   cardDim: { opacity: 0.4 },
+  // アプリの配信は、角を大きく丸めた枠(月のカレンダーと同じく、メールとアプリを形で見分ける。枠の色は状態)
+  cardPush: { borderRadius: '16px' },
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
   strip: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '3px 8px', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   stripEmail: { backgroundColor: tokens.colorPaletteBlueBackground2, color: tokens.colorPaletteBlueForeground2 },
@@ -311,11 +313,11 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       <button
         key={id}
         type="button"
-        className={mergeClasses(styles.card, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
+        className={mergeClasses(styles.card, channel === 'push' && styles.cardPush, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
         onClick={() => onSelect(id)}
         title={c.name}
         // 取りやめた配信は、消さずに薄く、取り消し線で出す
-        style={isCancelled(c) ? CANCELLED_STYLE : undefined}
+        style={{ ...(channel === 'push' ? { border: `1.5px solid ${statusColor(c.status)}` } : {}), ...(isCancelled(c) ? CANCELLED_STYLE : {}) }}
       >
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
           {channel === 'push' ? <PhoneRegular /> : <MailRegular />}
