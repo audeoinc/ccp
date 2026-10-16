@@ -34,7 +34,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 
 ### 構成図(ファイルのつながり)
 
-主なファイルと、呼び出しのつながり。GitHub では、図として表示される。
+主なファイルと、呼び出しのつながり。GitHub では、図として表示される。 同じ図の draw.io 版は [source-map.drawio](source-map.drawio)(Confluence の draw.io などで読み込める。中の言葉は、動かす環境に依存しない書き方にしてある)。下の図を変えたら、draw.io 版も合わせる。
 
 ```mermaid
 flowchart TD
