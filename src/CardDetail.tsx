@@ -120,7 +120,8 @@ interface Form {
   instructionsAngle: string
 }
 
-const str = (v?: string) => (v === undefined ? '' : String(v))
+// 空の項目は、DB から null で届く。String(null) は「null」という文字になり、保存すると「使えない値」になるので、空の文字にする
+const str = (v?: string | null) => (v === undefined || v === null ? '' : String(v))
 
 const toForm = (c?: DeliveryCard): Form => ({
   name: c?.name ?? '',
@@ -128,7 +129,7 @@ const toForm = (c?: DeliveryCard): Form => ({
   country: str(c?.country),
   channel: str(c?.channel),
   department: str(c?.department),
-  status: c?.status === undefined ? String(statusOptions[0].value) : String(c.status),
+  status: c?.status === undefined || c.status === null ? String(statusOptions[0].value) : String(c.status),
   owner: c?.owner ?? '',
   pushTitle: c?.push_title ?? '',
   pushBody: c?.push_body ?? '',
