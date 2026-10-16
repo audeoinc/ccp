@@ -191,7 +191,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - Fluent の `DialogBody` は、中を独自の列に並べる。広いフロートの中を自分で並べるときは、`DialogBody` を使わずに `div` にする。
 - Fluent の `makeStyles` は、`borderWidth` / `borderStyle` のような短い書き方を受け付けない。描くときに決める線は、`style` に書く。
 - 本番のデータを直すときは、API を Basic 認証で呼ぶ(パスワードは Secret Manager の `contents-planner-app-password`)。手順は [GCP.md](GCP.md)。
-- **DB(Cloud SQL)の起動・停止**: 2026-10-16 までは、毎朝 8:00 に起動(Scheduler の `ccp-start-db-3days`)、毎晩 21:00 に停止(`ccp-stop-db-nightly`)。**10/16 を過ぎたら、`ccp-start-db-3days` を消してよいか、利用者に確かめる**(勝手に消さない)。DB の起動には 10 分ほどかかる。
+- **DB(Cloud SQL)の起動・停止(2026-10-16 に利用者が決定)**: 起動は、画面を開いたときの自動起動だけ(10〜13 分かかる)。動き出したら、毎晩 21:00 の停止(`ccp-stop-db-nightly`)か、明示的な指示まで動かしておく。30 分使わないと止める `ccp-idle-check` と、朝 8:00 に起動する `ccp-start-db-3days` は、一時停止(PAUSED)にしてある(消していない。戻すなら `gcloud scheduler jobs resume <名前> --location asia-northeast1`)。
 
 ## 8. 動かし方・確かめ方
 

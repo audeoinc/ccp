@@ -10,7 +10,7 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 - アクセスは **HTTP Basic 認証**(環境変数 `APP_PASSWORD`。ユーザーの識別はしない)。環境は本番(PRD)1 つ。
 - サーバーは **Python / FastAPI**。DB は **Cloud SQL(PostgreSQL)**。画像は **GCS**。
 - AI は **Vertex AI の Gemini**(`google-genai` SDK で直接呼ぶ。ADK は使わない)。プロンプト・JSON の解釈・リトライは**画面側(TypeScript)**に置く。
-- DB は**普段は停止**。アクセス時に自動で起動(画面に「準備中」。起動は**実測で 10〜13 分**かかる。停止は 1 分未満)、最後のアクセスから 30 分で自動停止(Cloud Scheduler。5 分おきに確認)。
+- DB は**普段は停止**。アクセス時に自動で起動(画面に「準備中」。起動は**実測で 10〜13 分**かかる。停止は 1 分未満)。**動き出したら、毎日 21:00 の自動停止(または明示的な指示)まで動かしておく**(2026-10-16 から。利用者の決定。30 分使わなければ止める自動停止と、朝の決まった時刻の起動は、Scheduler のジョブを一時停止にしてある)。
 
 ## ビルド
 
@@ -134,7 +134,7 @@ gcloud run deploy contents-planner --source . --project <プロジェクトID> -
 
 チームメンバーが反映する手順(権限と、`npm run deploy:gcp`)は、[ONBOARDING.md](ONBOARDING.md) の「本番への反映」。2 回目以降は、環境変数とシークレットが残るので、`gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1` だけでよい(コードを変えても、Cloud Run は自動では更新されない)。
 
-**自動停止(Cloud Scheduler)**: 数分おきに `/internal/idle-check` を、Scheduler 用のサービスアカウントの署名つきトークン(OIDC。宛先はサービスの URL)で呼ぶ。サーバーが、最後のアクセスから `DB_IDLE_MINUTES`(既定 30)分たっていれば、DB の停止を依頼する。
+**使われていないときの自動停止(Cloud Scheduler。2026-10-16 から一時停止中)**: `ccp-idle-check` は `gcloud scheduler jobs pause` で止めてある。戻すときは `gcloud scheduler jobs resume ccp-idle-check --location asia-northeast1`。仕組み: 数分おきに `/internal/idle-check` を、Scheduler 用のサービスアカウントの署名つきトークン(OIDC。宛先はサービスの URL)で呼ぶ。サーバーが、最後のアクセスから `DB_IDLE_MINUTES`(既定 30)分たっていれば、DB の停止を依頼する。
 
 ```bash
 gcloud scheduler jobs create http ccp-idle-check --project <プロジェクトID> --location asia-northeast1   --schedule="*/5 * * * *" --http-method=POST --uri="<サービスの URL>/internal/idle-check"   --oidc-service-account-email=ccp-scheduler@<プロジェクトID>.iam.gserviceaccount.com --oidc-token-audience="<サービスの URL>"
