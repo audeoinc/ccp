@@ -37,9 +37,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
 主なファイルと、呼び出しのつながり(2026-10-16 時点。[gitdiagram.com](https://gitdiagram.com/audeoinc/ccp) の図をもとに、コードで確かめて描き直した)。GitHub では、図として表示される。
 
 ```mermaid
-flowchart TD
-    user(("配信の担当者"))
-
+flowchart LR
     subgraph plan["計画の面"]
         app["画面の入口<br/>App.tsx"]
         cal["月のカレンダー<br/>Calendar.tsx"]
@@ -54,7 +52,7 @@ flowchart TD
         preview["プレビュー<br/>Preview.tsx"]
         drafts["AI の下書きの流れ<br/>useAiDrafts.ts・autoDraft.ts"]
         aidraft["案(テーマ・コピー・制作指示)<br/>aiDraft.ts"]
-        aiselect["選定(商品・メイン画像)と AI の呼び出し<br/>aiSelect.ts"]
+        aiselect["選定(商品・メイン画像)と、AI の呼び出し askAgent<br/>aiSelect.ts(案づくりも、ここを通る)"]
         tmgr["テンプレートの管理<br/>TemplateManager.tsx"]
         tdef["テンプレートの定義<br/>templates.ts・layoutTemplates.ts"]
     end
@@ -87,24 +85,22 @@ flowchart TD
     gcs[("GCS<br/>画像・最後のアクセスの時刻")]
     gemini{{"Gemini<br/>Vertex AI"}}
 
-    user -->|計画する| app
     app -->|月| cal
     app -->|週| week
     app -->|一覧| list
     app -->|週のレビュー・承認| review
     app -->|結果の面| results
     app -->|アラート| alerts
-    cal & week & list -->|配信を開く| card
+    app -->|"配信を開く(月・週・一覧から)"| card
     results --> resdetail
     resdetail -.->|制作の詳細を重ねる| card
     alerts -.->|問題の商品を選んで開く| card
 
     card --> content
     card --> preview
-    content --> drafts
+    card -->|AI の下書き| drafts
     drafts --> aidraft
     drafts --> aiselect
-    aidraft --> aiselect
     app --> tmgr
     tmgr --> tdef
     preview --> tdef
@@ -142,6 +138,7 @@ flowchart TD
     class main,dataapi,schema,db,aiapi,dbctl,assets,pack srv
 ```
 
+- 左から右へ、画面 → データの出入り口 → サーバー → DB・AI の順に流れる。図が小さいときは、GitHub の図の右上のボタンで拡大できる。
 - 実線は呼び出し、点線は「上に重ねて開く」つながり。
 - 撮影・デモ用のビルドでは、「表ごとのサービス」と「AI の呼び出し」が、`src/mock/`(メモリ上のデータ・サンプルの返答)に差し替わる。サーバー側は使わない。
 
