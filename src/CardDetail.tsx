@@ -56,8 +56,8 @@ import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 
-/** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別) */
-export type NewCardDefaults = Partial<Pick<Form, 'scheduledAt' | 'country' | 'channel' | 'department'>>
+/** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
+export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'department'>>
 
 interface Props {
   /** undefined のときは新規作成 */
@@ -80,6 +80,10 @@ interface Props {
   alerts?: CardAlert[]
   /** 開いたときに選んでおく商品(アラートの画面から開いたとき。問題の商品を、プレビューで強調する) */
   focusProductId?: string
+  /** 新規作成で、最初に入れておく AI の下書き(まとめて作った下書きを「開いて直す」とき。W14) */
+  draft?: AutoDraftResult
+  /** 新規作成で保存したとき、作った配信カードの id を知らせる */
+  onCreated?: (id: string) => void
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -355,7 +359,7 @@ const useStyles = makeStyles({
   actor: { width: '160px' },
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, draft, onCreated }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -699,6 +703,15 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     void startAutoDraft()
   }
 
+  // まとめて作った下書きを開いたときは、「すべてAIで下書き」の結果と同じように、最初に反映する(1 回だけ)
+  const draftApplied = useRef(false)
+  useEffect(() => {
+    if (!draft || card || draftApplied.current) return
+    draftApplied.current = true
+    applyAutoResult(draft)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, card])
+
   useEffect(() => {
     aliveRef.current = true
     return () => {
@@ -889,6 +902,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       const cardId = card?.id ?? res.data?.id
       if (!cardId) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
       if (original) await syncItems(cardId, form.name, original)
+      if (!card) onCreated?.(cardId)
       if (reason !== undefined) {
         const now = new Date().toISOString()
         for (const w of lockedWeeks) {

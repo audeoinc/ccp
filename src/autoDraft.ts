@@ -31,6 +31,10 @@ export interface AutoDraftInput {
   heroes: HeroImage[]
   /** 配信カードのチャネル(アプリのときは、アプリのテンプレートから選び、制作指示は作らない) */
   channel?: TemplateChannel
+  /** 選ばない商品(まとめて作るとき、同じ週に、もう上限まで載せた商品。W14) */
+  avoidProductIds?: string[]
+  /** テーマが決まったとき(失敗したときは空)に知らせる。まとめて作るとき、次の下書きが、このテーマを避けられるように */
+  onTheme?: (theme: string) => void
 }
 
 export interface AutoDraftResult {
@@ -93,6 +97,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
     result.themeIdeas = themes
     result.theme = themes[0].theme
   }
+  input.onTheme?.(result.theme ?? '')
   if (!result.theme) return finish() // テーマがないと、以降の工程は進められない
   const withTheme: AiCard = { ...base, theme: result.theme }
 
@@ -134,7 +139,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
 
   // ④ 各セクション(見出し・コピー・商品)。前のセクションで使った商品は、あとのセクションで使わない
   const others: OtherSection[] = []
-  const excluded = new Set<string>()
+  const excluded = new Set<string>(input.avoidProductIds ?? [])
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   for (const sec of sections) {
     const proposal = await step(tr(`セクション ${sec.index + 1} / ${sections.length} を選んでいます`, `Choosing section ${sec.index + 1} / ${sections.length}`), () =>

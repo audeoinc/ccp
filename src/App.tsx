@@ -13,6 +13,8 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
+  SplitButton,
+  type MenuButtonProps,
   MessageBar,
   MessageBarBody,
   Portal,
@@ -64,6 +66,8 @@ import { loadCustomTemplates } from './layoutTemplates'
 import { TemplateManager } from './TemplateManager'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
+import { BulkCreatePanel } from './BulkCreatePanel'
+import { AiIcon } from './AiMark'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
@@ -307,6 +311,8 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
+  // まとめて AI で作るパネルを開いているか(W14)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
   // 配信カードごとの掲載商品(メールの並び順の商品 ID。候補の行は入れない)。数は、一覧の「商品数」「工程」と、締め切りの警告に使う
@@ -729,9 +735,26 @@ function App() {
             )}
           </Button>
         </Tooltip>
-        <Button appearance="primary" size="small" icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
-          {t('新規作成', 'New')}
-        </Button>
+        {/* 新規作成は、押せば 1 本。▾ から、まとめて AI で作る(W14)。よく使う 1 本を、いままでどおり 1 回で押せるようにする */}
+        <Menu positioning="below-end">
+          <MenuTrigger disableButtonEnhancement>
+            {(triggerProps: MenuButtonProps) => (
+              <SplitButton appearance="primary" size="small" icon={<AddRegular />} menuButton={triggerProps} primaryActionButton={{ onClick: () => setCreating(newCardDefaults()) }}>
+                {t('新規作成', 'New')}
+              </SplitButton>
+            )}
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
+                {t('1 本作る', 'Create one')}
+              </MenuItem>
+              <MenuItem icon={<AiIcon />} onClick={() => setBulkOpen(true)}>
+                {t('まとめて AI で作る(最大 10 本)', 'Create with AI in bulk (up to 10)')}
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
         {/* 管理系(テンプレート・言語・自動の下書き)は、毎日の作業と分けて、設定のメニューにまとめる */}
         <Menu
           checkedValues={{ lang: [lang], auto: autoDraft ? ['on'] : [] }}
@@ -1018,6 +1041,23 @@ function App() {
           onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
           alerts={selected ? cardAlerts.get(selected.id) : undefined}
           focusProductId={focusProduct}
+        />
+      )}
+      {bulkOpen && (
+        <BulkCreatePanel
+          cards={activeCards}
+          cardProducts={cardProducts}
+          products={products}
+          heroes={heroes}
+          weeks={weeks}
+          policies={policies}
+          questionCounts={questionCounts}
+          commentCounts={commentCounts}
+          initialWeek={weekStart}
+          defaults={newCardDefaults()}
+          owners={[...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort()}
+          onClose={() => setBulkOpen(false)}
+          onSaved={load}
         />
       )}
       {peekResult && (
