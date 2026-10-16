@@ -9,10 +9,11 @@ import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = join(root, 'docs', 'screenshots')
+// 保存先と、撮る画面の URL(既定は、モックのサーバー)。写真のある環境で撮るときは、SHOTS_URL・SHOTS_OUT で変える
+const out = process.env.SHOTS_OUT ?? join(root, 'docs', 'screenshots')
 mkdirSync(out, { recursive: true })
 const PORT = 5190
-const URL = `http://localhost:${PORT}/`
+const URL = process.env.SHOTS_URL ?? `http://localhost:${PORT}/`
 
 const EDGES = [
   process.env.BROWSER_PATH,
@@ -34,7 +35,7 @@ async function up() {
 }
 
 let server
-if (!(await up())) {
+if (!process.env.SHOTS_URL && !(await up())) {
   server = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', '--config', 'vite.mock.config.ts'], { cwd: root, stdio: 'ignore', shell: process.platform === 'win32' })
   for (let i = 0; i < 60 && !(await up()); i++) await sleep(500)
 }
@@ -42,7 +43,7 @@ if (!(await up())) {
 const profile = mkdtempSync(join(tmpdir(), 'shots-'))
 const DEBUG_PORT = 9333
 // puppeteer.launch は Edge で起動に失敗することがあるため、Edge を直接起動して接続する
-const edge = spawn(executablePath, ['--headless=new', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`, '--lang=ja-JP', '--no-first-run', 'about:blank'], {
+const edge = spawn(executablePath, ['--headless=new', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`, '--lang=en-US', '--no-first-run', 'about:blank'], {
   stdio: 'ignore',
 })
 for (let i = 0; i < 60; i++) {
@@ -149,116 +150,222 @@ const open = async (page, name) => {
 const CARD = (L) => (L === 'ja' ? '秋の新作ニット' : 'Fall Arrivals')
 const T = (L, ja, en) => (L === 'ja' ? ja : en)
 
+/** ⚙ のメニューから選ぶ */
+const settingsMenu = async (page, L, item) => {
+  await clickLabel(page, T(L, '設定(テンプレート・言語・自動の下書き)', 'Settings (templates, language, auto-draft)'), 500)
+  await click(page, item, { tag: '[role=menuitem],[role=menuitemcheckbox]' })
+}
+
+/** 見せ方・面の切り替え(ツールバー・ヘッダーのボタン) */
+const view = async (page, label, wait = 1200) => click(page, label, { tag: 'button', wait })
+
+/** 配信カードの中ペインのタブ */
+const cardTab = async (page, label) => {
+  await click(page, label, { tag: '[role=tab]', top: true })
+  await sleep(700)
+}
+
+/** 画面の上から決まった高さまでを撮る(ツールバーと中身) */
+const fullShot = (page, name) => shot(page, name)
+
 const SCENES = {
+  // ---- 計画の面
   async calendar(page, L) {
-    await shot(page, `${L}-01-calendar`)
+    await view(page, T(L, '計画', 'Plan'))
+    await view(page, T(L, '月', 'Month'))
+    await fullShot(page, `${L}-01-calendar`)
   },
+  async miniCalendar(page, L) {
+    await clickLabel(page, T(L, '2026年10月(押すと、月・週・日を選べる)', 'October 2026 (click to jump to a month, week or day)'), 700).catch(async () => {
+      // 文言が変わっていても開けるように、期間の文字のボタンを探す
+      await page.evaluate(() => [...document.querySelectorAll('button[aria-label]')].find((b) => /jump to a month/.test(b.getAttribute('aria-label') ?? ''))?.click())
+      await sleep(700)
+    })
+    await fullShot(page, `${L}-02-mini-calendar`)
+    await page.keyboard.press('Escape')
+    await sleep(400)
+  },
+  async week(page, L) {
+    await view(page, T(L, '週', 'Week'))
+    await fullShot(page, `${L}-03-week`)
+    // 確認の一覧の項目を選ぶと、かかわる配信が目立つ
+    await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'button,div,span', wait: 900 }).catch(() => undefined)
+    await fullShot(page, `${L}-04-week-checklist`)
+    await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'button,div,span', wait: 500 }).catch(() => undefined)
+    await view(page, T(L, '進み具合', 'Progress'))
+    await fullShot(page, `${L}-05-week-progress`)
+    await view(page, T(L, '商品', 'Products'))
+  },
+  async bulkDrafts(page, L) {
+    await view(page, T(L, '週', 'Week'))
+    await clickLabel(page, T(L, '次の週', 'Next week'), 1200)
+    await click(page, T(L, 'まとめて AI で下書き', 'Bulk AI drafts'), { tag: 'button', wait: 1200 })
+    await fullShot(page, `${L}-06-bulk-drafts-start`)
+    // 下書きを置いて、AI で作る(できるまで待つ。最大 6 分)
+    await click(page, T(L, '次へ', 'Next'), { tag: 'button', wait: 1500 })
+    await click(page, T(L, 'AI で作る', 'Create with AI'), { tag: 'button', wait: 3000 })
+    for (let i = 0; i < 180; i++) {
+      const left = await page.evaluate((s) => document.body.innerText.includes(s), T(L, 'まだ作っていません', 'Not created yet'))
+      if (!left) break
+      await sleep(2000)
+    }
+    await idle(page, 2000)
+    await fullShot(page, `${L}-07-bulk-drafts`)
+    // 下書きを破棄して、下書きモードを抜ける
+    await click(page, T(L, '終える', 'Finish'), { tag: 'button', wait: 800 }).catch(() => undefined)
+    await click(page, T(L, '破棄', 'Discard'), { tag: 'button', wait: 1000, top: true }).catch(() => undefined)
+    await clickLabel(page, T(L, '前の週', 'Previous week'), 1000).catch(() => undefined)
+  },
+  async list(page, L) {
+    await view(page, T(L, '一覧', 'List'))
+    await fullShot(page, `${L}-08-list`)
+    await view(page, T(L, '月', 'Month'))
+  },
+
+  // ---- 配信カード
   async cardDialog(page, L) {
-    await open(page, T(L, '秋の新作ニット', 'Fall Arrivals'))
-    await dialogShot(page, `${L}-02-card-dialog`)
+    await open(page, CARD(L))
+    await dialogShot(page, `${L}-09-card-dialog`)
     await clickLabel(page, T(L, '商品情報を開く', 'Open product info')).catch(() => undefined)
     await sleep(800)
-    await dialogShot(page, `${L}-03-product-info`)
+    await dialogShot(page, `${L}-10-product-info`)
     await closeDialog(page)
   },
   async aiTabs(page, L) {
-    await open(page, T(L, '秋の新作ニット', 'Fall Arrivals'))
+    await open(page, CARD(L))
     for (const [k, tab] of [
-      ['04-theme', T(L, '① テーマ', '1. Theme')],
-      ['05-template', T(L, '② テンプレート', '2. Template')],
-      ['06-hero', T(L, '③ ヒーロー', '3. Hero')],
-      ['07-sections', T(L, '④ セクション', '4. Sections')],
+      ['11-theme', T(L, '① テーマ', '1. Theme')],
+      ['12-template', T(L, '② テンプレート', '2. Template')],
+      ['13-hero', T(L, '③ ヒーロー', '3. Hero')],
+      ['14-sections', T(L, '④ セクション', '4. Sections')],
+      ['15-instructions', T(L, '⑤ 制作指示', '5. Production notes')],
+      ['16-links', T(L, 'リンク先', 'Links')],
+      ['17-handoff', T(L, '引き継ぎ', 'Handoff')],
+      ['18-tasks', T(L, 'タスク', 'Tasks')],
+      ['19-comments', T(L, 'コメント', 'Comments')],
     ]) {
-      await click(page, tab, { tag: '[role=tab]' })
-      await sleep(600)
+      await cardTab(page, tab)
       await dialogShot(page, `${L}-${k}`)
     }
     await closeDialog(page)
   },
   async aiSuggest(page, L) {
     await open(page, CARD(L))
-    await click(page, 'AIチャット', { tag: 'div,span' }).catch(() => click(page, 'AI chat', { tag: 'div,span' }))
-    await click(page, T(L, '① テーマ', '1. Theme'), { tag: '[role=tab]' })
+    await cardTab(page, T(L, '① テーマ', '1. Theme'))
     await click(page, T(L, '案を作り直す', 'Regenerate ideas'), { tag: 'button' }).catch(() => click(page, T(L, 'AIで案を出す', 'Suggest with AI'), { tag: 'button' }))
     await idle(page)
-    await dialogShot(page, `${L}-08-ai-theme-ideas`)
-    await click(page, T(L, '③ ヒーロー', '3. Hero'), { tag: '[role=tab]' })
+    await dialogShot(page, `${L}-20-ai-theme-ideas`)
+    await cardTab(page, T(L, '③ ヒーロー', '3. Hero'))
     await click(page, T(L, 'メイン画像をAIで選定', 'Select main image with AI'), { tag: 'button' })
     await idle(page)
-    await dialogShot(page, `${L}-09-ai-hero`)
-    await click(page, T(L, '④ セクション', '4. Sections'), { tag: '[role=tab]' })
+    await dialogShot(page, `${L}-21-ai-hero`)
+    await cardTab(page, T(L, '④ セクション', '4. Sections'))
     await click(page, T(L, 'このセクションをまとめてAIで選定', 'Select this whole section with AI'), { tag: 'button' })
     await idle(page, 1200)
-    await dialogShot(page, `${L}-10-ai-section`)
+    await dialogShot(page, `${L}-22-ai-section`)
     await closeDialog(page)
   },
   async aiChat(page, L) {
     await open(page, CARD(L))
-    await click(page, T(L, '④ セクション', '4. Sections'), { tag: '[role=tab]' })
+    await cardTab(page, T(L, '④ セクション', '4. Sections'))
     await page.type('[role=dialog] textarea[placeholder^="AI"], [role=dialog] textarea[placeholder^="Tell"]', T(L, 'もっと手頃な価格の商品で', 'Use more affordable products'))
     await page.keyboard.press('Enter')
     await idle(page, 1200)
-    await dialogShot(page, `${L}-11-ai-chat-update`)
+    await dialogShot(page, `${L}-23-ai-chat-update`)
     await page.type('[role=dialog] textarea[placeholder^="AI"], [role=dialog] textarea[placeholder^="Tell"]', T(L, 'この構成をどう思う?', 'What do you think of this lineup?'))
     await page.keyboard.press('Enter')
     await idle(page, 1200)
-    await dialogShot(page, `${L}-12-ai-chat-answer`)
+    await dialogShot(page, `${L}-24-ai-chat-answer`)
     await closeDialog(page)
   },
   async productDetail(page, L) {
     await open(page, CARD(L))
-    const code = T(L, 'P07', 'U07')
-    const ok = await page.evaluate((code) => {
-      const el = [...document.querySelectorAll('[role=dialog] *')].find((e) => e.children.length === 0 && (e.textContent ?? '').startsWith(code) && e.getBoundingClientRect().x > 1000)
+    // 右端の商品情報の、先頭の商品の行(「コード ・ 価格 ・ 在庫」の行)を押す
+    const ok = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('[role=dialog] *')].find((e) => e.children.length === 0 && /^[A-Z]?\d{2,6} ・/.test((e.textContent ?? '').trim()) && e.getBoundingClientRect().x > 1000)
       el?.click()
       return !!el
-    }, code)
+    })
     if (!ok) throw new Error('商品行が見つかりません')
     await sleep(1200)
-    await dialogShot(page, `${L}-13-product-detail`)
+    await dialogShot(page, `${L}-25-product-detail`)
     await closeDialog(page)
   },
+  async appCard(page, L) {
+    // アプリの配信(通知 + メッセージ)
+    await open(page, T(L, 'タイムセール', 'Flash Deal'))
+    await cardTab(page, T(L, '③ 通知', '3. Notification'))
+    await dialogShot(page, `${L}-26-app-notification`)
+    await cardTab(page, T(L, '⑤ 時刻・相手', '5. Timing & audience'))
+    await dialogShot(page, `${L}-27-app-timing`)
+    await closeDialog(page)
+  },
+
+  // ---- テンプレート(⚙ の「テンプレートの管理」)
   async templates(page, L) {
-    await click(page, T(L, 'テンプレート', 'Templates'), { tag: 'button' })
+    await settingsMenu(page, L, T(L, 'テンプレートの管理', 'Manage templates'))
     await page.waitForSelector('[role=dialog]')
     await sleep(1000)
-    await dialogShot(page, `${L}-14-template-manager`)
-    await click(page, 'Feature + 3-column grid', { tag: 'div,span' })
-    await sleep(600)
-    await dialogShot(page, `${L}-15-template-custom`)
-    // 新規作成
+    await dialogShot(page, `${L}-28-template-manager`)
     await click(page, T(L, '新規作成', 'New'), { tag: 'button', top: true })
     await sleep(600)
-    await dialogShot(page, `${L}-16-template-new`)
-    // 標準を複製して編集 → セクションを足す
+    await dialogShot(page, `${L}-29-template-new`)
     await click(page, 'Standard Hero + 4 Grid Items', { tag: 'div,span', top: true })
     await sleep(500)
     await click(page, T(L, '複製して編集', 'Duplicate to edit'), { tag: 'button', top: true })
     await sleep(600)
-    await dialogShot(page, `${L}-17-template-duplicate-edit`)
-    await click(page, T(L, 'セクションを追加', 'Add a section'), { tag: 'button', top: true })
-    await sleep(500)
-    await dialogShot(page, `${L}-18-template-add-section`)
-    // 2 つめのセクションを 3 列グリッド(3 点)にして、名前を付ける
-    const selects = await page.$$('[role=dialog]:last-of-type select')
-    await selects[2].select('grid3')
-    await selects[3].select('3')
-    const name = await page.$('[role=dialog]:last-of-type input')
-    if (name) {
-      await name.click()
-      await page.keyboard.down('Control')
-      await page.keyboard.press('KeyA')
-      await page.keyboard.up('Control')
-      await name.type(T(L, '特集 + 3列グリッド', 'Feature + 3-column grid (copy)'))
-    }
-    await sleep(500)
-    await dialogShot(page, `${L}-19-template-3col`)
+    await dialogShot(page, `${L}-30-template-duplicate-edit`)
     await closeDialog(page)
+  },
+
+  // ---- 結果の面
+  async results(page, L) {
+    await view(page, T(L, '結果', 'Results'), 1800)
+    await view(page, T(L, '月', 'Month'))
+    await fullShot(page, `${L}-31-results-month`)
+    await view(page, T(L, '週', 'Week'), 2500)
+    await fullShot(page, `${L}-32-results-week`)
+    await view(page, T(L, '一覧', 'List'))
+    await fullShot(page, `${L}-33-results-list`)
+    // 詳しい結果(一覧の行を押す)
+    await page.evaluate(() => document.querySelector('table tbody tr')?.click())
+    await page.waitForSelector('[role=dialog]')
+    await sleep(2500)
+    await dialogShot(page, `${L}-34-result-detail`)
+    await closeDialog(page)
+    await view(page, T(L, '比べる', 'Compare'), 2500)
+    await fullShot(page, `${L}-35-results-compare`)
+    await view(page, T(L, '月', 'Month'))
+    await view(page, T(L, '計画', 'Plan'))
+  },
+
+  // ---- アラート
+  async alerts(page, L) {
+    await click(page, T(L, 'アラート', 'Alerts'), { tag: 'button', wait: 1500 })
+    await fullShot(page, `${L}-36-alerts`)
+    await click(page, T(L, '差し替え', 'Replace'), { tag: 'button', wait: 800 })
+    await idle(page, 1200)
+    await fullShot(page, `${L}-37-alert-replace`)
+    await click(page, T(L, '閉じる', 'Close'), { tag: 'button', wait: 600 }).catch(() => undefined)
+    await click(page, T(L, 'アラートの条件', 'Alert conditions'), { tag: 'button', wait: 800 })
+    await dialogShot(page, `${L}-38-alert-conditions`)
+    await closeDialog(page)
+    // アラートから配信カードを開く(問題の商品を選んだ状態で開く)
+    await clickLabel(page, T(L, '配信カードを開く', 'Open the delivery card'), 1500).catch(async () => {
+      await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => (b.title || b.getAttribute('aria-label') || '').includes('Open the delivery card'))?.click())
+      await sleep(1500)
+    })
+    if (await page.$('[role=dialog]')) {
+      await sleep(1000)
+      await dialogShot(page, `${L}-39-card-alerts`)
+      await closeDialog(page)
+    }
+    await view(page, T(L, '計画', 'Plan'))
   },
 }
 
 try {
-  for (const L of (process.env.LANGS ?? 'ja,en').split(',')) {
+  for (const L of (process.env.LANGS ?? 'en').split(',')) {
     const page = await fresh(L)
     for (const [name, fn] of Object.entries(SCENES)) {
       if (process.env.ONLY && !process.env.ONLY.split(',').includes(name)) continue
