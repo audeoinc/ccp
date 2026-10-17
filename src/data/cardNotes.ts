@@ -1,9 +1,9 @@
-// 表「配信カードのメモ」(制作からの質問と返信など。server/schema.json の card_notes)。
+// 表「配信カードのメモ」(質問と返信など。server/schema.json の card_notes)。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、このファイルの読み込みを、サンプルデータに差し替える。
 import { makeService } from '../gcp/services'
 
 /**
- * メモの種類。question = 制作からの質問(返信を付ける) / task = やること(質問のやり取りなどから生まれる) /
+ * メモの種類。question = 質問(誰からでも、誰にでも。宛先は assignee。返信を付ける) / task = やること(質問のやり取りなどから生まれる) /
  * change = 確定した週の配信を変えたときの理由(本文が理由。週をレビューに戻した記録) /
  * comment = レビューの指摘(配信全体、または載せた商品 1 つへの。resolved で対応済み。repliedby / repliedat は、対応済みにした人・日時) /
  * reply = 指摘への返信(source_note が、元の指摘の ID。指摘ごとのスレッドになる)

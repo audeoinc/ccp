@@ -5,6 +5,7 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import { locale, tr, useT } from './i18n'
 import { AiButton } from './AiButton'
 import { suggestTasks, type TaskIdea } from './aiTasks'
+import { myName } from './history'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -17,6 +18,8 @@ const useStyles = makeStyles({
   reply: { display: 'grid', rowGap: '2px', paddingLeft: '10px', borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
   form: { display: 'grid', rowGap: '6px' },
+  // 質問する人と宛先を、横に並べる
+  people: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px' },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   // AI のタスクの案(採用するまで保存しない)
   ideas: { display: 'grid', rowGap: '6px', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
@@ -29,9 +32,9 @@ const useStyles = makeStyles({
 interface Props {
   /** 保存済みの配信カードの ID(新規作成中は undefined。質問は、保存してから) */
   cardId?: string
-  /** 返信する人の既定値(企画の担当者) */
+  /** 企画の担当者(宛先・返信する人の既定値に使う) */
   owner: string
-  /** 質問する人の既定値(制作の担当者) */
+  /** 制作の担当者(宛先の既定値に使う) */
   productionOwner: string
   /** 制作の締め切り(タスクの期日の既定値。YYYY-MM-DD) */
   productionDue: string
@@ -45,7 +48,8 @@ interface Props {
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
 /**
- * 制作からの質問と返信。会話なので、配信カードの「保存」を待たずに、その場で保存する。
+ * 質問と返信。誰からでも、誰にでも質問できる(宛先は card_notes の assignee の列)。宛先の人が返信する想定だが、ほかの人も返信できる。
+ * 会話なので、配信カードの「保存」を待たずに、その場で保存する。
  * 解決済みにしたものは、薄く表示する(消さない。あとで経緯を追えるように)。
  */
 export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, cardName, onOpenCount, onTasksChanged }: Props) {
@@ -53,7 +57,12 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
   const t = useT()
   const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [author, setAuthor] = useState(productionOwner)
+  // 質問する人の既定は、自分の名前(週の帯の「名前」)。なければ制作の担当者。宛先の既定は、企画・制作のうち、質問する人でないほう
+  const [author, setAuthor] = useState(() => myName() || productionOwner)
+  const [to, setTo] = useState(() => ((myName() || productionOwner) === owner ? productionOwner : owner))
+  // 質問ごとの、返信する人(既定は宛先の人)
+  const [repliers, setRepliers] = useState<Record<string, string>>({})
+  const replierOf = (n: CardNote) => repliers[n.id] ?? (n.assignee || myName() || owner)
   const [body, setBody] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -97,6 +106,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
         delivery_card_id: cardId,
         kind: 'question',
         author: author.trim(),
+        assignee: to.trim(),
         body: body.trim(),
         resolved: 0,
       })
@@ -108,13 +118,13 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
     run(async () => {
       const res = await CardNotesService.update(n.id, {
         reply: (drafts[n.id] ?? '').trim(),
-        replied_by: owner.trim(),
+        replied_by: replierOf(n).trim(),
         replied_at: new Date().toISOString(),
       })
       if (res.success) {
         setDrafts((d) => ({ ...d, [n.id]: '' }))
         // 返信したら、そのやり取りから、やることの案を出す(採用するまで保存しない)
-        void propose({ ...n, reply: (drafts[n.id] ?? '').trim(), replied_by: owner.trim() })
+        void propose({ ...n, reply: (drafts[n.id] ?? '').trim(), replied_by: replierOf(n).trim() })
       }
       return res
     })
@@ -179,11 +189,14 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
       <div>
         <div className={styles.head}>
           <ChatRegular />
-          {t('制作からの質問', 'Questions from production')}
+          {t('質問と返信', 'Questions')}
           {open > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未解決 ${open}`, `${open} open`)}</Badge>}
         </div>
         <div className={styles.caption}>
-          {t('質問・返信は、その場で保存します(配信カードの「保存」は不要です)。', 'Questions and replies are saved right away (no need to press Save).')}
+          {t(
+            '誰からでも、誰にでも質問できます。宛先の人が返信します(ほかの人も返信できます)。質問・返信は、その場で保存します(配信カードの「保存」は不要です)。',
+            'Anyone can ask anyone. The addressee replies (others can reply too). Questions and replies are saved right away (no need to press Save).',
+          )}
         </div>
       </div>
       {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、質問を受け付けられます。', 'Save the delivery card to take questions.')}</div>}
@@ -192,7 +205,8 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
       {questions.map((n) => (
         <div key={n.id} className={mergeClasses(styles.card, !n.resolved && styles.cardOpen)} style={n.resolved ? { opacity: 0.7 } : undefined}>
           <div className={styles.meta}>
-            {n.author || t('(名前なし)', '(no name)')} · {when(n.created_on)}
+            {n.author || t('(名前なし)', '(no name)')}
+            {n.assignee ? ` → ${n.assignee}` : ''} · {when(n.created_on)}
           </div>
           <div className={styles.body}>{n.body}</div>
           {n.reply ? (
@@ -205,10 +219,13 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
           ) : (
             !n.resolved && (
               <div className={styles.form}>
+                <Field label={t('返信する人', 'Reply as')} size="small">
+                  <Input size="small" list="ccp-people" value={replierOf(n)} onChange={(_, d) => setRepliers((x) => ({ ...x, [n.id]: d.value }))} />
+                </Field>
                 <Textarea
                   size="small"
                   resize="vertical"
-                  placeholder={t(`${owner || '企画の担当者'}として返信する`, `Reply as ${owner || 'the planner'}`)}
+                  placeholder={t('返信の内容', 'Your reply')}
                   value={drafts[n.id] ?? ''}
                   onChange={(_, d) => setDrafts((x) => ({ ...x, [n.id]: d.value }))}
                 />
@@ -217,7 +234,7 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
           )}
           <div className={styles.actions}>
             {!n.reply && !n.resolved && (
-              <Button size="small" appearance="primary" disabled={busy || !(drafts[n.id] ?? '').trim()} onClick={() => void reply(n)}>
+              <Button size="small" appearance="primary" disabled={busy || !(drafts[n.id] ?? '').trim() || !replierOf(n).trim()} onClick={() => void reply(n)}>
                 {t('返信する', 'Reply')}
               </Button>
             )}
@@ -268,12 +285,17 @@ export function QuestionsPanel({ cardId, owner, productionOwner, productionDue, 
       {cardId && notes && questions.length === 0 && <div className={styles.caption}>{t('まだ質問はありません。', 'No questions yet.')}</div>}
       {cardId && (
         <div className={styles.form}>
-          <Field label={t('質問する人', 'Asked by')} size="small">
-            <Input size="small" list="ccp-people" value={author} onChange={(_, d) => setAuthor(d.value)} />
-          </Field>
-          <Textarea size="small" resize="vertical" placeholder={t('制作から企画への質問', 'A question from production to the planner')} value={body} onChange={(_, d) => setBody(d.value)} />
+          <div className={styles.people}>
+            <Field label={t('質問する人', 'Asked by')} size="small">
+              <Input size="small" list="ccp-people" value={author} onChange={(_, d) => setAuthor(d.value)} />
+            </Field>
+            <Field label={t('宛先', 'To')} size="small">
+              <Input size="small" list="ccp-people" value={to} onChange={(_, d) => setTo(d.value)} />
+            </Field>
+          </div>
+          <Textarea size="small" resize="vertical" placeholder={t('質問の内容', 'Your question')} value={body} onChange={(_, d) => setBody(d.value)} />
           <div className={styles.actions}>
-            <Button size="small" disabled={busy || !body.trim() || !author.trim()} onClick={() => void ask()}>
+            <Button size="small" disabled={busy || !body.trim() || !author.trim() || !to.trim()} onClick={() => void ask()}>
               {t('質問を追加', 'Add question')}
             </Button>
           </div>

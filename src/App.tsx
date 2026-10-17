@@ -335,8 +335,10 @@ function App() {
   const productCounts = useMemo(() => new Map([...cardProducts].map(([k, v]) => [k, v.length])), [cardProducts])
   // 週の表示の、週の初め(日曜日)
   const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(new Date()))
-  // 配信カードごとの、制作からの質問の未解決の数(一覧の列)
+  // 配信カードごとの、質問の未解決の数(一覧の列)
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
+  // 配信カードごとの、未解決の質問の宛先・質問した人と、未完了のタスクの担当(絞り込みの「担当」で、その人がかかわる配信も出すため)
+  const [noteParties, setNoteParties] = useState<Map<string, Set<string>>>(new Map())
   // 配信カードごとの、未完了のタスクの数(一覧の列・週の表示)
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未対応のレビューのコメントの数(週の表示・確認の一覧)
@@ -371,7 +373,10 @@ function App() {
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
   const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
   // 配信に入っている担当(企画・制作)の名前。担当の絞り込みと、配信カードの担当の候補に使う
-  const owners = useMemo(() => [...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort(), [cards])
+  const owners = useMemo(
+    () => [...new Set([...cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]), ...[...noteParties.values()].flatMap((x) => [...x])].filter((o): o is string => !!o))].sort(),
+    [cards, noteParties],
+  )
   // アラートの条件(人ごと。A6)
   const alertSettings = useAlertSettings()
   const alertState = useStockAlerts(activeCards, products, cards, alertSettings.lowWeeks)
@@ -427,6 +432,10 @@ function App() {
           const overdue = new Map<string, number>()
           const comments = new Map<string, number>()
           const commentNotes = new Map<string, CardNote[]>()
+          const parties = new Map<string, Set<string>>()
+          const addParty = (id: string, name?: string) => {
+            if (name?.trim()) parties.set(id, (parties.get(id) ?? new Set()).add(name.trim()))
+          }
           const d = new Date()
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           setChangeNotes((res.data ?? []).filter((n) => n.kind === 'change'))
@@ -441,11 +450,18 @@ function App() {
               continue
             }
             if (n.kind === 'task') {
+              addParty(id, n.assignee)
               tasks.set(id, (tasks.get(id) ?? 0) + 1)
               if (n.due && n.due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
             }
-            else counts.set(id, (counts.get(id) ?? 0) + 1)
+            else {
+              // 質問: 誰からでも、誰にでも(宛先は assignee の列)
+              addParty(id, n.author)
+              addParty(id, n.assignee)
+              counts.set(id, (counts.get(id) ?? 0) + 1)
+            }
           }
+          setNoteParties(parties)
           setQuestionCounts(counts)
           setTaskCounts(tasks)
           setOverdueTasks(overdue)
@@ -520,9 +536,9 @@ function App() {
         match(filters.channel, c.channel) &&
         match(filters.department, c.department) &&
         match(filters.status, c.status) &&
-        (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person),
+        (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person || !!noteParties.get(c.id)?.has(filters.person)),
     )
-  }, [cards, filters])
+  }, [cards, filters, noteParties])
 
   // 表示中の月の配信(一覧と CSV の対象)。締め切りの警告は、月をまたいで求める(カレンダーの前後の月の日付にも出す)
   const rows = useMemo(() => toRows(filtered, productCounts, questionCounts, taskCounts), [filtered, productCounts, questionCounts, taskCounts])

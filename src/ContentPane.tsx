@@ -112,7 +112,7 @@ interface Props {
   people: string[]
   /** 保存済みの配信カードの ID(新規作成中は undefined) */
   cardId?: string
-  /** 企画の担当者(制作からの質問に返信する人) */
+  /** 企画の担当者(質問の宛先・返信する人の既定値) */
   owner: string
   /** 配信名(AI にタスクの案を頼むときに渡す) */
   cardName: string

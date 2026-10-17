@@ -37,7 +37,7 @@ interface Props {
   cards: DeliveryCard[]
   /** 配信カードごとの掲載商品(メールの並び順の商品 ID) */
   cardProducts: Map<string, string[]>
-  /** 配信カードごとの、制作からの質問の未解決の数 */
+  /** 配信カードごとの、質問の未解決の数 */
   questionCounts: Map<string, number>
   /** 配信カードごとの、未完了のタスクの数 */
   taskCounts: Map<string, number>

@@ -11,7 +11,7 @@ export type ColumnKey = 'image' | 'date' | 'time' | 'name' | 'country' | 'channe
 export interface Row {
   card: DeliveryCard
   products: number
-  /** 制作からの質問の、未解決の数 */
+  /** 質問の、未解決の数 */
   questions: number
   /** 未完了のタスクの数 */
   tasks: number
