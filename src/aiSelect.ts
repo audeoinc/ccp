@@ -1,3 +1,4 @@
+import { ProductCategory } from './models/products'
 import { AiRequestsService } from './data/aiRequests'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -248,6 +249,126 @@ const MD_NOTE =
   '商品を選ぶときの材料にする: 主力・Core は優先して選ぶ。定番・Staple は、テーマや季節に合えば選ぶ。在庫調整・Clearance は、セール・値下げなどのテーマのときに優先し、それ以外では控えめにする。' +
   '配信日(card.scheduledAt)が promoPeriod の中なら、優先する。promoPlan の予定と、配信のテーマが合えば、優先する。' +
   '方針に沿って選んだときは、reason に、沿った点(例: 主力・販促の期間中)を短く書く。md がない商品は、方針なしとして、ほかの情報で判断する。ただし、md に合わせるために、ほかのルールを破らない。\n\n'
+// ---- マーケティングポリシー(表 policy_rules / sales_policies。バックログ M3・M4。設計は docs/POLICY.md の 4 章) ----
+// 画面が読み込んだとき・取り込んだあとに App が入れる。依頼の task から対象を決め、配信カードの市場・チャネル・配信日で絞って、関係する決まりだけを依頼に足す
+// (プロンプトを大きくせず、遅くしないため)。読めなかったときは空のまま(決まりなしで、これまでどおり)
+export interface ActiveRule {
+  ruleId: string
+  title: string
+  appliesTo: string[]
+  strength: string
+  market: string[]
+  channel: string[]
+  periodStart?: string
+  periodEnd?: string
+  checkSpec?: string
+  body: string
+}
+export interface ActiveSales {
+  weekStart: string
+  market: string
+  scope: string
+  target: string
+  stage?: string
+  priority?: number
+  promoPeriod?: string
+  focus?: string
+  note?: string
+}
+let activeRules: ActiveRule[] = []
+let activeSales: ActiveSales[] = []
+export function setActiveRules(rules: ActiveRule[]) {
+  activeRules = rules
+}
+export function setActiveSales(rows: ActiveSales[]) {
+  activeSales = rows
+}
+/** 依頼(task)→ 決まりの対象(POLICY.md の 4 章の表)。ここにない依頼(suggest_tasks など)には、決まりを渡さない */
+export const TASK_TARGETS: Record<string, string[]> = {
+  suggest_themes: ['theme'],
+  select_section: ['selection', 'headline', 'copy'],
+  select_section_products: ['selection'],
+  suggest_replacements: ['selection'],
+  select_hero: ['hero'],
+  select_section_titles: ['headline'],
+  select_section_copies: ['copy'],
+  suggest_copies: ['headline', 'copy'],
+  suggest_push: ['copy'],
+  suggest_instructions: ['instructions'],
+}
+interface CardLite {
+  scheduledAt?: string
+  country?: string
+  channel?: string
+}
+const cardOf = (payload: unknown): CardLite => (payload as { card?: CardLite })?.card ?? {}
+/** 配信日の週の始まり(月曜。販売系の方針の week_start と同じ決め方。週の計画の日曜始まりとは違う) */
+export function mondayOf(iso?: string): string {
+  const d = iso ? new Date(iso) : null
+  if (!d || Number.isNaN(d.getTime())) return ''
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+}
+/** この依頼・この配信カードに効く決まり */
+export function rulesFor(task: unknown, card: CardLite): ActiveRule[] {
+  const targets = typeof task === 'string' ? TASK_TARGETS[task] : undefined
+  if (!targets) return []
+  const day = (card.scheduledAt ?? '').slice(0, 10)
+  return activeRules.filter(
+    (r) =>
+      r.appliesTo.some((a) => targets.includes(a)) &&
+      (r.market.length === 0 || !card.country || r.market.includes(card.country)) &&
+      (r.channel.length === 0 || !card.channel || r.channel.includes(card.channel)) &&
+      (!r.periodStart || !day || day >= r.periodStart) &&
+      (!r.periodEnd || !day || day <= r.periodEnd),
+  )
+}
+/** 配信日の週・市場の、販売系の方針 */
+export function salesFor(card: CardLite): ActiveSales[] {
+  const week = mondayOf(card.scheduledAt)
+  if (!week || !card.country) return []
+  return activeSales.filter((s) => s.weekStart === week && s.market === card.country)
+}
+const RULES_NOTE =
+  '【マーケティングの決まり】入力の rules は、この依頼に効くマーケティングの決まり(id・strength・text)。strength が must のものは必ず守り、反する案を出さない。' +
+  'should はなるべく守り、沿ったときは reason に id を書く。info は背景として知っておく。決まりは、ほかの指示より優先する(ただし、出力の形式と、商品は products の中からだけ選ぶ、というルールは守る)。\n\n'
+const FOCUS_NOTE = '【今週の重点】入力の weekFocus は、配信日の週・その市場の、販売の重点と重点の顧客(マーケティングの方針)。テーマ・見出し・コピー・商品の選定は、これに沿わせ、沿ったときは reason に短く書く。\n\n'
+const WEEK_POLICY_NOTE =
+  '【今週の商品の方針】products の weekPolicy は、配信日の週の、その商品(またはそのカテゴリ)の販売の方針(stage は段階、priority は優先度で 1 が最も高い、promoPeriod は販促の期間、note はメモ)。' +
+  'md より新しいので、両方あるときは weekPolicy を優先する。\n\n'
+const categoryLabel = (key: string) => (ProductCategory as Record<string, string>)[key] ?? key
+/** 依頼に、関係する決まりと今週の方針を足す。足したものに合わせて、指示文の前書きも返す */
+function withPolicies(body: Record<string, unknown>, task: unknown, card: CardLite): { body: Record<string, unknown>; notes: string } {
+  const rules = rulesFor(task, card)
+  const sales = salesFor(card)
+  const focus = sales.filter((s) => s.scope === 'all').map((s) => [s.focus, s.note].filter(Boolean).join(' — ')).filter(Boolean)
+  const byProduct = new Map(sales.filter((s) => s.scope === 'product').map((s) => [s.target, s]))
+  // カテゴリは、CCP の値(outer)でも表示名(アウター)でも合うように
+  const byCategory = new Map(sales.filter((s) => s.scope === 'category').flatMap((s) => [[s.target, s] as const, [categoryLabel(s.target), s] as const]))
+  const out: Record<string, unknown> = { ...body }
+  let notes = ''
+  if (rules.length) {
+    out.rules = rules.map((r) => ({ id: r.ruleId, strength: r.strength, text: r.body ? `${r.title}: ${r.body}` : r.title }))
+    notes += RULES_NOTE
+  }
+  if (focus.length) {
+    out.weekFocus = focus
+    notes += FOCUS_NOTE
+  }
+  const products = Array.isArray(out.products) ? (out.products as { code?: string; category?: string }[]) : null
+  if (products && (byProduct.size || byCategory.size)) {
+    let hit = false
+    out.products = products.map((p) => {
+      const s = (p.code && byProduct.get(p.code)) || (p.category && byCategory.get(p.category))
+      if (!s) return p
+      hit = true
+      return { ...p, weekPolicy: { stage: s.stage || undefined, priority: s.priority ?? undefined, promoPeriod: s.promoPeriod || undefined, note: clip(s.note) } }
+    })
+    if (hit) notes += WEEK_POLICY_NOTE
+  }
+  return { body: out, notes }
+}
 let lastReply = ''
 let lastAnswered = false
 
@@ -309,9 +430,11 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
     const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
-    const body = { ...(payload as object), ...(chat && chat.length > 0 ? { chat } : {}), ...(learnings ? { learnings } : {}) }
+    const base = { ...(payload as object), ...(chat && chat.length > 0 ? { chat } : {}), ...(learnings ? { learnings } : {}) }
+    // マーケティングの決まり・今週の方針(M3・M4)を、この依頼に効く分だけ足す
+    const { body, notes: policyNotes } = withPolicies(base, (payload as { task?: unknown })?.task, cardOf(payload))
     const text = await askText(
-      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + localizePrompt(prompt) + JSON.stringify(body),
+      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + policyNotes + localizePrompt(prompt) + JSON.stringify(body),
     )
     try {
       const parsed = extractJson(text) as Record<string, unknown>

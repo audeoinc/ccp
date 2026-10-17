@@ -43,6 +43,7 @@ import {
   DatabaseRegular,
   SettingsRegular,
   LayoutColumnTwoRegular,
+  DocumentBulletListRegular,
   PeopleTeamRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -69,7 +70,7 @@ import { appPath } from './appRoot'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
 import { clearProductDataCache } from './useProductData'
 import { isCancelled } from './cancel'
-import { setActivePolicies } from './aiSelect'
+import { setActivePolicies, setActiveRules, setActiveSales } from './aiSelect'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -77,6 +78,9 @@ import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
 import { loadCustomTemplates } from './layoutTemplates'
 import { TemplateManager } from './TemplateManager'
+import { PolicyManager } from './PolicyManager'
+import { PolicyRulesService } from './data/policyRules'
+import { SalesPoliciesService } from './data/salesPolicies'
 import { PeopleManager } from './PeopleManager'
 import { openPeopleManager, usePeople } from './people'
 import { InboxButton } from './InboxButton'
@@ -346,6 +350,40 @@ function App() {
   const [bq, setBq] = useState<BqSyncResult | null>(null)
   const [bqBusy, setBqBusy] = useState(false)
   const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
+  // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
+  const [policyOpen, setPolicyOpen] = useState(false)
+  const loadMarketingPolicies = useCallback(async () => {
+    const [r, s] = await Promise.all([PolicyRulesService.getAll({ top: 5000 }), SalesPoliciesService.getAll({ top: 5000 })])
+    if (r.success)
+      setActiveRules(
+        (r.data ?? []).map((x) => ({
+          ruleId: x.rule_id ?? '',
+          title: x.title ?? '',
+          appliesTo: (x.applies_to ?? '').split(',').filter(Boolean),
+          strength: x.strength ?? 'info',
+          market: (x.market ?? '').split(',').filter(Boolean),
+          channel: (x.channel ?? '').split(',').filter(Boolean),
+          periodStart: x.period_start || undefined,
+          periodEnd: x.period_end || undefined,
+          checkSpec: x.check_spec || undefined,
+          body: x.body ?? '',
+        })),
+      )
+    if (s.success)
+      setActiveSales(
+        (s.data ?? []).map((x) => ({
+          weekStart: (x.week_start ?? '').slice(0, 10),
+          market: x.market ?? '',
+          scope: x.scope ?? 'all',
+          target: x.target ?? '',
+          stage: x.stage || undefined,
+          priority: x.priority ?? undefined,
+          promoPeriod: x.promo_period || undefined,
+          focus: x.focus || undefined,
+          note: x.note || undefined,
+        })),
+      )
+  }, [])
   const [month, setMonth] = useState<Date | null>(null)
   const [filters, setFilters] = useState<Filters>(initialFilters)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -582,6 +620,7 @@ function App() {
     void loadProducts().then((ok) => {
       if (ok) void runBqSync(false)
     })
+    void loadMarketingPolicies().catch(() => undefined) // 読めなくても、決まりなしで画面は使える
     ProductPoliciesService.getAll({ select: ['product_code', 'stage', 'promo_period', 'policy', 'promo_plan'] })
       .then((res) => {
         if (!res.success) return // 主力の漏れが出ない・AI が方針を使わないだけで、画面は使える
@@ -597,7 +636,7 @@ function App() {
         else setError(res.error?.message ?? tr('メイン画像の取得に失敗しました', 'Failed to load hero images'))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-  }, [load, loadProducts, runBqSync])
+  }, [load, loadProducts, runBqSync, loadMarketingPolicies])
 
   const filtered = useMemo(() => {
     const match = (f: string, v?: string) => f === '' || String(v) === f
@@ -880,6 +919,7 @@ function App() {
   return (
     <>
       <TemplateManager />
+      <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
       <PeopleManager />
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
@@ -965,6 +1005,10 @@ function App() {
                   {bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery')}
                 </MenuItem>
               )}
+              {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}
+              <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
+                {t('方針・決まり(取り込み・一覧)', 'Marketing policies (import, list)')}
+              </MenuItem>
               <MenuDivider />
               <MenuGroup>
                 <MenuGroupHeader>{t('言語', 'Language')}</MenuGroupHeader>

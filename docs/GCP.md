@@ -59,6 +59,13 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 - 止める条件: BigQuery の SPU に、いまの商品の半分以上がない(出力がこの環境の商品と合っていない)/ 行数が前回の半分を切った / 値の NG(`bq_validate.py`)。止めた出力は前のデータのまま、理由を画面に出す。
 - Cloud Run の実行サービスアカウントに、BigQuery の「データ閲覧者」と「ジョブユーザー」が要る。
 
+## マーケティングポリシーの取り込み(`/api/policies`。`server/ccp/policies.py`)
+
+`POST /api/policies/preview`・`POST /api/policies/import`(本文は `{kind: "rules" | "sales", filename, content}`。画面 ⚙ →「方針・決まり」がファイルを読んで送る)。設計は [POLICY.md](POLICY.md)、ファイルの形は [POLICY_FORMAT.md](POLICY_FORMAT.md)。
+
+- `rules`(Markdown)は、同じファイル名の決まりをまるごと置き換える(表 `policy_rules`)。`sales`(CSV)は、ファイルに入っている週 × 市場の行を置き換える(表 `sales_policies`)。
+- 読めなかった決まり・行は飛ばし、行番号と理由を返す(preview と import で同じ読み分け)。
+
 ## AI(`/api/ask`)
 
 - 画面側の `askAgent`(プロンプトの作成・JSON の解釈・やり直し・チャット・英語化)は、画面側にある。依頼文を送って返答のテキストを受け取る部分だけが `src/gcp/ai.ts`。

@@ -355,6 +355,42 @@
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],
     ["approval_request_id", "approval_requests", {"onDelete": "CASCADE"}]
    ]
+  },
+  "policy_rules": {
+   "columns": [
+    ["rule_id", "text", {"index": true}],
+    ["title", "text"],
+    ["applies_to", "text"],
+    ["strength", "text"],
+    ["market", "text"],
+    ["channel", "text"],
+    ["period_start", "date"],
+    ["period_end", "date"],
+    ["check_spec", "text"],
+    ["body", "text"],
+    ["source_file", "text", {"index": true}],
+    ["sort_order", "int"],
+    ["imported_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "sales_policies": {
+   "columns": [
+    ["week_start", "date", {"index": true}],
+    ["market", "text"],
+    ["scope", "text"],
+    ["target", "text", {"index": true}],
+    ["stage", "text"],
+    ["priority", "int"],
+    ["promo_period", "text"],
+    ["focus", "text"],
+    ["note", "text"],
+    ["source_file", "text"],
+    ["imported_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
   }
  },
  "choices": {

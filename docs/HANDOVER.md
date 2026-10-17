@@ -250,6 +250,15 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **次(U8)**: 送る箱の未送信を送る仕組み(本番だけ。送り方 = SendGrid か Gmail API かは、利用者と決める)。
 - **3 つのセッションで同じフォルダを使っている**(BQ・承認プロセス・UI。2026-10-17)。本番への反映は BQ のセッションがまとめて行う。共有のファイル(`src/App.tsx`・`docs/BACKLOG.md`・`docs/HANDOVER.md`・`server/schema.json`)を触る前に、ほかのセッションに知らせる。
 
+## 6.15 マーケティングポリシーの取り込み(M3・M4。2026-10-17)
+
+- **取り込み**: `server/ccp/policies.py`(`POST /api/policies/preview` / `import`)。ルール系 = Markdown(ファイルごとに置き換え)、販売系 = CSV(週 × 市場ごとに置き換え)。読めなかった行は飛ばして理由を返す。単体テストは `server/tests/test_policies.py`。表は `policy_rules`・`sales_policies`(`server/schema.json`)。
+- **画面**: ⚙ →「方針・決まり(取り込み・一覧)」(`src/PolicyManager.tsx`)。ファイルを選ぶ → 件数と読めなかった行を見せる → 取り込む。一覧は見るだけ(対象・強さ・市場で絞る)。
+- **AI への渡し方**: `src/aiSelect.ts` の `withPolicies`(`askAgent` が毎回呼ぶ)。依頼の `task` → 対象(`TASK_TARGETS`。POLICY.md の 4 章)、配信カードの市場・チャネル・配信日で絞った決まりを `rules`(id・strength・text)に、配信日の週(月曜始まり。`mondayOf`)・市場の販売系の `all` の行を `weekFocus` に、`product` / `category` の行を商品の候補の `weekPolicy` に足し、前書き(`RULES_NOTE` など)を付ける。App が読み込み時と取り込み後に `setActiveRules` / `setActiveSales` で入れる。
+- **見本**: `docs/policy_example/rules.md`・`sales.csv`(利用先の Claude が変換するときの手本。架空の決まり)。
+- **未確認・残り**: 本物の Gemini で効き目が出るか(手元の確認は、取り込みと指示文の組み立てまで)。M5(must のコードでの確かめ)、M6・M7、`product_policies` からの移し方、`販売系の category の target` は CCP の値(outer)でも表示名でも合うようにしてある。
+- 同じフォルダで 3 セッションが作業しているので、この作業は別の clone で行い、push の前に main に rebase した。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

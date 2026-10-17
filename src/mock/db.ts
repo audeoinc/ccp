@@ -25,6 +25,9 @@ export const tables: Record<string, Row[]> = {
   ApprovalRequestsService: structuredClone(approvalRequests),
   ApprovalReviewersService: structuredClone(approvalReviewers),
   NotificationsService: structuredClone(notifications),
+  // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)
+  PolicyRulesService: [],
+  SalesPoliciesService: [],
 }
 
 
