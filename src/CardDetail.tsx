@@ -1166,6 +1166,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                   </div>
                 </Field>
               </div>
+              {/* 承認(U4): ステータスの直下に、依頼・相手ごとの状態・操作を縦に(利用者の指摘 2026-10-17)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
+              {canReview && card && <ApprovalBar card={card} isDirty={isDirty} busy={saving} onChanged={onSaved} />}
               <div className={styles.twoCol}>
                 <Field label={t('担当者', 'Owner')}>
                   <Input size="small" list="ccp-owners" value={form.owner} onChange={(_, d) => set('owner')(d.value)} />
@@ -1431,8 +1433,6 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </div>
             </div>
           )}
-          {/* 承認の依頼・承認・差し戻し(U4)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
-          {canReview && card && <ApprovalBar card={card} isDirty={isDirty} busy={saving} onChanged={onSaved} />}
           <div className={styles.actions}>
             <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
             {/* 次がないときも消さずに、選べないだけにする(ボタンの位置を変えない。PRINCIPLES.md 2-2) */}
