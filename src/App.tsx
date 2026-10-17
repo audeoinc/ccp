@@ -233,20 +233,24 @@ const useStyles = makeStyles({
     marginLeft: 'auto',
     flexWrap: 'wrap',
   },
+  // 凡例は、色の点だけ(名前はマウスを重ねると出す。週の表示では、その週の件数を点の横に出す)。毎回読むものではないので、場所を取らない(FLOWS の C-6)
   legendPill: {
     display: 'inline-flex',
     alignItems: 'center',
-    columnGap: tokens.spacingHorizontalXS,
+    columnGap: '4px',
+    minHeight: '22px',
+    padding: '0 6px',
     color: tokens.colorNeutralForeground2,
     fontSize: tokens.fontSizeBase200,
     fontWeight: tokens.fontWeightSemibold,
-    padding: `2px ${tokens.spacingHorizontalS}`,
+    fontVariantNumeric: 'tabular-nums',
     borderRadius: tokens.borderRadiusCircular,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
     whiteSpace: 'nowrap',
+    cursor: 'default',
   },
-  legendDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
+  legendDot: { width: '10px', height: '10px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   // 見出しの幅は、月・週・一覧で同じにする(切り替えで、右のボタンがずれないように)。言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
   weekLabelJa: { width: '236px' },
@@ -1122,14 +1126,19 @@ function App() {
               )}
               {page === 'calendar' && (
               <div className={styles.legend}>
-                {/* 凡例。週の表示では、その週の状態ごとの件数も出す(週の帯にあった件数を、ここにまとめた) */}
-                {statusOptions.map((o) => (
-                  <span key={o.value} className={styles.legendPill}>
-                    <span className={styles.legendDot} style={{ backgroundColor: statusColor(o.value) }} />
-                    {optionLabel(o.label)}
-                    {view === 'week' && ` ${weekCards.filter((c) => (c.status || 'not_started') === o.value).length}`}
-                  </span>
-                ))}
+                {/* 凡例: 色の点だけ。名前はマウスを重ねる(キーボードで選ぶ)と出す。週の表示では、その週の状態ごとの件数を点の横に出す */}
+                {statusOptions.map((o) => {
+                  const n = view === 'week' ? weekCards.filter((c) => (c.status || 'not_started') === o.value).length : undefined
+                  const name = n === undefined ? optionLabel(o.label) : t(`${optionLabel(o.label)} ${n} 件`, `${optionLabel(o.label)}: ${n}`)
+                  return (
+                    <Tooltip key={o.value} content={name} relationship="label">
+                      <span className={styles.legendPill} tabIndex={0}>
+                        <span className={styles.legendDot} style={{ backgroundColor: statusColor(o.value) }} />
+                        {n !== undefined && n}
+                      </span>
+                    </Tooltip>
+                  )
+                })}
               </div>
               )}
             </div>
