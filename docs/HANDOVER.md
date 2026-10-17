@@ -199,6 +199,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **M2**: `src/aiSelect.ts` の `setActivePolicies`(App が `product_policies` を読んだときに入れる)。`productPayload` の `md` と、`askAgent` が products に md があるときだけ足す `MD_NOTE`。**本物の Gemini での効き目は未確認**(モックの AI は md を使わない)。
 - 次: M1(ポリシーの棚卸し)の答えを待つ。B2 は、Workbench での check の結果を見てから。
 
+## 6.12 リンク先の工程・確定の前に直すこと・誰からでも質問(2026-10-17)
+
+- **X11 リンク先を工程 ⑤ に**: `src/progress.ts` の工程は 6 つ(`Progress.links`)。完了の判定は `src/links.ts` の `linksComplete`(既定の行き先を含め、すべての場所に行き先がある)。一覧・カレンダー用の `cardProgress` は、配信カードの `links` 列と `push_link` 列から判定する。締め切りの警告の「未着手」(`isDueSoonNotStarted`)は、テンプレートとリンク先を数えずに見る(リンク先は既定で完了になるため)。
+- **アプリのリンク先**: `src/AppLinksEditor.tsx`。通知を押したときの画面は、これまでどおり `push_link` 列(`custom` の `url` は、画面の名前として使う)。メッセージのメイン画像・ボタンの画面は、`links` 列の JSON の `screens`(鍵は、メールと同じ `hero` / ボタンの id)。FCM の data は `fcmData`。**キー名と画面の名前は仮**(アプリの実装が決まったら、`fcmData` だけを直す)。
+- **X12**: `src/WeekChecklist.tsx`。何をするかの文言は `src/weekLabels.ts` の `checkAction`。週の帯の未承認の数を、文字の比較から `statusRank` に直した(常に 0 だった)。
+- **X13**: 質問の宛先は `card_notes.assignee`(タスクの担当と同じ列。表は変えていない)。`src/App.tsx` の `noteParties` で、「担当」の絞り込みと候補に、質問・タスクの人を足す。
+- 本番には X11・X12 まで反映済み(2026-10-17、タグ `deployed-gcp/20261017-111041`)。X13 は未反映。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。
