@@ -11123,5 +11123,62 @@
    "user_id": "b5fd97e1-36a4-4534-a0b1-e153fa6b751e",
    "created_on": "2026-10-01T00:00:00.000Z"
   }
+ ],
+ "approval_rules": [
+  {
+   "id": "9a73ee38-002b-4d07-aa3a-3d4a6bce9e61",
+   "department": "promotion",
+   "rule": "all",
+   "group_ids": "[\"51f7a7db-21f4-46f8-af0c-eec9508d7aa6\",\"ef15187f-ec6d-4642-afae-e2ddd09bb908\"]",
+   "user_ids": "[]"
+  },
+  {
+   "id": "3f7cab29-6dec-4ca6-a82f-aa57d64e4a9c",
+   "department": "crm",
+   "rule": "any",
+   "group_ids": "[\"09014679-eec0-4de8-ac64-24ff6db8303e\"]",
+   "user_ids": "[]"
+  },
+  {
+   "id": "48fd78ab-8848-4c66-af10-1c99674d3d7c",
+   "department": "ec",
+   "rule": "any",
+   "group_ids": "[\"51f7a7db-21f4-46f8-af0c-eec9508d7aa6\"]",
+   "user_ids": "[]"
+  }
+ ],
+ "approval_requests": [
+  {
+   "id": "96887d95-0647-4e32-abee-f393008517a0",
+   "delivery_card_id": "f21fb26a-de2c-4b49-afab-b478c9dbc327",
+   "card_name": "Boots Edit",
+   "requested_by": "b5fd97e1-36a4-4534-a0b1-e153fa6b751e",
+   "requested_by_name": "Ken Sato",
+   "rule": "all",
+   "status": "open",
+   "requested_at": "2026-10-13T02:00:00.000Z",
+   "created_on": "2026-10-13T02:00:00.000Z"
+  }
+ ],
+ "approval_reviewers": [
+  {
+   "id": "a7053467-2d8a-4b7c-a773-0dad7ab8c522",
+   "approval_request_id": "96887d95-0647-4e32-abee-f393008517a0",
+   "approval_group_id": "51f7a7db-21f4-46f8-af0c-eec9508d7aa6",
+   "reviewer_name": "MD",
+   "decision": "approved",
+   "decided_by": "9735c380-b574-42fd-a91c-4262ab856eef",
+   "decided_by_name": "Aya Mori",
+   "decided_at": "2026-10-13T06:30:00.000Z",
+   "created_on": "2026-10-13T02:00:00.000Z"
+  },
+  {
+   "id": "8b7fefe3-86c9-4c0e-a093-ace9c962546c",
+   "approval_request_id": "96887d95-0647-4e32-abee-f393008517a0",
+   "approval_group_id": "ef15187f-ec6d-4642-afae-e2ddd09bb908",
+   "reviewer_name": "Brand",
+   "decision": "pending",
+   "created_on": "2026-10-13T02:00:00.000Z"
+  }
  ]
 }

@@ -57,4 +57,7 @@ export const actionText = (t: T, a?: EventAction): string =>
     bulk_create: t('AI でまとめて作成した', 'Created with AI in bulk'),
     user_change: t('ユーザーを変えた', 'Changed a user'),
     group_change: t('承認グループを変えた', 'Changed an approval group'),
+    rule_change: t('承認の決まりを変えた', 'Changed the approval rule'),
+    request: t('承認を依頼した', 'Requested approval'),
+    withdraw: t('承認の依頼を取り下げた', 'Withdrew the approval request'),
   })[a ?? 'status'] ?? ''

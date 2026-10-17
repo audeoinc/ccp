@@ -1,0 +1,49 @@
+{
+ "_comment": "承認の判定の例。画面(src/approvals.ts。scripts/check-approvals.mjs)とサーバー(server/ccp/approvals.py。test_approvals.py)の両方で、同じ結果になることを確かめる。",
+ "outcome": [
+  {"name": "相手がいなければ依頼中", "rule": "all", "decisions": [], "expect": "open"},
+  {"name": "全員: 1 人だけ承認では依頼中", "rule": "all", "decisions": ["approved", "pending"], "expect": "open"},
+  {"name": "全員: 全部承認で承認済み", "rule": "all", "decisions": ["approved", "approved"], "expect": "approved"},
+  {"name": "1 人: 1 人の承認で承認済み", "rule": "any", "decisions": ["approved", "pending"], "expect": "approved"},
+  {"name": "1 人: だれも決めていなければ依頼中", "rule": "any", "decisions": ["pending", "pending"], "expect": "open"},
+  {"name": "1 人でも差し戻したら止める(決まりが 1 人でも)", "rule": "any", "decisions": ["approved", "changes_requested"], "expect": "changes_requested"},
+  {"name": "全員: 差し戻しが混ざれば差し戻し", "rule": "all", "decisions": ["changes_requested", "pending"], "expect": "changes_requested"}
+ ],
+ "eligible": [
+  {
+   "name": "グループのメンバーは、そのグループの行を決められる",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}, {"id": "r-brand", "approval_group_id": "g-brand", "decision": "pending"}],
+   "actor": "u-aya", "groups": ["g-md"], "requester": "u-ken", "expect": ["r-md"]
+  },
+  {
+   "name": "2 つのグループに入っていても、行は別々(1 回の承認は 1 グループ分。順はグループの並び)",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}, {"id": "r-lead", "approval_group_id": "g-lead", "decision": "pending"}],
+   "actor": "u-ken", "groups": ["g-md", "g-lead"], "requester": "u-mika", "expect": ["r-md", "r-lead"]
+  },
+  {
+   "name": "本人を指名した行が、グループの行より先",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}, {"id": "r-aya", "user_id": "u-aya", "decision": "pending"}],
+   "actor": "u-aya", "groups": ["g-md"], "requester": "u-ken", "expect": ["r-aya", "r-md"]
+  },
+  {
+   "name": "決まった行は、もう決められない",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "approved"}, {"id": "r-brand", "approval_group_id": "g-brand", "decision": "pending"}],
+   "actor": "u-aya", "groups": ["g-md"], "requester": "u-ken", "expect": []
+  },
+  {
+   "name": "依頼した本人は、自分のグループの分も決められない",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}],
+   "actor": "u-ken", "groups": ["g-md"], "requester": "u-ken", "expect": []
+  },
+  {
+   "name": "指名されていない人は決められない",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}],
+   "actor": "u-sam", "groups": [], "requester": "u-ken", "expect": []
+  },
+  {
+   "name": "「あなた」が選ばれていなければ決められない",
+   "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}],
+   "actor": "", "groups": ["g-md"], "requester": "u-ken", "expect": []
+  }
+ ]
+}

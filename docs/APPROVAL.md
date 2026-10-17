@@ -31,17 +31,28 @@ GitHub のプルリクエストのように、配信カードごとに「承認�
 | `users`(U1) | `name`・`email`・`role`(`member` / `admin`)・`status`(`active` / `inactive`) | だれがいるか。**メールアドレスが、本人を見分けるかぎ**(ログイン・通知の宛先)。消さずに `inactive` にする(履歴に名前が残るように) |
 | `approval_groups`(U1) | `name`・`description`・`status` | 承認グループ(MD・ブランド・法務 など)。配信の種別とは分けて持つ(どの部署の配信か と、だれが承認するか は別のため) |
 | `approval_group_members`(U1) | `approval_group_id`・`user_id` | だれがどのグループにいるか(1 人が複数のグループに入ってよい) |
-| `approval_rules`(U3) | `department`・`rule`(`all` / `any`)・`group_ids`・`user_ids` | 種別ごとの既定の承認者と決まり |
-| `approval_requests`(U3) | `delivery_card_id`・`requested_by`(ユーザー)・`rule`・`status`(`open` / `approved` / `changes_requested` / `stale` / `withdrawn`)・`requested_at`・`closed_at`・`note` | 依頼 1 回分。内容を変えて出し直すと、前の依頼は `stale` |
-| `approval_reviewers`(U3) | `approval_request_id`・`approval_group_id` または `user_id`・`decided_by`(ユーザー)・`decision`(`pending` / `approved` / `changes_requested`)・`decided_at`・`note` | 依頼の相手ごとの状態。グループのときは、だれが済ませたかを `decided_by` に残す |
+| `approval_rules`(U3) | `department`・`rule`(`all` / `any`)・`group_ids`・`user_ids`(id の配列の JSON) | 種別ごとの既定の承認者と決まり(1 種別に 1 行)。⚙ →「ユーザーと承認グループ」→「承認の決まり」 |
+| `approval_requests`(U3) | `delivery_card_id`・`card_name`・`requested_by`(ユーザーの id)・`requested_by_name`・`rule`・`status`(`open` / `approved` / `changes_requested` / `stale` / `withdrawn`)・`requested_at`・`closed_at`・`note` | 依頼 1 回分。内容を変える・出し直す・取り下げると、生きている依頼(`open` / `approved` / `changes_requested`)は `stale` になる |
+| `approval_reviewers`(U3) | `approval_request_id`・`approval_group_id` または `user_id`・`reviewer_name`・`decision`(`pending` / `approved` / `changes_requested`)・`decided_by`(ユーザーの id)・`decided_by_name`・`decided_at`・`note` | 依頼の相手ごとの状態。グループのときは、だれが済ませたかを `decided_by` に残す。名前は、その時のものを残す(消しても読めるように) |
 | `notifications`(U5) | `user_id`・`email`・`kind`(`review_requested` / `approved` / `changes_requested` / `withdrawn` / `done_by_other`)・`subject`・`body`・`link`・`delivery_card_id`・`approval_request_id`・`status`(`pending` / `sent` / `skipped`)・`read_at`・`sent_at` | 送る箱。宛先のメールアドレスは、積んだ時点のものを残す |
 
 - 「誰が」の記録(`events.actor`・コメントの書いた人・`x-ccp-actor`)は、これまでどおり名前の文字で残す。U2 から、その名前は、ユーザーマスタから選んだ人の名前になる(ブラウザに `me.user`(ユーザーの id)と `me.name` を覚える)。ユーザーが 1 人も登録されていない環境では、これまでどおり名前を入れられる(いまの運用を止めないため)。
 - ユーザー・グループの変更は、操作の履歴(`events`)に、種類 `user_change` / `group_change` で残す(だれが・いつ・何を)。
 
-## 4. 承認の操作は、サーバーで行う(U4)
+## 4. 承認の操作は、サーバーで行う(U4。`server/ccp/approvals.py`、画面は `src/data/approvals.ts`・`src/ApprovalBar.tsx`)
 
-承認の依頼・承認・差し戻し・取り下げは、表を画面から直接書かずに、サーバーの窓口(`/api/approvals/…`)で行う。
+承認の依頼・承認・差し戻し・取り下げは、表を画面から直接書かずに、サーバーの窓口で行う。
+
+| 窓口 | すること |
+|---|---|
+| `POST /api/approvals/requests` | 依頼する。相手(グループ・人)の名前を写し、生きている依頼を `stale` にし、配信を `reviewing` に、履歴に `request` |
+| `POST /api/approvals/requests/{id}/decide` | 承認(`approved`)/ 差し戻し(`changes_requested`。理由は必須)。本人が決められる相手の行(本人の指名 → グループの順)を 1 つだけ更新し、決まりを判定。そろえば依頼と配信を `approved`、差し戻しなら依頼を `changes_requested` にして理由をコメントにも残す。履歴に `approve` / `reject` |
+| `POST /api/approvals/requests/{id}/withdraw` | 依頼した人が取り下げる。配信が `reviewing` なら `not_started` に戻す。履歴に `withdraw` |
+| `POST /api/approvals/reset` | 内容が変わった(承認後・確定後の変更)ので、生きている依頼を `stale` にする(配信カードの保存から呼ぶ。配信のステータスと履歴は、保存の側で書く) |
+
+- 「あなた」は、画面が `actor: {id, name}` で送る(ログインがないので、いまは信じる。ログインが入ったら、ここだけを直す)。
+- 判定(`request_outcome`・`eligible_reviewers`)は、画面の `src/approvals.ts` と同じ。例 `server/tests/approval_cases.json` を、Python(`test_approvals.py`)と Node(`scripts/check-approvals.mjs`。`npm run verify` に含む)の両方で確かめる。
+- 撮影・デモ用のビルドは、`src/mock/approvals.ts` が同じ流れをメモリ上で行う(`vite.mock.config.ts` が差し替える)。
 
 - 「承認できるのは指名された本人だけ」の確認は、ログインが入ったら、サーバーでしか守れない。今のうちに窓口を分けておけば、そのとき 1 か所を直すだけで済む。
 - 承認・決まりの判定・配信のステータスの更新・通知を積む、までを 1 つのトランザクションで行う(承認したのに通知が残らない、を防ぐ)。
@@ -52,7 +63,7 @@ GitHub のプルリクエストのように、配信カードごとに「承認�
 
 - ⚙ →「ユーザーと承認グループ」(U1): ユーザーの一覧(追加・編集・無効にする)、承認グループ(メンバーの出し入れ)、変更の履歴。
 - 「あなた」(U2): 週の帯・配信カードの下・コメントの名前の欄を、ユーザーから選ぶ形にする。
-- 配信カード(U4): 「承認を依頼」(承認者と決まりを選ぶ。既定は種別ごと)。承認者ごとの状態(「MD ✓ 山田 10/17 ・ ブランド 未(3 人)」)。承認者には「承認」「差し戻す」。依頼した人には「取り下げ」。
+- 配信カード(U4): 下のボタンの行の上の「承認」の帯(`ApprovalBar`)。依頼がなければ「承認を依頼」(相手と決まりを選ぶ。既定は種別ごと)。依頼中は、相手ごとの状態(「MD ✓ Aya Mori 10/13 ・ Brand 未定」)と、承認者には「承認」「差し戻す」、依頼した人には「取り下げ」。内容を変えていると、先に保存してもらう。以前の「保存して承認」「差し戻す」は、これに置き換えた(週の帯の「まとめて承認」は U6 まで残る。依頼を見ずに承認済みにするので、U6 で置き換える)。
 - 自分宛ての依頼(U5): ヘッダーに件数。押すと、自分(と自分のグループ)宛ての、未対応の依頼の一覧。だれかが済ませたものは「承認済み(山田)」として外す。
 - 週の帯(U6): 「レビューに出す」「まとめて承認」を、「この週の未依頼の配信を、まとめて依頼する」と「自分宛てをまとめて承認」に置き換える。週の確定は、すべての配信が承認済みのときに押せる(足りなければ件数を出して確かめる)。
 

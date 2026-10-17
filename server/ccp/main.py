@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import dbctl
 from .ai import router as ai_router
+from .approvals import router as approvals_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
 from .pack import router as pack_router
@@ -117,6 +118,7 @@ app.include_router(ai_router)
 app.include_router(assets_router)
 app.include_router(pack_router)
 app.include_router(bq_router)
+app.include_router(approvals_router)
 
 if STATIC_DIR.is_dir():
     # 画面。API より後に登録して、/api が先に処理されるようにする

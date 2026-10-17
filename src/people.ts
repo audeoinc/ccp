@@ -4,9 +4,11 @@ import { useSyncExternalStore } from 'react'
 import { UsersService } from './data/users'
 import { ApprovalGroupsService } from './data/approvalGroups'
 import { ApprovalGroupMembersService } from './data/approvalGroupMembers'
+import { ApprovalRulesService } from './data/approvalRules'
 import type { User } from './models/users'
 import type { ApprovalGroup } from './models/approvalGroups'
 import type { ApprovalGroupMember } from './models/approvalGroupMembers'
+import type { ApprovalRule } from './models/approvalRules'
 
 export interface People {
   /** 読み込めたか(読み込む前・失敗したときは false。そのあいだは、名前の入力に戻す) */
@@ -14,9 +16,11 @@ export interface People {
   users: User[]
   groups: ApprovalGroup[]
   members: ApprovalGroupMember[]
+  /** 種別ごとの既定の承認者と決まり(U3) */
+  rules: ApprovalRule[]
 }
 
-let state: People = { loaded: false, users: [], groups: [], members: [] }
+let state: People = { loaded: false, users: [], groups: [], members: [], rules: [] }
 let started = false
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((f) => f())
@@ -25,10 +29,10 @@ const byName = <T extends { name?: string }>(a: T, b: T) => (a.name ?? '').local
 
 export async function reloadPeople(): Promise<void> {
   started = true
-  const [u, g, m] = await Promise.all([UsersService.getAll(), ApprovalGroupsService.getAll(), ApprovalGroupMembersService.getAll()])
+  const [u, g, m, r] = await Promise.all([UsersService.getAll(), ApprovalGroupsService.getAll(), ApprovalGroupMembersService.getAll(), ApprovalRulesService.getAll()])
   // ユーザーが読めなければ、読めていない扱いにする(「あなた」は名前の入力に戻る。いまの運用を止めないため)
   if (!u.success) return
-  state = { loaded: true, users: [...(u.data ?? [])].sort(byName), groups: g.success ? [...(g.data ?? [])].sort(byName) : [], members: m.success ? (m.data ?? []) : [] }
+  state = { loaded: true, users: [...(u.data ?? [])].sort(byName), groups: g.success ? [...(g.data ?? [])].sort(byName) : [], members: m.success ? (m.data ?? []) : [], rules: r.success ? (r.data ?? []) : [] }
   emit()
 }
 
@@ -64,3 +68,9 @@ const subscribeManager = (f: () => void) => {
   }
 }
 export const usePeopleManagerOpen = (): boolean => useSyncExternalStore(subscribeManager, () => managerOpen)
+
+/** その人が入っている承認グループの id */
+export const groupsOf = (p: People, userId: string) => p.members.filter((m) => m.user_id === userId).map((m) => m.approval_group_id)
+
+/** 種別の既定の承認者と決まり(なければ undefined) */
+export const ruleFor = (p: People, department?: string | null) => p.rules.find((r) => r.department === (department ?? ''))

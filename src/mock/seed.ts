@@ -561,3 +561,32 @@ export const approvalGroups: Row[] = GROUPS.map(([name, description]) => ({
 export const approvalGroupMembers: Row[] = GROUPS.flatMap(([name, , mails]) =>
   mails.map((mail) => ({ id: guid(`member:${name}:${mail}`), approval_group_id: guid(`group:${name}`), user_id: userId(mail), created_on: '2026-10-01T00:00:00.000Z' })),
 )
+
+// ---- 承認の決まり・依頼(バックログ U3・U4)
+// 種別ごとの既定: 販促は MD と Brand の両方(全員)、CRM は Marketing leads のだれか、EC は MD のだれか
+const groupId = (name: string) => guid(`group:${name}`)
+export const approvalRules: Row[] = [
+  { id: guid('rule:promotion'), department: 'promotion', rule: 'all', group_ids: JSON.stringify([groupId('MD'), groupId('Brand')]), user_ids: '[]' },
+  { id: guid('rule:crm'), department: 'crm', rule: 'any', group_ids: JSON.stringify([groupId('Marketing leads')]), user_ids: '[]' },
+  { id: guid('rule:ec'), department: 'ec', rule: 'any', group_ids: JSON.stringify([groupId('MD')]), user_ids: '[]' },
+]
+// Boots Edit(今週の検討中の配信)に、依頼が 1 つ出ている見本。MD は Aya Mori が承認済み、Brand はまだ
+const bootsEdit = guid('card:Boots Edit:2026-10-15 10:00')
+const bootsRequest = guid('request:boots-edit:1')
+export const approvalRequests: Row[] = [
+  {
+    id: bootsRequest,
+    delivery_card_id: bootsEdit,
+    card_name: 'Boots Edit',
+    requested_by: userId('ken.sato'),
+    requested_by_name: 'Ken Sato',
+    rule: 'all',
+    status: 'open',
+    requested_at: '2026-10-13T02:00:00.000Z',
+    created_on: '2026-10-13T02:00:00.000Z',
+  },
+]
+export const approvalReviewers: Row[] = [
+  { id: guid('reviewer:boots-edit:MD'), approval_request_id: bootsRequest, approval_group_id: groupId('MD'), reviewer_name: 'MD', decision: 'approved', decided_by: userId('aya.mori'), decided_by_name: 'Aya Mori', decided_at: '2026-10-13T06:30:00.000Z', created_on: '2026-10-13T02:00:00.000Z' },
+  { id: guid('reviewer:boots-edit:Brand'), approval_request_id: bootsRequest, approval_group_id: groupId('Brand'), reviewer_name: 'Brand', decision: 'pending', created_on: '2026-10-13T02:00:00.000Z' },
+]

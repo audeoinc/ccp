@@ -300,6 +300,46 @@
     ["approval_group_id", "approval_groups", {"onDelete": "CASCADE"}],
     ["user_id", "users", {"onDelete": "CASCADE"}]
    ]
+  },
+  "approval_rules": {
+   "columns": [
+    ["department", "text", {"index": true}],
+    ["rule", "choice"],
+    ["group_ids", "text"],
+    ["user_ids", "text"]
+   ],
+   "lookups": [
+   ]
+  },
+  "approval_requests": {
+   "columns": [
+    ["card_name", "text"],
+    ["requested_by", "text"],
+    ["requested_by_name", "text"],
+    ["rule", "choice"],
+    ["status", "choice"],
+    ["requested_at", "timestamptz"],
+    ["closed_at", "timestamptz"],
+    ["note", "text"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
+   ]
+  },
+  "approval_reviewers": {
+   "columns": [
+    ["reviewer_name", "text"],
+    ["decision", "choice"],
+    ["decided_by", "text"],
+    ["decided_by_name", "text"],
+    ["decided_at", "timestamptz"],
+    ["note", "text"]
+   ],
+   "lookups": [
+    ["approval_request_id", "approval_requests", {"onDelete": "CASCADE"}],
+    ["approval_group_id", "approval_groups", {"onDelete": "SET NULL"}],
+    ["user_id", "users", {"onDelete": "SET NULL"}]
+   ]
   }
  },
  "choices": {
@@ -323,6 +363,10 @@
   "events.to_status": ["not_started", "reviewing", "approved", "confirmed"],
   "users.role": ["member", "admin"],
   "users.status": ["active", "inactive"],
-  "approval_groups.status": ["active", "inactive"]
+  "approval_groups.status": ["active", "inactive"],
+  "approval_rules.rule": ["all", "any"],
+  "approval_requests.rule": ["all", "any"],
+  "approval_requests.status": ["open", "approved", "changes_requested", "stale", "withdrawn"],
+  "approval_reviewers.decision": ["pending", "approved", "changes_requested"]
  }
 }

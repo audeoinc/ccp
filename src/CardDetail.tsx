@@ -20,7 +20,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, ArrowUndoRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -49,8 +49,9 @@ import { useAiDrafts } from './useAiDrafts'
 import { WeeksService, type WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf } from './weekLock'
-import { logEvent, myName } from './history'
-import { MePicker } from './MePicker'
+import { logEvent } from './history'
+import { ApprovalBar } from './ApprovalBar'
+import { ApprovalsService } from './data/approvals'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
@@ -360,8 +361,6 @@ const useStyles = makeStyles({
   reasonActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
   actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
-  review: { display: 'flex', alignItems: 'center', columnGap: '8px', marginRight: 'auto' },
-  actor: { width: '160px' },
 })
 
 export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, draft, onCreated, next, onNext }: Props) {
@@ -446,9 +445,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   // 確定した週の変更: 保存の前に、理由を入力してもらう(null = 入力欄を出していない)
   const [changeReason, setChangeReason] = useState<string | null>(null)
   // 差し戻しの理由(null = 入力欄を出していない)
-  const [rejectReason, setRejectReason] = useState<string | null>(null)
   // 承認・差し戻しの履歴に残す名前(週の状態の帯・コメントと共通)
-  const [actor, setActor] = useState(myName)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -901,26 +898,31 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   }, [card, original])
   const savedStatus = card?.status ?? STATUS_NOT_STARTED
   const approvedBefore = !!card && statusRank(savedStatus) >= statusRank(STATUS_APPROVED)
-  // 承認・差し戻しを出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
+  // 開いた時点から内容が変わったか(承認・依頼の前に、保存してもらうため。基準は ref なので、描画の中では読まず、関数で渡す)
+  const isDirty = () => baseline.current !== null && baseline.current !== contentKey()
+  // 承認(依頼・承認・差し戻し)を出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
   const canReview = !!card && lockedWeeks.length === 0 && statusRank(savedStatus) <= statusRank(STATUS_APPROVED)
+  // 承認の依頼・承認で、サーバーが配信のステータスを変えたら、入力欄のステータスもそろえる(次の保存で、古いステータスを書き戻さないように)
+  useEffect(() => {
+    if (!card?.status) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm((f) => (f.status === String(card.status) ? f : { ...f, status: String(card.status) }))
+  }, [card?.status])
 
   /**
-   * 保存する。reason を渡したとき(確定した週の変更)は、配信を「検討中」に戻し、週をレビュー中に戻して、理由を記録する。
-   * approve = 保存して承認する。reject = 差し戻す(理由を、コメントにも残す)。
-   * 承認済みの配信の内容を変えたときは、再承認が必要なので「検討中」に戻す
+   * 保存する。reason を渡したとき(確定した週の変更)は、配信を「承認待ち」に戻し、週をレビュー中に戻して、理由を記録する。
+   * 承認済みの配信の内容を変えたときは、承認のやり直しが必要なので「承認待ち」に戻し、いまの承認の依頼を古いものにする。
+   * 承認・差し戻しそのものは、ここではなく ApprovalBar(サーバーの窓口 /api/approvals)で行う(U4)
    */
-  async function save(reason?: string, opts?: { approve?: boolean; reject?: string }) {
-    // 承認・差し戻しは、これまでどおり閉じる(次へ進むのは「保存して次へ」と、その理由の入力からだけ)
-    const goNext = goNextRef.current && !opts?.approve && opts?.reject === undefined
+  async function save(reason?: string) {
+    const goNext = goNextRef.current
     setSaving(true)
     setError(null)
     try {
       const formStatus = num(form.status) as DeliveryCard['status']
-      const revoke =
-        reason === undefined && !opts?.approve && opts?.reject === undefined && approvedBefore && formStatus === card?.status && baseline.current !== null && baseline.current !== contentKey()
-      const status =
-        // 確定後に変えた配信・差し戻した配信・承認済みの内容を変えた配信は、もう一度レビューを受けるので「検討中」にする
-        reason !== undefined || opts?.reject !== undefined || revoke ? STATUS_REVIEW : opts?.approve ? STATUS_APPROVED : formStatus
+      const revoke = reason === undefined && approvedBefore && formStatus === card?.status && baseline.current !== null && baseline.current !== contentKey()
+      // 確定後に変えた配信・承認済みの内容を変えた配信は、もう一度承認を受けるので「承認待ち」(reviewing)にする
+      const status = reason !== undefined || revoke ? STATUS_REVIEW : formStatus
       const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
       const res = card
         ? await DeliveryCardsService.update(card.id, fields)
@@ -944,25 +946,19 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         })
         if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
       }
-      // 差し戻しの理由は、レビューのコメント(W5)にも残す(対応済みにするまで、未対応として数える)
-      if (opts?.reject !== undefined) {
-        const c = await CardNotesService.create({
-          delivery_card_id: cardId,
-          kind: 'comment',
-          author: myName(),
-          body: opts.reject.trim(),
-          resolved: 0,
-        })
-        if (!c.success) throw new Error(c.error?.message ?? tr('差し戻しの理由を記録できませんでした', 'Could not record the reason for sending back'))
+      // 内容が変わったので、いまの承認の依頼は古いものにする(依頼し直してもらう。U4)
+      if (card && (reason !== undefined || revoke)) {
+        const a = await ApprovalsService.reset({ delivery_card_id: cardId })
+        if (!a.success) throw new Error(a.error?.message ?? tr('承認の依頼を古いものにできませんでした', 'Could not mark the approval request as stale'))
       }
-      // 承認の履歴(W6): 保存済みの配信のステータスが変わったら(承認・差し戻しは、変わらなくても)、誰が・いつ・何から何にしたかを残す
-      if (card && (reason !== undefined || opts?.approve || opts?.reject !== undefined || card.status !== fields.status)) {
+      // 承認の履歴(W6): 保存済みの配信のステータスが変わったら、誰が・いつ・何から何にしたかを残す
+      if (card && (reason !== undefined || card.status !== fields.status)) {
         await logEvent({
-          action: reason !== undefined ? 'reopen' : opts?.approve ? 'approve' : opts?.reject !== undefined ? 'reject' : revoke ? 'revoke' : 'status',
+          action: reason !== undefined ? 'reopen' : revoke ? 'revoke' : 'status',
           card: { id: cardId, name: form.name, scheduledAt: fields.scheduled_at },
           from: card.status,
           to: fields.status,
-          note: (reason ?? opts?.reject)?.trim(),
+          note: reason?.trim(),
         })
       }
       await onSaved()
@@ -1402,50 +1398,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </div>
             </div>
           )}
-          {rejectReason !== null && (
-            <div className={styles.reasonBox}>
-              <Field label={t('差し戻しの理由(コメントにも残ります)', 'Reason for sending back (also saved as a comment)')} required size="small">
-                <AutoTextarea
-                  rows={2}
-                  size="small"
-                  autoFocus
-                  value={rejectReason}
-                  onChange={(_, d) => setRejectReason(d.value)}
-                  placeholder={t('例: 前日のメールと商品がかぶっているので、入れ替えてください', 'e.g. Same products as the previous day. Please swap some.')}
-                />
-              </Field>
-              <div className={styles.reasonActions}>
-                <Button type="button" size="small" onClick={() => setRejectReason(null)} disabled={saving}>{t('やめる', 'Back')}</Button>
-                <Button
-                  type="button"
-                  size="small"
-                  appearance="primary"
-                  icon={<ArrowUndoRegular />}
-                  disabled={saving || !rejectReason.trim() || !actor.trim()}
-                  onClick={() => void save(undefined, { reject: rejectReason })}
-                >
-                  {t('保存して、差し戻す', 'Save and send back')}
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* 承認の依頼・承認・差し戻し(U4)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
+          {canReview && card && <ApprovalBar card={card} isDirty={isDirty} busy={saving} onChanged={onSaved} />}
           <div className={styles.actions}>
-            {/* 承認・差し戻し(配信 1 本ずつ)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
-            {canReview && (
-              <div className={styles.review}>
-                <MePicker className={styles.actor} ariaLabel={t('承認・差し戻しの履歴に残す名前', 'Your name for the approval history')} onChange={setActor} />
-                {statusRank(savedStatus) < statusRank(STATUS_APPROVED) && (
-                  <Button type="button" icon={<CheckmarkCircleRegular />} disabled={saving || !actor.trim() || rejectReason !== null} onClick={() => void save(undefined, { approve: true })}>
-                    {t('保存して承認', 'Save and approve')}
-                  </Button>
-                )}
-                {statusRank(savedStatus) >= statusRank(STATUS_REVIEW) && (
-                  <Button type="button" icon={<ArrowUndoRegular />} disabled={saving || rejectReason !== null} onClick={() => setRejectReason('')}>
-                    {t('差し戻す', 'Send back')}
-                  </Button>
-                )}
-              </div>
-            )}
             <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
             {/* 次がないときも消さずに、選べないだけにする(ボタンの位置を変えない。PRINCIPLES.md 2-2) */}
             {next !== undefined && (

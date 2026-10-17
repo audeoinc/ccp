@@ -79,6 +79,14 @@ const OPTION_EN: Record<string, string> = {
   管理者: 'Admin',
   有効: 'Active',
   無効: 'Inactive',
+  // 承認の依頼
+  全員: 'Everyone',
+  '1 人': 'Any one',
+  依頼中: 'Open',
+  差し戻し: 'Changes requested',
+  古い依頼: 'Stale',
+  取り下げ: 'Withdrawn',
+  未定: 'Pending',
   // チャネル
   メール: 'Email',
   プッシュ: 'Push',
