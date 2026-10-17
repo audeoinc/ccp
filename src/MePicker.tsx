@@ -64,7 +64,7 @@ export function MePicker({ className, onChange, ariaLabel, list }: Props) {
       size="small"
       className={mergeClasses(styles.dropdown, className)}
       value={picked?.name ?? ''}
-      placeholder={t('あなたを選ぶ', 'Choose who you are')}
+      placeholder={t('あなたは?', 'Who are you?')}
       aria-label={label}
       selectedOptions={picked ? [picked.id] : []}
       onOptionSelect={(_, d) => {
