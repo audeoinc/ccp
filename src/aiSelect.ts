@@ -219,6 +219,35 @@ const usesLearnings = (task: unknown) => typeof task === 'string' && (task.start
 const LEARNINGS_NOTE =
   '【これまでの学び】入力の learnings は、同じテンプレートか同じテーマの種類の、過去の配信の振り返りメモ(新しい順)。' +
   '案を考えるときの参考にする。うまくいったことは生かし、悪かったことは繰り返さない。ただし、learnings に合わせるために、ほかのルールを破らない。\n\n'
+
+// 商品ごとの MD 方針(表 product_policies。段階・方針・販促の予定と期間)。商品の候補に付けて、AI の選定の材料にする(バックログ M2)。
+// 画面が読み込んだときに App が入れる。読めなかったときは空のまま(方針なしで、これまでどおり選ぶ)
+export interface MdPolicy {
+  stage?: string
+  policy?: string
+  promoPlan?: string
+  promoPeriod?: string
+}
+let activePolicies = new Map<string, MdPolicy>()
+export function setActivePolicies(map: Map<string, MdPolicy>) {
+  activePolicies = map
+}
+// 長い方針の文は切る(商品の数だけ入るので、プロンプトを大きくしすぎないように)
+const clip = (v?: string, n = 120) => {
+  const s = (v ?? '').replace(/\s+/g, ' ').trim()
+  return s.length > n ? `${s.slice(0, n)}…` : s || undefined
+}
+const mdOf = (code?: string) => {
+  const m = code ? activePolicies.get(code) : undefined
+  if (!m) return undefined
+  return { stage: m.stage || undefined, policy: clip(m.policy), promoPlan: clip(m.promoPlan, 160), promoPeriod: m.promoPeriod || undefined }
+}
+const hasMd = (body: unknown) => Array.isArray((body as { products?: unknown })?.products) && (body as { products: { md?: unknown }[] }).products.some((p) => p?.md)
+const MD_NOTE =
+  '【MD 方針】入力の products の md は、その商品の MD(商品担当)の方針。stage は段階、policy は方針、promoPlan は販促の予定、promoPeriod は販促の期間(開始 - 終了)。' +
+  '商品を選ぶときの材料にする: 主力・Core は優先して選ぶ。定番・Staple は、テーマや季節に合えば選ぶ。在庫調整・Clearance は、セール・値下げなどのテーマのときに優先し、それ以外では控えめにする。' +
+  '配信日(card.scheduledAt)が promoPeriod の中なら、優先する。promoPlan の予定と、配信のテーマが合えば、優先する。' +
+  '方針に沿って選んだときは、reason に、沿った点(例: 主力・販促の期間中)を短く書く。md がない商品は、方針なしとして、ほかの情報で判断する。ただし、md に合わせるために、ほかのルールを破らない。\n\n'
 let lastReply = ''
 let lastAnswered = false
 
@@ -282,7 +311,7 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
     const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
     const body = { ...(payload as object), ...(chat && chat.length > 0 ? { chat } : {}), ...(learnings ? { learnings } : {}) }
     const text = await askText(
-      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + localizePrompt(prompt) + JSON.stringify(body),
+      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + localizePrompt(prompt) + JSON.stringify(body),
     )
     try {
       const parsed = extractJson(text) as Record<string, unknown>
@@ -347,6 +376,7 @@ const productPayload = (p: Product) => ({
   rating: p.rating,
   weather: p.weather_name,
   description: p.description,
+  md: mdOf(p.product_code),
 })
 
 export interface SectionRequest {

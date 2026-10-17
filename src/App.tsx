@@ -61,6 +61,7 @@ import { buildCardAlerts, topKind, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
 import { isCancelled } from './cancel'
+import { setActivePolicies } from './aiSelect'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -494,10 +495,13 @@ function App() {
         else setError(res.error?.message ?? tr('商品の取得に失敗しました', 'Failed to load products'))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-    ProductPoliciesService.getAll({ select: ['product_code', 'stage', 'promo_period'] })
+    ProductPoliciesService.getAll({ select: ['product_code', 'stage', 'promo_period', 'policy', 'promo_plan'] })
       .then((res) => {
-        if (!res.success) return // 主力の漏れが出ないだけで、画面は使える
-        setPolicies(new Map((res.data ?? []).filter((r) => r.product_code).map((r) => [r.product_code!, { stage: r.stage, promoPeriod: r.promo_period }])))
+        if (!res.success) return // 主力の漏れが出ない・AI が方針を使わないだけで、画面は使える
+        const rows = (res.data ?? []).filter((r) => r.product_code)
+        setPolicies(new Map(rows.map((r) => [r.product_code!, { stage: r.stage, promoPeriod: r.promo_period }])))
+        // AI の商品の選定にも、MD 方針を渡す(バックログ M2)
+        setActivePolicies(new Map(rows.map((r) => [r.product_code!, { stage: r.stage, policy: r.policy, promoPlan: r.promo_plan, promoPeriod: r.promo_period }])))
       })
       .catch(() => undefined)
     HeroImagesService.getAll({ orderBy: ['image_code asc'] })
