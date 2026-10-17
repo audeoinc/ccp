@@ -238,11 +238,8 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase400,
     fontWeight: tokens.fontWeightSemibold,
   },
-  // 「この画面 ▾」の中の、色の意味の 1 行
-  legendRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '4px 10px', fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   // 「この画面 ▾」(ツールバーの右端)
   viewMenu: { marginLeft: 'auto' },
-  legendDot: { width: '10px', height: '10px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   // 見出しの幅は、月・週・一覧で同じにする(切り替えで、右のボタンがずれないように)。言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
   weekLabelJa: { width: '236px' },
@@ -1226,7 +1223,7 @@ function App() {
               {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
-              {/* この画面 ▾: いま見ているものへの操作(書き出し・取り込み・列)と、色の意味。どの面・見せ方でも、右端の同じ位置。システム全体の設定は ⚙ */}
+              {/* この画面 ▾: いま見ているものへの操作(書き出し・取り込み・列・週の資料と履歴)。どの面・見せ方でも、右端の同じ位置。システム全体の設定は ⚙ */}
               <span className={styles.viewMenu}>
                 <Menu
                   checkedValues={{ columns }}
@@ -1291,20 +1288,6 @@ function App() {
                               <MenuItemCheckbox key={c.key} name="columns" value={c.key} disabled={c.key === 'name'}>
                                 {c.label()}
                               </MenuItemCheckbox>
-                            ))}
-                          </MenuGroup>
-                        </>
-                      )}
-                      {page === 'calendar' && (
-                        <>
-                          <MenuDivider />
-                          <MenuGroup>
-                            <MenuGroupHeader>{t('色の意味(ステータス)', 'Colors (status)')}</MenuGroupHeader>
-                            {statusOptions.map((o) => (
-                              <div key={o.value} className={styles.legendRow}>
-                                <span className={styles.legendDot} style={{ backgroundColor: statusColor(o.value) }} />
-                                {optionLabel(o.label)}
-                              </div>
                             ))}
                           </MenuGroup>
                         </>
