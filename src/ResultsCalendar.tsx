@@ -50,6 +50,8 @@ interface Props {
   money: (v: number | undefined, card: DeliveryCard) => string
   /** 押したとき(結果があれば詳しい結果、なければ配信カード) */
   onOpen: (cardId: string) => void
+  /** 月の表示で、週の行から、その週の週表示へ移る */
+  onOpenWeek?: (sunday: Date) => void
 }
 
 // 前年比の色(左や上の線)。よければ緑、悪ければ赤、比べられなければ灰色
@@ -75,7 +77,7 @@ const byDay = (cards: DeliveryCard[]) => {
  * 計画と結果は同じ配信の表と裏なので、カレンダーの形・箱の 1 行目(アイコン + 名前)はそろえ、2 行目と色だけを変える
  * (左の線 = 前年比。地の色 = 結果があれば白、なければ灰色)
  */
-export function ResultsMonth({ month, cards, results, money, onOpen }: Props & { month: Date }) {
+export function ResultsMonth({ month, cards, results, money, onOpen, onOpenWeek }: Props & { month: Date }) {
   const styles = useStyles()
   const t = useT()
   const delta = useDelta()
@@ -84,6 +86,7 @@ export function ResultsMonth({ month, cards, results, money, onOpen }: Props & {
       month={month}
       cards={cards}
       onSelect={onOpen}
+      onOpenWeek={onOpenWeek}
       chipTone={(c) => {
         const r = results.get(c.id)
         return { line: trendColor(r), background: r ? tokens.colorNeutralBackground1 : tokens.colorNeutralBackground3 }

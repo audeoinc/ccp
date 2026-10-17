@@ -73,6 +73,8 @@ interface Props {
   onOpenCard: (id: string) => void
   /** 配信カードを書き換えたあと(テーマの種類など)、読み直す */
   onCardsChanged: () => Promise<void>
+  /** 月の表示で、週の行から、その週の週表示へ移る */
+  onOpenWeek?: (sunday: Date) => void
 }
 
 const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
@@ -81,7 +83,7 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -402,7 +404,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         {results === null && !error ? (
           <Spinner />
         ) : view === 'month' ? (
-          <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} />
+          <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} onOpenWeek={onOpenWeek} />
         ) : view === 'compare' ? (
           <ResultsCompareView
             rows={allRows}

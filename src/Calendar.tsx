@@ -24,6 +24,8 @@ interface Props {
   renderMeta?: (card: DeliveryCard) => React.ReactNode
   /** 配信の箱の色(左の線と、地の色)。既定は、状態の色 */
   chipTone?: (card: DeliveryCard) => { line: string; background: string }
+  /** 週の行の「週 ›」を押したとき(その週の日曜日)。月から、その週の週表示へ直接移る(FLOWS の C-4) */
+  onOpenWeek?: (sunday: Date) => void
 }
 
 // 選択肢の値から、画面の言葉を求める
@@ -77,6 +79,20 @@ const useStyles = makeStyles({
     ':hover .cal-add': { opacity: 1 },
   },
   dayHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  dayLeft: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', minWidth: 0 },
+  // 週の行の先頭(日曜日)の「週 ›」。その週の週表示へ移る(押せると分かるよう、リンクの色で常に出す)
+  weekLink: {
+    padding: '0 4px',
+    border: 'none',
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: 'transparent',
+    color: tokens.colorBrandForegroundLink,
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase100,
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorBrandBackground2, textDecoration: 'underline' },
+  },
   add: {
     opacity: 0,
     width: '22px',
@@ -161,7 +177,7 @@ const useStyles = makeStyles({
   },
 })
 
-export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone }: Props) {
+export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone, onOpenWeek }: Props) {
   const styles = useStyles()
   const t = useT()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -202,7 +218,24 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
               onClick={onCreate ? () => onCreate(k) : undefined}
             >
               <div className={styles.dayHead}>
-                <span className={mergeClasses(styles.dayNum, isToday && styles.today)}>{d.getDate()}</span>
+                <span className={styles.dayLeft}>
+                  <span className={mergeClasses(styles.dayNum, isToday && styles.today)}>{d.getDate()}</span>
+                  {onOpenWeek && d.getDay() === 0 && (
+                    <button
+                      type="button"
+                      className={styles.weekLink}
+                      // マスの「新規作成」まで届かないように止める
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenWeek(d)
+                      }}
+                      aria-label={t(`${d.getMonth() + 1}月${d.getDate()}日からの週を、週の表示で開く`, `Open the week of ${d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })} in the week view`)}
+                      title={t('この週を、週の表示で開く', 'Open this week in the week view')}
+                    >
+                      {t('週 ›', 'Week ›')}
+                    </button>
+                  )}
+                </span>
                 {onCreate && <button
                   type="button"
                   className={mergeClasses('cal-add', styles.add)}

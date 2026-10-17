@@ -10,6 +10,7 @@ import {
   DialogTitle,
   Field,
   Menu,
+  MenuButton,
   MenuDivider,
   MenuGroup,
   MenuGroupHeader,
@@ -39,6 +40,7 @@ import {
   CalendarLtrRegular,
   ColumnTripleRegular,
   DataBarVerticalRegular,
+  DatabaseRegular,
   SettingsRegular,
   LayoutColumnTwoRegular,
   PeopleTeamRegular,
@@ -1072,15 +1074,27 @@ function App() {
               {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
+              {/* 計画の面の、データの操作。結果の面の「データ ▾」と同じ形・同じ位置にそろえる(FLOWS の C-5) */}
               {page === 'calendar' && (
-              <Tooltip
-                content={view === 'week' ? t('表示中の週の配信を、CSV で書き出します(絞り込みを反映)', "Export this week's deliveries as CSV (filters applied)") : t('表示中の月の配信を、CSV で書き出します(絞り込みを反映)', "Export this month's deliveries as CSV (filters applied)")}
-                relationship="description"
-              >
-                <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} onClick={exportCsv} disabled={(view === 'week' ? weekRows : monthRows).length === 0}>
-                  {t('CSV で書き出す', 'Export CSV')}
-                </Button>
-              </Tooltip>
+                <Menu>
+                  <MenuTrigger disableButtonEnhancement>
+                    <MenuButton size="small" appearance="subtle" icon={<DatabaseRegular />}>
+                      {t('データ', 'Data')}
+                    </MenuButton>
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      <MenuItem
+                        icon={<ArrowDownloadRegular />}
+                        disabled={(view === 'week' ? weekRows : monthRows).length === 0}
+                        onClick={exportCsv}
+                        secondaryContent={view === 'week' ? t('表示中の週の配信', "This week's deliveries") : t('表示中の月の配信', "This month's deliveries")}
+                      >
+                        {t('CSV で書き出す', 'Export CSV')}
+                      </MenuItem>
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
               )}
               {page === 'calendar' && view === 'list' && (
                 <Menu
@@ -1138,6 +1152,7 @@ function App() {
                 onDetail={setResultDetail}
                 onOpenCard={setSelectedId}
                 onCardsChanged={load}
+                onOpenWeek={(d) => goTo('week', d)}
               />
             ) : view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
@@ -1202,7 +1217,7 @@ function App() {
               />
               </>
             ) : (
-              <Calendar month={month} cards={filtered} dueSoon={dueSoon} alertKinds={alertKinds} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} />
+              <Calendar month={month} cards={filtered} dueSoon={dueSoon} alertKinds={alertKinds} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} onOpenWeek={(d) => goTo('week', d)} />
             )}
           </>
         )}
