@@ -362,7 +362,8 @@ const SCENES = {
     await click(page, T(L, '差し替え', 'Replace'), { tag: 'button', wait: 800 })
     await idle(page, 1200)
     await fullShot(page, `${L}-37-alert-replace`)
-    await click(page, T(L, '閉じる', 'Close'), { tag: 'button', wait: 600 }).catch(() => undefined)
+    // 差し替えのパネルだけを閉じる(アラートのフロートの「アラートを閉じる」と取り違えないよう、aria-label で探す)
+    await clickLabel(page, T(L, '閉じる', 'Close'), 600).catch(() => undefined)
     await click(page, T(L, 'アラートの条件', 'Alert conditions'), { tag: 'button', wait: 800 })
     await dialogShot(page, `${L}-38-alert-conditions`)
     await closeDialog(page)
@@ -371,11 +372,14 @@ const SCENES = {
       await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => (b.title || b.getAttribute('aria-label') || '').includes('Open the delivery card'))?.click())
       await sleep(1500)
     })
-    if (await page.$('[role=dialog]')) {
+    // アラートはフロート。配信カードは、その上に重なる(ダイアログが 2 つになる)
+    if ((await page.$$('[role=dialog]')).length >= 2) {
       await sleep(1000)
       await dialogShot(page, `${L}-39-card-alerts`)
       await closeDialog(page)
     }
+    // アラートのフロートを閉じる
+    await clickLabel(page, T(L, 'アラートを閉じる', 'Close alerts'), 600).catch(() => undefined)
     await view(page, T(L, '計画', 'Plan'))
   },
 }

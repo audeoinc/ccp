@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowSwapRegular, CalendarArrowRightRegular, FilterRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
+import { DeliveryThumb } from './DataTable'
+import { heroImage, productImage } from './images'
 import type { WeekRow } from './data/weeks'
 import { AlertActionPanel } from './AlertActionPanel'
 import { LOW_STOCK_WEEKS, isLeadStage, type AffectedDelivery, type ChangeAlert, type Placement, type StockAlert, type StockModel } from './alerts'
@@ -22,7 +25,7 @@ const useStyles = makeStyles({
   tdWrap: { padding: '6px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: '200px' },
   root: { display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', columnGap: '20px', alignItems: 'start' },
   // 左: アラートの一覧
-  list: { display: 'grid', rowGap: '8px', position: 'sticky', top: '72px' },
+  list: { display: 'grid', rowGap: '8px', position: 'sticky', top: 0 },
   listHead: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: '2px' },
   item: {
     display: 'grid',
@@ -38,6 +41,16 @@ const useStyles = makeStyles({
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
   itemOn: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
+  // 一覧の項目: 左に商品(日程の変更は配信)の画像、右に文字
+  itemRow: { display: 'grid', gridTemplateColumns: '44px minmax(0, 1fr)', columnGap: '10px', alignItems: 'center' },
+  itemText: { display: 'grid', rowGap: '2px', minWidth: 0 },
+  itemImg: { width: '44px', height: '44px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
+  itemNoImg: { width: '44px', height: '44px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground2 },
+  // 右の見出し: 商品の画像と、名前
+  headRow: { display: 'flex', alignItems: 'center', columnGap: '14px' },
+  headImg: { width: '72px', height: '72px', flexShrink: 0, objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, border: `1px solid ${tokens.colorNeutralStroke2}` },
+  // 表の配信の列: サムネイル(マウスを重ねるとプレビュー)と名前
+  delivery: { display: 'inline-flex', alignItems: 'center', columnGap: '10px' },
   itemKind: { display: 'flex', alignItems: 'center', columnGap: '6px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   itemName: { fontSize: tokens.fontSizeBase200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemSub: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -77,6 +90,9 @@ interface Props {
   /** すべての配信(対応の記録で、配信名を出すため) */
   cards: DeliveryCard[]
   products: Product[]
+  /** 配信のサムネイル(マウスを重ねるとプレビュー)に使う */
+  heroes: HeroImage[]
+  cardProducts: Map<string, string[]>
   placements: Map<string, Placement[]>
   model: StockModel
   weeks: WeekRow[]
@@ -94,7 +110,7 @@ const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: t
  * アラートの画面(ワイヤーフレーム 12)。左に、配信に影響する変更(いまは在庫切れ・在庫僅少)の一覧。
  * 選ぶと、右に、影響を受ける、まだ送っていない配信と、商品が載っている場所、配信日の在庫の見込みを出す
  */
-export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, settings, owners, logs, cards, products, placements, model, weeks, onOpenCard, onChanged }: Props) {
+export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, settings, owners, logs, cards, products, heroes, cardProducts, placements, model, weeks, onOpenCard, onChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -107,6 +123,14 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
   const [done, setDone] = useState<string | null>(null)
   const actionCard = selected?.deliveries.find((d) => d.card.id === action?.cardId)?.card
 
+  // 一覧の小さな画像(なければ灰色の枠)
+  const thumb = (src?: string) => (src ? <img className={styles.itemImg} src={src} alt="" draggable={false} /> : <span className={styles.itemNoImg} />)
+  // 日程の変更の画像: その配信のメイン画像、なければ先頭の商品
+  const changeCardImage = (cardId?: string) => {
+    const c = cards.find((x) => x.id === cardId)
+    if (!c) return undefined
+    return heroImage(heroes.find((h) => h.id === c.hero_image_id)) ?? productImage(products.find((p) => p.id === (cardProducts.get(c.id) ?? [])[0]))
+  }
   const kindLabel = (a: StockAlert) => (a.kind === 'outOfStock' ? t('在庫切れの見込み', 'Out of stock (expected)') : t('在庫僅少', 'Low stock'))
   const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' }) : '')
   const n = (v: number) => Math.round(v).toLocaleString(locale())
@@ -228,14 +252,19 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
         <div className={styles.listHead}>{t(`配信に影響する変更(${alerts.length + changeAlerts.length})`, `Changes that affect deliveries (${alerts.length + changeAlerts.length})`)}</div>
         {alerts.map((a) => (
           <button key={a.id} type="button" className={mergeClasses(styles.item, a.id === selected?.id && styles.itemOn)} style={{ borderLeftColor: KIND_COLOR[a.kind] }} onClick={() => { setSelectedId(a.id); setAction(null); setDone(null) }}>
-            <span className={styles.itemKind}>
-              {kindLabel(a)}
-              <Badge size="small" appearance="tint" color={a.kind === 'outOfStock' ? 'danger' : 'warning'}>
-                {t(`${a.deliveries.length} 本`, `${a.deliveries.length}`)}
-              </Badge>
+            <span className={styles.itemRow}>
+              {thumb(productImage(a.product))}
+              <span className={styles.itemText}>
+                <span className={styles.itemKind}>
+                  {kindLabel(a)}
+                  <Badge size="small" appearance="tint" color={a.kind === 'outOfStock' ? 'danger' : 'warning'}>
+                    {t(`${a.deliveries.length} 本`, `${a.deliveries.length}`)}
+                  </Badge>
+                </span>
+                <span className={styles.itemName} title={a.product.name}>{a.product.name}</span>
+                <span className={styles.itemSub}>{summary(a)}</span>
+              </span>
             </span>
-            <span className={styles.itemName} title={a.product.name}>{a.product.name}</span>
-            <span className={styles.itemSub}>{summary(a)}</span>
           </button>
         ))}
         {changeAlerts.map((a) => {
@@ -243,6 +272,9 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
           const when = a.changes.find((c) => c.field === 'scheduled_at')
           return (
             <button key={a.id} type="button" className={mergeClasses(styles.item, a.id === selectedChange?.id && styles.itemOn)} style={{ borderLeftColor: KIND_COLOR[a.kind] }} onClick={() => { setSelectedId(a.id); setAction(null); setDone(null) }}>
+              <span className={styles.itemRow}>
+              {thumb(a.product ? productImage(a.product) : changeCardImage(a.card?.id))}
+              <span className={styles.itemText}>
               <span className={styles.itemKind}>
                 {a.kind === 'policyChanged' ? t('MD 方針の変更', 'MD policy change') : t('日程の変更', 'Date change')}
                 <Badge size="small" appearance="tint" color={a.kind === 'policyChanged' ? 'important' : 'informative'}>
@@ -257,6 +289,8 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
                     ? `${dateText(when.before)} → ${dateText(when.after)}`
                     : t('方針・期間の変更', 'Policy / period changed')}
               </span>
+              </span>
+              </span>
             </button>
           )
         })}
@@ -266,6 +300,8 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
           key={selectedChange.id}
           alert={selectedChange}
           products={products}
+          heroes={heroes}
+          cardProducts={cardProducts}
           placements={placements}
           model={model}
           weeks={weeks}
@@ -277,9 +313,14 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
 
       {selected && (
         <div className={styles.detail}>
-          <div>
-            <h2 className={styles.title}>{`${kindLabel(selected)}: ${selected.product.name}`}</h2>
-            <div className={styles.sub}>{t('この商品を載せている、まだ送っていない配信', 'Deliveries not yet sent that include this product')}</div>
+          <div className={styles.headRow}>
+            {productImage(selected.product) && <img className={styles.headImg} src={productImage(selected.product)} alt="" draggable={false} />}
+            <div>
+              <h2 className={styles.title}>{`${kindLabel(selected)}: ${selected.product.name}`}</h2>
+              <div className={styles.sub}>
+                {[selected.product.product_code, t('この商品を載せている、まだ送っていない配信', 'Deliveries not yet sent that include this product')].filter(Boolean).join(' ・ ')}
+              </div>
+            </div>
           </div>
           <div className={styles.facts}>
             <div className={styles.fact}>
@@ -318,7 +359,12 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
                 {selected.deliveries.map((d) => (
                   <tr key={d.card.id}>
                     <td className={styles.td}>{dateText(d.card.scheduled_at)}</td>
-                    <td className={mergeClasses(styles.td, styles.name)}>{d.card.name}</td>
+<td className={mergeClasses(styles.td, styles.name)}>
+                      <span className={styles.delivery}>
+                        <DeliveryThumb card={d.card} productIds={cardProducts.get(d.card.id) ?? []} products={products} heroes={heroes} />
+                        {d.card.name}
+                      </span>
+                    </td>
                     <td className={styles.td}>{d.card.channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
                     <td className={styles.td}>
                       <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.status ?? 'not_started') }} />

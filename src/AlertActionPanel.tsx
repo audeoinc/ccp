@@ -19,6 +19,9 @@ const useStyles = makeStyles({
   title: { margin: 0, fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
   close: { marginLeft: 'auto' },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
+  // 差し替えられる側の商品(画像・名前・いまの在庫)
+  replacing: { display: 'inline-flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  replacingImg: { width: '32px', height: '32px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
   picks: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '12px', rowGap: '12px' },
   pick: { display: 'grid', gridTemplateColumns: '84px minmax(0, 1fr)', columnGap: '10px', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   img: { width: '84px', height: '84px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
@@ -46,6 +49,8 @@ interface Props {
 }
 
 const STATUS_APPROVED = 'approved'
+/** 在庫の数の表記(なければ 0) */
+const num = (v?: number) => Math.round(v ?? 0).toLocaleString()
 const US = 'US'
 const US_MARKET = 'US'
 const JP_MARKET = 'JP'
@@ -153,6 +158,13 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
 
       {mode === 'replace' && (
         <>
+          {/* 差し替えられる側(いま載っている商品)の在庫。候補と比べられるように */}
+          {product && (
+            <span className={styles.replacing}>
+              {productImage(product) && <img className={styles.replacingImg} src={productImage(product)} alt="" draggable={false} />}
+              {t(`差し替える商品: ${product.name} ・ いまの在庫 ${num(product.stock)}`, `Replacing: ${product.name} · Stock now ${num(product.stock)}`)}
+            </span>
+          )}
           <span className={styles.sub}>
             <AiIcon size={14} /> {t(`AI の提案(在庫のある、同じカテゴリの商品。配信日に ${LOW_STOCK_WEEKS} 週分以上ある見込みのもの)`, `AI suggestions (in stock, same category, ${LOW_STOCK_WEEKS}+ weeks on the day)`)}
           </span>
@@ -168,10 +180,12 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
                   <div className={styles.pickBody}>
                     <span className={styles.pickName} title={c.product.name}>{c.product.name}</span>
                     <span>{priceText(c.product.price, market)}</span>
+                    {/* いまの在庫の数と、配信日に何週分残るかを、同じ行で読めるように */}
                     <span>
-                      {c.weeksLeft !== undefined ? t(`配信日に在庫 ${c.weeksLeft.toFixed(1)} 週分`, `${c.weeksLeft.toFixed(1)} wks of stock on the day`) : t(`在庫 ${c.product.stock ?? 0}`, `Stock ${c.product.stock ?? 0}`)}
+                      {t(`いまの在庫 ${num(c.product.stock)}`, `Stock now ${num(c.product.stock)}`)}
+                      {c.weeksLeft !== undefined && t(` ・ 配信日に ${c.weeksLeft.toFixed(1)} 週分`, ` · ${c.weeksLeft.toFixed(1)} wks on the day`)}
                     </span>
-                    <span>{t(`今週 ${c.thisWeek} 回・前週 ${c.lastWeek} 回 載せている`, `Featured ${c.thisWeek} this week, ${c.lastWeek} last week`)}</span>
+                    <span className={styles.sub}>{t(`載せた回数 今週 ${c.thisWeek} ・ 前週 ${c.lastWeek}`, `Featured: this wk ${c.thisWeek} · last wk ${c.lastWeek}`)}</span>
                     {why2 && <span className={styles.pickReason}>{why2}</span>}
                     <Button className={styles.pickUse} size="small" appearance="primary" disabled={busy || rows.length === 0} onClick={() => void use(c.product)}>
                       {t('使う', 'Use')}

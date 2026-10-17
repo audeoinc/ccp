@@ -67,6 +67,7 @@ import { ListView } from './ListView'
 import { ResultsPage, type ResultsDataActions } from './ResultsPage'
 import { AiIcon } from './AiMark'
 import { AlertsPage } from './AlertsPage'
+import { AlertsFloat } from './AlertsFloat'
 import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, topKind, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
@@ -482,6 +483,8 @@ function App() {
     setFocusProduct(productId)
     setSelectedId(cardId)
   }
+  // アラートは、面ではなく、上に重ねて開くフロート(閉じれば、見ていた画面に戻る)
+  const [alertsOpen, setAlertsOpen] = useState(false)
   const showFaceRaw = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
@@ -990,10 +993,10 @@ function App() {
         {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
         <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
           <Button
-            appearance={page === 'alerts' ? 'primary' : 'subtle'}
+            appearance={alertsOpen ? 'primary' : 'subtle'}
             size="small"
             icon={<AlertRegular />}
-            onClick={() => showFace(page === 'alerts' ? 'calendar' : 'alerts')}
+            onClick={() => setAlertsOpen(true)}
           >
             {t('アラート', 'Alerts')}
             {alertCount > 0 && (
@@ -1309,9 +1312,7 @@ function App() {
             </>
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
-            {page === 'alerts' ? (
-              <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
-            ) : page === 'results' ? (
+            {page === 'results' ? (
               <ResultsPage
                 cards={filtered}
                 products={products}
@@ -1405,6 +1406,10 @@ function App() {
           </>
         )}
       </div>
+      {/* アラート(フロート)。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
+      <AlertsFloat open={alertsOpen} onClose={() => setAlertsOpen(false)}>
+        <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+      </AlertsFloat>
       {(selected || creating) && (
         <CardDetail
           key={selected?.id ?? 'new'}

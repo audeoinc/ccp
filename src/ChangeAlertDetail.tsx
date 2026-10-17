@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Button, Field, MessageBar, MessageBarBody, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowSwapRegular, CalendarArrowRightRegular, CheckmarkCircleRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
+import { DeliveryThumb } from './DataTable'
+import { productImage } from './images'
 import type { WeekRow } from './data/weeks'
 import { AlertActionPanel } from './AlertActionPanel'
 import { isLeadStage, type ChangeAlert, type Placement, type StockModel } from './alerts'
@@ -24,6 +27,10 @@ const useStyles = makeStyles({
   th: { textAlign: 'left', padding: '6px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: tokens.colorNeutralBackground2, fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
   td: { padding: '6px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap' },
   name: { fontWeight: tokens.fontWeightSemibold },
+  // 見出し: 商品の画像と名前 / 表の配信の列: サムネイル(マウスを重ねるとプレビュー)と名前
+  headRow: { display: 'flex', alignItems: 'center', columnGap: '14px' },
+  headImg: { width: '72px', height: '72px', flexShrink: 0, objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, border: `1px solid ${tokens.colorNeutralStroke2}` },
+  delivery: { display: 'inline-flex', alignItems: 'center', columnGap: '10px' },
   dot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', marginRight: '6px' },
   warn: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
   actions: { display: 'inline-flex', columnGap: '4px' },
@@ -35,6 +42,8 @@ const useStyles = makeStyles({
 interface Props {
   alert: ChangeAlert
   products: Product[]
+  heroes: HeroImage[]
+  cardProducts: Map<string, string[]>
   placements: Map<string, Placement[]>
   model: StockModel
   weeks: WeekRow[]
@@ -48,7 +57,7 @@ interface Props {
  * 変更のアラート(MD 方針の変更・日程の変更)の詳しい中身。変更前と変更後、影響を受ける配信と、配信ごとの対応、対応済みにする。
  * 在庫のアラートは、在庫が持つようになれば消えるが、変更のアラートは、確かめたことを人が記録する(対応済み)
  */
-export function ChangeAlertDetail({ alert, products, placements, model, weeks, onOpenCard, onChanged, onResolve }: Props) {
+export function ChangeAlertDetail({ alert, products, heroes, cardProducts, placements, model, weeks, onOpenCard, onChanged, onResolve }: Props) {
   const styles = useStyles()
   const t = useT()
   const [action, setAction] = useState<{ mode: 'replace' | 'postpone' | 'cancel'; cardId: string } | null>(null)
@@ -85,6 +94,8 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
 
   return (
     <div className={styles.detail}>
+      <div className={styles.headRow}>
+        {alert.product && productImage(alert.product) && <img className={styles.headImg} src={productImage(alert.product)} alt="" draggable={false} />}
       <div>
         <h2 className={styles.title}>
           {policy ? t(`MD 方針の変更: ${alert.product?.name}`, `MD policy change: ${alert.product?.name}`) : t(`日程の変更: ${alert.card?.name}`, `Date change: ${alert.card?.name}`)}
@@ -93,6 +104,7 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
           {t(`${dateTime(alert.changedAt)} に変更`, `Changed ${dateTime(alert.changedAt)}`)}
           {alert.actor ? t(`(${alert.actor})`, ` by ${alert.actor}`) : ''}
         </div>
+      </div>
       </div>
 
       <div className={styles.changes}>
@@ -133,7 +145,12 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
               {alert.deliveries.map((d) => (
                 <tr key={d.card.id}>
                   <td className={styles.td}>{dateTime(d.card.scheduled_at)}</td>
-                  <td className={mergeClasses(styles.td, styles.name)}>{d.card.name}</td>
+                  <td className={mergeClasses(styles.td, styles.name)}>
+                    <span className={styles.delivery}>
+                      <DeliveryThumb card={d.card} productIds={cardProducts.get(d.card.id) ?? []} products={products} heroes={heroes} />
+                      {d.card.name}
+                    </span>
+                  </td>
                   <td className={styles.td}>{d.card.channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
                   <td className={styles.td}>
                     <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.status ?? 'not_started') }} />
