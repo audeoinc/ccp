@@ -3,20 +3,12 @@ import { createPortal } from 'react-dom'
 import {
   MessageBar,
   MessageBarBody,
-  Menu,
-  MenuButton,
-  MenuDivider,
-  MenuItem,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
   Spinner,
   ToggleButton,
   Tooltip,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowUploadRegular, DatabaseRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -26,7 +18,6 @@ import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResu
 import { locale, priceText, useT, type Market } from './i18n'
 import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
 import { ResultDetail } from './ResultDetail'
-import { AiIcon } from './AiMark'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
@@ -77,6 +68,20 @@ interface Props {
   onOpenWeek?: (sunday: Date) => void
   /** 週の表示の上に置く、この週の振り返りのメモ(App が WeekRetro を渡す) */
   retro?: ReactNode
+  /** 結果のデータの操作(書き出し・取り込み・AI で分ける)。App が ⚙ のメニューの「データ」に並べる */
+  onDataActions?: (a: ResultsDataActions | null) => void
+}
+
+/** 結果の面のデータの操作(⚙ のメニューに並べる) */
+export interface ResultsDataActions {
+  exportCsv: () => void
+  canExport: boolean
+  importCsv: () => void
+  downloadSample: () => void
+  sampleColumns: number
+  classify: () => void
+  untyped: number
+  classifying: boolean
 }
 
 const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
@@ -85,7 +90,7 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro, onDataActions }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -322,6 +327,25 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const detail = detailId ? resultByCard.get(detailId) : undefined
 
   // 共通のツールバーに差し込む、結果の面の操作(まとめ方は、一覧のときだけ)
+  // データの操作を App に渡す(⚙ のメニューの「データ」に並べる)。関数は、毎回作り直されるので、最新のものを ref で呼ぶ
+  const handlers = useRef({ exportCsv, downloadSample, classify })
+  useEffect(() => {
+    handlers.current = { exportCsv, downloadSample, classify }
+  })
+  useEffect(() => {
+    onDataActions?.({
+      exportCsv: () => handlers.current.exportCsv(),
+      canExport: rows.length > 0,
+      importCsv: () => fileRef.current?.click(),
+      downloadSample: () => handlers.current.downloadSample(),
+      sampleColumns: IMPORT_COLUMNS.length,
+      classify: () => void handlers.current.classify(),
+      untyped: untyped.length,
+      classifying,
+    })
+  }, [onDataActions, rows.length, untyped.length, classifying])
+  useEffect(() => () => onDataActions?.(null), [onDataActions])
+
   const tools = (
     <>
       {view === 'list' && (
@@ -342,32 +366,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           ))}
         </div>
       )}
-      {/* 操作(書き出し・取り込み・AI で分ける)は、1 つのメニューにまとめる(見せ方の切り替えと、見分けやすくするため) */}
-      <Menu>
-        <MenuTrigger disableButtonEnhancement>
-          <MenuButton size="small" appearance="subtle" icon={classifying ? <Spinner size="extra-tiny" /> : <DatabaseRegular />}>
-            {t('データ', 'Data')}
-          </MenuButton>
-        </MenuTrigger>
-        <MenuPopover>
-          <MenuList>
-            <MenuItem icon={<ArrowDownloadRegular />} disabled={rows.length === 0} onClick={exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
-              {t('CSV で書き出す', 'Export CSV')}
-            </MenuItem>
-            <MenuDivider />
-            <MenuItem icon={<ArrowUploadRegular />} onClick={() => fileRef.current?.click()}>
-              {t('結果を取り込む(CSV)', 'Import results (CSV)')}
-            </MenuItem>
-            <MenuItem onClick={downloadSample} secondaryContent={IMPORT_COLUMNS.length + t(' 列', ' columns')}>
-              {t('取り込みの見本を書き出す', 'Download a sample CSV')}
-            </MenuItem>
-            <MenuDivider />
-            <MenuItem icon={<AiIcon size={16} />} disabled={classifying || untyped.length === 0} onClick={() => void classify()} secondaryContent={t(`${untyped.length} 件`, `${untyped.length}`)}>
-              {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
-            </MenuItem>
-          </MenuList>
-        </MenuPopover>
-      </Menu>
       <input
         ref={fileRef}
         type="file"

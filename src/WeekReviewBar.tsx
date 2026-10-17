@@ -6,8 +6,6 @@ import type { WeekRow, WeekStatus } from './data/weeks'
 import type { CardNote } from './data/cardNotes'
 import type { CardEvent } from './data/events'
 import { actionText } from './weekLabels'
-import { MePicker } from './MePicker'
-import { AiIcon } from './AiMark'
 import { locale, useT } from './i18n'
 import { statusLabel, statusRank } from './status'
 
@@ -52,8 +50,6 @@ interface Props {
   events?: CardEvent[]
   /** 週の資料(PDF)を書き出す(App 側で、資料を描いて印刷の画面を開く) */
   onExportPdf?: () => void
-  /** この週の配信を、まとめて AI で下書きする(W14。App 側で下書きモードに入る。下書きモードのあいだは undefined で、ボタンを出さない) */
-  onBulkCreate?: () => void
   /** 週の未依頼の配信を、種別ごとの既定の相手で、まとめて承認の依頼にする(U6。App 側で行う) */
   onRequestAll?: () => Promise<void>
   /** まとめて依頼する配信の数(未承認で、依頼中の依頼がないもの) */
@@ -81,7 +77,7 @@ const STATUS_APPROVED = 'approved'
  * 配信の承認は、配信カードごとの依頼(U4)で行うので、ここでは「まとめて依頼」「自分宛てを承認」と、週の確定だけを置く。
  * 確定は、週のすべての配信を「確定」(見せ方は 承認済み + 鍵)にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onExportPdf, onBulkCreate, onChange, toFix = 0, fix, fixChip }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onExportPdf, onChange, toFix = 0, fix, fixChip }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -139,33 +135,15 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onReques
     </Popover>
   )
 
-  const needMe = !hasMe ? t('「あなた」を選んでください', 'Choose who you are first') : null
+  const needMe = !hasMe ? t('右上の「あなた」を選んでください', 'Choose who you are (top right) first') : null
 
   return (
     <div className={styles.root}>
-      {/* まとめて AI で下書き(W14)は、週の計画を作り始める操作なので、帯のいちばん左に置く(利用者の判断 2026-10-16) */}
-      {onBulkCreate && (
-        <Tooltip
-          content={
-            confirmed
-              ? t('確定した週には作れません(確定を取り消すと作れます)', 'Cannot create in a confirmed week (undo the confirmation first)')
-              : t('この週の配信を、国・チャネルを決めて、まとめて AI で下書きします(最大 10 本)', 'Choose a country and channel, then draft this week’s deliveries with AI in bulk (up to 10)')
-          }
-          relationship="description"
-        >
-          <Button size="small" icon={<AiIcon />} disabledFocusable={busy || confirmed} onClick={onBulkCreate}>
-            {t('まとめて AI で下書き', 'Bulk AI drafts')}
-          </Button>
-        </Tooltip>
-      )}
+      {/* 帯の主語: この週の状態(週の表示にしかない帯に置くので、月・一覧に切り替えても、ツールバーの位置は変わらない) */}
+      <WeekStatusBadge week={week} />
       {fixChip}
       <span className={styles.actions}>
         {busy && <Spinner size="extra-tiny" />}
-        <Tooltip content={t('履歴・依頼・承認に残す、あなた(このブラウザで覚えます)', 'You, for the history, requests and approvals (remembered in this browser)')} relationship="description">
-          <span>
-            <MePicker className={styles.name} />
-          </span>
-        </Tooltip>
         {history}
         {onExportPdf && (
           <Tooltip content={t('レビューの会議で配る、週の資料を作ります(印刷の画面で「PDF に保存」を選びます)', 'Creates the week handout for the review meeting (choose "Save as PDF" in the print dialog)')} relationship="description">
@@ -262,7 +240,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onReques
 }
 
 /**
- * 週の状態(確定前 / 確定)の印。週そのものの状態なので、ツールバーの期間の横に置く(週の帯は、操作だけにする)。
+ * 週の状態(確定前 / 確定)の印。週の帯の左端に置く(帯の主語。ツールバーに置くと、月に切り替えたときに、ほかのボタンの位置がずれるため)。
  * 確定した日時は、マウスを重ねると出す
  */
 export function WeekStatusBadge({ week }: { week?: WeekRow }) {

@@ -1,13 +1,11 @@
 import { Badge, Button, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { MailInboxRegular } from '@fluentui/react-icons'
 import { locale, useT } from './i18n'
-import { MePicker } from './MePicker'
 import type { ApprovalInbox } from './useApprovalInbox'
 
 const useStyles = makeStyles({
   list: { display: 'grid', rowGap: '6px', width: '360px', maxHeight: '420px', overflowY: 'auto', fontSize: tokens.fontSizeBase200 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
-  me: { marginLeft: 'auto', width: '150px' },
   note: { color: tokens.colorNeutralForeground3 },
   row: { display: 'grid', rowGap: '1px', padding: '6px 8px', textAlign: 'left', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   name: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
@@ -47,7 +45,6 @@ export function InboxButton({ inbox, onOpenCard }: Props) {
         <div className={s.list}>
           <div className={s.head}>
             {t('自分宛ての依頼', 'Requests for you')}
-            <MePicker className={s.me} />
           </div>
           {!inbox.meId && <span className={s.note}>{t('「あなた」を選ぶと、自分宛ての依頼が出ます', 'Choose who you are to see your requests')}</span>}
           {inbox.meId && n === 0 && <span className={s.note}>{t('いま、あなたが承認する依頼はありません', 'Nothing waiting for your approval right now')}</span>}

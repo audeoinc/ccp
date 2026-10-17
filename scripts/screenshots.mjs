@@ -206,7 +206,9 @@ const SCENES = {
   async bulkDrafts(page, L) {
     await view(page, T(L, '週', 'Week'))
     await clickLabel(page, T(L, '次の週', 'Next week'), 1200)
-    await click(page, T(L, 'まとめて AI で下書き', 'Bulk AI drafts'), { tag: 'button', wait: 1200 })
+    // ヘッダーの「新規作成 ▾」の ▾ から開く
+    await clickLabel(page, T(L, '新規作成のほかの方法', 'More ways to create'), 600)
+    await click(page, T(L, 'この週をまとめて AI で下書き', 'Bulk AI drafts for this week'), { tag: '[role=menuitem]', wait: 1200 })
     await fullShot(page, `${L}-06-bulk-drafts-start`)
     // 下書きを置いて、AI で作る(できるまで待つ。最大 6 分)
     await click(page, T(L, '次へ', 'Next'), { tag: 'button', wait: 1500 })

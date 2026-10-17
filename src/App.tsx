@@ -10,7 +10,7 @@ import {
   DialogTitle,
   Field,
   Menu,
-  MenuButton,
+  type MenuButtonProps,
   MenuDivider,
   MenuGroup,
   MenuGroupHeader,
@@ -25,6 +25,7 @@ import {
   MessageBarBody,
   Portal,
   Select,
+  SplitButton,
   Spinner,
   Tooltip,
   makeStyles,
@@ -36,11 +37,11 @@ import {
   AlertRegular,
   ArrowDownloadRegular,
   ArrowSyncRegular,
+  ArrowUploadRegular,
   DismissRegular,
   CalendarLtrRegular,
   ColumnTripleRegular,
   DataBarVerticalRegular,
-  DatabaseRegular,
   SettingsRegular,
   LayoutColumnTwoRegular,
   DocumentBulletListRegular,
@@ -58,11 +59,13 @@ import type { HeroImage } from './models/heroImages'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
-import { WeekReviewBar, WeekStatusBadge } from './WeekReviewBar'
+import { WeekReviewBar } from './WeekReviewBar'
+import { MePicker } from './MePicker'
 import { WeekRetro } from './WeekRetro'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
-import { ResultsPage } from './ResultsPage'
+import { ResultsPage, type ResultsDataActions } from './ResultsPage'
+import { AiIcon } from './AiMark'
 import { AlertsPage } from './AlertsPage'
 import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, topKind, type CardAlertKind } from './cardAlerts'
@@ -309,6 +312,8 @@ const useStyles = makeStyles({
   lensGroup: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', marginLeft: tokens.spacingHorizontalS },
   lensLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   lensLabelOff: { color: tokens.colorNeutralForegroundDisabled },
+  // ヘッダーの「あなた」
+  headerMe: { width: '170px' },
   toolbarDivider: { width: '1px', alignSelf: 'stretch', margin: `2px ${tokens.spacingHorizontalS}`, backgroundColor: tokens.colorNeutralStroke2 },
 })
 
@@ -415,6 +420,8 @@ function App() {
   const [printingWeek, setPrintingWeek] = useState(false)
   // 週の計画(週のレビューの状態)
   const [weeks, setWeeks] = useState<WeekRow[]>([])
+  // 結果の面のデータの操作(ResultsPage から受け取り、⚙ のメニューに並べる)
+  const [resultsData, setResultsData] = useState<ResultsDataActions | null>(null)
   // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
   const [changeNotes, setChangeNotes] = useState<CardNote[]>([])
   // 承認の履歴(週の操作・配信のステータスの変更。週の状態の帯で、週ごとに出す)
@@ -904,6 +911,16 @@ function App() {
   const changeView = (v: View) => navGuard(() => changeViewRaw(v), v !== 'week')
   const shift = (n: number) => navGuard(() => shiftRaw(n), false)
   const goTo = (v: 'month' | 'week' | 'list', d: Date) => navGuard(() => goToRaw(v, d), v !== 'week')
+  // まとめて AI で下書きは、計画の面の週の表示で、確定していない週だけ
+  const canBulk = page === 'calendar' && view === 'week' && !bulk.active && thisWeek?.status !== 'confirmed'
+  const canBulkReason =
+    page !== 'calendar' || view !== 'week'
+      ? t('週の表示で使えます', 'In the week view')
+      : bulk.active
+        ? t('下書き中', 'Drafting')
+        : thisWeek?.status === 'confirmed'
+          ? t('確定した週には作れません', 'Week is confirmed')
+          : ''
   const startBulk = () => {
     // ブラウザに控えがあれば戻す。その下書きの週へ移る
     const d = bulk.start()
@@ -976,10 +993,43 @@ function App() {
         </Tooltip>
         {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
         <InboxButton inbox={inbox} onOpenCard={setSelectedId} />
-        {/* まとめて AI で下書き(W14)は、週の計画の作業なので、ここではなく、週の表示の「週の状態」の帯に置く */}
-        <Button appearance="primary" size="small" icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
-          {t('新規作成', 'New')}
-        </Button>
+        {/* 作る操作は、ここにまとめる。ボタンの本体で 1 本を新規作成、▾ で、この週をまとめて AI で下書き(W14。週の表示のときだけ選べる) */}
+        <Menu positioning="below-end">
+          <MenuTrigger disableButtonEnhancement>
+            {(triggerProps: MenuButtonProps) => (
+              <SplitButton
+                appearance="primary"
+                size="small"
+                icon={<AddRegular />}
+                menuButton={{ ...triggerProps, 'aria-label': t('新規作成のほかの方法', 'More ways to create') }}
+                primaryActionButton={{ onClick: () => setCreating(newCardDefaults()) }}
+              >
+                {t('新規作成', 'New')}
+              </SplitButton>
+            )}
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
+                {t('配信を 1 本、新規作成', 'New delivery')}
+              </MenuItem>
+              <MenuItem
+                icon={<AiIcon size={16} />}
+                disabled={!canBulk}
+                secondaryContent={canBulkReason}
+                onClick={startBulk}
+              >
+                {t('この週をまとめて AI で下書き', 'Bulk AI drafts for this week')}
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+        {/* あなた(履歴・依頼・承認・コメントに残す人)。画面全体で共通なので、ヘッダーに常に出す */}
+        <Tooltip content={t('履歴・依頼・承認に残す、あなた(このブラウザで覚えます)', 'You, for the history, requests and approvals (remembered in this browser)')} relationship="description">
+          <span>
+            <MePicker className={styles.headerMe} ariaLabel={t('あなた', 'You')} />
+          </span>
+        </Tooltip>
         {/* 管理系(テンプレート・言語・自動の下書き)は、毎日の作業と分けて、設定のメニューにまとめる */}
         <Menu
           checkedValues={{ lang: [lang], auto: autoDraft ? ['on'] : [] }}
@@ -1005,6 +1055,36 @@ function App() {
               <MenuItem icon={<PeopleTeamRegular />} onClick={openPeopleManager}>
                 {t('ユーザーと承認グループ', 'Users and approval groups')}
               </MenuItem>
+              <MenuDivider />
+              {/* データの出入り(たまに使う操作なので、ツールバーではなく、ここにまとめる)。いま見ている面の書き出し・取り込みを先に */}
+              <MenuGroup>
+                <MenuGroupHeader>{t('データ', 'Data')}</MenuGroupHeader>
+                {page === 'calendar' && (
+                  <MenuItem
+                    icon={<ArrowDownloadRegular />}
+                    disabled={(view === 'week' ? weekRows : monthRows).length === 0}
+                    onClick={exportCsv}
+                    secondaryContent={view === 'week' ? t('表示中の週の配信', "This week's deliveries") : t('表示中の月の配信', "This month's deliveries")}
+                  >
+                    {t('配信を CSV で書き出す', 'Export deliveries as CSV')}
+                  </MenuItem>
+                )}
+                {page === 'results' && resultsData && (
+                  <>
+                    <MenuItem icon={<ArrowDownloadRegular />} disabled={!resultsData.canExport} onClick={resultsData.exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
+                      {t('結果を CSV で書き出す', 'Export results as CSV')}
+                    </MenuItem>
+                    <MenuItem icon={<ArrowUploadRegular />} onClick={resultsData.importCsv}>
+                      {t('結果を取り込む(CSV)', 'Import results (CSV)')}
+                    </MenuItem>
+                    <MenuItem onClick={resultsData.downloadSample} secondaryContent={resultsData.sampleColumns + t(' 列', ' columns')}>
+                      {t('取り込みの見本を書き出す', 'Download a sample CSV')}
+                    </MenuItem>
+                    <MenuItem icon={<AiIcon size={16} />} disabled={resultsData.classifying || resultsData.untyped === 0} onClick={resultsData.classify} secondaryContent={resultsData.classifying ? t('分けています…', 'Sorting…') : t(`${resultsData.untyped} 件`, `${resultsData.untyped}`)}>
+                      {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
+                    </MenuItem>
+                  </>
+                )}
               {/* 引っ越し用のパック: すべてのデータと画像を 1 つの ZIP に書き出す(外にアクセスできない環境へ持ち込むため。server/ccp/pack.py) */}
               <MenuItem
                 icon={<ArrowDownloadRegular />}
@@ -1024,6 +1104,8 @@ function App() {
                   {bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery')}
                 </MenuItem>
               )}
+              </MenuGroup>
+              <MenuDivider />
               {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}
               <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
                 {t('方針・決まり(取り込み・一覧)', 'Marketing policies (import, list)')}
@@ -1107,8 +1189,6 @@ function App() {
                   {t('前週', 'Last week')}
                 </Button>
               )}
-              {/* 週の状態は、その週そのものの状態なので、期間の横に出す(週の帯は、操作だけにする) */}
-              {page === 'calendar' && view === 'week' && <WeekStatusBadge week={thisWeek} />}
               {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
                   比べるは結果の面だけ。計画の面では選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
               <div className={styles.viewSwitch} role="tablist" aria-label={t('見せ方', 'View')}>
@@ -1164,28 +1244,6 @@ function App() {
               {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
-              {/* 計画の面の、データの操作。結果の面の「データ ▾」と同じ形・同じ位置にそろえる(FLOWS の C-5) */}
-              {page === 'calendar' && (
-                <Menu>
-                  <MenuTrigger disableButtonEnhancement>
-                    <MenuButton size="small" appearance="subtle" icon={<DatabaseRegular />}>
-                      {t('データ', 'Data')}
-                    </MenuButton>
-                  </MenuTrigger>
-                  <MenuPopover>
-                    <MenuList>
-                      <MenuItem
-                        icon={<ArrowDownloadRegular />}
-                        disabled={(view === 'week' ? weekRows : monthRows).length === 0}
-                        onClick={exportCsv}
-                        secondaryContent={view === 'week' ? t('表示中の週の配信', "This week's deliveries") : t('表示中の月の配信', "This month's deliveries")}
-                      >
-                        {t('CSV で書き出す', 'Export CSV')}
-                      </MenuItem>
-                    </MenuList>
-                  </MenuPopover>
-                </Menu>
-              )}
               {page === 'calendar' && view === 'list' && (
                 <Menu
                   checkedValues={{ columns }}
@@ -1248,13 +1306,14 @@ function App() {
                 onOpenCard={setSelectedId}
                 onCardsChanged={load}
                 onOpenWeek={(d) => goTo('week', d)}
+                onDataActions={setResultsData}
                 retro={<WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} />}
               />
             ) : view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek}
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onExportPdf={() => setPrintingWeek(true)} onChange={changeWeek}
                 toFix={shownChecklist.filter((i) => !i.ok).length}
                 fixChip={<WeekCheckChip items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
                 fix={
