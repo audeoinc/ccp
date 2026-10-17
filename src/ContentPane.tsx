@@ -56,7 +56,7 @@ import { CardNotesService } from './data/cardNotes'
 import { linkSlots, linksComplete, type Links } from './links'
 
 // handoff・tasks・comments は工程ではない(「工程 n / 6」に数えない)。やり取りの面に置く
-type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'comments' | 'notice' | 'message' | 'timing'
+export type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'comments' | 'notice' | 'message' | 'timing'
 /** 中ペインの 2 つの面。make = コンテンツを作る工程(AI チャットを使う)、talk = 人とのやり取り(引き継ぎ・タスク・コメント。AI チャットは使わない) */
 type Area = 'make' | 'talk'
 const TALK_TABS: TopTab[] = ['handoff', 'tasks', 'comments']
@@ -105,9 +105,11 @@ interface Props {
   onLinkFocus?: (key: string | null) => void
   /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
   campaign: string
-  /** 制作への引き継ぎ(制作指示のタブ) */
+  /** 制作への引き継ぎ(やり取りの「引き継ぎ」のタブ。担当・締め切り・引き継ぎ済みは、ここだけで決める) */
   handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
-  onHandoff: (key: 'productionOwner' | 'handedOffAt', value: string) => void
+  onHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
+  /** 外(左の配信情報など)から、タブを開く頼み。seq が変わるたびに開く */
+  tabRequest?: { tab: TopTab; seq: number }
   /** これまでに入れた人の名前(入力の候補) */
   people: string[]
   /** 保存済みの配信カードの ID(新規作成中は undefined) */
@@ -1106,6 +1108,13 @@ export function ContentPane(props: Props) {
     setTab(next)
     setLastTab((prev) => ({ ...prev, [TALK_TABS.includes(next) ? 'talk' : 'make']: next }))
   }
+  // 外からのタブを開く頼み(左の配信情報の「引き継ぎのタブで決める」など)。seq が変わったときだけ開く
+  const { tabRequest } = props
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (tabRequest && tabRequest.seq > 0) openTab(tabRequest.tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabRequest?.seq])
   // リンク先のタブを開いている間だけ、プレビューにリンクの場所の番号を出す(タブを離れたら、選んでいた欄も外す)
   const { onLinksTab, onLinkFocus } = props
   useEffect(() => {
@@ -1323,6 +1332,7 @@ export function ContentPane(props: Props) {
           handedOffAt={props.handoff.handedOffAt}
           onHandedOffAt={(v) => props.onHandoff('handedOffAt', v)}
           productionDue={props.handoff.productionDue}
+          onProductionDue={(v) => props.onHandoff('productionDue', v)}
           remaining={pr.remaining}
           people={props.people}
         />

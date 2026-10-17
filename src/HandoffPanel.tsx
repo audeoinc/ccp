@@ -19,8 +19,9 @@ interface Props {
   /** 引き継いだ日時(ISO。空は、まだ引き継いでいない) */
   handedOffAt: string
   onHandedOffAt: (v: string) => void
-  /** 制作の締め切り(YYYY-MM-DD。左の配信情報で決める) */
+  /** 制作の締め切り(YYYY-MM-DD) */
   productionDue: string
+  onProductionDue: (v: string) => void
   /** 終わっていない工程(引き継ぐ前の注意に出す) */
   remaining: string[]
   /** これまでに入れた名前(入力の候補) */
@@ -28,25 +29,20 @@ interface Props {
 }
 
 /**
- * 制作への引き継ぎ。「制作に引き継ぐ」で、引き継いだ日時を残す(保存で確定する)。
+ * 制作への引き継ぎ。制作の担当者・締め切りは、ここだけで決める(左の配信情報は表示だけ。FLOWS の C-3)。
+ * 「制作に引き継ぐ」で、引き継いだ日時を残す(保存で確定する)。
  * 制作担当への実際の通知(メールなど)は、まだ行わない(バックログ P3 の後)。
  */
-export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, onHandedOffAt, productionDue, remaining, people }: Props) {
+export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, onHandedOffAt, productionDue, onProductionDue, remaining, people }: Props) {
   const styles = useStyles()
   const t = useT()
-  const due = productionDue
-    ? (() => {
-        const [y, m, d] = productionDue.split('-').map(Number)
-        return new Date(y, m - 1, d).toLocaleDateString(locale(), { year: 'numeric', month: '2-digit', day: '2-digit' })
-      })()
-    : ''
 
   return (
     <div className={styles.root}>
       <div>
         <div className={styles.head}>{t('制作への引き継ぎ', 'Handoff to production')}</div>
         <div className={styles.caption}>
-          {t('制作の担当者を決めて「制作に引き継ぐ」を押し、保存します。締め切りは、左の配信情報で決めます。', 'Choose the production assignee, press “Hand off to production”, then save. The due date is set in Delivery info on the left.')}
+          {t('制作の担当者と締め切りを決めて「制作に引き継ぐ」を押し、保存します。左の配信情報には、ここで決めた内容が出ます。', 'Choose the production assignee and due date, press “Hand off to production”, then save. Delivery info on the left shows what you set here.')}
         </div>
       </div>
       <div className={styles.row}>
@@ -57,7 +53,7 @@ export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, 
           </datalist>
         </Field>
         <Field label={t('制作の締め切り', 'Production due')} size="small">
-          <Input size="small" readOnly value={due || t('(未設定)', '(not set)')} />
+          <Input size="small" type="date" value={productionDue} onChange={(_, d) => onProductionDue(d.value)} />
         </Field>
       </div>
       {handedOffAt ? (

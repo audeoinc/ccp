@@ -31,7 +31,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { ContentPane } from './ContentPane'
+import { ContentPane, type TopTab } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
@@ -344,6 +344,28 @@ const useStyles = makeStyles({
   sectionHead: { marginTop: '12px' },
   previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
+  // 左の「制作への引き継ぎ」(表示だけ。押すと、やり取りの「引き継ぎ」のタブが開く)
+  handoffField: { gridColumn: '1 / -1' },
+  handoffSummary: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: '12px',
+    rowGap: '2px',
+    width: '100%',
+    minHeight: '32px',
+    padding: '4px 8px',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  handoffLink: { marginLeft: '6px', color: tokens.colorBrandForegroundLink, whiteSpace: 'nowrap' },
   statusRow: { display: 'flex', alignItems: 'center', columnGap: '6px' },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   grow: { flexGrow: 1 },
@@ -417,6 +439,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [links, setLinks] = useState<Links>(() => parseLinks(card?.links))
   // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
   const [linksTab, setLinksTab] = useState(false)
+  // 中央のタブを開く頼み(左の「制作への引き継ぎ」を押すと、やり取りの「引き継ぎ」のタブを開く)
+  const [tabRequest, setTabRequest] = useState<{ tab: TopTab; seq: number } | undefined>(undefined)
   const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
@@ -1146,19 +1170,24 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     {owners.map((o) => <option key={o} value={o} />)}
                   </datalist>
                 </Field>
-                <Field label={t('制作の締め切り', 'Production due')}>
-                  <Input size="small" type="date" value={form.productionDue} onChange={(_, d) => set('productionDue')(d.value)} />
-                </Field>
-                {/* 制作の担当者は、中央の「⑥ 制作指示」と同じ値。引き継ぐ操作は、制作指示とリンク先を確かめてから行うよう、中央だけに置く */}
-                <Field label={t('制作の担当者', 'Production assignee')}>
-                  <Input size="small" list="ccp-owners" value={form.productionOwner} onChange={(_, d) => set('productionOwner')(d.value)} />
-                </Field>
-                <Field label={t('制作への引き継ぎ', 'Handed off')}>
-                  <Input
-                    size="small"
-                    readOnly
-                    value={form.handedOffAt ? new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : t('まだ', 'Not yet')}
-                  />
+                {/* 制作の担当者・締め切り・引き継ぎ済みは、中央の「やり取り → 引き継ぎ」だけで決める(2 か所で入力しない。FLOWS の C-3)。ここは表示だけで、押すとそのタブが開く */}
+                <Field label={t('制作への引き継ぎ', 'Handoff to production')} className={styles.handoffField}>
+                  <button type="button" className={styles.handoffSummary} onClick={() => setTabRequest((r) => ({ tab: 'handoff', seq: (r?.seq ?? 0) + 1 }))} title={t('引き継ぎのタブで決める', 'Set in the Handoff tab')}>
+                    <span>
+                      <span className={styles.caption}>{t('担当 ', 'Assignee ')}</span>
+                      {form.productionOwner.trim() || <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
+                      <span className={styles.caption}>{t(' ・ 締め切り ', ' · Due ')}</span>
+                      {form.productionDue ? form.productionDue.replace(/-/g, '/') : <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
+                    </span>
+                    <span>
+                      {form.handedOffAt ? (
+                        <span className={styles.success}>{t('引き継ぎ済み ', 'Handed off ')}{new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      ) : (
+                        <span className={styles.caption}>{t('まだ引き継いでいない', 'Not handed off yet')}</span>
+                      )}
+                      <span className={styles.handoffLink}>{t('引き継ぎのタブで決める ›', 'Set in the Handoff tab ›')}</span>
+                    </span>
+                  </button>
                 </Field>
               </div>
               <Text weight="semibold" size={300} className={styles.sectionHead}>{t('工程', 'Steps')}</Text>
@@ -1240,6 +1269,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 onLinks={setLinks}
                 handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
                 onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
+                tabRequest={tabRequest}
                 people={owners}
                 cardId={card?.id}
                 owner={form.owner}
