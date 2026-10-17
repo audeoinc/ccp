@@ -197,7 +197,20 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 - **B1**: `server/ccp/bq.py` と、`ccp.cli check` の「■ BigQuery」。出力の場所は環境変数(`BQ_SPU` など。リポジトリに書かない)。偽のクライアントでの単体テストは `server/tests/test_bq.py`。**本物の BigQuery では未確認**。次は、Workbench で `check` を実行してもらい、結果を見て B2(在庫の取り込み)に進む。
 - **M2**: `src/aiSelect.ts` の `setActivePolicies`(App が `product_policies` を読んだときに入れる)。`productPayload` の `md` と、`askAgent` が products に md があるときだけ足す `MD_NOTE`。**本物の Gemini での効き目は未確認**(モックの AI は md を使わない)。
-- 次: M1(ポリシーの棚卸し)の答えを待つ。B2 は、Workbench での check の結果を見てから。
+- (この行は古い。次の 6.12 を見る)
+
+## 6.12 BigQuery とマーケティングポリシー: 次のセッションへ(2026-10-17)
+
+**この 2 つを続けるセッションは、まず次を読む**: [BIGQUERY.md](BIGQUERY.md) の **11 章**(GCP 環境での進め方。決めたこと・これから作るもの)、[BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)(5 つの出力の列)、[POLICY.md](POLICY.md)(マーケティングポリシーの設計)、[POLICY_FORMAT.md](POLICY_FORMAT.md)(取り込むファイルの形)、[BACKLOG.md](BACKLOG.md) の 8 章(B)と 10 章(M)。
+
+- **優先**: Workbench での稼働の確認はあと。**まず GCP 環境(本番の Cloud Run・Cloud SQL)で、BigQuery からの取り込みを動かす**。ダミーデータの BigQuery は、同じ GCP プロジェクトに作ってよい。
+- **つなぎ方**: CCP は BIGQUERY_EXPORT.md の形だけを読む。クライアントの元データ(列の名前が違い、粒度が細かい。スキーマは共有できない)は、クライアント環境の Claude が、この形を作るビューで合わせる。だから、**仕様の文書・ダミーデータ・変換の手本・値まで確かめる道具**が、受け渡しの道具になる。
+- **Cloud Run での取り込み**: 画面を開いたとき + 取り込むボタン。スケジューラは、いまは要らない。
+- **利用者の確認待ち**: カテゴリの階層の段の数(カテゴリ・サブカテゴリ、部門 1・部門 2 など)。SKU には、サイズ・色・レングスがある。
+- **マーケティングポリシー**: M1 の答えをもらい、設計を POLICY.md にまとめた。4 種類ともある。販売系 = CSV(週ごとに置き換え)、ルール系 = 決まった書き方の Markdown(ファイルごとに置き換え)。決まりごとに対象(どの依頼に効くか)と強さ(must / should / info)。must で機械で確かめられるものは、コードで確かめて 1 回だけ作り直させ、だめなら警告(保存は止めない)。次は M4・M3。
+- **できていること**: B1(`server/ccp/bq.py`、`ccp.cli check` の「■ BigQuery」。本物の BigQuery では未確認)、M2(MD 方針を AI の商品の選定に渡す。本物の Gemini での効き目は未確認)。
+- **GCP の操作**: 手元の PC のローカルのセッションで行う(`gcloud` のログインがある)。クラウドのセッションには GCP の認証がない。本番への反映(`npm run deploy:gcp`)は、人が指示したときだけ。
+- コミット・push は、確認が通れば指示なしでよい(CLAUDE.md の作業の約束 2)。
 
 ## 6.12 リンク先の工程・確定の前に直すこと・誰からでも質問(2026-10-17)
 
