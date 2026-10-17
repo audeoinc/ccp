@@ -513,6 +513,8 @@ function App() {
             // 変更の理由は記録、コメントへの返信はスレッドの一部なので、質問・タスクの数には入れない
             if (n.kind === 'change' || n.kind === 'reply') continue
             if (n.kind === 'comment') {
+              // やり取り(2026-10-17 に質問と 1 つにした)は宛先を持てるので、「担当」の絞り込みの候補に足す
+              addParty(id, n.assignee)
               comments.set(id, (comments.get(id) ?? 0) + 1)
               commentNotes.set(id, [...(commentNotes.get(id) ?? []), n])
               continue
@@ -523,10 +525,11 @@ function App() {
               if (n.due && n.due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
             }
             else {
-              // 質問: 誰からでも、誰にでも(宛先は assignee の列)
+              // 質問: 誰からでも、誰にでも(宛先は assignee の列)。週の資料では、コメントと同じ「未解決のやり取り」に並べる
               addParty(id, n.author)
               addParty(id, n.assignee)
               counts.set(id, (counts.get(id) ?? 0) + 1)
+              commentNotes.set(id, [...(commentNotes.get(id) ?? []), n])
             }
           }
           setNoteParties(parties)

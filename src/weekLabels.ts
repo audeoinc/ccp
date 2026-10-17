@@ -13,7 +13,7 @@ export const checkTitle = (t: T, k: CheckKey): string =>
     pushAlign: t('メールとプッシュのテーマ違い', 'Email / push to align'),
     leadMissing: t('載っていない主力の商品', 'Lead items not featured'),
     repeat: t('テーマ・メイン画像の連続', 'Same main image or theme in a row'),
-    openComments: t('未対応のコメント', 'Open comments'),
+    openComments: t('未解決のやり取り', 'Open conversations'),
     openQuestions: t('未解決の質問', 'Open questions'),
     approved: t('承認済みの配信', 'Approved deliveries'),
   })[k]
@@ -25,7 +25,7 @@ export const checkHint = (t: T, k: CheckKey): string =>
     pushAlign: t('同じ日のメールと、テーマがそろっていないプッシュ', 'Pushes whose theme differs from the same-day email'),
     leadMissing: t('販促の期間が、この週にかかる主力の商品', 'Lead items whose promotion period covers this week'),
     repeat: t('同じチャネルで、すぐ前の配信と同じ(前の週の最後の配信を含む)', 'Same as the previous delivery on the same channel (including the last one of the previous week)'),
-    openComments: t('レビューのコメントで、まだ対応済みにしていないもの', 'Review comments not marked resolved yet'),
+    openComments: t('配信カードのやり取り(質問・指摘)で、まだ解決にしていないもの', 'Conversations (questions, feedback) on delivery cards not resolved yet'),
     openQuestions: t('質問で、まだ解決していないもの', 'Questions that are not resolved yet'),
     approved: t('まだ承認されていない配信', 'Deliveries not approved yet'),
   })[k]
@@ -37,7 +37,7 @@ export const checkAction = (t: T, k: CheckKey): string =>
     pushAlign: t('プッシュのテーマを、同じ日のメールにそろえる', 'Match the push theme to the same-day email'),
     leadMissing: t('どれかの配信に載せる', 'Feature them in a delivery'),
     repeat: t('テーマかメイン画像を変える', 'Change the theme or main image'),
-    openComments: t('コメントに対応して、対応済みにする', 'Address and resolve the comments'),
+    openComments: t('返信して、解決にする', 'Reply and resolve'),
     openQuestions: t('質問に返信して、解決にする', 'Reply to and resolve the questions'),
     approved: t('配信を承認する', 'Approve the deliveries'),
   })[k]

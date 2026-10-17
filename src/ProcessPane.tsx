@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { ChevronLeftRegular, EditRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
-import { CardNotesService } from './data/cardNotes'
+import { CardNotesService, type CardNote } from './data/cardNotes'
+import { ApprovalRequestsService } from './data/approvalRequests'
+import { ApprovalReviewersService } from './data/approvalReviewers'
 import { ApprovalBar } from './ApprovalBar'
 import { HandoffPanel } from './HandoffPanel'
-import { QuestionsPanel } from './QuestionsPanel'
 import { TasksPanel } from './TasksPanel'
 import { CommentsPanel } from './CommentsPanel'
 import { LockMark } from './LockMark'
+import { MarkdownLite } from './MarkdownLite'
 import { statusColor, statusLabel } from './status'
 import { useT } from './i18n'
 
 const useStyles = makeStyles({
-  // 上: 状態と承認(いつも見える) / 下: やり取りのタブ(スクロール)
+  // 上: 状態と承認(いつも見える) / 下: タブ(スクロール)
   shell: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', backgroundColor: tokens.colorNeutralBackground1 },
   top: { display: 'grid', rowGap: '8px', padding: '12px 12px 8px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   head: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
@@ -22,10 +25,18 @@ const useStyles = makeStyles({
   dot: { width: '12px', height: '12px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   tabs: { padding: '8px 8px 0', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, flexWrap: 'wrap' },
-  scroll: { flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: '12px', display: 'grid', rowGap: '12px', alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)' },
+  scroll: { flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: '12px', display: 'grid', rowGap: '16px', alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)' },
+  // 引き継ぎで渡す制作指示(読むだけ。直すのは中ペインの ⑥)
+  notes: { display: 'grid', rowGap: '6px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  notesHead: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
+  notesBody: { padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
+  // 閉じた帯(状態を縦書きで。押すと開く)
+  rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '10px', paddingTop: '10px', minHeight: 0, height: '100%', border: 'none', backgroundColor: tokens.colorNeutralBackground2, cursor: 'pointer', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
+  railStatus: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, letterSpacing: '0.05em' },
+  railNote: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, letterSpacing: '0.05em' },
 })
 
-export type TalkTab = 'handoff' | 'tasks' | 'comments'
+export type TalkTab = 'handoff' | 'threads' | 'tasks'
 
 interface Props {
   /** 保存済みの配信カード(新規作成中は undefined) */
@@ -42,10 +53,13 @@ interface Props {
   /** 制作への引き継ぎ(担当・締め切り・引き継ぎ済みは、ここだけで決める。FLOWS の C-3) */
   handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
   onHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
+  /** 制作指示(引き継ぎで渡すもの。ここでは読むだけ) */
+  instructions: string
+  /** 制作指示を直す(中ペインの ⑥ を開く) */
+  onEditInstructions: () => void
   /** 工程の残り(引き継ぎのときに知らせる) */
   remaining: string[]
   people: string[]
-  owner: string
   cardName: string
   productIds: string[]
   products: Product[]
@@ -53,10 +67,12 @@ interface Props {
   tabRequest?: { tab: TalkTab; seq: number }
 }
 
+/** やり取りのスレッドの元(以前の質問とレビューのコメント)か。CommentsPanel と同じ */
+const isRoot = (n: CardNote) => n.kind === 'comment' || (n.kind ?? 'question') === 'question'
+
 /**
- * 配信カードの右端の「プロセス」のペイン(2026-10-17。利用者の指摘: 承認が配信の基本情報(左)やプレビュー・商品情報(右)に混ざり、
- * やり取りは中ペインのタブに隠れていた)。コンテンツを「作る」(左・中・プレビュー・商品情報)と、配信を「進める」(状態・承認・引き継ぎ・質問・タスク・コメント)を分ける。
- * 上に状態と承認(いつも見える)、下にやり取りのタブ
+ * 配信カードの右端の「プロセス」のペイン(2026-10-17。利用者と決めた)。コンテンツを「作る」(左・中・プレビュー・商品情報)と、配信を「進める」を分ける。
+ * 上に状態と承認(いつも見える)、下にタブ: 引き継ぎ(担当・締め切り・制作指示)/ やり取り(以前の質問とコメントを 1 つに)/ タスク
  */
 export function ProcessPane(props: Props) {
   const s = useStyles()
@@ -68,10 +84,9 @@ export function ProcessPane(props: Props) {
     if (tabRequest && tabRequest.seq > 0) setTab(tabRequest.tab)
   }, [tabRequest])
 
-  // タブに出す、未解決の質問・未完了のタスク・未対応のコメントの数(開いたときに数え、欄で変わったら数え直す)
-  const [openQuestions, setOpenQuestions] = useState(0)
+  // タブに出す、未解決のやり取り・未完了のタスクの数(開いたときに数え、欄で変わったら数え直す)
+  const [openThreads, setOpenThreads] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
-  const [openComments, setOpenComments] = useState(0)
   const [noteVersion, setNoteVersion] = useState(0)
   const notesChanged = useCallback(() => setNoteVersion((v) => v + 1), [])
   const cardId = props.card?.id
@@ -82,9 +97,8 @@ export function ProcessPane(props: Props) {
       .then((res) => {
         if (!alive || !res.success) return
         const notes = res.data ?? []
-        setOpenQuestions(notes.filter((n) => !n.resolved && (n.kind ?? 'question') === 'question').length)
+        setOpenThreads(notes.filter((n) => !n.resolved && isRoot(n)).length)
         setOpenTasks(notes.filter((n) => !n.resolved && n.kind === 'task').length)
-        setOpenComments(notes.filter((n) => !n.resolved && n.kind === 'comment').length)
       })
       .catch(() => undefined)
     return () => {
@@ -118,9 +132,9 @@ export function ProcessPane(props: Props) {
         )}
       </div>
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TalkTab)}>
-        <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}${count(openQuestions)}`}</Tab>
+        <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}`}</Tab>
+        <Tab value="threads">{`${t('やり取り', 'Conversation')}${count(openThreads)}`}</Tab>
         <Tab value="tasks">{`${t('タスク', 'Tasks')}${count(openTasks)}`}</Tab>
-        <Tab value="comments">{`${t('コメント', 'Comments')}${count(openComments)}`}</Tab>
       </TabList>
       <div className={s.scroll}>
         {tab === 'handoff' && (
@@ -135,22 +149,85 @@ export function ProcessPane(props: Props) {
               remaining={props.remaining}
               people={props.people}
             />
-            <QuestionsPanel
-              cardId={cardId}
-              owner={props.owner}
-              productionOwner={props.handoff.productionOwner}
-              productionDue={props.handoff.productionDue}
-              cardName={props.cardName}
-              onOpenCount={setOpenQuestions}
-              onTasksChanged={notesChanged}
-            />
+            {/* 引き継ぎで渡す中身。渡す前に、担当・締め切りと一緒に確かめられるように(直すのは、AI と一緒に作る中ペインの ⑥) */}
+            <div className={s.notes}>
+              <div className={s.notesHead}>
+                {t('渡す制作指示', 'Production notes to hand off')}
+                <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={props.onEditInstructions}>
+                  {t('⑥ で直す', 'Edit in step 6')}
+                </Button>
+              </div>
+              {props.instructions.trim() ? (
+                <div className={s.notesBody}>
+                  <MarkdownLite text={props.instructions} />
+                </div>
+              ) : (
+                <span className={s.note}>{t('まだ制作指示がありません(中ペインの ⑥ で作ります)', 'No production notes yet (create them in step 6 in the middle pane)')}</span>
+              )}
+            </div>
           </>
         )}
-        {tab === 'tasks' && (
-          <TasksPanel cardId={cardId} productionOwner={props.handoff.productionOwner} productionDue={props.handoff.productionDue} onOpenSource={() => setTab('handoff')} onChanged={notesChanged} />
+        {tab === 'threads' && (
+          <CommentsPanel
+            cardId={cardId}
+            productIds={props.productIds}
+            products={props.products}
+            people={props.people}
+            cardName={props.cardName}
+            productionOwner={props.handoff.productionOwner}
+            productionDue={props.handoff.productionDue}
+            onOpenCount={setOpenThreads}
+            onTasksChanged={notesChanged}
+          />
         )}
-        {tab === 'comments' && <CommentsPanel cardId={cardId} productIds={props.productIds} products={props.products} people={props.people} onOpenCount={setOpenComments} />}
+        {tab === 'tasks' && (
+          <TasksPanel cardId={cardId} productionOwner={props.handoff.productionOwner} productionDue={props.handoff.productionDue} onOpenSource={() => setTab('threads')} onChanged={notesChanged} />
+        )}
       </div>
     </div>
+  )
+}
+
+/**
+ * プロセスのペインを閉じたときの帯(利用者の要望 2026-10-17)。閉じていても、承認の状態と、返事が要るものがあるかが分かるよう、
+ * 上から 色の点・状態(縦書き)・承認の残り(例: Brand 未定)・未解決のやり取りの数 を出す。帯のどこを押しても開く
+ */
+export function ProcessRail({ card, status, onOpen }: { card?: DeliveryCard; status: string; onOpen: () => void }) {
+  const s = useStyles()
+  const t = useT()
+  const [pending, setPending] = useState<string[]>([])
+  const [openThreads, setOpenThreads] = useState(0)
+  const cardId = card?.id
+  const cardStatus = card?.status
+  useEffect(() => {
+    if (!cardId) return
+    let alive = true
+    void (async () => {
+      const [req, notes] = await Promise.all([ApprovalRequestsService.getAll({ filter: `delivery_card_id eq '${cardId}'` }), CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}` })])
+      const open = req.success ? (req.data ?? []).find((r) => r.status === 'open') : undefined
+      const rows = open ? await ApprovalReviewersService.getAll({ filter: `approval_request_id eq '${open.id}'` }) : null
+      if (!alive) return
+      setPending(rows?.success ? (rows.data ?? []).filter((r) => (r.decision ?? 'pending') === 'pending').map((r) => r.reviewer_name ?? '') : [])
+      setOpenThreads(notes.success ? (notes.data ?? []).filter((n) => !n.resolved && isRoot(n)).length : 0)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [cardId, cardStatus])
+
+  const v = card?.status ?? status
+  return (
+    <button type="button" className={s.rail} onClick={onOpen} title={t('状態・承認・やり取りを開く', 'Open status, approval and conversation')} aria-label={t('プロセスを開く', 'Open process')}>
+      <ChevronLeftRegular />
+      <span className={s.dot} style={{ backgroundColor: statusColor(v) }} />
+      <span className={s.railStatus} style={{ color: statusColor(v) }}>{statusLabel(v)}</span>
+      <LockMark status={card?.status} />
+      {pending.length > 0 && <span className={s.railNote}>{t(`${pending.join('・')} 未定`, `${pending.join(', ')} pending`)}</span>}
+      {openThreads > 0 && (
+        <Badge size="small" appearance="filled" color="warning" title={t(`未解決のやり取り ${openThreads} 件`, `${openThreads} open conversation(s)`)}>
+          {openThreads}
+        </Badge>
+      )}
+    </button>
   )
 }
