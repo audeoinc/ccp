@@ -6,5 +6,7 @@ asyncpg>=0.30
 cloud-sql-python-connector[asyncpg]>=1.18
 google-genai>=1.0
 google-auth>=2.30
+# 利用先の BigQuery の本番データ(docs/BIGQUERY.md。Workbench だけで使う。設定がなければ読み込まない)
+google-cloud-bigquery>=3.25
 requests>=2.31
 pydantic>=2.7

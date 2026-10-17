@@ -193,6 +193,12 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **C-2「担当」の絞り込み(X10)**: `Filters.person`。企画・制作のどちらかの担当で絞る。担当の名前の一覧は App の `owners`(配信カード・アラートの条件の候補と共通)。
 - **次の候補**: C-3〜C-7(FLOWS.md の 6 章)。
 
+## 6.11 BigQuery への接続(B1)と、MD 方針を AI に渡す(M2)(2026-10-17)
+
+- **B1**: `server/ccp/bq.py` と、`ccp.cli check` の「■ BigQuery」。出力の場所は環境変数(`BQ_SPU` など。リポジトリに書かない)。偽のクライアントでの単体テストは `server/tests/test_bq.py`。**本物の BigQuery では未確認**。次は、Workbench で `check` を実行してもらい、結果を見て B2(在庫の取り込み)に進む。
+- **M2**: `src/aiSelect.ts` の `setActivePolicies`(App が `product_policies` を読んだときに入れる)。`productPayload` の `md` と、`askAgent` が products に md があるときだけ足す `MD_NOTE`。**本物の Gemini での効き目は未確認**(モックの AI は md を使わない)。
+- 次: M1(ポリシーの棚卸し)の答えを待つ。B2 は、Workbench での check の結果を見てから。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

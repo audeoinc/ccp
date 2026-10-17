@@ -1,7 +1,7 @@
 """動かす前の確認(python -m ccp.cli check)。
 
 Workbench など、新しい環境で CCP を動かすときに、設定が読めているか・DB につながるか・写真と画面があるかを、まとめて確かめる。
-パスワードは表示しない。何も変えない(DB には SELECT だけ)。
+パスワードは表示しない。何も変えない(DB には SELECT だけ。BigQuery は、テーブルの情報を読むのと、問い合わせの試し(dry run。料金なし)だけ)。
 """
 from __future__ import annotations
 
@@ -58,6 +58,46 @@ async def _db_query() -> tuple[bool, str]:
         return False, f"{type(e).__name__}: {e}"
 
 
+def _check_bigquery() -> int:
+    """BigQuery の出力の場所(BQ_*)が設定されていれば、つながるか・列が仕様どおりかを確かめる。NG の数を返す"""
+    from . import bq
+
+    outputs = bq.configured()
+    if not outputs:
+        _line(WARN, "BQ_SPU などの設定がありません(BigQuery から取り込まない。取り込むときは workbench.env に場所を書く)")
+        return 0
+    try:
+        client = bq.client()
+    except ImportError:
+        _line(NG, "パッケージ google-cloud-bigquery がありません。server で .venv/bin/python -m pip install -r requirements.txt")
+        return 1
+    except Exception as e:  # noqa: BLE001 — 認証が取れない など
+        _line(NG, f"BigQuery のクライアントを作れません({type(e).__name__}: {e})")
+        return 1
+    _line(OK, f"接続のアカウント: {bq.account()} / ジョブのプロジェクト: {bq.job_project() or '(なし)'}")
+    ng = 0
+    for o in bq.OUTPUTS:
+        if o not in outputs:
+            _line(WARN, f"{o.label}: {o.env} の設定がありません(この出力は取り込まない)")
+            continue
+        r = bq.inspect(o, client)
+        if r.error:
+            _line(NG, f"{o.label}: {r.where} を読めません({r.error})")
+            ng += 1
+            continue
+        when = r.modified.strftime("%Y-%m-%d %H:%M %Z") if r.modified else "不明"
+        rows = f"{r.rows} 行" if r.rows is not None and r.kind == "TABLE" else "行数はビューなので不明"
+        _line(OK if r.ok else NG, f"{o.label}: {r.where}({r.kind or '種類不明'}・最終更新 {when}・{rows})")
+        if r.missing:
+            _line(NG, f"  必須の列がありません: {', '.join(r.missing)}(BIGQUERY_EXPORT.md の列名に、AS で合わせてください)")
+        if r.missing_optional:
+            _line(WARN, f"  あると使う列がありません: {', '.join(r.missing_optional)}")
+        for n in r.notes:
+            _line(OK if "通りました" in n or "で見ます" in n else WARN if "ビューなので" in n else NG, f"  {n}")
+        ng += 0 if r.ok else 1
+    return ng
+
+
 def run() -> int:
     """確認して、NG の数を返す"""
     ng = 0
@@ -98,6 +138,9 @@ def run() -> int:
         _line(WARN, "GOOGLE_CLOUD_PROJECT がありません(AI のボタンが使えません。AI を使わないなら、このままでもよい)")
     if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
         _line(WARN, "Gemini の API キーの変数がありますが、CCP は使いません(Vertex AI の形で、サービスアカウントの権限を使う)")
+
+    print("■ BigQuery(利用先の本番のデータ。docs/BIGQUERY.md)")
+    ng += _check_bigquery()
 
     print("■ 写真")
     d = os.getenv("ASSET_DIR")

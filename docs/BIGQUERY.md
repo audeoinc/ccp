@@ -53,6 +53,7 @@ PostgreSQL のビュー(数ミリ秒)──▶ 候補を絞る ──▶ 短い�
 - 要る権限: 読む対象のデータセットの閲覧(BigQuery データ閲覧者)と、ジョブの実行(BigQuery ジョブユーザー)。
 - 足すパッケージ: `google-cloud-bigquery`(`scripts/workbench.sh update` で入る)。
 - `ccp.cli check` に、BigQuery への接続の確認(どの SA でつながったか・各表を読めるか)を足す。
+- **作った(2026-10-17。B1)**: `server/ccp/bq.py`(出力の場所は環境変数 `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST`、ビューなら `BQ_<名前>_WATCH`、ジョブのプロジェクトは `BQ_PROJECT`。見本は `server/workbench.env.example`)。`ccp.cli check` の「■ BigQuery」で、接続のアカウント、出力ごとの種類・最終更新・行数、仕様(BIGQUERY_EXPORT.md)の列が揃っているか、ビューなら問い合わせの試し(dry run。料金なし)を確かめる。**本物の BigQuery では、まだ確かめていない**(Workbench で `check` を実行してもらう)。
 
 ## 4. 表の形
 
