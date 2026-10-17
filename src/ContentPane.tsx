@@ -13,6 +13,7 @@ import {
   MessageBarBody,
   Tab,
   TabList,
+  Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
@@ -1146,6 +1147,46 @@ export function ContentPane(props: Props) {
   })
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
+  // 工程のタブ(① 〜 ⑥)。狭い幅で横にスクロールしないよう、収まらないときは、開いているタブ以外を番号だけにして、名前はマウスを重ねると出す(FLOWS の F9)
+  const steps: { value: TopTab; full: string; short: string; done: boolean; ideas: boolean }[] = [
+    { value: 'theme', full: t('① テーマ', '1. Theme'), short: t('①', '1'), done: pr.theme, ideas: drafts.themeIdeas.length > 0 },
+    { value: 'template', full: t('② テンプレート', '2. Template'), short: t('②', '2'), done: pr.template, ideas: false },
+    ...(isPush
+      ? [
+          { value: 'notice' as TopTab, full: t('③ 通知', '3. Notification'), short: t('③', '3'), done: pr.hero, ideas: drafts.pushIdeas.length > 0 },
+          { value: 'message' as TopTab, full: t('④ メッセージ', '4. Message'), short: t('④', '4'), done: pr.sections, ideas: drafts.copyIdeas.length > 0 },
+          { value: 'links' as TopTab, full: t('⑤ リンク先', '5. Links'), short: t('⑤', '5'), done: pr.links, ideas: false },
+          { value: 'timing' as TopTab, full: t('⑥ 時刻・相手', '6. Timing'), short: t('⑥', '6'), done: pr.instructions, ideas: false },
+        ]
+      : [
+          { value: 'hero' as TopTab, full: t('③ ヒーロー', '3. Hero'), short: t('③', '3'), done: pr.hero, ideas: drafts.copyIdeas.length > 0 },
+          { value: 'sections' as TopTab, full: t('④ セクション', '4. Sections'), short: t('④', '4'), done: pr.sections, ideas: false },
+          { value: 'links' as TopTab, full: t('⑤ リンク先', '5. Links'), short: t('⑤', '5'), done: pr.links, ideas: false },
+          { value: 'instructions' as TopTab, full: t('⑥ 制作指示', '6. Notes'), short: t('⑥', '6'), done: pr.instructions, ideas: drafts.instructionIdeas.length > 0 },
+        ]),
+  ]
+  // タブの列が幅に収まらなければ番号だけ(compact)にする。収まる幅に戻ったら、名前つきに戻す(名前つきのときの幅を覚えておく)
+  const tabListRef = useRef<HTMLDivElement>(null)
+  const [compact, setCompact] = useState(false)
+  const fullTabsWidth = useRef(0)
+  useEffect(() => {
+    const el = tabListRef.current
+    if (!el || area !== 'make') return
+    const check = () => {
+      if (!compact) {
+        if (el.scrollWidth > el.clientWidth + 1) {
+          fullTabsWidth.current = el.scrollWidth
+          setCompact(true)
+        }
+      } else if (fullTabsWidth.current > 0 && el.clientWidth >= fullTabsWidth.current) {
+        setCompact(false)
+      }
+    }
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [compact, area, isPush])
   // 引き継ぎ・タスクのタブに出す、未解決の質問・未完了のタスクの数(開いたときに数え、質問・タスクの欄で変わったら数え直す)
   const [openQuestions, setOpenQuestions] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
@@ -1215,28 +1256,24 @@ export function ContentPane(props: Props) {
         <Tab value="make">{t('コンテンツ生成', 'Content generation')}</Tab>
         <Tab value="talk">{`${t('やり取り', 'Communication')}${openTalk ? t(`(${openTalk})`, ` (${openTalk})`) : ''}`}</Tab>
       </TabList>
-      <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => openTab(d.value as TopTab)}>
-        {area === 'make' && (
-        <>
-        <Tab value="theme" onClick={revealTab}>{`${mark(pr.theme, drafts.themeIdeas.length > 0)}${t('① テーマ', '1. Theme')}`}</Tab>
-        <Tab value="template" onClick={revealTab}>{`${mark(pr.template, false)}${t('② テンプレート', '2. Template')}`}</Tab>
-        {isPush ? (
-          <>
-            <Tab value="notice" onClick={revealTab}>{`${mark(pr.hero, drafts.pushIdeas.length > 0)}${t('③ 通知', '3. Notification')}`}</Tab>
-            <Tab value="message" onClick={revealTab}>{`${mark(pr.sections, drafts.copyIdeas.length > 0)}${t('④ メッセージ', '4. Message')}`}</Tab>
-            <Tab value="links" onClick={revealTab}>{`${mark(pr.links, false)}${t('⑤ リンク先', '5. Links')}`}</Tab>
-            <Tab value="timing" onClick={revealTab}>{`${mark(pr.instructions, false)}${t('⑥ 時刻・相手', '6. Timing & audience')}`}</Tab>
-          </>
-        ) : (
-          <>
-            <Tab value="hero" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ ヒーロー', '3. Hero')}`}</Tab>
-            <Tab value="sections" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ セクション', '4. Sections')}`}</Tab>
-            <Tab value="links" onClick={revealTab}>{`${mark(pr.links, false)}${t('⑤ リンク先', '5. Links')}`}</Tab>
-            <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑥ 制作指示', '6. Production notes')}`}</Tab>
-          </>
-        )}
-        </>
-        )}
+      <TabList ref={tabListRef} size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => openTab(d.value as TopTab)}>
+        {area === 'make' &&
+          steps.map((st) => {
+            const tabEl = (
+              <Tab key={st.value} value={st.value} onClick={revealTab} aria-label={compact ? st.full : undefined}>
+                {/* 番号だけのときも、開いているタブは名前を出す(どこにいるかが分かるように) */}
+                {`${mark(st.done, st.ideas)}${compact && tab !== st.value ? st.short : st.full}`}
+              </Tab>
+            )
+            // 番号だけのときは、名前をマウスを重ねる(キーボードで選ぶ)と出す
+            return compact ? (
+              <Tooltip key={st.value} content={st.full} relationship="description">
+                {tabEl}
+              </Tooltip>
+            ) : (
+              tabEl
+            )
+          })}
         {area === 'talk' && (
         <>
         <Tab value="handoff" onClick={revealTab}>

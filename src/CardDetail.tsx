@@ -365,6 +365,7 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
+  handoffItem: { whiteSpace: 'nowrap' },
   handoffLink: { marginLeft: '6px', color: tokens.colorBrandForegroundLink, whiteSpace: 'nowrap' },
   statusRow: { display: 'flex', alignItems: 'center', columnGap: '6px' },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
@@ -1183,7 +1184,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     </span>
                     <span>
                       {form.handedOffAt ? (
-                        <span className={styles.success}>{t('引き継ぎ済み ', 'Handed off ')}{new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className={mergeClasses(styles.success, styles.handoffItem)}>{t('引き継ぎ済み ', 'Handed off ')}{new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                       ) : (
                         <span className={styles.caption}>{t('まだ引き継いでいない', 'Not handed off yet')}</span>
                       )}

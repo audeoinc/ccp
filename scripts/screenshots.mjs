@@ -65,7 +65,8 @@ async function click(page, text, { tag = 'button,[role=tab],[role=menuitem],[rol
       const root = top && dialogs.length ? dialogs[dialogs.length - 1] : document
       const els = [...root.querySelectorAll(tag)].filter((e) => {
         const r = e.getBoundingClientRect()
-        return r.width > 0 && r.height > 0 && (e.textContent ?? '').trim().replace(/^[✓●\s]+/, '').startsWith(text)
+        // 文字が番号だけに縮んでいるタブ(aria-label に名前)も探せるようにする
+        return r.width > 0 && r.height > 0 && ((e.textContent ?? '').trim().replace(/^[✓●\s]+/, '').startsWith(text) || (e.getAttribute('aria-label') ?? '').startsWith(text))
       })
       // いちばん内側(子孫に同じ文字の要素がないもの)
       const inner = els.filter((e) => !els.some((o) => o !== e && e.contains(o)))
@@ -245,7 +246,7 @@ const SCENES = {
       ['13-hero', T(L, '③ ヒーロー', '3. Hero')],
       ['14-sections', T(L, '④ セクション', '4. Sections')],
       ['16-links', T(L, '⑤ リンク先', '5. Links')],
-      ['15-instructions', T(L, '⑥ 制作指示', '6. Production notes')],
+      ['15-instructions', T(L, '⑥ 制作指示', '6. Notes')],
       ['17-handoff', T(L, '引き継ぎ', 'Handoff'), T(L, 'やり取り', 'Communication')],
       ['18-tasks', T(L, 'タスク', 'Tasks')],
       ['19-comments', T(L, 'コメント', 'Comments')],
