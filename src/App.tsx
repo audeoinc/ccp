@@ -616,7 +616,8 @@ function App() {
       const { result, error: err } = await syncBigQuery(force)
       setBqBusy(false)
       setBq(result)
-      if (result.imported.length) {
+      // レビューの要約(B5)ができたときも、商品を読み直す(商品情報に要約を出すため)
+      if (result.imported.length || result.reviews?.made) {
         clearProductDataCache()
         await loadProducts()
       }

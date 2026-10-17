@@ -16,7 +16,9 @@ DB が止まっているとき(dbctl)は、require_db が「準備中」を返�
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -170,6 +172,78 @@ async def _sum_stock(conn: AsyncConnection) -> None:
     """))
 
 
+# ---- レビューの要約(B5。docs/BIGQUERY.md の 8 章)
+# Cloud Run は応答のあとの裏の処理が止まりやすいので、取り込みの中で、時間の上限まで作る。残りは、次に開いたときに続きを作る
+SUMMARY_BUDGET_S = 25
+SUMMARY_PROMPT = """あなたは EC のマーケターの補助。次は、ある商品の、お客さまのレビュー(新しい順。--- で区切り)。
+商品を選ぶ・コピーを考えるときに役立つよう、よく言われている良い点と、気になる点を、{lang}で 2 文以内({limit} 文字以内)に要約する。
+- レビューに書かれていないことは書かない。数字や言い回しを作らない
+- 名前・メールアドレスなど、個人を特定できることは書かない。レビューの文をそのまま長く写さない
+返答は JSON だけ: {{"summary": "要約"}}
+
+商品: {name}
+平均の評価: {rating}(件数 {count})
+レビュー:
+{texts}"""
+
+
+def summary_basis(r: dict[str, Any]) -> str | None:
+    """要約を作り直すかの目安(件数と最新の日時)。レビューがなければ None(要約しない)"""
+    if not r.get("review_texts") or not r.get("review_count"):
+        return None
+    last = r.get("last_review_at")
+    return f"{r['review_count']}|{last.isoformat() if hasattr(last, 'isoformat') else last or ''}"
+
+
+def _summary_prompt(r: dict[str, Any]) -> str:
+    en = (r.get("market") or "") != "JP"
+    rating = f"{float(r['rating']):.1f}" if r.get("rating") is not None else "-"
+    return SUMMARY_PROMPT.format(lang="英語" if en else "日本語", limit=220 if en else 100, name=r.get("name") or "", rating=rating,
+                                 count=r.get("review_count"), texts=str(r.get("review_texts"))[:6000])
+
+
+async def summarize_reviews(budget_s: float = SUMMARY_BUDGET_S) -> dict[str, int]:
+    """件数・最新の日時が前回の要約から変わった商品だけ、Gemini でレビューを要約して products.review_summary に書く。
+    AI の設定(GOOGLE_CLOUD_PROJECT)がなければ、何もしない。失敗した商品は飛ばす(次の機会に、また作る)"""
+    if not os.getenv("GOOGLE_CLOUD_PROJECT"):
+        return {"made": 0, "left": 0, "failed": 0}
+    from .ai import generate
+
+    async with db() as conn:
+        rows = [dict(r) for r in (await conn.execute(text(
+            "SELECT id, market, name, rating, review_count, last_review_at, review_texts, review_summary_basis FROM products WHERE review_texts IS NOT NULL"
+        ))).mappings().all()]
+    todo = [(r, b) for r in rows if (b := summary_basis(r)) and b != r.get("review_summary_basis")]
+    deadline = time.monotonic() + budget_s
+    made = 0
+
+    async def one(r: dict[str, Any], basis: str) -> tuple[Any, str, str] | str | None:
+        # 上限を過ぎたら、新しくは呼ばない(呼び出し中のものは待つ)。順番待ち(GEMINI_CONCURRENCY)のあとでも確かめる
+        if time.monotonic() > deadline:
+            return "skip"
+        try:
+            raw = await generate(_summary_prompt(r))
+            summary = str(json.loads(raw).get("summary") or "").strip()
+            return (r["id"], summary, basis) if summary else None
+        except Exception as e:  # noqa: BLE001 — 1 件の失敗で、ほかの要約を止めない
+            log.warning("レビューの要約に失敗しました(%s): %s", r.get("name"), e)
+            return None
+
+    # 同時に呼ぶ数は ai.generate の上限(GEMINI_CONCURRENCY)に任せる
+    results = await asyncio.gather(*(one(r, b) for r, b in todo))
+    ok = [x for x in results if isinstance(x, tuple)]
+    done = sum(1 for x in results if x != "skip")
+    failed = done - len(ok)
+    if ok:
+        async with db(write=True) as conn:
+            await conn.execute(text("UPDATE products SET review_summary = :s, review_summary_basis = :b WHERE id = :id"),
+                               [{"id": pid, "s": s[:600], "b": b} for pid, s, b in ok])
+        made = len(ok)
+    if made or failed:
+        log.info("レビューの要約: 作った %d / 失敗 %d / 残り %d", made, failed, len(todo) - done)
+    return {"made": made, "left": len(todo) - done, "failed": failed}
+
+
 async def _db_context(conn: AsyncConnection, name: str) -> list[dict[str, Any]]:
     """取り込まない側の、いまの DB の行(SKU を確かめるときの SPU など)"""
     if name == "spu":
@@ -245,7 +319,8 @@ async def sync(force: bool = False) -> dict[str, Any]:
                 failed.append({"name": o.name, "message": f"BigQuery を読めません({type(e).__name__}: {e})"})
                 modified.setdefault(o.name, None)
         if not rows and not failed:
-            return {"configured": True, "imported": [], "failed": [], **(await status())}
+            reviews = await summarize_reviews()
+            return {"configured": True, "imported": [], "failed": [], "reviews": reviews, **(await status())}
 
         # ③ 確かめる(SKU は SPU に、在庫は SKU に結びつくか。取り込まない側は、いまの DB の行と比べる)
         async with db() as conn:
@@ -310,7 +385,9 @@ async def sync(force: bool = False) -> dict[str, Any]:
             """))
         if imported or failed:
             log.info("BigQuery の取り込み: 取り込んだ %s / 止めた %s", [i["name"] for i in imported], [f["name"] for f in failed])
-        return {"configured": True, "imported": imported, "failed": failed, **(await status())}
+    # 要約は、取り込みのトランザクションのあとで(Gemini を待つ間、取り込みのロックを持たないため)
+    reviews = await summarize_reviews()
+    return {"configured": True, "imported": imported, "failed": failed, "reviews": reviews, **(await status())}
 
 
 @router.get("/status")

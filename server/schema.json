@@ -83,7 +83,9 @@
     ["cold_days", "int"],
     ["rain_days", "int"],
     ["weather_basis", "text"],
-    ["as_of", "timestamptz"]
+    ["as_of", "timestamptz"],
+    ["review_summary", "text"],
+    ["review_summary_basis", "text"]
    ],
    "lookups": [
    ]

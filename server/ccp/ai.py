@@ -60,25 +60,30 @@ class AskIn(BaseModel):
     prompt: str = Field(min_length=1, max_length=400_000)
 
 
-@router.post("/ask")
-async def ask(body: AskIn):
+async def generate(prompt: str) -> str:
+    """Gemini に依頼文を渡し、返答のテキスト(JSON)を返す。画面の /api/ask と、サーバーの中の要約(bq_import のレビューの要約)で共通"""
     model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
     level = os.getenv("GEMINI_THINKING", "low").upper()
     global _gate
     if _gate is None:
         _gate = asyncio.Semaphore(int(os.getenv("GEMINI_CONCURRENCY", "4")))
+    async with _gate:
+        resp = await _get_client().aio.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                # 返答は JSON だけ(プロンプトでも指示しているが、形式の崩れを減らす)
+                response_mime_type="application/json",
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel(level)),
+            ),
+        )
+    return (resp.text or "").strip()
+
+
+@router.post("/ask")
+async def ask(body: AskIn):
     try:
-        async with _gate:
-            resp = await _get_client().aio.models.generate_content(
-                model=model,
-                contents=body.prompt,
-                config=types.GenerateContentConfig(
-                    # 返答は JSON だけ(プロンプトでも指示しているが、形式の崩れを減らす)
-                    response_mime_type="application/json",
-                    thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel(level)),
-                ),
-            )
-        text = (resp.text or "").strip()
+        text = await generate(body.prompt)
     except Exception as e:  # noqa: BLE001 — Vertex AI のエラーは種類が多い。画面に原因を返す
         log.exception("Gemini の呼び出しに失敗しました")
         busy = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)

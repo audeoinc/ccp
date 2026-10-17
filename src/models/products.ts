@@ -77,6 +77,10 @@ export interface ProductFields {
   weather_basis?: string
   /** BigQuery 側のデータの時点 */
   as_of?: string
+  /** レビューの要約(取り込みのときに Gemini で作る。B5) */
+  review_summary?: string
+  /** 要約を作ったときの「件数|最新の日時」(変わったら作り直す) */
+  review_summary_basis?: string
   state_code?: number
 }
 

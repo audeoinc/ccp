@@ -22,6 +22,8 @@ export interface BqSyncResult {
   imported: { name: string; rows: number; summary: string }[]
   failed: { name: string; message: string }[]
   outputs: BqOutputStatus[]
+  /** レビューの要約(B5): 今回作った数・残り(次に開いたときに続きを作る)・失敗 */
+  reviews?: { made: number; left: number; failed: number }
 }
 
 const EMPTY: BqSyncResult = { configured: false, imported: [], failed: [], outputs: [] }

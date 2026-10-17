@@ -156,7 +156,13 @@ export function ProductDetail({ product: p, onClose }: { product: Product; /** �
           <dt className={s.label}>{t('売上トレンド', 'Sales trend')}</dt>
           <dd className={s.value}>{optionLabel(p.sales_trend_name) || '-'}</dd>
           <dt className={s.label}>{t('評価', 'Rating')}</dt>
-          <dd className={s.value}>{p.rating !== undefined ? `★${p.rating}` : '-'}</dd>
+          <dd className={s.value}>{p.rating !== undefined ? `★${p.rating}` : '-'}{p.review_count ? t(`(${p.review_count} 件)`, ` (${p.review_count} reviews)`) : ''}</dd>
+          {p.review_summary && (
+            <>
+              <dt className={s.label}>{t('レビューの声', 'What reviewers say')}</dt>
+              <dd className={s.value}>{p.review_summary}</dd>
+            </>
+          )}
           <dt className={s.label}>{t('季節', 'Season')}</dt>
           <dd className={s.value}>{optionLabel(p.season_name) || '-'}</dd>
           <dt className={s.label}>{t('天候適性', 'Weather')}</dt>

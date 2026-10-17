@@ -536,6 +536,8 @@ const productPayload = (p: Product) => ({
   weather: p.weather_name,
   description: p.description,
   md: mdOf(p.product_code),
+  // お客さまのレビューの要約(B5。BigQuery から取り込んだ商品だけ)。選定の理由・コピーの材料
+  reviews: p.review_summary ? clip(p.review_summary, 160) : undefined,
 })
 
 export interface SectionRequest {
