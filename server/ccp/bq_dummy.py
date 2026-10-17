@@ -1,6 +1,6 @@
 """BigQuery の練習用のダミーデータ(docs/BIGQUERY.md の 11 章)。
 
-  python -m ccp.cli bq-dummy [--dataset ccp_dummy] [--yes]
+  python -m ccp.cli bq-dummy [--dataset ccp_dummy] [--pack <ZIP>] [--yes]
   python -m ccp.cli bq-dummy --touch-stock --yes     在庫のスナップショットを 1 回分だけ足す(更新の検知を試す)
 
 2 つのデータセットを作る:
@@ -8,7 +8,9 @@
                  (SKU ごと・日ごとの販売、在庫のスナップショット、レビューの明細、天気の実績・予報 など)
   <dataset>      仕様の形の 5 つの出力(ビュー)。SQL は docs/bq_example/*.sql(利用先でビューを作るときの手本)
 
-中身は、いまのデモ用の商品(server/seed.json)から作る。日付は、実行した日を起点にする(実行し直すと、新しくなる)。
+中身は、商品(既定は server/seed.json。--pack で、引っ越し用のパックの商品 = 本番の商品)から作る。日付は、実行した日を起点にする(実行し直すと、新しくなる)。
+**本番で試すなら、必ず本番のパック(⚙ → データと画像を書き出す)から作る。** 2026-10-17 に、seed.json(本番とは別の 60 商品)から作ったダミーを
+本番に取り込み、本番の週ごとの実績を消してしまった(取り込みは、SPU がいまの商品と合わなければ止めるように直したが、合わせて作るのが先)。
 利用先の Claude には、元データ → ビュー の変換の手本・練習台として渡す(docs/BIGQUERY_CONVERT.md)。
 """
 from __future__ import annotations
@@ -100,10 +102,20 @@ def _weather_obs(rng: random.Random, market: str, d: date) -> tuple[float, float
     return round(tmax, 1), round(tmin, 1), rain
 
 
-def build(today: date, seed: int = 42) -> dict[str, list[dict[str, Any]]]:
+def load_source(pack: Path | None) -> dict[str, list[dict[str, Any]]]:
+    """商品と週ごとの実績の出どころ。パック(data.json の tables)か、seed.json"""
+    if pack is None:
+        return json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    from .pack import read_pack
+
+    data, _ = read_pack(pack)
+    return data["tables"]
+
+
+def build(today: date, seed: int = 42, data: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[dict[str, Any]]]:
     """元データの表(SCHEMAS)の行を作る"""
     rng = random.Random(seed)
-    data = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    data = data if data is not None else load_source(None)
     weekly_units: dict[str, list[int]] = defaultdict(list)
     for w in data.get("weekly_performances", []):
         weekly_units[w["product_code"]].append(int(w.get("units") or 0))
@@ -231,7 +243,7 @@ def _location(project: str, dataset: str, table: str) -> str:
     return f"{project}.{dataset}.{table}"
 
 
-def run(dataset: str, location: str, yes: bool, touch: bool) -> None:
+def run(dataset: str, location: str, yes: bool, touch: bool, pack: Path | None = None) -> None:
     from google.cloud import bigquery
 
     project = bq.job_project()
@@ -254,8 +266,10 @@ def run(dataset: str, location: str, yes: bool, touch: bool) -> None:
         print("足しました(在庫の出力の更新を見る表が変わったので、CCP は次の確認で取り込む)")
         return
 
-    data = build(date.today())
+    source = load_source(pack)
+    data = build(date.today(), data=source)
     print(f"プロジェクト {project} / 場所 {location}")
+    print(f"商品の出どころ: {pack.name if pack else 'server/seed.json'}({len(source.get('products', []))} 点)")
     print(f"元データ({src}):")
     for name, rows in data.items():
         print(f"  {name}: {len(rows)} 行")

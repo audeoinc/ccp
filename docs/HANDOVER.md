@@ -228,9 +228,11 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **ダミーデータ**: `python -m ccp.cli bq-dummy --yes`(`server/ccp/bq_dummy.py`)。本番と同じ GCP プロジェクトに、`ccp_dummy_src`(利用先に似せた元データ 8 表)と `ccp_dummy`(仕様の形のビュー 5 つ。SQL は `docs/bq_example/`)を作ってある。`--touch-stock --yes` で在庫を 1 回分更新できる。
 - **値の確かめ**: `python -m ccp.cli bq-check`(`server/ccp/bq_validate.py`)。取り込みも同じ関数。
 - **取り込み**: `server/ccp/bq_import.py`(`POST /api/bq/sync`・`GET /api/bq/status`)。画面は、商品を読めたあとに 1 回(変わった出力だけ)と、⚙ の「BigQuery から取り込む」(全部。在庫の時点つき)。新しい表 `sku`・`sku_stock`・`weather_forecast`・`bq_imports`、`products` に集計の列、`weekly_performances.market`、列の型 `float`。
-- **確かめた範囲**: 手元の PostgreSQL(PGlite)+ ダミーの BigQuery で、取り込み・変わっていなければ読まない・在庫だけ・行数が半分を切ったら止める、画面の ⚙ と帯。**本番の Cloud Run では未確認**。
-- **本番で動かすのに、人の指示が要ること**: (1) Cloud Run の実行サービスアカウントに BigQuery のデータ閲覧者・ジョブユーザー (2) Cloud Run の環境変数 `BQ_*` と `BQ_*_WATCH`(値は `bq-dummy` が最後に表示する) (3) `npm run deploy:gcp`。取り込むと、本番の 60 商品の在庫・集計・トレンド・天気が、ダミーの値に変わる(id・名前・画像はそのまま)。
-- **次**: 本番での確認 → カテゴリを自由な文字に(B7)→ B3(在庫のアラートをサーバーで)・B5(レビューの要約)・B6(AI への渡し方)。パックの取り込みで BigQuery の表を置き換えない(B4 の残り)。マーケティングポリシーは M4・M3 から(6.12)。
+- **本番で試して、事故を起こした(2026-10-17 午後)**: 実行サービスアカウントに BigQuery の権限(プロジェクトのジョブユーザー、`ccp_dummy`・`ccp_dummy_src` の閲覧者)を付け、`BQ_*` を入れ、`deployed-gcp/20261017-124212`(3e1a6d4)を反映して取り込んだ。**ダミーを `server/seed.json` の 60 商品から作っていたが、本番の商品は別の 100 点(6 桁のコード)だった。** 結果: `products` にダミー 60 点が足され、`weekly_performances` が表ごと入れ替わって本番の 1200 行が消えた(配信カード・商品の選択・元の 100 商品は無事)。
+- **戻した(同日)**: `BQ_*` を Cloud Run から外し(いまは取り込みは動かない)、ダミーの行(商品 60・sku・sku_stock・weather_forecast・bq_imports・週ごとの実績 720)を消し、10/15 のパック(`ccp-pack-20261015-0046.zip`)から週ごとの実績 1200 行を元の id・日時のまま入れ直した。手元から Cloud SQL のコネクタで直接つないで、1 つのトランザクションで行った。
+- **直したこと**: (1) 週ごとの実績は、取り込む商品の行だけを入れ替える(`_replace` の `scope`) (2) BigQuery の SPU に、いまの商品の半分以上がなければ取り込みを止める(`spu_mismatch`) (3) 週ごとの実績の、SPU にない商品の行を NG に (4) `bq-dummy --pack <ZIP>` で本番のパックの商品からダミーを作る。GCP の `ccp_dummy` は、10/15 のパックの 100 商品で作り直した(`bq-check` OK)。手元で、本番の写し(パックを PGlite に取り込む)+ 新しいダミーで、正しい取り込み・全部合わない・半分弱が合わない、の 3 つを確かめた。
+- **本番でもう一度試すときに、人の指示が要ること**: Cloud Run の環境変数 `BQ_*` と `BQ_*_WATCH` を入れ直す(値は `bq-dummy` が最後に表示する。権限は付いたまま)。そのあと画面を開くか、⚙ →「BigQuery から取り込む」。**その前に、必ず `deployed-gcp/20261017-124212` より新しい(この修正を含む)版を反映する。**
+- **次**: 本番での再確認 → カテゴリを自由な文字に(B7)→ B3(在庫のアラートをサーバーで)・B5(レビューの要約)・B6(AI への渡し方)。パックの取り込みで BigQuery の表を置き換えない(B4 の残り)。マーケティングポリシーは M4・M3 から(6.12)。
 
 ## 6.14 ユーザーと承認(U。2026-10-17〜)
 
@@ -247,6 +249,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 計画の面で最初に出す月は「今月以降で、最初に配信がある月」。以前は「いちばん古い配信の月」で、過去の配信を足したら 8 月から始まってしまった。
 - `src/mock/agent.ts` は `src/aiSelect.ts` を読み込めない(撮影用のビルドで、読み込みの輪になる)。身代わりで使う関数は、ほかを読み込まないファイル(例: `src/themeGuess.ts`)に置く。
 - **撮影用のビルド(`vite.mock.config.ts`)は、`src/data/*.ts` のファイルを丸ごと差し替える。** サービスのファイルに、サービス以外の関数(JSON の読み方など)を置くと、撮影用のビルドで「その名前がない」と落ちる。そういう関数は `src/results.ts` に置く。
+- **本番で試すデータは、本番のデータから作る。** 2026-10-17 に、seed.json(本番とは別の商品)から作ったダミーを本番に取り込み、週ごとの実績を消した(6.13)。取り込みの側にも保護を入れたが、本番で何かを試す前に「本番の写し(パック → PGlite)で同じ手順を通す」を習慣にする。
 - **BigQuery の取り込みを手元で試すとき**: 手元に PostgreSQL がない。作業用のフォルダに `npm i @electric-sql/pglite @electric-sql/pglite-socket` を入れ、`pglite-server -p 55432 -m 8` で起動し、`DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55432/postgres?ssl=disable`。PGlite は 1 つの裏側を接続で共有するので、asyncpg の準備済みの文の名前がぶつかる。初期データの投入とサーバーの起動を 1 つのプロセスで行い、`create_async_engine` に `connect_args={"prepared_statement_name_func": ...}`(一意の名前)を渡す(起動用のスクリプトだけで行う。本番のコードは変えない)。BigQuery は `CCP_DEV_GCLOUD=1`(手元の ADC は再認証が要る状態だった)。
 - **`progress.ts` は改行が CRLF**、ほかの多くは LF(`App.tsx` は、以前は CRLF だったが、いまは LF。2026-10-15 に確認)。スクリプトで書き換えるときは、決めつけずに、読み込んだファイルの改行コードを保つ。
 - ツールで書いた文字列に、目に見えない BOM(`U+FEFF`)の文字がそのまま入ることがある(lint の `no-irregular-whitespace` で落ちる)。コードでは `String.fromCharCode(0xfeff)` と書く。

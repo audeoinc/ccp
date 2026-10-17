@@ -55,7 +55,8 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 
 - 出力の場所は環境変数(`BQ_SPU` など。`server/workbench.env.example`)。設定がなければ、何もしない(`configured: false`)。
 - 変わった出力だけを読み、値を確かめ(`bq_validate.py`。`ccp.cli bq-check` と同じ)、NG がない出力だけを 1 つのトランザクションで入れ替える。記録は表 `bq_imports`。
-- 書く表: `products`(SPU。市場と商品コードで今の行を更新し、BigQuery にない商品は残す)、`sku`、`sku_stock`(`products.stock` に SKU の合計を同時に書く)、`weekly_performances`、`weather_forecast`。
+- 書く表: `products`(SPU。市場と商品コードで今の行を更新し、BigQuery にない商品は残す)、`sku`、`sku_stock`(`products.stock` に SKU の合計を同時に書く)、`weekly_performances`(取り込む商品の行だけを入れ替える)、`weather_forecast`。
+- 止める条件: BigQuery の SPU に、いまの商品の半分以上がない(出力がこの環境の商品と合っていない)/ 行数が前回の半分を切った / 値の NG(`bq_validate.py`)。止めた出力は前のデータのまま、理由を画面に出す。
 - Cloud Run の実行サービスアカウントに、BigQuery の「データ閲覧者」と「ジョブユーザー」が要る。
 
 ## AI(`/api/ask`)

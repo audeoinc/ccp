@@ -9,8 +9,9 @@
                                      DB の中身をパックの内容に置き換え、画像をフォルダ(既定: server/images)に展開する。
                                      --yes がなければ、件数を見せるだけで、何も変えない
   python -m ccp.cli bq-check         BigQuery の出力を読み、値まで確かめる(キーの重複・空・範囲・SKU と SPU の結びつき。何も変えない)
-  python -m ccp.cli bq-dummy [--dataset ccp_dummy] [--touch-stock] [--yes]
+  python -m ccp.cli bq-dummy [--dataset ccp_dummy] [--pack <ZIP>] [--touch-stock] [--yes]
                                      BigQuery に練習用のダミーデータ(元データに似せた表と、仕様の形のビュー)を作る(ccp/bq_dummy.py)。
+                                     --pack は、商品をそのパック(本番の書き出し)から作る。本番で試すなら必ず付ける。
                                      --touch-stock は、在庫のスナップショットを 1 回分だけ足す(更新の検知を試す)
 
 接続先は、db.py の環境変数(CLOUD_SQL_INSTANCE / DB_PASSWORD など、または DATABASE_URL)。
@@ -114,6 +115,7 @@ def main() -> None:
     bd = sub.add_parser("bq-dummy")
     bd.add_argument("--dataset", default="ccp_dummy")
     bd.add_argument("--location", default="asia-northeast1")
+    bd.add_argument("--pack", type=Path, default=None)
     bd.add_argument("--touch-stock", action="store_true")
     bd.add_argument("--yes", action="store_true")
     args = p.parse_args()
@@ -132,7 +134,7 @@ def main() -> None:
     elif args.cmd == "bq-dummy":
         from .bq_dummy import run as bq_dummy
 
-        bq_dummy(args.dataset, args.location, args.yes, args.touch_stock)
+        bq_dummy(args.dataset, args.location, args.yes, args.touch_stock, args.pack)
     elif args.cmd == "import-pack":
         asyncio.run(import_pack(args.path, args.images, args.yes))
     else:

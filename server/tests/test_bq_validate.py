@@ -79,6 +79,10 @@ class WeeklyForecastTest(unittest.TestCase):
         self.assertIn("月曜ではありません", messages(issues, NG))
         self.assertIn("12 週に満たない", messages(issues, WARN))
 
+    def test_weekly_unknown_product_is_ng(self) -> None:
+        rows = [{"market": "JP", "product_code": "P99", "week_start": date(2026, 10, 5), "units": 1, "revenue": 1, "as_of": AS_OF}]
+        self.assertIn("SPU の出力にありません", messages(validate("weekly", rows, {"spu": [spu("P01")]}, now=NOW), NG))
+
     def test_forecast_values(self) -> None:
         rows = [{"market": "US", "date": date(2026, 10, 18), "weather": "storm", "precip_prob": 120, "temp_max": 10, "temp_min": 12, "issued_at": NOW}]
         ng = messages(validate("forecast", rows, now=NOW), NG)

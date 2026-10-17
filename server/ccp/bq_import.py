@@ -107,8 +107,28 @@ async def _write_spu(conn: AsyncConnection, rows: list[dict[str, Any]]) -> str:
     return f"更新 {len(updates)}・追加 {len(inserts)}" + (f"(BigQuery にない商品 {left} 件は、そのまま残しました)" if left else "")
 
 
-async def _replace(conn: AsyncConnection, table: str, rows: list[dict[str, Any]], cols: list[str], extra: Any = None) -> str:
-    await conn.execute(text(f"DELETE FROM {table}"))
+def spu_mismatch(rows: list[dict[str, Any]], existing: list[dict[str, Any]]) -> str | None:
+    """BigQuery の SPU が、いまの商品とまるで合っていないときの理由(合っていれば None)。
+    いまの商品が 1 つもなければ、初めての取り込みなので通す。2026-10-17 に、本番にないダミーの商品を取り込んでしまったので、
+    既存の商品の半分以上が BigQuery にない取り込みは止める(商品の入れ替えが本当に要るときは、ccp.importer で行う)"""
+    have = {r["product_code"] for r in existing if r.get("product_code")}
+    if not have:
+        return None
+    coming = {r["product_code"] for r in rows}
+    missing = len(have - coming)
+    if missing * 2 > len(have):
+        return f"BigQuery の SPU に、いまの商品 {len(have)} 点のうち {missing} 点がありません(出力が、この環境の商品と合っていません)。取り込みを止めました"
+    return None
+
+
+async def _replace(conn: AsyncConnection, table: str, rows: list[dict[str, Any]], cols: list[str], extra: Any = None, scope: str | None = None) -> str:
+    """表を入れ替える。scope を渡すと、取り込む行にあるその列の値(商品コードなど)の行だけを消して入れ替える(ほかの行は残す)。
+    2026-10-17 に、本番にない商品のダミーを取り込んで、本番の週ごとの実績を全部消してしまった。BigQuery にない商品の行は、消さない"""
+    if scope:
+        keys = sorted({str(r[scope]) for r in rows if r.get(scope) is not None})
+        await conn.execute(text(f"DELETE FROM {table} WHERE {scope} = ANY(:keys)"), {"keys": keys})
+    else:
+        await conn.execute(text(f"DELETE FROM {table}"))
     values = [{**_values(table, r, cols), **(extra(r) if extra else {})} for r in rows]
     if values:
         names = list(values[0])
@@ -126,7 +146,7 @@ async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -
     if name == "weekly":
         # name は、いまの画面・初期データと同じ「商品コード 週の始まり」
         return await _replace(conn, "weekly_performances", rows, ["market", "product_code", "week_start", "units", "revenue", "stock"],
-                              lambda r: {"name": f"{r['product_code']} {str(r['week_start'])[:10]}"})
+                              lambda r: {"name": f"{r['product_code']} {str(r['week_start'])[:10]}"}, scope="product_code")
     return await _replace(conn, "weather_forecast", rows, ["market", "date", "temp_max", "temp_min", "precip_prob", "weather", "issued_at"])
 
 
@@ -237,6 +257,11 @@ async def sync(force: bool = False) -> dict[str, Any]:
                 continue
             ctx = {"spu": context["spu"]} if name in ("sku", "weekly") else {"sku": context["sku"]} if name == "sku_stock" else {}
             issues = bv.validate(name, rows[name], ctx, now=now)
+            if name == "spu":
+                async with db() as conn:
+                    existing = [dict(r) for r in (await conn.execute(text("SELECT product_code FROM products"))).mappings().all()]
+                if (why := spu_mismatch(rows[name], existing)):
+                    issues.append(bv.Issue(bv.NG, name, why))
             before = ((prev.get(name) or {}).get("last_ok") or {}).get("row_count")
             if before and before >= 10 and len(rows[name]) < before / 2:
                 issues.append(bv.Issue(bv.NG, name, f"行数が前回の半分を切りました(前回 {before} 行 → 今回 {len(rows[name])} 行)。元のデータの不具合を疑って、取り込みを止めました"))

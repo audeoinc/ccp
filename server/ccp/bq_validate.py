@@ -199,7 +199,8 @@ def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict
         spu = ctx.get("spu")
         if spu is not None:
             have = {(r.get("market"), r.get("product_code")) for r in spu}
-            c.check(WARN, "product_code が、SPU の出力にありません", rows, lambda r: (r.get("market"), r.get("product_code")) not in have)
+            # 知らない商品の実績は使い道がなく、SPU が合っていない出力を半端に取り込まないよう、NG にする(2026-10-17)
+            c.check(NG, "product_code が、SPU の出力にありません", rows, lambda r: (r.get("market"), r.get("product_code")) not in have)
 
     elif name == "forecast":
         c.values(rows, "weather", ("sunny", "cloudy", "rain", "snow"))
