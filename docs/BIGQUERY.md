@@ -209,10 +209,10 @@ Workbench での稼働の確認はあとにして、**まず GCP 環境(いま�
 | 1. 仕様の更新 | ✅(階層は案) | SPU に `category_path`(階層を ` > ` でつなぐ。段の数に依存しないので、段の数の答えを待たずに足した)、SKU に `length`。CCP のカテゴリを自由な文字にする(B7)は、まだ |
 | 2. ダミーデータ | ✅ | `python -m ccp.cli bq-dummy`(`server/ccp/bq_dummy.py`)。GCP のプロジェクトに `ccp_dummy_src`(元データに似せた 8 表)と `ccp_dummy`(仕様の形の 5 つのビュー)を作った。ビューの SQL は [bq_example/](bq_example/)。`--touch-stock` で在庫のスナップショットを 1 回分足せる(更新の検知を試す) |
 | 3. 値まで確かめる道具 | ✅ | `python -m ccp.cli bq-check`(`server/ccp/bq_validate.py`)。取り込みも同じ確かめを使う |
-| 4. 取り込み | ✅(本番で 1 回動かしたが、ダミーが本番の商品と合わず戻した。HANDOVER 6.13) | `server/ccp/bq_import.py`、`POST /api/bq/sync`・`GET /api/bq/status`、画面は開いたとき + ⚙ の「BigQuery から取り込む」。手元の PostgreSQL(PGlite)とダミーの BigQuery で、全件の取り込み・変わっていないときに読まない・在庫だけの取り込み・行数が半分を切ったときに止める、を確かめた |
+| 4. 取り込み | ✅(本番で動いている。1 回目はダミーが本番の商品と合わず戻した。HANDOVER 6.13) | `server/ccp/bq_import.py`、`POST /api/bq/sync`・`GET /api/bq/status`、画面は開いたとき + ⚙ の「BigQuery から取り込む」。手元の PostgreSQL(PGlite)とダミーの BigQuery で、全件の取り込み・変わっていないときに読まない・在庫だけの取り込み・行数が半分を切ったときに止める、を確かめた |
 | 5. 変換の手引き | ✅ | [BIGQUERY_CONVERT.md](BIGQUERY_CONVERT.md) |
 
-**本番(Cloud Run)で動かすのに残っていること(2026-10-17 午後の時点)**: 権限は付けてある。環境変数 `BQ_*` は、事故のあと外してある。入れ直す前に、(1) 週ごとの実績を商品ごとに入れ替える・SPU の食い違いで止める修正を含む版が反映されていることを確かめる(`deployed-gcp/20261017-131244` 以降) (2) `ccp_dummy` が本番の商品(本番のパック)から作られていることを確かめる(`bq-dummy --pack <本番のパック> --yes` → `bq-check`)。人の指示を待つ。
+**本番(Cloud Run)の状態(2026-10-17 午後)**: 権限と環境変数 `BQ_*`・`BQ_*_WATCH` を設定済みで、`ccp_dummy`(本番のパックの 100 商品から作ったダミー)から取り込んでいる。ダミーを作り直すときは `bq-dummy --pack <本番のパック> --yes` → `bq-check`。利用先の本物の出力に切り替えるときは、環境変数の値を変えるだけ(切り替える前に、`bq-check` と、本番の写しでのリハーサル)。
 
 **取り込みの安全装置**(2026-10-17 の事故のあとに足した): BigQuery の SPU に、いまの商品の半分以上がなければ、SPU を取り込まない(SKU・週ごとの実績も、SPU にない商品の行があれば取り込まない)。週ごとの実績は、取り込む商品の行だけを入れ替える(BigQuery にない商品の行は残す)。行数が前回の半分を切ったら止める。BigQuery にだけある商品は、足す(BigQuery が商品の正、という設計のまま)。
 
