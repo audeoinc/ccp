@@ -245,7 +245,9 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **確かめた範囲(U5・U6)**: 型・lint・ビルド・サーバーのテスト・判定の突き合わせ。画面は撮影用で、週の帯・ヘッダーの「依頼」・カレンダーの鍵マークを目で見ただけ。「まとめて依頼」「自分宛てを承認」の操作、通知の積まれ方は、画面では未確認。**本番の Cloud SQL では未確認**。
 - **残っている古い動き**: App の `changeWeek('review')` の「未起案 → 検討中」の枝(「レビューに出す」をやめたので、確定の取り消しからしか通らない)。週を確定しても、依頼中の依頼(`open`)はそのまま残る(配信は `confirmed` になり、配信カードの承認の帯は出ない。確定を取り消すと `approved` に戻り、依頼は open のまま見える)。気になれば、確定のときに open の依頼を `stale` にする。
 - **本番の見本のデータ(2026-10-17。利用者の指示)**: 本番に、サンプルのユーザー 7 人・承認グループ 3 つ・種別ごとの既定(撮影用の seed と同じ。example.com の架空の人)と、配信「Weekend Sale」(10/17、US、販促)への承認の依頼(Ken Sato → MD + Brand、全員。MD は Aya Mori が承認済み、Brand は未定)を入れた。API を Basic 認証で呼んで入れた(手順の台本は、入れた人の scratchpad の `prod_sample_people.py`。リポジトリには入れていない)。消すときは、users・approval_groups・approval_rules・approval_requests の行と、events の request / approve の 2 行。
-- **次(U7・U8)**: ログイン(IAP など。入ったら MePicker をなくし、`approvals.py` の `_actor` をログインの人に、ユーザー・グループの編集を管理者だけに)、送る箱の未送信を送る仕組み(本番だけ)。
+- **できたこと(U7 の下地。同日)**: `server/ccp/identity.py`(`CCP_IAP_AUDIENCE` があれば IAP の JWT を検証してメールアドレス → `users` の行。手元は `CCP_DEV_USER_EMAIL`。`GET /api/me`)。ログインしているときは、`people.ts` が「あなた」をその人に固定(`MePicker` は名前だけ)、`approvals.py` の `_actor` はログインの人を使い(画面の「あなた」は見ない)、`data_api.py` が users・approval_groups・approval_group_members・approval_rules の書き込みを管理者だけにする(`PeopleManager` は見るだけに)。ログインがなければ、動きは変わらない。単体テストは `server/tests/test_identity.py`。**本物の IAP では未確認**(手元の環境変数でも、画面では未確認。型・lint・テストのみ)。
+- **人が行うこと(U7 を本番で効かせる)**: APPROVAL.md 6 章の GCP の操作(ロードバランサ + IAP、同意画面、Cloud Run の ingress、環境変数 `CCP_IAP_AUDIENCE`)。それまでは、ログインなしの運用(だれでも「あなた」を選べる)。
+- **次(U8)**: 送る箱の未送信を送る仕組み(本番だけ。送り方 = SendGrid か Gmail API かは、利用者と決める)。
 - **3 つのセッションで同じフォルダを使っている**(BQ・承認プロセス・UI。2026-10-17)。本番への反映は BQ のセッションがまとめて行う。共有のファイル(`src/App.tsx`・`docs/BACKLOG.md`・`docs/HANDOVER.md`・`server/schema.json`)を触る前に、ほかのセッションに知らせる。
 
 ## 7. 落とし穴

@@ -1,13 +1,16 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { Dropdown, Input, Option, makeStyles, mergeClasses } from '@fluentui/react-components'
+import { Dropdown, Input, Option, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { PersonRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
-import { myName, myUserId, onMeChange, setMe, setMyName } from './history'
+import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, usePeople } from './people'
 
 const useStyles = makeStyles({
   // Dropdown は、中の文字の長さで幅が変わるので、置き場所の幅に合わせる
   dropdown: { minWidth: 0 },
+  // ログインしている人は選び直せないので、名前だけ出す
+  fixed: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  unregistered: { color: tokens.colorPaletteDarkOrangeForeground1 },
 })
 
 interface Props {
@@ -33,6 +36,7 @@ export function MePicker({ className, onChange, ariaLabel, list }: Props) {
   const people = usePeople()
   const name = useSyncExternalStore(subscribe, myName)
   const userId = useSyncExternalStore(subscribe, myUserId)
+  const lock = useSyncExternalStore(subscribe, meLock)
   const users = activeUsers(people)
   const picked = users.find((u) => u.id === userId)
 
@@ -42,6 +46,17 @@ export function MePicker({ className, onChange, ariaLabel, list }: Props) {
   }, [picked, name])
 
   const label = ariaLabel ?? t('あなた(履歴に残す名前)', 'You (name for the history)')
+  if (lock) {
+    // ログインしている(U7): 選ばせない。登録のない人は、メールアドレスを出して知らせる
+    const text = lock.registered ? (picked?.name ?? name) : lock.email
+    const title = lock.registered ? t('ログインしている人(変えられません)', 'Signed in (cannot be changed)') : t('このメールアドレスは、ユーザーに登録されていません(⚙ →「ユーザーと承認グループ」)', 'This email is not a registered user (⚙ → Users and approval groups)')
+    return (
+      <span className={mergeClasses(styles.fixed, !lock.registered && styles.unregistered, className)} title={title} aria-label={label}>
+        <PersonRegular />
+        {text}
+      </span>
+    )
+  }
   if (!people.loaded || users.length === 0) {
     return (
       <Input

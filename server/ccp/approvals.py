@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from . import schema as sc
 from .data_api import _columns_sql, db, fail, ok, require_db
+from .identity import resolve_user
 
 router = APIRouter(prefix="/api/approvals", dependencies=[Depends(require_db)])
 
@@ -159,8 +160,14 @@ async def _body(request: Request) -> dict[str, Any]:
     return body
 
 
-def _actor(body: dict[str, Any], request: Request) -> dict[str, str]:
-    """操作した人。画面が選んだ「あなた」(users の id と名前)。名前は、なければ x-ccp-actor の見出しから"""
+async def _actor(conn: AsyncConnection, body: dict[str, Any], request: Request) -> dict[str, str]:
+    """操作した人。ログインしていれば(U7)、その人(画面が送った「あなた」は見ない。なりすましを防ぐ)。
+    ログインがなければ、画面が選んだ「あなた」(users の id と名前)。名前は、なければ x-ccp-actor の見出しから"""
+    ident, user = await resolve_user(conn, request)
+    if ident is not None:
+        if user is None:
+            raise sc.BadRequest(f"ログインした {ident.email} は、ユーザーに登録されていません(⚙ →「ユーザーと承認グループ」で足してください)")
+        return {"id": user["id"], "name": str(user.get("name") or ident.email)[:100]}
     a = body.get("actor") or {}
     user_id = str(a.get("id") or "").strip()
     name = str(a.get("name") or unquote(request.headers.get("x-ccp-actor", ""))).strip()[:100]
@@ -189,7 +196,6 @@ async def _stale_live_requests(conn: AsyncConnection, card_id: str, now: datetim
 @router.post("/requests")
 async def create_request(request: Request):
     body = await _body(request)
-    actor = _actor(body, request)
     card_id = str(body.get("delivery_card_id") or "")
     rule = str(body.get("rule") or "all")
     group_ids = [str(x) for x in (body.get("group_ids") or []) if x]
@@ -200,10 +206,11 @@ async def create_request(request: Request):
         return fail(400, "決まりは all か any です")
     if not group_ids and not user_ids:
         return fail(400, "承認グループか承認者を、1 つ以上選んでください")
-    if actor["id"] in user_ids:
-        return fail(400, "自分を承認者にはできません(自分で依頼した配信は、自分では承認できません)")
     now = _now()
     async with db(write=True) as conn:
+        actor = await _actor(conn, body, request)
+        if actor["id"] in user_ids:
+            return fail(400, "自分を承認者にはできません(自分で依頼した配信は、自分では承認できません)")
         card = await _one(conn, "delivery_cards", card_id, lock=True)
         if card is None:
             return fail(404, "配信カードが見つかりません")
@@ -259,7 +266,6 @@ async def create_request(request: Request):
 @router.post("/requests/{request_id}/decide")
 async def decide(request_id: str, request: Request):
     body = await _body(request)
-    actor = _actor(body, request)
     decision = str(body.get("decision") or "")
     note = (str(body.get("note") or "")).strip() or None
     wanted = str(body.get("reviewer_id") or "") or None
@@ -270,6 +276,7 @@ async def decide(request_id: str, request: Request):
         return fail(400, "差し戻しには、理由が要ります")
     now = _now()
     async with db(write=True) as conn:
+        actor = await _actor(conn, body, request)
         req = await _one(conn, "approval_requests", request_id, lock=True)
         if req is None:
             return fail(404, "承認の依頼が見つかりません")
@@ -311,11 +318,11 @@ async def decide(request_id: str, request: Request):
 @router.post("/requests/{request_id}/withdraw")
 async def withdraw(request_id: str, request: Request):
     body = await _body(request)
-    actor = _actor(body, request)
     note = (str(body.get("note") or "")).strip() or None
     week_start = body.get("week_start") or None
     now = _now()
     async with db(write=True) as conn:
+        actor = await _actor(conn, body, request)
         req = await _one(conn, "approval_requests", request_id, lock=True)
         if req is None:
             return fail(404, "承認の依頼が見つかりません")

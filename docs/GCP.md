@@ -66,6 +66,12 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 - 設定(環境変数。営業支援システムと同じ Vertex AI): `GOOGLE_CLOUD_PROJECT`(コードには書かない)、`GOOGLE_CLOUD_LOCATION`(既定 global)、`GEMINI_MODEL`(コードの既定は gemini-3.5-flash。本番は gemini-3.8-flash に設定)、`GEMINI_THINKING`(minimal / low / medium / high。既定 low)。
 - 1 回の「すべてAIで下書き」は、手元の確認で約 40 秒。
 
+## ログイン(IAP。バックログ U7。設計は [APPROVAL.md](APPROVAL.md) 6 章)
+
+- サーバーは、IAP が付ける `X-Goog-IAP-JWT-Assertion` を検証して、だれが開いているかを知る(`server/ccp/identity.py`)。環境変数 `CCP_IAP_AUDIENCE`(IAP の宛先。`/projects/<番号>/global/backendServices/<ID>`)を設定したときだけ有効。設定がなければ「ログインなし」で、これまでどおり画面で「あなた」を選ぶ。
+- 手元で試すときは `CCP_DEV_USER_EMAIL=<users に登録したメールアドレス>` で、その人がログインしたことにできる。
+- IAP を有効にする手順(ロードバランサ + IAP を Cloud Run の前に置く、OAuth の同意画面、許可するユーザー、Cloud Run の ingress を内部とロードバランサだけにする)は、人が行う。まだ行っていない(2026-10-17 時点)。
+
 ## 手元での動かし方
 
 必要なもの: Python 3.12 以上、Node、`gcloud`(ログイン済み)。

@@ -19,7 +19,8 @@ import {
 } from '@fluentui/react-components'
 import { AddRegular, DismissRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
-import { logEvent } from './history'
+import { logEvent, meLock, myUserId, onMeChange } from './history'
+import { useSyncExternalStore } from 'react'
 import { MePicker } from './MePicker'
 import { activeUsers, groupUsers, reloadPeople, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
 import { UsersService } from './data/users'
@@ -71,7 +72,12 @@ export function PeopleManager() {
   const t = useT()
   const people = usePeople()
   const [tab, setTab] = useState<TabKey>('users')
-  const [busy, setBusy] = useState(false)
+  const [working, setWorking] = useState(false)
+  // ログインしているとき(U7)は、管理者だけが編集できる。ログインがなければ、だれでも(いまの運用。変更は履歴に残る)
+  const lock = useSyncExternalStore(onMeChange, meLock)
+  const meId = useSyncExternalStore(onMeChange, myUserId)
+  const canEdit = !lock || people.users.find((u) => u.id === meId)?.role === 'admin'
+  const busy = working || !canEdit
   const [error, setError] = useState<string | null>(null)
   const [log, setLog] = useState<CardEvent[] | null>(null)
   // 足すユーザー・グループの入力
@@ -92,7 +98,7 @@ export function PeopleManager() {
 
   /** 書き込み → 履歴に残す → 読み直す。失敗したら理由を出して、履歴は残さない */
   const run = async (write: () => Promise<{ success: boolean; error?: { message: string } }>, action: 'user_change' | 'group_change' | 'rule_change', note: string) => {
-    setBusy(true)
+    setWorking(true)
     setError(null)
     try {
       const r = await write()
@@ -104,7 +110,7 @@ export function PeopleManager() {
       setError(e instanceof Error ? e.message : String(e))
       return false
     } finally {
-      setBusy(false)
+      setWorking(false)
     }
   }
 
@@ -337,16 +343,20 @@ export function PeopleManager() {
       <DialogSurface className={s.surface}>
         <div className={s.head}>
           <DialogTitle className={s.grow}>{t('ユーザーと承認グループ', 'Users and approval groups')}</DialogTitle>
-          {busy && <Spinner size="extra-tiny" />}
+          {working && <Spinner size="extra-tiny" />}
           {/* 変更の履歴に、だれが変えたかを残すため、ここでも「あなた」を選べるようにする */}
           <MePicker ariaLabel={t('変更の履歴に残す、あなた', 'You (for the change history)')} />
           <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setOpen(false)} />
         </div>
         <span className={s.note}>
-          {t(
-            'ログインが入るまでは、だれでも編集できます。変更は「変更の履歴」に残ります。やめた人は、消さずに「無効」にします(履歴に名前が残るように)。',
-            'Until sign-in is added, anyone can edit here. Every change is kept in the change history. Set people who left to Inactive instead of deleting them, so their names stay in the history.',
-          )}
+          {lock
+            ? canEdit
+              ? t('管理者として編集できます。変更は「変更の履歴」に残ります。やめた人は、消さずに「無効」にします(履歴に名前が残るように)。', 'You can edit as an admin. Every change is kept in the change history. Set people who left to Inactive instead of deleting them, so their names stay in the history.')
+              : t('ログインしているので、編集できるのは管理者だけです(見るだけ)。', 'You are signed in, so only admins can edit (view only).')
+            : t(
+                'ログインが入るまでは、だれでも編集できます。変更は「変更の履歴」に残ります。やめた人は、消さずに「無効」にします(履歴に名前が残るように)。',
+                'Until sign-in is added, anyone can edit here. Every change is kept in the change history. Set people who left to Inactive instead of deleting them, so their names stay in the history.',
+              )}
         </span>
         {error && (
           <MessageBar intent="error" layout="multiline">

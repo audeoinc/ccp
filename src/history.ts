@@ -21,6 +21,20 @@ export const setMe = (user?: { id: string; name: string }) => {
   savePref(USER_KEY, user?.id ?? '')
   setMyName(user?.name ?? '')
 }
+/**
+ * ログインしている人(U7)。サーバーの /api/me が返したときだけ入り、「あなた」はその人に固定される(選び直せない)。
+ * registered = そのメールアドレスのユーザーが登録されているか(なければ、承認の依頼・承認はできない)
+ */
+export interface MeLock {
+  email: string
+  registered: boolean
+}
+let lock: MeLock | null = null
+export const meLock = (): MeLock | null => lock
+export const setMeLock = (v: MeLock | null) => {
+  lock = v
+  meListeners.forEach((f) => f())
+}
 /** 「あなた」が変わったら知らせる(週の帯と配信カードなど、別の場所で選び直しても、そろえるため) */
 export const onMeChange = (f: () => void) => {
   meListeners.add(f)

@@ -22,6 +22,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from . import dbctl, schema as sc
+from .identity import people_edit_denied
 from .db import get_engine, reset_engine
 
 
@@ -158,6 +159,10 @@ async def create_row(table: str, request: Request):
     else:
         sql = f"INSERT INTO {t.pg} DEFAULT VALUES RETURNING {returning}"
     async with db(write=True) as conn:
+        # ユーザー・承認グループなどは、ログインしているときは管理者だけが変えられる(U7。ログインなしは、だれでも = いまの運用)
+        denied = await people_edit_denied(conn, request, t.name)
+        if denied:
+            return fail(403, denied)
         row = (await conn.execute(text(sql), values)).mappings().one()
     return ok(t.to_api(dict(row)))
 
@@ -209,6 +214,9 @@ async def update_row(table: str, row_id: str, request: Request):
     rid = sc.coerce("uuid", row_id)
     watched = WATCHED.get(t.name)
     async with db(write=True) as conn:
+        denied = await people_edit_denied(conn, request, t.name)
+        if denied:
+            return fail(403, denied)
         before = None
         if watched and any(c in values for c in watched[1]):
             cols = ", ".join([*watched[1], watched[2]])
@@ -224,9 +232,12 @@ async def update_row(table: str, row_id: str, request: Request):
 
 
 @router.delete("/{table}/{row_id}")
-async def delete_row(table: str, row_id: str):
+async def delete_row(table: str, row_id: str, request: Request):
     t = SCHEMA.table(table)
     async with db(write=True) as conn:
+        denied = await people_edit_denied(conn, request, t.name)
+        if denied:
+            return fail(403, denied)
         await conn.execute(text(f"DELETE FROM {t.pg} WHERE id = :id"), {"id": sc.coerce("uuid", row_id)})
     return ok(None)
 

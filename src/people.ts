@@ -5,6 +5,8 @@ import { UsersService } from './data/users'
 import { ApprovalGroupsService } from './data/approvalGroups'
 import { ApprovalGroupMembersService } from './data/approvalGroupMembers'
 import { ApprovalRulesService } from './data/approvalRules'
+import { MeService } from './data/me'
+import { setMe, setMeLock } from './history'
 import type { User } from './models/users'
 import type { ApprovalGroup } from './models/approvalGroups'
 import type { ApprovalGroupMember } from './models/approvalGroupMembers'
@@ -29,7 +31,13 @@ const byName = <T extends { name?: string }>(a: T, b: T) => (a.name ?? '').local
 
 export async function reloadPeople(): Promise<void> {
   started = true
-  const [u, g, m, r] = await Promise.all([UsersService.getAll(), ApprovalGroupsService.getAll(), ApprovalGroupMembersService.getAll(), ApprovalRulesService.getAll()])
+  const [u, g, m, r, me] = await Promise.all([UsersService.getAll(), ApprovalGroupsService.getAll(), ApprovalGroupMembersService.getAll(), ApprovalRulesService.getAll(), MeService.get()])
+  // ログインしている人(U7)がいれば、「あなた」をその人に固定する(登録がなければ、メールアドレスだけ見せる)
+  if (me?.email) {
+    if (me.user) setMe({ id: me.user.id, name: me.user.name })
+    else setMe(undefined)
+    setMeLock({ email: me.email, registered: !!me.user })
+  } else setMeLock(null)
   // ユーザーが読めなければ、読めていない扱いにする(「あなた」は名前の入力に戻る。いまの運用を止めないため)
   if (!u.success) return
   state = { loaded: true, users: [...(u.data ?? [])].sort(byName), groups: g.success ? [...(g.data ?? [])].sort(byName) : [], members: m.success ? (m.data ?? []) : [], rules: r.success ? (r.data ?? []) : [] }
