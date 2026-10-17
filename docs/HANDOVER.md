@@ -205,7 +205,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **アプリのリンク先**: `src/AppLinksEditor.tsx`。通知を押したときの画面は、これまでどおり `push_link` 列(`custom` の `url` は、画面の名前として使う)。メッセージのメイン画像・ボタンの画面は、`links` 列の JSON の `screens`(鍵は、メールと同じ `hero` / ボタンの id)。FCM の data は `fcmData`。**キー名と画面の名前は仮**(アプリの実装が決まったら、`fcmData` だけを直す)。
 - **X12**: `src/WeekChecklist.tsx`。何をするかの文言は `src/weekLabels.ts` の `checkAction`。週の帯の未承認の数を、文字の比較から `statusRank` に直した(常に 0 だった)。
 - **X13**: 質問の宛先は `card_notes.assignee`(タスクの担当と同じ列。表は変えていない)。`src/App.tsx` の `noteParties` で、「担当」の絞り込みと候補に、質問・タスクの人を足す。
-- 本番には X11・X12 まで反映済み(2026-10-17、タグ `deployed-gcp/20261017-111041`)。X13 は未反映。
+- 本番には X11〜X13 を反映済み(2026-10-17、タグ `deployed-gcp/20261017-112704`)。
 
 ## 7. 落とし穴
 
