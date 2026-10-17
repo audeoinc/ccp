@@ -250,11 +250,11 @@ const SCENES = {
       ['14-sections', T(L, '④ セクション', '4. Sections')],
       ['16-links', T(L, '⑤ リンク先', '5. Links')],
       ['15-instructions', T(L, '⑥ 制作指示', '6. Notes')],
-      ['17-handoff', T(L, '引き継ぎ', 'Handoff'), T(L, 'やり取り', 'Communication')],
+      ['17-handoff', T(L, '引き継ぎ', 'Handoff')],
       ['18-tasks', T(L, 'タスク', 'Tasks')],
       ['19-comments', T(L, 'コメント', 'Comments')],
     ]) {
-      // 引き継ぎ・タスク・コメントは、中ペインの「やり取り」の面にある(先に面を切り替える)
+      // 引き継ぎ・タスク・コメントは、右端のプロセスのペインのタブ(2026-10-17 に中ペインから移した)
       if (area) await cardTab(page, area)
       await cardTab(page, tab)
       await dialogShot(page, `${L}-${k}`)

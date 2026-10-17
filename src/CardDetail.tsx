@@ -31,7 +31,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { ContentPane, type TopTab } from './ContentPane'
+import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
@@ -50,7 +50,7 @@ import { WeeksService, type WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf } from './weekLock'
 import { logEvent } from './history'
-import { ApprovalBar } from './ApprovalBar'
+import { ProcessPane, type TalkTab } from './ProcessPane'
 import { ApprovalsService } from './data/approvals'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
@@ -195,7 +195,8 @@ function loadZoom(): number | 'fit' {
 /** 自動下書きを済ませたカード(同じカードを開き直しても、再実行しない) */
 const autoDrafted = new Set<string>()
 
-const WIDTH_KEY = 'cardDetail.paneWidths.v5'
+// 4 つめの幅(右端のプロセスのペイン)を足したので、版を上げた(2026-10-17)
+const WIDTH_KEY = 'cardDetail.paneWidths.v6'
 // ダイアログの大きさ(辺・角のドラッグで変える。null は既定の大きさ)
 const SIZE_KEY = 'cardDetail.size'
 const MIN_DIALOG = { w: 900, h: 560 }
@@ -207,6 +208,8 @@ const clampSize = (s: DialogSize): DialogSize => ({
 // 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
 const INFO_KEY = 'cardDetail.infoOpen.v2'
 const RAIL_W = 32
+// 右端のプロセスのペイン(状態・承認・やり取り)の開閉。既定は開く
+const PROCESS_KEY = 'cardDetail.processOpen.v1'
 
 /** 商品情報ペインを開くか。保存がなければ、開いておく(選んだ商品の売上・在庫を、すぐ確かめられるように) */
 function loadInfoOpen(): boolean {
@@ -227,16 +230,28 @@ const clamp = (v: number) => Math.min(MAX_W, Math.max(MIN_W, v))
 const MIN_PREVIEW = 320
 const clampMid = (v: number, max = 4000) => Math.min(Math.max(MIN_W, max), Math.max(MIN_W, v))
 
-function loadWidths(): [number, number, number] {
+function loadOpen(key: string): boolean {
+  try {
+    const v = localStorage.getItem(key)
+    if (v === 'open') return true
+    if (v === 'closed') return false
+  } catch {
+    // 保存を読めないときは、既定(開く)にする
+  }
+  return true
+}
+
+type Widths = [number, number, number, number]
+function loadWidths(): Widths {
   try {
     const v = JSON.parse(localStorage.getItem(WIDTH_KEY) ?? 'null')
-    if (Array.isArray(v) && v.length === 3) return [clamp(Number(v[0])), clampMid(Number(v[1])), clamp(Number(v[2]))]
+    if (Array.isArray(v) && v.length === 4) return [clamp(Number(v[0])), clampMid(Number(v[1])), clamp(Number(v[2])), clamp(Number(v[3]))]
   } catch {
     // 保存値が読めなければ既定値を使う
   }
-  // 既定値: ダイアログの幅(最大 1800px)に合わせる。左 22%・中 30%・商品情報(右端)19%・プレビューは残り
+  // 既定値: ダイアログの幅(最大 1800px)に合わせる。左 18%・中 26%・商品情報 15%・プロセス(右端)17%・プレビューは残り
   const total = Math.min(1800, window.innerWidth * 0.98)
-  return [clamp(Math.round(total * 0.22)), clamp(Math.round(total * 0.3)), clamp(Math.round(total * 0.19))]
+  return [clamp(Math.round(total * 0.18)), clamp(Math.round(total * 0.26)), clamp(Math.round(total * 0.15)), clamp(Math.round(total * 0.17))]
 }
 
 /** 読み込み時点の配信商品の行(保存時の差分判定用) */
@@ -306,7 +321,7 @@ const useStyles = makeStyles({
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     overflow: 'auto',
     '@media (min-width: 900px)': {
-      gridTemplateColumns: `var(--w0) 1px min(var(--w1), max(${MIN_W}px, calc(100% - var(--w0) - var(--w2) - 3px - ${MIN_PREVIEW}px))) 1px minmax(0, 1fr) 1px var(--w2)`,
+      gridTemplateColumns: `var(--w0) 1px min(var(--w1), max(${MIN_W}px, calc(100% - var(--w0) - var(--w2) - var(--w3) - 4px - ${MIN_PREVIEW}px))) 1px minmax(0, 1fr) 1px var(--w2) 1px var(--w3)`,
       gridTemplateRows: 'minmax(0, 1fr)',
       overflow: 'hidden',
     },
@@ -436,12 +451,12 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [heroCandidates, setHeroCandidates] = useState<ProposedHero[]>([])
   const [heroId, setHeroId] = useState<string | undefined>(card?.hero_image_id ?? undefined)
   const [heroReason, setHeroReason] = useState(card?.hero_reason ?? '')
-  const [widths, setWidths] = useState<[number, number, number]>(loadWidths)
+  const [widths, setWidths] = useState<Widths>(loadWidths)
   const [links, setLinks] = useState<Links>(() => parseLinks(card?.links))
   // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
   const [linksTab, setLinksTab] = useState(false)
-  // 中央のタブを開く頼み(左の「制作への引き継ぎ」を押すと、やり取りの「引き継ぎ」のタブを開く)
-  const [tabRequest, setTabRequest] = useState<{ tab: TopTab; seq: number } | undefined>(undefined)
+  // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
+  const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
   const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
@@ -457,6 +472,16 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   // 商品情報の行にマウスが乗っている商品(プレビューで光らせる)と、商品情報ペインの開閉
   const [hoverKey, setHoverKey] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState<boolean>(loadInfoOpen)
+  const [processOpen, setProcessOpen] = useState<boolean>(() => loadOpen(PROCESS_KEY))
+  const toggleProcess = () =>
+    setProcessOpen((open) => {
+      try {
+        localStorage.setItem(PROCESS_KEY, open ? 'closed' : 'open')
+      } catch {
+        // 保存できなくても動作には影響しない
+      }
+      return !open
+    })
   const toggleInfo = () =>
     setInfoOpen((open) => {
       try {
@@ -625,18 +650,19 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
 
   const panesRef = useRef<HTMLDivElement>(null)
   // 中央の上限: ダイアログの中の幅から、左・商品情報・境界線・プレビューの最小幅を引いた残り
-  const midMax = (w: [number, number, number]) => {
+  const midMax = (w: Widths) => {
     const total = panesRef.current?.clientWidth ?? window.innerWidth
-    return total - w[0] - (infoOpen ? w[2] : RAIL_W) - 3 - MIN_PREVIEW
+    return total - w[0] - (infoOpen ? w[2] : RAIL_W) - (processOpen ? w[3] : RAIL_W) - 4 - MIN_PREVIEW
   }
   const resize = (i: 0 | 1 | 2) => (dx: number) =>
     setWidths((w) => {
-      const next: [number, number, number] = [w[0], w[1], w[2]]
+      const next: Widths = [w[0], w[1], w[2], w[3]]
       if (i === 1) next[1] = clampMid(Math.min(next[1], midMax(w)) + dx, midMax(w))
       else next[i] = clamp(next[i] + dx)
       return next
     })
-  const resizeInfo = (dx: number) => setWidths((w) => [w[0], w[1], clamp(w[2] - dx)])
+  const resizeInfo = (dx: number) => setWidths((w) => [w[0], w[1], clamp(w[2] - dx), w[3]])
+  const resizeProcess = (dx: number) => setWidths((w) => [w[0], w[1], w[2], clamp(w[3] - dx)])
   const saveWidths = () => {
     try {
       localStorage.setItem(WIDTH_KEY, JSON.stringify(widths))
@@ -1127,7 +1153,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} />
           )}
 
-          <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px` } as React.CSSProperties}>
+          <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px`, '--w3': `${processOpen ? widths[3] : RAIL_W}px` } as React.CSSProperties}>
             {/* 左: 配信の情報 */}
             <div className={styles.pane}>
               <Button
@@ -1166,8 +1192,6 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                   </div>
                 </Field>
               </div>
-              {/* 承認(U4): ステータスの直下に、依頼・相手ごとの状態・操作を縦に(利用者の指摘 2026-10-17)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
-              {canReview && card && <ApprovalBar card={card} isDirty={isDirty} busy={saving} onChanged={onSaved} />}
               <div className={styles.twoCol}>
                 <Field label={t('担当者', 'Owner')}>
                   <Input size="small" list="ccp-owners" value={form.owner} onChange={(_, d) => set('owner')(d.value)} />
@@ -1175,9 +1199,12 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     {owners.map((o) => <option key={o} value={o} />)}
                   </datalist>
                 </Field>
-                {/* 制作の担当者・締め切り・引き継ぎ済みは、中央の「やり取り → 引き継ぎ」だけで決める(2 か所で入力しない。FLOWS の C-3)。ここは表示だけで、押すとそのタブが開く */}
+                {/* 制作の担当者・締め切り・引き継ぎ済みは、右端のプロセスのペインの「引き継ぎ」だけで決める(2 か所で入力しない。FLOWS の C-3)。ここは表示だけで、押すとそのタブが開く(閉じていれば開く) */}
                 <Field label={t('制作への引き継ぎ', 'Handoff to production')} className={styles.handoffField}>
-                  <button type="button" className={styles.handoffSummary} onClick={() => setTabRequest((r) => ({ tab: 'handoff', seq: (r?.seq ?? 0) + 1 }))} title={t('引き継ぎのタブで決める', 'Set in the Handoff tab')}>
+                  <button type="button" className={styles.handoffSummary} onClick={() => {
+                    if (!processOpen) toggleProcess()
+                    setTabRequest((r) => ({ tab: 'handoff', seq: (r?.seq ?? 0) + 1 }))
+                  }} title={t('引き継ぎのタブで決める', 'Set in the Handoff tab')}>
                     <span>
                       <span className={styles.caption}>{t('担当 ', 'Assignee ')}</span>
                       {form.productionOwner.trim() || <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
@@ -1274,7 +1301,6 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 onLinks={setLinks}
                 handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
                 onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
-                tabRequest={tabRequest}
                 people={owners}
                 cardId={card?.id}
                 owner={form.owner}
@@ -1394,6 +1420,40 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               <div className={styles.rail}>
                 <Button type="button" size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleInfo} aria-label={t('商品情報を開く', 'Open product info')} />
                 <span className={styles.railLabel}>{t('商品情報', 'Product info')}</span>
+              </div>
+            )}
+
+            <Splitter onDrag={processOpen ? resizeProcess : () => undefined} onDone={saveWidths} />
+
+            {/* 右端: プロセス(状態・承認・引き継ぎ・質問・タスク・コメント)。作る(左〜商品情報)と、進めるを分ける */}
+            {processOpen ? (
+              <div className={mergeClasses(styles.pane, styles.paneMid)}>
+                <div className={styles.infoToolbar} style={{ padding: '4px 4px 0', marginBottom: 0 }}>
+                  <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleProcess} aria-label={t('プロセスを閉じる', 'Collapse process')} />
+                </div>
+                <ProcessPane
+                  card={card}
+                  status={form.status}
+                  canReview={canReview}
+                  locked={lockedWeeks.length > 0}
+                  isDirty={isDirty}
+                  busy={saving}
+                  onChanged={onSaved}
+                  handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
+                  onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
+                  remaining={progress.remaining}
+                  people={owners}
+                  owner={form.owner}
+                  cardName={form.name}
+                  productIds={items.map((it) => it.productId)}
+                  products={products}
+                  tabRequest={tabRequest}
+                />
+              </div>
+            ) : (
+              <div className={styles.rail}>
+                <Button type="button" size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleProcess} aria-label={t('プロセスを開く', 'Open process')} />
+                <span className={styles.railLabel}>{t('状態・承認・やり取り', 'Status, approval, communication')}</span>
               </div>
             )}
           </div>

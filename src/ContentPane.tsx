@@ -43,24 +43,16 @@ import { openTemplateManager, sectionRange, sectionsOf, templateOptions, type Em
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { AppLinksEditor } from './AppLinksEditor'
-import { HandoffPanel } from './HandoffPanel'
-import { QuestionsPanel } from './QuestionsPanel'
 import { AiButton } from './AiButton'
-import { TasksPanel } from './TasksPanel'
-import { CommentsPanel } from './CommentsPanel'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { PushTimingPanel } from './PushTimingPanel'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type Audience, type PushLink } from './pushLink'
 import { MarkdownLite } from './MarkdownLite'
-import { CardNotesService } from './data/cardNotes'
 import { linkSlots, linksComplete, type Links } from './links'
 
-// handoff・tasks・comments は工程ではない(「工程 n / 6」に数えない)。やり取りの面に置く
-export type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'comments' | 'notice' | 'message' | 'timing'
-/** 中ペインの 2 つの面。make = コンテンツを作る工程(AI チャットを使う)、talk = 人とのやり取り(引き継ぎ・タスク・コメント。AI チャットは使わない) */
-type Area = 'make' | 'talk'
-const TALK_TABS: TopTab[] = ['handoff', 'tasks', 'comments']
+// 中ペインは、コンテンツを作る工程だけ。人とのやり取り(引き継ぎ・質問・タスク・コメント)は、右端の「プロセス」のペイン(ProcessPane)に移した(2026-10-17)
+export type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'notice' | 'message' | 'timing'
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -109,7 +101,7 @@ interface Props {
   /** 制作への引き継ぎ(やり取りの「引き継ぎ」のタブ。担当・締め切り・引き継ぎ済みは、ここだけで決める) */
   handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
   onHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
-  /** 外(左の配信情報など)から、タブを開く頼み。seq が変わるたびに開く */
+  /** 外から、工程のタブを開く頼み。seq が変わるたびに開く */
   tabRequest?: { tab: TopTab; seq: number }
   /** これまでに入れた人の名前(入力の候補) */
   people: string[]
@@ -1102,13 +1094,7 @@ export function ContentPane(props: Props) {
   const t = useT()
   const { theme, headline, instructions, onField, drafts, template, onTemplate, candidates } = props
   const [tab, setTab] = useState<TopTab>('theme')
-  // 面ごとに、最後に開いていたタブを覚えておき、面を戻したときに同じタブを開く
-  const area: Area = TALK_TABS.includes(tab) ? 'talk' : 'make'
-  const [lastTab, setLastTab] = useState<Record<Area, TopTab>>({ make: 'theme', talk: 'handoff' })
-  const openTab = (next: TopTab) => {
-    setTab(next)
-    setLastTab((prev) => ({ ...prev, [TALK_TABS.includes(next) ? 'talk' : 'make']: next }))
-  }
+  const openTab = (next: TopTab) => setTab(next)
   // 外からのタブを開く頼み(左の配信情報の「引き継ぎのタブで決める」など)。seq が変わったときだけ開く
   const { tabRequest } = props
   useEffect(() => {
@@ -1171,7 +1157,7 @@ export function ContentPane(props: Props) {
   const fullTabsWidth = useRef(0)
   useEffect(() => {
     const el = tabListRef.current
-    if (!el || area !== 'make') return
+    if (!el) return
     const check = () => {
       if (!compact) {
         if (el.scrollWidth > el.clientWidth + 1) {
@@ -1186,31 +1172,7 @@ export function ContentPane(props: Props) {
     const ro = new ResizeObserver(check)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [compact, area, isPush])
-  // 引き継ぎ・タスクのタブに出す、未解決の質問・未完了のタスクの数(開いたときに数え、質問・タスクの欄で変わったら数え直す)
-  const [openQuestions, setOpenQuestions] = useState(0)
-  const [openTasks, setOpenTasks] = useState(0)
-  const [openComments, setOpenComments] = useState(0)
-  // やり取りの面に、対応が残っている数の合計を出す(開かなくても、残っていると分かるように)
-  const openTalk = openQuestions + openTasks + openComments
-  const [noteVersion, setNoteVersion] = useState(0)
-  const notesChanged = useCallback(() => setNoteVersion((v) => v + 1), [])
-  useEffect(() => {
-    if (!props.cardId) return
-    let alive = true
-    CardNotesService.getAll({ filter: `delivery_card_id eq ${props.cardId}` })
-      .then((res) => {
-        if (!alive || !res.success) return
-        const notes = res.data ?? []
-        setOpenQuestions(notes.filter((n) => !n.resolved && (n.kind ?? 'question') === 'question').length)
-        setOpenTasks(notes.filter((n) => !n.resolved && n.kind === 'task').length)
-        setOpenComments(notes.filter((n) => !n.resolved && n.kind === 'comment').length)
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [props.cardId, noteVersion])
+  }, [compact, isPush])
   const needTheme = theme.trim() ? undefined : t('先にテーマを決めてください', 'Set a theme first')
 
   // テーマ・テンプレート・制作指示のタブの対象(ヒーロー・セクションは、各タブ(ProductsTab)が知らせる)
@@ -1219,7 +1181,7 @@ export function ContentPane(props: Props) {
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
     else if (tab === 'instructions') registerChat({ key: 'instructions', title: t('制作指示', 'Production notes') }, () => drafts.runInstructions())
     else if (tab === 'notice') registerChat({ key: 'push', title: t('通知', 'Notification') }, () => drafts.runPush())
-    else if (tab === 'template' || tab === 'links' || tab === 'handoff' || tab === 'tasks' || tab === 'comments' || tab === 'timing' || tab === 'message') registerChat(null)
+    else if (tab === 'template' || tab === 'links' || tab === 'timing' || tab === 'message') registerChat(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   })
 
@@ -1251,14 +1213,8 @@ export function ContentPane(props: Props) {
   return (
     <div className={s.shell}>
     <div className={s.head}>
-      {/* コンテンツを作る工程と、人とのやり取りは、性質が違う(AI を使うか、プレビューに出るか)ので、面を分けてタブを混ぜない */}
-      <TabList appearance="subtle-circular" size="small" className={s.areas} selectedValue={area} onTabSelect={(_, d) => openTab(lastTab[d.value as Area])}>
-        <Tab value="make">{t('コンテンツ生成', 'Content generation')}</Tab>
-        <Tab value="talk">{`${t('やり取り', 'Communication')}${openTalk ? t(`(${openTalk})`, ` (${openTalk})`) : ''}`}</Tab>
-      </TabList>
       <TabList ref={tabListRef} size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => openTab(d.value as TopTab)}>
-        {area === 'make' &&
-          steps.map((st) => {
+        {steps.map((st) => {
             const tabEl = (
               <Tab key={st.value} value={st.value} onClick={revealTab} aria-label={compact ? st.full : undefined}>
                 {/* 番号だけのときも、開いているタブは名前を出す(どこにいるかが分かるように) */}
@@ -1274,19 +1230,6 @@ export function ContentPane(props: Props) {
               tabEl
             )
           })}
-        {area === 'talk' && (
-        <>
-        <Tab value="handoff" onClick={revealTab}>
-          {`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}${openQuestions ? t(`(${openQuestions})`, ` (${openQuestions})`) : ''}`}
-        </Tab>
-        <Tab value="tasks" onClick={revealTab}>
-          {`${t('タスク', 'Tasks')}${openTasks ? t(`(${openTasks})`, ` (${openTasks})`) : ''}`}
-        </Tab>
-        <Tab value="comments" onClick={revealTab}>
-          {`${t('コメント', 'Comments')}${openComments ? t(`(${openComments})`, ` (${openComments})`) : ''}`}
-        </Tab>
-        </>
-        )}
       </TabList>
     </div>
     <div className={s.scroll}>
@@ -1362,47 +1305,6 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runInstructions}
         />
       )}
-      {tab === 'handoff' && (
-        <HandoffPanel
-          productionOwner={props.handoff.productionOwner}
-          onProductionOwner={(v) => props.onHandoff('productionOwner', v)}
-          handedOffAt={props.handoff.handedOffAt}
-          onHandedOffAt={(v) => props.onHandoff('handedOffAt', v)}
-          productionDue={props.handoff.productionDue}
-          onProductionDue={(v) => props.onHandoff('productionDue', v)}
-          remaining={pr.remaining}
-          people={props.people}
-        />
-      )}
-      {tab === 'handoff' && (
-        <QuestionsPanel
-          cardId={props.cardId}
-          owner={props.owner}
-          productionOwner={props.handoff.productionOwner}
-          productionDue={props.handoff.productionDue}
-          cardName={props.cardName}
-          onOpenCount={setOpenQuestions}
-          onTasksChanged={notesChanged}
-        />
-      )}
-      {tab === 'tasks' && (
-        <TasksPanel
-          cardId={props.cardId}
-          productionOwner={props.handoff.productionOwner}
-          productionDue={props.handoff.productionDue}
-          onOpenSource={() => openTab('handoff')}
-          onChanged={notesChanged}
-        />
-      )}
-      {tab === 'comments' && (
-        <CommentsPanel
-          cardId={props.cardId}
-          productIds={props.items.map((it) => it.productId)}
-          products={props.products}
-          people={props.people}
-          onOpenCount={setOpenComments}
-        />
-      )}
       {tab === 'links' && isPush && (
         <AppLinksEditor
           links={props.links}
@@ -1429,8 +1331,6 @@ export function ContentPane(props: Props) {
       )}
     </div>
     </div>
-    {/* やり取りの面では、AI チャットを出さない(対象にならないのに、場所だけ取るため) */}
-    {area === 'make' && (
     <ChatPanel
       title={chatTarget?.title ?? null}
       messages={chatTarget ? (chats[chatTarget.key] ?? []) : []}
@@ -1440,7 +1340,6 @@ export function ContentPane(props: Props) {
       onSend={(text) => void sendChat(text)}
       onClear={() => chatTarget && setChats((prev) => ({ ...prev, [chatTarget.key]: [] }))}
     />
-    )}
     </div>
   )
 }
