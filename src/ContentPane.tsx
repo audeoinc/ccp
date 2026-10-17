@@ -41,6 +41,7 @@ import { progressOf } from './progress'
 import { openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel } from './templates'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
+import { AppLinksEditor } from './AppLinksEditor'
 import { HandoffPanel } from './HandoffPanel'
 import { QuestionsPanel } from './QuestionsPanel'
 import { AiButton } from './AiButton'
@@ -49,12 +50,12 @@ import { CommentsPanel } from './CommentsPanel'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { PushTimingPanel } from './PushTimingPanel'
-import { PUSH_BODY_MAX, PUSH_TITLE_MAX, type Audience, type PushLink } from './pushLink'
+import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type Audience, type PushLink } from './pushLink'
 import { MarkdownLite } from './MarkdownLite'
 import { CardNotesService } from './data/cardNotes'
-import { linkSlots, type Links } from './links'
+import { linkSlots, linksComplete, type Links } from './links'
 
-// links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
+// handoff・tasks・comments は工程ではない(「工程 n / 6」に数えない)。やり取りの面に置く
 type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'comments' | 'notice' | 'message' | 'timing'
 /** 中ペインの 2 つの面。make = コンテンツを作る工程(AI チャットを使う)、talk = 人とのやり取り(引き継ぎ・タスク・コメント。AI チャットは使わない) */
 type Area = 'make' | 'talk'
@@ -115,7 +116,7 @@ interface Props {
   owner: string
   /** 配信名(AI にタスクの案を頼むときに渡す) */
   cardName: string
-  /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③文面 ④画像・商品 ⑤時刻・相手) */
+  /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③ 通知 ④ メッセージ ⑤ リンク先 ⑥ 時刻・相手) */
   channel: TemplateChannel
   pushLink: PushLink | null
   onPushLink: (l: PushLink) => void
@@ -183,8 +184,6 @@ const useStyles = makeStyles({
   },
   // 面の切り替え(コンテンツ生成 / やり取り)。見出しの代わりに置き、その下のタブとは大きさで区別する
   areas: { minWidth: 0 },
-  // 工程ではないタブ(リンク先)の前の区切り
-  extraTab: { marginLeft: '12px', '::before': { content: '""', position: 'absolute', left: '-8px', top: '25%', bottom: '25%', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` } },
   // Block
   block: {
     display: 'grid',
@@ -1124,6 +1123,8 @@ export function ContentPane(props: Props) {
     setChatTarget((prev) => (prev?.key === target?.key && prev?.title === target?.title ? prev : target))
   }, [])
   const isPush = props.channel === 'push'
+  // リンク先の場所(メイン画像・ボタン)。メールは URL、アプリは開く画面を決める
+  const slots = linkSlots(template, props.items, props.products, props.campaign)
   const pr = progressOf({
     theme,
     template,
@@ -1131,13 +1132,11 @@ export function ContentPane(props: Props) {
     headline,
     items: props.items,
     instructions,
-    push: isPush ? { title: props.pushTitle, body: props.pushBody, timing: !!props.pushLink && !!props.audience } : undefined,
+    links: linksComplete(slots, props.links, isPush ? { tapDone: tapComplete(props.pushLink) } : undefined),
+    push: isPush ? { title: props.pushTitle, body: props.pushBody, timing: !!props.audience } : undefined,
   })
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
-  // リンク先: 「配信カードで指定」のボタンで、URL が空のものがあれば、タブに「!」を付ける
-  const slots = linkSlots(template, props.items, props.products, props.campaign)
-  const linksMissing = slots.some((sl) => !sl.defaultUrl && !(sl.kind === 'hero' ? props.links.hero : props.links.buttons?.[sl.key])?.trim())
   // 引き継ぎ・タスクのタブに出す、未解決の質問・未完了のタスクの数(開いたときに数え、質問・タスクの欄で変わったら数え直す)
   const [openQuestions, setOpenQuestions] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
@@ -1216,16 +1215,17 @@ export function ContentPane(props: Props) {
           <>
             <Tab value="notice" onClick={revealTab}>{`${mark(pr.hero, drafts.pushIdeas.length > 0)}${t('③ 通知', '3. Notification')}`}</Tab>
             <Tab value="message" onClick={revealTab}>{`${mark(pr.sections, drafts.copyIdeas.length > 0)}${t('④ メッセージ', '4. Message')}`}</Tab>
-            <Tab value="timing" onClick={revealTab}>{`${mark(pr.instructions, false)}${t('⑤ 時刻・相手', '5. Timing & audience')}`}</Tab>
+            <Tab value="links" onClick={revealTab}>{`${mark(pr.links, false)}${t('⑤ リンク先', '5. Links')}`}</Tab>
+            <Tab value="timing" onClick={revealTab}>{`${mark(pr.instructions, false)}${t('⑥ 時刻・相手', '6. Timing & audience')}`}</Tab>
           </>
         ) : (
           <>
             <Tab value="hero" onClick={revealTab}>{`${mark(pr.hero, drafts.copyIdeas.length > 0)}${t('③ ヒーロー', '3. Hero')}`}</Tab>
             <Tab value="sections" onClick={revealTab}>{`${mark(pr.sections, false)}${t('④ セクション', '4. Sections')}`}</Tab>
-            <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑤ 制作指示', '5. Production notes')}`}</Tab>
+            <Tab value="links" onClick={revealTab}>{`${mark(pr.links, false)}${t('⑤ リンク先', '5. Links')}`}</Tab>
+            <Tab value="instructions" onClick={revealTab}>{`${mark(pr.instructions, drafts.instructionIdeas.length > 0)}${t('⑥ 制作指示', '6. Production notes')}`}</Tab>
           </>
         )}
-        {!isPush && <Tab value="links" onClick={revealTab} className={s.extraTab}>{`${linksMissing ? '! ' : ''}${t('リンク先', 'Links')}`}</Tab>}
         </>
         )}
         {area === 'talk' && (
@@ -1292,7 +1292,7 @@ export function ContentPane(props: Props) {
         </>
       )}
       {tab === 'timing' && (
-        <PushTimingPanel scheduledAt={props.scheduledAt} link={props.pushLink} onLink={props.onPushLink} audience={props.audience} onAudience={props.onAudience} />
+        <PushTimingPanel scheduledAt={props.scheduledAt} audience={props.audience} onAudience={props.onAudience} />
       )}
       {tab === 'hero' && <ProductsTab {...props} mode="hero" registerChat={registerChat} />}
       {tab === 'sections' && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
@@ -1356,7 +1356,20 @@ export function ContentPane(props: Props) {
           onOpenCount={setOpenComments}
         />
       )}
-      {tab === 'links' && (
+      {tab === 'links' && isPush && (
+        <AppLinksEditor
+          links={props.links}
+          onLinks={props.onLinks}
+          slots={slots}
+          items={props.items}
+          products={props.products}
+          campaign={props.campaign}
+          pushLink={props.pushLink}
+          onPushLink={props.onPushLink}
+          onFocusSlot={props.onLinkFocus}
+        />
+      )}
+      {tab === 'links' && !isPush && (
         <LinksEditor
           links={props.links}
           onLinks={props.onLinks}

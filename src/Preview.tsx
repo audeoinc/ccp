@@ -855,7 +855,7 @@ function PushPreview(props: Props) {
         <div data-link="push">{notification}</div>
         <div style={{ width: 96, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)', margin: '24px auto 0' }} />
       </div>
-      {/* 通知を押したあとに開く画面(「⑤ 時刻・相手」の「開く画面」で決める) */}
+      {/* 通知を押したあとに開く画面(「⑤ リンク先」の「通知を押したときに開く画面」で決める) */}
       <div style={{ fontSize: 14, fontWeight: 700 }}>
         {!pushLinkKind || pushLinkKind === 'message' ? t('通知を押すと開く、アプリのメッセージ', 'In-app message opened by the notification') : t('通知を押したあとに開く画面', 'Screen opened by the notification')}
       </div>
@@ -879,7 +879,7 @@ function PushPreview(props: Props) {
             : pushLinkKind === 'home'
               ? t('アプリのホームが開きます', 'Opens the app home')
               : pushLinkKind === 'custom'
-                ? t('指定した URL の画面が開きます', 'Opens the screen at the custom URL')
+                ? t('指定した名前の画面が開きます', 'Opens the named screen')
                 : ''}
         </div>
       )}

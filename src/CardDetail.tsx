@@ -34,14 +34,14 @@ import type { HeroImage } from './models/heroImages'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
-import { parsePushLink, type PushLink } from './pushLink'
+import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
 import { NotesEditor } from './NotesEditor'
-import { campaignSlug, defaultUtm, encodeLinks, linkSlots, parseLinks, productUrl, withUtm, type LinkSlot, type Links } from './links'
+import { campaignSlug, defaultUtm, encodeLinks, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links } from './links'
 import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
@@ -582,14 +582,21 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const linkCampaign = campaignSlug(form.name, form.scheduledAt)
   const linkSpots = useMemo(() => linkSlots(template, items, products, linkCampaign), [template, items, products, linkCampaign])
   const linkUtm = { ...defaultUtm(linkCampaign), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
+  // アプリの配信は、URL の代わりに、開く画面(FCM の data)を出す
   const linkUrlOf = (slot: LinkSlot) => {
+    if (previewTab === 'push') {
+      const d = fcmText(screenOf(links, slot), linkCampaign)
+      return d ? `data: ${d}` : ''
+    }
     const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
     return url ? withUtm(url, linkUtm) : ''
   }
   const productLinkOf = (itemKey: string) => {
     const it = items.find((x) => x.key === itemKey)
     const p = it && products.find((x) => x.id === it.productId)
-    return p ? { name: p.name, url: withUtm(productUrl(p), linkUtm) } : undefined
+    if (!p) return undefined
+    if (previewTab === 'push') return { name: p.name, url: p.product_code ? `data: ${fcmText({ kind: 'product', value: p.product_code }, linkCampaign)}` : '' }
+    return { name: p.name, url: withUtm(productUrl(p), linkUtm) }
   }
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
@@ -975,7 +982,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     headline: form.headline,
     items,
     instructions: form.instructions,
-    push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody, timing: !!pushLink && !!audience } : undefined,
+    links: linksComplete(linkSpots, links, templateChannel === 'push' ? { tapDone: tapComplete(pushLink) } : undefined),
+    push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody, timing: !!audience } : undefined,
   })
   const hero = heroes.find((h) => h.id === heroId)
 
@@ -1144,7 +1152,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 <Field label={t('制作の締め切り', 'Production due')}>
                   <Input size="small" type="date" value={form.productionDue} onChange={(_, d) => set('productionDue')(d.value)} />
                 </Field>
-                {/* 制作の担当者は、中央の「⑤ 制作指示」と同じ値。引き継ぐ操作は、制作指示とリンク先を確かめてから行うよう、中央だけに置く */}
+                {/* 制作の担当者は、中央の「⑥ 制作指示」と同じ値。引き継ぐ操作は、制作指示とリンク先を確かめてから行うよう、中央だけに置く */}
                 <Field label={t('制作の担当者', 'Production assignee')}>
                   <Input size="small" list="ccp-owners" value={form.productionOwner} onChange={(_, d) => set('productionOwner')(d.value)} />
                 </Field>
@@ -1190,7 +1198,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </Field>
               {(form.headline || form.copy) && form.copyAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.copyAngle}`}</Caption1>}
               <Field label={t('制作指示', 'Production notes')}>
-                {/* 中央の「⑤ 制作指示」と同じエディタ(値は 1 つ。どちらで書き換えても、両方が変わる) */}
+                {/* 中央の「⑥ 制作指示」と同じエディタ(値は 1 つ。どちらで書き換えても、両方が変わる) */}
                 <NotesEditor value={form.instructions} onChange={set('instructions')} minHeight="120px" />
               </Field>
               {form.instructions && form.instructionsAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.instructionsAngle}`}</Caption1>}
@@ -1329,9 +1337,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     onDropAt={dropAt}
                   />
                 </div>
-                {previewTab === 'email' && (
-                  <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
-                )}
+                <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
               </div>
             </div>
 

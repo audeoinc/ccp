@@ -15,6 +15,20 @@ export interface Links {
   buttons?: Record<string, string>
   /** 計測用のパラメーター(すべてのリンクに付ける) */
   utm?: { source?: string; medium?: string; campaign?: string }
+  /** アプリの配信: メイン画像・ボタンの鍵 → 開くアプリの画面(空は既定) */
+  screens?: Record<string, AppScreen>
+}
+
+/**
+ * アプリの配信のリンク先(アプリの中の画面)。通知は Firebase Cloud Messaging(FCM)で送り、
+ * 開く画面は、通知の data(文字のキーと値の組)の screen と、画面に渡す値で伝える(アプリが読んで、その画面を開く)。
+ * campaign: 配信のページ / category: カテゴリのページ / product: 商品のページ / home: アプリのホーム / message: メッセージボックスのこの配信 / custom: 画面の名前を指定
+ */
+export type AppScreenKind = 'message' | 'campaign' | 'category' | 'product' | 'home' | 'custom'
+export interface AppScreen {
+  kind: AppScreenKind
+  /** category: カテゴリ名 / product: 商品コード / custom: 画面の名前(screen) */
+  value?: string
 }
 
 /** ショップの URL(実際の URL が決まるまでの、仮の値) */
@@ -37,6 +51,12 @@ export const encodeLinks = (l: Links): string => {
   if (Object.keys(buttons).length) clean.buttons = buttons
   const utm = Object.fromEntries(Object.entries(l.utm ?? {}).filter(([, v]) => v?.trim()).map(([k, v]) => [k, v!.trim()]))
   if (Object.keys(utm).length) clean.utm = utm
+  const screens = Object.fromEntries(
+    Object.entries(l.screens ?? {})
+      .filter(([, v]) => v?.kind)
+      .map(([k, v]) => [k, v.value?.trim() ? { kind: v.kind, value: v.value.trim() } : { kind: v.kind }]),
+  )
+  if (Object.keys(screens).length) clean.screens = screens
   return Object.keys(clean).length ? JSON.stringify(clean) : ''
 }
 
@@ -101,6 +121,8 @@ export interface LinkSlot {
   label: string
   linkKind: LinkKind
   defaultUrl: string
+  /** アプリの配信のときの、既定の画面(custom は null) */
+  defaultScreen: AppScreen | null
 }
 
 /** テンプレートと掲載商品から、リンクを付ける場所の一覧を作る(メール上の並び順) */
@@ -120,7 +142,7 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
   }
   const heroKind = tpl.heroLink ?? 'campaign'
-  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign) }]
+  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign), defaultScreen: defaultScreen(heroKind) }]
   for (const block of placedButtons(tpl)) {
     const where = block.at === 0 ? tr('メイン画像の下', 'Below the main image') : tr(`セクション ${block.at} の後`, `After section ${block.at}`)
     block.buttons.forEach((b, i) => {
@@ -132,8 +154,77 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
         label: tr(`${text}(${where})`, `${text} (${where})`),
         linkKind: kind,
         defaultUrl: defaultUrl(kind, campaign, block.at > 0 ? categoryOf(block.at - 1) : undefined),
+        defaultScreen: defaultScreen(kind, block.at > 0 ? categoryOf(block.at - 1) : undefined),
       })
     })
   }
   return slots
+}
+
+// ---- アプリの配信(FCM の data)
+
+/** テンプレートのリンク先の種類から、既定のアプリの画面(custom は既定がない) */
+export function defaultScreen(kind: LinkKind, category?: string): AppScreen | null {
+  switch (kind) {
+    case 'top':
+      return { kind: 'home' }
+    case 'category':
+      return category ? { kind: 'category', value: category } : { kind: 'home' }
+    case 'custom':
+      return null
+    default:
+      return { kind: 'campaign' }
+  }
+}
+
+/** 画面の指定がそろっているか(カテゴリ・商品・画面の名前は、値が要る) */
+export const screenComplete = (sc: AppScreen | null | undefined): boolean =>
+  !!sc && (sc.kind === 'campaign' || sc.kind === 'home' || sc.kind === 'message' || !!sc.value?.trim())
+
+/**
+ * FCM の通知の data に入れる値。どの画面にも campaign(配信の名前)を付ける(配信のページ・メッセージは、これで配信を特定する。ほかの画面では計測に使う)。
+ * data の値は文字でなければならないので、すべて文字にする
+ */
+export function fcmData(sc: AppScreen | null | undefined, campaign: string): Record<string, string> | null {
+  if (!screenComplete(sc)) return null
+  const v = sc!.value?.trim() ?? ''
+  switch (sc!.kind) {
+    case 'campaign':
+      return { screen: 'campaign', campaign }
+    case 'category':
+      return { screen: 'category', category: slug(v) || v, campaign }
+    case 'product':
+      return { screen: 'product', product_code: v, campaign }
+    case 'home':
+      return { screen: 'home', campaign }
+    case 'message':
+      return { screen: 'message', campaign }
+    default:
+      return { screen: v, campaign }
+  }
+}
+
+/** 画面に表示する、FCM の data(JSON の 1 行) */
+export const fcmText = (sc: AppScreen | null | undefined, campaign: string) => {
+  const d = fcmData(sc, campaign)
+  return d ? JSON.stringify(d) : ''
+}
+
+/** 配信カードで決めた画面、なければ既定の画面 */
+export const screenOf = (links: Links, slot: LinkSlot): AppScreen | null => {
+  const set = links.screens?.[slot.key]
+  return set?.kind ? set : slot.defaultScreen
+}
+
+/**
+ * リンク先の工程が完了しているか(「工程 n / 6」の ⑤)。
+ * メール: すべてのリンクの場所に、URL として読める行き先がある(既定の URL を含む)。
+ * アプリ: 通知を押したときに開く画面と、メッセージのすべてのリンクの場所に、画面の指定がそろっている
+ */
+export function linksComplete(slots: LinkSlot[], links: Links, push?: { tapDone: boolean }): boolean {
+  if (push) return push.tapDone && slots.every((sl) => screenComplete(screenOf(links, sl)))
+  return slots.every((sl) => {
+    const url = ((sl.kind === 'hero' ? links.hero : links.buttons?.[sl.key]) ?? '').trim() || sl.defaultUrl
+    return !!url && isUrl(url)
+  })
 }
