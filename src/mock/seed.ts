@@ -253,13 +253,14 @@ export const events: Row[] = [
   { id: guid('event:1011:submit'), action: 'submit', week_start: '2026-10-11', actor: 'Ken Sato', created_on: '2026-10-07T06:00:00.000Z' },
 ]
 
-// ---- 配信カードのメモ(制作からの質問と返信)
+// ---- 配信カードのメモ(質問と返信。誰からでも、誰にでも。宛先は assignee)
 const cardIdOf = (name: string) => cards.find((c) => c.name === name)?.id
-const note = (card: string, author: string, body: string, at: string, reply?: { by: string; text: string; at: string }, resolved = false): Row => ({
+const note = (card: string, author: string, to: string, body: string, at: string, reply?: { by: string; text: string; at: string }, resolved = false): Row => ({
   id: guid(`note:${card}:${body}`),
   delivery_card_id: cardIdOf(card),
   kind: 'question',
   author: author,
+  assignee: to,
   body: body,
   created_on: at,
   ...(reply ? { reply: reply.text, replied_by: reply.by, replied_at: reply.at } : {}),
@@ -267,13 +268,14 @@ const note = (card: string, author: string, body: string, at: string, reply?: { 
 })
 
 export const cardNotes: Row[] = [
-  note('Fall Arrivals', 'Alex Kim', 'Can we use the close-up of the cable knit for the hero instead of the full look?', '2026-09-25T02:10:00.000Z', {
+  note('Fall Arrivals', 'Alex Kim', 'Mika Tanaka', 'Can we use the close-up of the cable knit for the hero instead of the full look?', '2026-09-25T02:10:00.000Z', {
     by: 'Mika Tanaka',
     text: 'Yes, but keep the warm tone. The full look can go in Section 1.',
     at: '2026-09-25T04:30:00.000Z',
   }, true),
-  note('Fall Arrivals', 'Sam Ito', 'Is the price in the email the sale price or the regular price?', '2026-09-26T01:00:00.000Z'),
-  note('Weekend Sale', 'Sam Ito', 'Should the countdown banner show hours or just "Ends Sunday"?', '2026-09-27T06:00:00.000Z', {
+  note('Fall Arrivals', 'Mika Tanaka', 'Alex Kim', 'Can you share a draft of the hero by Wednesday?', '2026-09-26T00:30:00.000Z'),
+  note('Fall Arrivals', 'Sam Ito', 'Mika Tanaka', 'Is the price in the email the sale price or the regular price?', '2026-09-26T01:00:00.000Z'),
+  note('Weekend Sale', 'Sam Ito', 'Jordan Lee', 'Should the countdown banner show hours or just "Ends Sunday"?', '2026-09-27T06:00:00.000Z', {
     by: 'Jordan Lee',
     text: 'Just "Ends Sunday" — the banner is too small for a timer.',
     at: '2026-09-27T07:15:00.000Z',
@@ -302,7 +304,8 @@ if (heroQuestion) {
 
 // レビューのコメント(配信全体への指摘。1 件は未対応、1 件は対応済み)
 const comment = (card: string, author: string, body: string, at: string, fix?: { by: string; text: string; at: string }): Row => ({
-  ...note(card, author, body, at, fix, !!fix),
+  ...note(card, author, '', body, at, fix, !!fix),
+  assignee: undefined,
   id: guid(`comment:${card}:${body}`),
   kind: 'comment',
 })

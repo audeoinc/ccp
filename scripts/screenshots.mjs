@@ -238,8 +238,8 @@ const SCENES = {
       ['12-template', T(L, '② テンプレート', '2. Template')],
       ['13-hero', T(L, '③ ヒーロー', '3. Hero')],
       ['14-sections', T(L, '④ セクション', '4. Sections')],
-      ['15-instructions', T(L, '⑤ 制作指示', '5. Production notes')],
-      ['16-links', T(L, 'リンク先', 'Links')],
+      ['16-links', T(L, '⑤ リンク先', '5. Links')],
+      ['15-instructions', T(L, '⑥ 制作指示', '6. Production notes')],
       ['17-handoff', T(L, '引き継ぎ', 'Handoff'), T(L, 'やり取り', 'Communication')],
       ['18-tasks', T(L, 'タスク', 'Tasks')],
       ['19-comments', T(L, 'コメント', 'Comments')],
@@ -299,8 +299,8 @@ const SCENES = {
     await open(page, T(L, 'タイムセール', 'Flash Deal'))
     await cardTab(page, T(L, '③ 通知', '3. Notification'))
     await dialogShot(page, `${L}-26-app-notification`)
-    await cardTab(page, T(L, '⑤ 時刻・相手', '5. Timing & audience'))
-    await dialogShot(page, `${L}-27-app-timing`)
+    await cardTab(page, T(L, '⑤ リンク先', '5. Links'))
+    await dialogShot(page, `${L}-27-app-links`)
     await closeDialog(page)
   },
 
