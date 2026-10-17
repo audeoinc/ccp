@@ -9,9 +9,11 @@ import { actionText } from './weekLabels'
 import { myName, setMyName } from './history'
 import { AiIcon } from './AiMark'
 import { locale, optionLabel, useT } from './i18n'
-import { statusColor, statusOptions } from './status'
+import { statusColor, statusOptions, statusRank } from './status'
 
 const useStyles = makeStyles({
+  // 「週を確定」の横の、確定の前に直すことの数
+  toFix: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1, whiteSpace: 'nowrap' },
   root: {
     display: 'flex',
     alignItems: 'center',
@@ -61,6 +63,8 @@ interface Props {
   onApproveAll?: () => Promise<void>
   /** 状態を変える(週の配信のステータスも、まとめて進める。App 側で行う) */
   onChange: (status: WeekStatus) => Promise<void>
+  /** 確定の前に直すことの数(確認の一覧で、問題のある項目の数)。「週を確定」の横に出す */
+  toFix?: number
 }
 
 const STATUS_NOT_STARTED = 'not_started'
@@ -71,7 +75,7 @@ const STATUS_APPROVED = 'approved'
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
  * 確定は、週のすべての配信を「確定」にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onBulkCreate, onChange }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onBulkCreate, onChange, toFix = 0 }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -80,7 +84,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
   const status: WeekStatus = week?.status ?? 'draft'
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const counts = statusOptions.map((o) => ({ ...o, n: cards.filter((c) => (c.status ?? STATUS_NOT_STARTED) === o.value).length }))
-  const notApproved = cards.filter((c) => (c.status ?? STATUS_NOT_STARTED) < STATUS_APPROVED).length
+  const notApproved = cards.filter((c) => statusRank(c.status) < statusRank(STATUS_APPROVED)).length
   const inReview = cards.filter((c) => c.status === STATUS_REVIEW).length
   // 確定後の変更: この週の配信の、最後に確定した日時より後の理由。もう一度確定すると、それより前のものは出なくなる
   const cardName = new Map(cards.map((c) => [c.id, c.name]))
@@ -224,6 +228,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
             <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={busy} onClick={() => void run('draft')}>
               {t('下書きに戻す', 'Back to draft')}
             </Button>
+            {toFix > 0 && <span className={styles.toFix}>{t(`直すこと ${toFix} 件`, `${toFix} to fix`)}</span>}
             <Tooltip content={t('週のすべての配信を「確定」にします', 'Sets every delivery in this week to Confirmed.')} relationship="description">
               <Button
                 size="small"
@@ -233,8 +238,12 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
                 onClick={() =>
                   void run(
                     'confirmed',
-                    notApproved > 0
-                      ? t(`承認されていない配信が ${notApproved} 件あります。週を確定すると、すべて「確定」になります。よろしいですか?`, `${notApproved} deliveries are not approved yet. Confirming the week sets all of them to Confirmed. Continue?`)
+                    notApproved > 0 || toFix > 0
+                      ? [
+                          toFix > 0 ? t(`確定の前に直すことが ${toFix} 件残っています(確認の一覧)。`, `${toFix} item(s) to fix before confirming are left (see the checklist).`) : '',
+                          notApproved > 0 ? t(`承認されていない配信が ${notApproved} 件あります。週を確定すると、すべて「確定」になります。`, `${notApproved} deliveries are not approved yet. Confirming the week sets all of them to Confirmed.`) : '',
+                          t('よろしいですか?', 'Continue?'),
+                        ].filter(Boolean).join(' ')
                       : undefined,
                   )
                 }

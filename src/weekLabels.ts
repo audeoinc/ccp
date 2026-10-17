@@ -30,6 +30,18 @@ export const checkHint = (t: T, k: CheckKey): string =>
     approved: t('まだ承認されていない配信', 'Deliveries not approved yet'),
   })[k]
 
+/** 確認の一覧の項目で、問題があるときに何をするか(項目の横と、選んだときに出す) */
+export const checkAction = (t: T, k: CheckKey): string =>
+  ({
+    overLimit: t('ほかの商品に差し替える', 'Swap in other products'),
+    pushAlign: t('プッシュのテーマを、同じ日のメールにそろえる', 'Match the push theme to the same-day email'),
+    leadMissing: t('どれかの配信に載せる', 'Feature them in a delivery'),
+    repeat: t('テーマかメイン画像を変える', 'Change the theme or main image'),
+    openComments: t('コメントに対応して、対応済みにする', 'Address and resolve the comments'),
+    openQuestions: t('質問に返信して、解決にする', 'Reply to and resolve the questions'),
+    approved: t('配信を承認する', 'Approve the deliveries'),
+  })[k]
+
 /** 承認の履歴の、操作の文言 */
 export const actionText = (t: T, a?: EventAction): string =>
   ({

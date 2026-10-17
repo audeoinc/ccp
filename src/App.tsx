@@ -1042,7 +1042,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek} toFix={shownChecklist.filter((i) => !i.ok).length} />
               {printingWeek && (
                 // 週の資料(W7)。印刷のあいだだけ見える(index.css の「週の資料の印刷」)。Portal なので、画面の並びには影響しない
                 <Portal>
