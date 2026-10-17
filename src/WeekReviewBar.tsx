@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, CheckmarkCircleRegular, LockClosedRegular, SendRegular } from '@fluentui/react-icons'
+import { ArrowUndoRegular, CheckmarkCircleRegular, ChevronRightRegular, LockClosedRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { WeekRow, WeekStatus } from './data/weeks'
 import type { CardNote } from './data/cardNotes'
@@ -22,10 +22,17 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
   },
   // 週の状態の印の横の、状態ごとの件数
-  counts: { display: 'inline-flex', alignItems: 'center', columnGap: '10px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
+  // かたまり(承認 / 確定)。左から右へ、配信の承認を進めて、週を確定する流れ
+  group: { display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '10px', rowGap: '6px' },
+  // 確定のかたまりは右端へ
+  confirmGroup: { marginLeft: 'auto' },
+  divider: { alignSelf: 'stretch', width: '1px', backgroundColor: tokens.colorNeutralStroke2 },
+  // 件数を「›」でつないで、未起案 → 承認待ち → 承認済み の流れに見せる
+  counts: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
   count: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
   countDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular },
-  actions: { display: 'flex', alignItems: 'center', columnGap: '8px', marginLeft: 'auto' },
+  arrow: { color: tokens.colorNeutralForeground4, fontSize: '12px' },
+  total: { color: tokens.colorNeutralForeground3 },
   // 確定後の変更(理由つき)の一覧。帯の下の行に出す
   changes: { flexBasis: '100%', display: 'grid', rowGap: '2px', paddingTop: '6px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
   changesHead: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
@@ -65,8 +72,9 @@ interface Props {
 const STATUS_APPROVED = 'approved'
 
 /**
- * 週の帯(バックログ U6)。週は 確定前 → 確定 の 2 つだけ(データの値 draft / review は、どちらも「確定前」として見せる)。
- * 配信の承認は、配信カードごとの依頼(U4)で行うので、ここでは「まとめて依頼」「自分宛てを承認」と、週の確定だけを置く。
+ * 週の帯 = 承認のバー(バックログ U6。2026-10-17 から、承認プロセスのセッションが受け持つ)。週は 確定前 → 確定 の 2 つだけ(データの値 draft / review は、どちらも「確定前」として見せる)。
+ * 左から右へ: 週の状態 │ 承認(件数を 未起案 › 承認待ち › 承認済み n / 全体 の流れで出し、そのすぐ右に、まとめて依頼・自分宛てを承認)│ 確定(直すこと → 週を確定)。
+ * 件数と、それを進める操作を隣に置き、配信ごとの承認と、週の確定を、区切りで分ける(利用者の指摘: 件数と操作が離れ、4 つのボタンが 1 かたまりに見えた)。
  * 確定は、週のすべての配信を「確定」(見せ方は 承認済み + 鍵)にする(承認されていない配信があれば、件数を出して確かめる)
  */
 export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onChange, toFix = 0, fix, fixChip, statusCounts = [] }: Props) {
@@ -105,19 +113,29 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
     <div className={styles.root}>
       {/* 帯の主語: この週の状態(週の表示にしかない帯に置くので、月・一覧に切り替えても、ツールバーの位置は変わらない) */}
       <WeekStatusBadge week={week} />
-      {statusCounts.length > 0 && (
-        <span className={styles.counts}>
-          {statusCounts.map((c) => (
-            <span key={c.label} className={styles.count}>
-              <span className={styles.countDot} style={{ backgroundColor: c.color }} />
-              {`${c.label} ${c.n}`}
-            </span>
-          ))}
-        </span>
-      )}
-      {fixChip}
-      <span className={styles.actions}>
-        {busy && <Spinner size="extra-tiny" />}
+      <span className={styles.divider} aria-hidden />
+      {/* 承認(配信ごと): 件数の流れと、それを進める操作 */}
+      <span className={styles.group}>
+        {statusCounts.length > 0 && (
+          <span className={styles.counts}>
+            {statusCounts.map((c, i) => (
+              <span key={c.label} className={styles.count}>
+                {i > 0 && <ChevronRightRegular className={styles.arrow} aria-hidden />}
+                <span className={styles.countDot} style={{ backgroundColor: c.color }} />
+                {c.label}
+                {/* 承認済み(最後)は、全体に対する数(あといくつで確定できるか) */}
+                {i === statusCounts.length - 1 ? (
+                  <span>
+                    {` ${c.n}`}
+                    <span className={styles.total}>{` / ${cards.length}`}</span>
+                  </span>
+                ) : (
+                  ` ${c.n}`
+                )}
+              </span>
+            ))}
+          </span>
+        )}
         {!confirmed && (
           <>
             {onRequestAll && (
@@ -150,44 +168,49 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
                 </Button>
               </Tooltip>
             )}
-            {fix}
-            <Tooltip content={t('週を確定します。すべての配信に鍵がかかり、変えるには理由が要ります', 'Confirms the week. Every delivery is locked and changes need a reason.')} relationship="description">
-              <Button
-                size="small"
-                appearance="primary"
-                icon={<LockClosedRegular />}
-                disabled={busy || cards.length === 0}
-                onClick={() =>
-                  void run(
-                    () => onChange('confirmed'),
-                    notApproved > 0 || toFix > 0
-                      ? [
-                          toFix > 0 ? t(`確定の前に直すことが ${toFix} 件残っています(「週を確定」の左の印)。`, `${toFix} item(s) to fix before confirming are left (see the mark next to Confirm week).`) : '',
-                          notApproved > 0 ? t(`承認されていない配信が ${notApproved} 件あります。週を確定すると、承認なしで鍵がかかります。`, `${notApproved} deliveries are not approved yet. Confirming the week locks them without approval.`) : '',
-                          t('よろしいですか?', 'Continue?'),
-                        ].filter(Boolean).join(' ')
-                      : undefined,
-                  )
-                }
-              >
-                {t('週を確定', 'Confirm week')}
-              </Button>
-            </Tooltip>
           </>
         )}
+        {fixChip}
+      </span>
+      {/* 確定(週): 確定の前に直すこと → 週を確定 */}
+      <span className={`${styles.group} ${styles.confirmGroup}`}>
+        {busy && <Spinner size="extra-tiny" />}
+        <span className={styles.divider} aria-hidden />
+        {fix}
+        {!confirmed && (
+              <Tooltip content={t('週を確定します。すべての配信に鍵がかかり、変えるには理由が要ります', 'Confirms the week. Every delivery is locked and changes need a reason.')} relationship="description">
+                <Button
+                  size="small"
+                  appearance="primary"
+                  icon={<LockClosedRegular />}
+                  disabled={busy || cards.length === 0}
+                  onClick={() =>
+                    void run(
+                      () => onChange('confirmed'),
+                      notApproved > 0 || toFix > 0
+                        ? [
+                            toFix > 0 ? t(`確定の前に直すことが ${toFix} 件残っています(「週を確定」の左の印)。`, `${toFix} item(s) to fix before confirming are left (see the mark next to Confirm week).`) : '',
+                            notApproved > 0 ? t(`承認されていない配信が ${notApproved} 件あります。週を確定すると、承認なしで鍵がかかります。`, `${notApproved} deliveries are not approved yet. Confirming the week locks them without approval.`) : '',
+                            t('よろしいですか?', 'Continue?'),
+                          ].filter(Boolean).join(' ')
+                        : undefined,
+                    )
+                  }
+                >
+                  {t('週を確定', 'Confirm week')}
+                </Button>
+              </Tooltip>
+        )}
         {confirmed && (
-          <>
-            {fix}
-            <Button
-              size="small"
-              appearance="subtle"
-              icon={<ArrowUndoRegular />}
-              disabled={busy}
-              onClick={() => void run(() => onChange('review'), t('確定を取り消します。配信の鍵は外れ、ステータスは「承認済み」に戻ります。よろしいですか?', 'Undo the confirmation? Deliveries are unlocked and go back to Approved.'))}
-            >
-              {t('確定を取り消す', 'Undo confirmation')}
-            </Button>
-          </>
+              <Button
+                size="small"
+                appearance="subtle"
+                icon={<ArrowUndoRegular />}
+                disabled={busy}
+                onClick={() => void run(() => onChange('review'), t('確定を取り消します。配信の鍵は外れ、ステータスは「承認済み」に戻ります。よろしいですか?', 'Undo the confirmation? Deliveries are unlocked and go back to Approved.'))}
+              >
+                {t('確定を取り消す', 'Undo confirmation')}
+              </Button>
         )}
       </span>
       {reopened.length > 0 && (

@@ -139,7 +139,8 @@ export function WeekChecklist({ items, selected, onSelect, onOpen }: Props) {
               className={s.trigger}
               icon={todo.length ? <WarningFilled className={s.warn} /> : <CheckmarkCircleFilled className={s.ok} />}
             >
-              {todo.length ? <span className={s.warn}>{todo.length}</span> : undefined}
+              {/* 確定の前の確認だと分かるよう、数だけでなく「直すこと」と添える(承認のバーの並びの見直し 2026-10-17) */}
+              {todo.length ? <span className={s.warn}>{t(`直すこと ${todo.length}`, `${todo.length} to fix`)}</span> : t('直すことなし', 'Nothing to fix')}
             </Button>
           </PopoverTrigger>
         </Tooltip>
