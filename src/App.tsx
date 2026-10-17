@@ -54,7 +54,7 @@ import type { HeroImage } from './models/heroImages'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
-import { WeekReviewBar } from './WeekReviewBar'
+import { WeekReviewBar, WeekStatusBadge } from './WeekReviewBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
@@ -88,7 +88,7 @@ import { channelOptions, countryOptions, departmentOptions, statusColor, statusO
 import { dayKeyOf, sundayOf } from './weekLock'
 import { logEvent, myName } from './history'
 import { EventsService, type CardEvent } from './data/events'
-import { WeekChecklist } from './WeekChecklist'
+import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
 import { WeekReport } from './WeekReport'
 import { MiniCalendar } from './MiniCalendar'
 import { printWeek } from './printWeek'
@@ -1008,6 +1008,8 @@ function App() {
                 )}
               </span>
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
+              {/* 週の状態は、その週そのものの状態なので、期間の横に出す(週の帯は、操作だけにする) */}
+              {page === 'calendar' && view === 'week' && <WeekStatusBadge week={thisWeek} />}
               {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
                   比べるは結果の面だけ。計画の面では選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
               <div className={styles.viewSwitch} role="tablist" aria-label={t('見せ方', 'View')}>
@@ -1099,10 +1101,12 @@ function App() {
               )}
               {page === 'calendar' && (
               <div className={styles.legend}>
+                {/* 凡例。週の表示では、その週の状態ごとの件数も出す(週の帯にあった件数を、ここにまとめた) */}
                 {statusOptions.map((o) => (
                   <span key={o.value} className={styles.legendPill}>
                     <span className={styles.legendDot} style={{ backgroundColor: statusColor(o.value) }} />
                     {optionLabel(o.label)}
+                    {view === 'week' && ` ${weekCards.filter((c) => (c.status || 'not_started') === o.value).length}`}
                   </span>
                 ))}
               </div>
@@ -1132,7 +1136,22 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek} toFix={shownChecklist.filter((i) => !i.ok).length} />
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek}
+                toFix={shownChecklist.filter((i) => !i.ok).length}
+                fixChip={<WeekCheckChip items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
+                fix={
+                  <WeekChecklist
+                    items={shownChecklist}
+                    selected={checkKey}
+                    onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)}
+                    // 項目にかかわる配信のうち、配信日時がいちばん早いものを開く(続きは「保存して次へ」で)
+                    onOpen={(ids) => {
+                      const first = [...weekCards].filter((c) => ids.includes(c.id)).sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))[0]
+                      if (first) setSelectedId(first.id)
+                    }}
+                  />
+                }
+              />
               {printingWeek && (
                 // 週の資料(W7)。印刷のあいだだけ見える(index.css の「週の資料の印刷」)。Portal なので、画面の並びには影響しない
                 <Portal>
@@ -1152,7 +1171,6 @@ function App() {
                   </div>
                 </Portal>
               )}
-              <WeekChecklist items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />
               {bulk.active && <BulkDraftBar bulk={bulk} weekStart={weekStart} weeks={weeks} onExit={() => navGuard(() => undefined, true)} />}
               <WeekView
                 start={weekStart}

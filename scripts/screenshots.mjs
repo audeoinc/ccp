@@ -188,10 +188,16 @@ const SCENES = {
   async week(page, L) {
     await view(page, T(L, '週', 'Week'))
     await fullShot(page, `${L}-03-week`)
-    // 確認の一覧の項目を選ぶと、かかわる配信が目立つ
-    await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'button,div,span', wait: 900 }).catch(() => undefined)
+    // 確定の前に直すこと: 「週を確定」の左の印を押して一覧を開き、項目を選ぶと、かかわる配信・商品が目立つ
+    const openFix = () =>
+      page.evaluate(() => [...document.querySelectorAll('button[aria-label]')].find((b) => /before confirming|確定の前に直すこと/.test(b.getAttribute('aria-label') ?? ''))?.click())
+    await openFix()
+    await sleep(600)
+    await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'span', wait: 900 }).catch(() => undefined)
     await fullShot(page, `${L}-04-week-checklist`)
-    await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'button,div,span', wait: 500 }).catch(() => undefined)
+    await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'span', wait: 500 }).catch(() => undefined)
+    await page.keyboard.press('Escape')
+    await sleep(400)
     await view(page, T(L, '進み具合', 'Progress'))
     await fullShot(page, `${L}-05-week-progress`)
     await view(page, T(L, '商品', 'Products'))

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ArrowUndoRegular, CheckmarkCircleRegular, DocumentPdfRegular, HistoryRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -9,11 +9,11 @@ import { actionText } from './weekLabels'
 import { myName, setMyName } from './history'
 import { AiIcon } from './AiMark'
 import { locale, optionLabel, useT } from './i18n'
-import { statusColor, statusOptions, statusRank } from './status'
+import { statusOptions, statusRank } from './status'
 
 const useStyles = makeStyles({
-  // 「週を確定」の横の、確定の前に直すことの数
-  toFix: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1, whiteSpace: 'nowrap' },
+  // 記録・資料(名前・履歴・PDF)と、週を進める操作の間の区切り
+  divider: { alignSelf: 'stretch', width: '1px', margin: '2px 4px', backgroundColor: tokens.colorNeutralStroke2 },
   root: {
     display: 'flex',
     alignItems: 'center',
@@ -26,12 +26,7 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
   },
-  label: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  when: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
-  counts: { display: 'flex', alignItems: 'center', columnGap: '10px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  count: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
-  dot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular },
-  actions: { display: 'flex', columnGap: '8px', marginLeft: 'auto' },
+  actions: { display: 'flex', alignItems: 'center', columnGap: '8px', marginLeft: 'auto' },
   // 確定後の変更(理由つき)の一覧。帯の下の行に出す
   changes: { flexBasis: '100%', display: 'grid', rowGap: '2px', paddingTop: '6px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
   changesHead: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
@@ -63,11 +58,14 @@ interface Props {
   onApproveAll?: () => Promise<void>
   /** 状態を変える(週の配信のステータスも、まとめて進める。App 側で行う) */
   onChange: (status: WeekStatus) => Promise<void>
-  /** 確定の前に直すことの数(確認の一覧で、問題のある項目の数)。「週を確定」の横に出す */
+  /** 確定の前に直すことの数(確認の一覧で、問題のある項目の数)。確定の確認に使う */
   toFix?: number
+  /** 確定の前に直すことのボタン(WeekChecklist)。週を進める操作の、すぐ左に置く */
+  fix?: ReactNode
+  /** 選んでいる確定の前に直すことの札(WeekCheckChip)。出たり消えたりするので、左側に置く */
+  fixChip?: ReactNode
 }
 
-const STATUS_NOT_STARTED = 'not_started'
 const STATUS_REVIEW = 'reviewing'
 const STATUS_APPROVED = 'approved'
 
@@ -75,7 +73,7 @@ const STATUS_APPROVED = 'approved'
  * 週の状態(下書き → レビュー中 → 確定)と、その操作。週の計画を、1 本ずつではなく、週単位でレビューに出し、確定する。
  * 確定は、週のすべての配信を「確定」にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onBulkCreate, onChange, toFix = 0 }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onApproveAll, onExportPdf, onBulkCreate, onChange, toFix = 0, fix, fixChip }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -83,7 +81,6 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
   const [name, setName] = useState(myName)
   const status: WeekStatus = week?.status ?? 'draft'
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
-  const counts = statusOptions.map((o) => ({ ...o, n: cards.filter((c) => (c.status ?? STATUS_NOT_STARTED) === o.value).length }))
   const notApproved = cards.filter((c) => statusRank(c.status) < statusRank(STATUS_APPROVED)).length
   const inReview = cards.filter((c) => c.status === STATUS_REVIEW).length
   // 確定後の変更: この週の配信の、最後に確定した日時より後の理由。もう一度確定すると、それより前のものは出なくなる
@@ -136,15 +133,6 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
     </Popover>
   )
 
-  const badge =
-    status === 'confirmed' ? (
-      <Badge appearance="filled" color="success" icon={<CheckmarkCircleRegular />}>{t('確定', 'Confirmed')}</Badge>
-    ) : status === 'review' ? (
-      <Badge appearance="filled" color="warning">{t('レビュー中', 'In review')}</Badge>
-    ) : (
-      <Badge appearance="outline" color="informative">{t('下書き', 'Draft')}</Badge>
-    )
-
   return (
     <div className={styles.root}>
       {/* まとめて AI で下書き(W14)は、週の計画を作り始める操作なので、帯のいちばん左に置く(利用者の判断 2026-10-16) */}
@@ -162,21 +150,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
           </Button>
         </Tooltip>
       )}
-      <span className={styles.label}>{t('週の状態', 'Week status')}</span>
-      {badge}
-      {status !== 'draft' && (
-        <span className={styles.when}>
-          {status === 'confirmed' ? t(`確定 ${when(week?.confirmed_at)}`, `Confirmed ${when(week?.confirmed_at)}`) : t(`レビューに出した日時 ${when(week?.submitted_at)}`, `Submitted ${when(week?.submitted_at)}`)}
-        </span>
-      )}
-      <span className={styles.counts}>
-        {counts.map((c) => (
-          <span key={c.value} className={styles.count} title={optionLabel(c.label)}>
-            <span className={styles.dot} style={{ backgroundColor: statusColor(c.value) }} />
-            {`${optionLabel(c.label)} ${c.n}`}
-          </span>
-        ))}
-      </span>
+      {fixChip}
       <span className={styles.actions}>
         {busy && <Spinner size="extra-tiny" />}
         <Tooltip content={t('履歴に残す、あなたの名前(このブラウザで覚えます)', 'Your name for the history (remembered in this browser)')} relationship="description">
@@ -200,6 +174,8 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
             </Button>
           </Tooltip>
         )}
+        <span className={styles.divider} aria-hidden />
+        {status !== 'review' && fix}
         {status === 'draft' && (
           <Tooltip content={t('週をレビュー中にします。未起案の配信は「検討中」にします', 'Puts the week in review. Not-started deliveries become In review.')} relationship="description">
             <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || cards.length === 0} onClick={() => void run('review')}>
@@ -228,7 +204,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
             <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={busy} onClick={() => void run('draft')}>
               {t('下書きに戻す', 'Back to draft')}
             </Button>
-            {toFix > 0 && <span className={styles.toFix}>{t(`直すこと ${toFix} 件`, `${toFix} to fix`)}</span>}
+            {fix}
             <Tooltip content={t('週のすべての配信を「確定」にします', 'Sets every delivery in this week to Confirmed.')} relationship="description">
               <Button
                 size="small"
@@ -240,7 +216,7 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
                     'confirmed',
                     notApproved > 0 || toFix > 0
                       ? [
-                          toFix > 0 ? t(`確定の前に直すことが ${toFix} 件残っています(確認の一覧)。`, `${toFix} item(s) to fix before confirming are left (see the checklist).`) : '',
+                          toFix > 0 ? t(`確定の前に直すことが ${toFix} 件残っています(「週を確定」の左の印)。`, `${toFix} item(s) to fix before confirming are left (see the mark next to Confirm week).`) : '',
                           notApproved > 0 ? t(`承認されていない配信が ${notApproved} 件あります。週を確定すると、すべて「確定」になります。`, `${notApproved} deliveries are not approved yet. Confirming the week sets all of them to Confirmed.`) : '',
                           t('よろしいですか?', 'Continue?'),
                         ].filter(Boolean).join(' ')
@@ -276,5 +252,32 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * 週の状態(下書き / レビュー中 / 確定)の印。週そのものの状態なので、ツールバーの期間の横に置く(週の帯は、操作だけにする)。
+ * レビューに出した日時・確定した日時は、マウスを重ねると出す
+ */
+export function WeekStatusBadge({ week }: { week?: WeekRow }) {
+  const t = useT()
+  const status: WeekStatus = week?.status ?? 'draft'
+  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
+  const tip =
+    status === 'confirmed'
+      ? t(`週の状態: 確定(${when(week?.confirmed_at)})`, `Week status: Confirmed (${when(week?.confirmed_at)})`)
+      : status === 'review'
+        ? t(`週の状態: レビュー中(レビューに出した日時 ${when(week?.submitted_at)})`, `Week status: In review (submitted ${when(week?.submitted_at)})`)
+        : t('週の状態: 下書き(まだレビューに出していない)', 'Week status: Draft (not submitted for review yet)')
+  return (
+    <Tooltip content={tip} relationship="description">
+      {status === 'confirmed' ? (
+        <Badge appearance="filled" color="success" icon={<CheckmarkCircleRegular />} tabIndex={0}>{t('確定', 'Confirmed')}</Badge>
+      ) : status === 'review' ? (
+        <Badge appearance="filled" color="warning" tabIndex={0}>{t('レビュー中', 'In review')}</Badge>
+      ) : (
+        <Badge appearance="outline" color="informative" tabIndex={0}>{t('下書き', 'Draft')}</Badge>
+      )}
+    </Tooltip>
   )
 }
