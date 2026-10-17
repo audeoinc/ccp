@@ -4,6 +4,10 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 
 **Power Apps 版は、2026-10-16 に廃止した(ソースも削除済み)。** Power Apps・Dataverse・Power Automate・Copilot Studio のコードや設定を、足し直さない。データの列・テーブルは `server/schema.json` に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。
 
+## クラウドのセッションで作業するとき
+
+**作業の前に [docs/CLOUD.md](docs/CLOUD.md) を読む。** ブランチ `cloud/…` で作業し、終わったら HANDOVER に書いて push する(`main` には入れない)。本番・GCP・秘密の情報に触る作業は、ローカルのセッションが担う。
+
 ## 作業の約束
 
 1. **確認してから終わる。** 変更のあとは、必ず次を通す。通らないまま、完了と言わない。
