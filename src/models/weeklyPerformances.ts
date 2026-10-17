@@ -8,6 +8,8 @@ export interface WeeklyPerformanceFields {
   units?: number
   revenue?: number
   stock?: number
+  /** 市場(BigQuery から取り込んだ行だけ) */
+  market?: string
   state_code?: number
 }
 

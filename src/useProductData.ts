@@ -26,6 +26,11 @@ export interface ProductData {
 // 同じ商品を開き直したときに、取り直さない(画面を開いている間だけ有効)
 const cache = new Map<string, ProductData>()
 
+/** BigQuery から取り込んだあとに、覚えておいた週次実績を捨てる(開き直したときに、新しい値を読むように) */
+export function clearProductDataCache(): void {
+  cache.clear()
+}
+
 async function load(code: string): Promise<ProductData> {
   const safe = code.replace(/'/g, "''")
   const [weekly, policy] = await Promise.all([

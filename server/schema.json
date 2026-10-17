@@ -66,7 +66,24 @@
     ["weather", "choice"],
     ["description", "text"],
     ["image_url", "text"],
-    ["market", "choice"]
+    ["market", "choice"],
+    ["category_path", "text"],
+    ["units_4w", "int"],
+    ["revenue_4w", "numeric"],
+    ["revenue_yoy", "float"],
+    ["views_4w", "int"],
+    ["cvr_4w", "float"],
+    ["review_count", "int"],
+    ["last_review_at", "timestamptz"],
+    ["review_texts", "text"],
+    ["lift_hot", "float"],
+    ["lift_cold", "float"],
+    ["lift_rain", "float"],
+    ["hot_days", "int"],
+    ["cold_days", "int"],
+    ["rain_days", "int"],
+    ["weather_basis", "text"],
+    ["as_of", "timestamptz"]
    ],
    "lookups": [
    ]
@@ -92,7 +109,8 @@
     ["week_start", "date"],
     ["units", "int"],
     ["revenue", "numeric"],
-    ["stock", "int"]
+    ["stock", "int"],
+    ["market", "text"]
    ],
    "lookups": [
    ]
@@ -203,6 +221,57 @@
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "SET NULL"}]
+   ]
+  },
+  "sku": {
+   "columns": [
+    ["market", "text"],
+    ["sku_code", "text", {"index": true}],
+    ["product_code", "text", {"index": true}],
+    ["color", "text"],
+    ["size", "text"],
+    ["length", "text"],
+    ["price", "numeric"],
+    ["units_4w", "int"],
+    ["as_of", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "sku_stock": {
+   "columns": [
+    ["market", "text"],
+    ["sku_code", "text", {"index": true}],
+    ["stock", "int"],
+    ["as_of", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "weather_forecast": {
+   "columns": [
+    ["market", "text"],
+    ["date", "date"],
+    ["temp_max", "float"],
+    ["temp_min", "float"],
+    ["precip_prob", "float"],
+    ["weather", "text"],
+    ["issued_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "bq_imports": {
+   "columns": [
+    ["source", "text", {"index": true}],
+    ["status", "text"],
+    ["source_modified", "timestamptz"],
+    ["data_as_of", "timestamptz"],
+    ["row_count", "int"],
+    ["message", "text"],
+    ["imported_at", "timestamptz"]
+   ],
+   "lookups": [
    ]
   }
  },

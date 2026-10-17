@@ -21,6 +21,7 @@ SQL_TYPES = {
     "text": "text",
     "int": "integer",
     "numeric": "numeric(14,2)",
+    "float": "double precision",  # 率・比(購入率・前年比・天気への反応)。numeric(14,2) では、小数 2 桁で丸まってしまうため
     "timestamptz": "timestamptz",
     "date": "date",
     "choice": "text",  # 選択肢は、文字の値(email / app など)。使える値は schema.json の choices
@@ -256,6 +257,8 @@ def coerce(type_: str, value: Any) -> Any:
             return str(value)
         if type_ == "numeric":
             return Decimal(str(value))
+        if type_ == "float":
+            return float(value)
         if type_ == "timestamptz":
             if isinstance(value, datetime):
                 return value

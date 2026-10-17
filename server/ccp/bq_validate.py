@@ -52,7 +52,7 @@ def _key(row: dict[str, Any], cols: Iterable[str]) -> str:
     return "/".join(str(row.get(c)) for c in cols)
 
 
-def _ts(v: Any) -> datetime | None:
+def as_ts(v: Any) -> datetime | None:
     if isinstance(v, datetime):
         return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
     if isinstance(v, str) and v:
@@ -132,7 +132,7 @@ def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict
 
     # 共通: データの時点が古すぎない・先すぎない
     stamp = "issued_at" if name == "forecast" else "as_of"
-    times = [t for t in (_ts(r.get(stamp)) for r in rows) if t]
+    times = [t for t in (as_ts(r.get(stamp)) for r in rows) if t]
     if times:
         newest = max(times)
         if newest > now + timedelta(hours=1):

@@ -35,6 +35,8 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 
 選択肢の値は、文字(`text`)で持つ(例: チャネルは `email` / `app`)。使える値は `choices`。
 
+列の型は `text` / `int` / `numeric`(金額。小数 2 桁)/ `float`(率・比。購入率・前年比・天気への反応)/ `timestamptz` / `date` / `choice`。
+
 **以前の名前と値(2026-10-16 まで)**: 以前は、Power Apps 版の名前(`cr854_…`)と、選択肢の数(588230000 など)を使っていた。その対応は `server/ccp/legacy_names.json`。古い DB は、サーバーが最初につないだときに、選択肢の数が文字の値に置き換わる(`schema.py` の `legacy_value_sql`。何度実行しても同じ)。古い引っ越し用のパック(版 1)も、取り込むときに直す。
 
 ## `/api/data`(サーバー)
@@ -46,6 +48,15 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 - 並べ替え(`orderBy`)、`select`、`top`、`skip`。
 - 書き込みの参照は、参照の列に、相手の `id` をそのまま入れる(例: `hero_image_id: "<id>"`。`null` で参照を外す)。
 - DB に接続できないときは 503 + `code: "db_unavailable"`。
+
+## BigQuery からの取り込み(`/api/bq`。`server/ccp/bq_import.py`)
+
+`POST /api/bq/sync`(画面を開いたとき。`?force=true` は ⚙ の「BigQuery から取り込む」)、`GET /api/bq/status`。設計は [BIGQUERY.md](BIGQUERY.md) の 5 章・11 章。
+
+- 出力の場所は環境変数(`BQ_SPU` など。`server/workbench.env.example`)。設定がなければ、何もしない(`configured: false`)。
+- 変わった出力だけを読み、値を確かめ(`bq_validate.py`。`ccp.cli bq-check` と同じ)、NG がない出力だけを 1 つのトランザクションで入れ替える。記録は表 `bq_imports`。
+- 書く表: `products`(SPU。市場と商品コードで今の行を更新し、BigQuery にない商品は残す)、`sku`、`sku_stock`(`products.stock` に SKU の合計を同時に書く)、`weekly_performances`、`weather_forecast`。
+- Cloud Run の実行サービスアカウントに、BigQuery の「データ閲覧者」と「ジョブユーザー」が要る。
 
 ## AI(`/api/ask`)
 

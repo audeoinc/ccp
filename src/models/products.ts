@@ -53,6 +53,30 @@ export interface ProductFields {
   description?: string
   image_url?: string
   market?: ProductMarket
+  // ここから下は、BigQuery の SPU の出力から取り込む列(docs/BIGQUERY_EXPORT.md の 2 章)。画面からは書かない
+  /** カテゴリの階層(上の段から ' > ' でつないだもの) */
+  category_path?: string
+  units_4w?: number
+  revenue_4w?: number
+  /** 直近 4 週の売上 ÷ 前年の同じ 4 週 */
+  revenue_yoy?: number
+  views_4w?: number
+  /** 直近 4 週の購入率(0〜1) */
+  cvr_4w?: number
+  review_count?: number
+  last_review_at?: string
+  review_texts?: string
+  /** 暑い日・寒い日・雨の日の売上の増減(+0.3 = +30%) */
+  lift_hot?: number
+  lift_cold?: number
+  lift_rain?: number
+  hot_days?: number
+  cold_days?: number
+  rain_days?: number
+  /** spu / category(データが少ないので、カテゴリの値で補った) */
+  weather_basis?: string
+  /** BigQuery 側のデータの時点 */
+  as_of?: string
   state_code?: number
 }
 

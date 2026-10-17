@@ -20,6 +20,7 @@ import {
   MenuPopover,
   MenuTrigger,
   MessageBar,
+  MessageBarActions,
   MessageBarBody,
   Portal,
   Select,
@@ -33,6 +34,8 @@ import {
   AddRegular,
   AlertRegular,
   ArrowDownloadRegular,
+  ArrowSyncRegular,
+  DismissRegular,
   CalendarLtrRegular,
   ColumnTripleRegular,
   DataBarVerticalRegular,
@@ -60,6 +63,8 @@ import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, topKind, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
+import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
+import { clearProductDataCache } from './useProductData'
 import { isCancelled } from './cancel'
 import { setActivePolicies } from './aiSelect'
 import { ResultPeek } from './ResultPeek'
@@ -310,6 +315,12 @@ function FilterSelect({ label, value, options, onChange }: {
   )
 }
 
+/** ⚙ に出す、在庫のデータの時点(BigQuery 側。取り込んだ時刻ではない) */
+function bqStockTime(r: BqSyncResult): string | undefined {
+  const at = r.outputs.find((o) => o.name === 'sku_stock')?.dataAsOf
+  return at ? tr('在庫 ', 'Stock ') + new Date(at).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : undefined
+}
+
 function App() {
   const styles = useStyles()
   const t = useT()
@@ -319,6 +330,10 @@ function App() {
   const [heroes, setHeroes] = useState<HeroImage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // BigQuery からの取り込み(B2・B4)。設定がない環境では configured: false のまま、何も出さない
+  const [bq, setBq] = useState<BqSyncResult | null>(null)
+  const [bqBusy, setBqBusy] = useState(false)
+  const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
   const [month, setMonth] = useState<Date | null>(null)
   const [filters, setFilters] = useState<Filters>(initialFilters)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -502,15 +517,56 @@ function App() {
     }
   }, [])
 
+  const loadProducts = useCallback(
+    () =>
+      ProductsService.getAll({ orderBy: ['product_code asc'] })
+        .then((res) => {
+          if (res.success) setProducts((res.data ?? []).map(withProductLabels))
+          else setError(res.error?.message ?? tr('商品の取得に失敗しました', 'Failed to load products'))
+          return res.success
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : String(e))
+          return false
+        }),
+    [],
+  )
+
+  // BigQuery の変わった出力を取り込み、取り込めたら商品(在庫・売上の集計)を読み直す。
+  // force は ⚙ のボタン(変わっていなくても、すべて読み直す)。開いたときは、変わった出力だけ(サーバーが判定する)
+  const runBqSync = useCallback(
+    async (force: boolean) => {
+      setBqBusy(true)
+      const { result, error: err } = await syncBigQuery(force)
+      setBqBusy(false)
+      setBq(result)
+      if (result.imported.length) {
+        clearProductDataCache()
+        await loadProducts()
+      }
+      const names = (list: { name: string }[]) => list.map((x) => bqOutputLabel(x.name)).join(tr('・', ', '))
+      if (err) setBqNotice({ intent: 'error', text: err })
+      else if (result.failed.length)
+        setBqNotice({
+          intent: 'warning',
+          text:
+            tr(`BigQuery から取り込めなかったデータがあります(前のデータのまま使います): `, `Some BigQuery data was not imported (the previous data is kept): `) +
+            result.failed.map((f) => `${bqOutputLabel(f.name)} — ${f.message}`).join(' / '),
+        })
+      // 開いたときの取り込みは、うまくいったら知らせない(在庫が変わるたびに出て、うるさいため)。ボタンのときだけ結果を出す
+      else if (force && result.imported.length) setBqNotice({ intent: 'success', text: tr(`BigQuery から取り込みました: ${names(result.imported)}`, `Imported from BigQuery: ${names(result.imported)}`) })
+      else if (force && result.configured) setBqNotice({ intent: 'success', text: tr('BigQuery から読み直しました(取り込むデータはありませんでした)', 'Checked BigQuery (nothing to import)') })
+    },
+    [loadProducts],
+  )
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
-    ProductsService.getAll({ orderBy: ['product_code asc'] })
-      .then((res) => {
-        if (res.success) setProducts((res.data ?? []).map(withProductLabels))
-        else setError(res.error?.message ?? tr('商品の取得に失敗しました', 'Failed to load products'))
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+    // 商品を読めたら(DB が使えるとわかってから)、BigQuery の更新を確かめる
+    void loadProducts().then((ok) => {
+      if (ok) void runBqSync(false)
+    })
     ProductPoliciesService.getAll({ select: ['product_code', 'stage', 'promo_period', 'policy', 'promo_plan'] })
       .then((res) => {
         if (!res.success) return // 主力の漏れが出ない・AI が方針を使わないだけで、画面は使える
@@ -526,7 +582,7 @@ function App() {
         else setError(res.error?.message ?? tr('メイン画像の取得に失敗しました', 'Failed to load hero images'))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-  }, [load])
+  }, [load, loadProducts, runBqSync])
 
   const filtered = useMemo(() => {
     const match = (f: string, v?: string) => f === '' || String(v) === f
@@ -877,6 +933,12 @@ function App() {
               >
                 {t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)')}
               </MenuItem>
+              {/* BigQuery からの取り込み(設定がある環境だけ)。開いたときにも自動で確かめるが、すぐに読み直したいとき用。時刻は在庫のデータの時点 */}
+              {bq?.configured && (
+                <MenuItem icon={<ArrowSyncRegular />} disabled={bqBusy} secondaryContent={bqStockTime(bq) ?? ''} onClick={() => void runBqSync(true)}>
+                  {bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery')}
+                </MenuItem>
+              )}
               <MenuDivider />
               <MenuGroup>
                 <MenuGroupHeader>{t('言語', 'Language')}</MenuGroupHeader>
@@ -896,6 +958,14 @@ function App() {
         {error && (
           <MessageBar layout="multiline" intent="error" className={styles.alert}>
             <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
+        {bqNotice && (
+          <MessageBar layout="multiline" intent={bqNotice.intent} className={styles.alert}>
+            <MessageBarBody>{bqNotice.text}</MessageBarBody>
+            <MessageBarActions
+              containerAction={<Button appearance="transparent" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setBqNotice(null)} />}
+            />
           </MessageBar>
         )}
         {!loading && !error && month && (
