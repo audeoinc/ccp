@@ -1,17 +1,14 @@
 import { useState, type ReactNode } from 'react'
-import { Badge, Button, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, CheckmarkCircleRegular, DocumentPdfRegular, HistoryRegular, LockClosedRegular, SendRegular } from '@fluentui/react-icons'
+import { Badge, Button, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { ArrowUndoRegular, CheckmarkCircleRegular, LockClosedRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { WeekRow, WeekStatus } from './data/weeks'
 import type { CardNote } from './data/cardNotes'
-import type { CardEvent } from './data/events'
-import { actionText } from './weekLabels'
 import { locale, useT } from './i18n'
-import { statusLabel, statusRank } from './status'
+import { statusRank } from './status'
 
 const useStyles = makeStyles({
   // 記録・資料(名前・履歴・PDF)と、週を進める操作の間の区切り
-  divider: { alignSelf: 'stretch', width: '1px', margin: '2px 4px', backgroundColor: tokens.colorNeutralStroke2 },
   root: {
     display: 'flex',
     alignItems: 'center',
@@ -34,13 +31,6 @@ const useStyles = makeStyles({
   changesHead: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
   changeRow: { color: tokens.colorNeutralForeground2, overflowWrap: 'anywhere' },
   name: { width: '140px' },
-  // 承認の履歴(新しい順)
-  history: { display: 'grid', rowGap: '8px', width: '420px', maxHeight: '360px', overflowY: 'auto', fontSize: tokens.fontSizeBase200 },
-  historyHead: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
-  historyRow: { display: 'grid', rowGap: '1px', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
-  historyMeta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
-  historyText: { color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere' },
-  historyNote: { color: tokens.colorNeutralForeground2, overflowWrap: 'anywhere' },
 })
 
 interface Props {
@@ -50,10 +40,6 @@ interface Props {
   cards: DeliveryCard[]
   /** 確定した週の配信を変えたときの理由(すべての配信の分。この週の、最後の確定より後のものだけを出す) */
   changes?: CardNote[]
-  /** この週の承認の履歴(新しい順) */
-  events?: CardEvent[]
-  /** 週の資料(PDF)を書き出す(App 側で、資料を描いて印刷の画面を開く) */
-  onExportPdf?: () => void
   /** 週の未依頼の配信を、種別ごとの既定の相手で、まとめて承認の依頼にする(U6。App 側で行う) */
   onRequestAll?: () => Promise<void>
   /** まとめて依頼する配信の数(未承認で、依頼中の依頼がないもの) */
@@ -83,7 +69,7 @@ const STATUS_APPROVED = 'approved'
  * 配信の承認は、配信カードごとの依頼(U4)で行うので、ここでは「まとめて依頼」「自分宛てを承認」と、週の確定だけを置く。
  * 確定は、週のすべての配信を「確定」(見せ方は 承認済み + 鍵)にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onExportPdf, onChange, toFix = 0, fix, fixChip, statusCounts = [] }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onChange, toFix = 0, fix, fixChip, statusCounts = [] }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -113,34 +99,6 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onReques
     }
   }
 
-  const history = (
-    <Popover withArrow positioning="below-end">
-      <PopoverTrigger disableButtonEnhancement>
-        <Button size="small" appearance="subtle" icon={<HistoryRegular />}>
-          {t(`履歴 ${events.length}`, `History ${events.length}`)}
-        </Button>
-      </PopoverTrigger>
-      <PopoverSurface>
-        <div className={styles.history}>
-          <span className={styles.historyHead}>{t('承認の履歴', 'Approval history')}</span>
-          {events.length === 0 && <span className={styles.historyMeta}>{t('まだ記録はありません', 'Nothing recorded yet')}</span>}
-          {events.map((e) => (
-            <div key={e.id} className={styles.historyRow}>
-              <span className={styles.historyMeta}>{`${when(e.created_on)} · ${e.actor || t('(名前なし)', '(no name)')}`}</span>
-              <span className={styles.historyText}>
-                {e.card_name ? `${e.card_name}: ` : ''}
-                {actionText(t, e.action)}
-                {/* 履歴では、確定と承認済みを読み分けたいので、名前は full で出す */}
-                {e.to_status !== undefined && e.to_status !== null && e.to_status !== e.from_status ? `(${e.from_status ? `${statusLabel(e.from_status, true)} ` : ''}→ ${statusLabel(e.to_status, true)})` : ''}
-              </span>
-              {e.note && <span className={styles.historyNote}>{e.note}</span>}
-            </div>
-          ))}
-        </div>
-      </PopoverSurface>
-    </Popover>
-  )
-
   const needMe = !hasMe ? t('右上の「あなた」を選んでください', 'Choose who you are (top right) first') : null
 
   return (
@@ -160,15 +118,6 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onReques
       {fixChip}
       <span className={styles.actions}>
         {busy && <Spinner size="extra-tiny" />}
-        {history}
-        {onExportPdf && (
-          <Tooltip content={t('レビューの会議で配る、週の資料を作ります(印刷の画面で「PDF に保存」を選びます)', 'Creates the week handout for the review meeting (choose "Save as PDF" in the print dialog)')} relationship="description">
-            <Button size="small" appearance="subtle" icon={<DocumentPdfRegular />} disabled={busy || cards.length === 0} onClick={onExportPdf}>
-              PDF
-            </Button>
-          </Tooltip>
-        )}
-        <span className={styles.divider} aria-hidden />
         {!confirmed && (
           <>
             {onRequestAll && (

@@ -42,6 +42,8 @@ import {
   DismissRegular,
   CalendarLtrRegular,
   TableRegular,
+  DocumentPdfRegular,
+  HistoryRegular,
   DataBarVerticalRegular,
   SettingsRegular,
   LayoutColumnTwoRegular,
@@ -63,6 +65,7 @@ import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar } from './WeekReviewBar'
 import { MePicker } from './MePicker'
 import { WeekRetro } from './WeekRetro'
+import { WeekHistory } from './WeekHistory'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage, type ResultsDataActions } from './ResultsPage'
@@ -462,6 +465,8 @@ function App() {
   }
   // アラートは、面ではなく、上に重ねて開くフロート(閉じれば、見ていた画面に戻る)
   const [alertsOpen, setAlertsOpen] = useState(false)
+  // この週の承認の履歴(「この画面 ▾」から開く)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const showFaceRaw = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
@@ -676,6 +681,7 @@ function App() {
   }, [rows, weekStart])
   // 週の状態: この週の行と、この週のすべての配信(絞り込みに関係なく、週の単位で進める)
   const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
+  const weekEvents = useMemo(() => events.filter((e) => e.week_start?.slice(0, 10) === weekKey), [events, weekKey])
   const thisWeek = weeks.find((w) => w.week_start?.slice(0, 10) === weekKey)
   const weekCards = useMemo(() => {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
@@ -1249,6 +1255,17 @@ function App() {
                           {t('配信を CSV で書き出す', 'Export deliveries as CSV')}
                         </MenuItem>
                       )}
+                      {/* 週の表示のときだけ: いま見ている週の資料(PDF)と、承認の履歴 */}
+                      {page === 'calendar' && view === 'week' && (
+                        <>
+                          <MenuItem icon={<DocumentPdfRegular />} disabled={weekCards.length === 0} onClick={() => setPrintingWeek(true)} secondaryContent={t('表示中の週', 'This week')}>
+                            {t('週の資料を PDF で書き出す', 'Export the week handout (PDF)')}
+                          </MenuItem>
+                          <MenuItem icon={<HistoryRegular />} onClick={() => setHistoryOpen(true)} secondaryContent={t(`${weekEvents.length} 件`, `${weekEvents.length}`)}>
+                            {t('この週の承認の履歴', 'Approval history for this week')}
+                          </MenuItem>
+                        </>
+                      )}
                       {page === 'results' && resultsData && (
                         <>
                           <MenuItem icon={<ArrowDownloadRegular />} disabled={!resultsData.canExport} onClick={resultsData.exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
@@ -1322,7 +1339,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onExportPdf={() => setPrintingWeek(true)} onChange={changeWeek}
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
                 statusCounts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: weekCards.filter((c) => statusView(c.status) === o.value).length }))}
                 toFix={shownChecklist.filter((i) => !i.ok).length}
                 fixChip={<WeekCheckChip items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
@@ -1359,7 +1376,7 @@ function App() {
                       products={products}
                       heroes={heroes}
                       checklist={checklist}
-                      events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)}
+                      events={weekEvents}
                       openComments={openComments}
                       author={myName()}
                     />
@@ -1396,6 +1413,7 @@ function App() {
         )}
       </div>
       {/* アラート(フロート)。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
+      <WeekHistory open={historyOpen} onClose={() => setHistoryOpen(false)} events={weekEvents} />
       <AlertsFloat open={alertsOpen} onClose={() => setAlertsOpen(false)}>
         <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
