@@ -273,6 +273,33 @@
    ],
    "lookups": [
    ]
+  },
+  "users": {
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["email", "text", {"index": true}],
+    ["role", "choice"],
+    ["status", "choice"]
+   ],
+   "lookups": [
+   ]
+  },
+  "approval_groups": {
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["description", "text"],
+    ["status", "choice"]
+   ],
+   "lookups": [
+   ]
+  },
+  "approval_group_members": {
+   "columns": [
+   ],
+   "lookups": [
+    ["approval_group_id", "approval_groups", {"onDelete": "CASCADE"}],
+    ["user_id", "users", {"onDelete": "CASCADE"}]
+   ]
   }
  },
  "choices": {
@@ -293,6 +320,9 @@
   "hero_images.market": ["JP", "US"],
   "ai_requests.status": ["waiting", "done", "error"],
   "events.from_status": ["not_started", "reviewing", "approved", "confirmed"],
-  "events.to_status": ["not_started", "reviewing", "approved", "confirmed"]
+  "events.to_status": ["not_started", "reviewing", "approved", "confirmed"],
+  "users.role": ["member", "admin"],
+  "users.status": ["active", "inactive"],
+  "approval_groups.status": ["active", "inactive"]
  }
 }

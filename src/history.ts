@@ -5,10 +5,29 @@ import { EventsService, type EventAction } from './data/events'
 import { loadPref, savePref } from './settings'
 import { weekKeyOf } from './weekLock'
 
-// 操作した人の名前。ログインで人を見分けないので、画面で入れた名前を、ブラウザごとに覚えて使う(コメントを書く人と共通)
+// 操作した人の名前。ログインで人を見分けないので、画面で選んだ(入れた)名前を、ブラウザごとに覚えて使う(コメントを書く人と共通)。
+// U2 から、ユーザーマスタから選んだ人の id も覚える(me.user)。記録には、これまでどおり名前の文字を残す(ログインが入るまでの形。docs/APPROVAL.md)
 const NAME_KEY = 'me.name'
+const USER_KEY = 'me.user'
+const meListeners = new Set<() => void>()
 export const myName = (): string => loadPref<string>(NAME_KEY, '') || loadPref<string>('comment.author', '')
-export const setMyName = (name: string) => savePref(NAME_KEY, name.trim())
+export const myUserId = (): string => loadPref<string>(USER_KEY, '')
+export const setMyName = (name: string) => {
+  savePref(NAME_KEY, name.trim())
+  meListeners.forEach((f) => f())
+}
+/** ユーザーマスタから「あなた」を選ぶ(名前も一緒に覚える。外すときは undefined) */
+export const setMe = (user?: { id: string; name: string }) => {
+  savePref(USER_KEY, user?.id ?? '')
+  setMyName(user?.name ?? '')
+}
+/** 「あなた」が変わったら知らせる(週の帯と配信カードなど、別の場所で選び直しても、そろえるため) */
+export const onMeChange = (f: () => void) => {
+  meListeners.add(f)
+  return () => {
+    meListeners.delete(f)
+  }
+}
 
 export interface EventInput {
   action: EventAction

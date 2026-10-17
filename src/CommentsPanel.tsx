@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Avatar, Badge, Button, Field, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowReplyRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, CommentRegular, DeleteRegular, EditRegular } from '@fluentui/react-icons'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
 import { locale, tr, useT } from './i18n'
 import { myName, setMyName } from './history'
+import { MePicker } from './MePicker'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -366,7 +367,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
         <div className={styles.form}>
           <div className={styles.formRow}>
             <Field label={t('あなたの名前', 'Your name')} size="small">
-              <Input size="small" list="ccp-comment-people" value={author} onChange={(_, d) => setAuthor(d.value)} onBlur={() => setMyName(author)} />
+              <MePicker list="ccp-comment-people" onChange={setAuthor} />
             </Field>
             <Field label={t('対象', 'About')} size="small">
               <Select size="small" value={target} onChange={(_, d) => setTarget(d.value)}>

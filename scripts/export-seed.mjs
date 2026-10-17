@@ -29,6 +29,9 @@ try {
     weeks: m.weeks,
     delivery_results: m.deliveryResults,
     change_logs: m.changeLogs,
+    users: m.users,
+    approval_groups: m.approvalGroups,
+    approval_group_members: m.approvalGroupMembers,
   }
   writeFileSync(join(root, 'server', 'seed.json'), JSON.stringify(data, null, 1) + '\n')
   for (const [k, v] of Object.entries(data)) console.log(k, v.length)

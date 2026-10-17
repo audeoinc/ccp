@@ -41,6 +41,7 @@ import {
   DataBarVerticalRegular,
   SettingsRegular,
   LayoutColumnTwoRegular,
+  PeopleTeamRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
 } from '@fluentui/react-icons'
@@ -74,6 +75,8 @@ import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
 import { loadCustomTemplates } from './layoutTemplates'
 import { TemplateManager } from './TemplateManager'
+import { PeopleManager } from './PeopleManager'
+import { openPeopleManager } from './people'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { BulkDraftBar } from './BulkDraftBar'
@@ -860,6 +863,7 @@ function App() {
   return (
     <>
       <TemplateManager />
+      <PeopleManager />
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
         <h1 className={styles.title}>{t('コンテンツプランナー', 'Contents Planner')}</h1>
@@ -919,6 +923,9 @@ function App() {
             <MenuList>
               <MenuItem icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
                 {t('テンプレートの管理', 'Manage templates')}
+              </MenuItem>
+              <MenuItem icon={<PeopleTeamRegular />} onClick={openPeopleManager}>
+                {t('ユーザーと承認グループ', 'Users and approval groups')}
               </MenuItem>
               {/* 引っ越し用のパック: すべてのデータと画像を 1 つの ZIP に書き出す(外にアクセスできない環境へ持ち込むため。server/ccp/pack.py) */}
               <MenuItem

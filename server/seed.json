@@ -10088,6 +10088,7 @@
    "delivery_card_id": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
    "kind": "question",
    "author": "Alex Kim",
+   "assignee": "Mika Tanaka",
    "body": "Can we use the close-up of the cable knit for the hero instead of the full look?",
    "created_on": "2026-09-25T02:10:00.000Z",
    "reply": "Yes, but keep the warm tone. The full look can go in Section 1.",
@@ -10096,10 +10097,21 @@
    "resolved": 1
   },
   {
+   "id": "3872523e-3fb6-4001-a2c7-1848f1eaa203",
+   "delivery_card_id": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "kind": "question",
+   "author": "Mika Tanaka",
+   "assignee": "Alex Kim",
+   "body": "Can you share a draft of the hero by Wednesday?",
+   "created_on": "2026-09-26T00:30:00.000Z",
+   "resolved": 0
+  },
+  {
    "id": "ab07cd19-9e16-4cf0-adaf-1f73df5daa0a",
    "delivery_card_id": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
    "kind": "question",
    "author": "Sam Ito",
+   "assignee": "Mika Tanaka",
    "body": "Is the price in the email the sale price or the regular price?",
    "created_on": "2026-09-26T01:00:00.000Z",
    "resolved": 0
@@ -10109,6 +10121,7 @@
    "delivery_card_id": "5400a216-eb9b-42cd-a91b-9f981e1c462f",
    "kind": "question",
    "author": "Sam Ito",
+   "assignee": "Jordan Lee",
    "body": "Should the countdown banner show hours or just \"Ends Sunday\"?",
    "created_on": "2026-09-27T06:00:00.000Z",
    "reply": "Just \"Ends Sunday\" — the banner is too small for a timer.",
@@ -10990,6 +11003,125 @@
    "card_name": "Holiday Preview",
    "actor": "Jordan Lee",
    "created_on": "2026-10-14T05:10:00.000Z"
+  }
+ ],
+ "users": [
+  {
+   "id": "58df32aa-125f-4ba9-a057-288411c7d163",
+   "name": "Mika Tanaka",
+   "email": "mika.tanaka@example.com",
+   "role": "admin",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "f7cb0342-8d53-4733-ad86-fd4c2e21b275",
+   "name": "Jordan Lee",
+   "email": "jordan.lee@example.com",
+   "role": "member",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "b5fd97e1-36a4-4534-a0b1-e153fa6b751e",
+   "name": "Ken Sato",
+   "email": "ken.sato@example.com",
+   "role": "member",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "d666d431-ca42-4b0c-abff-738fe9e24152",
+   "name": "Alex Kim",
+   "email": "alex.kim@example.com",
+   "role": "member",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "cb5e3a3b-7f1c-4cf8-a257-447937021efe",
+   "name": "Sam Ito",
+   "email": "sam.ito@example.com",
+   "role": "member",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "9735c380-b574-42fd-a91c-4262ab856eef",
+   "name": "Aya Mori",
+   "email": "aya.mori@example.com",
+   "role": "member",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "16a1452f-7c4f-43a0-a1b2-794dda8293be",
+   "name": "Rina Ueda",
+   "email": "rina.ueda@example.com",
+   "role": "member",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  }
+ ],
+ "approval_groups": [
+  {
+   "id": "51f7a7db-21f4-46f8-af0c-eec9508d7aa6",
+   "name": "MD",
+   "description": "Checks products, stock and promo periods",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "ef15187f-ec6d-4642-afae-e2ddd09bb908",
+   "name": "Brand",
+   "description": "Checks tone, copy and visuals",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "09014679-eec0-4de8-ac64-24ff6db8303e",
+   "name": "Marketing leads",
+   "description": "Checks the weekly plan and themes",
+   "status": "active",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  }
+ ],
+ "approval_group_members": [
+  {
+   "id": "5589f840-ade7-4be7-aa02-de22fb04ccb9",
+   "approval_group_id": "51f7a7db-21f4-46f8-af0c-eec9508d7aa6",
+   "user_id": "9735c380-b574-42fd-a91c-4262ab856eef",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "c7345ea1-8c16-4646-aa06-d513df152db0",
+   "approval_group_id": "51f7a7db-21f4-46f8-af0c-eec9508d7aa6",
+   "user_id": "b5fd97e1-36a4-4534-a0b1-e153fa6b751e",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "c67c4370-a8e3-43b7-ad48-f022bd344441",
+   "approval_group_id": "ef15187f-ec6d-4642-afae-e2ddd09bb908",
+   "user_id": "58df32aa-125f-4ba9-a057-288411c7d163",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "407ff7d1-1c84-494a-a9f4-3c7716c23068",
+   "approval_group_id": "ef15187f-ec6d-4642-afae-e2ddd09bb908",
+   "user_id": "16a1452f-7c4f-43a0-a1b2-794dda8293be",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "3fa43cf2-ab21-4457-a681-f20ca799d379",
+   "approval_group_id": "09014679-eec0-4de8-ac64-24ff6db8303e",
+   "user_id": "f7cb0342-8d53-4733-ad86-fd4c2e21b275",
+   "created_on": "2026-10-01T00:00:00.000Z"
+  },
+  {
+   "id": "677189b1-42fe-4dd8-ab2a-be1387d17192",
+   "approval_group_id": "09014679-eec0-4de8-ac64-24ff6db8303e",
+   "user_id": "b5fd97e1-36a4-4534-a0b1-e153fa6b751e",
+   "created_on": "2026-10-01T00:00:00.000Z"
   }
  ]
 }

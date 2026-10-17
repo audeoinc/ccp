@@ -1,0 +1,318 @@
+import { useEffect, useState } from 'react'
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogSurface,
+  DialogTitle,
+  Dropdown,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Option,
+  Select,
+  Spinner,
+  Tab,
+  TabList,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components'
+import { AddRegular, DismissRegular } from '@fluentui/react-icons'
+import { locale, optionLabel, tr, useT } from './i18n'
+import { logEvent } from './history'
+import { MePicker } from './MePicker'
+import { activeUsers, groupUsers, reloadPeople, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
+import { UsersService } from './data/users'
+import { ApprovalGroupsService } from './data/approvalGroups'
+import { ApprovalGroupMembersService } from './data/approvalGroupMembers'
+import { EventsService, type CardEvent } from './data/events'
+import { UserRole, UserStatus, type User, type UserFields } from './models/users'
+import { ApprovalGroupStatus, type ApprovalGroup, type ApprovalGroupFields } from './models/approvalGroups'
+
+const useStyles = makeStyles({
+  surface: { width: 'min(880px, 96vw)', maxWidth: 'none', maxHeight: '90vh', display: 'flex', flexDirection: 'column', rowGap: '12px' },
+  head: { display: 'flex', alignItems: 'center', columnGap: '8px' },
+  grow: { flexGrow: 1 },
+  note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  scroll: { overflowY: 'auto', minHeight: '240px', display: 'grid', rowGap: '8px', alignContent: 'start' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.4fr) 120px 100px', columnGap: '8px', rowGap: '6px', alignItems: 'center' },
+  colHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  addRow: { display: 'flex', columnGap: '8px', alignItems: 'center', flexWrap: 'wrap', paddingBottom: '8px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  group: { display: 'grid', rowGap: '6px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
+  groupHead: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 2fr) 100px', columnGap: '8px', alignItems: 'center' },
+  members: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', rowGap: '6px', alignItems: 'center' },
+  label: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  history: { display: 'grid', rowGap: '6px', fontSize: tokens.fontSizeBase200 },
+  historyRow: { display: 'grid', rowGap: '1px', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
+  meta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  inactive: { color: tokens.colorNeutralForeground4 },
+})
+
+type TabKey = 'users' | 'groups' | 'history'
+
+const roleOptions = Object.entries(UserRole) as [keyof typeof UserRole, string][]
+const statusOptions = Object.entries(UserStatus) as [keyof typeof UserStatus, string][]
+const groupStatusOptions = Object.entries(ApprovalGroupStatus) as [keyof typeof ApprovalGroupStatus, string][]
+
+const looksLikeEmail = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
+
+/**
+ * ユーザーと承認グループ(バックログ U1。docs/APPROVAL.md)。⚙ のメニューから開く。
+ * ログインが入るまでは、だれでも編集できる。そのかわり、変更はすべて操作の履歴に残し、ここの「変更の履歴」で見られるようにする
+ */
+export function PeopleManager() {
+  const isOpen = usePeopleManagerOpen()
+  const s = useStyles()
+  const t = useT()
+  const people = usePeople()
+  const [tab, setTab] = useState<TabKey>('users')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [log, setLog] = useState<CardEvent[] | null>(null)
+  // 足すユーザー・グループの入力
+  const [newUser, setNewUser] = useState({ name: '', email: '' })
+  const [newGroup, setNewGroup] = useState({ name: '', description: '' })
+
+  const loadLog = async () => {
+    const r = await EventsService.getAll({ orderBy: ['created_on desc'] })
+    setLog(r.success ? (r.data ?? []).filter((e) => e.action === 'user_change' || e.action === 'group_change') : [])
+  }
+  useEffect(() => {
+    if (!isOpen) return
+    void reloadPeople()
+    // 開いたときに、変更の履歴を読み直す(ほかの人の変更も見えるように)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadLog()
+  }, [isOpen])
+
+  /** 書き込み → 履歴に残す → 読み直す。失敗したら理由を出して、履歴は残さない */
+  const run = async (write: () => Promise<{ success: boolean; error?: { message: string } }>, action: 'user_change' | 'group_change', note: string) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await write()
+      if (!r.success) throw new Error(r.error?.message ?? tr('保存できませんでした', 'Could not save'))
+      await logEvent({ action, note })
+      await Promise.all([reloadPeople(), loadLog()])
+      return true
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const emailTaken = (email: string, except?: string) => people.users.some((u) => u.id !== except && (u.email ?? '').toLowerCase() === email.toLowerCase())
+  const checkEmail = (email: string, except?: string): string | null =>
+    email && !looksLikeEmail(email)
+      ? t('メールアドレスの形が正しくありません', 'The email address does not look right')
+      : email && emailTaken(email, except)
+        ? t('同じメールアドレスのユーザーがいます', 'Another user has the same email address')
+        : null
+
+  const addUser = async () => {
+    const name = newUser.name.trim()
+    const email = newUser.email.trim()
+    const bad = checkEmail(email)
+    if (bad) return setError(bad)
+    if (await run(() => UsersService.create({ name, email: email || undefined, role: 'member', status: 'active' }), 'user_change', tr(`追加: ${name}`, `Added: ${name}`))) setNewUser({ name: '', email: '' })
+  }
+
+  /** ユーザーの 1 項目を変える(入力欄は、離れたときに保存する) */
+  const updateUser = (u: User, field: keyof UserFields, value: string) => {
+    const v = value.trim()
+    if ((u[field] ?? '') === v) return
+    if (field === 'name' && !v) return setError(t('名前は空にできません', 'The name cannot be empty'))
+    if (field === 'email') {
+      const bad = checkEmail(v, u.id)
+      if (bad) return setError(bad)
+    }
+    const shown = (x?: string) => (field === 'role' ? optionLabel(UserRole[x as keyof typeof UserRole]) : field === 'status' ? optionLabel(UserStatus[x as keyof typeof UserStatus]) : x) || '—'
+    const what = { name: tr('名前', 'name'), email: tr('メールアドレス', 'email'), role: tr('役割', 'role'), status: tr('状態', 'status') }[field]
+    void run(() => UsersService.update(u.id, { [field]: v || undefined }), 'user_change', tr(`${u.name} の${what}: ${shown(u[field])} → ${shown(v)}`, `${u.name} ${what}: ${shown(u[field])} → ${shown(v)}`))
+  }
+
+  const addGroup = async () => {
+    const name = newGroup.name.trim()
+    const description = newGroup.description.trim()
+    if (await run(() => ApprovalGroupsService.create({ name, description: description || undefined, status: 'active' }), 'group_change', tr(`追加: ${name}`, `Added: ${name}`))) setNewGroup({ name: '', description: '' })
+  }
+
+  const updateGroup = (g: ApprovalGroup, field: keyof ApprovalGroupFields, value: string) => {
+    const v = value.trim()
+    if ((g[field] ?? '') === v) return
+    if (field === 'name' && !v) return setError(t('名前は空にできません', 'The name cannot be empty'))
+    const shown = (x?: string) => (field === 'status' ? optionLabel(ApprovalGroupStatus[x as keyof typeof ApprovalGroupStatus]) : x) || '—'
+    const what = { name: tr('名前', 'name'), description: tr('説明', 'description'), status: tr('状態', 'status') }[field]
+    void run(() => ApprovalGroupsService.update(g.id, { [field]: v || undefined }), 'group_change', tr(`${g.name} の${what}: ${shown(g[field])} → ${shown(v)}`, `${g.name} ${what}: ${shown(g[field])} → ${shown(v)}`))
+  }
+
+  const addMember = (g: ApprovalGroup, u: User) =>
+    void run(() => ApprovalGroupMembersService.create({ approval_group_id: g.id, user_id: u.id }), 'group_change', tr(`${g.name} に ${u.name} を足した`, `Added ${u.name} to ${g.name}`))
+
+  const removeMember = (g: ApprovalGroup, u: User) => {
+    const row = people.members.find((m) => m.approval_group_id === g.id && m.user_id === u.id)
+    if (!row) return
+    void run(
+      async () => {
+        await ApprovalGroupMembersService.delete(row.id)
+        return { success: true }
+      },
+      'group_change',
+      tr(`${g.name} から ${u.name} を外した`, `Removed ${u.name} from ${g.name}`),
+    )
+  }
+
+  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
+
+  const usersTab = (
+    <>
+      <div className={s.addRow}>
+        <Input size="small" placeholder={t('名前', 'Name')} value={newUser.name} onChange={(_, d) => setNewUser((x) => ({ ...x, name: d.value }))} />
+        <Input size="small" type="email" placeholder={t('メールアドレス(ログイン・通知に使う)', 'Email (for sign-in and notifications)')} value={newUser.email} onChange={(_, d) => setNewUser((x) => ({ ...x, email: d.value }))} style={{ minWidth: '260px' }} />
+        <Button size="small" icon={<AddRegular />} disabled={busy || !newUser.name.trim()} onClick={() => void addUser()}>
+          {t('ユーザーを足す', 'Add user')}
+        </Button>
+      </div>
+      <div className={s.grid}>
+        <span className={s.colHead}>{t('名前', 'Name')}</span>
+        <span className={s.colHead}>{t('メールアドレス', 'Email')}</span>
+        <span className={s.colHead}>{t('役割', 'Role')}</span>
+        <span className={s.colHead}>{t('状態', 'Status')}</span>
+        {people.users.map((u) => (
+          // key に更新の時刻を含め、保存し直したら入力欄を、保存した値で作り直す(入れかけの値が残らないように)
+          <UserRow key={`${u.id}:${u.modified_on ?? ''}:${u.name}:${u.email ?? ''}`} user={u} disabled={busy} onChange={(f, v) => updateUser(u, f, v)} />
+        ))}
+      </div>
+      {people.loaded && people.users.length === 0 && <span className={s.note}>{t('まだユーザーがいません。上で足すと、「あなた」をユーザーから選べるようになります。', 'No users yet. Once you add some, "You" is chosen from the users.')}</span>}
+    </>
+  )
+
+  const groupsTab = (
+    <>
+      <div className={s.addRow}>
+        <Input size="small" placeholder={t('グループの名前(例: MD・ブランド)', 'Group name (e.g. MD, Brand)')} value={newGroup.name} onChange={(_, d) => setNewGroup((x) => ({ ...x, name: d.value }))} />
+        <Input size="small" placeholder={t('何を見るグループか', 'What the group checks')} value={newGroup.description} onChange={(_, d) => setNewGroup((x) => ({ ...x, description: d.value }))} style={{ minWidth: '260px' }} />
+        <Button size="small" icon={<AddRegular />} disabled={busy || !newGroup.name.trim()} onClick={() => void addGroup()}>
+          {t('グループを足す', 'Add group')}
+        </Button>
+      </div>
+      <span className={s.note}>{t('承認を依頼すると、グループのだれか 1 人が承認すれば、そのグループは済みになります。', 'When approval is requested from a group, one approval from any member completes that group.')}</span>
+      {people.groups.map((g) => {
+        const inGroup = groupUsers(people, g.id)
+        const candidates = activeUsers(people).filter((u) => !inGroup.some((x) => x.id === u.id))
+        return (
+          <div key={`${g.id}:${g.modified_on ?? ''}:${g.name}:${g.description ?? ''}`} className={s.group}>
+            <div className={s.groupHead}>
+              <Input size="small" defaultValue={g.name} aria-label={t('グループの名前', 'Group name')} disabled={busy} onBlur={(e) => updateGroup(g, 'name', e.target.value)} />
+              <Input size="small" defaultValue={g.description ?? ''} placeholder={t('何を見るグループか', 'What the group checks')} aria-label={t('説明', 'Description')} disabled={busy} onBlur={(e) => updateGroup(g, 'description', e.target.value)} />
+              <Select size="small" value={g.status ?? 'active'} aria-label={t('状態', 'Status')} disabled={busy} onChange={(_, d) => updateGroup(g, 'status', d.value)}>
+                {groupStatusOptions.map(([v, l]) => (
+                  <option key={v} value={v}>{optionLabel(l)}</option>
+                ))}
+              </Select>
+            </div>
+            <div className={s.members}>
+              <span className={s.label}>{t(`メンバー ${inGroup.length} 人`, `${inGroup.length} member(s)`)}</span>
+              {inGroup.map((u) => (
+                <Button key={u.id} size="small" shape="circular" appearance="secondary" icon={<DismissRegular />} iconPosition="after" disabled={busy} title={t(`${u.name} をグループから外す`, `Remove ${u.name} from the group`)} onClick={() => removeMember(g, u)}>
+                  {u.name}
+                </Button>
+              ))}
+              {candidates.length > 0 && (
+                <Dropdown
+                  size="small"
+                  placeholder={t('メンバーを足す', 'Add a member')}
+                  value=""
+                  selectedOptions={[]}
+                  disabled={busy}
+                  onOptionSelect={(_, d) => {
+                    const u = candidates.find((x) => x.id === d.optionValue)
+                    if (u) addMember(g, u)
+                  }}
+                >
+                  {candidates.map((u) => (
+                    <Option key={u.id} value={u.id} text={u.name}>{u.name}</Option>
+                  ))}
+                </Dropdown>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      {people.loaded && people.groups.length === 0 && <span className={s.note}>{t('まだ承認グループがありません。', 'No approval groups yet.')}</span>}
+    </>
+  )
+
+  const historyTab = (
+    <div className={s.history}>
+      {log === null && <Spinner size="tiny" />}
+      {log?.length === 0 && <span className={s.note}>{t('まだ記録はありません', 'Nothing recorded yet')}</span>}
+      {log?.map((e) => (
+        <div key={e.id} className={s.historyRow}>
+          <span className={s.meta}>{`${when(e.created_on)} · ${e.actor || t('(名前なし)', '(no name)')} · ${e.action === 'user_change' ? t('ユーザー', 'User') : t('承認グループ', 'Approval group')}`}</span>
+          <span>{e.note}</span>
+        </div>
+      ))}
+    </div>
+  )
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(_, d) => !d.open && setOpen(false)}>
+      <DialogSurface className={s.surface}>
+        <div className={s.head}>
+          <DialogTitle className={s.grow}>{t('ユーザーと承認グループ', 'Users and approval groups')}</DialogTitle>
+          {busy && <Spinner size="extra-tiny" />}
+          {/* 変更の履歴に、だれが変えたかを残すため、ここでも「あなた」を選べるようにする */}
+          <MePicker ariaLabel={t('変更の履歴に残す、あなた', 'You (for the change history)')} />
+          <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setOpen(false)} />
+        </div>
+        <span className={s.note}>
+          {t(
+            'ログインが入るまでは、だれでも編集できます。変更は「変更の履歴」に残ります。やめた人は、消さずに「無効」にします(履歴に名前が残るように)。',
+            'Until sign-in is added, anyone can edit here. Every change is kept in the change history. Set people who left to Inactive instead of deleting them, so their names stay in the history.',
+          )}
+        </span>
+        {error && (
+          <MessageBar intent="error" layout="multiline">
+            <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
+        <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabKey)}>
+          <Tab value="users">
+            {t('ユーザー', 'Users')} <Badge size="small" appearance="tint" color="informative">{people.users.length}</Badge>
+          </Tab>
+          <Tab value="groups">
+            {t('承認グループ', 'Approval groups')} <Badge size="small" appearance="tint" color="informative">{people.groups.length}</Badge>
+          </Tab>
+          <Tab value="history">{t('変更の履歴', 'Change history')}</Tab>
+        </TabList>
+        <div className={s.scroll}>{!people.loaded ? <Spinner size="tiny" /> : tab === 'users' ? usersTab : tab === 'groups' ? groupsTab : historyTab}</div>
+      </DialogSurface>
+    </Dialog>
+  )
+}
+
+/** ユーザー 1 人の行。名前・メールアドレスは、入力欄を離れたときに保存する(1 文字ごとに保存・履歴が増えないように) */
+function UserRow({ user, disabled, onChange }: { user: User; disabled: boolean; onChange: (field: keyof UserFields, value: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const inactive = (user.status ?? 'active') === 'inactive'
+  return (
+    <>
+      <Input size="small" className={inactive ? s.inactive : undefined} defaultValue={user.name} aria-label={t('名前', 'Name')} disabled={disabled} onBlur={(e) => onChange('name', e.target.value)} />
+      <Input size="small" type="email" defaultValue={user.email ?? ''} aria-label={t('メールアドレス', 'Email')} disabled={disabled} onBlur={(e) => onChange('email', e.target.value)} />
+      <Select size="small" value={user.role ?? 'member'} aria-label={t('役割', 'Role')} disabled={disabled} onChange={(_, d) => onChange('role', d.value)}>
+        {roleOptions.map(([v, l]) => (
+          <option key={v} value={v}>{optionLabel(l)}</option>
+        ))}
+      </Select>
+      <Select size="small" value={user.status ?? 'active'} aria-label={t('状態', 'Status')} disabled={disabled} onChange={(_, d) => onChange('status', d.value)}>
+        {statusOptions.map(([v, l]) => (
+          <option key={v} value={v}>{optionLabel(l)}</option>
+        ))}
+      </Select>
+    </>
+  )
+}

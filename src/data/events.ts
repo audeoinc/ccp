@@ -10,9 +10,10 @@ import type { DeliveryCardStatus } from '../models/deliveryCards'
  * status = 配信のステータスを変えた(配信カードで) / reopen = 確定した週の配信を、理由を残して変えた(週はレビューに戻る) /
  * approve = 承認した(配信 1 本、または週の検討中の配信をまとめて) / reject = 差し戻した(理由つき) /
  * revoke = 承認済みの配信の内容が変わったので、検討中に戻した(再承認が必要) /
- * bulk_create = AI でまとめて作った配信を保存した(W14)
+ * bulk_create = AI でまとめて作った配信を保存した(W14) /
+ * user_change = ユーザーを足した・変えた / group_change = 承認グループを足した・変えた・メンバーを出し入れした(U1。週・配信に結び付かない)
  */
-export type EventAction = 'submit' | 'draft' | 'confirm' | 'unconfirm' | 'status' | 'reopen' | 'approve' | 'reject' | 'revoke' | 'bulk_create'
+export type EventAction = 'submit' | 'draft' | 'confirm' | 'unconfirm' | 'status' | 'reopen' | 'approve' | 'reject' | 'revoke' | 'bulk_create' | 'user_change' | 'group_change'
 
 export interface CardEvent {
   id: string

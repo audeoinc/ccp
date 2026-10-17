@@ -55,4 +55,6 @@ export const actionText = (t: T, a?: EventAction): string =>
     reject: t('差し戻した', 'Sent back'),
     revoke: t('承認後に内容が変わったので、検討中に戻した', 'Content changed after approval, back to In review'),
     bulk_create: t('AI でまとめて作成した', 'Created with AI in bulk'),
+    user_change: t('ユーザーを変えた', 'Changed a user'),
+    group_change: t('承認グループを変えた', 'Changed an approval group'),
   })[a ?? 'status'] ?? ''

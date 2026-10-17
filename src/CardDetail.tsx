@@ -20,7 +20,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, ArrowUndoRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PersonRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, ArrowUndoRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -49,7 +49,8 @@ import { useAiDrafts } from './useAiDrafts'
 import { WeeksService, type WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf } from './weekLock'
-import { logEvent, myName, setMyName } from './history'
+import { logEvent, myName } from './history'
+import { MePicker } from './MePicker'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
@@ -1432,18 +1433,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             {/* 承認・差し戻し(配信 1 本ずつ)。確定した週の配信は、確定後の変更(理由つき)の流れになるので出さない */}
             {canReview && (
               <div className={styles.review}>
-                <Input
-                  size="small"
-                  className={styles.actor}
-                  contentBefore={<PersonRegular />}
-                  placeholder={t('あなたの名前', 'Your name')}
-                  aria-label={t('承認・差し戻しの履歴に残す名前', 'Your name for the approval history')}
-                  value={actor}
-                  onChange={(_, d) => {
-                    setActor(d.value)
-                    setMyName(d.value)
-                  }}
-                />
+                <MePicker className={styles.actor} ariaLabel={t('承認・差し戻しの履歴に残す名前', 'Your name for the approval history')} onChange={setActor} />
                 {statusRank(savedStatus) < statusRank(STATUS_APPROVED) && (
                   <Button type="button" icon={<CheckmarkCircleRegular />} disabled={saving || !actor.trim() || rejectReason !== null} onClick={() => void save(undefined, { approve: true })}>
                     {t('保存して承認', 'Save and approve')}

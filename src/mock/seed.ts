@@ -523,3 +523,41 @@ export const changeLogs: Row[] = []
     })
   }
 }
+
+// ---- ユーザーと承認グループ(バックログ U1。docs/APPROVAL.md)
+// 名前は、ほかのサンプルデータ(担当・履歴・コメント)に出てくる人にそろえる。メールアドレスは、架空の example.com だけ(公開リポジトリのため)
+const PEOPLE: [string, string, 'member' | 'admin'][] = [
+  ['Mika Tanaka', 'mika.tanaka', 'admin'],
+  ['Jordan Lee', 'jordan.lee', 'member'],
+  ['Ken Sato', 'ken.sato', 'member'],
+  ['Alex Kim', 'alex.kim', 'member'],
+  ['Sam Ito', 'sam.ito', 'member'],
+  ['Aya Mori', 'aya.mori', 'member'],
+  ['Rina Ueda', 'rina.ueda', 'member'],
+]
+export const users: Row[] = PEOPLE.map(([name, mail, role]) => ({
+  id: guid(`user:${mail}`),
+  name,
+  email: `${mail}@example.com`,
+  role,
+  status: 'active',
+  created_on: '2026-10-01T00:00:00.000Z',
+}))
+const userId = (mail: string) => guid(`user:${mail}`)
+
+// Ken Sato は 2 つのグループに入っている(1 回の承認は 1 グループ分と数える、の見本)
+const GROUPS: [string, string, string[]][] = [
+  ['MD', 'Checks products, stock and promo periods', ['aya.mori', 'ken.sato']],
+  ['Brand', 'Checks tone, copy and visuals', ['mika.tanaka', 'rina.ueda']],
+  ['Marketing leads', 'Checks the weekly plan and themes', ['jordan.lee', 'ken.sato']],
+]
+export const approvalGroups: Row[] = GROUPS.map(([name, description]) => ({
+  id: guid(`group:${name}`),
+  name,
+  description,
+  status: 'active',
+  created_on: '2026-10-01T00:00:00.000Z',
+}))
+export const approvalGroupMembers: Row[] = GROUPS.flatMap(([name, , mails]) =>
+  mails.map((mail) => ({ id: guid(`member:${name}:${mail}`), approval_group_id: guid(`group:${name}`), user_id: userId(mail), created_on: '2026-10-01T00:00:00.000Z' })),
+)

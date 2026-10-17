@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, CheckmarkCircleRegular, DocumentPdfRegular, HistoryRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
+import { Badge, Button, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { ArrowUndoRegular, CheckmarkCircleRegular, DocumentPdfRegular, HistoryRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { WeekRow, WeekStatus } from './data/weeks'
 import type { CardNote } from './data/cardNotes'
 import type { CardEvent } from './data/events'
 import { actionText } from './weekLabels'
-import { myName, setMyName } from './history'
+import { myName } from './history'
+import { MePicker } from './MePicker'
 import { AiIcon } from './AiMark'
 import { locale, optionLabel, useT } from './i18n'
 import { statusOptions, statusRank } from './status'
@@ -154,17 +155,9 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onApprov
       <span className={styles.actions}>
         {busy && <Spinner size="extra-tiny" />}
         <Tooltip content={t('履歴に残す、あなたの名前(このブラウザで覚えます)', 'Your name for the history (remembered in this browser)')} relationship="description">
-          <Input
-            size="small"
-            className={styles.name}
-            contentBefore={<PersonRegular />}
-            placeholder={t('あなたの名前', 'Your name')}
-            value={name}
-            onChange={(_, d) => {
-              setName(d.value)
-              setMyName(d.value)
-            }}
-          />
+          <span>
+            <MePicker className={styles.name} onChange={setName} />
+          </span>
         </Tooltip>
         {history}
         {onExportPdf && (

@@ -74,6 +74,11 @@ const OPTION_EN: Record<string, string> = {
   検討中: 'In review',
   承認済み: 'Approved',
   確定: 'Confirmed',
+  // ユーザー・承認グループ
+  メンバー: 'Member',
+  管理者: 'Admin',
+  有効: 'Active',
+  無効: 'Inactive',
   // チャネル
   メール: 'Email',
   プッシュ: 'Push',
