@@ -20,7 +20,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PersonRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, ArrowUndoRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PersonRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -84,6 +84,10 @@ interface Props {
   draft?: AutoDraftResult
   /** 新規作成で保存したとき、作った配信カードの id を知らせる */
   onCreated?: (id: string) => void
+  /** 「保存して次へ」で開く配信(同じ週、または週の確認の項目で選んだ配信の、次の 1 本)。null は次がない。undefined はボタンを出さない */
+  next?: { name: string; position: string } | null
+  /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
+  onNext?: () => void
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -359,7 +363,7 @@ const useStyles = makeStyles({
   actor: { width: '160px' },
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, draft, onCreated }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, draft, onCreated, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -380,6 +384,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [autoEnabled] = useState(loadAutoDraft) // 設定は、画面上部のバーで切り替える
   const [auto, setAuto] = useState<{ label: string; done: number; total: number } | null>(null)
   const cancelRef = useRef(false)
+  // 保存のあとに、閉じずに次の配信を開くか(「保存して次へ」で立てる。確定した週の、理由を入力する流れでも引き継ぐ)
+  const goNextRef = useRef(false)
   const aliveRef = useRef(true)
   const previewBoxRef = useRef<HTMLDivElement>(null)
   const previewInnerRef = useRef<HTMLDivElement>(null)
@@ -814,6 +820,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
+    goNextRef.current = false
+    requestSave()
+  }
+
+  /** 保存して、次の配信を開く(週のレビュー・確定で、閉じてカレンダーで探し直さずに済むように。FLOWS.md の C-1) */
+  function saveAndNext() {
+    goNextRef.current = true
+    requestSave()
+  }
+
+  function requestSave() {
     // 確定した週の配信は、すぐには保存しない。理由を入力してもらってから、保存して、週をレビューに戻す
     if (lockedWeeks.length > 0) {
       setChangeReason((r) => r ?? '')
@@ -885,6 +902,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
    * 承認済みの配信の内容を変えたときは、再承認が必要なので「検討中」に戻す
    */
   async function save(reason?: string, opts?: { approve?: boolean; reject?: string }) {
+    // 承認・差し戻しは、これまでどおり閉じる(次へ進むのは「保存して次へ」と、その理由の入力からだけ)
+    const goNext = goNextRef.current && !opts?.approve && opts?.reject === undefined
     setSaving(true)
     setError(null)
     try {
@@ -939,7 +958,9 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         })
       }
       await onSaved()
-      onBack()
+      goNextRef.current = false
+      if (goNext && next && onNext) onNext()
+      else onBack()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -1357,7 +1378,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 />
               </Field>
               <div className={styles.reasonActions}>
-                <Button type="button" size="small" onClick={() => setChangeReason(null)} disabled={saving}>{t('やめる', 'Back')}</Button>
+                <Button
+                  type="button"
+                  size="small"
+                  onClick={() => {
+                    goNextRef.current = false
+                    setChangeReason(null)
+                  }}
+                  disabled={saving}
+                >
+                  {t('やめる', 'Back')}
+                </Button>
                 <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => void save(changeReason)}>
                   {t('保存して、レビューに戻す', 'Save and send back to review')}
                 </Button>
@@ -1420,6 +1451,17 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </div>
             )}
             <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
+            {/* 次がないときも消さずに、選べないだけにする(ボタンの位置を変えない。PRINCIPLES.md 2-2) */}
+            {next !== undefined && (
+              <Tooltip
+                relationship="description"
+                content={next ? t(`保存して、次の配信「${next.name}」を開きます(${next.position})`, `Save and open the next delivery "${next.name}" (${next.position})`) : t('次の配信はありません(この週・この確認の項目の、最後の配信です)', 'No next delivery (this is the last one in this week or check item)')}
+              >
+                <Button type="button" icon={<ArrowNextRegular />} iconPosition="after" disabled={saving || !next || (changeReason !== null && lockedWeeks.length > 0)} onClick={saveAndNext}>
+                  {t('保存して次へ', 'Save and next')}
+                </Button>
+              </Tooltip>
+            )}
             <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)}>
               {saving ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
             </Button>

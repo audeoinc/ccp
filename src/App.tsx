@@ -107,8 +107,10 @@ interface Filters {
   channel: string
   department: string
   status: string
+  /** 担当(企画・制作のどちらかが、この名前の配信)。制作担当が、自分の配信だけを見る入り口にする(FLOWS.md の C-2) */
+  person: string
 }
-const noFilter: Filters = { country: '', channel: '', department: '', status: '' }
+const noFilter: Filters = { country: '', channel: '', department: '', status: '', person: '' }
 // 開いたときの絞り込み: ビルドの設定(VITE_DEFAULT_COUNTRY。US)の国。なければ、絞り込まない
 const initialFilters: Filters = {
   ...noFilter,
@@ -367,6 +369,8 @@ function App() {
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
   const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
+  // 配信に入っている担当(企画・制作)の名前。担当の絞り込みと、配信カードの担当の候補に使う
+  const owners = useMemo(() => [...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort(), [cards])
   // アラートの条件(人ごと。A6)
   const alertSettings = useAlertSettings()
   const alertState = useStockAlerts(activeCards, products, cards, alertSettings.lowWeeks)
@@ -511,7 +515,8 @@ function App() {
         match(filters.country, c.country) &&
         match(filters.channel, c.channel) &&
         match(filters.department, c.department) &&
-        match(filters.status, c.status),
+        match(filters.status, c.status) &&
+        (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person),
     )
   }, [cards, filters])
 
@@ -693,6 +698,22 @@ function App() {
   }
 
   const selected = cards.find((c) => c.id === selectedId)
+  // 「保存して次へ」で開く配信(FLOWS.md の C-1)。週の表示で確認の項目を選んでいて、開いた配信がその項目に入っていれば、その項目の配信の中で次へ。
+  // それ以外は、同じ週(日曜から)の配信の中で次へ。どちらも、絞り込みを反映し、取りやめは除き、配信日時の順
+  const nextOf = (() => {
+    if (!selected?.scheduled_at) return undefined
+    const inCheck = page === 'calendar' && view === 'week' && !!focus?.cards.has(selected.id)
+    const week = sundayOf(new Date(selected.scheduled_at)).getTime()
+    const pool = filtered
+      .filter((c) => !isCancelled(c) && c.scheduled_at && (inCheck ? focus!.cards.has(c.id) : sundayOf(new Date(c.scheduled_at)).getTime() === week))
+      .sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!) || a.name.localeCompare(b.name))
+    const i = pool.findIndex((c) => c.id === selected.id)
+    // 開いた配信が、いまの絞り込みに入っていない(アラートの画面から開いた など)ときは、次を決められないので、ボタンを出さない
+    if (i < 0) return undefined
+    const n = pool[i + 1]
+    const where = inCheck ? tr(`確認の項目の ${i + 2} / ${pool.length}`, `${i + 2} of ${pool.length} in the check item`) : tr(`この週の ${i + 2} / ${pool.length}`, `${i + 2} of ${pool.length} this week`)
+    return n ? { id: n.id, name: n.name, position: where } : null
+  })()
   const shiftRaw = (n: number) => {
     if (view === 'week') {
       // 週を動かし、月も、その週の真ん中(水曜日)の月に合わせる(月の表示に戻ったときに、同じあたりを見せる)
@@ -867,6 +888,7 @@ function App() {
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
               <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
               <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />
+              <FilterSelect label={t('担当', 'Person')} value={filters.person} options={owners.map((o) => ({ value: o, label: o }))} onChange={setFilter('person')} />
               {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters(noFilter)}>{t('クリア', 'Clear')}</Button>}
               <span className={styles.count}>{t(`${filtered.filter((c) => !isCancelled(c)).length} / ${activeCards.length} 件`, `${filtered.filter((c) => !isCancelled(c)).length} / ${activeCards.length} items`)}</span>
             </div>
@@ -1000,7 +1022,7 @@ function App() {
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {page === 'alerts' ? (
-              <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={[...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort()} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+              <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
             ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}
@@ -1079,7 +1101,7 @@ function App() {
           heroes={heroes}
           otherThemes={cards.filter((c) => c.id !== selected?.id && c.theme).map((c) => c.theme!)}
           weeks={weeks}
-          owners={[...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort()}
+          owners={owners}
           onBack={() => {
             setFocusProduct(undefined)
             setSelectedId(null)
@@ -1092,6 +1114,12 @@ function App() {
           onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
           alerts={selected ? cardAlerts.get(selected.id) : undefined}
           focusProductId={focusProduct}
+          next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}
+          onNext={() => {
+            if (!nextOf) return
+            setFocusProduct(undefined)
+            setSelectedId(nextOf.id)
+          }}
         />
       )}
       {bulk.active && (
@@ -1107,7 +1135,7 @@ function App() {
           heroes={heroes}
           otherThemes={[...activeCards.map((c) => c.theme ?? ''), ...bulk.live.filter((x) => x.key !== editingDraft.key).map((x) => x.result?.theme ?? '')].filter(Boolean)}
           weeks={weeks}
-          owners={[...new Set(cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]).filter((o): o is string => !!o))].sort()}
+          owners={owners}
           onBack={() => setEditingDraft(null)}
           onSaved={load}
           onCreated={(id) => {
