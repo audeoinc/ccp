@@ -7,6 +7,7 @@ import { productImage } from './images'
 import { yen } from './items'
 import { optionLabel, useT } from './i18n'
 import { productMarket } from './market'
+import { reviewKeywords } from './reviewKeywords'
 import { MiniChart } from './MiniChart'
 import { useProductData } from './useProductData'
 
@@ -31,6 +32,7 @@ const useStyles = makeStyles({
   label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   value: { margin: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
   center: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
+  keywords: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' },
 })
 
 type TabId = 'trend' | 'plan' | 'details'
@@ -49,6 +51,8 @@ export function ProductDetail({ product: p, onClose }: { product: Product; /** �
   const { data, loading, error } = useProductData(p.product_code)
   const market = productMarket(p)
   const weekly = data?.weekly ?? []
+  // 良い声を先に(コピーの材料として先に目に入るよう)。同じ側の中は、AI の返した順(よく出る順)のまま
+  const keywords = [...reviewKeywords(p)].sort((a, b) => (a.sentiment === b.sentiment ? 0 : a.sentiment === 'good' ? -1 : 1))
 
   // 指標: 直近 4 週の販売数と、その前の 4 週との比較。在庫で何週分売れるか。12 週の売上
   const last4 = weekly.slice(-4).reduce((n, w) => n + w.units, 0)
@@ -157,10 +161,29 @@ export function ProductDetail({ product: p, onClose }: { product: Product; /** �
           <dd className={s.value}>{optionLabel(p.sales_trend_name) || '-'}</dd>
           <dt className={s.label}>{t('評価', 'Rating')}</dt>
           <dd className={s.value}>{p.rating !== undefined ? `★${p.rating}` : '-'}{p.review_count ? t(`(${p.review_count} 件)`, ` (${p.review_count} reviews)`) : ''}</dd>
-          {p.review_summary && (
+          {(p.review_summary || keywords.length > 0) && (
             <>
               <dt className={s.label}>{t('レビューの声', 'What reviewers say')}</dt>
-              <dd className={s.value}>{p.review_summary}</dd>
+              <dd className={s.value}>
+                {p.review_summary}
+                {keywords.length > 0 && (
+                  // 良い声は緑・気になる声は赤で分ける(コピーに使える言葉と、避ける・答える言葉を、ひと目で分けるため)
+                  <div className={s.keywords}>
+                    {keywords.map((k) => (
+                      <Badge
+                        key={`${k.sentiment}-${k.term}`}
+                        appearance="tint"
+                        shape="rounded"
+                        size="small"
+                        color={k.sentiment === 'good' ? 'success' : 'danger'}
+                        title={k.sentiment === 'good' ? t('良い点', 'Positive') : t('気になる点', 'Concern')}
+                      >
+                        {k.term}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </dd>
             </>
           )}
           <dt className={s.label}>{t('季節', 'Season')}</dt>

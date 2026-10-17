@@ -79,6 +79,8 @@ export interface ProductFields {
   as_of?: string
   /** レビューの要約(取り込みのときに Gemini で作る。B5) */
   review_summary?: string
+  /** レビューのキーワード(要約と同じ呼び出しで作る。B5)。JSON の文字 `[{term, sentiment: 'good' | 'bad'}]`。読むときは `reviewKeywords(p)` */
+  review_keywords?: string
   /** 要約を作ったときの「件数|最新の日時」(変わったら作り直す) */
   review_summary_basis?: string
   state_code?: number

@@ -172,14 +172,20 @@ async def _sum_stock(conn: AsyncConnection) -> None:
     """))
 
 
-# ---- レビューの要約(B5。docs/BIGQUERY.md の 8 章)
+# ---- レビューの要約とキーワード(B5・B8 の案 B。docs/BIGQUERY.md の 8 章)
 # Cloud Run は応答のあとの裏の処理が止まりやすいので、取り込みの中で、時間の上限まで作る。残りは、次に開いたときに続きを作る
 SUMMARY_BUDGET_S = 25
+# キーワードの数と 1 語の長さの上限(商品情報に並べる・AI に渡すので、多すぎると読まれない。返答がこれを超えたら切る)
+KEYWORDS_MAX = 6
+KEYWORD_LEN = 40
 SUMMARY_PROMPT = """あなたは EC のマーケターの補助。次は、ある商品の、お客さまのレビュー(新しい順。--- で区切り)。
-商品を選ぶ・コピーを考えるときに役立つよう、よく言われている良い点と、気になる点を、{lang}で 2 文以内({limit} 文字以内)に要約する。
+商品を選ぶ・コピーを考えるときに役立つよう、次の 2 つを作る。
+1. summary: よく言われている良い点と、気になる点を、{lang}で 2 文以内({limit} 文字以内)に要約する
+2. keywords: お客さまがレビューで実際に使っている言葉・短い言い回しを 3〜6 個。{lang}で、レビューの言葉のまま(言い換え・要約をしない)。
+   sentiment は、良い点なら "good"、気になる点なら "bad"。よく出るものから順に
 - レビューに書かれていないことは書かない。数字や言い回しを作らない
 - 名前・メールアドレスなど、個人を特定できることは書かない。レビューの文をそのまま長く写さない
-返答は JSON だけ: {{"summary": "要約"}}
+返答は JSON だけ: {{"summary": "要約", "keywords": [{{"term": "言葉", "sentiment": "good"}}]}}
 
 商品: {name}
 平均の評価: {rating}(件数 {count})
@@ -202,12 +208,40 @@ def _summary_prompt(r: dict[str, Any]) -> str:
                                  count=r.get("review_count"), texts=str(r.get("review_texts"))[:6000])
 
 
+def parse_summary(raw: str) -> tuple[str, list[dict[str, str]]] | None:
+    """Gemini の返答から、要約とキーワードを取り出す。要約がなければ None(壊れた返答として飛ばす)。
+    キーワードは、形の合わないもの(sentiment が good / bad 以外・空の言葉)と重複を捨てるだけで、要約は活かす
+    (キーワードだけ崩れた返答のために、要約まで作り直すのはむだなので)"""
+    try:
+        o = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(o, dict):
+        return None
+    summary = str(o.get("summary") or "").strip()
+    if not summary:
+        return None
+    keywords: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for k in o.get("keywords") if isinstance(o.get("keywords"), list) else []:
+        if not isinstance(k, dict):
+            continue
+        term = " ".join(str(k.get("term") or "").split())[:KEYWORD_LEN]
+        sentiment = str(k.get("sentiment") or "").strip().lower()
+        if not term or sentiment not in ("good", "bad") or term.lower() in seen:
+            continue
+        seen.add(term.lower())
+        keywords.append({"term": term, "sentiment": sentiment})
+    return summary, keywords[:KEYWORDS_MAX]
+
+
 async def summarize_reviews(budget_s: float = SUMMARY_BUDGET_S) -> dict[str, int]:
-    """件数・最新の日時が前回の要約から変わった商品だけ、Gemini でレビューを要約して products.review_summary に書く。
+    """件数・最新の日時が前回の要約から変わった商品だけ、Gemini でレビューを要約し、キーワードと一緒に
+    products.review_summary・review_keywords に書く(1 回の呼び出しで両方。呼ぶ回数・時間を増やさないため)。
     AI の設定(GOOGLE_CLOUD_PROJECT)がなければ、何もしない。失敗した商品は飛ばす(次の機会に、また作る)"""
     if not os.getenv("GOOGLE_CLOUD_PROJECT"):
         return {"made": 0, "left": 0, "failed": 0}
-    from .ai import generate
+    from . import ai
 
     async with db() as conn:
         rows = [dict(r) for r in (await conn.execute(text(
@@ -215,30 +249,35 @@ async def summarize_reviews(budget_s: float = SUMMARY_BUDGET_S) -> dict[str, int
         ))).mappings().all()]
     todo = [(r, b) for r in rows if (b := summary_basis(r)) and b != r.get("review_summary_basis")]
     deadline = time.monotonic() + budget_s
-    made = 0
+    # 順番待ちを、ここで持つ。ai.generate の中の順番待ちだけだと、全件が上限の確かめを通ってから並ぶので、
+    # 上限を過ぎても、並んだ分を全部呼んでしまう(前の版で、25 秒の上限に対して 114 秒かかった)
+    gate = asyncio.Semaphore(max(1, int(os.getenv("GEMINI_CONCURRENCY", "4"))))
 
-    async def one(r: dict[str, Any], basis: str) -> tuple[Any, str, str] | str | None:
-        # 上限を過ぎたら、新しくは呼ばない(呼び出し中のものは待つ)。順番待ち(GEMINI_CONCURRENCY)のあとでも確かめる
-        if time.monotonic() > deadline:
-            return "skip"
-        try:
-            raw = await generate(_summary_prompt(r))
-            summary = str(json.loads(raw).get("summary") or "").strip()
-            return (r["id"], summary, basis) if summary else None
-        except Exception as e:  # noqa: BLE001 — 1 件の失敗で、ほかの要約を止めない
-            log.warning("レビューの要約に失敗しました(%s): %s", r.get("name"), e)
+    async def one(r: dict[str, Any], basis: str) -> tuple[Any, str, str | None, str] | str | None:
+        async with gate:
+            # 上限を過ぎたら、新しくは呼ばない(呼び出し中のものは待つ)。順番が回ってきたときに確かめる
+            if time.monotonic() > deadline:
+                return "skip"
+            try:
+                got = parse_summary(await ai.generate(_summary_prompt(r)))
+            except Exception as e:  # noqa: BLE001 — 1 件の失敗で、ほかの要約を止めない
+                log.warning("レビューの要約に失敗しました(%s): %s", r.get("name"), e)
+                return None
+        if not got:
+            log.warning("レビューの要約の返答が読めませんでした(%s)", r.get("name"))
             return None
+        summary, keywords = got
+        return r["id"], summary, json.dumps(keywords, ensure_ascii=False) if keywords else None, basis
 
-    # 同時に呼ぶ数は ai.generate の上限(GEMINI_CONCURRENCY)に任せる
     results = await asyncio.gather(*(one(r, b) for r, b in todo))
     ok = [x for x in results if isinstance(x, tuple)]
     done = sum(1 for x in results if x != "skip")
     failed = done - len(ok)
     if ok:
         async with db(write=True) as conn:
-            await conn.execute(text("UPDATE products SET review_summary = :s, review_summary_basis = :b WHERE id = :id"),
-                               [{"id": pid, "s": s[:600], "b": b} for pid, s, b in ok])
-        made = len(ok)
+            await conn.execute(text("UPDATE products SET review_summary = :s, review_keywords = :k, review_summary_basis = :b WHERE id = :id"),
+                               [{"id": pid, "s": s[:600], "k": k, "b": b} for pid, s, k, b in ok])
+    made = len(ok)
     if made or failed:
         log.info("レビューの要約: 作った %d / 失敗 %d / 残り %d", made, failed, len(todo) - done)
     return {"made": made, "left": len(todo) - done, "failed": failed}

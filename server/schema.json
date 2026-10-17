@@ -85,6 +85,7 @@
     ["weather_basis", "text"],
     ["as_of", "timestamptz"],
     ["review_summary", "text"],
+    ["review_keywords", "text"],
     ["review_summary_basis", "text"]
    ],
    "lookups": [

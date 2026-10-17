@@ -2,6 +2,7 @@ import { findViolations, retryNote, type Violation } from './policyCheck'
 import { ProductCategory } from './models/products'
 import { AiRequestsService } from './data/aiRequests'
 import type { Product } from './models/products'
+import { reviewKeywords } from './reviewKeywords'
 import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
 import type { SectionKind } from './templates'
@@ -524,6 +525,11 @@ async function askText(message: string): Promise<string> {
 
 const today = () => new Date().toISOString().slice(0, 10)
 
+const reviewWordsOf = (p: Product) => {
+  const good = reviewKeywords(p).filter((k) => k.sentiment === 'good').slice(0, 4).map((k) => k.term)
+  return good.length ? good : undefined
+}
+
 const productPayload = (p: Product) => ({
   code: p.product_code,
   name: p.name,
@@ -538,6 +544,8 @@ const productPayload = (p: Product) => ({
   md: mdOf(p.product_code),
   // お客さまのレビューの要約(B5。BigQuery から取り込んだ商品だけ)。選定の理由・コピーの材料
   reviews: p.review_summary ? clip(p.review_summary, 160) : undefined,
+  // レビューでよく使われる良い言葉の上位(B5)。コピーにお客さまの言葉を活かすため。気になる言葉は、要約に含まれるので渡さない(プロンプトを短く保つ)
+  reviewWords: reviewWordsOf(p),
 })
 
 export interface SectionRequest {
