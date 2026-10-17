@@ -13,7 +13,6 @@ import {
   MessageBarBody,
   Tab,
   TabList,
-  Text,
   makeStyles,
   mergeClasses,
   tokens,
@@ -57,6 +56,9 @@ import { linkSlots, type Links } from './links'
 
 // links・handoff は工程ではない(「工程 n / 5」に数えない)。工程のタブと、少し間を空けて置く
 type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'handoff' | 'tasks' | 'comments' | 'notice' | 'message' | 'timing'
+/** 中ペインの 2 つの面。make = コンテンツを作る工程(AI チャットを使う)、talk = 人とのやり取り(引き継ぎ・タスク・コメント。AI チャットは使わない) */
+type Area = 'make' | 'talk'
+const TALK_TABS: TopTab[] = ['handoff', 'tasks', 'comments']
 type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
 
 interface Props {
@@ -179,7 +181,9 @@ const useStyles = makeStyles({
     columnGap: '4px',
     '& button': { flexShrink: 0, whiteSpace: 'nowrap' },
   },
-  // 工程ではないタブ(リンク先・引き継ぎ)の前の区切り
+  // 面の切り替え(コンテンツ生成 / やり取り)。見出しの代わりに置き、その下のタブとは大きさで区別する
+  areas: { minWidth: 0 },
+  // 工程ではないタブ(リンク先)の前の区切り
   extraTab: { marginLeft: '12px', '::before': { content: '""', position: 'absolute', left: '-8px', top: '25%', bottom: '25%', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` } },
   // Block
   block: {
@@ -1096,6 +1100,13 @@ export function ContentPane(props: Props) {
   const t = useT()
   const { theme, headline, instructions, onField, drafts, template, onTemplate, candidates } = props
   const [tab, setTab] = useState<TopTab>('theme')
+  // 面ごとに、最後に開いていたタブを覚えておき、面を戻したときに同じタブを開く
+  const area: Area = TALK_TABS.includes(tab) ? 'talk' : 'make'
+  const [lastTab, setLastTab] = useState<Record<Area, TopTab>>({ make: 'theme', talk: 'handoff' })
+  const openTab = (next: TopTab) => {
+    setTab(next)
+    setLastTab((prev) => ({ ...prev, [TALK_TABS.includes(next) ? 'talk' : 'make']: next }))
+  }
   // リンク先のタブを開いている間だけ、プレビューにリンクの場所の番号を出す(タブを離れたら、選んでいた欄も外す)
   const { onLinksTab, onLinkFocus } = props
   useEffect(() => {
@@ -1131,6 +1142,8 @@ export function ContentPane(props: Props) {
   const [openQuestions, setOpenQuestions] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
   const [openComments, setOpenComments] = useState(0)
+  // やり取りの面に、対応が残っている数の合計を出す(開かなくても、残っていると分かるように)
+  const openTalk = openQuestions + openTasks + openComments
   const [noteVersion, setNoteVersion] = useState(0)
   const notesChanged = useCallback(() => setNoteVersion((v) => v + 1), [])
   useEffect(() => {
@@ -1189,8 +1202,14 @@ export function ContentPane(props: Props) {
   return (
     <div className={s.shell}>
     <div className={s.head}>
-      <Text weight="semibold" size={300}>{t('コンテンツ生成', 'Content generation')}</Text>
-      <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TopTab)}>
+      {/* コンテンツを作る工程と、人とのやり取りは、性質が違う(AI を使うか、プレビューに出るか)ので、面を分けてタブを混ぜない */}
+      <TabList appearance="subtle-circular" size="small" className={s.areas} selectedValue={area} onTabSelect={(_, d) => openTab(lastTab[d.value as Area])}>
+        <Tab value="make">{t('コンテンツ生成', 'Content generation')}</Tab>
+        <Tab value="talk">{`${t('やり取り', 'Communication')}${openTalk ? t(`(${openTalk})`, ` (${openTalk})`) : ''}`}</Tab>
+      </TabList>
+      <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => openTab(d.value as TopTab)}>
+        {area === 'make' && (
+        <>
         <Tab value="theme" onClick={revealTab}>{`${mark(pr.theme, drafts.themeIdeas.length > 0)}${t('① テーマ', '1. Theme')}`}</Tab>
         <Tab value="template" onClick={revealTab}>{`${mark(pr.template, false)}${t('② テンプレート', '2. Template')}`}</Tab>
         {isPush ? (
@@ -1207,7 +1226,11 @@ export function ContentPane(props: Props) {
           </>
         )}
         {!isPush && <Tab value="links" onClick={revealTab} className={s.extraTab}>{`${linksMissing ? '! ' : ''}${t('リンク先', 'Links')}`}</Tab>}
-        <Tab value="handoff" onClick={revealTab} className={isPush ? s.extraTab : undefined}>
+        </>
+        )}
+        {area === 'talk' && (
+        <>
+        <Tab value="handoff" onClick={revealTab}>
           {`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}${openQuestions ? t(`(${openQuestions})`, ` (${openQuestions})`) : ''}`}
         </Tab>
         <Tab value="tasks" onClick={revealTab}>
@@ -1216,6 +1239,8 @@ export function ContentPane(props: Props) {
         <Tab value="comments" onClick={revealTab}>
           {`${t('コメント', 'Comments')}${openComments ? t(`(${openComments})`, ` (${openComments})`) : ''}`}
         </Tab>
+        </>
+        )}
       </TabList>
     </div>
     <div className={s.scroll}>
@@ -1318,7 +1343,7 @@ export function ContentPane(props: Props) {
           cardId={props.cardId}
           productionOwner={props.handoff.productionOwner}
           productionDue={props.handoff.productionDue}
-          onOpenSource={() => setTab('handoff')}
+          onOpenSource={() => openTab('handoff')}
           onChanged={notesChanged}
         />
       )}
@@ -1344,6 +1369,8 @@ export function ContentPane(props: Props) {
       )}
     </div>
     </div>
+    {/* やり取りの面では、AI チャットを出さない(対象にならないのに、場所だけ取るため) */}
+    {area === 'make' && (
     <ChatPanel
       title={chatTarget?.title ?? null}
       messages={chatTarget ? (chats[chatTarget.key] ?? []) : []}
@@ -1353,6 +1380,7 @@ export function ContentPane(props: Props) {
       onSend={(text) => void sendChat(text)}
       onClear={() => chatTarget && setChats((prev) => ({ ...prev, [chatTarget.key]: [] }))}
     />
+    )}
     </div>
   )
 }

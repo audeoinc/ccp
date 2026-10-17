@@ -233,17 +233,19 @@ const SCENES = {
   },
   async aiTabs(page, L) {
     await open(page, CARD(L))
-    for (const [k, tab] of [
+    for (const [k, tab, area] of [
       ['11-theme', T(L, '① テーマ', '1. Theme')],
       ['12-template', T(L, '② テンプレート', '2. Template')],
       ['13-hero', T(L, '③ ヒーロー', '3. Hero')],
       ['14-sections', T(L, '④ セクション', '4. Sections')],
       ['15-instructions', T(L, '⑤ 制作指示', '5. Production notes')],
       ['16-links', T(L, 'リンク先', 'Links')],
-      ['17-handoff', T(L, '引き継ぎ', 'Handoff')],
+      ['17-handoff', T(L, '引き継ぎ', 'Handoff'), T(L, 'やり取り', 'Communication')],
       ['18-tasks', T(L, 'タスク', 'Tasks')],
       ['19-comments', T(L, 'コメント', 'Comments')],
     ]) {
+      // 引き継ぎ・タスク・コメントは、中ペインの「やり取り」の面にある(先に面を切り替える)
+      if (area) await cardTab(page, area)
       await cardTab(page, tab)
       await dialogShot(page, `${L}-${k}`)
     }
