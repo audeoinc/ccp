@@ -25,6 +25,26 @@ function logEvent(action: string, actor: Actor, card: Row, weekStart: string | u
   tables.EventsService.push({ id: newId('event'), action, week_start: weekStart, delivery_card_id: card.id, card_name: card.name, from_status: from, to_status: to, actor: actor.name, note, created_on: now() })
 }
 
+/** 依頼の相手(グループ・人)に当たる、有効なユーザーの id(グループは、そのメンバー全員) */
+function reviewerUsers(reviewers: ApprovalReviewer[]): string[] {
+  const out: string[] = []
+  for (const r of reviewers) {
+    if (r.user_id) out.push(r.user_id)
+    else if (r.approval_group_id) out.push(...tables.ApprovalGroupMembersService.filter((m) => m.approval_group_id === r.approval_group_id).map((m) => String(m.user_id)))
+  }
+  return [...new Set(out)]
+}
+
+/** 送る箱(U5)に積む。本番のサーバー(approvals.py の _notify)と同じ。操作した本人には積まない */
+function notify(userIds: string[], exclude: string, kind: string, subject: string, body: string, cardId: string, requestId: string) {
+  for (const uid of new Set(userIds)) {
+    if (uid === exclude) continue
+    const u = tables.UsersService.find((x) => x.id === uid && (x.status ?? 'active') === 'active' && x.email)
+    if (!u) continue
+    tables.NotificationsService.push({ id: newId('notification'), user_id: uid, email: u.email, kind, subject, body, delivery_card_id: cardId, approval_request_id: requestId, status: 'pending', created_on: now() })
+  }
+}
+
 function staleLive(cardId: string) {
   for (const r of tables.ApprovalRequestsService) {
     if (r.delivery_card_id === cardId && LIVE.has(String(r.status))) {
@@ -80,6 +100,7 @@ export const ApprovalsService = {
     if (before !== 'reviewing') setCardStatus(card, 'reviewing')
     const all = [...groups, ...users].map((x) => x.name).join(' / ')
     logEvent('request', input.actor, card, input.week_start, before, 'reviewing', `${all}(${input.rule === 'all' ? '全員' : '1 人'})${input.note?.trim() ? ` — ${input.note.trim()}` : ''}`)
+    notify(reviewerUsers(reviewersOf(req.id as string)), input.actor.id, 'review_requested', `承認の依頼: ${card.name}`, `${input.actor.name} が「${card.name}」の承認を依頼しました(相手: ${all}。決まり: ${input.rule === 'all' ? '全員' : '1 人'})。${input.note?.trim() ? ` ${input.note.trim()}` : ''}`, card.id as string, req.id as string)
     return { success: true, data: view(req, req.id as string) }
   },
 
@@ -108,10 +129,12 @@ export const ApprovalsService = {
       Object.assign(req, { status: 'approved', closed_at: at })
       setCardStatus(card, 'approved')
       logEvent('approve', input.actor, card, input.week_start, before, 'approved', `${slot} — これで承認がそろった`)
+      notify([String(req.requested_by ?? '')], input.actor.id, 'approved', `承認されました: ${card.name}`, `${input.actor.name}(${slot})の承認で、「${card.name}」の承認がそろいました。`, card.id as string, requestId)
     } else if (outcome === 'changes_requested') {
       Object.assign(req, { status: 'changes_requested', closed_at: at })
       tables.CardNotesService.push({ id: newId('comment'), delivery_card_id: card.id, kind: 'comment', author: input.actor.name, body: note, resolved: 0, created_on: at })
       logEvent('reject', input.actor, card, input.week_start, before, before, `${slot} — ${note}`)
+      notify([String(req.requested_by ?? '')], input.actor.id, 'changes_requested', `差し戻されました: ${card.name}`, `${input.actor.name}(${slot})が「${card.name}」を差し戻しました。理由: ${note}`, card.id as string, requestId)
     } else {
       logEvent('approve', input.actor, card, input.week_start, before, before, `${slot}(ほかの相手の承認待ち)`)
     }
@@ -131,6 +154,7 @@ export const ApprovalsService = {
       const after = before === 'reviewing' ? 'not_started' : before
       if (after !== before) setCardStatus(card, after)
       logEvent('withdraw', input.actor, card, input.week_start, before, after, input.note?.trim() || undefined)
+      notify(reviewerUsers(reviewersOf(requestId).filter((r) => (r.decision ?? 'pending') === 'pending')), input.actor.id, 'withdrawn', `依頼の取り下げ: ${card.name}`, `${input.actor.name} が「${card.name}」の承認の依頼を取り下げました。${input.note?.trim() ? ` ${input.note.trim()}` : ''}`, card.id as string, requestId)
     }
     return { success: true, data: view(req, requestId) }
   },

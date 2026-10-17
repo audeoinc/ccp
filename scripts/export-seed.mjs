@@ -35,6 +35,7 @@ try {
     approval_rules: m.approvalRules,
     approval_requests: m.approvalRequests,
     approval_reviewers: m.approvalReviewers,
+    notifications: m.notifications,
   }
   writeFileSync(join(root, 'server', 'seed.json'), JSON.stringify(data, null, 1) + '\n')
   for (const [k, v] of Object.entries(data)) console.log(k, v.length)

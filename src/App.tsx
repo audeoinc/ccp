@@ -78,7 +78,10 @@ import { withHeroLabels, withProductLabels } from './labels'
 import { loadCustomTemplates } from './layoutTemplates'
 import { TemplateManager } from './TemplateManager'
 import { PeopleManager } from './PeopleManager'
-import { openPeopleManager } from './people'
+import { openPeopleManager, usePeople } from './people'
+import { InboxButton } from './InboxButton'
+import { useApprovalInbox } from './useApprovalInbox'
+import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { BulkDraftBar } from './BulkDraftBar'
@@ -89,9 +92,9 @@ import type { Draft } from './bulkDraft'
 import { draftName } from './bulkDraft'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
-import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions } from './status'
+import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusView } from './status'
 import { dayKeyOf, sundayOf } from './weekLock'
-import { logEvent, myName } from './history'
+import { logEvent, myName, myUserId } from './history'
 import { EventsService, type CardEvent } from './data/events'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
 import { WeekReport } from './WeekReport'
@@ -396,6 +399,9 @@ function App() {
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
   const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
+  // ユーザー・承認グループと、依頼中の承認(ヘッダーの「自分宛ての依頼」と、週の帯のまとめての操作に使う。U5・U6)
+  const people = usePeople()
+  const inbox = useApprovalInbox(cards)
   // 配信に入っている担当(企画・制作)の名前。担当の絞り込みと、配信カードの担当の候補に使う
   const owners = useMemo(
     () => [...new Set([...cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]), ...[...noteParties.values()].flatMap((x) => [...x])].filter((o): o is string => !!o))].sort(),
@@ -600,7 +606,7 @@ function App() {
         match(filters.country, c.country) &&
         match(filters.channel, c.channel) &&
         match(filters.department, c.department) &&
-        match(filters.status, c.status) &&
+        match(filters.status, statusView(c.status)) &&
         (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person || !!noteParties.get(c.id)?.has(filters.person)),
     )
   }, [cards, filters, noteParties])
@@ -738,17 +744,22 @@ function App() {
     }
     await load()
   }
-  // 週の「検討中」の配信を、まとめて承認する(承認の単位は、1 本ずつと週まとめての両方。2026-10-14 決定)
-  const approveWeek = async () => {
+  // 週の承認(U6): 未依頼の配信をまとめて依頼する / 自分宛ての依頼をまとめて承認する(配信カードと同じ窓口 /api/approvals を、順に呼ぶ)
+  const actor = () => ({ id: myUserId(), name: myName() })
+  const requestWeek = async () => {
     setError(null)
     try {
-      const moved: string[] = []
-      for (const c of weekCards.filter((x) => x.status === 'reviewing')) {
-        const r = await DeliveryCardsService.update(c.id, { status: 'approved' })
-        if (!r.success) throw new Error(r.error?.message ?? tr('配信のステータスを変えられませんでした', 'Could not update a delivery status'))
-        moved.push(c.name)
-      }
-      if (moved.length) await logEvent({ action: 'approve', weekStart: weekKey, from: 'reviewing', to: 'approved', note: moved.join(' / ') })
+      const { skipped } = await requestAll(needsRequest(weekCards, inbox.hasOpen), people, actor(), weekKey)
+      if (skipped.length) setError(tr(`既定の承認者がない種別の配信は飛ばしました(配信カードから依頼してください): ${skipped.join(' / ')}`, `Skipped deliveries whose type has no default approvers (request from the card): ${skipped.join(' / ')}`))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    await load()
+  }
+  const approveMineWeek = async () => {
+    setError(null)
+    try {
+      await approveMine(inbox.mineFor(weekCards.map((c) => c.id)), actor(), weekKey)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -904,6 +915,8 @@ function App() {
             )}
           </Button>
         </Tooltip>
+        {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
+        <InboxButton inbox={inbox} onOpenCard={setSelectedId} />
         {/* まとめて AI で下書き(W14)は、週の計画の作業なので、ここではなく、週の表示の「週の状態」の帯に置く */}
         <Button appearance="primary" size="small" icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
           {t('新規作成', 'New')}
@@ -1128,7 +1141,7 @@ function App() {
               <div className={styles.legend}>
                 {/* 凡例: 色の点だけ。名前はマウスを重ねる(キーボードで選ぶ)と出す。週の表示では、その週の状態ごとの件数を点の横に出す */}
                 {statusOptions.map((o) => {
-                  const n = view === 'week' ? weekCards.filter((c) => (c.status || 'not_started') === o.value).length : undefined
+                  const n = view === 'week' ? weekCards.filter((c) => statusView(c.status) === o.value).length : undefined
                   const name = n === undefined ? optionLabel(o.label) : t(`${optionLabel(o.label)} ${n} 件`, `${optionLabel(o.label)}: ${n}`)
                   return (
                     <Tooltip key={o.value} content={name} relationship="label">
@@ -1167,7 +1180,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onApproveAll={approveWeek} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek}
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onExportPdf={() => setPrintingWeek(true)} onBulkCreate={bulk.active ? undefined : startBulk} onChange={changeWeek}
                 toFix={shownChecklist.filter((i) => !i.ok).length}
                 fixChip={<WeekCheckChip items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
                 fix={

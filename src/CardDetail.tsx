@@ -1093,8 +1093,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             <MessageBar layout="multiline" intent="info" className={styles.locked}>
               <MessageBarBody>
                 {t(
-                  'この配信は承認済みです。内容を変えて保存すると「検討中」に戻り、もう一度承認が必要になります。',
-                  'This delivery is approved. If you change the content and save, it goes back to In review and needs approval again.',
+                  'この配信は承認済みです。内容を変えて保存すると「承認待ち」に戻り、承認の依頼からやり直しになります。',
+                  'This delivery is approved. If you change the content and save, it goes back to awaiting approval and needs a new approval request.',
                 )}
               </MessageBarBody>
             </MessageBar>
@@ -1103,8 +1103,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             <MessageBar layout="multiline" intent="warning" className={styles.locked}>
               <MessageBarBody>
                 {t(
-                  `この配信の週(${lockedWeeks.map(weekRange).join('、')})は確定済みです。変更を保存するときは、理由を入力します。保存すると、この配信は「検討中」に、週は「レビュー中」に戻ります。`,
-                  `The week of this delivery (${lockedWeeks.map(weekRange).join(', ')}) is confirmed. To save changes, enter a reason. Saving puts this delivery back to In review and the week back to review.`,
+                  `この配信の週(${lockedWeeks.map(weekRange).join('、')})は確定済みです。変更を保存するときは、理由を入力します。保存すると、この配信は「承認待ち」に戻り、週の確定は解けます。`,
+                  `The week of this delivery (${lockedWeeks.map(weekRange).join(', ')}) is confirmed. To save changes, enter a reason. Saving puts this delivery back to awaiting approval and the week is no longer confirmed.`,
                 )}
               </MessageBarBody>
             </MessageBar>
@@ -1159,6 +1159,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                       {statusOptions.map((o) => (
                         <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
                       ))}
+                      {/* 確定した週の配信の値(confirmed)は、画面の選択肢にはない(確定は週の言葉)ので、その値のときだけ出す */}
+                      {form.status === 'confirmed' && <option value="confirmed">{t('承認済み(週が確定)', 'Approved (week confirmed)')}</option>}
                     </Select>
                   </div>
                 </Field>

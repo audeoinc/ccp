@@ -209,8 +209,8 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
       <Field label={t('変更の理由(配信の変更の履歴に残ります)', 'Reason for the change (kept in the delivery history)')} size="small">
         <Textarea value={reason} onChange={(_, d) => setReason(d.value)} rows={2} resize="vertical" />
       </Field>
-      {mode !== 'cancel' && <Switch checked={backToReview || locked} disabled={locked} onChange={(_, d) => setBackToReview(d.checked)} label={t('変更のあと、レビューに戻す(承認済み・確定の配信は「検討中」に)', 'Send back to review after the change (approved / confirmed deliveries go back to In review)')} />}
-      {locked && <span className={styles.note}>{t('この配信の週は確定済みなので、変えると、週はレビュー中に戻ります', 'This week is confirmed, so changing it puts the week back in review')}</span>}
+      {mode !== 'cancel' && <Switch checked={backToReview || locked} disabled={locked} onChange={(_, d) => setBackToReview(d.checked)} label={t('変更のあと、承認をやり直す(承認済みの配信は「承認待ち」に)', 'Require approval again after the change (approved deliveries go back to awaiting approval)')} />}
+      {locked && <span className={styles.note}>{t('この配信の週は確定済みなので、変えると、週の確定は解けます', 'This week is confirmed, so changing it makes the week no longer confirmed')}</span>}
       {busy && <Spinner size="extra-tiny" />}
       {error && (
         <MessageBar intent="error">

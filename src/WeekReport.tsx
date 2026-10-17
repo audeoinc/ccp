@@ -7,8 +7,8 @@ import type { CardEvent } from './data/events'
 import type { CardNote } from './data/cardNotes'
 import type { CheckItem } from './reviewChecks'
 import { CardPreview } from './CardPreview'
-import { locale, optionLabel, useT } from './i18n'
-import { CHANNEL_PUSH, statusOptions } from './status'
+import { locale, useT } from './i18n'
+import { CHANNEL_PUSH, statusLabel } from './status'
 import { actionText, checkTitle } from './weekLabels'
 
 // 紙(A4 縦)に出す前提の、週の資料。画面には出さない(印刷のあいだだけ、index.css の「週の資料の印刷」で見せる)。
@@ -64,10 +64,10 @@ export function WeekReport({ weekStart, week, cards, cardProducts, products, her
   const day = (d: Date) => d.toLocaleDateString(locale(), { year: 'numeric', month: 'short', day: 'numeric' })
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '')
   const stamp = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
-  const statusName = (v?: string | null) => (v === undefined || v === null ? '' : optionLabel(statusOptions.find((o) => o.value === v)?.label))
+  const statusName = (v?: string | null) => (v === undefined || v === null ? '' : statusLabel(v, true))
   const channelName = (c: DeliveryCard) => (c.channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email'))
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
-  const weekStatus = week?.status === 'confirmed' ? t('確定', 'Confirmed') : week?.status === 'review' ? t('レビュー中', 'In review') : t('下書き', 'Draft')
+  const weekStatus = week?.status === 'confirmed' ? t('確定', 'Confirmed') : t('確定前', 'Not confirmed')
 
   return (
     <div className={s.root}>

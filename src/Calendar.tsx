@@ -1,7 +1,8 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, MailRegular, PhoneRegular, WarningFilled } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
-import { CHANNEL_PUSH, countryOptions, statusColor, statusOptions } from './status'
+import { CHANNEL_PUSH, countryOptions, statusColor, statusLabel } from './status'
+import { LockMark } from './LockMark'
 import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
@@ -260,7 +261,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                       e.stopPropagation()
                       onSelect(c.id)
                     }}
-                    title={`${c.name}(${label(statusOptions, c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
+                    title={`${c.name}(${statusLabel(c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
                     className={styles.pill}
                     style={{
                       backgroundColor: tone.background,
@@ -280,6 +281,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                         <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
                       )}
                       <AlertMark kind={alertKinds?.get(c.id)} />
+                      <LockMark status={c.status} />
                       {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
                       {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
                       {c.name}

@@ -72,6 +72,7 @@ const OPTION_EN: Record<string, string> = {
   // ステータス
   未起案: 'Not started',
   検討中: 'In review',
+  承認待ち: 'Awaiting approval',
   承認済み: 'Approved',
   確定: 'Confirmed',
   // ユーザー・承認グループ

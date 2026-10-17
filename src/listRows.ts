@@ -1,7 +1,7 @@
 import type { DeliveryCard } from './models/deliveryCards'
 import { locale, optionLabel, tr } from './i18n'
 import { cardProgress, isDueSoonNotStarted } from './progress'
-import { channelOptions, countryOptions, departmentOptions, statusOptions, statusRank } from './status'
+import { channelOptions, countryOptions, departmentOptions, statusLabel, statusRank } from './status'
 
 // 配信の一覧(ListView)の列と行。CSV の書き出しも、同じ定義を使う(画面と CSV で、列の並びと値をそろえるため)
 
@@ -56,7 +56,7 @@ export const COLUMNS: Column[] = [
   { key: 'country', label: () => tr('国', 'Country'), text: (r) => label(countryOptions, r.card.country) },
   { key: 'channel', label: () => tr('チャネル', 'Channel'), text: (r) => label(channelOptions, r.card.channel) },
   { key: 'department', label: () => tr('種別', 'Type'), text: (r) => label(departmentOptions, r.card.department) },
-  { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => label(statusOptions, r.card.status), sort: (r) => statusRank(r.card.status) },
+  { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => statusLabel(r.card.status), sort: (r) => statusRank(r.card.status) },
   { key: 'owner', label: () => tr('担当者', 'Owner'), text: (r) => r.card.owner ?? '' },
   { key: 'due', label: () => tr('制作の締め切り', 'Production due'), text: (r) => dueText(r.card.production_due), sort: (r) => r.card.production_due ?? '' },
   {

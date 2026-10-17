@@ -6,8 +6,8 @@ import type { WeekRow } from './data/weeks'
 import { AlertActionPanel } from './AlertActionPanel'
 import { isLeadStage, type ChangeAlert, type Placement, type StockModel } from './alerts'
 import { myName } from './history'
-import { locale, optionLabel, useT } from './i18n'
-import { CHANNEL_PUSH, statusColor, statusOptions } from './status'
+import { locale, useT } from './i18n'
+import { CHANNEL_PUSH, statusColor, statusLabel } from './status'
 
 const useStyles = makeStyles({
   detail: { display: 'grid', rowGap: '12px', minWidth: 0 },
@@ -63,7 +63,6 @@ export function ChangeAlertDetail({ alert, products, placements, model, weeks, o
   const fieldLabel = (f: string) =>
     ({ stage: t('位置づけ', 'Role'), promo_period: t('販促の期間', 'Promotion period'), policy: t('方針', 'Policy'), scheduled_at: t('配信日時', 'Date and time') })[f] ?? f
   const valueText = (f: string, v: string) => (f === 'scheduled_at' ? dateTime(v) : v || '—')
-  const statusLabel = (v?: string) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
   const stage = alert.changes.find((c) => c.field === 'stage')
   // 変更の説明(理由の最初の文・一覧に使う)
   const why = policy

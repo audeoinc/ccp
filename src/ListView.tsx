@@ -3,6 +3,7 @@ import { WarningRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { COLUMNS, type Column, type ColumnKey, type Row } from './listRows'
 import { statusColor } from './status'
+import { LockMark } from './LockMark'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
@@ -41,6 +42,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
           <span className={styles.status}>
             <span className={styles.dot} style={{ backgroundColor: statusColor(r.card.status) }} />
             {c.text(r)}
+            <LockMark status={r.card.status} />
           </span>
         )
       case 'steps':

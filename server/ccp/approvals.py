@@ -5,6 +5,10 @@
   POST /api/approvals/requests/{id}/withdraw    依頼を取り下げる(依頼した人だけ)
   POST /api/approvals/reset                     承認済み・依頼中の内容が変わったので、いまの依頼を「古い」にする
 
+通知(U5): 依頼・承認・差し戻し・取り下げのたびに、送る箱(notifications)に行を積む(宛先ごとに 1 行、status = pending)。
+実際にメールを送る仕組みは、まだない(U8)。外につながらない環境でも困らないよう、積むだけで、送れなくても操作は止めない。
+画面の「自分宛ての依頼」は、この箱ではなく、依頼中の依頼から計算する(箱の行は写しで、だれかが済ませたあとも残るため)。
+
 画面から表を直接書かず、ここで行う理由:
   - 「承認できるのは指名された本人だけ」「自分の依頼は承認できない」の確かめは、ログインが入ったら、サーバーでしか守れない。
     いまは、画面が送ってきた「あなた」(users の id と名前)を信じる(ログインが入ったら、ここだけを直す)
@@ -118,6 +122,33 @@ async def _event(conn: AsyncConnection, action: str, actor: dict[str, str], card
     )
 
 
+async def _reviewer_users(conn: AsyncConnection, reviewers: list[dict[str, Any]]) -> list[str]:
+    """依頼の相手(グループ・人)に当たる、有効なユーザーの id(グループは、そのメンバー全員)"""
+    out: list[str] = []
+    for r in reviewers:
+        if r.get("user_id"):
+            out.append(str(r["user_id"]))
+        elif r.get("approval_group_id"):
+            rows = (await conn.execute(text("SELECT user_id FROM approval_group_members WHERE approval_group_id = :g ORDER BY created_on"), {"g": sc.coerce("uuid", str(r["approval_group_id"]))})).all()
+            out.extend(str(x[0]) for x in rows if x[0] is not None)
+    return list(dict.fromkeys(out))
+
+
+async def _notify(conn: AsyncConnection, user_ids: list[str], exclude: str, kind: str, subject: str, body: str, card_id: str, request_id: str) -> None:
+    """送る箱に積む(宛先ごとに 1 行)。操作した本人には送らない。無効なユーザー・メールアドレスのない人には積まない"""
+    for uid in dict.fromkeys(user_ids):
+        if uid == exclude:
+            continue
+        u = await _one(conn, "users", uid)
+        if u is None or (u.get("status") or "active") != "active" or not u.get("email"):
+            continue
+        await _insert(
+            conn,
+            "notifications",
+            {"user_id": uid, "email": u["email"], "kind": kind, "subject": subject, "body": body, "delivery_card_id": card_id, "approval_request_id": request_id, "status": "pending"},
+        )
+
+
 async def _body(request: Request) -> dict[str, Any]:
     try:
         body = await request.json()
@@ -212,6 +243,16 @@ async def create_request(request: Request):
             await _set_card_status(conn, card_id, "reviewing")
         names = " / ".join(str(r.get("reviewer_name") or "") for r in reviewers)
         await _event(conn, "request", actor, card, week_start, before, "reviewing", f"{names}({'全員' if rule == 'all' else '1 人'})" + (f" — {note}" if note else ""))
+        await _notify(
+            conn,
+            await _reviewer_users(conn, reviewers),
+            actor["id"],
+            "review_requested",
+            f"承認の依頼: {card.get('name') or ''}",
+            f"{actor['name']} が「{card.get('name') or ''}」の承認を依頼しました(相手: {names}。決まり: {'全員' if rule == 'all' else '1 人'})。" + (f" {note}" if note else ""),
+            card["id"],
+            req["id"],
+        )
     return ok(_view(req, reviewers))
 
 
@@ -255,11 +296,13 @@ async def decide(request_id: str, request: Request):
             req = await _update(conn, "approval_requests", request_id, {"status": "approved", "closed_at": now}) or req
             await _set_card_status(conn, card["id"], "approved")
             await _event(conn, "approve", actor, card, week_start, before, "approved", f"{slot} — これで承認がそろった")
+            await _notify(conn, [str(req.get("requested_by") or "")], actor["id"], "approved", f"承認されました: {card.get('name') or ''}", f"{actor['name']}({slot})の承認で、「{card.get('name') or ''}」の承認がそろいました。", card["id"], req["id"])
         elif outcome == "changes_requested":
             req = await _update(conn, "approval_requests", request_id, {"status": "changes_requested", "closed_at": now}) or req
             # 差し戻しの理由は、レビューのコメント(W5)にも残す(対応済みにするまで、未対応として数える)
             await _insert(conn, "card_notes", {"delivery_card_id": card["id"], "kind": "comment", "author": actor["name"], "body": note, "resolved": 0})
             await _event(conn, "reject", actor, card, week_start, before, before, f"{slot} — {note}")
+            await _notify(conn, [str(req.get("requested_by") or "")], actor["id"], "changes_requested", f"差し戻されました: {card.get('name') or ''}", f"{actor['name']}({slot})が「{card.get('name') or ''}」を差し戻しました。理由: {note}", card["id"], req["id"])
         else:
             await _event(conn, "approve", actor, card, week_start, before, before, f"{slot}(ほかの相手の承認待ち)")
     return ok(_view(req, reviewers))
@@ -290,6 +333,8 @@ async def withdraw(request_id: str, request: Request):
             if after != before:
                 await _set_card_status(conn, card["id"], after)
             await _event(conn, "withdraw", actor, card, week_start, before, after, note)
+            pending = [r for r in reviewers if (r.get("decision") or "pending") == "pending"]
+            await _notify(conn, await _reviewer_users(conn, pending), actor["id"], "withdrawn", f"依頼の取り下げ: {card.get('name') or ''}", f"{actor['name']} が「{card.get('name') or ''}」の承認の依頼を取り下げました。" + (f" {note}" if note else ""), card["id"], req["id"])
     return ok(_view(req, reviewers))
 
 

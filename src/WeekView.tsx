@@ -19,10 +19,11 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { heroImage, productImage } from './images'
-import { locale, optionLabel, useT } from './i18n'
+import { locale, useT } from './i18n'
 import { DeliveryPeek } from './DeliveryPeek'
 import { cardProgress } from './progress'
-import { statusColor, statusOptions } from './status'
+import { statusColor, statusLabel } from './status'
+import { LockMark } from './LockMark'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
@@ -71,7 +72,6 @@ const PUSH = 'app'
 // 1 日の並び: メールを上、プッシュを下にそろえる(週を横に見比べやすく)。同じチャネルの中は時刻順
 const rank = (c: DeliveryCard) => (c.channel === EMAIL ? 0 : c.channel === PUSH ? 1 : 2)
 const order = (a: DeliveryCard, b: DeliveryCard) => rank(a) - rank(b) || (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? '')
-const label = (options: { value: string; label: string }[], v?: string) => optionLabel(options.find((o) => o.value === v)?.label)
 const shortDate = (ymd?: string) => {
   if (!ymd) return ''
   const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
@@ -334,7 +334,8 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         </div>
         <div className={styles.inner}>
           <div className={styles.nameRow}>
-            <span className={styles.dot} style={{ backgroundColor: statusColor(c.status) }} title={label(statusOptions, c.status)} />
+            <span className={styles.dot} style={{ backgroundColor: statusColor(c.status) }} title={statusLabel(c.status)} />
+            <LockMark status={c.status} />
             <AlertMark kind={alertKinds?.get(id)} />
             <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.name}` : c.name}</span>
           </div>
@@ -360,7 +361,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
           ) : (
             <>
               <div className={styles.progressRow}>
-                {label(statusOptions, c.status)}
+                {statusLabel(c.status)}
                 <span className={styles.bar} aria-hidden>
                   <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(ratio * 100)}%`, backgroundColor: statusColor(c.status) }} />
                 </span>

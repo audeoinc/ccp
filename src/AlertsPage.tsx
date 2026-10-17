@@ -10,8 +10,8 @@ import { AlertSettingsDialog } from './AlertSettingsDialog'
 import { isCustomized, type AlertSettings } from './alertSettings'
 import type { ChangeLog } from './data/changeLogs'
 import type { DeliveryCard } from './models/deliveryCards'
-import { locale, optionLabel, useT } from './i18n'
-import { CHANNEL_PUSH, statusColor, statusOptions } from './status'
+import { locale, useT } from './i18n'
+import { CHANNEL_PUSH, statusColor, statusLabel } from './status'
 
 const useStyles = makeStyles({
   page: { display: 'grid', rowGap: '12px' },
@@ -131,7 +131,6 @@ export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, s
     ) : (
       '—'
     )
-  const statusLabel = (v?: string) => optionLabel(statusOptions.find((o) => o.value === v)?.label ?? '')
 
   // 対応中のアラート / 対応の記録(誰が・いつ・どう対応したか)
   const [tab, setTab] = useState<'open' | 'done'>('open')

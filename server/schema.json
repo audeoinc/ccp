@@ -340,6 +340,21 @@
     ["approval_group_id", "approval_groups", {"onDelete": "SET NULL"}],
     ["user_id", "users", {"onDelete": "SET NULL"}]
    ]
+  },
+  "notifications": {
+   "columns": [
+    ["email", "text"],
+    ["kind", "choice"],
+    ["subject", "text"],
+    ["body", "text"],
+    ["status", "choice", {"index": true}],
+    ["sent_at", "timestamptz"]
+   ],
+   "lookups": [
+    ["user_id", "users", {"onDelete": "SET NULL"}],
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],
+    ["approval_request_id", "approval_requests", {"onDelete": "CASCADE"}]
+   ]
   }
  },
  "choices": {
@@ -367,6 +382,8 @@
   "approval_rules.rule": ["all", "any"],
   "approval_requests.rule": ["all", "any"],
   "approval_requests.status": ["open", "approved", "changes_requested", "stale", "withdrawn"],
-  "approval_reviewers.decision": ["pending", "approved", "changes_requested"]
+  "approval_reviewers.decision": ["pending", "approved", "changes_requested"],
+  "notifications.kind": ["review_requested", "approved", "changes_requested", "withdrawn"],
+  "notifications.status": ["pending", "sent", "skipped"]
  }
 }

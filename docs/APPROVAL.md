@@ -34,7 +34,7 @@ GitHub のプルリクエストのように、配信カードごとに「承認�
 | `approval_rules`(U3) | `department`・`rule`(`all` / `any`)・`group_ids`・`user_ids`(id の配列の JSON) | 種別ごとの既定の承認者と決まり(1 種別に 1 行)。⚙ →「ユーザーと承認グループ」→「承認の決まり」 |
 | `approval_requests`(U3) | `delivery_card_id`・`card_name`・`requested_by`(ユーザーの id)・`requested_by_name`・`rule`・`status`(`open` / `approved` / `changes_requested` / `stale` / `withdrawn`)・`requested_at`・`closed_at`・`note` | 依頼 1 回分。内容を変える・出し直す・取り下げると、生きている依頼(`open` / `approved` / `changes_requested`)は `stale` になる |
 | `approval_reviewers`(U3) | `approval_request_id`・`approval_group_id` または `user_id`・`reviewer_name`・`decision`(`pending` / `approved` / `changes_requested`)・`decided_by`(ユーザーの id)・`decided_by_name`・`decided_at`・`note` | 依頼の相手ごとの状態。グループのときは、だれが済ませたかを `decided_by` に残す。名前は、その時のものを残す(消しても読めるように) |
-| `notifications`(U5) | `user_id`・`email`・`kind`(`review_requested` / `approved` / `changes_requested` / `withdrawn` / `done_by_other`)・`subject`・`body`・`link`・`delivery_card_id`・`approval_request_id`・`status`(`pending` / `sent` / `skipped`)・`read_at`・`sent_at` | 送る箱。宛先のメールアドレスは、積んだ時点のものを残す |
+| `notifications`(U5) | `user_id`・`email`・`kind`(`review_requested` / `approved` / `changes_requested` / `withdrawn`)・`subject`・`body`・`delivery_card_id`・`approval_request_id`・`status`(`pending` / `sent` / `skipped`)・`sent_at` | 送る箱。承認の操作のたびに、サーバー(`approvals.py` の `_notify`)が宛先ごとに 1 行積む(操作した本人には積まない。グループ宛ては、メンバー全員)。宛先のメールアドレスは、積んだ時点のものを残す。送る仕組みは U8 |
 
 - 「誰が」の記録(`events.actor`・コメントの書いた人・`x-ccp-actor`)は、これまでどおり名前の文字で残す。U2 から、その名前は、ユーザーマスタから選んだ人の名前になる(ブラウザに `me.user`(ユーザーの id)と `me.name` を覚える)。ユーザーが 1 人も登録されていない環境では、これまでどおり名前を入れられる(いまの運用を止めないため)。
 - ユーザー・グループの変更は、操作の履歴(`events`)に、種類 `user_change` / `group_change` で残す(だれが・いつ・何を)。
@@ -64,8 +64,9 @@ GitHub のプルリクエストのように、配信カードごとに「承認�
 - ⚙ →「ユーザーと承認グループ」(U1): ユーザーの一覧(追加・編集・無効にする)、承認グループ(メンバーの出し入れ)、変更の履歴。
 - 「あなた」(U2): 週の帯・配信カードの下・コメントの名前の欄を、ユーザーから選ぶ形にする。
 - 配信カード(U4): 下のボタンの行の上の「承認」の帯(`ApprovalBar`)。依頼がなければ「承認を依頼」(相手と決まりを選ぶ。既定は種別ごと)。依頼中は、相手ごとの状態(「MD ✓ Aya Mori 10/13 ・ Brand 未定」)と、承認者には「承認」「差し戻す」、依頼した人には「取り下げ」。内容を変えていると、先に保存してもらう。以前の「保存して承認」「差し戻す」は、これに置き換えた(週の帯の「まとめて承認」は U6 まで残る。依頼を見ずに承認済みにするので、U6 で置き換える)。
-- 自分宛ての依頼(U5): ヘッダーに件数。押すと、自分(と自分のグループ)宛ての、未対応の依頼の一覧。だれかが済ませたものは「承認済み(山田)」として外す。
-- 週の帯(U6): 「レビューに出す」「まとめて承認」を、「この週の未依頼の配信を、まとめて依頼する」と「自分宛てをまとめて承認」に置き換える。週の確定は、すべての配信が承認済みのときに押せる(足りなければ件数を出して確かめる)。
+- 自分宛ての依頼(U5): ヘッダーの「依頼」(`InboxButton`)に件数。押すと、自分(と自分のグループ)宛ての、依頼中の依頼の一覧(押すと配信カードが開く)。**送る箱ではなく、依頼中の依頼から計算する**(`useApprovalInbox`。箱の行は写しで、だれかが済ませたあとも残るため)。だれかが済ませた分は、自然に消える。
+- 週の帯(U6): 「レビューに出す」「下書きに戻す」「まとめて承認」をやめ、「まとめて依頼(N)」(未承認で依頼のない配信を、種別ごとの既定の相手に依頼。既定がない種別は飛ばして知らせる)と「自分宛てを承認(M)」(配信カードと同じ窓口を順に呼ぶ。`src/weekApprovals.ts`)に置き換えた。週の状態は 確定前 / 確定 の 2 つ(データの `draft` / `review` は、どちらも確定前)。「週を確定」は、承認されていない配信があれば件数を出して確かめる。
+- 配信の見せ方(U6): 画面のステータスは 未起案 / 承認待ち / 承認済み の 3 つ(`src/status.ts` の `statusOptions`・`statusView`・`statusLabel`)。確定した週の配信は「承認済み」+ 鍵マーク(`LockMark`)。履歴だけ「承認済み(週が確定)」と読み分ける。データの値(`confirmed`)は変えていない。
 
 ## 6. あとで
 

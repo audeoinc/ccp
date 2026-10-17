@@ -106,7 +106,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
             <DialogContent className={styles.body}>
               <span>
                 {t(
-                  '取りやめた配信は、消さずに残ります(カレンダーに薄く出て、アラート・週の確認・件数からは外れます)。確定した週の配信なら、週はレビュー中に戻ります',
+                  '取りやめた配信は、消さずに残ります(カレンダーに薄く出て、アラート・週の確認・件数からは外れます)。確定した週の配信なら、週の確定は解けます',
                   'The delivery is kept (shown faded in the calendar, and left out of alerts, week checks and counts). If the week is confirmed, it goes back to review.',
                 )}
               </span>

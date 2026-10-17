@@ -590,3 +590,6 @@ export const approvalReviewers: Row[] = [
   { id: guid('reviewer:boots-edit:MD'), approval_request_id: bootsRequest, approval_group_id: groupId('MD'), reviewer_name: 'MD', decision: 'approved', decided_by: userId('aya.mori'), decided_by_name: 'Aya Mori', decided_at: '2026-10-13T06:30:00.000Z', created_on: '2026-10-13T02:00:00.000Z' },
   { id: guid('reviewer:boots-edit:Brand'), approval_request_id: bootsRequest, approval_group_id: groupId('Brand'), reviewer_name: 'Brand', decision: 'pending', created_on: '2026-10-13T02:00:00.000Z' },
 ]
+
+// ---- 通知の送る箱(U5)。見本はなし(承認の操作で、撮影用の身代わりが積む)
+export const notifications: Row[] = []
