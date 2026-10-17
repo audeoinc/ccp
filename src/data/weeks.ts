@@ -14,6 +14,8 @@ export interface WeekRow {
   submitted_at?: string
   /** 確定した日時(ISO) */
   confirmed_at?: string
+  /** この週の振り返りのメモ(結果の面で書き、翌週の計画の面に出す。FLOWS の C-7) */
+  retro?: string
 }
 
 interface Result<T> {

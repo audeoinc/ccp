@@ -170,7 +170,8 @@
     ["week_start", "date", {"index": true}],
     ["status", "text"],
     ["submitted_at", "timestamptz"],
-    ["confirmed_at", "timestamptz"]
+    ["confirmed_at", "timestamptz"],
+    ["retro", "text"]
    ],
    "lookups": [
    ]

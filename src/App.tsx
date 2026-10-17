@@ -59,6 +59,7 @@ import { DeliveryProductsService } from './data/deliveryProducts'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar, WeekStatusBadge } from './WeekReviewBar'
+import { WeekRetro } from './WeekRetro'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage } from './ResultsPage'
@@ -734,6 +735,24 @@ function App() {
     if (!printingWeek) return
     printWeek(`week-plan_${weekKey}`, () => setPrintingWeek(false))
   }, [printingWeek, weekKey])
+  // 前週の行(計画の面に、前週の振り返りを出す)
+  const prevWeek = useMemo(() => {
+    const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return weeks.find((w) => w.week_start?.slice(0, 10) === k)
+  }, [weeks, weekStart])
+  // 週の振り返りのメモを保存する(週の行がなければ、下書きの行を作る)
+  const saveRetro = async (key: string, row: WeekRow | undefined, text: string): Promise<boolean> => {
+    setError(null)
+    const res = row ? await WeeksService.update(row.id, { retro: text }) : await WeeksService.create({ week_start: key, status: 'draft', retro: text })
+    if (!res.success || !res.data) {
+      setError(res.error?.message ?? t('振り返りを保存できませんでした', 'Could not save the retrospective'))
+      return false
+    }
+    const saved = res.data
+    setWeeks((prev) => (prev.some((w) => w.id === saved.id) ? prev.map((w) => (w.id === saved.id ? { ...w, ...saved } : w)) : [...prev, saved]))
+    return true
+  }
   const changeWeek = async (next: WeekStatus) => {
     setError(null)
     try {
@@ -1078,6 +1097,16 @@ function App() {
                 )}
               </span>
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
+              {/* 結果の面の「前週」: 振り返りは前週から始まるので、1 回で前週の週表示へ(FLOWS の C-7) */}
+              {page === 'results' && (
+                <Button size="small" appearance="subtle" disabled={view === 'compare'} onClick={() => {
+                    const d = new Date()
+                    goTo('week', new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
+                  }}
+                >
+                  {t('前週', 'Last week')}
+                </Button>
+              )}
               {/* 週の状態は、その週そのものの状態なので、期間の横に出す(週の帯は、操作だけにする) */}
               {page === 'calendar' && view === 'week' && <WeekStatusBadge week={thisWeek} />}
               {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
@@ -1219,6 +1248,7 @@ function App() {
                 onOpenCard={setSelectedId}
                 onCardsChanged={load}
                 onOpenWeek={(d) => goTo('week', d)}
+                retro={<WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} />}
               />
             ) : view === 'list' ? (
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
@@ -1239,6 +1269,14 @@ function App() {
                     }}
                   />
                 }
+              />
+              <WeekRetro
+                mode="plan"
+                text={prevWeek?.retro ?? ''}
+                onOpenResults={() => {
+                  setPage('results')
+                  goTo('week', new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7))
+                }}
               />
               {printingWeek && (
                 // 週の資料(W7)。印刷のあいだだけ見える(index.css の「週の資料の印刷」)。Portal なので、画面の並びには影響しない

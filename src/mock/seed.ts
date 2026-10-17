@@ -242,7 +242,14 @@ export const layoutTemplates: Row[] = [
 // ---- 週の計画(週のレビューの状態)
 export const weeks: Row[] = [
   { id: guid('week:2026-09-27'), week_start: '2026-09-27', status: 'confirmed', submitted_at: '2026-09-22T06:00:00.000Z', confirmed_at: '2026-09-24T08:00:00.000Z' },
-  { id: guid('week:2026-10-04'), week_start: '2026-10-04', status: 'confirmed', submitted_at: '2026-09-29T06:00:00.000Z', confirmed_at: '2026-10-01T08:00:00.000Z' },
+  {
+    id: guid('week:2026-10-04'),
+    week_start: '2026-10-04',
+    status: 'confirmed',
+    submitted_at: '2026-09-29T06:00:00.000Z',
+    confirmed_at: '2026-10-01T08:00:00.000Z',
+    retro: 'Rainy Day Picks beat last year by a wide margin — keep one weather-led email per week. Flash Deal pushes at 6 PM drew fewer taps than the noon ones; try noon next time.',
+  },
   { id: guid('week:2026-10-11'), week_start: '2026-10-11', status: 'review', submitted_at: '2026-10-07T06:00:00.000Z' },
 ]
 

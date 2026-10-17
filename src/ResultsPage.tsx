@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   MessageBar,
@@ -75,6 +75,8 @@ interface Props {
   onCardsChanged: () => Promise<void>
   /** 月の表示で、週の行から、その週の週表示へ移る */
   onOpenWeek?: (sunday: Date) => void
+  /** 週の表示の上に置く、この週の振り返りのメモ(App が WeekRetro を渡す) */
+  retro?: ReactNode
 }
 
 const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
@@ -83,7 +85,7 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -420,7 +422,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
             }}
           />
         ) : view === 'week' ? (
+          <>
+          {retro}
           <ResultsWeek weekStart={weekStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} cardProducts={cardProducts} products={products} heroes={heroes} />
+          </>
         ) : rows.length === 0 ? (
           <div className={styles.empty}>{t('この条件の配信結果はまだありません', 'No results for these filters yet')}</div>
         ) : (
