@@ -50,7 +50,8 @@ import { WeeksService, type WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf } from './weekLock'
 import { logEvent } from './history'
-import { ProcessPane, type TalkTab } from './ProcessPane'
+import { ProcessPane, ProcessRail, type TalkTab } from './ProcessPane'
+import type { TopTab } from './ContentPane'
 import { ApprovalsService } from './data/approvals'
 import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
@@ -457,6 +458,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const [linksTab, setLinksTab] = useState(false)
   // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
   const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
+  // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
+  const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(undefined)
   const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
@@ -1301,6 +1304,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 onLinks={setLinks}
                 handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
                 onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
+                tabRequest={stepRequest}
                 people={owners}
                 cardId={card?.id}
                 owner={form.owner}
@@ -1441,9 +1445,10 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                   onChanged={onSaved}
                   handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
                   onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
+                  instructions={form.instructions}
+                  onEditInstructions={() => setStepRequest((r) => ({ tab: 'instructions', seq: (r?.seq ?? 0) + 1 }))}
                   remaining={progress.remaining}
                   people={owners}
-                  owner={form.owner}
                   cardName={form.name}
                   productIds={items.map((it) => it.productId)}
                   products={products}
@@ -1451,10 +1456,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 />
               </div>
             ) : (
-              <div className={styles.rail}>
-                <Button type="button" size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleProcess} aria-label={t('プロセスを開く', 'Open process')} />
-                <span className={styles.railLabel}>{t('状態・承認・やり取り', 'Status, approval, communication')}</span>
-              </div>
+              <ProcessRail card={card} status={form.status} onOpen={toggleProcess} />
             )}
           </div>
 

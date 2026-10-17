@@ -165,7 +165,9 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
     }),
   }
 
-  // ---- 未対応のレビューのコメント・未解決の質問(配信ごとの数を足す)
+  // ---- 未解決のやり取り(以前の「未対応のコメント」と「未解決の質問」を 1 つにした。2026-10-17、配信カードのやり取りを 1 つにしたのに合わせる)
+  const threadCounts = new Map<string, number>()
+  for (const m of [commentCounts, questionCounts]) for (const [id, n] of m) threadCounts.set(id, (threadCounts.get(id) ?? 0) + n)
   const openOf = (key: 'openComments' | 'openQuestions', counts: Map<string, number>): CheckItem => {
     const hit = weekCards.filter((c) => (counts.get(c.id) ?? 0) > 0)
     const n = hit.reduce((sum, c) => sum + (counts.get(c.id) ?? 0), 0)
@@ -178,8 +180,8 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
       details: hit.map((c) => `${cardLabel(c)} ×${counts.get(c.id)}`),
     }
   }
-  const openComments = openOf('openComments', commentCounts)
-  const openQuestions = openOf('openQuestions', questionCounts)
+  // 鍵は openComments のまま(画面の確認の一覧・PDF が鍵で見分けるため)。openQuestions は、もう出さない
+  const openComments = openOf('openComments', threadCounts)
 
   // ---- 承認の数: 選んだときは、まだ承認されていない配信を出す(残りの作業が分かるように)
   const notApproved = weekCards.filter((c) => statusRank(c.status) < statusRank(STATUS_APPROVED))
@@ -193,5 +195,5 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
     details: notApproved.map(cardLabel),
   }
 
-  return [overLimit, pushAlign, leadMissing, repeat, openComments, openQuestions, approved]
+  return [overLimit, pushAlign, leadMissing, repeat, openComments, approved]
 }

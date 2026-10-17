@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Avatar, Badge, Button, Field, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowReplyRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, CommentRegular, DeleteRegular, EditRegular } from '@fluentui/react-icons'
+import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
 import { locale, tr, useT } from './i18n'
 import { myName, setMyName } from './history'
 import { MePicker } from './MePicker'
+import { AiButton } from './AiButton'
+import { suggestTasks, type TaskIdea } from './aiTasks'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', rowGap: '8px', minWidth: 0, paddingTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  root: { display: 'grid', rowGap: '8px', minWidth: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase200 },
-  // スレッド 1 つ(指摘と、その返信)
+  // スレッド 1 つ(書き込みと、その返信)
   thread: { display: 'grid', rowGap: '8px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
   threadOpen: { borderLeft: `3px solid ${tokens.colorPaletteDarkOrangeBorderActive}` },
-  // 対応済みのスレッドは、たたんで 1 行にする(開いている指摘を見やすく)
+  // 解決したスレッドは、たたんで 1 行にする(開いているものを見やすく)
   folded: {
     display: 'flex',
     alignItems: 'center',
@@ -34,65 +36,86 @@ const useStyles = makeStyles({
   foldedText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   done: { color: tokens.colorPaletteGreenForeground1, flexShrink: 0 },
   count: { flexShrink: 0, whiteSpace: 'nowrap' },
-  // 1 件(指摘・返信)。顔 + 名前・日時 + 本文
+  // 1 件(書き込み・返信)。顔 + 名前・日時 + 本文
   entry: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
   entryBody: { display: 'grid', rowGap: '2px', minWidth: 0 },
   meta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   who: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, fontSize: tokens.fontSizeBase200 },
+  to: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   body: { fontSize: tokens.fontSizeBase200, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: tokens.colorNeutralForeground1 },
-  // 返信は、指摘の下に字下げして、縦の線でつなぐ
+  // 返信は、書き込みの下に字下げして、縦の線でつなぐ
   replies: { display: 'grid', rowGap: '8px', marginLeft: '12px', paddingLeft: '18px', borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
-  // 書いた本人だけの操作(編集・削除)。名前で見分ける(ログインで人を見分けないため)
+  // 書いた本人だけの操作(編集・削除)。名前で見分ける(ログインがないとき)
   own: { display: 'inline-flex', columnGap: '2px', marginLeft: 'auto' },
-  actions: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
+  actions: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
   form: { display: 'grid', rowGap: '6px' },
-  formRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px' },
+  formRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', rowGap: '6px' },
   hint: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
+  // AI のタスクの案(採用するまで保存しない)
+  ideas: { display: 'grid', rowGap: '6px', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  idea: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto auto', columnGap: '6px', rowGap: '4px', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}`, '& .fui-Input': { minWidth: 0, width: '100%' } },
+  ideaText: { gridColumn: '1 / -1' },
+  taskChip: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1 },
 })
 
 interface Props {
-  /** 保存済みの配信カードの ID(新規作成中は undefined。コメントは、保存してから) */
+  /** 保存済みの配信カードの ID(新規作成中は undefined。書き込みは、保存してから) */
   cardId?: string
-  /** 載せた商品(メールの並び順の商品 ID)。商品ごとのコメントの対象 */
+  /** 載せた商品(メールの並び順の商品 ID)。書き込みの対象に選べる */
   productIds: string[]
   /** 商品名の表示用(全件) */
   products: Product[]
+  /** 宛先の候補(担当の名前など) */
   people: string[]
-  /** 未対応の数が変わったとき(タブの数を、閉じなくても合わせるため) */
+  /** 配信名・制作の担当と締め切り(AI にタスクの案を頼むときに渡す) */
+  cardName: string
+  productionOwner: string
+  productionDue: string
+  /** 未解決の数が変わったとき(タブの数を、閉じなくても合わせるため) */
   onOpenCount?: (n: number) => void
+  /** タスクを採用したとき(タスクのタブの数を合わせる) */
+  onTasksChanged?: () => void
 }
 
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const time = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
+/** スレッドの元になる書き込みか(以前の「質問」と「レビューのコメント」の両方。種類のない古い行は質問) */
+const isRoot = (n: CardNote) => n.kind === 'comment' || (n.kind ?? 'question') === 'question'
 
 /**
- * レビューのコメント(バックログ W5)。Confluence のように、指摘 1 つを 1 つのスレッドにして、返信でやり取りし、決着したら対応済みにする。
- * 指摘は配信全体か、載せた商品 1 つに付ける。返信は、メモの表に種類 reply で入れ、source_note で元の指摘につなぐ。
- * 質問と同じく、配信カードの「保存」を待たずに、その場で保存する。対応済みのスレッドは消さずに、たたんで残す
+ * やり取り(2026-10-17 に、以前の「質問と返信」と「レビューのコメント」を 1 つにした。利用者の指摘: どちらも書いたら返事が要る)。
+ * Confluence のように、書き込み 1 つを 1 つのスレッドにして、返信でやり取りし、決着したら解決にする。
+ * 書き込みには、宛先(任意。返事を求める人)と対象(配信全体 / 載せた商品)を付けられる。返信のあるスレッドからは、AI でタスクの案を出せる。
+ * データは card_notes のまま: 新しい書き込みは種類 comment(宛先は assignee)、返信は種類 reply(source_note で元につなぐ)。
+ * 以前の質問(種類 question。返信は reply / replied_by / replied_at の列に 1 件)も、同じ一覧に出す。
+ * 配信カードの「保存」を待たずに、その場で保存する。解決したスレッドは消さずに、たたんで残す
  */
-export function CommentsPanel({ cardId, productIds, products, people, onOpenCount }: Props) {
+export function CommentsPanel({ cardId, productIds, products, people, cardName, productionOwner, productionDue, onOpenCount, onTasksChanged }: Props) {
   const styles = useStyles()
   const t = useT()
   const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // 書く人は、配信ごとに変わらない(レビューする人)ので、ブラウザごとに覚えた名前(承認の履歴と共通)を使う
+  // 書く人は、ブラウザごとに覚えた「あなた」(承認の履歴と共通)
   const [author, setAuthor] = useState(myName)
   const [target, setTarget] = useState('')
+  const [to, setTo] = useState('')
   const [body, setBody] = useState('')
   // スレッドごとの返信の下書き(開いている返信の欄だけ、キーがある)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   // 編集中の 1 件と、その下書き
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
-  // 開いて見ている、対応済みのスレッド
+  // 開いて見ている、解決したスレッド
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
+  // スレッドごとの、AI のタスクの案('busy' は作成中)
+  const [ideas, setIdeas] = useState<Record<string, TaskIdea[] | 'busy'>>({})
 
   const load = useCallback(async () => {
     if (!cardId) return
     const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
     if (!res.success) {
-      setError(res.error?.message ?? tr('コメントを読み込めませんでした', 'Could not load the comments'))
+      setError(res.error?.message ?? tr('やり取りを読み込めませんでした', 'Could not load the conversation'))
       return
     }
     setNotes(res.data ?? [])
@@ -103,12 +126,11 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
     void load()
   }, [load])
 
-  // 未対応を上に、それぞれ新しい順(Confluence と同じく、いま話している指摘を先に)
-  const comments = (notes ?? [])
-    .filter((n) => n.kind === 'comment')
-    .sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
+  // 未解決を上に、それぞれ新しい順(いま話しているものを先に)
+  const roots = (notes ?? []).filter(isRoot).sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
   const repliesOf = (id: string) => (notes ?? []).filter((n) => n.kind === 'reply' && n.source_note === id).sort((a, b) => time(a.created_on) - time(b.created_on))
-  const open = comments.filter((n) => !n.resolved).length
+  const tasksFrom = (id: string) => (notes ?? []).filter((n) => n.kind === 'task' && n.source_note === id)
+  const open = roots.filter((n) => !n.resolved).length
   useEffect(() => {
     if (notes) onOpenCount?.(open)
   }, [notes, open, onOpenCount])
@@ -137,6 +159,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
         ...(target ? { product_id: target } : {}),
         kind: 'comment',
         author: me,
+        ...(to.trim() ? { assignee: to.trim() } : {}),
         body: body.trim(),
         resolved: 0,
       })
@@ -151,25 +174,19 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
       return next
     })
 
-  /** 返信する。resolve なら、返信してから対応済みにする(「直しました」と書いて閉じる、よくある流れを 1 回で) */
+  /** 返信する。resolve なら、返信してから解決にする(「直しました」と書いて閉じる、よくある流れを 1 回で) */
   const reply = (root: CardNote, resolve = false) =>
     run(async () => {
       setMyName(author)
       const id = root.id
       const text = (drafts[id] ?? '').trim()
       if (text) {
-        const res = await CardNotesService.create({
-          delivery_card_id: cardId,
-          kind: 'reply',
-          source_note: id,
-          author: me,
-          body: text,
-        })
+        const res = await CardNotesService.create({ delivery_card_id: cardId, kind: 'reply', source_note: id, author: me, body: text })
         if (!res.success) return res
       }
       if (resolve) {
-        // 誰が、いつ対応済みにしたかを残す(以前は、対応した内容もここに入れていた。今は、返信として残す)
-        const res = await CardNotesService.update(id, { resolved: 1, replied_by: me, replied_at: new Date().toISOString() })
+        // 以前の質問は replied_by / replied_at に返信した人を持っているので、解決した人では上書きしない
+        const res = await CardNotesService.update(id, root.kind === 'comment' ? { resolved: 1, replied_by: me, replied_at: new Date().toISOString() } : { resolved: 1 })
         if (!res.success) return res
       }
       closeReply(id)
@@ -186,13 +203,12 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
       return res
     })
 
-  /** 消す。指摘を消すときは、返信もまとめて消す(返信だけが残っても、読めないため) */
+  /** 消す。書き込みを消すときは、返信もまとめて消す(返信だけが残っても、読めないため) */
   const remove = (n: CardNote) => {
-    const replies = n.kind === 'comment' ? repliesOf(n.id) : []
-    const ask =
-      n.kind === 'comment'
-        ? t(`この指摘を削除します${replies.length ? `(返信 ${replies.length} 件も削除)` : ''}。よろしいですか?`, `Delete this comment${replies.length ? ` and its ${replies.length} replies` : ''}?`)
-        : t('この返信を削除します。よろしいですか?', 'Delete this reply?')
+    const replies = isRoot(n) ? repliesOf(n.id) : []
+    const ask = isRoot(n)
+      ? t(`この書き込みを削除します${replies.length ? `(返信 ${replies.length} 件も削除)` : ''}。よろしいですか?`, `Delete this post${replies.length ? ` and its ${replies.length} replies` : ''}?`)
+      : t('この返信を削除します。よろしいですか?', 'Delete this reply?')
     if (!window.confirm(ask)) return
     void run(async () => {
       try {
@@ -205,6 +221,53 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
     })
   }
 
+  // ---- AI のタスクの案(返信のあるスレッドから。以前は質問だけにあった)
+  const propose = async (n: CardNote) => {
+    const id = n.id
+    const replies = repliesOf(id)
+    const replyText = [n.reply ?? '', ...replies.map((r) => `${r.author ?? ''}: ${r.body ?? ''}`)].filter(Boolean).join('\n')
+    setIdeas((x) => ({ ...x, [id]: 'busy' }))
+    try {
+      const list = await suggestTasks({
+        question: n.body ?? '',
+        reply: replyText,
+        asker: n.author ?? productionOwner,
+        replier: n.replied_by ?? replies[replies.length - 1]?.author ?? n.assignee ?? '',
+        card: { name: cardName, productionDue },
+        existing: tasksFrom(id).map((x) => x.body ?? ''),
+      })
+      setIdeas((x) => ({ ...x, [id]: list }))
+    } catch (e) {
+      setIdeas((x) => {
+        const next = { ...x }
+        delete next[id]
+        return next
+      })
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const editIdea = (rid: string, i: number, patch: Partial<TaskIdea>) =>
+    setIdeas((x) => {
+      const list = x[rid]
+      if (!Array.isArray(list)) return x
+      return { ...x, [rid]: list.map((it, k) => (k === i ? { ...it, ...patch } : it)) }
+    })
+  const dropIdea = (rid: string, i: number) =>
+    setIdeas((x) => {
+      const list = x[rid]
+      if (!Array.isArray(list)) return x
+      return { ...x, [rid]: list.filter((_, k) => k !== i) }
+    })
+  const adopt = (rid: string, i: number, idea: TaskIdea) =>
+    run(async () => {
+      const res = await CardNotesService.create({ delivery_card_id: cardId, kind: 'task', body: idea.text.trim(), assignee: idea.assignee.trim(), due: idea.due || undefined, source_note: rid, resolved: 0 })
+      if (res.success) {
+        dropIdea(rid, i)
+        onTasksChanged?.()
+      }
+      return res
+    })
+
   // Ctrl(Mac は ⌘)+ Enter で送る(複数行を書けるよう、Enter だけでは送らない)
   const submitOnCtrlEnter = (f: () => void) => (e: KeyboardEvent) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -213,13 +276,14 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
     }
   }
 
-  /** 1 件(指摘・返信)。編集中なら、本文の代わりに入力欄 */
+  /** 1 件(書き込み・返信)。編集中なら、本文の代わりに入力欄 */
   const entry = (n: CardNote, size: 24 | 20, extra?: ReactNode, readOnly = false) => (
     <div className={styles.entry}>
       <Avatar name={n.author || '?'} size={size} color="colorful" />
       <div className={styles.entryBody}>
         <div className={styles.meta}>
           <span className={styles.who}>{n.author || t('(名前なし)', '(no name)')}</span>
+          {isRoot(n) && n.assignee && <span className={styles.to}>{`→ ${n.assignee}`}</span>}
           <span>{when(n.created_on)}</span>
           {extra}
           {!readOnly && mine(n) && editing?.id !== n.id && (
@@ -238,7 +302,9 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
               // 書き足すことが多いので、入力の位置を末尾にする(既定では先頭になる)
               onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
               value={editing.text}
-              onChange={(_, d) => setEditing({ id: n.id, text: d.value })} onKeyDown={submitOnCtrlEnter(() => void saveEdit())} />
+              onChange={(_, d) => setEditing({ id: n.id, text: d.value })}
+              onKeyDown={submitOnCtrlEnter(() => void saveEdit())}
+            />
             <div className={styles.actions}>
               <Button size="small" appearance="primary" disabled={busy || !editing.text.trim()} onClick={() => void saveEdit()}>{t('保存', 'Save')}</Button>
               <Button size="small" appearance="subtle" onClick={() => setEditing(null)}>{t('やめる', 'Cancel')}</Button>
@@ -255,29 +321,32 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
     const id = n.id
     const replies = repliesOf(id)
     const resolved = !!n.resolved
+    const hasReply = replies.length > 0 || !!n.reply
+    const tasks = tasksFrom(id).length
     if (resolved && !expanded.has(id)) {
       return (
         <button key={id} type="button" className={styles.folded} onClick={() => setExpanded((s) => new Set(s).add(id))} aria-expanded={false}>
           <ChevronRightRegular />
           <CheckmarkCircleFilled className={styles.done} />
           <span className={styles.foldedText}>{`${n.author || t('(名前なし)', '(no name)')}: ${(n.body ?? '').split('\n')[0]}`}</span>
-          {replies.length > 0 && <span className={styles.count}>{t(`返信 ${replies.length}`, `${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}`)}</span>}
+          {(replies.length > 0 || n.reply) && <span className={styles.count}>{t(`返信 ${replies.length + (n.reply ? 1 : 0)}`, `${replies.length + (n.reply ? 1 : 0)} repl${replies.length + (n.reply ? 1 : 0) === 1 ? 'y' : 'ies'}`)}</span>}
         </button>
       )
     }
-    const target = (
+    const targetBadge = (
       <Badge appearance="outline" color={n.product_id ? 'brand' : 'informative'} size="small">
         {n.product_id ? productName(n.product_id) : t('配信全体', 'Whole delivery')}
       </Badge>
     )
     const replying = drafts[id] !== undefined
+    const list = ideas[id]
     return (
       <div key={id} className={mergeClasses(styles.thread, !resolved && styles.threadOpen)}>
-        {entry(n, 24, target)}
-        {(replies.length > 0 || n.reply) && (
+        {entry(n, 24, targetBadge)}
+        {hasReply && (
           <div className={styles.replies}>
-            {/* 返信の機能より前に、対応済みにしたときに書いた「対応した内容」(返信の 1 件として見せる) */}
-            {n.reply && entry({ ...n, author: n.replied_by, body: n.reply, created_on: n.replied_at, id: `${id}:fix` }, 20, undefined, true)}
+            {/* 以前の質問の返信(1 件だけ列に持っていた)。返信の 1 件として見せる */}
+            {n.reply && entry({ ...n, kind: 'reply', author: n.replied_by, body: n.reply, created_on: n.replied_at, id: `${id}:reply` }, 20, undefined, true)}
             {replies.map((r) => (
               <div key={r.id}>{entry(r, 20)}</div>
             ))}
@@ -298,7 +367,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
               <Button size="small" appearance="primary" disabled={busy || !me || !drafts[id].trim()} onClick={() => void reply(n)}>{t('返信', 'Reply')}</Button>
               {!resolved && (
                 <Button size="small" icon={<CheckmarkCircleRegular />} disabled={busy || !me} onClick={() => void reply(n, true)}>
-                  {drafts[id].trim() ? t('返信して対応済みにする', 'Reply and resolve') : t('対応済みにする', 'Resolve')}
+                  {drafts[id].trim() ? t('返信して解決にする', 'Reply and resolve') : t('解決にする', 'Resolve')}
                 </Button>
               )}
               <Button size="small" appearance="subtle" onClick={() => closeReply(id)}>{t('やめる', 'Cancel')}</Button>
@@ -315,7 +384,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
           {resolved ? (
             <>
               <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>
-                {n.replied_by ? t(`対応済み(${n.replied_by}・${when(n.replied_at)})`, `Resolved (${n.replied_by}, ${when(n.replied_at)})`) : t('対応済み', 'Resolved')}
+                {n.kind === 'comment' && n.replied_by ? t(`解決(${n.replied_by}・${when(n.replied_at)})`, `Resolved (${n.replied_by}, ${when(n.replied_at)})`) : t('解決', 'Resolved')}
               </Badge>
               <Button size="small" appearance="subtle" disabled={busy} onClick={() => void reopen(n)}>{t('もう一度開く', 'Reopen')}</Button>
               <Button
@@ -336,11 +405,38 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
           ) : (
             !replying && (
               <Button size="small" appearance="subtle" icon={<CheckmarkCircleRegular />} disabled={busy || !me} onClick={() => void reply(n, true)}>
-                {t('対応済みにする', 'Resolve')}
+                {t('解決にする', 'Resolve')}
               </Button>
             )
           )}
+          {hasReply && (
+            <AiButton busy={list === 'busy'} disabled={busy} onClick={() => void propose(n)}>
+              {t('AIでタスクを出す', 'Suggest tasks with AI')}
+            </AiButton>
+          )}
+          {tasks > 0 && (
+            <span className={styles.taskChip}>
+              <TaskListLtrRegular />
+              {t(`タスク ${tasks} 件`, `${tasks} task(s)`)}
+            </span>
+          )}
         </div>
+        {Array.isArray(list) && (
+          <div className={styles.ideas}>
+            <div className={styles.hint}>
+              {list.length ? t('AI のタスクの案(「採用」で、タスクのタブに入ります)', 'AI task ideas (Adopt adds them to the Tasks tab)') : t('このやり取りから、新しいタスクは見つかりませんでした。', 'No new tasks found in this exchange.')}
+            </div>
+            {list.map((idea, i) => (
+              <div key={i} className={styles.idea}>
+                <Input size="small" className={styles.ideaText} value={idea.text} onChange={(_, d) => editIdea(id, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
+                <Input size="small" list="ccp-thread-people" value={idea.assignee} onChange={(_, d) => editIdea(id, i, { assignee: d.value })} aria-label={t('担当', 'Assignee')} />
+                <Input size="small" type="date" value={idea.due} onChange={(_, d) => editIdea(id, i, { due: d.value })} aria-label={t('期日', 'Due')} />
+                <Button size="small" appearance="primary" disabled={busy || !idea.text.trim()} onClick={() => void adopt(id, i, idea)}>{t('採用', 'Adopt')}</Button>
+                <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('外す', 'Dismiss')} onClick={() => dropIdea(id, i)} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
@@ -349,25 +445,28 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
     <div className={styles.root}>
       <div>
         <div className={styles.head}>
-          <CommentRegular />
-          {t('レビューのコメント', 'Review comments')}
-          {open > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未対応 ${open}`, `${open} open`)}</Badge>}
+          <ChatRegular />
+          {t('やり取り', 'Conversation')}
+          {open > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未解決 ${open}`, `${open} open`)}</Badge>}
         </div>
         <div className={styles.caption}>
           {t(
-            '配信全体、または載せた商品に、指摘を残します。返信でやり取りして、決着したら対応済みにします。その場で保存します(配信カードの「保存」は不要です)。',
-            'Leave feedback on the whole delivery or on a featured product, discuss in replies, and resolve when settled. Saved right away (no need to press Save).',
+            '質問・指摘・相談を書き、返信でやり取りして、決着したら解決にします。宛先を入れると、その人に返事を求めます。その場で保存します(配信カードの「保存」は不要です)。',
+            'Post questions, feedback or notes, discuss in replies, and resolve when settled. Add a recipient to ask that person for a reply. Saved right away (no need to press Save).',
           )}
         </div>
       </div>
-      {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、コメントを付けられます。', 'Save the delivery card to add comments.')}</div>}
+      {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、書き込めます。', 'Save the delivery card to post.')}</div>}
       {cardId && notes === null && <Spinner size="tiny" />}
       {error && <div className={styles.error}>{error}</div>}
       {cardId && (
         <div className={styles.form}>
           <div className={styles.formRow}>
-            <Field label={t('あなたの名前', 'Your name')} size="small">
-              <MePicker list="ccp-comment-people" onChange={setAuthor} />
+            <Field label={t('あなた', 'You')} size="small">
+              <MePicker list="ccp-thread-people" onChange={setAuthor} />
+            </Field>
+            <Field label={t('宛先(任意)', 'To (optional)')} size="small">
+              <Input size="small" list="ccp-thread-people" value={to} onChange={(_, d) => setTo(d.value)} placeholder={t('返事を求める人', 'Who should reply')} />
             </Field>
             <Field label={t('対象', 'About')} size="small">
               <Select size="small" value={target} onChange={(_, d) => setTarget(d.value)}>
@@ -378,7 +477,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
               </Select>
             </Field>
           </div>
-          <datalist id="ccp-comment-people">
+          <datalist id="ccp-thread-people">
             {people.map((p) => (
               <option key={p} value={p} />
             ))}
@@ -386,7 +485,7 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
           <Textarea
             size="small"
             resize="vertical"
-            placeholder={t('レビューの指摘(例: 前日のメールと商品がかぶっている)', 'Review feedback (e.g. same products as the previous day)')}
+            placeholder={t('例: セールの終わりは日曜 23:59 ですか? / 前日のメールと商品がかぶっています', 'e.g. Does the sale end Sunday 11:59 PM? / Same products as the previous day')}
             value={body}
             onChange={(_, d) => setBody(d.value)}
             onKeyDown={submitOnCtrlEnter(() => {
@@ -395,14 +494,14 @@ export function CommentsPanel({ cardId, productIds, products, people, onOpenCoun
           />
           <div className={styles.actions}>
             <Button size="small" appearance="primary" disabled={busy || !body.trim() || !me} onClick={() => void add()}>
-              {t('コメントを追加', 'Add comment')}
+              {t('書き込む', 'Post')}
             </Button>
-            <span className={styles.hint}>{t('Ctrl + Enter で追加', 'Ctrl + Enter to add')}</span>
+            <span className={styles.hint}>{t('Ctrl + Enter で書き込む', 'Ctrl + Enter to post')}</span>
           </div>
         </div>
       )}
-      {comments.map(thread)}
-      {cardId && notes && comments.length === 0 && <div className={styles.caption}>{t('まだコメントはありません。', 'No comments yet.')}</div>}
+      {roots.map(thread)}
+      {cardId && notes && roots.length === 0 && <div className={styles.caption}>{t('まだ書き込みはありません。', 'Nothing posted yet.')}</div>}
     </div>
   )
 }
