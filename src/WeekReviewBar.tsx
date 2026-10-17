@@ -24,6 +24,10 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
   },
+  // 週の状態の印の横の、状態ごとの件数
+  counts: { display: 'inline-flex', alignItems: 'center', columnGap: '10px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
+  count: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
+  countDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', marginLeft: 'auto' },
   // 確定後の変更(理由つき)の一覧。帯の下の行に出す
   changes: { flexBasis: '100%', display: 'grid', rowGap: '2px', paddingTop: '6px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
@@ -68,6 +72,8 @@ interface Props {
   fix?: ReactNode
   /** 選んでいる確定の前に直すことの札(WeekCheckChip)。出たり消えたりするので、左側に置く */
   fixChip?: ReactNode
+  /** この週の状態ごとの件数(未起案 / 承認待ち / 承認済み。週の状態の印の横に、名前つきで出す) */
+  statusCounts?: { label: string; color: string; n: number }[]
 }
 
 const STATUS_APPROVED = 'approved'
@@ -77,7 +83,7 @@ const STATUS_APPROVED = 'approved'
  * 配信の承認は、配信カードごとの依頼(U4)で行うので、ここでは「まとめて依頼」「自分宛てを承認」と、週の確定だけを置く。
  * 確定は、週のすべての配信を「確定」(見せ方は 承認済み + 鍵)にする(承認されていない配信があれば、件数を出して確かめる)
  */
-export function WeekReviewBar({ week, cards, changes = [], events = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onExportPdf, onChange, toFix = 0, fix, fixChip }: Props) {
+export function WeekReviewBar({ week, cards, changes = [], events = [], onRequestAll, toRequest = 0, onApproveMine, mine = 0, hasMe = false, onExportPdf, onChange, toFix = 0, fix, fixChip, statusCounts = [] }: Props) {
   const styles = useStyles()
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -141,6 +147,16 @@ export function WeekReviewBar({ week, cards, changes = [], events = [], onReques
     <div className={styles.root}>
       {/* 帯の主語: この週の状態(週の表示にしかない帯に置くので、月・一覧に切り替えても、ツールバーの位置は変わらない) */}
       <WeekStatusBadge week={week} />
+      {statusCounts.length > 0 && (
+        <span className={styles.counts}>
+          {statusCounts.map((c) => (
+            <span key={c.label} className={styles.count}>
+              <span className={styles.countDot} style={{ backgroundColor: c.color }} />
+              {`${c.label} ${c.n}`}
+            </span>
+          ))}
+        </span>
+      )}
       {fixChip}
       <span className={styles.actions}>
         {busy && <Spinner size="extra-tiny" />}

@@ -10,6 +10,7 @@ import {
   DialogTitle,
   Field,
   Menu,
+  MenuButton,
   type MenuButtonProps,
   MenuDivider,
   MenuGroup,
@@ -40,7 +41,7 @@ import {
   ArrowUploadRegular,
   DismissRegular,
   CalendarLtrRegular,
-  ColumnTripleRegular,
+  TableRegular,
   DataBarVerticalRegular,
   SettingsRegular,
   LayoutColumnTwoRegular,
@@ -217,11 +218,6 @@ const useStyles = makeStyles({
     alignItems: 'flex-end',
   },
   filterField: { minWidth: '130px' },
-  count: {
-    marginLeft: 'auto',
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground2,
-  },
   monthRow: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -239,29 +235,10 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase400,
     fontWeight: tokens.fontWeightSemibold,
   },
-  legend: {
-    display: 'flex',
-    gap: tokens.spacingHorizontalXS,
-    marginLeft: 'auto',
-    flexWrap: 'wrap',
-  },
-  // 凡例は、色の点だけ(名前はマウスを重ねると出す。週の表示では、その週の件数を点の横に出す)。毎回読むものではないので、場所を取らない(FLOWS の C-6)
-  legendPill: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    columnGap: '4px',
-    minHeight: '22px',
-    padding: '0 6px',
-    color: tokens.colorNeutralForeground2,
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-    borderRadius: tokens.borderRadiusCircular,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    whiteSpace: 'nowrap',
-    cursor: 'default',
-  },
+  // 「この画面 ▾」の中の、色の意味の 1 行
+  legendRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '4px 10px', fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
+  // 「この画面 ▾」(ツールバーの右端)
+  viewMenu: { marginLeft: 'auto' },
   legendDot: { width: '10px', height: '10px', borderRadius: tokens.borderRadiusCircular, flexShrink: 0 },
   // 見出しの幅は、月・週・一覧で同じにする(切り替えで、右のボタンがずれないように)。言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
@@ -1071,35 +1048,9 @@ function App() {
                 {t('ユーザーと承認グループ', 'Users and approval groups')}
               </MenuItem>
               <MenuDivider />
-              {/* データの出入り(たまに使う操作なので、ツールバーではなく、ここにまとめる)。いま見ている面の書き出し・取り込みを先に */}
+              {/* システム全体のデータの出入り。いま見ている画面への操作(CSV の書き出し・結果の取り込み)は、ツールバー右端の「この画面 ▾」 */}
               <MenuGroup>
                 <MenuGroupHeader>{t('データ', 'Data')}</MenuGroupHeader>
-                {page === 'calendar' && (
-                  <MenuItem
-                    icon={<ArrowDownloadRegular />}
-                    disabled={(view === 'week' ? weekRows : monthRows).length === 0}
-                    onClick={exportCsv}
-                    secondaryContent={view === 'week' ? t('表示中の週の配信', "This week's deliveries") : t('表示中の月の配信', "This month's deliveries")}
-                  >
-                    {t('配信を CSV で書き出す', 'Export deliveries as CSV')}
-                  </MenuItem>
-                )}
-                {page === 'results' && resultsData && (
-                  <>
-                    <MenuItem icon={<ArrowDownloadRegular />} disabled={!resultsData.canExport} onClick={resultsData.exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
-                      {t('結果を CSV で書き出す', 'Export results as CSV')}
-                    </MenuItem>
-                    <MenuItem icon={<ArrowUploadRegular />} onClick={resultsData.importCsv}>
-                      {t('結果を取り込む(CSV)', 'Import results (CSV)')}
-                    </MenuItem>
-                    <MenuItem onClick={resultsData.downloadSample} secondaryContent={resultsData.sampleColumns + t(' 列', ' columns')}>
-                      {t('取り込みの見本を書き出す', 'Download a sample CSV')}
-                    </MenuItem>
-                    <MenuItem icon={<AiIcon size={16} />} disabled={resultsData.classifying || resultsData.untyped === 0} onClick={resultsData.classify} secondaryContent={resultsData.classifying ? t('分けています…', 'Sorting…') : t(`${resultsData.untyped} 件`, `${resultsData.untyped}`)}>
-                      {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
-                    </MenuItem>
-                  </>
-                )}
               {/* 引っ越し用のパック: すべてのデータと画像を 1 つの ZIP に書き出す(外にアクセスできない環境へ持ち込むため。server/ccp/pack.py) */}
               <MenuItem
                 icon={<ArrowDownloadRegular />}
@@ -1174,7 +1125,6 @@ function App() {
               <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />
               <FilterSelect label={t('担当', 'Person')} value={filters.person} options={owners.map((o) => ({ value: o, label: o }))} onChange={setFilter('person')} />
               {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters(noFilter)}>{t('クリア', 'Clear')}</Button>}
-              <span className={styles.count}>{t(`${filtered.filter((c) => !isCancelled(c)).length} / ${activeCards.length} 件`, `${filtered.filter((c) => !isCancelled(c)).length} / ${activeCards.length} items`)}</span>
             </div>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
@@ -1267,10 +1217,12 @@ function App() {
               {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
-              {page === 'calendar' && view === 'list' && (
+              {/* この画面 ▾: いま見ているものへの操作(書き出し・取り込み・列)と、色の意味。どの面・見せ方でも、右端の同じ位置。システム全体の設定は ⚙ */}
+              <span className={styles.viewMenu}>
                 <Menu
                   checkedValues={{ columns }}
                   onCheckedValueChange={(_, d) => {
+                    if (d.name !== 'columns') return
                     const added = d.checkedItems.find((k) => !columns.includes(k as ColumnKey))
                     const removed = columns.find((k) => !d.checkedItems.includes(k))
                     if (added) toggleColumn(added as ColumnKey, true)
@@ -1278,36 +1230,69 @@ function App() {
                   }}
                 >
                   <MenuTrigger disableButtonEnhancement>
-                    <Button size="small" appearance="subtle" icon={<ColumnTripleRegular />}>{t('列', 'Columns')}</Button>
+                    <MenuButton size="small" appearance="subtle" icon={<TableRegular />}>
+                      {t('この画面', 'This view')}
+                    </MenuButton>
                   </MenuTrigger>
                   <MenuPopover>
                     <MenuList>
-                      {COLUMNS.map((c) => (
-                        <MenuItemCheckbox key={c.key} name="columns" value={c.key} disabled={c.key === 'name'}>
-                          {c.label()}
-                        </MenuItemCheckbox>
-                      ))}
+                      {page === 'calendar' && (
+                        <MenuItem
+                          icon={<ArrowDownloadRegular />}
+                          disabled={(view === 'week' ? weekRows : monthRows).length === 0}
+                          onClick={exportCsv}
+                          secondaryContent={view === 'week' ? t('表示中の週', 'This week') : t('表示中の月', 'This month')}
+                        >
+                          {t('配信を CSV で書き出す', 'Export deliveries as CSV')}
+                        </MenuItem>
+                      )}
+                      {page === 'results' && resultsData && (
+                        <>
+                          <MenuItem icon={<ArrowDownloadRegular />} disabled={!resultsData.canExport} onClick={resultsData.exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
+                            {t('結果を CSV で書き出す', 'Export results as CSV')}
+                          </MenuItem>
+                          <MenuItem icon={<ArrowUploadRegular />} onClick={resultsData.importCsv}>
+                            {t('結果を取り込む(CSV)', 'Import results (CSV)')}
+                          </MenuItem>
+                          <MenuItem onClick={resultsData.downloadSample} secondaryContent={resultsData.sampleColumns + t(' 列', ' columns')}>
+                            {t('取り込みの見本を書き出す', 'Download a sample CSV')}
+                          </MenuItem>
+                          <MenuItem icon={<AiIcon size={16} />} disabled={resultsData.classifying || resultsData.untyped === 0} onClick={resultsData.classify} secondaryContent={resultsData.classifying ? t('分けています…', 'Sorting…') : t(`${resultsData.untyped} 件`, `${resultsData.untyped}`)}>
+                            {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
+                          </MenuItem>
+                        </>
+                      )}
+                      {page === 'calendar' && view === 'list' && (
+                        <>
+                          <MenuDivider />
+                          <MenuGroup>
+                            <MenuGroupHeader>{t('表示する列', 'Columns')}</MenuGroupHeader>
+                            {COLUMNS.map((c) => (
+                              <MenuItemCheckbox key={c.key} name="columns" value={c.key} disabled={c.key === 'name'}>
+                                {c.label()}
+                              </MenuItemCheckbox>
+                            ))}
+                          </MenuGroup>
+                        </>
+                      )}
+                      {page === 'calendar' && (
+                        <>
+                          <MenuDivider />
+                          <MenuGroup>
+                            <MenuGroupHeader>{t('色の意味(ステータス)', 'Colors (status)')}</MenuGroupHeader>
+                            {statusOptions.map((o) => (
+                              <div key={o.value} className={styles.legendRow}>
+                                <span className={styles.legendDot} style={{ backgroundColor: statusColor(o.value) }} />
+                                {optionLabel(o.label)}
+                              </div>
+                            ))}
+                          </MenuGroup>
+                        </>
+                      )}
                     </MenuList>
                   </MenuPopover>
                 </Menu>
-              )}
-              {page === 'calendar' && (
-              <div className={styles.legend}>
-                {/* 凡例: 色の点だけ。名前はマウスを重ねる(キーボードで選ぶ)と出す。週の表示では、その週の状態ごとの件数を点の横に出す */}
-                {statusOptions.map((o) => {
-                  const n = view === 'week' ? weekCards.filter((c) => statusView(c.status) === o.value).length : undefined
-                  const name = n === undefined ? optionLabel(o.label) : t(`${optionLabel(o.label)} ${n} 件`, `${optionLabel(o.label)}: ${n}`)
-                  return (
-                    <Tooltip key={o.value} content={name} relationship="label">
-                      <span className={styles.legendPill} tabIndex={0}>
-                        <span className={styles.legendDot} style={{ backgroundColor: statusColor(o.value) }} />
-                        {n !== undefined && n}
-                      </span>
-                    </Tooltip>
-                  )
-                })}
-              </div>
-              )}
+              </span>
             </div>
             </>
             )}
@@ -1335,6 +1320,7 @@ function App() {
             ) : view === 'week' ? (
               <>
               <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} events={events.filter((e) => e.week_start?.slice(0, 10) === weekKey)} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onExportPdf={() => setPrintingWeek(true)} onChange={changeWeek}
+                statusCounts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: weekCards.filter((c) => statusView(c.status) === o.value).length }))}
                 toFix={shownChecklist.filter((i) => !i.ok).length}
                 fixChip={<WeekCheckChip items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
                 fix={
