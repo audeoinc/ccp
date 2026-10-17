@@ -211,7 +211,8 @@ const SCENES = {
     await click(page, T(L, 'この週をまとめて AI で下書き', 'Bulk AI drafts for this week'), { tag: '[role=menuitem]', wait: 1200 })
     await fullShot(page, `${L}-06-bulk-drafts-start`)
     // 下書きを置いて、AI で作る(できるまで待つ。最大 6 分)
-    await click(page, T(L, '次へ', 'Next'), { tag: 'button', wait: 1500 })
+    // 「次へ(n 本の下書きを並べる)」。「次の週」のボタンと取り違えないよう、括弧つきの文言で探す
+    await click(page, T(L, '次へ(', 'Next (place'), { tag: 'button', wait: 1500 })
     await click(page, T(L, 'AI で作る', 'Create with AI'), { tag: 'button', wait: 3000 })
     for (let i = 0; i < 180; i++) {
       const left = await page.evaluate((s) => document.body.innerText.includes(s), T(L, 'まだ作っていません', 'Not created yet'))
