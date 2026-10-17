@@ -259,6 +259,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **見本**: `docs/policy_example/rules.md`・`sales.csv`(利用先の Claude が変換するときの手本。架空の決まり)。
 - **未確認・残り**: 本物の Gemini で効き目が出るか(手元の確認は、取り込みと指示文の組み立てまで)。M5(must のコードでの確かめ)、M6・M7、`product_policies` からの移し方、`販売系の category の target` は CCP の値(outer)でも表示名でも合うようにしてある。
 - 同じフォルダで 3 セッションが作業しているので、この作業は別の clone で行い、push の前に main に rebase した。
+- **M5(同日)**: `src/policyCheck.ts`(`findViolations`)。`askAgent` が、その依頼に効く must の決まりのうち「確かめ方」があるものを、返答に照らす(文字: 見出し・コピーなど。理由・切り口・商品名は数えない。商品: 選んだコードの段階 = 今週の方針 → MD 方針)。破っていたら `retryNote` を付けて 1 回だけ作り直し、それでもだめなら `onPolicyWarning` で App が画面の上に黄色の帯を出す(案は返す。保存は止めない)。例は `scripts/check-policy.mjs`。本物の Gemini では未確認。残り: 週の確認への表示、「上限 週 n 回」。
 
 ## 7. 落とし穴
 

@@ -74,7 +74,7 @@ import { appPath } from './appRoot'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
 import { clearProductDataCache } from './useProductData'
 import { isCancelled } from './cancel'
-import { setActivePolicies, setActiveRules, setActiveSales } from './aiSelect'
+import { setActivePolicies, setActiveRules, setActiveSales, onPolicyWarning } from './aiSelect'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -358,6 +358,18 @@ function App() {
   const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
   // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
   const [policyOpen, setPolicyOpen] = useState(false)
+  // AI の案が、作り直しても must の決まりを破っていたとき(M5)。案は使えるが、人が確かめる
+  const [policyWarning, setPolicyWarning] = useState<string | null>(null)
+  useEffect(
+    () =>
+      onPolicyWarning((w) =>
+        setPolicyWarning(
+          tr('AI の案が、必ず守る決まりを破っています(作り直しても直りませんでした)。案を確かめて、直してから保存してください: ', 'An AI suggestion breaks a must rule (still broken after one retry). Check and fix it before saving: ') +
+            w.violations.map((v) => `${v.ruleId}「${v.title}」(${v.detail})`).join(' / '),
+        ),
+      ),
+    [],
+  )
   const loadMarketingPolicies = useCallback(async () => {
     const [r, s] = await Promise.all([PolicyRulesService.getAll({ top: 5000 }), SalesPoliciesService.getAll({ top: 5000 })])
     if (r.success)
@@ -1129,6 +1141,14 @@ function App() {
         {error && (
           <MessageBar layout="multiline" intent="error" className={styles.alert}>
             <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
+        {policyWarning && (
+          <MessageBar layout="multiline" intent="warning" className={styles.alert}>
+            <MessageBarBody>{policyWarning}</MessageBarBody>
+            <MessageBarActions
+              containerAction={<Button appearance="transparent" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setPolicyWarning(null)} />}
+            />
           </MessageBar>
         )}
         {bqNotice && (

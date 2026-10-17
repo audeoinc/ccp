@@ -1,3 +1,4 @@
+import { findViolations, retryNote, type Violation } from './policyCheck'
 import { ProductCategory } from './models/products'
 import { AiRequestsService } from './data/aiRequests'
 import type { Product } from './models/products'
@@ -369,6 +370,28 @@ function withPolicies(body: Record<string, unknown>, task: unknown, card: CardLi
   }
   return { body: out, notes }
 }
+// ---- must の決まりの確かめ(M5。src/policyCheck.ts)----
+// 作り直しても破っていた案は、そのまま返し(保存は止めない。判断は人)、画面に警告を出す。App が購読して、帯に出す
+export interface PolicyWarning {
+  task: string
+  violations: Violation[]
+}
+const policyListeners = new Set<(w: PolicyWarning) => void>()
+export function onPolicyWarning(fn: (w: PolicyWarning) => void): () => void {
+  policyListeners.add(fn)
+  return () => {
+    policyListeners.delete(fn)
+  }
+}
+/** 依頼の入力(決まり・方針を足したあと)の商品から、商品コード → 段階(今週の方針を優先し、なければ MD 方針) */
+const stageLookup = (body: Record<string, unknown>) => {
+  const map = new Map<string, string>()
+  for (const p of Array.isArray(body.products) ? (body.products as { code?: string; md?: { stage?: string }; weekPolicy?: { stage?: string } }[]) : []) {
+    const stage = p.weekPolicy?.stage || p.md?.stage
+    if (p.code && stage) map.set(String(p.code), stage)
+  }
+  return (code: string) => map.get(code)
+}
 let lastReply = ''
 let lastAnswered = false
 
@@ -427,6 +450,10 @@ function localizePrompt(prompt: string): string {
 /** プロンプトと入力 JSON をエージェントへ送り、応答の JSON オブジェクトを返す。返答の JSON が壊れていたときは、依頼し直す */
 export async function askAgent(prompt: string, payload: unknown): Promise<Record<string, unknown>> {
   let lastError: unknown
+  // must の決まりを破った案は、1 回だけ作り直させる(M5)。作り直しの前書き
+  let retry = ''
+  const task = (payload as { task?: unknown })?.task
+  const mustRules = rulesFor(task, cardOf(payload)).filter((r) => r.strength === 'must' && r.checkSpec)
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
     const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
@@ -434,7 +461,7 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
     // マーケティングの決まり・今週の方針(M3・M4)を、この依頼に効く分だけ足す
     const { body, notes: policyNotes } = withPolicies(base, (payload as { task?: unknown })?.task, cardOf(payload))
     const text = await askText(
-      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + policyNotes + localizePrompt(prompt) + JSON.stringify(body),
+      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + policyNotes + retry + localizePrompt(prompt) + JSON.stringify(body),
     )
     try {
       const parsed = extractJson(text) as Record<string, unknown>
@@ -447,6 +474,15 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
           lastAnswered = true
           throw new ChatAnswer(lastReply)
         }
+      }
+      if (mustRules.length) {
+        const violations = findViolations(mustRules, parsed, stageLookup(body))
+        if (violations.length && !retry) {
+          retry = retryNote(violations)
+          attempt-- // 作り直しは、JSON の崩れのやり直しの回数に数えない
+          continue
+        }
+        if (violations.length) for (const fn of policyListeners) fn({ task: String(task ?? ''), violations })
       }
       return parsed
     } catch (e) {

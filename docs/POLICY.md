@@ -2,7 +2,7 @@
 
 マーケティングポリシー(販売の方針と、表現・配信の決まり)を CCP に取り込み、AI の推論(テーマ・商品・見出し・コピー・制作指示)で参照し、守れているかを確かめるための設計。
 
-- 状態: **設計(2026-10-17 に利用者と合意)。M2・M3・M4 を作った(2026-10-17。取り込みは `server/ccp/policies.py`、画面は `src/PolicyManager.tsx`、AI への渡し方は `src/aiSelect.ts` の `withPolicies`。見本のファイルは [policy_example/](policy_example/))。M5(コードでの確かめ)から先は、まだ。** 作る順番は [BACKLOG.md](BACKLOG.md) の 10 章(M1〜M8)
+- 状態: **設計(2026-10-17 に利用者と合意)。M2・M3・M4 を作った(2026-10-17。取り込みは `server/ccp/policies.py`、画面は `src/PolicyManager.tsx`、AI への渡し方は `src/aiSelect.ts` の `withPolicies`。見本のファイルは [policy_example/](policy_example/))。M5(コードでの確かめ)も作った(`src/policyCheck.ts`。含めない / 含める / 除く 段階= を、AI の返答に照らす。理由・切り口・商品名の文字は数えない。週の確認への表示と「上限 週 n 回」は、まだ)。** 作る順番は [BACKLOG.md](BACKLOG.md) の 10 章(M1〜M8)
 - 取り込むファイルの形(変換する人・Claude 向け): [POLICY_FORMAT.md](POLICY_FORMAT.md)
 - 関係する文書: [BIGQUERY.md](BIGQUERY.md)(本番のデータ。同じ「受け渡しの形に変換して入れる」考え方)、[PRINCIPLES.md](PRINCIPLES.md) の 6 章(判断は人、AI は補助)
 - 利用先の名前・ポリシーの文書の名前・置き場所は、ここにも、コードにも書かない
