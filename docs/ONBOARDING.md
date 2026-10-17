@@ -99,7 +99,7 @@ GitHub の**公開**リポジトリ(`audeoinc/ccp`)。だれでも読めるの�
 ## 5. AI コーディングアシスタント(Claude Code など)を使う場合
 
 - リポジトリの [CLAUDE.md](../CLAUDE.md) に、コードの約束事と、確認の手順が書いてある。アシスタントは、これを読んで作業する。
-- アシスタントが、`npm run deploy:gcp` や `git push` を勝手に行わないよう、**反映と push は、人が指示したときだけ**にする(CLAUDE.md にも書いてある)。
+- アシスタントは、確認(型チェック・lint・ビルド・`npm run verify`)が通ったら、**指示を待たずにコミットし、`main` に push してよい**(2026-10-17 に変えた)。**本番への反映(`npm run deploy:gcp`)・本番のデータの削除・Workbench の `import-pack --yes` は、人が指示したときだけ**にする(CLAUDE.md にも書いてある)。
 
 ## 6. よくある困りごと
 

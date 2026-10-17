@@ -12,7 +12,7 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
    npx eslint .
    npm run build
    ```
-2. **勝手に反映・公開しない。** `npm run deploy:gcp`(本番の上書き)、`git push`、本番のデータの削除は、**人が指示したときだけ**行う。コミットも、指示があったときに行う。
+2. **コミットと push は、確認が通ったら、指示を待たずに行ってよい**(2026-10-17、利用者の指示で変えた)。上の確認と `npm run verify` を通してからコミットし、`git pull --rebase` で、ほかの人・ほかのセッションの変更の上に載せ直して、`main` に push する(作業ブランチを指定されていれば、そこにも)。1 つのコミットは 1 つのまとまった変更にし、何をコミットしたかを報告する。**本番への反映(`npm run deploy:gcp`)、本番のデータの削除、Workbench の DB を置き換える `import-pack --yes` は、取り返しがつきにくいので、これまでどおり人が指示したときだけ**行う。
 3. **画面の見た目は、確認できていないと正直に伝える。** 画面は、撮影・デモ用のビルド(`npx vite --config vite.mock.config.ts`、5190)で確かめられる。「型チェック・lint・ビルドは通った。画面は未確認」のように、確認した範囲を分けて報告する。
 4. 小さい変更は、編集ツールで行う。複数ファイルへの一括置換は、スクリプトでもよいが、**改行コード(CRLF / LF の混在)を保つ**こと。
 5. **データの名前は、画面・API・PostgreSQL で同じ**(表 `delivery_cards`、列 `scheduled_at`、参照 `hero_image_id`、主キー `id`)。選択肢は文字の値(`email` / `app`、`not_started` / `reviewing` / `approved` / `confirmed` など。使える値は `server/schema.json` の `choices`)。状態の前後を比べるときは、文字のまま比べずに `statusRank`(`src/status.ts`)を使う。表の型は `src/models/`(一部の表は `src/data/` のサービスのファイルの中)、読み書きは `src/data/`。列を変えたら、`server/schema.json` と型を一緒に直す(`npm run verify` が食い違いを見つける)。
