@@ -40,7 +40,6 @@ import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
-import { NotesEditor } from './NotesEditor'
 import { campaignSlug, defaultUtm, encodeLinks, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links } from './links'
 import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, savePref } from './settings'
@@ -1258,11 +1257,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                 />
               </Field>
               {(form.headline || form.copy) && form.copyAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.copyAngle}`}</Caption1>}
-              <Field label={t('制作指示', 'Production notes')}>
-                {/* 中央の「⑥ 制作指示」と同じエディタ(値は 1 つ。どちらで書き換えても、両方が変わる) */}
-                <NotesEditor value={form.instructions} onChange={set('instructions')} minHeight="120px" />
-              </Field>
-              {form.instructions && form.instructionsAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.instructionsAngle}`}</Caption1>}
+              {/* 制作指示は、作るのは中ペインの「⑥ 制作指示」、引き継ぐ前に確かめるのは右のプロセスのペインの「渡す制作指示」。左には置かない(書き換える場所を 1 つにする。X26) */}
             </div>
 
             <Splitter onDrag={resize(0)} onDone={saveWidths} />
