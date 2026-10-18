@@ -1,10 +1,12 @@
 // テーマの種類を、配信の言葉から推し量る(AI で分けるまでの仮の種類)。
 // 撮影用の AI の身代わり(src/mock/agent.ts)からも使うので、ほかのファイルを読み込まない(読み込みの輪を作らないため)
-export type ThemeType = 'price' | 'sale' | 'new' | 'member' | 'season' | 'restock' | 'other'
+export type ThemeType = 'price' | 'limited' | 'sale' | 'new' | 'collab' | 'member' | 'season' | 'restock' | 'other'
 
 // 言葉から推し量る(AI で分けるまでの仮の種類。上から順に、先に当たったもの)
 const RULES: [ThemeType, RegExp][] = [
   ['price', /値下げ|プライスダウン|price ?drop|markdown|price cut/i],
+  ['limited', /期間限定価格|期間限定プライス|limited[- ]time price|special price/i],
+  ['collab', /コラボ|collab|×/i],
   ['restock', /再入荷|restock|back in stock/i],
   ['member', /会員|メンバー|member|loyalty|vip/i],
   ['sale', /セール|sale|deal|offer|割引|% ?off|black friday|ブラックフライデー|last call|ラストコール|limited/i],

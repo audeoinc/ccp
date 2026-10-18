@@ -206,24 +206,30 @@ const SCENES = {
   async bulkDrafts(page, L) {
     await view(page, T(L, '週', 'Week'))
     await clickLabel(page, T(L, '次の週', 'Next week'), 1200)
-    // ヘッダーの「新規作成 ▾」の ▾ から開く
+    // ヘッダーの「新規作成 ▾」の ▾ から、この週の枠を作る(W14)
     await clickLabel(page, T(L, '新規作成のほかの方法', 'More ways to create'), 600)
-    await click(page, T(L, 'この週をまとめて AI で下書き', 'Bulk AI drafts for this week'), { tag: '[role=menuitem]', wait: 1200 })
+    await click(page, T(L, 'この週の枠を作る', 'Create slots for this week'), { tag: '[role=menuitem]', wait: 1200 })
     await fullShot(page, `${L}-06-bulk-drafts-start`)
-    // 下書きを置いて、AI で作る(できるまで待つ。最大 6 分)
-    // 「次へ(n 本の下書きを並べる)」。「次の週」のボタンと取り違えないよう、括弧つきの文言で探す
-    await click(page, T(L, '次へ(', 'Next (place'), { tag: 'button', wait: 1500 })
-    await click(page, T(L, 'AI で作る', 'Create with AI'), { tag: 'button', wait: 3000 })
+    // 「n 本の枠を作る」→ 名前のない枠に配信名の案 → 種類を入れる → そろった枠の中身を作る(できるまで待つ。最大 6 分)
+    // 「5 本の枠を作る」は数から始まるので、前方一致の click ではなく、終わりの文字で探す
+    await page.evaluate((s) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim().endsWith(s))?.click(), T(L, '本の枠を作る', 'slot(s)'))
+    await sleep(1500)
+    await click(page, T(L, '名前のない', 'Suggest names'), { tag: 'button', wait: 2500 })
+    const kinds = ['season', 'sale', 'new', 'collab', 'limited']
+    const n = await page.evaluate(() => document.querySelectorAll('select[aria-label="種類"], select[aria-label="Type"]').length)
+    for (let i = 0; i < n; i++) {
+      const sels = await page.$$('select[aria-label="種類"], select[aria-label="Type"]')
+      if (sels[i]) await sels[i].select(kinds[i % kinds.length])
+      await sleep(600)
+    }
+    await click(page, T(L, 'そろった', 'Create all'), { tag: 'button', wait: 3000 })
     for (let i = 0; i < 180; i++) {
-      const left = await page.evaluate((s) => document.body.innerText.includes(s), T(L, 'まだ作っていません', 'Not created yet'))
-      if (!left) break
+      const busy = await page.evaluate((s) => [...document.querySelectorAll('button')].some((b) => b.textContent.includes(s)), T(L, '作るのをやめる', 'Stop'))
+      if (!busy) break
       await sleep(2000)
     }
     await idle(page, 2000)
     await fullShot(page, `${L}-07-bulk-drafts`)
-    // 下書きを破棄して、下書きモードを抜ける
-    await click(page, T(L, '終える', 'Finish'), { tag: 'button', wait: 800 }).catch(() => undefined)
-    await click(page, T(L, '破棄', 'Discard'), { tag: 'button', wait: 1000, top: true }).catch(() => undefined)
     await clickLabel(page, T(L, '前の週', 'Previous week'), 1000).catch(() => undefined)
   },
   async list(page, L) {

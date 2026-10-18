@@ -41,7 +41,7 @@
 
 テーマ → テンプレート + メイン画像 → ヘッドライン・コピー → 各セクション(順に)→ 制作指示。結果は画面に反映するだけで、保存はしない。
 
-まとめて AI で下書き(W14。`src/bulkDraft.ts`・`src/useBulkDrafts.ts`。週の表示の下書きモード)も、同じ `runAutoDraft` を使う(作り方を、配信カードとずらさないため)。保存は、配信カードの保存(`buildContent`・`syncItems`)と同じ形にそろえる。配信カードの保存の形を変えたら、`bulkDraft.ts` の `draftFields`・`saveDraft` も直す。
+週の枠からまとめて AI で中身を作る(W14。`src/bulkDraft.ts`・`src/useWeekFrames.ts`)も、同じ `runAutoDraft` を使う(作り方を、配信カードとずらさないため)。保存は、配信カードの保存(`buildContent`・`syncItems`)と同じ形にそろえる。配信カードの保存の形を変えたら、`bulkDraft.ts` の `applyResult` も直す。
 
 ## 3. 画面の構成
 
@@ -64,6 +64,7 @@
 - 配信カード: 表 `delivery_cards`。AI の理由・切り口(`theme_reason` など)、セクションの見出し(`section_titles`)・コピー(`section_copies`、JSON)も、ここに保存する。
 - 掲載商品: 表 `delivery_products`(1 行 = 1 商品)。`state`(`selected` 選定 / `candidate` 候補)、`section`(セクション番号)、`sort_order`、`reason`、`source`(AI / 手動)を持つ。保存時は、読み込み時点との差分で、作成・更新・削除する。
 - 候補(`state` = 候補)は、保存する。AI の案(テーマ・コピー・制作指示の案、セクションの見出し・コピーの候補)は、**保存しない**(画面を開いている間だけ)。
+- 週の枠からまとめて中身を作る(W14)ときは、人が「中身を作る」を押すことを、AI の第 1 候補の採用とみなして保存し、「AI 下書き・未確認」の印(`ai_unchecked_at`)を付ける。印は、人が配信カードで保存するか、「確認した」を押すと外れる(誰も確かめていない中身を、印で見分けるため)。
 - 選択肢(ステータス、チャネル、カテゴリなど)は、文字の値(例: `email` / `app`)で持つ。表示名(`○○_name`)は、`labels.ts` が、値から補う。状態の前後は `statusRank` で比べる(文字のまま `<` で比べない)。
 - **承認の流れ(2026-10-14 決定。2026-10-17 の U1〜U6 で、下の「ユーザーと承認」の形に変えた。データの値と `statusRank` の順はそのまま)**: データの値は、配信が 未起案(not_started)→ 検討中(reviewing)→ 承認済み(approved)→ 確定(confirmed)、週が 下書き(draft)→ レビュー中(review)→ 確定(confirmed)。**画面では**、配信を 未起案 / 承認待ち / 承認済み(+ 確定した週は鍵マーク)、週を 確定前 / 確定 と見せる(`src/status.ts` の `statusView`・`statusLabel`、`LockMark`)。
   - 承認は、配信 1 本ずつ(配信カードの「保存して承認」)と、週まとめて(週の帯の「まとめて承認」= 検討中をすべて承認済みに)の両方。誰でも押せる。

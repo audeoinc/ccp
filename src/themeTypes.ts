@@ -10,16 +10,20 @@ import { guessThemeType, type ThemeType } from './themeGuess'
 export { guessThemeType, type ThemeType }
 
 /** 種類の一覧(画面の並び順) */
-export const THEME_TYPES: ThemeType[] = ['price', 'sale', 'new', 'member', 'season', 'restock', 'other']
+export const THEME_TYPES: ThemeType[] = ['price', 'limited', 'sale', 'new', 'collab', 'member', 'season', 'restock', 'other']
 
 export function themeTypeLabel(v: ThemeType): string {
   switch (v) {
     case 'price':
       return tr('値下げ', 'Price drop')
+    case 'limited':
+      return tr('期間限定価格', 'Limited-time price')
     case 'sale':
       return tr('セール', 'Sale')
     case 'new':
       return tr('新作', 'New arrivals')
+    case 'collab':
+      return tr('コラボ', 'Collaboration')
     case 'member':
       return tr('会員向け', 'Members')
     case 'season':
@@ -43,8 +47,10 @@ const CLASSIFY_PROMPT = `あなたは、ファッション通販の配信(メー
 
 # 種類
 - price: 値下げ(特定の商品の価格を下げた知らせ)
+- limited: 期間限定価格(期間を区切った特別価格。期間が終われば元の価格に戻る)
 - sale: セール(期間限定の割引・タイムセール・ブラックフライデーなど)
 - new: 新作(新しく入った商品・先取り)
+- collab: コラボ(ブランド・作家・キャラクターなどとの協業の商品や企画)
 - member: 会員向け(会員限定・会員感謝)
 - season: 季節の特集(季節・行事・天候に合わせた着こなしや商品の特集)
 - restock: 再入荷
@@ -52,7 +58,7 @@ const CLASSIFY_PROMPT = `あなたは、ファッション通販の配信(メー
 
 # 出力の形式(厳守)
 次の JSON オブジェクト 1 つだけを返す。JSON の外には、説明文、コードフェンス、前置き、あとがきを一切付けない。
-{"types":[{"id":"...","type":"price | sale | new | member | season | restock | other"}]}
+{"types":[{"id":"...","type":"price | limited | sale | new | collab | member | season | restock | other"}]}
 
 # ルール
 1. 入力のすべての配信について、id をそのまま返す。

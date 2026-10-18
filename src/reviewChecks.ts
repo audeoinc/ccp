@@ -20,7 +20,7 @@ export interface PolicyLite {
   promoPeriod?: string
 }
 
-export type CheckKey = 'overLimit' | 'pushAlign' | 'leadMissing' | 'repeat' | 'openComments' | 'openQuestions' | 'approved'
+export type CheckKey = 'overLimit' | 'pushAlign' | 'leadMissing' | 'repeat' | 'openComments' | 'openQuestions' | 'aiUnchecked' | 'approved'
 
 export interface CheckItem {
   key: CheckKey
@@ -183,6 +183,17 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
   // 鍵は openComments のまま(画面の確認の一覧・PDF が鍵で見分けるため)。openQuestions は、もう出さない
   const openComments = openOf('openComments', threadCounts)
 
+  // ---- 未確認の AI 下書き(W14): まとめて AI で中身を作り、まだ人が確かめていない配信
+  const unchecked = weekCards.filter((c) => !!c.ai_unchecked_at)
+  const aiUnchecked: CheckItem = {
+    key: 'aiUnchecked',
+    count: unchecked.length,
+    ok: unchecked.length === 0,
+    cardIds: unchecked.map((c) => c.id),
+    productIds: [],
+    details: unchecked.map(cardLabel),
+  }
+
   // ---- 承認の数: 選んだときは、まだ承認されていない配信を出す(残りの作業が分かるように)
   const notApproved = weekCards.filter((c) => statusRank(c.status) < statusRank(STATUS_APPROVED))
   const approved: CheckItem = {
@@ -195,5 +206,5 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
     details: notApproved.map(cardLabel),
   }
 
-  return [overLimit, pushAlign, leadMissing, repeat, openComments, approved]
+  return [overLimit, pushAlign, leadMissing, repeat, openComments, aiUnchecked, approved]
 }

@@ -158,6 +158,20 @@ export function mockAgent(message: string): string {
     return J({ types: list.map((d) => ({ id: d.id, type: guessThemeType({ name: d.name, theme: d.theme, headline: d.headline }) })) })
   }
 
+  // 配信名の案: 種類と曜日から、決まった形で作る
+  if (task === 'suggest_names') {
+    const slots = (p.slots as { id: string; scheduledAt?: string; country?: string; themeType?: string }[] | undefined) ?? []
+    return J({
+      names: slots.map((s, i) => {
+        const d = s.scheduledAt ? new Date(s.scheduledAt) : new Date()
+        const us = s.country === 'US'
+        const md = `${d.getMonth() + 1}/${d.getDate()}`
+        const kind = s.themeType || (us ? 'Weekly Picks' : '今週のおすすめ')
+        return { id: s.id, name: us ? `${kind} ${md}` : `${md} ${kind}${i % 2 ? '特集' : ''}`, reason: '配信日と種類から付けた名前です。' }
+      }),
+    })
+  }
+
   if (task === 'suggest_themes') {
     return en
       ? J({ themes: [
