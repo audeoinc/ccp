@@ -775,10 +775,24 @@ function App() {
   }
   // 週の承認(U6): 未依頼の配信をまとめて依頼する / 自分宛ての依頼をまとめて承認する(配信カードと同じ窓口 /api/approvals を、順に呼ぶ)
   const actor = () => ({ id: myUserId(), name: myName() })
+  // まとめて依頼の対象。中身のない週の枠(W14)は、承認するものがないので外す(中身を作ってから依頼する)
+  const requestable = needsRequest(weekCards.filter((c) => !frames.frameIds.has(c.id)), inbox.hasOpen)
   const requestWeek = async () => {
+    // まだ誰も確かめていない AI の下書き(W14)が入っていれば、依頼の前に知らせる(確かめずに承認者へ回さないように)
+    const unchecked = requestable.filter((c) => !!c.ai_unchecked_at).length
+    if (
+      unchecked > 0 &&
+      !window.confirm(
+        tr(
+          `依頼する配信のうち ${unchecked} 本は、AI でまとめて作り、まだ誰も確かめていない下書きです(「AI 下書き・未確認」)。このまま依頼しますか?`,
+          `${unchecked} of the deliveries to request are AI drafts nobody has checked yet (“AI draft, unchecked”). Request anyway?`,
+        ),
+      )
+    )
+      return
     setError(null)
     try {
-      const { skipped } = await requestAll(needsRequest(weekCards, inbox.hasOpen), people, actor(), weekKey)
+      const { skipped } = await requestAll(requestable, people, actor(), weekKey)
       if (skipped.length) setError(tr(`既定の承認者がない種別の配信は飛ばしました(配信カードから依頼してください): ${skipped.join(' / ')}`, `Skipped deliveries whose type has no default approvers (request from the card): ${skipped.join(' / ')}`))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -1267,7 +1281,7 @@ function App() {
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={requestable.length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
                 statusCounts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: weekCards.filter((c) => statusView(c.status) === o.value).length }))}
                 toFix={checklist.filter((i) => !i.ok).length}
                 fixChip={<WeekCheckChip items={checklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
