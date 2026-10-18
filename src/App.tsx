@@ -66,6 +66,7 @@ import { WeekReviewBar } from './WeekReviewBar'
 import { MePicker } from './MePicker'
 import { WeekRetro } from './WeekRetro'
 import { WeekHistory } from './WeekHistory'
+import { MonthSummaryBar } from './MonthSummaryBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
 import { ResultsPage, type ResultsDataActions } from './ResultsPage'
@@ -919,6 +920,44 @@ function App() {
         : thisWeek?.status === 'confirmed'
           ? t('確定した週には作れません', 'Week is confirmed')
           : ''
+  // 月・一覧の表示から、まとめて AI で下書きを始める週(X24): 表示中の月にかかる週のうち、まだ終わっていない・確定していない週で、配信がいちばん少ない週(同じなら早い週)
+  const monthBulkWeek = useMemo(() => {
+    if (!month) return undefined
+    const today = new Date()
+    const todayKey = dayKeyOf(today)
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0)
+    let best: { sun: Date; n: number } | undefined
+    for (let sun = sundayOf(month); sun <= last; sun = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 7)) {
+      const sat = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 6)
+      if (dayKeyOf(sat) < todayKey) continue
+      const key = dayKeyOf(sun)
+      if (weeks.find((w) => w.week_start?.slice(0, 10) === key)?.status === 'confirmed') continue
+      const end = new Date(sat.getFullYear(), sat.getMonth(), sat.getDate() + 1)
+      const n = activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= sun && new Date(c.scheduled_at) < end).length
+      if (!best || n < best.n) best = { sun, n }
+    }
+    return best?.sun
+  }, [month, weeks, activeCards])
+  // 月の要約の帯(X25): 表示中の月の配信(絞り込みを反映しない。週の帯と同じ)の状態ごとの件数と、月にかかる週のうち確定した週の数
+  const monthSummary = useMemo(() => {
+    if (!month) return undefined
+    const first = new Date(month.getFullYear(), month.getMonth(), 1)
+    const next = new Date(month.getFullYear(), month.getMonth() + 1, 1)
+    const inMonth = activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= first && new Date(c.scheduled_at) < next)
+    const sundays: Date[] = []
+    for (let sun = sundayOf(first); sun < next; sun = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 7)) sundays.push(sun)
+    const isConfirmed = (sun: Date) => weeks.find((w) => w.week_start?.slice(0, 10) === dayKeyOf(sun))?.status === 'confirmed'
+    return { cards: inMonth, sundays, confirmed: sundays.filter(isConfirmed).length, firstOpen: sundays.find((d) => !isConfirmed(d)) }
+  }, [month, activeCards, weeks])
+  const monthBar = monthSummary && (
+    <MonthSummaryBar
+      counts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: monthSummary.cards.filter((c) => statusView(c.status) === o.value).length }))}
+      total={monthSummary.cards.length}
+      weeks={monthSummary.sundays.length}
+      confirmedWeeks={monthSummary.confirmed}
+      onOpenUnconfirmed={monthSummary.firstOpen ? () => goTo('week', monthSummary.firstOpen!) : undefined}
+    />
+  )
   const startBulk = () => {
     // ブラウザに控えがあれば戻す。その下書きの週へ移る
     const d = bulk.start()
@@ -1242,6 +1281,33 @@ function App() {
                   </MenuTrigger>
                   <MenuPopover>
                     <MenuList>
+                      {/* まとめて AI で下書き(X24)。週は表示中の週、月・一覧は「この月の空いている週から」(その週に移って始める)。「新規作成 ▾」にも同じ入口がある */}
+                      {page === 'calendar' && view === 'week' && (
+                        <MenuItem icon={<AiIcon size={16} />} disabled={!canBulk} onClick={startBulk} secondaryContent={canBulkReason || t('表示中の週', 'This week')}>
+                          {t('この週をまとめて AI で下書き', 'Bulk AI drafts for this week')}
+                        </MenuItem>
+                      )}
+                      {page === 'calendar' && view !== 'week' && (
+                        <MenuItem
+                          icon={<AiIcon size={16} />}
+                          disabled={!monthBulkWeek || bulk.active}
+                          onClick={() => {
+                            if (!monthBulkWeek) return
+                            goToRaw('week', monthBulkWeek)
+                            startBulk()
+                          }}
+                          secondaryContent={
+                            bulk.active
+                              ? t('下書き中', 'Drafting')
+                              : monthBulkWeek
+                                ? t(`${monthBulkWeek.getMonth() + 1}/${monthBulkWeek.getDate()} の週へ`, `Week of ${monthBulkWeek.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`)
+                                : t('作れる週がありません', 'No week to draft')
+                          }
+                        >
+                          {t('この月の空いている週から、まとめて AI で下書き', 'Bulk AI drafts from an open week in this month')}
+                        </MenuItem>
+                      )}
+                      {page === 'calendar' && <MenuDivider />}
                       {page === 'calendar' && (
                         <MenuItem
                           icon={<ArrowDownloadRegular />}
@@ -1319,7 +1385,10 @@ function App() {
                 retro={<WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} />}
               />
             ) : view === 'list' ? (
+              <>
+              {monthBar}
               <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
+              </>
             ) : view === 'week' ? (
               <>
               <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
@@ -1390,7 +1459,10 @@ function App() {
               />
               </>
             ) : (
+              <>
+              {monthBar}
               <Calendar month={month} cards={filtered} dueSoon={dueSoon} alertKinds={alertKinds} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} onOpenWeek={(d) => goTo('week', d)} />
+              </>
             )}
           </>
         )}

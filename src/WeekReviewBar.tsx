@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, CheckmarkCircleRegular, ChevronRightRegular, LockClosedRegular, SendRegular } from '@fluentui/react-icons'
+import { ArrowUndoRegular, CheckmarkCircleRegular, LockClosedRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { WeekRow, WeekStatus } from './data/weeks'
 import type { CardNote } from './data/cardNotes'
 import { locale, useT } from './i18n'
 import { statusRank } from './status'
+import { StatusFlow } from './StatusFlow'
 
 const useStyles = makeStyles({
   // 記録・資料(名前・履歴・PDF)と、週を進める操作の間の区切り
@@ -27,12 +28,6 @@ const useStyles = makeStyles({
   // 確定のかたまりは右端へ
   confirmGroup: { marginLeft: 'auto' },
   divider: { alignSelf: 'stretch', width: '1px', backgroundColor: tokens.colorNeutralStroke2 },
-  // 件数を「›」でつないで、未起案 → 承認待ち → 承認済み の流れに見せる
-  counts: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
-  count: { display: 'inline-flex', alignItems: 'center', columnGap: '4px' },
-  countDot: { width: '8px', height: '8px', borderRadius: tokens.borderRadiusCircular },
-  arrow: { color: tokens.colorNeutralForeground4, fontSize: '12px' },
-  total: { color: tokens.colorNeutralForeground3 },
   // 確定後の変更(理由つき)の一覧。帯の下の行に出す
   changes: { flexBasis: '100%', display: 'grid', rowGap: '2px', paddingTop: '6px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
   changesHead: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
@@ -116,26 +111,7 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
       <span className={styles.divider} aria-hidden />
       {/* 承認(配信ごと): 件数の流れと、それを進める操作 */}
       <span className={styles.group}>
-        {statusCounts.length > 0 && (
-          <span className={styles.counts}>
-            {statusCounts.map((c, i) => (
-              <span key={c.label} className={styles.count}>
-                {i > 0 && <ChevronRightRegular className={styles.arrow} aria-hidden />}
-                <span className={styles.countDot} style={{ backgroundColor: c.color }} />
-                {c.label}
-                {/* 承認済み(最後)は、全体に対する数(あといくつで確定できるか) */}
-                {i === statusCounts.length - 1 ? (
-                  <span>
-                    {` ${c.n}`}
-                    <span className={styles.total}>{` / ${cards.length}`}</span>
-                  </span>
-                ) : (
-                  ` ${c.n}`
-                )}
-              </span>
-            ))}
-          </span>
-        )}
+        <StatusFlow counts={statusCounts} total={cards.length} />
         {!confirmed && (
           <>
             {onRequestAll && (
