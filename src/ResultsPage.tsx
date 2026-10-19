@@ -506,7 +506,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           onClose={() => onDetail(null)}
           onOpenCard={onOpenCard}
           onSaved={load}
-          onCardChanged={onCardsChanged}
         />
       )}
     </div>

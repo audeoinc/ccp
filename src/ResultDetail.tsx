@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Dialog, DialogSurface, Select, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogSurface, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DismissRegular, DocumentPdfRegular, OpenRegular } from '@fluentui/react-icons'
 import { printReport } from './printReport'
 import type { Product } from './models/products'
@@ -8,9 +8,8 @@ import type { WeeklyPerformance } from './models/weeklyPerformances'
 import { HeatPreview } from './HeatPreview'
 import { locale, useT } from './i18n'
 import { ResultCompare } from './ResultCompare'
-import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryResultsService } from './data/deliveryResults'
-import { THEME_TYPES, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
+import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
 import { ChannelBadge } from './ChannelBadge'
@@ -22,6 +21,8 @@ const useStyles = makeStyles({
   head: { display: 'flex', alignItems: 'center', columnGap: '10px' },
   title: { margin: 0, fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase300 },
+  // テーマの種類の札(見るだけ。直すのは配信カードの「これまでの学び」の帯)
+  typeTag: { display: 'inline-flex', alignItems: 'center', height: '24px', padding: '0 10px', borderRadius: tokens.borderRadiusCircular, border: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: tokens.colorNeutralBackground2, color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, whiteSpace: 'nowrap', cursor: 'default' },
   headActions: { marginLeft: 'auto', display: 'flex', columnGap: '4px' },
   // プレビュー(クリックを重ねる) | リンクの表 | メモ・商品・AI の案
   grid: { display: 'grid', gridTemplateColumns: 'auto minmax(320px, 1fr) minmax(320px, 1fr)', columnGap: '24px', alignItems: 'start' },
@@ -56,15 +57,13 @@ interface Props {
   /** 制作の詳細(配信カード)を、上に重ねて開く。配信カードから開いたときは渡さない(下に配信カードがあるため) */
   onOpenCard?: (id: string) => void
   onSaved: () => Promise<void>
-  /** 配信カードを書き換えたあと(テーマの種類)、読み直す。渡さないときは、テーマの種類を直せない */
-  onCardChanged?: () => Promise<void>
 }
 
 /**
  * 配信 1 本の詳しい結果(フロート。計画の面の配信カードと同じ開き方)。
  * 上に主な数字、下に、クリックを重ねたプレビュー・リンクの表・メモと商品と AI の案を並べる
  */
-export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved, onCardChanged }: Props) {
+export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved }: Props) {
   const styles = useStyles()
   const t = useT()
   const { card } = row
@@ -82,10 +81,6 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
     const res = await DeliveryResultsService.update(row.result.id, { notes: now ? `${now}\n${text}` : text })
     if (res.success) await onSaved()
   }
-  const setThemeType = async (v: ThemeType) => {
-    const res = await DeliveryCardsService.update(card.id, { theme_type: v })
-    if (res.success) await onCardChanged?.()
-  }
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       {/* data-print-report: 「PDF で書き出す」で印刷するのは、このフロートだけ(index.css のレポートの印刷) */}
@@ -100,21 +95,13 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
             <h2 className={styles.title}>{card.name}</h2>
             <span className={styles.sub}>{sentText}</span>
             <Tooltip
-              content={t('テーマの種類。過去の配信と比べるときに、同じ種類の配信を集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type. Used to find past deliveries of the same type. "guessed" is a provisional type inferred from the wording.')}
+              content={t('テーマの種類。過去の配信と比べるときに、同じ種類の配信を集めるのに使います。「推定」は、言葉から推し量った仮の種類です。直すときは「制作の詳細」で配信カードを開き、「これまでの学び」の帯で直します', 'Theme type. Used to find past deliveries of the same type. "guessed" is a provisional type inferred from the wording. To change it, open the delivery card ("Production details") and edit it in the Learnings bar.')}
               relationship="description"
             >
-              <Select
-                size="small"
-                aria-label={t('テーマの種類', 'Theme type')}
-                value={themeType.guessed ? '' : themeType.type}
-                disabled={!onCardChanged}
-                onChange={(_, d) => d.value && void setThemeType(d.value as ThemeType)}
-              >
-                {themeType.guessed && <option value="">{t(`${themeTypeLabel(themeType.type)}(推定)`, `${themeTypeLabel(themeType.type)} (guessed)`)}</option>}
-                {THEME_TYPES.map((v) => (
-                  <option key={v} value={v}>{themeTypeLabel(v)}</option>
-                ))}
-              </Select>
+              {/* 結果を見る画面なので、見るだけ(ここで変えると、下の「過去の配信と比べる」の相手が急に入れ替わるため) */}
+              <span className={styles.typeTag} aria-label={t('テーマの種類', 'Theme type')}>
+                {themeType.guessed ? t(`${themeTypeLabel(themeType.type)}(推定)`, `${themeTypeLabel(themeType.type)} (guessed)`) : themeTypeLabel(themeType.type)}
+              </span>
             </Tooltip>
             <span className={styles.headActions} data-noprint>
               <Tooltip

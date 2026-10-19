@@ -1571,7 +1571,7 @@ function App() {
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
-        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} onCardChanged={load} />
+        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} />
       )}
     </>
   )

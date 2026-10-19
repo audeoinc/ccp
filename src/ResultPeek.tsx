@@ -24,15 +24,13 @@ interface Props {
   products: Product[]
   heroes: HeroImage[]
   onClose: () => void
-  /** 配信カードを書き換えたあと(テーマの種類)、読み直す */
-  onCardChanged?: () => Promise<void>
 }
 
 /**
  * 計画の面から、配信 1 本の結果を、いまの画面の上に重ねて見る(配信カードの「結果を見る」)。
  * 閉じると、元の配信カード(計画の面)に戻る
  */
-export function ResultPeek({ cardId: firstId, cards, cardProducts, products, heroes, onClose, onCardChanged }: Props) {
+export function ResultPeek({ cardId: firstId, cards, cardProducts, products, heroes, onClose }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -79,7 +77,6 @@ export function ResultPeek({ cardId: firstId, cards, cardProducts, products, her
       money={(v) => priceText(v === undefined ? undefined : Math.round(v), row.card.country === COUNTRY_US ? 'US' : 'JP')}
       onClose={onClose}
       onSaved={load}
-      onCardChanged={onCardChanged}
     />
   )
 }
