@@ -116,7 +116,12 @@ async function fresh(lang) {
   const page = await browser.newPage()
   page.on('dialog', (d) => d.accept()) // 「編集中の内容を破棄しますか」などの確認は、承諾する
   await page.emulateTimezone('Asia/Tokyo')
-  await page.evaluateOnNewDocument((lang) => localStorage.setItem('ui.lang', lang), lang)
+  // 右上の「あなた」= ログインしている人を、見本のユーザー Ken Sato にしておく(U9。選んでいないと、初回の「だれでログインしますか?」が全場面にかぶる)
+  await page.evaluateOnNewDocument((lang) => {
+    localStorage.setItem('ui.lang', lang)
+    localStorage.setItem('me.user', JSON.stringify('b5fd97e1-36a4-4534-a0b1-e153fa6b751e'))
+    localStorage.setItem('me.name', JSON.stringify('Ken Sato'))
+  }, lang)
   await page.goto(URL, { waitUntil: 'networkidle0' })
   await sleep(800)
   return page
