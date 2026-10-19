@@ -178,6 +178,7 @@ const useStyles = makeStyles({
   // ヘッダーの絞り込みの札(X39)。収まらないときだけ、2 段目に回る
   // 絞り込みの段(X42): ヘッダーのすぐ下。ヘッダーより一段控えめな地
   filterBar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: `6px ${tokens.spacingHorizontalXL}`, backgroundColor: tokens.colorNeutralBackground1, borderTop: `1px solid ${tokens.colorNeutralStroke3}` },
+  filterBarDivider: { width: '1px', alignSelf: 'stretch', margin: '2px 6px', backgroundColor: tokens.colorNeutralStroke2 },
   filterBarLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: '4px' },
   // 表(計画)と裏(結果)の切り替え。題名のすぐ横に固定して、どちらの面でも位置が動かないようにする
   faceSwitch: {
@@ -1240,21 +1241,6 @@ function App() {
             </MenuList>
           </MenuPopover>
         </Menu>
-        {/* 計画(表)と結果(裏)。同じ期間・見せ方・絞り込みのまま、面だけを切り替える */}
-        <div className={styles.faceSwitch} role="tablist" aria-label={t('計画と結果', 'Plan and results')}>
-          {(
-            [
-              ['calendar', t('計画', 'Plan'), <CalendarLtrRegular key="i" />],
-              ['production', t('制作', 'Production'), <PaintBrushRegular key="i" />],
-              ['results', t('結果', 'Results'), <DataBarVerticalRegular key="i" />],
-            ] as const
-          ).map(([p, label, icon]) => (
-            <button key={p} type="button" role="tab" aria-selected={page === p} className={mergeClasses(styles.faceBtn, page === p && styles.faceBtnOn)} style={page === p ? { color: FACE_COLOR[p] } : undefined} onClick={() => showFace(p)}>
-              {icon}
-              {label}
-            </button>
-          ))}
-        </div>
         <span className={styles.headerSpacer} />
         {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
         <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
@@ -1382,8 +1368,24 @@ function App() {
           </MenuPopover>
         </Menu>
       </header>
-      {/* 絞り込みの段(X42): ヘッダー(システム全体)とは分け、その下に置く。見ている画面の配信を絞る */}
+      {/* 作業の段(X42・X43): ヘッダー(システム全体)とは分け、その下に置く。左端に面の切り替え、続いて見ている画面の配信の絞り込み */}
         <div className={styles.filterBar}>
+        {/* 計画・制作・結果の切り替え(X43): ヘッダー(システム全体)ではなく、作業の段の左端。同じ期間・見せ方・絞り込みのまま、面だけを切り替える */}
+        <div className={styles.faceSwitch} role="tablist" aria-label={t('計画と結果', 'Plan and results')}>
+          {(
+            [
+              ['calendar', t('計画', 'Plan'), <CalendarLtrRegular key="i" />],
+              ['production', t('制作', 'Production'), <PaintBrushRegular key="i" />],
+              ['results', t('結果', 'Results'), <DataBarVerticalRegular key="i" />],
+            ] as const
+          ).map(([p, label, icon]) => (
+            <button key={p} type="button" role="tab" aria-selected={page === p} className={mergeClasses(styles.faceBtn, page === p && styles.faceBtnOn)} style={page === p ? { color: FACE_COLOR[p] } : undefined} onClick={() => showFace(p)}>
+              {icon}
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className={styles.filterBarDivider} aria-hidden />
         <span className={styles.filterBarLabel}>{t('絞り込み', 'Filters')}</span>
           <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
           <FilterSelect label={t('種類', 'Type')} value={filters.department} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={setFilter('department')} />

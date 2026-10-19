@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
-import { CalendarArrowRightRegular, DismissRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowMoveRegular, CalendarArrowRightRegular, DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { CardAlert } from './cardAlerts'
@@ -13,6 +13,9 @@ import { AiIcon } from './AiMark'
 
 const useStyles = makeStyles({
   surface: { width: 'min(760px, 94vw)' },
+  // 題名の行をつかんで動かす(下のプレビューを見ながら選べるように)
+  grab: { display: 'inline-flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
+  grabIcon: { color: tokens.colorNeutralForeground3 },
   body: { display: 'grid', rowGap: '12px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '12px' },
   headImg: { width: '56px', height: '56px', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, flexShrink: 0 },
@@ -57,6 +60,9 @@ interface Props {
  */
 export function CardAlertAction({ alert, product, card, scheduledAt, inCard, products, model, weekUse, onReplace, onPostpone, onOpenAlerts, onClose }: Props) {
   const s = useStyles()
+  // つかんで動かした量(題名の行のドラッグ)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const t = useT()
   // 差し替えで直すアラート(在庫と、週の上限超え)。週の上限超えはアラートの画面にないので、「アラートの画面で詳しく」は出さない
   const overLimit = alert.kind === 'overLimit'
@@ -87,11 +93,29 @@ export function CardAlertAction({ alert, product, card, scheduledAt, inCard, pro
   }, [])
 
   return (
-    <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+    // 下の配信カード(プレビュー・商品情報)も見て触れるよう、背景を暗くしない(non-modal)。題名の行をつかんで動かせる
+    <Dialog open modalType="non-modal" onOpenChange={(_, d) => !d.open && onClose()}>
+      <DialogSurface className={s.surface} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
         <DialogBody>
           <DialogTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />}>
-            {t('このアラートへの対応', 'Handle this alert')}
+            <span
+              className={s.grab}
+              title={t('つかんで動かせます', 'Drag to move')}
+              onPointerDown={(e) => {
+                drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y }
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }}
+              onPointerMove={(e) => {
+                const d = drag.current
+                if (d) setPos({ x: d.ox + e.clientX - d.sx, y: d.oy + e.clientY - d.sy })
+              }}
+              onPointerUp={() => {
+                drag.current = null
+              }}
+            >
+              <ArrowMoveRegular className={s.grabIcon} />
+              {t('このアラートへの対応', 'Handle this alert')}
+            </span>
           </DialogTitle>
           <DialogContent className={s.body}>
             <div className={s.head}>

@@ -18,7 +18,9 @@ const useStyles = makeStyles({
   title: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontWeight: tokens.fontWeightSemibold },
   // たたんでいるときの要約(種類ごとの件数)
   summary: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
-  toggle: { marginLeft: 'auto' },
+  // 「見る / 閉じる」は、種類の札のすぐ右(アラートを見てすぐ押せるように。右端だと遠い)
+  toggle: { minWidth: 'auto' },
+  kindBtn: { border: 'none', cursor: 'pointer', fontFamily: 'inherit', lineHeight: '18px' },
   item: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase200, flexWrap: 'wrap' },
   kind: { flexShrink: 0, padding: '0 6px', borderRadius: '8px', color: '#fff', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   name: { fontWeight: tokens.fontWeightSemibold },
@@ -31,9 +33,10 @@ const useStyles = makeStyles({
 const KIND_BG: Record<CardAlertKind, string> = {
   outOfStock: tokens.colorPaletteRedBackground3,
   lowStock: tokens.colorPaletteDarkOrangeBackground3,
-  policyChanged: tokens.colorPalettePurpleBackground2,
-  dateChanged: tokens.colorPaletteBlueBackground2,
-  overLimit: tokens.colorPaletteMarigoldBackground2,
+  // 白い文字が読めるよう、どれも濃い色にする(薄い地に白い文字だと読めない)
+  policyChanged: tokens.colorPalettePurpleBorderActive,
+  dateChanged: tokens.colorPaletteBlueBorderActive,
+  overLimit: tokens.colorPaletteBrownBorderActive,
 }
 
 interface Props {
@@ -71,7 +74,9 @@ export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAc
         {!open && (
           <span className={styles.summary}>
             {counts.map((c) => (
-              <span key={c.k} className={styles.kind} style={{ backgroundColor: KIND_BG[c.k] }}>{`${kindLabel(c.k)} ${c.n}`}</span>
+              <button key={c.k} type="button" className={mergeClasses(styles.kind, styles.kindBtn)} style={{ backgroundColor: KIND_BG[c.k] }} onClick={() => setOpen(true)} title={t('アラートの一覧を開く', 'Show the alerts')}>
+                {`${kindLabel(c.k)} ${c.n}`}
+              </button>
             ))}
           </span>
         )}

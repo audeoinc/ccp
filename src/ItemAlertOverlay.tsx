@@ -35,9 +35,10 @@ const useStyles = makeStyles({
 const BG: Record<CardAlertKind, string> = {
   outOfStock: tokens.colorPaletteRedBackground3,
   lowStock: tokens.colorPaletteDarkOrangeBackground3,
-  policyChanged: tokens.colorPalettePurpleBackground2,
-  dateChanged: tokens.colorPaletteBlueBackground2,
-  overLimit: tokens.colorPaletteMarigoldBackground2,
+  // 白い文字が読めるよう、濃い色にする(上の帯の種類の札と同じ)
+  policyChanged: tokens.colorPalettePurpleBorderActive,
+  dateChanged: tokens.colorPaletteBlueBorderActive,
+  overLimit: tokens.colorPaletteBrownBorderActive,
 }
 
 interface Box {
