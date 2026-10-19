@@ -10,7 +10,7 @@
 画面の「自分宛ての依頼」は、この箱ではなく、依頼中の依頼から計算する(箱の行は写しで、だれかが済ませたあとも残るため)。
 
 画面から表を直接書かず、ここで行う理由:
-  - 「承認できるのは指名された本人だけ」「自分の依頼は承認できない」の確かめは、ログインが入ったら、サーバーでしか守れない。
+  - 「承認できるのは指名された本人だけ」の確かめは、ログインが入ったら、サーバーでしか守れない(自分の依頼を自分で承認するのは、2026-10-19 から認めている)。
     いまは、画面が送ってきた「あなた」(users の id と名前)を信じる(ログインが入ったら、ここだけを直す)
   - 承認者の行の更新・決まりの判定・配信のステータス・操作の履歴(events)・差し戻しのコメントを、1 つのトランザクションで行う
 判定(request_outcome・eligible_reviewers)は、画面の src/approvals.ts と同じ。例 tests/approval_cases.json で、両方を確かめる。
@@ -49,8 +49,10 @@ def request_outcome(rule: str, decisions: list[str | None]) -> str:
 
 
 def eligible_reviewers(reviewers: list[dict[str, Any]], actor_id: str, actor_groups: list[str], requester_id: str | None) -> list[str]:
-    """その人が決められる、未定の相手(行の id)。本人を指名した行 → グループの行の順。依頼した本人は不可"""
-    if not actor_id or actor_id == requester_id:
+    """その人が決められる、未定の相手(行の id)。本人を指名した行 → グループの行の順。
+    依頼した本人も決められる(2026-10-19 に利用者の判断で変えた。requester_id は呼び出し側の形をそろえるために残す)"""
+    del requester_id
+    if not actor_id:
         return []
     groups = set(actor_groups)
     pending = [r for r in reviewers if (r.get("decision") or "pending") == "pending"]
@@ -209,8 +211,6 @@ async def create_request(request: Request):
     now = _now()
     async with db(write=True) as conn:
         actor = await _actor(conn, body, request)
-        if actor["id"] in user_ids:
-            return fail(400, "自分を承認者にはできません(自分で依頼した配信は、自分では承認できません)")
         card = await _one(conn, "delivery_cards", card_id, lock=True)
         if card is None:
             return fail(404, "配信カードが見つかりません")
@@ -282,8 +282,6 @@ async def decide(request_id: str, request: Request):
             return fail(404, "承認の依頼が見つかりません")
         if req.get("status") != "open":
             return fail(409, "この依頼は、もう受け付けていません(承認済み・差し戻し・古い依頼・取り下げ)")
-        if actor["id"] == req.get("requested_by"):
-            return fail(403, "自分で依頼した配信は、自分では承認できません")
         reviewers = await _select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
         able = eligible_reviewers(reviewers, actor["id"], await _actor_groups(conn, actor["id"]), req.get("requested_by"))
         if not able:

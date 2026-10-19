@@ -26,10 +26,12 @@ export function requestOutcome(rule: ApprovalRule, decisions: (ReviewerDecision 
 
 /**
  * その人が決められる、まだ未定の相手(行の id)。本人を指名した行 → 所属するグループの行の順(1 回の承認は 1 つの行の分だけ)。
- * 依頼した本人は、自分の依頼を承認できない(自分のグループの分も)
+ * 依頼した本人も、自分の依頼を承認できる(2026-10-19 に利用者の判断で変えた: 先に進めたいときに、自分で承認してよい。以前は承認できなかった)。
+ * requesterId は、呼び出し側の形をそろえるために残している
  */
 export function eligibleReviewers(reviewers: ReviewerLike[], actorId: string, actorGroupIds: Iterable<string>, requesterId?: string | null): string[] {
-  if (!actorId || actorId === requesterId) return []
+  void requesterId
+  if (!actorId) return []
   const groups = new Set(actorGroupIds)
   const pending = reviewers.filter((r) => (r.decision ?? 'pending') === 'pending')
   const direct = pending.filter((r) => r.user_id === actorId)

@@ -58,7 +58,6 @@ export const ApprovalsService = {
   async request(input: RequestInput): Promise<Result<ApprovalView>> {
     if (!input.actor?.id) return ng('「あなた」を選んでください(承認の依頼・承認には、ユーザーの選択が要ります)')
     if (input.group_ids.length === 0 && input.user_ids.length === 0) return ng('承認グループか承認者を、1 つ以上選んでください')
-    if (input.user_ids.includes(input.actor.id)) return ng('自分を承認者にはできません(自分で依頼した配信は、自分では承認できません)')
     const card = tables.DeliveryCardsService.find((c) => c.id === input.delivery_card_id)
     if (!card) return ng('配信カードが見つかりません')
     if (card.status === 'confirmed') return ng('確定した週の配信です。変えるときは、配信カードで理由を入れて保存してください(週がレビューに戻ります)')
@@ -111,7 +110,6 @@ export const ApprovalsService = {
     const req = tables.ApprovalRequestsService.find((r) => r.id === requestId)
     if (!req) return ng('承認の依頼が見つかりません')
     if (req.status !== 'open') return ng('この依頼は、もう受け付けていません(承認済み・差し戻し・古い依頼・取り下げ)')
-    if (input.actor.id === req.requested_by) return ng('自分で依頼した配信は、自分では承認できません')
     const reviewers = reviewersOf(requestId)
     const myGroups = tables.ApprovalGroupMembersService.filter((m) => m.user_id === input.actor.id).map((m) => String(m.approval_group_id))
     const able = eligibleReviewers(reviewers, input.actor.id, myGroups, String(req.requested_by ?? ''))

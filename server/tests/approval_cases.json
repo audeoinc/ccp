@@ -31,9 +31,9 @@
    "actor": "u-aya", "groups": ["g-md"], "requester": "u-ken", "expect": []
   },
   {
-   "name": "依頼した本人は、自分のグループの分も決められない",
+   "name": "依頼した本人も、自分のグループの分を決められる(2026-10-19 から)",
    "reviewers": [{"id": "r-md", "approval_group_id": "g-md", "decision": "pending"}],
-   "actor": "u-ken", "groups": ["g-md"], "requester": "u-ken", "expect": []
+   "actor": "u-ken", "groups": ["g-md"], "requester": "u-ken", "expect": ["r-md"]
   },
   {
    "name": "指名されていない人は決められない",

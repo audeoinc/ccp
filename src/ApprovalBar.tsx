@@ -128,7 +128,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
     const activeGroups = new Set(people.groups.filter((g) => (g.status ?? 'active') === 'active').map((g) => g.id))
     setRule(def?.rule ?? 'all')
     setGroupIds(parseIds(def?.group_ids).filter((id) => activeGroups.has(id)))
-    setUserIds(parseIds(def?.user_ids).filter((id) => id !== meId && activeUsers(people).some((u) => u.id === id)))
+    setUserIds(parseIds(def?.user_ids).filter((id) => activeUsers(people).some((u) => u.id === id)))
     setNote('')
     setError(null)
     setMode('request')
@@ -153,7 +153,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
   const def = ruleFor(people, card.department)
   const defNames = [
     ...parseIds(def?.group_ids).map((id) => people.groups.find((g) => g.id === id && (g.status ?? 'active') === 'active')?.name),
-    ...parseIds(def?.user_ids).filter((id) => id !== meId).map((id) => activeUsers(people).find((u) => u.id === id)?.name),
+    ...parseIds(def?.user_ids).map((id) => activeUsers(people).find((u) => u.id === id)?.name),
   ].filter(Boolean)
   const defaultTarget = usersOk && (
     <span className={s.target}>
@@ -214,7 +214,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
           <>
             {isRequester && (
               <>
-                <span className={mergeClasses(s.note, s.wide)}>{t('あなたが依頼しました(自分の依頼は、自分では承認できません)', 'You requested this (you cannot approve your own request)')}</span>
+                <span className={mergeClasses(s.note, s.wide)}>{t('あなたが依頼しました', 'You requested this')}</span>
                 <Button type="button" size="small" icon={<DeleteRegular />} disabled={disabled} onClick={() => void run(() => ApprovalsService.withdraw(live.id, { actor, week_start: weekStart }))}>
                   {t('取り下げ', 'Withdraw')}
                 </Button>
@@ -224,7 +224,11 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
               <>
                 <span className={mergeClasses(s.note, s.wide)}>{t(`あなたは ${firstSlot} として承認できます`, `You can approve as ${firstSlot}`)}</span>
                 <Tooltip content={blockedBy ?? t(`${firstSlot} として承認します`, `Approve as ${firstSlot}`)} relationship="description">
-                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => void run(() => ApprovalsService.decide(live.id, { actor, decision: 'approved', reviewer_id: eligible[0], week_start: weekStart }))}>
+                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => {
+                      // 自分の依頼を自分で承認する(先に進めたいとき。2026-10-19 から認めた)ときは、念のため確かめる
+                      if (isRequester && !window.confirm(t(`自分で依頼した配信を、${firstSlot} として自分で承認します。よろしいですか?`, `Approve your own request as ${firstSlot}?`))) return
+                      void run(() => ApprovalsService.decide(live.id, { actor, decision: 'approved', reviewer_id: eligible[0], week_start: weekStart }))
+                    }}>
                     {t('承認', 'Approve')}
                   </Button>
                 </Tooltip>
@@ -275,7 +279,6 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
               onOptionSelect={(_, d) => setUserIds(d.selectedOptions)}
             >
               {activeUsers(people)
-                .filter((u) => u.id !== meId)
                 .map((u) => (
                   <Option key={u.id} value={u.id} text={u.name}>{u.name}</Option>
                 ))}

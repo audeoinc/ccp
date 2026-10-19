@@ -27,7 +27,7 @@ export async function requestAll(cards: DeliveryCard[], people: People, actor: A
   for (const c of cards) {
     const def = ruleFor(people, c.department)
     const group_ids = parseIds(def?.group_ids).filter((id) => groups.has(id))
-    const user_ids = parseIds(def?.user_ids).filter((id) => id !== actor.id && users.has(id))
+    const user_ids = parseIds(def?.user_ids).filter((id) => users.has(id))
     if (group_ids.length === 0 && user_ids.length === 0) {
       skipped.push(c.name)
       continue
