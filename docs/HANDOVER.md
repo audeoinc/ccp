@@ -462,6 +462,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 商品の性別は `products.gender`。取り込み(`bq_import.gender_of`)で mens / womens / unisex に読み替え、読めない値は空。`bq.py` の SPU の optional に gender を足した(足さないと読まれない)。ダミーのビュー(`docs/bq_example/spu.sql`)は div_nm から作る。見本のデータ(seed.json・src/mock)は、商品名から決めた仮の値。
 - アプリの工程 ⑥ 時刻・相手 はなくした(`PushTimingPanel` は削除。送る相手は配信情報)。アプリの工程は 5 つ。
 
+## 6.29 X41 Type をテーマの種類に、X42 絞り込みの段(2026-10-19、UI セッション)
+
+- 配信カードの Form の `themeType` が `theme_type` を読み書きする。`department` は書かない(保存の中身から外した。既存の値は残る)。`NewCardDefaults` も `themeType`。
+- 絞り込みの `filters.department` は、名前はそのままで中身はテーマの種類のキー(`themeTypeOf(c).type` と比べる。推し量った種類も含む)。一覧の列のキー `department` も、覚えている列の設定を壊さないよう名前はそのまま。アラートの条件の `departments` も中身は種類(古い値は読み込むときに捨てる)。
+- ⚙ の「種類が未設定の配信を、AI で分ける」(App の `classifyAll`。20 本ずつ `classifyThemeTypes`)。
+- 承認のルールは、種別ごとから「すべての配信に同じルール」へ(承認プロセスのセッションが `ruleFor` を直す)。制作のページの写しの下の「種別」の表示も、承認プロセスの担当。
+- 絞り込みの段は、App の `headerWrap` の中で、ヘッダーと面の帯のあいだ(`styles.filterBar`)。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

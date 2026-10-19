@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Button, Select, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronUpRegular, LightbulbRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
@@ -7,7 +7,7 @@ import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResu
 import { setActiveLearnings } from './aiSelect'
 import { locale, useT } from './i18n'
 import { templateIdOf } from './results'
-import { THEME_TYPES, guessThemeType, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
+import { guessThemeType, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 
 const useStyles = makeStyles({
   root: {
@@ -40,6 +40,8 @@ interface Props {
   name: string
   theme: string
   headline: string
+  /** 配信情報の Type(テーマの種類。書きかけの値) */
+  themeType?: string
 }
 
 interface Learning {
@@ -57,16 +59,15 @@ const MAX = 8
  * 配信カードの「これまでの学び」。同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」を出す(新しい順)。
  * 出している間は、AI の下書きの依頼にも、学びを渡す(setActiveLearnings)。テーマの種類も、ここで直せる
  */
-export function LearningsBar({ card, templateId, country, channel, name, theme, headline }: Props) {
+export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType }: Props) {
   const styles = useStyles()
   const t = useT()
   const [cards, setCards] = useState<DeliveryCard[]>([])
   const [results, setResults] = useState<DeliveryResult[]>([])
   const [open, setOpen] = useState(false)
-  // テーマの種類: 保存済みの値(ここで直したら、その値)。なければ、いま画面にある言葉から推し量る
-  const [savedType, setSavedType] = useState<string | undefined>(card.theme_type)
-  const type: { type: ThemeType; guessed: boolean } = savedType
-    ? themeTypeOf({ ...card, theme_type: savedType })
+  // テーマの種類: 配信情報の Type(書きかけの値)。なければ、いま画面にある言葉から推し量る(X41。直すのは配信情報)
+  const type: { type: ThemeType; guessed: boolean } = themeType
+    ? themeTypeOf({ ...card, theme_type: themeType })
     : { type: guessThemeType({ name: name, theme: theme, headline: headline }), guessed: true }
 
   useEffect(() => {
@@ -100,10 +101,6 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     return () => setActiveLearnings([])
   }, [learnings])
 
-  const saveType = async (v: ThemeType) => {
-    const res = await DeliveryCardsService.update(card.id, { theme_type: v })
-    if (res.success) setSavedType(v)
-  }
   const dateText = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
 
   return (
@@ -127,12 +124,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
         >
           <span className={styles.head}>
             <span className={styles.label}>{t('テーマの種類', 'Theme type')}</span>
-            <Select size="small" aria-label={t('テーマの種類', 'Theme type')} value={type.guessed ? '' : type.type} onChange={(_, d) => d.value && void saveType(d.value as ThemeType)}>
-              {type.guessed && <option value="">{t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`)}</option>}
-              {THEME_TYPES.map((v) => (
-                <option key={v} value={v}>{themeTypeLabel(v)}</option>
-              ))}
-            </Select>
+            <span>{type.guessed ? t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`) : themeTypeLabel(type.type)}</span>
           </span>
         </Tooltip>
         {learnings.length > 0 && (

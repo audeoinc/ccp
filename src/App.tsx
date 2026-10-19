@@ -105,7 +105,8 @@ import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
-import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusView } from './status'
+import { channelOptions, countryOptions, statusColor, statusOptions, statusView } from './status'
+import { THEME_TYPES, classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
 import { logEvent, myName, myUserId, onMeChange } from './history'
 import { EventsService, type CardEvent } from './data/events'
@@ -172,10 +173,11 @@ const useStyles = makeStyles({
     letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
     // 画面が狭いときは、アプリ名の文字を隠してアイコンだけにする(絞り込みの札をヘッダーの 1 段に収めるため。X39)
-    '@media (max-width: 1680px)': { display: 'none' },
   },
   // ヘッダーの絞り込みの札(X39)。収まらないときだけ、2 段目に回る
-  headerFilters: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
+  // 絞り込みの段(X42): ヘッダーのすぐ下。ヘッダーより一段控えめな地
+  filterBar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: `6px ${tokens.spacingHorizontalXL}`, backgroundColor: tokens.colorNeutralBackground1, borderTop: `1px solid ${tokens.colorNeutralStroke3}` },
+  filterBarLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: '4px' },
   // 表(計画)と裏(結果)の切り替え。題名のすぐ横に固定して、どちらの面でも位置が動かないようにする
   faceSwitch: {
     display: 'inline-flex',
@@ -785,7 +787,8 @@ function App() {
     return scopedCards.filter(
       (c) =>
         match(filters.channel, c.channel) &&
-        match(filters.department, c.department) &&
+        // 種類(テーマの種類。決まっていない配信は、言葉から推し量った種類で見る。X41)
+        (filters.department === '' || themeTypeOf(c).type === filters.department) &&
         (page === 'results' || match(filters.status, statusView(c.status))) &&
         (filters.person === '' || (!!personName && (c.owner?.trim() === personName || c.production_owner?.trim() === personName || !!noteParties.get(c.id)?.has(personName)))),
     )
@@ -829,7 +832,7 @@ function App() {
     products,
     heroes,
     weeks,
-    defaults: { country: filters.country, channel: filters.channel, department: filters.department },
+    defaults: { country: filters.country, channel: filters.channel },
     onChanged: load,
   })
   // 週の枠と、まとめて AI で中身を作る(W14)。枠は、中身のない配信カードとして保存する。作業画面と比べるために残す
@@ -840,7 +843,7 @@ function App() {
     heroes,
     weeks,
     weekStart,
-    defaults: { country: filters.country, channel: filters.channel, department: filters.department },
+    defaults: { country: filters.country, channel: filters.channel },
     onChanged: load,
   })
   const checklist = useMemo(
@@ -1153,6 +1156,26 @@ function App() {
     return m
   }, [filtered])
   const setFilter = (k: keyof Filters) => (v: string) => setFilters({ ...filters, [k]: v })
+  // 種類(テーマの種類)が決まっていない配信を、AI で分ける(X41)。国の設定にかかわらず、すべての配信が対象
+  const untypedCards = useMemo(() => cards.filter((c) => !c.theme_type), [cards])
+  const [classifying, setClassifying] = useState(false)
+  const classifyAll = async () => {
+    setClassifying(true)
+    try {
+      let done = 0
+      // 一度に多く渡すと、返答が途中で切れることがあるので、20 本ずつ
+      for (let i = 0; i < untypedCards.length; i += 20) {
+        const types = await classifyThemeTypes(untypedCards.slice(i, i + 20))
+        for (const [id, type] of types) if ((await DeliveryCardsService.update(id, { theme_type: type })).success) done++
+      }
+      await load()
+      setBqNotice({ intent: 'success', text: tr(`${done} 本の配信の種類を、AI が分けました`, `AI sorted the type of ${done} deliveries`) })
+    } catch (e) {
+      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setClassifying(false)
+    }
+  }
   const [autoDraft, setAutoDraft] = useState(loadAutoDraft)
   useTemplates() // テンプレートの登録が変わったら、画面全体を描き直す
   // ユーザーが作ったテンプレートを読み込む(読めなくても、標準のテンプレートで動く)
@@ -1168,7 +1191,7 @@ function App() {
     ...(scheduledAt ? { scheduledAt } : {}),
     ...(filters.country ? { country: filters.country } : {}),
     ...(filters.channel ? { channel: filters.channel } : {}),
-    ...(filters.department ? { department: filters.department } : {}),
+    ...(filters.department ? { themeType: filters.department } : {}),
   })
 
   return (
@@ -1214,15 +1237,6 @@ function App() {
               {label}
             </button>
           ))}
-        </div>
-        {/* 絞り込み(X39): ヘッダーに横に並べる(X37 の 1 つのボタンは、押す回数が増えて使いにくかったため) */}
-        <div className={styles.headerFilters}>
-          <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
-          <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
-          {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
-          {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
-          <FilterSelect label={t('担当', 'Person')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
-          {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
         </div>
         <span className={styles.headerSpacer} />
         {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
@@ -1321,6 +1335,10 @@ function App() {
               >
                 {t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)')}
               </MenuItem>
+              {/* 種類(テーマの種類)が決まっていない配信を、AI で分ける(X41。これまでの配信の書き換え。決まっている配信は触らない) */}
+              <MenuItem icon={<AiIcon size={16} />} disabled={classifying || untypedCards.length === 0} secondaryContent={t(`${untypedCards.length} 本`, `${untypedCards.length}`)} onClick={() => void classifyAll()}>
+                {classifying ? t('種類を分けています…', 'Sorting types…') : t('種類が未設定の配信を、AI で分ける', 'Sort untyped deliveries with AI')}
+              </MenuItem>
               {/* BigQuery からの取り込み(設定がある環境だけ)。開いたときにも自動で確かめるが、すぐに読み直したいとき用。時刻は在庫のデータの時点 */}
               {bq?.configured && (
                 <MenuItem icon={<ArrowSyncRegular />} disabled={bqBusy} secondaryContent={bqStockTime(bq) ?? ''} onClick={() => void runBqSync(true)}>
@@ -1347,6 +1365,16 @@ function App() {
           </MenuPopover>
         </Menu>
       </header>
+      {/* 絞り込みの段(X42): ヘッダー(システム全体)とは分け、その下に置く。見ている画面の配信を絞る */}
+        <div className={styles.filterBar}>
+        <span className={styles.filterBarLabel}>{t('絞り込み', 'Filters')}</span>
+          <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
+          <FilterSelect label={t('種類', 'Type')} value={filters.department} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={setFilter('department')} />
+          {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
+          {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
+          <FilterSelect label={t('担当', 'Person')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
+          {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
+        </div>
       {/* 面の帯(X38): いまどの面にいるかを、面の色の線とロゴ風の名前で示す */}
       <div className={styles.faceBand} style={{ backgroundColor: FACE_TINT[face], borderBottomColor: FACE_COLOR[face] }}>
         <span className={styles.faceLogo} style={{ color: FACE_COLOR[face] }}>{FACE_LOGO[face]}</span>

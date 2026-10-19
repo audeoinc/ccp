@@ -1,6 +1,7 @@
 // アラートの条件(バックログ A6)。何週分を切ったら知らせるか、どの種別・担当の配信を対象にするか、どの種類を出すか。
 // ブラウザごとに覚える(人ごとに「自分が知らせてほしいもの」を決める)。ヘッダーの件数にも効く。
 // 在庫の見込みそのものは、すべての配信で計算する(ほかの人の配信も在庫を減らすため)。条件は、出す配信を絞るだけ
+import { THEME_TYPES, themeTypeOf } from './themeTypes'
 import { useSyncExternalStore } from 'react'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { ChangeAlert, StockAlert } from './alerts'
@@ -33,7 +34,8 @@ function load(): AlertSettings {
     if (!v) return DEFAULT_ALERT_SETTINGS
     const o = JSON.parse(v) as Partial<AlertSettings>
     // 種別は、以前は数値で覚えていた。文字の値でないものは捨てる(絞り込みが外れるだけ)
-    const departments = (o.departments ?? []).filter((d) => typeof d === 'string')
+    // 対象の種類(X41。これまでの種別の値 promotion などは、種類にないので捨てる)
+    const departments = (o.departments ?? []).filter((d) => typeof d === 'string' && (THEME_TYPES as string[]).includes(d))
     return { ...DEFAULT_ALERT_SETTINGS, ...o, departments, kinds: { ...DEFAULT_ALERT_SETTINGS.kinds, ...o.kinds } }
   } catch {
     return DEFAULT_ALERT_SETTINGS
@@ -65,7 +67,7 @@ export const isCustomized = (s: AlertSettings) => JSON.stringify(s) !== JSON.str
 
 /** 条件に合う配信か(種別・担当) */
 export function inScope(s: AlertSettings, c: DeliveryCard): boolean {
-  if (s.departments.length > 0 && !s.departments.includes(c.department ?? '')) return false
+  if (s.departments.length > 0 && !s.departments.includes(themeTypeOf(c).type)) return false
   if (s.owners.length > 0 && !s.owners.some((o) => o === c.owner?.trim() || o === c.production_owner?.trim())) return false
   return true
 }

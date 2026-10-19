@@ -35,6 +35,7 @@ import type { HeroImage } from './models/heroImages'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
 import { FaceBadge } from './FaceBadge'
+import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
@@ -57,7 +58,7 @@ import { logEvent, myName } from './history'
 import { ProcessPane, ProcessRail, type TalkTab } from './ProcessPane'
 import type { TopTab } from './ContentPane'
 import { ApprovalsService } from './data/approvals'
-import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusRank } from './status'
+import { CHANNEL_PUSH, channelOptions, countryOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
@@ -67,7 +68,7 @@ import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
-export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'department'>>
+export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
 
 interface Props {
   /** undefined のときは新規作成 */
@@ -131,7 +132,8 @@ interface Form {
   scheduledAt: string
   country: string
   channel: string
-  department: string
+  /** Type = テーマの種類(theme_type。値下げ・セール・新作 など。X41。これまでの種別 department は使わない) */
+  themeType: string
   status: string
   owner: string
   /** 配信の対象(X40): 性別(women / men / 空 = 指定なし)と年代(カンマ区切り) */
@@ -163,7 +165,7 @@ const toForm = (c?: DeliveryCard): Form => ({
   scheduledAt: toLocalInput(c?.scheduled_at),
   country: str(c?.country),
   channel: str(c?.channel),
-  department: str(c?.department),
+  themeType: str(c?.theme_type),
   status: c?.status === undefined || c.status === null ? String(statusOptions[0].value) : String(c.status),
   owner: c?.owner ?? '',
   targetGender: str(c?.target_gender),
@@ -714,7 +716,8 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
       scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : '',
       country: label(countryOptions, form.country),
       channel: label(channelOptions, form.channel),
-      department: label(departmentOptions, form.department),
+      department: '',
+      themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : undefined,
       target: targetText({ gender: form.targetGender, ages: form.targetAges, audience: templateChannel === 'push' ? audience : '' }),
       theme: form.theme,
       headline: form.headline,
@@ -930,7 +933,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
         scheduled_at: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
         country: num(form.country),
         channel: num(form.channel),
-        department: num(form.department),
+        theme_type: form.themeType || (null as never),
         owner: form.owner.trim(),
         production_due: form.productionDue || (null as never),
         links: encodeLinks(links),
@@ -1264,7 +1267,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
           )}
           {/* これまでの学び(同じテンプレート・テーマの種類の、過去の配信のメモ)。保存済みの配信だけ */}
           {card && (
-            <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} />
+            <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} />
           )}
 
           <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px`, '--w3': `${processOpen ? widths[3] : RAIL_W}px` } as React.CSSProperties}>
@@ -1292,7 +1295,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
               <div className={styles.twoCol}>
                 <OptionSelect label={t('国', 'Country')} value={form.country} options={countryOptions} onChange={set('country')} />
                 <OptionSelect label={t('チャネル', 'Channel')} value={form.channel} options={channelOptions} onChange={set('channel')} />
-                <OptionSelect label={t('種別', 'Type')} value={form.department} options={departmentOptions} onChange={set('department')} />
+                <OptionSelect label={t('種類', 'Type')} value={form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={set('themeType')} />
                 <Field label={t('ステータス', 'Status')}>
                   <div className={styles.statusRow}>
                     <span className={styles.dot} style={{ backgroundColor: statusColor(form.status) }} />

@@ -14,8 +14,8 @@ import {
   tokens,
 } from '@fluentui/react-components'
 import { DEFAULT_ALERT_SETTINGS, setAlertSettings, type AlertSettings } from './alertSettings'
-import { optionLabel, useT } from './i18n'
-import { departmentOptions } from './status'
+import { useT } from './i18n'
+import { THEME_TYPES, themeTypeLabel } from './themeTypes'
 
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '16px' },
@@ -77,8 +77,8 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
 
             <div className={styles.group}>
               <span className={styles.groupTitle}>{t('対象にする種別(選ばなければ、すべて)', 'Delivery types (none = all)')}</span>
-              {departmentOptions.map((o) => (
-                <Checkbox key={o.value} label={optionLabel(o.label)} checked={draft.departments.includes(o.value)} onChange={(_, d) => setDraft({ ...draft, departments: toggle(draft.departments, o.value, !!d.checked) })} />
+              {THEME_TYPES.map((v) => (
+                <Checkbox key={v} label={themeTypeLabel(v)} checked={draft.departments.includes(v)} onChange={(_, d) => setDraft({ ...draft, departments: toggle(draft.departments, v, !!d.checked) })} />
               ))}
             </div>
 
