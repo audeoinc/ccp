@@ -23,6 +23,8 @@ import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
 import { ResultsCompareView } from './ResultsCompareView'
 import { DataTable, DeliveryThumb, type DataColumn } from './DataTable'
+import { ChannelBadge } from './ChannelBadge'
+import { ResultsSummaryBar } from './ResultsSummaryBar'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -37,7 +39,6 @@ const useStyles = makeStyles({
   up: { color: tokens.colorPaletteGreenForeground1 },
   down: { color: tokens.colorPaletteRedForeground1 },
   muted: { color: tokens.colorNeutralForeground3 },
-  totals: { marginTop: '8px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   empty: { padding: '24px', textAlign: 'center', color: tokens.colorNeutralForeground3 },
   hidden: { display: 'none' },
 })
@@ -147,8 +148,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     const d = new Date(y, m - 2, 1)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })()
-  const prevRevenue = scoped.filter((r) => monthKey(r.result.sent_at ?? r.card.scheduled_at) === prevMonth).reduce((s, r) => s + r.revenue, 0)
-  const total = rows.reduce((s, r) => s + r.revenue, 0)
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? t('(削除された商品)', '(deleted product)')
 
   const groups: GroupRow[] =
@@ -174,12 +173,43 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       <span className={v >= 0 ? styles.up : styles.down}>{`${v >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(v * 100))}%`}</span>
     )
 
+  // 月の要約の帯(月の表示・一覧の上。計画の面の月の要約の帯と同じ位置)。数字は、その月の結果のある配信の合計
+  // 金額と増減は、通貨(国)ごとに出す(国が混ざると足せないため。1 つの国なら 1 つだけ)
+  const sum = groupRows(rows, 'theme', () => 'all')[0]
+  const byMarket = (['US', 'JP'] as const)
+    .map((m) => {
+      const mine = rows.filter((r) => marketOf(r.card) === m)
+      const g = groupRows(mine, 'theme', () => 'all')[0]
+      const prev = scoped.filter((r) => marketOf(r.card) === m && monthKey(r.result.sent_at ?? r.card.scheduled_at) === prevMonth).reduce((a, r) => a + r.revenue, 0)
+      return { m, n: mine.length, revenue: g?.revenue ?? 0, prev, lastYear: g?.lastYear ?? 0 }
+    })
+    .filter((x) => x.n > 0)
+  const perMarket = (f: (x: (typeof byMarket)[number]) => ReactNode) =>
+    byMarket.length === 0 ? <span className={styles.muted}>—</span> : byMarket.map((x, i) => (
+      <span key={x.m}>
+        {i > 0 && ' ・ '}
+        {byMarket.length > 1 && `${x.m} `}
+        {f(x)}
+      </span>
+    ))
+  const monthBar = view === 'month' || view === 'list' ? (
+    <ResultsSummaryBar
+      deliveries={periodCards.length}
+      withResults={rows.length}
+      revenue={perMarket((x) => priceText(Math.round(x.revenue), x.m))}
+      vsPrevMonth={perMarket((x) => delta(x.prev ? x.revenue / x.prev - 1 : undefined))}
+      vsLastYear={perMarket((x) => delta(x.lastYear ? x.revenue / x.lastYear - 1 : undefined))}
+      openRate={pct(sum?.emailRecipients ? sum.opens / sum.emailRecipients : undefined)}
+      clickRate={pct(sum?.recipients ? sum.clicks / sum.recipients : undefined)}
+    />
+  ) : null
+
   // 一覧の列(配信ごと)。計画の面の一覧と同じく、左にサムネイル
   const deliveryColumns: DataColumn<(typeof rows)[number]>[] = [
     { key: 'image', label: t('画像', 'Image'), cell: (r) => <DeliveryThumb card={r.card} productIds={cardProducts.get(r.card.id) ?? []} products={products} heroes={heroes} /> },
     { key: 'date', label: t('日付', 'Date'), cell: (r) => dateText(r.result.sent_at ?? r.card.scheduled_at), sort: (r) => sentAtOf(r) },
     { key: 'name', label: t('配信', 'Delivery'), cell: (r) => <span className={styles.name}>{r.card.name}</span>, sort: (r) => r.card.name },
-    { key: 'channel', label: t('チャネル', 'Ch.'), cell: (r) => (isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')), sort: (r) => (isPush(r.card) ? 1 : 0) },
+    { key: 'channel', label: t('チャネル', 'Ch.'), cell: (r) => <ChannelBadge channel={r.card.channel} size="small" />, sort: (r) => (isPush(r.card) ? 1 : 0) },
     { key: 'theme', label: t('テーマ', 'Theme'), cell: (r) => r.card.theme || '—', sort: (r) => r.card.theme ?? '', wide: true },
     { key: 'template', label: t('テンプレート', 'Template'), cell: (r) => templateName(r.card), sort: (r) => templateName(r.card) },
     { key: 'open', label: t('開封率', 'Open'), cell: (r) => pct(r.openRate), sort: (r) => r.openRate, numeric: true },
@@ -404,7 +434,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         {results === null && !error ? (
           <Spinner />
         ) : view === 'month' ? (
+          <>
+          {monthBar}
           <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} onOpenWeek={onOpenWeek} />
+          </>
         ) : view === 'compare' ? (
           <ResultsCompareView
             rows={allRows}
@@ -425,9 +458,13 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           <ResultsWeek weekStart={weekStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} cardProducts={cardProducts} products={products} heroes={heroes} />
           </>
         ) : rows.length === 0 ? (
+          <>
+          {monthBar}
           <div className={styles.empty}>{t('この条件の配信結果はまだありません', 'No results for these filters yet')}</div>
+          </>
         ) : (
           <>
+            {monthBar}
             {groupBy === 'delivery' ? (
               // 配信ごと: 計画の面の一覧と同じ表(DataTable)。左にサムネイル(マウスを重ねるとプレビュー)。行を押すと、詳しい結果をフロートで開く
               <DataTable
@@ -451,10 +488,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
                 defaultSort={{ key: 'revenue', dir: 'descending' }}
               />
             )}
-            <div className={styles.totals}>
-              {t(`合計: ${rows.length} 本の配信・売上 ${money(total)}・前月比 `, `Totals: ${rows.length} deliveries · revenue ${money(total)} · vs previous month `)}
-              {delta(prevRevenue ? total / prevRevenue - 1 : undefined)}
-            </div>
           </>
         )}
       </div>

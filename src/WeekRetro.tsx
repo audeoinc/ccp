@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Textarea, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowRightRegular, LightbulbRegular, SaveRegular } from '@fluentui/react-icons'
+import { ArrowRightRegular, EditRegular, LightbulbRegular, SaveRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 
 const useStyles = makeStyles({
@@ -22,6 +22,10 @@ const useStyles = makeStyles({
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   saved: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteGreenForeground1 },
+  // たたんだとき: 見出し・1 行目・書くボタンを 1 行に
+  folded: { alignItems: 'center' },
+  line: { flex: '1 1 0', minWidth: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  lineEmpty: { color: tokens.colorNeutralForeground3 },
 })
 
 type Props =
@@ -49,11 +53,14 @@ export function WeekRetro(props: Props) {
   const [draft, setDraft] = useState(props.text)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  // 結果の面: ふだんは 1 行にたたみ、「書く」「直す」で開く(週の表示の縦幅を空けるため)
+  const [open, setOpen] = useState(false)
   // 週を移ったら、その週のメモに入れ替える
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(props.text)
     setSavedAt(null)
+    setOpen(false)
   }, [props.text])
 
   if (props.mode === 'plan') {
@@ -81,7 +88,28 @@ export function WeekRetro(props: Props) {
     setSaving(true)
     const ok = await props.onSave(draft.trim())
     setSaving(false)
-    if (ok) setSavedAt(Date.now())
+    if (ok) {
+      setSavedAt(Date.now())
+      setOpen(false)
+    }
+  }
+  if (!open && !dirty) {
+    const first = props.text.trim().split('\n')[0]
+    return (
+      <div className={`${s.root} ${s.folded}`}>
+        <span className={s.head} style={{ paddingTop: 0 }}>
+          <LightbulbRegular />
+          {t('この週の振り返り', 'This week’s retrospective')}
+        </span>
+        <span className={`${s.line} ${first ? '' : s.lineEmpty}`} title={props.text || undefined}>
+          {first || t('まだ書いていません(翌週の計画の面に出ます)', 'Not written yet (shown on next week’s plan)')}
+        </span>
+        {savedAt && <span className={s.saved}>{t('保存しました', 'Saved')}</span>}
+        <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => setOpen(true)}>
+          {first ? t('直す', 'Edit') : t('書く', 'Write')}
+        </Button>
+      </div>
+    )
   }
   return (
     <div className={s.root}>
@@ -103,7 +131,16 @@ export function WeekRetro(props: Props) {
         <Button size="small" appearance={dirty ? 'primary' : 'secondary'} icon={<SaveRegular />} disabled={!dirty || saving} onClick={() => void save()}>
           {t('保存', 'Save')}
         </Button>
-        {savedAt && !dirty && <span className={s.saved}>{t('保存しました', 'Saved')}</span>}
+        <Button
+          size="small"
+          appearance="subtle"
+          onClick={() => {
+            setDraft(props.text)
+            setOpen(false)
+          }}
+        >
+          {dirty ? t('やめる', 'Cancel') : t('閉じる', 'Close')}
+        </Button>
       </span>
     </div>
   )

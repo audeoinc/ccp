@@ -13,6 +13,7 @@ import { DeliveryResultsService } from './data/deliveryResults'
 import { THEME_TYPES, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
+import { ChannelBadge } from './ChannelBadge'
 
 const useStyles = makeStyles({
   // 配信カードと同じく、画面いっぱいのフロートで開く
@@ -94,8 +95,10 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
             {t(`配信結果のレポート · 作成 ${new Date().toLocaleDateString(locale())}`, `Delivery results report · created ${new Date().toLocaleDateString(locale())}`)}
           </div>
           <div className={styles.head}>
+            {/* チャネルの札は、計画の面の配信カードと同じく、題名の左に */}
+            <ChannelBadge channel={card.channel} />
             <h2 className={styles.title}>{card.name}</h2>
-            <span className={styles.sub}>{`${sentText} · ${push ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
+            <span className={styles.sub}>{sentText}</span>
             <Tooltip
               content={t('テーマの種類。過去の配信と比べるときに、同じ種類の配信を集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type. Used to find past deliveries of the same type. "guessed" is a provisional type inferred from the wording.')}
               relationship="description"

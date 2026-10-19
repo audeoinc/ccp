@@ -683,10 +683,10 @@ function App() {
         match(filters.country, c.country) &&
         match(filters.channel, c.channel) &&
         match(filters.department, c.department) &&
-        match(filters.status, statusView(c.status)) &&
+        (page === 'results' || match(filters.status, statusView(c.status))) &&
         (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person || !!noteParties.get(c.id)?.has(filters.person)),
     )
-  }, [cards, filters, noteParties])
+  }, [cards, filters, noteParties, page])
 
   // 表示中の月の配信(一覧と CSV の対象)。締め切りの警告は、月をまたいで求める(カレンダーの前後の月の日付にも出す)
   const rows = useMemo(() => toRows(filtered, productCounts, questionCounts, taskCounts), [filtered, productCounts, questionCounts, taskCounts])
@@ -1185,7 +1185,8 @@ function App() {
               <FilterSelect label={t('国', 'Country')} value={filters.country} options={countryOptions} onChange={setFilter('country')} />
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
               <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
-              <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />
+              {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
+              {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
               <FilterSelect label={t('担当', 'Person')} value={filters.person} options={owners.map((o) => ({ value: o, label: o }))} onChange={setFilter('person')} />
               {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters(noFilter)}>{t('クリア', 'Clear')}</Button>}
             </div>
@@ -1215,14 +1216,21 @@ function App() {
                 )}
               </span>
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
-              {/* 結果の面の「前週」: 振り返りは前週から始まるので、1 回で前週の週表示へ(FLOWS の C-7) */}
+              {/* 結果の面の「先週を振り返る」: 振り返りは先週から始まるので、1 回で先週の週表示へ(FLOWS の C-7)。
+                  「前週」だけでは、比べる相手の切り替えにも見えるので、何が起きるかを名前にする */}
               {page === 'results' && (
-                <Button size="small" appearance="subtle" disabled={view === 'compare'} onClick={() => {
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  icon={<HistoryRegular />}
+                  disabled={view === 'compare'}
+                  title={t('先週の結果を、週の表示で開きます(この週の振り返りも書けます)', 'Open last week’s results in the week view (you can write the retrospective there)')}
+                  onClick={() => {
                     const d = new Date()
                     goTo('week', new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
                   }}
                 >
-                  {t('前週', 'Last week')}
+                  {t('先週を振り返る', 'Review last week')}
                 </Button>
               )}
               {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
@@ -1255,7 +1263,9 @@ function App() {
                   </button>
                 ))}
               </div>
-              {/* 週の見方: 見せ方の切り替えのすぐ外に、ラベルを付けて置く。計画の面の週の表示だけで使い、ほかでは選べないだけにする */}
+              {/* 週の見方: 見せ方の切り替えのすぐ外に、ラベルを付けて置く。計画の面の週の表示だけで使い、計画の面のほかの表示では選べないだけにする。
+                  結果の面では出さない(結果の面では使わないため。ここから右は、結果の面だけの凡例・まとめ方なので、ずれても困らない) */}
+              {page !== 'results' && (
               <span className={styles.lensGroup}>
                 <span className={mergeClasses(styles.lensLabel, !lensOn && styles.lensLabelOff)}>{t('週の見方', 'Week lens')}</span>
                 <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('週の見方', 'Week lens')} aria-disabled={!lensOn}>
@@ -1265,7 +1275,7 @@ function App() {
                       type="button"
                       aria-pressed={lensOn && lens === v}
                       disabled={!lensOn}
-                      title={!lensOn ? (page === 'results' ? t('計画の面で使えます', 'Available on the Plan side') : t('週の表示で使えます', 'Available in the week view')) : undefined}
+                      title={!lensOn ? t('週の表示で使えます', 'Available in the week view') : undefined}
                       className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
                       onClick={() => {
                         setLens(v)
@@ -1277,6 +1287,7 @@ function App() {
                   ))}
                 </div>
               </span>
+              )}
               {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />

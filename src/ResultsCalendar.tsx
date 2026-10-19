@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { MailRegular, PhoneRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { HeatPreview } from './HeatPreview'
+import { ChannelBadge } from './ChannelBadge'
 import { Calendar } from './Calendar'
 import { locale, useT } from './i18n'
 import { isPush, localDate, pct, type ResultRow } from './results'
@@ -12,7 +12,6 @@ import { isPush, localDate, pct, type ResultRow } from './results'
 const useStyles = makeStyles({
   chipNone: { color: tokens.colorNeutralForeground3, backgroundColor: tokens.colorNeutralBackground2 },
   noResult: { color: tokens.colorNeutralForeground3 },
-  channelIcon: { flexShrink: 0, verticalAlign: '-2px', marginRight: '3px', color: tokens.colorNeutralForeground3 },
   chipName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   chipNums: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2, fontVariantNumeric: 'tabular-nums' },
   up: { color: tokens.colorPaletteGreenForeground1 },
@@ -151,13 +150,13 @@ export function ResultsWeek({
                   key={c.id}
                   type="button"
                   className={mergeClasses(styles.tile, !r && styles.chipNone)}
-                  // アプリの配信は、角を大きく丸めた枠(月のカレンダーと同じく、メールとアプリを形で見分ける。枠の色は前年比)
-                  style={isPush(c) ? { border: `1.5px solid ${trendColor(r)}`, borderRadius: '16px' } : { borderTopColor: trendColor(r) }}
+                  // 上の線の色 = 前年比。メールとアプリは、形ではなく名前の前の札で見分ける(計画の面と同じ)
+                  style={{ borderTopColor: trendColor(r) }}
                   onClick={() => onOpen(c.id)}
                 >
                   <span className={styles.chipName} title={c.name}>
-                    {/* 計画の面・月の表示と同じく、チャネルはアイコンで示す */}
-                    {isPush(c) ? <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} /> : <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />}
+                    {/* 計画の面・月の表示と同じ、塗りつぶしのチャネルの札 */}
+                    <ChannelBadge channel={c.channel} size="icon" />
                     {c.name}
                   </span>
                   {r ? (

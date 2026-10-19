@@ -6,6 +6,7 @@ import type { HeroImage } from './models/heroImages'
 import { AiIcon } from './AiMark'
 import { evaluateLineup, type CompareVerdict } from './aiCompare'
 import { HeatPreview } from './HeatPreview'
+import { ChannelBadge } from './ChannelBadge'
 import { locale, useT } from './i18n'
 import { isPush, pct, positionLabel, positionShares, sentAtOf, templateIdOf, templateName, type ResultRow } from './results'
 import { getTemplate } from './templates'
@@ -40,6 +41,7 @@ const useStyles = makeStyles({
   colWorst: { border: `2px solid ${tokens.colorPaletteRedBorderActive}` },
   colHead: { display: 'grid', rowGap: '1px', fontSize: tokens.fontSizeBase200 },
   colName: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  colTop: { display: 'flex', alignItems: 'center', columnGap: '6px', color: tokens.colorNeutralForeground3 },
   colSub: { color: tokens.colorNeutralForeground3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   heat: { display: 'flex', justifyContent: 'center' },
   // 配信 × 数字・位置 の表。行ごとに、良いほど濃い緑
@@ -310,7 +312,10 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
               return (
                 <button key={r.result.id} id={`cmp-${id}`} type="button" className={mergeClasses(styles.col, bestIds.has(id) && styles.colBest, worstIds.has(id) && styles.colWorst, flash === id && styles.colFlash)} onClick={() => onOpen(id)} title={t('詳しい結果を開く', 'Open the details')}>
                   <span className={styles.colHead}>
-                    <span className={styles.colSub}>{`${dateText(r)} · ${isPush(r.card) ? t('アプリ', 'App') : t('メール', 'Email')}`}</span>
+                    <span className={styles.colTop}>
+                      <ChannelBadge channel={r.card.channel} size="small" />
+                      {dateText(r)}
+                    </span>
                     <span className={styles.colName}>{r.card.name}</span>
                     <span className={styles.colSub} title={r.card.theme}>{r.card.theme || '—'}</span>
                     {!sameTemplate && <span className={styles.colSub}>{templateName(r.card)}</span>}
