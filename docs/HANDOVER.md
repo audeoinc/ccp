@@ -415,6 +415,11 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 変えたところ: 判断の関数(`src/approvals.ts` の `eligibleReviewers`、`server/ccp/approvals.py` の `eligible_reviewers`)から、依頼した本人を外す条件を除いた。サーバーと撮影用の身代わり(`src/mock/approvals.ts`)の「自分を承認者にはできません」「自分で依頼した配信は、自分では承認できません」も除いた。例(`server/tests/approval_cases.json`)は「依頼した本人も決められる」に。承認のブロックは、自分の依頼を承認するときに確かめの言葉を出す。まとめて依頼・依頼の入力でも、自分を承認者から外さない。
 - 「1 回の承認は 1 グループ分」「1 人でも差し戻したら止める」は、そのまま。
 
+## 6.25 X33 国をヘッダーで選ぶ(2026-10-19、UI セッション)
+
+- 国は、絞り込み(`filters.country`)の値をそのまま使い、選ぶ場所をヘッダーに移した(App の `setCountry`。localStorage の `ccp.country` に覚える。初めては `VITE_DEFAULT_COUNTRY`)。絞り込みの「クリア」では消えない。
+- App の `scopedCards`(国で絞った配信)から `activeCards`・`filtered`・依頼(`useApprovalInbox`)を作るので、週の帯・アラート・依頼の件数も国に絞られる。在庫の見込みの 3 つめの引数(過去の配信の結果)は、すべての配信のまま。配信のない変更の知らせ(主力になった など)は、商品の市場で絞る。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

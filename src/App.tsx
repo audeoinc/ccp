@@ -42,6 +42,7 @@ import {
   DocumentBulletListRegular,
   PeopleTeamRegular,
   ChevronDownRegular,
+  GlobeRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
 } from '@fluentui/react-icons'
@@ -132,11 +133,11 @@ interface Filters {
   person: string
 }
 const noFilter: Filters = { country: '', channel: '', department: '', status: '', person: '' }
-// 開いたときの絞り込み: ビルドの設定(VITE_DEFAULT_COUNTRY。US)の国。なければ、絞り込まない
-const initialFilters: Filters = {
-  ...noFilter,
-  country: String(countryOptions.find((o) => o.label === import.meta.env.VITE_DEFAULT_COUNTRY)?.value ?? ''),
-}
+// 国(X33): 表示の絞り込みではなく、ヘッダーで選ぶ「どの国の仕事をしているか」。人ごと(ブラウザごと)に覚える。
+// 初めて開いたときは、ビルドの設定(VITE_DEFAULT_COUNTRY。US)の国。'' = すべての国
+const COUNTRY_KEY = 'ccp.country'
+const defaultCountry = String(countryOptions.find((o) => o.label === import.meta.env.VITE_DEFAULT_COUNTRY)?.value ?? '')
+const initialFilters = (): Filters => ({ ...noFilter, country: loadPref<string>(COUNTRY_KEY, defaultCountry) })
 
 const useStyles = makeStyles({
   header: {
@@ -192,6 +193,26 @@ const useStyles = makeStyles({
     ':hover': { backgroundColor: tokens.colorNeutralBackground1 },
   },
   headerSpacer: { flexGrow: 1 },
+  // 国の切り替え(X33): 計画 | 結果 の切り替えと同じ枠・同じ高さ
+  countryBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '6px',
+    padding: `5px ${tokens.spacingHorizontalM}`,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    color: tokens.colorNeutralForeground1,
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  countryIcon: { fontSize: '16px', color: tokens.colorNeutralForeground2 },
+  countryChevron: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
   // 結果の面だけの操作(まとめ方・書き出し・取り込み)を、共通のツールバーのこの場所に差し込む
   toolbarSlot: { display: 'contents' },
   container: {
@@ -415,6 +436,11 @@ function App() {
   }, [])
   const [month, setMonth] = useState<Date | null>(null)
   const [filters, setFilters] = useState<Filters>(initialFilters)
+  // 国を変える(ヘッダー)。覚えておき、次に開いたときも同じ国で始める
+  const setCountry = (v: string) => {
+    setFilters((f) => ({ ...f, country: v }))
+    savePref(COUNTRY_KEY, v)
+  }
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
@@ -465,10 +491,12 @@ function App() {
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
-  const activeCards = useMemo(() => cards.filter((c) => !isCancelled(c)), [cards])
+  // 国(ヘッダー)で絞った配信。計画・結果・週の帯・アラート・依頼の件数など、画面のすべてがこの国の配信を見る(X33)
+  const scopedCards = useMemo(() => (filters.country ? cards.filter((c) => c.country === filters.country) : cards), [cards, filters.country])
+  const activeCards = useMemo(() => scopedCards.filter((c) => !isCancelled(c)), [scopedCards])
   // ユーザー・承認グループと、依頼中の承認(ヘッダーの「自分宛ての依頼」と、週の帯のまとめての操作に使う。U5・U6)
   const people = usePeople()
-  const inbox = useApprovalInbox(cards)
+  const inbox = useApprovalInbox(scopedCards)
   // 配信に入っている担当(企画・制作)の名前。担当の絞り込みと、配信カードの担当の候補に使う
   const owners = useMemo(
     () => [...new Set([...cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]), ...[...noteParties.values()].flatMap((x) => [...x])].filter((o): o is string => !!o))].sort(),
@@ -480,7 +508,10 @@ function App() {
   const alerts = filterStockAlerts(alertSettings, alertState.alerts)
   // 変更のアラート(MD 方針の変更・日程の変更)。件数は、在庫のアラートと合わせて、ヘッダーに出す
   const changeState = useChangeAlerts(activeCards, products, alertState.placements, cards)
-  const changeAlerts = filterChangeAlerts(alertSettings, changeState.changeAlerts)
+  // 配信のない変更の知らせ(主力になった など)は、商品の市場で国に合わせる
+  const changeAlerts = filterChangeAlerts(alertSettings, changeState.changeAlerts).filter(
+    (a) => !filters.country || a.card || a.deliveries.length > 0 || !a.product?.market || a.product.market === filters.country,
+  )
   const alertCount = alerts.length + changeAlerts.length
   // 配信ごとのアラート(配信カードの帯・カレンダーの印)
   // 配信ごとのアラート: 在庫・方針・日程に、週の上限を超えた商品を足す(直す場所を配信カードにそろえるため)
@@ -683,15 +714,14 @@ function App() {
 
   const filtered = useMemo(() => {
     const match = (f: string, v?: string) => f === '' || String(v) === f
-    return cards.filter(
+    return scopedCards.filter(
       (c) =>
-        match(filters.country, c.country) &&
         match(filters.channel, c.channel) &&
         match(filters.department, c.department) &&
         (page === 'results' || match(filters.status, statusView(c.status))) &&
         (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person || !!noteParties.get(c.id)?.has(filters.person)),
     )
-  }, [cards, filters, noteParties, page])
+  }, [scopedCards, filters, noteParties, page])
 
   // 表示中の月の配信(一覧と CSV の対象)。締め切りの警告は、月をまたいで求める(カレンダーの前後の月の日付にも出す)
   const rows = useMemo(() => toRows(filtered, productCounts, questionCounts, taskCounts), [filtered, productCounts, questionCounts, taskCounts])
@@ -1002,7 +1032,8 @@ function App() {
   useEffect(() => {
     loadCustomTemplates().catch(() => undefined)
   }, [])
-  const filtering = Object.values(filters).some((v) => v !== '')
+  // 国はヘッダーの設定なので、絞り込みの「クリア」の対象にしない
+  const filtering = filters.channel !== '' || filters.department !== '' || filters.status !== '' || filters.person !== ''
   // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
@@ -1021,6 +1052,24 @@ function App() {
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
         <h1 className={styles.title}>{t('コンテンツプランナー', 'Contents Planner')}</h1>
+        {/* 国(X33): どの国の仕事をしているか。担当の国は、決めたらあまり変えない。全体を見る人は「すべての国」 */}
+        <Menu positioning="below-start" checkedValues={{ country: [filters.country] }} onCheckedValueChange={(_, d) => setCountry(d.checkedItems[0] ?? '')}>
+          <MenuTrigger disableButtonEnhancement>
+            <button type="button" className={styles.countryBtn} aria-label={t(`国: ${filters.country || 'すべての国'}`, `Country: ${filters.country || 'All countries'}`)} title={t('どの国の配信を扱うか(画面のすべてに効きます。次に開いたときも同じ国)', 'Which country you work on (applies to the whole app and is remembered)')}>
+              <GlobeRegular className={styles.countryIcon} />
+              {filters.country ? optionLabel(countryOptions.find((o) => String(o.value) === filters.country)?.label ?? filters.country) : t('すべての国', 'All countries')}
+              <ChevronDownRegular className={styles.countryChevron} />
+            </button>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItemRadio name="country" value="">{t('すべての国', 'All countries')}</MenuItemRadio>
+              {countryOptions.map((o) => (
+                <MenuItemRadio key={o.value} name="country" value={String(o.value)}>{optionLabel(o.label)}</MenuItemRadio>
+              ))}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
         {/* 計画(表)と結果(裏)。同じ期間・見せ方・絞り込みのまま、面だけを切り替える */}
         <div className={styles.faceSwitch} role="tablist" aria-label={t('計画と結果', 'Plan and results')}>
           {(
@@ -1187,13 +1236,12 @@ function App() {
             {page !== 'alerts' && (
             <>
             <div className={styles.filterRow}>
-              <FilterSelect label={t('国', 'Country')} value={filters.country} options={countryOptions} onChange={setFilter('country')} />
               <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
               <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
               {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
               {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
               <FilterSelect label={t('担当', 'Person')} value={filters.person} options={owners.map((o) => ({ value: o, label: o }))} onChange={setFilter('person')} />
-              {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters(noFilter)}>{t('クリア', 'Clear')}</Button>}
+              {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
             </div>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
