@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Badge,
   Button,
-  Field,
   Menu,
   MenuButton,
   type MenuButtonProps,
@@ -19,7 +18,6 @@ import {
   MessageBarActions,
   MessageBarBody,
   Portal,
-  Select,
   SplitButton,
   Spinner,
   Tooltip,
@@ -43,6 +41,7 @@ import {
   LayoutColumnTwoRegular,
   DocumentBulletListRegular,
   PeopleTeamRegular,
+  ChevronDownRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
 } from '@fluentui/react-icons'
@@ -207,11 +206,44 @@ const useStyles = makeStyles({
   filterRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: tokens.spacingHorizontalM,
-    marginBottom: tokens.spacingVerticalL,
-    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalS,
+    marginBottom: tokens.spacingVerticalM,
+    alignItems: 'center',
   },
-  filterField: { minWidth: '130px' },
+  // 絞り込みの札(名前: 値 ▾)。札の全体が押せる
+  filterChip: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '4px',
+    height: '28px',
+    padding: '0 8px 0 10px',
+    boxSizing: 'border-box',
+    borderRadius: tokens.borderRadiusCircular,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+    ':focus-within': { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px' },
+  },
+  // 「すべて」以外を選んでいる(絞り込み中)
+  filterChipOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
+  filterChipLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  filterChipSelect: {
+    appearance: 'none',
+    border: 'none',
+    background: 'transparent',
+    padding: '0 18px 0 0',
+    margin: 0,
+    font: 'inherit',
+    fontWeight: tokens.fontWeightSemibold,
+    color: 'inherit',
+    cursor: 'pointer',
+    outline: 'none',
+  },
+  filterChipChevron: { position: 'absolute', right: '8px', fontSize: '12px', pointerEvents: 'none', color: tokens.colorNeutralForeground3 },
   monthRow: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -294,15 +326,18 @@ function FilterSelect({ label, value, options, onChange }: {
 }) {
   const styles = useStyles()
   const t = useT()
+  // 名前を札の中に入れた、1 行の細い絞り込み(名前を上に置くと、2 行分の高さを取るため)。「すべて」以外を選んでいる札は、色を付けて目立たせる
   return (
-    <Field label={label} size="small" className={styles.filterField}>
-      <Select size="small" value={value} onChange={(_, d) => onChange(d.value)}>
+    <label className={mergeClasses(styles.filterChip, value !== '' && styles.filterChipOn)}>
+      <span className={styles.filterChipLabel}>{label}:</span>
+      <select className={styles.filterChipSelect} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
         <option value="">{t('すべて', 'All')}</option>
         {options.map((o) => (
           <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
         ))}
-      </Select>
-    </Field>
+      </select>
+      <ChevronDownRegular className={styles.filterChipChevron} aria-hidden />
+    </label>
   )
 }
 
