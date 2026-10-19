@@ -23,6 +23,7 @@ from .approvals import router as approvals_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
 from .identity import router as me_router
+from .production import router as production_router
 from .policies import router as policies_router
 from .pack import router as pack_router
 from sqlalchemy import text
@@ -104,6 +105,7 @@ app.include_router(bq_router)
 app.include_router(policies_router)
 app.include_router(approvals_router)
 app.include_router(me_router)
+app.include_router(production_router)
 if hosted_router is not None:
     app.include_router(hosted_router)
 

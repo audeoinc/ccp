@@ -160,7 +160,8 @@
     ["resolved", "int"],
     ["assignee", "text"],
     ["due", "date"],
-    ["source_note", "text"]
+    ["source_note", "text"],
+    ["stage", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],
@@ -394,6 +395,39 @@
    ],
    "lookups": [
    ]
+  },
+  "production_requests": {
+   "columns": [
+    ["version", "int"],
+    ["status", "choice", {"index": true}],
+    ["snapshot", "text"],
+    ["instructions", "text"],
+    ["production_owner", "text"],
+    ["production_due", "date"],
+    ["requested_at", "timestamptz"],
+    ["requested_by_name", "text"],
+    ["received_at", "timestamptz"],
+    ["received_by_name", "text"],
+    ["done_at", "timestamptz"],
+    ["done_by_name", "text"],
+    ["done_note", "text"],
+    ["done_link", "text"],
+    ["sent_at", "timestamptz"],
+    ["sent_by_name", "text"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
+   ]
+  },
+  "note_reactions": {
+   "columns": [
+    ["kind", "choice"],
+    ["user_name", "text"]
+   ],
+   "lookups": [
+    ["card_note_id", "card_notes", {"onDelete": "CASCADE"}],
+    ["user_id", "users", {"onDelete": "CASCADE"}]
+   ]
   }
  },
  "choices": {
@@ -423,6 +457,8 @@
   "approval_requests.status": ["open", "approved", "changes_requested", "stale", "withdrawn"],
   "approval_reviewers.decision": ["pending", "approved", "changes_requested"],
   "notifications.kind": ["review_requested", "approved", "changes_requested", "withdrawn"],
-  "notifications.status": ["pending", "sent", "skipped"]
+  "notifications.status": ["pending", "sent", "skipped"],
+  "production_requests.status": ["requested", "in_progress", "done", "sent", "stale"],
+  "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"]
  }
 }

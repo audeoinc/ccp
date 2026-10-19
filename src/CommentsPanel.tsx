@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
-import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
-import { locale, tr, useT } from './i18n'
-import { myName, onMeChange } from './history'
+import { locale, optionLabel, tr, useT } from './i18n'
+import { myName, myUserId, onMeChange } from './history'
+import { NoteReactionsService } from './data/noteReactions'
+import { NoteReactionKind, type NoteReaction } from './models/noteReactions'
 import { AiButton } from './AiButton'
 import { suggestTasks, type TaskIdea } from './aiTasks'
+import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -71,6 +74,8 @@ interface Props {
   cardName: string
   productionOwner: string
   productionDue: string
+  /** どの段階のやり取りを出すか(PR6。plan = 計画の配信カード / production = 制作のページ)。省略は全部 */
+  stage?: NoteStage
   /** 未解決の数が変わったとき(タブの数を、閉じなくても合わせるため) */
   onOpenCount?: (n: number) => void
   /** タスクを採用したとき(タスクのタブの数を合わせる) */
@@ -80,7 +85,7 @@ interface Props {
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const time = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
 /** スレッドの元になる書き込みか(以前の「質問」と「レビューのコメント」の両方。種類のない古い行は質問) */
-const isRoot = (n: CardNote) => n.kind === 'comment' || (n.kind ?? 'question') === 'question'
+const isRoot = isThreadRoot
 
 /**
  * やり取り(2026-10-17 に、以前の「質問と返信」と「レビューのコメント」を 1 つにした。利用者の指摘: どちらも書いたら返事が要る)。
@@ -90,7 +95,7 @@ const isRoot = (n: CardNote) => n.kind === 'comment' || (n.kind ?? 'question') =
  * 以前の質問(種類 question。返信は reply / replied_by / replied_at の列に 1 件)も、同じ一覧に出す。
  * 配信カードの「保存」を待たずに、その場で保存する。解決したスレッドは消さずに、たたんで残す
  */
-export function CommentsPanel({ cardId, productIds, products, people, cardName, productionOwner, productionDue, onOpenCount, onTasksChanged }: Props) {
+export function CommentsPanel({ cardId, productIds, products, people, cardName, productionOwner, productionDue, onOpenCount, onTasksChanged, stage }: Props) {
   const styles = useStyles()
   const t = useT()
   const [notes, setNotes] = useState<CardNote[] | null>(null)
@@ -109,6 +114,8 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   const [busy, setBusy] = useState(false)
   // スレッドごとの、AI のタスクの案('busy' は作成中)
   const [ideas, setIdeas] = useState<Record<string, TaskIdea[] | 'busy'>>({})
+  // 書き込みへのリアクション(PR6。Teams のような軽い返事。状態は変えない)
+  const [reactions, setReactions] = useState<NoteReaction[]>([])
 
   const load = useCallback(async () => {
     if (!cardId) return
@@ -117,7 +124,12 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
       setError(res.error?.message ?? tr('やり取りを読み込めませんでした', 'Could not load the conversation'))
       return
     }
-    setNotes(res.data ?? [])
+    const list = res.data ?? []
+    setNotes(list)
+    // この配信の書き込みへのリアクションだけを残す(表は配信を持たないので、書き込みの id で絞る)
+    const ids = new Set(list.map((n) => n.id))
+    const r = await NoteReactionsService.getAll()
+    setReactions(r.success ? (r.data ?? []).filter((x) => ids.has(x.card_note_id ?? '')) : [])
   }, [cardId])
 
   useEffect(() => {
@@ -126,7 +138,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   }, [load])
 
   // 未解決を上に、それぞれ新しい順(いま話しているものを先に)
-  const roots = (notes ?? []).filter(isRoot).sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
+  const roots = (notes ?? []).filter((n) => isRoot(n) && (!stage || stageOf(n) === stage)).sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
   const repliesOf = (id: string) => (notes ?? []).filter((n) => n.kind === 'reply' && n.source_note === id).sort((a, b) => time(a.created_on) - time(b.created_on))
   const tasksFrom = (id: string) => (notes ?? []).filter((n) => n.kind === 'task' && n.source_note === id)
   const open = roots.filter((n) => !n.resolved).length
@@ -156,6 +168,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         delivery_card_id: cardId,
         ...(target ? { product_id: target } : {}),
         kind: 'comment',
+        ...(stage ? { stage } : {}),
         author: me,
         ...(to.trim() ? { assignee: to.trim() } : {}),
         body: body.trim(),
@@ -310,6 +323,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         ) : (
           <div className={styles.body}>{n.body}</div>
         )}
+        {!readOnly && <ReactionBar noteId={n.id} reactions={reactions.filter((r) => r.card_note_id === n.id)} onChanged={() => void load()} />}
       </div>
     </div>
   )
@@ -499,3 +513,69 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     </div>
   )
 }
+
+// リアクションの種類と、その絵(Teams のような軽い返事)
+const REACTION_ICON: Record<keyof typeof NoteReactionKind, string> = { ok: '👍', looking: '👀', doing: '✅', thanks: '🙏', question: '❓' }
+const subscribeReactMe = (f: () => void) => onMeChange(f)
+
+/**
+ * 書き込み 1 件のリアクション(バックログ PR6)。押した数と、押した人(マウスを重ねると出る)。自分が押したものは、もう一度押すと外れる。
+ * 「受け取った」のような状態を進めるものは、ここではなく、制作のページのボタン
+ */
+function ReactionBar({ noteId, reactions, onChanged }: { noteId: string; reactions: NoteReaction[]; onChanged: () => void }) {
+  const t = useT()
+  const styles = useReactionStyles()
+  const meId = useSyncExternalStore(subscribeReactMe, myUserId)
+  const meName = useSyncExternalStore(subscribeReactMe, myName)
+  const [busy, setBusy] = useState(false)
+  const toggle = async (kind: keyof typeof NoteReactionKind) => {
+    if (!meId) return
+    setBusy(true)
+    const mine = reactions.find((r) => r.kind === kind && r.user_id === meId)
+    if (mine) await NoteReactionsService.delete(mine.id)
+    else await NoteReactionsService.create({ card_note_id: noteId, user_id: meId, user_name: meName, kind })
+    setBusy(false)
+    onChanged()
+  }
+  const kinds = Object.keys(NoteReactionKind) as (keyof typeof NoteReactionKind)[]
+  return (
+    <div className={styles.bar}>
+      {kinds.map((k) => {
+        const by = reactions.filter((r) => r.kind === k)
+        const mine = by.some((r) => r.user_id === meId)
+        const label = `${optionLabel(NoteReactionKind[k])}${by.length ? `: ${by.map((r) => r.user_name).join('・')}` : ''}`
+        // 押されていない種類は、薄く小さく出す(並びが動かないよう、いつも全部出す)
+        return (
+          <Tooltip key={k} content={meId ? label : t('右上で、だれでログインするかを選ぶと、押せます', 'Choose who is signed in at the top right to react')} relationship="label">
+            <button type="button" className={mergeClasses(styles.chip, by.length > 0 && styles.used, mine && styles.mine)} disabled={busy || !meId} onClick={() => void toggle(k)}>
+              <span>{REACTION_ICON[k]}</span>
+              {by.length > 0 && <span>{by.length}</span>}
+            </button>
+          </Tooltip>
+        )
+      })}
+    </div>
+  )
+}
+
+const useReactionStyles = makeStyles({
+  bar: { display: 'flex', columnGap: '4px', rowGap: '4px', flexWrap: 'wrap', marginTop: '2px' },
+  chip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '3px',
+    padding: '0 6px',
+    minHeight: '20px',
+    borderRadius: tokens.borderRadiusCircular,
+    border: `1px solid transparent`,
+    backgroundColor: 'transparent',
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+    opacity: 0.45,
+    cursor: 'pointer',
+    ':hover': { opacity: 1, backgroundColor: tokens.colorNeutralBackground1Hover },
+    ':disabled': { cursor: 'default' },
+  },
+  used: { opacity: 1, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
+  mine: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
+})

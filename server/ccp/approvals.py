@@ -352,4 +352,8 @@ async def reset(request: Request):
         return fail(400, "delivery_card_id が要ります")
     async with db(write=True) as conn:
         n = await _stale_live_requests(conn, card_id, _now())
+        # 制作の依頼も、企画が変わったので古い版にする(制作のページに「企画が変わりました」と出す。PR2)
+        from .production import stale_live
+
+        await stale_live(conn, card_id)
     return ok({"stale": n})

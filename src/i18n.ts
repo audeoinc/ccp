@@ -69,6 +69,17 @@ export function priceText(v?: number, market: Market = 'JP'): string {
 
 // 選択肢のラベル(日本語)の、英語表記。値は変えずに、表示だけを切り替える
 const OPTION_EN: Record<string, string> = {
+  // やり取りのリアクション・制作の依頼の状態(PR5・PR6)
+  了解: 'OK',
+  見ています: 'Looking',
+  対応します: 'On it',
+  ありがとう: 'Thanks',
+  確認したい: 'Question',
+  依頼済み: 'Requested',
+  制作している: 'In production',
+  制作が終わった: 'Production done',
+  配信のしくみに送った: 'Sent to delivery system',
+  古い版: 'Outdated',
   // ステータス
   未起案: 'Not started',
   検討中: 'In review',

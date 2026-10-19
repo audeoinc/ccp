@@ -98,6 +98,8 @@ interface Props {
   stockModel?: StockModel
   /** アラートの画面を開く(その商品のアラートを選んで。配信カードは閉じる) */
   onOpenAlerts?: (productId?: string) => void
+  /** 制作のページを開く(プロセスのペインの「制作の依頼」の札から。PR4) */
+  onOpenProduction?: (cardId: string) => void
   /** 「保存して次へ」で開く配信(同じ週、または週の確認の項目で選んだ配信の、次の 1 本)。null は次がない。undefined はボタンを出さない */
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
@@ -413,7 +415,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -1527,6 +1529,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                 </div>
                 <ProcessPane
                   card={card}
+                  onOpenProduction={onOpenProduction}
                   status={form.status}
                   canReview={canReview}
                   locked={lockedWeeks.length > 0}

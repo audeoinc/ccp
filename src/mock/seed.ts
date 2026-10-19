@@ -600,3 +600,7 @@ export const approvalReviewers: Row[] = [
 
 // ---- 通知の送る箱(U5)。見本はなし(承認の操作で、撮影用の身代わりが積む)
 export const notifications: Row[] = []
+
+// ---- 制作の依頼・やり取りのリアクション(PR2・PR6)。見本はなし(制作のページの操作で積む)
+export const productionRequests: Row[] = []
+export const noteReactions: Row[] = []

@@ -31,6 +31,8 @@ export interface CardNote {
   due?: string
   /** task: 生まれた元のメモ(質問)の ID */
   source_note?: string
+  /** やり取りが、どの段階の話か(PR6。plan = 何を配信するか(計画の配信カード)/ production = どう見せるか(制作のページ))。空は種類から決める(質問 = 制作、コメント = 企画) */
+  stage?: 'plan' | 'production'
   created_on?: string
 }
 

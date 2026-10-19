@@ -6,6 +6,7 @@ import type { ApprovalRequest } from '../models/approvalRequests'
 import type { ApprovalReviewer } from '../models/approvalReviewers'
 import { tables } from './db'
 import { guid, type Row } from './seed'
+import { staleProduction } from './production'
 
 type Result<T> = { success: boolean; data?: T; error?: { message: string } }
 const ng = <T,>(message: string): Result<T> => ({ success: false, error: { message } })
@@ -160,6 +161,7 @@ export const ApprovalsService = {
   async reset(input: { delivery_card_id: string }): Promise<Result<{ stale: number }>> {
     const before = tables.ApprovalRequestsService.filter((r) => r.delivery_card_id === input.delivery_card_id && LIVE.has(String(r.status))).length
     staleLive(input.delivery_card_id)
+    staleProduction(input.delivery_card_id)
     return { success: true, data: { stale: before } }
   },
 }

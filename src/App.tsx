@@ -33,6 +33,7 @@ import {
   ArrowUploadRegular,
   DismissRegular,
   CalendarLtrRegular,
+  PaintBrushRegular,
   TableRegular,
   DocumentPdfRegular,
   HistoryRegular,
@@ -89,6 +90,8 @@ import { PeopleManager } from './PeopleManager'
 import { openPeopleManager, usePeople } from './people'
 import { InboxButton } from './InboxButton'
 import { useApprovalInbox } from './useApprovalInbox'
+import { productionColor, productionLabel, productionView, useProductionRequests } from './useProductionRequests'
+import { ProductionPage } from './ProductionPage'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
@@ -482,7 +485,10 @@ function App() {
   const [check, setCheck] = useState<{ week: string; key: CheckKey } | null>(null)
   // 開いている画面: カレンダー / 配信結果(振り返り)
   // アラートは、計画・結果とは別の画面(ヘッダーの「アラート」から開く)
-  const [page, setPage] = useState<'calendar' | 'results' | 'alerts'>('calendar')
+  // 計画(表)・制作(中。PR4)・結果(裏)。同じカレンダー(配信日)を起点に行き来する
+  const [page, setPage] = useState<'calendar' | 'production' | 'results' | 'alerts'>('calendar')
+  // 開いている制作のページ(配信の id)
+  const [productionOpen, setProductionOpen] = useState<string | null>(null)
   // 結果の面で、詳しい結果(フロート)を開いている配信
   const [resultDetail, setResultDetail] = useState<string | null>(null)
   // 計画の面で、配信カードの上に重ねて見ている結果(閉じると、配信カードに戻る)
@@ -497,6 +503,26 @@ function App() {
   // ユーザー・承認グループと、依頼中の承認(ヘッダーの「自分宛ての依頼」と、週の帯のまとめての操作に使う。U5・U6)
   const people = usePeople()
   const inbox = useApprovalInbox(scopedCards)
+  // 制作の依頼(配信ごとの最新の版)。制作の面の箱の色・締め切りの印に使う(PR4)
+  const production = useProductionRequests(cards)
+  const onProduction = page === 'production'
+  // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
+  const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
+  const productionTone = (c: DeliveryCard) => {
+    const color = productionColor(productionView(c, production.latest.get(c.id)))
+    return { line: color, background: `color-mix(in srgb, ${color} 14%, var(--colorNeutralBackground1))` }
+  }
+  // 制作の面の箱の 2 行目: 状態と締め切り(締め切りを過ぎた・近いものに印)
+  const productionMeta = (c: DeliveryCard) => {
+    const req = production.latest.get(c.id)
+    const v = productionView(c, req)
+    const due = (req?.production_due ?? c.production_due ?? '').slice(0, 10)
+    const today = new Date().toISOString().slice(0, 10)
+    // 締め切りを過ぎた印は、まだ配信していない(配信日が今日以降の)ものだけ(過去の配信に全部付くと、見分けがつかないため)
+    const upcoming = (c.scheduled_at ?? '').slice(0, 10) >= today
+    const late = upcoming && !!due && due < today && (v === 'draft' || v === 'requested' || v === 'in_progress')
+    return `${productionLabel(v)}${due ? ` ・ ${t('締切', 'Due')} ${due.slice(5).replace('-', '/')}${late ? t('(過ぎた)', ' (late)') : ''}` : ''}`
+  }
   // 配信に入っている担当(企画・制作)の名前。担当の絞り込みと、配信カードの担当の候補に使う
   const owners = useMemo(
     () => [...new Set([...cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]), ...[...noteParties.values()].flatMap((x) => [...x])].filter((o): o is string => !!o))].sort(),
@@ -533,7 +559,7 @@ function App() {
   const [alertsFocus, setAlertsFocus] = useState<string | undefined>(undefined)
   // この週の承認の履歴(「この画面 ▾」から開く)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const showFace = (p: 'calendar' | 'results' | 'alerts') => {
+  const showFace = (p: 'calendar' | 'production' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
     if (p === 'calendar' && view === 'compare') setView('month')
@@ -1075,6 +1101,7 @@ function App() {
           {(
             [
               ['calendar', t('計画', 'Plan'), <CalendarLtrRegular key="i" />],
+              ['production', t('制作', 'Production'), <PaintBrushRegular key="i" />],
               ['results', t('結果', 'Results'), <DataBarVerticalRegular key="i" />],
             ] as const
           ).map(([p, label, icon]) => (
@@ -1467,10 +1494,12 @@ function App() {
             ) : view === 'list' ? (
               <>
               {monthBar}
-              <ListView rows={monthRows} columns={columns} onSelect={setSelectedId} cardProducts={cardProducts} products={products} heroes={heroes} />
+              <ListView rows={monthRows} columns={columns} onSelect={openCard} cardProducts={cardProducts} products={products} heroes={heroes} />
               </>
             ) : view === 'week' ? (
               <>
+              {/* 承認のバーと週の振り返りは、計画の面だけ(制作の面では、制作の状態を箱の色で見る) */}
+              {!onProduction && (
               <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={requestable.length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
                 statusCounts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: weekCards.filter((c) => statusView(c.status) === o.value).length }))}
                 toFix={checklist.filter((i) => !i.ok).length}
@@ -1488,6 +1517,8 @@ function App() {
                   />
                 }
               />
+              )}
+              {!onProduction && (
               <WeekRetro
                 mode="plan"
                 text={prevWeek?.retro ?? ''}
@@ -1496,6 +1527,7 @@ function App() {
                   goTo('week', new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7))
                 }}
               />
+              )}
               {printingWeek && (
                 // 週の資料(W7)。印刷のあいだだけ見える(index.css の「週の資料の印刷」)。Portal なので、画面の並びには影響しない
                 <Portal>
@@ -1515,7 +1547,7 @@ function App() {
                   </div>
                 </Portal>
               )}
-              <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} visibleIds={weekVisibleIds} />
+              {!onProduction && <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} visibleIds={weekVisibleIds} />}
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
@@ -1530,7 +1562,7 @@ function App() {
                 dueSoon={dueSoon}
                 focus={focus}
                 alertKinds={alertKinds}
-                onSelect={setSelectedId}
+                onSelect={openCard}
                 // 下書きモードでは、日の「＋」で、その日に下書きを足す
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
                 // 中身のない配信(週の枠)は、その場で配信名・種類を入れられる形で出す(W14)
@@ -1541,7 +1573,18 @@ function App() {
             ) : (
               <>
               {monthBar}
-              <Calendar month={month} cards={filtered} dueSoon={dueSoon} alertKinds={alertKinds} onSelect={setSelectedId} onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))} onOpenWeek={(d) => goTo('week', d)} />
+              <Calendar
+                month={month}
+                cards={filtered}
+                dueSoon={dueSoon}
+                alertKinds={alertKinds}
+                onSelect={openCard}
+                onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
+                onOpenWeek={(d) => goTo('week', d)}
+                // 制作の面: 箱の色は制作の状態、2 行目は状態と締め切り(PR4)
+                chipTone={onProduction ? productionTone : undefined}
+                renderMeta={onProduction ? productionMeta : undefined}
+              />
               </>
             )}
           </>
@@ -1608,6 +1651,8 @@ function App() {
             setAlertsFocus(productId)
             setAlertsOpen(true)
           }}
+          // 制作のページは、配信カードの上に重ねて開く(PR4)
+          onOpenProduction={setProductionOpen}
           next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}
           onNext={() => {
             if (!nextOf) return
@@ -1620,6 +1665,22 @@ function App() {
       <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
         <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} />
+      )}
+      {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
+      {productionOpen && cards.find((c) => c.id === productionOpen) && (
+        <ProductionPage
+          card={cards.find((c) => c.id === productionOpen)!}
+          productIds={cardProducts.get(productionOpen) ?? []}
+          products={products}
+          heroes={heroes}
+          people={owners}
+          onClose={() => setProductionOpen(null)}
+          onOpenCard={(id) => {
+            setProductionOpen(null)
+            setSelectedId(id)
+          }}
+          onChanged={() => void production.reload()}
+        />
       )}
     </>
   )

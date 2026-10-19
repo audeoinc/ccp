@@ -12,6 +12,11 @@ import { TasksPanel } from './TasksPanel'
 import { CommentsPanel } from './CommentsPanel'
 import { LockMark } from './LockMark'
 import { MarkdownLite } from './MarkdownLite'
+import { isThreadRoot, stageOf } from './notesStage'
+import { ProductionRequestsService } from './data/productionRequests'
+import type { ProductionRequest } from './models/productionRequests'
+import { productionColor, productionLabel, productionView } from './useProductionRequests'
+import { statusRank } from './status'
 import { statusColor, statusLabel } from './status'
 import { useT } from './i18n'
 
@@ -30,6 +35,9 @@ const useStyles = makeStyles({
   notes: { display: 'grid', rowGap: '6px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   notesHead: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   notesBody: { padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
+  // 制作の依頼の札(状態と承認の下)
+  production: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '8px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  productionText: { display: 'grid', flexGrow: 1, minWidth: 0 },
   // 閉じた帯(状態を縦書きで。押すと開く)
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '10px', paddingTop: '10px', minHeight: 0, height: '100%', border: 'none', backgroundColor: tokens.colorNeutralBackground2, cursor: 'pointer', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
   railStatus: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, letterSpacing: '0.05em' },
@@ -63,12 +71,15 @@ interface Props {
   cardName: string
   productIds: string[]
   products: Product[]
+  /** 制作のページを開く(「制作の依頼」の札。承認済みの配信だけ。PR4) */
+  onOpenProduction?: (cardId: string) => void
   /** 外(左の配信情報の「制作への引き継ぎ」)から、タブを開く頼み。seq が変わるたびに開く */
   tabRequest?: { tab: TalkTab; seq: number }
 }
 
 /** やり取りのスレッドの元(以前の質問とレビューのコメント)か。CommentsPanel と同じ */
-const isRoot = (n: CardNote) => n.kind === 'comment' || (n.kind ?? 'question') === 'question'
+// 計画の配信カードでは、企画の段階のやり取りだけを数える(制作の段階の話は、制作のページ。PR6)
+const isRoot = (n: CardNote) => isThreadRoot(n) && stageOf(n) === 'plan'
 
 /**
  * 配信カードの右端の「プロセス」のペイン(2026-10-17。利用者と決めた)。コンテンツを「作る」(左・中・プレビュー・商品情報)と、配信を「進める」を分ける。
@@ -135,6 +146,7 @@ export function ProcessPane(props: Props) {
           </>
         )}
       </div>
+      {props.card && props.onOpenProduction && statusRank(props.card.status) >= statusRank('approved') && <ProductionChip card={props.card} onOpen={props.onOpenProduction} />}
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TalkTab)}>
         <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}`}</Tab>
         <Tab value="threads">{`${t('やり取り', 'Conversation')}${count(openThreads)}`}</Tab>
@@ -174,6 +186,7 @@ export function ProcessPane(props: Props) {
         {tab === 'threads' && (
           <CommentsPanel
             cardId={cardId}
+            stage="plan"
             productIds={props.productIds}
             products={props.products}
             people={props.people}
@@ -233,5 +246,38 @@ export function ProcessRail({ card, status, onOpen }: { card?: DeliveryCard; sta
         </Badge>
       )}
     </button>
+  )
+}
+
+/**
+ * 「制作の依頼」の札(バックログ PR4)。承認済みの配信で、制作の状態(いま、だれの番か)を出し、押すと制作のページを開く。
+ * 承認のあとの「どう見せるか」のやり取りは、制作のページで行う(docs/PRODUCTION.md)
+ */
+function ProductionChip({ card, onOpen }: { card: DeliveryCard; onOpen: (cardId: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    void ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${card.id}'` }).then((r) => {
+      if (!alive || !r.success) return
+      setReq([...(r.data ?? [])].sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0))[0])
+    })
+    return () => {
+      alive = false
+    }
+  }, [card.id, card.status])
+  const v = productionView(card, req)
+  return (
+    <div className={s.production}>
+      <span className={s.dot} style={{ backgroundColor: productionColor(v) }} />
+      <span className={s.productionText}>
+        <span className={s.head}>{t('制作の依頼', 'Production')}</span>
+        <span className={s.note}>{productionLabel(v)}</span>
+      </span>
+      <Button size="small" onClick={() => onOpen(card.id)}>
+        {t('制作のページ', 'Production page')}
+      </Button>
+    </div>
   )
 }

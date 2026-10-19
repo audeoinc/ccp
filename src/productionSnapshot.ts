@@ -1,0 +1,206 @@
+// 制作の依頼の写し(バックログ PR2・PR3。docs/PRODUCTION.md)。
+// 「この内容で制作に依頼する」を押した時点の配信の中身を固めて保存し、制作のページはそれを見る(あとで配信カードを変えても、黙って変わらない)。
+// 依頼する前(下書き)は、いまの配信カードの中身から同じ形を作って見せる。
+// コピーしやすい行(テキスト・商品・リンク先)と、プレビューの HTML の書き出しも、ここにまとめる(React を使わない)
+import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
+import { SOURCE_MANUAL, type Item } from './items'
+import { campaignSlug, defaultUtm, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { parsePushLink } from './pushLink'
+import { CHANNEL_PUSH } from './status'
+import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
+import { priceText, tr } from './i18n'
+
+/** 写しに入れる配信カードの列(制作に要るものだけ。AI の案・理由は入れない) */
+const CARD_KEYS = [
+  'id',
+  'name',
+  'scheduled_at',
+  'country',
+  'channel',
+  'department',
+  'status',
+  'email_template',
+  'layout_key',
+  'theme',
+  'headline',
+  'copy',
+  'section_titles',
+  'section_copies',
+  'links',
+  'push_link',
+  'push_title',
+  'push_body',
+  'audience',
+  'hero_image_id',
+] as const satisfies readonly (keyof DeliveryCard)[]
+
+export interface Snapshot {
+  v: 1
+  /** 写しを作った日時 */
+  takenAt: string
+  card: Pick<DeliveryCard, (typeof CARD_KEYS)[number]>
+  /** 掲載商品(メールの並び順) */
+  productIds: string[]
+  /** 掲載商品の、その時の中身(あとで商品マスタが変わっても、依頼した時の名前・価格で見られるように) */
+  products: Product[]
+  hero: HeroImage | null
+}
+
+export function buildSnapshot(card: DeliveryCard, productIds: string[], products: Product[], heroes: HeroImage[]): Snapshot {
+  const picked = Object.fromEntries(CARD_KEYS.map((k) => [k, card[k]])) as Snapshot['card']
+  const used = new Set(productIds)
+  return {
+    v: 1,
+    takenAt: new Date().toISOString(),
+    card: picked,
+    productIds,
+    products: products.filter((p) => used.has(p.id)),
+    hero: heroes.find((h) => h.id === card.hero_image_id) ?? null,
+  }
+}
+
+export function parseSnapshot(json?: string | null): Snapshot | null {
+  if (!json) return null
+  try {
+    const v = JSON.parse(json) as Snapshot
+    return v && v.v === 1 && v.card ? v : null
+  } catch {
+    return null
+  }
+}
+
+const isPushCard = (s: Snapshot) => s.card.channel === CHANNEL_PUSH
+export const templateOf = (s: Snapshot): EmailTemplateId => (s.card.layout_key || (isPushCard(s) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(s.card.email_template))) as EmailTemplateId
+const items = (s: Snapshot): Item[] => s.productIds.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
+const parseCopies = (v?: string): string[] => {
+  if (!v) return []
+  try {
+    const a = JSON.parse(v)
+    if (Array.isArray(a)) return a.map(String)
+  } catch {
+    // JSON でなければ、改行区切りとして読む
+  }
+  return v.split('\n')
+}
+
+export interface CopyRow {
+  label: string
+  value: string
+}
+
+/** テキスト(件名・ヘッドライン・コピー・セクションの見出しとコピー。アプリは通知のタイトル・本文) */
+export function textRows(s: Snapshot): CopyRow[] {
+  const c = s.card
+  const rows: CopyRow[] = []
+  if (isPushCard(s)) {
+    rows.push({ label: tr('通知のタイトル', 'Notification title'), value: c.push_title ?? '' }, { label: tr('通知の本文', 'Notification body'), value: c.push_body ?? '' })
+  } else {
+    rows.push({ label: tr('件名', 'Subject'), value: c.name ?? '' })
+  }
+  rows.push({ label: tr('ヘッドライン', 'Headline'), value: c.headline ?? '' }, { label: tr('コピー', 'Copy'), value: c.copy ?? '' })
+  const titles = (c.section_titles ?? '').split('\n')
+  const copies = parseCopies(c.section_copies)
+  sectionsOf(templateOf(s)).forEach((sec, i) => {
+    if (titles[i]?.trim()) rows.push({ label: tr(`${sec.label} の見出し`, `${sec.label} heading`), value: titles[i] })
+    if (copies[i]?.trim()) rows.push({ label: tr(`${sec.label} のコピー`, `${sec.label} copy`), value: copies[i] })
+  })
+  return rows.filter((r) => r.value.trim())
+}
+
+const campaignOf = (s: Snapshot) => campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? '')
+const utmOf = (s: Snapshot) => {
+  const links = parseLinks(s.card.links)
+  return { ...defaultUtm(campaignOf(s)), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
+}
+
+export interface ProductRow {
+  section: string
+  product: Product
+  price: string
+  /** 商品ページの URL(計測用のパラメーター付き)。アプリは開く画面 */
+  url: string
+}
+
+/** 選定された商品(セクションごと、メールの並び順) */
+export function productRows(s: Snapshot): ProductRow[] {
+  const sections = sectionsOf(templateOf(s))
+  const utm = utmOf(s)
+  return s.productIds.flatMap((pid, i) => {
+    const product = s.products.find((p) => p.id === pid)
+    if (!product) return []
+    const sec = sections.find((x) => {
+      const [a, b] = sectionRange(sections, x, s.productIds.length)
+      return i >= a && i < b
+    })
+    const url = isPushCard(s) ? (product.product_code ? `data: ${fcmText({ kind: 'product', value: product.product_code }, campaignOf(s))}` : '') : withUtm(productUrl(product), utm)
+    return [{ section: sec?.label ?? '', product, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
+  })
+}
+
+/** リンク先(場所ごとの URL。アプリは開く画面) */
+export function linkRows(s: Snapshot): CopyRow[] {
+  const links = parseLinks(s.card.links)
+  const utm = utmOf(s)
+  const rows = linkSlots(templateOf(s), items(s), s.products, campaignOf(s)).map((slot) => {
+    if (isPushCard(s)) {
+      const d = fcmText(screenOf(links, slot), campaignOf(s))
+      return { label: slot.label, value: d ? `data: ${d}` : '' }
+    }
+    const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
+    return { label: slot.label, value: url ? withUtm(url, utm) : '' }
+  })
+  if (isPushCard(s)) {
+    const tap = parsePushLink(s.card.push_link)
+    if (tap) rows.unshift({ label: tr('通知を押したときに開く画面', 'Screen opened by the notification'), value: tap.kind === 'custom' ? (tap.url ?? '') : tap.kind })
+  }
+  return rows.filter((r) => r.value)
+}
+
+/** 項目をまとめてコピーするときの文字(見出し: 値 を 1 行ずつ) */
+export const rowsText = (rows: CopyRow[]) => rows.map((r) => `${r.label}: ${r.value}`).join('\n')
+
+// ---- プレビューの HTML の書き出し(下書き。プレビューと同じ見た目を、書式を直接書いた HTML にする)
+
+// 書き写す書式(見た目に効くものだけ。全部を書くと、重く読みにくくなる)
+const STYLE_KEYS = [
+  'display', 'position', 'box-sizing', 'width', 'max-width', 'min-width', 'height', 'max-height', 'margin', 'padding',
+  'border', 'border-radius', 'background-color', 'background-image', 'background-size', 'background-position',
+  'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-align',
+  'text-decoration', 'text-transform', 'white-space', 'vertical-align', 'object-fit', 'flex-direction', 'flex-wrap',
+  'justify-content', 'align-items', 'gap', 'grid-template-columns', 'grid-template-rows', 'opacity', 'overflow',
+] as const
+
+/**
+ * 画面に描いたプレビューの要素を、書式を直接書いた HTML の文字にする(下書き。メールの配信のしくみにそのまま入れる完成品ではない)。
+ * 画像の URL は、いまのサイトの URL を頭に付けた形にする(サイトの外で開くと、パスワードの関係で見えないことがある)
+ */
+export function previewHtml(root: HTMLElement, title: string): string {
+  const clone = root.cloneNode(true) as HTMLElement
+  const src = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
+  const dst = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))]
+  src.forEach((el, i) => {
+    const out = dst[i]
+    if (!out) return
+    const cs = getComputedStyle(el)
+    out.setAttribute('style', STYLE_KEYS.map((k) => `${k}:${cs.getPropertyValue(k)}`).filter((d) => !d.endsWith(':')).join(';'))
+    out.removeAttribute('class')
+    // 画面の操作のための印(編集・ドラッグ・リンクの場所の番号)は外す
+    for (const a of Array.from(out.attributes)) if (a.name.startsWith('data-') || a.name.startsWith('aria-') || a.name === 'draggable' || a.name === 'tabindex' || a.name === 'contenteditable') out.removeAttribute(a.name)
+    if (out instanceof HTMLImageElement && el instanceof HTMLImageElement) out.setAttribute('src', el.currentSrc || el.src)
+  })
+  clone.querySelectorAll('button, input, textarea, select, svg').forEach((n) => n.remove())
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `<!doctype html>\n<html lang="${navigator.language.startsWith('ja') ? 'ja' : 'en'}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)}</title>\n</head>\n<body style="margin:0;background:#ffffff">\n${clone.outerHTML}\n</body>\n</html>\n`
+}
+
+/** 文字をファイルとして保存させる(ブラウザのダウンロード) */
+export function downloadText(name: string, text: string, type = 'text/html') {
+  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
