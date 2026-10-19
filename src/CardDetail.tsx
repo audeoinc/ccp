@@ -33,6 +33,7 @@ import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
+import { FaceBadge } from './FaceBadge'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
@@ -1139,6 +1140,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
           )}
           <div className={styles.titleRow}>
             {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
+            <FaceBadge face="calendar" />
             <ChannelBadge channel={form.channel} />
             <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
             <Tooltip

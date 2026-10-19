@@ -14,6 +14,7 @@ import { ResultInsights, ResultKpis } from './ResultSummary'
 import { isPush, sentAtOf, type ResultRow } from './results'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
+import { FaceBadge } from './FaceBadge'
 
 const useStyles = makeStyles({
   // 配信カードと同じく、画面いっぱいのフロートで開く
@@ -92,6 +93,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
           </div>
           <div className={styles.head}>
             {/* チャネルの札は、計画の面の配信カードと同じく、題名の左に */}
+            <FaceBadge face="results" />
             <ChannelBadge channel={card.channel} />
             <h2 className={styles.title}>{card.name}</h2>
             <span className={styles.sub}>{sentText}</span>
@@ -105,7 +107,6 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               </span>
             </Tooltip>
             <span className={styles.headActions} data-noprint>
-              {onOpenCard && <CopyLinkButton />}
               <Tooltip
                 content={t('この結果を、レポートとして印刷します。印刷の画面で、送り先を「PDF に保存」にすると PDF になります', 'Prints these results as a report. Choose "Save as PDF" in the print dialog to get a PDF.')}
                 relationship="description"
@@ -126,6 +127,8 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
                   </Button>
                 </Tooltip>
               )}
+              {/* 開いたときに最初に選ばれて説明が出ないよう、ほかのボタンの後ろに置く */}
+              {onOpenCard && <CopyLinkButton />}
               <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
             </span>
           </div>

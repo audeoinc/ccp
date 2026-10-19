@@ -72,6 +72,7 @@ import { ResultsPage, type ResultsDataActions } from './ResultsPage'
 import { AiIcon } from './AiMark'
 import { AlertsPage } from './AlertsPage'
 import { AlertsFloat } from './AlertsFloat'
+import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
 import { dateOf, dateText, hasFloat, linkSearch, parseLink, type LinkState } from './deepLink'
 import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
@@ -150,19 +151,20 @@ const defaultCountry = String(countryOptions.find((o) => o.label === import.meta
 const initialFilters = (): Filters => ({ ...noFilter, country: loadPref<string>(COUNTRY_KEY, defaultCountry) })
 
 const useStyles = makeStyles({
+  // ヘッダーと面の帯を、ひとまとめで上に留める
+  headerWrap: { position: 'sticky', top: 0, zIndex: 10, boxShadow: tokens.shadow2 },
   header: {
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalXL}`,
     backgroundColor: tokens.colorNeutralBackground1,
     color: tokens.colorNeutralForeground1,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: tokens.shadow2,
   },
+  // 面の帯(X38): ヘッダーのすぐ下の細い帯。面の色の線と、ロゴ風の面の名前
+  faceBand: { display: 'flex', alignItems: 'center', columnGap: '10px', height: '22px', padding: `0 ${tokens.spacingHorizontalXL}`, borderBottomWidth: '3px', borderBottomStyle: 'solid' },
+  faceLogo: { fontSize: '12px', fontWeight: 800, letterSpacing: '0.18em', lineHeight: 1 },
+  faceHint: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   headerIcon: { color: tokens.colorBrandForeground1, flexShrink: 0 },
   title: {
     margin: 0,
@@ -513,6 +515,8 @@ function App() {
   // アラートは、計画・結果とは別の画面(ヘッダーの「アラート」から開く)
   // 計画(表)・制作(中。PR4)・結果(裏)。同じカレンダー(配信日)を起点に行き来する
   const [page, setPage] = useState<'calendar' | 'production' | 'results' | 'alerts'>(link.page ?? 'calendar')
+  // 面の色・帯に使う面(アラートは面ではないので、計画の色)
+  const face: Face = page === 'production' || page === 'results' ? page : 'calendar'
   // 開いている制作のページ(配信の id)
   const [productionOpen, setProductionOpen] = useState<string | null>(link.production ?? null)
   // 結果の面で、詳しい結果(フロート)を開いている配信
@@ -1174,6 +1178,7 @@ function App() {
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
+      <div className={styles.headerWrap}>
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
         <h1 className={styles.title}>{t('コンテンツプランナー', 'Contents Planner')}</h1>
@@ -1204,7 +1209,7 @@ function App() {
               ['results', t('結果', 'Results'), <DataBarVerticalRegular key="i" />],
             ] as const
           ).map(([p, label, icon]) => (
-            <button key={p} type="button" role="tab" aria-selected={page === p} className={mergeClasses(styles.faceBtn, page === p && styles.faceBtnOn)} onClick={() => showFace(p)}>
+            <button key={p} type="button" role="tab" aria-selected={page === p} className={mergeClasses(styles.faceBtn, page === p && styles.faceBtnOn)} style={page === p ? { color: FACE_COLOR[p] } : undefined} onClick={() => showFace(p)}>
               {icon}
               {label}
             </button>
@@ -1354,6 +1359,14 @@ function App() {
           </MenuPopover>
         </Menu>
       </header>
+      {/* 面の帯(X38): いまどの面にいるかを、面の色の線とロゴ風の名前で示す */}
+      <div className={styles.faceBand} style={{ backgroundColor: FACE_TINT[face], borderBottomColor: FACE_COLOR[face] }}>
+        <span className={styles.faceLogo} style={{ color: FACE_COLOR[face] }}>{FACE_LOGO[face]}</span>
+        <span className={styles.faceHint}>
+          {{ calendar: t('配信の企画と承認', 'Plan and approve deliveries'), production: t('制作の依頼と進み具合', 'Production requests and progress'), results: t('送ったあとの数字と振り返り', 'Numbers and lessons after sending') }[face]}
+        </span>
+      </div>
+      </div>
       <div className={mergeClasses(styles.container, styles.containerWide)}>
         {loading && <div className={styles.center}><Spinner /></div>}
         {error && (
