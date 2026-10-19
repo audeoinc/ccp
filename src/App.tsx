@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import {
   Badge,
   Button,
@@ -17,6 +17,9 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   Portal,
   SplitButton,
   Spinner,
@@ -43,6 +46,7 @@ import {
   DocumentBulletListRegular,
   PeopleTeamRegular,
   ChevronDownRegular,
+  FilterRegular,
   GlobeRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -106,7 +110,7 @@ import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusView } from './status'
 import { dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
-import { logEvent, myName, myUserId } from './history'
+import { logEvent, myName, myUserId, onMeChange } from './history'
 import { EventsService, type CardEvent } from './data/events'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
 import { WeekReport } from './WeekReport'
@@ -136,6 +140,8 @@ interface Filters {
   /** 担当(企画・制作のどちらかが、この名前の配信)。制作担当が、自分の配信だけを見る入り口にする(FLOWS.md の C-2) */
   person: string
 }
+// 担当の絞り込みの「自分」(ログインしている人の名前に読み替える。名前が変わっても、選び直さなくてよい)
+const ME_PERSON = '__me__'
 const noFilter: Filters = { country: '', channel: '', department: '', status: '', person: '' }
 // 国(X33): 表示の絞り込みではなく、ヘッダーで選ぶ「どの国の仕事をしているか」。人ごと(ブラウザごと)に覚える。
 // 初めて開いたときは、ビルドの設定(VITE_DEFAULT_COUNTRY。US)の国。'' = すべての国
@@ -217,6 +223,11 @@ const useStyles = makeStyles({
   },
   countryIcon: { fontSize: '16px', color: tokens.colorNeutralForeground2 },
   countryChevron: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
+  // 絞り込み(X37): 国と同じ形のボタン。絞っているときは色を付け、中身を文字で出す
+  filterBtnOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
+  filterBtnText: { maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis' },
+  filterPanel: { display: 'grid', rowGap: '8px', justifyItems: 'start', minWidth: '240px' },
+  filterPanelHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
   // 結果の面だけの操作(まとめ方・書き出し・取り込み)を、共通のツールバーのこの場所に差し込む
   toolbarSlot: { display: 'contents' },
   container: {
@@ -454,6 +465,9 @@ function App() {
     setFilters((f) => ({ ...f, country: v }))
     savePref(COUNTRY_KEY, v)
   }
+  // 右上でログインしている人の名前(担当の絞り込みの「自分」に使う。切り替えたら、絞り込みも追いかける)
+  const me = useSyncExternalStore(onMeChange, myName)
+  const personName = filters.person === ME_PERSON ? me : filters.person
   const [selectedId, setSelectedId] = useState<string | null>(link.card ?? null)
   // 配信カードで開いている工程のタブ(URL に持たせる)
   const [cardTab, setCardTab] = useState<string | undefined>(link.tab)
@@ -759,9 +773,9 @@ function App() {
         match(filters.channel, c.channel) &&
         match(filters.department, c.department) &&
         (page === 'results' || match(filters.status, statusView(c.status))) &&
-        (filters.person === '' || c.owner?.trim() === filters.person || c.production_owner?.trim() === filters.person || !!noteParties.get(c.id)?.has(filters.person)),
+        (filters.person === '' || (!!personName && (c.owner?.trim() === personName || c.production_owner?.trim() === personName || !!noteParties.get(c.id)?.has(personName)))),
     )
-  }, [scopedCards, filters, noteParties, page])
+  }, [scopedCards, filters, noteParties, page, personName])
 
   // 表示中の月の配信(一覧と CSV の対象)。締め切りの警告は、月をまたいで求める(カレンダーの前後の月の日付にも出す)
   const rows = useMemo(() => toRows(filtered, productCounts, questionCounts, taskCounts), [filtered, productCounts, questionCounts, taskCounts])
@@ -1132,7 +1146,19 @@ function App() {
     loadCustomTemplates().catch(() => undefined)
   }, [])
   // 国はヘッダーの設定なので、絞り込みの「クリア」の対象にしない
-  const filtering = filters.channel !== '' || filters.department !== '' || filters.status !== '' || filters.person !== ''
+  const filtering = filters.channel !== '' || filters.department !== '' || (page !== 'results' && filters.status !== '') || filters.person !== ''
+  // 担当の候補: いちばん上に「自分」(ログインしている人。Jira の Me と同じ)
+  const personOptions = [{ value: ME_PERSON, label: me ? t(`自分(${me})`, `Me (${me})`) : t('自分', 'Me') }, ...owners.map((o) => ({ value: o, label: o }))]
+  // ボタンに出す、いまの絞り込みの中身(例: メール・自分)
+  const optLabel = (opts: { value: string | number; label: string }[], v: string) => optionLabel(opts.find((o) => String(o.value) === v)?.label ?? v)
+  const filterSummary = [
+    filters.channel && optLabel(channelOptions, filters.channel),
+    filters.department && optLabel(departmentOptions, filters.department),
+    page !== 'results' && filters.status && optLabel(statusOptions, filters.status),
+    filters.person && (filters.person === ME_PERSON ? t('自分', 'Me') : filters.person),
+  ]
+    .filter(Boolean)
+    .join(t('・', ', '))
   // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
@@ -1184,6 +1210,27 @@ function App() {
             </button>
           ))}
         </div>
+        {/* 絞り込み(X37): 段を取らないよう、ヘッダーの 1 つのボタンにまとめる。絞っているときは、中身をボタンの文字に出す */}
+        <Popover positioning="below-start" trapFocus>
+          <PopoverTrigger disableButtonEnhancement>
+            <button type="button" className={mergeClasses(styles.countryBtn, filtering && styles.filterBtnOn)} aria-label={filtering ? t(`絞り込み: ${filterSummary}`, `Filters: ${filterSummary}`) : t('絞り込み', 'Filters')}>
+              <FilterRegular className={styles.countryIcon} />
+              <span className={styles.filterBtnText}>{filtering ? t(`絞り込み: ${filterSummary}`, `Filters: ${filterSummary}`) : t('絞り込み', 'Filters')}</span>
+              <ChevronDownRegular className={styles.countryChevron} />
+            </button>
+          </PopoverTrigger>
+          <PopoverSurface>
+            <div className={styles.filterPanel}>
+              <span className={styles.filterPanelHead}>{t('絞り込み', 'Filters')}</span>
+              <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
+              <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
+              {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
+              {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
+              <FilterSelect label={t('担当', 'Person')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
+              {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
+            </div>
+          </PopoverSurface>
+        </Popover>
         <span className={styles.headerSpacer} />
         {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
         <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
@@ -1335,14 +1382,6 @@ function App() {
             {/* アラートの画面は、期間・見せ方を使わないので、ツールバーを出さない */}
             {page !== 'alerts' && (
             <>
-            <div className={styles.filterRow}>
-              <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
-              <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
-              {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
-              {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
-              <FilterSelect label={t('担当', 'Person')} value={filters.person} options={owners.map((o) => ({ value: o, label: o }))} onChange={setFilter('person')} />
-              {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
-            </div>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
               <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel)}>

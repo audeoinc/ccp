@@ -446,6 +446,11 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 「リンクをコピー」は `src/CopyLinkButton.tsx`(`location.href` を写す)。配信カード・詳しい結果(結果の面から開いたときだけ)・アラート・制作のページ(承認プロセスの了承済み)の右上。
 - 面や見せ方を足すときは、`deepLink.ts` の `Page`・`LinkView` と、App の `linkState` / `onPop` にも足すこと。
 
+## 6.27 X37 絞り込みをヘッダーへ、担当に「自分」(2026-10-19、UI セッション)
+
+- 絞り込みの段(`filterRow`)はなくし、ヘッダーの面の切り替えの右に `Popover`(中は、これまでの `FilterSelect` の札を縦に並べたもの)。ボタンの文字は `filterSummary`。
+- 「自分」は `filters.person = '__me__'`(`ME_PERSON`)。App が `useSyncExternalStore(onMeChange, myName)` で右上の人の名前を持ち、`personName` に読み替えて絞る(右上で人を切り替えると、絞り込みも追いかける)。担当の列は、まだユーザーの id ではなく名前の文字なので、名前の一致で見る。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。
