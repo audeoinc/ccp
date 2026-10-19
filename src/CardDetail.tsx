@@ -32,6 +32,7 @@ import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { ChannelBadge } from './ChannelBadge'
+import { CopyLinkButton } from './CopyLinkButton'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
@@ -100,6 +101,10 @@ interface Props {
   onOpenAlerts?: (productId?: string) => void
   /** 制作のページを開く(プロセスのペインの「制作の依頼」の札から。PR4) */
   onOpenProduction?: (cardId: string) => void
+  /** 最初に開く工程のタブ(リンクから開いたとき。X36) */
+  initialTab?: string
+  /** 工程のタブが変わったとき(URL に持たせる) */
+  onTabChange?: (tab: string) => void
   /** 「保存して次へ」で開く配信(同じ週、または週の確認の項目で選んだ配信の、次の 1 本)。null は次がない。undefined はボタンを出さない */
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
@@ -415,7 +420,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -472,7 +477,8 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
   // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
   const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
   // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
-  const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(undefined)
+  // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
+  const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
   const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
@@ -1148,6 +1154,8 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                 {t('結果を見る', 'View results')}
               </Button>
             )}
+            {/* この配信カードを開くリンク(保存済みの配信だけ。X36) */}
+            {card && <CopyLinkButton />}
             {/* 取りやめ・削除(保存済みの配信だけ) */}
             {card && (
               <CardMenu
@@ -1402,6 +1410,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                 campaign={campaignSlug(form.name, form.scheduledAt)}
                 onLinksTab={setLinksTab}
                 onLinkFocus={setLinkFocus}
+                onTabChange={onTabChange}
               />
             </div>
 

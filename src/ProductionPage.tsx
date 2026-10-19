@@ -16,6 +16,7 @@ import { buildSnapshot, downloadText, linkRows, parseSnapshot, previewHtml, prod
 import { myName, myUserId, onMeChange } from './history'
 import { productImage, heroImage } from './images'
 import { locale, optionLabel, tr, useT } from './i18n'
+import { CopyLinkButton } from './CopyLinkButton'
 import { statusRank } from './status'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
@@ -211,6 +212,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
           <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(card.id)}>
             {t('企画を見る', 'Open the plan')}
           </Button>
+          <CopyLinkButton />
           <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
         </div>
         {requests === null ? (

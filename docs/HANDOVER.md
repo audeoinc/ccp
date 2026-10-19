@@ -438,6 +438,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **確かめた範囲**: 型・lint・ビルド・サーバーのテスト。撮影用の画面で、Production の面の月表示(箱の色と締め切り)、制作のページ(プレビュー・テキスト・リンク先・HTML の下書き)、「この内容で制作に依頼する」→「受け取った」まで。「制作が終わった」「配信のしくみに送る」・リアクション・企画のやり取りと制作のやり取りの分かれ方は、画面では未確認。本番では未確認。
 - **残っていること**: 週・一覧の制作の状態の色(いまは計画の色のまま)。「企画を見る」は、制作のページを閉じてから配信カードを開く(重ねない)。仕上がりの確認(PR7)。
 
+## 6.26 X36 画面の状態を URL に持たせる(2026-10-19、UI セッション)
+
+- 読み書きは `src/deepLink.ts`(`parseLink` / `linkSearch`)。App は、開いたときの URL(`link`)で状態を始め、状態から作った `search` が変わったら URL を書き換える(フロートを新しく開いたときは `pushState`、ほかは `replaceState`)。`popstate` で状態を戻す。
+- クエリだけを使う(パスは変えない)ので、Workbench の `/proxy/<ポート>/` の下でもサーバーの変更なしで動く。国は「すべての国」も `country=all` と書く(受け取った人の国の設定に左右されないように)。リンクの国はそのときだけで、`ccp.country` は書き換えない。
+- 配信カードのタブは、`ContentPane` の `onTabChange` → CardDetail の `onTabChange` → App の `cardTab`。リンクから開いたときは `initialTab` で最初の 1 回だけ開く。アラートの選んだ商品は `AlertsPage` の `onSelectProduct`。
+- 「リンクをコピー」は `src/CopyLinkButton.tsx`(`location.href` を写す)。配信カード・詳しい結果(結果の面から開いたときだけ)・アラート・制作のページ(承認プロセスの了承済み)の右上。
+- 面や見せ方を足すときは、`deepLink.ts` の `Page`・`LinkView` と、App の `linkState` / `onPop` にも足すこと。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

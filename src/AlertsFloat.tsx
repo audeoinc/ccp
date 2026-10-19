@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Button, Dialog, DialogSurface, makeStyles, tokens } from '@fluentui/react-components'
 import { AlertRegular, DismissRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
+import { CopyLinkButton } from './CopyLinkButton'
 
 const useStyles = makeStyles({
   // 配信カード・詳しい結果と同じ、全画面に近いフロート
@@ -30,7 +31,10 @@ export function AlertsFloat({ open, onClose, children }: Props) {
         <div className={s.head}>
           <AlertRegular fontSize={20} />
           <h2 className={s.title}>{t('アラート', 'Alerts')}</h2>
-          <Button className={s.close} appearance="subtle" icon={<DismissRegular />} aria-label={t('アラートを閉じる', 'Close alerts')} onClick={onClose} />
+          <span className={s.close}>
+            <CopyLinkButton />
+          </span>
+          <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('アラートを閉じる', 'Close alerts')} onClick={onClose} />
         </div>
         {children}
       </DialogSurface>

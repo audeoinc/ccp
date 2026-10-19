@@ -94,6 +94,8 @@ interface Props {
   onLinks: (l: Links) => void
   /** リンク先のタブを開いた・閉じた(プレビューに、リンクの場所の番号を出すため。W12) */
   onLinksTab?: (open: boolean) => void
+  /** 開いているタブが変わったとき(URL に持たせる。X36) */
+  onTabChange?: (tab: TopTab) => void
   /** リンク先の設定の欄で選んでいる場所(プレビューで光らせる。W12) */
   onLinkFocus?: (key: string | null) => void
   /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
@@ -1103,7 +1105,10 @@ export function ContentPane(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabRequest?.seq])
   // リンク先のタブを開いている間だけ、プレビューにリンクの場所の番号を出す(タブを離れたら、選んでいた欄も外す)
-  const { onLinksTab, onLinkFocus } = props
+  const { onLinksTab, onLinkFocus, onTabChange } = props
+  useEffect(() => {
+    onTabChange?.(tab)
+  }, [tab, onTabChange])
   useEffect(() => {
     onLinksTab?.(tab === 'links')
     if (tab !== 'links') onLinkFocus?.(null)

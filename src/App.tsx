@@ -68,6 +68,7 @@ import { ResultsPage, type ResultsDataActions } from './ResultsPage'
 import { AiIcon } from './AiMark'
 import { AlertsPage } from './AlertsPage'
 import { AlertsFloat } from './AlertsFloat'
+import { dateOf, dateText, hasFloat, linkSearch, parseLink, type LinkState } from './deepLink'
 import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
@@ -379,6 +380,8 @@ function bqStockTime(r: BqSyncResult): string | undefined {
 }
 
 function App() {
+  // 開いたときの URL(リンクから開いたら、その画面で始める。X36)
+  const [link] = useState(() => parseLink(window.location.search))
   const styles = useStyles()
   const t = useT()
   const lang = useLang()
@@ -437,14 +440,23 @@ function App() {
         })),
       )
   }, [])
-  const [month, setMonth] = useState<Date | null>(null)
-  const [filters, setFilters] = useState<Filters>(initialFilters)
+  // リンクの日付があれば、その月(週なら、その週の真ん中の日の月)で始める。なければ、読み込んだあとに決める
+  const [month, setMonth] = useState<Date | null>(() => {
+    const d = dateOf(link.date)
+    if (!d) return null
+    const mid = link.view === 'week' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3) : d
+    return new Date(mid.getFullYear(), mid.getMonth(), 1)
+  })
+  // リンクの国は、そのときだけ合わせる(ふだんの国の設定は書き換えない)
+  const [filters, setFilters] = useState<Filters>(() => ({ ...initialFilters(), ...(link.country !== undefined ? { country: link.country } : {}) }))
   // 国を変える(ヘッダー)。覚えておき、次に開いたときも同じ国で始める
   const setCountry = (v: string) => {
     setFilters((f) => ({ ...f, country: v }))
     savePref(COUNTRY_KEY, v)
   }
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(link.card ?? null)
+  // 配信カードで開いている工程のタブ(URL に持たせる)
+  const [cardTab, setCardTab] = useState<string | undefined>(link.tab)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
   // まとめて作る作業画面の、まだ保存していない案を、配信カードで開いているとき(保存すると新規作成になる)
@@ -455,7 +467,7 @@ function App() {
   const [cardProducts, setCardProducts] = useState<Map<string, string[]>>(new Map())
   const productCounts = useMemo(() => new Map([...cardProducts].map(([k, v]) => [k, v.length])), [cardProducts])
   // 週の表示の、週の初め(日曜日)
-  const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(new Date()))
+  const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(dateOf(link.date) ?? new Date()))
   // 配信カードごとの、質問の未解決の数(一覧の列)
   const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
   // 配信カードごとの、未解決の質問の宛先・質問した人と、未完了のタスクの担当(絞り込みの「担当」で、その人がかかわる配信も出すため)
@@ -486,11 +498,11 @@ function App() {
   // 開いている画面: カレンダー / 配信結果(振り返り)
   // アラートは、計画・結果とは別の画面(ヘッダーの「アラート」から開く)
   // 計画(表)・制作(中。PR4)・結果(裏)。同じカレンダー(配信日)を起点に行き来する
-  const [page, setPage] = useState<'calendar' | 'production' | 'results' | 'alerts'>('calendar')
+  const [page, setPage] = useState<'calendar' | 'production' | 'results' | 'alerts'>(link.page ?? 'calendar')
   // 開いている制作のページ(配信の id)
-  const [productionOpen, setProductionOpen] = useState<string | null>(null)
+  const [productionOpen, setProductionOpen] = useState<string | null>(link.production ?? null)
   // 結果の面で、詳しい結果(フロート)を開いている配信
-  const [resultDetail, setResultDetail] = useState<string | null>(null)
+  const [resultDetail, setResultDetail] = useState<string | null>(link.result ?? null)
   // 計画の面で、配信カードの上に重ねて見ている結果(閉じると、配信カードに戻る)
   const [peekResult, setPeekResult] = useState<string | null>(null)
   // 結果の面の操作を差し込む、ツールバーの場所
@@ -554,9 +566,9 @@ function App() {
     setSelectedId(cardId)
   }
   // アラートは、面ではなく、上に重ねて開くフロート(閉じれば、見ていた画面に戻る)
-  const [alertsOpen, setAlertsOpen] = useState(false)
+  const [alertsOpen, setAlertsOpen] = useState(link.alerts !== undefined)
   // アラートのフロートを開いたときに選んでおく商品(配信カードの「アラートの画面で詳しく」から)
-  const [alertsFocus, setAlertsFocus] = useState<string | undefined>(undefined)
+  const [alertsFocus, setAlertsFocus] = useState<string | undefined>(link.alerts || undefined)
   // この週の承認の履歴(「この画面 ▾」から開く)
   const [historyOpen, setHistoryOpen] = useState(false)
   const showFace = (p: 'calendar' | 'production' | 'results' | 'alerts') => {
@@ -568,6 +580,8 @@ function App() {
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   // 最初は計画の面なので、「比べる」を覚えていても、月で始める
   const [view, setView] = useState<View>(() => {
+    // リンクの見せ方を優先する(「比べる」は結果の面だけ)
+    if (link.view && (link.view !== 'compare' || link.page === 'results')) return link.view
     const v = loadPref<View>(VIEW_KEY, 'month')
     return v === 'compare' ? 'month' : v
   })
@@ -985,6 +999,65 @@ function App() {
     if (month) setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
   }
   /** ミニカレンダーで選んだ所へ移る(W11)。週は、その日を含む週。月の表示も、その週の真ん中の月に合わせる(shift と同じ) */
+  // ---- 画面の状態を URL に持たせる(X36)。状態が変わったら URL を書き換え、ブラウザの「戻る」「進む」で状態を戻す
+  const linkState: LinkState = {
+    page,
+    view,
+    date: view === 'week' ? dateText(weekStart) : month ? dateText(month) : undefined,
+    country: filters.country,
+    card: selectedId ?? undefined,
+    tab: selectedId ? cardTab : undefined,
+    result: page === 'results' ? (resultDetail ?? undefined) : undefined,
+    production: productionOpen ?? undefined,
+    alerts: alertsOpen ? (alertsFocus ?? '') : undefined,
+  }
+  const search = linkSearch(linkState)
+  const floatKey = (l: Partial<LinkState>) => [l.card, l.result, l.production, l.alerts].join('|')
+  const currentFloat = floatKey(linkState)
+  useEffect(() => {
+    if (search === window.location.search) return
+    const url = `${window.location.pathname}${search}${window.location.hash}`
+    // フロートを新しく開いた(別のものに替えた)ときは履歴に積み、「戻る」で閉じられるようにする。ほかは書き換えるだけ
+    const before = parseLink(window.location.search)
+    if (hasFloat(linkState) && floatKey(before) !== currentFloat) window.history.pushState(null, '', url)
+    else window.history.replaceState(null, '', url)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+  useEffect(() => {
+    const onPop = () => {
+      const l = parseLink(window.location.search)
+      setPage(l.page ?? 'calendar')
+      if (l.view) setView(l.view)
+      const d = dateOf(l.date)
+      if (d) {
+        const mid = l.view === 'week' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3) : d
+        setWeekStart(sundayOf(d))
+        setMonth(new Date(mid.getFullYear(), mid.getMonth(), 1))
+      }
+      if (l.country !== undefined) setFilters((f) => ({ ...f, country: l.country! }))
+      setSelectedId(l.card ?? null)
+      setCreating(null)
+      setDraftOpen(null)
+      setResultDetail(l.result ?? null)
+      setProductionOpen(l.production ?? null)
+      setAlertsOpen(l.alerts !== undefined)
+      setAlertsFocus(l.alerts || undefined)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  // リンクの配信が見つからない(消した・国が違うなど、ほかの環境のリンク)ときは、知らせて、ふつうの画面で始める
+  const [linkChecked, setLinkChecked] = useState(false)
+  if (!linkChecked && !loading && cards.length > 0) {
+    setLinkChecked(true)
+    const missing = [link.card, link.result, link.production].filter((id): id is string => !!id && !cards.some((c) => c.id === id))
+    if (missing.length > 0) {
+      if (link.card && missing.includes(link.card)) setSelectedId(null)
+      if (link.result && missing.includes(link.result)) setResultDetail(null)
+      if (link.production && missing.includes(link.production)) setProductionOpen(null)
+      setBqNotice({ intent: 'warning', text: tr('リンクの配信が見つかりません(消された、または別の環境のリンクです)。いつもの画面で開きました', 'The delivery in the link was not found (deleted, or a link from another environment). Opened the usual view.') })
+    }
+  }
   const goTo = (v: 'month' | 'week' | 'list', d: Date) => {
     const sun = sundayOf(d)
     const mid = v === 'week' ? new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 3) : d
@@ -1593,7 +1666,7 @@ function App() {
       {/* アラート(フロート)。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
       <WeekHistory open={historyOpen} onClose={() => setHistoryOpen(false)} events={weekEvents} />
       <AlertsFloat open={alertsOpen} onClose={() => { setAlertsOpen(false); setAlertsFocus(undefined) }}>
-        <AlertsPage initialProductId={alertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+        <AlertsPage initialProductId={alertsFocus} onSelectProduct={setAlertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
       {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
       <BulkWorkspace
@@ -1653,6 +1726,8 @@ function App() {
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
           onOpenProduction={setProductionOpen}
+          initialTab={selected && selected.id === link.card ? link.tab : undefined}
+          onTabChange={setCardTab}
           next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}
           onNext={() => {
             if (!nextOf) return
