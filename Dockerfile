@@ -1,12 +1,17 @@
 # CCP(Campaign Contents Planner)の GCP 版: Cloud Run 用のコンテナ。
 # 1 段目で画面(GCP 版のビルド)を作り、2 段目の Python のサーバーが、それを配信する(1 プロセス)。
-#   gcloud run deploy contents-planner --source .   (手順は docs/GCP.md。普段は npm run deploy:gcp)
+#   普段は npm run deploy:gcp(cloudbuild.yaml の kaniko で、層をキャッシュしてビルドする。手順は docs/GCP.md)
+# 層のキャッシュが効くように、変わりにくいもの(依存の一覧 → 依存の導入)を先に、変わりやすいもの(ソース)を後に置く。
 
 FROM node:24-slim AS web
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY . .
+# 画面のビルドに要るものだけを入れる(サーバー・文書だけを変えたときは、ビルドの層もキャッシュから使える)。
+# 画面のビルドが、ここにないファイルを読むようになったら、ここに足す。
+COPY index.html vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json ./
+COPY public public
+COPY src src
 RUN npx vite build
 
 FROM python:3.12-slim

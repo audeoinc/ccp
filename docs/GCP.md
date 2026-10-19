@@ -159,6 +159,15 @@ gcloud run deploy contents-planner --source . --project <プロジェクトID> -
 
 チームメンバーが反映する手順(権限と、`npm run deploy:gcp`)は、[ONBOARDING.md](ONBOARDING.md) の「本番への反映」。2 回目以降は、環境変数とシークレットが残るので、`gcloud run deploy contents-planner --source . --project <プロジェクトID> --region asia-northeast1` だけでよい(コードを変えても、Cloud Run は自動では更新されない)。
 
+**反映の速さ(2026-10-19 から、`npm run deploy:gcp` は層をキャッシュしてビルドする)**: `gcloud run deploy --source .` は、クラウドで毎回キャッシュなし(`docker build --no-cache`)に一からビルドする(`npm ci`・`vite build`・`pip install` で約 2 分半)。そこで `npm run deploy:gcp` は、`gcloud builds submit --config cloudbuild.yaml` で kaniko(`--cache=true`)を使ってビルドし、できたイメージ(タグはコミットの短い ID と `latest`)を `gcloud run deploy --image` で反映する。
+
+- キャッシュの置き場は、これまでと同じ Artifact Registry のリポジトリ `cloud-run-source-deploy` の `contents-planner/cache`。ソースは、これまでと同じソース用バケット(`run-sources-<プロジェクトID>-<リージョン>`)の `builds/` に置く。**新しく作るもの・足す権限はない**(反映する人の `roles/run.sourceDeveloper` と、Cloud Build の既定のサービスアカウントのまま)。
+- `package-lock.json` が変わらなければ `npm ci` の層、`server/requirements.txt` が変わらなければ `pip install` の層、`src`・`public` などの画面のファイルが変わらなければ `vite build` の層を、キャッシュから使う(Dockerfile は、この順に並べてある。画面のビルドに入れるファイルは、Dockerfile の 1 段目に列挙)。キャッシュは 30 日(`--cache-ttl=720h`)。
+- キャッシュつきのビルドが失敗したら(kaniko のイメージが取れない、権限が足りない、など)、スクリプトが自動で、これまでの `--source` の反映に切り替える。最初から `--source` にするなら `DEPLOY_BUILD=source npm run deploy:gcp`。ビルドのログは、画面に流さない(ログは Cloud Logging だけの設定で、流すには別の権限が要る)。失敗したときは、Cloud Build の履歴(`gcloud builds list --region asia-northeast1`)で見る。
+- **ほかの人(別の PC)が反映している最中なら、そちらを優先して待つ**: クラウドでビルドする直前に、タグ `service_contents-planner` が付いた Cloud Build が WORKING / QUEUED でないかを見る(`--source` のビルドにも、cloudbuild.yaml のビルドにも付く)。あれば 20 秒ごとに見て、終わるまで待ち(最大 20 分。過ぎたら中止)、リビジョンの切り替えを 1 分待ってから、`git fetch` で main が先に進んでいないか・同じコミットが反映済みでないかを確かめ直す(どちらかなら中止)。一覧を見られないときは、待たずに進める。
+- 手元の確認は、型チェック(`tsc -b`)と lint(`eslint`)を同時に行うだけ。画面のビルドは、クラウドで行う(手元の `dist-gcp` は送らない)。
+- さらに速くするなら、ビルドのマシンを大きくする(cloudbuild.yaml の `options.machineType: E2_HIGHCPU_8`。1 回の反映で数円の費用が増える。まだ入れていない)。
+
 **使われていないときの自動停止(Cloud Scheduler。2026-10-16 から一時停止中)**: `ccp-idle-check` は `gcloud scheduler jobs pause` で止めてある。戻すときは `gcloud scheduler jobs resume ccp-idle-check --location asia-northeast1`。仕組み: 数分おきに `/internal/idle-check` を、Scheduler 用のサービスアカウントの署名つきトークン(OIDC。宛先はサービスの URL)で呼ぶ。サーバーが、最後のアクセスから `DB_IDLE_MINUTES`(既定 30)分たっていれば、DB の停止を依頼する。
 
 ```bash

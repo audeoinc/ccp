@@ -328,6 +328,8 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 本番のデータを直すときは、API を Basic 認証で呼ぶ(パスワードは Secret Manager の `contents-planner-app-password`)。手順は [GCP.md](GCP.md)。
 - **DB(Cloud SQL)の起動・停止(2026-10-16 に利用者が決定)**: 起動は、画面を開いたときの自動起動だけ(10〜13 分かかる)。動き出したら、毎晩 21:00 の停止(`ccp-stop-db-nightly`)か、明示的な指示まで動かしておく。30 分使わないと止める `ccp-idle-check` と、朝 8:00 に起動する `ccp-start-db-3days` は、一時停止(PAUSED)にしてある(消していない。戻すなら `gcloud scheduler jobs resume <名前> --location asia-northeast1`)。
 
+- **本番への反映のビルドは、`cloudbuild.yaml`(kaniko。層のキャッシュ)で行う**(2026-10-19 から)。Dockerfile の 1 段目は、画面のビルドに要るファイルだけを入れる(`index.html`・`vite.config.ts`・`tsconfig*.json`・`public`・`src`)。**画面のビルドが、ほかの場所のファイル(例: `docs/` の CSV)を読むようにしたら、Dockerfile の COPY に足す**(足さないと、クラウドのビルドで、そのファイルがない)。キャッシュつきのビルドが失敗すると、スクリプトは `--source`(キャッシュなし)に切り替えるので、反映は遅いが止まらない。ほかの人の反映(同じサービスの Cloud Build)が進行中なら、終わるまで待ってから確かめ直す。くわしくは [GCP.md](GCP.md) の「反映の速さ」。
+
 ## 8. 動かし方・確かめ方
 
 ```bash
@@ -340,6 +342,7 @@ npx vite --config vite.mock.config.ts --port 5190 --strictPort
 # サンプルデータを直したら、初期データ(server/seed.json)も書き出してコミットする
 npm run seed:export
 # 本番に反映(main・最新・変更なしのときだけ動く。反映の印のタグ deployed-gcp/* を付ける)
+# 手元では tsc と eslint を同時に行うだけ。ビルドはクラウドで、層をキャッシュして行う(GCP.md の「反映の速さ」)
 npm run deploy:gcp
 ```
 

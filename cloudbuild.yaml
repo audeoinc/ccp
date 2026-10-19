@@ -1,0 +1,25 @@
+# 本番への反映(npm run deploy:gcp)のときの、クラウドでのビルド。
+#   gcloud builds submit --config cloudbuild.yaml --substitutions _IMAGE=<イメージ>,_TAG=<コミット>
+# `gcloud run deploy --source .` は毎回キャッシュなし(--no-cache)で一からビルドするので、
+# kaniko で、RUN の層(npm ci・pip install・vite build)を、イメージの置き場(<イメージ>/cache)にキャッシュする。
+# 依存の一覧やソースが変わらない層は、作り直さずにキャッシュから使う(Dockerfile の並べ方も参照)。
+# _IMAGE はプロジェクト ID を含むので、ここには書かずに、scripts/deploy-gcp.mjs が渡す。
+steps:
+  - name: gcr.io/kaniko-project/executor:v1.23.2
+    args:
+      - --dockerfile=Dockerfile
+      - --context=dir:///workspace
+      - --destination=${_IMAGE}:${_TAG}
+      - --destination=${_IMAGE}:latest
+      - --cache=true
+      # 依存を変えない日が続いても、キャッシュが切れて一からにならないように、既定(2 週間)より長くする
+      - --cache-ttl=720h
+      - --snapshot-mode=redo
+timeout: 1200s
+# --source の反映のビルドと同じタグ。deploy-gcp.mjs が、ほかの人の反映の最中かどうかを、このタグで見る
+# (タグには置き換え(${_…})を使わない。使えないと、ビルドそのものが受け付けられないため)
+tags:
+  - service_contents-planner
+options:
+  # これまでの --source のビルドと同じ(ログは Cloud Logging だけ。ログ用のバケットを使わない)
+  logging: CLOUD_LOGGING_ONLY
