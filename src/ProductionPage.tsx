@@ -27,6 +27,7 @@ import { MarkdownLite } from './MarkdownLite'
 import { ChannelBadge } from './ChannelBadge'
 import { FaceBadge } from './FaceBadge'
 import { HtmlEditor } from './HtmlEditor'
+import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
@@ -43,7 +44,8 @@ import { CopyLinkButton } from './CopyLinkButton'
 const RAIL_W = 32
 
 const useStyles = makeStyles({
-  surface: { width: 'min(1700px, 97vw)', maxWidth: 'none', height: '92vh', maxHeight: '92vh', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' },
+  // fixed + inset 0 + margin auto で画面の中央に置く(配信カードと同じ。relative だと標準の中央寄せが効かず、上端に貼りつく)
+  surface: { position: 'fixed', inset: 0, margin: 'auto', width: 'min(1700px, 97vw)', maxWidth: 'none', height: '92vh', maxHeight: '92vh', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '10px 16px 6px' },
   title: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
@@ -60,7 +62,6 @@ const useStyles = makeStyles({
   // たたんだペインの細い帯(押すと開く)
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '10px', paddingTop: '10px', minHeight: 0, border: 'none', backgroundColor: tokens.colorNeutralBackground2, cursor: 'pointer', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
   railLabel: { writingMode: 'vertical-rl', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, letterSpacing: '0.1em' },
-  frame: { flexGrow: 1, minHeight: 0, width: '100%', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
   editor: { flexGrow: 1, minHeight: 0 },
   // HTML の下書きを作るためだけに描く、見えないプレビュー(画面の外に置く)
   offscreen: { position: 'fixed', left: '-10000px', top: 0, width: '640px', pointerEvents: 'none' },
@@ -474,10 +475,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
 
             {/* 3. プレビュー: エディタの HTML を、アプリの画面とは切り離した枠でそのまま描く */}
             <div className={s.fill}>
-              <div className={s.sectionHead}>
-                <span className={s.grow}>{t('プレビュー(HTML をそのまま描いたもの)', 'Preview (the HTML as is)')}</span>
-              </div>
-              <iframe className={s.frame} title={t('HTML のプレビュー', 'HTML preview')} sandbox="" srcDoc={shown} />
+              <HtmlPreviewFrame html={shown} title={t('HTML のプレビュー', 'HTML preview')} heading={t('プレビュー(HTML をそのまま描いたもの)', 'Preview (the HTML as is)')} headingClassName={s.sectionHead} />
             </div>
 
             <Splitter onDrag={talkOpen ? panes.onDrag(2) : () => undefined} onDone={panes.onDone} />
