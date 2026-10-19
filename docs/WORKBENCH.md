@@ -1,11 +1,11 @@
 # 移行の手順書: Vertex AI Workbench で CCP を動かす
 
 CCP(配信コンテンツプランナー)を、利用先の **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
-本番(Cloud Run)と同じ**配信のデータ**と**商品・メイン画像の写真**を持ち込むための手順書です。
+本番と同じ**配信のデータ**と**商品・メイン画像の写真**を持ち込むための手順書です。
 
 - 最終更新: 2026-10-15(利用先の環境は PostgreSQL に直接つなぐ形に合わせた)
 - 対象: Workbench で CCP を立ち上げる・更新する人
-- 関係する文書: [WORKBENCH_ARCHITECTURE.md](WORKBENCH_ARCHITECTURE.md)(Workbench での構成の解説・構成図)、[GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)
+- 関係する文書: [WORKBENCH_ARCHITECTURE.md](WORKBENCH_ARCHITECTURE.md)(Workbench での構成の解説・構成図)、[UPDATE.md](UPDATE.md)(新しい版の受け取り方)<!-- hosted:begin -->、[GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)<!-- hosted:end -->
 
 ---
 
@@ -15,20 +15,20 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 そこで、**コードは Git で**、**データと写真は「引っ越し用のパック」(1 つの ZIP)で、ブラウザ経由で**持ち込みます。
 
 ```
- 本番(Cloud Run)                         利用先の環境
+ 本番の CCP                               利用先の環境
  ┌──────────────────┐   ブラウザで ZIP を     ┌────────────────────────────┐
  │ 画面 ⚙ →          │   ダウンロード          │ Workbench(Jupyter)          │
  │「データと画像を    │ ──────────────────▶ │  ① アップロード               │
  │  書き出す」        │   ccp-pack-…zip       │  ② import-pack で取り込む     │
  └──────────────────┘                       │  ③ サーバーを起動(8081)      │
                                              │  ④ /proxy/8081/ で開く        │
- GitHub(audeoinc/ccp)── git clone / pull ──▶│                              │
+ 利用先の Git(版ごとの ZIP)─ clone / pull ▶│                              │
                                              └────────────────────────────┘
 ```
 
 | 持ち込むもの | 方法 | いつ |
 |---|---|---|
-| コード(画面・サーバー) | `git clone` / `git pull` | 最初と、開発が進んだとき |
+| コード(画面・サーバー) | 版ごとの ZIP を利用先の Git に入れ、`git clone` / `git pull`([UPDATE.md](UPDATE.md)) | 最初と、新しい版が届いたとき |
 | データ(配信・商品・結果 など、すべてのテーブル)と写真 | 引っ越し用のパック(ZIP) | 最初と、本番のデータにそろえたいとき |
 
 > **注意:** パックの取り込みは、Workbench 側の DB の中身を**すべて置き換えます**。Workbench で入力したデータは消えます。
@@ -63,7 +63,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 
 | やりたいこと | コマンド |
 |---|---|
-| **コードを最新にして、起動し直す**(開発が進んだとき。いちばんよく使う) | `scripts/workbench.sh update` |
+| **コードを最新にして、起動し直す**(新しい版が入ったとき。いちばんよく使う) | `scripts/workbench.sh update` |
 | 本番のデータと写真を取り込む(中身を見せて、確認してから。DB は置き換わる) | `scripts/workbench.sh import server/ccp-pack-<日時>.zip` |
 | 起動 / 停止 / 起動し直し | `scripts/workbench.sh start` / `stop` / `restart` |
 | 動いているか(サーバー・PostgreSQL・コードの版) | `scripts/workbench.sh status` |
@@ -83,9 +83,9 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | Workbench のインスタンス | ターミナルが使える | Jupyter の「ターミナル」を開ける |
 | Node.js | **20.19 以上**(または 22.12 以上)。画面のビルドに使う | `node -v` |
 | Python | **3.12 以上**を推奨(本番は 3.12) | `python3 --version` |
-| Git | リポジトリ `audeoinc/ccp` を取得できる | `git --version` |
+| Git | 利用先の Git のリポジトリ(CCP の版を入れたもの。[UPDATE.md](UPDATE.md))を取得できる | `git --version` |
 | PostgreSQL | **利用先の環境は PostgreSQL に直接つなぐ**(Workbench の上や、同じネットワークのサーバー)。CCP 用の DB を 1 つ(本番は PostgreSQL 16) | `psql --version`、または DB の管理者に確認 |
-| 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」(Cloud SQL につなぐときだけ「Cloud SQL クライアント」も) | IAM の画面 |
+| 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」 | IAM の画面 |
 | ブラウザ | 利用先の環境から、本番の CCP の画面を開ける | 本番の URL を開く |
 
 > **パッケージの取得について:** 手順の `npm ci` と `pip install` は、パッケージをインターネット(npm・PyPI、または社内のミラー)から取ります。
@@ -103,11 +103,11 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 
 ```bash
 cd ~
-git clone https://github.com/audeoinc/ccp.git
+git clone <利用先のリポジトリの URL> ccp
 cd ccp
 ```
 
-**前に clone したことがある**とき(以前に動かしていた環境など)は、必ず最新にしてから進めます。
+**前に clone したことがある**とき(以前に動かしていた環境など)は、必ず最新にしてから進めます。取得元が利用先のリポジトリでないときは、先に [UPDATE.md](UPDATE.md) の「取得元を切り替える」を行います。
 この手順書と、設定の見本(`server/workbench.env.example`)、引っ越し用のパックの取り込み(`import-pack`)は、2026-10-15 に足したものなので、
 古いままだと、ファイルやコマンドが見つからずに止まります。
 
@@ -151,7 +151,6 @@ nano workbench.env     # または Jupyter のエディタで開く
 | 設定 | 中身 |
 |---|---|
 | `DATABASE_URL` | **PostgreSQL の接続先**(利用先の環境はこちら)。`postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` |
-| `CLOUD_SQL_INSTANCE` ・ `DB_USER` ・ `DB_PASSWORD` ・ `DB_NAME` | Cloud SQL につなぐときだけ(`DATABASE_URL` の代わり) |
 | `GOOGLE_CLOUD_PROJECT` | AI(Vertex AI)を使うプロジェクト |
 | `ASSET_DIR` | 写真を置くフォルダ。`/home/jupyter/ccp/server/images` のような**絶対パス** |
 
@@ -170,7 +169,7 @@ ASSET_DIR=/home/jupyter/ccp/server/images    # 実際のパスに合わせる
 
 | 用途 | CCP が読む名前 |
 |---|---|
-| DB | `DATABASE_URL`(Cloud SQL なら `CLOUD_SQL_INSTANCE`・`DB_USER`・`DB_PASSWORD`・`DB_NAME`) |
+| DB | `DATABASE_URL` |
 | AI | `GOOGLE_CLOUD_PROJECT`(必須)、`GOOGLE_CLOUD_LOCATION`(省略時 `global`)、`GEMINI_MODEL`(省略時 `gemini-3.5-flash`) |
 
 CCP は、Gemini を **Vertex AI の形**(Workbench のサービスアカウントの権限)で呼びます。Gemini の **API キー**(`GEMINI_API_KEY` など)では動かないので、その形で接続しているときは、`GOOGLE_CLOUD_PROJECT` の設定と、Vertex AI の権限が別に要ります。
@@ -178,7 +177,7 @@ CCP は、Gemini を **Vertex AI の形**(Workbench のサービスアカウン�
 名前を確かめるコマンド(パスワードの一部が画面に出るので、人に見せない):
 
 ```bash
-env | grep -E "^(DATABASE_URL|CLOUD_SQL_INSTANCE|DB_|GOOGLE_CLOUD_|GEMINI_)" | cut -c1-40
+env | grep -E "^(DATABASE_URL|GOOGLE_CLOUD_|GEMINI_)" | cut -c1-40
 ```
 >
 > **`DATABASE_URL` の書き方の注意:** 先頭は `postgresql+asyncpg://`(`postgresql://` だけでは動きません)。パスワードに `@` `:` `/` `#` などの記号があるときは、URL の形に置き換えます(例: `@` → `%40`、`#` → `%23`)。値は `'…'` で囲みます(`$` や `&` を、シェルが別の意味に読まないように)。
@@ -277,7 +276,7 @@ https://<ノートブックの URL>/proxy/8081/
 
 ---
 
-## 4. 更新の手順(開発を続けながら)
+## 4. 更新の手順(新しい版が届いたとき)
 
 ### 4.1 コードを最新にする
 
@@ -312,9 +311,9 @@ cd server
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
 | 画面に「**データベースにつながりません**」(以前の版では「データベースを起動しています」のまま進まない) | **サーバーを起動したターミナル**に、DB の設定が読み込まれていない(`check` を実行したターミナルとは別のターミナルで起動した、`conda activate` していない など)。画面の赤い文字が、つながらない理由 | サーバーを止め、**同じターミナルで** `set -a; source workbench.env; set +a`(必要なら `conda activate`)→ `check` → 起動 の順に実行する。サーバーのターミナルにも「DB につながりません: …」と理由が出る |
-| `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる)③ `DATABASE_URL` がなく、Cloud SQL の経路(外への接続)になった | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
+| `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる) | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
-| 起動時に `KeyError: 'CLOUD_SQL_INSTANCE'` | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
+| 画面やサーバーのログに「設定がありません: 'DATABASE_URL'」 | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
 | 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli check` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
 | AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
@@ -364,16 +363,13 @@ set -a; source workbench.env; set +a
 
 | 環境変数 | 必須 | 中身 | Workbench での値 |
 |---|---|---|---|
-| `DATABASE_URL` | PostgreSQL に直接つなぐとき | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **利用先の環境の PostgreSQL** |
-| `CLOUD_SQL_INSTANCE` | Cloud SQL のとき | `<プロジェクトID>:<リージョン>:<インスタンス名>` | 設定しない(`DATABASE_URL` を使う) |
-| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Cloud SQL のとき | DB のユーザー・パスワード・DB の名前(既定 `ccp_app` / なし / `ccp`) | 設定しない |
+| `DATABASE_URL` | ○ | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **利用先の環境の PostgreSQL** |
 | `GOOGLE_CLOUD_PROJECT` | AI を使うとき | Vertex AI のプロジェクト | その環境のプロジェクト |
 | `GOOGLE_CLOUD_LOCATION` | — | Vertex AI の場所(既定 `global`) | `global` |
 | `GEMINI_MODEL` / `GEMINI_THINKING` | — | AI のモデル・考える量 | 本番と同じなら `gemini-3.8-flash` / `low` |
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |
-| `DB_CONTROL` / `STATE_BUCKET` / `CCP_DEV_GCLOUD` / `IDLE_CHECK_*` | — | 本番(Cloud Run)の DB の自動起動・停止、手元の開発用 | **設定しない** |
 
 ## 付録 B. 引っ越し用のパックの中身
 

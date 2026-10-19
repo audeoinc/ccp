@@ -1,6 +1,6 @@
 """だれが開いているか(バックログ U7 の下地。docs/APPROVAL.md の 6 章)。
 
-ログインそのものは、Cloud Run の前に置く IAP(Identity-Aware Proxy)が行う。IAP は、通した依頼に見出し X-Goog-IAP-JWT-Assertion を付けるので、
+ログインそのものは、サーバーの前に置く IAP(Identity-Aware Proxy)が行う。IAP は、通した依頼に見出し X-Goog-IAP-JWT-Assertion を付けるので、
 ここでは、その JWT を Google の公開鍵で検証して、メールアドレスを取り出す(環境変数 CCP_IAP_AUDIENCE に、IAP の宛先を設定したときだけ。
 X-Goog-Authenticated-User-Email は、検証なしでは信じない)。手元では CCP_DEV_USER_EMAIL で、その人がログインしたことにできる。
 どちらもなければ None = ログインなし(これまでどおり、画面で「あなた」を選ぶ)。
@@ -8,7 +8,7 @@ X-Goog-Authenticated-User-Email は、検証なしでは信じない)。手元�
   GET /api/me   ログインしている人(メールアドレス)と、それに当たるユーザー(users。なければ null)
 
 メールアドレスが、本人を見分けるかぎ(users.email。大文字小文字は区別しない)。IAP を有効にする手順(ロードバランサ・OAuth の同意画面・
-Cloud Run への直接のアクセスを塞ぐ)は GCP の操作なので、人が行う(GCP.md)。
+サーバーへの直接のアクセスを塞ぐ)は GCP の操作なので、人が行う。
 """
 from __future__ import annotations
 

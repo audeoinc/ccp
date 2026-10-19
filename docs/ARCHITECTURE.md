@@ -6,13 +6,14 @@
 ブラウザ(React アプリ)
    │  src/data の …Service で読み書き(型は src/models)
    ▼
-サーバー(Python / FastAPI。Cloud Run、または Workbench)
-   │  /api/data/{テーブル} … PostgreSQL(Cloud SQL)
+サーバー(Python / FastAPI。本番のサーバー、または Workbench)
+   │  /api/data/{テーブル} … PostgreSQL
    │  /api/ask            … Vertex AI の Gemini
    │  /img/…              … 画像(GCS、または手元のフォルダ)
 ```
 
-- 詳しくは [GCP.md](GCP.md)。撮影・デモ用のビルド(`vite.mock.config.ts`)は、サービスの読み込みを、メモリ上のサンプルデータ(`src/mock`)に差し替える。
+- <!-- hosted:begin -->開発元の本番だけの処理は `server/ccp/hosted/` に置き、利用先に渡す Workbench 版(`npm run release:workbench`。[RELEASE.md](RELEASE.md))からは外す。<!-- hosted:end -->
+- <!-- hosted:begin -->詳しくは [GCP.md](GCP.md)。<!-- hosted:end -->撮影・デモ用のビルド(`vite.mock.config.ts`)は、サービスの読み込みを、メモリ上のサンプルデータ(`src/mock`)に差し替える。
 
 ## 2. AI の仕組み
 

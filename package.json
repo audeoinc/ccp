@@ -13,7 +13,8 @@
     "screenshots": "node scripts/screenshots.mjs",
     "dev:gcp": "vite",
     "build:gcp": "vite build",
-    "seed:export": "node scripts/export-seed.mjs"
+    "seed:export": "node scripts/export-seed.mjs",
+    "release:workbench": "node scripts/release-workbench.mjs"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.9",

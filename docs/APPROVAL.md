@@ -71,11 +71,11 @@ GitHub のプルリクエストのように、配信カードごとに「承認�
 
 ## 6. ログイン(U7。下地は 2026-10-17 にできた。IAP を有効にするのは、人の GCP の操作)
 
-- **仕組み**: ログインそのものは、Cloud Run の前に置く IAP(Identity-Aware Proxy)が行う。サーバー(`server/ccp/identity.py`)は、IAP が付ける見出し `X-Goog-IAP-JWT-Assertion` を Google の公開鍵で検証して、メールアドレスを取り出す(環境変数 `CCP_IAP_AUDIENCE` に IAP の宛先を設定したときだけ。検証なしの `X-Goog-Authenticated-User-Email` は信じない)。手元では `CCP_DEV_USER_EMAIL` で、その人がログインしたことにできる。どちらもなければ「ログインなし」= これまでどおり、画面で「あなた」を選ぶ。
+- **仕組み**: ログインそのものは、サーバーの前に置く IAP(Identity-Aware Proxy)が行う。サーバー(`server/ccp/identity.py`)は、IAP が付ける見出し `X-Goog-IAP-JWT-Assertion` を Google の公開鍵で検証して、メールアドレスを取り出す(環境変数 `CCP_IAP_AUDIENCE` に IAP の宛先を設定したときだけ。検証なしの `X-Goog-Authenticated-User-Email` は信じない)。手元では `CCP_DEV_USER_EMAIL` で、その人がログインしたことにできる。どちらもなければ「ログインなし」= これまでどおり、画面で「あなた」を選ぶ。
 - **メールアドレスが、本人を見分けるかぎ**(`users.email`。大文字小文字は区別しない)。`GET /api/me` が、ログインしている人と、それに当たるユーザーを返す。
 - **ログインしているときの動き**: 「あなた」はその人に固定(`MePicker` は名前だけ出す。登録のないメールアドレスは、その旨を出す)。承認の依頼・承認・差し戻し・取り下げは、画面が送った「あなた」を見ず、ログインした人で行う(`approvals.py` の `_actor`。登録がなければ 400)。ユーザー・承認グループ・メンバー・承認の決まりの書き込みは、管理者(`users.role` = `admin`)だけ(`data_api.py` が `people_edit_denied` で 403。画面は見るだけになる)。
 - **ログインがないときの動き**: これまでどおり(だれでも「あなた」を選べる・だれでも編集できる・変更は履歴に残る)。
-- **人が行うこと(GCP)**: ロードバランサ + IAP を Cloud Run の前に置き、OAuth の同意画面・許可するユーザー(Google アカウント)を設定し、Cloud Run への直接のアクセス(`run.app` の URL)を塞ぐ(ingress を内部とロードバランサだけに)。そのうえで Cloud Run の環境変数 `CCP_IAP_AUDIENCE`(`/projects/<番号>/global/backendServices/<ID>`)を設定する。Basic 認証(`APP_PASSWORD`)は、IAP が入れば外してよい。Workbench は Jupyter の中継を通すので、IAP は使えない(ログインなしの運用のまま。または Workbench の `CCP_DEV_USER_EMAIL` で 1 人に固定)。
+- **人が行うこと(GCP)**: ロードバランサ + IAP をサーバーの前に置き、OAuth の同意画面・許可するユーザー(Google アカウント)を設定し、サーバーへの直接のアクセスを塞ぐ(ロードバランサを通る依頼だけを受け付ける)。そのうえでサーバーの環境変数 `CCP_IAP_AUDIENCE`(`/projects/<番号>/global/backendServices/<ID>`)を設定する。Basic 認証(`APP_PASSWORD`)は、IAP が入れば外してよい。Workbench は Jupyter の中継を通すので、IAP は使えない(ログインなしの運用のまま。または Workbench の `CCP_DEV_USER_EMAIL` で 1 人に固定)。
 
 ## 7. あとで
 

@@ -223,7 +223,7 @@
 ### 7.5 進め方の決まり
 
 - **確かめ方**: 型チェック・lint・ビルド・`npm run verify` を通す。画面は撮影用のモック(`npx vite --config vite.mock.config.ts`、5190)で確かめ、スクリーンショットを撮って利用者に見せる。**本番の画面では確かめられていない**ことを、報告で分けて書く。
-- **コミット・push**: 確認が通ったら、指示を待たずにコミットし、`git pull --rebase` のあと `main` に push してよい(2026-10-17 に [CLAUDE.md](../CLAUDE.md) を変えた)。本番への反映(`npm run deploy:gcp`)は、人が指示したときだけ。
+- **コミット・push**: 確認が通ったら、指示を待たずにコミットし、`git pull --rebase` のあと `main` に push してよい(2026-10-17 に [CLAUDE.md](../CLAUDE.md) を変えた)。<!-- hosted:begin -->本番への反映(`npm run deploy:gcp`)は、人が指示したときだけ。<!-- hosted:end -->
 - **クラウドの環境で撮るとき**: Chromium は `/opt/pw-browsers/chromium-*/chrome-linux/chrome`。root で動くので `--no-sandbox` が要る。`scripts/screenshots.mjs` は `BROWSER_PATH` にブラウザを渡す形なので、`--no-sandbox` を付けて起動する小さなシェルスクリプトを作って渡す。`ONLY=aiTabs`(関数名)で撮る範囲を絞れ、`SHOTS_OUT` で保存先を変えられる(既定は `docs/screenshots/`)。モックで配信カードを開くと、中身が空の配信では自動の下書きが始まるので、確かめるときは `localStorage` の `cardDetail.autoDraft` を `off` にしておく。
 - 画面の部品を足したら、`scripts/screenshots.mjs` の撮る手順も合わせる(X8 で、引き継ぎを撮る前に「やり取り」に切り替える手順を足した)。
-- 決めたことは [BACKLOG.md](BACKLOG.md)(X の節)と、この文書の 6 章(候補の状態)に書く。作業を終える前に [HANDOVER.md](HANDOVER.md) を更新する。
+- 決めたことは [BACKLOG.md](BACKLOG.md)(X の節)と、この文書の 6 章(候補の状態)に書く。<!-- hosted:begin -->作業を終える前に [HANDOVER.md](HANDOVER.md) を更新する。<!-- hosted:end -->

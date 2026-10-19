@@ -8,8 +8,6 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import unquote
 
-import aiohttp
-
 import asyncio
 import logging
 from collections.abc import AsyncIterator
@@ -21,16 +19,24 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import dbctl, schema as sc
+from . import dbready, schema as sc
 from .identity import people_edit_denied
 from .db import get_engine, reset_engine
 
+# 接続できないときのエラー。接続の経路によっては(ccp/hosted/ のコネクタ経由)、aiohttp のエラーになる
+_CONNECT_ERRORS: tuple[type[BaseException], ...] = (SQLAlchemyError, OSError, asyncio.TimeoutError, KeyError)
+try:
+    import aiohttp
+
+    _CONNECT_ERRORS += (aiohttp.ClientError,)
+except ImportError:
+    pass
 
 
 async def require_db() -> None:
     """DB が止まっていれば、起動を依頼して「準備中」と返す。使える間は、最後のアクセスの時刻を残す"""
-    if dbctl.enabled():
-        c = dbctl.controller()
+    c = dbready.controller()
+    if c is not None:
         await c.ensure_running()
         await c.touch()
 
@@ -70,11 +76,11 @@ async def db(write: bool = False) -> AsyncIterator[AsyncConnection]:
     try:
         conn = (await get_engine()).connect()
         await conn.start()
-    except (SQLAlchemyError, OSError, aiohttp.ClientError, asyncio.TimeoutError, KeyError) as e:
-        last_db_error = f"{type(e).__name__}: {e}" if not isinstance(e, KeyError) else f"設定がありません: {e}(DATABASE_URL、または CLOUD_SQL_INSTANCE など)"
+    except _CONNECT_ERRORS as e:
+        last_db_error = f"{type(e).__name__}: {e}" if not isinstance(e, KeyError) else f"設定がありません: {e}(DATABASE_URL など)"
         log.warning("DB につながりません: %s", last_db_error)
         await reset_engine()
-        raise dbctl.DbNotReady("starting") from e
+        raise dbready.DbNotReady("starting") from e
     last_db_error = None
     try:
         await _ensure_schema(conn)
@@ -253,10 +259,10 @@ async def _body(request: Request) -> dict[str, Any]:
 
 
 def register_errors(app: FastAPI) -> None:
-    @app.exception_handler(dbctl.DbNotReady)
-    async def _starting(_: Request, e: dbctl.DbNotReady):
+    @app.exception_handler(dbready.DbNotReady)
+    async def _starting(_: Request, e: dbready.DbNotReady):
         # DB の自動起動を使わない環境(Workbench など)では、待っても起動しないので、つながらない理由を返す
-        if not dbctl.enabled():
+        if dbready.controller() is None:
             return fail(503, f"データベースにつながりません: {last_db_error or '理由は不明'}", "db_unreachable")
         return fail(503, "データベースを起動しています(10 分ほどかかることがあります)", "db_starting")
 

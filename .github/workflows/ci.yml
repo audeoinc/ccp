@@ -31,6 +31,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Server dependencies
-        run: pip install -r server/requirements.txt
+        run: pip install -r server/requirements.txt -r server/requirements-hosted.txt
       - name: Server tests
         run: python -m unittest discover server/tests

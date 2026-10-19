@@ -16,7 +16,7 @@
 
 画像から分かるのは、見た目の情報だけ(名前・カテゴリ・季節・天候・説明)。価格・在庫・売上・評価・販売方針は、
 カテゴリと売上トレンドに合う、もっともらしいデモ用の値を、コードごとに決まった乱数で作る(同じ入力なら、同じ結果)。
-接続先は、db.py / assets.py の環境変数(CLOUD_SQL_INSTANCE / DB_PASSWORD / STATE_BUCKET / GOOGLE_CLOUD_PROJECT など)。
+接続先は、db.py / assets.py の環境変数(DATABASE_URL / STATE_BUCKET / GOOGLE_CLOUD_PROJECT など)。
 """
 from __future__ import annotations
 

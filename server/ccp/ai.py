@@ -1,6 +1,6 @@
 """/api/ask — 画面から受け取った依頼文を Gemini(Vertex AI)に渡し、返答のテキストをそのまま返す。
 
-プロンプトの作り方・返答の JSON の解釈・やり直しは、画面側(src/aiSelect.ts)にあり、Power Apps 版と共通。
+プロンプトの作り方・返答の JSON の解釈・やり直しは、画面側(src/aiSelect.ts)にあり。
 ここは「文字列を渡して、文字列を受け取る」だけにして、2 つのビルドで AI の動きがずれないようにする。
 
 設定(環境変数。営業支援システムと同じ Vertex AI):
@@ -24,7 +24,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from . import dbctl
+from . import dbready
 from .creds import get_credentials
 
 log = logging.getLogger("ccp.ai")
@@ -32,8 +32,9 @@ log = logging.getLogger("ccp.ai")
 
 async def note_activity() -> None:
     """AI の利用も、アクセスとして数える(使っている間に、DB を止めないため)"""
-    if dbctl.enabled():
-        await dbctl.controller().touch()
+    c = dbready.controller()
+    if c is not None:
+        await c.touch()
 
 
 router = APIRouter(prefix="/api", dependencies=[Depends(note_activity)])

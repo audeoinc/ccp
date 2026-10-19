@@ -29,9 +29,6 @@ def _db_target() -> tuple[str, str | None, int | None]:
         except Exception as e:  # noqa: BLE001 — 読めない URL は、そのまま知らせる
             return f"DATABASE_URL(読めません: {e})", None, None
         return f"DATABASE_URL(scheme={u.drivername} host={u.host} port={u.port or 5432} db={u.database} user={u.username})", u.host, u.port or 5432
-    inst = os.getenv("CLOUD_SQL_INSTANCE")
-    if inst:
-        return f"Cloud SQL(CLOUD_SQL_INSTANCE={inst} user={os.getenv('DB_USER', 'ccp_app')} db={os.getenv('DB_NAME', 'ccp')})", None, None
     return "なし", None, None
 
 
@@ -106,7 +103,7 @@ def run() -> int:
     print("■ DB")
     target, host, port = _db_target()
     if target == "なし":
-        _line(NG, "接続先の設定がありません(DATABASE_URL、または CLOUD_SQL_INSTANCE)")
+        _line(NG, "接続先の設定がありません(DATABASE_URL)")
         ng += 1
     else:
         _line(OK, f"接続先: {target}")
@@ -125,7 +122,7 @@ def run() -> int:
                 _line(NG, f"ホスト {host} が見つかりません({e})。ホスト名の書き間違い、パスワードの @ を %40 にしていない、などを確かめてください")
                 ng += 1
                 host = None
-        if host is not None or os.getenv("CLOUD_SQL_INSTANCE"):
+        if host is not None:
             ok, detail = asyncio.run(_db_query())
             _line(OK if ok else NG, detail)
             ng += 0 if ok else 1
@@ -168,9 +165,6 @@ def run() -> int:
         ng += 1
 
     print("■ その他")
-    for name in ("DB_CONTROL", "CCP_DEV_GCLOUD"):
-        if os.getenv(name):
-            _line(WARN, f"{name} は、Workbench では設定しません(本番・手元の開発用)")
     _line(OK if os.getenv("APP_PASSWORD") else WARN, "APP_PASSWORD(画面のパスワード)あり" if os.getenv("APP_PASSWORD") else "APP_PASSWORD なし(画面にパスワードをかけない。Workbench の中継で守られているなら、このままでもよい)")
 
     print()

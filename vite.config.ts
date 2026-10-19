@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// ビルドの設定(Cloud Run と Workbench で動く版)。
+// ビルドの設定(サーバーが配信する版。Workbench でも動く)。
 //   開発:   npm run dev      (別のターミナルで、サーバーを 8080 で起動しておく。/api はそこへ中継する)
 //   ビルド: npm run build    (dist-gcp/ にできる。サーバーがこれを配信する)
 // 撮影・デモ用(サンプルデータで動かす)は、vite.mock.config.ts。

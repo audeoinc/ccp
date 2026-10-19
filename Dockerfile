@@ -18,8 +18,8 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 WORKDIR /app
-COPY server/requirements.txt server/requirements.txt
-RUN pip install -r server/requirements.txt
+COPY server/requirements.txt server/requirements-hosted.txt server/
+RUN pip install -r server/requirements.txt -r server/requirements-hosted.txt
 COPY server server
 COPY --from=web /app/dist-gcp dist-gcp
 WORKDIR /app/server

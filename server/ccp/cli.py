@@ -14,7 +14,7 @@
                                      --pack は、商品をそのパック(本番の書き出し)から作る。本番で試すなら必ず付ける。
                                      --touch-stock は、在庫のスナップショットを 1 回分だけ足す(更新の検知を試す)
 
-接続先は、db.py の環境変数(CLOUD_SQL_INSTANCE / DB_PASSWORD など、または DATABASE_URL)。
+接続先は、db.py の環境変数(DATABASE_URL)。
 """
 from __future__ import annotations
 

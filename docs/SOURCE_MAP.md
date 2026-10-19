@@ -3,7 +3,7 @@
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
 - 最終更新: 2026-10-15(`main` の時点のファイル。行数は目安)
-- 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)
+- 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
 ---
@@ -19,7 +19,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
                                    │
               ┌────────────────────┴────────────────────┐
               ▼                                         ▼
- 本番(Cloud Run・Workbench)                      撮影・デモ用
+ 本番(サーバー・Workbench)                      撮影・デモ用
  vite.config.ts                                  vite.mock.config.ts
  src/gcp/services.ts → server/ の API            src/mock/db.ts に差し替え(メモリ上のデータ)
  AI は /api/ask(Gemini)                         AI は src/mock/agent.ts
@@ -29,7 +29,7 @@ CCP のソースファイルが、どこに・何のためにあるかの一覧�
      PostgreSQL・画像・Gemini
 ```
 
-- **Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。** 同じ日に、名前(`cr854_…`)と選択肢の数も、読みやすい名前・文字の値に変えた(GCP.md の「データ定義」)。
+- **Power Apps 版は 2026-10-16 に廃止し、ソースも削除した。** 同じ日に、名前(`cr854_…`)と選択肢の数も、読みやすい名前・文字の値に変えた(GCP.md の「データ定義」)。 <!-- hosted -->
 - 撮影・デモ用の差し替えは、`vite.mock.config.ts` のプラグインが、サービスの読み込みを置き換えて行う。そのため、画面のコードはビルドの違いを知らない。
 
 ### 構成図(ファイルのつながり)
@@ -72,18 +72,20 @@ flowchart TD
         aiclient["AI の呼び出し<br/>src/gcp/ai.ts"]
     end
 
-    subgraph server["サーバー(server/ccp。Cloud Run・Workbench)"]
+    subgraph server["サーバー(server/ccp。本番・Workbench)"]
         main["FastAPI の入口・Basic 認証<br/>main.py"]
         dataapi["データの読み書き /api/data<br/>data_api.py"]
         schema["データ定義・値の確かめ<br/>schema.py ← schema.json"]
         db["DB への接続<br/>db.py"]
         aiapi["AI /api/ask<br/>ai.py"]
-        dbctl["DB の自動起動・停止<br/>dbctl.py"]
+        %% hosted:begin
+        dbctl["DB の自動起動・停止(本番だけ)<br/>hosted/dbctl.py"]
+        %% hosted:end
         assets["画像 /img<br/>assets.py"]
         pack["引っ越し用のパック /api/export<br/>pack.py"]
     end
 
-    pg[("PostgreSQL<br/>Cloud SQL")]
+    pg[("PostgreSQL")]
     gcs[("GCS<br/>画像・最後のアクセスの時刻")]
     gemini{{"Gemini<br/>Vertex AI"}}
 
@@ -120,15 +122,19 @@ flowchart TD
     main --> aiapi
     main --> assets
     main --> pack
+    %% hosted:begin
     main -->|止まっていれば起動| dbctl
+    %% hosted:end
     dataapi --> schema
     dataapi --> db
     pack --> db
     db --> pg
     aiapi --> gemini
     assets --> gcs
+    %% hosted:begin
     dbctl -->|起動・停止| pg
     dbctl -->|最後のアクセスの時刻| gcs
+    %% hosted:end
 
     classDef ui fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
     classDef auth fill:#fef3c7,stroke:#d97706,color:#78350f
@@ -139,7 +145,10 @@ flowchart TD
     class card,content,preview,drafts,aidraft,aiselect,tmgr,tdef auth
     class results,resdetail,alerts ins
     class svc,models,client,aiclient dat
-    class main,dataapi,schema,db,aiapi,dbctl,assets,pack srv
+    class main,dataapi,schema,db,aiapi,assets,pack srv
+    %% hosted:begin
+    class dbctl srv
+    %% hosted:end
 ```
 
 - 実線は呼び出し、点線は「上に重ねて開く」つながり。
@@ -153,11 +162,11 @@ flowchart TD
 | `server/` | サーバー(Python / FastAPI)。画面・データ API・AI・画像を配る |
 | `scripts/` | 反映・検証・撮影・Workbench の運用などの補助スクリプト |
 | `docs/` | 文書、ワイヤーフレーム、スクリーンショット、サンプルデータ(CSV) |
-| `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・ビルド・サーバーのテスト) |
+| `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・ビルド・サーバーのテスト) | <!-- hosted -->
 | `index.html` | 画面の入口の HTML |
 | `vite.config.ts` / `vite.mock.config.ts` | ビルドの設定(本番 / 撮影用。1 章) |
-| `package.json` | npm のスクリプト(`dev`・`build`・`verify`・`deploy:gcp`・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)・`screenshots`・`seed:export`) |
-| `Dockerfile` / `.dockerignore` / `.gcloudignore` | Cloud Run のコンテナ |
+| `package.json` | npm のスクリプト(`dev`・`build`・`verify`<!-- hosted:begin -->・`deploy:gcp`<!-- hosted:end -->・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)<!-- hosted:begin -->・`screenshots`<!-- hosted:end -->・`seed:export`・`release:workbench`) |
+| `Dockerfile` / `.dockerignore` / `.gcloudignore` / `cloudbuild.yaml` | Cloud Run のコンテナと、そのビルド | <!-- hosted -->
 | `tsconfig*.json` / `eslint.config.js` | 型チェック・lint の設定 |
 | `CLAUDE.md` / `README.md` | AI アシスタント向けの約束事 / 全体の紹介 |
 
@@ -326,8 +335,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/data_api.py` | — | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
 | `ccp/schema.py` | 290 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
 | `schema.json` | — | **データ定義**(テーブル・列・選択肢の値)。列を足すときはここ |
-| `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`、または Cloud SQL) |
-| `ccp/dbctl.py` | 173 | Cloud SQL の自動起動・自動停止(本番の Cloud Run だけ) |
+| `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`) |
+| `ccp/dbready.py` | — | DB が使えるかどうか(DB を必要なときだけ起動する環境のための、差し込み口)。使えないときの `DbNotReady` |
+| `ccp/hosted/` | — | 開発元の本番(Cloud Run + Cloud SQL)だけで使うもの。`dbctl.py`(Cloud SQL の自動起動・自動停止)・`connect.py`(Cloud SQL Connector)・`routes.py`(Cloud Scheduler が呼ぶ `/internal/idle-check`)・`devtoken.py`(手元の gcloud のトークン)。Workbench 版のリリースには入れない([RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `ccp/ai.py` | 89 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
 | `ccp/assets.py` | — | `/img/…`。商品・メイン画像を、GCS か `ASSET_DIR` のフォルダから配る |
 | `ccp/creds.py` | — | Google の認証(サービスアカウント) |
@@ -338,6 +348,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `seed.json` | — | 初期データ(`scripts/export-seed.mjs` が `src/mock/seed.ts` から作る) |
 | `tests/` | — | サーバーのテスト(`python -m unittest discover server/tests`。CI でも実行) |
 | `requirements.txt` / `requirements-tools.txt` | — | Python のパッケージ(サーバー / 運用ツール) |
+| `requirements-hosted.txt` | — | 開発元の本番だけのパッケージ(Cloud SQL Connector) | <!-- hosted -->
 | `workbench.env.example` | — | Workbench の設定の見本(本物の `workbench.env` は Git に入れない) |
 
 ## 5. スクリプト(`scripts/`)
@@ -345,11 +356,12 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | ファイル | 役割 |
 |---|---|
 | `workbench.sh` | Workbench の操作(`setup` / `update` / `start` / `stop` / `status` / `check` / `import` / `log`) |
-| `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) |
+| `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) | <!-- hosted -->
+| `release-workbench.mjs` | 利用先に渡す Workbench 版の ZIP を作り、検査する(`npm run release:workbench`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
-| `gcp-smoke.mjs` | 本番・手元のサーバーの動作確認(画面を開いて、カードが出るか) |
-| `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) |
+| `gcp-smoke.mjs` | 本番・手元のサーバーの動作確認(画面を開いて、カードが出るか) | <!-- hosted -->
+| `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) | <!-- hosted -->
 | `feature-reasons.py` | 機能の理由の台帳(`docs/FEATURE_REASONS.md`)を作る |
 
 ## 6. この変更は、どこを触るか

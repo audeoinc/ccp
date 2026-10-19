@@ -6,7 +6,7 @@
   一定時間(既定 30 分)アクセスがなければ、停止を依頼する。Cloud Run は 0 台に縮むので、時刻はメモリに持てない。
 
 起動と停止は、Cloud SQL の「稼働ポリシー」(ALWAYS / NEVER)を切り替えて行う。起動には、通常 1〜3 分かかる。
-有効にするのは、環境変数 DB_CONTROL=1 と CLOUD_SQL_INSTANCE(<プロジェクト>:<リージョン>:<インスタンス>)があるときだけ。
+画面・API からは、ccp/dbready.py を通して使う。有効にするのは、環境変数 DB_CONTROL=1 と CLOUD_SQL_INSTANCE(<プロジェクト>:<リージョン>:<インスタンス>)があるときだけ。
 手元の開発や、別の PostgreSQL(DATABASE_URL)を使うときは、何もしない。
 """
 from __future__ import annotations
@@ -19,7 +19,8 @@ import time
 from typing import Any
 from urllib.parse import quote
 
-from .creds import get_credentials
+from ..creds import get_credentials
+from ..dbready import DbNotReady
 
 log = logging.getLogger("ccp.dbctl")
 
@@ -33,14 +34,6 @@ STATUS_CACHE_S = 4
 
 def enabled() -> bool:
     return os.getenv("DB_CONTROL") == "1" and bool(os.getenv("CLOUD_SQL_INSTANCE")) and not os.getenv("DATABASE_URL")
-
-
-class DbNotReady(RuntimeError):
-    """DB が使えない(起動中など)。画面には、準備中として返す"""
-
-    def __init__(self, state: str) -> None:
-        super().__init__(state)
-        self.state = state
 
 
 def classify(instance: dict[str, Any]) -> str:

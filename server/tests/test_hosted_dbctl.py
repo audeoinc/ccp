@@ -1,4 +1,4 @@
-"""dbctl.py(DB の自動起動・停止の判断)の単体テスト。Google Cloud には接続しない(呼び出しを、模擬に差し替える)。"""
+"""hosted/dbctl.py(DB の自動起動・停止の判断)の単体テスト。Google Cloud には接続しない(呼び出しを、模擬に差し替える)。"""
 from __future__ import annotations
 
 import os
@@ -11,7 +11,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ["CLOUD_SQL_INSTANCE"] = "p:r:i"
 
-from ccp import dbctl  # noqa: E402
+from ccp.hosted import dbctl  # noqa: E402
 
 
 def instance(state: str, policy: str) -> dict[str, Any]:

@@ -1,0 +1,3 @@
+# 開発元の本番(Cloud Run + Cloud SQL)だけで使うもの(ccp/hosted/)。Dockerfile が requirements.txt と一緒に入れる。
+# Workbench 版のリリースには入れない。
+cloud-sql-python-connector[asyncpg]>=1.18

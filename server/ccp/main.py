@@ -13,11 +13,11 @@ from pathlib import Path
 import asyncio
 import logging
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import dbctl
+from . import dbready
 from .ai import router as ai_router
 from .approvals import router as approvals_router
 from .assets import router as assets_router
@@ -29,7 +29,13 @@ from sqlalchemy import text
 
 from .data_api import db, register_errors, router as data_router
 
-logging.basicConfig(level=logging.INFO)  # DB の起動・停止の記録(ccp.dbctl)などを、Cloud Run のログに出す
+try:
+    # 環境ごとの追加の API(ccp/hosted/)。そのフォルダがない環境では、登録しない
+    from .hosted.routes import router as hosted_router
+except ImportError:
+    hosted_router = None
+
+logging.basicConfig(level=logging.INFO)  # DB の状態の記録などを、サーバーのログに出す
 
 APP_PASSWORD = os.getenv("APP_PASSWORD")
 STATIC_DIR = Path(os.getenv("STATIC_DIR") or Path(__file__).resolve().parents[2] / "dist-gcp")
@@ -40,7 +46,7 @@ register_errors(app)
 
 @app.middleware("http")
 async def basic_auth(request: Request, call_next):
-    # 死活確認(中身は何も返さない)と、Cloud Scheduler からの内部の呼び出し(下で、Google の署名つきトークンを確認する)は、Basic 認証の対象外
+    # 死活確認(中身は何も返さない)と、内部の呼び出し(/internal/。呼ばれる側で、署名つきトークンを確認する)は、Basic 認証の対象外
     path = request.url.path
     if APP_PASSWORD and path != "/ping" and not path.startswith("/internal/"):
         header = request.headers.get("authorization", "")
@@ -64,7 +70,8 @@ async def healthz():
 @app.get("/api/db/status")
 async def db_status():
     """画面の「準備中」表示が、数秒おきに呼ぶ。止まっていれば、起動も依頼する"""
-    if not dbctl.enabled():
+    c = dbready.controller()
+    if c is None:
         # DB の自動起動を使わない環境(Workbench など): 実際につながるかを確かめ、つながらなければ理由を返す
         from . import data_api
 
@@ -74,10 +81,9 @@ async def db_status():
         except Exception:  # noqa: BLE001 — 理由は data_api.last_db_error に残っている
             return {"state": "unreachable", "detail": data_api.last_db_error or "理由は不明"}
         return {"state": "running"}
-    c = dbctl.controller()
     try:
         await c.ensure_running()
-    except dbctl.DbNotReady:
+    except dbready.DbNotReady:
         pass
     state = await c.status(fresh=True)
     if state == "running":
@@ -90,31 +96,6 @@ async def db_status():
     return {"state": state}
 
 
-@app.post("/internal/idle-check")
-async def idle_check(request: Request):
-    """Cloud Scheduler が定期的に呼ぶ。最後のアクセスから一定時間たっていたら、DB を停止する"""
-    if not dbctl.enabled():
-        return {"action": "none", "note": "DB の自動制御は無効です"}
-    await _verify_scheduler(request)
-    return await dbctl.controller().idle_check(float(os.getenv("DB_IDLE_MINUTES", "30")))
-
-
-async def _verify_scheduler(request: Request) -> None:
-    """Cloud Scheduler の署名つき(OIDC)トークンだけを受け付ける"""
-    from google.auth.transport import requests as greq
-    from google.oauth2 import id_token
-
-    header = request.headers.get("authorization", "")
-    if not header.startswith("Bearer "):
-        raise HTTPException(401, "token required")
-    try:
-        claims = await asyncio.to_thread(id_token.verify_oauth2_token, header[7:], greq.Request(), os.environ["IDLE_CHECK_AUDIENCE"])
-    except Exception as e:  # noqa: BLE001 — 署名・有効期限・宛先の不一致は、すべて拒否
-        raise HTTPException(401, "invalid token") from e
-    if claims.get("email") != os.environ["IDLE_CHECK_SA_EMAIL"] or not claims.get("email_verified"):
-        raise HTTPException(403, "forbidden")
-
-
 app.include_router(data_router)
 app.include_router(ai_router)
 app.include_router(assets_router)
@@ -123,6 +104,8 @@ app.include_router(bq_router)
 app.include_router(policies_router)
 app.include_router(approvals_router)
 app.include_router(me_router)
+if hosted_router is not None:
+    app.include_router(hosted_router)
 
 if STATIC_DIR.is_dir():
     # 画面。API より後に登録して、/api が先に処理されるようにする

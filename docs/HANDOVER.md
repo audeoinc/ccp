@@ -357,6 +357,19 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
     - 週の表示の上の古い形(`useWeekFrames`)の配信名の案は、種類の案を使っていない(返ってきても捨てる)。
     - 確かめたこと: `tsc`・`eslint`・`build`・`verify`。デモで、チップで選ぶ → 名前だけ入れた行・種類だけ選んだ行・空の行をまとめて AI で埋め、人の入力が残ることを見た。本物の Gemini で、種類の案が妥当か・同じ種類に偏らないかは、まだ。
 
+## 6.23 利用先に渡す Workbench 版のリリース ZIP(ローカル、2026-10-19、main)
+
+- 経緯: 利用先は、これまで公開リポジトリを直接 clone していたが、これからは利用先の GitHub で管理する。渡すのは Workbench 版として完結したソースだけ(開発元の名前・Cloud Run / Cloud SQL の本番の仕組み・Power Apps 版の痕跡・Git の履歴を入れない)。区切りごとの手での書き換えはしない。開発は、これまでどおりここで続ける。
+- 利用者と決めたこと: ① 本番だけの処理は**専用フォルダ `server/ccp/hosted/` に寄せ**、ZIP ではフォルダごと外す。② 文書は **Workbench 向けのもの + BACKLOG・SOURCE_MAP・FEATURE_REASONS**(開発の経緯として)。HANDOVER・CLOUD・ONBOARDING・GCP は入れない。③ Workbench から Cloud SQL Connector でつなぐ道は外す(`DATABASE_URL` だけ)。④ 環境に依存しない文書は、開発側の文書そのものを言い換えてよい(利用者)。
+- 作ったもの:
+  - `npm run release:workbench`(`scripts/release-workbench.mjs`)。コミット済みの内容から、`RULES` で選んだファイル + `release/workbench/files/`(Workbench 版の README・CLAUDE.md)+ `VERSION.txt` を `release-out/ccp-workbench-<日付>-<短い ID>.zip` にする。残してはいけない言葉・ファイル名・文書のリンク切れを検査し、展開した先で `npm ci`・`npm run verify`・サーバーのテスト・`ccp.main` の読み込みを通す。
+  - `server/ccp/hosted/`(`dbctl.py` を移した・`connect.py`(Cloud SQL Connector)・`routes.py`(`/internal/idle-check`)・`devtoken.py`(`CCP_DEV_GCLOUD`))、`server/ccp/dbready.py`(`DbNotReady` と、DB の起動待ちの差し込み口。**`dbctl` を直接 import しない**)、`server/requirements-hosted.txt`(Dockerfile と CI が一緒に入れる)、`server/tests/test_hosted_dbctl.py`。
+  - 文書: [RELEASE.md](RELEASE.md)(開発側の手引き。言葉の一覧・印の書き方)、[UPDATE.md](UPDATE.md)(利用先の Git への入れ替え・Workbench の取得元の切り替え・pull)。WORKBENCH・BIGQUERY・SOURCE_MAP・ARCHITECTURE・APPROVAL・BACKLOG などの本番の言葉を、言い換えるか印(`<!-- hosted -->` など)で外した。`scripts/workbench.sh status` に `VERSION.txt` の版を出す。
+- **約束が増えた**: ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)に、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・Power Apps・開発元の名前を書かない。新しいファイルを足したら `RULES` に足す(当たらないと止まる)。
+- 確かめたこと: `tsc`・`eslint`・`build`・`verify`、サーバーのテスト(71 件)、`npm run release:workbench` の通し(検査 → 展開した先での npm ci・verify・pip install・テスト)。本番に反映していない(Dockerfile と CI の依存の入れ方を変えたので、次の `deploy:gcp` で、Cloud SQL Connector が入ることを確かめる)。
+- 残したもの: `server/ccp/legacy_names.json`(以前の名前 `cr854_…` からの移行の表)。利用先の DB が古い名前のときに要るかもしれないので、外していない(外すかは利用者の判断)。
+- 渡した版: まだない(最初の ZIP は利用者が受け取ってから、ここに版を書く)。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

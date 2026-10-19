@@ -10,8 +10,8 @@
   ④ NG がない出力だけを、1 つのトランザクションで入れ替える(途中の状態を、画面や AI に見せない)
      NG の出力は、前のデータのまま残し、理由を bq_imports に記録する(画面に出す)
 
-Cloud Run は、決まった間隔で動き続けるサーバーではないので、定期的には取り込まない(画面を開いたとき + ボタン。11 章)。
-DB が止まっているとき(dbctl)は、require_db が「準備中」を返す。画面は、データを読めてから取り込みを依頼する。
+サーバーが常に動いているとは限らない(使われないときは止まる環境がある)ので、定期的には取り込まない(画面を開いたとき + ボタン。11 章)。
+DB が使えないとき(dbready)は、require_db が「準備中」を返す。画面は、データを読めてから取り込みを依頼する。
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import bq, bq_validate as bv, dbctl, schema as sc
+from . import bq, bq_validate as bv, dbready, schema as sc
 from .data_api import db, require_db
 
 log = logging.getLogger("ccp.bq")
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/bq", dependencies=[Depends(require_db)])
 MIN_INTERVAL_S = 60
 # 更新を見る表がないビューは、最終更新の日時で変化が分からないので、この間隔で読み直す
 VIEW_REFRESH = timedelta(minutes=10)
-# 取り込みを、複数のプロセス(Cloud Run の複数の台)で同時に行わない(PostgreSQL の勧告ロックの番号。CCP の中で一意なら何でもよい)
+# 取り込みを、複数のプロセス(サーバーの複数の台)で同時に行わない(PostgreSQL の勧告ロックの番号。CCP の中で一意なら何でもよい)
 LOCK_KEY = 4210017
 # 出力 → 書き込む表(取り込む順。SKU の確かめに SPU が、在庫の確かめに SKU が要る)
 ORDER = ("spu", "sku", "sku_stock", "weekly", "forecast")
@@ -322,7 +322,7 @@ async def get_status() -> dict[str, Any]:
 async def post_sync(force: bool = False) -> dict[str, Any]:
     try:
         return {"success": True, "data": await sync(force)}
-    except dbctl.DbNotReady:
+    except dbready.DbNotReady:
         raise  # DB の起動中は、ほかの API と同じ「準備中」で返す(register_errors)
     except ImportError:
         return {"success": False, "error": {"message": "パッケージ google-cloud-bigquery がありません(server/requirements.txt)"}}
