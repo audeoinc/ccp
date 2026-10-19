@@ -113,7 +113,11 @@ export function ProcessPane(props: Props) {
       <div className={s.top}>
         <span className={s.head}>{t('状態と承認', 'Status & approval')}</span>
         {props.canReview && props.card ? (
-          <ApprovalBar card={props.card} isDirty={props.isDirty} busy={props.busy} onChanged={props.onChanged} />
+          <>
+            <ApprovalBar card={props.card} isDirty={props.isDirty} busy={props.busy} onChanged={props.onChanged} />
+            {/* 週が確定しているときの説明(上の帯は、内容を変えたときだけ出すので、ふだんの説明はここに出す) */}
+            {props.locked && <span className={s.note}>{t('週が確定しています。変えるときは、理由を入れて保存します(承認はやり直しになります)', 'The week is confirmed. To change it, save with a reason (approval starts over).')}</span>}
+          </>
         ) : (
           <>
             <span className={s.status}>

@@ -943,6 +943,12 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const approvedBefore = !!card && statusRank(savedStatus) >= statusRank(STATUS_APPROVED)
   // 開いた時点から内容が変わったか(承認・依頼の前に、保存してもらうため。基準は ref なので、描画の中では読まず、関数で渡す)
   const isDirty = () => baseline.current !== null && baseline.current !== contentKey()
+  // 開いてから内容を変えたか(承認済み・確定した週の帯は、変えたときだけ出す。ふだんの説明は、右のプロセスのペインの状態の下)
+  const [changed, setChanged] = useState(false)
+  const currentKey = contentKey()
+  useEffect(() => {
+    setChanged(baseline.current !== null && baseline.current !== currentKey)
+  }, [currentKey])
   // 承認(依頼・承認・差し戻し)を出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
   const canReview = !!card && lockedWeeks.length === 0 && statusRank(savedStatus) <= statusRank(STATUS_APPROVED)
   // 承認の依頼・承認で、サーバーが配信のステータスを変えたら、入力欄のステータスもそろえる(次の保存で、古いステータスを書き戻さないように)
@@ -1119,22 +1125,22 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
               </MessageBarBody>
             </MessageBar>
           )}
-          {approvedBefore && lockedWeeks.length === 0 && (
+          {approvedBefore && lockedWeeks.length === 0 && changed && (
             <MessageBar layout="multiline" intent="info" className={styles.locked}>
               <MessageBarBody>
                 {t(
-                  'この配信は承認済みです。内容を変えて保存すると「承認待ち」に戻り、承認の依頼からやり直しになります。',
-                  'This delivery is approved. If you change the content and save, it goes back to awaiting approval and needs a new approval request.',
+                  '承認済みの配信の内容を変えています。保存すると「承認待ち」に戻り、承認の依頼からやり直しになります。',
+                  'You are changing an approved delivery. Saving puts it back to awaiting approval and needs a new approval request.',
                 )}
               </MessageBarBody>
             </MessageBar>
           )}
-          {lockedWeeks.length > 0 && (
+          {lockedWeeks.length > 0 && changed && (
             <MessageBar layout="multiline" intent="warning" className={styles.locked}>
               <MessageBarBody>
                 {t(
-                  `この配信の週(${lockedWeeks.map(weekRange).join('、')})は確定済みです。変更を保存するときは、理由を入力します。保存すると、この配信は「承認待ち」に戻り、週の確定は解けます。`,
-                  `The week of this delivery (${lockedWeeks.map(weekRange).join(', ')}) is confirmed. To save changes, enter a reason. Saving puts this delivery back to awaiting approval and the week is no longer confirmed.`,
+                  `確定した週(${lockedWeeks.map(weekRange).join('、')})の配信を変えています。保存するときは、理由を入力します。保存すると、この配信は「承認待ち」に戻り、週の確定は解けます。`,
+                  `You are changing a delivery in a confirmed week (${lockedWeeks.map(weekRange).join(', ')}). To save, enter a reason. Saving puts this delivery back to awaiting approval and the week is no longer confirmed.`,
                 )}
               </MessageBarBody>
             </MessageBar>

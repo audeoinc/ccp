@@ -203,7 +203,10 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
         <span className={s.note}>
           {card.status === 'reviewing'
             ? t('承認の依頼がありません(内容が変わったか、取り下げられました)。依頼し直してください', 'No open approval request (the content changed or it was withdrawn). Request again.')
-            : t('承認の依頼は、まだありません', 'No approval request yet')}
+            : card.status === 'approved' || card.status === 'confirmed'
+              ? // 依頼を通さずに承認済みになった配信(以前のまとめての承認など)。上の帯は、内容を変えたときだけ出すので、ふだんの説明はここに出す
+                t('承認済みです。内容を変えて保存すると、承認はやり直しになります', 'Approved. Changing the content and saving will require approval again')
+              : t('承認の依頼は、まだありません', 'No approval request yet')}
         </span>
       )}
       <div className={s.actions}>
