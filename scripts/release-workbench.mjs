@@ -2,6 +2,7 @@
 //   npm run release:workbench                 HEAD から作り、検査し、展開した先でビルドとテストを通す
 //   npm run release:workbench -- --ref main   作る元のコミットを指定する
 //   npm run release:workbench -- --no-test    検査だけ(npm ci・ビルド・サーバーのテストを省く。急ぐときの確認用。渡す ZIP は省かずに作る)
+//   npm run release:workbench -- --publish    すべての確かめを通ったら、GitHub の Releases に公開する(タグ workbench-<版>。利用先は、そこからダウンロードする)
 //
 // 書き換えの手作業をなくすため、次をすべてこのスクリプトが行う。
 //   ① コミット済みのファイル(git archive)から、入れるものだけを選ぶ(下の RULES。どれにも当たらないファイルがあれば止まる)
@@ -76,6 +77,7 @@ const option = (name, fallback) => {
 }
 const ref = option('--ref', 'HEAD')
 const runTests = !flag('--no-test')
+const publish = flag('--publish')
 
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 })
 const gitBuf = (...a) => execFileSync('git', a, { cwd: ROOT, maxBuffer: 1 << 30 })
@@ -84,6 +86,8 @@ const fail = (msg) => {
   process.exit(1)
 }
 const step = (msg) => console.log(`\n■ ${msg}`)
+
+if (publish && !runTests) fail('--publish は --no-test と一緒には使えません(確かめを通った ZIP だけを公開する)')
 
 // ---- ① ファイルを選ぶ
 step(`元のコミット: ${ref}`)
@@ -210,7 +214,7 @@ const app = join(work, top)
 const run = (cmd, a, cwd = app) => {
   console.log(`  $ ${cmd} ${a.join(' ')}`)
   // Windows の npm は npm.cmd なので、シェルを通す。ほかは通さない(シェルを通すと、空白を含む引数が切れる)
-  const r = spawnSync(cmd, a, { cwd, stdio: 'inherit', shell: process.platform === 'win32' && cmd === 'npm' })
+  const r = spawnSync(cmd, a, { cwd, stdio: 'inherit', shell: process.platform === 'win32' && cmd === 'npm', env: { ...process.env, PYTHONUTF8: '1' } })
   if (r.status !== 0) fail(`${cmd} ${a.join(' ')} が失敗しました(展開した先: ${relative(ROOT, app)})`)
 }
 run('npm', ['ci', '--no-audit', '--no-fund'])
@@ -225,6 +229,25 @@ run(venvPy, ['-c', "import ccp.main as m; paths = {getattr(r, 'path', '') for r 
 
 rmSync(work, { recursive: true, force: true })
 console.log(`\n完了: ${relative(ROOT, zipPath)}(検査・ビルド・サーバーのテストを通りました)`)
+
+// ---- GitHub の Releases に公開する(--publish)。版ごとのリリースに ZIP を添付する(リポジトリの履歴には入れない)
+if (publish) {
+  step('GitHub の Releases に公開する')
+  git('fetch', '-q', 'origin')
+  const full = git('rev-parse', `${sha}^{commit}`).trim()
+  // タグを元のコミットに付けるので、そのコミットが GitHub にないと公開できない
+  if (!git('branch', '-r', '--contains', full).trim()) fail(`元のコミット ${sha} が、まだ push されていません`)
+  const tag = `workbench-${version}`
+  const notes = [
+    `Vertex AI Workbench で動かす CCP の版 ${version}(元のコミット ${sha}、コミットの日付 ${commitDate})。`,
+    '',
+    `添付の ccp-workbench-${version}.zip をダウンロードし、ZIP の中の docs/UPDATE.md の手順で、利用先の Git に入れてください。`,
+    '検査(残してはいけない言葉・リンク切れ)と、展開した先での npm ci・npm run verify・サーバーのテストを通っています。',
+  ].join('\n')
+  const r = spawnSync('gh', ['release', 'create', tag, zipPath, '--target', full, '--title', `CCP Workbench 版 ${version}`, '--notes', notes], { cwd: ROOT, stdio: 'inherit' })
+  if (r.status !== 0) fail('gh release create に失敗しました(同じ版がすでにあるか、gh auth status でサインインを確かめる)')
+  console.log(`  公開しました: タグ ${tag}`)
+}
 
 // 印の 3 つの書き方: ① 行の中の <!-- hosted --> → その行を消す(表の行・箇条書き)
 // ② <!-- hosted:begin --> 〜 <!-- hosted:end -->(mermaid の中では %% hosted:begin 〜 %% hosted:end)→ その範囲を消す。

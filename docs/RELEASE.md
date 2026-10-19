@@ -12,6 +12,7 @@
 npm run release:workbench                  # HEAD から作る。検査 → 展開した先で npm ci・npm run verify・サーバーのテスト
 npm run release:workbench -- --ref main    # 作る元を指定する(タグやコミットでもよい)
 npm run release:workbench -- --no-test     # 検査だけ(ビルドとテストを省く。途中の確認用。渡す ZIP は省かずに作る)
+npm run release:workbench -- --publish     # すべて通ったら、GitHub の Releases に公開する(渡すときはこれ)
 ```
 
 - できるもの: `release-out/ccp-workbench-<版>.zip`(`release-out/` は Git に入れない)。版は `<コミットの日付 YYYYMMDD>-<コミットの短い ID>`。
@@ -79,7 +80,10 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 1. **言い換える**(おすすめ。利用先にも意味が通るなら)。例: 「Cloud Run では」→「本番では」「サーバーの」。
 2. 利用先に要らない話なら、印で囲む。
 
-## 6. 渡したあと
+## 6. 渡す
 
-- 渡した版は、HANDOVER に書く(版・元のコミット)。必要なら、元のコミットに `workbench/<版>` のタグを付ける。
+- **`--publish` で、GitHub の Releases に公開する。** 元のコミットにタグ `workbench-<版>` を付け、`CCP Workbench 版 <版>` のリリースに ZIP を添付する(`gh` のサインインが要る)。ZIP はリポジトリの履歴に入れない(版ごとに約 19 MB あるため)。
+- 元のコミットが push 済みでないと止まる。`--no-test` とは一緒に使えない(確かめを通った ZIP だけを公開する)。
+- 利用先は、Releases の版のページから ZIP をダウンロードする。公開リポジトリなので、だれでもダウンロードできる(中身は、リポジトリで公開しているソースの一部)。
+- 公開した版は、HANDOVER に書く(版・元のコミット)。
 - 利用先は、ZIP を Git に入れ、`CCP Workbench 版 <版>` でコミットする([UPDATE.md](UPDATE.md))。Workbench の `scripts/workbench.sh status` に、その版が出る。

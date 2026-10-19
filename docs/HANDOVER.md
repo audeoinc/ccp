@@ -369,7 +369,8 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **約束が増えた**: ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)に、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・Power Apps・開発元の名前を書かない。新しいファイルを足したら `RULES` に足す(当たらないと止まる)。
 - 確かめたこと: `tsc`・`eslint`・`build`・`verify`、サーバーのテスト(71 件)、`npm run release:workbench` の通し(検査 → 展開した先での npm ci・verify・pip install・テスト)。本番に反映していない(Dockerfile と CI の依存の入れ方を変えたので、次の `deploy:gcp` で、Cloud SQL Connector が入ることを確かめる)。
 - 残したもの: `server/ccp/legacy_names.json`(以前の名前 `cr854_…` からの移行の表)。利用先の DB が古い名前のときに要るかもしれないので、外していない(外すかは利用者の判断)。
-- 渡した版: まだない(最初の ZIP は利用者が受け取ってから、ここに版を書く)。
+- **渡し方**: GitHub の Releases(利用者が決めた。`npm run release:workbench -- --publish` が、タグ `workbench-<版>` のリリースを作って ZIP を添付する。リポジトリには ZIP を入れない)。
+- 公開した版: `20261019-1d1ed27`(1d1ed27 から。Releases の `workbench-20261019-1d1ed27`)。
 
 ## 6.23 X30 配信カードの中でアラートに対応する(2026-10-19、UI セッション)
 
