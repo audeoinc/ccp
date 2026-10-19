@@ -7,6 +7,12 @@ import {
   DialogSurface,
   Field,
   Input,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
+  type MenuButtonProps,
   MessageBar,
   MessageBarBody,
   ProgressBar,
@@ -14,6 +20,7 @@ import {
   RadioGroup,
   Select,
   Spinner,
+  SplitButton,
   Tab,
   ToggleButton,
   TabList,
@@ -679,14 +686,35 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
     if (plainDone) return finishButton
     if (ws.step === 1)
       return (
-        <>
-          <Button appearance="secondary" disabled={!ws.plainReady} onClick={() => void ws.savePlainAll()}>
-            {t(`中身は作らずに ${n} 本を保存`, `Save ${n} without content`)}
-          </Button>
-          <Button appearance="primary" icon={<AiIcon tone="white" />} disabled={!ws.allReady} onClick={() => void ws.generate(ws.pending)}>
-            {t(`${n} 本の中身を AI で作る`, `Create ${n} with AI`)}
-          </Button>
-        </>
+        // 主の道は「AI で作る」1 つ。中身なしの保存は、「新規作成 ▾」と同じく ▾ の中に置く(この画面の目的は、まとめて AI で作ることなので)
+        <Menu positioning="above-end">
+          <MenuTrigger disableButtonEnhancement>
+            {(triggerProps: MenuButtonProps) => (
+              <SplitButton
+                appearance="primary"
+                icon={<AiIcon tone="white" />}
+                disabled={!ws.allReady && !ws.plainReady}
+                primaryActionButton={{ disabled: !ws.allReady, onClick: () => void ws.generate(ws.pending) }}
+                menuButton={{ ...triggerProps, 'aria-label': t('ほかの保存のしかた', 'Other ways to save') }}
+              >
+                {t(`${n} 本の中身を AI で作る`, `Create ${n} with AI`)}
+              </SplitButton>
+            )}
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem
+                disabled={!ws.plainReady}
+                secondaryContent={t('配信名だけで保存できます', 'Needs names only')}
+                onClick={() => {
+                  if (window.confirm(t(`中身は作らずに、${n} 本を下書き(未起案)で保存します。中身は、あとで配信カードで作ります。よろしいですか?`, `Save ${n} as drafts (Not started) without content? You can create the content later in each card.`))) void ws.savePlainAll()
+                }}
+              >
+                {t(`中身は作らずに、${n} 本を下書きで保存`, `Save ${n} as drafts without content`)}
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
       )
     if (ws.step === 2)
       return (
@@ -701,8 +729,8 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
     ? ''
     : ws.step === 1
       ? t(
-          `作る ${n} 本 ・ 種類と配信名が入った ${readyCount} 本(AI で作るには、両方が要ります。作らずに保存するときは、配信名だけで保存できます)`,
-          `${n} to create · ${readyCount} with type and name (AI needs both; saving without content needs only names)`,
+          `作る ${n} 本 ・ 種類と配信名が入った ${readyCount} 本(AI で作るには、両方が要ります)`,
+          `${n} to create · ${readyCount} with type and name (AI needs both)`,
         )
       : ws.step === 3
         ? t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本。保存していない案は、終えると破棄されます。`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}. Unsaved drafts are discarded when you finish.`)

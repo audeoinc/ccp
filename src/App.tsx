@@ -707,6 +707,8 @@ function App() {
       return d >= weekStart && d < end
     })
   }, [rows, weekStart])
+  // 週の表示に出ている配信(絞り込みのあと)。週の枠の帯は、見えている枠だけを数える
+  const weekVisibleIds = useMemo(() => new Set(weekRows.map((r) => r.card.id)), [weekRows])
   // 週の状態: この週の行と、この週のすべての配信(絞り込みに関係なく、週の単位で進める)
   const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
   const weekEvents = useMemo(() => events.filter((e) => e.week_start?.slice(0, 10) === weekKey), [events, weekKey])
@@ -1447,7 +1449,7 @@ function App() {
                   </div>
                 </Portal>
               )}
-              <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} />
+              <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} visibleIds={weekVisibleIds} />
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
