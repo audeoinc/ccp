@@ -1,7 +1,8 @@
 // まとめて作る作業画面(BulkWorkspace)の、状態と操作。
 // 週の表示の上で作る形(useWeekFrames)は、表示の場所を作業の場所に使うので、手順が分かりにくかった(利用者・チームの指摘、2026-10-19)。
-// そこで、作業は全画面の作業画面で完結させ、① 対象 → ② 配信名・種類 → ③ 中身を AI で作る → ④ 確かめる、の順に進める。
-// 中身のない枠は保存しない。①② は画面の中だけで持ち、③ で中身ができた配信から、1 本ずつ新規作成した下書きと同じ「未起案」で保存する
+// そこで、作業は全画面の作業画面で完結させ、① 対象と方向(週・国・チャネル・作る日と、配信名・種類) → ② 中身を AI で作る → ③ 確かめる、の順に進める。
+// ① は画面の中だけで持つ。② で中身ができた配信から、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。
+// AI で作らない道もある(① のあと、中身を入れずに保存する。1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -12,7 +13,7 @@ import { channelOptions, departmentOptions, CHANNEL_EMAIL } from './status'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { sundayOf } from './weekLock'
 import { tr } from './i18n'
-import { BULK_PARALLEL, BULK_TIME, createDraft, generateFor, markChecked, overusedInWeek, weekDays, type DraftBase } from './bulkDraft'
+import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, markChecked, overusedInWeek, weekDays, type DraftBase } from './bulkDraft'
 import type { Progress } from './useWeekFrames'
 
 interface Ctx {
@@ -28,9 +29,10 @@ interface Ctx {
   onChanged: () => Promise<void>
 }
 
-export type Step = 1 | 2 | 3 | 4
+/** 1 = 対象と方向(週・国・チャネル・作る日と、配信名・種類)、2 = 中身を AI で作る、3 = 確かめる */
+export type Step = 1 | 2 | 3
 
-/** ② で入れる、1 日分の行(まだ保存しない) */
+/** ① で入れる、1 日分の行(まだ保存しない) */
 export interface Row {
   name: string
   themeType: string
@@ -51,16 +53,18 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const [weekStart, setWeekStart] = useState(() => sundayOf(new Date()))
   const [country, setCountryRaw] = useState('')
   const [channel, setChannelRaw] = useState(CHANNEL_EMAIL)
-  // ① で選んだ日(YYYY-MM-DD)
+  // ① で選んだ日(YYYY-MM-DD)と、行(日 → 配信名・種類)
   const [chosen, setChosen] = useState<Set<string>>(new Set())
-  // ② の行(日 → 配信名・種類)
   const [rows, setRows] = useState<Map<string, Row>>(new Map())
   const [naming, setNaming] = useState<Set<string>>(new Set())
-  // ③ の進み具合・失敗・保存した配信(日 → 配信カードの id)
+  // ② の進み具合・失敗・保存した配信(日 → 配信カードの id)
   const [progress, setProgress] = useState<Map<string, Progress>>(new Map())
   const [failed, setFailed] = useState<Map<string, string>>(new Map())
   const [made, setMade] = useState<Map<string, string>>(new Map())
-  // ④ で見ている配信
+  // 中身を作らずに保存した配信(日 → 配信カードの id)。1 本ずつ新規作成して、中身を入れずに保存したのと同じ
+  const [plain, setPlain] = useState<Map<string, string>>(new Map())
+  const [savingPlain, setSavingPlain] = useState(false)
+  // ③ で見ている配信
   const [checkId, setCheckId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const stopRef = useRef(false)
@@ -75,15 +79,20 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   )
 
   const days = useMemo(() => weekDays(weekStart, cards, weeks, channel, country), [weekStart, cards, weeks, channel, country])
-  // ② に進んだときの作る日。保存すると、その日は「配信あり」に変わるので、① の判定から毎回求めると、作った行が消えてしまう
+  // 保存を始めたときの作る日。保存すると、その日は「配信あり」に変わるので、① の判定から毎回求めると、作った行が消えてしまう
   const [plan, setPlan] = useState<string[] | null>(null)
-  /** 作る日(① では、選んだ作れる日。② 以降は、② に進んだときの日。日付の順) */
+  /** 作る日(① では、選んだ作れる日。保存を始めたら、その時の日。日付の順) */
   const targets = plan ?? days.filter((d) => d.state === 'free' && chosen.has(d.key)).map((d) => d.key)
   const rowOf = (day: string): Row => rows.get(day) ?? { name: '', themeType: '' }
+  /** AI で中身を作れる行(配信名と種類。方向を決めてから作ると、作り直しが減る) */
   const ready = (day: string) => !!rowOf(day).name.trim() && !!rowOf(day).themeType
   const allReady = targets.length > 0 && targets.every(ready)
-  // ③ の対象(まだ保存していない日)
+  /** 中身を作らずに保存できるか(配信名は空を許さない列なので、配信名だけは要る。種類は、あとでもよい) */
+  const plainReady = targets.length > 0 && targets.every((d) => !!rowOf(d).name.trim())
+  // ② の対象(まだ保存していない日)
   const pending = targets.filter((d) => !made.has(d))
+  /** 何か保存したら、① には戻らない(保存した配信と、行の対応がずれるため) */
+  const saved = made.size > 0 || plain.size > 0
 
   // 国・チャネル・週を変えたら、作れる日を選び直す(既定は、作れる日すべて)
   const pickFree = (ws: Date, ch: string, co: string) => setChosen(new Set(weekDays(ws, cards, weeks, ch, co).filter((d) => d.state === 'free').map((d) => d.key)))
@@ -103,23 +112,26 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setProgress(new Map())
     setFailed(new Map())
     setMade(new Map())
+    setPlain(new Map())
     setCheckId(null)
     setError(null)
     setPlan(null)
     setStep(1)
     setOpen(true)
   }
-  /** 手順を移る。① に戻ると、作る日を選び直せる。① から先に進むと、作る日を決める */
+  /** 手順を移る。① には、まだ何も保存していないときだけ戻れる(作る日を選び直せる) */
   function goStep(k: Step) {
-    if (k === 1) setPlan(null)
-    else if (step === 1) setPlan(targets)
+    if (k === 1) {
+      if (saved) return
+      setPlan(null)
+    }
     setStep(k)
   }
-  /** 閉じる。まだ保存していない入力があれば確かめる(作った中身は保存済みなので、消えない) */
+  /** 閉じる。まだ保存していない入力があれば確かめる(作った配信は保存済みなので、消えない) */
   function close() {
-    if (running) return
-    const unsaved = targets.some((d) => !made.has(d) && (rowOf(d).name.trim() || rowOf(d).themeType))
-    if (unsaved && !window.confirm(tr('中身をまだ作っていない配信名・種類は、保存されずに消えます。閉じますか?', 'Names and types without content are not saved and will be lost. Close anyway?'))) return
+    if (running || savingPlain) return
+    const unsaved = targets.some((d) => !made.has(d) && !plain.has(d) && (rowOf(d).name.trim() || rowOf(d).themeType))
+    if (unsaved && !window.confirm(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?'))) return
     setOpen(false)
   }
 
@@ -193,12 +205,38 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     }
   }
 
-  /** ③ 中身を作る(人が押す)。できた配信から、新しい配信カードとして保存する */
+  /**
+   * 中身を作らずに保存する。1 本ずつ新規作成して、中身を入れずに保存したのと同じ「未起案」の下書きにする
+   * (AI で作らないので、未確認の印は付けない。中身は、あとで配信カードで作る)
+   */
+  async function savePlainAll() {
+    if (!plainReady) return
+    const list = [...targets]
+    setPlan(list)
+    setError(null)
+    setSavingPlain(true)
+    try {
+      for (const day of list) {
+        if (plain.has(day)) continue
+        const card = await createPlainDraft(baseOf(day))
+        setPlain((m) => new Map(m).set(day, card.id))
+      }
+      await onChanged()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      await onChanged()
+    } finally {
+      setSavingPlain(false)
+    }
+  }
+
+  /** ② 中身を作る(人が押す)。できた配信から、新しい配信カードとして保存する */
   async function generate(list: string[]) {
     if (list.length === 0) return
     stopRef.current = false
     setError(null)
-    setStep(3)
+    setPlan((p) => p ?? list)
+    setStep(2)
     setFailed((m) => new Map([...m].filter(([d]) => !list.includes(d))))
     setProgress((m) => new Map([...m, ...list.map((d) => [d, { step: tr('順番を待っています', 'Waiting'), done: 0, total: 7 }] as const)]))
     const queue = [...list]
@@ -272,6 +310,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   /** ④ で見る配信(保存した順ではなく、日付の順) */
   const madeCards = targets.map((d) => made.get(d)).filter((id): id is string => !!id).map((id) => cards.find((c) => c.id === id)).filter((c): c is DeliveryCard => !!c)
   const unchecked = madeCards.filter((c) => c.ai_unchecked_at).length
+  /** 中身を作らずに保存した配信(日付の順) */
+  const plainCards = targets.map((d) => plain.get(d)).filter((id): id is string => !!id).map((id) => cards.find((c) => c.id === id)).filter((c): c is DeliveryCard => !!c)
 
   /** 「確認した」: AI 下書き・未確認の印を外す */
   async function check(id: string) {
@@ -315,6 +355,11 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     stop,
     madeCards,
     unchecked,
+    plainReady,
+    savePlainAll,
+    savingPlain,
+    plainCards,
+    saved,
     checkId,
     setCheckId,
     check,

@@ -102,15 +102,40 @@ const useStyles = makeStyles({
   weekText: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, minWidth: '150px', textAlign: 'center' },
   field: { minWidth: '220px' },
   radios: { '& label': { whiteSpace: 'nowrap' } },
-  // ① の 7 日。作れない日も並べ、薄くして理由を出す
-  days: { display: 'grid', rowGap: '4px' },
-  day: { display: 'grid', gridTemplateColumns: '28px 110px minmax(0, 1fr)', alignItems: 'center', columnGap: '6px', padding: '4px 8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
+  // ① の 7 日の表(作る日のチェック・配信日・種類・配信名)。作れない日も並べ、薄くして理由を出す
+  table: { display: 'grid', rowGap: '4px' },
+  thead: { display: 'grid', gridTemplateColumns: '28px 100px 170px minmax(0, 1fr)', columnGap: '8px', padding: '0 8px' },
+  tr: {
+    display: 'grid',
+    gridTemplateColumns: '28px 100px 170px minmax(0, 1fr)',
+    columnGap: '8px',
+    alignItems: 'center',
+    minHeight: '36px',
+    padding: '4px 8px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  span2: { gridColumn: 'span 2' },
   dayOff: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled },
   dayOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   dayDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
   dayNote: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  // ② ③ の表
-  grid: { display: 'grid', gridTemplateColumns: '110px 170px minmax(0, 1fr)', columnGap: '10px', rowGap: '8px', alignItems: 'start' },
+  // AI でまとめて入れる帯
+  aiBar: {
+    display: 'flex',
+    alignItems: 'center',
+    columnGap: '12px',
+    rowGap: '8px',
+    flexWrap: 'wrap',
+    padding: '10px 12px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorBrandStroke2}`,
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  aiText: { display: 'grid', rowGap: '2px', flexGrow: 1, flexBasis: '280px', minWidth: 0 },
+  aiTitle: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
+  plainRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },
+  // ② の表
   grid3: { display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) minmax(0, 1.2fr)', columnGap: '10px', rowGap: '10px', alignItems: 'center' },
   th: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   cellDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, paddingTop: '6px' },
@@ -127,6 +152,7 @@ const useStyles = makeStyles({
   sideDay: { display: 'grid', rowGap: '3px' },
   sideItem: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', minWidth: 0 },
   sideName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  newBadge: { flexShrink: 0, whiteSpace: 'nowrap' },
   sideNew: { fontStyle: 'italic', color: tokens.colorBrandForeground1 },
   muted: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
   // ④ 左に作った配信、右に中身
@@ -166,8 +192,9 @@ interface Props {
 /**
  * まとめて作る作業画面(W14 の作り直し。2026-10-19)。
  * 週の表示の上で作る形(「この週の枠を作る」)は比較のために残し、こちらは作業をこの画面で完結させる:
- * ① 対象(週・国・チャネル・作る日) → ② 配信名・種類 → ③ 中身を AI で作る → ④ 確かめる。
- * 中身のない枠は保存しない。③ で中身ができた配信から、ふつうの下書き(未起案)として保存する
+ * ① 対象と方向(週・国・チャネル、作る日と、その日の種類・配信名) → ② 中身を AI で作る → ③ 確かめる。
+ * ① は保存しない。② で中身ができた配信から、ふつうの下書き(未起案)として保存する。
+ * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
 export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpen, onFinish }: Props) {
   const s = useStyles()
@@ -185,38 +212,38 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
 
   // ---- 手順
   const stepNames: Record<Step, string> = {
-    1: t('対象を選ぶ', 'Choose target'),
-    2: t('配信名・種類', 'Name & type'),
-    3: t('中身を AI で作る', 'Create with AI'),
-    4: t('確かめる', 'Review'),
+    1: t('対象と方向を決める', 'Target & direction'),
+    2: t('中身を AI で作る', 'Create with AI'),
+    3: t('確かめる', 'Review'),
   }
-  // 戻れるのは、済んだ手順だけ。中身を作り始めたら、① ② には戻らない(作った配信と、行の対応がずれるため)
+  // 中身を作らずに保存したときは、② ③ は通らない
+  const plainDone = ws.plainCards.length > 0 || ws.savingPlain
+  // 戻れるのは、済んだ手順だけ。何か保存したら、① には戻らない(保存した配信と、行の対応がずれるため)
   const reachable = (k: Step) => {
-    if (ws.running) return k === ws.step
-    if (ws.made.size > 0) return k >= 3 && (k === 3 || ws.madeCards.length > 0)
-    if (k === 1) return true
-    if (k === 2) return n > 0
-    return false
+    if (ws.running || plainDone) return k === ws.step
+    if (k === 1) return !ws.saved
+    if (k === 2) return ws.made.size > 0 || ws.failed.size > 0
+    return ws.madeCards.length > 0
   }
-  const stepDone = (k: Step) => k < ws.step || (k === 3 && ws.made.size > 0 && ws.pending.length === 0)
+  const stepDone = (k: Step) => k < ws.step || (k === 1 && plainDone) || (k === 2 && ws.made.size > 0 && ws.pending.length === 0)
   const stepper = (
     <nav className={s.steps} aria-label={t('手順', 'Steps')}>
-      {([1, 2, 3, 4] as Step[]).map((k) => (
+      {([1, 2, 3] as Step[]).map((k) => (
         <Fragment key={k}>
           {k > 1 && <span className={s.stepLine} />}
           <Button
             appearance="transparent"
             size="small"
-            className={mergeClasses(s.stepBtn, k === ws.step && s.stepNow, stepDone(k) && k !== ws.step && s.stepDone)}
+            className={mergeClasses(s.stepBtn, k === ws.step && !plainDone && s.stepNow, stepDone(k) && k !== ws.step && s.stepDone)}
             disabled={!reachable(k)}
             aria-current={k === ws.step ? 'step' : undefined}
             onClick={() => ws.setStep(k)}
-            icon={stepDone(k) && k !== ws.step ? <CheckmarkCircleFilled className={s.doneIcon} /> : <span className={mergeClasses(s.stepNum, k === ws.step && s.stepNumNow)}>{k}</span>}
+            icon={stepDone(k) && (k !== ws.step || plainDone) ? <CheckmarkCircleFilled className={s.doneIcon} /> : <span className={mergeClasses(s.stepNum, k === ws.step && s.stepNumNow)}>{k}</span>}
           >
             {stepNames[k]}
-            {k === 2 && n > 0 ? ` (${readyCount}/${n})` : ''}
-            {k === 3 && n > 0 ? ` (${ws.made.size}/${n})` : ''}
-            {k === 4 && ws.madeCards.length > 0 ? ` (${t('未確認', 'unchecked')} ${ws.unchecked})` : ''}
+            {k === 1 && n > 0 && !plainDone ? ` (${readyCount}/${n})` : ''}
+            {k === 2 && plainDone ? ` — ${t('作らずに保存', 'skipped')}` : k === 2 && n > 0 && ws.saved ? ` (${ws.made.size}/${n})` : ''}
+            {k === 3 && ws.madeCards.length > 0 ? ` (${t('未確認', 'unchecked')} ${ws.unchecked})` : ''}
           </Button>
         </Fragment>
       ))}
@@ -226,13 +253,13 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
   // ---- 右: その週の配信(見るだけ。作ろうとしている行も、薄く重ねて見せる)
   const weekEndNext = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 7)
   const inWeek = cards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
-  const madeIds = new Set(ws.made.values())
+  const madeIds = new Set([...ws.made.values(), ...ws.plainCards.map((c) => c.id)])
   const side = (
     <aside className={s.side} aria-label={t('この週の配信', 'Deliveries this week')}>
       <h3 className={s.h3}>{t('この週の配信(すべての国・チャネル)', 'This week (all countries & channels)')}</h3>
       {ws.days.map((d) => {
         const list = inWeek.filter((c) => dayKeyOf(new Date(c.scheduled_at!)) === d.key).sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
-        const planned = ws.targets.includes(d.key) && !ws.made.has(d.key)
+        const planned = ws.targets.includes(d.key) && !list.some((c) => madeIds.has(c.id))
         return (
           <div key={d.key} className={s.sideDay}>
             <span className={s.label}>{dayText(d.key)}</span>
@@ -243,7 +270,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
                 <span className={s.sideName}>{c.name || t('(配信名なし)', '(no name)')}</span>
                 {/* すべての国を出すので、① の国と違う配信だと分かるように */}
                 {c.country && <span className={s.muted}>{c.country}</span>}
-                {madeIds.has(c.id) && <Badge size="small" appearance="tint" color="brand">{t('いま作った', 'New')}</Badge>}
+                {madeIds.has(c.id) && <Badge size="small" appearance="tint" color="brand" className={s.newBadge}>{t('いま作った', 'New')}</Badge>}
               </span>
             ))}
             {planned && (
@@ -258,19 +285,18 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
     </aside>
   )
 
-  // ---- ① 対象
+  // ---- ① 対象と方向(週・国・チャネル、作る日と、その日の配信名・種類を、1 つの表で)
   const step1 = () => {
     const locked = ws.days.some((d) => d.state === 'locked')
-    const note = (d: (typeof ws.days)[number]): ReactNode => {
+    const unnamed = ws.targets.filter((d) => !ws.rowOf(d).name.trim())
+    const note = (d: (typeof ws.days)[number]): string => {
       if (d.state === 'locked') return t('確定した週', 'Confirmed week')
       if (d.state === 'past') return t('過ぎた日', 'Past')
-      if (d.state === 'used') return t(`${channelName}あり: ${d.same.map((x) => x.name || '(配信名なし)').join('、')}`, `Has ${channelName}: ${d.same.map((x) => x.name || '(no name)').join(', ')}`)
-      return ws.chosen.has(d.key) ? t('作る', 'Create') : t('作らない', 'Skip')
+      return t(`${channelName}あり: ${d.same.map((x) => x.name || '(配信名なし)').join('、')}`, `Has ${channelName}: ${d.same.map((x) => x.name || '(no name)').join(', ')}`)
     }
     return (
       <div className={s.main}>
         <section className={s.panel}>
-          <h3 className={s.h3}>{t('どの週の、どの国・チャネルの配信を作りますか', 'Which week, country and channel?')}</h3>
           <div className={s.row}>
             <Field label={t('週', 'Week')}>
               <span className={s.weekPick}>
@@ -299,30 +325,70 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           </div>
         </section>
         <section className={s.panel}>
-          <h3 className={s.h3}>{t('作る日', 'Days to create')}</h3>
+          <h3 className={s.h3}>{t('作る日と、配信の方向', 'Days and direction')}</h3>
           <span className={s.hint}>
             {locked
               ? t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')
               : t(
-                  `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。もうある日・過ぎた日は選べません。`,
-                  `One delivery per day on days without ${channelName} (from today). Days that already have one, or have passed, can't be chosen.`,
+                  `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れ、種類と配信名を入れてください。ここではまだ保存しません。`,
+                  `One delivery per day on days without ${channelName} (from today). Check the days, then enter a type and a name. Nothing is saved yet.`,
                 )}
           </span>
-          <div className={s.days}>
+          {/* AI でまとめて入れる。表の上に、何をするかを書いた帯で出す(小さなボタンだけだと、何が起きるか分からないため) */}
+          <div className={s.aiBar}>
+            <AiIcon size={20} />
+            <div className={s.aiText}>
+              <span className={s.aiTitle}>{t('配信名を AI でまとめて入れる', 'Fill names with AI')}</span>
+              <span className={s.hint}>
+                {t(
+                  '作る日のうち、配信名が空の行に、日付・種類・前後の配信に合う案を入れます。種類を先に選ぶと、種類に合わせます。入れた名前は、あとで書き換えられます。',
+                  'Fills empty names with ideas that fit the date, type and nearby deliveries. Pick types first to match them. You can edit the names afterwards.',
+                )}
+              </span>
+            </div>
+            <Button appearance="primary" icon={ws.naming.size > 0 ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" />} disabled={unnamed.length === 0 || ws.naming.size > 0} onClick={() => void ws.suggest(unnamed)}>
+              {unnamed.length > 0 ? t(`空の ${unnamed.length} 行に入れる`, `Fill ${unnamed.length} empty`) : t('空の行はありません', 'No empty rows')}
+            </Button>
+          </div>
+          <div className={s.table} role="table">
+            <div className={s.thead} role="row">
+              <span />
+              <span className={s.th}>{t('配信日', 'Date')}</span>
+              <span className={s.th}>{t('種類', 'Type')}</span>
+              <span className={s.th}>{t('配信名', 'Name')}</span>
+            </div>
             {ws.days.map((d) => {
               const free = d.state === 'free'
               const on = free && ws.chosen.has(d.key)
+              const r = ws.rowOf(d.key)
+              const busy = ws.naming.has(d.key)
               return (
-                <div key={d.key} className={mergeClasses(s.day, !free && s.dayOff, on && s.dayOn)}>
-                  {free ? (
-                    <Checkbox checked={on} onChange={(_, v) => ws.toggleDay(d.key, !!v.checked)} aria-label={dayText(d.key)} />
-                  ) : d.state === 'locked' ? (
-                    <LockClosedRegular />
-                  ) : (
-                    <span />
-                  )}
+                <div key={d.key} className={mergeClasses(s.tr, !free && s.dayOff, on && s.dayOn)} role="row">
+                  {free ? <Checkbox checked={on} onChange={(_, v) => ws.toggleDay(d.key, !!v.checked)} aria-label={t(`${dayText(d.key)} に作る`, `Create on ${dayText(d.key)}`)} /> : d.state === 'locked' ? <LockClosedRegular /> : <span />}
                   <span className={s.dayDate}>{dayText(d.key)}</span>
-                  <span className={s.dayNote}>{note(d)}</span>
+                  {!free ? (
+                    <span className={mergeClasses(s.dayNote, s.span2)}>{note(d)}</span>
+                  ) : !on ? (
+                    <span className={mergeClasses(s.dayNote, s.span2, s.muted)}>{t('作らない', 'Skip')}</span>
+                  ) : (
+                    <>
+                      <Select size="small" value={r.themeType} onChange={(_, v) => ws.setRow(d.key, { themeType: v.value })} aria-label={t('種類', 'Type')}>
+                        <option value="">{t('選んでください', 'Choose')}</option>
+                        {THEME_TYPES.map((k) => (
+                          <option key={k} value={k}>
+                            {themeTypeLabel(k)}
+                          </option>
+                        ))}
+                      </Select>
+                      <div className={s.nameCell}>
+                        <div className={s.nameLine}>
+                          <Input size="small" className={s.grow} value={r.name} placeholder={t('配信名', 'Delivery name')} onChange={(_, v) => ws.setRow(d.key, { name: v.value, nameReason: undefined })} aria-label={t('配信名', 'Name')} />
+                          <Button size="small" appearance="subtle" icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={busy} title={t('この行に配信名の案', 'Suggest a name for this row')} aria-label={t('この行に配信名の案', 'Suggest a name for this row')} onClick={() => void ws.suggest([d.key])} />
+                        </div>
+                        {r.nameReason && <span className={s.reason}>{`${t('案の理由', 'Why')}: ${r.nameReason}`}</span>}
+                      </div>
+                    </>
+                  )}
                 </div>
               )
             })}
@@ -332,61 +398,39 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
     )
   }
 
-  // ---- ② 配信名・種類
-  const step2 = () => {
-    const unnamed = ws.targets.filter((d) => !ws.rowOf(d).name.trim())
-    return (
-      <div className={s.main}>
-        <section className={s.panel}>
-          <div className={s.tools}>
-            <h3 className={s.h3}>{t('配信の方向を決めます', 'Set the direction')}</h3>
-            <span className={s.spacer} />
-            <Button size="small" icon={ws.naming.size > 0 ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={unnamed.length === 0 || ws.naming.size > 0} onClick={() => void ws.suggest(unnamed)}>
-              {t(`名前のない ${unnamed.length} 本に、配信名の案を入れる`, `Suggest names for ${unnamed.length} unnamed`)}
-            </Button>
-          </div>
-          <span className={s.hint}>
-            {t(
-              '種類と配信名を入れると、AI はそれに沿って中身(テーマ・テンプレート・メイン画像・商品・コピー)を作ります。先に種類を選ぶと、配信名の案も種類に合わせます。ここではまだ保存しません。',
-              'AI follows the type and name to create the content (theme, template, hero, products, copy). Pick the type first so name ideas match it. Nothing is saved yet.',
-            )}
-          </span>
-          <div className={s.grid}>
-            <span className={s.th}>{t('配信日', 'Date')}</span>
-            <span className={s.th}>{t('種類', 'Type')}</span>
-            <span className={s.th}>{t('配信名', 'Name')}</span>
-            {ws.targets.map((d) => {
-              const r = ws.rowOf(d)
-              const busy = ws.naming.has(d)
-              return (
-                <Fragment key={d}>
-                  <span className={s.cellDate}>{dayText(d)}</span>
-                  <Select size="small" value={r.themeType} onChange={(_, v) => ws.setRow(d, { themeType: v.value })} aria-label={t('種類', 'Type')}>
-                    <option value="">{t('選んでください', 'Choose')}</option>
-                    {THEME_TYPES.map((k) => (
-                      <option key={k} value={k}>
-                        {themeTypeLabel(k)}
-                      </option>
-                    ))}
-                  </Select>
-                  <div className={s.nameCell}>
-                    <div className={s.nameLine}>
-                      <Input size="small" className={s.grow} value={r.name} placeholder={t('配信名', 'Delivery name')} onChange={(_, v) => ws.setRow(d, { name: v.value, nameReason: undefined })} aria-label={t('配信名', 'Name')} />
-                      <Button size="small" appearance="subtle" icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={busy} title={t('配信名の案', 'Suggest a name')} aria-label={t('配信名の案', 'Suggest a name')} onClick={() => void ws.suggest([d])} />
-                    </div>
-                    {r.nameReason && <span className={s.reason}>{`${t('案の理由', 'Why')}: ${r.nameReason}`}</span>}
-                  </div>
-                </Fragment>
-              )
-            })}
-          </div>
-        </section>
-      </div>
-    )
-  }
+  // ---- 中身を作らずに保存したあと
+  const plainView = () => (
+    <div className={s.main}>
+      <section className={s.panel}>
+        <h3 className={s.h3}>
+          {ws.savingPlain ? t('保存しています', 'Saving') : t(`${ws.plainCards.length} 本を、中身のない下書き(未起案)で保存しました`, `Saved ${ws.plainCards.length} as drafts without content (Not started)`)}
+        </h3>
+        <span className={s.hint}>
+          {t(
+            '1 本ずつ新規作成して、中身を入れずに保存したのと同じです。中身は、配信カードを開いて作ってください(配信カードの「すべて AI で下書き」も使えます)。',
+            'Same as creating each one and saving without content. Open each delivery card to create the content (“Draft all with AI” is available there).',
+          )}
+        </span>
+        <div className={s.list}>
+          {ws.plainCards.map((c) => (
+            <div key={c.id} className={s.plainRow}>
+              <ChannelBadge channel={c.channel} size="small" />
+              <span className={s.dayDate}>{c.scheduled_at ? dayText(dayKeyOf(new Date(c.scheduled_at))) : ''}</span>
+              <span className={s.name}>{c.name}</span>
+              <span className={s.muted}>{c.theme_type ? themeTypeLabel(c.theme_type as ThemeType) : ''}</span>
+              <span className={s.spacer} />
+              <Button size="small" icon={<EditRegular />} onClick={() => onOpen(c.id)}>
+                {t('開く', 'Open')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
 
-  // ---- ③ 中身を作る
-  const step3 = () => {
+  // ---- ② 中身を AI で作る
+  const step2 = () => {
     const failedDays = ws.targets.filter((d) => ws.failed.has(d))
     return (
       <div className={s.main}>
@@ -457,8 +501,8 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
     )
   }
 
-  // ---- ④ 確かめる
-  const step4 = () => {
+  // ---- ③ 確かめる
+  const step3 = () => {
     const current = ws.madeCards.find((c) => c.id === ws.checkId) ?? ws.madeCards[0]
     if (!current) return <span className={s.muted}>{t('作った配信はまだありません。', 'Nothing created yet.')}</span>
     const nextUnchecked = () => ws.madeCards.find((c) => c.id !== current.id && c.ai_unchecked_at)
@@ -520,48 +564,52 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
     )
   }
 
-  // ---- 下: 戻る と、手順に合わせた主のボタン 1 つ
-  const primary = (): ReactNode => {
+  // ---- 下: 戻る と、手順に合わせたボタン(① だけは、AI で作るか、作らずに保存するかの 2 つ)
+  const finishButton = (
+    <Button
+      appearance="primary"
+      icon={<CalendarLtrRegular />}
+      disabled={ws.savingPlain}
+      onClick={() => {
+        ws.close()
+        onFinish(ws.weekStart)
+      }}
+    >
+      {t('終えて、週の表示で見る', 'Finish and open the week')}
+    </Button>
+  )
+  const actions = (): ReactNode => {
+    if (plainDone) return finishButton
     if (ws.step === 1)
       return (
-        <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={n === 0} onClick={() => ws.setStep(2)}>
-          {t(`次へ: ${n} 本の配信名・種類`, `Next: name & type for ${n}`)}
-        </Button>
+        <>
+          <Button appearance="secondary" disabled={!ws.plainReady} onClick={() => void ws.savePlainAll()}>
+            {t(`中身は作らずに ${n} 本を保存`, `Save ${n} without content`)}
+          </Button>
+          <Button appearance="primary" icon={<AiIcon tone="white" />} disabled={!ws.allReady} onClick={() => void ws.generate(ws.pending)}>
+            {t(`${n} 本の中身を AI で作る`, `Create ${n} with AI`)}
+          </Button>
+        </>
       )
     if (ws.step === 2)
       return (
-        <Button appearance="primary" icon={<AiIcon tone="white" />} disabled={!ws.allReady} onClick={() => void ws.generate(ws.pending)}>
-          {t(`${n} 本の中身を AI で作る`, `Create ${n} with AI`)}
-        </Button>
-      )
-    if (ws.step === 3)
-      return (
-        <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={ws.running || ws.madeCards.length === 0} onClick={() => ws.setStep(4)}>
+        <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={ws.running || ws.madeCards.length === 0} onClick={() => ws.setStep(3)}>
           {t(`次へ: ${ws.madeCards.length} 本を確かめる`, `Next: review ${ws.madeCards.length}`)}
         </Button>
       )
-    return (
-      <Button
-        appearance="primary"
-        icon={<CalendarLtrRegular />}
-        onClick={() => {
-          ws.close()
-          onFinish(ws.weekStart)
-        }}
-      >
-        {t('終えて、週の表示で見る', 'Finish and open the week')}
-      </Button>
-    )
+    return finishButton
   }
-  const back = ws.step === 2 ? 1 : ws.step === 4 ? 3 : null
-  const footHint =
-    ws.step === 2
-      ? t(`配信名と種類が入った行: ${readyCount} / ${n}`, `Rows with name and type: ${readyCount} / ${n}`)
-      : ws.step === 4
+  const back = !plainDone && ws.step === 3 ? 2 : null
+  const footHint = plainDone
+    ? ''
+    : ws.step === 1
+      ? t(
+          `作る ${n} 本 ・ 種類と配信名が入った ${readyCount} 本(AI で作るには、両方が要ります。作らずに保存するときは、配信名だけで保存できます)`,
+          `${n} to create · ${readyCount} with type and name (AI needs both; saving without content needs only names)`,
+        )
+      : ws.step === 3
         ? t(`未確認 ${ws.unchecked} 本。確かめないまま終えても、配信は下書きとして残り、週の表示に「AI 下書き・未確認」の印が出ます。`, `${ws.unchecked} unchecked. If you finish now, they stay as drafts with an “AI draft, unchecked” mark in the week view.`)
-        : ws.step === 1
-          ? t(`作る日: ${n} 日`, `Days: ${n}`)
-          : ''
+        : ''
 
   return (
     <Dialog open={ws.open} modalType="modal" onOpenChange={(_, d) => !d.open && ws.close()}>
@@ -571,7 +619,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           <h2 className={s.title}>{t('まとめて作る', 'Create in bulk')}</h2>
           <span className={s.summary}>{`${weekText} ・ ${countryName} ・ ${channelName}`}</span>
           <span className={s.spacer} />
-          <Button appearance="subtle" icon={<DismissRegular />} disabled={ws.running} aria-label={t('閉じる', 'Close')} onClick={ws.close} />
+          <Button appearance="subtle" icon={<DismissRegular />} disabled={ws.running || ws.savingPlain} aria-label={t('閉じる', 'Close')} onClick={ws.close} />
         </div>
         {stepper}
         <div className={s.body}>
@@ -580,11 +628,11 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
               <MessageBarBody>{ws.error}</MessageBarBody>
             </MessageBar>
           )}
-          {ws.step === 4 ? (
-            step4()
+          {ws.step === 3 && !plainDone ? (
+            step3()
           ) : (
             <div className={s.withSide}>
-              {ws.step === 1 ? step1() : ws.step === 2 ? step2() : step3()}
+              {plainDone ? plainView() : ws.step === 1 ? step1() : step2()}
               {side}
             </div>
           )}
@@ -597,7 +645,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           )}
           <span className={s.summary}>{footHint}</span>
           <span className={s.spacer} />
-          {primary()}
+          {actions()}
         </div>
       </DialogSurface>
     </Dialog>

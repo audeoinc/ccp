@@ -147,6 +147,22 @@ export async function createDraft(base: DraftBase, r: AutoDraftResult, products:
   return card
 }
 
+/** 作業画面で、中身を作らずに保存する(配信名・日時・国・チャネル・種類だけの「未起案」。1 本ずつ新規作成して、中身を入れずに保存したのと同じ) */
+export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
+  const res = await DeliveryCardsService.create({
+    name: base.name,
+    scheduled_at: base.scheduled_at,
+    country: base.country,
+    channel: base.channel,
+    department: base.department,
+    theme_type: base.theme_type,
+    status: 'not_started',
+    state_code: 0,
+  })
+  if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
+  return res.data
+}
+
 /** 作った中身の列(配信カードの buildContent と同じ形) */
 function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[]): Partial<DeliveryCardFields> {
   const template = templateOf(c, r)
