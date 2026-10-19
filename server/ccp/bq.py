@@ -36,7 +36,7 @@ OUTPUTS: tuple[Output, ...] = (
     Output(
         "spu", "BQ_SPU", "SPU",
         ("market", "product_code", "name", "as_of"),
-        ("category", "category_path", "season", "price", "description", "sales_trend", "units_4w", "revenue_4w", "revenue_yoy", "views_4w", "cvr_4w",
+        ("category", "category_path", "gender", "season", "price", "description", "sales_trend", "units_4w", "revenue_4w", "revenue_yoy", "views_4w", "cvr_4w",
          "rating", "review_count", "last_review_at", "review_texts", "lift_hot", "lift_cold", "lift_rain", "hot_days", "cold_days", "rain_days", "weather_basis"),
     ),
     Output("sku", "BQ_SKU", "SKU", ("market", "sku_code", "product_code", "as_of"), ("color", "size", "length", "price", "units_4w")),

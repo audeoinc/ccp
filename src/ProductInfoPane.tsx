@@ -8,6 +8,7 @@ import { productMarket } from './market'
 import { ProductDetail } from './ProductDetail'
 import { sectionRange, sectionsOf, type EmailTemplateId } from './templates'
 import { AlertMark } from './AlertMark'
+import { productGenderLabel } from './target'
 import type { CardAlertKind } from './cardAlerts'
 
 interface Props {
@@ -180,6 +181,7 @@ function ProductItem({ product: p, itemKey, onHover, alert, onAlert }: { product
             )}
             <span className={s.sub}>
               {p.product_code} ・ {yen(p.price, market)} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
+              {p.gender && ` ・ ${productGenderLabel(p.gender)}`}
             </span>
           </div>
           {low && <Badge size="small" appearance="tint" color="warning">{t('残少', 'Low')}</Badge>}

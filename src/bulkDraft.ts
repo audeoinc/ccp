@@ -4,6 +4,7 @@
 // (あとで配信カードを開いて直したとき、AI で 1 本ずつ作ったものと、見分けがつかないように)
 import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import type { Product } from './models/products'
+import { fitsTarget, targetText } from './target'
 import type { HeroImage } from './models/heroImages'
 import type { WeekRow } from './data/weeks'
 import type { AiCard } from './aiSelect'
@@ -66,7 +67,7 @@ export async function createFrames(days: string[], setup: { country: string; cha
 }
 
 /** 中身を作るのに要る、配信の基本情報(保存した枠でも、作業画面の、まだ保存していない行でもよい) */
-export type DraftBase = Pick<DeliveryCard, 'name' | 'scheduled_at' | 'country' | 'channel' | 'department' | 'theme_type'>
+export type DraftBase = Pick<DeliveryCard, 'name' | 'scheduled_at' | 'country' | 'channel' | 'department' | 'theme_type' | 'target_gender' | 'target_ages' | 'audience'>
 
 /** 中身を作るときに、AI に渡す配信の基本情報(配信名・種類は、人が決めたもの) */
 function aiCardOf(c: DraftBase): AiCard {
@@ -77,6 +78,7 @@ function aiCardOf(c: DraftBase): AiCard {
     channel: label(channelOptions, c.channel),
     department: label(departmentOptions, c.department),
     themeType: c.theme_type ? themeTypeLabel(c.theme_type as ThemeType) : undefined,
+    target: targetText({ gender: c.target_gender, ages: c.target_ages, audience: c.channel === 'app' ? c.audience : '' }),
     theme: '',
     headline: '',
     copy: '',
@@ -97,7 +99,7 @@ export interface DraftContext {
 /** 枠の中身を作る(配信の国に合う市場の商品・メイン画像だけを使う) */
 export async function generateFor(c: DraftBase, ctx: DraftContext, onStep: AutoDraftProgress, isStopped: () => boolean): Promise<AutoDraftResult> {
   const market = cardMarket(String(c.country ?? ''))
-  const products = market ? ctx.products.filter((p) => productMarket(p) === market) : ctx.products
+  const products = ctx.products.filter((p) => (!market || productMarket(p) === market) && fitsTarget(p, c.target_gender))
   const heroes = market ? ctx.heroes.filter((h) => heroMarket(h) === market) : ctx.heroes
   return runAutoDraft(
     { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme },

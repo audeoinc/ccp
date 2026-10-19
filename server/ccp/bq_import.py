@@ -19,6 +19,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -75,6 +76,19 @@ def _weather_choice(r: dict[str, Any]) -> str | None:
     return best[0] if best[1] is not None and float(best[1]) >= 0.2 else None
 
 
+_GENDER = {
+    "mens": "mens", "men": "mens", "man": "mens", "male": "mens", "m": "mens",
+    "womens": "womens", "women": "womens", "woman": "womens", "female": "womens", "ladies": "womens", "w": "womens", "f": "womens",
+    "unisex": "unisex", "u": "unisex", "all": "unisex",
+}
+
+
+def gender_of(v: Any) -> str | None:
+    """SPU の gender を、CCP の値(mens / womens / unisex)に読み替える。読めない値・空は None(商品は、どの対象にも出る)"""
+    key = re.sub(r"[^a-z]", "", str(v or "").lower())
+    return _GENDER.get(key)
+
+
 def _values(table: str, row: dict[str, Any], cols: list[str]) -> dict[str, Any]:
     t = sc.load().table(table)
     return {c: sc.coerce(t.by_name[c].type, row.get(c)) for c in cols}
@@ -95,9 +109,10 @@ async def _write_spu(conn: AsyncConnection, rows: list[dict[str, Any]]) -> str:
     for r in rows:
         v = _values("products", r, SPU_COLS)
         v["weather"] = _weather_choice(r)
+        v["gender"] = gender_of(r.get("gender"))
         pid = by_key.get((r["market"], r["product_code"])) or by_code.get(r["product_code"])
         (updates if pid else inserts).append({**v, "id": pid} if pid else v)
-    cols = SPU_COLS + ["weather"]
+    cols = SPU_COLS + ["weather", "gender"]
     if updates:
         await conn.execute(text(f"UPDATE products SET {', '.join(f'{c} = :{c}' for c in cols)}, modified_on = now() WHERE id = :id"), updates)
     if inserts:

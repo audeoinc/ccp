@@ -455,7 +455,8 @@
    "weather": "cold",
    "description": "上質なウールを使ったロング丈コート。あらゆる着こなしに合う定番",
    "image_url": "https://placehold.co/400x400?text=P01",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "67398180-a166-4c3d-a047-d196c98d56e3",
@@ -470,7 +471,8 @@
    "weather": "cold",
    "description": "軽量で暖かい。撥水加工で雨雪にも対応",
    "image_url": "https://placehold.co/400x400?text=P02",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "68398313-a066-4aaa-a147-d329c88d5550",
@@ -485,7 +487,8 @@
    "weather": "rainy",
    "description": "撥水素材の定番トレンチ。雨の日の通勤にも",
    "image_url": "https://placehold.co/400x400?text=P03",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "6d398af2-9b66-42cb-a247-d4bccf8d6055",
@@ -500,7 +503,8 @@
    "weather": "rainy",
    "description": "防水・軽量のパッカブルパーカー",
    "image_url": "https://placehold.co/400x400?text=P04",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "6e398c85-9a66-4138-a347-d64fce8d5ec2",
@@ -515,7 +519,8 @@
    "weather": "sunny",
    "description": "薄手で羽織りやすい秋のジャケット",
    "image_url": "https://placehold.co/400x400?text=P05",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "6b3987cc-9d66-45f1-a447-d7e2cd8d5d2f",
@@ -530,7 +535,8 @@
    "weather": "cold",
    "description": "柔らかなコットンカシミヤ混のカーディガン",
    "image_url": "https://placehold.co/400x400?text=P06",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "6c39895f-9c66-445e-a547-d975cc8d5b9c",
@@ -545,7 +551,8 @@
    "weather": "cold",
    "description": "肌触りの良いメリノウールのニット",
    "image_url": "https://placehold.co/400x400?text=P07",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "7139913e-9766-4c7f-a647-db08d38d66a1",
@@ -560,7 +567,8 @@
    "weather": "cold",
    "description": "首元まで暖かい定番のタートル",
    "image_url": "https://placehold.co/400x400?text=P08",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "723992d1-9666-4aec-a747-dc9bd28d650e",
@@ -575,7 +583,8 @@
    "weather": "cold",
    "description": "編み柄が映える大人のケーブルニット",
    "image_url": "https://placehold.co/400x400?text=P09",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "ef3c962f-9964-410e-a44a-1679458a4880",
@@ -590,7 +599,8 @@
    "weather": "sunny",
    "description": "起毛素材の柔らかなシャツ",
    "image_url": "https://placehold.co/400x400?text=P10",
-   "market": "JP"
+   "market": "JP",
+   "gender": "mens"
   },
   {
    "id": "ee3c949c-9a64-42a1-a34a-14e6468a4a13",
@@ -605,7 +615,8 @@
    "weather": "sunny",
    "description": "裏毛の心地よいパーカー",
    "image_url": "https://placehold.co/400x400?text=P11",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "f13c9955-9764-4de8-a24a-1353478a4ba6",
@@ -620,7 +631,8 @@
    "weather": "sunny",
    "description": "ストレッチ入りで穿きやすい",
    "image_url": "https://placehold.co/400x400?text=P12",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "f03c97c2-9864-4f7b-a14a-11c0488a4d39",
@@ -635,7 +647,8 @@
    "weather": "cold",
    "description": "きれいめに決まるウールスラックス",
    "image_url": "https://placehold.co/400x400?text=P13",
-   "market": "JP"
+   "market": "JP",
+   "gender": "mens"
   },
   {
    "id": "eb3c8fe3-9d64-475a-a84a-1cc5498a4ecc",
@@ -650,7 +663,8 @@
    "weather": "sunny",
    "description": "秋らしい質感のコーデュロイ",
    "image_url": "https://placehold.co/400x400?text=P14",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "ea3c8e50-9e64-48ed-a74a-1b324a8a505f",
@@ -665,7 +679,8 @@
    "weather": "sunny",
    "description": "揺れ感のあるプリーツスカート",
    "image_url": "https://placehold.co/400x400?text=P15",
-   "market": "JP"
+   "market": "JP",
+   "gender": "womens"
   },
   {
    "id": "ed3c9309-9b64-4434-a64a-199f4b8a51f2",
@@ -680,7 +695,8 @@
    "weather": "cold",
    "description": "足に馴染む本革のショートブーツ",
    "image_url": "https://placehold.co/400x400?text=P16",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "ec3c9176-9c64-45c7-a54a-180c4c8a5385",
@@ -695,7 +711,8 @@
    "weather": "rainy",
    "description": "履き口が広く脱ぎ履きしやすい",
    "image_url": "https://placehold.co/400x400?text=P17",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "f73ca2c7-9164-4476-ac4a-23114d8a5518",
@@ -710,7 +727,8 @@
    "weather": "sunny",
    "description": "毎日履ける軽量スニーカー",
    "image_url": "https://placehold.co/400x400?text=P18",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "f63ca134-9264-4609-ab4a-217e4e8a56ab",
@@ -725,7 +743,8 @@
    "weather": "sunny",
    "description": "きれいめカジュアルのローファー",
    "image_url": "https://placehold.co/400x400?text=P19",
-   "market": "JP"
+   "market": "JP",
+   "gender": "mens"
   },
   {
    "id": "7d3526f4-1361-4f85-aa4d-2802d791ea1b",
@@ -740,7 +759,8 @@
    "weather": "cold",
    "description": "内側ボアで暖かい",
    "image_url": "https://placehold.co/400x400?text=P20",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "7e352887-1261-4df2-ab4d-2995d691e888",
@@ -755,7 +775,8 @@
    "weather": "cold",
    "description": "大判で巻きやすいマフラー",
    "image_url": "https://placehold.co/400x400?text=P21",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "7f352a1a-1161-4c5f-a84d-24dcd991ed41",
@@ -770,7 +791,8 @@
    "weather": "cold",
    "description": "伸縮性のあるリブ編みニット帽",
    "image_url": "https://placehold.co/400x400?text=P22",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "80352bad-1061-4acc-a94d-266fd891ebae",
@@ -785,7 +807,8 @@
    "weather": "cold",
    "description": "軽くて暖かい大判ストール",
    "image_url": "https://placehold.co/400x400?text=P23",
-   "market": "JP"
+   "market": "JP",
+   "gender": "womens"
   },
   {
    "id": "793520a8-0f61-4939-a64d-21b6db91f067",
@@ -800,7 +823,8 @@
    "weather": "cold",
    "description": "スマホ対応の本革グローブ",
    "image_url": "https://placehold.co/400x400?text=P24",
-   "market": "JP"
+   "market": "JP",
+   "gender": "mens"
   },
   {
    "id": "7a35223b-0e61-47a6-a74d-2349da91eed4",
@@ -815,7 +839,8 @@
    "weather": "sunny",
    "description": "A4が入る軽量トート",
    "image_url": "https://placehold.co/400x400?text=P25",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "7b3523ce-0d61-4613-a44d-1e90dd91f38d",
@@ -830,7 +855,8 @@
    "weather": "sunny",
    "description": "コンパクトで使いやすい",
    "image_url": "https://placehold.co/400x400?text=P26",
-   "market": "JP"
+   "market": "JP",
+   "gender": "womens"
   },
   {
    "id": "7c352561-0c61-4480-a54d-2023dc91f1fa",
@@ -845,7 +871,8 @@
    "weather": "rainy",
    "description": "撥水加工のバッグ",
    "image_url": "https://placehold.co/400x400?text=P27",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "75351a5c-1b61-4c1d-a24d-349acf91dd83",
@@ -860,7 +887,8 @@
    "weather": "cold",
    "description": "ふわふわ素材のルームウェア",
    "image_url": "https://placehold.co/400x400?text=P28",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "76351bef-1a61-4a8a-a34d-362dce91dbf0",
@@ -875,7 +903,8 @@
    "weather": "cold",
    "description": "ひざ掛けにも使えるブランケット",
    "image_url": "https://placehold.co/400x400?text=P29",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "83376efd-0d5e-477c-a04f-700bd18fa212",
@@ -890,7 +919,8 @@
    "weather": "sunny",
    "description": "ハロウィン限定のギフト詰め合わせ",
    "image_url": "https://placehold.co/400x400?text=P30",
-   "market": "JP"
+   "market": "JP",
+   "gender": "unisex"
   },
   {
    "id": "23599dca-e633-4293-a77a-64f42990903d",
@@ -905,7 +935,8 @@
    "weather": "cold",
    "description": "Long wool coat in a classic cut. A staple that goes with everything",
    "image_url": "https://placehold.co/400x400?text=U01",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "22599c37-e733-4426-aa7a-69ad26908b84",
@@ -920,7 +951,8 @@
    "weather": "cold",
    "description": "Lightweight and warm, with a water-repellent finish for rain and snow",
    "image_url": "https://placehold.co/400x400?text=U02",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "21599aa4-e833-45b9-a97a-681a27908d17",
@@ -935,7 +967,8 @@
    "weather": "rainy",
    "description": "Water-repellent classic trench. Made for rainy commutes",
    "image_url": "https://placehold.co/400x400?text=U03",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "20599911-e933-474c-a47a-603b2490885e",
@@ -950,7 +983,8 @@
    "weather": "rainy",
    "description": "Packable parka with taped seams. Easy to carry, easy to wear",
    "image_url": "https://placehold.co/400x400?text=U04",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1f59977e-ea33-48df-a37a-5ea8259089f1",
@@ -965,7 +999,8 @@
    "weather": "sunny",
    "description": "Breathable layer for in-between weather. Easy to slip on",
    "image_url": "https://placehold.co/400x400?text=U05",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1e5995eb-eb33-4a72-a67a-636122908538",
@@ -980,7 +1015,8 @@
    "weather": "sunny",
    "description": "Soft, relaxed cardigan that layers over anything",
    "image_url": "https://placehold.co/400x400?text=U06",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1d599458-ec33-4c05-a57a-61ce239086cb",
@@ -995,7 +1031,8 @@
    "weather": "cold",
    "description": "Smooth merino-blend crewneck. A fall essential",
    "image_url": "https://placehold.co/400x400?text=U07",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1c5992c5-ed33-4d98-a07a-59ef20908212",
@@ -1010,7 +1047,8 @@
    "weather": "cold",
    "description": "Warm turtleneck with a clean neckline. Great alone or layered",
    "image_url": "https://placehold.co/400x400?text=U08",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1b599132-ee33-4f2b-af7a-585c219083a5",
@@ -1025,7 +1063,8 @@
    "weather": "cold",
    "description": "Chunky cable knit with a cozy, textured look",
    "image_url": "https://placehold.co/400x400?text=U09",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1e575754-6b36-4289-a277-54fe0e92a453",
@@ -1040,7 +1079,8 @@
    "weather": "sunny",
    "description": "Brushed cotton flannel in a classic plaid",
    "image_url": "https://placehold.co/400x400?text=U10",
-   "market": "US"
+   "market": "US",
+   "gender": "mens"
   },
   {
    "id": "1f5758e7-6a36-40f6-a377-56910d92a2c0",
@@ -1055,7 +1095,8 @@
    "weather": "sunny",
    "description": "Midweight fleece hoodie for weekends",
    "image_url": "https://placehold.co/400x400?text=U11",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "20575a7a-6936-4f63-a077-51d81092a779",
@@ -1070,7 +1111,8 @@
    "weather": "sunny",
    "description": "Straight-fit stretch denim. Comfortable all day",
    "image_url": "https://placehold.co/400x400?text=U12",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "21575c0d-6836-4dd0-a177-536b0f92a5e6",
@@ -1085,7 +1127,8 @@
    "weather": "cold",
    "description": "Tailored wool trousers with a clean drape",
    "image_url": "https://placehold.co/400x400?text=U13",
-   "market": "US"
+   "market": "US",
+   "gender": "mens"
   },
   {
    "id": "1a575108-6f36-48d5-a677-5b4a1292aa9f",
@@ -1100,7 +1143,8 @@
    "weather": "sunny",
    "description": "Soft wide-wale corduroy with a relaxed fit",
    "image_url": "https://placehold.co/400x400?text=U14",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1b57529b-6e36-4742-a777-5cdd1192a90c",
@@ -1115,7 +1159,8 @@
    "weather": "sunny",
    "description": "Flowing midi skirt that moves beautifully",
    "image_url": "https://placehold.co/400x400?text=U15",
-   "market": "US"
+   "market": "US",
+   "gender": "womens"
   },
   {
    "id": "1c57542e-6d36-45af-a477-58241492adc5",
@@ -1130,7 +1175,8 @@
    "weather": "cold",
    "description": "Full-grain leather boots that age beautifully",
    "image_url": "https://placehold.co/400x400?text=U16",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "1d5755c1-6c36-441c-a577-59b71392ac32",
@@ -1145,7 +1191,8 @@
    "weather": "rainy",
    "description": "Fully waterproof rubber boots with a comfortable lining",
    "image_url": "https://placehold.co/400x400?text=U17",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "16574abc-7336-4f21-aa77-48661692b0eb",
@@ -1160,7 +1207,8 @@
    "weather": "sunny",
    "description": "Everyday low-top sneakers with a cushioned sole",
    "image_url": "https://placehold.co/400x400?text=U18",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "17574c4f-7236-4d8e-ab77-49f91592af58",
@@ -1175,7 +1223,8 @@
    "weather": "sunny",
    "description": "Polished leather loafers for work and weekends",
    "image_url": "https://placehold.co/400x400?text=U19",
-   "market": "US"
+   "market": "US",
+   "gender": "mens"
   },
   {
    "id": "905ec68f-7139-4a92-ac75-0cf59c8b3518",
@@ -1190,7 +1239,8 @@
    "weather": "cold",
    "description": "Shearling-lined boots for the coldest days",
    "image_url": "https://placehold.co/400x400?text=U20",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "8f5ec4fc-7239-4c25-ab75-0b629d8b36ab",
@@ -1205,7 +1255,8 @@
    "weather": "cold",
    "description": "Generous wool scarf in a soft, warm weave",
    "image_url": "https://placehold.co/400x400?text=U21",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "925ec9b5-6f39-476c-aa75-09cf9e8b383e",
@@ -1220,7 +1271,8 @@
    "weather": "cold",
    "description": "Ribbed knit beanie. The easiest way to stay warm",
    "image_url": "https://placehold.co/400x400?text=U22",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "915ec822-7039-48ff-a975-083c9f8b39d1",
@@ -1235,7 +1287,8 @@
    "weather": "cold",
    "description": "Oversized shawl that works as a scarf or a wrap",
    "image_url": "https://placehold.co/400x400?text=U23",
-   "market": "US"
+   "market": "US",
+   "gender": "womens"
   },
   {
    "id": "8c5ec043-6d39-4446-a875-06a9a08b3b64",
@@ -1250,7 +1303,8 @@
    "weather": "cold",
    "description": "Lined leather gloves with touchscreen fingertips",
    "image_url": "https://placehold.co/400x400?text=U24",
-   "market": "US"
+   "market": "US",
+   "gender": "mens"
   },
   {
    "id": "8b5ebeb0-6e39-45d9-a775-0516a18b3cf7",
@@ -1265,7 +1319,8 @@
    "weather": "sunny",
    "description": "Roomy canvas tote with an inner pocket",
    "image_url": "https://placehold.co/400x400?text=U25",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "8e5ec369-6b39-4120-a675-0383a28b3e8a",
@@ -1280,7 +1335,8 @@
    "weather": "sunny",
    "description": "Structured shoulder bag that fits the essentials",
    "image_url": "https://placehold.co/400x400?text=U26",
-   "market": "US"
+   "market": "US",
+   "gender": "womens"
   },
   {
    "id": "8d5ec1d6-6c39-42b3-a575-01f0a38b401d",
@@ -1295,7 +1351,8 @@
    "weather": "rainy",
    "description": "Water-resistant tote that keeps your things dry",
    "image_url": "https://placehold.co/400x400?text=U27",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "985ed327-7939-472a-a475-198d948b2880",
@@ -1310,7 +1367,8 @@
    "weather": "cold",
    "description": "Soft brushed top and pants set for relaxing at home",
    "image_url": "https://placehold.co/400x400?text=U28",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "975ed194-7a39-48bd-a375-17fa958b2a13",
@@ -1325,7 +1383,8 @@
    "weather": "cold",
    "description": "Plush throw blanket in a warm, neutral tone",
    "image_url": "https://placehold.co/400x400?text=U29",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   },
   {
    "id": "8a5c7e86-773b-429b-a672-c4ec228e46a1",
@@ -1340,7 +1399,8 @@
    "weather": "sunny",
    "description": "Seasonal gift set with candles and treats",
    "image_url": "https://placehold.co/400x400?text=U30",
-   "market": "US"
+   "market": "US",
+   "gender": "unisex"
   }
  ],
  "delivery_cards": [

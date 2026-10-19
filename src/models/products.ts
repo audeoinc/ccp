@@ -39,6 +39,14 @@ export const ProductMarket = {
 } as const
 export type ProductMarket = keyof typeof ProductMarket
 
+/** 商品の性別(BigQuery の SPU の gender。配信の対象の性別で、商品の候補を絞る。src/target.ts) */
+export const ProductGender = {
+  mens: 'メンズ',
+  womens: 'ウィメンズ',
+  unisex: 'ユニセックス',
+} as const
+export type ProductGender = keyof typeof ProductGender
+
 /** 書き込める列 */
 export interface ProductFields {
   name: string
@@ -56,6 +64,8 @@ export interface ProductFields {
   // ここから下は、BigQuery の SPU の出力から取り込む列(docs/BIGQUERY_EXPORT.md の 2 章)。画面からは書かない
   /** カテゴリの階層(上の段から ' > ' でつないだもの) */
   category_path?: string
+  /** 性別(mens / womens / unisex)。ない商品は、どの対象にも出す */
+  gender?: ProductGender
   units_4w?: number
   revenue_4w?: number
   /** 直近 4 週の売上 ÷ 前年の同じ 4 週 */

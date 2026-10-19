@@ -50,10 +50,14 @@ const US_MARKET = 'US'
 const JP_MARKET = 'JP'
 
 // ---- 商品・メイン画像
+// 商品の性別(見本。本番は BigQuery の SPU の gender)。server/seed.json と同じ決め方
+const guessGender = (name: string) =>
+  /Skirt|Dress|Blouse|Shawl|Shoulder Bag|スカート|ワンピース|ブラウス|ストール|ショルダーバッグ/.test(name) ? 'womens' : /Flannel|Trousers|Loafers|Leather Gloves|フランネル|スラックス|ローファー|レザーグローブ/.test(name) ? 'mens' : 'unisex'
 export const products: Row[] = [...csv('products.csv'), ...csv('products_us.csv')].map((r) => ({
   id: guid(`product:${r['商品コード']}`),
   product_code: r['商品コード'],
   name: r['商品名'],
+  gender: guessGender(r['商品名']),
   category: CATEGORY[r['カテゴリ']],
   price: Number(r['価格']),
   stock: Number(r['在庫数']),

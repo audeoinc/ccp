@@ -20,7 +20,6 @@ const pushLabelsNow = (): string[] => [
   tr('③ 通知', '3. Notification'),
   tr('④ メッセージ', '4. Message'),
   tr('⑤ リンク先', '5. Links'),
-  tr('⑥ 時刻・相手', '6. Timing & audience'),
 ]
 
 /** 工程の名前。読むたびに現在の言語で返す(インデックスのゲッター) */
@@ -56,18 +55,20 @@ export function progressOf(a: {
   /** リンク先の工程が完了しているか(src/links.ts の linksComplete) */
   links: boolean
   /** アプリの配信カードのとき: 通知のタイトル・本文と、送る相手が決まっているか */
-  push?: { title: string; body: string; timing: boolean }
+  push?: { title: string; body: string }
 }): Progress {
   if (a.push) {
-    // アプリ: テーマ / テンプレート / 通知(タイトル・本文)/ メッセージ(メイン画像・ヘッドライン・セクションの枠)/ リンク先 / 時刻・相手
+    // アプリ: テーマ / テンプレート / 通知(タイトル・本文)/ メッセージ(メイン画像・ヘッドライン・セクションの枠)/ リンク先
     const secs = sectionsOf(a.template)
     const filled = secs.every((sec) => {
       const [from, to] = sectionRange(secs, sec, a.items.length)
       return Math.max(0, to - from) >= sec.slots
     })
     const message = !!a.heroId && !!a.headline.trim() && filled
-    const flags = [!!a.theme.trim(), true, !!a.push.title.trim() && !!a.push.body.trim(), message, a.links, a.push.timing]
-    const [theme, template, hero, sectionsOk, links, instructions] = flags
+    // 送る相手は、工程ではなく配信情報で決める(X40。誰に向けるかを最初に決めて、それに合わせて中身を作る)
+    const flags = [!!a.theme.trim(), true, !!a.push.title.trim() && !!a.push.body.trim(), message, a.links]
+    const [theme, template, hero, sectionsOk, links] = flags
+    const instructions = true
     return {
       theme,
       template,
@@ -138,7 +139,7 @@ export function cardProgress(
   // リンク先の判定は、テンプレートのリンクの場所と、配信カードの設定だけで決まる(既定の行き先は、商品がなくても作れる)
   const links = linksComplete(linkSlots(template, [], [], 'campaign'), parseLinks(card.links), isApp ? { tapDone: tapComplete(parsePushLink(card.push_link)) } : undefined)
   return progressOf({
-    push: isApp ? { title: card.push_title ?? '', body: card.push_body ?? '', timing: !!card.audience } : undefined,
+    push: isApp ? { title: card.push_title ?? '', body: card.push_body ?? '' } : undefined,
     theme: card.theme ?? '',
     template,
     links,

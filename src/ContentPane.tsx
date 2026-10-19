@@ -46,8 +46,7 @@ import { AppLinksEditor } from './AppLinksEditor'
 import { AiButton } from './AiButton'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
-import { PushTimingPanel } from './PushTimingPanel'
-import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type Audience, type PushLink } from './pushLink'
+import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type PushLink } from './pushLink'
 import { MarkdownLite } from './MarkdownLite'
 import { linkSlots, linksComplete, type Links } from './links'
 
@@ -113,12 +112,10 @@ interface Props {
   owner: string
   /** 配信名(AI にタスクの案を頼むときに渡す) */
   cardName: string
-  /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③ 通知 ④ メッセージ ⑤ リンク先 ⑥ 時刻・相手) */
+  /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③ 通知 ④ メッセージ ⑤ リンク先。送る相手は配信情報) */
   channel: TemplateChannel
   pushLink: PushLink | null
   onPushLink: (l: PushLink) => void
-  audience: string
-  onAudience: (v: Audience) => void
   /** 送る日時(datetime-local の値) */
   scheduledAt: string
   /** アプリ: 通知のタイトル・本文(メッセージのヘッドライン・コピーとは別) */
@@ -1134,7 +1131,7 @@ export function ContentPane(props: Props) {
     items: props.items,
     instructions,
     links: linksComplete(slots, props.links, isPush ? { tapDone: tapComplete(props.pushLink) } : undefined),
-    push: isPush ? { title: props.pushTitle, body: props.pushBody, timing: !!props.audience } : undefined,
+    push: isPush ? { title: props.pushTitle, body: props.pushBody } : undefined,
   })
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
@@ -1147,7 +1144,6 @@ export function ContentPane(props: Props) {
           { value: 'notice' as TopTab, full: t('③ 通知', '3. Notification'), short: t('③', '3'), done: pr.hero, ideas: drafts.pushIdeas.length > 0 },
           { value: 'message' as TopTab, full: t('④ メッセージ', '4. Message'), short: t('④', '4'), done: pr.sections, ideas: drafts.copyIdeas.length > 0 },
           { value: 'links' as TopTab, full: t('⑤ リンク先', '5. Links'), short: t('⑤', '5'), done: pr.links, ideas: false },
-          { value: 'timing' as TopTab, full: t('⑥ 時刻・相手', '6. Timing'), short: t('⑥', '6'), done: pr.instructions, ideas: false },
         ]
       : [
           { value: 'hero' as TopTab, full: t('③ ヒーロー', '3. Hero'), short: t('③', '3'), done: pr.hero, ideas: drafts.copyIdeas.length > 0 },
@@ -1284,9 +1280,6 @@ export function ContentPane(props: Props) {
           <ProductsTab {...props} mode="hero" registerChat={registerChat} />
           {sectionsOf(template).length > 0 && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
         </>
-      )}
-      {tab === 'timing' && (
-        <PushTimingPanel scheduledAt={props.scheduledAt} audience={props.audience} onAudience={props.onAudience} />
       )}
       {tab === 'hero' && <ProductsTab {...props} mode="hero" registerChat={registerChat} />}
       {tab === 'sections' && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}

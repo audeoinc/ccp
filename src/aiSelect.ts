@@ -136,6 +136,8 @@ export interface AiCard {
   instructions: string
   /** 配信の種類(担当者が決めたもの。値下げ・セール・コラボ など。画面の言葉)。まとめて作る枠(W14)で使う */
   themeType?: string
+  /** 配信の対象(性別・年代・送る相手。例: 「女性・20代・30代」)。指定がなければ undefined(X40) */
+  target?: string
 }
 
 export interface ProposedRow {
@@ -463,7 +465,7 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
     // マーケティングの決まり・今週の方針(M3・M4)を、この依頼に効く分だけ足す
     const { body, notes: policyNotes } = withPolicies(base, (payload as { task?: unknown })?.task, cardOf(payload))
     const text = await askText(
-      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + policyNotes + retry + localizePrompt(prompt) + JSON.stringify(body),
+      (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + targetNote(cardOf(payload)) + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + policyNotes + retry + localizePrompt(prompt) + JSON.stringify(body),
     )
     try {
       const parsed = extractJson(text) as Record<string, unknown>
@@ -493,6 +495,13 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
     }
   }
   throw lastError
+}
+
+/** 配信の対象(X40)があれば、すべての依頼の前提として伝える(テーマ・コピー・メイン画像・商品・名前の案に効かせる) */
+function targetNote(card: unknown): string {
+  const target = (card as { target?: unknown } | undefined)?.target
+  if (typeof target !== 'string' || !target.trim()) return ''
+  return `# 配信の対象(card.target)\nこの配信は「${target}」に向けたもの。テーマ・言い回し・メイン画像・商品の選び方を、この対象に合わせる(対象に合わないものは選ばない)。\n\n`
 }
 
 /** 依頼文をエージェントへ送り、返答のテキストを返す */

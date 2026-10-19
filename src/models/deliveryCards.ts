@@ -19,6 +19,12 @@ export const DeliveryCardDepartment = {
 } as const
 export type DeliveryCardDepartment = keyof typeof DeliveryCardDepartment
 
+export const DeliveryCardTargetGender = {
+  women: '女性',
+  men: '男性',
+} as const
+export type DeliveryCardTargetGender = keyof typeof DeliveryCardTargetGender
+
 export const DeliveryCardStatus = {
   not_started: '未起案',
   reviewing: '検討中',
@@ -72,6 +78,10 @@ export interface DeliveryCardFields {
   push_link?: string
   /** アプリ: 送る相手(all / members / inactive30 / notOpenedEmail) */
   audience?: string
+  /** 配信の対象の性別(women / men。空は指定なし。src/target.ts) */
+  target_gender?: DeliveryCardTargetGender
+  /** 配信の対象の年代(10s,20s,… をカンマでつないだもの。空は指定なし) */
+  target_ages?: string
   /** アプリ: 通知のタイトル(メッセージのヘッドラインとは別) */
   push_title?: string
   /** アプリ: 通知の本文(メッセージのコピーとは別) */

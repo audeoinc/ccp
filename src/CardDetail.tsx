@@ -15,6 +15,7 @@ import {
   Spinner,
   Switch,
   Text,
+  ToggleButton,
   Tooltip,
   makeStyles,
   mergeClasses,
@@ -34,6 +35,7 @@ import type { HeroImage } from './models/heroImages'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
 import { FaceBadge } from './FaceBadge'
+import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
@@ -132,6 +134,9 @@ interface Form {
   department: string
   status: string
   owner: string
+  /** 配信の対象(X40): 性別(women / men / 空 = 指定なし)と年代(カンマ区切り) */
+  targetGender: string
+  targetAges: string
   /** アプリ: 通知のタイトル・本文 */
   pushTitle: string
   pushBody: string
@@ -161,6 +166,8 @@ const toForm = (c?: DeliveryCard): Form => ({
   department: str(c?.department),
   status: c?.status === undefined || c.status === null ? String(statusOptions[0].value) : String(c.status),
   owner: c?.owner ?? '',
+  targetGender: str(c?.target_gender),
+  targetAges: str(c?.target_ages),
   pushTitle: c?.push_title ?? '',
   pushBody: c?.push_body ?? '',
   productionDue: c?.production_due?.slice(0, 10) ?? '',
@@ -378,6 +385,11 @@ const useStyles = makeStyles({
   fullWidth: { width: '100%', flexShrink: 0, minHeight: '32px' },
   sectionHead: { marginTop: '12px' },
   previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
+  // 配信の対象(X40)
+  targetBox: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
+  targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
+  targetChip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
+  targetLabel: { width: '44px', flexShrink: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
   // 左の「制作への引き継ぎ」(表示だけ。押すと、やり取りの「引き継ぎ」のタブが開く)
   handoffField: { gridColumn: '1 / -1' },
@@ -703,6 +715,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
       country: label(countryOptions, form.country),
       channel: label(channelOptions, form.channel),
       department: label(departmentOptions, form.department),
+      target: targetText({ gender: form.targetGender, ages: form.targetAges, audience: templateChannel === 'push' ? audience : '' }),
       theme: form.theme,
       headline: form.headline,
       copy: form.copy,
@@ -712,7 +725,8 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
 
   // 商品・メイン画像は、配信カードの国に合う市場のものだけを、選定の対象にする(すでに載せた他の市場の商品は、表示のために残す)
   const market = cardMarket(form.country)
-  const poolProducts = useMemo(() => (market ? products.filter((p) => productMarket(p) === market) : products), [products, market])
+  // 配信の対象の性別が決まっていれば、それに合う商品だけ(女性向けなら、ウィメンズとユニセックス。X40)
+  const poolProducts = useMemo(() => products.filter((p) => (!market || productMarket(p) === market) && fitsTarget(p, form.targetGender)), [products, market, form.targetGender])
   const poolHeroes = useMemo(() => (market ? heroes.filter((h) => heroMarket(h) === market) : heroes), [heroes, market])
 
   // AI の案の状態と生成(案は採用するまで、配信カードには反映しない)
@@ -922,6 +936,8 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
         links: encodeLinks(links),
         push_link: pushLink ? JSON.stringify(pushLink) : '',
         audience: audience,
+        target_gender: (form.targetGender || null) as never,
+        target_ages: form.targetAges,
         push_title: form.pushTitle,
         push_body: form.pushBody,
         production_owner: form.productionOwner.trim(),
@@ -1096,7 +1112,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
     items,
     instructions: form.instructions,
     links: linksComplete(linkSpots, links, templateChannel === 'push' ? { tapDone: tapComplete(pushLink) } : undefined),
-    push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody, timing: !!audience } : undefined,
+    push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody } : undefined,
   })
   const hero = heroes.find((h) => h.id === heroId)
 
@@ -1290,6 +1306,56 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                   </div>
                 </Field>
               </div>
+              {/* 配信の対象(X40): 誰に向けて作るか。最初に決め、AI の下書きと商品の候補をこれに合わせる */}
+              <Field label={t('配信の対象', 'Target')} hint={t('AI の下書きと商品の候補が、これに合わせます', 'AI drafts and product candidates follow this')}>
+                <div className={styles.targetBox}>
+                  <div className={styles.targetRow}>
+                    <span className={styles.targetLabel}>{t('性別', 'Gender')}</span>
+                    {(['', ...TARGET_GENDERS] as TargetGender[]).map((g) => (
+                      <ToggleButton key={g || 'none'} className={styles.targetChip} size="small" shape="circular" checked={form.targetGender === g} appearance={form.targetGender === g ? 'primary' : 'outline'} onClick={() => set('targetGender')(g)}>
+                        {genderLabel(g)}
+                      </ToggleButton>
+                    ))}
+                  </div>
+                  <div className={styles.targetRow}>
+                    <span className={styles.targetLabel}>{t('年代', 'Age')}</span>
+                    <ToggleButton className={styles.targetChip} size="small" shape="circular" checked={!form.targetAges} appearance={!form.targetAges ? 'primary' : 'outline'} onClick={() => set('targetAges')('')}>
+                      {t('指定なし', 'Not specified')}
+                    </ToggleButton>
+                    {AGE_BANDS.map((a) => {
+                      const on = parseAges(form.targetAges).includes(a)
+                      return (
+                        <ToggleButton
+                          key={a}
+                          className={styles.targetChip}
+                          size="small"
+                          shape="circular"
+                          checked={on}
+                          appearance={on ? 'primary' : 'outline'}
+                          onClick={() => {
+                            const now = parseAges(form.targetAges)
+                            set('targetAges')(formatAges(on ? now.filter((x) => x !== a) : [...now, a]))
+                          }}
+                        >
+                          {ageLabel(a)}
+                        </ToggleButton>
+                      )
+                    })}
+                  </div>
+                  {/* アプリの送る相手(これまでの ⑥ 時刻・相手 から移した) */}
+                  {templateChannel === 'push' && (
+                    <div className={styles.targetRow}>
+                      <span className={styles.targetLabel}>{t('送る相手', 'Send to')}</span>
+                      <Select size="small" className={styles.grow} value={audience} onChange={(_, d) => setAudience(d.value)}>
+                        <option value="" disabled>{t('選んでください', 'Choose')}</option>
+                        {AUDIENCES.map((v) => (
+                          <option key={v} value={v}>{audienceLabel(v)}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </Field>
               <div className={styles.twoCol}>
                 <Field label={t('担当者', 'Owner')}>
                   <Input size="small" list="ccp-owners" value={form.owner} onChange={(_, d) => set('owner')(d.value)} />
@@ -1403,8 +1469,6 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                 channel={templateChannel}
                 pushLink={pushLink}
                 onPushLink={setPushLink}
-                audience={audience}
-                onAudience={setAudience}
                 pushTitle={form.pushTitle}
                 pushBody={form.pushBody}
                 onPush={(k, v) => setForm((f) => ({ ...f, [k]: v }))}

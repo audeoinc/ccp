@@ -455,6 +455,13 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 絞り込みの段(`filterRow`)はなくし、ヘッダーの面の切り替えの右に札を横に並べた(`headerFilters`)。最初は 1 つのボタンとパネル(`Popover`)にしたが、使いにくいとのことで同じ日に横並びに戻した(X39)。選んでいない札は名前だけ。アプリ名(`styles.title`)は幅 1680px 以下で隠す。ヘッダーは `flexWrap: 'wrap'`。
 - 「自分」は `filters.person = '__me__'`(`ME_PERSON`)。App が `useSyncExternalStore(onMeChange, myName)` で右上の人の名前を持ち、`personName` に読み替えて絞る(右上で人を切り替えると、絞り込みも追いかける)。担当の列は、まだユーザーの id ではなく名前の文字なので、名前の一致で見る。
 
+## 6.28 X40 配信の対象と商品の性別(2026-10-19、UI セッション)
+
+- 値と表示は `src/target.ts`(性別・年代・送る相手の選択肢、AI に渡す文 `targetText`、商品の絞り込み `fitsTarget`)。配信カードの `target_gender`(women / men。空 = 指定なし)・`target_ages`(10s,20s,… をカンマでつなぐ)。
+- AI には、`AiCard.target` を入れると、`askAgent` が依頼の頭に「配信の対象」の前提(`targetNote`)を足す。配信カード(`buildAiCard`)と、まとめて作る(`bulkDraft.aiCardOf`)の 2 か所で入れている。
+- 商品の性別は `products.gender`。取り込み(`bq_import.gender_of`)で mens / womens / unisex に読み替え、読めない値は空。`bq.py` の SPU の optional に gender を足した(足さないと読まれない)。ダミーのビュー(`docs/bq_example/spu.sql`)は div_nm から作る。見本のデータ(seed.json・src/mock)は、商品名から決めた仮の値。
+- アプリの工程 ⑥ 時刻・相手 はなくした(`PushTimingPanel` は削除。送る相手は配信情報)。アプリの工程は 5 つ。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

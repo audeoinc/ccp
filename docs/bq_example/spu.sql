@@ -21,6 +21,7 @@ style AS (
     ANY_VALUE(style_nm) AS name,
     ANY_VALUE(dept_nm) AS dept_nm,
     ANY_VALUE(CONCAT(div_nm, ' > ', dept_nm, ' > ', class_nm)) AS category_path,
+    ANY_VALUE(div_nm) AS div_nm,
     ANY_VALUE(season_cd) AS season_cd,
     ANY_VALUE(SUBSTR(item_txt, 1, 500)) AS description,
     MIN(retail_price) AS price
@@ -129,6 +130,7 @@ SELECT
     ELSE LOWER(st.dept_nm)
   END AS category,
   st.category_path,
+  CASE st.div_nm WHEN 'WOMEN' THEN 'womens' WHEN 'MEN' THEN 'mens' ELSE 'unisex' END AS gender,
   CASE st.season_cd WHEN 'A' THEN 'autumn' WHEN 'W' THEN 'winter' WHEN 'AW' THEN 'autumn_winter' ELSE 'all_year' END AS season,
   st.price,
   st.description,
