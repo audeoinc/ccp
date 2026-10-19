@@ -23,6 +23,7 @@ import {
   SplitButton,
   Tab,
   ToggleButton,
+  Tooltip,
   TabList,
   makeStyles,
   mergeClasses,
@@ -168,7 +169,7 @@ const useStyles = makeStyles({
   sideItem: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', minWidth: 0 },
   sideName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   newBadge: { flexShrink: 0, whiteSpace: 'nowrap' },
-  sideNew: { fontStyle: 'italic', color: tokens.colorBrandForeground1 },
+  sidePlanned: { display: 'grid', rowGap: '2px', padding: '4px 6px', borderRadius: tokens.borderRadiusMedium, border: `1.5px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, minWidth: 0 },
   muted: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
   // ④ 左に作った配信、右に中身
   check: { display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr)', columnGap: '16px', alignItems: 'start', minHeight: 0, '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '12px' } },
@@ -199,8 +200,8 @@ const useStyles = makeStyles({
   pickedName: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   reviewTabs: { borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   reviewBody: { minWidth: 0 },
-  // 決めるボタンは、中身を下まで読まなくても押せるように、パネルの下に貼りつける
-  decide: { position: 'sticky', bottom: '-16px', display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 0', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  footCurrent: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, maxWidth: '40%' },
+  footHint: { fontSize: '12px', color: tokens.colorNeutralForeground2, textAlign: 'right' },
   itemHead: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
   tools: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   foot: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 20px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
@@ -302,10 +303,17 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
                 {madeIds.has(c.id) && <Badge size="small" appearance="tint" color="brand" className={s.newBadge}>{t('いま作った', 'New')}</Badge>}
               </span>
             ))}
+            {/* 作る予定は、破線の小さなカードにして、もうある配信(線なし)と形で分ける。種類も出す */}
             {planned && (
-              <span className={mergeClasses(s.sideItem, s.sideNew)}>
-                <ChannelBadge channel={ws.channel} size="small" />
-                <span className={s.sideName}>{ws.rowOf(d.key).name || t('(作る予定)', '(to create)')}</span>
+              <span className={s.sidePlanned}>
+                <span className={s.sideItem}>
+                  <Badge size="small" appearance="filled" color="brand" className={s.newBadge}>
+                    {t('作る予定', 'Planned')}
+                  </Badge>
+                  <ChannelBadge channel={ws.channel} size="small" />
+                  <span className={s.sideName}>{ws.rowOf(d.key).name || t('(配信名はまだ)', '(no name yet)')}</span>
+                </span>
+                {ws.rowOf(d.key).themeType && <span className={s.muted}>{themeTypeLabel(ws.rowOf(d.key).themeType as ThemeType)}</span>}
               </span>
             )}
           </div>
@@ -558,13 +566,14 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
       </Badge>
     )
   const pOf = (id: string) => products.find((p) => p.id === id)
+  // ③ でいま見ている案(下の帯の「保存」「破棄」も、この案に効く)
+  const items = ws.reviewItems
+  const current = items.find((x) => x.day === ws.checkDay) ?? items.find((x) => x.state === 'unsaved') ?? items[0]
+  const index = current ? items.indexOf(current) : -1
+  const busy = !!current && ws.savingDay === current.day
   const step3 = () => {
-    const items = ws.reviewItems
-    const current = items.find((x) => x.day === ws.checkDay) ?? items.find((x) => x.state === 'unsaved') ?? items[0]
     if (!current) return <span className={s.muted}>{t('作った案はまだありません。', 'No drafts yet.')}</span>
     const c = current.card
-    const busy = ws.savingDay === current.day
-    const index = items.indexOf(current)
     return (
       <div className={s.check}>
         <div className={s.list} role="listbox" aria-label={t('作った案', 'Drafts')}>
@@ -627,47 +636,6 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
           <div className={s.reviewBody}>
             <CheckView card={c} tab={tab} cards={ws.compareCards} cardProducts={ws.compareProducts} products={products} heroes={heroes} />
           </div>
-          {/* 1 本ずつ決めるボタン。保存・破棄すると、次の未保存の案に進む */}
-          <div className={s.decide}>
-            {current.state === 'saved' ? (
-              <>
-                <span className={s.statusLine}>
-                  <CheckmarkCircleFilled className={s.doneIcon} />
-                  {t('下書き(未起案)で保存しました。', 'Saved as a draft (Not started).')}
-                </span>
-                <span className={s.spacer} />
-                <Button icon={<EditRegular />} onClick={() => onOpen(c.id)}>
-                  {t('配信カードで開く', 'Open card')}
-                </Button>
-              </>
-            ) : current.state === 'discarded' ? (
-              <>
-                <span className={s.muted}>{t('この案は保存しません。', 'This draft will not be saved.')}</span>
-                <span className={s.spacer} />
-                <Button onClick={() => ws.undoDiscard(current.day)}>{t('破棄を取り消す', 'Undo discard')}</Button>
-              </>
-            ) : (
-              <>
-                <Button appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => ws.discard(current.day)}>
-                  {t('破棄', 'Discard')}
-                </Button>
-                <span className={s.spacer} />
-                <Button
-                  icon={<EditRegular />}
-                  disabled={busy}
-                  onClick={async () => {
-                    const id = await ws.save(current.day)
-                    if (id) onOpen(id)
-                  }}
-                >
-                  {t('保存して、配信カードで直す', 'Save & edit in card')}
-                </Button>
-                <Button appearance="primary" size="large" icon={busy ? <Spinner size="tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(current.day)}>
-                  {t('保存', 'Save')}
-                </Button>
-              </>
-            )}
-          </div>
         </section>
       </div>
     )
@@ -722,18 +690,62 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
           {t(`次へ: ${ws.reviewItems.length} 本を確かめて保存`, `Next: review & save ${ws.reviewItems.length}`)}
         </Button>
       )
-    return finishButton
+    // ③: いま見ている案を決めるボタン(配信カードの「保存」と同じ、右下)。未保存の案がなくなったら「終える」
+    if (!current) return finishButton
+    const done = ws.unsavedCount === 0
+    if (current.state === 'unsaved')
+      return (
+        <>
+          {/* 配信カードは保存した配信しか開けないので、下書きで保存してから開く(押した時点で、この案は保存済みになる) */}
+          <Tooltip relationship="description" content={t('下書き(未起案)で保存して、配信カードで開きます', 'Saves as a draft, then opens the card')}>
+            <Button
+              icon={<EditRegular />}
+              disabled={busy}
+              onClick={async () => {
+                const id = await ws.save(current.day)
+                if (id) onOpen(id)
+              }}
+            >
+              {t('開いて編集', 'Open & edit')}
+            </Button>
+          </Tooltip>
+          <Button appearance="primary" icon={busy ? <Spinner size="tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(current.day)}>
+            {t('保存', 'Save')}
+          </Button>
+        </>
+      )
+    return (
+      <>
+        {current.state === 'saved' ? (
+          <Button icon={<EditRegular />} onClick={() => onOpen(current.card.id)}>
+            {t('配信カードで開く', 'Open card')}
+          </Button>
+        ) : (
+          <Button onClick={() => ws.undoDiscard(current.day)}>{t('破棄を取り消す', 'Undo discard')}</Button>
+        )}
+        {done ? (
+          finishButton
+        ) : (
+          <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" onClick={() => ws.setCheckDay(ws.reviewItems.find((x) => x.state === 'unsaved')?.day ?? null)}>
+            {t('次の未保存の案へ', 'Next unsaved')}
+          </Button>
+        )}
+      </>
+    )
   }
-  const back = !plainDone && ws.step === 3 ? 2 : null
+  const inReview = !plainDone && ws.step === 3
+  const back = inReview ? 2 : null
+  // ボタンのすぐ左に置く、短い状態の説明(説明とボタンを 1 か所にまとめ、目が左下から右下へ横断しないように)
   const footHint = plainDone
     ? ''
     : ws.step === 1
-      ? t(
-          `作る ${n} 本 ・ 種類と配信名が入った ${readyCount} 本(AI で作るには、両方が要ります)`,
-          `${n} to create · ${readyCount} with type and name (AI needs both)`,
-        )
-      : ws.step === 3
-        ? t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本。保存していない案は、終えると破棄されます。`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}. Unsaved drafts are discarded when you finish.`)
+      ? readyCount === n && n > 0
+        ? t(`${n} 本そろいました`, `All ${n} ready`)
+        : t(`種類と配信名: ${readyCount} / ${n} 本`, `Type & name: ${readyCount} / ${n}`)
+      : inReview
+        ? ws.unsavedCount === 0
+          ? t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本。すべて決めました`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}. All decided`)
+          : t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本(保存していない案は、終えると破棄)`, `Saved ${ws.savedCount} of ${ws.reviewItems.length} (unsaved drafts are discarded)`)
         : ''
 
   return (
@@ -768,8 +780,19 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
               {t('戻る', 'Back')}
             </Button>
           )}
-          <span className={s.summary}>{footHint}</span>
+          {/* ③: いま見ている案と、破棄(保存から離して、左に置く) */}
+          {inReview && current && (
+            <>
+              <span className={s.footCurrent}>{t(`${index + 1} / ${items.length} 本目 ・ ${current.card.name}`, `${index + 1} of ${items.length} · ${current.card.name}`)}</span>
+              {current.state === 'unsaved' && (
+                <Button appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => ws.discard(current.day)}>
+                  {t('破棄', 'Discard')}
+                </Button>
+              )}
+            </>
+          )}
           <span className={s.spacer} />
+          <span className={s.footHint}>{footHint}</span>
           {actions()}
         </div>
       </DialogSurface>
