@@ -38,6 +38,8 @@ export interface Row {
   themeType: string
   /** AI の配信名の案の理由(案を入れたときだけ) */
   nameReason?: string
+  /** 種類も AI の案で入れたか(人が選び直すと消える) */
+  typeByAi?: boolean
 }
 
 const mostCommon = (vs: string[]) => {
@@ -169,9 +171,9 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
 
   /**
    * 配信名の案を出して、行に入れる(押すこと自体を、案の採用とみなす。あとで書き換えられる)。
-   * まとめて出すときは、配信名がまだ空の行だけ(人が入れた名前は、上書きしない)
+   * まとめて出すときは、配信名か種類が空の行だけ。keepNames のときは、人が入れた名前を上書きしない(種類だけ埋める)
    */
-  async function suggest(list: string[]) {
+  async function suggest(list: string[], keepNames = false) {
     if (list.length === 0) return
     setError(null)
     setNaming((s) => new Set([...s, ...list]))
@@ -189,13 +191,20 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
             channel: label(channelOptions, channel),
             department: label(departmentOptions, defaults.department),
             themeType: b.theme_type ? themeTypeLabel(b.theme_type as ThemeType) : undefined,
+            // 人が入れた名前は、種類を選ぶ手がかりにする(keepNames のときは、名前はそのまま残る)
+            ...(keepNames && b.name ? { name: b.name } : {}),
           }
         }),
         others,
       })
       setRows((m) => {
         const n = new Map(m)
-        for (const x of names) n.set(x.id, { ...(n.get(x.id) ?? { name: '', themeType: '' }), name: x.name, nameReason: x.reason })
+        for (const x of names) {
+          const cur = n.get(x.id) ?? { name: '', themeType: '' }
+          // 種類は、人がまだ選んでいない行だけ、AI の案で埋める(人が選んだ種類は変えない)
+          const fill = !cur.themeType && !!x.themeType
+          n.set(x.id, { ...cur, ...(keepNames && cur.name.trim() ? {} : { name: x.name, nameReason: x.reason }), ...(fill ? { themeType: x.themeType, typeByAi: true } : {}) })
+        }
         return n
       })
     } catch (e) {

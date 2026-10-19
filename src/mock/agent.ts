@@ -158,16 +158,32 @@ export function mockAgent(message: string): string {
     return J({ types: list.map((d) => ({ id: d.id, type: guessThemeType({ name: d.name, theme: d.theme, headline: d.headline }) })) })
   }
 
-  // 配信名の案: 種類と曜日から、決まった形で作る
+  // 配信名の案: 種類と曜日から、決まった形で作る。種類が空の枠は、曜日で種類も決める
   if (task === 'suggest_names') {
     const slots = (p.slots as { id: string; scheduledAt?: string; country?: string; themeType?: string }[] | undefined) ?? []
+    const byDay = ['season', 'new', 'sale', 'collab', 'limited', 'member', 'restock'] as const
+    const kindName: Record<string, [string, string]> = {
+      season: ['季節の特集', 'Seasonal'],
+      new: ['新作', 'New In'],
+      sale: ['セール', 'Sale'],
+      collab: ['コラボ', 'Collab'],
+      limited: ['期間限定価格', 'Limited Price'],
+      member: ['会員向け', 'Members'],
+      restock: ['再入荷', 'Restock'],
+    }
     return J({
       names: slots.map((s, i) => {
         const d = s.scheduledAt ? new Date(s.scheduledAt) : new Date()
         const us = s.country === 'US'
         const md = `${d.getMonth() + 1}/${d.getDate()}`
-        const kind = s.themeType || (us ? 'Weekly Picks' : '今週のおすすめ')
-        return { id: s.id, name: us ? `${kind} ${md}` : `${md} ${kind}${i % 2 ? '特集' : ''}`, reason: '配信日と種類から付けた名前です。' }
+        const proposed = s.themeType ? undefined : byDay[d.getDay()]
+        const kind = s.themeType || (proposed ? kindName[proposed][us ? 1 : 0] : us ? 'Weekly Picks' : '今週のおすすめ')
+        return {
+          id: s.id,
+          name: us ? `${kind} ${md}` : `${md} ${kind}${i % 2 ? '特集' : ''}`,
+          ...(proposed ? { themeType: proposed } : {}),
+          reason: proposed ? '曜日から種類を選び、配信日と種類から付けた名前です。' : '配信日と種類から付けた名前です。',
+        }
       }),
     })
   }

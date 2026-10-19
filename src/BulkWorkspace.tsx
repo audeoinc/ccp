@@ -15,6 +15,7 @@ import {
   Select,
   Spinner,
   Tab,
+  ToggleButton,
   TabList,
   makeStyles,
   mergeClasses,
@@ -104,10 +105,10 @@ const useStyles = makeStyles({
   radios: { '& label': { whiteSpace: 'nowrap' } },
   // ① の 7 日の表(作る日のチェック・配信日・種類・配信名)。作れない日も並べ、薄くして理由を出す
   table: { display: 'grid', rowGap: '4px' },
-  thead: { display: 'grid', gridTemplateColumns: '28px 100px 170px minmax(0, 1fr)', columnGap: '8px', padding: '0 8px' },
+  thead: { display: 'grid', gridTemplateColumns: '28px 100px minmax(0, 1fr)', columnGap: '8px', padding: '0 8px' },
   tr: {
     display: 'grid',
-    gridTemplateColumns: '28px 100px 170px minmax(0, 1fr)',
+    gridTemplateColumns: '28px 100px minmax(0, 1fr)',
     columnGap: '8px',
     alignItems: 'center',
     minHeight: '36px',
@@ -115,7 +116,8 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusMedium,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
-  span2: { gridColumn: 'span 2' },
+  chips: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '4px', rowGap: '4px' },
+  chip: { minWidth: 0, fontSize: '12px', fontWeight: tokens.fontWeightRegular },
   dayOff: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled },
   dayOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   dayDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
@@ -288,7 +290,8 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
   // ---- ① 対象と方向(週・国・チャネル、作る日と、その日の配信名・種類を、1 つの表で)
   const step1 = () => {
     const locked = ws.days.some((d) => d.state === 'locked')
-    const unnamed = ws.targets.filter((d) => !ws.rowOf(d).name.trim())
+    // AI でまとめて入れる行(種類か配信名が空)
+    const unfilled = ws.targets.filter((d) => !ws.rowOf(d).name.trim() || !ws.rowOf(d).themeType)
     const note = (d: (typeof ws.days)[number]): string => {
       if (d.state === 'locked') return t('確定した週', 'Confirmed week')
       if (d.state === 'past') return t('過ぎた日', 'Past')
@@ -338,24 +341,23 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           <div className={s.aiBar}>
             <AiIcon size={20} />
             <div className={s.aiText}>
-              <span className={s.aiTitle}>{t('配信名を AI でまとめて入れる', 'Fill names with AI')}</span>
+              <span className={s.aiTitle}>{t('種類と配信名を AI でまとめて入れる', 'Fill types and names with AI')}</span>
               <span className={s.hint}>
                 {t(
-                  '作る日のうち、配信名が空の行に、日付・種類・前後の配信に合う案を入れます。種類を先に選ぶと、種類に合わせます。入れた名前は、あとで書き換えられます。',
-                  'Fills empty names with ideas that fit the date, type and nearby deliveries. Pick types first to match them. You can edit the names afterwards.',
+                  '作る日のうち、種類か配信名が空の行に、日付・前後の配信に合う案を入れます。人が選んだ種類・入れた配信名は変えません。入れたあとで、書き換えられます。',
+                  'Fills empty types and names with ideas that fit the date and nearby deliveries. Types and names you entered stay as they are. You can change them afterwards.',
                 )}
               </span>
             </div>
-            <Button appearance="primary" icon={ws.naming.size > 0 ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" />} disabled={unnamed.length === 0 || ws.naming.size > 0} onClick={() => void ws.suggest(unnamed)}>
-              {unnamed.length > 0 ? t(`空の ${unnamed.length} 行に入れる`, `Fill ${unnamed.length} empty`) : t('空の行はありません', 'No empty rows')}
+            <Button appearance="primary" icon={ws.naming.size > 0 ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" />} disabled={unfilled.length === 0 || ws.naming.size > 0} onClick={() => void ws.suggest(unfilled, true)}>
+              {unfilled.length > 0 ? t(`空いている ${unfilled.length} 行に入れる`, `Fill ${unfilled.length} rows`) : t('空いている行はありません', 'Nothing to fill')}
             </Button>
           </div>
           <div className={s.table} role="table">
             <div className={s.thead} role="row">
               <span />
               <span className={s.th}>{t('配信日', 'Date')}</span>
-              <span className={s.th}>{t('種類', 'Type')}</span>
-              <span className={s.th}>{t('配信名', 'Name')}</span>
+              <span className={s.th}>{t('配信名と種類', 'Name & type')}</span>
             </div>
             {ws.days.map((d) => {
               const free = d.state === 'free'
@@ -367,27 +369,39 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
                   {free ? <Checkbox checked={on} onChange={(_, v) => ws.toggleDay(d.key, !!v.checked)} aria-label={t(`${dayText(d.key)} に作る`, `Create on ${dayText(d.key)}`)} /> : d.state === 'locked' ? <LockClosedRegular /> : <span />}
                   <span className={s.dayDate}>{dayText(d.key)}</span>
                   {!free ? (
-                    <span className={mergeClasses(s.dayNote, s.span2)}>{note(d)}</span>
+                    <span className={s.dayNote}>{note(d)}</span>
                   ) : !on ? (
-                    <span className={mergeClasses(s.dayNote, s.span2, s.muted)}>{t('作らない', 'Skip')}</span>
+                    <span className={mergeClasses(s.dayNote, s.muted)}>{t('作らない', 'Skip')}</span>
                   ) : (
-                    <>
-                      <Select size="small" value={r.themeType} onChange={(_, v) => ws.setRow(d.key, { themeType: v.value })} aria-label={t('種類', 'Type')}>
-                        <option value="">{t('選んでください', 'Choose')}</option>
-                        {THEME_TYPES.map((k) => (
-                          <option key={k} value={k}>
-                            {themeTypeLabel(k)}
-                          </option>
-                        ))}
-                      </Select>
-                      <div className={s.nameCell}>
-                        <div className={s.nameLine}>
-                          <Input size="small" className={s.grow} value={r.name} placeholder={t('配信名', 'Delivery name')} onChange={(_, v) => ws.setRow(d.key, { name: v.value, nameReason: undefined })} aria-label={t('配信名', 'Name')} />
-                          <Button size="small" appearance="subtle" icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={busy} title={t('この行に配信名の案', 'Suggest a name for this row')} aria-label={t('この行に配信名の案', 'Suggest a name for this row')} onClick={() => void ws.suggest([d.key])} />
-                        </div>
-                        {r.nameReason && <span className={s.reason}>{`${t('案の理由', 'Why')}: ${r.nameReason}`}</span>}
+                    <div className={s.nameCell}>
+                      <div className={s.nameLine}>
+                        <Input size="small" className={s.grow} value={r.name} placeholder={t('配信名', 'Delivery name')} onChange={(_, v) => ws.setRow(d.key, { name: v.value, nameReason: undefined })} aria-label={t('配信名', 'Name')} />
+                        <Button size="small" appearance="subtle" icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={busy} title={t('この行に配信名の案', 'Suggest a name for this row')} aria-label={t('この行に配信名の案', 'Suggest a name for this row')} onClick={() => void ws.suggest([d.key])} />
                       </div>
-                    </>
+                      {/* 種類は、選ぶ一覧ではなく、押すだけのチップ(1 行ずつ一覧を開く手間を減らす。もう一度押すと外れる) */}
+                      <div className={s.chips} role="radiogroup" aria-label={t('種類', 'Type')}>
+                        {THEME_TYPES.map((k) => {
+                          const sel = r.themeType === k
+                          return (
+                            <ToggleButton
+                              key={k}
+                              size="small"
+                              shape="circular"
+                              appearance={sel ? 'primary' : 'outline'}
+                              checked={sel}
+                              role="radio"
+                              aria-checked={sel}
+                              className={s.chip}
+                              onClick={() => ws.setRow(d.key, { themeType: sel ? '' : k, typeByAi: false })}
+                            >
+                              {themeTypeLabel(k)}
+                            </ToggleButton>
+                          )
+                        })}
+                        {r.typeByAi && r.themeType && <span className={s.reason}>{t('種類は AI の案', 'Type suggested by AI')}</span>}
+                      </div>
+                      {r.nameReason && <span className={s.reason}>{`${t('案の理由', 'Why')}: ${r.nameReason}`}</span>}
+                    </div>
                   )}
                 </div>
               )

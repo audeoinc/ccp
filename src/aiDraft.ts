@@ -2,6 +2,7 @@ import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { askAgent, type AiCard, type CopyLanguage } from './aiSelect'
 import { tr } from './i18n'
+import { THEME_TYPES, type ThemeType } from './themeTypes'
 import { DEFAULT_PUSH_TEMPLATE, hasTemplate, templateOptions, type EmailTemplateId, type TemplateChannel } from './templates'
 
 // テーマ・コピー・制作指示の「案」の生成。出力形式はメッセージ内で毎回指定する(aiSelect.ts と同じ理由)
@@ -231,7 +232,7 @@ const NAME_PROMPT = `あなたは、ファッション通販の配信(メール�
 
 # 出力の形式(厳守)
 次の JSON オブジェクト 1 つだけを返す。説明文、見出し、箇条書き、コードフェンス(\`\`\`)、前置き、あとがきは一切付けない。
-{"names":[{"id":"...","name":"...","reason":"..."}]}
+{"names":[{"id":"...","name":"...","themeType":"...","reason":"..."}]}
 
 # ルール
 1. 入力のすべての枠について、id をそのまま返す。
@@ -239,6 +240,9 @@ const NAME_PROMPT = `あなたは、ファッション通販の配信(メール�
 3. 配信日(scheduledAt)の曜日・季節・行事、チャネル、配信の種類(themeType)を手がかりにする。種類があるときは、名前から種類が分かるようにする。
 4. others(前後の週の、ほかの配信の名前とテーマ)や、ほかの枠の案と、同じ・似た名前にしない。
 5. 理由(reason)は日本語で 40 文字以内。
+6. themeType が空の枠は、種類も 1 つ選び、次のキーで themeType に入れる(配信名は、その種類に合わせる)。同じ週で同じ種類ばかりにならないようにし、others の種類の並びも参考にする。themeType が入っている枠は、それをそのまま返す。
+   - price: 値下げ / limited: 期間限定価格 / sale: セール / new: 新作 / collab: コラボ / member: 会員向け / season: 季節の特集 / restock: 再入荷 / other: どれにも当てはまらない
+7. name が入っている枠は、人が決めた配信名なので、name をそのまま返し、その名前に合う種類を選ぶ。
 
 # 入力
 `
@@ -250,18 +254,31 @@ export interface NameSlot {
   channel: string
   department: string
   themeType?: string
+  /** 人がもう入れた配信名(あれば、名前は変えずに返し、種類を選ぶ手がかりにする) */
+  name?: string
 }
 
-/** 週の枠(中身のない配信)の、配信名の案。1 枠でも、まとめてでも、1 回の呼び出しで出す(枠どうしで名前が重ならないように) */
-export async function suggestNames(args: { slots: NameSlot[]; others: { name: string; theme?: string; scheduledAt?: string }[] }): Promise<{ id: string; name: string; reason: string }[]> {
+/**
+ * 週の枠(中身のない配信)の、配信名の案。1 枠でも、まとめてでも、1 回の呼び出しで出す(枠どうしで名前が重ならないように)。
+ * 種類(themeType)が空の枠は、種類の案も返す(種類を 1 行ずつ選ぶ手間を減らす。使うかは呼び出し側が決める)
+ */
+export async function suggestNames(args: { slots: NameSlot[]; others: { name: string; theme?: string; scheduledAt?: string }[] }): Promise<{ id: string; name: string; reason: string; themeType?: ThemeType }[]> {
   const parsed = (await askAgent(NAME_PROMPT, {
     task: 'suggest_names',
     today: new Date().toISOString().slice(0, 10),
     slots: args.slots,
     others: args.others,
-  })) as { names?: { id?: string; name?: string; reason?: string }[] }
+  })) as { names?: { id?: string; name?: string; reason?: string; themeType?: string }[] }
   const ids = new Set(args.slots.map((s) => s.id))
-  const list = (parsed.names ?? []).filter((n) => n.id && ids.has(String(n.id)) && n.name).map((n) => ({ id: String(n.id), name: String(n.name).trim(), reason: String(n.reason ?? '') }))
+  const list = (parsed.names ?? [])
+    .filter((n) => n.id && ids.has(String(n.id)) && n.name)
+    .map((n) => ({
+      id: String(n.id),
+      name: String(n.name).trim(),
+      reason: String(n.reason ?? ''),
+      // 知らない値は捨てる(AI が日本語の名前などで返すことがあるため)
+      themeType: (THEME_TYPES as string[]).includes(String(n.themeType)) ? (n.themeType as ThemeType) : undefined,
+    }))
   if (list.length === 0) throw new Error(tr('配信名の案を取得できませんでした', 'Could not get name ideas'))
   return list
 }
