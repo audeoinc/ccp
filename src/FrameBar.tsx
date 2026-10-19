@@ -37,13 +37,15 @@ interface Props {
   frames: WeekFrames
   weekStart: Date
   weeks: WeekRow[]
+  /** 週の表示に出ている配信(画面の絞り込みのあと)。枠の数・操作は、見えている枠だけにする(絞り込みで隠れた枠を数えると、見えない「枠 n 本」の帯だけが出るため) */
+  visibleIds: Set<string>
 }
 
 /**
  * 週の枠(W14)の帯。
  * 「週の枠を作る」を押すと、国・チャネルを 1 回だけ選ぶステップ。枠ができたら、配信名の案・中身を作る(そろった枠をまとめて / 選んだ枠だけ)
  */
-export function FrameBar({ frames, weekStart, weeks }: Props) {
+export function FrameBar({ frames, weekStart, weeks, visibleIds }: Props) {
   const s = useStyles()
   const t = useT()
   const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })
@@ -108,9 +110,12 @@ export function FrameBar({ frames, weekStart, weeks }: Props) {
     )
   }
 
-  const n = frames.frames.length
+  const shown = frames.frames.filter((c) => visibleIds.has(c.id))
+  const ready = frames.ready.filter((c) => visibleIds.has(c.id))
+  const chosen = frames.chosen.filter((c) => visibleIds.has(c.id))
+  const n = shown.length
   if (n === 0 && !frames.running && !frames.error) return null
-  const unnamed = frames.frames.filter((c) => !c.name?.trim() && !frames.isLocked(c))
+  const unnamed = shown.filter((c) => !c.name?.trim() && !frames.isLocked(c))
   return (
     <div className={s.root}>
       <div className={s.row}>
@@ -118,7 +123,7 @@ export function FrameBar({ frames, weekStart, weeks }: Props) {
           <AiIcon />
           {t(`この週の枠 ${n} 本`, `${n} slot(s) this week`)}
         </span>
-        <span className={s.count}>{t(`中身を作れる ${frames.ready.length} 本・選んだ ${frames.chosen.length} 本`, `${frames.ready.length} ready · ${frames.chosen.length} selected`)}</span>
+        <span className={s.count}>{t(`中身を作れる ${ready.length} 本・選んだ ${chosen.length} 本`, `${ready.length} ready · ${chosen.length} selected`)}</span>
         <Button size="small" appearance="subtle" icon={<AiIcon />} disabled={unnamed.length === 0 || frames.naming.size > 0} onClick={() => void frames.nameFrames(unnamed)}>
           {t(`名前のない ${unnamed.length} 本に、配信名の案を入れる`, `Suggest names for ${unnamed.length} unnamed slot(s)`)}
         </Button>
@@ -129,11 +134,11 @@ export function FrameBar({ frames, weekStart, weeks }: Props) {
           </Button>
         ) : (
           <>
-            <Button size="small" disabled={frames.chosen.length === 0} onClick={() => void frames.generate(frames.chosen)}>
-              {t(`選んだ ${frames.chosen.length} 本の中身を作る`, `Create ${frames.chosen.length} selected`)}
+            <Button size="small" disabled={chosen.length === 0} onClick={() => void frames.generate(chosen)}>
+              {t(`選んだ ${chosen.length} 本の中身を作る`, `Create ${chosen.length} selected`)}
             </Button>
-            <Button size="small" appearance="primary" icon={<AiIcon tone="white" />} disabled={frames.ready.length === 0} onClick={() => void frames.generate(frames.ready)}>
-              {t(`そろった ${frames.ready.length} 本の中身を作る`, `Create all ${frames.ready.length} ready`)}
+            <Button size="small" appearance="primary" icon={<AiIcon tone="white" />} disabled={ready.length === 0} onClick={() => void frames.generate(ready)}>
+              {t(`そろった ${ready.length} 本の中身を作る`, `Create all ${ready.length} ready`)}
             </Button>
           </>
         )}

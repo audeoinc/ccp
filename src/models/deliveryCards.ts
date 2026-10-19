@@ -84,6 +84,8 @@ export interface DeliveryCardFields {
   cancel_reason?: string
   /** AI でまとめて中身を作り、まだ人が確かめていない(作った日時。確かめたら空。W14) */
   ai_unchecked_at?: string | null
+  /** 週の表示の上の「この週の枠を作る」で、中身のない枠として作った日時(W14 の古い形)。中身のない配信のうち、これがあるものだけを枠として出す */
+  frame_at?: string | null
   /** hero_images の id(参照を外すときは null) */
   hero_image_id?: string | null
   state_code?: number

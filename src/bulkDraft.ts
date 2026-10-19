@@ -30,11 +30,14 @@ const label = (opts: { value: string; label: string }[], v?: string | null) => o
 const isPush = (c: { channel?: string | null }) => c.channel === CHANNEL_PUSH
 
 /**
- * 中身のない配信(週の枠)か。未起案で、テーマ・見出し・通知・メイン画像・商品がどれもないもの。
- * 枠は、週の表示で、その場で配信名・種類を入れられる形で出し、中身ができたら、ふつうの配信として出す
+ * 中身のない配信(週の枠)か。「この週の枠を作る」で作ったもの(frame_at)で、未起案で、テーマ・見出し・通知・メイン画像・商品がどれもないもの。
+ * 枠は、週の表示で、その場で配信名・種類を入れられる形で出し、中身ができたら、ふつうの配信として出す。
+ * 1 本ずつ新規作成した配信や、作業画面で中身なしで保存した配信は、中身がなくても枠にしない(ふつうの下書きとして出す。2026-10-19 利用者の指摘)。
+ * frame_at を足す前に作った枠は、配信名が空なら枠として出す(配信名は空を許さないので、枠からしか生まれない)
  */
 export function isFrame(c: DeliveryCard, productCount: number): boolean {
   if (isCancelled(c) || statusRank(c.status) > statusRank('not_started')) return false
+  if (!c.frame_at && c.name?.trim()) return false
   return !c.theme?.trim() && !c.headline?.trim() && !c.push_title?.trim() && !c.hero_image_id && productCount === 0
 }
 
@@ -54,6 +57,7 @@ export async function createFrames(days: string[], setup: { country: string; cha
       department: (setup.department || undefined) as DeliveryCardFields['department'],
       status: 'not_started',
       state_code: 0,
+      frame_at: new Date().toISOString(),
     })
     if (!res.success) throw new Error(res.error?.message ?? tr('枠を作れませんでした', 'Could not create the slot'))
     n += 1
@@ -109,7 +113,7 @@ const templateOf = (c: DraftBase, r: AutoDraftResult) => {
 }
 
 /** 載せる商品(選定済み。メールの並び順) */
-const productIdsOf = (r: AutoDraftResult): string[] => r.sections.flatMap((s) => s.selected.map((x) => x.productId))
+export const productIdsOf = (r: AutoDraftResult): string[] => r.sections.flatMap((s) => s.selected.map((x) => x.productId))
 
 /**
  * 作った中身を、枠の配信カードに書き込む(配信カードの buildContent・syncItems と同じ形)。
@@ -126,9 +130,9 @@ export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products:
 /**
  * 作業画面(BulkWorkspace)で作った中身を、新しい配信カードとして保存する。
  * 中身のない枠は作らず、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。
- * 誰も確かめていないことが分かるように、「AI 下書き・未確認」の印は付ける(作業画面の「確認した」か、配信カードで保存すると外れる)
+ * 作業画面は、人が中身を見て 1 本ずつ「保存」したものだけを保存するので、「AI 下書き・未確認」の印は付けない(unchecked = false)
  */
-export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[]): Promise<DeliveryCard> {
+export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[], unchecked = true): Promise<DeliveryCard> {
   const res = await DeliveryCardsService.create({
     name: base.name,
     scheduled_at: base.scheduled_at,
@@ -138,7 +142,7 @@ export async function createDraft(base: DraftBase, r: AutoDraftResult, products:
     theme_type: base.theme_type,
     status: 'not_started',
     state_code: 0,
-    ...contentFields(base, r, products),
+    ...contentFields(base, r, products, unchecked),
   })
   if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
   const card = res.data
@@ -163,8 +167,16 @@ export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
   return res.data
 }
 
+/**
+ * まだ保存していない AI の結果を、配信カードの形にする(作業画面で、保存する前にプレビュー・比較するため)。
+ * id は仮のもの(保存すると、本当の id の配信カードになる)
+ */
+export function previewCard(id: string, base: DraftBase, r: AutoDraftResult, products: Product[]): DeliveryCard {
+  return { id, ...base, status: 'not_started', ...contentFields(base, r, products, false) } as DeliveryCard
+}
+
 /** 作った中身の列(配信カードの buildContent と同じ形) */
-function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[]): Partial<DeliveryCardFields> {
+function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[], unchecked = true): Partial<DeliveryCardFields> {
   const template = templateOf(c, r)
   const pname = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   const copies = r.sections.map((s) => s.copy)
@@ -185,7 +197,7 @@ function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[]): P
     section_titles: r.sections.map((s) => s.title).join('\n').replace(/\n+$/, ''),
     section_copies: copies.some(Boolean) ? JSON.stringify(copies) : '',
     ...(r.hero?.hero?.heroId ? { hero_image_id: r.hero.hero.heroId } : {}),
-    ai_unchecked_at: new Date().toISOString(),
+    ...(unchecked ? { ai_unchecked_at: new Date().toISOString() } : {}),
   }
 }
 

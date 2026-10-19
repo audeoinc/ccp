@@ -1,19 +1,21 @@
 // まとめて作る作業画面(BulkWorkspace)の、状態と操作。
 // 週の表示の上で作る形(useWeekFrames)は、表示の場所を作業の場所に使うので、手順が分かりにくかった(利用者・チームの指摘、2026-10-19)。
-// そこで、作業は全画面の作業画面で完結させ、① 対象と方向(週・国・チャネル・作る日と、配信名・種類) → ② 中身を AI で作る → ③ 確かめる、の順に進める。
-// ① は画面の中だけで持つ。② で中身ができた配信から、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。
+// そこで、作業は全画面の作業画面で完結させ、① 対象と方向(週・国・チャネル・作る日と、配信名・種類) → ② 中身を AI で作る → ③ 確かめて保存、の順に進める。
+// ①② は画面の中だけで持つ。③ で人が 1 本ずつ「保存」したものだけを、1 本ずつ新規作成した下書きと同じ「未起案」で保存し、
+// 保存しなかったものは破棄する(「AI 下書き・未確認」のような、途中の状態を増やさないため。2026-10-19 利用者の指摘)。
 // AI で作らない道もある(① のあと、中身を入れずに保存する。1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import type { WeekRow } from './data/weeks'
+import type { AutoDraftResult } from './autoDraft'
 import { suggestNames } from './aiDraft'
 import { channelOptions, departmentOptions, CHANNEL_EMAIL } from './status'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { sundayOf } from './weekLock'
 import { tr } from './i18n'
-import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, markChecked, overusedInWeek, weekDays, type DraftBase } from './bulkDraft'
+import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { Progress } from './useWeekFrames'
 
 interface Ctx {
@@ -29,7 +31,7 @@ interface Ctx {
   onChanged: () => Promise<void>
 }
 
-/** 1 = 対象と方向(週・国・チャネル・作る日と、配信名・種類)、2 = 中身を AI で作る、3 = 確かめる */
+/** 1 = 対象と方向(週・国・チャネル・作る日と、配信名・種類)、2 = 中身を AI で作る、3 = 確かめて保存 */
 export type Step = 1 | 2 | 3
 
 /** ① で入れる、1 日分の行(まだ保存しない) */
@@ -42,12 +44,21 @@ export interface Row {
   typeByAi?: boolean
 }
 
+/** ③ で確かめる 1 本。保存する前は、仮の id の配信カード(previewCard) */
+export interface ReviewItem {
+  day: string
+  card: DeliveryCard
+  productIds: string[]
+  state: 'unsaved' | 'saved' | 'discarded'
+}
+
 const mostCommon = (vs: string[]) => {
   const n = new Map<string, number>()
   for (const v of vs.filter(Boolean)) n.set(v, (n.get(v) ?? 0) + 1)
   return [...n].sort((a, b) => b[1] - a[1])[0]?.[0]
 }
 const label = (opts: { value: string; label: string }[], v?: string | null) => opts.find((o) => String(o.value) === String(v ?? ''))?.label ?? ''
+const draftId = (day: string) => `draft:${day}`
 
 export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks, defaults, onChanged }: Ctx) {
   const [open, setOpen] = useState(false)
@@ -59,15 +70,19 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const [chosen, setChosen] = useState<Set<string>>(new Set())
   const [rows, setRows] = useState<Map<string, Row>>(new Map())
   const [naming, setNaming] = useState<Set<string>>(new Set())
-  // ② の進み具合・失敗・保存した配信(日 → 配信カードの id)
+  // ② の進み具合・失敗・できた中身(日 → AI の結果。まだ保存しない)
   const [progress, setProgress] = useState<Map<string, Progress>>(new Map())
   const [failed, setFailed] = useState<Map<string, string>>(new Map())
-  const [made, setMade] = useState<Map<string, string>>(new Map())
+  const [results, setResults] = useState<Map<string, AutoDraftResult>>(new Map())
+  // ③ で保存した配信(日 → 配信カードの id)と、破棄した日
+  const [savedIds, setSavedIds] = useState<Map<string, string>>(new Map())
+  const [discarded, setDiscarded] = useState<Set<string>>(new Set())
+  const [savingDay, setSavingDay] = useState<string | null>(null)
   // 中身を作らずに保存した配信(日 → 配信カードの id)。1 本ずつ新規作成して、中身を入れずに保存したのと同じ
   const [plain, setPlain] = useState<Map<string, string>>(new Map())
   const [savingPlain, setSavingPlain] = useState(false)
-  // ③ で見ている配信
-  const [checkId, setCheckId] = useState<string | null>(null)
+  // ③ で見ている日
+  const [checkDay, setCheckDay] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const stopRef = useRef(false)
   const running = progress.size > 0
@@ -81,9 +96,9 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   )
 
   const days = useMemo(() => weekDays(weekStart, cards, weeks, channel, country), [weekStart, cards, weeks, channel, country])
-  // 保存を始めたときの作る日。保存すると、その日は「配信あり」に変わるので、① の判定から毎回求めると、作った行が消えてしまう
+  // 中身を作り始めたとき(または保存を始めたとき)の作る日。保存すると、その日は「配信あり」に変わるので、① の判定から毎回求めると、行が消えてしまう
   const [plan, setPlan] = useState<string[] | null>(null)
-  /** 作る日(① では、選んだ作れる日。保存を始めたら、その時の日。日付の順) */
+  /** 作る日(① では、選んだ作れる日。作り始めたら、その時の日。日付の順) */
   const targets = plan ?? days.filter((d) => d.state === 'free' && chosen.has(d.key)).map((d) => d.key)
   const rowOf = (day: string): Row => rows.get(day) ?? { name: '', themeType: '' }
   /** AI で中身を作れる行(配信名と種類。方向を決めてから作ると、作り直しが減る) */
@@ -91,10 +106,10 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const allReady = targets.length > 0 && targets.every(ready)
   /** 中身を作らずに保存できるか(配信名は空を許さない列なので、配信名だけは要る。種類は、あとでもよい) */
   const plainReady = targets.length > 0 && targets.every((d) => !!rowOf(d).name.trim())
-  // ② の対象(まだ保存していない日)
-  const pending = targets.filter((d) => !made.has(d))
-  /** 何か保存したら、① には戻らない(保存した配信と、行の対応がずれるため) */
-  const saved = made.size > 0 || plain.size > 0
+  // ② の対象(まだ中身がなく、保存も破棄もしていない日)
+  const pending = targets.filter((d) => !results.has(d) && !savedIds.has(d) && !discarded.has(d))
+  /** 作り始めたら、① には戻らない(作った中身と、行の対応がずれるため) */
+  const started = plan !== null
 
   // 国・チャネル・週を変えたら、作れる日を選び直す(既定は、作れる日すべて)
   const pickFree = (ws: Date, ch: string, co: string) => setChosen(new Set(weekDays(ws, cards, weeks, ch, co).filter((d) => d.state === 'free').map((d) => d.key)))
@@ -113,28 +128,62 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setNaming(new Set())
     setProgress(new Map())
     setFailed(new Map())
-    setMade(new Map())
+    setResults(new Map())
+    setSavedIds(new Map())
+    setDiscarded(new Set())
     setPlain(new Map())
-    setCheckId(null)
+    setCheckDay(null)
     setError(null)
     setPlan(null)
     setStep(1)
     setOpen(true)
   }
-  /** 手順を移る。① には、まだ何も保存していないときだけ戻れる(作る日を選び直せる) */
+  /** 手順を移る。① には、まだ作り始めていないときだけ戻れる(作る日を選び直せる) */
   function goStep(k: Step) {
-    if (k === 1) {
-      if (saved) return
-      setPlan(null)
-    }
+    if (k === 1 && started) return
     setStep(k)
   }
-  /** 閉じる。まだ保存していない入力があれば確かめる(作った配信は保存済みなので、消えない) */
-  function close() {
-    if (running || savingPlain) return
-    const unsaved = targets.some((d) => !made.has(d) && !plain.has(d) && (rowOf(d).name.trim() || rowOf(d).themeType))
-    if (unsaved && !window.confirm(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?'))) return
+
+  /** 行を、AI に渡す配信の形に(まだ保存していない) */
+  const baseOf = (day: string): DraftBase => ({
+    name: rowOf(day).name.trim(),
+    scheduled_at: new Date(`${day}T${BULK_TIME}`).toISOString(),
+    country: (country || undefined) as DeliveryCardFields['country'],
+    channel: (channel || undefined) as DeliveryCardFields['channel'],
+    department: (defaults.department || undefined) as DeliveryCardFields['department'],
+    theme_type: rowOf(day).themeType || undefined,
+  })
+
+  // ---- ③ で確かめる 1 本ずつ(日付の順)
+  const reviewItems: ReviewItem[] = targets
+    .filter((d) => results.has(d))
+    .map((day) => {
+      const r = results.get(day)!
+      const id = savedIds.get(day)
+      const real = id ? cards.find((c) => c.id === id) : undefined
+      return {
+        day,
+        card: real ?? previewCard(id ?? draftId(day), baseOf(day), r, products),
+        productIds: (id && cardProducts.get(id)) || productIdsOf(r),
+        state: id ? 'saved' : discarded.has(day) ? 'discarded' : 'unsaved',
+      }
+    })
+  const unsavedCount = reviewItems.filter((x) => x.state === 'unsaved').length
+  const savedCount = reviewItems.filter((x) => x.state === 'saved').length
+  /** 比べるときの、すべての配信と商品(保存していない案も入れる。前後の配信と見比べるため) */
+  const compareCards = [...cards, ...reviewItems.filter((x) => x.state === 'unsaved').map((x) => x.card)]
+  const compareProducts = new Map(cardProducts)
+  for (const x of reviewItems) if (x.state === 'unsaved') compareProducts.set(x.card.id, x.productIds)
+
+  /** 閉じる。まだ保存していない入力・案があれば確かめる(保存したものは、消えない)。閉じたら true */
+  function close(): boolean {
+    if (running || savingPlain || savingDay) return false
+    const lostRows = targets.some((d) => !results.has(d) && !savedIds.has(d) && !plain.has(d) && !discarded.has(d) && (rowOf(d).name.trim() || rowOf(d).themeType))
+    if (unsavedCount > 0) {
+      if (!window.confirm(tr(`保存していない ${unsavedCount} 本の案は、破棄されます。閉じますか?`, `${unsavedCount} unsaved draft(s) will be discarded. Close anyway?`))) return false
+    } else if (lostRows && !window.confirm(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?'))) return false
     setOpen(false)
+    return true
   }
 
   const setCountry = (v: string) => {
@@ -158,16 +207,6 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       return n
     })
   const setRow = (day: string, patch: Partial<Row>) => setRows((m) => new Map(m).set(day, { ...rowOf(day), ...patch }))
-
-  /** 行を、AI に渡す配信の形に(まだ保存していない) */
-  const baseOf = (day: string): DraftBase => ({
-    name: rowOf(day).name.trim(),
-    scheduled_at: new Date(`${day}T${BULK_TIME}`).toISOString(),
-    country: (country || undefined) as DeliveryCardFields['country'],
-    channel: (channel || undefined) as DeliveryCardFields['channel'],
-    department: (defaults.department || undefined) as DeliveryCardFields['department'],
-    theme_type: rowOf(day).themeType || undefined,
-  })
 
   /**
    * 配信名の案を出して、行に入れる(押すこと自体を、案の採用とみなす。あとで書き換えられる)。
@@ -216,7 +255,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
 
   /**
    * 中身を作らずに保存する。1 本ずつ新規作成して、中身を入れずに保存したのと同じ「未起案」の下書きにする
-   * (AI で作らないので、未確認の印は付けない。中身は、あとで配信カードで作る)
+   * (中身は、あとで配信カードで作る。週の表示では、ふつうの配信として出る)
    */
   async function savePlainAll() {
     if (!plainReady) return
@@ -239,20 +278,22 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     }
   }
 
-  /** ② 中身を作る(人が押す)。できた配信から、新しい配信カードとして保存する */
+  /** ② 中身を作る(人が押す)。できた中身は、画面の中だけに持つ(保存は ③ で 1 本ずつ) */
   async function generate(list: string[]) {
     if (list.length === 0) return
     stopRef.current = false
     setError(null)
-    setPlan((p) => p ?? list)
+    setPlan((p) => p ?? targets)
     setStep(2)
     setFailed((m) => new Map([...m].filter(([d]) => !list.includes(d))))
     setProgress((m) => new Map([...m, ...list.map((d) => [d, { step: tr('順番を待っています', 'Waiting'), done: 0, total: 7 }] as const)]))
     const queue = [...list]
     // 並行して作ると、同時に作っている配信のテーマが見えず、同じテーマになりやすい。
-    // そこで、次の配信は、前の配信のテーマが決まってから始める(テーマのあとの工程は、並行して進む。useWeekFrames と同じ)
-    const themes: string[] = []
-    const done: { id: string; scheduled_at?: string; products: string[] }[] = []
+    // そこで、次の配信は、前の配信のテーマが決まってから始める(テーマのあとの工程は、並行して進む。useWeekFrames と同じ)。
+    // 先に作った案(まだ保存していない)のテーマ・商品も避ける
+    const earlier = [...results.entries()].filter(([d]) => !discarded.has(d))
+    const themes: string[] = earlier.map(([, r]) => r.theme ?? '').filter(Boolean)
+    const done: { id: string; scheduled_at?: string; products: string[] }[] = earlier.map(([d, r]) => ({ id: draftId(d), scheduled_at: baseOf(d).scheduled_at, products: productIdsOf(r) }))
     let themeGate: Promise<void> = Promise.resolve()
     const worker = async () => {
       for (;;) {
@@ -266,7 +307,6 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
         let release = () => undefined as void
         themeGate = new Promise<void>((r) => (release = r))
         const base = baseOf(day)
-        // 保存済みの配信と、先に作った配信のテーマを避け、同じ週で上限まで載せた商品は選ばない
         const cp = new Map(cardProducts)
         for (const m of done) cp.set(m.id, m.products)
         try {
@@ -286,16 +326,14 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
             () => stopRef.current,
           )
           if (res.cancelled) {
-            // 止めたときは、保存しない(行は残るので、もう一度作れる)
+            // 止めたときは、何も残さない(行は残るので、もう一度作れる)
           } else if (!res.theme) {
             setFailed((m) => new Map(m).set(day, res.errors.join(' / ') || tr('テーマを作れませんでした', 'Could not come up with a theme')))
           } else {
-            // 一部の工程が失敗しても、できたところまでを保存する(足りないところは、配信カードで直す)
-            const card = await createDraft(base, res, products)
-            done.push({ id: card.id, scheduled_at: card.scheduled_at, products: res.sections.flatMap((s) => s.selected.map((x) => x.productId)) })
-            setMade((m) => new Map(m).set(day, card.id))
+            // 一部の工程が失敗しても、できたところまでを案にする(足りないところは、保存してから配信カードで直す)
+            done.push({ id: draftId(day), scheduled_at: base.scheduled_at, products: productIdsOf(res) })
+            setResults((m) => new Map(m).set(day, res))
             if (res.errors.length > 0) setError(tr(`「${base.name}」は、一部の工程で失敗しました: ${res.errors.join(' / ')}`, `“${base.name}”: some steps failed: ${res.errors.join(' / ')}`))
-            await onChanged()
           }
         } catch (e) {
           setFailed((m) => new Map(m).set(day, e instanceof Error ? e.message : String(e)))
@@ -316,22 +354,54 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     stopRef.current = true
   }
 
-  /** ④ で見る配信(保存した順ではなく、日付の順) */
-  const madeCards = targets.map((d) => made.get(d)).filter((id): id is string => !!id).map((id) => cards.find((c) => c.id === id)).filter((c): c is DeliveryCard => !!c)
-  const unchecked = madeCards.filter((c) => c.ai_unchecked_at).length
-  /** 中身を作らずに保存した配信(日付の順) */
-  const plainCards = targets.map((d) => plain.get(d)).filter((id): id is string => !!id).map((id) => cards.find((c) => c.id === id)).filter((c): c is DeliveryCard => !!c)
+  /** 次に確かめる、まだ保存も破棄もしていない案(いまの日の次から、なければ最初から) */
+  const nextUnsaved = (after: string) => {
+    const open = reviewItems.filter((x) => x.state === 'unsaved' && x.day !== after)
+    return (open.find((x) => x.day > after) ?? open[0])?.day ?? null
+  }
 
-  /** 「確認した」: AI 下書き・未確認の印を外す */
-  async function check(id: string) {
+  /**
+   * ③ 保存: この案を、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。保存したら、次の案に進む。
+   * open が true なら、保存したあと配信カードで開く(直すため)
+   */
+  async function save(day: string): Promise<string | null> {
+    const r = results.get(day)
+    if (!r || savedIds.has(day)) return savedIds.get(day) ?? null
     setError(null)
+    setSavingDay(day)
     try {
-      await markChecked(id)
+      const card = await createDraft(baseOf(day), r, products, false)
+      setSavedIds((m) => new Map(m).set(day, card.id))
+      setDiscarded((s) => {
+        const n = new Set(s)
+        n.delete(day)
+        return n
+      })
       await onChanged()
+      setCheckDay(nextUnsaved(day) ?? day)
+      return card.id
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      return null
+    } finally {
+      setSavingDay(null)
     }
   }
+  /** ③ 破棄: この案は保存しない(破棄を取り消して、保存し直すこともできる) */
+  function discard(day: string) {
+    setDiscarded((s) => new Set(s).add(day))
+    setCheckDay(nextUnsaved(day) ?? day)
+  }
+  function undoDiscard(day: string) {
+    setDiscarded((s) => {
+      const n = new Set(s)
+      n.delete(day)
+      return n
+    })
+  }
+
+  /** 中身を作らずに保存した配信(日付の順) */
+  const plainCards = targets.map((d) => plain.get(d)).filter((id): id is string => !!id).map((id) => cards.find((c) => c.id === id)).filter((c): c is DeliveryCard => !!c)
 
   return {
     open,
@@ -358,20 +428,27 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     pending,
     progress,
     failed,
-    made,
+    results,
     running,
     generate,
     stop,
-    madeCards,
-    unchecked,
+    started,
+    reviewItems,
+    unsavedCount,
+    savedCount,
+    savedIds,
+    compareCards,
+    compareProducts,
+    savingDay,
+    save,
+    discard,
+    undoDiscard,
     plainReady,
     savePlainAll,
     savingPlain,
     plainCards,
-    saved,
-    checkId,
-    setCheckId,
-    check,
+    checkDay,
+    setCheckDay,
     error,
     clearError: () => setError(null),
   }
