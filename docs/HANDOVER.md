@@ -385,7 +385,8 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 残したもの: `server/ccp/legacy_names.json`(以前の名前 `cr854_…` からの移行の表)。利用先の DB が古い名前のときに要るかもしれないので、外していない(外すかは利用者の判断)。
 - Workbench の既定のポートを 8081 → **8082** に変えた(利用者の指示、2026-10-19。`scripts/workbench.sh` の `CCP_PORT` と、文書の `/proxy/8082/`)。版 20261019-1d1ed27 は 8081 のまま。
 - **渡し方**: GitHub の Releases(利用者が決めた。`npm run release:workbench -- --publish` が、タグ `workbench-<版>` のリリースを作って ZIP を添付する。リポジトリには ZIP を入れない)。
-- 公開した版: `20261019-1d1ed27`(1d1ed27 から。Releases の `workbench-20261019-1d1ed27`)。
+- 公開した版: `20261019-1d1ed27`(1d1ed27 から。ポート 8081)、`20261019-e31e13a`(ポート 8082)。Releases のタグ `workbench-<版>`。
+- **1 日の終わりの手順**(利用者の指示、2026-10-19): 利用者が言ったら、どのセッションでも、文書(FEATURES・SOURCE_MAP・FEATURE_REASONS・BACKLOG)を直して push し、`--publish` で公開する。言われなければ 21:00 の予約タスク `ccp-end-of-day` が行う(その日に公開済みなら何もしない)。手順は [RELEASE.md](RELEASE.md) の 7 章。
 
 ## 6.23 X30 配信カードの中でアラートに対応する(2026-10-19、UI セッション)
 

@@ -87,3 +87,28 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 - 利用先は、Releases の版のページから ZIP をダウンロードする。公開リポジトリなので、だれでもダウンロードできる(中身は、リポジトリで公開しているソースの一部)。
 - 公開した版は、HANDOVER に書く(版・元のコミット)。
 - 利用先は、ZIP を Git に入れ、`CCP Workbench 版 <版>` でコミットする([UPDATE.md](UPDATE.md))。Workbench の `scripts/workbench.sh status` に、その版が出る。
+
+## 7. 毎日の終わりの手順(文書の更新 + ZIP の公開)
+
+利用者が「今日の作業を終える」「1 日の終わりの手順を」などと言ったら、どのセッションでも、この手順を行う。
+言われなかった日は、21:00 に予約したタスク(Claude のアプリの「スケジュール」の `ccp-end-of-day`)が、同じ手順を行う。
+**その日にもう公開してあれば、何もしない**(Releases に、今日作られた `workbench-*` があるか: `gh release list --limit 5`)。
+
+1. **作業の場所**: ほかのセッションの作業中の変更に触らないよう、`main` の最新を、専用の作業ツリーで扱う。
+   ```bash
+   cd C:/Users/hiros/GitHub/ccp
+   git fetch origin --tags
+   git worktree add --detach ../ccp-eod origin/main   # 2 回目からは: cd ../ccp-eod && git checkout --detach origin/main
+   cd ../ccp-eod && npm ci                             # 初回は時間がかかる(Windows で 15 分ほど)
+   ```
+2. **今日の変更を知る**: 前に公開した版から後のコミット(`git log --oneline <最新の workbench-* タグ>..origin/main`)と、`docs/HANDOVER.md` のその日の節を読む。変更がなければ、ここで終わる。
+3. **文書を直す**(変わったところだけ。言い換えの約束は 4 章・5 章):
+   - [FEATURES.md](FEATURES.md): 足した・変えた機能、「未実装・制限」。
+   - [SOURCE_MAP.md](SOURCE_MAP.md)(と `source-map.drawio`): 足したファイル・役割の変わったファイル、図、「最終更新」の日付。
+   - [FEATURE_REASONS.md](FEATURE_REASONS.md): `scripts/feature-reasons.py` の機能(F)・対応づけ(M)を直して、`python scripts/feature-reasons.py` で作り直す(食い違いがあれば止まる)。[USER_STORIES.md](USER_STORIES.md) の実装の状態も合わせる。
+   - [BACKLOG.md](BACKLOG.md): 済んだもの・始めたものの状態。
+   - 新しいファイルがあれば、`scripts/release-workbench.mjs` の `RULES` に足す。
+4. **確かめる**: `npm run verify`、サーバーのテスト(`cd server && python -m unittest discover tests`)、`npm run release:workbench -- --no-test`(言葉の検査)。
+5. **コミット・push**: `docs: 1 日の終わりの文書の更新(<日付>)` で、`git pull --rebase` のあと `main` に push する。
+6. **公開する**: `npm run release:workbench -- --publish`(確かめをすべて通ったら、Releases に公開する。同じコミットを公開済みなら、何もしない)。
+7. **記録と報告**: HANDOVER 6.23 の「公開した版」に版を足して push する(この変更は ZIP に入らないので、版は作り直さない)。利用者には、版・Releases の URL・直した文書・確かめていないことを報告する。

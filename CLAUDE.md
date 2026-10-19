@@ -53,6 +53,7 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 - **利用先には、Workbench 版の ZIP(`npm run release:workbench`)だけを渡す**(手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
   開発元の本番(Cloud Run + Cloud SQL)だけの処理は `server/ccp/hosted/` に置き、外のコードは `hosted/` がなくても動くようにする(DB の準備中は `ccp/dbready.py` を通す)。
   ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)には、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・Power Apps・開発元の名前などを書かない(検査で止まる)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release-workbench.mjs` の `RULES` にも足す。
+- **1 日の終わり**(利用者が「今日の作業を終える」などと言ったとき。言われなければ 21:00 の予約が行う): 文書(FEATURES・SOURCE_MAP・FEATURE_REASONS・BACKLOG)を直して push し、Workbench 版を Releases に公開する。手順は [docs/RELEASE.md](docs/RELEASE.md) の 7 章。
 
 - 標準のテンプレート 10 種はコードに持ち、ユーザーが作ったものはテーブル `layout_templates`。`getTemplate(id)` で求める(`EMAIL_TEMPLATES` のような固定の一覧はない)。以前からある標準の 6 種は、**セクションの構成(種類・枠の数・順番)を変えない**(保存済みのカードの、見出し・商品の位置がずれるため。見た目の設定だけ変えてよい)。
 - AI の案(テーマ・コピー・制作指示の案、見出し・コピーの候補)は保存しない。保存するのは、採用した内容と、その補足(理由・切り口)。週の枠からまとめて中身を作る(W14)ときは、「中身を作る」を押すことを採用とみなして保存し、「AI 下書き・未確認」の印(`ai_unchecked_at`)を付ける。

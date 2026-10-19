@@ -88,6 +88,15 @@ const fail = (msg) => {
 const step = (msg) => console.log(`\n■ ${msg}`)
 
 if (publish && !runTests) fail('--publish は --no-test と一緒には使えません(確かめを通った ZIP だけを公開する)')
+if (publish) {
+  // 同じ版(同じコミット)を公開済みなら、何もしない(毎日の手順を、1 日に 2 回実行しても困らないように)
+  git('fetch', '-q', '--tags', 'origin')
+  const done = git('rev-parse', '--short=7', `${ref}^{commit}`).trim()
+  if (git('tag', '-l', `workbench-*-${done}`).trim()) {
+    console.log(`この版(コミット ${done})は、もう Releases に公開してあります。何もしません`)
+    process.exit(0)
+  }
+}
 
 // ---- ① ファイルを選ぶ
 step(`元のコミット: ${ref}`)
