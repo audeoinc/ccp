@@ -14,7 +14,7 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 - **まず [docs/WORKBENCH.md](docs/WORKBENCH.md)(手順書)を読む。** 立ち上げ・更新・よくあるつまずきが、すべて書いてある。
 - **操作は `scripts/workbench.sh` を使う**(`setup` / `update` / `start` / `stop` / `restart` / `status` / `pg-start` / `check` / `import <ZIP>` / `log`。設定の読み込みも、裏での起動も、Workbench の中の PostgreSQL の起動も、スクリプトが行う)。
 - **困ったら、最初に `cd server && .venv/bin/python -m ccp.cli check` を実行する**(設定・DB への接続・写真・画面のビルドを確かめる。パスワードは出さず、何も変えない)。`[NG]` の行と、手順書の「よくあるつまずき」の表から直す。
-- **環境:** Linux(Python は `.venv/bin/python`)。DB は PostgreSQL に直接つなぐ(`DATABASE_URL`。Workbench の中で動かしているなら、ホストは `localhost`)。AI は Vertex AI の Gemini(`GOOGLE_CLOUD_PROJECT`)。画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(末尾の `/` が必要)。
+- **環境:** Linux(Python は `.venv/bin/python`)。DB は PostgreSQL に直接つなぐ(`DATABASE_URL`。Workbench の中で動かしているなら、ホストは `localhost`)。AI は Vertex AI の Gemini(`GOOGLE_CLOUD_PROJECT`)。画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8082/` で開く(末尾の `/` が必要)。
 - **データと写真は「引っ越し用のパック」で持ち込む**(`python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けてサーバーを起動)。`import-pack --yes` は、Workbench の DB の中身を**すべて置き換える**ので、人に確認してから実行する。
 - **サーバーは、DB の設定を読み込んだのと同じターミナルで起動する**(`scripts/workbench.sh` を使えば、気にしなくてよい)。別のターミナルで起動すると、画面に「データベースにつながりません」と出る。
 - **してはいけないこと:** Workbench からの `git push`、`server/workbench.env`(パスワードを含む)や `server/images/`(写真)を Git に入れること、人の確認なしの `import-pack --yes`。

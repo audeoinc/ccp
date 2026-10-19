@@ -20,8 +20,8 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
  │ 画面 ⚙ →          │   ダウンロード          │ Workbench(Jupyter)          │
  │「データと画像を    │ ──────────────────▶ │  ① アップロード               │
  │  書き出す」        │   ccp-pack-…zip       │  ② import-pack で取り込む     │
- └──────────────────┘                       │  ③ サーバーを起動(8081)      │
-                                             │  ④ /proxy/8081/ で開く        │
+ └──────────────────┘                       │  ③ サーバーを起動(8082)      │
+                                             │  ④ /proxy/8082/ で開く        │
  利用先の Git(版ごとの ZIP)─ clone / pull ▶│                              │
                                              └────────────────────────────┘
 ```
@@ -72,7 +72,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | 設定の確認 | `scripts/workbench.sh check` |
 
 - `update` は、`git pull` → (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
-- ポートは `CCP_PORT`(既定 8081)、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
+- ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる)、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
 
@@ -248,14 +248,14 @@ set -a; source workbench.env; set +a
 ```bash
 cd ~/ccp/server
 set -a; source workbench.env; set +a
-.venv/bin/python -m uvicorn ccp.main:app --port 8081
+.venv/bin/python -m uvicorn ccp.main:app --port 8082
 ```
 
-`Uvicorn running on http://127.0.0.1:8081` と出たら起動しています。**このターミナルは閉じない**でください(閉じるとサーバーが止まります)。
+`Uvicorn running on http://127.0.0.1:8082` と出たら起動しています。**このターミナルは閉じない**でください(閉じるとサーバーが止まります)。
 ターミナルを閉じても動かし続けたいときは:
 
 ```bash
-nohup .venv/bin/python -m uvicorn ccp.main:app --port 8081 > ~/ccp-server.log 2>&1 &
+nohup .venv/bin/python -m uvicorn ccp.main:app --port 8082 > ~/ccp-server.log 2>&1 &
 # 止めるとき: pkill -f "uvicorn ccp.main:app"
 ```
 
@@ -264,7 +264,7 @@ nohup .venv/bin/python -m uvicorn ccp.main:app --port 8081 > ~/ccp-server.log 2>
 ブラウザで次を開きます(**末尾の `/` を必ず付ける**)。
 
 ```
-https://<ノートブックの URL>/proxy/8081/
+https://<ノートブックの URL>/proxy/8082/
 ```
 
 確認すること:
@@ -309,7 +309,7 @@ cd server
 |---|---|---|
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
-| 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8081/` のように `/` を付ける |
+| 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8082/` のように `/` を付ける |
 | 画面に「**データベースにつながりません**」(以前の版では「データベースを起動しています」のまま進まない) | **サーバーを起動したターミナル**に、DB の設定が読み込まれていない(`check` を実行したターミナルとは別のターミナルで起動した、`conda activate` していない など)。画面の赤い文字が、つながらない理由 | サーバーを止め、**同じターミナルで** `set -a; source workbench.env; set +a`(必要なら `conda activate`)→ `check` → 起動 の順に実行する。サーバーのターミナルにも「DB につながりません: …」と理由が出る |
 | `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる) | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
@@ -318,7 +318,7 @@ cd server
 | AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
 | `npm ci` / `pip install` が止まる | パッケージの取得先(インターネット)にアクセスできない | 2 の「パッケージの取得について」 |
-| 8081 が使えない(`address already in use`) | 前に起動したサーバーが残っている | `pkill -f "uvicorn ccp.main:app"` で止めてから起動 |
+| 8082 が使えない(`address already in use`) | 前に起動したサーバーが残っている | `pkill -f "uvicorn ccp.main:app"` で止めてから起動 |
 
 ---
 

@@ -112,7 +112,7 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
 
 画面を直しながら動かすときは、サーバーを 8080 で起動したまま `npm run dev`(5191。`/api` は 8080 に中継)。
 
-**Vertex AI Workbench(Agent Platform の Workbench)のノートブックで動かすとき**: サーバーを、たとえば 8081 で起動し(`uvicorn ccp.main:app --port 8081`)、Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(**末尾の `/` を付ける**。付けないと、画面のファイルの相対パスがずれる)。画面は、読み込んだ JS の場所から置き場所(`/proxy/8081/`)を求め、`/api/…`・`/img/…` をその下に送るので、ビルドの設定を変える必要はない(`src/appRoot.ts`、`vite.config.ts` の `base: './'`)。Cloud Run(置き場所が `/`)でも、同じビルドのまま動く。
+**Vertex AI Workbench(Agent Platform の Workbench)のノートブックで動かすとき**: サーバーを、たとえば 8082 で起動し(`uvicorn ccp.main:app --port 8082`)、Jupyter の中継 `https://<ノートブックの URL>/proxy/8082/` で開く(**末尾の `/` を付ける**。付けないと、画面のファイルの相対パスがずれる)。画面は、読み込んだ JS の場所から置き場所(`/proxy/8082/`)を求め、`/api/…`・`/img/…` をその下に送るので、ビルドの設定を変える必要はない(`src/appRoot.ts`、`vite.config.ts` の `base: './'`)。Cloud Run(置き場所が `/`)でも、同じビルドのまま動く。
 
 ### 外にアクセスできない環境(Workbench)に、本番のデータと画像を持ち込む(引っ越し用のパック)
 
@@ -132,9 +132,9 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
    DB の中身は、**すべて置き換わる**(Workbench で入力したデータは消える)。作った日時・変えた日時は、元のまま残る。
 4. **画像をフォルダから配る設定で、サーバーを起動する**:
    ```bash
-   ASSET_DIR=$PWD/images .venv/bin/python -m uvicorn ccp.main:app --port 8081
+   ASSET_DIR=$PWD/images .venv/bin/python -m uvicorn ccp.main:app --port 8082
    ```
-   `https://<ノートブックの URL>/proxy/8081/` を開く(末尾の `/` を付ける)。
+   `https://<ノートブックの URL>/proxy/8082/` を開く(末尾の `/` を付ける)。
 
 **開発を続けながら、Workbench を最新にする**: コードは `git pull` → `npm ci` → `npm run build` → サーバーの起動し直し(`scripts/workbench.sh update` がまとめて行う)。本番のデータ・画像にそろえたいときだけ、パックを書き出して取り込む(上の 1〜4)。
 画像(`server/images/`)は、権利のある素材なので Git には入れない(`.gitignore` 済み)。

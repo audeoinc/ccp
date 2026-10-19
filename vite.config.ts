@@ -11,7 +11,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_DEFAULT_COUNTRY': JSON.stringify('US'),
     'import.meta.env.VITE_DEFAULT_LANG': JSON.stringify('en'),
-    // API・画像のパスを、読み込んだ JS の場所から求める(src/appRoot.ts。Workbench の /proxy/8081/ の下でも動くように)
+    // API・画像のパスを、読み込んだ JS の場所から求める(src/appRoot.ts。Workbench の /proxy/8082/ の下でも動くように)
     'import.meta.env.VITE_APP_ROOT_FROM_SCRIPT': JSON.stringify('true'),
   },
   // 画面のファイル(assets/…)を、相対パスで読み込む(置き場所が「/」でなくても読めるように)

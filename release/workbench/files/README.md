@@ -27,7 +27,7 @@ scripts/workbench.sh status    # 動いているか・いまの版
 scripts/workbench.sh check     # 設定・DB への接続・写真・画面のビルドを確かめる(困ったら、まずこれ)
 ```
 
-画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開きます(末尾の `/` が必要)。
+画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8082/` で開きます(末尾の `/` が必要)。
 
 ## 主な機能
 

@@ -42,7 +42,7 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 - **まず [docs/WORKBENCH.md](docs/WORKBENCH.md)(移行の手順書)を読む。** 立ち上げ・更新・よくあるつまずきが、すべて書いてある。
 - **操作は `scripts/workbench.sh` を使う**(`setup` / `update` / `start` / `stop` / `restart` / `status` / `pg-start` / `check` / `import <ZIP>` / `log`。設定の読み込みも、裏での起動も、Workbench の中の PostgreSQL の起動も、スクリプトが行う)。
 - **困ったら、最初に `cd server && .venv/bin/python -m ccp.cli check` を実行する**(設定・DB への接続・写真・画面のビルドを確かめる。パスワードは出さず、何も変えない)。`[NG]` の行と、手順書の「よくあるつまずき」の表から直す。
-- **環境の違い:** Linux(Python は `.venv/bin/python`)。サーバーから外(本番の DB・GCS・Cloud SQL の管理の窓口)には**アクセスできない**。DB は PostgreSQL に直接つなぐ(`DATABASE_URL`。Workbench の中で動かしているなら、ホストは `localhost`)。AI は Vertex AI の Gemini(`GOOGLE_CLOUD_PROJECT`)。画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8081/` で開く(末尾の `/` が必要)。
+- **環境の違い:** Linux(Python は `.venv/bin/python`)。サーバーから外(本番の DB・GCS・Cloud SQL の管理の窓口)には**アクセスできない**。DB は PostgreSQL に直接つなぐ(`DATABASE_URL`。Workbench の中で動かしているなら、ホストは `localhost`)。AI は Vertex AI の Gemini(`GOOGLE_CLOUD_PROJECT`)。画面は Jupyter の中継 `https://<ノートブックの URL>/proxy/8082/` で開く(末尾の `/` が必要)。
 - **本番のデータと写真は、「引っ越し用のパック」で持ち込む**(本番の画面の ⚙ →「データと画像を書き出す」で ZIP → Workbench にアップロード → `python -m ccp.cli import-pack <ZIP> --yes` → `ASSET_DIR` を付けてサーバーを起動)。`import-pack --yes` は、Workbench の DB の中身を**すべて置き換える**ので、人に確認してから実行する。
 - **サーバーは、DB の設定を読み込んだのと同じターミナルで起動する。** 別のターミナルで起動すると、画面に「データベースにつながりません」と出る(サーバーのターミナルにも理由が出る)。
 - **してはいけないこと:** 本番への反映(`npm run deploy:gcp`・`gcloud run deploy`)、Workbench からの `git push`(コードの変更は、開発側のリポジトリで行う)、`server/workbench.env`(パスワードを含む)や `server/images/`(写真)を Git に入れること。

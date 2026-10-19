@@ -13,7 +13,7 @@
 #   scripts/workbench.sh log            サーバーのログの最後を見る
 #
 # 設定は server/workbench.env から、毎回読み込む(見本は server/workbench.env.example)。
-# ポートは CCP_PORT(既定 8081)。画面は https://<ノートブックの URL>/proxy/<ポート>/ で開く(末尾の / を付ける)。
+# ポートは CCP_PORT(既定 8082)。画面は https://<ノートブックの URL>/proxy/<ポート>/ で開く(末尾の / を付ける)。
 # PostgreSQL が Workbench の中(DATABASE_URL のホストが localhost)なら、サーバーを起動する前に、止まっていれば起動する。
 #   データのフォルダは CCP_PGDATA(なければ PGDATA、それもなければホームの下から探す)。pg_ctl の場所は CCP_PG_BIN(なければ PATH と conda の環境から探す)。
 set -euo pipefail
@@ -24,7 +24,7 @@ PY="${CCP_PYTHON:-$SERVER/.venv/bin/python}"  # Python の場所(既定は serve
 ENV_FILE="$SERVER/workbench.env"
 PID_FILE="$SERVER/.ccp-server.pid"
 LOG_FILE="$SERVER/ccp-server.log"
-PORT="${CCP_PORT:-8081}"
+PORT="${CCP_PORT:-8082}"
 
 say() { printf '\n== %s\n' "$*"; }
 die() { printf '\n[エラー] %s\n' "$*" >&2; exit 1; }

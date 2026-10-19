@@ -183,7 +183,7 @@ flowchart TD
 | `fonts.ts` | 23 | 同梱のフォント(外部の CDN に頼らない) |
 | `index.css` | — | 全体の CSS と、印刷(週の資料・レポート)のときの見せ方 |
 | `i18n.ts` | 118 | 日本語 / English の切り替え(`t` / `tr` / `useT` / `optionLabel`) |
-| `appRoot.ts` | 22 | アプリの置き場所。API・画像のパスの基準(Workbench の `/proxy/8081/` の下でも動くように) |
+| `appRoot.ts` | 22 | アプリの置き場所。API・画像のパスの基準(Workbench の `/proxy/8082/` の下でも動くように) |
 | `settings.ts` | 36 | アプリ全体の設定(自動下書きのオン・オフなど。ブラウザごと) |
 
 ### 3.2 計画の面(カレンダー・週・一覧)
