@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Dialog, DialogSurface, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -24,13 +24,15 @@ interface Props {
   products: Product[]
   heroes: HeroImage[]
   onClose: () => void
+  /** 題名の左に出す、配信の段階の帯(過去の配信に切り替えても、その配信の帯にする) */
+  stageNav?: (card: DeliveryCard) => ReactNode
 }
 
 /**
  * 計画の面から、配信 1 本の結果を、いまの画面の上に重ねて見る(配信カードの「結果を見る」)。
  * 閉じると、元の配信カード(計画の面)に戻る
  */
-export function ResultPeek({ cardId: firstId, cards, cardProducts, products, heroes, onClose }: Props) {
+export function ResultPeek({ cardId: firstId, cards, cardProducts, products, heroes, onClose, stageNav }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -77,6 +79,7 @@ export function ResultPeek({ cardId: firstId, cards, cardProducts, products, her
       money={(v) => priceText(v === undefined ? undefined : Math.round(v), row.card.country === COUNTRY_US ? 'US' : 'JP')}
       onClose={onClose}
       onSaved={load}
+      stageNav={stageNav?.(row.card)}
     />
   )
 }

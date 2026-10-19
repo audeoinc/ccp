@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -105,6 +105,8 @@ interface Props {
   onOpenAlerts?: (productId?: string) => void
   /** 制作のページを開く(プロセスのペインの「制作の依頼」の札から。PR4) */
   onOpenProduction?: (cardId: string) => void
+  /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav)。新規作成のときはなく、面の札を出す */
+  stageNav?: ReactNode
   /** 最初に開く工程のタブ(リンクから開いたとき。X36) */
   initialTab?: string
   /** 工程のタブが変わったとき(URL に持たせる) */
@@ -435,7 +437,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -1159,7 +1161,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
           )}
           <div className={styles.titleRow}>
             {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
-            <FaceBadge face="calendar" />
+            {stageNav ?? <FaceBadge face="calendar" />}
             <ChannelBadge channel={form.channel} />
             <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
             <Tooltip

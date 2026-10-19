@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Button, Dialog, DialogSurface, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DismissRegular, DocumentPdfRegular, OpenRegular } from '@fluentui/react-icons'
 import { printReport } from './printReport'
@@ -59,13 +59,15 @@ interface Props {
   /** 制作の詳細(配信カード)を、上に重ねて開く。配信カードから開いたときは渡さない(下に配信カードがあるため) */
   onOpenCard?: (id: string) => void
   onSaved: () => Promise<void>
+  /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav)。なければ面の札 */
+  stageNav?: ReactNode
 }
 
 /**
  * 配信 1 本の詳しい結果(フロート。計画の面の配信カードと同じ開き方)。
  * 上に主な数字、下に、クリックを重ねたプレビュー・リンクの表・メモと商品と AI の案を並べる
  */
-export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved }: Props) {
+export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved, stageNav }: Props) {
   const styles = useStyles()
   const t = useT()
   const { card } = row
@@ -93,7 +95,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
           </div>
           <div className={styles.head}>
             {/* チャネルの札は、計画の面の配信カードと同じく、題名の左に */}
-            <FaceBadge face="results" />
+            {stageNav ?? <FaceBadge face="results" />}
             <ChannelBadge channel={card.channel} />
             <h2 className={styles.title}>{card.name}</h2>
             <span className={styles.sub}>{sentText}</span>

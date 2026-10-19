@@ -46,6 +46,8 @@ export const ProductionService = {
   saveHtml: (requestId: string, input: { actor: Actor; html: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/html`, input),
   /** 制作のページの左で直した中身(写しと同じ形の JSON)を保存する。空の文字で、承認された写しに戻す */
   saveEdits: (requestId: string, input: { actor: Actor; edited_snapshot: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/edits`, input),
+  /** 制作が終わった版を、配信のしくみに送る(工程の最後。いまは仮の窓口) */
+  sendRequest: (requestId: string, input: { actor: Actor; html?: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/send`, input),
   /** 制作を通さず、配信のしくみに送る(いまは仮の窓口。「送りました」と返る) */
   send: (input: RequestInput) => post<ProductionRequest & { message?: string }>('/send', input),
 }

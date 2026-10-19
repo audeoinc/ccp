@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Badge, Button, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronLeftRegular, EditRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -38,6 +38,7 @@ const useStyles = makeStyles({
   // 制作の依頼の札(状態と承認の下)
   production: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '8px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   productionText: { display: 'grid', flexGrow: 1, minWidth: 0 },
+  productionNext: { backgroundColor: tokens.colorBrandBackground2, borderLeft: `3px solid ${tokens.colorBrandStroke1}` },
   // 閉じた帯(状態を縦書きで。押すと開く)
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '10px', paddingTop: '10px', minHeight: 0, height: '100%', border: 'none', backgroundColor: tokens.colorNeutralBackground2, cursor: 'pointer', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
   railStatus: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, letterSpacing: '0.05em' },
@@ -268,15 +269,20 @@ function ProductionChip({ card, onOpen }: { card: DeliveryCard; onOpen: (cardId:
     }
   }, [card.id, card.status])
   const v = productionView(card, req)
+  // 承認されたのに、まだ制作に依頼していない(または企画が変わって依頼し直す)ときは、次の一手として目立たせる
+  // (2026-10-19、利用者の指摘: 承認のあと、何をすればよいか分からなかった)
+  const next = v === 'draft' || v === 'stale'
   return (
-    <div className={s.production}>
+    <div className={mergeClasses(s.production, next && s.productionNext)}>
       <span className={s.dot} style={{ backgroundColor: productionColor(v) }} />
       <span className={s.productionText}>
-        <span className={s.head}>{t('制作の依頼', 'Production')}</span>
-        <span className={s.note}>{productionLabel(v)}</span>
+        <span className={s.head}>{next ? t('次: 制作に依頼する', 'Next: request production') : t('制作', 'Production')}</span>
+        <span className={s.note}>
+          {next ? t('制作のページで中身を確かめて、「この内容で依頼する」を押します', 'Check the content on the production page, then press "Request with this content"') : productionLabel(v)}
+        </span>
       </span>
-      <Button size="small" onClick={() => onOpen(card.id)}>
-        {t('制作のページ', 'Production page')}
+      <Button size="small" appearance={next ? 'primary' : 'secondary'} onClick={() => onOpen(card.id)}>
+        {next ? t('制作に依頼する', 'Request production') : t('制作のページ', 'Production page')}
       </Button>
     </div>
   )

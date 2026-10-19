@@ -92,6 +92,9 @@ export const ProductionService = {
     if (card) event('production_edit', input.actor, card, input.week_start, `版 ${r.version}${input.edited_snapshot ? '' : '(承認された写しに戻した)'}`)
     return { success: true, data: structuredClone(r) as unknown as ProductionRequest }
   },
+  async sendRequest(id: string, input: { actor: Actor; html?: string; week_start?: string }) {
+    return advance(id, input.actor, ['done'], { status: 'sent', sent_at: now(), sent_by_name: input.actor.name, ...(input.html ? { html: input.html } : {}) }, 'production_send', input.week_start, '配信のしくみへの送信は、まだ仮', '制作が終わった版だけを送れます(まだ終わっていないか、古い版です)')
+  },
   async send(input: RequestInput) {
     const r = create(input, 'sent')
     return r.success ? { ...r, data: { ...r.data!, message: '送りました' } } : r

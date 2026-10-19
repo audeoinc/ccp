@@ -5,6 +5,7 @@
   POST /api/production/requests/{id}/done     制作が「制作が終わった」(ひとこと・できたもののリンクを任意で)
   POST /api/production/requests/{id}/html     直した HTML を保存する
   POST /api/production/requests/{id}/edits    左の要素(文言・メイン画像・商品・リンク先)を直した写しを保存する
+  POST /api/production/requests/{id}/send     制作が終わった版を、配信のしくみに送る(工程の最後。いまは仮の窓口)
   POST /api/production/send                   制作を通さず、配信のしくみに送る(いまは送り先の窓口だけ。実際には送らずに「送りました」と返す)
 
 写し(snapshot)は、画面が組み立てて送る(テンプレート・リンク先・計測用のパラメーターの決め方が、画面の側にあるため)。
@@ -180,6 +181,19 @@ async def save_edits(request_id: str, request: Request):
         if card is not None:
             await _event(conn, "production_edit", actor, card, body.get("week_start") or None, f"版 {req.get('version')}" + ("" if edited else "(承認された写しに戻した)"))
     return ok(row)
+
+
+@router.post("/requests/{request_id}/send")
+async def send_request(request_id: str, request: Request):
+    """制作が終わった版を、配信のしくみに送る(工程の最後。2026-10-19、利用者と決めた: 送るのは最後の最後なので、制作が終わってから)。
+    新しい版は作らず、この版を「送った」にする。HTML は、いまのエディタのもの。送り先は、まだ仮(実際には送らない)"""
+    body = await _body(request)
+    html = str(body.get("html") or "") or None
+    fields: dict[str, Any] = {"status": "sent", "sent_at": "@now", "sent_by_name": "@actor"}
+    if html:
+        fields["html"] = html
+    res = await _advance(request, request_id, ("done",), fields, "production_send", "配信のしくみへの送信は、まだ仮", "制作が終わった版だけを送れます(まだ終わっていないか、古い版です)")
+    return res
 
 
 @router.post("/send")

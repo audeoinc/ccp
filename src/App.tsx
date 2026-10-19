@@ -94,6 +94,7 @@ import { InboxButton } from './InboxButton'
 import { useApprovalInbox } from './useApprovalInbox'
 import { productionColor, productionLabel, productionView, useProductionRequests } from './useProductionRequests'
 import { ProductionPage } from './ProductionPage'
+import { StageNav } from './StageNav'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
@@ -548,6 +549,22 @@ function App() {
   // 制作の依頼(配信ごとの最新の版)。制作の面の箱の色・締め切りの印に使う(PR4)
   const production = useProductionRequests(cards)
   const onProduction = page === 'production'
+  // 配信の段階の帯(StageNav)で、同じ配信の隣の段のフロートに切り替える。配信カードは下に開いたまま残し、
+  // 制作のページ・結果は、その上に重ねる(配信カードの直しかけを、切り替えで捨てないため)
+  const goStage = (id: string, f: Face) => {
+    if (f === 'calendar') {
+      setProductionOpen(null)
+      setPeekResult(null)
+      setSelectedId(id)
+    } else if (f === 'production') {
+      setPeekResult(null)
+      setProductionOpen(id)
+    } else {
+      setProductionOpen(null)
+      setPeekResult(id)
+    }
+  }
+  const stageNav = (c: DeliveryCard, f: Face) => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => goStage(c.id, to)} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
   const productionTone = (c: DeliveryCard) => {
@@ -1794,6 +1811,7 @@ function App() {
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
           onOpenProduction={setProductionOpen}
+          stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           initialTab={selected && selected.id === link.card ? link.tab : undefined}
           onTabChange={setCardTab}
           next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}
@@ -1807,7 +1825,7 @@ function App() {
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
-        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} />
+        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} />
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
       {productionOpen && cards.find((c) => c.id === productionOpen) && (
@@ -1823,6 +1841,7 @@ function App() {
             setSelectedId(id)
           }}
           onChanged={() => void production.reload()}
+          stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
         />
       )}
     </>

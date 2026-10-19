@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Dialog, DialogSurface, Input, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Badge, Button, Dialog, DialogSurface, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownloadRegular,
   ArrowResetRegular,
@@ -8,6 +8,7 @@ import {
   ChevronRightRegular,
   DismissRegular,
   HandRightRegular,
+  MoreHorizontalRegular,
   OpenRegular,
   SaveRegular,
   SendRegular,
@@ -50,7 +51,16 @@ const useStyles = makeStyles({
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   // 状態と操作の行(題名のすぐ下。ペインをたたんでも、いつも見える)
   stateBar: { display: 'flex', alignItems: 'center', columnGap: '10px', rowGap: '6px', flexWrap: 'wrap', padding: '6px 16px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  stateInfo: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap', flexGrow: 1, minWidth: 0 },
+  // 工程の帯: 段を左から右へ並べ、いまの段だけを枠で強調する
+  steps: { display: 'flex', alignItems: 'stretch', columnGap: '6px', flexGrow: 1, minWidth: 0, margin: 0, padding: 0, listStyleType: 'none', overflowX: 'auto' },
+  step: { display: 'flex', alignItems: 'flex-start', columnGap: '8px', flex: '1 1 0', minWidth: '150px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, color: tokens.colorNeutralForeground3 },
+  stepCurrent: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorNeutralForeground1 },
+  stepDone: { backgroundColor: tokens.colorNeutralBackground2, color: tokens.colorNeutralForeground2 },
+  stepDot: { flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, border: `1px solid ${tokens.colorNeutralStroke1}` },
+  stepDotCurrent: { backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand, border: 'none' },
+  stepDotDone: { backgroundColor: tokens.colorPaletteGreenBackground3, color: tokens.colorNeutralForegroundOnBrand, border: 'none' },
+  stepBody: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
+  stepName: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   // 4 つのペイン(要素の情報 | HTML のエディタ | プレビュー | やり取り)。幅は境界のドラッグで変え、覚える。要素の情報とやり取りは、たためる
   body: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateRows: 'minmax(0, 1fr)' },
   col: { minHeight: 0, overflowY: 'auto', padding: '8px 14px 12px', display: 'grid', rowGap: '14px', alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)' },
@@ -76,7 +86,6 @@ const useStyles = makeStyles({
   hero: { width: '100%', maxHeight: '160px', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   notes: { padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
-  actions: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap' },
   doneBox: { display: 'grid', rowGap: '8px', width: '320px' },
   dirty: { color: tokens.colorPaletteDarkOrangeForeground1 },
   // 左で直した中身の保存の行(ペインの上)
@@ -98,6 +107,8 @@ interface Props {
   onOpenCard: (cardId: string) => void
   /** 依頼・受け取り・終わった・送ったのあとに、外の一覧を読み直す */
   onChanged?: () => void
+  /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav) */
+  stageNav?: ReactNode
 }
 
 const subscribeMe = (f: () => void) => onMeChange(f)
@@ -111,7 +122,7 @@ const TALK_KEY = 'productionPage.talkOpen'
  * 状態と操作は、題名のすぐ下の行に、いつも出す(2026-10-19、利用者と決めた: 材料を見る → 書く → 確かめる → 相談する、の順。左のコピーを隣のエディタに貼れる)。
  * 中身は、依頼した時点の写し(依頼する前は、いまの配信カードから作った下書き)
  */
-export function ProductionPage({ card, productIds, products, heroes, people, onClose, onOpenCard, onChanged }: Props) {
+export function ProductionPage({ card, productIds, products, heroes, people, onClose, onOpenCard, onChanged, stageNav }: Props) {
   const s = useStyles()
   const t = useT()
   const meId = useSyncExternalStore(subscribeMe, myUserId)
@@ -224,18 +235,87 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
     week_start: weekStart,
   })
 
-  // 状態の名前と、次に動く人(「いま、だれの番か」。PROCESS.md 2 章)
-  const state: { name: string; next: string; color: 'informative' | 'warning' | 'brand' | 'success' } = !approved
-    ? { name: t('承認のあとに、制作に依頼します', 'Request production after approval'), next: t('企画・承認者', 'Planner / approvers'), color: 'informative' }
-    : !live
-      ? { name: t('制作に依頼する前', 'Not requested yet'), next: t('企画', 'Planner'), color: 'warning' }
-      : live.status === 'requested'
-        ? { name: t('依頼済み(受け取り待ち)', 'Requested (waiting to be received)'), next: owner || t('制作', 'Production'), color: 'brand' }
-        : live.status === 'in_progress'
-          ? { name: t('制作している', 'In production'), next: owner || t('制作', 'Production'), color: 'brand' }
-          : live.status === 'done'
-            ? { name: t('制作が終わった', 'Production done'), next: t('企画(仕上がりの確認)', 'Planner (check the result)'), color: 'success' }
-            : { name: t('制作を通さず、配信のしくみに送った', 'Sent to the delivery system without production'), next: t('企画', 'Planner'), color: 'success' }
+  // 工程の帯(2026-10-19、利用者と決めた: 左が始まり・右が終わり。いまの段のボタンだけを出す)。
+  // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 配信のしくみに送る(企画)。PROCESS.md 2 章の「いま、だれの番か」
+  const status = live?.status
+  const current = !approved ? -1 : !live ? 0 : status === 'requested' ? 1 : status === 'in_progress' ? 2 : status === 'done' ? 3 : 4
+  // 近道(制作を通さずに送った)のときは、② ③ を「飛ばした」にする
+  const skipped = status === 'sent' && !live?.received_at && !live?.done_at
+  const steps: { key: string; name: string; who: string; info?: string; skipped?: boolean; action?: ReactNode }[] = [
+    {
+      key: 'request',
+      name: t('制作に依頼する', 'Request production'),
+      who: t('企画', 'Planner'),
+      info: live?.requested_by_name ? `${live.requested_by_name} ${when(live.requested_at)}` : undefined,
+      action: (
+        <Tooltip content={needMe ?? t('いまの配信カードの中身と HTML を固めて、制作に依頼します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and requests production (later changes to the card do not change this page)')} relationship="description">
+          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || !shown} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
+            {t('この内容で依頼する', 'Request with this content')}
+          </Button>
+        </Tooltip>
+      ),
+    },
+    {
+      key: 'receive',
+      name: t('受け取る', 'Receive'),
+      who: owner || t('制作', 'Production'),
+      info: live?.received_by_name ? `${live.received_by_name} ${when(live.received_at)}` : undefined,
+      skipped,
+      action: live && (
+        <Button size="small" appearance="primary" icon={<HandRightRegular />} disabled={busy || !meId} onClick={() => void run(() => ProductionService.receive(live.id, { actor, week_start: weekStart }), tr('受け取りました', 'Received'))}>
+          {t('受け取った', 'Received')}
+        </Button>
+      ),
+    },
+    {
+      key: 'make',
+      name: t('制作する', 'Produce'),
+      who: owner || t('制作', 'Production'),
+      info: live?.done_by_name ? [`${live.done_by_name} ${when(live.done_at)}`, live.done_note, live.done_link].filter(Boolean).join(' — ') : undefined,
+      skipped,
+      action: live && (
+        <Popover withArrow positioning="below-start">
+          <PopoverTrigger disableButtonEnhancement>
+            <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy || !meId}>
+              {t('制作が終わった', 'Production done')}
+            </Button>
+          </PopoverTrigger>
+          <PopoverSurface>
+            <div className={s.doneBox}>
+              <span className={s.note}>{t('ひとこと・できたもののリンクを添えられます(どちらも任意)', 'You can add a note and a link to the result (both optional)')}</span>
+              <AutoTextarea rows={1} size="small" value={doneNote} onChange={(_, d) => setDoneNote(d.value)} placeholder={t('ひとこと', 'Note')} />
+              <Input size="small" value={doneLink} onChange={(_, d) => setDoneLink(d.value)} placeholder="https://" />
+              <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy} onClick={() => void run(() => ProductionService.done(live.id, { actor, note: doneNote, link: doneLink, week_start: weekStart }), tr('制作が終わりました', 'Marked as done'))}>
+                {t('制作が終わった', 'Production done')}
+              </Button>
+            </div>
+          </PopoverSurface>
+        </Popover>
+      ),
+    },
+    {
+      key: 'send',
+      name: t('配信のしくみに送る', 'Send to delivery system'),
+      who: t('企画', 'Planner'),
+      info: live?.sent_by_name ? t(`${live.sent_by_name} ${when(live.sent_at)}(送り先は、まだ仮)`, `${live.sent_by_name} ${when(live.sent_at)} (placeholder destination)`) : undefined,
+      action: live && (
+        <Tooltip content={needMe ?? t('エディタの HTML と、テキスト・リンク先を、配信のしくみに送ります(いまは送り先が仮です)', 'Sends the editor HTML, text and links to the delivery system (the destination is a placeholder for now)')} relationship="description">
+          <Button
+            size="small"
+            appearance="primary"
+            icon={<SendRegular />}
+            disabled={busy || !meId || !shown}
+            onClick={() => {
+              if (!window.confirm(t('配信のしくみに送ります。よろしいですか?', 'Send to the delivery system?'))) return
+              void run(() => ProductionService.sendRequest(live.id, { actor, html: shown, week_start: weekStart }), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
+            }}
+          >
+            {t('送る', 'Send')}
+          </Button>
+        </Tooltip>
+      ),
+    },
+  ]
 
   const rail = (label: string, onOpen: () => void) => (
     <button type="button" className={s.rail} onClick={onOpen} aria-label={t(`${label}を開く`, `Open ${label}`)}>
@@ -252,7 +332,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
       <DialogSurface ref={surfaceRef} className={s.surface} style={float.style} aria-label={t(`制作のページ: ${card.name}`, `Production page: ${card.name}`)}>
         <ResizeHandles {...float.handles} />
         <div className={s.head}>
-          <FaceBadge face="production" />
+          {stageNav ?? <FaceBadge face="production" />}
           <ChannelBadge channel={card.channel} />
           <span className={s.title}>{card.name}</span>
           <span className={s.meta}>{card.scheduled_at ? new Date(card.scheduled_at).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
@@ -266,67 +346,43 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
 
         {/* 状態と操作(いつも見える) */}
         <div className={s.stateBar}>
-          <span className={s.stateInfo}>
-            <Badge appearance="filled" color={state.color}>{state.name}</Badge>
-            <span className={s.note}>{t(`次に動く人: ${state.next}`, `Next: ${state.next}`)}</span>
-            {live?.received_by_name && <span className={s.note}>{t(`受け取った: ${live.received_by_name} ${when(live.received_at)}`, `Received: ${live.received_by_name} ${when(live.received_at)}`)}</span>}
-            {live?.done_by_name && (
-              <span className={s.note}>
-                {t(`終わった: ${live.done_by_name} ${when(live.done_at)}`, `Done: ${live.done_by_name} ${when(live.done_at)}`)}
-                {live.done_note ? ` — ${live.done_note}` : ''}
-                {live.done_link ? ` — ${live.done_link}` : ''}
-              </span>
-            )}
-            {live?.status === 'sent' && <span className={s.note}>{t(`配信のしくみに送った: ${live.sent_by_name} ${when(live.sent_at)}(送り先は、まだ仮)`, `Sent: ${live.sent_by_name} ${when(live.sent_at)} (placeholder destination)`)}</span>}
-          </span>
-          <span className={s.actions}>
-            {approved && !live && (
-              <Tooltip content={needMe ?? t('いまの配信カードの中身と HTML を固めて、制作に依頼します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and requests production (later changes to the card do not change this page)')} relationship="description">
-                <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || !shown} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
-                  {t('この内容で制作に依頼する', 'Request production with this content')}
-                </Button>
-              </Tooltip>
-            )}
-            {live?.status === 'requested' && (
-              <Button size="small" appearance="primary" icon={<HandRightRegular />} disabled={busy || !meId} onClick={() => void run(() => ProductionService.receive(live.id, { actor, week_start: weekStart }), tr('受け取りました', 'Received'))}>
-                {t('受け取った', 'Received')}
-              </Button>
-            )}
-            {(live?.status === 'requested' || live?.status === 'in_progress') && (
-              <Popover withArrow positioning="below-end">
-                <PopoverTrigger disableButtonEnhancement>
-                  <Button size="small" appearance={live.status === 'in_progress' ? 'primary' : 'secondary'} icon={<CheckmarkRegular />} disabled={busy || !meId}>
-                    {t('制作が終わった', 'Production done')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverSurface>
-                  <div className={s.doneBox}>
-                    <span className={s.note}>{t('ひとこと・できたもののリンクを添えられます(どちらも任意)', 'You can add a note and a link to the result (both optional)')}</span>
-                    <AutoTextarea rows={1} size="small" value={doneNote} onChange={(_, d) => setDoneNote(d.value)} placeholder={t('ひとこと', 'Note')} />
-                    <Input size="small" value={doneLink} onChange={(_, d) => setDoneLink(d.value)} placeholder="https://" />
-                    <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy} onClick={() => void run(() => ProductionService.done(live.id, { actor, note: doneNote, link: doneLink, week_start: weekStart }), tr('制作が終わりました', 'Marked as done'))}>
-                      {t('制作が終わった', 'Production done')}
-                    </Button>
-                  </div>
-                </PopoverSurface>
-              </Popover>
-            )}
-            {approved && live?.status !== 'sent' && (
-              <Tooltip content={needMe ?? t('制作を通さず、エディタの HTML・テキスト・リンク先を、配信のしくみに直接送ります(いまは送り先が仮です)', 'Sends the editor HTML, text and links straight to the delivery system without production (the destination is a placeholder for now)')} relationship="description">
-                <Button
-                  size="small"
-                  icon={<SendRegular />}
-                  disabled={busy || !meId || !shown}
-                  onClick={() => {
-                    if (!window.confirm(t('制作を通さず、配信のしくみに送ります。よろしいですか?', 'Send to the delivery system without production?'))) return
-                    void run(() => ProductionService.send(requestInput()))
-                  }}
-                >
-                  {t('配信のしくみに送る(HTML)', 'Send to delivery system (HTML)')}
-                </Button>
-              </Tooltip>
-            )}
-          </span>
+          <ol className={s.steps}>
+            {steps.map((st, i) => {
+              const at = st.skipped ? 'skipped' : i < current ? 'done' : i === current ? 'current' : 'todo'
+              return (
+                <li key={st.key} className={mergeClasses(s.step, at === 'current' && s.stepCurrent, (at === 'done' || at === 'skipped') && s.stepDone)}>
+                  <span className={mergeClasses(s.stepDot, at === 'current' && s.stepDotCurrent, at === 'done' && s.stepDotDone)}>{at === 'done' ? <CheckmarkRegular /> : i + 1}</span>
+                  <span className={s.stepBody}>
+                    <span className={s.stepName}>{st.name}</span>
+                    <span className={s.note}>{at === 'skipped' ? t('飛ばした(制作を通さずに送った)', 'Skipped (sent without production)') : st.info || st.who}</span>
+                    {at === 'current' && st.action}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+          {!approved && <span className={s.note}>{t('承認されたら、① から始めます', 'Start from step 1 after approval')}</span>}
+          {approved && current < 3 && (
+            <Menu positioning="below-end">
+              <MenuTrigger disableButtonEnhancement>
+                <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('その他の操作', 'More actions')} />
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItem
+                    icon={<SendRegular />}
+                    disabled={busy || !meId || !shown}
+                    onClick={() => {
+                      if (!window.confirm(t('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?'))) return
+                      void run(() => ProductionService.send(requestInput()))
+                    }}
+                  >
+                    {t('制作を通さずに、配信のしくみに送る', 'Send to the delivery system without production')}
+                  </MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
+          )}
         </div>
         {(error || notice || (staleLatest && !live)) && (
           <div className={s.messages}>
