@@ -83,10 +83,6 @@ interface Props {
   alerts?: CardAlert[]
   /** 開いたときに選んでおく商品(アラートの画面から開いたとき。問題の商品を、プレビューで強調する) */
   focusProductId?: string
-  /** 新規作成で、最初に入れておく AI の下書き(まとめて作った下書きを「開いて直す」とき。W14) */
-  draft?: AutoDraftResult
-  /** 新規作成で保存したとき、作った配信カードの id を知らせる */
-  onCreated?: (id: string) => void
   /** 「保存して次へ」で開く配信(同じ週、または週の確認の項目で選んだ配信の、次の 1 本)。null は次がない。undefined はボタンを出さない */
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
@@ -402,7 +398,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, draft, onCreated, next, onNext }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -768,15 +764,6 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
     void startAutoDraft()
   }
 
-  // まとめて作った下書きを開いたときは、「すべてAIで下書き」の結果と同じように、最初に反映する(1 回だけ)
-  const draftApplied = useRef(false)
-  useEffect(() => {
-    if (!draft || card || draftApplied.current) return
-    draftApplied.current = true
-    applyAutoResult(draft)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, card])
-
   useEffect(() => {
     aliveRef.current = true
     return () => {
@@ -929,6 +916,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
         layout_key: template,
         section_titles: sectionTitles.join('\n').replace(/\n+$/, ''),
         section_copies: encodeCopies(sectionCopies),
+        // AI でまとめて作った中身を、人が配信カードで確かめて保存したら、未確認の印を外す(W14)
+        ...(card?.ai_unchecked_at ? { ai_unchecked_at: null as never } : {}),
         // 外したときは null を送ってルックアップを空にする
         hero_image_id: heroId
           ? heroId
@@ -985,7 +974,6 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       const cardId = card?.id ?? res.data?.id
       if (!cardId) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
       if (original) await syncItems(cardId, form.name, original)
-      if (!card) onCreated?.(cardId)
       if (reason !== undefined) {
         const now = new Date().toISOString()
         for (const w of lockedWeeks) {
@@ -1121,6 +1109,16 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </MessageBar>
           )}
 
+          {card?.ai_unchecked_at && (
+            <MessageBar layout="multiline" intent="info" className={styles.locked}>
+              <MessageBarBody>
+                {t(
+                  'この配信の中身は、週の枠から AI でまとめて作ったもので、まだ誰も確かめていません。中身を確かめて保存すると、「AI 下書き・未確認」の印が外れます。',
+                  'This content was created by AI in bulk from a week slot and nobody has checked it yet. Check it and save to clear the “AI draft, unchecked” mark.',
+                )}
+              </MessageBarBody>
+            </MessageBar>
+          )}
           {approvedBefore && lockedWeeks.length === 0 && (
             <MessageBar layout="multiline" intent="info" className={styles.locked}>
               <MessageBarBody>

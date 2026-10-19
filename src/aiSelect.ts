@@ -134,6 +134,8 @@ export interface AiCard {
   /** ヘッドラインの下の導入文(コピー) */
   copy: string
   instructions: string
+  /** 配信の種類(担当者が決めたもの。値下げ・セール・コラボ など。画面の言葉)。まとめて作る枠(W14)で使う */
+  themeType?: string
 }
 
 export interface ProposedRow {

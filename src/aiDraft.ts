@@ -21,6 +21,7 @@ const THEME_PROMPT = `あなたは、ファッション通販の配信(メール
 5. 3 案は、切り口を変える(例: 季節感、商品カテゴリ、シーンや天候)。
 6. 理由(reason)は日本語で 60 文字以内。時期や商品の傾向など、根拠を具体的に書く。
 7. themeHint(担当者が書いたテーマのヒント)があるときは、それを最優先し、3 案ともその方向に沿わせる(文言をそのまま使わなくてよい)。
+8. card.themeType(担当者が決めた配信の種類)と card.name(担当者が決めた配信名)があるときは、それに沿うテーマにする(種類と食い違うテーマは出さない)。
 
 # 入力
 `
@@ -197,7 +198,7 @@ const TEMPLATE_PROMPT = `あなたは、ファッション通販の配信(メー
 # ルール
 1. template は、入力の templates の id のどれか 1 つ。
 2. 配信テーマ(card.theme)を最優先にする。次に、配信日の時期、チャネル、配信種別(department)を考慮する。
-3. セール、タイムセール、期間限定などのテーマは offer。コラボや特別企画のテーマは collab。
+3. セール、タイムセール、期間限定などのテーマは offer。コラボや特別企画のテーマは collab。card.themeType(担当者が決めた配信の種類)があるときは、それを優先する(セール・期間限定価格は offer、コラボは collab)。
 4. 特定の商品を絞って訴求するテーマ(例:「ブーツ特集」)は standard4。複数の切り口を見せたいテーマは cat2 か cat3。
 5. reason は日本語で 60 文字以内。
 
@@ -223,4 +224,44 @@ export async function suggestTemplate(args: { card: AiCard; channel?: TemplateCh
   // 想定外の値・別のチャネルのテンプレートは、そのチャネルの標準にする
   const fallback = channel === 'push' ? DEFAULT_PUSH_TEMPLATE : 'standard4'
   return { template: hasTemplate(id) && options.some((o) => o.id === id) ? id : fallback, reason: String(parsed.reason ?? '') }
+}
+
+const NAME_PROMPT = `あなたは、ファッション通販の配信(メール・プッシュ)を企画するアシスタントです。
+下の「入力」の JSON の slots(週の計画の、まだ中身のない配信の枠)それぞれに、配信名の案を 1 つずつ、理由とともに JSON だけで返してください。
+
+# 出力の形式(厳守)
+次の JSON オブジェクト 1 つだけを返す。説明文、見出し、箇条書き、コードフェンス(\`\`\`)、前置き、あとがきは一切付けない。
+{"names":[{"id":"...","name":"...","reason":"..."}]}
+
+# ルール
+1. 入力のすべての枠について、id をそのまま返す。
+2. 配信名は、社内で配信を見分けるための短い名前。日本向け(country が JP)は日本語で 15 文字以内、アメリカ向け(US)は英語で 4 語以内。
+3. 配信日(scheduledAt)の曜日・季節・行事、チャネル、配信の種類(themeType)を手がかりにする。種類があるときは、名前から種類が分かるようにする。
+4. others(前後の週の、ほかの配信の名前とテーマ)や、ほかの枠の案と、同じ・似た名前にしない。
+5. 理由(reason)は日本語で 40 文字以内。
+
+# 入力
+`
+
+export interface NameSlot {
+  id: string
+  scheduledAt: string
+  country: string
+  channel: string
+  department: string
+  themeType?: string
+}
+
+/** 週の枠(中身のない配信)の、配信名の案。1 枠でも、まとめてでも、1 回の呼び出しで出す(枠どうしで名前が重ならないように) */
+export async function suggestNames(args: { slots: NameSlot[]; others: { name: string; theme?: string; scheduledAt?: string }[] }): Promise<{ id: string; name: string; reason: string }[]> {
+  const parsed = (await askAgent(NAME_PROMPT, {
+    task: 'suggest_names',
+    today: new Date().toISOString().slice(0, 10),
+    slots: args.slots,
+    others: args.others,
+  })) as { names?: { id?: string; name?: string; reason?: string }[] }
+  const ids = new Set(args.slots.map((s) => s.id))
+  const list = (parsed.names ?? []).filter((n) => n.id && ids.has(String(n.id)) && n.name).map((n) => ({ id: String(n.id), name: String(n.name).trim(), reason: String(n.reason ?? '') }))
+  if (list.length === 0) throw new Error(tr('配信名の案を取得できませんでした', 'Could not get name ideas'))
+  return list
 }

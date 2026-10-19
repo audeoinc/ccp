@@ -2,12 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Badge,
   Button,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
   Field,
   Menu,
   MenuButton,
@@ -98,12 +92,10 @@ import { useApprovalInbox } from './useApprovalInbox'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
-import { BulkDraftBar } from './BulkDraftBar'
-import { DraftCard } from './DraftCard'
-import { DraftDrawer } from './DraftDrawer'
-import { useBulkDrafts } from './useBulkDrafts'
-import type { Draft } from './bulkDraft'
-import { draftName } from './bulkDraft'
+import { FrameBar } from './FrameBar'
+import { FrameCard } from './FrameCard'
+import { CheckDrawer } from './CheckDrawer'
+import { useWeekFrames } from './useWeekFrames'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusView } from './status'
@@ -146,8 +138,6 @@ const initialFilters: Filters = {
 }
 
 const useStyles = makeStyles({
-  // 下書きモードを抜ける前の確認のボタン(文字を折り返さない)
-  askActions: { '& button': { whiteSpace: 'nowrap', flexShrink: 0 } },
   header: {
     position: 'sticky',
     top: 0,
@@ -386,10 +376,6 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
-  // まとめて AI で下書き(W14)の、配信カードで開いて直している下書き
-  const [editingDraft, setEditingDraft] = useState<Draft | null>(null)
-  // 下書きモードで、保存していない下書きがあるのに、移ろうとしたときの行き先(確かめてから移る)
-  const [pendingNav, setPendingNav] = useState<{ go: () => void; leaves: boolean } | null>(null)
 
   // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
   // 配信カードごとの掲載商品(メールの並び順の商品 ID。候補の行は入れない)。数は、一覧の「商品数」「工程」と、締め切りの警告に使う
@@ -465,7 +451,7 @@ function App() {
   const [alertsOpen, setAlertsOpen] = useState(false)
   // この週の承認の履歴(「この画面 ▾」から開く)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const showFaceRaw = (p: 'calendar' | 'results' | 'alerts') => {
+  const showFace = (p: 'calendar' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」は結果の面だけ。計画の面に戻るときは、月にする
     if (p === 'calendar' && view === 'compare') setView('month')
@@ -685,8 +671,8 @@ function App() {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
     return activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= weekStart && new Date(c.scheduled_at) < end)
   }, [activeCards, weekStart])
-  // まとめて AI で下書き(W14)。週の表示の上で、下書きを作る・見比べる・保存する
-  const bulk = useBulkDrafts({
+  // 週の枠と、まとめて AI で中身を作る(W14)。枠は、中身のない配信カードとして保存する
+  const frames = useWeekFrames({
     cards: activeCards,
     cardProducts,
     products,
@@ -694,7 +680,7 @@ function App() {
     weeks,
     weekStart,
     defaults: { country: filters.country, channel: filters.channel, department: filters.department },
-    onSaved: load,
+    onChanged: load,
   })
   const checklist = useMemo(
     () =>
@@ -713,28 +699,8 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, commentCounts, lang],
   )
-  // 下書きを作っているあいだの確認の一覧は、作った下書きも含めて数える(保存する前に、週の偏りに気づけるように)。
-  // 週の資料(PDF)には、保存した配信だけを載せるので、上の checklist はそのまま使う
-  const shownChecklist = useMemo(() => {
-    const done = bulk.liveCards.filter((x) => x.draft.state === 'done').map((x) => x.card)
-    if (!bulk.active || done.length === 0) return checklist
-    const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-    return buildChecklist({
-      weekStart,
-      weekCards: [...weekCards, ...done.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= weekStart && new Date(c.scheduled_at) < end)],
-      allCards: [...activeCards, ...done],
-      cardProducts: bulk.allProducts,
-      products,
-      policies,
-      questionCounts,
-      commentCounts,
-      cardLabel: (c) => `${c.scheduled_at ? new Date(c.scheduled_at).toLocaleDateString(locale(), { weekday: 'short' }) : ''} ${c.name}`.trim(),
-    })
-    // 言語を変えたら、説明(曜日・種類)を作り直す
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checklist, bulk.active, bulk.liveCards, bulk.allProducts, weekStart, weekCards, activeCards, products, policies, questionCounts, commentCounts, lang])
   const checkKey = check?.week === weekKey ? check.key : null
-  const focusItem = shownChecklist.find((i) => i.key === checkKey)
+  const focusItem = checklist.find((i) => i.key === checkKey)
   const focus = useMemo(() => (focusItem ? { cards: new Set(focusItem.cardIds), products: new Set(focusItem.productIds) } : undefined), [focusItem])
   // 週の資料を描いたら、印刷の画面を開く(閉じたら、資料を片付ける)
   useEffect(() => {
@@ -810,10 +776,24 @@ function App() {
   }
   // 週の承認(U6): 未依頼の配信をまとめて依頼する / 自分宛ての依頼をまとめて承認する(配信カードと同じ窓口 /api/approvals を、順に呼ぶ)
   const actor = () => ({ id: myUserId(), name: myName() })
+  // まとめて依頼の対象。中身のない週の枠(W14)は、承認するものがないので外す(中身を作ってから依頼する)
+  const requestable = needsRequest(weekCards.filter((c) => !frames.frameIds.has(c.id)), inbox.hasOpen)
   const requestWeek = async () => {
+    // まだ誰も確かめていない AI の下書き(W14)が入っていれば、依頼の前に知らせる(確かめずに承認者へ回さないように)
+    const unchecked = requestable.filter((c) => !!c.ai_unchecked_at).length
+    if (
+      unchecked > 0 &&
+      !window.confirm(
+        tr(
+          `依頼する配信のうち ${unchecked} 本は、AI でまとめて作り、まだ誰も確かめていない下書きです(「AI 下書き・未確認」)。このまま依頼しますか?`,
+          `${unchecked} of the deliveries to request are AI drafts nobody has checked yet (“AI draft, unchecked”). Request anyway?`,
+        ),
+      )
+    )
+      return
     setError(null)
     try {
-      const { skipped } = await requestAll(needsRequest(weekCards, inbox.hasOpen), people, actor(), weekKey)
+      const { skipped } = await requestAll(requestable, people, actor(), weekKey)
       if (skipped.length) setError(tr(`既定の承認者がない種別の配信は飛ばしました(配信カードから依頼してください): ${skipped.join(' / ')}`, `Skipped deliveries whose type has no default approvers (request from the card): ${skipped.join(' / ')}`))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -831,7 +811,7 @@ function App() {
   }
   // 週の見方(商品 / 進み具合)は、計画の面の、週の表示だけで使う
   const lensOn = page === 'calendar' && view === 'week'
-  const changeViewRaw = (v: View) => {
+  const changeView = (v: View) => {
     // 週の表示に切り替えたら: 表示中の月に今日があれば今週、なければ、その月の最初の週
     if (v === 'week' && view !== 'week' && month) {
       const now = new Date()
@@ -874,7 +854,7 @@ function App() {
     const where = inCheck ? tr(`確認の項目の ${i + 2} / ${pool.length}`, `${i + 2} of ${pool.length} in the check item`) : tr(`この週の ${i + 2} / ${pool.length}`, `${i + 2} of ${pool.length} this week`)
     return n ? { id: n.id, name: n.name, position: where } : null
   })()
-  const shiftRaw = (n: number) => {
+  const shift = (n: number) => {
     if (view === 'week') {
       // 週を動かし、月も、その週の真ん中(水曜日)の月に合わせる(月の表示に戻ったときに、同じあたりを見せる)
       const next = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7 * n)
@@ -886,7 +866,7 @@ function App() {
     if (month) setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
   }
   /** ミニカレンダーで選んだ所へ移る(W11)。週は、その日を含む週。月の表示も、その週の真ん中の月に合わせる(shift と同じ) */
-  const goToRaw = (v: 'month' | 'week' | 'list', d: Date) => {
+  const goTo = (v: 'month' | 'week' | 'list', d: Date) => {
     const sun = sundayOf(d)
     const mid = v === 'week' ? new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 3) : d
     setWeekStart(sun)
@@ -896,31 +876,15 @@ function App() {
       savePref(VIEW_KEY, v)
     }
   }
-  // 下書きモード(W14)のあいだは、保存していない下書きを残したまま、別の週・見せ方・面へ移らない(移ると、下書きが見えなくなるため)。
-  // 移ろうとしたら、保存するか破棄するかを確かめてから移る。leaves = 週の表示から離れる(下書きモードも終える)
-  const navGuard = (go: () => void, leaves: boolean) => {
-    if (bulk.active && (bulk.pendingCount > 0 || bulk.running)) {
-      setPendingNav({ go, leaves })
-      return
-    }
-    if (bulk.active && leaves) bulk.exit()
-    go()
-  }
-  const showFace = (p: 'calendar' | 'results' | 'alerts') => navGuard(() => showFaceRaw(p), p !== 'calendar')
-  const changeView = (v: View) => navGuard(() => changeViewRaw(v), v !== 'week')
-  const shift = (n: number) => navGuard(() => shiftRaw(n), false)
-  const goTo = (v: 'month' | 'week' | 'list', d: Date) => navGuard(() => goToRaw(v, d), v !== 'week')
-  // まとめて AI で下書きは、計画の面の週の表示で、確定していない週だけ
-  const canBulk = page === 'calendar' && view === 'week' && !bulk.active && thisWeek?.status !== 'confirmed'
+  // 週の枠を作る(W14)のは、計画の面の週の表示で、確定していない週だけ
+  const canBulk = page === 'calendar' && view === 'week' && thisWeek?.status !== 'confirmed'
   const canBulkReason =
     page !== 'calendar' || view !== 'week'
       ? t('週の表示で使えます', 'In the week view')
-      : bulk.active
-        ? t('下書き中', 'Drafting')
-        : thisWeek?.status === 'confirmed'
-          ? t('確定した週には作れません', 'Week is confirmed')
-          : ''
-  // 月・一覧の表示から、まとめて AI で下書きを始める週(X24): 表示中の月にかかる週のうち、まだ終わっていない・確定していない週で、配信がいちばん少ない週(同じなら早い週)
+      : thisWeek?.status === 'confirmed'
+        ? t('確定した週には作れません', 'Week is confirmed')
+        : ''
+  // 月・一覧の表示から、週の枠を作り始める週(X24。W14 の枠の形に読み替え): 表示中の月にかかる週のうち、まだ終わっていない・確定していない週で、配信がいちばん少ない週(同じなら早い週)
   const monthBulkWeek = useMemo(() => {
     if (!month) return undefined
     const today = new Date()
@@ -958,11 +922,6 @@ function App() {
       onOpenUnconfirmed={monthSummary.firstOpen ? () => goTo('week', monthSummary.firstOpen!) : undefined}
     />
   )
-  const startBulk = () => {
-    // ブラウザに控えがあれば戻す。その下書きの週へ移る
-    const d = bulk.start()
-    if (d) goToRaw('week', d)
-  }
   // 日ごとの配信の数(ミニカレンダーの印。絞り込みを反映し、取りやめは数えない)
   const dayCounts = useMemo(() => {
     const m = new Map<string, number>()
@@ -1032,7 +991,7 @@ function App() {
         </Tooltip>
         {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
         <InboxButton inbox={inbox} onOpenCard={setSelectedId} />
-        {/* 作る操作は、ここにまとめる。ボタンの本体で 1 本を新規作成、▾ で、この週をまとめて AI で下書き(W14。週の表示のときだけ選べる) */}
+        {/* 作る操作は、ここにまとめる。ボタンの本体で 1 本を新規作成、▾ で、この週の枠を作る(W14。週の表示のときだけ選べる) */}
         <Menu positioning="below-end">
           <MenuTrigger disableButtonEnhancement>
             {(triggerProps: MenuButtonProps) => (
@@ -1056,9 +1015,9 @@ function App() {
                 icon={<AiIcon size={16} />}
                 disabled={!canBulk}
                 secondaryContent={canBulkReason}
-                onClick={startBulk}
+                onClick={frames.openSetup}
               >
-                {t('この週をまとめて AI で下書き', 'Bulk AI drafts for this week')}
+                {t('この週の枠を作る(配信名・種類を入れて、AI で中身)', 'Create slots for this week (name & type, then AI content)')}
               </MenuItem>
             </MenuList>
           </MenuPopover>
@@ -1279,30 +1238,28 @@ function App() {
                   </MenuTrigger>
                   <MenuPopover>
                     <MenuList>
-                      {/* まとめて AI で下書き(X24)。週は表示中の週、月・一覧は「この月の空いている週から」(その週に移って始める)。「新規作成 ▾」にも同じ入口がある */}
+                      {/* 週の枠を作る(X24 を W14 の枠の形に読み替え。2026-10-19)。週は表示中の週、月・一覧は「この月の空いている週から」(その週に移ってから、枠を作るステップを開く)。「新規作成 ▾」にも同じ入口がある */}
                       {page === 'calendar' && view === 'week' && (
-                        <MenuItem icon={<AiIcon size={16} />} disabled={!canBulk} onClick={startBulk} secondaryContent={canBulkReason || t('表示中の週', 'This week')}>
-                          {t('この週をまとめて AI で下書き', 'Bulk AI drafts for this week')}
+                        <MenuItem icon={<AiIcon size={16} />} disabled={!canBulk} onClick={frames.openSetup} secondaryContent={canBulkReason || t('表示中の週', 'This week')}>
+                          {t('この週の枠を作る', 'Create frames for this week')}
                         </MenuItem>
                       )}
                       {page === 'calendar' && view !== 'week' && (
                         <MenuItem
                           icon={<AiIcon size={16} />}
-                          disabled={!monthBulkWeek || bulk.active}
+                          disabled={!monthBulkWeek}
                           onClick={() => {
                             if (!monthBulkWeek) return
-                            goToRaw('week', monthBulkWeek)
-                            startBulk()
+                            goTo('week', monthBulkWeek)
+                            frames.openSetup()
                           }}
                           secondaryContent={
-                            bulk.active
-                              ? t('下書き中', 'Drafting')
-                              : monthBulkWeek
-                                ? t(`${monthBulkWeek.getMonth() + 1}/${monthBulkWeek.getDate()} の週へ`, `Week of ${monthBulkWeek.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`)
-                                : t('作れる週がありません', 'No week to draft')
+                            monthBulkWeek
+                              ? t(`${monthBulkWeek.getMonth() + 1}/${monthBulkWeek.getDate()} の週へ`, `Week of ${monthBulkWeek.toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`)
+                              : t('作れる週がありません', 'No week to plan')
                           }
                         >
-                          {t('この月の空いている週から、まとめて AI で下書き', 'Bulk AI drafts from an open week in this month')}
+                          {t('この月の空いている週から、枠を作る', 'Create frames from an open week in this month')}
                         </MenuItem>
                       )}
                       {page === 'calendar' && <MenuDivider />}
@@ -1389,13 +1346,13 @@ function App() {
               </>
             ) : view === 'week' ? (
               <>
-              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={needsRequest(weekCards, inbox.hasOpen).length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
+              <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={requestable.length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
                 statusCounts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: weekCards.filter((c) => statusView(c.status) === o.value).length }))}
-                toFix={shownChecklist.filter((i) => !i.ok).length}
-                fixChip={<WeekCheckChip items={shownChecklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
+                toFix={checklist.filter((i) => !i.ok).length}
+                fixChip={<WeekCheckChip items={checklist} selected={checkKey} onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)} />}
                 fix={
                   <WeekChecklist
-                    items={shownChecklist}
+                    items={checklist}
                     selected={checkKey}
                     onSelect={(key) => setCheck(key ? { week: weekKey, key } : null)}
                     // 項目にかかわる配信のうち、配信日時がいちばん早いものを開く(続きは「保存して次へ」で)
@@ -1433,7 +1390,7 @@ function App() {
                   </div>
                 </Portal>
               )}
-              {bulk.active && <BulkDraftBar bulk={bulk} weekStart={weekStart} weeks={weeks} onExit={() => navGuard(() => undefined, true)} />}
+              <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} />
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
@@ -1450,10 +1407,10 @@ function App() {
                 alertKinds={alertKinds}
                 onSelect={setSelectedId}
                 // 下書きモードでは、日の「＋」で、その日に下書きを足す
-                onCreate={(day) => (bulk.active && bulk.setup ? bulk.addOn(day) : setCreating(newCardDefaults(`${day}T10:00`)))}
-                createLabel={bulk.active && bulk.setup ? t('この日に下書きを足す', 'Add a draft on this day') : undefined}
-                muted={bulk.active && !!bulk.setup}
-                extras={bulk.active ? (day) => bulk.draftsOn(day).map((d) => <DraftCard key={d.key} draft={d} bulk={bulk} products={products} heroes={heroes} />) : undefined}
+                onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
+                // 中身のない配信(週の枠)は、その場で配信名・種類を入れられる形で出す(W14)
+                renderCard={(c) => (frames.frameIds.has(c.id) ? <FrameCard key={`${c.id}:${c.name}`} card={c} frames={frames} onOpen={setSelectedId} /> : null)}
+                onCheck={frames.openCheck}
               />
               </>
             ) : (
@@ -1500,68 +1457,8 @@ function App() {
           }}
         />
       )}
-      {bulk.active && (
-        <DraftDrawer bulk={bulk} cards={activeCards} products={products} heroes={heroes} onEdit={setEditingDraft} />
-      )}
-      {/* 下書きを開いて直す: 配信カードを上に重ねる。保存したら、その下書きは保存済みにする */}
-      {editingDraft?.result && (
-        <CardDetail
-          key={editingDraft.key}
-          defaults={{ name: draftName(editingDraft), scheduledAt: editingDraft.scheduledAt, country: editingDraft.country, channel: editingDraft.channel, department: editingDraft.department }}
-          draft={editingDraft.result}
-          products={products}
-          heroes={heroes}
-          otherThemes={[...activeCards.map((c) => c.theme ?? ''), ...bulk.live.filter((x) => x.key !== editingDraft.key).map((x) => x.result?.theme ?? '')].filter(Boolean)}
-          weeks={weeks}
-          owners={owners}
-          onBack={() => setEditingDraft(null)}
-          onSaved={load}
-          onCreated={(id) => {
-            bulk.markSaved(editingDraft.key, id)
-            void logEvent({ action: 'bulk_create', card: { id, name: draftName(editingDraft), scheduledAt: new Date(editingDraft.scheduledAt).toISOString() }, to: 'not_started' })
-          }}
-        />
-      )}
-      {/* 下書きモードで、保存していない下書きがあるのに、移ろう・終えようとしたとき */}
-      <Dialog open={!!pendingNav} onOpenChange={(_, v) => !v.open && setPendingNav(null)}>
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle>{t('保存していない下書きがあります', 'You have unsaved drafts')}</DialogTitle>
-            <DialogContent>
-              {bulk.running
-                ? t('まだ作っている下書きがあります。破棄すると、作るのをやめます。', 'Some drafts are still being created. Discarding stops them.')
-                : t(`保存していない下書きが ${bulk.pendingCount} 本あります(できているもの ${bulk.unsaved.length} 本)。保存しないと、カレンダーには残りません。`, `${bulk.pendingCount} draft(s) are not saved (${bulk.unsaved.length} created). Unsaved drafts are not kept on the calendar.`)}
-            </DialogContent>
-            <DialogActions className={styles.askActions}>
-              <Button appearance="secondary" onClick={() => setPendingNav(null)}>{t('下書きに戻る', 'Back to drafts')}</Button>
-              <Button
-                onClick={() => {
-                  const nav = pendingNav
-                  setPendingNav(null)
-                  bulk.exit()
-                  nav?.go()
-                }}
-              >
-                {t('破棄する', 'Discard')}
-              </Button>
-              <Button
-                appearance="primary"
-                disabled={bulk.running || bulk.unsaved.length === 0}
-                onClick={async () => {
-                  const nav = pendingNav
-                  setPendingNav(null)
-                  if (await bulk.saveDrafts(bulk.unsaved)) {
-                    bulk.exit()
-                    nav?.go()
-                  }
-                }}
-              >
-                {t(`できたものを保存する(${bulk.unsaved.length} 本)`, `Save created (${bulk.unsaved.length})`)}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
+      <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
         <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} onCardChanged={load} />
       )}

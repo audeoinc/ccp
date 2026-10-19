@@ -33,7 +33,8 @@
     ["push_body", "text"],
     ["theme_type", "text"],
     ["cancelled_at", "timestamptz"],
-    ["cancel_reason", "text"]
+    ["cancel_reason", "text"],
+    ["ai_unchecked_at", "timestamptz"]
    ],
    "lookups": [
     ["hero_image_id", "hero_images", {"onDelete": "SET NULL"}]

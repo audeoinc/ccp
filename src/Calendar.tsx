@@ -261,7 +261,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                       e.stopPropagation()
                       onSelect(c.id)
                     }}
-                    title={`${c.name}(${statusLabel(c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
+                    title={`${c.name || t('(配信名のない枠)', '(unnamed slot)')}(${statusLabel(c.status)})${dueSoon?.has(c.id) ? t(' — 配信が近いのに未着手', ' — due soon, not started') : ''}`}
                     className={styles.pill}
                     style={{
                       backgroundColor: tone.background,
@@ -284,7 +284,8 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                       <LockMark status={c.status} />
                       {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
                       {isCancelled(c) && `${t('取りやめ', 'Cancelled')}・`}
-                      {c.name}
+                      {/* 週の枠(W14)は、配信名を入れるまで空なので、空のときは、枠だと分かる文字にする */}
+                      {c.name || t('(配信名のない枠)', '(unnamed slot)')}
                     </span>
                     {renderMeta ? (
                       <span className={styles.pillMetaAlways}>{renderMeta(c)}</span>

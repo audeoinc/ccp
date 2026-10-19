@@ -82,6 +82,8 @@ export interface DeliveryCardFields {
   cancelled_at?: string
   /** 取りやめの理由 */
   cancel_reason?: string
+  /** AI でまとめて中身を作り、まだ人が確かめていない(作った日時。確かめたら空。W14) */
+  ai_unchecked_at?: string | null
   /** hero_images の id(参照を外すときは null) */
   hero_image_id?: string | null
   state_code?: number

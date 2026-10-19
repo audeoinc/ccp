@@ -52,7 +52,7 @@ export const COLUMNS: Column[] = [
   { key: 'image', label: () => tr('画像', 'Image'), text: (r) => (r.card.hero_image_id ? tr('あり', 'yes') : '') },
   { key: 'date', label: () => tr('配信日', 'Date'), text: (r) => date(r.card.scheduled_at), sort: (r) => r.card.scheduled_at ?? '' },
   { key: 'time', label: () => tr('時刻', 'Time'), text: (r) => time(r.card.scheduled_at), sort: (r) => time(r.card.scheduled_at) },
-  { key: 'name', label: () => tr('配信名', 'Name'), text: (r) => r.card.name },
+  { key: 'name', label: () => tr('配信名', 'Name'), text: (r) => r.card.name || tr('(配信名のない枠)', '(unnamed slot)') },
   { key: 'country', label: () => tr('国', 'Country'), text: (r) => label(countryOptions, r.card.country) },
   { key: 'channel', label: () => tr('チャネル', 'Channel'), text: (r) => label(channelOptions, r.card.channel) },
   { key: 'department', label: () => tr('種別', 'Type'), text: (r) => label(departmentOptions, r.card.department) },

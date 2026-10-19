@@ -27,6 +27,7 @@ import { LockMark } from './LockMark'
 import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
+import { AiIcon } from './AiMark'
 import type { CardAlertKind } from './cardAlerts'
 
 /** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る */
@@ -57,12 +58,10 @@ interface Props {
   onSelect: (id: string) => void
   /** その日付で新規作成する(値は YYYY-MM-DD) */
   onCreate: (day: string) => void
-  /** 日の「＋」の説明(まとめて AI で下書きのあいだは「この日に下書きを足す」。W14) */
-  createLabel?: string
-  /** 日の列の、既存の配信の下に足すもの(まとめて AI で下書きの、下書きの札。W14) */
-  extras?: (day: string) => ReactNode
-  /** 既存の配信を薄くする(下書きを作っているあいだ、下書きを目立たせるため。マウスを重ねると元の濃さ) */
-  muted?: boolean
+  /** 配信の描き方を差し替える(中身のない配信(週の枠)を、その場で入力できる形で出す。W14)。null なら、ふつうに描く */
+  renderCard?: (c: DeliveryCard) => ReactNode | null
+  /** 「AI 下書き・未確認」の印を押したとき(確かめる引き出しを開く。W14) */
+  onCheck?: (id: string) => void
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -141,8 +140,8 @@ const useStyles = makeStyles({
   // 確認の一覧で選んだ項目に、かかわる配信と、かかわらない配信
   cardFocus: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
   cardDim: { opacity: 0.4 },
-  // 下書きを作っているあいだの、既存の配信(隠さずに薄く。見比べるために、マウスを重ねると元に戻す)
-  cardMuted: { opacity: 0.45, transition: 'opacity 0.15s', ':hover': { opacity: 1 } },
+  // AI でまとめて作り、まだ人が確かめていない配信の印(押すと、確かめる引き出し。破線で、ふつうの印と形を分ける)
+  issueAi: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, border: `1px dashed ${tokens.colorBrandStroke1}`, cursor: 'pointer' },
   // アプリの配信は、角を大きく丸めた枠(月のカレンダーと同じく、メールとアプリを形で見分ける。枠の色は状態)
   cardPush: { borderRadius: '16px' },
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
@@ -210,7 +209,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, onSelect, onCreate, createLabel, extras, muted }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, onSelect, onCreate, renderCard, onCheck }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -297,9 +296,30 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
             {t(`コメント ${comments}`, `${comments} comment${comments === 1 ? '' : 's'}`)}
           </span>
         )}
+        {c.ai_unchecked_at && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={mergeClasses(styles.issue, styles.issueAi)}
+            title={t('AI でまとめて作った中身を、まだ誰も確かめていません。押すと、中身と前後の配信を確かめられます', 'Nobody has checked this AI-made content yet. Click to check it against nearby deliveries')}
+            onClick={(e) => {
+              e.stopPropagation()
+              onCheck?.(id)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.stopPropagation()
+                onCheck?.(id)
+              }
+            }}
+          >
+            <AiIcon size={10} />
+            {t('AI 下書き・未確認', 'AI draft, unchecked')}
+          </span>
+        )}
       </>
     )
-    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0 || comments > 0
+    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0 || comments > 0 || !!c.ai_unchecked_at
 
     const pushBox = hasPushText && (
       <div className={styles.push}>
@@ -321,7 +341,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       <button
         key={id}
         type="button"
-        className={mergeClasses(styles.card, channel === 'push' && styles.cardPush, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim), muted && styles.cardMuted)}
+        className={mergeClasses(styles.card, channel === 'push' && styles.cardPush, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
         onClick={() => onSelect(id)}
         title={c.name}
         // 取りやめた配信は、消さずに薄く、取り消し線で出す
@@ -412,13 +432,12 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
           <div key={k} className={styles.col}>
             <div className={mergeClasses(styles.head, k === today && styles.today)}>
               <span>{d.toLocaleDateString(locale(), { weekday: 'short', month: 'numeric', day: 'numeric' })}</span>
-              <button type="button" className={styles.add} onClick={() => onCreate(k)} aria-label={createLabel ?? t('この日に新規作成', 'New delivery on this day')} title={createLabel ?? t('この日に新規作成', 'New delivery on this day')}>
+              <button type="button" className={styles.add} onClick={() => onCreate(k)} aria-label={t('この日に新規作成', 'New delivery on this day')} title={t('この日に新規作成', 'New delivery on this day')}>
                 <AddRegular />
               </button>
             </div>
             <div className={styles.body}>
-              {(byDay.get(k) ?? []).map(card)}
-              {extras?.(k)}
+              {(byDay.get(k) ?? []).map((c) => renderCard?.(c) ?? card(c))}
             </div>
           </div>
         )
