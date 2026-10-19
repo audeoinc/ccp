@@ -33,6 +33,7 @@ const KIND_BG: Record<CardAlertKind, string> = {
   lowStock: tokens.colorPaletteDarkOrangeBackground3,
   policyChanged: tokens.colorPalettePurpleBackground2,
   dateChanged: tokens.colorPaletteBlueBackground2,
+  overLimit: tokens.colorPaletteMarigoldBackground2,
 }
 
 interface Props {
@@ -55,11 +56,11 @@ export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAc
   const styles = useStyles()
   const t = useT()
   const [open, setOpen] = useState(defaultOpen)
-  // 種類ごとの件数(たたんでいるときの要約)。並びは、強い順(在庫切れ → 在庫僅少 → 方針 → 日程)
-  const ORDER: CardAlertKind[] = ['outOfStock', 'lowStock', 'policyChanged', 'dateChanged']
+  // 種類ごとの件数(たたんでいるときの要約)。並びは、強い順(在庫切れ → 在庫僅少 → 方針 → 週の上限超え → 日程)
+  const ORDER: CardAlertKind[] = ['outOfStock', 'lowStock', 'policyChanged', 'overLimit', 'dateChanged']
   const counts = ORDER.map((k) => ({ k, n: alerts.filter((a) => a.kind === k).length })).filter((c) => c.n > 0)
   const kindLabel = (k: CardAlertKind) =>
-    ({ outOfStock: t('在庫切れの見込み', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy'), dateChanged: t('日程の変更', 'Date change') })[k]
+    ({ outOfStock: t('在庫切れの見込み', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over weekly limit') })[k]
   return (
     <div className={styles.root} role="status">
       <span className={styles.head}>

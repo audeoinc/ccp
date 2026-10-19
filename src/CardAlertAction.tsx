@@ -7,7 +7,8 @@ import type { CardAlert } from './cardAlerts'
 import type { StockModel } from './alerts'
 import { replacementCandidates, suggestReplacements, type ReplacementCandidate } from './alertActions'
 import { productImage } from './images'
-import { priceText, useT } from './i18n'
+import { priceText, tr, useT } from './i18n'
+import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
 import { AiIcon } from './AiMark'
 
 const useStyles = makeStyles({
@@ -38,6 +39,8 @@ interface Props {
   inCard: Set<string>
   products: Product[]
   model?: StockModel
+  /** この週に、商品を載せる配信の数(週の上限超えのアラートで、上限に届いた商品を候補から除く) */
+  weekUse?: Map<string, number>
   /** 差し替える(配信カードの中で置き換える。保存で確定) */
   onReplace: (to: Product) => void
   /** 配信日を変える(左の配信日時の欄へ) */
@@ -52,11 +55,13 @@ interface Props {
  * 差し替えは、配信カードの中でその枠の商品を置き換えるだけ(保存で確定。保存しなければ元のまま)。
  * 配信カードは「直してから保存」の作りなので、裏で保存するアラートの画面の差し替えとは分ける(書きかけの内容と食い違わないように)
  */
-export function CardAlertAction({ alert, product, card, scheduledAt, inCard, products, model, onReplace, onPostpone, onOpenAlerts, onClose }: Props) {
+export function CardAlertAction({ alert, product, card, scheduledAt, inCard, products, model, weekUse, onReplace, onPostpone, onOpenAlerts, onClose }: Props) {
   const s = useStyles()
   const t = useT()
-  const stock = alert.kind === 'outOfStock' || alert.kind === 'lowStock'
-  const kindName = { outOfStock: t('在庫切れの見込み', 'Out of stock (expected)'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy change'), dateChanged: t('日程の変更', 'Date change') }[alert.kind]
+  // 差し替えで直すアラート(在庫と、週の上限超え)。週の上限超えはアラートの画面にないので、「アラートの画面で詳しく」は出さない
+  const overLimit = alert.kind === 'overLimit'
+  const stock = alert.kind === 'outOfStock' || alert.kind === 'lowStock' || overLimit
+  const kindName = { outOfStock: t('在庫切れの見込み', 'Out of stock (expected)'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy change'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over the weekly limit') }[alert.kind]
   const [picks, setPicks] = useState<{ c: ReplacementCandidate; reason: string }[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const market = card.country === 'US' ? 'US' : 'JP'
@@ -67,8 +72,8 @@ export function CardAlertAction({ alert, product, card, scheduledAt, inCard, pro
     if (!stock || !product || !model) return
     let alive = true
     const when = scheduledAt ? new Date(scheduledAt).toISOString() : (card.scheduled_at ?? new Date().toISOString())
-    const candidates = replacementCandidates({ card, removed: product, products, model, inCard, when })
-    suggestReplacements({ card, removed: product, candidates })
+    const candidates = replacementCandidates({ card, removed: product, products, model, inCard, when }).filter((c) => !overLimit || (weekUse?.get(c.product.id) ?? 0) < WEEKLY_PRODUCT_LIMIT)
+    suggestReplacements({ card, removed: product, candidates, ...(overLimit ? { why: tr(`この週に ${WEEKLY_PRODUCT_LIMIT} 本を超えて載せている`, `featured in more than ${WEEKLY_PRODUCT_LIMIT} deliveries this week`) } : {}) })
       .then((r) => alive && setPicks(r))
       .catch((e: unknown) => {
         if (!alive) return
@@ -106,7 +111,9 @@ export function CardAlertAction({ alert, product, card, scheduledAt, inCard, pro
             {stock && product && (
               <>
                 <span className={s.sub}>
-                  <AiIcon size={14} /> {t('AI の差し替え候補(在庫のある、同じカテゴリの商品)。「使う」で、この配信の中で置き換えます(保存で確定)', 'AI replacement ideas (in stock, same category). "Use" swaps it in this delivery (saved when you save).')}
+                  <AiIcon size={14} /> {overLimit
+                    ? t(`AI の差し替え候補(在庫のある、同じカテゴリで、この週にまだ ${WEEKLY_PRODUCT_LIMIT} 本載せていない商品)。「使う」で、この配信の中で置き換えます(保存で確定)`, `AI replacement ideas (in stock, same category, fewer than ${WEEKLY_PRODUCT_LIMIT} uses this week). "Use" swaps it in this delivery (saved when you save).`)
+                    : t('AI の差し替え候補(在庫のある、同じカテゴリの商品)。「使う」で、この配信の中で置き換えます(保存で確定)', 'AI replacement ideas (in stock, same category). "Use" swaps it in this delivery (saved when you save).')}
                 </span>
                 {error && (
                   <MessageBar intent="error">
@@ -152,9 +159,11 @@ export function CardAlertAction({ alert, product, card, scheduledAt, inCard, pro
                   {t('配信日を変える', 'Change the send date')}
                 </Button>
               )}
-              <Button size="small" appearance={stock ? 'subtle' : 'primary'} icon={<OpenRegular />} onClick={onOpenAlerts}>
-                {t('アラートの画面で詳しく', 'Open in Alerts')}
-              </Button>
+              {!overLimit && (
+                <Button size="small" appearance={stock ? 'subtle' : 'primary'} icon={<OpenRegular />} onClick={onOpenAlerts}>
+                  {t('アラートの画面で詳しく', 'Open in Alerts')}
+                </Button>
+              )}
             </div>
           </DialogContent>
         </DialogBody>
