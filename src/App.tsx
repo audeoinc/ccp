@@ -1485,7 +1485,7 @@ function App() {
         <AlertsPage initialProductId={alertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
       {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
-      <BulkWorkspace ws={bulk} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} onFinish={(d) => goTo('week', d)} />
+      <BulkWorkspace ws={bulk} cards={activeCards} products={products} heroes={heroes} onOpen={setSelectedId} onFinish={(d) => goTo('week', d)} />
       {(selected || creating) && (
         <CardDetail
           key={selected?.id ?? 'new'}

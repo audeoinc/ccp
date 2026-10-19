@@ -27,12 +27,14 @@ import {
   CalendarLtrRegular,
   CheckmarkCircleFilled,
   CheckmarkRegular,
+  DeleteRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
   DismissRegular,
   EditRegular,
   ErrorCircleRegular,
   LockClosedRegular,
+  SaveRegular,
 } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -44,7 +46,11 @@ import { CheckView, type CheckTab } from './CheckDrawer'
 import { channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
-import type { BulkWorkspaceState, Step } from './useBulkWorkspace'
+import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
+import { ImageThumb } from './ImageThumb'
+import { productImage } from './images'
+import { yen } from './items'
+import { productMarket } from './market'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -173,6 +179,21 @@ const useStyles = makeStyles({
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
   itemOn: { border: `1.5px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
+  itemOff: { opacity: 0.6 },
+  thumbs: { display: 'flex', alignItems: 'center', columnGap: '3px', minHeight: '36px' },
+  // ③ の右: 題名の帯 → 選んだ商品 → タブ → 中身 → 決めるボタン
+  reviewPanel: { display: 'grid', rowGap: '12px', padding: '16px 18px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
+  reviewHead: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  reviewMeta: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2 },
+  reviewTitle: { margin: 0, fontSize: tokens.fontSizeBase500, lineHeight: tokens.lineHeightBase500, fontWeight: tokens.fontWeightSemibold },
+  picked: { display: 'grid', rowGap: '6px' },
+  pickedRow: { display: 'flex', columnGap: '10px', rowGap: '8px', flexWrap: 'wrap' },
+  pickedItem: { display: 'grid', rowGap: '2px', width: '96px', fontSize: '12px' },
+  pickedName: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  reviewTabs: { borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  reviewBody: { minWidth: 0 },
+  // 決めるボタンは、中身を下まで読まなくても押せるように、パネルの下に貼りつける
+  decide: { position: 'sticky', bottom: '-16px', display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 0', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
   itemHead: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
   tools: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   foot: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 20px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
@@ -182,7 +203,6 @@ interface Props {
   ws: BulkWorkspaceState
   /** すべての配信(取りやめを除く) */
   cards: DeliveryCard[]
-  cardProducts: Map<string, string[]>
   products: Product[]
   heroes: HeroImage[]
   /** 配信カードを開いて直す(作業画面の上に重なる) */
@@ -198,7 +218,7 @@ interface Props {
  * ① は保存しない。② で中身ができた配信から、ふつうの下書き(未起案)として保存する。
  * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
-export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpen, onFinish }: Props) {
+export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }: Props) {
   const s = useStyles()
   const t = useT()
   const [tab, setTab] = useState<CheckTab>('content')
@@ -216,18 +236,18 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
   const stepNames: Record<Step, string> = {
     1: t('対象と方向を決める', 'Target & direction'),
     2: t('中身を AI で作る', 'Create with AI'),
-    3: t('確かめる', 'Review'),
+    3: t('確かめて保存', 'Review & save'),
   }
   // 中身を作らずに保存したときは、② ③ は通らない
   const plainDone = ws.plainCards.length > 0 || ws.savingPlain
-  // 戻れるのは、済んだ手順だけ。何か保存したら、① には戻らない(保存した配信と、行の対応がずれるため)
+  // 戻れるのは、済んだ手順だけ。中身を作り始めたら、① には戻らない(作った案と、行の対応がずれるため)
   const reachable = (k: Step) => {
     if (ws.running || plainDone) return k === ws.step
-    if (k === 1) return !ws.saved
-    if (k === 2) return ws.made.size > 0 || ws.failed.size > 0
-    return ws.madeCards.length > 0
+    if (k === 1) return !ws.started
+    if (k === 2) return ws.started
+    return ws.reviewItems.length > 0
   }
-  const stepDone = (k: Step) => k < ws.step || (k === 1 && plainDone) || (k === 2 && ws.made.size > 0 && ws.pending.length === 0)
+  const stepDone = (k: Step) => k < ws.step || (k === 1 && plainDone) || (k === 2 && ws.results.size > 0 && ws.pending.length === 0) || (k === 3 && ws.reviewItems.length > 0 && ws.unsavedCount === 0)
   const stepper = (
     <nav className={s.steps} aria-label={t('手順', 'Steps')}>
       {([1, 2, 3] as Step[]).map((k) => (
@@ -244,8 +264,8 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           >
             {stepNames[k]}
             {k === 1 && n > 0 && !plainDone ? ` (${readyCount}/${n})` : ''}
-            {k === 2 && plainDone ? ` — ${t('作らずに保存', 'skipped')}` : k === 2 && n > 0 && ws.saved ? ` (${ws.made.size}/${n})` : ''}
-            {k === 3 && ws.madeCards.length > 0 ? ` (${t('未確認', 'unchecked')} ${ws.unchecked})` : ''}
+            {k === 2 && plainDone ? ` — ${t('作らずに保存', 'skipped')}` : k === 2 && n > 0 && ws.started ? ` (${ws.results.size}/${n})` : ''}
+            {k === 3 && ws.reviewItems.length > 0 ? ` (${t('保存', 'saved')} ${ws.savedCount}/${ws.reviewItems.length})` : ''}
           </Button>
         </Fragment>
       ))}
@@ -255,7 +275,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
   // ---- 右: その週の配信(見るだけ。作ろうとしている行も、薄く重ねて見せる)
   const weekEndNext = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 7)
   const inWeek = cards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
-  const madeIds = new Set([...ws.made.values(), ...ws.plainCards.map((c) => c.id)])
+  const madeIds = new Set([...ws.savedIds.values(), ...ws.plainCards.map((c) => c.id)])
   const side = (
     <aside className={s.side} aria-label={t('この週の配信', 'Deliveries this week')}>
       <h3 className={s.h3}>{t('この週の配信(すべての国・チャネル)', 'This week (all countries & channels)')}</h3>
@@ -466,8 +486,8 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           </div>
           <span className={s.hint}>
             {t(
-              `同時に 3 本まで作ります。できた配信から、1 本ずつ作った下書きと同じ「未起案」で保存し、「AI 下書き・未確認」の印を付けます(④ で確かめると外れます)。`,
-              `Up to 3 at a time. Each finished delivery is saved as a regular draft (Not started) with an “AI draft, unchecked” mark (cleared when you review it in step 4).`,
+              '同時に 3 本まで作ります。できた案は、まだ保存しません。③ で中身を見て、1 本ずつ「保存」か「破棄」を選びます。',
+              'Up to 3 at a time. Drafts are not saved yet: in step 3, review each one and choose Save or Discard.',
             )}
           </span>
           <div className={s.grid3}>
@@ -475,7 +495,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
               const r = ws.rowOf(d)
               const prog = ws.progress.get(d)
               const fail = ws.failed.get(d)
-              const done = ws.made.has(d)
+              const done = ws.results.has(d)
               return (
                 <Fragment key={d}>
                   <span className={s.dayDate}>{dayText(d)}</span>
@@ -487,7 +507,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
                     {done ? (
                       <span className={s.statusLine}>
                         <CheckmarkCircleFilled className={s.doneIcon} />
-                        {t('保存しました(未起案・AI 下書き・未確認)', 'Saved (Not started · AI draft, unchecked)')}
+                        {t('できました(まだ保存していません)', 'Ready (not saved yet)')}
                       </span>
                     ) : prog ? (
                       <>
@@ -515,80 +535,143 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
     )
   }
 
-  // ---- ③ 確かめる
+  // ---- ③ 確かめて保存(1 本ずつ、中身を見て「保存」か「破棄」。保存しなかった案は、終えると破棄される)
+  const stateBadge = (state: ReviewItem['state']) =>
+    state === 'saved' ? (
+      <Badge size="small" appearance="tint" color="success" icon={<CheckmarkRegular />} className={s.newBadge}>
+        {t('保存済み', 'Saved')}
+      </Badge>
+    ) : state === 'discarded' ? (
+      <Badge size="small" appearance="outline" color="subtle" className={s.newBadge}>
+        {t('破棄', 'Discarded')}
+      </Badge>
+    ) : (
+      <Badge size="small" appearance="outline" color="informative" className={s.newBadge}>
+        {t('未保存', 'Not saved')}
+      </Badge>
+    )
+  const pOf = (id: string) => products.find((p) => p.id === id)
   const step3 = () => {
-    const current = ws.madeCards.find((c) => c.id === ws.checkId) ?? ws.madeCards[0]
-    if (!current) return <span className={s.muted}>{t('作った配信はまだありません。', 'Nothing created yet.')}</span>
-    const nextUnchecked = () => ws.madeCards.find((c) => c.id !== current.id && c.ai_unchecked_at)
+    const items = ws.reviewItems
+    const current = items.find((x) => x.day === ws.checkDay) ?? items.find((x) => x.state === 'unsaved') ?? items[0]
+    if (!current) return <span className={s.muted}>{t('作った案はまだありません。', 'No drafts yet.')}</span>
+    const c = current.card
+    const busy = ws.savingDay === current.day
+    const index = items.indexOf(current)
     return (
       <div className={s.check}>
-        <div className={s.list} role="listbox" aria-label={t('作った配信', 'Created deliveries')}>
-          {ws.madeCards.map((c) => (
-            <button key={c.id} type="button" role="option" aria-selected={c.id === current.id} className={mergeClasses(s.item, c.id === current.id && s.itemOn)} onClick={() => ws.setCheckId(c.id)}>
+        <div className={s.list} role="listbox" aria-label={t('作った案', 'Drafts')}>
+          {items.map((x) => (
+            <button key={x.day} type="button" role="option" aria-selected={x === current} className={mergeClasses(s.item, x === current && s.itemOn, x.state === 'discarded' && s.itemOff)} onClick={() => ws.setCheckDay(x.day)}>
               <span className={s.itemHead}>
-                <ChannelBadge channel={c.channel} size="small" />
-                <span className={s.name}>{c.name}</span>
+                <ChannelBadge channel={x.card.channel} size="small" />
+                <span className={s.name}>{x.card.name}</span>
               </span>
               <span className={s.itemHead}>
-                <span className={s.muted}>{c.scheduled_at ? dayText(dayKeyOf(new Date(c.scheduled_at))) : ''}</span>
+                <span className={s.muted}>{dayText(x.day)}</span>
                 <span className={s.spacer} />
-                {c.ai_unchecked_at ? (
-                  <Badge size="small" appearance="tint" color="warning">
-                    {t('未確認', 'Unchecked')}
-                  </Badge>
-                ) : (
-                  <Badge size="small" appearance="tint" color="success" icon={<CheckmarkRegular />}>
-                    {t('確認した', 'Checked')}
-                  </Badge>
-                )}
+                {stateBadge(x.state)}
+              </span>
+              {/* 開かなくても、選んだ商品が分かるように、小さな写真を並べる */}
+              <span className={s.thumbs}>
+                {x.productIds.slice(0, 5).map((pid, i) => (
+                  <ImageThumb key={`${pid}-${i}`} src={productImage(pOf(pid))} alt={pOf(pid)?.name ?? ''} width={28} height={36} />
+                ))}
+                {x.productIds.length > 5 && <span className={s.muted}>{`+${x.productIds.length - 5}`}</span>}
               </span>
             </button>
           ))}
         </div>
-        <section className={s.panel}>
-          <div className={s.tools}>
-            <h3 className={s.h3}>{current.name}</h3>
-            <TabList size="small" selectedValue={tab} onTabSelect={(_, v) => setTab(v.value as CheckTab)}>
-              <Tab value="content">{t('中身', 'Content')}</Tab>
-              <Tab value="compare">{t('比べる', 'Compare')}</Tab>
-            </TabList>
-            <span className={s.spacer} />
-            <Button size="small" icon={<EditRegular />} onClick={() => onOpen(current.id)}>
-              {t('開いて直す', 'Open & edit')}
-            </Button>
-            {current.ai_unchecked_at && (
-              <Button
-                size="small"
-                appearance="primary"
-                icon={<CheckmarkRegular />}
-                onClick={async () => {
-                  const next = nextUnchecked()
-                  await ws.check(current.id)
-                  // 確かめたら、次の未確認に進む(1 本ずつ選び直さなくてよいように)
-                  if (next) ws.setCheckId(next.id)
-                }}
-              >
-                {t('確認した', 'Checked')}
-              </Button>
+        <section className={s.reviewPanel}>
+          {/* 題名の帯: 配信日・チャネル・種類の下に、配信名を大きく。タブは、その下に線で区切って置く(題名とタブを見分けやすく) */}
+          <header className={s.reviewHead}>
+            <div className={s.reviewMeta}>
+              <ChannelBadge channel={c.channel} size="small" />
+              <span>{dayText(current.day)}</span>
+              {c.theme_type && <span>{`・ ${themeTypeLabel(c.theme_type as ThemeType)}`}</span>}
+              <span className={s.spacer} />
+              <span className={s.muted}>{t(`${index + 1} / ${items.length} 本目`, `${index + 1} of ${items.length}`)}</span>
+              {stateBadge(current.state)}
+            </div>
+            <h3 className={s.reviewTitle}>{c.name}</h3>
+            {c.theme && <span className={s.hint}>{`${t('テーマ', 'Theme')}: ${c.theme}`}</span>}
+          </header>
+          {/* 選んだ商品(開かなくても分かるように) */}
+          <div className={s.picked}>
+            <span className={s.label}>{t(`選んだ商品(${current.productIds.length})`, `Products (${current.productIds.length})`)}</span>
+            <div className={s.pickedRow}>
+              {current.productIds.length === 0 && <span className={s.muted}>{t('なし', 'None')}</span>}
+              {current.productIds.map((pid, i) => {
+                const p = pOf(pid)
+                return (
+                  <div key={`${pid}-${i}`} className={s.pickedItem}>
+                    <ImageThumb src={productImage(p)} alt={p?.name ?? ''} width={56} height={72} />
+                    <span className={s.pickedName}>{p?.name ?? pid}</span>
+                    {p?.price !== undefined && <span className={s.muted}>{yen(p.price, productMarket(p))}</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <TabList className={s.reviewTabs} selectedValue={tab} onTabSelect={(_, v) => setTab(v.value as CheckTab)}>
+            <Tab value="content">{t('中身', 'Content')}</Tab>
+            <Tab value="compare">{t('前後の配信と比べる', 'Compare with nearby')}</Tab>
+          </TabList>
+          <div className={s.reviewBody}>
+            <CheckView card={c} tab={tab} cards={ws.compareCards} cardProducts={ws.compareProducts} products={products} heroes={heroes} />
+          </div>
+          {/* 1 本ずつ決めるボタン。保存・破棄すると、次の未保存の案に進む */}
+          <div className={s.decide}>
+            {current.state === 'saved' ? (
+              <>
+                <span className={s.statusLine}>
+                  <CheckmarkCircleFilled className={s.doneIcon} />
+                  {t('下書き(未起案)で保存しました。', 'Saved as a draft (Not started).')}
+                </span>
+                <span className={s.spacer} />
+                <Button icon={<EditRegular />} onClick={() => onOpen(c.id)}>
+                  {t('配信カードで開く', 'Open card')}
+                </Button>
+              </>
+            ) : current.state === 'discarded' ? (
+              <>
+                <span className={s.muted}>{t('この案は保存しません。', 'This draft will not be saved.')}</span>
+                <span className={s.spacer} />
+                <Button onClick={() => ws.undoDiscard(current.day)}>{t('破棄を取り消す', 'Undo discard')}</Button>
+              </>
+            ) : (
+              <>
+                <Button appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => ws.discard(current.day)}>
+                  {t('破棄', 'Discard')}
+                </Button>
+                <span className={s.spacer} />
+                <Button
+                  icon={<EditRegular />}
+                  disabled={busy}
+                  onClick={async () => {
+                    const id = await ws.save(current.day)
+                    if (id) onOpen(id)
+                  }}
+                >
+                  {t('保存して、配信カードで直す', 'Save & edit in card')}
+                </Button>
+                <Button appearance="primary" size="large" icon={busy ? <Spinner size="tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(current.day)}>
+                  {t('保存', 'Save')}
+                </Button>
+              </>
             )}
           </div>
-          <CheckView card={current} tab={tab} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} />
         </section>
       </div>
     )
   }
 
   // ---- 下: 戻る と、手順に合わせたボタン(① だけは、AI で作るか、作らずに保存するかの 2 つ)
+  const finish = () => {
+    if (ws.close()) onFinish(ws.weekStart)
+  }
   const finishButton = (
-    <Button
-      appearance="primary"
-      icon={<CalendarLtrRegular />}
-      disabled={ws.savingPlain}
-      onClick={() => {
-        ws.close()
-        onFinish(ws.weekStart)
-      }}
-    >
+    <Button appearance="primary" icon={<CalendarLtrRegular />} disabled={ws.savingPlain || !!ws.savingDay} onClick={finish}>
       {t('終えて、週の表示で見る', 'Finish and open the week')}
     </Button>
   )
@@ -607,8 +690,8 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
       )
     if (ws.step === 2)
       return (
-        <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={ws.running || ws.madeCards.length === 0} onClick={() => ws.setStep(3)}>
-          {t(`次へ: ${ws.madeCards.length} 本を確かめる`, `Next: review ${ws.madeCards.length}`)}
+        <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={ws.running || ws.reviewItems.length === 0} onClick={() => ws.setStep(3)}>
+          {t(`次へ: ${ws.reviewItems.length} 本を確かめて保存`, `Next: review & save ${ws.reviewItems.length}`)}
         </Button>
       )
     return finishButton
@@ -622,7 +705,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           `${n} to create · ${readyCount} with type and name (AI needs both; saving without content needs only names)`,
         )
       : ws.step === 3
-        ? t(`未確認 ${ws.unchecked} 本。確かめないまま終えても、配信は下書きとして残り、週の表示に「AI 下書き・未確認」の印が出ます。`, `${ws.unchecked} unchecked. If you finish now, they stay as drafts with an “AI draft, unchecked” mark in the week view.`)
+        ? t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本。保存していない案は、終えると破棄されます。`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}. Unsaved drafts are discarded when you finish.`)
         : ''
 
   return (
@@ -633,7 +716,7 @@ export function BulkWorkspace({ ws, cards, cardProducts, products, heroes, onOpe
           <h2 className={s.title}>{t('まとめて作る', 'Create in bulk')}</h2>
           <span className={s.summary}>{`${weekText} ・ ${countryName} ・ ${channelName}`}</span>
           <span className={s.spacer} />
-          <Button appearance="subtle" icon={<DismissRegular />} disabled={ws.running || ws.savingPlain} aria-label={t('閉じる', 'Close')} onClick={ws.close} />
+          <Button appearance="subtle" icon={<DismissRegular />} disabled={ws.running || ws.savingPlain} aria-label={t('閉じる', 'Close')} onClick={() => ws.close()} />
         </div>
         {stepper}
         <div className={s.body}>
