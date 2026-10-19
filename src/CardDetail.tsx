@@ -1140,10 +1140,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </MessageBar>
           )}
 
-          {/* この配信のアラート(在庫・方針・日程)。どこに問題があるかを、開いた瞬間にわかるように */}
+          {/* この配信のアラート(在庫・方針・日程)。ふだんは 1 行にたたむ。アラートの画面から開いたときは、開いておく */}
           {alerts.length > 0 && (
             <CardAlertsBar
               alerts={alerts}
+              defaultOpen={!!focusProductId}
               selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
               onSelectProduct={(pid) => {
                 const it = items.find((i) => i.productId === pid)
