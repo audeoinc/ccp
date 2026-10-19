@@ -269,6 +269,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 **本番への反映と、セッション間の連絡は、専用のセッション「CCP の本番反映と、セッション間の連絡係」が受け持つ**(2026-10-17 から。反映は利用者の指示があったときだけ)。BQ のセッションは BigQuery に集中する。push したら、連絡係にコミットの要点を知らせる。
 
+- **`review-summary` を main に入れる前に(2026-10-19 に連絡係から)**: Workbench 版のリリース ZIP の作業で、`server/ccp/ai.py` と `bq_import.py` の import と分岐が変わった。`dbctl.py` は `server/ccp/hosted/dbctl.py` に移り、DB の起動待ち・`DbNotReady` は `from . import dbready` を使う。本番専用の処理は `server/ccp/hosted/` に置く。ZIP に入るファイル(コメントを含む)には、Cloud Run・Cloud SQL・gcloud・会社名・Power Apps などの言葉を書かない(`release:workbench` の検査で止まる)。**main の最新の上に載せ直してから**、確かめる。
 1. **B5 レビューの要約(作りかけ。ブランチ `review-summary`、コミット 85f744e。main には入れていない)**
    - 中身: `products.review_summary`・`review_summary_basis`(件数|最新の日時。変わった商品だけ作り直す)。`server/ccp/bq_import.py` の `summarize_reviews` が、取り込みの最後に Gemini で要約する(1 回 25 秒まで、残りは次に画面を開いたとき)。`server/ccp/ai.py` の `generate` を切り出して `/api/ask` と共通に。AI の商品の候補に `reviews`、商品情報(`src/ProductDetail.tsx`)に「レビューの声」。
    - 確かめたこと: 手元(PGlite + 本番のパック + ダミーの BigQuery + 本物の Gemini)で要約の中身は良好(JP は日本語・US は英語、レビューにないことは書かない)。
