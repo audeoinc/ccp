@@ -38,6 +38,10 @@ export interface ProductionRequestFields {
   done_link?: string
   sent_at?: string
   sent_by_name?: string
+  /** 制作のページで直して保存した HTML(版ごとに 1 つ。空なら、プレビューから作った下書き)と、保存した日時・人 */
+  html?: string
+  html_saved_at?: string
+  html_saved_by_name?: string
 }
 
 /** 読んだ 1 行 */

@@ -40,6 +40,7 @@ function create(input: RequestInput, status: 'requested' | 'sent'): Result<Produ
     instructions: input.instructions,
     production_owner: input.production_owner || undefined,
     production_due: input.production_due || undefined,
+    html: input.html || undefined,
     requested_at: at,
     requested_by_name: input.actor.name,
     ...(status === 'sent' ? { sent_at: at, sent_by_name: input.actor.name } : {}),
@@ -73,7 +74,15 @@ export const ProductionService = {
     const link = input.link?.trim() || undefined
     return advance(id, input.actor, ['requested', 'in_progress'], { status: 'done', done_at: now(), done_by_name: input.actor.name, done_note: note, done_link: link }, 'production_done', input.week_start, [note, link].filter(Boolean).join(' / ') || undefined, 'この依頼は、もう終わっているか、古い版です')
   },
-  async send(input: RequestInput & { html: string }) {
+  async saveHtml(id: string, input: { actor: Actor; html: string }) {
+    if (!input.actor?.id) return ng<ProductionRequest>('右上で、だれでログインするかを選んでください')
+    const r = tables.ProductionRequestsService.find((x) => x.id === id)
+    if (!r) return ng<ProductionRequest>('制作の依頼が見つかりません')
+    if (r.status === 'stale') return ng<ProductionRequest>('古い版には保存できません(企画が変わりました)')
+    Object.assign(r, { html: input.html, html_saved_at: now(), html_saved_by_name: input.actor.name, modified_on: now() })
+    return { success: true, data: structuredClone(r) as unknown as ProductionRequest }
+  },
+  async send(input: RequestInput) {
     const r = create(input, 'sent')
     return r.success ? { ...r, data: { ...r.data!, message: '送りました' } } : r
   },

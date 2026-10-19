@@ -56,6 +56,8 @@ def _fields(body: dict[str, Any]) -> dict[str, Any]:
         "instructions": str(body.get("instructions") or ""),
         "production_owner": str(body.get("production_owner") or "").strip() or None,
         "production_due": due,
+        # 依頼・送信のときに、エディタの HTML(直していればそれ)も一緒に固める
+        "html": str(body.get("html") or "") or None,
     }
 
 
@@ -139,6 +141,22 @@ async def done(request_id: str, request: Request):
         " / ".join(x for x in (note, link) if x) or None,
         "この依頼は、もう終わっているか、古い版です",
     )
+
+
+@router.post("/requests/{request_id}/html")
+async def save_html(request_id: str, request: Request):
+    """制作のページで直した HTML を保存する(版ごとに 1 つ。主に制作の人、企画の人も直せる)。古い版には保存しない"""
+    body = await _body(request)
+    html = str(body.get("html") or "")
+    async with db(write=True) as conn:
+        actor = await _actor(conn, body, request)
+        req = await _one(conn, "production_requests", request_id, lock=True)
+        if req is None:
+            return fail(404, "制作の依頼が見つかりません")
+        if req.get("status") == "stale":
+            return fail(409, "古い版には保存できません(企画が変わりました)")
+        row = await _update(conn, "production_requests", request_id, {"html": html, "html_saved_at": _now(), "html_saved_by_name": actor["name"]}) or req
+    return ok(row)
 
 
 @router.post("/send")

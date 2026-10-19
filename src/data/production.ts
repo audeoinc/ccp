@@ -14,6 +14,8 @@ export interface RequestInput {
   instructions: string
   production_owner: string
   production_due: string
+  /** エディタの HTML(直していればそれ。依頼・送信のときに一緒に固める) */
+  html?: string
   week_start?: string
 }
 
@@ -40,6 +42,8 @@ export const ProductionService = {
   receive: (requestId: string, input: { actor: Actor; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/receive`, input),
   /** 制作が「制作が終わった」 */
   done: (requestId: string, input: { actor: Actor; note?: string; link?: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/done`, input),
+  /** 制作のページで直した HTML を保存する */
+  saveHtml: (requestId: string, input: { actor: Actor; html: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/html`, input),
   /** 制作を通さず、配信のしくみに送る(いまは仮の窓口。「送りました」と返る) */
-  send: (input: RequestInput & { html: string }) => post<ProductionRequest & { message?: string }>('/send', input),
+  send: (input: RequestInput) => post<ProductionRequest & { message?: string }>('/send', input),
 }

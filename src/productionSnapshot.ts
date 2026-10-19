@@ -192,7 +192,52 @@ export function previewHtml(root: HTMLElement, title: string): string {
   })
   clone.querySelectorAll('button, input, textarea, select, svg').forEach((n) => n.remove())
   const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return `<!doctype html>\n<html lang="${navigator.language.startsWith('ja') ? 'ja' : 'en'}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)}</title>\n</head>\n<body style="margin:0;background:#ffffff">\n${clone.outerHTML}\n</body>\n</html>\n`
+  return prettyHtml(
+    `<!doctype html>\n<html lang="${navigator.language.startsWith('ja') ? 'ja' : 'en'}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)}</title>\n</head>\n<body style="margin:0;background:#ffffff">\n${clone.outerHTML}\n</body>\n</html>\n`,
+  )
+}
+
+// 中身のない要素(閉じタグを書かない)と、中の空白をそのまま残す要素
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
+const RAW = new Set(['pre', 'textarea', 'script', 'style'])
+
+/**
+ * HTML を、要素ごとに改行して字下げした形に整える(利用者の指摘: 1 行に並ぶと構成が見づらい)。
+ * 文字だけを持つ要素は 1 行にまとめる。中の空白に意味がある要素(pre など)は、そのまま
+ */
+export function prettyHtml(src: string): string {
+  const doc = new DOMParser().parseFromString(src, 'text/html')
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const attr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+  const squash = (v: string) => v.replace(/\s+/g, ' ').trim()
+  const open = (el: Element) => `<${el.tagName.toLowerCase()}${Array.from(el.attributes).map((a) => ` ${a.name}="${attr(a.value)}"`).join('')}>`
+  const lines: string[] = ['<!doctype html>']
+  const walk = (node: Node, depth: number) => {
+    const pad = '  '.repeat(depth)
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = squash(node.textContent ?? '')
+      if (text) lines.push(pad + esc(text))
+      return
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return
+    const el = node as Element
+    const tag = el.tagName.toLowerCase()
+    if (VOID.has(tag)) {
+      lines.push(pad + open(el))
+      return
+    }
+    const kids = Array.from(el.childNodes).filter((n) => n.nodeType === Node.ELEMENT_NODE || squash(n.textContent ?? ''))
+    if (RAW.has(tag) || kids.every((n) => n.nodeType === Node.TEXT_NODE)) {
+      const inner = RAW.has(tag) ? el.innerHTML : esc(squash(el.textContent ?? ''))
+      lines.push(`${pad}${open(el)}${inner}</${tag}>`)
+      return
+    }
+    lines.push(pad + open(el))
+    kids.forEach((k) => walk(k, depth + 1))
+    lines.push(`${pad}</${tag}>`)
+  }
+  walk(doc.documentElement, 0)
+  return lines.join('\n') + '\n'
 }
 
 /** 文字をファイルとして保存させる(ブラウザのダウンロード) */

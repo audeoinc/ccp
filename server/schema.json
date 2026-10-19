@@ -413,7 +413,10 @@
     ["done_note", "text"],
     ["done_link", "text"],
     ["sent_at", "timestamptz"],
-    ["sent_by_name", "text"]
+    ["sent_by_name", "text"],
+    ["html", "text"],
+    ["html_saved_at", "timestamptz"],
+    ["html_saved_by_name", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
