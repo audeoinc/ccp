@@ -1,10 +1,14 @@
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, useRef, useState, type ReactNode } from 'react'
 import {
   Badge,
   Button,
   Checkbox,
   Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
   DialogSurface,
+  DialogTitle,
   Field,
   Input,
   Menu,
@@ -12,6 +16,9 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   type MenuButtonProps,
   MessageBar,
   MessageBarBody,
@@ -21,10 +28,7 @@ import {
   Select,
   Spinner,
   SplitButton,
-  Tab,
   ToggleButton,
-  Tooltip,
-  TabList,
   makeStyles,
   mergeClasses,
   tokens,
@@ -38,6 +42,8 @@ import {
   DeleteRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
+  ArrowSwapRegular,
+  WarningFilled,
   DismissRegular,
   EditRegular,
   ErrorCircleRegular,
@@ -50,7 +56,7 @@ import type { HeroImage } from './models/heroImages'
 import { locale, optionLabel, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ChannelBadge } from './ChannelBadge'
-import { CheckView, type CheckTab } from './CheckDrawer'
+import { CheckView } from './CheckDrawer'
 import { channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
@@ -59,6 +65,9 @@ import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { yen } from './items'
 import { productMarket } from './market'
+import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { ReplacePicker } from './ReplacePicker'
+import type { StockModel } from './alerts'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -196,12 +205,20 @@ const useStyles = makeStyles({
   reviewTitle: { margin: 0, fontSize: tokens.fontSizeBase500, lineHeight: tokens.lineHeightBase500, fontWeight: tokens.fontWeightSemibold },
   picked: { display: 'grid', rowGap: '6px' },
   pickedRow: { display: 'flex', columnGap: '10px', rowGap: '8px', flexWrap: 'wrap' },
-  pickedItem: { display: 'grid', rowGap: '2px', width: '96px', fontSize: '12px' },
+  pickedItem: { display: 'grid', rowGap: '2px', width: '110px', fontSize: '12px', alignContent: 'start' },
   pickedName: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  reviewTabs: { borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  // 週の上限を超えた商品は、赤い枠と ⚠(色だけに頼らない)
+  pickedOver: { outline: `1.5px solid ${tokens.colorPaletteRedBorder2}`, outlineOffset: '3px', borderRadius: tokens.borderRadiusSmall },
+  uses: { display: 'inline-flex', alignItems: 'center', columnGap: '3px', fontSize: '11px', color: tokens.colorNeutralForeground3 },
+  usesOver: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
+  overlap: { display: 'flex', alignItems: 'baseline', columnGap: '10px', flexWrap: 'wrap', fontSize: '12px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  overlapWarn: { backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
   reviewBody: { minWidth: 0 },
   footCurrent: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, maxWidth: '40%' },
   footHint: { fontSize: '12px', color: tokens.colorNeutralForeground2, textAlign: 'right' },
+  askSurface: { maxWidth: '520px', '& button': { whiteSpace: 'nowrap' } },
+  // ① 右の、もうある配信は薄く(作る予定の破線のカードを目立たせる)
+  sideOld: { opacity: 0.5 },
   itemHead: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
   tools: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   foot: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 20px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
@@ -215,6 +232,10 @@ interface Props {
   heroes: HeroImage[]
   /** 配信カードを開いて直す(作業画面の上に重なる) */
   onOpen: (id: string) => void
+  /** まだ保存していない案を、配信カードで開く(配信カードで保存したときに、はじめて保存される) */
+  onOpenDraft: (day: string) => void
+  /** 在庫の見込み(週の上限を超えた商品の差し替えの候補を選ぶのに使う。まだ読めていなければ、差し替えは出さない) */
+  model?: StockModel
   /** 終えて、作った週の週表示に移る */
   onFinish: (weekStart: Date) => void
 }
@@ -226,10 +247,13 @@ interface Props {
  * ① は保存しない。② で中身ができた配信から、ふつうの下書き(未起案)として保存する。
  * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
-export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }: Props) {
+export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft, onFinish, model }: Props) {
   const s = useStyles()
   const t = useT()
-  const [tab, setTab] = useState<CheckTab>('content')
+  // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
+  const finishRef = useRef(false)
+  // 差し替えの候補を開いている商品(選んだら閉じる)
+  const [replacing, setReplacing] = useState<string | null>(null)
   const dayText = (key: string) => new Date(`${key}T00:00`).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
   const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
   const weekEnd = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 6)
@@ -295,7 +319,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
             <span className={s.label}>{dayText(d.key)}</span>
             {list.length === 0 && !planned && <span className={s.muted}>—</span>}
             {list.map((c) => (
-              <span key={c.id} className={s.sideItem}>
+              <span key={c.id} className={mergeClasses(s.sideItem, !madeIds.has(c.id) && s.sideOld)}>
                 <ChannelBadge channel={c.channel} size="small" />
                 <span className={s.sideName}>{c.name || t('(配信名なし)', '(no name)')}</span>
                 {/* すべての国を出すので、① の国と違う配信だと分かるように */}
@@ -566,6 +590,10 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
       </Badge>
     )
   const pOf = (id: string) => products.find((p) => p.id === id)
+  const issueCount = (x: ReviewItem) => {
+    const is = ws.issuesOf(x)
+    return is.over.length + (is.sameTheme.length > 0 ? 1 : 0) + (is.sameHero.length > 0 ? 1 : 0)
+  }
   // ③ でいま見ている案(下の帯の「保存」「破棄」も、この案に効く)
   const items = ws.reviewItems
   const current = items.find((x) => x.day === ws.checkDay) ?? items.find((x) => x.state === 'unsaved') ?? items[0]
@@ -586,6 +614,12 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
               <span className={s.itemHead}>
                 <span className={s.muted}>{dayText(x.day)}</span>
                 <span className={s.spacer} />
+                {/* 週の中で気になる点がある案は、開かなくても分かるように */}
+                {issueCount(x) > 0 && (
+                  <Badge size="small" appearance="tint" color="warning" icon={<WarningFilled />} className={s.newBadge}>
+                    {issueCount(x)}
+                  </Badge>
+                )}
                 {stateBadge(x.state)}
               </span>
               {/* 開かなくても、選んだ商品が分かるように、小さな写真を並べる */}
@@ -608,6 +642,16 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
               <span className={s.spacer} />
               <span className={s.muted}>{t(`${index + 1} / ${items.length} 本目`, `${index + 1} of ${items.length}`)}</span>
               {stateBadge(current.state)}
+              {/* 破棄は、保存(右下)から離して、案の題名の帯に置く。保存したあとでも破棄できる(保存した配信を消す) */}
+              {current.state === 'discarded' ? (
+                <Button size="small" appearance="subtle" onClick={() => ws.undoDiscard(current.day)}>
+                  {t('破棄を取り消す', 'Undo discard')}
+                </Button>
+              ) : (
+                <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(current.day)}>
+                  {t('破棄', 'Discard')}
+                </Button>
+              )}
             </div>
             <h3 className={s.reviewTitle}>{c.name}</h3>
             {c.theme && <span className={s.hint}>{`${t('テーマ', 'Theme')}: ${c.theme}`}</span>}
@@ -619,22 +663,60 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
               {current.productIds.length === 0 && <span className={s.muted}>{t('なし', 'None')}</span>}
               {current.productIds.map((pid, i) => {
                 const p = pOf(pid)
+                const uses = ws.weekUse.get(pid) ?? 0
+                const over = current.state !== 'discarded' && uses > WEEKLY_PRODUCT_LIMIT
                 return (
-                  <div key={`${pid}-${i}`} className={s.pickedItem}>
+                  <div key={`${pid}-${i}`} className={mergeClasses(s.pickedItem, over && s.pickedOver)}>
                     <ImageThumb src={productImage(p)} alt={p?.name ?? ''} width={56} height={72} />
                     <span className={s.pickedName}>{p?.name ?? pid}</span>
                     {p?.price !== undefined && <span className={s.muted}>{yen(p.price, productMarket(p))}</span>}
+                    {/* この週に、この商品を載せる配信の数(週の確認の一覧 W4 と同じ数え方。上限を超えると ⚠) */}
+                    <span className={mergeClasses(s.uses, over && s.usesOver)}>
+                      {over && <WarningFilled />}
+                      {t(`今週 ${uses} 本 / 上限 ${WEEKLY_PRODUCT_LIMIT}`, `${uses} this week / max ${WEEKLY_PRODUCT_LIMIT}`)}
+                    </span>
+                    {over &&
+                      p &&
+                      (current.state === 'unsaved' && model ? (
+                        <Popover positioning="below-start" withArrow trapFocus open={replacing === `${current.day}:${pid}`} onOpenChange={(_, d) => setReplacing(d.open ? `${current.day}:${pid}` : null)}>
+                          <PopoverTrigger disableButtonEnhancement>
+                            <Button size="small" appearance="outline" icon={<ArrowSwapRegular />}>
+                              {t('差し替え', 'Replace')}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverSurface>
+                            <ReplacePicker card={c} removed={p} inCard={current.productIds} products={products} model={model} weekUse={ws.weekUse} onPick={(to) => {
+                                ws.replace(current.day, pid, to)
+                                setReplacing(null)
+                              }}
+                            />
+                          </PopoverSurface>
+                        </Popover>
+                      ) : (
+                        <span className={s.muted}>{t('「開いて編集」で直す', 'Fix via “Open & edit”')}</span>
+                      ))}
                   </div>
                 )
               })}
             </div>
           </div>
-          <TabList className={s.reviewTabs} selectedValue={tab} onTabSelect={(_, v) => setTab(v.value as CheckTab)}>
-            <Tab value="content">{t('中身', 'Content')}</Tab>
-            <Tab value="compare">{t('前後の配信と比べる', 'Compare with nearby')}</Tab>
-          </TabList>
+          {/* この週の中での重なり(週の確認の一覧と同じ見方)。なければ「重なりなし」とだけ出す */}
+          {(() => {
+            const is = ws.issuesOf(current)
+            const notes = [
+              is.sameTheme.length > 0 && t(`同じテーマ: ${is.sameTheme.join('、')}`, `Same theme: ${is.sameTheme.join(', ')}`),
+              is.sameHero.length > 0 && t(`同じメイン画像: ${is.sameHero.join('、')}`, `Same hero image: ${is.sameHero.join(', ')}`),
+              is.over.length > 0 && t(`週の上限を超える商品 ${is.over.length} 点`, `${is.over.length} item(s) over the weekly limit`),
+            ].filter(Boolean)
+            return (
+              <div className={mergeClasses(s.overlap, notes.length > 0 && s.overlapWarn)}>
+                <span className={s.label}>{t('この週の中での重なり', 'Overlap within this week')}</span>
+                <span>{notes.length > 0 ? notes.join(' ・ ') : t('重なりなし', 'No overlap')}</span>
+              </div>
+            )
+          })()}
           <div className={s.reviewBody}>
-            <CheckView card={c} tab={tab} cards={ws.compareCards} cardProducts={ws.compareProducts} products={products} heroes={heroes} />
+            <CheckView card={c} tab="content" cards={ws.compareCards} cardProducts={ws.compareProducts} products={products} heroes={heroes} />
           </div>
         </section>
       </div>
@@ -642,8 +724,15 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
   }
 
   // ---- 下: 戻る と、手順に合わせたボタン(① だけは、AI で作るか、作らずに保存するかの 2 つ)
+  // 「終えて、週の表示で見る」で閉じたときは、閉じるダイアログで決めたあとも、週の表示に移る
   const finish = () => {
+    finishRef.current = true
     if (ws.close()) onFinish(ws.weekStart)
+  }
+  const afterAsk = () => {
+    ws.setCloseAsk(false)
+    ws.closeNow()
+    if (finishRef.current) onFinish(ws.weekStart)
   }
   const finishButton = (
     <Button appearance="primary" icon={<CalendarLtrRegular />} disabled={ws.savingPlain || !!ws.savingDay} onClick={finish}>
@@ -696,32 +785,46 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
     if (current.state === 'unsaved')
       return (
         <>
-          {/* 配信カードは保存した配信しか開けないので、下書きで保存してから開く(押した時点で、この案は保存済みになる) */}
-          <Tooltip relationship="description" content={t('下書き(未起案)で保存して、配信カードで開きます', 'Saves as a draft, then opens the card')}>
-            <Button
-              icon={<EditRegular />}
-              disabled={busy}
-              onClick={async () => {
-                const id = await ws.save(current.day)
-                if (id) onOpen(id)
-              }}
-            >
-              {t('開いて編集', 'Open & edit')}
-            </Button>
-          </Tooltip>
-          <Button appearance="primary" icon={busy ? <Spinner size="tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(current.day)}>
-            {t('保存', 'Save')}
+          {/* 保存せずに、配信カードで開く(配信カードで「保存」を押したときに、はじめて保存される) */}
+          <Button icon={<EditRegular />} disabled={busy} onClick={() => onOpenDraft(current.day)}>
+            {t('開いて編集', 'Open & edit')}
           </Button>
+          {/* 保存の ▾ に「残りをまとめて保存」(途中で切り上げるとき。ふだんは 1 本ずつ) */}
+          <Menu positioning="above-end">
+            <MenuTrigger disableButtonEnhancement>
+              {(triggerProps: MenuButtonProps) => (
+                <SplitButton
+                  appearance="primary"
+                  icon={busy ? <Spinner size="tiny" /> : <SaveRegular />}
+                  disabled={busy}
+                  primaryActionButton={{ onClick: () => void ws.save(current.day) }}
+                  menuButton={{ ...triggerProps, 'aria-label': t('ほかの保存のしかた', 'Other ways to save') }}
+                >
+                  {t('保存', 'Save')}
+                </SplitButton>
+              )}
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem
+                  icon={<SaveRegular />}
+                  onClick={() => {
+                    if (window.confirm(t(`まだ決めていない ${ws.unsavedCount} 本を、まとめて下書き(未起案)で保存します。よろしいですか?`, `Save all ${ws.unsavedCount} remaining drafts (Not started)?`))) void ws.saveAll()
+                  }}
+                >
+                  {t(`残りの ${ws.unsavedCount} 本をまとめて保存`, `Save all ${ws.unsavedCount} remaining`)}
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
         </>
       )
     return (
       <>
-        {current.state === 'saved' ? (
+        {current.state === 'saved' && (
           <Button icon={<EditRegular />} onClick={() => onOpen(current.card.id)}>
-            {t('配信カードで開く', 'Open card')}
+            {t('開いて編集', 'Open & edit')}
           </Button>
-        ) : (
-          <Button onClick={() => ws.undoDiscard(current.day)}>{t('破棄を取り消す', 'Undo discard')}</Button>
         )}
         {done ? (
           finishButton
@@ -745,57 +848,89 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onFinish }:
       : inReview
         ? ws.unsavedCount === 0
           ? t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本。すべて決めました`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}. All decided`)
-          : t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本(保存していない案は、終えると破棄)`, `Saved ${ws.savedCount} of ${ws.reviewItems.length} (unsaved drafts are discarded)`)
+          : t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}`)
         : ''
 
   return (
-    <Dialog open={ws.open} modalType="modal" onOpenChange={(_, d) => !d.open && ws.close()}>
-      <DialogSurface className={s.surface} aria-label={t('まとめて作る', 'Create in bulk')}>
-        <div className={s.head}>
-          <AiIcon size={20} />
-          <h2 className={s.title}>{t('まとめて作る', 'Create in bulk')}</h2>
-          <span className={s.summary}>{`${weekText} ・ ${countryName} ・ ${channelName}`}</span>
-          <span className={s.spacer} />
-          <Button appearance="subtle" icon={<DismissRegular />} disabled={ws.running || ws.savingPlain} aria-label={t('閉じる', 'Close')} onClick={() => ws.close()} />
-        </div>
-        {stepper}
-        <div className={s.body}>
-          {ws.error && (
-            <MessageBar intent="error" layout="multiline" className={s.msg}>
-              <MessageBarBody>{ws.error}</MessageBarBody>
-            </MessageBar>
-          )}
-          {ws.step === 3 && !plainDone ? (
-            step3()
-          ) : (
-            <div className={s.withSide}>
-              {plainDone ? plainView() : ws.step === 1 ? step1() : step2()}
-              {side}
-            </div>
-          )}
-        </div>
-        <div className={s.foot}>
-          {back && (
-            <Button appearance="subtle" icon={<ArrowLeftRegular />} disabled={ws.running} onClick={() => ws.setStep(back as Step)}>
-              {t('戻る', 'Back')}
-            </Button>
-          )}
-          {/* ③: いま見ている案と、破棄(保存から離して、左に置く) */}
-          {inReview && current && (
-            <>
-              <span className={s.footCurrent}>{t(`${index + 1} / ${items.length} 本目 ・ ${current.card.name}`, `${index + 1} of ${items.length} · ${current.card.name}`)}</span>
-              {current.state === 'unsaved' && (
-                <Button appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => ws.discard(current.day)}>
-                  {t('破棄', 'Discard')}
-                </Button>
+    <>
+      <Dialog open={ws.open} modalType="modal" onOpenChange={(_, d) => !d.open && ws.close()}>
+        <DialogSurface className={s.surface} aria-label={t('まとめて作る', 'Create in bulk')}>
+          <div className={s.head}>
+            <AiIcon size={20} />
+            <h2 className={s.title}>{t('まとめて作る', 'Create in bulk')}</h2>
+            <span className={s.summary}>{`${weekText} ・ ${countryName} ・ ${channelName}`}</span>
+            <span className={s.spacer} />
+            <Button
+              appearance="subtle"
+              icon={<DismissRegular />}
+              disabled={ws.running || ws.savingPlain}
+              aria-label={t('閉じる', 'Close')}
+              onClick={() => {
+                finishRef.current = false
+                ws.close()
+              }}
+            />
+          </div>
+          {stepper}
+          <div className={s.body}>
+            {ws.error && (
+              <MessageBar intent="error" layout="multiline" className={s.msg}>
+                <MessageBarBody>{ws.error}</MessageBarBody>
+              </MessageBar>
+            )}
+            {ws.step === 3 && !plainDone ? (
+              step3()
+            ) : (
+              <div className={s.withSide}>
+                {plainDone ? plainView() : ws.step === 1 ? step1() : step2()}
+                {side}
+              </div>
+            )}
+          </div>
+          <div className={s.foot}>
+            {back && (
+              <Button appearance="subtle" icon={<ArrowLeftRegular />} disabled={ws.running} onClick={() => ws.setStep(back as Step)}>
+                {t('戻る', 'Back')}
+              </Button>
+            )}
+            {inReview && current && <span className={s.footCurrent}>{t(`${index + 1} / ${items.length} 本目 ・ ${current.card.name}`, `${index + 1} of ${items.length} · ${current.card.name}`)}</span>}
+            <span className={s.spacer} />
+            <span className={s.footHint}>{footHint}</span>
+            {actions()}
+          </div>
+        </DialogSurface>
+      </Dialog>
+      {/* 保存していない案があるまま閉じるとき。選ぶのは 2 つだけ(やめるときは × で、作業画面に戻る) */}
+      <Dialog open={ws.closeAsk} modalType="alert" onOpenChange={(_, d) => !d.open && ws.setCloseAsk(false)}>
+        <DialogSurface className={s.askSurface}>
+          <DialogBody>
+            <DialogTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('作業画面に戻る', 'Back to the workspace')} onClick={() => ws.setCloseAsk(false)} />}>
+              {t(`保存していない案が ${ws.unsavedCount} 本あります`, `${ws.unsavedCount} draft(s) not saved`)}
+            </DialogTitle>
+            <DialogContent>
+              {t(
+                '閉じる前に、残りの案をどうするか選んでください。保存した案は、下書き(未起案)になります。',
+                'Choose what to do with the remaining drafts. Saved drafts become regular drafts (Not started).',
               )}
-            </>
-          )}
-          <span className={s.spacer} />
-          <span className={s.footHint}>{footHint}</span>
-          {actions()}
-        </div>
-      </DialogSurface>
-    </Dialog>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" icon={<DeleteRegular />} disabled={!!ws.savingDay} onClick={afterAsk}>
+                {t('破棄して閉じる', 'Discard and close')}
+              </Button>
+              <Button
+                appearance="primary"
+                icon={ws.savingDay ? <Spinner size="tiny" /> : <SaveRegular />}
+                disabled={!!ws.savingDay}
+                onClick={async () => {
+                  if (await ws.saveAll()) afterAsk()
+                }}
+              >
+                {t('まとめて保存して閉じる', 'Save all and close')}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+    </>
   )
 }

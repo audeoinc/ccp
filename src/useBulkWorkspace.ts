@@ -15,6 +15,9 @@ import { channelOptions, departmentOptions, CHANNEL_EMAIL } from './status'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { sundayOf } from './weekLock'
 import { tr } from './i18n'
+import { DeliveryCardsService } from './data/deliveryCards'
+import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { Progress } from './useWeekFrames'
 
@@ -42,6 +45,13 @@ export interface Row {
   nameReason?: string
   /** 種類も AI の案で入れたか(人が選び直すと消える) */
   typeByAi?: boolean
+}
+
+/** 配信カードで開く、まだ保存していない案(配信カードは、新規作成として中身まで入れて開く) */
+export interface BulkDraft {
+  card: DeliveryCard
+  items: Item[]
+  candidates: Candidate[]
 }
 
 /** ③ で確かめる 1 本。保存する前は、仮の id の配信カード(previewCard) */
@@ -78,6 +88,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const [savedIds, setSavedIds] = useState<Map<string, string>>(new Map())
   const [discarded, setDiscarded] = useState<Set<string>>(new Set())
   const [savingDay, setSavingDay] = useState<string | null>(null)
+  // 保存していない案があるまま閉じようとしたときの、閉じるダイアログ
+  const [closeAsk, setCloseAsk] = useState(false)
   // 中身を作らずに保存した配信(日 → 配信カードの id)。1 本ずつ新規作成して、中身を入れずに保存したのと同じ
   const [plain, setPlain] = useState<Map<string, string>>(new Map())
   const [savingPlain, setSavingPlain] = useState(false)
@@ -133,6 +145,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setDiscarded(new Set())
     setPlain(new Map())
     setCheckDay(null)
+    setCloseAsk(false)
     setError(null)
     setPlan(null)
     setStep(1)
@@ -175,13 +188,51 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const compareProducts = new Map(cardProducts)
   for (const x of reviewItems) if (x.state === 'unsaved') compareProducts.set(x.card.id, x.productIds)
 
+  // ---- 週の中での重なり(週の確認の一覧 W4 と同じ見方を、保存する前の案にも当てる)
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+  const inThisWeek = (iso?: string) => !!iso && new Date(iso) >= weekStart && new Date(iso) < weekEnd
+  /** この週の配信と、まだ保存していない案(破棄したものは除く) */
+  const weekCards = compareCards.filter((c) => inThisWeek(c.scheduled_at))
+  /** 商品ごとの、この週に載せる配信の数(もうある配信・保存した案・保存していない案のすべて) */
+  const weekUse = new Map<string, number>()
+  for (const c of weekCards) for (const pid of new Set(compareProducts.get(c.id) ?? [])) weekUse.set(pid, (weekUse.get(pid) ?? 0) + 1)
+  const norm = (s?: string | null) => (s ?? '').trim().replace(/\s+/g, ' ')
+  /** 案ごとの、週の中での気になる点(上限を超えた商品・同じテーマ・同じメイン画像の配信) */
+  function issuesOf(x: ReviewItem): { over: string[]; sameTheme: string[]; sameHero: string[] } {
+    if (x.state === 'discarded') return { over: [], sameTheme: [], sameHero: [] }
+    const others = weekCards.filter((c) => c.id !== x.card.id)
+    return {
+      over: [...new Set(x.productIds)].filter((pid) => (weekUse.get(pid) ?? 0) > WEEKLY_PRODUCT_LIMIT),
+      sameTheme: norm(x.card.theme) ? others.filter((c) => norm(c.theme) === norm(x.card.theme)).map((c) => c.name) : [],
+      sameHero: x.card.hero_image_id ? others.filter((c) => c.hero_image_id === x.card.hero_image_id).map((c) => c.name) : [],
+    }
+  }
+
+  /**
+   * 保存していない案の商品を、ほかの商品に差し替える(週の上限を超えた商品など)。
+   * 配信カードのアラートへの対応(X30)の差し替えと同じく、候補から選んで置き換え、確定は「保存」で行う
+   */
+  function replace(day: string, fromId: string, to: { id: string; reason: string }) {
+    const r = results.get(day)
+    if (!r || savedIds.has(day)) return
+    const sections = r.sections.map((s) => ({
+      ...s,
+      selected: s.selected.map((x) => (x.productId === fromId ? { ...x, productId: to.id, reason: to.reason || x.reason } : x)),
+      candidates: s.candidates.filter((x) => x.productId !== to.id),
+    }))
+    setResults((m) => new Map(m).set(day, { ...r, sections }))
+  }
+
   /** 閉じる。まだ保存していない入力・案があれば確かめる(保存したものは、消えない)。閉じたら true */
   function close(): boolean {
     if (running || savingPlain || savingDay) return false
     const lostRows = targets.some((d) => !results.has(d) && !savedIds.has(d) && !plain.has(d) && !discarded.has(d) && (rowOf(d).name.trim() || rowOf(d).themeType))
+    // 保存していない案があるときは、閉じるダイアログ(まとめて保存して閉じる / 破棄して閉じる)で決めてもらう
     if (unsavedCount > 0) {
-      if (!window.confirm(tr(`保存していない ${unsavedCount} 本の案は、破棄されます。閉じますか?`, `${unsavedCount} unsaved draft(s) will be discarded. Close anyway?`))) return false
-    } else if (lostRows && !window.confirm(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?'))) return false
+      setCloseAsk(true)
+      return false
+    }
+    if (lostRows && !window.confirm(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?'))) return false
     setOpen(false)
     return true
   }
@@ -387,11 +438,78 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       setSavingDay(null)
     }
   }
-  /** ③ 破棄: この案は保存しない(破棄を取り消して、保存し直すこともできる) */
-  function discard(day: string) {
+  /** ③ まとめて保存: まだ保存も破棄もしていない案を、すべて保存する(途中で切り上げるとき) */
+  async function saveAll(): Promise<boolean> {
+    const list = reviewItems.filter((x) => x.state === 'unsaved').map((x) => x.day)
+    setError(null)
+    for (const day of list) {
+      const r = results.get(day)
+      if (!r) continue
+      setSavingDay(day)
+      try {
+        const card = await createDraft(baseOf(day), r, products, false)
+        setSavedIds((m) => new Map(m).set(day, card.id))
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        setSavingDay(null)
+        await onChanged()
+        return false
+      }
+    }
+    setSavingDay(null)
+    await onChanged()
+    return true
+  }
+
+  /**
+   * ③ 破棄: この案は保存しない(破棄を取り消して、保存し直すこともできる)。
+   * 保存したあとの案は、保存した配信カードを消す(作業画面で作ったばかりの下書きなので、取りやめではなく削除)
+   */
+  async function discard(day: string) {
+    const id = savedIds.get(day)
+    if (id) {
+      if (!window.confirm(tr('保存したこの配信を消して、破棄します。よろしいですか?', 'Delete this saved delivery and discard it?'))) return
+      setError(null)
+      setSavingDay(day)
+      try {
+        await DeliveryCardsService.delete(id)
+        setSavedIds((m) => {
+          const n = new Map(m)
+          n.delete(day)
+          return n
+        })
+        await onChanged()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        return
+      } finally {
+        setSavingDay(null)
+      }
+    }
     setDiscarded((s) => new Set(s).add(day))
     setCheckDay(nextUnsaved(day) ?? day)
   }
+
+  /** 配信カードで開いて直すための、保存していない案(配信カードは、この中身を新規作成として開く。保存したら markSaved) */
+  function draftFor(day: string): BulkDraft | null {
+    const r = results.get(day)
+    if (!r) return null
+    const items: Item[] = r.sections.flatMap((s) => s.selected).map((x, i) => ({ key: `ai-${day}-${i}`, productId: x.productId, reason: x.reason, source: SOURCE_AI }))
+    const candidates: Candidate[] = r.sections.flatMap((s, si) => s.candidates.map((x, i) => ({ key: `ai-${day}-c${si}-${i}`, productId: x.productId, reason: x.reason, source: SOURCE_AI, section: si })))
+    return { card: previewCard(draftId(day), baseOf(day), r, products), items, candidates }
+  }
+  /** 配信カードで保存された(その案は、保存済みにする) */
+  function markSaved(day: string, id: string) {
+    setSavedIds((m) => new Map(m).set(day, id))
+    setDiscarded((s) => {
+      const n = new Set(s)
+      n.delete(day)
+      return n
+    })
+    setCheckDay(nextUnsaved(day) ?? day)
+  }
+  /** 確かめずに閉じる(閉じるダイアログで、決めたあと) */
+  const closeNow = () => setOpen(false)
   function undoDiscard(day: string) {
     setDiscarded((s) => {
       const n = new Set(s)
@@ -439,9 +557,18 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     savedIds,
     compareCards,
     compareProducts,
+    weekUse,
+    issuesOf,
+    replace,
     savingDay,
     save,
     discard,
+    saveAll,
+    draftFor,
+    markSaved,
+    closeNow,
+    closeAsk,
+    setCloseAsk,
     undoDiscard,
     plainReady,
     savePlainAll,

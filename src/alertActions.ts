@@ -108,7 +108,7 @@ export function replacementCandidates(args: { card: DeliveryCard; removed: Produ
 }
 
 const REPLACE_PROMPT = `あなたは、ファッション通販の配信(メール・プッシュ)の企画を手伝うアシスタントです。
-配信に載せていた商品(removed)が、在庫が持たない見込みになりました。下の「入力」の candidates(在庫のある、同じカテゴリの商品)から、
+配信に載せていた商品(removed)を、ほかの商品に差し替えます(差し替える理由は、入力の why)。下の「入力」の candidates(在庫のある、同じカテゴリの商品)から、
 差し替えにふさわしいものを 3 つまで選び、JSON だけで返してください。
 
 # 出力の形式(厳守)
@@ -125,7 +125,8 @@ const REPLACE_PROMPT = `あなたは、ファッション通販の配信(メー�
 `
 
 /** AI に差し替えの候補を選んでもらう。AI が使えないときは、在庫に余裕があり、訴求の少ない順に 3 つ */
-export async function suggestReplacements(args: { card: DeliveryCard; removed: Product; candidates: ReplacementCandidate[] }): Promise<{ c: ReplacementCandidate; reason: string }[]> {
+/** why は差し替える理由(在庫のアラートでは、在庫が持たない見込み。作業画面では、週の上限を超えた) */
+export async function suggestReplacements(args: { card: DeliveryCard; removed: Product; candidates: ReplacementCandidate[]; why?: string }): Promise<{ c: ReplacementCandidate; reason: string }[]> {
   const { card, removed, candidates } = args
   const byRule = () =>
     [...candidates]
@@ -135,6 +136,7 @@ export async function suggestReplacements(args: { card: DeliveryCard; removed: P
   if (candidates.length === 0) return []
   const parsed = (await askAgent(REPLACE_PROMPT, {
     task: 'suggest_replacements',
+    why: args.why ?? '在庫が持たない見込み',
     delivery: { name: card.name, theme: card.theme, date: (card.scheduled_at ?? '').slice(0, 10) },
     removed: { name: removed.name, price: removed.price, category: removed.category },
     candidates: candidates.map((c) => ({

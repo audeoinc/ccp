@@ -70,6 +70,12 @@ interface Props {
   card?: DeliveryCard
   /** 新規作成のときだけ使う */
   defaults?: NewCardDefaults
+  /**
+   * 新規作成で、中身まで入れて開く(まとめて作る作業画面の、まだ保存していない AI の案)。
+   * 保存すると新しい配信カードになり、onCreated で id を返す(作業画面が、その案を保存済みにする)
+   */
+  draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[] }
+  onCreated?: (id: string) => void
   products: Product[]
   heroes: HeroImage[]
   /** 他の配信で使われているテーマ(テーマ案の重複回避用) */
@@ -405,13 +411,13 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
-  const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
-  const [items, setItems] = useState<Item[]>([])
+  const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
+  const [items, setItems] = useState<Item[]>(() => draft?.items ?? [])
   // 選定候補(配信商品テーブルの「候補」の行。セクションごと)
-  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [candidates, setCandidates] = useState<Candidate[]>(() => draft?.candidates ?? [])
   // 読み込み時点の配信商品(保存時に差分を取る)。読み込めなかったときは保存で消さないよう null のまま
   const [original, setOriginal] = useState<Map<string, RowSnap> | null>(card ? null : new Map())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -1022,6 +1028,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
       const cardId = card?.id ?? res.data?.id
       if (!cardId) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
       if (original) await syncItems(cardId, form.name, original)
+      // 作業画面の案を、ここで新規作成として保存した(作業画面で、その案を保存済みにする)
+      if (!card) onCreated?.(cardId)
       if (reason !== undefined) {
         const now = new Date().toISOString()
         for (const w of lockedWeeks) {
@@ -1081,7 +1089,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
 
   return (
     <Dialog open onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
-      <DialogSurface ref={surfaceRef} className={styles.surface} style={sizeStyle} aria-label={card ? card.name : t('配信カードの新規作成', 'New delivery card')}>
+      <DialogSurface ref={surfaceRef} className={styles.surface} style={sizeStyle} aria-label={card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}>
         <ResizeHandles
           onResize={resizeDialog}
           onDone={() =>
@@ -1120,7 +1128,7 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
           <div className={styles.titleRow}>
             {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
             <ChannelBadge channel={form.channel} />
-            <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
+            <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
             <Tooltip
               relationship="description"
               content={progress.remaining.length ? t(`未完了: ${progress.remaining.join('、')}`, `Incomplete: ${progress.remaining.join(', ')}`) : t('すべての工程が完了しています', 'All steps are complete')}

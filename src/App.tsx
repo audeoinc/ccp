@@ -95,7 +95,7 @@ import { FrameBar } from './FrameBar'
 import { FrameCard } from './FrameCard'
 import { CheckDrawer } from './CheckDrawer'
 import { useWeekFrames } from './useWeekFrames'
-import { useBulkWorkspace } from './useBulkWorkspace'
+import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
@@ -418,6 +418,8 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
+  // まとめて作る作業画面の、まだ保存していない案を、配信カードで開いているとき(保存すると新規作成になる)
+  const [draftOpen, setDraftOpen] = useState<{ day: string; draft: BulkDraft } | null>(null)
 
   // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
   // 配信カードごとの掲載商品(メールの並び順の商品 ID。候補の行は入れない)。数は、一覧の「商品数」「工程」と、締め切りの警告に使う
@@ -1487,12 +1489,28 @@ function App() {
         <AlertsPage initialProductId={alertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
       {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
-      <BulkWorkspace ws={bulk} cards={activeCards} products={products} heroes={heroes} onOpen={setSelectedId} onFinish={(d) => goTo('week', d)} />
-      {(selected || creating) && (
+      <BulkWorkspace
+        ws={bulk}
+        cards={activeCards}
+        products={products}
+        heroes={heroes}
+        onOpen={setSelectedId}
+        onOpenDraft={(day) => {
+          const draft = bulk.draftFor(day)
+          if (draft) setDraftOpen({ day, draft })
+        }}
+        onFinish={(d) => goTo('week', d)}
+        model={alertState.model}
+      />
+      {(selected || creating || draftOpen) && (
         <CardDetail
-          key={selected?.id ?? 'new'}
+          key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
           defaults={creating ?? undefined}
+          draft={selected ? undefined : draftOpen?.draft}
+          onCreated={(id) => {
+            if (draftOpen) bulk.markSaved(draftOpen.day, id)
+          }}
           products={products}
           heroes={heroes}
           otherThemes={cards.filter((c) => c.id !== selected?.id && c.theme).map((c) => c.theme!)}
@@ -1502,6 +1520,7 @@ function App() {
             setFocusProduct(undefined)
             setSelectedId(null)
             setCreating(null)
+            setDraftOpen(null)
             // 質問・返信は、保存を待たずに書き込むので、閉じたときにも読み直す
             void load()
           }}
@@ -1516,6 +1535,7 @@ function App() {
             setFocusProduct(undefined)
             setSelectedId(null)
             setCreating(null)
+            setDraftOpen(null)
             setAlertsFocus(productId)
             setAlertsOpen(true)
           }}
