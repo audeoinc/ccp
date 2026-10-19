@@ -31,6 +31,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
+import { ChannelBadge } from './ChannelBadge'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
@@ -310,7 +311,7 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
   },
   overlayBar: { width: '320px' },
-  titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '12px 12px 12px 24px', backgroundColor: tokens.colorNeutralBackground1 },
+  titleRow: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '12px 12px 12px 24px', backgroundColor: tokens.colorNeutralBackground1 },
   titleText: { flexGrow: 1, minWidth: 0 },
   panes: {
     flexGrow: 1,
@@ -1076,6 +1077,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </div>
           )}
           <div className={styles.titleRow}>
+            {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
+            <ChannelBadge channel={form.channel} />
             <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
             <Tooltip
               relationship="description"
