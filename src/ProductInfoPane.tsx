@@ -19,12 +19,36 @@ interface Props {
   onHover: (key: string | null) => void
   /** アラートのある商品(商品 ID → いちばん強い種類)。商品名の前に印を付ける */
   alertKinds?: Map<string, CardAlertKind>
+  /** 商品のアラートの印を押したとき(その商品のアラートへの対応を開く) */
+  onAlert?: (productId: string) => void
 }
 
 /** 在庫が少ないとみなす数(AI の商品選定の基準と同じ) */
 const LOW_STOCK = 50
 
+// アラートのラベルの色(配信カードの上の帯の種類の札と同じ)
+const ALERT_BG: Record<CardAlertKind, string> = {
+  outOfStock: tokens.colorPaletteRedBackground3,
+  lowStock: tokens.colorPaletteDarkOrangeBackground3,
+  policyChanged: tokens.colorPalettePurpleBackground2,
+  dateChanged: tokens.colorPaletteBlueBackground2,
+}
+
 const useStyles = makeStyles({
+  alertChip: {
+    justifySelf: 'start',
+    width: 'fit-content',
+    marginTop: '2px',
+    padding: '0 7px',
+    height: '18px',
+    border: 'none',
+    borderRadius: tokens.borderRadiusCircular,
+    color: '#ffffff',
+    fontFamily: 'inherit',
+    fontSize: '11px',
+    fontWeight: tokens.fontWeightSemibold,
+    cursor: 'pointer',
+  },
   root: { display: 'grid', rowGap: '10px', minWidth: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -75,7 +99,7 @@ function trendMark(name?: string): { mark: string; color: string } {
  * 行を押すと、詳細がフロートで開く(今後は、売上・在庫の推移などのグラフもここに載せる)。
  * 操作(選ぶ・並べ替え・直す)は、中ペインで行う。ここには、操作する部品を置かない。
  */
-export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds }: Props) {
+export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert }: Props) {
   const t = useT()
   const s = useStyles()
   const productById = new Map(products.map((p) => [p.id, p]))
@@ -105,7 +129,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
             <div className={s.list}>
               {list.map((it) => {
                 const p = productById.get(it.productId)
-                return p ? <ProductItem key={it.key} product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} /> : null
+                return p ? <ProductItem key={it.key} product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} /> : null
               })}
             </div>
           </section>
@@ -115,7 +139,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
   )
 }
 
-function ProductItem({ product: p, itemKey, onHover, alert }: { product: Product; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind }) {
+function ProductItem({ product: p, itemKey, onHover, alert, onAlert }: { product: Product; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind; onAlert?: (productId: string) => void }) {
   const t = useT()
   const s = useStyles()
   const market = productMarket(p)
@@ -135,9 +159,24 @@ function ProductItem({ product: p, itemKey, onHover, alert }: { product: Product
           <Avatar shape="square" image={{ src: productImage(p), alt: p.name }} name={p.name} className={s.avatar} />
           <div className={s.main}>
             <Text size={200} weight="semibold" className={s.name}>
-              <AlertMark kind={alert} />
+              {!onAlert && <AlertMark kind={alert} />}
               {p.name}
             </Text>
+            {/* アラートのある商品は、種類のラベル(押すと、そのアラートへの対応を開く。行のクリック = 商品の詳しい情報 とは分ける) */}
+            {alert && onAlert && (
+              <button
+                type="button"
+                className={s.alertChip}
+                style={{ backgroundColor: ALERT_BG[alert] }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAlert(p.id)
+                }}
+                title={t('このアラートへの対応を開く', 'Handle this alert')}
+              >
+                {{ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date') }[alert]}
+              </button>
+            )}
             <span className={s.sub}>
               {p.product_code} ・ {yen(p.price, market)} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
             </span>

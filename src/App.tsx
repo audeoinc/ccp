@@ -491,6 +491,8 @@ function App() {
   }
   // アラートは、面ではなく、上に重ねて開くフロート(閉じれば、見ていた画面に戻る)
   const [alertsOpen, setAlertsOpen] = useState(false)
+  // アラートのフロートを開いたときに選んでおく商品(配信カードの「アラートの画面で詳しく」から)
+  const [alertsFocus, setAlertsFocus] = useState<string | undefined>(undefined)
   // この週の承認の履歴(「この画面 ▾」から開く)
   const [historyOpen, setHistoryOpen] = useState(false)
   const showFace = (p: 'calendar' | 'results' | 'alerts') => {
@@ -1479,8 +1481,8 @@ function App() {
       </div>
       {/* アラート(フロート)。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
       <WeekHistory open={historyOpen} onClose={() => setHistoryOpen(false)} events={weekEvents} />
-      <AlertsFloat open={alertsOpen} onClose={() => setAlertsOpen(false)}>
-        <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+      <AlertsFloat open={alertsOpen} onClose={() => { setAlertsOpen(false); setAlertsFocus(undefined) }}>
+        <AlertsPage initialProductId={alertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
       {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
       <BulkWorkspace ws={bulk} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} onFinish={(d) => goTo('week', d)} />
@@ -1506,6 +1508,15 @@ function App() {
           onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
           alerts={selected ? cardAlerts.get(selected.id) : undefined}
           focusProductId={focusProduct}
+          stockModel={alertState.model}
+          // 配信カードの中の「アラートの画面で詳しく」: 配信カードを閉じて、その商品のアラートを選んだアラートのフロートを開く
+          onOpenAlerts={(productId) => {
+            setFocusProduct(undefined)
+            setSelectedId(null)
+            setCreating(null)
+            setAlertsFocus(productId)
+            setAlertsOpen(true)
+          }}
           next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}
           onNext={() => {
             if (!nextOf) return

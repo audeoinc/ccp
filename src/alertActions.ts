@@ -12,6 +12,7 @@ import { logEvent, myName } from './history'
 import { tr } from './i18n'
 import { confirmedWeekOf } from './weekLock'
 import { statusRank } from './status'
+import { LOW_STOCK_WEEKS, type StockModel } from './alerts'
 
 const STATUS_REVIEW = 'reviewing'
 const STATUS_APPROVED = 'approved'
@@ -88,6 +89,22 @@ export interface ReplacementCandidate {
   projected: number
   thisWeek: number
   lastWeek: number
+}
+
+/**
+ * 差し替えの候補: 配信の国の市場の、同じカテゴリの商品で、配信日に在庫が持つもの(この配信に載っている商品は除く)。
+ * アラートの画面の差し替えと、配信カードの中での差し替えで、同じ決め方を使う
+ */
+export function replacementCandidates(args: { card: DeliveryCard; removed: Product; products: Product[]; model: StockModel; inCard: Set<string>; when: string }): ReplacementCandidate[] {
+  const { card, removed, products, model, inCard, when } = args
+  const market = card.country === 'US' ? 'US' : 'JP'
+  return products
+    .filter((p) => p.market === market && p.category === removed.category && !inCard.has(p.id))
+    .map((p) => {
+      const { projected, weeksLeft } = model.projectAt(p, when, card.id)
+      return { product: p, projected, weeksLeft, ...model.exposures(p.id, when) }
+    })
+    .filter((c) => c.projected - model.upliftOf(c.product) > 0 && (c.weeksLeft === undefined || c.weeksLeft >= LOW_STOCK_WEEKS))
 }
 
 const REPLACE_PROMPT = `あなたは、ファッション通販の配信(メール・プッシュ)の企画を手伝うアシスタントです。

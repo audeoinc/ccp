@@ -19,12 +19,13 @@ const useStyles = makeStyles({
   // たたんでいるときの要約(種類ごとの件数)
   summary: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   toggle: { marginLeft: 'auto' },
-  item: { display: 'flex', alignItems: 'baseline', columnGap: '8px', fontSize: tokens.fontSizeBase200, flexWrap: 'wrap' },
+  item: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase200, flexWrap: 'wrap' },
   kind: { flexShrink: 0, padding: '0 6px', borderRadius: '8px', color: '#fff', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   name: { fontWeight: tokens.fontWeightSemibold },
   link: { border: 'none', background: 'none', padding: 0, font: 'inherit', fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1, textDecoration: 'underline', cursor: 'pointer' },
   on: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px', borderRadius: '2px' },
   detail: { color: tokens.colorNeutralForeground2 },
+  act: { minWidth: 'auto', height: '22px', padding: '0 8px' },
 })
 
 const KIND_BG: Record<CardAlertKind, string> = {
@@ -40,6 +41,8 @@ interface Props {
   selectedProductId?: string
   /** 商品名を押したとき: 配信カードで、その商品を選ぶ */
   onSelectProduct: (productId: string) => void
+  /** 「対応する」を押したとき(このアラートへの対応を開く) */
+  onAct?: (alert: CardAlert) => void
   /** 最初から開いておくか(アラートの画面から開いたとき)。ふだんは、たたんで 1 行だけ(画面の縦を取りすぎないように) */
   defaultOpen?: boolean
 }
@@ -48,7 +51,7 @@ interface Props {
  * 配信カードの「この配信のアラート」。ふだんは 1 行にたたみ(種類ごとの件数だけ)、「見る」で、どの商品にどんな問題があるかを出す。
  * アラートの画面から開いたときは、最初から開いておく。商品名を押すと、その商品を選び、プレビューのその枠に移る
  */
-export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, defaultOpen = false }: Props) {
+export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAct, defaultOpen = false }: Props) {
   const styles = useStyles()
   const t = useT()
   const [open, setOpen] = useState(defaultOpen)
@@ -79,13 +82,24 @@ export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, defa
         <span key={`${a.kind}:${a.productId ?? ''}:${i}`} className={styles.item}>
           <span className={styles.kind} style={{ backgroundColor: KIND_BG[a.kind] }}>{kindLabel(a.kind)}</span>
           {a.productId ? (
-            <button type="button" className={mergeClasses(styles.link, a.productId === selectedProductId && styles.on)} onClick={() => onSelectProduct(a.productId!)} title={t('この商品を選んで、プレビューで見る', 'Select this product and show it in the preview')}>
+            <button type="button" className={mergeClasses(styles.link, a.productId === selectedProductId && styles.on)} onClick={() => {
+                // 商品を選んでプレビューで見せ、対応できるときは、そのまま「このアラートへの対応」も開く
+                onSelectProduct(a.productId!)
+                onAct?.(a)
+              }}
+              title={onAct ? t('この商品を選んで、このアラートへの対応を開く', 'Select this product and handle this alert') : t('この商品を選んで、プレビューで見る', 'Select this product and show it in the preview')}
+            >
               {a.label}
             </button>
           ) : (
             <span className={styles.name}>{a.label}</span>
           )}
           <span className={styles.detail}>{a.detail}</span>
+          {onAct && (
+            <Button size="small" appearance="secondary" className={styles.act} onClick={() => onAct(a)}>
+              {t('対応する', 'Handle')}
+            </Button>
+          )}
         </span>
       ))}
     </div>

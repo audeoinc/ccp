@@ -102,6 +102,8 @@ interface Props {
   onOpenAlertCard?: (cardId: string, productId?: string) => void
   /** 差し替え・延期のあと、配信カードを読み直す(アラートも計算し直す) */
   onChanged: () => Promise<void>
+  /** 開いたときに選んでおく、アラートの商品(配信カードの「アラートの画面で詳しく」から) */
+  initialProductId?: string
 }
 
 const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: tokens.colorPaletteDarkOrangeBorderActive, policyChanged: tokens.colorPalettePurpleBorderActive, dateChanged: tokens.colorPaletteBlueBorderActive }
@@ -110,10 +112,17 @@ const KIND_COLOR = { outOfStock: tokens.colorPaletteRedBorderActive, lowStock: t
  * アラートの画面(ワイヤーフレーム 12)。左に、配信に影響する変更(いまは在庫切れ・在庫僅少)の一覧。
  * 選ぶと、右に、影響を受ける、まだ送っていない配信と、商品が載っている場所、配信日の在庫の見込みを出す
  */
-export function AlertsPage({ onOpenAlertCard, alerts, changeAlerts, onResolve, settings, owners, logs, cards, products, heroes, cardProducts, placements, model, weeks, onOpenCard, onChanged }: Props) {
+export function AlertsPage({ initialProductId, onOpenAlertCard, alerts, changeAlerts, onResolve, settings, owners, logs, cards, products, heroes, cardProducts, placements, model, weeks, onOpenCard, onChanged }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const alertIdOf = (productId?: string) => (productId ? (alerts.find((a) => a.product.id === productId)?.id ?? changeAlerts.find((a) => a.product?.id === productId)?.id ?? null) : null)
+  const [selectedId, setSelectedId] = useState<string | null>(() => alertIdOf(initialProductId))
+  // アラートのフロートを開いたまま、配信カードの「アラートの画面で詳しく」から来たときも、その商品のアラートを選び直す
+  const [seenFocus, setSeenFocus] = useState(initialProductId)
+  if (initialProductId !== seenFocus) {
+    setSeenFocus(initialProductId)
+    if (initialProductId) setSelectedId(alertIdOf(initialProductId))
+  }
   // 選んでいるアラート(在庫か、変更のどちらか)。選んでいなければ、一覧のいちばん上
   const selectedChangeById = changeAlerts.find((a) => a.id === selectedId)
   const selected = selectedChangeById ? undefined : (alerts.find((a) => a.id === selectedId) ?? alerts[0])

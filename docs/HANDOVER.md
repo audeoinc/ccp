@@ -371,6 +371,13 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 残したもの: `server/ccp/legacy_names.json`(以前の名前 `cr854_…` からの移行の表)。利用先の DB が古い名前のときに要るかもしれないので、外していない(外すかは利用者の判断)。
 - 渡した版: まだない(最初の ZIP は利用者が受け取ってから、ここに版を書く)。
 
+## 6.23 X30 配信カードの中でアラートに対応する(2026-10-19、UI セッション)
+
+- 帯の商品名・「対応する」(`src/CardAlertsBar.tsx`)、プレビューの商品の枠の札(`src/ItemAlertOverlay.tsx`。リンク先の番号と同じく `[data-item-key]` を測って重ねる)、商品情報の行の札(`src/ProductInfoPane.tsx` の `onAlert`)の、どこからでも同じパネル `src/CardAlertAction.tsx` を開く。
+- 差し替えは、アラートの画面(裏で保存する)とは分け、**配信カードの中で置き換えて保存で確定**にした(書きかけの内容と食い違わないように)。理由は保存のときに配信のメモ(kind change)に残す。候補は `alertActions.ts` の `replacementCandidates`(アラートの画面と同じ条件)。
+- **落とし穴**: 保存(`syncItems`)は、行 ID のある掲載商品の `product_id` を書き換えない。商品を差し替えるときは、行 ID(`rowId`)を外して新しい行にすること(元の行は消える)。
+- 差し替えた商品のアラートは、保存の前でも帯・札から消す(`liveAlerts`)。「アラートの画面で詳しく」は配信カードを閉じ、`AlertsPage` の `initialProductId` で、その商品のアラートを選んで開く(フロートが開いたままでも選び直す)。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

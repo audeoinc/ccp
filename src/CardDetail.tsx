@@ -49,7 +49,7 @@ import { useAiDrafts } from './useAiDrafts'
 import { WeeksService, type WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf } from './weekLock'
-import { logEvent } from './history'
+import { logEvent, myName } from './history'
 import { ProcessPane, ProcessRail, type TalkTab } from './ProcessPane'
 import type { TopTab } from './ContentPane'
 import { ApprovalsService } from './data/approvals'
@@ -57,6 +57,9 @@ import { CHANNEL_PUSH, channelOptions, countryOptions, departmentOptions, status
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
+import { CardAlertAction } from './CardAlertAction'
+import { ItemAlertOverlay } from './ItemAlertOverlay'
+import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
@@ -83,6 +86,10 @@ interface Props {
   alerts?: CardAlert[]
   /** 開いたときに選んでおく商品(アラートの画面から開いたとき。問題の商品を、プレビューで強調する) */
   focusProductId?: string
+  /** 在庫の見込み(アラートへの対応で、差し替えの候補を選ぶのに使う) */
+  stockModel?: StockModel
+  /** アラートの画面を開く(その商品のアラートを選んで。配信カードは閉じる) */
+  onOpenAlerts?: (productId?: string) => void
   /** 「保存して次へ」で開く配信(同じ週、または週の確認の項目で選んだ配信の、次の 1 本)。null は次がない。undefined はボタンを出さない */
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
@@ -398,7 +405,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, next, onNext }: Props) {
+export function CardDetail({ card, defaults, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : { ...toForm(), ...defaults }))
@@ -943,6 +950,41 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
   const approvedBefore = !!card && statusRank(savedStatus) >= statusRank(STATUS_APPROVED)
   // 開いた時点から内容が変わったか(承認・依頼の前に、保存してもらうため。基準は ref なので、描画の中では読まず、関数で渡す)
   const isDirty = () => baseline.current !== null && baseline.current !== contentKey()
+  // ---- アラートへの対応(上の帯・プレビューの商品の枠・商品情報の行から開く。差し替えは、この配信カードの中で置き換えて、保存で確定)
+  const [actAlert, setActAlert] = useState<CardAlert | null>(null)
+  // 差し替えた理由(保存したときに、配信のメモ(種類 change)に残す。アラートの画面で差し替えたときと同じ記録)
+  const [alertNotes, setAlertNotes] = useState<string[]>([])
+  // 商品ごとの、いちばん強いアラート(商品の枠の印・商品情報のラベルに使う)
+  const alertByProduct = new Map<string, CardAlert>()
+  // 差し替えなどでこの配信から外した商品のアラートは、保存の前でも出さない(保存すると、アラートは計算し直される)
+  const liveAlerts = alerts.filter((a) => !a.productId || items.some((i) => i.productId === a.productId))
+  for (const k of CARD_ALERT_ORDER.slice().reverse()) for (const a of liveAlerts) if (a.kind === k && a.productId) alertByProduct.set(a.productId, a)
+  const itemAlertKinds = new Map(items.filter((i) => alertByProduct.has(i.productId)).map((i) => [i.key, alertByProduct.get(i.productId)!.kind] as const))
+  const openAlertFor = (productId: string) => {
+    const a = alertByProduct.get(productId)
+    if (a) setActAlert(a)
+  }
+  const replaceForAlert = (alert: CardAlert, to: Product) => {
+    const from = products.find((p) => p.id === alert.productId)
+    // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
+    setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
+    setAlertNotes((prev) => [...prev, tr(`${from?.name ?? alert.label}: ${alert.detail}。${to.name} に差し替えた`, `${from?.name ?? alert.label}: ${alert.detail}. Replaced with ${to.name}.`)])
+    setActAlert(null)
+  }
+  const postponeForAlert = () => {
+    setActAlert(null)
+    // 左の配信日時の欄へ移って、光らせる(延期も、ここで直して保存する)
+    window.setTimeout(() => {
+      const input = surfaceRef.current?.querySelector<HTMLInputElement>('input[type="datetime-local"]')
+      input?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      input?.focus()
+    }, 50)
+  }
+  const openAlertsScreen = (productId?: string) => {
+    if (isDirty() && !window.confirm(tr('保存していない変更があります。破棄して、アラートの画面を開きますか?', 'You have unsaved changes. Discard them and open the Alerts screen?'))) return
+    setActAlert(null)
+    onOpenAlerts?.(productId)
+  }
   // 開いてから内容を変えたか(承認済み・確定した週の帯は、変えたときだけ出す。ふだんの説明は、右のプロセスのペインの状態の下)
   const [changed, setChanged] = useState(false)
   const currentKey = contentKey()
@@ -1008,6 +1050,11 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
           to: fields.status,
           note: reason?.trim(),
         })
+      }
+      // アラートへの対応で差し替えた理由を、配信のメモ(種類 change)に残す
+      if (cardId && alertNotes.length > 0) {
+        for (const body of alertNotes) await CardNotesService.create({ kind: 'change', body, author: myName() || form.owner || '', delivery_card_id: cardId })
+        setAlertNotes([])
       }
       await onSaved()
       goNextRef.current = false
@@ -1146,10 +1193,26 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
             </MessageBar>
           )}
 
+          {actAlert && card && (
+            <CardAlertAction
+              alert={actAlert}
+              product={products.find((p) => p.id === actAlert.productId)}
+              card={card}
+              scheduledAt={form.scheduledAt}
+              inCard={new Set(items.map((i) => i.productId))}
+              products={products}
+              model={stockModel}
+              onReplace={(to) => replaceForAlert(actAlert, to)}
+              onPostpone={postponeForAlert}
+              onOpenAlerts={() => openAlertsScreen(actAlert.productId)}
+              onClose={() => setActAlert(null)}
+            />
+          )}
           {/* この配信のアラート(在庫・方針・日程)。ふだんは 1 行にたたむ。アラートの画面から開いたときは、開いておく */}
-          {alerts.length > 0 && (
+          {liveAlerts.length > 0 && (
             <CardAlertsBar
-              alerts={alerts}
+              alerts={liveAlerts}
+              onAct={card ? setActAlert : undefined}
               defaultOpen={!!focusProductId}
               selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
               onSelectProduct={(pid) => {
@@ -1402,6 +1465,16 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                     onDropAt={dropAt}
                   />
                 </div>
+                {card && itemAlertKinds.size > 0 && (
+                  <ItemAlertOverlay
+                    boxRef={previewBoxRef}
+                    kinds={itemAlertKinds}
+                    onOpen={(key) => {
+                      const it = items.find((i) => i.key === key)
+                      if (it) openAlertFor(it.productId)
+                    }}
+                  />
+                )}
                 <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
               </div>
             </div>
@@ -1420,7 +1493,8 @@ export function CardDetail({ card, defaults, products, heroes, otherThemes, owne
                   items={items}
                   products={products}
                   onHover={setHoverKey}
-                  alertKinds={new Map(CARD_ALERT_ORDER.slice().reverse().flatMap((k) => alerts.filter((a) => a.kind === k && a.productId).map((a) => [a.productId!, k] as const)))}
+                  alertKinds={new Map(CARD_ALERT_ORDER.slice().reverse().flatMap((k) => liveAlerts.filter((a) => a.kind === k && a.productId).map((a) => [a.productId!, k] as const)))}
+                  onAlert={card ? openAlertFor : undefined}
                 />
               </div>
             ) : (
