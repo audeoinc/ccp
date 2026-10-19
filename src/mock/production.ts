@@ -82,6 +82,16 @@ export const ProductionService = {
     Object.assign(r, { html: input.html, html_saved_at: now(), html_saved_by_name: input.actor.name, modified_on: now() })
     return { success: true, data: structuredClone(r) as unknown as ProductionRequest }
   },
+  async saveEdits(id: string, input: { actor: Actor; edited_snapshot: string; week_start?: string }) {
+    if (!input.actor?.id) return ng<ProductionRequest>('右上で、だれでログインするかを選んでください')
+    const r = tables.ProductionRequestsService.find((x) => x.id === id)
+    if (!r) return ng<ProductionRequest>('制作の依頼が見つかりません')
+    if (r.status === 'stale') return ng<ProductionRequest>('古い版には保存できません(企画が変わりました)')
+    Object.assign(r, { edited_snapshot: input.edited_snapshot || undefined, edited_at: now(), edited_by_name: input.actor.name, modified_on: now() })
+    const card = tables.DeliveryCardsService.find((c) => c.id === r.delivery_card_id)
+    if (card) event('production_edit', input.actor, card, input.week_start, `版 ${r.version}${input.edited_snapshot ? '' : '(承認された写しに戻した)'}`)
+    return { success: true, data: structuredClone(r) as unknown as ProductionRequest }
+  },
   async send(input: RequestInput) {
     const r = create(input, 'sent')
     return r.success ? { ...r, data: { ...r.data!, message: '送りました' } } : r

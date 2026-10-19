@@ -6,7 +6,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { SOURCE_MANUAL, type Item } from './items'
-import { campaignSlug, defaultUtm, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { campaignSlug, defaultUtm, encodeLinks, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
@@ -90,23 +90,58 @@ export interface CopyRow {
   value: string
 }
 
-/** テキスト(件名・ヘッドライン・コピー・セクションの見出しとコピー。アプリは通知のタイトル・本文) */
-export function textRows(s: Snapshot): CopyRow[] {
+/** 直せるテキストの場所(配信カードの列。セクションは何番目か) */
+export type TextField = { key: 'name' | 'push_title' | 'push_body' | 'headline' | 'copy' } | { key: 'section_titles' | 'section_copies'; index: number }
+export interface TextRow extends CopyRow {
+  field: TextField
+  /** 行を見分ける鍵(直した印・元の値を、同じ行どうしで比べる) */
+  id: string
+}
+
+const fieldId = (f: TextField) => ('index' in f ? `${f.key}.${f.index}` : f.key)
+
+export function getText(s: Snapshot, f: TextField): string {
   const c = s.card
-  const rows: CopyRow[] = []
-  if (isPushCard(s)) {
-    rows.push({ label: tr('通知のタイトル', 'Notification title'), value: c.push_title ?? '' }, { label: tr('通知の本文', 'Notification body'), value: c.push_body ?? '' })
+  if (f.key === 'section_titles') return (c.section_titles ?? '').split('\n')[f.index] ?? ''
+  if (f.key === 'section_copies') return parseCopies(c.section_copies)[f.index] ?? ''
+  return c[f.key] ?? ''
+}
+
+/** テキストを 1 つ直した、新しい写し(元の写しは変えない) */
+export function setText(s: Snapshot, f: TextField, value: string): Snapshot {
+  const card = { ...s.card }
+  if (f.key === 'section_titles' || f.key === 'section_copies') {
+    const n = sectionsOf(templateOf(s)).length
+    const list = f.key === 'section_titles' ? (card.section_titles ?? '').split('\n') : parseCopies(card.section_copies)
+    const next = Array.from({ length: Math.max(n, list.length, f.index + 1) }, (_, i) => list[i] ?? '')
+    next[f.index] = value
+    // 見出しは改行区切り、コピーは JSON の配列(配信カードと同じ持ち方)
+    if (f.key === 'section_titles') card.section_titles = next.join('\n').replace(/\n+$/, '')
+    else card.section_copies = JSON.stringify(next)
   } else {
-    rows.push({ label: tr('件名', 'Subject'), value: c.name ?? '' })
+    card[f.key] = value
   }
-  rows.push({ label: tr('ヘッドライン', 'Headline'), value: c.headline ?? '' }, { label: tr('コピー', 'Copy'), value: c.copy ?? '' })
-  const titles = (c.section_titles ?? '').split('\n')
-  const copies = parseCopies(c.section_copies)
+  return { ...s, card }
+}
+
+/**
+ * テキスト(件名・ヘッドライン・コピー・セクションの見出しとコピー。アプリは通知のタイトル・本文)。
+ * all のときは、空の行も出す(制作のページで直すとき、空のセクションにも書けるように)
+ */
+export function textRows(s: Snapshot, all = false): TextRow[] {
+  const fields: { label: string; field: TextField }[] = []
+  if (isPushCard(s)) {
+    fields.push({ label: tr('通知のタイトル', 'Notification title'), field: { key: 'push_title' } }, { label: tr('通知の本文', 'Notification body'), field: { key: 'push_body' } })
+  } else {
+    fields.push({ label: tr('件名', 'Subject'), field: { key: 'name' } })
+  }
+  fields.push({ label: tr('ヘッドライン', 'Headline'), field: { key: 'headline' } }, { label: tr('コピー', 'Copy'), field: { key: 'copy' } })
   sectionsOf(templateOf(s)).forEach((sec, i) => {
-    if (titles[i]?.trim()) rows.push({ label: tr(`${sec.label} の見出し`, `${sec.label} heading`), value: titles[i] })
-    if (copies[i]?.trim()) rows.push({ label: tr(`${sec.label} のコピー`, `${sec.label} copy`), value: copies[i] })
+    fields.push({ label: tr(`${sec.label} の見出し`, `${sec.label} heading`), field: { key: 'section_titles', index: i } })
+    fields.push({ label: tr(`${sec.label} のコピー`, `${sec.label} copy`), field: { key: 'section_copies', index: i } })
   })
-  return rows.filter((r) => r.value.trim())
+  const rows = fields.map((x) => ({ ...x, id: fieldId(x.field), value: getText(s, x.field) }))
+  return all ? rows : rows.filter((r) => r.value.trim())
 }
 
 const campaignOf = (s: Snapshot) => campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? '')
@@ -139,23 +174,53 @@ export function productRows(s: Snapshot): ProductRow[] {
   })
 }
 
+export interface LinkRow extends CopyRow {
+  /** 直せる場所(メールのメイン画像・ボタン)の鍵。アプリの画面・通知を押したときの画面は、ここでは直さない */
+  slotKey?: string
+  /** 計測用のパラメーターを付ける前の URL(直すのは、こちら) */
+  base?: string
+}
+
 /** リンク先(場所ごとの URL。アプリは開く画面) */
-export function linkRows(s: Snapshot): CopyRow[] {
+export function linkRows(s: Snapshot): LinkRow[] {
   const links = parseLinks(s.card.links)
   const utm = utmOf(s)
-  const rows = linkSlots(templateOf(s), items(s), s.products, campaignOf(s)).map((slot) => {
+  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignOf(s)).map((slot) => {
     if (isPushCard(s)) {
       const d = fcmText(screenOf(links, slot), campaignOf(s))
       return { label: slot.label, value: d ? `data: ${d}` : '' }
     }
     const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
-    return { label: slot.label, value: url ? withUtm(url, utm) : '' }
+    return { label: slot.label, value: url ? withUtm(url, utm) : '', slotKey: slot.key, base: url }
   })
   if (isPushCard(s)) {
     const tap = parsePushLink(s.card.push_link)
     if (tap) rows.unshift({ label: tr('通知を押したときに開く画面', 'Screen opened by the notification'), value: tap.kind === 'custom' ? (tap.url ?? '') : tap.kind })
   }
-  return rows.filter((r) => r.value)
+  return rows.filter((r) => r.value || r.slotKey)
+}
+
+/** リンク先を 1 つ直した、新しい写し(計測用のパラメーターは、これまでどおり後から付く) */
+export function setLink(s: Snapshot, slotKey: string, url: string): Snapshot {
+  const links = parseLinks(s.card.links)
+  if (slotKey === 'hero') links.hero = url
+  else links.buttons = { ...(links.buttons ?? {}), [slotKey]: url }
+  return { ...s, card: { ...s.card, links: encodeLinks(links) } }
+}
+
+/** メイン画像を替えた、新しい写し */
+export function setHero(s: Snapshot, hero: HeroImage | null): Snapshot {
+  return { ...s, card: { ...s.card, hero_image_id: hero?.id }, hero }
+}
+
+/** 掲載商品の並びを替えた、新しい写し(新しく載せた商品は、その時の中身を写しに足す) */
+export function setProducts(s: Snapshot, productIds: string[], all: Product[]): Snapshot {
+  const known = new Map(s.products.map((p) => [p.id, p]))
+  for (const id of productIds) if (!known.has(id)) {
+    const p = all.find((x) => x.id === id)
+    if (p) known.set(id, p)
+  }
+  return { ...s, productIds, products: productIds.map((id) => known.get(id)).filter((p): p is Product => !!p).filter((p, i, a) => a.indexOf(p) === i) }
 }
 
 /** 項目をまとめてコピーするときの文字(見出し: 値 を 1 行ずつ) */

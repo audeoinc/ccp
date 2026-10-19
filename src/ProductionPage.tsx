@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Badge, Button, Dialog, DialogSurface, Input, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownloadRegular,
@@ -6,7 +6,6 @@ import {
   CheckmarkRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
-  CopyRegular,
   DismissRegular,
   HandRightRegular,
   OpenRegular,
@@ -28,12 +27,12 @@ import { ChannelBadge } from './ChannelBadge'
 import { FaceBadge } from './FaceBadge'
 import { HtmlEditor } from './HtmlEditor'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
+import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
 import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
-import { buildSnapshot, downloadText, linkRows, parseSnapshot, previewHtml, productRows, rowsText, textRows, type Snapshot } from './productionSnapshot'
+import { buildSnapshot, downloadText, parseSnapshot, previewHtml, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
-import { productImage, heroImage } from './images'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { loadPref, savePref } from './settings'
 import { statusRank } from './status'
@@ -80,6 +79,8 @@ const useStyles = makeStyles({
   actions: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap' },
   doneBox: { display: 'grid', rowGap: '8px', width: '320px' },
   dirty: { color: tokens.colorPaletteDarkOrangeForeground1 },
+  // 左で直した中身の保存の行(ペインの上)
+  editBar: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
   messages: { padding: '0 16px', display: 'grid', rowGap: '6px' },
 })
 
@@ -103,28 +104,6 @@ const subscribeMe = (f: () => void) => onMeChange(f)
 const LIVE = new Set(['requested', 'in_progress', 'done', 'sent'])
 const INFO_KEY = 'productionPage.infoOpen'
 const TALK_KEY = 'productionPage.talkOpen'
-
-/** 押すと文字をコピーする小さなボタン(コピーしたら、少しのあいだ印を変える) */
-function CopyButton({ text, label }: { text: string; label?: string }) {
-  const t = useT()
-  const [done, setDone] = useState(false)
-  return (
-    <Tooltip content={label ?? t('コピー', 'Copy')} relationship="label">
-      <Button
-        size="small"
-        appearance="subtle"
-        icon={done ? <CheckmarkRegular /> : <CopyRegular />}
-        disabled={!text}
-        onClick={() => {
-          void navigator.clipboard?.writeText(text).then(() => {
-            setDone(true)
-            setTimeout(() => setDone(false), 1200)
-          })
-        }}
-      />
-    </Tooltip>
-  )
-}
 
 /**
  * 制作のページ(バックログ PR3。docs/PRODUCTION.md)。承認された配信を、制作に渡す材料のページ。制作の人は、ここだけを見ればよい。
@@ -174,14 +153,18 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   const draft = useMemo(() => buildSnapshot(card, productIds, products, heroes), [card, productIds, products, heroes])
   // 描くたびに写しを読み直すと、HTML の下書きを作り直し続けるので、固めた写しの文字が変わったときだけ読む
   const frozenSnap = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
-  const snap: Snapshot = frozenSnap || draft
+  const approvedSnap: Snapshot = frozenSnap || draft
   const frozen = !!live
+  // 左で直した中身: 保存したもの(edited_snapshot)と、直しかけ(null = 直していない)。承認された写し・配信カードは書き換えない
+  const savedEdits = useMemo(() => parseSnapshot(live?.edited_snapshot), [live?.edited_snapshot])
+  const [work, setWork] = useState<Snapshot | null>(null)
+  const snap: Snapshot = work ?? savedEdits ?? approvedSnap
+  const editable = !!live && live.status !== 'sent'
+  const editsDirty = work !== null && JSON.stringify(work) !== JSON.stringify(savedEdits ?? approvedSnap)
+  const hasEdits = JSON.stringify({ ...snap, takenAt: '' }) !== JSON.stringify({ ...approvedSnap, takenAt: '' })
   const instructions = frozen ? (live?.instructions ?? '') : (card.instructions ?? '')
   const owner = frozen ? (live?.production_owner ?? '') : (card.production_owner ?? '')
   const due = frozen ? (live?.production_due ?? '') : (card.production_due ?? '')
-  const texts = textRows(snap)
-  const prows = productRows(snap)
-  const lrows = linkRows(snap)
   const weekStart = card.scheduled_at ? weekKeyOf(new Date(card.scheduled_at)) : undefined
   const actor = { id: meId, name: meName }
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
@@ -202,8 +185,11 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHtml(null)
+    setWork(null)
   }, [live?.id])
   const dirty = html !== null && html !== (savedHtml || generated)
+  // 要素を直したのに、保存した HTML が前のまま(HTML は自動では作り直さない。直した HTML を消さないため)
+  const htmlBehind = !!savedHtml && html === null && (editsDirty || (!!live?.edited_at && (!live?.html_saved_at || live.edited_at > live.html_saved_at)))
 
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string }; data?: unknown }>, done?: string) => {
     setBusy(true)
@@ -217,8 +203,10 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
       if (done || message) setNotice(message ?? done ?? null)
       await load()
       onChanged?.()
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      return false
     } finally {
       setBusy(false)
     }
@@ -226,7 +214,8 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   const requestInput = () => ({
     delivery_card_id: card.id,
     actor,
-    snapshot: JSON.stringify(draft),
+    // 依頼する前は、いまの配信カード。依頼したあとに配信のしくみへ送るときは、直した中身(あれば)
+    snapshot: JSON.stringify(live ? snap : draft),
     instructions: card.instructions ?? '',
     production_owner: card.production_owner ?? '',
     production_due: card.production_due ?? '',
@@ -248,25 +237,6 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
             ? { name: t('制作が終わった', 'Production done'), next: t('企画(仕上がりの確認)', 'Planner (check the result)'), color: 'success' }
             : { name: t('制作を通さず、配信のしくみに送った', 'Sent to the delivery system without production'), next: t('企画', 'Planner'), color: 'success' }
 
-  const section = (title: string, copyAll: string | null, children: ReactNode, extra?: ReactNode) => (
-    <div className={s.section}>
-      <div className={s.sectionHead}>
-        <span className={s.grow}>{title}</span>
-        {extra}
-        {copyAll !== null && <CopyButton text={copyAll} label={t('まとめてコピー', 'Copy all')} />}
-      </div>
-      {children}
-    </div>
-  )
-  const copyRow = (label: string, value: string, key = label) => (
-    <div key={key} className={s.row}>
-      <span className={s.rowValue}>
-        <span className={s.rowLabel}>{label}</span>
-        {value}
-      </span>
-      <CopyButton text={value} />
-    </div>
-  )
   const rail = (label: string, onOpen: () => void) => (
     <button type="button" className={s.rail} onClick={onOpen} aria-label={t(`${label}を開く`, `Open ${label}`)}>
       <ChevronLeftRegular />
@@ -388,57 +358,67 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
                 <div className={s.paneTool}>
                   <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleInfo} aria-label={t('要素の情報をたたむ', 'Collapse the info')} />
                 </div>
-                {section(
-                  t('制作指示', 'Production notes'),
-                  instructions,
-                  <>
-                    <span className={s.note}>{t(`担当: ${owner || '(未設定)'} ・ 締め切り: ${due ? due.slice(0, 10).replace(/-/g, '/') : '(未設定)'}`, `Assignee: ${owner || '(not set)'} · Due: ${due ? due.slice(0, 10) : '(not set)'}`)}</span>
-                    {instructions.trim() ? (
-                      <div className={s.notes}>
-                        <MarkdownLite text={instructions} />
-                      </div>
-                    ) : (
-                      <span className={s.note}>{t('制作指示がありません(企画の配信カードの ⑥ で作ります)', 'No production notes (create them in step 6 of the plan card)')}</span>
-                    )}
-                    {!frozen && <span className={s.note}>{t('依頼する前は、いまの配信カードの中身を出しています。担当・締め切り・制作指示は、企画の配信カードで直します。', 'Before the request, this shows the current card. Edit the assignee, due date and notes in the plan card.')}</span>}
-                  </>,
-                )}
-                {section(
-                  t('テキスト', 'Text'),
-                  rowsText(texts),
-                  texts.map((r) => copyRow(r.label, r.value)),
-                )}
-                {snap.hero &&
-                  section(
-                    t('メイン画像', 'Main image'),
-                    null,
+                <ProductionInfoPane
+                  original={approvedSnap}
+                  current={snap}
+                  editable={editable}
+                  onChange={setWork}
+                  products={products}
+                  heroes={heroes}
+                  head={
                     <>
-                      <img className={s.hero} src={heroImage(snap.hero) ?? ''} alt="" />
-                      {copyRow(t('画像の URL', 'Image URL'), new URL(heroImage(snap.hero) ?? '', location.href).href)}
-                    </>,
-                  )}
-                {section(
-                  t(`選定された商品(${prows.length})`, `Selected products (${prows.length})`),
-                  prows.map((r) => [r.section, r.product.name, r.product.product_code, r.price, r.url].filter(Boolean).join('\t')).join('\n'),
-                  prows.map((r, i) => (
-                    <div key={`${r.product.id}-${i}`} className={s.product}>
-                      <img className={s.thumb} src={productImage(r.product) ?? ''} alt="" />
-                      <span className={s.rowValue}>
-                        <span className={s.rowLabel}>{r.section}</span>
-                        {`${r.product.name} ・ ${r.product.product_code ?? ''} ・ ${r.price}`}
-                        {'\n'}
-                        <span className={s.note}>{r.url}</span>
-                      </span>
-                      <CopyButton text={[r.product.name, r.product.product_code, r.price, r.url].filter(Boolean).join('\t')} />
-                    </div>
-                  )),
-                )}
-                {section(
-                  t('リンク先', 'Links'),
-                  rowsText(lrows),
-                  lrows.length ? lrows.map((r) => copyRow(r.label, r.value)) : <span className={s.note}>{t('リンク先はありません', 'No links')}</span>,
-                )}
-                <span className={s.note}>{t(`種別: ${optionLabel(card.department_name)} ・ 写し: ${when(snap.takenAt)}`, `Type: ${optionLabel(card.department_name)} · Snapshot: ${when(snap.takenAt)}`)}</span>
+                      {editable && (
+                        <div className={s.editBar}>
+                          <span className={s.grow}>
+                            {editsDirty ? (
+                              <span className={s.dirty}>{t('保存していない変更があります', 'Unsaved changes')}</span>
+                            ) : live?.edited_by_name ? (
+                              <span className={s.note}>{t(`直した: ${live.edited_by_name} ${when(live.edited_at)}`, `Edited by ${live.edited_by_name} ${when(live.edited_at)}`)}</span>
+                            ) : (
+                              <span className={s.note}>{t('文言・画像・商品・リンク先は、ここで直せます(配信カードは変わりません)', 'You can edit text, image, products and links here (the plan card does not change)')}</span>
+                            )}
+                          </span>
+                          {hasEdits && (
+                            <Tooltip content={t('直したものを捨てて、企画で承認された内容に戻します(保存すると反映)', 'Discard the edits and go back to the approved plan (applies when saved)')} relationship="label">
+                              <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} onClick={() => setWork(approvedSnap)} />
+                            </Tooltip>
+                          )}
+                          <Button
+                            size="small"
+                            appearance="primary"
+                            icon={<SaveRegular />}
+                            disabled={busy || !meId || !editsDirty}
+                            onClick={() =>
+                              live &&
+                              void run(
+                                () => ProductionService.saveEdits(live.id, { actor, edited_snapshot: hasEdits ? JSON.stringify(snap) : '', week_start: weekStart }),
+                                tr('直した内容を保存しました', 'Saved the edits'),
+                              ).then((saved) => saved && setWork(null))
+                            }
+                          >
+                            {t('保存', 'Save')}
+                          </Button>
+                        </div>
+                      )}
+                      <div className={s.section}>
+                        <div className={s.sectionHead}>
+                          <span className={s.grow}>{t('制作指示', 'Production notes')}</span>
+                          <CopyButton text={instructions} label={t('まとめてコピー', 'Copy all')} />
+                        </div>
+                        <span className={s.note}>{t(`担当: ${owner || '(未設定)'} ・ 締め切り: ${due ? due.slice(0, 10).replace(/-/g, '/') : '(未設定)'}`, `Assignee: ${owner || '(not set)'} · Due: ${due ? due.slice(0, 10) : '(not set)'}`)}</span>
+                        {instructions.trim() ? (
+                          <div className={s.notes}>
+                            <MarkdownLite text={instructions} />
+                          </div>
+                        ) : (
+                          <span className={s.note}>{t('制作指示がありません(企画の配信カードの ⑥ で作ります)', 'No production notes (create them in step 6 of the plan card)')}</span>
+                        )}
+                        {!frozen && <span className={s.note}>{t('依頼する前は、いまの配信カードの中身を出しています。直すときは、企画の配信カードで直します(依頼したあとは、ここで直せます)。', 'Before the request, this shows the current card. Edit it in the plan card (after the request, you can edit here).')}</span>}
+                      </div>
+                    </>
+                  }
+                  foot={<span className={s.note}>{t(`種別: ${optionLabel(card.department_name)} ・ 写し: ${when(approvedSnap.takenAt)}`, `Type: ${optionLabel(card.department_name)} · Snapshot: ${when(approvedSnap.takenAt)}`)}</span>}
+                />
               </div>
             ) : (
               rail(t('要素の情報', 'Info'), toggleInfo)
@@ -452,6 +432,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
                 <span className={s.grow}>
                   HTML
                   {dirty && <span className={s.dirty}>{t(' ・ 保存していない変更があります', ' · unsaved changes')}</span>}
+                  {htmlBehind && <span className={s.dirty}>{t(' ・ 要素を直したあと、作り直していません(↺ で作り直す)', ' · not rebuilt since the edits (↺ to rebuild)')}</span>}
                   {!dirty && live?.html_saved_by_name && <span className={s.note}>{t(` ・ 保存: ${live.html_saved_by_name} ${when(live.html_saved_at)}`, ` · saved by ${live.html_saved_by_name} ${when(live.html_saved_at)}`)}</span>}
                 </span>
                 <Tooltip content={t('プレビューから作った下書きに戻します', 'Reset to the draft built from the preview')} relationship="label">

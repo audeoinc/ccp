@@ -3,6 +3,8 @@
   POST /api/production/requests               「この内容で制作に依頼する」(画面が作った写しを固めて保存する)
   POST /api/production/requests/{id}/receive  制作が「受け取った」
   POST /api/production/requests/{id}/done     制作が「制作が終わった」(ひとこと・できたもののリンクを任意で)
+  POST /api/production/requests/{id}/html     直した HTML を保存する
+  POST /api/production/requests/{id}/edits    左の要素(文言・メイン画像・商品・リンク先)を直した写しを保存する
   POST /api/production/send                   制作を通さず、配信のしくみに送る(いまは送り先の窓口だけ。実際には送らずに「送りました」と返す)
 
 写し(snapshot)は、画面が組み立てて送る(テンプレート・リンク先・計測用のパラメーターの決め方が、画面の側にあるため)。
@@ -156,6 +158,27 @@ async def save_html(request_id: str, request: Request):
         if req.get("status") == "stale":
             return fail(409, "古い版には保存できません(企画が変わりました)")
         row = await _update(conn, "production_requests", request_id, {"html": html, "html_saved_at": _now(), "html_saved_by_name": actor["name"]}) or req
+    return ok(row)
+
+
+@router.post("/requests/{request_id}/edits")
+async def save_edits(request_id: str, request: Request):
+    """制作のページの左で直した中身を保存する(2026-10-19、利用者と決めた: 承認のあとの文言・画像・商品・リンク先の調整は、
+    企画と制作のあいだで決めてよく、承認のやり直しは要らない)。承認された snapshot と配信カードは書き換えず、別の列に持つ。
+    空の文字を送ると、直したものを捨てて、承認された写しに戻す"""
+    body = await _body(request)
+    edited = str(body.get("edited_snapshot") or "") or None
+    async with db(write=True) as conn:
+        actor = await _actor(conn, body, request)
+        req = await _one(conn, "production_requests", request_id, lock=True)
+        if req is None:
+            return fail(404, "制作の依頼が見つかりません")
+        if req.get("status") == "stale":
+            return fail(409, "古い版には保存できません(企画が変わりました)")
+        row = await _update(conn, "production_requests", request_id, {"edited_snapshot": edited, "edited_at": _now(), "edited_by_name": actor["name"]}) or req
+        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
+        if card is not None:
+            await _event(conn, "production_edit", actor, card, body.get("week_start") or None, f"版 {req.get('version')}" + ("" if edited else "(承認された写しに戻した)"))
     return ok(row)
 
 

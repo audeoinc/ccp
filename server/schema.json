@@ -416,7 +416,10 @@
     ["sent_by_name", "text"],
     ["html", "text"],
     ["html_saved_at", "timestamptz"],
-    ["html_saved_by_name", "text"]
+    ["html_saved_by_name", "text"],
+    ["edited_snapshot", "text"],
+    ["edited_at", "timestamptz"],
+    ["edited_by_name", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
