@@ -63,7 +63,7 @@ GitHub の**公開**リポジトリ(`audeoinc/ccp`)。だれでも読めるの�
 
 **本番への反映(`npm run deploy:gcp`)**
 - 対象は、Cloud Run のサービス `contents-planner`。
-- 安全装置つき: `main` にいて、リモートと同じで、未コミットの変更がないときだけ動く。型チェック・lint・ビルドを通してから、`gcloud run deploy`(クラウドでビルド。数分かかる)で反映し、**タグ `deployed-gcp/日時`** を GitHub に送る。
+- 安全装置つき: `main` にいて、リモートと同じで、未コミットの変更がないときだけ動く。型チェックと lint を通してから、クラウドでビルドし(`gcloud builds submit`。層をキャッシュする。うまくいかなければ、これまでの `gcloud run deploy --source`)、`gcloud run deploy` で反映し、**タグ `deployed-gcp/日時`** を GitHub に送る。
 - 環境変数・シークレット(DB のパスワードなど)は、サービスに設定済みで、再反映でも引き継がれる(変えるときは、[GCP.md](GCP.md))。
 - **事前に必要なこと**:
   1. **gcloud CLI** をインストールする(https://cloud.google.com/sdk/docs/install)。
