@@ -72,7 +72,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | 設定の確認 | `scripts/workbench.sh check` |
 
 - `update` は、`git pull` → (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
-- ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる)、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
+- ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
 
