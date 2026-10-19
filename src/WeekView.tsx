@@ -142,8 +142,6 @@ const useStyles = makeStyles({
   cardDim: { opacity: 0.4 },
   // AI でまとめて作り、まだ人が確かめていない配信の印(押すと、確かめる引き出し。破線で、ふつうの印と形を分ける)
   issueAi: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, border: `1px dashed ${tokens.colorBrandStroke1}`, cursor: 'pointer' },
-  // アプリの配信は、角を大きく丸めた枠(月のカレンダーと同じく、メールとアプリを形で見分ける。枠の色は状態)
-  cardPush: { borderRadius: '16px' },
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
   strip: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '3px 8px', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   // 帯は、配信カードの札と同じ、塗りつぶしの地に白抜き(メール = 青、アプリ = ベリー)
@@ -342,11 +340,11 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       <button
         key={id}
         type="button"
-        className={mergeClasses(styles.card, channel === 'push' && styles.cardPush, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
+        className={mergeClasses(styles.card, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
         onClick={() => onSelect(id)}
         title={c.name}
         // 取りやめた配信は、消さずに薄く、取り消し線で出す
-        style={{ ...(channel === 'push' ? { border: `1.5px solid ${statusColor(c.status)}` } : {}), ...(isCancelled(c) ? CANCELLED_STYLE : {}) }}
+        style={isCancelled(c) ? CANCELLED_STYLE : undefined}
       >
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
           {channel === 'push' ? <PhoneFilled /> : <MailFilled />}

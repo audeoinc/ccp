@@ -265,10 +265,8 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                     className={styles.pill}
                     style={{
                       backgroundColor: tone.background,
-                      // メールとアプリを、ぱっと見で分ける: メールは左の線、アプリは角の丸い枠(色は状態・前年比に使っているので、形で分ける)
-                      ...(c.channel === CHANNEL_PUSH
-                        ? { border: `1.5px solid ${tone.line}`, borderRadius: '999px', paddingLeft: '9px', paddingRight: '9px' }
-                        : { borderLeft: `3px solid ${tone.line}` }),
+                      // ステータスの色は、メール・アプリとも左の線で出す(チャネルは、名前の前の塗りつぶしの印で見分ける)
+                      borderLeft: `3px solid ${tone.line}`,
                       // 取りやめた配信は、消さずに薄く、取り消し線で出す
                       ...(isCancelled(c) ? CANCELLED_STYLE : {}),
                     }}
