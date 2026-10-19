@@ -13,6 +13,7 @@ import {
   MenuDivider,
   MenuGroup,
   MenuGroupHeader,
+  MenuItem,
   MenuItemRadio,
   MenuList,
   MenuPopover,
@@ -20,8 +21,9 @@ import {
   makeStyles,
   mergeClasses,
   tokens,
+  Tooltip,
 } from '@fluentui/react-components'
-import { ChevronDownRegular, PersonRegular } from '@fluentui/react-icons'
+import { ChevronDownRegular, PersonRegular, SignOutRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, groupsOf, usePeople, type People } from './people'
@@ -94,7 +96,7 @@ export function MePicker({ className, ariaLabel }: Props) {
     )
   }
   if (!people.loaded || users.length === 0) {
-    return (
+    const input = (
       <Input
         size="small"
         className={className}
@@ -104,6 +106,17 @@ export function MePicker({ className, ariaLabel }: Props) {
         value={name}
         onChange={(_, d) => setMyName(d.value)}
       />
+    )
+    // 読めたのに 1 人もいない(Workbench を初期データなしで始めた など): なぜ名前の入力なのかを知らせる
+    return people.loaded ? (
+      <Tooltip
+        content={t('ユーザーが登録されていないため、名前を入れる形になっています。⚙ →「ユーザーと承認グループ」で登録すると、選んでログインできます', 'No users are registered, so you type a name. Register users in ⚙ → Users and approval groups to pick who signs in.')}
+        relationship="description"
+      >
+        {input}
+      </Tooltip>
+    ) : (
+      input
     )
   }
   return (
@@ -138,6 +151,10 @@ export function MePicker({ className, ariaLabel }: Props) {
             ))}
           </MenuGroup>
           <MenuDivider />
+          {/* ログアウト(デモ): 覚えている人を消し、最初の「だれでログインしますか?」をもう一度出す */}
+          <MenuItem icon={<SignOutRegular />} disabled={!picked} onClick={() => setMe(undefined)}>
+            {t('ログアウト', 'Sign out')}
+          </MenuItem>
           <div className={styles.menuNote}>
             {t('ログインが入るまでの見本の機能です。選んだ人として、依頼・承認・やり取りが記録されます。', 'A demo feature until sign-in is added. Requests, approvals and comments are recorded as the chosen person.')}
           </div>
@@ -158,6 +175,12 @@ export function SignInDialog() {
   const userId = useSyncExternalStore(subscribe, myUserId)
   const lock = useSyncExternalStore(subscribe, meLock)
   const [later, setLater] = useState(false)
+  // ログアウトしたら(覚えている人が消えたら)、「あとで」で閉じていても、もう一度出す
+  const [seenId, setSeenId] = useState(userId)
+  if (userId !== seenId) {
+    setSeenId(userId)
+    if (!userId) setLater(false)
+  }
   const users = activeUsers(people)
   // 覚えている id のユーザーが無効・削除になっていたら、選び直してもらう
   const known = users.some((u) => u.id === userId)
