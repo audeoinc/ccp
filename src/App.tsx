@@ -217,33 +217,25 @@ const useStyles = makeStyles({
     alignItems: 'center',
     columnGap: '4px',
     height: '28px',
-    padding: '0 8px 0 10px',
+    padding: '0 10px 0 12px',
     boxSizing: 'border-box',
     borderRadius: tokens.borderRadiusCircular,
     border: `1px solid ${tokens.colorNeutralStroke1}`,
+    fontFamily: 'inherit',
     backgroundColor: tokens.colorNeutralBackground1,
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground1,
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-    ':focus-within': { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px' },
+    ':focus-visible': { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px' },
   },
   // 「すべて」以外を選んでいる(絞り込み中)
   filterChipOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
   filterChipLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  filterChipSelect: {
-    appearance: 'none',
-    border: 'none',
-    background: 'transparent',
-    padding: '0 18px 0 0',
-    margin: 0,
-    font: 'inherit',
-    fontWeight: tokens.fontWeightSemibold,
-    color: 'inherit',
-    cursor: 'pointer',
-    outline: 'none',
-  },
-  filterChipChevron: { position: 'absolute', right: '8px', fontSize: '12px', pointerEvents: 'none', color: tokens.colorNeutralForeground3 },
+  filterChipValue: { fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
+  // 絞り込みの選ぶ一覧(項目の幅をそろえ、少し広めに)
+  filterMenu: { minWidth: '180px' },
+  filterChipChevron: { fontSize: '12px', marginLeft: '2px', color: tokens.colorNeutralForeground3 },
   monthRow: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -326,18 +318,31 @@ function FilterSelect({ label, value, options, onChange }: {
 }) {
   const styles = useStyles()
   const t = useT()
-  // 名前を札の中に入れた、1 行の細い絞り込み(名前を上に置くと、2 行分の高さを取るため)。「すべて」以外を選んでいる札は、色を付けて目立たせる
+  // 名前を札の中に入れた、1 行の細い絞り込み(名前を上に置くと、2 行分の高さを取るため)。「すべて」以外を選んでいる札は、色を付けて目立たせる。
+  // 選ぶ一覧は、ブラウザ標準のものではなく、ほかのメニューと同じ見た目(余白があり、選んでいる値にチェック)
+  const current = value === '' ? t('すべて', 'All') : optionLabel(options.find((o) => String(o.value) === value)?.label ?? value)
   return (
-    <label className={mergeClasses(styles.filterChip, value !== '' && styles.filterChipOn)}>
-      <span className={styles.filterChipLabel}>{label}:</span>
-      <select className={styles.filterChipSelect} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
-        <option value="">{t('すべて', 'All')}</option>
-        {options.map((o) => (
-          <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
-        ))}
-      </select>
-      <ChevronDownRegular className={styles.filterChipChevron} aria-hidden />
-    </label>
+    <Menu
+      positioning="below-start"
+      checkedValues={{ [label]: [value] }}
+      onCheckedValueChange={(_, d) => onChange(d.checkedItems[0] ?? '')}
+    >
+      <MenuTrigger disableButtonEnhancement>
+        <button type="button" className={mergeClasses(styles.filterChip, value !== '' && styles.filterChipOn)} aria-label={`${label}: ${current}`}>
+          <span className={styles.filterChipLabel}>{label}:</span>
+          <span className={styles.filterChipValue}>{current}</span>
+          <ChevronDownRegular className={styles.filterChipChevron} aria-hidden />
+        </button>
+      </MenuTrigger>
+      <MenuPopover>
+        <MenuList className={styles.filterMenu}>
+          <MenuItemRadio name={label} value="">{t('すべて', 'All')}</MenuItemRadio>
+          {options.map((o) => (
+            <MenuItemRadio key={o.value} name={label} value={String(o.value)}>{optionLabel(o.label)}</MenuItemRadio>
+          ))}
+        </MenuList>
+      </MenuPopover>
+    </Menu>
   )
 }
 
