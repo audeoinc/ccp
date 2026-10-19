@@ -62,9 +62,62 @@ const norm = (s?: string) => (s ?? '').trim().replace(/\s+/g, ' ')
 export function CheckDrawer({ frames, cards, cardProducts, products, heroes, onOpen }: Props) {
   const s = useStyles()
   const t = useT()
-  const [tab, setTab] = useState<'content' | 'compare'>('content')
+  const [tab, setTab] = useState<CheckTab>('content')
   const c = cards.find((x) => x.id === frames.checkId)
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '')
+  return (
+    <OverlayDrawer open={!!c} position="end" modalType="non-modal" className={s.drawer} onOpenChange={(_, v) => !v.open && frames.openCheck(null)}>
+      {c && (
+        <>
+          <DrawerHeader>
+            <DrawerHeaderTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => frames.openCheck(null)} />}>{c.name}</DrawerHeaderTitle>
+            <div className={s.head}>
+              <span className={s.muted}>{whenOf(c.scheduled_at)}</span>
+              <div className={s.tools}>
+                <TabList size="small" selectedValue={tab} onTabSelect={(_, v) => setTab(v.value as CheckTab)}>
+                  <Tab value="content">{t('中身', 'Content')}</Tab>
+                  <Tab value="compare">{t('比べる', 'Compare')}</Tab>
+                </TabList>
+                <span className={s.spacer} />
+                <Button size="small" icon={<EditRegular />} onClick={() => onOpen(c.id)}>
+                  {t('開いて直す', 'Open & edit')}
+                </Button>
+                {c.ai_unchecked_at && (
+                  <Button
+                    size="small"
+                    appearance="primary"
+                    icon={<CheckmarkRegular />}
+                    onClick={async () => {
+                      await frames.check(c.id)
+                      frames.openCheck(null)
+                    }}
+                  >
+                    {t('確認した', 'Checked')}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DrawerHeader>
+          <DrawerBody>
+            <CheckView card={c} tab={tab} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} />
+          </DrawerBody>
+        </>
+      )}
+    </OverlayDrawer>
+  )
+}
+
+export type CheckTab = 'content' | 'compare'
+
+const whenOf = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '')
+
+/**
+ * AI で作った配信の、中身(プレビュー・全項目・AI の理由)か、前後の配信との比較。
+ * 週の表示の引き出し(CheckDrawer)と、まとめて作る作業画面の ④(BulkWorkspace)で使う
+ */
+export function CheckView({ card: c, tab, cards, cardProducts, products, heroes }: { card: DeliveryCard; tab: CheckTab; cards: DeliveryCard[]; cardProducts: Map<string, string[]>; products: Product[]; heroes: HeroImage[] }) {
+  const s = useStyles()
+  const t = useT()
+  const when = whenOf
   const pname = (id: string) => products.find((p) => p.id === id)?.name ?? id
 
   const fact = (labelText: string, value?: string | null, reason?: string | null, reasonLabel?: string): ReactNode =>
@@ -173,42 +226,5 @@ export function CheckDrawer({ frames, cards, cardProducts, products, heroes, onO
     )
   }
 
-  return (
-    <OverlayDrawer open={!!c} position="end" modalType="non-modal" className={s.drawer} onOpenChange={(_, v) => !v.open && frames.openCheck(null)}>
-      {c && (
-        <>
-          <DrawerHeader>
-            <DrawerHeaderTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => frames.openCheck(null)} />}>{c.name}</DrawerHeaderTitle>
-            <div className={s.head}>
-              <span className={s.muted}>{when(c.scheduled_at)}</span>
-              <div className={s.tools}>
-                <TabList size="small" selectedValue={tab} onTabSelect={(_, v) => setTab(v.value as 'content' | 'compare')}>
-                  <Tab value="content">{t('中身', 'Content')}</Tab>
-                  <Tab value="compare">{t('比べる', 'Compare')}</Tab>
-                </TabList>
-                <span className={s.spacer} />
-                <Button size="small" icon={<EditRegular />} onClick={() => onOpen(c.id)}>
-                  {t('開いて直す', 'Open & edit')}
-                </Button>
-                {c.ai_unchecked_at && (
-                  <Button
-                    size="small"
-                    appearance="primary"
-                    icon={<CheckmarkRegular />}
-                    onClick={async () => {
-                      await frames.check(c.id)
-                      frames.openCheck(null)
-                    }}
-                  >
-                    {t('確認した', 'Checked')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DrawerHeader>
-          <DrawerBody>{tab === 'content' ? contentPane(c) : comparePane(c)}</DrawerBody>
-        </>
-      )}
-    </OverlayDrawer>
-  )
+  return tab === 'content' ? contentPane(c) : comparePane(c)
 }

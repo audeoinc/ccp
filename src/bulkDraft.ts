@@ -61,8 +61,11 @@ export async function createFrames(days: string[], setup: { country: string; cha
   return n
 }
 
+/** 中身を作るのに要る、配信の基本情報(保存した枠でも、作業画面の、まだ保存していない行でもよい) */
+export type DraftBase = Pick<DeliveryCard, 'name' | 'scheduled_at' | 'country' | 'channel' | 'department' | 'theme_type'>
+
 /** 中身を作るときに、AI に渡す配信の基本情報(配信名・種類は、人が決めたもの) */
-function aiCardOf(c: DeliveryCard): AiCard {
+function aiCardOf(c: DraftBase): AiCard {
   return {
     name: c.name ?? '',
     scheduledAt: c.scheduled_at ?? '',
@@ -88,7 +91,7 @@ export interface DraftContext {
 }
 
 /** 枠の中身を作る(配信の国に合う市場の商品・メイン画像だけを使う) */
-export async function generateFor(c: DeliveryCard, ctx: DraftContext, onStep: AutoDraftProgress, isStopped: () => boolean): Promise<AutoDraftResult> {
+export async function generateFor(c: DraftBase, ctx: DraftContext, onStep: AutoDraftProgress, isStopped: () => boolean): Promise<AutoDraftResult> {
   const market = cardMarket(String(c.country ?? ''))
   const products = market ? ctx.products.filter((p) => productMarket(p) === market) : ctx.products
   const heroes = market ? ctx.heroes.filter((h) => heroMarket(h) === market) : ctx.heroes
@@ -100,7 +103,7 @@ export async function generateFor(c: DeliveryCard, ctx: DraftContext, onStep: Au
 }
 
 /** 作った中身のテンプレート(AI が決めていなければ、チャネルの既定) */
-const templateOf = (c: DeliveryCard, r: AutoDraftResult) => {
+const templateOf = (c: DraftBase, r: AutoDraftResult) => {
   const fallback = isPush(c) ? DEFAULT_PUSH_TEMPLATE : DEFAULT_TEMPLATE
   return r.template && channelOf(r.template) === (isPush(c) ? 'push' : 'email') ? r.template : fallback
 }
@@ -114,10 +117,42 @@ const productIdsOf = (r: AutoDraftResult): string[] => r.sections.flatMap((s) =>
  * 「AI 下書き・未確認」の印(ai_unchecked_at)を付ける(人が配信カードで保存するか、「確認した」を押すと外れる)
  */
 export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products: Product[]): Promise<void> {
+  const res = await DeliveryCardsService.update(c.id, contentFields(c, r, products))
+  if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
+  await saveProducts(c.id, c.name, r, templateOf(c, r), products)
+  await logEvent({ action: 'bulk_create', card: { id: c.id, name: c.name, scheduledAt: c.scheduled_at }, to: 'not_started' })
+}
+
+/**
+ * 作業画面(BulkWorkspace)で作った中身を、新しい配信カードとして保存する。
+ * 中身のない枠は作らず、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。
+ * 誰も確かめていないことが分かるように、「AI 下書き・未確認」の印は付ける(作業画面の「確認した」か、配信カードで保存すると外れる)
+ */
+export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[]): Promise<DeliveryCard> {
+  const res = await DeliveryCardsService.create({
+    name: base.name,
+    scheduled_at: base.scheduled_at,
+    country: base.country,
+    channel: base.channel,
+    department: base.department,
+    theme_type: base.theme_type,
+    status: 'not_started',
+    state_code: 0,
+    ...contentFields(base, r, products),
+  })
+  if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
+  const card = res.data
+  await saveProducts(card.id, base.name, r, templateOf(base, r), products)
+  await logEvent({ action: 'bulk_create', card: { id: card.id, name: card.name, scheduledAt: card.scheduled_at }, to: 'not_started' })
+  return card
+}
+
+/** 作った中身の列(配信カードの buildContent と同じ形) */
+function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[]): Partial<DeliveryCardFields> {
   const template = templateOf(c, r)
   const pname = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   const copies = r.sections.map((s) => s.copy)
-  const res = await DeliveryCardsService.update(c.id, {
+  return {
     theme: r.theme ?? '',
     theme_reason: r.theme ? (r.themeIdeas[0]?.reason ?? '') : '',
     headline: r.headline ?? '',
@@ -135,8 +170,12 @@ export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products:
     section_copies: copies.some(Boolean) ? JSON.stringify(copies) : '',
     ...(r.hero?.hero?.heroId ? { hero_image_id: r.hero.hero.heroId } : {}),
     ai_unchecked_at: new Date().toISOString(),
-  })
-  if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
+  }
+}
+
+/** 載せる商品の行を保存する */
+async function saveProducts(cardId: string, cardName: string, r: AutoDraftResult, template: string, products: Product[]): Promise<void> {
+  const pname = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   // 商品の行は、配信カードの syncItems と同じ形(選定は並び順、候補は 1000 番から)
   const sections = sectionsOf(template)
   const rows = [
@@ -150,14 +189,13 @@ export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products:
       source: SOURCE_AI,
       state: row.state,
       section: row.section,
-      name: `${c.name} / ${pname(row.x.productId)}`,
-      delivery_card_id: c.id,
+      name: `${cardName} / ${pname(row.x.productId)}`,
+      delivery_card_id: cardId,
       product_id: row.x.productId,
       state_code: 0,
     })
     if (!p.success) throw new Error(p.error?.message ?? tr('掲載商品の保存に失敗しました', 'Failed to save the products in this delivery'))
   }
-  await logEvent({ action: 'bulk_create', card: { id: c.id, name: c.name, scheduledAt: c.scheduled_at }, to: 'not_started' })
 }
 
 /** 「確認した」: AI 下書き・未確認の印を外す */
@@ -180,6 +218,31 @@ export function overusedInWeek(when: string | undefined, cards: { id: string; sc
 
 /** 確定した週に入る配信か(枠を作れず、中身も作らない。確定した週を変えるときは、配信カードで理由を残す流れのため) */
 export const lockedWeekOf = (weeks: WeekRow[], when?: string) => confirmedWeekOf(weeks, when)
+
+/** 作業画面の、週の 1 日。作れない日も、理由と、その日にもうある配信を見せる(空いている日だけを出すと、なぜその日がないのか分からないため) */
+export interface WeekDay {
+  key: string
+  date: Date
+  /** free = 作れる、used = 同じ国・チャネルの配信がもうある、past = 今日より前、locked = 確定した週 */
+  state: 'free' | 'used' | 'past' | 'locked'
+  /** その日の、同じ国・チャネルの配信 */
+  same: { id: string; name: string }[]
+}
+
+/** 週の 7 日と、選んだ国・チャネルで作れるか(作業画面の ① で使う。作れる日の決め方は emptyDays と同じ) */
+export function weekDays(weekStart: Date, cards: { id: string; name: string; scheduled_at?: string; channel?: string; country?: string }[], weeks: WeekRow[], channel: string, country: string): WeekDay[] {
+  const today = dayKeyOf(new Date())
+  const start = sundayOf(weekStart)
+  const locked = !!confirmedWeekOf(weeks, start.toISOString())
+  const same = (c: { channel?: string; country?: string }) => (c.channel ?? CHANNEL_EMAIL) === channel && (!country || !c.country || c.country === country)
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+    const key = dayKeyOf(date)
+    const onDay = cards.filter((c) => same(c) && c.scheduled_at && dayKeyOf(new Date(c.scheduled_at)) === key).map((c) => ({ id: c.id, name: c.name }))
+    const state: WeekDay['state'] = locked ? 'locked' : key < today ? 'past' : onDay.length > 0 ? 'used' : 'free'
+    return { key, date, state, same: onDay }
+  })
+}
 
 /**
  * 週の、選んだ国・チャネルの配信がない日(今日より前の日と、確定した週は除く)。枠を作る日に使う。

@@ -95,6 +95,8 @@ import { FrameBar } from './FrameBar'
 import { FrameCard } from './FrameCard'
 import { CheckDrawer } from './CheckDrawer'
 import { useWeekFrames } from './useWeekFrames'
+import { useBulkWorkspace } from './useBulkWorkspace'
+import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusView } from './status'
@@ -711,7 +713,17 @@ function App() {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
     return activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= weekStart && new Date(c.scheduled_at) < end)
   }, [activeCards, weekStart])
-  // 週の枠と、まとめて AI で中身を作る(W14)。枠は、中身のない配信カードとして保存する
+  // まとめて作る作業画面(W14 の作り直し)。中身のない枠は保存せず、中身ができた配信から下書きとして保存する
+  const bulk = useBulkWorkspace({
+    cards: activeCards,
+    cardProducts,
+    products,
+    heroes,
+    weeks,
+    defaults: { country: filters.country, channel: filters.channel, department: filters.department },
+    onChanged: load,
+  })
+  // 週の枠と、まとめて AI で中身を作る(W14)。枠は、中身のない配信カードとして保存する。作業画面と比べるために残す
   const frames = useWeekFrames({
     cards: activeCards,
     cardProducts,
@@ -1051,13 +1063,16 @@ function App() {
               <MenuItem icon={<AddRegular />} onClick={() => setCreating(newCardDefaults())}>
                 {t('配信を 1 本、新規作成', 'New delivery')}
               </MenuItem>
+              <MenuItem icon={<AiIcon size={16} />} secondaryContent={t('作業画面', 'Workspace')} onClick={() => bulk.openFor(weekStart)}>
+                {t('まとめて作る(週・国・チャネルを選び、AI で中身まで)', 'Create in bulk (week, country & channel, then AI content)')}
+              </MenuItem>
               <MenuItem
                 icon={<AiIcon size={16} />}
                 disabled={!canBulk}
                 secondaryContent={canBulkReason}
                 onClick={frames.openSetup}
               >
-                {t('この週の枠を作る(配信名・種類を入れて、AI で中身)', 'Create slots for this week (name & type, then AI content)')}
+                {t('この週の枠を作る(週の表示の上で作る、これまでの形)', 'Create slots for this week (in the week view, previous way)')}
               </MenuItem>
             </MenuList>
           </MenuPopover>
@@ -1467,6 +1482,8 @@ function App() {
       <AlertsFloat open={alertsOpen} onClose={() => setAlertsOpen(false)}>
         <AlertsPage onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
+      {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
+      <BulkWorkspace ws={bulk} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} onFinish={(d) => goTo('week', d)} />
       {(selected || creating) && (
         <CardDetail
           key={selected?.id ?? 'new'}
