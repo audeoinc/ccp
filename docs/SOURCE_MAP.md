@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-10-15(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-10-19(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -178,7 +178,11 @@ flowchart TD
 |---|---|---|
 | `main.tsx` | 14 | 起動。フォント・CSS を読み、`Root` を描く |
 | `Root.tsx` | 12 | Fluent UI のテーマで `App` を包む |
-| `App.tsx` | 1,030 | **画面の入口**。ヘッダー・ツールバー・絞り込み、計画 / 結果 / アラートの面の切り替え、月 / 週 / 一覧の切り替え、配信カードを開く |
+| `App.tsx` | 1,850 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
+| `deepLink.ts` / `CopyLinkButton.tsx` | 78 / 49 | 画面の状態(面・見せ方・期間・国・開いているフロート)を URL のクエリと行き来させる / 「リンクをコピー」 |
+| `faces.ts` / `FaceBadge.tsx` / `StageNav.tsx` | 25 / 36 / 114 | 面(計画・制作・結果)の色と名前 / フロートの面の札 / フロートの段階の帯(PLAN → PRODUCTION → RESULTS) |
+| `floatLayout.ts` | 67 | フロートの大きさとペインの幅を変えて覚える、共通の部品 |
+| `MePicker.tsx` / `InboxButton.tsx` | 218 / 62 | 右上の「あなた」(選んでログイン・切り替え・ログアウト。最初の「だれでログインしますか?」) / 右上の「依頼」(自分宛ての承認の依頼) |
 | `theme.ts` | 70 | Fluent UI のテーマ(色・書体) |
 | `fonts.ts` | 23 | 同梱のフォント(外部の CDN に頼らない) |
 | `index.css` | — | 全体の CSS と、印刷(週の資料・レポート)のときの見せ方 |
@@ -205,6 +209,10 @@ flowchart TD
 | `useBulkWorkspace.ts` / `BulkWorkspace.tsx` | 371 / 653 | まとめて作る作業画面(W14 の 4 回目の見直し)の状態と操作(App が持つ。① は保存しない) / 画面(① 対象と方向 → ② 中身を AI で作る → ③ 確かめる。① のあと、中身を作らずに保存もできる) |
 | `DeliveryPeek.tsx` / `CardPreview.tsx` | 34 / 68 | 配信にマウスを重ねたときのプレビュー / 保存済みの配信カードのプレビュー |
 | `status.ts` / `progress.ts` | 25 / 147 | 配信のステータスの色・チャネル / 工程(進み具合) |
+| `ChannelBadge.tsx` | 54 | メール / アプリの札(配信カード・月・週・一覧・結果で共通) |
+| `StatusFlow.tsx` / `MonthSummaryBar.tsx` | 46 / 65 | 件数の流れ(未起案 › 承認待ち › 承認済み)/ 月の要約の帯 |
+| `WeekRetro.tsx` / `WeekHistory.tsx` | 147 / 60 | 週の振り返りのメモ(結果の面で書き、翌週の計画の面に出す)/ 週の承認の履歴 |
+| `DataTable.tsx` | 151 | 一覧の表(並べ替え・サムネイル。計画と結果で共通) |
 
 ### 3.3 配信カード(全画面のフロート)
 
@@ -215,7 +223,10 @@ flowchart TD
 | `CardDetail.tsx` | 1,417 | **配信カードの本体**。4 ペインの配置、読み込み・保存、AI の下書きの起動、承認・差し戻し |
 | `CardMenu.tsx` | 160 | 「…」メニュー(取りやめ・削除 など) |
 | `cancel.ts` | 61 | 配信の取りやめ(消さずに残す) |
-| `CardAlertsBar.tsx` | 70 | 配信カードの上の、アラートの帯 |
+| `CardAlertsBar.tsx` | 113 | 配信カードの上の、アラートの帯(たたむ・種類の札・「対応する」) |
+| `CardAlertAction.tsx` / `ItemAlertOverlay.tsx` | 197 / 130 | 配信カードの中の「このアラートへの対応」(差し替えの候補・配信日を変える。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
+| `target.ts` | 45 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
+| `ProcessPane.tsx` / `ApprovalBar.tsx` | 289 / 327 | 右端のプロセスのペイン(状態・承認・引き継ぎ・制作の依頼の札)/ 承認の依頼・承認・差し戻し |
 | `LearningsBar.tsx` | 162 | 「これまでの学び」(過去の結果から) |
 | `Splitter.tsx` / `ResizeHandles.tsx` | 49 / 67 | ペインの幅の変更 / フロートの大きさの変更 |
 
@@ -231,7 +242,7 @@ flowchart TD
 | `NotesEditor.tsx` / `MarkdownLite.tsx` | 124 / 51 | 制作指示の入力(Markdown)/ その表示 |
 | `LinksEditor.tsx` / `links.ts` | 146 / 139 | リンク先の入力 / 配信ごとのリンク先(JSON で保存) |
 | `HandoffPanel.tsx` | 89 | 制作への引き継ぎ |
-| `PushTimingPanel.tsx` / `pushLink.ts` | 70 / 24 | アプリの配信の時刻・相手 / 通知を押したときに開く画面 |
+| `pushLink.ts` / `AppLinksEditor.tsx` | 24 / 218 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `QuestionsPanel.tsx` / `TasksPanel.tsx` | 284 / 186 | 制作からの質問と返信 / タスク |
 | `CommentsPanel.tsx` | 407 | レビューのコメント(スレッド) |
 | `AiButton.tsx` / `AiMark.tsx` | 14 / 17 | AI に頼むボタン / AI の印 |
@@ -272,7 +283,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `AlertsPage.tsx` | 392 | アラートの面(左に一覧、右に選んだアラート) |
+| `AlertsPage.tsx` / `AlertsFloat.tsx` | 453 / 43 | アラートの画面(左に一覧、右に選んだアラート)/ それを重ねて開くフロート |
 | `alerts.ts` | 342 | **在庫のアラートの計算**(配信日の在庫の見込み)と、変更のアラート |
 | `cardAlerts.ts` | 76 | アラートを、配信ごとに分ける(カード・カレンダーの印) |
 | `alertSettings.ts` / `AlertSettingsDialog.tsx` | 94 / 113 | アラートの条件(ブラウザごと)と、その設定の画面 |
@@ -285,7 +296,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `ResultsPage.tsx` | 500 | 結果の面(月 / 週 / 一覧、まとめ方、取り込み・書き出し) |
+| `ResultsPage.tsx` / `ResultsSummaryBar.tsx` | 513 / 79 | 結果の面(月 / 週 / 一覧、まとめ方、取り込み・書き出し)/ 結果の面の月の要約の帯(通貨ごとの売上・前月比・前年比・開封率・クリック率) |
 | `ResultsCalendar.tsx` | 208 | 結果の月・週の表示 |
 | `ResultsCompareView.tsx` | 371 | 条件で絞り込んだ配信を並べて比べる |
 | `ResultDetail.tsx` | 206 | 詳しい結果のフロート |
@@ -316,6 +327,25 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `images.ts` | 26 | 同梱のイラスト(画像の URL が空のとき) |
 | `assets/products/` ・ `assets/heroes/` | — | 同梱のイラスト(商品・メイン画像) |
 
+### 3.8.1 承認
+
+| ファイル | 行数 | 役割 |
+|---|---|---|
+| `approvals.ts` / `weekApprovals.ts` | 51 / 51 | 承認者になれる人の判断 / 週のまとめての依頼・承認 |
+| `people.ts` / `useApprovalInbox.ts` | 93 / 82 | ユーザー・承認グループ・承認のルール(すべての配信に同じ 1 つ)の読み込み / 自分宛ての依頼 |
+| `PeopleManager.tsx` | 408 | ⚙ の「ユーザーと承認グループ」 |
+| `PolicyManager.tsx` / `policyCheck.ts` | 344 / 126 | ⚙ の「方針と決まり」/ AI の案が決まりを守っているかの確かめ |
+
+### 3.8.2 制作
+
+| ファイル | 行数 | 役割 |
+|---|---|---|
+| `ProductionPage.tsx` | 572 | **制作のページ**(フロート。要素の情報・HTML のエディタ・プレビュー・やり取り、工程の帯) |
+| `ProductionInfoPane.tsx` | 344 | 制作のページの左のペイン(要素の情報。コピー・直す・企画の値に戻す) |
+| `HtmlEditor.tsx` / `HtmlPreviewFrame.tsx` | 78 / 108 | HTML のエディタ(開いたときに読み込む)/ HTML をそのまま描くプレビュー(縮小・拡大・全体) |
+| `productionSnapshot.ts` | 317 | 配信カードの写し(制作に要る中身を固める)、コピー用の行、プレビューの HTML の書き出し |
+| `useProductionRequests.ts` / `notesStage.ts` | 65 / 11 | 制作の依頼の読み込み(制作の面・札)/ やり取りの段階(企画 / 制作) |
+
 ### 3.9 データの出入り口
 
 | パス | 役割 |
@@ -339,6 +369,12 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/dbready.py` | — | DB が使えるかどうか(DB を必要なときだけ起動する環境のための、差し込み口)。使えないときの `DbNotReady` |
 | `ccp/hosted/` | — | 開発元の本番(Cloud Run + Cloud SQL)だけで使うもの。`dbctl.py`(Cloud SQL の自動起動・自動停止)・`connect.py`(Cloud SQL Connector)・`routes.py`(Cloud Scheduler が呼ぶ `/internal/idle-check`)・`devtoken.py`(手元の gcloud のトークン)。Workbench 版のリリースには入れない([RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `ccp/ai.py` | 89 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
+| `ccp/approvals.py` | 359 | 承認の依頼・承認・差し戻し・やり直し(`/api/approvals`) |
+| `ccp/production.py` | 263 | 制作の依頼(`/api/production`。依頼・受け取る・終わった・送る・やり直す・HTML・要素の直し) |
+| `ccp/identity.py` | 96 | ログインしている人(`/api/me`) |
+| `ccp/policies.py` | 335 | 方針と決まりの取り込みと、AI への渡し方 |
+| `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 139 / 346 / 259 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報。商品の性別の読み替え)/ 取り込む前の確かめ |
+| `ccp/bq_dummy.py` | 300 | BigQuery の見本のデータ(ダミーの元の表)を作る運用ツール |
 | `ccp/assets.py` | — | `/img/…`。商品・メイン画像を、GCS か `ASSET_DIR` のフォルダから配る |
 | `ccp/creds.py` | — | Google の認証(サービスアカウント) |
 | `ccp/pack.py` | 113 | 引っ越し用のパック(すべてのデータと画像の ZIP)の書き出し・取り込み |
