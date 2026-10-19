@@ -122,9 +122,9 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
     }
   }
 
-  // 「承認を依頼」を開くとき、種別の既定の相手と決まりを入れる(依頼のときに足し引きできる)
+  // 「承認を依頼」を開くとき、既定の相手と決まりを入れる(依頼のときに足し引きできる)
   const openRequest = () => {
-    const def = ruleFor(people, card.department)
+    const def = ruleFor(people)
     const activeGroups = new Set(people.groups.filter((g) => (g.status ?? 'active') === 'active').map((g) => g.id))
     setRule(def?.rule ?? 'all')
     setGroupIds(parseIds(def?.group_ids).filter((id) => activeGroups.has(id)))
@@ -149,8 +149,8 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
   const requestColor = (st?: string): 'success' | 'warning' | 'danger' | 'informative' => (st === 'approved' ? 'success' : st === 'open' ? 'warning' : st === 'changes_requested' ? 'danger' : 'informative')
   const firstSlot = reviewers.find((r) => r.id === eligible[0])?.reviewer_name ?? ''
 
-  // 種別の既定の依頼先(⚙ →「承認の決まり」)。依頼の入力を開く前に、だれに届くかを見せる(例: 依頼先: MD・Brand(全員))
-  const def = ruleFor(people, card.department)
+  // 既定の依頼先(⚙ →「承認の決まり」。すべての配信に同じ)。依頼の入力を開く前に、だれに届くかを見せる(例: 依頼先: MD・Brand(全員))
+  const def = ruleFor(people)
   const defNames = [
     ...parseIds(def?.group_ids).map((id) => people.groups.find((g) => g.id === id && (g.status ?? 'active') === 'active')?.name),
     ...parseIds(def?.user_ids).map((id) => activeUsers(people).find((u) => u.id === id)?.name),

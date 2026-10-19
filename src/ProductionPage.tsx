@@ -34,9 +34,10 @@ import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
 import { buildSnapshot, downloadText, parseSnapshot, previewHtml, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
-import { locale, optionLabel, tr, useT } from './i18n'
+import { locale, tr, useT } from './i18n'
 import { loadPref, savePref } from './settings'
 import { statusRank } from './status'
+import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
 import { CopyLinkButton } from './CopyLinkButton'
@@ -473,7 +474,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
                       </div>
                     </>
                   }
-                  foot={<span className={s.note}>{t(`種別: ${optionLabel(card.department_name)} ・ 写し: ${when(approvedSnap.takenAt)}`, `Type: ${optionLabel(card.department_name)} · Snapshot: ${when(approvedSnap.takenAt)}`)}</span>}
+                  foot={<span className={s.note}>{t(`種類: ${themeTypeLabel(themeTypeOf(card).type)} ・ 写し: ${when(approvedSnap.takenAt)}`, `Type: ${themeTypeLabel(themeTypeOf(card).type)} · Snapshot: ${when(approvedSnap.takenAt)}`)}</span>}
                 />
               </div>
             ) : (

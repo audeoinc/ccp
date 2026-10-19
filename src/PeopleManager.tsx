@@ -21,14 +21,13 @@ import { AddRegular, DismissRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { logEvent, meLock, myName, myUserId, onMeChange } from './history'
 import { useSyncExternalStore } from 'react'
-import { activeUsers, groupUsers, reloadPeople, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
+import { activeUsers, groupUsers, reloadPeople, ruleFor, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
 import { UsersService } from './data/users'
 import { ApprovalGroupsService } from './data/approvalGroups'
 import { ApprovalGroupMembersService } from './data/approvalGroupMembers'
 import { ApprovalRulesService } from './data/approvalRules'
 import { ApprovalRuleRule, type ApprovalRule } from './models/approvalRules'
 import { parseIds } from './approvals'
-import { departmentOptions } from './status'
 import { EventsService, type CardEvent } from './data/events'
 import { UserRole, UserStatus, type User, type UserFields } from './models/users'
 import { ApprovalGroupStatus, type ApprovalGroup, type ApprovalGroupFields } from './models/approvalGroups'
@@ -175,11 +174,18 @@ export function PeopleManager() {
     )
   }
 
-  /** 種別ごとの既定の承認者と決まり(U3)。1 種別に 1 行。変えた項目だけを書く */
-  const saveRule = (department: string, label: string, patch: Partial<Pick<ApprovalRule, 'rule' | 'group_ids' | 'user_ids'>>, what: string) => {
-    const cur = people.rules.find((r) => r.department === department)
-    const write = () => (cur ? ApprovalRulesService.update(cur.id, patch) : ApprovalRulesService.create({ department, rule: 'all', group_ids: '[]', user_ids: '[]', ...patch }))
-    void run(write, 'rule_change', tr(`${label} の既定: ${what}`, `${label} default: ${what}`))
+  /**
+   * 既定の承認者と決まり(U3)。すべての配信に同じ 1 つ(2026-10-19、利用者の判断: 配信カードの「種別」をやめた)。
+   * 共通の行(department が空)に書く。まだなければ、いま使っている行(以前の種別ごとの行)を写して作る。変えた項目だけを書く
+   */
+  const saveRule = (patch: Partial<Pick<ApprovalRule, 'rule' | 'group_ids' | 'user_ids'>>, what: string) => {
+    const common = people.rules.find((r) => !r.department)
+    const base = ruleFor(people)
+    const write = () =>
+      common
+        ? ApprovalRulesService.update(common.id, patch)
+        : ApprovalRulesService.create({ department: '', rule: base?.rule ?? 'all', group_ids: base?.group_ids ?? '[]', user_ids: base?.user_ids ?? '[]', ...patch })
+    void run(write, 'rule_change', tr(`既定: ${what}`, `Default: ${what}`))
   }
 
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
@@ -267,22 +273,21 @@ export function PeopleManager() {
     <>
       <span className={s.note}>
         {t(
-          '配信カードで「承認を依頼」を押したときの、最初の相手と決まりです(依頼のときに足し引きできます)。全員 = 指名したそれぞれから 1 人ずつ、1 人 = だれか 1 人。',
-          'The default approvers and rule when "Request approval" is pressed on a delivery card (adjustable per request). Everyone = one from each; Any one = any single approver.',
+          '配信カードで「承認を依頼」を押したときの、最初の相手と決まりです。すべての配信に同じです(依頼のときに足し引きできます)。全員 = 指名したそれぞれから 1 人ずつ、1 人 = だれか 1 人。',
+          'The default approvers and rule when "Request approval" is pressed on a delivery card. The same for all deliveries (adjustable per request). Everyone = one from each; Any one = any single approver.',
         )}
       </span>
-      {departmentOptions.map((d) => {
-        const r = people.rules.find((x) => x.department === d.value)
-        const label = optionLabel(d.label)
+      {(() => {
+        const r = ruleFor(people)
         const activeGroups = people.groups.filter((g) => (g.status ?? 'active') === 'active')
         const users = activeUsers(people)
         const gids = parseIds(r?.group_ids)
         const uids = parseIds(r?.user_ids)
         return (
-          <div key={d.value} className={s.group}>
+          <div className={s.group}>
             <div className={s.groupHead}>
-              <span className={s.colHead}>{label}</span>
-              <Select size="small" value={r?.rule ?? 'all'} aria-label={t(`${label} の決まり`, `${label} rule`)} disabled={busy} onChange={(_, v) => saveRule(d.value, label, { rule: v.value as ApprovalRule['rule'] }, `${t('決まり', 'rule')} ${optionLabel(ApprovalRuleRule[v.value as keyof typeof ApprovalRuleRule])}`)}>
+              <span className={s.colHead}>{t('すべての配信', 'All deliveries')}</span>
+              <Select size="small" value={r?.rule ?? 'all'} aria-label={t('決まり', 'Rule')} disabled={busy} onChange={(_, v) => saveRule({ rule: v.value as ApprovalRule['rule'] }, `${t('決まり', 'rule')} ${optionLabel(ApprovalRuleRule[v.value as keyof typeof ApprovalRuleRule])}`)}>
                 {ruleOptions.map(([v, l]) => (
                   <option key={v} value={v}>{optionLabel(l)}</option>
                 ))}
@@ -298,7 +303,7 @@ export function PeopleManager() {
                 disabled={busy}
                 value={activeGroups.filter((g) => gids.includes(g.id)).map((g) => g.name).join(', ')}
                 selectedOptions={gids}
-                onOptionSelect={(_, v) => saveRule(d.value, label, { group_ids: JSON.stringify(v.selectedOptions) }, `${t('グループ', 'groups')} ${activeGroups.filter((g) => v.selectedOptions.includes(g.id)).map((g) => g.name).join(' / ') || '—'}`)}
+                onOptionSelect={(_, v) => saveRule({ group_ids: JSON.stringify(v.selectedOptions) }, `${t('グループ', 'groups')} ${activeGroups.filter((g) => v.selectedOptions.includes(g.id)).map((g) => g.name).join(' / ') || '—'}`)}
               >
                 {activeGroups.map((g) => (
                   <Option key={g.id} value={g.id} text={g.name}>{g.name}</Option>
@@ -312,7 +317,7 @@ export function PeopleManager() {
                 disabled={busy}
                 value={users.filter((u) => uids.includes(u.id)).map((u) => u.name).join(', ')}
                 selectedOptions={uids}
-                onOptionSelect={(_, v) => saveRule(d.value, label, { user_ids: JSON.stringify(v.selectedOptions) }, `${t('承認者', 'approvers')} ${users.filter((u) => v.selectedOptions.includes(u.id)).map((u) => u.name).join(' / ') || '—'}`)}
+                onOptionSelect={(_, v) => saveRule({ user_ids: JSON.stringify(v.selectedOptions) }, `${t('承認者', 'approvers')} ${users.filter((u) => v.selectedOptions.includes(u.id)).map((u) => u.name).join(' / ') || '—'}`)}
               >
                 {users.map((u) => (
                   <Option key={u.id} value={u.id} text={u.name}>{u.name}</Option>
@@ -321,7 +326,7 @@ export function PeopleManager() {
             </div>
           </div>
         )
-      })}
+      })()}
     </>
   )
 

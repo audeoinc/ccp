@@ -19,7 +19,8 @@ const CARD_KEYS = [
   'scheduled_at',
   'country',
   'channel',
-  'department',
+  // 種類(テーマの種類)。配信カードの「種別」(department)は、2026-10-19 にやめた
+  'theme_type',
   'status',
   'email_template',
   'layout_key',

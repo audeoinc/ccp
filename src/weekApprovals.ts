@@ -16,8 +16,8 @@ export const needsRequest = (cards: DeliveryCard[], hasOpen: (cardId: string) =>
   cards.filter((c) => !isCancelled(c) && statusRank(c.status) < statusRank(STATUS_APPROVED) && !hasOpen(c.id))
 
 /**
- * 週の未依頼の配信を、種別ごとの既定の相手と決まりで、まとめて依頼する。
- * 既定がない種別の配信は飛ばして、名前を返す(配信カードで相手を選んで依頼してもらう)
+ * 週の未依頼の配信を、既定の相手と決まり(すべての配信に同じ)で、まとめて依頼する。
+ * 既定の相手がいなければ飛ばして、名前を返す(配信カードで相手を選んで依頼してもらう)
  */
 export async function requestAll(cards: DeliveryCard[], people: People, actor: Actor, weekStart: string): Promise<{ done: string[]; skipped: string[] }> {
   const done: string[] = []
@@ -25,7 +25,7 @@ export async function requestAll(cards: DeliveryCard[], people: People, actor: A
   const users = new Set(activeUsers(people).map((u) => u.id))
   const groups = new Set(people.groups.filter((g) => (g.status ?? 'active') === 'active').map((g) => g.id))
   for (const c of cards) {
-    const def = ruleFor(people, c.department)
+    const def = ruleFor(people)
     const group_ids = parseIds(def?.group_ids).filter((id) => groups.has(id))
     const user_ids = parseIds(def?.user_ids).filter((id) => users.has(id))
     if (group_ids.length === 0 && user_ids.length === 0) {
