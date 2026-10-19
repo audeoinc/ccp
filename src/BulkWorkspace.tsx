@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useRef, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -16,9 +16,6 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
-  Popover,
-  PopoverSurface,
-  PopoverTrigger,
   type MenuButtonProps,
   MessageBar,
   MessageBarBody,
@@ -42,7 +39,6 @@ import {
   DeleteRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
-  ArrowSwapRegular,
   WarningFilled,
   DismissRegular,
   EditRegular,
@@ -66,8 +62,6 @@ import { productImage } from './images'
 import { yen } from './items'
 import { productMarket } from './market'
 import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
-import { ReplacePicker } from './ReplacePicker'
-import type { StockModel } from './alerts'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -203,6 +197,7 @@ const useStyles = makeStyles({
   reviewHead: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   reviewMeta: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2 },
   reviewTitle: { margin: 0, fontSize: tokens.fontSizeBase500, lineHeight: tokens.lineHeightBase500, fontWeight: tokens.fontWeightSemibold },
+  reviewTitleRow: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap' },
   picked: { display: 'grid', rowGap: '6px' },
   pickedRow: { display: 'flex', columnGap: '10px', rowGap: '8px', flexWrap: 'wrap' },
   pickedItem: { display: 'grid', rowGap: '2px', width: '110px', fontSize: '12px', alignContent: 'start' },
@@ -214,7 +209,6 @@ const useStyles = makeStyles({
   overlap: { display: 'flex', alignItems: 'baseline', columnGap: '10px', flexWrap: 'wrap', fontSize: '12px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   overlapWarn: { backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
   reviewBody: { minWidth: 0 },
-  footCurrent: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, maxWidth: '40%' },
   footHint: { fontSize: '12px', color: tokens.colorNeutralForeground2, textAlign: 'right' },
   askSurface: { maxWidth: '520px', '& button': { whiteSpace: 'nowrap' } },
   // ① 右の、もうある配信は薄く(作る予定の破線のカードを目立たせる)
@@ -231,11 +225,10 @@ interface Props {
   products: Product[]
   heroes: HeroImage[]
   /** 配信カードを開いて直す(作業画面の上に重なる) */
-  onOpen: (id: string) => void
+  /** 保存した配信を、配信カードで開く(focus は、選んでおく商品。週の上限超えを直すとき) */
+  onOpen: (id: string, focus?: string) => void
   /** まだ保存していない案を、配信カードで開く(配信カードで保存したときに、はじめて保存される) */
-  onOpenDraft: (day: string) => void
-  /** 在庫の見込み(週の上限を超えた商品の差し替えの候補を選ぶのに使う。まだ読めていなければ、差し替えは出さない) */
-  model?: StockModel
+  onOpenDraft: (day: string, focus?: string) => void
   /** 終えて、作った週の週表示に移る */
   onFinish: (weekStart: Date) => void
 }
@@ -247,13 +240,11 @@ interface Props {
  * ① は保存しない。② で中身ができた配信から、ふつうの下書き(未起案)として保存する。
  * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
-export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft, onFinish, model }: Props) {
+export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft, onFinish }: Props) {
   const s = useStyles()
   const t = useT()
   // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
   const finishRef = useRef(false)
-  // 差し替えの候補を開いている商品(選んだら閉じる)
-  const [replacing, setReplacing] = useState<string | null>(null)
   const dayText = (key: string) => new Date(`${key}T00:00`).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
   const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
   const weekEnd = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 6)
@@ -642,18 +633,36 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
               <span className={s.spacer} />
               <span className={s.muted}>{t(`${index + 1} / ${items.length} 本目`, `${index + 1} of ${items.length}`)}</span>
               {stateBadge(current.state)}
-              {/* 破棄は、保存(右下)から離して、案の題名の帯に置く。保存したあとでも破棄できる(保存した配信を消す) */}
+            </div>
+            {/* 題名の行の右に、この案だけに効くボタン(破棄・開いて編集・保存)。画面の右下は、全体に効くボタン(まとめて保存・終える) */}
+            <div className={s.reviewTitleRow}>
+              <h3 className={s.reviewTitle}>{c.name}</h3>
+              <span className={s.spacer} />
               {current.state === 'discarded' ? (
-                <Button size="small" appearance="subtle" onClick={() => ws.undoDiscard(current.day)}>
+                <Button size="small" onClick={() => ws.undoDiscard(current.day)}>
                   {t('破棄を取り消す', 'Undo discard')}
                 </Button>
               ) : (
-                <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(current.day)}>
-                  {t('破棄', 'Discard')}
-                </Button>
+                <>
+                  <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(current.day)}>
+                    {t('破棄', 'Discard')}
+                  </Button>
+                  <Button size="small" icon={<EditRegular />} disabled={busy} onClick={() => (current.state === 'saved' ? onOpen(c.id) : onOpenDraft(current.day))}>
+                    {t('開いて編集', 'Open & edit')}
+                  </Button>
+                  {current.state === 'unsaved' ? (
+                    <Button size="small" appearance="primary" icon={busy ? <Spinner size="extra-tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(current.day)}>
+                      {t('保存', 'Save')}
+                    </Button>
+                  ) : (
+                    <span className={s.statusLine}>
+                      <CheckmarkCircleFilled className={s.doneIcon} />
+                      {t('保存済み', 'Saved')}
+                    </span>
+                  )}
+                </>
               )}
             </div>
-            <h3 className={s.reviewTitle}>{c.name}</h3>
             {c.theme && <span className={s.hint}>{`${t('テーマ', 'Theme')}: ${c.theme}`}</span>}
           </header>
           {/* 選んだ商品(開かなくても分かるように) */}
@@ -675,26 +684,12 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                       {over && <WarningFilled />}
                       {t(`今週 ${uses} 本 / 上限 ${WEEKLY_PRODUCT_LIMIT}`, `${uses} this week / max ${WEEKLY_PRODUCT_LIMIT}`)}
                     </span>
-                    {over &&
-                      p &&
-                      (current.state === 'unsaved' && model ? (
-                        <Popover positioning="below-start" withArrow trapFocus open={replacing === `${current.day}:${pid}`} onOpenChange={(_, d) => setReplacing(d.open ? `${current.day}:${pid}` : null)}>
-                          <PopoverTrigger disableButtonEnhancement>
-                            <Button size="small" appearance="outline" icon={<ArrowSwapRegular />}>
-                              {t('差し替え', 'Replace')}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverSurface>
-                            <ReplacePicker card={c} removed={p} inCard={current.productIds} products={products} model={model} weekUse={ws.weekUse} onPick={(to) => {
-                                ws.replace(current.day, pid, to)
-                                setReplacing(null)
-                              }}
-                            />
-                          </PopoverSurface>
-                        </Popover>
-                      ) : (
-                        <span className={s.muted}>{t('「開いて編集」で直す', 'Fix via “Open & edit”')}</span>
-                      ))}
+                    {/* 直す場所は配信カード(週の表示の「直すこと」・在庫のアラートと同じ)。開くと、その商品のアラートを選んだ状態になる */}
+                    {over && (
+                      <Button size="small" appearance="outline" icon={<EditRegular />} onClick={() => (current.state === 'saved' ? onOpen(c.id, pid) : onOpenDraft(current.day, pid))}>
+                        {t('開いて直す', 'Open & fix')}
+                      </Button>
+                    )}
                   </div>
                 )
               })}
@@ -779,60 +774,21 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
           {t(`次へ: ${ws.reviewItems.length} 本を確かめて保存`, `Next: review & save ${ws.reviewItems.length}`)}
         </Button>
       )
-    // ③: いま見ている案を決めるボタン(配信カードの「保存」と同じ、右下)。未保存の案がなくなったら「終える」
-    if (!current) return finishButton
-    const done = ws.unsavedCount === 0
-    if (current.state === 'unsaved')
-      return (
-        <>
-          {/* 保存せずに、配信カードで開く(配信カードで「保存」を押したときに、はじめて保存される) */}
-          <Button icon={<EditRegular />} disabled={busy} onClick={() => onOpenDraft(current.day)}>
-            {t('開いて編集', 'Open & edit')}
-          </Button>
-          {/* 保存の ▾ に「残りをまとめて保存」(途中で切り上げるとき。ふだんは 1 本ずつ) */}
-          <Menu positioning="above-end">
-            <MenuTrigger disableButtonEnhancement>
-              {(triggerProps: MenuButtonProps) => (
-                <SplitButton
-                  appearance="primary"
-                  icon={busy ? <Spinner size="tiny" /> : <SaveRegular />}
-                  disabled={busy}
-                  primaryActionButton={{ onClick: () => void ws.save(current.day) }}
-                  menuButton={{ ...triggerProps, 'aria-label': t('ほかの保存のしかた', 'Other ways to save') }}
-                >
-                  {t('保存', 'Save')}
-                </SplitButton>
-              )}
-            </MenuTrigger>
-            <MenuPopover>
-              <MenuList>
-                <MenuItem
-                  icon={<SaveRegular />}
-                  onClick={() => {
-                    if (window.confirm(t(`まだ決めていない ${ws.unsavedCount} 本を、まとめて下書き(未起案)で保存します。よろしいですか?`, `Save all ${ws.unsavedCount} remaining drafts (Not started)?`))) void ws.saveAll()
-                  }}
-                >
-                  {t(`残りの ${ws.unsavedCount} 本をまとめて保存`, `Save all ${ws.unsavedCount} remaining`)}
-                </MenuItem>
-              </MenuList>
-            </MenuPopover>
-          </Menu>
-        </>
-      )
+    // ③: 画面の右下は、全体に効くボタンだけ(まとめて保存・終える)。1 本ずつの保存・編集・破棄は、案の題名の行の右
     return (
       <>
-        {current.state === 'saved' && (
-          <Button icon={<EditRegular />} onClick={() => onOpen(current.card.id)}>
-            {t('開いて編集', 'Open & edit')}
+        {ws.unsavedCount > 0 && (
+          <Button
+            icon={ws.savingDay ? <Spinner size="tiny" /> : <SaveRegular />}
+            disabled={!!ws.savingDay}
+            onClick={() => {
+              if (window.confirm(t(`まだ決めていない ${ws.unsavedCount} 本を、まとめて下書き(未起案)で保存します。よろしいですか?`, `Save all ${ws.unsavedCount} remaining drafts (Not started)?`))) void ws.saveAll()
+            }}
+          >
+            {t(`残りの ${ws.unsavedCount} 本をまとめて保存`, `Save all ${ws.unsavedCount} remaining`)}
           </Button>
         )}
-        {done ? (
-          finishButton
-        ) : (
-          <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" onClick={() => ws.setCheckDay(ws.reviewItems.find((x) => x.state === 'unsaved')?.day ?? null)}>
-            {t('次の未保存の案へ', 'Next unsaved')}
-          </Button>
-        )}
+        {finishButton}
       </>
     )
   }
@@ -893,7 +849,6 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                 {t('戻る', 'Back')}
               </Button>
             )}
-            {inReview && current && <span className={s.footCurrent}>{t(`${index + 1} / ${items.length} 本目 ・ ${current.card.name}`, `${index + 1} of ${items.length} · ${current.card.name}`)}</span>}
             <span className={s.spacer} />
             <span className={s.footHint}>{footHint}</span>
             {actions()}

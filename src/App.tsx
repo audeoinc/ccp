@@ -67,7 +67,7 @@ import { AiIcon } from './AiMark'
 import { AlertsPage } from './AlertsPage'
 import { AlertsFloat } from './AlertsFloat'
 import { useChangeAlerts, useStockAlerts } from './alerts'
-import { buildCardAlerts, topKind, type CardAlertKind } from './cardAlerts'
+import { buildCardAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
@@ -100,7 +100,7 @@ import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, departmentOptions, statusColor, statusOptions, statusView } from './status'
-import { dayKeyOf, sundayOf } from './weekLock'
+import { dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
 import { logEvent, myName, myUserId } from './history'
 import { EventsService, type CardEvent } from './data/events'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
@@ -419,7 +419,7 @@ function App() {
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
   // まとめて作る作業画面の、まだ保存していない案を、配信カードで開いているとき(保存すると新規作成になる)
-  const [draftOpen, setDraftOpen] = useState<{ day: string; draft: BulkDraft } | null>(null)
+  const [draftOpen, setDraftOpen] = useState<{ day: string; draft: BulkDraft; alerts?: CardAlert[]; focus?: string } | null>(null)
 
   // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
   // 配信カードごとの掲載商品(メールの並び順の商品 ID。候補の行は入れない)。数は、一覧の「商品数」「工程」と、締め切りの警告に使う
@@ -483,7 +483,12 @@ function App() {
   const changeAlerts = filterChangeAlerts(alertSettings, changeState.changeAlerts)
   const alertCount = alerts.length + changeAlerts.length
   // 配信ごとのアラート(配信カードの帯・カレンダーの印)
-  const cardAlerts = useMemo(() => buildCardAlerts(alerts, changeAlerts), [alerts, changeAlerts])
+  // 配信ごとのアラート: 在庫・方針・日程に、週の上限を超えた商品を足す(直す場所を配信カードにそろえるため)
+  const cardAlerts = useMemo(
+    () => mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProducts, (id) => products.find((p) => p.id === id)?.name ?? '')),
+    [alerts, changeAlerts, activeCards, cardProducts, products],
+  )
+  const weekUseAll = useMemo(() => weeklyUse(activeCards, cardProducts), [activeCards, cardProducts])
   const alertKinds = useMemo(() => new Map([...cardAlerts].map(([id, list]) => [id, topKind(list)]).filter((e): e is [string, CardAlertKind] => !!e[1])), [cardAlerts])
   // アラートの画面から開いたときに、配信カードで選んでおく商品
   const [focusProduct, setFocusProduct] = useState<string | undefined>(undefined)
@@ -1494,13 +1499,16 @@ function App() {
         cards={activeCards}
         products={products}
         heroes={heroes}
-        onOpen={setSelectedId}
-        onOpenDraft={(day) => {
+        onOpen={(id, focus) => {
+          setFocusProduct(focus)
+          setSelectedId(id)
+        }}
+        onOpenDraft={(day, focus) => {
           const draft = bulk.draftFor(day)
-          if (draft) setDraftOpen({ day, draft })
+          // 週の上限超えは、配信カードのアラートとして出し、その商品を選んだ状態で開く(直す場所を配信カードにそろえる)
+          if (draft) setDraftOpen({ day, draft, alerts: bulk.draftAlerts(day), focus })
         }}
         onFinish={(d) => goTo('week', d)}
-        model={alertState.model}
       />
       {(selected || creating || draftOpen) && (
         <CardDetail
@@ -1527,8 +1535,10 @@ function App() {
           onSaved={load}
           // 結果は、面を切り替えずに、配信カードの上に重ねて見る。結果の面で、その結果から開いた配信カードでは出さない(下に結果があるため)
           onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
-          alerts={selected ? cardAlerts.get(selected.id) : undefined}
-          focusProductId={focusProduct}
+          alerts={selected ? cardAlerts.get(selected.id) : draftOpen?.alerts}
+          // 週の上限超えの差し替えで、上限に届いた商品を候補から除く(作業画面の案は、保存していない案も数える)
+          weekUse={selected?.scheduled_at ? weekUseAll.get(weekKeyOf(new Date(selected.scheduled_at))) : draftOpen ? bulk.weekUse : undefined}
+          focusProductId={focusProduct ?? draftOpen?.focus}
           stockModel={alertState.model}
           // 配信カードの中の「アラートの画面で詳しく」: 配信カードを閉じて、その商品のアラートを選んだアラートのフロートを開く
           onOpenAlerts={(productId) => {

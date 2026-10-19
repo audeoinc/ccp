@@ -17,6 +17,7 @@ import { sundayOf } from './weekLock'
 import { tr } from './i18n'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import type { CardAlert } from './cardAlerts'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { Progress } from './useWeekFrames'
@@ -209,18 +210,18 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   }
 
   /**
-   * 保存していない案の商品を、ほかの商品に差し替える(週の上限を超えた商品など)。
-   * 配信カードのアラートへの対応(X30)の差し替えと同じく、候補から選んで置き換え、確定は「保存」で行う
+   * 保存していない案を配信カードで開くときの、週の上限超えのアラート(配信カードの帯・商品の札に出し、
+   * 「このアラートへの対応」から差し替える。直す場所を配信カードにそろえる)
    */
-  function replace(day: string, fromId: string, to: { id: string; reason: string }) {
-    const r = results.get(day)
-    if (!r || savedIds.has(day)) return
-    const sections = r.sections.map((s) => ({
-      ...s,
-      selected: s.selected.map((x) => (x.productId === fromId ? { ...x, productId: to.id, reason: to.reason || x.reason } : x)),
-      candidates: s.candidates.filter((x) => x.productId !== to.id),
+  function draftAlerts(day: string): CardAlert[] {
+    const x = reviewItems.find((i) => i.day === day)
+    if (!x) return []
+    return issuesOf(x).over.map((pid) => ({
+      kind: 'overLimit' as const,
+      productId: pid,
+      label: products.find((p) => p.id === pid)?.name ?? '',
+      detail: tr(`この週に ${weekUse.get(pid) ?? 0} 本の配信に載っている(上限 ${WEEKLY_PRODUCT_LIMIT} 本)`, `In ${weekUse.get(pid) ?? 0} deliveries this week (max ${WEEKLY_PRODUCT_LIMIT})`),
     }))
-    setResults((m) => new Map(m).set(day, { ...r, sections }))
   }
 
   /** 閉じる。まだ保存していない入力・案があれば確かめる(保存したものは、消えない)。閉じたら true */
@@ -559,7 +560,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     compareProducts,
     weekUse,
     issuesOf,
-    replace,
+    draftAlerts,
     savingDay,
     save,
     discard,

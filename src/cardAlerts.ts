@@ -2,8 +2,10 @@
 // 配信カードの帯(どこに問題があるか)と、カレンダーの印に使う
 import type { ChangeAlert, StockAlert } from './alerts'
 import { locale, tr } from './i18n'
+import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { weekKeyOf } from './weekLock'
 
-export type CardAlertKind = 'outOfStock' | 'lowStock' | 'policyChanged' | 'dateChanged'
+export type CardAlertKind = 'outOfStock' | 'lowStock' | 'policyChanged' | 'dateChanged' | 'overLimit'
 
 export interface CardAlert {
   kind: CardAlertKind
@@ -15,7 +17,7 @@ export interface CardAlert {
 }
 
 /** 強い順(カレンダーの印の色に使う) */
-export const CARD_ALERT_ORDER: CardAlertKind[] = ['outOfStock', 'policyChanged', 'lowStock', 'dateChanged']
+export const CARD_ALERT_ORDER: CardAlertKind[] = ['outOfStock', 'policyChanged', 'lowStock', 'overLimit', 'dateChanged']
 
 const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
@@ -74,3 +76,49 @@ export function buildCardAlerts(stock: StockAlert[], changes: ChangeAlert[]): Ma
 
 /** いちばん強いアラートの種類(カレンダーの印) */
 export const topKind = (list?: CardAlert[]): CardAlertKind | undefined => CARD_ALERT_ORDER.find((k) => list?.some((a) => a.kind === k))
+
+/**
+ * 週ごとの、商品を載せる配信の数(週の確認の一覧 W4 の「週の上限を超えた商品」と同じ数え方。同じ配信に 2 回載せても 1 と数える)。
+ * 週のキーは weekKeyOf
+ */
+export function weeklyUse(cards: { id: string; scheduled_at?: string }[], cardProducts: Map<string, string[]>): Map<string, Map<string, number>> {
+  const out = new Map<string, Map<string, number>>()
+  for (const c of cards) {
+    if (!c.scheduled_at) continue
+    const key = weekKeyOf(new Date(c.scheduled_at))
+    const m = out.get(key) ?? new Map<string, number>()
+    for (const pid of new Set(cardProducts.get(c.id) ?? [])) m.set(pid, (m.get(pid) ?? 0) + 1)
+    out.set(key, m)
+  }
+  return out
+}
+
+/**
+ * 週の上限を超えた商品のアラート(配信ごと)。在庫のアラートと同じく、配信カードの帯・プレビューの枠・商品情報の行に出し、
+ * 「このアラートへの対応」から差し替えられるようにする(直す場所を配信カードにそろえる。2026-10-19 利用者と決めた)
+ */
+export function overLimitAlerts(cards: { id: string; scheduled_at?: string }[], cardProducts: Map<string, string[]>, productName: (id: string) => string): Map<string, CardAlert[]> {
+  const use = weeklyUse(cards, cardProducts)
+  const out = new Map<string, CardAlert[]>()
+  for (const c of cards) {
+    if (!c.scheduled_at) continue
+    const m = use.get(weekKeyOf(new Date(c.scheduled_at)))
+    const list = [...new Set(cardProducts.get(c.id) ?? [])]
+      .filter((pid) => (m?.get(pid) ?? 0) > WEEKLY_PRODUCT_LIMIT)
+      .map((pid) => ({
+        kind: 'overLimit' as const,
+        productId: pid,
+        label: productName(pid),
+        detail: tr(`この週に ${m?.get(pid) ?? 0} 本の配信に載っている(上限 ${WEEKLY_PRODUCT_LIMIT} 本)`, `In ${m?.get(pid) ?? 0} deliveries this week (max ${WEEKLY_PRODUCT_LIMIT})`),
+      }))
+    if (list.length > 0) out.set(c.id, list)
+  }
+  return out
+}
+
+/** 2 つの、配信ごとのアラートをまとめる */
+export function mergeCardAlerts(a: Map<string, CardAlert[]>, b: Map<string, CardAlert[]>): Map<string, CardAlert[]> {
+  const out = new Map(a)
+  for (const [id, list] of b) out.set(id, [...(out.get(id) ?? []), ...list])
+  return out
+}

@@ -32,6 +32,7 @@ const ALERT_BG: Record<CardAlertKind, string> = {
   lowStock: tokens.colorPaletteDarkOrangeBackground3,
   policyChanged: tokens.colorPalettePurpleBackground2,
   dateChanged: tokens.colorPaletteBlueBackground2,
+  overLimit: tokens.colorPaletteMarigoldBackground2,
 }
 
 const useStyles = makeStyles({
@@ -174,7 +175,7 @@ function ProductItem({ product: p, itemKey, onHover, alert, onAlert }: { product
                 }}
                 title={t('このアラートへの対応を開く', 'Handle this alert')}
               >
-                {{ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date') }[alert]}
+                {{ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date'), overLimit: t('週の上限', 'Weekly limit') }[alert]}
               </button>
             )}
             <span className={s.sub}>

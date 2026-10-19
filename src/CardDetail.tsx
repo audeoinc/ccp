@@ -76,6 +76,8 @@ interface Props {
    */
   draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[] }
   onCreated?: (id: string) => void
+  /** この配信の週に、商品を載せる配信の数(週の上限超えのアラートの差し替えで、上限に届いた商品を候補から除く) */
+  weekUse?: Map<string, number>
   products: Product[]
   heroes: HeroImage[]
   /** 他の配信で使われているテーマ(テーマ案の重複回避用) */
@@ -411,7 +413,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -970,6 +972,8 @@ export function CardDetail({ card, defaults, draft, onCreated, products, heroes,
     const a = alertByProduct.get(productId)
     if (a) setActAlert(a)
   }
+  // アラートへの対応で使う配信(保存した配信か、作業画面から開いた、まだ保存していない案)
+  const alertCard = card ?? draft?.card
   const replaceForAlert = (alert: CardAlert, to: Product) => {
     const from = products.find((p) => p.id === alert.productId)
     // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
@@ -1201,15 +1205,16 @@ export function CardDetail({ card, defaults, draft, onCreated, products, heroes,
             </MessageBar>
           )}
 
-          {actAlert && card && (
+          {actAlert && alertCard && (
             <CardAlertAction
               alert={actAlert}
               product={products.find((p) => p.id === actAlert.productId)}
-              card={card}
+              card={alertCard}
               scheduledAt={form.scheduledAt}
               inCard={new Set(items.map((i) => i.productId))}
               products={products}
               model={stockModel}
+              weekUse={weekUse}
               onReplace={(to) => replaceForAlert(actAlert, to)}
               onPostpone={postponeForAlert}
               onOpenAlerts={() => openAlertsScreen(actAlert.productId)}
@@ -1220,7 +1225,7 @@ export function CardDetail({ card, defaults, draft, onCreated, products, heroes,
           {liveAlerts.length > 0 && (
             <CardAlertsBar
               alerts={liveAlerts}
-              onAct={card ? setActAlert : undefined}
+              onAct={alertCard ? setActAlert : undefined}
               defaultOpen={!!focusProductId}
               selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
               onSelectProduct={(pid) => {
@@ -1502,7 +1507,7 @@ export function CardDetail({ card, defaults, draft, onCreated, products, heroes,
                   products={products}
                   onHover={setHoverKey}
                   alertKinds={new Map(CARD_ALERT_ORDER.slice().reverse().flatMap((k) => liveAlerts.filter((a) => a.kind === k && a.productId).map((a) => [a.productId!, k] as const)))}
-                  onAlert={card ? openAlertFor : undefined}
+                  onAlert={alertCard ? openAlertFor : undefined}
                 />
               </div>
             ) : (
