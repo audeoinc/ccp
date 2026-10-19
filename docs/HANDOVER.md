@@ -448,7 +448,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 ## 6.27 X37 絞り込みをヘッダーへ、担当に「自分」(2026-10-19、UI セッション)
 
-- 絞り込みの段(`filterRow`)はなくし、ヘッダーの面の切り替えの右に `Popover`(中は、これまでの `FilterSelect` の札を縦に並べたもの)。ボタンの文字は `filterSummary`。
+- 絞り込みの段(`filterRow`)はなくし、ヘッダーの面の切り替えの右に札を横に並べた(`headerFilters`)。最初は 1 つのボタンとパネル(`Popover`)にしたが、使いにくいとのことで同じ日に横並びに戻した(X39)。選んでいない札は名前だけ。アプリ名(`styles.title`)は幅 1680px 以下で隠す。ヘッダーは `flexWrap: 'wrap'`。
 - 「自分」は `filters.person = '__me__'`(`ME_PERSON`)。App が `useSyncExternalStore(onMeChange, myName)` で右上の人の名前を持ち、`personName` に読み替えて絞る(右上で人を切り替えると、絞り込みも追いかける)。担当の列は、まだユーザーの id ではなく名前の文字なので、名前の一致で見る。
 
 ## 7. 落とし穴

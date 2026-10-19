@@ -17,9 +17,6 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
-  Popover,
-  PopoverSurface,
-  PopoverTrigger,
   Portal,
   SplitButton,
   Spinner,
@@ -46,7 +43,6 @@ import {
   DocumentBulletListRegular,
   PeopleTeamRegular,
   ChevronDownRegular,
-  FilterRegular,
   GlobeRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -155,6 +151,8 @@ const useStyles = makeStyles({
   headerWrap: { position: 'sticky', top: 0, zIndex: 10, boxShadow: tokens.shadow2 },
   header: {
     display: 'flex',
+    flexWrap: 'wrap',
+    rowGap: tokens.spacingVerticalS,
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalXL}`,
@@ -172,7 +170,12 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     lineHeight: tokens.lineHeightBase400,
     letterSpacing: '0.01em',
+    whiteSpace: 'nowrap',
+    // 画面が狭いときは、アプリ名の文字を隠してアイコンだけにする(絞り込みの札をヘッダーの 1 段に収めるため。X39)
+    '@media (max-width: 1680px)': { display: 'none' },
   },
+  // ヘッダーの絞り込みの札(X39)。収まらないときだけ、2 段目に回る
+  headerFilters: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
   // 表(計画)と裏(結果)の切り替え。題名のすぐ横に固定して、どちらの面でも位置が動かないようにする
   faceSwitch: {
     display: 'inline-flex',
@@ -369,8 +372,15 @@ function FilterSelect({ label, value, options, onChange }: {
     >
       <MenuTrigger disableButtonEnhancement>
         <button type="button" className={mergeClasses(styles.filterChip, value !== '' && styles.filterChipOn)} aria-label={`${label}: ${current}`}>
-          <span className={styles.filterChipLabel}>{label}:</span>
-          <span className={styles.filterChipValue}>{current}</span>
+          {/* 選んでいないときは名前だけ(「すべて」は情報が少ないので出さない。ヘッダーに収めるため短くする)。選んだら「名前: 値」 */}
+          {value === '' ? (
+            <span>{label}</span>
+          ) : (
+            <>
+              <span className={styles.filterChipLabel}>{label}:</span>
+              <span className={styles.filterChipValue}>{current}</span>
+            </>
+          )}
           <ChevronDownRegular className={styles.filterChipChevron} aria-hidden />
         </button>
       </MenuTrigger>
@@ -1153,16 +1163,6 @@ function App() {
   const filtering = filters.channel !== '' || filters.department !== '' || (page !== 'results' && filters.status !== '') || filters.person !== ''
   // 担当の候補: いちばん上に「自分」(ログインしている人。Jira の Me と同じ)
   const personOptions = [{ value: ME_PERSON, label: me ? t(`自分(${me})`, `Me (${me})`) : t('自分', 'Me') }, ...owners.map((o) => ({ value: o, label: o }))]
-  // ボタンに出す、いまの絞り込みの中身(例: メール・自分)
-  const optLabel = (opts: { value: string | number; label: string }[], v: string) => optionLabel(opts.find((o) => String(o.value) === v)?.label ?? v)
-  const filterSummary = [
-    filters.channel && optLabel(channelOptions, filters.channel),
-    filters.department && optLabel(departmentOptions, filters.department),
-    page !== 'results' && filters.status && optLabel(statusOptions, filters.status),
-    filters.person && (filters.person === ME_PERSON ? t('自分', 'Me') : filters.person),
-  ]
-    .filter(Boolean)
-    .join(t('・', ', '))
   // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
@@ -1215,27 +1215,15 @@ function App() {
             </button>
           ))}
         </div>
-        {/* 絞り込み(X37): 段を取らないよう、ヘッダーの 1 つのボタンにまとめる。絞っているときは、中身をボタンの文字に出す */}
-        <Popover positioning="below-start" trapFocus>
-          <PopoverTrigger disableButtonEnhancement>
-            <button type="button" className={mergeClasses(styles.countryBtn, filtering && styles.filterBtnOn)} aria-label={filtering ? t(`絞り込み: ${filterSummary}`, `Filters: ${filterSummary}`) : t('絞り込み', 'Filters')}>
-              <FilterRegular className={styles.countryIcon} />
-              <span className={styles.filterBtnText}>{filtering ? t(`絞り込み: ${filterSummary}`, `Filters: ${filterSummary}`) : t('絞り込み', 'Filters')}</span>
-              <ChevronDownRegular className={styles.countryChevron} />
-            </button>
-          </PopoverTrigger>
-          <PopoverSurface>
-            <div className={styles.filterPanel}>
-              <span className={styles.filterPanelHead}>{t('絞り込み', 'Filters')}</span>
-              <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
-              <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
-              {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
-              {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
-              <FilterSelect label={t('担当', 'Person')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
-              {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
-            </div>
-          </PopoverSurface>
-        </Popover>
+        {/* 絞り込み(X39): ヘッダーに横に並べる(X37 の 1 つのボタンは、押す回数が増えて使いにくかったため) */}
+        <div className={styles.headerFilters}>
+          <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
+          <FilterSelect label={t('種別', 'Type')} value={filters.department} options={departmentOptions} onChange={setFilter('department')} />
+          {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
+          {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
+          <FilterSelect label={t('担当', 'Person')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
+          {filtering && <Button size="small" appearance="subtle" onClick={() => setFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
+        </div>
         <span className={styles.headerSpacer} />
         {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
         <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
