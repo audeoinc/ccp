@@ -15,10 +15,11 @@ const useStyles = makeStyles({
     color: '#ffffff',
   },
   // 配信カードの題名の左
-  card: { columnGap: '6px', height: '30px', padding: '0 12px 0 10px', fontSize: tokens.fontSizeBase300 },
+  // 幅はメールとアプリでそろえる(並んだときに、札の端がそろうように)。中身は真ん中に
+  card: { columnGap: '6px', height: '30px', minWidth: '92px', justifyContent: 'center', padding: '0 12px 0 10px', boxSizing: 'border-box', fontSize: tokens.fontSizeBase300 },
   cardIcon: { fontSize: '20px' },
   // 一覧の列・週の配信の箱など
-  small: { columnGap: '4px', height: '20px', padding: '0 8px 0 6px', fontSize: tokens.fontSizeBase100 },
+  small: { columnGap: '4px', height: '20px', minWidth: '64px', justifyContent: 'center', padding: '0 8px 0 6px', boxSizing: 'border-box', fontSize: tokens.fontSizeBase100 },
   smallIcon: { fontSize: '13px' },
   // 月の配信の箱の、名前の前(文字なし。幅が狭いため)
   icon: { justifyContent: 'center', width: '16px', height: '16px', borderRadius: tokens.borderRadiusSmall, verticalAlign: '-3px', marginRight: '4px' },
