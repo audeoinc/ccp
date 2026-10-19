@@ -63,7 +63,7 @@ import { DeliveryProductsService } from './data/deliveryProducts'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar } from './WeekReviewBar'
-import { MePicker } from './MePicker'
+import { MePicker, SignInDialog } from './MePicker'
 import { WeekRetro } from './WeekRetro'
 import { WeekHistory } from './WeekHistory'
 import { MonthSummaryBar } from './MonthSummaryBar'
@@ -292,7 +292,7 @@ const useStyles = makeStyles({
   lensLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   lensLabelOff: { color: tokens.colorNeutralForegroundDisabled },
   // ヘッダーの「あなた」
-  headerMe: { width: '170px' },
+  headerMe: { maxWidth: '200px' },
   toolbarDivider: { width: '1px', alignSelf: 'stretch', margin: `2px ${tokens.spacingHorizontalS}`, backgroundColor: tokens.colorNeutralStroke2 },
 })
 
@@ -994,6 +994,8 @@ function App() {
       <TemplateManager />
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
       <PeopleManager />
+      {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
+      <SignInDialog />
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
         <h1 className={styles.title}>{t('コンテンツプランナー', 'Contents Planner')}</h1>
@@ -1061,12 +1063,8 @@ function App() {
             </MenuList>
           </MenuPopover>
         </Menu>
-        {/* あなた(履歴・依頼・承認・コメントに残す人)。画面全体で共通なので、ヘッダーに常に出す */}
-        <Tooltip content={t('履歴・依頼・承認に残す、あなた(このブラウザで覚えます)', 'You, for the history, requests and approvals (remembered in this browser)')} relationship="description">
-          <span>
-            <MePicker className={styles.headerMe} ariaLabel={t('あなた', 'You')} />
-          </span>
-        </Tooltip>
+        {/* ログインしている人(U9)。履歴・依頼・承認・やり取りは、すべてこの人で残す(ほかの画面では人を選ばせない) */}
+        <MePicker className={styles.headerMe} ariaLabel={t('ログインしている人', 'Signed-in user')} />
         {/* 管理系(テンプレート・言語・自動の下書き)は、毎日の作業と分けて、設定のメニューにまとめる */}
         <Menu
           checkedValues={{ lang: [lang], auto: autoDraft ? ['on'] : [] }}

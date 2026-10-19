@@ -46,7 +46,7 @@ export function InboxButton({ inbox, onOpenCard }: Props) {
           <div className={s.head}>
             {t('自分宛ての依頼', 'Requests for you')}
           </div>
-          {!inbox.meId && <span className={s.note}>{t('「あなた」を選ぶと、自分宛ての依頼が出ます', 'Choose who you are to see your requests')}</span>}
+          {!inbox.meId && <span className={s.note}>{t('右上で、だれでログインするかを選ぶと、自分宛ての依頼が出ます', 'Choose who is signed in at the top right to see your requests')}</span>}
           {inbox.meId && n === 0 && <span className={s.note}>{t('いま、あなたが承認する依頼はありません', 'Nothing waiting for your approval right now')}</span>}
           {inbox.mine.map((m) => (
             <button key={m.request.id} type="button" className={s.row} onClick={() => m.request.delivery_card_id && onOpenCard(m.request.delivery_card_id)}>

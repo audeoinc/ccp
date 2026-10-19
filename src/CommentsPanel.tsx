@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
 import { locale, tr, useT } from './i18n'
-import { myName, setMyName } from './history'
-import { MePicker } from './MePicker'
+import { myName, onMeChange } from './history'
 import { AiButton } from './AiButton'
 import { suggestTasks, type TaskIdea } from './aiTasks'
 
@@ -96,8 +95,8 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   const t = useT()
   const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // 書く人は、ブラウザごとに覚えた「あなた」(承認の履歴と共通)
-  const [author, setAuthor] = useState(myName)
+  // 書く人は、右上のログインしている人(U9)。ここでは選ばせない(承認のブロックと同じ人で残すため)
+  const author = useSyncExternalStore(onMeChange, myName)
   const [target, setTarget] = useState('')
   const [to, setTo] = useState('')
   const [body, setBody] = useState('')
@@ -153,7 +152,6 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
 
   const add = () =>
     run(async () => {
-      setMyName(author)
       const res = await CardNotesService.create({
         delivery_card_id: cardId,
         ...(target ? { product_id: target } : {}),
@@ -177,7 +175,6 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   /** 返信する。resolve なら、返信してから解決にする(「直しました」と書いて閉じる、よくある流れを 1 回で) */
   const reply = (root: CardNote, resolve = false) =>
     run(async () => {
-      setMyName(author)
       const id = root.id
       const text = (drafts[id] ?? '').trim()
       if (text) {
@@ -462,9 +459,6 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
       {cardId && (
         <div className={styles.form}>
           <div className={styles.formRow}>
-            <Field label={t('あなた', 'You')} size="small">
-              <MePicker list="ccp-thread-people" onChange={setAuthor} />
-            </Field>
             <Field label={t('宛先(任意)', 'To (optional)')} size="small">
               <Input size="small" list="ccp-thread-people" value={to} onChange={(_, d) => setTo(d.value)} placeholder={t('返事を求める人', 'Who should reply')} />
             </Field>
@@ -496,7 +490,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             <Button size="small" appearance="primary" disabled={busy || !body.trim() || !me} onClick={() => void add()}>
               {t('書き込む', 'Post')}
             </Button>
-            <span className={styles.hint}>{t('Ctrl + Enter で書き込む', 'Ctrl + Enter to post')}</span>
+            <span className={styles.hint}>{me ? t('Ctrl + Enter で書き込む', 'Ctrl + Enter to post') : t('右上で、だれでログインするかを選ぶと、書き込めます', 'Choose who is signed in at the top right to post')}</span>
           </div>
         </div>
       )}

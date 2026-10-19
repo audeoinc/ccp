@@ -19,9 +19,8 @@ import {
 } from '@fluentui/react-components'
 import { AddRegular, DismissRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
-import { logEvent, meLock, myUserId, onMeChange } from './history'
+import { logEvent, meLock, myName, myUserId, onMeChange } from './history'
 import { useSyncExternalStore } from 'react'
-import { MePicker } from './MePicker'
 import { activeUsers, groupUsers, reloadPeople, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
 import { UsersService } from './data/users'
 import { ApprovalGroupsService } from './data/approvalGroups'
@@ -76,6 +75,7 @@ export function PeopleManager() {
   // ログインしているとき(U7)は、管理者だけが編集できる。ログインがなければ、だれでも(いまの運用。変更は履歴に残る)
   const lock = useSyncExternalStore(onMeChange, meLock)
   const meId = useSyncExternalStore(onMeChange, myUserId)
+  const meName = useSyncExternalStore(onMeChange, myName)
   const canEdit = !lock || people.users.find((u) => u.id === meId)?.role === 'admin'
   const busy = working || !canEdit
   const [error, setError] = useState<string | null>(null)
@@ -344,8 +344,8 @@ export function PeopleManager() {
         <div className={s.head}>
           <DialogTitle className={s.grow}>{t('ユーザーと承認グループ', 'Users and approval groups')}</DialogTitle>
           {working && <Spinner size="extra-tiny" />}
-          {/* 変更の履歴に、だれが変えたかを残すため、ここでも「あなた」を選べるようにする */}
-          <MePicker ariaLabel={t('変更の履歴に残す、あなた', 'You (for the change history)')} />
+          {/* 変更の履歴に残るのは、右上のログインしている人(U9。ここでは選ばせない) */}
+          <span className={s.note}>{meName ? t(`${meName} として変更します`, `Editing as ${meName}`) : t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right')}</span>
           <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setOpen(false)} />
         </div>
         <span className={s.note}>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Checkbox, Dropdown, Field, MessageBar, MessageBarBody, Option, Radio, RadioGroup, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Checkbox, Dropdown, Field, MessageBar, MessageBarBody, Option, Radio, RadioGroup, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowUndoRegular, CheckmarkCircleFilled, CircleRegular, DeleteRegular, DismissCircleFilled, PeopleTeamRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ApprovalRequestStatus, type ApprovalRequest, type ApprovalRequestRule } from './models/approvalRequests'
@@ -15,7 +15,6 @@ import { statusColor, statusLabel } from './status'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
 import { LockMark } from './LockMark'
-import { MePicker } from './MePicker'
 
 const useStyles = makeStyles({
   // 左ペインの「ステータス」の直下に置く、縦のブロック(利用者の指摘 2026-10-17: 横一列では読めず、配信の状態と離れていた)
@@ -34,7 +33,11 @@ const useStyles = makeStyles({
   ng: { color: tokens.colorPaletteRedForeground1 },
   pending: { color: tokens.colorNeutralForeground4 },
   actions: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap' },
-  me: { width: '100%' },
+  // 承認を依頼するときの、種別の既定の依頼先(依頼の前に、だれに届くかが分かるように)
+  target: { flexBasis: '100%', display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, overflowWrap: 'anywhere' },
+  // ボタンの行の中で、案内だけは 1 行を使う(ボタンと横に並ぶと、どれの説明か分かりにくいため)
+  wide: { flexBasis: '100%' },
+  targetLabel: { color: tokens.colorNeutralForeground3 },
   // 依頼・差し戻しの入力
   box: { display: 'grid', rowGap: '8px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   boxActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
@@ -136,7 +139,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
   const blockedBy = !usersOk
     ? t('ユーザーが登録されていないので、承認の依頼は使えません(⚙ →「ユーザーと承認グループ」)', 'No users are registered, so approval requests are not available (⚙ → Users and approval groups)')
     : needMe
-      ? t('「あなた」を選んでください', 'Choose who you are first')
+      ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right first')
       : dirty
         ? t('変更があります。先に保存してください', 'There are unsaved changes. Save first.')
         : null
@@ -145,6 +148,21 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
     d === 'approved' ? <CheckmarkCircleFilled className={s.ok} /> : d === 'changes_requested' ? <DismissCircleFilled className={s.ng} /> : <CircleRegular className={s.pending} />
   const requestColor = (st?: string): 'success' | 'warning' | 'danger' | 'informative' => (st === 'approved' ? 'success' : st === 'open' ? 'warning' : st === 'changes_requested' ? 'danger' : 'informative')
   const firstSlot = reviewers.find((r) => r.id === eligible[0])?.reviewer_name ?? ''
+
+  // 種別の既定の依頼先(⚙ →「承認の決まり」)。依頼の入力を開く前に、だれに届くかを見せる(例: 依頼先: MD・Brand(全員))
+  const def = ruleFor(people, card.department)
+  const defNames = [
+    ...parseIds(def?.group_ids).map((id) => people.groups.find((g) => g.id === id && (g.status ?? 'active') === 'active')?.name),
+    ...parseIds(def?.user_ids).filter((id) => id !== meId).map((id) => activeUsers(people).find((u) => u.id === id)?.name),
+  ].filter(Boolean)
+  const defaultTarget = usersOk && (
+    <span className={s.target}>
+      <span className={s.targetLabel}>{t('依頼先:', 'Request to:')}</span>
+      {defNames.length > 0
+        ? t(`${defNames.join('・')}(${def?.rule === 'any' ? 'だれか 1 人' : '全員'})`, `${defNames.join(', ')} (${def?.rule === 'any' ? 'any one' : 'everyone'})`)
+        : t('種別の既定はありません(依頼のときに選びます)', 'No default for this type (choose when requesting)')}
+    </span>
+  )
 
   const requestButton = (
     <Tooltip content={blockedBy ?? t('承認グループ・承認者を指名して、承認を依頼します', 'Choose approval groups or approvers and request approval')} relationship="description">
@@ -188,17 +206,20 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
             : t('承認の依頼は、まだありません', 'No approval request yet')}
         </span>
       )}
-      <MePicker className={s.me} ariaLabel={t('承認の記録に残す、あなた', 'You (for the approval record)')} />
       <div className={s.actions}>
         {live?.status === 'open' ? (
           <>
             {isRequester && (
-              <Button type="button" size="small" icon={<DeleteRegular />} disabled={disabled} onClick={() => void run(() => ApprovalsService.withdraw(live.id, { actor, week_start: weekStart }))}>
-                {t('取り下げ', 'Withdraw')}
-              </Button>
+              <>
+                <span className={mergeClasses(s.note, s.wide)}>{t('あなたが依頼しました(自分の依頼は、自分では承認できません)', 'You requested this (you cannot approve your own request)')}</span>
+                <Button type="button" size="small" icon={<DeleteRegular />} disabled={disabled} onClick={() => void run(() => ApprovalsService.withdraw(live.id, { actor, week_start: weekStart }))}>
+                  {t('取り下げ', 'Withdraw')}
+                </Button>
+              </>
             )}
             {eligible.length > 0 && (
               <>
+                <span className={mergeClasses(s.note, s.wide)}>{t(`あなたは ${firstSlot} として承認できます`, `You can approve as ${firstSlot}`)}</span>
                 <Tooltip content={blockedBy ?? t(`${firstSlot} として承認します`, `Approve as ${firstSlot}`)} relationship="description">
                   <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => void run(() => ApprovalsService.decide(live.id, { actor, decision: 'approved', reviewer_id: eligible[0], week_start: weekStart }))}>
                     {t('承認', 'Approve')}
@@ -209,12 +230,15 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
                 </Button>
               </>
             )}
-            {!isRequester && eligible.length === 0 && <span className={s.note}>{needMe ? t('「あなた」を選ぶと、承認できるか分かります', 'Choose who you are to see if you can approve') : t('あなたは、この配信の承認者ではありません', 'You are not an approver for this delivery')}</span>}
+            {!isRequester && eligible.length === 0 && <span className={s.note}>{needMe ? t('右上で、だれでログインするかを選ぶと、承認できるか分かります', 'Choose who is signed in at the top right to see if you can approve') : t(`あなた(${meName})は、この配信の承認者ではありません`, `You (${meName}) are not an approver for this delivery`)}</span>}
           </>
         ) : live?.status === 'approved' ? (
           <span className={s.note}>{t('内容を変えて保存すると、承認はやり直しになります', 'Changing the content and saving will require approval again')}</span>
         ) : (
-          requestButton
+          <>
+            {mode !== 'request' && defaultTarget}
+            {requestButton}
+          </>
         )}
       </div>
       {error && (
