@@ -7,9 +7,9 @@ import {
   CircleRegular,
   CommentRegular,
   EyeRegular,
-  MailRegular,
+  MailFilled,
   PersonRegular,
-  PhoneRegular,
+  PhoneFilled,
   QuestionCircleFilled,
   TaskListLtrRegular,
   WarningFilled,
@@ -146,8 +146,9 @@ const useStyles = makeStyles({
   cardPush: { borderRadius: '16px' },
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
   strip: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '3px 8px', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
-  stripEmail: { backgroundColor: tokens.colorPaletteBlueBackground2, color: tokens.colorPaletteBlueForeground2 },
-  stripPush: { backgroundColor: tokens.colorPaletteBerryBackground2, color: tokens.colorPaletteBerryForeground2 },
+  // 帯は、配信カードの札と同じ、塗りつぶしの地に白抜き(メール = 青、アプリ = ベリー)
+  stripEmail: { backgroundColor: tokens.colorPaletteBlueBorderActive, color: '#ffffff' },
+  stripPush: { backgroundColor: tokens.colorPaletteBerryBorderActive, color: '#ffffff' },
   stripNone: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground3 },
   stripTime: { marginLeft: 'auto', fontWeight: tokens.fontWeightRegular },
   inner: { display: 'grid', rowGap: '5px', padding: '6px 8px 8px', minWidth: 0 },
@@ -348,7 +349,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         style={{ ...(channel === 'push' ? { border: `1.5px solid ${statusColor(c.status)}` } : {}), ...(isCancelled(c) ? CANCELLED_STYLE : {}) }}
       >
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
-          {channel === 'push' ? <PhoneRegular /> : <MailRegular />}
+          {channel === 'push' ? <PhoneFilled /> : <MailFilled />}
           {channel === 'email' ? t('メール', 'Email') : channel === 'push' ? t('アプリ', 'App') : t('チャネル未設定', 'No channel')}
           <span className={styles.stripTime}>{time}</span>
         </div>

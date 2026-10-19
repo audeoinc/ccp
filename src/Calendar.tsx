@@ -1,5 +1,6 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, MailRegular, PhoneRegular, WarningFilled } from '@fluentui/react-icons'
+import { AddRegular, WarningFilled } from '@fluentui/react-icons'
+import { ChannelBadge } from './ChannelBadge'
 import type { DeliveryCard } from './models/deliveryCards'
 import { CHANNEL_PUSH, countryOptions, statusColor, statusLabel } from './status'
 import { LockMark } from './LockMark'
@@ -145,7 +146,6 @@ const useStyles = makeStyles({
     transitionDuration: tokens.durationFast,
     ':hover': { boxShadow: tokens.shadow4 },
   },
-  channelIcon: { flexShrink: 0, verticalAlign: '-2px', marginRight: '3px', color: tokens.colorNeutralForeground3 },
   pillMeta: {
     display: 'none',
     color: tokens.colorNeutralForeground3,
@@ -275,11 +275,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                   >
                     <span className={styles.pillName}>
                       {/* メールかアプリかを、2 行目が出ない狭い画面でも見分けられるよう、名前の前にアイコンを付ける */}
-                      {c.channel === CHANNEL_PUSH ? (
-                        <PhoneRegular className={styles.channelIcon} aria-label={t('アプリ', 'App')} />
-                      ) : (
-                        <MailRegular className={styles.channelIcon} aria-label={t('メール', 'Email')} />
-                      )}
+                      <ChannelBadge channel={c.channel} size="icon" />
                       <AlertMark kind={alertKinds?.get(c.id)} />
                       <LockMark status={c.status} />
                       {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
