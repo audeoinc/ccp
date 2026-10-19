@@ -92,6 +92,20 @@ export const ProductionService = {
     if (card) event('production_edit', input.actor, card, input.week_start, `版 ${r.version}${input.edited_snapshot ? '' : '(承認された写しに戻した)'}`)
     return { success: true, data: structuredClone(r) as unknown as ProductionRequest }
   },
+  async undo(id: string, input: { actor: Actor; week_start?: string }) {
+    // 本番の undo と同じ: いまの状態 → 戻した先と、消す記録
+    const map: Record<string, [string, string[]]> = {
+      sent: ['done', ['sent_at', 'sent_by_name']],
+      done: ['in_progress', ['done_at', 'done_by_name', 'done_note', 'done_link']],
+      in_progress: ['requested', ['received_at', 'received_by_name']],
+      requested: ['withdrawn', []],
+    }
+    const r = tables.ProductionRequestsService.find((x) => x.id === id)
+    const status = String(r?.status ?? '')
+    let [to, clear] = map[status] ?? ['', []]
+    if (status === 'sent' && !r?.done_at) [to, clear] = ['withdrawn', []]
+    return advance(id, input.actor, Object.keys(map), { status: to, ...Object.fromEntries(clear.map((k) => [k, undefined])) }, 'production_undo', input.week_start, `版 ${r?.version}: ${status} → ${to}`, 'この版は戻せません(古い版か、取り下げた版です)')
+  },
   async sendRequest(id: string, input: { actor: Actor; html?: string; week_start?: string }) {
     return advance(id, input.actor, ['done'], { status: 'sent', sent_at: now(), sent_by_name: input.actor.name, ...(input.html ? { html: input.html } : {}) }, 'production_send', input.week_start, '配信のしくみへの送信は、まだ仮', '制作が終わった版だけを送れます(まだ終わっていないか、古い版です)')
   },

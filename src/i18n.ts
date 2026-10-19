@@ -80,6 +80,7 @@ const OPTION_EN: Record<string, string> = {
   制作が終わった: 'Production done',
   配信のしくみに送った: 'Sent to delivery system',
   古い版: 'Outdated',
+  取り下げた: 'Withdrawn',
   // ステータス
   未起案: 'Not started',
   検討中: 'In review',

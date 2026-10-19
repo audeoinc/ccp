@@ -12,6 +12,8 @@ export const ProductionRequestStatus = {
   sent: '配信のしくみに送った',
   /** 企画が変わったので古い版 */
   stale: '古い版',
+  /** 依頼を取り下げた(工程を ① に戻した。やり直すときは、新しい版で依頼し直す) */
+  withdrawn: '取り下げた',
 } as const
 export type ProductionRequestStatus = keyof typeof ProductionRequestStatus
 

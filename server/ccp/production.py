@@ -5,6 +5,7 @@
   POST /api/production/requests/{id}/done     制作が「制作が終わった」(ひとこと・できたもののリンクを任意で)
   POST /api/production/requests/{id}/html     直した HTML を保存する
   POST /api/production/requests/{id}/edits    左の要素(文言・メイン画像・商品・リンク先)を直した写しを保存する
+  POST /api/production/requests/{id}/undo     工程を 1 段戻す(やり直す)
   POST /api/production/requests/{id}/send     制作が終わった版を、配信のしくみに送る(工程の最後。いまは仮の窓口)
   POST /api/production/send                   制作を通さず、配信のしくみに送る(いまは送り先の窓口だけ。実際には送らずに「送りました」と返す)
 
@@ -180,6 +181,38 @@ async def save_edits(request_id: str, request: Request):
         card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
         if card is not None:
             await _event(conn, "production_edit", actor, card, body.get("week_start") or None, f"版 {req.get('version')}" + ("" if edited else "(承認された写しに戻した)"))
+    return ok(row)
+
+
+# 工程を 1 段戻すときの、いまの状態 → (戻した先の状態, 消す記録)。依頼の取り下げ(requested → withdrawn)は、版を残して記録にする
+_UNDO: dict[str, tuple[str, tuple[str, ...]]] = {
+    "sent": ("done", ("sent_at", "sent_by_name")),
+    "done": ("in_progress", ("done_at", "done_by_name", "done_note", "done_link")),
+    "in_progress": ("requested", ("received_at", "received_by_name")),
+    "requested": ("withdrawn", ()),
+}
+
+
+@router.post("/requests/{request_id}/undo")
+async def undo(request_id: str, request: Request):
+    """工程を 1 段戻す(2026-10-19、利用者の要望: 押し間違い・やり直しのとき)。いちばん新しく終わった段だけを戻す。
+    制作を通さずに送った版(受け取り・終わりの記録がない)は、取り下げにする(① からやり直す)"""
+    body = await _body(request)
+    async with db(write=True) as conn:
+        actor = await _actor(conn, body, request)
+        req = await _one(conn, "production_requests", request_id, lock=True)
+        if req is None:
+            return fail(404, "制作の依頼が見つかりません")
+        status = str(req.get("status") or "")
+        if status not in _UNDO:
+            return fail(409, "この版は戻せません(古い版か、取り下げた版です)")
+        to, clear = _UNDO[status]
+        if status == "sent" and not req.get("done_at"):
+            to, clear = "withdrawn", ()
+        row = await _update(conn, "production_requests", request_id, {"status": to, **{k: None for k in clear}}) or req
+        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
+        if card is not None:
+            await _event(conn, "production_undo", actor, card, body.get("week_start") or None, f"版 {req.get('version')}: {status} → {to}")
     return ok(row)
 
 

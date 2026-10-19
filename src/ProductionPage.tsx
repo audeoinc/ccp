@@ -3,6 +3,7 @@ import { Badge, Button, Dialog, DialogSurface, Input, Menu, MenuItem, MenuList, 
 import {
   ArrowDownloadRegular,
   ArrowResetRegular,
+  ArrowUndoRegular,
   CheckmarkRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
@@ -62,6 +63,8 @@ const useStyles = makeStyles({
   stepDotDone: { backgroundColor: tokens.colorPaletteGreenBackground3, color: tokens.colorNeutralForegroundOnBrand, border: 'none' },
   stepBody: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
   stepName: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  // 終えた段を戻すリンク(いちばん新しく終えた段だけ。目立たせない)
+  undo: { minWidth: 0, padding: 0, height: 'auto', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
   // 4 つのペイン(要素の情報 | HTML のエディタ | プレビュー | やり取り)。幅は境界のドラッグで変え、覚える。要素の情報とやり取りは、たためる
   body: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateRows: 'minmax(0, 1fr)' },
   col: { minHeight: 0, overflowY: 'auto', padding: '8px 14px 12px', display: 'grid', rowGap: '14px', alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)' },
@@ -240,7 +243,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 配信のしくみに送る(企画)。PROCESS.md 2 章の「いま、だれの番か」
   const status = live?.status
   const current = !approved ? -1 : !live ? 0 : status === 'requested' ? 1 : status === 'in_progress' ? 2 : status === 'done' ? 3 : 4
-  // 近道(制作を通さずに送った)のときは、② ③ を「飛ばした」にする
+  // 近道(制作を通さずに送った)のときは、② ③ を「飛ばした」にする。いちばん新しく終えた段(current - 1)には「やり直す」(依頼の段は「依頼を取り下げる」)
   const skipped = status === 'sent' && !live?.received_at && !live?.done_at
   const steps: { key: string; name: string; who: string; info?: string; skipped?: boolean; action?: ReactNode }[] = [
     {
@@ -357,6 +360,23 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
                     <span className={s.stepName}>{st.name}</span>
                     <span className={s.note}>{at === 'skipped' ? t('飛ばした(制作を通さずに送った)', 'Skipped (sent without production)') : st.info || st.who}</span>
                     {at === 'current' && st.action}
+                    {i === current - 1 && live && (
+                      <Tooltip content={i === 0 ? t('依頼を取り下げて、① に戻します(この版は記録に残ります。やり直すときは、新しい版で依頼し直します)', 'Withdraws the request and goes back to step 1 (this version stays on record; request again with a new version)') : t('この段を、まだ終えていない状態に戻します', 'Puts this step back to not done')} relationship="description">
+                        <Button
+                          size="small"
+                          appearance="transparent"
+                          className={s.undo}
+                          icon={<ArrowUndoRegular />}
+                          disabled={busy || !meId}
+                          onClick={() => {
+                            if (!window.confirm(i === 0 ? t('依頼を取り下げます。よろしいですか?', 'Withdraw the request?') : t(`「${st.name}」をやり直します。よろしいですか?`, `Redo "${st.name}"?`))) return
+                            void run(() => ProductionService.undo(live.id, { actor, week_start: weekStart }), i === 0 ? tr('依頼を取り下げました', 'Withdrew the request') : tr('1 つ前の段に戻しました', 'Went back one step'))
+                          }}
+                        >
+                          {i === 0 ? t('依頼を取り下げる', 'Withdraw') : t('やり直す', 'Redo')}
+                        </Button>
+                      </Tooltip>
+                    )}
                   </span>
                 </li>
               )

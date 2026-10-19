@@ -469,7 +469,7 @@
   "approval_reviewers.decision": ["pending", "approved", "changes_requested"],
   "notifications.kind": ["review_requested", "approved", "changes_requested", "withdrawn"],
   "notifications.status": ["pending", "sent", "skipped"],
-  "production_requests.status": ["requested", "in_progress", "done", "sent", "stale"],
+  "production_requests.status": ["requested", "in_progress", "done", "sent", "stale", "withdrawn"],
   "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"]
  }
 }
