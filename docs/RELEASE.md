@@ -29,7 +29,7 @@ npm run release:workbench -- --publish     # すべて通ったら、GitHub の 
 |---|---|
 | `src/`(`hosted/` を除く)・`public/`・画面のビルドの設定・`package.json`(本番用のスクリプトを消したもの)・`package-lock.json` | `Dockerfile`・`.dockerignore`・`.gcloudignore`・`cloudbuild.yaml`・`.github/`・`src/hosted/`(本番だけの画面) |
 | `server/ccp/`(`hosted/` を除く)・`server/tests/`(`test_hosted_*` を除く)・`schema.json`・`seed.json`・`requirements.txt`・`workbench.env.example` | `server/ccp/hosted/`・`server/requirements-hosted.txt` |
-| `scripts/workbench.sh`・`check-*.mjs`・`export-seed.mjs`・`feature-reasons.py` | `scripts/deploy-gcp.mjs`・`gcp-smoke.mjs`・`screenshots.mjs`・`release-workbench.mjs` |
+| `scripts/workbench.sh`・`check-*.mjs`・`export-seed.mjs`・`feature-reasons.py`・`flows-sheet.py` | `scripts/deploy-gcp.mjs`・`gcp-smoke.mjs`・`screenshots.mjs`・`release-workbench.mjs` |
 | `docs/` の Workbench の手引き・設計・機能・開発の理由(FEATURE_REASONS)・BACKLOG・SOURCE_MAP・BigQuery・承認・方針・スクリーンショット・ワイヤーフレーム | `docs/GCP.md`・`HANDOVER.md`・`CLOUD.md`・`ONBOARDING.md`・`RELEASE.md`(この文書)・`font-compare.html` |
 | `release/workbench/files/` の中身(Workbench 版の `README.md`・`CLAUDE.md`)を、ルートに置く | 開発側の `README.md`・`CLAUDE.md` |
 | `VERSION.txt`(スクリプトが作る。版・元のコミット・日付) | Git の履歴(`.git`) |
@@ -109,6 +109,7 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
    - [SOURCE_MAP.md](SOURCE_MAP.md)(と `source-map.drawio`): 足したファイル・役割の変わったファイル、図、「最終更新」の日付。
    - [FEATURE_REASONS.md](FEATURE_REASONS.md): `scripts/feature-reasons.py` の機能(F)・対応づけ(M)を直して、`python scripts/feature-reasons.py` で作り直す(食い違いがあれば止まる)。[USER_STORIES.md](USER_STORIES.md) の実装の状態も合わせる。
    - [BACKLOG.md](BACKLOG.md): 済んだもの・始めたものの状態。
+   - [FLOWS.md](FLOWS.md): 画面の入り口・移り方や前提の決まりが変わったら、2 章を直す。2 章・5.3・6 章の表を変えたら、`python scripts/flows-sheet.py` で記入用のシート [FLOWS_SHEET.md](FLOWS_SHEET.md) を作り直す。
    - 新しいファイルがあれば、`scripts/release-workbench.mjs` の `RULES` に足す。
 4. **確かめる**: `npm run verify`、サーバーのテスト(`cd server && python -m unittest discover tests`)、`npm run release:workbench -- --no-test`(言葉の検査)。
 5. **コミット・push**: `docs: 1 日の終わりの文書の更新(<日付>)` で、`git pull --rebase` のあと `main` に push する。
