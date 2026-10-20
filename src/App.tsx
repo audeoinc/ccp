@@ -100,6 +100,7 @@ import { useApprovalInbox } from './useApprovalInbox'
 import { productionColor, productionLabel, productionView, useProductionRequests } from './useProductionRequests'
 import { ProductionPage } from './ProductionPage'
 import { StageNav } from './StageNav'
+import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
@@ -1811,6 +1812,8 @@ function App() {
               />
               </>
             ) : page === 'results' ? (
+              // 結果の面も、週・月なら、つかんで前後へ(一覧・比べるは動かさない)
+              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={view === 'week' || view === 'month'}>
               <ResultsPage
                 stageNav={(c) => stageNav(c, 'results')}
                 cards={filtered}
@@ -1829,6 +1832,7 @@ function App() {
                 onDataActions={setResultsData}
                 retro={<WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} />}
               />
+              </SwipePager>
             ) : view === 'list' ? (
               <>
               {monthBar}
@@ -1887,6 +1891,8 @@ function App() {
               )}
               {!onProduction && <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} visibleIds={weekVisibleIds} />}
               {/* 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子。計画の面だけ */}
+              {/* 地の部分をつかんで横に引くと、前後の週へ(SwipePager) */}
+              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
               {lens === 'time' && !onProduction ? (
                 <WeekTimeGrid
                   start={weekStart}
@@ -1925,10 +1931,12 @@ function App() {
                 onCheck={frames.openCheck}
               />
               )}
+              </SwipePager>
               </>
             ) : (
               <>
               {monthBar}
+              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
               <Calendar
                 month={month}
                 cards={filtered}
@@ -1941,6 +1949,7 @@ function App() {
                 chipTone={onProduction ? productionTone : undefined}
                 renderMeta={onProduction ? productionMeta : undefined}
               />
+              </SwipePager>
               </>
             )}
           </>
