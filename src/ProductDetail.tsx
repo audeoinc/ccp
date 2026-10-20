@@ -73,10 +73,11 @@ export function ProductDetail({ product: p, onClose, footer }: { product: Produc
       </div>
 
       <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabId)}>
+        {/* 基本情報は、売上・在庫のすぐ右(利用者の要望 2026-10-20) */}
         <Tab value="trend">{t('売上・在庫', 'Sales & stock')}</Tab>
+        <Tab value="details">{t('基本情報', 'Details')}</Tab>
         <Tab value="metrics">{t('指標', 'Metrics')}</Tab>
         <Tab value="plan">{t('販売方針・販促', 'MD plan')}</Tab>
-        <Tab value="details">{t('基本情報', 'Details')}</Tab>
       </TabList>
 
       {(tab === 'trend' || tab === 'plan') && loading && <div className={s.center}><Spinner size="small" /></div>}
