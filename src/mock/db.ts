@@ -2,7 +2,7 @@
 // vite.mock.config.ts が、サービスの読み込みを、ここに差し替える。ページを読み込み直すと、データは、最初に戻る。
 
 import { mockAgent } from './agent'
-import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, cards, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, users, weekly, type Row } from './seed'
+import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, users, weekly, type Row } from './seed'
 import { sampleAds } from './ads'
 
 export const tables: Record<string, Row[]> = {
@@ -11,6 +11,7 @@ export const tables: Record<string, Row[]> = {
   ProductsService: structuredClone(products),
   HeroImagesService: structuredClone(heroes),
   WeeklyPerformancesService: structuredClone(weekly),
+  ProductRankingsService: structuredClone(productRankings),
   ProductPoliciesService: structuredClone(policies),
   LayoutTemplatesService: structuredClone(layoutTemplates),
   AiRequestsService: [],

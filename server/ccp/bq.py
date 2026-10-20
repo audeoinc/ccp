@@ -6,6 +6,7 @@
 接続は、Workbench のサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
 出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、環境変数で渡す:
   BQ_SPU / BQ_SKU / BQ_SKU_STOCK / BQ_WEEKLY / BQ_FORECAST   5 つの出力(BIGQUERY_EXPORT.md の 2〜6 章)
+  BQ_RANKING   販売チャネルごとの販売順位(BIGQUERY_EXPORT.md の 9 章。結果の画面で使う)
   BQ_<名前>_WATCH   出力がビューのとき、更新を見る元のテーブル(ビューの最終更新の日時は、元のデータが変わっても変わらないため)
   BQ_PROJECT       問い合わせ(ジョブ)を走らせるプロジェクト。なければ GOOGLE_CLOUD_PROJECT
 """
@@ -43,6 +44,7 @@ OUTPUTS: tuple[Output, ...] = (
     Output("sku_stock", "BQ_SKU_STOCK", "SKU の在庫", ("market", "sku_code", "stock", "as_of")),
     Output("weekly", "BQ_WEEKLY", "週ごとの実績", ("market", "product_code", "week_start", "units", "revenue", "as_of"), ("stock",)),
     Output("forecast", "BQ_FORECAST", "天気予報", ("market", "date", "issued_at"), ("temp_max", "temp_min", "precip_prob", "weather")),
+    Output("ranking", "BQ_RANKING", "販売チャネルごとの順位", ("market", "product_code", "week_start", "channel", "rank", "as_of"), ("units",)),
 )
 
 

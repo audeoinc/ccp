@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-20(X47 商品のフロートを中からも開き、残りの候補と差し替える。6.31)
+- 最終更新: 2026-10-20(R17 商品の販売チャネルごとの順位。6.32)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -496,6 +496,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 画面は `src/ProductsView.tsx`(配信の結果・週ごとの実績・外部広告を開いたときに読み、商品ごと(またはカテゴリごと)に集める)。App の `view === 'products'`、期間は `range`(URL の `from`・`to`)。
 - 外部広告は表 `ad_spends`。見本は `server/ccp/ads.py`(`POST /api/ads/sample`。表の中身を置き換える。⚙ の「外部広告の見本を作る」)と `src/mock/ads.ts`(撮影用。同じ考え方)。本物の取り込み(BigQuery の出力か CSV)は、まだ。
 - 番号: 同じ日に「商品のフロートの指標」のセッションが X48 を使ったので、こちらは X49。
+
+## 6.32 R17 商品の販売チャネルごとの順位(2026-10-20、結果のセッション)
+
+- 詳しい結果のフロートの 3 列の下に `src/ProductRankings.tsx`。商品ごとに読む(`product_code eq …`。市場で読むと 5000 件の上限に当たるため)。週は、送った日時の週の月曜(`week_start` と同じ)。Top N は `src/rankingSettings.ts`(ブラウザごと、既定 60)。
+- 表 `product_rankings`(`server/schema.json`)。BigQuery の 6 つめの出力 `ranking`(`bq.py`・`bq_validate.py`・`bq_import.py`。週ごとの実績と同じく、取り込む商品の行だけ入れ替える)。仕様は BIGQUERY_EXPORT.md の 9 章。
+- ダミー: 撮影用は `src/mock/seed.ts` の `productRankings`、DB は `python -m ccp.cli ranking-dummy [--yes]`(`server/ccp/ranking_dummy.py`。DB の商品 × 直近 20 週。配信に載せた週は配信経由の順位が上がる。BigQuery から取り込んだ行があれば何もしない)。**本番の DB には、まだ入れていない**(反映で表ができてから)。
+- 同じ要望のつながり: X48(商品のフロートの指標)にも「店舗・EC の売上と順位」がある。順位はこの表を使えるはず。
+- UTM(campaign = 配信カードの ID から作る識別子、content = コンポーネントの種類_番号 + 商品の枠は商品コード)で、配信 × リンクの位置ごとの GA の成果を取る方針を、利用者と決めた(2026-10-20)。まだ作っていない(`src/links.ts` はいま、campaign を配信名と日付から作り、content を付けていない)。
 
 ## 7. 落とし穴
 

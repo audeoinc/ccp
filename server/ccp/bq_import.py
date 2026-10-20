@@ -39,7 +39,7 @@ VIEW_REFRESH = timedelta(minutes=10)
 # 取り込みを、複数のプロセス(サーバーの複数の台)で同時に行わない(PostgreSQL の勧告ロックの番号。CCP の中で一意なら何でもよい)
 LOCK_KEY = 4210017
 # 出力 → 書き込む表(取り込む順。SKU の確かめに SPU が、在庫の確かめに SKU が要る)
-ORDER = ("spu", "sku", "sku_stock", "weekly", "forecast")
+ORDER = ("spu", "sku", "sku_stock", "weekly", "forecast", "ranking")
 
 _lock = asyncio.Lock()
 _last_check = 0.0
@@ -162,6 +162,9 @@ async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -
         # name は、いまの画面・初期データと同じ「商品コード 週の始まり」
         return await _replace(conn, "weekly_performances", rows, ["market", "product_code", "week_start", "units", "revenue", "stock"],
                               lambda r: {"name": f"{r['product_code']} {str(r['week_start'])[:10]}"}, scope="product_code")
+    if name == "ranking":
+        # 週ごとの実績と同じく、取り込む商品の行だけを入れ替える(BigQuery にない商品の行は残す)
+        return await _replace(conn, "product_rankings", rows, ["market", "product_code", "week_start", "channel", "rank", "units", "as_of"], scope="product_code")
     return await _replace(conn, "weather_forecast", rows, ["market", "date", "temp_max", "temp_min", "precip_prob", "weather", "issued_at"])
 
 

@@ -483,6 +483,44 @@ export const deliveryResults: Row[] = cards
     }
   })
 
+// ---- 商品の販売順位(市場 × 週 × 販売チャネル。本番は BigQuery の出力 ranking から取り込む)
+// 本物の順位は全商品の中の順位なので、見本の商品(市場ごとに 30 点)の中で順位を付けず、400 点ほどの中の順位に見えるように作る。
+// 配信に載せた週は、配信経由の順位が上がる(結果の画面で、配信の効き方の違いが見えるように)。
+// サーバーのダミー(server/ccp/ranking_dummy.py)と同じ考え方
+export const productRankings: Row[] = []
+{
+  const weeks: string[] = []
+  for (let d = new Date(2026, 6, 6); d <= new Date(2026, 10, 2); d.setDate(d.getDate() + 7)) {
+    weeks.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+  }
+  const weekOf = (iso: string) => {
+    const d = new Date(iso)
+    const m = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
+    return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`
+  }
+  // 配信に載せた商品と週(商品 ID:週)
+  const placed = new Set<string>()
+  for (const d of deliveryProducts) {
+    const c = cards.find((x) => x.id === d.delivery_card_id)
+    if (c?.scheduled_at && d.state === 'selected') placed.add(`${d.product_id}:${weekOf(String(c.scheduled_at))}`)
+  }
+  const units = (rank: number, scale: number) => Math.max(0, Math.round(scale / rank ** 0.85))
+  for (const p of products) {
+    const code = String(p.product_code ?? '')
+    if (!code) continue
+    const base = 1 + Math.floor(400 * rand(`rank:${code}`)() ** 1.6)
+    for (const w of weeks) {
+      const r = rand(`rank:${code}:${w}`)
+      const all = Math.max(1, Math.round(base * (0.6 + r())))
+      const ec = Math.max(1, Math.round(all * (0.7 + 0.7 * r())))
+      const via = Math.max(1, Math.round(all * (placed.has(`${p.id}:${w}`) ? 0.15 + 0.3 * r() : 1 + 1.5 * r())))
+      for (const [channel, rank, scale] of [['all', all, 3000], ['ec', ec, 1800], ['delivery', via, 500]] as const) {
+        productRankings.push({ id: guid(`rank:${code}:${w}:${channel}`), market: p.market, product_code: code, week_start: w, channel, rank, units: units(rank, scale) })
+      }
+    }
+  }
+}
+
 // 過去の配信の、次に生かすメモ(配信カードの「これまでの学び」の見本)
 const NOTES: [string, string, string][] = [
   ['Fall Arrivals', '2026-09-24', 'Worked: the warm-tone hero drew 31% of clicks.\nTry next: put the best-selling knit in slot 1; slot 4 was weak.'],

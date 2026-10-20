@@ -11,6 +11,7 @@ import { ResultCompare } from './ResultCompare'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
+import { ProductRankings } from './ProductRankings'
 import { isPush, sentAtOf, type ResultRow } from './results'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
@@ -195,6 +196,8 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               onSaved={onSaved}
             />
           </div>
+          {/* 販売チャネルごとの順位は、列が多い(3 チャネル × 3)ので、3 列の下に、幅いっぱいで出す */}
+          <ProductRankings row={row} productIds={productIds} products={products} />
           <ResultCompare row={row} history={history} cardProducts={cardProducts} products={products} heroes={heroes} money={money} onOpenOther={onOpenOther} onAdopt={adopt} />
         </div>
       </DialogSurface>

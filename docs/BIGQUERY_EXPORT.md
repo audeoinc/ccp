@@ -12,7 +12,7 @@ CCP が利用先の BigQuery から取り込むデータの、**列の名前・�
 
 | ルール | 内容 |
 |---|---|
-| 出力の数 | 下の **5 つ**(2〜6 章)。1 つの出力 = 1 つのテーブルかビュー |
+| 出力の数 | 下の **5 つ**(2〜6 章)と、結果の画面で使う販売順位(9 章。2026-10-20 に足した)。1 つの出力 = 1 つのテーブルかビュー |
 | 列の名前 | この文書のとおりにする(`AS` で付け替える)。CCP は、名前をそのまま PostgreSQL の列に写す。余分な列は無視する |
 | 1 行の単位(キー) | 各章の「キー」の列の組で、行が重複しないようにする。キーの列は空(NULL)にしない |
 | 市場 | すべての出力に `market`(`'JP'` / `'US'` など。大文字の 2 文字)を付ける。CCP は、配信カードの国に合う市場の商品だけを、AI の選定に使う |
@@ -32,6 +32,7 @@ CCP が利用先の BigQuery から取り込むデータの、**列の名前・�
 | SKU の在庫 | 4 | SKU | 元の在庫の更新に合わせる(1 時間に数回) |
 | 週ごとの実績 | 5 | SPU × 週 | 1 日 1 回 |
 | 天気予報 | 6 | 日付(代表の 1 地点) | 予報の更新に合わせる |
+| 販売チャネルごとの順位 | 9 | SPU × 週 × 販売チャネル | 1 日 1 回 |
 
 ---
 
@@ -189,6 +190,43 @@ GROUP BY market, product_code
 
 ## 8. 共有してほしいもの
 
-1. 5 つの出力の、利用先での**場所**(プロジェクト・データセット・テーブル(ビュー)の名前)。ビューなら、更新を見る元のテーブルの名前も。→ CCP の設定(`server/workbench.env`)に入れる。リポジトリには書かない
+1. 各出力の、利用先での**場所**(プロジェクト・データセット・テーブル(ビュー)の名前)。ビューなら、更新を見る元のテーブルの名前も。→ CCP の設定(`server/workbench.env`)に入れる。リポジトリには書かない
 2. `category`・`season` に入る値の一覧(2 章の ※1)
 3. 各出力の、おおよその行数
+
+## 9. 販売チャネルごとの順位(SPU × 週 × 販売チャネル)
+
+配信の結果の画面で、載せた商品が、販売チャネルごとに何位だったか(配信前の 4 週で Top N に入った週の数、配信の週・翌週の順位)を見せるために使う(2026-10-20 に足した)。CCP の設定は `BQ_RANKING`。
+
+**キー: `market`, `product_code`, `week_start`, `channel`**
+
+| 列 | 型 | 空を許す | 中身 |
+|---|---|---|---|
+| `market` | STRING | × | 市場 |
+| `product_code` | STRING | × | SPU のコード |
+| `week_start` | DATE | × | 週の始まり(月曜。5 章と同じ週) |
+| `channel` | STRING | × | `all`(全社)/ `ec`(EC)/ `delivery`(配信経由) |
+| `rank` | INT64 | × | その週・そのチャネルの、**売れた数量**の順位(市場の中で、1 が最も売れた) |
+| `units` | INT64 | ○ | その週・そのチャネルで売れた数量 |
+| `as_of` | TIMESTAMP | × | データの時点 |
+
+- **順位は、市場の全 SPU の中で付ける**(CCP に取り込む商品の中だけで付けない)。同じ数量は同じ順位(`RANK()`)でよい。
+- **配信経由**は、メール・アプリの**すべての配信**を通った売上(UTM などで配信から来たと分かる注文)。どの配信かは問わない。
+- 期間は**直近 26 週**ほど(配信の 4 週前から翌週までを見るため、過去の配信の結果を見る期間に合わせる)。終わっていない今週は含めない。
+- 行は、そのチャネルで 1 点以上売れた商品だけでよい(行がなければ、画面は「—」= 圏外として出す)。
+- 「上位」とみなす線(Top 60 など)は、CCP の画面で決める(BigQuery では決めない)。
+
+```sql
+-- 例: 週 × チャネルごとに、数量で順位を付ける(元の表の名前・列は、利用先に合わせる)
+SELECT market, product_code, week_start, channel, units,
+       RANK() OVER (PARTITION BY market, week_start, channel ORDER BY units DESC) AS rank,
+       CURRENT_TIMESTAMP() AS as_of
+FROM (
+  SELECT market, product_code, DATE_TRUNC(order_date, WEEK(MONDAY)) AS week_start, 'all' AS channel, SUM(qty) AS units FROM sales GROUP BY 1, 2, 3
+  UNION ALL
+  SELECT market, product_code, DATE_TRUNC(order_date, WEEK(MONDAY)), 'ec', SUM(qty) FROM sales WHERE sales_channel = 'ec' GROUP BY 1, 2, 3
+  UNION ALL
+  SELECT market, product_code, DATE_TRUNC(order_date, WEEK(MONDAY)), 'delivery', SUM(qty) FROM sales WHERE from_delivery GROUP BY 1, 2, 3
+)
+WHERE units > 0
+```

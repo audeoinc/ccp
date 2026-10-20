@@ -90,6 +90,13 @@ class WeeklyForecastTest(unittest.TestCase):
         self.assertIn("precip_prob", ng)
         self.assertIn("temp_min", ng)
 
+    def test_ranking_values(self) -> None:
+        rows = [{"market": "US", "product_code": "U01", "week_start": date(2026, 10, 6), "channel": "app", "rank": 0, "units": 3, "as_of": AS_OF}]
+        ng = messages(validate("ranking", rows, now=NOW), NG)
+        self.assertIn("channel", ng)
+        self.assertIn("rank", ng)
+        self.assertIn("月曜", ng)
+
     def test_empty_output_is_ng(self) -> None:
         self.assertTrue(has_ng(validate("forecast", [], now=NOW)))
 

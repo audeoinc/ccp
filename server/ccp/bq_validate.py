@@ -20,9 +20,11 @@ NG, WARN = "NG", "注意"
 MARKET = re.compile(r"^[A-Z]{2}$")
 # 仕様(BIGQUERY_EXPORT.md)のキー
 KEYS = {"spu": ("market", "product_code"), "sku": ("market", "sku_code"), "sku_stock": ("market", "sku_code"),
-        "weekly": ("market", "product_code", "week_start"), "forecast": ("market", "date")}
+        "weekly": ("market", "product_code", "week_start"), "forecast": ("market", "date"),
+        "ranking": ("market", "product_code", "week_start", "channel")}
 # データの時点が、これより古ければ注意(更新が止まっていないか)
-FRESH = {"spu": timedelta(days=3), "sku": timedelta(days=3), "sku_stock": timedelta(hours=6), "weekly": timedelta(days=10), "forecast": timedelta(days=2)}
+FRESH = {"spu": timedelta(days=3), "sku": timedelta(days=3), "sku_stock": timedelta(hours=6), "weekly": timedelta(days=10), "forecast": timedelta(days=2),
+         "ranking": timedelta(days=10)}
 
 
 @dataclass
@@ -105,7 +107,7 @@ class _Collector:
 
 
 def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict[str, Any]]] | None = None, now: datetime | None = None) -> list[Issue]:
-    """出力 name(spu / sku / sku_stock / weekly / forecast)の行を確かめる。
+    """出力 name(spu / sku / sku_stock / weekly / forecast / ranking)の行を確かめる。
     context には、結びつきを確かめる相手の行を入れる(sku なら spu、sku_stock なら sku。なければ、結びつきは確かめない)"""
     o = next(x for x in bq.OUTPUTS if x.name == name)
     key = KEYS[name]
@@ -208,6 +210,12 @@ def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict
         c.range(rows, "temp_max", -40, 50, WARN)
         c.check(NG, "temp_min が temp_max より高い行があります", rows, lambda r: _num(r.get("temp_min")) is not None and _num(r.get("temp_max")) is not None and (_num(r.get("temp_min")) or 0) > (_num(r.get("temp_max")) or 0))
         c.check(WARN, "過去の日付の予報があります(今日からにしてください)", rows, lambda r: (d := _date(r.get("date"))) is not None and d < now.date() - timedelta(days=1))
+
+    elif name == "ranking":
+        c.values(rows, "channel", ("all", "ec", "delivery"))
+        c.range(rows, "rank", 1, None)
+        c.range(rows, "units", 0, None)
+        c.check(NG, "week_start が月曜ではありません", rows, lambda r: (d := _date(r.get("week_start"))) is not None and d.weekday() != 0)
     return c.issues
 
 
