@@ -80,6 +80,7 @@ import { isCancelled } from './cancel'
 import { setActivePolicies, setActiveRules, setActiveSales, onPolicyWarning } from './aiSelect'
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
+import { WeekTimeGrid } from './WeekTimeGrid'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -106,9 +107,9 @@ import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
-import { channelOptions, countryOptions, statusColor, statusOptions, statusView } from './status'
+import { channelOptions, countryOptions, statusColor, statusOptions, statusRank, statusView } from './status'
 import { THEME_TYPES, classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
-import { dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
+import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
 import { logEvent, myName, myUserId, onMeChange } from './history'
 import { EventsService, type CardEvent } from './data/events'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
@@ -1114,6 +1115,37 @@ function App() {
       setBqNotice({ intent: 'warning', text: tr('リンクの配信が見つかりません(消された、または別の環境のリンクです)。いつもの画面で開きました', 'The delivery in the link was not found (deleted, or a link from another environment). Opened the usual view.') })
     }
   }
+  // ---- 週の「時刻」の見方で、配信をつかんで動かす(X46)
+  // 承認済み・確定した週の配信は、理由の記録と承認のやり直しが要るので、ここでは動かさず、配信カードで変えてもらう
+  const moveBlockedReason = (c: DeliveryCard, to?: string): string | null => {
+    if (statusRank(c.status) >= statusRank('approved')) return tr('承認済みの配信は、配信カードを開いて時刻を変えてください(承認のやり直しが要るため)', 'Approved deliveries: change the time in the delivery card (re-approval is needed)')
+    if (confirmedWeekOf(weeks, c.scheduled_at) || (to && confirmedWeekOf(weeks, to))) return tr('確定した週の配信は、配信カードを開いて時刻を変えてください(理由の記録が要るため)', 'Deliveries in a confirmed week: change the time in the delivery card (a reason is needed)')
+    return null
+  }
+  const [moveNotice, setMoveNotice] = useState<{ text: string; undo?: () => void } | null>(null)
+  const moveCard = async (c: DeliveryCard, iso: string) => {
+    const blocked = moveBlockedReason(c, iso)
+    if (blocked) {
+      setMoveNotice({ text: blocked })
+      return
+    }
+    const before = c.scheduled_at
+    const res = await DeliveryCardsService.update(c.id, { scheduled_at: iso })
+    if (!res.success) {
+      setMoveNotice({ text: res.error?.message ?? tr('配信日時を変えられませんでした', 'Could not change the send time') })
+      return
+    }
+    await load()
+    const fmt = (v?: string) => (v ? new Date(v).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '')
+    setMoveNotice({
+      text: tr(`「${c.name}」を ${fmt(before)} → ${fmt(iso)} に動かしました`, `Moved "${c.name}" from ${fmt(before)} to ${fmt(iso)}`),
+      undo: async () => {
+        setMoveNotice(null)
+        await DeliveryCardsService.update(c.id, { scheduled_at: before })
+        await load()
+      },
+    })
+  }
   const goTo = (v: 'month' | 'week' | 'list', d: Date) => {
     const sun = sundayOf(d)
     const mid = v === 'week' ? new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 3) : d
@@ -1424,6 +1456,20 @@ function App() {
             />
           </MessageBar>
         )}
+        {moveNotice && (
+          <MessageBar layout="multiline" intent="info" className={styles.alert}>
+            <MessageBarBody>{moveNotice.text}</MessageBarBody>
+            <MessageBarActions
+              containerAction={<Button appearance="transparent" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setMoveNotice(null)} />}
+            >
+              {moveNotice.undo && (
+                <Button size="small" onClick={() => void moveNotice.undo?.()}>
+                  {t('元に戻す', 'Undo')}
+                </Button>
+              )}
+            </MessageBarActions>
+          </MessageBar>
+        )}
         {bqNotice && (
           <MessageBar layout="multiline" intent={bqNotice.intent} className={styles.alert}>
             <MessageBarBody>{bqNotice.text}</MessageBarBody>
@@ -1516,7 +1562,7 @@ function App() {
               <span className={styles.lensGroup}>
                 <span className={mergeClasses(styles.lensLabel, !lensOn && styles.lensLabelOff)}>{t('週の見方', 'Week lens')}</span>
                 <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('週の見方', 'Week lens')} aria-disabled={!lensOn}>
-                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')]] as const).map(([v, name]) => (
+                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')], ['time', t('時刻', 'Time')]] as const).map(([v, name]) => (
                     <button
                       key={v}
                       type="button"
@@ -1715,6 +1761,17 @@ function App() {
                 </Portal>
               )}
               {!onProduction && <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} visibleIds={weekVisibleIds} />}
+              {/* 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子。計画の面だけ */}
+              {lens === 'time' && !onProduction ? (
+                <WeekTimeGrid
+                  start={weekStart}
+                  cards={weekRows.map((r) => r.card)}
+                  alertKinds={alertKinds}
+                  fixedReason={moveBlockedReason}
+                  onSelect={openCard}
+                  onMove={(c, iso) => void moveCard(c, iso)}
+                />
+              ) : (
               <WeekView
                 start={weekStart}
                 cards={weekRows.map((r) => r.card)}
@@ -1738,6 +1795,7 @@ function App() {
                 renderCard={(c) => (frames.frameIds.has(c.id) ? <FrameCard key={`${c.id}:${c.name}`} card={c} frames={frames} onOpen={setSelectedId} /> : null)}
                 onCheck={frames.openCheck}
               />
+              )}
               </>
             ) : (
               <>

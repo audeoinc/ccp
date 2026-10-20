@@ -30,8 +30,8 @@ import { AlertMark } from './AlertMark'
 import { AiIcon } from './AiMark'
 import type { CardAlertKind } from './cardAlerts'
 
-/** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る */
-export type WeekLens = 'products' | 'progress'
+/** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る / time = 時刻の格子(WeekTimeGrid。X46) */
+export type WeekLens = 'products' | 'progress' | 'time'
 
 interface Props {
   /** 週の初め(日曜日) */

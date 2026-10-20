@@ -208,6 +208,14 @@ const SCENES = {
     await fullShot(page, `${L}-05-week-progress`)
     await view(page, T(L, '商品', 'Products'))
   },
+
+  // 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子
+  async weekTime(page, L) {
+    await view(page, T(L, '週', 'Week'))
+    await view(page, T(L, '時刻', 'Time'), 1200)
+    await fullShot(page, `${L}-05b-week-time`)
+    await view(page, T(L, '商品', 'Products'))
+  },
   async bulkDrafts(page, L) {
     await view(page, T(L, '週', 'Week'))
     await clickLabel(page, T(L, '次の週', 'Next week'), 1200)
