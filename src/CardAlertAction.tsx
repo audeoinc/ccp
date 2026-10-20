@@ -14,7 +14,9 @@ import { AiIcon } from './AiMark'
 const useStyles = makeStyles({
   surface: { width: 'min(760px, 94vw)' },
   // 題名の行をつかんで動かす(下のプレビューを見ながら選べるように)
-  grab: { display: 'inline-flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
+  // 題名の行の全体をつかめるようにする(アイコンの近くだけだと、つかめると気づきにくいため)
+  grab: { display: 'flex', alignItems: 'center', columnGap: '8px', width: '100%', cursor: 'move', userSelect: 'none', touchAction: 'none' },
+  grabHint: { marginLeft: 'auto', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   grabIcon: { color: tokens.colorNeutralForeground3 },
   body: { display: 'grid', rowGap: '12px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '12px' },
@@ -115,6 +117,7 @@ export function CardAlertAction({ alert, product, card, scheduledAt, inCard, pro
             >
               <ArrowMoveRegular className={s.grabIcon} />
               {t('このアラートへの対応', 'Handle this alert')}
+              <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
             </span>
           </DialogTitle>
           <DialogContent className={s.body}>
