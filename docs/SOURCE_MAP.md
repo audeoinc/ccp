@@ -235,6 +235,10 @@ flowchart TD
 | `CardMenu.tsx` | 160 | 「…」メニュー(取りやめ・削除 など) |
 | `cancel.ts` | 61 | 配信の取りやめ(消さずに残す) |
 | `CardAlertsBar.tsx` | 113 | 配信カードの上の、アラートの帯(たたむ・種類の札・「対応する」) |
+| `AbResult.tsx` / `abResults.ts` | 174 / 147 | 詳しい結果の「AB テストの結果」(案ごとの数字・勝ち案・偶然の範囲かの目安)/ その計算(2 つの割合の z 検定・学びの文) |
+| `abSeed.ts` | 227 | ⚙ の「AB テスト・案から選ぶの例を作る」(例の配信 5 本を足す。`ab_test` の `seed` で見分ける) |
+| `ImpactView.tsx` / `impact.ts` / `useDeliveryImpact.ts` | 740 / 329 / 71 | 結果の面の見せ方「効果」(増えた売上・リフト率、学びの記録と評価)/ その計算と見本 / 詳しい結果に出す、配信 1 本の効果 |
+| `SwipePager.tsx` | 158 | 週・月の表示を、地の部分をつかんで横に引く(トラックパッドの横スワイプ)と、前後の週・月へ |
 | `AbBadge.tsx` / `AbCompare.tsx` / `abAi.ts` | 47 / 99 / 83 | AB テストの印(月・週・一覧・時刻の格子)/ 案のプレビューを並べて比べる / 「B 案を AI で作る」 |
 | `abTest.ts` / `AbTestBar.tsx` | 114 / 173 | AB テスト(X55)の型・既定・配分・制作に渡す文 / 配信カードの題名の下の、案の切り替えとテストの設定の帯 |
 | `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 315 / 130 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
@@ -405,6 +409,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/check.py` | 172 | 動かす前の確認(設定・DB・写真・画面のビルド) |
 | `ccp/importer.py` | — | 画像から、デモ用の商品・メイン画像のデータを作って取り込む運用ツール |
 | `seed.json` | — | 初期データ(`scripts/export-seed.mjs` が `src/mock/seed.ts` から作る) |
+| `ccp/impact.py` | — | 配信の効果の見本(⚙ の「効果の見本を作る」。`POST /api/impact/sample`。見本の行だけを置き換える) |
 | `tests/` | — | サーバーのテスト(`python -m unittest discover server/tests`。CI でも実行) |
 | `requirements.txt` / `requirements-tools.txt` | — | Python のパッケージ(サーバー / 運用ツール) |
 | `requirements-hosted.txt` | — | 開発元の本番だけのパッケージ(Cloud SQL Connector) | <!-- hosted -->
