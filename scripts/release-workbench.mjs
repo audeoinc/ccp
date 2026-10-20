@@ -33,7 +33,8 @@ const RULES = [
   ['exclude', /^\.github\//],
   // 開発用の文書(開発の進め方・本番の運用。利用先には、release/workbench/files の版を渡す)
   ['exclude', /^(README|CLAUDE)\.md$/],
-  ['exclude', /^docs\/(GCP|HANDOVER|CLOUD|ONBOARDING|RELEASE)\.md$/],
+  // UPDATE.md(利用先の Git への入れ方)は ZIP に入れない(利用者の指示 2026-10-20。手順は別に渡す)
+  ['exclude', /^docs\/(GCP|HANDOVER|CLOUD|ONBOARDING|RELEASE|UPDATE)\.md$/],
   ['exclude', /^docs\/font-compare\.html$/],
   ['exclude', /^release\//],
   // 撮影用(手元の Edge を使う開発の道具)
@@ -250,7 +251,7 @@ if (publish) {
   const notes = [
     `Vertex AI Workbench で動かす CCP の版 ${version}(元のコミット ${sha}、コミットの日付 ${commitDate})。`,
     '',
-    `添付の ccp-workbench-${version}.zip をダウンロードし、ZIP の中の docs/UPDATE.md の手順で、利用先の Git に入れてください。`,
+    `添付の ccp-workbench-${version}.zip をダウンロードし、利用先の Git に入れてください(入れ方の手順は、別にお渡しします)。`,
     '検査(残してはいけない言葉・リンク切れ)と、展開した先での npm ci・npm run verify・サーバーのテストを通っています。',
   ].join('\n')
   const r = spawnSync('gh', ['release', 'create', tag, zipPath, '--target', full, '--title', `CCP Workbench 版 ${version}`, '--notes', notes], { cwd: ROOT, stdio: 'inherit' })

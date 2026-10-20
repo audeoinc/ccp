@@ -5,7 +5,7 @@ CCP(配信コンテンツプランナー)を、利用先の **Vertex AI Workbenc
 
 - 最終更新: 2026-10-20(既定のポートを 8082 に。BigQuery・販売順位・指標のコマンドと設定を足した)
 - 対象: Workbench で CCP を立ち上げる・更新する人
-- 関係する文書: [WORKBENCH_ARCHITECTURE.md](WORKBENCH_ARCHITECTURE.md)(Workbench での構成の解説・構成図)、[UPDATE.md](UPDATE.md)(新しい版の受け取り方)<!-- hosted:begin -->、[GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)<!-- hosted:end -->
+- 関係する文書: [WORKBENCH_ARCHITECTURE.md](WORKBENCH_ARCHITECTURE.md)(Workbench での構成の解説・構成図)<!-- hosted:begin -->、[UPDATE.md](UPDATE.md)(新しい版の受け取り方)、[GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)<!-- hosted:end -->
 
 ---
 
@@ -28,7 +28,7 @@ Workbench のサーバーからは外(本番の DB・画像の置き場所)に�
 
 | 持ち込むもの | 方法 | いつ |
 |---|---|---|
-| コード(画面・サーバー) | 版ごとの ZIP を利用先の Git に入れ、`git clone` / `git pull`([UPDATE.md](UPDATE.md)) | 最初と、新しい版が届いたとき |
+| コード(画面・サーバー) | 版ごとの ZIP を利用先の Git に入れ、`git clone` / `git pull`<!-- hosted:begin -->([UPDATE.md](UPDATE.md))<!-- hosted:end --> | 最初と、新しい版が届いたとき |
 | データ(配信・商品・結果 など、すべてのテーブル)と写真 | 引っ越し用のパック(ZIP) | 最初と、本番のデータにそろえたいとき |
 
 > **注意:** パックの取り込みは、Workbench 側の DB の中身を**すべて置き換えます**。Workbench で入力したデータは消えます。
@@ -81,7 +81,7 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 
 画面からは、⚙ の「BigQuery から取り込む」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
 
-- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる。直さない約束は [UPDATE.md](UPDATE.md))→ (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
+- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
@@ -93,7 +93,7 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 | Workbench のインスタンス | ターミナルが使える | Jupyter の「ターミナル」を開ける |
 | Node.js | **20.19 以上**(または 22.12 以上)。画面のビルドに使う | `node -v` |
 | Python | **3.12 以上**を推奨(本番は 3.12) | `python3 --version` |
-| Git | 利用先の Git のリポジトリ(CCP の版を入れたもの。[UPDATE.md](UPDATE.md))を取得できる | `git --version` |
+| Git | 利用先の Git のリポジトリ(CCP の版を入れたもの<!-- hosted:begin -->。[UPDATE.md](UPDATE.md)<!-- hosted:end -->)を取得できる | `git --version` |
 | PostgreSQL | **利用先の環境は PostgreSQL に直接つなぐ**(Workbench の上や、同じネットワークのサーバー)。CCP 用の DB を 1 つ(本番は PostgreSQL 16) | `psql --version`、または DB の管理者に確認 |
 | 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」。BigQuery から取り込むなら「**BigQuery データ閲覧者**」「**BigQuery ジョブユーザー**」も | IAM の画面 |
 | ブラウザ | 利用先の環境から、本番の CCP の画面を開ける | 本番の URL を開く |
@@ -117,7 +117,7 @@ git clone <利用先のリポジトリの URL> ccp
 cd ccp
 ```
 
-**前に clone したことがある**とき(以前に動かしていた環境など)は、必ず最新にしてから進めます。取得元が利用先のリポジトリでないときは、先に [UPDATE.md](UPDATE.md) の「取得元を切り替える」を行います。
+**前に clone したことがある**とき(以前に動かしていた環境など)は、必ず最新にしてから進めます。<!-- hosted:begin -->取得元が利用先のリポジトリでないときは、先に [UPDATE.md](UPDATE.md) の「取得元を切り替える」を行います。<!-- hosted:end -->
 この手順書と、設定の見本(`server/workbench.env.example`)、引っ越し用のパックの取り込み(`import-pack`)は、2026-10-15 に足したものなので、
 古いままだと、ファイルやコマンドが見つからずに止まります。
 

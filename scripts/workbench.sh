@@ -253,7 +253,7 @@ cmd_status() {
     echo "PostgreSQL: (pg_isready が見つかりません。場所を workbench.env の CCP_PG_BIN に書いてください)"
   fi
   (cd "$ROOT" && echo "コード: $(git log --oneline -1)")
-  # 版ごとに届く ZIP から入れたときは、版の名前(docs/UPDATE.md)
+  # 版ごとに届く ZIP から入れたときは、版の名前
   if [ -f "$ROOT/VERSION.txt" ]; then grep '^版:' "$ROOT/VERSION.txt"; fi
 }
 

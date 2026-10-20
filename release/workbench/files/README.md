@@ -11,7 +11,6 @@
 | やりたいこと | 文書 |
 |---|---|
 | Workbench で立ち上げる・更新する・困ったとき | [docs/WORKBENCH.md](docs/WORKBENCH.md)(手順書)、[docs/WORKBENCH_ARCHITECTURE.md](docs/WORKBENCH_ARCHITECTURE.md)(構成) |
-| 新しい版を受け取って、Git に入れる・Workbench に届ける | [docs/UPDATE.md](docs/UPDATE.md) |
 | BigQuery からの取り込み | [docs/BIGQUERY.md](docs/BIGQUERY.md)、[docs/BIGQUERY_EXPORT.md](docs/BIGQUERY_EXPORT.md)、[docs/BIGQUERY_CONVERT.md](docs/BIGQUERY_CONVERT.md) |
 | 機能の一覧・使い方の流れ | [docs/FEATURES.md](docs/FEATURES.md)、[docs/FLOWS.md](docs/FLOWS.md)、[docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | 各機能の理由と開発の経緯 | [docs/FEATURE_REASONS.md](docs/FEATURE_REASONS.md)、[docs/PRINCIPLES.md](docs/PRINCIPLES.md) |
@@ -45,7 +44,7 @@ React 19 / TypeScript / Vite 7 / Fluent UI v9 / フォント: Inter + Noto Sans 
 ## コードの変更について
 
 このリポジトリのコードは、版ごとに届くものです。**このリポジトリの中で、コードを直接直さないでください**(次の版で上書きされます)。
-直したい不具合・足したい機能は、内容を開発の担当に伝えてください。次の版に入れて届けます(手順は [docs/UPDATE.md](docs/UPDATE.md))。
+直したい不具合・足したい機能は、内容を開発の担当に伝えてください。次の版に入れて届けます。
 
 手元で画面だけを確かめたいときは、サンプルデータで動かせます(サーバーも DB も要りません):
 
