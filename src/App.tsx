@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Badge,
   Button,
@@ -42,6 +42,7 @@ import {
   LayoutColumnTwoRegular,
   DocumentBulletListRegular,
   PeopleTeamRegular,
+  ClipboardTaskListLtrRegular,
   ChevronDownRegular,
   GlobeRegular,
   ChevronLeftRegular,
@@ -93,6 +94,7 @@ import { PolicyManager } from './PolicyManager'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
 import { PeopleManager } from './PeopleManager'
+import { ProcessCheckScreen } from './hostedScreens'
 import { openPeopleManager, usePeople } from './people'
 import { InboxButton } from './InboxButton'
 import { useApprovalInbox } from './useApprovalInbox'
@@ -433,6 +435,8 @@ function App() {
   const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
   // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
   const [policyOpen, setPolicyOpen] = useState(false)
+  // 前提運用の照らし合わせ(⚙ から。本番だけの画面で、ないときはメニューにも出さない。src/hostedScreens.ts)
+  const [processOpen, setProcessOpen] = useState(false)
   // AI の案が、作り直しても must の決まりを破っていたとき(M5)。案は使えるが、人が確かめる
   const [policyWarning, setPolicyWarning] = useState<string | null>(null)
   useEffect(
@@ -1309,6 +1313,11 @@ function App() {
       />
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
       <PeopleManager />
+      {ProcessCheckScreen && processOpen && (
+        <Suspense fallback={null}>
+          <ProcessCheckScreen open onClose={() => setProcessOpen(false)} />
+        </Suspense>
+      )}
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
       <div className={styles.headerWrap}>
@@ -1466,6 +1475,11 @@ function App() {
               <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
                 {t('方針・決まり(取り込み・一覧)', 'Marketing policies (import, list)')}
               </MenuItem>
+              {ProcessCheckScreen && (
+                <MenuItem icon={<ClipboardTaskListLtrRegular />} onClick={() => setProcessOpen(true)}>
+                  {t('前提運用の照らし合わせ', 'Process check against assumed operations')}
+                </MenuItem>
+              )}
               <MenuDivider />
               <MenuGroup>
                 <MenuGroupHeader>{t('言語', 'Language')}</MenuGroupHeader>

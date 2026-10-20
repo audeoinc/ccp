@@ -27,10 +27,10 @@ npm run release:workbench -- --publish     # すべて通ったら、GitHub の 
 
 | 入る | 入らない |
 |---|---|
-| `src/`・`public/`・画面のビルドの設定・`package.json`(本番用のスクリプトを消したもの)・`package-lock.json` | `Dockerfile`・`.dockerignore`・`.gcloudignore`・`cloudbuild.yaml`・`.github/` |
+| `src/`(`hosted/` を除く)・`public/`・画面のビルドの設定・`package.json`(本番用のスクリプトを消したもの)・`package-lock.json` | `Dockerfile`・`.dockerignore`・`.gcloudignore`・`cloudbuild.yaml`・`.github/`・`src/hosted/`(本番だけの画面) |
 | `server/ccp/`(`hosted/` を除く)・`server/tests/`(`test_hosted_*` を除く)・`schema.json`・`seed.json`・`requirements.txt`・`workbench.env.example` | `server/ccp/hosted/`・`server/requirements-hosted.txt` |
 | `scripts/workbench.sh`・`check-*.mjs`・`export-seed.mjs`・`feature-reasons.py` | `scripts/deploy-gcp.mjs`・`gcp-smoke.mjs`・`screenshots.mjs`・`release-workbench.mjs` |
-| `docs/` の Workbench の手引き・設計・機能・開発の理由(FEATURE_REASONS)・BACKLOG・SOURCE_MAP・BigQuery・承認・方針・スクリーンショット・ワイヤーフレーム | `docs/GCP.md`・`HANDOVER.md`・`CLOUD.md`・`ONBOARDING.md`・`RELEASE.md`(この文書)・`font-compare.html`・`process-sheet.html`(照らし合わせのシートの元。Artifact の保存のしくみでしか動かない) |
+| `docs/` の Workbench の手引き・設計・機能・開発の理由(FEATURE_REASONS)・BACKLOG・SOURCE_MAP・BigQuery・承認・方針・スクリーンショット・ワイヤーフレーム | `docs/GCP.md`・`HANDOVER.md`・`CLOUD.md`・`ONBOARDING.md`・`RELEASE.md`(この文書)・`font-compare.html` |
 | `release/workbench/files/` の中身(Workbench 版の `README.md`・`CLAUDE.md`)を、ルートに置く | 開発側の `README.md`・`CLAUDE.md` |
 | `VERSION.txt`(スクリプトが作る。版・元のコミット・日付) | Git の履歴(`.git`) |
 
@@ -42,7 +42,9 @@ npm run release:workbench -- --publish     # すべて通ったら、GitHub の 
 - **`hosted/` の外のコードは、`hosted/` がなくても動くようにする。** 使うところは `try: from .hosted … except ImportError:` で囲む(`dbready.py`・`db.py`・`creds.py`・`main.py`)。DB の準備中の扱いは `ccp/dbready.py`(`DbNotReady`・`controller()`)を通す。`dbctl` を直接 import しない。
 - 本番だけのパッケージは `server/requirements-hosted.txt`(Dockerfile と CI が、`requirements.txt` と一緒に入れる)。
 - テストは `server/tests/test_hosted_*.py`。
-- 画面(`src/`)には、本番だけの分岐を置かない(いまもない)。
+- **画面の本番だけの機能は、`src/hosted/` に置く**(いまは ⚙ の「前提運用の照らし合わせ」= `ProcessCheck.tsx` と行の定義 `processRows.ts`)。ZIP は、このフォルダをまるごと外す。
+  - 外のコードは `src/hosted/` を直接 import しない。`src/hostedScreens.ts` が `import.meta.glob('./hosted/*.tsx')` で「ファイルがあれば」読み込み、ないときは `null` を返す。⚙ のメニューの項目は、`null` でなければ出す(`App.tsx`)。
+  - 画面が使う表(`process_interviews`・`process_checks`)は `server/schema.json` に置く(型の検査 `check-schema.mjs` が `src/models` と突き合わせるため)。Workbench の DB にも表はできるが、画面がないので使われない。
 
 ## 4. 残してはいけない言葉
 
