@@ -62,7 +62,7 @@ import { CHANNEL_PUSH, channelOptions, countryOptions, statusColor, statusOption
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
-import { CardAlertAction } from './CardAlertAction'
+import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
@@ -1009,6 +1009,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   const isDirty = () => baseline.current !== null && baseline.current !== contentKey()
   // ---- アラートへの対応(上の帯・プレビューの商品の枠・商品情報の行から開く。差し替えは、この配信カードの中で置き換えて、保存で確定)
   const [actAlert, setActAlert] = useState<CardAlert | null>(null)
+  // 商品の行(中の「選定済み」・右の商品情報)から開いた、商品の対応のフロートの行(X54。アラートから開いたときは actAlert)
+  const [productOpen, setProductOpen] = useState<string | null>(null)
   // 差し替えた理由(保存したときに、配信のメモ(種類 change)に残す。アラートの画面で差し替えたときと同じ記録)。
   // アラートへの対応と、商品のフロートで残りの候補と入れ替えたとき(X47)の両方
   const [alertNotes, setAlertNotes] = useState<string[]>([])
@@ -1020,15 +1022,19 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   const itemAlertKinds = new Map(items.filter((i) => alertByProduct.has(i.productId)).map((i) => [i.key, alertByProduct.get(i.productId)!.kind] as const))
   const openAlertFor = (productId: string) => {
     const a = alertByProduct.get(productId)
-    if (a) setActAlert(a)
+    if (a) {
+      setProductOpen(null)
+      setActAlert(a)
+    }
   }
   // アラートへの対応で使う配信(保存した配信か、作業画面から開いた、まだ保存していない案)
   const alertCard = card ?? draft?.card
-  const replaceForAlert = (alert: CardAlert, to: Product) => {
+  const replaceForAlert = (alert: CardAlert, to: Product, reason = '') => {
     const from = products.find((p) => p.id === alert.productId)
     // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
     setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
-    setAlertNotes((prev) => [...prev, tr(`${from?.name ?? alert.label}: ${alert.detail}。${to.name} に差し替えた`, `${from?.name ?? alert.label}: ${alert.detail}. Replaced with ${to.name}.`)])
+    const why = reason.trim()
+    setAlertNotes((prev) => [...prev, tr(`${from?.name ?? alert.label}: ${alert.detail}。${to.name} に差し替えた${why ? `。理由: ${why}` : ''}`, `${from?.name ?? alert.label}: ${alert.detail}. Replaced with ${to.name}.${why ? ` Reason: ${why}` : ''}`)])
     setActAlert(null)
   }
   // 商品のフロートの「ほかの候補から選ぶ」(X47): 選定済みの商品と、残りの候補を入れ替える(中ペインの「選ぶ」と同じく、外した商品は候補に戻す)。
@@ -1047,6 +1053,19 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
       why
         ? tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた。理由: ${why}`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}. Reason: ${why}`)
         : tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}.`),
+    ])
+  }
+  // 商品の対応のフロート(X54)で、AI の案・検索で選んだ商品に置き換える(アラートからのときは replaceForAlert)。
+  // 保存では行の商品 ID を書き換えないので、置き換えた枠は行 ID を外して、新しい行として保存する
+  const replaceItemWith = (itemKey: string, to: Product, reason: string) => {
+    const it = items.find((i) => i.key === itemKey)
+    if (!it) return
+    const from = products.find((p) => p.id === it.productId)
+    const why = reason.trim()
+    setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
+    setAlertNotes((prev) => [
+      ...prev,
+      why ? tr(`${from?.name ?? ''} を ${to.name} に差し替えた。理由: ${why}`, `Replaced ${from?.name ?? ''} with ${to.name}. Reason: ${why}`) : tr(`${from?.name ?? ''} を ${to.name} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to.name}.`),
     ])
   }
   // 商品 ID → いちばん強いアラートの種類(中ペインの選定済みの行と、商品情報の行の札)
@@ -1291,22 +1310,60 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
             </MessageBar>
           )}
 
-          {actAlert && alertCard && (
-            <CardAlertAction
-              alert={actAlert}
-              product={products.find((p) => p.id === actAlert.productId)}
-              card={alertCard}
-              scheduledAt={form.scheduledAt}
-              inCard={new Set(items.map((i) => i.productId))}
-              products={products}
-              model={stockModel}
-              weekUse={weekUse}
-              onReplace={(to) => replaceForAlert(actAlert, to)}
-              onPostpone={postponeForAlert}
-              onOpenAlerts={() => openAlertsScreen(actAlert.productId)}
-              onClose={() => setActAlert(null)}
-            />
-          )}
+          {/* 商品の対応のフロート(X54): アラートの札・商品の行の、どこから開いても、これ 1 つ */}
+          {(actAlert || productOpen) && (() => {
+            const item = actAlert ? items.find((i) => i.productId === actAlert.productId) : items.find((i) => i.key === productOpen)
+            const product = products.find((p) => p.id === (item?.productId ?? actAlert?.productId))
+            const idx = item ? items.indexOf(item) : -1
+            const section = idx >= 0 ? sectionIndexAt(sectionsOf(template), idx) : -1
+            const options: SwapOption[] = candidates.filter((c) => c.section === section).flatMap((c) => {
+              const p = products.find((x) => x.id === c.productId)
+              return p ? [{ key: c.key, product: p, reason: c.reason, source: c.source }] : []
+            })
+            const closeAction = () => {
+              setActAlert(null)
+              setProductOpen(null)
+            }
+            return (
+              <ProductActionFloat
+                key={`${actAlert ? `alert:${actAlert.kind}:${actAlert.productId ?? ''}` : `item:${productOpen}`}`}
+                product={product}
+                alert={actAlert ?? undefined}
+                card={alertCard}
+                scheduledAt={form.scheduledAt}
+                inCard={new Set(items.map((i) => i.productId))}
+                products={products}
+                poolProducts={poolProducts}
+                model={stockModel}
+                weekUse={weekUse}
+                alertKinds={productAlertKinds}
+                options={options}
+                onSwapCandidate={
+                  item
+                    ? (candKey, reason) => {
+                        swapWithCandidate(item.key, candKey, reason)
+                        closeAction()
+                      }
+                    : undefined
+                }
+                onReplace={
+                  item
+                    ? (to, reason) => {
+                        if (actAlert) replaceForAlert(actAlert, to, reason)
+                        else replaceItemWith(item.key, to, reason)
+                        closeAction()
+                      }
+                    : undefined
+                }
+                onPostpone={() => {
+                  setProductOpen(null)
+                  postponeForAlert()
+                }}
+                onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
+                onClose={closeAction}
+              />
+            )
+          })()}
           {/* この配信のアラート(在庫・方針・日程)。ふだんは 1 行にたたむ。アラートの画面から開いたときは、開いておく */}
           {liveAlerts.length > 0 && (
             <CardAlertsBar
@@ -1509,7 +1566,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
                 setCandidates={setCandidates}
                 alertKinds={productAlertKinds}
                 onAlert={alertCard ? openAlertFor : undefined}
-                onSwap={swapWithCandidate}
+                onOpenProduct={(key) => {
+                  setActAlert(null)
+                  setProductOpen(key)
+                }}
                 heroId={heroId}
                 setHeroId={setHeroId}
                 heroReason={heroReason}
@@ -1646,8 +1706,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
                   onHover={setHoverKey}
                   alertKinds={productAlertKinds}
                   onAlert={alertCard ? openAlertFor : undefined}
-                  candidates={candidates}
-                  onSwap={swapWithCandidate}
+                  onOpenProduct={(key) => {
+                    setActAlert(null)
+                    setProductOpen(key)
+                  }}
                 />
               </div>
             ) : (

@@ -37,7 +37,7 @@ import { DND_HERO, SOURCE_AI, type Candidate, type Item } from './items'
 import { withChat, type ProposedHero } from './aiSelect'
 import { optionLabel, tr, useT } from './i18n'
 import { Row, productMeta } from './ProductRow'
-import { ProductFloat, type SwapOption } from './ProductFloat'
+import { ProductFloat } from './ProductFloat'
 import { AlertChip, LowStockBadge } from './ProductMarks'
 import type { CardAlertKind } from './cardAlerts'
 import { useSelection } from './useSelection'
@@ -86,8 +86,8 @@ interface Props {
   alertKinds?: Map<string, CardAlertKind>
   /** アラートの札を押したとき(その商品のアラートへの対応を開く) */
   onAlert?: (productId: string) => void
-  /** 選定済みの商品を、残りの候補と入れ替える(商品のフロートの「ほかの候補から選ぶ」。保存で確定) */
-  onSwap?: (itemKey: string, candKey: string, reason: string) => void
+  /** 選定済みの行を押したとき(商品の対応のフロートを開く。X54) */
+  onOpenProduct?: (itemKey: string) => void
   heroId?: string
   setHeroId: (id?: string) => void
   heroReason: string
@@ -737,10 +737,6 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
 
     const list = listOf(sec)
     const cands = candidates.filter((c) => c.section === i)
-    const swapOptions: SwapOption[] = cands.flatMap((c) => {
-      const prod = productById.get(c.productId)
-      return prod ? [{ key: c.key, product: prod, reason: c.reason, source: c.source }] : []
-    })
     const usedIds = new Set([...items, ...candidates].map((x) => x.productId))
     const titles = drafts.titleCandidates[i] ?? []
     const copies = drafts.sectionCopyCandidates[i] ?? []
@@ -901,7 +897,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
               )
               // 行を押すと、商品のフロート(右端の商品情報と同じもの)。そこから残りの候補と入れ替えられる(X47)
               return prod ? (
-                <ProductFloat key={it.key} product={prod} position="after" swap={p.onSwap && { options: swapOptions, onSwap: (candKey, reason) => p.onSwap?.(it.key, candKey, reason) }}>
+                <ProductFloat key={it.key} onOpen={p.onOpenProduct && (() => p.onOpenProduct?.(it.key))}>
                   {row}
                 </ProductFloat>
               ) : (

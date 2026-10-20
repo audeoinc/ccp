@@ -1,10 +1,10 @@
 import { Avatar, Badge, Text, makeStyles, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { productImage } from './images'
-import { yen, type Candidate, type Item } from './items'
+import { yen, type Item } from './items'
 import { optionLabel, useT } from './i18n'
 import { productMarket } from './market'
-import { ProductFloat, type SwapOption } from './ProductFloat'
+import { ProductFloat } from './ProductFloat'
 import { AlertChip, LowStockBadge } from './ProductMarks'
 import { sectionRange, sectionsOf, type EmailTemplateId } from './templates'
 import { AlertMark } from './AlertMark'
@@ -22,10 +22,8 @@ interface Props {
   alertKinds?: Map<string, CardAlertKind>
   /** 商品のアラートの印を押したとき(その商品のアラートへの対応を開く) */
   onAlert?: (productId: string) => void
-  /** 残りの候補(中ペインと同じ)。渡したときだけ、フロートに「ほかの候補から選ぶ」を出す */
-  candidates?: Candidate[]
-  /** 選定済みの商品を、残りの候補と入れ替える(配信カードの中で。保存で確定) */
-  onSwap?: (itemKey: string, candKey: string, reason: string) => void
+  /** 行を押したとき(商品の対応のフロートを開く。X54) */
+  onOpenProduct?: (itemKey: string) => void
 }
 
 const useStyles = makeStyles({
@@ -73,7 +71,7 @@ function trendMark(name?: string): { mark: string; color: string } {
  * 行を押すと、商品のフロート(ProductFloat。中ペインの選定済みの行と同じもの)が開き、そこから残りの候補と差し替えられる。
  * 一覧そのものには、操作する部品を置かない(並べ替え・外すは中ペインだけ。X47)。
  */
-export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, candidates, onSwap }: Props) {
+export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, onOpenProduct }: Props) {
   const t = useT()
   const s = useStyles()
   const productById = new Map(products.map((p) => [p.id, p]))
@@ -94,10 +92,6 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
         const list = items.slice(from, to)
         if (list.length === 0) return null
         const label = sec.wantTitle ? sectionTitles[sec.index] || sec.label : sec.label
-        const options: SwapOption[] = (candidates ?? []).filter((c) => c.section === sec.index).flatMap((c) => {
-          const p = productById.get(c.productId)
-          return p ? [{ key: c.key, product: p, reason: c.reason, source: c.source }] : []
-        })
         return (
           <section key={sec.index}>
             <div className={s.sectionHead}>
@@ -108,7 +102,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
               {list.map((it) => {
                 const p = productById.get(it.productId)
                 return p ? (
-                  <ProductFloat key={it.key} product={p} position="before" swap={onSwap && { options, onSwap: (candKey, reason) => onSwap(it.key, candKey, reason) }}>
+                  <ProductFloat key={it.key} onOpen={onOpenProduct && (() => onOpenProduct(it.key))}>
                     <ProductItem product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} />
                   </ProductFloat>
                 ) : null

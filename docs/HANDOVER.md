@@ -399,7 +399,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 ## 6.23 X30 配信カードの中でアラートに対応する(2026-10-19、UI セッション)
 
-- 帯の商品名・「対応する」(`src/CardAlertsBar.tsx`)、プレビューの商品の枠の札(`src/ItemAlertOverlay.tsx`。リンク先の番号と同じく `[data-item-key]` を測って重ねる)、商品情報の行の札(`src/ProductInfoPane.tsx` の `onAlert`)の、どこからでも同じパネル `src/CardAlertAction.tsx` を開く。
+- 帯の商品名・「対応する」(`src/CardAlertsBar.tsx`)、プレビューの商品の枠の札(`src/ItemAlertOverlay.tsx`。リンク先の番号と同じく `[data-item-key]` を測って重ねる)、商品情報の行の札(`src/ProductInfoPane.tsx` の `onAlert`)の、どこからでも同じパネル `src/CardAlertAction.tsx` を開く(X54 で `src/ProductActionFloat.tsx` に統合。6.35)。
 - 差し替えは、アラートの画面(裏で保存する)とは分け、**配信カードの中で置き換えて保存で確定**にした(書きかけの内容と食い違わないように)。理由は保存のときに配信のメモ(kind change)に残す。候補は `alertActions.ts` の `replacementCandidates`(アラートの画面と同じ条件)。
 - **落とし穴**: 保存(`syncItems`)は、行 ID のある掲載商品の `product_id` を書き換えない。商品を差し替えるときは、行 ID(`rowId`)を外して新しい行にすること(元の行は消える)。
 - 差し替えた商品のアラートは、保存の前でも帯・札から消す(`liveAlerts`)。「アラートの画面で詳しく」は配信カードを閉じ、`AlertsPage` の `initialProductId` で、その商品のアラートを選んで開く(フロートが開いたままでも選び直す)。
@@ -527,6 +527,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - やり残し: ほかの人の入力は自動では届かない(開き直すか ⟳)。聞き取り先の名前の変更・削除はない(要れば足す)。
 - **同じ日に外した**(2026-10-20、利用者の決定:「運用は難しそう。md ファイルでの運用に変える。機能として外してよい」)。画面(`src/hosted/`)・⚙ の項目・`src/hostedScreens.ts`・`release-workbench.mjs` の `src/hosted/` の除外・型とサービス・撮影用の見本・`schema.json` の 2 つの表を外し、RELEASE.md 3 章を「画面には本番だけの分岐を置かない」に戻した。聞き取りは md の記入用シート(FLOWS.md。ドキュメントのセッションが担当)。
   - **本番の DB の表 `process_interviews`・`process_checks` は、利用者の指示で消した**(2026-10-20。消す前の中身は 0 件。`DROP TABLE`)。`schema.json` から外したので、サーバーは作り直さない。消したあと、外した版の反映(13:46)までに古い版のサーバーが空の表を作り直していたので、利用者の指示でもう一度消した(中身は 0 件。今の版は作らない)。
+
+## 6.35 X54 アラートへの対応と商品のフロートを 1 つに(2026-10-20、UI セッション)
+
+- 利用者の決定(案 B): 大きく真ん中に出す(760〜1040px)、つかんで動かせる、モーダルではない。部品は `src/ProductActionFloat.tsx`。`CardAlertAction.tsx` は消し、`ProductFloat.tsx` は行を包む開き口(`onOpen`)だけにした。
+- 配信カード(`CardDetail.tsx`)が 1 つだけ持つ。`actAlert`(アラートの札から)か `productOpen`(中・右の商品の行から。行の key)のどちらかで開く。片方を開くと、もう片方は消す。
+- 差し替え: 残りの候補 = `swapWithCandidate`(入れ替え。行 ID のまま)。AI の案・検索 = アラートからなら `replaceForAlert`、商品の行からなら `replaceItemWith`(どちらも行 ID を外して新しい行として保存。X30 の落とし穴と同じ理由)。理由は任意で `alertNotes` に積む。
+- 検索は `Candidates` の選ぶだけの使い方(`onPick`・`pickedId`・`marks`。引いて並べる・追加はしない)。
+- モックで確かめた: 商品の行から開く、候補を押すと右が切り替わる、検索の商品で差し替える(フロートが閉じ、中に入る)、アラートの札から開く(上にアラートの帯と AI の案)、つかんで動かす。
 
 ## 7. 落とし穴
 

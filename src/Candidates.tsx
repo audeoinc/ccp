@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
 import { AddRegular, DismissRegular, SearchRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -12,6 +12,12 @@ interface Props {
   products: Product[]
   usedIds: Set<string>
   onAdd: (productId: string) => void
+  /** 選ぶ使い方(X54。商品の対応のフロートの「ほかの商品を探す」): 行を押すと onPick。ドラッグ・追加のボタンは出さない */
+  onPick?: (productId: string) => void
+  /** 選ぶ使い方で、選んでいる商品 */
+  pickedId?: string
+  /** 行に添える印(残少・週の上限 など) */
+  marks?: (p: Product) => ReactNode
 }
 
 const useStyles = makeStyles({
@@ -50,7 +56,7 @@ const PAGE = 20
 
 const trendMark = (label?: string) => (label === '上昇' ? '▲ ' : label === '下降' ? '▼ ' : '— ') + optionLabel(label === '上昇' || label === '下降' ? label : '横ばい')
 
-export function Candidates({ products, usedIds, onAdd }: Props) {
+export function Candidates({ products, usedIds, onAdd, onPick, pickedId, marks }: Props) {
   const t = useT()
   const styles = useStyles()
   const [query, setQuery] = useState('')
@@ -101,7 +107,7 @@ export function Candidates({ products, usedIds, onAdd }: Props) {
         </Caption1>
       ) : (
         <Caption1 className={styles.caption}>
-          {t(`${matched.length}件`, `${matched.length} items`)} ・ {t('右のプレビューへドラッグして掲載', 'Drag to the preview on the right to include')}
+          {t(`${matched.length}件`, `${matched.length} items`)} ・ {onPick ? t('押すと、右に詳しい情報が出ます', 'Click to see details on the right') : t('右のプレビューへドラッグして掲載', 'Drag to the preview on the right to include')}
         </Caption1>
       )}
       {searching && matched.length === 0 && <Caption1 className={styles.caption}>{t('該当する商品がありません。', 'No matching products.')}</Caption1>}
@@ -110,7 +116,11 @@ export function Candidates({ products, usedIds, onAdd }: Props) {
         return (
           <div
             key={p.id}
-            draggable={!used}
+            draggable={!used && !onPick}
+            role={onPick ? 'button' : undefined}
+            tabIndex={onPick ? 0 : undefined}
+            onClick={onPick && !used ? () => onPick(p.id) : undefined}
+            style={onPick ? { cursor: used ? 'default' : 'pointer', outline: pickedId === p.id ? `2px solid ${tokens.colorBrandStroke1}` : undefined } : undefined}
             onDragStart={(e) => {
               e.dataTransfer.setData(DND_PRODUCT, p.id)
               e.dataTransfer.effectAllowed = 'copy'
@@ -126,10 +136,11 @@ export function Candidates({ products, usedIds, onAdd }: Props) {
               <Caption1 className={styles.line}>
                 {trendMark(p.sales_trend_name)} ・ ★{p.rating ?? '-'} ・ {optionLabel(p.weather_name)}
               </Caption1>
+              {marks?.(p)}
             </div>
             {used ? (
               <Badge appearance="tint" color="informative">{t('掲載中', 'Included')}</Badge>
-            ) : (
+            ) : onPick ? null : (
               <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => onAdd(p.id)} aria-label={t('追加', 'Add')} />
             )}
           </div>
