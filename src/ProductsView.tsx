@@ -136,6 +136,7 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
     const today = dayKey(new Date().toISOString())
     const byId = new Map(products.map((p) => [p.id, p]))
     const byCode = new Map(products.map((p) => [`${productMarket(p)}:${p.product_code}`, p]))
+    const byCodeOnly = new Map(products.map((p) => [String(p.product_code), p]))
     const resultOf = new Map(results.filter((r) => r.delivery_card_id).map((r) => [r.delivery_card_id!, r]))
     const markets = new Set(cards.map((c) => (c.country === 'US' ? 'US' : 'JP')))
     // 商品ごとに集める
@@ -198,7 +199,8 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
     for (const w of weekly) {
       const ws = w.week_start?.slice(0, 10)
       if (!ws || ws < fromWeek || ws > to) continue
-      const p = byCode.get(`${w.market === 'US' ? 'US' : 'JP'}:${w.product_code}`)
+      // 市場のない行(見本のデータ)は、商品コードだけで探す(US の商品コードも JP と取り違えないように)
+      const p = w.market ? byCode.get(`${w.market === 'US' ? 'US' : 'JP'}:${w.product_code}`) : byCodeOnly.get(String(w.product_code))
       const r = p && per.get(p.id)
       if (!r) continue
       r.weekUnits += Number(w.units ?? 0)
