@@ -62,6 +62,56 @@ const useStyles = makeStyles({
     boxShadow: tokens.shadow2,
   },
   detailGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '16px', rowGap: '8px' },
+  // 表と、選んだ行の詳しい欄を横に並べる(表の下に出すと、開いたことに気づきにくいため)。狭い画面では縦に積む
+  split: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 400px)',
+    columnGap: '12px',
+    rowGap: '12px',
+    alignItems: 'start',
+    '@media (max-width: 1100px)': { gridTemplateColumns: 'minmax(0, 1fr)' },
+  },
+  pane: {
+    position: 'sticky',
+    top: '8px',
+    maxHeight: 'calc(100vh - 180px)',
+    overflowY: 'auto',
+    display: 'grid',
+    alignContent: 'start',
+    rowGap: '10px',
+    padding: '12px 14px',
+    borderRadius: tokens.borderRadiusLarge,
+    border: `1px solid ${tokens.colorBrandStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  paneLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  learnCard: {
+    display: 'grid',
+    rowGap: '2px',
+    padding: '6px 8px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  deliveryRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    columnGap: '8px',
+    alignItems: 'center',
+    width: '100%',
+    padding: '4px 6px',
+    border: 'none',
+    borderRadius: tokens.borderRadiusMedium,
+    background: 'none',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase200,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  num: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  snippet: { display: 'grid', justifyItems: 'start', rowGap: '2px', minWidth: 0, fontSize: tokens.fontSizeBase200 },
+  oneLine: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px', color: tokens.colorNeutralForeground2 },
   list: { display: 'grid', rowGap: '6px', margin: 0, paddingLeft: '18px', fontSize: tokens.fontSizeBase200 },
   up: { color: tokens.colorPaletteGreenForeground1 },
   down: { color: tokens.colorPaletteRedForeground1 },
@@ -290,14 +340,34 @@ function LiftTab({ impacts, onOpenResult }: { impacts: DeliveryImpact[]; onOpenR
 function LogTab({ impacts, evals, onOpenResult }: { impacts: DeliveryImpact[]; evals: LearningEval[]; onOpenResult: (id: string) => void }) {
   const s = useStyles()
   const t = useT()
-  const [selected, setSelected] = useState<string | null>(null)
   const rows = impacts.filter((d) => d.runs.length > 0)
+  // 最初から、学びを渡したいちばん新しい配信を選んでおく(右の欄が空だと、何が見られるのか分からないため)
+  const [picked, setPicked] = useState<string | null>(null)
+  const selected = picked ?? (rows.find((d) => d.learningIds.length > 0) ?? rows[0])?.card.id ?? null
   const learningBy = useMemo(() => new Map(evals.map((e) => [e.id, e])), [evals])
+  const firstLine = (id: string) => learningBy.get(id)?.notes.split('\n')[0] ?? ''
   const columns: DataColumn<DeliveryImpact>[] = [
-    { key: 'name', label: t('配信', 'Delivery'), cell: (d) => <DeliveryName d={d} />, sort: (d) => d.sentAt, wide: true },
+    { key: 'name', label: t('配信', 'Delivery'), cell: (d) => <DeliveryName d={d} />, sort: (d) => d.sentAt },
     { key: 'channel', label: t('チャネル', 'Channel'), cell: (d) => <ChannelBadge size="small" channel={String(d.card.channel ?? '')} /> },
     { key: 'runs', label: t('AI の依頼', 'AI requests'), numeric: true, cell: (d) => d.runs.length, sort: (d) => d.runs.length },
-    { key: 'learn', label: t('渡した学び', 'Learnings passed'), cell: (d) => <LearningsMark d={d} />, sort: (d) => d.learningIds.length },
+    {
+      key: 'learn',
+      label: t('渡した学び', 'Learnings passed'),
+      wide: true,
+      // 表の中でも、どの学びかが分かるように、最初の学びの 1 行目を出す(全部は右の欄)
+      cell: (d) => (
+        <span className={s.snippet}>
+          <LearningsMark d={d} />
+          {d.learningIds.length > 0 && (
+            <span className={s.oneLine}>
+              {firstLine(d.learningIds[0])}
+              {d.learningIds.length > 1 ? t(` ほか ${d.learningIds.length - 1} 件`, ` +${d.learningIds.length - 1} more`) : ''}
+            </span>
+          )}
+        </span>
+      ),
+      sort: (d) => d.learningIds.length,
+    },
     {
       key: 'adoption',
       label: t('案の扱い', 'How AI ideas were used'),
@@ -312,60 +382,67 @@ function LogTab({ impacts, evals, onOpenResult }: { impacts: DeliveryImpact[]; e
     <div className={s.section}>
       <span className={s.intro}>
         {t(
-          '配信カードで AI の案(テーマ・コピー・商品・メイン画像など)を頼むたびに、そのとき「これまでの学び」から渡した学びを記録します。学びを渡さなかった依頼も記録します(比べる相手になるため)。AI の案そのものは保存しません。行を押すと、渡した学びの中身が見られます。',
-          'Each AI request on a delivery card records which learnings were passed. Requests without learnings are recorded too, as the comparison group. The AI ideas themselves are not saved. Click a row to see the learnings.',
+          '配信カードで AI の案(テーマ・コピー・商品・メイン画像など)を頼むたびに、そのとき「これまでの学び」から渡した学びを記録します。学びを渡さなかった依頼も記録します(比べる相手になるため)。AI の案そのものは保存しません。行を選ぶと、右に、渡した学びの中身が出ます。',
+          'Each AI request on a delivery card records which learnings were passed. Requests without learnings are recorded too, as the comparison group. The AI ideas themselves are not saved. Select a row to see its learnings on the right.',
         )}
       </span>
-      <DataTable
-        rows={rows}
-        columns={columns}
-        rowKey={(d) => d.card.id}
-        ariaLabel={t('AI に渡した学びの記録', 'Log of learnings passed to AI')}
-        empty={t('AI の依頼の記録は、まだありません', 'No AI request records yet')}
-        selectedKey={selected ?? undefined}
-        onRowClick={(d) => setSelected(d.card.id === selected ? null : d.card.id)}
-      />
-      {on && (
-        <div className={s.detail}>
-          <div className={s.bar}>
-            <span className={s.heading}>{on.card.name}</span>
-            <Button size="small" appearance="subtle" onClick={() => onOpenResult(on.card.id)}>
-              {t('結果を開く', 'Open results')}
+      <div className={s.split}>
+        <DataTable
+          rows={rows}
+          columns={columns}
+          rowKey={(d) => d.card.id}
+          ariaLabel={t('AI に渡した学びの記録', 'Log of learnings passed to AI')}
+          empty={t('AI の依頼の記録は、まだありません', 'No AI request records yet')}
+          selectedKey={selected ?? undefined}
+          onRowClick={(d) => setPicked(d.card.id)}
+        />
+        {on ? (
+          <div className={s.pane}>
+            <span className={s.name}>
+              <span className={s.heading}>{on.card.name}</span>
+              <span className={s.sub}>
+                {on.sentAt ? new Date(on.sentAt).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : ''} · {on.market} ·{' '}
+                {t(`リフト率 ${pct(on.liftRate)}`, `Lift ${pct(on.liftRate)}`)}
+              </span>
+            </span>
+            <span className={s.paneLabel}>{t(`渡した学び(${on.learningIds.length})`, `Learnings passed (${on.learningIds.length})`)}</span>
+            {on.learningIds.length ? (
+              on.learningIds.map((id) => {
+                const e = learningBy.get(id)
+                return (
+                  <div key={id} className={s.learnCard}>
+                    <span className={s.notes}>{e?.notes ?? t('(絞り込みの外の学び)', '(outside current filters)')}</span>
+                    {e && (
+                      <span className={s.sub}>
+                        {t('出どころ: ', 'From: ')}
+                        {e.source.name} · {e.sourceAt ? new Date(e.sourceAt).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : ''}
+                      </span>
+                    )}
+                  </div>
+                )
+              })
+            ) : (
+              <span className={s.muted}>{t('学びは渡していません(比べる相手になる配信です)', 'No learnings passed (part of the comparison group)')}</span>
+            )}
+            <span className={s.paneLabel}>{t('AI の依頼と、案の扱い', 'AI requests and how ideas were used')}</span>
+            <ul className={s.list}>
+              {on.runs.map((r) => (
+                <li key={r.id}>
+                  {r.task} — {adoptionLabel(r.adoption, t)}
+                  {learningIdsOf(r).length === 0 && on.learningIds.length > 0 && <span className={s.muted}>{t('(学びなし)', ' (no learnings)')}</span>}
+                </li>
+              ))}
+            </ul>
+            <Button size="small" appearance="secondary" onClick={() => onOpenResult(on.card.id)}>
+              {t('この配信の結果を開く', 'Open this delivery’s results')}
             </Button>
           </div>
-          <div className={s.detailGrid}>
-            <div className={s.section}>
-              <span className={s.muted}>{t('渡した学び', 'Learnings passed')}</span>
-              {on.learningIds.length ? (
-                <ol className={s.list}>
-                  {on.learningIds.map((id) => {
-                    const e = learningBy.get(id)
-                    return (
-                      <li key={id}>
-                        <span className={s.notes}>{e?.notes ?? t('(絞り込みの外の学び)', '(outside current filters)')}</span>
-                        {e && <div className={s.sub}>{e.source.name}</div>}
-                      </li>
-                    )
-                  })}
-                </ol>
-              ) : (
-                <span className={s.muted}>{t('学びは渡していません', 'No learnings passed')}</span>
-              )}
-            </div>
-            <div className={s.section}>
-              <span className={s.muted}>{t('AI の依頼', 'AI requests')}</span>
-              <ul className={s.list}>
-                {on.runs.map((r) => (
-                  <li key={r.id}>
-                    {r.task} — {adoptionLabel(r.adoption, t)}
-                    {learningIdsOf(r).length === 0 && <span className={s.muted}>{t('(学びなし)', ' (no learnings)')}</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        ) : (
+          <div className={s.pane}>
+            <span className={s.muted}>{t('行を選ぶと、渡した学びがここに出ます', 'Select a row to see its learnings here')}</span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -495,6 +572,9 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
   }
   const rows = evals.filter((e) => showRetired || e.review?.status !== 'retired')
   const retiredCount = evals.filter((e) => e.review?.status === 'retired').length
+  // 選んだ学び(最初は、いちばん多く渡した学び)。右の欄に、その学びを渡した配信と、比べた相手を並べる
+  const [picked, setPicked] = useState<string | null>(null)
+  const on = rows.find((e) => e.id === picked) ?? rows[0]
   const columns: DataColumn<LearningEval>[] = [
     {
       key: 'notes',
@@ -529,8 +609,7 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
       sort: (e) => e.lift.diff ?? undefined,
     },
     { key: 'verdict', label: t('見立て', 'Read'), cell: (e) => <VerdictBadge verdict={e.lift.verdict} />, sort: (e) => e.lift.verdict },
-    { key: 'ctr', label: t('クリック率の差', 'Click rate gap'), numeric: true, cell: (e) => pt(e.ctr.diff, 2), sort: (e) => e.ctr.diff ?? undefined },
-    { key: 'suggest', label: t('おすすめ', 'Suggested'), cell: (e) => statusLabel(e.suggestion) },
+    // クリック率の差・おすすめは、右の欄に出す(表の列を減らし、扱いのボタンが隠れないようにするため)
     {
       key: 'status',
       label: t('扱い', 'Decision'),
@@ -550,21 +629,95 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
     <div className={s.section}>
       <span className={s.intro}>
         {t(
-          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「これまでの学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。',
-          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Learnings that are always passed together cannot be told apart.',
+          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「これまでの学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。',
+          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Select a row to see where it was used on the right. Learnings that are always passed together cannot be told apart.',
         )}
       </span>
       <div className={s.bar}>
         <Switchable on={showRetired} onToggle={() => setShowRetired(!showRetired)} label={t(`外した学びも出す(${retiredCount})`, `Show retired (${retiredCount})`)} />
       </div>
-      <DataTable
-        rows={rows}
-        columns={columns}
-        rowKey={(e) => e.id}
-        ariaLabel={t('学びの評価', 'Learning evaluation')}
-        empty={t('学び(次に生かすメモ)は、まだありません', 'No learnings yet')}
-        onRowClick={(e) => onOpenResult(e.source.id)}
-      />
+      <div className={s.split}>
+        <DataTable
+          rows={rows}
+          columns={columns}
+          rowKey={(e) => e.id}
+          ariaLabel={t('学びの評価', 'Learning evaluation')}
+          empty={t('学び(次に生かすメモ)は、まだありません', 'No learnings yet')}
+          selectedKey={on?.id}
+          onRowClick={(e) => setPicked(e.id)}
+        />
+        {on ? (
+          <div className={s.pane}>
+            <div className={s.learnCard}>
+              <span className={s.notes}>{on.notes}</span>
+              <span className={s.sub}>
+                {t('出どころ: ', 'From: ')}
+                {on.source.name} · {on.sourceAt ? new Date(on.sourceAt).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : ''}
+              </span>
+            </div>
+            <div className={s.bar}>
+              <VerdictBadge verdict={on.lift.verdict} />
+              <span>
+                {t('リフト率の差', 'Lift gap')} <b className={on.lift.diff == null ? undefined : on.lift.diff >= 0 ? s.up : s.down}>{pt(on.lift.diff)}</b>
+              </span>
+              <span className={s.muted}>{t(`クリック率の差 ${pt(on.ctr.diff, 2)}`, `Click rate gap ${pt(on.ctr.diff, 2)}`)}</span>
+              <Badge appearance="outline" color="brand" size="small">
+                {t(`おすすめ: ${statusLabel(on.suggestion)}`, `Suggested: ${statusLabel(on.suggestion)}`)}
+              </Badge>
+            </div>
+            <PaneDeliveries
+              label={t(`この学びを渡した配信(${on.used.length})`, `Deliveries that received it (${on.used.length})`)}
+              avg={on.lift.a.mean}
+              rows={on.used}
+              empty={t('まだ、どの配信にも渡していません', 'Not passed to any delivery yet')}
+              onOpen={onOpenResult}
+            />
+            <PaneDeliveries
+              label={t(`比べた相手: 渡さなかった配信(${on.baseline.length})`, `Compared with: deliveries without it (${on.baseline.length})`)}
+              avg={on.lift.b.mean}
+              rows={on.baseline}
+              empty={t('比べる相手の配信が、まだありません', 'No comparison deliveries yet')}
+              onOpen={onOpenResult}
+            />
+            <Button size="small" appearance="secondary" onClick={() => onOpenResult(on.source.id)}>
+              {t('学びの出どころの配信を開く', 'Open the delivery this came from')}
+            </Button>
+          </div>
+        ) : (
+          <div className={s.pane}>
+            <span className={s.muted}>{t('行を選ぶと、その学びを渡した配信がここに出ます', 'Select a row to see where the learning was used')}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** 右の欄の、配信の並び(日付・名前・リフト率。押すと、その配信の結果を開く) */
+function PaneDeliveries({ label, avg, rows, empty, onOpen }: { label: string; avg: number | null; rows: DeliveryImpact[]; empty: string; onOpen: (id: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  return (
+    <div className={s.section}>
+      <span className={s.paneLabel}>
+        {label}
+        {rows.length > 0 && t(` · 平均のリフト率 ${pct(avg)}`, ` · average lift ${pct(avg)}`)}
+      </span>
+      {rows.length === 0 ? (
+        <span className={s.muted}>{empty}</span>
+      ) : (
+        <div>
+          {rows.map((d) => (
+            <button key={d.card.id} type="button" className={s.deliveryRow} onClick={() => onOpen(d.card.id)} title={t('この配信の結果を開く', 'Open this delivery’s results')}>
+              <span className={s.name}>
+                <span>{d.card.name}</span>
+                <span className={s.sub}>{d.sentAt ? new Date(d.sentAt).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : ''}</span>
+              </span>
+              <span className={s.num}>{pct(d.liftRate)}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
