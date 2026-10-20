@@ -3,7 +3,7 @@
 CCP が利用先の BigQuery から取り込むデータの、**列の名前・型・意味**の仕様です。
 設計の背景(なぜこの形か)は [BIGQUERY.md](BIGQUERY.md) にあります。
 
-- 状態: 案(2026-10-15。2026-10-17 に `category_path`・`length` を足した)。CCP 側の取り込みは、作っているところ
+- 状態: 案(2026-10-15。2026-10-17 に `category_path`・`length`、2026-10-20 に販売順位(9 章)を足した)。CCP 側の取り込みは、できている(`server/ccp/bq_import.py`)
 - 利用先のプロジェクト・データセット・テーブルの名前は、この文書にもコードにも書かない。CCP には設定(環境変数)で渡す
 
 ---
@@ -47,6 +47,7 @@ CCP が利用先の BigQuery から取り込むデータの、**列の名前・�
 | `name` | STRING | × | 商品名(その市場の言語) |
 | `category` | STRING | ○ | カテゴリ(※1)。CCP が商品をまとめるときに使う段(1 つ) |
 | `category_path` | STRING | ○ | カテゴリの階層を、上の段から ` > ` でつないだもの(例: `WOMEN > TOPS > KNIT`)。段の数は自由(※4) |
+| `gender` | STRING | ○ | 商品の性別(`mens` / `womens` / `unisex`。`men`・`women`・`female`・`ladies`・`m`・`w` なども読み替える。空・読めない値は「どの対象にも出す」) |
 | `season` | STRING | ○ | 季節(春 / 夏 / 秋 / 冬 / 通年 など。※1) |
 | `price` | NUMERIC | ○ | 代表の価格(SKU で価格が違うなら、最も多い価格か最安値。どちらかに決める) |
 | `description` | STRING | ○ | 商品の説明(長ければ 500 字ほどで切る) |
@@ -196,7 +197,7 @@ GROUP BY market, product_code
 
 ## 9. 販売チャネルごとの順位(SPU × 週 × 販売チャネル)
 
-配信の結果の画面で、載せた商品が、販売チャネルごとに何位だったか(配信前の 4 週で Top N に入った週の数、配信の週・翌週の順位)を見せるために使う(2026-10-20 に足した)。CCP の設定は `BQ_RANKING`。
+配信の結果の画面で、載せた商品が、販売チャネルごとに何位だったか(配信前の 4 週で Top N に入った週の数、配信の週・翌週の順位)を見せるために使う(2026-10-20 に足した)。CCP の設定は `BQ_RANKING`(ビューなら、更新を見る元の販売の表を `BQ_RANKING_WATCH` に)。まだ出せないあいだは、`python -m ccp.cli ranking-dummy --yes` のダミーで画面を確かめられる(BigQuery から取り込んだ行があれば、ダミーは作らない)。
 
 **キー: `market`, `product_code`, `week_start`, `channel`**
 
@@ -220,7 +221,7 @@ GROUP BY market, product_code
 -- 例: 週 × チャネルごとに、数量で順位を付ける(元の表の名前・列は、利用先に合わせる)
 SELECT market, product_code, week_start, channel, units,
        RANK() OVER (PARTITION BY market, week_start, channel ORDER BY units DESC) AS rank,
-       CURRENT_TIMESTAMP() AS as_of
+       (SELECT MAX(updated_at) FROM sales) AS as_of  -- 元の販売の表の時点(1 章。CURRENT_TIMESTAMP() は使わない)
 FROM (
   SELECT market, product_code, DATE_TRUNC(order_date, WEEK(MONDAY)) AS week_start, 'all' AS channel, SUM(qty) AS units FROM sales GROUP BY 1, 2, 3
   UNION ALL

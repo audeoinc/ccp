@@ -3,7 +3,7 @@
 CCP(配信コンテンツプランナー)を、利用先の **Vertex AI Workbench**(Agent Platform の Workbench)で動かし、
 本番と同じ**配信のデータ**と**商品・メイン画像の写真**を持ち込むための手順書です。
 
-- 最終更新: 2026-10-15(利用先の環境は PostgreSQL に直接つなぐ形に合わせた)
+- 最終更新: 2026-10-20(既定のポートを 8082 に。BigQuery・販売順位・指標のコマンドと設定を足した)
 - 対象: Workbench で CCP を立ち上げる・更新する人
 - 関係する文書: [WORKBENCH_ARCHITECTURE.md](WORKBENCH_ARCHITECTURE.md)(Workbench での構成の解説・構成図)、[UPDATE.md](UPDATE.md)(新しい版の受け取り方)<!-- hosted:begin -->、[GCP.md](GCP.md)(サーバー・DB・AI の全体)、[HANDOVER.md](HANDOVER.md)(開発の現在地)<!-- hosted:end -->
 
@@ -71,7 +71,17 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | サーバーのログの最後を見る | `scripts/workbench.sh log` |
 | 設定の確認 | `scripts/workbench.sh check` |
 
-- `update` は、`git pull` → (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
+BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m ccp.cli …`):
+
+| やりたいこと | コマンド |
+|---|---|
+| BigQuery の出力を、値まで確かめる(何も変えない) | `bq-check` |
+| 商品・カテゴリの週の指標を取り込む(CSV) | `import-metrics <CSV> [--yes]` |
+| BigQuery の販売順位がないとき、結果の画面の「販売チャネルごとの順位」のダミーを作る | `ranking-dummy [--yes]` |
+
+画面からは、⚙ の「BigQuery から取り込む」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
+
+- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる。直さない約束は [UPDATE.md](UPDATE.md))→ (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
@@ -85,7 +95,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 | Python | **3.12 以上**を推奨(本番は 3.12) | `python3 --version` |
 | Git | 利用先の Git のリポジトリ(CCP の版を入れたもの。[UPDATE.md](UPDATE.md))を取得できる | `git --version` |
 | PostgreSQL | **利用先の環境は PostgreSQL に直接つなぐ**(Workbench の上や、同じネットワークのサーバー)。CCP 用の DB を 1 つ(本番は PostgreSQL 16) | `psql --version`、または DB の管理者に確認 |
-| 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」 | IAM の画面 |
+| 権限(Workbench のサービスアカウント) | AI を使うなら「**Vertex AI ユーザー**」。BigQuery から取り込むなら「**BigQuery データ閲覧者**」「**BigQuery ジョブユーザー**」も | IAM の画面 |
 | ブラウザ | 利用先の環境から、本番の CCP の画面を開ける | 本番の URL を開く |
 
 > **パッケージの取得について:** 手順の `npm ci` と `pip install` は、パッケージをインターネット(npm・PyPI、または社内のミラー)から取ります。
@@ -294,6 +304,8 @@ cd server
 
 新しい列・テーブルは、サーバーの起動後、最初に DB につないだときに自動で足されます(手で `migrate` しなくてよい)。
 
+設定の見本(`server/workbench.env.example`)に新しい行が増えても、`server/workbench.env` には自動では入りません(`workbench.env` は Git の外)。版のあとに `diff server/workbench.env.example server/workbench.env` で見比べ、要る行を写してから `scripts/workbench.sh restart` します。
+
 ### 4.2 データと写真を、本番にそろえる
 
 3.5〜3.8 を繰り返します(書き出す → 上げる → `import-pack --yes` → 起動し直す)。スクリプトなら、ZIP を上げたあと `scripts/workbench.sh import server/ccp-pack-<日時>.zip`(確認してから取り込み、起動し直す)。
@@ -338,14 +350,20 @@ set -a; source workbench.env; set +a
 ■ DB
   [OK  ] 接続先: DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp_app)
   [OK  ] ホスト localhost → 127.0.0.1
-  [OK  ] つながりました(PostgreSQL 16.x …)。テーブル 12 個、配信カード 83 件
+  [OK  ] つながりました(PostgreSQL 16.x …)。テーブル 32 個、配信カード 83 件
 ■ AI(Vertex AI の Gemini)
   [OK  ] GOOGLE_CLOUD_PROJECT=… / GOOGLE_CLOUD_LOCATION=global / GEMINI_MODEL=…
 ■ 写真
   [OK  ] ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
 ■ 画面
   [OK  ] ビルドがあります(/home/jupyter/ccp/dist-gcp)
+■ BigQuery(利用先の本番のデータ)
+  [注意] BQ_SPU などの設定がありません(BigQuery から取り込まない)
+■ その他
+  [注意] APP_PASSWORD なし(画面にパスワードをかけない)
 ```
+
+BigQuery を使わないなら、「■ BigQuery」の [注意] はそのままでかまいません。
 
 主な `[NG]` と直し方:
 
@@ -370,12 +388,18 @@ set -a; source workbench.env; set +a
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |
+| `CCP_PORT` | — | サーバーのポート(`scripts/workbench.sh`) | 既定 8082 |
+| `CCP_PYTHON` / `CCP_PGDATA` / `CCP_PG_BIN` | — | スクリプトが使う Python・Workbench の中の PostgreSQL のデータの場所・`pg_ctl` のあるフォルダ | `server/workbench.env.example` の説明のとおり |
+| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` | BigQuery を使うとき | 出力の場所 `<プロジェクト>.<データセット>.<表>`(ジョブのプロジェクトは `BQ_PROJECT`)。ビューなら、更新を見る元の表を `BQ_<名前>_WATCH` に | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
+| `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
+| `GEMINI_CONCURRENCY` | — | Gemini への同時の呼び出しの上限(既定 4) | 設定しない |
 
 ## 付録 B. 引っ越し用のパックの中身
 
 | ZIP の中 | 中身 |
 |---|---|
-| `data.json` | すべてのテーブルの行(配信カード・載せた商品・結果・メモ・週・承認の履歴・商品・メイン画像・週ごとの実績・販売方針・テンプレート)。作った日時・変えた日時も含む |
+| `data.json` | すべてのテーブルの行(`server/schema.json` の全部。配信カード・結果・週・ユーザーと承認・制作の依頼・方針と決まり・商品・SKU と在庫・週ごとの実績・販売順位・外部広告・指標 など)。作った日時・変えた日時も含む |
 | `images/products/…` ・ `images/heroes/…` | 商品・メイン画像の写真(本番の GCS にあるもの) |
 
 書き出しは `server/ccp/pack.py`(`GET /api/export`)、取り込みは `python -m ccp.cli import-pack`。

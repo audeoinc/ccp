@@ -129,3 +129,4 @@ scripts/workbench.sh status      # いまの版を確かめる
 
 - Workbench からは **push しません**(コードは、版ごとに届くものだけにする)。
 - 版の中に、データの列が増える変更があっても、サーバーが起動したときに DB に足します(手で migrate しなくてよい)。
+- 設定の見本(`server/workbench.env.example`)に新しい行が増えても、`server/workbench.env` には自動では入りません(`workbench.env` は Git の外)。版のあとに `diff server/workbench.env.example server/workbench.env` で見比べ、要る行を写してから `scripts/workbench.sh restart` します。
