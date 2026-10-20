@@ -601,6 +601,58 @@ export const productRankings: Row[] = []
   }
 }
 
+// ---- AB テストの配信の見本(X55 の段階 2)。結果は「配信 × 案 × 区分」の行
+// Fall Arrivals(10/1): メイン画像を比べ、クリック率で B が確かに勝って、残り 80% に B を送った
+// Weekend Sale(10/3): 全員を均等に分け、1 通あたりの売上で比べたが、差は偶然の範囲
+{
+  const abCase = (name: string, date: string, ab: Record<string, unknown>, parts: { variant: string; segment?: string; share: number; open: number; ctr: number; cvr: number }[]) => {
+    const c = cards.find((x) => x.name === name && String(x.scheduled_at ?? '').slice(0, 10) === date && x.country === COUNTRY['US'])
+    const i = c ? deliveryResults.findIndex((x) => x.delivery_card_id === c.id) : -1
+    if (!c || i < 0) return
+    const whole = deliveryResults[i]
+    const usHeroes = heroes.filter((h) => h.market === US_MARKET && h.id !== c.hero_image_id)
+    c.ab_test = JSON.stringify({ v: 1, target: 'hero', testShare: 20, waitHours: 4, ...ab, heroes: { B: { heroId: usHeroes[0]?.id, heroReason: 'A close-up of the knit texture' } } })
+    const total = Number(whole.recipients)
+    const items = JSON.parse(String(whole.products ?? '[]')) as { productId: string; clicks: number; units: number; revenue: number }[]
+    const links = JSON.parse(String(whole.links ?? '{}')) as { hero?: number; buttons?: number[]; other?: number }
+    const rows = parts.map((p, k) => {
+      const recipients = Math.round(total * p.share)
+      const opens = Math.round(recipients * p.open)
+      const clicks = Math.round(recipients * p.ctr)
+      const orders = Math.round(recipients * p.cvr)
+      const scale = Number(whole.clicks) ? clicks / Number(whole.clicks) : 0
+      const prod = items.map((x) => ({ ...x, clicks: Math.round(x.clicks * scale), units: Math.round(x.units * scale), revenue: Math.round(x.revenue * scale) }))
+      const revenue = prod.reduce((s, x) => s + x.revenue, 0)
+      return {
+        id: guid(`result:${c.id}:${p.variant}:${p.segment ?? ''}`),
+        delivery_card_id: c.id,
+        sent_at: k === parts.length - 1 && p.segment === 'rollout' ? new Date(new Date(String(c.scheduled_at)).getTime() + 4 * 3600_000).toISOString() : c.scheduled_at,
+        recipients,
+        opens,
+        clicks,
+        orders,
+        revenue,
+        // 前年の売上は、配信全体の数字なので、最初の行にだけ入れる(合計すると全体の値になる)
+        last_year_revenue: k === 0 ? whole.last_year_revenue : undefined,
+        products: JSON.stringify(prod),
+        links: JSON.stringify({ hero: Math.round((links.hero ?? 0) * scale), buttons: (links.buttons ?? []).map((b) => Math.round(b * scale)), other: Math.round((links.other ?? 0) * scale) }),
+        variant: p.variant,
+        segment: p.segment,
+      }
+    })
+    deliveryResults.splice(i, 1, ...rows)
+  }
+  abCase('Fall Arrivals', '2026-10-01', { variants: ['B'], metric: 'ctr', mode: 'winner', hypothesis: 'A close-up of the knit texture draws more clicks than the full-look photo' }, [
+    { variant: 'A', segment: 'test', share: 0.1, open: 0.27, ctr: 0.031, cvr: 0.0012 },
+    { variant: 'B', segment: 'test', share: 0.1, open: 0.27, ctr: 0.038, cvr: 0.0014 },
+    { variant: 'B', segment: 'rollout', share: 0.8, open: 0.26, ctr: 0.037, cvr: 0.0013 },
+  ])
+  abCase('Weekend Sale', '2026-10-03', { variants: ['B'], metric: 'rpr', mode: 'even', testShare: 100, hypothesis: 'Showing the discount on the hero lifts revenue per recipient' }, [
+    { variant: 'A', share: 0.5, open: 0.24, ctr: 0.04, cvr: 0.0021 },
+    { variant: 'B', share: 0.5, open: 0.24, ctr: 0.041, cvr: 0.0022 },
+  ])
+}
+
 // 過去の配信の、次に生かすメモ(配信カードの「これまでの学び」の見本)
 const NOTES: [string, string, string][] = [
   ['Fall Arrivals', '2026-09-24', 'Worked: the warm-tone hero drew 31% of clicks.\nTry next: put the best-selling knit in slot 1; slot 4 was weak.'],

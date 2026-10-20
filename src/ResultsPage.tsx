@@ -329,13 +329,13 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     }
   }
 
-  // CSV の取り込み: 配信ごとに、結果があれば上書き、なければ作る
+  // CSV の取り込み: 配信(AB テストは、配信・案・区分)ごとに、結果があれば上書き、なければ作る
   const importCsv = async (file: File) => {
     setMessage(null)
     const { rows: imported, errors } = parseResultsCsv(await file.text(), cards)
     let done = 0
     for (const r of imported) {
-      const existing = (results ?? []).find((x) => x.delivery_card_id === r.cardId)
+      const existing = (results ?? []).find((x) => x.delivery_card_id === r.cardId && (x.variant || undefined) === r.variant && (x.segment || undefined) === r.segment)
       const res = existing
         ? await DeliveryResultsService.update(existing.id, r.fields)
         : await DeliveryResultsService.create({ ...r.fields, delivery_card_id: r.cardId })
@@ -351,7 +351,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const downloadSample = () =>
     downloadTable(
       [...IMPORT_COLUMNS],
-      rows.slice(0, 2).map((r) => [r.card.name ?? '', localDate(r.card.scheduled_at), r.result.sent_at ?? '', 0, 0, 0, 0, 0, 0]),
+      rows.slice(0, 2).map((r) => [r.card.name ?? '', localDate(r.card.scheduled_at), r.result.sent_at ?? '', 0, 0, 0, 0, 0, 0, '', '']),
       'results-import-sample.csv',
     )
 

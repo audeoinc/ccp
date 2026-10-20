@@ -12,6 +12,7 @@ import { DeliveryResultsService } from './data/deliveryResults'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { ProductRankings } from './ProductRankings'
+import { AbResult } from './AbResult'
 import { isPush, sentAtOf, type ResultRow } from './results'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
@@ -133,6 +134,8 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
             </span>
           </div>
           <ResultKpis row={row} money={money} />
+          {/* AB テストの配信だけ(案ごとの結果があるとき)。主な数字は全体、ここは案ごと */}
+          {row.parts.length > 0 && <AbResult row={row} heroes={heroes} money={money} onAdopt={adopt} />}
           <div className={styles.grid} data-print-grid>
             <HeatPreview
               row={row}

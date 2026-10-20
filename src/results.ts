@@ -21,6 +21,8 @@ export interface ResultRow {
   vsPrevWeek?: number
   /** 前年と比べた増減(割合) */
   vsLastYear?: number
+  /** AB テストの、案・区分ごとの行(AB テストでなければ空)。result は、これを合計したもの */
+  parts: DeliveryResult[]
 }
 
 const ratio = (a?: number, b?: number) => (a !== undefined && b ? a / b : undefined)
@@ -115,17 +117,92 @@ export function pastSame(all: ResultRow[], row: ResultRow, n: number, by: Compar
     .slice(0, n)
 }
 
+// ---- AB テストの案ごとの行(X55 の段階 2)
+// 結果は「配信 × 案 × 区分」で 1 行(delivery_results の variant・segment)。配信全体の数字は、その合計。
+// 月・週・一覧・比べる・過去との比べは、合計した 1 行で動かす(案の行を知らなくてよいように)
+
+const sumOf = (rows: DeliveryResult[], key: 'recipients' | 'opens' | 'clicks' | 'orders' | 'revenue' | 'last_year_revenue') => {
+  const vs = rows.map((r) => r[key]).filter((v): v is number => v !== undefined && v !== null)
+  return vs.length ? vs.reduce((s, v) => s + Number(v), 0) : undefined
+}
+
+/**
+ * メモ(notes)を持つ行。配信全体の行(案なし)があればそれ、なければ A 案のテスト分、なければ最初の行。
+ * メモの保存は、この行に書く(合計した結果の id は、この行の id)
+ */
+function primaryOf(rows: DeliveryResult[]): DeliveryResult {
+  return rows.find((r) => !r.variant && !r.segment) ?? rows.find((r) => r.variant === 'A' && r.segment !== 'rollout') ?? rows.find((r) => r.variant === 'A') ?? rows[0]
+}
+
+/** 配信 1 本の行を合計する。案の行があれば、案のない行(配信全体)は数字に入れない(同じ受信者を 2 回数えないため) */
+function mergeRows(rows: DeliveryResult[]): { result: DeliveryResult; parts: DeliveryResult[] } {
+  const parts = rows.filter((r) => r.variant)
+  if (parts.length === 0) return { result: rows.length === 1 ? rows[0] : { ...primaryOf(rows) }, parts: [] }
+  const primary = primaryOf(rows)
+  const products = new Map<string, ProductResult>()
+  for (const r of parts)
+    for (const x of parseProductResults(r.products)) {
+      const p = products.get(x.productId) ?? { productId: x.productId, clicks: 0, units: 0, revenue: 0 }
+      products.set(x.productId, { ...p, clicks: p.clicks + x.clicks, units: p.units + x.units, revenue: p.revenue + x.revenue })
+    }
+  const links: LinkResults = {}
+  for (const r of parts) {
+    const l = parseLinkResults(r.links)
+    if (l.hero !== undefined) links.hero = (links.hero ?? 0) + l.hero
+    if (l.other !== undefined) links.other = (links.other ?? 0) + l.other
+    ;(l.buttons ?? []).forEach((v, i) => {
+      links.buttons = links.buttons ?? []
+      links.buttons[i] = (links.buttons[i] ?? 0) + v
+    })
+  }
+  const sent = parts.map((r) => r.sent_at).filter((v): v is string => !!v).sort()[0]
+  return {
+    result: {
+      id: primary.id,
+      delivery_card_id: primary.delivery_card_id,
+      sent_at: sent ?? primary.sent_at,
+      recipients: sumOf(parts, 'recipients'),
+      opens: sumOf(parts, 'opens'),
+      clicks: sumOf(parts, 'clicks'),
+      orders: sumOf(parts, 'orders'),
+      revenue: sumOf(parts, 'revenue'),
+      // 前年の売上は、配信全体の行に入れることが多い(前年には案がないため)。案の行の合計がなければ、全体の行の値
+      last_year_revenue: sumOf(parts, 'last_year_revenue') ?? rows.find((r) => !r.variant)?.last_year_revenue,
+      products: products.size ? JSON.stringify([...products.values()]) : undefined,
+      links: Object.keys(links).length ? JSON.stringify(links) : undefined,
+      notes: primary.notes,
+    },
+    parts,
+  }
+}
+
+/** 結果の行を、配信ごとに 1 行へ合計する(結果を配信ごとに読む所で使う。AB テストでない配信は、そのまま) */
+export function mergeResultsByCard(results: DeliveryResult[]): DeliveryResult[] {
+  return groupByCard(results).map((rows) => mergeRows(rows).result)
+}
+
+function groupByCard(results: DeliveryResult[]): DeliveryResult[][] {
+  const map = new Map<string, DeliveryResult[]>()
+  for (const r of results) {
+    if (!r.delivery_card_id) continue
+    map.set(r.delivery_card_id, [...(map.get(r.delivery_card_id) ?? []), r])
+  }
+  return [...map.values()]
+}
+
 /** 結果のある配信を、行にする(前の週との比較は、同じ国・チャネルの、7 日前までの配信と比べる) */
 export function toResultRows(cards: DeliveryCard[], results: DeliveryResult[]): ResultRow[] {
   const byCard = new Map(cards.map((c) => [c.id, c]))
-  const rows = results
-    .filter((r) => r.delivery_card_id && byCard.has(r.delivery_card_id))
-    .map((r): ResultRow => {
+  const rows = groupByCard(results)
+    .filter((g) => byCard.has(g[0].delivery_card_id!))
+    .map((g): ResultRow => {
+      const { result: r, parts } = mergeRows(g)
       const card = byCard.get(r.delivery_card_id!)!
       const push = isPush(card)
       return {
         card,
         result: r,
+        parts,
         openRate: push ? undefined : ratio(r.opens, r.recipients),
         clickRate: ratio(push ? r.opens : r.clicks, r.recipients),
         revenue: Number(r.revenue ?? 0),
@@ -198,11 +275,17 @@ export function productRows(rows: ResultRow[], productName: (id: string) => stri
 
 // ---- CSV の取り込み
 
-/** 取り込む CSV の列(見出し)。配信は、配信名と配信日(YYYY-MM-DD)で探す */
-export const IMPORT_COLUMNS = ['delivery', 'date', 'sent_at', 'recipients', 'opens', 'clicks', 'orders', 'revenue', 'last_year_revenue'] as const
+/**
+ * 取り込む CSV の列(見出し)。配信は、配信名と配信日(YYYY-MM-DD)で探す。
+ * variant・segment は AB テストの配信だけ(省略・空なら、配信全体の 1 行)。variant は A / B / C、segment は test(テスト分)/ rollout(勝ち案を残りに送った分)
+ */
+export const IMPORT_COLUMNS = ['delivery', 'date', 'sent_at', 'recipients', 'opens', 'clicks', 'orders', 'revenue', 'last_year_revenue', 'variant', 'segment'] as const
 
 export interface ImportedResult {
   cardId: string
+  /** AB テストの案と区分(なければ空。同じ配信・案・区分の行があれば上書きする) */
+  variant?: string
+  segment?: string
   fields: Partial<DeliveryResult>
 }
 
@@ -219,6 +302,12 @@ export function parseResultsCsv(text: string, cards: DeliveryCard[]): { rows: Im
       errors.push(`${i + 2}: ${name} ${date}`)
       return
     }
+    const variant = (r.variant ?? '').trim().toUpperCase() || undefined
+    const segment = (r.segment ?? '').trim().toLowerCase() || undefined
+    if ((variant && !['A', 'B', 'C'].includes(variant)) || (segment && !['test', 'rollout'].includes(segment)) || (segment && !variant)) {
+      errors.push(`${i + 2}: ${name} ${date} (variant ${variant ?? '—'} / segment ${segment ?? '—'})`)
+      return
+    }
     const fields: Partial<DeliveryResult> = {
       sent_at: r.sent_at ? new Date(r.sent_at).toISOString() : card.scheduled_at,
       recipients: num(r.recipients),
@@ -228,7 +317,7 @@ export function parseResultsCsv(text: string, cards: DeliveryCard[]): { rows: Im
       revenue: num(r.revenue),
       last_year_revenue: num(r.last_year_revenue),
     }
-    rows.push({ cardId: card.id, fields: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && !Number.isNaN(v))) })
+    rows.push({ cardId: card.id, variant, segment, fields: { ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && !Number.isNaN(v))), variant, segment } })
   })
   return { rows, errors }
 }

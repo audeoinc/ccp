@@ -42,6 +42,10 @@ export interface DeliveryResult {
   links?: string
   /** 振り返りのメモ(次に生かすこと) */
   notes?: string
+  /** AB テストの案('A'・'B'・'C'。AB テストでない配信は空。X55 の段階 2) */
+  variant?: string
+  /** AB テストの区分('test' = テストに回した分 / 'rollout' = 勝ち案を残りに送った分。空 = 配信全体) */
+  segment?: string
 }
 
 interface Result<T> {

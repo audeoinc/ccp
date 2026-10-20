@@ -14,7 +14,7 @@ import { WeeklyPerformancesService } from './data/weeklyPerformances'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { ChangeLogsService, type ChangeLog } from './data/changeLogs'
 import { STATE_SELECTED } from './items'
-import { parseProductResults } from './results'
+import { mergeResultsByCard, parseProductResults } from './results'
 
 export type AlertKind = 'outOfStock' | 'lowStock'
 
@@ -190,7 +190,8 @@ export function useStockAlerts(cards: DeliveryCard[], products: Product[], reloa
       .then((res) => res.success && setWeekly(res.data ?? []))
       .catch(() => undefined)
     DeliveryResultsService.getAll()
-      .then((res) => res.success && setResults(res.data ?? []))
+      // AB テストの配信は、案ごとの行を配信 1 本に合計する(売れた数を、配信ごとの実績として数えるため)
+      .then((res) => res.success && setResults(mergeResultsByCard(res.data ?? [])))
       .catch(() => undefined)
     DeliveryProductsService.getAll()
       .then((res) => {

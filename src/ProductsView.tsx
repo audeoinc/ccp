@@ -12,7 +12,7 @@ import { DataTable, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
 import { productImage } from './images'
 import { locale, optionLabel, priceText, useT, type Market } from './i18n'
-import { parseProductResults } from './results'
+import { mergeResultsByCard, parseProductResults } from './results'
 import { productMarket } from './market'
 import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
 import { weekKeyOf } from './weekLock'
@@ -137,7 +137,8 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
     const byId = new Map(products.map((p) => [p.id, p]))
     const byCode = new Map(products.map((p) => [`${productMarket(p)}:${p.product_code}`, p]))
     const byCodeOnly = new Map(products.map((p) => [String(p.product_code), p]))
-    const resultOf = new Map(results.filter((r) => r.delivery_card_id).map((r) => [r.delivery_card_id!, r]))
+    // AB テストの配信は、案ごとの行を合計した 1 行で見る(X55)
+    const resultOf = new Map(mergeResultsByCard(results).map((r) => [r.delivery_card_id!, r]))
     const markets = new Set(cards.map((c) => (c.country === 'US' ? 'US' : 'JP')))
     // 商品ごとに集める
     const per = new Map<string, Row>()

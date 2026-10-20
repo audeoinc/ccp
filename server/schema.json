@@ -195,7 +195,9 @@
     ["last_year_revenue", "numeric"],
     ["products", "text"],
     ["links", "text"],
-    ["notes", "text"]
+    ["notes", "text"],
+    ["variant", "text"],
+    ["segment", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
