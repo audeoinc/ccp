@@ -510,7 +510,7 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 商品のフロート(`ProductDetail.tsx`)に、タブ「指標」(`ProductMetrics.tsx`。読み込みは `useProductMetrics.ts`、項目と書き方は `metrics.ts`)。1 つの表で、上の段がこの商品、下の段がそのカテゴリ。いちばん新しい週だけを出す。フロートの幅を 420 → 520px にした(表が 1 行に収まるように)。
 - データは表 `product_metrics` / `category_metrics`(1 行 = 対象 × 週 × 項目。縦長の形にしたのは、項目を足しても列を足さずに済むため)。値は外で計算し終えたもの(順位・WoW・MoM・YoY まで)で、画面では計算しない。
 - 取り込み: ⚙ →「商品・カテゴリの指標を取り込む(CSV)」、または `python -m ccp.cli import-metrics <CSV> --yes`(`server/ccp/metrics.py`。1 行目の列名で商品 / カテゴリを見分け、週 × 市場ごとに置き換える)。形と定義は [METRICS_FORMAT.md](METRICS_FORMAT.md)。撮影用のビルドでは `src/mock/metricsImport.ts` が同じ置き換えをメモリで行う(確かめは本物だけ)。
-- **利用者と決めた定義**: 順位は市場の全体(カテゴリはカテゴリ同士)、MoM は暦の月(月初〜週の最終日 と 前月の同じ日まで)、YoY は 52 週前の同じ週、SKU 欠品率は週の最終日の在庫 0 の SKU 数 ÷ SKU 数。増えたら緑・減ったら赤。ただし欠品率は逆(増えたら赤。`metrics.ts` の `lowerIsBetter`)。SKU 在庫数は在庫の合計。
+- **利用者と決めた定義**: 順位は市場の全体(カテゴリはカテゴリ同士)、MoM は暦の月(月初〜週の最終日 と 前月の同じ日まで)、YoY は 52 週前の同じ週、SKU 欠品率は週の最終日の在庫 0 の SKU 数 ÷ SPU の全 SKU 数(販売を終えた SKU も含める)。増えたら緑・減ったら赤。ただし欠品率は逆(増えたら赤。`metrics.ts` の `lowerIsBetter`)。SKU 在庫数は在庫の合計。
 - 値はすべてダミー。サンプルデータ(`src/mock/seed.ts` の `productMetrics` / `categoryMetrics`。2026-10-12 の週)と `server/seed.json`。本番・Workbench の DB には入っていない(初期データは、空の DB にだけ入る)。本番で見るには、CSV を取り込む。
 - 残り(BACKLOG の X48): 本物の値の CSV をだれが出すか(決まるまではダミーでよい、と利用者)、BigQuery からの取り込み。順位の前週との差は持っていない(要望があれば列を足す)。
 - **BigQuery の取り込みとの重なり(BQ セッションの指摘)**: `products` の列(units_4w・revenue_4w・revenue_yoy など。直近 4 週の集計)と `sku_stock` に、近い値がすでにある。指標のタブの項目(店舗 / EC の別、お気に入り、カテゴリのセッション、WoW・暦の MoM・YoY、順位)は、それらにはないので、新しい表にした。BigQuery から取るようにするときは、在庫・欠品率は `sku` / `sku_stock` から作れるか先に確かめ、新しい出力は BIGQUERY_EXPORT.md と `bq.py` の OUTPUTS に足す(本番で動かすには、利用者の指示が要る)。

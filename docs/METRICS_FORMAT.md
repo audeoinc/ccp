@@ -38,7 +38,7 @@ week_start,market,product_code,metric,value,rank,rank_of,wow,mom,yoy
 |---|---|---|---|
 | 商品 | `spu_stock` | SPU の在庫数(週の最終日の時点) | なし |
 | 商品 | `sku_stock` | SKU の在庫の**合計**(在庫のある SKU の数ではない。週の最終日の時点) | なし |
-| 商品 | `sku_stockout_rate` | SKU 欠品率(0〜1)。**週の最終日(日曜)の在庫が 0 の SKU の数 ÷ SKU の数**。販売を終えた SKU は数えない | なし |
+| 商品 | `sku_stockout_rate` | SKU 欠品率(0〜1)。**週の最終日(日曜)の在庫が 0 の SKU の数 ÷ SKU の数**。分母は SPU の全 SKU(販売を終えた SKU も含める。利用者 2026-10-20) | なし |
 | 商品 | `store_sales` | 店舗の売上(その週) | あり |
 | 商品 | `ec_sales` | EC の売上(その週) | あり |
 | 商品 | `ec_favorites` | EC のお気に入りの数(その週に足された数) | あり |
