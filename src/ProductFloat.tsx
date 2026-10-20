@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Button, Field, Popover, PopoverSurface, Text, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowLeftRegular, ArrowSwapRegular, DismissRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, DismissRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import { ProductDetail } from './ProductDetail'
 import { Row, productMeta } from './ProductRow'
@@ -19,6 +19,8 @@ export interface SwapOption {
 
 const useStyles = makeStyles({
   anchor: { minWidth: 0 },
+  // つかんで動かす帯(プレビューにかぶったとき、ずらして見ながら選べるように。X53)
+  grab: { display: 'flex', alignItems: 'center', columnGap: '6px', margin: '-4px -4px 6px', padding: '4px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, cursor: 'move', userSelect: 'none', touchAction: 'none' },
   // 商品の詳しい情報(ProductDetail)と同じ大きさにそろえる(切り替えても、フロートの大きさが変わらないように)
   swap: { width: '420px', maxWidth: '90vw', minHeight: '400px', maxHeight: '80vh', overflowY: 'auto', display: 'grid', rowGap: '10px', padding: '4px', minWidth: 0, alignContent: 'start' },
   swapHead: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
@@ -45,12 +47,17 @@ interface Props {
  */
 export function ProductFloat({ product, position, swap, children }: Props) {
   const s = useStyles()
+  const t = useT()
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<'detail' | 'swap'>('detail')
+  // つかんで動かした量(閉じたら元の位置に戻す)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const close = () => {
     setOpen(false)
     setView('detail')
+    setPos({ x: 0, y: 0 })
   }
   const fromInner = (target: EventTarget) => {
     const el = (target as HTMLElement).closest?.('button, a, input, textarea, select, [data-no-float]')
@@ -81,7 +88,25 @@ export function ProductFloat({ product, position, swap, children }: Props) {
           if (!d.open) close()
         }}
       >
-        <PopoverSurface>
+        <PopoverSurface style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+          <div
+            className={s.grab}
+            title={t('つかんで動かせます', 'Drag to move')}
+            onPointerDown={(e) => {
+              drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y }
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              const d = drag.current
+              if (d) setPos({ x: d.ox + e.clientX - d.sx, y: d.oy + e.clientY - d.sy })
+            }}
+            onPointerUp={() => {
+              drag.current = null
+            }}
+          >
+            <ArrowMoveRegular />
+            {t('つかんで動かせます', 'Drag to move')}
+          </div>
           {view === 'detail' ? (
             <ProductDetail
               product={product}
