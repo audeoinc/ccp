@@ -15,8 +15,11 @@ export interface MetricDef {
   kind: MetricKind
   /** 順位を持つか(在庫・欠品率は持たない) */
   ranked: boolean
-  /** 減るほうが良い項目(欠品率)。増減の色を逆にする(増えたら赤) */
-  lowerIsBetter?: boolean
+  /**
+   * 増減の色の向き。up = 増えたら緑(既定)、down = 減るほうが良い(欠品率。増えたら赤)、
+   * none = 色を付けない(在庫数。増えるのが良いとも在庫過多とも読めるので、在庫の持ち・販売と合わせて人が判断する。利用者 2026-10-20)
+   */
+  better?: 'up' | 'down' | 'none'
   label: () => string
 }
 
@@ -25,10 +28,10 @@ export const PRODUCT_METRIC_KEYS = ['spu_stock', 'sku_stock', 'sku_stockout_rate
 export const CATEGORY_METRIC_KEYS = ['ec_sessions', 'ec_sales', 'ec_favorites'] as const
 
 export const productMetricDefs = (): MetricDef[] => [
-  { key: 'spu_stock', kind: 'count', ranked: false, label: () => tr('SPU 在庫数', 'SPU stock') },
+  { key: 'spu_stock', kind: 'count', ranked: false, better: 'none', label: () => tr('SPU 在庫数', 'SPU stock') },
   // SKU の在庫の合計(在庫のある SKU の数ではない。2026-10-20 利用者)
-  { key: 'sku_stock', kind: 'count', ranked: false, label: () => tr('SKU 在庫数', 'SKU stock') },
-  { key: 'sku_stockout_rate', kind: 'rate', ranked: false, lowerIsBetter: true, label: () => tr('SKU 欠品率', 'SKU stockout rate') },
+  { key: 'sku_stock', kind: 'count', ranked: false, better: 'none', label: () => tr('SKU 在庫数', 'SKU stock') },
+  { key: 'sku_stockout_rate', kind: 'rate', ranked: false, better: 'down', label: () => tr('SKU 欠品率', 'SKU stockout rate') },
   { key: 'store_sales', kind: 'money', ranked: true, label: () => tr('店舗売上', 'Store sales') },
   { key: 'ec_sales', kind: 'money', ranked: true, label: () => tr('EC 売上', 'EC sales') },
   { key: 'ec_favorites', kind: 'count', ranked: true, label: () => tr('EC お気に入り数', 'EC favorites') },
