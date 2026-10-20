@@ -11,7 +11,7 @@ const ng = <T,>(message: string): Result<T> => ({ success: false, error: { messa
 const now = () => new Date().toISOString()
 const newId = (key: string) => guid(`${key}:${Math.random()}:${Date.now()}`)
 const APPROVED = new Set(['approved', 'confirmed'])
-const LIVE = new Set(['requested', 'in_progress', 'done'])
+const LIVE = new Set(['requested', 'in_progress', 'done', 'checked'])
 
 function event(action: string, actor: Actor, card: Row, weekStart: string | undefined, note?: string) {
   tables.EventsService.push({ id: newId('event'), action, week_start: weekStart, delivery_card_id: card.id, card_name: card.name, actor: actor.name, note, created_on: now() })
@@ -95,7 +95,8 @@ export const ProductionService = {
   async undo(id: string, input: { actor: Actor; week_start?: string }) {
     // 本番の undo と同じ: いまの状態 → 戻した先と、消す記録
     const map: Record<string, [string, string[]]> = {
-      sent: ['done', ['sent_at', 'sent_by_name']],
+      sent: ['checked', ['sent_at', 'sent_by_name']],
+      checked: ['done', ['checked_at', 'checked_by_name']],
       done: ['in_progress', ['done_at', 'done_by_name', 'done_note', 'done_link']],
       in_progress: ['requested', ['received_at', 'received_by_name']],
       requested: ['withdrawn', []],
@@ -103,11 +104,27 @@ export const ProductionService = {
     const r = tables.ProductionRequestsService.find((x) => x.id === id)
     const status = String(r?.status ?? '')
     let [to, clear] = map[status] ?? ['', []]
-    if (status === 'sent' && !r?.done_at) [to, clear] = ['withdrawn', []]
+    if (status === 'sent' && !r?.checked_at) [to, clear] = r?.done_at ? ['done', ['sent_at', 'sent_by_name']] : ['withdrawn', []]
     return advance(id, input.actor, Object.keys(map), { status: to, ...Object.fromEntries(clear.map((k) => [k, undefined])) }, 'production_undo', input.week_start, `版 ${r?.version}: ${status} → ${to}`, 'この版は戻せません(古い版か、取り下げた版です)')
   },
+  async check(id: string, input: { actor: Actor; week_start?: string }) {
+    return advance(id, input.actor, ['done'], { status: 'checked', checked_at: now(), checked_by_name: input.actor.name }, 'production_check', input.week_start, undefined, '制作が終わった版だけを確認できます')
+  },
+  async revise(id: string, input: { actor: Actor; note: string; week_start?: string }) {
+    if (!input.note?.trim()) return ng<ProductionRequest>('直してほしいことを書いてください')
+    return advance(
+      id,
+      input.actor,
+      ['done', 'checked'],
+      { status: 'in_progress', done_at: undefined, done_by_name: undefined, checked_at: undefined, checked_by_name: undefined, revision_note: input.note.trim(), revision_at: now(), revision_by_name: input.actor.name },
+      'production_revise',
+      input.week_start,
+      input.note.trim(),
+      '制作が終わった版だけを、直してもらえます',
+    )
+  },
   async sendRequest(id: string, input: { actor: Actor; html?: string; week_start?: string }) {
-    return advance(id, input.actor, ['done'], { status: 'sent', sent_at: now(), sent_by_name: input.actor.name, ...(input.html ? { html: input.html } : {}) }, 'production_send', input.week_start, '配信のしくみへの送信は、まだ仮', '制作が終わった版だけを送れます(まだ終わっていないか、古い版です)')
+    return advance(id, input.actor, ['checked'], { status: 'sent', sent_at: now(), sent_by_name: input.actor.name, ...(input.html ? { html: input.html } : {}) }, 'production_send', input.week_start, '配信のしくみへの送信は、まだ仮', '仕上がりを確認した版だけを送れます(まだ確認していないか、古い版です)')
   },
   async send(input: RequestInput) {
     const r = create(input, 'sent')

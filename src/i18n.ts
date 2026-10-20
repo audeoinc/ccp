@@ -81,6 +81,7 @@ const OPTION_EN: Record<string, string> = {
   配信のしくみに送った: 'Sent to delivery system',
   古い版: 'Outdated',
   取り下げた: 'Withdrawn',
+  仕上がりを確認した: 'Result checked',
   // ステータス
   未起案: 'Not started',
   検討中: 'In review',

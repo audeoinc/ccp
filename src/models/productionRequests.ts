@@ -8,6 +8,8 @@ export const ProductionRequestStatus = {
   in_progress: '制作している',
   /** 制作が「制作が終わった」 */
   done: '制作が終わった',
+  /** 企画が仕上がりを確かめて「これで OK」(配信のしくみに送れる) */
+  checked: '仕上がりを確認した',
   /** 制作を通さず、配信のしくみに送った */
   sent: '配信のしくみに送った',
   /** 企画が変わったので古い版 */
@@ -48,6 +50,13 @@ export interface ProductionRequestFields {
   edited_snapshot?: string
   edited_at?: string
   edited_by_name?: string
+  /** 仕上がりの確認(PR7): OK にした日時・人 */
+  checked_at?: string
+  checked_by_name?: string
+  /** いちばん新しい「直してほしい」の中身と、日時・人(制作に戻したとき) */
+  revision_note?: string
+  revision_at?: string
+  revision_by_name?: string
 }
 
 /** 読んだ 1 行 */

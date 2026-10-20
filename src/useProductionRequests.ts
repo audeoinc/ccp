@@ -9,10 +9,10 @@ import { statusRank } from './status'
 import { tr } from './i18n'
 
 /** 制作の面での状態(依頼の版がない承認済みの配信は「依頼する前」、承認前は「承認待ち」) */
-export type ProductionView = 'not_approved' | 'draft' | 'requested' | 'in_progress' | 'done' | 'sent' | 'stale'
+export type ProductionView = 'not_approved' | 'draft' | 'requested' | 'in_progress' | 'done' | 'checked' | 'sent' | 'stale'
 
 export function productionView(card: DeliveryCard, req?: ProductionRequest): ProductionView {
-  if (req?.status === 'sent' || req?.status === 'done' || req?.status === 'in_progress' || req?.status === 'requested') return req.status
+  if (req?.status === 'sent' || req?.status === 'checked' || req?.status === 'done' || req?.status === 'in_progress' || req?.status === 'requested') return req.status
   if (statusRank(card.status) < statusRank('approved')) return 'not_approved'
   return req?.status === 'stale' ? 'stale' : 'draft'
 }
@@ -24,7 +24,8 @@ export const productionLabel = (v: ProductionView): string =>
     draft: tr('制作に依頼する前', 'Not requested yet'),
     requested: tr('依頼済み(受け取り待ち)', 'Requested'),
     in_progress: tr('制作している', 'In production'),
-    done: tr('制作が終わった', 'Production done'),
+    done: tr('制作が終わった(確認待ち)', 'Production done (to check)'),
+    checked: tr('仕上がりを確認した', 'Result checked'),
     sent: tr('配信のしくみに送った', 'Sent to delivery system'),
     stale: tr('企画が変わりました', 'Plan changed'),
   })[v]
@@ -36,7 +37,8 @@ export const productionColor = (v: ProductionView): string =>
     draft: tokens.colorPaletteMarigoldBorderActive,
     requested: tokens.colorPaletteBlueBorderActive,
     in_progress: tokens.colorPaletteBlueBorderActive,
-    done: tokens.colorPaletteGreenBorderActive,
+    done: tokens.colorPaletteMarigoldBorderActive,
+    checked: tokens.colorPaletteGreenBorderActive,
     sent: tokens.colorPaletteGreenBorderActive,
     stale: tokens.colorPaletteRedBorderActive,
   })[v]

@@ -5,6 +5,8 @@
   POST /api/production/requests/{id}/done     制作が「制作が終わった」(ひとこと・できたもののリンクを任意で)
   POST /api/production/requests/{id}/html     直した HTML を保存する
   POST /api/production/requests/{id}/edits    左の要素(文言・メイン画像・商品・リンク先)を直した写しを保存する
+  POST /api/production/requests/{id}/check    企画が仕上がりを確かめて OK にする(PR7)
+  POST /api/production/requests/{id}/revise   企画が「直してほしい」と制作に戻す(PR7)
   POST /api/production/requests/{id}/undo     工程を 1 段戻す(やり直す)
   POST /api/production/requests/{id}/send     制作が終わった版を、配信のしくみに送る(工程の最後。いまは仮の窓口)
   POST /api/production/send                   制作を通さず、配信のしくみに送る(いまは送り先の窓口だけ。実際には送らずに「送りました」と返す)
@@ -45,9 +47,9 @@ async def _next_version(conn: AsyncConnection, card_id: str) -> int:
 
 
 async def stale_live(conn: AsyncConnection, card_id: str) -> None:
-    """生きている版(依頼済み・制作している・終わった)を、古い版にする。配信のしくみに送った版は、記録として残す"""
+    """生きている版(依頼済み・制作している・終わった・確認した)を、古い版にする。配信のしくみに送った版は、記録として残す"""
     await conn.execute(
-        text("UPDATE production_requests SET status = 'stale', modified_on = now() WHERE delivery_card_id = :c AND status IN ('requested', 'in_progress', 'done')"),
+        text("UPDATE production_requests SET status = 'stale', modified_on = now() WHERE delivery_card_id = :c AND status IN ('requested', 'in_progress', 'done', 'checked')"),
         {"c": sc.coerce("uuid", card_id)},
     )
 
@@ -186,7 +188,8 @@ async def save_edits(request_id: str, request: Request):
 
 # 工程を 1 段戻すときの、いまの状態 → (戻した先の状態, 消す記録)。依頼の取り下げ(requested → withdrawn)は、版を残して記録にする
 _UNDO: dict[str, tuple[str, tuple[str, ...]]] = {
-    "sent": ("done", ("sent_at", "sent_by_name")),
+    "sent": ("checked", ("sent_at", "sent_by_name")),
+    "checked": ("done", ("checked_at", "checked_by_name")),
     "done": ("in_progress", ("done_at", "done_by_name", "done_note", "done_link")),
     "in_progress": ("requested", ("received_at", "received_by_name")),
     "requested": ("withdrawn", ()),
@@ -207,8 +210,9 @@ async def undo(request_id: str, request: Request):
         if status not in _UNDO:
             return fail(409, "この版は戻せません(古い版か、取り下げた版です)")
         to, clear = _UNDO[status]
-        if status == "sent" and not req.get("done_at"):
-            to, clear = "withdrawn", ()
+        if status == "sent" and not req.get("checked_at"):
+            # 仕上がりの確認より前に送った版(確認を作る前の記録)は、終わったに戻す。制作を通さずに送った版は、取り下げ
+            to, clear = ("done", ("sent_at", "sent_by_name")) if req.get("done_at") else ("withdrawn", ())
         row = await _update(conn, "production_requests", request_id, {"status": to, **{k: None for k in clear}}) or req
         card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
         if card is not None:
@@ -216,16 +220,49 @@ async def undo(request_id: str, request: Request):
     return ok(row)
 
 
+@router.post("/requests/{request_id}/check")
+async def check(request_id: str, request: Request):
+    """企画が仕上がりを確かめて「これで OK」にする(PR7)。このあと、配信のしくみに送れる"""
+    return await _advance(request, request_id, ("done",), {"status": "checked", "checked_at": "@now", "checked_by_name": "@actor"}, "production_check", None, "制作が終わった版だけを確認できます")
+
+
+@router.post("/requests/{request_id}/revise")
+async def revise(request_id: str, request: Request):
+    """企画が「直してほしい」と制作に戻す(PR7)。版は変えず、制作している に戻し、終わった の記録を消して、直してほしいことを残す"""
+    body = await _body(request)
+    note = (str(body.get("note") or "")).strip()
+    if not note:
+        return fail(400, "直してほしいことを書いてください")
+    return await _advance(
+        request,
+        request_id,
+        ("done", "checked"),
+        {
+            "status": "in_progress",
+            "done_at": None,
+            "done_by_name": None,
+            "checked_at": None,
+            "checked_by_name": None,
+            "revision_note": note,
+            "revision_at": "@now",
+            "revision_by_name": "@actor",
+        },
+        "production_revise",
+        note,
+        "制作が終わった版だけを、直してもらえます",
+    )
+
+
 @router.post("/requests/{request_id}/send")
 async def send_request(request_id: str, request: Request):
-    """制作が終わった版を、配信のしくみに送る(工程の最後。2026-10-19、利用者と決めた: 送るのは最後の最後なので、制作が終わってから)。
+    """仕上がりを確認した版を、配信のしくみに送る(工程の最後。2026-10-19、利用者と決めた: 送るのは最後の最後なので、確認が済んでから)。
     新しい版は作らず、この版を「送った」にする。HTML は、いまのエディタのもの。送り先は、まだ仮(実際には送らない)"""
     body = await _body(request)
     html = str(body.get("html") or "") or None
     fields: dict[str, Any] = {"status": "sent", "sent_at": "@now", "sent_by_name": "@actor"}
     if html:
         fields["html"] = html
-    res = await _advance(request, request_id, ("done",), fields, "production_send", "配信のしくみへの送信は、まだ仮", "制作が終わった版だけを送れます(まだ終わっていないか、古い版です)")
+    res = await _advance(request, request_id, ("checked",), fields, "production_send", "配信のしくみへの送信は、まだ仮", "仕上がりを確認した版だけを送れます(まだ確認していないか、古い版です)")
     return res
 
 

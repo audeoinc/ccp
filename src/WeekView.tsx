@@ -62,6 +62,10 @@ interface Props {
   renderCard?: (c: DeliveryCard) => ReactNode | null
   /** 「AI 下書き・未確認」の印を押したとき(確かめる引き出しを開く。W14) */
   onCheck?: (id: string) => void
+  /** 配信の状態の色と名前を差し替える(制作の面では、制作の状態。なければ計画のステータス) */
+  stateOf?: (c: DeliveryCard) => { color: string; label: string }
+  /** 配信名の下に出す 1 行(制作の面の、状態と締め切り) */
+  renderMeta?: (c: DeliveryCard) => ReactNode
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -159,6 +163,8 @@ const useStyles = makeStyles({
   issueWarn: { backgroundColor: tokens.colorPaletteDarkOrangeBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
   issueBad: { backgroundColor: tokens.colorPaletteRedBackground1, color: tokens.colorPaletteRedForeground1 },
   // 進み具合: 工程の棒
+  // 制作の面の、状態と締め切りの 1 行
+  meta: { display: 'block', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   progressRow: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   bar: { flexGrow: 1, height: '4px', borderRadius: '2px', backgroundColor: tokens.colorNeutralBackground5, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: '2px' },
@@ -208,7 +214,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, onSelect, onCreate, renderCard, onCheck }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, onSelect, onCreate, renderCard, onCheck, stateOf, renderMeta }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -268,6 +274,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
     const hasVisual = !!hero || ids.length > 0
     const hasPushText = isPush && !!(c.push_title || c.push_body || c.headline || c.copy)
     const ratio = progress.total ? progress.done / progress.total : 0
+    const state = stateOf ? stateOf(c) : { color: statusColor(c.status), label: statusLabel(c.status) }
 
     const issues = (
       <>
@@ -353,11 +360,12 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         </div>
         <div className={styles.inner}>
           <div className={styles.nameRow}>
-            <span className={styles.dot} style={{ backgroundColor: statusColor(c.status) }} title={statusLabel(c.status)} />
-            <LockMark status={c.status} />
+            <span className={styles.dot} style={{ backgroundColor: state.color }} title={state.label} />
+            {!stateOf && <LockMark status={c.status} />}
             <AlertMark kind={alertKinds?.get(id)} />
             <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.name}` : c.name}</span>
           </div>
+          {renderMeta && <span className={styles.meta}>{renderMeta(c)}</span>}
           {hasIssues && <div className={styles.issues}>{issues}</div>}
 
           {lens === 'products' ? (
@@ -380,9 +388,9 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
           ) : (
             <>
               <div className={styles.progressRow}>
-                {statusLabel(c.status)}
+                {state.label}
                 <span className={styles.bar} aria-hidden>
-                  <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(ratio * 100)}%`, backgroundColor: statusColor(c.status) }} />
+                  <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(ratio * 100)}%`, backgroundColor: state.color }} />
                 </span>
                 {`${progress.done}/${progress.total}`}
               </div>

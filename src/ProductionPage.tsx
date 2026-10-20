@@ -63,6 +63,7 @@ const useStyles = makeStyles({
   stepDotDone: { backgroundColor: tokens.colorPaletteGreenBackground3, color: tokens.colorNeutralForegroundOnBrand, border: 'none' },
   stepBody: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
   stepName: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  stepActions: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', rowGap: '4px' },
   // 終えた段を戻すリンク(いちばん新しく終えた段だけ。目立たせない)
   undo: { minWidth: 0, padding: 0, height: 'auto', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
   // 4 つのペイン(要素の情報 | HTML のエディタ | プレビュー | やり取り)。幅は境界のドラッグで変え、覚える。要素の情報とやり取りは、たためる
@@ -116,7 +117,7 @@ interface Props {
 }
 
 const subscribeMe = (f: () => void) => onMeChange(f)
-const LIVE = new Set(['requested', 'in_progress', 'done', 'sent'])
+const LIVE = new Set(['requested', 'in_progress', 'done', 'checked', 'sent'])
 const INFO_KEY = 'productionPage.infoOpen'
 const TALK_KEY = 'productionPage.talkOpen'
 
@@ -145,6 +146,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   const [notice, setNotice] = useState<string | null>(null)
   const [doneNote, setDoneNote] = useState('')
   const [doneLink, setDoneLink] = useState('')
+  const [reviseNote, setReviseNote] = useState('')
   const [side, setSide] = useState<'talk' | 'tasks'>('talk')
   // プレビューから作った HTML(下書き)と、エディタの中身(null = まだ直していない)
   const [generated, setGenerated] = useState('')
@@ -240,11 +242,13 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   })
 
   // 工程の帯(2026-10-19、利用者と決めた: 左が始まり・右が終わり。いまの段のボタンだけを出す)。
-  // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 配信のしくみに送る(企画)。PROCESS.md 2 章の「いま、だれの番か」
+  // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 仕上がりの確認(企画。PR7)→ ⑤ 配信のしくみに送る(企画)。PROCESS.md 2 章の「いま、だれの番か」
   const status = live?.status
-  const current = !approved ? -1 : !live ? 0 : status === 'requested' ? 1 : status === 'in_progress' ? 2 : status === 'done' ? 3 : 4
+  const current = !approved ? -1 : !live ? 0 : status === 'requested' ? 1 : status === 'in_progress' ? 2 : status === 'done' ? 3 : status === 'checked' ? 4 : 5
   // 近道(制作を通さずに送った)のときは、② ③ を「飛ばした」にする。いちばん新しく終えた段(current - 1)には「やり直す」(依頼の段は「依頼を取り下げる」)
   const skipped = status === 'sent' && !live?.received_at && !live?.done_at
+  // 確認を作る前に送った版は、④ を飛ばしている
+  const checkSkipped = status === 'sent' && !skipped && !live?.checked_at
   const steps: { key: string; name: string; who: string; info?: string; skipped?: boolean; action?: ReactNode }[] = [
     {
       key: 'request',
@@ -275,7 +279,11 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
       key: 'make',
       name: t('制作する', 'Produce'),
       who: owner || t('制作', 'Production'),
-      info: live?.done_by_name ? [`${live.done_by_name} ${when(live.done_at)}`, live.done_note, live.done_link].filter(Boolean).join(' — ') : undefined,
+      info: live?.done_by_name
+        ? [`${live.done_by_name} ${when(live.done_at)}`, live.done_note, live.done_link].filter(Boolean).join(' — ')
+        : live?.revision_note
+          ? t(`直してほしい(${live.revision_by_name ?? ''} ${when(live.revision_at)}): ${live.revision_note}`, `Fix requested (${live.revision_by_name ?? ''} ${when(live.revision_at)}): ${live.revision_note}`)
+          : undefined,
       skipped,
       action: live && (
         <Popover withArrow positioning="below-start">
@@ -295,6 +303,45 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
             </div>
           </PopoverSurface>
         </Popover>
+      ),
+    },
+    {
+      key: 'check',
+      name: t('仕上がりの確認', 'Check the result'),
+      who: t('企画', 'Planner'),
+      info: live?.checked_by_name ? `${live.checked_by_name} ${when(live.checked_at)}` : undefined,
+      skipped: skipped || checkSkipped,
+      action: live && (
+        <span className={s.stepActions}>
+          <Tooltip content={needMe ?? t('右のプレビューと HTML を見て、これで送ってよければ押します', 'Press when the preview and HTML on the right are good to send')} relationship="description">
+            <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy || !meId} onClick={() => void run(() => ProductionService.check(live.id, { actor, week_start: weekStart }), tr('仕上がりを確認しました', 'Checked the result'))}>
+              {t('これで OK', 'Looks good')}
+            </Button>
+          </Tooltip>
+          <Popover withArrow positioning="below-start">
+            <PopoverTrigger disableButtonEnhancement>
+              <Button size="small" disabled={busy || !meId}>
+                {t('直してほしい', 'Request a fix')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverSurface>
+              <div className={s.doneBox}>
+                <span className={s.note}>{t('直してほしいことを書いて、制作に戻します(③ 制作する に戻ります)', 'Write what to fix and send it back to production (back to step 3)')}</span>
+                <AutoTextarea rows={2} size="small" value={reviseNote} onChange={(_, d) => setReviseNote(d.value)} placeholder={t('例: ボタンの文言を「今すぐ見る」に', 'e.g. Change the button text to "Shop now"')} />
+                <Button
+                  size="small"
+                  appearance="primary"
+                  disabled={busy || !reviseNote.trim()}
+                  onClick={() =>
+                    void run(() => ProductionService.revise(live.id, { actor, note: reviseNote, week_start: weekStart }), tr('制作に戻しました', 'Sent back to production')).then((ok) => ok && setReviseNote(''))
+                  }
+                >
+                  {t('制作に戻す', 'Send back')}
+                </Button>
+              </div>
+            </PopoverSurface>
+          </Popover>
+        </span>
       ),
     },
     {
@@ -383,7 +430,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
             })}
           </ol>
           {!approved && <span className={s.note}>{t('承認されたら、① から始めます', 'Start from step 1 after approval')}</span>}
-          {approved && current < 3 && (
+          {approved && current < 4 && (
             <Menu positioning="below-end">
               <MenuTrigger disableButtonEnhancement>
                 <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('その他の操作', 'More actions')} />

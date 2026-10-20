@@ -550,16 +550,21 @@ function App() {
   // 制作の依頼(配信ごとの最新の版)。制作の面の箱の色・締め切りの印に使う(PR4)
   const production = useProductionRequests(cards)
   const onProduction = page === 'production'
-  // 配信の段階の帯(StageNav)で、同じ配信の隣の段のフロートに切り替える。配信カードは下に開いたまま残し、
-  // 制作のページ・結果は、その上に重ねる(配信カードの直しかけを、切り替えで捨てないため)
+  // 配信の段階の帯(StageNav)と「企画を見る」で、同じ配信の隣の段のフロートに切り替える。
+  // 配信カードと制作のページは、閉じずに重ねる(閉じると直しかけを捨てるため。2026-10-20、利用者の要望で「企画を見る」も重ねる)。
+  // 重なりの順は、あとから開いたものが上。下にあるものを見たいときは、上を閉じて見せる(配信カード)か、開き直して上に出す(制作のページ)
+  const [productionKey, setProductionKey] = useState(0)
   const goStage = (id: string, f: Face) => {
     if (f === 'calendar') {
-      setProductionOpen(null)
       setPeekResult(null)
-      setSelectedId(id)
+      // 配信カードが制作のページの下にあれば、制作のページを閉じて見せる。なければ、上に重ねて開く(閉じると制作のページに戻る)
+      if (selectedId === id) setProductionOpen(null)
+      else setSelectedId(id)
     } else if (f === 'production') {
       setPeekResult(null)
-      setProductionOpen(id)
+      // 制作のページが配信カードの下にあれば、開き直して上に出す
+      if (productionOpen === id) setProductionKey((k) => k + 1)
+      else setProductionOpen(id)
     } else {
       setProductionOpen(null)
       setPeekResult(id)
@@ -583,6 +588,8 @@ function App() {
     const late = upcoming && !!due && due < today && (v === 'draft' || v === 'requested' || v === 'in_progress')
     return `${productionLabel(v)}${due ? ` ・ ${t('締切', 'Due')} ${due.slice(5).replace('-', '/')}${late ? t('(過ぎた)', ' (late)') : ''}` : ''}`
   }
+  // 週・一覧の、制作の面での状態の色と名前(名前は、状態と締め切り)
+  const productionState = (c: DeliveryCard) => ({ color: productionColor(productionView(c, production.latest.get(c.id))), label: productionMeta(c) })
   // 配信に入っている担当(企画・制作)の名前。担当の絞り込みと、配信カードの担当の候補に使う
   const owners = useMemo(
     () => [...new Set([...cards.flatMap((c) => [c.owner?.trim(), c.production_owner?.trim()]), ...[...noteParties.values()].flatMap((x) => [...x])].filter((o): o is string => !!o))].sort(),
@@ -1654,7 +1661,7 @@ function App() {
             ) : view === 'list' ? (
               <>
               {monthBar}
-              <ListView rows={monthRows} columns={columns} onSelect={openCard} cardProducts={cardProducts} products={products} heroes={heroes} />
+              <ListView rows={monthRows} columns={columns} onSelect={openCard} cardProducts={cardProducts} products={products} heroes={heroes} stateOf={onProduction ? productionState : undefined} />
               </>
             ) : view === 'week' ? (
               <>
@@ -1723,6 +1730,8 @@ function App() {
                 focus={focus}
                 alertKinds={alertKinds}
                 onSelect={openCard}
+                stateOf={onProduction ? productionState : undefined}
+                renderMeta={onProduction ? productionMeta : undefined}
                 // 下書きモードでは、日の「＋」で、その日に下書きを足す
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
                 // 中身のない配信(週の枠)は、その場で配信名・種類を入れられる形で出す(W14)
@@ -1812,7 +1821,7 @@ function App() {
             setAlertsOpen(true)
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
-          onOpenProduction={setProductionOpen}
+          onOpenProduction={(id) => goStage(id, 'production')}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           initialTab={selected && selected.id === link.card ? link.tab : undefined}
           onTabChange={setCardTab}
@@ -1832,16 +1841,14 @@ function App() {
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
       {productionOpen && cards.find((c) => c.id === productionOpen) && (
         <ProductionPage
+          key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}
           products={products}
           heroes={heroes}
           people={owners}
           onClose={() => setProductionOpen(null)}
-          onOpenCard={(id) => {
-            setProductionOpen(null)
-            setSelectedId(id)
-          }}
+          onOpenCard={(id) => goStage(id, 'calendar')}
           onChanged={() => void production.reload()}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
         />

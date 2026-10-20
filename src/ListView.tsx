@@ -25,10 +25,12 @@ interface Props {
   cardProducts: Map<string, string[]>
   products: Product[]
   heroes: HeroImage[]
+  /** ステータスの列の色と名前を差し替える(制作の面では、制作の状態と締め切り) */
+  stateOf?: (c: Row['card']) => { color: string; label: string }
 }
 
 /** 配信の一覧(表)。列見出しを押すと並べ替える。行を押すと、配信カードを開く。表の見た目は、結果の一覧と共通(DataTable) */
-export function ListView({ rows, columns, onSelect, cardProducts, products, heroes }: Props) {
+export function ListView({ rows, columns, onSelect, cardProducts, products, heroes, stateOf }: Props) {
   const styles = useStyles()
   const t = useT()
 
@@ -41,6 +43,15 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
       case 'channel':
         return <ChannelBadge channel={r.card.channel} size="small" />
       case 'status':
+        if (stateOf) {
+          const st = stateOf(r.card)
+          return (
+            <span className={styles.status}>
+              <span className={styles.dot} style={{ backgroundColor: st.color }} />
+              {st.label}
+            </span>
+          )
+        }
         return (
           <span className={styles.status}>
             <span className={styles.dot} style={{ backgroundColor: statusColor(r.card.status) }} />

@@ -46,9 +46,13 @@ export const ProductionService = {
   saveHtml: (requestId: string, input: { actor: Actor; html: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/html`, input),
   /** 制作のページの左で直した中身(写しと同じ形の JSON)を保存する。空の文字で、承認された写しに戻す */
   saveEdits: (requestId: string, input: { actor: Actor; edited_snapshot: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/edits`, input),
+  /** 企画が仕上がりを確かめて OK にする(PR7) */
+  check: (requestId: string, input: { actor: Actor; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/check`, input),
+  /** 企画が「直してほしい」と制作に戻す(PR7) */
+  revise: (requestId: string, input: { actor: Actor; note: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/revise`, input),
   /** 工程を 1 段戻す(やり直す)。依頼したばかりなら、依頼の取り下げ */
   undo: (requestId: string, input: { actor: Actor; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/undo`, input),
-  /** 制作が終わった版を、配信のしくみに送る(工程の最後。いまは仮の窓口) */
+  /** 仕上がりを確認した版を、配信のしくみに送る(工程の最後。いまは仮の窓口) */
   sendRequest: (requestId: string, input: { actor: Actor; html?: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/send`, input),
   /** 制作を通さず、配信のしくみに送る(いまは仮の窓口。「送りました」と返る) */
   send: (input: RequestInput) => post<ProductionRequest & { message?: string }>('/send', input),

@@ -40,7 +40,8 @@ const SHORT: Record<ProductionView, () => string> = {
   draft: () => tr('依頼の前', 'Not requested'),
   requested: () => tr('依頼済み', 'Requested'),
   in_progress: () => tr('制作中', 'In production'),
-  done: () => tr('終わった', 'Done'),
+  done: () => tr('確認待ち', 'To check'),
+  checked: () => tr('確認済み', 'Checked'),
   sent: () => tr('送った', 'Sent'),
   stale: () => tr('依頼し直す', 'Request again'),
 }
