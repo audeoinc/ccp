@@ -10,6 +10,9 @@
    │  /api/data/{テーブル} … PostgreSQL
    │  /api/ask            … Vertex AI の Gemini
    │  /img/…              … 画像(GCS、または手元のフォルダ)
+   │  /api/approvals・/api/production … 状態を進める操作(サーバーで確かめてから書く)
+   │  /api/bq・/api/metrics・/api/policies・/api/ads … 取り込み
+   │  /api/me・/api/export … ログインしている人・引っ越し用のパック
 ```
 
 - <!-- hosted:begin -->開発元の本番だけの処理は `server/ccp/hosted/` に置き、利用先に渡す Workbench 版(`npm run release:workbench`。[RELEASE.md](RELEASE.md))からは外す。<!-- hosted:end -->
@@ -73,6 +76,9 @@
 - 週の枠からまとめて中身を作る(W14)ときは、人が「中身を作る」を押すことを、AI の第 1 候補の採用とみなして保存し、「AI 下書き・未確認」の印(`ai_unchecked_at`)を付ける。印は、人が配信カードで保存するか、「確認した」を押すと外れる(誰も確かめていない中身を、印で見分けるため)。
 - まとめて作る作業画面(`BulkWorkspace`)は、AI の案を保存せずに画面だけに持ち、人が 1 本ずつ「保存」したものだけを、ふつうの下書き(未起案)で保存する(未確認の印は付けない。保存しなかった案は破棄)。週の表示で枠(破線)として出すのは、「この週の枠を作る」で作った配信(`frame_at`)だけ。
 - 商品・カテゴリの週の指標(X48): 表 `product_metrics` / `category_metrics`(1 行 = 商品(カテゴリ)× 週 × 項目)。値は、外で計算し終えたもの(順位・WoW・MoM・YoY まで)を持ち、**画面では計算しない**(母集団・暦の月の数え方を、取り込む側の 1 か所で決めるため)。取り込みは CSV(⚙、または `ccp.cli import-metrics`。`server/ccp/metrics.py`)で、週 × 市場ごとに置き換える。あとで BigQuery からの取り込みに替えても、表と置き換え方は同じ。定義と形は [METRICS_FORMAT.md](METRICS_FORMAT.md)。
+- 商品の販売順位(R17): 表 `product_rankings`(1 行 = 商品 × 週 × 販売チャネル(全社 / EC / 配信経由))。BigQuery の出力 `ranking` から週ごとに置き換えて取り込む(`server/ccp/bq_import.py`)。取り込むまでは `ccp.cli ranking-dummy` のダミー(`as_of` が空)。上位とみなす線 Top N は、ブラウザごと(`rankingSettings.ts`)。
+- 外部広告の出稿(X49): 表 `ad_spends`(1 行 = 1 日・1 商品・1 媒体)。いまは見本だけ(`/api/ads/sample`。`campaign` が `sample:` で始まる行)。あとで BigQuery か CSV から取り込む。見せ方「商品別」(`ProductsView.tsx`)が読む。
+- 制作の依頼(PR2〜): 表 `production_requests`(配信 1 本の 1 版)。画面から直接書かず、`/api/production`(`server/ccp/production.py`)だけで進める(承認済みかの確かめ・版の数え方をサーバーでまとめる)。設計は [PRODUCTION.md](PRODUCTION.md)。やり取りへのリアクションは表 `note_reactions`(状態は変えない)。
 - 選択肢(ステータス、チャネル、カテゴリなど)は、文字の値(例: `email` / `app`)で持つ。表示名(`○○_name`)は、`labels.ts` が、値から補う。状態の前後は `statusRank` で比べる(文字のまま `<` で比べない)。
 - **承認の流れ(2026-10-14 決定。2026-10-17 の U1〜U6 で、下の「ユーザーと承認」の形に変えた。データの値と `statusRank` の順はそのまま)**: データの値は、配信が 未起案(not_started)→ 検討中(reviewing)→ 承認済み(approved)→ 確定(confirmed)、週が 下書き(draft)→ レビュー中(review)→ 確定(confirmed)。**画面では**、配信を 未起案 / 承認待ち / 承認済み(+ 確定した週は鍵マーク)、週を 確定前 / 確定 と見せる(`src/status.ts` の `statusView`・`statusLabel`、`LockMark`)。
   - 承認は、配信 1 本ずつ(配信カードの「保存して承認」)と、週まとめて(週の帯の「まとめて承認」= 検討中をすべて承認済みに)の両方。誰でも押せる。
@@ -126,14 +132,22 @@
 |---|---|
 | `ui.lang` | 画面の言語(ja / en) |
 | `cardDetail.autoDraft` | 「開いたとき自動で下書き」のオン・オフ |
-| `cardDetail.paneWidths.v5` | ペインの幅 |
+| `cardDetail.paneWidths.v6` | ペインの幅 |
+| `cardDetail.processOpen.v1` | 右端のプロセスのペインの開閉(既定は開く) |
+| `cardDetail.size` | 配信カードのフロートの大きさ |
 | `cardDetail.infoOpen.v2` | 商品情報ペインの開閉(既定は開く) |
 | `cardDetail.previewZoom.v2` | プレビューの倍率(既定は全体 = `fit`) |
 | `chat.paneHeight` | AI チャットの高さ |
 | `me.name` | 承認の履歴・コメントに残す、あなたの名前(週の帯・配信カードの下・コメントで入れる。共通) |
+| `calendar.view` / `week.lens` | 見せ方(月 / 週 / 一覧 / 商品別 / 比べる)/ 週の見方(商品 / 進み具合 / 時刻) |
+| `list.columns.v2` | 一覧の列の選び方 |
+| `ccp.country` | ヘッダーで選んだ国(X33) |
+| `alerts.settings` | アラートの条件 |
+| `results.rankTopN` | 販売順位で「上位」とみなす線(既定 60) |
+| `productionPage.size` / `productionPage.paneWidths.v1` / `productionPage.infoOpen` / `productionPage.talkOpen` / `productionPage.previewZoom` | 制作のページのフロートの大きさ・ペインの幅・左右のペインの開閉・プレビューの倍率(`floatLayout.ts`) |
 | `me.user` | 「あなた」に選んだユーザーの id(U2。`me.name` も一緒に書く。ユーザーマスタで名前を変えたら、`MePicker` が `me.name` をそろえる) |
 
-形式を変えるときは、キーの版(`.v5`)を上げて、古い値を捨てる。
+形式を変えるときは、キーの版(`.v6` など)を上げて、古い値を捨てる。
 
 ## 9. 落とし穴(過去にはまったこと)
 

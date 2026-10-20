@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-10-19(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-10-20(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -65,6 +65,10 @@ flowchart TD
         alerts["アラート<br/>AlertsPage.tsx・alerts.ts"]
     end
 
+    subgraph production["制作の面"]
+        prod["制作のページ<br/>ProductionPage.tsx・productionSnapshot.ts"]
+    end
+
     subgraph data["データの出入り口(画面)"]
         svc["表ごとのサービス<br/>src/data/*.ts"]
         models["表の型・選択肢<br/>src/models/*.ts"]
@@ -83,6 +87,7 @@ flowchart TD
         %% hosted:end
         assets["画像 /img<br/>assets.py"]
         pack["引っ越し用のパック /api/export<br/>pack.py"]
+        ops["状態を進める・取り込む<br/>/api/approvals・/api/production・/api/bq・/api/metrics・/api/ads<br/>approvals.py・production.py・bq_import.py・metrics.py・ads.py"]
     end
 
     pg[("PostgreSQL")]
@@ -96,6 +101,8 @@ flowchart TD
     app -->|週のレビュー・承認| review
     app -->|結果の面| results
     app -->|アラート| alerts
+    app -->|制作の面| prod
+    card -.->|制作に依頼| prod
     cal & week & list -->|配信を開く| card
     results --> resdetail
     resdetail -.->|制作の詳細を重ねる| card
@@ -122,6 +129,8 @@ flowchart TD
     main --> aiapi
     main --> assets
     main --> pack
+    main --> ops
+    ops --> db
     %% hosted:begin
     main -->|止まっていれば起動| dbctl
     %% hosted:end
@@ -178,15 +187,15 @@ flowchart TD
 |---|---|---|
 | `main.tsx` | 14 | 起動。フォント・CSS を読み、`Root` を描く |
 | `Root.tsx` | 12 | Fluent UI のテーマで `App` を包む |
-| `App.tsx` | 1,850 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
-| `deepLink.ts` / `CopyLinkButton.tsx` | 78 / 49 | 画面の状態(面・見せ方・期間・国・開いているフロート)を URL のクエリと行き来させる / 「リンクをコピー」 |
+| `App.tsx` | 2,042 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
+| `deepLink.ts` / `CopyLinkButton.tsx` | 89 / 49 | 画面の状態(面・見せ方・期間・国・開いているフロート)を URL のクエリと行き来させる / 「リンクをコピー」 |
 | `faces.ts` / `FaceBadge.tsx` / `StageNav.tsx` | 25 / 36 / 114 | 面(計画・制作・結果)の色と名前 / フロートの面の札 / フロートの段階の帯(PLAN → PRODUCTION → RESULTS) |
 | `floatLayout.ts` | 67 | フロートの大きさとペインの幅を変えて覚える、共通の部品 |
 | `MePicker.tsx` / `InboxButton.tsx` | 218 / 62 | 右上の「あなた」(選んでログイン・切り替え・ログアウト。最初の「だれでログインしますか?」) / 右上の「依頼」(自分宛ての承認の依頼) |
 | `theme.ts` | 70 | Fluent UI のテーマ(色・書体) |
 | `fonts.ts` | 23 | 同梱のフォント(外部の CDN に頼らない) |
 | `index.css` | — | 全体の CSS と、印刷(週の資料・レポート)のときの見せ方 |
-| `i18n.ts` | 118 | 日本語 / English の切り替え(`t` / `tr` / `useT` / `optionLabel`) |
+| `i18n.ts` | 145 | 日本語 / English の切り替え(`t` / `tr` / `useT` / `optionLabel`) |
 | `appRoot.ts` | 22 | アプリの置き場所。API・画像のパスの基準(Workbench の `/proxy/8082/` の下でも動くように) |
 | `settings.ts` | 36 | アプリ全体の設定(自動下書きのオン・オフなど。ブラウザごと) |
 
@@ -194,21 +203,23 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `Calendar.tsx` | 242 | 月のカレンダー(配信・締め切りの近い配信・アラートの印) |
-| `WeekView.tsx` | 414 | 週の表示(縮小プレビューつき。商品のバランス / 進み具合の 2 つの見方) |
-| `WeekReviewBar.tsx` | 253 | 週の状態の帯(レビューに出す・確定・承認、確定後の変更、承認の履歴、PDF) |
-| `WeekChecklist.tsx` | 93 | 週の確認の一覧(項目ごとの件数と中身) |
+| `Calendar.tsx` | 302 | 月のカレンダー(配信・締め切りの近い配信・アラートの印) |
+| `WeekView.tsx` | 454 | 週の表示(縮小プレビューつき。商品のバランス / 進み具合 / 時刻 の 3 つの見方。時刻は `WeekTimeGrid`) |
+| `WeekTimeGrid.tsx` | 314 | 週の表示の「時刻」の見方(X46。横 = 曜日・縦 = 時刻の格子に配信を置く。同じ時刻の印、つかんで別の日・時刻へ動かす(15 分きざみ)) |
+| `WeekReviewBar.tsx` | 226 | 週の状態の帯(レビューに出す・確定・承認、確定後の変更、承認の履歴、PDF) |
+| `WeekChecklist.tsx` | 180 | 週の確認の一覧(項目ごとの件数と中身) |
 | `reviewChecks.ts` | 196 | 週の確認の判定(上限超えの商品・主力の漏れ・連続 など) |
-| `weekLabels.ts` | 45 | 週のレビューの項目名・説明・履歴の文言(画面と PDF で共通) |
+| `weekLabels.ts` | 66 | 週のレビューの項目名・説明・履歴の文言(画面と PDF で共通) |
 | `weekLock.ts` | 29 | 確定した週の、変更の制限 |
+| `LockMark.tsx` | 19 | 週が確定した配信の鍵マーク(配信は「承認済み」に添えて見分ける。U6) |
 | `WeekReport.tsx` / `printWeek.ts` | 203 / 48 | 週の資料(A4 の PDF)と、その印刷 |
-| `ListView.tsx` / `listRows.ts` | 160 / 110 | 表の形の一覧と、その列の定義(CSV の書き出しも同じ定義) |
+| `ListView.tsx` / `listRows.ts` | 100 / 110 | 表の形の一覧と、その列の定義(CSV の書き出しも同じ定義) |
 | `MiniCalendar.tsx` | 166 | ツールバーのミニカレンダー(月・週・日へ移る) |
-| `useWeekFrames.ts` / `bulkDraft.ts` | 298 / 263 | 週の枠とまとめて AI で中身を作る(W14)の、画面の状態と操作(App が持つ) / 枠を作る・中身を作る・書き込む部分(React を使わない) |
+| `useWeekFrames.ts` / `bulkDraft.ts` | 298 / 293 | 週の枠とまとめて AI で中身を作る(W14)の、画面の状態と操作(App が持つ) / 枠を作る・中身を作る・書き込む部分(React を使わない) |
 | `FrameBar.tsx` / `FrameCard.tsx` / `CheckDrawer.tsx` | 150 / 136 / 230 | 週の枠の帯(国・チャネル、配信名の案、中身を作る) / 週の列の枠(配信名・種類) / 未確認の AI 下書きを確かめる引き出し(中身・比べる・確認した)。中身・比べるの表示は `CheckView` として作業画面でも使う |
-| `useBulkWorkspace.ts` / `BulkWorkspace.tsx` | 371 / 653 | まとめて作る作業画面(W14 の 4 回目の見直し)の状態と操作(App が持つ。① は保存しない) / 画面(① 対象と方向 → ② 中身を AI で作る → ③ 確かめる。① のあと、中身を作らずに保存もできる) |
+| `useBulkWorkspace.ts` / `BulkWorkspace.tsx` | 585 / 891 | まとめて作る作業画面(W14 の 4 回目の見直し)の状態と操作(App が持つ。① は保存しない) / 画面(① 対象と方向 → ② 中身を AI で作る → ③ 確かめる。① のあと、中身を作らずに保存もできる) |
 | `DeliveryPeek.tsx` / `CardPreview.tsx` | 34 / 68 | 配信にマウスを重ねたときのプレビュー / 保存済みの配信カードのプレビュー |
-| `status.ts` / `progress.ts` | 25 / 147 | 配信のステータスの色・チャネル / 工程(進み具合) |
+| `status.ts` / `progress.ts` | 53 / 167 | 配信のステータスの色・チャネル / 工程(進み具合) |
 | `ChannelBadge.tsx` | 54 | メール / アプリの札(配信カード・月・週・一覧・結果で共通) |
 | `StatusFlow.tsx` / `MonthSummaryBar.tsx` | 46 / 65 | 件数の流れ(未起案 › 承認待ち › 承認済み)/ 月の要約の帯 |
 | `WeekRetro.tsx` / `WeekHistory.tsx` | 147 / 60 | 週の振り返りのメモ(結果の面で書き、翌週の計画の面に出す)/ 週の承認の履歴 |
@@ -216,15 +227,16 @@ flowchart TD
 
 ### 3.3 配信カード(全画面のフロート)
 
-配信カードは 4 ペイン: **左** 配信情報 / **中** コンテンツ生成(タブ) / **プレビュー** / **右** 商品情報(参照専用)。
+配信カードは 5 ペイン: **左** 配信情報 / **中** コンテンツ生成(タブ) / **プレビュー** / 商品情報(参照専用) / **右端** プロセス(状態・承認・引き継ぎ・やり取り・タスク)。
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `CardDetail.tsx` | 1,417 | **配信カードの本体**。4 ペインの配置、読み込み・保存、AI の下書きの起動、承認・差し戻し |
+| `CardDetail.tsx` | 1,817 | **配信カードの本体**。5 ペインの配置、読み込み・保存、AI の下書きの起動、承認・差し戻し |
 | `CardMenu.tsx` | 160 | 「…」メニュー(取りやめ・削除 など) |
 | `cancel.ts` | 61 | 配信の取りやめ(消さずに残す) |
 | `CardAlertsBar.tsx` | 113 | 配信カードの上の、アラートの帯(たたむ・種類の札・「対応する」) |
 | `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 315 / 130 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
+| `ProductFloat.tsx` / `ProductMarks.tsx` | 35 / 63 | 商品の行の開き口(中の「選定済み」・右の商品情報の行を押すと、商品の対応のフロートを開く。行の中のボタン・入力欄は除く)/ 商品の行の札(アラートの種類の札・「残少」。商品情報と中の選定済みの行で共通) |
 | `target.ts` | 45 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
 | `ProcessPane.tsx` / `ApprovalBar.tsx` | 289 / 327 | 右端のプロセスのペイン(状態・承認・引き継ぎ・制作の依頼の札)/ 承認の依頼・承認・差し戻し |
 | `LearningsBar.tsx` | 162 | 「これまでの学び」(過去の結果から) |
@@ -240,11 +252,11 @@ flowchart TD
 | `HeroCandidates.tsx` | 124 | メイン画像の候補(すべての画像から探して設定) |
 | `ChatPanel.tsx` | 280 | AI チャット |
 | `NotesEditor.tsx` / `MarkdownLite.tsx` | 124 / 51 | 制作指示の入力(Markdown)/ その表示 |
-| `LinksEditor.tsx` / `links.ts` | 146 / 139 | リンク先の入力 / 配信ごとのリンク先(JSON で保存) |
+| `LinksEditor.tsx` / `links.ts` | 146 / 230 | リンク先の入力 / 配信ごとのリンク先(JSON で保存) |
 | `HandoffPanel.tsx` | 89 | 制作への引き継ぎ |
-| `pushLink.ts` / `AppLinksEditor.tsx` | 24 / 218 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
-| `QuestionsPanel.tsx` / `TasksPanel.tsx` | 284 / 186 | 制作からの質問と返信 / タスク |
-| `CommentsPanel.tsx` | 407 | レビューのコメント(スレッド) |
+| `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 218 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
+| `TasksPanel.tsx` | 186 | タスク(プロセスのペインの「タスク」タブ) |
+| `CommentsPanel.tsx` | 581 | プロセスのペインの「やり取り」(以前の質問とレビューのコメントを 1 つに。宛先・対象・返信・解決・AI でタスクの案) |
 | `AiButton.tsx` / `AiMark.tsx` | 14 / 17 | AI に頼むボタン / AI の印 |
 | `AutoTextarea.tsx` | 23 | 内容に合わせて高さが伸びる、複数行の入力 |
 
@@ -261,7 +273,8 @@ flowchart TD
 | ファイル | 行数 | 役割 |
 |---|---|---|
 | `ProductInfoPane.tsx` | 154 | 載せた商品の情報の一覧 |
-| `ProductDetail.tsx` / `MiniChart.tsx` | 170 / 86 | 商品の詳細のフロート / 推移のグラフ |
+| `ProductDetail.tsx` / `MiniChart.tsx` | 179 / 86 | 商品の詳しい情報(商品の対応のフロートの右。タブ: 売上・在庫 / 基本情報 / 指標 / 販売方針・販促)/ 推移のグラフ |
+| `ProductMetrics.tsx` / `useProductMetrics.ts` / `metrics.ts` | 121 / 66 / 60 | 商品の詳しい情報の「指標」タブ(X48。商品とカテゴリの、いちばん新しい週の値・順位・WoW・MoM・YoY)/ その読み込み / 項目の一覧と値・増減の書き方(画面では計算しない) |
 | `useProductData.ts` | 83 | 商品の週ごとの実績などを読む(開いている間だけ覚える) |
 | `ImageThumb.tsx` | 44 | 画像のサムネイル |
 
@@ -271,13 +284,13 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `aiSelect.ts` | 559 | **AI の呼び出しの入口**(`askAgent`)と、商品・メイン画像・見出し・コピーの選定 |
-| `aiDraft.ts` | 222 | テーマ・コピー・制作指示の「案」 |
+| `aiSelect.ts` | 759 | **AI の呼び出しの入口**(`askAgent`)と、商品・メイン画像・見出し・コピーの選定 |
+| `aiDraft.ts` | 284 | テーマ・コピー・制作指示の「案」 |
 | `autoDraft.ts` | 197 | 「すべてAIで下書き」(1 回で 6〜9 回呼ぶ) |
 | `useAiDrafts.ts` | 248 | 下書きの状態を、画面に渡すフック |
 | `aiReview.ts` / `aiCompare.ts` | 43 / 53 | 結果の振り返り / 配信どうしの比較 |
 | `aiTasks.ts` | 42 | 制作とのやり取りから、タスクの案を出す |
-| `themeTypes.ts` / `themeGuess.ts` | 70 / 20 | テーマの種類 / 言葉から種類を推し量る |
+| `themeTypes.ts` / `themeGuess.ts` | 70 / 22 | テーマの種類 / 言葉から種類を推し量る |
 
 ### 3.5 アラート
 
@@ -285,21 +298,23 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|---|
 | `AlertsPage.tsx` / `AlertsFloat.tsx` | 453 / 43 | アラートの画面(左に一覧、右に選んだアラート)/ それを重ねて開くフロート |
 | `alerts.ts` | 342 | **在庫のアラートの計算**(配信日の在庫の見込み)と、変更のアラート |
-| `cardAlerts.ts` | 76 | アラートを、配信ごとに分ける(カード・カレンダーの印) |
+| `cardAlerts.ts` | 124 | アラートを、配信ごとに分ける(カード・カレンダーの印) |
 | `alertSettings.ts` / `AlertSettingsDialog.tsx` | 94 / 113 | アラートの条件(ブラウザごと)と、その設定の画面 |
-| `alertActions.ts` / `AlertActionPanel.tsx` | 137 / 221 | アラートへの対応(商品の差し替え・延期) |
+| `alertActions.ts` / `AlertActionPanel.tsx` | 157 / 221 | アラートへの対応(商品の差し替え・延期) |
 | `ChangeAlertDetail.tsx` | 221 | 変更のアラート(方針・日程の変更)の詳しい中身 |
 | `AlertMark.tsx` | 19 | カレンダーの配信に付ける、アラートの印 |
-| `history.ts` | 37 | 操作の履歴の記録の入り口(承認・ステータスの変更) |
+| `history.ts` | 71 | 操作の履歴の記録の入り口(承認・ステータスの変更) |
 
 ### 3.6 結果の面
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `ResultsPage.tsx` / `ResultsSummaryBar.tsx` | 513 / 79 | 結果の面(月 / 週 / 一覧、まとめ方、取り込み・書き出し)/ 結果の面の月の要約の帯(通貨ごとの売上・前月比・前年比・開封率・クリック率) |
-| `ResultsCalendar.tsx` | 208 | 結果の月・週の表示 |
+| `ResultsPage.tsx` / `ResultsSummaryBar.tsx` | 513 / 79 | 結果の面(月 / 週 / 一覧、まとめ方、取り込み・書き出し。商品別は `ProductsView`、比べるは `ResultsCompareView`)/ 結果の面の月の要約の帯(通貨ごとの売上・前月比・前年比・開封率・クリック率) |
+| `ResultsCalendar.tsx` | 187 | 結果の月・週の表示 |
 | `ResultsCompareView.tsx` | 371 | 条件で絞り込んだ配信を並べて比べる |
-| `ResultDetail.tsx` | 206 | 詳しい結果のフロート |
+| `ProductsView.tsx` | 385 | 見せ方「商品別」(X49。期間の中で、商品(SPU / カテゴリ)ごとに、載せた配信と回数・結果・週ごとの実績・外部広告の出稿を並べる) |
+| `ResultDetail.tsx` | 203 | 詳しい結果のフロート(段階の帯、載せた商品の販売チャネルごとの順位を含む) |
+| `ProductRankings.tsx` / `rankingSettings.ts` | 193 / 39 | 詳しい結果の「販売チャネルごとの順位」(R17。全社 / EC / 配信経由。配信前 4 週で Top N に入った週の数と、配信の週・翌週の順位)/ 「上位」とみなす線 Top N(既定 60。ブラウザごと) |
 | `ResultSummary.tsx` | 184 | 主な数字と、メモ・商品の売れ方・AI の案 |
 | `ResultCompare.tsx` | 324 | 過去の配信と比べる・AI の振り返り |
 | `ResultPeek.tsx` | 85 | 計画の面で、配信カードの上に結果を重ねる |
@@ -322,7 +337,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | ファイル | 行数 | 役割 |
 |---|---|---|
 | `items.ts` | 38 | 配信に載せる商品 1 件の型 |
-| `market.ts` | 14 | 商品・メイン画像の市場(JP / US)と、配信カードの国の対応 |
+| `market.ts` | 10 | 商品・メイン画像の市場(JP / US)と、配信カードの国の対応 |
 | `labels.ts` | 29 | 選択肢の表示名を、値から補う |
 | `images.ts` | 26 | 同梱のイラスト(画像の URL が空のとき) |
 | `assets/products/` ・ `assets/heroes/` | — | 同梱のイラスト(商品・メイン画像) |
@@ -354,8 +369,10 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `data/` | 表ごとの読み書きのサービス(`DeliveryCardsService` など)。一部の表は、型もここに持つ |
 | `gcp/services.ts` | サーバーの `/api/data/…` を呼ぶ、データの入出力(`tableService`) |
 | `gcp/ai.ts` | AI の依頼のサービス(サーバーの `/api/ask` を呼ぶ) |
+| `gcp/bq.ts` | BigQuery からの取り込みの呼び出し(サーバーの `/api/bq`。画面を開いたときと ⚙ の「BigQuery から取り込む」) |
 | `gcp/dbWake.ts` | 「データベースを準備中」の表示 |
 | `mock/db.ts` ・ `mock/agent.ts` ・ `mock/seed.ts` | 撮影・デモ用の、DB と AI の身代わりと、サンプルデータ(本番のビルドには入らない) |
+| `mock/approvals.ts` ・ `mock/production.ts` ・ `mock/me.ts` ・ `mock/metricsImport.ts` ・ `mock/ads.ts` ・ `mock/csv.ts` | 撮影・デモ用の、サーバーの窓口(`/api/approvals`・`/api/production`・`/api/me`・指標の取り込み)の身代わりと、外部広告の出稿の見本(`server/ccp/ads.py` と同じ作り方) |
 
 ## 4. サーバー(`server/`)
 
@@ -363,23 +380,27 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|---|
 | `ccp/main.py` | 121 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
 | `ccp/data_api.py` | — | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
-| `ccp/schema.py` | 290 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
+| `ccp/schema.py` | 342 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
+| `ccp/legacy_names.json` | — | 以前の名前(`cr854_…`)・値から、いまの名前への対応(`schema.py` の移行が読む) |
 | `schema.json` | — | **データ定義**(テーブル・列・選択肢の値)。列を足すときはここ |
 | `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`) |
 | `ccp/dbready.py` | — | DB が使えるかどうか(DB を必要なときだけ起動する環境のための、差し込み口)。使えないときの `DbNotReady` |
 | `ccp/hosted/` | — | 開発元の本番(Cloud Run + Cloud SQL)だけで使うもの。`dbctl.py`(Cloud SQL の自動起動・自動停止)・`connect.py`(Cloud SQL Connector)・`routes.py`(Cloud Scheduler が呼ぶ `/internal/idle-check`)・`devtoken.py`(手元の gcloud のトークン)。Workbench 版のリリースには入れない([RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `ccp/ai.py` | 89 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
 | `ccp/approvals.py` | 359 | 承認の依頼・承認・差し戻し・やり直し(`/api/approvals`) |
-| `ccp/production.py` | 263 | 制作の依頼(`/api/production`。依頼・受け取る・終わった・送る・やり直す・HTML・要素の直し) |
+| `ccp/production.py` | 300 | 制作の依頼(`/api/production`。依頼・受け取る・終わった・仕上がりの確認(OK / 直してほしい)・送る・やり直す・HTML・要素の直し) |
 | `ccp/identity.py` | 96 | ログインしている人(`/api/me`) |
 | `ccp/policies.py` | 335 | 方針と決まりの取り込みと、AI への渡し方 |
-| `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 139 / 346 / 259 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報。商品の性別の読み替え)/ 取り込む前の確かめ |
+| `ccp/metrics.py` | 171 | 商品・カテゴリの週の指標の取り込み(`/api/metrics/import` と `ccp.cli import-metrics`。CSV の週 × 市場の行を置き換える) |
+| `ccp/ads.py` | 93 | 外部広告の出稿の記録(表 `ad_spends`。X49)。`/api/ads/sample` で見本を作り直す(消すのは `campaign` が `sample:` で始まる行だけ) |
+| `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 139 / 346 / 259 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報・販売チャネルごとの順位。商品の性別の読み替え)/ 取り込む前の確かめ |
 | `ccp/bq_dummy.py` | 300 | BigQuery の見本のデータ(ダミーの元の表)を作る運用ツール |
+| `ccp/ranking_dummy.py` | 82 | 商品の販売順位(`product_rankings`)のダミーを作る運用ツール(`ccp.cli ranking-dummy`。BigQuery から取り込んだ行があれば何もしない) |
 | `ccp/assets.py` | — | `/img/…`。商品・メイン画像を、GCS か `ASSET_DIR` のフォルダから配る |
 | `ccp/creds.py` | — | Google の認証(サービスアカウント) |
 | `ccp/pack.py` | 113 | 引っ越し用のパック(すべてのデータと画像の ZIP)の書き出し・取り込み |
-| `ccp/cli.py` | — | 運用のコマンド(`migrate` / `seed` / `counts` / `check` / `import-pack`) |
-| `ccp/check.py` | 135 | 動かす前の確認(設定・DB・写真・画面のビルド) |
+| `ccp/cli.py` | — | 運用のコマンド(`migrate` / `seed` / `counts` / `check` / `import-pack` / `import-metrics` / `bq-check` / `bq-dummy` / `ranking-dummy`) |
+| `ccp/check.py` | 172 | 動かす前の確認(設定・DB・写真・画面のビルド) |
 | `ccp/importer.py` | — | 画像から、デモ用の商品・メイン画像のデータを作って取り込む運用ツール |
 | `seed.json` | — | 初期データ(`scripts/export-seed.mjs` が `src/mock/seed.ts` から作る) |
 | `tests/` | — | サーバーのテスト(`python -m unittest discover server/tests`。CI でも実行) |
@@ -395,10 +416,13 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) | <!-- hosted -->
 | `release-workbench.mjs` | 利用先に渡す Workbench 版の ZIP を作り、検査する(`npm run release:workbench`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
+| `check-approvals.mjs` | 承認の判定(`src/approvals.ts`)が、サーバーと同じ例(`server/tests/approval_cases.json`)で同じ結果になるかの確かめ(`npm run verify`) |
+| `check-policy.mjs` | must の決まりの確かめ(`src/policyCheck.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
 | `gcp-smoke.mjs` | 本番・手元のサーバーの動作確認(画面を開いて、カードが出るか) | <!-- hosted -->
 | `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) | <!-- hosted -->
 | `feature-reasons.py` | 機能の理由の台帳(`docs/FEATURE_REASONS.md`)を作る |
+| `flows-sheet.py` | [FLOWS.md](FLOWS.md) から、照らし合わせの記入用シート([FLOWS_SHEET.md](FLOWS_SHEET.md))を作る(FLOWS.md の表を変えたら流し直す) |
 
 ## 6. この変更は、どこを触るか
 
@@ -410,6 +434,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | 配信カードの中ペインにタブ・機能を足す | `src/ContentPane.tsx`(保存は `src/CardDetail.tsx`) |
 | プレビューの見た目を変える | `src/Preview.tsx`(テンプレートの定義は `src/templates.ts`) |
 | 在庫のアラートの計算を変える | `src/alerts.ts`(条件は `src/alertSettings.ts`) |
+| 商品の対応のフロート(差し替え・詳しい情報)を変える | `src/ProductActionFloat.tsx`(中身は `src/ProductDetail.tsx`、開き口は `src/ProductFloat.tsx`) |
+| 商品・カテゴリの指標の項目を足す | `src/metrics.ts`・`server/ccp/metrics.py` |
 | 週の確認の項目を足す | `src/reviewChecks.ts` と `src/weekLabels.ts` |
 | ヘッダー・ツールバー・面の切り替え | `src/App.tsx` |
 | 画面の文言を日英で足す | その場で `t('日本語', 'English')`(`src/i18n.ts`) |

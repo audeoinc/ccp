@@ -49,7 +49,7 @@ Campaign Contents Planner(CCP)を、Vertex AI Workbench のインスタンスの
 | 利用者のブラウザ | CCP の画面を開く。Workbench の Jupyter と同じ URL の下 | `https://<ノートブックの URL>/proxy/8082/`(末尾の `/` が必要) |
 | Jupyter の中継 | Workbench に組み込みの仕組み。ブラウザからの通信を、インスタンスの中のポートに中継する。Google のログインで守られている | `/proxy/<ポート>/` |
 | uvicorn | Web サーバー。`localhost:8082` で HTTP の依頼を待ち受け、FastAPI に渡し、返事を送り返す | `localhost:8082`(`CCP_PORT` で変えられる) |
-| FastAPI | CCP のサーバーのアプリの本体(Python)。URL ごとに処理を振り分ける: `/`(画面の HTML・JS)、`/api/data`(データの読み書き)、`/img`(画像)、`/api/ask`(AI)。結果は JSON で返す | uvicorn の中で動く |
+| FastAPI | CCP のサーバーのアプリの本体(Python)。URL ごとに処理を振り分ける: `/`(画面の HTML・JS)、`/api/data`(データの読み書き)、`/api/approvals`・`/api/production`(承認・制作の依頼を進める)、`/api/bq`・`/api/metrics`・`/api/policies`(取り込み)、`/img`(画像)、`/api/ask`(AI)。結果は JSON で返す | uvicorn の中で動く |
 | 画面(HTML・JS) | React で作った画面を、あらかじめビルドしたもの。FastAPI が配り、ブラウザで動く。JS が、操作に応じて `/api/data`・`/api/ask` などを呼び(fetch)、返ってきた JSON で画面を書き換える。中継の下(`/proxy/8082/`)でも動くよう、API・画像のパスは、読み込んだ場所から求める | `dist-gcp/` |
 | PostgreSQL | データベース。CCP のデータ(配信・商品・結果・メモ・履歴 など)を保存・検索する。FastAPI だけが、SQL で読み書きする(ブラウザから直接はつながらない)。Workbench の中に conda で入れたもの | `localhost:5432` |
 | 画像のフォルダ | 商品・メイン画像の写真。サーバーが `/img/…` で配る(外部から直接は見えない) | `server/images/`(`ASSET_DIR`) |
