@@ -1770,6 +1770,9 @@ function App() {
                   fixedReason={moveBlockedReason}
                   onSelect={openCard}
                   onMove={(c, iso) => void moveCard(c, iso)}
+                  cardProducts={cardProducts}
+                  products={products}
+                  heroes={heroes}
                 />
               ) : (
               <WeekView

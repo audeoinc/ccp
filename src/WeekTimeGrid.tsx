@@ -4,6 +4,9 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { CardAlertKind } from './cardAlerts'
 import { LockClosedRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from './ChannelBadge'
+import { DeliveryPeek } from './DeliveryPeek'
+import type { Product } from './models/products'
+import type { HeroImage } from './models/heroImages'
 import { AlertMark } from './AlertMark'
 import { locale, useT } from './i18n'
 import { statusColor } from './status'
@@ -29,7 +32,7 @@ const dayIndexOf = (start: Date, iso?: string) => {
 }
 
 const useStyles = makeStyles({
-  root: { display: 'grid', gridTemplateColumns: '56px repeat(7, minmax(0, 1fr))', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, overflow: 'hidden', userSelect: 'none' },
+  root: { display: 'grid', gridTemplateColumns: '76px repeat(7, minmax(0, 1fr))', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, overflow: 'hidden', userSelect: 'none' },
   head: { padding: '6px 8px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, borderLeft: `1px solid ${tokens.colorNeutralStroke3}`, fontVariantNumeric: 'tabular-nums' },
   headToday: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   corner: { borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -39,8 +42,8 @@ const useStyles = makeStyles({
   colToday: { backgroundColor: tokens.colorBrandBackground2 },
   // 違う日で同じ時刻に配信がある時刻の、横の線(その時刻に何日あるかを左に出す)
   sameLine: { position: 'absolute', left: 0, right: 0, height: 0, borderTop: `1px dashed ${tokens.colorBrandStroke1}`, pointerEvents: 'none' },
-  sameLabel: { position: 'absolute', left: '2px', transform: 'translateY(-50%)', padding: '0 4px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand, fontSize: tokens.fontSizeBase100, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
-  now: { position: 'absolute', left: 0, right: 0, height: 0, borderTop: `2px solid ${tokens.colorPaletteRedBorderActive}`, pointerEvents: 'none', zIndex: 2 },
+  sameLabel: { position: 'absolute', right: '4px', transform: 'translateY(-50%)', zIndex: 1, padding: '0 4px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand, fontSize: tokens.fontSizeBase100, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  now: { position: 'absolute', left: 0, right: 0, height: 0, borderTop: `2px solid ${tokens.colorPaletteRedBorderActive}`, pointerEvents: 'none' },
   card: {
     position: 'absolute',
     boxSizing: 'border-box',
@@ -81,10 +84,14 @@ interface Props {
   onMove: (c: DeliveryCard, iso: string) => void
   /** カードの 2 行目の右に添えるもの */
   renderMeta?: (c: DeliveryCard) => ReactNode
+  /** マウスを重ねたときのプレビューに使う(配信ごとの掲載商品・商品・メイン画像) */
+  cardProducts: Map<string, string[]>
+  products: Product[]
+  heroes: HeroImage[]
 }
 
 /** 週の表示の「時刻」の見方(X46) */
-export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, onSelect, onMove, renderMeta }: Props) {
+export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, onSelect, onMove, renderMeta, cardProducts, products, heroes }: Props) {
   const s = useStyles()
   const t = useT()
   const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
@@ -178,8 +185,14 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
       ))}
       <div className={s.axis} style={{ height }}>
         {Array.from({ length: to - from + 1 }, (_, i) => (
+          // 同じ時刻の札がある時刻は、札のほうに時刻を書くので、時刻だけの文字は出さない
           <span key={i} className={s.hourLabel} style={{ top: i * HOUR }}>
-            {i === 0 ? '' : `${from + i}:00`}
+            {i === 0 || sameTimes.some((x) => x.m === (from + i) * 60) ? '' : `${from + i}:00`}
+          </span>
+        ))}
+        {sameTimes.map(({ m, n }) => (
+          <span key={m} className={s.sameLabel} style={{ top: yOf(m) }} title={t(`${timeText(m)} の配信が ${n} 日あります`, `${n} days have a delivery at ${timeText(m)}`)}>
+            {t(`${timeText(m)} ×${n}`, `${timeText(m)} ×${n}`)}
           </span>
         ))}
       </div>
@@ -223,9 +236,7 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
           />
         ))}
         {sameTimes.map(({ m, n }) => (
-          <div key={m} className={s.sameLine} style={{ top: yOf(m) }} title={t(`${timeText(m)} の配信が ${n} 日あります`, `${n} days have a delivery at ${timeText(m)}`)}>
-            <span className={s.sameLabel}>{t(`${timeText(m)} ×${n} 日`, `${timeText(m)} ×${n}`)}</span>
-          </div>
+          <div key={m} className={s.sameLine} style={{ top: yOf(m) }} title={t(`${timeText(m)} の配信が ${n} 日あります`, `${n} days have a delivery at ${timeText(m)}`)} />
         ))}
         {todayIndex >= 0 && todayIndex < 7 && yOf(now.getHours() * 60 + now.getMinutes()) >= 0 && yOf(now.getHours() * 60 + now.getMinutes()) <= height && (
           <div className={s.now} style={{ top: yOf(now.getHours() * 60 + now.getMinutes()), left: `${(todayIndex / 7) * 100}%`, width: `${100 / 7}%` }} />
@@ -238,7 +249,7 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
           const state = stateOf?.(c)
           const color = state?.color ?? statusColor(c.status)
           const colW = 100 / 7
-          return (
+          const body = (
             <div
               key={c.id}
               role="button"
@@ -273,6 +284,14 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
               </span>
               <span className={s.name}>{c.name || t('(配信名のない枠)', '(untitled frame)')}</span>
             </div>
+          )
+          // マウスを重ねると、配信のプレビュー(週の表示・一覧と同じ)。つかんで動かしている間は出さない
+          return drag?.moved ? (
+            body
+          ) : (
+            <DeliveryPeek key={c.id} card={c} productIds={cardProducts.get(c.id) ?? []} products={products} heroes={heroes}>
+              {body}
+            </DeliveryPeek>
           )
         })}
         {drag?.moved && (
