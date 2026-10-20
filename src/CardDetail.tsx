@@ -81,6 +81,8 @@ interface Props {
    */
   draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[] }
   onCreated?: (id: string) => void
+  /** 新しい配信を「保存」(閉じない)したとき、保存した配信として開き直す(X52) */
+  onReopen?: (id: string) => void
   /** この配信の週に、商品を載せる配信の数(週の上限超えのアラートの差し替えで、上限に届いた商品を候補から除く) */
   weekUse?: Map<string, number>
   products: Product[]
@@ -392,6 +394,7 @@ const useStyles = makeStyles({
   // 配信の対象(X40)
   targetBox: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
   targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
+  savedNote: { alignSelf: 'center', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteGreenForeground1 },
   targetChip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
   targetLabel: { width: '44px', flexShrink: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
@@ -437,7 +440,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -460,6 +463,11 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
   const cancelRef = useRef(false)
   // 保存のあとに、閉じずに次の配信を開くか(「保存して次へ」で立てる。確定した週の、理由を入力する流れでも引き継ぐ)
   const goNextRef = useRef(false)
+  // 「保存」(閉じない)か「保存して閉じる」か(X52)
+  const stayRef = useRef(false)
+  const [justSaved, setJustSaved] = useState(false)
+  // どちらのボタンで保存中か(ボタンの文字を「保存中...」にするため)
+  const [saveMode, setSaveMode] = useState<'stay' | 'close'>('close')
   const aliveRef = useRef(true)
   const previewBoxRef = useRef<HTMLDivElement>(null)
   const previewInnerRef = useRef<HTMLDivElement>(null)
@@ -910,12 +918,23 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
   function submit(e: React.FormEvent) {
     e.preventDefault()
     goNextRef.current = false
+    stayRef.current = false
+    setSaveMode('close')
+    requestSave()
+  }
+
+  /** 保存して、開いたまま続ける(X52。「保存して閉じる」とは別) */
+  function saveAndStay() {
+    goNextRef.current = false
+    stayRef.current = true
+    setSaveMode('stay')
     requestSave()
   }
 
   /** 保存して、次の配信を開く(週のレビュー・確定で、閉じてカレンダーで探し直さずに済むように。FLOWS.md の C-1) */
   function saveAndNext() {
     goNextRef.current = true
+    stayRef.current = false
     requestSave()
   }
 
@@ -1068,6 +1087,7 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
    */
   async function save(reason?: string) {
     const goNext = goNextRef.current
+    const stay = stayRef.current
     setSaving(true)
     setError(null)
     try {
@@ -1121,6 +1141,18 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
       }
       await onSaved()
       goNextRef.current = false
+      stayRef.current = false
+      if (stay) {
+        // 開いたまま続ける: 保存した内容を、変更の基準にし直す(掲載商品は、読み直した配信カードから読み直される)
+        baseline.current = null
+        setForm((f) => ({ ...f, status: String(status) }))
+        setChangeReason(null)
+        setJustSaved(true)
+        window.setTimeout(() => setJustSaved(false), 3000)
+        // 新しい配信は、保存した配信として開き直す
+        if (!card) onReopen?.(cardId)
+        return
+      }
       if (goNext && next && onNext) onNext()
       else onBack()
     } catch (err) {
@@ -1707,8 +1739,13 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                 </Button>
               </Tooltip>
             )}
+            {/* 保存(閉じない)と、保存して閉じる(X52。保存のたびに閉じると、続けて直しにくいため) */}
+            {justSaved && <span className={styles.savedNote}>{t('保存しました', 'Saved')}</span>}
+            <Button type="button" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)} onClick={saveAndStay}>
+              {saving && saveMode === 'stay' ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
+            </Button>
             <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)}>
-              {saving ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
+              {saving && saveMode === 'close' ? t('保存中...', 'Saving...') : t('保存して閉じる', 'Save & close')}
             </Button>
           </div>
         </form>

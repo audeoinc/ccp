@@ -1963,6 +1963,12 @@ function App() {
           card={selected}
           defaults={creating ?? undefined}
           draft={selected ? undefined : draftOpen?.draft}
+          // 新しい配信を「保存」(閉じない)したら、保存した配信として開き直す(X52)
+          onReopen={(id) => {
+            setCreating(null)
+            setDraftOpen(null)
+            setSelectedId(id)
+          }}
           onCreated={(id) => {
             if (draftOpen) bulk.markSaved(draftOpen.day, id)
           }}
