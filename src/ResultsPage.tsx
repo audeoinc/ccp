@@ -71,6 +71,8 @@ interface Props {
   retro?: ReactNode
   /** 結果のデータの操作(書き出し・取り込み・AI で分ける)。App が ⚙ のメニューの「データ」に並べる */
   onDataActions?: (a: ResultsDataActions | null) => void
+  /** 詳しい結果の題名の左に出す段階の帯(PLAN → PRODUCTION → RESULTS。配信カード・制作のページとそろえる) */
+  stageNav?: (card: DeliveryCard) => ReactNode
 }
 
 /** 結果の面のデータの操作(⚙ のメニューに並べる) */
@@ -91,7 +93,7 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro, onDataActions }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro, onDataActions, stageNav }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -495,6 +497,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         <ResultDetail
           key={detailId}
           row={detail}
+          stageNav={stageNav?.(detail.card)}
           history={allRows}
           cardProducts={cardProducts}
           onOpenOther={onDetail}

@@ -118,7 +118,7 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
               <Tooltip
                 content={
                   needMe ??
-                  t('まだ承認されておらず、依頼も出ていない配信を、種別ごとの既定の承認者に、まとめて依頼します(既定がない種別は飛ばします)', 'Requests approval for every delivery that is not approved and has no open request, from each type’s default approvers (types without defaults are skipped)')
+                  t('まだ承認されておらず、依頼も出ていない配信を、既定の依頼先(⚙ の「承認の決まり」)に、まとめて依頼します(既定の依頼先がなければ、依頼しません)', 'Requests approval for every delivery that is not approved and has no open request, from the default approvers (⚙ Approval rules). Nothing is requested if there are none.')
                 }
                 relationship="description"
               >

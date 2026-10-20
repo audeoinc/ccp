@@ -1815,6 +1815,7 @@ function App() {
               </>
             ) : page === 'results' ? (
               <ResultsPage
+                stageNav={(c) => stageNav(c, 'results')}
                 cards={filtered}
                 products={products}
                 heroes={heroes}

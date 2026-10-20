@@ -160,7 +160,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
       <span className={s.targetLabel}>{t('依頼先:', 'Request to:')}</span>
       {defNames.length > 0
         ? t(`${defNames.join('・')}(${def?.rule === 'any' ? 'だれか 1 人' : '全員'})`, `${defNames.join(', ')} (${def?.rule === 'any' ? 'any one' : 'everyone'})`)
-        : t('種別の既定はありません(依頼のときに選びます)', 'No default for this type (choose when requesting)')}
+        : t('既定の依頼先はありません(依頼のときに選びます。⚙ の「承認の決まり」で決められます)', 'No default approvers (choose when requesting, or set them in ⚙ Approval rules)')}
     </span>
   )
 
