@@ -29,7 +29,7 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 - **画面の文言は、その場に `t('日本語', 'English')`**(`const t = useT()`)。React の外では `tr(...)`。日本語だけの文言を、画面に書かない。最上位の定数に文言を置かない(関数か getter にする)。日付は `locale()`、価格は `yen(price, market)`、選択肢のラベルは `optionLabel(...)`。
 - 商品・メイン画像は、配信カードの国に合う市場のものだけを、AI の選定と検索の対象にする(`poolProducts` / `poolHeroes`)。載せた商品の表示には、全件を使う。
 - **AI の呼び出しは `askAgent`(`src/aiSelect.ts`)だけ**を通す(サーバーの `/api/ask` が Gemini を呼ぶ)。指示文は日本語で書き、画面が English のときの言い換えは `localizePrompt` が行う。
-- 選定した商品の**操作は中ペインだけ**。右端の商品情報(`ProductInfoPane`)は、参照専用で、操作する部品を置かない。
+- **右端の商品情報(`ProductInfoPane`)の一覧には、操作する部品を置かない。** 商品の差し替えは、商品のフロート(`ProductFloat`。中の「選定済み」の行からも、右の行からも同じものが開く)か、アラートへの対応のパネルから行う。並べ替え・外すは中ペインだけ(X47)。
 - お知らせの帯は `layout="multiline"`。複数行の入力は `AutoTextarea`。CSS の `zoom` を使うときは、幅を `%` で補正しない。
 - コメントは日本語で、**何をしているかより、なぜそうしているか**を書く。既存のコードの密度・書き方に合わせる。
 - 文字の階層(ラベル 12px 中太・薄いグレー / 値 12px / 見出し 13px 中太)は、[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) の「見た目の約束事」を守る。

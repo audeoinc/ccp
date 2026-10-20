@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { Avatar, Badge, Popover, PopoverSurface, PopoverTrigger, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Avatar, Badge, Text, makeStyles, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { productImage } from './images'
-import { yen, type Item } from './items'
+import { yen, type Candidate, type Item } from './items'
 import { optionLabel, useT } from './i18n'
 import { productMarket } from './market'
-import { ProductDetail } from './ProductDetail'
+import { ProductFloat, type SwapOption } from './ProductFloat'
+import { AlertChip, LowStockBadge } from './ProductMarks'
 import { sectionRange, sectionsOf, type EmailTemplateId } from './templates'
 import { AlertMark } from './AlertMark'
 import { productGenderLabel } from './target'
@@ -22,36 +22,14 @@ interface Props {
   alertKinds?: Map<string, CardAlertKind>
   /** 商品のアラートの印を押したとき(その商品のアラートへの対応を開く) */
   onAlert?: (productId: string) => void
-}
-
-/** 在庫が少ないとみなす数(AI の商品選定の基準と同じ) */
-const LOW_STOCK = 50
-
-// アラートのラベルの色(配信カードの上の帯の種類の札と同じ)
-const ALERT_BG: Record<CardAlertKind, string> = {
-  outOfStock: tokens.colorPaletteRedBackground3,
-  lowStock: tokens.colorPaletteDarkOrangeBackground3,
-  // 白い文字が読めるよう、濃い色にする(上の帯の種類の札と同じ)
-  policyChanged: tokens.colorPalettePurpleBorderActive,
-  dateChanged: tokens.colorPaletteBlueBorderActive,
-  overLimit: tokens.colorPaletteBrownBorderActive,
+  /** 残りの候補(中ペインと同じ)。渡したときだけ、フロートに「ほかの候補から選ぶ」を出す */
+  candidates?: Candidate[]
+  /** 選定済みの商品を、残りの候補と入れ替える(配信カードの中で。保存で確定) */
+  onSwap?: (itemKey: string, candKey: string, reason: string) => void
 }
 
 const useStyles = makeStyles({
-  alertChip: {
-    justifySelf: 'start',
-    width: 'fit-content',
-    marginTop: '2px',
-    padding: '0 7px',
-    height: '18px',
-    border: 'none',
-    borderRadius: tokens.borderRadiusCircular,
-    color: '#ffffff',
-    fontFamily: 'inherit',
-    fontSize: '11px',
-    fontWeight: tokens.fontWeightSemibold,
-    cursor: 'pointer',
-  },
+  alertChip: { marginTop: '2px' },
   root: { display: 'grid', rowGap: '10px', minWidth: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -81,13 +59,6 @@ const useStyles = makeStyles({
   name: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   trend: { flexShrink: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, width: '16px', textAlign: 'center' },
-  // フロート(クリックで出る詳細)
-  float: { width: '340px', maxWidth: '90vw', display: 'grid', rowGap: '10px', padding: '4px' },
-  floatHead: { display: 'flex', alignItems: 'center', columnGap: '10px', minWidth: 0 },
-  floatAvatar: { flexShrink: 0, width: '48px', height: '48px', borderRadius: tokens.borderRadiusMedium },
-  facts: { display: 'grid', gridTemplateColumns: 'minmax(56px, auto) minmax(0, 1fr)', columnGap: '10px', rowGap: '3px', margin: 0 },
-  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  value: { margin: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
 })
 
 /** 売上トレンドの矢印と色 */
@@ -99,10 +70,10 @@ function trendMark(name?: string): { mark: string; color: string } {
 
 /**
  * 商品情報: プレビューに載っている商品を、メールの並び順に、コンパクトな一覧で見るための参照用のペイン。
- * 行を押すと、詳細がフロートで開く(今後は、売上・在庫の推移などのグラフもここに載せる)。
- * 操作(選ぶ・並べ替え・直す)は、中ペインで行う。ここには、操作する部品を置かない。
+ * 行を押すと、商品のフロート(ProductFloat。中ペインの選定済みの行と同じもの)が開き、そこから残りの候補と差し替えられる。
+ * 一覧そのものには、操作する部品を置かない(並べ替え・外すは中ペインだけ。X47)。
  */
-export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert }: Props) {
+export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, candidates, onSwap }: Props) {
   const t = useT()
   const s = useStyles()
   const productById = new Map(products.map((p) => [p.id, p]))
@@ -123,6 +94,10 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
         const list = items.slice(from, to)
         if (list.length === 0) return null
         const label = sec.wantTitle ? sectionTitles[sec.index] || sec.label : sec.label
+        const options: SwapOption[] = (candidates ?? []).filter((c) => c.section === sec.index).flatMap((c) => {
+          const p = productById.get(c.productId)
+          return p ? [{ key: c.key, product: p, reason: c.reason, source: c.source }] : []
+        })
         return (
           <section key={sec.index}>
             <div className={s.sectionHead}>
@@ -132,7 +107,11 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
             <div className={s.list}>
               {list.map((it) => {
                 const p = productById.get(it.productId)
-                return p ? <ProductItem key={it.key} product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} /> : null
+                return p ? (
+                  <ProductFloat key={it.key} product={p} position="before" swap={onSwap && { options, onSwap: (candKey, reason) => onSwap(it.key, candKey, reason) }}>
+                    <ProductItem product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} />
+                  </ProductFloat>
+                ) : null
               })}
             </div>
           </section>
@@ -147,51 +126,23 @@ function ProductItem({ product: p, itemKey, onHover, alert, onAlert }: { product
   const s = useStyles()
   const market = productMarket(p)
   const trend = trendMark(p.sales_trend_name)
-  const low = p.stock !== undefined && p.stock < LOW_STOCK
-  // 開閉を自分で持つ: フロートの中の「閉じる」ボタンから閉じられるようにするため(外側のクリック・Esc でも閉じる)
-  const [open, setOpen] = useState(false)
   return (
-    <Popover
-      positioning={{ position: 'before', align: 'top', pinned: true, overflowBoundaryPadding: 8 }}
-      openOnHover={false}
-      open={open}
-      onOpenChange={(_, d) => setOpen(d.open)}
-    >
-      <PopoverTrigger disableButtonEnhancement>
-        <div className={mergeClasses(s.item)} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
-          <Avatar shape="square" image={{ src: productImage(p), alt: p.name }} name={p.name} className={s.avatar} />
-          <div className={s.main}>
-            <Text size={200} weight="semibold" className={s.name}>
-              {!onAlert && <AlertMark kind={alert} />}
-              {p.name}
-            </Text>
-            {/* アラートのある商品は、種類のラベル(押すと、そのアラートへの対応を開く。行のクリック = 商品の詳しい情報 とは分ける) */}
-            {alert && onAlert && (
-              <button
-                type="button"
-                className={s.alertChip}
-                style={{ backgroundColor: ALERT_BG[alert] }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onAlert(p.id)
-                }}
-                title={t('このアラートへの対応を開く', 'Handle this alert')}
-              >
-                {{ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date'), overLimit: t('週の上限', 'Weekly limit') }[alert]}
-              </button>
-            )}
-            <span className={s.sub}>
-              {p.product_code} ・ {yen(p.price, market)} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
-              {p.gender && ` ・ ${productGenderLabel(p.gender)}`}
-            </span>
-          </div>
-          {low && <Badge size="small" appearance="tint" color="warning">{t('残少', 'Low')}</Badge>}
-          <span className={s.trend} style={{ color: trend.color }} title={optionLabel(p.sales_trend_name)}>{trend.mark}</span>
-        </div>
-      </PopoverTrigger>
-      <PopoverSurface>
-        <ProductDetail product={p} onClose={() => setOpen(false)} />
-      </PopoverSurface>
-    </Popover>
+    <div className={s.item} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
+      <Avatar shape="square" image={{ src: productImage(p), alt: p.name }} name={p.name} className={s.avatar} />
+      <div className={s.main}>
+        <Text size={200} weight="semibold" className={s.name}>
+          {!onAlert && <AlertMark kind={alert} />}
+          {p.name}
+        </Text>
+        {/* アラートのある商品は、種類のラベル(押すと、そのアラートへの対応を開く。行のクリック = 商品のフロート とは分ける) */}
+        {alert && onAlert && <AlertChip kind={alert} onClick={() => onAlert(p.id)} className={s.alertChip} />}
+        <span className={s.sub}>
+          {p.product_code} ・ {yen(p.price, market)} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
+          {p.gender && ` ・ ${productGenderLabel(p.gender)}`}
+        </span>
+      </div>
+      <LowStockBadge product={p} />
+      <span className={s.trend} style={{ color: trend.color }} title={optionLabel(p.sales_trend_name)}>{trend.mark}</span>
+    </div>
   )
 }

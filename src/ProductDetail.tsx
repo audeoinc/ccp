@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Badge, Button, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -42,7 +42,7 @@ const weekLabel = (iso: string) => {
 }
 
 /** 商品の詳細(クリックで開くフロートの中身): 売上・在庫の推移、MD の販売方針と販促計画、商品の基本情報 */
-export function ProductDetail({ product: p, onClose }: { product: Product; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void }) {
+export function ProductDetail({ product: p, onClose, footer }: { product: Product; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void; /** 下に足すもの(商品のフロートの「ほかの候補から選ぶ」) */ footer?: ReactNode }) {
   const t = useT()
   const s = useStyles()
   const [tab, setTab] = useState<TabId>('trend')
@@ -165,6 +165,8 @@ export function ProductDetail({ product: p, onClose }: { product: Product; /** �
           <dd className={s.value}>{p.description || '-'}</dd>
         </dl>
       )}
+
+      {footer}
     </div>
   )
 }

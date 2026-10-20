@@ -54,7 +54,7 @@ export function ReasonText({ value, onChange }: { value: string; onChange?: (v: 
   const [editing, setEditing] = useState(false)
   if (onChange && editing) {
     return (
-      <Field label={t('選定理由', 'Selection reason')} size="small">
+      <Field label={t('選定理由', 'Selection reason')} size="small" data-no-float>
         <AutoTextarea
           autoFocus
           size="small"
@@ -70,6 +70,8 @@ export function ReasonText({ value, onChange }: { value: string; onChange?: (v: 
       className={mergeClasses(s.reason, onChange ? s.reasonEditable : s.reasonPlain)}
       style={{ color: value ? tokens.colorNeutralForeground3 : tokens.colorNeutralForegroundDisabled }}
       onClick={onChange ? () => setEditing(true) : undefined}
+      // 押すと編集になる理由の文は、商品のフロートを開かない(ProductFloat)
+      data-no-float={onChange ? '' : undefined}
       title={onChange ? t('クリックして編集', 'Click to edit') : undefined}
     >
       {value || (onChange ? t('(理由を入力)', '(Enter a reason)') : t('(理由なし)', '(No reason)'))}
@@ -86,6 +88,8 @@ export interface RowProps {
   onReason?: (v: string) => void
   source?: string
   badge?: string
+  /** 名前の横に足す印(残少・アラートの札) */
+  marks?: ReactNode
   actions?: ReactNode
   dim?: boolean
   /** ドラッグ&ドロップ(ドラッグ元・ドロップ先) */
@@ -105,7 +109,7 @@ export interface RowProps {
   onHover?: (on: boolean) => void
 }
 
-export function Row({ image, wide, title, meta, reason, onReason, source, badge, actions, dim, drag, highlight, selected, onClick, onHover }: RowProps) {
+export function Row({ image, wide, title, meta, reason, onReason, source, badge, marks, actions, dim, drag, highlight, selected, onClick, onHover }: RowProps) {
   const s = useStyles()
   const t = useT()
   return (
@@ -125,6 +129,7 @@ export function Row({ image, wide, title, meta, reason, onReason, source, badge,
             <Badge size="small" appearance="tint" color={source === SOURCE_AI ? 'brand' : 'informative'}>{source === SOURCE_AI ? 'AI' : t('手動', 'Manual')}</Badge>
           )}
           {badge && <Badge size="small" appearance="tint" color="warning">{badge}</Badge>}
+          {marks}
         </div>
         <span className={s.noWrap}>{meta}</span>
         <ReasonText value={reason} onChange={onReason} />

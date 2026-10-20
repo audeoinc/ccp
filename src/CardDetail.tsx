@@ -990,7 +990,8 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
   const isDirty = () => baseline.current !== null && baseline.current !== contentKey()
   // ---- アラートへの対応(上の帯・プレビューの商品の枠・商品情報の行から開く。差し替えは、この配信カードの中で置き換えて、保存で確定)
   const [actAlert, setActAlert] = useState<CardAlert | null>(null)
-  // 差し替えた理由(保存したときに、配信のメモ(種類 change)に残す。アラートの画面で差し替えたときと同じ記録)
+  // 差し替えた理由(保存したときに、配信のメモ(種類 change)に残す。アラートの画面で差し替えたときと同じ記録)。
+  // アラートへの対応と、商品のフロートで残りの候補と入れ替えたとき(X47)の両方
   const [alertNotes, setAlertNotes] = useState<string[]>([])
   // 商品ごとの、いちばん強いアラート(商品の枠の印・商品情報のラベルに使う)
   const alertByProduct = new Map<string, CardAlert>()
@@ -1011,6 +1012,26 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
     setAlertNotes((prev) => [...prev, tr(`${from?.name ?? alert.label}: ${alert.detail}。${to.name} に差し替えた`, `${from?.name ?? alert.label}: ${alert.detail}. Replaced with ${to.name}.`)])
     setActAlert(null)
   }
+  // 商品のフロートの「ほかの候補から選ぶ」(X47): 選定済みの商品と、残りの候補を入れ替える(中ペインの「選ぶ」と同じく、外した商品は候補に戻す)。
+  // どちらの行も行 ID のまま状態(選定 / 候補)だけが変わるので、保存で商品 ID を書き換えずに済む。確定は保存のとき
+  const swapWithCandidate = (itemKey: string, candKey: string, reason: string) => {
+    const it = items.find((i) => i.key === itemKey)
+    const c = candidates.find((x) => x.key === candKey)
+    if (!it || !c) return
+    const from = products.find((p) => p.id === it.productId)
+    const to = products.find((p) => p.id === c.productId)
+    const why = reason.trim()
+    setItems((prev) => prev.map((i) => (i.key === itemKey ? { key: c.key, rowId: c.rowId, productId: c.productId, reason: c.reason, source: c.source } : i)))
+    setCandidates((prev) => [{ ...it, section: c.section }, ...prev.filter((x) => x.key !== candKey)])
+    setAlertNotes((prev) => [
+      ...prev,
+      why
+        ? tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた。理由: ${why}`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}. Reason: ${why}`)
+        : tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}.`),
+    ])
+  }
+  // 商品 ID → いちばん強いアラートの種類(中ペインの選定済みの行と、商品情報の行の札)
+  const productAlertKinds = new Map([...alertByProduct].map(([id, a]) => [id, a.kind] as const))
   const postponeForAlert = () => {
     setActAlert(null)
     // 左の配信日時の欄へ移って、光らせる(延期も、ここで直して保存する)
@@ -1454,6 +1475,9 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                 setItems={setItems}
                 candidates={candidates}
                 setCandidates={setCandidates}
+                alertKinds={productAlertKinds}
+                onAlert={alertCard ? openAlertFor : undefined}
+                onSwap={swapWithCandidate}
                 heroId={heroId}
                 setHeroId={setHeroId}
                 heroReason={heroReason}
@@ -1588,8 +1612,10 @@ export function CardDetail({ card, defaults, draft, onCreated, weekUse, products
                   items={items}
                   products={products}
                   onHover={setHoverKey}
-                  alertKinds={new Map(CARD_ALERT_ORDER.slice().reverse().flatMap((k) => liveAlerts.filter((a) => a.kind === k && a.productId).map((a) => [a.productId!, k] as const)))}
+                  alertKinds={productAlertKinds}
                   onAlert={alertCard ? openAlertFor : undefined}
+                  candidates={candidates}
+                  onSwap={swapWithCandidate}
                 />
               </div>
             ) : (
