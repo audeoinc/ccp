@@ -1405,7 +1405,7 @@ function App() {
               <MenuItem
                 icon={<ArrowSyncRegular />}
                 onClick={async () => {
-                  if (!window.confirm(tr('外部広告の見本のデータを作り直します(いまの外部広告のデータは置き換わります)。よろしいですか?', 'Recreate sample ad data? Existing ad data will be replaced.'))) return
+                  if (!window.confirm(tr('外部広告の見本のデータを作り直します(前に作った見本は置き換わります。取り込んだ本物のデータは消しません)。よろしいですか?', 'Recreate sample ad data? Previous sample rows are replaced; imported data is kept.'))) return
                   try {
                     const res = await fetch(appPath('/api/ads/sample'), { method: 'POST' })
                     const json = (await res.json()) as { success: boolean; data?: { rows: number } }

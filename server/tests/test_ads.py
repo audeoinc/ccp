@@ -25,6 +25,8 @@ class GenerateRowsTest(unittest.TestCase):
             self.assertLessEqual(r["date"], today.isoformat())
             self.assertGreaterEqual(r["clicks"], 0)
             self.assertGreaterEqual(r["spend"], 0)
+            # 見本の行には印を付ける(本物と見分けて、見本だけを消すため)
+            self.assertTrue(r["campaign"].startswith("sample:"))
 
 
 if __name__ == "__main__":

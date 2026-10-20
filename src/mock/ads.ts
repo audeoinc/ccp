@@ -55,7 +55,7 @@ export function sampleAds(products: Row[], today = new Date(), days = 150): Row[
             market,
             product_code: code,
             media: m,
-            campaign: `${m}-${code}-${iso(d)}`,
+            campaign: `sample:${m}-${code}-${iso(d)}`,
             impressions: imps,
             clicks,
             spend: Math.round(clicks * cpc * (0.8 + r() * 0.4) * 100) / 100,

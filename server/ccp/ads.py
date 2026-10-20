@@ -1,6 +1,7 @@
 """外部広告の出稿の記録(表 ad_spends。X49)。
 
-  POST /api/ads/sample   見本のデータを作り直す(いまの商品から、過去 150 日ぶんの日ごとの出稿を作る。表の中身は置き換わる)
+  POST /api/ads/sample   見本のデータを作り直す(いまの商品から、過去 150 日ぶんの日ごとの出稿を作る)。
+                         消すのは見本の行(campaign が「sample:」で始まる行)だけ。取り込んだ本物の行は消さない
 
 本物のデータは、あとで BigQuery(または CSV)から取り込む。いまは、商品を軸に見る画面(見せ方「商品」)を触って確かめるための見本。
 見本の作り方は、撮影用の画面(src/mock/ads.ts)と同じ: 商品ごとに決まった乱数で、出稿する商品・媒体・期間を決める。
@@ -19,6 +20,9 @@ from . import schema as sc
 from .data_api import db, ok, require_db
 
 router = APIRouter(prefix="/api/ads", dependencies=[Depends(require_db)])
+
+# 見本の行の印(campaign の頭)。本物のデータと見分けて、見本だけを消すため
+SAMPLE_PREFIX = "sample:"
 
 # 媒体ごとの、クリック率・クリック単価(US はドル、JP は円)・購入率
 MEDIA = {
@@ -62,7 +66,7 @@ def generate_rows(products: list[dict[str, Any]], today: date, days: int = 150) 
                         "market": market,
                         "product_code": code,
                         "media": m,
-                        "campaign": f"{m}-{code}-{d.isoformat()}",
+                        "campaign": f"{SAMPLE_PREFIX}{m}-{code}-{d.isoformat()}",
                         "impressions": imps,
                         "clicks": clicks,
                         "spend": round(clicks * cpc * rng.uniform(0.8, 1.2), 2),
@@ -79,7 +83,8 @@ async def sample() -> dict[str, Any]:
     async with db() as conn:
         products = [dict(r) for r in (await conn.execute(text("SELECT product_code, market, price FROM products"))).mappings().all()]
         rows = generate_rows(products, date.today())
-        await conn.execute(text(f"DELETE FROM {t.pg}"))
+        # 見本の行だけを消す(本物の行は残す)
+        await conn.execute(text(f"DELETE FROM {t.pg} WHERE campaign LIKE :p"), {"p": f"{SAMPLE_PREFIX}%"})
         if rows:
             values = [t.to_db(r) for r in rows]
             cols = list(values[0])
