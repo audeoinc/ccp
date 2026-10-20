@@ -8,6 +8,9 @@
                                      引っ越し用のパック(画面の ⚙ →「データと画像を書き出す」)を取り込む。
                                      DB の中身をパックの内容に置き換え、画像をフォルダ(既定: server/images)に展開する。
                                      --yes がなければ、件数を見せるだけで、何も変えない
+  python -m ccp.cli import-metrics <CSV> [--yes]
+                                     商品・カテゴリの週の指標の CSV(docs/METRICS_FORMAT.md)を取り込む。ファイルにある週 × 市場の行を置き換える。
+                                     --yes がなければ、読めた件数と読めなかった行を見せるだけで、何も変えない
   python -m ccp.cli bq-check         BigQuery の出力を読み、値まで確かめる(キーの重複・空・範囲・SKU と SPU の結びつき。何も変えない)
   python -m ccp.cli bq-dummy [--dataset ccp_dummy] [--pack <ZIP>] [--touch-stock] [--yes]
                                      BigQuery に練習用のダミーデータ(元データに似せた表と、仕様の形のビュー)を作る(ccp/bq_dummy.py)。
@@ -74,6 +77,23 @@ async def counts() -> None:
             print(f"{t.pg}: {n}")
 
 
+async def import_metrics(path: Path, yes: bool) -> None:
+    from .metrics import parse, save
+
+    p = parse(path.read_text(encoding="utf-8-sig"))
+    weeks = sorted({(r["week_start"], r["market"]) for r in p.rows})
+    print(f"{'商品' if p.kind == 'product' else 'カテゴリ'}の指標: {len(p.rows)} 行(週 × 市場: {', '.join(f'{w} {m}' for w, m in weeks) or 'なし'})")
+    for x in p.problems:
+        print(f"  {x.line} 行目: {x.message}")
+    if not p.rows:
+        sys.exit(1)
+    if not yes:
+        print("確かめただけです。取り込むときは --yes を付けてください")
+        return
+    result = await save(p, path.name)
+    print(f"取り込みました(置き換えた行 {result['replaced']}、入れた行 {result['saved']})")
+
+
 async def import_pack(path: Path, images: Path, yes: bool) -> None:
     from .pack import read_pack, replace_tables
 
@@ -114,6 +134,9 @@ def main() -> None:
     ip.add_argument("path", type=Path)
     ip.add_argument("--images", type=Path, default=DEFAULT_IMAGES)
     ip.add_argument("--yes", action="store_true")
+    im = sub.add_parser("import-metrics")
+    im.add_argument("path", type=Path)
+    im.add_argument("--yes", action="store_true")
     sub.add_parser("bq-check")
     bd = sub.add_parser("bq-dummy")
     bd.add_argument("--dataset", default="ccp_dummy")
@@ -144,6 +167,8 @@ def main() -> None:
         from .ranking_dummy import run as ranking_dummy
 
         asyncio.run(ranking_dummy(args.yes))
+    elif args.cmd == "import-metrics":
+        asyncio.run(import_metrics(args.path, args.yes))
     elif args.cmd == "import-pack":
         asyncio.run(import_pack(args.path, args.images, args.yes))
     else:

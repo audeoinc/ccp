@@ -38,6 +38,8 @@ try {
     notifications: m.notifications,
     production_requests: m.productionRequests,
     note_reactions: m.noteReactions,
+    product_metrics: m.productMetrics,
+    category_metrics: m.categoryMetrics,
   }
   writeFileSync(join(root, 'server', 'seed.json'), JSON.stringify(data, null, 1) + '\n')
   for (const [k, v] of Object.entries(data)) console.log(k, v.length)

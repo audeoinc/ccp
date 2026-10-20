@@ -9,13 +9,15 @@ import { optionLabel, useT } from './i18n'
 import { productMarket } from './market'
 import { MiniChart } from './MiniChart'
 import { useProductData } from './useProductData'
+import { ProductMetrics } from './ProductMetrics'
 
 /** 在庫が少ないとみなす数(AI の商品選定の基準と同じ) */
 const LOW_STOCK = 50
 
 const useStyles = makeStyles({
   // タブを切り替えても、フロートの大きさが変わらないよう、高さを揃える(はみ出すときは、中でスクロール)
-  root: { width: '420px', maxWidth: '90vw', minHeight: '400px', maxHeight: '80vh', overflowY: 'auto', display: 'grid', rowGap: '10px', padding: '4px', minWidth: 0, alignContent: 'start' },
+  // 幅は「指標」の表(値・順位・WoW・MoM・YoY)が 1 行に収まるように
+  root: { width: '520px', maxWidth: '90vw', minHeight: '400px', maxHeight: '80vh', overflowY: 'auto', display: 'grid', rowGap: '10px', padding: '4px', minWidth: 0, alignContent: 'start' },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px', minWidth: 0 },
   title: { minWidth: 0, display: 'grid', flexGrow: 1 },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -33,7 +35,7 @@ const useStyles = makeStyles({
   center: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
 })
 
-type TabId = 'trend' | 'plan' | 'details'
+type TabId = 'trend' | 'metrics' | 'plan' | 'details'
 
 /** 週の開始日(YYYY-MM-DD)を「M/D」にする */
 const weekLabel = (iso: string) => {
@@ -72,12 +74,13 @@ export function ProductDetail({ product: p, onClose, footer }: { product: Produc
 
       <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabId)}>
         <Tab value="trend">{t('売上・在庫', 'Sales & stock')}</Tab>
+        <Tab value="metrics">{t('指標', 'Metrics')}</Tab>
         <Tab value="plan">{t('販売方針・販促', 'MD plan')}</Tab>
         <Tab value="details">{t('基本情報', 'Details')}</Tab>
       </TabList>
 
-      {tab !== 'details' && loading && <div className={s.center}><Spinner size="small" /></div>}
-      {tab !== 'details' && error && <span className={s.muted}>{error}</span>}
+      {(tab === 'trend' || tab === 'plan') && loading && <div className={s.center}><Spinner size="small" /></div>}
+      {(tab === 'trend' || tab === 'plan') && error && <span className={s.muted}>{error}</span>}
 
       {tab === 'trend' && !loading && !error && (
         weekly.length === 0 ? (
@@ -128,6 +131,9 @@ export function ProductDetail({ product: p, onClose, footer }: { product: Produc
           </>
         )
       )}
+
+      {/* 商品とカテゴリの週の指標(X48)。読み込みは、タブを開いたときだけ */}
+      {tab === 'metrics' && <ProductMetrics product={p} />}
 
       {tab === 'plan' && !loading && !error && (
         data?.policy ? (

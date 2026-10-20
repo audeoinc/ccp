@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Badge,
   Button,
@@ -76,6 +76,8 @@ import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alert
 import { appPath } from './appRoot'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
 import { clearProductDataCache } from './useProductData'
+import { clearProductMetricsCache } from './useProductMetrics'
+import { importMetricsCsv } from './data/metricsImport'
 import { isCancelled } from './cancel'
 import { setActivePolicies, setActiveRules, setActiveSales, onPolicyWarning } from './aiSelect'
 import { ResultPeek } from './ResultPeek'
@@ -1257,6 +1259,22 @@ function App() {
       setClassifying(false)
     }
   }
+  // 商品・カテゴリの週の指標の CSV の取り込み(X48)。週 × 市場ごとに置き換え、商品のフロートの「指標」に出す
+  const metricsFileRef = useRef<HTMLInputElement>(null)
+  const importMetrics = async (file: File) => {
+    const r = await importMetricsCsv(file.name, await file.text())
+    clearProductMetricsCache()
+    const skipped = (r.problems ?? []).slice(0, 5).map((x) => `${x.line}: ${x.message}`).join(' / ')
+    const kind = r.kind === 'category' ? tr('カテゴリ', 'category') : tr('商品', 'product')
+    if (r.error) setBqNotice({ intent: 'error', text: tr(`指標を取り込めませんでした: ${r.error}`, `Could not import metrics: ${r.error}`) + (skipped ? ` (${skipped})` : '') })
+    else
+      setBqNotice({
+        intent: skipped ? 'warning' : 'success',
+        text:
+          tr(`${kind}の指標を ${r.count ?? 0} 行取り込みました(${(r.weeks ?? []).map((w) => `${w.week_start} ${w.market}`).join('・')})`, `Imported ${r.count ?? 0} ${kind} metric rows (${(r.weeks ?? []).map((w) => `${w.week_start} ${w.market}`).join(', ')})`) +
+          (skipped ? tr(`。読めなかった行: ${skipped}`, `. Skipped: ${skipped}`) : ''),
+      })
+  }
   const [autoDraft, setAutoDraft] = useState(loadAutoDraft)
   useTemplates() // テンプレートの登録が変わったら、画面全体を描き直す
   // ユーザーが作ったテンプレートを読み込む(読めなくても、標準のテンプレートで動く)
@@ -1278,6 +1296,17 @@ function App() {
   return (
     <>
       <TemplateManager />
+      <input
+        ref={metricsFileRef}
+        type="file"
+        accept=".csv,text/csv"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (f) void importMetrics(f)
+        }}
+      />
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
@@ -1427,6 +1456,10 @@ function App() {
                   {bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery')}
                 </MenuItem>
               )}
+              {/* 商品・カテゴリの週の指標(X48。商品のフロートの「指標」)。形は docs/METRICS_FORMAT.md */}
+              <MenuItem icon={<ArrowUploadRegular />} onClick={() => metricsFileRef.current?.click()}>
+                {t('商品・カテゴリの指標を取り込む(CSV)', 'Import product & category metrics (CSV)')}
+              </MenuItem>
               </MenuGroup>
               <MenuDivider />
               {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}

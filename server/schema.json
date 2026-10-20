@@ -471,6 +471,42 @@
    ],
    "lookups": [
    ]
+  },
+  "product_metrics": {
+   "columns": [
+    ["market", "text"],
+    ["product_code", "text", {"index": true}],
+    ["week_start", "date", {"index": true}],
+    ["metric", "text"],
+    ["value", "numeric"],
+    ["rank", "int"],
+    ["rank_of", "int"],
+    ["wow", "numeric"],
+    ["mom", "numeric"],
+    ["yoy", "numeric"],
+    ["source_file", "text"],
+    ["imported_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "category_metrics": {
+   "columns": [
+    ["market", "text"],
+    ["category", "text", {"index": true}],
+    ["week_start", "date", {"index": true}],
+    ["metric", "text"],
+    ["value", "numeric"],
+    ["rank", "int"],
+    ["rank_of", "int"],
+    ["wow", "numeric"],
+    ["mom", "numeric"],
+    ["yoy", "numeric"],
+    ["source_file", "text"],
+    ["imported_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
   }
  },
  "choices": {

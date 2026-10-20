@@ -229,6 +229,86 @@ export const policies: Row[] = csv('product_policy.csv').map((r) => ({
   stage: r.stage,
 }))
 
+// ---- 商品・カテゴリの週の指標(X48。ダミー)。本番は、外で計算し終えた値を CSV で取り込む(docs/METRICS_FORMAT.md)。
+// 商品コードを種にした決まった乱数で作る(何度作っても同じ)。順位は、同じ市場の全商品 / カテゴリ同士で、値から数え直す
+export const METRICS_WEEK = '2026-10-12'
+const mrand = (key: string) => parseInt(guid(key).slice(0, 8), 16) / 0xffffffff
+/** -span〜+span の増減(小数 3 桁) */
+const swing = (key: string, span: number) => Math.round((mrand(key) * 2 - 1) * span * 1000) / 1000
+function ranked(rows: Row[]): Row[] {
+  // 市場 × 項目ごとに、値の大きい順に順位を付ける(在庫・欠品率は順位を持たない)
+  const groups = new Map<string, Row[]>()
+  for (const r of rows) {
+    if (['spu_stock', 'sku_stock', 'sku_stockout_rate'].includes(String(r.metric))) continue
+    const k = `${r.market}|${r.metric}`
+    groups.set(k, [...(groups.get(k) ?? []), r])
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => Number(b.value) - Number(a.value)).forEach((r, i) => {
+      r.rank = i + 1
+      r.rank_of = list.length
+    })
+  }
+  return rows
+}
+export const productMetrics: Row[] = ranked(
+  products.flatMap((p) => {
+    const code = String(p.product_code)
+    const us = p.market === US_MARKET
+    const price = Number(p.price)
+    const stock = Number(p.stock)
+    const store = Math.round(price * (20 + mrand(`${code}:store`) * 380))
+    const values: Record<string, number> = {
+      spu_stock: stock,
+      sku_stock: Math.max(0, stock - Math.round(mrand(`${code}:reserve`) * 12)),
+      sku_stockout_rate: Math.round(mrand(`${code}:out`) * 40) / 100,
+      store_sales: store,
+      ec_sales: Math.round(store * (0.4 + mrand(`${code}:ec`) * (us ? 1.6 : 0.9))),
+      ec_favorites: Math.round(40 + mrand(`${code}:fav`) * 2400),
+    }
+    return Object.entries(values).map(([metric, value]) => {
+      const rate = metric === 'sku_stockout_rate'
+      return {
+        id: guid(`product_metric:${code}:${METRICS_WEEK}:${metric}`),
+        market: p.market,
+        product_code: code,
+        week_start: METRICS_WEEK,
+        metric,
+        value,
+        wow: swing(`${code}:${metric}:wow`, rate ? 0.08 : 0.3),
+        mom: swing(`${code}:${metric}:mom`, rate ? 0.12 : 0.4),
+        yoy: swing(`${code}:${metric}:yoy`, rate ? 0.15 : 0.6),
+        source_file: 'sample',
+        imported_at: '2026-10-19T09:00:00Z',
+      }
+    })
+  }),
+)
+export const categoryMetrics: Row[] = ranked(
+  [...new Set(products.map((p) => `${p.market}|${p.category}`))].flatMap((k) => {
+    const [market, category] = k.split('|')
+    const sessions = Math.round(5000 + mrand(`${k}:sessions`) * 75000)
+    const values: Record<string, number> = {
+      ec_sessions: sessions,
+      ec_sales: Math.round(sessions * (market === US_MARKET ? 2.5 : 300) * (0.5 + mrand(`${k}:sales`))),
+      ec_favorites: Math.round(sessions * (0.02 + mrand(`${k}:fav`) * 0.06)),
+    }
+    return Object.entries(values).map(([metric, value]) => ({
+      id: guid(`category_metric:${k}:${METRICS_WEEK}:${metric}`),
+      market,
+      category,
+      week_start: METRICS_WEEK,
+      metric,
+      value,
+      wow: swing(`${k}:${metric}:wow`, 0.2),
+      mom: swing(`${k}:${metric}:mom`, 0.3),
+      yoy: swing(`${k}:${metric}:yoy`, 0.4),
+      source_file: 'sample',
+      imported_at: '2026-10-19T09:00:00Z',
+    }))
+  }),
+)
+
 // ---- ユーザーが作ったテンプレート(1 件)
 export const layoutTemplates: Row[] = [
   {

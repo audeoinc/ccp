@@ -2,7 +2,7 @@
 // vite.mock.config.ts が、サービスの読み込みを、ここに差し替える。ページを読み込み直すと、データは、最初に戻る。
 
 import { mockAgent } from './agent'
-import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, users, weekly, type Row } from './seed'
+import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, categoryMetrics, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, productMetrics, products, users, weekly, type Row } from './seed'
 import { sampleAds } from './ads'
 
 export const tables: Record<string, Row[]> = {
@@ -31,6 +31,8 @@ export const tables: Record<string, Row[]> = {
   NoteReactionsService: structuredClone(noteReactions),
   // 外部広告の出稿の見本(X49)
   AdSpendsService: sampleAds(products),
+  ProductMetricsService: structuredClone(productMetrics),
+  CategoryMetricsService: structuredClone(categoryMetrics),
   // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)
   PolicyRulesService: [],
   SalesPoliciesService: [],
