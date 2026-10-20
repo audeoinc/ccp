@@ -81,6 +81,7 @@ import { setActivePolicies, setActiveRules, setActiveSales, onPolicyWarning } fr
 import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { WeekTimeGrid } from './WeekTimeGrid'
+import { ProductsView } from './ProductsView'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -126,7 +127,7 @@ const weekLabel = (start: Date) => {
 
 // 表示の切り替え(月のカレンダー / 週 / 表の一覧)。ブラウザごとに覚える
 // compare(比べる)は、結果の面だけの見せ方
-type View = 'month' | 'week' | 'list' | 'compare'
+type View = 'month' | 'week' | 'list' | 'compare' | 'products'
 const VIEW_KEY = 'calendar.view'
 const LENS_KEY = 'week.lens'
 // 列を足したら、版を上げる(以前に選んだ列の設定では、新しい列が出ないため)
@@ -179,6 +180,10 @@ const useStyles = makeStyles({
   // ヘッダーの絞り込みの札(X39)。収まらないときだけ、2 段目に回る
   // 絞り込みの段(X42): ヘッダーのすぐ下。ヘッダーより一段控えめな地
   filterBar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: `6px ${tokens.spacingHorizontalXL}`, backgroundColor: tokens.colorNeutralBackground1, borderTop: `1px solid ${tokens.colorNeutralStroke3}` },
+  // 見せ方「商品」の期間(X49)
+  rangeRow: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300 },
+  rangeInput: { fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, padding: '2px 6px', border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: tokens.borderRadiusMedium },
+  rangePresets: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' },
   filterBarDivider: { width: '1px', alignSelf: 'stretch', margin: '2px 6px', backgroundColor: tokens.colorNeutralStroke2 },
   filterBarLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: '4px' },
   // 表(計画)と裏(結果)の切り替え。題名のすぐ横に固定して、どちらの面でも位置が動かないようにする
@@ -306,6 +311,8 @@ const useStyles = makeStyles({
   // 見出しの幅は、月・週・一覧で同じにする(切り替えで、右のボタンがずれないように)。言語ごとに、いちばん長い表記(例: Nov 22 – Nov 28, 2026 / 2026年 11月22日 – 11月28日)が収まる幅
   weekLabel: { width: '180px' },
   weekLabelJa: { width: '236px' },
+  // 見せ方「商品」の期間(日付の欄が 2 つ並ぶので、幅を中身に合わせる)
+  rangeLabel: { width: 'auto' },
   // 「週」の隣の、見方の小さな切り替え(週の下位の選択だと分かるよう、枠で囲んで小さく)
   lensSwitch: {
     display: 'inline-flex',
@@ -485,6 +492,12 @@ function App() {
   // 右上でログインしている人の名前(担当の絞り込みの「自分」に使う。切り替えたら、絞り込みも追いかける)
   const me = useSyncExternalStore(onMeChange, myName)
   const personName = filters.person === ME_PERSON ? me : filters.person
+  // 見せ方「商品」の期間(X49)。既定は、4 週間前から 2 週間あと(過去の結果と、これからの予定の両方を見るため)
+  const [range, setRange] = useState<{ from: string; to: string }>(() => {
+    if (link.from && link.to) return { from: link.from, to: link.to }
+    const now = new Date()
+    return { from: dateText(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 27)), to: dateText(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14)) }
+  })
   const [selectedId, setSelectedId] = useState<string | null>(link.card ?? null)
   // 配信カードで開いている工程のタブ(URL に持たせる)
   const [cardTab, setCardTab] = useState<string | undefined>(link.tab)
@@ -1045,6 +1058,14 @@ function App() {
     return n ? { id: n.id, name: n.name, position: where } : null
   })()
   const shift = (n: number) => {
+    // 見せ方「商品」: 期間を、その長さぶん前後に動かす
+    if (view === 'products') {
+      const f = new Date(`${range.from}T00:00:00`)
+      const tt = new Date(`${range.to}T00:00:00`)
+      const days = Math.round((tt.getTime() - f.getTime()) / 86400000) + 1
+      setRange({ from: dateText(new Date(f.getFullYear(), f.getMonth(), f.getDate() + days * n)), to: dateText(new Date(tt.getFullYear(), tt.getMonth(), tt.getDate() + days * n)) })
+      return
+    }
     if (view === 'week') {
       // 週を動かし、月も、その週の真ん中(水曜日)の月に合わせる(月の表示に戻ったときに、同じあたりを見せる)
       const next = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7 * n)
@@ -1062,6 +1083,8 @@ function App() {
     view,
     date: view === 'week' ? dateText(weekStart) : month ? dateText(month) : undefined,
     country: filters.country,
+    from: range.from,
+    to: range.to,
     card: selectedId ?? undefined,
     tab: selectedId ? cardTab : undefined,
     result: page === 'results' ? (resultDetail ?? undefined) : undefined,
@@ -1092,6 +1115,7 @@ function App() {
         setMonth(new Date(mid.getFullYear(), mid.getMonth(), 1))
       }
       if (l.country !== undefined) setFilters((f) => ({ ...f, country: l.country! }))
+      if (l.from && l.to) setRange({ from: l.from, to: l.to })
       setSelectedId(l.card ?? null)
       setCreating(null)
       setDraftOpen(null)
@@ -1377,6 +1401,22 @@ function App() {
               >
                 {t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)')}
               </MenuItem>
+              {/* 外部広告の出稿の見本を作る(X49。本物のデータを取り込むまで、見せ方「商品別」を確かめるため。表の中身は置き換わる) */}
+              <MenuItem
+                icon={<ArrowSyncRegular />}
+                onClick={async () => {
+                  if (!window.confirm(tr('外部広告の見本のデータを作り直します(いまの外部広告のデータは置き換わります)。よろしいですか?', 'Recreate sample ad data? Existing ad data will be replaced.'))) return
+                  try {
+                    const res = await fetch(appPath('/api/ads/sample'), { method: 'POST' })
+                    const json = (await res.json()) as { success: boolean; data?: { rows: number } }
+                    setBqNotice(json.success ? { intent: 'success', text: tr(`外部広告の見本を ${json.data?.rows ?? 0} 行作りました`, `Created ${json.data?.rows ?? 0} rows of sample ad data`) } : { intent: 'error', text: tr('外部広告の見本を作れませんでした', 'Could not create sample ad data') })
+                  } catch (e) {
+                    setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                  }
+                }}
+              >
+                {t('外部広告の見本を作る', 'Create sample ad data')}
+              </MenuItem>
               {/* 種類(テーマの種類)が決まっていない配信を、AI で分ける(X41。これまでの配信の書き換え。決まっている配信は触らない) */}
               <MenuItem icon={<AiIcon size={16} />} disabled={classifying || untypedCards.length === 0} secondaryContent={t(`${untypedCards.length} 本`, `${untypedCards.length}`)} onClick={() => void classifyAll()}>
                 {classifying ? t('種類を分けています…', 'Sorting types…') : t('種類が未設定の配信を、AI で分ける', 'Sort untyped deliveries with AI')}
@@ -1485,9 +1525,16 @@ function App() {
             <>
             <div className={styles.monthRow}>
               <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
-              <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel)}>
+              <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel, view === 'products' && styles.rangeLabel)}>
                 {view === 'compare' ? (
                   t('絞り込んで比べる', 'Filter and compare')
+                ) : view === 'products' ? (
+                  // 見せ方「商品」: 期間を自由に(開始〜終了)。近道は「この画面」の右の札
+                  <span className={styles.rangeRow}>
+                    <input type="date" className={styles.rangeInput} value={range.from} max={range.to} onChange={(e) => e.target.value && setRange({ ...range, from: e.target.value })} aria-label={t('期間の始まり', 'From')} />
+                    <span>〜</span>
+                    <input type="date" className={styles.rangeInput} value={range.to} min={range.from} onChange={(e) => e.target.value && setRange({ ...range, to: e.target.value })} aria-label={t('期間の終わり', 'To')} />
+                  </span>
                 ) : (
                   // 期間の文字を押すと、ミニカレンダーで月・週・日を選んで移れる(W11)
                   <MiniCalendar
@@ -1534,6 +1581,7 @@ function App() {
                     ['month', t('月', 'Month'), false, undefined],
                     ['week', t('週', 'Week'), false, undefined],
                     ['list', t('一覧', 'List'), false, undefined],
+                    ['products', t('商品別', 'By product'), false, t('商品を軸に、期間の中の掲載回数・配信の結果・売上・外部広告を見ます', 'See featuring, results, sales and paid ads by product for a period')],
                     [
                       'compare',
                       t('比べる', 'Compare'),
@@ -1686,7 +1734,39 @@ function App() {
             </>
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
-            {page === 'results' ? (
+            {view === 'products' ? (
+              <>
+              {/* 期間の近道(見せ方「商品」) */}
+              <div className={styles.rangePresets}>
+                {(
+                  [
+                    [t('直近 4 週', 'Last 4 weeks'), -27, 0],
+                    [t('直近 12 週', 'Last 12 weeks'), -83, 0],
+                    [t('前後 4 週', '±4 weeks'), -27, 28],
+                    [t('これから 4 週', 'Next 4 weeks'), 0, 27],
+                  ] as const
+                ).map(([name, a, b]) => {
+                  const now = new Date()
+                  const next = { from: dateText(new Date(now.getFullYear(), now.getMonth(), now.getDate() + a)), to: dateText(new Date(now.getFullYear(), now.getMonth(), now.getDate() + b)) }
+                  const on = next.from === range.from && next.to === range.to
+                  return (
+                    <Button key={name} size="small" appearance={on ? 'primary' : 'subtle'} onClick={() => setRange(next)}>
+                      {name}
+                    </Button>
+                  )
+                })}
+              </div>
+              <ProductsView
+                cards={filtered.filter((c) => !isCancelled(c))}
+                cardProducts={cardProducts}
+                products={products}
+                from={range.from}
+                to={range.to}
+                onOpenCard={setSelectedId}
+                onOpenResult={(id) => (page === 'results' ? setResultDetail(id) : setPeekResult(id))}
+              />
+              </>
+            ) : page === 'results' ? (
               <ResultsPage
                 cards={filtered}
                 products={products}

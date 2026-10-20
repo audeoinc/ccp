@@ -3,6 +3,7 @@
 
 import { mockAgent } from './agent'
 import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, cards, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, products, users, weekly, type Row } from './seed'
+import { sampleAds } from './ads'
 
 export const tables: Record<string, Row[]> = {
   DeliveryCardsService: structuredClone(cards),
@@ -27,6 +28,8 @@ export const tables: Record<string, Row[]> = {
   NotificationsService: structuredClone(notifications),
   ProductionRequestsService: structuredClone(productionRequests),
   NoteReactionsService: structuredClone(noteReactions),
+  // 外部広告の出稿の見本(X49)
+  AdSpendsService: sampleAds(products),
   // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)
   PolicyRulesService: [],
   SalesPoliciesService: [],

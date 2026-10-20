@@ -442,6 +442,22 @@
     ["card_note_id", "card_notes", {"onDelete": "CASCADE"}],
     ["user_id", "users", {"onDelete": "CASCADE"}]
    ]
+  },
+  "ad_spends": {
+   "columns": [
+    ["date", "date", {"index": true}],
+    ["market", "choice"],
+    ["product_code", "text", {"index": true}],
+    ["media", "choice"],
+    ["campaign", "text"],
+    ["impressions", "int"],
+    ["clicks", "int"],
+    ["spend", "numeric"],
+    ["conversions", "int"],
+    ["revenue", "numeric"]
+   ],
+   "lookups": [
+   ]
   }
  },
  "choices": {
@@ -475,6 +491,8 @@
   "notifications.kind": ["review_requested", "approved", "changes_requested", "withdrawn"],
   "notifications.status": ["pending", "sent", "skipped"],
   "production_requests.status": ["requested", "in_progress", "done", "checked", "sent", "stale", "withdrawn"],
-  "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"]
+  "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"],
+  "ad_spends.market": ["JP", "US"],
+  "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"]
  }
 }

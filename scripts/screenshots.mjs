@@ -209,6 +209,13 @@ const SCENES = {
     await view(page, T(L, '商品', 'Products'))
   },
 
+  // 見せ方「商品別」(X49): 商品を軸に、期間の中の掲載・結果・外部広告
+  async productsView(page, L) {
+    await view(page, T(L, '商品別', 'By product'), 2500)
+    await fullShot(page, `${L}-08b-products-view`)
+    await view(page, T(L, '月', 'Month'))
+  },
+
   // 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子
   async weekTime(page, L) {
     await view(page, T(L, '週', 'Week'))

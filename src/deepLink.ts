@@ -5,7 +5,7 @@
 
 /** 画面の中の面の名前(App の page)と、URL での名前 */
 export type Page = 'calendar' | 'production' | 'results' | 'alerts'
-export type LinkView = 'month' | 'week' | 'list' | 'compare'
+export type LinkView = 'month' | 'week' | 'list' | 'compare' | 'products'
 
 export interface LinkState {
   page: Page
@@ -23,11 +23,14 @@ export interface LinkState {
   production?: string
   /** 国('' = すべての国) */
   country?: string
+  /** 見せ方「商品」の期間(YYYY-MM-DD。X49) */
+  from?: string
+  to?: string
 }
 
 const PAGE_TO_URL: Record<Page, string> = { calendar: 'plan', production: 'production', results: 'results', alerts: 'alerts' }
 const URL_TO_PAGE: Record<string, Page> = { plan: 'calendar', production: 'production', results: 'results', alerts: 'alerts' }
-const VIEWS: LinkView[] = ['month', 'week', 'list', 'compare']
+const VIEWS: LinkView[] = ['month', 'week', 'list', 'compare', 'products']
 
 /** URL のクエリを読む。知らない値は無視する(古いリンク・手で書き換えたリンクでも、開ける所まで開く) */
 export function parseLink(search: string): Partial<LinkState> {
@@ -39,6 +42,10 @@ export function parseLink(search: string): Partial<LinkState> {
   if (view && VIEWS.includes(view)) out.view = view
   const date = q.get('date')
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) out.date = date
+  for (const k of ['from', 'to'] as const) {
+    const v = q.get(k)
+    if (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) out[k] = v
+  }
   for (const k of ['card', 'tab', 'result', 'production'] as const) {
     const v = q.get(k)
     if (v) out[k] = v
@@ -53,7 +60,11 @@ export function linkSearch(s: LinkState): string {
   const q = new URLSearchParams()
   if (s.page !== 'calendar') q.set('page', PAGE_TO_URL[s.page])
   if (s.view) q.set('view', s.view)
-  if (s.date) q.set('date', s.date)
+  if (s.date && s.view !== 'products') q.set('date', s.date)
+  if (s.view === 'products' && s.from && s.to) {
+    q.set('from', s.from)
+    q.set('to', s.to)
+  }
   if (s.country !== undefined) q.set('country', s.country || 'all')
   if (s.card) q.set('card', s.card)
   if (s.card && s.tab) q.set('tab', s.tab)
