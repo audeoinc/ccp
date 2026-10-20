@@ -727,7 +727,7 @@ export const notifications: Row[] = []
 export const productionRequests: Row[] = []
 export const noteReactions: Row[] = []
 
-// ---- 前提運用の照らし合わせ(⚙ の画面。docs/PROCESS.md 8.1)。見本の聞き取り先を 1 つ、いくつかの行を埋めた形で
+// ---- 前提運用の照らし合わせ(⚙ の画面。docs/FLOWS.md 7 章)。見本の聞き取り先を 1 つ、いくつかの行を埋めた形で
 const sampleInterview = guid('process:interview:sample')
 export const processInterviews: Row[] = [{ id: sampleInterview, name: '見本の聞き取り', created_on: '2026-10-20T01:00:00.000Z' }]
 export const processChecks: Row[] = [

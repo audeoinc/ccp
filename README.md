@@ -69,7 +69,7 @@ GitHub Actions(`.github/workflows/ci.yml`)が、`main` への push とプルリ�
 - [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md) — ソースの地図(ファイルの構造と役割、変更するときに触るところ)
 - [docs/WORKBENCH.md](docs/WORKBENCH.md) — Vertex AI Workbench で動かす手順
 - [docs/PRINCIPLES.md](docs/PRINCIPLES.md) — デザインの方針(UI/UX ポリシー)
-- [docs/FLOWS.md](docs/FLOWS.md) — 導線の棚卸し(週のサイクルの段階ごとの、画面の入り口・移り方と、気になる点)
+- [docs/FLOWS.md](docs/FLOWS.md) — 業務の流れと前提運用(段階ごとの画面の入り口・移り方・前提の決まりと、今の運用との照らし合わせ)
 - [docs/BACKLOG.md](docs/BACKLOG.md) — 機能のバックログと、状況メモ
 - [docs/HANDOVER.md](docs/HANDOVER.md) — 開発の現在地と、次にやること
 - [CLAUDE.md](CLAUDE.md) — AI コーディングアシスタント(Claude Code など)向けの指示書

@@ -1,6 +1,6 @@
 # 制作の依頼と、Production の面の設計(2026-10-19 に利用者と決めた)
 
-承認された配信を、制作に頼むためのしくみ。前提とする運用は [PROCESS.md](PROCESS.md)、承認は [APPROVAL.md](APPROVAL.md)。作る順番は [BACKLOG.md](BACKLOG.md) の 12 章(PR1〜。2 章の P1〜P5 とは別)。
+承認された配信を、制作に頼むためのしくみ。前提とする運用は [FLOWS.md](FLOWS.md)、承認は [APPROVAL.md](APPROVAL.md)。作る順番は [BACKLOG.md](BACKLOG.md) の 12 章(PR1〜。2 章の P1〜P5 とは別)。
 
 ## 1. なぜ分けるか(利用者の指摘)
 

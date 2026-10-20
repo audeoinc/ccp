@@ -1,5 +1,5 @@
 // 表 process_checks(前提運用の照らし合わせの、聞き取り先ごと・行ごとの答え)の、1 行の型と選択肢。列を変えたら、server/schema.json と一緒に直す(scripts/check-schema.mjs が食い違いを見つける)。
-// 行(row_id)は docs/PROCESS.md の業務(A1・P1 など)・要検討(R1 など)・物差し(M1 など)。どの列を使うかは行の種類で違う
+// 行(row_id)は docs/FLOWS.md の業務(A1・P1 など)・要検討(R1 など)・物差し(M1 など)。どの列を使うかは行の種類で違う
 
 /** 差(業務の行) */
 export const ProcessCheckGap = {

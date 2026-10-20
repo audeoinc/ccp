@@ -112,8 +112,8 @@ function Chips({ list, current, onPick, label: aria }: { list: [string, string][
 }
 
 /**
- * 前提運用の照らし合わせ(docs/PROCESS.md の 8.1)。⚙ のメニューから開く。開発元の本番だけの画面(Workbench 版には入れない)。
- * 聞き取り先ごとに、業務の行(3・7 章)・要検討(5 章)・物差し(6 章)の答えを、表 process_interviews / process_checks に保存する。
+ * 前提運用の照らし合わせ(docs/FLOWS.md の 7 章)。⚙ のメニューから開く。開発元の本番だけの画面(Workbench 版には入れない)。
+ * 聞き取り先ごとに、業務と前提の決まりの行(2 章)・要検討(5 章)・物差し(6 章)の答えを、表 process_interviews / process_checks に保存する。
  * 文字は手が止まってから、選択はすぐに保存する。同じ行の書き込みは、順番に 1 つずつ(行の作成が二重にならないように)
  */
 export default function ProcessCheck({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -283,7 +283,7 @@ export default function ProcessCheck({ open, onClose }: { open: boolean; onClose
     const out = [
       `## ${tr('聞き取り', 'Interview')}: ${name}`,
       '',
-      `### ${tr('前提運用との照らし合わせ(3 章・7 章)', 'Comparison with assumed operations (ch. 3, 7)')}`,
+      `### ${tr('前提運用との照らし合わせ(2 章)', 'Comparison with assumed operations (ch. 2)')}`,
       '',
       `| ${tr('業務', 'Task')} | ${tr('名前', 'Name')} | ${tr('今の運用', 'Current operation')} | ${tr('差', 'Gap')} | ${tr('差の扱い', 'Handling')} | ${tr('メモ', 'Notes')} |`,
       '|---|---|---|---|---|---|',
@@ -370,8 +370,8 @@ export default function ProcessCheck({ open, onClose }: { open: boolean; onClose
         <div className={s.scroll}>
           <p className={s.intro}>
             {t(
-              '左は、CCP が前提にしている運用です。これを見せながら今の運用を聞き、右に書きます。そのうえで「差なし / 差あり / その業務はない」を付けます。差があるときは、運用を CCP に合わせるのか(それで良くなる)、CCP を直すのかを選びます。入力はその場で保存され、ほかの人も同じ聞き取り先を開けば見えます。終わったら、いちばん下の「Markdown で写す」で PROCESS.md に反映できます。',
-              'On the left is the operation CCP assumes. Show it, ask how things work today, and write that on the right. Then mark "No gap / Gap / No such task". Where there is a gap, choose whether to adopt CCP’s way (an improvement) or fix CCP. Input saves as you go and is visible to anyone who opens the same interviewee. When done, use "Copy as Markdown" at the bottom to update PROCESS.md.',
+              '左は、CCP が前提にしている運用です。これを見せながら今の運用を聞き、右に書きます。そのうえで「差なし / 差あり / その業務はない」を付けます。差があるときは、運用を CCP に合わせるのか(それで良くなる)、CCP を直すのかを選びます。入力はその場で保存され、ほかの人も同じ聞き取り先を開けば見えます。終わったら、いちばん下の「Markdown で写す」で FLOWS.md(業務の流れと前提運用)に反映できます。',
+              'On the left is the operation CCP assumes. Show it, ask how things work today, and write that on the right. Then mark "No gap / Gap / No such task". Where there is a gap, choose whether to adopt CCP’s way (an improvement) or fix CCP. Input saves as you go and is visible to anyone who opens the same interviewee. When done, use "Copy as Markdown" at the bottom to update FLOWS.md (Business flow and assumed operations).',
             )}
           </p>
 
@@ -530,7 +530,7 @@ export default function ProcessCheck({ open, onClose }: { open: boolean; onClose
             <section className={s.section}>
               <div className={mergeClasses(s.stageHead, s.other)}>
                 <h2 className={mergeClasses(s.h2, s.stageText)}>{t('Markdown で写す', 'Copy as Markdown')}</h2>
-                <p className={s.muted}>{t('この聞き取り先の内容を、表の形にします。PROCESS.md の 3.8 に貼り、3.7・5 章を直します。', 'Turns this interviewee’s answers into tables. Paste into PROCESS.md 3.8, then update 3.7 and chapter 5.')}</p>
+                <p className={s.muted}>{t('この聞き取り先の内容を、表の形にします。FLOWS.md の 3.2 に貼り、3.1・5 章を直します。', 'Turns this interviewee’s answers into tables. Paste into FLOWS.md 3.2, then update 3.1 and chapter 5.')}</p>
               </div>
               <div className={s.who}>
                 <Button appearance="primary" size="small" icon={<CopyRegular />} onClick={copyMd}>

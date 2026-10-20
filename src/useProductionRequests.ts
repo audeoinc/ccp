@@ -17,7 +17,7 @@ export function productionView(card: DeliveryCard, req?: ProductionRequest): Pro
   return req?.status === 'stale' ? 'stale' : 'draft'
 }
 
-/** 状態の名前(「いま、だれの番か」。docs/PROCESS.md 2 章) */
+/** 状態の名前(「いま、だれの番か」。docs/FLOWS.md の 1.2) */
 export const productionLabel = (v: ProductionView): string =>
   ({
     not_approved: tr('承認待ち(制作の前)', 'Awaiting approval (before production)'),

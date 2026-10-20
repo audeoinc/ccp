@@ -242,7 +242,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   })
 
   // 工程の帯(2026-10-19、利用者と決めた: 左が始まり・右が終わり。いまの段のボタンだけを出す)。
-  // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 仕上がりの確認(企画。PR7)→ ⑤ 配信のしくみに送る(企画)。PROCESS.md 2 章の「いま、だれの番か」
+  // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 仕上がりの確認(企画。PR7)→ ⑤ 配信のしくみに送る(企画)。FLOWS.md 1.2 の「いま、だれの番か」
   const status = live?.status
   const current = !approved ? -1 : !live ? 0 : status === 'requested' ? 1 : status === 'in_progress' ? 2 : status === 'done' ? 3 : status === 'checked' ? 4 : 5
   // 近道(制作を通さずに送った)のときは、② ③ を「飛ばした」にする。いちばん新しく終えた段(current - 1)には「やり直す」(依頼の段は「依頼を取り下げる」)

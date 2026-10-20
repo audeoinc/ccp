@@ -1,5 +1,5 @@
-// 前提運用の照らし合わせ(⚙ の画面)の行の定義。中身は docs/PROCESS.md の 3 章(業務)・5.3(要検討)・6 章(物差し)・7 章(前提の決まり)・8.1(聞くこと)の写し。
-// PROCESS.md を変えたら、ここも直す。行の ID(A1・R1・M1 など)は保存のかぎ(process_checks.row_id)なので、変えない・使い回さない。
+// 前提運用の照らし合わせ(⚙ の画面)の行の定義。中身は docs/FLOWS.md の 2 章(段階ごとの業務・前提の決まり・聞くこと)・5.3(要検討)・6 章(物差し)の写し。
+// FLOWS.md を変えたら、ここも直す。行の ID(A1・R1・M1 など)は保存のかぎ(process_checks.row_id)なので、変えない・使い回さない。
 // 文言は画面の言語に合わせるので、定数ではなく関数で返す(呼ぶたびに tr が今の言語を読む)
 import { tr } from '../i18n'
 
@@ -10,18 +10,18 @@ export interface ProcessStage {
   key: string
   name: string
   tone: StageTone
-  /** 聞くこと(8.1) */
+  /** 聞くこと(2 章の各段階の「聞くこと」) */
   ask: string
 }
 
-/** 業務の行(3 章)と、前提の決まりの行(7 章。P) */
+/** 業務の行と、前提の決まりの行(P)。どちらも 2 章 */
 export interface ProcessRow {
   id: string
   stage: string
   name: string
   /** CCP の前提運用 */
   ccp: string
-  /** 差があったときに良くなること(時間・質…)。7 章の行にはない */
+  /** 差があったときに良くなること(時間・質…)。前提の決まりの行にはない */
   gains: string[]
   /** 機能の番号(FEATURE_REASONS.md) */
   fids: string
@@ -89,7 +89,7 @@ export const processRows = (): ProcessRow[] => {
     row('E3', tr('学びを次に生かす', 'Carry learnings forward'), tr('「次に生かすメモ」と週の振り返りのメモを、次の配信カードと AI の案に渡す', 'Pass "notes for next time" and weekly retro notes to the next delivery card and AI ideas'), [Q(), N()], 'F84, F85, F103'),
     row('G1', tr('US と JP で分けて動く', 'Work separately for US and JP'), tr('同じ画面で、国を選んで見る。画面の言語(日本語 / English)は人ごと', 'Same screens, filtered by country. UI language (Japanese / English) is per person'), [T(), L()], 'F05, F32, F105'),
     row('G2', tr('画面を人に見せる', 'Show a screen to someone'), tr('「リンクをコピー」で、相手も同じ画面(同じ配信カード・同じタブ)で開く', '"Copy link" opens the same screen (same card, same tab) for the other person'), [T()], 'F106'),
-    // 7 章の「機能ごとに前提にしていること」。業務の流れの中の決まりなので、照らし合わせる行に入れる
+    // 2 章の「前提の決まり」(もとは「機能ごとに前提にしていること」)。業務の流れの中の決まりなので、照らし合わせる行に入れる
     row('P1', tr('ログインしている人', 'Signed-in person'), tr('右上の「あなた」で選んだ人を、ログインしている人とみなす(本物のログインが入るまでの形)', 'The person chosen under "You" (top right) is treated as signed in (until real sign-in arrives)'), [], ''),
     row('P2', tr('承認の依頼の単位と相手', 'Approval request unit and recipients'), tr('配信カードごとに依頼する。相手は承認グループ(だれか 1 人が承認すれば済み)か、人', 'Request per delivery card, to an approval group (any one member suffices) or a person'), [], 'F73'),
     row('P3', tr('承認の決まり', 'Approval rule'), tr('全員(指名したそれぞれから 1 人ずつ)/ 1 人(だれか 1 人)。すべての配信に同じ 1 つ', 'Everyone (one from each named) / Any one. One rule for all deliveries'), [], 'F73'),

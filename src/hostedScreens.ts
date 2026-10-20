@@ -10,5 +10,5 @@ const screen = (name: string) => {
   return load ? lazy(load) : null
 }
 
-/** 前提運用の照らし合わせ(docs/PROCESS.md の 8.1) */
+/** 前提運用の照らし合わせ(docs/FLOWS.md の 7 章) */
 export const ProcessCheckScreen = screen('ProcessCheck')
