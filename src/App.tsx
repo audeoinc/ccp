@@ -31,21 +31,22 @@ import {
   ArrowDownloadRegular,
   ArrowSyncRegular,
   ArrowUploadRegular,
-  DismissRegular,
+  BeakerRegular,
   CalendarLtrRegular,
-  PaintBrushRegular,
-  TableRegular,
-  DocumentPdfRegular,
-  HistoryRegular,
-  DataBarVerticalRegular,
-  SettingsRegular,
-  LayoutColumnTwoRegular,
-  DocumentBulletListRegular,
-  PeopleTeamRegular,
   ChevronDownRegular,
-  GlobeRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
+  DataBarVerticalRegular,
+  DismissRegular,
+  DocumentBulletListRegular,
+  DocumentPdfRegular,
+  GlobeRegular,
+  HistoryRegular,
+  LayoutColumnTwoRegular,
+  PaintBrushRegular,
+  PeopleTeamRegular,
+  SettingsRegular,
+  TableRegular,
 } from '@fluentui/react-icons'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -86,6 +87,7 @@ import { WeekTimeGrid } from './WeekTimeGrid'
 import { ProductsView } from './ProductsView'
 import { ImpactView } from './ImpactView'
 import type { VariantKey } from './abTest'
+import { createAbExamples, isAbSeed } from './abSeed'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -1485,6 +1487,26 @@ function App() {
                 }}
               >
                 {t('効果の見本を作る', 'Create sample impact data')}
+              </MenuItem>
+              {/* AB テスト・案から選ぶの例の配信を作る(X55・X57。利用者の依頼で、本番にも用意する。新しい配信を足すだけで、今ある配信は触らない) */}
+              <MenuItem
+                icon={<BeakerRegular />}
+                onClick={async () => {
+                  const already = cards.filter(isAbSeed).length
+                  const msg = already
+                    ? tr(`例の配信はすでに ${already} 本あります。もう一組(5 本)作りますか?`, `${already} example deliveries already exist. Create another set (5)?`)
+                    : tr('AB テスト(B まで・C まで)と、案から選ぶ(B まで・C まで・決めたあと)の例の配信を 5 本作ります。今ある配信は変えません。よろしいですか?', 'Create 5 example deliveries: A/B tests (up to B and C) and choose-a-variant (up to B, up to C, and already decided)? Existing deliveries are not changed.')
+                  if (!window.confirm(msg)) return
+                  try {
+                    const n = await createAbExamples({ products, heroes, owner: myName() })
+                    setBqNotice({ intent: 'success', text: tr(`例の配信を ${n} 本作りました(8〜15 日後)`, `Created ${n} example deliveries (8–15 days ahead)`) })
+                    await load()
+                  } catch (e) {
+                    setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                  }
+                }}
+              >
+                {t('AB テスト・案から選ぶの例を作る', 'Create A/B and choose-a-variant examples')}
               </MenuItem>
               {/* 種類(テーマの種類)が決まっていない配信を、AI で分ける(X41。これまでの配信の書き換え。決まっている配信は触らない) */}
               <MenuItem icon={<AiIcon size={16} />} disabled={classifying || untypedCards.length === 0} secondaryContent={t(`${untypedCards.length} 本`, `${untypedCards.length}`)} onClick={() => void classifyAll()}>

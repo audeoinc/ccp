@@ -106,7 +106,7 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
         </span>
         <span className={mergeClasses(s.note, s.grow)}>
           {choose
-            ? t(`${active} 案を編集中。${targetLabel(ab.target)}は案ごと、それ以外は全案で共通。決めた 1 案だけを配信します`, `Editing variant ${active}. The ${targetLabel(ab.target).toLowerCase()} is per variant; the rest is shared. Only the variant you choose is sent.`)
+            ? t(`${active} 案を編集中。${targetLabel(ab.target)}は案ごと、それ以外は全案で共通。決めた 1 案だけを配信します`, `Editing variant ${active}. Each variant has its own ${targetLabel(ab.target).toLowerCase()}; the rest is shared. Only the variant you choose is sent.`)
             : active === 'A'
             ? t(`A 案(いまの配信そのもの)を編集中。${targetLabel(ab.target)}は案ごと、それ以外は全案で共通です`, `Editing variant A (the delivery itself). Each variant has its own ${targetLabel(ab.target).toLowerCase()}; everything else is shared.`)
             : t(`${active} 案を編集中。${targetLabel(ab.target)}は ${active} 案だけのもの。それ以外(テーマ・コピー・リンク先など)を直すと、全案に効きます`, `Editing variant ${active}. It has its own ${targetLabel(ab.target).toLowerCase()}; other fields (theme, copy, links…) are shared by all variants.`)}
