@@ -63,10 +63,16 @@ async function click(page, text, { tag = 'button,[role=tab],[role=menuitem],[rol
       // top: いちばん手前のダイアログの中だけを探す(背面の同名のボタンを押さない)
       const dialogs = document.querySelectorAll('[role=dialog]')
       const root = top && dialogs.length ? dialogs[dialogs.length - 1] : document
+      // 印(role="img"。チャネルの札・AB テストの「A/B」など)の文字は外して比べる
+      const textOf = (e) => {
+        const c = e.cloneNode(true)
+        c.querySelectorAll('[role=img]').forEach((x) => x.remove())
+        return c.textContent ?? ''
+      }
       const els = [...root.querySelectorAll(tag)].filter((e) => {
         const r = e.getBoundingClientRect()
-        // 文字が番号だけに縮んでいるタブ(aria-label に名前)も探せるようにする。AB テストの配信は、名前の前の「A/B」の印を外して比べる
-        return r.width > 0 && r.height > 0 && ((e.textContent ?? '').trim().replace(/^[✓●\s]+/, '').replace(/^A\/B(\/C)?/, '').startsWith(text) || (e.getAttribute('aria-label') ?? '').startsWith(text))
+        // 文字が番号だけに縮んでいるタブ(aria-label に名前)も探せるようにする
+        return r.width > 0 && r.height > 0 && (textOf(e).trim().replace(/^[✓●\s]+/, '').startsWith(text) || (e.getAttribute('aria-label') ?? '').startsWith(text))
       })
       // いちばん内側(子孫に同じ文字の要素がないもの)
       const inner = els.filter((e) => !els.some((o) => o !== e && e.contains(o)))

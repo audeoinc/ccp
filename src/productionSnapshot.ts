@@ -11,7 +11,7 @@ import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
 import { priceText, tr } from './i18n'
-import { abSummary, ownsHero, ownsProducts, parseAbTest, type VariantKey } from './abTest'
+import { abSummary, isChoose, ownsHero, ownsProducts, ownsText, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
 /** 写しに入れる配信カードの列(制作に要るものだけ。AI の案・理由は入れない) */
 const CARD_KEYS = [
@@ -51,13 +51,15 @@ export interface Snapshot {
   products: Product[]
   hero: HeroImage | null
   /** AB テスト(X55)。B・C 案の商品とメイン画像(比べる要素でないものは A と同じ)。制作のページでは見るだけ(直すのは配信カードで) */
-  ab?: { summary: string; variants: SnapshotVariant[] }
+  ab?: { summary: string; variants: SnapshotVariant[]; /** 案から選ぶ(まだ決まっていない。X57) */ choose?: boolean }
 }
 
 export interface SnapshotVariant {
   key: VariantKey
   productIds: string[]
   hero: HeroImage | null
+  /** 案ごとの文言(X57。比べる要素が all のとき) */
+  texts?: VariantText
 }
 
 /** variantIds: B・C 案の商品 ID(メールの並び順。AB テストで商品を比べるとき) */
@@ -69,6 +71,7 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     key: k,
     productIds: ownsProducts(ab) ? (variantIds?.[k] ?? []) : productIds,
     hero: ownsHero(ab) ? (heroes.find((h) => h.id === ab.heroes[k]?.heroId) ?? null) : hero,
+    ...(ownsText(ab) && ab.texts?.[k] ? { texts: ab.texts[k] } : {}),
   }))
   const used = new Set([...productIds, ...(variants ?? []).flatMap((v) => v.productIds)])
   return {
@@ -78,7 +81,7 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     productIds,
     products: products.filter((p) => used.has(p.id)),
     hero,
-    ...(ab && variants ? { ab: { summary: abSummary(ab), variants } } : {}),
+    ...(ab && variants ? { ab: { summary: abSummary(ab), variants, ...(isChoose(ab) ? { choose: true } : {}) } } : {}),
   }
 }
 
@@ -172,7 +175,24 @@ const utmOf = (s: Snapshot, variant?: VariantKey) => utmFor(parseLinks(s.card.li
 /** 案の utm_campaign(制作のページの「AB テスト」の段に出す) */
 export const variantUtmCampaign = (s: Snapshot, variant: VariantKey) => (isPushCard(s) ? campaignOf(s, variant) : utmOf(s, variant).campaign)
 /** 案の中身で作った写し(商品・メイン画像を、その案のものに。リンクの行を案ごとに作るため) */
-export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => ({ ...s, productIds: v.productIds, hero: v.hero })
+export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => ({
+  ...s,
+  productIds: v.productIds,
+  hero: v.hero,
+  ...(v.texts
+    ? {
+        card: {
+          ...s.card,
+          headline: v.texts.headline,
+          copy: v.texts.copy,
+          push_title: v.texts.pushTitle,
+          push_body: v.texts.pushBody,
+          section_titles: v.texts.sectionTitles.join('\n'),
+          section_copies: v.texts.sectionCopies.some(Boolean) ? JSON.stringify(v.texts.sectionCopies) : '',
+        },
+      }
+    : {}),
+})
 
 export interface ProductRow {
   section: string

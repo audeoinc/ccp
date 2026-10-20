@@ -10,8 +10,10 @@ export const VARIANT_KEYS: VariantKey[] = ['A', 'B', 'C']
 /** 案の数の上限(A・B・C) */
 export const MAX_VARIANTS = 3
 
-/** 比べる要素 */
-export type AbTarget = 'hero' | 'products' | 'both'
+/** 比べる要素(all = メイン画像・商品・文言(ヘッドライン・コピー・セクションの見出しとコピー・通知の文)のすべて) */
+export type AbTarget = 'hero' | 'products' | 'both' | 'all'
+/** 使い方(test = AB テスト: 全案を分けて送る / choose = 案から選ぶ: 決めた 1 案だけを送る。X57) */
+export type AbPurpose = 'test' | 'choose'
 /** 判定の指標 */
 export type AbMetric = 'ctr' | 'rpr' | 'cvr' | 'open'
 /** 送り方(winner = 一部に送って、勝った案を残りに自動で送る / even = 全員を均等に分ける) */
@@ -22,8 +24,37 @@ export interface VariantHero {
   heroReason?: string
 }
 
+/** 案ごとの文言(比べる要素が all のとき) */
+export interface VariantText {
+  headline: string
+  copy: string
+  pushTitle: string
+  pushBody: string
+  sectionTitles: string[]
+  sectionCopies: string[]
+}
+
+/** 案から選んだ結果(X57)。配信しなかった案は、中身ごと残す(あとで見返せるように) */
+export interface AbDecision {
+  /** 決めた案(配信の中身になった案) */
+  variant: VariantKey
+  at: string
+  by: string
+  target: AbTarget
+  rejected: RejectedVariant[]
+}
+export interface RejectedVariant {
+  key: VariantKey
+  heroId?: string
+  heroReason?: string
+  productIds: string[]
+  texts?: VariantText
+}
+
 export interface AbTest {
   v: 1
+  /** 使い方(古いデータにはない = test) */
+  purpose?: AbPurpose
   /** A 以外の案(B・C)。並びは記号の順 */
   variants: VariantKey[]
   target: AbTarget
@@ -37,13 +68,19 @@ export interface AbTest {
   hypothesis: string
   /** B・C 案のメイン画像(比べる要素に画像を含むとき) */
   heroes: Partial<Record<VariantKey, VariantHero>>
+  /** B・C 案の文言(比べる要素が all のとき) */
+  texts?: Partial<Record<VariantKey, VariantText>>
+  /** 案から選んだ結果。決めたあとは variants が空になり、AB テスト(案を持つ配信)としては扱わない */
+  decided?: AbDecision
 }
 
 /** はじめて AB テストにしたときの既定(利用者と決めた: 指標はクリック率、送り方は勝った案を残りに) */
-export const newAbTest = (): AbTest => ({
+export const newAbTest = (purpose: AbPurpose = 'test'): AbTest => ({
   v: 1,
+  purpose,
   variants: ['B'],
-  target: 'hero',
+  // 案から選ぶときは、クリエイティブ全体を変えられるように(利用者 2026-10-20: 全部変える)
+  target: purpose === 'choose' ? 'all' : 'hero',
   metric: 'ctr',
   mode: 'winner',
   testShare: 20,
@@ -63,11 +100,27 @@ export function parseAbTest(json?: string | null): AbTest | null {
   }
 }
 
-export const encodeAbTest = (ab: AbTest | null): string => (ab && ab.variants.length > 0 ? JSON.stringify(ab) : '')
+/** 案を持つ配信(AB テスト・案から選ぶ の途中)。決めたあと・しないときは null */
+export const encodeAbTest = (ab: AbTest | null, decided?: AbDecision | null): string =>
+  ab && ab.variants.length > 0 ? JSON.stringify(ab) : decided ? JSON.stringify({ v: 1, purpose: 'choose', variants: [], target: decided.target, metric: 'ctr', mode: 'even', testShare: 0, waitHours: 0, hypothesis: '', heroes: {}, decided }) : ''
+
+/** 案から選んだ結果(決めたあとの配信だけ) */
+export function parseDecision(json?: string | null): AbDecision | null {
+  if (!json) return null
+  try {
+    const v = JSON.parse(json) as AbTest
+    return v?.decided?.variant ? v.decided : null
+  } catch {
+    return null
+  }
+}
+
+export const isChoose = (ab: AbTest | null) => ab?.purpose === 'choose'
 
 /** 案ごとに商品を持つか / メイン画像を持つか */
-export const ownsProducts = (ab: AbTest | null) => !!ab && (ab.target === 'products' || ab.target === 'both')
-export const ownsHero = (ab: AbTest | null) => !!ab && (ab.target === 'hero' || ab.target === 'both')
+export const ownsProducts = (ab: AbTest | null) => !!ab && (ab.target === 'products' || ab.target === 'both' || ab.target === 'all')
+export const ownsHero = (ab: AbTest | null) => !!ab && (ab.target === 'hero' || ab.target === 'both' || ab.target === 'all')
+export const ownsText = (ab: AbTest | null) => !!ab && ab.target === 'all'
 
 /** A を含む、すべての案 */
 export const allVariants = (ab: AbTest | null): VariantKey[] => (ab ? ['A', ...ab.variants] : ['A'])
@@ -87,7 +140,13 @@ export function splitOf(ab: AbTest): Record<VariantKey, number> {
 }
 
 export const targetLabel = (t: AbTarget) =>
-  t === 'hero' ? tr('メイン画像', 'Hero image') : t === 'products' ? tr('商品', 'Products') : tr('メイン画像と商品', 'Hero image and products')
+  t === 'hero'
+    ? tr('メイン画像', 'Hero image')
+    : t === 'products'
+      ? tr('商品', 'Products')
+      : t === 'both'
+        ? tr('メイン画像と商品', 'Hero image and products')
+        : tr('メイン画像・商品・文言', 'Hero image, products and text')
 
 export const metricLabel = (m: AbMetric) =>
   m === 'ctr' ? tr('クリック率', 'Click rate') : m === 'rpr' ? tr('受信者あたりの売上', 'Revenue per recipient') : m === 'cvr' ? tr('注文率', 'Order rate') : tr('開封率', 'Open rate')
@@ -95,6 +154,11 @@ export const metricLabel = (m: AbMetric) =>
 /** 制作・配信の担当に渡す、テストの設定の文(制作指示・制作の依頼の写しに入れる) */
 export function abSummary(ab: AbTest): string {
   const keys = allVariants(ab)
+  if (isChoose(ab))
+    return tr(
+      `案から選ぶ: ${keys.join('・')} の ${keys.length} 案から、1 案に決めて配信する(まだ決まっていません。配信カードで「この案に決める」)。違うのは${targetLabel(ab.target)}`,
+      `Choose a variant: one of ${keys.length} variants (${keys.join(', ')}) will be sent (not decided yet; use "Go with this variant" in the delivery card). Differs in: ${targetLabel(ab.target).toLowerCase()}`,
+    )
   const split = splitOf(ab)
   const parts = keys.map((k) => `${k} ${split[k]}%`).join(' / ')
   const how =

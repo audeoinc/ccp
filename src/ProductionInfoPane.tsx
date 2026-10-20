@@ -11,6 +11,7 @@ import { useT } from './i18n'
 
 const useStyles = makeStyles({
   preLine: { whiteSpace: 'pre-line' },
+  warn: { display: 'block', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, color: tokens.colorPaletteMarigoldForeground2, backgroundColor: tokens.colorPaletteMarigoldBackground1 },
   section: { display: 'grid', rowGap: '6px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   grow: { flexGrow: 1 },
@@ -172,6 +173,11 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
         <div className={s.row}>
           <span className={mergeClasses(s.rowValue, s.preLine)}>{ab.summary}</span>
         </div>
+        {ab.choose && (
+          <span className={s.warn}>
+            {t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードで「この案に決める」を押してから、制作に進めてください', 'This delivery is still choosing between variants. Choose one in the delivery card before production.')}
+          </span>
+        )}
         {[{ key: 'A' as const, productIds: current.productIds, hero: current.hero }, ...ab.variants].map((v) => {
           // 案ごとの計測用のパラメーター(utm_campaign の末尾に案。X55)。その案のリンク・商品の URL を、まとめて写せる
           const vs = variantSnapshot(current, v)
@@ -182,8 +188,9 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
               <span className={s.rowValue}>
                 <span className={s.rowLabel}>{t(`${v.key} 案`, `Variant ${v.key}`)}</span>
                 {v.hero && <img className={s.heroWas} src={heroImage(v.hero) ?? ''} alt="" />}
+                {'texts' in v && v.texts && <span className={s.note}>{t(`ヘッドライン: ${v.texts.headline || '(なし)'}`, `Headline: ${v.texts.headline || '(none)'}`)}</span>}
                 <span className={s.note}>{v.productIds.map(productName).filter(Boolean).join(' / ') || t('(商品なし)', '(no products)')}</span>
-                <span className={s.note}>utm_campaign: {campaign}</span>
+                {!ab.choose && <span className={s.note}>utm_campaign: {campaign}</span>}
               </span>
               <span className={s.tools}>
                 <CopyButton text={rowsText(urls)} label={t('この案のリンクをコピー', 'Copy this variant’s links')} />
