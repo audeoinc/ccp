@@ -51,7 +51,7 @@ import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type PushLink } from './pushLink'
 import { MarkdownLite } from './MarkdownLite'
-import { linkSlots, linksComplete, type Links } from './links'
+import { type Links, linkSlots, linksComplete, variantCampaign } from './links'
 
 // 中ペインは、コンテンツを作る工程だけ。人とのやり取り(引き継ぎ・質問・タスク・コメント)は、右端の「プロセス」のペイン(ProcessPane)に移した(2026-10-17)
 export type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'notice' | 'message' | 'timing'
@@ -108,6 +108,8 @@ interface Props {
   onLinkFocus?: (key: string | null) => void
   /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
   campaign: string
+  /** AB テストの、いま編集している案(計測用のパラメーターの campaign の末尾に付ける。AB テストでなければ null。X55) */
+  linkVariant?: string | null
   /** 制作への引き継ぎ(やり取りの「引き継ぎ」のタブ。担当・締め切り・引き継ぎ済みは、ここだけで決める) */
   handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
   onHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
@@ -1334,7 +1336,7 @@ export function ContentPane(props: Props) {
           slots={slots}
           items={props.items}
           products={props.products}
-          campaign={props.campaign}
+          campaign={variantCampaign(props.campaign, props.linkVariant)}
           pushLink={props.pushLink}
           onPushLink={props.onPushLink}
           onFocusSlot={props.onLinkFocus}
@@ -1348,6 +1350,7 @@ export function ContentPane(props: Props) {
           items={props.items}
           products={props.products}
           campaign={props.campaign}
+          variant={props.linkVariant}
           onFocusSlot={props.onLinkFocus}
         />
       )}

@@ -4,7 +4,7 @@ import { ChevronDownRegular, ChevronRightRegular, OpenRegular } from '@fluentui/
 import type { Product } from './models/products'
 import type { Item } from './items'
 import { useT } from './i18n'
-import { defaultUtm, isUrl, productUrl, withUtm, type LinkSlot, type Links } from './links'
+import { type LinkSlot, type Links, defaultUtm, isUrl, productUrl, variantCampaign, withUtm } from './links'
 import { linkKindLabel } from './templates'
 
 const useStyles = makeStyles({
@@ -45,17 +45,19 @@ interface Props {
   products: Product[]
   /** 計測用のパラメーターの campaign の既定値(配信名と日付から作る) */
   campaign: string
+  /** AB テストの、いま編集している案(campaign の末尾に付ける。X55) */
+  variant?: string | null
   /** 欄にマウスを重ねた・入力欄を選んだ場所(プレビューで、その場所を光らせる。W12) */
   onFocusSlot?: (key: string | null) => void
 }
 
 /** 制作指示のタブの下に置く、リンク先の設定(メイン画像・ボタンごとの URL、計測用のパラメーター、商品のリンクの一覧) */
-export function LinksEditor({ links, onLinks, slots, items, products, campaign, onFocusSlot }: Props) {
+export function LinksEditor({ links, onLinks, slots, items, products, campaign, variant, onFocusSlot }: Props) {
   const styles = useStyles()
   const t = useT()
   const [showProducts, setShowProducts] = useState(false)
   const dflt = defaultUtm(campaign)
-  const utm = { source: links.utm?.source || dflt.source, medium: links.utm?.medium || dflt.medium, campaign: links.utm?.campaign || dflt.campaign }
+  const utm = { source: links.utm?.source || dflt.source, medium: links.utm?.medium || dflt.medium, campaign: variantCampaign(links.utm?.campaign || dflt.campaign, variant) }
 
   const valueOf = (s: LinkSlot) => (s.kind === 'hero' ? links.hero : links.buttons?.[s.key]) ?? ''
   const setSlot = (s: LinkSlot, v: string) =>
@@ -113,6 +115,16 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
           <Field label="utm_campaign" size="small">
             <Input size="small" value={links.utm?.campaign ?? ''} placeholder={dflt.campaign} onChange={(_, d) => setUtm('campaign', d.value)} />
           </Field>
+        </div>
+        {variant && (
+          <div className={styles.caption}>
+            {t(
+              `AB テストの配信は、utm_campaign の末尾に案の印(-a・-b・-c)を付けます。いま編集している ${variant} 案のリンクは「${utm.campaign}」です`,
+              `For A/B tests, the variant (-a, -b, -c) is added to the end of utm_campaign. Links for variant ${variant}, which you are editing, use “${utm.campaign}”.`,
+            )}
+          </div>
+        )}
+        <div>
         </div>
       </div>
       <Button

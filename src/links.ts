@@ -74,6 +74,18 @@ export const campaignSlug = (name: string, scheduledAt: string) => [slug(name), 
 /** 計測用のパラメーターの既定値 */
 export const defaultUtm = (campaign: string) => ({ source: 'newsletter', medium: 'email', campaign })
 
+/**
+ * AB テストの案ごとの campaign(X55)。AB テストの配信だけ、末尾に案を付ける(A も含めて -a / -b / -c)。
+ * A を付けないと、付けない値が A なのか AB テストでない配信なのか、GA で区別できないため。AB テストでない配信(variant なし)は、そのまま
+ */
+export const variantCampaign = (campaign: string, variant?: string | null) => (variant && campaign ? `${campaign}-${variant.toLowerCase()}` : campaign)
+
+/** 計測用のパラメーター(決まった値に、手で入れた値を重ね、AB テストなら campaign に案を付ける) */
+export function utmFor(links: Links, campaign: string, variant?: string | null) {
+  const base = { ...defaultUtm(campaign), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
+  return { ...base, campaign: variantCampaign(base.campaign, variant) }
+}
+
 /** 種類から作る、既定のリンク先。custom は既定がない(配信カードで必ず決める) */
 export function defaultUrl(kind: LinkKind, campaign: string, category?: string): string {
   switch (kind) {

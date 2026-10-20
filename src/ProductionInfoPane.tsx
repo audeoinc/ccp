@@ -3,7 +3,7 @@ import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip,
 import { AddRegular, ArrowDownRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DeleteRegular, EditRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { getText, linkRows, productRows, rowsText, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
+import { getText, linkRows, productRows, rowsText, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
 import { productImage, heroImage } from './images'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
@@ -172,16 +172,32 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
         <div className={s.row}>
           <span className={mergeClasses(s.rowValue, s.preLine)}>{ab.summary}</span>
         </div>
-        {[{ key: 'A', productIds: current.productIds, hero: current.hero }, ...ab.variants].map((v) => (
-          <div key={v.key} className={s.row}>
-            <span className={s.rowValue}>
-              <span className={s.rowLabel}>{t(`${v.key} 案`, `Variant ${v.key}`)}</span>
-              {v.hero && <img className={s.heroWas} src={heroImage(v.hero) ?? ''} alt="" />}
-              <span className={s.note}>{v.productIds.map(productName).filter(Boolean).join(' / ') || t('(商品なし)', '(no products)')}</span>
-            </span>
-          </div>
-        ))}
+        {[{ key: 'A' as const, productIds: current.productIds, hero: current.hero }, ...ab.variants].map((v) => {
+          // 案ごとの計測用のパラメーター(utm_campaign の末尾に案。X55)。その案のリンク・商品の URL を、まとめて写せる
+          const vs = variantSnapshot(current, v)
+          const campaign = variantUtmCampaign(current, v.key)
+          const urls = [...linkRows(vs, v.key), ...productRows(vs, v.key).map((r) => ({ label: r.product.name, value: r.url }))].filter((r) => r.value)
+          return (
+            <div key={v.key} className={s.row}>
+              <span className={s.rowValue}>
+                <span className={s.rowLabel}>{t(`${v.key} 案`, `Variant ${v.key}`)}</span>
+                {v.hero && <img className={s.heroWas} src={heroImage(v.hero) ?? ''} alt="" />}
+                <span className={s.note}>{v.productIds.map(productName).filter(Boolean).join(' / ') || t('(商品なし)', '(no products)')}</span>
+                <span className={s.note}>utm_campaign: {campaign}</span>
+              </span>
+              <span className={s.tools}>
+                <CopyButton text={rowsText(urls)} label={t('この案のリンクをコピー', 'Copy this variant’s links')} />
+              </span>
+            </div>
+          )
+        })}
         <span className={s.note}>{t('A 案は、下のテキスト・メイン画像・商品そのものです。B・C 案の中身を直すときは、配信カードで直します', 'Variant A is the text, image and products below. Edit variants B and C in the delivery card.')}</span>
+        <span className={s.note}>
+          {t(
+            '計測: 案ごとに utm_campaign の末尾が -a・-b・-c になります(配信システムには、案ごとのリンクを設定してください)。勝ち案を残りに送ると、残り分も同じリンクのまま送られるので、GA の案ごとの数字には、勝ち案にだけ残り分が混ざります。勝ち負けは、配信システムのテスト分の数字で見ます',
+            'Tracking: utm_campaign ends in -a, -b or -c per variant (set each variant’s links in the delivery system). The rollout to the rest reuses the winner’s links, so in GA only the winner’s numbers include the rollout. Judge the winner by the delivery system’s test-group numbers.',
+          )}
+        </span>
       </>,
     )
 

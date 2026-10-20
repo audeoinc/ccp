@@ -6,7 +6,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { SOURCE_MANUAL, type Item } from './items'
-import { campaignSlug, defaultUtm, encodeLinks, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { campaignSlug, encodeLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
@@ -165,11 +165,14 @@ export function textRows(s: Snapshot, all = false): TextRow[] {
   return all ? rows : rows.filter((r) => r.value.trim())
 }
 
-const campaignOf = (s: Snapshot) => campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? '')
-const utmOf = (s: Snapshot) => {
-  const links = parseLinks(s.card.links)
-  return { ...defaultUtm(campaignOf(s)), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
-}
+// AB テストの配信は、案ごとに campaign の末尾に案を付ける(X55)。案を渡さなければ、AB テストの配信では A
+const variantOf = (s: Snapshot, variant?: VariantKey) => variant ?? (s.ab ? 'A' : undefined)
+const campaignOf = (s: Snapshot, variant?: VariantKey) => variantCampaign(campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
+const utmOf = (s: Snapshot, variant?: VariantKey) => utmFor(parseLinks(s.card.links), campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
+/** 案の utm_campaign(制作のページの「AB テスト」の段に出す) */
+export const variantUtmCampaign = (s: Snapshot, variant: VariantKey) => (isPushCard(s) ? campaignOf(s, variant) : utmOf(s, variant).campaign)
+/** 案の中身で作った写し(商品・メイン画像を、その案のものに。リンクの行を案ごとに作るため) */
+export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => ({ ...s, productIds: v.productIds, hero: v.hero })
 
 export interface ProductRow {
   section: string
@@ -180,9 +183,9 @@ export interface ProductRow {
 }
 
 /** 選定された商品(セクションごと、メールの並び順) */
-export function productRows(s: Snapshot): ProductRow[] {
+export function productRows(s: Snapshot, variant?: VariantKey): ProductRow[] {
   const sections = sectionsOf(templateOf(s))
-  const utm = utmOf(s)
+  const utm = utmOf(s, variant)
   return s.productIds.flatMap((pid, i) => {
     const product = s.products.find((p) => p.id === pid)
     if (!product) return []
@@ -190,7 +193,7 @@ export function productRows(s: Snapshot): ProductRow[] {
       const [a, b] = sectionRange(sections, x, s.productIds.length)
       return i >= a && i < b
     })
-    const url = isPushCard(s) ? (product.product_code ? `data: ${fcmText({ kind: 'product', value: product.product_code }, campaignOf(s))}` : '') : withUtm(productUrl(product), utm)
+    const url = isPushCard(s) ? (product.product_code ? `data: ${fcmText({ kind: 'product', value: product.product_code }, campaignOf(s, variant))}` : '') : withUtm(productUrl(product), utm)
     return [{ section: sec?.label ?? '', product, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
   })
 }
@@ -203,12 +206,13 @@ export interface LinkRow extends CopyRow {
 }
 
 /** リンク先(場所ごとの URL。アプリは開く画面) */
-export function linkRows(s: Snapshot): LinkRow[] {
+export function linkRows(s: Snapshot, variant?: VariantKey): LinkRow[] {
   const links = parseLinks(s.card.links)
-  const utm = utmOf(s)
-  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignOf(s)).map((slot) => {
+  const utm = utmOf(s, variant)
+  // リンク先のページ(配信のページ)の URL は、案で変えない(案を付けるのは計測用のパラメーターだけ)
+  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? '')).map((slot) => {
     if (isPushCard(s)) {
-      const d = fcmText(screenOf(links, slot), campaignOf(s))
+      const d = fcmText(screenOf(links, slot), campaignOf(s, variant))
       return { label: slot.label, value: d ? `data: ${d}` : '' }
     }
     const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
