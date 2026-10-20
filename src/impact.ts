@@ -53,6 +53,36 @@ export interface DeliveryImpact {
 
 const ratio = (a?: number, b?: number) => (a != null && b ? a / b : null)
 
+/** ホールドアウトとの比べ 1 行から、1 人あたりの差・増えた売上・リフト率を出す(比べがなければ null) */
+export function liftOf(lift?: DeliveryLift): { incPerUser: number; incRevenue: number; liftRate: number | null } | null {
+  const tRpu = ratio(lift?.treated_revenue, lift?.treated_users)
+  const hRpu = ratio(lift?.holdout_revenue, lift?.holdout_users)
+  if (tRpu == null || hRpu == null) return null
+  const inc = tRpu - hRpu
+  return { incPerUser: inc, incRevenue: inc * (lift?.treated_users ?? 0), liftRate: hRpu ? inc / hRpu : null }
+}
+
+// 詳しい結果の「効果で見る」から、結果の面の見せ方「効果」の、決まったタブを開く。
+// 見せ方を切り替えるのは App なので、URL を書き換えて「戻る」と同じ知らせ(popstate)を出し、App に読み直させる。
+// 開くタブは、見せ方「効果」がすでに出ていれば知らせ(IMPACT_TAB_EVENT)で、まだなら開いたときに受け取る
+export const IMPACT_TAB_EVENT = 'ccp:impact-tab'
+let pendingTab: string | null = null
+export function openImpactView(tab: string) {
+  pendingTab = tab
+  const q = new URLSearchParams(window.location.search)
+  q.set('page', 'results')
+  q.set('view', 'impact')
+  for (const k of ['result', 'card', 'tab', 'production', 'alerts']) q.delete(k)
+  window.history.pushState(null, '', `${window.location.pathname}?${q.toString()}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  window.dispatchEvent(new CustomEvent(IMPACT_TAB_EVENT, { detail: tab }))
+}
+export function takePendingImpactTab(): string | null {
+  const t = pendingTab
+  pendingTab = null
+  return t
+}
+
 /** results は、配信ごとに 1 行にまとめたもの(results.ts の mergeResultsByCard を通す。AB テストの配信は、案ごとに行が分かれるため) */
 export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], runs: AiRun[], lifts: DeliveryLift[]): DeliveryImpact[] {
   const byCard = new Map(cards.map((c) => [c.id, c]))
@@ -78,9 +108,7 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
     const ids = [...new Set(cardRuns.flatMap(learningIdsOf))]
     const adoption = mainAdoption(cardRuns)
     const lift = liftBy.get(id)
-    const tRpu = ratio(lift?.treated_revenue, lift?.treated_users)
-    const hRpu = ratio(lift?.holdout_revenue, lift?.holdout_users)
-    const inc = tRpu != null && hRpu != null ? tRpu - hRpu : null
+    const l = liftOf(lift)
     out.push({
       card,
       result: r,
@@ -95,9 +123,9 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
       ctr: ratio(r.clicks, r.recipients),
       cvr: ratio(r.orders, r.clicks),
       rpr: ratio(r.revenue, r.recipients),
-      incPerUser: inc,
-      incRevenue: inc != null ? inc * (lift?.treated_users ?? 0) : null,
-      liftRate: inc != null && hRpu ? inc / hRpu : null,
+      incPerUser: l?.incPerUser ?? null,
+      incRevenue: l?.incRevenue ?? null,
+      liftRate: l?.liftRate ?? null,
     })
   }
   return out.sort((a, b) => b.sentAt.localeCompare(a.sentAt))

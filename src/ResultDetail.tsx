@@ -11,6 +11,8 @@ import { ResultCompare } from './ResultCompare'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
+import { useDeliveryImpact } from './useDeliveryImpact'
+import { openImpactView } from './impact'
 import { ProductRankings } from './ProductRankings'
 import { AbResult } from './AbResult'
 import { isPush, sentAtOf, type ResultRow } from './results'
@@ -81,6 +83,8 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   const sentText = sent ? new Date(sent).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
   const previewH = Math.max(480, window.innerHeight * 0.94 - 220)
   const themeType = themeTypeOf(card)
+  // 効果(ホールドアウトとの比べ・AI に渡した学び。X56)。ここで 1 回だけ読み、主な数字と右の列に渡す
+  const impact = useDeliveryImpact(card.id)
   // AI の振り返りを、次に生かすメモの末尾に足す
   const adopt = async (text: string) => {
     const now = row.result.notes?.trim()
@@ -133,7 +137,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
             </span>
           </div>
-          <ResultKpis row={row} money={money} />
+          <ResultKpis row={row} money={money} lift={impact?.lift} />
           {/* AB テストの配信だけ(案ごとの結果があるとき)。主な数字は全体、ここは案ごと */}
           {row.parts.length > 0 && <AbResult row={row} heroes={heroes} money={money} onAdopt={adopt} />}
           <div className={styles.grid} data-print-grid>
@@ -194,6 +198,11 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               productCode={(id) => products.find((p) => p.id === id)?.product_code}
               money={money}
               onSaved={onSaved}
+              impact={impact}
+              onOpenImpact={() => {
+                onClose()
+                openImpactView('learnings')
+              }}
             />
           </div>
           {/* 販売チャネルごとの順位は、列が多い(3 チャネル × 3)ので、3 列の下に、幅いっぱいで出す */}

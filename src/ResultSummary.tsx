@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { Button, Spinner, Textarea, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Spinner, Textarea, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import type { WeeklyPerformance } from './models/weeklyPerformances'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { locale, useT } from './i18n'
 import { isPush, parseProductResults, pct, templateName, type ResultRow } from './results'
+import type { DeliveryImpactInfo } from './useDeliveryImpact'
 
 const useStyles = makeStyles({
   // 主な数字: 横一列に並べる
@@ -24,10 +25,17 @@ const useStyles = makeStyles({
   aiReason: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   noteActions: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', columnGap: '8px', marginTop: '6px' },
   muted: { color: tokens.colorNeutralForeground3 },
+  // 「この配信に渡した学び」の見出しの行(右に「効果で見る」)
+  h3Row: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', columnGap: '8px' },
+  linkBtn: { minWidth: 'auto', height: 'auto', padding: 0 },
+  learnLine: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'default' },
 })
 
-/** 配信 1 本の主な数字(開封率・クリック率 / タップ率・売上・注文・送った数・前年比) */
-export function ResultKpis({ row, money }: { row: ResultRow; money: (v?: number) => string }) {
+/**
+ * 配信 1 本の主な数字(開封率・クリック率 / タップ率・配信経由の売上・注文・送った数・前年比)。
+ * lift(ホールドアウトとの比べ。X56)があるときだけ、売上の右に「増えた売上」「リフト率」を足す
+ */
+export function ResultKpis({ row, money, lift }: { row: ResultRow; money: (v?: number) => string; lift?: DeliveryImpactInfo['lift'] }) {
   const styles = useStyles()
   const t = useT()
   const { card, result } = row
@@ -36,7 +44,14 @@ export function ResultKpis({ row, money }: { row: ResultRow; money: (v?: number)
   const items: [string, ReactNode][] = [
     ...(push ? [] : ([[t('開封率', 'Open rate'), pct(row.openRate)]] as [string, ReactNode][])),
     [push ? t('タップ率', 'Tap rate') : t('クリック率', 'Click rate'), pct(row.clickRate)],
-    [t('売上', 'Revenue'), money(row.revenue)],
+    // 配信のリンクを通った売上(配信がなくても買った人の分を含む)。増分と取り違えないように、呼び方で分ける
+    [t('配信経由の売上', 'Revenue via delivery'), money(row.revenue)],
+    ...(lift
+      ? ([
+          [t('増えた売上', 'Incremental revenue'), money(Math.round(lift.incremental))],
+          [t('リフト率', 'Lift'), lift.liftRate == null ? '—' : `${(lift.liftRate * 100).toFixed(1)}%`],
+        ] as [string, ReactNode][])
+      : []),
     [t('注文', 'Orders'), n(result.orders)],
     [t('送った数', 'Sent'), n(result.recipients)],
     [
@@ -64,6 +79,8 @@ export function ResultInsights({
   productCode,
   money,
   onSaved,
+  impact,
+  onOpenImpact,
 }: {
   row: ResultRow
   weekly: WeeklyPerformance[]
@@ -72,6 +89,10 @@ export function ResultInsights({
   productCode: (id: string) => string | undefined
   money: (v?: number) => string
   onSaved: () => Promise<void>
+  /** この配信の効果(AI に渡した学び。X56)。読み込み中・読めないときは null */
+  impact?: DeliveryImpactInfo | null
+  /** 結果の面の見せ方「効果」の、学びの評価を開く */
+  onOpenImpact?: () => void
 }) {
   const styles = useStyles()
   const t = useT()
@@ -179,6 +200,53 @@ export function ResultInsights({
           </div>
         )}
       </section>
+      {impact && (
+        <section>
+          <div className={styles.h3Row}>
+            <h3 className={styles.h3}>{t(`この配信に渡した学び(${impact.learnings.length} 件)`, `Learnings passed to this delivery (${impact.learnings.length})`)}</h3>
+            {onOpenImpact && (
+              <span data-noprint>
+                <Button appearance="transparent" size="small" className={styles.linkBtn} onClick={onOpenImpact}>
+                  {t('効果で見る', 'See in Impact')}
+                </Button>
+              </span>
+            )}
+          </div>
+          {impact.learnings.length === 0 ? (
+            <div className={styles.muted}>
+              {impact.recorded
+                ? t('AI の案を頼んだとき、学びは渡していません(学びの効き目を比べる相手になる配信です)', 'No learnings were passed when asking AI (this delivery is part of the comparison group)')
+                : t('AI の依頼の記録がありません', 'No AI request records')}
+            </div>
+          ) : (
+            <div className={styles.list}>
+              {impact.learnings.map((l) => (
+                <div key={l.id} className={styles.aiItem}>
+                  {/* 1 行目だけを出し、全文は吹き出しで(フロートの中なので、重ねて開かない) */}
+                  <Tooltip content={<span style={{ whiteSpace: 'pre-wrap' }}>{l.notes}</span>} relationship="description">
+                    <div className={styles.learnLine} tabIndex={0}>
+                      {l.notes.split('\n')[0]}
+                    </div>
+                  </Tooltip>
+                  <div className={styles.aiReason}>
+                    {t('出どころ: ', 'From: ')}
+                    {l.sourceName}
+                    {l.sourceAt ? ` · ${new Date(l.sourceAt).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' })}` : ''}
+                    {l.retired && (
+                      <>
+                        {' '}
+                        <Badge appearance="tint" color="subtle" size="small">
+                          {t('いまは外した学び', 'Retired since')}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   )
 }

@@ -9,7 +9,7 @@ import { DataTable, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
 import { locale, priceText, useT, type Market } from './i18n'
 import { mergeResultsByCard } from './results'
-import { buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
+import { IMPACT_TAB_EVENT, takePendingImpactTab, buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
 
 // 結果の面の見せ方「効果」。配信が売上をどれだけ増やしたか(ホールドアウトとの差)と、AI に渡した学びが効いているかを見る。
 // 4 つの見方(記録する → 指標を見る → 売上を比べる → 学びを評価して淘汰する)を、増分の要約と並べてタブにした。
@@ -143,7 +143,16 @@ const MARKETS: Market[] = ['US', 'JP']
 export function ImpactView({ cards, onOpenResult }: Props) {
   const s = useStyles()
   const t = useT()
-  const [tab, setTab] = useState<TabKey>('lift')
+  // 詳しい結果の「効果で見る」から来たときは、そのタブで開く
+  const [tab, setTab] = useState<TabKey>(() => (takePendingImpactTab() as TabKey | null) ?? 'lift')
+  useEffect(() => {
+    const on = (e: Event) => {
+      takePendingImpactTab()
+      setTab((e as CustomEvent<TabKey>).detail)
+    }
+    window.addEventListener(IMPACT_TAB_EVENT, on)
+    return () => window.removeEventListener(IMPACT_TAB_EVENT, on)
+  }, [])
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
   const [runs, setRuns] = useState<AiRun[]>([])
   const [lifts, setLifts] = useState<DeliveryLift[]>([])
