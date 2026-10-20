@@ -64,6 +64,8 @@ const useStyles = makeStyles({
     ':hover': { boxShadow: tokens.shadow4, zIndex: 3 },
   },
   cardFixed: { cursor: 'pointer' },
+  // 週の枠(中身のない配信。W14)は、週の表示と同じく破線
+  cardFrame: { borderTopWidth: '1px', borderRightWidth: '1px', borderBottomWidth: '1px', borderTopStyle: 'dashed', borderRightStyle: 'dashed', borderBottomStyle: 'dashed', borderTopColor: tokens.colorNeutralStroke1, borderRightColor: tokens.colorNeutralStroke1, borderBottomColor: tokens.colorNeutralStroke1 },
   cardCancelled: { opacity: 0.5, textDecorationLine: 'line-through' },
   cardDragging: { opacity: 0.35 },
   line1: { display: 'flex', alignItems: 'center', columnGap: '3px', minWidth: 0, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, lineHeight: 1.3 },
@@ -86,6 +88,8 @@ interface Props {
   onMove: (c: DeliveryCard, iso: string) => void
   /** カードの 2 行目の右に添えるもの */
   renderMeta?: (c: DeliveryCard) => ReactNode
+  /** 週の枠(中身のない配信。W14)か。破線で出し、押すと配信カードで配信名・種類を入れる */
+  isFrame?: (c: DeliveryCard) => boolean
   /** マウスを重ねたときのプレビューに使う(配信ごとの掲載商品・商品・メイン画像) */
   cardProducts: Map<string, string[]>
   products: Product[]
@@ -93,7 +97,7 @@ interface Props {
 }
 
 /** 週の表示の「時刻」の見方(X46) */
-export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, onSelect, onMove, renderMeta, cardProducts, products, heroes }: Props) {
+export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, onSelect, onMove, renderMeta, isFrame, cardProducts, products, heroes }: Props) {
   const s = useStyles()
   const t = useT()
   const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
@@ -256,7 +260,7 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
               key={c.id}
               role="button"
               tabIndex={0}
-              className={mergeClasses(s.card, !!reason && s.cardFixed, isCancelled(c) && s.cardCancelled, drag?.id === c.id && drag.moved && s.cardDragging)}
+              className={mergeClasses(s.card, !!reason && s.cardFixed, isFrame?.(c) && s.cardFrame, isCancelled(c) && s.cardCancelled, drag?.id === c.id && drag.moved && s.cardDragging)}
               style={{
                 top: yOf(m),
                 left: `calc(${day * colW}% + 3px + (${colW}% - 6px) * ${pos.lane / pos.lanes})`,

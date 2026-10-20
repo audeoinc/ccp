@@ -1900,6 +1900,7 @@ function App() {
                   cardProducts={cardProducts}
                   products={products}
                   heroes={heroes}
+                  isFrame={(c) => frames.frameIds.has(c.id)}
                 />
               ) : (
               <WeekView

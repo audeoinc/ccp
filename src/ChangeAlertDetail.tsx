@@ -10,7 +10,8 @@ import { AlertActionPanel } from './AlertActionPanel'
 import { isLeadStage, type ChangeAlert, type Placement, type StockModel } from './alerts'
 import { myName } from './history'
 import { locale, useT } from './i18n'
-import { CHANNEL_PUSH, statusColor, statusLabel } from './status'
+import { statusColor, statusLabel } from './status'
+import { ChannelBadge } from './ChannelBadge'
 
 const useStyles = makeStyles({
   detail: { display: 'grid', rowGap: '12px', minWidth: 0 },
@@ -151,7 +152,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
                       {d.card.name}
                     </span>
                   </td>
-                  <td className={styles.td}>{d.card.channel === CHANNEL_PUSH ? t('アプリ', 'App') : t('メール', 'Email')}</td>
+                  <td className={styles.td}><ChannelBadge channel={d.card.channel} size="small" /></td>
                   <td className={styles.td}>
                     <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.status ?? 'not_started') }} />
                     {statusLabel(d.card.status ?? 'not_started')}

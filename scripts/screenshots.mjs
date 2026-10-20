@@ -165,6 +165,12 @@ const settingsMenu = async (page, L, item) => {
 /** 見せ方・面の切り替え(ツールバー・ヘッダーのボタン) */
 const view = async (page, label, wait = 1200) => click(page, label, { tag: 'button', wait })
 
+/** 週の見方(商品 / 進み具合 / 時刻)。文字が完全に同じボタンを押す(「商品」で、見せ方の「商品別」を押さないように) */
+const lens = async (page, label, wait = 1200) => {
+  await page.evaluate((label) => [...document.querySelectorAll('button[aria-pressed]')].find((b) => (b.textContent ?? '').trim() === label)?.click(), label)
+  await sleep(wait)
+}
+
 /** 配信カードの中ペインのタブ */
 const cardTab = async (page, label) => {
   await click(page, label, { tag: '[role=tab]', top: true })
@@ -204,9 +210,9 @@ const SCENES = {
     await click(page, T(L, '主力の漏れ', 'Lead items not featured'), { tag: 'span', wait: 500 }).catch(() => undefined)
     await page.keyboard.press('Escape')
     await sleep(400)
-    await view(page, T(L, '進み具合', 'Progress'))
+    await lens(page, T(L, '進み具合', 'Progress'))
     await fullShot(page, `${L}-05-week-progress`)
-    await view(page, T(L, '商品', 'Products'))
+    await lens(page, T(L, '商品', 'Products'))
   },
 
   // 見せ方「商品別」(X49): 商品を軸に、期間の中の掲載・結果・外部広告
@@ -219,9 +225,9 @@ const SCENES = {
   // 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子
   async weekTime(page, L) {
     await view(page, T(L, '週', 'Week'))
-    await view(page, T(L, '時刻', 'Time'), 1200)
+    await lens(page, T(L, '時刻', 'Time'))
     await fullShot(page, `${L}-05b-week-time`)
-    await view(page, T(L, '商品', 'Products'))
+    await lens(page, T(L, '商品', 'Products'))
   },
   async bulkDrafts(page, L) {
     await view(page, T(L, '週', 'Week'))

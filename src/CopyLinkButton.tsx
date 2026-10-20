@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Tooltip } from '@fluentui/react-components'
+import { Button } from '@fluentui/react-components'
 import { CheckmarkRegular, LinkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 
@@ -29,11 +29,12 @@ export function CopyLinkButton() {
   const t = useT()
   const [copied, setCopied] = useState(false)
   return (
-    <Tooltip content={t('この画面を開くリンクをコピーします。チャットやメールに貼ると、相手も同じ画面で開けます', 'Copy a link to this view. Anyone who opens it sees the same screen.')} relationship="description">
       <Button
         type="button"
         size="small"
         appearance="subtle"
+        // 説明は title で出す(フロートを開いたとき、最初の操作の部品に焦点が来て、吹き出しが勝手に開くため)
+        title={t('この画面を開くリンクをコピーします。チャットやメールに貼ると、相手も同じ画面で開けます', 'Copy a link to this view. Anyone who opens it sees the same screen.')}
         icon={copied ? <CheckmarkRegular /> : <LinkRegular />}
         onClick={async () => {
           if (await copyText(window.location.href)) {
@@ -44,6 +45,5 @@ export function CopyLinkButton() {
       >
         {copied ? t('コピーしました', 'Copied') : t('リンクをコピー', 'Copy link')}
       </Button>
-    </Tooltip>
   )
 }

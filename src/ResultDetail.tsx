@@ -110,19 +110,16 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               </span>
             </Tooltip>
             <span className={styles.headActions} data-noprint>
-              <Tooltip
-                content={t('この結果を、レポートとして印刷します。印刷の画面で、送り先を「PDF に保存」にすると PDF になります', 'Prints these results as a report. Choose "Save as PDF" in the print dialog to get a PDF.')}
-                relationship="description"
-              >
+              {/* 開いたときに最初に焦点が来るので、説明は吹き出しではなく title で出す(勝手に開かないように) */}
                 <Button
                   appearance="secondary"
                   size="small"
                   icon={<DocumentPdfRegular />}
+                  title={t('この結果を、レポートとして印刷します。印刷の画面で、送り先を「PDF に保存」にすると PDF になります', 'Prints these results as a report. Choose "Save as PDF" in the print dialog to get a PDF.')}
                   onClick={() => printReport(`${card.name ?? 'results'}_${(sent ?? '').slice(0, 10)}_results`)}
                 >
                   {t('PDF で書き出す', 'Export PDF')}
                 </Button>
-              </Tooltip>
               {onOpenCard && (
                 <Tooltip content={t('この配信を作ったときの内容(配信カード)を、上に重ねて開きます。閉じると、この結果に戻ります', 'Opens the delivery card on top. Close it to come back to these results.')} relationship="description">
                   <Button appearance="secondary" size="small" icon={<OpenRegular />} onClick={() => onOpenCard(card.id)}>

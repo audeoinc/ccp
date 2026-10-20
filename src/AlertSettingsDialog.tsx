@@ -76,7 +76,7 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
             </div>
 
             <div className={styles.group}>
-              <span className={styles.groupTitle}>{t('対象にする種別(選ばなければ、すべて)', 'Delivery types (none = all)')}</span>
+              <span className={styles.groupTitle}>{t('対象にする種類(選ばなければ、すべて)', 'Theme types (none = all)')}</span>
               {THEME_TYPES.map((v) => (
                 <Checkbox key={v} label={themeTypeLabel(v)} checked={draft.departments.includes(v)} onChange={(_, d) => setDraft({ ...draft, departments: toggle(draft.departments, v, !!d.checked) })} />
               ))}
