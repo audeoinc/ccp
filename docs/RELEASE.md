@@ -96,7 +96,7 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 
 1. **作業の場所**: ほかのセッションの作業中の変更に触らないよう、`main` の最新を、専用の作業ツリーで扱う。
    ```bash
-   cd C:/Users/hiros/GitHub/ccp
+   cd <このリポジトリを clone したフォルダ>
    git fetch origin --tags
    git worktree add --detach ../ccp-eod origin/main   # 2 回目からは: cd ../ccp-eod && git checkout --detach origin/main
    cd ../ccp-eod && npm ci                             # 初回は時間がかかる(Windows で 15 分ほど)
