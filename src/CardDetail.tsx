@@ -21,7 +21,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, BeakerRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -62,6 +62,8 @@ import { CHANNEL_PUSH, channelOptions, countryOptions, statusColor, statusOption
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
+import { AbTestBar } from './AbTestBar'
+import { encodeAbTest, metricLabel, newAbTest, nextVariant, ownsHero, ownsProducts, parseAbTest, targetLabel, type AbTarget, type AbTest, type VariantKey } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import type { StockModel } from './alerts'
@@ -294,6 +296,15 @@ interface RowSnap {
   state: string
   section: number
   order: number
+  /** AB テストの案(空 = A。X55) */
+  variant: string
+}
+
+/** AB テストの、いま編集していない案の中身(X55。編集中の案は items・heroId・heroReason にある) */
+interface VariantData {
+  items: Item[]
+  heroId?: string
+  heroReason: string
 }
 
 /** 各セクションのコピーは、改行を含みうるので JSON の配列で保存する(古い形式の改行区切りも読む) */
@@ -495,6 +506,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   const [heroCandidates, setHeroCandidates] = useState<ProposedHero[]>([])
   const [heroId, setHeroId] = useState<string | undefined>(card?.hero_image_id ?? undefined)
   const [heroReason, setHeroReason] = useState(card?.hero_reason ?? '')
+  // AB テスト(X55)。ab = 設定(null = しない)、active = いま編集している案、stash = 編集していない案の中身(A を含む)
+  const [ab, setAb] = useState<AbTest | null>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test))
+  const [active, setActive] = useState<VariantKey>('A')
+  const [stash, setStash] = useState<Partial<Record<VariantKey, VariantData>>>(() => {
+    const a = parseAbTest(card?.ab_test ?? draft?.card.ab_test)
+    const out: Partial<Record<VariantKey, VariantData>> = {}
+    for (const k of a?.variants ?? []) out[k] = { items: [], heroId: a?.heroes[k]?.heroId, heroReason: a?.heroes[k]?.heroReason ?? '' }
+    return out
+  })
   const [widths, setWidths] = useState<Widths>(loadWidths)
   const [links, setLinks] = useState<Links>(() => parseLinks(card?.links))
   // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
@@ -557,6 +577,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
         if (!res.success) throw new Error(res.error?.message ?? tr('掲載商品の取得に失敗しました', 'Failed to load the products in this delivery'))
         const sel: Item[] = []
         const cands: Candidate[] = []
+        const byVariant = new Map<string, Item[]>()
         const snap = new Map<string, RowSnap>()
         for (const r of res.data ?? []) {
           const state = r.state ?? STATE_SELECTED
@@ -568,11 +589,20 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
             reason: r.reason ?? '',
             source: r.source ?? SOURCE_MANUAL,
           }
-          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0 })
+          const variant = r.variant ?? ''
+          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
+          else if (variant) byVariant.set(variant, [...(byVariant.get(variant) ?? []), base])
           else sel.push(base)
         }
         setItems(sel)
+        // B・C 案の商品(X55)
+        if (byVariant.size > 0)
+          setStash((prev) => {
+            const next = { ...prev }
+            for (const [k, list] of byVariant) next[k as VariantKey] = { heroReason: '', ...next[k as VariantKey], items: list }
+            return next
+          })
         setCandidates(cands)
         setOriginal(snap)
         // アラートの画面から開いたときは、問題の商品を選んでおく(プレビューのその枠が強調され、見える位置までスクロールする)
@@ -857,6 +887,94 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
       return next
     })
 
+  // ---- AB テスト(X55): 案の中身の出し入れ。編集中の案は items・heroId・heroReason、それ以外は stash
+  // 案ごとに持たないもの(比べる要素でないもの)は、全案で共通 = いまの state そのもの
+  const itemsOf = (k: VariantKey): Item[] => (k === active || !ownsProducts(ab) ? items : (stash[k]?.items ?? []))
+  const heroOf = (k: VariantKey): { heroId?: string; heroReason: string } =>
+    k === active || !ownsHero(ab) ? { heroId, heroReason } : { heroId: stash[k]?.heroId, heroReason: stash[k]?.heroReason ?? '' }
+  /** 保存する設定(B・C 案のメイン画像を入れる) */
+  const abForSave = (): AbTest | null => {
+    if (!ab) return null
+    const heroes = ownsHero(ab) ? Object.fromEntries(ab.variants.map((k) => [k, heroOf(k)])) : {}
+    return { ...ab, heroes }
+  }
+  /** いま編集している案を stash に置き、to の案の中身を出す(案ごとに持つものだけ。共通のものはそのまま) */
+  const loadVariant = (to: VariantKey, data: VariantData, base: AbTest | null) => {
+    setStash((prev) => ({ ...prev, [active]: { items, heroId, heroReason } }))
+    if (ownsProducts(base)) {
+      setItems(data.items)
+      setSelectedKey(null)
+    }
+    if (ownsHero(base)) {
+      setHeroId(data.heroId)
+      setHeroReason(data.heroReason)
+    }
+    setActive(to)
+  }
+  const switchVariant = (to: VariantKey) => {
+    if (to === active) return
+    loadVariant(to, stash[to] ?? { items: [], heroReason: '' }, ab)
+  }
+  /** A 案の写し(商品は新しい行として。行 ID は持たない) */
+  const copyOfA = (): VariantData => {
+    const h = heroOf('A')
+    return { items: itemsOf('A').map((i) => ({ ...i, key: crypto.randomUUID(), rowId: undefined })), heroId: h.heroId, heroReason: h.heroReason }
+  }
+  const startAbTest = () => {
+    setStash({ B: copyOfA() })
+    setAb(newAbTest())
+  }
+  const addVariant = () => {
+    if (!ab) return
+    const k = nextVariant(ab)
+    if (!k) return
+    const nextAb = { ...ab, variants: [...ab.variants, k].sort() as VariantKey[] }
+    setAb(nextAb)
+    loadVariant(k, copyOfA(), nextAb)
+  }
+  /** A 案に戻す */
+  const backToA = () => {
+    if (active !== 'A') loadVariant('A', stash.A ?? { items: [], heroReason: '' }, ab)
+  }
+  const removeVariant = (k: VariantKey) => {
+    if (!ab) return
+    backToA()
+    const rest = ab.variants.filter((x) => x !== k)
+    setStash((prev) => {
+      const next = { ...prev }
+      delete next[k]
+      return next
+    })
+    setAb(rest.length ? { ...ab, variants: rest } : null)
+  }
+  const stopAbTest = () => {
+    backToA()
+    setStash({})
+    setAb(null)
+  }
+  /** 比べる要素を変える。A 案に戻してから変え、新しく案ごとに持つものは、A の写しで始める */
+  const changeTarget = (target: AbTarget) => {
+    if (!ab) return
+    backToA()
+    const next = { ...ab, target }
+    const a = copyOfA()
+    setStash((prev) => {
+      const out = { ...prev }
+      for (const k of ab.variants) {
+        const cur = out[k] ?? { items: [], heroReason: '' }
+        const addProducts = ownsProducts(next) && !ownsProducts(ab)
+        const addHero = ownsHero(next) && !ownsHero(ab)
+        out[k] = {
+          items: addProducts ? a.items.map((i) => ({ ...i, key: crypto.randomUUID() })) : cur.items,
+          heroId: addHero ? a.heroId : cur.heroId,
+          heroReason: addHero ? a.heroReason : cur.heroReason,
+        }
+      }
+      return out
+    })
+    setAb(next)
+  }
+
   const removeItem = (key: string) => {
     const idx = items.findIndex((i) => i.key === key)
     if (idx >= 0) {
@@ -870,9 +988,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   // 差分を配信商品テーブルへ反映する(選定済み + 候補。削除 → 更新/追加)
   async function syncItems(cardId: string, cardName: string, before: Map<string, RowSnap>) {
     const sections = sectionsOf(template)
-    const desired: { it: Item; state: typeof STATE_SELECTED | typeof STATE_CANDIDATE; section: number; order: number }[] = [
-      ...items.map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1 })),
-      ...candidates.map((c, i) => ({ it: c as Item, state: STATE_CANDIDATE as typeof STATE_CANDIDATE, section: c.section, order: 1000 + i })),
+    const desired: { it: Item; state: typeof STATE_SELECTED | typeof STATE_CANDIDATE; section: number; order: number; variant: string }[] = [
+      ...itemsOf('A').map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: '' })),
+      ...candidates.map((c, i) => ({ it: c as Item, state: STATE_CANDIDATE as typeof STATE_CANDIDATE, section: c.section, order: 1000 + i, variant: '' })),
+      // AB テストで、案ごとに商品を持つとき: B・C 案の商品も、variant を付けて保存する(X55)
+      ...(ab && ownsProducts(ab)
+        ? ab.variants.flatMap((k) => itemsOf(k).map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: k })))
+        : []),
     ]
     const keep = new Set(desired.map((d) => d.it.rowId).filter((id): id is string => !!id))
     for (const id of before.keys()) {
@@ -885,11 +1007,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
         source: d.it.source,
         state: d.state,
         section: d.section,
+        variant: d.variant,
       }
       let res
       if (d.it.rowId) {
         const old = before.get(d.it.rowId)
-        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order) continue
+        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant) continue
         res = await DeliveryProductsService.update(d.it.rowId, fields)
       } else {
         res = await DeliveryProductsService.create({
@@ -968,13 +1091,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
         handed_off_at: form.handedOffAt || (null as never),
         theme: form.theme,
         headline: form.headline,
-        products: items.map((i) => productName(i.productId)).filter(Boolean).join(' / '),
+        products: itemsOf('A').map((i) => productName(i.productId)).filter(Boolean).join(' / '),
         copy: form.copy,
         instructions: form.instructions,
         theme_reason: form.themeReason,
         copy_angle: form.copyAngle,
         instructions_angle: form.instructionsAngle,
-        hero_reason: heroReason,
+        hero_reason: heroOf('A').heroReason,
+        ab_test: encodeAbTest(abForSave()),
         // 標準のテンプレートは、以前の選択肢の列にも書く(互換)。作ったテンプレートは、layoutkey だけ
         email_template: TEMPLATE_VALUES[template],
         layout_key: template,
@@ -983,8 +1107,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
         // AI でまとめて作った中身を、人が配信カードで確かめて保存したら、未確認の印を外す(W14)
         ...(card?.ai_unchecked_at ? { ai_unchecked_at: null as never } : {}),
         // 外したときは null を送ってルックアップを空にする
-        hero_image_id: heroId
-          ? heroId
+        hero_image_id: heroOf('A').heroId
+          ? heroOf('A').heroId
           : card?.hero_image_id
             ? (null as never)
             : undefined,
@@ -995,7 +1119,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   const contentKey = () => {
     const { products: _names, ...rest } = buildContent()
     void _names
-    return JSON.stringify({ ...rest, items: items.map((i) => i.productId) })
+    return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(ab) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
   }
   const baseline = useRef<string | null>(null)
   useEffect(() => {
@@ -1382,6 +1506,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
             <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} />
           )}
 
+          {/* AB テストの帯(X55): 案の切り替えと、テストの設定 */}
+          {ab && (
+            <AbTestBar ab={ab} active={active} onSwitch={switchVariant} onChange={setAb} onAdd={addVariant} onRemove={removeVariant} onStop={stopAbTest} onTarget={changeTarget} />
+          )}
+
           <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px`, '--w3': `${processOpen ? widths[3] : RAIL_W}px` } as React.CSSProperties}>
             {/* 左: 配信の情報 */}
             <div className={styles.pane}>
@@ -1501,6 +1630,21 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
                   </button>
                 </Field>
               </div>
+              {/* AB テスト(X55)。始めると、題名の下に案の切り替えと設定の帯が出る */}
+              <Field label={t('AB テスト', 'A/B test')}>
+                {ab ? (
+                  <Caption1 className={styles.caption}>
+                    {t(
+                      `${['A', ...ab.variants].join('・')} の ${ab.variants.length + 1} 案で、${targetLabel(ab.target)}を比べる(判定: ${metricLabel(ab.metric)})。設定と案の切り替えは、上の帯で`,
+                      `${ab.variants.length + 1} variants (${['A', ...ab.variants].join(', ')}) comparing the ${targetLabel(ab.target).toLowerCase()} (judged by ${metricLabel(ab.metric).toLowerCase()}). Settings and switching are in the bar above.`,
+                    )}
+                  </Caption1>
+                ) : (
+                  <Button type="button" size="small" icon={<BeakerRegular />} onClick={startAbTest} title={t('A 案(いまの配信)の写しから B 案を作り、メイン画像や商品を比べます(C 案まで)', 'Create variant B as a copy of A to compare the hero image or products (up to C)')}>
+                    {t('AB テストにする', 'Make it an A/B test')}
+                  </Button>
+                )}
+              </Field>
               <Text weight="semibold" size={300} className={styles.sectionHead}>{t('工程', 'Steps')}</Text>
               <Field label={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise for the whole delivery; not shown in the email)')}>
                 <AutoTextarea
@@ -1610,6 +1754,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
                   {previewTab === 'push' ? <PhoneRegular /> : <MailRegular />}
                   <Text weight="semibold" size={300}>{previewTab === 'push' ? t('アプリのプレビュー', 'App preview') : t('メールのプレビュー', 'Email preview')}</Text>
                   {!form.channel && <Caption1 className={styles.caption}>{t('チャネルが未設定のため、メールで表示しています', 'No channel set — showing the email')}</Caption1>}
+                  {ab && (
+                    <Badge appearance="filled" color="brand">
+                      {t(`${active} 案`, `Variant ${active}`)}
+                    </Badge>
+                  )}
                 </div>
                 <div className={styles.zoomBox}>
                   <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />

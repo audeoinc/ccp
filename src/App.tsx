@@ -84,6 +84,7 @@ import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { WeekTimeGrid } from './WeekTimeGrid'
 import { ProductsView } from './ProductsView'
+import type { VariantKey } from './abTest'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -511,6 +512,8 @@ function App() {
   // 配信カードごとの掲載商品の数(一覧の「商品数」「工程」と、締め切りの警告に使う。候補の行は数えない)
   // 配信カードごとの掲載商品(メールの並び順の商品 ID。候補の行は入れない)。数は、一覧の「商品数」「工程」と、締め切りの警告に使う
   const [cardProducts, setCardProducts] = useState<Map<string, string[]>>(new Map())
+  // AB テストの B・C 案の商品(配信 ID → 案 → 商品 ID。X55。制作の依頼の写しに入れる)
+  const [variantProducts, setVariantProducts] = useState<Map<string, Partial<Record<VariantKey, string[]>>>>(new Map())
   const productCounts = useMemo(() => new Map([...cardProducts].map(([k, v]) => [k, v.length])), [cardProducts])
   // 週の表示の、週の初め(日曜日)
   const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(dateOf(link.date) ?? new Date()))
@@ -664,7 +667,7 @@ function App() {
         .then((res) => {
           if (!res.success) return // 数が出ないだけで、画面は使える
           const rows = (res.data ?? [])
-            .filter((r) => r.delivery_card_id && r.state !== STATE_CANDIDATE)
+            .filter((r) => r.delivery_card_id && r.state !== STATE_CANDIDATE && !r.variant) // AB テストの B・C 案の商品は、配信の中身(A 案)に入れない(X55)
             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
           const byCard = new Map<string, string[]>()
           for (const r of rows) {
@@ -672,6 +675,14 @@ function App() {
             if (r.product_id) byCard.set(id, [...(byCard.get(id) ?? []), r.product_id])
           }
           setCardProducts(byCard)
+          const byVariant = new Map<string, Partial<Record<VariantKey, string[]>>>()
+          for (const r of (res.data ?? []).filter((x) => x.delivery_card_id && x.variant && x.product_id && x.state !== STATE_CANDIDATE).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))) {
+            const m = byVariant.get(r.delivery_card_id!) ?? {}
+            const k = r.variant as VariantKey
+            m[k] = [...(m[k] ?? []), r.product_id!]
+            byVariant.set(r.delivery_card_id!, m)
+          }
+          setVariantProducts(byVariant)
         })
         .catch(() => undefined)
       CardNotesService.getAll()
@@ -2026,6 +2037,7 @@ function App() {
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}
+          variantIds={variantProducts.get(productionOpen)}
           products={products}
           heroes={heroes}
           people={owners}

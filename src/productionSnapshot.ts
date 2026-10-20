@@ -11,6 +11,7 @@ import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
 import { priceText, tr } from './i18n'
+import { abSummary, ownsHero, ownsProducts, parseAbTest, type VariantKey } from './abTest'
 
 /** 写しに入れる配信カードの列(制作に要るものだけ。AI の案・理由は入れない) */
 const CARD_KEYS = [
@@ -35,6 +36,8 @@ const CARD_KEYS = [
   'push_body',
   'audience',
   'hero_image_id',
+  // AB テストの設定(X55)
+  'ab_test',
 ] as const satisfies readonly (keyof DeliveryCard)[]
 
 export interface Snapshot {
@@ -47,18 +50,35 @@ export interface Snapshot {
   /** 掲載商品の、その時の中身(あとで商品マスタが変わっても、依頼した時の名前・価格で見られるように) */
   products: Product[]
   hero: HeroImage | null
+  /** AB テスト(X55)。B・C 案の商品とメイン画像(比べる要素でないものは A と同じ)。制作のページでは見るだけ(直すのは配信カードで) */
+  ab?: { summary: string; variants: SnapshotVariant[] }
 }
 
-export function buildSnapshot(card: DeliveryCard, productIds: string[], products: Product[], heroes: HeroImage[]): Snapshot {
+export interface SnapshotVariant {
+  key: VariantKey
+  productIds: string[]
+  hero: HeroImage | null
+}
+
+/** variantIds: B・C 案の商品 ID(メールの並び順。AB テストで商品を比べるとき) */
+export function buildSnapshot(card: DeliveryCard, productIds: string[], products: Product[], heroes: HeroImage[], variantIds?: Partial<Record<VariantKey, string[]>>): Snapshot {
   const picked = Object.fromEntries(CARD_KEYS.map((k) => [k, card[k]])) as Snapshot['card']
-  const used = new Set(productIds)
+  const hero = heroes.find((h) => h.id === card.hero_image_id) ?? null
+  const ab = parseAbTest(card.ab_test)
+  const variants: SnapshotVariant[] | undefined = ab?.variants.map((k) => ({
+    key: k,
+    productIds: ownsProducts(ab) ? (variantIds?.[k] ?? []) : productIds,
+    hero: ownsHero(ab) ? (heroes.find((h) => h.id === ab.heroes[k]?.heroId) ?? null) : hero,
+  }))
+  const used = new Set([...productIds, ...(variants ?? []).flatMap((v) => v.productIds)])
   return {
     v: 1,
     takenAt: new Date().toISOString(),
     card: picked,
     productIds,
     products: products.filter((p) => used.has(p.id)),
-    hero: heroes.find((h) => h.id === card.hero_image_id) ?? null,
+    hero,
+    ...(ab && variants ? { ab: { summary: abSummary(ab), variants } } : {}),
   }
 }
 

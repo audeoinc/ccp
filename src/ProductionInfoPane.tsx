@@ -10,6 +10,7 @@ import { AutoTextarea } from './AutoTextarea'
 import { useT } from './i18n'
 
 const useStyles = makeStyles({
+  preLine: { whiteSpace: 'pre-line' },
   section: { display: 'grid', rowGap: '6px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   grow: { flexGrow: 1 },
@@ -155,9 +156,39 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
 
   const heroChanged = (current.hero?.id ?? '') !== (original.hero?.id ?? '')
 
+  // AB テスト(X55): 案ごとのメイン画像と商品。見るだけ(案の中身を直すのは配信カード)
+  const ab = current.ab
+  const productName = (id: string) => current.products.find((p) => p.id === id)?.name ?? ''
+  const abBlock =
+    ab &&
+    section(
+      t('AB テスト', 'A/B test'),
+      [
+        ab.summary,
+        `A: ${current.productIds.map(productName).join(' / ')}`,
+        ...ab.variants.map((v) => `${v.key}: ${v.productIds.map(productName).join(' / ')}${v.hero ? ` (${v.hero.name})` : ''}`),
+      ].join('\n'),
+      <>
+        <div className={s.row}>
+          <span className={mergeClasses(s.rowValue, s.preLine)}>{ab.summary}</span>
+        </div>
+        {[{ key: 'A', productIds: current.productIds, hero: current.hero }, ...ab.variants].map((v) => (
+          <div key={v.key} className={s.row}>
+            <span className={s.rowValue}>
+              <span className={s.rowLabel}>{t(`${v.key} 案`, `Variant ${v.key}`)}</span>
+              {v.hero && <img className={s.heroWas} src={heroImage(v.hero) ?? ''} alt="" />}
+              <span className={s.note}>{v.productIds.map(productName).filter(Boolean).join(' / ') || t('(商品なし)', '(no products)')}</span>
+            </span>
+          </div>
+        ))}
+        <span className={s.note}>{t('A 案は、下のテキスト・メイン画像・商品そのものです。B・C 案の中身を直すときは、配信カードで直します', 'Variant A is the text, image and products below. Edit variants B and C in the delivery card.')}</span>
+      </>,
+    )
+
   return (
     <>
       {head}
+      {abBlock}
       {section(
         t('テキスト', 'Text'),
         rowsText(texts),

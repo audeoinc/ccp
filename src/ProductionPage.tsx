@@ -33,6 +33,7 @@ import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
 import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
+import type { VariantKey } from './abTest'
 import { buildSnapshot, downloadText, parseSnapshot, previewHtml, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
@@ -103,6 +104,8 @@ interface Props {
   card: DeliveryCard
   /** いまの掲載商品(メールの並び順) */
   productIds: string[]
+  /** AB テストの B・C 案の商品(X55) */
+  variantIds?: Partial<Record<VariantKey, string[]>>
   products: Product[]
   heroes: HeroImage[]
   /** やり取りの宛先・タスクの担当の候補 */
@@ -127,7 +130,7 @@ const TALK_KEY = 'productionPage.talkOpen'
  * 状態と操作は、題名のすぐ下の行に、いつも出す(2026-10-19、利用者と決めた: 材料を見る → 書く → 確かめる → 相談する、の順。左のコピーを隣のエディタに貼れる)。
  * 中身は、依頼した時点の写し(依頼する前は、いまの配信カードから作った下書き)
  */
-export function ProductionPage({ card, productIds, products, heroes, people, onClose, onOpenCard, onChanged, stageNav }: Props) {
+export function ProductionPage({ card, productIds, variantIds, products, heroes, people, onClose, onOpenCard, onChanged, stageNav }: Props) {
   const s = useStyles()
   const t = useT()
   const meId = useSyncExternalStore(subscribeMe, myUserId)
@@ -167,7 +170,7 @@ export function ProductionPage({ card, productIds, products, heroes, people, onC
   const live = latest && LIVE.has(latest.status ?? '') ? latest : undefined
   const staleLatest = latest?.status === 'stale' ? latest : undefined
   // 写し: 依頼したあとは固めたもの、依頼する前(下書き)は、いまの配信カードから作ったもの
-  const draft = useMemo(() => buildSnapshot(card, productIds, products, heroes), [card, productIds, products, heroes])
+  const draft = useMemo(() => buildSnapshot(card, productIds, products, heroes, variantIds), [card, productIds, products, heroes, variantIds])
   // 描くたびに写しを読み直すと、HTML の下書きを作り直し続けるので、固めた写しの文字が変わったときだけ読む
   const frozenSnap = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
   const approvedSnap: Snapshot = frozenSnap || draft

@@ -20,6 +20,8 @@ export interface DeliveryProductFields {
   sort_order?: number
   source?: DeliveryProductSource
   state?: DeliveryProductState
+  /** AB テストの案('B'・'C'。空は A = いまの配信そのもの。X55) */
+  variant?: string
   /** delivery_cards の id(参照を外すときは null) */
   delivery_card_id?: string | null
   /** products の id(参照を外すときは null) */

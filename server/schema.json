@@ -37,7 +37,8 @@
     ["cancelled_at", "timestamptz"],
     ["cancel_reason", "text"],
     ["ai_unchecked_at", "timestamptz"],
-    ["frame_at", "timestamptz"]
+    ["frame_at", "timestamptz"],
+    ["ab_test", "text"]
    ],
    "lookups": [
     ["hero_image_id", "hero_images", {"onDelete": "SET NULL"}]
@@ -50,7 +51,8 @@
     ["section", "int"],
     ["sort_order", "int"],
     ["source", "choice"],
-    ["state", "choice"]
+    ["state", "choice"],
+    ["variant", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],

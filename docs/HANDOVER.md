@@ -543,6 +543,15 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
   - 直さずに残したもの: `docs/source-map.drawio`(SOURCE_MAP の図の draw.io 版)は、まだ制作の面と新しい窓口を足していない。FEATURES 5.15 の「週の上限超え」が、アラートの画面の一覧にも出るかは確かめていない(配信カードの帯には出る)。
   - **共有のフォルダで `eslint .`(verify の中も)が、`.claude/worktrees/` のほかのセッションのビルドの途中のファイルを読んで ENOENT で落ちることがある**。流し直すか、`npx eslint src scripts` で確かめる。
 
+## 6.37 X55 AB テスト・段階 1(2026-10-20、UI セッション)
+
+- 利用者と決めた: カード 1 枚の中に A・B・C(3 案まで)。比べるのはメイン画像と商品(どちらか・両方)。メールとアプリの両方。判定の既定はクリック率、新しい案は A の写しから。配信システムに「勝った案を残りに自動で送る」機能がある。案ごとの結果は受け取りたい(段階 2)。
+- 部品: `src/abTest.ts`(型・既定・配分・制作に渡す文)、`src/AbTestBar.tsx`(題名の下の帯)。`CardDetail.tsx` の `itemsOf` / `heroOf` / `loadVariant` / `switchVariant` / `addVariant` / `removeVariant` / `changeTarget` / `stopAbTest`。比べる要素を変えるときと、案を外すときは、A に戻してから。
+- 保存: `buildContent` の `ab_test`・`hero_image_id`(A のもの)・`products`(A の名前)、`syncItems` が B・C 案の行を variant 付きで書く。比べる要素から商品を外すと、B・C 案の商品の行は保存で消える。変更の判定(`contentKey`)にも B・C 案の商品を入れた(承認済みの配信で B 案を変えても、承認のやり直しになる)。
+- 制作: `buildSnapshot` の 5 つ目の引数(B・C 案の商品 ID。App の `variantProducts`)で、写しに `ab`(設定の文と案ごとの商品・メイン画像)を入れ、`ProductionInfoPane` の上に「AB テスト」の段(見るだけ)。制作のページで直せるのは、これまでどおり A だけ。
+- モックで確かめた: AB テストにする → 商品を比べる → B 案で先頭の商品を差し替え → A は元のまま → 保存 → 開き直すと帯が出て、A・B の商品が保たれる。写しは esbuild で `buildSnapshot` を直接呼んで確かめた(制作のページは承認のあとにしか開けないため)。
+- 残り: BACKLOG の X55 の段階 2・3。
+
 ## 7. 落とし穴
 
 - **チームメンバーと同じ `main` に push している。** push の前に `git fetch` して、先に進んでいたら `git pull --rebase` で、自分のコミットを上に載せ直す。`src/App.tsx` と `src/CardDetail.tsx` は、2 人ともよく触るので、衝突しやすい。

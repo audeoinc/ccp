@@ -235,6 +235,7 @@ flowchart TD
 | `CardMenu.tsx` | 160 | 「…」メニュー(取りやめ・削除 など) |
 | `cancel.ts` | 61 | 配信の取りやめ(消さずに残す) |
 | `CardAlertsBar.tsx` | 113 | 配信カードの上の、アラートの帯(たたむ・種類の札・「対応する」) |
+| `abTest.ts` / `AbTestBar.tsx` | 114 / 173 | AB テスト(X55)の型・既定・配分・制作に渡す文 / 配信カードの題名の下の、案の切り替えとテストの設定の帯 |
 | `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 315 / 130 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
 | `ProductFloat.tsx` / `ProductMarks.tsx` | 35 / 63 | 商品の行の開き口(中の「選定済み」・右の商品情報の行を押すと、商品の対応のフロートを開く。行の中のボタン・入力欄は除く)/ 商品の行の札(アラートの種類の札・「残少」。商品情報と中の選定済みの行で共通) |
 | `target.ts` | 45 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
@@ -434,6 +435,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | 配信カードの中ペインにタブ・機能を足す | `src/ContentPane.tsx`(保存は `src/CardDetail.tsx`) |
 | プレビューの見た目を変える | `src/Preview.tsx`(テンプレートの定義は `src/templates.ts`) |
 | 在庫のアラートの計算を変える | `src/alerts.ts`(条件は `src/alertSettings.ts`) |
+| AB テスト(案の持ち方・設定)を変える | `src/abTest.ts`・`src/AbTestBar.tsx`、案の出し入れと保存は `src/CardDetail.tsx`(`itemsOf`・`switchVariant`・`syncItems`) |
 | 商品の対応のフロート(差し替え・詳しい情報)を変える | `src/ProductActionFloat.tsx`(中身は `src/ProductDetail.tsx`、開き口は `src/ProductFloat.tsx`) |
 | 商品・カテゴリの指標の項目を足す | `src/metrics.ts`・`server/ccp/metrics.py` |
 | 週の確認の項目を足す | `src/reviewChecks.ts` と `src/weekLabels.ts` |
