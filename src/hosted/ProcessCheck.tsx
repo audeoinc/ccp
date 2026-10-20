@@ -431,7 +431,7 @@ export default function ProcessCheck({ open, onClose }: { open: boolean; onClose
           {stages.filter((st) => shown(st.key)).map((st) => (
             <section key={st.key} className={s.section}>
               <div className={mergeClasses(s.stageHead, toneClass[st.tone])}>
-                <h2 className={mergeClasses(s.h2, s.stageText)}>{st.name}</h2>
+                <h2 className={mergeClasses(s.h2, s.stageText)}>{`${st.key} ${st.name}`}</h2>
                 <p className={s.muted}>{t('聞くこと: ', 'Ask: ') + st.ask}</p>
               </div>
               {rows

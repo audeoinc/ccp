@@ -10,6 +10,8 @@ export interface ProcessStage {
   key: string
   name: string
   tone: StageTone
+  /** この段階で照らし合わせる行(業務と前提の決まり) */
+  ids: string[]
   /** 聞くこと(2 章の各段階の「聞くこと」) */
   ask: string
 }
@@ -43,14 +45,19 @@ export interface MetricRow {
   rows: string
 }
 
+// 段階は FLOWS.md の 2 章の節(2.1〜2.10.2)と同じ並び・同じ名前。ids は、その節の業務の表の行と、上の表の「前提の決まり」の行
 export const processStages = (): ProcessStage[] => [
-  { key: 'A', tone: 'plan', name: tr('起案(何を配信するか)', 'Planning (what to send)'), ask: tr('配信の予定・進み具合をどこで持っているか。1 本の企画にどのくらいかかり、どこに時間がかかるか。商品・画像を選ぶとき何を見ているか。', 'Where the schedule and progress live. How long one delivery takes to plan, and where the time goes. What people look at when picking products and images.') },
-  { key: 'B', tone: 'plan', name: tr('レビューと承認', 'Review and approval'), ask: tr('週のレビューは会議か、資料を回すか。資料づくりにかかる時間。承認はだれが・何で行い、週で締めるか配信ごとか。決まったあとの変更をどう伝えるか。', 'Is the weekly review a meeting or a circulated document? Time spent preparing it. Who approves, by what means, and per week or per delivery. How changes after approval are communicated.') },
-  { key: 'C', tone: 'prod', name: tr('制作(どう見せるか)', 'Production (how it looks)'), ask: tr('制作への依頼は何で送るか。制作はどこで仕上げるか。仕上がりは何で確かめるか。配信のしくみに入れるのはだれか。', 'How requests reach production. Where production finishes the work. How the result is checked. Who loads it into the delivery system.') },
-  { key: 'D', tone: 'prod', name: tr('変更・例外', 'Changes and exceptions'), ask: tr('在庫切れ・方針や日程の変更で、差し替え・取りやめたことがどのくらいあるか。いつ・どうやって気づいたか。', 'How often items were swapped or deliveries cancelled because of stock-outs or policy/schedule changes. When and how it was noticed.') },
-  { key: 'E', tone: 'res', name: tr('結果と振り返り', 'Results and retrospective'), ask: tr('結果の数字をだれが・どこに集めるか。振り返りの会はあるか。学びを次の企画でどう使っているか。', 'Who collects the results, and where. Is there a retrospective? How learnings feed the next plan.') },
-  { key: 'G', tone: 'res', name: tr('チーム・国', 'Teams and countries'), ask: tr('US と JP で、進め方・資料は違うか。', 'Do US and JP work differently or use different documents?') },
-  { key: 'P', tone: 'other', name: tr('前提の決まり(承認・制作)', 'Assumed rules (approval, production)'), ask: tr('決まりを読み上げて、今の進め方と同じか、違えばどう違うかを聞く。', 'Read each rule aloud and ask whether it matches how things work today, and if not, how it differs.') },
+  { key: '2.1', tone: 'plan', ids: ['A1'], name: tr('計画する', 'Plan'), ask: tr('配信の予定・進み具合を、どこで持っているか(表計算・予定表・ほか)。国・チャネル・部署で分かれているか', 'Where the schedule and progress are kept (spreadsheet, calendar, other). Whether they are split by country, channel or department') },
+  { key: '2.2', tone: 'plan', ids: ['A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9'], name: tr('起案する(配信の中身を作る)', 'Draft (build the content)'), ask: tr('1 本の企画にどのくらいかかるか。いちばん時間がかかるのはどこか(テーマ・画像・文言・商品・制作指示)。商品・画像を選ぶとき、何を見ているか。制作の前に、受け取った人にどう見えるかを確かめているか', 'How long one delivery takes to plan, and where most time goes (theme, image, copy, products, production notes). What people look at when picking products and images. Whether they check how it will look to recipients before production') },
+  { key: '2.3', tone: 'plan', ids: ['B1', 'B2', 'B3'], name: tr('レビューする', 'Review'), ask: tr('週のレビューは、会議か、資料を回すか。資料はだれが、どのくらいかけて作るか。意見と、直したかどうかを、どこで追っているか', 'Is the weekly review a meeting or a circulated document? Who makes the document and how long it takes. Where feedback and fixes are tracked') },
+  { key: '2.4', tone: 'plan', ids: ['B4', 'B5', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'], name: tr('承認する・週を確定する', 'Approve and lock the week'), ask: tr('承認は、だれが・何で(メール・チャット・会議)行っているか。週で締めているか、配信ごとか。決まったあとの変更は、どう伝えているか', 'Who approves and by what means (email, chat, meeting). Per week or per delivery. How changes after approval are communicated') },
+  { key: '2.5', tone: 'prod', ids: ['C1', 'P8', 'P9', 'P10'], name: tr('制作に依頼する', 'Request production'), ask: tr('制作への依頼は、何で(指示書のファイル・メール・チャット)送っているか', 'How requests reach production (brief files, email, chat)') },
+  { key: '2.6', tone: 'prod', ids: ['C2', 'C3', 'P11', 'P12'], name: tr('制作する', 'Produce'), ask: tr('制作は、どこで仕上げているか。必要な情報を、どこから集めているか。制作中の質問は、何で聞いているか', 'Where production finishes the work, where it gathers the information it needs, and how questions are asked during production') },
+  { key: '2.7', tone: 'prod', ids: ['C4'], name: tr('仕上がりを確かめる', 'Check the finished work'), ask: tr('仕上がりは、何で(スクリーンショット・テスト送信)確かめているか', 'How the result is checked (screenshots, test sends)') },
+  { key: '2.8', tone: 'prod', ids: ['C5', 'P13'], name: tr('配信する(CCP の外)', 'Deliver (outside CCP)'), ask: tr('配信のしくみに入れるのは、だれか。制作を通さない配信(アプリの通知だけ、など)はあるか', 'Who loads it into the delivery system. Are there deliveries without production (e.g. app push only)?') },
+  { key: '2.9', tone: 'res', ids: ['E1', 'E2', 'E3'], name: tr('結果を振り返る', 'Review results'), ask: tr('結果の数字は、だれが・どこに集めているか。振り返りの会はあるか。学びを、次の企画でどう使っているか', 'Who collects the results, and where. Is there a retrospective? How learnings feed the next plan') },
+  { key: '2.10.1', tone: 'other', ids: ['D1', 'D2', 'D3'], name: tr('アラート(段階をまたぐ)', 'Alerts (across stages)'), ask: tr('在庫切れ・方針や日程の変更で、差し替え・取りやめたことが、どのくらいあるか。いつ・どうやって気づいたか', 'How often items were swapped or deliveries cancelled due to stock-outs or policy/schedule changes. When and how it was noticed') },
+  { key: '2.10.2', tone: 'other', ids: ['G1', 'G2', 'P1'], name: tr('チーム・国・人(段階をまたぐ)', 'Teams, countries, people (across stages)'), ask: tr('US と JP で、進め方・資料は違うか。画面を人に見せるとき、どうしているか', 'Do US and JP work differently or use different documents? How screens are shown to others') },
 ]
 
 const T = () => tr('時間', 'Time')
@@ -60,7 +67,8 @@ const L = () => tr('記録', 'Records')
 const N = () => tr('新規', 'New')
 
 export const processRows = (): ProcessRow[] => {
-  const row = (id: string, name: string, ccp: string, gains: string[], fids: string): ProcessRow => ({ id, stage: id[0], name, ccp, gains, fids })
+  const stages = processStages()
+  const row = (id: string, name: string, ccp: string, gains: string[], fids: string): ProcessRow => ({ id, stage: stages.find((st) => st.ids.includes(id))?.key ?? '', name, ccp, gains, fids })
   return [
     row('A1', tr('月・週の配信の予定を立てる', 'Plan the monthly and weekly schedule'), tr('計画の面のカレンダー 1 つに、国・チャネル・種類・担当で絞って見る。状態の色で進み具合が分かる', 'One Plan calendar, filtered by country, channel, type and owner. Status colours show progress'), [T(), L()], 'F01〜F04, F68, F97, F101, F105'),
     row('A2', tr('配信の素案を作る', 'Draft a delivery'), tr('「すべてAIで下書き」で、テーマから制作指示まで一度に下書き。週の枠(配信名・種類)を人が決め、まとめて AI で中身を作る', '"Draft all with AI" drafts everything from theme to production notes at once. People set the weekly slots (name, type) and AI fills them in bulk'), [T()], 'F14〜F16, F76'),
