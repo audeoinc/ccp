@@ -13,7 +13,6 @@
 ```
 
 - <!-- hosted:begin -->開発元の本番だけの処理は `server/ccp/hosted/` に置き、利用先に渡す Workbench 版(`npm run release:workbench`。[RELEASE.md](RELEASE.md))からは外す。<!-- hosted:end -->
-- <!-- hosted:begin -->画面の本番だけの機能は `src/hosted/` に置く(いまは ⚙ の「前提運用の照らし合わせ」)。外のコードは直接 import せず、`src/hostedScreens.ts` が `import.meta.glob` で「ファイルがあれば」読み込む(なければ `null` で、⚙ のメニューにも出さない)。<!-- hosted:end -->
 - <!-- hosted:begin -->詳しくは [GCP.md](GCP.md)。<!-- hosted:end -->撮影・デモ用のビルド(`vite.mock.config.ts`)は、サービスの読み込みを、メモリ上のサンプルデータ(`src/mock`)に差し替える。
 
 ## 2. AI の仕組み

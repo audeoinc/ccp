@@ -727,15 +727,3 @@ export const notifications: Row[] = []
 export const productionRequests: Row[] = []
 export const noteReactions: Row[] = []
 
-// ---- 前提運用の照らし合わせ(⚙ の画面。docs/FLOWS.md 7 章)。見本の聞き取り先を 1 つ、いくつかの行を埋めた形で
-const sampleInterview = guid('process:interview:sample')
-export const processInterviews: Row[] = [{ id: sampleInterview, name: '見本の聞き取り', created_on: '2026-10-20T01:00:00.000Z' }]
-export const processChecks: Row[] = [
-  { row_id: 'A1', asis: '表計算のカレンダーを国ごとに持つ。進み具合は週の会議で聞く', gap: 'gap', handle: 'adopt', note: 'カレンダーを 1 つにまとめたい' },
-  { row_id: 'A2', asis: '過去の配信を写して、半日ほどかけて作る', gap: 'gap', handle: 'adopt' },
-  { row_id: 'A9', gap: 'nowork', note: 'AI はまだ使っていない' },
-  { row_id: 'B4', asis: 'チャットで OK をもらう', gap: 'gap', handle: 'hold', note: '週でまとめて承認したいという声もある' },
-  { row_id: 'C5', gap: 'none' },
-  { row_id: 'R4', decision: 'keep', note: '役員に週の資料を見せている' },
-  { row_id: 'M1', value: '1 本 3〜4 時間', note: '担当の感覚' },
-].map((r, i) => ({ id: guid(`process:check:${r.row_id}`), interview_id: sampleInterview, created_on: `2026-10-20T01:${String(10 + i).padStart(2, '0')}:00.000Z`, ...r }))

@@ -507,26 +507,6 @@
    ],
    "lookups": [
    ]
-  },
-  "process_interviews": {
-   "columns": [
-    ["name", "text", {"required": true}]
-   ],
-   "lookups": []
-  },
-  "process_checks": {
-   "columns": [
-    ["row_id", "text", {"required": true, "index": true}],
-    ["asis", "text"],
-    ["gap", "choice"],
-    ["handle", "choice"],
-    ["decision", "choice"],
-    ["value", "text"],
-    ["note", "text"]
-   ],
-   "lookups": [
-    ["interview_id", "process_interviews", {"onDelete": "CASCADE"}]
-   ]
   }
  },
  "choices": {
@@ -562,9 +542,6 @@
   "production_requests.status": ["requested", "in_progress", "done", "checked", "sent", "stale", "withdrawn"],
   "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"],
   "ad_spends.market": ["JP", "US"],
-  "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"],
-  "process_checks.gap": ["none", "gap", "nowork"],
-  "process_checks.handle": ["adopt", "fix", "hold"],
-  "process_checks.decision": ["keep", "remove", "hold"]
+  "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"]
  }
 }
