@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CheckmarkRegular, LightbulbRegular } from '@fluentui/react-icons'
 import type { HeroImage } from './models/heroImages'
-import { metricLabel, ownsHero, parseAbTest, targetLabel, type AbMetric } from './abTest'
+import { isChoose, metricLabel, ownsHero, parseAbTest, targetLabel, type AbMetric } from './abTest'
 import { abVerdict, confidenceLabel, learningText, metricValue, perRecipientMoney } from './abResults'
 import { ImageThumb } from './ImageThumb'
 import { locale, useT } from './i18n'
@@ -42,7 +42,8 @@ export function AbResult({ row, heroes, money, onAdopt }: { row: ResultRow; hero
   const ab = parseAbTest(row.card.ab_test)
   const push = isPush(row.card)
   const v = abVerdict(row.parts, ab, push)
-  if (v.stats.length === 0) return null
+  // 案から選ぶ配信(X57)は 1 案だけを送るので、案ごとの勝ち負けは出さない
+  if (v.stats.length === 0 || isChoose(ab)) return null
 
   const num = (x: number) => x.toLocaleString(locale())
   const rate = (a: number, b: number) => (b ? a / b : undefined)
