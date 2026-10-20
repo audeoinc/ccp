@@ -4,6 +4,17 @@
 import { mockAgent } from './agent'
 import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, categoryMetrics, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, productMetrics, products, users, weekly, type Row } from './seed'
 import { sampleAds } from './ads'
+import { sampleImpact } from '../impact'
+import type { DeliveryCard } from '../models/deliveryCards'
+import type { DeliveryResult } from '../data/deliveryResults'
+
+function impactTables(): Record<string, Row[]> {
+  const { runs, lifts } = sampleImpact(cards as unknown as DeliveryCard[], deliveryResults as unknown as DeliveryResult[])
+  return {
+    AiRunsService: runs.map((r, i) => ({ id: guid(`ai_run:${i}`), created_on: new Date().toISOString(), ...r })),
+    DeliveryLiftsService: lifts.map((r, i) => ({ id: guid(`lift:${i}`), ...r })),
+  }
+}
 
 export const tables: Record<string, Row[]> = {
   DeliveryCardsService: structuredClone(cards),
@@ -33,6 +44,9 @@ export const tables: Record<string, Row[]> = {
   AdSpendsService: sampleAds(products),
   ProductMetricsService: structuredClone(productMetrics),
   CategoryMetricsService: structuredClone(categoryMetrics),
+  // 配信の効果(AI の依頼の記録・ホールドアウトとの比べ)の見本。学びの判定は、人が画面で決めるので空から
+  ...impactTables(),
+  LearningReviewsService: [],
   // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)
   PolicyRulesService: [],
   SalesPoliciesService: [],

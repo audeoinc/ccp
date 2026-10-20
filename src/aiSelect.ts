@@ -1,6 +1,7 @@
 import { findViolations, retryNote, type Violation } from './policyCheck'
 import { ProductCategory } from './models/products'
 import { AiRequestsService } from './data/aiRequests'
+import { AiRunsService } from './data/aiRuns'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
@@ -218,8 +219,18 @@ let activeChat: ChatTurn[] | null = null
 // 開いている配信カードの「これまでの学び」(同じ条件の過去の配信の、次に生かすメモ)。
 // 案を作る依頼(suggest_ / select_)に、askAgent が加える。配信カードの「これまでの学び」の帯が、開いている間だけ入れる
 let activeLearnings: string[] = []
-export function setActiveLearnings(lines: string[]) {
+// 学びの id(配信結果の id)と、開いている配信カード。AI の依頼ごとに、どの学びを渡したかを記録する(ai_runs。結果の面の「効果」で、学びあり / なしを比べるため)
+let activeLearningIds: string[] = []
+let activeCardId: string | null = null
+export function setActiveLearnings(lines: string[], ids: string[] = [], cardId: string | null = null) {
   activeLearnings = lines
+  activeLearningIds = ids
+  activeCardId = cardId
+}
+/** 案を作る依頼の記録を残す(学びを渡さなかった依頼も残す。比べる相手になるため)。記録に失敗しても、AI の依頼は止めない */
+function recordRun(task: unknown, learningIds: string[]) {
+  if (!activeCardId || typeof task !== 'string') return
+  AiRunsService.create({ delivery_card_id: activeCardId, task, learning_ids: JSON.stringify(learningIds) }).catch(() => undefined)
 }
 const usesLearnings = (task: unknown) => typeof task === 'string' && (task.startsWith('suggest_') || task.startsWith('select_')) && task !== 'suggest_tasks'
 const LEARNINGS_NOTE =
@@ -458,6 +469,7 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
   let retry = ''
   const task = (payload as { task?: unknown })?.task
   const mustRules = rulesFor(task, cardOf(payload)).filter((r) => r.strength === 'must' && r.checkSpec)
+  if (usesLearnings(task)) recordRun(task, activeLearnings.length > 0 ? activeLearningIds : [])
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
     const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null

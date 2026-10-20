@@ -5,7 +5,7 @@
 
 /** 画面の中の面の名前(App の page)と、URL での名前 */
 export type Page = 'calendar' | 'production' | 'results' | 'alerts'
-export type LinkView = 'month' | 'week' | 'list' | 'compare' | 'products'
+export type LinkView = 'month' | 'week' | 'list' | 'compare' | 'products' | 'impact'
 
 export interface LinkState {
   page: Page
@@ -30,7 +30,7 @@ export interface LinkState {
 
 const PAGE_TO_URL: Record<Page, string> = { calendar: 'plan', production: 'production', results: 'results', alerts: 'alerts' }
 const URL_TO_PAGE: Record<string, Page> = { plan: 'calendar', production: 'production', results: 'results', alerts: 'alerts' }
-const VIEWS: LinkView[] = ['month', 'week', 'list', 'compare', 'products']
+const VIEWS: LinkView[] = ['month', 'week', 'list', 'compare', 'products', 'impact']
 
 /** URL のクエリを読む。知らない値は無視する(古いリンク・手で書き換えたリンクでも、開ける所まで開く) */
 export function parseLink(search: string): Partial<LinkState> {

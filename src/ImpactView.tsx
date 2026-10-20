@@ -1,0 +1,578 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Badge, Button, MessageBar, MessageBarBody, Spinner, Tab, TabList, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import type { DeliveryCard } from './models/deliveryCards'
+import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
+import { AiRunsService, type AiRun, type AiRunAdoption } from './data/aiRuns'
+import { DeliveryLiftsService, type DeliveryLift } from './data/deliveryLifts'
+import { LearningReviewsService, type LearningReview, type LearningReviewStatus } from './data/learningReviews'
+import { DataTable, type DataColumn } from './DataTable'
+import { ChannelBadge } from './ChannelBadge'
+import { locale, priceText, useT, type Market } from './i18n'
+import { mergeResultsByCard } from './results'
+import { buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
+
+// 結果の面の見せ方「効果」。配信が売上をどれだけ増やしたか(ホールドアウトとの差)と、AI に渡した学びが効いているかを見る。
+// 4 つの見方(記録する → 指標を見る → 売上を比べる → 学びを評価して淘汰する)を、増分の要約と並べてタブにした。
+// 金額は国(通貨)ごとに分ける。率(クリック率・リフト率)は通貨によらないので、国をまたいで比べる
+
+const useStyles = makeStyles({
+  root: { display: 'grid', rowGap: '12px' },
+  intro: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, maxWidth: '920px' },
+  tiles: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
+  tile: {
+    display: 'grid',
+    rowGap: '2px',
+    minWidth: '170px',
+    padding: '10px 14px',
+    borderRadius: tokens.borderRadiusLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  tileLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  tileValue: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
+  tileSub: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  section: { display: 'grid', rowGap: '8px' },
+  heading: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  muted: { color: tokens.colorNeutralForeground3 },
+  sub: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  name: { display: 'grid', rowGap: '1px', minWidth: 0 },
+  nameMain: { fontWeight: tokens.fontWeightSemibold },
+  notes: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: tokens.fontSizeBase200 },
+  clamp: { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  actions: { display: 'flex', gap: '4px', flexWrap: 'nowrap' },
+  bar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: tokens.fontSizeBase200 },
+  // 比べの文(差と、偶然の範囲かどうか)
+  finding: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '8px',
+    padding: '8px 12px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  detail: {
+    display: 'grid',
+    rowGap: '8px',
+    padding: '12px 14px',
+    borderRadius: tokens.borderRadiusLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow2,
+  },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '16px', rowGap: '8px' },
+  list: { display: 'grid', rowGap: '6px', margin: 0, paddingLeft: '18px', fontSize: tokens.fontSizeBase200 },
+  up: { color: tokens.colorPaletteGreenForeground1 },
+  down: { color: tokens.colorPaletteRedForeground1 },
+})
+
+type TabKey = 'lift' | 'log' | 'metrics' | 'sales' | 'learnings'
+
+interface Props {
+  /** 絞り込み済みの配信(国・チャネル・種類 など) */
+  cards: DeliveryCard[]
+  onOpenResult: (id: string) => void
+}
+
+const pct = (v: number | null | undefined, digits = 1) => (v == null ? '-' : `${(v * 100).toFixed(digits)}%`)
+/** 率の差(ポイント) */
+const pt = (v: number | null | undefined, digits = 1) => (v == null ? '-' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}pt`)
+/** 金額。1 人あたりは、円でも小数 1 桁まで出す(数円の差を見るため) */
+function money(v: number | null | undefined, market: Market, perUser = false): string {
+  if (v == null) return '-'
+  // 合計は整数で(ドルのセントまでは要らない)。1 人あたりは、ドルはセント・円は小数 1 桁まで
+  const r = !perUser ? Math.round(v) : market === 'US' ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10
+  return priceText(r, market)
+}
+/** 1 通あたりの金額は小さすぎて差が読めないので、1,000 通あたりで出す */
+const PER = 1000
+const signedMoney = (v: number | null, market: Market, perUser = false) => (v == null ? '-' : `${v >= 0 ? '+' : '−'}${money(Math.abs(v), market, perUser)}`)
+const MARKETS: Market[] = ['US', 'JP']
+
+export function ImpactView({ cards, onOpenResult }: Props) {
+  const s = useStyles()
+  const t = useT()
+  const [tab, setTab] = useState<TabKey>('lift')
+  const [results, setResults] = useState<DeliveryResult[] | null>(null)
+  const [runs, setRuns] = useState<AiRun[]>([])
+  const [lifts, setLifts] = useState<DeliveryLift[]>([])
+  const [reviews, setReviews] = useState<LearningReview[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const loadReviews = useCallback(() => {
+    LearningReviewsService.getAll()
+      .then((r) => r.success && setReviews(r.data ?? []))
+      .catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    DeliveryResultsService.getAll()
+      .then((r) => (r.success ? setResults(r.data ?? []) : setError(r.error?.message ?? 'results')))
+      .catch((e: unknown) => setError(String(e)))
+    AiRunsService.getAll()
+      .then((r) => r.success && setRuns(r.data ?? []))
+      .catch(() => undefined)
+    DeliveryLiftsService.getAll()
+      .then((r) => r.success && setLifts(r.data ?? []))
+      .catch(() => undefined)
+    loadReviews()
+  }, [loadReviews])
+
+  // AB テストの配信は、案ごとに結果の行が分かれるので、配信ごとに 1 行にまとめてから使う(まとめた行の id は、メモのある行 = 学びの id)
+  const merged = useMemo(() => (results ? mergeResultsByCard(results) : null), [results])
+  const impacts = useMemo(() => (merged ? buildImpacts(cards, merged, runs, lifts) : []), [cards, merged, runs, lifts])
+  // 学びは、絞り込み済みの配信(国・チャネル)の分だけを並べる(その国・チャネルの学びだけが並ぶほうが分かりやすい)
+  const evals = useMemo(() => (merged ? evaluateLearnings(cards, merged, impacts, reviews) : []), [cards, merged, impacts, reviews])
+
+  if (error) {
+    return (
+      <MessageBar intent="error">
+        <MessageBarBody>{t(`結果を読めませんでした: ${error}`, `Could not load results: ${error}`)}</MessageBarBody>
+      </MessageBar>
+    )
+  }
+  if (!results) return <Spinner size="small" label={t('読み込み中…', 'Loading…')} />
+
+  const noData = runs.length === 0 && lifts.length === 0
+  return (
+    <div className={s.root}>
+      <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabKey)} size="small">
+        <Tab value="lift">{t('売上の増分', 'Incremental sales')}</Tab>
+        <Tab value="log">{t('① 学びの記録', '① Learnings log')}</Tab>
+        <Tab value="metrics">{t('② 指標を見る', '② Metrics')}</Tab>
+        <Tab value="sales">{t('③ 売上を比べる', '③ Sales')}</Tab>
+        <Tab value="learnings">{t('④ 学びの評価', '④ Evaluate learnings')}</Tab>
+      </TabList>
+      {noData && (
+        <MessageBar intent="info">
+          <MessageBarBody>
+            {t(
+              'まだ記録がありません。配信カードで AI の案を頼むと、渡した学びが記録されます。ホールドアウトとの比べは、配信の仕組みとデータ基盤から取り込む予定です。いまは ⚙ の「効果の見本を作る」で見本を作れます。',
+              'No records yet. Learnings passed to AI are recorded when you ask for AI suggestions on a delivery card. Holdout comparisons will be imported later. For now, use ⚙ → "Create sample impact data".',
+            )}
+          </MessageBarBody>
+        </MessageBar>
+      )}
+      {tab === 'lift' && <LiftTab impacts={impacts} onOpenResult={onOpenResult} />}
+      {tab === 'log' && <LogTab impacts={impacts} evals={evals} onOpenResult={onOpenResult} />}
+      {tab === 'metrics' && <MetricsTab impacts={impacts} />}
+      {tab === 'sales' && <SalesTab impacts={impacts} />}
+      {tab === 'learnings' && <LearningsTab evals={evals} onChanged={loadReviews} onOpenResult={onOpenResult} />}
+    </div>
+  )
+}
+
+// ---- 共通の部品
+
+function Tile({ label, value, sub }: { label: ReactNode; value: ReactNode; sub?: ReactNode }) {
+  const s = useStyles()
+  return (
+    <div className={s.tile}>
+      <span className={s.tileLabel}>{label}</span>
+      <span className={s.tileValue}>{value}</span>
+      {sub && <span className={s.tileSub}>{sub}</span>}
+    </div>
+  )
+}
+
+/** 差の見立ての札 */
+function VerdictBadge({ verdict, good = 'up' }: { verdict: Verdict; good?: 'up' | 'down' }) {
+  const t = useT()
+  if (verdict === 'few') return <Badge appearance="tint" color="informative" size="small">{t('材料不足', 'Too few')}</Badge>
+  if (verdict === 'flat') return <Badge appearance="tint" color="subtle" size="small">{t('偶然の範囲', 'Within noise')}</Badge>
+  const positive = verdict === good
+  return (
+    <Badge appearance="tint" color={positive ? 'success' : 'danger'} size="small">
+      {verdict === 'up' ? t('差がある(上)', 'Higher') : t('差がある(下)', 'Lower')}
+    </Badge>
+  )
+}
+
+/** 「a は b より ◯ 高い」の 1 行。fmt は差の書き方 */
+function Finding({ label, d, fmt, aName, bName }: { label: ReactNode; d: Diff; fmt: (v: number | null) => string; aName: string; bName: string }) {
+  const s = useStyles()
+  const t = useT()
+  return (
+    <div className={s.finding}>
+      <span className={s.nameMain}>{label}</span>
+      <span>
+        {aName} − {bName} = <b className={d.diff == null ? undefined : d.diff >= 0 ? s.up : s.down}>{fmt(d.diff)}</b>
+      </span>
+      {d.low != null && d.high != null && (
+        <span className={s.muted}>
+          {t(`目安の幅 ${fmt(d.low)} 〜 ${fmt(d.high)}`, `Range ${fmt(d.low)} to ${fmt(d.high)}`)}
+        </span>
+      )}
+      <span className={s.muted}>{t(`(${d.a.n} 本 / ${d.b.n} 本)`, `(${d.a.n} / ${d.b.n} deliveries)`)}</span>
+      <VerdictBadge verdict={d.verdict} />
+    </div>
+  )
+}
+
+function DeliveryName({ d }: { d: DeliveryImpact }) {
+  const s = useStyles()
+  return (
+    <span className={s.name}>
+      <span className={s.nameMain}>{d.card.name}</span>
+      <span className={s.sub}>{d.sentAt ? new Date(d.sentAt).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : ''}</span>
+    </span>
+  )
+}
+
+function LearningsMark({ d }: { d: DeliveryImpact }) {
+  const t = useT()
+  if (d.withLearnings == null) return <span>-</span>
+  return d.withLearnings ? (
+    <Badge appearance="tint" color="brand" size="small">{t(`学びあり ${d.learningIds.length}`, `${d.learningIds.length} learnings`)}</Badge>
+  ) : (
+    <Badge appearance="outline" color="subtle" size="small">{t('学びなし', 'None')}</Badge>
+  )
+}
+
+function adoptionLabel(a: AiRunAdoption | null | undefined, t: ReturnType<typeof useT>): string {
+  return a === 'as_is' ? t('そのまま採用', 'Used as is') : a === 'edited' ? t('人が直した', 'Edited') : a === 'rejected' ? t('使わなかった', 'Not used') : t('未判定', 'Unknown')
+}
+
+// ---- 売上の増分
+
+function LiftTab({ impacts, onOpenResult }: { impacts: DeliveryImpact[]; onOpenResult: (id: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const withLift = impacts.filter((d) => d.liftRate != null)
+  const columns: DataColumn<DeliveryImpact>[] = [
+    { key: 'name', label: t('配信', 'Delivery'), cell: (d) => <DeliveryName d={d} />, sort: (d) => d.sentAt, wide: true },
+    { key: 'channel', label: t('チャネル', 'Channel'), cell: (d) => <ChannelBadge size="small" channel={String(d.card.channel ?? '')} /> },
+    { key: 'country', label: t('国', 'Country'), cell: (d) => d.market, sort: (d) => d.market },
+    { key: 'users', label: t('送った人 / 送らなかった人', 'Sent / holdout'), numeric: true, cell: (d) => (d.lift ? `${(d.lift.treated_users ?? 0).toLocaleString()} / ${(d.lift.holdout_users ?? 0).toLocaleString()}` : '-'), sort: (d) => d.lift?.treated_users },
+    { key: 'attr', label: t('配信を通った売上', 'Attributed sales'), numeric: true, cell: (d) => money(d.result.revenue, d.market), sort: (d) => d.result.revenue },
+    { key: 'inc', label: t('増えた売上', 'Incremental sales'), numeric: true, cell: (d) => money(d.incRevenue, d.market), sort: (d) => d.incRevenue ?? undefined },
+    { key: 'lift', label: t('リフト率', 'Lift'), numeric: true, cell: (d) => pct(d.liftRate), sort: (d) => d.liftRate ?? undefined },
+    { key: 'learn', label: t('学び', 'Learnings'), cell: (d) => <LearningsMark d={d} />, sort: (d) => d.learningIds.length },
+  ]
+  return (
+    <div className={s.section}>
+      <span className={s.intro}>
+        {t(
+          '「配信を通った売上」は、配信のリンクから買った分で、配信がなくても買った人の分を含みます。「増えた売上」は、わざと送らなかった人(ホールドアウト)と、1 人あたりの売上(店舗・EC・配信を通らない分も含む)を比べた差 × 送った人数です。リフト率は、送った人の 1 人あたりの売上が、送らなかった人より何 % 多いかです。',
+          'Attributed sales are purchases via the delivery links, including people who would have bought anyway. Incremental sales compare revenue per person (all channels) between recipients and a holdout that was not sent, times recipients. Lift is how much more recipients spent per person than the holdout.',
+        )}
+      </span>
+      <div className={s.tiles}>
+        {MARKETS.map((m) => {
+          const rows = withLift.filter((d) => d.market === m)
+          if (!rows.length) return null
+          const attr = rows.reduce((a, d) => a + (d.result.revenue ?? 0), 0)
+          const inc = rows.reduce((a, d) => a + (d.incRevenue ?? 0), 0)
+          const avg = rows.reduce((a, d) => a + (d.liftRate ?? 0), 0) / rows.length
+          return (
+            <div key={m} className={s.tiles}>
+              <Tile label={t(`${m}: 増えた売上`, `${m}: incremental sales`)} value={money(inc, m)} sub={t(`${rows.length} 本の配信`, `${rows.length} deliveries`)} />
+              <Tile label={t(`${m}: 配信を通った売上`, `${m}: attributed sales`)} value={money(attr, m)} sub={t(`増分はその ${pct(attr ? inc / attr : null, 0)}`, `Incremental is ${pct(attr ? inc / attr : null, 0)} of it`)} />
+              <Tile label={t(`${m}: 平均のリフト率`, `${m}: average lift`)} value={pct(avg)} sub={t('送らなかった人に比べて', 'vs. holdout')} />
+            </div>
+          )
+        })}
+      </div>
+      <DataTable
+        rows={withLift}
+        columns={columns}
+        rowKey={(d) => d.card.id}
+        ariaLabel={t('配信ごとの増分', 'Incremental sales by delivery')}
+        empty={t('ホールドアウトとの比べがある配信は、まだありません', 'No deliveries with a holdout comparison yet')}
+        onRowClick={(d) => onOpenResult(d.card.id)}
+      />
+    </div>
+  )
+}
+
+// ---- ① 学びの記録
+
+function LogTab({ impacts, evals, onOpenResult }: { impacts: DeliveryImpact[]; evals: LearningEval[]; onOpenResult: (id: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const [selected, setSelected] = useState<string | null>(null)
+  const rows = impacts.filter((d) => d.runs.length > 0)
+  const learningBy = useMemo(() => new Map(evals.map((e) => [e.id, e])), [evals])
+  const columns: DataColumn<DeliveryImpact>[] = [
+    { key: 'name', label: t('配信', 'Delivery'), cell: (d) => <DeliveryName d={d} />, sort: (d) => d.sentAt, wide: true },
+    { key: 'channel', label: t('チャネル', 'Channel'), cell: (d) => <ChannelBadge size="small" channel={String(d.card.channel ?? '')} /> },
+    { key: 'runs', label: t('AI の依頼', 'AI requests'), numeric: true, cell: (d) => d.runs.length, sort: (d) => d.runs.length },
+    { key: 'learn', label: t('渡した学び', 'Learnings passed'), cell: (d) => <LearningsMark d={d} />, sort: (d) => d.learningIds.length },
+    {
+      key: 'adoption',
+      label: t('案の扱い', 'How AI ideas were used'),
+      cell: (d) => {
+        const count = (a: AiRunAdoption) => d.runs.filter((r) => r.adoption === a).length
+        return t(`そのまま ${count('as_is')} / 直した ${count('edited')} / 使わず ${count('rejected')}`, `As is ${count('as_is')} / edited ${count('edited')} / not used ${count('rejected')}`)
+      },
+    },
+  ]
+  const on = rows.find((d) => d.card.id === selected)
+  return (
+    <div className={s.section}>
+      <span className={s.intro}>
+        {t(
+          '配信カードで AI の案(テーマ・コピー・商品・メイン画像など)を頼むたびに、そのとき「これまでの学び」から渡した学びを記録します。学びを渡さなかった依頼も記録します(比べる相手になるため)。AI の案そのものは保存しません。行を押すと、渡した学びの中身が見られます。',
+          'Each AI request on a delivery card records which learnings were passed. Requests without learnings are recorded too, as the comparison group. The AI ideas themselves are not saved. Click a row to see the learnings.',
+        )}
+      </span>
+      <DataTable
+        rows={rows}
+        columns={columns}
+        rowKey={(d) => d.card.id}
+        ariaLabel={t('AI に渡した学びの記録', 'Log of learnings passed to AI')}
+        empty={t('AI の依頼の記録は、まだありません', 'No AI request records yet')}
+        selectedKey={selected ?? undefined}
+        onRowClick={(d) => setSelected(d.card.id === selected ? null : d.card.id)}
+      />
+      {on && (
+        <div className={s.detail}>
+          <div className={s.bar}>
+            <span className={s.heading}>{on.card.name}</span>
+            <Button size="small" appearance="subtle" onClick={() => onOpenResult(on.card.id)}>
+              {t('結果を開く', 'Open results')}
+            </Button>
+          </div>
+          <div className={s.detailGrid}>
+            <div className={s.section}>
+              <span className={s.muted}>{t('渡した学び', 'Learnings passed')}</span>
+              {on.learningIds.length ? (
+                <ol className={s.list}>
+                  {on.learningIds.map((id) => {
+                    const e = learningBy.get(id)
+                    return (
+                      <li key={id}>
+                        <span className={s.notes}>{e?.notes ?? t('(絞り込みの外の学び)', '(outside current filters)')}</span>
+                        {e && <div className={s.sub}>{e.source.name}</div>}
+                      </li>
+                    )
+                  })}
+                </ol>
+              ) : (
+                <span className={s.muted}>{t('学びは渡していません', 'No learnings passed')}</span>
+              )}
+            </div>
+            <div className={s.section}>
+              <span className={s.muted}>{t('AI の依頼', 'AI requests')}</span>
+              <ul className={s.list}>
+                {on.runs.map((r) => (
+                  <li key={r.id}>
+                    {r.task} — {adoptionLabel(r.adoption, t)}
+                    {learningIdsOf(r).length === 0 && <span className={s.muted}>{t('(学びなし)', ' (no learnings)')}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- ② 指標を見る
+
+interface GroupRow {
+  key: string
+  label: string
+  rows: DeliveryImpact[]
+}
+
+function MetricsTab({ impacts }: { impacts: DeliveryImpact[] }) {
+  const s = useStyles()
+  const t = useT()
+  const withL = impacts.filter((d) => d.withLearnings === true)
+  const without = impacts.filter((d) => d.withLearnings === false)
+  const asIs = impacts.filter((d) => d.adoption === 'as_is')
+  const edited = impacts.filter((d) => d.adoption === 'edited')
+  const rejected = impacts.filter((d) => d.adoption === 'rejected')
+  const groups: GroupRow[] = [
+    { key: 'with', label: t('学びを渡した', 'With learnings'), rows: withL },
+    { key: 'without', label: t('学びを渡さなかった', 'Without learnings'), rows: without },
+    { key: 'as_is', label: t('AI の案をそのまま採用', 'AI ideas used as is'), rows: asIs },
+    { key: 'edited', label: t('人が直した', 'Edited by people'), rows: edited },
+    { key: 'rejected', label: t('AI の案を使わなかった', 'AI ideas not used'), rows: rejected },
+  ]
+  const avg = (rows: DeliveryImpact[], f: (d: DeliveryImpact) => number | null) => {
+    const v = rows.map(f).filter((x): x is number => x != null)
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null
+  }
+  const columns: DataColumn<GroupRow>[] = [
+    { key: 'label', label: t('配信のまとまり', 'Group'), cell: (g) => <span className={s.nameMain}>{g.label}</span> },
+    { key: 'n', label: t('配信の数', 'Deliveries'), numeric: true, cell: (g) => g.rows.length },
+    { key: 'ctr', label: t('クリック率', 'Click rate'), numeric: true, cell: (g) => pct(avg(g.rows, (d) => d.ctr), 2) },
+    { key: 'cvr', label: t('購入率(クリックから)', 'Conversion (from clicks)'), numeric: true, cell: (g) => pct(avg(g.rows, (d) => d.cvr), 2) },
+    { key: 'lift', label: t('リフト率', 'Lift'), numeric: true, cell: (g) => pct(avg(g.rows, (d) => d.liftRate)) },
+  ]
+  return (
+    <div className={s.section}>
+      <span className={s.intro}>
+        {t(
+          '配信を、学びを渡したか・AI の案をどう扱ったかで分け、配信ごとの率の平均を比べます(通貨によらない率だけを使います)。「偶然の範囲」は、差が配信ごとのばらつきの中に収まっていて、まだ差があるとは言えないという意味です。どちらかが 3 本未満のときは「材料不足」です。',
+          'Deliveries are grouped by whether learnings were passed and how AI ideas were used, and rates are averaged per delivery. "Within noise" means the gap is inside normal variation. "Too few" means fewer than 3 deliveries on a side.',
+        )}
+      </span>
+      <DataTable rows={groups} columns={columns} rowKey={(g) => g.key} ariaLabel={t('まとまりごとの指標', 'Metrics by group')} empty="-" />
+      <span className={s.heading}>{t('学びを渡した − 渡さなかった', 'With − without learnings')}</span>
+      <Finding label={t('クリック率', 'Click rate')} d={compare(withL.map((d) => d.ctr), without.map((d) => d.ctr))} fmt={(v) => pt(v, 2)} aName={t('あり', 'with')} bName={t('なし', 'without')} />
+      <Finding label={t('購入率', 'Conversion')} d={compare(withL.map((d) => d.cvr), without.map((d) => d.cvr))} fmt={(v) => pt(v, 2)} aName={t('あり', 'with')} bName={t('なし', 'without')} />
+      <Finding label={t('リフト率', 'Lift')} d={compare(withL.map((d) => d.liftRate), without.map((d) => d.liftRate))} fmt={(v) => pt(v)} aName={t('あり', 'with')} bName={t('なし', 'without')} />
+      <span className={s.heading}>{t('人が直した − そのまま採用', 'Edited − used as is')}</span>
+      <Finding label={t('クリック率', 'Click rate')} d={compare(edited.map((d) => d.ctr), asIs.map((d) => d.ctr))} fmt={(v) => pt(v, 2)} aName={t('直した', 'edited')} bName={t('そのまま', 'as is')} />
+      <Finding label={t('リフト率', 'Lift')} d={compare(edited.map((d) => d.liftRate), asIs.map((d) => d.liftRate))} fmt={(v) => pt(v)} aName={t('直した', 'edited')} bName={t('そのまま', 'as is')} />
+    </div>
+  )
+}
+
+// ---- ③ 売上を比べる
+
+function SalesTab({ impacts }: { impacts: DeliveryImpact[] }) {
+  const s = useStyles()
+  const t = useT()
+  return (
+    <div className={s.section}>
+      <span className={s.intro}>
+        {t(
+          '学びを渡した配信と渡さなかった配信で、1,000 通あたりの売上を比べます。金額なので、国(通貨)ごとに分けます。「増分」は、ホールドアウトとの差なので、配信がなくても生まれた売上を除いた、配信が生んだ分です。',
+          'Compare revenue per 1,000 recipients between deliveries with and without learnings, by country (currency). Incremental is the gap to the holdout, i.e. what the delivery itself created.',
+        )}
+      </span>
+      {MARKETS.map((m) => {
+        const rows = impacts.filter((d) => d.market === m)
+        const withL = rows.filter((d) => d.withLearnings === true)
+        const without = rows.filter((d) => d.withLearnings === false)
+        if (!withL.length && !without.length) return null
+        const sum = (list: DeliveryImpact[]) => list.reduce((a, d) => a + (d.incRevenue ?? 0), 0)
+        const k = (v: number | null) => (v == null ? null : v * PER)
+        const inc = compare(withL.map((d) => k(d.incPerUser)), without.map((d) => k(d.incPerUser)))
+        const rpr = compare(withL.map((d) => k(d.rpr)), without.map((d) => k(d.rpr)))
+        // 学びなしの配信と同じ増分だったとしたら、学びありの配信で、増えた売上はいくら少なかったか(学びの分の売上の目安)
+        const users = withL.reduce((a, d) => a + (d.lift?.treated_users ?? 0), 0)
+        const byLearnings = inc.diff != null ? (inc.diff / PER) * users : null
+        return (
+          <div key={m} className={s.section}>
+            <span className={s.heading}>{m}</span>
+            <div className={s.tiles}>
+              <Tile label={t('学びあり: 1,000 通あたりの増分', 'With: incremental / 1,000 recipients')} value={money(inc.a.mean, m)} sub={t(`${withL.length} 本 / 増えた売上 ${money(sum(withL), m)}`, `${withL.length} deliveries / ${money(sum(withL), m)} incremental`)} />
+              <Tile label={t('学びなし: 1,000 通あたりの増分', 'Without: incremental / 1,000 recipients')} value={money(inc.b.mean, m)} sub={t(`${without.length} 本 / 増えた売上 ${money(sum(without), m)}`, `${without.length} deliveries / ${money(sum(without), m)} incremental`)} />
+              <Tile
+                label={t('学びの分の売上(目安)', 'Sales from learnings (est.)')}
+                value={signedMoney(byLearnings, m)}
+                sub={t('1 通あたりの増分の差 × 学びありで送った人数', 'Gap per recipient × recipients with learnings')}
+              />
+            </div>
+            <Finding label={t('1,000 通あたりの増分', 'Incremental / 1,000 recipients')} d={inc} fmt={(v) => signedMoney(v, m)} aName={t('あり', 'with')} bName={t('なし', 'without')} />
+            <Finding label={t('1,000 通あたりの売上(配信を通った分)', 'Attributed revenue / 1,000 recipients')} d={rpr} fmt={(v) => signedMoney(v, m)} aName={t('あり', 'with')} bName={t('なし', 'without')} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---- ④ 学びの評価
+
+function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[]; onChanged: () => void; onOpenResult: (id: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const [showRetired, setShowRetired] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const statusLabel = (v: LearningReviewStatus) => (v === 'keep' ? t('残す', 'Keep') : v === 'watch' ? t('様子を見る', 'Watch') : t('外す', 'Retire'))
+  const decide = async (e: LearningEval, status: LearningReviewStatus) => {
+    setBusy(e.id)
+    const reason = t(
+      `リフト率の差 ${pt(e.lift.diff)}(${e.lift.a.n} 本 / ${e.lift.b.n} 本)`,
+      `Lift gap ${pt(e.lift.diff)} (${e.lift.a.n} / ${e.lift.b.n} deliveries)`,
+    )
+    const fields = { learning_id: e.id, status, reason, decided_at: new Date().toISOString() }
+    try {
+      if (e.review) await LearningReviewsService.update(e.review.id, fields)
+      else await LearningReviewsService.create(fields)
+    } finally {
+      setBusy(null)
+      onChanged()
+    }
+  }
+  const rows = evals.filter((e) => showRetired || e.review?.status !== 'retired')
+  const retiredCount = evals.filter((e) => e.review?.status === 'retired').length
+  const columns: DataColumn<LearningEval>[] = [
+    {
+      key: 'notes',
+      label: t('学び', 'Learning'),
+      wide: true,
+      cell: (e) => (
+        <span className={s.name}>
+          <span className={mergeClasses(s.notes, s.clamp)}>{e.notes}</span>
+          <span className={s.sub}>
+            {e.source.name} · {e.sourceAt ? new Date(e.sourceAt).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : ''}
+          </span>
+        </span>
+      ),
+    },
+    { key: 'used', label: t('渡した配信', 'Used in'), numeric: true, cell: (e) => e.used.length, sort: (e) => e.used.length },
+    {
+      key: 'lift',
+      label: t('リフト率(渡した / 渡さなかった)', 'Lift (with / without)'),
+      numeric: true,
+      cell: (e) => `${pct(e.lift.a.mean)} / ${pct(e.lift.b.mean)}`,
+      sort: (e) => e.lift.a.mean ?? undefined,
+    },
+    {
+      key: 'diff',
+      label: t('差', 'Gap'),
+      numeric: true,
+      cell: (e) => (
+        <Tooltip relationship="description" content={e.lift.low != null ? t(`目安の幅 ${pt(e.lift.low)} 〜 ${pt(e.lift.high)}`, `Range ${pt(e.lift.low)} to ${pt(e.lift.high)}`) : t('材料不足', 'Too few')}>
+          <span className={e.lift.diff == null ? undefined : e.lift.diff >= 0 ? s.up : s.down}>{pt(e.lift.diff)}</span>
+        </Tooltip>
+      ),
+      sort: (e) => e.lift.diff ?? undefined,
+    },
+    { key: 'verdict', label: t('見立て', 'Read'), cell: (e) => <VerdictBadge verdict={e.lift.verdict} />, sort: (e) => e.lift.verdict },
+    { key: 'ctr', label: t('クリック率の差', 'Click rate gap'), numeric: true, cell: (e) => pt(e.ctr.diff, 2), sort: (e) => e.ctr.diff ?? undefined },
+    { key: 'suggest', label: t('おすすめ', 'Suggested'), cell: (e) => statusLabel(e.suggestion) },
+    {
+      key: 'status',
+      label: t('扱い', 'Decision'),
+      cell: (e) => (
+        <span className={s.actions} onClick={(ev) => ev.stopPropagation()}>
+          {(['keep', 'watch', 'retired'] as const).map((v) => (
+            <ToggleButton key={v} size="small" checked={e.review?.status === v} disabled={busy === e.id} appearance={e.review?.status === v ? 'primary' : 'subtle'} onClick={() => void decide(e, v)}>
+              {statusLabel(v)}
+            </ToggleButton>
+          ))}
+        </span>
+      ),
+      sort: (e) => e.review?.status ?? '',
+    },
+  ]
+  return (
+    <div className={s.section}>
+      <span className={s.intro}>
+        {t(
+          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「これまでの学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。',
+          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Learnings that are always passed together cannot be told apart.',
+        )}
+      </span>
+      <div className={s.bar}>
+        <Switchable on={showRetired} onToggle={() => setShowRetired(!showRetired)} label={t(`外した学びも出す(${retiredCount})`, `Show retired (${retiredCount})`)} />
+      </div>
+      <DataTable
+        rows={rows}
+        columns={columns}
+        rowKey={(e) => e.id}
+        ariaLabel={t('学びの評価', 'Learning evaluation')}
+        empty={t('学び(次に生かすメモ)は、まだありません', 'No learnings yet')}
+        onRowClick={(e) => onOpenResult(e.source.id)}
+      />
+    </div>
+  )
+}
+
+function Switchable({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <ToggleButton size="small" checked={on} appearance={on ? 'primary' : 'outline'} onClick={onToggle}>
+      {label}
+    </ToggleButton>
+  )
+}

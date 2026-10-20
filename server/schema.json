@@ -511,6 +511,44 @@
    ],
    "lookups": [
    ]
+  },
+  "ai_runs": {
+   "columns": [
+    ["task", "text"],
+    ["learning_ids", "text"],
+    ["adoption", "choice"],
+    ["sample", "int"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
+   ]
+  },
+  "learning_reviews": {
+   "columns": [
+    ["learning_id", "text", {"index": true}],
+    ["status", "choice"],
+    ["reason", "text"],
+    ["decided_by", "text"],
+    ["decided_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "delivery_lifts": {
+   "columns": [
+    ["holdout_rate", "float"],
+    ["window_days", "int"],
+    ["treated_users", "int"],
+    ["holdout_users", "int"],
+    ["treated_orders", "int"],
+    ["holdout_orders", "int"],
+    ["treated_revenue", "numeric"],
+    ["holdout_revenue", "numeric"],
+    ["sample", "int"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
+   ]
   }
  },
  "choices": {
@@ -546,6 +584,8 @@
   "production_requests.status": ["requested", "in_progress", "done", "checked", "sent", "stale", "withdrawn"],
   "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"],
   "ad_spends.market": ["JP", "US"],
-  "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"]
+  "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"],
+  "ai_runs.adoption": ["as_is", "edited", "rejected"],
+  "learning_reviews.status": ["keep", "watch", "retired"]
  }
 }

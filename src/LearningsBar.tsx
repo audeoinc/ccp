@@ -4,6 +4,8 @@ import { ChevronDownRegular, ChevronUpRegular, LightbulbRegular } from '@fluentu
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
+import { LearningReviewsService, type LearningReview } from './data/learningReviews'
+import { retiredLearningIds } from './impact'
 import { setActiveLearnings } from './aiSelect'
 import { locale, useT } from './i18n'
 import { templateIdOf } from './results'
@@ -66,6 +68,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   const t = useT()
   const [cards, setCards] = useState<DeliveryCard[]>([])
   const [results, setResults] = useState<DeliveryResult[]>([])
+  // 学びの判定(結果の面の「効果」で、外した学びは、ここにも AI にも出さない)
+  const [reviews, setReviews] = useState<LearningReview[]>([])
   const [open, setOpen] = useState(false)
   // テーマの種類: 配信情報の Type(書きかけの値)。なければ、いま画面にある言葉から推し量る(X41。直すのは配信情報)
   const type: { type: ThemeType; guessed: boolean } = themeType
@@ -76,15 +80,19 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     DeliveryResultsService.getAll()
       .then((res) => res.success && setResults(res.data ?? []))
       .catch(() => undefined)
+    LearningReviewsService.getAll()
+      .then((res) => res.success && setReviews(res.data ?? []))
+      .catch(() => undefined)
     DeliveryCardsService.getAll()
       .then((res) => res.success && setCards(res.data ?? []))
       .catch(() => undefined)
   }, [])
 
+  const retired = useMemo(() => retiredLearningIds(reviews), [reviews])
   const learnings: Learning[] = useMemo(() => {
     const byId = new Map(cards.map((c) => [c.id, c]))
     return results
-      .filter((r) => r.notes?.trim() && r.delivery_card_id && r.delivery_card_id !== card.id)
+      .filter((r) => r.notes?.trim() && r.delivery_card_id && r.delivery_card_id !== card.id && !retired.has(r.id))
       .flatMap((r): Learning[] => {
         const c = byId.get(r.delivery_card_id!)
         if (!c || String(c.country ?? '') !== country || String(c.channel ?? '') !== channel) return []
@@ -95,13 +103,17 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
       })
       .sort((a, b) => b.at.localeCompare(a.at))
       .slice(0, MAX)
-  }, [cards, results, card.id, country, channel, templateId, type.type])
+  }, [cards, results, retired, card.id, country, channel, templateId, type.type])
 
   // AI の下書きに、学びを渡す(この帯が出ている間だけ)
   useEffect(() => {
-    setActiveLearnings(learnings.map((l) => `${l.at.slice(0, 10)} ${l.name}: ${l.notes.replace(/\n/g, ' / ')}`))
+    setActiveLearnings(
+      learnings.map((l) => `${l.at.slice(0, 10)} ${l.name}: ${l.notes.replace(/\n/g, ' / ')}`),
+      learnings.map((l) => l.id),
+      card.id,
+    )
     return () => setActiveLearnings([])
-  }, [learnings])
+  }, [learnings, card.id])
 
   const dateText = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
 
