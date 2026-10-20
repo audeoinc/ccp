@@ -34,7 +34,7 @@ const RULES = [
   // 開発用の文書(開発の進め方・本番の運用。利用先には、release/workbench/files の版を渡す)
   ['exclude', /^(README|CLAUDE)\.md$/],
   ['exclude', /^docs\/(GCP|HANDOVER|CLOUD|ONBOARDING|RELEASE)\.md$/],
-  ['exclude', /^docs\/font-compare\.html$/],
+  ['exclude', /^docs\/(font-compare|process-sheet)\.html$/],
   ['exclude', /^release\//],
   // 撮影用(手元の Edge を使う開発の道具)
   ['exclude', /^scripts\/screenshots\.mjs$/],
