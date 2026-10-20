@@ -23,7 +23,9 @@ const useStyles = makeStyles({
   title: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   muted: { color: tokens.colorNeutralForeground3 },
   label: { color: tokens.colorNeutralForeground3 },
-  toggle: { marginLeft: 'auto' },
+  // 「見る / 閉じる」は、件数のすぐ右(アラートの帯と同じ。右端だと遠い。X45)
+  toggle: { minWidth: 'auto' },
+  countBtn: { border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex' },
   list: { display: 'grid', rowGap: '6px', maxHeight: '220px', overflowY: 'auto', paddingBottom: '4px' },
   item: { display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', columnGap: '12px', fontSize: tokens.fontSizeBase200 },
   itemHead: { display: 'grid', rowGap: '2px', color: tokens.colorNeutralForeground2 },
@@ -109,10 +111,24 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
         <span className={styles.title}>
           <LightbulbRegular />
           {t('これまでの学び', 'Learnings so far')}
-          <Badge appearance="tint" color={learnings.length > 0 ? 'brand' : 'informative'} size="small">
-            {learnings.length}
-          </Badge>
+          {/* 件数を押しても開く */}
+          {learnings.length > 0 ? (
+            <button type="button" className={styles.countBtn} onClick={() => setOpen(!open)} aria-label={open ? t('学びを閉じる', 'Hide learnings') : t('学びを見る', 'Show learnings')}>
+              <Badge appearance="tint" color="brand" size="small">
+                {learnings.length}
+              </Badge>
+            </button>
+          ) : (
+            <Badge appearance="tint" color="informative" size="small">
+              0
+            </Badge>
+          )}
         </span>
+        {learnings.length > 0 && (
+          <Button size="small" appearance="subtle" className={styles.toggle} icon={open ? <ChevronUpRegular /> : <ChevronDownRegular />} onClick={() => setOpen(!open)}>
+            {open ? t('閉じる', 'Hide') : t('見る', 'Show')}
+          </Button>
+        )}
         <span className={styles.muted}>
           {learnings.length > 0
             ? t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」。AI の下書きにも渡します', 'Notes for next time from past deliveries with the same template or theme type. Also passed to AI drafts.')
@@ -127,11 +143,6 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
             <span>{type.guessed ? t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`) : themeTypeLabel(type.type)}</span>
           </span>
         </Tooltip>
-        {learnings.length > 0 && (
-          <Button size="small" appearance="subtle" className={styles.toggle} icon={open ? <ChevronUpRegular /> : <ChevronDownRegular />} onClick={() => setOpen(!open)}>
-            {open ? t('閉じる', 'Hide') : t('見る', 'Show')}
-          </Button>
-        )}
       </div>
       {open && (
         <div className={styles.list}>
