@@ -63,7 +63,9 @@ import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
 import { AbTestBar } from './AbTestBar'
-import { encodeAbTest, metricLabel, newAbTest, nextVariant, ownsHero, ownsProducts, parseAbTest, targetLabel, type AbTarget, type AbTest, type VariantKey } from './abTest'
+import { AbCompare } from './AbCompare'
+import { draftVariant } from './abAi'
+import { allVariants, encodeAbTest, metricLabel, newAbTest, nextVariant, ownsHero, ownsProducts, parseAbTest, targetLabel, type AbTarget, type AbTest, type VariantKey } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import type { StockModel } from './alerts'
@@ -947,6 +949,49 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
     })
     setAb(rest.length ? { ...ab, variants: rest } : null)
   }
+  // 「この案を AI で作る」と「並べて比べる」(X55 段階 3)
+  const [abAiBusy, setAbAiBusy] = useState(false)
+  const [comparing, setComparing] = useState(false)
+  const draftActiveVariant = async () => {
+    if (!ab || active === 'A') return
+    if (!form.theme.trim()) {
+      setError(tr('AI で案を作るには、先にテーマを決めてください', 'Set a theme before drafting a variant with AI'))
+      return
+    }
+    const key = active
+    const others = ab.variants.filter((k) => k !== key)
+    setAbAiBusy(true)
+    setError(null)
+    try {
+      const res = await draftVariant({
+        ab,
+        key,
+        card: buildAiCard(),
+        template,
+        aProductIds: itemsOf('A').map((i) => i.productId),
+        aHeroId: heroOf('A').heroId,
+        otherProductIds: others.flatMap((k) => itemsOf(k).map((i) => i.productId)),
+        otherHeroIds: others.map((k) => heroOf(k).heroId).filter((x): x is string => !!x),
+        products: poolProducts,
+        heroes: poolHeroes,
+        sectionTitles,
+        sectionCopies,
+        language,
+      })
+      if (res.hero) {
+        setHeroId(res.hero.heroId)
+        setHeroReason(res.hero.reason)
+      }
+      if (res.sections) {
+        setItems(res.sections.flat().map((r) => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })))
+        setSelectedKey(null)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAbAiBusy(false)
+    }
+  }
   const stopAbTest = () => {
     backToA()
     setStash({})
@@ -1508,7 +1553,30 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
 
           {/* AB テストの帯(X55): 案の切り替えと、テストの設定 */}
           {ab && (
-            <AbTestBar ab={ab} active={active} onSwitch={switchVariant} onChange={setAb} onAdd={addVariant} onRemove={removeVariant} onStop={stopAbTest} onTarget={changeTarget} />
+            <AbTestBar
+              ab={ab}
+              active={active}
+              onSwitch={switchVariant}
+              onChange={setAb}
+              onAdd={addVariant}
+              onRemove={removeVariant}
+              onStop={stopAbTest}
+              onTarget={changeTarget}
+              onAiDraft={() => void draftActiveVariant()}
+              aiBusy={abAiBusy}
+              onCompare={() => setComparing(true)}
+            />
+          )}
+          {ab && comparing && (
+            <AbCompare
+              ab={ab}
+              base={{ id: card?.id ?? 'draft', ...buildContent(), hero_image_id: null } as DeliveryCard}
+              variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId }))}
+              products={products}
+              heroes={heroes}
+              onEdit={switchVariant}
+              onClose={() => setComparing(false)}
+            />
           )}
 
           <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px`, '--w3': `${processOpen ? widths[3] : RAIL_W}px` } as React.CSSProperties}>

@@ -4,6 +4,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { CardAlertKind } from './cardAlerts'
 import { LockClosedRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from './ChannelBadge'
+import { AbBadge } from './AbBadge'
 import { DeliveryPeek } from './DeliveryPeek'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -283,6 +284,7 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
             >
               <span className={s.line1}>
                 <ChannelBadge channel={c.channel} size="icon" />
+                <AbBadge abTest={c.ab_test} size="icon" />
                 <AlertMark kind={alertKinds?.get(c.id)} />
                 {/* 動かせない配信(承認済み・確定した週・取りやめ)は、鍵の印 */}
                 {reason && <LockClosedRegular fontSize={12} aria-label={reason} />}

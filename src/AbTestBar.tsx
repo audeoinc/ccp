@@ -1,5 +1,6 @@
-import { Button, Input, Select, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, BeakerRegular, DismissRegular } from '@fluentui/react-icons'
+import { Button, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, BeakerRegular, DismissRegular, SplitVerticalRegular } from '@fluentui/react-icons'
+import { AiIcon } from './AiMark'
 import { allVariants, metricLabel, nextVariant, splitOf, targetLabel, type AbMetric, type AbMode, type AbTarget, type AbTest, type VariantKey } from './abTest'
 import { useT } from './i18n'
 
@@ -36,6 +37,11 @@ interface Props {
   onStop: () => void
   /** 比べる要素を変える(案の中身の持ち方が変わるので、配信カードの側で A に戻してから変える) */
   onTarget: (t: AbTarget) => void
+  /** いまの案(B・C)を、A と違う切り口で AI に作らせる */
+  onAiDraft: () => void
+  aiBusy: boolean
+  /** 案をプレビューで並べて比べる */
+  onCompare: () => void
 }
 
 /**
@@ -43,7 +49,7 @@ interface Props {
  * 1 行目: 案の切り替え(A・B・C。押した案を、中ペイン・プレビュー・商品情報で編集する)と、いま編集している案の説明。
  * 2 行目: テストの設定(比べる要素・指標・送り方・仮説)
  */
-export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onStop, onTarget }: Props) {
+export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onStop, onTarget, onAiDraft, aiBusy, onCompare }: Props) {
   const s = useStyles()
   const t = useT()
   const keys = allVariants(ab)
@@ -99,6 +105,22 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
             ? t(`A 案(いまの配信そのもの)を編集中。${targetLabel(ab.target)}は案ごと、それ以外は全案で共通です`, `Editing variant A (the delivery itself). Each variant has its own ${targetLabel(ab.target).toLowerCase()}; everything else is shared.`)
             : t(`${active} 案を編集中。${targetLabel(ab.target)}は ${active} 案だけのもの。それ以外(テーマ・コピー・リンク先など)を直すと、全案に効きます`, `Editing variant ${active}. It has its own ${targetLabel(ab.target).toLowerCase()}; other fields (theme, copy, links…) are shared by all variants.`)}
         </span>
+        {active !== 'A' && (
+          <Button
+            type="button"
+            size="small"
+            appearance="secondary"
+            icon={aiBusy ? <Spinner size="extra-tiny" /> : <AiIcon size={16} />}
+            disabled={aiBusy}
+            onClick={onAiDraft}
+            title={t(`A 案と違う切り口の${targetLabel(ab.target)}を、AI が選びます(仮説があれば、それを確かめられる案に)。いまの ${active} 案の${targetLabel(ab.target)}は置き換わります(保存で確定)`, `AI picks a ${targetLabel(ab.target).toLowerCase()} with a different angle from A (testing the hypothesis if any). Replaces variant ${active}'s current one (on save).`)}
+          >
+            {aiBusy ? t('AI が選んでいます', 'AI is choosing') : t(`${active} 案を AI で作る`, `Draft variant ${active} with AI`)}
+          </Button>
+        )}
+        <Button type="button" size="small" appearance="secondary" icon={<SplitVerticalRegular />} onClick={onCompare} title={t('案のプレビューを横に並べて比べます', 'Show the variant previews side by side')}>
+          {t('並べて比べる', 'Compare side by side')}
+        </Button>
         <Button
           type="button"
           size="small"

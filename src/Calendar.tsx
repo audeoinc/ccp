@@ -1,6 +1,7 @@
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, WarningFilled } from '@fluentui/react-icons'
 import { ChannelBadge } from './ChannelBadge'
+import { AbBadge } from './AbBadge'
 import type { DeliveryCard } from './models/deliveryCards'
 import { countryOptions, statusColor, statusLabel } from './status'
 import { LockMark } from './LockMark'
@@ -274,6 +275,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                     <span className={styles.pillName}>
                       {/* メールかアプリかを、2 行目が出ない狭い画面でも見分けられるよう、名前の前にアイコンを付ける */}
                       <ChannelBadge channel={c.channel} size="icon" />
+                      <AbBadge abTest={c.ab_test} size="icon" />
                       <AlertMark kind={alertKinds?.get(c.id)} />
                       <LockMark status={c.status} />
                       {dueSoon?.has(c.id) && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}

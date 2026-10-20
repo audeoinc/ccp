@@ -5,6 +5,7 @@ import { COLUMNS, type Column, type ColumnKey, type Row } from './listRows'
 import { statusColor } from './status'
 import { LockMark } from './LockMark'
 import { ChannelBadge } from './ChannelBadge'
+import { AbBadge } from './AbBadge'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
@@ -41,7 +42,12 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
       case 'name':
         return <span className={styles.name}>{isCancelled(r.card) ? `${t('取りやめ', 'Cancelled')}・${c.text(r)}` : c.text(r)}</span>
       case 'channel':
-        return <ChannelBadge channel={r.card.channel} size="small" />
+        return (
+          <>
+            <ChannelBadge channel={r.card.channel} size="small" />
+            <AbBadge abTest={r.card.ab_test} />
+          </>
+        )
       case 'status':
         if (stateOf) {
           const st = stateOf(r.card)

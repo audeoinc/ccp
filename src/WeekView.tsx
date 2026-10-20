@@ -16,6 +16,7 @@ import {
   WrenchRegular,
 } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
+import { AbBadge } from './AbBadge'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { heroImage, productImage } from './images'
@@ -363,6 +364,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
             <span className={styles.dot} style={{ backgroundColor: state.color }} title={state.label} />
             {!stateOf && <LockMark status={c.status} />}
             <AlertMark kind={alertKinds?.get(id)} />
+            <AbBadge abTest={c.ab_test} />
             <span className={styles.name}>{isCancelled(c) ? `${t('取りやめ', 'Cancelled')}・${c.name}` : c.name}</span>
           </div>
           {renderMeta && <span className={styles.meta}>{renderMeta(c)}</span>}

@@ -515,6 +515,14 @@ function App() {
   const [cardProducts, setCardProducts] = useState<Map<string, string[]>>(new Map())
   // AB テストの B・C 案の商品(配信 ID → 案 → 商品 ID。X55。制作の依頼の写しに入れる)
   const [variantProducts, setVariantProducts] = useState<Map<string, Partial<Record<VariantKey, string[]>>>>(new Map())
+  // 週の上限(同じ商品を週に何回載せたか)に使う、AB テストの B・C 案の商品も足した中身(X55 段階 3)。
+  // B・C 案も実際に一部の受信者に送るので、安全側に数える。同じ配信の中で A と同じ商品は 1 回だけ
+  const cardProductsAll = useMemo(() => {
+    if (variantProducts.size === 0) return cardProducts
+    const out = new Map(cardProducts)
+    for (const [id, byKey] of variantProducts) out.set(id, [...new Set([...(cardProducts.get(id) ?? []), ...Object.values(byKey).flat()])])
+    return out
+  }, [cardProducts, variantProducts])
   const productCounts = useMemo(() => new Map([...cardProducts].map(([k, v]) => [k, v.length])), [cardProducts])
   // 週の表示の、週の初め(日曜日)
   const [weekStart, setWeekStart] = useState<Date>(() => sundayOf(dateOf(link.date) ?? new Date()))
@@ -629,10 +637,10 @@ function App() {
   // 配信ごとのアラート(配信カードの帯・カレンダーの印)
   // 配信ごとのアラート: 在庫・方針・日程に、週の上限を超えた商品を足す(直す場所を配信カードにそろえるため)
   const cardAlerts = useMemo(
-    () => mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProducts, (id) => products.find((p) => p.id === id)?.name ?? '')),
-    [alerts, changeAlerts, activeCards, cardProducts, products],
+    () => mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProductsAll, (id) => products.find((p) => p.id === id)?.name ?? '')),
+    [alerts, changeAlerts, activeCards, cardProductsAll, products],
   )
-  const weekUseAll = useMemo(() => weeklyUse(activeCards, cardProducts), [activeCards, cardProducts])
+  const weekUseAll = useMemo(() => weeklyUse(activeCards, cardProductsAll), [activeCards, cardProductsAll])
   const alertKinds = useMemo(() => new Map([...cardAlerts].map(([id, list]) => [id, topKind(list)]).filter((e): e is [string, CardAlertKind] => !!e[1])), [cardAlerts])
   // アラートの画面から開いたときに、配信カードで選んでおく商品
   const [focusProduct, setFocusProduct] = useState<string | undefined>(undefined)
