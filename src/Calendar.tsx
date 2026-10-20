@@ -2,7 +2,7 @@ import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, WarningFilled } from '@fluentui/react-icons'
 import { ChannelBadge } from './ChannelBadge'
 import type { DeliveryCard } from './models/deliveryCards'
-import { CHANNEL_PUSH, countryOptions, statusColor, statusLabel } from './status'
+import { countryOptions, statusColor, statusLabel } from './status'
 import { LockMark } from './LockMark'
 import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
@@ -286,7 +286,8 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                     ) : (
                       <span className={styles.pillMeta}>
                         {new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
-                        {' '}{label(countryOptions, c.country)}・{c.channel === CHANNEL_PUSH ? t('アプリ', 'App') : c.channel === undefined ? '' : t('メール', 'Email')}
+                        {/* チャネルは名前の前の札で分かるので、文字では書かない(時刻と国だけ) */}
+                        {' '}{label(countryOptions, c.country)}
                       </span>
                     )}
                   </button>

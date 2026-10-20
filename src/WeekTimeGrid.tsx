@@ -51,22 +51,24 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateRows: 'auto auto',
     alignContent: 'center',
-    padding: '2px 6px 2px 8px',
+    // 月の表示の配信の箱と同じ見た目(地 = 状態の色を薄く、左の線 = 状態の色、1 行目 = 印と名前、2 行目 = 時刻と国。X46)
+    padding: '3px 6px',
     borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderLeftWidth: '4px',
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow2,
+    border: 'none',
+    borderLeftWidth: '3px',
+    borderLeftStyle: 'solid',
+    color: tokens.colorNeutralForeground1,
     cursor: 'grab',
     overflow: 'hidden',
     touchAction: 'none',
-    ':hover': { boxShadow: tokens.shadow8, zIndex: 3 },
+    ':hover': { boxShadow: tokens.shadow4, zIndex: 3 },
   },
   cardFixed: { cursor: 'pointer' },
   cardCancelled: { opacity: 0.5, textDecorationLine: 'line-through' },
   cardDragging: { opacity: 0.35 },
-  line1: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, fontVariantNumeric: 'tabular-nums' },
-  name: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  line1: { display: 'flex', alignItems: 'center', columnGap: '3px', minWidth: 0, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, lineHeight: 1.3 },
+  name: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  meta: { display: 'flex', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' },
   ghost: { position: 'absolute', boxSizing: 'border-box', height: `${CARD}px`, borderRadius: tokens.borderRadiusMedium, border: `2px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, pointerEvents: 'none', zIndex: 4, padding: '2px 6px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1, fontVariantNumeric: 'tabular-nums' },
 })
 
@@ -260,6 +262,7 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
                 left: `calc(${day * colW}% + 3px + (${colW}% - 6px) * ${pos.lane / pos.lanes})`,
                 width: `calc((${colW}% - 6px) / ${pos.lanes})`,
                 borderLeftColor: color,
+                backgroundColor: `color-mix(in srgb, ${color} 16%, var(--colorNeutralBackground1))`,
               }}
               title={[c.name, state?.label, reason ?? t('つかんで、別の日・時刻へ動かせます', 'Drag to another day or time')].filter(Boolean).join('\n')}
               onPointerDown={(e) => {
@@ -276,13 +279,15 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
             >
               <span className={s.line1}>
                 <ChannelBadge channel={c.channel} size="icon" />
-                {timeText(m)}
-                {/* 動かせない配信(承認済み・確定した週・取りやめ)は、鍵の印 */}
-                {reason && <LockClosedRegular fontSize={11} aria-label={reason} />}
                 <AlertMark kind={alertKinds?.get(c.id)} />
+                {/* 動かせない配信(承認済み・確定した週・取りやめ)は、鍵の印 */}
+                {reason && <LockClosedRegular fontSize={12} aria-label={reason} />}
+                <span className={s.name}>{c.name || t('(配信名のない枠)', '(untitled frame)')}</span>
+              </span>
+              <span className={s.meta}>
+                {`${timeText(m)} ${c.country ?? ''}`.trim()}
                 {renderMeta?.(c)}
               </span>
-              <span className={s.name}>{c.name || t('(配信名のない枠)', '(untitled frame)')}</span>
             </div>
           )
           // マウスを重ねると、配信のプレビュー(週の表示・一覧と同じ)。つかんで動かしている間は出さない
