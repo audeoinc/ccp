@@ -4,7 +4,7 @@
 //   WoW    … 前の週と比べる
 //   MoM    … 暦の月。週の最終日が入る月の 1 日からその日まで と、前の月の同じ日まで を比べる(在庫・率は、その日の値と前の月の同じ日の値)
 //   YoY    … 前年の同じ週(52 週前)と比べる
-//   SKU 欠品率 … 週の最終日(日曜)の在庫が 0 の SKU の数 ÷ SKU の数(販売を終えた SKU は数えない)
+//   SKU 欠品率 … 週の最終日(日曜)の在庫が 0 の SKU の数 ÷ SKU の数(販売を終えた SKU は数えない)。増えたら赤(悪いことなので)
 import { tr } from './i18n'
 
 /** 値の種類。count / money は増減を割合(0.05 = +5%)で、rate は差(0.02 = +2pt)で持つ */
@@ -15,6 +15,8 @@ export interface MetricDef {
   kind: MetricKind
   /** 順位を持つか(在庫・欠品率は持たない) */
   ranked: boolean
+  /** 減るほうが良い項目(欠品率)。増減の色を逆にする(増えたら赤) */
+  lowerIsBetter?: boolean
   label: () => string
 }
 
@@ -24,8 +26,9 @@ export const CATEGORY_METRIC_KEYS = ['ec_sessions', 'ec_sales', 'ec_favorites'] 
 
 export const productMetricDefs = (): MetricDef[] => [
   { key: 'spu_stock', kind: 'count', ranked: false, label: () => tr('SPU 在庫数', 'SPU stock') },
+  // SKU の在庫の合計(在庫のある SKU の数ではない。2026-10-20 利用者)
   { key: 'sku_stock', kind: 'count', ranked: false, label: () => tr('SKU 在庫数', 'SKU stock') },
-  { key: 'sku_stockout_rate', kind: 'rate', ranked: false, label: () => tr('SKU 欠品率', 'SKU stockout rate') },
+  { key: 'sku_stockout_rate', kind: 'rate', ranked: false, lowerIsBetter: true, label: () => tr('SKU 欠品率', 'SKU stockout rate') },
   { key: 'store_sales', kind: 'money', ranked: true, label: () => tr('店舗売上', 'Store sales') },
   { key: 'ec_sales', kind: 'money', ranked: true, label: () => tr('EC 売上', 'EC sales') },
   { key: 'ec_favorites', kind: 'count', ranked: true, label: () => tr('EC お気に入り数', 'EC favorites') },

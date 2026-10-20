@@ -42,9 +42,11 @@ export function ProductMetrics({ product: p }: { product: Product }) {
     if (d.kind === 'rate') return `${(Math.round(v * 1000) / 10).toFixed(1)}%`
     return Math.round(v).toLocaleString(locale())
   }
-  const change = (d: MetricDef, v?: number) => (
-    <td className={mergeClasses(s.td, v !== undefined && v !== null && v > 0 && s.up, v !== undefined && v !== null && v < 0 && s.down)}>{changeText(v, d.kind)}</td>
-  )
+  // 良くなったら緑、悪くなったら赤。ふつうは増えたら緑、欠品率のように減るほうが良い項目は逆
+  const change = (d: MetricDef, v?: number) => {
+    const good = v === undefined || v === null || v === 0 ? undefined : (v > 0) !== !!d.lowerIsBetter
+    return <td className={mergeClasses(s.td, good === true && s.up, good === false && s.down)}>{changeText(v, d.kind)}</td>
+  }
   const rows = (defs: MetricDef[], list: MetricRow[]) =>
     defs.map((d) => {
       const r = list.find((x) => x.metric === d.key)
@@ -110,7 +112,7 @@ export function ProductMetrics({ product: p }: { product: Product }) {
         </tbody>
       </table>
       <span className={s.muted}>
-        {t('数・金額の増減は %、欠品率は差(pt)。SKU 欠品率は、週の最終日の在庫が 0 の SKU の割合。', 'Changes are % for counts and amounts, and points (pt) for the stockout rate (share of SKUs with zero stock at week end).')}
+        {t('数・金額の増減は %、欠品率は差(pt)。SKU 欠品率は、週の最終日の在庫が 0 の SKU の割合(増えたら赤)。', 'Changes are % for counts and amounts, and points (pt) for the stockout rate (share of SKUs with zero stock at week end; a rise shows red).')}
       </span>
     </div>
   )
