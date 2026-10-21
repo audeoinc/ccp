@@ -36,7 +36,7 @@
 
 #### W14 の方針
 
-[backlog-archive/DONE.md](backlog-archive/DONE.md) の「W14 の方針」(決めたこと・作ったもの・経緯。経緯の 6 は未着手の改修)。
+[backlog-archive/DONE.md](backlog-archive/DONE.md) の「W14 の方針」(決めたこと・作ったもの・経緯。経緯の 6 の改修も、2026-10-21 の d83d76f で済み)。
 
 ### 4. 週の比較・商品の露出バランス(ワイヤーフレーム 09・05)
 
