@@ -64,6 +64,7 @@ import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
 import { AbDecidedBar, AbTestBar } from './AbTestBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
+import { CreativeAssets } from './CreativeAssets'
 import { isUsableHero } from './heroRights'
 import { AbCompare } from './AbCompare'
 import { draftVariant } from './abAi'
@@ -1888,6 +1889,20 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 poolProducts={poolProducts}
                 poolHeroes={poolHeroes}
                 onUploadHero={() => setHeroUpload(true)}
+                assetsSlot={
+                  <CreativeAssets
+                    cardId={card?.id}
+                    stage="plan"
+                    title={t('参考の素材(制作に使ってほしい画像・資料・ページ)', 'Reference assets (images, documents and pages for production)')}
+                    owner={card?.owner}
+                    people={owners}
+                    cardName={form.name}
+                    productionOwner={form.productionOwner}
+                    productionDue={form.productionDue}
+                    productIds={items.map((i) => i.productId)}
+                    products={products}
+                  />
+                }
                 items={items}
                 setItems={setItems}
                 candidates={candidates}

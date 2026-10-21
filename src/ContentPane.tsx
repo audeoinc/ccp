@@ -79,6 +79,8 @@ interface Props {
   /** 選定の対象(配信カードの国に合う市場のもの)。products / heroes は、すでに載せたものの表示用に全件を持つ */
   poolProducts: Product[]
   poolHeroes: HeroImage[]
+  /** ⑥ 制作指示の下に出す「参考の素材」(X58。素材は配信カードが持つので、出来上がった部品を受け取る) */
+  assetsSlot?: ReactNode
   /** 持っている画像を上げる(メイン画像のライブラリへ。X59) */
   onUploadHero?: () => void
   items: Item[]
@@ -141,6 +143,7 @@ interface Props {
 // ------------------------------------------------------------------ スタイル
 
 const useStyles = makeStyles({
+  assetsBlock: { marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   uploadRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '4px' },
   // グリッドの子は、中身が長くても列を押し広げない(帯や長い文がペインからはみ出さないように)
   // 中ペイン全体: 上は内容(スクロール)、下は AI チャット(固定)
@@ -1342,6 +1345,8 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runInstructions}
         />
       )}
+      {/* 制作指示(文章)と参考の素材(画像・URL)は、マーケ担当が制作に伝えるひと組なので、同じタブで書いて添える(X58) */}
+      {tab === 'instructions' && props.assetsSlot && <div className={s.assetsBlock}>{props.assetsSlot}</div>}
       {tab === 'links' && isPush && (
         <AppLinksEditor
           links={props.links}

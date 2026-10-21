@@ -547,6 +547,22 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                         )}
                         {!frozen && <span className={s.note}>{t('依頼する前は、いまの配信カードの中身を出しています。直すときは、企画の配信カードで直します(依頼したあとは、ここで直せます)。', 'Before the request, this shows the current card. Edit it in the plan card (after the request, you can edit here).')}</span>}
                       </div>
+                      {/* 参考の素材(X58): 制作指示のすぐ下。指示と参考を上から順に読む */}
+                      <div className={s.section}>
+                        <CreativeAssets
+                          cardId={card.id}
+                          stage="production"
+                          title={t('参考の素材', 'Reference assets')}
+                          hideCaption
+                          owner={card.owner}
+                          people={people}
+                          cardName={card.name ?? ''}
+                          productionOwner={owner}
+                          productionDue={due}
+                          productIds={snap.productIds}
+                          products={snap.products}
+                        />
+                      </div>
                     </>
                   }
                   foot={<span className={s.note}>{t(`種類: ${themeTypeLabel(themeTypeOf(card).type)} ・ 写し: ${when(approvedSnap.takenAt)}`, `Type: ${themeTypeLabel(themeTypeOf(card).type)} · Snapshot: ${when(approvedSnap.takenAt)}`)}</span>}

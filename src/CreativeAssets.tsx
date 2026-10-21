@@ -33,7 +33,28 @@ const useStyles = makeStyles({
   // 狭いペイン(配信カードの右端)でもはみ出さないよう、縦に積む
   urlRow: { display: 'grid', rowGap: '6px', justifyItems: 'stretch' },
   addBtn: { justifySelf: 'start' },
-  list: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' },
+  list: { display: 'grid', rowGap: '6px' },
+  // 1 行: 左に小さな画像、右に題名・制作へのメッセージ(全文)・だれがいつ・未解決のコメント(利用者と決めた: メッセージが主役)
+  row: {
+    display: 'grid',
+    gridTemplateColumns: '72px minmax(0, 1fr)',
+    columnGap: '10px',
+    alignItems: 'start',
+    padding: '8px',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    ':hover': { border: `1px solid ${tokens.colorBrandStroke1}` },
+  },
+  rowThumb: { width: '72px', height: '72px', objectFit: 'cover', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
+  rowIcon: { display: 'grid', placeItems: 'center', width: '72px', height: '72px', fontSize: '28px', color: tokens.colorNeutralForeground3, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
+  rowBody: { display: 'grid', rowGap: '3px', minWidth: 0 },
+  rowTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  rowMessage: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
+  rowMeta: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   tile: {
     display: 'grid',
     gridTemplateRows: '96px auto',
@@ -47,11 +68,6 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     ':hover': { border: `1px solid ${tokens.colorBrandStroke1}` },
   },
-  thumb: { width: '100%', height: '96px', objectFit: 'cover', backgroundColor: tokens.colorNeutralBackground3 },
-  icon: { display: 'grid', placeItems: 'center', height: '96px', fontSize: '36px', color: tokens.colorNeutralForeground3, backgroundColor: tokens.colorNeutralBackground3 },
-  tileBody: { display: 'grid', rowGap: '2px', padding: '6px 8px', minWidth: 0 },
-  tileName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  tileSub: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   // 素材のフロート
   surface: { width: 'min(1100px, 94vw)', maxWidth: 'none', height: '86vh' },
   body: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
@@ -65,6 +81,7 @@ const useStyles = makeStyles({
   meta: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', rowGap: '4px' },
   url: { overflowWrap: 'anywhere', fontSize: tokens.fontSizeBase200 },
+  message: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: tokens.fontSizeBase300 },
   // URL の見本カード
   linkCard: { display: 'grid', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusLarge, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
   linkImage: { width: '100%', maxHeight: '52vh', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3 },
@@ -100,6 +117,10 @@ interface Props {
   products: Product[]
   /** 素材の数が変わったとき(タブの数を合わせる) */
   onCount?: (n: number) => void
+  /** 見出し(既定は「素材(Creative Assets)」。制作指示の下では「参考の素材」) */
+  title?: string
+  /** 説明の文を出さない(制作指示の下など、続けて読む場所) */
+  hideCaption?: boolean
 }
 
 /**
@@ -107,7 +128,7 @@ interface Props {
  * 配信ごとに、ファイル(画像・PDF・Office)と参考の URL を置き、素材ごとにやり取り(コメント)できる。配信カードと制作のページの両方で、同じものを出す。
  * だれでも足せて、コメントできる。消せるのは、入れた本人と配信の担当者。制作の依頼の写しには入れない(いつも最新を見る)
  */
-export function CreativeAssets({ cardId, stage, owner, people, cardName, productionOwner, productionDue, productIds, products, onCount }: Props) {
+export function CreativeAssets({ cardId, stage, owner, people, cardName, productionOwner, productionDue, productIds, products, onCount, title, hideCaption }: Props) {
   const s = useStyles()
   const t = useT()
   const me = useSyncExternalStore(onMeChange, myName).trim()
@@ -214,10 +235,10 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
       <div>
         <div className={s.head}>
           <AttachRegular />
-          {t('素材(Creative Assets)', 'Creative assets')}
+          {title ?? t('素材(Creative Assets)', 'Creative assets')}
           {assets && assets.length > 0 && <Badge appearance="tint" size="small">{assets.length}</Badge>}
         </div>
-        <div className={s.caption}>
+        <div className={s.caption} hidden={hideCaption}>
           {t(
             '制作に使ってほしい画像・資料(ファイル)や、参考のページ(URL)を置きます。素材を押すと大きく見られ、その素材についてやり取りできます。だれでも足せて、その場で保存します。',
             'Add images, documents or reference pages (URLs) for production. Click an asset to view it and discuss it. Anyone can add; saved right away.',
@@ -228,6 +249,35 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
         <div className={s.caption}>{t('配信カードを保存すると、素材を置けます。', 'Save the delivery card to add assets.')}</div>
       ) : (
         <>
+          {/* 一覧が先(マーケ担当からのメッセージを、まず読む)。足す欄は、その下 */}
+          {assets === null ? (
+            <Spinner size="tiny" />
+          ) : assets.length === 0 ? (
+            <div className={s.caption}>{t('まだ素材はありません。', 'No assets yet.')}</div>
+          ) : (
+            <div className={s.list}>
+              {assets.map((a) => (
+                <button key={a.id} type="button" className={s.row} onClick={() => setOpenId(a.id)} title={t('押すと大きく見て、この素材についてやり取りできます', 'Click to view it and discuss it')}>
+                  {isImage(a) && a.stored ? (
+                    <img className={s.rowThumb} src={CreativeFiles.url(a.stored)} alt="" loading="lazy" />
+                  ) : a.kind === 'url' && a.preview_image ? (
+                    <img className={s.rowThumb} src={CreativeFiles.url(a.preview_image)} alt="" loading="lazy" />
+                  ) : (
+                    <span className={s.rowIcon}>{a.kind === 'url' ? <LinkRegular /> : isPdf(a) ? <DocumentPdfRegular /> : <DocumentRegular />}</span>
+                  )}
+                  <span className={s.rowBody}>
+                    <span className={s.rowTitle}>{a.name}</span>
+                    {a.note ? <span className={s.rowMessage}>{a.note}</span> : <span className={s.rowMeta}>{t('(制作へのメッセージなし)', '(no message for production)')}</span>}
+                    <span className={s.rowMeta}>
+                      <span>{[a.added_by, when(a.created_on)].filter(Boolean).join(' ・ ')}</span>
+                      <span>{a.kind === 'url' ? hostOf(a.url) : `${extOf(a.file_name).toUpperCase()} ${sizeText(a.size)}`}</span>
+                      {(talk.get(a.id) ?? 0) > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未解決のコメント ${talk.get(a.id)}`, `${talk.get(a.id)} open comments`)}</Badge>}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <div
             className={mergeClasses(s.drop, over && s.dropOn)}
             onDragOver={(e) => {
@@ -270,37 +320,10 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
               {t('URL を追加', 'Add URL')}
             </Button>
           </div>
-          <Field label={t('ひとこと(次に足す素材に付けます。任意)', 'Note (added to the next asset; optional)')} size="small">
-            <Input size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: この雰囲気で、背景は明るめに', 'e.g. This mood, with a lighter background')} />
+          <Field label={t('制作へのメッセージ(次に足す素材に付きます。任意)', 'Message for production (added to the next asset; optional)')} size="small">
+            <Textarea size="small" resize="vertical" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: このような雰囲気で。背景は明るめに。/ この資料の数字を使って', 'e.g. A mood like this, with a lighter background. / Use the figures in this document')} />
           </Field>
           {error && <div className={s.error}>{error}</div>}
-          {assets === null ? (
-            <Spinner size="tiny" />
-          ) : assets.length === 0 ? (
-            <div className={s.caption}>{t('まだ素材はありません。', 'No assets yet.')}</div>
-          ) : (
-            <div className={s.list}>
-              {assets.map((a) => (
-                <button key={a.id} type="button" className={s.tile} onClick={() => setOpenId(a.id)} title={a.note || a.name}>
-                  {isImage(a) && a.stored ? (
-                    <img className={s.thumb} src={CreativeFiles.url(a.stored)} alt="" loading="lazy" />
-                  ) : a.kind === 'url' && a.preview_image ? (
-                    <img className={s.thumb} src={CreativeFiles.url(a.preview_image)} alt="" loading="lazy" />
-                  ) : (
-                    <span className={s.icon}>{a.kind === 'url' ? <LinkRegular /> : isPdf(a) ? <DocumentPdfRegular /> : <DocumentRegular />}</span>
-                  )}
-                  <span className={s.tileBody}>
-                    <span className={s.tileName}>{a.name}</span>
-                    <span className={s.tileSub}>{a.kind === 'url' ? hostOf(a.url) : `${extOf(a.file_name).toUpperCase()} ${sizeText(a.size)}`}</span>
-                    <span className={s.tileSub}>
-                      {[a.added_by, when(a.created_on)].filter(Boolean).join(' ・ ')}
-                      {(talk.get(a.id) ?? 0) > 0 && ` ・ ${t(`未解決 ${talk.get(a.id)}`, `${talk.get(a.id)} open`)}`}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
       {opened && cardId && (
@@ -448,7 +471,7 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
                   <Field label={t('題名', 'Title')} size="small">
                     <Input size="small" value={edit.name} onChange={(_, d) => setEdit({ ...edit, name: d.value })} />
                   </Field>
-                  <Field label={t('ひとこと', 'Note')} size="small">
+                  <Field label={t('制作へのメッセージ', 'Message for production')} size="small">
                     <Textarea size="small" value={edit.note} onChange={(_, d) => setEdit({ ...edit, note: d.value })} />
                   </Field>
                   <div className={s.actions}>
@@ -462,14 +485,15 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
                 </div>
               ) : (
                 <div className={s.meta}>
-                  {a.note ? <span>{a.note}</span> : <span className={s.caption}>{t('(ひとことなし)', '(no note)')}</span>}
+                  <span className={s.caption}>{t('制作へのメッセージ', 'Message for production')}</span>
+                  {a.note ? <span className={s.message}>{a.note}</span> : <span className={s.caption}>{t('(なし)', '(none)')}</span>}
                   <span className={s.caption}>
                     {[a.added_by, when(a.created_on), a.kind === 'file' ? `${a.file_name} ${sizeText(a.size)}` : ''].filter(Boolean).join(' ・ ')}
                   </span>
                   <div className={s.actions}>
                     {canEdit && (
                       <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => setEdit({ name: a.name, note: a.note ?? '' })}>
-                        {t('題名・ひとことを直す', 'Edit title and note')}
+                        {t('題名・メッセージを直す', 'Edit title and message')}
                       </Button>
                     )}
                     {canDelete && (
