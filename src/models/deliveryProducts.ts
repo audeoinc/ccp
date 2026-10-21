@@ -22,6 +22,10 @@ export interface DeliveryProductFields {
   state?: DeliveryProductState
   /** AB テストの案('B'・'C'。空は A = いまの配信そのもの。X55) */
   variant?: string
+  /** この配信で使う商品の画像(空 = 商品のマスタの画像。X64)。/api/creative/files/… か /sample-shop/img/…、写せなかったときは元の URL */
+  image_url?: string
+  /** その画像を選んだ元(商品ページの URL など。どこから持ってきたかを残す) */
+  image_source?: string
   /** delivery_cards の id(参照を外すときは null) */
   delivery_card_id?: string | null
   /** products の id(参照を外すときは null) */

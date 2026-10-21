@@ -14,7 +14,9 @@ const assetCode = (code?: string) => (code ?? '').replace(/^UH/, 'H').replace(/^
 
 const isPlaceholder = (url?: string) => !url || url.includes('placehold.co')
 
-export function productImage(p?: Product): string | undefined {
+/** override: この配信で選んだ画像(X64。配信に載せた商品の行の image_url)。あれば、商品のマスタの画像より先に使う */
+export function productImage(p?: Product, override?: string): string | undefined {
+  if (override) return appPath(override)
   if (!p) return undefined
   if (!isPlaceholder(p.image_url)) return appPath(p.image_url!)
   return (productAssets[`./assets/products/${p.product_code}.svg`] ?? productAssets[`./assets/products/${assetCode(p.product_code)}.svg`]) ?? p.image_url

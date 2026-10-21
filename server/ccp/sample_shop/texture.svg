@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 750" width="600" height="750">
+  <title>texture</title>
+  <defs>
+    <pattern id="knit" width="60" height="50" patternUnits="userSpaceOnUse">
+      <rect width="60" height="50" fill="{{main}}"/>
+      <path d="M0 0 Q15 25 30 50 M30 0 Q15 25 0 50" fill="none" stroke="{{dark}}" stroke-width="5"/>
+      <path d="M30 0 Q45 25 60 50 M60 0 Q45 25 30 50" fill="none" stroke="{{light}}" stroke-width="4"/>
+    </pattern>
+  </defs>
+  <rect width="600" height="750" fill="url(#knit)"/>
+</svg>

@@ -55,7 +55,9 @@
     ["sort_order", "int"],
     ["source", "choice"],
     ["state", "choice"],
-    ["variant", "text"]
+    ["variant", "text"],
+    ["image_url", "text"],
+    ["image_source", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 750" width="600" height="750">
+  <title>worn</title>
+  <rect width="600" height="750" fill="{{bg}}"/>
+  <circle cx="300" cy="120" r="52" fill="#e7c9a9"/>
+  <path d="M248 105 Q300 40 352 105 Q340 70 300 66 Q260 70 248 105 Z" fill="#4a3a2e"/>
+  <rect x="285" y="168" width="30" height="24" fill="#e7c9a9"/>
+  <path d="M230 190 L300 210 L370 190 L430 230 L455 420 L415 428 L395 300 L395 520 L205 520 L205 300 L185 428 L145 420 L170 230 Z" fill="{{main}}" stroke="{{dark}}" stroke-width="4"/>
+  <circle cx="150" cy="440" r="18" fill="#e7c9a9"/><circle cx="450" cy="440" r="18" fill="#e7c9a9"/>
+  <rect x="215" y="520" width="75" height="190" fill="#3b4256"/><rect x="310" y="520" width="75" height="190" fill="#3b4256"/>
+  <rect x="205" y="705" width="90" height="22" rx="8" fill="#222"/><rect x="305" y="705" width="90" height="22" rx="8" fill="#222"/>
+</svg>

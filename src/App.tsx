@@ -536,6 +536,8 @@ function App() {
   const [cardProducts, setCardProducts] = useState<Map<string, string[]>>(new Map())
   // AB テストの B・C 案の商品(配信 ID → 案 → 商品 ID。X55。制作の依頼の写しに入れる)
   const [variantProducts, setVariantProducts] = useState<Map<string, Partial<Record<VariantKey, string[]>>>>(new Map())
+  // 配信ごとに選んだ商品の画像(配信 ID → 商品 ID → 画像の URL。X64。制作のページに渡す)
+  const [cardImages, setCardImages] = useState<Map<string, Map<string, string>>>(new Map())
   // 週の上限(同じ商品を週に何回載せたか)に使う、AB テストの B・C 案の商品も足した中身(X55 段階 3)。
   // B・C 案も実際に一部の受信者に送るので、安全側に数える。同じ配信の中で A と同じ商品は 1 回だけ
   const cardProductsAll = useMemo(() => {
@@ -719,6 +721,15 @@ function App() {
             byVariant.set(r.delivery_card_id!, m)
           }
           setVariantProducts(byVariant)
+          // 同じ商品を A と B・C 案で違う画像にしたときは、A 案の画像(写しの商品は 1 つの画像しか持てないため)
+          const images = new Map<string, Map<string, string>>()
+          for (const r of [...(res.data ?? [])].sort((a, b) => Number(!a.variant) - Number(!b.variant))) {
+            if (!r.delivery_card_id || !r.product_id || !r.image_url || r.state === STATE_CANDIDATE) continue
+            const m = images.get(r.delivery_card_id) ?? new Map<string, string>()
+            m.set(r.product_id, r.image_url)
+            images.set(r.delivery_card_id, m)
+          }
+          setCardImages(images)
         })
         .catch(() => undefined)
       CardNotesService.getAll()
@@ -2212,6 +2223,7 @@ function App() {
           productIds={cardProducts.get(productionOpen) ?? []}
           variantIds={variantProducts.get(productionOpen)}
           products={products}
+          productImages={cardImages.get(productionOpen)}
           heroes={heroes}
           people={owners}
           onClose={() => setProductionOpen(null)}

@@ -314,6 +314,8 @@ interface RowSnap {
   order: number
   /** AB テストの案(空 = A。X55) */
   variant: string
+  /** この配信で使う画像(X64) */
+  image: string
 }
 
 /** AB テストの、いま編集していない案の中身(X55。編集中の案は items・heroId・heroReason にある) */
@@ -617,9 +619,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             productId: r.product_id ?? '',
             reason: r.reason ?? '',
             source: r.source ?? SOURCE_MANUAL,
+            ...(r.image_url ? { imageUrl: r.image_url, imageSource: r.image_source ?? '' } : {}),
           }
           const variant = r.variant ?? ''
-          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant })
+          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '' })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
           else if (variant) byVariant.set(variant, [...(byVariant.get(variant) ?? []), base])
           else sel.push(base)
@@ -1173,11 +1176,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         state: d.state,
         section: d.section,
         variant: d.variant,
+        image_url: d.it.imageUrl ?? '',
+        image_source: d.it.imageUrl ? (d.it.imageSource ?? '') : '',
       }
       let res
       if (d.it.rowId) {
         const old = before.get(d.it.rowId)
-        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant) continue
+        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant && old.image === (d.it.imageUrl ?? '')) continue
         res = await DeliveryProductsService.update(d.it.rowId, fields)
       } else {
         res = await DeliveryProductsService.create({
@@ -1327,7 +1332,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const replaceForAlert = (alert: CardAlert, to: Product, reason = '') => {
     const from = products.find((p) => p.id === alert.productId)
     // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
-    setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
+    setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
     const why = reason.trim()
     setAlertNotes((prev) => [...prev, tr(`${from?.name ?? alert.label}: ${alert.detail}。${to.name} に差し替えた${why ? `。理由: ${why}` : ''}`, `${from?.name ?? alert.label}: ${alert.detail}. Replaced with ${to.name}.${why ? ` Reason: ${why}` : ''}`)])
     setActAlert(null)
@@ -1350,6 +1355,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         : tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}.`),
     ])
   }
+  // 商品のフロートで、この配信で使う画像を替える(X64。url が空なら、商品のマスタの画像に戻す)。確定は保存のとき
+  const setItemImage = (itemKey: string, url: string, source: string) => {
+    setItems((prev) => prev.map((i) => (i.key === itemKey ? (url ? { ...i, imageUrl: url, imageSource: source } : { ...i, imageUrl: undefined, imageSource: undefined }) : i)))
+  }
   // 商品の対応のフロート(X54)で、AI の案・検索で選んだ商品に置き換える(アラートからのときは replaceForAlert)。
   // 保存では行の商品 ID を書き換えないので、置き換えた枠は行 ID を外して、新しい行として保存する
   const replaceItemWith = (itemKey: string, to: Product, reason: string) => {
@@ -1357,7 +1366,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (!it) return
     const from = products.find((p) => p.id === it.productId)
     const why = reason.trim()
-    setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
+    setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
     setAlertNotes((prev) => [
       ...prev,
       why ? tr(`${from?.name ?? ''} を ${to.name} に差し替えた。理由: ${why}`, `Replaced ${from?.name ?? ''} with ${to.name}. Reason: ${why}`) : tr(`${from?.name ?? ''} を ${to.name} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to.name}.`),
@@ -1639,6 +1648,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 weekUse={weekUse}
                 alertKinds={productAlertKinds}
                 options={options}
+                image={item?.imageUrl}
+                delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '' }}
+                onImage={item ? (url, source) => setItemImage(item.key, url, source) : undefined}
                 onSwapCandidate={
                   item
                     ? (candKey, reason) => {

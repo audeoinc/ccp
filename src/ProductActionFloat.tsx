@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Dialog, DialogBody, DialogSurface, Field, MessageBar, MessageBarBody, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { DeliveryProductSource as Source } from './models/deliveryProducts'
@@ -18,6 +18,7 @@ import { productMarket } from './market'
 import { weeklyLimit } from './weeklyLimit'
 import { AiIcon } from './AiMark'
 import { getUiScale } from './uiScale'
+import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
 // どこから開いても同じ形: 左に、差し替えの候補(AI の差し替え案・残りの候補・ほかの商品を探す)、右に、選んでいる商品の詳しい情報。
@@ -61,6 +62,8 @@ const useStyles = makeStyles({
   swapBox: { display: 'grid', rowGap: '8px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   swapActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
   others: { display: 'flex', flexWrap: 'wrap', columnGap: '8px', rowGap: '6px' },
+  imageBox: { display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr)', columnGap: '10px', alignItems: 'center', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
+  imageText: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
 })
 
 interface Props {
@@ -88,6 +91,12 @@ interface Props {
   onSwapCandidate?: (candKey: string, reason: string) => void
   /** ほかの商品(AI の案・検索)に置き換える */
   onReplace?: (to: Product, reason: string) => void
+  /** この配信で使う、この商品の画像(空 = 商品のマスタの画像。X64) */
+  image?: string
+  /** 画像を選ぶときに AI に渡す、配信で伝えたいこと */
+  delivery?: DeliveryGist
+  /** この配信で使う画像を替える(url が空なら、商品のマスタの画像に戻す) */
+  onImage?: (url: string, source: string) => void
   /** 配信日を変える(左の配信日時の欄へ) */
   onPostpone?: () => void
   /** アラートの画面で詳しく見る */
@@ -96,7 +105,7 @@ interface Props {
 }
 
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, onClose }: Props) {
   const s = useStyles()
   const t = useT()
   // つかんで動かした量
@@ -104,6 +113,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const [focus, setFocus] = useState<Focus>({ kind: 'current' })
   const [reason, setReason] = useState('')
+  const [picking, setPicking] = useState(false)
 
   // AI の差し替え案(在庫・週の上限のアラートから開いたとき。開いたときに 1 回だけ)
   const overLimit = alert?.kind === 'overLimit'
@@ -163,155 +173,189 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
 
   return (
     // 下の配信カード(プレビュー・中ペイン)も見て触れるよう、背景を暗くしない
-    <Dialog open modalType="non-modal" onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
-        <DialogBody className={s.body}>
-          <div
-            className={s.grab}
-            title={t('つかんで動かせます', 'Drag to move')}
-            onPointerDown={(e) => {
-              if ((e.target as HTMLElement).closest('button')) return
-              drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y }
-              e.currentTarget.setPointerCapture(e.pointerId)
-            }}
-            onPointerMove={(e) => {
-              const d = drag.current
-              // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
-              if (d) setPos({ x: d.ox + (e.clientX - d.sx) / getUiScale(), y: d.oy + (e.clientY - d.sy) / getUiScale() })
-            }}
-            onPointerUp={() => {
-              drag.current = null
-            }}
-          >
-            <ArrowMoveRegular className={s.muted} />
-            <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と差し替え', 'Product details and swap')}{product ? ` — ${product.name}` : ''}</span>
-            <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
-            <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
-          </div>
-
-          {/* アラートの札から開いたとき: アラートの内容と、アラートの種類ごとの操作 */}
-          {alert && (
-            <div className={s.alert}>
-              <span className={s.alertText}>
-                <span>
-                  <strong>{kindName(alert.kind)}</strong>
-                  {`: ${alert.label}`}
-                </span>
-                <span className={s.alertDetail}>
-                  {alert.detail}
-                  {product && stockAlert && t(` ・ いまの在庫 ${num(product.stock)}`, ` · Stock now ${num(product.stock)}`)}
-                </span>
-                {!stockAlert && <span className={s.alertDetail}>{t('この変更は、確かめて「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
-              </span>
-              <span className={s.others}>
-                {stockAlert && onPostpone && (
-                  <Button size="small" icon={<CalendarArrowRightRegular />} onClick={onPostpone}>
-                    {t('配信日を変える', 'Change the send date')}
-                  </Button>
-                )}
-                {!overLimit && onOpenAlerts && (
-                  <Button size="small" appearance={stockAlert ? 'subtle' : 'primary'} icon={<OpenRegular />} onClick={onOpenAlerts}>
-                    {t('アラートの画面で詳しく', 'Open in Alerts')}
-                  </Button>
-                )}
-              </span>
+    <>
+      <Dialog open modalType="non-modal" onOpenChange={(_, d) => !d.open && onClose()}>
+        <DialogSurface className={s.surface} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+          <DialogBody className={s.body}>
+            <div
+              className={s.grab}
+              title={t('つかんで動かせます', 'Drag to move')}
+              onPointerDown={(e) => {
+                if ((e.target as HTMLElement).closest('button')) return
+                drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y }
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }}
+              onPointerMove={(e) => {
+                const d = drag.current
+                // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
+                if (d) setPos({ x: d.ox + (e.clientX - d.sx) / getUiScale(), y: d.oy + (e.clientY - d.sy) / getUiScale() })
+              }}
+              onPointerUp={() => {
+                drag.current = null
+              }}
+            >
+              <ArrowMoveRegular className={s.muted} />
+              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と差し替え', 'Product details and swap')}{product ? ` — ${product.name}` : ''}</span>
+              <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
+              <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
             </div>
-          )}
 
-          {product && (
-            <div className={s.cols}>
-              {/* 左: 差し替えの候補 */}
-              <div className={s.left}>
-                {stockAlert && (
+            {/* アラートの札から開いたとき: アラートの内容と、アラートの種類ごとの操作 */}
+            {alert && (
+              <div className={s.alert}>
+                <span className={s.alertText}>
+                  <span>
+                    <strong>{kindName(alert.kind)}</strong>
+                    {`: ${alert.label}`}
+                  </span>
+                  <span className={s.alertDetail}>
+                    {alert.detail}
+                    {product && stockAlert && t(` ・ いまの在庫 ${num(product.stock)}`, ` · Stock now ${num(product.stock)}`)}
+                  </span>
+                  {!stockAlert && <span className={s.alertDetail}>{t('この変更は、確かめて「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
+                </span>
+                <span className={s.others}>
+                  {stockAlert && onPostpone && (
+                    <Button size="small" icon={<CalendarArrowRightRegular />} onClick={onPostpone}>
+                      {t('配信日を変える', 'Change the send date')}
+                    </Button>
+                  )}
+                  {!overLimit && onOpenAlerts && (
+                    <Button size="small" appearance={stockAlert ? 'subtle' : 'primary'} icon={<OpenRegular />} onClick={onOpenAlerts}>
+                      {t('アラートの画面で詳しく', 'Open in Alerts')}
+                    </Button>
+                  )}
+                </span>
+              </div>
+            )}
+
+            {product && (
+              <div className={s.cols}>
+                {/* 左: 差し替えの候補 */}
+                <div className={s.left}>
+                  {stockAlert && (
+                    <div className={s.section}>
+                      <span className={s.sectionHead}>
+                        <AiIcon size={14} />
+                        {t('AI の差し替え案', 'AI replacement ideas')}
+                      </span>
+                      <span className={s.caption}>
+                        {overLimit
+                          ? t(`在庫があり、同じカテゴリで、この週にまだ ${weeklyLimit(card)} 本載せていない商品から`, `In stock, same category, fewer than ${weeklyLimit(card)} uses this week`)
+                          : t('在庫のある、同じカテゴリの商品から', 'In stock, same category')}
+                      </span>
+                      {error && (
+                        <MessageBar intent="error">
+                          <MessageBarBody>{error}</MessageBarBody>
+                        </MessageBar>
+                      )}
+                      {picks === null ? (
+                        <Spinner size="small" label={t('AI が候補を選んでいます', 'AI is choosing candidates')} />
+                      ) : picks.length === 0 ? (
+                        <span className={s.caption}>{t('条件に合う商品がありません。下の「ほかの商品を探す」から選んでください', 'No matching products. Search other products below.')}</span>
+                      ) : (
+                        picks.map(({ c, reason: why }) =>
+                          row(`ai:${c.product.id}`, c.product, focus.kind === 'ai' && focus.product.id === c.product.id, () => setFocus({ kind: 'ai', product: c.product, why }), why, c.weeksLeft !== undefined ? t(`配信日に ${c.weeksLeft.toFixed(1)} 週分`, `${c.weeksLeft.toFixed(1)} wks on the day`) : undefined),
+                        )
+                      )}
+                    </div>
+                  )}
                   <div className={s.section}>
                     <span className={s.sectionHead}>
-                      <AiIcon size={14} />
-                      {t('AI の差し替え案', 'AI replacement ideas')}
+                      <ArrowSwapRegular />
+                      {t(`残りの候補(${options.length})`, `Remaining candidates (${options.length})`)}
                     </span>
-                    <span className={s.caption}>
-                      {overLimit
-                        ? t(`在庫があり、同じカテゴリで、この週にまだ ${weeklyLimit(card)} 本載せていない商品から`, `In stock, same category, fewer than ${weeklyLimit(card)} uses this week`)
-                        : t('在庫のある、同じカテゴリの商品から', 'In stock, same category')}
-                    </span>
-                    {error && (
-                      <MessageBar intent="error">
-                        <MessageBarBody>{error}</MessageBarBody>
-                      </MessageBar>
-                    )}
-                    {picks === null ? (
-                      <Spinner size="small" label={t('AI が候補を選んでいます', 'AI is choosing candidates')} />
-                    ) : picks.length === 0 ? (
-                      <span className={s.caption}>{t('条件に合う商品がありません。下の「ほかの商品を探す」から選んでください', 'No matching products. Search other products below.')}</span>
+                    {options.length === 0 ? (
+                      <span className={s.caption}>{t('このセクションの残りの候補はありません(中ペインの「AIで選ぶ」で案を出すと、ここに並びます)', 'No remaining candidates for this section (use "Select with AI" in the middle pane).')}</span>
                     ) : (
-                      picks.map(({ c, reason: why }) =>
-                        row(`ai:${c.product.id}`, c.product, focus.kind === 'ai' && focus.product.id === c.product.id, () => setFocus({ kind: 'ai', product: c.product, why }), why, c.weeksLeft !== undefined ? t(`配信日に ${c.weeksLeft.toFixed(1)} 週分`, `${c.weeksLeft.toFixed(1)} wks on the day`) : undefined),
-                      )
+                      options.map((o) => row(`cand:${o.key}`, o.product, focus.kind === 'cand' && focus.key === o.key, () => setFocus({ kind: 'cand', key: o.key, product: o.product }), o.reason))
                     )}
                   </div>
-                )}
-                <div className={s.section}>
-                  <span className={s.sectionHead}>
-                    <ArrowSwapRegular />
-                    {t(`残りの候補(${options.length})`, `Remaining candidates (${options.length})`)}
-                  </span>
-                  {options.length === 0 ? (
-                    <span className={s.caption}>{t('このセクションの残りの候補はありません(中ペインの「AIで選ぶ」で案を出すと、ここに並びます)', 'No remaining candidates for this section (use "Select with AI" in the middle pane).')}</span>
-                  ) : (
-                    options.map((o) => row(`cand:${o.key}`, o.product, focus.kind === 'cand' && focus.key === o.key, () => setFocus({ kind: 'cand', key: o.key, product: o.product }), o.reason))
-                  )}
-                </div>
-                <div className={s.section}>
-                  <span className={s.sectionHead}>{t('ほかの商品を探す', 'Search other products')}</span>
-                  <Candidates
-                    products={poolProducts}
-                    usedIds={inCard}
-                    onAdd={() => undefined}
-                    onPick={(id) => {
-                      const p = poolProducts.find((x) => x.id === id)
-                      if (p) setFocus({ kind: 'search', product: p })
-                    }}
-                    pickedId={focus.kind === 'search' ? focus.product.id : undefined}
-                    marks={marks}
-                  />
-                </div>
-              </div>
-
-              {/* 右: 選んでいる商品の詳しい情報(最初は、いまの商品) */}
-              <div className={s.right}>
-                <div className={s.rightHead}>
-                  {focus.kind === 'current' ? (
-                    <Text weight="semibold">{t('いまの商品', 'Current product')}</Text>
-                  ) : (
-                    <>
-                      <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => setFocus({ kind: 'current' })}>
-                        {t('いまの商品に戻る', 'Back to current')}
-                      </Button>
-                      <Text weight="semibold">{t('候補', 'Candidate')}</Text>
-                    </>
-                  )}
-                </div>
-                {shown && <ProductDetail key={shown.id} product={shown} />}
-                {canSwap && (
-                  <div className={s.swapBox}>
-                    <Field label={t('差し替えの理由(任意。配信のメモに残ります)', 'Reason for the swap (optional; kept in the delivery notes)')} size="small">
-                      <AutoTextarea size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
-                    </Field>
-                    <div className={s.swapActions}>
-                      <Button size="small" onClick={() => setFocus({ kind: 'current' })}>
-                        {t('やめる', 'Cancel')}
-                      </Button>
-                      <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={doSwap}>
-                        {t(`「${product.name}」をこの商品に差し替える`, `Replace "${product.name}" with this`)}
-                      </Button>
-                    </div>
-                    <span className={s.caption}>{t('この配信の中で置き換えます(保存で確定。保存しなければ元のまま)', 'Swaps it in this delivery (confirmed when you save).')}</span>
+                  <div className={s.section}>
+                    <span className={s.sectionHead}>{t('ほかの商品を探す', 'Search other products')}</span>
+                    <Candidates
+                      products={poolProducts}
+                      usedIds={inCard}
+                      onAdd={() => undefined}
+                      onPick={(id) => {
+                        const p = poolProducts.find((x) => x.id === id)
+                        if (p) setFocus({ kind: 'search', product: p })
+                      }}
+                      pickedId={focus.kind === 'search' ? focus.product.id : undefined}
+                      marks={marks}
+                    />
                   </div>
-                )}
+                </div>
+
+                {/* 右: 選んでいる商品の詳しい情報(最初は、いまの商品) */}
+                <div className={s.right}>
+                  <div className={s.rightHead}>
+                    {focus.kind === 'current' ? (
+                      <Text weight="semibold">{t('いまの商品', 'Current product')}</Text>
+                    ) : (
+                      <>
+                        <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => setFocus({ kind: 'current' })}>
+                          {t('いまの商品に戻る', 'Back to current')}
+                        </Button>
+                        <Text weight="semibold">{t('候補', 'Candidate')}</Text>
+                      </>
+                    )}
+                  </div>
+                  {/* この配信で使う画像(X64)。いまの商品のときだけ。商品のマスタの画像は変えない */}
+                  {focus.kind === 'current' && onImage && (
+                    <div className={s.imageBox}>
+                      <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
+                      <span className={s.imageText}>
+                        <span className={s.sectionHead}>
+                          {t('この配信で使う画像', 'Image for this delivery')}
+                          {image && (
+                            <Badge size="small" appearance="tint" color="brand">
+                              {t('この配信で選んだ画像', 'Chosen for this delivery')}
+                            </Badge>
+                          )}
+                        </span>
+                        <span className={s.caption}>{image ? t('商品のマスタの画像は変えていません(ほかの配信は元のまま)', 'The product master image is unchanged (other deliveries keep it).') : t('いまは商品のマスタの画像。強みが伝わる画像に、この配信だけ替えられます', 'Uses the product master image. You can change it for this delivery only.')}</span>
+                        <Button size="small" icon={<ImageEditRegular />} onClick={() => setPicking(true)}>
+                          {t('商品ページから画像を選ぶ…', 'Choose an image from the product page…')}
+                        </Button>
+                      </span>
+                    </div>
+                  )}
+                  {shown && <ProductDetail key={shown.id} product={shown} />}
+                  {canSwap && (
+                    <div className={s.swapBox}>
+                      <Field label={t('差し替えの理由(任意。配信のメモに残ります)', 'Reason for the swap (optional; kept in the delivery notes)')} size="small">
+                        <AutoTextarea size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
+                      </Field>
+                      <div className={s.swapActions}>
+                        <Button size="small" onClick={() => setFocus({ kind: 'current' })}>
+                          {t('やめる', 'Cancel')}
+                        </Button>
+                        <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={doSwap}>
+                          {t(`「${product.name}」をこの商品に差し替える`, `Replace "${product.name}" with this`)}
+                        </Button>
+                      </div>
+                      <span className={s.caption}>{t('この配信の中で置き換えます(保存で確定。保存しなければ元のまま)', 'Swaps it in this delivery (confirmed when you save).')}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </DialogBody>
-      </DialogSurface>
-    </Dialog>
+            )}
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+      {picking && product && onImage && (
+        <ProductImagePicker
+          product={product}
+          current={image}
+          delivery={delivery ?? {}}
+          onPick={(url, source) => {
+            onImage(url, source)
+            setPicking(false)
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
+    </>
   )
 }

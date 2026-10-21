@@ -103,7 +103,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
                 const p = productById.get(it.productId)
                 return p ? (
                   <ProductFloat key={it.key} onOpen={onOpenProduct && (() => onOpenProduct(it.key))}>
-                    <ProductItem product={p} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} />
+                    <ProductItem product={p} image={it.imageUrl} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} />
                   </ProductFloat>
                 ) : null
               })}
@@ -115,14 +115,14 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
   )
 }
 
-function ProductItem({ product: p, itemKey, onHover, alert, onAlert }: { product: Product; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind; onAlert?: (productId: string) => void }) {
+function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert }: { product: Product; image?: string; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind; onAlert?: (productId: string) => void }) {
   const t = useT()
   const s = useStyles()
   const market = productMarket(p)
   const trend = trendMark(p.sales_trend_name)
   return (
     <div className={s.item} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
-      <Avatar shape="square" image={{ src: productImage(p), alt: p.name }} name={p.name} className={s.avatar} />
+      <Avatar shape="square" image={{ src: productImage(p, image), alt: p.name }} name={p.name} className={s.avatar} />
       <div className={s.main}>
         <Text size={200} weight="semibold" className={s.name}>
           {!onAlert && <AlertMark kind={alert} />}

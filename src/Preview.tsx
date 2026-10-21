@@ -316,7 +316,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={frameStyle(it, idx)}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', aspectRatio: compact ? '1 / 1' : '3 / 4' }} />
+        <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', aspectRatio: compact ? '1 / 1' : '3 / 4' }} />
         <div className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 4, color: INK }}>{p?.name}</div>
         {priceEl(p?.price, productMarket(p))}
         {controls(it, idx)}
@@ -329,7 +329,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 2 }}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 4 }} />
+        <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 4 }} />
         {controls(it, idx)}
       </div>
     )
@@ -341,7 +341,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, ...(fill ? { height: '100%' } : {}) }}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', ...(fill ? { height: '100%' } : { aspectRatio: '1 / 1' }) }} />
+        <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...(fill ? { height: '100%' } : { aspectRatio: '1 / 1' }) }} />
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: small ? '4px 6px' : '8px 12px', borderRadius: '0 0 8px 8px', background: 'rgba(255,255,255,0.92)' }}>
           <div className={classes.noWrap} style={{ fontSize: small ? '0.7rem' : '0.9rem', fontWeight: 600, color: INK }}>{p?.name}</div>
           {!small && priceEl(p?.price, productMarket(p))}
@@ -362,7 +362,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         {p?.description && <div style={{ fontSize: '0.78rem', color: SUB, lineHeight: 1.5, marginTop: 6 }}>“{p.description}”</div>}
       </div>
     )
-    const img = <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: '100%', aspectRatio: '3 / 4', borderRadius: 0 }} />
+    const img = <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', aspectRatio: '3 / 4', borderRadius: 0 }} />
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, backgroundColor: over === idx ? ACCENT_BG : '#f1f1f3' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'stretch' }}>
@@ -379,7 +379,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const p = byId.get(it.productId)
     return (
       <div key={it.key} {...dragProps(it, idx)} className={mergeClasses(classes.frame, classes.featureFrame)} style={frameStyle(it, idx)}>
-        <img className={classes.img} draggable={false} src={productImage(p)} alt={p?.name} style={{ width: compact ? '30%' : '44%', aspectRatio: compact ? '1 / 1' : '3 / 4', flexShrink: 0 }} />
+        <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: compact ? '30%' : '44%', aspectRatio: compact ? '1 / 1' : '3 / 4', flexShrink: 0 }} />
         <div className={classes.featureBody}>
           <div style={{ fontSize: '0.7rem', letterSpacing: 2, color: SUB }}>FEATURE</div>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: INK }}>{p?.name}</div>
@@ -877,7 +877,7 @@ function PushPreview(props: Props) {
       </div>
       {pushLinkKind === 'product' && firstProduct ? (
         <div style={{ border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: 16, padding: 12, display: 'grid', gap: 8, ...scaled }}>
-          <img draggable={false} src={productImage(firstProduct)} alt={firstProduct.name} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'contain', borderRadius: 12, backgroundColor: '#f1f1f4' }} />
+          <img draggable={false} src={productImage(firstProduct, items[0]?.imageUrl)} alt={firstProduct.name} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'contain', borderRadius: 12, backgroundColor: '#f1f1f4' }} />
           <div style={{ fontWeight: 700 }}>{firstProduct.name}</div>
           <div style={{ color: SUB }}>{t('商品のページ', 'Product page')}</div>
         </div>
@@ -917,7 +917,7 @@ function PushPreview(props: Props) {
               style={{ borderColor: over === idx || it.key === selectedKey ? tokens.colorBrandForeground1 : tokens.colorNeutralStroke2 }}
             >
               <span style={{ width: 16, fontSize: 12, color: tokens.colorNeutralForeground2 }}>{idx + 1}</span>
-              <img draggable={false} src={productImage(p)} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+              <img draggable={false} src={productImage(p, it.imageUrl)} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
               <div className={classes.noWrap} style={{ flexGrow: 1, fontSize: '0.85rem' }}>{p?.name}</div>
               <Button
                 appearance="subtle"

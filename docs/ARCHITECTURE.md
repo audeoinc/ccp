@@ -125,6 +125,7 @@
 - 日付・数値は `locale()`、価格は `yen(price, market)`(US の商品はドル、JP の商品は円)。
 - 選択肢のラベル(日本語)は、`optionLabel(label)` で、表示だけ英語にする(値は変えない)。辞書は `i18n.ts` の `OPTION_EN`。
 - 商品・メイン画像は、`market` 列(JP / US)で区別する。空は JP とみなす(`market.ts`)。US の商品の画像は、同じイラストを使い回す(`images.ts`)。
+- **配信ごとに選んだ商品の画像(X64)は、配信に載せた商品の行(`delivery_products.image_url`)に持つ**(商品のマスタ `products.image_url` は変えない)。画面では `Item.imageUrl` に載せ、描くところは `productImage(p, it.imageUrl)` を使う(プレビュー・商品情報の行)。制作のページは、写しの商品の `image_url` にその画像を入れて持つ(App の `cardImages`。依頼したあとは、そのときの画像のまま)。商品を差し替えたら、画像は外す。
 
 ## 7. 見た目の約束事
 

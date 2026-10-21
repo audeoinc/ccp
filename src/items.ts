@@ -12,6 +12,10 @@ export interface Item {
   productId: string
   reason: string
   source: Source
+  /** この配信で使う画像(空 = 商品のマスタの画像。X64) */
+  imageUrl?: string
+  /** その画像を選んだ元(商品ページの URL など) */
+  imageSource?: string
 }
 
 // ドラッグ&ドロップ用の MIME タイプ

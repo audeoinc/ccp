@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 750" width="600" height="750">
+  <title>detail</title>
+  <rect width="600" height="750" fill="{{main}}"/>
+  <line x1="330" y1="0" x2="330" y2="750" stroke="{{dark}}" stroke-width="6"/>
+  <line x1="345" y1="0" x2="345" y2="750" stroke="{{light}}" stroke-width="3" stroke-dasharray="14 10"/>
+  <g fill="{{light}}" stroke="{{dark}}" stroke-width="5"><circle cx="400" cy="200" r="42"/><circle cx="400" cy="520" r="42"/></g>
+  <g fill="{{dark}}"><circle cx="388" cy="188" r="6"/><circle cx="412" cy="188" r="6"/><circle cx="388" cy="212" r="6"/><circle cx="412" cy="212" r="6"/><circle cx="388" cy="508" r="6"/><circle cx="412" cy="508" r="6"/><circle cx="388" cy="532" r="6"/><circle cx="412" cy="532" r="6"/></g>
+  <path d="M40 330 L280 330 L280 420 Q160 450 40 420 Z" fill="{{main}}" stroke="{{dark}}" stroke-width="5"/>
+  <path d="M55 345 L265 345" stroke="{{light}}" stroke-width="3" stroke-dasharray="12 8"/>
+</svg>

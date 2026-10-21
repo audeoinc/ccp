@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 750" width="600" height="750">
+  <title>front</title>
+  <rect width="600" height="750" fill="{{bg}}"/>
+  <path d="M215 150 L300 185 L385 150 L470 205 L505 360 L450 375 L430 290 L430 610 L170 610 L170 290 L150 375 L95 360 L130 205 Z" fill="{{main}}" stroke="{{dark}}" stroke-width="4"/>
+  <path d="M262 165 L300 250 L338 165" fill="none" stroke="{{dark}}" stroke-width="4"/>
+  <line x1="300" y1="250" x2="300" y2="610" stroke="{{dark}}" stroke-width="3"/>
+  <circle cx="318" cy="300" r="8" fill="{{light}}"/><circle cx="318" cy="370" r="8" fill="{{light}}"/><circle cx="318" cy="440" r="8" fill="{{light}}"/><circle cx="318" cy="510" r="8" fill="{{light}}"/>
+  <rect x="195" y="455" width="70" height="12" rx="3" fill="{{dark}}"/><rect x="335" y="455" width="70" height="12" rx="3" fill="{{dark}}"/>
+</svg>

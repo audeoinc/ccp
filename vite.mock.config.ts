@@ -23,6 +23,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/policyEdit$/.test(source)) return fileURLToPath(new URL('./src/mock/policyEdit.ts', import.meta.url))
     // 部品の画像を上げる窓口(src/data/partUpload。X59 ③)も同じ
     if (/(?:^|\/)data\/partUpload$/.test(source)) return fileURLToPath(new URL('./src/mock/partUpload.ts', import.meta.url))
+    // 商品ページから画像を選ぶ窓口(src/data/productPages。X64)は、ブラウザの中で見本のページを作る身代わりに
+    if (/(?:^|\/)data\/productPages$/.test(source)) return fileURLToPath(new URL('./src/mock/productPages.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに
     if (/(?:^|\/)data\/me$/.test(source)) return fileURLToPath(new URL('./src/mock/me.ts', import.meta.url))
     // 表ごとのサービス(src/data/<名前>。書き出す名前は <名前の先頭を大文字>Service)を差し替える

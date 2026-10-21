@@ -29,6 +29,7 @@ from .creative import router as creative_router
 from .heroes import router as heroes_router
 from .parts import router as parts_router
 from .linkpreview import router as linkpreview_router
+from .product_pages import router as product_pages_router
 from .impact import router as impact_router
 from .policies import router as policies_router
 from .metrics import router as metrics_router
@@ -119,6 +120,7 @@ app.include_router(creative_router)
 app.include_router(heroes_router)
 app.include_router(parts_router)
 app.include_router(linkpreview_router)
+app.include_router(product_pages_router)
 app.include_router(impact_router)
 if hosted_router is not None:
     app.include_router(hosted_router)

@@ -81,6 +81,9 @@ export async function duplicateDelivery(card: DeliveryCard, name: string, schedu
         source: r.source,
         state: r.state,
         variant: r.variant,
+        // この配信で選んだ商品の画像も写す(X64)
+        image_url: r.image_url,
+        image_source: r.image_source,
         product_id: r.product_id,
         delivery_card_id: newId,
         state_code: 0,

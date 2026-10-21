@@ -244,6 +244,7 @@ flowchart TD
 | `abTest.ts` / `AbTestBar.tsx` | 114 / 173 | AB テスト(X55)の型・既定・配分・制作に渡す文 / 配信カードの題名の下の、案の切り替えとテストの設定の帯 |
 | `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 315 / 130 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
 | `ProductFloat.tsx` / `ProductMarks.tsx` | 35 / 63 | 商品の行の開き口(中の「選定済み」・右の商品情報の行を押すと、商品の対応のフロートを開く。行の中のボタン・入力欄は除く)/ 商品の行の札(アラートの種類の札・「残少」。商品情報と中の選定済みの行で共通) |
+| `ProductImagePicker.tsx` | 347 | この配信で使う商品の画像を、商品ページから選ぶフロート(X64。ページの画像の一覧・AI のおすすめとアングル・貼り付け / ファイル / URL)。窓口は `data/productPages.ts`(撮影用の身代わりは `mock/productPages.ts`) |
 | `target.ts` | 45 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
 | `ProcessPane.tsx` / `ApprovalBar.tsx` | 289 / 327 | 右端のプロセスのペイン(状態・承認・引き継ぎ・制作の依頼の札)/ 承認の依頼・承認・差し戻し |
 | `LearningsBar.tsx` | 162 | 「これまでの学び」(過去の結果から) |
@@ -414,6 +415,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/metrics.py` | 171 | 商品・カテゴリの週の指標の取り込み(`/api/metrics/import` と `ccp.cli import-metrics`。CSV の週 × 市場の行を置き換える) |
 | `ccp/heroes.py` | 98 | メイン画像を上げる・AI で画像を読んで下書き(`/api/heroes/upload`・`/api/heroes/describe`。X59) |
 | `ccp/linkpreview.py` | 153 | 素材の URL の見本カード(ページの題名・説明・代表の画像を 1 回だけ取る。公開のアドレスだけ。`/api/creative/preview`) |
+| `ccp/product_pages.py` | 334 | 商品ページから配信で使う画像を選ぶ(X64。`/api/product-pages/images`・`suggest`(Gemini でアングルとおすすめ)・`adopt`(素材の置き場所に写す))。見本の EC サイト(`/sample-shop/p/<コード>`・`/sample-shop/img/<コード>/<アングル>.svg`。絵の型は `ccp/sample_shop/*.svg`) |
 | `ccp/creative.py` | 124 | 素材のファイルの置き場所(`/api/creative/files`。本番はバケットの `creative/`、Workbench は `ASSET_DIR/creative`) |
 | `ccp/ads.py` | 93 | 外部広告の出稿の記録(表 `ad_spends`。X49)。`/api/ads/sample` で見本を作り直す(消すのは `campaign` が `sample:` で始まる行だけ) |
 | `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 139 / 346 / 259 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報・販売チャネルごとの順位。商品の性別の読み替え)/ 取り込む前の確かめ |

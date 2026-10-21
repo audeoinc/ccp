@@ -108,6 +108,8 @@ interface Props {
   /** AB テストの B・C 案の商品(X55) */
   variantIds?: Partial<Record<VariantKey, string[]>>
   products: Product[]
+  /** この配信で選んだ商品の画像(商品 ID → 画像の URL。X64)。写しの商品の画像に入れる */
+  productImages?: Map<string, string>
   heroes: HeroImage[]
   /** やり取りの宛先・タスクの担当の候補 */
   people: string[]
@@ -131,7 +133,7 @@ const TALK_KEY = 'productionPage.talkOpen'
  * 状態と操作は、題名のすぐ下の行に、いつも出す(2026-10-19、利用者と決めた: 材料を見る → 書く → 確かめる → 相談する、の順。左のコピーを隣のエディタに貼れる)。
  * 中身は、依頼した時点の写し(依頼する前は、いまの配信カードから作った下書き)
  */
-export function ProductionPage({ card, productIds, variantIds, products, heroes, people, onClose, onOpenCard, onChanged, stageNav }: Props) {
+export function ProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onOpenCard, onChanged, stageNav }: Props) {
   const s = useStyles()
   const t = useT()
   const meId = useSyncExternalStore(subscribeMe, myUserId)
@@ -178,7 +180,9 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
   const live = latest && LIVE.has(latest.status ?? '') ? latest : undefined
   const staleLatest = latest?.status === 'stale' ? latest : undefined
   // 写し: 依頼したあとは固めたもの、依頼する前(下書き)は、いまの配信カードから作ったもの
-  const draft = useMemo(() => buildSnapshot(card, productIds, products, heroes, variantIds), [card, productIds, products, heroes, variantIds])
+  // この配信で選んだ画像は、写しの商品の画像として持つ(依頼したあとは、そのときの画像のまま。プレビュー・HTML・コピーの行がそのまま使う)
+  const shownProducts = useMemo(() => (productImages?.size ? products.map((p) => (productImages.has(p.id) ? { ...p, image_url: productImages.get(p.id) } : p)) : products), [products, productImages])
+  const draft = useMemo(() => buildSnapshot(card, productIds, shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   // 描くたびに写しを読み直すと、HTML の下書きを作り直し続けるので、固めた写しの文字が変わったときだけ読む
   const frozenSnap = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
   const approvedSnap: Snapshot = frozenSnap || draft
