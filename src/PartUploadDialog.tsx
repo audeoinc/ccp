@@ -5,7 +5,7 @@ import { AutoTextarea } from './AutoTextarea'
 import { PartImagesService } from './data/partImages'
 import { PartUpload, type PartDraft } from './data/partUpload'
 import { rasterize, toUploadable } from './imageConvert'
-import { partImage } from './images'
+import { imgSrc, partImage } from './images'
 import { getLang, optionLabel, tr, useT } from './i18n'
 import { PartImageKind, type PartImage } from './models/partImages'
 
@@ -69,6 +69,8 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
   const [error, setError] = useState<string | null>(null)
   const editing = !!part
   const [url, setUrl] = useState(part ? (partImage(part) ?? '') : '')
+  // 表示に使う URL(保存するのは url = サーバーが返したパスのまま。Workbench の中継の下でも出るように)
+  const src = imgSrc(url)
   const [size, setSize] = useState<{ w: number; h: number } | null>(part?.width && part?.height ? { w: part.width, h: part.height } : null)
   const [form, setForm] = useState({
     name: part?.name ?? '',
@@ -183,13 +185,13 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
                     <div className={s.stage}>
                       <img
                         className={s.img}
-                        src={url}
+                        src={src}
                         alt=""
                         onLoad={(e) => {
                           const img = e.currentTarget
                           const next = { w: img.naturalWidth, h: img.naturalHeight }
                           // 上げたばかりの画像は、大きさを測ってから AI に見せる(1 回だけ)
-                          if (!size && !editing) void draft(url)
+                          if (!size && !editing) void draft(src)
                           setSize(next)
                         }}
                       />
@@ -202,7 +204,7 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
                 {busy === 'ai' && <Spinner size="tiny" label={t('AI が画像を見て、下書きを作っています…', 'AI is reading the image and drafting…')} />}
                 {editing ? (
                   <div>
-                    <Button size="small" icon={<SparkleRegular />} disabled={!!busy || !url} onClick={() => void draft(url)}>
+                    <Button size="small" icon={<SparkleRegular />} disabled={!!busy || !url} onClick={() => void draft(src)}>
                       {t('AI で下書きし直す', 'Redraft with AI')}
                     </Button>
                   </div>

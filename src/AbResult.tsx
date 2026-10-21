@@ -5,6 +5,7 @@ import type { HeroImage } from './models/heroImages'
 import { isChoose, metricLabel, ownsHero, parseAbTest, targetLabel, type AbMetric } from './abTest'
 import { abVerdict, confidenceLabel, learningText, metricValue, perRecipientMoney } from './abResults'
 import { ImageThumb } from './ImageThumb'
+import { heroImage } from './images'
 import { locale, useT } from './i18n'
 import { isPush, pct, type ResultRow } from './results'
 
@@ -107,7 +108,7 @@ export function AbResult({ row, heroes, money, onAdopt }: { row: ResultRow; hero
               <tr key={s.key} className={mergeClasses(win && sure && styles.winRow)}>
                 <td className={mergeClasses(styles.td, styles.left)}>
                   <span className={styles.variantCell}>
-                    {hero && <ImageThumb src={hero.image_url} alt={hero.name ?? ''} width={36} height={36} />}
+                    {hero && <ImageThumb src={heroImage(hero)} alt={hero.name ?? ''} width={36} height={36} />}
                     <span className={styles.key}>{t(`${s.key} 案`, `Variant ${s.key}`)}</span>
                     {win &&
                       (sure ? (

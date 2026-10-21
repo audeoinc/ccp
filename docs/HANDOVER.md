@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X61 マーケティングの決まりを画面で直す。6.52。その前は X59 画像のライブラリの仕上げ。6.51)
+- 最終更新: 2026-10-21(Workbench で上げた直後の画像が壊れる件。6.53。その前は X61 マーケティングの決まりを画面で直す。6.52)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -664,6 +664,12 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
 - AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
 - 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)→ 6.50。
+
+## 6.53 Workbench で、上げた直後の画像が壊れて出る(2026-10-21、UI セッション)
+
+- 利用者の報告: Workbench の clone 版で、画像を上げると壊れて表示される(Jupyter の中継 `/proxy/<port>/` の下で動くため)。サーバーの記録では、上げる・AI の下書きはどちらも成功していた(連絡係がログを確認)。
+- 原因: `HeroUploadDialog`・`PartUploadDialog` が、サーバーが返したパス `/img/…` をそのまま `<img src>` と AI に見せる画像の読み込みに使っていた(`appPath` を通していない)。直した: `images.ts` の `imgSrc`(`/img/` で始まるパスだけ置き場所を頭に付ける)を表示用に使い、保存するのはサーバーが返したパスのまま。`AbResult` の案のサムネも `hero.image_url` を直接使っていたので `heroImage` に(見本の SVG も出るようになる)。
+- **落とし穴**: 画面で `/img/…`・`/api/…` を使うときは、必ず `appPath`(画像は `heroImage` / `partImage` / `imgSrc`)を通す。本番(置き場所が `/`)では気づけない。
 
 ## 6.52 X61 マーケティングの決まりを画面で直す(2026-10-21、UI セッション)
 

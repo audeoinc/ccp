@@ -4,7 +4,7 @@ import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload, type HeroDraft } from './data/heroUpload'
-import { heroImage } from './images'
+import { heroImage, imgSrc } from './images'
 import { cropStyle } from './heroRights'
 import { rasterize, toUploadable } from './imageConvert'
 import { getLang, optionLabel, tr, useT } from './i18n'
@@ -70,6 +70,8 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
   const [error, setError] = useState<string | null>(null)
   const editing = !!hero
   const [url, setUrl] = useState(hero ? (heroImage(hero) ?? '') : '')
+  // 表示に使う URL(保存するのは url = サーバーが返したパスのまま。Workbench の中継の下でも出るように)
+  const src = imgSrc(url)
   const [focal, setFocal] = useState({ x: hero?.focal_x ?? 0.5, y: hero?.focal_y ?? 0.5 })
   // 切り出すときの拡大(X59 ④。1 = 拡大なし)
   const [zoom, setZoom] = useState(Math.min(3, Math.max(1, Number(hero?.focal_zoom) || 1)))
@@ -108,7 +110,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
     setError(null)
     setBusy('ai')
     try {
-      applyDraft(await HeroUpload.describeImage(await rasterize(url), lang()), false)
+      applyDraft(await HeroUpload.describeImage(await rasterize(src), lang()), false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -235,7 +237,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
                         setFocal({ x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) })
                       }}
                     >
-                      <img className={s.img} src={url} alt="" />
+                      <img className={s.img} src={src} alt="" />
                       <span className={s.focal} style={{ left: `${focal.x * 100}%`, top: `${focal.y * 100}%` }} />
                     </div>
                     <span className={s.note}>{t('画像を押して、焦点(いちばん見せたい場所)を決めます。拡大すると、焦点を中心に寄って切り出します。下は、テンプレートの枠(帯・正方形・縦長・横長)に切り出したときの見え方です。', 'Click the image to set the focal point. Zoom in to crop closer around it. Below: how it crops into the template frames (band, square, tall, wide).')}</span>
@@ -260,7 +262,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
                       ).map(([label, w, h]) => (
                         <span key={label} className={s.cropBox}>
                           <span className={s.crop} style={{ width: w, height: h }}>
-                            <img src={url} alt="" style={{ width: '100%', height: '100%', ...cropStyle(focal.x, focal.y, zoom) }} />
+                            <img src={src} alt="" style={{ width: '100%', height: '100%', ...cropStyle(focal.x, focal.y, zoom) }} />
                           </span>
                           {label}
                         </span>

@@ -31,3 +31,7 @@ export function partImage(p?: PartImage): string | undefined {
   if (!p?.image_url) return undefined
   return appPath(p.image_url)
 }
+
+/** サーバーが返した画像のパス(/img/…)を、表示に使える URL にする(Workbench では Jupyter の中継の下で動くため、置き場所を頭に付ける)。
+ *  すでに表示用の URL(heroImage などの結果・blob:・https:)は、そのまま */
+export const imgSrc = (url: string): string => (url.startsWith('/img/') ? appPath(url) : url)
