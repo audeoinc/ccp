@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Badge, Button, Dialog, DialogSurface, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
+import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, ClipboardPasteRegular, DismissRegular, EyeRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -15,6 +15,7 @@ import { ChannelBadge } from './ChannelBadge'
 import { FaceBadge } from './FaceBadge'
 import { HtmlEditor } from './HtmlEditor'
 import { CreativeAssets } from './CreativeAssets'
+import { FinishedFloat } from './FinishedFloat'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
 import { ResizeHandles } from './ResizeHandles'
@@ -68,6 +69,14 @@ const useStyles = makeStyles({
   // HTML の下書きを作るためだけに描く、見えないプレビュー(画面の外に置く)
   offscreen: { position: 'fixed', left: '-10000px', top: 0, width: '640px', pointerEvents: 'none' },
   section: { display: 'grid', rowGap: '6px' },
+  // 制作した HTML / 企画の見本 の切り替え(X58)
+  seg: { display: 'inline-flex', columnGap: '2px', flexShrink: 0 },
+  toolRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '4px' },
+  segBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular, whiteSpace: 'nowrap' },
+  planCode: { flexGrow: 1, minHeight: 0, margin: 0, overflow: 'auto', padding: '8px', fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontFamily: 'Consolas, Menlo, monospace', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, color: tokens.colorNeutralForeground2 },
+  compare: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px' },
+  compareCol: { display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 },
+  pasteBox: { width: '100%', minHeight: '50vh', fontFamily: 'Consolas, Menlo, monospace', fontSize: '12px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   grow: { flexGrow: 1 },
   // コピーできる 1 行(見出し・値・コピー)
@@ -141,6 +150,12 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
   // プレビューから作った HTML(下書き)と、エディタの中身(null = まだ直していない)
   const [generated, setGenerated] = useState('')
   const [html, setHtml] = useState<string | null>(null)
+  // X58 段階 3: エディタで見る HTML(制作した HTML / 企画の見本)と、プレビューの見せ方(並べて比べる)。貼り付けの欄
+  const [htmlView, setHtmlView] = useState<'made' | 'plan'>('made')
+  const [previewView, setPreviewView] = useState<'made' | 'plan' | 'compare'>('made')
+  const [pasting, setPasting] = useState<string | null>(null)
+  // 仕上がりを見る(X58 段階 4)
+  const [finishedOpen, setFinishedOpen] = useState(false)
   const offscreenRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -303,6 +318,9 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
       skipped: skipped || checkSkipped,
       action: live && (
         <span className={s.stepActions}>
+          <Button size="small" appearance="secondary" icon={<EyeRegular />} onClick={() => setFinishedOpen(true)} title={t('制作した HTML・ひとこと・リンク・素材を 1 か所で見ます', 'See the production HTML, note, link and assets in one place')}>
+            {t('仕上がりを見る', 'View result')}
+          </Button>
           <Tooltip content={needMe ?? t('右のプレビューと HTML を見て、これで送ってよければ押します', 'Press when the preview and HTML on the right are good to send')} relationship="description">
             <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy || !meId} onClick={() => void run(() => ProductionService.check(live.id, { actor, week_start: weekStart }), tr('仕上がりを確認しました', 'Checked the result'))}>
               {t('これで OK', 'Looks good')}
@@ -549,10 +567,10 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                   {htmlBehind && <span className={s.dirty}>{t(' ・ 要素を直したあと、作り直していません(↺ で作り直す)', ' · not rebuilt since the edits (↺ to rebuild)')}</span>}
                   {!dirty && live?.html_saved_by_name && <span className={s.note}>{t(` ・ 保存: ${live.html_saved_by_name} ${when(live.html_saved_at)}`, ` · saved by ${live.html_saved_by_name} ${when(live.html_saved_at)}`)}</span>}
                 </span>
-                <Tooltip content={t('プレビューから作った下書きに戻します', 'Reset to the draft built from the preview')} relationship="label">
-                  <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} disabled={!generated} onClick={() => setHtml(generated)} />
+                <Tooltip content={t('企画の見本(プレビューから作った下書き)に戻します', 'Reset to the plan sample (draft built from the preview)')} relationship="label">
+                  <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} disabled={!generated || htmlView === 'plan'} onClick={() => setHtml(generated)} />
                 </Tooltip>
-                <CopyButton text={shown} label={t('HTML をコピー', 'Copy HTML')} />
+                <CopyButton text={htmlView === 'plan' ? generated : shown} label={t('HTML をコピー', 'Copy HTML')} />
                 <Tooltip content={t('.html として保存', 'Download as .html')} relationship="label">
                   <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!shown} onClick={() => downloadText(`${(card.name ?? 'delivery').replace(/[\\/:*?"<>|]/g, '_')}.html`, shown)} />
                 </Tooltip>
@@ -562,15 +580,77 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                   </Button>
                 </Tooltip>
               </div>
-              <div className={s.editor}>{shown ? <HtmlEditor value={shown} onChange={setHtml} ariaLabel={t('HTML のエディタ', 'HTML editor')} /> : <Spinner size="tiny" label={t('プレビューから HTML を作っています…', 'Building HTML from the preview…')} />}</div>
-              <span className={s.note}>{t('プレビューと同じ見た目の下書きです。メールの配信のしくみにそのまま入れる完成品ではありません。画像は、このサイトの外で開くと見えないことがあります。', 'A draft with the same look as the preview, not a finished email. Images may not show outside this site.')}</span>
+              <div className={s.toolRow}>
+                <span className={s.seg} role="tablist" aria-label={t('どの HTML を見るか', 'Which HTML')}>
+                  {(
+                    [
+                      ['made', t('制作した HTML', 'Production HTML'), t('制作者が作った HTML(貼り付け・直して、版ごとに保存)', 'The HTML made by production (paste, edit and save per version)')],
+                      ['plan', t('企画の見本', 'Plan sample'), t('企画のプレビュー(AI と作った配信カードの中身)から作った HTML。見るだけ', 'HTML built from the plan preview (the delivery card made with AI). Read-only')],
+                    ] as const
+                  ).map(([k, label, tip]) => (
+                    <Button key={k} size="small" role="tab" aria-selected={htmlView === k} appearance={htmlView === k ? 'primary' : 'subtle'} className={s.segBtn} title={tip} onClick={() => setHtmlView(k)}>
+                      {label}
+                    </Button>
+                  ))}
+                </span>
+                {htmlView === 'made' && (
+                  <Button size="small" appearance="secondary" className={s.segBtn} icon={<ClipboardPasteRegular />} disabled={!live} title={live ? t('制作ツールなどで作った HTML を貼り付けて、いまの HTML と置き換えます(保存で確定)', 'Paste HTML made elsewhere to replace the current HTML (confirmed on save)') : t('依頼したあとに貼り付けられます', 'You can paste after the request')} onClick={() => setPasting('')}>
+                    {t('貼り付けて置き換える', 'Paste to replace')}
+                  </Button>
+                )}
+              </div>
+              {htmlView === 'plan' ? (
+                // 企画の見本: AI と作った配信カードの中身を描いて作った HTML。直さない(直すのは「制作した HTML」)
+                <pre className={s.planCode} aria-label={t('企画の見本の HTML', 'Plan sample HTML')}>{generated || t('プレビューから HTML を作っています…', 'Building HTML from the preview…')}</pre>
+              ) : (
+                <div className={s.editor}>{shown ? <HtmlEditor value={shown} onChange={setHtml} ariaLabel={t('HTML のエディタ', 'HTML editor')} /> : <Spinner size="tiny" label={t('プレビューから HTML を作っています…', 'Building HTML from the preview…')} />}</div>
+              )}
+              <span className={s.note}>
+                {htmlView === 'plan'
+                  ? t('企画の見本は、配信カードのプレビューと同じ見た目の HTML です(見るだけ)。制作した HTML と並べるときは、右のプレビューの「並べて比べる」。', 'The plan sample is HTML with the same look as the delivery card preview (read-only). To compare with the production HTML, use "Side by side" in the preview.')
+                  : savedHtml
+                    ? t('制作した HTML です。制作ツールで作ったものは「貼り付けて置き換える」で入れ、保存します。画像は、このサイトの外で開くと見えないことがあります。', 'The production HTML. Paste HTML made elsewhere with "Paste to replace", then save. Images may not show outside this site.')
+                    : t('まだ制作した HTML がないので、企画の見本から始めています。直すか、制作ツールで作ったものを「貼り付けて置き換える」で入れて、保存します。', 'No production HTML yet, so this starts from the plan sample. Edit it, or paste HTML made elsewhere with "Paste to replace", then save.')}
+              </span>
             </div>
 
             <Splitter onDrag={panes.onDrag(1)} onDone={panes.onDone} />
 
             {/* 3. プレビュー: エディタの HTML を、アプリの画面とは切り離した枠でそのまま描く */}
             <div className={s.fill}>
-              <HtmlPreviewFrame html={shown} title={t('HTML のプレビュー', 'HTML preview')} heading={t('プレビュー(HTML をそのまま描いたもの)', 'Preview (the HTML as is)')} headingClassName={s.sectionHead} />
+              {/* 見せ方: 制作した HTML / 企画の見本 / 並べて比べる(X58) */}
+              <div className={s.sectionHead}>
+                <span className={s.grow}>{t('プレビュー', 'Preview')}</span>
+                <span className={s.seg} role="tablist" aria-label={t('プレビューの見せ方', 'Preview mode')}>
+                  {(
+                    [
+                      ['made', t('制作した HTML', 'Production HTML')],
+                      ['plan', t('企画の見本', 'Plan sample')],
+                      ['compare', t('並べて比べる', 'Side by side')],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <Button key={k} size="small" role="tab" aria-selected={previewView === k} appearance={previewView === k ? 'primary' : 'subtle'} className={s.segBtn} onClick={() => setPreviewView(k)}>
+                      {label}
+                    </Button>
+                  ))}
+                </span>
+              </div>
+              {previewView === 'compare' ? (
+                <div className={s.compare}>
+                  <div className={s.compareCol}>
+                    <HtmlPreviewFrame html={generated} title={t('企画の見本のプレビュー', 'Plan sample preview')} heading={t('企画の見本', 'Plan sample')} />
+                  </div>
+                  <div className={s.compareCol}>
+                    <HtmlPreviewFrame html={shown} title={t('制作した HTML のプレビュー', 'Production HTML preview')} heading={t('制作した HTML', 'Production HTML')} />
+                  </div>
+                </div>
+              ) : (
+                <HtmlPreviewFrame
+                  html={previewView === 'plan' ? generated : shown}
+                  title={t('HTML のプレビュー', 'HTML preview')}
+                  heading={previewView === 'plan' ? t('企画の見本(配信カードのプレビューと同じ見た目)', 'Plan sample (same look as the delivery card preview)') : t('制作した HTML をそのまま描いたもの', 'The production HTML as is')}
+                />
+              )}
             </div>
 
             <Splitter onDrag={talkOpen ? panes.onDrag(2) : () => undefined} onDone={panes.onDone} />
@@ -606,6 +686,38 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
               </div>
             </div>
           </div>
+        )}
+        {finishedOpen && live && (
+          <FinishedFloat card={card} request={live} people={people} productIds={snap.productIds} products={snap.products} onClose={() => setFinishedOpen(false)} />
+        )}
+        {/* 制作した HTML を貼り付けて置き換える(X58) */}
+        {pasting !== null && (
+          <Dialog open onOpenChange={(_, d) => !d.open && setPasting(null)}>
+            <DialogSurface>
+              <DialogBody>
+                <DialogTitle>{t('制作した HTML を貼り付ける', 'Paste the production HTML')}</DialogTitle>
+                <DialogContent>
+                  <Textarea className={s.pasteBox} value={pasting} onChange={(_, d) => setPasting(d.value)} placeholder={t('ここに HTML を貼り付けます(<html> から </html> まで、まるごと)', 'Paste the whole HTML here (from <html> to </html>)')} />
+                  <span className={s.note}>{t('いまの HTML と置き換わります。保存するまでは、この版には残りません。', 'This replaces the current HTML. It is not kept in this version until you save.')}</span>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setPasting(null)}>{t('やめる', 'Cancel')}</Button>
+                  <Button
+                    appearance="primary"
+                    disabled={!pasting.trim()}
+                    onClick={() => {
+                      setHtml(pasting)
+                      setHtmlView('made')
+                      setPreviewView('compare')
+                      setPasting(null)
+                    }}
+                  >
+                    {t('置き換えて、並べて比べる', 'Replace and compare')}
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
         )}
       </DialogSurface>
     </Dialog>

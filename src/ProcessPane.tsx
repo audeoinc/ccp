@@ -11,6 +11,7 @@ import { HandoffPanel } from './HandoffPanel'
 import { TasksPanel } from './TasksPanel'
 import { CommentsPanel } from './CommentsPanel'
 import { CreativeAssets } from './CreativeAssets'
+import { FinishedFloat } from './FinishedFloat'
 import { LockMark } from './LockMark'
 import { MarkdownLite } from './MarkdownLite'
 import { isThreadRoot, stageOf } from './notesStage'
@@ -150,7 +151,7 @@ export function ProcessPane(props: Props) {
           </>
         )}
       </div>
-      {props.card && props.onOpenProduction && statusRank(props.card.status) >= statusRank('approved') && <ProductionChip card={props.card} onOpen={props.onOpenProduction} />}
+      {props.card && props.onOpenProduction && statusRank(props.card.status) >= statusRank('approved') && <ProductionChip card={props.card} onOpen={props.onOpenProduction} people={props.people} productIds={props.productIds} products={props.products} />}
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TalkTab)}>
         <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}`}</Tab>
         <Tab value="threads">{`${t('やり取り', 'Conversation')}${count(openThreads)}`}</Tab>
@@ -273,7 +274,8 @@ export function ProcessRail({ card, status, onOpen }: { card?: DeliveryCard; sta
  * 「制作の依頼」の札(バックログ PR4)。承認済みの配信で、制作の状態(いま、だれの番か)を出し、押すと制作のページを開く。
  * 承認のあとの「どう見せるか」のやり取りは、制作のページで行う(docs/PRODUCTION.md)
  */
-function ProductionChip({ card, onOpen }: { card: DeliveryCard; onOpen: (cardId: string) => void }) {
+function ProductionChip({ card, onOpen, people, productIds, products }: { card: DeliveryCard; onOpen: (cardId: string) => void; people: string[]; productIds: string[]; products: Product[] }) {
+  const [finished, setFinished] = useState(false)
   const s = useStyles()
   const t = useT()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -303,6 +305,13 @@ function ProductionChip({ card, onOpen }: { card: DeliveryCard; onOpen: (cardId:
       <Button size="small" appearance={next ? 'primary' : 'secondary'} onClick={() => onOpen(card.id)}>
         {next ? t('制作に依頼する', 'Request production') : t('制作のページ', 'Production page')}
       </Button>
+      {/* 制作したもの(HTML・ひとこと・リンク)ができたら、仕上がりを見る(X58 段階 4) */}
+      {req && (req.done_at || req.html) && (
+        <Button size="small" appearance="subtle" onClick={() => setFinished(true)}>
+          {t('仕上がりを見る', 'View result')}
+        </Button>
+      )}
+      {finished && req && <FinishedFloat card={card} request={req} people={people} productIds={productIds} products={products} onClose={() => setFinished(false)} />}
     </div>
   )
 }

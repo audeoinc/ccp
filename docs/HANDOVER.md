@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X58 素材(Creative Assets)の段階 1。6.44。その前は X57 案から選ぶ。6.43)
+- 最終更新: 2026-10-21(X58 素材・パックの足すだけの取り込み・制作した HTML と並べて比べる・仕上がりを見る。6.44)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -622,7 +622,9 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 画面: `src/CreativeAssets.tsx`(一覧・追加・素材のフロート)。窓口は `src/data/cardAssets.ts`(表)と `src/data/creativeFiles.ts`(ファイル。撮影用は `src/mock/creativeFiles.ts` がブラウザの中だけに置く)。決まりは `src/creativeConst.ts`(サーバーと同じ値)。`CommentsPanel` に `assetId`(その素材のスレッドだけ。段階によらず出す)・`assets`(札の名前)・`compact`。配信カードは `ProcessPane` のタブ「素材」、制作のページは右のペインのタブ「素材」。
 - 確かめたこと: サーバーのテスト(`server/tests/test_creative.py`)。モックで、画像の追加・URL の追加・素材のフロート・素材へのコメント。本番の GCS への書き込みは、反映のあとに確かめる。
 - **段階 2 パック(2026-10-21)**: 書き出し(`pack.py` の `export_pack`)に、`card_assets` の `stored` のファイルを `images/creative/<名前>` で入れる(取り込み先のフォルダの `creative/` が、そのまま置き場所)。取り込みに「足すだけ」: `pack.add_tables`(テーブルごとに、いまある id を読み、ない行だけを `INSERT … ON CONFLICT DO NOTHING`。1 行ずつ SAVEPOINT で試し、参照先がないなどで失敗した行は数えて進める)、`cli.import_pack(..., add=True)`(すでにあるファイルは置き換えない)、`scripts/workbench.sh import --add <ZIP>`。手順は WORKBENCH.md の 3.7。テストは `server/tests/test_pack_add.py`(偽の接続で)。本物の PostgreSQL での確かめは、まだ(手元に DB がないため。Workbench か本番の写しで試す)。
-- 残り(BACKLOG X58): 制作した HTML の貼り付けと並べて比べる、仕上がりを見るフロート。
+- **段階 3 制作した HTML(2026-10-21)**: `ProductionPage` の HTML のエディタを `htmlView`('made' = 制作した HTML / 'plan' = 企画の見本 = `generated`。見るだけで `<pre>`)、プレビューを `previewView`('made' / 'plan' / 'compare' = `HtmlPreviewFrame` を 2 つ横に)。「貼り付けて置き換える」(`pasting` のダイアログ。置き換えたら並べて比べるにする。保存は今までどおり `saveHtml`)。依頼する前は押せない(保存先の版がないため)。データの形は変えていない(`production_requests.html` = 制作した HTML)。
+- **段階 4 仕上がりを見る(2026-10-21)**: `src/FinishedFloat.tsx`。左に `request.html` のプレビュー、右に done_note・done_link・revision_note・instructions と `CreativeAssets`。制作のページの工程 ④ の「仕上がりを見る」、配信カードの `ProductionChip`(制作が終わったか HTML があるとき)から開く。
+- モックで確かめた: 依頼 → 受け取る → 貼り付けて置き換える → 並べて比べる → 保存 → 制作が終わった(リンク付き)→ 仕上がりを見る(貼った HTML・リンクが出る)。
 
 ## 7. 落とし穴
 
