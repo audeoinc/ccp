@@ -1,4 +1,4 @@
-import { Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { sortSizes, stockoutRate, useProductSkus, type SkuRow } from './useProductSkus'
 import { locale, useT } from './i18n'
@@ -14,7 +14,7 @@ const useStyles = makeStyles({
   kpiValue: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   kpiSub: { marginLeft: '6px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   bad: { color: tokens.colorPaletteRedForeground1 },
-  sectionTitle: { color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
+  sectionTitle: { display: 'flex', alignItems: 'center', columnGap: '8px', color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
   scroll: { overflowX: 'auto', minWidth: 0 },
   table: { borderCollapse: 'separate', borderSpacing: '3px', fontSize: tokens.fontSizeBase200, fontVariantNumeric: 'tabular-nums' },
   th: { padding: '2px 6px', color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightMedium, whiteSpace: 'nowrap', textAlign: 'center' },
@@ -52,6 +52,7 @@ export function ProductSkus({ product: p }: { product: Product }) {
   const byKey = new Map(data.map((r) => [`${r.color || '—'}|${sizeKey(r)}`, r]))
   const asOf = data.reduce((a, r) => ((r.as_of ?? '') > a ? (r.as_of ?? '') : a), '')
   const num = (n: number) => n.toLocaleString(locale())
+  const sample = data.some((r) => r.sample)
 
   return (
     <div className={s.root}>
@@ -73,7 +74,15 @@ export function ProductSkus({ product: p }: { product: Product }) {
         </div>
       </div>
 
-      <span className={s.sectionTitle}>{t('色 × サイズの在庫', 'Stock by color and size')}</span>
+      <span className={s.sectionTitle}>
+        {t('色 × サイズの在庫', 'Stock by color and size')}
+        {/* 見本(⚙ で作った SKU)は、本物と取り違えないように印を出す */}
+        {sample && (
+          <Tooltip content={t('⚙ の「見本の SKU を作る」で作った SKU です(色・サイズは仮。在庫の合計は商品の在庫に合わせています)。BigQuery の SKU が入ると、置き換わります', 'Created with ⚙ → Create sample SKUs (placeholder colors and sizes; total matches product stock). Replaced when BigQuery SKUs arrive.')} relationship="description">
+            <Badge size="small" appearance="tint" color="warning">{t('見本', 'Sample')}</Badge>
+          </Tooltip>
+        )}
+      </span>
       <div className={s.scroll}>
         <table className={s.table}>
           <thead>

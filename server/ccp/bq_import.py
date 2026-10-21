@@ -136,12 +136,19 @@ def spu_mismatch(rows: list[dict[str, Any]], existing: list[dict[str, Any]]) -> 
     return None
 
 
-async def _replace(conn: AsyncConnection, table: str, rows: list[dict[str, Any]], cols: list[str], extra: Any = None, scope: str | None = None) -> str:
+# 画面の ⚙ の「見本の SKU を作る」で入れた行の印(sku・sku_stock の source。X63)。BigQuery から入れた行は空
+SAMPLE = "sample"
+
+
+async def _replace(conn: AsyncConnection, table: str, rows: list[dict[str, Any]], cols: list[str], extra: Any = None, scope: str | None = None, keep_sample: bool = False) -> str:
     """表を入れ替える。scope を渡すと、取り込む行にあるその列の値(商品コードなど)の行だけを消して入れ替える(ほかの行は残す)。
-    2026-10-17 に、本番にない商品のダミーを取り込んで、本番の週ごとの実績を全部消してしまった。BigQuery にない商品の行は、消さない"""
+    2026-10-17 に、本番にない商品のダミーを取り込んで、本番の週ごとの実績を全部消してしまった。BigQuery にない商品の行は、消さない。
+    keep_sample なら、見本の行(source = 'sample')は消さない(SKU の在庫は 1 時間に数回入れ替わるので、そのたびに見本が消えないように)"""
     if scope:
         keys = sorted({str(r[scope]) for r in rows if r.get(scope) is not None})
         await conn.execute(text(f"DELETE FROM {table} WHERE {scope} = ANY(:keys)"), {"keys": keys})
+    elif keep_sample:
+        await conn.execute(text(f"DELETE FROM {table} WHERE source IS DISTINCT FROM :sample"), {"sample": SAMPLE})
     else:
         await conn.execute(text(f"DELETE FROM {table}"))
     values = [{**_values(table, r, cols), **(extra(r) if extra else {})} for r in rows]
@@ -155,9 +162,16 @@ async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -
     if name == "spu":
         return await _write_spu(conn, rows)
     if name == "sku":
-        return await _replace(conn, "sku", rows, ["market", "sku_code", "product_code", "color", "size", "length", "price", "units_4w", "as_of"])
+        # BigQuery の SKU が来た商品の見本は消す(本物と見本を、同じ商品に混ぜない)。ほかの商品の見本は残す
+        codes = sorted({str(r["product_code"]) for r in rows if r.get("product_code") is not None})
+        await conn.execute(text("""
+            DELETE FROM sku_stock WHERE source = :sample
+              AND sku_code IN (SELECT sku_code FROM sku WHERE source = :sample AND product_code = ANY(:codes))
+        """), {"sample": SAMPLE, "codes": codes})
+        await conn.execute(text("DELETE FROM sku WHERE source = :sample AND product_code = ANY(:codes)"), {"sample": SAMPLE, "codes": codes})
+        return await _replace(conn, "sku", rows, ["market", "sku_code", "product_code", "color", "size", "length", "price", "units_4w", "as_of"], keep_sample=True)
     if name == "sku_stock":
-        return await _replace(conn, "sku_stock", rows, ["market", "sku_code", "stock", "as_of"])
+        return await _replace(conn, "sku_stock", rows, ["market", "sku_code", "stock", "as_of"], keep_sample=True)
     if name == "weekly":
         # name は、いまの画面・初期データと同じ「商品コード 週の始まり」
         return await _replace(conn, "weekly_performances", rows, ["market", "product_code", "week_start", "units", "revenue", "stock"],
@@ -170,12 +184,14 @@ async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -
 
 async def _sum_stock(conn: AsyncConnection) -> None:
     """SPU の在庫(products.stock)を、SKU の在庫の合計にする。在庫の行がない SKU は 0(BIGQUERY_EXPORT.md の 4 章)。
-    SKU と在庫を入れ替えたのと同じトランザクションで書くので、SPU と SKU の在庫が食い違わない"""
+    SKU と在庫を入れ替えたのと同じトランザクションで書くので、SPU と SKU の在庫が食い違わない。
+    見本の SKU(source = 'sample')は数えない(見本は、いまの商品の在庫に合わせて作った写しで、在庫の出どころではないため)"""
     await conn.execute(text("""
         UPDATE products AS p SET stock = s.total, modified_on = now()
         FROM (
           SELECT k.market, k.product_code, SUM(COALESCE(st.stock, 0)) AS total
-          FROM sku AS k LEFT JOIN sku_stock AS st ON st.market = k.market AND st.sku_code = k.sku_code
+          FROM sku AS k LEFT JOIN sku_stock AS st ON st.market = k.market AND st.sku_code = k.sku_code AND st.source IS DISTINCT FROM 'sample'
+          WHERE k.source IS DISTINCT FROM 'sample'
           GROUP BY k.market, k.product_code
         ) AS s
         WHERE p.product_code = s.product_code AND (p.market = s.market OR p.market IS NULL) AND p.stock IS DISTINCT FROM s.total
@@ -184,7 +200,7 @@ async def _sum_stock(conn: AsyncConnection) -> None:
     await conn.execute(text("""
         UPDATE products AS p SET stock = 0, modified_on = now()
         WHERE p.as_of IS NOT NULL AND COALESCE(p.stock, 0) <> 0
-          AND NOT EXISTS (SELECT 1 FROM sku AS k WHERE k.product_code = p.product_code AND (k.market = p.market OR p.market IS NULL))
+          AND NOT EXISTS (SELECT 1 FROM sku AS k WHERE k.product_code = p.product_code AND (k.market = p.market OR p.market IS NULL) AND k.source IS DISTINCT FROM 'sample')
     """))
 
 
@@ -193,7 +209,7 @@ async def _db_context(conn: AsyncConnection, name: str) -> list[dict[str, Any]]:
     if name == "spu":
         sql = "SELECT market, product_code FROM products WHERE as_of IS NOT NULL"
     else:
-        sql = "SELECT market, sku_code FROM sku"
+        sql = "SELECT market, sku_code FROM sku WHERE source IS DISTINCT FROM 'sample'"
     return [dict(r) for r in (await conn.execute(text(sql))).mappings().all()]
 
 

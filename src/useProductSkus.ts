@@ -5,6 +5,7 @@ import { SkuService } from './data/sku'
 import { SkuStockService } from './data/skuStock'
 import { tr } from './i18n'
 import { productMarket } from './market'
+import { SAMPLE_SOURCE } from './skuSampleData'
 
 export interface SkuRow {
   sku_code: string
@@ -16,6 +17,8 @@ export interface SkuRow {
   units_4w?: number
   /** 在庫の時点 */
   as_of?: string
+  /** ⚙ で作った見本の SKU か(X63) */
+  sample: boolean
 }
 
 // 同じ商品を開き直したときに、取り直さない(画面を開いている間だけ。見本を作ったら捨てる)
@@ -34,12 +37,17 @@ async function load(p: Product): Promise<SkuRow[]> {
   // 絞り込みは 1 つの列だけにする(撮影用のビルドの身代わりが、and を読めないため)。市場は、読んだあとに絞る
   const res = await SkuService.getAll({ filter: `product_code eq ${q(p.product_code)}`, top: 500 })
   if (!res.success) throw new Error(res.error?.message ?? tr('SKU を取得できませんでした', 'Failed to load SKUs'))
-  const skus = (res.data ?? []).filter((s) => s.sku_code && (!s.market || s.market === market))
+  const mine = (res.data ?? []).filter((s) => s.sku_code && (!s.market || s.market === market))
+  // 本物(BigQuery)の SKU があれば、見本は出さない(取り込みで消えるまでの間に、両方が見えないように)
+  const real = mine.filter((s) => s.source !== SAMPLE_SOURCE)
+  const skus = real.length ? real : mine
   // 在庫は SKU ごとに読む(表の窓口が「どれかに当てはまる」の絞り込みを持たないため。1 つの SPU の SKU は多くても数十)
   const stocks = await Promise.all(skus.map((s) => SkuStockService.getAll({ filter: `sku_code eq ${q(s.sku_code ?? '')}`, top: 5 })))
   return skus.map((s, i) => {
-    const st = (stocks[i].success ? (stocks[i].data ?? []) : []).find((r) => !r.market || r.market === market)
-    return { sku_code: s.sku_code ?? '', color: s.color ?? '', size: s.size ?? '', length: s.length ?? '', stock: st?.stock ?? 0, units_4w: s.units_4w, as_of: st?.as_of ?? s.as_of }
+    const sample = s.source === SAMPLE_SOURCE
+    // 在庫も、同じ出どころの行だけ(見本の在庫を、本物の SKU に当てない)
+    const st = (stocks[i].success ? (stocks[i].data ?? []) : []).find((r) => (!r.market || r.market === market) && (r.source === SAMPLE_SOURCE) === sample)
+    return { sku_code: s.sku_code ?? '', color: s.color ?? '', size: s.size ?? '', length: s.length ?? '', stock: st?.stock ?? 0, units_4w: s.units_4w, as_of: st?.as_of ?? s.as_of, sample }
   })
 }
 

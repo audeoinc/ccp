@@ -15,6 +15,8 @@ export interface SkuFields {
   units_4w?: number
   /** BigQuery 側のデータの時点 */
   as_of?: string
+  /** 出どころ: 'sample' = ⚙ で作った見本(X63)。空 = BigQuery から取り込んだ本物 */
+  source?: string
   state_code?: number
 }
 

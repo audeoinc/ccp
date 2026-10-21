@@ -311,7 +311,8 @@
     ["length", "text"],
     ["price", "numeric"],
     ["units_4w", "int"],
-    ["as_of", "timestamptz"]
+    ["as_of", "timestamptz"],
+    ["source", "text"]
    ],
    "lookups": [
    ]
@@ -321,7 +322,8 @@
     ["market", "text"],
     ["sku_code", "text", {"index": true}],
     ["stock", "int"],
-    ["as_of", "timestamptz"]
+    ["as_of", "timestamptz"],
+    ["source", "text"]
    ],
    "lookups": [
    ]

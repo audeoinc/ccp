@@ -91,7 +91,7 @@ import { ProductsView } from './ProductsView'
 import { ImpactView } from './ImpactView'
 import type { VariantKey } from './abTest'
 import { createAbExamples, isAbSeed } from './abSeed'
-import { createSampleSkus } from './skuSample'
+import { createSampleSkus, removeSampleSkus } from './skuSample'
 import { clearProductSkusCache } from './useProductSkus'
 import { countAssetExamples, createAssetExamples, removeAssetExamples } from './assetSeed'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -1547,28 +1547,45 @@ function App() {
               >
                 {t('素材の見本を消す', 'Delete sample assets')}
               </MenuItem>
-              {/* 見本の SKU(X63)。SKU がまだない商品にだけ、色 × サイズの SKU と在庫を足す。本物の SKU(BigQuery)を取り込んでいる環境では出さない */}
-              {!bq?.configured && (
-                <MenuItem
-                  icon={<BeakerRegular />}
-                  disabled={skuBusy}
-                  onClick={async () => {
-                    if (!window.confirm(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?'))) return
-                    setSkuBusy(true)
-                    try {
-                      const n = await createSampleSkus(products, (done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を作っています(${done} / ${total})`, `Creating sample SKUs (${done} / ${total})`) }))
-                      clearProductSkusCache()
-                      setBqNotice({ intent: 'success', text: n ? tr(`見本の SKU を ${n} 件作りました(商品のフロートの「SKU」のタブで見られます)`, `Created ${n} sample SKUs (see the SKUs tab of a product)`) : tr('どの商品にも SKU があるので、作りませんでした', 'Every product already has SKUs; nothing created') })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    } finally {
-                      setSkuBusy(false)
-                    }
-                  }}
-                >
-                  {skuBusy ? t('見本の SKU を作っています…', 'Creating sample SKUs…') : t('見本の SKU を作る', 'Create sample SKUs')}
-                </MenuItem>
-              )}
+              {/* 見本の SKU(X63)。SKU がまだない商品にだけ、色 × サイズの SKU と在庫を足す。見本には印(source)があり、BigQuery の取り込みは見本を消さず、在庫の合計にも数えない */}
+              <MenuItem
+                icon={<BeakerRegular />}
+                disabled={skuBusy}
+                onClick={async () => {
+                  if (!window.confirm(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?'))) return
+                  setSkuBusy(true)
+                  try {
+                    const n = await createSampleSkus(products, (done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を作っています(${done} / ${total})`, `Creating sample SKUs (${done} / ${total})`) }))
+                    clearProductSkusCache()
+                    setBqNotice({ intent: 'success', text: n ? tr(`見本の SKU を ${n} 件作りました(商品のフロートの「SKU」のタブで見られます)`, `Created ${n} sample SKUs (see the SKUs tab of a product)`) : tr('どの商品にも SKU があるので、作りませんでした', 'Every product already has SKUs; nothing created') })
+                  } catch (e) {
+                    setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                  } finally {
+                    setSkuBusy(false)
+                  }
+                }}
+              >
+                {skuBusy ? t('見本の SKU を作っています…', 'Creating sample SKUs…') : t('見本の SKU を作る', 'Create sample SKUs')}
+              </MenuItem>
+              <MenuItem
+                icon={<DeleteRegular />}
+                disabled={skuBusy}
+                onClick={async () => {
+                  if (!window.confirm(tr('見本の SKU と、その在庫を消します(BigQuery から入れた本物の SKU は消しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?'))) return
+                  setSkuBusy(true)
+                  try {
+                    const n = await removeSampleSkus((done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を消しています(${done} / ${total})`, `Deleting sample SKUs (${done} / ${total})`) }))
+                    clearProductSkusCache()
+                    setBqNotice({ intent: 'success', text: tr(`見本の SKU を ${n} 件消しました`, `Deleted ${n} sample SKUs`) })
+                  } catch (e) {
+                    setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                  } finally {
+                    setSkuBusy(false)
+                  }
+                }}
+              >
+                {t('見本の SKU を消す', 'Delete sample SKUs')}
+              </MenuItem>
               {/* AB テスト・案から選ぶの例の配信を作る(X55・X57。利用者の依頼で、本番にも用意する。新しい配信を足すだけで、今ある配信は触らない) */}
               <MenuItem
                 icon={<BeakerRegular />}

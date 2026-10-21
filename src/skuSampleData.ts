@@ -59,6 +59,9 @@ function split(total: number, weights: number[]): number[] {
   return out
 }
 
+/** 見本の行の印(sku・sku_stock の source)。BigQuery の取り込みは、この行を消さず、在庫の合計にも数えない(server/ccp/bq_import.py) */
+export const SAMPLE_SOURCE = 'sample'
+
 export interface SampleSku {
   sku: SkuFields
   stock: SkuStockFields
@@ -89,10 +92,11 @@ export function buildSampleSkus(p: ProductLike, asOf: string): SampleSku[] {
   const stocks = split(Math.max(0, Math.round(p.stock ?? 0)), weights)
   const units = split(Math.max(0, Math.round(p.units_4w ?? 0)), combos.map(({ color, size }) => 0.3 + rand(`${code}:${color}:${size}:u`)))
   return combos.map(({ color, ci, size }, i) => {
-    const sku_code = `${code}-${String(ci + 1).padStart(2, '0')}-${size.replace(/\s+/g, '')}`
+    // 本物の SKU のコードと重ならないよう、先頭に SMP- を付ける
+    const sku_code = `SMP-${code}-${String(ci + 1).padStart(2, '0')}-${size.replace(/\s+/g, '')}`
     return {
-      sku: { market, sku_code, product_code: code, color, size, price: p.price, units_4w: units[i], as_of: asOf },
-      stock: { market, sku_code, stock: stocks[i], as_of: asOf },
+      sku: { market, sku_code, product_code: code, color, size, price: p.price, units_4w: units[i], as_of: asOf, source: SAMPLE_SOURCE },
+      stock: { market, sku_code, stock: stocks[i], as_of: asOf, source: SAMPLE_SOURCE },
     }
   })
 }
