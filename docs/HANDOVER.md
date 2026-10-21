@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(新しい順。詳しくは [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md))
 
+- 2026-10-22: **B10 Workbench の開発用の画面の設計**([DEVTOOLS.md](DEVTOOLS.md)。`/dev/`、Gemini と BigQuery の出力の SQL・GCS のポリシーの文書を作る。まだ作っていない。9 章の未決を利用者に確かめてから 8 章の 1 から)
 - 2026-10-21: X66 制作のページの AI チャット(見た目は案をプレビューで並べて採用、文言・画像・商品は左の 1 行のフロートで。記録の末尾)
 - 2026-10-21: **当面、承認の前でも制作に進める・依頼できる**(本番・Workbench も。実践で使い始めるときに戻すかもしれない。戻すのは `src/productionGate.ts` と `server/ccp/production.py` の `REQUIRE_APPROVAL` の 2 か所。記録の末尾)
 - 2026-10-21: 週・月の振り返りを AI で下書き(月は表 `months` に保存。本物の Gemini での質は未確認。記録の同名の節)
