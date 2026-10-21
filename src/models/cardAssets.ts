@@ -20,6 +20,12 @@ export interface CardAssetFields {
   note?: string
   /** 入れた人(その時の名前) */
   added_by?: string
+  /** kind = url の見本カード(ページの題名・説明・サイト名・代表の画像。画像は素材のファイルと同じ置き場所の名前)と、取った日時 */
+  preview_title?: string
+  preview_description?: string
+  preview_site?: string
+  preview_image?: string
+  preview_at?: string
   /** delivery_cards の id */
   delivery_card_id?: string | null
 }

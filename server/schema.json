@@ -170,7 +170,12 @@
     ["content_type", "text"],
     ["size", "int"],
     ["note", "text"],
-    ["added_by", "text"]
+    ["added_by", "text"],
+    ["preview_title", "text"],
+    ["preview_description", "text"],
+    ["preview_site", "text"],
+    ["preview_image", "text"],
+    ["preview_at", "timestamptz"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]

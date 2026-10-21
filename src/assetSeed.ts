@@ -8,6 +8,7 @@ import { ProductionRequestsService } from './data/productionRequests'
 import { tr } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
 import { statusRank } from './status'
+import { refreshPreview } from './creativePreview'
 
 /** 見本の印(名前の先頭) */
 export const ASSET_SAMPLE_PREFIX = '見本:'
@@ -195,7 +196,8 @@ export async function createAssetExamples(args: { cards: DeliveryCard[]; me: str
         fields = { kind: 'file', file_name: f.name, stored: up.stored, content_type: up.contentType, size: up.size }
       }
       const res = await CardAssetsService.create({ name: it.name, note: it.note, added_by: args.me, delivery_card_id: card.id, ...fields })
-      if (!res.success) throw new Error(res.error?.message ?? tr('見本を保存できませんでした', 'Could not save a sample'))
+      if (!res.success || !res.data) throw new Error(res.error?.message ?? tr('見本を保存できませんでした', 'Could not save a sample'))
+      if (it.url) await refreshPreview(res.data).catch(() => undefined)
       count++
     }
   }
@@ -209,6 +211,7 @@ export async function removeAssetExamples(): Promise<number> {
   for (const a of rows) {
     await CardAssetsService.delete(a.id)
     if (a.stored) await CreativeFiles.remove(a.stored)
+    if (a.preview_image) await CreativeFiles.remove(a.preview_image)
   }
   return rows.length
 }

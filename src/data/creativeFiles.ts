@@ -24,6 +24,13 @@ export const CreativeFiles = {
   url(stored: string, download?: string): string {
     return appPath(`/api/creative/files/${encodeURIComponent(stored)}${download ? `?download=${encodeURIComponent(download)}` : ''}`)
   },
+  /** URL のページを 1 回読み、見本カード(題名・説明・サイト名・代表の画像)を作る。読めなければ例外 */
+  async preview(url: string): Promise<{ title: string; description: string; site: string; image_stored: string }> {
+    const res = await fetch(appPath('/api/creative/preview'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+    const json = (await res.json().catch(() => null)) as { success: boolean; data?: { title: string; description: string; site: string; image_stored: string }; error?: { message: string } } | null
+    if (!json?.success || !json.data) throw new Error(json?.error?.message ?? `ページを読めませんでした(${res.status})`)
+    return json.data
+  },
   /** ファイルを消す(表の行は、呼び出し側が消す) */
   async remove(stored: string): Promise<void> {
     await fetch(appPath(`/api/creative/files/${encodeURIComponent(stored)}`), { method: 'DELETE' })

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Field, Input, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, AttachRegular, DeleteRegular, DismissRegular, DocumentPdfRegular, DocumentRegular, EditRegular, LinkRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowSyncRegular, AttachRegular, DeleteRegular, DismissRegular, DocumentPdfRegular, DocumentRegular, EditRegular, LinkRegular, OpenRegular } from '@fluentui/react-icons'
 import { CardAssetsService } from './data/cardAssets'
 import { CardNotesService } from './data/cardNotes'
 import { CreativeFiles } from './data/creativeFiles'
 import { CREATIVE_EXTS, CREATIVE_MAX_BYTES, IMAGE_EXTS, extOf } from './creativeConst'
 import { CommentsPanel } from './CommentsPanel'
+import { refreshPreview } from './creativePreview'
 import { myName, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import type { CardAsset } from './models/cardAssets'
@@ -64,6 +65,12 @@ const useStyles = makeStyles({
   meta: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', rowGap: '4px' },
   url: { overflowWrap: 'anywhere', fontSize: tokens.fontSizeBase200 },
+  // URL の見本カード
+  linkCard: { display: 'grid', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusLarge, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
+  linkImage: { width: '100%', maxHeight: '52vh', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3 },
+  linkBody: { display: 'grid', rowGap: '4px', padding: '10px 12px' },
+  linkTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
+  linkDesc: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground2 },
 })
 
 const sizeText = (n?: number) => (!n ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`)
@@ -179,11 +186,22 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
     setBusy(true)
     setError(null)
     const res = await CardAssetsService.create({ name: urlName.trim() || hostOf(u), kind: 'url', url: u, note: note.trim(), added_by: me, delivery_card_id: cardId })
-    if (!res.success) setError(res.error?.message ?? tr('素材を保存できませんでした', 'Could not save the asset'))
+    if (!res.success || !res.data) setError(res.error?.message ?? tr('素材を保存できませんでした', 'Could not save the asset'))
     else {
       setUrl('')
       setUrlName('')
       setNote('')
+      // 見本カード(題名・説明・代表の画像)を取る。読めなくても、URL の素材としては使える
+      try {
+        await refreshPreview(res.data)
+        // 題名を入れていなければ、ページの題名を素材の名前にする
+        if (!urlName.trim()) {
+          const p = await CardAssetsService.get(res.data.id)
+          if (p.success && p.data?.preview_title) await CardAssetsService.update(res.data.id, { name: p.data.preview_title })
+        }
+      } catch (e) {
+        setError(tr(`URL は追加しました。見本カードは作れませんでした(${e instanceof Error ? e.message : String(e)})`, `Added the URL, but could not build the preview card (${e instanceof Error ? e.message : String(e)})`))
+      }
     }
     setBusy(false)
     await load()
@@ -266,6 +284,8 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
                 <button key={a.id} type="button" className={s.tile} onClick={() => setOpenId(a.id)} title={a.note || a.name}>
                   {isImage(a) && a.stored ? (
                     <img className={s.thumb} src={CreativeFiles.url(a.stored)} alt="" loading="lazy" />
+                  ) : a.kind === 'url' && a.preview_image ? (
+                    <img className={s.thumb} src={CreativeFiles.url(a.preview_image)} alt="" loading="lazy" />
                   ) : (
                     <span className={s.icon}>{a.kind === 'url' ? <LinkRegular /> : isPdf(a) ? <DocumentPdfRegular /> : <DocumentRegular />}</span>
                   )}
@@ -340,6 +360,7 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
     try {
       await CardAssetsService.delete(a.id)
       if (a.stored) await CreativeFiles.remove(a.stored)
+      if (a.preview_image) await CreativeFiles.remove(a.preview_image)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : tr('消せませんでした', 'Could not delete'))
@@ -363,9 +384,16 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
               ) : isPdf(a) ? (
                 <iframe className={s.frame} src={fileUrl} title={a.name} />
               ) : a.kind === 'url' ? (
-                <div className={s.meta}>
-                  <span className={s.url}>{a.url}</span>
-                  <span className={s.caption}>{t('参考のページは、新しいタブで開きます(外のページは、ここには埋め込めないことが多いため)。', 'Reference pages open in a new tab (most sites cannot be embedded here).')}</span>
+                // 見本カード(ページは埋め込めないことが多いので、題名・説明・代表の画像で見せる)
+                <div className={s.linkCard}>
+                  {a.preview_image && <img className={s.linkImage} src={CreativeFiles.url(a.preview_image)} alt="" />}
+                  <div className={s.linkBody}>
+                    {a.preview_site && <span className={s.caption}>{a.preview_site}</span>}
+                    <span className={s.linkTitle}>{a.preview_title || a.name}</span>
+                    {a.preview_description && <span className={s.linkDesc}>{a.preview_description}</span>}
+                    <span className={s.url}>{a.url}</span>
+                    {!a.preview_at && <span className={s.caption}>{t('まだ見本カードがありません。「見本カードを取る」で、ページの題名・説明・代表の画像を取ります。', 'No preview card yet. Use "Get preview" to fetch the page title, description and image.')}</span>}
+                  </div>
                 </div>
               ) : (
                 <div className={s.meta}>
@@ -375,9 +403,33 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
               )}
               <div className={s.actions}>
                 {a.kind === 'url' ? (
-                  <Button size="small" icon={<OpenRegular />} as="a" href={a.url} target="_blank" rel="noreferrer">
-                    {t('ページを開く', 'Open page')}
-                  </Button>
+                  <>
+                    <Button size="small" icon={<OpenRegular />} as="a" href={a.url} target="_blank" rel="noreferrer">
+                      {t('ページを開く', 'Open page')}
+                    </Button>
+                    {canEdit && (
+                      <Button
+                        size="small"
+                        appearance="subtle"
+                        icon={<ArrowSyncRegular />}
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true)
+                          setError(null)
+                          try {
+                            await refreshPreview(a)
+                            await onChanged()
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : String(e))
+                          } finally {
+                            setBusy(false)
+                          }
+                        }}
+                      >
+                        {a.preview_at ? t('見本カードを取り直す', 'Refresh preview') : t('見本カードを取る', 'Get preview')}
+                      </Button>
+                    )}
+                  </>
                 ) : (
                   <>
                     <Button size="small" icon={<OpenRegular />} as="a" href={fileUrl} target="_blank" rel="noreferrer">
