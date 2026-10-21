@@ -318,6 +318,24 @@ export function mockAgent(message: string): string {
       : J({ template: 'cat2', reason: '複数の切り口(アウターとニット)を並べて見せたいテーマのため。' })
   }
 
+  // 制作のページの手直し: 文言の頼みは要素の直し、画像の頼みはメイン画像の差し替え、それ以外は見た目(本文の背景)の直しを返す
+  if (task === 'revise_production') {
+    const req = String(p.request ?? '')
+    if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: hasJa(req) ? '全体のまとまりは良いです。ボタンの色を少し強めると、押してほしい所がより伝わります。' : 'It hangs together well. A slightly stronger button color would make the call to action clearer.' })
+    const els = (p.elements ?? {}) as { texts?: { id: string; value: string }[]; hero?: { id: string } | null }
+    const heroes = ((p.candidates as { heroes?: { id: string }[] } | undefined)?.heroes ?? []).filter((h) => h.id !== els.hero?.id)
+    const edits: Obj[] = []
+    if (/見出し|ヘッドライン|件名|短く|headline|subject|shorter/i.test(req)) {
+      const head = els.texts?.find((x) => x.id === 'headline')
+      if (head?.value) edits.push({ id: 'headline', value: head.value.slice(0, Math.max(6, Math.ceil(head.value.length / 2))), reason: hasJa(req) ? '前半の言葉だけを残し、ひと目で読める長さにしました。' : 'Kept only the first half so it reads at a glance.' })
+    }
+    if (/画像|image/i.test(req) && heroes[0]) edits.push({ id: 'hero', hero_id: heroes[0].id, reason: hasJa(req) ? '明るい色味の画像です。' : 'A brighter image.' })
+    const html = String(p.html ?? '')
+    const body = html.match(/<body style="[^"]*">/)?.[0]
+    const patches = edits.length === 0 && body ? [{ find: body, replace: '<body style="margin:0;background:#f4efe6">' }] : []
+    return J({ mode: 'update', reply: hasJa(req) ? '頼まれた所を直す案を作りました。' : 'Here is a proposal for your request.', html_patches: patches, element_edits: edits })
+  }
+
   if (task === 'select_hero') {
     const heroes = (p.heroes as HeroIn[] | undefined) ?? []
     const fall = heroes.filter((h) => /秋|fall|autumn/i.test(String(h.season ?? '')) || /new|新作/i.test(String(h.purpose ?? '')))

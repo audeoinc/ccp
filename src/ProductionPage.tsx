@@ -22,6 +22,8 @@ import { pinView } from './pinStore'
 import { PartPicker } from './PartPicker'
 import { cardMarket } from './market'
 import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
+import { ProductionChat } from './ProductionChat'
+import { syncHtml } from './productionRevise'
 import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
@@ -171,6 +173,9 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   // 仕上がりを見る(X58 段階 4)
   const [finishedOpen, setFinishedOpen] = useState(false)
   const offscreenRefs = useRef<Partial<Record<VariantKey, HTMLDivElement | null>>>({})
+  // AI チャットの見た目の案(どの案の HTML か)と、採用する前の HTML(「元に戻す」のため)
+  const [proposal, setProposal] = useState<{ variant: VariantKey; html: string } | null>(null)
+  const [beforeAdopt, setBeforeAdopt] = useState<{ variant: VariantKey; html: string } | null>(null)
 
   const load = useCallback(async () => {
     const r = await ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${card.id}'` })
@@ -240,6 +245,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHtmls({})
     setWork(null)
+    setProposal(null)
+    setBeforeAdopt(null)
   }, [live?.id])
   const dirty = dirtyOf(cur)
   const anyDirty = keys.some(dirtyOf)
@@ -247,6 +254,23 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const variantHtmlJson = () =>
     keys.length > 1 ? JSON.stringify(Object.fromEntries(keys.filter((k) => k !== 'A').map((k) => [k, { ...savedVariants[k], html: shownOf(k) }]))) : undefined
   // 要素を直したのに、保存した HTML が前のまま(HTML は自動では作り直さない。直した HTML を消さないため。要素を直せるのは A 案だけ)
+  // AI の見た目の案は、いま見ている案のものだけを出す
+  const curProposal = proposal?.variant === cur ? proposal.html : null
+  const curBeforeAdopt = beforeAdopt?.variant === cur ? beforeAdopt.html : null
+  // HTML を手で直しているか(直していなければ、要素を直すと下書きが作り直される)
+  const htmlCustom = htmls[cur] !== undefined || !!savedOf(cur)
+  // AI チャットから要素を直したとき: 左のペインで直したのと同じに入れ、手で直した HTML の同じ場所も書き換える(作り直すと、直した見た目が消えるため)
+  const applyChatEdit = (next: Snapshot) => {
+    setWork(next)
+    if (!htmlCustom) return
+    const r = syncHtml(shownOf(cur), curSnap, next)
+    if (r.replaced) setHtml(r.html)
+    setNotice(
+      r.missing
+        ? tr(`左のペインに入れました。HTML の中で場所が見つからなかったものが ${r.missing} つあります(HTML を手で直すか、↺ で作り直してください)。`, `Applied in the left pane. ${r.missing} item(s) could not be found in the HTML (edit it by hand, or rebuild with ↺).`)
+        : tr('左のペインに入れ、HTML の同じ場所も書き換えました(左と HTML の「保存」で確定します)。', 'Applied in the left pane and the same spot in the HTML (confirm with Save on both).'),
+    )
+  }
   const htmlBehind = cur === 'A' && !!savedHtml && html === null && (editsDirty || (!!live?.edited_at && (!live?.html_saved_at || live.edited_at > live.html_saved_at)))
 
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string }; data?: unknown }>, done?: string) => {
@@ -711,6 +735,19 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                     ? t('制作した HTML です。制作ツールで作ったものは「貼り付けて置き換える」で入れ、保存します。画像は、このサイトの外で開くと見えないことがあります。', 'The production HTML. Paste HTML made elsewhere with "Paste to replace", then save. Images may not show outside this site.')
                     : t('まだ制作した HTML がないので、企画の見本から始めています。直すか、制作ツールで作ったものを「貼り付けて置き換える」で入れて、保存します。', 'No production HTML yet, so this starts from the plan sample. Edit it, or paste HTML made elsewhere with "Paste to replace", then save.')}
               </span>
+              {/* AI チャット(制作物の手直し): 見た目は右のプレビューで見比べて採用、文言などは左のペインの 1 行のフロートで入れる */}
+              <ProductionChat
+                current={curSnap}
+                original={snapshotOf(approvedSnap, cur)}
+                editable={editable && cur === 'A'}
+                html={shown}
+                htmlCustom={htmlCustom}
+                products={products}
+                heroes={heroes}
+                revisionNote={live?.revision_note ?? undefined}
+                onProposal={(h: string) => setProposal({ variant: cur, html: h })}
+                onApplyEdit={applyChatEdit}
+              />
             </div>
 
             <Splitter onDrag={panes.onDrag(1)} onDone={panes.onDone} />
@@ -733,8 +770,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                     </Button>
                   ))}
                 </span>
-                {/* 並べて比べるときは、どちらに置くか分からないので出さない */}
-                {previewView !== 'compare' && (
+                {/* 並べて比べるとき(AI の案と見比べているときも)は、どちらに置くか分からないので出さない */}
+                {previewView !== 'compare' && curProposal === null && (
                   <Tooltip relationship="description" content={t('プレビューの場所を押して、そこへの書き込み(マーケ担当者への問い合わせなど)を始めます。Esc でやめます。', 'Click a spot in the preview to start a comment there (e.g. a question to marketing). Esc to cancel.')}>
                     <Button size="small" appearance={placingPin ? 'primary' : 'subtle'} icon={<CommentAddRegular />} onClick={() => setPlacingPin((v) => !v)} aria-pressed={placingPin}>
                       {placingPin ? t('場所を押す…', 'Click a spot…') : t('コメントを置く', 'Place comment')}
@@ -742,7 +779,53 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   </Tooltip>
                 )}
               </div>
-              {previewView === 'compare' ? (
+              {curBeforeAdopt !== null && curProposal === null && (
+                <div className={s.editBar}>
+                  <span className={mergeClasses(s.grow, s.note)}>{t('AI の見た目の案を採用しました。', 'Adopted the AI layout proposal.')}</span>
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    icon={<ArrowUndoRegular />}
+                    onClick={() => {
+                      setHtml(curBeforeAdopt)
+                      setBeforeAdopt(null)
+                    }}
+                  >
+                    {t('元に戻す', 'Undo')}
+                  </Button>
+                  <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setBeforeAdopt(null)} />
+                </div>
+              )}
+              {curProposal !== null ? (
+                // AI の見た目の案: いまの HTML と並べて見比べ、採用するか決める(採用するまで、エディタは変わらない)
+                <>
+                  <div className={s.editBar}>
+                    <span className={mergeClasses(s.grow, s.note)}>{t('AI の見た目の案です。いまの HTML と見比べて、よければ採用します(保存は HTML の「保存」で)。', 'This is the AI layout proposal. Compare it with the current HTML and adopt it if it looks good (save with the HTML Save).')}</span>
+                    <Button size="small" onClick={() => setProposal(null)}>{t('やめる', 'Discard')}</Button>
+                    <Button
+                      size="small"
+                      appearance="primary"
+                      icon={<CheckmarkRegular />}
+                      onClick={() => {
+                        setBeforeAdopt({ variant: cur, html: shown })
+                        setHtml(curProposal)
+                        setHtmlView('made')
+                        setProposal(null)
+                      }}
+                    >
+                      {t('採用', 'Adopt')}
+                    </Button>
+                  </div>
+                  <div className={s.compare}>
+                    <div className={s.compareCol}>
+                      <HtmlPreviewFrame html={shown} title={t('いまの HTML のプレビュー', 'Current HTML preview')} heading={t('いま', 'Now')} />
+                    </div>
+                    <div className={s.compareCol}>
+                      <HtmlPreviewFrame html={curProposal} title={t('AI の案のプレビュー', 'AI proposal preview')} heading={t('AI の案', 'AI proposal')} />
+                    </div>
+                  </div>
+                </>
+              ) : previewView === 'compare' ? (
                 <div className={s.compare}>
                   <div className={s.compareCol}>
                     <HtmlPreviewFrame html={generated} title={t('企画の見本のプレビュー', 'Plan sample preview')} heading={t('企画の見本', 'Plan sample')} />

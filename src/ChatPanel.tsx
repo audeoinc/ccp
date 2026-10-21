@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronUpRegular, DeleteRegular, SendRegular } from '@fluentui/react-icons'
 import { AiIcon } from './AiMark'
@@ -9,6 +9,8 @@ import { getUiScale, viewHeight } from './uiScale'
 export interface ChatMsg {
   role: 'user' | 'assistant'
   text: string
+  /** 発言の下に出す操作(制作のページの「直す」のボタンなど) */
+  extra?: ReactNode
 }
 
 interface Props {
@@ -20,6 +22,10 @@ interface Props {
   suggestions: string[]
   /** 対象がないときの説明 */
   idleHint?: string
+  /** 会話が空のときの説明(既定は、配信カードのタブ向けの文) */
+  intro?: string
+  /** よく使う頼み方を押したとき、入力欄に足す(いくつか選んで、まとめて頼めるように)。既定は置き換え */
+  appendSuggestions?: boolean
   onSend: (text: string) => void
   onClear: () => void
 }
@@ -140,7 +146,7 @@ const useStyles = makeStyles({
 })
 
 /** 中ペインの下に置く、AI へのチャットのペイン。開いているタブの案づくりに、指示を加える */
-export function ChatPanel({ title, messages, busy, suggestions, idleHint, onSend, onClear }: Props) {
+export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro, appendSuggestions, onSend, onClear }: Props) {
   const t = useT()
   const s = useStyles()
   const [open, setOpen] = useState(true)
@@ -191,7 +197,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, onSend
   const chips = !disabled && !busy && suggestions.length > 0 && (
     <div className={s.chips}>
       {suggestions.map((q) => (
-        <button key={q} type="button" className={s.chip} onClick={() => setText(q)}>
+        <button key={q} type="button" className={s.chip} onClick={() => setText((v) => (appendSuggestions && v.trim() ? (v.includes(q) ? v : `${v.trim()}${/[。.!?！？]$/.test(v.trim()) ? '' : '。'}${q}`) : q))}>
           {q}
         </button>
       ))}
@@ -225,7 +231,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, onSend
               <span className={s.hint}>
                 {disabled
                   ? (idleHint ?? '')
-                  : t('このタブの案づくりに、指示を加えられます。例えば、次のように頼めます。', 'Add your own instructions to this tab’s suggestions. For example:')}
+                  : (intro ?? t('このタブの案づくりに、指示を加えられます。例えば、次のように頼めます。', 'Add your own instructions to this tab’s suggestions. For example:'))}
               </span>
               {chips}
             </div>
@@ -233,7 +239,10 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, onSend
           {messages.map((m, i) => (
             <div key={i} className={mergeClasses(s.msg, m.role === 'assistant' && s.msgAi)}>
               <span className={mergeClasses(s.who, m.role === 'assistant' && s.whoAi)}>{m.role === 'user' ? 'You' : 'AI'}</span>
-              <span>{m.text}</span>
+              <span>
+                {m.text}
+                {m.extra}
+              </span>
             </div>
           ))}
           {busy && (

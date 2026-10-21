@@ -337,7 +337,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
   )
 }
 
-function ProductPicker({ trigger, products, onPick }: { trigger: ReactNode; products: Product[]; onPick: (id: string) => void }) {
+export function ProductPicker({ trigger, products, onPick }: { trigger: ReactNode; products: Product[]; onPick: (id: string) => void }) {
   const s = useStyles()
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -378,7 +378,7 @@ function ProductPicker({ trigger, products, onPick }: { trigger: ReactNode; prod
   )
 }
 
-function HeroPicker({ heroes, onPick, onUpload }: { heroes: HeroImage[]; onPick: (h: HeroImage) => void; onUpload: () => void }) {
+export function HeroPicker({ heroes, onPick, onUpload }: { heroes: HeroImage[]; onPick: (h: HeroImage) => void; onUpload: () => void }) {
   const s = useStyles()
   const t = useT()
   const [open, setOpen] = useState(false)
