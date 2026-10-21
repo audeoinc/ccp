@@ -2036,6 +2036,8 @@ function App() {
                 dueSoon={dueSoon}
                 focus={focus}
                 alertKinds={alertKinds}
+                // 商品の見方の、この週の掲載回数のバッジ(絞り込みに関係なく、その週のすべての配信で数える)
+                weekUse={weekUseAll.get(weekKeyOf(weekStart))}
                 onSelect={openCard}
                 stateOf={onProduction ? productionState : undefined}
                 renderMeta={onProduction ? productionMeta : undefined}

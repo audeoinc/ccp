@@ -30,6 +30,7 @@ import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
 import { AiIcon } from './AiMark'
 import type { CardAlertKind } from './cardAlerts'
+import { weeklyLimitFor } from './weeklyLimit'
 
 /** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る / time = 時刻の格子(WeekTimeGrid。X46) */
 export type WeekLens = 'products' | 'progress' | 'time'
@@ -56,6 +57,8 @@ interface Props {
   focus?: { cards: Set<string>; products: Set<string> }
   /** アラートのある配信(いちばん強い種類。印を付ける) */
   alertKinds?: Map<string, CardAlertKind>
+  /** この週の、商品ごとの掲載の回数(絞り込みに関係なく、その週のすべての配信。B・C 案も数え、取りやめは除く。週の上限超えのアラートと同じ数) */
+  weekUse?: Map<string, number>
   onSelect: (id: string) => void
   /** その日付で新規作成する(値は YYYY-MM-DD) */
   onCreate: (day: string) => void
@@ -182,6 +185,7 @@ const useStyles = makeStyles({
   secLabel: { fontSize: '10px', color: tokens.colorNeutralForeground3 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '3px' },
   thumb: {
+    position: 'relative',
     aspectRatio: '3 / 4',
     borderRadius: tokens.borderRadiusSmall,
     backgroundColor: tokens.colorNeutralBackground3,
@@ -192,6 +196,27 @@ const useStyles = makeStyles({
   // マウスを重ねた商品と同じ商品(この週の他の配信にあるもの)を、枠で光らせる
   thumbHit: { outlineColor: tokens.colorBrandStroke1 },
   thumbDim: { opacity: 0.35 },
+  // この週に 2 回以上載せている商品の回数(右上の丸。上限より下 = 灰、ちょうど上限 = 黄、超え = 赤)
+  useBadge: {
+    position: 'absolute',
+    top: '2px',
+    right: '2px',
+    minWidth: '16px',
+    height: '16px',
+    padding: '0 3px',
+    boxSizing: 'border-box',
+    borderRadius: '8px',
+    fontSize: '10px',
+    lineHeight: '16px',
+    fontWeight: tokens.fontWeightSemibold,
+    textAlign: 'center',
+    color: '#ffffff',
+    backgroundColor: 'rgba(60, 60, 67, 0.82)',
+    boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+    pointerEvents: 'none',
+  },
+  useAt: { backgroundColor: tokens.colorPaletteMarigoldBackground3, color: '#1f1f1f' },
+  useOver: { backgroundColor: tokens.colorPaletteRedBackground3 },
   push: {
     display: 'grid',
     rowGap: '2px',
@@ -215,7 +240,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, onSelect, onCreate, renderCard, onCheck, stateOf, renderMeta }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, weekUse, onSelect, onCreate, renderCard, onCheck, stateOf, renderMeta }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -230,25 +255,32 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
   for (const list of byDay.values()) list.sort(order)
   const productOf = (id: string) => products.find((p) => p.id === id)
 
-  const thumbs = (ids: string[]) => (
-    <div className={styles.grid}>
-      {ids.map((id, i) => {
-        const p = productOf(id)
-        const src = productImage(p)
-        return (
-          <div
-            key={`${id}-${i}`}
-            className={mergeClasses(styles.thumb, (hover ? hover === id : !!focus?.products.has(id)) && styles.thumbHit, !!hover && hover !== id && styles.thumbDim)}
-            title={p?.name}
-            onMouseEnter={() => setHover(id)}
-            onMouseLeave={() => setHover(null)}
-          >
-            {src && <img className={styles.img} src={src} alt={p?.name ?? ''} draggable={false} />}
-          </div>
-        )
-      })}
-    </div>
-  )
+  const thumbs = (ids: string[], c: DeliveryCard) => {
+    // 週の上限は、配信の国・チャネル・配信日で決まる(決まりがなければ、アラートの条件の値)
+    const limit = weeklyLimitFor(c)
+    return (
+      <div className={styles.grid}>
+        {ids.map((id, i) => {
+          const p = productOf(id)
+          const src = productImage(p)
+          const n = weekUse?.get(id) ?? 0
+          const tip = n >= 2 ? t(`${p?.name ?? ''} — この週に ${n} 本(上限 ${limit.n} 本${limit.rule ? `・決まり: ${limit.rule}` : ''})`, `${p?.name ?? ''} — in ${n} deliveries this week (cap ${limit.n}${limit.rule ? `, rule: ${limit.rule}` : ''})`) : p?.name
+          return (
+            <div
+              key={`${id}-${i}`}
+              className={mergeClasses(styles.thumb, (hover ? hover === id : !!focus?.products.has(id)) && styles.thumbHit, !!hover && hover !== id && styles.thumbDim)}
+              title={tip}
+              onMouseEnter={() => setHover(id)}
+              onMouseLeave={() => setHover(null)}
+            >
+              {src && <img className={styles.img} src={src} alt={p?.name ?? ''} draggable={false} />}
+              {n >= 2 && <span className={mergeClasses(styles.useBadge, n === limit.n && styles.useAt, n > limit.n && styles.useOver)} aria-label={t(`この週に ${n} 本`, `${n} this week`)}>{`×${n}`}</span>}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   const card = (c: DeliveryCard) => {
     const id = c.id
@@ -379,7 +411,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
                   {groups.map((g, i) => (
                     <div key={i}>
                       <div className={styles.secLabel}>{`${g.label} · ${g.ids.length}`}</div>
-                      {thumbs(g.ids)}
+                      {thumbs(g.ids, c)}
                     </div>
                   ))}
                 </>
