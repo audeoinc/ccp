@@ -68,6 +68,7 @@ import { CreativeAssets } from './CreativeAssets'
 import { isUsableHero } from './heroRights'
 import { AbCompare } from './AbCompare'
 import { draftVariant } from './abAi'
+import { templateUse } from './templateUse'
 import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
@@ -99,6 +100,8 @@ interface Props {
   heroes: HeroImage[]
   /** 他の配信で使われているテーマ(テーマ案の重複回避用) */
   otherThemes: string[]
+  /** すべての配信(テンプレートの最近の使用回数を数える。X4) */
+  allCards?: DeliveryCard[]
   /** これまでに入れた担当者の名前(入力の候補) */
   owners?: string[]
   /** 週の計画(確定した週の配信は、理由を残さないと保存できない) */
@@ -468,7 +471,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -801,6 +804,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const poolProducts = useMemo(() => products.filter((p) => (!market || productMarket(p) === market) && fitsTarget(p, form.targetGender)), [products, market, form.targetGender])
   // 使える期限を過ぎた画像は、選ぶ候補・AI の候補から外す(いま使っている画像は残す。X59)
   const poolHeroes = useMemo(() => heroes.filter((h) => (!market || heroMarket(h) === market) && (isUsableHero(h) || h.id === heroId)), [heroes, market, heroId])
+
+  // テンプレートの最近の使用回数(X4。② テンプレートで選ぶとき。この配信の配信日・国を基準に)
+  const templateUseMap = useMemo(() => (allCards ? templateUse(allCards, form.scheduledAt || undefined, form.country || undefined, card?.id) : undefined), [allCards, form.scheduledAt, form.country, card?.id])
 
   // AI の案の状態と生成(案は採用するまで、配信カードには反映しない)
   const drafts = useAiDrafts(
@@ -1933,6 +1939,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 onField={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
                 template={template}
                 onTemplate={changeTemplate}
+                templateUse={templateUseMap}
                 sectionTitles={sectionTitles}
                 onSectionTitle={setSectionTitle}
                 sectionCopies={sectionCopies}

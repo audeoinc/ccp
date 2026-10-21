@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(Workbench で上げた直後の画像が壊れる件。6.53。その前は X61 マーケティングの決まりを画面で直す。6.52)
+- 最終更新: 2026-10-21(X4 テンプレートの最近の使用回数。6.54。その前は Workbench で上げた直後の画像が壊れる件。6.53)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -664,6 +664,11 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
 - AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
 - 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)→ 6.50。
+
+## 6.54 X4 テンプレートの最近の使用回数(2026-10-21、UI セッション)
+
+- 管理画面の「N 本で使用」は、チームメンバーの「テンプレートを版で持つ」(067a8e9)で入っていたので、選ぶときだけを作った。`src/templateUse.ts`(同じ国・取りやめを除く。この配信日の前 28 日の本数・同じ週の本数・この配信日より前の最後の配信日。版は区別しない)。App が `allCards` を CardDetail に渡し、`templateUseMap` を ContentPane の `TemplateTab` に(`TemplateUseLine`)。
+- モックの JP の見本は 10/2 より前の配信がほとんどないので 0 本と出る。US の Fall Arrivals では「最近 4 週で 16 本・同じ週に 4 本」と出ることを確かめた。
 
 ## 6.53 Workbench で、上げた直後の画像が壊れて出る(2026-10-21、UI セッション)
 

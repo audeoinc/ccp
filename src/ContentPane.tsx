@@ -33,6 +33,7 @@ import { AiButton } from './AiButton'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type PushLink } from './pushLink'
+import type { TemplateUse } from './templateUse'
 
 // メールの件名・プリヘッダーの文字数の目安(受信一覧で切れずに見える長さ。端末で違うので目安。X2)
 const SUBJECT_MAX = 40
@@ -61,6 +62,8 @@ interface Props {
   instructionsAngle: string
   onField: (key: FieldKey, value: string) => void
   template: EmailTemplateId
+  /** テンプレートごとの最近の使用回数(X4。選ぶときに出す) */
+  templateUse?: Map<string, TemplateUse>
   onTemplate: (id: EmailTemplateId) => void
   sectionTitles: string[]
   onSectionTitle: (index: number, text: string) => void
@@ -521,7 +524,25 @@ function CopyTab(props: {
 
 // ------------------------------------------------------------------ テンプレート
 
-function TemplateTab({ template, onTemplate, hasCandidates, channel }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel }) {
+/** テンプレートの最近の使用回数の行(X4)。同じ国の配信を、この配信の配信日の前 4 週間・同じ週で数える */
+function TemplateUseLine({ u }: { u?: TemplateUse }) {
+  const s = useStyles()
+  const t = useT()
+  const recent = u?.recent ?? 0
+  const week = u?.sameWeek ?? 0
+  const last = u?.last ? u.last.slice(5).replace('-', '/') : ''
+  return (
+    <span className={s.flexRowTight}>
+      <Badge size="small" appearance={recent ? 'tint' : 'outline'} color={recent >= 4 ? 'warning' : 'informative'}>
+        {t(`最近 4 週で ${recent} 本`, `${recent} in last 4 wks`)}
+      </Badge>
+      {week > 0 && <Badge size="small" appearance="tint" color="warning">{t(`同じ週に ${week} 本`, `${week} in same week`)}</Badge>}
+      <span className={s.caption}>{last ? t(`最後に使った配信日 ${last}`, `Last used ${last}`) : t('この配信日より前の使用なし', 'Not used before this date')}</span>
+    </span>
+  )
+}
+
+function TemplateTab({ template, onTemplate, hasCandidates, channel, use }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel; use?: Map<string, TemplateUse> }) {
   const s = useStyles()
   const t = useT()
   return (
@@ -581,6 +602,7 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel }: { templat
                 {selected && <Badge size="small" appearance="filled" color="brand">{t('選択中', 'Selected')}</Badge>}
               </div>
               <span className={s.caption}>{o.description}</span>
+              {use && <TemplateUseLine u={use.get(o.id)} />}
             </div>
           </div>
         )
@@ -1363,7 +1385,7 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runTheme}
         />
       )}
-      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} />}
+      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} use={props.templateUse} />}
       {tab === 'notice' && (
         <CopyTab
           push

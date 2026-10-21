@@ -2111,6 +2111,7 @@ function App() {
           heroes={heroes}
           onHeroesChanged={reloadHeroes}
           otherThemes={cards.filter((c) => c.id !== selected?.id && c.theme).map((c) => c.theme!)}
+          allCards={cards}
           weeks={weeks}
           owners={owners}
           onBack={() => {
