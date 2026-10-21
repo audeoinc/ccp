@@ -39,7 +39,7 @@ import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, splitTemplateKey, templateKeyOfCard } from './templates'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
@@ -509,7 +509,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // コピー・ヘッドラインの言語は、配信の国に合わせる(US は英語、JP は日本語)。以前は切り替えられたが、2026-10-16 に外した
   const language: CopyLanguage = 'auto'
   const [template, setTemplate] = useState<EmailTemplateId>(
-    () => card?.layout_key || (card?.channel === CHANNEL_PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card?.email_template)),
+    // 使った版で開く(テンプレートが編集されていても、この配信は、使った版の形のまま)
+    () => (card ? templateKeyOfCard(card) : draft ? templateKeyOfCard(draft.card) : templateFromValue(undefined)),
   )
   // アプリ: 通知を押したときに開く画面と、送る相手
   const [pushLink, setPushLink] = useState<PushLink | null>(() => parsePushLink(card?.push_link))
@@ -1258,8 +1259,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         hero_reason: heroOf('A').heroReason,
         ab_test: encodeAbTest(abForSave(), decision),
         // 標準のテンプレートは、以前の選択肢の列にも書く(互換)。作ったテンプレートは、layoutkey だけ
-        email_template: TEMPLATE_VALUES[template],
-        layout_key: template,
+        email_template: TEMPLATE_VALUES[baseTemplateId(template)],
+        // テンプレートの ID と、使った版の番号を分けて書く(いまの版を選んだときは、いまの版の番号)
+        layout_key: baseTemplateId(template),
+        layout_version: splitTemplateKey(template).version ?? currentVersion(template),
         section_titles: textsOf('A').sectionTitles.join('\n').replace(/\n+$/, ''),
         section_copies: encodeCopies(textsOf('A').sectionCopies),
         // AI でまとめて作った中身を、人が配信カードで確かめて保存したら、未確認の印を外す(W14)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Badge,
   Button,
@@ -20,10 +20,12 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowUpRegular, CopyRegular, DeleteRegular, DismissRegular, MailRegular, PhoneRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownRegular, ArrowResetRegular, ArrowUpRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
-import { useT } from './i18n'
-import { MAX_BUTTON_BLOCKS, MAX_BUTTON_LABEL, MAX_SECTIONS, MAX_SLOTS, deleteTemplate, fitSlots, saveTemplate } from './layoutTemplates'
+import { locale, useT } from './i18n'
+import { MAX_BUTTON_BLOCKS, MAX_BUTTON_LABEL, MAX_SECTIONS, MAX_SLOTS, deleteTemplate, fitSlots, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
+import type { DeliveryCard } from './models/deliveryCards'
+import { statusLabel, statusRank } from './status'
 import { TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import {
@@ -39,9 +41,15 @@ import {
   sectionKindLabel,
   setTemplateManagerOpen,
   slotStep,
+  templateIdOfCard,
   templateOptions,
   useTemplateManagerOpen,
   useTemplates,
+  currentVersion,
+  getTemplate,
+  pastVersions,
+  templateKey,
+  builtinOriginal,
   type ButtonBlock,
   type ButtonSpec,
   type HeroKind,
@@ -68,6 +76,8 @@ interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'h
   parts: Part[]
   /** アプリのテンプレート: 通知の形(メールのテンプレートでは undefined) */
   push?: PushSpec
+  /** 変更のメモ(版の履歴に残す) */
+  note?: string
 }
 
 let partSeq = 0
@@ -171,6 +181,28 @@ const useStyles = makeStyles({
   },
   itemSelected: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   itemText: { minWidth: 0, display: 'grid', rowGap: '2px', alignContent: 'start' },
+  itemTags: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
+  // 版の履歴・使っている配信
+  history: { display: 'grid', rowGap: '4px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  historyHead: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
+  historyRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '2px 6px', borderRadius: tokens.borderRadiusMedium, minWidth: 0 },
+  historyOn: { backgroundColor: tokens.colorBrandBackground2 },
+  historyVer: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, minWidth: '40px' },
+  usedGroup: { display: 'grid', rowGap: '2px' },
+  usedRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+    columnGap: '10px',
+    alignItems: 'center',
+    textAlign: 'left',
+    padding: '4px 6px',
+    border: 'none',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  usedName: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemName: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   // カードの高さをそろえるため、説明は 5 行で省略する(全文は、選ぶと右に出る)
   clamp: { display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
@@ -202,16 +234,51 @@ const useStyles = makeStyles({
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
 
-/** テンプレートの管理(一覧・新規・複製・編集・削除)。標準のテンプレートは編集できず、複製して編集する */
-export function TemplateManager() {
+/**
+ * テンプレートの管理(一覧・新規・複製・編集・版の履歴・使っている配信・使わない(無効)・削除)。
+ * テンプレートは版で持つ(配信のもとになるマスターなので): 保存するたびに新しい版になり、配信カードは、テンプレートの ID と使った版の番号を持つ。
+ * 編集しても、すでにある配信は使った版の形のまま(見た目・見出し・商品の位置は変わらない)。前の版に戻すときも、新しい版として上に積む。
+ * 標準も編集できる(コードの定義が版 0。上書きの行で置き換える)。使っているテンプレートは削除せず、使わない(無効)にする
+ */
+export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: DeliveryCard[]; onChanged: () => Promise<void>; onOpenCard: (id: string) => void }) {
   const open = useTemplateManagerOpen()
   useTemplates() // 登録が変わったら、一覧を描き直す
   const t = useT()
   const s = useStyles()
   // メール用 / アプリ用を、タブで分ける(配信カードは、チャネルごとに、そのチャネルのテンプレートだけを選ぶ)
   const [channel, setChannel] = useState<TemplateChannel>('email')
-  const options = templateOptions(channel)
+  // 使わない(無効)のものも出す(一覧の下にたたむ)。過去の版は出さない(詳しい欄の、版の履歴に出す)
+  const options = templateOptions(channel, true)
+  const [showHidden, setShowHidden] = useState(false)
+  // テンプレートごとの、使っている配信の数(状態ごと・版ごと)。編集・使わない・削除のときに知らせる
+  const usage = useMemo(() => {
+    // テンプレートの ID でまとめる(どの版を使っていても、同じテンプレートとして数える)
+    const m = new Map<string, { total: number; fixed: number; reviewing: number; draft: number; byVersion: Map<number, DeliveryCard[]> }>()
+    for (const c of cards) {
+      const id = templateIdOfCard(c)
+      const u = m.get(id) ?? { total: 0, fixed: 0, reviewing: 0, draft: 0, byVersion: new Map<number, DeliveryCard[]>() }
+      u.total += 1
+      const v = c.layout_version ?? currentVersion(id)
+      u.byVersion.set(v, [...(u.byVersion.get(v) ?? []), c])
+      const r = statusRank(c.status)
+      if (r >= statusRank('approved')) u.fixed += 1
+      else if (r >= statusRank('reviewing')) u.reviewing += 1
+      else u.draft += 1
+      m.set(id, u)
+    }
+    return m
+  }, [cards])
+  const usageOf = (id?: string) => (id ? usage.get(id) : undefined) ?? { total: 0, fixed: 0, reviewing: 0, draft: 0, byVersion: new Map<number, DeliveryCard[]>() }
+  const usageText = (id?: string) => {
+    const u = usageOf(id)
+    return t(
+      `${u.total} 本の配信で使っています(承認済み・確定 ${u.fixed} 本、承認待ち ${u.reviewing} 本、未起案 ${u.draft} 本)`,
+      `Used by ${u.total} deliveries (approved/confirmed ${u.fixed}, awaiting approval ${u.reviewing}, not started ${u.draft})`,
+    )
+  }
   const [selectedId, setSelectedId] = useState<string>('standard4')
+  // 詳しい欄で見ている過去の版の鍵(null は、いまの版)
+  const [viewKey, setViewKey] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null) // 編集中(新規・複製・編集)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -239,6 +306,7 @@ export function TemplateManager() {
   }
 
   const choose = (id: string) => {
+    setViewKey(null)
     if (editing && !window.confirm(t('編集中の内容を破棄して、別のテンプレートを開きます。よろしいですか?', 'Discard the current edits and open another template?'))) return
     setDraft(null)
     setError(null)
@@ -265,8 +333,10 @@ export function TemplateManager() {
     })
     setSelectedId('')
   }
+  // 自由な並び(free)は、決まった構成がないので、編集するものがない
+  const canEdit = (o?: { id: string }) => !!o && o.id !== 'free'
   const startEdit = () => {
-    if (!selected || selected.builtin) return
+    if (!selected || !canEdit(selected)) return
     setError(null)
     setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected), push: selected.push })
   }
@@ -292,38 +362,158 @@ export function TemplateManager() {
   const totalSlots = (draft?.parts ?? []).reduce((n, p) => n + (p.type === 'section' ? p.sec.slots : 0), 0)
   const valid = !!draft && draft.name.trim() !== '' && (sectionCount > 0 || !!draft.push)
 
+  /** 操作をまとめて行う(失敗したら知らせる。配信を付け替えたら、配信を読み直す) */
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await fn()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const save = async () => {
     if (!draft || !valid) return
-    setBusy(true)
-    setError(null)
-    try {
-      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...fromParts(draft), push: draft.push })
+    const used = draft.id ? usageOf(draft.id).total : 0
+    const next = draft.id ? currentVersion(draft.id) + 1 : 1
+    // 使っている配信があるときは、保存しても、その配信は使った版の形のままであることを知らせて、確かめる
+    if (
+      used > 0 &&
+      !window.confirm(
+        t(
+          `${usageText(draft.id)}。\n\n保存すると、版 ${next} になります。これらの配信は、使った版の形のままです(見た目・見出し・商品の位置は変わりません)。これから作る配信と、テンプレートを選び直した配信から、版 ${next} になります。\n\n保存しますか?`,
+          `${usageText(draft.id)}.\n\nSaving creates v${next}. These deliveries keep the version they used (look, headings and product positions stay). New deliveries, and ones that re-select this template, get v${next}.\n\nSave?`,
+        ),
+      )
+    )
+      return
+    await run(async () => {
+      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...fromParts(draft), push: draft.push }, cards, draft.note ?? '')
+      if (used > 0) await onChanged()
       setSelectedId(id)
       setDraft(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
+  /** 作成したテンプレートで、どの版もどの配信でも使っていないものだけ、削除できる(版の履歴も消す) */
   const remove = async () => {
-    if (!selected || selected.builtin || editing) return
-    if (!window.confirm(t(`「${selected.label}」を削除します。このテンプレートを使っている配信カードは、Standard4 として扱われます。よろしいですか?`, `Delete "${selected.label}"? Delivery cards that use it will be treated as Standard4.`))) return
-    setBusy(true)
-    setError(null)
-    try {
+    if (!selected || selected.builtin || editing || usageOf(selected.id).total > 0) return
+    if (!window.confirm(t(`「${selected.label}」を削除します。どの版も、どの配信でも使っていません。版の履歴も消えます。よろしいですか?`, `Delete "${selected.label}"? No delivery uses any version of it. Its version history is deleted too.`))) return
+    await run(async () => {
       await deleteTemplate(selected.id)
-      setSelectedId('standard4')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
-    }
+      setSelectedId(channel === 'push' ? DEFAULT_PUSH_TEMPLATE : 'standard4')
+    })
   }
 
-  const customs = options.filter((o) => !o.builtin)
-  const builtins = options.filter((o) => o.builtin)
+  /** 使わない(無効)にする・また使う(配信カードの選択肢から外すだけ。使っている配信は、そのまま) */
+  const toggleHidden = async (hide: boolean) => {
+    if (!selected || editing) return
+    if (hide && !window.confirm(t(`「${selected.label}」を使わない(無効)にします。配信カードのテンプレートの選択肢に出なくなります。使っている配信は、そのままです。あとで「また使う」で戻せます。よろしいですか?`, `Make "${selected.label}" inactive? It will no longer be offered in delivery cards. Deliveries that use it stay as they are. You can reactivate it later.`))) return
+    await run(() => setTemplateHidden(selected.id, hide))
+  }
+
+  /** 標準を最初の形に戻す(最初の形を、新しい版として保存する。使っている配信は、使った版のまま) */
+  const reset = async () => {
+    if (!selected?.edited || editing) return
+    const used = usageOf(selected.id).total
+    if (!window.confirm(t(`「${selected.label}」を、最初の形に戻します(版 ${currentVersion(selected.id) + 1} として保存)。${used > 0 ? `${usageText(selected.id)}。これらの配信は、使った版の形のままです。` : ''}よろしいですか?`, `Reset "${selected.label}" to the original (saved as v${currentVersion(selected.id) + 1})? ${used > 0 ? `${usageText(selected.id)}. They keep the version they used. ` : ''}Continue?`))) return
+    await run(async () => {
+      await resetBuiltin(selected.id, cards)
+      if (used > 0) await onChanged()
+    })
+  }
+
+  /** 前の版に戻す(その版の中身を、新しい版として保存する。履歴は消さない) */
+  const restore = async (key: string, v: number) => {
+    if (!selected || editing) return
+    const used = usageOf(selected.id).total
+    if (!window.confirm(t(`版 ${v} の形に戻します(版 ${currentVersion(selected.id) + 1} として保存)。${used > 0 ? `${usageText(selected.id)}。これらの配信は、使った版の形のままです。` : ''}よろしいですか?`, `Restore v${v} (saved as v${currentVersion(selected.id) + 1})? ${used > 0 ? `${usageText(selected.id)}. They keep the version they used. ` : ''}Continue?`))) return
+    await run(async () => {
+      await restoreVersion(selected.id, key, cards)
+      if (used > 0) await onChanged()
+      setViewKey(null)
+    })
+  }
+
+  const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
+  /** 版の履歴(新しい順)。版ごとに、保存した日・人・メモ・使っている配信の数。過去の版は「見る」「この版に戻す」 */
+  const versionHistory = (id: string) => {
+    const cur = currentVersion(id)
+    const u = usageOf(id)
+    const rows = [
+      ...pastVersions(id).filter((v) => (v.version ?? 0) !== cur),
+      // 標準の版 0(コードの定義)は、版の表にないので足す
+      ...(builtinOriginal(id) && cur !== 0 && !pastVersions(id).some((v) => v.version === 0) ? [{ ...builtinOriginal(id)!, version: 0, note: t('最初の形(コードの定義)', 'Original (built-in)') }] : []),
+    ].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))
+    const curRow = pastVersions(id).find((v) => v.version === cur)
+    return (
+      <div className={s.history}>
+        <span className={s.historyHead}>{t('版の履歴', 'Version history')}</span>
+        <div className={s.historyRow}>
+          <span className={s.historyVer}>{t(`版 ${cur}`, `v${cur}`)}</span>
+          <Badge size="small" appearance="tint" color="brand">{t('いまの版', 'Latest')}</Badge>
+          <span className={s.caption}>{[dateText(curRow?.savedAt), curRow?.author, curRow?.note].filter(Boolean).join(' ・ ')}</span>
+          <span className={s.grow} />
+          <span className={s.caption}>{t(`${u.byVersion.get(cur)?.length ?? 0} 本`, `${u.byVersion.get(cur)?.length ?? 0} uses`)}</span>
+          {viewKey && (
+            <Button size="small" appearance="subtle" onClick={() => setViewKey(null)}>
+              {t('見る', 'View')}
+            </Button>
+          )}
+        </div>
+        {rows.length === 0 && <span className={s.caption}>{t('過去の版はありません。', 'No earlier versions.')}</span>}
+        {rows.map((v) => {
+          const key = templateKey(id, v.version)
+          return (
+            <div key={key} className={mergeClasses(s.historyRow, viewKey === key && s.historyOn)}>
+              <span className={s.historyVer}>{t(`版 ${v.version}`, `v${v.version}`)}</span>
+              <span className={s.caption}>{[dateText(v.savedAt), v.author, v.note].filter(Boolean).join(' ・ ')}</span>
+              <span className={s.grow} />
+              <span className={s.caption}>{t(`${u.byVersion.get(v.version ?? 0)?.length ?? 0} 本`, `${u.byVersion.get(v.version ?? 0)?.length ?? 0} uses`)}</span>
+              <Button size="small" appearance="subtle" onClick={() => setViewKey(viewKey === key ? null : key)}>
+                {viewKey === key ? t('閉じる', 'Close') : t('見る', 'View')}
+              </Button>
+              <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} disabled={busy || editing} onClick={() => void restore(key, v.version ?? 0)}>
+                {t('この版に戻す', 'Restore')}
+              </Button>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+  /** 使っている配信(版ごと)。押すと配信カードを開く */
+  const usedBy = (id: string) => {
+    const u = usageOf(id)
+    if (u.total === 0) return null
+    const versions = [...u.byVersion.keys()].sort((a, b) => b - a)
+    return (
+      <div className={s.history}>
+        <span className={s.historyHead}>{t(`使っている配信(${u.total} 本)`, `Deliveries using it (${u.total})`)}</span>
+        {versions.map((v) => (
+          <div key={v} className={s.usedGroup}>
+            <span className={s.caption}>{v === currentVersion(id) ? t(`版 ${v}(いまの版)`, `v${v} (latest)`) : t(`版 ${v}`, `v${v}`)}</span>
+            {[...(u.byVersion.get(v) ?? [])]
+              .sort((a, b) => (b.scheduled_at ?? '').localeCompare(a.scheduled_at ?? ''))
+              .map((c) => (
+                <button key={c.id} type="button" className={s.usedRow} onClick={() => onOpenCard(c.id)}>
+                  <span className={s.usedName}>{c.name}</span>
+                  <span className={s.caption}>{dateText(c.scheduled_at)}</span>
+                  <span className={s.caption}>{statusLabel(c.status)}</span>
+                </button>
+              ))}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const customs = options.filter((o) => !o.builtin && !o.hidden)
+  const builtins = options.filter((o) => o.builtin && !o.hidden)
+  const hiddenList = options.filter((o) => o.hidden)
 
   const renderItem = (o: (typeof options)[number]) => (
     <div key={o.id} className={mergeClasses(s.item, !editing && o.id === selected?.id && s.itemSelected)} onClick={() => choose(o.id)} role="button" tabIndex={0}>
@@ -331,6 +521,19 @@ export function TemplateManager() {
       <div className={s.itemText}>
         <span className={s.itemName}>{o.label}</span>
         <span className={mergeClasses(s.caption, s.clamp)} title={o.description}>{o.description}</span>
+        <span className={s.itemTags}>
+          {o.edited && (
+            <Badge size="small" appearance="tint" color="brand">
+              {t('編集済み', 'Edited')}
+            </Badge>
+          )}
+          {o.hidden && (
+            <Badge size="small" appearance="outline" color="subtle">
+              {t('使わない', 'Inactive')}
+            </Badge>
+          )}
+          <span className={s.caption}>{usageOf(o.id).total > 0 ? t(`${usageOf(o.id).total} 本で使用`, `Used by ${usageOf(o.id).total}`) : t('未使用', 'Not used')}</span>
+        </span>
       </div>
     </div>
   )
@@ -489,6 +692,14 @@ export function TemplateManager() {
 
               <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('標準', 'Standard')}</span>
               {builtins.map(renderItem)}
+
+              {/* 使わない(無効)のものは、一覧の下にたたむ(配信カードの選択肢には出ない。ここから「また使う」で戻せる) */}
+              {hiddenList.length > 0 && (
+                <Button size="small" appearance="subtle" className={s.fullRow} icon={<EyeOffRegular />} onClick={() => setShowHidden((v) => !v)}>
+                  {showHidden ? t(`使わないテンプレートをたたむ(${hiddenList.length})`, `Collapse inactive templates (${hiddenList.length})`) : t(`使わないテンプレート(${hiddenList.length})`, `Inactive templates (${hiddenList.length})`)}
+                </Button>
+              )}
+              {showHidden && hiddenList.map(renderItem)}
             </div>
 
             <div className={s.editor}>
@@ -498,12 +709,28 @@ export function TemplateManager() {
                 </MessageBar>
               )}
 
+              {/* 使っている配信があるテンプレートを編集しているときは、保存しても、その配信は今の形のままと知らせる */}
+              {draft?.id && usageOf(draft.id).total > 0 && (
+                <MessageBar layout="multiline" intent="warning">
+                  <MessageBarBody>
+                    {t(
+                      `${usageText(draft.id)}。保存しても、これらの配信は今の形のままです。これから作る配信と、テンプレートを選び直した配信から、新しい形になります。`,
+                      `${usageText(draft.id)}. Saving keeps those deliveries on the current version. New deliveries and ones that re-select this template get the new version.`,
+                    )}
+                  </MessageBarBody>
+                </MessageBar>
+              )}
               {draft ? (
                 <div className={s.editorGrid}>
                   <div className={s.fields}>
                     <Field label={t('テンプレート名', 'Template name')} required>
                       <Input size="small" value={draft.name} onChange={(_, d) => patch({ name: d.value })} />
                     </Field>
+                    {draft.id && (
+                      <Field label={t(`変更のメモ(任意。版 ${currentVersion(draft.id) + 1} の履歴に残ります)`, `Change note (optional; kept in the v${currentVersion(draft.id) + 1} history)`)}>
+                        <Input size="small" value={draft.note ?? ''} placeholder={t('例: グリッドを 3 列に', 'e.g. Grid to 3 columns')} onChange={(_, d) => patch({ note: d.value })} />
+                      </Field>
+                    )}
                     <Field label={t('説明', 'Description')}>
                       <AutoTextarea rows={2} size="small" value={draft.description} onChange={(_, d) => patch({ description: d.value })} />
                     </Field>
@@ -638,8 +865,21 @@ export function TemplateManager() {
                   <div className={s.fields}>
                     <div style={{ display: 'flex', alignItems: 'center', columnGap: 8, flexWrap: 'wrap' }}>
                       <Text weight="semibold" size={400}>{selected.label}</Text>
-                      <Badge size="small" appearance="tint" color={selected.builtin ? 'informative' : 'brand'}>{selected.builtin ? t('標準', 'Standard') : t('作成したテンプレート', 'Your template')}</Badge>
+                      <Badge size="small" appearance="tint" color={selected.builtin ? 'informative' : 'brand'}>
+                        {selected.builtin ? (selected.edited ? t('標準(編集済み)', 'Standard (edited)') : t('標準', 'Standard')) : t('作成したテンプレート', 'Your template')}
+                      </Badge>
+                      {selected.hidden && (
+                        <Badge size="small" appearance="outline" color="subtle">
+                          {t('使わない', 'Inactive')}
+                        </Badge>
+                      )}
+                      {selected.id !== 'free' && (
+                        <Badge size="small" appearance="outline">
+                          {t(`いまの版: 版 ${currentVersion(selected.id)}`, `Latest: v${currentVersion(selected.id)}`)}
+                        </Badge>
+                      )}
                     </div>
+                    <span className={s.caption}>{usageOf(selected.id).total > 0 ? usageText(selected.id) : t('どの配信でも使っていません', 'Not used by any delivery')}</span>
                     <span className={s.caption}>{selected.description || t('(説明なし)', '(No description)')}</span>
                     {selected.push && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 12, rowGap: 4 }}>
@@ -667,23 +907,52 @@ export function TemplateManager() {
                       </span>
                     </div>
                     )}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {selected.builtin ? (
-                        <Button size="small" appearance="primary" icon={<CopyRegular />} onClick={startDuplicate}>{t('複製して編集', 'Duplicate to edit')}</Button>
+                    {/* 標準も、作成したものも、同じボタン。使っているものは削除できないので、使わない(無効)にする */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {canEdit(selected) && (
+                        <Button size="small" appearance="primary" icon={<EditRegular />} onClick={startEdit} disabled={busy}>
+                          {t('編集', 'Edit')}
+                        </Button>
+                      )}
+                      <Button size="small" appearance="outline" icon={<CopyRegular />} onClick={startDuplicate} disabled={busy}>
+                        {t('複製', 'Duplicate')}
+                      </Button>
+                      {selected.hidden ? (
+                        <Button size="small" appearance="outline" icon={<EyeRegular />} onClick={() => void toggleHidden(false)} disabled={busy}>
+                          {t('また使う', 'Reactivate')}
+                        </Button>
+                      ) : !selected.builtin && usageOf(selected.id).total === 0 ? (
+                        <Button size="small" appearance="outline" icon={<DeleteRegular />} onClick={() => void remove()} disabled={busy}>
+                          {t('削除', 'Delete')}
+                        </Button>
                       ) : (
-                        <>
-                          <Button size="small" appearance="primary" onClick={startEdit}>{t('編集', 'Edit')}</Button>
-                          <Button size="small" appearance="outline" icon={<DeleteRegular />} onClick={remove} disabled={busy}>{t('削除', 'Delete')}</Button>
-                        </>
+                        <Button size="small" appearance="outline" icon={<EyeOffRegular />} onClick={() => void toggleHidden(true)} disabled={busy}>
+                          {t('使わないにする', 'Make inactive')}
+                        </Button>
+                      )}
+                      {selected.edited && (
+                        <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} onClick={() => void reset()} disabled={busy}>
+                          {t('最初の形に戻す', 'Reset to original')}
+                        </Button>
                       )}
                     </div>
-                    {selected.builtin && <span className={s.caption}>{t('標準のテンプレートは、編集・削除できません。複製して、自分用に作り変えてください。', 'Standard templates cannot be edited or deleted. Duplicate one to make your own version.')}</span>}
+                    <span className={s.caption}>
+                      {selected.builtin
+                        ? t('標準のテンプレートも編集できます(コードの定義が版 0)。保存するたびに新しい版になり、使っている配信は、使った版の形のままです。標準は削除できないので、要らなければ「使わないにする」。', 'Standard templates can be edited too (the built-in definition is v0). Each save creates a new version; deliveries keep the version they used. Standards cannot be deleted; make them inactive instead.')
+                        : usageOf(selected.id).total > 0
+                          ? t('使っている配信があるので、削除の代わりに「使わないにする」(配信カードの選択肢から外れます。使っている配信は、そのまま)。', 'In use, so make it inactive instead of deleting it (it leaves the delivery card choices; deliveries keep it).')
+                          : t('どの版も、どの配信でも使っていないので、削除できます。', 'No version is in use, so it can be deleted.')}
+                    </span>
+                    {selected.id !== 'free' && versionHistory(selected.id)}
+                    {usedBy(selected.id)}
                   </div>
                   <div className={s.preview}>
-                    <Text size={200} weight="semibold">{t('構成のプレビュー', 'Layout preview')}</Text>
+                    <Text size={200} weight="semibold">
+                      {viewKey ? t(`構成のプレビュー(版 ${getTemplate(viewKey).version} を見ています)`, `Layout preview (viewing v${getTemplate(viewKey).version})`) : t('構成のプレビュー', 'Layout preview')}
+                    </Text>
                     <div className={s.previewScroll}>
-                      {selected.push && <PushThumb spec={selected.push} width={160} />}
-                      <TemplateThumb layout={selected} free={selected.id === 'free'} width={PREVIEW_WIDTH} />
+                      {(viewKey ? getTemplate(viewKey) : selected).push && <PushThumb spec={(viewKey ? getTemplate(viewKey) : selected).push!} width={160} />}
+                      <TemplateThumb layout={viewKey ? getTemplate(viewKey) : selected} free={selected.id === 'free'} width={PREVIEW_WIDTH} />
                     </div>
                   </div>
                 </div>

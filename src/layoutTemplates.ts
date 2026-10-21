@@ -1,14 +1,25 @@
 import { LayoutTemplatesService } from './data/layoutTemplates'
+import { LayoutTemplateVersionsService } from './data/layoutTemplateVersions'
+import { myName } from './history'
+import { DeliveryCardsService } from './data/deliveryCards'
+import type { DeliveryCard } from './models/deliveryCards'
 import {
   LINK_KINDS,
   MAX_BUTTONS_PER_BLOCK,
   SECTION_KINDS,
   gridColumns,
   newButtonId,
+  builtinOriginal,
+  getTemplate,
+  currentVersion,
+  pastVersions,
   setCustomTemplates,
+  setTemplateVersions,
+  templateIdOfCard,
   slotStep,
   type ButtonBlock,
   type ButtonSpec,
+  type EmailTemplate,
   type HeroKind,
   type HeroText,
   type LinkKind,
@@ -183,43 +194,132 @@ export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroBu
   push?: PushSpec
 }
 
-/** データベースから、ユーザーが作ったテンプレートを読み込み、登録に反映する */
+/** 保存されている 1 行(テンプレート・版)を、登録の形に読む */
+const readRow = (r: { name: string; description?: string; hero_kind?: string; sections?: string }) => ({
+  label: r.name,
+  description: r.description ?? '',
+  hero: (HERO_KINDS.includes(r.hero_kind as HeroKind) ? r.hero_kind : 'standard') as HeroKind,
+  ...parseLayout(r.sections),
+})
+
+/** データベースから、ユーザーが作ったテンプレート・標準の上書き・過去の版を読み込み、登録に反映する */
 export async function loadCustomTemplates(): Promise<void> {
-  const res = await LayoutTemplatesService.getAll({ orderBy: ['created_on asc'] })
+  const [res, vres] = await Promise.all([LayoutTemplatesService.getAll({ orderBy: ['created_on asc'] }), LayoutTemplateVersionsService.getAll({ orderBy: ['version asc'] })])
   if (!res.success) throw new Error(res.error?.message ?? tr('テンプレートを取得できませんでした', 'Failed to load templates'))
   setCustomTemplates(
     (res.data ?? [])
       .map((r) => ({
         id: r.id,
-        label: r.name,
-        description: r.description ?? '',
-        hero: (HERO_KINDS.includes(r.hero_kind as HeroKind) ? r.hero_kind : 'standard') as HeroKind,
-        ...parseLayout(r.sections),
+        ...readRow(r),
+        ...(r.overrides ? { overrides: r.overrides } : {}),
+        ...(r.hidden_at ? { hidden: true } : {}),
+        ...(r.current_version ? { version: r.current_version } : {}),
       }))
       // セクションが 1 つもない行は、メールを組めないので、一覧に出さない(アプリは、メイン画像とコピーだけのメッセージもある)
       .filter((t) => t.sections.length > 0 || t.channel === 'push'),
   )
+  // 版の表が読めなくても(まだない環境など)、いまの版で動く
+  if (vres.success) {
+    setTemplateVersions(
+      (vres.data ?? [])
+        .filter((v) => v.template_id && v.version !== undefined && v.version !== null)
+        .map((v) => ({ templateId: v.template_id!, version: v.version!, ...readRow(v), note: v.note ?? '', author: v.author ?? '', savedAt: v.created_on ?? '' })),
+    )
+  }
 }
 
-/** 新規作成(id なし)または更新。保存後に、登録を読み込み直す。保存した行の ID を返す */
-export async function saveTemplate(input: TemplateInput): Promise<string> {
-  const fields = {
-    name: input.name.trim(),
-    description: input.description.trim(),
-    hero_kind: input.hero,
-    sections: stringifyLayout(input),
+const fieldsOf = (input: TemplateInput) => ({
+  name: input.name.trim(),
+  description: input.description.trim(),
+  hero_kind: input.hero,
+  sections: stringifyLayout(input),
+})
+
+/** いまの形を、保存する入力の形にする(版の行・使わないの行を作るとき) */
+export const inputOf = (tpl: EmailTemplate): TemplateInput => ({
+  name: tpl.label,
+  description: tpl.description,
+  hero: tpl.hero,
+  heroText: tpl.heroText,
+  heroButtons: tpl.heroButtons,
+  topBar: tpl.topBar,
+  heroLink: tpl.heroLink,
+  sections: tpl.sections,
+  buttonBlocks: tpl.buttonBlocks,
+  push: tpl.push,
+})
+
+/** 版の行を足す */
+async function addVersionRow(templateId: string, version: number, input: TemplateInput, note: string) {
+  const res = await LayoutTemplateVersionsService.create({ ...fieldsOf(input), template_id: templateId, version, note: note.trim(), author: myName(), state_code: 0 })
+  if (!res.success) throw new Error(res.error?.message ?? tr('テンプレートの版を保存できませんでした', 'Failed to save the template version'))
+}
+
+/**
+ * 新規作成(id なし)または編集の保存。保存するたびに、新しい版を作る(版の表に 1 行)。保存したテンプレートの ID を返す。
+ * 使っている配信が、版を持っていない(版を管理する前の)ときは、先に、いまの版の番号を書き込む(編集しても、その配信は今の形のまま)。
+ * 標準の ID のときは、上書きの行を作る(または直す)。コードの標準はそのまま残し、版 0 として扱う
+ */
+export async function saveTemplate(input: TemplateInput, cards: DeliveryCard[] = [], note = ''): Promise<string> {
+  const fields = fieldsOf(input)
+  if (!input.id) {
+    const res = await LayoutTemplatesService.create({ ...fields, current_version: 1, state_code: 0 })
+    const id = res.data?.id
+    if (!res.success || !id) throw new Error(res.error?.message ?? tr('テンプレートを保存できませんでした', 'Failed to save the template'))
+    await addVersionRow(id, 1, input, note || tr('作成', 'Created'))
+    await loadCustomTemplates()
+    return id
   }
-  const res = input.id
-    ? await LayoutTemplatesService.update(input.id, fields)
-    : await LayoutTemplatesService.create({ ...fields, state_code: 0 })
+  const id = input.id
+  const cur = currentVersion(id)
+  const next = cur + 1
+  // 版を持っていない配信に、いまの版の番号を書き込む(この保存のあとも、その配信は今の形のまま)
+  for (const c of cards.filter((x) => templateIdOfCard(x) === id && (x.layout_version === undefined || x.layout_version === null))) {
+    const r = await DeliveryCardsService.update(c.id, { layout_key: id, layout_version: cur })
+    if (!r.success) throw new Error(r.error?.message ?? tr('配信に、テンプレートの版を書き込めませんでした', 'Could not record the template version on a delivery'))
+  }
+  // いまの版の中身が、まだ版の表にないとき(作成したテンプレートの版 1 を、版を管理する前に作ったなど)は、先に残す。標準の版 0 はコードにある
+  const isBuiltin = !!builtinOriginal(id)
+  if (!(isBuiltin && cur === 0) && !pastVersions(id).some((v) => v.version === cur)) await addVersionRow(id, cur, inputOf(getTemplate(id)), tr('(版を管理する前の形)', '(before version history)'))
+  await addVersionRow(id, next, input, note)
+  const rowId = getTemplate(id).rowId
+  const res = rowId
+    ? await LayoutTemplatesService.update(rowId, { ...fields, current_version: next })
+    : await LayoutTemplatesService.create({ ...fields, overrides: id, current_version: next, state_code: 0 })
   if (!res.success) throw new Error(res.error?.message ?? tr('テンプレートを保存できませんでした', 'Failed to save the template'))
-  const id = input.id ?? res.data?.id
   await loadCustomTemplates()
-  if (!id) throw new Error(tr('保存した行の ID を取得できませんでした', 'Could not get the ID of the saved row'))
   return id
 }
 
+/** 過去の版の中身を、新しい版として保存する(前の版に戻す。履歴は消さずに、上に積む) */
+export async function restoreVersion(id: string, key: string, cards: DeliveryCard[]): Promise<void> {
+  const tpl = getTemplate(key)
+  await saveTemplate({ ...inputOf(tpl), id }, cards, tr(`版 ${tpl.version ?? 0} に戻した`, `Restored version ${tpl.version ?? 0}`))
+}
+
+/** 標準を、最初の形(コードの定義)に戻す。上書きを消すのではなく、最初の形を新しい版として保存する(使っている配信は今の版のまま) */
+export async function resetBuiltin(id: string, cards: DeliveryCard[]): Promise<void> {
+  const original = builtinOriginal(id)
+  if (!original) return
+  await saveTemplate({ ...inputOf(original), id }, cards, tr('最初の形に戻した', 'Reset to the original'))
+}
+
+/** 使わない(無効)にする・また使う(配信カードの選択肢から外すだけ。使っている配信は、そのまま) */
+export async function setTemplateHidden(id: string, hidden: boolean): Promise<void> {
+  const tpl = getTemplate(id)
+  const hidden_at = hidden ? new Date().toISOString() : null
+  const res = tpl.rowId
+    ? await LayoutTemplatesService.update(tpl.rowId, { hidden_at })
+    : // 標準をそのまま使わないにするときは、いまの形の上書きの行を作って、そこに印を付ける(版は変えない)
+      await LayoutTemplatesService.create({ ...fieldsOf(inputOf(tpl)), overrides: id, hidden_at, current_version: currentVersion(id), state_code: 0 })
+  if (!res.success) throw new Error(res.error?.message ?? tr('テンプレートを保存できませんでした', 'Failed to save the template'))
+  await loadCustomTemplates()
+}
+
+/** 削除(作成したテンプレートで、どの版もどの配信でも使っていないときだけ呼ぶ)。版の行も一緒に消す */
 export async function deleteTemplate(id: string): Promise<void> {
+  const vres = await LayoutTemplateVersionsService.getAll({ filter: `template_id eq ${id}` })
+  for (const v of vres.data ?? []) await LayoutTemplateVersionsService.delete(v.id)
   await LayoutTemplatesService.delete(id)
   await loadCustomTemplates()
 }

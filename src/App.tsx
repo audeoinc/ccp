@@ -1337,7 +1337,7 @@ function App() {
 
   return (
     <>
-      <TemplateManager />
+      <TemplateManager cards={cards} onChanged={load} onOpenCard={setSelectedId} />
       <input
         ref={metricsFileRef}
         type="file"

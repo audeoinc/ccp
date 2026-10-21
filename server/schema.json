@@ -38,6 +38,7 @@
     ["cancel_reason", "text"],
     ["ai_unchecked_at", "timestamptz"],
     ["frame_at", "timestamptz"],
+    ["layout_version", "int"],
     ["ab_test", "text"],
     ["subject", "text"],
     ["preheader", "text"]
@@ -166,7 +167,24 @@
     ["name", "text", {"required": true}],
     ["description", "text"],
     ["hero_kind", "text"],
-    ["sections", "text"]
+    ["sections", "text"],
+    ["overrides", "text"],
+    ["hidden_at", "timestamptz"],
+    ["current_version", "int"]
+   ],
+   "lookups": [
+   ]
+  },
+  "layout_template_versions": {
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["template_id", "text"],
+    ["version", "int"],
+    ["description", "text"],
+    ["hero_kind", "text"],
+    ["sections", "text"],
+    ["note", "text"],
+    ["author", "text"]
    ],
    "lookups": [
    ]

@@ -25,7 +25,7 @@ import { DeliveryPeek } from './DeliveryPeek'
 import { cardProgress } from './progress'
 import { statusColor, statusLabel } from './status'
 import { LockMark } from './LockMark'
-import { DEFAULT_PUSH_TEMPLATE, getTemplate, sectionRange, sectionsOf, templateFromValue } from './templates'
+import { getTemplate, sectionRange, sectionsOf, templateKeyOfCard } from './templates'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
 import { AiIcon } from './AiMark'
@@ -256,7 +256,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
     const heroRow = heroes.find((h) => h.id === c.hero_image_id)
     const hero = heroImage(heroRow)
     const time = new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-    const templateId = c.layout_key || (c.channel === PUSH ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
+    const templateId = templateKeyOfCard(c)
     const progress = cardProgress(c, ids.length)
     const questions = questionCounts.get(id) ?? 0
     const tasks = taskCounts.get(id) ?? 0

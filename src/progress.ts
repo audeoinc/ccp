@@ -2,7 +2,7 @@ import type { Item } from './items'
 import { tr } from './i18n'
 import { linkSlots, linksComplete, parseLinks } from './links'
 import { parsePushLink, tapComplete } from './pushLink'
-import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
+import { sectionRange, sectionsOf, type EmailTemplateId, templateKeyOfCard } from './templates'
 
 const labelsNow = (): string[] => [
   tr('① テーマ', '1. Theme'),
@@ -123,6 +123,7 @@ export function cardProgress(
     copy?: string
     instructions?: string
     layout_key?: string
+    layout_version?: number | null
     email_template?: string
     hero_image_id?: string | null
     channel?: string
@@ -135,7 +136,7 @@ export function cardProgress(
   productCount: number,
 ): Progress {
   const isApp = card.channel === 'app'
-  const template = card.layout_key || (isApp ? DEFAULT_PUSH_TEMPLATE : templateFromValue(card.email_template))
+  const template = templateKeyOfCard(card)
   // リンク先の判定は、テンプレートのリンクの場所と、配信カードの設定だけで決まる(既定の行き先は、商品がなくても作れる)
   const links = linksComplete(linkSlots(template, [], [], 'campaign'), parseLinks(card.links), isApp ? { tapDone: tapComplete(parsePushLink(card.push_link)) } : undefined)
   return progressOf({

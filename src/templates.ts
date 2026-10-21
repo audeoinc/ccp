@@ -165,8 +165,22 @@ export interface EmailTemplate {
   sections: Section[]
   /** 独立したボタンの部品(セクションとは別に持つ。商品の枠の位置の計算に関わらないように) */
   buttonBlocks?: ButtonBlock[]
-  /** 標準のテンプレート(編集・削除できない) */
+  /** 標準のテンプレート(コードに持つもの。編集すると、上書きの行で置き換わる) */
   builtin: boolean
+  /** 標準を編集した(上書きの行がある)。「最初の形に戻す」で、上書きの行を消す */
+  edited?: boolean
+  /** 上書きの行・作成したテンプレートの行の ID(標準のままなら、ない) */
+  rowId?: string
+  /** 版の番号(いまの版。過去の版の登録では、その版の番号) */
+  version?: number
+  /** 過去の版の登録のとき: もとのテンプレートの ID(一覧には出さない。配信カードが、使った版として引く) */
+  versionOf?: string
+  /** 過去の版のとき: 変更のメモ・保存した人・保存した日時 */
+  note?: string
+  author?: string
+  savedAt?: string
+  /** 非表示(配信カードの選択肢に出さない。使っている配信は、そのまま) */
+  hidden?: boolean
 }
 
 /** 構成の見た目に関わる部分(見取り図、プレビュー、編集中の内容で共通に使う) */
@@ -416,18 +430,39 @@ export const channelOf = (id: EmailTemplateId): TemplateChannel => getTemplate(i
 // ---- 登録(標準 + ユーザーが作ったもの) ----
 
 let custom: Record<string, EmailTemplate> = {}
+// 標準を編集したときの上書き(標準の ID → 上書きの中身)。コードの標準はそのまま残すので、上書きを消せば最初の形に戻る
+let overrides: Record<string, EmailTemplate> = {}
+// 過去の版(「テンプレートの ID@v版」→ その版の中身)。配信カードは、使った版をこの鍵で引く(描画の仕組みは、ID のときと同じ)
+let versions: Record<string, EmailTemplate> = {}
 let version = 0
 const listeners = new Set<() => void>()
 const subscribe = (fn: () => void) => {
   listeners.add(fn)
   return () => listeners.delete(fn)
 }
-
-/** データベースから読み込んだ、ユーザーが作ったテンプレートに入れ替える */
-export function setCustomTemplates(list: ({ id: string } & Omit<EmailTemplate, 'builtin'>)[]) {
-  custom = Object.fromEntries(list.map(({ id, ...rest }) => [id, { ...rest, builtin: false }]))
+const changed = () => {
   version += 1
   listeners.forEach((fn) => fn())
+}
+
+/**
+ * データベースから読み込んだテンプレートに入れ替える。
+ * overrides のある行は、標準の上書き(その標準の ID で引ける)。それ以外は、作成したテンプレート
+ */
+export function setCustomTemplates(list: ({ id: string; overrides?: string } & Omit<EmailTemplate, 'builtin'>)[]) {
+  custom = Object.fromEntries(list.filter((x) => !x.overrides || !BUILTIN[x.overrides]).map((x) => [x.id, { ...x, rowId: x.id, builtin: false, version: x.version ?? 1 }]))
+  // 使わない(無効)にしただけの上書きの行は、中身が標準と同じ。中身が違うときだけ「編集済み」にする
+  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null])
+  overrides = Object.fromEntries(
+    list.filter((x) => x.overrides && BUILTIN[x.overrides]).map(({ id, overrides: o, ...rest }) => [o!, { ...rest, rowId: id, builtin: true, edited: shape(rest) !== shape(BUILTIN[o!]), version: rest.version ?? 0 }]),
+  )
+  changed()
+}
+
+/** 過去の版を登録する(テンプレートの ID・版の番号・中身) */
+export function setTemplateVersions(list: ({ templateId: string; version: number } & Omit<EmailTemplate, 'builtin'>)[]) {
+  versions = Object.fromEntries(list.map(({ templateId, version: v, ...rest }) => [`${templateId}@v${v}`, { ...rest, builtin: !!BUILTIN[templateId], version: v, versionOf: templateId }]))
+  changed()
 }
 
 /** テンプレートの登録が変わったら、再描画する(読み込み・保存・削除のあと) */
@@ -435,21 +470,72 @@ export function useTemplates(): number {
   return useSyncExternalStore(subscribe, () => version)
 }
 
-/** テンプレートを求める。登録にない ID(削除された、まだ読み込まれていない)は、Standard4 にする */
-export const getTemplate = (id: EmailTemplateId): EmailTemplate => custom[id] ?? BUILTIN[id] ?? BUILTIN[DEFAULT_TEMPLATE]
+/** 鍵(ID、または「ID@v版」)を、テンプレートの ID と版の番号に分ける */
+export function splitTemplateKey(key: EmailTemplateId): { id: EmailTemplateId; version?: number } {
+  const m = /^(.*)@v(\d+)$/.exec(key)
+  return m ? { id: m[1], version: Number(m[2]) } : { id: key }
+}
+
+/** いまの版を求める(版の登録がないときに使う) */
+const currentOf = (id: EmailTemplateId): EmailTemplate | undefined => custom[id] ?? overrides[id] ?? BUILTIN[id]
+
+/**
+ * テンプレートを求める。鍵は、ID(いまの版)か「ID@v版」(過去の版)。
+ * 過去の版が見つからないときは、標準の版 0 はコードの定義、それ以外は、いまの版にする。
+ * 登録にない ID(削除された、まだ読み込まれていない)は、Standard4 にする
+ */
+export function getTemplate(key: EmailTemplateId): EmailTemplate {
+  const { id, version: v } = splitTemplateKey(key)
+  if (v !== undefined) return versions[key] ?? (v === 0 && BUILTIN[id]) ?? currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
+  return currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
+}
 
 /** 登録にあるテンプレートか */
 export const hasTemplate = (id: string): boolean => id in custom || id in BUILTIN
 
-/** 選べるテンプレートの一覧(標準 → ユーザーが作ったもの)。channel を渡すと、そのチャネルのものだけ */
-export function templateOptions(channel?: TemplateChannel): ({ id: EmailTemplateId; label: string; description: string; builtin: boolean; channel: TemplateChannel; push?: PushSpec } & TemplateLayout)[] {
-  return [...BUILTIN_IDS, ...Object.keys(custom)].filter((id) => !channel || (getTemplate(id).channel ?? 'email') === channel).map((id) => {
+/** 標準の、最初の形(上書きのないもの。「最初の形に戻す」で、何に戻るかを見せる) */
+export const builtinOriginal = (id: string): EmailTemplate | undefined => BUILTIN[id]
+
+/** いまの版の番号(標準は、編集していなければ 0) */
+export const currentVersion = (id: EmailTemplateId): number => currentOf(id)?.version ?? (BUILTIN[id] ? 0 : 1)
+
+/** テンプレートの ID と版の番号から、引くときの鍵を作る(いまの版なら ID のまま) */
+export const templateKey = (id: EmailTemplateId, v?: number | null): EmailTemplateId => (v === undefined || v === null || v === currentVersion(id) ? id : `${id}@v${v}`)
+
+/** 鍵から、テンプレートの ID(版を外す)。結果をテンプレートごとにまとめるときなどに使う */
+export const baseTemplateId = (key: EmailTemplateId): EmailTemplateId => splitTemplateKey(key).id
+
+/** テンプレートの、登録されている過去の版の一覧(版の番号の順) */
+export const pastVersions = (id: EmailTemplateId): EmailTemplate[] =>
+  Object.values(versions)
+    .filter((x) => x.versionOf === id)
+    .sort((a, b) => (a.version ?? 0) - (b.version ?? 0))
+
+/** 配信カードが使っているテンプレートの ID(テンプレートを選んでいない以前の配信は、メールの種類の値から) */
+export const templateIdOfCard = (c: { layout_key?: string; channel?: string; email_template?: string }): EmailTemplateId =>
+  c.layout_key || (c.channel === 'app' ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
+
+/** 配信カードが使っている版を引く鍵(版を管理する前の配信は、いまの版) */
+export const templateKeyOfCard = (c: { layout_key?: string; layout_version?: number | null; channel?: string; email_template?: string }): EmailTemplateId =>
+  templateKey(templateIdOfCard(c), c.layout_version)
+
+/**
+ * 選べるテンプレートの一覧(標準 → ユーザーが作ったもの)。channel を渡すと、そのチャネルのものだけ。
+ * 使わない(無効)のものは、includeHidden のときだけ出す(管理の画面)。過去の版は出さない
+ */
+export function templateOptions(channel?: TemplateChannel, includeHidden = false): ({ id: EmailTemplateId; label: string; description: string; builtin: boolean; edited: boolean; hidden: boolean; channel: TemplateChannel; push?: PushSpec } & TemplateLayout)[] {
+  return [...BUILTIN_IDS, ...Object.keys(custom)]
+    .filter((id) => !channel || (getTemplate(id).channel ?? 'email') === channel)
+    .filter((id) => includeHidden || !getTemplate(id).hidden)
+    .map((id) => {
     const tpl = getTemplate(id)
     return {
       id,
       label: tpl.label,
       description: tpl.description,
       builtin: tpl.builtin,
+      edited: !!tpl.edited,
+      hidden: !!tpl.hidden,
       channel: tpl.channel ?? 'email',
       push: tpl.push,
       hero: tpl.hero,
