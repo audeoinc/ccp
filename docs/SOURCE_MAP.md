@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-10-20(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-10-21(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -222,7 +222,7 @@ flowchart TD
 | `status.ts` / `progress.ts` | 53 / 167 | 配信のステータスの色・チャネル / 工程(進み具合) |
 | `ChannelBadge.tsx` | 54 | メール / アプリの札(配信カード・月・週・一覧・結果で共通) |
 | `StatusFlow.tsx` / `MonthSummaryBar.tsx` | 46 / 65 | 件数の流れ(未起案 › 承認待ち › 承認済み)/ 月の要約の帯 |
-| `WeekRetro.tsx` / `WeekHistory.tsx` | 218 / 60 | 週・月の振り返りのメモ(結果の面で書き、AI で下書きもでき、翌週・翌月の計画の面に出す)/ 週の承認の履歴 |
+| `WeekRetro.tsx` / `WeekHistory.tsx` | 218 / 60 | 週・月の振り返りのメモ(結果の面で書き、AI で下書きもでき、翌週・翌月の計画の面に出す。月の振り返りの表は `data/months.ts`)/ 週の承認の履歴 |
 | `DataTable.tsx` | 151 | 一覧の表(並べ替え・サムネイル。計画と結果で共通) |
 
 ### 3.3 配信カード(全画面のフロート)
@@ -268,11 +268,12 @@ flowchart TD
 | `uiScale.ts` | 55 | 画面全体の表示の大きさ(X60。zoom と --ui-zoom、viewWidth / viewHeight、getUiScale) |
 | `weeklyLimit.ts` | 73 | 週の上限(C3。マーケティングの決まりの「上限 週 N 回」→ なければアラートの条件の値) |
 | `HeroLibrary.tsx` | 290 | ⚙ の「画像のライブラリ」(メイン画像の一覧・絞り込み・上げる・直す・消す・期限を切る・空の項目を AI で埋める。タブで部品の画像。X59) |
-| `PartLibrary.tsx` / `PartUploadDialog.tsx` / `PartPicker.tsx` | 200 / 260 / 90 | 部品の画像(ボタン・バナー・ロゴ・アイコン。X59 ③)のライブラリ / 上げる・直す(AI の下書き・代替テキスト)/ 制作のページの左の欄(URL・`<img>` のタグをコピー)。窓口は `data/partUpload.ts`、サーバーは `server/ccp/parts.py` |
+| `PartLibrary.tsx` / `PartUploadDialog.tsx` / `PartPicker.tsx` | 200 / 260 / 90 | 部品の画像(ボタン・バナー・ロゴ・アイコン。X59 ③)のライブラリ / 上げる・直す(AI の下書き・代替テキスト)/ 制作のページの左の欄(URL・`<img>` のタグをコピー)。窓口は `data/partUpload.ts`、表は `data/partImages.ts`、サーバーは `server/ccp/parts.py` |
 | `imageConvert.ts` | 60 | AVIF を JPEG・PNG に変える、画面の画像を AI に見せる JPEG にする(X59) |
 | `HeroUploadDialog.tsx` / `heroRights.ts` | 243 / 13 | 持っている画像をメイン画像のライブラリに上げる・直す(AI の下書き・焦点と拡大・出どころ・期限。X59)/ 使える期限と、焦点・拡大の切り出し。窓口は `data/heroUpload.ts` |
 | `FinishedFloat.tsx` | 125 | 仕上がりを見る(X58。制作した HTML・制作からのひとこととリンク・直してほしいこと・制作指示・素材を 1 つのフロートで) |
-| `CreativeAssets.tsx` / `creativeConst.ts` | 439 / 7 | 素材(Creative Assets。X58): 配信ごとの参考のファイル・URL の一覧・追加・素材のフロート(大きく見る・素材へのやり取り)/ 添付できる種類と大きさ。ファイルの窓口は `data/creativeFiles.ts` |
+| `CreativeAssets.tsx` / `creativeConst.ts` | 439 / 7 | 素材(Creative Assets。X58): 配信ごとの参考のファイル・URL の一覧・追加・素材のフロート(大きく見る・素材へのやり取り)/ 添付できる種類と大きさ。ファイルの窓口は `data/creativeFiles.ts`、表は `data/cardAssets.ts` |
+| `creativePreview.ts` | 23 | URL の素材の見本カード(ページの題名・説明・サイト名・代表の画像)を取り、素材の行に書く。サーバーは `server/ccp/linkpreview.py` |
 | `CommentsPanel.tsx` | 581 | プロセスのペインの「やり取り」(以前の質問とレビューのコメントを 1 つに。宛先・対象・返信・解決・AI でタスクの案) |
 | `AiButton.tsx` / `AiMark.tsx` | 14 / 17 | AI に頼むボタン / AI の印 |
 | `AutoTextarea.tsx` | 23 | 内容に合わせて高さが伸びる、複数行の入力 |
@@ -284,6 +285,7 @@ flowchart TD
 | `Preview.tsx` | 951 | **メール・プッシュのプレビュー**(受信側の見た目。色の直書きは、ここだけ例外) |
 | `FitPreview.tsx` | 30 | プレビューを、スクロールせずに全体が見える大きさに縮める |
 | `LinkOverlay.tsx` | 188 | プレビューの上に、リンク先の番号・枠・URL の吹き出しを重ねる |
+| `PreviewPins.tsx` / `pinStore.ts` | 224 / 107 | プレビューの任意の場所に書き込む(ピン。X65)。ピンの層と、場所を選ぶ間の覆い / 置こうとしている場所・光らせるスレッドを、プレビューとやり取りの欄で共有する |
 
 **右ペイン(商品情報。参照専用で、操作する部品を置かない)**
 
@@ -291,7 +293,7 @@ flowchart TD
 |---|---|---|
 | `ProductInfoPane.tsx` | 154 | 載せた商品の情報の一覧 |
 | `ProductDetail.tsx` / `MiniChart.tsx` | 185 / 86 | 商品の詳しい情報(商品の対応のフロートの右。タブ: 売上・在庫 / 基本情報 / SKU / 指標 / 販売方針・販促)/ 推移のグラフ |
-| `ProductSkus.tsx` / `useProductSkus.ts` | 130 / 91 | 商品の詳しい情報の「SKU」タブ(X63。いまの在庫からの欠品率と、色 × サイズの在庫の表)/ その読み込み・サイズの並び順・欠品率 |
+| `ProductSkus.tsx` / `useProductSkus.ts` | 130 / 91 | 商品の詳しい情報の「SKU」タブ(X63。いまの在庫からの欠品率と、色 × サイズの在庫の表)/ その読み込み・サイズの並び順・欠品率。表は `data/sku.ts`・`data/skuStock.ts` |
 | `ProductHeadImage.tsx` | 58 | 見出しの商品の画像と、その下の「SKU・詳しい情報」のボタン。どちらを押しても商品の詳しい情報を SKU のタブで重ねて開く(商品別・アラートの画面。X63) |
 | `skuSample.ts` / `skuSampleData.ts` | 72 / 102 | ⚙ の「見本の SKU を作る / 消す」(SKU がない商品だけ。見本は source = sample)/ 見本の SKU の組み立て(撮影用のデータからも読む) |
 | `ProductMetrics.tsx` / `useProductMetrics.ts` / `metrics.ts` | 121 / 66 / 60 | 商品の詳しい情報の「指標」タブ(X48。商品とカテゴリの、いちばん新しい週の値・順位・WoW・MoM・YoY)/ その読み込み / 項目の一覧と値・増減の書き方(画面では計算しない) |
@@ -348,7 +350,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | ファイル | 行数 | 役割 |
 |---|---|---|
 | `templates.ts` | 554 | **テンプレートの定義**(標準 10 種はコードに持つ)と `getTemplate(id)`。以前からの標準 6 種は、セクションの構成を変えない |
-| `layoutTemplates.ts` | 225 | ユーザーが作ったテンプレート(DB)の読み書き、上限 |
+| `layoutTemplates.ts` | 225 | ユーザーが作ったテンプレート(DB)の読み書き、上限。版の表は `data/layoutTemplateVersions.ts` |
+| `templateUse.ts` | 49 | テンプレートの最近の使用回数(X4。② テンプレートで選ぶとき。前 4 週・同じ週・最後に使った日。版が違っても同じテンプレートとして数える) |
 | `TemplateManager.tsx` | 704 | テンプレートの管理画面 |
 | `TemplateThumb.tsx` / `PushThumb.tsx` | 241 / 55 | テンプレートの見取り図(メール / アプリの通知) |
 
@@ -369,7 +372,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `approvals.ts` / `weekApprovals.ts` | 51 / 51 | 承認者になれる人の判断 / 週のまとめての依頼・承認 |
 | `people.ts` / `useApprovalInbox.ts` | 93 / 82 | ユーザー・承認グループ・承認のルール(すべての配信に同じ 1 つ)の読み込み / 自分宛ての依頼 |
 | `PeopleManager.tsx` | 408 | ⚙ の「ユーザーと承認グループ」 |
-| `PolicyManager.tsx` / `policyCheck.ts` | 480 / 126 | ⚙ の「方針と決まり」(取り込み・一覧・画面で足す / 直す / 消す・Markdown に書き出す・直した記録。X61)/ AI の案が決まりを守っているかの確かめ |
+| `PolicyManager.tsx` / `policyCheck.ts` | 480 / 126 | ⚙ の「方針と決まり」(取り込み・一覧・画面で足す / 直す / 消す・Markdown に書き出す・直した記録。X61。直した記録の表は `data/policyRuleEdits.ts`)/ AI の案が決まりを守っているかの確かめ |
 | `RuleEditDialog.tsx` / `ruleTemplates.ts` | 230 / 15 | 決まりを足す・直すダイアログ(X61。確かめ方は種類と値)/ 週の上限の決まりのひな形。窓口は `data/policyEdit.ts`(サーバーは `server/ccp/policies.py` の `/api/policies/rules`) |
 
 ### 3.8.2 制作
@@ -381,6 +384,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `HtmlEditor.tsx` / `HtmlPreviewFrame.tsx` | 78 / 108 | HTML のエディタ(開いたときに読み込む)/ HTML をそのまま描くプレビュー(縮小・拡大・全体) |
 | `productionSnapshot.ts` | 317 | 配信カードの写し(制作に要る中身を固める)、コピー用の行、プレビューの HTML の書き出し |
 | `useProductionRequests.ts` / `notesStage.ts` | 65 / 11 | 制作の依頼の読み込み(制作の面・札)/ やり取りの段階(企画 / 制作) |
+| `productionGate.ts` | 12 | 制作(PRODUCTION)に進むのに承認を要るか(いまは承認の前でも進める)。サーバーの `production.py` の `REQUIRE_APPROVAL` とそろえる |
+| `HtmlPins.tsx` | 183 | 制作のページのプレビュー(制作した HTML・企画の見本)に重ねるピン(X65。メールの箱の中の割合で場所を持つ) |
+| `ProductionChat.tsx` / `productionRevise.ts` | 316 / 225 | 制作のページの AI チャット(X66。見た目の直しは案をプレビューで並べて採用、文言・画像・商品・リンク先は左のペインの 1 行のフロートで確かめて入れる)/ その AI への頼み方と、返事を見た目の直し・要素の直しに分ける部分(案は保存しない) |
 
 ### 3.9 データの出入り口
 
