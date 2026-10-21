@@ -1499,7 +1499,7 @@ function App() {
                     const have = await countAssetExamples()
                     const msg = have
                       ? tr(`素材の見本はすでに ${have} 件あります。もう一組作りますか?`, `${have} sample assets already exist. Create another set?`)
-                      : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "見本:". Existing assets are not changed. Continue?')
+                      : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」(US の配信は英語で「Sample:」)です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "Sample:" ("見本:" for Japan deliveries). Existing assets are not changed. Continue?')
                     if (!window.confirm(msg)) return
                     const r = await createAssetExamples({ cards: activeCards, me: myName() })
                     setBqNotice({ intent: 'success', text: tr(`素材の見本を ${r.count} 件、${r.cards.join('・')} に足しました`, `Added ${r.count} sample assets to ${r.cards.join(', ')}`) })
@@ -1513,7 +1513,7 @@ function App() {
               <MenuItem
                 icon={<DeleteRegular />}
                 onClick={async () => {
-                  if (!window.confirm(tr('名前の先頭が「見本:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "見本:" and their files (other assets are kept)?'))) return
+                  if (!window.confirm(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?'))) return
                   try {
                     const n = await removeAssetExamples()
                     setBqNotice({ intent: 'success', text: tr(`素材の見本を ${n} 件消しました`, `Deleted ${n} sample assets`) })

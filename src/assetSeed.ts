@@ -12,7 +12,9 @@ import { refreshPreview } from './creativePreview'
 
 /** 見本の印(名前の先頭) */
 export const ASSET_SAMPLE_PREFIX = '見本:'
-const isSample = (name?: string) => !!name && name.startsWith(ASSET_SAMPLE_PREFIX)
+/** US の配信の見本は英語で書くので、印も英語(利用者の指摘 2026-10-21: US 向けに日本語の見本は違和感がある) */
+export const ASSET_SAMPLE_PREFIX_EN = 'Sample:'
+const isSample = (name?: string) => !!name && (name.startsWith(ASSET_SAMPLE_PREFIX) || name.startsWith(ASSET_SAMPLE_PREFIX_EN))
 
 type Draw = (g: CanvasRenderingContext2D, w: number, h: number) => void
 
@@ -137,33 +139,38 @@ interface Item {
   url?: string
 }
 
-const ITEMS = (): Item[][] => [
+/** 見本の中身。en = US の配信(名前もメッセージも英語)。日本の配信は日本語 */
+const ITEMS = (en: boolean): Item[][] => {
+  const P = en ? ASSET_SAMPLE_PREFIX_EN : ASSET_SAMPLE_PREFIX
+  const L = (ja: string, e: string) => (en ? e : ja)
+  return [
   [
-    { name: `${ASSET_SAMPLE_PREFIX} ムードボード(秋の色)`, note: tr('この雰囲気で。暖かい色を重ねて、落ち着いた印象に', 'This mood: warm layered colors, calm feel'), file: () => png('mood.png', 1200, 800, mood) },
-    { name: `${ASSET_SAMPLE_PREFIX} 色の指定`, note: tr('メイン画像とボタンは、この 5 色の中で', 'Keep the hero and buttons within these 5 colors'), file: () => png('palette.png', 1200, 500, palette) },
-    { name: `${ASSET_SAMPLE_PREFIX} レイアウトのラフ`, note: tr('メイン画像の下に見出し、商品は 2 列、ボタンは 1 つ', 'Headline under the hero, products in 2 columns, one button'), file: () => png('layout.png', 800, 1100, layout) },
+    { name: `${P} ${L('ムードボード(秋の色)', 'Mood board (autumn colors)')}`, note: L('この雰囲気で。暖かい色を重ねて、落ち着いた印象に', 'This mood: warm layered colors, calm feel'), file: () => png('mood.png', 1200, 800, mood) },
+    { name: `${P} ${L('色の指定', 'Color palette')}`, note: L('メイン画像とボタンは、この 5 色の中で', 'Keep the hero and buttons within these 5 colors'), file: () => png('palette.png', 1200, 500, palette) },
+    { name: `${P} ${L('レイアウトのラフ', 'Layout sketch')}`, note: L('メイン画像の下に見出し、商品は 2 列、ボタンは 1 つ', 'Headline under the hero, products in 2 columns, one button'), file: () => png('layout.png', 800, 1100, layout) },
     {
-      name: `${ASSET_SAMPLE_PREFIX} 制作の補足(PDF)`,
-      note: tr('文字の大きさと余白の補足', 'Notes on type size and spacing'),
+      name: `${P} ${L('制作の補足(PDF)', 'Production notes (PDF)')}`,
+      note: L('文字の大きさと余白の補足', 'Notes on type size and spacing'),
       file: () => pdf('brief.pdf', ['Sample brief (for testing)', 'Headline: 1 line, large, centered.', 'Body text: at least 14px, high contrast.', 'Buttons: one primary action, dark fill.', 'Keep generous white space around products.']),
     },
-    { name: `${ASSET_SAMPLE_PREFIX} 参考ページ: 見やすいデザインのヒント(W3C)`, note: tr('文字と背景の差、ボタンの分かりやすさの参考に', 'For contrast and clear buttons'), url: 'https://www.w3.org/WAI/tips/designing/' },
-    { name: `${ASSET_SAMPLE_PREFIX} 参考の写真: 秋(Wikimedia Commons)`, note: tr('自由に使える写真の一覧。雰囲気の参考に', 'Freely licensed photos, for mood reference'), url: 'https://commons.wikimedia.org/wiki/Category:Autumn' },
+    { name: `${P} ${L('参考ページ: 見やすいデザインのヒント(W3C)', 'Reference: Designing for accessibility (W3C)')}`, note: L('文字と背景の差、ボタンの分かりやすさの参考に', 'For contrast and clear buttons'), url: 'https://www.w3.org/WAI/tips/designing/' },
+    { name: `${P} ${L('参考の写真: 秋(Wikimedia Commons)', 'Reference photos: Autumn (Wikimedia Commons)')}`, note: L('自由に使える写真の一覧。雰囲気の参考に', 'Freely licensed photos, for mood reference'), url: 'https://commons.wikimedia.org/wiki/Category:Autumn' },
   ],
   [
-    { name: `${ASSET_SAMPLE_PREFIX} ムードボード(秋の色)`, note: tr('前回と同じ色味で', 'Same tones as last time'), file: () => png('mood.png', 1200, 800, mood) },
-    { name: `${ASSET_SAMPLE_PREFIX} レイアウトのラフ`, note: tr('商品は 2 列で 4 点', '4 products in 2 columns'), file: () => png('layout.png', 800, 1100, layout) },
-    { name: `${ASSET_SAMPLE_PREFIX} 参考ページ: 見やすいデザインのヒント(W3C)`, note: '', url: 'https://www.w3.org/WAI/tips/designing/' },
+    { name: `${P} ${L('ムードボード(秋の色)', 'Mood board (autumn colors)')}`, note: L('前回と同じ色味で', 'Same tones as last time'), file: () => png('mood.png', 1200, 800, mood) },
+    { name: `${P} ${L('レイアウトのラフ', 'Layout sketch')}`, note: L('商品は 2 列で 4 点', '4 products in 2 columns'), file: () => png('layout.png', 800, 1100, layout) },
+    { name: `${P} ${L('参考ページ: 見やすいデザインのヒント(W3C)', 'Reference: Designing for accessibility (W3C)')}`, note: '', url: 'https://www.w3.org/WAI/tips/designing/' },
   ],
   [
-    { name: `${ASSET_SAMPLE_PREFIX} 色の指定`, note: tr('この 5 色の中で', 'Within these 5 colors'), file: () => png('palette.png', 1200, 500, palette) },
+    { name: `${P} ${L('色の指定', 'Color palette')}`, note: L('この 5 色の中で', 'Within these 5 colors'), file: () => png('palette.png', 1200, 500, palette) },
     {
-      name: `${ASSET_SAMPLE_PREFIX} 制作の補足(PDF)`,
+      name: `${P} ${L('制作の補足(PDF)', 'Production notes (PDF)')}`,
       note: '',
       file: () => pdf('brief.pdf', ['Sample brief (for testing)', 'Use the color palette attached.', 'One primary button only.']),
     },
   ],
 ]
+}
 
 /** 見本を入れる配信: 制作の依頼のある配信を先に、なければ承認済み、それもなければ配信日の近いもの。取りやめた配信は除く */
 async function targets(cards: DeliveryCard[]): Promise<DeliveryCard[]> {
@@ -184,11 +191,11 @@ async function targets(cards: DeliveryCard[]): Promise<DeliveryCard[]> {
 export async function createAssetExamples(args: { cards: DeliveryCard[]; me: string }): Promise<{ cards: string[]; count: number }> {
   const list = await targets(args.cards)
   if (list.length === 0) throw new Error(tr('見本を入れる配信がありません', 'No delivery to add the samples to'))
-  const sets = ITEMS()
   let count = 0
   for (let i = 0; i < list.length; i++) {
     const card = list[i]
-    for (const it of sets[i] ?? []) {
+    // US の配信は英語、日本の配信は日本語(画面の言葉ではなく、配信の国で決める)
+    for (const it of ITEMS(card.country === 'US')[i] ?? []) {
       let fields: Record<string, unknown> = { kind: 'url', url: it.url }
       if (it.file) {
         const f = await it.file()
