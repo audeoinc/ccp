@@ -310,14 +310,10 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
       <div className={s.detailHead}>
         {current.product && productImage(current.product) && <img className={s.thumb} src={productImage(current.product)} alt="" draggable={false} />}
         <span className={s.detailTitle}>{current.label}</span>
+        {/* SKU ごとの在庫などを、その場で開く(X63。カテゴリの行には出さない)。商品の名前のすぐ右に置く(利用者 2026-10-21) */}
+        {current.product && <ProductDetailButton product={current.product} />}
         <span className={s.sub}>{t(`掲載 ${current.placements.length} 回 ・ 外部広告 ${current.adDays} 日${current.adMedia.size ? `(${[...current.adMedia].map((m) => AdSpendMedia[m as keyof typeof AdSpendMedia] ?? m).join('・')})` : ''}`, `Featured ${current.placements.length}× · Ads ${current.adDays} days`)}</span>
-        {/* SKU ごとの在庫などを、その場で開く(X63。カテゴリの行には出さない) */}
-        {current.product && (
-          <span className={s.close}>
-            <ProductDetailButton product={current.product} />
-          </span>
-        )}
-        <Button className={current.product ? undefined : s.close} appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setSelected(null)} />
+        <Button className={s.close} appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setSelected(null)} />
       </div>
       {/* 期間の中の並び: 下の帯 = 外部広告を出稿した日、点 = 配信に載せた日(押すと開く) */}
       <span className={s.laneLabel}>{t('期間の中の並び(点 = 配信、帯 = 外部広告の出稿)', 'Timeline (dots = deliveries, bars = paid ads)')}</span>
