@@ -11,7 +11,7 @@ import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
 import { priceText, tr } from './i18n'
-import { abSummary, isChoose, ownsHero, ownsProducts, ownsText, parseAbTest, type VariantKey, type VariantText } from './abTest'
+import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
 /** 写しに入れる配信カードの列(制作に要るものだけ。AI の案・理由は入れない) */
 const CARD_KEYS = [
@@ -74,7 +74,7 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     key: k,
     productIds: ownsProducts(ab) ? (variantIds?.[k] ?? []) : productIds,
     hero: ownsHero(ab) ? (heroes.find((h) => h.id === ab.heroes[k]?.heroId) ?? null) : hero,
-    ...(ownsText(ab) && ab.texts?.[k] ? { texts: ab.texts[k] } : {}),
+    ...(ownsAnyText(ab) && ab.texts?.[k] ? { texts: ab.texts[k] } : {}),
   }))
   const used = new Set([...productIds, ...(variants ?? []).flatMap((v) => v.productIds)])
   return {
@@ -192,6 +192,8 @@ export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => ({
           copy: v.texts.copy,
           push_title: v.texts.pushTitle,
           push_body: v.texts.pushBody,
+          subject: v.texts.subject ?? s.card.subject,
+          preheader: v.texts.preheader ?? s.card.preheader,
           section_titles: v.texts.sectionTitles.join('\n'),
           section_copies: v.texts.sectionCopies.some(Boolean) ? JSON.stringify(v.texts.sectionCopies) : '',
         },

@@ -45,6 +45,25 @@ const COPY_PROMPT = `あなたは、ファッション通販の配信(メール�
 # 入力
 `
 
+const SUBJECT_PROMPT = `あなたは、ファッション通販のメールのコピーライターです。
+下の「入力」の JSON を読み、受信一覧に出る「件名」と「プリヘッダー」(件名の横・下に出る短い文)の組を、3 案、JSON だけで返してください。
+
+# 出力の形式(厳守)
+次の JSON オブジェクト 1 つだけを返す。JSON の外には、説明文、コードフェンス、前置き、あとがきを一切付けない。
+{"subjects":[{"subject":"...","preheader":"...","angle":"..."}]}
+
+# ルール
+1. 言語は language に従う('ja' は日本語、'en' は英語)。'auto' のときは card.country に合わせる(US は英語、JP は日本語)。
+2. 件名は 30 文字前後(日本語は 20〜32 文字、英語は 35〜50 文字)。受信一覧で開きたくなる、具体的な一言。メールの見出し(card.headline)の言い換えだけにしない。
+3. プリヘッダーは 40〜90 文字。件名を補う(何が・いつまでか・開くと何が見られるか)。件名の繰り返しにしない。
+4. 3 案は、切り口を変える(例: 季節感、商品の魅力、期限の呼びかけ)。angle には、その切り口を日本語 10 文字以内で書く。
+5. 誇大な表現や、根拠のない断定(「最安値」「絶対」など)は使わない。絵文字は使わない。
+6. abTest があるときは、AB テストの別の案の件名を作っている。abTest.compareWith(A 案の件名・プリヘッダー)とは違う切り口にする。abTest.hypothesis(仮説)があれば、それを確かめられる案にする。
+7. 既存の件名(card.subject)がある場合は、それとは別の案にする。
+
+# 入力
+`
+
 const INSTRUCTIONS_PROMPT = `あなたは、ファッション通販の配信(メール・プッシュ)の制作ディレクターです。
 下の「入力」の JSON を読み、制作担当者向けの「制作指示」の案を 3 つ、JSON だけで返してください。
 
@@ -167,6 +186,25 @@ export async function suggestPushNotifications(ctx: DraftContext): Promise<CopyI
   const parsed = (await askAgent(PUSH_PROMPT, { task: 'suggest_push', ...contextPayload(ctx) })) as { notifications?: { title?: string; body?: string; angle?: string }[] }
   const list = (parsed.notifications ?? []).filter((n) => n.title).map((n) => ({ headline: String(n.title), lead: String(n.body ?? ''), angle: String(n.angle ?? '') }))
   if (list.length === 0) throw new Error(tr('通知の案を取得できませんでした', 'Could not get notification ideas'))
+  return list
+}
+
+/** AB テストの別の案の件名を作るときの、A 案との違い */
+export interface SubjectAbNote {
+  key: string
+  compareWith: { subject: string; preheader: string }
+  hypothesis: string
+}
+
+/** メールの件名・プリヘッダーの案(ヘッドライン・コピーと同じ形で返す。案の画面を共通にするため。X2・AB テスト) */
+export async function suggestSubjects(ctx: DraftContext & { subject?: string; abTest?: SubjectAbNote | null }): Promise<CopyIdea[]> {
+  const { subject, abTest, ...rest } = ctx
+  const payload = contextPayload(rest)
+  const parsed = (await askAgent(SUBJECT_PROMPT, { task: 'suggest_subjects', ...payload, card: { ...payload.card, subject: subject ?? '' }, abTest: abTest ?? null })) as {
+    subjects?: { subject?: string; preheader?: string; angle?: string }[]
+  }
+  const list = (parsed.subjects ?? []).filter((x) => x.subject).map((x) => ({ headline: String(x.subject), lead: String(x.preheader ?? ''), angle: String(x.angle ?? '') }))
+  if (list.length === 0) throw new Error(tr('件名の案を取得できませんでした', 'Could not get subject ideas'))
   return list
 }
 

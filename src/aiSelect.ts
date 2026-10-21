@@ -310,6 +310,7 @@ export const TASK_TARGETS: Record<string, string[]> = {
   select_section_copies: ['copy'],
   suggest_copies: ['headline', 'copy'],
   suggest_push: ['copy'],
+  suggest_subjects: ['headline', 'copy'],
   suggest_instructions: ['instructions'],
 }
 interface CardLite {

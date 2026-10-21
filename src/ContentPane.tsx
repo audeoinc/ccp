@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { Accordion, AccordionHeader, AccordionItem, AccordionPanel, Badge, Button, Divider, Field, Input, MessageBar, MessageBarActions, MessageBarBody, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Accordion, AccordionHeader, AccordionItem, AccordionPanel, Badge, Button, Divider, Field, MessageBar, MessageBarActions, MessageBarBody, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownRegular,
   ArrowUpRegular,
@@ -33,6 +33,10 @@ import { AiButton } from './AiButton'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type PushLink } from './pushLink'
+
+// メールの件名・プリヘッダーの文字数の目安(受信一覧で切れずに見える長さ。端末で違うので目安。X2)
+const SUBJECT_MAX = 40
+const PREHEADER_MAX = 90
 import { MarkdownLite } from './MarkdownLite'
 import { type Links, linkSlots, linksComplete, variantCampaign } from './links'
 
@@ -45,6 +49,8 @@ interface Props {
   subject?: string
   preheader?: string
   deliveryName?: string
+  /** AB テストで件名を案ごとに持ち、B・C 案を編集中なら、その案の記号(件名の案を A 案と違う切り口にする) */
+  subjectAbKey?: string
   theme: string
   headline: string
   copy: string
@@ -426,40 +432,53 @@ function CopyTab(props: {
   onGenerate: () => void
   /** アプリ(プッシュ通知)の文面: ヘッドライン = 通知のタイトル、コピー = 本文。文字数の目安を出す */
   push?: boolean
+  /** メールの件名・プリヘッダー: ヘッドライン = 件名、コピー = プリヘッダー(X2) */
+  subject?: { deliveryName: string; abKey?: string }
 }) {
   const s = useStyles()
   const t = useT()
-  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, onGenerate, push } = props
+  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, onGenerate, push, subject } = props
   // 通知に収まる文字数の目安(端末で切れ方が違うので、目安として出す)
   const count = (text: string, max: number) =>
-    push ? <span className={text.length > max ? s.warn : s.caption}>{` ${text.length} / ${max}`}</span> : null
+    push || subject ? <span className={text.length > max ? s.warn : s.caption}>{` ${text.length} / ${max}`}</span> : null
+  const firstMax = subject ? SUBJECT_MAX : PUSH_TITLE_MAX
+  const secondMax = subject ? PREHEADER_MAX : PUSH_BODY_MAX
   return (
     <div className={s.grid12}>
       <div className={s.flexRow}>
         <AiButton busy={busy} disabled={!!blocked} onClick={onGenerate}>
-          {ideas.length ? t('案を作り直す', 'Regenerate ideas') : t('AIで案を出す', 'Suggest with AI')}
+          {ideas.length ? t('案を作り直す', 'Regenerate ideas') : subject ? t('AIで件名の案を出す', 'Suggest subjects with AI') : t('AIで案を出す', 'Suggest with AI')}
         </AiButton>
+        {subject?.abKey && <span className={s.caption}>{t(`${subject.abKey} 案: A 案と違う切り口の件名を出します`, `Variant ${subject.abKey}: ideas with a different angle from A`)}</span>}
         {blocked && <span className={s.warn}>{blocked}</span>}
       </div>
       <div className={s.group}>
       <Field
         label={
           <span className={s.flexRowTight}>
-            {push ? t('通知のタイトル', 'Notification title') : t('現在のヘッドライン(メイン画像に載ります)', 'Current headline (shown on the main image)')}
+            {subject
+              ? t(`件名(空なら配信名「${subject.deliveryName}」)`, `Subject (empty uses the delivery name "${subject.deliveryName}")`)
+              : push
+                ? t('通知のタイトル', 'Notification title')
+                : t('現在のヘッドライン(メイン画像に載ります)', 'Current headline (shown on the main image)')}
             <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
-            {count(headline, PUSH_TITLE_MAX)}
+            {count(headline, firstMax)}
           </span>
         }
         size="small"
       >
-        <AutoTextarea rows={1} value={headline} onChange={(_, d) => onHeadline(d.value)} />
+        <AutoTextarea rows={1} value={headline} onChange={(_, d) => onHeadline(d.value)} placeholder={subject?.deliveryName} />
       </Field>
       <Field
         label={
           <span className={s.flexRowTight}>
-            {push ? t('通知の本文', 'Notification body') : t('現在のコピー(ヘッドラインの下に入ります)', 'Current copy (placed below the headline)')}
+            {subject
+              ? t('プリヘッダー(受信一覧で件名の横・下に出る短い文。目安 40〜90 文字)', 'Preheader (short text next to or under the subject in the inbox; aim for 40–90 chars)')
+              : push
+                ? t('通知の本文', 'Notification body')
+                : t('現在のコピー(ヘッドラインの下に入ります)', 'Current copy (placed below the headline)')}
             <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
-            {count(lead, PUSH_BODY_MAX)}
+            {count(lead, secondMax)}
           </span>
         }
         size="small"
@@ -472,7 +491,7 @@ function CopyTab(props: {
         </div>
       )}
       </div>
-      {ideas.length > 0 && <span className={s.listHead}><span className={s.lead}>{t('AIの案(未採用):', 'AI ideas (not adopted):')}</span> {t('「採用」を押すと、ヘッドラインとコピーの両方が反映されます', 'Press "Adopt" to apply both the headline and the copy')}</span>}
+      {ideas.length > 0 && <span className={s.listHead}><span className={s.lead}>{t('AIの案(未採用):', 'AI ideas (not adopted):')}</span> {subject ? t('「採用」を押すと、件名とプリヘッダーの両方が反映されます', 'Press "Adopt" to apply both the subject and the preheader') : t('「採用」を押すと、ヘッドラインとコピーの両方が反映されます', 'Press "Adopt" to apply both the headline and the copy')}</span>}
       {ideas.map((idea) => {
         const adopted = idea.headline === headline && idea.lead === lead
         return (
@@ -1099,14 +1118,24 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
   // メールの件名・プリヘッダー(X2)。受信一覧で最初に目に入る文。プレビューの上に、受信一覧での見え方を出す
   const inboxView = p.channel !== 'push' && (
     <div className={s.inboxBlock}>
-      <Field label={t(`件名(空なら配信名「${p.deliveryName ?? ''}」)`, `Subject (empty uses the delivery name "${p.deliveryName ?? ''}")`)} size="small">
-        <Input size="small" value={p.subject ?? ''} onChange={(_, d) => p.onField('subject', d.value)} placeholder={p.deliveryName} />
-      </Field>
-      <Field label={t('プリヘッダー(受信一覧で件名の横・下に出る短い文。任意)', 'Preheader (short text shown next to or under the subject in the inbox; optional)')} size="small" hint={t(`${(p.preheader ?? '').length} 文字(目安 40〜90 文字)`, `${(p.preheader ?? '').length} chars (aim for 40–90)`)}>
-        <Input size="small" value={p.preheader ?? ''} onChange={(_, d) => p.onField('preheader', d.value)} placeholder={t('例: 週末までの限定。秋のアウターが最大 30% オフ', 'e.g. Ends Sunday. Up to 30% off fall outerwear')} />
-      </Field>
+      <CopyTab
+        subject={{ deliveryName: p.deliveryName ?? '', abKey: p.subjectAbKey }}
+        headline={p.subject ?? ''}
+        lead={p.preheader ?? ''}
+        onHeadline={(v) => p.onField('subject', v)}
+        onLead={(v) => p.onField('preheader', v)}
+        ideas={drafts.subjectIdeas}
+        onAdopt={(idea) => {
+          p.onField('subject', idea.headline)
+          p.onField('preheader', idea.lead)
+        }}
+        busy={!!drafts.busy.subject}
+        blocked={noTheme ? t('先にテーマを決めてください', 'Set a theme first') : undefined}
+        onGenerate={drafts.runSubject}
+      />
     </div>
   )
+
 
   return (
     <div className={s.grid12}>

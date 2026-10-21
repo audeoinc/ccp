@@ -233,6 +233,34 @@ export function mockAgent(message: string): string {
         ] })
   }
 
+  if (task === 'suggest_subjects') {
+    // AB テストの別の案(abTest あり)は、切り口を変えた案にする(撮影用の簡単な身代わり)
+    const b = !!p.abTest
+    return en
+      ? J({ subjects: b
+          ? [
+              { subject: 'Last call: fall layers end Sunday', preheader: 'Our most-loved layers are going fast. See what is left before the weekend.', angle: 'Urgency' },
+              { subject: 'What to wear on a 15°C morning', preheader: 'Three easy layering ideas for chilly mornings and warm afternoons.', angle: 'Use case' },
+              { subject: 'Your fall edit is here', preheader: 'Picked for you: knits, trenches and boots for the new season.', angle: 'Personal' },
+            ]
+          : [
+              { subject: 'New fall layers just landed', preheader: 'Soft knits and light outerwear for cool mornings. Shop the edit.', angle: 'Seasonal' },
+              { subject: 'The knit you will wear all season', preheader: 'Quality yarns, easy shapes. Find your favorite before it sells out.', angle: 'Product appeal' },
+              { subject: 'This week only: fall picks', preheader: 'Hand-picked new arrivals, available until Sunday.', angle: 'Deadline' },
+            ] })
+      : J({ subjects: b
+          ? [
+              { subject: '日曜まで。人気の秋アウター、残りわずか', preheader: '売れ行きの良いアウターから品薄になっています。週末の前にチェックしてください。', angle: '期限' },
+              { subject: '朝 15℃ の日、何を着る?', preheader: '肌寒い朝と暖かい昼に。重ね着のコツを 3 つ、今週の新作で紹介します。', angle: '使う場面' },
+              { subject: 'あなたに選んだ、秋の 3 着', preheader: 'ニット・トレンチ・ブーツ。今季の装いの軸になる新作を集めました。', angle: '提案' },
+            ]
+          : [
+              { subject: '秋の新作、重ね着アイテムが届きました', preheader: 'やわらかなニットと軽いアウター。肌寒い朝にちょうどいい新作をまとめました。', angle: '季節感' },
+              { subject: '一枚で決まる、秋のニット', preheader: '上質な糸とこなれた形。売り切れる前に、お気に入りを見つけてください。', angle: '商品の魅力' },
+              { subject: '今週だけのおすすめ、日曜まで', preheader: 'スタッフが選んだ新作を、日曜日までの特集でお届けします。', angle: '期限' },
+            ] })
+  }
+
   if (task === 'suggest_tasks') {
     // 返信の文を、そのまま「やること」にする(撮影用の簡単な身代わり)
     const reply = String(p.reply ?? '')

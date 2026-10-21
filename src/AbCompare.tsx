@@ -57,7 +57,7 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
   const target: AbTarget = ab?.target ?? targetProp ?? 'both'
   // 案の文言を、配信の列の形にして重ねる
   const withTexts = (x?: VariantText): Partial<DeliveryCard> =>
-    x ? { headline: x.headline, copy: x.copy, push_title: x.pushTitle, push_body: x.pushBody, section_titles: x.sectionTitles.join('\n'), section_copies: x.sectionCopies.some(Boolean) ? JSON.stringify(x.sectionCopies) : '' } : {}
+    x ? { headline: x.headline, copy: x.copy, push_title: x.pushTitle, push_body: x.pushBody, subject: x.subject, preheader: x.preheader, section_titles: x.sectionTitles.join('\n'), section_copies: x.sectionCopies.some(Boolean) ? JSON.stringify(x.sectionCopies) : '' } : {}
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   const heroName = (id?: string) => heroes.find((h) => h.id === id)?.name ?? t('(なし)', '(none)')
   return (
@@ -96,9 +96,10 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
                         </Button>
                       )}
                     </div>
-                    {v.texts && <span className={s.note}>{t(`ヘッドライン: ${v.texts.headline || '(なし)'}`, `Headline: ${v.texts.headline || '(none)'}`)}</span>}
-                    {target !== 'products' && <span className={s.note}>{t(`メイン画像: ${heroName(v.heroId)}`, `Hero: ${heroName(v.heroId)}`)}</span>}
-                    {target !== 'hero' && <span className={s.note}>{t(`商品: ${v.productIds.map(productName).filter(Boolean).join(' / ') || '(なし)'}`, `Products: ${v.productIds.map(productName).filter(Boolean).join(' / ') || '(none)'}`)}</span>}
+                    {v.texts && (target === 'subject' || target === 'all') && <span className={s.note}>{t(`件名: ${v.texts.subject || '(配信名)'}`, `Subject: ${v.texts.subject || '(delivery name)'}`)}</span>}
+                    {v.texts && target !== 'subject' && <span className={s.note}>{t(`ヘッドライン: ${v.texts.headline || '(なし)'}`, `Headline: ${v.texts.headline || '(none)'}`)}</span>}
+                    {target !== 'products' && target !== 'subject' && <span className={s.note}>{t(`メイン画像: ${heroName(v.heroId)}`, `Hero: ${heroName(v.heroId)}`)}</span>}
+                    {target !== 'hero' && target !== 'subject' && <span className={s.note}>{t(`商品: ${v.productIds.map(productName).filter(Boolean).join(' / ') || '(なし)'}`, `Products: ${v.productIds.map(productName).filter(Boolean).join(' / ') || '(none)'}`)}</span>}
                   </div>
                   <div className={s.scroll}>
                     <div className={s.zoom}>

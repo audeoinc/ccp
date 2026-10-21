@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X2 件名・プリヘッダー / X3 PC・スマホ。6.48。その前は X60 表示の大きさ。6.47)
+- 最終更新: 2026-10-21(AB テストの案ごとの件名・件名の AI 案。6.49。その前は X2 件名・プリヘッダー / X3 PC・スマホ。6.48)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -657,7 +657,13 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 - X2: `delivery_cards` に subject・preheader(空の件名は配信名を使う)。`CardDetail` の Form と `buildContent`、`ContentPane` の ③「ヘッドライン・コピー」の下(`inboxView`。メールのときだけ)。`Preview` に `subjectLine`・`preheader`(上の「件名:」の行と、プリヘッダーの行)。`CardPreview` も渡す。制作の写しは `CARD_KEYS` に subject・preheader、テキストの行の「件名」は `subject`(空なら name)、「プリヘッダー」を足した。
 - X3: `Preview` に `device`('mobile' 375px / 'pc' 640px。省略は 440px のまま。保存した配信のプレビュー・まとめて作るなどは変わらない)。配信カードのプレビューの見出しに「スマホ / PC」(`cardDetail.previewDevice`)。
-- 残り: AI で件名・プリヘッダーの案、AB テストの案ごとの件名(VariantText に足す)。
+- 残り: AI で件名・プリヘッダーの案、AB テストの案ごとの件名(VariantText に足す)。→ 6.49 で済み。
+
+## 6.49 AB テストの案ごとの件名・件名の AI 案(2026-10-21、UI セッション)
+
+- 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
+- AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
+- 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)は、まだ。
 
 ## 7. 落とし穴
 

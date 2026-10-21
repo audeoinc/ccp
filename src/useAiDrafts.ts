@@ -20,10 +20,12 @@ import {
 import {
   suggestCopies,
   suggestPushNotifications,
+  suggestSubjects,
   suggestInstructions,
   suggestThemes,
   type CopyIdea,
   type InstructionIdea,
+  type SubjectAbNote,
   type ThemeSuggestion,
 } from './aiDraft'
 import { tr } from './i18n'
@@ -44,6 +46,9 @@ export interface DraftInputs {
   heroReason?: string
   /** コピー・ヘッドラインの言語 */
   language: CopyLanguage
+  /** いまの件名と、AB テストの別の案を作っているときの A 案との違い(件名の案のため) */
+  subject?: string
+  subjectAb?: () => SubjectAbNote | null
 }
 
 /** 実行中の対象: theme / copy / instructions / hero / section:番号[:title|copy|products] */
@@ -57,6 +62,8 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
   const [instructionIdeas, setInstructionIdeas] = useState<InstructionIdea[]>([])
   // アプリ: 通知のタイトル・本文の案
   const [pushIdeas, setPushIdeas] = useState<CopyIdea[]>([])
+  // メール: 件名・プリヘッダーの案(X2)
+  const [subjectIdeas, setSubjectIdeas] = useState<CopyIdea[]>([])
   // セクションの見出し・コピーの候補(AI が作ったときの分。保存はしない)
   const [titleCandidates, setTitleCandidates] = useState<Record<number, TitleCandidate[]>>({})
   const [sectionCopyCandidates, setSectionCopyCandidates] = useState<Record<number, CopyCandidate[]>>({})
@@ -109,6 +116,14 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
       const ctx = context()
       if (!ctx.card.theme.trim()) throw new Error(tr('通知の案を出すには、先にテーマを決めてください', 'Set a theme before requesting notification ideas'))
       setPushIdeas(await suggestPushNotifications(ctx))
+      return true
+    })
+
+  const runSubject = () =>
+    withBusy('subject', async () => {
+      const ctx = context()
+      if (!ctx.card.theme.trim()) throw new Error(tr('件名の案を出すには、先にテーマを決めてください', 'Set a theme before requesting subject ideas'))
+      setSubjectIdeas(await suggestSubjects({ ...ctx, subject: inputs.subject, abTest: inputs.subjectAb?.() ?? null }))
       return true
     })
 
@@ -228,6 +243,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     copyIdeas,
     instructionIdeas,
     pushIdeas,
+    subjectIdeas,
     titleCandidates,
     sectionCopyCandidates,
     busy,
@@ -235,6 +251,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     runCopy,
     runInstructions,
     runPush,
+    runSubject,
     runHero,
     runSection,
     runSectionTitles,

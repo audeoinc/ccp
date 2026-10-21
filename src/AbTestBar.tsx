@@ -167,7 +167,7 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
           </Button>
         ))}
         <span className={s.label}>{choose ? t('案ごとに変える', 'Per variant') : t('比べる', 'Compare')}</span>
-        {(['hero', 'products', 'both', 'all'] as AbTarget[]).map((x) => (
+        {(['subject', 'hero', 'products', 'both', 'all'] as AbTarget[]).map((x) => (
           <Button key={x} type="button" size="small" shape="circular" className={s.chip} appearance={ab.target === x ? 'primary' : 'outline'} onClick={() => ab.target !== x && onTarget(x)}>
             {targetLabel(x)}
           </Button>

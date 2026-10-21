@@ -68,7 +68,7 @@ import { CreativeAssets } from './CreativeAssets'
 import { isUsableHero } from './heroRights'
 import { AbCompare } from './AbCompare'
 import { draftVariant } from './abAi'
-import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsProducts, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
+import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import type { StockModel } from './alerts'
@@ -803,7 +803,26 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   // AI の案の状態と生成(案は採用するまで、配信カードには反映しない)
   const drafts = useAiDrafts(
-    { buildCard: buildAiCard, products: poolProducts, heroes: poolHeroes, otherThemes, template, items, candidates, sectionTitles, sectionCopies, heroId, heroReason, language },
+    {
+      buildCard: buildAiCard,
+      products: poolProducts,
+      heroes: poolHeroes,
+      otherThemes,
+      template,
+      items,
+      candidates,
+      sectionTitles,
+      sectionCopies,
+      heroId,
+      heroReason,
+      language,
+      subject: form.subject,
+      // AB テストで件名を案ごとに持ち、B・C 案を編集中なら、A 案と違う切り口の件名にする
+      subjectAb: () =>
+        ab && active !== 'A' && ownsSubject(ab)
+          ? { key: active, compareWith: { subject: textsOf('A').subject || form.name, preheader: textsOf('A').preheader ?? '' }, hypothesis: ab.hypothesis.trim() }
+          : null,
+    },
     setError,
   )
 
@@ -918,24 +937,34 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   // ---- AB テスト(X55)・案から選ぶ(X57): 案の中身の出し入れ。編集中の案は items・heroId・heroReason・文言の state、それ以外は stash
   // 案ごとに持たないもの(比べる要素でないもの)は、全案で共通 = いまの state そのもの
-  const curText = (): VariantText => ({ headline: form.headline, copy: form.copy, pushTitle: form.pushTitle, pushBody: form.pushBody, sectionTitles, sectionCopies })
+  const curText = (): VariantText => ({ headline: form.headline, copy: form.copy, pushTitle: form.pushTitle, pushBody: form.pushBody, sectionTitles, sectionCopies, subject: form.subject, preheader: form.preheader })
   const itemsOf = (k: VariantKey): Item[] => (k === active || !ownsProducts(ab) ? items : (stash[k]?.items ?? []))
   const heroOf = (k: VariantKey): { heroId?: string; heroReason: string } =>
     k === active || !ownsHero(ab) ? { heroId, heroReason } : { heroId: stash[k]?.heroId, heroReason: stash[k]?.heroReason ?? '' }
-  const textsOf = (k: VariantKey): VariantText => (k === active || !ownsText(ab) ? curText() : (stash[k]?.texts ?? curText()))
+  // 件名だけを比べるときも、文言を案ごとに持つ(読むのは件名・プリヘッダーだけ)
+  const textsOf = (k: VariantKey): VariantText => (k === active || !ownsAnyText(ab) ? curText() : (stash[k]?.texts ?? curText()))
   /** 保存する設定(B・C 案のメイン画像・文言を入れる) */
   const abForSave = (): AbTest | null => {
     if (!ab) return null
     const heroes = ownsHero(ab) ? Object.fromEntries(ab.variants.map((k) => [k, heroOf(k)])) : {}
-    const texts = ownsText(ab) ? Object.fromEntries(ab.variants.map((k) => [k, textsOf(k)])) : undefined
+    const texts = ownsAnyText(ab) ? Object.fromEntries(ab.variants.map((k) => [k, textsOf(k)])) : undefined
     return { ...ab, heroes, ...(texts ? { texts } : {}) }
   }
   /** 文言を画面に出す(ヘッドライン・コピー・通知の文・セクションの見出しとコピー) */
-  const showText = (x: VariantText) => {
-    setForm((f) => ({ ...f, headline: x.headline, copy: x.copy, pushTitle: x.pushTitle, pushBody: x.pushBody }))
-    setSectionTitles(x.sectionTitles)
-    setSectionCopies(x.sectionCopies)
+  /** 文言を画面に出す。full でなければ(件名だけを比べるとき)件名・プリヘッダーだけ */
+  const showText = (x: VariantText, full = true) => {
+    setForm((f) => ({
+      ...f,
+      ...(full ? { headline: x.headline, copy: x.copy, pushTitle: x.pushTitle, pushBody: x.pushBody } : {}),
+      subject: x.subject ?? f.subject,
+      preheader: x.preheader ?? f.preheader,
+    }))
+    if (full) {
+      setSectionTitles(x.sectionTitles)
+      setSectionCopies(x.sectionCopies)
+    }
   }
+
   /** いま編集している案を stash に置き、to の案の中身を出す(案ごとに持つものだけ。共通のものはそのまま) */
   const loadVariant = (to: VariantKey, data: VariantData, base: AbTest | null) => {
     setStash((prev) => ({ ...prev, [active]: { items, heroId, heroReason, texts: curText() } }))
@@ -947,7 +976,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       setHeroId(data.heroId)
       setHeroReason(data.heroReason)
     }
-    if (ownsText(base) && data.texts) showText(data.texts)
+    if (ownsAnyText(base) && data.texts) showText(data.texts, ownsText(base))
     setActive(to)
   }
   const switchVariant = (to: VariantKey) => {
@@ -1052,7 +1081,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         const cur = out[k] ?? { items: [], heroReason: '' }
         const addProducts = ownsProducts(next) && !ownsProducts(ab)
         const addHero = ownsHero(next) && !ownsHero(ab)
-        const addText = ownsText(next) && !ownsText(ab)
+        const addText = ownsAnyText(next) && !ownsAnyText(ab)
         out[k] = {
           items: addProducts ? a.items.map((i) => ({ ...i, key: crypto.randomUUID() })) : cur.items,
           heroId: addHero ? a.heroId : cur.heroId,
@@ -1079,7 +1108,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       key: x,
       ...(ownsHero(ab) ? heroOf(x) : {}),
       productIds: ownsProducts(ab) ? itemsOf(x).map((i) => i.productId) : [],
-      ...(ownsText(ab) ? { texts: textsOf(x) } : {}),
+      ...(ownsAnyText(ab) ? { texts: textsOf(x) } : {}),
     }))
     const chosen: VariantData = { items: itemsOf(k), ...heroOf(k), texts: textsOf(k) }
     // 決めた案の中身を、配信そのもの(A)にする。B・C 案の行は、保存で A の行になる(行 ID はそのまま使い、variant を空に)
@@ -1088,7 +1117,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       setHeroId(chosen.heroId)
       setHeroReason(chosen.heroReason)
     }
-    if (ownsText(ab) && chosen.texts) showText(chosen.texts)
+    if (ownsAnyText(ab) && chosen.texts) showText(chosen.texts, ownsText(ab))
     setSelectedKey(null)
     setStash({})
     setActive('A')
@@ -1210,8 +1239,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         audience: audience,
         target_gender: (form.targetGender || null) as never,
         target_ages: form.targetAges,
-        subject: form.subject,
-        preheader: form.preheader,
+        // 件名を案ごとに持つときは、A 案の件名を配信の列に(X2・AB テスト)
+        subject: ownsSubject(ab) ? (textsOf('A').subject ?? '') : form.subject,
+        preheader: ownsSubject(ab) ? (textsOf('A').preheader ?? '') : form.preheader,
         push_title: textsOf('A').pushTitle,
         push_body: textsOf('A').pushBody,
         production_owner: form.productionOwner.trim(),
@@ -1672,7 +1702,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             <AbCompare
               ab={ab}
               base={{ id: card?.id ?? 'draft', ...buildContent(), hero_image_id: null } as DeliveryCard}
-              variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsText(ab) ? textsOf(k) : undefined }))}
+              variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined }))}
               products={products}
               heroes={heroes}
               onEdit={switchVariant}
@@ -1892,6 +1922,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 subject={form.subject}
                 preheader={form.preheader}
                 deliveryName={form.name}
+                subjectAbKey={ab && active !== 'A' && ownsSubject(ab) ? active : undefined}
                 instructions={form.instructions}
                 themeReason={form.themeReason}
                 copyAngle={form.copyAngle}

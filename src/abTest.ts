@@ -11,7 +11,7 @@ export const VARIANT_KEYS: VariantKey[] = ['A', 'B', 'C']
 export const MAX_VARIANTS = 3
 
 /** 比べる要素(all = メイン画像・商品・文言(ヘッドライン・コピー・セクションの見出しとコピー・通知の文)のすべて) */
-export type AbTarget = 'hero' | 'products' | 'both' | 'all'
+export type AbTarget = 'hero' | 'products' | 'both' | 'all' | 'subject'
 /** 使い方(test = AB テスト: 全案を分けて送る / choose = 案から選ぶ: 決めた 1 案だけを送る。X57) */
 export type AbPurpose = 'test' | 'choose'
 /** 判定の指標 */
@@ -32,6 +32,9 @@ export interface VariantText {
   pushBody: string
   sectionTitles: string[]
   sectionCopies: string[]
+  /** メールの件名・プリヘッダー(比べる要素が subject か all のとき。古いデータにはない) */
+  subject?: string
+  preheader?: string
 }
 
 /** 案から選んだ結果(X57)。配信しなかった案は、中身ごと残す(あとで見返せるように) */
@@ -121,6 +124,10 @@ export const isChoose = (ab: AbTest | null) => ab?.purpose === 'choose'
 export const ownsProducts = (ab: AbTest | null) => !!ab && (ab.target === 'products' || ab.target === 'both' || ab.target === 'all')
 export const ownsHero = (ab: AbTest | null) => !!ab && (ab.target === 'hero' || ab.target === 'both' || ab.target === 'all')
 export const ownsText = (ab: AbTest | null) => !!ab && ab.target === 'all'
+/** 件名・プリヘッダーを案ごとに持つか(件名だけを比べる・すべてを変える) */
+export const ownsSubject = (ab: AbTest | null) => !!ab && (ab.target === 'subject' || ab.target === 'all')
+/** 文言(件名・プリヘッダーを含む)を、案ごとに保存するか */
+export const ownsAnyText = (ab: AbTest | null) => ownsText(ab) || ownsSubject(ab)
 
 /** A を含む、すべての案 */
 export const allVariants = (ab: AbTest | null): VariantKey[] => (ab ? ['A', ...ab.variants] : ['A'])
@@ -146,7 +153,9 @@ export const targetLabel = (t: AbTarget) =>
       ? tr('商品', 'Products')
       : t === 'both'
         ? tr('メイン画像と商品', 'Hero image and products')
-        : tr('メイン画像・商品・文言', 'Hero image, products and text')
+        : t === 'subject'
+          ? tr('件名・プリヘッダー', 'Subject and preheader')
+          : tr('メイン画像・商品・文言(件名も)', 'Hero image, products and text (incl. subject)')
 
 export const metricLabel = (m: AbMetric) =>
   m === 'ctr' ? tr('クリック率', 'Click rate') : m === 'rpr' ? tr('受信者あたりの売上', 'Revenue per recipient') : m === 'cvr' ? tr('注文率', 'Order rate') : tr('開封率', 'Open rate')
