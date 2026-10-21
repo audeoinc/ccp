@@ -166,6 +166,9 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2,
   },
   fullRow: { gridColumn: '1 / -1' },
+  // 使わないテンプレートの開け閉め。一覧は高さの決まったスクロールの格子で、ボタンは overflow: hidden なので、
+  // 高さを決めておかないと、行がつぶれる(2026-10-21 利用者の指摘)
+  inactiveToggle: { minHeight: '32px', justifyContent: 'flex-start', marginTop: '6px' },
   listHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   groupLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, marginTop: '6px' },
   item: {
@@ -695,7 +698,7 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
 
               {/* 使わない(無効)のものは、一覧の下にたたむ(配信カードの選択肢には出ない。ここから「また使う」で戻せる) */}
               {hiddenList.length > 0 && (
-                <Button size="small" appearance="subtle" className={s.fullRow} icon={<EyeOffRegular />} onClick={() => setShowHidden((v) => !v)}>
+                <Button size="small" appearance="subtle" className={mergeClasses(s.fullRow, s.inactiveToggle)} icon={<EyeOffRegular />} onClick={() => setShowHidden((v) => !v)}>
                   {showHidden ? t(`使わないテンプレートをたたむ(${hiddenList.length})`, `Collapse inactive templates (${hiddenList.length})`) : t(`使わないテンプレート(${hiddenList.length})`, `Inactive templates (${hiddenList.length})`)}
                 </Button>
               )}
