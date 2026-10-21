@@ -234,7 +234,11 @@
     ["assignee", "text"],
     ["due", "date"],
     ["source_note", "text"],
-    ["stage", "text"]
+    ["stage", "text"],
+    ["anchor", "text"],
+    ["anchor_x", "numeric"],
+    ["anchor_y", "numeric"],
+    ["anchor_view", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],

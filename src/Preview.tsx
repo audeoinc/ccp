@@ -155,6 +155,8 @@ const useStyles = makeStyles({
   },
 })
 
+// ブロックの data-anchor(hero・section:N・button:… など)は、プレビュー上に置く書き込み(ピン)の場所の目印(pinStore.ts)。
+// 座標だけで持つと、幅・倍率・文言でずれるので、ブロックの中の割合で持つ。名前を変えると、置いたピンが見つからなくなる
 export function Preview(props: Props) {
   return props.channel === 'email' ? <EmailPreview {...props} /> : <PushPreview {...props} />
 }
@@ -461,6 +463,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     <div
       className={classes.hero}
       data-link="hero"
+      data-anchor="hero"
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(DND_HERO)) return
         e.preventDefault()
@@ -582,6 +585,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           key={b.id}
           data-link="button"
           data-link-id={b.id}
+          data-anchor={`button:${b.id}`}
           className={classes.noWrap}
           style={{
             textAlign: 'center',
@@ -604,14 +608,14 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   const heroAfter = (
     <>
       {heroText === 'below' && (
-        <div style={{ textAlign: 'center', padding: '16px 16px 0', color: INK }}>
+        <div data-anchor="herotext" style={{ textAlign: 'center', padding: '16px 16px 0', color: INK }}>
           <div style={{ fontFamily: hf.family, fontWeight: hf.weight, fontSize: `calc(1.5rem * ${hf.scale})`, lineHeight: 1.25, letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking, textTransform: hf.upper ? 'uppercase' : 'none' }}>
             {headline || t('(ヘッドライン未入力)', '(No headline)')}
           </div>
         </div>
       )}
       {heroText !== 'band' && (
-        <div style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
+        <div data-anchor="herotext" style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
       )}
       {buttonsAfter(0, 12)}
       <div style={{ height: 8 }} />
@@ -672,8 +676,8 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     })
     body = (
       <>
-        {runs.map((run) => (
-          <div key={run.start} style={{ padding: '0 16px 16px' }}>
+        {runs.map((run, ri) => (
+          <div key={run.start} data-anchor={`section:${ri}`} style={{ padding: '0 16px 16px' }}>
             {showHeadings && run.category && headingEl(optionLabel(run.category))}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{run.items.map((it, j) => gridTile(it, run.start + j))}</div>
           </div>
@@ -707,7 +711,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         {sections.map(({ sec, start, list }, si) => {
           const category = sec.categoryHeading ? byId.get(list[0]?.productId ?? '')?.category_name : undefined
           return (
-            <div key={start} style={{ padding: '0 16px 16px' }}>
+            <div key={start} data-anchor={`section:${si}`} style={{ padding: '0 16px 16px' }}>
               {sec.categoryHeading && editableHeading(si, category ? optionLabel(category) : `CATEGORY ${si + 1}`)}
               {sec.copy !== false && sectionCopyEl(si, !!sec.categoryHeading)}
               {sectionBody(sec, start, list)}
@@ -730,10 +734,10 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   }
 
   return (
-    <div style={{ maxWidth: device === 'pc' ? 640 : device === 'mobile' ? 375 : 440, margin: '0 auto' }}>
+    <div data-anchor="preview" style={{ maxWidth: device === 'pc' ? 640 : device === 'mobile' ? 375 : 440, margin: '0 auto' }}>
       {/* 受信一覧での見え方: 件名(空は配信名)と、プリヘッダー(X2) */}
       {!compact && (
-        <div style={{ fontSize: 12, color: tokens.colorNeutralForeground2, display: 'grid', rowGap: 2 }}>
+        <div data-anchor="subject" style={{ fontSize: 12, color: tokens.colorNeutralForeground2, display: 'grid', rowGap: 2 }}>
           <span>
             {t('件名', 'Subject')}: <span style={{ color: tokens.colorNeutralForeground1, fontWeight: 600 }}>{subjectLine || subject || t('(配信名未入力)', '(No name)')}</span>
           </span>
@@ -743,15 +747,15 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       <div style={{ backgroundColor: '#fff', color: INK, border: '1px solid #ddd', borderRadius: 16, overflow: 'hidden', marginTop: 4, ...scaled }}>
         {/* お知らせ帯: 配信名を、メールの最上部に細い帯で出す */}
         {tpl.topBar && (
-          <div className={classes.noWrap} style={{ backgroundColor: '#555', color: '#fff', textAlign: 'center', padding: '6px 12px', fontSize: '0.75rem', letterSpacing: 2 }}>
+          <div data-anchor="topbar" className={classes.noWrap} style={{ backgroundColor: '#555', color: '#fff', textAlign: 'center', padding: '6px 12px', fontSize: '0.75rem', letterSpacing: 2 }}>
             {subject || t('(配信名未入力)', '(No name)')} ›
           </div>
         )}
-        <div style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>SHOP</div>
+        <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>SHOP</div>
         {heroBox}
         {heroAfter}
         {body}
-        {!compact && <div style={{ backgroundColor: '#f5f5f5', color: SUB, fontSize: '0.75rem', textAlign: 'center', padding: '12px 0' }}>{t('配信停止はこちら', 'Unsubscribe')}</div>}
+        {!compact && <div data-anchor="footer" style={{ backgroundColor: '#f5f5f5', color: SUB, fontSize: '0.75rem', textAlign: 'center', padding: '12px 0' }}>{t('配信停止はこちら', 'Unsubscribe')}</div>}
       </div>
     </div>
   )
@@ -843,7 +847,7 @@ function PushPreview(props: Props) {
     )
 
   return (
-    <div style={{ maxWidth: 380, margin: '0 auto', display: 'grid', gap: 16 }}>
+    <div data-anchor="preview" style={{ maxWidth: 380, margin: '0 auto', display: 'grid', gap: 16 }}>
       <div style={{ justifySelf: 'center', display: 'flex' }}>
         <ToggleButton size="small" checked={style === 'ios'} onClick={() => setStyle('ios')} style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
           {t('iOS風', 'iOS style')}
@@ -868,7 +872,7 @@ function PushPreview(props: Props) {
           {dateText && <div style={{ fontSize: '0.85rem', opacity: 0.85 }}>{dateText}</div>}
           <div style={{ fontSize: style === 'ios' ? '3.6rem' : '3rem', fontWeight: style === 'ios' ? 300 : 400, lineHeight: 1.1 }}>{clock}</div>
         </div>
-        <div data-link="push">{notification}</div>
+        <div data-link="push" data-anchor="push">{notification}</div>
         <div style={{ width: 96, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)', margin: '24px auto 0' }} />
       </div>
       {/* 通知を押したあとに開く画面(「⑤ リンク先」の「通知を押したときに開く画面」で決める) */}

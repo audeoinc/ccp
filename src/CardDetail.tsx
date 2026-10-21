@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -21,7 +21,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, CommentAddRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -72,6 +72,8 @@ import { templateUse } from './templateUse'
 import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
+import { PreviewPins } from './PreviewPins'
+import { pinView } from './pinStore'
 import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 import { viewHeight, viewWidth } from './uiScale'
@@ -552,6 +554,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [linksTab, setLinksTab] = useState(false)
   // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
   const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
+  // プレビュー上の場所を指して書き込む(ピン)。選んでいる間は、プレビューを押しても編集しない
+  const [placingPin, setPlacingPin] = useState(false)
+  const endPlacingPin = useCallback(() => setPlacingPin(false), [])
   // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
   // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
   const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
@@ -2075,6 +2080,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     {zoom === 'fit' ? '100%' : t('全体', 'Fit')}
                   </Button>
                 </div>
+                <Tooltip
+                  relationship="description"
+                  content={card ? t('プレビューの場所を押して、そこへの書き込み(承認者のコメント・制作への問い合わせなど)を始めます。Esc でやめます。', 'Click a spot in the preview to start a comment there (approver feedback, questions to production, etc.). Esc to cancel.') : t('配信カードを保存すると、使えます', 'Save the delivery card first')}
+                >
+                  <ToggleButton type="button" size="small" appearance={placingPin ? 'primary' : 'subtle'} checked={placingPin} icon={<CommentAddRegular />} disabled={!card} onClick={() => setPlacingPin((v) => !v)}>
+                    {placingPin ? t('場所を押す…', 'Click a spot…') : t('コメントを置く', 'Place comment')}
+                  </ToggleButton>
+                </Tooltip>
                 {previewTab === 'email' && template === 'free' && (
                   <>
                     <Switch label={t('カテゴリ見出し', 'Category headings')} checked={showHeadings} onChange={(_, d) => setShowHeadings(d.checked)} />
@@ -2128,6 +2141,18 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     }}
                   />
                 )}
+                <PreviewPins
+                  boxRef={previewBoxRef}
+                  cardId={card?.id}
+                  view={pinView(previewTab, previewDevice, ab ? active : 'A')}
+                  items={items}
+                  placing={placingPin}
+                  onPlacingEnd={endPlacingPin}
+                  onOpenThreads={() => {
+                    if (!processOpen) toggleProcess()
+                    setTabRequest((r) => ({ tab: 'threads', seq: (r?.seq ?? 0) + 1 }))
+                  }}
+                />
                 <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
               </div>
             </div>

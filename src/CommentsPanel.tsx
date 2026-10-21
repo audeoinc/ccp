@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
+import { ArrowReplyRegular, ChatRegular, LocationRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
 import { locale, optionLabel, tr, useT } from './i18n'
@@ -10,6 +10,7 @@ import { NoteReactionKind, type NoteReaction } from './models/noteReactions'
 import { AiButton } from './AiButton'
 import { suggestTasks, type TaskIdea } from './aiTasks'
 import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
+import { anchorLabel, bumpNotes, focusPin, focusedPin, pendingPin, pinNumbers, setPendingPin, subscribePins, viewLabel } from './pinStore'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -59,6 +60,35 @@ const useStyles = makeStyles({
   idea: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto auto', columnGap: '6px', rowGap: '4px', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}`, '& .fui-Input': { minWidth: 0, width: '100%' } },
   ideaText: { gridColumn: '1 / -1' },
   taskChip: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1 },
+  // プレビュー上の場所(ピン)。押すと、プレビューのそのピンを光らせる
+  pinChip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '4px',
+    padding: '0 6px 0 2px',
+    minHeight: '20px',
+    border: `1px solid ${tokens.colorPaletteDarkOrangeBorder1}`,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorPaletteDarkOrangeBackground1,
+    color: tokens.colorNeutralForeground1,
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase100,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorPaletteDarkOrangeBackground2 },
+  },
+  pinNo: {
+    display: 'inline-grid',
+    placeItems: 'center',
+    minWidth: '16px',
+    height: '16px',
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorPaletteDarkOrangeBackground3,
+    color: tokens.colorNeutralForegroundOnBrand,
+    fontWeight: tokens.fontWeightBold,
+  },
+  // 書き込む前の、選んだ場所
+  pendingRow: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorBrandForeground1 },
+  focusedThread: { boxShadow: `0 0 0 2px ${tokens.colorBrandStroke1}` },
 })
 
 interface Props {
@@ -122,6 +152,12 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   const [ideas, setIdeas] = useState<Record<string, TaskIdea[] | 'busy'>>({})
   // 書き込みへのリアクション(PR6。Teams のような軽い返事。状態は変えない)
   const [reactions, setReactions] = useState<NoteReaction[]>([])
+  // プレビュー上の場所(ピン)は、配信カードの企画のやり取りだけ(制作のページ・素材のフロートは、プレビューが別のため)
+  const pinnable = stage === 'plan' && !assetId
+  const pendingAll = useSyncExternalStore(subscribePins, pendingPin)
+  const pending = pinnable && pendingAll && pendingAll.cardId === cardId ? pendingAll : null
+  const focus = useSyncExternalStore(subscribePins, focusedPin)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
   const load = useCallback(async () => {
     if (!cardId) return
@@ -136,6 +172,8 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     const ids = new Set(list.map((n) => n.id))
     const r = await NoteReactionsService.getAll()
     setReactions(r.success ? (r.data ?? []).filter((x) => ids.has(x.card_note_id ?? '')) : [])
+    // プレビューのピンも読み直す
+    bumpNotes()
   }, [cardId])
 
   useEffect(() => {
@@ -168,11 +206,29 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     return res.success
   }
 
+  // プレビューで場所を選んだら、商品の枠ならその商品を対象にし、書く欄へ移る
+  useEffect(() => {
+    if (!pending) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (pending.productId) setTarget(pending.productId)
+    window.setTimeout(() => bodyRef.current?.focus(), 150)
+  }, [pending])
+
+  // ピンを押したら、そのスレッドを見える位置に出す(解決してたたんでいれば、開く)
+  useEffect(() => {
+    if (!focus || !notes?.some((n) => n.id === focus.noteId)) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExpanded((s) => (s.has(focus.noteId) ? s : new Set(s).add(focus.noteId)))
+    window.setTimeout(() => document.querySelector(`[data-thread-id="${CSS.escape(focus.noteId)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 120)
+  }, [focus, notes])
+  const pinNo = pinNumbers(notes ?? [])
+
   const add = () =>
     run(async () => {
       const res = await CardNotesService.create({
         delivery_card_id: cardId,
         ...(assetId ? { asset_id: assetId } : target ? { product_id: target } : {}),
+        ...(pending ? { anchor: pending.anchor, anchor_x: pending.x, anchor_y: pending.y, anchor_view: pending.view } : {}),
         kind: 'comment',
         ...(stage ? { stage } : {}),
         author: me,
@@ -180,7 +236,14 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         body: body.trim(),
         resolved: 0,
       })
-      if (res.success) setBody('')
+      if (res.success) {
+        setBody('')
+        if (pending) {
+          // 商品の枠を押して入った対象は、その書き込みだけのもの(次の書き込みに残さない)
+          if (pending.productId) setTarget('')
+          setPendingPin(null)
+        }
+      }
       return res
     })
 
@@ -358,9 +421,25 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     )
     const replying = drafts[id] !== undefined
     const list = ideas[id]
+    const no = pinNo.get(id)
+    const pinBadge = no ? (
+      <button type="button" className={styles.pinChip} onClick={() => focusPin(id)} title={t('プレビューでこの場所を見る', 'Show this spot in the preview')}>
+        <span className={styles.pinNo}>{no}</span>
+        {/* 商品の枠のときは、商品名は対象の札に出ているので、ここは「商品」だけ */}
+        {anchorLabel(n.anchor ?? '')}
+        {viewLabel(n.anchor_view) && `(${viewLabel(n.anchor_view)})`}
+      </button>
+    ) : null
     return (
-      <div key={id} className={mergeClasses(styles.thread, !resolved && styles.threadOpen)}>
-        {entry(n, 24, targetBadge)}
+      <div key={id} data-thread-id={id} className={mergeClasses(styles.thread, !resolved && styles.threadOpen, focus?.noteId === id && styles.focusedThread)}>
+        {entry(
+          n,
+          24,
+          <>
+            {targetBadge}
+            {pinBadge}
+          </>,
+        )}
         {hasReply && (
           <div className={styles.replies}>
             {/* 以前の質問の返信(1 件だけ列に持っていた)。返信の 1 件として見せる */}
@@ -499,7 +578,17 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
               <option key={p} value={p} />
             ))}
           </datalist>
+          {pending ? (
+            <div className={styles.pendingRow}>
+              <LocationRegular />
+              <span>{t(`プレビューの場所: ${anchorLabel(pending.anchor, pending.productId ? productName(pending.productId) : undefined)}`, `Spot in the preview: ${anchorLabel(pending.anchor, pending.productId ? productName(pending.productId) : undefined)}`)}</span>
+              <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => setPendingPin(null)} aria-label={t('場所を外す', 'Remove the spot')} />
+            </div>
+          ) : (
+            pinnable && <span className={styles.hint}>{t('プレビューの「コメントを置く」で、場所を指して書き込めます。', 'Use "Place comment" on the preview to point at a spot.')}</span>
+          )}
           <Textarea
+            ref={bodyRef}
             size="small"
             resize="vertical"
             placeholder={t('例: セールの終わりは日曜 23:59 ですか? / 前日のメールと商品がかぶっています', 'e.g. Does the sale end Sunday 11:59 PM? / Same products as the previous day')}
