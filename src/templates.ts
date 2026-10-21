@@ -191,10 +191,14 @@ export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButt
 const BUILTIN: Record<string, EmailTemplate> = {
   free: {
     get label() {
-      return tr('自由(カテゴリ見出しを自動)', 'Free (auto category headings)')
+      // 枠の数・形が決まっていないことと、見出しが付くことを、名前で分かるように(2026-10-21 利用者の指摘)
+      return tr('自由に並べる(カテゴリごとに見出し)', 'Free order (heading per category)')
     },
     get description() {
-      return tr('カテゴリ見出しを自動で付ける、自由な並び。商品の数に決まりはありません。', 'A free-form layout with category headings added automatically. No fixed number of products.')
+      return tr(
+        '商品の数を決めずに、2 列で並べる。同じカテゴリが続く所に、カテゴリ名の見出しを自動で付ける。点数が毎回変わる配信(新作まとめ・セール対象の一覧など)に。',
+        'Products in two columns, any number. A category heading is added wherever the category changes. For deliveries whose item count varies (new-arrivals roundups, sale lists).',
+      )
     },
     hero: 'standard',
     sections: [],

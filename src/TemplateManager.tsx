@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import {
   Badge,
   Button,
@@ -29,6 +29,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { statusLabel, statusRank } from './status'
 import { PartThumb, TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
+import { Splitter } from './Splitter'
 import {
   DEFAULT_PUSH_TEMPLATE,
   LINK_KINDS,
@@ -134,6 +135,29 @@ const similarity = (a: TemplateLayout, b: TemplateLayout) => {
 }
 /** 見比べるときの、キャンバスと、並べるテンプレートの幅(2 つ並べても、ダイアログに収まるように少し小さく) */
 const COMPARE_WIDTH = 240
+/** 編集中の列の幅(一覧・キャンバス・部品。設定の列は残り)を覚えておく所(その人のブラウザだけ) */
+const EDITOR_WIDTHS_KEY = 'ccp.templateEditorWidths'
+type EditorWidths = { list: number; canvas: number; palette: number }
+// キャンバスは、見取り図 300px + 余白(押す・つかむ箱が小さすぎないように、一覧の見取り図より大きく)
+const EDITOR_WIDTHS: EditorWidths = { list: 200, canvas: 324, palette: 200 }
+const clampWidths = (w: EditorWidths): EditorWidths => ({
+  list: Math.round(Math.min(400, Math.max(160, w.list))),
+  canvas: Math.round(Math.min(760, Math.max(220, w.canvas))),
+  palette: Math.round(Math.min(340, Math.max(160, w.palette))),
+})
+function loadEditorWidths(): EditorWidths {
+  try {
+    const v = JSON.parse(localStorage.getItem(EDITOR_WIDTHS_KEY) ?? 'null') as Partial<EditorWidths> | null
+    if (v && typeof v === 'object') return clampWidths({ ...EDITOR_WIDTHS, ...v })
+  } catch {
+    // 読めなければ既定の幅
+  }
+  return EDITOR_WIDTHS
+}
+/** 設定の列の最小の幅(ボタンの行が収まる幅)。ほかの列を広げても、これより狭くしない */
+const FIELDS_MIN = 340
+/** 列の間(境界 3 本 + 間隔 6 つ) */
+const EDITOR_GAPS = 3 + 6 * 10
 /** 編集中の左の一覧の開け閉めを覚えておく所(その人のブラウザだけ) */
 const COMPARE_OPEN_KEY = 'ccp.templateCompareOpen'
 
@@ -157,8 +181,6 @@ const layoutPatch = (v: SectionLayout, sec: Section): Section => {
 
 /** 構成のプレビューの幅。一覧の見取り図(84px)では、枠の数や列が読み取りにくいため、大きく描く */
 const PREVIEW_WIDTH = 220
-/** 編集中のキャンバスの幅(押す・つかむ箱が小さすぎないように、一覧の見取り図より大きく) */
-const CANVAS_WIDTH = 300
 
 const newDraft = (): Draft => ({
   name: '',
@@ -266,11 +288,13 @@ const useStyles = makeStyles({
   editor3: {
     display: 'grid',
     // 列の幅は、一覧の開け閉め・見比べで変わるので、描くときに style で決める
-    gridTemplateAreas: '"list fields canvas palette"',
-    columnGap: '16px',
+    gridTemplateAreas: '"list s1 fields s2 canvas s3 palette"',
+    columnGap: '10px',
     alignItems: 'start',
   },
   areaCanvas: { gridArea: 'canvas' },
+  // 境界の線は、いちばん長い列(設定)の高さまで伸ばす
+  splitCell: { alignSelf: 'stretch', display: 'grid' },
   compareCol: { gridArea: 'list', position: 'sticky', top: 0, display: 'grid', rowGap: '6px', alignContent: 'start', maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px' },
   compareHead: { display: 'flex', alignItems: 'flex-start', columnGap: '2px' },
   compareItem: {
@@ -291,7 +315,7 @@ const useStyles = makeStyles({
   railLabel: { writingMode: 'vertical-rl', fontSize: '12px', letterSpacing: '2px' },
   canvasRow: { display: 'flex', columnGap: '12px', alignItems: 'flex-start' },
   compareBox: { display: 'grid', rowGap: '4px', flexShrink: 0 },
-  compareBoxHead: { display: 'flex', alignItems: 'center', columnGap: '2px', maxWidth: `${COMPARE_WIDTH}px` },
+  compareBoxHead: { display: 'flex', alignItems: 'center', columnGap: '2px', minWidth: 0 },
   compareBoxName: { flexGrow: 1, fontSize: '12px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   sameNote: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', padding: '2px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorNeutralForeground1 },
   crumbs: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
@@ -437,6 +461,35 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     })
   // キャンバスの隣に並べて見比べているテンプレート
   const [compareId, setCompareId] = useState<string | null>(null)
+  // 列の幅。配信カードと同じく、境界(スプリッター)をつかんで変え、その人のブラウザに覚えさせる
+  const [colW, setColW] = useState<EditorWidths>(loadEditorWidths)
+  useEffect(() => {
+    try {
+      localStorage.setItem(EDITOR_WIDTHS_KEY, JSON.stringify(colW))
+    } catch {
+      // 覚えられなくても、幅は変えられる
+    }
+  }, [colW])
+  // 列を並べた枠の幅。広げすぎて設定の列が押し出されないように、ほかの列の上限を、ここから決める
+  const [gridW, setGridW] = useState(0)
+  const gridObs = useRef<ResizeObserver | null>(null)
+  // 描くたびに付け直さないように、同じ関数を使う
+  const gridRef = useCallback((el: HTMLDivElement | null) => {
+    gridObs.current?.disconnect()
+    gridObs.current = null
+    if (!el) return
+    setGridW(el.clientWidth)
+    gridObs.current = new ResizeObserver(() => setGridW(el.clientWidth))
+    gridObs.current.observe(el)
+  }, [])
+  const resizeCol = (key: keyof EditorWidths, sign: 1 | -1) => (dx: number) =>
+    setColW((w) => {
+      const next = clampWidths({ ...w, [key]: w[key] + sign * dx })
+      if (!gridW) return next
+      // 広げるのは、設定の列が最小の幅を保てるところまで
+      const room = gridW - EDITOR_GAPS - FIELDS_MIN - (listOpen ? next.list : 32) - next.canvas - next.palette
+      return room >= 0 || sign * dx < 0 ? next : { ...next, [key]: Math.max(w[key], next[key] + room) }
+    })
 
   const heroLabels: Record<HeroKind, string> = {
     standard: t('標準', 'Standard'),
@@ -632,7 +685,10 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     : []
   const sameAs = others.find((x) => x.same)
   const compared = compareId ? options.find((o) => o.id === compareId) : undefined
-  const canvasWidth = compared ? COMPARE_WIDTH : CANVAS_WIDTH
+  // キャンバスの列の幅から、見取り図の幅を決める。見比べるときは 2 つ並べるので、列を広げて半分ずつ
+  const canvasRoom = gridW ? gridW - EDITOR_GAPS - FIELDS_MIN - (listOpen ? colW.list : 32) - colW.palette : Infinity
+  const canvasCol = Math.max(220, Math.min(compared ? Math.max(colW.canvas, COMPARE_WIDTH * 2 + 36) : colW.canvas, canvasRoom))
+  const canvasWidth = compared ? Math.floor((canvasCol - 36) / 2) : canvasCol - 24
 
   /** 左の列: ほかのテンプレート(押すと、キャンバスの隣に並べて見比べる)。閉じると細い帯 */
   const compareCol = () =>
@@ -1239,8 +1295,16 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                 </MessageBar>
               )}
               {draft ? (
-                <div className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? 200 : 32}px minmax(320px, 1fr) ${compared ? canvasWidth * 2 + 36 : canvasWidth + 24}px 200px` }}>
+                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? colW.list : 32}px 1px minmax(${FIELDS_MIN}px, 1fr) 1px ${canvasCol}px 1px ${colW.palette}px` }}>
                   {compareCol()}
+                  {/* 列の境界。つかんで幅を変える(一覧を閉じているときは、一覧の幅は変えない) */}
+                  <div className={s.splitCell} style={{ gridArea: 's1' }}>{listOpen && <Splitter onDrag={resizeCol('list', 1)} />}</div>
+                  <div className={s.splitCell} style={{ gridArea: 's2' }}>
+                    <Splitter onDrag={resizeCol('canvas', -1)} />
+                  </div>
+                  <div className={s.splitCell} style={{ gridArea: 's3' }}>
+                    <Splitter onDrag={resizeCol('palette', -1)} />
+                  </div>
                   {paletteCol()}
                   <div className={mergeClasses(s.fields, s.areaFields)}>
                     <Field label={t('テンプレート名', 'Template name')} required>
@@ -1514,7 +1578,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                             <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => setCompareId(null)} aria-label={t('見比べるのをやめる', 'Stop comparing')} />
                           </div>
                           {compared.push && <PushThumb spec={compared.push} width={160} />}
-                          <TemplateThumb layout={compared} width={COMPARE_WIDTH} />
+                          <TemplateThumb layout={compared} width={canvasWidth} />
                         </div>
                       )}
                     </div>
@@ -1566,6 +1630,16 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                         {selected.id === 'free' ? t('自由な並び(枠の数は決まっていません)', 'Free-form (no fixed number of slots)') : summary(selected)}
                       </span>
                     </div>
+                    )}
+                    {selected.id === 'free' && (
+                      <MessageBar layout="multiline" intent="info">
+                        <MessageBarBody>
+                          {t(
+                            '使いどころ: 点数が毎回変わる配信や、カテゴリごとに見せたい配信(新作まとめ・セール対象の一覧など)。載せた商品を 2 列で並べ、同じカテゴリが続く所に見出しを付けます。配信カードのプレビューの上で、見出しを出す・出さないと、「カテゴリでまとめる」(同じカテゴリを隣どうしに並べ直す)が使えます。決まった構成がないので、編集はできません。',
+                            'Use it when the number of items varies, or to show items by category (new-arrivals roundups, sale lists). Products go in two columns with a heading wherever the category changes. Above the delivery card preview you can turn headings on or off and "Group by category". It has no fixed layout, so it cannot be edited.',
+                          )}
+                        </MessageBarBody>
+                      </MessageBar>
                     )}
                     {/* 標準も、作成したものも、同じボタン。使っているものは削除できないので、使わない(無効)にする */}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

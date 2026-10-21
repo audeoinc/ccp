@@ -297,7 +297,12 @@ function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }:
           <>
             {pillsAt(0)}
             {free ? (
-              <span className={s.free} style={{ fontSize: px(10), padding: px(6) }}>{t('自由', 'Free')}</span>
+              // 見出し + 2 列のまとまりが続き、いくつでも足せる(点線の枠)ことを描く
+              <>
+                {section({ kind: 'grid', slots: 2, categoryHeading: true, copy: false }, 0)}
+                {section({ kind: 'grid', slots: 4, categoryHeading: true, copy: false }, 1)}
+                <div className={s.free} style={{ fontSize: px(7), padding: px(2), border: '1px dashed #bbb', borderRadius: 2 }}>{t('＋ いくつでも', '+ any number')}</div>
+              </>
             ) : (
               layout.sections.map(section)
             )}
