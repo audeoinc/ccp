@@ -77,14 +77,28 @@ export function useProductSkus(p: Product) {
 
 /** サイズの並び順: 服の記号の順 → 数字の小さい順 → 出てきた順 */
 const LETTER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']
+const sizeRank = (s: string) => {
+  const i = LETTER.indexOf(s.trim().toUpperCase())
+  if (i >= 0) return i
+  const n = Number.parseFloat(s)
+  return Number.isFinite(n) ? 100 + n : 10000
+}
+
+/**
+ * 横の見出しの並び順。丈のある見出し(「S / REG」)は、丈ごとにまとめ(丈は出てきた順)、その中をサイズの順にする。
+ * 本番の BigQuery の SKU で「L / REG・S / REG・M / REG…」と出てきた順に並び、読みにくかったため
+ */
 export function sortSizes(sizes: string[]): string[] {
-  const rank = (s: string) => {
-    const i = LETTER.indexOf(s.toUpperCase())
-    if (i >= 0) return i
-    const n = Number.parseFloat(s)
-    return Number.isFinite(n) ? 100 + n : 10000
+  const parts = (k: string) => {
+    const [size, ...rest] = k.split(' / ')
+    return { size, length: rest.join(' / ') }
   }
-  return [...sizes].sort((a, b) => rank(a) - rank(b) || sizes.indexOf(a) - sizes.indexOf(b))
+  const lengths = [...new Set(sizes.map((k) => parts(k).length))]
+  return [...sizes].sort((a, b) => {
+    const pa = parts(a)
+    const pb = parts(b)
+    return lengths.indexOf(pa.length) - lengths.indexOf(pb.length) || sizeRank(pa.size) - sizeRank(pb.size) || sizes.indexOf(a) - sizes.indexOf(b)
+  })
 }
 
 /** 欠品率: 在庫 0 の SKU の数 ÷ SKU の数(分母は、販売を終えた SKU も含めた、その SPU のすべての SKU。docs/METRICS_FORMAT.md と同じ) */

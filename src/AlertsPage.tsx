@@ -16,6 +16,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { locale, useT } from './i18n'
 import { statusColor, statusLabel } from './status'
 import { ChannelBadge } from './ChannelBadge'
+import { ProductDetailButton } from './ProductDetailButton'
 
 const useStyles = makeStyles({
   page: { display: 'grid', rowGap: '12px' },
@@ -49,6 +50,7 @@ const useStyles = makeStyles({
   itemNoImg: { width: '44px', height: '44px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground2 },
   // 右の見出し: 商品の画像と、名前
   headRow: { display: 'flex', alignItems: 'center', columnGap: '14px' },
+  headAction: { marginLeft: 'auto', flexShrink: 0 },
   headImg: { width: '72px', height: '72px', flexShrink: 0, objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, border: `1px solid ${tokens.colorNeutralStroke2}` },
   // 表の配信の列: サムネイル(マウスを重ねるとプレビュー)と名前
   delivery: { display: 'inline-flex', alignItems: 'center', columnGap: '10px' },
@@ -338,6 +340,10 @@ export function AlertsPage({ initialProductId, onSelectProduct, onOpenAlertCard,
                 {[selected.product.product_code, t('この商品を載せている、まだ送っていない配信', 'Deliveries not yet sent that include this product')].filter(Boolean).join(' ・ ')}
               </div>
             </div>
+            {/* 在庫のアラートは、どの色・サイズが欠けているかで対応が変わるので、SKU ごとの在庫を、その場で開けるようにする(X63) */}
+            <span className={styles.headAction}>
+              <ProductDetailButton product={selected.product} />
+            </span>
           </div>
           <div className={styles.facts}>
             <div className={styles.fact}>

@@ -36,7 +36,8 @@ const useStyles = makeStyles({
   center: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
 })
 
-type TabId = 'trend' | 'sku' | 'metrics' | 'plan' | 'details'
+export type ProductDetailTab = 'trend' | 'sku' | 'metrics' | 'plan' | 'details'
+type TabId = ProductDetailTab
 
 /** 週の開始日(YYYY-MM-DD)を「M/D」にする */
 const weekLabel = (iso: string) => {
@@ -45,10 +46,10 @@ const weekLabel = (iso: string) => {
 }
 
 /** 商品の詳細(クリックで開くフロートの中身): 売上・在庫の推移、MD の販売方針と販促計画、商品の基本情報 */
-export function ProductDetail({ product: p, onClose, footer }: { product: Product; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void; /** 下に足すもの(商品のフロートの「ほかの候補から選ぶ」) */ footer?: ReactNode }) {
+export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend' }: { product: Product; /** 開いたときのタブ(商品別・アラートの画面からは SKU。X63) */ initialTab?: ProductDetailTab; /** 渡したときだけ、右上に閉じるボタンを出す */ onClose?: () => void; /** 下に足すもの(商品のフロートの「ほかの候補から選ぶ」) */ footer?: ReactNode }) {
   const t = useT()
   const s = useStyles()
-  const [tab, setTab] = useState<TabId>('trend')
+  const [tab, setTab] = useState<TabId>(initialTab)
   const { data, loading, error } = useProductData(p.product_code)
   const market = productMarket(p)
   const weekly = data?.weekly ?? []

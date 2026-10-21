@@ -291,6 +291,7 @@ flowchart TD
 | `ProductInfoPane.tsx` | 154 | 載せた商品の情報の一覧 |
 | `ProductDetail.tsx` / `MiniChart.tsx` | 185 / 86 | 商品の詳しい情報(商品の対応のフロートの右。タブ: 売上・在庫 / 基本情報 / SKU / 指標 / 販売方針・販促)/ 推移のグラフ |
 | `ProductSkus.tsx` / `useProductSkus.ts` | 130 / 91 | 商品の詳しい情報の「SKU」タブ(X63。いまの在庫からの欠品率と、色 × サイズの在庫の表)/ その読み込み・サイズの並び順・欠品率 |
+| `ProductDetailButton.tsx` | 31 | 商品の詳しい情報を、その場で重ねて開くボタン(商品別・アラートの画面。開くと SKU のタブ。X63) |
 | `skuSample.ts` / `skuSampleData.ts` | 72 / 102 | ⚙ の「見本の SKU を作る / 消す」(SKU がない商品だけ。見本は source = sample)/ 見本の SKU の組み立て(撮影用のデータからも読む) |
 | `ProductMetrics.tsx` / `useProductMetrics.ts` / `metrics.ts` | 121 / 66 / 60 | 商品の詳しい情報の「指標」タブ(X48。商品とカテゴリの、いちばん新しい週の値・順位・WoW・MoM・YoY)/ その読み込み / 項目の一覧と値・増減の書き方(画面では計算しない) |
 | `useProductData.ts` | 83 | 商品の週ごとの実績などを読む(開いている間だけ覚える) |
