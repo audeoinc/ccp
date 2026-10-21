@@ -31,12 +31,14 @@ import {
   ArrowDownloadRegular,
   ArrowSyncRegular,
   ArrowUploadRegular,
+  AttachRegular,
   BeakerRegular,
   CalendarLtrRegular,
   ChevronDownRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
   DataBarVerticalRegular,
+  DeleteRegular,
   DismissRegular,
   DocumentBulletListRegular,
   DocumentPdfRegular,
@@ -88,6 +90,7 @@ import { ProductsView } from './ProductsView'
 import { ImpactView } from './ImpactView'
 import type { VariantKey } from './abTest'
 import { createAbExamples, isAbSeed } from './abSeed'
+import { countAssetExamples, createAssetExamples, removeAssetExamples } from './assetSeed'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
@@ -1487,6 +1490,39 @@ function App() {
                 }}
               >
                 {t('効果の見本を作る', 'Create sample impact data')}
+              </MenuItem>
+              {/* 素材(Creative Assets)の見本を作る・消す(X58。利用者の依頼で、本番にも用意する。名前の先頭が「見本:」のものだけを扱う) */}
+              <MenuItem
+                icon={<AttachRegular />}
+                onClick={async () => {
+                  try {
+                    const have = await countAssetExamples()
+                    const msg = have
+                      ? tr(`素材の見本はすでに ${have} 件あります。もう一組作りますか?`, `${have} sample assets already exist. Create another set?`)
+                      : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "見本:". Existing assets are not changed. Continue?')
+                    if (!window.confirm(msg)) return
+                    const r = await createAssetExamples({ cards: activeCards, me: myName() })
+                    setBqNotice({ intent: 'success', text: tr(`素材の見本を ${r.count} 件、${r.cards.join('・')} に足しました`, `Added ${r.count} sample assets to ${r.cards.join(', ')}`) })
+                  } catch (e) {
+                    setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                  }
+                }}
+              >
+                {t('素材の見本を作る', 'Create sample assets')}
+              </MenuItem>
+              <MenuItem
+                icon={<DeleteRegular />}
+                onClick={async () => {
+                  if (!window.confirm(tr('名前の先頭が「見本:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "見本:" and their files (other assets are kept)?'))) return
+                  try {
+                    const n = await removeAssetExamples()
+                    setBqNotice({ intent: 'success', text: tr(`素材の見本を ${n} 件消しました`, `Deleted ${n} sample assets`) })
+                  } catch (e) {
+                    setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                  }
+                }}
+              >
+                {t('素材の見本を消す', 'Delete sample assets')}
               </MenuItem>
               {/* AB テスト・案から選ぶの例の配信を作る(X55・X57。利用者の依頼で、本番にも用意する。新しい配信を足すだけで、今ある配信は触らない) */}
               <MenuItem
