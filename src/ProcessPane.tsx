@@ -10,6 +10,7 @@ import { ApprovalBar } from './ApprovalBar'
 import { HandoffPanel } from './HandoffPanel'
 import { TasksPanel } from './TasksPanel'
 import { CommentsPanel } from './CommentsPanel'
+import { CreativeAssets } from './CreativeAssets'
 import { LockMark } from './LockMark'
 import { MarkdownLite } from './MarkdownLite'
 import { isThreadRoot, stageOf } from './notesStage'
@@ -45,7 +46,7 @@ const useStyles = makeStyles({
   railNote: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, letterSpacing: '0.05em' },
 })
 
-export type TalkTab = 'handoff' | 'threads' | 'tasks'
+export type TalkTab = 'handoff' | 'threads' | 'tasks' | 'assets'
 
 interface Props {
   /** 保存済みの配信カード(新規作成中は undefined) */
@@ -90,6 +91,8 @@ export function ProcessPane(props: Props) {
   const s = useStyles()
   const t = useT()
   const [tab, setTab] = useState<TalkTab>('handoff')
+  // 素材の数(タブに出す。素材のタブを開くまでは数えない)
+  const [assetCount, setAssetCount] = useState(0)
   const { tabRequest } = props
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -152,6 +155,7 @@ export function ProcessPane(props: Props) {
         <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}`}</Tab>
         <Tab value="threads">{`${t('やり取り', 'Conversation')}${count(openThreads)}`}</Tab>
         <Tab value="tasks">{`${t('タスク', 'Tasks')}${count(openTasks)}`}</Tab>
+        <Tab value="assets">{`${t('素材', 'Assets')}${count(assetCount)}`}</Tab>
       </TabList>
       <div className={s.scroll}>
         {tab === 'handoff' && (
@@ -196,6 +200,21 @@ export function ProcessPane(props: Props) {
             productionDue={props.handoff.productionDue}
             onOpenCount={setOpenThreads}
             onTasksChanged={notesChanged}
+          />
+        )}
+        {/* 素材(Creative Assets。X58): 制作に使ってほしい画像・資料・参考のページ。制作のページと同じもの */}
+        {tab === 'assets' && (
+          <CreativeAssets
+            cardId={cardId}
+            stage="plan"
+            owner={props.card?.owner}
+            people={props.people}
+            cardName={props.cardName}
+            productionOwner={props.handoff.productionOwner}
+            productionDue={props.handoff.productionDue}
+            productIds={props.productIds}
+            products={props.products}
+            onCount={setAssetCount}
           />
         )}
         {tab === 'tasks' && (

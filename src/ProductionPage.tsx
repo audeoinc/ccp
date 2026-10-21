@@ -1,20 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogSurface, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import {
-  ArrowDownloadRegular,
-  ArrowResetRegular,
-  ArrowUndoRegular,
-  CheckmarkRegular,
-  ChevronLeftRegular,
-  ChevronRightRegular,
-  DismissRegular,
-  HandRightRegular,
-  MoreHorizontalRegular,
-  OpenRegular,
-  SaveRegular,
-  SendRegular,
-  TaskListLtrRegular,
-} from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -28,6 +14,7 @@ import { MarkdownLite } from './MarkdownLite'
 import { ChannelBadge } from './ChannelBadge'
 import { FaceBadge } from './FaceBadge'
 import { HtmlEditor } from './HtmlEditor'
+import { CreativeAssets } from './CreativeAssets'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
 import { ResizeHandles } from './ResizeHandles'
@@ -150,7 +137,7 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
   const [doneNote, setDoneNote] = useState('')
   const [doneLink, setDoneLink] = useState('')
   const [reviseNote, setReviseNote] = useState('')
-  const [side, setSide] = useState<'talk' | 'tasks'>('talk')
+  const [side, setSide] = useState<'talk' | 'tasks' | 'assets'>('talk')
   // プレビューから作った HTML(下書き)と、エディタの中身(null = まだ直していない)
   const [generated, setGenerated] = useState('')
   const [html, setHtml] = useState<string | null>(null)
@@ -594,12 +581,16 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                 <div className={s.paneTool}>
                   <Button size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleTalk} aria-label={t('やり取りをたたむ', 'Collapse the conversation')} />
                 </div>
-                <TabList size="small" selectedValue={side} onTabSelect={(_, d) => setSide(d.value as 'talk' | 'tasks')}>
+                <TabList size="small" selectedValue={side} onTabSelect={(_, d) => setSide(d.value as 'talk' | 'tasks' | 'assets')}>
                   <Tab value="talk">{t('制作のやり取り', 'Production conversation')}</Tab>
+                  <Tab value="assets" icon={<AttachRegular />}>{t('素材', 'Assets')}</Tab>
                   <Tab value="tasks" icon={<TaskListLtrRegular />}>{t('タスク', 'Tasks')}</Tab>
                 </TabList>
                 {side === 'talk' ? (
                   <CommentsPanel cardId={card.id} stage="production" productIds={snap.productIds} products={snap.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} />
+                ) : side === 'assets' ? (
+                  // 素材(Creative Assets。X58): 企画側が配信カードで置いたものと同じ。制作側からも足せる
+                  <CreativeAssets cardId={card.id} stage="production" owner={card.owner} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={snap.productIds} products={snap.products} />
                 ) : (
                   <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />
                 )}

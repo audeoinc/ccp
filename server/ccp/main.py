@@ -25,6 +25,7 @@ from .bq_import import router as bq_router
 from .identity import router as me_router
 from .production import router as production_router
 from .ads import router as ads_router
+from .creative import router as creative_router
 from .impact import router as impact_router
 from .policies import router as policies_router
 from .metrics import router as metrics_router
@@ -111,6 +112,7 @@ app.include_router(approvals_router)
 app.include_router(me_router)
 app.include_router(production_router)
 app.include_router(ads_router)
+app.include_router(creative_router)
 app.include_router(impact_router)
 if hosted_router is not None:
     app.include_router(hosted_router)

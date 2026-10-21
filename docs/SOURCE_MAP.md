@@ -262,6 +262,7 @@ flowchart TD
 | `HandoffPanel.tsx` | 89 | 制作への引き継ぎ |
 | `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 218 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `TasksPanel.tsx` | 186 | タスク(プロセスのペインの「タスク」タブ) |
+| `CreativeAssets.tsx` / `creativeConst.ts` | 439 / 7 | 素材(Creative Assets。X58): 配信ごとの参考のファイル・URL の一覧・追加・素材のフロート(大きく見る・素材へのやり取り)/ 添付できる種類と大きさ。ファイルの窓口は `data/creativeFiles.ts` |
 | `CommentsPanel.tsx` | 581 | プロセスのペインの「やり取り」(以前の質問とレビューのコメントを 1 つに。宛先・対象・返信・解決・AI でタスクの案) |
 | `AiButton.tsx` / `AiMark.tsx` | 14 / 17 | AI に頼むボタン / AI の印 |
 | `AutoTextarea.tsx` | 23 | 内容に合わせて高さが伸びる、複数行の入力 |
@@ -398,6 +399,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/identity.py` | 96 | ログインしている人(`/api/me`) |
 | `ccp/policies.py` | 335 | 方針と決まりの取り込みと、AI への渡し方 |
 | `ccp/metrics.py` | 171 | 商品・カテゴリの週の指標の取り込み(`/api/metrics/import` と `ccp.cli import-metrics`。CSV の週 × 市場の行を置き換える) |
+| `ccp/creative.py` | 124 | 素材のファイルの置き場所(`/api/creative/files`。本番はバケットの `creative/`、Workbench は `ASSET_DIR/creative`) |
 | `ccp/ads.py` | 93 | 外部広告の出稿の記録(表 `ad_spends`。X49)。`/api/ads/sample` で見本を作り直す(消すのは `campaign` が `sample:` で始まる行だけ) |
 | `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 139 / 346 / 259 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報・販売チャネルごとの順位。商品の性別の読み替え)/ 取り込む前の確かめ |
 | `ccp/bq_dummy.py` | 300 | BigQuery の見本のデータ(ダミーの元の表)を作る運用ツール |

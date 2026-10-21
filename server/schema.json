@@ -154,6 +154,22 @@
    "lookups": [
    ]
   },
+  "card_assets": {
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["kind", "text"],
+    ["url", "text"],
+    ["file_name", "text"],
+    ["stored", "text"],
+    ["content_type", "text"],
+    ["size", "int"],
+    ["note", "text"],
+    ["added_by", "text"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
+   ]
+  },
   "card_notes": {
    "columns": [
     ["kind", "text"],
@@ -170,7 +186,8 @@
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],
-    ["product_id", "products", {"onDelete": "SET NULL"}]
+    ["product_id", "products", {"onDelete": "SET NULL"}],
+    ["asset_id", "card_assets", {"onDelete": "CASCADE"}]
    ]
   },
   "weeks": {

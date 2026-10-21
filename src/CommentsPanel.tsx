@@ -80,6 +80,12 @@ interface Props {
   onOpenCount?: (n: number) => void
   /** タスクを採用したとき(タスクのタブの数を合わせる) */
   onTasksChanged?: () => void
+  /** この配信の素材(X58。素材へのやり取りの札に名前を出す) */
+  assets?: { id: string; name: string }[]
+  /** 素材 1 つのやり取りだけを出す(素材のフロートの中。段階によらず出し、書き込みはその素材へ) */
+  assetId?: string
+  /** 説明の段を出さない(素材のフロートの中など、狭いところ) */
+  compact?: boolean
 }
 
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
@@ -95,7 +101,7 @@ const isRoot = isThreadRoot
  * 以前の質問(種類 question。返信は reply / replied_by / replied_at の列に 1 件)も、同じ一覧に出す。
  * 配信カードの「保存」を待たずに、その場で保存する。解決したスレッドは消さずに、たたんで残す
  */
-export function CommentsPanel({ cardId, productIds, products, people, cardName, productionOwner, productionDue, onOpenCount, onTasksChanged, stage }: Props) {
+export function CommentsPanel({ cardId, productIds, products, people, cardName, productionOwner, productionDue, onOpenCount, onTasksChanged, stage, assets = [], assetId, compact }: Props) {
   const styles = useStyles()
   const t = useT()
   const [notes, setNotes] = useState<CardNote[] | null>(null)
@@ -138,7 +144,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   }, [load])
 
   // 未解決を上に、それぞれ新しい順(いま話しているものを先に)
-  const roots = (notes ?? []).filter((n) => isRoot(n) && (!stage || stageOf(n) === stage)).sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
+  const roots = (notes ?? []).filter((n) => isRoot(n) && (assetId ? n.asset_id === assetId : !stage || stageOf(n) === stage)).sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || time(b.created_on) - time(a.created_on))
   const repliesOf = (id: string) => (notes ?? []).filter((n) => n.kind === 'reply' && n.source_note === id).sort((a, b) => time(a.created_on) - time(b.created_on))
   const tasksFrom = (id: string) => (notes ?? []).filter((n) => n.kind === 'task' && n.source_note === id)
   const open = roots.filter((n) => !n.resolved).length
@@ -166,7 +172,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     run(async () => {
       const res = await CardNotesService.create({
         delivery_card_id: cardId,
-        ...(target ? { product_id: target } : {}),
+        ...(assetId ? { asset_id: assetId } : target ? { product_id: target } : {}),
         kind: 'comment',
         ...(stage ? { stage } : {}),
         author: me,
@@ -344,9 +350,10 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         </button>
       )
     }
-    const targetBadge = (
-      <Badge appearance="outline" color={n.product_id ? 'brand' : 'informative'} size="small">
-        {n.product_id ? productName(n.product_id) : t('配信全体', 'Whole delivery')}
+    const assetName = n.asset_id ? (assets.find((a) => a.id === n.asset_id)?.name ?? t('素材', 'Asset')) : ''
+    const targetBadge = assetId ? null : (
+      <Badge appearance="outline" color={n.product_id ? 'brand' : n.asset_id ? 'important' : 'informative'} size="small">
+        {n.asset_id ? t(`素材: ${assetName}`, `Asset: ${assetName}`) : n.product_id ? productName(n.product_id) : t('配信全体', 'Whole delivery')}
       </Badge>
     )
     const replying = drafts[id] !== undefined
@@ -454,7 +461,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
 
   return (
     <div className={styles.root}>
-      <div>
+      <div hidden={compact}>
         <div className={styles.head}>
           <ChatRegular />
           {t('やり取り', 'Conversation')}
@@ -476,14 +483,16 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             <Field label={t('宛先(任意)', 'To (optional)')} size="small">
               <Input size="small" list="ccp-thread-people" value={to} onChange={(_, d) => setTo(d.value)} placeholder={t('返事を求める人', 'Who should reply')} />
             </Field>
-            <Field label={t('対象', 'About')} size="small">
-              <Select size="small" value={target} onChange={(_, d) => setTarget(d.value)}>
-                <option value="">{t('配信全体', 'Whole delivery')}</option>
-                {targets.map((id) => (
-                  <option key={id} value={id}>{productName(id)}</option>
-                ))}
-              </Select>
-            </Field>
+            {!assetId && (
+              <Field label={t('対象', 'About')} size="small">
+                <Select size="small" value={target} onChange={(_, d) => setTarget(d.value)}>
+                  <option value="">{t('配信全体', 'Whole delivery')}</option>
+                  {targets.map((id) => (
+                    <option key={id} value={id}>{productName(id)}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
           </div>
           <datalist id="ccp-thread-people">
             {people.map((p) => (

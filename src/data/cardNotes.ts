@@ -15,6 +15,8 @@ export interface CardNote {
   delivery_card_id?: string
   /** comment: 指摘の対象の商品(配信全体への指摘なら、なし) */
   product_id?: string
+  /** comment: 指摘の対象の素材(card_assets。X58。素材ごとのやり取り) */
+  asset_id?: string
   kind?: NoteKind
   /** 書いた人 */
   author?: string
@@ -42,9 +44,10 @@ interface Result<T> {
   error?: { message: string }
 }
 
-type Fields = Partial<Omit<CardNote, 'id' | 'delivery_card_id' | 'product_id' | 'created_on'>> & {
+type Fields = Partial<Omit<CardNote, 'id' | 'delivery_card_id' | 'product_id' | 'asset_id' | 'created_on'>> & {
   'delivery_card_id'?: string
   'product_id'?: string
+  'asset_id'?: string
 }
 
 const svc = makeService('card_notes')

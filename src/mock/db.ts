@@ -27,6 +27,7 @@ export const tables: Record<string, Row[]> = {
   LayoutTemplatesService: structuredClone(layoutTemplates),
   AiRequestsService: [],
   CardNotesService: structuredClone(cardNotes),
+  CardAssetsService: [],
   WeeksService: structuredClone(weeks),
   DeliveryResultsService: structuredClone(deliveryResults),
   EventsService: structuredClone(events),
