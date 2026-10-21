@@ -61,6 +61,19 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
               </Select>
             </Field>
 
+            {/* 週の上限(C3)。決まり(⚙ の「方針・決まり」)に「上限 週 N 回」があれば、そちらが優先 */}
+            <Field
+              label={t('週の上限(同じ商品を、同じ週に何本の配信まで載せてよいか)', 'Weekly limit (how many deliveries the same product may appear in per week)')}
+              hint={t('マーケティングの決まり(⚙ の「方針・決まり」)に「上限 週 N 回」があり、配信の国・チャネル・配信日に当てはまれば、そちらを使います', 'If a marketing rule (⚙ Policies & rules) says "上限 週 N 回" and matches the delivery’s country, channel and date, that rule is used instead')}
+              size="small"
+            >
+              <Select value={String(draft.weeklyLimit)} onChange={(_, d) => setDraft({ ...draft, weeklyLimit: Number(d.value) })}>
+                {[1, 2, 3, 4, 5, 6].map((v) => (
+                  <option key={v} value={String(v)}>{t(`${v} 本まで`, `Up to ${v}`)}</option>
+                ))}
+              </Select>
+            </Field>
+
             <div className={styles.group}>
               <span className={styles.groupTitle}>{t('出す種類', 'Kinds to show')}</span>
               {(

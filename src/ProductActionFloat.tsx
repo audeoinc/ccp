@@ -15,7 +15,7 @@ import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { priceText, tr, useT } from './i18n'
 import { productMarket } from './market'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { weeklyLimit } from './weeklyLimit'
 import { AiIcon } from './AiMark'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
@@ -113,8 +113,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
     if (!stockAlert || !product || !model || !card) return
     let alive = true
     const when = scheduledAt ? new Date(scheduledAt).toISOString() : (card.scheduled_at ?? new Date().toISOString())
-    const candidates = replacementCandidates({ card, removed: product, products, model, inCard, when }).filter((c) => !overLimit || (weekUse?.get(c.product.id) ?? 0) < WEEKLY_PRODUCT_LIMIT)
-    suggestReplacements({ card, removed: product, candidates, ...(overLimit ? { why: tr(`この週に ${WEEKLY_PRODUCT_LIMIT} 本を超えて載せている`, `featured in more than ${WEEKLY_PRODUCT_LIMIT} deliveries this week`) } : {}) })
+    const candidates = replacementCandidates({ card, removed: product, products, model, inCard, when }).filter((c) => !overLimit || (weekUse?.get(c.product.id) ?? 0) < weeklyLimit(card))
+    suggestReplacements({ card, removed: product, candidates, ...(overLimit ? { why: tr(`この週に ${weeklyLimit(card)} 本を超えて載せている`, `featured in more than ${weeklyLimit(card)} deliveries this week`) } : {}) })
       .then((r) => alive && setPicks(r))
       .catch((e: unknown) => {
         if (!alive) return
@@ -131,7 +131,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
   // 候補の商品の印(差し替えた先が、別のアラートにならないように)
   const marks = (p: Product) => {
     const kind = alertKinds?.get(p.id)
-    const over = (weekUse?.get(p.id) ?? 0) >= WEEKLY_PRODUCT_LIMIT
+    const over = (weekUse?.get(p.id) ?? 0) >= weeklyLimit(card)
     return (
       <span className={s.marks}>
         <LowStockBadge product={p} />
@@ -228,7 +228,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     </span>
                     <span className={s.caption}>
                       {overLimit
-                        ? t(`在庫があり、同じカテゴリで、この週にまだ ${WEEKLY_PRODUCT_LIMIT} 本載せていない商品から`, `In stock, same category, fewer than ${WEEKLY_PRODUCT_LIMIT} uses this week`)
+                        ? t(`在庫があり、同じカテゴリで、この週にまだ ${weeklyLimit(card)} 本載せていない商品から`, `In stock, same category, fewer than ${weeklyLimit(card)} uses this week`)
                         : t('在庫のある、同じカテゴリの商品から', 'In stock, same category')}
                     </span>
                     {error && (

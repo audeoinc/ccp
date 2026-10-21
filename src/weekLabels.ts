@@ -1,6 +1,6 @@
 // 週のレビューの、項目名・説明・履歴の文言。画面(確認の一覧・週の帯の履歴)と、週の資料(PDF。WeekReport)で同じ言葉にするため、1 か所に置く
 import type { CheckKey } from './reviewChecks'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { weeklyLimit } from './weeklyLimit'
 import type { EventAction } from './data/events'
 import type { tr } from './i18n'
 
@@ -9,7 +9,7 @@ type T = typeof tr
 /** 確認の一覧の項目名 */
 export const checkTitle = (t: T, k: CheckKey): string =>
   ({
-    overLimit: t(`週の上限(${WEEKLY_PRODUCT_LIMIT} 本)を超えた商品`, `Products over the weekly limit (${WEEKLY_PRODUCT_LIMIT})`),
+    overLimit: t(`週の上限(${weeklyLimit()} 本。決まりがあれば、その値)を超えた商品`, `Products over the weekly limit (${weeklyLimit()}; a rule overrides it)`),
     pushAlign: t('メールとプッシュのテーマ違い', 'Email / push to align'),
     leadMissing: t('載っていない主力の商品', 'Lead items not featured'),
     repeat: t('テーマ・メイン画像の連続', 'Same main image or theme in a row'),

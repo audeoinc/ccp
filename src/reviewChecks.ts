@@ -5,8 +5,10 @@ import type { Product } from './models/products'
 import { cardMarket, productMarket } from './market'
 import { tr } from './i18n'
 import { statusRank } from './status'
+import { weeklyLimit } from './weeklyLimit'
 
 /** 同じ商品を、週に何本の配信まで載せてよいか。設定(C3)ができるまでの、仮の値 */
+/** 週の上限の既定(アラートの条件の既定と同じ)。実際の値は src/weeklyLimit.ts の weeklyLimitFor(決まり → アラートの条件) */
 export const WEEKLY_PRODUCT_LIMIT = 2
 
 const EMAIL = 'email'
@@ -85,14 +87,17 @@ export function buildChecklist({ weekStart, weekCards, allCards, cardProducts, p
   for (const c of weekCards) {
     for (const pid of new Set(ids(c))) used.set(pid, [...(used.get(pid) ?? []), c.id])
   }
-  const over = [...used].filter(([, cs]) => cs.length > WEEKLY_PRODUCT_LIMIT).sort((a, b) => b[1].length - a[1].length)
+  // 上限は、その商品を載せた配信に効く上限のうち、いちばん厳しいもの(国・チャネル・配信日で、決まりが違うことがある)
+  const byId = new Map(weekCards.map((c) => [c.id, c]))
+  const limitOf = (cs: string[]) => Math.min(...cs.map((id) => weeklyLimit(byId.get(id))))
+  const over = [...used].filter(([, cs]) => cs.length > limitOf(cs)).sort((a, b) => b[1].length - a[1].length)
   const overLimit: CheckItem = {
     key: 'overLimit',
     count: over.length,
     ok: over.length === 0,
     cardIds: [...new Set(over.flatMap(([, cs]) => cs))],
     productIds: over.map(([pid]) => pid),
-    details: over.map(([pid, cs]) => `${name(pid)} ×${cs.length}`),
+    details: over.map(([pid, cs]) => `${name(pid)} ×${cs.length}(${tr(`上限 ${limitOf(cs)}`, `max ${limitOf(cs)}`)})`),
   }
 
   // ---- メールとプッシュ: 同じ日にメールがあるのに、プッシュのテーマが、その日のどのメールとも違う(またはテーマがない)

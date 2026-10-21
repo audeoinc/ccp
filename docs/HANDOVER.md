@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X59 画像のライブラリ・① メイン画像を上げる。6.45。その前は X58 素材。6.44)
+- 最終更新: 2026-10-21(C3 週の上限を画面で変える。6.46。その前は X59 画像のライブラリ ①。6.45)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -638,6 +638,13 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 画面: `src/HeroUploadDialog.tsx`(置く → AI の下書き → 焦点を押して決め、横長・正方形・縦長の切り出しを見る → 出どころ・期限 → 「ライブラリに入れて、この配信に使う」)。窓口は `src/data/heroUpload.ts`(撮影用は `src/mock/heroUpload.ts`)。配信カードは `heroUpload` の state と、App の `onHeroesChanged`(ライブラリを読み直す)。中ペインの ③ に `onUploadHero`。`src/heroRights.ts` の `isUsableHero`(期限)・`heroPosition`(焦点を object-position に)。プレビュー(`Preview.tsx`)のメイン画像は焦点で切り出す。期限切れは `CardDetail` の `poolHeroes` と `bulkDraft` の候補から外す(いま使っている画像は残す)。
 - 確かめたこと: サーバーのテスト(`test_heroes_upload.py`)。モックで、画像を置く → AI の下書き → ライブラリに入れる → この配信のメイン画像になり、プレビューに出る。本番の Gemini での画像の読み取りと、バケットへの保存は、反映のあとに確かめる。
 - 残り: ② ⚙ のライブラリの管理画面(一覧・直す・期限・消す)、③ 部品の画像(ボタンなど)、④ 必要ならトリミングの編集。制作のページの「メイン画像を選ぶ」(HeroPicker)からの上げる入口も、まだ。
+
+## 6.46 C3 週の上限を画面で変える(2026-10-21、UI セッション)
+
+- 利用者と決めた: まずは ⚙ のアラートの条件の「週の上限」(`AlertSettings.weeklyLimit`。ブラウザごと。既定 2)。マーケティングの決まりに「上限 週 N 回」(policyCheck の weeklyLimit と同じ書き方)があり、配信の国・チャネル・配信日に当てはまれば、そちらを優先。決まりを画面で直すのは X61(それまではアラートの条件で運用)。
+- `src/weeklyLimit.ts`: `setLimitRules`(App の `loadMarketingPolicies` で、`setActiveRules` と一緒に呼ぶ)、`weeklyLimitFor(card)`(当てはまる決まりのうち、いちばん小さい値。なければアラートの条件)、`limitText`。`reviewChecks.ts` の `WEEKLY_PRODUCT_LIMIT` は既定の値として残す。
+- 使うところ: `cardAlerts.overLimitAlerts`(配信ごと)、`reviewChecks.buildChecklist`(商品ごとに、載せた配信の上限のうち厳しいもの。説明に「上限 N」)、`bulkDraft.overusedInWeek`(作る配信の国・チャネル)、`useBulkWorkspace`(案ごと)、`ProductActionFloat`(配信カード)、`ProductsView`・`weekLabels`(配信を区別しないので、アラートの条件の値)。App の `cardAlerts`・`checklist` の useMemo は、上限の値と決まりの変化で作り直す。
+- 確かめたこと: tsc・eslint、esbuild で `weeklyLimitFor` を直接呼び、決まり(US・12 月・3 本)が当てはまるときだけ 3、ほかはアラートの条件の値になること。
 
 ## 7. 落とし穴
 

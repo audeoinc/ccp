@@ -205,7 +205,7 @@ export function useWeekFrames({ cards, cardProducts, products, heroes, weeks, we
               products,
               heroes,
               otherThemes: [...cards.map((x) => x.theme ?? ''), ...pending].filter(Boolean),
-              avoidProductIds: overusedInWeek(c.scheduled_at, [...cards, ...made], cp),
+              avoidProductIds: overusedInWeek(c.scheduled_at, [...cards, ...made], cp, c),
               onTheme: (theme) => {
                 if (theme) pending.push(theme)
                 release()

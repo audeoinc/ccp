@@ -16,7 +16,7 @@ import { isUsableHero } from './heroRights'
 import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH, statusRank } from './status'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf } from './templates'
 import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { weeklyLimit } from './weeklyLimit'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { isCancelled } from './cancel'
 import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
@@ -236,8 +236,8 @@ export async function markChecked(id: string): Promise<void> {
   if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
 }
 
-/** その週に、上限(WEEKLY_PRODUCT_LIMIT)まで載せた商品。確認の一覧(W4)の「載せすぎ」を、作る前に避ける */
-export function overusedInWeek(when: string | undefined, cards: { id: string; scheduled_at?: string }[], cardProducts: Map<string, string[]>): string[] {
+/** その週に、上限まで載せた商品。確認の一覧(W4)の「載せすぎ」を、作る前に避ける。上限は、作る配信(target。国・チャネル)に効くもの */
+export function overusedInWeek(when: string | undefined, cards: { id: string; scheduled_at?: string }[], cardProducts: Map<string, string[]>, target?: { country?: string; channel?: string }): string[] {
   if (!when) return []
   const key = weekKeyOf(new Date(when))
   const count = new Map<string, number>()
@@ -245,7 +245,8 @@ export function overusedInWeek(when: string | undefined, cards: { id: string; sc
     if (!c.scheduled_at || weekKeyOf(new Date(c.scheduled_at)) !== key) continue
     for (const pid of new Set(cardProducts.get(c.id) ?? [])) count.set(pid, (count.get(pid) ?? 0) + 1)
   }
-  return [...count].filter(([, n]) => n >= WEEKLY_PRODUCT_LIMIT).map(([pid]) => pid)
+  const lim = weeklyLimit({ ...target, scheduled_at: when })
+  return [...count].filter(([, n]) => n >= lim).map(([pid]) => pid)
 }
 
 /** 確定した週に入る配信か(枠を作れず、中身も作らない。確定した週を変えるときは、配信カードで理由を残す流れのため) */

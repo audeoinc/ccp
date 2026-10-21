@@ -15,6 +15,8 @@ export interface AlertSettings {
   owners: string[]
   /** 出す種類 */
   kinds: { outOfStock: boolean; lowStock: boolean; policyChanged: boolean; dateChanged: boolean }
+  /** 週の上限(同じ商品を、同じ週に何本の配信まで載せてよいか。C3)。マーケティングの決まりに「上限 週 N 回」があれば、そちらが優先(src/weeklyLimit.ts) */
+  weeklyLimit: number
 }
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
@@ -22,6 +24,7 @@ export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
   departments: [],
   owners: [],
   kinds: { outOfStock: true, lowStock: true, policyChanged: true, dateChanged: true },
+  weeklyLimit: 2,
 }
 
 const KEY = 'alerts.settings'
@@ -51,6 +54,9 @@ export function setAlertSettings(next: AlertSettings) {
   }
   for (const l of listeners) l()
 }
+
+/** いまの条件(描画の外で読むとき。描画の中は useAlertSettings) */
+export const getAlertSettings = (): AlertSettings => current
 
 export function useAlertSettings(): AlertSettings {
   return useSyncExternalStore(

@@ -128,6 +128,7 @@ import { WeekReport } from './WeekReport'
 import { MiniCalendar } from './MiniCalendar'
 import { printWeek } from './printWeek'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
+import { limitRulesVersion, onLimitRulesChange, setLimitRules } from './weeklyLimit'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -455,9 +456,8 @@ function App() {
   )
   const loadMarketingPolicies = useCallback(async () => {
     const [r, s] = await Promise.all([PolicyRulesService.getAll({ top: 5000 }), SalesPoliciesService.getAll({ top: 5000 })])
-    if (r.success)
-      setActiveRules(
-        (r.data ?? []).map((x) => ({
+    if (r.success) {
+      const rules = (r.data ?? []).map((x) => ({
           ruleId: x.rule_id ?? '',
           title: x.title ?? '',
           appliesTo: (x.applies_to ?? '').split(',').filter(Boolean),
@@ -468,8 +468,10 @@ function App() {
           periodEnd: x.period_end || undefined,
           checkSpec: x.check_spec || undefined,
           body: x.body ?? '',
-        })),
-      )
+        }))
+      setActiveRules(rules)
+      setLimitRules(rules)
+    }
     if (s.success)
       setActiveSales(
         (s.data ?? []).map((x) => ({
@@ -631,6 +633,8 @@ function App() {
   )
   // アラートの条件(人ごと。A6)
   const alertSettings = useAlertSettings()
+  // 週の上限の決まり(読み込み直したら、上限を使う計算を作り直すため)
+  const limitRules = useSyncExternalStore(onLimitRulesChange, limitRulesVersion)
   const alertState = useStockAlerts(activeCards, products, cards, alertSettings.lowWeeks)
   const alerts = filterStockAlerts(alertSettings, alertState.alerts)
   // 変更のアラート(MD 方針の変更・日程の変更)。件数は、在庫のアラートと合わせて、ヘッダーに出す
@@ -644,7 +648,9 @@ function App() {
   // 配信ごとのアラート: 在庫・方針・日程に、週の上限を超えた商品を足す(直す場所を配信カードにそろえるため)
   const cardAlerts = useMemo(
     () => mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProductsAll, (id) => products.find((p) => p.id === id)?.name ?? '')),
-    [alerts, changeAlerts, activeCards, cardProductsAll, products],
+    // 週の上限(アラートの条件・決まり)が変わったら、作り直す
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [alerts, changeAlerts, activeCards, cardProductsAll, products, alertSettings.weeklyLimit, limitRules],
   )
   const weekUseAll = useMemo(() => weeklyUse(activeCards, cardProductsAll), [activeCards, cardProductsAll])
   const alertKinds = useMemo(() => new Map([...cardAlerts].map(([id, list]) => [id, topKind(list)]).filter((e): e is [string, CardAlertKind] => !!e[1])), [cardAlerts])
@@ -930,7 +936,7 @@ function App() {
       }),
     // 言語を変えたら、説明(曜日・種類)を作り直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, commentCounts, lang],
+    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, commentCounts, lang, alertSettings.weeklyLimit, limitRules],
   )
   const checkKey = check?.week === weekKey ? check.key : null
   const focusItem = checklist.find((i) => i.key === checkKey)

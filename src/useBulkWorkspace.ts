@@ -16,7 +16,7 @@ import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { sundayOf } from './weekLock'
 import { tr } from './i18n'
 import { DeliveryCardsService } from './data/deliveryCards'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { limitText, weeklyLimit, weeklyLimitFor } from './weeklyLimit'
 import type { CardAlert } from './cardAlerts'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
@@ -203,7 +203,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     if (x.state === 'discarded') return { over: [], sameTheme: [], sameHero: [] }
     const others = weekCards.filter((c) => c.id !== x.card.id)
     return {
-      over: [...new Set(x.productIds)].filter((pid) => (weekUse.get(pid) ?? 0) > WEEKLY_PRODUCT_LIMIT),
+      over: [...new Set(x.productIds)].filter((pid) => (weekUse.get(pid) ?? 0) > weeklyLimit(x.card)),
       sameTheme: norm(x.card.theme) ? others.filter((c) => norm(c.theme) === norm(x.card.theme)).map((c) => c.name) : [],
       sameHero: x.card.hero_image_id ? others.filter((c) => c.hero_image_id === x.card.hero_image_id).map((c) => c.name) : [],
     }
@@ -220,7 +220,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       kind: 'overLimit' as const,
       productId: pid,
       label: products.find((p) => p.id === pid)?.name ?? '',
-      detail: tr(`この週に ${weekUse.get(pid) ?? 0} 本の配信に載っている(上限 ${WEEKLY_PRODUCT_LIMIT} 本)`, `In ${weekUse.get(pid) ?? 0} deliveries this week (max ${WEEKLY_PRODUCT_LIMIT})`),
+      detail: tr(`この週に ${weekUse.get(pid) ?? 0} 本の配信に載っている(${limitText(weeklyLimitFor(x.card))})`, `In ${weekUse.get(pid) ?? 0} deliveries this week (${limitText(weeklyLimitFor(x.card))})`),
     }))
   }
 
@@ -368,7 +368,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
               products,
               heroes,
               otherThemes: [...cards.map((x) => x.theme ?? ''), ...themes].filter(Boolean),
-              avoidProductIds: overusedInWeek(base.scheduled_at, [...cards, ...done], cp),
+              avoidProductIds: overusedInWeek(base.scheduled_at, [...cards, ...done], cp, base),
               onTheme: (theme) => {
                 if (theme) themes.push(theme)
                 release()

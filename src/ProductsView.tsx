@@ -14,7 +14,7 @@ import { productImage } from './images'
 import { locale, optionLabel, priceText, useT, type Market } from './i18n'
 import { mergeResultsByCard, parseProductResults } from './results'
 import { productMarket } from './market'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { weeklyLimit } from './weeklyLimit'
 import { weekKeyOf } from './weekLock'
 import { CHANNEL_PUSH } from './status'
 import { productGenderLabel } from './target'
@@ -180,7 +180,7 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
         }
         const wk = `${weekKeyOf(new Date(c.scheduled_at!))}:${pid}`
         weekUse.set(wk, (weekUse.get(wk) ?? 0) + 1)
-        if ((weekUse.get(wk) ?? 0) > WEEKLY_PRODUCT_LIMIT) r.overLimit = true
+        if ((weekUse.get(wk) ?? 0) > weeklyLimit()) r.overLimit = true
       })
     }
     // 外部広告(期間の中・表示中の国の商品)。配信に載っていない商品も、出稿があれば行を作る
@@ -252,7 +252,7 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
   // 判断の材料になる組み合わせを、印で目立たせる
   const flagsOf = (r: Row): { text: string; color: string; tip: string }[] => {
     const out: { text: string; color: string; tip: string }[] = []
-    if (r.overLimit) out.push({ text: t('週の上限超え', 'Over weekly limit'), color: tokens.colorPaletteBrownBorderActive, tip: t(`同じ週に ${WEEKLY_PRODUCT_LIMIT} 回を超えて載せている`, `Featured more than ${WEEKLY_PRODUCT_LIMIT} times in a week`) })
+    if (r.overLimit) out.push({ text: t('週の上限超え', 'Over weekly limit'), color: tokens.colorPaletteBrownBorderActive, tip: t(`同じ週に ${weeklyLimit()} 回を超えて載せている`, `Featured more than ${weeklyLimit()} times in a week`) })
     if (r.adDays >= 7 && r.placements.length >= 3) out.push({ text: t('外部広告と重複', 'Also in ads'), color: tokens.colorPaletteBerryBorderActive, tip: t('外部広告で 7 日以上出稿している商品を、配信でも 3 回以上載せている', 'Heavily featured while also running in paid ads') })
     const ro = roas(r)
     if (ro !== undefined && ro >= 3 && r.placements.length === 0) out.push({ text: t('外部で好調・未掲載', 'Strong in ads, not featured'), color: tokens.colorPaletteGreenBorderActive, tip: t(`外部広告の費用対効果が ${ro.toFixed(1)} 倍なのに、配信に載せていない`, `Ad ROAS ${ro.toFixed(1)}x but not featured in deliveries`) })

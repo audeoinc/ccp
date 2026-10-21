@@ -2,7 +2,7 @@
 // 配信カードの帯(どこに問題があるか)と、カレンダーの印に使う
 import type { ChangeAlert, StockAlert } from './alerts'
 import { locale, tr } from './i18n'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
+import { limitText, weeklyLimitFor } from './weeklyLimit'
 import { weekKeyOf } from './weekLock'
 
 export type CardAlertKind = 'outOfStock' | 'lowStock' | 'policyChanged' | 'dateChanged' | 'overLimit'
@@ -97,19 +97,20 @@ export function weeklyUse(cards: { id: string; scheduled_at?: string }[], cardPr
  * 週の上限を超えた商品のアラート(配信ごと)。在庫のアラートと同じく、配信カードの帯・プレビューの枠・商品情報の行に出し、
  * 「このアラートへの対応」から差し替えられるようにする(直す場所を配信カードにそろえる。2026-10-19 利用者と決めた)
  */
-export function overLimitAlerts(cards: { id: string; scheduled_at?: string }[], cardProducts: Map<string, string[]>, productName: (id: string) => string): Map<string, CardAlert[]> {
+export function overLimitAlerts(cards: { id: string; scheduled_at?: string; country?: string; channel?: string }[], cardProducts: Map<string, string[]>, productName: (id: string) => string): Map<string, CardAlert[]> {
   const use = weeklyUse(cards, cardProducts)
   const out = new Map<string, CardAlert[]>()
   for (const c of cards) {
     if (!c.scheduled_at) continue
     const m = use.get(weekKeyOf(new Date(c.scheduled_at)))
+    const lim = weeklyLimitFor(c)
     const list = [...new Set(cardProducts.get(c.id) ?? [])]
-      .filter((pid) => (m?.get(pid) ?? 0) > WEEKLY_PRODUCT_LIMIT)
+      .filter((pid) => (m?.get(pid) ?? 0) > lim.n)
       .map((pid) => ({
         kind: 'overLimit' as const,
         productId: pid,
         label: productName(pid),
-        detail: tr(`この週に ${m?.get(pid) ?? 0} 本の配信に載っている(上限 ${WEEKLY_PRODUCT_LIMIT} 本)`, `In ${m?.get(pid) ?? 0} deliveries this week (max ${WEEKLY_PRODUCT_LIMIT})`),
+        detail: tr(`この週に ${m?.get(pid) ?? 0} 本の配信に載っている(${limitText(lim)})`, `In ${m?.get(pid) ?? 0} deliveries this week (${limitText(lim)})`),
       }))
     if (list.length > 0) out.set(c.id, list)
   }
