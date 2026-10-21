@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Field,
   Input,
   Menu,
   MenuItem,
@@ -20,31 +19,28 @@ import {
   MessageBar,
   MessageBarBody,
   ProgressBar,
-  Radio,
-  RadioGroup,
   Select,
   Spinner,
   SplitButton,
-  ToggleButton,
+  Tab,
+  TabList,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
 import {
-  ArrowLeftRegular,
-  ArrowRightRegular,
   CalendarLtrRegular,
   CheckmarkCircleFilled,
   CheckmarkRegular,
-  DeleteRegular,
   ChevronLeftRegular,
   ChevronRightRegular,
-  WarningFilled,
+  DeleteRegular,
   DismissRegular,
   EditRegular,
   ErrorCircleRegular,
   LockClosedRegular,
   SaveRegular,
+  WarningFilled,
 } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -52,16 +48,12 @@ import type { HeroImage } from './models/heroImages'
 import { locale, optionLabel, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ChannelBadge } from './ChannelBadge'
-import { CheckView } from './CheckDrawer'
 import { channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
 import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
-import { yen } from './items'
-import { productMarket } from './market'
-import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -76,18 +68,24 @@ const useStyles = makeStyles({
     gridTemplateRows: 'auto auto minmax(0, 1fr) auto',
     backgroundColor: tokens.colorNeutralBackground2,
   },
-  head: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '14px 20px 10px', backgroundColor: tokens.colorNeutralBackground1 },
+  head: { display: 'flex', alignItems: 'center', columnGap: '10px', rowGap: '6px', flexWrap: 'wrap', padding: '14px 20px 10px', backgroundColor: tokens.colorNeutralBackground1 },
   title: { margin: 0, fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
   summary: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
   spacer: { flexGrow: 1 },
-  // 手順。いまの手順を太く、済んだ手順に ✓。押すと、済んだ手順に戻れる
+  // 見出しの中の、週・国・チャネル(① で選ぶ。② では見るだけ)
+  target: { display: 'inline-flex', alignItems: 'center', columnGap: '10px', rowGap: '6px', flexWrap: 'wrap' },
+  weekPick: { display: 'inline-flex', alignItems: 'center', columnGap: '2px' },
+  weekText: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, minWidth: '150px', textAlign: 'center' },
+  country: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
+  countryPick: { minWidth: '160px' },
+  // 手順。いまの手順を太く、済んだ手順に ✓
   steps: {
     display: 'flex',
     alignItems: 'center',
     columnGap: '6px',
     rowGap: '6px',
     flexWrap: 'wrap',
-    padding: '8px 20px 12px',
+    padding: '6px 20px 10px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
   },
@@ -108,24 +106,19 @@ const useStyles = makeStyles({
   doneIcon: { color: tokens.colorPaletteGreenForeground1 },
   body: { minHeight: 0, overflowY: 'auto', padding: '16px 20px' },
   msg: { marginBottom: '12px' },
-  // 作る手順の横に、その週にもうある配信(見るだけ)。重なりを見ながら決められるように
+  // ① の横に、その週にもうある配信(見るだけ)。重なりを見ながら決められるように
   withSide: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', columnGap: '20px', alignItems: 'start', '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '16px' } },
   main: { display: 'grid', rowGap: '14px', minWidth: 0 },
   panel: { display: 'grid', rowGap: '10px', padding: '14px 16px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
   h3: { margin: 0, fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   hint: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
   label: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
-  row: { display: 'flex', alignItems: 'end', columnGap: '16px', rowGap: '8px', flexWrap: 'wrap' },
-  weekPick: { display: 'inline-flex', alignItems: 'center', columnGap: '2px' },
-  weekText: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, minWidth: '150px', textAlign: 'center' },
-  field: { minWidth: '220px' },
-  radios: { '& label': { whiteSpace: 'nowrap' } },
   // ① の 7 日の表(作る日のチェック・配信日・種類・配信名)。作れない日も並べ、薄くして理由を出す
   table: { display: 'grid', rowGap: '4px' },
-  thead: { display: 'grid', gridTemplateColumns: '28px 100px minmax(0, 1fr)', columnGap: '8px', padding: '0 8px' },
+  thead: { display: 'grid', gridTemplateColumns: '28px 100px 160px minmax(0, 1fr)', columnGap: '8px', padding: '0 8px', alignItems: 'end' },
   tr: {
     display: 'grid',
-    gridTemplateColumns: '28px 100px minmax(0, 1fr)',
+    gridTemplateColumns: '28px 100px 160px minmax(0, 1fr)',
     columnGap: '8px',
     alignItems: 'center',
     minHeight: '36px',
@@ -133,8 +126,9 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusMedium,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
-  chips: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '4px', rowGap: '4px' },
-  chip: { minWidth: 0, fontSize: '12px', fontWeight: tokens.fontWeightRegular },
+  span2: { gridColumn: 'span 2' },
+  thName: { display: 'grid', rowGap: '1px' },
+  thNote: { fontSize: '11px', fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   dayOff: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled },
   dayOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   dayDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
@@ -153,68 +147,53 @@ const useStyles = makeStyles({
   },
   aiText: { display: 'grid', rowGap: '2px', flexGrow: 1, flexBasis: '280px', minWidth: 0 },
   aiTitle: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
-  plainRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },
-  // ② の表
-  grid3: { display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) minmax(0, 1.2fr)', columnGap: '10px', rowGap: '10px', alignItems: 'center' },
-  th: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
-  cellDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, paddingTop: '6px' },
   nameCell: { display: 'grid', rowGap: '2px', minWidth: 0 },
   nameLine: { display: 'flex', columnGap: '4px', minWidth: 0 },
   grow: { flexGrow: 1, minWidth: 0 },
   reason: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
   name: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  status: { display: 'grid', rowGap: '3px', fontSize: '12px', color: tokens.colorNeutralForeground2, minWidth: 0 },
-  statusLine: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
+  statusLine: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0, fontSize: '12px' },
   error: { color: tokens.colorPaletteRedForeground1 },
-  // 右の、その週の配信
+  // ① 右の、その週の配信
   side: { display: 'grid', rowGap: '8px', padding: '12px 14px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, position: 'sticky', top: 0 },
   sideDay: { display: 'grid', rowGap: '3px' },
   sideItem: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', minWidth: 0 },
   sideName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sideOld: { opacity: 0.5 },
   newBadge: { flexShrink: 0, whiteSpace: 'nowrap' },
   sidePlanned: { display: 'grid', rowGap: '2px', padding: '4px 6px', borderRadius: tokens.borderRadiusMedium, border: `1.5px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, minWidth: 0 },
   muted: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
-  // ④ 左に作った配信、右に中身
-  check: { display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr)', columnGap: '16px', alignItems: 'start', minHeight: 0, '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '12px' } },
   list: { display: 'grid', rowGap: '4px' },
-  item: {
+  plainRow: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },
+  // ② 案のカードを並べる。中身を見る・直す場所は配信カード(「開いて編集」)にまとめ、ここでは並べて決めるだけにする
+  tools: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '6px', flexWrap: 'wrap', marginBottom: '12px' },
+  cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', alignItems: 'stretch' },
+  card: {
     display: 'grid',
-    rowGap: '2px',
-    textAlign: 'left',
-    padding: '8px 10px',
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    gridTemplateRows: 'auto auto auto 1fr auto',
+    rowGap: '6px',
+    padding: '12px 14px',
+    borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground1,
-    cursor: 'pointer',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     minWidth: 0,
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
-  itemOn: { border: `1.5px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
-  itemOff: { opacity: 0.6 },
-  thumbs: { display: 'flex', alignItems: 'center', columnGap: '3px', minHeight: '36px' },
-  // ③ の右: 題名の帯 → 選んだ商品 → タブ → 中身 → 決めるボタン
-  reviewPanel: { display: 'grid', rowGap: '12px', padding: '16px 18px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
-  reviewHead: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  reviewMeta: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2 },
-  reviewTitle: { margin: 0, fontSize: tokens.fontSizeBase500, lineHeight: tokens.lineHeightBase500, fontWeight: tokens.fontWeightSemibold },
-  reviewTitleRow: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap' },
-  picked: { display: 'grid', rowGap: '6px' },
-  pickedRow: { display: 'flex', columnGap: '10px', rowGap: '8px', flexWrap: 'wrap' },
-  pickedItem: { display: 'grid', rowGap: '2px', width: '110px', fontSize: '12px', alignContent: 'start' },
-  pickedName: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardSaved: { border: `1.5px solid ${tokens.colorPaletteGreenBorder2}` },
+  cardOff: { opacity: 0.55 },
+  cardHead: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '6px', rowGap: '2px', fontSize: '12px', color: tokens.colorNeutralForeground2, minWidth: 0, '& > span': { whiteSpace: 'nowrap' } },
+  cardTitle: { margin: 0, fontSize: '15px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  theme: { fontSize: '12px', color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  thumbs: { display: 'flex', alignItems: 'flex-start', columnGap: '6px', flexWrap: 'wrap', rowGap: '6px', minHeight: '64px' },
+  thumb: { display: 'grid', justifyItems: 'center', rowGap: '2px' },
   // 週の上限を超えた商品は、赤い枠と ⚠(色だけに頼らない)
-  pickedOver: { outline: `1.5px solid ${tokens.colorPaletteRedBorder2}`, outlineOffset: '3px', borderRadius: tokens.borderRadiusSmall },
-  uses: { display: 'inline-flex', alignItems: 'center', columnGap: '3px', fontSize: '11px', color: tokens.colorNeutralForeground3 },
-  usesOver: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
-  overlap: { display: 'flex', alignItems: 'baseline', columnGap: '10px', flexWrap: 'wrap', fontSize: '12px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  overlapWarn: { backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
-  reviewBody: { minWidth: 0 },
+  thumbOver: { outline: `1.5px solid ${tokens.colorPaletteRedBorder2}`, outlineOffset: '2px', borderRadius: tokens.borderRadiusSmall },
+  thumbWarn: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: '10px', color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
+  issues: { fontSize: '12px', padding: '4px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
+  sameDay: { fontSize: '11px', color: tokens.colorNeutralForeground3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardActions: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  waiting: { display: 'grid', rowGap: '6px', alignContent: 'center', minHeight: '120px' },
   footHint: { fontSize: '12px', color: tokens.colorNeutralForeground2, textAlign: 'right' },
   askSurface: { maxWidth: '520px', '& button': { whiteSpace: 'nowrap' } },
-  // ① 右の、もうある配信は薄く(作る予定の破線のカードを目立たせる)
-  sideOld: { opacity: 0.5 },
-  itemHead: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
-  tools: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   foot: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 20px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
 })
 
@@ -224,7 +203,6 @@ interface Props {
   cards: DeliveryCard[]
   products: Product[]
   heroes: HeroImage[]
-  /** 配信カードを開いて直す(作業画面の上に重なる) */
   /** 保存した配信を、配信カードで開く(focus は、選んでおく商品。週の上限超えを直すとき) */
   onOpen: (id: string, focus?: string) => void
   /** まだ保存していない案を、配信カードで開く(配信カードで保存したときに、はじめて保存される) */
@@ -234,13 +212,13 @@ interface Props {
 }
 
 /**
- * まとめて作る作業画面(W14 の作り直し。2026-10-19)。
- * 週の表示の上で作る形(「この週の枠を作る」)は比較のために残し、こちらは作業をこの画面で完結させる:
- * ① 対象と方向(週・国・チャネル、作る日と、その日の種類・配信名) → ② 中身を AI で作る → ③ 確かめる。
- * ① は保存しない。② で中身ができた配信から、ふつうの下書き(未起案)として保存する。
+ * まとめて作る作業画面(W14。2026-10-19 に、利用者のメモをもとに 2 つの手順に組み直した)。
+ * ① 計画する(週・チャネル、作る日と、その日の種類・配信名。国はヘッダーで選んだ国)
+ * → ② 作って決める(AI で作った案をカードで並べ、1 本ずつ「開いて編集」「保存」「破棄」)。
+ * 中身を見る・直す場所は配信カードにまとめる(作業画面に、配信カードと同じ情報を並べない)。
  * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
-export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft, onFinish }: Props) {
+export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFinish }: Props) {
   const s = useStyles()
   const t = useT()
   // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
@@ -251,57 +229,85 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
   const weekText = `${f(ws.weekStart)} – ${f(weekEnd)}`
   const optionText = (opts: { value: string; label: string }[], v: string) => optionLabel(opts.find((o) => String(o.value) === v)?.label)
   const channelName = optionText(channelOptions, ws.channel)
-  const countryName = ws.country ? optionText(countryOptions, ws.country) : t('国は未設定', 'No country')
   const n = ws.targets.length
   const readyCount = ws.targets.filter(ws.ready).length
-
-  // ---- 手順
-  const stepNames: Record<Step, string> = {
-    1: t('対象と方向を決める', 'Target & direction'),
-    2: t('中身を AI で作る', 'Create with AI'),
-    3: t('確かめて保存', 'Review & save'),
-  }
-  // 中身を作らずに保存したときは、② ③ は通らない
+  // 中身を作らずに保存したときは、② は通らない
   const plainDone = ws.plainCards.length > 0 || ws.savingPlain
-  // 戻れるのは、済んだ手順だけ。中身を作り始めたら、① には戻らない(作った案と、行の対応がずれるため)
-  const reachable = (k: Step) => {
-    if (ws.running || plainDone) return k === ws.step
-    if (k === 1) return !ws.started
-    if (k === 2) return ws.started
-    return ws.reviewItems.length > 0
+  const pOf = (id: string) => products.find((p) => p.id === id)
+
+  // ---- 見出し: 週・国・チャネル。国はヘッダーで選んだ国(X33)。ヘッダーが「すべての国」のときだけ、ここで選ぶ
+  const editable = ws.step === 1 && !ws.started
+  const target = (
+    <span className={s.target}>
+      {editable ? (
+        <span className={s.weekPick}>
+          <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} aria-label={t('前の週', 'Previous week')} onClick={() => ws.moveWeek(-1)} />
+          <span className={s.weekText}>{weekText}</span>
+          <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} aria-label={t('次の週', 'Next week')} onClick={() => ws.moveWeek(1)} />
+        </span>
+      ) : (
+        <span className={s.weekText}>{weekText}</span>
+      )}
+      {ws.countryFixed ? (
+        <span className={s.country} title={t('国は、画面の上のヘッダーで選んだ国です', 'Country comes from the header')}>
+          {optionText(countryOptions, ws.country)}
+        </span>
+      ) : (
+        <Select size="small" className={s.countryPick} value={ws.country} disabled={!editable} aria-label={t('国', 'Country')} onChange={(_, v) => ws.setCountry(v.value)}>
+          <option value="">{t('国を選んでください', 'Choose a country')}</option>
+          {countryOptions.map((o) => (
+            <option key={o.value} value={String(o.value)}>
+              {optionLabel(o.label)}
+            </option>
+          ))}
+        </Select>
+      )}
+      <TabList size="small" selectedValue={ws.channel} disabled={!editable} onTabSelect={(_, d) => ws.setChannel(String(d.value))} aria-label={t('チャネル', 'Channel')}>
+        {channelOptions.map((o) => (
+          <Tab key={o.value} value={String(o.value)}>
+            {optionLabel(o.label)}
+          </Tab>
+        ))}
+      </TabList>
+    </span>
+  )
+
+  // ---- 手順(2 つ)
+  const stepNames: Record<Step, string> = {
+    1: t('計画する', 'Plan'),
+    2: t('作って決める', 'Create & decide'),
   }
-  const stepDone = (k: Step) => k < ws.step || (k === 1 && plainDone) || (k === 2 && ws.results.size > 0 && ws.pending.length === 0) || (k === 3 && ws.reviewItems.length > 0 && ws.unsavedCount === 0)
+  const stepDone = (k: Step) => (k === 1 && (ws.started || plainDone)) || (k === 2 && ws.reviewItems.length > 0 && ws.unsavedCount === 0 && ws.pending.length === 0 && !ws.running)
   const stepper = (
     <nav className={s.steps} aria-label={t('手順', 'Steps')}>
-      {([1, 2, 3] as Step[]).map((k) => (
+      {([1, 2] as Step[]).map((k) => (
         <Fragment key={k}>
           {k > 1 && <span className={s.stepLine} />}
           <Button
             appearance="transparent"
             size="small"
             className={mergeClasses(s.stepBtn, k === ws.step && !plainDone && s.stepNow, stepDone(k) && k !== ws.step && s.stepDone)}
-            disabled={!reachable(k)}
+            disabled={k === ws.step || (k === 1 ? ws.started || plainDone : !ws.started)}
             aria-current={k === ws.step ? 'step' : undefined}
             onClick={() => ws.setStep(k)}
-            icon={stepDone(k) && (k !== ws.step || plainDone) ? <CheckmarkCircleFilled className={s.doneIcon} /> : <span className={mergeClasses(s.stepNum, k === ws.step && s.stepNumNow)}>{k}</span>}
+            icon={stepDone(k) && k !== ws.step ? <CheckmarkCircleFilled className={s.doneIcon} /> : <span className={mergeClasses(s.stepNum, k === ws.step && s.stepNumNow)}>{k}</span>}
           >
             {stepNames[k]}
-            {k === 1 && n > 0 && !plainDone ? ` (${readyCount}/${n})` : ''}
-            {k === 2 && plainDone ? ` — ${t('作らずに保存', 'skipped')}` : k === 2 && n > 0 && ws.started ? ` (${ws.results.size}/${n})` : ''}
-            {k === 3 && ws.reviewItems.length > 0 ? ` (${t('保存', 'saved')} ${ws.savedCount}/${ws.reviewItems.length})` : ''}
+            {k === 1 && n > 0 && !ws.started && !plainDone ? ` (${readyCount}/${n})` : ''}
+            {k === 2 && plainDone ? ` — ${t('作らずに保存', 'skipped')}` : k === 2 && ws.started ? ` (${t('保存', 'saved')} ${ws.savedCount}/${n})` : ''}
           </Button>
         </Fragment>
       ))}
     </nav>
   )
 
-  // ---- 右: その週の配信(見るだけ。作ろうとしている行も、薄く重ねて見せる)
+  // ---- ① 右: その週の配信(見るだけ。作ろうとしている行も、破線で重ねて見せる)
   const weekEndNext = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 7)
   const inWeek = cards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
   const madeIds = new Set([...ws.savedIds.values(), ...ws.plainCards.map((c) => c.id)])
   const side = (
     <aside className={s.side} aria-label={t('この週の配信', 'Deliveries this week')}>
-      <h3 className={s.h3}>{t('この週の配信(すべての国・チャネル)', 'This week (all countries & channels)')}</h3>
+      <h3 className={s.h3}>{t('この週の配信', 'This week')}</h3>
       {ws.days.map((d) => {
         const list = inWeek.filter((c) => dayKeyOf(new Date(c.scheduled_at!)) === d.key).sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
         const planned = ws.targets.includes(d.key) && !list.some((c) => madeIds.has(c.id))
@@ -313,12 +319,13 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
               <span key={c.id} className={mergeClasses(s.sideItem, !madeIds.has(c.id) && s.sideOld)}>
                 <ChannelBadge channel={c.channel} size="small" />
                 <span className={s.sideName}>{c.name || t('(配信名なし)', '(no name)')}</span>
-                {/* すべての国を出すので、① の国と違う配信だと分かるように */}
-                {c.country && <span className={s.muted}>{c.country}</span>}
-                {madeIds.has(c.id) && <Badge size="small" appearance="tint" color="brand" className={s.newBadge}>{t('いま作った', 'New')}</Badge>}
+                {madeIds.has(c.id) && (
+                  <Badge size="small" appearance="tint" color="brand" className={s.newBadge}>
+                    {t('いま作った', 'New')}
+                  </Badge>
+                )}
               </span>
             ))}
-            {/* 作る予定は、破線の小さなカードにして、もうある配信(線なし)と形で分ける。種類も出す */}
             {planned && (
               <span className={s.sidePlanned}>
                 <span className={s.sideItem}>
@@ -337,7 +344,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
     </aside>
   )
 
-  // ---- ① 対象と方向(週・国・チャネル、作る日と、その日の配信名・種類を、1 つの表で)
+  // ---- ① 計画する(作る日と、その日の種類・配信名を、1 つの表で)
   const step1 = () => {
     const locked = ws.days.some((d) => d.state === 'locked')
     // AI でまとめて入れる行(種類か配信名が空)
@@ -350,42 +357,16 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
     return (
       <div className={s.main}>
         <section className={s.panel}>
-          <div className={s.row}>
-            <Field label={t('週', 'Week')}>
-              <span className={s.weekPick}>
-                <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} aria-label={t('前の週', 'Previous week')} onClick={() => ws.moveWeek(-1)} />
-                <span className={s.weekText}>{weekText}</span>
-                <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} aria-label={t('次の週', 'Next week')} onClick={() => ws.moveWeek(1)} />
-              </span>
-            </Field>
-            <Field label={t('国', 'Country')} className={s.field}>
-              <Select size="small" value={ws.country} onChange={(_, v) => ws.setCountry(v.value)}>
-                <option value="">{t('未設定(すべての市場の商品を使う)', 'Not set (use products of all markets)')}</option>
-                {countryOptions.map((o) => (
-                  <option key={o.value} value={String(o.value)}>
-                    {optionLabel(o.label)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label={t('チャネル', 'Channel')} className={s.radios}>
-              <RadioGroup layout="horizontal" value={ws.channel} onChange={(_, v) => ws.setChannel(v.value)}>
-                {channelOptions.map((o) => (
-                  <Radio key={o.value} value={String(o.value)} label={optionLabel(o.label)} />
-                ))}
-              </RadioGroup>
-            </Field>
-          </div>
-        </section>
-        <section className={s.panel}>
           <h3 className={s.h3}>{t('作る日と、配信の方向', 'Days and direction')}</h3>
           <span className={s.hint}>
-            {locked
-              ? t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')
-              : t(
-                  `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れ、種類と配信名を入れてください。ここではまだ保存しません。`,
-                  `One delivery per day on days without ${channelName} (from today). Check the days, then enter a type and a name. Nothing is saved yet.`,
-                )}
+            {!ws.country
+              ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
+              : locked
+                ? t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')
+                : t(
+                    `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れてください。種類と配信名は、AI に入れてもらい、あとで直せます。ここではまだ保存しません。`,
+                    `One delivery per day on days without ${channelName} (from today). Check the days. Let AI fill the type and name, then adjust. Nothing is saved yet.`,
+                  )}
           </span>
           {/* AI でまとめて入れる。表の上に、何をするかを書いた帯で出す(小さなボタンだけだと、何が起きるか分からないため) */}
           <div className={s.aiBar}>
@@ -394,8 +375,8 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
               <span className={s.aiTitle}>{t('種類と配信名を AI でまとめて入れる', 'Fill types and names with AI')}</span>
               <span className={s.hint}>
                 {t(
-                  '作る日のうち、種類か配信名が空の行に、日付・前後の配信に合う案を入れます。人が選んだ種類・入れた配信名は変えません。入れたあとで、書き換えられます。',
-                  'Fills empty types and names with ideas that fit the date and nearby deliveries. Types and names you entered stay as they are. You can change them afterwards.',
+                  '作る日のうち、種類か配信名が空の行に、日付・前後の配信に合う案を入れます。人が選んだ種類・入れた配信名は変えません。',
+                  'Fills empty types and names with ideas that fit the date and nearby deliveries. What you entered stays as it is.',
                 )}
               </span>
             </div>
@@ -406,8 +387,13 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
           <div className={s.table} role="table">
             <div className={s.thead} role="row">
               <span />
-              <span className={s.th}>{t('配信日', 'Date')}</span>
-              <span className={s.th}>{t('配信名と種類', 'Name & type')}</span>
+              <span className={s.label}>{t('配信日', 'Date')}</span>
+              <span className={s.label}>{t('種類', 'Type')}</span>
+              {/* 配信名が何かを、見出しの下に一言(メールに出る文と間違えないように) */}
+              <span className={s.thName}>
+                <span className={s.label}>{t('配信名', 'Delivery name')}</span>
+                <span className={s.thNote}>{t('社内で配信を見分けるための名前です(メールには出ません)', 'An internal label to tell deliveries apart (not shown in the email)')}</span>
+              </span>
             </div>
             {ws.days.map((d) => {
               const free = d.state === 'free'
@@ -419,39 +405,32 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                   {free ? <Checkbox checked={on} onChange={(_, v) => ws.toggleDay(d.key, !!v.checked)} aria-label={t(`${dayText(d.key)} に作る`, `Create on ${dayText(d.key)}`)} /> : d.state === 'locked' ? <LockClosedRegular /> : <span />}
                   <span className={s.dayDate}>{dayText(d.key)}</span>
                   {!free ? (
-                    <span className={s.dayNote}>{note(d)}</span>
+                    <span className={mergeClasses(s.dayNote, s.span2)}>{note(d)}</span>
                   ) : !on ? (
-                    <span className={mergeClasses(s.dayNote, s.muted)}>{t('作らない', 'Skip')}</span>
+                    <span className={mergeClasses(s.dayNote, s.span2, s.muted)}>{t('作らない', 'Skip')}</span>
                   ) : (
-                    <div className={s.nameCell}>
-                      <div className={s.nameLine}>
-                        <Input size="small" className={s.grow} value={r.name} placeholder={t('配信名', 'Delivery name')} onChange={(_, v) => ws.setRow(d.key, { name: v.value, nameReason: undefined })} aria-label={t('配信名', 'Name')} />
-                        <Button size="small" appearance="subtle" icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={busy} title={t('この行に配信名の案', 'Suggest a name for this row')} aria-label={t('この行に配信名の案', 'Suggest a name for this row')} onClick={() => void ws.suggest([d.key])} />
+                    <>
+                      {/* 種類はプルダウン(AI が埋めて、人が直す。チップだと毎回 9 種類が並び、情報が多すぎるため) */}
+                      <Select size="small" value={r.themeType} onChange={(_, v) => ws.setRow(d.key, { themeType: v.value, typeByAi: false })} aria-label={t('種類', 'Type')}>
+                        <option value="">{t('(AI が入れます)', '(AI will fill)')}</option>
+                        {THEME_TYPES.map((k) => (
+                          <option key={k} value={k}>
+                            {themeTypeLabel(k)}
+                          </option>
+                        ))}
+                      </Select>
+                      <div className={s.nameCell}>
+                        <div className={s.nameLine}>
+                          <Input size="small" className={s.grow} value={r.name} placeholder={t('(AI が入れます)', '(AI will fill)')} onChange={(_, v) => ws.setRow(d.key, { name: v.value, nameReason: undefined })} aria-label={t('配信名', 'Delivery name')} />
+                          <Button size="small" appearance="subtle" icon={busy ? <Spinner size="extra-tiny" /> : <AiIcon />} disabled={busy} title={t('この行に配信名の案', 'Suggest a name for this row')} aria-label={t('この行に配信名の案', 'Suggest a name for this row')} onClick={() => void ws.suggest([d.key])} />
+                        </div>
+                        {(r.nameReason || r.typeByAi) && (
+                          <span className={s.reason}>
+                            {[r.typeByAi && r.themeType ? t('種類は AI の案', 'Type by AI') : '', r.nameReason ? `${t('案の理由', 'Why')}: ${r.nameReason}` : ''].filter(Boolean).join(' ・ ')}
+                          </span>
+                        )}
                       </div>
-                      {/* 種類は、選ぶ一覧ではなく、押すだけのチップ(1 行ずつ一覧を開く手間を減らす。もう一度押すと外れる) */}
-                      <div className={s.chips} role="radiogroup" aria-label={t('種類', 'Type')}>
-                        {THEME_TYPES.map((k) => {
-                          const sel = r.themeType === k
-                          return (
-                            <ToggleButton
-                              key={k}
-                              size="small"
-                              shape="circular"
-                              appearance={sel ? 'primary' : 'outline'}
-                              checked={sel}
-                              role="radio"
-                              aria-checked={sel}
-                              className={s.chip}
-                              onClick={() => ws.setRow(d.key, { themeType: sel ? '' : k, typeByAi: false })}
-                            >
-                              {themeTypeLabel(k)}
-                            </ToggleButton>
-                          )
-                        })}
-                        {r.typeByAi && r.themeType && <span className={s.reason}>{t('種類は AI の案', 'Type suggested by AI')}</span>}
-                      </div>
-                      {r.nameReason && <span className={s.reason}>{`${t('案の理由', 'Why')}: ${r.nameReason}`}</span>}
-                    </div>
+                    </>
                   )}
                 </div>
               )
@@ -493,79 +472,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
     </div>
   )
 
-  // ---- ② 中身を AI で作る
-  const step2 = () => {
-    const failedDays = ws.targets.filter((d) => ws.failed.has(d))
-    return (
-      <div className={s.main}>
-        <section className={s.panel}>
-          <div className={s.tools}>
-            <h3 className={s.h3}>{ws.running ? t('AI が中身を作っています', 'AI is creating the content') : t('中身を作りました', 'Content created')}</h3>
-            <span className={s.spacer} />
-            {ws.running ? (
-              <Button size="small" icon={<Spinner size="extra-tiny" />} onClick={ws.stop}>
-                {t('作るのをやめる', 'Stop')}
-              </Button>
-            ) : (
-              ws.pending.length > 0 && (
-                <Button size="small" icon={<AiIcon />} onClick={() => void ws.generate(ws.pending)}>
-                  {failedDays.length > 0 ? t(`失敗した ${ws.pending.length} 本をやり直す`, `Retry ${ws.pending.length}`) : t(`残りの ${ws.pending.length} 本を作る`, `Create remaining ${ws.pending.length}`)}
-                </Button>
-              )
-            )}
-          </div>
-          <span className={s.hint}>
-            {t(
-              '同時に 3 本まで作ります。できた案は、まだ保存しません。③ で中身を見て、1 本ずつ「保存」か「破棄」を選びます。',
-              'Up to 3 at a time. Drafts are not saved yet: in step 3, review each one and choose Save or Discard.',
-            )}
-          </span>
-          <div className={s.grid3}>
-            {ws.targets.map((d) => {
-              const r = ws.rowOf(d)
-              const prog = ws.progress.get(d)
-              const fail = ws.failed.get(d)
-              const done = ws.results.has(d)
-              return (
-                <Fragment key={d}>
-                  <span className={s.dayDate}>{dayText(d)}</span>
-                  <span className={s.nameCell}>
-                    <span className={s.name}>{r.name}</span>
-                    <span className={s.reason}>{r.themeType ? themeTypeLabel(r.themeType as ThemeType) : ''}</span>
-                  </span>
-                  <span className={s.status}>
-                    {done ? (
-                      <span className={s.statusLine}>
-                        <CheckmarkCircleFilled className={s.doneIcon} />
-                        {t('できました(まだ保存していません)', 'Ready (not saved yet)')}
-                      </span>
-                    ) : prog ? (
-                      <>
-                        <span className={s.statusLine}>
-                          <Spinner size="extra-tiny" />
-                          {prog.step}
-                        </span>
-                        <ProgressBar value={prog.total ? prog.done / prog.total : 0} thickness="medium" />
-                      </>
-                    ) : fail ? (
-                      <span className={mergeClasses(s.statusLine, s.error)}>
-                        <ErrorCircleRegular />
-                        {fail}
-                      </span>
-                    ) : (
-                      <span className={s.statusLine}>{t('まだ作っていません', 'Not created yet')}</span>
-                    )}
-                  </span>
-                </Fragment>
-              )
-            })}
-          </div>
-        </section>
-      </div>
-    )
-  }
-
-  // ---- ③ 確かめて保存(1 本ずつ、中身を見て「保存」か「破棄」。保存しなかった案は、終えると破棄される)
+  // ---- ② 作って決める: 作る日ごとのカード。AI ができたものから中身が入る
   const stateBadge = (state: ReviewItem['state']) =>
     state === 'saved' ? (
       <Badge size="small" appearance="tint" color="success" icon={<CheckmarkRegular />} className={s.newBadge}>
@@ -580,146 +487,157 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
         {t('未保存', 'Not saved')}
       </Badge>
     )
-  const pOf = (id: string) => products.find((p) => p.id === id)
-  const issueCount = (x: ReviewItem) => {
-    const is = ws.issuesOf(x)
-    return is.over.length + (is.sameTheme.length > 0 ? 1 : 0) + (is.sameHero.length > 0 ? 1 : 0)
-  }
-  // ③ でいま見ている案(下の帯の「保存」「破棄」も、この案に効く)
-  const items = ws.reviewItems
-  const current = items.find((x) => x.day === ws.checkDay) ?? items.find((x) => x.state === 'unsaved') ?? items[0]
-  const index = current ? items.indexOf(current) : -1
-  const busy = !!current && ws.savingDay === current.day
-  const step3 = () => {
-    if (!current) return <span className={s.muted}>{t('作った案はまだありません。', 'No drafts yet.')}</span>
-    const c = current.card
+  const step2 = () => {
+    const failedDays = ws.targets.filter((d) => ws.failed.has(d))
     return (
-      <div className={s.check}>
-        <div className={s.list} role="listbox" aria-label={t('作った案', 'Drafts')}>
-          {items.map((x) => (
-            <button key={x.day} type="button" role="option" aria-selected={x === current} className={mergeClasses(s.item, x === current && s.itemOn, x.state === 'discarded' && s.itemOff)} onClick={() => ws.setCheckDay(x.day)}>
-              <span className={s.itemHead}>
-                <ChannelBadge channel={x.card.channel} size="small" />
-                <span className={s.name}>{x.card.name}</span>
-              </span>
-              <span className={s.itemHead}>
-                <span className={s.muted}>{dayText(x.day)}</span>
-                <span className={s.spacer} />
-                {/* 週の中で気になる点がある案は、開かなくても分かるように */}
-                {issueCount(x) > 0 && (
-                  <Badge size="small" appearance="tint" color="warning" icon={<WarningFilled />} className={s.newBadge}>
-                    {issueCount(x)}
-                  </Badge>
+      <div>
+        <div className={s.tools}>
+          <span className={s.hint}>
+            {ws.running
+              ? t('AI が中身を作っています(同時に 3 本まで)。できた案から、カードに中身が入ります。', 'AI is creating the content (up to 3 at a time). Cards fill in as they finish.')
+              : t(
+                  'できた案は、まだ保存していません。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」。',
+                  'Drafts are not saved yet. Use “Open & edit” to review or fix in the card, “Save” to keep as is, or “Discard”.',
                 )}
-                {stateBadge(x.state)}
-              </span>
-              {/* 開かなくても、選んだ商品が分かるように、小さな写真を並べる */}
-              <span className={s.thumbs}>
-                {x.productIds.slice(0, 5).map((pid, i) => (
-                  <ImageThumb key={`${pid}-${i}`} src={productImage(pOf(pid))} alt={pOf(pid)?.name ?? ''} width={28} height={36} />
-                ))}
-                {x.productIds.length > 5 && <span className={s.muted}>{`+${x.productIds.length - 5}`}</span>}
-              </span>
-            </button>
-          ))}
+          </span>
+          <span className={s.spacer} />
+          {ws.running ? (
+            <Button size="small" icon={<Spinner size="extra-tiny" />} onClick={ws.stop}>
+              {t('作るのをやめる', 'Stop')}
+            </Button>
+          ) : (
+            ws.pending.length > 0 && (
+              <Button size="small" icon={<AiIcon />} onClick={() => void ws.generate(ws.pending)}>
+                {failedDays.length > 0 ? t(`失敗した ${ws.pending.length} 本をやり直す`, `Retry ${ws.pending.length}`) : t(`残りの ${ws.pending.length} 本を作る`, `Create remaining ${ws.pending.length}`)}
+              </Button>
+            )
+          )}
         </div>
-        <section className={s.reviewPanel}>
-          {/* 題名の帯: 配信日・チャネル・種類の下に、配信名を大きく。タブは、その下に線で区切って置く(題名とタブを見分けやすく) */}
-          <header className={s.reviewHead}>
-            <div className={s.reviewMeta}>
-              <ChannelBadge channel={c.channel} size="small" />
-              <span>{dayText(current.day)}</span>
-              {c.theme_type && <span>{`・ ${themeTypeLabel(c.theme_type as ThemeType)}`}</span>}
-              <span className={s.spacer} />
-              <span className={s.muted}>{t(`${index + 1} / ${items.length} 本目`, `${index + 1} of ${items.length}`)}</span>
-              {stateBadge(current.state)}
-            </div>
-            {/* 題名の行の右に、この案だけに効くボタン(破棄・開いて編集・保存)。画面の右下は、全体に効くボタン(まとめて保存・終える) */}
-            <div className={s.reviewTitleRow}>
-              <h3 className={s.reviewTitle}>{c.name}</h3>
-              <span className={s.spacer} />
-              {current.state === 'discarded' ? (
-                <Button size="small" onClick={() => ws.undoDiscard(current.day)}>
-                  {t('破棄を取り消す', 'Undo discard')}
-                </Button>
-              ) : (
-                <>
-                  <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(current.day)}>
-                    {t('破棄', 'Discard')}
-                  </Button>
-                  <Button size="small" icon={<EditRegular />} disabled={busy} onClick={() => (current.state === 'saved' ? onOpen(c.id) : onOpenDraft(current.day))}>
-                    {t('開いて編集', 'Open & edit')}
-                  </Button>
-                  {current.state === 'unsaved' ? (
-                    <Button size="small" appearance="primary" icon={busy ? <Spinner size="extra-tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(current.day)}>
-                      {t('保存', 'Save')}
-                    </Button>
-                  ) : (
-                    <span className={s.statusLine}>
-                      <CheckmarkCircleFilled className={s.doneIcon} />
-                      {t('保存済み', 'Saved')}
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-            {c.theme && <span className={s.hint}>{`${t('テーマ', 'Theme')}: ${c.theme}`}</span>}
-          </header>
-          {/* 選んだ商品(開かなくても分かるように) */}
-          <div className={s.picked}>
-            <span className={s.label}>{t(`選んだ商品(${current.productIds.length})`, `Products (${current.productIds.length})`)}</span>
-            <div className={s.pickedRow}>
-              {current.productIds.length === 0 && <span className={s.muted}>{t('なし', 'None')}</span>}
-              {current.productIds.map((pid, i) => {
-                const p = pOf(pid)
-                const uses = ws.weekUse.get(pid) ?? 0
-                const over = current.state !== 'discarded' && uses > WEEKLY_PRODUCT_LIMIT
-                return (
-                  <div key={`${pid}-${i}`} className={mergeClasses(s.pickedItem, over && s.pickedOver)}>
-                    <ImageThumb src={productImage(p)} alt={p?.name ?? ''} width={56} height={72} />
-                    <span className={s.pickedName}>{p?.name ?? pid}</span>
-                    {p?.price !== undefined && <span className={s.muted}>{yen(p.price, productMarket(p))}</span>}
-                    {/* この週に、この商品を載せる配信の数(週の確認の一覧 W4 と同じ数え方。上限を超えると ⚠) */}
-                    <span className={mergeClasses(s.uses, over && s.usesOver)}>
-                      {over && <WarningFilled />}
-                      {t(`今週 ${uses} 本 / 上限 ${WEEKLY_PRODUCT_LIMIT}`, `${uses} this week / max ${WEEKLY_PRODUCT_LIMIT}`)}
-                    </span>
-                    {/* 直す場所は配信カード(週の表示の「直すこと」・在庫のアラートと同じ)。開くと、その商品のアラートを選んだ状態になる */}
-                    {over && (
-                      <Button size="small" appearance="outline" icon={<EditRegular />} onClick={() => (current.state === 'saved' ? onOpen(c.id, pid) : onOpenDraft(current.day, pid))}>
-                        {t('開いて直す', 'Open & fix')}
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          {/* この週の中での重なり(週の確認の一覧と同じ見方)。なければ「重なりなし」とだけ出す */}
-          {(() => {
-            const is = ws.issuesOf(current)
-            const notes = [
-              is.sameTheme.length > 0 && t(`同じテーマ: ${is.sameTheme.join('、')}`, `Same theme: ${is.sameTheme.join(', ')}`),
-              is.sameHero.length > 0 && t(`同じメイン画像: ${is.sameHero.join('、')}`, `Same hero image: ${is.sameHero.join(', ')}`),
-              is.over.length > 0 && t(`週の上限を超える商品 ${is.over.length} 点`, `${is.over.length} item(s) over the weekly limit`),
-            ].filter(Boolean)
-            return (
-              <div className={mergeClasses(s.overlap, notes.length > 0 && s.overlapWarn)}>
-                <span className={s.label}>{t('この週の中での重なり', 'Overlap within this week')}</span>
-                <span>{notes.length > 0 ? notes.join(' ・ ') : t('重なりなし', 'No overlap')}</span>
+        <div className={s.cards}>
+          {ws.targets.map((day) => {
+            const row = ws.rowOf(day)
+            const item = ws.reviewItems.find((x) => x.day === day)
+            const prog = ws.progress.get(day)
+            const fail = ws.failed.get(day)
+            // 同じ日の、ほかの配信(週の中の手がかり。週の表示をもう 1 つ作らずに、まわりの様子が分かるように)
+            const sameDay = inWeek.filter((c) => !madeIds.has(c.id) && dayKeyOf(new Date(c.scheduled_at!)) === day)
+            const head = (
+              <div className={s.cardHead}>
+                <ChannelBadge channel={ws.channel} size="small" />
+                <span>{dayText(day)}</span>
+                {(item?.card.theme_type || row.themeType) && <span>{`・ ${themeTypeLabel((item?.card.theme_type || row.themeType) as ThemeType)}`}</span>}
+                <span className={s.spacer} />
+                {item && stateBadge(item.state)}
               </div>
             )
-          })()}
-          <div className={s.reviewBody}>
-            <CheckView card={c} tab="content" cards={ws.compareCards} cardProducts={ws.compareProducts} products={products} heroes={heroes} />
-          </div>
-        </section>
+            const sameDayLine = sameDay.length > 0 && (
+              <span className={s.sameDay}>{t(`同じ日の配信: ${sameDay.map((c) => c.name).join('、')}`, `Same day: ${sameDay.map((c) => c.name).join(', ')}`)}</span>
+            )
+            if (!item) {
+              // まだできていない(作っている途中・順番待ち・失敗)
+              return (
+                <div key={day} className={s.card}>
+                  {head}
+                  <h4 className={s.cardTitle}>{row.name}</h4>
+                  <div className={s.waiting}>
+                    {prog ? (
+                      <>
+                        <span className={s.statusLine}>
+                          <Spinner size="extra-tiny" />
+                          {prog.step}
+                        </span>
+                        <ProgressBar value={prog.total ? prog.done / prog.total : 0} thickness="medium" />
+                      </>
+                    ) : fail ? (
+                      <span className={mergeClasses(s.statusLine, s.error)}>
+                        <ErrorCircleRegular />
+                        {fail}
+                      </span>
+                    ) : (
+                      <span className={s.muted}>{t('まだ作っていません', 'Not created yet')}</span>
+                    )}
+                  </div>
+                  <span />
+                  {sameDayLine || <span />}
+                </div>
+              )
+            }
+            const c = item.card
+            const is = ws.issuesOf(item)
+            const issueText = [
+              is.over.length > 0 && t(`週の上限を超える商品 ${is.over.length} 点`, `${is.over.length} item(s) over the weekly limit`),
+              is.sameTheme.length > 0 && t(`同じテーマ ${is.sameTheme.length} 本`, `Same theme ×${is.sameTheme.length}`),
+              is.sameHero.length > 0 && t(`同じメイン画像 ${is.sameHero.length} 本`, `Same hero ×${is.sameHero.length}`),
+            ].filter(Boolean)
+            const busy = ws.savingDay === day
+            // 直すことがあれば、主のボタンを「開いて直す」にして、上限を超えた商品を選んだ状態で開く
+            const fixFocus = is.over[0]
+            const open = () => (item.state === 'saved' ? onOpen(c.id, fixFocus) : onOpenDraft(day, fixFocus))
+            return (
+              <div key={day} className={mergeClasses(s.card, item.state === 'saved' && s.cardSaved, item.state === 'discarded' && s.cardOff)}>
+                {head}
+                <h4 className={s.cardTitle} title={c.name}>
+                  {c.name}
+                </h4>
+                <span className={s.theme} title={c.theme ?? ''}>{c.theme ? `${t('テーマ', 'Theme')}: ${c.theme}` : ''}</span>
+                <div>
+                  <div className={s.thumbs}>
+                    {item.productIds.map((pid, i) => {
+                      const over = is.over.includes(pid)
+                      return (
+                        <span key={`${pid}-${i}`} className={s.thumb} title={pOf(pid)?.name ?? ''}>
+                          <span className={mergeClasses(over && s.thumbOver)}>
+                            <ImageThumb src={productImage(pOf(pid))} alt={pOf(pid)?.name ?? ''} width={40} height={52} />
+                          </span>
+                          {over && (
+                            <span className={s.thumbWarn}>
+                              <WarningFilled />
+                              {t(`今週 ${ws.weekUse.get(pid) ?? 0}`, `${ws.weekUse.get(pid) ?? 0}/wk`)}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  {item.state !== 'discarded' && issueText.length > 0 && (
+                    // 名前は、数だけにして、指したときに出す(カードが長くならないように)
+                    <div className={s.issues} title={[...is.sameTheme.map((x) => t(`同じテーマ: ${x}`, `Same theme: ${x}`)), ...is.sameHero.map((x) => t(`同じメイン画像: ${x}`, `Same hero: ${x}`))].join(' / ')}>
+                      <WarningFilled /> {issueText.join(' ・ ')}
+                    </div>
+                  )}
+                  {sameDayLine}
+                </div>
+                <div className={s.cardActions}>
+                  {item.state === 'discarded' ? (
+                    <Button size="small" onClick={() => ws.undoDiscard(day)}>
+                      {t('破棄を取り消す', 'Undo discard')}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
+                        {t('破棄', 'Discard')}
+                      </Button>
+                      <span className={s.spacer} />
+                      {item.state === 'unsaved' && (
+                        <Button size="small" icon={busy ? <Spinner size="extra-tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(day)}>
+                          {t('保存', 'Save')}
+                        </Button>
+                      )}
+                      <Button size="small" appearance={item.state === 'unsaved' ? 'primary' : 'secondary'} icon={fixFocus ? <WarningFilled /> : <EditRegular />} disabled={busy} onClick={open}>
+                        {fixFocus ? t('開いて直す', 'Open & fix') : t('開いて編集', 'Open & edit')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     )
   }
 
-  // ---- 下: 戻る と、手順に合わせたボタン(① だけは、AI で作るか、作らずに保存するかの 2 つ)
-  // 「終えて、週の表示で見る」で閉じたときは、閉じるダイアログで決めたあとも、週の表示に移る
+  // ---- 下: 手順に合わせたボタン。② では、全体に効くボタンだけ(1 本ずつのボタンは、カードの中)
   const finish = () => {
     finishRef.current = true
     if (ws.close()) onFinish(ws.weekStart)
@@ -730,7 +648,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
     if (finishRef.current) onFinish(ws.weekStart)
   }
   const finishButton = (
-    <Button appearance="primary" icon={<CalendarLtrRegular />} disabled={ws.savingPlain || !!ws.savingDay} onClick={finish}>
+    <Button appearance="primary" icon={<CalendarLtrRegular />} disabled={ws.savingPlain || !!ws.savingDay || ws.running} onClick={finish}>
       {t('終えて、週の表示で見る', 'Finish and open the week')}
     </Button>
   )
@@ -745,8 +663,8 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
               <SplitButton
                 appearance="primary"
                 icon={<AiIcon tone="white" />}
-                disabled={!ws.allReady && !ws.plainReady}
-                primaryActionButton={{ disabled: !ws.allReady, onClick: () => void ws.generate(ws.pending) }}
+                disabled={!ws.country || (!ws.allReady && !ws.plainReady)}
+                primaryActionButton={{ disabled: !ws.country || !ws.allReady, onClick: () => void ws.generate(ws.pending) }}
                 menuButton={{ ...triggerProps, 'aria-label': t('ほかの保存のしかた', 'Other ways to save') }}
               >
                 {t(`${n} 本の中身を AI で作る`, `Create ${n} with AI`)}
@@ -768,19 +686,12 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
           </MenuPopover>
         </Menu>
       )
-    if (ws.step === 2)
-      return (
-        <Button appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={ws.running || ws.reviewItems.length === 0} onClick={() => ws.setStep(3)}>
-          {t(`次へ: ${ws.reviewItems.length} 本を確かめて保存`, `Next: review & save ${ws.reviewItems.length}`)}
-        </Button>
-      )
-    // ③: 画面の右下は、全体に効くボタンだけ(まとめて保存・終える)。1 本ずつの保存・編集・破棄は、案の題名の行の右
     return (
       <>
         {ws.unsavedCount > 0 && (
           <Button
             icon={ws.savingDay ? <Spinner size="tiny" /> : <SaveRegular />}
-            disabled={!!ws.savingDay}
+            disabled={!!ws.savingDay || ws.running}
             onClick={() => {
               if (window.confirm(t(`まだ決めていない ${ws.unsavedCount} 本を、まとめて下書き(未起案)で保存します。よろしいですか?`, `Save all ${ws.unsavedCount} remaining drafts (Not started)?`))) void ws.saveAll()
             }}
@@ -792,8 +703,6 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
       </>
     )
   }
-  const inReview = !plainDone && ws.step === 3
-  const back = inReview ? 2 : null
   // ボタンのすぐ左に置く、短い状態の説明(説明とボタンを 1 か所にまとめ、目が左下から右下へ横断しないように)
   const footHint = plainDone
     ? ''
@@ -801,11 +710,9 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
       ? readyCount === n && n > 0
         ? t(`${n} 本そろいました`, `All ${n} ready`)
         : t(`種類と配信名: ${readyCount} / ${n} 本`, `Type & name: ${readyCount} / ${n}`)
-      : inReview
-        ? ws.unsavedCount === 0
-          ? t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本。すべて決めました`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}. All decided`)
-          : t(`保存 ${ws.savedCount} / ${ws.reviewItems.length} 本`, `Saved ${ws.savedCount} of ${ws.reviewItems.length}`)
-        : ''
+      : ws.unsavedCount === 0 && !ws.running && ws.pending.length === 0
+        ? t(`保存 ${ws.savedCount} / ${n} 本。すべて決めました`, `Saved ${ws.savedCount} of ${n}. All decided`)
+        : t(`保存 ${ws.savedCount} / ${n} 本`, `Saved ${ws.savedCount} of ${n}`)
 
   return (
     <>
@@ -814,7 +721,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
           <div className={s.head}>
             <AiIcon size={20} />
             <h2 className={s.title}>{t('まとめて作る', 'Create in bulk')}</h2>
-            <span className={s.summary}>{`${weekText} ・ ${countryName} ・ ${channelName}`}</span>
+            {target}
             <span className={s.spacer} />
             <Button
               appearance="subtle"
@@ -834,21 +741,21 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                 <MessageBarBody>{ws.error}</MessageBarBody>
               </MessageBar>
             )}
-            {ws.step === 3 && !plainDone ? (
-              step3()
-            ) : (
+            {plainDone ? (
               <div className={s.withSide}>
-                {plainDone ? plainView() : ws.step === 1 ? step1() : step2()}
+                {plainView()}
                 {side}
               </div>
+            ) : ws.step === 1 ? (
+              <div className={s.withSide}>
+                {step1()}
+                {side}
+              </div>
+            ) : (
+              step2()
             )}
           </div>
           <div className={s.foot}>
-            {back && (
-              <Button appearance="subtle" icon={<ArrowLeftRegular />} disabled={ws.running} onClick={() => ws.setStep(back as Step)}>
-                {t('戻る', 'Back')}
-              </Button>
-            )}
             <span className={s.spacer} />
             <span className={s.footHint}>{footHint}</span>
             {actions()}
