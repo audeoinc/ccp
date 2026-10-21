@@ -443,7 +443,21 @@
     ["body", "text"],
     ["source_file", "text", {"index": true}],
     ["sort_order", "int"],
-    ["imported_at", "timestamptz"]
+    ["imported_at", "timestamptz"],
+    ["edited_at", "timestamptz"],
+    ["edited_by", "text"]
+   ],
+   "lookups": [
+   ]
+  },
+  "policy_rule_edits": {
+   "columns": [
+    ["rule_id", "text", {"index": true}],
+    ["action", "text"],
+    ["before_value", "text"],
+    ["after_value", "text"],
+    ["actor", "text"],
+    ["source_file", "text"]
    ],
    "lookups": [
    ]

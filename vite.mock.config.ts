@@ -19,6 +19,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/creativeFiles$/.test(source)) return fileURLToPath(new URL('./src/mock/creativeFiles.ts', import.meta.url))
     // メイン画像を上げる窓口(src/data/heroUpload)も、ブラウザの中だけに置く身代わりに
     if (/(?:^|\/)data\/heroUpload$/.test(source)) return fileURLToPath(new URL('./src/mock/heroUpload.ts', import.meta.url))
+    // 決まりを画面で直す窓口(src/data/policyEdit。X61)は、メモリ上の表を書き換える身代わりに
+    if (/(?:^|\/)data\/policyEdit$/.test(source)) return fileURLToPath(new URL('./src/mock/policyEdit.ts', import.meta.url))
     // 部品の画像を上げる窓口(src/data/partUpload。X59 ③)も同じ
     if (/(?:^|\/)data\/partUpload$/.test(source)) return fileURLToPath(new URL('./src/mock/partUpload.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに

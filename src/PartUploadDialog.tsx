@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
+import { AutoTextarea } from './AutoTextarea'
 import { PartImagesService } from './data/partImages'
 import { PartUpload, type PartDraft } from './data/partUpload'
 import { rasterize, toUploadable } from './imageConvert'
@@ -230,10 +231,10 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
                   <Input size="small" value={form.alt} onChange={(_, d) => set('alt')(d.value)} />
                 </Field>
                 <Field label={t('タグ(色・形・文言・用途)', 'Tags (color, shape, wording, use)')} size="small">
-                  <Input size="small" value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
+                  <AutoTextarea size="small" rows={2} value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
                 </Field>
                 <Field label={t('説明', 'Description')} size="small">
-                  <Textarea size="small" value={form.description} onChange={(_, d) => set('description')(d.value)} />
+                  <AutoTextarea size="small" rows={4} value={form.description} onChange={(_, d) => set('description')(d.value)} />
                 </Field>
                 <div className={s.two}>
                   <Field label={t('出どころ(任意)', 'Source (optional)')} size="small">

@@ -1,10 +1,17 @@
 // マーケティングポリシー(方針・決まり)の取り込みと一覧(バックログ M3・M4。設計は docs/POLICY.md の 6 章)。
 // ⚙ →「方針・決まり」で開く。ファイル(ルール系 = Markdown、販売系 = CSV)を選ぶ → サーバーが読み分けた結果(件数・読めなかった行と理由)を見せる → 取り込む。
-// 一覧は見るだけ(直すのは元のファイル。取り込み直すと置き換わる)。読み分けと保存は server/ccp/policies.py。
+// ルール系の決まりは、画面でも足す・直す・消せる(X61。RuleEditDialog)。画面で足したものは「画面で作成」に入り、取り込み直しても消えない。
+// 取り込んだ決まりを画面で直すと、同じファイルを取り込み直したときにファイルの内容に戻る(取り込みの確かめで知らせる。「Markdown に書き出す」で元のファイルを直せる)。
+// 直した記録は「直した記録」のタブ(表 policy_rule_edits)。販売系の方針は、取り込みだけ。読み分けと保存は server/ccp/policies.py。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
   Dialog,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   DialogSurface,
   DialogTitle,
   MessageBar,
@@ -23,15 +30,26 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowUploadRegular, DismissRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownloadRegular, ArrowUploadRegular, DeleteRegular, DismissRegular, EditRegular, TopSpeedRegular } from '@fluentui/react-icons'
 import { appPath } from './appRoot'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
-import { locale, useT } from './i18n'
+import { PolicyEdit, type RuleInput } from './data/policyEdit'
+import { PolicyRuleEditsService } from './data/policyRuleEdits'
+import type { PolicyRuleEdit } from './models/policyRuleEdits'
+import { RuleEditDialog } from './RuleEditDialog'
+import { LIMIT_TEMPLATE } from './ruleTemplates'
+import { downloadText } from './productionSnapshot'
+import { locale, tr, useT } from './i18n'
 import { RULE_STRENGTHS, RULE_TARGETS, type PolicyRule } from './models/policyRules'
 import type { SalesPolicy } from './models/salesPolicies'
 
 type Kind = 'rules' | 'sales'
+/** 一覧のタブ(直した記録は、ルール系の決まりの記録。X61) */
+type ListTab = Kind | 'edits'
+const SCREEN_FILE = '画面で作成'
+/** 直した記録で、前後を比べる項目(日時などの印は出さない) */
+const SHOWN_KEYS = ['rule_id', 'title', 'applies_to', 'strength', 'market', 'channel', 'period_start', 'period_end', 'check_spec', 'body']
 
 interface Problem {
   line: number
@@ -50,6 +68,8 @@ interface Preview {
   replaced?: number
   saved?: number
   duplicates?: string[]
+  /** 確かめのときだけ: このファイルから取り込んで、画面で直した決まりの番号(取り込むとファイルの内容に戻る。X61) */
+  edited_on_screen?: string[]
 }
 
 const useStyles = makeStyles({
@@ -86,7 +106,10 @@ const fmtDate = (v?: string) => (v ? new Date(v).toLocaleString(locale(), { mont
 export function PolicyManager({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: () => void }) {
   const styles = useStyles()
   const t = useT()
-  const [kind, setKind] = useState<Kind>('rules')
+  const [kind, setKind] = useState<ListTab>('rules')
+  // 画面で足す・直す(X61)
+  const [editing, setEditing] = useState<{ rule?: PolicyRule; initial?: RuleInput } | null>(null)
+  const [edits, setEdits] = useState<PolicyRuleEdit[]>([])
   const [rules, setRules] = useState<PolicyRule[]>([])
   const [sales, setSales] = useState<SalesPolicy[]>([])
   const [loading, setLoading] = useState(false)
@@ -102,12 +125,14 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
 
   const reload = useCallback(async () => {
     setLoading(true)
-    const [r, s] = await Promise.all([
+    const [r, s, e] = await Promise.all([
       PolicyRulesService.getAll({ orderBy: ['source_file asc', 'sort_order asc'], top: 5000 }),
       SalesPoliciesService.getAll({ orderBy: ['week_start desc', 'market asc', 'scope asc'], top: 5000 }),
+      PolicyRuleEditsService.getAll({ orderBy: ['created_on desc'], top: 300 }),
     ])
     if (r.success) setRules(r.data ?? [])
     if (s.success) setSales(s.data ?? [])
+    if (e.success) setEdits(e.data ?? [])
     setLoading(false)
   }, [])
 
@@ -159,6 +184,57 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
     )
     await reload()
     onImported()
+  }
+
+  // 画面で足した・直した・消したあと: 一覧と、AI・週の上限が使う決まりを読み直す
+  const afterEdit = async (message: string) => {
+    setEditing(null)
+    setError(null)
+    setDone(message)
+    await reload()
+    onImported()
+  }
+  const removeRule = async (r: PolicyRule) => {
+    if (!window.confirm(tr(`決まり ${r.rule_id}「${r.title}」を消します。よろしいですか?` + (r.source_file !== SCREEN_FILE ? `(ファイル「${r.source_file}」を取り込み直すと、また入ります)` : ''), `Delete rule ${r.rule_id} "${r.title}"?` + (r.source_file !== SCREEN_FILE ? ` (re-importing "${r.source_file}" brings it back)` : '')))) return
+    try {
+      await PolicyEdit.remove(r.id)
+      await afterEdit(tr(`決まり ${r.rule_id} を消しました`, `Deleted rule ${r.rule_id}`))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const exportMd = async (sourceFile?: string) => {
+    try {
+      const x = await PolicyEdit.exportMarkdown(sourceFile)
+      downloadText(x.filename, x.content, 'text/markdown')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const sourceFiles = useMemo(() => Array.from(new Set(rules.map((r) => r.source_file ?? '').filter(Boolean))).sort(), [rules])
+  // 週の上限の決まりの番号は、重ならないものにする
+  const limitTemplate = (): RuleInput => {
+    let n = 1
+    while (rules.some((r) => r.rule_id === `R-LIMIT-${String(n).padStart(3, '0')}`)) n++
+    return { ...LIMIT_TEMPLATE, rule_id: `R-LIMIT-${String(n).padStart(3, '0')}` }
+  }
+  const actionLabel = (a?: string) => (a === 'create' ? t('足した', 'Added') : a === 'delete' ? t('消した', 'Deleted') : t('直した', 'Edited'))
+  // 直した記録の、前後で変わった項目
+  const changedFields = (e: PolicyRuleEdit) => {
+    const parse = (v?: string) => {
+      try {
+        return v ? (JSON.parse(v) as Record<string, string | null>) : null
+      } catch {
+        return null
+      }
+    }
+    const b = parse(e.before_value)
+    const a = parse(e.after_value)
+    if (!b || !a) return (a ?? b)?.title ?? ''
+    return Object.keys(a)
+      .filter((k) => SHOWN_KEYS.includes(k) && (a[k] ?? '') !== (b[k] ?? ''))
+      .map((k) => `${k}: ${b[k] ?? ''} → ${a[k] ?? ''}`)
+      .join(' / ')
   }
 
   const markets = useMemo(() => Array.from(new Set([...rules.flatMap((r) => (r.market ?? '').split(',').filter(Boolean)), ...sales.map((s) => s.market ?? '').filter(Boolean)])).sort(), [rules, sales])
@@ -220,6 +296,14 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                         : t('取り込む(このファイルの決まりを置き換える)', 'Import (replace rules from this file)')}
                   </Button>
                 </div>
+                {preview.kind === 'rules' && (preview.edited_on_screen?.length ?? 0) > 0 && (
+                  <div className={styles.small}>
+                    {t(
+                      `※ このファイルから取り込んで、画面で直した決まりがあります(${preview.edited_on_screen?.join(', ')})。取り込むと、ファイルの内容に戻ります。画面で直した内容を残すなら、先に「Markdown に書き出す」でファイルに写してください。`,
+                      `Note: rules from this file were edited on screen (${preview.edited_on_screen?.join(', ')}). Importing restores the file's version. To keep the edits, export them to the file first.`,
+                    )}
+                  </div>
+                )}
                 {preview.kind === 'sales' && preview.weeks && (
                   <div className={styles.small}>{preview.weeks.map((w) => `${w.week_start} ${w.market}: ${w.rows}`).join(' / ')}</div>
                 )}
@@ -233,9 +317,10 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
             </MessageBar>
           )}
           <div className={styles.row}>
-            <TabList selectedValue={kind} onTabSelect={(_, d) => setKind(d.value as Kind)} size="small">
+            <TabList selectedValue={kind} onTabSelect={(_, d) => setKind(d.value as ListTab)} size="small">
               <Tab value="rules">{t(`ルール系の決まり(${rules.length})`, `Rules (${rules.length})`)}</Tab>
               <Tab value="sales">{t(`販売系の方針(${sales.length})`, `Sales policies (${sales.length})`)}</Tab>
+              <Tab value="edits">{t(`直した記録(${edits.length})`, `Edit history (${edits.length})`)}</Tab>
             </TabList>
             <span className={styles.grow} />
             {kind === 'rules' && (
@@ -254,13 +339,41 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                 </Select>
               </>
             )}
+            {kind !== 'edits' && (
             <Select size="small" value={fMarket} onChange={(_, d) => setFMarket(d.value)} aria-label={t('市場', 'Market')}>
               <option value="">{t('市場: すべて', 'Market: all')}</option>
               {markets.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </Select>
+            )}
           </div>
+          {kind === 'rules' && (
+            <div className={styles.row}>
+              <Button size="small" icon={<AddRegular />} onClick={() => setEditing({})}>
+                {t('決まりを足す', 'Add a rule')}
+              </Button>
+              <Button size="small" icon={<TopSpeedRegular />} onClick={() => setEditing({ initial: limitTemplate() })} title={t('「同じ商品は週 N 回まで」の決まりを、ひな形から足します(アラートの条件の週の上限より優先)', 'Add a "same product at most N times a week" rule from a template (overrides the alert setting)')}>
+                {t('週の上限の決まりを足す', 'Add a weekly cap rule')}
+              </Button>
+              <Menu>
+                <MenuTrigger disableButtonEnhancement>
+                  <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!rules.length}>
+                    {t('Markdown に書き出す', 'Export as Markdown')}
+                  </Button>
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem onClick={() => void exportMd()}>{t('すべての決まり', 'All rules')}</MenuItem>
+                    {sourceFiles.map((f) => (
+                      <MenuItem key={f} onClick={() => void exportMd(f)}>{f === SCREEN_FILE ? t('画面で作成した決まり', 'Rules created on screen') : f}</MenuItem>
+                    ))}
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+              <Text className={styles.small}>{t('画面で足した決まりは「画面で作成」に入り、取り込み直しても消えません。取り込んだ決まりを直すと、同じファイルを取り込み直したときに戻ります。', 'Rules added here go to "画面で作成" and survive re-imports. Edits to imported rules are reverted when that file is re-imported.')}</Text>
+            </div>
+          )}
           <div className={styles.scroll}>
             {loading && <Spinner size="tiny" />}
             {!loading && kind === 'rules' && (
@@ -274,6 +387,7 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                     <TableHeaderCell>{t('市場・チャネル・期間', 'Market / channel / period')}</TableHeaderCell>
                     <TableHeaderCell>{t('確かめ方', 'Check')}</TableHeaderCell>
                     <TableHeaderCell>{t('ファイル(取り込み)', 'File (imported)')}</TableHeaderCell>
+                    <TableHeaderCell>{t('操作', 'Actions')}</TableHeaderCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -292,12 +406,22 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                         {[r.market || t('全市場', 'All markets'), r.channel || t('両チャネル', 'Both channels'), r.period_start || r.period_end ? `${r.period_start ?? ''} - ${r.period_end ?? ''}` : t('いつでも', 'Always')].join(' / ')}
                       </TableCell>
                       <TableCell className={styles.small}>{r.check_spec ?? ''}</TableCell>
-                      <TableCell className={styles.small}>{r.source_file}{r.imported_at ? ` (${fmtDate(r.imported_at)})` : ''}</TableCell>
+                      <TableCell className={styles.small}>
+                        {r.source_file}
+                        {r.imported_at ? ` (${fmtDate(r.imported_at)})` : ''}
+                        {r.edited_at && <div>{t(`画面で${r.source_file === SCREEN_FILE ? '作成' : '直した'}: ${r.edited_by || '?'} ${fmtDate(r.edited_at)}`, `${r.source_file === SCREEN_FILE ? 'Created' : 'Edited'} on screen: ${r.edited_by || '?'} ${fmtDate(r.edited_at)}`)}</div>}
+                      </TableCell>
+                      <TableCell>
+                        <div className={styles.row}>
+                          <Button size="small" appearance="subtle" icon={<EditRegular />} aria-label={t('直す', 'Edit')} onClick={() => setEditing({ rule: r })} />
+                          <Button size="small" appearance="subtle" icon={<DeleteRegular />} aria-label={t('消す', 'Delete')} onClick={() => void removeRule(r)} />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {shownRules.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className={styles.small}>{t('決まりはありません', 'No rules')}</TableCell>
+                      <TableCell colSpan={8} className={styles.small}>{t('決まりはありません', 'No rules')}</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -336,8 +460,40 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                 </TableBody>
               </Table>
             )}
+            {!loading && kind === 'edits' && (
+              <Table size="extra-small" aria-label={t('直した記録', 'Edit history')}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHeaderCell>{t('日時', 'When')}</TableHeaderCell>
+                    <TableHeaderCell>{t('人', 'Who')}</TableHeaderCell>
+                    <TableHeaderCell>{t('操作', 'Action')}</TableHeaderCell>
+                    <TableHeaderCell>{t('番号', 'Id')}</TableHeaderCell>
+                    <TableHeaderCell>{t('変わったところ', 'Changes')}</TableHeaderCell>
+                    <TableHeaderCell>{t('置き場所', 'Source')}</TableHeaderCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {edits.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className={styles.small}>{fmtDate(e.created_on)}</TableCell>
+                      <TableCell className={styles.small}>{e.actor || '?'}</TableCell>
+                      <TableCell className={styles.small}>{actionLabel(e.action)}</TableCell>
+                      <TableCell className={styles.small}>{e.rule_id}</TableCell>
+                      <TableCell className={styles.small}>{changedFields(e)}</TableCell>
+                      <TableCell className={styles.small}>{e.source_file}</TableCell>
+                    </TableRow>
+                  ))}
+                  {edits.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className={styles.small}>{t('画面で直した記録はまだありません(取り込みは記録しません。取り込んだ日時は一覧の「ファイル」に出ます)', 'No edits on screen yet (imports are not listed here; see the File column)')}</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
+        {editing && <RuleEditDialog rule={editing.rule} initial={editing.initial} markets={markets} onClose={() => setEditing(null)} onDone={afterEdit} />}
       </DialogSurface>
     </Dialog>
   )

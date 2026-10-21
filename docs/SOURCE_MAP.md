@@ -364,7 +364,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `approvals.ts` / `weekApprovals.ts` | 51 / 51 | 承認者になれる人の判断 / 週のまとめての依頼・承認 |
 | `people.ts` / `useApprovalInbox.ts` | 93 / 82 | ユーザー・承認グループ・承認のルール(すべての配信に同じ 1 つ)の読み込み / 自分宛ての依頼 |
 | `PeopleManager.tsx` | 408 | ⚙ の「ユーザーと承認グループ」 |
-| `PolicyManager.tsx` / `policyCheck.ts` | 344 / 126 | ⚙ の「方針と決まり」/ AI の案が決まりを守っているかの確かめ |
+| `PolicyManager.tsx` / `policyCheck.ts` | 480 / 126 | ⚙ の「方針と決まり」(取り込み・一覧・画面で足す / 直す / 消す・Markdown に書き出す・直した記録。X61)/ AI の案が決まりを守っているかの確かめ |
+| `RuleEditDialog.tsx` / `ruleTemplates.ts` | 230 / 15 | 決まりを足す・直すダイアログ(X61。確かめ方は種類と値)/ 週の上限の決まりのひな形。窓口は `data/policyEdit.ts`(サーバーは `server/ccp/policies.py` の `/api/policies/rules`) |
 
 ### 3.8.2 制作
 

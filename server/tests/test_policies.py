@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ccp.policies import parse_rules, parse_sales  # noqa: E402
+from ccp.policies import check_rule, history_json, parse_rules, parse_sales, rule_markdown, rules_markdown  # noqa: E402
 
 RULES_MD = """# ルール集: 表現の決まり
 - 版: 2026-10-17
@@ -100,6 +100,48 @@ class SalesTest(unittest.TestCase):
         p = parse_sales("week,market\n2026-10-19,US\n")
         self.assertEqual(p.rows, [])
         self.assertIn("必須の列がありません", p.problems[0].message)
+
+
+class ScreenEditTest(unittest.TestCase):
+    """画面で決まりを直す(X61)。取り込みと同じ読み分けで確かめ、書き出したものは取り込み直せる"""
+
+    LIMIT = {"rule_id": "R-LIMIT-001", "title": "同じ商品は週 2 回まで", "applies_to": "selection", "strength": "must",
+             "market": "JP", "channel": "email, app", "check_spec": "上限 週 2 回", "body": "同じ商品を、同じ週に 3 本以上の配信に載せない。"}
+
+    def test_valid_rule(self) -> None:
+        row, problems = check_rule(self.LIMIT)
+        self.assertIsNotNone(row)
+        self.assertEqual(problems, [])
+        self.assertEqual(row["check_spec"], "上限 週 2 回")
+        self.assertEqual(row["channel"], "email,app")
+
+    def test_invalid_rule(self) -> None:
+        row, problems = check_rule({**self.LIMIT, "strength": "maybe"})
+        self.assertIsNone(row)
+        self.assertTrue(any("強さ" in p.message for p in problems))
+        row, problems = check_rule({**self.LIMIT, "check_spec": "上限 月 2 回"})
+        self.assertIsNone(row)
+        row, problems = check_rule({**self.LIMIT, "rule_id": ""})
+        self.assertIsNone(row)
+        row, problems = check_rule({**self.LIMIT, "period_start": "2026-12-01", "period_end": "2026-10-01"})
+        self.assertIsNone(row)
+
+    def test_period_one_side(self) -> None:
+        row, _ = check_rule({**self.LIMIT, "period_start": "2026-11-01"})
+        self.assertEqual((row["period_start"], row["period_end"]), ("2026-11-01", "2026-11-01"))
+
+    def test_export_round_trip(self) -> None:
+        parsed = parse_rules(RULES_MD).rows
+        md = rules_markdown(parsed, "表現の決まり")
+        again = parse_rules(md)
+        self.assertEqual(again.problems, [])
+        keys = ("rule_id", "title", "applies_to", "strength", "market", "channel", "period_start", "period_end", "check_spec", "body")
+        self.assertEqual([{k: r[k] for k in keys} for r in again.rows], [{k: r[k] for k in keys} for r in parsed])
+        self.assertIn("## R-LIMIT-001 同じ商品は週 2 回まで", rule_markdown(self.LIMIT))
+
+    def test_history_json(self) -> None:
+        self.assertEqual(history_json(None), "")
+        self.assertIn('"rule_id": "R-1"', history_json({"rule_id": "R-1", "title": "t"}))
 
 
 if __name__ == "__main__":

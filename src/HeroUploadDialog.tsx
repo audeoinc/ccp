@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Slider, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Slider, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
+import { AutoTextarea } from './AutoTextarea'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload, type HeroDraft } from './data/heroUpload'
 import { heroImage } from './images'
@@ -298,10 +299,10 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
                   </Field>
                 </div>
                 <Field label={t('タグ(テーマ・色・写っているもの)', 'Tags (theme, colors, subjects)')} size="small">
-                  <Input size="small" value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
+                  <AutoTextarea size="small" rows={2} value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
                 </Field>
                 <Field label={t('説明', 'Description')} size="small">
-                  <Textarea size="small" value={form.description} onChange={(_, d) => set('description')(d.value)} />
+                  <AutoTextarea size="small" rows={4} value={form.description} onChange={(_, d) => set('description')(d.value)} />
                 </Field>
                 {editing ? (
                   <div className={s.two}>

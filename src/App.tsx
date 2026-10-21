@@ -1580,7 +1580,7 @@ function App() {
               <MenuDivider />
               {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}
               <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
-                {t('方針・決まり(取り込み・一覧)', 'Marketing policies (import, list)')}
+                {t('方針・決まり(取り込み・一覧・直す)', 'Marketing policies (import, list, edit)')}
               </MenuItem>
               <MenuDivider />
               <MenuGroup>

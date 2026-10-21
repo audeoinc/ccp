@@ -61,6 +61,7 @@ export const tables: Record<string, Row[]> = {
   LearningReviewsService: [],
   // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)
   PolicyRulesService: [],
+  PolicyRuleEditsService: [],
   SalesPoliciesService: [],
 }
 

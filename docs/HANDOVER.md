@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X59 画像のライブラリの仕上げ。6.51。その前は制作のページを AB テストの案ごとに。6.50)
+- 最終更新: 2026-10-21(X61 マーケティングの決まりを画面で直す。6.52。その前は X59 画像のライブラリの仕上げ。6.51)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -664,6 +664,13 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
 - AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
 - 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)→ 6.50。
+
+## 6.52 X61 マーケティングの決まりを画面で直す(2026-10-21、UI セッション)
+
+- 利用者の指示「確認している間に X61 を」。取り込みのファイルとの関係は、私が決めて報告した: 画面で足した決まりは `source_file = 画面で作成`(取り込み直しても消えない。`画面で作成` という名前のファイルは取り込みで断る)、取り込んだ決まりを画面で直すと同じファイルの取り込みで戻る(`/preview` が `edited_on_screen` で番号を返し、画面が知らせる)、「Markdown に書き出す」で元のファイルを直す。
+- サーバー: `server/ccp/policies.py` の `/api/policies/rules`(POST・PUT・DELETE、GET `/rules/export`)。確かめは `rule_markdown` で 1 件の Markdown にして `parse_rules` に通す(取り込みと同じ確かめ。書き出したものは取り込み直せる = テストで往復を確かめた)。`policy_rules` に edited_at・edited_by、表 `policy_rule_edits`(前後の中身の JSON・人・置き場所)。直した人は画面の `x-ccp-actor`。
+- 画面: `src/data/policyEdit.ts`(窓口。モックは `src/mock/policyEdit.ts`)、`src/RuleEditDialog.tsx`(確かめ方は種類と値に分けて入れる)、`src/ruleTemplates.ts`(週の上限のひな形)、`PolicyManager.tsx`(足す・週の上限の決まりを足す・直す・消す・書き出す・「直した記録」のタブ)。保存のあとは `onImported` で App が決まりを読み直すので、週の上限(`weeklyLimit.ts`)と AI に渡す決まりにすぐ効く。
+- 同じときに、X59 の説明・タグの入力欄を、中身に合わせて下に伸びる `AutoTextarea` にした(利用者の指摘: 狭い)。決まりの本文も同じ。
 
 ## 6.51 X59 画像のライブラリの仕上げ(③〜⑥。2026-10-21、UI セッション)
 

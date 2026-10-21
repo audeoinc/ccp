@@ -3,6 +3,11 @@
   POST /api/policies/preview  {kind: "rules" | "sales", filename, content}
                               ファイルを読み分けた結果(件数・読めなかった行と理由)を返す。何も変えない
   POST /api/policies/import   同じ入力。読めたものを保存する
+  POST /api/policies/rules            画面で決まりを足す(X61。置き場所は「画面で作成」。取り込み直しても消えない)
+  PUT  /api/policies/rules/{id}       決まりを直す(取り込んだ決まりも直せる。同じファイルを取り込み直すと、ファイルの内容に戻る)
+  DELETE /api/policies/rules/{id}     決まりを消す
+  GET  /api/policies/rules/export     いまの決まりを、取り込める Markdown にする(?source_file= でファイルごと)
+  画面で足す・直す・消すと、表 policy_rule_edits に前後の中身を残す。確かめは、取り込みと同じ読み分け(rule_markdown → parse_rules)
                               rules(ルール系の Markdown): 同じファイル名の決まりを、まるごと置き換える(版 = ファイル名 + 取り込んだ日時)
                               sales(販売系の CSV):       ファイルに入っている週 × 市場の行を置き換える(ファイルにない週は残す)
 
@@ -13,15 +18,18 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from . import schema as sc
 from .data_api import db, require_db
 
 router = APIRouter(prefix="/api/policies", dependencies=[Depends(require_db)])
@@ -288,6 +296,13 @@ async def preview(file: PolicyFile) -> dict[str, Any]:
         p = parse(file.kind, file.content)
     except ValueError as e:
         return {"success": False, "error": {"message": str(e)}}
+    if p.kind == "rules":
+        if file.filename == SCREEN_FILE:
+            return {"success": False, "error": {"message": f"「{SCREEN_FILE}」は画面で足した決まりの置き場所です。別のファイル名にしてください"}}
+        # 画面で直した決まり(このファイルから取り込んだもの)は、取り込むとファイルの内容に戻る
+        async with db() as conn:
+            edited = (await conn.execute(text("SELECT rule_id FROM policy_rules WHERE source_file = :f AND edited_at IS NOT NULL ORDER BY sort_order"), {"f": file.filename})).scalars().all()
+        return {"success": True, "data": {**_summary(p, file.filename), "edited_on_screen": list(edited)}}
     return {"success": True, "data": _summary(p, file.filename)}
 
 
@@ -329,7 +344,161 @@ async def import_file(file: PolicyFile) -> dict[str, Any]:
         p = parse(file.kind, file.content)
     except ValueError as e:
         return {"success": False, "error": {"message": str(e)}}
+    if p.kind == "rules" and file.filename == SCREEN_FILE:
+        # 画面で足した決まりの置き場所は、取り込みで置き換えない
+        return {"success": False, "error": {"message": f"「{SCREEN_FILE}」は画面で足した決まりの置き場所です。別のファイル名にしてください"}}
     if not p.rows:
         return {"success": False, "error": {"message": "読めた決まり・行がありません(中身を確かめてください)"}, "data": _summary(p, file.filename)}
     result = await save(p, file.filename)
     return {"success": True, "data": {**_summary(p, file.filename), **result}}
+
+
+# ---- 画面で直す(X61)
+# 画面で足した決まりの置き場所(ファイル名の代わり)。ファイルを取り込み直しても、ここは置き換わらない
+SCREEN_FILE = "画面で作成"
+# 書き出しのときの項目の名前(読み分けの ITEM_KEYS の日本語)
+_ITEM_LABELS = (("applies_to", "対象"), ("strength", "強さ"), ("market", "市場"), ("channel", "チャネル"))
+
+
+def rule_markdown(r: dict[str, Any]) -> str:
+    """決まり 1 件を、取り込みのファイルと同じ Markdown にする(画面で直したものを、同じ読み分けで確かめる・書き出すため)"""
+    head = f"## {str(r.get('rule_id') or '').strip()} {str(r.get('title') or '').strip()}".rstrip()
+    lines = [head]
+    for key, label in _ITEM_LABELS:
+        v = str(r.get(key) or "").strip()
+        if v:
+            lines.append(f"- {label}: {', '.join(_split_list(v))}")
+    ps, pe = str(r.get("period_start") or "")[:10], str(r.get("period_end") or "")[:10]
+    if ps or pe:
+        lines.append(f"- 期間: {ps or pe} - {pe or ps}")
+    if str(r.get("check_spec") or "").strip():
+        lines.append(f"- 確かめ方: {str(r['check_spec']).strip()}")
+    body = str(r.get("body") or "").strip()
+    return "\n".join(lines) + ("\n\n" + body if body else "") + "\n"
+
+
+def rules_markdown(rows: list[dict[str, Any]], title: str) -> str:
+    """決まりの一覧を、取り込めるファイルの形(POLICY_FORMAT.md の 3 章)にする"""
+    today = datetime.now(timezone.utc).date().isoformat()
+    head = f"# {title}\n- 版: {today}(CCP から書き出し)\n"
+    return head + "\n" + "\n".join(rule_markdown(r) for r in rows)
+
+
+def check_rule(fields: dict[str, Any]) -> tuple[dict[str, Any] | None, list[Problem]]:
+    """画面で入れた決まりを、取り込みと同じ読み分けで確かめる。読めれば保存する形の行を返す"""
+    if not str(fields.get("rule_id") or "").strip():
+        return None, [Problem(0, "決まりの番号を入れてください(例: R-LIMIT-001)")]
+    if not str(fields.get("title") or "").strip():
+        return None, [Problem(0, "題名を入れてください")]
+    p = parse_rules(rule_markdown(fields))
+    # 行番号は画面では意味がないので 0 に
+    problems = [Problem(0, x.message, x.where) for x in p.problems]
+    return (p.rows[0] if p.rows else None), problems
+
+
+class RuleIn(BaseModel):
+    rule_id: str = ""
+    title: str = ""
+    applies_to: str = ""
+    strength: str = ""
+    market: str = ""
+    channel: str = ""
+    period_start: str | None = None
+    period_end: str | None = None
+    check_spec: str | None = None
+    body: str = ""
+
+
+def _actor(request: Request) -> str:
+    return unquote(request.headers.get("x-ccp-actor", ""))[:100]
+
+
+def _db_values(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "rule_id": row["rule_id"], "title": row["title"], "applies_to": row["applies_to"], "strength": row["strength"],
+        "market": row["market"], "channel": row["channel"],
+        "period_start": date.fromisoformat(row["period_start"]) if row.get("period_start") else None,
+        "period_end": date.fromisoformat(row["period_end"]) if row.get("period_end") else None,
+        "check_spec": row.get("check_spec"), "body": row.get("body") or "",
+    }
+
+
+_HISTORY_KEYS = ("rule_id", "title", "applies_to", "strength", "market", "channel", "period_start", "period_end", "check_spec", "body", "source_file")
+
+
+def history_json(row: Any) -> str:
+    """直した記録に残す、前後の中身(JSON)"""
+    if row is None:
+        return ""
+    return json.dumps({k: (str(row[k]) if row.get(k) is not None else None) for k in _HISTORY_KEYS}, ensure_ascii=False)
+
+
+async def _history(conn: Any, action: str, rule_id: str, before: Any, after: Any, actor: str, source_file: str | None) -> None:
+    await conn.execute(
+        text("INSERT INTO policy_rule_edits (rule_id, action, before_value, after_value, actor, source_file) VALUES (:r, :a, :b, :f, :who, :src)"),
+        {"r": rule_id, "a": action, "b": history_json(before), "f": history_json(after), "who": actor, "src": source_file},
+    )
+
+
+def _invalid(problems: list[Problem]) -> dict[str, Any]:
+    return {"success": False, "error": {"message": " / ".join(p.message for p in problems) or "決まりを読めませんでした"}, "data": {"problems": [asdict(p) for p in problems]}}
+
+
+@router.post("/rules")
+async def create_rule(body: RuleIn, request: Request) -> dict[str, Any]:
+    """画面で決まりを足す(置き場所は「画面で作成」。ファイルを取り込み直しても消えない)"""
+    row, problems = check_rule(body.model_dump())
+    if row is None:
+        return _invalid(problems)
+    actor = _actor(request)
+    async with db(write=True) as conn:
+        if (await conn.execute(text("SELECT 1 FROM policy_rules WHERE rule_id = :r"), {"r": row["rule_id"]})).first():
+            return {"success": False, "error": {"message": f"決まりの番号「{row['rule_id']}」は、もう使われています"}}
+        order = (await conn.execute(text("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM policy_rules WHERE source_file = :f"), {"f": SCREEN_FILE})).scalar() or 0
+        values = {**_db_values(row), "source_file": SCREEN_FILE, "sort_order": order, "edited_at": datetime.now(timezone.utc), "edited_by": actor}
+        cols = list(values)
+        created = (await conn.execute(text(f"INSERT INTO policy_rules ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) RETURNING *"), values)).mappings().first()
+        await _history(conn, "create", row["rule_id"], None, dict(created) if created else values, actor, SCREEN_FILE)
+    return {"success": True, "data": {"problems": [asdict(p) for p in problems]}}
+
+
+@router.put("/rules/{rid}")
+async def update_rule(rid: str, body: RuleIn, request: Request) -> dict[str, Any]:
+    """決まりを直す。取り込んだ決まりを直したときは、同じファイルを取り込み直すと、ファイルの内容に戻る(取り込みの確かめで知らせる)"""
+    row, problems = check_rule(body.model_dump())
+    if row is None:
+        return _invalid(problems)
+    actor = _actor(request)
+    async with db(write=True) as conn:
+        before = (await conn.execute(text("SELECT * FROM policy_rules WHERE id = :id FOR UPDATE"), {"id": sc.coerce("uuid", rid)})).mappings().first()
+        if before is None:
+            return {"success": False, "error": {"message": "決まりが見つかりません(ほかの人が消したか、取り込み直されました)"}}
+        if (await conn.execute(text("SELECT 1 FROM policy_rules WHERE rule_id = :r AND id <> :id"), {"r": row["rule_id"], "id": before["id"]})).first():
+            return {"success": False, "error": {"message": f"決まりの番号「{row['rule_id']}」は、ほかの決まりで使われています"}}
+        values = {**_db_values(row), "edited_at": datetime.now(timezone.utc), "edited_by": actor}
+        sets = ", ".join(f"{c} = :{c}" for c in values)
+        after = (await conn.execute(text(f"UPDATE policy_rules SET {sets}, modified_on = now() WHERE id = :id RETURNING *"), {**values, "id": before["id"]})).mappings().first()
+        await _history(conn, "update", row["rule_id"], dict(before), dict(after) if after else None, actor, before.get("source_file"))
+    return {"success": True, "data": {"problems": [asdict(p) for p in problems]}}
+
+
+@router.delete("/rules/{rid}")
+async def delete_rule(rid: str, request: Request) -> dict[str, Any]:
+    actor = _actor(request)
+    async with db(write=True) as conn:
+        before = (await conn.execute(text("DELETE FROM policy_rules WHERE id = :id RETURNING *"), {"id": sc.coerce("uuid", rid)})).mappings().first()
+        if before is None:
+            return {"success": False, "error": {"message": "決まりが見つかりません"}}
+        await _history(conn, "delete", str(before.get("rule_id") or ""), dict(before), None, actor, before.get("source_file"))
+    return {"success": True, "data": {}}
+
+
+@router.get("/rules/export")
+async def export_rules(source_file: str = "") -> dict[str, Any]:
+    """いまの決まりを、取り込めるファイル(Markdown)にする。source_file を渡せば、そのファイルの分だけ(元のファイルを直すため)"""
+    async with db() as conn:
+        q = "SELECT * FROM policy_rules" + (" WHERE source_file = :f" if source_file else "") + " ORDER BY source_file, sort_order, rule_id"
+        rows = [dict(r) for r in (await conn.execute(text(q), {"f": source_file} if source_file else {})).mappings().all()]
+    title = source_file or "CCP のマーケティングの決まり(すべて)"
+    base = re.sub(r"\.(md|markdown|txt)$", "", source_file or "ccp-rules", flags=re.I)
+    return {"success": True, "data": {"filename": f"{base}.md", "content": rules_markdown(rows, title), "count": len(rows)}}
