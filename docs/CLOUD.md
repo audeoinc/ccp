@@ -21,10 +21,10 @@ CCP の作業を、**クラウドのセッション**(claude.ai/code などで�
 
 1. **ブランチで作業する。** `main` に直接 push しない。ブランチの名前は `cloud/<短い説明>`(例: `cloud/flows-c13`、`cloud/features-sync`)。
 2. **確かめてからコミットする。** `npm run verify`(型チェック・lint・ビルド・schema の照合)を通す。画面を変えたら、撮影用のモックで確かめる(3 章)。サーバーを変えたら `server/tests` を通す。
-3. **終わったら、HANDOVER に書いて push する。** [HANDOVER.md](HANDOVER.md) の 6 章の末尾に、次の形で 1 節を足す。ローカルのセッションは、これを読んで取り込む(クラウドからはメッセージを送れないため、git が連絡の手段)。
+3. **終わったら、作業の記録と HANDOVER に書いて push する。** 作業の記録([handover-archive/](handover-archive/README.md) のいちばん新しいファイル)の末尾に、次の形で 1 節を足し、[HANDOVER.md](HANDOVER.md) の「最近の作業」に 1 行(日付・題名・ブランチ)を足す。ローカルのセッションは、これを読んで取り込む(クラウドからはメッセージを送れないため、git が連絡の手段)。
 
    ```
-   ## 6.xx <やったこと>(クラウド、YYYY-MM-DD、ブランチ cloud/xxx)
+   ## YYYY-MM-DD <ID> <やったこと>(クラウド、ブランチ cloud/xxx)
    - やったこと: …(触ったファイル)
    - 確かめたこと: verify / モックで見た画面 / テスト
    - 確かめていないこと: 本番の画面、…
@@ -53,7 +53,7 @@ CCP の作業を、**クラウドのセッション**(claude.ai/code などで�
 - **何を**: 例「FLOWS の C-◯ を作る」「FEATURES を、いまの画面に合わせて直す」
 - **触ってよいファイル**: 例「`src/WeekView.tsx` と docs だけ」(ローカルの作業とぶつからないように)
 - **ブランチの名前**: 例 `cloud/week-view-legend`
-- **終わりの形**: 「verify を通し、モックで撮った画面を `docs/screenshots/` に入れ、HANDOVER に 6.xx を書いて、ブランチを push」
+- **終わりの形**: 「verify を通し、モックで撮った画面を `docs/screenshots/` に入れ、作業の記録に節を足し、HANDOVER に 1 行を書いて、ブランチを push」
 
 ## 6. 最初に任せる候補(2026-10-17 時点)
 

@@ -72,6 +72,6 @@ GitHub Actions(`.github/workflows/ci.yml`)が、`main` への push とプルリ�
 - [docs/WORKBENCH.md](docs/WORKBENCH.md) — Vertex AI Workbench で動かす手順
 - [docs/PRINCIPLES.md](docs/PRINCIPLES.md) — デザインの方針(UI/UX ポリシー)
 - [docs/FLOWS.md](docs/FLOWS.md) — 業務の流れと前提運用(段階ごとの画面の入り口・移り方・前提の決まりと、今の運用との照らし合わせ)。記入用のシートは [docs/FLOWS_SHEET.md](docs/FLOWS_SHEET.md)
-- [docs/BACKLOG.md](docs/BACKLOG.md) — 機能のバックログと、状況メモ
-- [docs/HANDOVER.md](docs/HANDOVER.md) — 開発の現在地と、次にやること
+- [docs/BACKLOG.md](docs/BACKLOG.md) — 機能のバックログ(まだ済んでいない項目)。済んだ項目は [docs/backlog-archive/](docs/backlog-archive/DONE.md)
+- [docs/HANDOVER.md](docs/HANDOVER.md) — 開発の現在地と、次にやること(要約)。詳しい作業の記録・設計の判断は [docs/handover-archive/](docs/handover-archive/README.md)
 - [CLAUDE.md](CLAUDE.md) — AI コーディングアシスタント(Claude Code など)向けの指示書

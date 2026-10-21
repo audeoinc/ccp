@@ -35,6 +35,8 @@ const RULES = [
   ['exclude', /^(README|CLAUDE)\.md$/],
   // UPDATE.md(利用先の Git への入れ方)は ZIP に入れない(利用者の指示 2026-10-20。手順は別に渡す)
   ['exclude', /^docs\/(GCP|HANDOVER|CLOUD|ONBOARDING|RELEASE|UPDATE)\.md$/],
+  // HANDOVER の作業の記録(開発元の本番の話を含む)。BACKLOG の済んだ項目(docs/backlog-archive/)は、BACKLOG と同じく入れる
+  ['exclude', /^docs\/handover-archive\//],
   ['exclude', /^docs\/font-compare\.html$/],
   ['exclude', /^release\//],
   // 撮影用(手元の Edge を使う開発の道具)
