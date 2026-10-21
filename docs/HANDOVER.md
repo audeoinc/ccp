@@ -616,7 +616,8 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - ファイルの置き場所: `server/ccp/creative.py`(`POST /api/creative/files?name=` に本文でファイルを送る。multipart は依存が増えるので使わない。`GET`・`DELETE /api/creative/files/{stored}`)。ASSET_DIR があればそのフォルダの `creative/`(Workbench)、なければバケットの `creative/`(本番。Cloud Run の実行アカウントはプロジェクトの編集者なので書ける)、どちらもなければ `server/images/creative`(手元の開発)。SVG は、中に処理を書けるので受け付けない。
 - 画面: `src/CreativeAssets.tsx`(一覧・追加・素材のフロート)。窓口は `src/data/cardAssets.ts`(表)と `src/data/creativeFiles.ts`(ファイル。撮影用は `src/mock/creativeFiles.ts` がブラウザの中だけに置く)。決まりは `src/creativeConst.ts`(サーバーと同じ値)。`CommentsPanel` に `assetId`(その素材のスレッドだけ。段階によらず出す)・`assets`(札の名前)・`compact`。配信カードは `ProcessPane` のタブ「素材」、制作のページは右のペインのタブ「素材」。
 - 確かめたこと: サーバーのテスト(`server/tests/test_creative.py`)。モックで、画像の追加・URL の追加・素材のフロート・素材へのコメント。本番の GCS への書き込みは、反映のあとに確かめる。
-- 残り(BACKLOG X58): パック(素材とファイル・足すだけの取り込み・見本)、制作した HTML の貼り付けと並べて比べる、仕上がりを見るフロート。
+- **段階 2 パック(2026-10-21)**: 書き出し(`pack.py` の `export_pack`)に、`card_assets` の `stored` のファイルを `images/creative/<名前>` で入れる(取り込み先のフォルダの `creative/` が、そのまま置き場所)。取り込みに「足すだけ」: `pack.add_tables`(テーブルごとに、いまある id を読み、ない行だけを `INSERT … ON CONFLICT DO NOTHING`。1 行ずつ SAVEPOINT で試し、参照先がないなどで失敗した行は数えて進める)、`cli.import_pack(..., add=True)`(すでにあるファイルは置き換えない)、`scripts/workbench.sh import --add <ZIP>`。手順は WORKBENCH.md の 3.7。テストは `server/tests/test_pack_add.py`(偽の接続で)。本物の PostgreSQL での確かめは、まだ(手元に DB がないため。Workbench か本番の写しで試す)。
+- 残り(BACKLOG X58): 制作した HTML の貼り付けと並べて比べる、仕上がりを見るフロート。
 
 ## 7. 落とし穴
 

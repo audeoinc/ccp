@@ -4,10 +4,16 @@
   書き出し: 画面の ⚙ →「データと画像を書き出す」(GET /api/export)。ブラウザで ZIP をダウンロードする
   取り込み: python -m ccp.cli import-pack <ZIP> --yes(DB の中身を置き換え、画像をフォルダに展開する)
 
+取り込みには 2 つある:
+  置き換え(既定)   DB の中身を、パックの内容に置き換える(いまの中身は消える)
+  足すだけ(--add)  まだない行(id で見る)だけを足す。すでにある行は、中身が違っても変えない。消さない。
+                    画像・素材のファイルも、まだないものだけを置く(Workbench で作業した内容を残したまま、本番で作った見本などを持ち込むため。X58)
+
 ZIP の中身:
   data.json                 {"version": 2, "exportedAt": ..., "tables": {テーブル名: [行, ...]}}
                             (版 1 は、2026-10-16 より前の形。以前の名前(cr854_…)と選択肢の数。取り込むときに、いまの形に直す)
   images/<種類>/<ファイル名>  商品(products)・ヒーロー画像(heroes)の画像。DB の画像 URL(/img/<種類>/<名前>)のもの
+  images/creative/<名前>    素材(Creative Assets。表 card_assets)のファイル(ccp/creative.py。取り込み先のフォルダの creative/ が、そのまま置き場所になる)
 """
 from __future__ import annotations
 
@@ -24,7 +30,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from sqlalchemy import text
 
-from . import assets, schema as sc
+from . import assets, creative, schema as sc
 from .data_api import db, require_db
 
 PACK_VERSION = 2
@@ -67,6 +73,15 @@ async def export_pack() -> Response:
         return kind, name, found[0] if found else None
 
     images = await asyncio.gather(*(load(k, n) for k, n in refs))
+
+    # 素材(Creative Assets)のファイル
+    async def load_creative(stored: str) -> tuple[str, str, bytes | None]:
+        async with sem:
+            data = await asyncio.to_thread(creative.load, stored)
+        return creative.KIND, stored, data
+
+    stored = sorted({str(r["stored"]) for r in tables.get("card_assets", []) if r.get("stored") and creative.STORED.match(str(r["stored"]))})
+    images = [*images, *await asyncio.gather(*(load_creative(n) for n in stored))]
     now = datetime.now(timezone.utc)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -116,3 +131,43 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
                 cols = list(values)
                 await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"), values)
             print(f"{t.pg}: {len(rows)} 件")
+
+
+async def add_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, tuple[int, int, int]]:
+    """パックの行のうち、まだない行(id で見る)だけを足す。すでにある行は変えず、消さない(X58)。
+    参照先がない・ほかの一意の決まりに当たる行は、その行だけ足さずに進める(1 行ずつ SAVEPOINT で試す)。
+    返すのは、テーブルごとの(足した・すでにあった・足せなかった)の数"""
+    from .db import get_engine
+
+    schema = sc.load()
+    engine = await get_engine()
+    out: dict[str, tuple[int, int, int]] = {}
+    async with engine.begin() as conn:
+        for t in schema.creation_order():
+            rows = tables.get(t.name, [])
+            if not rows:
+                continue
+            have = {str(r[0]) for r in (await conn.execute(text(f"SELECT id FROM {t.pg}"))).all()}
+            added = skipped = failed = 0
+            for rec in rows:
+                if str(rec["id"]) in have:
+                    skipped += 1
+                    continue
+                values = t.to_db(rec)
+                values["id"] = sc.coerce("uuid", rec["id"])
+                for dv, pg in (("created_on", "created_on"), ("modified_on", "modified_on")):
+                    if rec.get(dv):
+                        values[pg] = sc.coerce("timestamptz", rec[dv])
+                cols = list(values)
+                try:
+                    async with conn.begin_nested():
+                        r = await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) ON CONFLICT DO NOTHING"), values)
+                    if r.rowcount:
+                        added += 1
+                    else:
+                        skipped += 1
+                except Exception:  # noqa: BLE001 — 参照先がない行などは、その行だけ足さない
+                    failed += 1
+            out[t.pg] = (added, skipped, failed)
+            print(f"{t.pg}: 足した {added} 件 / すでにあった {skipped} 件" + (f" / 足せなかった {failed} 件(参照先がない など)" if failed else ""))
+    return out

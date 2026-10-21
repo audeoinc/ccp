@@ -130,6 +130,7 @@ CCP_PASSWORD=<APP_PASSWORD> node scripts/gcp-smoke.mjs
    .venv/bin/python -m ccp.cli import-pack ccp-pack-<日時>.zip --yes    # DB の中身を置き換え、画像を server/images に展開
    ```
    DB の中身は、**すべて置き換わる**(Workbench で入力したデータは消える)。作った日時・変えた日時は、元のまま残る。
+   Workbench の中身を残したまま、まだない行・ファイルだけを足すときは `--add` を付ける(WORKBENCH.md の 3.7)。
 4. **画像をフォルダから配る設定で、サーバーを起動する**:
    ```bash
    ASSET_DIR=$PWD/images .venv/bin/python -m uvicorn ccp.main:app --port 8082

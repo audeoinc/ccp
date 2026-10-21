@@ -268,20 +268,27 @@ cmd_update() {
 }
 
 cmd_import() {
+  # --add: 足すだけ(まだない行・ファイルだけを足す。いまの中身は変えない・消さない。X58)
+  local add=""
+  if [ "${1:-}" = "--add" ]; then add="--add"; shift; fi
   local zip="${1:-}"
-  [ -n "$zip" ] || die "取り込むパック(ZIP)を指定してください。例: scripts/workbench.sh import server/ccp-pack-20261015-0938.zip"
+  [ -n "$zip" ] || die "取り込むパック(ZIP)を指定してください。例: scripts/workbench.sh import server/ccp-pack-20261015-0938.zip(足すだけなら import --add <ZIP>)"
   [ -f "$zip" ] || die "ファイルが見つかりません: $zip"
   need_venv
   load_env
   zip="$(cd "$(dirname "$zip")" && pwd)/$(basename "$zip")"
   say "パックの中身"
-  (cd "$SERVER" && "$PY" -m ccp.cli import-pack "$zip")
-  printf '\nこの環境の DB の中身を、このパックの内容に置き換えます(いまの中身は消えます)。よろしいですか? [y/N] '
+  (cd "$SERVER" && "$PY" -m ccp.cli import-pack "$zip" $add)
+  if [ -n "$add" ]; then
+    printf '\nこのパックから、この環境にまだない行・ファイルだけを足します(いまの中身は変えません)。よろしいですか? [y/N] '
+  else
+    printf '\nこの環境の DB の中身を、このパックの内容に置き換えます(いまの中身は消えます)。よろしいですか? [y/N] '
+  fi
   read -r ans
   [ "$ans" = "y" ] || [ "$ans" = "Y" ] || { echo "やめました(何も変えていません)"; return 0; }
   # 写真は、ASSET_DIR(設定があれば)か、server/images に展開する(サーバーは、そこから配る)
   local images="${ASSET_DIR:-$SERVER/images}"
-  (cd "$SERVER" && "$PY" -m ccp.cli import-pack "$zip" --yes --images "$images")
+  (cd "$SERVER" && "$PY" -m ccp.cli import-pack "$zip" --yes --images "$images" $add)
   export ASSET_DIR="$images"
   cmd_stop
   cmd_start
@@ -300,7 +307,7 @@ case "${1:-}" in
   status) cmd_status ;;
   pg-start) cmd_pg_start ;;
   check) cmd_check ;;
-  import) cmd_import "${2:-}" ;;
+  import) shift; cmd_import "$@" ;;
   log) cmd_log "$@" ;;
   *)
     sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'

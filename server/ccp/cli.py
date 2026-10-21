@@ -4,9 +4,10 @@
   python -m ccp.cli seed [--reset]   初期データ(server/seed.json)を入れる。--reset は、中身を消してから
   python -m ccp.cli counts           各テーブルの件数
   python -m ccp.cli check            動かす前の確認(設定・DB への接続・写真・画面のビルド。パスワードは出さない。何も変えない)
-  python -m ccp.cli import-pack <ZIP> [--images <フォルダ>] [--yes]
+  python -m ccp.cli import-pack <ZIP> [--images <フォルダ>] [--add] [--yes]
                                      引っ越し用のパック(画面の ⚙ →「データと画像を書き出す」)を取り込む。
                                      DB の中身をパックの内容に置き換え、画像をフォルダ(既定: server/images)に展開する。
+                                     --add は「足すだけ」: まだない行・ファイルだけを足し、いまの中身は変えない・消さない。
                                      --yes がなければ、件数を見せるだけで、何も変えない
   python -m ccp.cli import-metrics <CSV> [--yes]
                                      商品・カテゴリの週の指標の CSV(docs/METRICS_FORMAT.md)を取り込む。ファイルにある週 × 市場の行を置き換える。
@@ -94,8 +95,8 @@ async def import_metrics(path: Path, yes: bool) -> None:
     print(f"取り込みました(置き換えた行 {result['replaced']}、入れた行 {result['saved']})")
 
 
-async def import_pack(path: Path, images: Path, yes: bool) -> None:
-    from .pack import read_pack, replace_tables
+async def import_pack(path: Path, images: Path, yes: bool, add: bool = False) -> None:
+    from .pack import add_tables, read_pack, replace_tables
 
     data, files = read_pack(path)
     tables = data.get("tables", {})
@@ -107,16 +108,28 @@ async def import_pack(path: Path, images: Path, yes: bool) -> None:
         print(f"  (書き出した環境で見つからなかった画像: {len(data['missingImages'])} 点)")
     if not yes:
         print()
-        print("確認だけです。DB の中身を、このパックの内容に置き換えるときは --yes を付けて実行してください(いまの中身は消えます)")
+        if add:
+            print("確認だけです。まだない行・ファイルだけを足すときは --yes を付けて実行してください(いまの中身は変えません)")
+        else:
+            print("確認だけです。DB の中身を、このパックの内容に置き換えるときは --yes を付けて実行してください(いまの中身は消えます)")
         return
+    written = 0
     for name, content in files:
         dest = images / Path(name).relative_to("images")
+        # 足すだけのときは、すでにあるファイルは置き換えない
+        if add and dest.exists():
+            continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(content)
-    print(f"画像を {images} に展開しました")
+        written += 1
+    print(f"画像・素材のファイルを {images} に {written} 点置きました")
     # テーブルがまだない・列が足りない環境でも取り込めるよう、先にテーブルを作る(何度実行してもよい)
     await migrate()
-    await replace_tables(tables)
+    if add:
+        await add_tables(tables)
+        print("足しました(すでにあった行・ファイルは、そのままです)")
+    else:
+        await replace_tables(tables)
     print()
     print(f"取り込みました。サーバーは、環境変数 ASSET_DIR={images} を付けて起動してください(画像をこのフォルダから配る)")
 
@@ -134,6 +147,7 @@ def main() -> None:
     ip.add_argument("path", type=Path)
     ip.add_argument("--images", type=Path, default=DEFAULT_IMAGES)
     ip.add_argument("--yes", action="store_true")
+    ip.add_argument("--add", action="store_true")
     im = sub.add_parser("import-metrics")
     im.add_argument("path", type=Path)
     im.add_argument("--yes", action="store_true")
@@ -170,7 +184,7 @@ def main() -> None:
     elif args.cmd == "import-metrics":
         asyncio.run(import_metrics(args.path, args.yes))
     elif args.cmd == "import-pack":
-        asyncio.run(import_pack(args.path, args.images, args.yes))
+        asyncio.run(import_pack(args.path, args.images, args.yes, args.add))
     else:
         asyncio.run(counts())
 

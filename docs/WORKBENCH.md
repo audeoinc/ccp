@@ -65,6 +65,7 @@ scripts/workbench.sh start     # サーバーを起動(ターミナルを閉じ�
 |---|---|
 | **コードを最新にして、起動し直す**(新しい版が入ったとき。いちばんよく使う) | `scripts/workbench.sh update` |
 | 本番のデータと写真を取り込む(中身を見せて、確認してから。DB は置き換わる) | `scripts/workbench.sh import server/ccp-pack-<日時>.zip` |
+| 本番で作ったものを**足すだけ**(Workbench の中身は変えない・消さない。まだない行・ファイルだけを足す) | `scripts/workbench.sh import --add server/ccp-pack-<日時>.zip` |
 | 起動 / 停止 / 起動し直し | `scripts/workbench.sh start` / `stop` / `restart` |
 | 動いているか(サーバー・PostgreSQL・コードの版) | `scripts/workbench.sh status` |
 | PostgreSQL だけを起動する(Workbench の中の PostgreSQL。`start`・`update`・`restart` でも、止まっていれば自動で起動する) | `scripts/workbench.sh pg-start` |
@@ -252,6 +253,20 @@ set -a; source workbench.env; set +a
 
 > **`images` のフォルダは、作らなくてよい:** `--yes` を付けた取り込みのときに、`server/images/products/` と `server/images/heroes/` が自動で作られ、写真が入ります(すでにあれば、上書きします)。`--yes` なしの「確認だけ」のときは、何も作りません。
 > 別の場所に展開したいときは、`--images <フォルダ>` を付けます(そのときは `ASSET_DIR` も同じフォルダにする)。
+
+**Workbench の中身を残したまま、本番で作ったものだけを足すとき(足すだけの取り込み)**: `--add` を付けます。
+
+```bash
+# 確認だけ(何も変えない)
+.venv/bin/python -m ccp.cli import-pack ccp-pack-<日時>.zip --add
+# 足す
+.venv/bin/python -m ccp.cli import-pack ccp-pack-<日時>.zip --add --yes
+```
+
+- Workbench に**まだない行**(配信・素材・やり取りなど。行の ID で見ます)だけを足します。すでにある行は、中身が違っても**変えません**。消すこともしません。
+- 写真・素材のファイルも、まだないものだけを置きます(すでにあるファイルは上書きしません)。
+- 参照先がない行(例: Workbench にない商品へのやり取り)は、その行だけ足さずに進め、数を出します。
+- 本番で作った見本(素材など)を、Workbench で作業した内容を消さずに持ち込むときに使います。
 
 ### 3.8 サーバーを起動する
 
