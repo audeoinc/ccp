@@ -32,5 +32,7 @@ jobs:
           python-version: '3.12'
       - name: Server dependencies
         run: pip install -r server/requirements.txt -r server/requirements-hosted.txt
+      # server の中で流す(テストの多くは ccp を、server を起点に読み込む。HANDOVER の「動かし方」と同じ流し方)
       - name: Server tests
-        run: python -m unittest discover server/tests
+        working-directory: server
+        run: python -m unittest discover -s tests
