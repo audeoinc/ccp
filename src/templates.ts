@@ -7,6 +7,7 @@ import type { DeliveryCardEmailTemplate } from './models/deliveryCards'
 
 import { useSyncExternalStore } from 'react'
 import { tr } from './i18n'
+import { cellRows, type Cell } from './cells'
 
 /** 標準のテンプレートは 'free' | 'standard4' | 'collab' | 'offer' | 'cat2' | 'cat3'。ユーザーが作ったものは、行の ID */
 export type EmailTemplateId = string
@@ -19,10 +20,11 @@ export type HeroText = 'band' | 'overlay' | 'below'
 /**
  * セクション(商品を並べる部品)の種類。
  * grid: 名前・価格つきのグリッド / photos: 写真だけのタイル / wide: 全幅で大きく 1 点ずつ /
- * mosaic: 大きい 1 点 + 小さい 2 点(3 点で 1 組) / story: 写真と文を左右交互に / feature: 写真の横に説明を置く特集枠
+ * mosaic: 大きい 1 点 + 小さい 2 点(3 点で 1 組) / story: 写真と文を左右交互に / feature: 写真の横に説明を置く特集枠 /
+ * cells: マス目(列の数と、枠の置き方を自由に決める。いくつかのマスを 1 つの枠にまとめられる。枠の形は cells.ts)
  */
-export type SectionKind = 'grid' | 'photos' | 'wide' | 'mosaic' | 'story' | 'feature'
-export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic', 'story', 'feature']
+export type SectionKind = 'grid' | 'photos' | 'wide' | 'mosaic' | 'story' | 'feature' | 'cells'
+export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic', 'story', 'feature', 'cells']
 
 export interface Section {
   kind: SectionKind
@@ -31,6 +33,10 @@ export interface Section {
   columns?: 2 | 3
   /** mosaic: 大きい枠を右に置く */
   flip?: boolean
+  /** cells: マス目の列の数(1〜4) */
+  cols?: number
+  /** cells: 枠の並び(上の行から、同じ行は左から。商品の載る順)。枠の数 slots は、この数と同じ */
+  cells?: Cell[]
   /** true のとき、セクションに見出しを付ける(AI が文言を作る。名前は、以前のデータとの互換のため) */
   categoryHeading?: boolean
   /** false のとき、セクションのコピーを置かない(省略は置く。以前のテンプレートは、すべてコピーあり) */
@@ -130,6 +136,8 @@ export function sectionKindLabel(sec: Section): string {
       return tr('ストーリー(写真 + 文)', 'Story (photo + text)')
     case 'feature':
       return tr('特集', 'Feature')
+    case 'cells':
+      return tr(`マス目(${sec.cols ?? 2} 列 × ${cellRows(sec.cells ?? [])} 行)`, `Grid cells (${sec.cols ?? 2} × ${cellRows(sec.cells ?? [])})`)
     default:
       return tr(`グリッド(${gridColumns(sec)}列)`, `Grid (${gridColumns(sec)} col)`)
   }
@@ -618,6 +626,7 @@ export function sectionsOf(id: EmailTemplateId): SectionInfo[] {
     mosaic: () => tr('モザイク', 'Mosaic'),
     story: () => tr('ストーリー', 'Story'),
     feature: () => tr('特集', 'Feature'),
+    cells: () => tr('マス目', 'Cells'),
   }
   return tpl.sections.map((sec, i) => {
     const start = tpl.sections.slice(0, i).reduce((n, s) => n + s.slots, 0)

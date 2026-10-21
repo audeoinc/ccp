@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode 
 import { makeStyles, mergeClasses, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
+import { cellRows } from './cells'
 
 // 見取り図は、受信側のメールの見た目を写したものなので、テーマに依らず固定の配色にする
 const HERO_COLOR: Record<HeroKind, string> = { standard: '#cfd2dc', collab: '#b9a9d6', offer: '#f0a5a0' }
@@ -151,6 +152,19 @@ function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }:
           </div>
         ))
         break
+      case 'cells': {
+        // マス目: 1 マスは正方形。まとめた枠(2 マス以上)は写真の色、1 マスは薄い色
+        const cols = sec.cols ?? 2
+        const rows = Math.max(1, cellRows(sec.cells ?? []))
+        body = (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: px(2), aspectRatio: `${cols} / ${rows}` }}>
+            {(sec.cells ?? []).map((x, j) => (
+              <div key={j} style={{ background: x.w * x.h > 1 ? IMG : TILE, gridColumn: `${x.c + 1} / span ${x.w}`, gridRow: `${x.r + 1} / span ${x.h}` }} />
+            ))}
+          </div>
+        )
+        break
+      }
       case 'mosaic': {
         // 3 点で 1 組。大きい 1 点が、縦 2 行分を使う
         const groups = Array.from({ length: Math.ceil(sec.slots / 3) }, (_, g) => g)
