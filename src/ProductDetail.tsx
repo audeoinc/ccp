@@ -10,6 +10,7 @@ import { productMarket } from './market'
 import { MiniChart } from './MiniChart'
 import { useProductData } from './useProductData'
 import { ProductMetrics } from './ProductMetrics'
+import { ProductSkus } from './ProductSkus'
 
 /** 在庫が少ないとみなす数(AI の商品選定の基準と同じ) */
 const LOW_STOCK = 50
@@ -35,7 +36,7 @@ const useStyles = makeStyles({
   center: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
 })
 
-type TabId = 'trend' | 'metrics' | 'plan' | 'details'
+type TabId = 'trend' | 'sku' | 'metrics' | 'plan' | 'details'
 
 /** 週の開始日(YYYY-MM-DD)を「M/D」にする */
 const weekLabel = (iso: string) => {
@@ -76,6 +77,8 @@ export function ProductDetail({ product: p, onClose, footer }: { product: Produc
         {/* 基本情報は、売上・在庫のすぐ右(利用者の要望 2026-10-20) */}
         <Tab value="trend">{t('売上・在庫', 'Sales & stock')}</Tab>
         <Tab value="details">{t('基本情報', 'Details')}</Tab>
+        {/* SKU(色 × サイズ)ごとの在庫と欠品率(X63) */}
+        <Tab value="sku">{t('SKU', 'SKUs')}</Tab>
         <Tab value="metrics">{t('指標', 'Metrics')}</Tab>
         <Tab value="plan">{t('販売方針・販促', 'MD plan')}</Tab>
       </TabList>
@@ -135,6 +138,9 @@ export function ProductDetail({ product: p, onClose, footer }: { product: Produc
 
       {/* 商品とカテゴリの週の指標(X48)。読み込みは、タブを開いたときだけ */}
       {tab === 'metrics' && <ProductMetrics product={p} />}
+
+      {/* SKU ごとの在庫(X63)。読み込みは、タブを開いたときだけ */}
+      {tab === 'sku' && <ProductSkus product={p} />}
 
       {tab === 'plan' && !loading && !error && (
         data?.policy ? (

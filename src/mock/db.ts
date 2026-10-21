@@ -4,6 +4,7 @@
 import { mockAgent } from './agent'
 import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, categoryMetrics, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, productMetrics, products, users, weekly, type Row } from './seed'
 import { sampleAds } from './ads'
+import { buildSampleSkus } from '../skuSampleData'
 import { sampleImpact } from '../impact'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { DeliveryResult } from '../data/deliveryResults'
@@ -18,6 +19,16 @@ function impactTables(): Record<string, Row[]> {
 
 // 部品の画像の見本(X59 ③): ボタン・ロゴ・バナー
 const svg = (body: string, w: number, h: number) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`)}`
+// SKU の見本(X63): 商品ごとに色 × サイズ。在庫の合計は商品の在庫と同じ(src/skuSampleData.ts)
+function skuTables(): Record<string, Row[]> {
+  const asOf = new Date().toISOString()
+  const built = (products as Row[]).flatMap((p) => buildSampleSkus(p as Parameters<typeof buildSampleSkus>[0], asOf))
+  return {
+    SkuService: built.map((r, i) => ({ id: guid(`sku:${i}`), ...r.sku })),
+    SkuStockService: built.map((r, i) => ({ id: guid(`sku_stock:${i}`), ...r.stock })),
+  }
+}
+
 const sampleParts = (): Row[] =>
   [
     { name: '黒の「今すぐ見る」ボタン', kind: 'button', market: 'JP', alt_text: '今すぐ見る', tags: '黒, 角丸, 行動の呼びかけ', w: 480, h: 112, body: '<rect x="4" y="4" width="472" height="104" rx="52" fill="#1b1f2a"/><text x="240" y="70" font-family="sans-serif" font-size="40" fill="#fff" text-anchor="middle">今すぐ見る</text>' },
@@ -57,6 +68,7 @@ export const tables: Record<string, Row[]> = {
   AdSpendsService: sampleAds(products),
   ProductMetricsService: structuredClone(productMetrics),
   CategoryMetricsService: structuredClone(categoryMetrics),
+  ...skuTables(),
   // 配信の効果(AI の依頼の記録・ホールドアウトとの比べ)の見本。学びの判定は、人が画面で決めるので空から
   ...impactTables(),
   LearningReviewsService: [],

@@ -91,6 +91,8 @@ import { ProductsView } from './ProductsView'
 import { ImpactView } from './ImpactView'
 import type { VariantKey } from './abTest'
 import { createAbExamples, isAbSeed } from './abSeed'
+import { createSampleSkus } from './skuSample'
+import { clearProductSkusCache } from './useProductSkus'
 import { countAssetExamples, createAssetExamples, removeAssetExamples } from './assetSeed'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { STATE_CANDIDATE } from './items'
@@ -449,6 +451,8 @@ function App() {
   const [bq, setBq] = useState<BqSyncResult | null>(null)
   const [bqBusy, setBqBusy] = useState(false)
   const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
+  // 見本の SKU を作っている間(X63。数千行になることがあるので、終わるまで押せなくする)
+  const [skuBusy, setSkuBusy] = useState(false)
   // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
   const [policyOpen, setPolicyOpen] = useState(false)
   // AI の案が、作り直しても must の決まりを破っていたとき(M5)。案は使えるが、人が確かめる
@@ -1543,6 +1547,28 @@ function App() {
               >
                 {t('素材の見本を消す', 'Delete sample assets')}
               </MenuItem>
+              {/* 見本の SKU(X63)。SKU がまだない商品にだけ、色 × サイズの SKU と在庫を足す。本物の SKU(BigQuery)を取り込んでいる環境では出さない */}
+              {!bq?.configured && (
+                <MenuItem
+                  icon={<BeakerRegular />}
+                  disabled={skuBusy}
+                  onClick={async () => {
+                    if (!window.confirm(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?'))) return
+                    setSkuBusy(true)
+                    try {
+                      const n = await createSampleSkus(products, (done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を作っています(${done} / ${total})`, `Creating sample SKUs (${done} / ${total})`) }))
+                      clearProductSkusCache()
+                      setBqNotice({ intent: 'success', text: n ? tr(`見本の SKU を ${n} 件作りました(商品のフロートの「SKU」のタブで見られます)`, `Created ${n} sample SKUs (see the SKUs tab of a product)`) : tr('どの商品にも SKU があるので、作りませんでした', 'Every product already has SKUs; nothing created') })
+                    } catch (e) {
+                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                    } finally {
+                      setSkuBusy(false)
+                    }
+                  }}
+                >
+                  {skuBusy ? t('見本の SKU を作っています…', 'Creating sample SKUs…') : t('見本の SKU を作る', 'Create sample SKUs')}
+                </MenuItem>
+              )}
               {/* AB テスト・案から選ぶの例の配信を作る(X55・X57。利用者の依頼で、本番にも用意する。新しい配信を足すだけで、今ある配信は触らない) */}
               <MenuItem
                 icon={<BeakerRegular />}
