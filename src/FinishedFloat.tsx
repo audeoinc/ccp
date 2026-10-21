@@ -9,7 +9,7 @@ import type { ProductionRequest } from './models/productionRequests'
 import type { Product } from './models/products'
 
 const useStyles = makeStyles({
-  surface: { width: 'min(1400px, 96vw)', maxWidth: 'none', height: '90vh' },
+  surface: { width: 'min(1400px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(90vh / var(--ui-zoom, 1))' },
   body: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
   titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   grow: { flexGrow: 1, minWidth: 0 },

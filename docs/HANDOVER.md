@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(C3 週の上限を画面で変える。6.46。その前は X59 画像のライブラリ ①。6.45)
+- 最終更新: 2026-10-21(X60 表示の大きさ。6.47。その前は C3 週の上限。6.46)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -645,6 +645,12 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - `src/weeklyLimit.ts`: `setLimitRules`(App の `loadMarketingPolicies` で、`setActiveRules` と一緒に呼ぶ)、`weeklyLimitFor(card)`(当てはまる決まりのうち、いちばん小さい値。なければアラートの条件)、`limitText`。`reviewChecks.ts` の `WEEKLY_PRODUCT_LIMIT` は既定の値として残す。
 - 使うところ: `cardAlerts.overLimitAlerts`(配信ごと)、`reviewChecks.buildChecklist`(商品ごとに、載せた配信の上限のうち厳しいもの。説明に「上限 N」)、`bulkDraft.overusedInWeek`(作る配信の国・チャネル)、`useBulkWorkspace`(案ごと)、`ProductActionFloat`(配信カード)、`ProductsView`・`weekLabels`(配信を区別しないので、アラートの条件の値)。App の `cardAlerts`・`checklist` の useMemo は、上限の値と決まりの変化で作り直す。
 - 確かめたこと: tsc・eslint、esbuild で `weeklyLimitFor` を直接呼び、決まり(US・12 月・3 本)が当てはまるときだけ 3、ほかはアラートの条件の値になること。
+
+## 6.47 X60 表示の大きさ(2026-10-21、UI セッション)
+
+- 右上の「あなた」のメニュー(`MePicker`)に「表示の大きさ」(80 / 90 / 100 / 110%)。`src/uiScale.ts`(localStorage の `ui.scale`。`main.tsx` で最初の描画の前に `applyUiScale`)。html に CSS の zoom と、変数 `--ui-zoom`。
+- **zoom の落とし穴(これから画面を作るとき)**: (1) 中の 100vh・100vw は画面の 80% などになるので、vh / vw は `calc(92vh / var(--ui-zoom, 1))` の形で書く(20 のファイルを直した)。(2) `window.innerWidth`・`innerHeight` は画面の px なので、中の px が要るところは `viewWidth()`・`viewHeight()`。(3) マウスの動き(clientX の差)は画面の px なので、中の px で幅・位置を決めるところは `/ getUiScale()` で割る(Splitter・ResizeHandles・ProductActionFloat・ChatPanel・WeekTimeGrid の 1 時間の高さ)。(4) getBoundingClientRect と clientX は、どちらも画面の px なので、その比(位置の割合)は直さなくてよい。プレビューに重ねる札・番号(ItemAlertOverlay・LinkOverlay・HeatPreview)は、もとから offsetWidth との比で直している。
+- 確かめたこと: モックで 80% にして、月の表示・配信カードが画面いっぱいになること、⚙ のメニューの位置、商品のフロートをつかんで 200px 動かすと 200px 動くこと。
 
 ## 7. 落とし穴
 

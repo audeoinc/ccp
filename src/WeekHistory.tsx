@@ -6,9 +6,9 @@ import { locale, useT } from './i18n'
 import { statusLabel } from './status'
 
 const useStyles = makeStyles({
-  surface: { width: 'min(520px, 94vw)' },
+  surface: { width: 'min(520px, (94vw / var(--ui-zoom, 1)))' },
   // 承認の履歴(新しい順)
-  history: { display: 'grid', rowGap: '8px', maxHeight: '60vh', overflowY: 'auto', fontSize: tokens.fontSizeBase200 },
+  history: { display: 'grid', rowGap: '8px', maxHeight: 'calc(60vh / var(--ui-zoom, 1))', overflowY: 'auto', fontSize: tokens.fontSizeBase200 },
   historyRow: { display: 'grid', rowGap: '1px', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
   historyMeta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   historyText: { color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere' },

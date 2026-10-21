@@ -22,7 +22,7 @@ import { FaceBadge } from './FaceBadge'
 
 const useStyles = makeStyles({
   // 配信カードと同じく、画面いっぱいのフロートで開く
-  surface: { width: 'min(1640px, 96vw)', maxWidth: 'none', maxHeight: '94vh', padding: '16px 20px', overflowY: 'auto' },
+  surface: { width: 'min(1640px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(94vh / var(--ui-zoom, 1))', padding: '16px 20px', overflowY: 'auto' },
   body: { display: 'grid', rowGap: '14px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px' },
   title: { margin: 0, fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },

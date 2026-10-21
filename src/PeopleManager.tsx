@@ -33,7 +33,7 @@ import { UserRole, UserStatus, type User, type UserFields } from './models/users
 import { ApprovalGroupStatus, type ApprovalGroup, type ApprovalGroupFields } from './models/approvalGroups'
 
 const useStyles = makeStyles({
-  surface: { width: 'min(880px, 96vw)', maxWidth: 'none', maxHeight: '90vh', display: 'flex', flexDirection: 'column', rowGap: '12px' },
+  surface: { width: 'min(880px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(90vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', rowGap: '12px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   grow: { flexGrow: 1 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },

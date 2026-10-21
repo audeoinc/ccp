@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { viewHeight } from './uiScale'
 
 /**
  * 中身(メールのプレビュー)を、スクロールせずに全体が見える大きさに縮めて表示する。
@@ -17,7 +18,7 @@ export function FitPreview({ children, width = 600, maxWidth = 380, maxHeight }:
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const limitH = maxHeight ?? Math.round(window.innerHeight * 0.88)
+  const limitH = maxHeight ?? Math.round(viewHeight() * 0.88)
   const scale = height > 0 ? Math.min(maxWidth / width, limitH / height) : maxWidth / width
   return (
     <div style={{ width: width * scale, height: height * scale, overflow: 'hidden', backgroundColor: '#ffffff' }}>

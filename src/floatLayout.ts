@@ -3,6 +3,7 @@
 // 配信カード(CardDetail)は、これより前から同じ動きを自前で持っている。新しいフロートは、これを使う
 import { useState, type CSSProperties, type RefObject } from 'react'
 import { loadPref, savePref } from './settings'
+import { viewHeight, viewWidth } from './uiScale'
 
 export type FloatSize = { w: number; h: number }
 
@@ -12,8 +13,8 @@ export type FloatSize = { w: number; h: number }
  */
 export function useFloatSize(key: string, surfaceRef: RefObject<HTMLElement | null>, min: FloatSize = { w: 900, h: 560 }) {
   const clampSize = (s: FloatSize): FloatSize => ({
-    w: Math.round(Math.min(window.innerWidth, Math.max(min.w, s.w))),
-    h: Math.round(Math.min(window.innerHeight, Math.max(min.h, s.h))),
+    w: Math.round(Math.min(viewWidth(), Math.max(min.w, s.w))),
+    h: Math.round(Math.min(viewHeight(), Math.max(min.h, s.h))),
   })
   const [size, setSize] = useState<FloatSize | null>(() => loadPref<FloatSize | null>(key, null))
   const onResize = (dw: number, dh: number) =>
@@ -34,7 +35,7 @@ export function useFloatSize(key: string, surfaceRef: RefObject<HTMLElement | nu
   }
   // 画面より大きく覚えていても、画面に収める
   const style: CSSProperties | undefined =
-    size && window.innerWidth >= 900 ? (() => { const c = clampSize(size); return { width: `${c.w}px`, height: `${c.h}px`, maxHeight: `${c.h}px` } })() : undefined
+    size && viewWidth() >= 900 ? (() => { const c = clampSize(size); return { width: `${c.w}px`, height: `${c.h}px`, maxHeight: `${c.h}px` } })() : undefined
   return { style, handles: { onResize, onDone, onReset } }
 }
 

@@ -4,6 +4,7 @@ import { ChevronDownRegular, ChevronUpRegular, DeleteRegular, SendRegular } from
 import { AiIcon } from './AiMark'
 import { AutoTextarea } from './AutoTextarea'
 import { useT } from './i18n'
+import { getUiScale, viewHeight } from './uiScale'
 
 export interface ChatMsg {
   role: 'user' | 'assistant'
@@ -27,7 +28,7 @@ const HEIGHT_KEY = 'chat.paneHeight'
 const MIN_H = 140
 const DEFAULT_H = 260
 
-const clampHeight = (h: number) => Math.min(Math.round(window.innerHeight * 0.65), Math.max(MIN_H, h))
+const clampHeight = (h: number) => Math.min(Math.round(viewHeight() * 0.65), Math.max(MIN_H, h))
 
 function loadHeight(): number {
   try {
@@ -159,7 +160,8 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, onSend
     el.setPointerCapture(e.pointerId)
     const startY = e.clientY
     const startH = height
-    const move = (ev: PointerEvent) => setHeight(clampHeight(startH + (startY - ev.clientY)))
+    // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
+    const move = (ev: PointerEvent) => setHeight(clampHeight(startH + (startY - ev.clientY) / getUiScale()))
     const end = () => {
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', end)

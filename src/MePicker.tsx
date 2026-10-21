@@ -27,6 +27,7 @@ import { ChevronDownRegular, PersonRegular, SignOutRegular } from '@fluentui/rea
 import { useT } from './i18n'
 import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, groupsOf, usePeople, type People } from './people'
+import { UI_SCALES, setUiScale, useUiScale, type UiScale } from './uiScale'
 
 const useStyles = makeStyles({
   // アカウントの見た目(頭文字の顔 + 名前)。幅は置き場所が決めるので、長い名前は省略する
@@ -71,6 +72,7 @@ const groupNames = (people: People, userId: string) =>
 export function MePicker({ className, ariaLabel }: Props) {
   const styles = useStyles()
   const t = useT()
+  const scale = useUiScale()
   const people = usePeople()
   const name = useSyncExternalStore(subscribe, myName)
   const userId = useSyncExternalStore(subscribe, myUserId)
@@ -121,8 +123,14 @@ export function MePicker({ className, ariaLabel }: Props) {
   }
   return (
     <Menu
-      checkedValues={{ me: picked ? [picked.id] : [] }}
+      checkedValues={{ me: picked ? [picked.id] : [], scale: [String(scale)] }}
       onCheckedValueChange={(_, d) => {
+        // 表示の大きさ(X60)
+        if (d.name === 'scale') {
+          const v = Number(d.checkedItems[0])
+          if ((UI_SCALES as readonly number[]).includes(v)) setUiScale(v as UiScale)
+          return
+        }
         const u = users.find((x) => x.id === d.checkedItems[0])
         if (u) setMe(u)
       }}
@@ -147,6 +155,16 @@ export function MePicker({ className, ariaLabel }: Props) {
             {users.map((u) => (
               <MenuItemRadio key={u.id} name="me" value={u.id} secondaryContent={groupNames(people, u.id)}>
                 {u.name}
+              </MenuItemRadio>
+            ))}
+          </MenuGroup>
+          <MenuDivider />
+          {/* 表示の大きさ(X60。ノート PC など、画面が狭いときに縮める。このブラウザで覚える) */}
+          <MenuGroup>
+            <MenuGroupHeader>{t('表示の大きさ(このブラウザ)', 'Display size (this browser)')}</MenuGroupHeader>
+            {UI_SCALES.map((v) => (
+              <MenuItemRadio key={v} name="scale" value={String(v)}>
+                {v === 0.8 ? t('小さめ(80%)', 'Small (80%)') : v === 0.9 ? t('やや小さめ(90%)', 'Smaller (90%)') : v === 1 ? t('標準(100%)', 'Standard (100%)') : t('大きめ(110%)', 'Large (110%)')}
               </MenuItemRadio>
             ))}
           </MenuGroup>

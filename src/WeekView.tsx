@@ -124,7 +124,7 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     rowGap: '8px',
     padding: '8px',
-    height: 'max(520px, calc(100vh - 250px))',
+    height: 'max(520px, calc((100vh / var(--ui-zoom, 1)) - 250px))',
     boxSizing: 'border-box',
     overflowY: 'auto',
   },

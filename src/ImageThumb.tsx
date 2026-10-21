@@ -15,7 +15,7 @@ const useStyles = makeStyles({
   },
   img: { display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
   // マウスを重ねたときに出す、大きい画像
-  big: { display: 'block', maxWidth: 'min(360px, 60vw)', maxHeight: 'min(480px, 70vh)', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium },
+  big: { display: 'block', maxWidth: 'min(360px, (60vw / var(--ui-zoom, 1)))', maxHeight: 'min(480px, (70vh / var(--ui-zoom, 1)))', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium },
 })
 
 /**

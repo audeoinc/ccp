@@ -1,4 +1,5 @@
 import { makeStyles, tokens } from '@fluentui/react-components'
+import { getUiScale } from './uiScale'
 
 interface Props {
   /** ドラッグ中、ポインタの移動量(px)ごとに呼ばれる */
@@ -31,7 +32,8 @@ export function Splitter({ onDrag, onDone }: Props) {
     el.setPointerCapture(e.pointerId)
     let last = e.clientX
     const move = (ev: PointerEvent) => {
-      onDrag(ev.clientX - last)
+      // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
+      onDrag((ev.clientX - last) / getUiScale())
       last = ev.clientX
     }
     const end = () => {

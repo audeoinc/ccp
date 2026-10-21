@@ -12,6 +12,7 @@ import { AlertMark } from './AlertMark'
 import { locale, useT } from './i18n'
 import { statusColor } from './status'
 import { isCancelled } from './cancel'
+import { getUiScale } from './uiScale'
 
 // 週の表示の「時刻」の見方(X46)。Outlook の予定表のように、横 = 曜日・縦 = 時刻の格子に、配信を配信時刻の位置で置く。
 // 配信は瞬間なので、カードの高さは一定(上の端が配信時刻)。違う日の同じ時刻の配信は、同じ高さに並ぶ(横に目で追える)。
@@ -176,7 +177,8 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
     const r = body.getBoundingClientRect()
     const colW = r.width / 7
     const day = Math.min(6, Math.max(0, Math.floor((clientX - r.left) / colW)))
-    const raw = from * 60 + ((clientY - r.top - offsetY) / HOUR) * 60
+    // 1 時間の高さ(HOUR)は中の px。画面の px に直して割る(表示の大きさ X60)
+    const raw = from * 60 + ((clientY - r.top - offsetY) / (HOUR * getUiScale())) * 60
     const m = Math.min(to * 60 - SNAP, Math.max(from * 60, Math.round(raw / SNAP) * SNAP))
     return { day, m }
   }

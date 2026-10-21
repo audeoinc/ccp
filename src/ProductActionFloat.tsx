@@ -17,6 +17,7 @@ import { priceText, tr, useT } from './i18n'
 import { productMarket } from './market'
 import { weeklyLimit } from './weeklyLimit'
 import { AiIcon } from './AiMark'
+import { getUiScale } from './uiScale'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
 // どこから開いても同じ形: 左に、差し替えの候補(AI の差し替え案・残りの候補・ほかの商品を探す)、右に、選んでいる商品の詳しい情報。
@@ -34,7 +35,7 @@ export interface SwapOption {
 type Focus = { kind: 'current' } | { kind: 'cand'; key: string; product: Product } | { kind: 'ai'; product: Product; why: string } | { kind: 'search'; product: Product }
 
 const useStyles = makeStyles({
-  surface: { width: 'min(1040px, 96vw)', maxWidth: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
+  surface: { width: 'min(1040px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(88vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
   body: { display: 'flex', flexDirection: 'column', rowGap: '10px', minHeight: 0, flexGrow: 1 },
   // 題名の行の全体をつかんで動かす(プレビューを見ながら選べるように)
   grab: { display: 'flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
@@ -175,7 +176,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
             }}
             onPointerMove={(e) => {
               const d = drag.current
-              if (d) setPos({ x: d.ox + e.clientX - d.sx, y: d.oy + e.clientY - d.sy })
+              // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
+              if (d) setPos({ x: d.ox + (e.clientX - d.sx) / getUiScale(), y: d.oy + (e.clientY - d.sy) / getUiScale() })
             }}
             onPointerUp={() => {
               drag.current = null

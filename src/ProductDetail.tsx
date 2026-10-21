@@ -17,7 +17,7 @@ const LOW_STOCK = 50
 const useStyles = makeStyles({
   // タブを切り替えても、フロートの大きさが変わらないよう、高さを揃える(はみ出すときは、中でスクロール)
   // 幅は「指標」の表(値・順位・WoW・MoM・YoY)が 1 行に収まるように
-  root: { width: '520px', maxWidth: '90vw', minHeight: '400px', maxHeight: '80vh', overflowY: 'auto', display: 'grid', rowGap: '10px', padding: '4px', minWidth: 0, alignContent: 'start' },
+  root: { width: '520px', maxWidth: 'calc(90vw / var(--ui-zoom, 1))', minHeight: '400px', maxHeight: 'calc(80vh / var(--ui-zoom, 1))', overflowY: 'auto', display: 'grid', rowGap: '10px', padding: '4px', minWidth: 0, alignContent: 'start' },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px', minWidth: 0 },
   title: { minWidth: 0, display: 'grid', flexGrow: 1 },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },

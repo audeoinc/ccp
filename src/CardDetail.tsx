@@ -73,6 +73,7 @@ import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
+import { viewHeight, viewWidth } from './uiScale'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -244,8 +245,8 @@ const SIZE_KEY = 'cardDetail.size'
 const MIN_DIALOG = { w: 900, h: 560 }
 type DialogSize = { w: number; h: number }
 const clampSize = (s: DialogSize): DialogSize => ({
-  w: Math.round(Math.min(window.innerWidth, Math.max(MIN_DIALOG.w, s.w))),
-  h: Math.round(Math.min(window.innerHeight, Math.max(MIN_DIALOG.h, s.h))),
+  w: Math.round(Math.min(viewWidth(), Math.max(MIN_DIALOG.w, s.w))),
+  h: Math.round(Math.min(viewHeight(), Math.max(MIN_DIALOG.h, s.h))),
 })
 // 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
 const INFO_KEY = 'cardDetail.infoOpen.v2'
@@ -292,7 +293,7 @@ function loadWidths(): Widths {
     // 保存値が読めなければ既定値を使う
   }
   // 既定値: ダイアログの幅(最大 1800px)に合わせる。左 18%・中 26%・商品情報 15%・プロセス(右端)17%・プレビューは残り
-  const total = Math.min(1800, window.innerWidth * 0.98)
+  const total = Math.min(1800, viewWidth() * 0.98)
   return [clamp(Math.round(total * 0.18)), clamp(Math.round(total * 0.26)), clamp(Math.round(total * 0.15)), clamp(Math.round(total * 0.17))]
 }
 
@@ -338,13 +339,13 @@ const useStyles = makeStyles({
     padding: 0,
     overflow: 'hidden',
     maxWidth: 'none',
-    width: 'min(1800px, 98vw)',
-    height: '92vh',
-    maxHeight: '92vh',
+    width: 'min(1800px, (98vw / var(--ui-zoom, 1)))',
+    height: 'calc(92vh / var(--ui-zoom, 1))',
+    maxHeight: 'calc(92vh / var(--ui-zoom, 1))',
     '@media (max-width: 899px)': {
-      width: '100vw',
-      height: '100vh',
-      maxHeight: '100vh',
+      width: 'calc(100vw / var(--ui-zoom, 1))',
+      height: 'calc(100vh / var(--ui-zoom, 1))',
+      maxHeight: 'calc(100vh / var(--ui-zoom, 1))',
       borderRadius: 0,
     },
   },
@@ -546,7 +547,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       return cur ? clampSize({ w: cur.w + dw, h: cur.h + dh }) : s
     })
   // 画面より大きく保存されていても、画面に収める(狭い画面では、既定の全画面表示のまま)
-  const sizeStyle = size && window.innerWidth >= 900 ? (() => { const c = clampSize(size); return { width: `${c.w}px`, height: `${c.h}px`, maxHeight: `${c.h}px` } })() : undefined
+  const sizeStyle = size && viewWidth() >= 900 ? (() => { const c = clampSize(size); return { width: `${c.w}px`, height: `${c.h}px`, maxHeight: `${c.h}px` } })() : undefined
   // 商品情報の行にマウスが乗っている商品(プレビューで光らせる)と、商品情報ペインの開閉
   const [hoverKey, setHoverKey] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState<boolean>(loadInfoOpen)
@@ -742,7 +743,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const panesRef = useRef<HTMLDivElement>(null)
   // 中央の上限: ダイアログの中の幅から、左・商品情報・境界線・プレビューの最小幅を引いた残り
   const midMax = (w: Widths) => {
-    const total = panesRef.current?.clientWidth ?? window.innerWidth
+    const total = panesRef.current?.clientWidth ?? viewWidth()
     return total - w[0] - (infoOpen ? w[2] : RAIL_W) - (processOpen ? w[3] : RAIL_W) - 4 - MIN_PREVIEW
   }
   const resize = (i: 0 | 1 | 2) => (dx: number) =>

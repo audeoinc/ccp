@@ -74,7 +74,7 @@ const useStyles = makeStyles({
   pane: {
     position: 'sticky',
     top: '8px',
-    maxHeight: 'calc(100vh - 180px)',
+    maxHeight: 'calc((100vh / var(--ui-zoom, 1)) - 180px)',
     overflowY: 'auto',
     display: 'grid',
     alignContent: 'start',

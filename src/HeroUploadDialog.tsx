@@ -7,7 +7,7 @@ import { getLang, optionLabel, tr, useT } from './i18n'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
 const useStyles = makeStyles({
-  surface: { width: 'min(1000px, 94vw)', maxWidth: 'none' },
+  surface: { width: 'min(1000px, (94vw / var(--ui-zoom, 1)))', maxWidth: 'none' },
   cols: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', columnGap: '16px', alignItems: 'start' },
   drop: {
     display: 'grid',
@@ -23,7 +23,7 @@ const useStyles = makeStyles({
   },
   dropOn: { border: `1px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   stage: { position: 'relative', cursor: 'crosshair', userSelect: 'none', lineHeight: 0 },
-  img: { width: '100%', maxHeight: '56vh', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3 },
+  img: { width: '100%', maxHeight: 'calc(56vh / var(--ui-zoom, 1))', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3 },
   focal: { position: 'absolute', width: '28px', height: '28px', marginLeft: '-14px', marginTop: '-14px', borderRadius: '50%', border: '3px solid #ffffff', boxShadow: '0 0 0 2px rgba(0,0,0,0.6)', pointerEvents: 'none' },
   crops: { display: 'flex', columnGap: '8px', marginTop: '8px' },
   crop: { borderRadius: tokens.borderRadiusSmall, border: `1px solid ${tokens.colorNeutralStroke2}`, objectFit: 'cover' },

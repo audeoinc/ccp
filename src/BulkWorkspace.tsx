@@ -58,10 +58,10 @@ import { productImage } from './images'
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
   surface: {
-    width: 'min(1400px, 96vw)',
+    width: 'min(1400px, (96vw / var(--ui-zoom, 1)))',
     maxWidth: 'none',
-    height: '92vh',
-    maxHeight: '92vh',
+    height: 'calc(92vh / var(--ui-zoom, 1))',
+    maxHeight: 'calc(92vh / var(--ui-zoom, 1))',
     padding: 0,
     overflow: 'hidden',
     display: 'grid',

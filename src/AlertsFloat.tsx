@@ -6,7 +6,7 @@ import { CopyLinkButton } from './CopyLinkButton'
 
 const useStyles = makeStyles({
   // 配信カード・詳しい結果と同じ、全画面に近いフロート
-  surface: { width: 'min(1640px, 96vw)', maxWidth: 'none', height: '94vh', maxHeight: '94vh', padding: '16px 20px', overflowY: 'auto', backgroundColor: tokens.colorNeutralBackground2 },
+  surface: { width: 'min(1640px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(94vh / var(--ui-zoom, 1))', maxHeight: 'calc(94vh / var(--ui-zoom, 1))', padding: '16px 20px', overflowY: 'auto', backgroundColor: tokens.colorNeutralBackground2 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', marginBottom: '12px' },
   title: { margin: 0, fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
   close: { marginLeft: 'auto' },

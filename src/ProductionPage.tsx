@@ -36,7 +36,7 @@ const RAIL_W = 32
 
 const useStyles = makeStyles({
   // fixed + inset 0 + margin auto で画面の中央に置く(配信カードと同じ。relative だと標準の中央寄せが効かず、上端に貼りつく)
-  surface: { position: 'fixed', inset: 0, margin: 'auto', width: 'min(1700px, 97vw)', maxWidth: 'none', height: '92vh', maxHeight: '92vh', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  surface: { position: 'fixed', inset: 0, margin: 'auto', width: 'min(1700px, (97vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(92vh / var(--ui-zoom, 1))', maxHeight: 'calc(92vh / var(--ui-zoom, 1))', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '10px 16px 6px' },
   title: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
@@ -76,7 +76,7 @@ const useStyles = makeStyles({
   planCode: { flexGrow: 1, minHeight: 0, margin: 0, overflow: 'auto', padding: '8px', fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontFamily: 'Consolas, Menlo, monospace', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, color: tokens.colorNeutralForeground2 },
   compare: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px' },
   compareCol: { display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 },
-  pasteBox: { width: '100%', minHeight: '50vh', fontFamily: 'Consolas, Menlo, monospace', fontSize: '12px' },
+  pasteBox: { width: '100%', minHeight: 'calc(50vh / var(--ui-zoom, 1))', fontFamily: 'Consolas, Menlo, monospace', fontSize: '12px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   grow: { flexGrow: 1 },
   // コピーできる 1 行(見出し・値・コピー)

@@ -1,4 +1,5 @@
 import { makeStyles, mergeClasses } from '@fluentui/react-components'
+import { getUiScale } from './uiScale'
 
 /** ドラッグできる辺・角 */
 type Edge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
@@ -42,7 +43,8 @@ export function ResizeHandles({ onResize, onDone, onReset }: Props) {
     const sx = edge.includes('e') ? 2 : edge.includes('w') ? -2 : 0
     const sy = edge.includes('s') ? 2 : edge.includes('n') ? -2 : 0
     const move = (ev: PointerEvent) => {
-      onResize((ev.clientX - lastX) * sx, (ev.clientY - lastY) * sy)
+      // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
+      onResize(((ev.clientX - lastX) * sx) / getUiScale(), ((ev.clientY - lastY) * sy) / getUiScale())
       lastX = ev.clientX
       lastY = ev.clientY
     }

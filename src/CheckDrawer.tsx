@@ -16,7 +16,7 @@ import type { WeekFrames } from './useWeekFrames'
 
 const useStyles = makeStyles({
   // 週の表示を見ながら使うので、画面全体は覆わず、右に重ねる
-  drawer: { width: 'min(760px, 92vw)' },
+  drawer: { width: 'min(760px, (92vw / var(--ui-zoom, 1)))' },
   head: { display: 'grid', rowGap: '8px' },
   tools: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   spacer: { flexGrow: 1 },

@@ -138,7 +138,7 @@ const newDraft = (): Draft => ({
 })
 
 const useStyles = makeStyles({
-  surface: { width: '1360px', maxWidth: '96vw', height: '86vh', maxHeight: '86vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' },
+  surface: { width: '1360px', maxWidth: 'calc(96vw / var(--ui-zoom, 1))', height: 'calc(86vh / var(--ui-zoom, 1))', maxHeight: 'calc(86vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' },
   body: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1, padding: 0, rowGap: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '12px 16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   grow: { flexGrow: 1 },
@@ -182,7 +182,7 @@ const useStyles = makeStyles({
   // 縦長の見取り図をスクロールしても、編集欄と並べて見られるように、上に貼り付ける
   preview: { display: 'grid', rowGap: '6px', justifyItems: 'start', position: 'sticky', top: 0 },
   // 縦長の見取り図は、それだけでスクロールできるようにする(長いテンプレートでも、編集しながら下まで見られる)
-  previewScroll: { maxHeight: 'calc(86vh - 150px)', overflowY: 'auto', paddingRight: '4px' },
+  previewScroll: { maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 150px)', overflowY: 'auto', paddingRight: '4px' },
   row: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'end' },
   // 部品(ヒーロー・セクション・ボタン)のカード
   card: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },

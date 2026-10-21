@@ -53,8 +53,8 @@ interface Preview {
 }
 
 const useStyles = makeStyles({
-  surface: { maxWidth: '1100px', width: '96vw' },
-  body: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, maxHeight: '80vh' },
+  surface: { maxWidth: '1100px', width: 'calc(96vw / var(--ui-zoom, 1))' },
+  body: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, maxHeight: 'calc(80vh / var(--ui-zoom, 1))' },
   row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
   grow: { flexGrow: 1 },
   scroll: { overflow: 'auto', minHeight: 0 },
