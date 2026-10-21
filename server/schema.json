@@ -111,6 +111,7 @@
     ["usable_until", "date"],
     ["focal_x", "numeric"],
     ["focal_y", "numeric"],
+    ["focal_zoom", "numeric"],
     ["uploaded_by", "text"],
     ["first_card_id", "text"]
    ],

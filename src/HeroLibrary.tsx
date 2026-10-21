@@ -4,7 +4,7 @@ import { CalendarCancelRegular, DeleteRegular, DismissRegular, EditRegular, Imag
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload } from './data/heroUpload'
 import { HeroUploadDialog } from './HeroUploadDialog'
-import { heroPosition, isUsableHero } from './heroRights'
+import { heroCropStyle, isUsableHero } from './heroRights'
 import { heroImage } from './images'
 import { rasterize } from './imageConvert'
 import { getLang, optionLabel, tr, useT } from './i18n'
@@ -25,6 +25,7 @@ const useStyles = makeStyles({
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gridAutoRows: 'max-content', gap: '10px', overflow: 'auto', minHeight: 0, flexGrow: 1, flexBasis: 0, alignContent: 'start', paddingBottom: '8px' },
   card: { display: 'grid', gridTemplateRows: '150px auto', alignSelf: 'start', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
   thumb: { width: '100%', height: '150px', objectFit: 'cover', backgroundColor: tokens.colorNeutralBackground3 },
+  thumbBox: { height: '150px', overflow: 'hidden' },
   info: { display: 'grid', rowGap: '3px', padding: '8px 10px', minWidth: 0 },
   name: { fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   line: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -204,7 +205,9 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
               const left = h.usable_until ? daysUntil(h.usable_until) : null
               return (
                 <div key={h.id} className={s.card}>
-                  <img className={s.thumb} src={heroImage(h)} alt="" loading="lazy" style={{ objectPosition: heroPosition(h) }} />
+                  <div className={s.thumbBox}>
+                    <img className={s.thumb} src={heroImage(h)} alt="" loading="lazy" style={heroCropStyle(h)} />
+                  </div>
                   <div className={s.info}>
                     <span className={s.name} title={h.name}>{h.name}</span>
                     <span className={s.line}>{[h.image_code, heroMarket(h), optionLabel(h.purpose_name), optionLabel(h.season_name)].filter(Boolean).join(' ・ ')}</span>

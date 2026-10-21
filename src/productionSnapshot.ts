@@ -307,6 +307,8 @@ const STYLE_KEYS = [
   'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-align',
   'text-decoration', 'text-transform', 'white-space', 'vertical-align', 'object-fit', 'flex-direction', 'flex-wrap',
   'justify-content', 'align-items', 'gap', 'grid-template-columns', 'grid-template-rows', 'opacity', 'overflow',
+  // メイン画像の切り出し(焦点と拡大。X59)
+  'object-position', 'transform', 'transform-origin',
 ] as const
 
 /**

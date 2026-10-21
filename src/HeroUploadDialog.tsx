@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Slider, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload, type HeroDraft } from './data/heroUpload'
 import { heroImage } from './images'
+import { cropStyle } from './heroRights'
 import { rasterize, toUploadable } from './imageConvert'
 import { getLang, optionLabel, tr, useT } from './i18n'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
@@ -27,8 +28,10 @@ const useStyles = makeStyles({
   stage: { position: 'relative', cursor: 'crosshair', userSelect: 'none', lineHeight: 0 },
   img: { width: '100%', maxHeight: 'calc(56vh / var(--ui-zoom, 1))', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3 },
   focal: { position: 'absolute', width: '28px', height: '28px', marginLeft: '-14px', marginTop: '-14px', borderRadius: '50%', border: '3px solid #ffffff', boxShadow: '0 0 0 2px rgba(0,0,0,0.6)', pointerEvents: 'none' },
-  crops: { display: 'flex', columnGap: '8px', marginTop: '8px' },
-  crop: { borderRadius: tokens.borderRadiusSmall, border: `1px solid ${tokens.colorNeutralStroke2}`, objectFit: 'cover' },
+  crops: { display: 'flex', columnGap: '10px', marginTop: '8px', alignItems: 'end' },
+  cropBox: { display: 'grid', rowGap: '2px', justifyItems: 'center', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  crop: { borderRadius: tokens.borderRadiusSmall, border: `1px solid ${tokens.colorNeutralStroke2}`, overflow: 'hidden', lineHeight: 0 },
+  zoomRow: { display: 'flex', alignItems: 'center', columnGap: '8px', marginTop: '6px', fontSize: tokens.fontSizeBase200 },
   form: { display: 'grid', rowGap: '8px' },
   two: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8px' },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -67,6 +70,8 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
   const editing = !!hero
   const [url, setUrl] = useState(hero ? (heroImage(hero) ?? '') : '')
   const [focal, setFocal] = useState({ x: hero?.focal_x ?? 0.5, y: hero?.focal_y ?? 0.5 })
+  // 切り出すときの拡大(X59 ④。1 = 拡大なし)
+  const [zoom, setZoom] = useState(Math.min(3, Math.max(1, Number(hero?.focal_zoom) || 1)))
   const [form, setForm] = useState({
     name: hero?.name ?? '',
     purpose: (hero?.purpose ?? 'feature') as string,
@@ -152,6 +157,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
         usable_until: form.until || null,
         focal_x: Math.round(focal.x * 1000) / 1000,
         focal_y: Math.round(focal.y * 1000) / 1000,
+        focal_zoom: Math.round(zoom * 100) / 100,
       })
       setBusy('')
       if (!res.success) {
@@ -176,6 +182,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
       usable_until: form.until || null,
       focal_x: Math.round(focal.x * 1000) / 1000,
       focal_y: Math.round(focal.y * 1000) / 1000,
+      focal_zoom: Math.round(zoom * 100) / 100,
       uploaded_by: me,
       ...(cardId ? { first_card_id: cardId } : {}),
       state_code: 0,
@@ -189,7 +196,6 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
     setBusy('')
   }
 
-  const pos = `${focal.x * 100}% ${focal.y * 100}%`
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && !busy && onClose()}>
       <DialogSurface className={s.surface}>
@@ -231,11 +237,33 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
                       <img className={s.img} src={url} alt="" />
                       <span className={s.focal} style={{ left: `${focal.x * 100}%`, top: `${focal.y * 100}%` }} />
                     </div>
-                    <span className={s.note}>{t('画像を押して、焦点(いちばん見せたい場所)を決めます。下は、横長・正方形・縦長に切り出したときの見え方です。', 'Click the image to set the focal point. Below: how it crops to wide, square and tall.')}</span>
+                    <span className={s.note}>{t('画像を押して、焦点(いちばん見せたい場所)を決めます。拡大すると、焦点を中心に寄って切り出します。下は、テンプレートの枠(帯・正方形・縦長・横長)に切り出したときの見え方です。', 'Click the image to set the focal point. Zoom in to crop closer around it. Below: how it crops into the template frames (band, square, tall, wide).')}</span>
+                    <div className={s.zoomRow}>
+                      <span>{t('拡大', 'Zoom')}</span>
+                      <Slider size="small" min={1} max={3} step={0.1} value={zoom} onChange={(_, d) => setZoom(d.value)} aria-label={t('切り出すときの拡大', 'Crop zoom')} />
+                      <span>{`${zoom.toFixed(1)}×`}</span>
+                      {zoom > 1 && (
+                        <Button size="small" appearance="subtle" onClick={() => setZoom(1)}>
+                          {t('拡大なし', 'Reset')}
+                        </Button>
+                      )}
+                    </div>
                     <div className={s.crops}>
-                      <img className={s.crop} src={url} alt="" style={{ width: 160, height: 90, objectPosition: pos }} />
-                      <img className={s.crop} src={url} alt="" style={{ width: 90, height: 90, objectPosition: pos }} />
-                      <img className={s.crop} src={url} alt="" style={{ width: 72, height: 96, objectPosition: pos }} />
+                      {(
+                        [
+                          [t('帯 8:3', 'Band 8:3'), 160, 60],
+                          [t('正方形', 'Square'), 90, 90],
+                          [t('縦 4:5', 'Tall 4:5'), 80, 100],
+                          [t('横 2:1', 'Wide 2:1'), 140, 70],
+                        ] as const
+                      ).map(([label, w, h]) => (
+                        <span key={label} className={s.cropBox}>
+                          <span className={s.crop} style={{ width: w, height: h }}>
+                            <img src={url} alt="" style={{ width: '100%', height: '100%', ...cropStyle(focal.x, focal.y, zoom) }} />
+                          </span>
+                          {label}
+                        </span>
+                      ))}
                     </div>
                   </>
                 )}

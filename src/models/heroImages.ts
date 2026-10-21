@@ -40,6 +40,8 @@ export interface HeroImageFields {
   /** 焦点(いちばん見せたい場所。0〜1、左上が 0,0。テンプレートの縦横比に合わせて切り出すときの中心) */
   focal_x?: number | null
   focal_y?: number | null
+  /** 切り出すときの拡大(1 = 拡大なし〜3。焦点を中心に拡大する。X59 ④) */
+  focal_zoom?: number | null
   /** 上げた人と、最初に使った配信(delivery_cards の id。参照にはしない) */
   uploaded_by?: string
   first_card_id?: string
