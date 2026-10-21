@@ -7,6 +7,9 @@ export const HeroUpload = {
   async upload(file: File) {
     return { image_url: URL.createObjectURL(file) }
   },
+  async remove(imageUrl: string) {
+    if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl)
+  },
   async describe(_imageUrl: string, language: 'ja' | 'en'): Promise<HeroDraft> {
     await new Promise((r) => setTimeout(r, 600))
     const en = language === 'en'

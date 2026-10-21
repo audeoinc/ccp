@@ -96,3 +96,28 @@ async def describe(body: DescribeIn):
         log.exception("画像の読み取りに失敗しました")
         return fail(502, f"AI で画像を読み取れませんでした(手で入れて登録できます): {type(e).__name__}", "ai_failed")
     return ok(draft if isinstance(draft, dict) else {})
+
+
+UPLOADED = re.compile(r"^up-[0-9a-f]{32}\.(?:jpg|png|webp)$")
+
+
+def remove(name: str) -> None:
+    d = assets.asset_dir()
+    if d is not None or not assets.bucket():
+        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / "heroes"
+        (folder / name).unlink(missing_ok=True)
+        return
+    from urllib.parse import quote
+
+    r = assets.session().delete(f"{assets.GCS_API}/storage/v1/b/{assets.bucket()}/o/{quote(assets.object_name('heroes', name), safe='')}", timeout=30)
+    if r.status_code not in (200, 204, 404):
+        r.raise_for_status()
+
+
+@router.delete("/files/{name}")
+async def delete_file(name: str):
+    """上げた画像(up-…)のファイルを消す(ライブラリの管理画面で、使っていない画像を消すとき。X59 ②)。もとからある画像は消さない"""
+    if not UPLOADED.match(name):
+        return fail(400, "上げた画像だけ消せます", "not_uploaded")
+    await asyncio.to_thread(remove, name)
+    return ok({"name": name})

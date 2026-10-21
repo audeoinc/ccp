@@ -3,6 +3,7 @@ import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface
 import { ImageAddRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload, type HeroDraft } from './data/heroUpload'
+import { heroImage } from './images'
 import { getLang, optionLabel, tr, useT } from './i18n'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
@@ -45,6 +46,8 @@ interface Props {
   me: string
   onDone: (hero: HeroImage) => void | Promise<void>
   onClose: () => void
+  /** 直すとき(ライブラリの管理画面。X59 ②)。画像は差し替えず、名前・用途・季節・タグ・説明・焦点・出どころ・期限を直す */
+  hero?: HeroImage
 }
 
 /**
@@ -53,16 +56,29 @@ interface Props {
  * テンプレートの縦横比に切り出したときの見え方を確かめる。出どころと使える期限(過ぎたら候補から外す)も入れる。
  * 上げた画像は配信ではなくライブラリに入り、同じ国の次の配信からは、選ぶ候補にも AI の候補にも出る
  */
-export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props) {
+export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: Props) {
   const s = useStyles()
   const t = useT()
   const fileRef = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState<'' | 'upload' | 'ai' | 'save'>('')
   const [error, setError] = useState<string | null>(null)
-  const [url, setUrl] = useState('')
-  const [focal, setFocal] = useState({ x: 0.5, y: 0.5 })
-  const [form, setForm] = useState({ name: '', purpose: 'feature', season: 'all_year', tags: '', description: '', source: 'own' as (typeof SOURCES)[number], sourceNote: '', until: '' })
+  const editing = !!hero
+  const [url, setUrl] = useState(hero ? (heroImage(hero) ?? '') : '')
+  const [focal, setFocal] = useState({ x: hero?.focal_x ?? 0.5, y: hero?.focal_y ?? 0.5 })
+  const [form, setForm] = useState({
+    name: hero?.name ?? '',
+    purpose: (hero?.purpose ?? 'feature') as string,
+    season: (hero?.season ?? 'all_year') as string,
+    tags: hero?.tags ?? '',
+    description: hero?.description ?? '',
+    source: 'own' as (typeof SOURCES)[number],
+    // 直すときは、出どころを 1 つの文として直す(上げたときの「種類: ひとこと」をそのまま)
+    sourceNote: hero?.source ?? '',
+    until: (hero?.usable_until ?? '').slice(0, 10),
+  })
+  // ライブラリの画面から上げるときは、どの国のライブラリに入れるかを選ぶ
+  const [pickMarket, setPickMarket] = useState<'US' | 'JP'>(market ?? 'US')
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const pick = async (file?: File) => {
@@ -103,6 +119,26 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
   const save = async () => {
     setBusy('save')
     setError(null)
+    if (hero) {
+      const res = await HeroImagesService.update(hero.id, {
+        name: form.name.trim(),
+        purpose: form.purpose as HeroImage['purpose'],
+        season: form.season as HeroImage['season'],
+        tags: form.tags.trim(),
+        description: form.description.trim(),
+        source: form.sourceNote.trim(),
+        usable_until: form.until || null,
+        focal_x: Math.round(focal.x * 1000) / 1000,
+        focal_y: Math.round(focal.y * 1000) / 1000,
+      })
+      setBusy('')
+      if (!res.success) {
+        setError(res.error?.message ?? tr('保存できませんでした', 'Could not save'))
+        return
+      }
+      await onDone({ ...hero, ...(res.data ?? {}) })
+      return
+    }
     const d = new Date()
     const code = `UP${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
     const res = await HeroImagesService.create({
@@ -113,7 +149,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
       tags: form.tags.trim(),
       description: form.description.trim(),
       image_url: url,
-      ...(market ? { market } : {}),
+      market: market ?? pickMarket,
       source: [sourceLabel(form.source), form.sourceNote.trim()].filter(Boolean).join(': '),
       usable_until: form.until || null,
       focal_x: Math.round(focal.x * 1000) / 1000,
@@ -136,7 +172,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
     <Dialog open onOpenChange={(_, d) => !d.open && !busy && onClose()}>
       <DialogSurface className={s.surface}>
         <DialogBody>
-          <DialogTitle>{t('持っている画像を上げる(メイン画像のライブラリへ)', 'Upload your own image (to the hero library)')}</DialogTitle>
+          <DialogTitle>{editing ? t(`メイン画像を直す — ${hero?.image_code ?? ''}`, `Edit hero image — ${hero?.image_code ?? ''}`) : t('持っている画像を上げる(メイン画像のライブラリへ)', 'Upload your own image (to the hero library)')}</DialogTitle>
           <DialogContent>
             <div className={s.cols}>
               <div>
@@ -184,7 +220,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
               </div>
               <div className={s.form}>
                 {busy === 'ai' && <Spinner size="tiny" label={t('AI が画像を見て、下書きを作っています…', 'AI is reading the image and drafting…')} />}
-                <span className={s.note}>{t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確かめて直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}</span>
+                {!editing && <span className={s.note}>{t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確かめて直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}</span>}
                 <Field label={t('名前', 'Name')} required size="small">
                   <Input size="small" value={form.name} onChange={(_, d) => set('name')(d.value)} />
                 </Field>
@@ -210,6 +246,25 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
                 <Field label={t('説明', 'Description')} size="small">
                   <Textarea size="small" value={form.description} onChange={(_, d) => set('description')(d.value)} />
                 </Field>
+                {editing ? (
+                  <div className={s.two}>
+                    <Field label={t('出どころ', 'Source')} size="small">
+                      <Input size="small" value={form.sourceNote} onChange={(_, d) => set('sourceNote')(d.value)} />
+                    </Field>
+                    <Field label={t('使える期限(任意)', 'Usable until (optional)')} size="small">
+                      <Input size="small" type="date" value={form.until} onChange={(_, d) => set('until')(d.value)} />
+                    </Field>
+                  </div>
+                ) : (
+                <>
+                {!market && (
+                  <Field label={t('入れる国のライブラリ', 'Library (country)')} size="small">
+                    <Select size="small" value={pickMarket} onChange={(_, d) => setPickMarket(d.value as 'US' | 'JP')}>
+                      <option value="US">US</option>
+                      <option value="JP">JP</option>
+                    </Select>
+                  </Field>
+                )}
                 <div className={s.two}>
                   <Field label={t('出どころ', 'Source')} size="small">
                     <Select size="small" value={form.source} onChange={(_, d) => set('source')(d.value)}>
@@ -225,6 +280,8 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
                 <Field label={t('出どころのひとこと(任意。例: 取引先名、契約の番号)', 'Source note (optional, e.g. partner, license number)')} size="small">
                   <Input size="small" value={form.sourceNote} onChange={(_, d) => set('sourceNote')(d.value)} />
                 </Field>
+                </>
+                )}
                 <span className={s.note}>{t('期限を過ぎた画像は、選ぶ候補と AI の候補から外れます(使っている配信からは消えません)。', 'Images past the deadline are removed from the candidates and AI suggestions (deliveries already using them keep them).')}</span>
                 {error && <span className={s.error}>{error}</span>}
               </div>
@@ -233,7 +290,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose }: Props)
           <DialogActions>
             <Button disabled={!!busy} onClick={onClose}>{t('やめる', 'Cancel')}</Button>
             <Button appearance="primary" disabled={!!busy || !url || !form.name.trim()} onClick={() => void save()}>
-              {busy === 'save' ? t('入れています…', 'Adding…') : t('ライブラリに入れて、この配信に使う', 'Add to library and use here')}
+              {busy === 'save' ? t('保存しています…', 'Saving…') : editing ? t('保存', 'Save') : cardId ? t('ライブラリに入れて、この配信に使う', 'Add to library and use here') : t('ライブラリに入れる', 'Add to library')}
             </Button>
           </DialogActions>
         </DialogBody>

@@ -637,7 +637,8 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 表 `hero_images` に列: source(出どころ)・usable_until(使える期限)・focal_x・focal_y(焦点。0〜1)・uploaded_by・first_card_id(最初に使った配信。参照にはしない)。image_code は `UPyymmdd-XXXX`。
 - 画面: `src/HeroUploadDialog.tsx`(置く → AI の下書き → 焦点を押して決め、横長・正方形・縦長の切り出しを見る → 出どころ・期限 → 「ライブラリに入れて、この配信に使う」)。窓口は `src/data/heroUpload.ts`(撮影用は `src/mock/heroUpload.ts`)。配信カードは `heroUpload` の state と、App の `onHeroesChanged`(ライブラリを読み直す)。中ペインの ③ に `onUploadHero`。`src/heroRights.ts` の `isUsableHero`(期限)・`heroPosition`(焦点を object-position に)。プレビュー(`Preview.tsx`)のメイン画像は焦点で切り出す。期限切れは `CardDetail` の `poolHeroes` と `bulkDraft` の候補から外す(いま使っている画像は残す)。
 - 確かめたこと: サーバーのテスト(`test_heroes_upload.py`)。モックで、画像を置く → AI の下書き → ライブラリに入れる → この配信のメイン画像になり、プレビューに出る。本番の Gemini での画像の読み取りと、バケットへの保存は、反映のあとに確かめる。
-- 残り: ② ⚙ のライブラリの管理画面(一覧・直す・期限・消す)、③ 部品の画像(ボタンなど)、④ 必要ならトリミングの編集。制作のページの「メイン画像を選ぶ」(HeroPicker)からの上げる入口も、まだ。
+- **② ライブラリの管理画面(2026-10-21)**: ⚙ の「メイン画像のライブラリ」→ `src/HeroLibrary.tsx`(App の `heroLibraryOpen`、読み直しは `reloadHeroes`)。直すのは `HeroUploadDialog` に `hero` を渡す形(画像は差し替えない。出どころは 1 つの文で直す)。ライブラリから上げるときは入れる国を選ぶ(`market` が null のとき)。消すのは使っている配信がない画像だけ(配信の hero_image_id は SET NULL なので、使っている画像を消すと配信のメイン画像が外れるため)。使っている画像は「今日で期限を切る」。上げた画像のファイルは `heroes.py` の `DELETE /api/heroes/files/{name}`(`up-<uuid>` の名前だけ)。モックで一覧・直す画面を確かめた。
+- 残り: ③ 部品の画像(ボタンなど)、④ 必要ならトリミングの編集。制作のページの「メイン画像を選ぶ」(HeroPicker)からの上げる入口も、まだ。
 
 ## 6.46 C3 週の上限を画面で変える(2026-10-21、UI セッション)
 

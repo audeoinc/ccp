@@ -265,6 +265,7 @@ flowchart TD
 | `assetSeed.ts` | 220 | ⚙ の「素材の見本を作る / 消す」(画面の中で描いたイラスト・PDF と公開の URL を、制作の依頼のある配信に。名前の先頭が「見本:」) |
 | `uiScale.ts` | 55 | 画面全体の表示の大きさ(X60。zoom と --ui-zoom、viewWidth / viewHeight、getUiScale) |
 | `weeklyLimit.ts` | 73 | 週の上限(C3。マーケティングの決まりの「上限 週 N 回」→ なければアラートの条件の値) |
+| `HeroLibrary.tsx` | 211 | ⚙ の「メイン画像のライブラリ」(一覧・絞り込み・上げる・直す・消す・期限を切る。X59 ②) |
 | `HeroUploadDialog.tsx` / `heroRights.ts` | 243 / 13 | 持っている画像をメイン画像のライブラリに上げる(AI の下書き・焦点・出どころ・期限。X59)/ 使える期限と焦点の切り出し。窓口は `data/heroUpload.ts` |
 | `FinishedFloat.tsx` | 125 | 仕上がりを見る(X58。制作した HTML・制作からのひとこととリンク・直してほしいこと・制作指示・素材を 1 つのフロートで) |
 | `CreativeAssets.tsx` / `creativeConst.ts` | 439 / 7 | 素材(Creative Assets。X58): 配信ごとの参考のファイル・URL の一覧・追加・素材のフロート(大きく見る・素材へのやり取り)/ 添付できる種類と大きさ。ファイルの窓口は `data/creativeFiles.ts` |

@@ -36,5 +36,17 @@ class HeroUploadTest(unittest.TestCase):
         self.assertEqual(asyncio.run(heroes.describe(heroes.DescribeIn(image_url="/img/heroes/../x.png"))).status_code, 400)
 
 
+class HeroDeleteTest(unittest.TestCase):
+    def test_deletes_only_uploaded_files(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"ASSET_DIR": d}):
+            url = asyncio.run(heroes.upload(FakeRequest(b"PNG-DATA"), "a.png"))["data"]["image_url"]
+            name = url.rsplit("/", 1)[1]
+            self.assertTrue((Path(d) / "heroes" / name).is_file())
+            asyncio.run(heroes.delete_file(name))
+            self.assertFalse((Path(d) / "heroes" / name).exists())
+            # もとからある画像(up- で始まらない名前)は消さない
+            self.assertEqual(asyncio.run(heroes.delete_file("H01.jpg")).status_code, 400)
+
+
 if __name__ == "__main__":
     unittest.main()

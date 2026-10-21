@@ -25,6 +25,11 @@ export const HeroUpload = {
   /** 画像を置く。画像の URL(/img/heroes/<名前>)を返す */
   upload: (file: File) =>
     post<{ image_url: string }>(`/api/heroes/upload?name=${encodeURIComponent(file.name)}`, { headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file }),
+  /** 上げた画像のファイルを消す(/img/heroes/up-… のものだけ。表の行は、呼び出し側が消す) */
+  async remove(imageUrl: string): Promise<void> {
+    const name = imageUrl.match(/^\/img\/heroes\/(up-[0-9a-f]{32}\.(?:jpg|png|webp))$/)?.[1]
+    if (name) await fetch(appPath(`/api/heroes/files/${name}`), { method: 'DELETE' })
+  },
   /** AI に画像を見せて、名前・用途・季節・タグ・説明などの下書きを作る */
   describe: (imageUrl: string, language: 'ja' | 'en') =>
     post<HeroDraft>('/api/heroes/describe', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl, language }) }),

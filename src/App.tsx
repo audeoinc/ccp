@@ -44,6 +44,7 @@ import {
   DocumentPdfRegular,
   GlobeRegular,
   HistoryRegular,
+  ImageMultipleRegular,
   LayoutColumnTwoRegular,
   PaintBrushRegular,
   PeopleTeamRegular,
@@ -129,6 +130,7 @@ import { MiniCalendar } from './MiniCalendar'
 import { printWeek } from './printWeek'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 import { limitRulesVersion, onLimitRulesChange, setLimitRules } from './weeklyLimit'
+import { HeroLibrary } from './HeroLibrary'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -434,6 +436,12 @@ function App() {
   const [cards, setCards] = useState<DeliveryCard[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [heroes, setHeroes] = useState<HeroImage[]>([])
+  // メイン画像のライブラリを読み直す(画像を上げた・直したあと。X59)
+  const reloadHeroes = useCallback(async () => {
+    const res = await HeroImagesService.getAll({ orderBy: ['image_code asc'] })
+    if (res.success) setHeroes((res.data ?? []).map(withHeroLabels))
+  }, [])
+  const [heroLibraryOpen, setHeroLibraryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // BigQuery からの取り込み(B2・B4)。設定がない環境では configured: false のまま、何も出さない
@@ -1444,6 +1452,10 @@ function App() {
               <MenuItem icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
                 {t('テンプレートの管理', 'Manage templates')}
               </MenuItem>
+              {/* メイン画像のライブラリ(X59 ②。一覧・上げる・直す・期限・消す) */}
+              <MenuItem icon={<ImageMultipleRegular />} onClick={() => setHeroLibraryOpen(true)}>
+                {t('メイン画像のライブラリ', 'Hero image library')}
+              </MenuItem>
               <MenuItem icon={<PeopleTeamRegular />} onClick={openPeopleManager}>
                 {t('ユーザーと承認グループ', 'Users and approval groups')}
               </MenuItem>
@@ -2097,10 +2109,7 @@ function App() {
           }}
           products={products}
           heroes={heroes}
-          onHeroesChanged={async () => {
-            const res = await HeroImagesService.getAll({ orderBy: ['image_code asc'] })
-            if (res.success) setHeroes((res.data ?? []).map(withHeroLabels))
-          }}
+          onHeroesChanged={reloadHeroes}
           otherThemes={cards.filter((c) => c.id !== selected?.id && c.theme).map((c) => c.theme!)}
           weeks={weeks}
           owners={owners}
@@ -2143,6 +2152,7 @@ function App() {
         />
       )}
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
+      {heroLibraryOpen && <HeroLibrary heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} onClose={() => setHeroLibraryOpen(false)} />}
       <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
         <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} />
