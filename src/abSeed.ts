@@ -9,7 +9,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { HeroImage } from './models/heroImages'
 import type { Product } from './models/products'
 import { heroMarket, productMarket } from './market'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, sectionIndexAt, sectionsOf } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, sectionIndexAt, sectionsOf, currentVersion } from './templates'
 
 /** 例の配信の印(ab_test の JSON の seed)。探して消すときに使う */
 export const AB_SEED = 'x57-examples'
@@ -185,6 +185,7 @@ export async function createAbExamples(args: { products: Product[]; heroes: Hero
       channel: p.channel,
       status: 'not_started',
       layout_key: template,
+      layout_version: currentVersion(template),
       email_template: TEMPLATE_VALUES[template],
       theme: p.theme,
       headline: shownText.headline,

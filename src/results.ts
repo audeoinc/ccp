@@ -2,7 +2,7 @@
 import type { DeliveryCard } from './models/deliveryCards'
 import type { DeliveryResult, LinkResults, ProductResult } from './data/deliveryResults'
 import { CHANNEL_PUSH } from './status'
-import { DEFAULT_PUSH_TEMPLATE, getTemplate, templateFromValue } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, baseTemplateId, getTemplate, templateFromValue } from './templates'
 import { parseCsv } from './csv'
 import { themeTypeOf } from './themeTypes'
 
@@ -60,8 +60,8 @@ export const sentAtOf = (r: ResultRow) => r.result.sent_at ?? r.card.scheduled_a
 
 export const isPush = (c: DeliveryCard) => c.channel === CHANNEL_PUSH
 
-/** 配信のテンプレートの ID */
-export const templateIdOf = (c: DeliveryCard): string => c.layout_key || (isPush(c) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
+/** 配信のテンプレートの ID(編集の前の形の写しを使っている配信も、もとのテンプレートとしてまとめる) */
+export const templateIdOf = (c: DeliveryCard): string => baseTemplateId(c.layout_key || (isPush(c) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template)))
 
 /** 配信のテンプレートの名前 */
 export function templateName(c: DeliveryCard): string {

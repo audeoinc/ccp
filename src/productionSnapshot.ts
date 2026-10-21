@@ -9,7 +9,7 @@ import { SOURCE_MANUAL, type Item } from './items'
 import { campaignSlug, encodeLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
-import { DEFAULT_PUSH_TEMPLATE, sectionRange, sectionsOf, templateFromValue, type EmailTemplateId } from './templates'
+import { sectionRange, sectionsOf, type EmailTemplateId, templateKeyOfCard } from './templates'
 import { priceText, tr } from './i18n'
 import { abSummary, isChoose, ownsHero, ownsProducts, ownsText, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
@@ -96,7 +96,7 @@ export function parseSnapshot(json?: string | null): Snapshot | null {
 }
 
 const isPushCard = (s: Snapshot) => s.card.channel === CHANNEL_PUSH
-export const templateOf = (s: Snapshot): EmailTemplateId => (s.card.layout_key || (isPushCard(s) ? DEFAULT_PUSH_TEMPLATE : templateFromValue(s.card.email_template))) as EmailTemplateId
+export const templateOf = (s: Snapshot): EmailTemplateId => templateKeyOfCard(s.card)
 const items = (s: Snapshot): Item[] => s.productIds.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
 const parseCopies = (v?: string): string[] => {
   if (!v) return []

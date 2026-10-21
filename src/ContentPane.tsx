@@ -43,7 +43,7 @@ import { AlertChip, LowStockBadge } from './ProductMarks'
 import type { CardAlertKind } from './cardAlerts'
 import { useSelection } from './useSelection'
 import { progressOf } from './progress'
-import { openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel } from './templates'
+import { getTemplate, hasTemplate, openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel, currentVersion, splitTemplateKey } from './templates'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { AppLinksEditor } from './AppLinksEditor'
@@ -529,6 +529,41 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel }: { templat
       <div>
         <Button size="small" appearance="outline" onClick={openTemplateManager}>{t('テンプレートを管理(作成・編集)', 'Manage templates (create / edit)')}</Button>
       </div>
+      {/* この配信が、テンプレートの前の版や、使わない(無効)のテンプレートを使っているとき。選択肢には出ないので、ここに出して知らせる */}
+      {(() => {
+        const cur = getTemplate(template)
+        const { id: base, version: v } = splitTemplateKey(template)
+        const old = v !== undefined
+        if (!old && !cur.hidden) return null
+        const canUpdate = old && hasTemplate(base) && !getTemplate(base).hidden
+        return (
+          <div className={mergeClasses(s.tplCard, s.tplCardSelected)}>
+            {cur.push ? <PushThumb spec={cur.push} width={110} /> : <TemplateThumb layout={cur} maxHeight={170} zoom />}
+            <div style={{ minWidth: 0 }}>
+              <div className={s.flexRowTight}>
+                <span className={s.bold}>{cur.label}</span>
+                <Badge size="small" appearance="filled" color="brand">{t('選択中', 'Selected')}</Badge>
+                {old && <Badge size="small" appearance="outline">{t(`版 ${v}`, `v${v}`)}</Badge>}
+              </div>
+              <span className={s.caption}>
+                {old
+                  ? t(
+                      `このテンプレートは、この配信のあとに編集されました(この配信は版 ${v}、いまは版 ${currentVersion(base)})。この配信は、版 ${v} の形のままです。`,
+                      `This template was edited after this delivery was made (this delivery uses v${v}; the latest is v${currentVersion(base)}). It keeps the v${v} layout.`,
+                    )
+                  : t('このテンプレートは、使わない(無効)になっています。この配信は、そのまま使えます。', 'This template is inactive. This delivery can keep using it.')}
+              </span>
+              {canUpdate && (
+                <div>
+                  <Button size="small" appearance="outline" onClick={() => onTemplate(base)}>
+                    {t(`いまの版(版 ${currentVersion(base)})にする`, `Use the latest (v${currentVersion(base)})`)}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
       {templateOptions(channel).map((o) => {
         const selected = o.id === template
         return (

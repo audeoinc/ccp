@@ -14,7 +14,7 @@ import { runAutoDraft, type AutoDraftProgress, type AutoDraftResult } from './au
 import { cardMarket, heroMarket, productMarket } from './market'
 import { isUsableHero } from './heroRights'
 import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH, statusRank } from './status'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, currentVersion } from './templates'
 import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
 import { WEEKLY_PRODUCT_LIMIT } from './reviewChecks'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
@@ -198,6 +198,7 @@ function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[], un
     hero_reason: r.hero?.hero?.reason ?? '',
     email_template: TEMPLATE_VALUES[template],
     layout_key: template,
+    layout_version: currentVersion(template),
     section_titles: r.sections.map((s) => s.title).join('\n').replace(/\n+$/, ''),
     section_copies: copies.some(Boolean) ? JSON.stringify(copies) : '',
     ...(r.hero?.hero?.heroId ? { hero_image_id: r.hero.hero.heroId } : {}),

@@ -5,7 +5,7 @@ import { SOURCE_MANUAL, type Item } from './items'
 import { Preview } from './Preview'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
-import { DEFAULT_PUSH_TEMPLATE, templateFromValue } from './templates'
+import { templateKeyOfCard } from './templates'
 
 /** セクションのコピー(JSON の配列。古い形式の改行区切りも読む) */
 const parseCopies = (v?: string): string[] => {
@@ -35,7 +35,8 @@ interface Props {
  */
 export function CardPreview({ card: c, productIds, products, heroes }: Props) {
   const isPush = c.channel === CHANNEL_PUSH
-  const templateId = c.layout_key || (isPush ? DEFAULT_PUSH_TEMPLATE : templateFromValue(c.email_template))
+  // 使った版の形で描く
+  const templateId = templateKeyOfCard(c)
   const items: Item[] = productIds.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
   return (
     <Preview
