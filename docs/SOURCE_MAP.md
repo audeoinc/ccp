@@ -260,7 +260,7 @@ flowchart TD
 | `HeroCandidates.tsx` | 124 | メイン画像の候補(すべての画像から探して設定) |
 | `ChatPanel.tsx` | 280 | AI チャット |
 | `NotesEditor.tsx` / `MarkdownLite.tsx` | 124 / 51 | 制作指示の入力(Markdown)/ その表示 |
-| `LinksEditor.tsx` / `links.ts` | 146 / 230 | リンク先の入力 / 配信ごとのリンク先(JSON で保存) |
+| `LinksEditor.tsx` / `links.ts` | 146 / 230 | リンク先の入力 / 配信ごとのリンク先(JSON で保存)と、計測用のパラメーター(UTM)の決まり(utm_campaign・utm_content。X67) |
 | `HandoffPanel.tsx` | 89 | 制作への引き継ぎ |
 | `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 218 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `TasksPanel.tsx` | 186 | タスク(プロセスのペインの「タスク」タブ) |

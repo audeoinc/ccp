@@ -46,7 +46,7 @@ import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
-import { campaignSlug, encodeLinks, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links, utmFor, variantCampaign } from './links'
+import { campaignId, campaignSlug, encodeLinks, productContent, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links, utmFor, variantCampaign } from './links'
 import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, savePref } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
@@ -745,7 +745,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const linkSpots = useMemo(() => linkSlots(template, items, products, linkCampaign), [template, items, products, linkCampaign])
   // AB テストの配信は、いま編集している案の印を campaign に付ける(X55)
   const linkVariant = ab ? active : null
-  const linkUtm = utmFor(links, linkCampaign, linkVariant)
+  // utm_campaign の既定値は、配信日 + 配信カードの ID(links.ts の「UTM の決まり」)。リンク先のページの名前(linkCampaign)とは分ける
+  const utmCampaign = campaignId(card?.id, form.scheduledAt)
+  const linkUtm = utmFor(links, utmCampaign, linkVariant)
   const fcmCampaign = variantCampaign(linkCampaign, linkVariant)
   // アプリの配信は、URL の代わりに、開く画面(FCM の data)を出す
   const linkUrlOf = (slot: LinkSlot) => {
@@ -754,14 +756,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       return d ? `data: ${d}` : ''
     }
     const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
-    return url ? withUtm(url, linkUtm) : ''
+    return url ? withUtm(url, linkUtm, slot.content) : ''
   }
   const productLinkOf = (itemKey: string) => {
-    const it = items.find((x) => x.key === itemKey)
+    const index = items.findIndex((x) => x.key === itemKey)
+    const it = items[index]
     const p = it && products.find((x) => x.id === it.productId)
     if (!p) return undefined
     if (previewTab === 'push') return { name: p.name, url: p.product_code ? `data: ${fcmText({ kind: 'product', value: p.product_code }, fcmCampaign)}` : '' }
-    return { name: p.name, url: withUtm(productUrl(p), linkUtm) }
+    return { name: p.name, url: withUtm(productUrl(p), linkUtm, productContent(index, p.product_code)) }
   }
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
@@ -2024,6 +2027,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 onPush={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
                 scheduledAt={form.scheduledAt}
                 campaign={campaignSlug(form.name, form.scheduledAt)}
+                utmCampaign={utmCampaign}
                 linkVariant={linkVariant}
                 onLinksTab={setLinksTab}
                 onLinkFocus={setLinkFocus}

@@ -106,8 +106,10 @@ interface Props {
   onTabChange?: (tab: TopTab) => void
   /** リンク先の設定の欄で選んでいる場所(プレビューで光らせる。W12) */
   onLinkFocus?: (key: string | null) => void
-  /** 配信のページの名前(リンク先の既定値と、計測用のパラメーターに使う) */
+  /** 配信のページの名前(リンク先の既定値と、アプリの配信の campaign に使う) */
   campaign: string
+  /** 計測用のパラメーターの utm_campaign の既定値(配信日 + 配信カードの ID。links.ts の campaignId) */
+  utmCampaign: string
   /** AB テストの、いま編集している案(計測用のパラメーターの campaign の末尾に付ける。AB テストでなければ null。X55) */
   linkVariant?: string | null
   /** 制作への引き継ぎ(やり取りの「引き継ぎ」のタブ。担当・締め切り・引き継ぎ済みは、ここだけで決める) */
@@ -1456,7 +1458,7 @@ export function ContentPane(props: Props) {
           slots={slots}
           items={props.items}
           products={props.products}
-          campaign={props.campaign}
+          campaign={props.utmCampaign}
           variant={props.linkVariant}
           onFocusSlot={props.onLinkFocus}
         />

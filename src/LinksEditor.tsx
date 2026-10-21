@@ -4,7 +4,7 @@ import { ChevronDownRegular, ChevronRightRegular, OpenRegular } from '@fluentui/
 import type { Product } from './models/products'
 import type { Item } from './items'
 import { useT } from './i18n'
-import { type LinkSlot, type Links, defaultUtm, isUrl, productUrl, variantCampaign, withUtm } from './links'
+import { type LinkSlot, type Links, defaultUtm, isUrl, productContent, productUrl, variantCampaign, withUtm } from './links'
 import { linkKindLabel } from './templates'
 
 const useStyles = makeStyles({
@@ -14,6 +14,8 @@ const useStyles = makeStyles({
   slot: { display: 'grid', rowGap: '2px', minWidth: 0 },
   slotHead: { display: 'flex', alignItems: 'baseline', columnGap: '8px', flexWrap: 'wrap', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
   kind: { fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
+  // utm_content は自動で決まる値(手で変えると計測が壊れるので、見せるだけ)
+  content: { fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace },
   // プレビューの上の番号と同じ印
   num: {
     display: 'inline-block',
@@ -43,7 +45,7 @@ interface Props {
   slots: LinkSlot[]
   items: Item[]
   products: Product[]
-  /** 計測用のパラメーターの campaign の既定値(配信名と日付から作る) */
+  /** 計測用のパラメーターの campaign の既定値(配信日 + 配信カードの ID から作る。links.ts の campaignId) */
   campaign: string
   /** AB テストの、いま編集している案(campaign の末尾に付ける。X55) */
   variant?: string | null
@@ -95,11 +97,12 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
               <span className={styles.num}>{i + 1}</span>
               {s.label}
               <span className={styles.kind}>{linkKindLabel(s.linkKind)}</span>
+              <span className={styles.content}>utm_content={s.content}</span>
             </div>
             <Input size="small" value={v} placeholder={s.defaultUrl || t('URL を入れてください', 'Enter a URL')} onChange={(_, d) => setSlot(s, d.value)} />
             {!url && <span className={styles.warn}>{t('このボタンは、配信ごとに URL を決める設定です。URL を入れてください', 'This button needs a URL for each delivery. Enter one.')}</span>}
             {url && !isUrl(url) && <span className={styles.warn}>{t('URL の形式が正しくありません(https:// から始めてください)', 'This doesn’t look like a URL (start with https://)')}</span>}
-            {url && isUrl(url) && <span className={styles.final}>{t('計測用のパラメーターつき: ', 'With tracking: ')}{withUtm(url, utm)}</span>}
+            {url && isUrl(url) && <span className={styles.final}>{t('計測用のパラメーターつき: ', 'With tracking: ')}{withUtm(url, utm, s.content)}</span>}
           </div>
         )
       })}
@@ -115,6 +118,13 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
           <Field label="utm_campaign" size="small">
             <Input size="small" value={links.utm?.campaign ?? ''} placeholder={dflt.campaign} onChange={(_, d) => setUtm('campaign', d.value)} />
           </Field>
+        </div>
+        <div className={styles.caption}>
+          {t(
+            'utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所(hero・btn1…・商品の枠は p01-商品コード)から自動で決まります。GA で、どの配信のどのリンクが押されたかを見分けるためです。',
+            'utm_campaign is made from the send date and the delivery card ID, and utm_content from the link spot (hero, btn1…, and p01-product code for product slots). This lets GA tell which link in which delivery was clicked.',
+          )}
+          {!campaign.includes('-') && t(' まだ保存していない配信は、保存すると utm_campaign に ID が付きます。', ' For an unsaved delivery, the ID is added to utm_campaign when you save.')}
         </div>
         {variant && (
           <div className={styles.caption}>
@@ -138,9 +148,9 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
       </Button>
       {showProducts && (
         <div className={styles.products}>
-          {items.map((it) => {
+          {items.map((it, i) => {
             const p = products.find((x) => x.id === it.productId)
-            const url = withUtm(productUrl(p), utm)
+            const url = withUtm(productUrl(p), utm, productContent(i, p?.product_code))
             return (
               <div key={it.key} className={styles.productRow}>
                 <div>

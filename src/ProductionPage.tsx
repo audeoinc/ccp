@@ -28,7 +28,7 @@ import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
 import type { VariantKey } from './abTest'
-import { buildSnapshot, downloadText, parseSnapshot, parseVariantHtml, previewHtml, productionVariants, snapshotOf, type Snapshot } from './productionSnapshot'
+import { buildSnapshot, downloadText, htmlLinks, parseSnapshot, parseVariantHtml, previewHtml, productionVariants, snapshotOf, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import { loadPref, savePref } from './settings'
@@ -224,7 +224,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   useEffect(() => {
     const id = setTimeout(() => {
       const out: Partial<Record<VariantKey, string>> = {}
-      for (const [k, el] of Object.entries(offscreenRefs.current)) if (el) out[k as VariantKey] = previewHtml(el, card.name ?? '')
+      for (const [k, el] of Object.entries(offscreenRefs.current)) if (el) out[k as VariantKey] = previewHtml(el, card.name ?? '', htmlLinks(snapshotOf(snap, k as VariantKey), k as VariantKey))
       setGeneratedMap(out)
     }, 600)
     return () => clearTimeout(id)

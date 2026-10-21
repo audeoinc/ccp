@@ -71,6 +71,37 @@ export const slug = (s: string) =>
 /** 配信のページの名前(配信名 + 配信日。配信名が英数字でなければ、日付だけ) */
 export const campaignSlug = (name: string, scheduledAt: string) => [slug(name), scheduledAt.slice(0, 10).replace(/-/g, '')].filter(Boolean).join('-')
 
+// ---- 計測用のパラメーター(UTM)の決まり(2026-10-21 利用者と決めた)
+// utm_campaign = どの配信か(配信日 + 配信カードの ID の先頭 8 文字。AB テストなら末尾に案)、utm_content = その配信の中のどのリンクか。
+// GA の「campaign × content」の数字を、配信 × リンクの位置(メイン画像・ボタン・商品の枠)に振り分けて、結果のヒートマップ・学びに使う。
+// content は位置と商品コードをそのまま書くので、取り込むときに対応表が要らない(制作に渡したあとで並べ替えても、送った値から読める)
+
+/**
+ * UTM の作り方の版。制作の依頼の写しに入れ、版のない古い写しは、これまでの作り方(campaign = 配信名 + 日付、content なし)で出す。
+ * もう送った配信の URL を、画面の上で黙って変えないため
+ */
+export const UTM_SCHEME = 2
+
+/**
+ * utm_campaign の既定値(版 2): 配信日(YYYYMMDD)+ 配信カードの ID の先頭 8 文字。例: 20261021-1a2b3c4d。
+ * 配信名から作ると、日本語の名前は英数字の部分が空になり、同じ日の配信が見分けられない。名前・日時をあとで直しても値が変わらないよう ID を使い、
+ * 日付は人が GA で見て分かるように付ける。まだ保存していない配信は ID がないので、日付だけ(保存すると ID が付く)
+ */
+export const campaignId = (cardId: string | undefined | null, scheduledAt: string) =>
+  [scheduledAt.slice(0, 10).replace(/-/g, ''), (cardId ?? '').replace(/[^0-9a-z]/gi, '').slice(0, 8).toLowerCase()].filter(Boolean).join('-')
+
+/** utm_content: メイン画像 */
+export const CONTENT_HERO = 'hero'
+/** utm_content: ボタン(メールの上から数えた番号。1 から) */
+export const buttonContent = (n: number) => `btn${n}`
+/**
+ * utm_content: 商品の枠(セクションをまたいで、メールの上から通しの番号を 2 桁で。商品コードがあれば後ろに付ける)。例: p01-ABC123。
+ * 商品コードは、大文字・小文字を変えずにそのまま書く(GA は大文字と小文字を区別するので、マスタの商品コードと同じ文字で探せるように)。空白だけ外す。
+ * 取り込むときは、最初の「-」までが枠、残りが商品コード
+ */
+export const productContent = (index: number, productCode?: string | null) =>
+  [`p${String(index + 1).padStart(2, '0')}`, (productCode ?? '').replace(/\s+/g, '')].filter(Boolean).join('-')
+
 /** 計測用のパラメーターの既定値 */
 export const defaultUtm = (campaign: string) => ({ source: 'newsletter', medium: 'email', campaign })
 
@@ -102,14 +133,15 @@ export function defaultUrl(kind: LinkKind, campaign: string, category?: string):
 
 export const productUrl = (p?: Product) => (p?.product_code ? `${SHOP_URL}/p/${p.product_code}` : '')
 
-/** 計測用のパラメーターを付けた URL(URL として読めないときは、そのまま返す) */
-export function withUtm(url: string, utm: Links['utm']): string {
+/** 計測用のパラメーターを付けた URL(URL として読めないときは、そのまま返す)。content はリンクの場所ごと(UTM の版 1 の写しでは渡さない) */
+export function withUtm(url: string, utm: Links['utm'], content?: string): string {
   if (!url) return ''
   try {
     const u = new URL(url)
     if (utm?.source) u.searchParams.set('utm_source', utm.source)
     if (utm?.medium) u.searchParams.set('utm_medium', utm.medium)
     if (utm?.campaign) u.searchParams.set('utm_campaign', utm.campaign)
+    if (content) u.searchParams.set('utm_content', content)
     return u.toString()
   } catch {
     return url
@@ -135,6 +167,8 @@ export interface LinkSlot {
   defaultUrl: string
   /** アプリの配信のときの、既定の画面(custom は null) */
   defaultScreen: AppScreen | null
+  /** utm_content(hero / btn1 …) */
+  content: string
 }
 
 /** テンプレートと掲載商品から、リンクを付ける場所の一覧を作る(メール上の並び順) */
@@ -154,7 +188,8 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
   }
   const heroKind = tpl.heroLink ?? 'campaign'
-  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign), defaultScreen: defaultScreen(heroKind) }]
+  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign), defaultScreen: defaultScreen(heroKind), content: CONTENT_HERO }]
+  let buttonNo = 0
   for (const block of placedButtons(tpl)) {
     const where = block.at === 0 ? tr('メイン画像の下', 'Below the main image') : tr(`セクション ${block.at} の後`, `After section ${block.at}`)
     block.buttons.forEach((b, i) => {
@@ -167,6 +202,7 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
         linkKind: kind,
         defaultUrl: defaultUrl(kind, campaign, block.at > 0 ? categoryOf(block.at - 1) : undefined),
         defaultScreen: defaultScreen(kind, block.at > 0 ? categoryOf(block.at - 1) : undefined),
+        content: buttonContent(++buttonNo),
       })
     })
   }

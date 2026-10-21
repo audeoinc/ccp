@@ -6,7 +6,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { SOURCE_MANUAL, type Item } from './items'
-import { campaignSlug, encodeLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { UTM_SCHEME, campaignId, campaignSlug, encodeLinks, productContent, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { sectionRange, sectionsOf, type EmailTemplateId, templateKeyOfCard } from './templates'
@@ -53,6 +53,8 @@ export interface Snapshot {
   /** 掲載商品の、その時の中身(あとで商品マスタが変わっても、依頼した時の名前・価格で見られるように) */
   products: Product[]
   hero: HeroImage | null
+  /** 計測用のパラメーターの作り方の版(links.ts の UTM_SCHEME)。ない写しは版 1(campaign = 配信名 + 日付、utm_content なし)で出す */
+  utm?: number
   /** AB テスト(X55)。B・C 案の商品とメイン画像(比べる要素でないものは A と同じ)。制作のページでは見るだけ(直すのは配信カードで) */
   ab?: { summary: string; variants: SnapshotVariant[]; /** 案から選ぶ(まだ決まっていない。X57) */ choose?: boolean }
 }
@@ -84,6 +86,7 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     productIds,
     products: products.filter((p) => used.has(p.id)),
     hero,
+    utm: UTM_SCHEME,
     ...(ab && variants ? { ab: { summary: abSummary(ab), variants, ...(isChoose(ab) ? { choose: true } : {}) } } : {}),
   }
 }
@@ -176,7 +179,10 @@ export function textRows(s: Snapshot, all = false): TextRow[] {
 // AB テストの配信は、案ごとに campaign の末尾に案を付ける(X55)。案を渡さなければ、AB テストの配信では A
 const variantOf = (s: Snapshot, variant?: VariantKey) => variant ?? (s.ab ? 'A' : undefined)
 const campaignOf = (s: Snapshot, variant?: VariantKey) => variantCampaign(campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
-const utmOf = (s: Snapshot, variant?: VariantKey) => utmFor(parseLinks(s.card.links), campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
+// utm_campaign の既定値と utm_content は、写しの UTM の版で決める(古い写しは、依頼したときの URL のまま出す)
+const scheme2 = (s: Snapshot) => (s.utm ?? 1) >= 2
+const utmCampaignOf = (s: Snapshot) => (scheme2(s) ? campaignId(s.card.id, s.card.scheduled_at ?? '') : campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''))
+const utmOf = (s: Snapshot, variant?: VariantKey) => utmFor(parseLinks(s.card.links), utmCampaignOf(s), variantOf(s, variant))
 /** 案の utm_campaign(制作のページの「AB テスト」の段に出す) */
 /** AB テスト(全案を送る)の B・C 案の HTML(制作の依頼の列 variant_html)。A 案は列 html */
 export type VariantHtml = Partial<Record<VariantKey, { html: string; saved_at?: string | null; saved_by_name?: string | null }>>
@@ -240,7 +246,11 @@ export function productRows(s: Snapshot, variant?: VariantKey): ProductRow[] {
       const [a, b] = sectionRange(sections, x, s.productIds.length)
       return i >= a && i < b
     })
-    const url = isPushCard(s) ? (product.product_code ? `data: ${fcmText({ kind: 'product', value: product.product_code }, campaignOf(s, variant))}` : '') : withUtm(productUrl(product), utm)
+    const url = isPushCard(s)
+      ? product.product_code
+        ? `data: ${fcmText({ kind: 'product', value: product.product_code }, campaignOf(s, variant))}`
+        : ''
+      : withUtm(productUrl(product), utm, scheme2(s) ? productContent(i, product.product_code) : undefined)
     return [{ section: sec?.label ?? '', product, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
   })
 }
@@ -263,13 +273,31 @@ export function linkRows(s: Snapshot, variant?: VariantKey): LinkRow[] {
       return { label: slot.label, value: d ? `data: ${d}` : '' }
     }
     const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
-    return { label: slot.label, value: url ? withUtm(url, utm) : '', slotKey: slot.key, base: url }
+    return { label: slot.label, value: url ? withUtm(url, utm, scheme2(s) ? slot.content : undefined) : '', slotKey: slot.key, base: url }
   })
   if (isPushCard(s)) {
     const tap = parsePushLink(s.card.push_link)
     if (tap) rows.unshift({ label: tr('通知を押したときに開く画面', 'Screen opened by the notification'), value: tap.kind === 'custom' ? (tap.url ?? '') : tap.kind })
   }
   return rows.filter((r) => r.value || r.slotKey)
+}
+
+/**
+ * 書き出す HTML に付けるリンク(プレビューの印 → 計測用のパラメーターつきの URL)。
+ * 鍵は、メイン画像・ボタンは data-link の場所の鍵(hero・ボタンの id)、商品の枠は data-item-key(`商品ID-並び順`。CardPreview と同じ)。
+ * アプリの配信は、リンクが URL でない(開く画面)ので空
+ */
+export function htmlLinks(s: Snapshot, variant?: VariantKey): Record<string, string> {
+  if (isPushCard(s)) return {}
+  const out: Record<string, string> = {}
+  for (const r of linkRows(s, variant)) if (r.slotKey && r.value) out[r.slotKey] = r.value
+  const utm = utmOf(s, variant)
+  s.productIds.forEach((pid, i) => {
+    const p = s.products.find((x) => x.id === pid)
+    const url = withUtm(productUrl(p), utm, scheme2(s) ? productContent(i, p?.product_code) : undefined)
+    if (url) out[`${pid}-${i}`] = url
+  })
+  return out
 }
 
 /** リンク先を 1 つ直した、新しい写し(計測用のパラメーターは、これまでどおり後から付く) */
@@ -315,13 +343,18 @@ const STYLE_KEYS = [
  * 画面に描いたプレビューの要素を、書式を直接書いた HTML の文字にする(下書き。メールの配信のしくみにそのまま入れる完成品ではない)。
  * 画像の URL は、いまのサイトの URL を頭に付けた形にする(サイトの外で開くと、パスワードの関係で見えないことがある)
  */
-export function previewHtml(root: HTMLElement, title: string): string {
+export function previewHtml(root: HTMLElement, title: string, links: Record<string, string> = {}): string {
   const clone = root.cloneNode(true) as HTMLElement
   const src = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
   const dst = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))]
+  // リンクの場所(メイン画像・ボタン・商品の枠)を、あとで <a> で包む(印は下で外すので、先に拾う)
+  const wraps: { out: HTMLElement; href: string }[] = []
   src.forEach((el, i) => {
     const out = dst[i]
     if (!out) return
+    const at = el.dataset.link === 'hero' ? 'hero' : el.dataset.link === 'button' ? el.dataset.linkId : el.dataset.itemKey
+    const href = at ? links[at] : undefined
+    if (href) wraps.push({ out, href })
     const cs = getComputedStyle(el)
     // 切り出しの書式(焦点・拡大)は、画像だけに、拡大しているときだけ書く(ほかの要素に書くと、HTML が長くなるだけ)
     const isImg = el.tagName === 'IMG'
@@ -334,6 +367,16 @@ export function previewHtml(root: HTMLElement, title: string): string {
     if (out instanceof HTMLImageElement && el instanceof HTMLImageElement) out.setAttribute('src', el.currentSrc || el.src)
   })
   clone.querySelectorAll('button, input, textarea, select, svg').forEach((n) => n.remove())
+  // <a> の中に <a> は置けないので、ほかのリンクの場所を含む場所(ボタンを中に持つメイン画像など)は包まない(中のリンクを生かす)
+  const hasInner = (w: { out: HTMLElement }) => wraps.some((x) => x !== w && w.out.contains(x.out))
+  for (const w of wraps.filter((x) => !hasInner(x))) {
+    const a = document.createElement('a')
+    a.setAttribute('href', w.href)
+    a.setAttribute('target', '_blank')
+    a.setAttribute('style', 'display:block;color:inherit;text-decoration:none')
+    w.out.replaceWith(a)
+    a.appendChild(w.out)
+  }
   const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return prettyHtml(
     `<!doctype html>\n<html lang="${navigator.language.startsWith('ja') ? 'ja' : 'en'}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)}</title>\n</head>\n<body style="margin:0;background:#ffffff">\n${clone.outerHTML}\n</body>\n</html>\n`,
