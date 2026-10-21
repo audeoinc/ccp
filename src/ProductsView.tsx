@@ -18,7 +18,7 @@ import { weeklyLimit } from './weeklyLimit'
 import { weekKeyOf } from './weekLock'
 import { CHANNEL_PUSH } from './status'
 import { productGenderLabel } from './target'
-import { ProductDetailButton } from './ProductDetailButton'
+import { ProductHeadImage } from './ProductHeadImage'
 
 // 見せ方「商品」(X49): 商品を軸に、期間の中で、どの配信に何回載せたか・その結果・週ごとの実績・外部広告の出稿を並べる。
 // 外部に出稿している商品を、配信でも推すべきかを決める材料にする。SPU(商品)とカテゴリの 2 つの粒度で見られる
@@ -308,10 +308,9 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
   const detail: ReactNode = current && (
     <div className={s.detail}>
       <div className={s.detailHead}>
-        {current.product && productImage(current.product) && <img className={s.thumb} src={productImage(current.product)} alt="" draggable={false} />}
+        {/* 画像(とその下のボタン)から、SKU ごとの在庫などを開く(X63。カテゴリの行には出さない)。アラートの画面と同じ形にそろえる */}
+        {current.product && <ProductHeadImage product={current.product} size={64} />}
         <span className={s.detailTitle}>{current.label}</span>
-        {/* SKU ごとの在庫などを、その場で開く(X63。カテゴリの行には出さない)。商品の名前のすぐ右に置く(利用者 2026-10-21) */}
-        {current.product && <ProductDetailButton product={current.product} />}
         <span className={s.sub}>{t(`掲載 ${current.placements.length} 回 ・ 外部広告 ${current.adDays} 日${current.adMedia.size ? `(${[...current.adMedia].map((m) => AdSpendMedia[m as keyof typeof AdSpendMedia] ?? m).join('・')})` : ''}`, `Featured ${current.placements.length}× · Ads ${current.adDays} days`)}</span>
         <Button className={s.close} appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setSelected(null)} />
       </div>

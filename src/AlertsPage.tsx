@@ -16,7 +16,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { locale, useT } from './i18n'
 import { statusColor, statusLabel } from './status'
 import { ChannelBadge } from './ChannelBadge'
-import { ProductDetailButton } from './ProductDetailButton'
+import { ProductHeadImage } from './ProductHeadImage'
 
 const useStyles = makeStyles({
   page: { display: 'grid', rowGap: '12px' },
@@ -50,8 +50,6 @@ const useStyles = makeStyles({
   itemNoImg: { width: '44px', height: '44px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground2 },
   // 右の見出し: 商品の画像と、名前
   headRow: { display: 'flex', alignItems: 'center', columnGap: '14px' },
-  titleRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '12px', rowGap: '4px' },
-  headImg: { width: '72px', height: '72px', flexShrink: 0, objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, border: `1px solid ${tokens.colorNeutralStroke2}` },
   // 表の配信の列: サムネイル(マウスを重ねるとプレビュー)と名前
   delivery: { display: 'inline-flex', alignItems: 'center', columnGap: '10px' },
   itemKind: { display: 'flex', alignItems: 'center', columnGap: '6px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
@@ -333,14 +331,10 @@ export function AlertsPage({ initialProductId, onSelectProduct, onOpenAlertCard,
       {selected && (
         <div className={styles.detail}>
           <div className={styles.headRow}>
-            {productImage(selected.product) && <img className={styles.headImg} src={productImage(selected.product)} alt="" draggable={false} />}
+            {/* 在庫のアラートは、どの色・サイズが欠けているかで対応が変わるので、画像(とその下のボタン)から SKU ごとの在庫を開けるようにする(X63) */}
+            <ProductHeadImage product={selected.product} size={72} />
             <div>
-              {/* 在庫のアラートは、どの色・サイズが欠けているかで対応が変わるので、SKU ごとの在庫を、その場で開けるようにする(X63)。
-                  商品の名前のすぐ右に置く(右端だと、どの商品の情報か分かりにくかったため。利用者 2026-10-21) */}
-              <div className={styles.titleRow}>
-                <h2 className={styles.title}>{`${kindLabel(selected)}: ${selected.product.name}`}</h2>
-                <ProductDetailButton product={selected.product} />
-              </div>
+              <h2 className={styles.title}>{`${kindLabel(selected)}: ${selected.product.name}`}</h2>
               <div className={styles.sub}>
                 {[selected.product.product_code, t('この商品を載せている、まだ送っていない配信', 'Deliveries not yet sent that include this product')].filter(Boolean).join(' ・ ')}
               </div>
