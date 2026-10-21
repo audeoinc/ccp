@@ -21,7 +21,7 @@ export interface UsedLearning {
 
 export interface DeliveryImpactInfo {
   /** ホールドアウトとの比べ(なければ null) */
-  lift: { incremental: number; liftRate: number | null } | null
+  lift: { incremental: number; liftRate: number | null; windowDays?: number; holdoutRate?: number } | null
   /** AI の依頼の記録があるか(ない配信は、学びを渡したかが分からない) */
   recorded: boolean
   learnings: UsedLearning[]
@@ -35,7 +35,8 @@ export function useDeliveryImpact(cardId: string): DeliveryImpactInfo | null {
     void (async () => {
       try {
         const [lifts, runs, reviews] = await Promise.all([DeliveryLiftsService.getAll({ filter }), AiRunsService.getAll({ filter }), LearningReviewsService.getAll()])
-        const l = liftOf(lifts.success ? lifts.data?.[0] : undefined)
+        const liftRow = lifts.success ? lifts.data?.[0] : undefined
+        const l = liftOf(liftRow)
         const runRows = runs.success ? (runs.data ?? []) : []
         const ids = [...new Set(runRows.flatMap(learningIdsOf))]
         const retired = retiredLearningIds(reviews.success ? (reviews.data ?? []) : [])
@@ -58,7 +59,7 @@ export function useDeliveryImpact(cardId: string): DeliveryImpactInfo | null {
             }),
           )
         ).filter((x): x is UsedLearning => !!x)
-        if (alive) setInfo({ lift: l ? { incremental: l.incRevenue, liftRate: l.liftRate } : null, recorded: runRows.length > 0, learnings })
+        if (alive) setInfo({ lift: l ? { incremental: l.incRevenue, liftRate: l.liftRate, windowDays: liftRow?.window_days, holdoutRate: liftRow?.holdout_rate } : null, recorded: runRows.length > 0, learnings })
       } catch {
         if (alive) setInfo(null)
       }

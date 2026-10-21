@@ -48,8 +48,17 @@ export function ResultKpis({ row, money, lift }: { row: ResultRow; money: (v?: n
     [t('配信経由の売上', 'Revenue via delivery'), money(row.revenue)],
     ...(lift
       ? ([
-          [t('増えた売上', 'Incremental revenue'), money(Math.round(lift.incremental))],
-          [t('リフト率', 'Lift'), lift.liftRate == null ? '—' : `${(lift.liftRate * 100).toFixed(1)}%`],
+          // 測定の条件(購買を数えた日数・送らなかった割合)も、ラベルに添える(何と比べた数字かが分かるように)
+          [
+            lift.windowDays
+              ? t(`増えた売上(${lift.windowDays} 日間)`, `Incremental (${lift.windowDays} days)`)
+              : t('増えた売上', 'Incremental revenue'),
+            money(Math.round(lift.incremental)),
+          ],
+          [
+            lift.holdoutRate ? t(`リフト率(送らず ${Math.round(lift.holdoutRate * 100)}%)`, `Lift (${Math.round(lift.holdoutRate * 100)}% holdout)`) : t('リフト率', 'Lift'),
+            lift.liftRate == null ? '—' : `${(lift.liftRate * 100).toFixed(1)}%`,
+          ],
         ] as [string, ReactNode][])
       : []),
     [t('注文', 'Orders'), n(result.orders)],

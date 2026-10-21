@@ -115,6 +115,21 @@ const useStyles = makeStyles({
   list: { display: 'grid', rowGap: '6px', margin: 0, paddingLeft: '18px', fontSize: tokens.fontSizeBase200 },
   up: { color: tokens.colorPaletteGreenForeground1 },
   down: { color: tokens.colorPaletteRedForeground1 },
+  // 対象の期間(どの配信を集計に入れるか)と、測定の条件の要約
+  period: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '8px',
+    padding: '8px 12px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    fontSize: tokens.fontSizeBase200,
+  },
+  periodLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  dateInput: { fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, padding: '2px 6px', border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: tokens.borderRadiusMedium },
+  periodSummary: { color: tokens.colorNeutralForeground2, fontVariantNumeric: 'tabular-nums' },
 })
 
 type TabKey = 'lift' | 'log' | 'metrics' | 'sales' | 'learnings'
@@ -140,6 +155,32 @@ const PER = 1000
 const signedMoney = (v: number | null, market: Market, perUser = false) => (v == null ? '-' : `${v >= 0 ? '+' : '−'}${money(Math.abs(v), market, perUser)}`)
 const MARKETS: Market[] = ['US', 'JP']
 
+/** 対象の期間(配信日。YYYY-MM-DD。'' = 端を決めない) */
+interface Period {
+  from: string
+  to: string
+}
+const PERIOD_KEY = 'ccp.impactPeriod'
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const dayOf = (iso: string) => (iso ? ymd(new Date(iso)) : '')
+/** 期間はブラウザごとに覚える(開き直しても同じ期間で見られるように)。読めなければ「すべて」 */
+function loadPeriod(): Period {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(PERIOD_KEY) ?? 'null') as Period | null
+    if (v && typeof v.from === 'string' && typeof v.to === 'string') return v
+  } catch {
+    // 読めないときは「すべて」
+  }
+  return { from: '', to: '' }
+}
+function savePeriod(p: Period) {
+  try {
+    window.localStorage.setItem(PERIOD_KEY, JSON.stringify(p))
+  } catch {
+    // 覚えられなくても、画面はそのまま使える
+  }
+}
+
 export function ImpactView({ cards, onOpenResult }: Props) {
   const s = useStyles()
   const t = useT()
@@ -153,6 +194,11 @@ export function ImpactView({ cards, onOpenResult }: Props) {
     window.addEventListener(IMPACT_TAB_EVENT, on)
     return () => window.removeEventListener(IMPACT_TAB_EVENT, on)
   }, [])
+  const [period, setPeriodState] = useState<Period>(loadPeriod)
+  const setPeriod = (p: Period) => {
+    setPeriodState(p)
+    savePeriod(p)
+  }
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
   const [runs, setRuns] = useState<AiRun[]>([])
   const [lifts, setLifts] = useState<DeliveryLift[]>([])
@@ -179,8 +225,18 @@ export function ImpactView({ cards, onOpenResult }: Props) {
 
   // AB テストの配信は、案ごとに結果の行が分かれるので、配信ごとに 1 行にまとめてから使う(まとめた行の id は、メモのある行 = 学びの id)
   const merged = useMemo(() => (results ? mergeResultsByCard(results) : null), [results])
-  const impacts = useMemo(() => (merged ? buildImpacts(cards, merged, runs, lifts) : []), [cards, merged, runs, lifts])
-  // 学びは、絞り込み済みの配信(国・チャネル)の分だけを並べる(その国・チャネルの学びだけが並ぶほうが分かりやすい)
+  const allImpacts = useMemo(() => (merged ? buildImpacts(cards, merged, runs, lifts) : []), [cards, merged, runs, lifts])
+  // 対象の期間(配信日)で絞る。すべてのタブの集計・比べが、この期間の配信だけになる
+  const impacts = useMemo(
+    () =>
+      allImpacts.filter((d) => {
+        const day = dayOf(d.sentAt)
+        return (!period.from || day >= period.from) && (!period.to || day <= period.to)
+      }),
+    [allImpacts, period],
+  )
+  // 学びは、絞り込み済みの配信(国・チャネル)の分だけを並べる(その国・チャネルの学びだけが並ぶほうが分かりやすい)。
+  // 学びの出どころは期間の前でもよい(期間の中の配信に渡していれば、比べられる)
   const evals = useMemo(() => (merged ? evaluateLearnings(cards, merged, impacts, reviews) : []), [cards, merged, impacts, reviews])
 
   if (error) {
@@ -195,6 +251,7 @@ export function ImpactView({ cards, onOpenResult }: Props) {
   const noData = runs.length === 0 && lifts.length === 0
   return (
     <div className={s.root}>
+      <PeriodBar period={period} onChange={setPeriod} impacts={impacts} />
       <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabKey)} size="small">
         <Tab value="lift">{t('売上の増分', 'Incremental sales')}</Tab>
         <Tab value="log">{t('① 学びの記録', '① Learnings log')}</Tab>
@@ -217,6 +274,59 @@ export function ImpactView({ cards, onOpenResult }: Props) {
       {tab === 'metrics' && <MetricsTab impacts={impacts} />}
       {tab === 'sales' && <SalesTab impacts={impacts} />}
       {tab === 'learnings' && <LearningsTab evals={evals} onChanged={loadReviews} onOpenResult={onOpenResult} />}
+    </div>
+  )
+}
+
+// ---- 対象の期間
+
+function PeriodBar({ period, onChange, impacts }: { period: Period; onChange: (p: Period) => void; impacts: DeliveryImpact[] }) {
+  const s = useStyles()
+  const t = useT()
+  const today = new Date()
+  const ago = (days: number) => ymd(new Date(today.getFullYear(), today.getMonth(), today.getDate() - days))
+  const presets: [string, Period][] = [
+    [t('すべて', 'All'), { from: '', to: '' }],
+    [t('直近 4 週', 'Last 4 weeks'), { from: ago(27), to: ymd(today) }],
+    [t('直近 12 週', 'Last 12 weeks'), { from: ago(83), to: ymd(today) }],
+    [t('直近 26 週', 'Last 26 weeks'), { from: ago(181), to: ymd(today) }],
+    [t('今年', 'This year'), { from: `${today.getFullYear()}-01-01`, to: ymd(today) }],
+  ]
+  const date = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
+  // 期間の中の、実際の最初と最後の配信日(「すべて」のときも、どこからどこまでかが分かるように)
+  const days = impacts.map((d) => d.sentAt).filter(Boolean).sort()
+  // 測定の条件(購買を数えた日数・送らなかった割合)。配信ごとに違えば、幅で出す
+  const span = (vals: number[], fmt: (v: number) => string) => {
+    const u = [...new Set(vals)].sort((a, b) => a - b)
+    return u.length === 0 ? null : u.length === 1 ? fmt(u[0]) : `${fmt(u[0])}〜${fmt(u[u.length - 1])}`
+  }
+  const lifted = impacts.filter((d) => d.lift)
+  const windowText = span(lifted.map((d) => d.lift?.window_days ?? 0).filter((v) => v > 0), (v) => `${v}`)
+  const holdoutText = span(lifted.map((d) => Math.round((d.lift?.holdout_rate ?? 0) * 100)).filter((v) => v > 0), (v) => `${v}`)
+  return (
+    <div className={s.period}>
+      <span className={s.periodLabel}>{t('対象の期間(配信日)', 'Period (send date)')}</span>
+      <input type="date" className={s.dateInput} value={period.from} max={period.to || undefined} onChange={(e) => onChange({ ...period, from: e.target.value })} aria-label={t('期間の始まり', 'From')} />
+      <span>〜</span>
+      <input type="date" className={s.dateInput} value={period.to} min={period.from || undefined} onChange={(e) => onChange({ ...period, to: e.target.value })} aria-label={t('期間の終わり', 'To')} />
+      {presets.map(([name, p]) => {
+        const on = p.from === period.from && p.to === period.to
+        return (
+          <Button key={name} size="small" appearance={on ? 'primary' : 'subtle'} onClick={() => onChange(p)}>
+            {name}
+          </Button>
+        )
+      })}
+      <span className={s.periodSummary}>
+        {days.length
+          ? t(`${date(days[0])}〜${date(days[days.length - 1])} の配信 ${impacts.length} 本`, `${impacts.length} deliveries, ${date(days[0])} to ${date(days[days.length - 1])}`)
+          : t('この期間の配信はありません', 'No deliveries in this period')}
+        {windowText && t(` · 購買は配信から ${windowText} 日`, ` · purchases counted for ${windowText} days after sending`)}
+        {holdoutText && t(` · 送らなかった人 ${holdoutText}%`, ` · holdout ${holdoutText}%`)}
+      </span>
+      {impacts.length > 0 && impacts.length < 12 && (
+        <span className={s.muted}>{t('配信が少ないと、比べは「材料不足」になりやすくなります', 'With few deliveries, comparisons are often "too few"')}</span>
+      )}
     </div>
   )
 }
@@ -306,6 +416,14 @@ function LiftTab({ impacts, onOpenResult }: { impacts: DeliveryImpact[]; onOpenR
     { key: 'attr', label: t('配信を通った売上', 'Attributed sales'), numeric: true, cell: (d) => money(d.result.revenue, d.market), sort: (d) => d.result.revenue },
     { key: 'inc', label: t('増えた売上', 'Incremental sales'), numeric: true, cell: (d) => money(d.incRevenue, d.market), sort: (d) => d.incRevenue ?? undefined },
     { key: 'lift', label: t('リフト率', 'Lift'), numeric: true, cell: (d) => pct(d.liftRate), sort: (d) => d.liftRate ?? undefined },
+    {
+      key: 'window',
+      label: t('測定', 'Measured'),
+      cell: (d) =>
+        d.lift
+          ? t(`${d.lift.window_days ?? '-'} 日 · 送らず ${Math.round((d.lift.holdout_rate ?? 0) * 100)}%`, `${d.lift.window_days ?? '-'} days · holdout ${Math.round((d.lift.holdout_rate ?? 0) * 100)}%`)
+          : '-',
+    },
     { key: 'learn', label: t('学び', 'Learnings'), cell: (d) => <LearningsMark d={d} />, sort: (d) => d.learningIds.length },
   ]
   return (
