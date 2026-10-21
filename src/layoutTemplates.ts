@@ -30,6 +30,16 @@ import {
   type TemplateChannel,
 } from './templates'
 import { tr } from './i18n'
+import { MAX_CELL_COLS, MAX_CELL_ROWS, cellRows, normalizeCells, type Cell } from './cells'
+
+/** 保存されたマス目の枠を読む(数でないもの・欠けたものは外す。形は toStored で整える) */
+function parseCells(v: unknown): Cell[] {
+  if (!Array.isArray(v)) return []
+  return v
+    .map((x) => x as Partial<Cell>)
+    .filter((x) => [x.c, x.r, x.w, x.h].every((n) => typeof n === 'number' && Number.isFinite(n)))
+    .map((x) => ({ c: x.c as number, r: x.r as number, w: x.w as number, h: x.h as number }))
+}
 
 const HERO_KINDS: HeroKind[] = ['standard', 'collab', 'offer']
 const HERO_TEXTS: HeroText[] = ['band', 'overlay', 'below']
@@ -44,6 +54,8 @@ export const MAX_BUTTON_LABEL = 30
 
 /** 種類に合わせて、枠の数を整える(モザイクは 3 の倍数) */
 export function fitSlots(kind: SectionKind, slots: number): number {
+  // マス目は、枠の数がマス目の形で決まるので、ここでは変えない(上限だけ)
+  if (kind === 'cells') return Math.min(MAX_SLOTS, Math.max(1, slots))
   const step = slotStep(kind)
   const max = Math.floor(MAX_SLOTS / step) * step
   return Math.min(max, Math.max(step, Math.round(slots / step) * step))
@@ -51,6 +63,20 @@ export function fitSlots(kind: SectionKind, slots: number): number {
 
 /** 保存する形に整える。既定の値(2 列、見出しなし、コピーあり、ボタンなし)は書かない(以前の JSON と同じ形を保つため) */
 export function toStored(s: Section): Section {
+  if (s.kind === 'cells') {
+    // マス目: 列・行の範囲に収め、すき間なく埋めた形にして持つ。slots は枠の数(以前の版のアプリは、知らない種類をグリッドとして、この数で読む)
+    const cols = Math.min(MAX_CELL_COLS, Math.max(1, Math.round(s.cols ?? 2)))
+    const rows = Math.min(MAX_CELL_ROWS, Math.max(1, cellRows(s.cells ?? [])))
+    const cells = normalizeCells(cols, rows, s.cells ?? []).slice(0, MAX_SLOTS)
+    return {
+      kind: 'cells',
+      slots: cells.length,
+      cols,
+      cells,
+      ...(s.categoryHeading ? { categoryHeading: true } : {}),
+      ...(s.copy === false ? { copy: false } : {}),
+    }
+  }
   return {
     kind: s.kind,
     slots: fitSlots(s.kind, s.slots),
@@ -127,7 +153,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
     const sections: Section[] = []
     const buttonBlocks: ButtonBlock[] = []
     for (const r of raw) {
-      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown }
+      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown }
       if (o?.kind === 'hero' || o?.kind === 'app') continue
       if (o?.kind === 'buttons') {
         const buttons = parseButtons(o.buttons)
@@ -147,6 +173,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
           categoryHeading: !!o.categoryHeading,
           copy: o.copy === false ? false : undefined,
           buttons: o.buttons === 1 || o.buttons === 2 ? o.buttons : undefined,
+          ...(kind === 'cells' ? { cols: Number(o.cols), cells: parseCells(o.cells) } : {}),
         }),
       )
     }

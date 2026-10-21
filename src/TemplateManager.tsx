@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import {
   Badge,
   Button,
@@ -13,6 +13,7 @@ import {
   MessageBar,
   MessageBarBody,
   Select,
+  Slider,
   Tab,
   TabList,
   Text,
@@ -30,6 +31,8 @@ import { statusLabel, statusRank } from './status'
 import { PartThumb, TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import { Splitter } from './Splitter'
+import { CellEditor } from './CellEditor'
+import { CELL_PRESETS, cellPreset, type CellPreset } from './cells'
 import {
   DEFAULT_PUSH_TEMPLATE,
   LINK_KINDS,
@@ -60,6 +63,7 @@ import {
   type PushSpec,
   type LinkKind,
   type Section,
+  type SectionKind,
   type TemplateLayout,
 } from './templates'
 
@@ -110,8 +114,9 @@ function fromParts(d: Draft): TemplateLayout {
  * 種類の選択肢。データでは、種類(kind)と、列の数(columns)・左右(flip)の組み合わせで表す。
  * 選び直したときは、その種類で 1 行(1 組)になる枠の数に合わせる(3 列なら 3 点、モザイクなら 3 点)
  */
-type SectionLayout = 'grid' | 'grid3' | 'photos' | 'photos3' | 'wide' | 'mosaic' | 'mosaicR' | 'story' | 'feature'
-const LAYOUTS: SectionLayout[] = ['grid', 'grid3', 'photos', 'photos3', 'wide', 'mosaic', 'mosaicR', 'story', 'feature']
+// cells: マス目(自由に組む)。cells:見本の ID は、パレットの見本から置くとき
+type SectionLayout = 'grid' | 'grid3' | 'photos' | 'photos3' | 'wide' | 'mosaic' | 'mosaicR' | 'story' | 'feature' | 'cells' | `cells:${string}`
+const LAYOUTS: SectionLayout[] = ['grid', 'grid3', 'photos', 'photos3', 'wide', 'mosaic', 'mosaicR', 'story', 'feature', 'cells']
 const layoutValue = (sec: Section): SectionLayout => {
   if (sec.kind === 'grid' || sec.kind === 'photos') return gridColumns(sec) === 3 ? `${sec.kind}3` : sec.kind
   if (sec.kind === 'mosaic') return sec.flip ? 'mosaicR' : 'mosaic'
@@ -120,7 +125,7 @@ const layoutValue = (sec: Section): SectionLayout => {
 /** 構成の形(セクションの種類・列・左右・枠の数と、ボタンの位置・数)。同じなら、見た目の設定のほかは同じテンプレート */
 const shapeOf = (l: TemplateLayout) =>
   JSON.stringify([
-    l.sections.map((sec) => [layoutValue(sec), sec.slots]),
+    l.sections.map((sec) => [layoutValue(sec), sec.slots, sec.kind === 'cells' ? [sec.cols, sec.cells] : null]),
     // 標準の古い形(ヒーローの後・セクションの後のボタンの数)も、置いた位置のボタンに直してから比べる
     placedButtons(l).filter((b) => b.buttons.length > 0).map((b) => [Math.max(0, Math.min(b.at, l.sections.length)), b.buttons.length]).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
   ])
@@ -154,6 +159,23 @@ function loadEditorWidths(): EditorWidths {
   }
   return EDITOR_WIDTHS
 }
+/** プレビュー・キャンバスの倍率(その人のブラウザに覚える)。全体('fit')は、枠の高さ(と幅)に収まる大きさ */
+const ZOOM_KEY = 'ccp.templatePreviewZoom'
+const ZOOM_MIN = 0.25 // キャンバスの列を広げていても、「全体」で収まるように、小さくできる
+const ZOOM_MAX = 2.5
+function loadZoom(): number | 'fit' {
+  try {
+    const v = JSON.parse(localStorage.getItem(ZOOM_KEY) ?? 'null')
+    if (v === 'fit') return 'fit'
+    if (typeof v === 'number' && v >= ZOOM_MIN && v <= ZOOM_MAX) return v
+  } catch {
+    // 読めなければ 100%
+  }
+  return 1
+}
+/** 倍率を広げたときの、一覧で見ているプレビューの最大の幅(設定の欄を押しつぶさないように) */
+const PREVIEW_MAX = 560
+
 /** 設定の列の最小の幅(ボタンの行が収まる幅)。ほかの列を広げても、これより狭くしない */
 const FIELDS_MIN = 340
 /** 列の間(境界 3 本 + 間隔 6 つ) */
@@ -161,6 +183,8 @@ const EDITOR_GAPS = 3 + 6 * 10
 /** 編集中の左の一覧の開け閉めを覚えておく所(その人のブラウザだけ) */
 const COMPARE_OPEN_KEY = 'ccp.templateCompareOpen'
 
+/** 見本のマス目から、セクションを作る */
+const cellsSection = (p: CellPreset): Section => ({ kind: 'cells', cols: p.cols, cells: p.cells.map((x) => ({ ...x })), slots: p.cells.length })
 const layoutSection = (v: SectionLayout): Section => {
   switch (v) {
     case 'grid3':
@@ -169,8 +193,12 @@ const layoutSection = (v: SectionLayout): Section => {
       return { kind: 'photos', columns: 3, slots: 6 }
     case 'mosaicR':
       return { kind: 'mosaic', flip: true, slots: 3 }
-    default:
-      return { kind: v, slots: v === 'mosaic' ? 3 : v === 'wide' ? 1 : 2 }
+    case 'cells':
+      return cellsSection(CELL_PRESETS[0])
+    default: {
+      if (v.startsWith('cells:')) return cellsSection(cellPreset(v.slice(6)) ?? CELL_PRESETS[0])
+      return { kind: v as Exclude<SectionKind, 'cells'>, slots: v === 'mosaic' ? 3 : v === 'wide' ? 1 : 2 }
+    }
   }
 }
 const layoutPatch = (v: SectionLayout, sec: Section): Section => {
@@ -264,7 +292,13 @@ const useStyles = makeStyles({
   // 縦長の見取り図をスクロールしても、編集欄と並べて見られるように、上に貼り付ける
   preview: { display: 'grid', rowGap: '6px', justifyItems: 'start', position: 'sticky', top: 0 },
   // 縦長の見取り図は、それだけでスクロールできるようにする(長いテンプレートでも、編集しながら下まで見られる)
-  previewScroll: { maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 150px)', overflowY: 'auto', paddingRight: '4px' },
+  // 高さを決めておく(倍率「全体」は、この高さに収める)。広げたときは、縦横にスクロール
+  previewScroll: { height: 'calc((86vh / var(--ui-zoom, 1)) - 190px)', overflow: 'auto', paddingRight: '4px' },
+  previewZoomBox: { maxWidth: `${PREVIEW_MAX + 8}px` },
+  zoomTarget: { flexShrink: 0 },
+  zoomBar: { display: 'flex', alignItems: 'center', columnGap: '2px' },
+  zoomSlider: { width: '80px', minWidth: '80px' },
+  zoomLabel: { width: '36px', textAlign: 'right', fontSize: '12px' },
   row: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'end' },
   // 部品(ヒーロー・セクション・ボタン)のカード
   card: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },
@@ -272,6 +306,12 @@ const useStyles = makeStyles({
   cardHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '4px 6px 4px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, minHeight: '32px' },
   cardTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   // セクションの 4 つの設定を、1 行に並べる(狭いときは折り返す)
+  // マス目の編集は、設定の行の幅いっぱいに置く
+  cellsField: { gridColumn: '1 / -1', order: 10 },
+  foldButton: { minWidth: '20px', width: '20px', padding: 0 },
+  foldSummary: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
+  foldAll: { display: 'flex', justifyContent: 'flex-end', columnGap: '2px', marginTop: '-4px' },
+  infoBody: { padding: '10px', display: 'grid', rowGap: '10px' },
   sectionBody: { padding: '10px', display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr)', gap: '10px 12px', alignItems: 'start' },
   // Select の既定の最小幅で、隣の欄に重ならないようにする
   fill: { width: '100%', minWidth: 0 },
@@ -292,7 +332,9 @@ const useStyles = makeStyles({
     columnGap: '10px',
     alignItems: 'start',
   },
-  areaCanvas: { gridArea: 'canvas' },
+  // 拡大したとき、隣の列にはみ出さず、枠の中で横にスクロールするように(グリッドの子は、既定では中身より狭くならない)
+  areaCanvas: { gridArea: 'canvas', minWidth: 0 },
+  canvasScroll: { width: '100%', boxSizing: 'border-box' },
   // 境界の線は、いちばん長い列(設定)の高さまで伸ばす
   splitCell: { alignSelf: 'stretch', display: 'grid' },
   compareCol: { gridArea: 'list', position: 'sticky', top: 0, display: 'grid', rowGap: '6px', alignContent: 'start', maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px' },
@@ -423,7 +465,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   const usage = useMemo(() => buildUsage(cards), [cards])
   const usageHere = useMemo(() => buildUsage(country ? cards.filter((c) => c.country === country) : cards), [cards, country])
   const hereOf = (id?: string) => (id ? usageHere.get(id) : undefined) ?? emptyUsage()
-  // 使っている配信の一覧で、開いている過去の版(いまの版は、いつも開いておく)
+  // 使っている配信の一覧で、開いている版。いまの版も含めて、最初は閉じておく(一覧が長いと、ほかの欄が下に押し出されるため。2026-10-21 利用者の指示)
   const [openVersions, setOpenVersions] = useState<Set<number>>(new Set())
   const usageOf = (id?: string) => (id ? usage.get(id) : undefined) ?? emptyUsage()
   const usageText = (id?: string) => {
@@ -461,6 +503,57 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     })
   // キャンバスの隣に並べて見比べているテンプレート
   const [compareId, setCompareId] = useState<string | null>(null)
+  // プレビュー・キャンバスの倍率。見取り図の幅を変えて大きくする(CSS の zoom ではなく幅で。箱を押す・つかむ位置がずれないように)
+  const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
+  const [fitZoom, setFitZoom] = useState(1)
+  useEffect(() => {
+    try {
+      localStorage.setItem(ZOOM_KEY, JSON.stringify(zoom))
+    } catch {
+      // 覚えられなくても、倍率は変えられる
+    }
+  }, [zoom])
+  const shownZoom = zoom === 'fit' ? fitZoom : zoom
+  const stepZoom = (d: number) => setZoom(Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, shownZoom + d)) * 100) / 100)
+  /** 倍率をかけた幅 */
+  const zoomed = (base: number) => Math.round(base * shownZoom)
+  // 全体: 見取り図の縦横の比を測り、枠に収まる倍率を求める(内容・列の幅・窓の大きさが変わったら、測り直す)
+  const zoomBoxRef = useRef<HTMLDivElement>(null)
+  const zoomBaseRef = useRef(1)
+  useLayoutEffect(() => {
+    const box = zoomBoxRef.current
+    if (zoom !== 'fit' || !box) return
+    const calc = () => {
+      const el = box.querySelector<HTMLElement>('[data-zoom-target]')
+      if (!el || el.offsetWidth === 0) return
+      const ratio = el.offsetHeight / el.offsetWidth
+      // 一覧のプレビューの枠は、中身に合わせて幅が変わるので、枠の幅ではなく上限で決める(枠の幅で決めると、測るたびに縮む)
+      const maxW = el.dataset.zoomTarget === 'pair' ? (box.clientWidth - 16) / 2 : el.dataset.zoomTarget === 'grow' ? PREVIEW_MAX : box.clientWidth - 8
+      // 高さには余白を残す(キャンバスの「いちばん下に入れる所」など、倍率に比例しない高さがあるため)
+      const w = Math.min(maxW, (box.clientHeight - 32) / ratio)
+      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, w / zoomBaseRef.current))
+      // 幅の丸めで値がわずかに揺れ、描き直しが続かないように、小さな差では変えない
+      setFitZoom((v) => (Math.abs(v - z) < 0.01 ? v : z))
+    }
+    calc()
+    const ro = new ResizeObserver(calc)
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [zoom, draft, selectedId, viewKey, compareId, listOpen]) // 列の幅が変わったときは、枠の大きさの変化(ResizeObserver)で測り直す
+  /** 倍率の操作(配信カードのプレビューと同じ並び) */
+  const zoomBar = () => (
+    <div className={s.zoomBar}>
+      <Button size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
+      <Slider size="small" className={s.zoomSlider} min={ZOOM_MIN * 100} max={ZOOM_MAX * 100} step={5} value={Math.round(shownZoom * 100)} onChange={(_, d) => setZoom(d.value / 100)} aria-label={t('プレビューの倍率', 'Preview zoom')} />
+      <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
+      <span className={s.zoomLabel}>{Math.round(shownZoom * 100)}%</span>
+      {/* ボタンの文字は、押したときの動き: 全体表示の前は「全体」、全体表示のときは「100%」 */}
+      <Button size="small" appearance={zoom === 'fit' ? 'primary' : 'outline'} onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')} aria-label={zoom === 'fit' ? t('100% の倍率に戻す', 'Reset to 100%') : t('全体を表示', 'Fit the whole layout')}>
+        {zoom === 'fit' ? '100%' : t('全体', 'Fit')}
+      </Button>
+    </div>
+  )
+
   // 列の幅。配信カードと同じく、境界(スプリッター)をつかんで変え、その人のブラウザに覚えさせる
   const [colW, setColW] = useState<EditorWidths>(loadEditorWidths)
   useEffect(() => {
@@ -501,7 +594,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     overlay: t('写真に大きく重ねる', 'Large over the photo'),
     below: t('写真の下に置く', 'Below the photo'),
   }
-  const layoutLabel = (v: SectionLayout) => sectionKindLabel(layoutSection(v))
+  const layoutLabel = (v: SectionLayout) =>
+    v === 'cells' ? t('マス目(自由に組む)', 'Grid cells (build your own)') : v.startsWith('cells:') ? (cellPreset(v.slice(6))?.label() ?? '') : sectionKindLabel(layoutSection(v))
   const styleLabel = (b: ButtonSpec) => (b.style === 'outline' ? t('枠線', 'Outline') : t('塗り', 'Filled'))
 
   const close = () => {
@@ -523,12 +617,14 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     setError(null)
     setSelectedId('')
     setCompareId(null)
+    setFolded(new Set()) // 開くたびに、すべて開いた形から
     setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, buttons: [] } } : newDraft())
   }
   const startDuplicate = () => {
     if (!selected) return
     setError(null)
     setCompareId(null)
+    setFolded(new Set()) // 開くたびに、すべて開いた形から
     setDraft({
       name: t(`${selected.label} のコピー`, `Copy of ${selected.label}`),
       description: selected.description,
@@ -548,6 +644,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     if (!selected || !canEdit(selected)) return
     setError(null)
     setCompareId(null)
+    setFolded(new Set()) // 開くたびに、すべて開いた形から
     setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected), push: selected.push })
   }
 
@@ -634,8 +731,38 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   const [dragKey, setDragKey] = useState<string | null>(null)
   // 選んでいる部品(プレビューの箱を押す・左のカードを押す)。プレビューの箱に枠と道具、左のカードに枠を出し、左はその位置までスクロールする
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  // 右の設定の、閉じているまとまり(info・push・hero・部品の key)。キャンバスで選んだ部品は開く
+  const [folded, setFolded] = useState<Set<string>>(new Set())
+  const toggleFold = (key: string) =>
+    setFolded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  /** まとまりの開け閉めのボタン(見出しの先頭に置く) */
+  const foldButton = (key: string) => (
+    <Button
+      size="small"
+      appearance="transparent"
+      className={s.foldButton}
+      icon={folded.has(key) ? <ChevronRightRegular /> : <ChevronDownRegular />}
+      aria-expanded={!folded.has(key)}
+      aria-label={folded.has(key) ? t('開く', 'Expand') : t('閉じる', 'Collapse')}
+      onClick={(e) => {
+        e.stopPropagation()
+        toggleFold(key)
+      }}
+    />
+  )
   const selectPart = (key: string, scroll: boolean) => {
     setSelectedKey(key)
+    setFolded((prev) => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
     if (scroll) window.setTimeout(() => document.getElementById(`tplpart-${key}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0)
   }
   const [dropAt, setDropAt] = useState<number | null>(null)
@@ -688,7 +815,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   // キャンバスの列の幅から、見取り図の幅を決める。見比べるときは 2 つ並べるので、列を広げて半分ずつ
   const canvasRoom = gridW ? gridW - EDITOR_GAPS - FIELDS_MIN - (listOpen ? colW.list : 32) - colW.palette : Infinity
   const canvasCol = Math.max(220, Math.min(compared ? Math.max(colW.canvas, COMPARE_WIDTH * 2 + 36) : colW.canvas, canvasRoom))
-  const canvasWidth = compared ? Math.floor((canvasCol - 36) / 2) : canvasCol - 24
+  const canvasBase = compared ? Math.floor((canvasCol - 36) / 2) : canvasCol - 24
+  const canvasWidth = zoomed(canvasBase)
 
   /** 左の列: ほかのテンプレート(押すと、キャンバスの隣に並べて見比べる)。閉じると細い帯 */
   const compareCol = () =>
@@ -748,11 +876,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   const PALETTE_GROUPS: { label: string; items: (SectionLayout | 'buttons')[] }[] = [
     { label: t('商品を並べる', 'List products'), items: ['grid', 'grid3', 'feature'] },
     { label: t('写真で見せる', 'Show photos'), items: ['photos', 'photos3', 'wide', 'mosaic', 'mosaicR'] },
+    // マス目は、見本から置いて、マス目を直して自由に組む
+    { label: t('マス目で組む(見本)', 'Grid cells (samples)'), items: CELL_PRESETS.map((p): SectionLayout => `cells:${p.id}`) },
     { label: t('読ませる', 'Tell a story'), items: ['story'] },
     { label: t('ボタン', 'Buttons'), items: ['buttons'] },
   ]
   const partHelp = (k: SectionLayout | 'buttons'): string =>
-    ({
+    k.startsWith('cells:')
+      ? `${cellPreset(k.slice(6))?.help() ?? ''}${t('(置いたあと、マス目を直せます)', ' (you can edit the cells after placing it)')}`
+      : ({
       grid: t('名前・価格つきで、2 列に並べる。いちばん使う形', 'Two columns with names and prices. The most common layout'),
       grid3: t('名前・価格つきで、3 列に並べる。点数を多く見せたいとき', 'Three columns with names and prices. To show more items'),
       feature: t('写真と説明を横に並べて、1 点ずつ紹介する', 'Photo and text side by side, one item at a time'),
@@ -763,7 +895,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       mosaicR: t('大 1 点 + 小 2 点(右が大)。モザイクを続けるときに左右を変える', 'One large + two small (large on the right). Alternate with the left one'),
       story: t('写真と商品の説明を、左右交互に。読ませる特集に', 'Photo and description, alternating sides. For editorial features'),
       buttons: t('ボタンを置く(1〜2 個)。セクションの間の好きな位置に', 'Place buttons (1–2) anywhere between sections'),
-    })[k]
+      cells: t('列と行を決め、マスをなぞって枠をまとめる', 'Choose columns and rows, then drag to merge cells'),
+    } as Record<string, string>)[k] ?? ''
   /** 左の列: 上限の目盛りと、絵つきの部品のパレット(構成・キャンバスへドラッグ。押すと、いちばん下に足す) */
   const paletteCol = () => (
     <aside className={s.paletteCol} aria-label={t('部品', 'Parts')}>
@@ -996,29 +1129,25 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
         {country && all > u.total && <span className={s.caption}>{t(`ほかの国でも ${all - u.total} 本で使っています(ヘッダーの国を変えると見られます)`, `Also used by ${all - u.total} in other countries (switch the country in the header to see them)`)}</span>}
         {versions.map((v) => {
           const list = [...(u.byVersion.get(v) ?? [])].sort((a, b) => (b.scheduled_at ?? '').localeCompare(a.scheduled_at ?? ''))
-          const opened = v === cur || openVersions.has(v)
+          const opened = openVersions.has(v)
           return (
             <div key={v} className={s.usedGroup}>
-              {v === cur ? (
-                <span className={s.caption}>{t(`版 ${v}(いまの版)・${list.length} 本`, `v${v} (latest) · ${list.length}`)}</span>
-              ) : (
-                <Button
-                  size="small"
-                  appearance="transparent"
-                  className={s.usedToggle}
-                  icon={opened ? <ChevronDownRegular /> : <ChevronRightRegular />}
-                  onClick={() =>
-                    setOpenVersions((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(v)) next.delete(v)
-                      else next.add(v)
-                      return next
-                    })
-                  }
-                >
-                  {t(`版 ${v}・${list.length} 本`, `v${v} · ${list.length}`)}
-                </Button>
-              )}
+              <Button
+                size="small"
+                appearance="transparent"
+                className={s.usedToggle}
+                icon={opened ? <ChevronDownRegular /> : <ChevronRightRegular />}
+                onClick={() =>
+                  setOpenVersions((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(v)) next.delete(v)
+                    else next.add(v)
+                    return next
+                  })
+                }
+              >
+                {v === cur ? t(`版 ${v}(いまの版)・${list.length} 本`, `v${v} (latest) · ${list.length}`) : t(`版 ${v}・${list.length} 本`, `v${v} · ${list.length}`)}
+              </Button>
               {opened &&
                 list.map((c) => (
                   <button key={c.id} type="button" className={s.usedRow} onClick={() => onOpenCard(c.id)}>
@@ -1107,11 +1236,13 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
           >
             <ReOrderDotsVerticalRegular />
           </span>
+          {foldButton(p.key)}
           <Badge size="small" appearance="tint" color="brand">{t(`セクション ${no}`, `Section ${no}`)}</Badge>
           <span className={s.caption}>{`${sectionKindLabel(sec)} · ${t(`${sec.slots} 点`, `${sec.slots} items`)}`}</span>
           <span className={s.grow} />
           {partActions(i, p)}
         </div>
+        {!folded.has(p.key) && (
         <div className={s.sectionBody}>
           <Field label={t('商品の並び方', 'Product layout')}>
             <Select size="small" className={s.fill} value={layoutValue(sec)} onChange={(_, d) => patchSection(p.key, layoutPatch(d.value as SectionLayout, sec))}>
@@ -1120,6 +1251,11 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
               ))}
             </Select>
           </Field>
+          {sec.kind === 'cells' ? (
+            <div className={s.cellsField}>
+              <CellEditor cols={sec.cols ?? 2} cells={sec.cells ?? []} maxSlots={MAX_SLOTS} onChange={(cols, cells) => patchSection(p.key, { cols, cells, slots: cells.length })} />
+            </div>
+          ) : (
           <Field label={t('商品の枠の数', 'Product slots')}>
             <Select size="small" className={s.fill} value={String(sec.slots)} onChange={(_, d) => patchSection(p.key, { slots: fitSlots(sec.kind, Number(d.value)) })}>
               {Array.from({ length: Math.floor(MAX_SLOTS / slotStep(sec.kind)) }, (_, k) => (k + 1) * slotStep(sec.kind)).map((n) => (
@@ -1127,6 +1263,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
               ))}
             </Select>
           </Field>
+          )}
           <Field label={t('見出し', 'Heading')}>
             <Checkbox label={t('AI で付ける', 'Add (AI)')} checked={!!sec.categoryHeading} onChange={(_, d) => patchSection(p.key, { categoryHeading: d.checked === true })} />
           </Field>
@@ -1134,6 +1271,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
             <Checkbox label={t('置く', 'Show')} checked={sec.copy !== false} onChange={(_, d) => patchSection(p.key, { copy: d.checked === true ? undefined : false })} />
           </Field>
         </div>
+        )}
       </div>
     )
   }
@@ -1155,11 +1293,13 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
         >
           <ReOrderDotsVerticalRegular />
         </span>
+        {foldButton(p.key)}
         <Badge size="small" appearance="tint" color="informative">{t('ボタン', 'Buttons')}</Badge>
         <span className={s.caption}>{p.buttons.map((b, k) => t(`${b.label?.trim() || defaultButtonLabel(k)}(${styleLabel(b)})`, `${b.label?.trim() || defaultButtonLabel(k)} (${styleLabel(b)})`)).join(t('、', ', '))}</span>
         <span className={s.grow} />
         {partActions(i, p)}
       </div>
+      {!folded.has(p.key) && (
       <div className={s.buttonRows}>
         <div className={s.buttonRow}>
           <span />
@@ -1206,6 +1346,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
           </div>
         )}
       </div>
+      )}
     </div>
   )
 
@@ -1307,6 +1448,14 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                   </div>
                   {paletteCol()}
                   <div className={mergeClasses(s.fields, s.areaFields)}>
+                    <div className={s.card}>
+                      <div className={s.cardHead}>
+                        {foldButton('info')}
+                        <span className={s.cardTitle}>{t('テンプレートの情報', 'Template info')}</span>
+                        {folded.has('info') && <span className={mergeClasses(s.caption, s.foldSummary)}>{draft.name || t('(名前なし)', '(no name)')}</span>}
+                      </div>
+                      {!folded.has('info') && (
+                      <div className={s.infoBody}>
                     <Field label={t('テンプレート名', 'Template name')} required>
                       <Input size="small" value={draft.name} onChange={(_, d) => patch({ name: d.value })} />
                     </Field>
@@ -1318,13 +1467,18 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                     <Field label={t('説明', 'Description')}>
                       <AutoTextarea rows={2} size="small" value={draft.description} onChange={(_, d) => patch({ description: d.value })} />
                     </Field>
+                      </div>
+                      )}
+                    </div>
 
                     {draft.push && (
                       <div className={s.card}>
                         <div className={s.cardHead}>
+                          {foldButton('push')}
                           <span className={s.cardTitle}>{t('通知', 'Notification')}</span>
                           <span className={s.caption}>{t('アプリの通知の形。メッセージの本文は、下の部品で組みます', 'The notification format. Build the in-app message with the parts below.')}</span>
                         </div>
+                        {!folded.has('push') && (
                         <div className={s.heroBody}>
                           <Field label={t('通知の形', 'Format')}>
                             <div className={s.row} style={{ flexWrap: 'nowrap' }}>
@@ -1368,13 +1522,16 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                             </div>
                           </Field>
                         </div>
+                        )}
                       </div>
                     )}
 
                     <div id="tplpart-hero" className={mergeClasses(s.card, selectedKey === 'hero' && s.partSelected)} onClickCapture={() => setSelectedKey('hero')}>
                       <div className={s.cardHead}>
+                        {foldButton('hero')}
                         <span className={s.cardTitle}>{draft.push ? t('メッセージ: ヒーロー(メイン画像)', 'Message: hero (main image)') : t('ヒーロー(メイン画像)', 'Hero (main image)')}</span>
                       </div>
+                      {!folded.has('hero') && (
                       <div className={s.heroBody}>
                         <Field label={t('種類', 'Type')}>
                           <div className={s.row} style={{ flexWrap: 'nowrap' }}>
@@ -1403,6 +1560,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                           <Checkbox label={t('メールの最上部に置く', 'Show at the very top')} checked={!!draft.topBar} onChange={(_, d) => patch({ topBar: d.checked === true || undefined })} />
                         </Field>
                       </div>
+                      )}
                     </div>
 
                     <Field
@@ -1410,6 +1568,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                       hint={t('部品は、⠿ をつかんで上下に動かせます(矢印でも動かせます)。ボタンは、セクションとは別の部品です。リンク先は既定の種類で、実際の URL は配信ごとに決めます。', 'Drag ⠿ to reorder parts (or use the arrows). Buttons are separate parts. Links are default kinds; the actual URLs are set per delivery.')}
                     >
                       <div className={s.partList}>
+                        {/* 部品が多いと長くなるので、まとめて閉じる・開く(キャンバスで選んだ部品は、閉じていても開く) */}
+                        <div className={s.foldAll}>
+                          <Button size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={() => setFolded(new Set(['info', 'push', 'hero', ...draft.parts.map((x) => x.key)]))}>
+                            {t('すべて閉じる', 'Collapse all')}
+                          </Button>
+                          <Button size="small" appearance="subtle" icon={<ChevronDownRegular />} onClick={() => setFolded(new Set())}>
+                            {t('すべて開く', 'Expand all')}
+                          </Button>
+                        </div>
                         {(() => {
                           let no = 0
                           return draft.parts.map((p, i) => (
@@ -1456,6 +1623,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                         <Button size="small" appearance="subtle" icon={<ArrowRedoRegular />} disabled={histCount.future === 0} onClick={redo} />
                       </Tooltip>
                     </div>
+                    {zoomBar()}
                     {removedAt !== null && (
                       <div className={s.toast}>
                         <span>{t('部品を削除しました', 'Part removed')}</span>
@@ -1483,8 +1651,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                         )}
                       </div>
                     )}
-                    <div className={mergeClasses(s.previewScroll, s.canvasRow)}>
+                    <div
+                      ref={(el) => {
+                        zoomBoxRef.current = el
+                        zoomBaseRef.current = canvasBase
+                      }}
+                      className={mergeClasses(s.previewScroll, s.canvasRow, s.canvasScroll)}
+                    >
                       {/* プレビューの箱を、そのまま操作できる(押して選ぶ・つかんで並べ替える・パレットの部品を箱の間に落とす) */}
+                      <div data-zoom-target={compared ? 'pair' : 'one'} className={s.zoomTarget} style={{ width: canvasWidth }}>
                       <TemplateThumb
                         layout={fromParts(draft)}
                         width={canvasWidth}
@@ -1545,7 +1720,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                                     </Button>
                                   </Tooltip>
                                 )}
-                                {sec && (
+                                {sec && sec.kind !== 'cells' && (
                                   <>
                                     <Button size="small" appearance="subtle" icon={<SubtractRegular />} disabled={sec.slots <= step} onClick={(e) => { e.stopPropagation(); patchSection(p.key, { slots: fitSlots(sec.kind, sec.slots - step) }) }} aria-label={t('枠を減らす', 'Fewer slots')} />
                                     <span className={s.toolCount}>{sec.slots}</span>
@@ -1571,6 +1746,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                           },
                         }}
                       />
+                      </div>
                       {compared && (
                         <div className={s.compareBox}>
                           <div className={s.compareBoxHead}>
@@ -1684,9 +1860,18 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                     <Text size={200} weight="semibold">
                       {viewKey ? t(`構成のプレビュー(版 ${getTemplate(viewKey).version} を見ています)`, `Layout preview (viewing v${getTemplate(viewKey).version})`) : t('構成のプレビュー', 'Layout preview')}
                     </Text>
-                    <div className={s.previewScroll}>
+                    {zoomBar()}
+                    <div
+                      ref={(el) => {
+                        zoomBoxRef.current = el
+                        zoomBaseRef.current = PREVIEW_WIDTH
+                      }}
+                      className={mergeClasses(s.previewScroll, s.previewZoomBox)}
+                    >
                       {(viewKey ? getTemplate(viewKey) : selected).push && <PushThumb spec={(viewKey ? getTemplate(viewKey) : selected).push!} width={160} />}
-                      <TemplateThumb layout={viewKey ? getTemplate(viewKey) : selected} free={selected.id === 'free'} width={PREVIEW_WIDTH} />
+                      <div data-zoom-target="grow" className={s.zoomTarget} style={{ width: zoomed(PREVIEW_WIDTH) }}>
+                        <TemplateThumb layout={viewKey ? getTemplate(viewKey) : selected} free={selected.id === 'free'} width={zoomed(PREVIEW_WIDTH)} />
+                      </div>
                     </div>
                   </div>
                 </div>

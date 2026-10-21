@@ -15,6 +15,7 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section } from './templates'
+import { cellRows } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { locale, optionLabel, useT } from './i18n'
 
@@ -646,6 +647,20 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                 <div style={{ gridRow: '1 / 3', gridColumn: sec.flip ? 2 : 1, minHeight: 0 }}>{cell(g, true)}</div>
                 <div style={{ gridRow: 1, gridColumn: sec.flip ? 1 : 2, minHeight: 0 }}>{cell(g + 1, false)}</div>
                 <div style={{ gridRow: 2, gridColumn: sec.flip ? 1 : 2, minHeight: 0 }}>{cell(g + 2, false)}</div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+      case 'cells': {
+        // マス目: 1 マスは正方形。枠ごとに写真を敷き、名前・価格を重ねる(モザイクと同じ見せ方)。商品は、枠の並び(上から、左から)の順に載る
+        const cols = sec.cols ?? 2
+        const rows = Math.max(1, cellRows(sec.cells ?? []))
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 8, aspectRatio: `${cols} / ${rows}` }}>
+            {(sec.cells ?? []).map((x, j) => (
+              <div key={j} style={{ gridColumn: `${x.c + 1} / span ${x.w}`, gridRow: `${x.r + 1} / span ${x.h}`, minHeight: 0, minWidth: 0 }}>
+                {slot(j, (it, idx) => overlayTile(it, idx, true, x.w * x.h === 1 && cols > 2), { aspectRatio: 'auto', height: '100%' })}
               </div>
             ))}
           </div>
