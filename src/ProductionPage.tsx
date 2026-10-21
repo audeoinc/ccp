@@ -32,7 +32,7 @@ import { buildSnapshot, downloadText, htmlLinks, parseSnapshot, parseVariantHtml
 import { myName, myUserId, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import { loadPref, savePref } from './settings'
-import { statusRank } from './status'
+import { canGoProduction } from './demo'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
@@ -186,7 +186,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
     void load()
   }, [load])
 
-  const approved = statusRank(card.status) >= statusRank('approved')
+  // 承認済みか(デモ用のビルドでは、承認の前でも制作を始められる。src/demo.ts)
+  const approved = canGoProduction(card)
   const latest = requests?.[0]
   const live = latest && LIVE.has(latest.status ?? '') ? latest : undefined
   const staleLatest = latest?.status === 'stale' ? latest : undefined

@@ -4,7 +4,8 @@ import { ChevronRightRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { ProductionRequest } from './models/productionRequests'
 import { productionView, type ProductionView } from './useProductionRequests'
-import { statusLabel, statusRank } from './status'
+import { statusLabel } from './status'
+import { canGoProduction } from './demo'
 import { FACE_COLOR, FACE_TINT, type Face } from './faces'
 import { tr, useT } from './i18n'
 
@@ -74,7 +75,7 @@ export function StageNav({ face, card, production, onGo }: Props) {
       face: 'production',
       name: 'PRODUCTION',
       state: SHORT[pv](),
-      enabled: statusRank(card.status) >= statusRank('approved') || !!production,
+      enabled: canGoProduction(card) || !!production,
       why: t('承認されたら、制作に進めます', 'You can move to production after approval'),
     },
     { face: 'results', name: 'RESULTS', state: sent ? t('結果を見る', 'See results') : t('配信の前', 'Not sent yet'), enabled: sent, why: t('配信日のあとに、結果を見られます', 'Results are available after the send date') },

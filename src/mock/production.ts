@@ -11,7 +11,6 @@ type Result<T> = { success: boolean; data?: T; error?: { message: string } }
 const ng = <T,>(message: string): Result<T> => ({ success: false, error: { message } })
 const now = () => new Date().toISOString()
 const newId = (key: string) => guid(`${key}:${Math.random()}:${Date.now()}`)
-const APPROVED = new Set(['approved', 'confirmed'])
 const LIVE = new Set(['requested', 'in_progress', 'done', 'checked'])
 
 function event(action: string, actor: Actor, card: Row, weekStart: string | undefined, note?: string) {
@@ -28,7 +27,7 @@ function create(input: RequestInput, status: 'requested' | 'sent'): Result<Produ
   if (!input.snapshot) return ng('写し(snapshot)が要ります')
   const card = tables.DeliveryCardsService.find((c) => c.id === input.delivery_card_id)
   if (!card) return ng('配信カードが見つかりません')
-  if (!APPROVED.has(String(card.status))) return ng('承認されていない配信です(先に承認を受けてください)')
+  // 本番は承認済みの配信だけを受け付けるが、デモでは承認の前でも依頼できる(src/demo.ts の canGoProduction)
   staleProduction(String(card.id))
   const version = Math.max(0, ...tables.ProductionRequestsService.filter((r) => r.delivery_card_id === card.id).map((r) => Number(r.version ?? 0))) + 1
   const at = now()

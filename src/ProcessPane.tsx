@@ -18,7 +18,7 @@ import { isThreadRoot, stageOf } from './notesStage'
 import { ProductionRequestsService } from './data/productionRequests'
 import type { ProductionRequest } from './models/productionRequests'
 import { productionColor, productionLabel, productionView } from './useProductionRequests'
-import { statusRank } from './status'
+import { canGoProduction } from './demo'
 import { statusColor, statusLabel } from './status'
 import { useT } from './i18n'
 
@@ -151,7 +151,7 @@ export function ProcessPane(props: Props) {
           </>
         )}
       </div>
-      {props.card && props.onOpenProduction && statusRank(props.card.status) >= statusRank('approved') && <ProductionChip card={props.card} onOpen={props.onOpenProduction} people={props.people} productIds={props.productIds} products={props.products} />}
+      {props.card && props.onOpenProduction && canGoProduction(props.card) && <ProductionChip card={props.card} onOpen={props.onOpenProduction} people={props.people} productIds={props.productIds} products={props.products} />}
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TalkTab)}>
         <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}`}</Tab>
         <Tab value="threads">{`${t('やり取り', 'Conversation')}${count(openThreads)}`}</Tab>

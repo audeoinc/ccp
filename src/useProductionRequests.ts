@@ -5,7 +5,7 @@ import { tokens } from '@fluentui/react-components'
 import { ProductionRequestsService } from './data/productionRequests'
 import type { ProductionRequest } from './models/productionRequests'
 import type { DeliveryCard } from './models/deliveryCards'
-import { statusRank } from './status'
+import { canGoProduction } from './demo'
 import { tr } from './i18n'
 
 /** 制作の面での状態(依頼の版がない承認済みの配信は「依頼する前」、承認前は「承認待ち」) */
@@ -13,7 +13,7 @@ export type ProductionView = 'not_approved' | 'draft' | 'requested' | 'in_progre
 
 export function productionView(card: DeliveryCard, req?: ProductionRequest): ProductionView {
   if (req?.status === 'sent' || req?.status === 'checked' || req?.status === 'done' || req?.status === 'in_progress' || req?.status === 'requested') return req.status
-  if (statusRank(card.status) < statusRank('approved')) return 'not_approved'
+  if (!canGoProduction(card)) return 'not_approved'
   return req?.status === 'stale' ? 'stale' : 'draft'
 }
 
