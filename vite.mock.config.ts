@@ -17,6 +17,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/metricsImport$/.test(source)) return fileURLToPath(new URL('./src/mock/metricsImport.ts', import.meta.url))
     // 素材のファイルの置き場所(src/data/creativeFiles。表ではなくサーバーの API)は、ブラウザの中だけに置く身代わりに
     if (/(?:^|\/)data\/creativeFiles$/.test(source)) return fileURLToPath(new URL('./src/mock/creativeFiles.ts', import.meta.url))
+    // メイン画像を上げる窓口(src/data/heroUpload)も、ブラウザの中だけに置く身代わりに
+    if (/(?:^|\/)data\/heroUpload$/.test(source)) return fileURLToPath(new URL('./src/mock/heroUpload.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに
     if (/(?:^|\/)data\/me$/.test(source)) return fileURLToPath(new URL('./src/mock/me.ts', import.meta.url))
     // 表ごとのサービス(src/data/<名前>。書き出す名前は <名前の先頭を大文字>Service)を差し替える

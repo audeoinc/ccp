@@ -24,6 +24,7 @@ import {
   ChevronDownRegular,
   ChevronRightRegular,
   DismissRegular,
+  ImageAddRegular,
 } from '@fluentui/react-icons'
 import { TemplateThumb } from './TemplateThumb'
 import { ChatPanel, type ChatMsg } from './ChatPanel'
@@ -78,6 +79,8 @@ interface Props {
   /** 選定の対象(配信カードの国に合う市場のもの)。products / heroes は、すでに載せたものの表示用に全件を持つ */
   poolProducts: Product[]
   poolHeroes: HeroImage[]
+  /** 持っている画像を上げる(メイン画像のライブラリへ。X59) */
+  onUploadHero?: () => void
   items: Item[]
   setItems: Dispatch<SetStateAction<Item[]>>
   candidates: Candidate[]
@@ -138,6 +141,7 @@ interface Props {
 // ------------------------------------------------------------------ スタイル
 
 const useStyles = makeStyles({
+  uploadRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '4px' },
   // グリッドの子は、中身が長くても列を押し広げない(帯や長い文がペインからはみ出さないように)
   // 中ペイン全体: 上は内容(スクロール)、下は AI チャット(固定)
   shell: { flexGrow: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' },
@@ -1064,6 +1068,15 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
           })}
         </div>
         {finder(t('すべての画像から探す', 'Browse all images'), <HeroCandidates heroes={p.poolHeroes} selectedId={p.heroId} onSelect={(id) => setHero(id, '')} />)}
+        {/* AI の案 → 頼み直す → ほかから選ぶ、で合わなければ、持っている画像を上げる(X59) */}
+        {p.onUploadHero && (
+          <div className={s.uploadRow}>
+            <Button size="small" icon={<ImageAddRegular />} onClick={p.onUploadHero}>
+              {t('持っている画像を上げる', 'Upload your own image')}
+            </Button>
+            <span className={s.caption}>{t('ライブラリに入り、この配信のメイン画像になります。次の配信からは候補にも出ます', 'It goes into the library and becomes this delivery’s hero. Later deliveries can pick it too')}</span>
+          </div>
+        )}
       </div>
     )
   }

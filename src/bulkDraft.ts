@@ -12,6 +12,7 @@ import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { runAutoDraft, type AutoDraftProgress, type AutoDraftResult } from './autoDraft'
 import { cardMarket, heroMarket, productMarket } from './market'
+import { isUsableHero } from './heroRights'
 import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH, statusRank } from './status'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf } from './templates'
 import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
@@ -100,7 +101,8 @@ export interface DraftContext {
 export async function generateFor(c: DraftBase, ctx: DraftContext, onStep: AutoDraftProgress, isStopped: () => boolean): Promise<AutoDraftResult> {
   const market = cardMarket(String(c.country ?? ''))
   const products = ctx.products.filter((p) => (!market || productMarket(p) === market) && fitsTarget(p, c.target_gender))
-  const heroes = market ? ctx.heroes.filter((h) => heroMarket(h) === market) : ctx.heroes
+  // 使える期限を過ぎた画像は、AI の候補から外す(X59)
+  const heroes = ctx.heroes.filter((h) => (!market || heroMarket(h) === market) && isUsableHero(h))
   return runAutoDraft(
     { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme },
     onStep,

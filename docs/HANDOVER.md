@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X58 素材・パックの足すだけの取り込み・制作した HTML と並べて比べる・仕上がりを見る。6.44)
+- 最終更新: 2026-10-21(X59 画像のライブラリ・① メイン画像を上げる。6.45。その前は X58 素材。6.44)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -626,6 +626,15 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - **段階 4 仕上がりを見る(2026-10-21)**: `src/FinishedFloat.tsx`。左に `request.html` のプレビュー、右に done_note・done_link・revision_note・instructions と `CreativeAssets`。制作のページの工程 ④ の「仕上がりを見る」、配信カードの `ProductionChip`(制作が終わったか HTML があるとき)から開く。
 - **素材の見本**(利用者の依頼 2026-10-21: 本番にも見本を): ⚙ の「素材の見本を作る」「素材の見本を消す」(`src/assetSeed.ts`)。本番の API には UI セッションがパスワードで入らない決まりなので、利用者が本番の画面で押す。イラストは画面の中で canvas に図形を描いた PNG(ムードボード・色の指定・レイアウトのラフ)、PDF は文字だけのものを作る。URL は W3C の見やすいデザインのヒントと、Wikimedia Commons の秋の写真の一覧。制作の依頼のある配信を先に 2〜3 本へ。名前の先頭が「見本:」で、消すのはそれだけ。
 - モックで確かめた: 依頼 → 受け取る → 貼り付けて置き換える → 並べて比べる → 保存 → 制作が終わった(リンク付き)→ 仕上がりを見る(貼った HTML・リンクが出る)。
+
+## 6.45 X59 画像のライブラリ・① メイン画像を上げる(2026-10-21、UI セッション)
+
+- 利用者と決めたこと(連絡係の意見を了承): BACKLOG X59。素材(X58。配信ごとの参考)と、使い回す画像のライブラリ(配信に載せる在庫)は分ける。
+- サーバー: `server/ccp/heroes.py`。`POST /api/heroes/upload?name=`(本文で画像。`up-<uuid>.<拡張子>` の名前で、商品画像と同じ置き場所の heroes/ に置く。本番はバケットの images/heroes/、Workbench は ASSET_DIR/heroes。JPEG・PNG・WebP、15MB まで)。`POST /api/heroes/describe`(`/img/heroes/…` の画像を読み、Gemini に画像と指示を渡して、name・purpose・season・tags・description・colors・subjects・focal の JSON を返す。`ai.py` の `_get_client` を使う。失敗しても、人が手で入れれば登録できる)。
+- 表 `hero_images` に列: source(出どころ)・usable_until(使える期限)・focal_x・focal_y(焦点。0〜1)・uploaded_by・first_card_id(最初に使った配信。参照にはしない)。image_code は `UPyymmdd-XXXX`。
+- 画面: `src/HeroUploadDialog.tsx`(置く → AI の下書き → 焦点を押して決め、横長・正方形・縦長の切り出しを見る → 出どころ・期限 → 「ライブラリに入れて、この配信に使う」)。窓口は `src/data/heroUpload.ts`(撮影用は `src/mock/heroUpload.ts`)。配信カードは `heroUpload` の state と、App の `onHeroesChanged`(ライブラリを読み直す)。中ペインの ③ に `onUploadHero`。`src/heroRights.ts` の `isUsableHero`(期限)・`heroPosition`(焦点を object-position に)。プレビュー(`Preview.tsx`)のメイン画像は焦点で切り出す。期限切れは `CardDetail` の `poolHeroes` と `bulkDraft` の候補から外す(いま使っている画像は残す)。
+- 確かめたこと: サーバーのテスト(`test_heroes_upload.py`)。モックで、画像を置く → AI の下書き → ライブラリに入れる → この配信のメイン画像になり、プレビューに出る。本番の Gemini での画像の読み取りと、バケットへの保存は、反映のあとに確かめる。
+- 残り: ② ⚙ のライブラリの管理画面(一覧・直す・期限・消す)、③ 部品の画像(ボタンなど)、④ 必要ならトリミングの編集。制作のページの「メイン画像を選ぶ」(HeroPicker)からの上げる入口も、まだ。
 
 ## 7. 落とし穴
 

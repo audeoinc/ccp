@@ -104,7 +104,13 @@
     ["tags", "text"],
     ["description", "text"],
     ["image_url", "text"],
-    ["market", "choice"]
+    ["market", "choice"],
+    ["source", "text"],
+    ["usable_until", "date"],
+    ["focal_x", "numeric"],
+    ["focal_y", "numeric"],
+    ["uploaded_by", "text"],
+    ["first_card_id", "text"]
    ],
    "lookups": [
    ]

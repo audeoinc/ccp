@@ -12,6 +12,7 @@ import type { HeroImage } from './models/heroImages'
 import { AutoTextarea } from './AutoTextarea'
 import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
+import { heroPosition } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section } from './templates'
 import { HEADLINE_FONT } from './fonts'
@@ -476,7 +477,7 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
     >
       {hero ? (
         <>
-          <img draggable={false} src={heroImage(hero)} alt={hero.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img draggable={false} src={heroImage(hero)} alt={hero.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: heroPosition(hero), display: 'block' }} />
           <Button
             className={mergeClasses('hero-clear', classes.heroClear, classes.ctl)}
             appearance="subtle"

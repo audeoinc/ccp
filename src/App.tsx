@@ -2091,6 +2091,10 @@ function App() {
           }}
           products={products}
           heroes={heroes}
+          onHeroesChanged={async () => {
+            const res = await HeroImagesService.getAll({ orderBy: ['image_code asc'] })
+            if (res.success) setHeroes((res.data ?? []).map(withHeroLabels))
+          }}
           otherThemes={cards.filter((c) => c.id !== selected?.id && c.theme).map((c) => c.theme!)}
           weeks={weeks}
           owners={owners}

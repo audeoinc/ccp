@@ -63,6 +63,8 @@ import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
 import { AbDecidedBar, AbTestBar } from './AbTestBar'
+import { HeroUploadDialog } from './HeroUploadDialog'
+import { isUsableHero } from './heroRights'
 import { AbCompare } from './AbCompare'
 import { draftVariant } from './abAi'
 import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsProducts, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
@@ -87,6 +89,8 @@ interface Props {
   onCreated?: (id: string) => void
   /** 新しい配信を「保存」(閉じない)したとき、保存した配信として開き直す(X52) */
   onReopen?: (id: string) => void
+  /** メイン画像のライブラリを読み直す(画像を上げたあと。X59) */
+  onHeroesChanged?: () => Promise<void>
   /** この配信の週に、商品を載せる配信の数(週の上限超えのアラートの差し替えで、上限に届いた商品を候補から除く) */
   weekUse?: Map<string, number>
   products: Product[]
@@ -455,7 +459,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -510,6 +514,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   const [heroCandidates, setHeroCandidates] = useState<ProposedHero[]>([])
   const [heroId, setHeroId] = useState<string | undefined>(card?.hero_image_id ?? undefined)
   const [heroReason, setHeroReason] = useState(card?.hero_reason ?? '')
+  // 持っている画像を上げる(X59)
+  const [heroUpload, setHeroUpload] = useState(false)
   // AB テスト(X55)。ab = 設定(null = しない)、active = いま編集している案、stash = 編集していない案の中身(A を含む)
   const [ab, setAb] = useState<AbTest | null>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test))
   const [active, setActive] = useState<VariantKey>('A')
@@ -777,7 +783,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
   const market = cardMarket(form.country)
   // 配信の対象の性別が決まっていれば、それに合う商品だけ(女性向けなら、ウィメンズとユニセックス。X40)
   const poolProducts = useMemo(() => products.filter((p) => (!market || productMarket(p) === market) && fitsTarget(p, form.targetGender)), [products, market, form.targetGender])
-  const poolHeroes = useMemo(() => (market ? heroes.filter((h) => heroMarket(h) === market) : heroes), [heroes, market])
+  // 使える期限を過ぎた画像は、選ぶ候補・AI の候補から外す(いま使っている画像は残す。X59)
+  const poolHeroes = useMemo(() => heroes.filter((h) => (!market || heroMarket(h) === market) && (isUsableHero(h) || h.id === heroId)), [heroes, market, heroId])
 
   // AI の案の状態と生成(案は採用するまで、配信カードには反映しない)
   const drafts = useAiDrafts(
@@ -1611,6 +1618,20 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
             <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} />
           )}
 
+          {heroUpload && (
+            <HeroUploadDialog
+              market={cardMarket(form.country)}
+              cardId={card?.id}
+              me={myName() || form.owner}
+              onClose={() => setHeroUpload(false)}
+              onDone={async (h) => {
+                await onHeroesChanged?.()
+                setHeroId(h.id)
+                setHeroReason(tr('持っている画像を上げて使った', 'Uploaded and used'))
+                setHeroUpload(false)
+              }}
+            />
+          )}
           {/* AB テストの帯(X55): 案の切り替えと、テストの設定 */}
           {ab && (
             <AbTestBar
@@ -1866,6 +1887,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, weekUse
                 heroes={heroes}
                 poolProducts={poolProducts}
                 poolHeroes={poolHeroes}
+                onUploadHero={() => setHeroUpload(true)}
                 items={items}
                 setItems={setItems}
                 candidates={candidates}

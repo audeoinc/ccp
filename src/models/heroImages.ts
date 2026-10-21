@@ -33,6 +33,16 @@ export interface HeroImageFields {
   description?: string
   image_url?: string
   market?: HeroImageMarket
+  /** 出どころ(自社撮影 / 取引先から / 素材サイト / その他 と、ひとこと。上げた画像。X59) */
+  source?: string
+  /** 使える期限(YYYY-MM-DD。過ぎたら、選ぶ候補・AI の候補から外す。空は期限なし) */
+  usable_until?: string | null
+  /** 焦点(いちばん見せたい場所。0〜1、左上が 0,0。テンプレートの縦横比に合わせて切り出すときの中心) */
+  focal_x?: number | null
+  focal_y?: number | null
+  /** 上げた人と、最初に使った配信(delivery_cards の id。参照にはしない) */
+  uploaded_by?: string
+  first_card_id?: string
   state_code?: number
 }
 
