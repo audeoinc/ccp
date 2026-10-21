@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X62 週の見方「商品」の掲載回数のバッジ。6.55。その前は X4 テンプレートの最近の使用回数。6.54)
+- 最終更新: 2026-10-21(W13 期間の文字を、押せるボタンに見せる。6.56。その前は X62 週の見方「商品」の掲載回数のバッジ。6.55)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -664,6 +664,10 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
 - AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
 - 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)→ 6.50。
+
+## 6.56 W13 期間の文字を、押せるボタンに見せる(2026-10-21、UI セッション)
+
+- `MiniCalendar` の trigger に、カレンダーのアイコン・文字・▾ と薄い枠(hover で背景)。文字は `triggerText`(見切れたら …、title で全部)。幅は `App.tsx` の weekLabel 272px(英語。「Oct 18 – Oct 24, 2026」が収まる)/ weekLabelJa 288px(「2026年 10月18日 – 10月24日」)。週・月・一覧で同じ幅なので、「‹ ›」の位置はずれない。
 
 ## 6.55 X62 週の見方「商品」の掲載回数のバッジ(2026-10-21、UI セッション)
 

@@ -1,11 +1,26 @@
 import { useState } from 'react'
 import { Button, Popover, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { CalendarRegular, ChevronDoubleLeftRegular, ChevronDoubleRightRegular, ChevronLeftRegular, ChevronRightRegular } from '@fluentui/react-icons'
+import { CalendarRegular, ChevronDoubleLeftRegular, ChevronDoubleRightRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular } from '@fluentui/react-icons'
 import { locale, useLang, useT } from './i18n'
 import { dayKeyOf } from './weekLock'
 
 const useStyles = makeStyles({
-  trigger: { minWidth: 0, width: '100%', fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  // 押せるボタンだと分かるように(W13): カレンダーのアイコン・▾・薄い枠。マウスを重ねると背景の色
+  trigger: {
+    minWidth: 0,
+    width: '100%',
+    fontSize: tokens.fontSizeBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    columnGap: '6px',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover, border: `1px solid ${tokens.colorNeutralStroke1Hover}` },
+  },
+  // 長い表記でも見切れたときに、… で終わらせる(幅は App の monthLabel で、言語ごとに決める)
+  triggerText: { overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+  triggerIcon: { flexShrink: 0, fontSize: '16px', color: tokens.colorNeutralForeground3 },
   surface: { display: 'grid', rowGap: '6px', padding: '10px 12px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '2px' },
   // 見出しの月名は押せる(その月の月表示へ)
@@ -113,7 +128,9 @@ export function MiniCalendar({ label, view, month, weekStart, dayCounts, onPickM
     >
       <PopoverTrigger disableButtonEnhancement>
         <Button appearance="subtle" size="small" className={s.trigger} aria-label={t(`${label}(押すと、月・週・日を選んで移動)`, `${label} (click to jump to a month, week or day)`)}>
-          {label}
+          <CalendarRegular className={s.triggerIcon} />
+          <span className={s.triggerText} title={label}>{label}</span>
+          <ChevronDownRegular className={s.triggerIcon} />
         </Button>
       </PopoverTrigger>
       <PopoverSurface className={s.surface}>
