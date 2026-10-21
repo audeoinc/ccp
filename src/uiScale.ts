@@ -2,7 +2,8 @@
 // 文字も部品もまとめて縮める・広げる(html に CSS の zoom を掛ける。ダイアログ・フロートも body の中なので、同じく効く)。ブラウザごとに覚える
 import { useSyncExternalStore } from 'react'
 
-export const UI_SCALES = [0.8, 0.9, 1, 1.1] as const
+// 70% は、利用者の要望(2026-10-21: もう一回り小さく)で足した
+export const UI_SCALES = [0.7, 0.8, 0.9, 1, 1.1] as const
 export type UiScale = (typeof UI_SCALES)[number]
 
 const KEY = 'ui.scale'

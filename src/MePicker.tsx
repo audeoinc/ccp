@@ -164,7 +164,7 @@ export function MePicker({ className, ariaLabel }: Props) {
             <MenuGroupHeader>{t('表示の大きさ(このブラウザ)', 'Display size (this browser)')}</MenuGroupHeader>
             {UI_SCALES.map((v) => (
               <MenuItemRadio key={v} name="scale" value={String(v)}>
-                {v === 0.8 ? t('小さめ(80%)', 'Small (80%)') : v === 0.9 ? t('やや小さめ(90%)', 'Smaller (90%)') : v === 1 ? t('標準(100%)', 'Standard (100%)') : t('大きめ(110%)', 'Large (110%)')}
+                {v === 0.7 ? t('とても小さめ(70%)', 'Smallest (70%)') : v === 0.8 ? t('小さめ(80%)', 'Small (80%)') : v === 0.9 ? t('やや小さめ(90%)', 'Smaller (90%)') : v === 1 ? t('標準(100%)', 'Standard (100%)') : t('大きめ(110%)', 'Large (110%)')}
               </MenuItemRadio>
             ))}
           </MenuGroup>
