@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { makeStyles, Tooltip, tokens } from '@fluentui/react-components'
+import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { makeStyles, mergeClasses, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
 
@@ -23,7 +23,50 @@ const useStyles = makeStyles({
   },
   body: { display: 'grid', alignContent: 'start' },
   free: { color: '#888', textAlign: 'center' },
+  // 編集できる見取り図(テンプレート管理のプレビュー): 部品の箱。指すと枠、選ぶと太い枠と道具
+  part: {
+    position: 'relative',
+    cursor: 'pointer',
+    borderRadius: '2px',
+    outline: '1px dashed transparent',
+    outlineOffset: '1px',
+    ':hover': { outline: `1px dashed ${tokens.colorBrandStroke1}` },
+  },
+  partSelected: { outline: `2px solid ${tokens.colorBrandStroke1}`, ':hover': { outline: `2px solid ${tokens.colorBrandStroke1}` } },
+  partDragging: { opacity: 0.4 },
+  dropLine: { height: '3px', borderRadius: '2px', backgroundColor: tokens.colorBrandBackground, margin: '1px 0' },
+  dropEnd: { minHeight: '14px', borderRadius: '2px' },
+  dropEndOn: { outline: `1.5px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
+  ghost: { opacity: 0.45, outline: `1.5px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '1px', borderRadius: '2px', pointerEvents: 'none' },
+  tools: { position: 'absolute', top: '2px', right: '2px', zIndex: 1, display: 'flex', columnGap: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow8 },
 })
+
+/**
+ * 見取り図の上で、部品(セクション・ボタンの部品)を直接操作するとき(テンプレート管理の編集中のプレビュー)。
+ * 部品の番号は、上から順(ヒーローの直後のボタン → セクション 1 → その後のボタン → …)で、編集中の部品の並びと同じ
+ */
+export interface ThumbEdit {
+  /** 選んでいる部品の番号 */
+  selected: number | null
+  /** つかんでいる部品の番号(パレットの部品をつかんでいるときは null) */
+  dragging: number | null
+  /** 入れる位置(その前に入れる番号。部品の数と同じなら、いちばん下) */
+  dropAt: number | null
+  /** ドラッグの最中か(いちばん下に入れる所を、目立たせる) */
+  active: boolean
+  onSelect: (part: number) => void
+  /** 部品の箱に付ける、ドラッグの出来事など */
+  partProps: (part: number) => HTMLAttributes<HTMLDivElement>
+  /** いちばん下に入れる所に付ける、ドラッグの出来事 */
+  endProps: HTMLAttributes<HTMLDivElement>
+  /** 選んだ部品の右上に重ねる道具(上へ・下へ・削除) */
+  tools: (part: number) => ReactNode
+  /** ドラッグ中に、入れる位置に薄く出す、その部品の姿(実際の大きさで。どこに何が入るかを、落とす前に見せる) */
+  ghost?: { sec?: Section; buttons?: ButtonSpec[] }
+  /** ヒーローを押した(右の設定のヒーローの欄へ) */
+  onSelectHero?: () => void
+  heroSelected?: boolean
+}
 
 /** 一覧で使う、見取り図の基準の幅 */
 const BASE_WIDTH = 84
@@ -34,7 +77,7 @@ const BASE_WIDTH = 84
  * width で大きく描ける(管理画面のプレビュー用)。
  * CSS の zoom ではなく寸法を掛け算するのは、zoom だと枠の幅の計算がずれるため
  */
-function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateLayout; free?: boolean; width?: number }) {
+function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }: { layout: TemplateLayout; free?: boolean; width?: number; edit?: ThumbEdit; bare?: boolean }) {
   const s = useStyles()
   const t = useT()
   const k = width / BASE_WIDTH
@@ -179,7 +222,59 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
         {sec.categoryHeading && line('40%', 2.5, INK)}
         {sec.copy !== false && line('55%', 1.5, '#c7ccd4')}
         {body}
-        {pillsAt(i + 1)}
+        {!edit && pillsAt(i + 1)}
+      </div>
+    )
+  }
+
+  /** 入れる位置の線と、落とす前の姿 */
+  const ghostAt = () => (
+    <>
+      <div className={s.dropLine} />
+      {edit?.ghost && <div className={s.ghost}>{edit.ghost.sec ? section(edit.ghost.sec, -1) : edit.ghost.buttons ? pills(edit.ghost.buttons, -1) : null}</div>}
+    </>
+  )
+  /** 編集できる部品の並び(上から順に番号を振り、1 つずつ箱で包む) */
+  const editableParts = () => {
+    if (!edit) return null
+    const out: ReactNode[] = []
+    let n = 0
+    const box = (node: ReactNode, key: string) => {
+      const i = n++
+      out.push(
+        <div
+          key={key}
+          {...edit.partProps(i)}
+          className={mergeClasses(s.part, edit.selected === i && s.partSelected, edit.dragging === i && s.partDragging)}
+          onClick={(e) => {
+            e.stopPropagation()
+            edit.onSelect(i)
+          }}
+        >
+          {edit.dropAt === i && ghostAt()}
+          {node}
+          {edit.selected === i && <div className={s.tools}>{edit.tools(i)}</div>}
+        </div>,
+      )
+    }
+    buttonsAt(blocks, 0, layout.sections.length).forEach((b, j) => box(pills(b, j), `b0-${j}`))
+    layout.sections.forEach((sec, i) => {
+      box(section(sec, i), `s${i}`)
+      buttonsAt(blocks, i + 1, layout.sections.length).forEach((b, j) => box(pills(b, j), `b${i + 1}-${j}`))
+    })
+    out.push(
+      <div key="end" {...edit.endProps} className={mergeClasses(s.dropEnd, edit.active && s.dropEndOn)}>
+        {edit.dropAt === n && ghostAt()}
+      </div>,
+    )
+    return out
+  }
+
+  if (bare) {
+    return (
+      <div className={s.body} style={{ width, rowGap: px(3) }}>
+        {pillsAt(0)}
+        {layout.sections.map(section)}
       </div>
     )
   }
@@ -189,12 +284,29 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
       <div className={s.body} style={{ padding: px(3), rowGap: px(3) }}>
         <div style={{ height: px(5), background: '#222' }} />
         {layout.topBar && <div style={{ height: px(4), background: '#555' }} />}
-        {hero}
-        {pillsAt(0)}
-        {free ? (
-          <span className={s.free} style={{ fontSize: px(10), padding: px(6) }}>{t('自由', 'Free')}</span>
+        {edit?.onSelectHero ? (
+          <div className={mergeClasses(s.part, edit.heroSelected && s.partSelected)} onClick={edit.onSelectHero}>
+            {hero}
+          </div>
         ) : (
-          layout.sections.map(section)
+          hero
+        )}
+        {edit ? (
+          editableParts()
+        ) : (
+          <>
+            {pillsAt(0)}
+            {free ? (
+              // 見出し + 2 列のまとまりが続き、いくつでも足せる(点線の枠)ことを描く
+              <>
+                {section({ kind: 'grid', slots: 2, categoryHeading: true, copy: false }, 0)}
+                {section({ kind: 'grid', slots: 4, categoryHeading: true, copy: false }, 1)}
+                <div className={s.free} style={{ fontSize: px(7), padding: px(2), border: '1px dashed #bbb', borderRadius: 2 }}>{t('＋ いくつでも', '+ any number')}</div>
+              </>
+            ) : (
+              layout.sections.map(section)
+            )}
+          </>
         )}
         <div style={{ height: px(12), background: PANEL, marginTop: px(4) }} />
       </div>
@@ -223,7 +335,9 @@ function FitThumb({ layout, free, width, maxHeight }: { layout: TemplateLayout; 
  * メールの構成の見取り図。maxHeight を指定すると(一覧用)、全体が、その高さに収まるように縮小して見せる。
  * zoom を付けると、マウスを重ねたときに、大きい見取り図を、横に表示する。
  */
-export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHeight, zoom = false }: { layout: TemplateLayout; free?: boolean; width?: number; maxHeight?: number; zoom?: boolean }) {
+export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHeight, zoom = false, edit }: { layout: TemplateLayout; free?: boolean; width?: number; maxHeight?: number; zoom?: boolean; edit?: ThumbEdit }) {
+  // 編集できる見取り図は、縮小せずに描く(箱を押す・つかむ位置がずれないように)
+  if (edit) return <Thumb layout={layout} free={free} width={width} edit={edit} />
   const small = maxHeight ? <FitThumb layout={layout} free={free} width={width} maxHeight={maxHeight} /> : <Thumb layout={layout} free={free} width={width} />
   if (!zoom) return small
   return (
@@ -238,4 +352,10 @@ export function TemplateThumb({ layout, free = false, width = BASE_WIDTH, maxHei
       <div style={{ flexShrink: 0 }}>{small}</div>
     </Tooltip>
   )
+}
+
+/** パレットの部品の絵(外枠・ヒーローなしで、その部品だけを描く) */
+export function PartThumb({ sec, buttons, width = 64 }: { sec?: Section; buttons?: ButtonSpec[]; width?: number }) {
+  const layout: TemplateLayout = { hero: 'standard', sections: sec ? [sec] : [], buttonBlocks: buttons ? [{ at: 0, buttons }] : undefined }
+  return <Thumb layout={layout} width={width} bare />
 }

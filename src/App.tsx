@@ -1342,7 +1342,7 @@ function App() {
 
   return (
     <>
-      <TemplateManager cards={cards} onChanged={load} onOpenCard={setSelectedId} />
+      <TemplateManager cards={cards} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} />
       <input
         ref={metricsFileRef}
         type="file"
