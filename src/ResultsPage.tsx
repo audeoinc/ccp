@@ -25,6 +25,10 @@ import { ResultsCompareView } from './ResultsCompareView'
 import { DataTable, DeliveryThumb, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
 import { ResultsSummaryBar } from './ResultsSummaryBar'
+import { WeekRetro } from './WeekRetro'
+import { MonthsService, type MonthRow } from './data/months'
+import { WeeksService } from './data/weeks'
+import { draftRetro } from './aiRetro'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -67,8 +71,8 @@ interface Props {
   onCardsChanged: () => Promise<void>
   /** 月の表示で、週の行から、その週の週表示へ移る */
   onOpenWeek?: (sunday: Date) => void
-  /** 週の表示の上に置く、この週の振り返りのメモ(App が WeekRetro を渡す) */
-  retro?: ReactNode
+  /** 週の表示の上に置く、この週の振り返りのメモ(App が WeekRetro を渡す。週の行は App が持つため)。draft は、この週の AI の下書きを作る */
+  retro?: (draft: () => Promise<string>) => ReactNode
   /** 結果のデータの操作(書き出し・取り込み・AI で分ける)。App が ⚙ のメニューの「データ」に並べる */
   onDataActions?: (a: ResultsDataActions | null) => void
   /** 詳しい結果の題名の左に出す段階の帯(PLAN → PRODUCTION → RESULTS。配信カード・制作のページとそろえる) */
@@ -101,6 +105,8 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('delivery')
+  // 月の振り返り(表 months)。月の表示でだけ使うので、App ではなく、ここで持つ
+  const [months, setMonths] = useState<MonthRow[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
@@ -117,6 +123,9 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       .catch((e: unknown) => setError(String(e)))
     WeeklyPerformancesService.getAll()
       .then((res) => res.success && setWeekly(res.data ?? []))
+      .catch(() => undefined)
+    MonthsService.getAll()
+      .then((res) => res.success && setMonths(res.data ?? []))
       .catch(() => undefined)
     // 最初の 1 回だけ読む
   }, [])
@@ -150,6 +159,57 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     const d = new Date(y, m - 2, 1)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })()
+
+  // ---- 週・月の振り返りの AI の下書き。前の期間は、週なら 4 週、月なら 3 か月(1 回分だと、ぶれが大きいため)
+  const PAST_WEEKS = 4
+  const PAST_MONTHS = 3
+  const sentMs = (r: (typeof allRows)[number]) => new Date(sentAtOf(r) ?? 0).getTime()
+  const draftWeek = () => {
+    const from = weekStart.getTime()
+    const to = weekEnd.getTime()
+    const pastFrom = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7 * PAST_WEEKS).getTime()
+    const ymd = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
+    return draftRetro({
+      period: 'week',
+      label: t(`${ymd} の週`, `Week of ${ymd}`),
+      now: allRows.filter((r) => sentMs(r) >= from && sentMs(r) < to),
+      past: allRows.filter((r) => sentMs(r) >= pastFrom && sentMs(r) < from),
+      pastPeriods: PAST_WEEKS,
+    })
+  }
+  const draftMonth = async () => {
+    const pastKeys = Array.from({ length: PAST_MONTHS }, (_, i) => {
+      const d = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1 - i, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })
+    // その月の各週の振り返り(週の初めがこの月にある週)も渡す。担当者の気づきを、月のまとめに生かすため
+    const weeks = await WeeksService.getAll().catch(() => null)
+    const weekRetros = (weeks?.success ? (weeks.data ?? []) : [])
+      .filter((w) => w.week_start?.slice(0, 7) === month && w.retro?.trim())
+      .sort((a, b) => (a.week_start ?? '').localeCompare(b.week_start ?? ''))
+      .map((w) => ({ week: w.week_start!.slice(0, 10), text: w.retro!.trim() }))
+    return draftRetro({
+      period: 'month',
+      label: month,
+      now: allRows.filter((r) => monthKey(sentAtOf(r)) === month),
+      past: allRows.filter((r) => pastKeys.includes(monthKey(sentAtOf(r)))),
+      pastPeriods: PAST_MONTHS,
+      weekRetros,
+    })
+  }
+  const thisMonth = months.find((m) => m.month_start?.slice(0, 7) === month)
+  // 月の振り返りを保存する(その月の行がなければ作る)
+  const saveMonthRetro = async (text: string): Promise<boolean> => {
+    setError(null)
+    const res = thisMonth ? await MonthsService.update(thisMonth.id, { retro: text }) : await MonthsService.create({ month_start: `${month}-01`, retro: text })
+    if (!res.success || !res.data) {
+      setError(res.error?.message ?? t('振り返りを保存できませんでした', 'Could not save the retrospective'))
+      return false
+    }
+    const saved = res.data
+    setMonths((prev) => (prev.some((m) => m.id === saved.id) ? prev.map((m) => (m.id === saved.id ? { ...m, ...saved } : m)) : [...prev, saved]))
+    return true
+  }
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? t('(削除された商品)', '(deleted product)')
 
   const groups: GroupRow[] =
@@ -438,6 +498,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         ) : view === 'month' ? (
           <>
           {monthBar}
+          <WeekRetro period="month" mode="results" text={thisMonth?.retro ?? ''} onSave={saveMonthRetro} onDraft={draftMonth} />
           <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} onOpenWeek={onOpenWeek} />
           </>
         ) : view === 'compare' ? (
@@ -456,7 +517,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           />
         ) : view === 'week' ? (
           <>
-          {retro}
+          {retro?.(draftWeek)}
           <ResultsWeek weekStart={weekStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} cardProducts={cardProducts} products={products} heroes={heroes} />
           </>
         ) : rows.length === 0 ? (

@@ -105,6 +105,33 @@ export function mockAgent(message: string): string {
         })
   }
 
+  // 週・月の振り返りの下書き: 国 × チャネルの数字を前の期間と比べ、売上の多い配信・少ない配信の名前を入れた、決まった形の文を作る
+  if (task === 'draft_retro') {
+    type Kpi = { deliveries: number; clickRate?: number; revenue: number }
+    const summary = (p.summary as { country: string; channel: string; now: Kpi; past: Kpi }[] | undefined) ?? []
+    const ds = [...((p.deliveries as { name: string; revenue: number }[] | undefined) ?? [])].sort((a, b) => b.revenue - a.revenue)
+    const month = p.period === 'month'
+    const pt = (k: { now: Kpi; past: Kpi }) => (((k.now.clickRate ?? 0) - (k.past.clickRate ?? 0)) * 100).toFixed(1)
+    const rev = (k: { now: Kpi; past: Kpi }) => (k.past.revenue ? Math.round((k.now.revenue / k.past.revenue - 1) * 100) : 0)
+    const up = summary.filter((k) => rev(k) >= 0)
+    const down = summary.filter((k) => rev(k) < 0)
+    const label = (k: { country: string; channel: string }) => (en ? `${k.country} ${k.channel}` : `${k.country} の${k.channel === 'push' ? 'プッシュ' : 'メール'}`)
+    return J({
+      good: [
+        ...up.slice(0, 1).map((k) => (en ? `${label(k)} revenue was ${rev(k)}% above the past average; click rate ${pt(k)}pt.` : `${label(k)}の売上は、前の期間の平均より ${rev(k)}% 多く、クリック率は ${pt(k)}pt。`)),
+        ...(ds[0] ? [en ? `"${ds[0].name}" led with the most revenue in the period.` : `「${ds[0].name}」が、期間でいちばん売上が多かった。`] : []),
+      ],
+      bad: [
+        ...down.slice(0, 1).map((k) => (en ? `${label(k)} revenue fell ${Math.abs(rev(k))}% below the past average.` : `${label(k)}の売上は、前の期間の平均より ${Math.abs(rev(k))}% 少なかった。`)),
+        ...(ds.length > 1 ? [en ? `"${ds[ds.length - 1].name}" had the least revenue in the period.` : `「${ds[ds.length - 1].name}」が、期間でいちばん売上が少なかった。`] : []),
+      ],
+      next: ds[0]
+        ? [en ? `Reuse the angle of "${ds[0].name}" in one delivery next ${month ? 'month' : 'week'}.` : `次の${month ? '月' : '週'}も、「${ds[0].name}」の切り口を 1 本は試す。`]
+        : [],
+      confidence: ds.length < 5 ? (en ? `Weak: only ${ds.length} deliveries.` : `弱い: 配信が ${ds.length} 本だけ。`) : en ? `Medium: ${ds.length} deliveries.` : `中くらい: ${ds.length} 本を比べた。`,
+    })
+  }
+
   // 結果の振り返り: 過去の平均との差が大きい位置・数字から、決まった形の文を作る
   if (task === 'review_results') {
     type Pos = { key: string; now: number; past: number }

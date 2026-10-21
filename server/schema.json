@@ -257,6 +257,14 @@
    "lookups": [
    ]
   },
+  "months": {
+   "columns": [
+    ["month_start", "date", {"index": true}],
+    ["retro", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "delivery_results": {
    "columns": [
     ["sent_at", "timestamptz"],

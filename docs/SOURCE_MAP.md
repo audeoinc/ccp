@@ -222,7 +222,7 @@ flowchart TD
 | `status.ts` / `progress.ts` | 53 / 167 | 配信のステータスの色・チャネル / 工程(進み具合) |
 | `ChannelBadge.tsx` | 54 | メール / アプリの札(配信カード・月・週・一覧・結果で共通) |
 | `StatusFlow.tsx` / `MonthSummaryBar.tsx` | 46 / 65 | 件数の流れ(未起案 › 承認待ち › 承認済み)/ 月の要約の帯 |
-| `WeekRetro.tsx` / `WeekHistory.tsx` | 147 / 60 | 週の振り返りのメモ(結果の面で書き、翌週の計画の面に出す)/ 週の承認の履歴 |
+| `WeekRetro.tsx` / `WeekHistory.tsx` | 218 / 60 | 週・月の振り返りのメモ(結果の面で書き、AI で下書きもでき、翌週・翌月の計画の面に出す)/ 週の承認の履歴 |
 | `DataTable.tsx` | 151 | 一覧の表(並べ替え・サムネイル。計画と結果で共通) |
 
 ### 3.3 配信カード(全画面のフロート)
@@ -308,7 +308,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `aiDraft.ts` | 284 | テーマ・コピー・制作指示・件名の「案」 |
 | `autoDraft.ts` | 197 | 「すべてAIで下書き」(1 回で 6〜9 回呼ぶ) |
 | `useAiDrafts.ts` | 248 | 下書きの状態を、画面に渡すフック |
-| `aiReview.ts` / `aiCompare.ts` | 43 / 53 | 結果の振り返り / 配信どうしの比較 |
+| `aiReview.ts` / `aiRetro.ts` / `aiCompare.ts` | 43 / 116 / 53 | 結果の振り返り(配信 1 本)/ 週・月の振り返りの下書き / 配信どうしの比較 |
 | `aiTasks.ts` | 42 | 制作とのやり取りから、タスクの案を出す |
 | `themeTypes.ts` / `themeGuess.ts` | 70 / 22 | テーマの種類 / 言葉から種類を推し量る |
 

@@ -63,7 +63,7 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar } from './WeekReviewBar'
 import { MePicker, SignInDialog } from './MePicker'
-import { WeekRetro } from './WeekRetro'
+import { PrevMonthRetro, WeekRetro } from './WeekRetro'
 import { WeekHistory } from './WeekHistory'
 import { MonthSummaryBar } from './MonthSummaryBar'
 import { Calendar } from './Calendar'
@@ -2000,7 +2000,7 @@ function App() {
                 onCardsChanged={load}
                 onOpenWeek={(d) => goTo('week', d)}
                 onDataActions={setResultsData}
-                retro={<WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} />}
+                retro={(draft) => <WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} onDraft={draft} />}
               />
               </SwipePager>
             ) : view === 'list' ? (
@@ -2108,6 +2108,16 @@ function App() {
             ) : (
               <>
               {monthBar}
+              {/* 計画の面の月の表示に、前月の振り返り(結果の面の月の表示で書いたもの)を出す */}
+              {!onProduction && month && (
+                <PrevMonthRetro
+                  month={month}
+                  onOpenResults={() => {
+                    setPage('results')
+                    goTo('month', new Date(month.getFullYear(), month.getMonth() - 1, 1))
+                  }}
+                />
+              )}
               <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
               <Calendar
                 month={month}
