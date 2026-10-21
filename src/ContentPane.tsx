@@ -1,23 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
-  Badge,
-  Button,
-  Divider,
-  Field,
-  MessageBar,
-  MessageBarActions,
-  MessageBarBody,
-  Tab,
-  TabList,
-  Tooltip,
-  makeStyles,
-  mergeClasses,
-  tokens,
-} from '@fluentui/react-components'
+import { Accordion, AccordionHeader, AccordionItem, AccordionPanel, Badge, Button, Divider, Field, Input, MessageBar, MessageBarActions, MessageBarBody, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownRegular,
   ArrowUpRegular,
@@ -56,9 +38,13 @@ import { type Links, linkSlots, linksComplete, variantCampaign } from './links'
 
 // 中ペインは、コンテンツを作る工程だけ。人とのやり取り(引き継ぎ・質問・タスク・コメント)は、右端の「プロセス」のペイン(ProcessPane)に移した(2026-10-17)
 export type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'notice' | 'message' | 'timing'
-type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle'
+type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle' | 'subject' | 'preheader'
 
 interface Props {
+  /** メールの件名・プリヘッダー(X2)と、件名が空のときに使う配信名 */
+  subject?: string
+  preheader?: string
+  deliveryName?: string
   theme: string
   headline: string
   copy: string
@@ -143,6 +129,7 @@ interface Props {
 // ------------------------------------------------------------------ スタイル
 
 const useStyles = makeStyles({
+  inboxBlock: { display: 'grid', rowGap: '8px', marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   assetsBlock: { marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   uploadRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '4px' },
   // グリッドの子は、中身が長くても列を押し広げない(帯や長い文がペインからはみ出さないように)
@@ -1109,11 +1096,27 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
       onGenerate={drafts.runCopy}
     />
   )
+  // メールの件名・プリヘッダー(X2)。受信一覧で最初に目に入る文。プレビューの上に、受信一覧での見え方を出す
+  const inboxView = p.channel !== 'push' && (
+    <div className={s.inboxBlock}>
+      <Field label={t(`件名(空なら配信名「${p.deliveryName ?? ''}」)`, `Subject (empty uses the delivery name "${p.deliveryName ?? ''}")`)} size="small">
+        <Input size="small" value={p.subject ?? ''} onChange={(_, d) => p.onField('subject', d.value)} placeholder={p.deliveryName} />
+      </Field>
+      <Field label={t('プリヘッダー(受信一覧で件名の横・下に出る短い文。任意)', 'Preheader (short text shown next to or under the subject in the inbox; optional)')} size="small" hint={t(`${(p.preheader ?? '').length} 文字(目安 40〜90 文字)`, `${(p.preheader ?? '').length} chars (aim for 40–90)`)}>
+        <Input size="small" value={p.preheader ?? ''} onChange={(_, d) => p.onField('preheader', d.value)} placeholder={t('例: 週末までの限定。秋のアウターが最大 30% オフ', 'e.g. Ends Sunday. Up to 30% off fall outerwear')} />
+      </Field>
+    </div>
+  )
 
   return (
     <div className={s.grid12}>
       {!p.only && subTabs}
-      {active === 'hero' ? heroView() : active === 'copy' ? copyView : sectionView(sections[active])}
+      {active === 'hero' ? heroView() : active === 'copy' ? (
+        <>
+          {copyView}
+          {inboxView}
+        </>
+      ) : sectionView(sections[active])}
     </div>
   )
 }

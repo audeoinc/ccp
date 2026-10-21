@@ -38,6 +38,9 @@ const CARD_KEYS = [
   'hero_image_id',
   // AB テストの設定(X55)
   'ab_test',
+  // メールの件名・プリヘッダー(X2)
+  'subject',
+  'preheader',
 ] as const satisfies readonly (keyof DeliveryCard)[]
 
 export interface Snapshot {
@@ -115,7 +118,7 @@ export interface CopyRow {
 }
 
 /** 直せるテキストの場所(配信カードの列。セクションは何番目か) */
-export type TextField = { key: 'name' | 'push_title' | 'push_body' | 'headline' | 'copy' } | { key: 'section_titles' | 'section_copies'; index: number }
+export type TextField = { key: 'name' | 'subject' | 'preheader' | 'push_title' | 'push_body' | 'headline' | 'copy' } | { key: 'section_titles' | 'section_copies'; index: number }
 export interface TextRow extends CopyRow {
   field: TextField
   /** 行を見分ける鍵(直した印・元の値を、同じ行どうしで比べる) */
@@ -128,6 +131,8 @@ export function getText(s: Snapshot, f: TextField): string {
   const c = s.card
   if (f.key === 'section_titles') return (c.section_titles ?? '').split('\n')[f.index] ?? ''
   if (f.key === 'section_copies') return parseCopies(c.section_copies)[f.index] ?? ''
+  // 件名は、空なら配信名(X2 より前の写しにも合う)
+  if (f.key === 'subject') return c.subject || c.name || ''
   return c[f.key] ?? ''
 }
 
@@ -157,7 +162,7 @@ export function textRows(s: Snapshot, all = false): TextRow[] {
   if (isPushCard(s)) {
     fields.push({ label: tr('通知のタイトル', 'Notification title'), field: { key: 'push_title' } }, { label: tr('通知の本文', 'Notification body'), field: { key: 'push_body' } })
   } else {
-    fields.push({ label: tr('件名', 'Subject'), field: { key: 'name' } })
+    fields.push({ label: tr('件名', 'Subject'), field: { key: 'subject' } }, { label: tr('プリヘッダー', 'Preheader'), field: { key: 'preheader' } })
   }
   fields.push({ label: tr('ヘッドライン', 'Headline'), field: { key: 'headline' } }, { label: tr('コピー', 'Copy'), field: { key: 'copy' } })
   sectionsOf(templateOf(s)).forEach((sec, i) => {

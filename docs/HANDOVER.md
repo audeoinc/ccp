@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(X60 表示の大きさ。6.47。その前は C3 週の上限。6.46)
+- 最終更新: 2026-10-21(X2 件名・プリヘッダー / X3 PC・スマホ。6.48。その前は X60 表示の大きさ。6.47)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -652,6 +652,12 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 右上の「あなた」のメニュー(`MePicker`)に「表示の大きさ」(80 / 90 / 100 / 110%)。`src/uiScale.ts`(localStorage の `ui.scale`。`main.tsx` で最初の描画の前に `applyUiScale`)。html に CSS の zoom と、変数 `--ui-zoom`。
 - **zoom の落とし穴(これから画面を作るとき)**: (1) 中の 100vh・100vw は画面の 80% などになるので、vh / vw は `calc(92vh / var(--ui-zoom, 1))` の形で書く(20 のファイルを直した)。(2) `window.innerWidth`・`innerHeight` は画面の px なので、中の px が要るところは `viewWidth()`・`viewHeight()`。(3) マウスの動き(clientX の差)は画面の px なので、中の px で幅・位置を決めるところは `/ getUiScale()` で割る(Splitter・ResizeHandles・ProductActionFloat・ChatPanel・WeekTimeGrid の 1 時間の高さ)。(4) getBoundingClientRect と clientX は、どちらも画面の px なので、その比(位置の割合)は直さなくてよい。プレビューに重ねる札・番号(ItemAlertOverlay・LinkOverlay・HeatPreview)は、もとから offsetWidth との比で直している。
 - 確かめたこと: モックで 80% にして、月の表示・配信カードが画面いっぱいになること、⚙ のメニューの位置、商品のフロートをつかんで 200px 動かすと 200px 動くこと。
+
+## 6.48 X2 件名・プリヘッダー / X3 プレビューの PC・スマホ(2026-10-21、UI セッション)
+
+- X2: `delivery_cards` に subject・preheader(空の件名は配信名を使う)。`CardDetail` の Form と `buildContent`、`ContentPane` の ③「ヘッドライン・コピー」の下(`inboxView`。メールのときだけ)。`Preview` に `subjectLine`・`preheader`(上の「件名:」の行と、プリヘッダーの行)。`CardPreview` も渡す。制作の写しは `CARD_KEYS` に subject・preheader、テキストの行の「件名」は `subject`(空なら name)、「プリヘッダー」を足した。
+- X3: `Preview` に `device`('mobile' 375px / 'pc' 640px。省略は 440px のまま。保存した配信のプレビュー・まとめて作るなどは変わらない)。配信カードのプレビューの見出しに「スマホ / PC」(`cardDetail.previewDevice`)。
+- 残り: AI で件名・プリヘッダーの案、AB テストの案ごとの件名(VariantText に足す)。
 
 ## 7. 落とし穴
 

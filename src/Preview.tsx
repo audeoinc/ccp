@@ -21,6 +21,11 @@ import { locale, optionLabel, useT } from './i18n'
 interface Props {
   channel: 'email' | 'push'
   subject: string
+  /** メールの件名(空は subject = 配信名)とプリヘッダー(X2) */
+  subjectLine?: string
+  preheader?: string
+  /** メールの幅(X3。mobile = スマホ 375px / pc = PC 640px。既定はこれまでどおり 440px) */
+  device?: 'mobile' | 'pc'
   /** メイン画像に載せる大見出し */
   headline: string
   copy: string
@@ -211,7 +216,7 @@ function FitLine({ baseSize, minScale = 0.55, style, children }: { baseSize: str
   )
 }
 
-function EmailPreview({ subject, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt }: Props) {
+function EmailPreview({ subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt }: Props) {
   const t = useT()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
@@ -723,8 +728,16 @@ function EmailPreview({ subject, headline, copy, items, products, selectedKey, h
   }
 
   return (
-    <div style={{ maxWidth: 440, margin: '0 auto' }}>
-      {!compact && <span style={{ fontSize: 12, color: tokens.colorNeutralForeground2 }}>{t('件名', 'Subject')}: {subject || t('(配信名未入力)', '(No name)')}</span>}
+    <div style={{ maxWidth: device === 'pc' ? 640 : device === 'mobile' ? 375 : 440, margin: '0 auto' }}>
+      {/* 受信一覧での見え方: 件名(空は配信名)と、プリヘッダー(X2) */}
+      {!compact && (
+        <div style={{ fontSize: 12, color: tokens.colorNeutralForeground2, display: 'grid', rowGap: 2 }}>
+          <span>
+            {t('件名', 'Subject')}: <span style={{ color: tokens.colorNeutralForeground1, fontWeight: 600 }}>{subjectLine || subject || t('(配信名未入力)', '(No name)')}</span>
+          </span>
+          {preheader ? <span>{t('プリヘッダー', 'Preheader')}: {preheader}</span> : null}
+        </div>
+      )}
       <div style={{ backgroundColor: '#fff', color: INK, border: '1px solid #ddd', borderRadius: 16, overflow: 'hidden', marginTop: 4, ...scaled }}>
         {/* お知らせ帯: 配信名を、メールの最上部に細い帯で出す */}
         {tpl.topBar && (

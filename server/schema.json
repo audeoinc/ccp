@@ -38,7 +38,9 @@
     ["cancel_reason", "text"],
     ["ai_unchecked_at", "timestamptz"],
     ["frame_at", "timestamptz"],
-    ["ab_test", "text"]
+    ["ab_test", "text"],
+    ["subject", "text"],
+    ["preheader", "text"]
    ],
    "lookups": [
     ["hero_image_id", "hero_images", {"onDelete": "SET NULL"}]

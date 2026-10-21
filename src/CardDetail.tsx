@@ -21,7 +21,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -156,6 +156,9 @@ interface Form {
   /** アプリ: 通知のタイトル・本文 */
   pushTitle: string
   pushBody: string
+  /** メール: 件名(空は配信名)・プリヘッダー(X2) */
+  subject: string
+  preheader: string
   /** 制作の締め切り(YYYY-MM-DD) */
   productionDue: string
   productionOwner: string
@@ -185,6 +188,8 @@ const toForm = (c?: DeliveryCard): Form => ({
   targetGender: str(c?.target_gender),
   targetAges: str(c?.target_ages),
   pushTitle: c?.push_title ?? '',
+  subject: c?.subject ?? '',
+  preheader: c?.preheader ?? '',
   pushBody: c?.push_body ?? '',
   productionDue: c?.production_due?.slice(0, 10) ?? '',
   productionOwner: c?.production_owner ?? '',
@@ -411,6 +416,8 @@ const useStyles = makeStyles({
   success: { color: tokens.colorPaletteGreenForeground1 },
   fullWidth: { width: '100%', flexShrink: 0, minHeight: '32px' },
   sectionHead: { marginTop: '12px' },
+  deviceSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: '4px' },
+  deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
   previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
   // 配信の対象(X40)
   targetBox: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
@@ -477,6 +484,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [showHeadings, setShowHeadings] = useState(true)
   // プレビューの倍率(15〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
   const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
+  // メールのプレビューの幅(X3。スマホ / PC。ブラウザごとに覚える)
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'pc'>(() => loadPref<'mobile' | 'pc'>('cardDetail.previewDevice', 'mobile'))
+  const pickDevice = (d: 'mobile' | 'pc') => {
+    setPreviewDevice(d)
+    savePref('cardDetail.previewDevice', d)
+  }
   const [fitZoom, setFitZoom] = useState(1)
   // 「すべてAIで下書き」の進み具合(実行中だけ、画面全体に「推論中」を出す)
   const [autoEnabled] = useState(loadAutoDraft) // 設定は、画面上部のバーで切り替える
@@ -1197,6 +1210,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         audience: audience,
         target_gender: (form.targetGender || null) as never,
         target_ages: form.targetAges,
+        subject: form.subject,
+        preheader: form.preheader,
         push_title: textsOf('A').pushTitle,
         push_body: textsOf('A').pushBody,
         production_owner: form.productionOwner.trim(),
@@ -1874,6 +1889,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 theme={form.theme}
                 headline={form.headline}
                 copy={form.copy}
+                subject={form.subject}
+                preheader={form.preheader}
+                deliveryName={form.name}
                 instructions={form.instructions}
                 themeReason={form.themeReason}
                 copyAngle={form.copyAngle}
@@ -1955,6 +1973,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                   {previewTab === 'push' ? <PhoneRegular /> : <MailRegular />}
                   <Text weight="semibold" size={300}>{previewTab === 'push' ? t('アプリのプレビュー', 'App preview') : t('メールのプレビュー', 'Email preview')}</Text>
                   {!form.channel && <Caption1 className={styles.caption}>{t('チャネルが未設定のため、メールで表示しています', 'No channel set — showing the email')}</Caption1>}
+                  {previewTab !== 'push' && (
+                    <span className={styles.deviceSwitch} role="tablist" aria-label={t('プレビューの幅', 'Preview width')}>
+                      {(['mobile', 'pc'] as const).map((d) => (
+                        <Button key={d} type="button" size="small" role="tab" aria-selected={previewDevice === d} appearance={previewDevice === d ? 'primary' : 'subtle'} className={styles.deviceBtn} icon={d === 'mobile' ? <PhoneRegular /> : <DesktopRegular />} onClick={() => pickDevice(d)}>
+                          {d === 'mobile' ? t('スマホ', 'Mobile') : t('PC', 'Desktop')}
+                        </Button>
+                      ))}
+                    </span>
+                  )}
                   {ab && (
                     <Badge appearance="filled" color="brand">
                       {t(`${active} 案`, `Variant ${active}`)}
@@ -2001,6 +2028,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     pushTitle={form.pushTitle}
                     pushBody={form.pushBody}
                     subject={form.name}
+                    subjectLine={form.subject}
+                    preheader={form.preheader}
+                    device={previewDevice}
                     headline={form.headline}
                     copy={form.copy}
                     items={items}

@@ -98,6 +98,10 @@ export interface DeliveryCardFields {
   frame_at?: string | null
   /** AB テストの設定と、B・C 案のメイン画像(JSON。src/abTest.ts。空は、AB テストをしない。X55) */
   ab_test?: string
+  /** メールの件名(空は配信名を使う。X2) */
+  subject?: string
+  /** メールのプリヘッダー(受信一覧で、件名の横・下に出る短い文。X2) */
+  preheader?: string
   /** hero_images の id(参照を外すときは null) */
   hero_image_id?: string | null
   state_code?: number

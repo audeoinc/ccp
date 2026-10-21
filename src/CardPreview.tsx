@@ -44,6 +44,8 @@ export function CardPreview({ card: c, productIds, products, heroes }: Props) {
       pushTitle={c.push_title}
       pushBody={c.push_body}
       subject={c.name}
+      subjectLine={c.subject}
+      preheader={c.preheader}
       headline={c.headline ?? ''}
       copy={c.copy ?? ''}
       items={items}
