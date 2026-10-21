@@ -118,6 +118,24 @@
    "lookups": [
    ]
   },
+  "part_images": {
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["kind", "choice"],
+    ["market", "choice"],
+    ["tags", "text"],
+    ["description", "text"],
+    ["alt_text", "text"],
+    ["image_url", "text"],
+    ["width", "int"],
+    ["height", "int"],
+    ["source", "text"],
+    ["usable_until", "date"],
+    ["uploaded_by", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "weekly_performances": {
    "columns": [
     ["name", "text", {"required": true}],
@@ -601,6 +619,8 @@
   "hero_images.purpose": ["new", "feature", "sale", "member", "event"],
   "hero_images.season": ["autumn", "winter", "autumn_winter", "all_year"],
   "hero_images.market": ["JP", "US"],
+  "part_images.kind": ["button", "banner", "logo", "icon", "other"],
+  "part_images.market": ["JP", "US"],
   "ai_requests.status": ["waiting", "done", "error"],
   "events.from_status": ["not_started", "reviewing", "approved", "confirmed"],
   "events.to_status": ["not_started", "reviewing", "approved", "confirmed"],

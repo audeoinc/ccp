@@ -1,5 +1,6 @@
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
+import type { PartImage } from './models/partImages'
 import { appPath } from './appRoot'
 
 // ビルドに同梱するイラスト(商品コード・画像コードと同じファイル名。scripts の生成物)
@@ -23,4 +24,10 @@ export function heroImage(h?: HeroImage): string | undefined {
   if (!h) return undefined
   if (!isPlaceholder(h.image_url)) return appPath(h.image_url!)
   return heroAssets[`./assets/heroes/${assetCode(h.image_code)}.svg`] ?? h.image_url
+}
+
+/** 部品の画像(X59 ③)。同梱のイラストはないので、URL をそのまま使う */
+export function partImage(p?: PartImage): string | undefined {
+  if (!p?.image_url) return undefined
+  return appPath(p.image_url)
 }

@@ -16,11 +16,22 @@ function impactTables(): Record<string, Row[]> {
   }
 }
 
+// 部品の画像の見本(X59 ③): ボタン・ロゴ・バナー
+const svg = (body: string, w: number, h: number) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`)}`
+const sampleParts = (): Row[] =>
+  [
+    { name: '黒の「今すぐ見る」ボタン', kind: 'button', market: 'JP', alt_text: '今すぐ見る', tags: '黒, 角丸, 行動の呼びかけ', w: 480, h: 112, body: '<rect x="4" y="4" width="472" height="104" rx="52" fill="#1b1f2a"/><text x="240" y="70" font-family="sans-serif" font-size="40" fill="#fff" text-anchor="middle">今すぐ見る</text>' },
+    { name: 'Black "Shop now" button', kind: 'button', market: 'US', alt_text: 'Shop now', tags: 'black, rounded, call to action', w: 480, h: 112, body: '<rect x="4" y="4" width="472" height="104" rx="52" fill="#1b1f2a"/><text x="240" y="70" font-family="sans-serif" font-size="40" fill="#fff" text-anchor="middle">Shop now</text>' },
+    { name: 'SHOP ロゴ(白抜き)', kind: 'logo', market: 'JP', alt_text: 'SHOP', tags: 'ロゴ, 白, ヘッダー', w: 360, h: 96, body: '<text x="180" y="66" font-family="sans-serif" font-size="56" font-weight="700" letter-spacing="12" fill="#1b1f2a" text-anchor="middle">SHOP</text>' },
+    { name: '送料無料バナー', kind: 'banner', market: 'JP', alt_text: '5,000円以上で送料無料', tags: '送料無料, 帯, 黄', w: 1200, h: 160, body: '<rect width="1200" height="160" fill="#f3c845"/><text x="600" y="98" font-family="sans-serif" font-size="56" font-weight="700" fill="#1b1f2a" text-anchor="middle">5,000円以上で送料無料</text>' },
+  ].map(({ w, h, body, ...p }, i) => ({ id: guid(`part:${i}`), ...p, width: w, height: h, image_url: svg(body, w, h), created_on: new Date(Date.now() - i * 86400000).toISOString() }))
+
 export const tables: Record<string, Row[]> = {
   DeliveryCardsService: structuredClone(cards),
   DeliveryProductsService: structuredClone(deliveryProducts),
   ProductsService: structuredClone(products),
   HeroImagesService: structuredClone(heroes),
+  PartImagesService: sampleParts(),
   WeeklyPerformancesService: structuredClone(weekly),
   ProductRankingsService: structuredClone(productRankings),
   ProductPoliciesService: structuredClone(policies),

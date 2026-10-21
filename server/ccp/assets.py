@@ -1,4 +1,4 @@
-"""/img/{products|heroes}/{ファイル名} — GCS のバケットにある、商品画像・ヒーロー画像を配信する。
+"""/img/{products|heroes|parts}/{ファイル名} — GCS のバケットにある、商品画像・ヒーロー画像・部品の画像(X59 ③)を配信する。
 
 バケットは非公開(外部からは見えない)。サーバーが、実行サービスアカウントの権限で読んで返す。
 画像のアクセスにも、サイト全体と同じ Basic 認証がかかる(同じサイトから読む画像には、ブラウザが認証情報を付ける)。
@@ -22,7 +22,7 @@ from fastapi.responses import Response
 from .creds import get_credentials
 
 GCS_API = "https://storage.googleapis.com"
-KINDS = ("products", "heroes")
+KINDS = ("products", "heroes", "parts")
 NAME = re.compile(r"^[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$")
 
 router = APIRouter()

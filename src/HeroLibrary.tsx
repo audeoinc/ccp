@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Input, Switch, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Input, Switch, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
 import { CalendarCancelRegular, DeleteRegular, DismissRegular, EditRegular, ImageAddRegular, SearchRegular, SparkleRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload } from './data/heroUpload'
 import { HeroUploadDialog } from './HeroUploadDialog'
+import { PartLibrary } from './PartLibrary'
 import { heroCropStyle, isUsableHero } from './heroRights'
 import { heroImage } from './images'
 import { rasterize } from './imageConvert'
@@ -57,6 +58,8 @@ interface Props {
 export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: Props) {
   const s = useStyles()
   const t = useT()
+  // メイン画像 / 部品の画像(X59 ③)
+  const [tab, setTab] = useState<'heroes' | 'parts'>('heroes')
   const [q, setQ] = useState('')
   const [market, setMarket] = useState<'' | 'US' | 'JP'>(country === 'US' || country === 'JP' ? country : '')
   const [onlyUploaded, setOnlyUploaded] = useState(false)
@@ -171,12 +174,22 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
       <DialogSurface className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.titleRow}>
-            <DialogTitle className={s.grow}>{t('メイン画像のライブラリ', 'Hero image library')}</DialogTitle>
-            <Button appearance="primary" icon={<ImageAddRegular />} onClick={() => setUploading(true)}>
-              {t('画像を上げる', 'Upload an image')}
-            </Button>
+            <DialogTitle className={s.grow}>{t('画像のライブラリ', 'Image library')}</DialogTitle>
+            {tab === 'heroes' && (
+              <Button appearance="primary" icon={<ImageAddRegular />} onClick={() => setUploading(true)}>
+                {t('画像を上げる', 'Upload an image')}
+              </Button>
+            )}
             <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
           </div>
+          <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as 'heroes' | 'parts')}>
+            <Tab value="heroes">{t(`メイン画像(${heroes.length})`, `Hero images (${heroes.length})`)}</Tab>
+            <Tab value="parts">{t('部品の画像(ボタン・バナー・ロゴ・アイコン)', 'Part images (buttons, banners, logos, icons)')}</Tab>
+          </TabList>
+          {tab === 'parts' ? (
+            <PartLibrary country={country} me={me} />
+          ) : (
+          <>
           <div className={s.tools}>
             <Input size="small" contentBefore={<SearchRegular />} value={q} onChange={(_, d) => setQ(d.value)} placeholder={t('名前・コード・タグ・出どころで探す', 'Search name, code, tags, source')} />
             {(['', 'US', 'JP'] as const).map((m) => (
@@ -246,6 +259,8 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
               )
             })}
           </div>
+          </>
+          )}
           {(editing || uploading) && (
             <HeroUploadDialog
               market={market || null}

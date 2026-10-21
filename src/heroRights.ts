@@ -1,7 +1,8 @@
 // メイン画像の使える期限と焦点(X59)
 import type { HeroImage } from './models/heroImages'
+import type { PartImage } from './models/partImages'
 
-const today = () => {
+export const today = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -18,3 +19,6 @@ export const cropStyle = (x: number, y: number, zoom = 1) => {
   return { objectFit: 'cover' as const, objectPosition: pos, ...(zoom > 1 ? { transform: `scale(${zoom})`, transformOrigin: pos } : {}) }
 }
 export const heroCropStyle = (h?: HeroImage) => cropStyle(h?.focal_x ?? 0.5, h?.focal_y ?? 0.5, heroZoom(h))
+
+/** 部品の画像(X59 ③)が使える期限の中か。過ぎたものは、制作のページの候補から外す */
+export const isUsablePart = (p: PartImage, on = today()) => !p.usable_until || p.usable_until.slice(0, 10) >= on

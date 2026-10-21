@@ -36,14 +36,15 @@ TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": 
 URL = re.compile(r"^/img/heroes/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
 
 
-def save(name: str, data: bytes, content_type: str) -> None:
+def save(name: str, data: bytes, content_type: str, kind: str = "heroes") -> None:
+    """画像を置く(kind = heroes / parts。部品の画像も同じ置き方。ccp/parts.py)"""
     d = assets.asset_dir()
     if d is not None or not assets.bucket():
-        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / "heroes"
+        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / kind
         folder.mkdir(parents=True, exist_ok=True)
         (folder / name).write_bytes(data)
         return
-    assets.put_object(assets.object_name("heroes", name), data, content_type)
+    assets.put_object(assets.object_name(kind, name), data, content_type)
 
 
 @router.post("/upload")
@@ -124,15 +125,15 @@ async def describe_image(request: Request, language: str = "ja"):
 UPLOADED = re.compile(r"^up-[0-9a-f]{32}\.(?:jpg|png|webp)$")
 
 
-def remove(name: str) -> None:
+def remove(name: str, kind: str = "heroes") -> None:
     d = assets.asset_dir()
     if d is not None or not assets.bucket():
-        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / "heroes"
+        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / kind
         (folder / name).unlink(missing_ok=True)
         return
     from urllib.parse import quote
 
-    r = assets.session().delete(f"{assets.GCS_API}/storage/v1/b/{assets.bucket()}/o/{quote(assets.object_name('heroes', name), safe='')}", timeout=30)
+    r = assets.session().delete(f"{assets.GCS_API}/storage/v1/b/{assets.bucket()}/o/{quote(assets.object_name(kind, name), safe='')}", timeout=30)
     if r.status_code not in (200, 204, 404):
         r.raise_for_status()
 

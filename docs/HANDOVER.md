@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(制作のページを AB テストの案ごとに。6.50。その前は AB テストの案ごとの件名・件名の AI 案。6.49)
+- 最終更新: 2026-10-21(X59 画像のライブラリの仕上げ。6.51。その前は制作のページを AB テストの案ごとに。6.50)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -664,6 +664,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 - 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
 - AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
 - 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)→ 6.50。
+
+## 6.51 X59 画像のライブラリの仕上げ(③〜⑥。2026-10-21、UI セッション)
+
+- 利用者の指示「X59 に関連する内容をすべて進めて」。3 つのコミット。
+- ⑤⑥: `src/imageConvert.ts`(`toUploadable` = AVIF を JPEG に(部品は PNG に)、`rasterize` = 画面に出している画像を JPEG にして AI に見せる。SVG の見本も読める。placehold.co など、よそのサイトの画像は CORS で読めないことがある)。サーバーは `/api/heroes/describe-image`(画像そのもの。`_describe` を共通に)。`HeroUploadDialog` の「AI で下書きし直す」(直すとき。焦点は変えない)、`HeroLibrary` の「空の項目を AI で埋める」(1 点ずつ・入っている項目は変えない・やめられる)。制作のページの `HeroPicker` に「持っている画像を上げる」(`ProductionInfoPane` が `HeroUploadDialog` を開き、上げた画像をこの版のメイン画像に)。
+- ④: `hero_images.focal_zoom`(1〜3)。`heroRights.ts` の `cropStyle` / `heroCropStyle`(object-position と、拡大なら transform: scale を焦点を中心に)。枠の側に overflow: hidden が要る(Preview のヒーローの枠・ライブラリのサムネに足した)。制作の HTML の下書き(`previewHtml`)は、画像だけに object-position、拡大しているときだけ transform を書く。**メールの受信ソフトによっては transform が効かない**ので、拡大した画像は制作が切り出して使う前提(下書きは見本)。`heroPosition` は使わなくなったので消した。
+- ③: 表 `part_images`(name・kind(button / banner / logo / icon / other)・market・tags・description・alt_text・image_url・width・height・source・usable_until・uploaded_by)。`server/ccp/parts.py`(upload・describe-image・files の DELETE。置き場所は heroes の `save` / `remove` に kind を足して共通に)、`assets.KINDS` に parts、パックの画像にも part_images。画面は `PartLibrary.tsx`(ライブラリのタブ)・`PartUploadDialog.tsx`・`PartPicker.tsx`(制作のページの左。URL と `<img>` のタグのコピー)。配信とは結びつけない(使った記録はない)。モックの見本は `src/mock/db.ts` の `sampleParts`(SVG の data URL)。
+- テスト: `server/tests/test_heroes_upload.py` に describe-image・部品の upload / delete。モックで、AI で下書きし直す・拡大の見え方・部品のタブ・制作のページの部品の欄を確かめた。「空の項目を AI で埋める」は、見本に空の項目がないので押せない状態だけ確かめた。
 
 ## 6.50 制作のページを AB テストの案ごとに(2026-10-21、UI セッション)
 

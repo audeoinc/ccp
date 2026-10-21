@@ -12,7 +12,7 @@
 ZIP の中身:
   data.json                 {"version": 2, "exportedAt": ..., "tables": {テーブル名: [行, ...]}}
                             (版 1 は、2026-10-16 より前の形。以前の名前(cr854_…)と選択肢の数。取り込むときに、いまの形に直す)
-  images/<種類>/<ファイル名>  商品(products)・ヒーロー画像(heroes)の画像。DB の画像 URL(/img/<種類>/<名前>)のもの
+  images/<種類>/<ファイル名>  商品(products)・ヒーロー画像(heroes)・部品の画像(parts)の画像。DB の画像 URL(/img/<種類>/<名前>)のもの
   images/creative/<名前>    素材(Creative Assets。表 card_assets)のファイル(ccp/creative.py。取り込み先のフォルダの creative/ が、そのまま置き場所になる)
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ from . import assets, creative, schema as sc
 from .data_api import db, require_db
 
 PACK_VERSION = 2
-IMG_URL = re.compile(r"^/img/(products|heroes)/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
+IMG_URL = re.compile(r"^/img/(products|heroes|parts)/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
 
 router = APIRouter(dependencies=[Depends(require_db)])
 
@@ -52,7 +52,7 @@ async def read_tables() -> dict[str, list[dict[str, Any]]]:
 def image_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
     """DB の画像 URL のうち、このサーバーが配っている画像(/img/…)の、種類とファイル名"""
     refs: set[tuple[str, str]] = set()
-    for name in ("products", "hero_images"):
+    for name in ("products", "hero_images", "part_images"):
         for row in tables.get(name, []):
             m = IMG_URL.match(str(row.get("image_url") or ""))
             if m:

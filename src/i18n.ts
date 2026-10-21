@@ -123,6 +123,12 @@ const OPTION_EN: Record<string, string> = {
   冬: 'Winter',
   秋冬: 'Fall/Winter',
   通年: 'All year',
+  // 部品の画像の種類(X59 ③)
+  ボタン: 'Button',
+  バナー: 'Banner',
+  ロゴ: 'Logo',
+  アイコン: 'Icon',
+  その他: 'Other',
   // 天候適性
   晴れ: 'Sunny',
   雨の日: 'Rainy',

@@ -323,7 +323,11 @@ export function previewHtml(root: HTMLElement, title: string): string {
     const out = dst[i]
     if (!out) return
     const cs = getComputedStyle(el)
-    out.setAttribute('style', STYLE_KEYS.map((k) => `${k}:${cs.getPropertyValue(k)}`).filter((d) => !d.endsWith(':')).join(';'))
+    // 切り出しの書式(焦点・拡大)は、画像だけに、拡大しているときだけ書く(ほかの要素に書くと、HTML が長くなるだけ)
+    const isImg = el.tagName === 'IMG'
+    const zoomed = isImg && cs.getPropertyValue('transform') !== 'none'
+    const keys = STYLE_KEYS.filter((k) => (k === 'object-position' ? isImg : k === 'transform' || k === 'transform-origin' ? zoomed : true))
+    out.setAttribute('style', keys.map((k) => `${k}:${cs.getPropertyValue(k)}`).filter((d) => !d.endsWith(':')).join(';'))
     out.removeAttribute('class')
     // 画面の操作のための印(編集・ドラッグ・リンクの場所の番号)は外す
     for (const a of Array.from(out.attributes)) if (a.name.startsWith('data-') || a.name.startsWith('aria-') || a.name === 'draggable' || a.name === 'tabindex' || a.name === 'contenteditable') out.removeAttribute(a.name)

@@ -1454,7 +1454,7 @@ function App() {
               </MenuItem>
               {/* メイン画像のライブラリ(X59 ②。一覧・上げる・直す・期限・消す) */}
               <MenuItem icon={<ImageMultipleRegular />} onClick={() => setHeroLibraryOpen(true)}>
-                {t('メイン画像のライブラリ', 'Hero image library')}
+                {t('画像のライブラリ(メイン画像・部品)', 'Image library (heroes, parts)')}
               </MenuItem>
               <MenuItem icon={<PeopleTeamRegular />} onClick={openPeopleManager}>
                 {t('ユーザーと承認グループ', 'Users and approval groups')}

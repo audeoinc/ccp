@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from ccp import heroes
+from ccp import heroes, parts
 
 
 class FakeRequest:
@@ -60,6 +60,24 @@ class DescribeImageTest(unittest.TestCase):
             res = asyncio.run(heroes.describe_image(FakeRequest(b"JPEG", "image/jpeg; charset=binary"), "en"))
         self.assertEqual(res["data"], {"name": "秋の公園", "tags": "秋, 公園"})
         self.assertIn("英語", models.kw["contents"][1])
+
+
+class PartsTest(unittest.TestCase):
+    """部品の画像(X59 ③): 置き場所は parts/。消せるのは上げた画像だけ"""
+
+    def test_upload_and_delete_in_parts_folder(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"ASSET_DIR": d}):
+            url = asyncio.run(parts.upload(FakeRequest(b"PNG"), "button.png"))["data"]["image_url"]
+            self.assertRegex(url, r"^/img/parts/up-[0-9a-f]{32}\.png$")
+            name = url.rsplit("/", 1)[1]
+            self.assertTrue((Path(d) / "parts" / name).is_file())
+            asyncio.run(parts.delete_file(name))
+            self.assertFalse((Path(d) / "parts" / name).exists())
+            self.assertEqual(asyncio.run(parts.delete_file("logo.png")).status_code, 400)
+
+    def test_rejects(self):
+        self.assertEqual(asyncio.run(parts.upload(FakeRequest(b"x"), "a.gif")).status_code, 400)
+        self.assertEqual(asyncio.run(parts.describe_image(FakeRequest(b"x", "image/gif"))).status_code, 400)
 
 
 class HeroDeleteTest(unittest.TestCase):

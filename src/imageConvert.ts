@@ -6,8 +6,9 @@ const isAvif = (f: File) => /\.avif$/i.test(f.name) || f.type === 'image/avif'
 const canvasJpeg = (c: HTMLCanvasElement, quality = 0.92) =>
   new Promise<Blob>((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('画像を変換できませんでした'))), 'image/jpeg', quality))
 
-/** 上げる前の画像。AVIF は JPEG に変える(メールでは AVIF を出せない受信ソフトが多いため)。ほかはそのまま */
-export async function toUploadable(file: File): Promise<File> {
+/** 上げる前の画像。AVIF は JPEG に変える(メールでは AVIF を出せない受信ソフトが多いため)。ほかはそのまま。
+ *  keepAlpha: 透明を残す(部品の画像。PNG に変える) */
+export async function toUploadable(file: File, keepAlpha = false): Promise<File> {
   if (!isAvif(file)) return file
   let bmp: ImageBitmap
   try {
@@ -20,13 +21,20 @@ export async function toUploadable(file: File): Promise<File> {
   c.height = bmp.height
   const ctx = c.getContext('2d')
   if (!ctx) throw new Error('画像を変換できませんでした')
-  // 透明な部分は白にする(JPEG は透明を持てない)
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, c.width, c.height)
+  if (!keepAlpha) {
+    // 透明な部分は白にする(JPEG は透明を持てない)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, c.width, c.height)
+  }
   ctx.drawImage(bmp, 0, 0)
   bmp.close()
+  const base = file.name.replace(/\.avif$/i, '')
+  if (keepAlpha) {
+    const png = await new Promise<Blob>((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('画像を変換できませんでした'))), 'image/png'))
+    return new File([png], `${base}.png`, { type: 'image/png' })
+  }
   const blob = await canvasJpeg(c)
-  return new File([blob], file.name.replace(/\.avif$/i, '') + '.jpg', { type: 'image/jpeg' })
+  return new File([blob], `${base}.jpg`, { type: 'image/jpeg' })
 }
 
 /** 画面に出している画像(URL)を、AI に見せるための JPEG にする(長い辺は max まで縮める)。SVG の見本の画像も、ここで絵にする */

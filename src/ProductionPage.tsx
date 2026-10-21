@@ -17,6 +17,8 @@ import { HtmlEditor } from './HtmlEditor'
 import { CreativeAssets } from './CreativeAssets'
 import { FinishedFloat } from './FinishedFloat'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
+import { PartPicker } from './PartPicker'
+import { cardMarket } from './market'
 import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
 import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
@@ -620,6 +622,13 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                           productIds={snap.productIds}
                           products={snap.products}
                         />
+                      </div>
+                      {/* 部品の画像(X59 ③): ボタン・バナー・ロゴ・アイコン。URL か <img> のタグをコピーして、隣の HTML に貼る */}
+                      <div className={s.section}>
+                        <div className={s.sectionHead}>
+                          <span className={s.grow}>{t('部品の画像', 'Part images')}</span>
+                        </div>
+                        <PartPicker market={cardMarket(card.country ?? '')} />
                       </div>
                     </>
                   }
