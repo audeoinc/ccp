@@ -8,6 +8,7 @@ import {
   DialogSurface,
   DialogTitle,
   Field,
+  Input,
   Menu,
   MenuItem,
   MenuList,
@@ -19,11 +20,13 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowUndoRegular, DeleteRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
+import { ArrowUndoRegular, CopyRegular, DeleteRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { WeekRow } from './data/weeks'
 import { cancelDelivery, isCancelled, undoCancel } from './cancel'
+import { defaultDuplicateAt, defaultDuplicateName, duplicateDelivery } from './duplicate'
+import { confirmedWeekOf } from './weekLock'
 import { logEvent } from './history'
 import { useT } from './i18n'
 
@@ -40,20 +43,26 @@ interface Props {
   onChanged: () => Promise<void>
   /** 削除のあと(配信カードを閉じる) */
   onDeleted: () => Promise<void>
+  /** 複製のあと(新しい配信カードを開く) */
+  onDuplicated: (id: string) => Promise<void>
 }
 
 /**
- * 配信カードの「…」のメニュー: 取りやめにする / 取りやめを取り消す / 削除。
+ * 配信カードの「…」のメニュー: 複製 / 取りやめにする / 取りやめを取り消す / 削除。
  * 取りやめは、経緯を残すふだんの操作(カレンダーに薄く残る)。削除は、間違えて作ったものを消すためのもので、元に戻せない
  */
-export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
+export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [dialog, setDialog] = useState<'cancel' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'duplicate' | 'cancel' | 'delete' | null>(null)
   const [reason, setReason] = useState('')
+  const [dupName, setDupName] = useState('')
+  const [dupAt, setDupAt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cancelled = isCancelled(card)
+  // 確定した週には複製しない(確定した計画に、黙って配信が増えるため。週をレビューに戻してから作る)
+  const dupLocked = confirmedWeekOf(weeks, dupAt)
 
   const run = async (fn: () => Promise<void>, after: () => Promise<void>) => {
     setBusy(true)
@@ -83,6 +92,17 @@ export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
         </MenuTrigger>
         <MenuPopover>
           <MenuList>
+            <MenuItem
+              icon={<CopyRegular />}
+              onClick={() => {
+                setDupName(defaultDuplicateName(card))
+                setDupAt(defaultDuplicateAt(card, weeks))
+                setError(null)
+                setDialog('duplicate')
+              }}
+            >
+              {t('複製…', 'Duplicate…')}
+            </MenuItem>
             {cancelled ? (
               <MenuItem icon={<ArrowUndoRegular />} onClick={() => void run(() => undoCancel(card), onChanged)}>
                 {t('取りやめを取り消す', 'Undo cancellation')}
@@ -98,6 +118,62 @@ export function CardMenu({ card, weeks, onChanged, onDeleted }: Props) {
           </MenuList>
         </MenuPopover>
       </Menu>
+
+      <Dialog open={dialog === 'duplicate'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{t(`「${card.name}」を複製する`, `Duplicate "${card.name}"`)}</DialogTitle>
+            <DialogContent className={styles.body}>
+              <span>
+                {t(
+                  'テーマ・コピー・テンプレート・載せた商品・AB テストの案を写した、新しい配信カードを作ります。承認・制作への引き継ぎ・素材は写しません(新しい配信は、もう一度承認を通します)',
+                  'Creates a new delivery card with the same theme, copy, template, products and AB test variants. Approvals, hand-off to production and assets are not copied (the new delivery goes through approval again).',
+                )}
+              </span>
+              <Field label={t('配信名', 'Name')} required size="small">
+                <Input value={dupName} onChange={(_, d) => setDupName(d.value)} />
+              </Field>
+              <Field
+                label={t('配信日時', 'Send date and time')}
+                required
+                size="small"
+                validationState={dupLocked ? 'error' : 'none'}
+                validationMessage={
+                  dupLocked
+                    ? t('この週は確定しています。ほかの日にするか、週をレビューに戻してから複製してください', 'This week is confirmed. Pick another date, or put the week back in review first.')
+                    : undefined
+                }
+              >
+                <Input type="datetime-local" value={dupAt} onChange={(_, d) => setDupAt(d.value)} />
+              </Field>
+              {error && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{error}</MessageBarBody>
+                </MessageBar>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setDialog(null)}>{t('やめる', 'Back')}</Button>
+              <Button
+                appearance="primary"
+                icon={<CopyRegular />}
+                disabled={busy || !dupName.trim() || !dupAt || !!dupLocked}
+                onClick={() => {
+                  let id = ''
+                  void run(
+                    async () => {
+                      id = await duplicateDelivery(card, dupName, dupAt)
+                    },
+                    () => onDuplicated(id),
+                  )
+                }}
+              >
+                {t('複製して開く', 'Duplicate')}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
       <Dialog open={dialog === 'cancel'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
         <DialogSurface>

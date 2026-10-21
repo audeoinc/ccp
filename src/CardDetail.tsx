@@ -1543,7 +1543,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             )}
             {/* この配信カードを開くリンク(保存済みの配信だけ。X36) */}
             {card && <CopyLinkButton />}
-            {/* 取りやめ・削除(保存済みの配信だけ) */}
+            {/* 複製・取りやめ・削除(保存済みの配信だけ) */}
             {card && (
               <CardMenu
                 card={card}
@@ -1555,6 +1555,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 onDeleted={async () => {
                   await onSaved()
                   onBack()
+                }}
+                // 複製した配信を読み込んでから、それに開き直す(onReopen は開く配信を差し替える)
+                onDuplicated={async (id) => {
+                  await onSaved()
+                  onReopen?.(id)
                 }}
               />
             )}
