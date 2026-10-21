@@ -201,6 +201,9 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
   const curSnap = snapshotOf(snap, cur)
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
+  // 案から選ぶ配信(X57)は、1 案に決めるまで制作に依頼しない(決まらない案まで作り込むのは無駄なため。2026-10-21 利用者の判断)
+  const choosing = !live && !!draft.ab?.choose
+  const needChoice = choosing ? t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードの上の帯で「この案に決める」を押して保存してから、依頼してください', 'This delivery is still choosing between variants. Choose one in the bar at the top of the delivery card and save before requesting.') : null
 
   // 見えないプレビューを描いたあとに、HTML の下書きを作る(画面に描いたものから、書式を直接書いた形にする)
   useEffect(() => {
@@ -283,10 +286,11 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
       key: 'request',
       name: t('制作に依頼する', 'Request production'),
       who: t('企画', 'Planner'),
-      info: live?.requested_by_name ? `${live.requested_by_name} ${when(live.requested_at)}` : undefined,
+      // 案から選ぶ配信の、依頼できない理由は、段の中に出す(押せないボタンには、ヒントが出ないため)
+      info: live?.requested_by_name ? `${live.requested_by_name} ${when(live.requested_at)}` : choosing ? t('1 案に決めてから依頼できます(案から選ぶ)', 'Choose a variant first') : undefined,
       action: (
-        <Tooltip content={needMe ?? t('いまの配信カードの中身と HTML を固めて、制作に依頼します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and requests production (later changes to the card do not change this page)')} relationship="description">
-          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || !shownOf('A')} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
+        <Tooltip content={needMe ?? needChoice ?? t('いまの配信カードの中身と HTML を固めて、制作に依頼します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and requests production (later changes to the card do not change this page)')} relationship="description">
+          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || choosing || !shownOf('A')} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
             {t('この内容で依頼する', 'Request with this content')}
           </Button>
         </Tooltip>
@@ -502,7 +506,8 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                 <MenuList>
                   <MenuItem
                     icon={<SendRegular />}
-                    disabled={busy || !meId || !shownOf('A')}
+                    disabled={busy || !meId || choosing || !shownOf('A')}
+                    title={needChoice ?? undefined}
                     onClick={() => {
                       if (!window.confirm(t('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?'))) return
                       void run(() => ProductionService.send(requestInput()))
