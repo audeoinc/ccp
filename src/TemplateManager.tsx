@@ -321,14 +321,14 @@ const useStyles = makeStyles({
   // 一覧を開いて見比べているときは、設定の列が狭くなるので、最小の幅を小さめにする
   buttonRow: { display: 'grid', gridTemplateColumns: '18px minmax(80px, 1fr) 76px minmax(100px, 160px) 28px', columnGap: '6px', alignItems: 'center' },
   partList: { display: 'grid', rowGap: '8px' },
-  // 編集中: 2 列の大きな一覧の代わりに、一覧(閉じられる) | 設定と構成の一覧 | キャンバス | 部品 の 4 列にする。
-  // 名前の欄を左に置くのは、何を編集しているかを最初に見せるため。部品は、主な落とし先のキャンバスの隣に置く
+  // 編集中: 2 列の大きな一覧の代わりに、一覧(閉じられる) | 部品 | キャンバス | 設定と構成の一覧 の 4 列にする。
+  // 部品は、主な落とし先のキャンバスの左隣に、設定は右に置く(左から取って、中で組み、右で整える。2026-10-22 利用者の指示)
   splitEditing: { gridTemplateColumns: 'minmax(0, 1fr)' },
   listHidden: { display: 'none' },
   editor3: {
     display: 'grid',
     // 列の幅は、一覧の開け閉め・見比べで変わるので、描くときに style で決める
-    gridTemplateAreas: '"list s1 fields s2 canvas s3 palette"',
+    gridTemplateAreas: '"list s1 palette s2 canvas s3 fields"',
     columnGap: '10px',
     alignItems: 'start',
   },
@@ -897,7 +897,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       buttons: t('ボタンを置く(1〜2 個)。セクションの間の好きな位置に', 'Place buttons (1–2) anywhere between sections'),
       cells: t('列と行を決め、マスをなぞって枠をまとめる', 'Choose columns and rows, then drag to merge cells'),
     } as Record<string, string>)[k] ?? ''
-  /** 左の列: 上限の目盛りと、絵つきの部品のパレット(構成・キャンバスへドラッグ。押すと、いちばん下に足す) */
+  /** 部品の列(一覧の右): 上限の目盛りと、絵つきの部品のパレット(構成・キャンバスへドラッグ。押すと、いちばん下に足す) */
   const paletteCol = () => (
     <aside className={s.paletteCol} aria-label={t('部品', 'Parts')}>
       <div className={s.meter}>
@@ -1436,15 +1436,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                 </MessageBar>
               )}
               {draft ? (
-                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? colW.list : 32}px 1px minmax(${FIELDS_MIN}px, 1fr) 1px ${canvasCol}px 1px ${colW.palette}px` }}>
+                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? colW.list : 32}px 1px ${colW.palette}px 1px ${canvasCol}px 1px minmax(${FIELDS_MIN}px, 1fr)` }}>
                   {compareCol()}
                   {/* 列の境界。つかんで幅を変える(一覧を閉じているときは、一覧の幅は変えない) */}
                   <div className={s.splitCell} style={{ gridArea: 's1' }}>{listOpen && <Splitter onDrag={resizeCol('list', 1)} />}</div>
                   <div className={s.splitCell} style={{ gridArea: 's2' }}>
-                    <Splitter onDrag={resizeCol('canvas', -1)} />
+                    <Splitter onDrag={resizeCol('palette', 1)} />
                   </div>
                   <div className={s.splitCell} style={{ gridArea: 's3' }}>
-                    <Splitter onDrag={resizeCol('palette', -1)} />
+                    <Splitter onDrag={resizeCol('canvas', 1)} />
                   </div>
                   {paletteCol()}
                   <div className={mergeClasses(s.fields, s.areaFields)}>
