@@ -178,6 +178,26 @@ const variantOf = (s: Snapshot, variant?: VariantKey) => variant ?? (s.ab ? 'A' 
 const campaignOf = (s: Snapshot, variant?: VariantKey) => variantCampaign(campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
 const utmOf = (s: Snapshot, variant?: VariantKey) => utmFor(parseLinks(s.card.links), campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
 /** 案の utm_campaign(制作のページの「AB テスト」の段に出す) */
+/** AB テスト(全案を送る)の B・C 案の HTML(制作の依頼の列 variant_html)。A 案は列 html */
+export type VariantHtml = Partial<Record<VariantKey, { html: string; saved_at?: string | null; saved_by_name?: string | null }>>
+export function parseVariantHtml(json?: string | null): VariantHtml {
+  if (!json) return {}
+  try {
+    const v = JSON.parse(json) as Record<string, { html?: unknown }>
+    if (!v || typeof v !== 'object') return {}
+    return Object.fromEntries(Object.entries(v).filter(([k, x]) => (k === 'B' || k === 'C') && typeof x?.html === 'string')) as VariantHtml
+  } catch {
+    return {}
+  }
+}
+/** 制作のページで案ごとに切り替えるか(全案を送る AB テストだけ。案から選ぶは、決めた 1 案だけを作る) */
+export const productionVariants = (s: Snapshot): VariantKey[] => (s.ab && !s.ab.choose ? ['A', ...s.ab.variants.map((v) => v.key)] : ['A'])
+/** その案の写し(A はそのまま) */
+export const snapshotOf = (s: Snapshot, k: VariantKey): Snapshot => {
+  const v = k === 'A' ? undefined : s.ab?.variants.find((x) => x.key === k)
+  return v ? variantSnapshot(s, v) : s
+}
+
 export const variantUtmCampaign = (s: Snapshot, variant: VariantKey) => (isPushCard(s) ? campaignOf(s, variant) : utmOf(s, variant).campaign)
 /** 案の中身で作った写し(商品・メイン画像を、その案のものに。リンクの行を案ごとに作るため) */
 export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => ({

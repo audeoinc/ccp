@@ -4,7 +4,7 @@
 前の会話・前の担当の記憶がなくても、これだけ読めば、いまどこにいて、次に何をするかがわかるように書く。
 作業を終える前に、この文書を更新してからコミットすること(更新のしかたは、最後の章)。
 
-- 最終更新: 2026-10-21(AB テストの案ごとの件名・件名の AI 案。6.49。その前は X2 件名・プリヘッダー / X3 PC・スマホ。6.48)
+- 最終更新: 2026-10-21(制作のページを AB テストの案ごとに。6.50。その前は AB テストの案ごとの件名・件名の AI 案。6.49)
 - 書いた人: 結果(R)を進めた担当(Claude Code)。6.6 章と W の行は、週(W)を進めた担当(Claude Code)
 
 ---
@@ -663,7 +663,14 @@ Workbench のサーバーは外にアクセスできないので、本番のデ�
 
 - 利用者と決めた 3 段階の 1・2。`VariantText` に subject・preheader(古いデータにはない)。`AbTarget` に `subject`(件名・プリヘッダー)。`ownsSubject`(subject か all)・`ownsAnyText`(文言を案ごとに保存するか)を `abTest.ts` に。`subject` のときも `texts` に全部を写すが、画面に戻すのは件名・プリヘッダーだけ(`showText(x, full)`)。配信の列 subject・preheader は A 案の値。制作の写し(`variantSnapshot`)・並べて比べる(`AbCompare`)にも件名。
 - AI: `aiDraft.ts` の `suggestSubjects`(task `suggest_subjects`、決まりの対象は headline・copy)。`useAiDrafts` の `runSubject`・`subjectIdeas`。B・C 案を編集中なら `subjectAb`(A 案の件名と仮説)を渡し、違う切り口にさせる。画面は `ContentPane` の `CopyTab` に `subject` を足して使い回した(通知のタイトル・本文と同じ部品)。
-- 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)は、まだ。
+- 段階 3(全案を送る AB テストで、制作のページを案ごとに切り替える)→ 6.50。
+
+## 6.50 制作のページを AB テストの案ごとに(2026-10-21、UI セッション)
+
+- 全案を送る AB テストだけ(案から選ぶは、決めた 1 案だけを作るので出さない。`productionVariants`)。題名の行に「A 案 / B 案 / C 案」。左の要素・HTML・プレビューが選んだ案のもの(`snapshotOf`)。左で直せるのは A 案だけ(B・C の中身は配信カードで)。
+- HTML は案ごと: A は列 `html`、B・C は新しい列 `production_requests.variant_html`(`{"B": {html, saved_at, saved_by_name}}` の JSON。`server/ccp/production.py` の `parse_variant_html`・`merge_variant_html`、`/html` に `variant`)。依頼・送信のときは全案の HTML を固める(見えないプレビューを案ごとに描いて下書きを作る)。
+- 「制作が終わった」の欄に案ごとの保存の状態。保存していない案があれば押せない。「仕上がりを見る」(`FinishedFloat`)も案を切り替えられる(B・C の HTML があるとき)。
+- テスト: `server/tests/test_production_variants.py`。モックで A・B の切り替え・B だけの未保存の表示・「制作が終わった」が押せないことを確かめた(仕上がりの切り替えは撮影の手順が届かず、型と lint だけ)。
 
 ## 7. 落とし穴
 

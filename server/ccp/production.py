@@ -3,7 +3,7 @@
   POST /api/production/requests               「この内容で制作に依頼する」(画面が作った写しを固めて保存する)
   POST /api/production/requests/{id}/receive  制作が「受け取った」
   POST /api/production/requests/{id}/done     制作が「制作が終わった」(ひとこと・できたもののリンクを任意で)
-  POST /api/production/requests/{id}/html     直した HTML を保存する
+  POST /api/production/requests/{id}/html     直した HTML を保存する(variant = "B" / "C" なら、AB テストのその案の HTML)
   POST /api/production/requests/{id}/edits    左の要素(文言・メイン画像・商品・リンク先)を直した写しを保存する
   POST /api/production/requests/{id}/check    企画が仕上がりを確かめて OK にする(PR7)
   POST /api/production/requests/{id}/revise   企画が「直してほしい」と制作に戻す(PR7)
@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -54,6 +55,33 @@ async def stale_live(conn: AsyncConnection, card_id: str) -> None:
     )
 
 
+VARIANTS = ("B", "C")
+
+
+def parse_variant_html(raw: Any) -> dict[str, dict[str, Any]]:
+    """AB テストの B・C 案の HTML(列 variant_html。{"B": {"html", "saved_at", "saved_by_name"}, ...} の JSON)を読む。壊れていれば空"""
+    try:
+        data = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items() if k in VARIANTS and isinstance(v, dict) and isinstance(v.get("html"), str)}
+
+
+def merge_variant_html(raw: Any, key: str, html: str, saved_at: str | None, by: str | None) -> str:
+    """B・C 案の HTML を 1 つ差し替えた JSON を返す(ほかの案はそのまま)"""
+    data = parse_variant_html(raw)
+    data[key] = {"html": html, "saved_at": saved_at, "saved_by_name": by}
+    return json.dumps(data, ensure_ascii=False)
+
+
+def _variant_html_in(body: dict[str, Any]) -> str | None:
+    """依頼・送信のときに画面が送る、B・C 案の HTML(なければ None)"""
+    data = parse_variant_html(body.get("variant_html"))
+    return json.dumps(data, ensure_ascii=False) if data else None
+
+
 def _fields(body: dict[str, Any]) -> dict[str, Any]:
     """画面が送る、写しと、依頼した時点の制作指示・担当・締め切り"""
     due = str(body.get("production_due") or "")[:10] or None
@@ -64,6 +92,8 @@ def _fields(body: dict[str, Any]) -> dict[str, Any]:
         "production_due": due,
         # 依頼・送信のときに、エディタの HTML(直していればそれ)も一緒に固める
         "html": str(body.get("html") or "") or None,
+        # AB テスト(全案を送る)の B・C 案の HTML。A 案は html
+        "variant_html": _variant_html_in(body),
     }
 
 
@@ -154,6 +184,9 @@ async def save_html(request_id: str, request: Request):
     """制作のページで直した HTML を保存する(版ごとに 1 つ。主に制作の人、企画の人も直せる)。古い版には保存しない"""
     body = await _body(request)
     html = str(body.get("html") or "")
+    variant = str(body.get("variant") or "A").upper()
+    if variant not in ("A", *VARIANTS):
+        return fail(400, "案は A・B・C のどれかです")
     async with db(write=True) as conn:
         actor = await _actor(conn, body, request)
         req = await _one(conn, "production_requests", request_id, lock=True)
@@ -161,7 +194,12 @@ async def save_html(request_id: str, request: Request):
             return fail(404, "制作の依頼が見つかりません")
         if req.get("status") == "stale":
             return fail(409, "古い版には保存できません(企画が変わりました)")
-        row = await _update(conn, "production_requests", request_id, {"html": html, "html_saved_at": _now(), "html_saved_by_name": actor["name"]}) or req
+        now = _now()
+        if variant == "A":
+            fields: dict[str, Any] = {"html": html, "html_saved_at": now, "html_saved_by_name": actor["name"]}
+        else:
+            fields = {"variant_html": merge_variant_html(req.get("variant_html"), variant, html, now.isoformat(), actor["name"])}
+        row = await _update(conn, "production_requests", request_id, fields) or req
     return ok(row)
 
 
@@ -262,6 +300,10 @@ async def send_request(request_id: str, request: Request):
     fields: dict[str, Any] = {"status": "sent", "sent_at": "@now", "sent_by_name": "@actor"}
     if html:
         fields["html"] = html
+    # AB テストの B・C 案の HTML も、いまのエディタのもので送る
+    variant_html = _variant_html_in(body)
+    if variant_html:
+        fields["variant_html"] = variant_html
     res = await _advance(request, request_id, ("checked",), fields, "production_send", "配信のしくみへの送信は、まだ仮", "仕上がりを確認した版だけを送れます(まだ確認していないか、古い版です)")
     return res
 

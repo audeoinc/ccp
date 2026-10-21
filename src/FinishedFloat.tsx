@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
 import { DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import { CreativeAssets } from './CreativeAssets'
@@ -7,11 +8,14 @@ import { locale, useT } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { ProductionRequest } from './models/productionRequests'
 import type { Product } from './models/products'
+import type { VariantKey } from './abTest'
+import { parseVariantHtml } from './productionSnapshot'
 
 const useStyles = makeStyles({
   surface: { width: 'min(1400px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(90vh / var(--ui-zoom, 1))' },
   body: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
   titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
+  variants: { display: 'inline-flex', columnGap: '2px' },
   grow: { flexGrow: 1, minWidth: 0 },
   cols: { display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(320px, 2fr)', columnGap: '16px', minHeight: 0, flexGrow: 1, marginTop: '8px' },
   preview: { display: 'flex', flexDirection: 'column', minHeight: 0 },
@@ -44,13 +48,26 @@ interface Props {
 export function FinishedFloat({ card, request: r, people, productIds, products, onClose }: Props) {
   const s = useStyles()
   const t = useT()
-  const html = r.html ?? ''
+  // AB テスト(全案を送る)は、案ごとの HTML を切り替えて見る
+  const others = parseVariantHtml(r.variant_html)
+  const keys: VariantKey[] = ['A', ...(['B', 'C'] as const).filter((k) => others[k])]
+  const [variant, setVariant] = useState<VariantKey>('A')
+  const html = variant === 'A' ? (r.html ?? '') : (others[variant]?.html ?? '')
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       <DialogSurface className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.titleRow}>
             <DialogTitle className={s.grow}>{t(`仕上がり — ${card.name ?? ''}`, `Result — ${card.name ?? ''}`)}</DialogTitle>
+            {keys.length > 1 && (
+              <span className={s.variants} role="tablist" aria-label={t('案', 'Variants')}>
+                {keys.map((k) => (
+                  <Button key={k} size="small" role="tab" aria-selected={variant === k} appearance={variant === k ? 'primary' : 'subtle'} onClick={() => setVariant(k)}>
+                    {t(`${k} 案`, `Variant ${k}`)}
+                  </Button>
+                ))}
+              </span>
+            )}
             <Badge appearance="outline">{t(`版 ${r.version ?? 1}`, `v${r.version ?? 1}`)}</Badge>
             {r.checked_at ? (
               <Badge appearance="tint" color="success">{t('確認済み', 'Checked')}</Badge>
@@ -64,7 +81,7 @@ export function FinishedFloat({ card, request: r, people, productIds, products, 
           <div className={s.cols}>
             <div className={s.preview}>
               {html ? (
-                <HtmlPreviewFrame html={html} title={t('制作した HTML のプレビュー', 'Production HTML preview')} heading={t('制作した HTML', 'Production HTML')} />
+                <HtmlPreviewFrame html={html} title={t('制作した HTML のプレビュー', 'Production HTML preview')} heading={keys.length > 1 ? t(`制作した HTML(${variant} 案)`, `Production HTML (variant ${variant})`) : t('制作した HTML', 'Production HTML')} />
               ) : (
                 <div className={s.empty}>{t('まだ制作した HTML が保存されていません(制作のページで保存すると、ここに出ます)', 'No production HTML saved yet (it appears here once saved on the production page)')}</div>
               )}

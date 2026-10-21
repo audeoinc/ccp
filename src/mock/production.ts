@@ -1,6 +1,7 @@
 // 撮影・デモ用の、制作の依頼の窓口(/api/production)の身代わり。src/data/production.ts と同じ形で呼べる(vite.mock.config.ts が差し替える)。
 // 流れは本番のサーバー(server/ccp/production.py)と同じ。表はメモリ上(src/mock/db.ts の tables)
 import type { Actor } from '../data/approvals'
+import { parseVariantHtml } from '../productionSnapshot'
 import type { RequestInput } from '../data/production'
 import type { ProductionRequest } from '../models/productionRequests'
 import { tables } from './db'
@@ -41,6 +42,7 @@ function create(input: RequestInput, status: 'requested' | 'sent'): Result<Produ
     production_owner: input.production_owner || undefined,
     production_due: input.production_due || undefined,
     html: input.html || undefined,
+    variant_html: input.variant_html || undefined,
     requested_at: at,
     requested_by_name: input.actor.name,
     ...(status === 'sent' ? { sent_at: at, sent_by_name: input.actor.name } : {}),
@@ -74,12 +76,14 @@ export const ProductionService = {
     const link = input.link?.trim() || undefined
     return advance(id, input.actor, ['requested', 'in_progress'], { status: 'done', done_at: now(), done_by_name: input.actor.name, done_note: note, done_link: link }, 'production_done', input.week_start, [note, link].filter(Boolean).join(' / ') || undefined, 'この依頼は、もう終わっているか、古い版です')
   },
-  async saveHtml(id: string, input: { actor: Actor; html: string }) {
+  async saveHtml(id: string, input: { actor: Actor; html: string; variant?: string }) {
     if (!input.actor?.id) return ng<ProductionRequest>('右上で、だれでログインするかを選んでください')
     const r = tables.ProductionRequestsService.find((x) => x.id === id)
     if (!r) return ng<ProductionRequest>('制作の依頼が見つかりません')
     if (r.status === 'stale') return ng<ProductionRequest>('古い版には保存できません(企画が変わりました)')
-    Object.assign(r, { html: input.html, html_saved_at: now(), html_saved_by_name: input.actor.name, modified_on: now() })
+    const v = (input.variant ?? 'A').toUpperCase()
+    if (v === 'A') Object.assign(r, { html: input.html, html_saved_at: now(), html_saved_by_name: input.actor.name, modified_on: now() })
+    else Object.assign(r, { variant_html: JSON.stringify({ ...parseVariantHtml(r.variant_html as string | undefined), [v]: { html: input.html, saved_at: now(), saved_by_name: input.actor.name } }), modified_on: now() })
     return { success: true, data: structuredClone(r) as unknown as ProductionRequest }
   },
   async saveEdits(id: string, input: { actor: Actor; edited_snapshot: string; week_start?: string }) {
@@ -123,8 +127,8 @@ export const ProductionService = {
       '制作が終わった版だけを、直してもらえます',
     )
   },
-  async sendRequest(id: string, input: { actor: Actor; html?: string; week_start?: string }) {
-    return advance(id, input.actor, ['checked'], { status: 'sent', sent_at: now(), sent_by_name: input.actor.name, ...(input.html ? { html: input.html } : {}) }, 'production_send', input.week_start, '配信のしくみへの送信は、まだ仮', '仕上がりを確認した版だけを送れます(まだ確認していないか、古い版です)')
+  async sendRequest(id: string, input: { actor: Actor; html?: string; variant_html?: string; week_start?: string }) {
+    return advance(id, input.actor, ['checked'], { status: 'sent', sent_at: now(), sent_by_name: input.actor.name, ...(input.html ? { html: input.html } : {}), ...(input.variant_html ? { variant_html: input.variant_html } : {}) }, 'production_send', input.week_start, '配信のしくみへの送信は、まだ仮', '仕上がりを確認した版だけを送れます(まだ確認していないか、古い版です)')
   },
   async send(input: RequestInput) {
     const r = create(input, 'sent')

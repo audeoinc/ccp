@@ -22,7 +22,7 @@ import { ResizeHandles } from './ResizeHandles'
 import { Splitter } from './Splitter'
 import { useFloatSize, usePaneWidths } from './floatLayout'
 import type { VariantKey } from './abTest'
-import { buildSnapshot, downloadText, parseSnapshot, previewHtml, type Snapshot } from './productionSnapshot'
+import { buildSnapshot, downloadText, parseSnapshot, parseVariantHtml, previewHtml, productionVariants, snapshotOf, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import { loadPref, savePref } from './settings'
@@ -93,6 +93,9 @@ const useStyles = makeStyles({
   // 左で直した中身の保存の行(ペインの上)
   editBar: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
   messages: { padding: '0 16px', display: 'grid', rowGap: '6px' },
+  // AB テストの案の切り替え(題名の行)と、「制作が終わった」の案ごとの状態
+  variantSwitch: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
+  variantRow: { display: 'flex', columnGap: '6px', alignItems: 'baseline', fontSize: tokens.fontSizeBase200 },
 })
 
 interface Props {
@@ -147,16 +150,17 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
   const [doneLink, setDoneLink] = useState('')
   const [reviseNote, setReviseNote] = useState('')
   const [side, setSide] = useState<'talk' | 'tasks' | 'assets'>('talk')
-  // プレビューから作った HTML(下書き)と、エディタの中身(null = まだ直していない)
-  const [generated, setGenerated] = useState('')
-  const [html, setHtml] = useState<string | null>(null)
+  // プレビューから作った HTML(下書き)と、エディタの中身(ない = まだ直していない)。AB テスト(全案を送る)は案ごと
+  const [generatedMap, setGeneratedMap] = useState<Partial<Record<VariantKey, string>>>({})
+  const [htmls, setHtmls] = useState<Partial<Record<VariantKey, string>>>({})
+  const [variant, setVariant] = useState<VariantKey>('A')
   // X58 段階 3: エディタで見る HTML(制作した HTML / 企画の見本)と、プレビューの見せ方(並べて比べる)。貼り付けの欄
   const [htmlView, setHtmlView] = useState<'made' | 'plan'>('made')
   const [previewView, setPreviewView] = useState<'made' | 'plan' | 'compare'>('made')
   const [pasting, setPasting] = useState<string | null>(null)
   // 仕上がりを見る(X58 段階 4)
   const [finishedOpen, setFinishedOpen] = useState(false)
-  const offscreenRef = useRef<HTMLDivElement>(null)
+  const offscreenRefs = useRef<Partial<Record<VariantKey, HTMLDivElement | null>>>({})
 
   const load = useCallback(async () => {
     const r = await ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${card.id}'` })
@@ -189,29 +193,46 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
   const due = frozen ? (live?.production_due ?? '') : (card.production_due ?? '')
   const weekStart = card.scheduled_at ? weekKeyOf(new Date(card.scheduled_at)) : undefined
   const actor = { id: meId, name: meName }
+  // AB テスト(全案を送る)は、案ごとに HTML を作る(案から選ぶは、決めた 1 案だけ)。直せるのは A 案の要素だけ(B・C 案の中身は配信カードで直す)
+  const keys = productionVariants(snap)
+  const cur: VariantKey = keys.includes(variant) ? variant : 'A'
+  const curSnap = snapshotOf(snap, cur)
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
 
   // 見えないプレビューを描いたあとに、HTML の下書きを作る(画面に描いたものから、書式を直接書いた形にする)
   useEffect(() => {
-    const el = offscreenRef.current
-    if (!el) return
-    const id = setTimeout(() => setGenerated(previewHtml(el, card.name ?? '')), 600)
+    const id = setTimeout(() => {
+      const out: Partial<Record<VariantKey, string>> = {}
+      for (const [k, el] of Object.entries(offscreenRefs.current)) if (el) out[k as VariantKey] = previewHtml(el, card.name ?? '')
+      setGeneratedMap(out)
+    }, 600)
     return () => clearTimeout(id)
     // 依頼を読み終えるまではプレビューを描かないので、読み終えたときにも作る
   }, [snap, card.name, requests])
-  // エディタの中身: 直していればそれ、なければ保存した HTML、それもなければプレビューから作った下書き
-  const savedHtml = live?.html ?? ''
-  const shown = html ?? (savedHtml || generated)
+  // エディタの中身: 直していればそれ、なければ保存した HTML、それもなければプレビューから作った下書き(案ごと。A 案は列 html、B・C 案は列 variant_html)
+  const savedVariants = useMemo(() => parseVariantHtml(live?.variant_html), [live?.variant_html])
+  const savedOf = (k: VariantKey) => (k === 'A' ? (live?.html ?? '') : (savedVariants[k]?.html ?? ''))
+  const shownOf = (k: VariantKey) => htmls[k] ?? (savedOf(k) || generatedMap[k] || '')
+  const dirtyOf = (k: VariantKey) => htmls[k] !== undefined && htmls[k] !== (savedOf(k) || generatedMap[k] || '')
+  const generated = generatedMap[cur] ?? ''
+  const savedHtml = savedOf(cur)
+  const html = htmls[cur] ?? null
+  const setHtml = (v: string) => setHtmls((m) => ({ ...m, [cur]: v }))
+  const shown = shownOf(cur)
   // 版が変わったら(依頼した・古い版になった)、直しかけを捨てて選び直す
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHtml(null)
+    setHtmls({})
     setWork(null)
   }, [live?.id])
-  const dirty = html !== null && html !== (savedHtml || generated)
-  // 要素を直したのに、保存した HTML が前のまま(HTML は自動では作り直さない。直した HTML を消さないため)
-  const htmlBehind = !!savedHtml && html === null && (editsDirty || (!!live?.edited_at && (!live?.html_saved_at || live.edited_at > live.html_saved_at)))
+  const dirty = dirtyOf(cur)
+  const anyDirty = keys.some(dirtyOf)
+  // B・C 案の HTML(依頼・送信のときに一緒に固める。保存した人・時刻は残す)
+  const variantHtmlJson = () =>
+    keys.length > 1 ? JSON.stringify(Object.fromEntries(keys.filter((k) => k !== 'A').map((k) => [k, { ...savedVariants[k], html: shownOf(k) }]))) : undefined
+  // 要素を直したのに、保存した HTML が前のまま(HTML は自動では作り直さない。直した HTML を消さないため。要素を直せるのは A 案だけ)
+  const htmlBehind = cur === 'A' && !!savedHtml && html === null && (editsDirty || (!!live?.edited_at && (!live?.html_saved_at || live.edited_at > live.html_saved_at)))
 
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string }; data?: unknown }>, done?: string) => {
     setBusy(true)
@@ -241,8 +262,9 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
     instructions: card.instructions ?? '',
     production_owner: card.production_owner ?? '',
     production_due: card.production_due ?? '',
-    // エディタの HTML(直していればそれ)も一緒に固める
-    html: shown,
+    // エディタの HTML(直していればそれ)も一緒に固める。AB テストは B・C 案も
+    html: shownOf('A'),
+    variant_html: variantHtmlJson(),
     week_start: weekStart,
   })
 
@@ -262,7 +284,7 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
       info: live?.requested_by_name ? `${live.requested_by_name} ${when(live.requested_at)}` : undefined,
       action: (
         <Tooltip content={needMe ?? t('いまの配信カードの中身と HTML を固めて、制作に依頼します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and requests production (later changes to the card do not change this page)')} relationship="description">
-          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || !shown} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
+          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || !shownOf('A')} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
             {t('この内容で依頼する', 'Request with this content')}
           </Button>
         </Tooltip>
@@ -299,10 +321,31 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
           </PopoverTrigger>
           <PopoverSurface>
             <div className={s.doneBox}>
+              {keys.length > 1 && (
+                <>
+                  <span className={s.note}>{t('AB テストの全案の HTML がそろってから、終わりにします', 'Mark as done once every variant’s HTML is ready')}</span>
+                  {keys.map((k) => {
+                    const by = k === 'A' ? live?.html_saved_by_name : savedVariants[k]?.saved_by_name
+                    const at = k === 'A' ? live?.html_saved_at : (savedVariants[k]?.saved_at ?? undefined)
+                    return (
+                      <span key={k} className={s.variantRow}>
+                        <b>{t(`${k} 案`, `Variant ${k}`)}</b>
+                        {dirtyOf(k) ? (
+                          <span className={s.dirty}>{t('保存していない変更があります', 'Unsaved changes')}</span>
+                        ) : by ? (
+                          <span className={s.note}>{t(`保存: ${by} ${when(at)}`, `Saved by ${by} ${when(at)}`)}</span>
+                        ) : (
+                          <span className={s.note}>{t('依頼したときの HTML のまま', 'Still the HTML from the request')}</span>
+                        )}
+                      </span>
+                    )
+                  })}
+                </>
+              )}
               <span className={s.note}>{t('ひとこと・できたもののリンクを添えられます(どちらも任意)', 'You can add a note and a link to the result (both optional)')}</span>
               <AutoTextarea rows={1} size="small" value={doneNote} onChange={(_, d) => setDoneNote(d.value)} placeholder={t('ひとこと', 'Note')} />
               <Input size="small" value={doneLink} onChange={(_, d) => setDoneLink(d.value)} placeholder="https://" />
-              <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy} onClick={() => void run(() => ProductionService.done(live.id, { actor, note: doneNote, link: doneLink, week_start: weekStart }), tr('制作が終わりました', 'Marked as done'))}>
+              <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy || anyDirty} title={anyDirty ? t('保存していない HTML があります(案を切り替えて保存してください)', 'Some HTML is not saved (switch variants and save)') : undefined} onClick={() => void run(() => ProductionService.done(live.id, { actor, note: doneNote, link: doneLink, week_start: weekStart }), tr('制作が終わりました', 'Marked as done'))}>
                 {t('制作が終わった', 'Production done')}
               </Button>
             </div>
@@ -363,10 +406,10 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
             size="small"
             appearance="primary"
             icon={<SendRegular />}
-            disabled={busy || !meId || !shown}
+            disabled={busy || !meId || !shownOf('A')}
             onClick={() => {
               if (!window.confirm(t('配信のしくみに送ります。よろしいですか?', 'Send to the delivery system?'))) return
-              void run(() => ProductionService.sendRequest(live.id, { actor, html: shown, week_start: weekStart }), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
+              void run(() => ProductionService.sendRequest(live.id, { actor, html: shownOf('A'), variant_html: variantHtmlJson(), week_start: weekStart }), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
             }}
           >
             {t('送る', 'Send')}
@@ -396,6 +439,16 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
           <span className={s.title}>{card.name}</span>
           <span className={s.meta}>{card.scheduled_at ? new Date(card.scheduled_at).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
           {frozen && <Badge appearance="tint" color="informative">{t(`版 ${live?.version} ・ ${when(live?.requested_at)} に依頼`, `v${live?.version} · requested ${when(live?.requested_at)}`)}</Badge>}
+          {keys.length > 1 && (
+            <span className={s.variantSwitch} role="tablist" aria-label={t('AB テストの案', 'A/B test variants')} title={t('AB テストは全案を送るので、案ごとに HTML を作ります。左の要素・HTML・プレビューが、選んだ案のものになります', 'An A/B test sends every variant, so each variant gets its own HTML. The info, HTML and preview follow the selected variant')}>
+              {keys.map((k) => (
+                <Button key={k} size="small" role="tab" aria-selected={cur === k} appearance={cur === k ? 'primary' : 'subtle'} className={s.segBtn} onClick={() => setVariant(k)}>
+                  {t(`${k} 案`, `Variant ${k}`)}
+                  {dirtyOf(k) ? ' •' : ''}
+                </Button>
+              ))}
+            </span>
+          )}
           <Button size="small" appearance="subtle" icon={<OpenRegular />} onClick={() => onOpenCard(card.id)}>
             {t('企画を見る', 'Open the plan')}
           </Button>
@@ -447,7 +500,7 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                 <MenuList>
                   <MenuItem
                     icon={<SendRegular />}
-                    disabled={busy || !meId || !shown}
+                    disabled={busy || !meId || !shownOf('A')}
                     onClick={() => {
                       if (!window.confirm(t('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?'))) return
                       void run(() => ProductionService.send(requestInput()))
@@ -491,15 +544,20 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                   <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleInfo} aria-label={t('要素の情報をたたむ', 'Collapse the info')} />
                 </div>
                 <ProductionInfoPane
-                  original={approvedSnap}
-                  current={snap}
-                  editable={editable}
+                  original={snapshotOf(approvedSnap, cur)}
+                  current={curSnap}
+                  editable={editable && cur === 'A'}
                   onChange={setWork}
                   products={products}
                   heroes={heroes}
                   head={
                     <>
-                      {editable && (
+                      {editable && cur !== 'A' && (
+                        <div className={s.editBar}>
+                          <span className={s.note}>{t(`${cur} 案の要素です。直すのは HTML で(要素は配信カードで直します)`, `Variant ${cur}. Edit its HTML here (edit the elements in the delivery card)`)}</span>
+                        </div>
+                      )}
+                      {editable && cur === 'A' && (
                         <div className={s.editBar}>
                           <span className={s.grow}>
                             {editsDirty ? (
@@ -586,12 +644,13 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
                 <Tooltip content={t('企画の見本(プレビューから作った下書き)に戻します', 'Reset to the plan sample (draft built from the preview)')} relationship="label">
                   <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} disabled={!generated || htmlView === 'plan'} onClick={() => setHtml(generated)} />
                 </Tooltip>
+                {keys.length > 1 && <Badge appearance="tint" color="brand">{t(`${cur} 案`, `Variant ${cur}`)}</Badge>}
                 <CopyButton text={htmlView === 'plan' ? generated : shown} label={t('HTML をコピー', 'Copy HTML')} />
                 <Tooltip content={t('.html として保存', 'Download as .html')} relationship="label">
-                  <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!shown} onClick={() => downloadText(`${(card.name ?? 'delivery').replace(/[\\/:*?"<>|]/g, '_')}.html`, shown)} />
+                  <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!shown} onClick={() => downloadText(`${(card.name ?? 'delivery').replace(/[\\/:*?"<>|]/g, '_')}${keys.length > 1 ? `-${cur.toLowerCase()}` : ''}.html`, shown)} />
                 </Tooltip>
                 <Tooltip content={live ? (needMe ?? t('この HTML を、この版に保存します', 'Save this HTML to this version')) : t('依頼したあとに保存できます(依頼するときは、この HTML も一緒に固めます)', 'You can save after the request (requesting freezes this HTML too)')} relationship="label">
-                  <Button size="small" appearance="primary" icon={<SaveRegular />} disabled={busy || !live || !meId || !dirty} onClick={() => live && void run(() => ProductionService.saveHtml(live.id, { actor, html: shown }), tr('HTML を保存しました', 'Saved the HTML'))}>
+                  <Button size="small" appearance="primary" icon={<SaveRegular />} disabled={busy || !live || !meId || !dirty} onClick={() => live && void run(() => ProductionService.saveHtml(live.id, { actor, html: shown, variant: cur }), keys.length > 1 ? tr(`${cur} 案の HTML を保存しました`, `Saved variant ${cur}'s HTML`) : tr('HTML を保存しました', 'Saved the HTML'))}>
                     {t('保存', 'Save')}
                   </Button>
                 </Tooltip>
@@ -697,9 +756,19 @@ export function ProductionPage({ card, productIds, variantIds, products, heroes,
 
             {/* HTML の下書きを作るためだけの、見えないプレビュー(写しの中身をそのまま描く) */}
             <div className={s.offscreen} aria-hidden>
-              <div ref={offscreenRef}>
-                <CardPreview card={{ ...card, ...snap.card } as DeliveryCard} productIds={snap.productIds} products={snap.products} heroes={snap.hero ? [snap.hero] : []} />
-              </div>
+              {keys.map((k) => {
+                const vs = snapshotOf(snap, k)
+                return (
+                  <div
+                    key={k}
+                    ref={(el) => {
+                      offscreenRefs.current[k] = el
+                    }}
+                  >
+                    <CardPreview card={{ ...card, ...vs.card } as DeliveryCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
