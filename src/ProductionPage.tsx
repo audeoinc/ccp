@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, ClipboardPasteRegular, DismissRegular, EyeRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, ClipboardPasteRegular, CommentAddRegular, DismissRegular, EyeRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -17,6 +17,8 @@ import { HtmlEditor } from './HtmlEditor'
 import { CreativeAssets } from './CreativeAssets'
 import { FinishedFloat } from './FinishedFloat'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
+import { HtmlPins } from './HtmlPins'
+import { pinView } from './pinStore'
 import { PartPicker } from './PartPicker'
 import { cardMarket } from './market'
 import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
@@ -161,6 +163,10 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   // X58 段階 3: エディタで見る HTML(制作した HTML / 企画の見本)と、プレビューの見せ方(並べて比べる)。貼り付けの欄
   const [htmlView, setHtmlView] = useState<'made' | 'plan'>('made')
   const [previewView, setPreviewView] = useState<'made' | 'plan' | 'compare'>('made')
+  // プレビューの場所を指して書き込む(ピン。X65)。制作のやり取りに、場所つきで書く
+  const [placingPin, setPlacingPin] = useState(false)
+  const endPlacingPin = useCallback(() => setPlacingPin(false), [])
+  const [previewFrame, setPreviewFrame] = useState<HTMLIFrameElement | null>(null)
   const [pasting, setPasting] = useState<string | null>(null)
   // 仕上がりを見る(X58 段階 4)
   const [finishedOpen, setFinishedOpen] = useState(false)
@@ -727,6 +733,14 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                     </Button>
                   ))}
                 </span>
+                {/* 並べて比べるときは、どちらに置くか分からないので出さない */}
+                {previewView !== 'compare' && (
+                  <Tooltip relationship="description" content={t('プレビューの場所を押して、そこへの書き込み(マーケ担当者への問い合わせなど)を始めます。Esc でやめます。', 'Click a spot in the preview to start a comment there (e.g. a question to marketing). Esc to cancel.')}>
+                    <Button size="small" appearance={placingPin ? 'primary' : 'subtle'} icon={<CommentAddRegular />} onClick={() => setPlacingPin((v) => !v)} aria-pressed={placingPin}>
+                      {placingPin ? t('場所を押す…', 'Click a spot…') : t('コメントを置く', 'Place comment')}
+                    </Button>
+                  </Tooltip>
+                )}
               </div>
               {previewView === 'compare' ? (
                 <div className={s.compare}>
@@ -742,6 +756,20 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   html={previewView === 'plan' ? generated : shown}
                   title={t('HTML のプレビュー', 'HTML preview')}
                   heading={previewView === 'plan' ? t('企画の見本(配信カードのプレビューと同じ見た目)', 'Plan sample (same look as the delivery card preview)') : t('制作した HTML をそのまま描いたもの', 'The production HTML as is')}
+                  onFrame={setPreviewFrame}
+                />
+              )}
+              {previewView !== 'compare' && (
+                <HtmlPins
+                  frame={previewFrame}
+                  cardId={card.id}
+                  view={pinView(previewView === 'plan' ? 'html-plan' : 'html-made', '', cur)}
+                  placing={placingPin}
+                  onPlacingEnd={endPlacingPin}
+                  onOpenThreads={() => {
+                    if (!talkOpen) toggleTalk()
+                    setSide('talk')
+                  }}
                 />
               )}
             </div>

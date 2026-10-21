@@ -181,7 +181,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     const x = clamp((e.clientX - r.left) / (r.width || 1))
     const y = clamp((e.clientY - r.top) / (r.height || 1))
     const productId = item ? items.find((i) => i.key === item.getAttribute('data-item-key'))?.productId : undefined
-    setPendingPin({ cardId, anchor: productId ? 'product' : (block.getAttribute('data-anchor') ?? 'preview'), x, y, view, productId })
+    setPendingPin({ cardId, stage: 'plan', anchor: productId ? 'product' : (block.getAttribute('data-anchor') ?? 'preview'), x, y, view, productId })
     onPlacingEnd()
     onOpenThreads()
   }

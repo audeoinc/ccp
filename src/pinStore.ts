@@ -1,5 +1,5 @@
 import type { CardNote } from './data/cardNotes'
-import { isThreadRoot, stageOf } from './notesStage'
+import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
 import { tr } from './i18n'
 
 /**
@@ -11,6 +11,8 @@ import { tr } from './i18n'
 /** プレビューで押した場所(まだ書き込んでいない) */
 export interface PendingPin {
   cardId: string
+  /** どの段階のやり取りに書くか(配信カードのプレビュー = plan、制作のページのプレビュー = production) */
+  stage: NoteStage
   anchor: string
   x: number
   y: number
@@ -57,12 +59,12 @@ export const sameSurface = (a?: string, b?: string) => {
   return ca === cb && (va || 'A') === (vb || 'A')
 }
 
-/** ピンを置ける書き込み(企画の段階の、スレッドの元で、場所のあるもの) */
-export const isPinned = (n: CardNote) => !!n.anchor && isThreadRoot(n) && stageOf(n) === 'plan'
+/** ピンを置ける書き込み(その段階の、スレッドの元で、場所のあるもの) */
+export const isPinned = (n: CardNote, stage: NoteStage = 'plan') => !!n.anchor && isThreadRoot(n) && stageOf(n) === stage
 
-/** ピンの番号(書いた順。見た目や解決に関わらず変わらないように、場所のある書き込み全体で数える) */
-export function pinNumbers(notes: CardNote[]): Map<string, number> {
-  const list = notes.filter(isPinned).sort((a, b) => (a.created_on ?? '').localeCompare(b.created_on ?? ''))
+/** ピンの番号(書いた順。見た目や解決に関わらず変わらないように、その段階の場所のある書き込み全体で数える) */
+export function pinNumbers(notes: CardNote[], stage: NoteStage = 'plan'): Map<string, number> {
+  const list = notes.filter((n) => isPinned(n, stage)).sort((a, b) => (a.created_on ?? '').localeCompare(b.created_on ?? ''))
   return new Map(list.map((n, i) => [n.id, i + 1]))
 }
 
@@ -90,6 +92,8 @@ export function anchorLabel(anchor: string, productName?: string): string {
       return tr('フッター', 'Footer')
     case 'push':
       return tr('アプリの通知', 'App notification')
+    case 'page':
+      return tr('HTML の中', 'In the HTML')
     default:
       return tr('プレビュー', 'Preview')
   }
@@ -98,6 +102,6 @@ export function anchorLabel(anchor: string, productName?: string): string {
 /** 見た目の名前(書いたときと違う幅で見ているときに添える) */
 export function viewLabel(view?: string): string {
   const [ch, device, variant] = (view ?? '').split('|')
-  const parts = [ch === 'push' ? tr('アプリ', 'App') : device === 'pc' ? 'PC' : device === 'mobile' ? tr('スマホ', 'Mobile') : '', variant && variant !== 'A' ? tr(`${variant} 案`, `Variant ${variant}`) : '']
+  const parts = [ch === 'html-made' ? tr('制作した HTML', 'Production HTML') : ch === 'html-plan' ? tr('企画の見本', 'Plan sample') : ch === 'push' ? tr('アプリ', 'App') : device === 'pc' ? 'PC' : device === 'mobile' ? tr('スマホ', 'Mobile') : '', variant && variant !== 'A' ? tr(`${variant} 案`, `Variant ${variant}`) : '']
   return parts.filter(Boolean).join('・')
 }

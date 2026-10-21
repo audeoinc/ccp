@@ -152,10 +152,10 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   const [ideas, setIdeas] = useState<Record<string, TaskIdea[] | 'busy'>>({})
   // 書き込みへのリアクション(PR6。Teams のような軽い返事。状態は変えない)
   const [reactions, setReactions] = useState<NoteReaction[]>([])
-  // プレビュー上の場所(ピン)は、配信カードの企画のやり取りだけ(制作のページ・素材のフロートは、プレビューが別のため)
-  const pinnable = stage === 'plan' && !assetId
+  // プレビュー上の場所(ピン)は、段階のやり取り(企画 = 配信カードのプレビュー、制作 = 制作のページのプレビュー)。素材のフロートは扱わない
+  const pinStage = !assetId ? stage : undefined
   const pendingAll = useSyncExternalStore(subscribePins, pendingPin)
-  const pending = pinnable && pendingAll && pendingAll.cardId === cardId ? pendingAll : null
+  const pending = pinStage && pendingAll && pendingAll.cardId === cardId && pendingAll.stage === pinStage ? pendingAll : null
   const focus = useSyncExternalStore(subscribePins, focusedPin)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
 
@@ -221,7 +221,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     setExpanded((s) => (s.has(focus.noteId) ? s : new Set(s).add(focus.noteId)))
     window.setTimeout(() => document.querySelector(`[data-thread-id="${CSS.escape(focus.noteId)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 120)
   }, [focus, notes])
-  const pinNo = pinNumbers(notes ?? [])
+  const pinNo = pinStage ? pinNumbers(notes ?? [], pinStage) : new Map<string, number>()
 
   const add = () =>
     run(async () => {
@@ -585,7 +585,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
               <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => setPendingPin(null)} aria-label={t('場所を外す', 'Remove the spot')} />
             </div>
           ) : (
-            pinnable && <span className={styles.hint}>{t('プレビューの「コメントを置く」で、場所を指して書き込めます。', 'Use "Place comment" on the preview to point at a spot.')}</span>
+            pinStage && <span className={styles.hint}>{t('プレビューの「コメントを置く」で、場所を指して書き込めます。', 'Use "Place comment" on the preview to point at a spot.')}</span>
           )}
           <Textarea
             ref={bodyRef}

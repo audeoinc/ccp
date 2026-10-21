@@ -28,8 +28,8 @@ function loadZoom(): number | 'fit' {
  * HTML をアプリの画面と切り離した枠(iframe)で描き、縮小・拡大と「全体」(枠に収める)を付ける。
  * 倍率は枠の中の文書に zoom を掛ける(枠の外から測るので、sandbox は allow-same-origin だけ。HTML の中のスクリプトは動かない)
  */
-/** heading は、操作と同じ行の左に出す見出し(ペインの見出しの行を 1 行にまとめる) */
-export function HtmlPreviewFrame({ html, title, heading, headingClassName }: { html: string; title: string; heading?: ReactNode; headingClassName?: string }) {
+/** heading は、操作と同じ行の左に出す見出し(ペインの見出しの行を 1 行にまとめる)。onFrame は、枠(iframe)を外へ渡す(制作のページのピンが、枠の中に印を足すため) */
+export function HtmlPreviewFrame({ html, title, heading, headingClassName, onFrame }: { html: string; title: string; heading?: ReactNode; headingClassName?: string; onFrame?: (el: HTMLIFrameElement | null) => void }) {
   const s = useStyles()
   const t = useT()
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -71,6 +71,11 @@ export function HtmlPreviewFrame({ html, title, heading, headingClassName }: { h
     ro.observe(frame)
     return () => ro.disconnect()
   }, [apply])
+
+  useEffect(() => {
+    onFrame?.(frameRef.current)
+    return () => onFrame?.(null)
+  }, [onFrame])
 
   const shown = zoom === 'fit' ? fitZoom : zoom
   const step = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shown + d) * 20) / 20)))
