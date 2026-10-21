@@ -33,4 +33,7 @@ export const HeroUpload = {
   /** AI に画像を見せて、名前・用途・季節・タグ・説明などの下書きを作る */
   describe: (imageUrl: string, language: 'ja' | 'en') =>
     post<HeroDraft>('/api/heroes/describe', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl, language }) }),
+  /** 画像そのもの(JPEG など)を AI に見せて、下書きを作る(X59 ⑤。ライブラリで直すとき・空の項目をまとめて埋めるとき) */
+  describeImage: (image: Blob, language: 'ja' | 'en') =>
+    post<HeroDraft>(`/api/heroes/describe-image?language=${language}`, { headers: { 'Content-Type': image.type || 'image/jpeg' }, body: image }),
 }

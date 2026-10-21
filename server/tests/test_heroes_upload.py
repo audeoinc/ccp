@@ -10,8 +10,9 @@ from ccp import heroes
 
 
 class FakeRequest:
-    def __init__(self, data: bytes):
+    def __init__(self, data: bytes, content_type: str = "application/octet-stream"):
         self._data = data
+        self.headers = {"content-type": content_type}
 
     async def body(self) -> bytes:
         return self._data
@@ -34,6 +35,31 @@ class HeroUploadTest(unittest.TestCase):
     def test_describe_rejects_outside_urls(self):
         self.assertEqual(asyncio.run(heroes.describe(heroes.DescribeIn(image_url="https://example.com/a.png"))).status_code, 400)
         self.assertEqual(asyncio.run(heroes.describe(heroes.DescribeIn(image_url="/img/heroes/../x.png"))).status_code, 400)
+
+
+class DescribeImageTest(unittest.TestCase):
+    """画像そのものを AI に見せる(X59 ⑤。ライブラリで直すとき・空の項目をまとめて埋めるとき)"""
+
+    def test_rejects_other_types_and_empty(self):
+        self.assertEqual(asyncio.run(heroes.describe_image(FakeRequest(b"GIF", "image/gif"))).status_code, 400)
+        self.assertEqual(asyncio.run(heroes.describe_image(FakeRequest(b"", "image/jpeg"))).status_code, 400)
+
+    def test_returns_ai_draft(self):
+        class Resp:
+            text = '{"name": "秋の公園", "tags": "秋, 公園"}'
+
+        class Models:
+            async def generate_content(self, **kw):
+                self.kw = kw
+                return Resp()
+
+        models = Models()
+        client = mock.Mock()
+        client.aio.models = models
+        with mock.patch.object(heroes, "_get_client", return_value=client):
+            res = asyncio.run(heroes.describe_image(FakeRequest(b"JPEG", "image/jpeg; charset=binary"), "en"))
+        self.assertEqual(res["data"], {"name": "秋の公園", "tags": "秋, 公園"})
+        self.assertIn("英語", models.kw["contents"][1])
 
 
 class HeroDeleteTest(unittest.TestCase):

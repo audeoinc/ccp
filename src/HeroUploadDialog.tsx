@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ImageAddRegular } from '@fluentui/react-icons'
+import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload, type HeroDraft } from './data/heroUpload'
 import { heroImage } from './images'
+import { rasterize, toUploadable } from './imageConvert'
 import { getLang, optionLabel, tr, useT } from './i18n'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
@@ -81,31 +82,52 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
   const [pickMarket, setPickMarket] = useState<'US' | 'JP'>(market ?? 'US')
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
 
-  const pick = async (file?: File) => {
-    if (!file) return
-    if (!/\.(jpe?g|png|webp)$/i.test(file.name)) {
-      setError(tr('メイン画像に使えるのは JPEG・PNG・WebP です', 'Use a JPEG, PNG or WebP image'))
+  /** AI の下書きを、フォームに入れる(焦点は、上げたときだけ) */
+  const applyDraft = (d: HeroDraft, withFocal: boolean) => {
+    setForm((f) => ({
+      ...f,
+      name: d.name || f.name,
+      purpose: d.purpose && d.purpose in HeroImagePurpose ? d.purpose : f.purpose,
+      season: d.season && d.season in HeroImageSeason ? d.season : f.season,
+      tags: [d.tags, d.colors, d.subjects].filter(Boolean).join(', ') || f.tags,
+      description: d.description || f.description,
+    }))
+    if (withFocal && d.focal && typeof d.focal.x === 'number' && typeof d.focal.y === 'number') setFocal({ x: Math.min(1, Math.max(0, d.focal.x)), y: Math.min(1, Math.max(0, d.focal.y)) })
+  }
+  const lang = () => (getLang() === 'en' ? 'en' : 'ja')
+
+  // 直すとき: いまの画像を AI に見せ直して、名前・用途・季節・タグ・説明を作り直す(X59 ⑤。焦点は変えない)
+  const redraft = async () => {
+    if (!url) return
+    setError(null)
+    setBusy('ai')
+    try {
+      applyDraft(await HeroUpload.describeImage(await rasterize(url), lang()), false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const pick = async (picked?: File) => {
+    if (!picked) return
+    if (!/\.(jpe?g|png|webp|avif)$/i.test(picked.name)) {
+      setError(tr('メイン画像に使えるのは JPEG・PNG・WebP・AVIF です', 'Use a JPEG, PNG, WebP or AVIF image'))
       return
     }
     setError(null)
     setBusy('upload')
     try {
+      // AVIF は、ブラウザの中で JPEG に変えてから上げる(メールでは AVIF を出せない受信ソフトが多いため。X59 ⑥)
+      const file = await toUploadable(picked)
       const up = await HeroUpload.upload(file)
       setUrl(up.image_url)
       setForm((f) => ({ ...f, name: f.name || file.name.replace(/\.[^.]+$/, '') }))
       setBusy('ai')
       // AI の下書き(失敗しても、手で入れれば登録できる)
       try {
-        const d: HeroDraft = await HeroUpload.describe(up.image_url, getLang() === 'en' ? 'en' : 'ja')
-        setForm((f) => ({
-          ...f,
-          name: d.name || f.name,
-          purpose: d.purpose && d.purpose in HeroImagePurpose ? d.purpose : f.purpose,
-          season: d.season && d.season in HeroImageSeason ? d.season : f.season,
-          tags: [d.tags, d.colors, d.subjects].filter(Boolean).join(', '),
-          description: d.description || f.description,
-        }))
-        if (d.focal && typeof d.focal.x === 'number' && typeof d.focal.y === 'number') setFocal({ x: Math.min(1, Math.max(0, d.focal.x)), y: Math.min(1, Math.max(0, d.focal.y)) })
+        applyDraft(await HeroUpload.describe(up.image_url, lang()), true)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       }
@@ -191,11 +213,11 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
                     }}
                   >
                     {busy === 'upload' ? <Spinner size="small" /> : <ImageAddRegular fontSize={32} />}
-                    <span>{t('ここに画像を置く(JPEG・PNG・WebP、15MB まで)', 'Drop an image here (JPEG, PNG, WebP; up to 15 MB)')}</span>
+                    <span>{t('ここに画像を置く(JPEG・PNG・WebP・AVIF、15MB まで。AVIF は JPEG に変えて上げます)', 'Drop an image here (JPEG, PNG, WebP, AVIF; up to 15 MB. AVIF is converted to JPEG)')}</span>
                     <Button size="small" disabled={!!busy} onClick={() => fileRef.current?.click()}>
                       {t('画像を選ぶ', 'Choose an image')}
                     </Button>
-                    <input ref={fileRef} type="file" hidden accept=".jpg,.jpeg,.png,.webp" onChange={(e) => void pick(e.target.files?.[0] ?? undefined)} />
+                    <input ref={fileRef} type="file" hidden accept=".jpg,.jpeg,.png,.webp,.avif" onChange={(e) => void pick(e.target.files?.[0] ?? undefined)} />
                   </div>
                 ) : (
                   <>
@@ -221,6 +243,13 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
               <div className={s.form}>
                 {busy === 'ai' && <Spinner size="tiny" label={t('AI が画像を見て、下書きを作っています…', 'AI is reading the image and drafting…')} />}
                 {!editing && <span className={s.note}>{t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確かめて直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}</span>}
+                {editing && (
+                  <div>
+                    <Button size="small" icon={<SparkleRegular />} disabled={!!busy || !url} onClick={() => void redraft()} title={t('いまの画像を AI に見せ直して、名前・用途・季節・タグ・説明を作り直します(焦点は変えません。保存で確定)', 'Show the image to AI again and redraft the name, purpose, season, tags and description (focal point unchanged; saved on Save)')}>
+                      {t('AI で下書きし直す', 'Redraft with AI')}
+                    </Button>
+                  </div>
+                )}
                 <Field label={t('名前', 'Name')} required size="small">
                   <Input size="small" value={form.name} onChange={(_, d) => set('name')(d.value)} />
                 </Field>

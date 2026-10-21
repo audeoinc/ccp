@@ -1,12 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DeleteRegular, EditRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DeleteRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getText, linkRows, productRows, rowsText, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
 import { productImage, heroImage } from './images'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
+import { HeroUploadDialog } from './HeroUploadDialog'
+import { myName } from './history'
 import { useT } from './i18n'
 
 const useStyles = makeStyles({
@@ -85,6 +87,8 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
   const s = useStyles()
   const t = useT()
   const [editing, setEditing] = useState<string | null>(null)
+  // 持っている画像を上げる(X59。制作のページから。上げた画像はライブラリにも入る)
+  const [uploading, setUploading] = useState(false)
   const market = cardMarket(current.card.country ?? '')
   const poolProducts = useMemo(() => (market ? products.filter((p) => productMarket(p) === market) : products), [products, market])
   const poolHeroes = useMemo(() => (market ? heroes.filter((h) => heroMarket(h) === market) : heroes), [heroes, market])
@@ -234,7 +238,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
           </span>
           <span className={s.tools}>
             {heroChanged && editable && undo(() => onChange(setHero(current, original.hero)))}
-            {editable && <HeroPicker heroes={poolHeroes} onPick={(h) => onChange(setHero(current, h))} />}
+            {editable && <HeroPicker heroes={poolHeroes} onPick={(h) => onChange(setHero(current, h))} onUpload={() => setUploading(true)} />}
             {current.hero && <CopyButton text={new URL(heroImage(current.hero) ?? '', location.href).href} label={t('画像の URL をコピー', 'Copy image URL')} />}
           </span>
         </div>,
@@ -317,6 +321,18 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
         ),
       )}
       {foot}
+      {uploading && (
+        <HeroUploadDialog
+          market={market}
+          cardId={current.card.id}
+          me={myName()}
+          onClose={() => setUploading(false)}
+          onDone={(h) => {
+            onChange(setHero(current, h))
+            setUploading(false)
+          }}
+        />
+      )}
     </>
   )
 }
@@ -362,7 +378,7 @@ function ProductPicker({ trigger, products, onPick }: { trigger: ReactNode; prod
   )
 }
 
-function HeroPicker({ heroes, onPick }: { heroes: HeroImage[]; onPick: (h: HeroImage) => void }) {
+function HeroPicker({ heroes, onPick, onUpload }: { heroes: HeroImage[]; onPick: (h: HeroImage) => void; onUpload: () => void }) {
   const s = useStyles()
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -375,6 +391,17 @@ function HeroPicker({ heroes, onPick }: { heroes: HeroImage[]; onPick: (h: HeroI
       </PopoverTrigger>
       <PopoverSurface>
         <div className={s.picker}>
+          {/* 持っている画像を上げて替える(X59。ライブラリにも入る) */}
+          <Button
+            size="small"
+            icon={<ImageAddRegular />}
+            onClick={() => {
+              setOpen(false)
+              onUpload()
+            }}
+          >
+            {t('持っている画像を上げる', 'Upload your own image')}
+          </Button>
           <div className={s.heroGrid}>
             {heroes.map((h) => (
               <button

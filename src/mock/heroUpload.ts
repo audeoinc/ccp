@@ -10,6 +10,9 @@ export const HeroUpload = {
   async remove(imageUrl: string) {
     if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl)
   },
+  async describeImage(_image: Blob, language: 'ja' | 'en'): Promise<HeroDraft> {
+    return this.describe('', language)
+  },
   async describe(_imageUrl: string, language: 'ja' | 'en'): Promise<HeroDraft> {
     await new Promise((r) => setTimeout(r, 600))
     const en = language === 'en'

@@ -3,6 +3,8 @@
   POST /api/heroes/upload?name=<元のファイル名>   本文 = 画像そのもの。ライブラリの置き場所に保存し、画像の URL(/img/heroes/<名前>)を返す
   POST /api/heroes/describe                       {"image_url": "/img/heroes/<名前>", "language": "ja" | "en"}
                                                    画像を Gemini に見せて、名前・用途・季節・タグ・説明・色・写っているものの下書きを返す(人が確かめて直す)
+  POST /api/heroes/describe-image?language=ja    本文 = 画像そのもの(JPEG・PNG・WebP)。上と同じ下書きを返す
+                                                   ライブラリで直すとき・空の項目をまとめて埋めるときに使う(もとからある画像は、画面が JPEG にして送る)
 
 置き場所は、商品画像・メイン画像と同じ(ccp/assets.py): ASSET_DIR があればそのフォルダの heroes/(Workbench)、なければバケットの images/heroes/(本番)。
 どちらもなければ server/images/heroes に置く(手元の開発。この場合、/img からは配られない)。
@@ -71,6 +73,21 @@ PROMPT = """あなたは、EC のメール・アプリの配信で使うメイ�
 文字は %LANG% で書く。人物を特定する情報(名前など)は書かない。"""
 
 
+async def _describe(data: bytes, content_type: str, language: str):
+    prompt = PROMPT.replace("%LANG%", "英語" if language == "en" else "日本語")
+    try:
+        resp = await _get_client().aio.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+            contents=[types.Part.from_bytes(data=data, mime_type=content_type), prompt],
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
+        )
+        draft = json.loads((resp.text or "").strip() or "{}")
+    except Exception as e:  # noqa: BLE001 — 下書きがなくても、人が書けば登録できる
+        log.exception("画像の読み取りに失敗しました")
+        return fail(502, f"AI で画像を読み取れませんでした(手で入れて登録できます): {type(e).__name__}", "ai_failed")
+    return ok(draft if isinstance(draft, dict) else {})
+
+
 @router.post("/describe")
 async def describe(body: DescribeIn):
     m = URL.match(body.image_url)
@@ -84,18 +101,24 @@ async def describe(body: DescribeIn):
     if found is None:
         return fail(404, "画像が見つかりません", "not_found")
     data, content_type = found
-    prompt = PROMPT.replace("%LANG%", "英語" if body.language == "en" else "日本語")
-    try:
-        resp = await _get_client().aio.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=[types.Part.from_bytes(data=data, mime_type=content_type), prompt],
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        draft = json.loads((resp.text or "").strip() or "{}")
-    except Exception as e:  # noqa: BLE001 — 下書きがなくても、人が書けば登録できる
-        log.exception("画像の読み取りに失敗しました")
-        return fail(502, f"AI で画像を読み取れませんでした(手で入れて登録できます): {type(e).__name__}", "ai_failed")
-    return ok(draft if isinstance(draft, dict) else {})
+    return await _describe(data, content_type, body.language)
+
+
+IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
+
+
+@router.post("/describe-image")
+async def describe_image(request: Request, language: str = "ja"):
+    """画像そのものを受け取って、下書きを返す(X59 ⑤。保存はしない)"""
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if content_type not in IMAGE_TYPES:
+        return fail(400, "AI に見せられるのは JPEG・PNG・WebP です", "bad_type")
+    data = await request.body()
+    if not data:
+        return fail(400, "画像が空です", "empty")
+    if len(data) > MAX_BYTES:
+        return fail(400, "画像が大きすぎます(1 枚 15MB まで)", "too_large")
+    return await _describe(data, content_type, language)
 
 
 UPLOADED = re.compile(r"^up-[0-9a-f]{32}\.(?:jpg|png|webp)$")
