@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import {
   Badge,
   Button,
@@ -13,6 +13,7 @@ import {
   MessageBar,
   MessageBarBody,
   Select,
+  Slider,
   Tab,
   TabList,
   Text,
@@ -154,6 +155,23 @@ function loadEditorWidths(): EditorWidths {
   }
   return EDITOR_WIDTHS
 }
+/** プレビュー・キャンバスの倍率(その人のブラウザに覚える)。全体('fit')は、枠の高さ(と幅)に収まる大きさ */
+const ZOOM_KEY = 'ccp.templatePreviewZoom'
+const ZOOM_MIN = 0.25 // キャンバスの列を広げていても、「全体」で収まるように、小さくできる
+const ZOOM_MAX = 2.5
+function loadZoom(): number | 'fit' {
+  try {
+    const v = JSON.parse(localStorage.getItem(ZOOM_KEY) ?? 'null')
+    if (v === 'fit') return 'fit'
+    if (typeof v === 'number' && v >= ZOOM_MIN && v <= ZOOM_MAX) return v
+  } catch {
+    // 読めなければ 100%
+  }
+  return 1
+}
+/** 倍率を広げたときの、一覧で見ているプレビューの最大の幅(設定の欄を押しつぶさないように) */
+const PREVIEW_MAX = 560
+
 /** 設定の列の最小の幅(ボタンの行が収まる幅)。ほかの列を広げても、これより狭くしない */
 const FIELDS_MIN = 340
 /** 列の間(境界 3 本 + 間隔 6 つ) */
@@ -264,7 +282,13 @@ const useStyles = makeStyles({
   // 縦長の見取り図をスクロールしても、編集欄と並べて見られるように、上に貼り付ける
   preview: { display: 'grid', rowGap: '6px', justifyItems: 'start', position: 'sticky', top: 0 },
   // 縦長の見取り図は、それだけでスクロールできるようにする(長いテンプレートでも、編集しながら下まで見られる)
-  previewScroll: { maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 150px)', overflowY: 'auto', paddingRight: '4px' },
+  // 高さを決めておく(倍率「全体」は、この高さに収める)。広げたときは、縦横にスクロール
+  previewScroll: { height: 'calc((86vh / var(--ui-zoom, 1)) - 190px)', overflow: 'auto', paddingRight: '4px' },
+  previewZoomBox: { maxWidth: `${PREVIEW_MAX + 8}px` },
+  zoomTarget: { flexShrink: 0 },
+  zoomBar: { display: 'flex', alignItems: 'center', columnGap: '2px' },
+  zoomSlider: { width: '80px', minWidth: '80px' },
+  zoomLabel: { width: '36px', textAlign: 'right', fontSize: '12px' },
   row: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'end' },
   // 部品(ヒーロー・セクション・ボタン)のカード
   card: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, minWidth: 0 },
@@ -292,7 +316,9 @@ const useStyles = makeStyles({
     columnGap: '10px',
     alignItems: 'start',
   },
-  areaCanvas: { gridArea: 'canvas' },
+  // 拡大したとき、隣の列にはみ出さず、枠の中で横にスクロールするように(グリッドの子は、既定では中身より狭くならない)
+  areaCanvas: { gridArea: 'canvas', minWidth: 0 },
+  canvasScroll: { width: '100%', boxSizing: 'border-box' },
   // 境界の線は、いちばん長い列(設定)の高さまで伸ばす
   splitCell: { alignSelf: 'stretch', display: 'grid' },
   compareCol: { gridArea: 'list', position: 'sticky', top: 0, display: 'grid', rowGap: '6px', alignContent: 'start', maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px' },
@@ -423,7 +449,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   const usage = useMemo(() => buildUsage(cards), [cards])
   const usageHere = useMemo(() => buildUsage(country ? cards.filter((c) => c.country === country) : cards), [cards, country])
   const hereOf = (id?: string) => (id ? usageHere.get(id) : undefined) ?? emptyUsage()
-  // 使っている配信の一覧で、開いている過去の版(いまの版は、いつも開いておく)
+  // 使っている配信の一覧で、開いている版。いまの版も含めて、最初は閉じておく(一覧が長いと、ほかの欄が下に押し出されるため。2026-10-21 利用者の指示)
   const [openVersions, setOpenVersions] = useState<Set<number>>(new Set())
   const usageOf = (id?: string) => (id ? usage.get(id) : undefined) ?? emptyUsage()
   const usageText = (id?: string) => {
@@ -461,6 +487,57 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     })
   // キャンバスの隣に並べて見比べているテンプレート
   const [compareId, setCompareId] = useState<string | null>(null)
+  // プレビュー・キャンバスの倍率。見取り図の幅を変えて大きくする(CSS の zoom ではなく幅で。箱を押す・つかむ位置がずれないように)
+  const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
+  const [fitZoom, setFitZoom] = useState(1)
+  useEffect(() => {
+    try {
+      localStorage.setItem(ZOOM_KEY, JSON.stringify(zoom))
+    } catch {
+      // 覚えられなくても、倍率は変えられる
+    }
+  }, [zoom])
+  const shownZoom = zoom === 'fit' ? fitZoom : zoom
+  const stepZoom = (d: number) => setZoom(Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, shownZoom + d)) * 100) / 100)
+  /** 倍率をかけた幅 */
+  const zoomed = (base: number) => Math.round(base * shownZoom)
+  // 全体: 見取り図の縦横の比を測り、枠に収まる倍率を求める(内容・列の幅・窓の大きさが変わったら、測り直す)
+  const zoomBoxRef = useRef<HTMLDivElement>(null)
+  const zoomBaseRef = useRef(1)
+  useLayoutEffect(() => {
+    const box = zoomBoxRef.current
+    if (zoom !== 'fit' || !box) return
+    const calc = () => {
+      const el = box.querySelector<HTMLElement>('[data-zoom-target]')
+      if (!el || el.offsetWidth === 0) return
+      const ratio = el.offsetHeight / el.offsetWidth
+      // 一覧のプレビューの枠は、中身に合わせて幅が変わるので、枠の幅ではなく上限で決める(枠の幅で決めると、測るたびに縮む)
+      const maxW = el.dataset.zoomTarget === 'pair' ? (box.clientWidth - 16) / 2 : el.dataset.zoomTarget === 'grow' ? PREVIEW_MAX : box.clientWidth - 8
+      // 高さには余白を残す(キャンバスの「いちばん下に入れる所」など、倍率に比例しない高さがあるため)
+      const w = Math.min(maxW, (box.clientHeight - 32) / ratio)
+      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, w / zoomBaseRef.current))
+      // 幅の丸めで値がわずかに揺れ、描き直しが続かないように、小さな差では変えない
+      setFitZoom((v) => (Math.abs(v - z) < 0.01 ? v : z))
+    }
+    calc()
+    const ro = new ResizeObserver(calc)
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [zoom, draft, selectedId, viewKey, compareId, listOpen]) // 列の幅が変わったときは、枠の大きさの変化(ResizeObserver)で測り直す
+  /** 倍率の操作(配信カードのプレビューと同じ並び) */
+  const zoomBar = () => (
+    <div className={s.zoomBar}>
+      <Button size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
+      <Slider size="small" className={s.zoomSlider} min={ZOOM_MIN * 100} max={ZOOM_MAX * 100} step={5} value={Math.round(shownZoom * 100)} onChange={(_, d) => setZoom(d.value / 100)} aria-label={t('プレビューの倍率', 'Preview zoom')} />
+      <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
+      <span className={s.zoomLabel}>{Math.round(shownZoom * 100)}%</span>
+      {/* ボタンの文字は、押したときの動き: 全体表示の前は「全体」、全体表示のときは「100%」 */}
+      <Button size="small" appearance={zoom === 'fit' ? 'primary' : 'outline'} onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')} aria-label={zoom === 'fit' ? t('100% の倍率に戻す', 'Reset to 100%') : t('全体を表示', 'Fit the whole layout')}>
+        {zoom === 'fit' ? '100%' : t('全体', 'Fit')}
+      </Button>
+    </div>
+  )
+
   // 列の幅。配信カードと同じく、境界(スプリッター)をつかんで変え、その人のブラウザに覚えさせる
   const [colW, setColW] = useState<EditorWidths>(loadEditorWidths)
   useEffect(() => {
@@ -688,7 +765,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   // キャンバスの列の幅から、見取り図の幅を決める。見比べるときは 2 つ並べるので、列を広げて半分ずつ
   const canvasRoom = gridW ? gridW - EDITOR_GAPS - FIELDS_MIN - (listOpen ? colW.list : 32) - colW.palette : Infinity
   const canvasCol = Math.max(220, Math.min(compared ? Math.max(colW.canvas, COMPARE_WIDTH * 2 + 36) : colW.canvas, canvasRoom))
-  const canvasWidth = compared ? Math.floor((canvasCol - 36) / 2) : canvasCol - 24
+  const canvasBase = compared ? Math.floor((canvasCol - 36) / 2) : canvasCol - 24
+  const canvasWidth = zoomed(canvasBase)
 
   /** 左の列: ほかのテンプレート(押すと、キャンバスの隣に並べて見比べる)。閉じると細い帯 */
   const compareCol = () =>
@@ -996,29 +1074,25 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
         {country && all > u.total && <span className={s.caption}>{t(`ほかの国でも ${all - u.total} 本で使っています(ヘッダーの国を変えると見られます)`, `Also used by ${all - u.total} in other countries (switch the country in the header to see them)`)}</span>}
         {versions.map((v) => {
           const list = [...(u.byVersion.get(v) ?? [])].sort((a, b) => (b.scheduled_at ?? '').localeCompare(a.scheduled_at ?? ''))
-          const opened = v === cur || openVersions.has(v)
+          const opened = openVersions.has(v)
           return (
             <div key={v} className={s.usedGroup}>
-              {v === cur ? (
-                <span className={s.caption}>{t(`版 ${v}(いまの版)・${list.length} 本`, `v${v} (latest) · ${list.length}`)}</span>
-              ) : (
-                <Button
-                  size="small"
-                  appearance="transparent"
-                  className={s.usedToggle}
-                  icon={opened ? <ChevronDownRegular /> : <ChevronRightRegular />}
-                  onClick={() =>
-                    setOpenVersions((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(v)) next.delete(v)
-                      else next.add(v)
-                      return next
-                    })
-                  }
-                >
-                  {t(`版 ${v}・${list.length} 本`, `v${v} · ${list.length}`)}
-                </Button>
-              )}
+              <Button
+                size="small"
+                appearance="transparent"
+                className={s.usedToggle}
+                icon={opened ? <ChevronDownRegular /> : <ChevronRightRegular />}
+                onClick={() =>
+                  setOpenVersions((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(v)) next.delete(v)
+                    else next.add(v)
+                    return next
+                  })
+                }
+              >
+                {v === cur ? t(`版 ${v}(いまの版)・${list.length} 本`, `v${v} (latest) · ${list.length}`) : t(`版 ${v}・${list.length} 本`, `v${v} · ${list.length}`)}
+              </Button>
               {opened &&
                 list.map((c) => (
                   <button key={c.id} type="button" className={s.usedRow} onClick={() => onOpenCard(c.id)}>
@@ -1456,6 +1530,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                         <Button size="small" appearance="subtle" icon={<ArrowRedoRegular />} disabled={histCount.future === 0} onClick={redo} />
                       </Tooltip>
                     </div>
+                    {zoomBar()}
                     {removedAt !== null && (
                       <div className={s.toast}>
                         <span>{t('部品を削除しました', 'Part removed')}</span>
@@ -1483,8 +1558,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                         )}
                       </div>
                     )}
-                    <div className={mergeClasses(s.previewScroll, s.canvasRow)}>
+                    <div
+                      ref={(el) => {
+                        zoomBoxRef.current = el
+                        zoomBaseRef.current = canvasBase
+                      }}
+                      className={mergeClasses(s.previewScroll, s.canvasRow, s.canvasScroll)}
+                    >
                       {/* プレビューの箱を、そのまま操作できる(押して選ぶ・つかんで並べ替える・パレットの部品を箱の間に落とす) */}
+                      <div data-zoom-target={compared ? 'pair' : 'one'} className={s.zoomTarget} style={{ width: canvasWidth }}>
                       <TemplateThumb
                         layout={fromParts(draft)}
                         width={canvasWidth}
@@ -1571,6 +1653,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                           },
                         }}
                       />
+                      </div>
                       {compared && (
                         <div className={s.compareBox}>
                           <div className={s.compareBoxHead}>
@@ -1684,9 +1767,18 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                     <Text size={200} weight="semibold">
                       {viewKey ? t(`構成のプレビュー(版 ${getTemplate(viewKey).version} を見ています)`, `Layout preview (viewing v${getTemplate(viewKey).version})`) : t('構成のプレビュー', 'Layout preview')}
                     </Text>
-                    <div className={s.previewScroll}>
+                    {zoomBar()}
+                    <div
+                      ref={(el) => {
+                        zoomBoxRef.current = el
+                        zoomBaseRef.current = PREVIEW_WIDTH
+                      }}
+                      className={mergeClasses(s.previewScroll, s.previewZoomBox)}
+                    >
                       {(viewKey ? getTemplate(viewKey) : selected).push && <PushThumb spec={(viewKey ? getTemplate(viewKey) : selected).push!} width={160} />}
-                      <TemplateThumb layout={viewKey ? getTemplate(viewKey) : selected} free={selected.id === 'free'} width={PREVIEW_WIDTH} />
+                      <div data-zoom-target="grow" className={s.zoomTarget} style={{ width: zoomed(PREVIEW_WIDTH) }}>
+                        <TemplateThumb layout={viewKey ? getTemplate(viewKey) : selected} free={selected.id === 'free'} width={zoomed(PREVIEW_WIDTH)} />
+                      </div>
                     </div>
                   </div>
                 </div>
