@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import {
   Badge,
   Button,
@@ -16,17 +16,18 @@ import {
   Tab,
   TabList,
   Text,
+  Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowResetRegular, ArrowUpRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ArrowUpRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, ReOrderDotsVerticalRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { locale, useT } from './i18n'
 import { MAX_BUTTON_BLOCKS, MAX_BUTTON_LABEL, MAX_SECTIONS, MAX_SLOTS, deleteTemplate, fitSlots, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
 import type { DeliveryCard } from './models/deliveryCards'
 import { statusLabel, statusRank } from './status'
-import { TemplateThumb } from './TemplateThumb'
+import { PartThumb, TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import {
   DEFAULT_PUSH_TEMPLATE,
@@ -115,6 +116,27 @@ const layoutValue = (sec: Section): SectionLayout => {
   if (sec.kind === 'mosaic') return sec.flip ? 'mosaicR' : 'mosaic'
   return sec.kind
 }
+/** 構成の形(セクションの種類・列・左右・枠の数と、ボタンの位置・数)。同じなら、見た目の設定のほかは同じテンプレート */
+const shapeOf = (l: TemplateLayout) =>
+  JSON.stringify([
+    l.sections.map((sec) => [layoutValue(sec), sec.slots]),
+    // 標準の古い形(ヒーローの後・セクションの後のボタンの数)も、置いた位置のボタンに直してから比べる
+    placedButtons(l).filter((b) => b.buttons.length > 0).map((b) => [Math.max(0, Math.min(b.at, l.sections.length)), b.buttons.length]).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+  ])
+/** 似ている度(0〜1): セクションの形の並びが、どれだけ同じ順に重なるか(最長共通部分列 ÷ 長いほうの数) */
+const similarity = (a: TemplateLayout, b: TemplateLayout) => {
+  const x = a.sections.map(layoutValue)
+  const y = b.sections.map(layoutValue)
+  if (x.length === 0 || y.length === 0) return 0
+  const dp = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0))
+  for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) dp[i][j] = x[i - 1] === y[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
+  return dp[x.length][y.length] / Math.max(x.length, y.length)
+}
+/** 見比べるときの、キャンバスと、並べるテンプレートの幅(2 つ並べても、ダイアログに収まるように少し小さく) */
+const COMPARE_WIDTH = 240
+/** 編集中の左の一覧の開け閉めを覚えておく所(その人のブラウザだけ) */
+const COMPARE_OPEN_KEY = 'ccp.templateCompareOpen'
+
 const layoutSection = (v: SectionLayout): Section => {
   switch (v) {
     case 'grid3':
@@ -135,6 +157,8 @@ const layoutPatch = (v: SectionLayout, sec: Section): Section => {
 
 /** 構成のプレビューの幅。一覧の見取り図(84px)では、枠の数や列が読み取りにくいため、大きく描く */
 const PREVIEW_WIDTH = 220
+/** 編集中のキャンバスの幅(押す・つかむ箱が小さすぎないように、一覧の見取り図より大きく) */
+const CANVAS_WIDTH = 300
 
 const newDraft = (): Draft => ({
   name: '',
@@ -206,6 +230,7 @@ const useStyles = makeStyles({
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
   usedName: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  usedToggle: { justifyContent: 'flex-start', minWidth: 0, minHeight: '24px', paddingLeft: 0, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground2 },
   itemName: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   // カードの高さをそろえるため、説明は 5 行で省略する(全文は、選ぶと右に出る)
   clamp: { display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
@@ -231,11 +256,126 @@ const useStyles = makeStyles({
   heroBody: { padding: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'start' },
   heroSelect: { width: '180px' },
   buttonRows: { padding: '10px', display: 'grid', rowGap: '8px' },
-  buttonRow: { display: 'grid', gridTemplateColumns: '18px minmax(120px, 1fr) 96px minmax(130px, 160px) 28px', columnGap: '6px', alignItems: 'center' },
+  // 一覧を開いて見比べているときは、設定の列が狭くなるので、最小の幅を小さめにする
+  buttonRow: { display: 'grid', gridTemplateColumns: '18px minmax(80px, 1fr) 76px minmax(100px, 160px) 28px', columnGap: '6px', alignItems: 'center' },
   partList: { display: 'grid', rowGap: '8px' },
+  // 編集中: 2 列の大きな一覧の代わりに、一覧(閉じられる) | 設定と構成の一覧 | キャンバス | 部品 の 4 列にする。
+  // 名前の欄を左に置くのは、何を編集しているかを最初に見せるため。部品は、主な落とし先のキャンバスの隣に置く
+  splitEditing: { gridTemplateColumns: 'minmax(0, 1fr)' },
+  listHidden: { display: 'none' },
+  editor3: {
+    display: 'grid',
+    // 列の幅は、一覧の開け閉め・見比べで変わるので、描くときに style で決める
+    gridTemplateAreas: '"list fields canvas palette"',
+    columnGap: '16px',
+    alignItems: 'start',
+  },
+  areaCanvas: { gridArea: 'canvas' },
+  compareCol: { gridArea: 'list', position: 'sticky', top: 0, display: 'grid', rowGap: '6px', alignContent: 'start', maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px' },
+  compareHead: { display: 'flex', alignItems: 'flex-start', columnGap: '2px' },
+  compareItem: {
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    columnGap: '8px',
+    alignItems: 'start',
+    padding: '6px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    ':hover': { border: `1px solid ${tokens.colorBrandStroke1}` },
+  },
+  // 閉じた一覧: 細い帯に、縦書きの「テンプレート」を残す(押せば開く)
+  rail: { gridArea: 'list', position: 'sticky', top: 0 },
+  railButton: { minWidth: 0, width: '32px', padding: '8px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '6px', backgroundColor: tokens.colorNeutralBackground3 },
+  railLabel: { writingMode: 'vertical-rl', fontSize: '12px', letterSpacing: '2px' },
+  canvasRow: { display: 'flex', columnGap: '12px', alignItems: 'flex-start' },
+  compareBox: { display: 'grid', rowGap: '4px', flexShrink: 0 },
+  compareBoxHead: { display: 'flex', alignItems: 'center', columnGap: '2px', maxWidth: `${COMPARE_WIDTH}px` },
+  compareBoxName: { flexGrow: 1, fontSize: '12px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sameNote: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', padding: '2px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorNeutralForeground1 },
+  crumbs: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
+  crumbLink: { minWidth: 0, padding: '0 2px', fontSize: 'inherit', fontWeight: 'inherit', color: tokens.colorBrandForeground1 },
+  crumbName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  areaFields: { gridArea: 'fields' },
+  paletteCol: { gridArea: 'palette', position: 'sticky', top: 0, display: 'grid', rowGap: '8px', alignContent: 'start', maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px' },
+  meter: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
+  meterItem: { fontSize: '11px', padding: '1px 6px', borderRadius: tokens.borderRadiusCircular, backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground2 },
+  meterFull: { backgroundColor: tokens.colorPaletteDarkOrangeBackground1, color: tokens.colorPaletteDarkOrangeForeground1 },
+  paletteGroup: { display: 'grid', rowGap: '4px' },
+  paletteGroupHead: { fontSize: '11px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginTop: '4px' },
+  paletteItem: {
+    display: 'grid',
+    gridTemplateColumns: '60px minmax(0, 1fr)',
+    columnGap: '8px',
+    alignItems: 'center',
+    padding: '4px 6px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'grab',
+    userSelect: 'none',
+    ':hover': { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
+  },
+  paletteThumb: { display: 'grid', placeItems: 'center', padding: '2px', backgroundColor: '#fff', borderRadius: tokens.borderRadiusSmall, maxHeight: '64px', overflow: 'hidden' },
+  paletteName: { fontSize: '12px', overflowWrap: 'anywhere' },
+  canvasHead: { display: 'flex', alignItems: 'center', columnGap: '2px', width: '100%' },
+  toast: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', padding: '2px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
+  toolCount: { fontSize: '12px', minWidth: '14px', textAlign: 'center' },
+  // 部品のパレット(ドラッグして構成に入れる)
+  palette: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px dashed ${tokens.colorNeutralStroke1}`, backgroundColor: tokens.colorNeutralBackground2 },
+  paletteHead: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  paletteItems: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+  chip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '4px',
+    padding: '3px 10px',
+    fontSize: '12px',
+    borderRadius: tokens.borderRadiusCircular,
+    border: `1px solid ${tokens.colorBrandStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorBrandForeground1,
+    cursor: 'grab',
+    userSelect: 'none',
+    ':hover': { backgroundColor: tokens.colorBrandBackground2 },
+  },
+  chipButtons: { border: `1px solid ${tokens.colorNeutralStroke1}`, color: tokens.colorNeutralForeground2 },
+  chipOff: { opacity: 0.4, cursor: 'not-allowed' },
+  // 構成の部品: つかむ所・入れる位置の線・いちばん下に入れる所
+  handle: { display: 'inline-flex', alignItems: 'center', cursor: 'grab', color: tokens.colorNeutralForeground3, fontSize: '16px', ':hover': { color: tokens.colorNeutralForeground1 } },
+  dropWrap: { display: 'grid', rowGap: '4px', borderRadius: tokens.borderRadiusMedium },
+  // プレビューの箱と同じ部品を選んでいるとき
+  partSelected: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '2px' },
+  dragging: { opacity: 0.45 },
+  dropLine: { height: '3px', borderRadius: '2px', backgroundColor: tokens.colorBrandBackground },
+  dropEnd: { minHeight: '28px', display: 'grid', placeItems: 'center', fontSize: '12px', color: tokens.colorNeutralForeground3, borderRadius: tokens.borderRadiusMedium },
+  dropEndOn: { border: `1.5px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
   num: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
+
+type Usage = { total: number; fixed: number; reviewing: number; draft: number; byVersion: Map<number, DeliveryCard[]> }
+const emptyUsage = (): Usage => ({ total: 0, fixed: 0, reviewing: 0, draft: 0, byVersion: new Map<number, DeliveryCard[]>() })
+
+/** 配信の一覧から、テンプレートごとの使っている数(状態ごと・版ごと)を数える */
+function buildUsage(cards: DeliveryCard[]): Map<string, Usage> {
+  // テンプレートの ID でまとめる(どの版を使っていても、同じテンプレートとして数える)
+  const m = new Map<string, { total: number; fixed: number; reviewing: number; draft: number; byVersion: Map<number, DeliveryCard[]> }>()
+  for (const c of cards) {
+    const id = templateIdOfCard(c)
+    const u = m.get(id) ?? { total: 0, fixed: 0, reviewing: 0, draft: 0, byVersion: new Map<number, DeliveryCard[]>() }
+    u.total += 1
+    const v = c.layout_version ?? currentVersion(id)
+    u.byVersion.set(v, [...(u.byVersion.get(v) ?? []), c])
+    const r = statusRank(c.status)
+    if (r >= statusRank('approved')) u.fixed += 1
+    else if (r >= statusRank('reviewing')) u.reviewing += 1
+    else u.draft += 1
+    m.set(id, u)
+  }
+  return m
+}
 
 /**
  * テンプレートの管理(一覧・新規・複製・編集・版の履歴・使っている配信・使わない(無効)・削除)。
@@ -243,7 +383,7 @@ const useStyles = makeStyles({
  * 編集しても、すでにある配信は使った版の形のまま(見た目・見出し・商品の位置は変わらない)。前の版に戻すときも、新しい版として上に積む。
  * 標準も編集できる(コードの定義が版 0。上書きの行で置き換える)。使っているテンプレートは削除せず、使わない(無効)にする
  */
-export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: DeliveryCard[]; onChanged: () => Promise<void>; onOpenCard: (id: string) => void }) {
+export function TemplateManager({ cards, country, onChanged, onOpenCard }: { cards: DeliveryCard[]; country?: string; onChanged: () => Promise<void>; onOpenCard: (id: string) => void }) {
   const open = useTemplateManagerOpen()
   useTemplates() // 登録が変わったら、一覧を描き直す
   const t = useT()
@@ -253,25 +393,15 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
   // 使わない(無効)のものも出す(一覧の下にたたむ)。過去の版は出さない(詳しい欄の、版の履歴に出す)
   const options = templateOptions(channel, true)
   const [showHidden, setShowHidden] = useState(false)
-  // テンプレートごとの、使っている配信の数(状態ごと・版ごと)。編集・使わない・削除のときに知らせる
-  const usage = useMemo(() => {
-    // テンプレートの ID でまとめる(どの版を使っていても、同じテンプレートとして数える)
-    const m = new Map<string, { total: number; fixed: number; reviewing: number; draft: number; byVersion: Map<number, DeliveryCard[]> }>()
-    for (const c of cards) {
-      const id = templateIdOfCard(c)
-      const u = m.get(id) ?? { total: 0, fixed: 0, reviewing: 0, draft: 0, byVersion: new Map<number, DeliveryCard[]>() }
-      u.total += 1
-      const v = c.layout_version ?? currentVersion(id)
-      u.byVersion.set(v, [...(u.byVersion.get(v) ?? []), c])
-      const r = statusRank(c.status)
-      if (r >= statusRank('approved')) u.fixed += 1
-      else if (r >= statusRank('reviewing')) u.reviewing += 1
-      else u.draft += 1
-      m.set(id, u)
-    }
-    return m
-  }, [cards])
-  const usageOf = (id?: string) => (id ? usage.get(id) : undefined) ?? { total: 0, fixed: 0, reviewing: 0, draft: 0, byVersion: new Map<number, DeliveryCard[]>() }
+  // テンプレートごとの、使っている配信の数(状態ごと・版ごと)。
+  // 削除・使わない・保存の前の確かめは、すべての国の分で決める(ほかの国で使っている配信を、見落とさないように)。
+  // 画面の一覧・数は、ヘッダーで選んだ国の分だけ出す(X33。国を選んでいなければ、すべて)
+  const usage = useMemo(() => buildUsage(cards), [cards])
+  const usageHere = useMemo(() => buildUsage(country ? cards.filter((c) => c.country === country) : cards), [cards, country])
+  const hereOf = (id?: string) => (id ? usageHere.get(id) : undefined) ?? emptyUsage()
+  // 使っている配信の一覧で、開いている過去の版(いまの版は、いつも開いておく)
+  const [openVersions, setOpenVersions] = useState<Set<number>>(new Set())
+  const usageOf = (id?: string) => (id ? usage.get(id) : undefined) ?? emptyUsage()
   const usageText = (id?: string) => {
     const u = usageOf(id)
     return t(
@@ -288,6 +418,25 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
 
   const selected = options.find((o) => o.id === selectedId) ?? options[0]
   const editing = draft !== null
+  // 編集中の左の一覧(ほかのテンプレートを見比べて、被りに気づけるように)。開け閉めは、その人のブラウザに覚えさせる
+  const [listOpen, setListOpen] = useState(() => {
+    try {
+      return localStorage.getItem(COMPARE_OPEN_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleList = () =>
+    setListOpen((v) => {
+      try {
+        localStorage.setItem(COMPARE_OPEN_KEY, v ? '0' : '1')
+      } catch {
+        // 覚えられなくても、開け閉めはできる
+      }
+      return !v
+    })
+  // キャンバスの隣に並べて見比べているテンプレート
+  const [compareId, setCompareId] = useState<string | null>(null)
 
   const heroLabels: Record<HeroKind, string> = {
     standard: t('標準', 'Standard'),
@@ -310,6 +459,7 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
 
   const choose = (id: string) => {
     setViewKey(null)
+    setOpenVersions(new Set())
     if (editing && !window.confirm(t('編集中の内容を破棄して、別のテンプレートを開きます。よろしいですか?', 'Discard the current edits and open another template?'))) return
     setDraft(null)
     setError(null)
@@ -319,11 +469,13 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
   const startNew = () => {
     setError(null)
     setSelectedId('')
+    setCompareId(null)
     setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, buttons: [] } } : newDraft())
   }
   const startDuplicate = () => {
     if (!selected) return
     setError(null)
+    setCompareId(null)
     setDraft({
       name: t(`${selected.label} のコピー`, `Copy of ${selected.label}`),
       description: selected.description,
@@ -339,10 +491,59 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
   // 自由な並び(free)は、決まった構成がないので、編集するものがない
   const canEdit = (o?: { id: string }) => !!o && o.id !== 'free'
   const startEdit = () => {
+    setSelectedKey(null)
     if (!selected || !canEdit(selected)) return
     setError(null)
+    setCompareId(null)
     setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected), push: selected.push })
   }
+
+  // ---- 元に戻す・やり直す。編集中の内容が変わるたびに、前の内容を残す(続けて打った文字は 0.6 秒の間をまとめて 1 つにする)
+  const hist = useRef<{ past: Draft[]; future: Draft[]; prev: Draft | null; at: number; skip: boolean }>({ past: [], future: [], prev: null, at: 0, skip: false })
+  const [histCount, setHistCount] = useState({ past: 0, future: 0 })
+  useEffect(() => {
+    const h = hist.current
+    if (!draft) {
+      h.past = []
+      h.future = []
+      h.prev = null
+    } else if (h.skip) {
+      h.skip = false
+      h.prev = draft
+    } else if (h.prev && h.prev !== draft) {
+      const now = Date.now()
+      if (now - h.at > 600) h.past = [...h.past.slice(-99), h.prev]
+      h.at = now
+      h.future = []
+      h.prev = draft
+    } else {
+      h.prev = draft
+    }
+    setHistCount({ past: h.past.length, future: h.future.length })
+  }, [draft])
+  const undo = () => {
+    const h = hist.current
+    const back = h.past.pop()
+    if (!back || !draft) return
+    h.future.push(draft)
+    h.skip = true
+    setDraft(back)
+  }
+  const redo = () => {
+    const h = hist.current
+    const fwd = h.future.pop()
+    if (!fwd || !draft) return
+    h.past.push(draft)
+    h.skip = true
+    setDraft(fwd)
+  }
+  // 部品を消したときは、すぐ下に「元に戻す」を出す(押し間違いを、その場で取り消せるように)
+  const [removedAt, setRemovedAt] = useState<number | null>(null)
+  useEffect(() => {
+    if (removedAt === null) return
+    const id = window.setTimeout(() => setRemovedAt(null), 6000)
+    return () => window.clearTimeout(id)
+  }, [removedAt])
 
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d))
   const setParts = (fn: (parts: Part[]) => Part[]) => setDraft((d) => (d ? { ...d, parts: fn(d.parts) } : d))
@@ -358,7 +559,242 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
       ;[next[i], next[j]] = [next[j], next[i]]
       return next
     })
-  const removePart = (key: string) => setParts((list) => list.filter((x) => x.key !== key))
+  const removePart = (key: string) => {
+    setParts((list) => list.filter((x) => x.key !== key))
+    setRemovedAt((n) => (n ?? 0) + 1)
+  }
+  /** 部品を複製して、すぐ後ろに置く(同じ形のセクションを続けて置きたいとき) */
+  const duplicatePart = (key: string) =>
+    setParts((list) => {
+      const i = list.findIndex((x) => x.key === key)
+      if (i < 0) return list
+      const p = list[i]
+      if (p.type === 'section' ? list.filter((x) => x.type === 'section').length >= MAX_SECTIONS : list.filter((x) => x.type === 'buttons').length >= MAX_BUTTON_BLOCKS) return list
+      const copy: Part = p.type === 'section' ? { key: partKey(), type: 'section', sec: { ...p.sec } } : { key: partKey(), type: 'buttons', buttons: p.buttons.map((b) => ({ ...b, id: newButtonId() })) }
+      const next = [...list]
+      next.splice(i + 1, 0, copy)
+      return next
+    })
+
+  // ---- ドラッグ&ドロップ: パレットの部品を構成の好きな位置に入れる・構成の部品を並べ替える。
+  // つかんでいるもの(構成の部品の key か、パレットの「new:種類」)と、入れる位置(その前に入れる番号)を持つ
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  // 選んでいる部品(プレビューの箱を押す・左のカードを押す)。プレビューの箱に枠と道具、左のカードに枠を出し、左はその位置までスクロールする
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const selectPart = (key: string, scroll: boolean) => {
+    setSelectedKey(key)
+    if (scroll) window.setTimeout(() => document.getElementById(`tplpart-${key}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0)
+  }
+  const [dropAt, setDropAt] = useState<number | null>(null)
+  const endDrag = () => {
+    setDragKey(null)
+    setDropAt(null)
+  }
+  /** パレットの部品から、構成の部品を作る */
+  const newPart = (kind: SectionLayout | 'buttons'): Part =>
+    kind === 'buttons' ? { key: partKey(), type: 'buttons', buttons: [{ id: newButtonId(), style: 'outline' }] } : { key: partKey(), type: 'section', sec: layoutSection(kind) }
+  /** 上限(セクション 6・ボタンの部品 8)まで来ていれば、足せない */
+  const canAdd = (kind: SectionLayout | 'buttons') => (kind === 'buttons' ? blockCount < MAX_BUTTON_BLOCKS : sectionCount < MAX_SECTIONS)
+  const addPart = (kind: SectionLayout | 'buttons', at?: number) => {
+    if (!canAdd(kind)) return
+    setParts((list) => {
+      const next = [...list]
+      next.splice(at ?? next.length, 0, newPart(kind))
+      return next
+    })
+  }
+  /** 落とした: パレットの部品なら足し、構成の部品なら動かす */
+  const drop = () => {
+    const key = dragKey
+    const at = dropAt
+    endDrag()
+    if (!key || at === null) return
+    if (key.startsWith('new:')) {
+      addPart(key.slice(4) as SectionLayout | 'buttons', at)
+      return
+    }
+    setParts((list) => {
+      const from = list.findIndex((x) => x.key === key)
+      if (from < 0) return list
+      const next = [...list]
+      const [moved] = next.splice(from, 1)
+      next.splice(from < at ? at - 1 : at, 0, moved)
+      return next
+    })
+  }
+  // 編集中の形と、ほかのテンプレートとの比べ(同じ構成を先に、あとは似ている順)
+  const mine = draft ? fromParts(draft) : null
+  const others = mine
+    ? options
+        .filter((o) => o.id !== draft?.id && o.id !== 'free' && !o.hidden)
+        .map((o) => ({ o, same: shapeOf(o) === shapeOf(mine), score: similarity(mine, o) }))
+        .sort((a, b) => Number(b.same) - Number(a.same) || b.score - a.score)
+    : []
+  const sameAs = others.find((x) => x.same)
+  const compared = compareId ? options.find((o) => o.id === compareId) : undefined
+  const canvasWidth = compared ? COMPARE_WIDTH : CANVAS_WIDTH
+
+  /** 左の列: ほかのテンプレート(押すと、キャンバスの隣に並べて見比べる)。閉じると細い帯 */
+  const compareCol = () =>
+    listOpen ? (
+      <aside className={s.compareCol} aria-label={t('ほかのテンプレート', 'Other templates')}>
+        <div className={s.compareHead}>
+          <span className={s.paletteHead}>{t('ほかのテンプレート(似ている順。押すと見比べる)', 'Other templates (most similar first; click to compare)')}</span>
+          <Tooltip relationship="label" content={t('一覧を閉じる', 'Close the list')}>
+            <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleList} />
+          </Tooltip>
+        </div>
+        {others.map(({ o, same, score }) => (
+          <div
+            key={o.id}
+            role="button"
+            tabIndex={0}
+            aria-pressed={compareId === o.id}
+            className={mergeClasses(s.compareItem, compareId === o.id && s.itemSelected)}
+            onClick={() => setCompareId((v) => (v === o.id ? null : o.id))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setCompareId((v) => (v === o.id ? null : o.id))
+              }
+            }}
+          >
+            {o.push ? <PushThumb spec={o.push} width={64} /> : <TemplateThumb layout={o} maxHeight={110} />}
+            <span className={s.itemText}>
+              <span className={s.itemName}>{o.label}</span>
+              {same ? (
+                <Badge size="small" appearance="tint" color="warning">
+                  {t('同じ構成', 'Same layout')}
+                </Badge>
+              ) : (
+                score >= 0.6 && (
+                  <Badge size="small" appearance="outline" color="informative">
+                    {t('似ている', 'Similar')}
+                  </Badge>
+                )
+              )}
+            </span>
+          </div>
+        ))}
+      </aside>
+    ) : (
+      <aside className={s.rail}>
+        <Tooltip relationship="label" content={t('ほかのテンプレートを開いて見比べる', 'Open other templates to compare')}>
+          <Button appearance="subtle" className={s.railButton} onClick={toggleList}>
+            <ChevronRightRegular />
+            <span className={s.railLabel}>{t('テンプレート', 'Templates')}</span>
+          </Button>
+        </Tooltip>
+      </aside>
+    )
+
+  /** パレットの部品の、まとまり・説明(マウスを重ねると出す) */
+  const PALETTE_GROUPS: { label: string; items: (SectionLayout | 'buttons')[] }[] = [
+    { label: t('商品を並べる', 'List products'), items: ['grid', 'grid3', 'feature'] },
+    { label: t('写真で見せる', 'Show photos'), items: ['photos', 'photos3', 'wide', 'mosaic', 'mosaicR'] },
+    { label: t('読ませる', 'Tell a story'), items: ['story'] },
+    { label: t('ボタン', 'Buttons'), items: ['buttons'] },
+  ]
+  const partHelp = (k: SectionLayout | 'buttons'): string =>
+    ({
+      grid: t('名前・価格つきで、2 列に並べる。いちばん使う形', 'Two columns with names and prices. The most common layout'),
+      grid3: t('名前・価格つきで、3 列に並べる。点数を多く見せたいとき', 'Three columns with names and prices. To show more items'),
+      feature: t('写真と説明を横に並べて、1 点ずつ紹介する', 'Photo and text side by side, one item at a time'),
+      photos: t('写真だけを 2 列に。雰囲気で見せたいとき', 'Photos only, two columns. For mood'),
+      photos3: t('写真だけを 3 列に。たくさんの色・柄を見せたいとき', 'Photos only, three columns. For many colors or patterns'),
+      wide: t('全幅で 1 点ずつ大きく。主役の商品に', 'Full width, one item each. For hero products'),
+      mosaic: t('大 1 点 + 小 2 点。新作を 1 点大きく見せたいとき(左が大)', 'One large + two small (large on the left). To feature one new item'),
+      mosaicR: t('大 1 点 + 小 2 点(右が大)。モザイクを続けるときに左右を変える', 'One large + two small (large on the right). Alternate with the left one'),
+      story: t('写真と商品の説明を、左右交互に。読ませる特集に', 'Photo and description, alternating sides. For editorial features'),
+      buttons: t('ボタンを置く(1〜2 個)。セクションの間の好きな位置に', 'Place buttons (1–2) anywhere between sections'),
+    })[k]
+  /** 左の列: 上限の目盛りと、絵つきの部品のパレット(構成・キャンバスへドラッグ。押すと、いちばん下に足す) */
+  const paletteCol = () => (
+    <aside className={s.paletteCol} aria-label={t('部品', 'Parts')}>
+      <div className={s.meter}>
+        <span className={mergeClasses(s.meterItem, sectionCount >= MAX_SECTIONS && s.meterFull)}>{t(`セクション ${sectionCount}/${MAX_SECTIONS}`, `Sections ${sectionCount}/${MAX_SECTIONS}`)}</span>
+        <span className={mergeClasses(s.meterItem, blockCount >= MAX_BUTTON_BLOCKS && s.meterFull)}>{t(`ボタン ${blockCount}/${MAX_BUTTON_BLOCKS}`, `Buttons ${blockCount}/${MAX_BUTTON_BLOCKS}`)}</span>
+        <span className={s.meterItem}>{t(`商品の枠 ${totalSlots} 点`, `${totalSlots} product slots`)}</span>
+      </div>
+      <span className={s.paletteHead}>{t('部品(キャンバスや構成へドラッグ。押すと、いちばん下に足す)', 'Parts (drag onto the canvas or the layout; click to add at the bottom)')}</span>
+      {PALETTE_GROUPS.map((g) => (
+        <div key={g.label} className={s.paletteGroup}>
+          <span className={s.paletteGroupHead}>{g.label}</span>
+          {g.items.map((k) => (
+            <Tooltip key={k} relationship="description" positioning="after" content={canAdd(k) ? partHelp(k) : t('上限まで使っています', 'Limit reached')}>
+              <div
+                role="button"
+                tabIndex={0}
+                draggable={canAdd(k)}
+                aria-disabled={!canAdd(k)}
+                className={mergeClasses(s.paletteItem, !canAdd(k) && s.chipOff)}
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'copy'
+                  e.dataTransfer.setData('text/plain', `new:${k}`)
+                  setDragKey(`new:${k}`)
+                }}
+                onDragEnd={endDrag}
+                onClick={() => addPart(k)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    addPart(k)
+                  }
+                }}
+              >
+                <span className={s.paletteThumb}>
+                  {k === 'buttons' ? <PartThumb buttons={[{ id: 'a' }, { id: 'b', style: 'outline' }]} width={56} /> : <PartThumb sec={layoutSection(k)} width={56} />}
+                </span>
+                <span className={s.paletteName}>{k === 'buttons' ? t('ボタン', 'Buttons') : layoutLabel(k)}</span>
+              </div>
+            </Tooltip>
+          ))}
+        </div>
+      ))}
+    </aside>
+  )
+
+  /** 部品の上をドラッグしているとき: 上半分ならその前、下半分ならその後に入れる */
+  const overPart = (e: DragEvent<HTMLDivElement>, i: number) => {
+    if (!dragKey) return
+    e.preventDefault()
+    const r = e.currentTarget.getBoundingClientRect()
+    setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1)
+  }
+
+  useEffect(() => {
+    if (!draft) return
+    const onKey = (e: KeyboardEvent) => {
+      // 入力欄の中では、ブラウザの元に戻すなどを、そのまま使う
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      const mod = e.ctrlKey || e.metaKey
+      const i = draft.parts.findIndex((p) => p.key === selectedKey)
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      } else if (mod && e.key.toLowerCase() === 'y') {
+        e.preventDefault()
+        redo()
+      } else if (mod && e.key.toLowerCase() === 'd' && i >= 0) {
+        e.preventDefault()
+        duplicatePart(draft.parts[i].key)
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && i >= 0) {
+        const p = draft.parts[i]
+        if (p.type === 'section' && draft.parts.filter((x) => x.type === 'section').length <= 1) return
+        e.preventDefault()
+        removePart(p.key)
+      } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && i >= 0) {
+        e.preventDefault()
+        const d = e.key === 'ArrowUp' ? -1 : 1
+        if (e.altKey) movePart(i, d)
+        else if (draft.parts[i + d]) selectPart(draft.parts[i + d].key, true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   const sectionCount = draft?.parts.filter((p) => p.type === 'section').length ?? 0
   const blockCount = draft?.parts.filter((p) => p.type === 'buttons').length ?? 0
@@ -445,7 +881,7 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
   /** 版の履歴(新しい順)。版ごとに、保存した日・人・メモ・使っている配信の数。過去の版は「見る」「この版に戻す」 */
   const versionHistory = (id: string) => {
     const cur = currentVersion(id)
-    const u = usageOf(id)
+    const u = hereOf(id)
     const rows = [
       ...pastVersions(id).filter((v) => (v.version ?? 0) !== cur),
       // 標準の版 0(コードの定義)は、版の表にないので足す
@@ -488,28 +924,56 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
       </div>
     )
   }
-  /** 使っている配信(版ごと)。押すと配信カードを開く */
+  /** 使っている配信(版ごと)。ヘッダーの国の分だけ。いまの版は開き、過去の版はたたむ(押すと開く)。押すと配信カードを開く */
   const usedBy = (id: string) => {
-    const u = usageOf(id)
-    if (u.total === 0) return null
+    const u = hereOf(id)
+    const all = usageOf(id).total
+    if (u.total === 0 && all === 0) return null
+    const cur = currentVersion(id)
     const versions = [...u.byVersion.keys()].sort((a, b) => b - a)
     return (
       <div className={s.history}>
-        <span className={s.historyHead}>{t(`使っている配信(${u.total} 本)`, `Deliveries using it (${u.total})`)}</span>
-        {versions.map((v) => (
-          <div key={v} className={s.usedGroup}>
-            <span className={s.caption}>{v === currentVersion(id) ? t(`版 ${v}(いまの版)`, `v${v} (latest)`) : t(`版 ${v}`, `v${v}`)}</span>
-            {[...(u.byVersion.get(v) ?? [])]
-              .sort((a, b) => (b.scheduled_at ?? '').localeCompare(a.scheduled_at ?? ''))
-              .map((c) => (
-                <button key={c.id} type="button" className={s.usedRow} onClick={() => onOpenCard(c.id)}>
-                  <span className={s.usedName}>{c.name}</span>
-                  <span className={s.caption}>{dateText(c.scheduled_at)}</span>
-                  <span className={s.caption}>{statusLabel(c.status)}</span>
-                </button>
-              ))}
-          </div>
-        ))}
+        <span className={s.historyHead}>
+          {country ? t(`使っている配信(${country}: ${u.total} 本)`, `Deliveries using it (${country}: ${u.total})`) : t(`使っている配信(${u.total} 本)`, `Deliveries using it (${u.total})`)}
+        </span>
+        {/* ほかの国でも使っていれば、数だけ知らせる(削除・使わないの判断は、すべての国の分で行う) */}
+        {country && all > u.total && <span className={s.caption}>{t(`ほかの国でも ${all - u.total} 本で使っています(ヘッダーの国を変えると見られます)`, `Also used by ${all - u.total} in other countries (switch the country in the header to see them)`)}</span>}
+        {versions.map((v) => {
+          const list = [...(u.byVersion.get(v) ?? [])].sort((a, b) => (b.scheduled_at ?? '').localeCompare(a.scheduled_at ?? ''))
+          const opened = v === cur || openVersions.has(v)
+          return (
+            <div key={v} className={s.usedGroup}>
+              {v === cur ? (
+                <span className={s.caption}>{t(`版 ${v}(いまの版)・${list.length} 本`, `v${v} (latest) · ${list.length}`)}</span>
+              ) : (
+                <Button
+                  size="small"
+                  appearance="transparent"
+                  className={s.usedToggle}
+                  icon={opened ? <ChevronDownRegular /> : <ChevronRightRegular />}
+                  onClick={() =>
+                    setOpenVersions((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(v)) next.delete(v)
+                      else next.add(v)
+                      return next
+                    })
+                  }
+                >
+                  {t(`版 ${v}・${list.length} 本`, `v${v} · ${list.length}`)}
+                </Button>
+              )}
+              {opened &&
+                list.map((c) => (
+                  <button key={c.id} type="button" className={s.usedRow} onClick={() => onOpenCard(c.id)}>
+                    <span className={s.usedName}>{c.name}</span>
+                    <span className={s.caption}>{dateText(c.scheduled_at)}</span>
+                    <span className={s.caption}>{statusLabel(c.status)}</span>
+                  </button>
+                ))}
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -535,7 +999,7 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
               {t('使わない', 'Inactive')}
             </Badge>
           )}
-          <span className={s.caption}>{usageOf(o.id).total > 0 ? t(`${usageOf(o.id).total} 本で使用`, `Used by ${usageOf(o.id).total}`) : t('未使用', 'Not used')}</span>
+          <span className={s.caption}>{hereOf(o.id).total > 0 ? t(`${hereOf(o.id).total} 本で使用`, `Used by ${hereOf(o.id).total}`) : t('未使用', 'Not used')}</span>
         </span>
       </div>
     </div>
@@ -554,6 +1018,7 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
   // ---- 部品のカード
   const partActions = (i: number, p: Part) => (
     <>
+      <Button size="small" appearance="subtle" icon={<CopyRegular />} onClick={() => duplicatePart(p.key)} aria-label={t('複製', 'Duplicate')} />
       <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={() => movePart(i, -1)} aria-label={t('上へ', 'Move up')} />
       <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === (draft?.parts.length ?? 0) - 1} onClick={() => movePart(i, 1)} aria-label={t('下へ', 'Move down')} />
       <Button
@@ -572,6 +1037,20 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
     return (
       <div key={p.key} className={s.card}>
         <div className={s.cardHead}>
+          <span
+            className={s.handle}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', p.key)
+              setDragKey(p.key)
+            }}
+            onDragEnd={endDrag}
+            title={t('つかんで動かす', 'Drag to move')}
+            aria-hidden
+          >
+            <ReOrderDotsVerticalRegular />
+          </span>
           <Badge size="small" appearance="tint" color="brand">{t(`セクション ${no}`, `Section ${no}`)}</Badge>
           <span className={s.caption}>{`${sectionKindLabel(sec)} · ${t(`${sec.slots} 点`, `${sec.slots} items`)}`}</span>
           <span className={s.grow} />
@@ -606,6 +1085,20 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
   const buttonsCard = (p: Extract<Part, { type: 'buttons' }>, i: number) => (
     <div key={p.key} className={mergeClasses(s.card, s.cardButtons)}>
       <div className={s.cardHead}>
+        <span
+          className={s.handle}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move'
+            e.dataTransfer.setData('text/plain', p.key)
+            setDragKey(p.key)
+          }}
+          onDragEnd={endDrag}
+          title={t('つかんで動かす', 'Drag to move')}
+          aria-hidden
+        >
+          <ReOrderDotsVerticalRegular />
+        </span>
         <Badge size="small" appearance="tint" color="informative">{t('ボタン', 'Buttons')}</Badge>
         <span className={s.caption}>{p.buttons.map((b, k) => t(`${b.label?.trim() || defaultButtonLabel(k)}(${styleLabel(b)})`, `${b.label?.trim() || defaultButtonLabel(k)} (${styleLabel(b)})`)).join(t('、', ', '))}</span>
         <span className={s.grow} />
@@ -665,11 +1158,33 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
       <DialogSurface className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.head}>
-            <DialogTitle className={s.grow}>{t('テンプレート', 'Templates')}</DialogTitle>
+            <DialogTitle className={s.grow}>
+              {draft ? (
+                <span className={s.crumbs}>
+                  {/* 見出しから一覧に戻れるように(編集した内容があれば、捨ててよいか確かめる) */}
+                  <Button
+                    appearance="transparent"
+                    className={s.crumbLink}
+                    onClick={() => {
+                      if (histCount.past > 0 && !window.confirm(t('編集中の内容を破棄します。よろしいですか?', 'Discard the current edits?'))) return
+                      setDraft(null)
+                      setError(null)
+                    }}
+                  >
+                    {t('テンプレート', 'Templates')}
+                  </Button>
+                  <ChevronRightRegular />
+                  <span className={s.crumbName}>{draft.name || t('新しいテンプレート', 'New template')}</span>
+                  <span className={s.caption}>{draft.id ? t('を編集中', '(editing)') : t('(新規)', '(new)')}</span>
+                </span>
+              ) : (
+                t('テンプレート', 'Templates')
+              )}
+            </DialogTitle>
             <Button appearance="subtle" icon={<DismissRegular />} onClick={close} aria-label={t('閉じる', 'Close')} />
           </div>
-          <DialogContent className={s.split} style={{ padding: 0 }}>
-            <div className={s.list}>
+          <DialogContent className={mergeClasses(s.split, editing && s.splitEditing)} style={{ padding: 0 }}>
+            <div className={mergeClasses(s.list, editing && s.listHidden)}>
               <TabList
                 size="small"
                 className={s.fullRow}
@@ -724,8 +1239,10 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
                 </MessageBar>
               )}
               {draft ? (
-                <div className={s.editorGrid}>
-                  <div className={s.fields}>
+                <div className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? 200 : 32}px minmax(320px, 1fr) ${compared ? canvasWidth * 2 + 36 : canvasWidth + 24}px 200px` }}>
+                  {compareCol()}
+                  {paletteCol()}
+                  <div className={mergeClasses(s.fields, s.areaFields)}>
                     <Field label={t('テンプレート名', 'Template name')} required>
                       <Input size="small" value={draft.name} onChange={(_, d) => patch({ name: d.value })} />
                     </Field>
@@ -790,7 +1307,7 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
                       </div>
                     )}
 
-                    <div className={s.card}>
+                    <div id="tplpart-hero" className={mergeClasses(s.card, selectedKey === 'hero' && s.partSelected)} onClickCapture={() => setSelectedKey('hero')}>
                       <div className={s.cardHead}>
                         <span className={s.cardTitle}>{draft.push ? t('メッセージ: ヒーロー(メイン画像)', 'Message: hero (main image)') : t('ヒーロー(メイン画像)', 'Hero (main image)')}</span>
                       </div>
@@ -826,40 +1343,180 @@ export function TemplateManager({ cards, onChanged, onOpenCard }: { cards: Deliv
 
                     <Field
                       label={t(`構成(上から順に。商品の枠は合計 ${totalSlots} 点)`, `Layout (top to bottom; ${totalSlots} product slots in total)`)}
-                      hint={t('ボタンは、セクションとは別の部品です。上下の矢印で、好きな位置に置けます。リンク先は既定の種類で、実際の URL は配信ごとに決めます。', 'Buttons are separate parts; move them anywhere with the arrows. Links are default kinds; the actual URLs are set per delivery.')}
+                      hint={t('部品は、⠿ をつかんで上下に動かせます(矢印でも動かせます)。ボタンは、セクションとは別の部品です。リンク先は既定の種類で、実際の URL は配信ごとに決めます。', 'Drag ⠿ to reorder parts (or use the arrows). Buttons are separate parts. Links are default kinds; the actual URLs are set per delivery.')}
                     >
                       <div className={s.partList}>
                         {(() => {
                           let no = 0
-                          return draft.parts.map((p, i) => (p.type === 'section' ? sectionCard(p, i, ++no) : buttonsCard(p, i)))
+                          return draft.parts.map((p, i) => (
+                            <div
+                              key={p.key}
+                              id={`tplpart-${p.key}`}
+                              className={mergeClasses(s.dropWrap, dragKey === p.key && s.dragging, selectedKey === p.key && s.partSelected)}
+                              onClickCapture={() => selectPart(p.key, false)}
+                              onDragOver={(e) => overPart(e, i)}
+                              onDrop={(e) => { e.preventDefault(); drop() }}
+                            >
+                              {dropAt === i && <div className={s.dropLine} />}
+                              {p.type === 'section' ? sectionCard(p, i, ++no) : buttonsCard(p, i)}
+                              {i === draft.parts.length - 1 && dropAt === draft.parts.length && <div className={s.dropLine} />}
+                            </div>
+                          ))
                         })()}
-                        <div className={s.row}>
-                          <Button
-                            size="small"
-                            appearance="outline"
-                            icon={<AddRegular />}
-                            disabled={sectionCount >= MAX_SECTIONS}
-                            onClick={() => setParts((list) => [...list, { key: partKey(), type: 'section', sec: { kind: 'grid', slots: 2 } }])}
-                          >
-                            {t('セクションを追加', 'Add a section')}
-                          </Button>
-                          <Button
-                            size="small"
-                            appearance="outline"
-                            icon={<AddRegular />}
-                            disabled={blockCount >= MAX_BUTTON_BLOCKS}
-                            onClick={() => setParts((list) => [...list, { key: partKey(), type: 'buttons', buttons: [{ id: newButtonId(), style: 'outline' }] }])}
-                          >
-                            {t('ボタンを追加', 'Add buttons')}
-                          </Button>
+                        {/* いちばん下(部品がないときも)に入れる所 */}
+                        <div
+                          className={mergeClasses(s.dropEnd, !!dragKey && s.dropEndOn)}
+                          onDragOver={(e) => {
+                            if (!dragKey) return
+                            e.preventDefault()
+                            setDropAt(draft.parts.length)
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            drop()
+                          }}
+                        >
+                          {dragKey ? t('ここに入れる(いちばん下)', 'Drop here (bottom)') : draft.parts.length === 0 ? t('上の部品を、ここへドラッグしてください', 'Drag a part here') : ''}
                         </div>
                       </div>
                     </Field>
                   </div>
-                  <div className={s.preview}>
-                    <Text size={200} weight="semibold">{t('構成のプレビュー', 'Layout preview')}</Text>
-                    <div className={s.previewScroll}>
-                      <TemplateThumb layout={fromParts(draft)} width={PREVIEW_WIDTH} />
+                  <div className={mergeClasses(s.preview, s.areaCanvas)}>
+                    <div className={s.canvasHead}>
+                      <Text size={200} weight="semibold">{t('キャンバス(箱を押して選ぶ・つかんで動かす)', 'Canvas (click to select, drag to move)')}</Text>
+                      <span className={s.grow} />
+                      <Tooltip relationship="label" content={t('元に戻す(Ctrl+Z)', 'Undo (Ctrl+Z)')}>
+                        <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0} onClick={undo} />
+                      </Tooltip>
+                      <Tooltip relationship="label" content={t('やり直す(Ctrl+Shift+Z)', 'Redo (Ctrl+Shift+Z)')}>
+                        <Button size="small" appearance="subtle" icon={<ArrowRedoRegular />} disabled={histCount.future === 0} onClick={redo} />
+                      </Tooltip>
+                    </div>
+                    {removedAt !== null && (
+                      <div className={s.toast}>
+                        <span>{t('部品を削除しました', 'Part removed')}</span>
+                        <Button
+                          size="small"
+                          appearance="transparent"
+                          onClick={() => {
+                            undo()
+                            setRemovedAt(null)
+                          }}
+                        >
+                          {t('元に戻す', 'Undo')}
+                        </Button>
+                      </div>
+                    )}
+                    <span className={s.caption}>{t('↑↓ で選ぶ部品を移る・Alt+↑↓ で動かす・Delete で消す・Ctrl+D で複製', '↑↓ select · Alt+↑↓ move · Delete remove · Ctrl+D duplicate')}</span>
+                    {/* 構成がほかのテンプレートと同じになったら知らせる(保存は止めない。ヒーローや見た目だけ違う使い分けもあるため) */}
+                    {sameAs && (
+                      <div className={s.sameNote}>
+                        <span>{t(`「${sameAs.o.label}」と同じ構成です`, `Same layout as "${sameAs.o.label}"`)}</span>
+                        {compareId !== sameAs.o.id && (
+                          <Button size="small" appearance="transparent" onClick={() => setCompareId(sameAs.o.id)}>
+                            {t('見比べる', 'Compare')}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <div className={mergeClasses(s.previewScroll, s.canvasRow)}>
+                      {/* プレビューの箱を、そのまま操作できる(押して選ぶ・つかんで並べ替える・パレットの部品を箱の間に落とす) */}
+                      <TemplateThumb
+                        layout={fromParts(draft)}
+                        width={canvasWidth}
+                        edit={{
+                          selected: draft.parts.findIndex((p) => p.key === selectedKey) >= 0 ? draft.parts.findIndex((p) => p.key === selectedKey) : null,
+                          dragging: dragKey && !dragKey.startsWith('new:') ? draft.parts.findIndex((p) => p.key === dragKey) : null,
+                          dropAt,
+                          active: !!dragKey,
+                          // 落とす前の姿: パレットの部品なら、その形。構成の部品なら、その部品
+                          ghost: (() => {
+                            if (!dragKey) return undefined
+                            if (dragKey.startsWith('new:')) {
+                              const k = dragKey.slice(4) as SectionLayout | 'buttons'
+                              return k === 'buttons' ? { buttons: [{ id: 'g', style: 'outline' as const }] } : { sec: layoutSection(k) }
+                            }
+                            const p = draft.parts.find((x) => x.key === dragKey)
+                            return p ? (p.type === 'section' ? { sec: p.sec } : { buttons: p.buttons }) : undefined
+                          })(),
+                          heroSelected: selectedKey === 'hero',
+                          onSelectHero: () => selectPart('hero', true),
+                          onSelect: (i) => draft.parts[i] && selectPart(draft.parts[i].key, true),
+                          partProps: (i) => ({
+                            draggable: true,
+                            onDragStart: (e) => {
+                              e.dataTransfer.effectAllowed = 'move'
+                              e.dataTransfer.setData('text/plain', draft.parts[i].key)
+                              setDragKey(draft.parts[i].key)
+                            },
+                            onDragEnd: endDrag,
+                            onDragOver: (e) => overPart(e, i),
+                            onDrop: (e) => {
+                              e.preventDefault()
+                              drop()
+                            },
+                          }),
+                          endProps: {
+                            onDragOver: (e) => {
+                              if (!dragKey) return
+                              e.preventDefault()
+                              setDropAt(draft.parts.length)
+                            },
+                            onDrop: (e) => {
+                              e.preventDefault()
+                              drop()
+                            },
+                          },
+                          tools: (i) => {
+                            const p = draft.parts[i]
+                            const sec = p.type === 'section' ? p.sec : null
+                            const step = sec ? slotStep(sec.kind) : 1
+                            return (
+                              <>
+                                {/* よく使う設定は、キャンバスの上で(右の設定を見なくても済むように) */}
+                                {sec && (sec.kind === 'grid' || sec.kind === 'photos') && (
+                                  <Tooltip relationship="label" content={t('2 列 / 3 列', '2 / 3 columns')}>
+                                    <Button size="small" appearance="subtle" onClick={(e) => { e.stopPropagation(); patchSection(p.key, { columns: gridColumns(sec) === 3 ? undefined : 3 }) }}>
+                                      {gridColumns(sec) === 3 ? t('3列', '3 col') : t('2列', '2 col')}
+                                    </Button>
+                                  </Tooltip>
+                                )}
+                                {sec && (
+                                  <>
+                                    <Button size="small" appearance="subtle" icon={<SubtractRegular />} disabled={sec.slots <= step} onClick={(e) => { e.stopPropagation(); patchSection(p.key, { slots: fitSlots(sec.kind, sec.slots - step) }) }} aria-label={t('枠を減らす', 'Fewer slots')} />
+                                    <span className={s.toolCount}>{sec.slots}</span>
+                                    <Button size="small" appearance="subtle" icon={<AddRegular />} disabled={sec.slots + step > MAX_SLOTS} onClick={(e) => { e.stopPropagation(); patchSection(p.key, { slots: fitSlots(sec.kind, sec.slots + step) }) }} aria-label={t('枠を増やす', 'More slots')} />
+                                  </>
+                                )}
+                                <Button size="small" appearance="subtle" icon={<CopyRegular />} onClick={(e) => { e.stopPropagation(); duplicatePart(p.key) }} aria-label={t('複製', 'Duplicate')} />
+                                <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={(e) => { e.stopPropagation(); movePart(i, -1) }} aria-label={t('上へ', 'Move up')} />
+                                <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === draft.parts.length - 1} onClick={(e) => { e.stopPropagation(); movePart(i, 1) }} aria-label={t('下へ', 'Move down')} />
+                                <Button
+                                  size="small"
+                                  appearance="subtle"
+                                  icon={<DeleteRegular />}
+                                  disabled={p.type === 'section' && sectionCount <= 1}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    removePart(p.key)
+                                  }}
+                                  aria-label={p.type === 'section' ? t('このセクションを削除', 'Remove this section') : t('このボタンの部品を削除', 'Remove these buttons')}
+                                />
+                              </>
+                            )
+                          },
+                        }}
+                      />
+                      {compared && (
+                        <div className={s.compareBox}>
+                          <div className={s.compareBoxHead}>
+                            <span className={s.compareBoxName}>{compared.label}</span>
+                            <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => setCompareId(null)} aria-label={t('見比べるのをやめる', 'Stop comparing')} />
+                          </div>
+                          {compared.push && <PushThumb spec={compared.push} width={160} />}
+                          <TemplateThumb layout={compared} width={COMPARE_WIDTH} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
