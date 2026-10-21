@@ -32,6 +32,9 @@ from .data_api import db, fail, ok, require_db
 router = APIRouter(prefix="/api/production", dependencies=[Depends(require_db)])
 
 APPROVED = ("approved", "confirmed")
+# 制作の依頼に、承認を要るとするか。いま(いろいろな場所で画面を見せている段階)は、承認の前でも依頼できる(利用者の判断 2026-10-21)。
+# 実践で使い始めるときは True に戻すかもしれない。画面の src/productionGate.ts の REQUIRE_APPROVAL と、必ずそろえる
+REQUIRE_APPROVAL = False
 
 
 def _now() -> datetime:
@@ -101,7 +104,7 @@ async def _approved_card(conn: AsyncConnection, card_id: str) -> tuple[dict[str,
     card = await _one(conn, "delivery_cards", card_id, lock=True)
     if card is None:
         return None, "配信カードが見つかりません"
-    if card.get("status") not in APPROVED:
+    if REQUIRE_APPROVAL and card.get("status") not in APPROVED:
         return None, "承認されていない配信です(先に承認を受けてください)"
     return card, None
 

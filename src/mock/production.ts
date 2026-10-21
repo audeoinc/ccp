@@ -6,6 +6,8 @@ import type { RequestInput } from '../data/production'
 import type { ProductionRequest } from '../models/productionRequests'
 import { tables } from './db'
 import { guid, type Row } from './seed'
+import { canGoProduction } from '../productionGate'
+import type { DeliveryCard } from '../models/deliveryCards'
 
 type Result<T> = { success: boolean; data?: T; error?: { message: string } }
 const ng = <T,>(message: string): Result<T> => ({ success: false, error: { message } })
@@ -27,7 +29,7 @@ function create(input: RequestInput, status: 'requested' | 'sent'): Result<Produ
   if (!input.snapshot) return ng('写し(snapshot)が要ります')
   const card = tables.DeliveryCardsService.find((c) => c.id === input.delivery_card_id)
   if (!card) return ng('配信カードが見つかりません')
-  // 本番は承認済みの配信だけを受け付けるが、デモでは承認の前でも依頼できる(src/demo.ts の canGoProduction)
+  if (!canGoProduction(card as Pick<DeliveryCard, 'status'>)) return ng('承認されていない配信です(先に承認を受けてください)')
   staleProduction(String(card.id))
   const version = Math.max(0, ...tables.ProductionRequestsService.filter((r) => r.delivery_card_id === card.id).map((r) => Number(r.version ?? 0))) + 1
   const at = now()

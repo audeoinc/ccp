@@ -5,7 +5,7 @@ import { tokens } from '@fluentui/react-components'
 import { ProductionRequestsService } from './data/productionRequests'
 import type { ProductionRequest } from './models/productionRequests'
 import type { DeliveryCard } from './models/deliveryCards'
-import { canGoProduction } from './demo'
+import { canGoProduction } from './productionGate'
 import { tr } from './i18n'
 
 /** 制作の面での状態(依頼の版がない承認済みの配信は「依頼する前」、承認前は「承認待ち」) */

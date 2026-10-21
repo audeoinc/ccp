@@ -5,7 +5,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { ProductionRequest } from './models/productionRequests'
 import { productionView, type ProductionView } from './useProductionRequests'
 import { statusLabel } from './status'
-import { canGoProduction } from './demo'
+import { canGoProduction } from './productionGate'
 import { FACE_COLOR, FACE_TINT, type Face } from './faces'
 import { tr, useT } from './i18n'
 

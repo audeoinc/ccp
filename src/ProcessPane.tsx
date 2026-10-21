@@ -18,7 +18,7 @@ import { isThreadRoot, stageOf } from './notesStage'
 import { ProductionRequestsService } from './data/productionRequests'
 import type { ProductionRequest } from './models/productionRequests'
 import { productionColor, productionLabel, productionView } from './useProductionRequests'
-import { canGoProduction } from './demo'
+import { canGoProduction } from './productionGate'
 import { statusColor, statusLabel } from './status'
 import { useT } from './i18n'
 

@@ -41,6 +41,4 @@ const mockServices = (): Plugin => ({
 export default defineConfig({
   plugins: [mockServices(), react()],
   server: { port: 5190, strictPort: true },
-  // デモ用のビルドの印(src/demo.ts)。承認の前でも制作に進めるなど、デモだけの扱いに使う
-  define: { 'import.meta.env.VITE_DEMO_BUILD': JSON.stringify('true') },
 })
