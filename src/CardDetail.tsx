@@ -1056,6 +1056,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         sectionTitles,
         sectionCopies,
         language,
+        aTexts: textsOf('A'),
+        push: templateChannel === 'push',
       })
       if (res.hero) {
         setHeroId(res.hero.heroId)
@@ -1065,6 +1067,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         setItems(res.sections.flat().map((r) => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })))
         setSelectedKey(null)
       }
+      // 文言(X57): 作ったものだけを、いまの案の文言に重ねる
+      if (res.texts) showText({ ...curText(), ...res.texts }, ownsText(ab))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

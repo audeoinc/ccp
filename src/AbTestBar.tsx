@@ -131,9 +131,9 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
             icon={aiBusy ? <Spinner size="extra-tiny" /> : <AiIcon size={16} />}
             disabled={aiBusy}
             onClick={onAiDraft}
-            title={t(`A 案と違う切り口の${targetLabel(ab.target)}を、AI が選びます(仮説があれば、それを確かめられる案に)。いまの ${active} 案の${targetLabel(ab.target)}は置き換わります(保存で確定)`, `AI picks a ${targetLabel(ab.target).toLowerCase()} with a different angle from A (testing the hypothesis if any). Replaces variant ${active}'s current one (on save).`)}
+            title={t(`A 案と違う切り口の${targetLabel(ab.target)}を、AI が作ります(仮説があれば、それを確かめられる案に)。いまの ${active} 案の${targetLabel(ab.target)}は置き換わります(保存で確定)`, `AI drafts a ${targetLabel(ab.target).toLowerCase()} with a different angle from A (testing the hypothesis if any). Replaces variant ${active}'s current one (on save).`)}
           >
-            {aiBusy ? t('AI が選んでいます', 'AI is choosing') : t(`${active} 案を AI で作る`, `Draft variant ${active} with AI`)}
+            {aiBusy ? t('AI が作っています', 'AI is drafting') : t(`${active} 案を AI で作る`, `Draft variant ${active} with AI`)}
           </Button>
         )}
         <Button type="button" size="small" appearance="secondary" icon={<SplitVerticalRegular />} onClick={onCompare} title={t('案のプレビューを横に並べて比べます', 'Show the variant previews side by side')}>
