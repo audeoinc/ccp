@@ -1,4 +1,4 @@
-import { makeStyles, tokens } from '@fluentui/react-components'
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Column, Row } from './api'
 import { CopyButton } from './CopyButton'
 import { cellText, toMarkdown, toTsv } from './format'
@@ -7,13 +7,17 @@ const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 },
   bar: { display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, marginRight: 'auto' },
+  // 高さは、行の数に合わせて始め、右下をドラッグして変えられる
   scroll: {
     overflow: 'auto',
-    maxHeight: '420px',
+    resize: 'vertical',
+    minHeight: '60px',
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusMedium,
     backgroundColor: tokens.colorNeutralBackground1,
   },
+  // 詳細のタブの中(外側がスクロールする)では、自分で高さを持たない
+  scrollCompact: { resize: 'none', minHeight: 0 },
   table: { borderCollapse: 'collapse', fontSize: tokens.fontSizeBase200, fontFamily: tokens.fontFamilyMonospace },
   th: {
     position: 'sticky',
@@ -35,10 +39,12 @@ interface Props {
   rows: Row[]
   /** 表の上の説明(何行のうち何行か など) */
   note?: string
+  /** 外側がスクロールする場所に置く(高さを持たない) */
+  compact?: boolean
 }
 
 /** 問い合わせの結果の表。TSV(スプレッドシートに貼る)と Markdown(Gemini・Claude に貼る)で写せる */
-export function ResultGrid({ columns, rows, note }: Props) {
+export function ResultGrid({ columns, rows, note, compact }: Props) {
   const s = useStyles()
   return (
     <div className={s.root}>
@@ -47,7 +53,7 @@ export function ResultGrid({ columns, rows, note }: Props) {
         <CopyButton label="TSV でコピー" title="スプレッドシートにそのまま貼れる形(タブ区切り)" text={() => toTsv(columns, rows)} />
         <CopyButton label="Markdown でコピー" title="Gemini・Claude に貼る形" text={() => toMarkdown(columns, rows)} />
       </div>
-      <div className={s.scroll}>
+      <div className={compact ? mergeClasses(s.scroll, s.scrollCompact) : s.scroll} style={compact ? undefined : { height: `${Math.min(36 + rows.length * 25 + 14, 420)}px` }}>
         <table className={s.table}>
           <thead>
             <tr>

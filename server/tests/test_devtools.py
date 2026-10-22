@@ -74,7 +74,7 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(devtools.chapters(md, (1, 3)), "## 1. 全体\nA\n\n## 3. SKU\nC")
 
     def test_parse_reply(self) -> None:
-        self.assertEqual(devtools.parse_reply('{"reply": "直しました", "sql": " SELECT 1 ", "questions": ["q", ""]}'), {"reply": "直しました", "sql": "SELECT 1", "questions": ["q"]})
+        self.assertEqual(devtools.parse_reply('{"reply": "直しました", "sql": " SELECT 1 ", "questions": ["q", ""]}'), {"reply": "直しました", "sqls": [{"title": "", "sql": "SELECT 1"}], "questions": ["q"]})
         # JSON が崩れていても、本文を返事として見せる
         self.assertEqual(devtools.parse_reply("ただの文")["reply"], "ただの文")
 
@@ -121,9 +121,40 @@ class ToolTest(unittest.TestCase):
         # ビュー自身と重なりは除く
         self.assertEqual(devtools.view_sources(c, "p.v.vw"), ["p.raw.item", "p.raw.price"])
 
+    def test_referenced_views(self) -> None:
+        # ジョブの記録には元の表だけ。SQL に書いたビューは、名前から見つける
+        job = SimpleNamespace(referenced_tables=[SimpleNamespace(project="p", dataset_id="raw", table_id="item")])
+        kinds = {"p.mart.v_item": "VIEW", "p.raw.item": "TABLE"}
+
+        def get_table(name: str) -> SimpleNamespace:
+            if name not in kinds:
+                raise KeyError(name)
+            pr, ds, t = name.split(".")
+            return SimpleNamespace(project=pr, dataset_id=ds, table_id=t, table_type=kinds[name])
+
+        c = SimpleNamespace(get_table=get_table)
+        r = devtools.referenced(c, "SELECT a.x FROM `p.mart.v_item` a JOIN p.raw.item b ON a.id = b.id", job)
+        self.assertEqual(r, {"tables": ["p.raw.item"], "views": ["p.mart.v_item"]})
+
+    def test_weight_and_cost(self) -> None:
+        self.assertEqual(devtools.weight(50 * 1024**2, 2000), "軽い")
+        self.assertEqual(devtools.weight(5 * 1024**3, None), "ふつう")
+        self.assertEqual(devtools.weight(200 * 1024**3, None), "重い")
+        self.assertAlmostEqual(devtools.cost_usd(1024**4), 6.25)
+
     def test_parse_fenced(self) -> None:
         r = devtools.parse_reply('調べました。\n```json\n{"reply": "a", "sql": "SELECT 1"}\n```')
-        self.assertEqual((r["reply"], r["sql"]), ("a", "SELECT 1"))
+        self.assertEqual((r["reply"], r["sqls"][0]["sql"]), ("a", "SELECT 1"))
+
+    def test_parse_many_sqls(self) -> None:
+        r = devtools.parse_reply('{"reply": "2 つ", "sqls": [{"title": "値の確かめ", "sql": "SELECT DISTINCT a FROM t"}, {"title": "本番", "sql": "SELECT a FROM t"}, {"title": "空", "sql": ""}]}')
+        self.assertEqual([x["title"] for x in r["sqls"]], ["値の確かめ", "本番"])
+
+    def test_pick_models(self) -> None:
+        names = ["publishers/google/models/gemini-3.5-flash", "publishers/google/models/gemini-3.5-pro", "publishers/google/models/gemini-3.8-pro-preview",
+                 "publishers/google/models/gemini-3.8-pro", "publishers/google/models/gemini-3.5-flash-image", "publishers/google/models/text-embedding-005",
+                 "publishers/google/models/gemini-3.5-flash-lite"]
+        self.assertEqual(devtools.pick_models(names), ["gemini-3.8-pro", "gemini-3.8-pro-preview", "gemini-3.5-pro", "gemini-3.5-flash"])
 
 
 if __name__ == "__main__":

@@ -34,6 +34,8 @@ export interface Settings {
 
 /** Gemini に何を渡すか(DEVTOOLS.md の 4 章) */
 export interface ChatContext {
+  /** 使うモデル(なければサーバーの既定) */
+  model: string | null
   /** 作ろうとしている出力(spu など)。仕様の章と手本の SQL を渡す */
   output: string | null
   /** 画面で開いているデータセット(「このデータセット」の手がかり) */
@@ -54,14 +56,66 @@ export interface ChatTurn {
   text: string
 }
 
-export interface ChatReply {
-  ok: true
-  reply: string
+export interface SqlBlock {
+  title: string
   sql: string
-  questions: string[]
-  /** Gemini が BigQuery で何を調べたか(画面に出す) */
-  steps: string[]
-  context_chars: number
+}
+
+/** 会話の 1 回分で、サーバーから起きた順に届くもの(NDJSON の 1 行) */
+export type ChatEvent =
+  | { type: 'start'; model: string; thinking?: string }
+  | { type: 'thought'; text: string }
+  | { type: 'step'; text: string }
+  | { type: 'ping' }
+  | { type: 'final'; reply: string; sqls: SqlBlock[]; questions: string[]; context_chars?: number }
+  | { type: 'error'; error: string }
+
+/**
+ * 会話の 1 回分を送り、届いたそばから onEvent に渡す(思考・調べたこと・返事)。
+ * signal で止められる。つながらない・途中で切れたときも、error として渡す
+ */
+export async function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch(appPath('/api/dev/ai/chat'), { ...post({ messages, ...ctx }), signal })
+  } catch (e) {
+    if (signal?.aborted) return
+    onEvent({ type: 'error', error: `サーバーにつながりません(${e instanceof Error ? e.message : String(e)})` })
+    return
+  }
+  if (!res.ok || !res.body) {
+    onEvent({ type: 'error', error: res.status === 404 ? '開発用の画面が無効です(CCP_DEVTOOLS=1)' : `サーバーの返事を読めませんでした(${res.status})` })
+    return
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let ended = false
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      let i: number
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim()
+        buf = buf.slice(i + 1)
+        if (!line) continue
+        try {
+          const ev = JSON.parse(line) as ChatEvent
+          if (ev.type === 'final' || ev.type === 'error') ended = true
+          onEvent(ev)
+        } catch {
+          // 壊れた行は飛ばす
+        }
+      }
+    }
+  } catch (e) {
+    if (signal?.aborted) return
+    onEvent({ type: 'error', error: `途中で切れました(${e instanceof Error ? e.message : String(e)})` })
+    return
+  }
+  if (!ended && !signal?.aborted) onEvent({ type: 'error', error: '返事が最後まで届きませんでした(サーバーのログを見てください)' })
 }
 
 export interface TableInfo {
@@ -89,6 +143,30 @@ export interface DryRun {
   runnable: boolean
   reason: string | null
   max_bytes: number
+  /** 流したときの概算の料金(ドル。オンデマンドの単価から) */
+  cost_usd: number | null
+  price_per_tib: number
+  weight: string
+  /** 読むことになる元の表と、SQL に書いたビュー */
+  tables: string[]
+  views: string[]
+}
+
+/** ジョブの実行情報(結果の下に出す) */
+export interface JobStats {
+  job_id: string | null
+  location: string | null
+  processed: number | null
+  billed: number | null
+  cost_usd: number | null
+  price_per_tib: number
+  slot_ms: number | null
+  elapsed: number | null
+  cached: boolean
+  /** 軽い / ふつう / 重い */
+  weight: string
+  tables: string[]
+  views: string[]
 }
 
 export interface RunResult {
@@ -100,6 +178,7 @@ export interface RunResult {
   billed: number | null
   seconds: number
   cached: boolean
+  job?: JobStats
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T | Failure> {
@@ -128,7 +207,8 @@ export const DevApi = {
   dryrun: (sql: string) => call<DryRun>('/bq/dryrun', post({ sql })),
   run: (sql: string, maxRows: number) => call<RunResult>('/bq/run', post({ sql, max_rows: maxRows })),
   projects: () => call<{ ok: true; default: string | null; projects: string[] }>('/bq/projects'),
-  chat: (messages: ChatTurn[], ctx: ChatContext) => call<ChatReply>('/ai/chat', post({ messages, ...ctx })),
+  models: () => call<{ ok: true; default: string; models: string[]; thinking: string }>('/ai/models'),
+  chatStream,
   context: (ctx: ChatContext) => call<{ ok: true; context: string }>('/ai/context', post({ messages: [], ...ctx })),
 }
 

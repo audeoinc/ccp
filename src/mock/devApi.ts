@@ -1,6 +1,6 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { ChatContext, ChatReply, ChatTurn, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ChatContext, ChatEvent, ChatTurn, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
 
 export * from '../dev/api'
 
@@ -78,31 +78,38 @@ export const DevApi = {
   projects: () => wait({ ok: true as const, default: 'demo-project', projects: ['demo-project', 'demo-analytics'] }),
   datasets: (project?: string) =>
     wait({ ok: true as const, project: project ?? 'demo-project', datasets: project === 'demo-analytics' ? ['mart_ctlg', 'mart_sales'] : ['ccp_dummy', 'ccp_dummy_src', 'ctlg_master', 'ctlg_stage', 'sales_daily'] }),
-  chat: (messages: ChatTurn[], ctx: ChatContext) => {
+  models: () => wait({ ok: true as const, default: 'gemini-demo-pro', models: ['gemini-demo-pro', 'gemini-demo-flash'], thinking: 'high' }),
+  /** 思考・調べたこと・返事を、少しずつ届ける(本物と同じ順で、届き方を確かめられるように) */
+  chatStream: async (messages: ChatTurn[], ctx: ChatContext, onEvent: (e: ChatEvent) => void, signal?: AbortSignal) => {
     const ask = messages[messages.length - 1]?.text ?? ''
-    const r: ChatReply = {
-      ok: true,
-      reply: `**m_item** の列を見ました(見本の返事です。いまの発言: 「${ask.slice(0, 40)}」)。
-
-### CCP の列への当て方の案
-- \`item_cd\` → SKU の \`product_code\`(品番)
-- \`country_cd\` → \`market\`(JPN → JP、USA → US に直す)
-- \`dept_nm\` → \`category\`(部門 2 が CCP のカテゴリに近い)
-- \`price\` → \`price\``,
-      sql: `SELECT
-  CASE country_cd WHEN 'JPN' THEN 'JP' WHEN 'USA' THEN 'US' END AS market,
-  item_cd AS product_code,
-  ANY_VALUE(item_nm) AS name,
-  ANY_VALUE(dept_nm) AS category,
-  MAX(price) AS price
-FROM \`${DS}.m_item\`
-WHERE on_sale_flg
-GROUP BY market, product_code`,
-      questions: ctx.output ? [] : ['季節(season)に当たる列が見つかりません。別の表にありますか?'],
-      steps: [`表を探した(${DS}、「ctlg」を含む、0 件)`, `表を探した(${DS}、3 件)`, `表の列を見た(${DS}.m_item)`, 'SQL を確かめた(通った。読む量 52,428,800 バイト)'],
-      context_chars: 18_000,
+    const later = (ms: number) => new Promise<void>((ok) => window.setTimeout(ok, ms))
+    const events: ChatEvent[] = [
+      { type: 'start', model: ctx.model ?? 'gemini-demo-pro', thinking: 'high' },
+      { type: 'thought', text: '**表を探す**\n利用者は ctlg を含む表を探している。まず list_tables で名前の一部で探す。\n\n' },
+      { type: 'step', text: `表を探した(${DS}、「ctlg」を含む、0 件)` },
+      { type: 'thought', text: '**範囲を広げる**\nctlg を含む表がない。データセットの表をすべて見て、商品マスタに当たる表を探す。m_item が商品マスタらしい。\n\n' },
+      { type: 'step', text: `表を探した(${DS}、3 件)` },
+      { type: 'step', text: `表の列を見た(${DS}.m_item)` },
+      { type: 'thought', text: '**CCP の列に当てる**\nSPU のキーは market と product_code。item_cd が品番、country_cd は JPN/USA なので JP/US に直す。dept_nm がカテゴリに近い。\n' },
+      { type: 'step', text: 'SQL を確かめた(通った。読む量 52,428,800 バイト)' },
+      {
+        type: 'final',
+        reply: `**m_item** の列を見ました(見本の返事です。いまの発言: 「${ask.slice(0, 40)}」)。\n\n### CCP の列への当て方の案\n- \`item_cd\` → \`product_code\`(品番)\n- \`country_cd\` → \`market\`(JPN → JP、USA → US に直す)\n- \`dept_nm\` → \`category\`(部門 2 が CCP のカテゴリに近い)\n- \`price\` → \`price\`\n\n| 元の列 | CCP の列 | 変換 |\n|---|---|---|\n| \`item_cd\` | \`product_code\` | そのまま |\n| \`country_cd\` | \`market\` | JPN → JP |\n\n念のため、件数も見てください:\n\n\`\`\`sql\nSELECT COUNT(*) AS n\nFROM \`${DS}.m_item\`\n\`\`\``,
+        sqls: [
+          { title: '国のコードの値を確かめる', sql: `SELECT country_cd, COUNT(*) AS n\nFROM \`${DS}.m_item\`\nGROUP BY country_cd` },
+          {
+            title: 'SPU の形にする',
+            sql: `SELECT\n  CASE country_cd WHEN 'JPN' THEN 'JP' WHEN 'USA' THEN 'US' END AS market,\n  item_cd AS product_code,\n  ANY_VALUE(item_nm) AS name,\n  ANY_VALUE(dept_nm) AS category,\n  MAX(price) AS price\nFROM \`${DS}.m_item\`\nWHERE on_sale_flg\nGROUP BY market, product_code`,
+          },
+        ],
+        questions: ctx.output ? [] : ['季節(season)に当たる列が見つかりません。別の表にありますか?'],
+      },
+    ]
+    for (const ev of events) {
+      await later(ev.type === 'final' ? 900 : 600)
+      if (signal?.aborted) return
+      onEvent(ev)
     }
-    return new Promise<ChatReply>((ok) => window.setTimeout(() => ok(r), 900))
   },
   context: (ctx: ChatContext) => wait({ ok: true as const, context: `あなたは BigQuery(GoogleSQL)の SQL を書く専門家です。…(見本)
 
@@ -147,14 +154,14 @@ ${ctx.sql}
     const t = tableIn(sql)
     if (!t) return fail('BadRequest: 400 Not found: Table demo-project:ccp_dummy_src.xxx was not found in location asia-northeast1')
     const st = /^\s*(create|insert|delete|update|merge|drop)/i.test(sql) ? 'CREATE_TABLE_AS_SELECT' : 'SELECT'
-    const d: DryRun = { ok: true, statement_type: st, bytes: 52_428_800, columns: TABLES[t].columns.map(({ name, type }) => ({ name, type })), runnable: st === 'SELECT', reason: st === 'SELECT' ? null : `SELECT ではないので流しません(文の種類: ${st})。表を作る SQL は、BigQuery のコンソールで実行してください`, max_bytes: 10 * 1024 ** 3 }
+    const d: DryRun = { ok: true, statement_type: st, bytes: 52_428_800, columns: TABLES[t].columns.map(({ name, type }) => ({ name, type })), runnable: st === 'SELECT', reason: st === 'SELECT' ? null : `SELECT ではないので流しません(文の種類: ${st})。表を作る SQL は、BigQuery のコンソールで実行してください`, max_bytes: 10 * 1024 ** 3, cost_usd: 0.0003, price_per_tib: 6.25, weight: '軽い', tables: [ref(t)], views: [] }
     return wait(d)
   },
   run: (sql: string, maxRows: number) => {
     const t = tableIn(sql)
     if (!t) return fail('BadRequest: 400 Not found: Table demo-project:ccp_dummy_src.xxx was not found in location asia-northeast1')
     if (/^\s*(create|insert|delete|update|merge|drop)/i.test(sql)) return fail('SELECT ではないので流しません(文の種類: CREATE_TABLE_AS_SELECT)。表を作る SQL は、BigQuery のコンソールで実行してください')
-    const r: RunResult = { ok: true, columns: TABLES[t].columns.map(({ name, type }) => ({ name, type })), rows: TABLES[t].rows.slice(0, maxRows), total_rows: TABLES[t].rows.length, bytes: 52_428_800, billed: 52_428_800, seconds: 0.84, cached: false }
+    const r: RunResult = { ok: true, columns: TABLES[t].columns.map(({ name, type }) => ({ name, type })), rows: TABLES[t].rows.slice(0, maxRows), total_rows: TABLES[t].rows.length, bytes: 52_428_800, billed: 52_428_800, seconds: 0.84, cached: false, job: { job_id: 'bquxjob_demo_123', location: 'asia-northeast1', processed: 52_428_800, billed: 52_428_800, cost_usd: 0.0003, price_per_tib: 6.25, slot_ms: 1840, elapsed: 0.84, cached: false, weight: '軽い', tables: [ref(t)], views: [] } }
     return wait(r)
   },
 }
