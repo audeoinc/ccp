@@ -312,6 +312,11 @@ export const TASK_TARGETS: Record<string, string[]> = {
   suggest_push: ['copy'],
   suggest_subjects: ['headline', 'copy'],
   suggest_instructions: ['instructions'],
+  // シンプルな配信カードで、選んだ部品の文言を AI に頼む(SU1 段階 b)
+  suggest_part_rewrite: ['headline', 'copy'],
+  suggest_part_hero: ['hero'],
+  suggest_part_product: ['selection'],
+  suggest_whole_rewrite: ['headline', 'copy', 'hero'],
 }
 interface CardLite {
   scheduledAt?: string
@@ -548,7 +553,7 @@ async function askText(message: string): Promise<string> {
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-const productPayload = (p: Product) => ({
+export const productPayload = (p: Product) => ({
   code: p.product_code,
   name: p.name,
   category: p.category_name,
@@ -595,7 +600,7 @@ interface SectionArgs {
   language: CopyLanguage
 }
 
-const heroPayload = (h?: HeroImage, reason?: string) =>
+export const heroPayload = (h?: HeroImage, reason?: string) =>
   h
     ? {
         code: h.image_code,

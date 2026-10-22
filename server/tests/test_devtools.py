@@ -68,5 +68,181 @@ class FlattenTest(unittest.TestCase):
         self.assertEqual(cols[1]["mode"], "REPEATED")
 
 
+class ChatTest(unittest.TestCase):
+    def test_chapters(self) -> None:
+        md = "# 題\n\n## 1. 全体\nA\n\n---\n\n## 2. SPU\nB\n\n## 3. SKU\nC\n"
+        self.assertEqual(devtools.chapters(md, (1, 3)), "## 1. 全体\nA\n\n## 3. SKU\nC")
+
+    def test_parse_reply(self) -> None:
+        self.assertEqual(devtools.parse_reply('{"reply": "直しました", "sql": " SELECT 1 ", "questions": ["q", ""]}'), {"reply": "直しました", "sqls": [{"title": "", "sql": "SELECT 1"}], "questions": ["q"]})
+        # JSON が崩れていても、本文を返事として見せる
+        self.assertEqual(devtools.parse_reply("ただの文")["reply"], "ただの文")
+
+    def test_private_columns(self) -> None:
+        for name in ("customer_name", "item_nm", "email", "tel_no", "review_text", "氏名"):
+            self.assertTrue(devtools.PRIVATE.search(name), name)
+        for name in ("sku_cd", "qty", "sales_date", "price"):
+            self.assertFalse(devtools.PRIVATE.search(name), name)
+
+    def test_context_has_spec_and_sql(self) -> None:
+        body = devtools.ChatIn(output="sku", sql="SELECT 1", last="BadRequest: x", notes="まとめ")
+        c = devtools.build_context(body, None)
+        self.assertIn("## 3. SKU", c)
+        self.assertIn("## 1. 全体のルール", c)
+        self.assertIn("SELECT 1", c)
+        self.assertIn("まとめ", c)
+
+
+class ToolTest(unittest.TestCase):
+    def client(self) -> SimpleNamespace:
+        tables = [SimpleNamespace(project="p", dataset_id="a", table_id=n, table_type="TABLE") for n in ("m_ctlg_item", "CTLG_price", "t_sales")]
+        return SimpleNamespace(project="p", list_tables=lambda ds: tables if ds == "p.a" else [],
+                               query=lambda sql, job_config=None: SimpleNamespace(statement_type="DELETE", total_bytes_processed=0, schema=[]))
+
+    def test_list_tables_by_part_of_name(self) -> None:
+        out, step = devtools.run_tool(self.client(), "list_tables", {"dataset": "a", "name_contains": "ctlg"}, devtools.ChatIn())
+        self.assertEqual([t["table"] for t in out["tables"]], ["p.a.m_ctlg_item", "p.a.CTLG_price"])
+        self.assertIn("2 件", step)
+
+    def test_run_select_only(self) -> None:
+        out, _ = devtools.run_tool(self.client(), "run_select", {"sql": "DELETE FROM x WHERE true"}, devtools.ChatIn())
+        self.assertIn("SELECT ではない", out["error"])
+        out, _ = devtools.run_tool(self.client(), "run_select", {"sql": "SELECT 1"}, devtools.ChatIn(allow_run=False))
+        self.assertIn("止めて", out["error"])
+
+    def test_tools_declared(self) -> None:
+        names = [f.name for f in devtools.tool_declarations()[0].function_declarations]
+        self.assertEqual(names, ["list_datasets", "list_tables", "describe_table", "describe_view_sources", "dry_run", "run_select"])
+
+    def test_view_sources(self) -> None:
+        refs = [SimpleNamespace(project="p", dataset_id="v", table_id="vw"), SimpleNamespace(project="p", dataset_id="raw", table_id="item"),
+                SimpleNamespace(project="p", dataset_id="raw", table_id="item"), SimpleNamespace(project="p", dataset_id="raw", table_id="price")]
+        c = SimpleNamespace(query=lambda sql, job_config=None: SimpleNamespace(referenced_tables=refs))
+        # ビュー自身と重なりは除く
+        self.assertEqual(devtools.view_sources(c, "p.v.vw"), ["p.raw.item", "p.raw.price"])
+
+    def test_referenced_views(self) -> None:
+        # ジョブの記録には元の表だけ。SQL に書いたビューは、名前から見つける
+        job = SimpleNamespace(referenced_tables=[SimpleNamespace(project="p", dataset_id="raw", table_id="item")])
+        kinds = {"p.mart.v_item": "VIEW", "p.raw.item": "TABLE"}
+
+        def get_table(name: str) -> SimpleNamespace:
+            if name not in kinds:
+                raise KeyError(name)
+            pr, ds, t = name.split(".")
+            return SimpleNamespace(project=pr, dataset_id=ds, table_id=t, table_type=kinds[name])
+
+        c = SimpleNamespace(get_table=get_table)
+        r = devtools.referenced(c, "SELECT a.x FROM `p.mart.v_item` a JOIN p.raw.item b ON a.id = b.id", job)
+        self.assertEqual(r, {"tables": ["p.raw.item"], "views": ["p.mart.v_item"]})
+
+    def test_weight_and_cost(self) -> None:
+        self.assertEqual(devtools.weight(50 * 1024**2, 2000), "軽い")
+        self.assertEqual(devtools.weight(5 * 1024**3, None), "ふつう")
+        self.assertEqual(devtools.weight(200 * 1024**3, None), "重い")
+        self.assertAlmostEqual(devtools.cost_usd(1024**4), 6.25)
+
+    def test_parse_fenced(self) -> None:
+        r = devtools.parse_reply('調べました。\n```json\n{"reply": "a", "sql": "SELECT 1"}\n```')
+        self.assertEqual((r["reply"], r["sqls"][0]["sql"]), ("a", "SELECT 1"))
+
+    def test_parse_many_sqls(self) -> None:
+        r = devtools.parse_reply('{"reply": "2 つ", "sqls": [{"title": "値の確かめ", "sql": "SELECT DISTINCT a FROM t"}, {"title": "本番", "sql": "SELECT a FROM t"}, {"title": "空", "sql": ""}]}')
+        self.assertEqual([x["title"] for x in r["sqls"]], ["値の確かめ", "本番"])
+
+    def test_pro_of(self) -> None:
+        self.assertEqual(devtools.pro_of("gemini-3.8-flash"), "gemini-3.8-pro")
+        self.assertEqual(devtools.pro_of("gemini-3.5-flash-lite"), "gemini-3.5-pro")
+        self.assertIsNone(devtools.pro_of("gemini-3.8-pro"))
+
+    def test_pick_models(self) -> None:
+        names = ["publishers/google/models/gemini-3.5-flash", "publishers/google/models/gemini-3.5-pro", "publishers/google/models/gemini-3.8-pro-preview",
+                 "publishers/google/models/gemini-3.8-pro", "publishers/google/models/gemini-3.5-flash-image", "publishers/google/models/text-embedding-005",
+                 "publishers/google/models/gemini-3.5-flash-lite"]
+        self.assertEqual(devtools.pick_models(names), ["gemini-3.8-pro", "gemini-3.8-pro-preview", "gemini-3.5-pro", "gemini-3.5-flash"])
+
+
+class WorkTest(unittest.TestCase):
+    def setUp(self) -> None:
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.patch = mock.patch.object(devtools, "DEVWORK", Path(self.tmp.name))
+        self.patch.start()
+
+    def tearDown(self) -> None:
+        self.patch.stop()
+        self.tmp.cleanup()
+
+    def run_async(self, coro):  # noqa: ANN001, ANN202
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def test_versions_and_adopt(self) -> None:
+        a = self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT 1")))
+        same = self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT 1 ")))
+        b = self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT 2", note="直した")))
+        # 同じ SQL では版を増やさない
+        self.assertEqual((a["v"], same["v"], same["same"], b["v"]), (1, 1, True, 2))
+        self.run_async(devtools.adopt("spu", devtools.AdoptIn(v=2)))
+        w = self.run_async(devtools.work())
+        self.assertEqual([x["v"] for x in w["outputs"]["spu"]["versions"]], [1, 2])
+        self.assertEqual(w["outputs"]["spu"]["adopted"], 2)
+        self.assertEqual(self.run_async(devtools.get_version("spu", 2))["sql"], "SELECT 2")
+        self.assertEqual(devtools._adopted_sql("spu"), "SELECT 2")
+
+    def test_chats(self) -> None:
+        msgs = [{"role": "user", "text": "ctlg を含む表から  CCP で使える列を探して"}, {"role": "model", "text": "見ました", "thoughts": "…"}]
+        self.run_async(devtools.save_chat("abc123", devtools.ChatSaveIn(messages=msgs, output="spu")))
+        self.run_async(devtools.save_chat("def456", devtools.ChatSaveIn(title="名前つき", messages=[])))
+        lst = self.run_async(devtools.chats())["chats"]
+        self.assertEqual({c["id"]: c["title"] for c in lst}, {"abc123": "ctlg を含む表から CCP で使える列を探して", "def456": "名前つき"})
+        got = self.run_async(devtools.get_chat("abc123"))
+        self.assertEqual((got["output"], got["messages"][1]["thoughts"]), ("spu", "…"))
+        # 名前を付け直さずに残しても、前の名前のまま
+        self.run_async(devtools.save_chat("def456", devtools.ChatSaveIn(messages=msgs)))
+        self.assertEqual(self.run_async(devtools.get_chat("def456"))["title"], "名前つき")
+        self.run_async(devtools.delete_chat("abc123"))
+        self.assertEqual([c["id"] for c in self.run_async(devtools.chats())["chats"]], ["def456"])
+        with self.assertRaises(Exception):
+            devtools._chat_path("../x")
+
+    def test_check_runs_validate_with_context(self) -> None:
+        self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT spu")))
+        self.run_async(devtools.adopt("spu", devtools.AdoptIn(v=1)))
+        f = lambda n: SimpleNamespace(name=n)  # noqa: E731
+        schema = [f(n) for n in ("market", "sku_code", "product_code", "as_of")]
+        sku_rows = [{"market": "JP", "sku_code": "S1", "product_code": "P1", "as_of": datetime.now(timezone.utc)},
+                    {"market": "JP", "sku_code": "S2", "product_code": "P9", "as_of": datetime.now(timezone.utc)}]
+        spu_rows = [{"market": "JP", "product_code": "P1"}]
+        sqls: list[str] = []
+
+        def query(sql: str, job_config=None):  # noqa: ANN001, ANN202
+            sqls.append(sql)
+            if getattr(job_config, "dry_run", False):
+                return SimpleNamespace(statement_type="SELECT", total_bytes_processed=1000, schema=schema)
+            rows = spu_rows if "SELECT spu" in sql else sku_rows
+            job = SimpleNamespace(result=lambda: _Rows(rows), job_id="j", location="x", total_bytes_processed=1000, total_bytes_billed=10485760,
+                                  slot_millis=10, started=None, ended=None, cache_hit=False, referenced_tables=[])
+            return job
+
+        c = SimpleNamespace(query=query, get_table=lambda n: (_ for _ in ()).throw(KeyError(n)))
+        r = devtools.check_output(c, devtools.CheckIn(output="sku", sql="SELECT sku", run=True))
+        self.assertTrue(r["ran"], r)
+        self.assertEqual(r["context"], ["spu"])
+        # P9 は SPU の採用の版にない → NG
+        self.assertTrue(any("SPU の出力にありません" in i["message"] for i in r["issues"] if i["level"] == "NG"), r["issues"])
+        self.assertGreaterEqual(r["ng"], 1)
+        # 結びつきの相手は、採用の版をキーだけにして流す
+        self.assertTrue(any("SELECT DISTINCT market, product_code FROM (" in q for q in sqls))
+
+
+class _Rows(list):
+    def __init__(self, rows):  # noqa: ANN001
+        super().__init__(rows)
+        self.total_rows = len(rows)
+
+
 if __name__ == "__main__":
     unittest.main()

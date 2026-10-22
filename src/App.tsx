@@ -28,7 +28,6 @@ import {
 import {
   AddRegular,
   AlertRegular,
-  CursorClickRegular,
   ArrowDownloadRegular,
   ArrowSyncRegular,
   ArrowUploadRegular,
@@ -120,7 +119,7 @@ import { CheckDrawer } from './CheckDrawer'
 import { useWeekFrames } from './useWeekFrames'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { BulkWorkspace } from './BulkWorkspace'
-import { loadAutoDraft, loadPref, loadSimpleCard, saveAutoDraft, savePref, saveSimpleCard } from './settings'
+import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, statusColor, statusOptions, statusRank, statusView } from './status'
 import { THEME_TYPES, classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
@@ -606,7 +605,11 @@ function App() {
   // 配信カードと制作のページは、閉じずに重ねる(閉じると直しかけを捨てるため。2026-10-20、利用者の要望で「企画を見る」も重ねる)。
   // 重なりの順は、あとから開いたものが上。下にあるものを見たいときは、上を閉じて見せる(配信カード)か、開き直して上に出す(制作のページ)
   const [productionKey, setProductionKey] = useState(0)
+  // 制作のページを開いたら、そのまま制作に依頼するか(シンプルな配信カードの「制作に渡す」)
+  const [productionAuto, setProductionAuto] = useState(false)
   const goStage = (id: string, f: Face) => {
+    // ほかの道から開いたときは、そのまま依頼しない(「制作に渡す」だけが、下でもう一度立てる)
+    setProductionAuto(false)
     if (f === 'calendar') {
       setPeekResult(null)
       // 配信カードが制作のページの下にあれば、制作のページを閉じて見せる。なければ、上に重ねて開く(閉じると制作のページに戻る)
@@ -1335,8 +1338,6 @@ function App() {
       })
   }
   const [autoDraft, setAutoDraft] = useState(loadAutoDraft)
-  // シンプルな配信カード(SU1)で開くか(人の設定。ヘッダーのトグル)
-  const [simpleCard, setSimpleCard] = useState(loadSimpleCard)
   useTemplates() // テンプレートの登録が変わったら、画面全体を描き直す
   // ユーザーが作ったテンプレートを読み込む(読めなくても、標準のテンプレートで動く)
   useEffect(() => {
@@ -1448,21 +1449,6 @@ function App() {
           </MenuPopover>
         </Menu>
         {/* ログインしている人(U9)。履歴・依頼・承認・やり取りは、すべてこの人で残す(ほかの画面では人を選ばせない) */}
-        {/* シンプルな配信カード(SU1): プレビューを押して直す画面で開く。人の設定なので、ヘッダーに置く(Switch はヘッダーで色が効きにくいので、ボタンの押し込みで見せる) */}
-        <Tooltip content={simpleCard ? t('配信カードを、プレビューを押して直すシンプルな画面で開きます。押すと、今までの配信カードに戻します', 'Delivery cards open in the simple view (click the preview to edit). Click to go back to the full card.') : t('配信カードを、プレビューを押して直すシンプルな画面で開きます', 'Open delivery cards in the simple view (click the preview to edit)')} relationship="description">
-          <Button
-            appearance={simpleCard ? 'primary' : 'subtle'}
-            size="small"
-            icon={<CursorClickRegular />}
-            aria-pressed={simpleCard}
-            onClick={() => {
-              setSimpleCard(!simpleCard)
-              saveSimpleCard(!simpleCard)
-            }}
-          >
-            {t('シンプル', 'Simple')}
-          </Button>
-        </Tooltip>
         <MePicker className={styles.headerMe} ariaLabel={t('ログインしている人', 'Signed-in user')} />
         {/* 管理系(テンプレート・言語・自動の下書き)は、毎日の作業と分けて、設定のメニューにまとめる */}
         <Menu
@@ -2181,7 +2167,6 @@ function App() {
         <CardDetail
           key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
-          simple={simpleCard}
           defaults={creating ?? undefined}
           draft={selected ? undefined : draftOpen?.draft}
           // 新しい配信を「保存」(閉じない)したら、保存した配信として開き直す(X52)
@@ -2226,7 +2211,11 @@ function App() {
             setAlertsOpen(true)
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
-          onOpenProduction={(id) => goStage(id, 'production')}
+          onOpenProduction={(id, opts) => {
+            // シンプルな配信カードの「制作に渡す」は、開いた制作のページで、そのまま依頼まで進める
+            goStage(id, 'production')
+            setProductionAuto(!!opts?.request)
+          }}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           initialTab={selected && selected.id === link.card ? link.tab : undefined}
           onTabChange={setCardTab}
@@ -2255,9 +2244,13 @@ function App() {
           productImages={cardImages.get(productionOpen)}
           heroes={heroes}
           people={owners}
-          onClose={() => setProductionOpen(null)}
+          onClose={() => {
+            setProductionOpen(null)
+            setProductionAuto(false)
+          }}
           onOpenCard={(id) => goStage(id, 'calendar')}
           onChanged={() => void production.reload()}
+          autoRequest={productionAuto}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
         />
       )}

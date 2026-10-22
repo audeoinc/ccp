@@ -82,7 +82,7 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 
 画面からは、⚙ の「BigQuery から取り込む」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
 
-- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
+- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → (`package-lock.json` が変わったときだけ)`npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
@@ -409,7 +409,7 @@ BigQuery を使わないなら、「■ BigQuery」の [注意] はそのまま�
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
 | `GEMINI_CONCURRENCY` | — | Gemini への同時の呼び出しの上限(既定 4) | 設定しない |
-| `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/8082/dev/`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
+| `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` / `DEVTOOLS_GEMINI_MODEL` / `DEVTOOLS_THINKING` / `DEVTOOLS_PRICE_PER_TIB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。AI のモデル(既定は一覧でいちばん賢い Gemini)・考える量(既定 high)・料金の概算の単価(既定 $6.25/TiB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
 
 ## 付録 B. 引っ越し用のパックの中身
 

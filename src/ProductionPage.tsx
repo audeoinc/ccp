@@ -122,6 +122,8 @@ interface Props {
   onOpenCard: (cardId: string) => void
   /** 依頼・受け取り・終わった・送ったのあとに、外の一覧を読み直す */
   onChanged?: () => void
+  /** 開いたら、そのまま制作に依頼する(シンプルな配信カードの「制作に渡す」。依頼の前で、依頼できるときだけ。1 回だけ) */
+  autoRequest?: boolean
   /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav) */
   stageNav?: ReactNode
 }
@@ -137,7 +139,7 @@ const TALK_KEY = 'productionPage.talkOpen'
  * 状態と操作は、題名のすぐ下の行に、いつも出す(2026-10-19、利用者と決めた: 材料を見る → 書く → 確かめる → 相談する、の順。左のコピーを隣のエディタに貼れる)。
  * 中身は、依頼した時点の写し(依頼する前は、いまの配信カードから作った下書き)
  */
-export function ProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onOpenCard, onChanged, stageNav }: Props) {
+export function ProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onOpenCard, onChanged, stageNav, autoRequest }: Props) {
   const s = useStyles()
   const t = useT()
   const meId = useSyncExternalStore(subscribeMe, myUserId)
@@ -307,6 +309,16 @@ export function ProductionPage({ card, productIds, variantIds, products, product
     variant_html: variantHtmlJson(),
     week_start: weekStart,
   })
+
+  // シンプルな配信カードの「制作に渡す」から開いたとき: HTML の下書きができたら、1 回だけ依頼まで進める
+  const autoDone = useRef(false)
+  const autoReady = !!autoRequest && requests !== null && !live && approved && !!meId && !choosing && !busy && !!shownOf('A')
+  useEffect(() => {
+    if (!autoReady || autoDone.current) return
+    autoDone.current = true
+    void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoReady])
 
   // 工程の帯(2026-10-19、利用者と決めた: 左が始まり・右が終わり。いまの段のボタンだけを出す)。
   // ① 依頼する(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 仕上がりの確認(企画。PR7)→ ⑤ 配信のしくみに送る(企画)。FLOWS.md 1.2 の「いま、だれの番か」

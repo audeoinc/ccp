@@ -112,3 +112,32 @@ export function partsInOrder(root: Element): PartRef[] {
   }
   return out
 }
+
+/** 部品の、プレビュー上の書き込みの目印(PreviewPins が読む data-anchor の名前。商品は product_id で持つ)。目印のない部品は null */
+export function anchorOfPart(p: PartRef | null, productIdOf: (itemKey: string) => string | undefined): { anchor: string; productId?: string } | null {
+  if (!p) return null
+  switch (p.kind) {
+    case 'hero':
+      return { anchor: 'hero' }
+    case 'headline':
+    case 'copy':
+      return { anchor: 'herotext' }
+    case 'subject':
+    case 'preheader':
+      return { anchor: 'subject' }
+    case 'pushTitle':
+    case 'pushBody':
+      return { anchor: 'push' }
+    case 'sectionTitle':
+    case 'sectionCopy':
+      return { anchor: `section:${p.index}` }
+    case 'button':
+      return { anchor: `button:${p.id}` }
+    case 'product': {
+      const productId = productIdOf(p.itemKey)
+      return productId ? { anchor: 'product', productId } : null
+    }
+    default:
+      return null
+  }
+}

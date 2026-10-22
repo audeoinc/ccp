@@ -3,11 +3,15 @@ import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
 import type { Candidate, Item } from '../items'
-import type { ProposedHero } from '../aiSelect'
+import type { AiCard, ProposedHero } from '../aiSelect'
 import type { EmailTemplateId } from '../templates'
 import type { LinkSlot, Links } from '../links'
 import type { CardAlertKind } from '../cardAlerts'
 import type { NextStep } from './nextStep'
+import type { AbPurpose, VariantKey } from '../abTest'
+import type { PartRef } from './parts'
+import type { WholeTexts } from './partAi'
+import type { PreviewZoom } from './usePreviewNav'
 
 /** シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部。名前は Form と同じ) */
 export type SimpleField =
@@ -37,6 +41,14 @@ export type SimpleForm = Record<SimpleField, string> & {
   handedOffAt: string
 }
 
+/** プレビューにだけ仮に写す、AI の案(メイン画像・商品) */
+export interface AiPreview {
+  heroId?: string
+  /** テンプレートの選び直しで、乗せているテンプレート */
+  templateId?: EmailTemplateId
+  item?: { key: string; productId: string }
+}
+
 /** 商品のフロートに足す、選んでいる枠への操作(「この枠の商品と入れ替える」など) */
 export interface FloatAction {
   label: string
@@ -51,11 +63,22 @@ export interface FloatAction {
 export interface SimpleEditor {
   card: DeliveryCard
   form: SimpleForm
+  /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
+  aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
   channel: 'email' | 'push'
   template: EmailTemplateId
-  /** 開いている案(AB テストは段階 c。いまは A だけを直す) */
-  abVariants: string[] | null
+  /** AB テスト(SU2)。keys は A を含む案、active はいま直している案(プレビューとペインは、この案の中身) */
+  ab: { keys: VariantKey[]; active: VariantKey; purpose: AbPurpose; canAdd: boolean; busy: boolean } | null
+  abSwitch: (k: VariantKey) => void
+  /** 案を足す(その案の写しから始める。ai は A を写して AI に作らせる)。AB テストでなければ始める */
+  abAdd: (from: VariantKey | 'ai') => void
+  abRemove: (k: VariantKey) => void
+  abCompare: () => void
+  /** テストの設定(タブの横の ⚙ の中身) */
+  abSettings: ReactNode
+  /** いまの案が A と違う部品(「A と違う」の目印) */
+  abDiffParts: PartRef[]
   items: Item[]
   candidates: Candidate[]
   products: Product[]
@@ -70,6 +93,8 @@ export interface SimpleEditor {
   sectionCopies: string[]
   setSectionTitle: (i: number, v: string) => void
   setSectionCopy: (i: number, v: string) => void
+  /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
+  applyTexts: (t: WholeTexts) => void
   links: Links
   setLinks: (l: Links) => void
   linkSpots: LinkSlot[]
@@ -85,6 +110,12 @@ export interface SimpleEditor {
   /** 商品のフロートを開く(載せた商品か候補の鍵。action は、選んでいる枠への操作) */
   openProduct: (key: string, action?: FloatAction) => void
   hoverProduct: (key: string | null) => void
+  /** 載せた商品を、ほかの商品に置き換える(行は作り直す。理由は配信のメモに残す) */
+  replaceItem: (itemKey: string, productId: string, reason: string) => void
+  /** AI の案を、保存する中身を変えずに、プレビューにだけ仮に写す(null で戻す)。商品の item.key が空なら、空いた枠に足して見せる */
+  setAiPreview: (p: AiPreview | null) => void
+  /** テンプレートを替える(セクションの構成が変わるので、残りの候補と AI の案は捨てる。CardDetail の changeTemplate) */
+  setTemplate: (id: EmailTemplateId) => void
   // ---- 反映(保存)と元に戻す
   saving: boolean
   /** 開いたとき・前に反映したときから、内容が変わったか */
@@ -98,13 +129,32 @@ export interface SimpleEditor {
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る・詳しい画面へ + 複製・取りやめ・削除) */
   menu: ReactNode
   stageNav?: ReactNode
+  /** 「シンプル | 詳しい」の切り替え */
+  viewSwitch: ReactNode
   // ---- プレビュー(倍率の計算は CardDetail のまま。箱の ref は、別の引数で渡して、この画面の箱に付ける)
   preview: ReactNode
   device: 'mobile' | 'pc'
   setDevice: (d: 'mobile' | 'pc') => void
-  zoomControls: ReactNode
+  zoom: PreviewZoom
   /** 上の知らせ(取りやめ・AI 下書き・承認済みの変更・確定した週) */
   notices: ReactNode
   /** 下の知らせ(エラー・確定した週の理由の入力欄) */
   footer: ReactNode
+  /** 目印: 商品のアラートの印(プレビューに重ねる層)と、これまでの学びの帯(AI の依頼に学びを渡す役もあるので、隠すときも描く)と、その件数 */
+  alertOverlay: ReactNode
+  // ---- コミュニケーションのペイン(段階 d)
+  /** 制作への引き継ぎ(担当・締め切り・引き継ぎ済み) */
+  setHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
+  /** 工程の残り(引き継ぎのときに知らせる) */
+  remaining: string[]
+  /** これまでに入れた人の名前(宛先の候補) */
+  people: string[]
+  /** 承認の依頼・承認を出せるか(確定した週の配信は、出さない) */
+  canReview: boolean
+  /** 承認・依頼のあとに、配信カードを読み直す */
+  reload: () => Promise<void>
+  /** 制作のページを開く(request: 開いたら、そのまま制作に依頼する。シンプルな画面の「制作に渡す」) */
+  openProduction?: (opts?: { request?: boolean }) => void
+  learnings: ReactNode
+  learnCount: number
 }
