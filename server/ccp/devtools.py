@@ -713,17 +713,45 @@ async def available_models() -> list[str]:
         except Exception:  # noqa: BLE001 — 一覧を出せない環境でも、設定のモデルで動く
             log.info("Vertex AI のモデルの一覧を読めませんでした", exc_info=True)
         _models_cache = pick_models(names)
-    pinned = [m for m in (os.getenv("DEVTOOLS_GEMINI_MODEL"), os.getenv("GEMINI_MODEL")) if m]
-    return list(dict.fromkeys(pinned[:1] + _models_cache + pinned[1:]))
+    pinned = [m for m in (os.getenv("DEVTOOLS_GEMINI_MODEL"), _pro_guess or None, os.getenv("GEMINI_MODEL")) if m]
+    return list(dict.fromkeys(pinned[:-1] + _models_cache + pinned[-1:]))
 
 
 async def default_model() -> str:
     """開発用の画面の既定のモデル。設定(DEVTOOLS_GEMINI_MODEL)があればそれ、なければ一覧でいちばん賢いもの。
     SQL を組み立てるのは、配信の下書きと違って 1 回ずつの呼び出しなので、速さより賢さを取る"""
+    global _pro_guess
     if os.getenv("DEVTOOLS_GEMINI_MODEL"):
         return os.environ["DEVTOOLS_GEMINI_MODEL"]
     models = await available_models()
-    return models[0] if models else os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    pros = [m for m in (_models_cache or []) if "-pro" in m]
+    if pros:
+        return pros[0]
+    # 一覧を読めない環境: CCP のモデル(GEMINI_MODEL)の Flash を Pro に置き換えた名前が、使えるかを 1 度だけ聞く
+    base = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    if _pro_guess is None:
+        _pro_guess = ""
+        guess = pro_of(base)
+        if guess:
+            from . import ai
+
+            try:
+                await ai._get_client().aio.models.get(model=guess)
+                _pro_guess = guess
+            except Exception:  # noqa: BLE001 — その Pro がない・権限がない。CCP のモデルのまま
+                log.info("%s は使えませんでした。%s を使います", guess, base)
+    if _pro_guess:
+        return _pro_guess
+    return models[0] if models else base
+
+
+def pro_of(name: str) -> str | None:
+    """Flash の名前から、同じ版の Pro の名前を作る(gemini-3.8-flash → gemini-3.8-pro)。作れなければ None"""
+    guess = re.sub(r"-flash(-lite)?", "-pro", name, count=1)
+    return guess if guess != name else None
+
+
+_pro_guess: str | None = None
 
 
 @router.get("/ai/models")
