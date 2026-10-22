@@ -2,6 +2,7 @@ import type { Product } from './models/products'
 import type { Item } from './items'
 import { optionLabel, tr } from './i18n'
 import { getTemplate, placedButtons, sectionRange, sectionsOf, type EmailTemplateId, type LinkKind } from './templates'
+import { tableButtonBlocks } from './tables'
 
 /**
  * 配信ごとのリンク先(配信カードの links に JSON で保存する)。
@@ -190,8 +191,16 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
   const heroKind = tpl.heroLink ?? 'campaign'
   const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign), defaultScreen: defaultScreen(heroKind), content: CONTENT_HERO }]
   let buttonNo = 0
-  for (const block of placedButtons(tpl)) {
-    const where = block.at === 0 ? tr('メイン画像の下', 'Below the main image') : tr(`セクション ${block.at} の後`, `After section ${block.at}`)
+  // 表のセクションのボタンは、そのセクションの中にある(以前の形のボタンと合わせて、メールの上から順に)
+  const inTable = new Set(tableButtonBlocks(tpl).flatMap((b) => b.buttons.map((x) => x.id)))
+  const blocks = [...placedButtons(tpl), ...tableButtonBlocks(tpl)].sort((a, b) => a.at - b.at)
+  for (const block of blocks) {
+    const where =
+      block.at === 0
+        ? tr('メイン画像の下', 'Below the main image')
+        : block.buttons.some((b) => inTable.has(b.id))
+          ? tr(`セクション ${block.at}`, `Section ${block.at}`)
+          : tr(`セクション ${block.at} の後`, `After section ${block.at}`)
     block.buttons.forEach((b, i) => {
       const kind = b.link ?? 'campaign'
       const text = b.label?.trim() || (i === 0 ? tr('商品を見る', 'Shop now') : tr('もっと見る', 'See more'))

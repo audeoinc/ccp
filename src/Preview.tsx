@@ -14,7 +14,8 @@ import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
-import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section } from './templates'
+import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section, type TablePart } from './templates'
+import { boxesOf } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { locale, optionLabel, useT } from './i18n'
@@ -708,6 +709,68 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             {(sec.cells ?? []).map((x, j) => (
               <div key={j} style={{ gridColumn: `${x.c + 1} / span ${x.w}`, gridRow: `${x.r + 1} / span ${x.h}`, minHeight: 0, minWidth: 0 }}>
                 {slot(j, tile(x, j), text ? undefined : { aspectRatio: 'auto', height: '100%' }, sec.view === 'detail')}
+              </div>
+            ))}
+          </div>
+        )
+      }
+      case 'table': {
+        // 表: 部品を、表のマスの位置に置く。商品は、箱の順(上の行から、同じ行は左から)に載る。
+        // 写真の箱は、マスの形(横 w・縦 h)の縦横比で、ほかの部品の高さに合わせて伸びる。文を並べる見せ方は、文の高さに合わせる
+        const cols = sec.cols ?? 1
+        const boxNo = new Map(boxesOf(sec).map((p, j) => [p.id, j]))
+        const body = (p: TablePart) => {
+          if (p.type === 'box') {
+            const j = boxNo.get(p.id) ?? 0
+            const text = isTextView(p.view)
+            const big = p.w * p.h > 1
+            const tile = (it: Item, idx: number) =>
+              p.view === 'detail'
+                ? featureTile(it, idx)
+                : p.view === 'story'
+                  ? storyRow(it, idx, j % 2 === 1)
+                  : p.view === 'photo'
+                    ? overlayPhoto(it, idx)
+                    : big
+                      ? overlayTile(it, idx, true)
+                      : gridTile(it, idx)
+            const fill = !text && (big || p.view === 'photo')
+            return (
+              <div style={fill ? { aspectRatio: `${p.w} / ${p.h}`, height: '100%', minHeight: 0 } : undefined}>
+                {slot(j, tile, fill ? { aspectRatio: 'auto', height: '100%' } : undefined, p.view === 'detail')}
+              </div>
+            )
+          }
+          if (p.type === 'button') {
+            return (
+              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 ? '0 20%' : 0 }}>
+                <div
+                  data-link="button"
+                  data-link-id={p.id}
+                  data-anchor={`button:${p.id}`}
+                  data-part={`button:${p.id}`}
+                  className={classes.noWrap}
+                  style={{
+                    textAlign: 'center',
+                    padding: '8px 4px',
+                    borderRadius: 999,
+                    fontSize: '0.8rem',
+                    ...(p.style === 'outline' ? { border: `1px solid ${INK}`, color: INK } : { backgroundColor: offer ? '#d32f2f' : '#222', color: '#fff' }),
+                  }}
+                >
+                  {p.label || defaultButtonLabel(0)}
+                </div>
+              </div>
+            )
+          }
+          if (p.type === 'text') return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center' }}>{p.text ?? ''}</div>
+          return null
+        }
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 8 }}>
+            {(sec.parts ?? []).map((p) => (
+              <div key={p.id} data-part-id={p.id} style={{ gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}`, minWidth: 0, minHeight: 0, display: 'grid' }}>
+                {body(p)}
               </div>
             ))}
           </div>

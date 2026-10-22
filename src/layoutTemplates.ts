@@ -31,6 +31,7 @@ import {
 } from './templates'
 import { tr } from './i18n'
 import { CELL_VIEWS, MAX_CELL_COLS, MAX_CELL_ROWS, cellRows, normalizeCells, type Cell, type CellView } from './cells'
+import { normalizeTable, parsePart, storedPart } from './tables'
 
 /** 保存されたマス目の枠を読む(数でないもの・欠けたものは外す。形は toStored で整える) */
 function parseCells(v: unknown): Cell[] {
@@ -44,8 +45,8 @@ function parseCells(v: unknown): Cell[] {
 const HERO_KINDS: HeroKind[] = ['standard', 'collab', 'offer']
 const HERO_TEXTS: HeroText[] = ['band', 'overlay', 'below']
 
-/** セクションの上限(画面とデータの両方で守る) */
-export const MAX_SECTIONS = 6
+/** セクションの上限(画面とデータの両方で守る)。表にしてから、ボタンだけのセクションもあるので 8(以前の版のアプリは 6 つめまで読む) */
+export const MAX_SECTIONS = 8
 export const MAX_SLOTS = 8
 /** 独立したボタンの部品の上限 */
 export const MAX_BUTTON_BLOCKS = 8
@@ -63,6 +64,22 @@ export function fitSlots(kind: SectionKind, slots: number): number {
 
 /** 保存する形に整える。既定の値(2 列、見出しなし、コピーあり、ボタンなし)は書かない(以前の JSON と同じ形を保つため) */
 export function toStored(s: Section): Section {
+  if (s.kind === 'table') {
+    // 表: 整えた形で、部品の既定の値は書かずに持つ。slots は箱の数(以前の版のアプリは、知らない種類をグリッドとして、この数で読む)
+    const t = normalizeTable(s)
+    return {
+      kind: 'table',
+      slots: t.slots,
+      id: t.id,
+      ...(t.name?.trim() ? { name: t.name.trim().slice(0, 40) } : {}),
+      ...(t.aiNote?.trim() ? { aiNote: t.aiNote.trim().slice(0, 300) } : {}),
+      cols: t.cols,
+      rows: t.rows,
+      parts: (t.parts ?? []).map(storedPart),
+      ...(s.categoryHeading ? { categoryHeading: true } : {}),
+      ...(s.copy === false ? { copy: false } : {}),
+    }
+  }
   if (s.kind === 'cells') {
     // 箱: 列・行の範囲に収め、すき間なく埋めた形にして持つ(枠の順 = 商品の載る順は保つ)。slots は枠の数(以前の版のアプリは、知らない種類をグリッドとして、この数で読む)
     const cols = Math.min(MAX_CELL_COLS, Math.max(1, Math.round(s.cols ?? 2)))
@@ -154,8 +171,32 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
     const sections: Section[] = []
     const buttonBlocks: ButtonBlock[] = []
     for (const r of raw) {
-      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string }
+      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string; id?: unknown; name?: unknown; aiNote?: unknown; rows?: unknown; parts?: unknown }
       if (o?.kind === 'hero' || o?.kind === 'app') continue
+      if (o?.kind === 'table') {
+        // 表: 箱がなくても(ボタンだけのセクションも)読む。埋めた空きの ID は、位置から決める(読むたびに同じ ID に)
+        if (sections.length >= MAX_SECTIONS) continue
+        const si = sections.length
+        const parts = Array.isArray(o.parts) ? o.parts.map(parsePart).filter((x) => x !== null) : []
+        sections.push(
+          normalizeTable(
+            {
+              kind: 'table',
+              id: typeof o.id === 'string' && o.id ? o.id.slice(0, 40) : `sec_${si + 1}`,
+              ...(typeof o.name === 'string' && o.name.trim() ? { name: o.name.slice(0, 40) } : {}),
+              ...(typeof o.aiNote === 'string' && o.aiNote.trim() ? { aiNote: o.aiNote.slice(0, 300) } : {}),
+              cols: Number(o.cols),
+              rows: Number(o.rows),
+              parts,
+              slots: 0,
+              ...(o.categoryHeading ? { categoryHeading: true } : {}),
+              ...(o.copy === false ? { copy: false } : {}),
+            },
+            (c, r) => `emp_${si + 1}_${c + 1}_${r + 1}`,
+          ),
+        )
+        continue
+      }
       if (o?.kind === 'buttons') {
         const buttons = parseButtons(o.buttons)
         if (buttons.length > 0 && buttonBlocks.length < MAX_BUTTON_BLOCKS) buttonBlocks.push({ at: sections.length, buttons })

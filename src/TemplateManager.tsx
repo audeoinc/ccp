@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Badge,
   Button,
@@ -12,9 +12,6 @@ import {
   Input,
   MessageBar,
   MessageBarBody,
-  Popover,
-  PopoverSurface,
-  PopoverTrigger,
   Select,
   Slider,
   Tab,
@@ -25,30 +22,26 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ArrowUpRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, ReOrderDotsVerticalRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { locale, useT } from './i18n'
-import { MAX_BUTTON_BLOCKS, MAX_BUTTON_LABEL, MAX_SECTIONS, MAX_SLOTS, deleteTemplate, fitSlots, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
+import { MAX_BUTTON_LABEL, deleteTemplate, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
 import type { DeliveryCard } from './models/deliveryCards'
 import { statusLabel, statusRank } from './status'
-import { PartThumb, TemplateThumb } from './TemplateThumb'
+import { TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import { Splitter } from './Splitter'
-import { BoxSizePicker, CellEditor } from './CellEditor'
-import { BOX_SAMPLES, CELL_VIEWS, boxSample, cellViewLabel, plainCells, type BoxSample, type CellView } from './cells'
+import { useTableEditor } from './TemplateTableEditor'
+import { toTableLayout } from './tables'
 import {
   DEFAULT_PUSH_TEMPLATE,
   LINK_KINDS,
-  MAX_BUTTONS_PER_BLOCK,
   buttonsAt,
-  defaultButtonLabel,
-  gridColumns,
   linkKindLabel,
   newButtonId,
   placedButtons,
   sectionKindLabel,
   setTemplateManagerOpen,
-  slotStep,
   templateIdOfCard,
   templateOptions,
   useTemplateManagerOpen,
@@ -58,100 +51,58 @@ import {
   pastVersions,
   templateKey,
   builtinOriginal,
-  type ButtonBlock,
-  type ButtonSpec,
   type HeroKind,
   type HeroText,
   type TemplateChannel,
   type PushSpec,
   type LinkKind,
   type Section,
-  type SectionKind,
   type TemplateLayout,
 } from './templates'
 
 /**
- * 編集中の構成は、上から順の部品(セクション・ボタン)の並びで持つ。
- * 保存するときに、セクションの並び(商品の枠の計算に使う)と、ボタンの置く位置(at)に分ける。
- * key は、並べ替えても入力欄の状態が入れ替わらないようにするための、画面だけの ID
+ * 編集中の内容。構成は、表のセクションの並びだけで持つ(T8。docs/TEMPLATE_OBJECTS.md)。
+ * 以前の種類のセクション・独立したボタンは、開いたときに表に直す(tables.ts の toTableLayout。保存すると、以後は表の形で持つ)
  */
-type Part = { key: string; type: 'section'; sec: Section } | { key: string; type: 'buttons'; buttons: ButtonSpec[] }
-
 interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'heroLink'> {
   /** 保存済みの行の ID(新規は undefined) */
   id?: string
   name: string
   description: string
-  parts: Part[]
+  sections: Section[]
   /** アプリのテンプレート: 通知の形(メールのテンプレートでは undefined) */
   push?: PushSpec
   /** 変更のメモ(版の履歴に残す) */
   note?: string
 }
 
-let partSeq = 0
-const partKey = () => `p${++partSeq}`
+/** 編集中の内容から、保存・見取り図に使う構成を作る */
+const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections: d.sections })
 
-/**
- * テンプレートを、部品の並びに直す。以前の形のボタン(ヒーローのボタンの数、セクションの後のボタンの数)は、
- * ここで独立したボタンの部品に置き換える(保存すると、以後は部品として持つ)
- */
-function toParts(layout: TemplateLayout): Part[] {
-  const blocks = placedButtons(layout)
-  const at = (i: number): Part[] => buttonsAt(blocks, i, layout.sections.length).map((buttons) => ({ key: partKey(), type: 'buttons', buttons: buttons.map((x) => ({ ...x })) }))
-  return [...at(0), ...layout.sections.flatMap((sec, i): Part[] => [{ key: partKey(), type: 'section', sec: { ...sec, buttons: undefined } }, ...at(i + 1)])]
-}
-
-/** 部品の並びから、保存・見取り図に使う構成を作る */
-function fromParts(d: Draft): TemplateLayout {
-  const sections: Section[] = []
-  const buttonBlocks: ButtonBlock[] = []
-  for (const p of d.parts) {
-    if (p.type === 'section') sections.push(p.sec)
-    else if (p.buttons.length > 0) buttonBlocks.push({ at: sections.length, buttons: p.buttons })
-  }
-  return { hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections, buttonBlocks }
-}
-
-/**
- * 種類の選択肢。データでは、種類(kind)と、列の数(columns)・左右(flip)の組み合わせで表す。
- * 選び直したときは、その種類で 1 行(1 組)になる枠の数に合わせる(3 列なら 3 点、モザイクなら 3 点)
- */
-// cells: 箱(自由に組む)。cells:見本の ID は、パレットの箱の見本から置くとき
-type SectionLayout = 'grid' | 'grid3' | 'photos' | 'photos3' | 'wide' | 'mosaic' | 'mosaicR' | 'story' | 'feature' | 'cells' | `cells:${string}`
-const LAYOUTS: SectionLayout[] = ['grid', 'grid3', 'photos', 'photos3', 'wide', 'mosaic', 'mosaicR', 'story', 'feature', 'cells']
-const layoutValue = (sec: Section): SectionLayout => {
-  if (sec.kind === 'grid' || sec.kind === 'photos') return gridColumns(sec) === 3 ? `${sec.kind}3` : sec.kind
-  if (sec.kind === 'mosaic') return sec.flip ? 'mosaicR' : 'mosaic'
-  return sec.kind
-}
-/** 構成の形(セクションの種類・列・左右・枠の数と、ボタンの位置・数)。同じなら、見た目の設定のほかは同じテンプレート */
-const shapeOf = (l: TemplateLayout) =>
-  JSON.stringify([
-    l.sections.map((sec) => [layoutValue(sec), sec.slots, sec.kind === 'cells' ? [sec.cols, sec.cells, sec.view ?? 'card'] : null]),
-    // 標準の古い形(ヒーローの後・セクションの後のボタンの数)も、置いた位置のボタンに直してから比べる
-    placedButtons(l).filter((b) => b.buttons.length > 0).map((b) => [Math.max(0, Math.min(b.at, l.sections.length)), b.buttons.length]).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
-  ])
+/** セクションの形(表に直して、部品の種類・位置・大きさ・見せ方)。ID・文言・見出しは比べない */
+const sectionShape = (sec: Section) =>
+  JSON.stringify([sec.cols, sec.rows, [...(sec.parts ?? [])].sort((a, b) => a.r - b.r || a.c - b.c).map((p) => [p.type, p.c, p.r, p.w, p.h, p.view ?? 'card'])])
+/** 構成の形の並び。以前の種類のテンプレートも、表に直してから比べる(同じ見た目なら、同じ形になる) */
+const shapesOf = (l: TemplateLayout) => toTableLayout(l).sections.map(sectionShape)
+/** 構成の形。同じなら、見た目の設定のほかは同じテンプレート */
+const shapeOf = (l: TemplateLayout) => JSON.stringify(shapesOf(l))
 /** 似ている度(0〜1): セクションの形の並びが、どれだけ同じ順に重なるか(最長共通部分列 ÷ 長いほうの数) */
 const similarity = (a: TemplateLayout, b: TemplateLayout) => {
-  const x = a.sections.map(layoutValue)
-  const y = b.sections.map(layoutValue)
+  const x = shapesOf(a)
+  const y = shapesOf(b)
   if (x.length === 0 || y.length === 0) return 0
   const dp = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0))
   for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) dp[i][j] = x[i - 1] === y[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
   return dp[x.length][y.length] / Math.max(x.length, y.length)
 }
-/** 見比べるときの、キャンバスと、並べるテンプレートの幅(2 つ並べても、ダイアログに収まるように少し小さく) */
-const COMPARE_WIDTH = 240
-/** 編集中の列の幅(一覧・キャンバス・部品。設定の列は残り)を覚えておく所(その人のブラウザだけ) */
-const EDITOR_WIDTHS_KEY = 'ccp.templateEditorWidths'
-type EditorWidths = { list: number; canvas: number; palette: number }
-// キャンバスは、見取り図 300px + 余白(押す・つかむ箱が小さすぎないように、一覧の見取り図より大きく)
-const EDITOR_WIDTHS: EditorWidths = { list: 200, canvas: 324, palette: 200 }
+/** 編集中の列の幅(一覧・パーツ・右のタブ。キャンバスは残り)を覚えておく所(その人のブラウザだけ。列の並びを変えたので、以前の鍵とは別) */
+const EDITOR_WIDTHS_KEY = 'ccp.templateEditorWidths2'
+type EditorWidths = { list: number; palette: number; props: number }
+const EDITOR_WIDTHS: EditorWidths = { list: 200, palette: 190, props: 330 }
 const clampWidths = (w: EditorWidths): EditorWidths => ({
   list: Math.round(Math.min(400, Math.max(160, w.list))),
-  canvas: Math.round(Math.min(760, Math.max(220, w.canvas))),
-  palette: Math.round(Math.min(340, Math.max(160, w.palette))),
+  palette: Math.round(Math.min(300, Math.max(150, w.palette))),
+  props: Math.round(Math.min(560, Math.max(260, w.props))),
 })
 function loadEditorWidths(): EditorWidths {
   try {
@@ -179,49 +130,23 @@ function loadZoom(): number | 'fit' {
 /** 倍率を広げたときの、一覧で見ているプレビューの最大の幅(設定の欄を押しつぶさないように) */
 const PREVIEW_MAX = 560
 
-/** 設定の列の最小の幅(ボタンの行が収まる幅)。ほかの列を広げても、これより狭くしない */
-const FIELDS_MIN = 340
+/** キャンバスの列の最小の幅(メールの形が読める大きさ)。ほかの列を広げても、これより狭くしない */
+const CANVAS_MIN = 380
 /** 列の間(境界 3 本 + 間隔 6 つ) */
 const EDITOR_GAPS = 3 + 6 * 10
 /** 編集中の左の一覧の開け閉めを覚えておく所(その人のブラウザだけ) */
 const COMPARE_OPEN_KEY = 'ccp.templateCompareOpen'
 
-/** 箱の見本から、セクションを作る */
-const cellsSection = (p: BoxSample): Section => ({ kind: 'cells', cols: p.cols, cells: p.cells.map((x) => ({ ...x })), slots: p.cells.length, ...(p.view ? { view: p.view } : {}) })
-const layoutSection = (v: SectionLayout): Section => {
-  switch (v) {
-    case 'grid3':
-      return { kind: 'grid', columns: 3, slots: 3 }
-    case 'photos3':
-      return { kind: 'photos', columns: 3, slots: 6 }
-    case 'mosaicR':
-      return { kind: 'mosaic', flip: true, slots: 3 }
-    case 'cells':
-      return cellsSection(BOX_SAMPLES[0])
-    default: {
-      if (v.startsWith('cells:')) return cellsSection(boxSample(v.slice(6)) ?? BOX_SAMPLES[0])
-      return { kind: v as Exclude<SectionKind, 'cells'>, slots: v === 'mosaic' ? 3 : v === 'wide' ? 1 : 2 }
-    }
-  }
-}
-const layoutPatch = (v: SectionLayout, sec: Section): Section => {
-  const next = layoutSection(v)
-  // 並び方だけを変える。見出し・コピーの設定は、そのまま残す
-  return { ...next, categoryHeading: sec.categoryHeading, copy: sec.copy }
-}
-
 /** 構成のプレビューの幅。一覧の見取り図(84px)では、枠の数や列が読み取りにくいため、大きく描く */
 const PREVIEW_WIDTH = 220
 
+/** 新規作成の初めの形(以前の新規作成と同じ見た目: ヒーローの下にボタン、2 × 2 の箱) */
 const newDraft = (): Draft => ({
   name: '',
   description: '',
   hero: 'standard',
   heroText: 'below',
-  parts: [
-    { key: partKey(), type: 'buttons', buttons: [{ id: newButtonId() }] },
-    { key: partKey(), type: 'section', sec: { kind: 'grid', slots: 4 } },
-  ],
+  sections: toTableLayout({ hero: 'standard', sections: [{ kind: 'grid', slots: 4 }], buttonBlocks: [{ at: 0, buttons: [{ id: newButtonId() }] }] }).sections,
 })
 
 const useStyles = makeStyles({
@@ -421,6 +346,16 @@ const useStyles = makeStyles({
   dropEnd: { minHeight: '28px', display: 'grid', placeItems: 'center', fontSize: '12px', color: tokens.colorNeutralForeground3, borderRadius: tokens.borderRadiusMedium },
   dropEndOn: { border: `1.5px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
   num: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
+  // 右のタブ「テンプレート」のまとまり
+  tplTab: { display: 'grid', rowGap: '12px', minWidth: 0 },
+  grp: { display: 'grid', rowGap: '8px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  grpTitle: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
+  kv: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', columnGap: '8px', fontSize: '12px', minHeight: '24px' },
+  kvLabel: { color: tokens.colorNeutralForeground3 },
+  tree: { display: 'grid', rowGap: '2px' },
+  treeItem: { textAlign: 'left', fontSize: '12px', padding: '4px 6px', border: 'none', borderRadius: tokens.borderRadiusMedium, backgroundColor: 'transparent', color: tokens.colorNeutralForeground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  propsCol: { gridArea: 'fields', position: 'sticky', top: 0, maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px', minWidth: 0 },
+  compareThumb: { paddingLeft: '4px' },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
 
@@ -566,7 +501,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       // 覚えられなくても、幅は変えられる
     }
   }, [colW])
-  // 列を並べた枠の幅。広げすぎて設定の列が押し出されないように、ほかの列の上限を、ここから決める
+  // 列を並べた枠の幅。広げすぎてキャンバスが押しつぶされないように、ほかの列の上限を、ここから決める
   const [gridW, setGridW] = useState(0)
   const gridObs = useRef<ResizeObserver | null>(null)
   // 描くたびに付け直さないように、同じ関数を使う
@@ -582,8 +517,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     setColW((w) => {
       const next = clampWidths({ ...w, [key]: w[key] + sign * dx })
       if (!gridW) return next
-      // 広げるのは、設定の列が最小の幅を保てるところまで
-      const room = gridW - EDITOR_GAPS - FIELDS_MIN - (listOpen ? next.list : 32) - next.canvas - next.palette
+      // 広げるのは、キャンバスが最小の幅を保てるところまで
+      const room = gridW - EDITOR_GAPS - CANVAS_MIN - (listOpen ? next.list : 32) - next.palette - next.props
       return room >= 0 || sign * dx < 0 ? next : { ...next, [key]: Math.max(w[key], next[key] + room) }
     })
 
@@ -597,9 +532,6 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     overlay: t('写真に大きく重ねる', 'Large over the photo'),
     below: t('写真の下に置く', 'Below the photo'),
   }
-  const layoutLabel = (v: SectionLayout) =>
-    v === 'cells' ? t('箱(自由に組む)', 'Box (build your own)') : v.startsWith('cells:') ? (boxSample(v.slice(6))?.label() ?? '') : sectionKindLabel(layoutSection(v))
-  const styleLabel = (b: ButtonSpec) => (b.style === 'outline' ? t('枠線', 'Outline') : t('塗り', 'Filled'))
 
   const close = () => {
     setTemplateManagerOpen(false)
@@ -620,14 +552,12 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     setError(null)
     setSelectedId('')
     setCompareId(null)
-    setFolded(new Set()) // 開くたびに、すべて開いた形から
     setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, buttons: [] } } : newDraft())
   }
   const startDuplicate = () => {
     if (!selected) return
     setError(null)
     setCompareId(null)
-    setFolded(new Set()) // 開くたびに、すべて開いた形から
     setDraft({
       name: t(`${selected.label} のコピー`, `Copy of ${selected.label}`),
       description: selected.description,
@@ -635,7 +565,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       heroText: selected.heroText,
       topBar: selected.topBar,
       heroLink: selected.heroLink,
-      parts: toParts(selected),
+      sections: toTableLayout(selected).sections,
       push: selected.push ? { ...selected.push, buttons: [...selected.push.buttons] } : undefined,
     })
     setSelectedId('')
@@ -643,12 +573,10 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   // 自由な並び(free)は、決まった構成がないので、編集するものがない
   const canEdit = (o?: { id: string }) => !!o && o.id !== 'free'
   const startEdit = () => {
-    setSelectedKey(null)
     if (!selected || !canEdit(selected)) return
     setError(null)
     setCompareId(null)
-    setFolded(new Set()) // 開くたびに、すべて開いた形から
-    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, parts: toParts(selected), push: selected.push })
+    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, sections: toTableLayout(selected).sections, push: selected.push })
   }
 
   // ---- 元に戻す・やり直す。編集中の内容が変わるたびに、前の内容を残す(続けて打った文字は 0.6 秒の間をまとめて 1 つにする)
@@ -690,146 +618,22 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     h.skip = true
     setDraft(fwd)
   }
-  // 部品を消したときは、すぐ下に「元に戻す」を出す(押し間違いを、その場で取り消せるように)
-  const [removedAt, setRemovedAt] = useState<number | null>(null)
-  useEffect(() => {
-    if (removedAt === null) return
-    const id = window.setTimeout(() => setRemovedAt(null), 6000)
-    return () => window.clearTimeout(id)
-  }, [removedAt])
-
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d))
-  const setParts = (fn: (parts: Part[]) => Part[]) => setDraft((d) => (d ? { ...d, parts: fn(d.parts) } : d))
-  const patchSection = (key: string, p: Partial<Section>) => setParts((list) => list.map((x) => (x.key === key && x.type === 'section' ? { ...x, sec: { ...x.sec, ...p } } : x)))
-  const setButtons = (key: string, fn: (buttons: ButtonSpec[]) => ButtonSpec[]) =>
-    setParts((list) => list.map((x) => (x.key === key && x.type === 'buttons' ? { ...x, buttons: fn(x.buttons) } : x)))
-  const patchButton = (key: string, id: string, p: Partial<ButtonSpec>) => setButtons(key, (list) => list.map((b) => (b.id === id ? { ...b, ...p } : b)))
-  const movePart = (i: number, delta: number) =>
-    setParts((list) => {
-      const j = i + delta
-      if (j < 0 || j >= list.length) return list
-      const next = [...list]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
-    })
-  const removePart = (key: string) => {
-    setParts((list) => list.filter((x) => x.key !== key))
-    setRemovedAt((n) => (n ?? 0) + 1)
-  }
-  /** 部品を複製して、すぐ後ろに置く(同じ形のセクションを続けて置きたいとき) */
-  const duplicatePart = (key: string) =>
-    setParts((list) => {
-      const i = list.findIndex((x) => x.key === key)
-      if (i < 0) return list
-      const p = list[i]
-      if (p.type === 'section' ? list.filter((x) => x.type === 'section').length >= MAX_SECTIONS : list.filter((x) => x.type === 'buttons').length >= MAX_BUTTON_BLOCKS) return list
-      const copy: Part = p.type === 'section' ? { key: partKey(), type: 'section', sec: { ...p.sec } } : { key: partKey(), type: 'buttons', buttons: p.buttons.map((b) => ({ ...b, id: newButtonId() })) }
-      const next = [...list]
-      next.splice(i + 1, 0, copy)
-      return next
-    })
+  const setSections = (fn: (list: Section[]) => Section[]) => setDraft((d) => (d ? { ...d, sections: fn(d.sections) } : d))
+  // 右のタブ「テンプレート」の、全体の見た目の欄(キャンバスのヒーローを押したときに、そこを見せる)
+  const heroRef = useRef<HTMLDivElement>(null)
+  const editor = useTableEditor({
+    active: editing,
+    sections: draft?.sections ?? [],
+    setSections,
+    hero: draft?.hero ?? 'standard',
+    heroText: draft?.heroText,
+    topBar: draft?.topBar,
+    onSelectHero: () => window.setTimeout(() => heroRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0),
+  })
 
-  // ---- ドラッグ&ドロップ: パレットの部品を構成の好きな位置に入れる・構成の部品を並べ替える。
-  // つかんでいるもの(構成の部品の key か、パレットの「new:種類」)と、入れる位置(その前に入れる番号)を持つ
-  const [dragKey, setDragKey] = useState<string | null>(null)
-  // 選んでいる部品(プレビューの箱を押す・左のカードを押す)。プレビューの箱に枠と道具、左のカードに枠を出し、左はその位置までスクロールする
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  // 右の設定の、閉じているまとまり(info・push・hero・部品の key)。キャンバスで選んだ部品は開く
-  const [folded, setFolded] = useState<Set<string>>(new Set())
-  const toggleFold = (key: string) =>
-    setFolded((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  /** まとまりの開け閉めのボタン(見出しの先頭に置く) */
-  const foldButton = (key: string) => (
-    <Button
-      size="small"
-      appearance="transparent"
-      className={s.foldButton}
-      icon={folded.has(key) ? <ChevronRightRegular /> : <ChevronDownRegular />}
-      aria-expanded={!folded.has(key)}
-      aria-label={folded.has(key) ? t('開く', 'Expand') : t('閉じる', 'Collapse')}
-      onClick={(e) => {
-        e.stopPropagation()
-        toggleFold(key)
-      }}
-    />
-  )
-  const selectPart = (key: string, scroll: boolean) => {
-    setSelectedKey(key)
-    setFolded((prev) => {
-      if (!prev.has(key)) return prev
-      const next = new Set(prev)
-      next.delete(key)
-      return next
-    })
-    if (scroll) window.setTimeout(() => document.getElementById(`tplpart-${key}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0)
-  }
-  const [dropAt, setDropAt] = useState<number | null>(null)
-  const endDrag = () => {
-    setDragKey(null)
-    setDropAt(null)
-  }
-  /**
-   * パレットの部品の鍵: box(箱。大きさは選ぶ)・buttons・cells:見本の ID(箱の見本)・combo:ID(組み合わせの見本。いくつかの部品をまとめて置く)。
-   * 以前の部品の種類(grid など)の鍵も、そのまま使える
-   */
-  const combos = (): { id: string; keys: string[]; label: string; help: string }[] => [
-    { id: 'lead', keys: ['cells:wide1', 'cells:grid2'], label: t('主役 1 + 2 列', 'Lead item + 2 columns'), help: t('大きく 1 点のあとに、2 列で 4 点', 'One large item, then four in two columns') },
-    { id: 'featureGrid', keys: ['cells:feature2', 'cells:grid3'], label: t('特集 2 点 + 3 列', '2 features + 3 columns'), help: t('写真の横に説明を 2 点、そのあと 3 列で 6 点', 'Two features with text, then six in three columns') },
-    { id: 'bigButton', keys: ['cells:big4', 'buttons'], label: t('大 1 + 小 4 + ボタン', '1 large + 4 small + button'), help: t('新作と色違いを並べ、ボタンで一覧へ', 'A new item and its colors, then a button to the list') },
-    { id: 'story', keys: ['cells:story3', 'buttons'], label: t('ストーリー 3 点 + ボタン', 'Story (3) + button'), help: t('読ませる特集のあとにボタン', 'An editorial feature, then a button') },
-  ]
-  const partsFor = (key: string, size?: [number, number]): Part[] => {
-    if (key === 'buttons') return [{ key: partKey(), type: 'buttons', buttons: [{ id: newButtonId(), style: 'outline' }] }]
-    if (key === 'box') {
-      const [c, r] = size ?? [2, 2]
-      return [{ key: partKey(), type: 'section', sec: { kind: 'cells', cols: c, cells: plainCells(c, r), slots: c * r } }]
-    }
-    if (key.startsWith('combo:')) return (combos().find((x) => x.id === key.slice(6))?.keys ?? []).flatMap((k) => partsFor(k))
-    return [{ key: partKey(), type: 'section', sec: layoutSection(key as SectionLayout) }]
-  }
-  /** 上限(セクション 6・ボタンの部品 8)を超えるなら、足せない(組み合わせは、全部が入るときだけ) */
-  const canAdd = (key: string) => {
-    const ps = partsFor(key)
-    const secs = ps.filter((p) => p.type === 'section').length
-    return sectionCount + secs <= MAX_SECTIONS && blockCount + (ps.length - secs) <= MAX_BUTTON_BLOCKS
-  }
-  const addPart = (key: string, at?: number, size?: [number, number]) => {
-    if (!canAdd(key)) return
-    const ps = partsFor(key, size)
-    setParts((list) => {
-      const next = [...list]
-      next.splice(at ?? next.length, 0, ...ps)
-      return next
-    })
-    // 置いた部品(組み合わせなら最初の部品)を選び、右の設定で開く
-    selectPart(ps[0].key, true)
-  }
-  /** 落とした: パレットの部品なら足し、構成の部品なら動かす */
-  const drop = () => {
-    const key = dragKey
-    const at = dropAt
-    endDrag()
-    if (!key || at === null) return
-    if (key.startsWith('new:')) {
-      addPart(key.slice(4), at)
-      return
-    }
-    setParts((list) => {
-      const from = list.findIndex((x) => x.key === key)
-      if (from < 0) return list
-      const next = [...list]
-      const [moved] = next.splice(from, 1)
-      next.splice(from < at ? at - 1 : at, 0, moved)
-      return next
-    })
-  }
   // 編集中の形と、ほかのテンプレートとの比べ(同じ構成を先に、あとは似ている順)
-  const mine = draft ? fromParts(draft) : null
+  const mine = draft ? layoutOf(draft) : null
   const others = mine
     ? options
         .filter((o) => o.id !== draft?.id && o.id !== 'free' && !o.hidden)
@@ -837,14 +641,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
         .sort((a, b) => Number(b.same) - Number(a.same) || b.score - a.score)
     : []
   const sameAs = others.find((x) => x.same)
-  const compared = compareId ? options.find((o) => o.id === compareId) : undefined
-  // キャンバスの列の幅から、見取り図の幅を決める。見比べるときは 2 つ並べるので、列を広げて半分ずつ
-  const canvasRoom = gridW ? gridW - EDITOR_GAPS - FIELDS_MIN - (listOpen ? colW.list : 32) - colW.palette : Infinity
-  const canvasCol = Math.max(220, Math.min(compared ? Math.max(colW.canvas, COMPARE_WIDTH * 2 + 36) : colW.canvas, canvasRoom))
-  const canvasBase = compared ? Math.floor((canvasCol - 36) / 2) : canvasCol - 24
-  const canvasWidth = zoomed(canvasBase)
 
-  /** 左の列: ほかのテンプレート(押すと、キャンバスの隣に並べて見比べる)。閉じると細い帯 */
+  /** 左の列: ほかのテンプレート(押すと、その下に大きく出して見比べる)。閉じると細い帯 */
   const compareCol = () =>
     listOpen ? (
       <aside className={s.compareCol} aria-label={t('ほかのテンプレート', 'Other templates')}>
@@ -855,35 +653,42 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
           </Tooltip>
         </div>
         {others.map(({ o, same, score }) => (
-          <div
-            key={o.id}
-            role="button"
-            tabIndex={0}
-            aria-pressed={compareId === o.id}
-            className={mergeClasses(s.compareItem, compareId === o.id && s.itemSelected)}
-            onClick={() => setCompareId((v) => (v === o.id ? null : o.id))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                setCompareId((v) => (v === o.id ? null : o.id))
-              }
-            }}
-          >
-            {o.push ? <PushThumb spec={o.push} width={64} /> : <TemplateThumb layout={o} maxHeight={110} />}
-            <span className={s.itemText}>
-              <span className={s.itemName}>{o.label}</span>
-              {same ? (
-                <Badge size="small" appearance="tint" color="warning">
-                  {t('同じ構成', 'Same layout')}
-                </Badge>
-              ) : (
-                score >= 0.6 && (
-                  <Badge size="small" appearance="outline" color="informative">
-                    {t('似ている', 'Similar')}
+          <div key={o.id} style={{ display: 'grid', rowGap: 4 }}>
+            <div
+              role="button"
+              tabIndex={0}
+              aria-pressed={compareId === o.id}
+              className={mergeClasses(s.compareItem, compareId === o.id && s.itemSelected)}
+              onClick={() => setCompareId((v) => (v === o.id ? null : o.id))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setCompareId((v) => (v === o.id ? null : o.id))
+                }
+              }}
+            >
+              {o.push ? <PushThumb spec={o.push} width={64} /> : <TemplateThumb layout={o} maxHeight={110} />}
+              <span className={s.itemText}>
+                <span className={s.itemName}>{o.label}</span>
+                {same ? (
+                  <Badge size="small" appearance="tint" color="warning">
+                    {t('同じ構成', 'Same layout')}
                   </Badge>
-                )
-              )}
-            </span>
+                ) : (
+                  score >= 0.6 && (
+                    <Badge size="small" appearance="outline" color="informative">
+                      {t('似ている', 'Similar')}
+                    </Badge>
+                  )
+                )}
+              </span>
+            </div>
+            {/* 見比べる: 一覧の幅いっぱいに、大きく描く */}
+            {compareId === o.id && (
+              <div className={s.compareThumb}>
+                <TemplateThumb layout={o} width={Math.max(140, colW.list - 16)} />
+              </div>
+            )}
           </div>
         ))}
       </aside>
@@ -898,113 +703,12 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       </aside>
     )
 
-  /** パレットの部品の、まとまり(ベース部品 → 見本)。ベース部品で何でも組め、よく使う形は見本から置ける */
-  const paletteGroups = (): { label: string; items: string[] }[] => [
-    { label: t('ベース部品', 'Base parts'), items: ['box', 'buttons'] },
-    { label: t('サンプル(箱)', 'Samples (box)'), items: BOX_SAMPLES.map((p) => `cells:${p.id}`) },
-    { label: t('サンプル(組み合わせ)', 'Samples (combinations)'), items: combos().map((c) => `combo:${c.id}`) },
-  ]
-  const paletteName = (k: string): string =>
-    k === 'box'
-      ? t('箱', 'Box')
-      : k === 'buttons'
-        ? t('ボタン', 'Buttons')
-        : k.startsWith('combo:')
-          ? (combos().find((c) => c.id === k.slice(6))?.label ?? '')
-          : layoutLabel(k as SectionLayout)
-  const partHelp = (k: string): string =>
-    k === 'box'
-      ? t('押して、マス目で列と行を選んで置く(ドラッグすると 2 × 2)。置いたあと、なぞって枠をまとめ、見せ方を選べる', 'Click to pick columns and rows (drag places a 2 × 2). Then merge cells and choose how items look')
-      : k === 'buttons'
-        ? t('ボタンを置く(1〜2 個)。セクションの間の好きな位置に', 'Place buttons (1–2) anywhere between sections')
-        : k.startsWith('combo:')
-          ? `${combos().find((c) => c.id === k.slice(6))?.help ?? ''}${t('(まとめて置き、あとで 1 つずつ直せます)', ' (placed together; edit each part afterwards)')}`
-          : `${boxSample(k.slice(6))?.help() ?? ''}${t('(置いたあと、マス目と見せ方を直せます)', ' (edit the cells and look after placing it)')}`
-  const [boxPickerOpen, setBoxPickerOpen] = useState(false)
-  /** 部品の絵(組み合わせは、部品を縦に重ねる) */
-  const paletteThumb = (k: string) =>
-    // 描くたびに部品の key が新しくなるので、絵の key は並びの番号にする(描き直しで作り直さないように)
-    partsFor(k).map((p, i) => (p.type === 'section' ? <PartThumb key={i} sec={p.sec} width={56} /> : <PartThumb key={i} buttons={[{ id: 'a' }, { id: 'b', style: 'outline' }]} width={56} />))
-  /** 部品の列(一覧の右): 上限の目盛りと、絵つきの部品のパレット(構成・キャンバスへドラッグ。押すと、いちばん下に足す) */
-  const paletteCol = () => (
-    <aside className={s.paletteCol} aria-label={t('部品', 'Parts')}>
-      <div className={s.meter}>
-        <span className={mergeClasses(s.meterItem, sectionCount >= MAX_SECTIONS && s.meterFull)}>{t(`セクション ${sectionCount}/${MAX_SECTIONS}`, `Sections ${sectionCount}/${MAX_SECTIONS}`)}</span>
-        <span className={mergeClasses(s.meterItem, blockCount >= MAX_BUTTON_BLOCKS && s.meterFull)}>{t(`ボタン ${blockCount}/${MAX_BUTTON_BLOCKS}`, `Buttons ${blockCount}/${MAX_BUTTON_BLOCKS}`)}</span>
-        <span className={s.meterItem}>{t(`商品の枠 ${totalSlots} 点`, `${totalSlots} product slots`)}</span>
-      </div>
-      <span className={s.paletteHead}>{t('部品(キャンバスや構成へドラッグ。押すと、いちばん下に足す)', 'Parts (drag onto the canvas or the layout; click to add at the bottom)')}</span>
-      {paletteGroups().map((g) => (
-        <div key={g.label} className={s.paletteGroup}>
-          <span className={s.paletteGroupHead}>{g.label}</span>
-          {g.items.map((k) => {
-            const item = (
-              <div
-                role="button"
-                tabIndex={0}
-                draggable={canAdd(k)}
-                aria-disabled={!canAdd(k)}
-                className={mergeClasses(s.paletteItem, !canAdd(k) && s.chipOff)}
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = 'copy'
-                  e.dataTransfer.setData('text/plain', `new:${k}`)
-                  setDragKey(`new:${k}`)
-                }}
-                onDragEnd={endDrag}
-                onClick={() => (k === 'box' ? setBoxPickerOpen(canAdd(k)) : addPart(k))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    if (k === 'box') setBoxPickerOpen(canAdd(k))
-                    else addPart(k)
-                  }
-                }}
-              >
-                <span className={s.paletteThumb}>{paletteThumb(k)}</span>
-                <span className={s.paletteName}>{paletteName(k)}</span>
-              </div>
-            )
-            // 箱は、押すとマス目で大きさを選ぶ(Confluence の表の作成と同じ)
-            return k === 'box' ? (
-              <Popover key={k} open={boxPickerOpen} onOpenChange={(_, d) => setBoxPickerOpen(d.open)} positioning="after" withArrow>
-                <PopoverTrigger disableButtonEnhancement>{item}</PopoverTrigger>
-                <PopoverSurface>
-                  <BoxSizePicker
-                    maxSlots={MAX_SLOTS}
-                    onPick={(c, r) => {
-                      setBoxPickerOpen(false)
-                      addPart('box', undefined, [c, r])
-                    }}
-                  />
-                </PopoverSurface>
-              </Popover>
-            ) : (
-              <Tooltip key={k} relationship="description" positioning="after" content={canAdd(k) ? partHelp(k) : t('上限まで使っています', 'Limit reached')}>
-                {item}
-              </Tooltip>
-            )
-          })}
-        </div>
-      ))}
-    </aside>
-  )
-
-  /** 部品の上をドラッグしているとき: 上半分ならその前、下半分ならその後に入れる */
-  const overPart = (e: DragEvent<HTMLDivElement>, i: number) => {
-    if (!dragKey) return
-    e.preventDefault()
-    const r = e.currentTarget.getBoundingClientRect()
-    setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1)
-  }
-
+  // 元に戻す・やり直す(入力欄の中では、ブラウザの元に戻すなどを、そのまま使う)。表の操作のキーは、表の編集(TemplateTableEditor)が受ける
   useEffect(() => {
     if (!draft) return
     const onKey = (e: KeyboardEvent) => {
-      // 入力欄の中では、ブラウザの元に戻すなどを、そのまま使う
-      const el = e.target as HTMLElement | null
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return
       const mod = e.ctrlKey || e.metaKey
-      const i = draft.parts.findIndex((p) => p.key === selectedKey)
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (e.shiftKey) redo()
@@ -1012,29 +716,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
         redo()
-      } else if (mod && e.key.toLowerCase() === 'd' && i >= 0) {
-        e.preventDefault()
-        duplicatePart(draft.parts[i].key)
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && i >= 0) {
-        const p = draft.parts[i]
-        if (p.type === 'section' && draft.parts.filter((x) => x.type === 'section').length <= 1) return
-        e.preventDefault()
-        removePart(p.key)
-      } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && i >= 0) {
-        e.preventDefault()
-        const d = e.key === 'ArrowUp' ? -1 : 1
-        if (e.altKey) movePart(i, d)
-        else if (draft.parts[i + d]) selectPart(draft.parts[i + d].key, true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const sectionCount = draft?.parts.filter((p) => p.type === 'section').length ?? 0
-  const blockCount = draft?.parts.filter((p) => p.type === 'buttons').length ?? 0
-  const totalSlots = (draft?.parts ?? []).reduce((n, p) => n + (p.type === 'section' ? p.sec.slots : 0), 0)
-  const valid = !!draft && draft.name.trim() !== '' && (sectionCount > 0 || !!draft.push)
+  const countParts = (type: string) => (draft?.sections ?? []).reduce((n, sec) => n + (sec.parts ?? []).filter((p) => p.type === type).length, 0)
+  const boxCount = countParts('box')
+  const valid = !!draft && draft.name.trim() !== '' && (draft.sections.length > 0 || !!draft.push)
 
   /** 操作をまとめて行う(失敗したら知らせる。配信を付け替えたら、配信を読み直す) */
   const run = async (fn: () => Promise<void>) => {
@@ -1065,7 +755,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     )
       return
     await run(async () => {
-      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...fromParts(draft), push: draft.push }, cards, draft.note ?? '')
+      const id = await saveTemplate({ id: draft.id, name: draft.name, description: draft.description, ...layoutOf(draft), push: draft.push }, cards, draft.note ?? '')
       if (used > 0) await onChanged()
       setSelectedId(id)
       setDraft(null)
@@ -1237,173 +927,153 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   )
 
   /** 構成の要約(上から順に。ボタンも、置いた位置に並べる) */
-  const summary = (layout: TemplateLayout) =>
-    toParts(layout)
-      .map((p) =>
-        p.type === 'section'
-          ? `${sectionKindLabel(p.sec)}${t(` ${p.sec.slots}点`, ` ×${p.sec.slots}`)}${p.sec.categoryHeading ? t('(見出し付き)', ' (heading)') : ''}${p.sec.copy === false ? t('(コピーなし)', ' (no copy)') : ''}`
-          : t(`ボタン ${p.buttons.length}`, `${p.buttons.length} button(s)`),
-      )
-      .join(' → ')
+  const summary = (layout: TemplateLayout) => {
+    const blocks = placedButtons(layout)
+    const at = (i: number) => buttonsAt(blocks, i, layout.sections.length).map((b) => t(`ボタン ${b.length}`, `${b.length} button(s)`))
+    const flags = (sec: Section) => `${sec.categoryHeading ? t('(見出し付き)', ' (heading)') : ''}${sec.copy === false ? t('(コピーなし)', ' (no copy)') : ''}`
+    const text = (sec: Section) => {
+      if (sec.kind !== 'table') return `${sectionKindLabel(sec)}${t(` ${sec.slots}点`, ` ×${sec.slots}`)}${flags(sec)}`
+      const buttons = (sec.parts ?? []).filter((p) => p.type === 'button').length
+      return `${sec.name?.trim() ? `${sec.name.trim()} ` : ''}${sectionKindLabel(sec)}${t(` 商品 ${sec.slots}点`, ` ×${sec.slots}`)}${buttons ? t(`・ボタン ${buttons}`, `, ${buttons} button(s)`) : ''}${flags(sec)}`
+    }
+    return [...at(0), ...layout.sections.flatMap((sec, i) => [text(sec), ...at(i + 1)])].join(' → ')
+  }
 
-  // ---- 部品のカード
-  const partActions = (i: number, p: Part) => (
-    <>
-      <Button size="small" appearance="subtle" icon={<CopyRegular />} onClick={() => duplicatePart(p.key)} aria-label={t('複製', 'Duplicate')} />
-      <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={() => movePart(i, -1)} aria-label={t('上へ', 'Move up')} />
-      <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === (draft?.parts.length ?? 0) - 1} onClick={() => movePart(i, 1)} aria-label={t('下へ', 'Move down')} />
-      <Button
-        size="small"
-        appearance="subtle"
-        icon={<DeleteRegular />}
-        disabled={p.type === 'section' && sectionCount <= 1}
-        onClick={() => removePart(p.key)}
-        aria-label={p.type === 'section' ? t('このセクションを削除', 'Remove this section') : t('このボタンの部品を削除', 'Remove these buttons')}
-      />
-    </>
-  )
-
-  const sectionCard = (p: Extract<Part, { type: 'section' }>, i: number, no: number) => {
-    const sec = p.sec
+  /** 右のタブ「テンプレート」: 基本・通知・全体の見た目・状況・構成 */
+  const templateTab = (d: Draft) => {
+    const cur = d.id ? currentVersion(d.id) : 0
+    const used = d.id ? usageOf(d.id).total : 0
+    const kv = (label: string, value: React.ReactNode) => (
+      <div className={s.kv}>
+        <span className={s.kvLabel}>{label}</span>
+        {value}
+      </div>
+    )
     return (
-      <div key={p.key} className={s.card}>
-        <div className={s.cardHead}>
-          <span
-            className={s.handle}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = 'move'
-              e.dataTransfer.setData('text/plain', p.key)
-              setDragKey(p.key)
-            }}
-            onDragEnd={endDrag}
-            title={t('つかんで動かす', 'Drag to move')}
-            aria-hidden
-          >
-            <ReOrderDotsVerticalRegular />
-          </span>
-          {foldButton(p.key)}
-          <Badge size="small" appearance="tint" color="brand">{t(`セクション ${no}`, `Section ${no}`)}</Badge>
-          <span className={s.caption}>{`${sectionKindLabel(sec)} · ${t(`${sec.slots} 点`, `${sec.slots} items`)}`}</span>
-          <span className={s.grow} />
-          {partActions(i, p)}
-        </div>
-        {!folded.has(p.key) && (
-        <div className={s.sectionBody}>
-          <Field label={t('商品の並び方', 'Product layout')}>
-            <Select size="small" className={s.fill} value={layoutValue(sec)} onChange={(_, d) => patchSection(p.key, layoutPatch(d.value as SectionLayout, sec))}>
-              {LAYOUTS.map((v) => (
-                <option key={v} value={v}>{layoutLabel(v)}</option>
-              ))}
-            </Select>
+      <div className={s.tplTab}>
+        <div className={s.grp}>
+          <span className={s.grpTitle}>{t('基本', 'Basics')}</span>
+          <Field label={t('テンプレート名', 'Template name')} required size="small">
+            <Input size="small" value={d.name} onChange={(_, x) => patch({ name: x.value })} />
           </Field>
-          {sec.kind === 'cells' && (
-            <Field label={t('見せ方', 'Look')}>
-              <Select size="small" className={s.fill} value={sec.view ?? 'card'} onChange={(_, d) => patchSection(p.key, { view: d.value === 'card' ? undefined : (d.value as CellView) })}>
-                {CELL_VIEWS.map((v) => (
-                  <option key={v} value={v}>{cellViewLabel(v)}</option>
-                ))}
-              </Select>
+          {d.id && (
+            <Field label={t(`変更のメモ(任意。版 ${cur + 1} の履歴に残ります)`, `Change note (optional; kept in the v${cur + 1} history)`)} size="small">
+              <Input size="small" value={d.note ?? ''} placeholder={t('例: 2 列を 3 列に', 'e.g. 2 columns to 3')} onChange={(_, x) => patch({ note: x.value })} />
             </Field>
           )}
-          {sec.kind === 'cells' ? (
-            <div className={s.cellsField}>
-              <CellEditor cols={sec.cols ?? 2} cells={sec.cells ?? []} maxSlots={MAX_SLOTS} onChange={(cols, cells) => patchSection(p.key, { cols, cells, slots: cells.length })} />
+          <Field label={t('説明', 'Description')} size="small">
+            <AutoTextarea rows={2} size="small" value={d.description} onChange={(_, x) => patch({ description: x.value })} />
+          </Field>
+        </div>
+
+        {d.push && (
+          <div className={s.grp}>
+            <span className={s.grpTitle}>{t('通知', 'Notification')}</span>
+            <span className={s.caption}>{t('アプリの通知の形。メッセージの本文は、キャンバスで組みます', 'The notification format. Build the in-app message on the canvas.')}</span>
+            <Field label={t('通知の形', 'Format')} size="small">
+              <div className={s.row} style={{ flexWrap: 'nowrap' }}>
+                {(
+                  [
+                    ['text', t('テキストだけ', 'Text only')],
+                    ['image', t('画像つき(メイン画像)', 'With image (main image)')],
+                  ] as const
+                ).map(([k, label]) => {
+                  const on = k === 'image' ? d.push!.image : !d.push!.image
+                  return (
+                    <Button key={k} size="small" appearance={on ? 'primary' : 'outline'} aria-pressed={on} onClick={() => patch({ push: { ...d.push!, image: k === 'image' } })}>
+                      {label}
+                    </Button>
+                  )
+                })}
+              </div>
+            </Field>
+            <Field label={t('通知のボタン(最大 2 つ。空なら、ボタンなし)', 'Notification buttons (up to 2; empty = none)')} size="small">
+              <div className={s.row}>
+                {[0, 1].map((i) => (
+                  <Input
+                    key={i}
+                    size="small"
+                    value={d.push!.buttons[i] ?? ''}
+                    placeholder={i === 0 ? t('例: 見る', 'e.g. View') : t('例: あとで', 'e.g. Later')}
+                    maxLength={MAX_BUTTON_LABEL}
+                    onChange={(_, x) => {
+                      const b = [d.push!.buttons[0] ?? '', d.push!.buttons[1] ?? '']
+                      b[i] = x.value
+                      patch({ push: { ...d.push!, buttons: b } }) // 空の欄は、保存のときに外す
+                    }}
+                  />
+                ))}
+              </div>
+            </Field>
+          </div>
+        )}
+
+        <div ref={heroRef} className={s.grp}>
+          <span className={s.grpTitle}>{d.push ? t('メッセージの全体の見た目', 'Message look') : t('全体の見た目', 'Overall look')}</span>
+          <Field label={t('ヒーロー(メイン画像)', 'Hero (main image)')} size="small">
+            <div className={s.row} style={{ flexWrap: 'nowrap' }}>
+              {(['standard', 'collab', 'offer'] as HeroKind[]).map((h) => (
+                <Button key={h} size="small" appearance={d.hero === h ? 'primary' : 'outline'} aria-pressed={d.hero === h} onClick={() => patch({ hero: h })}>
+                  {heroLabels[h]}
+                </Button>
+              ))}
             </div>
-          ) : (
-          <Field label={t('商品の枠の数', 'Product slots')}>
-            <Select size="small" className={s.fill} value={String(sec.slots)} onChange={(_, d) => patchSection(p.key, { slots: fitSlots(sec.kind, Number(d.value)) })}>
-              {Array.from({ length: Math.floor(MAX_SLOTS / slotStep(sec.kind)) }, (_, k) => (k + 1) * slotStep(sec.kind)).map((n) => (
-                <option key={n} value={n}>{t(`${n} 点`, `${n} items`)}</option>
+          </Field>
+          <Field label={t('ヘッドラインの置き方', 'Headline placement')} size="small">
+            <Select size="small" value={d.heroText ?? 'band'} onChange={(_, x) => patch({ heroText: x.value as HeroText })}>
+              {(['below', 'overlay', 'band'] as HeroText[]).map((h) => (
+                <option key={h} value={h}>{heroTextLabels[h]}</option>
               ))}
             </Select>
           </Field>
-          )}
-          <Field label={t('見出し', 'Heading')}>
-            <Checkbox label={t('AI で付ける', 'Add (AI)')} checked={!!sec.categoryHeading} onChange={(_, d) => patchSection(p.key, { categoryHeading: d.checked === true })} />
+          <Field label={t('画像のリンク先(既定)', 'Image link (default)')} size="small">
+            <Select size="small" value={d.heroLink ?? 'campaign'} onChange={(_, x) => patch({ heroLink: x.value === 'campaign' ? undefined : (x.value as LinkKind) })}>
+              {LINK_KINDS.map((k) => (
+                <option key={k} value={k}>{linkKindLabel(k)}</option>
+              ))}
+            </Select>
           </Field>
-          <Field label={t('コピー', 'Copy')}>
-            <Checkbox label={t('置く', 'Show')} checked={sec.copy !== false} onChange={(_, d) => patchSection(p.key, { copy: d.checked === true ? undefined : false })} />
-          </Field>
+          <Checkbox label={t('お知らせ帯を、メールの最上部に置く', 'Show the top bar at the very top')} checked={!!d.topBar} onChange={(_, x) => patch({ topBar: x.checked === true || undefined })} />
         </div>
-        )}
+
+        <div className={s.grp}>
+          <span className={s.grpTitle}>{t('状況', 'Status')}</span>
+          {kv(t('商品の枠', 'Product slots'), <strong>{t(`${boxCount} 点`, `${boxCount}`)}</strong>)}
+          {kv(t('ボタン · テキスト', 'Buttons · text'), <strong>{`${countParts('button')} · ${countParts('text')}`}</strong>)}
+          {kv(t('版', 'Version'), <strong>{d.id ? t(`版 ${cur} → 保存で 版 ${cur + 1}`, `v${cur} → v${cur + 1} on save`) : t('新規(保存で 版 1)', 'New (v1 on save)')}</strong>)}
+          {kv(t('使っている配信', 'Deliveries using it'), <strong>{t(`${used} 本`, `${used}`)}</strong>)}
+          {kv(
+            t('同じ構成のテンプレート', 'Template with the same layout'),
+            sameAs ? (
+              <Button
+                size="small"
+                appearance="transparent"
+                onClick={() => {
+                  setCompareId(sameAs.o.id)
+                  if (!listOpen) toggleList()
+                }}
+              >
+                {t(`「${sameAs.o.label}」を見比べる`, `Compare "${sameAs.o.label}"`)}
+              </Button>
+            ) : (
+              <strong>{t('なし', 'None')}</strong>
+            ),
+          )}
+        </div>
+
+        <div className={s.grp} style={{ borderBottom: 'none' }}>
+          <span className={s.grpTitle}>{t('構成(押すと、そこへ)', 'Outline (click to go there)')}</span>
+          <div className={s.tree}>
+            {d.sections.map((sec, si) => (
+              <button key={sec.id ?? si} type="button" className={s.treeItem} onClick={() => sec.id && editor.goSection(sec.id)}>
+                {`S${si + 1}${sec.name?.trim() ? ` ${sec.name.trim()}` : ''} · ${(sec.rows ?? 0) > 0 ? `${sec.cols} × ${sec.rows}` : t('空', 'empty')} · ${t(`商品 ${sec.slots}`, `${sec.slots} items`)}`}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
-
-  const buttonsCard = (p: Extract<Part, { type: 'buttons' }>, i: number) => (
-    <div key={p.key} className={mergeClasses(s.card, s.cardButtons)}>
-      <div className={s.cardHead}>
-        <span
-          className={s.handle}
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move'
-            e.dataTransfer.setData('text/plain', p.key)
-            setDragKey(p.key)
-          }}
-          onDragEnd={endDrag}
-          title={t('つかんで動かす', 'Drag to move')}
-          aria-hidden
-        >
-          <ReOrderDotsVerticalRegular />
-        </span>
-        {foldButton(p.key)}
-        <Badge size="small" appearance="tint" color="informative">{t('ボタン', 'Buttons')}</Badge>
-        <span className={s.caption}>{p.buttons.map((b, k) => t(`${b.label?.trim() || defaultButtonLabel(k)}(${styleLabel(b)})`, `${b.label?.trim() || defaultButtonLabel(k)} (${styleLabel(b)})`)).join(t('、', ', '))}</span>
-        <span className={s.grow} />
-        {partActions(i, p)}
-      </div>
-      {!folded.has(p.key) && (
-      <div className={s.buttonRows}>
-        <div className={s.buttonRow}>
-          <span />
-          <span className={s.caption}>{t('文言', 'Label')}</span>
-          <span className={s.caption}>{t('見た目', 'Style')}</span>
-          <span className={s.caption}>{t('リンク先(既定)', 'Link (default)')}</span>
-          <span />
-        </div>
-        {p.buttons.map((b, k) => (
-          <div key={b.id} className={s.buttonRow}>
-            <span className={s.num}>{k + 1}</span>
-            <Input
-              size="small"
-              value={b.label ?? ''}
-              placeholder={defaultButtonLabel(k)}
-              maxLength={MAX_BUTTON_LABEL}
-              aria-label={t(`ボタン ${k + 1} の文言`, `Button ${k + 1} label`)}
-              onChange={(_, d) => patchButton(p.key, b.id, { label: d.value })}
-            />
-            <Select size="small" value={b.style ?? 'fill'} aria-label={t('見た目', 'Style')} onChange={(_, d) => patchButton(p.key, b.id, { style: d.value === 'outline' ? 'outline' : undefined })}>
-              <option value="fill">{t('塗り', 'Filled')}</option>
-              <option value="outline">{t('枠線', 'Outline')}</option>
-            </Select>
-            <Select size="small" value={b.link ?? 'campaign'} aria-label={t('リンク先', 'Link')} onChange={(_, d) => patchButton(p.key, b.id, { link: d.value as LinkKind })}>
-              {LINK_KINDS.map((k2) => (
-                <option key={k2} value={k2}>{linkKindLabel(k2)}</option>
-              ))}
-            </Select>
-            <Button
-              size="small"
-              appearance="subtle"
-              icon={<DismissRegular />}
-              disabled={p.buttons.length <= 1}
-              onClick={() => setButtons(p.key, (list) => list.filter((x) => x.id !== b.id))}
-              aria-label={t('このボタンを外す', 'Remove this button')}
-            />
-          </div>
-        ))}
-        {p.buttons.length < MAX_BUTTONS_PER_BLOCK && (
-          <div>
-            <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => setButtons(p.key, (list) => [...list, { id: newButtonId(), style: 'outline' }])}>
-              {t('横にボタンを追加', 'Add a button beside')}
-            </Button>
-          </div>
-        )}
-      </div>
-      )}
-    </div>
-  )
 
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && close()}>
@@ -1491,7 +1161,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                 </MessageBar>
               )}
               {draft ? (
-                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? colW.list : 32}px 1px ${colW.palette}px 1px ${canvasCol}px 1px minmax(${FIELDS_MIN}px, 1fr)` }}>
+                // 一覧(たたむ) | パーツ | キャンバス | 右のタブ。境目はスプリッターで幅を変える(キャンバスは残りの幅)
+                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? colW.list : 32}px 1px ${colW.palette}px 1px minmax(${CANVAS_MIN}px, 1fr) 1px ${colW.props}px` }}>
                   {compareCol()}
                   {/* 列の境界。つかんで幅を変える(一覧を閉じているときは、一覧の幅は変えない) */}
                   <div className={s.splitCell} style={{ gridArea: 's1' }}>{listOpen && <Splitter onDrag={resizeCol('list', 1)} />}</div>
@@ -1499,178 +1170,17 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                     <Splitter onDrag={resizeCol('palette', 1)} />
                   </div>
                   <div className={s.splitCell} style={{ gridArea: 's3' }}>
-                    <Splitter onDrag={resizeCol('canvas', 1)} />
+                    <Splitter onDrag={resizeCol('props', -1)} />
                   </div>
-                  {paletteCol()}
-                  <div className={mergeClasses(s.fields, s.areaFields)}>
-                    <div className={s.card}>
-                      <div className={s.cardHead}>
-                        {foldButton('info')}
-                        <span className={s.cardTitle}>{t('テンプレートの情報', 'Template info')}</span>
-                        {folded.has('info') && <span className={mergeClasses(s.caption, s.foldSummary)}>{draft.name || t('(名前なし)', '(no name)')}</span>}
-                      </div>
-                      {!folded.has('info') && (
-                      <div className={s.infoBody}>
-                    <Field label={t('テンプレート名', 'Template name')} required>
-                      <Input size="small" value={draft.name} onChange={(_, d) => patch({ name: d.value })} />
-                    </Field>
-                    {draft.id && (
-                      <Field label={t(`変更のメモ(任意。版 ${currentVersion(draft.id) + 1} の履歴に残ります)`, `Change note (optional; kept in the v${currentVersion(draft.id) + 1} history)`)}>
-                        <Input size="small" value={draft.note ?? ''} placeholder={t('例: グリッドを 3 列に', 'e.g. Grid to 3 columns')} onChange={(_, d) => patch({ note: d.value })} />
-                      </Field>
-                    )}
-                    <Field label={t('説明', 'Description')}>
-                      <AutoTextarea rows={2} size="small" value={draft.description} onChange={(_, d) => patch({ description: d.value })} />
-                    </Field>
-                      </div>
-                      )}
-                    </div>
-
-                    {draft.push && (
-                      <div className={s.card}>
-                        <div className={s.cardHead}>
-                          {foldButton('push')}
-                          <span className={s.cardTitle}>{t('通知', 'Notification')}</span>
-                          <span className={s.caption}>{t('アプリの通知の形。メッセージの本文は、下の部品で組みます', 'The notification format. Build the in-app message with the parts below.')}</span>
-                        </div>
-                        {!folded.has('push') && (
-                        <div className={s.heroBody}>
-                          <Field label={t('通知の形', 'Format')}>
-                            <div className={s.row} style={{ flexWrap: 'nowrap' }}>
-                              {(
-                                [
-                                  ['text', t('テキストだけ', 'Text only')],
-                                  ['image', t('画像つき(メイン画像)', 'With image (main image)')],
-                                ] as const
-                              ).map(([k, label]) => {
-                                const on = k === 'image' ? draft.push!.image : !draft.push!.image
-                                return (
-                                  <Button
-                                    key={k}
-                                    size="small"
-                                    appearance={on ? 'primary' : 'outline'}
-                                    aria-pressed={on}
-                                    onClick={() => patch({ push: { ...draft.push!, image: k === 'image' } })}
-                                  >
-                                    {label}
-                                  </Button>
-                                )
-                              })}
-                            </div>
-                          </Field>
-                          <Field label={t('通知のボタン(最大 2 つ。空なら、ボタンなし)', 'Notification buttons (up to 2; empty = none)')}>
-                            <div className={s.row}>
-                              {[0, 1].map((i) => (
-                                <Input
-                                  key={i}
-                                  size="small"
-                                  value={draft.push!.buttons[i] ?? ''}
-                                  placeholder={i === 0 ? t('例: 見る', 'e.g. View') : t('例: あとで', 'e.g. Later')}
-                                  maxLength={MAX_BUTTON_LABEL}
-                                  onChange={(_, d) => {
-                                    const b = [draft.push!.buttons[0] ?? '', draft.push!.buttons[1] ?? '']
-                                    b[i] = d.value
-                                    patch({ push: { ...draft.push!, buttons: b } }) // 空の欄は、保存のときに外す
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </Field>
-                        </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div id="tplpart-hero" className={mergeClasses(s.card, selectedKey === 'hero' && s.partSelected)} onClickCapture={() => setSelectedKey('hero')}>
-                      <div className={s.cardHead}>
-                        {foldButton('hero')}
-                        <span className={s.cardTitle}>{draft.push ? t('メッセージ: ヒーロー(メイン画像)', 'Message: hero (main image)') : t('ヒーロー(メイン画像)', 'Hero (main image)')}</span>
-                      </div>
-                      {!folded.has('hero') && (
-                      <div className={s.heroBody}>
-                        <Field label={t('種類', 'Type')}>
-                          <div className={s.row} style={{ flexWrap: 'nowrap' }}>
-                            {(['standard', 'collab', 'offer'] as HeroKind[]).map((h) => (
-                              <Button key={h} size="small" appearance={draft.hero === h ? 'primary' : 'outline'} aria-pressed={draft.hero === h} onClick={() => patch({ hero: h })}>
-                                {heroLabels[h]}
-                              </Button>
-                            ))}
-                          </div>
-                        </Field>
-                        <Field label={t('ヘッドラインの見せ方', 'Headline placement')}>
-                          <Select size="small" className={s.heroSelect} value={draft.heroText ?? 'band'} onChange={(_, d) => patch({ heroText: d.value as HeroText })}>
-                            {(['below', 'overlay', 'band'] as HeroText[]).map((h) => (
-                              <option key={h} value={h}>{heroTextLabels[h]}</option>
-                            ))}
-                          </Select>
-                        </Field>
-                        <Field label={t('画像のリンク先(既定)', 'Image link (default)')}>
-                          <Select size="small" className={s.heroSelect} value={draft.heroLink ?? 'campaign'} onChange={(_, d) => patch({ heroLink: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
-                            {LINK_KINDS.map((k) => (
-                              <option key={k} value={k}>{linkKindLabel(k)}</option>
-                            ))}
-                          </Select>
-                        </Field>
-                        <Field label={t('お知らせ帯', 'Top bar')}>
-                          <Checkbox label={t('メールの最上部に置く', 'Show at the very top')} checked={!!draft.topBar} onChange={(_, d) => patch({ topBar: d.checked === true || undefined })} />
-                        </Field>
-                      </div>
-                      )}
-                    </div>
-
-                    <Field
-                      label={t(`構成(上から順に。商品の枠は合計 ${totalSlots} 点)`, `Layout (top to bottom; ${totalSlots} product slots in total)`)}
-                      hint={t('部品は、⠿ をつかんで上下に動かせます(矢印でも動かせます)。ボタンは、セクションとは別の部品です。リンク先は既定の種類で、実際の URL は配信ごとに決めます。', 'Drag ⠿ to reorder parts (or use the arrows). Buttons are separate parts. Links are default kinds; the actual URLs are set per delivery.')}
-                    >
-                      <div className={s.partList}>
-                        {/* 部品が多いと長くなるので、まとめて閉じる・開く(キャンバスで選んだ部品は、閉じていても開く) */}
-                        <div className={s.foldAll}>
-                          <Button size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={() => setFolded(new Set(['info', 'push', 'hero', ...draft.parts.map((x) => x.key)]))}>
-                            {t('すべて閉じる', 'Collapse all')}
-                          </Button>
-                          <Button size="small" appearance="subtle" icon={<ChevronDownRegular />} onClick={() => setFolded(new Set())}>
-                            {t('すべて開く', 'Expand all')}
-                          </Button>
-                        </div>
-                        {(() => {
-                          let no = 0
-                          return draft.parts.map((p, i) => (
-                            <div
-                              key={p.key}
-                              id={`tplpart-${p.key}`}
-                              className={mergeClasses(s.dropWrap, dragKey === p.key && s.dragging, selectedKey === p.key && s.partSelected)}
-                              onClickCapture={() => selectPart(p.key, false)}
-                              onDragOver={(e) => overPart(e, i)}
-                              onDrop={(e) => { e.preventDefault(); drop() }}
-                            >
-                              {dropAt === i && <div className={s.dropLine} />}
-                              {p.type === 'section' ? sectionCard(p, i, ++no) : buttonsCard(p, i)}
-                              {i === draft.parts.length - 1 && dropAt === draft.parts.length && <div className={s.dropLine} />}
-                            </div>
-                          ))
-                        })()}
-                        {/* いちばん下(部品がないときも)に入れる所 */}
-                        <div
-                          className={mergeClasses(s.dropEnd, !!dragKey && s.dropEndOn)}
-                          onDragOver={(e) => {
-                            if (!dragKey) return
-                            e.preventDefault()
-                            setDropAt(draft.parts.length)
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault()
-                            drop()
-                          }}
-                        >
-                          {dragKey ? t('ここに入れる(いちばん下)', 'Drop here (bottom)') : draft.parts.length === 0 ? t('上の部品を、ここへドラッグしてください', 'Drag a part here') : ''}
-                        </div>
-                      </div>
-                    </Field>
-                  </div>
-                  <div className={mergeClasses(s.preview, s.areaCanvas)}>
+                  <aside className={s.paletteCol} aria-label={t('パーツ', 'Parts')}>
+                    {editor.palette}
+                  </aside>
+                  <div className={s.areaCanvas}>
                     <div className={s.canvasHead}>
-                      <Text size={200} weight="semibold">{t('キャンバス(箱を押して選ぶ・つかんで動かす)', 'Canvas (click to select, drag to move)')}</Text>
+                      <Text size={200} weight="semibold">{t('キャンバス', 'Canvas')}</Text>
+                      <span className={s.caption} style={{ marginLeft: 8 }}>{t(`商品の枠 ${boxCount} 点`, `${boxCount} product slots`)}</span>
                       <span className={s.grow} />
+                      {editor.zoomBar}
                       <Tooltip relationship="label" content={t('元に戻す(Ctrl+Z)', 'Undo (Ctrl+Z)')}>
                         <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0} onClick={undo} />
                       </Tooltip>
@@ -1678,142 +1188,9 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                         <Button size="small" appearance="subtle" icon={<ArrowRedoRegular />} disabled={histCount.future === 0} onClick={redo} />
                       </Tooltip>
                     </div>
-                    {zoomBar()}
-                    {removedAt !== null && (
-                      <div className={s.toast}>
-                        <span>{t('部品を削除しました', 'Part removed')}</span>
-                        <Button
-                          size="small"
-                          appearance="transparent"
-                          onClick={() => {
-                            undo()
-                            setRemovedAt(null)
-                          }}
-                        >
-                          {t('元に戻す', 'Undo')}
-                        </Button>
-                      </div>
-                    )}
-                    <span className={s.caption}>{t('↑↓ で選ぶ部品を移る・Alt+↑↓ で動かす・Delete で消す・Ctrl+D で複製', '↑↓ select · Alt+↑↓ move · Delete remove · Ctrl+D duplicate')}</span>
-                    {/* 構成がほかのテンプレートと同じになったら知らせる(保存は止めない。ヒーローや見た目だけ違う使い分けもあるため) */}
-                    {sameAs && (
-                      <div className={s.sameNote}>
-                        <span>{t(`「${sameAs.o.label}」と同じ構成です`, `Same layout as "${sameAs.o.label}"`)}</span>
-                        {compareId !== sameAs.o.id && (
-                          <Button size="small" appearance="transparent" onClick={() => setCompareId(sameAs.o.id)}>
-                            {t('見比べる', 'Compare')}
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                    <div
-                      ref={(el) => {
-                        zoomBoxRef.current = el
-                        zoomBaseRef.current = canvasBase
-                      }}
-                      className={mergeClasses(s.previewScroll, s.canvasRow, s.canvasScroll)}
-                    >
-                      {/* プレビューの箱を、そのまま操作できる(押して選ぶ・つかんで並べ替える・パレットの部品を箱の間に落とす) */}
-                      <div data-zoom-target={compared ? 'pair' : 'one'} className={s.zoomTarget} style={{ width: canvasWidth }}>
-                      <TemplateThumb
-                        layout={fromParts(draft)}
-                        width={canvasWidth}
-                        edit={{
-                          selected: draft.parts.findIndex((p) => p.key === selectedKey) >= 0 ? draft.parts.findIndex((p) => p.key === selectedKey) : null,
-                          dragging: dragKey && !dragKey.startsWith('new:') ? draft.parts.findIndex((p) => p.key === dragKey) : null,
-                          dropAt,
-                          active: !!dragKey,
-                          // 落とす前の姿: パレットの部品なら、その形。構成の部品なら、その部品
-                          ghost: (() => {
-                            if (!dragKey) return undefined
-                            if (dragKey.startsWith('new:')) {
-                              const p0 = partsFor(dragKey.slice(4))[0]
-                              return !p0 ? undefined : p0.type === 'section' ? { sec: p0.sec } : { buttons: p0.buttons }
-                            }
-                            const p = draft.parts.find((x) => x.key === dragKey)
-                            return p ? (p.type === 'section' ? { sec: p.sec } : { buttons: p.buttons }) : undefined
-                          })(),
-                          heroSelected: selectedKey === 'hero',
-                          onSelectHero: () => selectPart('hero', true),
-                          onSelect: (i) => draft.parts[i] && selectPart(draft.parts[i].key, true),
-                          partProps: (i) => ({
-                            draggable: true,
-                            onDragStart: (e) => {
-                              e.dataTransfer.effectAllowed = 'move'
-                              e.dataTransfer.setData('text/plain', draft.parts[i].key)
-                              setDragKey(draft.parts[i].key)
-                            },
-                            onDragEnd: endDrag,
-                            onDragOver: (e) => overPart(e, i),
-                            onDrop: (e) => {
-                              e.preventDefault()
-                              drop()
-                            },
-                          }),
-                          endProps: {
-                            onDragOver: (e) => {
-                              if (!dragKey) return
-                              e.preventDefault()
-                              setDropAt(draft.parts.length)
-                            },
-                            onDrop: (e) => {
-                              e.preventDefault()
-                              drop()
-                            },
-                          },
-                          tools: (i) => {
-                            const p = draft.parts[i]
-                            const sec = p.type === 'section' ? p.sec : null
-                            const step = sec ? slotStep(sec.kind) : 1
-                            return (
-                              <>
-                                {/* よく使う設定は、キャンバスの上で(右の設定を見なくても済むように) */}
-                                {sec && (sec.kind === 'grid' || sec.kind === 'photos') && (
-                                  <Tooltip relationship="label" content={t('2 列 / 3 列', '2 / 3 columns')}>
-                                    <Button size="small" appearance="subtle" onClick={(e) => { e.stopPropagation(); patchSection(p.key, { columns: gridColumns(sec) === 3 ? undefined : 3 }) }}>
-                                      {gridColumns(sec) === 3 ? t('3列', '3 col') : t('2列', '2 col')}
-                                    </Button>
-                                  </Tooltip>
-                                )}
-                                {sec && sec.kind !== 'cells' && (
-                                  <>
-                                    <Button size="small" appearance="subtle" icon={<SubtractRegular />} disabled={sec.slots <= step} onClick={(e) => { e.stopPropagation(); patchSection(p.key, { slots: fitSlots(sec.kind, sec.slots - step) }) }} aria-label={t('枠を減らす', 'Fewer slots')} />
-                                    <span className={s.toolCount}>{sec.slots}</span>
-                                    <Button size="small" appearance="subtle" icon={<AddRegular />} disabled={sec.slots + step > MAX_SLOTS} onClick={(e) => { e.stopPropagation(); patchSection(p.key, { slots: fitSlots(sec.kind, sec.slots + step) }) }} aria-label={t('枠を増やす', 'More slots')} />
-                                  </>
-                                )}
-                                <Button size="small" appearance="subtle" icon={<CopyRegular />} onClick={(e) => { e.stopPropagation(); duplicatePart(p.key) }} aria-label={t('複製', 'Duplicate')} />
-                                <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={(e) => { e.stopPropagation(); movePart(i, -1) }} aria-label={t('上へ', 'Move up')} />
-                                <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === draft.parts.length - 1} onClick={(e) => { e.stopPropagation(); movePart(i, 1) }} aria-label={t('下へ', 'Move down')} />
-                                <Button
-                                  size="small"
-                                  appearance="subtle"
-                                  icon={<DeleteRegular />}
-                                  disabled={p.type === 'section' && sectionCount <= 1}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    removePart(p.key)
-                                  }}
-                                  aria-label={p.type === 'section' ? t('このセクションを削除', 'Remove this section') : t('このボタンの部品を削除', 'Remove these buttons')}
-                                />
-                              </>
-                            )
-                          },
-                        }}
-                      />
-                      </div>
-                      {compared && (
-                        <div className={s.compareBox}>
-                          <div className={s.compareBoxHead}>
-                            <span className={s.compareBoxName}>{compared.label}</span>
-                            <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => setCompareId(null)} aria-label={t('見比べるのをやめる', 'Stop comparing')} />
-                          </div>
-                          {compared.push && <PushThumb spec={compared.push} width={160} />}
-                          <TemplateThumb layout={compared} width={canvasWidth} />
-                        </div>
-                      )}
-                    </div>
+                    {editor.canvas}
                   </div>
+                  <div className={s.propsCol}>{editor.rightPane(templateTab(draft))}</div>
                 </div>
               ) : selected ? (
                 <div className={s.editorGrid}>
