@@ -60,6 +60,8 @@ export const products: Row[] = [...csv('products.csv'), ...csv('products_us.csv'
   gender: guessGender(r['商品名']),
   category: CATEGORY[r['カテゴリ']],
   price: Number(r['価格']),
+  // 撮影用: 3 点に 1 点を、セール中(元の価格あり)にする(箱の「セール」の見せ方を確かめるため)
+  ...(Number(r['商品コード'].replace(/\D/g, '')) % 3 === 0 ? { regular_price: Math.round(Number(r['価格']) * 125) / 100 } : {}),
   stock: Number(r['在庫数']),
   season: SEASON[r['季節']],
   sales_trend: TREND[r['売上トレンド']],
