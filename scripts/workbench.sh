@@ -61,8 +61,18 @@ server_pid() {
 }
 
 build() {
-  say "画面のパッケージを入れる(npm ci)"
-  (cd "$ROOT" && npm ci)
+  # npm ci は node_modules を消して入れ直すので、遅い(Workbench のネットワークでは数分)。
+  # package-lock.json が変わったときだけ入れ直す(前回の中身の記録と比べる。記録は node_modules の中に置くので、消えれば入れ直す)
+  local stamp="$ROOT/node_modules/.ccp-lock.sha"
+  local now
+  now="$(sha256sum "$ROOT/package-lock.json" | cut -d' ' -f1)"
+  if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$now" ]; then
+    say "画面のパッケージを入れる(npm ci。package-lock.json が変わったとき)"
+    (cd "$ROOT" && npm ci --no-audit --no-fund --prefer-offline)
+    echo "$now" > "$stamp"
+  else
+    echo "(画面のパッケージは変わっていないので、入れ直しません)"
+  fi
   say "画面をビルドする(npm run build)"
   (cd "$ROOT" && npm run build)
 }

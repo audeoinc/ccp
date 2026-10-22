@@ -82,7 +82,7 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 
 画面からは、⚙ の「BigQuery から取り込む」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
 
-- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → `npm ci` → `npm run build` → 停止 → 起動、の順に行います。
+- `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → (`package-lock.json` が変わったときだけ)`npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
 - `ASSET_DIR` を設定していなくても、`server/images` があれば、そこから写真を配ります。
 - `Permission denied` と出たら、`bash scripts/workbench.sh …` のように `bash` を付けて実行します。
