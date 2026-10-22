@@ -170,10 +170,12 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 | 1 | ✅ | `dev/index.html` → `src/dev/`(`DevApp`・`BqTab`・`SqlEditor`(CodeMirror + `@codemirror/lang-sql`)・`ResultGrid`・`CopyButton`)、`server/ccp/devtools.py`(テスト `server/tests/test_devtools.py`)、`CCP_DEVTOOLS`・`DEVTOOLS_MAX_GB`・`DEVTOOLS_DIR`、`server/devwork/settings.json`(よく見るデータセット) |
 | 2 | ✅(本物の BigQuery では、画面が開くところまで確認) | データセットを開く(**名前の一部で探す**: 接続しているプロジェクトのデータセット・前に開いたもの・プロジェクト名の一部。`DatasetPicker`) → 表の一覧(絞り込み)→ 表の列・行数・パーティション・ビューの SQL → 先頭の 20 行(料金なし)。SQL を試す: 料金なしで確かめる(文の種類・読む量)/ 流す(SELECT だけ、先頭 20・200・1000 行、Ctrl + Enter)。写す: 場所・列の一覧(Markdown)・SQL・結果(TSV / Markdown)・エラー・`.sql` で保存。ビューは、参照している元の表を出す(押すと開く) |
 | 3 の一部 | ✅(本物の Gemini では未確認) | 右の「Gemini と SQL を作る」(`ChatPanel`、`POST /api/dev/ai/chat`)。**Gemini が BigQuery を調べる道具を使う**(関数の呼び出し。1 回の発言で 16 回まで): `list_datasets`・`list_tables`(名前の一部で)・`describe_table`(列・説明・パーティション・先頭の 5 行。ビューは SQL と参照先)・`describe_view_sources`(ビューが参照している元の表を dry-run でたどり、列の定義を返す)・`dry_run`・`run_select`(SELECT だけ、20 行、読む量の上限つき。画面で止められる)。何を調べたかは、返事の上に出す。前提には、CCP の 6 つの出力の仕様をいつも全文入れる(どの列に当てるかを考えられるように)。作る出力を選ぶと手本の SQL も。仕様のまとめは `server/devwork/settings.json` に残す。会話はブラウザに残す(`ccp-dev-chat`)。返事の SQL は「SQL の欄に入れる」で試せる。エラーのあとは「このエラーを直して」。「前提」で、渡す前提を見る・コピーする。残り: 版・差分、`bq_validate` の答え合わせ、表を作る SQL |
+| 使い勝手(2026-10-22 利用者の要望) | ✅(デモ用のビルドで確認) | 会話は、思考の要約(`include_thoughts`)・調べたこと・返事を、届いたそばから出す(NDJSON。15 秒ごとに合図。経過の秒数・「止める」)。モデルを選べる(既定は Vertex AI の一覧でいちばん賢い Gemini。`DEVTOOLS_GEMINI_MODEL`・`DEVTOOLS_THINKING`(既定 high))。Enter で送る・Shift + Enter で改行(変換の確定では送らない)。返事の SQL は複数(`sqls`)、それぞれに「入れて流す」「欄に入れる」「コピー」。ペインの幅はドラッグ、左右は畳める(畳んでも会話は続く)。表の詳細は、概要を横に並べ、列・先頭の行・ビューの SQL・参照している表をタブに。高さは右下をドラッグ。結果の下に、ジョブの実行情報(重さ・処理した量・課金された量・概算の料金(`DEVTOOLS_PRICE_PER_TIB`)・スロット時間・キャッシュ・ジョブ ID・参照したビューと読んだ元の表) |
 
 撮影・デモ用のビルド(`vite.mock.config.ts`)には、BigQuery も GCS もないので、見本の表と列で画面だけ動く形にする(画面の確認用)。
 
 ## 9. まだ決めていないこと
 
 - 版の保存の形: 出力ごとのフォルダに `v1.sql` と `v1.json`(結果)を並べる案。
+- Claude(Opus)を、Vertex AI 経由で選べるようにするか(利用先のプロジェクトで有効か・場所を確かめてから。会話の作りは Gemini と同じで、道具の呼び出しの形だけ違う)。
 - ポリシーの書き直しで、1 つの文書がルール系と販売系の両方を含むときに、2 つのファイルに分けるか。

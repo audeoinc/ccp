@@ -1,18 +1,46 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Dropdown, Input, MessageBar, MessageBarBody, Option, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular } from '@fluentui/react-icons'
-import { DevApi, bytesLabel, isFailure, type DryRun, type RunResult, type Settings, type TableInfo, type Column, type Row } from './api'
+import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular } from '@fluentui/react-icons'
+import { DevApi, bytesLabel, isFailure, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
 import { SqlEditor } from './SqlEditor'
-import { columnsMarkdown, toMarkdown } from './format'
+import { toMarkdown } from './format'
+import { TableDetail } from './TableDetail'
 import { DatasetPicker } from './DatasetPicker'
 import { ChatPanel } from './ChatPanel'
+import { JobInfo } from './JobInfo'
 
 const useStyles = makeStyles({
   // 左: データセットと表 / 中: 表の中身と SQL / 右: Gemini との会話(SQL を見ながら話せるように、並べて置く)
-  root: { display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) minmax(360px, 34%)', gap: '12px', alignItems: 'start' },
-  side: { display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '12px' },
+  root: { display: 'grid', columnGap: '2px', alignItems: 'start' },
+  // ペインの境目(ドラッグで幅を変える)
+  splitter: {
+    alignSelf: 'stretch',
+    cursor: 'col-resize',
+    borderRadius: tokens.borderRadiusMedium,
+    touchAction: 'none',
+    ':hover': { backgroundColor: tokens.colorNeutralStroke2 },
+  },
+  side: { display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '12px', minWidth: 0 },
+  // 畳んだペインの帯(押すと開く)
+  folded: {
+    position: 'sticky',
+    top: '12px',
+    height: 'calc(100vh - 80px)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+    paddingTop: '10px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusLarge,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    color: tokens.colorNeutralForeground2,
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  foldedLabel: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
   card: {
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -47,8 +75,6 @@ const useStyles = makeStyles({
   itemOn: { backgroundColor: tokens.colorBrandBackground2, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
   itemName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1 },
   mono: { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
-  facts: { display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: '12px', rowGap: '2px', fontSize: tokens.fontSizeBase200 },
-  factKey: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold },
   editor: { height: '260px', resize: 'vertical', overflow: 'hidden' },
   muted: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
@@ -72,6 +98,21 @@ const writeDraft = (v: string) => {
 
 const ROW_CHOICES = [20, 200, 1000]
 
+// ペインの幅と、開いているか(左: データセットと表 / 右: AI との会話。真ん中は残り。ただし 420px は残し、窓が狭ければ横にスクロール)。
+// この画面を開いている人のブラウザに覚える
+const WIDTHS = { left: 280, right: 460, leftOpen: true, rightOpen: true }
+const WIDTHS_KEY = 'ccp-dev-layout'
+// 畳んだペインの帯の幅
+const FOLDED = 32
+const readWidths = (): typeof WIDTHS => {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(WIDTHS_KEY) ?? 'null') as Partial<typeof WIDTHS> | null
+    return v && (v.left ?? 0) > 0 && (v.right ?? 0) > 0 ? { ...WIDTHS, ...v } : WIDTHS
+  } catch {
+    return WIDTHS
+  }
+}
+
 function download(name: string, text: string, type = 'text/plain') {
   const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }))
   const a = document.createElement('a')
@@ -91,11 +132,37 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   const [selected, setSelected] = useState<string | null>(null)
   const [info, setInfo] = useState<TableInfo | null>(null)
   const [infoError, setInfoError] = useState('')
-  const [preview, setPreview] = useState<{ columns: Column[]; rows: Row[] } | null>(null)
-  const [previewError, setPreviewError] = useState('')
-  const [busy, setBusy] = useState<'' | 'info' | 'preview' | 'dry' | 'run'>('')
+  const [busy, setBusy] = useState<'' | 'info' | 'dry' | 'run'>('')
 
   const [sql, setSql] = useState(readDraft)
+  const [widths, setWidths] = useState(readWidths)
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WIDTHS_KEY, JSON.stringify(widths))
+    } catch {
+      // 覚えられない環境では、毎回既定の幅
+    }
+  }, [widths])
+
+  /** 境目のドラッグ。左の境目は左のペイン、右の境目は右のペインの幅を変える(真ん中は残りを使う) */
+  const drag = (e: React.PointerEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    e.preventDefault()
+    const x0 = e.clientX
+    const w0 = widths
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0
+      if (side === 'left') setWidths({ ...w0, left: Math.min(Math.max(w0.left + dx, 200), 600) })
+      else setWidths({ ...w0, right: Math.min(Math.max(w0.right - dx, 320), Math.round(window.innerWidth * 0.7)) })
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      document.body.style.userSelect = ''
+    }
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
   const [maxRows, setMaxRows] = useState(200)
   const [dry, setDry] = useState<DryRun | null>(null)
   const [result, setResult] = useState<RunResult | null>(null)
@@ -138,23 +205,11 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
     setSelected(ref)
     setInfo(null)
     setInfoError('')
-    setPreview(null)
-    setPreviewError('')
     setBusy('info')
     const r = await DevApi.table(ref)
     setBusy('')
     if (isFailure(r)) setInfoError(r.error)
     else setInfo(r)
-  }
-
-  const loadPreview = async () => {
-    if (!selected) return
-    setBusy('preview')
-    setPreviewError('')
-    const r = await DevApi.preview(selected)
-    setBusy('')
-    if (isFailure(r)) setPreviewError(r.error)
-    else setPreview(r)
   }
 
   const dryRun = async () => {
@@ -169,11 +224,12 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
     } else setDry(r)
   }
 
-  const runSql = async () => {
-    if (!sql.trim() || busy) return
+  /** 流す。text を渡すと、それを流す(AI の返事の「入れて流す」。欄の中身が変わるのを待たずに) */
+  const runSql = async (text = sql) => {
+    if (!text.trim() || busy) return
     setBusy('run')
     setSqlError('')
-    const r = await DevApi.run(sql, maxRows)
+    const r = await DevApi.run(text, maxRows)
     setBusy('')
     if (isFailure(r)) {
       setResult(null)
@@ -184,13 +240,10 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
     }
   }
 
-  // Gemini に渡す「いまの SQL を流した結果」(エラー、または結果の先頭 20 行)
+  // AI に渡す「いまの SQL を流した結果」(エラー、または結果の先頭 20 行)
   const last = useMemo(() => {
-    if (sqlError) return `エラー:
-${sqlError}`
-    if (result) return `${result.total_rows ?? '?'} 行(先頭 ${Math.min(20, result.rows.length)} 行):
-
-${toMarkdown(result.columns, result.rows.slice(0, 20))}`
+    if (sqlError) return `エラー:\n${sqlError}`
+    if (result) return `${result.total_rows ?? '?'} 行(先頭 ${Math.min(20, result.rows.length)} 行):\n\n${toMarkdown(result.columns, result.rows.slice(0, 20))}`
     return ''
   }, [sqlError, result])
 
@@ -200,11 +253,22 @@ ${toMarkdown(result.columns, result.rows.slice(0, 20))}`
   }, [tables, filter])
 
   return (
-    <div className={s.root}>
-      <div className={s.side}>
+    <div
+      className={s.root}
+      style={{ gridTemplateColumns: `${widths.leftOpen ? widths.left : FOLDED}px 10px minmax(420px, 1fr) 10px ${widths.rightOpen ? widths.right : FOLDED}px` }}
+    >
+      {!widths.leftOpen && (
+        <button type="button" className={s.folded} onClick={() => setWidths((w) => ({ ...w, leftOpen: true }))} title="データセットと表を開く">
+          <PanelLeftExpandRegular />
+          <span className={s.foldedLabel}>データセット</span>
+        </button>
+      )}
+      <div className={s.side} style={widths.leftOpen ? undefined : { display: 'none' }}>
         <div className={s.card}>
           <div className={s.heading}>
-            <DatabaseRegular /> データセット
+            <DatabaseRegular />
+            <span className={s.grow}>データセット</span>
+            <Button size="small" appearance="subtle" icon={<PanelLeftContractRegular />} onClick={() => setWidths((w) => ({ ...w, leftOpen: false }))} title="畳む" />
           </div>
           <DatasetPicker value={dataset} recent={settings.datasets ?? []} onOpen={(d) => void openDataset(d)} busy={loadingTables} />
           {dataset && tables && <span className={s.mono}>{dataset}</span>}
@@ -232,99 +296,9 @@ ${toMarkdown(result.columns, result.rows.slice(0, 20))}`
         </div>
       </div>
 
+      <div className={s.splitter} role="separator" aria-orientation="vertical" title="ドラッグで幅を変える(ダブルクリックで元に戻す)" onPointerDown={(e) => widths.leftOpen && drag(e, 'left')} onDoubleClick={() => setWidths(WIDTHS)} />
       <div className={s.main}>
-        {selected && (
-          <div className={s.card}>
-            <div className={s.row}>
-              <span className={mergeClasses(s.heading, s.grow)}>
-                <TableRegular />
-                <span className={s.mono}>{selected}</span>
-              </span>
-              <CopyButton label="場所をコピー" text={() => `\`${selected}\``} />
-              {info && <CopyButton label="列の一覧をコピー" title="Gemini・Claude に渡す形(Markdown の表)" text={() => columnsMarkdown(info.ref, info.columns, info.description)} />}
-              <Button size="small" appearance="subtle" icon={<PlayRegular />} onClick={() => changeSql(`SELECT *\nFROM \`${selected}\`\nLIMIT 20`)}>
-                SQL の欄に入れる
-              </Button>
-            </div>
-            {busy === 'info' && <Spinner size="tiny" label="表を読んでいます" />}
-            {infoError && (
-              <MessageBar intent="error" layout="multiline">
-                <MessageBarBody>{infoError}</MessageBarBody>
-              </MessageBar>
-            )}
-            {info && (
-              <>
-                <div className={s.facts}>
-                  <span className={s.factKey}>種類</span>
-                  <span>{info.type}</span>
-                  <span className={s.factKey}>行数</span>
-                  <span>{info.rows?.toLocaleString() ?? '—'}</span>
-                  <span className={s.factKey}>大きさ</span>
-                  <span>{bytesLabel(info.bytes)}</span>
-                  <span className={s.factKey}>最終更新</span>
-                  <span>{info.modified ? new Date(info.modified).toLocaleString('ja-JP') : '—'}</span>
-                  <span className={s.factKey}>場所</span>
-                  <span>{info.location ?? '—'}</span>
-                  <span className={s.factKey}>パーティション</span>
-                  <span>{info.partitioning ? `${info.partitioning.field}(${info.partitioning.type})` : 'なし'}</span>
-                  {info.clustering.length > 0 && (
-                    <>
-                      <span className={s.factKey}>クラスタ</span>
-                      <span>{info.clustering.join(', ')}</span>
-                    </>
-                  )}
-                  {info.description && (
-                    <>
-                      <span className={s.factKey}>説明</span>
-                      <span>{info.description}</span>
-                    </>
-                  )}
-                </div>
-                <ResultGrid
-                  note={`列 ${info.columns.length}`}
-                  columns={[
-                    { name: '列', type: '' },
-                    { name: '型', type: '' },
-                    { name: 'モード', type: '' },
-                    { name: '説明', type: '' },
-                  ]}
-                  rows={info.columns.map((c) => ({ 列: c.name, 型: c.type, モード: c.mode, 説明: c.description }))}
-                />
-                {info.sources.length > 0 && (
-                  <div className={s.row}>
-                    <span className={s.label}>参照している元の表</span>
-                    {info.sources.map((r) => (
-                      <Button key={r} size="small" appearance="secondary" title={r} onClick={() => void openTable(r)}>
-                        {r.split('.').slice(-2).join('.')}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-                {info.view_sql && (
-                  <div className={s.row}>
-                    <span className={mergeClasses(s.label, s.grow)}>ビューの SQL</span>
-                    <CopyButton text={() => info.view_sql} />
-                    <Button size="small" appearance="subtle" onClick={() => changeSql(info.view_sql)}>
-                      SQL の欄に入れる
-                    </Button>
-                  </div>
-                )}
-                <div className={s.row}>
-                  <span className={mergeClasses(s.label, s.grow)}>先頭の行</span>
-                  <Button size="small" onClick={() => void loadPreview()} disabled={busy === 'preview' || info.type !== 'TABLE'} title={info.type !== 'TABLE' ? 'ビューは、SQL の欄で SELECT を流して見てください' : '料金はかかりません'}>
-                    {busy === 'preview' ? '読んでいます…' : '先頭の 20 行を見る'}
-                  </Button>
-                </div>
-                {previewError && (
-                  <MessageBar intent="error" layout="multiline">
-                    <MessageBarBody>{previewError}</MessageBarBody>
-                  </MessageBar>
-                )}
-                {preview && <ResultGrid columns={preview.columns} rows={preview.rows} />}
-              </>
-            )}
-          </div>
-        )}
+        {selected && <TableDetail refName={selected} info={info} error={infoError} loading={busy === 'info'} onOpenTable={(r) => void openTable(r)} onUseSql={changeSql} />}
 
         <div className={s.card}>
           <div className={s.row}>
@@ -363,7 +337,10 @@ ${toMarkdown(result.columns, result.rows.slice(0, 20))}`
           {dry && (
             <MessageBar intent={dry.runnable ? (dry.bytes != null && dry.bytes > dry.max_bytes ? 'warning' : 'success') : 'warning'} layout="multiline">
               <MessageBarBody>
-                文の種類: {dry.statement_type ?? '不明'} / 読む量: {bytesLabel(dry.bytes)}(上限 {bytesLabel(dry.max_bytes)})
+                文の種類: {dry.statement_type ?? '不明'} / 読む量: {bytesLabel(dry.bytes)}(上限 {bytesLabel(dry.max_bytes)})/ 重さ: {dry.weight} / 流したときの概算:{' '}
+                {dry.cost_usd == null ? '—' : `$${dry.cost_usd < 0.01 ? dry.cost_usd.toFixed(4) : dry.cost_usd.toFixed(2)}`}(${dry.price_per_tib}/TiB)
+                {dry.views.length > 0 && <div className={s.mono}>参照するビュー: {dry.views.join(', ')}</div>}
+                {dry.tables.length > 0 && <div className={s.mono}>読む元の表: {dry.tables.join(', ')}</div>}
                 {dry.reason && <div>{dry.reason}</div>}
                 {dry.runnable && dry.bytes != null && dry.bytes > dry.max_bytes && <div>上限を超えるので、流すと BigQuery が止めます。期間やパーティションで絞ってください</div>}
                 {dry.columns.length > 0 && <div className={s.mono}>結果の列: {dry.columns.map((c) => `${c.name} ${c.type}`).join(', ')}</div>}
@@ -377,10 +354,22 @@ ${toMarkdown(result.columns, result.rows.slice(0, 20))}`
               note={`${result.total_rows?.toLocaleString() ?? '?'} 行のうち先頭 ${result.rows.length} 行 / 読んだ量 ${bytesLabel(result.bytes)}${result.cached ? '(キャッシュ)' : ''} / ${result.seconds} 秒`}
             />
           )}
+          {result?.job && <JobInfo job={result.job} />}
         </div>
       </div>
 
-      <ChatPanel
+      <div className={s.splitter} role="separator" aria-orientation="vertical" title="ドラッグで幅を変える(ダブルクリックで元に戻す)" onPointerDown={(e) => widths.rightOpen && drag(e, 'right')} onDoubleClick={() => setWidths(WIDTHS)} />
+      {!widths.rightOpen && (
+        <button type="button" className={s.folded} onClick={() => setWidths((w) => ({ ...w, rightOpen: true }))} title="AI との会話を開く">
+          <PanelRightExpandRegular />
+          <SparkleRegular />
+          <span className={s.foldedLabel}>AI と SQL を作る</span>
+        </button>
+      )}
+      {/* 畳んでも消さない(考えている途中の会話が止まらないように) */}
+      <div style={widths.rightOpen ? { minWidth: 0 } : { display: 'none' }}>
+        <ChatPanel
+          onFold={() => setWidths((w) => ({ ...w, rightOpen: false }))}
         dataset={dataset}
         selected={selected}
         sql={sql}
@@ -388,8 +377,12 @@ ${toMarkdown(result.columns, result.rows.slice(0, 20))}`
         hasError={!!sqlError}
         notes={settings.notes ?? ''}
         onNotes={(notes) => onSettings({ ...settings, notes })}
-        onUseSql={changeSql}
+        onUseSql={(text, run) => {
+          changeSql(text)
+          if (run) void runSql(text)
+        }}
       />
+      </div>
     </div>
   )
 }

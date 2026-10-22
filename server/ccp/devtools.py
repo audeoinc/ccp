@@ -13,7 +13,9 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/bq/dryrun       {sql}  料金なしの試し。文の種類・読む量・結果の列
   POST /api/dev/bq/run          {sql, max_rows}  SELECT だけを、読む量の上限を付けて流す
   GET  /api/dev/bq/projects     見られるプロジェクト(データセットを、名前の一部で探すため)
-  POST /api/dev/ai/chat         Gemini と会話して SQL を組み立てる。前提(仕様・手本・表の列・まとめ・いまの SQL)はサーバーで組み立てる
+  POST /api/dev/ai/chat         Gemini と会話して SQL を組み立てる。前提(仕様・手本・表の列・まとめ・いまの SQL)はサーバーで組み立てる。
+                                思考・調べたこと・返事を、起きた順に NDJSON で返す
+  GET  /api/dev/ai/models       使えるモデル(賢い順)と既定
   POST /api/dev/ai/context      Gemini に渡す前提を、そのまま返す(見る・コピーする)
 
 決まり(DEVTOOLS.md の 6 章):
@@ -27,18 +29,22 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import os
 import re
 import time
 from datetime import date, datetime, time as dtime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import bq
+
+log = logging.getLogger("ccp.devtools")
 
 DEVWORK = Path(os.getenv("DEVTOOLS_DIR") or Path(__file__).resolve().parents[1] / "devwork")
 # 画面に返す行の上限(多すぎるとブラウザが重くなる。全件の確かめは、別の段で行う)
@@ -251,13 +257,87 @@ async def preview(ref: str) -> dict[str, Any]:
 
 # ---- SQL を試す
 
+def price_per_tib() -> float:
+    """オンデマンドの料金(1 TiB あたりのドル)。場所や契約で違うので、設定(DEVTOOLS_PRICE_PER_TIB)で変えられる"""
+    try:
+        return float(os.getenv("DEVTOOLS_PRICE_PER_TIB") or 6.25)
+    except ValueError:
+        return 6.25
+
+
+def cost_usd(n: int | None) -> float | None:
+    return None if n is None else round(n / 1024**4 * price_per_tib(), 4)
+
+
+def weight(processed: int | None, slot_ms: int | None) -> str:
+    """重さの目安(読む量とスロット時間から。画面に一言で出す)"""
+    gb = (processed or 0) / 1024**3
+    slot_s = (slot_ms or 0) / 1000
+    if gb >= 100 or slot_s >= 3600:
+        return "重い"
+    if gb >= 1 or slot_s >= 60:
+        return "ふつう"
+    return "軽い"
+
+
+# SQL の中の `プロジェクト.データセット.表` の形(参照したビューを見つけるため)
+TABLE_REF = re.compile(r"`?([A-Za-z0-9_-]+\.[A-Za-z0-9_]+\.[A-Za-z0-9_$*]+)`?")
+
+
+def referenced(c: Any, sql: str, job: Any) -> dict[str, list[str]]:
+    """参照した表とビュー。BigQuery のジョブの記録には、ビューの中身(元の表)しか残らないので、
+    SQL に書いた名前のうち、元の表に出てこないものを調べて、ビューを見つける"""
+    tables = [f"{t.project}.{t.dataset_id}.{t.table_id}" for t in (job.referenced_tables or [])]
+    views: list[str] = []
+    for name in dict.fromkeys(TABLE_REF.findall(sql)):
+        if name in tables or "*" in name:
+            continue
+        try:
+            t = c.get_table(name)
+        except Exception:  # noqa: BLE001 — 列の名前などが、たまたま同じ形だっただけ
+            continue
+        if t.table_type in ("VIEW", "MATERIALIZED_VIEW"):
+            views.append(f"{t.project}.{t.dataset_id}.{t.table_id}")
+    return {"tables": list(dict.fromkeys(tables)), "views": views}
+
+
+def job_info(c: Any, sql: str, job: Any) -> dict[str, Any]:
+    """ジョブの実行情報(重いのか・高いのか・どこを読んだのか)。画面の結果の下に出す"""
+    elapsed = (job.ended - job.started).total_seconds() if job.started and job.ended else None
+    try:
+        refs = referenced(c, sql, job)
+    except Exception:  # noqa: BLE001
+        refs = {"tables": [], "views": []}
+    return {
+        "job_id": job.job_id,
+        "location": job.location,
+        "processed": job.total_bytes_processed,
+        "billed": job.total_bytes_billed,
+        "cost_usd": cost_usd(job.total_bytes_billed),
+        "price_per_tib": price_per_tib(),
+        "slot_ms": job.slot_millis,
+        "elapsed": elapsed,
+        "cached": bool(job.cache_hit),
+        "weight": weight(job.total_bytes_processed, job.slot_millis),
+        **refs,
+    }
+
+
 @router.post("/bq/dryrun")
 async def dryrun(body: SqlIn) -> dict[str, Any]:
     def go() -> dict[str, Any]:
-        job = _dry_run(bq.client(), body.sql)
+        c = bq.client()
+        job = _dry_run(c, body.sql)
         st = job.statement_type
+        try:
+            refs = referenced(c, body.sql, job)
+        except Exception:  # noqa: BLE001
+            refs = {"tables": [], "views": []}
         return {"ok": True, "statement_type": st, "bytes": job.total_bytes_processed, "columns": schema_columns(job.schema),
-                "runnable": only_select(st) is None, "reason": only_select(st), "max_bytes": max_bytes()}
+                "runnable": only_select(st) is None, "reason": only_select(st), "max_bytes": max_bytes(),
+                # 流したときの概算(課金は最小 10 MB から。キャッシュに当たれば 0)
+                "cost_usd": cost_usd(max(job.total_bytes_processed or 0, 10 * 1024**2)), "price_per_tib": price_per_tib(),
+                "weight": weight(job.total_bytes_processed, None), **refs}
 
     try:
         return await asyncio.to_thread(go)
@@ -287,6 +367,7 @@ async def run(body: SqlIn) -> dict[str, Any]:
             "billed": job.total_bytes_billed,
             "seconds": round(time.monotonic() - t0, 2),
             "cached": bool(job.cache_hit),
+            "job": job_info(c, body.sql, job),
         }
 
     try:
@@ -361,8 +442,10 @@ CCP の列に合う元の列を探してください。ビューに出ていな�
 
 最後の返答は、次の形の JSON だけにしてください(```json で囲まない):
 {"reply": "利用者への返事(日本語。Markdown の見出し・箇条書き・**太字**・表を使ってよい。SQL はここに書かない)",
- "sql": "SQL の全文(新しく書いた・直したときだけ。直すときも、部分ではなく、そのまま流せる全文。ないときは空の文字)",
+ "sqls": [{"title": "何の SQL か(短く)", "sql": "SQL の全文"}],
  "questions": ["決めきれなかったこと・利用者に確かめたいこと(なければ空の配列)"]}
+sqls は、新しく書いた・直した SQL があるときだけ(なければ空の配列)。直すときも、部分ではなく、そのまま流せる全文。
+値を確かめる SQL と、本番の SQL のように、いくつか出すときは並べる(利用者は 1 つずつ試す)。
 
 決まり:
 - 方言は GoogleSQL(BigQuery)。表は `プロジェクト.データセット.表` の形で、バッククォートで囲む
@@ -388,6 +471,8 @@ class ChatTurn(BaseModel):
 
 class ChatIn(BaseModel):
     messages: list[ChatTurn] = Field(default_factory=list, max_length=200)
+    # 使うモデル(画面で選ぶ)。なければ既定(default_model)
+    model: str | None = Field(None, max_length=200)
     # 作ろうとしている出力(spu など)。手本の SQL を渡す。なしでも、仕様はいつも全文を渡す
     output: str | None = None
     # 画面で開いているデータセット(「このデータセット」と言ったときの手がかり)
@@ -501,11 +586,15 @@ def parse_reply(text: str) -> dict[str, Any]:
             v = json.loads(c)
         except ValueError:
             continue
-        if isinstance(v, dict) and ("reply" in v or "sql" in v):
+        if isinstance(v, dict) and ("reply" in v or "sql" in v or "sqls" in v):
             q = v.get("questions")
-            return {"reply": str(v.get("reply") or ""), "sql": str(v.get("sql") or "").strip(),
+            sqls = [{"title": str(x.get("title") or ""), "sql": str(x.get("sql") or "").strip()} for x in (v.get("sqls") or []) if isinstance(x, dict)]
+            # 1 つだけの形(sql)で返してきたときも受ける
+            if isinstance(v.get("sql"), str) and v["sql"].strip():
+                sqls.insert(0, {"title": "", "sql": v["sql"].strip()})
+            return {"reply": str(v.get("reply") or ""), "sqls": [x for x in sqls if x["sql"]],
                     "questions": [str(x) for x in q if x] if isinstance(q, list) else []}
-    return {"reply": text, "sql": "", "questions": []}
+    return {"reply": text, "sqls": [], "questions": []}
 
 
 # ---- Gemini が使う道具(どれも読むだけ。BigQuery に書き込むものはない)
@@ -588,54 +677,162 @@ async def _context(body: ChatIn) -> tuple[str, Any]:
     return await asyncio.to_thread(build_context, body, client), client
 
 
-@router.post("/ai/chat")
-async def chat(body: ChatIn) -> dict[str, Any]:
+def _version(name: str) -> tuple[float, int]:
+    """モデルの名前から、新しさを比べる値(gemini-3.5-pro → 3.5。preview は、同じ版の正式より後ろ)"""
+    m = re.search(r"gemini-(\d+(?:\.\d+)?)", name)
+    return (float(m.group(1)) if m else 0.0, 0 if "preview" in name else 1)
+
+
+def pick_models(names: list[str]) -> list[str]:
+    """Vertex AI のモデルの一覧から、会話に使える Gemini を、賢い順(Pro → Flash、新しい版が先)に並べる"""
+    keep = []
+    for n in names:
+        n = n.split("/")[-1]
+        if not n.startswith("gemini-") or not re.search(r"-(pro|flash)\b", n):
+            continue
+        if re.search(r"(image|tts|audio|live|embedding|lite|exp|thinking-exp)", n):
+            continue
+        keep.append(n)
+    return sorted(set(keep), key=lambda n: (0 if "-pro" in n else 1, tuple(-x for x in _version(n))))
+
+
+_models_cache: list[str] | None = None
+
+
+async def available_models() -> list[str]:
+    """使えるモデル(Vertex AI に聞く。聞けなければ設定のモデルだけ)。プロセスの間は覚えておく"""
+    global _models_cache
+    if _models_cache is None:
+        from . import ai
+
+        names: list[str] = []
+        try:
+            pager = await ai._get_client().aio.models.list(config={"query_base": True, "page_size": 200})
+            async for m in pager:
+                names.append(m.name or "")
+        except Exception:  # noqa: BLE001 — 一覧を出せない環境でも、設定のモデルで動く
+            log.info("Vertex AI のモデルの一覧を読めませんでした", exc_info=True)
+        _models_cache = pick_models(names)
+    pinned = [m for m in (os.getenv("DEVTOOLS_GEMINI_MODEL"), os.getenv("GEMINI_MODEL")) if m]
+    return list(dict.fromkeys(pinned[:1] + _models_cache + pinned[1:]))
+
+
+async def default_model() -> str:
+    """開発用の画面の既定のモデル。設定(DEVTOOLS_GEMINI_MODEL)があればそれ、なければ一覧でいちばん賢いもの。
+    SQL を組み立てるのは、配信の下書きと違って 1 回ずつの呼び出しなので、速さより賢さを取る"""
+    if os.getenv("DEVTOOLS_GEMINI_MODEL"):
+        return os.environ["DEVTOOLS_GEMINI_MODEL"]
+    models = await available_models()
+    return models[0] if models else os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+
+
+@router.get("/ai/models")
+async def models() -> dict[str, Any]:
+    return {"ok": True, "default": await default_model(), "models": await available_models(),
+            "thinking": (os.getenv("DEVTOOLS_THINKING") or "high").lower()}
+
+
+def _line(obj: dict[str, Any]) -> bytes:
+    return (json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+async def chat_events(body: ChatIn) -> AsyncIterator[dict[str, Any]]:
+    """会話の 1 回分を、起きた順に返す(画面が、思考・調べたこと・返事を、届いたそばから出せるように)。
+      {"type": "start", "model": …}       {"type": "thought", "text": …}(思考の要約。少しずつ届く)
+      {"type": "step", "text": …}         {"type": "final", "reply": …, "sqls": […], "questions": […]}
+      {"type": "error", "error": …}"""
     from google.genai import types
 
     from . import ai
 
     if not body.messages or body.messages[-1].role != "user":
-        return {"ok": False, "error": "送る発言がありません"}
+        yield {"type": "error", "error": "送る発言がありません"}
+        return
+    model = body.model or await default_model()
+    level = (os.getenv("DEVTOOLS_THINKING") or "high").upper()
+    yield {"type": "start", "model": model, "thinking": level.lower()}
     try:
         context, client = await _context(body)
     except Exception as e:  # noqa: BLE001
-        return _error(e)
-    model = os.getenv("DEVTOOLS_GEMINI_MODEL") or os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
-    # SQL は、配信の下書きより考える量を多めに(1 回ずつの呼び出しなので、速さより正しさ)
-    level = (os.getenv("DEVTOOLS_THINKING") or "medium").upper()
+        yield {"type": "error", "error": _error(e)["error"]}
+        return
     config = types.GenerateContentConfig(
         system_instruction=context,
         tools=tool_declarations(),
         # 道具の呼び出しは、ここで 1 つずつ行う(画面に「何をしたか」を出し、回数に上限を付けるため)
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel(level)),
+        # 思考の要約も受け取る(利用者が、どう考えて SQL にしたかを確かめながら進めるため)
+        thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel(level), include_thoughts=True),
     )
     contents: list[Any] = [types.Content(role=m.role, parts=[types.Part(text=m.text)]) for m in body.messages]
-    steps: list[str] = []
+    text = ""
     try:
         for round_ in range(MAX_TOOL_ROUNDS + 1):
             if round_ == MAX_TOOL_ROUNDS:
                 # 道具を使う回数の上限。ここまでで分かったことで答えさせる(道具を渡さずに、もう 1 回)
                 contents.append(types.Content(role="user", parts=[types.Part(text="道具を使う回数の上限に達しました。ここまでで分かったことで、決まりの JSON で答えてください。")]))
                 config = config.model_copy(update={"tools": None, "automatic_function_calling": None})
-            resp = await ai._get_client().aio.models.generate_content(model=model, contents=contents, config=config)
-            calls = resp.function_calls or []
+            parts: list[Any] = []
+            calls: list[Any] = []
+            text = ""
+            stream = await ai._get_client().aio.models.generate_content_stream(model=model, contents=contents, config=config)
+            async for chunk in stream:
+                for cand in chunk.candidates or []:
+                    for p in (cand.content.parts if cand.content else None) or []:
+                        if p.thought:
+                            if p.text:
+                                yield {"type": "thought", "text": p.text}
+                            # 思考の署名(thought_signature)は、次の呼び出しに戻す必要がある
+                            if p.thought_signature:
+                                parts.append(p)
+                            continue
+                        parts.append(p)
+                        if p.function_call:
+                            calls.append(p.function_call)
+                        elif p.text:
+                            text += p.text
             if not calls:
                 break
             # 返答(思考の署名を含む)をそのまま履歴に戻してから、道具の結果を足す
-            contents.append(resp.candidates[0].content)
+            contents.append(types.Content(role="model", parts=parts))
             results = []
             for call in calls:
                 out, step = await asyncio.to_thread(run_tool, client, call.name or "", dict(call.args or {}), body)
-                steps.append(step)
+                yield {"type": "step", "text": step}
                 results.append(types.Part.from_function_response(name=call.name or "", response=out))
             contents.append(types.Content(role="user", parts=results))
-        text = (resp.text or "").strip()
     except Exception as e:  # noqa: BLE001 — Vertex AI のエラーは種類が多い。原因をそのまま見せる
-        return {"ok": False, "error": f"Gemini の呼び出しに失敗しました: {type(e).__name__}: {e}"[:2000], "steps": steps}
+        yield {"type": "error", "error": f"{model} の呼び出しに失敗しました: {type(e).__name__}: {e}"[:2000]}
+        return
+    text = text.strip()
     if not text:
-        return {"ok": False, "error": "Gemini の返答が空でした(道具を使う回数の上限に達したか、安全フィルターで止まった可能性があります)", "steps": steps}
-    return {"ok": True, **parse_reply(text), "steps": steps, "context_chars": len(context)}
+        yield {"type": "error", "error": "返答が空でした(安全フィルターなどで止まった可能性があります)"}
+        return
+    yield {"type": "final", **parse_reply(text), "context_chars": len(context)}
+
+
+@router.post("/ai/chat")
+async def chat(body: ChatIn) -> StreamingResponse:
+    """会話の 1 回分。1 行 1 つの JSON(NDJSON)で、起きた順に返す。考えている間も、15 秒ごとに合図を送る
+    (中継(Jupyter のプロキシ)が、黙っている接続を切らないように。画面も「止まっていない」と分かる)"""
+
+    async def gen() -> AsyncIterator[bytes]:
+        events = chat_events(body).__aiter__()
+        pending = asyncio.ensure_future(events.__anext__())
+        while True:
+            done, _ = await asyncio.wait({pending}, timeout=15)
+            if not done:
+                yield _line({"type": "ping"})
+                continue
+            try:
+                ev = pending.result()
+            except StopAsyncIteration:
+                return
+            yield _line(ev)
+            pending = asyncio.ensure_future(events.__anext__())
+
+    # X-Accel-Buffering: 途中の中継が、まとめて送らないように
+    return StreamingResponse(gen(), media_type="application/x-ndjson", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/ai/context")

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Button,
   Checkbox,
+  Combobox,
   Dialog,
   DialogActions,
   DialogBody,
@@ -18,9 +19,22 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DocumentSearchRegular, SparkleRegular, TableAddRegular } from '@fluentui/react-icons'
-import { MarkdownLite } from '../MarkdownLite'
-import { DevApi, isFailure, type ChatContext, type ChatTurn } from './api'
+import {
+  ArrowUpRegular,
+  BrainCircuitRegular,
+  ChevronDownRegular,
+  ChevronRightRegular,
+  DeleteRegular,
+  DocumentSearchRegular,
+  PlayRegular,
+  ArrowLeftRegular,
+  PanelRightContractRegular,
+  SparkleRegular,
+  StopRegular,
+  TableAddRegular,
+} from '@fluentui/react-icons'
+import { ChatMarkdown } from './ChatMarkdown'
+import { DevApi, isFailure, type ChatContext, type ChatEvent, type ChatTurn, type SqlBlock } from './api'
 import { CopyButton } from './CopyButton'
 
 const useStyles = makeStyles({
@@ -35,14 +49,15 @@ const useStyles = makeStyles({
     position: 'sticky',
     top: '12px',
   },
-  head: { display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  head: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, flexWrap: 'wrap' },
   title: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1 },
-  ctx: { padding: '8px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, display: 'flex', flexDirection: 'column', gap: '6px' },
-  ctxToggle: { display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', border: 'none', background: 'none', padding: 0, color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
+  model: { minWidth: '200px', maxWidth: '100%' },
+  ctx: { flexShrink: 0, padding: '8px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '45vh', overflowY: 'auto' },
+  toggle: { display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', border: 'none', background: 'none', padding: 0, color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, textAlign: 'left' },
   label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
   grow: { flexGrow: 1 },
-  log: { flexGrow: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0 },
+  log: { flexGrow: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 },
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: '20px' },
   user: {
     alignSelf: 'flex-end',
@@ -54,34 +69,52 @@ const useStyles = makeStyles({
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
   },
-  model: { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 },
-  steps: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, margin: 0, paddingLeft: '16px' },
+  answer: { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 },
+  meta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
+  thoughts: {
+    margin: 0,
+    padding: '6px 8px',
+    borderLeft: `3px solid ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+    overflowWrap: 'anywhere',
+    maxHeight: '320px',
+    overflowY: 'auto',
+  },
+  steps: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, margin: 0, paddingLeft: '18px' },
+  sqlBox: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden' },
+  sqlHead: { display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 6px', backgroundColor: tokens.colorNeutralBackground3, flexWrap: 'wrap' },
+  sqlTitle: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, flexGrow: 1, minWidth: '80px' },
   sql: {
     margin: 0,
     padding: '8px',
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderRadius: tokens.borderRadiusMedium,
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
-    maxHeight: '280px',
+    maxHeight: '320px',
     overflowY: 'auto',
   },
   questions: { fontSize: tokens.fontSizeBase200, margin: 0, paddingLeft: '18px', color: tokens.colorPaletteMarigoldForeground2 },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
-  input: { padding: '8px 12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, display: 'flex', flexDirection: 'column', gap: '6px' },
+  input: { flexShrink: 0, padding: '8px 12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, display: 'flex', flexDirection: 'column', gap: '6px' },
   pre: { margin: 0, fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '60vh', overflowY: 'auto' },
 })
 
-/** 会話の 1 つ(画面に出す形)。Gemini の返事は、返事・SQL・聞きたいこと・調べたことに分けて持つ */
+/** 会話の 1 つ(画面に出す形)。返事は、思考・調べたこと・返事・SQL・聞きたいことに分けて持つ */
 interface Message {
   role: 'user' | 'model'
   text: string
-  sql?: string
+  sqls?: SqlBlock[]
   questions?: string[]
   steps?: string[]
+  thoughts?: string
+  model?: string
+  seconds?: number
   error?: boolean
+  /** 届いている途中 */
+  live?: boolean
 }
 
 const OUTPUTS: { value: string; label: string }[] = [
@@ -94,33 +127,35 @@ const OUTPUTS: { value: string; label: string }[] = [
   { value: 'ranking', label: '販売チャネルごとの順位' },
 ]
 
-// 会話は、この画面を開いている人のブラウザにだけ残す(閉じても続きから話せるように。作ったものは SQL として持ち出す)
-const LOG_KEY = 'ccp-dev-chat'
-const readLog = (): Message[] => {
+// 上の帯(見出し・渡すもの)と下の入力欄は縮めない(会話の欄だけがスクロールする)
+// 会話と選んだモデルは、この画面を開いている人のブラウザにだけ残す(閉じても続きから話せるように)
+const LOG_KEY = 'ccp-dev-chat.v2'
+const MODEL_KEY = 'ccp-dev-model'
+const load = <T,>(key: string, fallback: T): T => {
   try {
-    const v = JSON.parse(window.localStorage.getItem(LOG_KEY) ?? '[]') as unknown
-    return Array.isArray(v) ? (v as Message[]) : []
+    const v = window.localStorage.getItem(key)
+    return v ? (JSON.parse(v) as T) : fallback
   } catch {
-    return []
+    return fallback
   }
 }
-const writeLog = (m: Message[]) => {
+const save = (key: string, v: unknown) => {
   try {
-    window.localStorage.setItem(LOG_KEY, JSON.stringify(m.slice(-80)))
+    window.localStorage.setItem(key, JSON.stringify(v))
   } catch {
     // 保存できない環境では、残さない
   }
 }
 
-/** Gemini に戻す会話の形。前の返事の SQL も本文に入れる(「さっきの SQL の…」が通じるように) */
+/** Gemini に戻す会話の形。前の返事の SQL も本文に入れる(「さっきの 2 つめの SQL の…」が通じるように) */
 const toTurn = (m: Message): ChatTurn => ({
   role: m.role,
-  text: m.role === 'model' && m.sql ? `${m.text}\n\n\`\`\`sql\n${m.sql}\n\`\`\`` : m.text,
+  text: m.role === 'model' && m.sqls?.length ? `${m.text}\n\n${m.sqls.map((b, i) => `-- SQL ${i + 1}${b.title ? `: ${b.title}` : ''}\n\`\`\`sql\n${b.sql}\n\`\`\``).join('\n\n')}` : m.text,
 })
 
 interface Props {
   dataset: string
-  /** 左で開いている表(「この表を渡す」で足す) */
+  /** 左で開いている表(「開いている表を足す」で足す) */
   selected: string | null
   sql: string
   /** いまの SQL を流した結果(エラー、または結果の先頭の Markdown) */
@@ -128,19 +163,28 @@ interface Props {
   hasError: boolean
   notes: string
   onNotes: (notes: string) => void
-  onUseSql: (sql: string) => void
+  /** SQL の欄に入れる(run なら、入れてすぐ流す) */
+  onUseSql: (sql: string, run: boolean) => void
+  /** ペインを畳む */
+  onFold?: () => void
 }
 
 /**
  * Gemini と会話しながら SQL を組み立てる(DEVTOOLS.md の 3.1 ④)。
- * Gemini は、BigQuery を調べる道具(表を探す・列を見る・確かめる・SELECT を流す)を使える。
- * 「A データセットの ctlg を含む表から、CCP で使えそうな列を…」のように頼めば、自分で表を探して答える
+ * Gemini は、BigQuery を調べる道具(表を探す・列を見る・ビューの参照先をたどる・確かめる・SELECT を流す)を使える。
+ * 思考の要約・調べたこと・返事は、届いたそばから出す(止まっているのか考えているのかが分かるように)
  */
-export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql }: Props) {
+export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql, onFold }: Props) {
   const s = useStyles()
-  const [messages, setMessages] = useState<Message[]>(readLog)
+  const [messages, setMessages] = useState<Message[]>(() => load<Message[]>(LOG_KEY, []).map((m) => ({ ...m, live: false })))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const [models, setModels] = useState<string[]>([])
+  const [model, setModel] = useState<string>(() => load<string>(MODEL_KEY, ''))
+  const [defaultModel, setDefaultModel] = useState('')
+  // モデルの欄に打っている途中の文字(確定するまで、選んだモデルは変えない)
+  const [modelDraft, setModelDraft] = useState<string | null>(null)
   const [output, setOutput] = useState('')
   const [tables, setTables] = useState<string[]>([])
   const [sampleRows, setSampleRows] = useState(true)
@@ -149,13 +193,37 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
   const [ctxOpen, setCtxOpen] = useState(false)
   const [draftNotes, setDraftNotes] = useState(notes)
   const [preview, setPreview] = useState<string | null>(null)
+  // 開いている思考(既定は、届いている途中だけ開く)
+  const [openThoughts, setOpenThoughts] = useState<Record<number, boolean>>({})
   const logEnd = useRef<HTMLDivElement>(null)
+  const abort = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      const r = await DevApi.models()
+      if (isFailure(r)) return
+      setModels(r.models)
+      setDefaultModel(r.default)
+    })()
+  }, [])
 
   useEffect(() => {
     logEnd.current?.scrollIntoView({ block: 'end' })
-  }, [messages, busy])
+  }, [messages])
+
+  // 考えている間は、経過の秒数を出す(止まっていないことが分かるように)
+  useEffect(() => {
+    if (!busy) return
+    const t0 = Date.now()
+    const id = window.setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000)
+    return () => {
+      window.clearInterval(id)
+      setElapsed(0)
+    }
+  }, [busy])
 
   const ctx = (): ChatContext => ({
+    model: model || null,
     output: output || null,
     dataset,
     tables,
@@ -166,23 +234,46 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
     last: withSql ? last : '',
   })
 
-  const update = (next: Message[]) => {
+  const commit = (next: Message[]) => {
     setMessages(next)
-    writeLog(next)
+    save(LOG_KEY, next.slice(-80))
   }
 
   const send = async (text: string) => {
     const t = text.trim()
     if (!t || busy) return
-    const next = [...messages, { role: 'user' as const, text: t }]
-    update(next)
+    // エラーになった返事は、会話に戻さない(Gemini が混乱しないように)
+    const history = [...messages.filter((m) => !m.error), { role: 'user' as const, text: t }]
+    const base = [...messages, { role: 'user' as const, text: t }]
+    let answer: Message = { role: 'model', text: '', steps: [], thoughts: '', live: true }
+    const at = base.length
+    setMessages([...base, answer])
     setInput('')
     setBusy(true)
-    // エラーになった発言は、会話に戻さない(Gemini が混乱しないように)
-    const r = await DevApi.chat(next.filter((m) => !m.error).map(toTurn), ctx())
+    const t0 = Date.now()
+    const ac = new AbortController()
+    abort.current = ac
+    const apply = (patch: Partial<Message>) => {
+      answer = { ...answer, ...patch }
+      setMessages((ms) => [...ms.slice(0, at), answer])
+    }
+    await DevApi.chatStream(
+      history.map(toTurn),
+      ctx(),
+      (ev: ChatEvent) => {
+        if (ev.type === 'start') apply({ model: ev.model })
+        else if (ev.type === 'thought') apply({ thoughts: (answer.thoughts ?? '') + ev.text })
+        else if (ev.type === 'step') apply({ steps: [...(answer.steps ?? []), ev.text] })
+        else if (ev.type === 'final') apply({ text: ev.reply, sqls: ev.sqls, questions: ev.questions })
+        else if (ev.type === 'error') apply({ text: ev.error, error: true })
+      },
+      ac.signal,
+    )
+    if (ac.signal.aborted) apply({ text: '止めました', error: true })
+    answer = { ...answer, live: false, seconds: Math.round((Date.now() - t0) / 1000) }
+    abort.current = null
     setBusy(false)
-    if (isFailure(r)) update([...next, { role: 'model', text: r.error, steps: r.steps, error: true }])
-    else update([...next, { role: 'model', text: r.reply, sql: r.sql, questions: r.questions, steps: r.steps }])
+    commit([...base, answer])
   }
 
   const showContext = async () => {
@@ -191,24 +282,60 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
     setPreview(isFailure(r) ? r.error : r.context)
   }
 
+  const shownModel = model || defaultModel
+
   return (
     <div className={s.root}>
       <div className={s.head}>
         <span className={s.title}>
-          <SparkleRegular /> Gemini と SQL を作る
+          <SparkleRegular /> AI と SQL を作る
         </span>
-        <Button size="small" appearance="subtle" icon={<DocumentSearchRegular />} onClick={() => void showContext()} title="Gemini に渡す前提(仕様・手本・表・まとめ・いまの SQL)を見る">
+        <Button size="small" appearance="subtle" icon={<DocumentSearchRegular />} onClick={() => void showContext()} title="AI に渡す前提(仕様・手本・表・まとめ・いまの SQL)を見る">
           前提
         </Button>
-        <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={!messages.length || busy} onClick={() => update([])} title="会話を消して、最初から">
+        <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={!messages.length || busy} onClick={() => commit([])} title="会話を消して、最初から">
           消す
         </Button>
+        {onFold && <Button size="small" appearance="subtle" icon={<PanelRightContractRegular />} onClick={onFold} title="畳む(会話は続きます)" />}
+        <div className={s.row} style={{ width: '100%' }}>
+          <span className={s.label}>モデル</span>
+          <Combobox
+            className={s.model}
+            size="small"
+            freeform
+            value={modelDraft ?? shownModel}
+            selectedOptions={shownModel ? [shownModel] : []}
+            placeholder="読んでいます…"
+            onChange={(e) => setModelDraft((e.target as HTMLInputElement).value)}
+            onOptionSelect={(_, d) => {
+              const v = d.optionValue ?? ''
+              setModelDraft(null)
+              if (!v) return
+              setModel(v === defaultModel ? '' : v)
+              save(MODEL_KEY, v === defaultModel ? '' : v)
+            }}
+            onBlur={() => {
+              // 一覧にないモデルも、名前を打てば使える(Vertex AI で有効なもの)。空にすれば既定に戻る
+              if (modelDraft === null) return
+              const v = modelDraft.trim()
+              setModelDraft(null)
+              setModel(v === defaultModel ? '' : v)
+              save(MODEL_KEY, v === defaultModel ? '' : v)
+            }}
+          >
+            {models.map((m) => (
+              <Option key={m} value={m}>
+                {m === defaultModel ? `${m}(既定)` : m}
+              </Option>
+            ))}
+          </Combobox>
+        </div>
       </div>
 
       <div className={s.ctx}>
-        <button type="button" className={s.ctxToggle} onClick={() => setCtxOpen((v) => !v)}>
+        <button type="button" className={s.toggle} onClick={() => setCtxOpen((v) => !v)}>
           {ctxOpen ? <ChevronDownRegular /> : <ChevronRightRegular />}
-          Gemini に渡すもの({output ? `${OUTPUTS.find((o) => o.value === output)?.label}・` : ''}表 {tables.length}・まとめ {draftNotes.trim() ? 'あり' : 'なし'})
+          AI に渡すもの({output ? `${OUTPUTS.find((o) => o.value === output)?.label}・` : ''}表 {tables.length}・まとめ {draftNotes.trim() ? 'あり' : 'なし'})
         </button>
         {ctxOpen && (
           <>
@@ -237,10 +364,10 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
                 ))}
               </TagGroup>
             )}
-            <span className={s.label}>表を足さなくても、Gemini が自分で探して列を見ます。</span>
-            <Checkbox size="medium" label="表の先頭の数行も渡す(名前・住所・レビューなどの列は外す)" checked={sampleRows} onChange={(_, d) => setSampleRows(!!d.checked)} />
-            <Checkbox size="medium" label="Gemini に SELECT を流させる(値の確かめ。読む量の上限つき)" checked={allowRun} onChange={(_, d) => setAllowRun(!!d.checked)} />
-            <Checkbox size="medium" label="いまの SQL と、流した結果・エラーを渡す" checked={withSql} onChange={(_, d) => setWithSql(!!d.checked)} />
+            <span className={s.label}>表を足さなくても、AI が自分で探して列を見ます(ビューは参照先の表までたどります)。</span>
+            <Checkbox label="表の先頭の数行も渡す(名前・住所・レビューなどの列は外す)" checked={sampleRows} onChange={(_, d) => setSampleRows(!!d.checked)} />
+            <Checkbox label="AI に SELECT を流させる(値の確かめ。読む量の上限つき)" checked={allowRun} onChange={(_, d) => setAllowRun(!!d.checked)} />
+            <Checkbox label="いまの SQL と、流した結果・エラーを渡す" checked={withSql} onChange={(_, d) => setWithSql(!!d.checked)} />
             <span className={s.label}>仕様のまとめ(コンフルなどから。保存して次も使う)</span>
             <Textarea
               size="small"
@@ -263,13 +390,33 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
             「接続しているプロジェクトの A データセットに、ctlg を含む表があると思います。CCP で使えそうな列を SELECT する SQL を書いてください。そのあと、どの列を CCP のどの列に当てるとよさそうか、一緒に考えてください」
           </div>
         )}
-        {messages.map((m, i) =>
-          m.role === 'user' ? (
-            <div key={i} className={s.user}>
-              {m.text}
-            </div>
-          ) : (
-            <div key={i} className={s.model}>
+        {messages.map((m, i) => {
+          if (m.role === 'user')
+            return (
+              <div key={i} className={s.user}>
+                {m.text}
+              </div>
+            )
+          const thoughtsOpen = openThoughts[i] ?? !!m.live
+          return (
+            <div key={i} className={s.answer}>
+              <div className={s.meta}>
+                {m.model ?? '…'}
+                {m.live ? <Spinner size="extra-tiny" label={`考えています ${elapsed} 秒`} /> : m.seconds != null ? <span>{m.seconds} 秒</span> : null}
+              </div>
+              {!!m.thoughts && (
+                <>
+                  <button type="button" className={s.toggle} onClick={() => setOpenThoughts((o) => ({ ...o, [i]: !thoughtsOpen }))}>
+                    {thoughtsOpen ? <ChevronDownRegular /> : <ChevronRightRegular />}
+                    <BrainCircuitRegular /> 思考({m.thoughts.length.toLocaleString()} 文字)
+                  </button>
+                  {thoughtsOpen && (
+                    <div className={s.thoughts}>
+                      <ChatMarkdown text={m.thoughts} />
+                    </div>
+                  )}
+                </>
+              )}
               {m.steps && m.steps.length > 0 && (
                 <ul className={s.steps}>
                   {m.steps.map((st, j) => (
@@ -277,7 +424,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
                   ))}
                 </ul>
               )}
-              {m.error ? <div className={s.error}>{m.text}</div> : <MarkdownLite text={m.text} />}
+              {m.error ? <div className={s.error}>{m.text}</div> : m.text ? <ChatMarkdown text={m.text} onUseSql={onUseSql} /> : null}
               {m.questions && m.questions.length > 0 && (
                 <ul className={s.questions}>
                   {m.questions.map((q, j) => (
@@ -285,61 +432,68 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
                   ))}
                 </ul>
               )}
-              {m.sql && (
-                <>
-                  <pre className={s.sql}>{m.sql}</pre>
-                  <div className={s.row}>
-                    <Button size="small" appearance="primary" onClick={() => onUseSql(m.sql!)}>
-                      SQL の欄に入れる
+              {m.sqls?.map((b, j) => (
+                <div key={j} className={s.sqlBox}>
+                  <div className={s.sqlHead}>
+                    <span className={s.sqlTitle}>{b.title || `SQL ${j + 1}`}</span>
+                    <Button size="small" appearance="primary" icon={<PlayRegular />} onClick={() => onUseSql(b.sql, true)} title="SQL の欄に入れて、すぐ流す(SELECT だけ)">
+                      入れて流す
                     </Button>
-                    <CopyButton text={() => m.sql!} />
+                    <Button size="small" icon={<ArrowLeftRegular />} onClick={() => onUseSql(b.sql, false)} title="SQL の欄に入れる(流さない)">
+                      欄に入れる
+                    </Button>
+                    <CopyButton text={() => b.sql} />
                   </div>
-                </>
-              )}
-              {!m.error && <CopyButton label="返事をコピー" text={() => toTurn(m).text} />}
+                  <pre className={s.sql}>{b.sql}</pre>
+                </div>
+              ))}
+              {!m.error && !m.live && m.text && <CopyButton label="返事をコピー" text={() => toTurn(m).text} />}
             </div>
-          ),
-        )}
-        {busy && <Spinner size="tiny" label="Gemini が考えています(表を調べるときは、少し時間がかかります)" />}
+          )
+        })}
         <div ref={logEnd} />
       </div>
 
       <div className={s.input}>
-        {hasError && withSql && (
+        {hasError && withSql && !busy && (
           <div className={s.row}>
-            <Button size="small" disabled={busy} onClick={() => void send('いまの SQL のエラーを直してください。')}>
+            <Button size="small" onClick={() => void send('いまの SQL のエラーを直してください。')}>
               このエラーを直して
             </Button>
           </div>
         )}
         <Textarea
           resize="vertical"
-          rows={3}
+          // 長い頼みごと(表の名前・条件・考えてほしいこと)を見渡せるように、高めにする。足りなければ右下で伸ばせる
+          rows={8}
           value={input}
-          disabled={busy}
-          placeholder="Gemini に頼む(Ctrl + Enter で送る)"
+          placeholder="AI に頼む(Enter で送る・Shift + Enter で改行)"
           onChange={(_, d) => setInput(d.value)}
           onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-              e.preventDefault()
-              void send(input)
-            }
+            // 日本語の変換を確定する Enter では送らない
+            if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return
+            e.preventDefault()
+            void send(input)
           }}
         />
         <div className={s.row}>
-          <span className={mergeClasses(s.label, s.grow)}>
-            Gemini が調べたこと・流した SQL は、返事の上に出ます
-          </span>
-          <Button size="small" appearance="primary" icon={<ArrowUpRegular />} disabled={busy || !input.trim()} onClick={() => void send(input)}>
-            送る
-          </Button>
+          <span className={mergeClasses(s.label, s.grow)}>{busy ? `考えています(${elapsed} 秒)。思考と調べたことは、上に出ます` : `${shownModel || 'モデル'} に送ります`}</span>
+          {busy ? (
+            <Button size="small" icon={<StopRegular />} onClick={() => abort.current?.abort()}>
+              止める
+            </Button>
+          ) : (
+            <Button size="small" appearance="primary" icon={<ArrowUpRegular />} disabled={!input.trim()} onClick={() => void send(input)}>
+              送る
+            </Button>
+          )}
         </div>
       </div>
 
       <Dialog open={preview !== null} onOpenChange={(_, d) => !d.open && setPreview(null)}>
         <DialogSurface style={{ maxWidth: '900px', width: '90vw' }}>
           <DialogBody>
-            <DialogTitle>Gemini に渡す前提</DialogTitle>
+            <DialogTitle>AI に渡す前提</DialogTitle>
             <DialogContent>{preview === '' ? <Spinner size="tiny" label="組み立てています" /> : <pre className={s.pre}>{preview}</pre>}</DialogContent>
             <DialogActions>
               <span className={s.label}>{preview ? `${preview.length.toLocaleString()} 文字` : ''}</span>
