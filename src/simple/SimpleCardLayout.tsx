@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, ColumnTripleRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, ColumnTripleRegular, CommentRegular, PersonAvailableRegular, SettingsRegular, TaskListSquareLtrRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
+import { PreviewPins } from '../PreviewPins'
+import { pinView } from '../pinStore'
+import { CommPane } from './CommPane'
 import { Splitter } from '../Splitter'
 import { ImageThumb } from '../ImageThumb'
 import { ALERT_COLOR } from '../alertColors'
@@ -28,8 +31,10 @@ import type { PartTurn } from './partAi'
 const WIDTH_KEY = 'simpleCard.paneWidths.v2'
 const PRODUCTS_KEY = 'simpleCard.productsOpen'
 const RAIL_W = 32
-type Widths = { mobile: number; pc: number; list: number }
-const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300 }
+type Widths = { mobile: number; pc: number; list: number; comm: number }
+const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320 }
+// コミュニケーションのペインの開閉(既定は畳む。自分宛てのものがあれば、開いたときに広げる)
+const COMM_KEY = 'simpleCard.commOpen'
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
 // 目印の出し分け(人の設定)。学びは帯で場所を取るので、既定は隠す(隠していても、AI の依頼には渡す)
@@ -70,7 +75,7 @@ const useStyles = makeStyles({
     flexGrow: 1,
     minHeight: 0,
     display: 'grid',
-    gridTemplateColumns: `var(--wv) 1px minmax(320px, 1fr) 1px var(--wl) 1px ${RAIL_W}px`,
+    gridTemplateColumns: 'var(--wv) 1px minmax(320px, 1fr) 1px var(--wl) 1px var(--wc)',
     gridTemplateRows: 'minmax(0, 1fr)',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -116,6 +121,12 @@ const useStyles = makeStyles({
   },
   zoomLabel: { minWidth: '44px', padding: '0 2px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '8px', paddingTop: '10px', minHeight: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground2 },
+  commRail: { border: 'none', fontFamily: 'inherit', cursor: 'pointer', color: tokens.colorNeutralForeground2, ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
+  railIcon: { color: tokens.colorBrandForeground1, fontSize: '16px' },
+  railCount: { display: 'grid', justifyItems: 'center', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2 },
+  railMine: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
+  commPane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
+  commHead: { display: 'flex', justifyContent: 'flex-end', padding: '2px 4px 0' },
   railLabel: { writingMode: 'vertical-rl', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, letterSpacing: '0.1em' },
   railDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' },
   listHead: { display: 'flex', justifyContent: 'flex-end', marginBottom: '-6px' },
@@ -137,6 +148,8 @@ const useStyles = makeStyles({
 
 interface Props {
   editor: SimpleEditor
+  /** 開いたとき・前に反映したときから、内容が変わったか(承認の前の確かめ。ref を読むので、まとまりとは別に渡す) */
+  isDirty: () => boolean
   /** プレビューの枠(CardDetail の倍率の計算が測る箱) */
   boxRef: RefObject<HTMLDivElement | null>
   /** 別の部品を選んだときの反映(変わっていなければ何もしない。確定した週の配信は反映しない) */
@@ -152,7 +165,7 @@ interface Props {
  * シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。プレビューが主役で、部品を押すと、その部品だけを直すペインが出る。
  * 状態と保存は CardDetail のもの(editor)をそのまま使う。ここは並べ方と、部品の選び方・反映の時機だけを持つ
  */
-export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo, onRunNext, onClose }: Props) {
+export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply, onUndo, onRunNext, onClose }: Props) {
   const t = useT()
   const s = useStyles()
   const [part, setPart] = useState<PartRef | null>(null)
@@ -163,7 +176,7 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
   const setChat = (key: string, f: (prev: PartTurn[]) => PartTurn[]) => setChats((c) => ({ ...c, [key]: f(c[key] ?? []) }))
   const [widths, setWidths] = useState<Widths>(() => {
     const v = loadPref<Partial<Widths> | null>(WIDTH_KEY, null)
-    return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)) }
+    return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)), comm: clampList(Number(v?.comm ?? DEFAULT_WIDTHS.comm)) }
   })
   // アプリの配信は、スマホの幅
   const widthKey: 'mobile' | 'pc' = e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile'
@@ -199,6 +212,28 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
+  const resizeComm = (dx: number) => setWidths((w) => ({ ...w, comm: clampList(w.comm - dx) }))
+  const [commOpen, setCommOpen] = useState(() => loadPref<boolean>(COMM_KEY, false))
+  const toggleComm = (v = !commOpen) => {
+    setCommOpen(v)
+    savePref(COMM_KEY, v)
+  }
+  const [counts, setCounts] = useState<{ open: number; tasks: number; mine: boolean; waiting: boolean }>({ open: 0, tasks: 0, mine: false, waiting: false })
+  // 自分宛ての書き込み・承認の番があれば、開いたときに一度だけ広げる(設定は変えない)
+  const autoOpened = useRef(false)
+  const onCounts = useCallback((c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => {
+    setCounts(c)
+    if (c.mine && !autoOpened.current) {
+      autoOpened.current = true
+      setCommOpen(true)
+    }
+  }, [])
+  const noop = useCallback(() => undefined, [])
+  // プレビューの書き込みの番号を押したら、コミュニケーションを開く
+  const openThreads = useCallback(() => {
+    setCommOpen(true)
+    savePref(COMM_KEY, true)
+  }, [])
   const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
   const saveWidths = () => savePref(WIDTH_KEY, widths)
   const toggleProducts = () => {
@@ -271,7 +306,12 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
             </Button>
           </Tooltip>
         )}
-        <NextAction step={e.nextStep} busy={e.saving} onRun={onRunNext} />
+        <NextAction
+          step={e.nextStep}
+          busy={e.saving}
+          // 承認・制作への依頼は、コミュニケーションのペインで行う(承認は ⋯、引き継ぎは制作の札)。確認した・制作のページは、CardDetail の側
+          onRun={(step) => (step === 'requestApproval' || step === 'watchApproval' || step === 'requestProduction' ? toggleComm(true) : onRunNext(step))}
+        />
         {e.viewSwitch}
         {e.menu}
         <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
@@ -282,7 +322,7 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
         <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
       </div>
 
-      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px` } as React.CSSProperties}>
+      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--wc': `${commOpen ? widths.comm : RAIL_W}px` } as React.CSSProperties}>
         {/* プレビュー(いちばん広い) */}
         <div className={s.previewPane}>
           <div className={s.toolbar}>
@@ -407,6 +447,7 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
             {markOn('alert') && e.alertOverlay}
+            <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={false} onPlacingEnd={noop} onOpenThreads={openThreads} />
             {uncheckedMarks.length + diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={[...uncheckedMarks, ...diffMarks]} onSelect={select} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving} />
           </div>
@@ -495,12 +536,54 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           </div>
         )}
 
-        <span />
+        <Splitter onDrag={commOpen ? resizeComm : () => undefined} onDone={saveWidths} />
 
-        {/* コミュニケーション(段階 d)。あとで足してもレイアウトが変わらないよう、場所だけ空けて畳んでおく */}
-        <div className={s.rail} title={t('やり取り・承認・タスクは、次の段階でここに入ります(いまは「⋯」→「詳しい画面へ」)', 'Threads, approvals and tasks will come here in a later stage (for now: “⋯” → “Open full view”)')}>
-          <span className={s.railLabel}>{t('コミュニケーション(準備中)', 'Communication (coming)')}</span>
-        </div>
+        {/* コミュニケーション(段階 d): 状態と次に動く人・1 本の流れ・書く欄 1 つ。畳むと、件数だけの帯 */}
+        {commOpen ? (
+          <div className={s.commPane}>
+            <div className={s.commHead}>
+              <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={() => toggleComm(false)} aria-label={t('コミュニケーションを畳む', 'Collapse communication')} />
+            </div>
+            <CommPane
+              card={e.card}
+              part={part}
+              onPick={select}
+              items={e.items}
+              productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
+              view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
+              handoff={{ productionOwner: e.form.productionOwner, handedOffAt: e.form.handedOffAt, productionDue: e.form.productionDue }}
+              onHandoff={e.setHandoff}
+              remaining={e.remaining}
+              people={e.people}
+              onCommit={onCommit}
+              isDirty={isDirty}
+              busy={e.saving}
+              onChanged={e.reload}
+              canReview={e.canReview}
+              onOpenProduction={e.openProduction}
+              onCounts={onCounts}
+            />
+          </div>
+        ) : (
+          <button type="button" className={mergeClasses(s.rail, s.commRail)} onClick={() => toggleComm(true)} title={t('コミュニケーションを開く', 'Open communication')}>
+            <ChevronLeftRegular />
+            {counts.waiting && <PersonAvailableRegular className={s.railIcon} />}
+            {counts.open > 0 && (
+              <span className={s.railCount}>
+                <CommentRegular />
+                {counts.open}
+              </span>
+            )}
+            {counts.tasks > 0 && (
+              <span className={s.railCount}>
+                <TaskListSquareLtrRegular />
+                {counts.tasks}
+              </span>
+            )}
+            {counts.mine && <span className={s.railMine} />}
+            <span className={s.railLabel}>{t('コミュニケーション', 'Communication')}</span>
+          </button>
+        )}
       </div>
     </div>
   )

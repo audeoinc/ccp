@@ -142,6 +142,18 @@ export interface SimpleEditor {
   footer: ReactNode
   /** 目印: 商品のアラートの印(プレビューに重ねる層)と、これまでの学びの帯(AI の依頼に学びを渡す役もあるので、隠すときも描く)と、その件数 */
   alertOverlay: ReactNode
+  // ---- コミュニケーションのペイン(段階 d)
+  /** 制作への引き継ぎ(担当・締め切り・引き継ぎ済み) */
+  setHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
+  /** 工程の残り(引き継ぎのときに知らせる) */
+  remaining: string[]
+  /** これまでに入れた人の名前(宛先の候補) */
+  people: string[]
+  /** 承認の依頼・承認を出せるか(確定した週の配信は、出さない) */
+  canReview: boolean
+  /** 承認・依頼のあとに、配信カードを読み直す */
+  reload: () => Promise<void>
+  openProduction?: () => void
   learnings: ReactNode
   learnCount: number
 }

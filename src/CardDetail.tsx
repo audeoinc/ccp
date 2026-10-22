@@ -2288,6 +2288,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         ),
         footer: footerNode,
         alertOverlay: simpleAlertOverlay,
+        setHandoff: (k, v) => setForm((f) => ({ ...f, [k]: v })),
+        remaining: progress.remaining,
+        people: owners,
+        canReview,
+        reload: onSaved,
+        openProduction: onOpenProduction && card ? () => onOpenProduction(card.id) : undefined,
         learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} />,
         learnCount,
       }
@@ -2336,7 +2342,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               {productFloat}
               {heroUploadNode}
               {abCompareNode}
-              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
+              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
             </>
           ) : (
           <>
