@@ -14,7 +14,9 @@ import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
 import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges, type TargetGender } from '../target'
 import { channelOptions, countryOptions, statusColor, statusOptions } from '../status'
-import { getTemplate, sectionIndexAt, sectionsOf } from '../templates'
+import { baseTemplateId, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
+import { TemplateThumb } from '../TemplateThumb'
+import { PushThumb } from '../PushThumb'
 import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
 import { PartAiChat } from './PartAiChat'
@@ -36,6 +38,9 @@ const useStyles = makeStyles({
   name: { fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   compare: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8px' },
+  tplList: { display: 'grid', rowGap: '8px' },
+  tplCard: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '10px', alignItems: 'start', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorBrandBackground2 } },
+  tplOn: { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1 },
   ideaText: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap' },
   ideaRow: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', minWidth: 0 },
   productOpen: { borderRadius: tokens.borderRadiusMedium, cursor: 'pointer', ':hover > div': { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1 } },
@@ -79,7 +84,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
-  const tpl = getTemplate(e.template)
   const sections = sectionsOf(e.template)
 
   // 文言の案を仮に写している間の、元の文言(マウスが離れたら戻す。描画をまたいで持つので ref)
@@ -506,16 +510,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         )
       }
       case 'template':
-        return (
-          <>
-            <div className={s.readonly}>
-              <span className={s.label}>{t('いまのテンプレート', 'Current template')}</span>
-              <span>{tpl.label}</span>
-              {tpl.description && <span className={s.caption}>{tpl.description}</span>}
-            </div>
-            <span className={s.caption}>{t('テンプレートの選び直しは、次の段階で作ります。いまは「⋯」→「詳しい画面へ」の「② テンプレート」で変えられます。', 'Choosing a different template comes in the next stage. For now, change it in “② Template” via “⋯” → “Open full view”.')}</span>
-          </>
-        )
+        return <TemplatePicker editor={e} />
       case 'overview':
       case 'meta':
         return <MetaFields editor={e} focus={part.field} />
@@ -558,6 +553,58 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {compareBlock}
       {body}
     </div>
+  )
+}
+
+/**
+ * テンプレートの選び直し(SU1 ⑧・段階 b)。チャネルのテンプレートを、見取り図と一緒に並べる。乗せるとプレビューに仮で写し(この配信の商品・画像のまま)、
+ * 押すと替える。枠に収まらない商品は「枠外」として、メールには載らないことを知らせる(載せたままにするので、戻せば元の枠に戻る)。
+ * 国ごとに使えるテンプレートの絞り込み(ST1)は、まだない
+ */
+function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
+  const t = useT()
+  const s = useStyles()
+  const current = baseTemplateId(e.template)
+  const slotsOf = (sections?: { slots: number }[]) => (sections ?? []).reduce((n, x) => n + x.slots, 0)
+  const pick = (id: string) => {
+    if (id === current) return
+    if (e.candidates.length > 0 && !window.confirm(t('テンプレートを替えると、セクションの構成が変わるので、残りの候補(AI が出した商品の案)は外れます。替えますか?', 'Changing the template changes the sections, so the remaining candidates (AI product ideas) are cleared. Change it?'))) return
+    e.setAiPreview(null)
+    e.setTemplate(id)
+  }
+  return (
+    <>
+      <span className={s.caption}>{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</span>
+      <div className={s.tplList} onMouseLeave={() => e.setAiPreview(null)}>
+        {templateOptions(e.channel).map((o) => {
+          const slots = o.id === 'free' ? Infinity : slotsOf(o.sections)
+          const over = Number.isFinite(slots) ? Math.max(0, e.items.length - slots) : 0
+          const on = o.id === current
+          return (
+            <div
+              key={o.id}
+              role="button"
+              tabIndex={0}
+              className={mergeClasses(s.tplCard, on && s.tplOn)}
+              onMouseEnter={() => e.setAiPreview(on ? null : { templateId: o.id })}
+              onClick={() => pick(o.id)}
+              onKeyDown={(ev) => ev.key === 'Enter' && pick(o.id)}
+            >
+              {o.push ? <PushThumb spec={o.push} width={72} /> : <TemplateThumb layout={o} free={o.id === 'free'} maxHeight={110} />}
+              <span style={{ display: 'grid', rowGap: 2, minWidth: 0 }}>
+                <span className={s.name}>{o.label}</span>
+                {o.description && <span className={s.caption}>{o.description}</span>}
+                <span className={s.row}>
+                  {on && <Badge size="small" appearance="filled" color="brand">{t('いまのテンプレート', 'Current')}</Badge>}
+                  {Number.isFinite(slots) && <span className={s.caption}>{t(`商品の枠 ${slots}`, `${slots} product slots`)}</span>}
+                  {over > 0 && <Badge size="small" appearance="tint" color="warning">{t(`${over} 件が枠外(メールに載らない)`, `${over} out of slots (not in the email)`)}</Badge>}
+                </span>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </>
   )
 }
 

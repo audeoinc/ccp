@@ -46,6 +46,8 @@ interface Props {
   headline: string
   /** 配信情報の Type(テーマの種類。書きかけの値) */
   themeType?: string
+  /** 学びの件数が変わったとき(シンプルな配信カードの「目印」に出す) */
+  onCount?: (n: number) => void
 }
 
 interface Learning {
@@ -63,7 +65,7 @@ const MAX = 8
  * 配信カードの「これまでの学び」。同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」を出す(新しい順)。
  * 出している間は、AI の下書きの依頼にも、学びを渡す(setActiveLearnings)。テーマの種類も、ここで直せる
  */
-export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType }: Props) {
+export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType, onCount }: Props) {
   const styles = useStyles()
   const t = useT()
   const [cards, setCards] = useState<DeliveryCard[]>([])
@@ -114,6 +116,10 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     )
     return () => setActiveLearnings([])
   }, [learnings, card.id])
+
+  useEffect(() => {
+    onCount?.(learnings.length)
+  }, [learnings.length, onCount])
 
   const dateText = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
 

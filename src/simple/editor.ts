@@ -42,6 +42,8 @@ export type SimpleForm = Record<SimpleField, string> & {
 /** プレビューにだけ仮に写す、AI の案(メイン画像・商品) */
 export interface AiPreview {
   heroId?: string
+  /** テンプレートの選び直しで、乗せているテンプレート */
+  templateId?: EmailTemplateId
   item?: { key: string; productId: string }
 }
 
@@ -101,6 +103,8 @@ export interface SimpleEditor {
   replaceItem: (itemKey: string, productId: string, reason: string) => void
   /** AI の案を、保存する中身を変えずに、プレビューにだけ仮に写す(null で戻す)。商品の item.key が空なら、空いた枠に足して見せる */
   setAiPreview: (p: AiPreview | null) => void
+  /** テンプレートを替える(セクションの構成が変わるので、残りの候補と AI の案は捨てる。CardDetail の changeTemplate) */
+  setTemplate: (id: EmailTemplateId) => void
   // ---- 反映(保存)と元に戻す
   saving: boolean
   /** 開いたとき・前に反映したときから、内容が変わったか */
@@ -125,4 +129,8 @@ export interface SimpleEditor {
   notices: ReactNode
   /** 下の知らせ(エラー・確定した週の理由の入力欄) */
   footer: ReactNode
+  /** 目印: 商品のアラートの印(プレビューに重ねる層)と、これまでの学びの帯(AI の依頼に学びを渡す役もあるので、隠すときも描く)と、その件数 */
+  alertOverlay: ReactNode
+  learnings: ReactNode
+  learnCount: number
 }

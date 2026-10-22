@@ -1739,6 +1739,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const undoStack = useUndo<Snapshot>()
   // AI の案(メイン画像・商品)を、プレビューにだけ仮に写す(保存する中身は変えない)
   const [aiPreview, setAiPreview] = useState<AiPreview | null>(null)
+  // これまでの学びの件数(シンプルな画面の「目印」に出す)
+  const [learnCount, setLearnCount] = useState(0)
   const shownHero = aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
   const previewItem = aiPreview?.item
   const shownItems = previewItem
@@ -1895,7 +1897,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           selectedKey={null}
           hoverKey={hoverKey}
           showHeadings={showHeadings}
-          template={template}
+          template={aiPreview?.templateId ?? template}
           scheduledAt={form.scheduledAt}
           sectionTitles={sectionTitles}
           onSectionTitle={setSectionTitle}
@@ -1914,19 +1916,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           pickMode
         />
       </div>
-      {itemAlertKinds.size > 0 && (
-        // アラートの印を押しても、部品を選び直さない
-        <div data-no-pick>
-          <ItemAlertOverlay
-            boxRef={previewBoxRef}
-            kinds={itemAlertKinds}
-            onOpen={(key) => {
-              const it = items.find((i) => i.key === key)
-              if (it) openAlertFor(it.productId)
-            }}
-          />
-        </div>
-      )}
     </>
   )
   const footerNode = (
@@ -1964,6 +1953,23 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             {t('保存して、レビューに戻す', 'Save and send back to review')}
           </Button>
         </div>
+      </div>
+    )}
+    </>
+  )
+  const simpleAlertOverlay = (
+    <>
+    {itemAlertKinds.size > 0 && (
+      // アラートの印を押しても、部品を選び直さない
+      <div data-no-pick>
+        <ItemAlertOverlay
+          boxRef={previewBoxRef}
+          kinds={itemAlertKinds}
+          onOpen={(key) => {
+            const it = items.find((i) => i.key === key)
+            if (it) openAlertFor(it.productId)
+          }}
+        />
       </div>
     )}
     </>
@@ -2027,6 +2033,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           if (to) replaceItemWith(itemKey, to, reason)
         },
         setAiPreview,
+        setTemplate: changeTemplate,
         saving,
         dirty: changed,
         locked,
@@ -2081,6 +2088,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           </>
         ),
         footer: footerNode,
+        alertOverlay: simpleAlertOverlay,
+        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} />,
+        learnCount,
       }
     : null
 

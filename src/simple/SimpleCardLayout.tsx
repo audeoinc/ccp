@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Badge, Button, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { Badge, Button, Menu, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, ArrowUndoRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -11,13 +11,14 @@ import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
 import { statusColor, statusLabel } from '../status'
-import { getTemplate } from '../templates'
+import { getTemplate, sectionsOf } from '../templates'
 import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
 import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
 import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
+import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
 
@@ -30,6 +31,10 @@ type Widths = { mobile: number; pc: number; list: number }
 const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300 }
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
+// 目印の出し分け(人の設定)。学びは帯で場所を取るので、既定は隠す(隠していても、AI の依頼には渡す)
+const MARKS_KEY = 'simpleCard.marks'
+type MarkKind = 'unchecked' | 'alert' | 'learn'
+const DEFAULT_MARKS: MarkKind[] = ['unchecked', 'alert']
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
@@ -154,6 +159,17 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
   // アプリの配信は、スマホの幅
   const widthKey: 'mobile' | 'pc' = e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile'
   const nav = usePreviewNav(boxRef, e.zoom)
+  const [marks, setMarks] = useState<MarkKind[]>(() => loadPref<MarkKind[]>(MARKS_KEY, DEFAULT_MARKS))
+  const markOn = (k: MarkKind) => marks.includes(k)
+  // AI 下書き・未確認の目印: AI が作った部品(文言・メイン画像・商品)の右上に点。見つからない部品(テンプレートにない枠)は出ない
+  const uncheckedMarks: Mark[] =
+    e.card.ai_unchecked_at && markOn('unchecked')
+      ? [
+          ...(['headline', 'copy', 'hero', 'pushTitle', 'pushBody'] as const).map((kind) => ({ part: { kind } as PartRef })),
+          ...sectionsOf(e.template).flatMap((_, index) => [{ part: { kind: 'sectionTitle', index } as PartRef }, { part: { kind: 'sectionCopy', index } as PartRef }]),
+          ...e.items.map((it) => ({ part: { kind: 'product', itemKey: it.key } as PartRef })),
+        ].map((x) => ({ ...x, color: tokens.colorPaletteBerryBackground3, label: t('AI 下書き・未確認(確かめたら、上の「確認した」)', 'AI draft, unchecked (press “Mark as checked” above when done)') }))
+      : []
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
@@ -254,7 +270,11 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
         {e.menu}
         <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
       </div>
-      <div className={s.notices}>{e.notices}</div>
+      <div className={s.notices}>
+        {e.notices}
+        {/* 学びの帯は、隠していても描く(AI の依頼に学びを渡すのは、この帯の役目のため) */}
+        <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
+      </div>
 
       <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px` } as React.CSSProperties}>
         {/* プレビュー(いちばん広い) */}
@@ -273,6 +293,33 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
             <Button type="button" size="small" appearance={isOn({ kind: 'template' }) ? 'primary' : 'outline'} icon={<LayoutColumnTwoRegular />} onClick={() => select({ kind: 'template' })}>
               {t(`テンプレート: ${tpl.label}`, `Template: ${tpl.label}`)}
             </Button>
+            <Menu
+              checkedValues={{ marks }}
+              onCheckedValueChange={(_, d) => {
+                const next = d.checkedItems as MarkKind[]
+                setMarks(next)
+                savePref(MARKS_KEY, next)
+              }}
+            >
+              <MenuTrigger disableButtonEnhancement>
+                <Button type="button" size="small" appearance="subtle" icon={<FlagRegular />}>
+                  {t('目印', 'Marks')}
+                </Button>
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItemCheckbox name="marks" value="unchecked" disabled={!e.card.ai_unchecked_at} secondaryContent={e.card.ai_unchecked_at ? undefined : t('なし', 'None')}>
+                    {t('AI 下書き・未確認', 'AI draft, unchecked')}
+                  </MenuItemCheckbox>
+                  <MenuItemCheckbox name="marks" value="alert" secondaryContent={String(new Set(e.items.filter((i) => e.alertKinds.has(i.productId)).map((i) => i.productId)).size)}>
+                    {t('アラート(在庫など)', 'Alerts (stock etc.)')}
+                  </MenuItemCheckbox>
+                  <MenuItemCheckbox name="marks" value="learn" secondaryContent={String(e.learnCount)}>
+                    {t('これまでの学び', 'Learnings so far')}
+                  </MenuItemCheckbox>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
           </div>
           {e.channel === 'email' ? (
             <div className={s.inbox}>
@@ -290,6 +337,8 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           <div className={s.boxWrap}>
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
+            {markOn('alert') && e.alertOverlay}
+            {uncheckedMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={uncheckedMarks} onSelect={select} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
