@@ -5,10 +5,13 @@ import { DevApi, bytesLabel, isFailure, type DryRun, type RunResult, type Settin
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
 import { SqlEditor } from './SqlEditor'
-import { columnsMarkdown } from './format'
+import { columnsMarkdown, toMarkdown } from './format'
+import { DatasetPicker } from './DatasetPicker'
+import { ChatPanel } from './ChatPanel'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: '12px', alignItems: 'start' },
+  // 左: データセットと表 / 中: 表の中身と SQL / 右: Gemini との会話(SQL を見ながら話せるように、並べて置く)
+  root: { display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) minmax(360px, 34%)', gap: '12px', alignItems: 'start' },
   side: { display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '12px' },
   card: {
     backgroundColor: tokens.colorNeutralBackground1,
@@ -25,7 +28,6 @@ const useStyles = makeStyles({
   label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
   grow: { flexGrow: 1, minWidth: 0 },
-  recent: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
   list: { display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 330px)', overflowY: 'auto', marginLeft: '-4px', marginRight: '-4px' },
   item: {
     display: 'flex',
@@ -182,6 +184,16 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
     }
   }
 
+  // Gemini に渡す「いまの SQL を流した結果」(エラー、または結果の先頭 20 行)
+  const last = useMemo(() => {
+    if (sqlError) return `エラー:
+${sqlError}`
+    if (result) return `${result.total_rows ?? '?'} 行(先頭 ${Math.min(20, result.rows.length)} 行):
+
+${toMarkdown(result.columns, result.rows.slice(0, 20))}`
+    return ''
+  }, [sqlError, result])
+
   const shown = useMemo(() => {
     const f = filter.trim().toLowerCase()
     return (tables ?? []).filter((t) => !f || t.id.toLowerCase().includes(f))
@@ -194,30 +206,8 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
           <div className={s.heading}>
             <DatabaseRegular /> データセット
           </div>
-          <div className={s.row}>
-            <Input
-              className={s.grow}
-              size="small"
-              value={dataset}
-              placeholder="プロジェクト.データセット"
-              onChange={(_, d) => setDataset(d.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void openDataset()
-              }}
-            />
-            <Button size="small" appearance="primary" onClick={() => void openDataset()} disabled={loadingTables || !dataset.trim()}>
-              開く
-            </Button>
-          </div>
-          {(settings.datasets?.length ?? 0) > 1 && (
-            <div className={s.recent}>
-              {settings.datasets!.slice(1).map((d) => (
-                <Button key={d} size="small" appearance="secondary" onClick={() => void openDataset(d)} title={d}>
-                  {d.split('.').pop()}
-                </Button>
-              ))}
-            </div>
-          )}
+          <DatasetPicker value={dataset} recent={settings.datasets ?? []} onOpen={(d) => void openDataset(d)} busy={loadingTables} />
+          {dataset && tables && <span className={s.mono}>{dataset}</span>}
           {tablesError && (
             <MessageBar intent="error" layout="multiline">
               <MessageBarBody>{tablesError}</MessageBarBody>
@@ -300,6 +290,16 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
                   ]}
                   rows={info.columns.map((c) => ({ 列: c.name, 型: c.type, モード: c.mode, 説明: c.description }))}
                 />
+                {info.sources.length > 0 && (
+                  <div className={s.row}>
+                    <span className={s.label}>参照している元の表</span>
+                    {info.sources.map((r) => (
+                      <Button key={r} size="small" appearance="secondary" title={r} onClick={() => void openTable(r)}>
+                        {r.split('.').slice(-2).join('.')}
+                      </Button>
+                    ))}
+                  </div>
+                )}
                 {info.view_sql && (
                   <div className={s.row}>
                     <span className={mergeClasses(s.label, s.grow)}>ビューの SQL</span>
@@ -379,6 +379,17 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
           )}
         </div>
       </div>
+
+      <ChatPanel
+        dataset={dataset}
+        selected={selected}
+        sql={sql}
+        last={last}
+        hasError={!!sqlError}
+        notes={settings.notes ?? ''}
+        onNotes={(notes) => onSettings({ ...settings, notes })}
+        onUseSql={changeSql}
+      />
     </div>
   )
 }

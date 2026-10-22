@@ -2,8 +2,8 @@
 
 利用先の Workbench の中で、**CCP が読むデータを用意する作業**を、Gemini と一緒に進めるための画面です。CCP とは入り口も URL も別にします。使うのは開発する人だけ(配信の担当者は使わない)。
 
-- 状態: 作りかけ(2026-10-22。8 章の 1・2 まで。バックログ B10)
-- Workbench は、ZIP で渡した版でも、`git clone` した版(`scripts/workbench.sh update` で更新)でも、同じに動く。有効にするのは `server/workbench.env` の `CCP_DEVTOOLS=1` だけ。作業ファイル(`server/devwork/`)は Git に入れないので、clone の版で `git pull` してもぶつからない
+- 状態: 作りかけ(2026-10-22。8 章の 1・2 と、3 の会話の部分まで。バックログ B10)
+- Workbench は、ZIP で渡した版でも、`git clone` した版(`scripts/workbench.sh update` で更新)でも、同じに動く。有効にするのは `server/workbench.env` の `CCP_DEVTOOLS=1` だけ(版ごとに)。開く URL は、その版の CCP の画面のポート(`CCP_PORT`)の下の `/proxy/<ポート>/dev/`。同じ Workbench で clone の版と ZIP の版を別のポートで動かしていても、それぞれに開発用の画面が出る。作業ファイル(`server/devwork/`)は Git に入れないので、clone の版で `git pull` してもぶつからない
 - 関係する文書: 出力の形 [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)、変換の手引き [BIGQUERY_CONVERT.md](BIGQUERY_CONVERT.md)、ポリシーのファイルの形 [POLICY_FORMAT.md](POLICY_FORMAT.md)
 - 利用先のプロジェクト・データセット・テーブル・文書の名前は、この文書にもコードにも書かない
 
@@ -163,10 +163,13 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 
 **作ったもの(2026-10-22)**
 
+利用者の要望(2026-10-22、Workbench で画面を開いたあと): データセットを名前の一部で探したい。SQL の画面で、Gemini と会話しながら SQL を組み立てたい(「A データセットの ctlg を含む表から、CCP で使えそうな列を SELECT して。どの列を CCP のどの列に当てるか一緒に考えて」のように頼みたい)。ビューなら、DDL と参照先の表の列定義から、合う列を見つけてほしい。
+
 | 順 | 状態 | 中身 |
 |---|---|---|
 | 1 | ✅ | `dev/index.html` → `src/dev/`(`DevApp`・`BqTab`・`SqlEditor`(CodeMirror + `@codemirror/lang-sql`)・`ResultGrid`・`CopyButton`)、`server/ccp/devtools.py`(テスト `server/tests/test_devtools.py`)、`CCP_DEVTOOLS`・`DEVTOOLS_MAX_GB`・`DEVTOOLS_DIR`、`server/devwork/settings.json`(よく見るデータセット) |
-| 2 | ✅(本物の BigQuery では未確認) | データセットを開く → 表の一覧(絞り込み)→ 表の列・行数・パーティション・ビューの SQL → 先頭の 20 行(料金なし)。SQL を試す: 料金なしで確かめる(文の種類・読む量)/ 流す(SELECT だけ、先頭 20・200・1000 行、Ctrl + Enter)。写す: 場所・列の一覧(Markdown)・SQL・結果(TSV / Markdown)・エラー・`.sql` で保存 |
+| 2 | ✅(本物の BigQuery では、画面が開くところまで確認) | データセットを開く(**名前の一部で探す**: 接続しているプロジェクトのデータセット・前に開いたもの・プロジェクト名の一部。`DatasetPicker`) → 表の一覧(絞り込み)→ 表の列・行数・パーティション・ビューの SQL → 先頭の 20 行(料金なし)。SQL を試す: 料金なしで確かめる(文の種類・読む量)/ 流す(SELECT だけ、先頭 20・200・1000 行、Ctrl + Enter)。写す: 場所・列の一覧(Markdown)・SQL・結果(TSV / Markdown)・エラー・`.sql` で保存。ビューは、参照している元の表を出す(押すと開く) |
+| 3 の一部 | ✅(本物の Gemini では未確認) | 右の「Gemini と SQL を作る」(`ChatPanel`、`POST /api/dev/ai/chat`)。**Gemini が BigQuery を調べる道具を使う**(関数の呼び出し。1 回の発言で 16 回まで): `list_datasets`・`list_tables`(名前の一部で)・`describe_table`(列・説明・パーティション・先頭の 5 行。ビューは SQL と参照先)・`describe_view_sources`(ビューが参照している元の表を dry-run でたどり、列の定義を返す)・`dry_run`・`run_select`(SELECT だけ、20 行、読む量の上限つき。画面で止められる)。何を調べたかは、返事の上に出す。前提には、CCP の 6 つの出力の仕様をいつも全文入れる(どの列に当てるかを考えられるように)。作る出力を選ぶと手本の SQL も。仕様のまとめは `server/devwork/settings.json` に残す。会話はブラウザに残す(`ccp-dev-chat`)。返事の SQL は「SQL の欄に入れる」で試せる。エラーのあとは「このエラーを直して」。「前提」で、渡す前提を見る・コピーする。残り: 版・差分、`bq_validate` の答え合わせ、表を作る SQL |
 
 撮影・デモ用のビルド(`vite.mock.config.ts`)には、BigQuery も GCS もないので、見本の表と列で画面だけ動く形にする(画面の確認用)。
 
