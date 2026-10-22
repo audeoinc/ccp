@@ -150,6 +150,11 @@ class ToolTest(unittest.TestCase):
         r = devtools.parse_reply('{"reply": "2 つ", "sqls": [{"title": "値の確かめ", "sql": "SELECT DISTINCT a FROM t"}, {"title": "本番", "sql": "SELECT a FROM t"}, {"title": "空", "sql": ""}]}')
         self.assertEqual([x["title"] for x in r["sqls"]], ["値の確かめ", "本番"])
 
+    def test_pro_of(self) -> None:
+        self.assertEqual(devtools.pro_of("gemini-3.8-flash"), "gemini-3.8-pro")
+        self.assertEqual(devtools.pro_of("gemini-3.5-flash-lite"), "gemini-3.5-pro")
+        self.assertIsNone(devtools.pro_of("gemini-3.8-pro"))
+
     def test_pick_models(self) -> None:
         names = ["publishers/google/models/gemini-3.5-flash", "publishers/google/models/gemini-3.5-pro", "publishers/google/models/gemini-3.8-pro-preview",
                  "publishers/google/models/gemini-3.8-pro", "publishers/google/models/gemini-3.5-flash-image", "publishers/google/models/text-embedding-005",
