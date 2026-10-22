@@ -3,6 +3,7 @@ import { FluentProvider, MessageBar, MessageBarBody, Tab, TabList, makeStyles, t
 import { WrenchRegular } from '@fluentui/react-icons'
 import { DevApi, isFailure, type Settings, type Status } from './api'
 import { BqTab } from './BqTab'
+import { PolicyTab } from './PolicyTab'
 import { useFluentTheme } from '../theme'
 
 const useStyles = makeStyles({
@@ -11,10 +12,18 @@ const useStyles = makeStyles({
   title: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, display: 'flex', alignItems: 'center', gap: '6px' },
   status: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, display: 'flex', gap: '12px', flexWrap: 'wrap', marginLeft: 'auto' },
   key: { fontWeight: tokens.fontWeightSemibold },
-  soon: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground3, padding: '24px 0' },
 })
 
 type TabKey = 'bq' | 'policy'
+
+// AI のモデルは、SQL の会話の欄で選んだものを使う(ChatPanel が覚えている。なければサーバーの既定)
+const chosenModel = (): string | null => {
+  try {
+    return (JSON.parse(window.localStorage.getItem('ccp-dev-model') ?? '""') as string) || null
+  } catch {
+    return null
+  }
+}
 
 /**
  * 開発用の画面(/dev/。設計は docs/DEVTOOLS.md)。CCP の画面とはつなげない(入り口も URL も別)。
@@ -71,7 +80,7 @@ function DevApp() {
         </MessageBar>
       )}
       {settings && tab === 'bq' && <BqTab settings={settings} onSettings={saveSettings} />}
-      {tab === 'policy' && <div className={s.soon}>まだ作っていません(DEVTOOLS.md の 8 章の 5)。</div>}
+      {settings && tab === 'policy' && <PolicyTab settings={settings} onSettings={saveSettings} model={chosenModel()} />}
     </div>
   )
 }

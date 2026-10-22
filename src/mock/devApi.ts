@@ -1,6 +1,6 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { ChatContext, ChatEvent, ChatTurn, CheckResult, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ChatContext, ChatEvent, ChatTurn, CheckResult, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
 
 export * from '../dev/api'
 
@@ -233,4 +233,72 @@ export const ChatApi = {
     delete chats[id]
     return wait({ ok: true as const })
   },
+}
+
+// ポリシーの文書(身代わり)。GCS の見本のフォルダと、書き直しの見本を返す
+const POLICY_FILES: GcsFile[] = [
+  { name: 'policy/表現ガイド.xlsx', size: 48_000, updated: '2026-10-20T09:00:00Z', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  { name: 'policy/秋冬の販売方針.pdf', size: 820_000, updated: '2026-10-18T09:00:00Z', type: 'application/pdf' },
+  { name: 'policy/memo.docx', size: 12_000, updated: '2026-10-01T09:00:00Z', type: '' },
+]
+const SAMPLE_RULES = `# ルール集: 表現の決まり
+- 版: 2026-10-20
+- 出どころ: 表現ガイド.xlsx
+
+## R-COPY-001 価格は税込みで書く
+- 対象: copy, headline
+- 強さ: must
+- 市場: JP
+
+## R-TONE-002 口調は、落ち着いた丁寧語
+- 対象: copy
+- 強さ: should
+`
+const SAMPLE_SALES = 'week_start,market,scope,target,stage,priority,focus\n2026-10-26,JP,all,,,,防寒を主役に\n2026-10-26,JP,category,ニット,主力,1,\n'
+
+export const PolicyApi = {
+  list: (bucket: string, prefix: string) =>
+    wait({ ok: true as const, bucket, prefix, folders: prefix ? [] : ['policy/'], files: prefix === 'policy/' ? POLICY_FILES : [] }),
+  extract: (_bucket: string, names: string[]) =>
+    wait({
+      ok: true as const,
+      docs: names.map((n) =>
+        n.endsWith('.pdf') ? { name: n, kind: 'pdf', size: 820_000 } : { name: n, kind: 'xlsx', text: '### シート: 表現の決まり\n\n```csv\n区分,決まり,強さ\n価格,税込みで書く,必ず\n口調,落ち着いた丁寧語,なるべく\n```', chars: 80 },
+      ),
+    }),
+  convert: async (body: { names: string[] }, onEvent: (e: ConvertEvent) => void, signal?: AbortSignal) => {
+    const later = (ms: number) => new Promise<void>((ok) => window.setTimeout(ok, ms))
+    const events: ConvertEvent[] = [
+      { type: 'start', model: 'gemini-demo-pro', thinking: 'high' },
+      ...body.names.map((n): ConvertEvent => ({ type: 'step', text: `${n} を読んだ` })),
+      { type: 'thought', text: '**分け方を決める**\n表現の決まりはルール系、週ごとの方針は販売系に分ける。\n' },
+      { type: 'final', reply: '2 つのファイルに分けました(見本の返事です)。', files: [{ kind: 'rules', filename: '表現ガイド.md', content: SAMPLE_RULES }, { kind: 'sales', filename: '秋冬の販売方針.csv', content: SAMPLE_SALES }], questions: ['「なるべく」は should として扱いました。よいですか?'] },
+    ]
+    for (const ev of events) {
+      await later(500)
+      if (signal?.aborted) return
+      onEvent(ev)
+    }
+  },
+  drafts: () => wait({ ok: true as const, drafts: [] }),
+  preview: (d: PolicyDraft) => wait(mockPreview(d)),
+  import: (d: PolicyDraft) => wait(mockPreview(d)),
+}
+
+/** 取り込みの確かめの身代わり(## R- の見出しを決まりとして数え、「強さ」がないものを読めない決まりにする) */
+function mockPreview(d: PolicyDraft): PolicyPreview {
+  if (d.kind === 'sales') {
+    const rows = d.content.trim().split('\n').slice(1)
+    return { kind: 'sales', filename: d.filename, title: '', count: rows.length, problems: [], weeks: [{ week_start: '2026-10-26', market: 'JP', rows: rows.length }] }
+  }
+  const blocks = d.content.split(/\n(?=## )/).filter((b) => b.startsWith('## '))
+  const ok = blocks.filter((b) => b.includes('強さ:'))
+  return {
+    kind: 'rules',
+    filename: d.filename,
+    title: '表現の決まり',
+    count: ok.length,
+    problems: blocks.filter((b) => !b.includes('強さ:')).map((b) => ({ line: 1, where: b.split('\n')[0].slice(3), message: '強さ がありません' })),
+    rules: ok.map((b) => ({ rule_id: b.split(' ')[1], title: b.split('\n')[0].split(' ').slice(2).join(' '), strength: b.includes('must') ? 'must' : 'should', market: b.includes('市場: JP') ? 'JP' : null, channel: null })),
+  }
 }

@@ -30,6 +30,8 @@ export interface Settings {
   datasets?: string[]
   /** 仕様のまとめ(利用先の資料から。Gemini に渡す。DEVTOOLS.md の 4 章の 8) */
   notes?: string
+  /** ポリシーの文書のタブで、前に開いた GCS のバケットとフォルダ */
+  gcs?: { bucket: string; prefix: string }
 }
 
 /** Gemini に何を渡すか(DEVTOOLS.md の 4 章) */
@@ -74,17 +76,23 @@ export type ChatEvent =
  * 会話の 1 回分を送り、届いたそばから onEvent に渡す(思考・調べたこと・返事)。
  * signal で止められる。つながらない・途中で切れたときも、error として渡す
  */
-export async function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+export function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+  return ndjson<ChatEvent>('/api/dev/ai/chat', { messages, ...ctx }, onEvent, signal)
+}
+
+/** 起きた順に届く返事(NDJSON)を読み、1 行ずつ onEvent に渡す。最後が final か error でなければ、error を足す */
+async function ndjson<E extends { type: string }>(path: string, body: unknown, onEvent: (e: E) => void, signal?: AbortSignal): Promise<void> {
+  const fail = (error: string) => onEvent({ type: 'error', error } as unknown as E)
   let res: Response
   try {
-    res = await fetch(appPath('/api/dev/ai/chat'), { ...post({ messages, ...ctx }), signal })
+    res = await fetch(appPath(path), { ...post(body), signal })
   } catch (e) {
     if (signal?.aborted) return
-    onEvent({ type: 'error', error: `サーバーにつながりません(${e instanceof Error ? e.message : String(e)})` })
+    fail(`サーバーにつながりません(${e instanceof Error ? e.message : String(e)})`)
     return
   }
   if (!res.ok || !res.body) {
-    onEvent({ type: 'error', error: res.status === 404 ? '開発用の画面が無効です(CCP_DEVTOOLS=1)' : `サーバーの返事を読めませんでした(${res.status})` })
+    fail(res.status === 404 ? '開発用の画面が無効です(CCP_DEVTOOLS=1)' : `サーバーの返事を読めませんでした(${res.status})`)
     return
   }
   const reader = res.body.getReader()
@@ -102,7 +110,7 @@ export async function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent
         buf = buf.slice(i + 1)
         if (!line) continue
         try {
-          const ev = JSON.parse(line) as ChatEvent
+          const ev = JSON.parse(line) as E
           if (ev.type === 'final' || ev.type === 'error') ended = true
           onEvent(ev)
         } catch {
@@ -112,10 +120,10 @@ export async function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent
     }
   } catch (e) {
     if (signal?.aborted) return
-    onEvent({ type: 'error', error: `途中で切れました(${e instanceof Error ? e.message : String(e)})` })
+    fail(`途中で切れました(${e instanceof Error ? e.message : String(e)})`)
     return
   }
-  if (!ended && !signal?.aborted) onEvent({ type: 'error', error: '返事が最後まで届きませんでした(サーバーのログを見てください)' })
+  if (!ended && !signal?.aborted) fail('返事が最後まで届きませんでした(サーバーのログを見てください)')
 }
 
 export interface TableInfo {
@@ -274,6 +282,64 @@ export const ChatApi = {
   save: (id: string, body: { title?: string; output: string; messages: unknown[] }) =>
     call<{ ok: true }>(`/chats/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   remove: (id: string) => call<{ ok: true }>(`/chats/${id}`, { method: 'DELETE' }),
+}
+
+/** ポリシーの文書(DEVTOOLS.md の 3.2) */
+export interface GcsFile {
+  name: string
+  size: number
+  updated: string | null
+  type: string
+}
+
+export interface PolicyDraft {
+  kind: 'rules' | 'sales'
+  filename: string
+  content: string
+}
+
+export type ConvertEvent =
+  | { type: 'start'; model: string; thinking?: string }
+  | { type: 'thought'; text: string }
+  | { type: 'step'; text: string }
+  | { type: 'ping' }
+  | { type: 'final'; reply: string; files: PolicyDraft[]; questions: string[] }
+  | { type: 'error'; error: string }
+
+/** CCP の取り込みの確かめ(/api/policies/preview)の結果 */
+export interface PolicyPreview {
+  kind: string
+  filename: string
+  title: string
+  count: number
+  problems: { line: number; message: string; where: string }[]
+  rules?: { rule_id: string; title: string; strength: string; market: string | null; channel: string | null }[]
+  weeks?: { week_start: string; market: string; rows: number }[]
+  edited_on_screen?: string[]
+}
+
+/** CCP の既存の API(/api/policies/…)は { success, data | error } の形 */
+async function policyCall(path: string, body: unknown): Promise<PolicyPreview | Failure> {
+  try {
+    const res = await fetch(appPath(`/api/policies${path}`), post(body))
+    const json = (await res.json().catch(() => null)) as { success: boolean; data?: PolicyPreview; error?: { message: string } } | null
+    if (!json) return { ok: false, error: `サーバーの返事を読めませんでした(${res.status})` }
+    if (!json.success || !json.data) return { ok: false, error: json.error?.message ?? '確かめに失敗しました' }
+    return json.data
+  } catch (e) {
+    return { ok: false, error: `サーバーにつながりません(${e instanceof Error ? e.message : String(e)})` }
+  }
+}
+
+export const PolicyApi = {
+  list: (bucket: string, prefix: string) => call<{ ok: true; bucket: string; prefix: string; folders: string[]; files: GcsFile[] }>(`/gcs/list?bucket=${q(bucket)}&prefix=${q(prefix)}`),
+  extract: (bucket: string, names: string[]) =>
+    call<{ ok: true; docs: { name: string; kind: string; text?: string; chars?: number; size?: number; truncated?: boolean; error?: string }[] }>('/gcs/extract', post({ bucket, names })),
+  convert: (body: { bucket: string; names: string[]; messages: ChatTurn[]; model: string | null }, onEvent: (e: ConvertEvent) => void, signal?: AbortSignal) =>
+    ndjson<ConvertEvent>('/api/dev/policy/convert', body, onEvent, signal),
+  drafts: () => call<{ ok: true; drafts: (PolicyDraft & { updated: string })[] }>('/policy/drafts'),
+  preview: (d: PolicyDraft) => policyCall('/preview', d),
+  import: (d: PolicyDraft) => policyCall('/import', d),
 }
 
 export const WorkApi = {

@@ -238,6 +238,52 @@ class WorkTest(unittest.TestCase):
         self.assertTrue(any("SELECT DISTINCT market, product_code FROM (" in q for q in sqls))
 
 
+class PolicyDocTest(unittest.TestCase):
+    def test_xlsx_text(self) -> None:
+        import io
+
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "表現の決まり"
+        ws.append(["区分", "決まり", None, "メモ"])
+        ws.append(["価格", "税込みで書く", None, ""])
+        ws.append([None, "割引率は整数", None, None])
+        ws.merge_cells("A2:A3")
+        ws.append([None, None, None, None])
+        hidden = wb.create_sheet("下書き")
+        hidden.append(["見せない"])
+        hidden.sheet_state = "hidden"
+        buf = io.BytesIO()
+        wb.save(buf)
+        t = devtools.xlsx_text(buf.getvalue())
+        self.assertIn("### シート: 表現の決まり", t)
+        # 結合したセルは左上の値で埋める。空の列(C)は落とす。隠したシートは読まない
+        self.assertIn("区分,決まり,メモ", t)
+        self.assertIn("価格,割引率は整数,", t)
+        self.assertNotIn("見せない", t)
+
+    def test_decode_and_kind(self) -> None:
+        self.assertEqual(devtools.decode_text("市場,方針".encode("cp932")), "市場,方針")
+        self.assertEqual(devtools.decode_text("﻿a,b".encode("utf-8")), "a,b")
+        self.assertEqual([devtools.kind_of(n) for n in ("a.XLSX", "b.pdf", "c.csv", "d.docx")], ["xlsx", "pdf", "text", "other"])
+
+    def test_parse_files(self) -> None:
+        v = devtools.parse_files('{"reply": "2 つに分けました", "files": [{"kind": "rules", "filename": "表現.md", "content": "# ルール集"}, {"kind": "SALES", "filename": "", "content": "a,b"}, {"kind": "rules", "content": ""}], "questions": []}')
+        self.assertEqual([(f["kind"], f["filename"]) for f in v["files"]], [("rules", "表現.md"), ("sales", "policy.csv")])
+        self.assertEqual(devtools.parse_files("文だけ")["reply"], "文だけ")
+
+    def test_gcs_list(self) -> None:
+        import asyncio
+
+        pages = [{"prefixes": ["policy/2026/"], "items": [{"name": "policy/", "size": "0"}, {"name": "policy/a.xlsx", "size": "120", "updated": "t", "contentType": "x"}], "nextPageToken": "n"},
+                 {"items": [{"name": "policy/b.pdf", "size": "9"}]}]
+        with mock.patch.object(devtools, "_gcs_get", side_effect=pages):
+            r = asyncio.run(devtools.gcs_list("gs://bkt/", "policy/"))
+        self.assertEqual((r["bucket"], r["folders"], [f["name"] for f in r["files"]]), ("bkt", ["policy/2026/"], ["policy/a.xlsx", "policy/b.pdf"]))
+
+
 class _Rows(list):
     def __init__(self, rows):  # noqa: ANN001
         super().__init__(rows)

@@ -9,3 +9,5 @@ google-auth>=2.30
 google-cloud-bigquery>=3.25
 requests>=2.31
 pydantic>=2.7
+# 開発用の画面(/dev/)で、GCS のポリシーの文書(Excel)を読む(docs/DEVTOOLS.md の 5 章)
+openpyxl>=3.1
