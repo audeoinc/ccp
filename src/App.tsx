@@ -608,6 +608,8 @@ function App() {
   // 制作のページを開いたら、そのまま制作に依頼するか(シンプルな配信カードの「制作に渡す」)
   const [productionAuto, setProductionAuto] = useState(false)
   const goStage = (id: string, f: Face) => {
+    // ほかの道から開いたときは、そのまま依頼しない(「制作に渡す」だけが、下でもう一度立てる)
+    setProductionAuto(false)
     if (f === 'calendar') {
       setPeekResult(null)
       // 配信カードが制作のページの下にあれば、制作のページを閉じて見せる。なければ、上に重ねて開く(閉じると制作のページに戻る)
@@ -2211,8 +2213,8 @@ function App() {
           // 制作のページは、配信カードの上に重ねて開く(PR4)
           onOpenProduction={(id, opts) => {
             // シンプルな配信カードの「制作に渡す」は、開いた制作のページで、そのまま依頼まで進める
-            setProductionAuto(!!opts?.request)
             goStage(id, 'production')
+            setProductionAuto(!!opts?.request)
           }}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           initialTab={selected && selected.id === link.card ? link.tab : undefined}
@@ -2242,7 +2244,10 @@ function App() {
           productImages={cardImages.get(productionOpen)}
           heroes={heroes}
           people={owners}
-          onClose={() => setProductionOpen(null)}
+          onClose={() => {
+            setProductionOpen(null)
+            setProductionAuto(false)
+          }}
           onOpenCard={(id) => goStage(id, 'calendar')}
           onChanged={() => void production.reload()}
           autoRequest={productionAuto}

@@ -24,7 +24,6 @@ import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import { HandoffSheet } from './HandoffSheet'
 import { ProductionRequestsService } from '../data/productionRequests'
-
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
@@ -203,7 +202,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   useEffect(() => {
     const before = prevStatus.current
     prevStatus.current = e.card.status
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (statusRank(before) < statusRank('approved') && statusRank(e.card.status) >= statusRank('approved')) setStage('handoff')
   }, [e.card.status])
   // 商品の一覧で押した商品(選んでいる枠と見比べる)
@@ -266,6 +264,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       setCommOpen(true)
     }
   }, [])
+  // 渡す・制作の段階では、コミュニケーションは畳んでおく(開けば使える)。企画に戻ったら、人の設定に戻す
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCommOpen(stage === 'plan' ? loadPref<boolean>(COMM_KEY, false) : false)
+  }, [stage])
   const noop = useCallback(() => undefined, [])
   // プレビューの書き込みの番号を押したら、コミュニケーションを開く
   const openThreads = useCallback(() => {
@@ -597,7 +600,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         ) : (
           // 渡す・制作: 制作に渡すもの(文章・参考の画像と URL・担当と締め切り)の 1 枚。プレビューは見本として残す
           <div className={s.pane}>
-            <HandoffSheet editor={e} stage={stage} onCommit={onCommit} />
+            <HandoffSheet editor={e} stage={stage} onCommit={onCommit} onPassed={() => chooseStage('production')} />
           </div>
         )}
 

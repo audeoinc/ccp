@@ -34,6 +34,8 @@ interface Props {
   onCommit: () => Promise<void>
   /** 制作の依頼の最新の版を読んだとき(段階を決めるため) */
   onRequest?: (req: ProductionRequest | undefined) => void
+  /** 「制作に渡す」を押したとき(段階を「制作」にする) */
+  onPassed?: () => void
 }
 
 /**
@@ -42,7 +44,7 @@ interface Props {
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
-export function HandoffSheet({ editor: e, stage, onCommit, onRequest }: Props) {
+export function HandoffSheet({ editor: e, stage, onCommit, onRequest, onPassed }: Props) {
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -74,7 +76,8 @@ export function HandoffSheet({ editor: e, stage, onCommit, onRequest }: Props) {
     setBusy(true)
     try {
       await onCommit()
-      e.openProduction?.({ request: true })
+      e.openProduction?.({ request: !requested })
+      onPassed?.()
     } finally {
       setBusy(false)
     }

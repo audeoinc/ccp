@@ -57,7 +57,7 @@ const useStyles = makeStyles({
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', columnGap: '6px', flexWrap: 'wrap' },
   bar: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  pill: { border: 'none', padding: '2px 10px', borderRadius: '999px', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, cursor: 'pointer' },
+  pill: { whiteSpace: 'nowrap', flexShrink: 0, border: 'none', padding: '2px 10px', borderRadius: '999px', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, cursor: 'pointer' },
   pillOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
   handoff: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', columnGap: '4px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'pointer', maxWidth: '50%', overflow: 'hidden', whiteSpace: 'nowrap' },
   stream: { overflowY: 'auto', minHeight: 0, padding: '8px 12px', display: 'grid', alignContent: 'start', rowGap: '10px' },
