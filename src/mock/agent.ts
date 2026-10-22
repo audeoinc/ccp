@@ -245,6 +245,64 @@ export function mockAgent(message: string): string {
         ] })
   }
 
+  // シンプルな配信カードの、部品の文言を直す(SU1 段階 b)。依頼の言葉から、それらしい直し方を 3 つ
+  if (task === 'suggest_part_rewrite') {
+    const part = (p.part ?? {}) as { kind?: string; current?: string }
+    const req = String(p.request ?? '')
+    const cur = String(part.current ?? '')
+    const ja = hasJa(cur) || (!cur && hasJa(req))
+    if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? 'テーマに合っていて読みやすいです。もう少し短くすると、スマホでも 1 行に収まります。' : 'It fits the theme and reads well. A bit shorter would fit on one line on mobile.' })
+    const words = cur.split(/(?<=[、。,.])\s*/).filter(Boolean)
+    const short = words[0] ?? cur
+    const ideas = ja
+      ? [
+          { text: short.replace(/[、。]$/, ''), why: '前半だけを残し、ひと目で読める長さにしました。' },
+          { text: `この秋、${short.replace(/[、。]$/, '')}`, why: '季節の言葉を先に置きました。' },
+          { text: `${short.replace(/[、。]$/, '')}。いまチェック`, why: '行動を促す言葉で締めました。' },
+        ]
+      : [
+          { text: short.replace(/[,.]$/, ''), why: 'Kept the first phrase so it reads at a glance.' },
+          { text: `This fall: ${short.replace(/[,.]$/, '').replace(/^./, (c) => c.toLowerCase())}`, why: 'Leads with the season.' },
+          { text: `${short.replace(/[,.]$/, '')}. Shop now.`, why: 'Ends with a call to action.' },
+        ]
+    return J({ mode: 'update', reply: ja ? `「${req}」の方向で、3 つ考えました。` : `Here are three takes on "${req}".`, ideas })
+  }
+
+  // シンプルな配信カードで、メイン画像・商品を AI に頼む(SU1 段階 b)。候補の先頭から 3 つ
+  if (task === 'suggest_part_hero' || task === 'suggest_part_product') {
+    const req = String(p.request ?? '')
+    const ja = hasJa(req)
+    if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? 'テーマに合っています。もう少し明るい画像にすると、季節感が伝わりやすくなります。' : 'It fits the theme. A brighter image would convey the season better.' })
+    const hero = task === 'suggest_part_hero'
+    const list = ((hero ? p.heroes : p.products) as { code?: string; name?: string; stock?: number }[] | undefined) ?? []
+    const picks = hero ? list.slice(0, 3) : [...list].sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0)).slice(0, 3)
+    const why = (x: { name?: string; stock?: number }) =>
+      hero
+        ? ja ? `「${req}」に近い、${x.name ?? ''}を選びました。` : `${x.name ?? ''} is closest to "${req}".`
+        : ja ? `在庫 ${x.stock ?? '-'} で、「${req}」に合います。` : `Stock ${x.stock ?? '-'}; fits "${req}".`
+    return J({ mode: 'update', reply: ja ? `「${req}」に合う候補を 3 つ選びました。` : `Here are three picks for "${req}".`, ideas: picks.map((x) => ({ code: x.code, why: why(x) })) })
+  }
+
+  // シンプルな配信カードで、配信の全体を AI に頼む(SU1 段階 b)。見出し・コピーと、あればセクションの見出しを替えた案を 2 つ
+  if (task === 'suggest_whole_rewrite') {
+    const req = String(p.request ?? '')
+    const cur = (p.current ?? {}) as { headline?: string; copy?: string; subject?: string; section_titles?: string[] }
+    const ja = hasJa(cur.headline ?? '') || hasJa(req)
+    if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? '全体としてテーマに沿っています。見出しをもう少し短くすると、メリハリが出ます。' : 'It follows the theme well. A shorter headline would add punch.' })
+    const heroes = (p.heroes as { code?: string }[] | undefined) ?? []
+    const titles = (cur.section_titles ?? []).filter(Boolean)
+    const ideas = ja
+      ? [
+          { title: 'やわらかく', why: `「${req}」に合わせ、語りかける言い方にそろえました。`, changes: { headline: '今年の秋も、重ね着で', copy: '肌寒い朝も、ふわっと軽いニットで気分よく。', ...(cur.subject ? { subject: '秋の重ね着、そろいました' } : {}), ...(titles.length ? { section_titles: titles.map((x) => `${x}をゆるっと`) } : {}) } },
+          { title: '季節を前に', why: '季節の言葉を先に出し、画像も明るいものにしました。', changes: { headline: '秋、はじまる', copy: '色づく季節に、いちばん似合う一枚を。', ...(heroes[0]?.code ? { hero_code: heroes[0].code } : {}) } },
+        ]
+      : [
+          { title: 'Laid-back', why: `Rewritten in a relaxed voice for "${req}".`, changes: { headline: 'Easy Layers for Fall', copy: 'Soft knits and light jackets for those cool mornings.', ...(cur.subject ? { subject: 'Your easy fall layers are here' } : {}), ...(titles.length ? { section_titles: titles.map((x) => `Easy ${x}`) } : {}) } },
+          { title: 'Season first', why: 'Leads with the season and uses a brighter image.', changes: { headline: 'Fall Starts Here', copy: 'The one layer that suits the season best.', ...(heroes[0]?.code ? { hero_code: heroes[0].code } : {}) } },
+        ]
+    return J({ mode: 'update', reply: ja ? `「${req}」の方向で、全体を直す案を 2 つ考えました。` : `Two ways to rework the whole delivery for "${req}".`, ideas })
+  }
+
   if (task === 'suggest_push') {
     const name = String(card.name ?? '')
     return en

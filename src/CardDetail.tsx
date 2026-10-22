@@ -79,7 +79,7 @@ import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 import { viewHeight, viewWidth } from './uiScale'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
-import type { FloatAction, SimpleEditor } from './simple/editor'
+import type { AiPreview, FloatAction, SimpleEditor } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
@@ -1737,6 +1737,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   )
   // ---- シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。状態と保存は、上のものをそのまま使い、描き方だけを替える
   const undoStack = useUndo<Snapshot>()
+  // AI の案(メイン画像・商品)を、プレビューにだけ仮に写す(保存する中身は変えない)
+  const [aiPreview, setAiPreview] = useState<AiPreview | null>(null)
+  const shownHero = aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
+  const previewItem = aiPreview?.item
+  const shownItems = previewItem
+    ? previewItem.key
+      ? items.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
+      : [...items, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI }]
+    : items
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   // 承認済みの配信を自動で反映すると承認待ちに戻るので、最初の反映の前に一度だけ確かめる
   const revokeOk = useRef(false)
@@ -1880,7 +1889,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           device={previewDevice}
           headline={form.headline}
           copy={form.copy}
-          items={items}
+          items={shownItems}
           products={products}
           // 選んだ部品の枠は、部品を選ぶ層が描く(二重に光らせない)
           selectedKey={null}
@@ -1892,7 +1901,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           onSectionTitle={setSectionTitle}
           sectionCopies={sectionCopies}
           onSectionCopy={setSectionCopy}
-          hero={hero}
+          hero={shownHero}
           onDropHero={setHeroId}
           onClearHero={() => setHeroId(undefined)}
           onSelect={() => undefined}
@@ -1963,6 +1972,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     ? {
         card,
         form,
+        aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
         channel: previewTab,
         template,
@@ -1984,6 +1994,19 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         sectionCopies,
         setSectionTitle,
         setSectionCopy,
+        applyTexts: (x) => {
+          setForm((f) => ({
+            ...f,
+            ...(x.subject !== undefined ? { subject: x.subject } : {}),
+            ...(x.preheader !== undefined ? { preheader: x.preheader } : {}),
+            ...(x.headline !== undefined ? { headline: x.headline } : {}),
+            ...(x.copy !== undefined ? { copy: x.copy } : {}),
+            ...(x.pushTitle !== undefined ? { pushTitle: x.pushTitle } : {}),
+            ...(x.pushBody !== undefined ? { pushBody: x.pushBody } : {}),
+          }))
+          if (x.sectionTitles) setSectionTitles(x.sectionTitles)
+          if (x.sectionCopies) setSectionCopies(x.sectionCopies)
+        },
         links,
         setLinks,
         linkSpots,
@@ -1999,6 +2022,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           setProductOpen(key)
         },
         hoverProduct: setHoverKey,
+        replaceItem: (itemKey, productId, reason) => {
+          const to = products.find((p) => p.id === productId)
+          if (to) replaceItemWith(itemKey, to, reason)
+        },
+        setAiPreview,
         saving,
         dirty: changed,
         locked,

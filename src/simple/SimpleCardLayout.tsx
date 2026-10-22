@@ -19,6 +19,7 @@ import { placeInPart } from './actions'
 import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import type { SimpleEditor } from './editor'
+import type { PartTurn } from './partAi'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
@@ -143,6 +144,9 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
   const [part, setPart] = useState<PartRef | null>(null)
   // 商品の一覧で押した商品(選んでいる枠と見比べる)
   const [compareKey, setCompareKey] = useState<string | null>(null)
+  // 部品ごとの AI とのやり取り(開いている間だけ)
+  const [chats, setChats] = useState<Record<string, PartTurn[]>>({})
+  const setChat = (key: string, f: (prev: PartTurn[]) => PartTurn[]) => setChats((c) => ({ ...c, [key]: f(c[key] ?? []) }))
   const [widths, setWidths] = useState<Widths>(() => {
     const v = loadPref<Partial<Widths> | null>(WIDTH_KEY, null)
     return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)) }
@@ -305,7 +309,7 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} />
           {e.dirty && (
             <div className={s.applyBox}>
               <span className={s.hint}>

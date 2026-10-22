@@ -3,11 +3,12 @@ import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
 import type { Candidate, Item } from '../items'
-import type { ProposedHero } from '../aiSelect'
+import type { AiCard, ProposedHero } from '../aiSelect'
 import type { EmailTemplateId } from '../templates'
 import type { LinkSlot, Links } from '../links'
 import type { CardAlertKind } from '../cardAlerts'
 import type { NextStep } from './nextStep'
+import type { WholeTexts } from './partAi'
 import type { PreviewZoom } from './usePreviewNav'
 
 /** シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部。名前は Form と同じ) */
@@ -38,6 +39,12 @@ export type SimpleForm = Record<SimpleField, string> & {
   handedOffAt: string
 }
 
+/** プレビューにだけ仮に写す、AI の案(メイン画像・商品) */
+export interface AiPreview {
+  heroId?: string
+  item?: { key: string; productId: string }
+}
+
 /** 商品のフロートに足す、選んでいる枠への操作(「この枠の商品と入れ替える」など) */
 export interface FloatAction {
   label: string
@@ -52,6 +59,8 @@ export interface FloatAction {
 export interface SimpleEditor {
   card: DeliveryCard
   form: SimpleForm
+  /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
+  aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
   channel: 'email' | 'push'
   template: EmailTemplateId
@@ -71,6 +80,8 @@ export interface SimpleEditor {
   sectionCopies: string[]
   setSectionTitle: (i: number, v: string) => void
   setSectionCopy: (i: number, v: string) => void
+  /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
+  applyTexts: (t: WholeTexts) => void
   links: Links
   setLinks: (l: Links) => void
   linkSpots: LinkSlot[]
@@ -86,6 +97,10 @@ export interface SimpleEditor {
   /** 商品のフロートを開く(載せた商品か候補の鍵。action は、選んでいる枠への操作) */
   openProduct: (key: string, action?: FloatAction) => void
   hoverProduct: (key: string | null) => void
+  /** 載せた商品を、ほかの商品に置き換える(行は作り直す。理由は配信のメモに残す) */
+  replaceItem: (itemKey: string, productId: string, reason: string) => void
+  /** AI の案を、保存する中身を変えずに、プレビューにだけ仮に写す(null で戻す)。商品の item.key が空なら、空いた枠に足して見せる */
+  setAiPreview: (p: AiPreview | null) => void
   // ---- 反映(保存)と元に戻す
   saving: boolean
   /** 開いたとき・前に反映したときから、内容が変わったか */
