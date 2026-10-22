@@ -409,7 +409,7 @@ BigQuery を使わないなら、「■ BigQuery」の [注意] はそのまま�
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
 | `GEMINI_CONCURRENCY` | — | Gemini への同時の呼び出しの上限(既定 4) | 設定しない |
-| `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/8082/dev/`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
+| `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
 
 ## 付録 B. 引っ越し用のパックの中身
 

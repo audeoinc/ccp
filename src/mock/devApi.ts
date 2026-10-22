@@ -1,6 +1,6 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ChatContext, ChatReply, ChatTurn, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
 
 export * from '../dev/api'
 
@@ -75,7 +75,45 @@ export const DevApi = {
     settings = s
     return wait({ ok: true as const })
   },
-  datasets: () => wait({ ok: true as const, project: 'demo-project', datasets: ['ccp_dummy', 'ccp_dummy_src'] }),
+  projects: () => wait({ ok: true as const, default: 'demo-project', projects: ['demo-project', 'demo-analytics'] }),
+  datasets: (project?: string) =>
+    wait({ ok: true as const, project: project ?? 'demo-project', datasets: project === 'demo-analytics' ? ['mart_ctlg', 'mart_sales'] : ['ccp_dummy', 'ccp_dummy_src', 'ctlg_master', 'ctlg_stage', 'sales_daily'] }),
+  chat: (messages: ChatTurn[], ctx: ChatContext) => {
+    const ask = messages[messages.length - 1]?.text ?? ''
+    const r: ChatReply = {
+      ok: true,
+      reply: `**m_item** の列を見ました(見本の返事です。いまの発言: 「${ask.slice(0, 40)}」)。
+
+### CCP の列への当て方の案
+- \`item_cd\` → SKU の \`product_code\`(品番)
+- \`country_cd\` → \`market\`(JPN → JP、USA → US に直す)
+- \`dept_nm\` → \`category\`(部門 2 が CCP のカテゴリに近い)
+- \`price\` → \`price\``,
+      sql: `SELECT
+  CASE country_cd WHEN 'JPN' THEN 'JP' WHEN 'USA' THEN 'US' END AS market,
+  item_cd AS product_code,
+  ANY_VALUE(item_nm) AS name,
+  ANY_VALUE(dept_nm) AS category,
+  MAX(price) AS price
+FROM \`${DS}.m_item\`
+WHERE on_sale_flg
+GROUP BY market, product_code`,
+      questions: ctx.output ? [] : ['季節(season)に当たる列が見つかりません。別の表にありますか?'],
+      steps: [`表を探した(${DS}、「ctlg」を含む、0 件)`, `表を探した(${DS}、3 件)`, `表の列を見た(${DS}.m_item)`, 'SQL を確かめた(通った。読む量 52,428,800 バイト)'],
+      context_chars: 18_000,
+    }
+    return new Promise<ChatReply>((ok) => window.setTimeout(() => ok(r), 900))
+  },
+  context: (ctx: ChatContext) => wait({ ok: true as const, context: `あなたは BigQuery(GoogleSQL)の SQL を書く専門家です。…(見本)
+
+## いまの接続
+- 画面で開いているデータセット: \`${ctx.dataset}\`
+
+## いまの SQL
+
+\`\`\`sql
+${ctx.sql}
+\`\`\`` }),
   tables: (dataset: string) => {
     if (!dataset.endsWith('ccp_dummy_src')) return fail(`NotFound: 404 Not found: Dataset ${dataset}(見本は ${DS} だけです)`)
     return wait({ ok: true as const, tables: Object.keys(TABLES).map((id) => ({ id, ref: ref(id), type: 'TABLE' })) })
@@ -95,6 +133,7 @@ export const DevApi = {
       partitioning: t.columns[0].type === 'DATE' ? { type: 'DAY', field: t.columns[0].name } : null,
       clustering: [],
       view_sql: '',
+      sources: [],
       columns: t.columns,
     }
     return wait(info)

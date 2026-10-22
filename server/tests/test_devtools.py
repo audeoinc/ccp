@@ -68,5 +68,63 @@ class FlattenTest(unittest.TestCase):
         self.assertEqual(cols[1]["mode"], "REPEATED")
 
 
+class ChatTest(unittest.TestCase):
+    def test_chapters(self) -> None:
+        md = "# 題\n\n## 1. 全体\nA\n\n---\n\n## 2. SPU\nB\n\n## 3. SKU\nC\n"
+        self.assertEqual(devtools.chapters(md, (1, 3)), "## 1. 全体\nA\n\n## 3. SKU\nC")
+
+    def test_parse_reply(self) -> None:
+        self.assertEqual(devtools.parse_reply('{"reply": "直しました", "sql": " SELECT 1 ", "questions": ["q", ""]}'), {"reply": "直しました", "sql": "SELECT 1", "questions": ["q"]})
+        # JSON が崩れていても、本文を返事として見せる
+        self.assertEqual(devtools.parse_reply("ただの文")["reply"], "ただの文")
+
+    def test_private_columns(self) -> None:
+        for name in ("customer_name", "item_nm", "email", "tel_no", "review_text", "氏名"):
+            self.assertTrue(devtools.PRIVATE.search(name), name)
+        for name in ("sku_cd", "qty", "sales_date", "price"):
+            self.assertFalse(devtools.PRIVATE.search(name), name)
+
+    def test_context_has_spec_and_sql(self) -> None:
+        body = devtools.ChatIn(output="sku", sql="SELECT 1", last="BadRequest: x", notes="まとめ")
+        c = devtools.build_context(body, None)
+        self.assertIn("## 3. SKU", c)
+        self.assertIn("## 1. 全体のルール", c)
+        self.assertIn("SELECT 1", c)
+        self.assertIn("まとめ", c)
+
+
+class ToolTest(unittest.TestCase):
+    def client(self) -> SimpleNamespace:
+        tables = [SimpleNamespace(project="p", dataset_id="a", table_id=n, table_type="TABLE") for n in ("m_ctlg_item", "CTLG_price", "t_sales")]
+        return SimpleNamespace(project="p", list_tables=lambda ds: tables if ds == "p.a" else [],
+                               query=lambda sql, job_config=None: SimpleNamespace(statement_type="DELETE", total_bytes_processed=0, schema=[]))
+
+    def test_list_tables_by_part_of_name(self) -> None:
+        out, step = devtools.run_tool(self.client(), "list_tables", {"dataset": "a", "name_contains": "ctlg"}, devtools.ChatIn())
+        self.assertEqual([t["table"] for t in out["tables"]], ["p.a.m_ctlg_item", "p.a.CTLG_price"])
+        self.assertIn("2 件", step)
+
+    def test_run_select_only(self) -> None:
+        out, _ = devtools.run_tool(self.client(), "run_select", {"sql": "DELETE FROM x WHERE true"}, devtools.ChatIn())
+        self.assertIn("SELECT ではない", out["error"])
+        out, _ = devtools.run_tool(self.client(), "run_select", {"sql": "SELECT 1"}, devtools.ChatIn(allow_run=False))
+        self.assertIn("止めて", out["error"])
+
+    def test_tools_declared(self) -> None:
+        names = [f.name for f in devtools.tool_declarations()[0].function_declarations]
+        self.assertEqual(names, ["list_datasets", "list_tables", "describe_table", "describe_view_sources", "dry_run", "run_select"])
+
+    def test_view_sources(self) -> None:
+        refs = [SimpleNamespace(project="p", dataset_id="v", table_id="vw"), SimpleNamespace(project="p", dataset_id="raw", table_id="item"),
+                SimpleNamespace(project="p", dataset_id="raw", table_id="item"), SimpleNamespace(project="p", dataset_id="raw", table_id="price")]
+        c = SimpleNamespace(query=lambda sql, job_config=None: SimpleNamespace(referenced_tables=refs))
+        # ビュー自身と重なりは除く
+        self.assertEqual(devtools.view_sources(c, "p.v.vw"), ["p.raw.item", "p.raw.price"])
+
+    def test_parse_fenced(self) -> None:
+        r = devtools.parse_reply('調べました。\n```json\n{"reply": "a", "sql": "SELECT 1"}\n```')
+        self.assertEqual((r["reply"], r["sql"]), ("a", "SELECT 1"))
+
+
 if __name__ == "__main__":
     unittest.main()

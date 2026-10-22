@@ -14,6 +14,7 @@ export type Row = Record<string, unknown>
 export interface Failure {
   ok: false
   error: string
+  steps?: string[]
 }
 
 export interface Status {
@@ -27,6 +28,40 @@ export interface Status {
 export interface Settings {
   /** よく見るデータセット(<プロジェクト>.<データセット>)。新しく開いたものが先頭 */
   datasets?: string[]
+  /** 仕様のまとめ(利用先の資料から。Gemini に渡す。DEVTOOLS.md の 4 章の 8) */
+  notes?: string
+}
+
+/** Gemini に何を渡すか(DEVTOOLS.md の 4 章) */
+export interface ChatContext {
+  /** 作ろうとしている出力(spu など)。仕様の章と手本の SQL を渡す */
+  output: string | null
+  /** 画面で開いているデータセット(「このデータセット」の手がかり) */
+  dataset: string
+  /** 列(と先頭の数行)を渡す表 */
+  tables: string[]
+  sample_rows: boolean
+  /** Gemini に SELECT を流させるか(読む量の上限つき) */
+  allow_run: boolean
+  notes: string
+  sql: string
+  /** いまの SQL を流した結果(エラー、または結果の先頭) */
+  last: string
+}
+
+export interface ChatTurn {
+  role: 'user' | 'model'
+  text: string
+}
+
+export interface ChatReply {
+  ok: true
+  reply: string
+  sql: string
+  questions: string[]
+  /** Gemini が BigQuery で何を調べたか(画面に出す) */
+  steps: string[]
+  context_chars: number
 }
 
 export interface TableInfo {
@@ -41,6 +76,8 @@ export interface TableInfo {
   partitioning: { type: string; field: string } | null
   clustering: string[]
   view_sql: string
+  /** ビューが参照している元の表(ビューの中のビューもたどる) */
+  sources: string[]
   columns: Column[]
 }
 
@@ -90,6 +127,9 @@ export const DevApi = {
   preview: (ref: string) => call<{ ok: true; columns: Column[]; rows: Row[] }>(`/bq/preview?ref=${q(ref)}`),
   dryrun: (sql: string) => call<DryRun>('/bq/dryrun', post({ sql })),
   run: (sql: string, maxRows: number) => call<RunResult>('/bq/run', post({ sql, max_rows: maxRows })),
+  projects: () => call<{ ok: true; default: string | null; projects: string[] }>('/bq/projects'),
+  chat: (messages: ChatTurn[], ctx: ChatContext) => call<ChatReply>('/ai/chat', post({ messages, ...ctx })),
+  context: (ctx: ChatContext) => call<{ ok: true; context: string }>('/ai/context', post({ messages: [], ...ctx })),
 }
 
 export const isFailure = (v: unknown): v is Failure => !!v && typeof v === 'object' && (v as { ok?: unknown }).ok === false
