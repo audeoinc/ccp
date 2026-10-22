@@ -22,8 +22,6 @@ import {
   Select,
   Spinner,
   SplitButton,
-  Tab,
-  TabList,
   makeStyles,
   mergeClasses,
   tokens,
@@ -113,6 +111,7 @@ const useStyles = makeStyles({
   h3: { margin: 0, fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   hint: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
   label: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  channelRow: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   // ① の 7 日の表(作る日のチェック・配信日・種類・配信名)。作れない日も並べ、薄くして理由を出す
   table: { display: 'grid', rowGap: '4px' },
   thead: { display: 'grid', gridTemplateColumns: '28px 100px 160px minmax(0, 1fr)', columnGap: '8px', padding: '0 8px', alignItems: 'end' },
@@ -262,14 +261,24 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
           ))}
         </Select>
       )}
-      <TabList size="small" selectedValue={ws.channel} disabled={!editable} onTabSelect={(_, d) => ws.setChannel(String(d.value))} aria-label={t('チャネル', 'Channel')}>
-        {channelOptions.map((o) => (
-          <Tab key={o.value} value={String(o.value)}>
-            {optionLabel(o.label)}
-          </Tab>
-        ))}
-      </TabList>
+      {/* チャネルは ① の「作るチャネル」で選ぶ。選んだあとは、ここに印だけ出す(どのチャネルを作っているかが分かるように) */}
+      {!editable && <ChannelBadge channel={ws.channel} size="small" />}
     </span>
+  )
+  // 作るチャネル: 空いている日(そのチャネルの配信がまだない日)の判定が変わるので、① の表のすぐ上で選ぶ
+  // (以前は見出しの週・国の横のタブで、何を切り替えるものか分かりにくかった。2026-10-22 利用者の指摘)
+  const channelPick = (
+    <div className={s.channelRow} role="radiogroup" aria-label={t('作るチャネル', 'Channel to create')}>
+      <span className={s.label}>{t('作るチャネル', 'Channel to create')}</span>
+      {channelOptions.map((o) => {
+        const on = ws.channel === String(o.value)
+        return (
+          <Button key={o.value} size="small" appearance={on ? 'primary' : 'outline'} role="radio" aria-checked={on} disabled={!editable} onClick={() => ws.setChannel(String(o.value))}>
+            {optionLabel(o.label)}
+          </Button>
+        )
+      })}
+    </div>
   )
 
   // ---- 手順(2 つ)
@@ -358,6 +367,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
       <div className={s.main}>
         <section className={s.panel}>
           <h3 className={s.h3}>{t('作る日と、配信の方向', 'Days and direction')}</h3>
+          {channelPick}
           <span className={s.hint}>
             {!ws.country
               ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
