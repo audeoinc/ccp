@@ -20,6 +20,7 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/work/{出力}     SQL を新しい版として保存する   GET /api/dev/work/{出力}/{版}  版を開く
   PUT  /api/dev/work/{出力}/adopt  採用の版を決める          PUT /api/dev/work/target       出す先を決める
   POST /api/dev/check           答え合わせ(全件を流して bq_validate。run=false なら読む量の見積もりだけ)
+  GET  /api/dev/chats           AI との会話の一覧   GET/PUT/DELETE /api/dev/chats/{id}  会話を開く・残す・消す(server/devwork/chats/)
   POST /api/dev/ai/context      Gemini に渡す前提を、そのまま返す(見る・コピーする)
 
 決まり(DEVTOOLS.md の 6 章):
@@ -1087,3 +1088,70 @@ async def check(body: CheckIn) -> dict[str, Any]:
         return await asyncio.to_thread(check_output, bq.client(), body)
     except Exception as e:  # noqa: BLE001
         return _error(e)
+
+
+# ---- AI との会話(セッション)を残す: server/devwork/chats/<id>.json
+# ブラウザに残すだけだと、別のブラウザ・PC から続きを話せないので、Workbench のフォルダに置く(Git には入らない)
+
+CHAT_ID = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
+
+
+def _chat_path(cid: str) -> Path:
+    if not CHAT_ID.match(cid):
+        raise HTTPException(400, "会話の ID の形が違います")
+    return DEVWORK / "chats" / f"{cid}.json"
+
+
+def chat_title(messages: list[dict[str, Any]]) -> str:
+    """名前がないときは、最初の発言の頭から付ける"""
+    first = next((str(m.get("text") or "") for m in messages if m.get("role") == "user"), "")
+    t = re.sub(r"\s+", " ", first).strip()
+    return (t[:40] + "…") if len(t) > 40 else (t or "新しい会話")
+
+
+@router.get("/chats")
+async def chats() -> dict[str, Any]:
+    """会話の一覧(新しく話した順)。中身は返さない"""
+    out = []
+    for p in (DEVWORK / "chats").glob("*.json"):
+        v = _read_json(p, None)
+        if not isinstance(v, dict):
+            continue
+        msgs = v.get("messages") or []
+        out.append({"id": p.stem, "title": v.get("title") or chat_title(msgs), "created": v.get("created"), "updated": v.get("updated"),
+                    "count": len(msgs), "output": v.get("output") or ""})
+    out.sort(key=lambda x: x.get("updated") or "", reverse=True)
+    return {"ok": True, "chats": out}
+
+
+@router.get("/chats/{cid}")
+async def get_chat(cid: str) -> dict[str, Any]:
+    v = _read_json(_chat_path(cid), None)
+    if not isinstance(v, dict):
+        raise HTTPException(404, "その会話はありません")
+    return {"ok": True, "id": cid, **v}
+
+
+class ChatSaveIn(BaseModel):
+    title: str = Field("", max_length=200)
+    output: str = Field("", max_length=40)
+    # 画面の形のまま(思考・調べたこと・SQL も含めて)残す
+    messages: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
+
+
+@router.put("/chats/{cid}")
+async def save_chat(cid: str, body: ChatSaveIn) -> dict[str, Any]:
+    p = _chat_path(cid)
+    old = _read_json(p, {}) if p.is_file() else {}
+    now = _now_iso()
+    _write_json(p, {"title": body.title.strip() or old.get("title") or chat_title(body.messages), "output": body.output,
+                    "created": old.get("created") or now, "updated": now, "messages": body.messages})
+    return {"ok": True}
+
+
+@router.delete("/chats/{cid}")
+async def delete_chat(cid: str) -> dict[str, Any]:
+    p = _chat_path(cid)
+    if p.is_file():
+        p.unlink()
+    return {"ok": True}

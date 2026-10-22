@@ -258,6 +258,24 @@ export interface CheckResult {
   job?: JobStats
 }
 
+/** AI との会話(セッション)。server/devwork/chats/ に残る */
+export interface ChatMeta {
+  id: string
+  title: string
+  created: string
+  updated: string
+  count: number
+  output: string
+}
+
+export const ChatApi = {
+  list: () => call<{ ok: true; chats: ChatMeta[] }>('/chats'),
+  get: (id: string) => call<{ ok: true; id: string; title: string; output: string; messages: unknown[] }>(`/chats/${id}`),
+  save: (id: string, body: { title?: string; output: string; messages: unknown[] }) =>
+    call<{ ok: true }>(`/chats/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  remove: (id: string) => call<{ ok: true }>(`/chats/${id}`, { method: 'DELETE' }),
+}
+
 export const WorkApi = {
   list: () => call<WorkInfo>('/work'),
   save: (output: string, sql: string, note = '') => call<{ ok: true; v: number; same: boolean }>(`/work/${output}`, post({ sql, note })),

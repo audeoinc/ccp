@@ -192,6 +192,22 @@ class WorkTest(unittest.TestCase):
         self.assertEqual(self.run_async(devtools.get_version("spu", 2))["sql"], "SELECT 2")
         self.assertEqual(devtools._adopted_sql("spu"), "SELECT 2")
 
+    def test_chats(self) -> None:
+        msgs = [{"role": "user", "text": "ctlg を含む表から  CCP で使える列を探して"}, {"role": "model", "text": "見ました", "thoughts": "…"}]
+        self.run_async(devtools.save_chat("abc123", devtools.ChatSaveIn(messages=msgs, output="spu")))
+        self.run_async(devtools.save_chat("def456", devtools.ChatSaveIn(title="名前つき", messages=[])))
+        lst = self.run_async(devtools.chats())["chats"]
+        self.assertEqual({c["id"]: c["title"] for c in lst}, {"abc123": "ctlg を含む表から CCP で使える列を探して", "def456": "名前つき"})
+        got = self.run_async(devtools.get_chat("abc123"))
+        self.assertEqual((got["output"], got["messages"][1]["thoughts"]), ("spu", "…"))
+        # 名前を付け直さずに残しても、前の名前のまま
+        self.run_async(devtools.save_chat("def456", devtools.ChatSaveIn(messages=msgs)))
+        self.assertEqual(self.run_async(devtools.get_chat("def456"))["title"], "名前つき")
+        self.run_async(devtools.delete_chat("abc123"))
+        self.assertEqual([c["id"] for c in self.run_async(devtools.chats())["chats"]], ["def456"])
+        with self.assertRaises(Exception):
+            devtools._chat_path("../x")
+
     def test_check_runs_validate_with_context(self) -> None:
         self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT spu")))
         self.run_async(devtools.adopt("spu", devtools.AdoptIn(v=1)))

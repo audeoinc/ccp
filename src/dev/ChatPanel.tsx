@@ -10,6 +10,7 @@ import {
   DialogSurface,
   DialogTitle,
   Dropdown,
+  Input,
   Option,
   Spinner,
   Tag,
@@ -28,13 +29,16 @@ import {
   DocumentSearchRegular,
   PlayRegular,
   ArrowLeftRegular,
+  AddRegular,
+  HistoryRegular,
+  RenameRegular,
   PanelRightContractRegular,
   SparkleRegular,
   StopRegular,
   TableAddRegular,
 } from '@fluentui/react-icons'
 import { ChatMarkdown } from './ChatMarkdown'
-import { DevApi, isFailure, type ChatContext, type ChatEvent, type ChatTurn, type SqlBlock } from './api'
+import { ChatApi, DevApi, isFailure, type ChatContext, type ChatEvent, type ChatMeta, type ChatTurn, type SqlBlock } from './api'
 import { CopyButton } from './CopyButton'
 
 const useStyles = makeStyles({
@@ -57,6 +61,13 @@ const useStyles = makeStyles({
   label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
   grow: { flexGrow: 1 },
+  history: { flexShrink: 0, maxHeight: '40vh', overflowY: 'auto', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: '2px' },
+  historyItem: { display: 'flex', alignItems: 'center', gap: '2px', borderRadius: tokens.borderRadiusMedium, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  historyOn: { backgroundColor: tokens.colorBrandBackground2 },
+  historyOpen: { flexGrow: 1, minWidth: 0, border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', padding: '4px', display: 'flex', flexDirection: 'column', color: tokens.colorNeutralForeground1 },
+  historyTitle: { fontSize: tokens.fontSizeBase200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  historyMeta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  chatName: { flexShrink: 0, padding: '4px 12px 0', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   log: { flexGrow: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 },
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: '20px' },
   user: {
@@ -129,7 +140,11 @@ const OUTPUTS: { value: string; label: string }[] = [
 
 // 上の帯(見出し・渡すもの)と下の入力欄は縮めない(会話の欄だけがスクロールする)
 // 会話と選んだモデルは、この画面を開いている人のブラウザにだけ残す(閉じても続きから話せるように)
+// (以前は会話をブラウザだけに残していた。初めて開いたときに、1 つの会話としてサーバーに移す)
 const LOG_KEY = 'ccp-dev-chat.v2'
+// いま開いている会話の ID(会話そのものは server/devwork/chats/ に残す。別のブラウザ・PC からも続きを話せるように)
+const CHAT_KEY = 'ccp-dev-chat-id'
+const newId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 const MODEL_KEY = 'ccp-dev-model'
 const load = <T,>(key: string, fallback: T): T => {
   try {
@@ -181,7 +196,12 @@ interface Props {
  */
 export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql, onFold, output, onOutput, ask }: Props) {
   const s = useStyles()
-  const [messages, setMessages] = useState<Message[]>(() => load<Message[]>(LOG_KEY, []).map((m) => ({ ...m, live: false })))
+  const [messages, setMessages] = useState<Message[]>([])
+  const [chatId, setChatId] = useState<string>(() => load<string>(CHAT_KEY, '') || newId())
+  const [title, setTitle] = useState('')
+  const [chats, setChats] = useState<ChatMeta[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [renaming, setRenaming] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -238,9 +258,87 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
     last: withSql ? last : '',
   })
 
-  const commit = (next: Message[]) => {
+  const refreshChats = async () => {
+    const r = await ChatApi.list()
+    if (!isFailure(r)) setChats(r.chats)
+  }
+
+  // 開いたとき: 前に開いていた会話を読む。以前のブラウザだけの会話があれば、サーバーに移す
+  // (開発中は effect が 2 回走るので、移すのは 1 回だけにする。2 つの会話に分かれないように)
+  const started = useRef(false)
+  useEffect(() => {
+    if (started.current) return
+    started.current = true
+    void (async () => {
+      const legacy = load<Message[]>(LOG_KEY, [])
+      if (legacy.length) {
+        const id = newId()
+        const r = await ChatApi.save(id, { output: '', messages: legacy.map((m) => ({ ...m, live: false })) })
+        if (!isFailure(r)) {
+          try {
+            window.localStorage.removeItem(LOG_KEY)
+          } catch {
+            // 消せなくても、次に開いたときにもう一度移すだけ
+          }
+          save(CHAT_KEY, id)
+          setChatId(id)
+          setMessages(legacy.map((m) => ({ ...m, live: false })))
+        }
+      } else {
+        const r = await ChatApi.get(chatId)
+        if (!isFailure(r)) {
+          setMessages((r.messages as Message[]).map((m) => ({ ...m, live: false })))
+          setTitle(r.title)
+        }
+      }
+      await refreshChats()
+    })()
+    // 最初の 1 回だけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** 会話を残す(返事が届き終わったとき)。名前は、付け直していなければ最初の発言から付く */
+  const commit = (next: Message[], id = chatId) => {
     setMessages(next)
-    save(LOG_KEY, next.slice(-80))
+    void ChatApi.save(id, { output, messages: next.slice(-200) }).then(() => refreshChats())
+  }
+
+  const openChat = async (id: string) => {
+    if (busy) return
+    const r = await ChatApi.get(id)
+    if (isFailure(r)) return
+    setChatId(id)
+    save(CHAT_KEY, id)
+    setMessages((r.messages as Message[]).map((m) => ({ ...m, live: false })))
+    setTitle(r.title)
+    if (r.output) onOutput(r.output)
+    setHistoryOpen(false)
+  }
+
+  const newChat = () => {
+    if (busy) return
+    const id = newId()
+    setChatId(id)
+    save(CHAT_KEY, id)
+    setMessages([])
+    setTitle('')
+    setHistoryOpen(false)
+  }
+
+  const removeChat = async (id: string) => {
+    if (!window.confirm('この会話を消します(元に戻せません)。よいですか?')) return
+    await ChatApi.remove(id)
+    if (id === chatId) newChat()
+    await refreshChats()
+  }
+
+  const rename = async (id: string, name: string) => {
+    setRenaming(null)
+    const r = await ChatApi.get(id)
+    if (isFailure(r)) return
+    await ChatApi.save(id, { title: name, output: r.output, messages: r.messages })
+    if (id === chatId) setTitle(name)
+    await refreshChats()
   }
 
   const send = async (text: string) => {
@@ -307,8 +405,11 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
         <Button size="small" appearance="subtle" icon={<DocumentSearchRegular />} onClick={() => void showContext()} title="AI に渡す前提(仕様・手本・表・まとめ・いまの SQL)を見る">
           前提
         </Button>
-        <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={!messages.length || busy} onClick={() => commit([])} title="会話を消して、最初から">
-          消す
+        <Button size="small" appearance="subtle" icon={<AddRegular />} disabled={busy} onClick={newChat} title="新しい会話を始める(いまの会話は履歴に残る)">
+          新しい会話
+        </Button>
+        <Button size="small" appearance={historyOpen ? 'secondary' : 'subtle'} icon={<HistoryRegular />} disabled={busy} onClick={() => setHistoryOpen((v) => !v)} title="前の会話を開く">
+          履歴 {chats.length || ''}
         </Button>
         {onFold && <Button size="small" appearance="subtle" icon={<PanelRightContractRegular />} onClick={onFold} title="畳む(会話は続きます)" />}
         <div className={s.row} style={{ width: '100%' }}>
@@ -345,6 +446,39 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
           </Combobox>
         </div>
       </div>
+
+      {historyOpen && (
+        <div className={s.history}>
+          {chats.length === 0 && <span className={s.label}>まだ残っている会話はありません</span>}
+          {chats.map((c) => (
+            <div key={c.id} className={mergeClasses(s.historyItem, c.id === chatId && s.historyOn)}>
+              {renaming === c.id ? (
+                <Input
+                  size="small"
+                  className={s.grow}
+                  defaultValue={c.title}
+                  autoFocus
+                  onBlur={(e) => void rename(c.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) void rename(c.id, (e.target as HTMLInputElement).value)
+                    if (e.key === 'Escape') setRenaming(null)
+                  }}
+                />
+              ) : (
+                <button type="button" className={s.historyOpen} onClick={() => void openChat(c.id)} title={c.title}>
+                  <span className={s.historyTitle}>{c.title}</span>
+                  <span className={s.historyMeta}>
+                    {new Date(c.updated).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' })}・{c.count} 件
+                  </span>
+                </button>
+              )}
+              <Button size="small" appearance="subtle" icon={<RenameRegular />} onClick={() => setRenaming(c.id)} title="名前を付け直す" />
+              <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => void removeChat(c.id)} title="消す" />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className={s.chatName}>{title || (messages.length ? '' : '新しい会話')}</div>
 
       <div className={s.ctx}>
         <button type="button" className={s.toggle} onClick={() => setCtxOpen((v) => !v)}>

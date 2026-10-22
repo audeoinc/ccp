@@ -216,3 +216,21 @@ export const WorkApi = {
     return new Promise<CheckResult>((ok) => window.setTimeout(() => ok(r), sql.length ? 900 : 0))
   },
 }
+
+// AI との会話(身代わり。ブラウザのメモリの中だけ)
+const chats: Record<string, { title: string; output: string; created: string; updated: string; messages: unknown[] }> = {}
+const firstText = (m: unknown[]) => String((m.find((x) => (x as { role?: string }).role === 'user') as { text?: string } | undefined)?.text ?? '新しい会話').slice(0, 40)
+
+export const ChatApi = {
+  list: () => wait({ ok: true as const, chats: Object.entries(chats).map(([id, c]) => ({ id, title: c.title, created: c.created, updated: c.updated, count: c.messages.length, output: c.output })).sort((a, b) => b.updated.localeCompare(a.updated)) }),
+  get: (id: string) => (chats[id] ? wait({ ok: true as const, id, ...chats[id] }) : fail('その会話はありません')),
+  save: (id: string, body: { title?: string; output: string; messages: unknown[] }) => {
+    const now = new Date().toISOString()
+    chats[id] = { title: body.title || chats[id]?.title || firstText(body.messages), output: body.output, created: chats[id]?.created ?? now, updated: now, messages: body.messages }
+    return wait({ ok: true as const })
+  },
+  remove: (id: string) => {
+    delete chats[id]
+    return wait({ ok: true as const })
+  },
+}
