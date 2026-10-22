@@ -1,6 +1,6 @@
 import { tr } from './i18n'
 import { CELL_VIEWS, type CellView } from './cells'
-import { gridColumns, placedButtons, type ButtonBlock, type ButtonSpec, type LinkKind, type PartType, type Section, type TablePart, type TemplateLayout } from './templates'
+import { BOX_FIELDS, gridColumns, placedButtons, type BoxField, type ButtonBlock, type ButtonSpec, type LinkKind, type PartType, type Section, type TablePart, type TemplateLayout } from './templates'
 
 // 表のセクション(種類 'table'。T8、docs/TEMPLATE_OBJECTS.md)の計算と操作。
 // 部品は {列 c, 行 r, 幅 w, 高さ h} で、表をすき間なく敷き詰める(空いた所は「空き」の部品)。
@@ -37,6 +37,48 @@ export const newPart = (type: PartType, c: number, r: number, w = 1, h = 1): Tab
 export const isTable = (sec: Section) => sec.kind === 'table'
 export const partsOf = (sec: Section): TablePart[] => sec.parts ?? []
 const byPosition = (a: { r: number; c: number }, b: { r: number; c: number }) => a.r - b.r || a.c - b.c
+
+// ---- 箱の見せ方(出すもの・価格の見せ方・バッジ)
+
+/** 見せ方ごとの、出すものの既定(以前の描き方と同じになるように) */
+const DEFAULT_FIELDS: Record<CellView, BoxField[]> = {
+  card: ['name', 'price'],
+  photo: [],
+  detail: ['name', 'desc', 'price', 'button'],
+  story: ['name', 'price', 'desc'],
+}
+/** 箱に出すもの(設定がなければ、見せ方の既定) */
+export const boxFields = (p: Pick<TablePart, 'view' | 'fields'>): BoxField[] => p.fields ?? DEFAULT_FIELDS[p.view ?? 'card']
+export const boxFieldLabel = (f: BoxField): string =>
+  ({ name: tr('名前', 'Name'), price: tr('価格', 'Price'), badge: tr('バッジ', 'Badge'), desc: tr('説明', 'Description'), button: tr('ボタン', 'Button') })[f]
+export const priceStyleLabel = (v?: TablePart['priceStyle']): string =>
+  v === 'sale' ? tr('セール(元の価格に取り消し線)', 'Sale (original price struck through)') : v === 'from' ? tr('〜から', 'From …') : tr('ふつう', 'Regular')
+
+/** 箱の見本(よく使う組み合わせ。押すと、出すもの・価格の見せ方・バッジをまとめて入れる) */
+export interface BoxPreset {
+  id: string
+  label: () => string
+  view?: CellView
+  fields: BoxField[]
+  priceStyle?: TablePart['priceStyle']
+  badge?: string
+}
+export const BOX_PRESETS: BoxPreset[] = [
+  { id: 'standard', label: () => tr('標準(名前・価格)', 'Standard (name, price)'), fields: ['name', 'price'] },
+  { id: 'simple', label: () => tr('価格だけ', 'Price only'), fields: ['price'] },
+  { id: 'photo', label: () => tr('写真だけ', 'Photo only'), view: 'photo', fields: [] },
+  { id: 'sale', label: () => tr('セール(セール価格・SALE)', 'Sale (sale price, SALE)'), fields: ['name', 'price', 'badge'], priceStyle: 'sale', badge: 'SALE' },
+  { id: 'new', label: () => tr('新作(NEW)', 'New (NEW)'), fields: ['name', 'price', 'badge'], badge: 'NEW' },
+  { id: 'detail', label: () => tr('詳しく(説明・ボタン)', 'Detailed (description, button)'), fields: ['name', 'price', 'desc', 'button'] },
+]
+/** 見本を当てたときの、箱の設定(見せ方は、写真だけの見本のときと、写真だけから戻すときだけ変える) */
+export function presetPatch(p: TablePart, preset: BoxPreset): Partial<TablePart> {
+  const view = preset.view ?? (p.view === 'photo' ? undefined : p.view)
+  return { view, fields: preset.fields, priceStyle: preset.priceStyle, badge: preset.badge }
+}
+/** いまの設定が、どの見本と同じか(なければ undefined) */
+export const presetOf = (p: TablePart): BoxPreset | undefined =>
+  BOX_PRESETS.find((x) => (x.view ?? 'card') === (p.view === 'photo' ? 'photo' : x.view ?? 'card') && JSON.stringify(x.fields) === JSON.stringify(boxFields(p)) && (x.priceStyle ?? '') === (p.priceStyle ?? '') && (x.badge ?? '') === (p.badge ?? ''))
 
 /** 箱(商品の枠)を、商品の載る順(上の行から、同じ行は左から)に */
 export const boxesOf = (sec: Section): TablePart[] => partsOf(sec).filter((p) => p.type === 'box').sort(byPosition)
@@ -110,8 +152,8 @@ const retype = (p: TablePart, type: PartType): TablePart => ({ id: newPartId(typ
 
 /** 種類ごとの設定だけを写す(分割したマスに、もとの見せ方・文言を残すため) */
 const settingsOf = (p: TablePart): Partial<TablePart> => {
-  const { view, aiNote, label, style, link, track, text, overridable } = p
-  return Object.fromEntries(Object.entries({ view, aiNote, label, style, link, track, text, overridable }).filter(([, v]) => v !== undefined))
+  const { view, aiNote, fields, priceStyle, badge, label, style, link, track, text, overridable } = p
+  return Object.fromEntries(Object.entries({ view, aiNote, fields, priceStyle, badge, label, style, link, track, text, overridable }).filter(([, v]) => v !== undefined))
 }
 
 /** 選んだ範囲を 1 つの部品にまとめる。中身は、左上(空きなら、最初の中身のある部品)のものを残し、新しい ID にする */
@@ -376,6 +418,10 @@ export function parsePart(raw: unknown): TablePart | null {
     if (CELL_VIEWS.includes(o.view as CellView) && o.view !== 'card') part.view = o.view as CellView
     const note = str(o.aiNote, 300)
     if (note) part.aiNote = note
+    if (Array.isArray(o.fields)) part.fields = BOX_FIELDS.filter((f) => (o.fields as unknown[]).includes(f))
+    if (o.priceStyle === 'sale' || o.priceStyle === 'from') part.priceStyle = o.priceStyle
+    const badge = str(o.badge, 12)
+    if (badge) part.badge = badge
   } else if (type === 'button') {
     const label = str(o.label, 30)
     if (label) part.label = label

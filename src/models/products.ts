@@ -53,6 +53,8 @@ export interface ProductFields {
   product_code?: string
   category?: ProductCategory
   price?: number
+  /** 元の価格(セールの前の価格。任意)。テンプレートの箱で「セール」の見せ方を選んだとき、取り消し線で出す */
+  regular_price?: number
   stock?: number
   season?: ProductSeason
   sales_trend?: ProductSalesTrend

@@ -14,8 +14,8 @@ import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
-import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section, type TablePart } from './templates'
-import { boxesOf } from './tables'
+import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart } from './templates'
+import { boxFields, boxesOf } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { locale, optionLabel, useT } from './i18n'
@@ -413,6 +413,75 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     )
   }
 
+  // ---- 表の箱(T8): テンプレートで決めた「出すもの」・価格の見せ方・バッジで描く(以前の種類のタイルは、そのまま)
+  const boxTile = (it: Item, idx: number, part: TablePart, j: number) => {
+    const p = byId.get(it.productId)
+    const fields = boxFields(part)
+    const has = (f: BoxField) => fields.includes(f)
+    const market = productMarket(p)
+    const sale = part.priceStyle === 'sale'
+    const regular = sale && p?.regular_price && p.price !== undefined && p.regular_price > p.price ? p.regular_price : undefined
+    const price = has('price') && (
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+        {regular !== undefined && <span style={{ fontSize: '0.72rem', color: SUB, textDecoration: 'line-through' }}>{yen(regular, market)}</span>}
+        <span style={{ fontSize: sale ? '0.95rem' : '0.8rem', fontWeight: sale ? 800 : 700, color: sale || offer ? '#d32f2f' : INK }}>
+          {part.priceStyle === 'from' ? t(`${yen(p?.price, market)}〜`, `From ${yen(p?.price, market)}`) : yen(p?.price, market)}
+        </span>
+      </div>
+    )
+    const badgeText = part.badge?.trim() || 'NEW'
+    const badge = has('badge') && (
+      <span style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4, color: '#fff', backgroundColor: /sale|限定|off/i.test(badgeText) || sale ? '#d32f2f' : INK }}>{badgeText}</span>
+    )
+    const name = has('name') && <div className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, color: INK }}>{p?.name}</div>
+    const desc = has('desc') && p?.description && <div style={{ fontSize: '0.75rem', color: SUB, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
+    const button = has('button') && cta
+    const text = (name || price || desc || button) && (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        {name}
+        {price}
+        {desc}
+        {button}
+      </div>
+    )
+    const img = (style: React.CSSProperties) => <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...style }} />
+    // 文を写真の横に置く見せ方(特集・ストーリー)
+    if (part.view === 'detail' || part.view === 'story') {
+      const reverse = part.view === 'story' && j % 2 === 1
+      const body = <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: part.view === 'story' ? '12px 14px' : 0, minWidth: 0 }}>{text}</div>
+      const photo = <div style={{ position: 'relative' }}>{badge}{img({ aspectRatio: '3 / 4', borderRadius: part.view === 'story' ? 0 : 8 })}</div>
+      return (
+        <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), ...(part.view === 'story' ? { padding: 0, backgroundColor: '#f1f1f3' } : {}) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: part.view === 'story' ? '1fr 1fr' : '44% 1fr', gap: part.view === 'story' ? 0 : 12, alignItems: 'center' }}>
+            {reverse || part.view === 'detail' ? photo : body}
+            {reverse || part.view === 'detail' ? body : photo}
+          </div>
+          {controls(it, idx)}
+        </div>
+      )
+    }
+    // 大きい箱・写真だけ: 写真を枠いっぱいに敷き、文は下端の白い帯に
+    if (part.view === 'photo' || part.w * part.h > 1) {
+      return (
+        <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, height: '100%' }}>
+          {badge}
+          {img({ height: '100%' })}
+          {text && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 12px', borderRadius: '0 0 8px 8px', background: 'rgba(255,255,255,0.92)' }}>{text}</div>}
+          {controls(it, idx)}
+        </div>
+      )
+    }
+    // ふつうの箱: 写真の下に、名前・価格など
+    return (
+      <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={frameStyle(it, idx)}>
+        {badge}
+        {img({ aspectRatio: compact ? '1 / 1' : '3 / 4' })}
+        {text && <div style={{ marginTop: 4 }}>{text}</div>}
+        {controls(it, idx)}
+      </div>
+    )
+  }
+
   // 空きの枠: ここへドロップすると、末尾の空き枠から埋まる
   const emptySlot = (key: string, feature: boolean, shape?: React.CSSProperties, index = items.length) => (
     <div
@@ -724,16 +793,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             const j = boxNo.get(p.id) ?? 0
             const text = isTextView(p.view)
             const big = p.w * p.h > 1
-            const tile = (it: Item, idx: number) =>
-              p.view === 'detail'
-                ? featureTile(it, idx)
-                : p.view === 'story'
-                  ? storyRow(it, idx, j % 2 === 1)
-                  : p.view === 'photo'
-                    ? overlayPhoto(it, idx)
-                    : big
-                      ? overlayTile(it, idx, true)
-                      : gridTile(it, idx)
+            const tile = (it: Item, idx: number) => boxTile(it, idx, p, j)
             const fill = !text && (big || p.view === 'photo')
             return (
               <div style={fill ? { aspectRatio: `${p.w} / ${p.h}`, height: '100%', minHeight: 0 } : undefined}>

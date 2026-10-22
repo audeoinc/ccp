@@ -31,6 +31,10 @@ export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic',
 /** 表の部品の種類。箱 = 商品 1 点 */
 export type PartType = 'box' | 'button' | 'text' | 'empty'
 
+/** 箱に出すもの(写真のほか)。名前・価格は商品のデータから出す(テンプレートでは文言を打たない。値段の食い違いを防ぐため) */
+export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button'
+export const BOX_FIELDS: BoxField[] = ['name', 'price', 'badge', 'desc', 'button']
+
 /**
  * 表の部品(マス)。列 c・行 r(0 から)に置き、横 w・縦 h マス分を使う(結合したマスも 1 つの部品)。
  * id は、動かしても・中身の設定を変えても・版が変わっても同じ。形が変わったら(結合・分割・種類の変更・複製)新しい ID にする
@@ -47,6 +51,12 @@ export interface TablePart {
   view?: CellView
   /** 箱: AI に伝える一言(この枠に、どんな商品を置くか) */
   aiNote?: string
+  /** 箱: 出すもの(省略は、見せ方の既定。tables.ts の boxFields) */
+  fields?: BoxField[]
+  /** 箱: 価格の見せ方(省略はふつう)。sale: 元の価格(商品の regular_price)に取り消し線 + 赤い価格 / from: 「〜から」 */
+  priceStyle?: 'sale' | 'from'
+  /** 箱: バッジの文言(出すものに badge があるとき。空は NEW) */
+  badge?: string
   /** ボタン: 文言(空は、既定の文言) */
   label?: string
   /** ボタン: 見た目(省略は fill) */

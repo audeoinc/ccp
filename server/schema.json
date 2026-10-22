@@ -70,6 +70,7 @@
     ["product_code", "text", {"index": true}],
     ["category", "choice"],
     ["price", "numeric"],
+    ["regular_price", "numeric"],
     ["stock", "int"],
     ["season", "choice"],
     ["sales_trend", "choice"],

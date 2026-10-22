@@ -3,6 +3,7 @@ import { makeStyles, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
 import { cellRows, isTextView } from './cells'
+import { boxFields } from './tables'
 
 // 見取り図は、受信側のメールの見た目を写したものなので、テーマに依らず固定の配色にする
 const HERO_COLOR: Record<HeroKind, string> = { standard: '#cfd2dc', collab: '#b9a9d6', offer: '#f0a5a0' }
@@ -183,8 +184,10 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                   )
                 }
                 return (
-                  <div key={p.id} style={{ ...area, display: 'grid', alignContent: 'end', background: p.w * p.h > 1 ? IMG : TILE }}>
-                    {p.view !== 'photo' && <div style={{ padding: px(2), background: 'rgba(255,255,255,0.85)' }}>{caption()}</div>}
+                  <div key={p.id} style={{ ...area, position: 'relative', display: 'grid', alignContent: 'end', background: p.w * p.h > 1 ? IMG : TILE }}>
+                    {/* 箱の「出すもの」: バッジは左上の小さな印、名前・価格は下の帯 */}
+                    {boxFields(p).includes('badge') && <div style={{ position: 'absolute', top: px(2), left: px(2), width: px(8), height: px(3), background: p.priceStyle === 'sale' ? RED : INK }} />}
+                    {(boxFields(p).includes('name') || boxFields(p).includes('price')) && <div style={{ padding: px(2), background: 'rgba(255,255,255,0.85)' }}>{caption()}</div>}
                   </div>
                 )
               }
