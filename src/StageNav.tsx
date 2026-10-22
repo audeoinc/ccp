@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import { Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronRightRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -55,6 +55,8 @@ interface Props {
   production?: ProductionRequest
   /** 押した段のフロートに切り替える(同じ配信のまま)。なければ、いまの段の札だけを出す */
   onGo?: (face: Face) => void
+  /** PLAN の札のすぐ右に置くもの(シンプルな配信カードの「直す | 渡す」。PLAN の中の切り替えなので、段の帯の中に置き、別の帯を作らない) */
+  planSlot?: ReactNode
 }
 
 /**
@@ -62,7 +64,7 @@ interface Props {
  * 3 つのフロート(配信カード・制作のページ・詳しい結果)の題名の左に出し、押すと同じ配信の隣の段に切り替える。
  * 段ごとに短い状態を添えるので、この配信がいまどこまで進んでいるかも分かる。まだ入れない段は押せない(承認前の制作、配信日前の結果)
  */
-export function StageNav({ face, card, production, onGo }: Props) {
+export function StageNav({ face, card, production, onGo, planSlot }: Props) {
   const s = useStyles()
   const t = useT()
   const pv = productionView(card, production)
@@ -108,6 +110,7 @@ export function StageNav({ face, card, production, onGo }: Props) {
             ) : (
               button
             )}
+            {x.face === 'calendar' && planSlot}
           </Fragment>
         )
       })}

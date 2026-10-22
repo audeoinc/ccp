@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { cloneElement, isValidElement, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Button, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, ArrowUndoRegular, ColumnTripleRegular, CommentRegular, PersonAvailableRegular, SettingsRegular, TaskListSquareLtrRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
@@ -14,7 +14,7 @@ import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
-import { statusColor, statusLabel, statusRank } from '../status'
+import { statusRank } from '../status'
 import { getTemplate, sectionsOf } from '../templates'
 import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
@@ -37,7 +37,9 @@ type Widths = { mobile: number; pc: number; list: number; comm: number }
 const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320 }
 // コミュニケーションのペインの開閉(既定は畳む。自分宛てのものがあれば、開いたときに広げる)
 const COMM_KEY = 'simpleCard.commOpen'
-type Stage = 'plan' | 'handoff' | 'production'
+// PLAN(配信カード)の中の見せ方: 直す(AI の下書きを直す・承認者とのやり取り)/ 渡す(制作に渡すもの)。
+// 制作・結果は、上の段の帯(PLAN › PRODUCTION › RESULTS)の側で、別のページに移る
+type Stage = 'plan' | 'handoff'
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
 // 目印の出し分け(人の設定)。学びは帯で場所を取るので、既定は隠す(隠していても、AI の依頼には渡す)
@@ -69,7 +71,6 @@ const useStyles = makeStyles({
   name: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '360px' },
   // 配信名だけは、狭いときに縮めて「…」にする(ほかの項目とボタンは、縮めない)
   nameField: { flexShrink: 1, minWidth: '80px' },
-  dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   grow: { flexGrow: 1 },
   state: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   saved: { color: tokens.colorPaletteGreenForeground1 },
@@ -138,11 +139,10 @@ const useStyles = makeStyles({
   candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  // 段階の切り替え(企画 → 渡す → 制作)
-  stages: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', flexShrink: 0, marginLeft: '6px' },
+  // PLAN の中の「直す | 渡す」(段の帯の PLAN の札のすぐ右)
+  stages: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', flexShrink: 0, marginLeft: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
   stageBtn: { border: 'none', padding: '3px 10px', borderRadius: '999px', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'pointer', whiteSpace: 'nowrap', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover, color: tokens.colorNeutralForeground1 } },
   stageOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
-  stageArrow: { color: tokens.colorNeutralForeground4, fontSize: '12px' },
   // 案のタブ(SU2)
   abRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px', minHeight: '28px' },
   abTab: { display: 'inline-flex', alignItems: 'center', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
@@ -185,13 +185,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     stageChosen.current = true
     setStage(v)
   }
-  // 制作に依頼してあれば、開いたときは「制作」
+  // 制作に依頼してあれば、開いたときは「渡す」(渡したものを読むだけで見せる)
   useEffect(() => {
     let alive = true
     void ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${e.card.id}'` }).then((r) => {
       if (!alive || !r.success || stageChosen.current) return
       const latest = [...(r.data ?? [])].sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0))[0]
-      if (latest && ['requested', 'in_progress', 'done', 'checked', 'sent'].includes(latest.status ?? '')) setStage('production')
+      if (latest && ['requested', 'in_progress', 'done', 'checked', 'sent'].includes(latest.status ?? '')) setStage('handoff')
     })
     return () => {
       alive = false
@@ -315,38 +315,36 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const tpl = getTemplate(e.template)
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時 未設定', 'No send date')
 
+  const modeSwitch = (
+    <span className={s.stages} role="tablist" aria-label={t('配信カードの見せ方', 'Card mode')}>
+      {(
+        [
+          ['plan', t('直す', 'Edit'), t('AI の下書きを直し、承認者とやり取りする', 'Edit the AI draft and work with approvers')],
+          ['handoff', t('渡す', 'Hand off'), t('制作に渡すもの(文章・参考の画像と URL・担当と締め切り)。承認の前でも開けます', 'What goes to production (notes, reference images and URLs, assignee and due date). Available before approval')],
+        ] as const
+      ).map(([v, label, hint]) => (
+        <Tooltip key={v} content={hint} relationship="description">
+          <button type="button" role="tab" aria-selected={stage === v} className={mergeClasses(s.stageBtn, stage === v && s.stageOn)} onClick={() => chooseStage(v)}>
+            {label}
+          </button>
+        </Tooltip>
+      ))}
+    </span>
+  )
+
   return (
     <div className={s.root}>
       <div className={s.top}>
-        {e.stageNav}
+        {/* 段の帯(PLAN › PRODUCTION › RESULTS)の PLAN の中に、「直す | 渡す」を入れる(帯を 2 本にしない。ステータスも PLAN の札に出ているので、ここには出さない) */}
+        {isValidElement<{ planSlot?: ReactNode }>(e.stageNav) ? cloneElement(e.stageNav, { planSlot: modeSwitch }) : (
+          <>
+            {e.stageNav}
+            {modeSwitch}
+          </>
+        )}
         <ChannelBadge channel={e.form.channel} />
         {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
         {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
-        {field(
-          { kind: 'meta', field: 'status' },
-          <>
-            <span className={s.dot} style={{ backgroundColor: statusColor(e.form.status) }} />
-            <span>{statusLabel(e.form.status)}</span>
-          </>,
-          t('ステータスを直す', 'Edit the status'),
-        )}
-        {/* 段階の切り替え(承認の前でも押せる) */}
-        <span className={s.stages} role="tablist" aria-label={t('段階', 'Stage')}>
-          {(
-            [
-              ['plan', t('企画', 'Plan')],
-              ['handoff', t('渡す', 'Hand off')],
-              ['production', t('制作', 'Production')],
-            ] as const
-          ).map(([v, label], i) => (
-            <span key={v} style={{ display: 'contents' }}>
-              {i > 0 && <ChevronRightRegular className={s.stageArrow} />}
-              <button type="button" role="tab" aria-selected={stage === v} className={mergeClasses(s.stageBtn, stage === v && s.stageOn)} onClick={() => chooseStage(v)}>
-                {label}
-              </button>
-            </span>
-          ))}
-        </span>
         <span className={s.grow} />
         {/* 反映の様子: 保存中 / 保存しました / 未反映の変更あり */}
         {e.saving ? (
@@ -600,7 +598,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         ) : (
           // 渡す・制作: 制作に渡すもの(文章・参考の画像と URL・担当と締め切り)の 1 枚。プレビューは見本として残す
           <div className={s.pane}>
-            <HandoffSheet editor={e} stage={stage} onCommit={onCommit} onPassed={() => chooseStage('production')} />
+            <HandoffSheet editor={e} onCommit={onCommit} />
           </div>
         )}
 

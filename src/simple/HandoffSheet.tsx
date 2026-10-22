@@ -28,14 +28,10 @@ const useStyles = makeStyles({
 
 interface Props {
   editor: SimpleEditor
-  /** 渡す段階(渡す前)か、渡したあと(制作中。読むだけ) */
-  stage: 'handoff' | 'production'
   /** 渡す前に、直した中身を反映(保存)する */
   onCommit: () => Promise<void>
   /** 制作の依頼の最新の版を読んだとき(段階を決めるため) */
   onRequest?: (req: ProductionRequest | undefined) => void
-  /** 「制作に渡す」を押したとき(段階を「制作」にする) */
-  onPassed?: () => void
 }
 
 /**
@@ -44,13 +40,15 @@ interface Props {
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
-export function HandoffSheet({ editor: e, stage, onCommit, onRequest, onPassed }: Props) {
+export function HandoffSheet({ editor: e, onCommit, onRequest }: Props) {
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
   const [turns, setTurns] = useState<PartTurn[]>([])
   const [busy, setBusy] = useState(false)
+  // 「制作に渡す」を押したあと、依頼ができたかを読み直す回数(制作のページで HTML を作ってから依頼するので、少し遅れる)
+  const [poll, setPoll] = useState(0)
   // 渡す文章の案を仮に写している間の、元の文章
   const original = useRef<string | null>(null)
 
@@ -68,16 +66,23 @@ export function HandoffSheet({ editor: e, stage, onCommit, onRequest, onPassed }
     }
     // 段階を決める onRequest は、読んだときに 1 回知らせるだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [e.card.id, e.card.status])
+  }, [e.card.id, e.card.status, poll])
 
   const view = productionView(e.card, req)
   const requested = view !== 'draft' && view !== 'stale' && view !== 'not_approved'
+  // 渡したあとは、渡したものを読むだけで見せる(直すと、制作に依頼し直しになるため。直すときは「直す」で)
+  const readOnly = requested
+  useEffect(() => {
+    if (poll === 0 || requested || poll > 20) return
+    const timer = window.setTimeout(() => setPoll((n) => n + 1), 3000)
+    return () => window.clearTimeout(timer)
+  }, [poll, requested])
   const pass = async () => {
     setBusy(true)
     try {
       await onCommit()
       e.openProduction?.({ request: !requested })
-      onPassed?.()
+      setPoll(1)
     } finally {
       setBusy(false)
     }
@@ -101,7 +106,7 @@ export function HandoffSheet({ editor: e, stage, onCommit, onRequest, onPassed }
           <span className={s.num}>1</span>
           {t('渡す文章(制作指示)', 'Text for production (notes)')}
         </span>
-        {stage === 'production' ? (
+        {readOnly ? (
           <div className={s.read}>{e.form.instructions.trim() ? <MarkdownLite text={e.form.instructions} /> : <span className={s.caption}>{t('(なし)', '(none)')}</span>}</div>
         ) : (
           <>
@@ -179,9 +184,9 @@ export function HandoffSheet({ editor: e, stage, onCommit, onRequest, onPassed }
         />
       </div>
 
-      {stage === 'handoff' && (
+      {(
         <div className={s.foot}>
-          <span className={s.caption}>{statusNote(e.card.status, t)}</span>
+          <span className={s.caption}>{readOnly ? t('渡したものを読むだけで出しています。直すときは「直す」で直し、制作のページで依頼し直します', 'Shown read-only after handoff. To change it, edit in “Edit” and request again on the production page') : statusNote(e.card.status, t)}</span>
           <Button appearance="primary" icon={<SendRegular />} disabled={busy || e.saving || !e.openProduction} onClick={() => void pass()}>
             {requested ? t('制作のページで続きを見る', 'Continue on the production page') : t('制作に渡す', 'Hand off to production')}
           </Button>
