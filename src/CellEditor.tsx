@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Button, Select, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, SplitVerticalRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowLeftRegular, ArrowRightRegular, SplitVerticalRegular, SubtractRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
-import { MAX_CELL_COLS, MAX_CELL_ROWS, cellAt, cellRows, mergeCells, normalizeCells, plainCells, splitCell, type Cell } from './cells'
+import { MAX_CELL_COLS, MAX_CELL_ROWS, cellAt, cellRows, mergeCells, moveCell, normalizeCells, plainCells, splitCell, type Cell } from './cells'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px' },
@@ -91,6 +91,17 @@ export function CellEditor({ cols, cells, maxSlots, onChange }: { cols: number; 
         <span className={s.count}>{rows}</span>
         <Button size="small" appearance="subtle" icon={<AddRegular />} disabled={!canAddRow} onClick={() => setRows(rows + 1)} aria-label={t('行を足す', 'Add a row')} />
         <span className={s.label}>{t(`枠 ${cells.length} 点`, `${cells.length} slots`)}</span>
+        {/* 番号(商品の載る順)を入れ替える。例: 右上の大きい枠を 1 番にする */}
+        {sel && selected !== null && (
+          <>
+            <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} disabled={selected === 0} onClick={() => { onChange(cols, moveCell(cells, selected, selected - 1)); setSelected(selected - 1) }}>
+              {t('番号を前に', 'Earlier')}
+            </Button>
+            <Button size="small" appearance="subtle" icon={<ArrowRightRegular />} iconPosition="after" disabled={selected === cells.length - 1} onClick={() => { onChange(cols, moveCell(cells, selected, selected + 1)); setSelected(selected + 1) }}>
+              {t('番号を後に', 'Later')}
+            </Button>
+          </>
+        )}
         {sel && sel.w * sel.h > 1 && (
           <Button size="small" appearance="outline" icon={<SplitVerticalRegular />} onClick={() => { onChange(cols, splitCell(cols, rows, cells, selected!)); setSelected(null) }}>
             {t('この枠を分ける', 'Split this slot')}
@@ -125,7 +136,53 @@ export function CellEditor({ cols, cells, maxSlots, onChange }: { cols: number; 
           </div>
         ))}
       </div>
-      <span className={s.hint}>{t('マスをなぞると 1 つの枠にまとまります。枠を押して「この枠を分ける」で戻せます。番号は商品の載る順です。', 'Drag across cells to merge them into one slot. Click a slot and use "Split" to undo. Numbers show the order products appear in.')}</span>
+      <span className={s.hint}>{t('マスをなぞると 1 つの枠にまとまります。枠を押すと、番号(商品の載る順)を入れ替えたり、「この枠を分ける」で戻したりできます。', 'Drag across cells to merge them into one slot. Click a slot to change its number (the order products appear in) or split it.')}</span>
     </div>
   )
 }
+
+/**
+ * 箱の大きさを、マス目の上を指して選ぶ(Confluence の表の作成と同じ)。指したところまでが色付きになり、押すと、その大きさの箱を置く。
+ * 枠の上限を超える大きさは選べない
+ */
+export function BoxSizePicker({ maxSlots, onPick }: { maxSlots: number; onPick: (cols: number, rows: number) => void }) {
+  const s = usePickerStyles()
+  const t = useT()
+  const [hover, setHover] = useState<[number, number]>([2, 2])
+  const rows = 4
+  return (
+    <div className={s.root}>
+      <span className={s.label}>{t(`箱の大きさ: ${hover[0]} 列 × ${hover[1]} 行`, `Box size: ${hover[0]} × ${hover[1]}`)}</span>
+      <div className={s.grid} style={{ gridTemplateColumns: `repeat(${MAX_CELL_COLS}, 22px)` }} onMouseLeave={() => setHover([2, 2])}>
+        {Array.from({ length: rows * MAX_CELL_COLS }, (_, i) => {
+          const c = (i % MAX_CELL_COLS) + 1
+          const r = Math.floor(i / MAX_CELL_COLS) + 1
+          const ok = c * r <= maxSlots
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={!ok}
+              className={mergeClasses(s.sq, c <= hover[0] && r <= hover[1] && s.on, !ok && s.off)}
+              aria-label={t(`${c} 列 × ${r} 行`, `${c} × ${r}`)}
+              onMouseEnter={() => ok && setHover([c, r])}
+              onFocus={() => ok && setHover([c, r])}
+              onClick={() => onPick(c, r)}
+            />
+          )
+        })}
+      </div>
+      <span className={s.hint}>{t(`枠は 1 つの箱に ${maxSlots} 点まで`, `Up to ${maxSlots} slots per box`)}</span>
+    </div>
+  )
+}
+
+const usePickerStyles = makeStyles({
+  root: { display: 'grid', rowGap: '6px', padding: '4px' },
+  label: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
+  grid: { display: 'grid', gap: '3px' },
+  sq: { width: '22px', height: '22px', padding: 0, borderRadius: '3px', border: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer' },
+  on: { backgroundColor: tokens.colorBrandBackground2, border: `1px solid ${tokens.colorBrandStroke1}` },
+  off: { opacity: 0.35, cursor: 'not-allowed' },
+  hint: { fontSize: '11px', color: tokens.colorNeutralForeground3 },
+})

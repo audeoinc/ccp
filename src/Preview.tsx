@@ -15,7 +15,7 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type Section } from './templates'
-import { cellRows } from './cells'
+import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { locale, optionLabel, useT } from './i18n'
 
@@ -360,6 +360,17 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     )
   }
 
+  // 箱の「写真だけ」: 枠いっぱいに写真を敷く(名前・価格を出さない)
+  const overlayPhoto = (it: Item, idx: number) => {
+    const p = byId.get(it.productId)
+    return (
+      <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, height: '100%' }}>
+        <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', height: '100%' }} />
+        {controls(it, idx)}
+      </div>
+    )
+  }
+
   // ストーリー: 写真と、名前・価格・商品の説明を横に並べる。reverse で、写真を左にする
   const storyRow = (it: Item, idx: number, reverse: boolean) => {
     const p = byId.get(it.productId)
@@ -680,14 +691,23 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         )
       }
       case 'cells': {
-        // マス目: 1 マスは正方形。枠ごとに写真を敷き、名前・価格を重ねる(モザイクと同じ見せ方)。商品は、枠の並び(上から、左から)の順に載る
+        // 箱: 商品は、枠の並び(番号の順)に載る。写真の見せ方は 1 マスを正方形にし、説明を並べる見せ方は、文の高さに合わせる
         const cols = sec.cols ?? 2
         const rows = Math.max(1, cellRows(sec.cells ?? []))
+        const text = isTextView(sec.view)
+        const tile = (x: { w: number; h: number }, j: number) => (it: Item, idx: number) =>
+          sec.view === 'detail'
+            ? featureTile(it, idx)
+            : sec.view === 'story'
+              ? storyRow(it, idx, j % 2 === 1)
+              : sec.view === 'photo'
+                ? overlayPhoto(it, idx)
+                : overlayTile(it, idx, true, x.w * x.h === 1 && cols > 2)
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 8, aspectRatio: `${cols} / ${rows}` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 8, ...(text ? {} : { gridTemplateRows: `repeat(${rows}, 1fr)`, aspectRatio: `${cols} / ${rows}` }) }}>
             {(sec.cells ?? []).map((x, j) => (
               <div key={j} style={{ gridColumn: `${x.c + 1} / span ${x.w}`, gridRow: `${x.r + 1} / span ${x.h}`, minHeight: 0, minWidth: 0 }}>
-                {slot(j, (it, idx) => overlayTile(it, idx, true, x.w * x.h === 1 && cols > 2), { aspectRatio: 'auto', height: '100%' })}
+                {slot(j, tile(x, j), text ? undefined : { aspectRatio: 'auto', height: '100%' }, sec.view === 'detail')}
               </div>
             ))}
           </div>

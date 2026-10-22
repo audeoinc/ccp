@@ -12,6 +12,9 @@ import {
   Input,
   MessageBar,
   MessageBarBody,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   Select,
   Slider,
   Tab,
@@ -31,8 +34,8 @@ import { statusLabel, statusRank } from './status'
 import { PartThumb, TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import { Splitter } from './Splitter'
-import { CellEditor } from './CellEditor'
-import { CELL_PRESETS, cellPreset, type CellPreset } from './cells'
+import { BoxSizePicker, CellEditor } from './CellEditor'
+import { BOX_SAMPLES, CELL_VIEWS, boxSample, cellViewLabel, plainCells, type BoxSample, type CellView } from './cells'
 import {
   DEFAULT_PUSH_TEMPLATE,
   LINK_KINDS,
@@ -114,7 +117,7 @@ function fromParts(d: Draft): TemplateLayout {
  * 種類の選択肢。データでは、種類(kind)と、列の数(columns)・左右(flip)の組み合わせで表す。
  * 選び直したときは、その種類で 1 行(1 組)になる枠の数に合わせる(3 列なら 3 点、モザイクなら 3 点)
  */
-// cells: マス目(自由に組む)。cells:見本の ID は、パレットの見本から置くとき
+// cells: 箱(自由に組む)。cells:見本の ID は、パレットの箱の見本から置くとき
 type SectionLayout = 'grid' | 'grid3' | 'photos' | 'photos3' | 'wide' | 'mosaic' | 'mosaicR' | 'story' | 'feature' | 'cells' | `cells:${string}`
 const LAYOUTS: SectionLayout[] = ['grid', 'grid3', 'photos', 'photos3', 'wide', 'mosaic', 'mosaicR', 'story', 'feature', 'cells']
 const layoutValue = (sec: Section): SectionLayout => {
@@ -125,7 +128,7 @@ const layoutValue = (sec: Section): SectionLayout => {
 /** 構成の形(セクションの種類・列・左右・枠の数と、ボタンの位置・数)。同じなら、見た目の設定のほかは同じテンプレート */
 const shapeOf = (l: TemplateLayout) =>
   JSON.stringify([
-    l.sections.map((sec) => [layoutValue(sec), sec.slots, sec.kind === 'cells' ? [sec.cols, sec.cells] : null]),
+    l.sections.map((sec) => [layoutValue(sec), sec.slots, sec.kind === 'cells' ? [sec.cols, sec.cells, sec.view ?? 'card'] : null]),
     // 標準の古い形(ヒーローの後・セクションの後のボタンの数)も、置いた位置のボタンに直してから比べる
     placedButtons(l).filter((b) => b.buttons.length > 0).map((b) => [Math.max(0, Math.min(b.at, l.sections.length)), b.buttons.length]).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
   ])
@@ -183,8 +186,8 @@ const EDITOR_GAPS = 3 + 6 * 10
 /** 編集中の左の一覧の開け閉めを覚えておく所(その人のブラウザだけ) */
 const COMPARE_OPEN_KEY = 'ccp.templateCompareOpen'
 
-/** 見本のマス目から、セクションを作る */
-const cellsSection = (p: CellPreset): Section => ({ kind: 'cells', cols: p.cols, cells: p.cells.map((x) => ({ ...x })), slots: p.cells.length })
+/** 箱の見本から、セクションを作る */
+const cellsSection = (p: BoxSample): Section => ({ kind: 'cells', cols: p.cols, cells: p.cells.map((x) => ({ ...x })), slots: p.cells.length, ...(p.view ? { view: p.view } : {}) })
 const layoutSection = (v: SectionLayout): Section => {
   switch (v) {
     case 'grid3':
@@ -194,9 +197,9 @@ const layoutSection = (v: SectionLayout): Section => {
     case 'mosaicR':
       return { kind: 'mosaic', flip: true, slots: 3 }
     case 'cells':
-      return cellsSection(CELL_PRESETS[0])
+      return cellsSection(BOX_SAMPLES[0])
     default: {
-      if (v.startsWith('cells:')) return cellsSection(cellPreset(v.slice(6)) ?? CELL_PRESETS[0])
+      if (v.startsWith('cells:')) return cellsSection(boxSample(v.slice(6)) ?? BOX_SAMPLES[0])
       return { kind: v as Exclude<SectionKind, 'cells'>, slots: v === 'mosaic' ? 3 : v === 'wide' ? 1 : 2 }
     }
   }
@@ -595,7 +598,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     below: t('写真の下に置く', 'Below the photo'),
   }
   const layoutLabel = (v: SectionLayout) =>
-    v === 'cells' ? t('マス目(自由に組む)', 'Grid cells (build your own)') : v.startsWith('cells:') ? (cellPreset(v.slice(6))?.label() ?? '') : sectionKindLabel(layoutSection(v))
+    v === 'cells' ? t('箱(自由に組む)', 'Box (build your own)') : v.startsWith('cells:') ? (boxSample(v.slice(6))?.label() ?? '') : sectionKindLabel(layoutSection(v))
   const styleLabel = (b: ButtonSpec) => (b.style === 'outline' ? t('枠線', 'Outline') : t('塗り', 'Filled'))
 
   const close = () => {
@@ -770,18 +773,41 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     setDragKey(null)
     setDropAt(null)
   }
-  /** パレットの部品から、構成の部品を作る */
-  const newPart = (kind: SectionLayout | 'buttons'): Part =>
-    kind === 'buttons' ? { key: partKey(), type: 'buttons', buttons: [{ id: newButtonId(), style: 'outline' }] } : { key: partKey(), type: 'section', sec: layoutSection(kind) }
-  /** 上限(セクション 6・ボタンの部品 8)まで来ていれば、足せない */
-  const canAdd = (kind: SectionLayout | 'buttons') => (kind === 'buttons' ? blockCount < MAX_BUTTON_BLOCKS : sectionCount < MAX_SECTIONS)
-  const addPart = (kind: SectionLayout | 'buttons', at?: number) => {
-    if (!canAdd(kind)) return
+  /**
+   * パレットの部品の鍵: box(箱。大きさは選ぶ)・buttons・cells:見本の ID(箱の見本)・combo:ID(組み合わせの見本。いくつかの部品をまとめて置く)。
+   * 以前の部品の種類(grid など)の鍵も、そのまま使える
+   */
+  const combos = (): { id: string; keys: string[]; label: string; help: string }[] => [
+    { id: 'lead', keys: ['cells:wide1', 'cells:grid2'], label: t('主役 1 + 2 列', 'Lead item + 2 columns'), help: t('大きく 1 点のあとに、2 列で 4 点', 'One large item, then four in two columns') },
+    { id: 'featureGrid', keys: ['cells:feature2', 'cells:grid3'], label: t('特集 2 点 + 3 列', '2 features + 3 columns'), help: t('写真の横に説明を 2 点、そのあと 3 列で 6 点', 'Two features with text, then six in three columns') },
+    { id: 'bigButton', keys: ['cells:big4', 'buttons'], label: t('大 1 + 小 4 + ボタン', '1 large + 4 small + button'), help: t('新作と色違いを並べ、ボタンで一覧へ', 'A new item and its colors, then a button to the list') },
+    { id: 'story', keys: ['cells:story3', 'buttons'], label: t('ストーリー 3 点 + ボタン', 'Story (3) + button'), help: t('読ませる特集のあとにボタン', 'An editorial feature, then a button') },
+  ]
+  const partsFor = (key: string, size?: [number, number]): Part[] => {
+    if (key === 'buttons') return [{ key: partKey(), type: 'buttons', buttons: [{ id: newButtonId(), style: 'outline' }] }]
+    if (key === 'box') {
+      const [c, r] = size ?? [2, 2]
+      return [{ key: partKey(), type: 'section', sec: { kind: 'cells', cols: c, cells: plainCells(c, r), slots: c * r } }]
+    }
+    if (key.startsWith('combo:')) return (combos().find((x) => x.id === key.slice(6))?.keys ?? []).flatMap((k) => partsFor(k))
+    return [{ key: partKey(), type: 'section', sec: layoutSection(key as SectionLayout) }]
+  }
+  /** 上限(セクション 6・ボタンの部品 8)を超えるなら、足せない(組み合わせは、全部が入るときだけ) */
+  const canAdd = (key: string) => {
+    const ps = partsFor(key)
+    const secs = ps.filter((p) => p.type === 'section').length
+    return sectionCount + secs <= MAX_SECTIONS && blockCount + (ps.length - secs) <= MAX_BUTTON_BLOCKS
+  }
+  const addPart = (key: string, at?: number, size?: [number, number]) => {
+    if (!canAdd(key)) return
+    const ps = partsFor(key, size)
     setParts((list) => {
       const next = [...list]
-      next.splice(at ?? next.length, 0, newPart(kind))
+      next.splice(at ?? next.length, 0, ...ps)
       return next
     })
+    // 置いた部品(組み合わせなら最初の部品)を選び、右の設定で開く
+    selectPart(ps[0].key, true)
   }
   /** 落とした: パレットの部品なら足し、構成の部品なら動かす */
   const drop = () => {
@@ -790,7 +816,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     endDrag()
     if (!key || at === null) return
     if (key.startsWith('new:')) {
-      addPart(key.slice(4) as SectionLayout | 'buttons', at)
+      addPart(key.slice(4), at)
       return
     }
     setParts((list) => {
@@ -872,31 +898,33 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       </aside>
     )
 
-  /** パレットの部品の、まとまり・説明(マウスを重ねると出す) */
-  const PALETTE_GROUPS: { label: string; items: (SectionLayout | 'buttons')[] }[] = [
-    { label: t('商品を並べる', 'List products'), items: ['grid', 'grid3', 'feature'] },
-    { label: t('写真で見せる', 'Show photos'), items: ['photos', 'photos3', 'wide', 'mosaic', 'mosaicR'] },
-    // マス目は、見本から置いて、マス目を直して自由に組む
-    { label: t('マス目で組む(見本)', 'Grid cells (samples)'), items: CELL_PRESETS.map((p): SectionLayout => `cells:${p.id}`) },
-    { label: t('読ませる', 'Tell a story'), items: ['story'] },
-    { label: t('ボタン', 'Buttons'), items: ['buttons'] },
+  /** パレットの部品の、まとまり(ベース部品 → 見本)。ベース部品で何でも組め、よく使う形は見本から置ける */
+  const paletteGroups = (): { label: string; items: string[] }[] => [
+    { label: t('ベース部品', 'Base parts'), items: ['box', 'buttons'] },
+    { label: t('サンプル(箱)', 'Samples (box)'), items: BOX_SAMPLES.map((p) => `cells:${p.id}`) },
+    { label: t('サンプル(組み合わせ)', 'Samples (combinations)'), items: combos().map((c) => `combo:${c.id}`) },
   ]
-  const partHelp = (k: SectionLayout | 'buttons'): string =>
-    k.startsWith('cells:')
-      ? `${cellPreset(k.slice(6))?.help() ?? ''}${t('(置いたあと、マス目を直せます)', ' (you can edit the cells after placing it)')}`
-      : ({
-      grid: t('名前・価格つきで、2 列に並べる。いちばん使う形', 'Two columns with names and prices. The most common layout'),
-      grid3: t('名前・価格つきで、3 列に並べる。点数を多く見せたいとき', 'Three columns with names and prices. To show more items'),
-      feature: t('写真と説明を横に並べて、1 点ずつ紹介する', 'Photo and text side by side, one item at a time'),
-      photos: t('写真だけを 2 列に。雰囲気で見せたいとき', 'Photos only, two columns. For mood'),
-      photos3: t('写真だけを 3 列に。たくさんの色・柄を見せたいとき', 'Photos only, three columns. For many colors or patterns'),
-      wide: t('全幅で 1 点ずつ大きく。主役の商品に', 'Full width, one item each. For hero products'),
-      mosaic: t('大 1 点 + 小 2 点。新作を 1 点大きく見せたいとき(左が大)', 'One large + two small (large on the left). To feature one new item'),
-      mosaicR: t('大 1 点 + 小 2 点(右が大)。モザイクを続けるときに左右を変える', 'One large + two small (large on the right). Alternate with the left one'),
-      story: t('写真と商品の説明を、左右交互に。読ませる特集に', 'Photo and description, alternating sides. For editorial features'),
-      buttons: t('ボタンを置く(1〜2 個)。セクションの間の好きな位置に', 'Place buttons (1–2) anywhere between sections'),
-      cells: t('列と行を決め、マスをなぞって枠をまとめる', 'Choose columns and rows, then drag to merge cells'),
-    } as Record<string, string>)[k] ?? ''
+  const paletteName = (k: string): string =>
+    k === 'box'
+      ? t('箱', 'Box')
+      : k === 'buttons'
+        ? t('ボタン', 'Buttons')
+        : k.startsWith('combo:')
+          ? (combos().find((c) => c.id === k.slice(6))?.label ?? '')
+          : layoutLabel(k as SectionLayout)
+  const partHelp = (k: string): string =>
+    k === 'box'
+      ? t('押して、マス目で列と行を選んで置く(ドラッグすると 2 × 2)。置いたあと、なぞって枠をまとめ、見せ方を選べる', 'Click to pick columns and rows (drag places a 2 × 2). Then merge cells and choose how items look')
+      : k === 'buttons'
+        ? t('ボタンを置く(1〜2 個)。セクションの間の好きな位置に', 'Place buttons (1–2) anywhere between sections')
+        : k.startsWith('combo:')
+          ? `${combos().find((c) => c.id === k.slice(6))?.help ?? ''}${t('(まとめて置き、あとで 1 つずつ直せます)', ' (placed together; edit each part afterwards)')}`
+          : `${boxSample(k.slice(6))?.help() ?? ''}${t('(置いたあと、マス目と見せ方を直せます)', ' (edit the cells and look after placing it)')}`
+  const [boxPickerOpen, setBoxPickerOpen] = useState(false)
+  /** 部品の絵(組み合わせは、部品を縦に重ねる) */
+  const paletteThumb = (k: string) =>
+    // 描くたびに部品の key が新しくなるので、絵の key は並びの番号にする(描き直しで作り直さないように)
+    partsFor(k).map((p, i) => (p.type === 'section' ? <PartThumb key={i} sec={p.sec} width={56} /> : <PartThumb key={i} buttons={[{ id: 'a' }, { id: 'b', style: 'outline' }]} width={56} />))
   /** 部品の列(一覧の右): 上限の目盛りと、絵つきの部品のパレット(構成・キャンバスへドラッグ。押すと、いちばん下に足す) */
   const paletteCol = () => (
     <aside className={s.paletteCol} aria-label={t('部品', 'Parts')}>
@@ -906,11 +934,11 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
         <span className={s.meterItem}>{t(`商品の枠 ${totalSlots} 点`, `${totalSlots} product slots`)}</span>
       </div>
       <span className={s.paletteHead}>{t('部品(キャンバスや構成へドラッグ。押すと、いちばん下に足す)', 'Parts (drag onto the canvas or the layout; click to add at the bottom)')}</span>
-      {PALETTE_GROUPS.map((g) => (
+      {paletteGroups().map((g) => (
         <div key={g.label} className={s.paletteGroup}>
           <span className={s.paletteGroupHead}>{g.label}</span>
-          {g.items.map((k) => (
-            <Tooltip key={k} relationship="description" positioning="after" content={canAdd(k) ? partHelp(k) : t('上限まで使っています', 'Limit reached')}>
+          {g.items.map((k) => {
+            const item = (
               <div
                 role="button"
                 tabIndex={0}
@@ -923,21 +951,39 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                   setDragKey(`new:${k}`)
                 }}
                 onDragEnd={endDrag}
-                onClick={() => addPart(k)}
+                onClick={() => (k === 'box' ? setBoxPickerOpen(canAdd(k)) : addPart(k))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    addPart(k)
+                    if (k === 'box') setBoxPickerOpen(canAdd(k))
+                    else addPart(k)
                   }
                 }}
               >
-                <span className={s.paletteThumb}>
-                  {k === 'buttons' ? <PartThumb buttons={[{ id: 'a' }, { id: 'b', style: 'outline' }]} width={56} /> : <PartThumb sec={layoutSection(k)} width={56} />}
-                </span>
-                <span className={s.paletteName}>{k === 'buttons' ? t('ボタン', 'Buttons') : layoutLabel(k)}</span>
+                <span className={s.paletteThumb}>{paletteThumb(k)}</span>
+                <span className={s.paletteName}>{paletteName(k)}</span>
               </div>
-            </Tooltip>
-          ))}
+            )
+            // 箱は、押すとマス目で大きさを選ぶ(Confluence の表の作成と同じ)
+            return k === 'box' ? (
+              <Popover key={k} open={boxPickerOpen} onOpenChange={(_, d) => setBoxPickerOpen(d.open)} positioning="after" withArrow>
+                <PopoverTrigger disableButtonEnhancement>{item}</PopoverTrigger>
+                <PopoverSurface>
+                  <BoxSizePicker
+                    maxSlots={MAX_SLOTS}
+                    onPick={(c, r) => {
+                      setBoxPickerOpen(false)
+                      addPart('box', undefined, [c, r])
+                    }}
+                  />
+                </PopoverSurface>
+              </Popover>
+            ) : (
+              <Tooltip key={k} relationship="description" positioning="after" content={canAdd(k) ? partHelp(k) : t('上限まで使っています', 'Limit reached')}>
+                {item}
+              </Tooltip>
+            )
+          })}
         </div>
       ))}
     </aside>
@@ -1251,6 +1297,15 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
               ))}
             </Select>
           </Field>
+          {sec.kind === 'cells' && (
+            <Field label={t('見せ方', 'Look')}>
+              <Select size="small" className={s.fill} value={sec.view ?? 'card'} onChange={(_, d) => patchSection(p.key, { view: d.value === 'card' ? undefined : (d.value as CellView) })}>
+                {CELL_VIEWS.map((v) => (
+                  <option key={v} value={v}>{cellViewLabel(v)}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
           {sec.kind === 'cells' ? (
             <div className={s.cellsField}>
               <CellEditor cols={sec.cols ?? 2} cells={sec.cells ?? []} maxSlots={MAX_SLOTS} onChange={(cols, cells) => patchSection(p.key, { cols, cells, slots: cells.length })} />
@@ -1672,8 +1727,8 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                           ghost: (() => {
                             if (!dragKey) return undefined
                             if (dragKey.startsWith('new:')) {
-                              const k = dragKey.slice(4) as SectionLayout | 'buttons'
-                              return k === 'buttons' ? { buttons: [{ id: 'g', style: 'outline' as const }] } : { sec: layoutSection(k) }
+                              const p0 = partsFor(dragKey.slice(4))[0]
+                              return !p0 ? undefined : p0.type === 'section' ? { sec: p0.sec } : { buttons: p0.buttons }
                             }
                             const p = draft.parts.find((x) => x.key === dragKey)
                             return p ? (p.type === 'section' ? { sec: p.sec } : { buttons: p.buttons }) : undefined

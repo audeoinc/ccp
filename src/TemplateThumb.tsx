@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode 
 import { makeStyles, mergeClasses, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
-import { cellRows } from './cells'
+import { cellRows, isTextView } from './cells'
 
 // 見取り図は、受信側のメールの見た目を写したものなので、テーマに依らず固定の配色にする
 const HERO_COLOR: Record<HeroKind, string> = { standard: '#cfd2dc', collab: '#b9a9d6', offer: '#f0a5a0' }
@@ -39,6 +39,7 @@ const useStyles = makeStyles({
   dropEnd: { minHeight: '14px', borderRadius: '2px' },
   dropEndOn: { outline: `1.5px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   ghost: { opacity: 0.45, outline: `1.5px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '1px', borderRadius: '2px', pointerEvents: 'none' },
+  secNo: { position: 'absolute', top: '2px', left: '2px', zIndex: 1, fontSize: '10px', fontWeight: tokens.fontWeightSemibold, lineHeight: '14px', padding: '0 4px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand, pointerEvents: 'none' },
   tools: { position: 'absolute', top: '2px', right: '2px', zIndex: 1, display: 'flex', columnGap: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow8 },
 })
 
@@ -153,13 +154,37 @@ function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }:
         ))
         break
       case 'cells': {
-        // マス目: 1 マスは正方形。まとめた枠(2 マス以上)は写真の色、1 マスは薄い色
+        // 箱: 1 マスは正方形(説明を並べる見せ方は、横長の行)。見せ方ごとに、写真・名前・説明の線を描く
         const cols = sec.cols ?? 2
         const rows = Math.max(1, cellRows(sec.cells ?? []))
+        const text = isTextView(sec.view)
+        const lines = (
+          <div style={{ display: 'grid', alignContent: 'center', gap: px(1.5), padding: px(2) }}>
+            <div style={{ height: px(2), width: '80%', background: INK }} />
+            <div style={{ height: px(1.5), width: '90%', background: LINE }} />
+            <div style={{ height: px(1.5), width: '40%', background: offer ? RED : LINE }} />
+          </div>
+        )
         body = (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: px(2), aspectRatio: `${cols} / ${rows}` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: px(2), aspectRatio: text ? `${cols * 2} / ${rows}` : `${cols} / ${rows}` }}>
             {(sec.cells ?? []).map((x, j) => (
-              <div key={j} style={{ background: x.w * x.h > 1 ? IMG : TILE, gridColumn: `${x.c + 1} / span ${x.w}`, gridRow: `${x.r + 1} / span ${x.h}` }} />
+              <div key={j} style={{ gridColumn: `${x.c + 1} / span ${x.w}`, gridRow: `${x.r + 1} / span ${x.h}`, minHeight: 0, display: 'grid', ...(text ? { gridTemplateColumns: '1fr 1fr', background: PANEL } : { background: x.w * x.h > 1 ? IMG : TILE, alignContent: 'end' }) }}>
+                {text ? (
+                  sec.view === 'story' && j % 2 === 1 ? (
+                    <>
+                      <div style={{ background: IMG }} />
+                      {lines}
+                    </>
+                  ) : (
+                    <>
+                      {sec.view === 'story' ? lines : <div style={{ background: TILE }} />}
+                      {sec.view === 'story' ? <div style={{ background: IMG }} /> : lines}
+                    </>
+                  )
+                ) : (
+                  sec.view !== 'photo' && <div style={{ padding: px(2), background: 'rgba(255,255,255,0.85)' }}>{caption()}</div>
+                )}
+              </div>
             ))}
           </div>
         )
@@ -253,7 +278,8 @@ function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }:
     if (!edit) return null
     const out: ReactNode[] = []
     let n = 0
-    const box = (node: ReactNode, key: string) => {
+    // セクションの箱には、左上に番号(S1, S2…)を出す(配信カードのセクションのタブ・AI の選定と同じ単位なので)
+    const box = (node: ReactNode, key: string, secNo?: number) => {
       const i = n++
       out.push(
         <div
@@ -266,6 +292,7 @@ function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }:
           }}
         >
           {edit.dropAt === i && ghostAt()}
+          {secNo !== undefined && <span className={s.secNo}>{`S${secNo}`}</span>}
           {node}
           {edit.selected === i && <div className={s.tools}>{edit.tools(i)}</div>}
         </div>,
@@ -273,7 +300,7 @@ function Thumb({ layout, free = false, width = BASE_WIDTH, edit, bare = false }:
     }
     buttonsAt(blocks, 0, layout.sections.length).forEach((b, j) => box(pills(b, j), `b0-${j}`))
     layout.sections.forEach((sec, i) => {
-      box(section(sec, i), `s${i}`)
+      box(section(sec, i), `s${i}`, i + 1)
       buttonsAt(blocks, i + 1, layout.sections.length).forEach((b, j) => box(pills(b, j), `b${i + 1}-${j}`))
     })
     out.push(
