@@ -49,7 +49,7 @@ import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
 import { campaignId, campaignSlug, encodeLinks, productContent, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links, utmFor, variantCampaign } from './links'
 import { LinkOverlay } from './LinkOverlay'
-import { loadAutoDraft, loadPref, savePref } from './settings'
+import { loadAutoDraft, loadPref, loadSimpleCard, savePref, saveSimpleCard } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { WeeksService, type WeekRow } from './data/weeks'
@@ -82,6 +82,7 @@ import { SimpleCardLayout } from './simple/SimpleCardLayout'
 import type { FloatAction, SimpleEditor } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
+import { ViewSwitch } from './simple/ViewSwitch'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -137,8 +138,6 @@ interface Props {
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
   onNext?: () => void
-  /** シンプルな配信カード(SU1)で開く(ヘッダーのトグル。保存済みの配信だけ。新規作成・まとめて作った案は今の画面) */
-  simple?: boolean
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -497,13 +496,19 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext, simple = false }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
-  // シンプルな配信カード(SU1)で描くか。「⋯」→「詳しい画面へ」で、この配信だけ今の配信カードにする(トグルは変えない)
-  const [detailed, setDetailed] = useState(false)
-  const simpleOn = simple && !!card && !detailed
+  // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
+  // 保存済みの配信だけ(新規作成・まとめて作った案は、自動の反映で新しい配信を作らないよう、詳しい画面)
+  const [simpleView, setSimpleView] = useState(loadSimpleCard)
+  const simpleOn = simpleView && !!card
+  /** 見せ方を替える。remember が false のとき(次にやることのボタンで、承認・依頼のために詳しい画面へ移るとき)は、次に開くときの見せ方を変えない */
+  const changeView = (v: boolean, remember = true) => {
+    setSimpleView(v)
+    if (remember) saveSimpleCard(v)
+  }
   const [items, setItems] = useState<Item[]>(() => draft?.items ?? [])
   // 選定候補(配信商品テーブルの「候補」の行。セクションごと)
   const [candidates, setCandidates] = useState<Candidate[]>(() => draft?.candidates ?? [])
@@ -1818,7 +1823,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const nextStep = nextStepOf({ status: form.status, aiUnchecked: !!card?.ai_unchecked_at, handedOff: !!form.handedOffAt })
   /** 詳しい画面(今の配信カード)で続ける。コミュニケーションの段階(d)ができるまで、承認・制作への依頼はこちらで */
   const openDetailed = (tab?: TalkTab) => {
-    setDetailed(true)
+    changeView(false, false)
     if (!processOpen) toggleProcess()
     if (tab) setTabRequest((r) => ({ tab, seq: (r?.seq ?? 0) + 1 }))
   }
@@ -2031,18 +2036,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     {t('結果を見る', 'View results')}
                   </MenuItem>
                 )}
-                <MenuItem icon={<MailRegular />} onClick={() => openDetailed()}>
-                  {t('詳しい画面へ(この配信だけ、今の配信カードで)', 'Open full view (this delivery only)')}
-                </MenuItem>
               </>
             }
           />
         ),
         stageNav,
+        viewSwitch: <ViewSwitch simple onChange={changeView} />,
         preview: simplePreview,
         device: previewDevice,
         setDevice: pickDevice,
-        zoomControls: zoomBox,
+        zoom: { mode: zoom, shown: shownZoom, set: setZoom, min: ZOOM_MIN, max: ZOOM_MAX },
         notices: (
           <>
             {noticesNode}
@@ -2118,6 +2121,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               </Button>
             )}
             {/* この配信カードを開くリンク(保存済みの配信だけ。X36) */}
+            {card && <ViewSwitch simple={false} onChange={changeView} />}
             {card && <CopyLinkButton />}
             {/* 複製・取りやめ・削除(保存済みの配信だけ) */}
             {card && (

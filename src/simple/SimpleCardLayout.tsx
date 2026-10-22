@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Badge, Button, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -8,23 +8,27 @@ import { Splitter } from '../Splitter'
 import { ImageThumb } from '../ImageThumb'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
-import { locale, optionLabel, useT } from '../i18n'
+import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
-import { countryOptions, statusColor, statusLabel } from '../status'
+import { statusColor, statusLabel } from '../status'
 import { getTemplate } from '../templates'
-import { targetText } from '../target'
 import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
 import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
 import { partKey, samePart, type PartRef } from './parts'
+import { usePreviewNav } from './usePreviewNav'
 import type { SimpleEditor } from './editor'
 
-// 選んだ部品・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)
-const WIDTH_KEY = 'simpleCard.paneWidths.v1'
+// プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
+// プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
+const WIDTH_KEY = 'simpleCard.paneWidths.v2'
 const PRODUCTS_KEY = 'simpleCard.productsOpen'
 const RAIL_W = 32
-const clampW = (v: number) => Math.min(640, Math.max(240, v))
+type Widths = { mobile: number; pc: number; list: number }
+const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300 }
+const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
+const clampList = (v: number) => Math.min(640, Math.max(240, v))
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
@@ -54,35 +58,19 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1 },
   state: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   saved: { color: tokens.colorPaletteGreenForeground1 },
-  // 概要の帯: 送られる中身と見間違えないよう、メールの枠の外に、地の色を変えて置く
-  overview: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: '4px',
-    rowGap: '4px',
-    padding: '6px 20px',
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  overviewLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginRight: '4px', whiteSpace: 'nowrap' },
-  chip: { fontSize: tokens.fontSizeBase200, maxWidth: '320px' },
-  chipKey: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  chipVal: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  empty: { color: tokens.colorNeutralForeground4 },
   notices: { display: 'grid', rowGap: '4px' },
   panes: {
     flexGrow: 1,
     minHeight: 0,
     display: 'grid',
-    gridTemplateColumns: `minmax(360px, 1fr) 1px var(--wp) 1px var(--wl) 1px ${RAIL_W}px`,
+    gridTemplateColumns: `var(--wv) 1px minmax(320px, 1fr) 1px var(--wl) 1px ${RAIL_W}px`,
     gridTemplateRows: 'minmax(0, 1fr)',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     overflow: 'hidden',
   },
   pane: { minHeight: 0, overflow: 'auto', padding: '12px 14px', backgroundColor: tokens.colorNeutralBackground1 },
-  previewPane: { display: 'grid', gridTemplateRows: 'auto auto minmax(0, 1fr)', rowGap: '6px', minHeight: 0, padding: '10px 12px', backgroundColor: tokens.colorNeutralBackground2 },
+  previewPane: { display: 'grid', gridTemplateRows: 'auto auto minmax(0, 1fr)', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
@@ -91,7 +79,35 @@ const useStyles = makeStyles({
   inboxPart: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: tokens.borderRadiusSmall, border: '1px solid transparent', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, cursor: 'pointer', textAlign: 'left', color: tokens.colorNeutralForeground1, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)。押したら Tab・Esc が効くよう、フォーカスを受け取る
-  box: { position: 'relative', overflow: 'auto', minHeight: 0, paddingTop: '8px', paddingBottom: '8px', outline: 'none' },
+  boxWrap: { position: 'relative', minHeight: 0, display: 'grid' },
+  // 部品の外の地は、つかんで動かせる(手のひら)。部品は押して選ぶ(指)
+  box: {
+    position: 'relative',
+    overflow: 'auto',
+    minHeight: 0,
+    paddingTop: '8px',
+    paddingBottom: '48px',
+    outline: 'none',
+    cursor: 'grab',
+    '& [data-part], & [data-item-key]': { cursor: 'pointer' },
+  },
+  boxPanning: { cursor: 'grabbing', userSelect: 'none', '& [data-part], & [data-item-key]': { cursor: 'grabbing' } },
+  boxSpace: { cursor: 'grab', '& [data-part], & [data-item-key]': { cursor: 'grab' } },
+  // 倍率の箱: 画像を見るソフトと同じく、プレビューの右下に重ねる
+  zoomBox: {
+    position: 'absolute',
+    right: '14px',
+    bottom: '10px',
+    zIndex: 5,
+    display: 'flex',
+    alignItems: 'center',
+    columnGap: '2px',
+    padding: '2px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow8,
+  },
+  zoomLabel: { minWidth: '44px', padding: '0 2px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '8px', paddingTop: '10px', minHeight: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground2 },
   railLabel: { writingMode: 'vertical-rl', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, letterSpacing: '0.1em' },
   railDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' },
@@ -104,10 +120,6 @@ const useStyles = makeStyles({
   applyBox: { display: 'grid', rowGap: '6px', marginTop: '14px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
 })
 
-/**
- * シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。プレビューが主役で、部品を押すと、その部品だけを直すペインが出る。
- * 状態と保存は CardDetail のもの(editor)をそのまま使う。ここは並べ方と、部品の選び方・反映の時機だけを持つ
- */
 interface Props {
   editor: SimpleEditor
   /** プレビューの枠(CardDetail の倍率の計算が測る箱) */
@@ -121,16 +133,23 @@ interface Props {
   onClose: () => void
 }
 
+/**
+ * シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。プレビューが主役で、部品を押すと、その部品だけを直すペインが出る。
+ * 状態と保存は CardDetail のもの(editor)をそのまま使う。ここは並べ方と、部品の選び方・反映の時機だけを持つ
+ */
 export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo, onRunNext, onClose }: Props) {
   const t = useT()
   const s = useStyles()
   const [part, setPart] = useState<PartRef | null>(null)
   // 商品の一覧で押した商品(選んでいる枠と見比べる)
   const [compareKey, setCompareKey] = useState<string | null>(null)
-  const [widths, setWidths] = useState<[number, number]>(() => {
-    const v = loadPref<[number, number] | null>(WIDTH_KEY, null)
-    return Array.isArray(v) && v.length === 2 ? [clampW(Number(v[0])), clampW(Number(v[1]))] : [360, 300]
+  const [widths, setWidths] = useState<Widths>(() => {
+    const v = loadPref<Partial<Widths> | null>(WIDTH_KEY, null)
+    return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)) }
   })
+  // アプリの配信は、スマホの幅
+  const widthKey: 'mobile' | 'pc' = e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile'
+  const nav = usePreviewNav(boxRef, e.zoom)
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
@@ -147,7 +166,9 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
   })
   const onPick = useCallback((p: PartRef | null) => selectRef.current(p), [])
 
-  const resize = (i: 0 | 1) => (dx: number) => setWidths((w) => (i === 0 ? [clampW(w[0] - dx), w[1]] : [w[0], clampW(w[1] - dx)]))
+  const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
+  const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
+  const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
   const saveWidths = () => savePref(WIDTH_KEY, widths)
   const toggleProducts = () => {
     setProductsOpen(!productsOpen)
@@ -185,16 +206,6 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
     </button>
   )
   const tpl = getTemplate(e.template)
-  const country = optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label) ?? ''
-  const target = targetText({ gender: e.form.targetGender, ages: e.form.targetAges, audience: '' })
-  const chip = (key: string, label: string, value: string) =>
-    field(
-      { kind: 'overview', field: key },
-      <span className={s.chip} style={{ display: 'inline-flex', columnGap: 4, minWidth: 0 }}>
-        <span className={s.chipKey}>{label}</span>
-        <span className={mergeClasses(s.chipVal, !value && s.empty)}>{value || t('未設定', 'Not set')}</span>
-      </span>,
-    )
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時 未設定', 'No send date')
 
   return (
@@ -212,7 +223,11 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           </>,
           t('ステータスを直す', 'Edit the status'),
         )}
-        {e.abVariants && <Badge appearance="tint" color="brand">{t('AB テスト(A 案を表示)', 'A/B test (showing A)')}</Badge>}
+        {e.abVariants && (
+          <Tooltip content={t('AB テストの配信です。この画面では A 案を表示して直します', 'A/B test: this view shows and edits variant A')} relationship="description">
+            <Badge appearance="tint" color="brand" style={{ flexShrink: 0 }}>A/B</Badge>
+          </Tooltip>
+        )}
         <span className={s.grow} />
         {/* 反映の様子: 保存中 / 保存しました / 未反映の変更あり */}
         {e.saving ? (
@@ -220,10 +235,8 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
         ) : e.justSaved ? (
           <span className={mergeClasses(s.state, s.saved)}>{t('反映しました', 'Saved')}</span>
         ) : null}
-        <Tooltip content={t('前に反映した中身に戻します(開いている間の履歴)', 'Go back to the content before the last save (history while open)')} relationship="description">
-          <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo}>
-            {t('元に戻す', 'Undo')}
-          </Button>
+        <Tooltip content={t('元に戻す: 前に反映した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
+          <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
         </Tooltip>
         {e.dirty && (
           <Tooltip content={e.locked ? t('確定した週の配信です。変えた理由を入力してから反映します', 'Confirmed week: enter a reason to save') : t('まだ反映していない変更があります。ほかの部品を押しても反映します', 'Unsaved changes. Picking another part also saves them')} relationship="description">
@@ -233,22 +246,13 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           </Tooltip>
         )}
         <NextAction step={e.nextStep} busy={e.saving} onRun={onRunNext} />
+        {e.viewSwitch}
         {e.menu}
         <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
       </div>
       <div className={s.notices}>{e.notices}</div>
-      <div className={s.overview}>
-        <span className={s.overviewLabel}>{t('概要(メールには出ません)', 'Overview (not in the email)')}</span>
-        {chip('theme', t('テーマ', 'Theme'), e.form.theme)}
-        {chip('theme', t('切り口', 'Angle'), e.form.copyAngle)}
-        {chip('instructions', t('制作指示', 'Notes'), e.form.instructions.split('\n')[0] ?? '')}
-        {chip('country', t('国', 'Country'), country)}
-        {chip('target', t('ターゲット', 'Target'), target ?? '')}
-        {chip('owner', t('担当', 'Owner'), e.form.owner)}
-        {chip('due', t('締め切り', 'Due'), e.form.productionDue ? new Date(`${e.form.productionDue}T00:00:00`).toLocaleDateString(locale(), { month: 'short', day: 'numeric' }) : '')}
-      </div>
 
-      <div className={s.panes} style={{ '--wp': `${widths[0]}px`, '--wl': `${productsOpen ? widths[1] : RAIL_W}px` } as React.CSSProperties}>
+      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px` } as React.CSSProperties}>
         {/* プレビュー(いちばん広い) */}
         <div className={s.previewPane}>
           <div className={s.toolbar}>
@@ -265,8 +269,6 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
             <Button type="button" size="small" appearance={isOn({ kind: 'template' }) ? 'primary' : 'outline'} icon={<LayoutColumnTwoRegular />} onClick={() => select({ kind: 'template' })}>
               {t(`テンプレート: ${tpl.label}`, `Template: ${tpl.label}`)}
             </Button>
-            <span className={s.grow} />
-            {e.zoomControls}
           </div>
           {e.channel === 'email' ? (
             <div className={s.inbox}>
@@ -281,13 +283,25 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           ) : (
             <span className={s.hint}>{t('通知のタイトル・本文・画像・商品は、プレビューを押して直します', 'Click the preview to edit the notification title, body, image and products')}</span>
           )}
-          <div ref={boxRef} className={s.box} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
+          <div className={s.boxWrap}>
+          <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving} />
           </div>
+          {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
+          <div className={s.zoomBox}>
+            <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
+            <Tooltip content={e.zoom.mode === 'fit' ? t('100% にする', 'Set to 100%') : t('全体を表示', 'Fit the whole email')} relationship="description">
+              <button type="button" className={s.zoomLabel} onClick={() => e.zoom.set(e.zoom.mode === 'fit' ? 1 : 'fit')}>
+                {e.zoom.mode === 'fit' ? t('全体', 'Fit') : `${Math.round(e.zoom.shown * 100)}%`}
+              </button>
+            </Tooltip>
+            <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
+          </div>
+          </div>
         </div>
 
-        <Splitter onDrag={resize(0)} onDone={saveWidths} />
+        <Splitter onDrag={resizePreview} onDone={saveWidths} />
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
@@ -307,7 +321,7 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           {e.footer}
         </div>
 
-        <Splitter onDrag={productsOpen ? resize(1) : () => undefined} onDone={saveWidths} />
+        <Splitter onDrag={productsOpen ? resizeList : () => undefined} onDone={saveWidths} />
 
         {/* 商品の一覧(畳める)。畳んでいても、商品ごとの点とアラートの色を出す */}
         {productsOpen ? (

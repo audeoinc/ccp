@@ -8,6 +8,7 @@ import type { EmailTemplateId } from '../templates'
 import type { LinkSlot, Links } from '../links'
 import type { CardAlertKind } from '../cardAlerts'
 import type { NextStep } from './nextStep'
+import type { PreviewZoom } from './usePreviewNav'
 
 /** シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部。名前は Form と同じ) */
 export type SimpleField =
@@ -98,11 +99,13 @@ export interface SimpleEditor {
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る・詳しい画面へ + 複製・取りやめ・削除) */
   menu: ReactNode
   stageNav?: ReactNode
+  /** 「シンプル | 詳しい」の切り替え */
+  viewSwitch: ReactNode
   // ---- プレビュー(倍率の計算は CardDetail のまま。箱の ref は、別の引数で渡して、この画面の箱に付ける)
   preview: ReactNode
   device: 'mobile' | 'pc'
   setDevice: (d: 'mobile' | 'pc') => void
-  zoomControls: ReactNode
+  zoom: PreviewZoom
   /** 上の知らせ(取りやめ・AI 下書き・承認済みの変更・確定した週) */
   notices: ReactNode
   /** 下の知らせ(エラー・確定した週の理由の入力欄) */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Badge, Button, Field, Input, Select, Text, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownRegular, ArrowSwapRegular, ArrowUpRegular, DeleteRegular, ImageAddRegular, OpenRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
@@ -47,6 +47,10 @@ const useStyles = makeStyles({
   heroCands: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '6px' },
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
+  // この配信のねらい(テーマ・切り口)。直す部品の上の、控えめな箱
+  aim: { display: 'grid', rowGap: '2px', width: '100%', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, boxSizing: 'border-box' },
+  aimBtn: { border: 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
+  aimTheme: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1 },
   readonly: { display: 'grid', rowGap: '2px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
 })
 
@@ -170,7 +174,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         return (
           <>
             {part.kind === 'headline' ? text('headline', t('ヘッドライン(メイン画像に載せる大見出し)', 'Headline (on the main image)'), { rows: 1 }) : text('copy', t('コピー(ヘッドラインの下の導入文)', 'Copy (intro below the headline)'), { rows: 3 })}
-            {e.form.copyAngle && <span className={s.caption}>{t(`切り口: ${e.form.copyAngle}`, `Angle: ${e.form.copyAngle}`)}</span>}
           </>
         )
       case 'sectionTitle':
@@ -307,7 +310,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           </>
         )
       case 'overview':
-        return <OverviewFields editor={e} focus={part.field} />
       case 'meta':
         return <MetaFields editor={e} focus={part.field} />
     }
@@ -329,7 +331,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'slot': return t('空いた枠', 'Empty slot')
       case 'button': return t('ボタン', 'Button')
       case 'template': return t('テンプレート', 'Template')
-      case 'overview': return t('概要(メールには出ません)', 'Overview (not in the email)')
+      case 'overview':
       case 'meta': return t('配信の情報', 'Delivery info')
     }
   }
@@ -344,30 +346,43 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           </Button>
         )}
       </div>
+      {/* 文言・画像・商品を直すときの手がかり(この配信のねらい)。配信の情報を直すときは出さない */}
+      {part?.kind !== 'meta' && part?.kind !== 'overview' && <Aim editor={e} />}
       {compareBlock}
       {body}
     </div>
   )
 }
 
-/** 概要の帯の項目(テーマ・制作指示・種類・国・ターゲット・担当)。focus の欄に、最初に入る */
-function OverviewFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string }) {
+/**
+ * この配信のねらい(テーマと切り口)。直す部品の上に小さく出し、ねらいを見ながら書けるようにする。
+ * テーマは押すとその場で直せる。切り口は、採用した AI の案の補足なので、読むだけ
+ */
+function Aim({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
-  const ref = useFocusField(focus)
+  const [editing, setEditing] = useState(false)
+  if (editing)
+    return (
+      <div className={s.aim}>
+        <AutoTextarea size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
+      </div>
+    )
+  return (
+    <button type="button" className={mergeClasses(s.aim, s.aimBtn)} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
+      <span className={e.form.theme ? s.aimTheme : s.caption}>{e.form.theme || t('テーマを入れる', 'Add a theme')}</span>
+      {e.form.copyAngle && <span className={s.caption}>{e.form.copyAngle}</span>}
+    </button>
+  )
+}
+
+/** 配信の管理の項目(制作指示・種類・国・ターゲット・担当・締め切り)。文言を直すときには使わないので、配信の情報の中に置く */
+function ManageFields({ editor: e }: { editor: SimpleEditor }) {
+  const t = useT()
+  const s = useStyles()
   const ages = parseAges(e.form.targetAges)
   return (
-    <div ref={ref} className={s.root}>
-      <Field label={t('テーマ(配信全体の前提)', 'Theme (premise for the delivery)')} size="small" data-field="theme">
-        <AutoTextarea size="small" rows={2} value={e.form.theme} onChange={(_, d) => e.setField('theme', d.value)} />
-      </Field>
-      {e.form.themeReason && <span className={s.caption}>{t(`AI の理由: ${e.form.themeReason}`, `AI rationale: ${e.form.themeReason}`)}</span>}
-      {e.form.copyAngle && (
-        <div className={s.readonly}>
-          <span className={s.label}>{t('切り口', 'Angle')}</span>
-          <span>{e.form.copyAngle}</span>
-        </div>
-      )}
+    <>
       <Field label={t('制作指示', 'Production notes')} size="small" data-field="instructions">
         <AutoTextarea size="small" rows={3} value={e.form.instructions} onChange={(_, d) => e.setField('instructions', d.value)} />
       </Field>
@@ -422,11 +437,11 @@ function OverviewFields({ editor: e, focus }: { editor: SimpleEditor; focus?: st
         </span>
         <span className={s.caption}>{t('詳しい画面のプロセスのペインの「引き継ぎ」で決めます', 'Set in the Handoff tab of the full view')}</span>
       </div>
-    </div>
+    </>
   )
 }
 
-/** 上の帯の項目(配信名・配信日時・チャネル・ステータス) */
+/** 配信の情報(上の帯の配信名・配信日時・ステータスを押したとき)。配信の管理の項目も、ここにまとめる */
 function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string }) {
   const t = useT()
   const s = useStyles()
@@ -457,6 +472,7 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
       {e.abVariants && (
         <Badge appearance="tint" color="warning">{t('AB テストの配信です。この画面では A 案だけを直します', 'This is an A/B test. This view edits variant A only')}</Badge>
       )}
+      <ManageFields editor={e} />
     </div>
   )
 }

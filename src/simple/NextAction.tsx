@@ -18,7 +18,7 @@ export function NextAction({ step, busy, onRun }: { step: NextStep; busy?: boole
   }[step]
   return (
     <Tooltip content={spec.hint} relationship="description">
-      <Button type="button" size="small" appearance="primary" icon={spec.icon} disabled={busy} onClick={() => onRun(step)}>
+      <Button type="button" size="small" appearance="primary" icon={spec.icon} disabled={busy} onClick={() => onRun(step)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
         {spec.label}
       </Button>
     </Tooltip>
