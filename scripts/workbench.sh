@@ -204,6 +204,8 @@ cmd_start() {
     if curl -s -o /dev/null "http://127.0.0.1:$PORT/ping"; then
       echo "起動しました(pid $(cat "$PID_FILE"))。"
       echo "  画面: https://<ノートブックの URL>/proxy/$PORT/   ← 末尾の / を付ける"
+      # 開発用の画面(docs/DEVTOOLS.md)は、CCP_DEVTOOLS=1 のときだけ出る
+      case "${CCP_DEVTOOLS:-}" in 1|true|yes|on) echo "  開発用: https://<ノートブックの URL>/proxy/$PORT/dev/" ;; esac
       echo "  ログ: scripts/workbench.sh log"
       return 0
     fi

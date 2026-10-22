@@ -44,6 +44,8 @@ const RULES = [
   // 画面
   ['include', /^(index\.html|vite\.config\.ts|vite\.mock\.config\.ts|eslint\.config\.js|tsconfig(\.app|\.node)?\.json|package(-lock)?\.json|\.gitattributes|\.gitignore)$/],
   ['include', /^(src|public)\//],
+  // 開発用の画面の入り口(/dev/。docs/DEVTOOLS.md)
+  ['include', /^dev\/index\.html$/],
   // サーバー
   ['include', /^server\/ccp\//],
   ['include', /^server\/tests\//],

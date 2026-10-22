@@ -22,6 +22,7 @@ from .ai import router as ai_router
 from .approvals import router as approvals_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
+from . import devtools
 from .identity import router as me_router
 from .production import router as production_router
 from .ads import router as ads_router
@@ -57,6 +58,9 @@ register_errors(app)
 async def basic_auth(request: Request, call_next):
     # 死活確認(中身は何も返さない)と、内部の呼び出し(/internal/。呼ばれる側で、署名つきトークンを確認する)は、Basic 認証の対象外
     path = request.url.path
+    # 開発用の画面(/dev/)と API は、CCP_DEVTOOLS=1 のときだけ見せる(ccp/devtools.py)
+    if devtools.blocks(path):
+        return PlainTextResponse("Not Found", status_code=404)
     if APP_PASSWORD and path != "/ping" and not path.startswith("/internal/"):
         header = request.headers.get("authorization", "")
         ok = False
@@ -122,6 +126,7 @@ app.include_router(parts_router)
 app.include_router(linkpreview_router)
 app.include_router(product_pages_router)
 app.include_router(impact_router)
+app.include_router(devtools.router)
 if hosted_router is not None:
     app.include_router(hosted_router)
 

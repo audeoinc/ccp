@@ -45,3 +45,6 @@ docs/screenshots-photo/
 
 # Workbench 版のリリース ZIP と、その確かめの作業フォルダ(npm run release:workbench)
 release-out/
+
+# 開発用の画面(/dev/)の作業ファイル(利用先の表の名前を含む。docs/DEVTOOLS.md)
+server/devwork/

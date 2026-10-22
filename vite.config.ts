@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -18,6 +19,13 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist-gcp',
+    // ページは 2 つ: CCP の画面(/)と、開発用の画面(/dev/。docs/DEVTOOLS.md。サーバーが CCP_DEVTOOLS=1 のときだけ配信する)
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        dev: fileURLToPath(new URL('./dev/index.html', import.meta.url)),
+      },
+    },
     // SVG は、大きさにかかわらず、アプリの中に埋め込む(既定は 4KB 以下だけ)
     assetsInlineLimit: (file) => (file.endsWith('.svg') ? true : undefined),
   },

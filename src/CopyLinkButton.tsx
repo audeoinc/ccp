@@ -2,24 +2,7 @@ import { useState } from 'react'
 import { Button } from '@fluentui/react-components'
 import { CheckmarkRegular, LinkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
-
-/** クリップボードに書く。使えない環境(古いブラウザ・権限がない)では、隠した入力欄から写す */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    const el = document.createElement('textarea')
-    el.value = text
-    el.style.position = 'fixed'
-    el.style.opacity = '0'
-    document.body.appendChild(el)
-    el.select()
-    const ok = document.execCommand('copy')
-    el.remove()
-    return ok
-  }
-}
+import { copyText } from './clipboard'
 
 /**
  * 「リンクをコピー」(X36)。いま開いている画面(URL に持たせた状態)の URL を写す。

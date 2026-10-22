@@ -26,7 +26,7 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 ## コードの約束
 
 - **UI は Fluent UI v9 のみ**(MUI は使わない)。スタイルは `makeStyles` と `tokens`。色の直書きは避ける(メール・プッシュのプレビュー内の、受信側の見た目だけ例外)。
-- **画面の文言は、その場に `t('日本語', 'English')`**(`const t = useT()`)。React の外では `tr(...)`。日本語だけの文言を、画面に書かない。最上位の定数に文言を置かない(関数か getter にする)。日付は `locale()`、価格は `yen(price, market)`、選択肢のラベルは `optionLabel(...)`。
+- **画面の文言は、その場に `t('日本語', 'English')`**(`const t = useT()`)。React の外では `tr(...)`。日本語だけの文言を、画面に書かない(開発用の画面 `src/dev/` だけは日本語のみでよい。[docs/DEVTOOLS.md](docs/DEVTOOLS.md))。最上位の定数に文言を置かない(関数か getter にする)。日付は `locale()`、価格は `yen(price, market)`、選択肢のラベルは `optionLabel(...)`。
 - 商品・メイン画像は、配信カードの国に合う市場のものだけを、AI の選定と検索の対象にする(`poolProducts` / `poolHeroes`)。載せた商品の表示には、全件を使う。
 - **AI の呼び出しは `askAgent`(`src/aiSelect.ts`)だけ**を通す(サーバーの `/api/ask` が Gemini を呼ぶ)。指示文は日本語で書き、画面が English のときの言い換えは `localizePrompt` が行う。
 - **今の配信カードでは、右端の商品情報(`ProductInfoPane`)の一覧に、操作する部品を置かない。** 商品の差し替えは、商品のフロート(`ProductFloat`。中の「選定済み」の行からも、右の行からも同じものが開く)か、アラートへの対応のパネルから行う。並べ替え・外すは中ペインだけ(X47)。**シンプルな配信カード(SU1。`src/simple/`)では**、商品の操作は、プレビューで選んだ部品のペインと商品のフロートで行う(一覧の行を押すと、選んでいる枠と見比べて入れ替えられる)。どちらの画面も、状態と保存は `CardDetail` の 1 つだけを使い、複製しない。

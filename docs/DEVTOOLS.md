@@ -2,7 +2,8 @@
 
 利用先の Workbench の中で、**CCP が読むデータを用意する作業**を、Gemini と一緒に進めるための画面です。CCP とは入り口も URL も別にします。使うのは開発する人だけ(配信の担当者は使わない)。
 
-- 状態: 案(2026-10-22。利用者と方向を決めた。まだ作っていない。バックログ B10)
+- 状態: 作りかけ(2026-10-22。8 章の 1・2 まで。バックログ B10)
+- Workbench は、ZIP で渡した版でも、`git clone` した版(`scripts/workbench.sh update` で更新)でも、同じに動く。有効にするのは `server/workbench.env` の `CCP_DEVTOOLS=1` だけ。作業ファイル(`server/devwork/`)は Git に入れないので、clone の版で `git pull` してもぶつからない
 - 関係する文書: 出力の形 [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)、変換の手引き [BIGQUERY_CONVERT.md](BIGQUERY_CONVERT.md)、ポリシーのファイルの形 [POLICY_FORMAT.md](POLICY_FORMAT.md)
 - 利用先のプロジェクト・データセット・テーブル・文書の名前は、この文書にもコードにも書かない
 
@@ -16,9 +17,10 @@
 | Claude | 利用先の環境の Claude は、Workbench に入れない。`bq query` も使えない(BigQuery に問い合わせを投げられない)。Claude ができるのは、コンフルを読んでデータの仕様をまとめるところまで |
 | Gemini | Workbench からは使える(CCP の `/api/ask` と同じ、Vertex AI の Gemini) |
 | 問い合わせを投げられるもの | **Workbench で動く CCP のサーバー**(Python の BigQuery のライブラリ。`server/ccp/bq.py` と同じ認証)だけ。だから、この画面が、BigQuery の試しと答え合わせの唯一の場所になる |
-| 使う人 | 開発する人 1 人(利用者本人)。作り込みより、**SQL をコピーして持ち出しやすいこと**を優先する |
+| 使う人 | 開発する人 1 人(利用者本人)。作り込みより、**SQL をコピーして持ち出しやすいこと**を優先する。画面の文言は日本語だけ(CCP の `t()` の約束の例外) |
+| 動かす場所 | Workbench の ZIP の版と、`git clone` の版の両方(2026-10-22 利用者) |
 | BigQuery の出力 | ビューではなく**表**にして、定期的に更新する(読む時間を短くするため)。表を作る SQL(DDL)は、画面が作り、**実行は人が BigQuery のコンソールで行う** |
-| GCS の文書 | マーケティングポリシー・文言のルールが、文書やスプレッドシートでまとまっている。これを CCP のポリシーの形([POLICY_FORMAT.md](POLICY_FORMAT.md))に直して取り込む |
+| GCS の文書 | マーケティングポリシー・文言のルールが、文書やスプレッドシートでまとまっている(**Excel が多く、次に PDF**。2026-10-22 利用者)。これを CCP のポリシーの形([POLICY_FORMAT.md](POLICY_FORMAT.md))に直して取り込む |
 
 ## 2. 方針(結論)
 
@@ -116,8 +118,8 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 |---|---|
 | `.md` / `.txt` / `.csv` | そのまま(UTF-8。読めなければ Shift_JIS を試す) |
 | `.pdf` | Gemini にファイルのまま渡す(Gemini は PDF を読める) |
-| `.xlsx` | シートごとに CSV の形にする(ライブラリ `openpyxl` を足す)。シート名を見出しにする |
-| `.docx` | 段落と表を、Markdown の形にする(ライブラリ `python-docx` を足す) |
+| `.xlsx`(いちばん多い) | シートごとに CSV の形にする(ライブラリ `openpyxl` を足す)。シート名を見出しにする。結合したセルは左上の値で埋め、空の行・列は落とす。数式は計算済みの値を読む(`data_only=True`) |
+| `.docx` | 少ないので、最初は扱わない(PDF に書き出してもらう) |
 | Google ドキュメント・スプレッドシートを書き出したもの | 書き出した形式(上のどれか)で扱う |
 
 ファイルを Gemini にそのまま渡すには、`/api/ask` に「文字列だけ」でない入り口が要る(いまは文字列だけ)。開発用の API の中に、ファイルを添える呼び方を足す(CCP の画面の `askAgent` は変えない)。
@@ -159,11 +161,16 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 
 1〜4 で BigQuery の 6 つの出力が作れる。5 は、そのあと。
 
+**作ったもの(2026-10-22)**
+
+| 順 | 状態 | 中身 |
+|---|---|---|
+| 1 | ✅ | `dev/index.html` → `src/dev/`(`DevApp`・`BqTab`・`SqlEditor`(CodeMirror + `@codemirror/lang-sql`)・`ResultGrid`・`CopyButton`)、`server/ccp/devtools.py`(テスト `server/tests/test_devtools.py`)、`CCP_DEVTOOLS`・`DEVTOOLS_MAX_GB`・`DEVTOOLS_DIR`、`server/devwork/settings.json`(よく見るデータセット) |
+| 2 | ✅(本物の BigQuery では未確認) | データセットを開く → 表の一覧(絞り込み)→ 表の列・行数・パーティション・ビューの SQL → 先頭の 20 行(料金なし)。SQL を試す: 料金なしで確かめる(文の種類・読む量)/ 流す(SELECT だけ、先頭 20・200・1000 行、Ctrl + Enter)。写す: 場所・列の一覧(Markdown)・SQL・結果(TSV / Markdown)・エラー・`.sql` で保存 |
+
 撮影・デモ用のビルド(`vite.mock.config.ts`)には、BigQuery も GCS もないので、見本の表と列で画面だけ動く形にする(画面の確認用)。
 
 ## 9. まだ決めていないこと
 
-- 画面の言語: 開発用で使う人が 1 人なので、日本語だけでよいか(CCP の約束は「`t('日本語', 'English')`」。開発用の画面だけ例外にするか)。
 - 版の保存の形: 出力ごとのフォルダに `v1.sql` と `v1.json`(結果)を並べる案。
-- GCS の文書の置き場所と形式(PDF・Excel・Google ドキュメントのどれが多いか)。5 章で足すライブラリが変わる。
 - ポリシーの書き直しで、1 つの文書がルール系と販売系の両方を含むときに、2 つのファイルに分けるか。
