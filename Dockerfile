@@ -12,6 +12,8 @@ RUN npm ci
 COPY index.html vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json ./
 COPY public public
 COPY src src
+# 開発用の画面(/dev/)の入り口。vite.config.ts の input にあるので、ないとビルドが止まる(本番では CCP_DEVTOOLS を設定しないので、/dev/ は 404)
+COPY dev dev
 RUN npx vite build
 
 FROM python:3.12-slim
