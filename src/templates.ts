@@ -22,18 +22,63 @@ export type HeroText = 'band' | 'overlay' | 'below'
  * grid: 名前・価格つきのグリッド / photos: 写真だけのタイル / wide: 全幅で大きく 1 点ずつ /
  * mosaic: 大きい 1 点 + 小さい 2 点(3 点で 1 組) / story: 写真と文を左右交互に / feature: 写真の横に説明を置く特集枠 /
  * cells: 箱(マス目の列・行と、枠の置き方を自由に決める。いくつかのマスを 1 つの枠にまとめられ、見せ方も選べる。枠の形は cells.ts)
+ * table: 表(T8。列 1〜4 × 行 1〜8 のマスに、箱・ボタン・テキスト・空きの部品を敷き詰める。部品ごとに ID を持つ。操作は tables.ts)。
+ *   テンプレートの編集画面は、この形だけで編集する(以前の種類は、開いたときに表に直す)
  */
-export type SectionKind = 'grid' | 'photos' | 'wide' | 'mosaic' | 'story' | 'feature' | 'cells'
-export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic', 'story', 'feature', 'cells']
+export type SectionKind = 'grid' | 'photos' | 'wide' | 'mosaic' | 'story' | 'feature' | 'cells' | 'table'
+export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic', 'story', 'feature', 'cells', 'table']
+
+/** 表の部品の種類。箱 = 商品 1 点 */
+export type PartType = 'box' | 'button' | 'text' | 'empty'
+
+/**
+ * 表の部品(マス)。列 c・行 r(0 から)に置き、横 w・縦 h マス分を使う(結合したマスも 1 つの部品)。
+ * id は、動かしても・中身の設定を変えても・版が変わっても同じ。形が変わったら(結合・分割・種類の変更・複製)新しい ID にする
+ * (コメント・成績を、条件の違う部品と混ぜないため。docs/TEMPLATE_OBJECTS.md の 2.2)
+ */
+export interface TablePart {
+  id: string
+  type: PartType
+  c: number
+  r: number
+  w: number
+  h: number
+  /** 箱: 見せ方(省略は card) */
+  view?: CellView
+  /** 箱: AI に伝える一言(この枠に、どんな商品を置くか) */
+  aiNote?: string
+  /** ボタン: 文言(空は、既定の文言) */
+  label?: string
+  /** ボタン: 見た目(省略は fill) */
+  style?: 'fill' | 'outline'
+  /** ボタン: リンク先の種類(省略は campaign) */
+  link?: LinkKind
+  /** ボタン: 計測用の名前(クリックの集計で使う) */
+  track?: string
+  /** テキスト: 固定の文 */
+  text?: string
+  /** テキスト: false のとき、配信ごとに書き換えない(省略は書き換えてよい) */
+  overridable?: boolean
+}
 
 export interface Section {
   kind: SectionKind
+  /** 表: セクションの ID(sec_…)。以前の種類を表に直したときは、順番から決めた ID */
+  id?: string
+  /** 表: 画面の呼び名(任意。キャンバスの札・構成の一覧に出す) */
+  name?: string
+  /** 表: AI の切り口のメモ(商品を選ぶ・見出しを書くときに渡す) */
+  aiNote?: string
+  /** 表: 行の数(0 は、まだ最初の行を作っていない) */
+  rows?: number
+  /** 表: 部品(すき間なく敷き詰める)。商品の載る順は、上の行から・同じ行は左から(tables.ts の boxesOf) */
+  parts?: TablePart[]
   slots: number
   /** grid・photos の列の数(省略は 2) */
   columns?: 2 | 3
   /** mosaic: 大きい枠を右に置く */
   flip?: boolean
-  /** cells: マス目の列の数(1〜4) */
+  /** cells・table: マス目の列の数(1〜4) */
   cols?: number
   /** cells: 枠の並び(配列の順が商品の載る順)。枠の数 slots は、この数と同じ */
   cells?: Cell[]
@@ -140,6 +185,8 @@ export function sectionKindLabel(sec: Section): string {
       return tr('特集', 'Feature')
     case 'cells':
       return `${tr('箱', 'Box')}(${sec.cols ?? 2} × ${cellRows(sec.cells ?? [])}${sec.view && sec.view !== 'card' ? tr('・', ', ') + cellViewLabel(sec.view) : ''})`
+    case 'table':
+      return `${tr('表', 'Table')}(${sec.cols ?? 1} × ${sec.rows ?? 0})`
     default:
       return tr(`グリッド(${gridColumns(sec)}列)`, `Grid (${gridColumns(sec)} col)`)
   }
@@ -611,6 +658,16 @@ export interface SectionInfo {
   /** カテゴリ系: AI が見出しを付ける */
   wantTitle: boolean
   label: string
+  /** 表: テンプレートを作った人のメモ(セクションの切り口と、箱ごとの一言)。AI の選定に渡す */
+  note?: string
+}
+
+/** 表のセクションの、AI に渡すメモ(セクションの切り口 + 箱ごとの一言)。箱の番号は、セクションの中で 1 から */
+function tableNote(sec: Section): string | undefined {
+  if (sec.kind !== 'table') return undefined
+  const boxes = (sec.parts ?? []).filter((p) => p.type === 'box').sort((a, b) => a.r - b.r || a.c - b.c)
+  const lines = [sec.aiNote?.trim(), ...boxes.map((p, i) => (p.aiNote?.trim() ? tr(`${i + 1} 番目の商品: ${p.aiNote.trim()}`, `Item ${i + 1}: ${p.aiNote.trim()}`) : ''))].filter(Boolean)
+  return lines.length > 0 ? lines.join('\n') : undefined
 }
 
 /** テンプレートのセクション一覧。free は、全体で 1 つのセクションとして扱う */
@@ -629,16 +686,20 @@ export function sectionsOf(id: EmailTemplateId): SectionInfo[] {
     story: () => tr('ストーリー', 'Story'),
     feature: () => tr('特集', 'Feature'),
     cells: () => tr('箱', 'Box'),
+    table: () => tr('表', 'Table'),
   }
   return tpl.sections.map((sec, i) => {
     const start = tpl.sections.slice(0, i).reduce((n, s) => n + s.slots, 0)
     const name = kindName[sec.kind]()
-    const label = sec.categoryHeading
-      ? tr(`セクション${i + 1}`, `Section ${i + 1}`)
-      : countOf(sec.kind) > 1
-        ? `${name}${countOf(sec.kind, i + 1)}`
-        : name
-    return { index: i, start, slots: sec.slots, kind: sec.kind, wantTitle: !!sec.categoryHeading, label }
+    // 表は、テンプレートで付けた名前があれば、それを使う(テンプレートの編集画面の札と同じ呼び名に)
+    const label = sec.name?.trim()
+      ? sec.name.trim()
+      : sec.categoryHeading || sec.kind === 'table'
+        ? tr(`セクション${i + 1}`, `Section ${i + 1}`)
+        : countOf(sec.kind) > 1
+          ? `${name}${countOf(sec.kind, i + 1)}`
+          : name
+    return { index: i, start, slots: sec.slots, kind: sec.kind, wantTitle: !!sec.categoryHeading, label, note: tableNote(sec) }
   })
 }
 
