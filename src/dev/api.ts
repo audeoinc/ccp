@@ -212,6 +212,62 @@ export const DevApi = {
   context: (ctx: ChatContext) => call<{ ok: true; context: string }>('/ai/context', post({ messages: [], ...ctx })),
 }
 
+/** 出力ごとの版(server/devwork/outputs/<出力>/) */
+export interface VersionMeta {
+  v: number
+  created: string
+  note?: string
+  check: { checked_at: string; rows: number; ng: number; warn: number } | null
+}
+
+export interface WorkInfo {
+  ok: true
+  outputs: Record<string, { label: string; env: string; versions: VersionMeta[]; adopted: number | null }>
+  /** 出す先(<プロジェクト>.<データセット>)と、表の名前の頭 */
+  target: { dataset?: string; prefix?: string }
+}
+
+export interface CheckIssue {
+  level: string
+  message: string
+  count: number
+  examples: string[]
+}
+
+export interface CheckResult {
+  ok: true
+  output: string
+  columns: string[]
+  missing: string[]
+  missing_optional: string[]
+  bytes: number
+  cost_usd: number | null
+  price_per_tib: number
+  weight: string
+  /** 結びつきを確かめる相手(採用の版がある出力) */
+  context: string[]
+  max_bytes: number
+  ran: boolean
+  error?: string
+  rows?: number
+  issues?: CheckIssue[]
+  ng?: number
+  warn?: number
+  notes?: string[]
+  checked_at?: string
+  job?: JobStats
+}
+
+export const WorkApi = {
+  list: () => call<WorkInfo>('/work'),
+  save: (output: string, sql: string, note = '') => call<{ ok: true; v: number; same: boolean }>(`/work/${output}`, post({ sql, note })),
+  get: (output: string, v: number) => call<VersionMeta & { ok: true; sql: string }>(`/work/${output}/${v}`),
+  adopt: (output: string, v: number | null) => call<{ ok: true }>(`/work/${output}/adopt`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v }) }),
+  target: (dataset: string, prefix: string) => call<{ ok: true }>('/work/target', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset, prefix }) }),
+  check: (output: string, sql: string, opts: { version?: number | null; withContext: boolean; run: boolean }) =>
+    call<CheckResult>('/check', post({ output, sql, version: opts.version ?? null, with_context: opts.withContext, run: opts.run })),
+}
+
 export const isFailure = (v: unknown): v is Failure => !!v && typeof v === 'object' && (v as { ok?: unknown }).ok === false
 
 /** 読む量の表示(BigQuery の料金は読んだ量で決まるので、GB で見せる) */

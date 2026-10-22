@@ -162,5 +162,71 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(devtools.pick_models(names), ["gemini-3.8-pro", "gemini-3.8-pro-preview", "gemini-3.5-pro", "gemini-3.5-flash"])
 
 
+class WorkTest(unittest.TestCase):
+    def setUp(self) -> None:
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.patch = mock.patch.object(devtools, "DEVWORK", Path(self.tmp.name))
+        self.patch.start()
+
+    def tearDown(self) -> None:
+        self.patch.stop()
+        self.tmp.cleanup()
+
+    def run_async(self, coro):  # noqa: ANN001, ANN202
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def test_versions_and_adopt(self) -> None:
+        a = self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT 1")))
+        same = self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT 1 ")))
+        b = self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT 2", note="直した")))
+        # 同じ SQL では版を増やさない
+        self.assertEqual((a["v"], same["v"], same["same"], b["v"]), (1, 1, True, 2))
+        self.run_async(devtools.adopt("spu", devtools.AdoptIn(v=2)))
+        w = self.run_async(devtools.work())
+        self.assertEqual([x["v"] for x in w["outputs"]["spu"]["versions"]], [1, 2])
+        self.assertEqual(w["outputs"]["spu"]["adopted"], 2)
+        self.assertEqual(self.run_async(devtools.get_version("spu", 2))["sql"], "SELECT 2")
+        self.assertEqual(devtools._adopted_sql("spu"), "SELECT 2")
+
+    def test_check_runs_validate_with_context(self) -> None:
+        self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT spu")))
+        self.run_async(devtools.adopt("spu", devtools.AdoptIn(v=1)))
+        f = lambda n: SimpleNamespace(name=n)  # noqa: E731
+        schema = [f(n) for n in ("market", "sku_code", "product_code", "as_of")]
+        sku_rows = [{"market": "JP", "sku_code": "S1", "product_code": "P1", "as_of": datetime.now(timezone.utc)},
+                    {"market": "JP", "sku_code": "S2", "product_code": "P9", "as_of": datetime.now(timezone.utc)}]
+        spu_rows = [{"market": "JP", "product_code": "P1"}]
+        sqls: list[str] = []
+
+        def query(sql: str, job_config=None):  # noqa: ANN001, ANN202
+            sqls.append(sql)
+            if getattr(job_config, "dry_run", False):
+                return SimpleNamespace(statement_type="SELECT", total_bytes_processed=1000, schema=schema)
+            rows = spu_rows if "SELECT spu" in sql else sku_rows
+            job = SimpleNamespace(result=lambda: _Rows(rows), job_id="j", location="x", total_bytes_processed=1000, total_bytes_billed=10485760,
+                                  slot_millis=10, started=None, ended=None, cache_hit=False, referenced_tables=[])
+            return job
+
+        c = SimpleNamespace(query=query, get_table=lambda n: (_ for _ in ()).throw(KeyError(n)))
+        r = devtools.check_output(c, devtools.CheckIn(output="sku", sql="SELECT sku", run=True))
+        self.assertTrue(r["ran"], r)
+        self.assertEqual(r["context"], ["spu"])
+        # P9 は SPU の採用の版にない → NG
+        self.assertTrue(any("SPU の出力にありません" in i["message"] for i in r["issues"] if i["level"] == "NG"), r["issues"])
+        self.assertGreaterEqual(r["ng"], 1)
+        # 結びつきの相手は、採用の版をキーだけにして流す
+        self.assertTrue(any("SELECT DISTINCT market, product_code FROM (" in q for q in sqls))
+
+
+class _Rows(list):
+    def __init__(self, rows):  # noqa: ANN001
+        super().__init__(rows)
+        self.total_rows = len(rows)
+
+
 if __name__ == "__main__":
     unittest.main()

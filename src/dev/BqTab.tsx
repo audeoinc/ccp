@@ -10,6 +10,7 @@ import { TableDetail } from './TableDetail'
 import { DatasetPicker } from './DatasetPicker'
 import { ChatPanel } from './ChatPanel'
 import { JobInfo } from './JobInfo'
+import { WorkPanel } from './WorkPanel'
 
 const useStyles = makeStyles({
   // 左: データセットと表 / 中: 表の中身と SQL / 右: Gemini との会話(SQL を見ながら話せるように、並べて置く)
@@ -135,6 +136,10 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   const [busy, setBusy] = useState<'' | 'info' | 'dry' | 'run'>('')
 
   const [sql, setSql] = useState(readDraft)
+  // 作る出力(SPU など)。版・答え合わせと、AI に渡す手本の SQL に使う
+  const [output, setOutput] = useState('')
+  // AI に頼む(答え合わせの結果から)。id を変えて、同じ文でも送り直せるように
+  const [ask, setAsk] = useState<{ id: number; text: string } | null>(null)
   const [widths, setWidths] = useState(readWidths)
   useEffect(() => {
     try {
@@ -308,6 +313,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
               .sql で保存
             </Button>
           </div>
+          <WorkPanel output={output} onOutput={setOutput} sql={sql} onLoadSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />
           <span className={s.muted}>流せるのは SELECT だけです(表を作る SQL は、BigQuery のコンソールで実行します)。Ctrl + Enter で流します。</span>
           <div className={s.editor}>
             <SqlEditor value={sql} onChange={changeSql} onRun={() => void runSql()} />
@@ -369,6 +375,9 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
       {/* 畳んでも消さない(考えている途中の会話が止まらないように) */}
       <div style={widths.rightOpen ? { minWidth: 0 } : { display: 'none' }}>
         <ChatPanel
+          output={output}
+          onOutput={setOutput}
+          ask={ask}
           onFold={() => setWidths((w) => ({ ...w, rightOpen: false }))}
         dataset={dataset}
         selected={selected}

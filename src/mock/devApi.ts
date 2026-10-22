@@ -1,6 +1,6 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { ChatContext, ChatEvent, ChatTurn, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ChatContext, ChatEvent, ChatTurn, CheckResult, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
 
 export * from '../dev/api'
 
@@ -163,5 +163,56 @@ ${ctx.sql}
     if (/^\s*(create|insert|delete|update|merge|drop)/i.test(sql)) return fail('SELECT ではないので流しません(文の種類: CREATE_TABLE_AS_SELECT)。表を作る SQL は、BigQuery のコンソールで実行してください')
     const r: RunResult = { ok: true, columns: TABLES[t].columns.map(({ name, type }) => ({ name, type })), rows: TABLES[t].rows.slice(0, maxRows), total_rows: TABLES[t].rows.length, bytes: 52_428_800, billed: 52_428_800, seconds: 0.84, cached: false, job: { job_id: 'bquxjob_demo_123', location: 'asia-northeast1', processed: 52_428_800, billed: 52_428_800, cost_usd: 0.0003, price_per_tib: 6.25, slot_ms: 1840, elapsed: 0.84, cached: false, weight: '軽い', tables: [ref(t)], views: [] } }
     return wait(r)
+  },
+}
+
+// 出力ごとの版(身代わり。ブラウザのメモリの中だけ)
+const work: Record<string, { versions: (VersionMeta & { sql: string })[]; adopted: number | null }> = {}
+let target = { dataset: 'demo-project.ccp_out', prefix: 'ccp_' }
+const workOf = (o: string) => (work[o] ??= { versions: [], adopted: null })
+const LABELS: Record<string, [string, string]> = {
+  spu: ['SPU', 'BQ_SPU'], sku: ['SKU', 'BQ_SKU'], sku_stock: ['SKU の在庫', 'BQ_SKU_STOCK'],
+  weekly: ['週ごとの実績', 'BQ_WEEKLY'], forecast: ['天気予報', 'BQ_FORECAST'], ranking: ['販売チャネルごとの順位', 'BQ_RANKING'],
+}
+
+export const WorkApi = {
+  list: () =>
+    wait({
+      ok: true as const,
+      target,
+      outputs: Object.fromEntries(Object.entries(LABELS).map(([k, [label, env]]) => [k, { label, env, versions: workOf(k).versions.map((x) => ({ v: x.v, created: x.created, check: x.check })), adopted: workOf(k).adopted }])),
+    }),
+  save: (output: string, sql: string) => {
+    const w = workOf(output)
+    const last = w.versions[w.versions.length - 1]
+    if (last && last.sql.trim() === sql.trim()) return wait({ ok: true as const, v: last.v, same: true })
+    const v = (last?.v ?? 0) + 1
+    w.versions.push({ v, created: new Date().toISOString(), check: null, sql })
+    return wait({ ok: true as const, v, same: false })
+  },
+  get: (output: string, v: number) => {
+    const x = workOf(output).versions.find((y) => y.v === v)
+    return x ? wait({ ok: true as const, ...x }) : fail(`v${v} はありません`)
+  },
+  adopt: (output: string, v: number | null) => {
+    workOf(output).adopted = v
+    return wait({ ok: true as const })
+  },
+  target: (dataset: string, prefix: string) => {
+    target = { dataset, prefix }
+    return wait({ ok: true as const })
+  },
+  check: (output: string, sql: string, opts: { version?: number | null; withContext: boolean; run: boolean }) => {
+    const ctx = opts.withContext && output === 'sku' && workOf('spu').adopted ? ['spu'] : []
+    const base: CheckResult = { ok: true, output, columns: [], missing: [], missing_optional: ['length'], bytes: 52_428_800, cost_usd: 0.0003, price_per_tib: 6.25, weight: '軽い', context: ctx, max_bytes: 10 * 1024 ** 3, ran: false }
+    if (!opts.run) return wait(base)
+    const issues = [
+      { level: 'NG', message: 'キー(market, product_code)が重なっている組があります: 2 組', count: 0, examples: ['JP/A1001', 'JP/B2040'] },
+      { level: '注意', message: 'category に、CCP の選択肢にない値があります', count: 12, examples: ['ニット', 'Bottoms'] },
+    ]
+    const r: CheckResult = { ...base, ran: true, rows: 4000, issues, ng: 1, warn: 1, notes: [], checked_at: new Date().toISOString() }
+    const x = opts.version ? workOf(output).versions.find((y) => y.v === opts.version) : null
+    if (x) x.check = { checked_at: r.checked_at!, rows: 4000, ng: 1, warn: 1 }
+    return new Promise<CheckResult>((ok) => window.setTimeout(() => ok(r), sql.length ? 900 : 0))
   },
 }
