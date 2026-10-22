@@ -8,6 +8,8 @@ import type { EmailTemplateId } from '../templates'
 import type { LinkSlot, Links } from '../links'
 import type { CardAlertKind } from '../cardAlerts'
 import type { NextStep } from './nextStep'
+import type { AbPurpose, VariantKey } from '../abTest'
+import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
 import type { PreviewZoom } from './usePreviewNav'
 
@@ -66,8 +68,17 @@ export interface SimpleEditor {
   setField: (k: SimpleField, v: string) => void
   channel: 'email' | 'push'
   template: EmailTemplateId
-  /** 開いている案(AB テストは段階 c。いまは A だけを直す) */
-  abVariants: string[] | null
+  /** AB テスト(SU2)。keys は A を含む案、active はいま直している案(プレビューとペインは、この案の中身) */
+  ab: { keys: VariantKey[]; active: VariantKey; purpose: AbPurpose; canAdd: boolean; busy: boolean } | null
+  abSwitch: (k: VariantKey) => void
+  /** 案を足す(その案の写しから始める。ai は A を写して AI に作らせる)。AB テストでなければ始める */
+  abAdd: (from: VariantKey | 'ai') => void
+  abRemove: (k: VariantKey) => void
+  abCompare: () => void
+  /** テストの設定(タブの横の ⚙ の中身) */
+  abSettings: ReactNode
+  /** いまの案が A と違う部品(「A と違う」の目印) */
+  abDiffParts: PartRef[]
   items: Item[]
   candidates: Candidate[]
   products: Product[]

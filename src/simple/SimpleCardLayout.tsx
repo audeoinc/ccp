@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Badge, Button, Menu, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { Button, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, ArrowUndoRegular, ColumnTripleRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
+import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
 import { Splitter } from '../Splitter'
@@ -76,7 +77,7 @@ const useStyles = makeStyles({
     overflow: 'hidden',
   },
   pane: { minHeight: 0, overflow: 'auto', padding: '12px 14px', backgroundColor: tokens.colorNeutralBackground1 },
-  previewPane: { display: 'grid', gridTemplateRows: 'auto auto minmax(0, 1fr)', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
+  previewPane: { display: 'grid', gridTemplateRows: 'auto auto auto auto minmax(0, 1fr)', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
@@ -123,6 +124,14 @@ const useStyles = makeStyles({
   candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  // 案のタブ(SU2)
+  abRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px', minHeight: '28px' },
+  abTab: { display: 'inline-flex', alignItems: 'center', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  abTabOn: { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1, backgroundColor: tokens.colorBrandBackground2 },
+  abTabBtn: { border: 'none', backgroundColor: 'transparent', padding: '3px 10px', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, cursor: 'pointer', color: tokens.colorNeutralForeground1 },
+  abTabX: { border: 'none', backgroundColor: 'transparent', padding: '0 8px 0 0', fontFamily: 'inherit', cursor: 'pointer', color: tokens.colorNeutralForeground3 },
+  abWarn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
+  abDiff: { boxShadow: `inset 0 -2px 0 ${tokens.colorPaletteDarkOrangeBorder2}` },
   applyBox: { display: 'grid', rowGap: '6px', marginTop: '14px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
 })
 
@@ -170,6 +179,8 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           ...e.items.map((it) => ({ part: { kind: 'product', itemKey: it.key } as PartRef })),
         ].map((x) => ({ ...x, color: tokens.colorPaletteBerryBackground3, label: t('AI 下書き・未確認(確かめたら、上の「確認した」)', 'AI draft, unchecked (press “Mark as checked” above when done)') }))
       : []
+  // 「A と違う」の目印(B・C 案を直しているとき)
+  const diffMarks: Mark[] = e.abDiffParts.map((part) => ({ part, color: tokens.colorPaletteDarkOrangeBackground3, label: t('A と違う', 'Differs from A') }))
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
@@ -242,11 +253,6 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
             <span>{statusLabel(e.form.status)}</span>
           </>,
           t('ステータスを直す', 'Edit the status'),
-        )}
-        {e.abVariants && (
-          <Tooltip content={t('AB テストの配信です。この画面では A 案を表示して直します', 'A/B test: this view shows and edits variant A')} relationship="description">
-            <Badge appearance="tint" color="brand" style={{ flexShrink: 0 }}>A/B</Badge>
-          </Tooltip>
         )}
         <span className={s.grow} />
         {/* 反映の様子: 保存中 / 保存しました / 未反映の変更あり */}
@@ -321,13 +327,76 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
               </MenuPopover>
             </Menu>
           </div>
+          {/* 案のタブ(SU2): A | B | C | ＋。切り替えると、プレビューとペインがその案の中身になる */}
+          <div className={s.abRow}>
+            {e.ab ? (
+              e.ab.keys.map((k) => (
+                <span key={k} className={mergeClasses(s.abTab, e.ab?.active === k && s.abTabOn)}>
+                  <button type="button" className={s.abTabBtn} onClick={() => k !== e.ab?.active && (void onCommit(), e.abSwitch(k))} aria-pressed={e.ab?.active === k}>
+                    {t(`${k} 案`, `Variant ${k}`)}
+                  </button>
+                  {k !== 'A' && e.ab?.active === k && (
+                    <button
+                      type="button"
+                      className={s.abTabX}
+                      aria-label={t(`${k} 案を消す`, `Remove variant ${k}`)}
+                      onClick={() => window.confirm(t(`${k} 案を消します(保存で確定)。よろしいですか?`, `Remove variant ${k}? (on save)`)) && e.abRemove(k)}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className={s.hint}>{t('案は 1 つ', 'One variant')}</span>
+            )}
+            {(!e.ab || e.ab.canAdd) && (
+              <Menu>
+                <MenuTrigger disableButtonEnhancement>
+                  <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} disabled={e.saving || e.ab?.busy}>
+                    {e.ab ? t('案を足す', 'Add variant') : t('案を足す(AB テスト)', 'Add variant (A/B)')}
+                  </Button>
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    {(e.ab?.keys ?? ['A']).map((k) => (
+                      <MenuItem key={k} onClick={() => (void onCommit(), e.abAdd(k))}>
+                        {t(`${k} 案を写して直す`, `Copy variant ${k} and edit`)}
+                      </MenuItem>
+                    ))}
+                    <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
+                      {t('AI で別の案を作る', 'Let AI make another variant')}
+                    </MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            )}
+            {e.ab && (
+              <>
+                <Button type="button" size="small" appearance="subtle" icon={<ColumnTripleRegular />} onClick={e.abCompare}>
+                  {t('並べて比べる', 'Compare')}
+                </Button>
+                <Popover positioning="below-start" withArrow>
+                  <PopoverTrigger disableButtonEnhancement>
+                    <Button type="button" size="small" appearance="subtle" icon={<SettingsRegular />} aria-label={t('テストの設定', 'Test settings')} />
+                  </PopoverTrigger>
+                  <PopoverSurface>{e.abSettings}</PopoverSurface>
+                </Popover>
+              </>
+            )}
+            {e.ab?.busy && <Spinner size="extra-tiny" label={t('AI が案を作っています', 'AI is drafting')} labelPosition="after" />}
+          </div>
+          {/* 違いが多いときは知らせる(止めない)。案から選ぶときは、違ってよいので出さない */}
+          {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length >= 3 && (
+            <span className={s.abWarn}>{t(`A と違う所が ${e.abDiffParts.length} か所あります。結果の原因を切り分けにくくなります`, `${e.abDiffParts.length} places differ from A. It will be harder to tell what caused the result.`)}</span>
+          )}
           {e.channel === 'email' ? (
             <div className={s.inbox}>
               <span className={s.sender}>SHOP</span>
-              <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'subject' }) && s.on)} style={{ fontWeight: 600 }} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
+              <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff)} style={{ fontWeight: 600 }} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
                 {e.form.subject || e.form.name || t('(件名未入力)', '(No subject)')}
               </button>
-              <button type="button" className={mergeClasses(s.inboxPart, s.inboxSub, isOn({ kind: 'preheader' }) && s.on)} onClick={() => select({ kind: 'preheader' })} title={t('プリヘッダーを直す', 'Edit the preheader')}>
+              <button type="button" className={mergeClasses(s.inboxPart, s.inboxSub, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={t('プリヘッダーを直す', 'Edit the preheader')}>
                 {e.form.preheader || t('(プリヘッダー未入力)', '(No preheader)')}
               </button>
             </div>
@@ -338,7 +407,7 @@ export function SimpleCardLayout({ editor: e, boxRef, onCommit, onApply, onUndo,
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
             {markOn('alert') && e.alertOverlay}
-            {uncheckedMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={uncheckedMarks} onSelect={select} />}
+            {uncheckedMarks.length + diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={[...uncheckedMarks, ...diffMarks]} onSelect={select} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}

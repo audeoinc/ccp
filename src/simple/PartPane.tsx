@@ -497,7 +497,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
         return (
           <>
-            <span className={s.caption}>{t('ボタンの文言はテンプレートで決まっています(テンプレートの管理で変えます)。', 'The button text comes from the template (change it in Manage templates).')}</span>
+            <span className={s.caption}>{t('ボタンの文言はテンプレートで決まっています(テンプレートの管理で変えます)。', 'The button text comes from the template (change it in Manage templates).')}{e.ab ? t('リンク先は全部の案で共通です。', ' Links are shared by all variants.') : ''}</span>
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' ? (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
@@ -626,6 +626,7 @@ function Aim({ editor: e }: { editor: SimpleEditor }) {
     <button type="button" className={mergeClasses(s.aim, s.aimBtn)} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
       <span className={e.form.theme ? s.aimTheme : s.caption}>{e.form.theme || t('テーマを入れる', 'Add a theme')}</span>
       {e.form.copyAngle && <span className={s.caption}>{e.form.copyAngle}</span>}
+      {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
     </button>
   )
 }
@@ -723,9 +724,6 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
           </Select>
         </span>
       </Field>
-      {e.abVariants && (
-        <Badge appearance="tint" color="warning">{t('AB テストの配信です。この画面では A 案だけを直します', 'This is an A/B test. This view edits variant A only')}</Badge>
-      )}
       <ManageFields editor={e} />
     </div>
   )

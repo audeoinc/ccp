@@ -83,6 +83,8 @@ import type { AiPreview, FloatAction, SimpleEditor } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
+import { AbSettings } from './simple/AbSettings'
+import type { PartRef } from './simple/parts'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -994,9 +996,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   /** 保存する設定(B・C 案のメイン画像・文言を入れる) */
   const abForSave = (): AbTest | null => {
     if (!ab) return null
-    const heroes = ownsHero(ab) ? Object.fromEntries(ab.variants.map((k) => [k, heroOf(k)])) : {}
-    const texts = ownsAnyText(ab) ? Object.fromEntries(ab.variants.map((k) => [k, textsOf(k)])) : undefined
-    return { ...ab, heroes, ...(texts ? { texts } : {}) }
+    // 案ごとに持つものは、保存する比べる要素で決める(シンプルな画面では、A と違う所から決めた要素。saveTarget)
+    const owner = savedTargetAb() ?? ab
+    const heroes = ownsHero(owner) ? Object.fromEntries(ab.variants.map((k) => [k, heroOf(k)])) : {}
+    const texts = ownsAnyText(owner) ? Object.fromEntries(ab.variants.map((k) => [k, textsOf(k)])) : undefined
+    return { ...ab, target: owner.target, heroes, ...(texts ? { texts } : {}) }
   }
   /** 文言を画面に出す(ヘッドライン・コピー・通知の文・セクションの見出しとコピー) */
   /** 文言を画面に出す。full でなければ(件名だけを比べるとき)件名・プリヘッダーだけ */
@@ -1181,6 +1185,56 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     ])
   }
 
+  // ---- シンプルな配信カードの AB テスト(SU2)。比べる要素は、最初に選ばせず、A と違う所から自動で決める。
+  // 編集の間は、どの部品も案ごとに持ち(target all)、保存するときに、違う所から比べる要素を決める(saveTarget)。今の画面で決めた比べる要素は、今の画面では、そのまま使う
+  const [abAuto, setAbAuto] = useState(false)
+  /** 案 k が A と違う部品(違いの目印と、比べる要素の決め方に使う) */
+  const diffOf = (k: VariantKey) => {
+    const a = textsOf('A')
+    const x = textsOf(k)
+    const parts: PartRef[] = []
+    for (const f of ['headline', 'copy', 'pushTitle', 'pushBody'] as const) if ((x[f] ?? '') !== (a[f] ?? '')) parts.push({ kind: f })
+    const subject = (x.subject ?? '') !== (a.subject ?? '') || (x.preheader ?? '') !== (a.preheader ?? '')
+    if ((x.subject ?? '') !== (a.subject ?? '')) parts.push({ kind: 'subject' })
+    if ((x.preheader ?? '') !== (a.preheader ?? '')) parts.push({ kind: 'preheader' })
+    const n = Math.max(a.sectionTitles.length, x.sectionTitles.length, a.sectionCopies.length, x.sectionCopies.length)
+    for (let i = 0; i < n; i++) {
+      if ((x.sectionTitles[i] ?? '') !== (a.sectionTitles[i] ?? '')) parts.push({ kind: 'sectionTitle', index: i })
+      if ((x.sectionCopies[i] ?? '') !== (a.sectionCopies[i] ?? '')) parts.push({ kind: 'sectionCopy', index: i })
+    }
+    const text = parts.some((p) => p.kind !== 'subject' && p.kind !== 'preheader')
+    const hero = (heroOf(k).heroId ?? '') !== (heroOf('A').heroId ?? '')
+    if (hero) parts.push({ kind: 'hero' })
+    const ai = itemsOf('A')
+    const xi = itemsOf(k)
+    let products = false
+    for (let i = 0; i < Math.max(ai.length, xi.length); i++) {
+      if (ai[i]?.productId === xi[i]?.productId) continue
+      products = true
+      parts.push(xi[i] ? { kind: 'product', itemKey: xi[i].key } : { kind: 'slot', index: i })
+    }
+    return { parts, text, subject, hero, products }
+  }
+  // 開いたときの比べる要素(どの案も A と違わないときは、これを使う)
+  const [abBaseTarget] = useState<AbTarget>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test)?.target ?? 'hero')
+  /** 保存する比べる要素: A と違う所から決める(文言が違えば全体、件名だけなら件名、画像と商品なら両方 …) */
+  const saveTarget = (): AbTarget | null => {
+    if (!ab) return null
+    if (!abAuto) return ab.target
+    const ds = ab.variants.map(diffOf)
+    const text = ds.some((d) => d.text)
+    const subject = ds.some((d) => d.subject)
+    const hero = ds.some((d) => d.hero)
+    const products = ds.some((d) => d.products)
+    if (text || (subject && (hero || products))) return 'all'
+    if (subject) return 'subject'
+    if (hero && products) return 'both'
+    if (products) return 'products'
+    if (hero) return 'hero'
+    return abBaseTarget
+  }
+  const savedTargetAb = (): AbTest | null => (ab ? asTarget(saveTarget() ?? ab.target) : null)
+
   const removeItem = (key: string) => {
     const idx = items.findIndex((i) => i.key === key)
     if (idx >= 0) {
@@ -1198,7 +1252,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       ...itemsOf('A').map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: '' })),
       ...candidates.map((c, i) => ({ it: c as Item, state: STATE_CANDIDATE as typeof STATE_CANDIDATE, section: c.section, order: 1000 + i, variant: '' })),
       // AB テストで、案ごとに商品を持つとき: B・C 案の商品も、variant を付けて保存する(X55)
-      ...(ab && ownsProducts(ab)
+      ...(ab && ownsProducts(savedTargetAb())
         ? ab.variants.flatMap((k) => itemsOf(k).map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: k })))
         : []),
     ]
@@ -1335,7 +1389,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const { products: _names, ai_unchecked_at: _unchecked, ...rest } = buildContent()
     void _names
     void _unchecked
-    return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(ab) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
+    return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(savedTargetAb()) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
   }
   const baseline = useRef<string | null>(null)
   // 基準にした時点の中身(シンプルな配信カードの「元に戻す」で、反映の前に戻す)
@@ -1735,6 +1789,145 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </Button>
     </div>
   )
+  // ---- シンプルな画面の AB テスト(SU2)の操作
+  /** 案の写し(商品は新しい行として。行 ID は持たない) */
+  const copyOfVariant = (k: VariantKey): VariantData => {
+    const h = heroOf(k)
+    const x = textsOf(k)
+    return {
+      items: itemsOf(k).map((i) => ({ ...i, key: crypto.randomUUID(), rowId: undefined })),
+      heroId: h.heroId,
+      heroReason: h.heroReason,
+      texts: { ...x, sectionTitles: [...x.sectionTitles], sectionCopies: [...x.sectionCopies] },
+    }
+  }
+  // 「AI で別の案を作る」: 案を足した次の描画で、その案を AI に作らせる(作るのは、いま編集している案)
+  const [abDraftPending, setAbDraftPending] = useState(false)
+  useEffect(() => {
+    if (!abDraftPending) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAbDraftPending(false)
+    void draftActiveVariant()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abDraftPending])
+  /** 案を足す(from の写しから始める。ai は A を写してから、AI に作らせる)。AB テストでなければ、始める */
+  const abAddSimple = (from: VariantKey | 'ai') => {
+    const base = from === 'ai' ? 'A' : from
+    if (!ab) {
+      const next: AbTest = { ...newAbTest('test'), target: 'all' }
+      setAbAuto(true)
+      setAb(next)
+      loadVariant('B', copyOfVariant(base), next)
+    } else {
+      const k = nextVariant(ab)
+      if (!k) return
+      const next: AbTest = { ...ab, variants: [...ab.variants, k].sort() as VariantKey[] }
+      setAb(next)
+      loadVariant(k, copyOfVariant(base), next)
+    }
+    if (from === 'ai') setAbDraftPending(true)
+  }
+  // シンプルな画面で開いた AB テストは、どの部品も案ごとに直せるようにする(target all。足りない分は A の写しで始める)。
+  // 開いただけで「変えた」にならないよう、変えたあとの中身を基準にし直す
+  const abUpgraded = useRef(false)
+  useEffect(() => {
+    if (!simpleOn || !ab || abAuto || original === null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (ab.target !== 'all') changeTarget('all')
+    setAbAuto(true)
+    abUpgraded.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simpleOn, ab, abAuto, original])
+  useEffect(() => {
+    if (!abUpgraded.current || !abAuto) return
+    abUpgraded.current = false
+    if (!changed) {
+      baseline.current = contentKey()
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBaseVersion((v) => v + 1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abAuto, stash])
+  // A を直したら、B・C でまだ直していない部品(A の前の中身と同じ所)も、A に合わせる(SU2 ⑥。「B は A とこの部分だけが違う」を保つ)
+  const prevA = useRef<{ texts: VariantText; heroId?: string; productIds: string[] } | null>(null)
+  const aNow = { texts: curText(), heroId, productIds: items.map((i) => i.productId) }
+  const aKey = JSON.stringify(aNow)
+  useEffect(() => {
+    if (!ab || !abAuto || active !== 'A') {
+      prevA.current = null
+      return
+    }
+    const before = prevA.current
+    prevA.current = { texts: { ...aNow.texts, sectionTitles: [...aNow.texts.sectionTitles], sectionCopies: [...aNow.texts.sectionCopies] }, heroId: aNow.heroId, productIds: [...aNow.productIds] }
+    if (!before) return
+    setStash((prev) => {
+      let changedAny = false
+      const out = { ...prev }
+      for (const k of ab.variants) {
+        const v = prev[k]
+        if (!v) continue
+        const tx = v.texts ? { ...v.texts, sectionTitles: [...v.texts.sectionTitles], sectionCopies: [...v.texts.sectionCopies] } : undefined
+        if (tx) {
+          for (const f of ['headline', 'copy', 'pushTitle', 'pushBody', 'subject', 'preheader'] as const) {
+            if ((tx[f] ?? '') === (before.texts[f] ?? '') && (aNow.texts[f] ?? '') !== (before.texts[f] ?? '')) {
+              tx[f] = aNow.texts[f] ?? ''
+              changedAny = true
+            }
+          }
+          for (const arr of ['sectionTitles', 'sectionCopies'] as const) {
+            const n = Math.max(aNow.texts[arr].length, before.texts[arr].length)
+            for (let i = 0; i < n; i++) {
+              if ((tx[arr][i] ?? '') === (before.texts[arr][i] ?? '') && (aNow.texts[arr][i] ?? '') !== (before.texts[arr][i] ?? '')) {
+                while (tx[arr].length <= i) tx[arr].push('')
+                tx[arr][i] = aNow.texts[arr][i] ?? ''
+                changedAny = true
+              }
+            }
+          }
+        }
+        let hero = v.heroId
+        let heroReason2 = v.heroReason
+        if ((v.heroId ?? '') === (before.heroId ?? '') && (aNow.heroId ?? '') !== (before.heroId ?? '')) {
+          hero = aNow.heroId
+          heroReason2 = heroReason
+          changedAny = true
+        }
+        // 商品は枠ごとに: B のその枠が A の前の商品のままなら、A のいまの商品にする
+        const list = [...v.items]
+        for (let i = 0; i < Math.max(aNow.productIds.length, before.productIds.length); i++) {
+          const now = aNow.productIds[i]
+          if (list[i]?.productId !== before.productIds[i] || now === before.productIds[i]) continue
+          const src = items[i]
+          if (src) list[i] = { ...src, key: crypto.randomUUID(), rowId: undefined }
+          else list.splice(i, 1)
+          changedAny = true
+        }
+        if (aNow.productIds.length > before.productIds.length && list.length === before.productIds.length)
+          for (let i = before.productIds.length; i < aNow.productIds.length; i++) list.push({ ...items[i], key: crypto.randomUUID(), rowId: undefined })
+        out[k] = { ...v, texts: tx, heroId: hero, heroReason: heroReason2, items: list }
+      }
+      return changedAny ? out : prev
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aKey, active, abAuto, ab])
+  // いまの案が A と違う部品(目印と、違いが多いときの知らせ)
+  const abDiff = ab && active !== 'A' ? diffOf(active) : null
+  const abCompareNode = (
+    <>
+      {ab && comparing === 'live' && (
+        <AbCompare
+          ab={ab}
+          base={{ id: card?.id ?? 'draft', ...buildContent(), hero_image_id: null } as DeliveryCard}
+          variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined }))}
+          products={products}
+          heroes={heroes}
+          onEdit={switchVariant}
+          onClose={() => setComparing(null)}
+        />
+      )}
+    </>
+  )
+
   // ---- シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。状態と保存は、上のものをそのまま使い、描き方だけを替える
   const undoStack = useUndo<Snapshot>()
   // AI の案(メイン画像・商品)を、プレビューにだけ仮に写す(保存する中身は変えない)
@@ -1982,7 +2175,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         setField: (k, v) => set(k)(v),
         channel: previewTab,
         template,
-        abVariants: ab ? allVariants(ab) : null,
+        ab: ab ? { keys: allVariants(ab), active, purpose: ab.purpose ?? 'test', canAdd: !!nextVariant(ab), busy: abAiBusy } : null,
+        abSwitch: switchVariant,
+        abAdd: abAddSimple,
+        abRemove: removeVariant,
+        abCompare: () => setComparing('live'),
+        abSettings: ab ? <AbSettings ab={ab} active={active} target={saveTarget() ?? ab.target} onChange={setAb} onDecide={decideVariant} onStop={stopAbTest} /> : null,
+        abDiffParts: abDiff?.parts ?? [],
         items,
         candidates,
         products,
@@ -2136,6 +2335,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             <>
               {productFloat}
               {heroUploadNode}
+              {abCompareNode}
               {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
             </>
           ) : (
