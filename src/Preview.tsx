@@ -62,6 +62,11 @@ interface Props {
   /** アプリ: 通知のタイトル・本文(空なら、メッセージのヘッドライン・コピーで仮に見せる) */
   pushTitle?: string
   pushBody?: string
+  /**
+   * 部品を押して選ぶ見せ方(シンプルな配信カード SU1)。入力はペインで行うので、プレビューの中の入力欄は文字の表示にし、
+   * 並べ替え・外すのボタンも出さない(並べ替えのドラッグは残す)。受信箱の 1 行は、画面の側がプレビューの上に出す
+   */
+  pickMode?: boolean
 }
 
 // メール・プッシュは受信側の見た目なので、テーマに依らず固定の配色にする
@@ -157,7 +162,8 @@ const useStyles = makeStyles({
 })
 
 // ブロックの data-anchor(hero・section:N・button:… など)は、プレビュー上に置く書き込み(ピン)の場所の目印(pinStore.ts)。
-// 座標だけで持つと、幅・倍率・文言でずれるので、ブロックの中の割合で持つ。名前を変えると、置いたピンが見つからなくなる
+// 座標だけで持つと、幅・倍率・文言でずれるので、ブロックの中の割合で持つ。名前を変えると、置いたピンが見つからなくなる。
+// 部品を選ぶ(SU1)ための細かい目印は、別の属性 data-part に持つ(simple/parts.ts。見出しとコピー・空いた枠などを見分ける)
 export function Preview(props: Props) {
   return props.channel === 'email' ? <EmailPreview {...props} /> : <PushPreview {...props} />
 }
@@ -219,7 +225,7 @@ function FitLine({ baseSize, minScale = 0.55, style, children }: { baseSize: str
   )
 }
 
-function EmailPreview({ subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt }: Props) {
+function EmailPreview({ subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt, pickMode = false }: Props) {
   const t = useT()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
@@ -237,8 +243,8 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   const jaHeadline = /[\u3000-\u9fff\uff00-\uffef]/.test(headline)
   const hf = HEADLINE_FONT
 
-  // 商品にマウスを乗せたときに出る、並べ替えと削除のボタン
-  const controls = (it: Item, idx: number) => (
+  // 商品にマウスを乗せたときに出る、並べ替えと削除のボタン(部品を選ぶ見せ方では、選んだ部品のペインで行う)
+  const controls = (it: Item, idx: number) => pickMode ? null : (
     <div className={mergeClasses('remove', classes.controls)}>
       <div className={classes.controlsGroup}>
         <Button
@@ -396,9 +402,10 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   }
 
   // 空きの枠: ここへドロップすると、末尾の空き枠から埋まる
-  const emptySlot = (key: string, feature: boolean, shape?: React.CSSProperties) => (
+  const emptySlot = (key: string, feature: boolean, shape?: React.CSSProperties, index = items.length) => (
     <div
       key={key}
+      data-part={`slot:${index}`}
       {...handlers(items.length)}
       className={classes.slot}
       style={{
@@ -426,6 +433,12 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   // カテゴリ系テンプレートの見出し。クリックして書き換えられる(未設定なら商品カテゴリ名を出す)
   const editableHeading = (index: number, fallback: string) => {
     const value = sectionTitles[index] ? sectionTitles[index] : fallback
+    if (pickMode)
+      return (
+        <div data-part={`sectionTitle:${index}`} style={{ textAlign: 'center', margin: '12px 0' }}>
+          <span style={{ display: 'inline-block', border: `2px solid ${INK}`, padding: '4px 16px', fontWeight: 700, fontSize: '0.95rem', color: INK, letterSpacing: 2 }}>{value}</span>
+        </div>
+      )
     return (
       <div style={{ textAlign: 'center', margin: '12px 0' }}>
         <Input
@@ -444,6 +457,12 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   // hasHeading: カテゴリ見出しの直下かどうか。見出しがないときは、メイン画像から離す(コピーは、直下の商品に寄せる)
   const sectionCopyEl = (index: number, hasHeading: boolean) => {
     const text = sectionCopies[index] ?? ''
+    if (pickMode)
+      return (
+        <div data-part={`sectionCopy:${index}`} style={{ textAlign: 'center', marginTop: hasHeading ? 6 : 22, marginBottom: 4, padding: '2px 8px', fontSize: '0.85rem', color: SUB, letterSpacing: 0.5, whiteSpace: 'pre-wrap', opacity: text ? 1 : 0.6 }}>
+          {text || t('(セクションのコピー)', '(Section copy)')}
+        </div>
+      )
     return (
       <div style={{ textAlign: 'center', marginTop: hasHeading ? 6 : 22, marginBottom: 4, padding: '0 8px' }}>
         <AutoTextarea
@@ -465,6 +484,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       className={classes.hero}
       data-link="hero"
       data-anchor="hero"
+      data-part="hero"
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(DND_HERO)) return
         e.preventDefault()
@@ -489,14 +509,14 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       {hero ? (
         <>
           <img draggable={false} src={heroImage(hero)} alt={hero.name} style={{ width: '100%', height: '100%', ...heroCropStyle(hero), display: 'block' }} />
-          <Button
+          {!pickMode && <Button
             className={mergeClasses('hero-clear', classes.heroClear, classes.ctl)}
             appearance="subtle"
             size="small"
             icon={<DismissRegular />}
             onClick={onClearHero}
             aria-label={t('メイン画像を外す', 'Remove main image')}
-          />
+          />}
         </>
       ) : (
         t('メインビジュアル(候補から画像をドロップ)', 'Main visual (drop an image from the candidates)')
@@ -523,10 +543,12 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           backgroundColor: 'rgba(0,0,0,0.42)',
           color: '#fff',
           textAlign: 'left',
-          pointerEvents: 'none',
+          // 部品を選ぶ見せ方では、見出しとコピーを、メイン画像とは別に押せるようにする
+          pointerEvents: pickMode ? 'auto' : 'none',
         }}
       >
         {/* 日英どちらも 1 行に収める: 長いときは、文字を縮める(下限は 0.4 倍) */}
+        <div data-part="headline">
         <FitLine
           baseSize={`calc(${compact ? '4.2cqw' : '5cqw'} * ${hf.scale})`}
           minScale={0.4}
@@ -541,12 +563,15 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         >
           {headline || t('(ヘッドライン未入力)', '(No headline)')}
         </FitLine>
+        </div>
+        <div data-part="copy">
         <FitLine
           baseSize={compact ? '2.6cqw' : '2.9cqw'}
           style={{ marginTop: '0.8cqw', fontFamily: hf.family, fontWeight: 400, letterSpacing: '0.06em', lineHeight: 1.5, opacity: 0.95 }}
         >
           {copy || t('(コピー未入力)', '(No copy)')}
         </FitLine>
+        </div>
       </div>
       )}
       {/* ヘッドライン(大きく重ねる): 写真の中央に、折り返して大きく載せる。コピーは写真の下 */}
@@ -570,7 +595,8 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             overflowWrap: 'anywhere',
           }}
         >
-          {headline || t('(ヘッドライン未入力)', '(No headline)')}
+          {/* 文字の所だけを押せるようにする(画像の全体を覆うと、メイン画像を選べなくなるため) */}
+          <span data-part="headline" style={{ pointerEvents: pickMode ? 'auto' : 'none' }}>{headline || t('(ヘッドライン未入力)', '(No headline)')}</span>
         </div>
       )}
     </div>
@@ -587,6 +613,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           data-link="button"
           data-link-id={b.id}
           data-anchor={`button:${b.id}`}
+          data-part={`button:${b.id}`}
           className={classes.noWrap}
           style={{
             textAlign: 'center',
@@ -610,13 +637,13 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     <>
       {heroText === 'below' && (
         <div data-anchor="herotext" style={{ textAlign: 'center', padding: '16px 16px 0', color: INK }}>
-          <div style={{ fontFamily: hf.family, fontWeight: hf.weight, fontSize: `calc(1.5rem * ${hf.scale})`, lineHeight: 1.25, letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking, textTransform: hf.upper ? 'uppercase' : 'none' }}>
+          <div data-part="headline" style={{ fontFamily: hf.family, fontWeight: hf.weight, fontSize: `calc(1.5rem * ${hf.scale})`, lineHeight: 1.25, letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking, textTransform: hf.upper ? 'uppercase' : 'none' }}>
             {headline || t('(ヘッドライン未入力)', '(No headline)')}
           </div>
         </div>
       )}
       {heroText !== 'band' && (
-        <div data-anchor="herotext" style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
+        <div data-anchor="herotext" data-part="copy" style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
       )}
       {buttonsAfter(0, 12)}
       <div style={{ height: 8 }} />
@@ -626,7 +653,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   // ---- セクションの商品の並び(種類ごと)。start は、並び全体の中での先頭の位置
   const sectionBody = (sec: Section, start: number, list: Item[]) => {
     const slot = (j: number, tile: (it: Item, idx: number) => React.ReactNode, shape?: React.CSSProperties, feature = false) =>
-      list[j] ? tile(list[j], start + j) : emptySlot(`e${start + j}`, feature, shape)
+      list[j] ? tile(list[j], start + j) : emptySlot(`e${start + j}`, feature, shape, start + j)
     const slots = Array.from({ length: sec.slots }, (_, j) => j)
     const cols = gridColumns(sec)
     switch (sec.kind) {
@@ -700,6 +727,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         <div style={{ padding: '0 16px 24px' }}>
           <div
             {...handlers(items.length)}
+            data-part={`slot:${items.length}`}
             className={classes.slot}
             style={{
               minHeight: items.length === 0 ? 96 : 44,
@@ -751,7 +779,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   return (
     <div data-anchor="preview" style={{ maxWidth: device === 'pc' ? 640 : device === 'mobile' ? 375 : 440, margin: '0 auto' }}>
       {/* 受信一覧での見え方: 件名(空は配信名)と、プリヘッダー(X2) */}
-      {!compact && (
+      {!compact && !pickMode && (
         <div data-anchor="subject" style={{ fontSize: 12, color: tokens.colorNeutralForeground2, display: 'grid', rowGap: 2 }}>
           <span>
             {t('件名', 'Subject')}: <span style={{ color: tokens.colorNeutralForeground1, fontWeight: 600 }}>{subjectLine || subject || t('(配信名未入力)', '(No name)')}</span>
@@ -777,7 +805,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
 }
 
 function PushPreview(props: Props) {
-  const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind, pushTitle, pushBody } = props
+  const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind, pushTitle, pushBody, pickMode = false } = props
   // アプリのテンプレートの中身(画像・商品・ボタン)。アプリのテンプレートでなければ、以前と同じ(画像つき)
   const spec = getTemplate(template).push ?? { image: true, buttons: [] }
   const t = useT()
@@ -840,8 +868,8 @@ function PushPreview(props: Props) {
           <div style={{ flexGrow: 1, fontSize: '0.7rem', letterSpacing: 1, color: SUB }}>SHOP</div>
           <div style={{ fontSize: '0.7rem', color: SUB }}>{t('たった今', 'now')}</div>
         </div>
-        <div style={{ ...titleFont, fontSize: '0.9rem', color: INK }}>{title}</div>
-        <div style={{ ...bodyFont, fontSize: '0.85rem', color: INK, whiteSpace: 'pre-wrap' }}>{bodyText}</div>
+        <div data-part="pushTitle" style={{ ...titleFont, fontSize: '0.9rem', color: INK }}>{title}</div>
+        <div data-part="pushBody" style={{ ...bodyFont, fontSize: '0.85rem', color: INK, whiteSpace: 'pre-wrap' }}>{bodyText}</div>
         {image}
         {more && <div style={{ fontSize: '0.7rem', color: SUB, marginTop: 6 }}>{more}</div>}
         {actions}
@@ -853,8 +881,8 @@ function PushPreview(props: Props) {
           <div style={{ flexGrow: 1, fontSize: '0.7rem', color: SUB }}>SHOP ・ {t('たった今', 'now')}</div>
           <div style={{ fontSize: '0.8rem', color: SUB, lineHeight: 1 }}>⌃</div>
         </div>
-        <div style={{ ...titleFont, fontSize: '0.9rem', color: INK }}>{title}</div>
-        <div style={{ ...bodyFont, fontSize: '0.85rem', color: '#444', whiteSpace: 'pre-wrap' }}>{bodyText}</div>
+        <div data-part="pushTitle" style={{ ...titleFont, fontSize: '0.9rem', color: INK }}>{title}</div>
+        <div data-part="pushBody" style={{ ...bodyFont, fontSize: '0.85rem', color: '#444', whiteSpace: 'pre-wrap' }}>{bodyText}</div>
         {image}
         {more && <div style={{ fontSize: '0.7rem', color: SUB, marginTop: 6 }}>{more}</div>}
         {actions}
@@ -931,6 +959,8 @@ function PushPreview(props: Props) {
               }}
               onDragEnd={clear}
               onClick={() => onSelect(it.key)}
+              // 部品を選ぶ見せ方のときだけ(結果のヒートマップなどは、メッセージの中の商品の枠だけを数えるため)
+              data-item-key={pickMode ? it.key : undefined}
               {...handlers(idx)}
               className={classes.pushRow}
               style={{ borderColor: over === idx || it.key === selectedKey ? tokens.colorBrandForeground1 : tokens.colorNeutralStroke2 }}
@@ -938,6 +968,7 @@ function PushPreview(props: Props) {
               <span style={{ width: 16, fontSize: 12, color: tokens.colorNeutralForeground2 }}>{idx + 1}</span>
               <img draggable={false} src={productImage(p, it.imageUrl)} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
               <div className={classes.noWrap} style={{ flexGrow: 1, fontSize: '0.85rem' }}>{p?.name}</div>
+              {!pickMode && <>
               <Button
                 appearance="subtle"
                 size="small"
@@ -970,11 +1001,13 @@ function PushPreview(props: Props) {
                 }}
                 aria-label={t('外す', 'Remove')}
               />
+              </>}
             </div>
           )
         })}
         <div
           {...handlers(items.length)}
+          data-part={`slot:${items.length}`}
           className={classes.pushDrop}
           style={{ borderColor: over === items.length ? tokens.colorBrandForeground1 : tokens.colorNeutralStroke2 }}
         >

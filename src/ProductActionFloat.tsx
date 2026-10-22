@@ -101,11 +101,13 @@ interface Props {
   onPostpone?: () => void
   /** アラートの画面で詳しく見る */
   onOpenAlerts?: () => void
+  /** 選んでいる枠への操作(シンプルな配信カードで、プレビューの枠を選んでから一覧の商品を押したとき。「この枠の商品と入れ替える」など。SU1 ⑩) */
+  slotAction?: { label: string; run: () => void }
   onClose: () => void
 }
 
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, onClose }: Props) {
   const s = useStyles()
   const t = useT()
   // つかんで動かした量
@@ -226,6 +228,15 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     </Button>
                   )}
                 </span>
+              </div>
+            )}
+
+            {slotAction && (
+              <div className={s.alert} style={{ backgroundColor: tokens.colorBrandBackground2, borderColor: tokens.colorBrandStroke2 }}>
+                <span className={s.alertText}>{t('プレビューで選んでいる枠と見比べています(選んだ部品のペインにも並べています)', 'Comparing with the slot selected in the preview (also shown side by side in the part pane)')}</span>
+                <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={slotAction.run}>
+                  {slotAction.label}
+                </Button>
               </div>
             )}
 

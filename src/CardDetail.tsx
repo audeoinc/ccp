@@ -7,6 +7,7 @@ import {
   DialogSurface,
   Field,
   Input,
+  MenuItem,
   MessageBar,
   MessageBarBody,
   ProgressBar,
@@ -77,6 +78,10 @@ import { pinView } from './pinStore'
 import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
 import { viewHeight, viewWidth } from './uiScale'
+import { SimpleCardLayout } from './simple/SimpleCardLayout'
+import type { FloatAction, SimpleEditor } from './simple/editor'
+import { nextStepOf, type NextStep } from './simple/nextStep'
+import { useUndo } from './simple/useUndo'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -132,6 +137,8 @@ interface Props {
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
   onNext?: () => void
+  /** シンプルな配信カード(SU1)で開く(ヘッダーのトグル。保存済みの配信だけ。新規作成・まとめて作った案は今の画面) */
+  simple?: boolean
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -329,6 +336,21 @@ interface VariantData {
   texts?: VariantText
 }
 
+/** 元に戻す(SU1 ⑫)の 1 つ分: 反映の前の、配信カードの中身 */
+interface Snapshot {
+  form: Form
+  items: Item[]
+  candidates: Candidate[]
+  heroId?: string
+  heroReason: string
+  sectionTitles: string[]
+  sectionCopies: string[]
+  template: EmailTemplateId
+  links: Links
+  pushLink: PushLink | null
+  audience: string
+}
+
 /** 各セクションのコピーは、改行を含みうるので JSON の配列で保存する(古い形式の改行区切りも読む) */
 function parseCopies(v?: string): string[] {
   if (!v) return []
@@ -475,10 +497,13 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext, simple = false }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
+  // シンプルな配信カード(SU1)で描くか。「⋯」→「詳しい画面へ」で、この配信だけ今の配信カードにする(トグルは変えない)
+  const [detailed, setDetailed] = useState(false)
+  const simpleOn = simple && !!card && !detailed
   const [items, setItems] = useState<Item[]>(() => draft?.items ?? [])
   // 選定候補(配信商品テーブルの「候補」の行。セクションごと)
   const [candidates, setCandidates] = useState<Candidate[]>(() => draft?.candidates ?? [])
@@ -736,7 +761,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       ro.disconnect()
       inner.style.zoom = ''
     }
-  }, [zoom, previewTab, template, items, form.headline, form.copy, sectionTitles, sectionCopies, heroId])
+  }, [zoom, previewTab, template, items, form.headline, form.copy, sectionTitles, sectionCopies, heroId, simpleOn])
 
   const shownZoom = zoom === 'fit' ? fitZoom : zoom
 
@@ -1249,7 +1274,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
 
   /** 保存する内容(ステータスを除く)。保存と、承認済みの配信の内容が変わったかの判定(再承認)の両方で使う */
-  function buildContent() {
+  function buildContent(clearUnchecked = true) {
     return {
         name: form.name,
         scheduled_at: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
@@ -1289,7 +1314,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         section_titles: textsOf('A').sectionTitles.join('\n').replace(/\n+$/, ''),
         section_copies: encodeCopies(textsOf('A').sectionCopies),
         // AI でまとめて作った中身を、人が配信カードで確かめて保存したら、未確認の印を外す(W14)
-        ...(card?.ai_unchecked_at ? { ai_unchecked_at: null as never } : {}),
+        // シンプルな画面の自動の反映(SU1)では外さない(外すのは「確認した」のボタン)
+        ...(card?.ai_unchecked_at && clearUnchecked ? { ai_unchecked_at: null as never } : {}),
         // 外したときは null を送ってルックアップを空にする
         hero_image_id: heroOf('A').heroId
           ? heroOf('A').heroId
@@ -1301,14 +1327,24 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 再承認の判定に使う、内容の要約。商品の名前の列は、商品の一覧の読み込みで変わるので、商品 ID の並びで比べる。
   // 開いたときの値(下の baseline)と比べる(保存済みの行と比べると、表し方の違いだけで「変わった」になるため)
   const contentKey = () => {
-    const { products: _names, ...rest } = buildContent()
+    const { products: _names, ai_unchecked_at: _unchecked, ...rest } = buildContent()
     void _names
+    void _unchecked
     return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(ab) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
   }
   const baseline = useRef<string | null>(null)
+  // 基準にした時点の中身(シンプルな配信カードの「元に戻す」で、反映の前に戻す)
+  const committedSnap = useRef<Snapshot | null>(null)
+  // 基準を取り直した回数(保存して開いたままのとき、「変えたか」を測り直すため)
+  const [baseVersion, setBaseVersion] = useState(0)
+  const takeSnapshot = (): Snapshot => ({ form, items, candidates, heroId, heroReason, sectionTitles, sectionCopies, template, links, pushLink, audience })
   useEffect(() => {
     // 掲載商品を読み込んだ時点(自動の下書きより前)の内容を、基準にする
-    if (card && original !== null && baseline.current === null) baseline.current = contentKey()
+    if (card && original !== null && baseline.current === null) {
+      baseline.current = contentKey()
+      committedSnap.current = takeSnapshot()
+      setBaseVersion((v) => v + 1)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, original])
   const savedStatus = card?.status ?? STATUS_NOT_STARTED
@@ -1319,6 +1355,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [actAlert, setActAlert] = useState<CardAlert | null>(null)
   // 商品の行(中の「選定済み」・右の商品情報)から開いた、商品の対応のフロートの行(X54。アラートから開いたときは actAlert)
   const [productOpen, setProductOpen] = useState<string | null>(null)
+  // シンプルな配信カード(SU1)で、プレビューの枠を選んでから一覧の商品を押したときの、その枠への操作
+  const [slotAction, setSlotAction] = useState<FloatAction | null>(null)
   // 差し替えた理由(保存したときに、配信のメモ(種類 change)に残す。アラートの画面で差し替えたときと同じ記録)。
   // アラートへの対応と、商品のフロートで残りの候補と入れ替えたとき(X47)の両方
   const [alertNotes, setAlertNotes] = useState<string[]>([])
@@ -1402,7 +1440,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const currentKey = contentKey()
   useEffect(() => {
     setChanged(baseline.current !== null && baseline.current !== currentKey)
-  }, [currentKey])
+  }, [currentKey, baseVersion])
   // 承認(依頼・承認・差し戻し)を出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
   const canReview = !!card && lockedWeeks.length === 0 && statusRank(savedStatus) <= statusRank(STATUS_APPROVED)
   // 承認の依頼・承認で、サーバーが配信のステータスを変えたら、入力欄のステータスもそろえる(次の保存で、古いステータスを書き戻さないように)
@@ -1417,7 +1455,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
    * 承認済みの配信の内容を変えたときは、承認のやり直しが必要なので「承認待ち」に戻し、いまの承認の依頼を古いものにする。
    * 承認・差し戻しそのものは、ここではなく ApprovalBar(サーバーの窓口 /api/approvals)で行う(U4)
    */
-  async function save(reason?: string) {
+  async function save(reason?: string, keepUnchecked = false): Promise<boolean> {
     const goNext = goNextRef.current
     const stay = stayRef.current
     setSaving(true)
@@ -1427,7 +1465,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       const revoke = reason === undefined && approvedBefore && formStatus === card?.status && baseline.current !== null && baseline.current !== contentKey()
       // 確定後に変えた配信・承認済みの内容を変えた配信は、もう一度承認を受けるので「承認待ち」(reviewing)にする
       const status = reason !== undefined || revoke ? STATUS_REVIEW : formStatus
-      const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
+      const fields = { ...buildContent(!keepUnchecked), status: status as DeliveryCard['status'] }
       const res = card
         ? await DeliveryCardsService.update(card.id, fields)
         : await DeliveryCardsService.create({ ...fields, state_code: 0 })
@@ -1483,12 +1521,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         window.setTimeout(() => setJustSaved(false), 3000)
         // 新しい配信は、保存した配信として開き直す
         if (!card) onReopen?.(cardId)
-        return
+        return true
       }
       if (goNext && next && onNext) onNext()
       else onBack()
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+      return false
     } finally {
       setSaving(false)
     }
@@ -1505,6 +1545,513 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     push: templateChannel === 'push' ? { title: form.pushTitle, body: form.pushBody } : undefined,
   })
   const hero = heroes.find((h) => h.id === heroId)
+
+  // ---- 2 つの画面(今の配信カード・シンプルな配信カード SU1)で共通の部品
+  const noticesNode = (
+    <>
+    {card?.cancelled_at && (
+      <MessageBar layout="multiline" intent="warning" className={styles.locked}>
+        <MessageBarBody>
+          {t(
+            `この配信は取りやめ済みです(${new Date(card.cancelled_at).toLocaleString(locale())})。理由: ${card.cancel_reason || '—'}。元に戻すときは、右上の「…」から「取りやめを取り消す」`,
+            `This delivery was cancelled (${new Date(card.cancelled_at).toLocaleString(locale())}). Reason: ${card.cancel_reason || '—'}. To restore it, use "…" > "Undo cancellation".`,
+          )}
+        </MessageBarBody>
+      </MessageBar>
+    )}
+
+    {card?.ai_unchecked_at && (
+      <MessageBar layout="multiline" intent="info" className={styles.locked}>
+        <MessageBarBody>
+          {t(
+            'この配信の中身は、週の枠から AI でまとめて作ったもので、まだ誰も確かめていません。中身を確かめて保存すると、「AI 下書き・未確認」の印が外れます。',
+            'This content was created by AI in bulk from a week slot and nobody has checked it yet. Check it and save to clear the “AI draft, unchecked” mark.',
+          )}
+        </MessageBarBody>
+      </MessageBar>
+    )}
+    {approvedBefore && lockedWeeks.length === 0 && changed && (
+      <MessageBar layout="multiline" intent="info" className={styles.locked}>
+        <MessageBarBody>
+          {t(
+            '承認済みの配信の内容を変えています。保存すると「承認待ち」に戻り、承認の依頼からやり直しになります。',
+            'You are changing an approved delivery. Saving puts it back to awaiting approval and needs a new approval request.',
+          )}
+        </MessageBarBody>
+      </MessageBar>
+    )}
+    {lockedWeeks.length > 0 && changed && (
+      <MessageBar layout="multiline" intent="warning" className={styles.locked}>
+        <MessageBarBody>
+          {t(
+            `確定した週(${lockedWeeks.map(weekRange).join('、')})の配信を変えています。保存するときは、理由を入力します。保存すると、この配信は「承認待ち」に戻り、週の確定は解けます。`,
+            `You are changing a delivery in a confirmed week (${lockedWeeks.map(weekRange).join(', ')}). To save, enter a reason. Saving puts this delivery back to awaiting approval and the week is no longer confirmed.`,
+          )}
+        </MessageBarBody>
+      </MessageBar>
+    )}
+    </>
+  )
+  const productFloat = (
+    <>
+    {/* 商品の対応のフロート(X54): アラートの札・商品の行の、どこから開いても、これ 1 つ */}
+    {(actAlert || productOpen) && (() => {
+      const item = actAlert ? items.find((i) => i.productId === actAlert.productId) : items.find((i) => i.key === productOpen)
+      // シンプルな配信カードの商品の一覧では、候補の行からも開く(詳しい情報を見るだけ。差し替えは、選んだ枠への操作で)
+      const cand = !actAlert && !item ? candidates.find((c) => c.key === productOpen) : undefined
+      const product = products.find((p) => p.id === (item?.productId ?? cand?.productId ?? actAlert?.productId))
+      const idx = item ? items.indexOf(item) : -1
+      const section = idx >= 0 ? sectionIndexAt(sectionsOf(template), idx) : -1
+      const options: SwapOption[] = candidates.filter((c) => c.section === section).flatMap((c) => {
+        const p = products.find((x) => x.id === c.productId)
+        return p ? [{ key: c.key, product: p, reason: c.reason, source: c.source }] : []
+      })
+      const closeAction = () => {
+        setActAlert(null)
+        setProductOpen(null)
+        setSlotAction(null)
+      }
+      return (
+        <ProductActionFloat
+          key={`${actAlert ? `alert:${actAlert.kind}:${actAlert.productId ?? ''}` : `item:${productOpen}`}`}
+          product={product}
+          alert={actAlert ?? undefined}
+          card={alertCard}
+          scheduledAt={form.scheduledAt}
+          inCard={new Set(items.map((i) => i.productId))}
+          products={products}
+          poolProducts={poolProducts}
+          model={stockModel}
+          weekUse={weekUse}
+          alertKinds={productAlertKinds}
+          options={options}
+          image={item?.imageUrl}
+          delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '' }}
+          onImage={item ? (url, source) => setItemImage(item.key, url, source) : undefined}
+          onSwapCandidate={
+            item
+              ? (candKey, reason) => {
+                  swapWithCandidate(item.key, candKey, reason)
+                  closeAction()
+                }
+              : undefined
+          }
+          onReplace={
+            item
+              ? (to, reason) => {
+                  if (actAlert) replaceForAlert(actAlert, to, reason)
+                  else replaceItemWith(item.key, to, reason)
+                  closeAction()
+                }
+              : undefined
+          }
+          onPostpone={() => {
+            setProductOpen(null)
+            postponeForAlert()
+          }}
+          onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
+          slotAction={
+            slotAction && !actAlert
+              ? {
+                  label: slotAction.label,
+                  run: () => {
+                    slotAction.run()
+                    closeAction()
+                  },
+                }
+              : undefined
+          }
+          onClose={closeAction}
+        />
+      )
+    })()}
+    </>
+  )
+  const alertsNode = (
+    <>
+    {/* この配信のアラート(在庫・方針・日程)。ふだんは 1 行にたたむ。アラートの画面から開いたときは、開いておく */}
+    {liveAlerts.length > 0 && (
+      <CardAlertsBar
+        alerts={liveAlerts}
+        onAct={alertCard ? setActAlert : undefined}
+        defaultOpen={!!focusProductId}
+        selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
+        onSelectProduct={(pid) => {
+          const it = items.find((i) => i.productId === pid)
+          if (it) setSelectedKey(it.key)
+        }}
+      />
+    )}
+    </>
+  )
+  const heroUploadNode = (
+    <>
+    {heroUpload && (
+      <HeroUploadDialog
+        market={cardMarket(form.country)}
+        cardId={card?.id}
+        me={myName() || form.owner}
+        onClose={() => setHeroUpload(false)}
+        onDone={async (h) => {
+          await onHeroesChanged?.()
+          setHeroId(h.id)
+          setHeroReason(tr('持っている画像を上げて使った', 'Uploaded and used'))
+          setHeroUpload(false)
+        }}
+      />
+    )}
+    </>
+  )
+
+  const zoomBox = (
+    <div className={styles.zoomBox}>
+      <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
+      <Slider
+        size="small"
+        className={styles.slider}
+        min={ZOOM_MIN * 100}
+        max={ZOOM_MAX * 100}
+        step={5}
+        value={Math.round(shownZoom * 100)}
+        onChange={(_, d) => setZoom(d.value / 100)}
+        aria-label={t('プレビューの倍率', 'Preview zoom')}
+      />
+      <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
+      <Caption1 className={styles.zoomLabel}>{Math.round(shownZoom * 100)}%</Caption1>
+      {/* ボタンの文字は、押したときの動きを表す: 全体表示にする前は「全体」、全体表示のときは「100%」(押すと100%に戻る) */}
+      <Button
+        type="button"
+        size="small"
+        appearance={zoom === 'fit' ? 'primary' : 'outline'}
+        onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')}
+        aria-label={zoom === 'fit' ? t('100% の倍率に戻す', 'Reset to 100%') : t('メール全体を表示', 'Fit the whole email')}
+      >
+        {zoom === 'fit' ? '100%' : t('全体', 'Fit')}
+      </Button>
+    </div>
+  )
+  // ---- シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。状態と保存は、上のものをそのまま使い、描き方だけを替える
+  const undoStack = useUndo<Snapshot>()
+  const [pendingUndoSave, setPendingUndoSave] = useState(false)
+  // 承認済みの配信を自動で反映すると承認待ちに戻るので、最初の反映の前に一度だけ確かめる
+  const revokeOk = useRef(false)
+  // 確定した週の配信で、元に戻す・確認したの保存を、理由の入力を待って行うとき(履歴に積まない・未確認の印を外す)
+  const undoingRef = useRef(false)
+  const checkingRef = useRef(false)
+  const locked = lockedWeeks.length > 0
+  /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
+  const saveStaying = async (reason?: string, push = true, keepUnchecked = true) => {
+    const before = committedSnap.current
+    goNextRef.current = false
+    stayRef.current = true
+    setSaveMode('stay')
+    const ok = await save(reason, keepUnchecked)
+    if (ok && push && before) undoStack.push(before)
+  }
+  /** 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying) */
+  const askReason = () => {
+    goNextRef.current = false
+    stayRef.current = true
+    setSaveMode('stay')
+    setChangeReason((r) => r ?? '')
+  }
+  const confirmRevoke = () => {
+    if (!approvedBefore || revokeOk.current) return true
+    if (!window.confirm(tr('承認済みの配信です。変更を反映すると「承認待ち」に戻り、承認の依頼からやり直しになります。反映しますか?(以後、この配信を開いている間は聞きません)', 'This delivery is approved. Saving the change puts it back to awaiting approval and needs a new request. Save? (Not asked again while this card is open.)'))) return false
+    revokeOk.current = true
+    return true
+  }
+  /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
+  const commitSimple = async () => {
+    if (saving || locked || !isDirty()) return
+    if (!confirmRevoke()) return
+    await saveStaying()
+  }
+  const applySimple = () => {
+    if (saving) return
+    if (locked) askReason()
+    else void commitSimple()
+  }
+  /** 元に戻す: 前に反映したときの中身に戻して、保存する(行 ID は、いまも残っている行だけ使う。消えた行は新しい行として作り直す) */
+  const undoSimple = () => {
+    if (saving) return
+    const snap = undoStack.pop()
+    if (!snap) return
+    const alive = <T extends Item>(x: T): T => (x.rowId && original?.has(x.rowId) ? x : { ...x, rowId: undefined })
+    // ステータスは戻さない(承認のやり直しを、元に戻すで飛ばさないように)
+    setForm({ ...snap.form, status: form.status })
+    setItems(snap.items.map(alive))
+    setCandidates(snap.candidates.map(alive))
+    setHeroId(snap.heroId)
+    setHeroReason(snap.heroReason)
+    setSectionTitles(snap.sectionTitles)
+    setSectionCopies(snap.sectionCopies)
+    setTemplate(snap.template)
+    setLinks(snap.links)
+    setPushLink(snap.pushLink)
+    setAudience(snap.audience)
+    setPendingUndoSave(true)
+  }
+  // 戻した中身で保存する(state を戻した次の描画の save を使うため、effect で呼ぶ)
+  useEffect(() => {
+    if (!pendingUndoSave) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPendingUndoSave(false)
+    if (lockedWeeks.length > 0) {
+      undoingRef.current = true
+      askReason()
+    } else void saveStaying(undefined, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingUndoSave])
+  /** 確定した週の、理由の欄の保存のボタン */
+  const saveWithReason = (reason: string) => {
+    if (!simpleOn) {
+      void save(reason)
+      return
+    }
+    const push = !undoingRef.current
+    const keep = !checkingRef.current
+    undoingRef.current = false
+    checkingRef.current = false
+    void saveStaying(reason, push, keep)
+  }
+  const nextStep = nextStepOf({ status: form.status, aiUnchecked: !!card?.ai_unchecked_at, handedOff: !!form.handedOffAt })
+  /** 詳しい画面(今の配信カード)で続ける。コミュニケーションの段階(d)ができるまで、承認・制作への依頼はこちらで */
+  const openDetailed = (tab?: TalkTab) => {
+    setDetailed(true)
+    if (!processOpen) toggleProcess()
+    if (tab) setTabRequest((r) => ({ tab, seq: (r?.seq ?? 0) + 1 }))
+  }
+  const runNext = (step: NextStep) => {
+    if (step === 'check') {
+      // 中身を確かめたので、保存して「AI 下書き・未確認」の印を外す(変わっていなくても保存する)
+      if (locked) {
+        checkingRef.current = true
+        askReason()
+      } else if (confirmRevoke()) void saveStaying(undefined, isDirty(), false)
+    } else if (step === 'openProduction') {
+      if (card) {
+        void commitSimple()
+        onOpenProduction?.(card.id)
+      }
+    } else openDetailed(step === 'requestProduction' ? 'handoff' : undefined)
+  }
+  /** 閉じる: 変更があれば反映してから閉じる(確定した週の配信は、捨てるかを聞く) */
+  const closeSimple = () => {
+    if (saving) return
+    if (!isDirty()) {
+      onBack()
+      return
+    }
+    if (locked) {
+      if (window.confirm(tr('確定した週の配信の変更を、反映せずに閉じます。よろしいですか?(反映するときは「理由を入力して反映」)', 'Close without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)'))) onBack()
+      return
+    }
+    if (!confirmRevoke()) return
+    goNextRef.current = false
+    stayRef.current = false
+    setSaveMode('close')
+    void save(undefined, true)
+  }
+  const swapItems = (a: string, b: string) => {
+    const i = items.findIndex((x) => x.key === a)
+    const j = items.findIndex((x) => x.key === b)
+    if (i < 0 || j < 0 || i === j) return
+    const next = [...items]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setItems(next)
+  }
+  const simplePreview = (
+    <>
+      <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
+        <Preview
+          channel={previewTab}
+          pushLinkKind={pushLink?.kind}
+          pushTitle={form.pushTitle}
+          pushBody={form.pushBody}
+          subject={form.name}
+          subjectLine={form.subject}
+          preheader={form.preheader}
+          device={previewDevice}
+          headline={form.headline}
+          copy={form.copy}
+          items={items}
+          products={products}
+          // 選んだ部品の枠は、部品を選ぶ層が描く(二重に光らせない)
+          selectedKey={null}
+          hoverKey={hoverKey}
+          showHeadings={showHeadings}
+          template={template}
+          scheduledAt={form.scheduledAt}
+          sectionTitles={sectionTitles}
+          onSectionTitle={setSectionTitle}
+          sectionCopies={sectionCopies}
+          onSectionCopy={setSectionCopy}
+          hero={hero}
+          onDropHero={setHeroId}
+          onClearHero={() => setHeroId(undefined)}
+          onSelect={() => undefined}
+          onRemove={removeItem}
+          onMove={(key, d) => {
+            const i = items.findIndex((x) => x.key === key)
+            moveItem(i, i + d)
+          }}
+          onDropAt={dropAt}
+          pickMode
+        />
+      </div>
+      {itemAlertKinds.size > 0 && (
+        // アラートの印を押しても、部品を選び直さない
+        <div data-no-pick>
+          <ItemAlertOverlay
+            boxRef={previewBoxRef}
+            kinds={itemAlertKinds}
+            onOpen={(key) => {
+              const it = items.find((i) => i.key === key)
+              if (it) openAlertFor(it.productId)
+            }}
+          />
+        </div>
+      )}
+    </>
+  )
+  const footerNode = (
+    <>
+    {error && (
+      <MessageBar layout="multiline" intent="error" className={styles.error}>
+        <MessageBarBody>{error}</MessageBarBody>
+      </MessageBar>
+    )}
+    {changeReason !== null && lockedWeeks.length > 0 && (
+      <div className={styles.reasonBox}>
+        <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
+          <AutoTextarea
+            rows={2}
+            size="small"
+            autoFocus
+            value={changeReason}
+            onChange={(_, d) => setChangeReason(d.value)}
+            placeholder={t('例: 在庫切れのため、商品を差し替え', 'e.g. Swapped a product that went out of stock')}
+          />
+        </Field>
+        <div className={styles.reasonActions}>
+          <Button
+            type="button"
+            size="small"
+            onClick={() => {
+              goNextRef.current = false
+              setChangeReason(null)
+            }}
+            disabled={saving}
+          >
+            {t('やめる', 'Back')}
+          </Button>
+          <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => saveWithReason(changeReason)}>
+            {t('保存して、レビューに戻す', 'Save and send back to review')}
+          </Button>
+        </div>
+      </div>
+    )}
+    </>
+  )
+  const simpleEditor: SimpleEditor | null = card
+    ? {
+        card,
+        form,
+        setField: (k, v) => set(k)(v),
+        channel: previewTab,
+        template,
+        abVariants: ab ? allVariants(ab) : null,
+        items,
+        candidates,
+        products,
+        poolProducts,
+        poolHeroes,
+        hero,
+        heroReason,
+        heroCandidates,
+        setHero: (id, reason) => {
+          setHeroId(id)
+          setHeroReason(reason)
+        },
+        uploadHero: () => setHeroUpload(true),
+        sectionTitles,
+        sectionCopies,
+        setSectionTitle,
+        setSectionCopy,
+        links,
+        setLinks,
+        linkSpots,
+        alertKinds: productAlertKinds,
+        addProduct,
+        removeItem,
+        moveItem,
+        swapItems,
+        swapWithCandidate,
+        openProduct: (key, action) => {
+          setActAlert(null)
+          setSlotAction(action ?? null)
+          setProductOpen(key)
+        },
+        hoverProduct: setHoverKey,
+        saving,
+        dirty: changed,
+        locked,
+        justSaved,
+        canUndo: undoStack.canUndo,
+        nextStep,
+        menu: (
+          <CardMenu
+            card={card}
+            weeks={weeks}
+            onChanged={async () => {
+              await onSaved()
+              onBack()
+            }}
+            onDeleted={async () => {
+              await onSaved()
+              onBack()
+            }}
+            onDuplicated={async (id) => {
+              await onSaved()
+              onReopen?.(id)
+            }}
+            extra={
+              <>
+                <MenuItem icon={<AiIcon size={16} />} disabled={!!auto || saving} onClick={runAllManual}>
+                  {t('すべて AI で下書き', 'Draft everything with AI')}
+                </MenuItem>
+                {next !== undefined && (
+                  <MenuItem icon={<ArrowNextRegular />} disabled={saving || !next} onClick={saveAndNext}>
+                    {next ? t(`保存して次へ(${next.name})`, `Save and next (${next.name})`) : t('保存して次へ(次の配信はありません)', 'Save and next (no next delivery)')}
+                  </MenuItem>
+                )}
+                {onOpenResults && card.scheduled_at && new Date(card.scheduled_at) < new Date() && (
+                  <MenuItem icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.id)}>
+                    {t('結果を見る', 'View results')}
+                  </MenuItem>
+                )}
+                <MenuItem icon={<MailRegular />} onClick={() => openDetailed()}>
+                  {t('詳しい画面へ(この配信だけ、今の配信カードで)', 'Open full view (this delivery only)')}
+                </MenuItem>
+              </>
+            }
+          />
+        ),
+        stageNav,
+        preview: simplePreview,
+        device: previewDevice,
+        setDevice: pickDevice,
+        zoomControls: zoomBox,
+        notices: (
+          <>
+            {noticesNode}
+            {alertsNode}
+          </>
+        ),
+        footer: footerNode,
+      }
+    : null
 
   return (
     <Dialog open onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
@@ -1544,6 +2091,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               </Button>
             </div>
           )}
+          {simpleOn ? (
+            <>
+              {productFloat}
+              {heroUploadNode}
+              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
+            </>
+          ) : (
+          <>
           <div className={styles.titleRow}>
             {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
             {stageNav ?? <FaceBadge face="calendar" />}
@@ -1586,137 +2141,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             )}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
-          {card?.cancelled_at && (
-            <MessageBar layout="multiline" intent="warning" className={styles.locked}>
-              <MessageBarBody>
-                {t(
-                  `この配信は取りやめ済みです(${new Date(card.cancelled_at).toLocaleString(locale())})。理由: ${card.cancel_reason || '—'}。元に戻すときは、右上の「…」から「取りやめを取り消す」`,
-                  `This delivery was cancelled (${new Date(card.cancelled_at).toLocaleString(locale())}). Reason: ${card.cancel_reason || '—'}. To restore it, use "…" > "Undo cancellation".`,
-                )}
-              </MessageBarBody>
-            </MessageBar>
-          )}
-
-          {card?.ai_unchecked_at && (
-            <MessageBar layout="multiline" intent="info" className={styles.locked}>
-              <MessageBarBody>
-                {t(
-                  'この配信の中身は、週の枠から AI でまとめて作ったもので、まだ誰も確かめていません。中身を確かめて保存すると、「AI 下書き・未確認」の印が外れます。',
-                  'This content was created by AI in bulk from a week slot and nobody has checked it yet. Check it and save to clear the “AI draft, unchecked” mark.',
-                )}
-              </MessageBarBody>
-            </MessageBar>
-          )}
-          {approvedBefore && lockedWeeks.length === 0 && changed && (
-            <MessageBar layout="multiline" intent="info" className={styles.locked}>
-              <MessageBarBody>
-                {t(
-                  '承認済みの配信の内容を変えています。保存すると「承認待ち」に戻り、承認の依頼からやり直しになります。',
-                  'You are changing an approved delivery. Saving puts it back to awaiting approval and needs a new approval request.',
-                )}
-              </MessageBarBody>
-            </MessageBar>
-          )}
-          {lockedWeeks.length > 0 && changed && (
-            <MessageBar layout="multiline" intent="warning" className={styles.locked}>
-              <MessageBarBody>
-                {t(
-                  `確定した週(${lockedWeeks.map(weekRange).join('、')})の配信を変えています。保存するときは、理由を入力します。保存すると、この配信は「承認待ち」に戻り、週の確定は解けます。`,
-                  `You are changing a delivery in a confirmed week (${lockedWeeks.map(weekRange).join(', ')}). To save, enter a reason. Saving puts this delivery back to awaiting approval and the week is no longer confirmed.`,
-                )}
-              </MessageBarBody>
-            </MessageBar>
-          )}
-
-          {/* 商品の対応のフロート(X54): アラートの札・商品の行の、どこから開いても、これ 1 つ */}
-          {(actAlert || productOpen) && (() => {
-            const item = actAlert ? items.find((i) => i.productId === actAlert.productId) : items.find((i) => i.key === productOpen)
-            const product = products.find((p) => p.id === (item?.productId ?? actAlert?.productId))
-            const idx = item ? items.indexOf(item) : -1
-            const section = idx >= 0 ? sectionIndexAt(sectionsOf(template), idx) : -1
-            const options: SwapOption[] = candidates.filter((c) => c.section === section).flatMap((c) => {
-              const p = products.find((x) => x.id === c.productId)
-              return p ? [{ key: c.key, product: p, reason: c.reason, source: c.source }] : []
-            })
-            const closeAction = () => {
-              setActAlert(null)
-              setProductOpen(null)
-            }
-            return (
-              <ProductActionFloat
-                key={`${actAlert ? `alert:${actAlert.kind}:${actAlert.productId ?? ''}` : `item:${productOpen}`}`}
-                product={product}
-                alert={actAlert ?? undefined}
-                card={alertCard}
-                scheduledAt={form.scheduledAt}
-                inCard={new Set(items.map((i) => i.productId))}
-                products={products}
-                poolProducts={poolProducts}
-                model={stockModel}
-                weekUse={weekUse}
-                alertKinds={productAlertKinds}
-                options={options}
-                image={item?.imageUrl}
-                delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '' }}
-                onImage={item ? (url, source) => setItemImage(item.key, url, source) : undefined}
-                onSwapCandidate={
-                  item
-                    ? (candKey, reason) => {
-                        swapWithCandidate(item.key, candKey, reason)
-                        closeAction()
-                      }
-                    : undefined
-                }
-                onReplace={
-                  item
-                    ? (to, reason) => {
-                        if (actAlert) replaceForAlert(actAlert, to, reason)
-                        else replaceItemWith(item.key, to, reason)
-                        closeAction()
-                      }
-                    : undefined
-                }
-                onPostpone={() => {
-                  setProductOpen(null)
-                  postponeForAlert()
-                }}
-                onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
-                onClose={closeAction}
-              />
-            )
-          })()}
-          {/* この配信のアラート(在庫・方針・日程)。ふだんは 1 行にたたむ。アラートの画面から開いたときは、開いておく */}
-          {liveAlerts.length > 0 && (
-            <CardAlertsBar
-              alerts={liveAlerts}
-              onAct={alertCard ? setActAlert : undefined}
-              defaultOpen={!!focusProductId}
-              selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
-              onSelectProduct={(pid) => {
-                const it = items.find((i) => i.productId === pid)
-                if (it) setSelectedKey(it.key)
-              }}
-            />
-          )}
+          {noticesNode}
+          {productFloat}
+          {alertsNode}
           {/* これまでの学び(同じテンプレート・テーマの種類の、過去の配信のメモ)。保存済みの配信だけ */}
           {card && (
             <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} />
           )}
 
-          {heroUpload && (
-            <HeroUploadDialog
-              market={cardMarket(form.country)}
-              cardId={card?.id}
-              me={myName() || form.owner}
-              onClose={() => setHeroUpload(false)}
-              onDone={async (h) => {
-                await onHeroesChanged?.()
-                setHeroId(h.id)
-                setHeroReason(tr('持っている画像を上げて使った', 'Uploaded and used'))
-                setHeroUpload(false)
-              }}
-            />
-          )}
+          {heroUploadNode}
           {/* AB テストの帯(X55): 案の切り替えと、テストの設定 */}
           {ab && (
             <AbTestBar
@@ -2059,31 +2492,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     </Badge>
                   )}
                 </div>
-                <div className={styles.zoomBox}>
-                  <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
-                  <Slider
-                    size="small"
-                    className={styles.slider}
-                    min={ZOOM_MIN * 100}
-                    max={ZOOM_MAX * 100}
-                    step={5}
-                    value={Math.round(shownZoom * 100)}
-                    onChange={(_, d) => setZoom(d.value / 100)}
-                    aria-label={t('プレビューの倍率', 'Preview zoom')}
-                  />
-                  <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
-                  <Caption1 className={styles.zoomLabel}>{Math.round(shownZoom * 100)}%</Caption1>
-                  {/* ボタンの文字は、押したときの動きを表す: 全体表示にする前は「全体」、全体表示のときは「100%」(押すと100%に戻る) */}
-                  <Button
-                    type="button"
-                    size="small"
-                    appearance={zoom === 'fit' ? 'primary' : 'outline'}
-                    onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')}
-                    aria-label={zoom === 'fit' ? t('100% の倍率に戻す', 'Reset to 100%') : t('メール全体を表示', 'Fit the whole email')}
-                  >
-                    {zoom === 'fit' ? '100%' : t('全体', 'Fit')}
-                  </Button>
-                </div>
+                {zoomBox}
                 <Tooltip
                   relationship="description"
                   content={card ? t('プレビューの場所を押して、そこへの書き込み(承認者のコメント・制作への問い合わせなど)を始めます。Esc でやめます。', 'Click a spot in the preview to start a comment there (approver feedback, questions to production, etc.). Esc to cancel.') : t('配信カードを保存すると、使えます', 'Save the delivery card first')}
@@ -2224,41 +2633,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             )}
           </div>
 
-          {error && (
-            <MessageBar layout="multiline" intent="error" className={styles.error}>
-              <MessageBarBody>{error}</MessageBarBody>
-            </MessageBar>
-          )}
-          {changeReason !== null && lockedWeeks.length > 0 && (
-            <div className={styles.reasonBox}>
-              <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
-                <AutoTextarea
-                  rows={2}
-                  size="small"
-                  autoFocus
-                  value={changeReason}
-                  onChange={(_, d) => setChangeReason(d.value)}
-                  placeholder={t('例: 在庫切れのため、商品を差し替え', 'e.g. Swapped a product that went out of stock')}
-                />
-              </Field>
-              <div className={styles.reasonActions}>
-                <Button
-                  type="button"
-                  size="small"
-                  onClick={() => {
-                    goNextRef.current = false
-                    setChangeReason(null)
-                  }}
-                  disabled={saving}
-                >
-                  {t('やめる', 'Back')}
-                </Button>
-                <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => void save(changeReason)}>
-                  {t('保存して、レビューに戻す', 'Save and send back to review')}
-                </Button>
-              </div>
-            </div>
-          )}
+          {footerNode}
           <div className={styles.actions}>
             <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
             {/* 次がないときも消さずに、選べないだけにする(ボタンの位置を変えない。PRINCIPLES.md 2-2) */}
@@ -2281,6 +2656,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               {saving && saveMode === 'close' ? t('保存中...', 'Saving...') : t('保存して閉じる', 'Save & close')}
             </Button>
           </div>
+          </>
+          )}
         </form>
       </DialogSurface>
     </Dialog>

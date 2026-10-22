@@ -46,11 +46,12 @@
 |---|---|
 | `src/simple/SimpleCardLayout.tsx` | 上の帯・概要の帯・ペインの並び。`CardDetail` から `editor` を受け取る |
 | `src/simple/parts.ts` | 部品の型 `PartRef` と、プレビューの目印との対応(React を使わない) |
-| `src/PartPicker.tsx` | プレビューの上に重ねる層。押した所の部品を見分けて選び、選んだ部品に枠を描く(`PreviewPins.tsx` と同じ作り。制作・結果でも使う) |
+| `src/PreviewPartPicker.tsx`(`PartPicker.tsx` は部品の画像(X59)で使っていたので、この名前にした) | プレビューの上に重ねる層。押した所の部品を見分けて選び、選んだ部品に枠を描く(`PreviewPins.tsx` と同じ作り。制作・結果でも使う) |
 | `src/simple/PartPane.tsx` | 選んだ部品のペイン。`PartRef` の種類ごとに編集の欄を出す |
-| `src/simple/NextAction.tsx` | 次にやることのボタン(ステータスから決める) |
+| `src/simple/NextAction.tsx`・`nextStep.ts` | 次にやることのボタンと、ステータスからの決め方 |
+| `src/simple/editor.ts`・`actions.ts` | `SimpleEditor`(CardDetail から渡す値と操作の型)と、一覧で押した商品を選んだ枠に置く処理 |
 | `src/simple/useUndo.ts` | 元に戻すの履歴(開いている間だけ) |
-| `src/settings.ts` | トグルの値 `simpleCard.on`(`loadPref` / `savePref`) |
+| `src/settings.ts` | トグルの値 `simpleCard.on`(`loadSimpleCard` / `saveSimpleCard`) |
 | `src/App.tsx` | ヘッダーのツールバーにトグル |
 
 新しいファイルは `src/` の下なので、Workbench 版の ZIP の規則(`scripts/release-workbench.mjs` の `RULES`)は足さなくてよい。この文書も `docs/` なので入る(本番の名前を書かない)。
@@ -66,7 +67,7 @@ type PartRef =
   | { kind: 'headline' } | { kind: 'copy' }              // メイン画像の上の大見出し・コピー
   | { kind: 'hero' }                                     // メイン画像
   | { kind: 'sectionTitle'; index: number } | { kind: 'sectionCopy'; index: number }
-  | { kind: 'product'; itemKey: string } | { kind: 'slot'; section: number }  // 載せた商品・空いた枠
+  | { kind: 'product'; itemKey: string } | { kind: 'slot'; index: number }  // 載せた商品・空いた枠(index は商品の並び全体の位置。作るときに section から改めた)
   | { kind: 'button'; id: string } | { kind: 'link'; id: string }
   | { kind: 'template' } | { kind: 'overview'; field?: string } | { kind: 'meta'; field: string }  // テンプレート・概要・上の帯
 ```
@@ -152,3 +153,9 @@ type PartRef =
 - 新しい localStorage のキーは ARCHITECTURE の 8 章の表に足す。
 - 標準のテンプレートの構成(セクションの種類・数・順)は変えない(保存済みのカードがずれる)。
 - 撮影用の画面で配信カードを開くと、中身が空の配信では自動の下書きが始まる(確かめるときは `cardDetail.autoDraft` を `off`)。
+
+## 12. 段階 (a) で作ったもの(2026-10-22)
+
+- 上の 10 章の (a) のとおり。作り・決まりは [ARCHITECTURE.md](ARCHITECTURE.md) の「シンプルな配信カード」にまとめた。
+- 作りながら決めたこと: シンプルな画面は保存済みの配信だけ(新規作成・まとめて作った案は今の画面。自動の反映で新しい配信を作らないため)。AB テストの配信は A 案だけを直す(段階 c まで)。テンプレートの札は、いまは名前と説明だけ(選び直しは段階 b)。リンク先はメイン画像・ボタンを選んだときに直せる(アプリの開く画面は詳しい画面で)。制作の担当・締め切りは概要に出すが、決めるのは今までどおり引き継ぎのタブ。
+- 空いた枠に入れた商品は、前から埋まる(テンプレートの枠は、商品の並びの順に埋まるため)。

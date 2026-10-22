@@ -24,6 +24,8 @@ interface Props {
   onAlert?: (productId: string) => void
   /** 行を押したとき(商品の対応のフロートを開く。X54) */
   onOpenProduct?: (itemKey: string) => void
+  /** 一覧の上の説明(シンプルな配信カードでは、枠を選んでからの見比べも書く) */
+  hint?: string
 }
 
 const useStyles = makeStyles({
@@ -71,7 +73,7 @@ function trendMark(name?: string): { mark: string; color: string } {
  * 行を押すと、商品のフロート(ProductFloat。中ペインの選定済みの行と同じもの)が開き、そこから残りの候補と差し替えられる。
  * 一覧そのものには、操作する部品を置かない(並べ替え・外すは中ペインだけ。X47)。
  */
-export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, onOpenProduct }: Props) {
+export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, onOpenProduct, hint }: Props) {
   const t = useT()
   const s = useStyles()
   const productById = new Map(products.map((p) => [p.id, p]))
@@ -83,7 +85,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
         <Text weight="semibold" size={300}>{t('商品情報', 'Product info')}</Text>
         <Badge size="small" appearance="tint" color="informative">{items.length}</Badge>
       </div>
-      <span className={s.caption}>{t('メールに載せる商品の一覧です。行を押すと詳細が開きます。', 'Products in the email. Click a row for details.')}</span>
+      <span className={s.caption}>{hint ?? t('メールに載せる商品の一覧です。行を押すと詳細が開きます。', 'Products in the email. Click a row for details.')}</span>
 
       {items.length === 0 && <span className={s.caption}>{t('まだ商品が選定されていません。', 'No products selected yet.')}</span>}
 

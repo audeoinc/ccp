@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Button,
   Dialog,
@@ -10,6 +10,7 @@ import {
   Field,
   Input,
   Menu,
+  MenuDivider,
   MenuItem,
   MenuList,
   MenuPopover,
@@ -45,13 +46,15 @@ interface Props {
   onDeleted: () => Promise<void>
   /** 複製のあと(新しい配信カードを開く) */
   onDuplicated: (id: string) => Promise<void>
+  /** メニューの先頭に足す項目(シンプルな配信カードの「すべて AI で下書き」「詳しい画面へ」など。SU1) */
+  extra?: ReactNode
 }
 
 /**
  * 配信カードの「…」のメニュー: 複製 / 取りやめにする / 取りやめを取り消す / 削除。
  * 取りやめは、経緯を残すふだんの操作(カレンダーに薄く残る)。削除は、間違えて作ったものを消すためのもので、元に戻せない
  */
-export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated }: Props) {
+export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extra }: Props) {
   const styles = useStyles()
   const t = useT()
   const [dialog, setDialog] = useState<'duplicate' | 'cancel' | 'delete' | null>(null)
@@ -92,6 +95,12 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated }: Pr
         </MenuTrigger>
         <MenuPopover>
           <MenuList>
+            {extra && (
+              <>
+                {extra}
+                <MenuDivider />
+              </>
+            )}
             <MenuItem
               icon={<CopyRegular />}
               onClick={() => {

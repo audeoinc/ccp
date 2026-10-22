@@ -34,3 +34,9 @@ export function savePref<T>(key: string, value: T) {
     // 保存できなくても動作には影響しない
   }
 }
+
+const SIMPLE_KEY = 'simpleCard.on'
+
+/** シンプルな配信カード(SU1)で開くか。人の設定(当面はブラウザごと。ST1 の人の設定ができたら、そちらへ)。既定はオフ(今の配信カード) */
+export const loadSimpleCard = (): boolean => loadPref<boolean>(SIMPLE_KEY, false)
+export const saveSimpleCard = (on: boolean) => savePref(SIMPLE_KEY, on)
