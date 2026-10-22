@@ -167,6 +167,11 @@ interface Props {
   onUseSql: (sql: string, run: boolean) => void
   /** ペインを畳む */
   onFold?: () => void
+  /** 作る出力(SQL の欄の「作る出力」と同じもの) */
+  output: string
+  onOutput: (output: string) => void
+  /** 外から頼む(答え合わせの「AI に直してもらう」)。id が変わったら送る */
+  ask?: { id: number; text: string } | null
 }
 
 /**
@@ -174,7 +179,7 @@ interface Props {
  * Gemini は、BigQuery を調べる道具(表を探す・列を見る・ビューの参照先をたどる・確かめる・SELECT を流す)を使える。
  * 思考の要約・調べたこと・返事は、届いたそばから出す(止まっているのか考えているのかが分かるように)
  */
-export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql, onFold }: Props) {
+export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql, onFold, output, onOutput, ask }: Props) {
   const s = useStyles()
   const [messages, setMessages] = useState<Message[]>(() => load<Message[]>(LOG_KEY, []).map((m) => ({ ...m, live: false })))
   const [input, setInput] = useState('')
@@ -185,7 +190,6 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
   const [defaultModel, setDefaultModel] = useState('')
   // モデルの欄に打っている途中の文字(確定するまで、選んだモデルは変えない)
   const [modelDraft, setModelDraft] = useState<string | null>(null)
-  const [output, setOutput] = useState('')
   const [tables, setTables] = useState<string[]>([])
   const [sampleRows, setSampleRows] = useState(true)
   const [allowRun, setAllowRun] = useState(true)
@@ -276,6 +280,16 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
     commit([...base, answer])
   }
 
+  const asked = useRef<number | null>(null)
+  useEffect(() => {
+    if (!ask || asked.current === ask.id) return
+    asked.current = ask.id
+    const id = window.setTimeout(() => void send(ask.text))
+    return () => window.clearTimeout(id)
+    // send は毎回作り直されるが、頼みの id が変わったときだけ送る
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask])
+
   const showContext = async () => {
     setPreview('')
     const r = await DevApi.context(ctx())
@@ -341,7 +355,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
           <>
             <div className={s.row}>
               <span className={s.label}>作る出力</span>
-              <Dropdown size="small" value={OUTPUTS.find((o) => o.value === output)?.label} selectedOptions={[output]} onOptionSelect={(_, d) => setOutput(d.optionValue ?? '')}>
+              <Dropdown size="small" value={OUTPUTS.find((o) => o.value === output)?.label} selectedOptions={[output]} onOptionSelect={(_, d) => onOutput(d.optionValue ?? '')}>
                 {OUTPUTS.map((o) => (
                   <Option key={o.value} value={o.value}>
                     {o.label}

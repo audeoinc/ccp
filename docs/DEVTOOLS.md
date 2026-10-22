@@ -2,7 +2,7 @@
 
 利用先の Workbench の中で、**CCP が読むデータを用意する作業**を、Gemini と一緒に進めるための画面です。CCP とは入り口も URL も別にします。使うのは開発する人だけ(配信の担当者は使わない)。
 
-- 状態: 作りかけ(2026-10-22。8 章の 1・2 と、3 の会話の部分まで。バックログ B10)
+- 状態: 作りかけ(2026-10-22。8 章の 1〜3 まで。バックログ B10)
 - Workbench は、ZIP で渡した版でも、`git clone` した版(`scripts/workbench.sh update` で更新)でも、同じに動く。有効にするのは `server/workbench.env` の `CCP_DEVTOOLS=1` だけ(版ごとに)。開く URL は、その版の CCP の画面のポート(`CCP_PORT`)の下の `/proxy/<ポート>/dev/`。同じ Workbench で clone の版と ZIP の版を別のポートで動かしていても、それぞれに開発用の画面が出る。作業ファイル(`server/devwork/`)は Git に入れないので、clone の版で `git pull` してもぶつからない
 - 関係する文書: 出力の形 [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)、変換の手引き [BIGQUERY_CONVERT.md](BIGQUERY_CONVERT.md)、ポリシーのファイルの形 [POLICY_FORMAT.md](POLICY_FORMAT.md)
 - 利用先のプロジェクト・データセット・テーブル・文書の名前は、この文書にもコードにも書かない
@@ -170,6 +170,7 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 | 1 | ✅ | `dev/index.html` → `src/dev/`(`DevApp`・`BqTab`・`SqlEditor`(CodeMirror + `@codemirror/lang-sql`)・`ResultGrid`・`CopyButton`)、`server/ccp/devtools.py`(テスト `server/tests/test_devtools.py`)、`CCP_DEVTOOLS`・`DEVTOOLS_MAX_GB`・`DEVTOOLS_DIR`、`server/devwork/settings.json`(よく見るデータセット) |
 | 2 | ✅(本物の BigQuery では、画面が開くところまで確認) | データセットを開く(**名前の一部で探す**: 接続しているプロジェクトのデータセット・前に開いたもの・プロジェクト名の一部。`DatasetPicker`) → 表の一覧(絞り込み)→ 表の列・行数・パーティション・ビューの SQL → 先頭の 20 行(料金なし)。SQL を試す: 料金なしで確かめる(文の種類・読む量)/ 流す(SELECT だけ、先頭 20・200・1000 行、Ctrl + Enter)。写す: 場所・列の一覧(Markdown)・SQL・結果(TSV / Markdown)・エラー・`.sql` で保存。ビューは、参照している元の表を出す(押すと開く) |
 | 3 の一部 | ✅(本物の Gemini では未確認) | 右の「Gemini と SQL を作る」(`ChatPanel`、`POST /api/dev/ai/chat`)。**Gemini が BigQuery を調べる道具を使う**(関数の呼び出し。1 回の発言で 16 回まで): `list_datasets`・`list_tables`(名前の一部で)・`describe_table`(列・説明・パーティション・先頭の 5 行。ビューは SQL と参照先)・`describe_view_sources`(ビューが参照している元の表を dry-run でたどり、列の定義を返す)・`dry_run`・`run_select`(SELECT だけ、20 行、読む量の上限つき。画面で止められる)。何を調べたかは、返事の上に出す。前提には、CCP の 6 つの出力の仕様をいつも全文入れる(どの列に当てるかを考えられるように)。作る出力を選ぶと手本の SQL も。仕様のまとめは `server/devwork/settings.json` に残す。会話はブラウザに残す(`ccp-dev-chat`)。返事の SQL は「SQL の欄に入れる」で試せる。エラーのあとは「このエラーを直して」。「前提」で、渡す前提を見る・コピーする。残り: 版・差分、`bq_validate` の答え合わせ、表を作る SQL |
+| 3 の残り | ✅(デモ用のビルドで確認) | SQL の欄の上に「作る出力」(AI の欄と共通)。**版**: 「版として保存」で `server/devwork/outputs/<出力>/v<番号>.sql` と `.json`(作った日時・答え合わせの結果。同じ SQL では増やさない)、版を開く・「違い」(2 つの版、またはいまの欄との行の違い)・「採用」(`index.json`)。**答え合わせ**(`POST /api/dev/check`): まず dry-run で必須の列・読む量・概算の料金を見せ、「全件で答え合わせ」で全件を流して `bq_validate.validate`(取り込みと同じ)。結びつき(SKU → SPU、在庫 → SKU、週ごと → SPU)は、相手の出力の採用の版をキーだけにして流して確かめる。結果は版に記録。「AI に直してもらう」で結果を会話に送る。**表を作る SQL**: 出す先のデータセットと表の名前の頭(既定 `ccp_`)を 1 度入れる(`server/devwork/target.json`)と、`CREATE OR REPLACE TABLE` に組み立てる(先頭のコメントに版・答え合わせ・更新の目安)。`BQ_<名前>=…` の行のコピー、`.sql` で保存、採用の版をまとめて 1 ファイルに |
 | 使い勝手(2026-10-22 利用者の要望) | ✅(デモ用のビルドで確認) | 会話は、思考の要約(`include_thoughts`)・調べたこと・返事を、届いたそばから出す(NDJSON。15 秒ごとに合図。経過の秒数・「止める」)。モデルを選べる(既定は Vertex AI の一覧でいちばん賢い Gemini。一覧を読めない環境では、`GEMINI_MODEL` の Flash を Pro に置き換えた名前が使えればそれ。Opus は使わない(2026-10-22 利用者)。`DEVTOOLS_GEMINI_MODEL`・`DEVTOOLS_THINKING`(既定 high))。Enter で送る・Shift + Enter で改行(変換の確定では送らない)。返事の SQL は複数(`sqls`)、それぞれに「入れて流す」「欄に入れる」「コピー」。ペインの幅はドラッグ、左右は畳める(畳んでも会話は続く)。表の詳細は、概要を横に並べ、列・先頭の行・ビューの SQL・参照している表をタブに。高さは右下をドラッグ。結果の下に、ジョブの実行情報(重さ・処理した量・課金された量・概算の料金(`DEVTOOLS_PRICE_PER_TIB`)・スロット時間・キャッシュ・ジョブ ID・参照したビューと読んだ元の表) |
 
 撮影・デモ用のビルド(`vite.mock.config.ts`)には、BigQuery も GCS もないので、見本の表と列で画面だけ動く形にする(画面の確認用)。
