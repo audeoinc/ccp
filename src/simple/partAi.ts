@@ -39,7 +39,7 @@ ${COMMON}
 決まり:
 1. ideas は 3 つ。それぞれ違う方向にする(同じ言い回しを並べない)。
 2. 文言は、配信の国に合わせる(US は英語、JP は日本語)。テーマと切り口から外れない。価格・割引率・期限など、入力にない事実を作らない。
-3. 長さの目安: 件名は 40 文字(英語は 50 字)まで、見出し・通知のタイトルは短く、コピー・プリヘッダー・通知の本文は 2 文まで。依頼が長さを決めていれば、それに従う。
+3. 長さの目安: 件名は 40 文字(英語は 50 字)まで、見出し・通知のタイトルは短く、コピー・プリヘッダー・通知の本文は 2 文まで。制作指示(kind が instructions)は、制作の人に向けた箇条書きで 10 行まで(画像・見せ方・強調する所)。依頼が長さを決めていれば、それに従う。
 
 入力:
 `
@@ -253,6 +253,8 @@ export function requestSamples(kind: string): string[] {
       return [tr('もっと明るい写真に', 'A brighter photo'), tr('人物が入ったもの', 'With a person'), tr('商品が大きく写るもの', 'Product front and center'), tr('季節感の強いもの', 'More seasonal')]
     case 'product':
       return [tr('在庫の多いものに', 'More in stock'), tr('価格帯を下げて', 'Lower price'), tr('売れ行きが上がっているもの', 'Trending up'), tr('同じカテゴリで別のもの', 'Same category, different item')]
+    case 'instructions':
+      return [tr('箇条書きに', 'As bullet points'), tr('画像の指示を足して', 'Add image directions'), tr('もっと具体的に', 'More specific'), tr('短くまとめて', 'Shorter')]
     case 'whole':
       return [tr('もっとカジュアルに', 'More casual'), tr('季節感を強く', 'More seasonal'), tr('高級感を出して', 'More premium'), tr('全体を短く', 'Shorter overall')]
     case 'slot':

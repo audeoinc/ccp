@@ -153,7 +153,8 @@ export interface SimpleEditor {
   canReview: boolean
   /** 承認・依頼のあとに、配信カードを読み直す */
   reload: () => Promise<void>
-  openProduction?: () => void
+  /** 制作のページを開く(request: 開いたら、そのまま制作に依頼する。シンプルな画面の「制作に渡す」) */
+  openProduction?: (opts?: { request?: boolean }) => void
   learnings: ReactNode
   learnCount: number
 }

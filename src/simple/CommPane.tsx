@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { Avatar, Button, Checkbox, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowRepeatAllRegular,
+  AttachRegular,
   CheckmarkCircleRegular,
   CheckmarkRegular,
   ChevronDownRegular,
@@ -18,6 +19,9 @@ import {
   TaskListSquareLtrRegular,
 } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
+import type { Product } from '../models/products'
+import { CardAssetsService } from '../data/cardAssets'
+import { CreativeAssets } from '../CreativeAssets'
 import type { ApprovalRequest } from '../models/approvalRequests'
 import type { ApprovalReviewer } from '../models/approvalReviewers'
 import { CardNotesService, type CardNote } from '../data/cardNotes'
@@ -141,6 +145,8 @@ interface Props {
   /** 載せた商品(商品の書き込みの場所 ↔ プレビューの枠) */
   items: { key: string; productId: string }[]
   productName: (productId: string) => string
+  /** 商品(素材の欄で、素材に商品を結び付けるため) */
+  products: Product[]
   /** 書き込みの見た目(チャネル|幅|案。pinView) */
   view: string
   /** 制作への引き継ぎ(担当・締め切り・引き継ぎ済み。ここでも決められる) */
@@ -180,7 +186,9 @@ export function CommPane(props: Props) {
   const [request, setRequest] = useState<ApprovalRequest | null>(null)
   const [reviewers, setReviewers] = useState<ApprovalReviewer[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'open' | 'all'>('open')
+  // 流れの絞り込み(未解決 / すべて)と、素材(参考の素材。流れの代わりに出す)
+  const [filter, setFilter] = useState<'open' | 'all' | 'assets'>('open')
+  const [assetCount, setAssetCount] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [showChanges, setShowChanges] = useState(false)
   const [text, setText] = useState('')
@@ -214,6 +222,16 @@ export function CommPane(props: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [load, version, card.status])
+  // 素材の数(札に出す。素材を開いている間は、素材の欄が数え直す)
+  useEffect(() => {
+    let alive = true
+    void CardAssetsService.getAll({ filter: `delivery_card_id eq ${card.id}` }).then((r) => {
+      if (alive && r.success) setAssetCount((r.data ?? []).length)
+    })
+    return () => {
+      alive = false
+    }
+  }, [card.id, version])
 
   // ---- 状態の道のりと、次に動く人
   const rank = statusRank(card.status)
@@ -415,6 +433,12 @@ export function CommPane(props: Props) {
         <button type="button" className={mergeClasses(s.pill, filter === 'all' && s.pillOn)} onClick={() => setFilter('all')}>
           {t('すべて', 'All')}
         </button>
+        <Tooltip content={t('参考の素材(制作に使ってほしい画像・資料・ページ)', 'Reference assets (images, documents and pages for production)')} relationship="description">
+          <button type="button" className={mergeClasses(s.pill, filter === 'assets' && s.pillOn)} onClick={() => setFilter('assets')}>
+            <AttachRegular style={{ verticalAlign: '-2px' }} />
+            {` ${assetCount}`}
+          </button>
+        </Tooltip>
         <Popover positioning="below-end" withArrow>
           <PopoverTrigger disableButtonEnhancement>
             <button type="button" className={s.handoff} title={t('制作の担当・締め切り', 'Production assignee and due date')}>
@@ -438,7 +462,25 @@ export function CommPane(props: Props) {
         </Popover>
       </div>
 
-      {/* 3. 1 本の流れ */}
+      {/* 3. 1 本の流れ(素材を選んでいるときは、素材の一覧。データと操作は、詳しい画面の素材のタブと同じ) */}
+      {filter === 'assets' ? (
+        <div className={s.stream}>
+          <CreativeAssets
+            cardId={card.id}
+            stage="plan"
+            title={t('参考の素材', 'Reference assets')}
+            hideCaption
+            owner={card.owner}
+            people={props.people}
+            cardName={card.name ?? ''}
+            productionOwner={props.handoff.productionOwner}
+            productionDue={props.handoff.productionDue}
+            productIds={props.items.map((i) => i.productId)}
+            products={props.products}
+            onCount={setAssetCount}
+          />
+        </div>
+      ) : (
       <div className={s.stream}>
         {loading && <Spinner size="tiny" />}
         {!loading && rows.length === 0 && <span className={s.empty}>{filter === 'open' ? t('未解決のやり取りはありません', 'Nothing open') : t('まだやり取りはありません', 'No activity yet')}</span>}
@@ -525,6 +567,7 @@ export function CommPane(props: Props) {
           </div>
         )}
       </div>
+      )}
 
       {/* 4. 書く欄は 1 つ。場所は、プレビューで選んでいる部品 */}
       <div className={s.composer}>

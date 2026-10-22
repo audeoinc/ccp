@@ -14,7 +14,7 @@ import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
-import { statusColor, statusLabel } from '../status'
+import { statusColor, statusLabel, statusRank } from '../status'
 import { getTemplate, sectionsOf } from '../templates'
 import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
@@ -22,6 +22,9 @@ import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
 import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
+import { HandoffSheet } from './HandoffSheet'
+import { ProductionRequestsService } from '../data/productionRequests'
+
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
@@ -35,6 +38,7 @@ type Widths = { mobile: number; pc: number; list: number; comm: number }
 const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320 }
 // コミュニケーションのペインの開閉(既定は畳む。自分宛てのものがあれば、開いたときに広げる)
 const COMM_KEY = 'simpleCard.commOpen'
+type Stage = 'plan' | 'handoff' | 'production'
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
 // 目印の出し分け(人の設定)。学びは帯で場所を取るので、既定は隠す(隠していても、AI の依頼には渡す)
@@ -135,6 +139,11 @@ const useStyles = makeStyles({
   candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  // 段階の切り替え(企画 → 渡す → 制作)
+  stages: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', flexShrink: 0, marginLeft: '6px' },
+  stageBtn: { border: 'none', padding: '3px 10px', borderRadius: '999px', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'pointer', whiteSpace: 'nowrap', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover, color: tokens.colorNeutralForeground1 } },
+  stageOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
+  stageArrow: { color: tokens.colorNeutralForeground4, fontSize: '12px' },
   // 案のタブ(SU2)
   abRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px', minHeight: '28px' },
   abTab: { display: 'inline-flex', alignItems: 'center', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
@@ -169,6 +178,34 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const t = useT()
   const s = useStyles()
   const [part, setPart] = useState<PartRef | null>(null)
+  // 段階(2026-10-22 利用者と決めた): 企画(AI の下書きを直す・承認者とのやり取り)→ 渡す(制作に渡すもの)→ 制作(渡したあと)。
+  // 承認されたら「渡す」に切り替えるが、承認の前でも、いつでも切り替えられる(人がいない・先に進めたいときがあるため)
+  const [stage, setStage] = useState<Stage>(() => (statusRank(e.card.status) >= statusRank('approved') ? 'handoff' : 'plan'))
+  const stageChosen = useRef(false)
+  const chooseStage = (v: Stage) => {
+    stageChosen.current = true
+    setStage(v)
+  }
+  // 制作に依頼してあれば、開いたときは「制作」
+  useEffect(() => {
+    let alive = true
+    void ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${e.card.id}'` }).then((r) => {
+      if (!alive || !r.success || stageChosen.current) return
+      const latest = [...(r.data ?? [])].sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0))[0]
+      if (latest && ['requested', 'in_progress', 'done', 'checked', 'sent'].includes(latest.status ?? '')) setStage('production')
+    })
+    return () => {
+      alive = false
+    }
+  }, [e.card.id])
+  // 開いている間に承認されたら、「渡す」に切り替える
+  const prevStatus = useRef(e.card.status)
+  useEffect(() => {
+    const before = prevStatus.current
+    prevStatus.current = e.card.status
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (statusRank(before) < statusRank('approved') && statusRank(e.card.status) >= statusRank('approved')) setStage('handoff')
+  }, [e.card.status])
   // 商品の一覧で押した商品(選んでいる枠と見比べる)
   const [compareKey, setCompareKey] = useState<string | null>(null)
   // 部品ごとの AI とのやり取り(開いている間だけ)
@@ -198,6 +235,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
   const select = (p: PartRef | null) => {
+    if (p && stage !== 'plan') chooseStage('plan')
     if (samePart(p, part)) return
     void onCommit()
     setPart(p)
@@ -289,6 +327,23 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           </>,
           t('ステータスを直す', 'Edit the status'),
         )}
+        {/* 段階の切り替え(承認の前でも押せる) */}
+        <span className={s.stages} role="tablist" aria-label={t('段階', 'Stage')}>
+          {(
+            [
+              ['plan', t('企画', 'Plan')],
+              ['handoff', t('渡す', 'Hand off')],
+              ['production', t('制作', 'Production')],
+            ] as const
+          ).map(([v, label], i) => (
+            <span key={v} style={{ display: 'contents' }}>
+              {i > 0 && <ChevronRightRegular className={s.stageArrow} />}
+              <button type="button" role="tab" aria-selected={stage === v} className={mergeClasses(s.stageBtn, stage === v && s.stageOn)} onClick={() => chooseStage(v)}>
+                {label}
+              </button>
+            </span>
+          ))}
+        </span>
         <span className={s.grow} />
         {/* 反映の様子: 保存中 / 保存しました / 未反映の変更あり */}
         {e.saving ? (
@@ -322,7 +377,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
       </div>
 
-      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--wc': `${commOpen ? widths.comm : RAIL_W}px` } as React.CSSProperties}>
+      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--wc': `${commOpen ? widths.comm : RAIL_W}px`, ...(stage !== 'plan' ? { gridTemplateColumns: 'var(--wv) 1px minmax(320px, 1fr) 1px var(--wc)' } : {}) } as React.CSSProperties}>
         {/* プレビュー(いちばん広い) */}
         <div className={s.previewPane}>
           <div className={s.toolbar}>
@@ -466,6 +521,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         <Splitter onDrag={resizePreview} onDone={saveWidths} />
 
+        {stage === 'plan' ? (
+          <>
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
           <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} />
@@ -536,6 +593,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           </div>
         )}
 
+          </>
+        ) : (
+          // 渡す・制作: 制作に渡すもの(文章・参考の画像と URL・担当と締め切り)の 1 枚。プレビューは見本として残す
+          <div className={s.pane}>
+            <HandoffSheet editor={e} stage={stage} onCommit={onCommit} />
+          </div>
+        )}
+
         <Splitter onDrag={commOpen ? resizeComm : () => undefined} onDone={saveWidths} />
 
         {/* コミュニケーション(段階 d): 状態と次に動く人・1 本の流れ・書く欄 1 つ。畳むと、件数だけの帯 */}
@@ -550,6 +615,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               onPick={select}
               items={e.items}
               productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
+              products={e.products}
               view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
               handoff={{ productionOwner: e.form.productionOwner, handedOffAt: e.form.handedOffAt, productionDue: e.form.productionDue }}
               onHandoff={e.setHandoff}

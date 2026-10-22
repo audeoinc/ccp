@@ -605,6 +605,8 @@ function App() {
   // 配信カードと制作のページは、閉じずに重ねる(閉じると直しかけを捨てるため。2026-10-20、利用者の要望で「企画を見る」も重ねる)。
   // 重なりの順は、あとから開いたものが上。下にあるものを見たいときは、上を閉じて見せる(配信カード)か、開き直して上に出す(制作のページ)
   const [productionKey, setProductionKey] = useState(0)
+  // 制作のページを開いたら、そのまま制作に依頼するか(シンプルな配信カードの「制作に渡す」)
+  const [productionAuto, setProductionAuto] = useState(false)
   const goStage = (id: string, f: Face) => {
     if (f === 'calendar') {
       setPeekResult(null)
@@ -2207,7 +2209,11 @@ function App() {
             setAlertsOpen(true)
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
-          onOpenProduction={(id) => goStage(id, 'production')}
+          onOpenProduction={(id, opts) => {
+            // シンプルな配信カードの「制作に渡す」は、開いた制作のページで、そのまま依頼まで進める
+            setProductionAuto(!!opts?.request)
+            goStage(id, 'production')
+          }}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           initialTab={selected && selected.id === link.card ? link.tab : undefined}
           onTabChange={setCardTab}
@@ -2239,6 +2245,7 @@ function App() {
           onClose={() => setProductionOpen(null)}
           onOpenCard={(id) => goStage(id, 'calendar')}
           onChanged={() => void production.reload()}
+          autoRequest={productionAuto}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
         />
       )}

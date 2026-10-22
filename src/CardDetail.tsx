@@ -129,7 +129,7 @@ interface Props {
   /** アラートの画面を開く(その商品のアラートを選んで。配信カードは閉じる) */
   onOpenAlerts?: (productId?: string) => void
   /** 制作のページを開く(プロセスのペインの「制作の依頼」の札から。PR4) */
-  onOpenProduction?: (cardId: string) => void
+  onOpenProduction?: (cardId: string, opts?: { request?: boolean }) => void
   /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav)。新規作成のときはなく、面の札を出す */
   stageNav?: ReactNode
   /** 最初に開く工程のタブ(リンクから開いたとき。X36) */
@@ -2293,7 +2293,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         people: owners,
         canReview,
         reload: onSaved,
-        openProduction: onOpenProduction && card ? () => onOpenProduction(card.id) : undefined,
+        openProduction: onOpenProduction && card ? (opts) => onOpenProduction(card.id, opts) : undefined,
         learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} />,
         learnCount,
       }
