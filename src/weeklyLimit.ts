@@ -2,10 +2,12 @@
 // 決め方(利用者と決めた 2026-10-21): マーケティングの決まり(⚙ の「方針・決まり」)に「上限 週 N 回」があり、配信の国・チャネル・配信日に当てはまれば、それを使う。
 // なければ、⚙ のアラートの条件の「週の上限」(ブラウザごとに覚える。既定 2)。決まりは ⚙ の「方針・決まり」の「週の上限の決まりを足す」で画面から作れる(X61)
 import { criteriaFor } from './countrySettings'
+import { policyUsableIn } from './countryApply'
 import { tr } from './i18n'
 
 /** 上限の決まり(policy_rules の行のうち、check_spec が「上限 週 N 回」のもの) */
 interface LimitRule {
+  ruleId: string
   title: string
   n: number
   market: string[]
@@ -18,10 +20,10 @@ let rules: LimitRule[] = []
 const listeners = new Set<() => void>()
 
 /** 決まりを読み込んだときに呼ぶ(App の loadMarketingPolicies)。上限の決まりだけを残す */
-export function setLimitRules(all: { title: string; checkSpec?: string; market: string[]; channel: string[]; periodStart?: string; periodEnd?: string }[]) {
+export function setLimitRules(all: { ruleId: string; title: string; checkSpec?: string; market: string[]; channel: string[]; periodStart?: string; periodEnd?: string }[]) {
   rules = all.flatMap((r) => {
     const m = (r.checkSpec ?? '').trim().match(/^上限\s+週\s+(\d+)\s*回$/)
-    return m ? [{ title: r.title, n: Number(m[1]), market: r.market, channel: r.channel, periodStart: r.periodStart, periodEnd: r.periodEnd }] : []
+    return m ? [{ ruleId: r.ruleId, title: r.title, n: Number(m[1]), market: r.market, channel: r.channel, periodStart: r.periodStart, periodEnd: r.periodEnd }] : []
   })
   for (const l of listeners) l()
 }
@@ -51,7 +53,8 @@ export function weeklyLimitFor(card?: CardLike): WeeklyLimit {
     const day = (card.scheduled_at ?? '').slice(0, 10)
     const hit = rules.filter(
       (r) =>
-        (r.market.length === 0 || !card.country || r.market.includes(card.country)) &&
+        // 国で使うか(ST8。市場の列は既定で、国ごとに変えられる)
+        policyUsableIn(r.ruleId, r.market, card.country) &&
         (r.channel.length === 0 || !card.channel || r.channel.includes(card.channel)) &&
         (!r.periodStart || !day || day >= r.periodStart) &&
         (!r.periodEnd || !day || day <= r.periodEnd),

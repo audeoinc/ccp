@@ -2,6 +2,7 @@ import { findViolations, retryNote, type Violation } from './policyCheck'
 import { ProductCategory } from './models/products'
 import { AiRequestsService } from './data/aiRequests'
 import { AiRunsService } from './data/aiRuns'
+import { policyUsableIn } from './countryApply'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
@@ -340,7 +341,8 @@ export function rulesFor(task: unknown, card: CardLite): ActiveRule[] {
   return activeRules.filter(
     (r) =>
       r.appliesTo.some((a) => targets.includes(a)) &&
-      (r.market.length === 0 || !card.country || r.market.includes(card.country)) &&
+      // 国で使うか(ST8。市場の列は既定で、国ごとに変えられる)
+      policyUsableIn(r.ruleId, r.market, card.country) &&
       (r.channel.length === 0 || !card.channel || r.channel.includes(card.channel)) &&
       (!r.periodStart || !day || day >= r.periodStart) &&
       (!r.periodEnd || !day || day <= r.periodEnd),

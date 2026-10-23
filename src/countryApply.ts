@@ -55,6 +55,14 @@ export const appliesIn = (kind: ApplyKind, id: string, country?: string | null, 
 /** 学びを、その国で使うか(ST5)。出元の国は決めていなければ使う。ほかの国は、人が「使う」と決めたときだけ(国で客層が違うため) */
 export const learningUsableIn = (id: string, origin: string, country: string) => appliesIn('learning', id, country, origin === country)
 
+/**
+ * マーケティングの決まりを、その国で使うか(ST8)。決まりの「市場」(markets)は、決めていないときの既定として読む:
+ * 空ならブランド全体の決まりで全部の国、書いてあればその国だけ(法律・表記など)。国ごとに使う・使わないを変えられる。
+ * 国を渡さない(国のない配信)ときは、これまでどおり使う。決まりの id は rule_id(取り込み直しても変わらないため)
+ */
+export const policyUsableIn = (ruleId: string, markets: string[], country?: string | null) =>
+  !country ? true : appliesIn('policy', ruleId, country, markets.length === 0 || markets.includes(country))
+
 /** 国で使うかを、決めたか(行があるか)。決めていなければ既定 */
 export const applyDecided = (kind: ApplyKind, id: string, country: string): boolean => history.has(keyOf(kind, id, country))
 

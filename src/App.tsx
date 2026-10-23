@@ -42,6 +42,7 @@ import {
   DismissRegular,
   DocumentBulletListRegular,
   LightbulbFilamentRegular,
+  ShieldCheckmarkRegular,
   DocumentPdfRegular,
   GlobeRegular,
   HistoryRegular,
@@ -114,7 +115,8 @@ import { PatternManager } from './PatternManager'
 import { CountryCriteriaDialog } from './CountryCriteriaDialog'
 import { CountryTemplatesDialog } from './CountryTemplatesDialog'
 import { CountryLearningsDialog } from './CountryLearningsDialog'
-import { loadCountryApply } from './countryApply'
+import { CountryPoliciesDialog } from './CountryPoliciesDialog'
+import { loadCountryApply, useCountryApply } from './countryApply'
 import { criteriaFor, loadCountrySettings, useCountrySettings } from './countrySettings'
 import { createUsSamplePatterns } from './samplePatterns'
 import { DeliveryPatternsService } from './data/deliveryPatterns'
@@ -481,6 +483,7 @@ function App() {
   // この国で使うテンプレート(ST1。共通のマスタ + 国ごとの適用 ST7)
   const [countryTplOpen, setCountryTplOpen] = useState(false)
   const [countryLearnOpen, setCountryLearnOpen] = useState(false)
+  const [countryPolicyOpen, setCountryPolicyOpen] = useState(false)
   useEffect(() => {
     void loadCountrySettings()
     void loadCountryApply()
@@ -725,6 +728,8 @@ function App() {
   const limitRules = useSyncExternalStore(onLimitRulesChange, limitRulesVersion)
   // 国の基準(ST2)。読み直したら、アラート・週の上限を作り直す
   const countryVersion = useCountrySettings()
+  // 国で使う決まり(ST8)を変えたら、週の上限を使う計算を作り直す
+  const applyVersion = useCountryApply()
   const lowWeeksOf = useCallback((c: DeliveryCard) => criteriaFor(c.country).lowWeeks, [countryVersion]) // eslint-disable-line react-hooks/exhaustive-deps
   const alertState = useStockAlerts(activeCards, products, cards, lowWeeksOf)
   const alerts = filterStockAlerts(alertSettings, alertState.alerts)
@@ -741,7 +746,7 @@ function App() {
     () => mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProductsAll, (id) => products.find((p) => p.id === id)?.name ?? '')),
     // 週の上限(アラートの条件・決まり)が変わったら、作り直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [alerts, changeAlerts, activeCards, cardProductsAll, products, countryVersion, limitRules],
+    [alerts, changeAlerts, activeCards, cardProductsAll, products, countryVersion, limitRules, applyVersion],
   )
   const weekUseAll = useMemo(() => weeklyUse(activeCards, cardProductsAll), [activeCards, cardProductsAll])
   const alertKinds = useMemo(() => new Map([...cardAlerts].map(([id, list]) => [id, topKind(list)]).filter((e): e is [string, CardAlertKind] => !!e[1])), [cardAlerts])
@@ -1049,7 +1054,7 @@ function App() {
       }),
     // 言語を変えたら、説明(曜日・種類)を作り直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, commentCounts, lang, countryVersion, limitRules],
+    [weekStart, weekCards, cards, cardProducts, products, policies, questionCounts, commentCounts, lang, countryVersion, limitRules, applyVersion],
   )
   const checkKey = check?.week === weekKey ? check.key : null
   const focusItem = checklist.find((i) => i.key === checkKey)
@@ -1464,6 +1469,7 @@ function App() {
       <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} onChanged={() => void loadPatterns()} />
       <CountryCriteriaDialog open={criteriaOpen} onClose={() => setCriteriaOpen(false)} country={filters.country} />
       <CountryTemplatesDialog open={countryTplOpen} onClose={() => setCountryTplOpen(false)} country={filters.country} />
+      <CountryPoliciesDialog open={countryPolicyOpen} onClose={() => setCountryPolicyOpen(false)} country={filters.country} />
       <CountryLearningsDialog open={countryLearnOpen} onClose={() => setCountryLearnOpen(false)} country={filters.country} cards={cards} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
@@ -1588,6 +1594,10 @@ function App() {
                 {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}
                 <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
                   {t('方針・決まり(取り込み・一覧・直す)', 'Marketing policies (import, list, edit)')}
+                </MenuItem>
+                {/* この国で使う決まり(ST8): 決まりは共通。市場の列を既定に、国では、使う・使わないだけを決める(ST7 の適用の表) */}
+                <MenuItem icon={<ShieldCheckmarkRegular />} onClick={() => setCountryPolicyOpen(true)}>
+                  {t('この国で使う決まり', 'Rules used in this country')}
                 </MenuItem>
                 {/* 国のアラートの基準(ST2): 在庫僅少の週数・週の上限・販売順位の上位の線。国の全員に効くので、変えた人・日時を残す */}
                 <MenuItem icon={<AlertRegular />} onClick={() => setCriteriaOpen(true)}>
