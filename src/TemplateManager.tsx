@@ -36,7 +36,7 @@ import { TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import { Splitter } from './Splitter'
 import { useTableEditor } from './TemplateTableEditor'
-import { toTableLayout } from './tables'
+import { ratioLabel, toTableLayout } from './tables'
 import {
   DEFAULT_PUSH_TEMPLATE,
   LINK_KINDS,
@@ -62,13 +62,16 @@ import {
   type LinkKind,
   type Section,
   type TemplateLayout,
+  type HeroStyle,
+  type MediaRatio,
+  MEDIA_RATIOS,
 } from './templates'
 
 /**
  * 編集中の内容。構成は、表のセクションの並びだけで持つ(T8。docs/TEMPLATE_OBJECTS.md)。
  * 以前の種類のセクション・独立したボタンは、開いたときに表に直す(tables.ts の toTableLayout。保存すると、以後は表の形で持つ)
  */
-interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'heroLink'> {
+interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'heroLink' | 'heroStyle'> {
   /** 保存済みの行の ID(新規は undefined) */
   id?: string
   name: string
@@ -83,7 +86,7 @@ interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'h
 }
 
 /** 編集中の内容から、保存・見取り図に使う構成を作る */
-const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}) })
+const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}), ...(d.heroStyle ? { heroStyle: d.heroStyle } : {}) })
 
 /** セクションの形(表に直して、部品の種類・位置・大きさ・見せ方)。ID・文言・見出しは比べない */
 const sectionShape = (sec: Section) =>
@@ -574,6 +577,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
       heroText: selected.heroText,
       topBar: selected.topBar,
       heroLink: selected.heroLink,
+      heroStyle: selected.heroStyle,
       sections: toTableLayout(selected).sections,
       heroTable: toTableLayout(selected).heroTable,
       push: selected.push ? { ...selected.push, buttons: [...selected.push.buttons] } : undefined,
@@ -586,7 +590,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     if (!selected || !canEdit(selected)) return
     setError(null)
     setCompareId(null)
-    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, sections: toTableLayout(selected).sections, heroTable: toTableLayout(selected).heroTable, push: selected.push })
+    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, heroStyle: selected.heroStyle, sections: toTableLayout(selected).sections, heroTable: toTableLayout(selected).heroTable, push: selected.push })
   }
 
   // ---- 元に戻す・やり直す。編集中の内容が変わるたびに、前の内容を残す(続けて打った文字は 0.6 秒の間をまとめて 1 つにする)
@@ -653,6 +657,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     hero: draft?.hero ?? 'standard',
     heroText: draft?.heroText,
     topBar: draft?.topBar,
+    heroStyle: draft?.heroStyle,
     samples,
     onSelectHero: () => window.setTimeout(() => heroRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0),
   })
@@ -966,6 +971,12 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
 
   /** 右のタブ「テンプレート」: 基本・通知・全体の見た目・状況・構成 */
   const templateTab = (d: Draft) => {
+    const hs = d.heroStyle ?? {}
+    // ヒーローの細かい見た目を直す(空になった項目は持たない)
+    const setHs = (x: Partial<HeroStyle>) => {
+      const next = Object.fromEntries(Object.entries({ ...hs, ...x }).filter(([, v]) => v !== undefined)) as HeroStyle
+      patch({ heroStyle: Object.keys(next).length > 0 ? next : undefined })
+    }
     const cur = d.id ? currentVersion(d.id) : 0
     const used = d.id ? usageOf(d.id).total : 0
     const kv = (label: string, value: React.ReactNode) => (
@@ -1058,7 +1069,68 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
               ))}
             </Select>
           </Field>
+          {/* ヒーローの細かい見た目(T8 の 8.6) */}
+          <Field label={t('写真の形', 'Photo shape')} size="small">
+            <Select size="small" value={hs.ratio ?? ''} onChange={(_, x) => setHs({ ratio: (x.value || undefined) as MediaRatio | undefined })}>
+              <option value="">{t('既定(ヘッドラインの置き方に合わせる)', 'Default (follows the headline placement)')}</option>
+              {MEDIA_RATIOS.map((r) => (
+                <option key={r} value={r}>{ratioLabel(r)}</option>
+              ))}
+            </Select>
+          </Field>
+          {(d.heroText ?? 'band') !== 'below' && (
+            <Field label={t('ヘッドラインの位置(縦)', 'Headline position (vertical)')} size="small">
+              <div className={s.row}>
+                {(['top', 'middle', 'bottom'] as const).map((v) => {
+                  const on = (hs.v ?? ((d.heroText ?? 'band') === 'band' ? 'bottom' : 'middle')) === v
+                  return (
+                    <Button key={v} size="small" appearance={on ? 'primary' : 'outline'} aria-pressed={on} onClick={() => setHs({ v })}>
+                      {{ top: t('上', 'Top'), middle: t('中央', 'Middle'), bottom: t('下', 'Bottom') }[v]}
+                    </Button>
+                  )
+                })}
+              </div>
+            </Field>
+          )}
+          <Field label={t('ヘッドラインの位置(横)', 'Headline position (horizontal)')} size="small">
+            <div className={s.row}>
+              {(['left', 'center', 'right'] as const).map((h) => {
+                const on = (hs.h ?? ((d.heroText ?? 'band') === 'band' ? 'left' : 'center')) === h
+                return (
+                  <Button key={h} size="small" appearance={on ? 'primary' : 'outline'} aria-pressed={on} onClick={() => setHs({ h })}>
+                    {{ left: t('左', 'Left'), center: t('中央', 'Center'), right: t('右', 'Right') }[h]}
+                  </Button>
+                )
+              })}
+            </div>
+          </Field>
+          {(d.heroText ?? 'band') !== 'below' && (
+            <>
+              <Field label={t('文字の色', 'Text color')} size="small">
+                <div className={s.row}>
+                  {(['light', 'dark'] as const).map((c) => (
+                    <Button key={c} size="small" appearance={(hs.color ?? 'light') === c ? 'primary' : 'outline'} aria-pressed={(hs.color ?? 'light') === c} onClick={() => setHs({ color: c === 'light' ? undefined : c })}>
+                      {c === 'light' ? t('白', 'White') : t('黒', 'Black')}
+                    </Button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={(d.heroText ?? 'band') === 'band' ? t('帯の濃さ', 'Band strength') : t('写真に重ねる暗さ', 'Darken the photo')} size="small">
+                <Select size="small" value={String(hs.shade ?? ((d.heroText ?? 'band') === 'band' ? 2 : 0))} onChange={(_, x) => setHs({ shade: Number(x.value) as 0 | 1 | 2 | 3 })}>
+                  <option value="0">{t('なし', 'None')}</option>
+                  <option value="1">{t('薄く', 'Light')}</option>
+                  <option value="2">{t('ふつう', 'Normal')}</option>
+                  <option value="3">{t('濃く', 'Strong')}</option>
+                </Select>
+              </Field>
+            </>
+          )}
           <Checkbox label={t('お知らせ帯を、メールの最上部に置く', 'Show the top bar at the very top')} checked={!!d.topBar} onChange={(_, x) => patch({ topBar: x.checked === true || undefined })} />
+          {d.topBar && (
+            <Field label={t('お知らせ帯の文言(空は配信名)', 'Top bar text (empty uses the delivery name)')} size="small">
+              <Input size="small" value={hs.barText ?? ''} maxLength={60} onChange={(_, x) => setHs({ barText: x.value || undefined })} />
+            </Field>
+          )}
         </div>
 
         <div className={s.grp}>

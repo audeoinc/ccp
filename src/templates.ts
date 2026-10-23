@@ -14,6 +14,20 @@ export type EmailTemplateId = string
 
 export type HeroKind = 'standard' | 'collab' | 'offer'
 
+/**
+ * ヒーローの細かい見た目(T8 の 8.6)。どれも省略は、以前の見た目(帯は下・左、大きく重ねるは中央、写真の下は中央)。
+ * ratio: 写真の形 / v・h: ヘッドラインの位置(帯は上か下、大きく重ねるは 9 か所、写真の下は左右だけ)/
+ * color: 文字の色(light 白・dark 黒)/ shade: 写真に重ねる暗さ(0 なし〜3 濃く)/ barText: お知らせの帯の文言(空は配信名)
+ */
+export interface HeroStyle {
+  ratio?: MediaRatio
+  v?: 'top' | 'middle' | 'bottom'
+  h?: 'left' | 'center' | 'right'
+  color?: 'light' | 'dark'
+  shade?: 0 | 1 | 2 | 3
+  barText?: string
+}
+
 /** ヘッドラインの見せ方。band: 写真の下部に帯で重ねる / overlay: 写真の中央に大きく重ねる / below: 写真の下に置く */
 export type HeroText = 'band' | 'overlay' | 'below'
 
@@ -269,6 +283,8 @@ export interface EmailTemplate {
   heroText?: HeroText
   /** ヒーローの下に置くボタンの数(省略は 0。以前の形。今は、位置 0 の ButtonBlock で表す) */
   heroButtons?: 0 | 1 | 2
+  /** ヒーローの細かい見た目(T8 の 8.6。省略は以前の見た目) */
+  heroStyle?: HeroStyle
   /** メールの最上部に、お知らせの帯を置く */
   topBar?: boolean
   /** メイン画像のリンク先の種類(省略は campaign) */
@@ -300,7 +316,7 @@ export interface EmailTemplate {
 }
 
 /** 構成の見た目に関わる部分(見取り図、プレビュー、編集中の内容で共通に使う) */
-export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'>
+export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable' | 'heroStyle'>
 
 // ---- 標準のテンプレート ----
 
@@ -572,7 +588,7 @@ const changed = () => {
 export function setCustomTemplates(list: ({ id: string; overrides?: string } & Omit<EmailTemplate, 'builtin'>)[]) {
   custom = Object.fromEntries(list.filter((x) => !x.overrides || !BUILTIN[x.overrides]).map((x) => [x.id, { ...x, rowId: x.id, builtin: false, version: x.version ?? 1 }]))
   // 使わない(無効)にしただけの上書きの行は、中身が標準と同じ。中身が違うときだけ「編集済み」にする
-  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null, x.heroTable ?? null])
+  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null, x.heroTable ?? null, x.heroStyle ?? null])
   overrides = Object.fromEntries(
     list.filter((x) => x.overrides && BUILTIN[x.overrides]).map(({ id, overrides: o, ...rest }) => [o!, { ...rest, rowId: id, builtin: true, edited: shape(rest) !== shape(BUILTIN[o!]), version: rest.version ?? 0 }]),
   )
@@ -667,6 +683,7 @@ export function templateOptions(channel?: TemplateChannel, includeHidden = false
       sections: tpl.sections,
       buttonBlocks: tpl.buttonBlocks,
       heroTable: tpl.heroTable,
+      heroStyle: tpl.heroStyle,
     }
   })
 }

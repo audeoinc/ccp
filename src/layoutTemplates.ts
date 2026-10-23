@@ -25,6 +25,9 @@ import {
   type LinkKind,
   type Section,
   type SectionBg,
+  type HeroStyle,
+  type MediaRatio,
+  MEDIA_RATIOS,
   type SectionKind,
   type TemplateLayout,
   type PushSpec,
@@ -116,7 +119,7 @@ export function toStored(s: Section): Section {
  * ヒーローの見せ方は、テーブルに列がないので、セクションの JSON の先頭に { "kind": "hero", ... } として入れる。
  * slots を持たないので、以前の版のアプリは、この要素を読み飛ばす(テンプレートは、以前の見た目で使える)
  */
-type HeroMeta = { kind: 'hero'; text?: HeroText; buttons?: 1 | 2; topBar?: true; link?: LinkKind }
+type HeroMeta = { kind: 'hero'; text?: HeroText; buttons?: 1 | 2; topBar?: true; link?: LinkKind; style?: HeroStyle }
 
 /**
  * 独立したボタンの部品は、セクションの JSON の、置く位置に { "kind": "buttons", "buttons": [...] } として入れる。
@@ -163,8 +166,21 @@ function parseButtons(raw: unknown): ButtonSpec[] {
     .slice(0, MAX_BUTTONS_PER_BLOCK)
 }
 
+/** ヒーローの細かい見た目を読む(知らない値は外す。既定の値は持たない) */
+function parseHeroStyle(raw: unknown): HeroStyle {
+  const o = (raw ?? {}) as Record<string, unknown>
+  return {
+    ...(MEDIA_RATIOS.includes(o.ratio as MediaRatio) ? { ratio: o.ratio as MediaRatio } : {}),
+    ...(o.v === 'top' || o.v === 'middle' || o.v === 'bottom' ? { v: o.v } : {}),
+    ...(o.h === 'left' || o.h === 'center' || o.h === 'right' ? { h: o.h } : {}),
+    ...(o.color === 'light' || o.color === 'dark' ? { color: o.color } : {}),
+    ...(o.shade === 0 || o.shade === 1 || o.shade === 2 || o.shade === 3 ? { shade: o.shade } : {}),
+    ...(typeof o.barText === 'string' && o.barText.trim() ? { barText: o.barText.trim().slice(0, 60) } : {}),
+  }
+}
+
 /** 保存されている JSON から、ヒーローの見せ方と、セクションの一覧を読む(壊れていても、読める分だけ) */
-function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'> & { channel?: TemplateChannel; push?: PushSpec } {
+function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable' | 'heroStyle'> & { channel?: TemplateChannel; push?: PushSpec } {
   const empty = { sections: [] }
   if (!text) return empty
   try {
@@ -242,6 +258,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
       heroText: meta && HERO_TEXTS.includes(meta.text as HeroText) ? meta.text : undefined,
       heroButtons: meta?.buttons === 1 || meta?.buttons === 2 ? meta.buttons : undefined,
       topBar: meta?.topBar ? true : undefined,
+      ...(meta?.style ? { heroStyle: parseHeroStyle(meta.style) } : {}),
       heroLink: meta && meta.link !== 'campaign' && LINK_KINDS.includes(meta.link as LinkKind) ? meta.link : undefined,
       ...(heroTable ? { heroTable } : {}),
     }
@@ -254,13 +271,14 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
  * セクションの JSON を作る。ボタンの部品は、置く位置(at)に挟む。
  * ヒーローの見せ方が既定(帯・ボタンなし・お知らせ帯なし・配信のページ)で、ボタンの部品もないときは、以前と同じ形(セクションの配列だけ)
  */
-function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'> & { push?: PushSpec }): string {
+function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable' | 'heroStyle'> & { push?: PushSpec }): string {
   const meta: HeroMeta = {
     kind: 'hero',
     ...(layout.heroText && layout.heroText !== 'band' ? { text: layout.heroText } : {}),
     ...(layout.heroButtons ? { buttons: layout.heroButtons } : {}),
     ...(layout.topBar ? { topBar: true as const } : {}),
     ...(layout.heroLink && layout.heroLink !== 'campaign' ? { link: layout.heroLink } : {}),
+    ...(layout.heroStyle && Object.keys(parseHeroStyle(layout.heroStyle)).length > 0 ? { style: parseHeroStyle(layout.heroStyle) } : {}),
   }
   const blocks = (layout.buttonBlocks ?? []).filter((b) => b.buttons.length > 0).slice(0, MAX_BUTTON_BLOCKS)
   const buttonsAt = (at: number): StoredButtons[] =>
@@ -271,7 +289,7 @@ function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons'
   return JSON.stringify(Object.keys(meta).length > 1 || app.length ? [...app, ...(Object.keys(meta).length > 1 ? [meta] : []), ...parts] : parts)
 }
 
-export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'buttonBlocks' | 'heroTable'> {
+export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'buttonBlocks' | 'heroTable' | 'heroStyle'> {
   id?: string
   name: string
   description: string
@@ -334,6 +352,7 @@ export const inputOf = (tpl: EmailTemplate): TemplateInput => ({
   sections: tpl.sections,
   buttonBlocks: tpl.buttonBlocks,
   heroTable: tpl.heroTable,
+  heroStyle: tpl.heroStyle,
   push: tpl.push,
 })
 

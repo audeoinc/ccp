@@ -560,6 +560,13 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   }
 
   // ---- ヒーロー(メイン画像 + 見出し)。種類によって装飾が変わる
+  // 細かい見た目(T8 の 8.6): 写真の形・ヘッドラインの位置・文字の色・重ねる暗さ。省略は以前の見た目
+  const hs = tpl.heroStyle ?? {}
+  const heroInk = hs.color === 'dark' ? INK : '#fff'
+  const bandShade = [0, 0.25, 0.42, 0.6][hs.shade ?? 2]
+  const coverShade = [0, 0.15, 0.3, 0.45][hs.shade ?? 0]
+  const alignOf = (v?: 'top' | 'middle' | 'bottom') => (v === 'top' ? 'start' : v === 'bottom' ? 'end' : 'center')
+  const justifyOf = (h?: 'left' | 'center' | 'right') => (h === 'left' ? 'start' : h === 'right' ? 'end' : 'center')
   const heroBox = (
     <div
       className={classes.hero}
@@ -579,7 +586,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         if (id) onDropHero(id)
       }}
       style={{
-        aspectRatio: heroText === 'band' ? (compact ? '3 / 1' : '8 / 3') : compact ? '2 / 1' : heroText === 'overlay' ? '4 / 5' : '1 / 1',
+        aspectRatio: hs.ratio ? String(ratioValue(hs.ratio)) : heroText === 'band' ? (compact ? '3 / 1' : '8 / 3') : compact ? '2 / 1' : heroText === 'overlay' ? '4 / 5' : '1 / 1',
         backgroundColor: heroOver ? 'rgba(103,80,164,0.15)' : '#e9e9ee',
         // 拡大して切り出すとき(X59 ④)に、はみ出しを隠す
         overflow: 'hidden',
@@ -602,6 +609,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       ) : (
         t('メインビジュアル(候補から画像をドロップ)', 'Main visual (drop an image from the candidates)')
       )}
+      {heroText !== 'band' && coverShade > 0 && <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${coverShade})`, pointerEvents: 'none' }} />}
       {tpl.hero === 'offer' && (
         <div style={{ position: 'absolute', top: 12, left: 12, backgroundColor: '#d32f2f', color: '#fff', fontWeight: 800, letterSpacing: 2, fontSize: '0.75rem', padding: '4px 10px', borderRadius: 4 }}>
           LIMITED OFFER
@@ -619,11 +627,11 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: 0,
+          ...(hs.v === 'top' ? { top: 0 } : hs.v === 'middle' ? { top: '50%', transform: 'translateY(-50%)' } : { bottom: 0 }),
           padding: `${compact ? '1.2cqw' : '2.2cqw'} 5cqw`,
-          backgroundColor: 'rgba(0,0,0,0.42)',
-          color: '#fff',
-          textAlign: 'left',
+          backgroundColor: hs.color === 'dark' ? `rgba(255,255,255,${bandShade})` : `rgba(0,0,0,${bandShade})`,
+          color: heroInk,
+          textAlign: hs.h ?? 'left',
           // 部品を選ぶ見せ方では、見出しとコピーを、メイン画像とは別に押せるようにする
           pointerEvents: pickMode ? 'auto' : 'none',
         }}
@@ -660,11 +668,12 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         <div
           style={{
             position: 'absolute',
-            inset: '0 6cqw',
+            inset: '4cqw 6cqw',
             display: 'grid',
-            placeItems: 'center',
-            color: '#fff',
-            textAlign: 'center',
+            alignItems: alignOf(hs.v),
+            justifyItems: justifyOf(hs.h),
+            color: heroInk,
+            textAlign: hs.h ?? 'center',
             pointerEvents: 'none',
             fontFamily: hf.family,
             fontWeight: hf.weight,
@@ -672,7 +681,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             lineHeight: 1.15,
             letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking,
             textTransform: hf.upper ? 'uppercase' : 'none',
-            textShadow: '0 2px 12px rgba(0,0,0,0.35)',
+            textShadow: hs.color === 'dark' ? 'none' : '0 2px 12px rgba(0,0,0,0.35)',
             overflowWrap: 'anywhere',
           }}
         >
@@ -717,14 +726,14 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   const heroAfter = (
     <>
       {heroText === 'below' && (
-        <div data-anchor="herotext" style={{ textAlign: 'center', padding: '16px 16px 0', color: INK }}>
+        <div data-anchor="herotext" style={{ textAlign: hs.h ?? 'center', padding: '16px 16px 0', color: INK }}>
           <div data-part="headline" style={{ fontFamily: hf.family, fontWeight: hf.weight, fontSize: `calc(1.5rem * ${hf.scale})`, lineHeight: 1.25, letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking, textTransform: hf.upper ? 'uppercase' : 'none' }}>
             {headline || t('(ヘッドライン未入力)', '(No headline)')}
           </div>
         </div>
       )}
       {heroText !== 'band' && (
-        <div data-anchor="herotext" data-part="copy" style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
+        <div data-anchor="herotext" data-part="copy" style={{ textAlign: heroText === 'below' ? (hs.h ?? 'center') : 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
       )}
       {buttonsAfter(0, 12)}
       <div style={{ height: 8 }} />
@@ -989,7 +998,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         {/* お知らせ帯: 配信名を、メールの最上部に細い帯で出す */}
         {tpl.topBar && (
           <div data-anchor="topbar" className={classes.noWrap} style={{ backgroundColor: '#555', color: '#fff', textAlign: 'center', padding: '6px 12px', fontSize: '0.75rem', letterSpacing: 2 }}>
-            {subject || t('(配信名未入力)', '(No name)')} ›
+            {hs.barText || subject || t('(配信名未入力)', '(No name)')} ›
           </div>
         )}
         <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>SHOP</div>

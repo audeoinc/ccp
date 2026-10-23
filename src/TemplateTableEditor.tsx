@@ -6,7 +6,7 @@ import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
 import { MAX_SECTIONS } from './layoutTemplates'
 import { getUiScale } from './uiScale'
-import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
+import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
 
@@ -241,6 +241,8 @@ export interface TableEditorArgs {
   /** セクションの並びを変える(元に戻すは、呼ぶ側の編集中の内容の履歴で行う) */
   setSections: (fn: (list: Section[]) => Section[]) => void
   hero: HeroKind
+  /** ヒーローの細かい見た目(キャンバスの絵に写す) */
+  heroStyle?: HeroStyle
   heroText?: HeroText
   topBar?: boolean
   /** 見本の写真(T8 の確認 4・案 A): 箱に、商品のデータの写真・名前・価格を仮に入れて見せる(保存しない。並びの順に使い回す) */
@@ -253,7 +255,7 @@ export interface TableEditorArgs {
  * 表の編集。パーツの列・キャンバス・右のタブ(テンプレート / セクションと部品)を返す(並べ方とスプリッターは、呼ぶ側が決める)。
  * テンプレートのタブの中身は、呼ぶ側が作って rightPane に渡す
  */
-export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroText, topBar, samples = [], onSelectHero }: TableEditorArgs) {
+export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroStyle, heroText, topBar, samples = [], onSelectHero }: TableEditorArgs) {
   const t = useT()
   const s = useStyles()
   const [sel, setSel] = useState<Sel>(null)
@@ -1337,7 +1339,17 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         {topBar && <div className={s.topBar} />}
         <div
           className={s.hero}
-          style={{ backgroundColor: MAIL.hero[hero] }}
+          style={{
+            backgroundColor: MAIL.hero[hero],
+            // 写真の形を選んでいれば、その形の高さ(キャンバスが縦に長くなりすぎないよう上限)
+            ...(heroStyle?.ratio ? { height: Math.round(Math.min(300, Math.max(80, (mailW - 20) / ratioValue(heroStyle.ratio)))) } : {}),
+            // ヘッドラインの位置を、絵の中の文字の位置で見せる(写真の下のときは、横だけ)
+            ...(heroText !== 'below'
+              ? { alignItems: heroStyle?.v === 'top' ? 'start' : heroStyle?.v === 'middle' || (!heroStyle?.v && heroText === 'overlay') ? 'center' : 'end', justifyItems: heroStyle?.h === 'right' ? 'end' : heroStyle?.h === 'center' || (!heroStyle?.h && heroText === 'overlay') ? 'center' : 'start', padding: 10 }
+              : {}),
+            color: heroStyle?.color === 'dark' ? MAIL.ink : heroText === 'below' ? MAIL.ink : '#fff',
+            textShadow: heroText !== 'below' && heroStyle?.color !== 'dark' ? '0 1px 4px rgba(0,0,0,0.45)' : 'none',
+          }}
           onClick={() => {
             // ヒーローの設定は、テンプレートのタブにある
             setSel(null)
