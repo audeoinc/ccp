@@ -9,6 +9,7 @@ import {
   Input,
   MenuItem,
   MessageBar,
+  MessageBarActions,
   MessageBarBody,
   ProgressBar,
   Select,
@@ -40,7 +41,7 @@ import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, getTemplate, splitTemplateKey, templateKeyOfCard } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, getTemplate, splitTemplateKey, templateKeyOfCard, templateMissing, templatesSettled, useTemplates } from './templates'
 import { remapSectionTexts } from './tables'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
@@ -647,6 +648,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 差し戻しの理由(null = 入力欄を出していない)
   // 承認・差し戻しの履歴に残す名前(週の状態の帯・コメントと共通)
   const [error, setError] = useState<string | null>(null)
+  // 使ったテンプレートが見つからなかった配信(見せるテンプレートの名前と、AI で下書きし直したか)
+  const [missingTemplate, setMissingTemplate] = useState<{ key: string; redrafted: boolean } | null>(null)
+  // テンプレートの読み込みが済んだら、下の自動の下書きの判定をし直す
+  const templatesVersion = useTemplates()
 
   useEffect(() => {
     if (!card) return
@@ -954,16 +959,27 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
   }, [])
 
-  // 内容が空の既存のカードを開いたときは、自動で下書きを作る(同じカードで、1 回だけ)
+  // 既存のカードを開いたとき、自動で下書きを作る(同じカードで、1 回だけ):
+  // ・内容が空のとき
+  // ・使ったテンプレートが登録に見つからないとき(削除された・版が残っていない。代わりのテンプレートで描くので、保存した見出し・商品の枠がずれる。
+  //   SU1。2026-10-23 利用者 OK)。テンプレートも AI が選び直す。保存するまでは、キャンセルで元に戻せる
+  // どちらも、テンプレートの読み込みが済んでから判定する(済む前は、作ったテンプレートがまだ登録にない)
   useEffect(() => {
-    if (!card || !autoEnabled || original === null) return
-    if (products.length === 0 || heroes.length === 0) return
+    if (!card || original === null) return
+    if (products.length === 0 || heroes.length === 0 || !templatesSettled()) return
     if (autoDrafted.has(card.id)) return
     autoDrafted.add(card.id)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!hasContent) void startAutoDraft()
+    const missing = templateMissing(templateKeyOfCard(card))
+    if (missing) {
+      // 版だけがないときは、テンプレートの名前と版の番号で見せる(ID より分かりやすい)。テンプレートごとないときは ID のまま
+      const { id, version: v } = splitTemplateKey(templateKeyOfCard(card))
+      const label = !templateMissing(id) && v !== undefined ? t(`${getTemplate(id).label} の版 ${v}`, `${getTemplate(id).label}, version ${v}`) : id
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMissingTemplate({ key: label, redrafted: autoEnabled })
+    }
+    if (autoEnabled && (!hasContent || missing)) void startAutoDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card, original, products.length, heroes.length])
+  }, [card, original, products.length, heroes.length, templatesVersion])
 
   // テンプレートを変えると、セクションの構成が変わるので、候補と商品選定の案は破棄する
   const changeTemplate = (id: EmailTemplateId) => {
@@ -2132,6 +2148,36 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   )
   const footerNode = (
     <>
+    {missingTemplate && (
+      <MessageBar layout="multiline" intent="warning" className={styles.error}>
+        <MessageBarBody>
+          {missingTemplate.redrafted
+            ? t(
+                `この配信が使っていたテンプレート(${missingTemplate.key})が見つからないため、AI がテンプレートを選び直して下書きし直しました。保存するまでは、キャンセルで元に戻せます。`,
+                `The template this delivery used (${missingTemplate.key}) was not found, so AI chose a template and redrafted it. Cancel to discard before saving.`,
+              )
+            : t(
+                `この配信が使っていたテンプレート(${missingTemplate.key})が見つからないため、代わりのテンプレートで表示しています。見出し・商品の枠がずれていることがあります。`,
+                `The template this delivery used (${missingTemplate.key}) was not found, so it is shown with a substitute. Headings and product slots may be off.`,
+              )}
+        </MessageBarBody>
+        {/* 自動の下書きを切っているときは、ここから作り直す(シンプルな配信カードには「すべてAIで下書き」のボタンがないため) */}
+        {!missingTemplate.redrafted && (
+          <MessageBarActions>
+            <Button
+              size="small"
+              disabled={auto !== null}
+              onClick={() => {
+                setMissingTemplate({ ...missingTemplate, redrafted: true })
+                void startAutoDraft()
+              }}
+            >
+              {t('AI で下書きし直す', 'Redraft with AI')}
+            </Button>
+          </MessageBarActions>
+        )}
+      </MessageBar>
+    )}
     {error && (
       <MessageBar layout="multiline" intent="error" className={styles.error}>
         <MessageBarBody>{error}</MessageBarBody>

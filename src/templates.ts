@@ -608,6 +608,9 @@ let overrides: Record<string, EmailTemplate> = {}
 // 過去の版(「テンプレートの ID@v版」→ その版の中身)。配信カードは、使った版をこの鍵で引く(描画の仕組みは、ID のときと同じ)
 let versions: Record<string, EmailTemplate> = {}
 let version = 0
+// データベースから読み込んだか(読み込む前は、作ったテンプレートがまだ登録になく、「見つからない」と取り違えるため)
+let customLoaded = false
+let versionsLoaded = false
 const listeners = new Set<() => void>()
 const subscribe = (fn: () => void) => {
   listeners.add(fn)
@@ -629,12 +632,14 @@ export function setCustomTemplates(list: ({ id: string; overrides?: string } & O
   overrides = Object.fromEntries(
     list.filter((x) => x.overrides && BUILTIN[x.overrides]).map(({ id, overrides: o, ...rest }) => [o!, { ...rest, rowId: id, builtin: true, edited: shape(rest) !== shape(BUILTIN[o!]), version: rest.version ?? 0 }]),
   )
+  customLoaded = true
   changed()
 }
 
 /** 過去の版を登録する(テンプレートの ID・版の番号・中身) */
 export function setTemplateVersions(list: ({ templateId: string; version: number } & Omit<EmailTemplate, 'builtin'>)[]) {
   versions = Object.fromEntries(list.map(({ templateId, version: v, ...rest }) => [`${templateId}@v${v}`, { ...rest, builtin: !!BUILTIN[templateId], version: v, versionOf: templateId }]))
+  versionsLoaded = true
   changed()
 }
 
@@ -662,6 +667,31 @@ export function getTemplate(key: EmailTemplateId): EmailTemplate {
   // `v === 0 && …` は版が 0 以外だと false になり、?? では飛ばされない(テンプレートの代わりに false を返し、画面全体が止まった。2026-10-23)
   if (v !== undefined) return versions[key] ?? (v === 0 ? BUILTIN[id] : undefined) ?? currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
   return currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
+}
+
+// 読み込みに失敗したか(そのときも、待つのをやめて、標準のテンプレートで動く)
+let loadFailed = false
+
+/** テンプレートの読み込みに失敗したことを知らせる(App の読み込み) */
+export function markTemplatesLoadFailed() {
+  loadFailed = true
+  changed()
+}
+
+/** テンプレートの読み込みが終わったか(失敗も含む)。開いた配信の自動の下書きは、これを待ってから判定する */
+export const templatesSettled = (): boolean => customLoaded || loadFailed
+
+/**
+ * 配信カードが使ったテンプレート(鍵)が、登録に見つからないか。getTemplate は代わりのテンプレートで描くので、
+ * 保存した見出し・コピー・商品の枠が、描いている形と合わない。開いたときに、AI の下書きをやり直す目印にする(SU1。2026-10-23 利用者 OK)。
+ * 読み込みが済むまでは、見つからないと言わない(作ったテンプレート・過去の版は、読み込むまで登録にない)
+ */
+export function templateMissing(key: EmailTemplateId): boolean {
+  const { id, version: v } = splitTemplateKey(key)
+  if (!customLoaded) return false
+  if (v === undefined || (v === 0 && BUILTIN[id])) return !currentOf(id)
+  // 過去の版の表が読めなかったときは、いまの版で描く(見つからないとは言わない)
+  return !currentOf(id) || (versionsLoaded && !versions[key])
 }
 
 /** 登録にあるテンプレートか */

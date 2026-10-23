@@ -132,7 +132,7 @@ import { ProductionPage } from './ProductionPage'
 import { StageNav } from './StageNav'
 import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
-import { openTemplateManager, useTemplates } from './templates'
+import { markTemplatesLoadFailed, openTemplateManager, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { FrameBar } from './FrameBar'
 import { FrameCard } from './FrameCard'
@@ -1437,7 +1437,7 @@ function App() {
   useTemplates() // テンプレートの登録が変わったら、画面全体を描き直す
   // ユーザーが作ったテンプレートを読み込む(読めなくても、標準のテンプレートで動く)
   useEffect(() => {
-    loadCustomTemplates().catch(() => undefined)
+    loadCustomTemplates().catch(() => markTemplatesLoadFailed())
   }, [])
   // 国はヘッダーの設定なので、絞り込みの「クリア」の対象にしない
   const filtering = filters.channel !== '' || filters.department !== '' || (page !== 'results' && filters.status !== '') || filters.person !== ''
