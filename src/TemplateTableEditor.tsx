@@ -206,6 +206,7 @@ const useStyles = makeStyles({
   tBox: { borderLeftColor: tokens.colorPaletteBlueBorderActive },
   tButton: { borderLeftColor: tokens.colorNeutralForeground1 },
   tText: { borderLeftColor: tokens.colorPaletteGreenBorderActive },
+  tMedia: { borderLeftColor: tokens.colorPaletteBerryBorderActive },
   tEmpty: { borderLeftColor: tokens.colorNeutralStroke1 },
   phd: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '4px 6px', cursor: 'pointer', minWidth: 0 },
   mini: { display: 'grid', gap: '1px', width: '28px', height: '20px', flexShrink: 0 },
@@ -255,7 +256,8 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   // 右のタブ: 自分でタブを押したら固定。押していなければ、選んだものがあれば「セクションと部品」
   const [tab, setTab] = useState<'tpl' | 'obj'>('tpl')
   const [pinned, setPinned] = useState(false)
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  // 右のカードの開け閉め。選んでいるものは自動で開くが、その選び方のあいだは、閉じたら閉じたまま(key: 閉じたときの選び方)
+  const [fold, setFold] = useState<Record<string, { open: boolean; key: string }>>({})
 
   useEffect(() => {
     if (!toast) return
@@ -1308,13 +1310,14 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   )
 
   // ---- 右のタブ: セクションと部品(セクションのカードと、部品の行。利用者の指示で「オブジェクト」から改名。中身はセクションの内容なので)
-  const toggleOpen = (id: string) =>
-    setOpenIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const selKey = sel ? `${sel.kind}:${sel.sec}:${selParts.map((p) => p.id).join(',')}` : ''
+  /** カードが開いているか(auto: 選んでいるので、ふだんは開く) */
+  const isOpen = (id: string, auto: boolean) => {
+    const f = fold[id]
+    if (auto) return f && f.key === selKey ? f.open : true
+    return f ? f.open : false
+  }
+  const setOpen = (id: string, open: boolean) => setFold((prev) => ({ ...prev, [id]: { open, key: selKey } }))
   const mini = (sec: Section, p: TablePart) => (
     <span className={s.mini} style={{ gridTemplateColumns: `repeat(${sec.cols ?? 1}, 1fr)`, gridTemplateRows: `repeat(${Math.max(1, sec.rows ?? 1)}, 1fr)` }}>
       {(sec.parts ?? []).map((q) => (
@@ -1478,14 +1481,17 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
         )}
         {sections.map((sec, si) => {
           const cur = sel?.sec === sec.id
-          const open = cur || openIds.has(sec.id!)
+          const open = isOpen(sec.id!, cur)
           const n = (type: PartType) => (sec.parts ?? []).filter((p) => p.type === type).length
           return (
             <div key={sec.id} className={mergeClasses(s.scard, sel?.kind === 'section' && cur && s.scardCur)}>
               <div
                 className={s.shd}
                 onClick={() => {
+                  // 選んでいるセクションの見出しをもう一度押したら、閉じる(開くのは、選んだとき)
+                  if (sel?.kind === 'section' && cur && open) return setOpen(sec.id!, false)
                   setSel({ kind: 'section', sec: sec.id! })
+                  setFold((prev) => ({ ...prev, [sec.id!]: { open: true, key: '' } }))
                   document.querySelector(`[data-sec="${CSS.escape(sec.id!)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
                 }}
               >
@@ -1493,7 +1499,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                   className={s.chev}
                   onClick={(e) => {
                     e.stopPropagation()
-                    toggleOpen(sec.id!)
+                    setOpen(sec.id!, !open)
                   }}
                 >
                   {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
@@ -1508,17 +1514,20 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                   {[...(sec.parts ?? [])]
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {
-                      const pOpen = p.id === one || openIds.has(p.id)
+                      const pOpen = isOpen(p.id, p.id === one)
                       return (
                         <div
                           key={p.id}
-                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : s.tEmpty, selIds.has(p.id) && s.pcardCur)}
+                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : p.type === 'media' ? s.tMedia : s.tEmpty, selIds.has(p.id) && s.pcardCur)}
                           onMouseEnter={() => setPeek(p.id)}
                           onMouseLeave={() => setPeek(null)}
                         >
                           <div
                             className={s.phd}
                             onClick={() => {
+                              // 選んでいる部品の行をもう一度押したら、閉じる
+                              if (p.id === one && pOpen) return setOpen(p.id, false)
+                              setOpen(p.id, true)
                               selectCell(sec.id!, p.c, p.r)
                               document.querySelector(`[data-cell="${CSS.escape(p.id)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
                             }}
@@ -1531,7 +1540,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                               className={s.chev}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                toggleOpen(p.id)
+                                setOpen(p.id, !pOpen)
                               }}
                             >
                               {pOpen ? <ChevronDownRegular /> : <ChevronRightRegular />}
