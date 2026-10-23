@@ -532,10 +532,18 @@ const ALIGNS: TextAlign[] = ['left', 'center', 'right']
 const url = (v: unknown): string | undefined => (typeof v === 'string' && /^(https?:\/\/|\/)/i.test(v.trim()) ? v.trim().slice(0, 1000) : undefined)
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined)
 
+/** ボタンの文言に、矢印(›)を付ける(T8 の 8.7) */
+export const buttonText = (p: Pick<TablePart, 'label' | 'icon'>, fallback: string): string => {
+  const label = p.label || fallback
+  return p.icon === 'right' ? `${label} ›` : p.icon === 'left' ? `› ${label}` : label
+}
+/** ボタンの角の丸み(px。丸は 999) */
+export const buttonRadius = (p: Pick<TablePart, 'shape'>): number => (p.shape === 'square' ? 0 : p.shape === 'rounded' ? 6 : 999)
+
 /** 保存してよい要素の名前(種類ごと。箱は、出すものを外しても設定は残す。elements.ts の partElements と合わせる) */
 const ELEMENT_KEYS: Record<PartType, string[]> = {
   box: ['image', 'name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button'],
-  button: ['label'],
+  button: ['label', 'image'],
   text: ['text'],
   media: ['image'],
   empty: [],
@@ -586,6 +594,19 @@ export function parsePart(raw: unknown): TablePart | null {
     const label = str(o.label, 30)
     if (label) part.label = label
     if (o.style === 'outline' || o.style === 'text') part.style = o.style
+    if (o.shape === 'rounded' || o.shape === 'square' || o.shape === 'underline') part.shape = o.shape
+    if (o.size === 'small' || o.size === 'large') part.size = o.size
+    if (o.fit === true) part.fit = true
+    if (o.icon === 'right' || o.icon === 'left') part.icon = o.icon
+    if (o.face === 'image' || o.face === 'both') {
+      part.face = o.face
+      const src = url(o.src)
+      if (src) part.src = src
+      if (typeof o.imageId === 'string' && o.imageId) part.imageId = o.imageId.slice(0, 60)
+      const alt = str(o.alt, 120)
+      if (alt) part.alt = alt
+      if (o.swap === false) part.swap = false
+    }
     if (typeof o.color === 'string' && o.color !== 'black' && o.color in BUTTON_COLORS) part.color = o.color as ButtonColor
     if (ALIGNS.includes(o.align as TextAlign) && o.align !== 'center') part.align = o.align as TextAlign
     if (LINKS.includes(o.link as LinkKind) && o.link !== 'campaign') part.link = o.link as LinkKind

@@ -1102,12 +1102,33 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     if (p.type === 'button') {
       const color = T.buttonColor(p, hero === 'offer')
       const align = p.align ?? 'center'
+      const text = p.style === 'text' || p.shape === 'underline'
+      const label = T.buttonText(p, defaultButtonLabel(0))
+      const fontSize = p.size === 'small' ? 10 : p.size === 'large' ? 13 : 11
+      // 画像のボタン: 画像を敷いて(画像の上に文字なら、文字を重ねる)
+      if (p.face) {
+        return (
+          <div
+            className={s.pill}
+            style={{ justifySelf: p.fit ? (align === 'left' ? 'start' : align === 'right' ? 'end' : 'center') : 'stretch', minWidth: p.fit ? undefined : 0, minHeight: 24, borderRadius: Math.min(T.buttonRadius(p), 8), color: p.src ? '#fff' : MAIL.sub, backgroundColor: MAIL.img, fontSize, ...(p.src ? { backgroundImage: `url("${p.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.5)' } : {}) }}
+          >
+            {p.face === 'both' ? label : p.src ? '' : t('ボタンの画像', 'Button image')}
+          </div>
+        )
+      }
       return (
         <div
-          className={mergeClasses(s.pill, p.style === 'outline' && s.pillOutline, p.style === 'text' && s.pillText)}
-          style={{ justifySelf: align === 'left' ? 'start' : align === 'right' ? 'end' : 'center', ...(p.style === 'outline' ? { borderColor: color, color } : p.style === 'text' ? { color } : { backgroundColor: color }) }}
+          className={mergeClasses(s.pill, p.style === 'outline' && !text && s.pillOutline, text && s.pillText)}
+          style={{
+            justifySelf: align === 'left' ? 'start' : align === 'right' ? 'end' : 'center',
+            borderRadius: T.buttonRadius(p),
+            fontSize,
+            ...(p.fit ? { minWidth: 0 } : {}),
+            ...(p.size === 'large' ? { padding: '8px 16px' } : p.size === 'small' ? { padding: '3px 10px' } : {}),
+            ...(text ? { color, ...(p.shape === 'underline' ? { textDecoration: 'underline' } : {}) } : p.style === 'outline' ? { borderColor: color, color } : { backgroundColor: color }),
+          }}
         >
-          {p.label || defaultButtonLabel(0)}
+          {label}
         </div>
       )
     }
@@ -1636,6 +1657,56 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               <option value="text">{t('文字のリンク(枠なし)', 'Text link (no box)')}</option>
             </Select>
           </Field>
+          <Field label={t('形', 'Shape')} size="small">
+            <div className={s.row2}>
+              {([undefined, 'rounded', 'square', 'underline'] as TablePart['shape'][]).map((x) => (
+                <Button key={x ?? 'pill'} size="small" appearance={p.shape === x ? 'primary' : 'outline'} aria-pressed={p.shape === x} onClick={() => patch(sec, p, { shape: x })}>
+                  {x === 'rounded' ? t('角丸', 'Rounded') : x === 'square' ? t('四角', 'Square') : x === 'underline' ? t('下線だけ', 'Underline') : t('丸', 'Pill')}
+                </Button>
+              ))}
+            </div>
+          </Field>
+          <div className={s.row2}>
+            <Field label={t('大きさ', 'Size')} size="small">
+              <Select size="small" value={p.size ?? ''} onChange={(_, d) => patch(sec, p, { size: d.value === 'small' || d.value === 'large' ? d.value : undefined })}>
+                <option value="small">{t('小', 'Small')}</option>
+                <option value="">{t('中', 'Medium')}</option>
+                <option value="large">{t('大', 'Large')}</option>
+              </Select>
+            </Field>
+            <Field label={t('幅', 'Width')} size="small">
+              <Select size="small" value={p.fit ? 'fit' : ''} onChange={(_, d) => patch(sec, p, { fit: d.value === 'fit' || undefined })}>
+                <option value="">{t('マスいっぱい', 'Fill the cell')}</option>
+                <option value="fit">{t('文字に合わせる', 'Fit the text')}</option>
+              </Select>
+            </Field>
+            <Field label={t('矢印(›)', 'Arrow (›)')} size="small">
+              <Select size="small" value={p.icon ?? ''} onChange={(_, d) => patch(sec, p, { icon: d.value === 'right' || d.value === 'left' ? d.value : undefined })}>
+                <option value="">{t('なし', 'None')}</option>
+                <option value="right">{t('右に', 'Right')}</option>
+                <option value="left">{t('左に', 'Left')}</option>
+              </Select>
+            </Field>
+          </div>
+          <Field label={t('見せ方(文字 / 画像)', 'Face (text / image)')} size="small">
+            <Select size="small" value={p.face ?? ''} onChange={(_, d) => patch(sec, p, { face: d.value === 'image' || d.value === 'both' ? d.value : undefined })}>
+              <option value="">{t('文字だけ', 'Text only')}</option>
+              <option value="image">{t('画像だけ', 'Image only')}</option>
+              <option value="both">{t('画像の上に文字', 'Text over an image')}</option>
+            </Select>
+          </Field>
+          {p.face && (
+            <>
+              <Field label={t('ボタンの画像(ライブラリから選ぶか、URL を入れる)', 'Button image (pick from the library or enter a URL)')} size="small">
+                <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
+                <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
+              </Field>
+              <Field label={t('代わりの文(画像が出ないとき)', 'Alt text (when images are off)')} size="small">
+                <Input size="small" value={p.alt ?? ''} placeholder={p.label || defaultButtonLabel(0)} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+              </Field>
+              <Checkbox label={t('配信ごとに画像を差し替えてよい', 'Image can be swapped per delivery')} checked={p.swap !== false} onChange={(_, d) => patch(sec, p, { swap: d.checked === true ? undefined : false })} />
+            </>
+          )}
           <Field label={t('色(決まった色から選ぶ)', 'Color (from the set colors)')} size="small">
             <div className={s.row2}>
               {(Object.keys(T.BUTTON_COLORS) as ButtonColor[]).map((c) => {

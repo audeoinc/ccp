@@ -15,7 +15,7 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
-import { SECTION_BG, boxFields, boxesOf, buttonColor, sectionSpace } from './tables'
+import { SECTION_BG, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
@@ -843,9 +843,36 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           if (p.type === 'button') {
             const color = buttonColor(p, offer)
             const align = p.align ?? 'center'
-            const text = p.style === 'text'
+            const under = p.shape === 'underline'
+            const text = p.style === 'text' || under
+            const justify = align === 'left' ? 'start' : align === 'right' ? 'end' : 'center'
+            const label = buttonText(p, defaultButtonLabel(0))
+            const fontSize = p.size === 'small' ? '0.72rem' : p.size === 'large' ? '0.92rem' : '0.8rem'
+            // 画像のボタン(画像だけ / 画像の上に文字。T8 の 8.7)。リンクと計測の目印は、文字のボタンと同じ
+            if (p.face) {
+              return (
+                <div style={{ display: 'grid', alignItems: 'center', height: '100%', justifyItems: p.fit ? justify : 'stretch' }}>
+                  <div
+                    data-link="button"
+                    data-link-id={p.id}
+                    data-anchor={`button:${p.id}`}
+                    data-part={`button:${p.id}`}
+                    style={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 36, minWidth: p.fit ? 120 : undefined, borderRadius: Math.min(buttonRadius(p), 12), overflow: 'hidden', backgroundColor: p.src ? undefined : '#eef0f3' }}
+                  >
+                    {p.src ? (
+                      <img data-el={`${p.id}.image`} src={p.src} alt={p.alt ?? label} draggable={false} style={{ ...(p.fit ? { maxWidth: '100%' } : { width: '100%' }), display: 'block' }} />
+                    ) : (
+                      <span data-el={`${p.id}.image`} style={{ fontSize: '0.72rem', color: SUB, padding: 8 }}>{t('ボタンの画像(未設定)', 'Button image (not set)')}</span>
+                    )}
+                    {p.face === 'both' && (
+                      <span data-el={`${p.id}.label`} style={{ ...(p.src ? { position: 'absolute', inset: 0 } : {}), display: 'grid', placeItems: 'center', padding: p.src ? '0 8px' : '8px 12px', color: p.src ? '#fff' : INK, fontWeight: 700, fontSize, textShadow: p.src ? '0 1px 4px rgba(0,0,0,0.5)' : 'none', whiteSpace: 'nowrap' }}>{label}</span>
+                    )}
+                  </div>
+                </div>
+              )
+            }
             return (
-              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 && !text && align === 'center' ? '0 20%' : 0, justifyItems: text ? (align === 'left' ? 'start' : align === 'right' ? 'end' : 'center') : 'stretch' }}>
+              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 && !text && !p.fit && align === 'center' ? '0 20%' : 0, justifyItems: text || p.fit ? justify : 'stretch' }}>
                 <div
                   data-link="button"
                   data-link-id={p.id}
@@ -855,13 +882,13 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                   className={classes.noWrap}
                   style={{
                     textAlign: align,
-                    padding: text ? '8px 2px' : '8px 12px',
-                    borderRadius: 999,
-                    fontSize: '0.8rem',
-                    ...(p.style === 'outline' ? { border: `1px solid ${color}`, color } : text ? { color, fontWeight: 600, letterSpacing: 1 } : { backgroundColor: color, color: '#fff' }),
+                    padding: text ? '8px 2px' : p.size === 'small' ? '5px 10px' : p.size === 'large' ? '12px 20px' : '8px 12px',
+                    borderRadius: buttonRadius(p),
+                    fontSize,
+                    ...(text ? { color, fontWeight: 600, letterSpacing: 1, ...(under ? { textDecoration: 'underline', textUnderlineOffset: 3 } : {}) } : p.style === 'outline' ? { border: `1px solid ${color}`, color } : { backgroundColor: color, color: '#fff' }),
                   }}
                 >
-                  {p.label || defaultButtonLabel(0)}
+                  {label}
                 </div>
               </div>
             )

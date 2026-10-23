@@ -112,6 +112,16 @@ export interface TablePart {
   style?: 'fill' | 'outline' | 'text'
   /** ボタン: 色(決まった色から選ぶ。ブランドの見た目をそろえるため、自由な色は持たない。省略は黒。期間限定のヒーローでは赤) */
   color?: ButtonColor
+  /** ボタン: 形(省略は丸 pill)。rounded 角丸 / square 四角 / underline 下線だけの文字(T8 の 8.7) */
+  shape?: 'rounded' | 'square' | 'underline'
+  /** ボタン: 大きさ(省略は中) */
+  size?: 'small' | 'large'
+  /** ボタン: true のとき、幅を文字に合わせる(省略はマスいっぱい) */
+  fit?: boolean
+  /** ボタン: 矢印(›)を文字の右・左に付ける(省略はなし) */
+  icon?: 'right' | 'left'
+  /** ボタン: 画像のボタン。image 画像だけ / both 画像の上に文字(省略は文字だけ)。画像は src・imageId・alt を使う */
+  face?: 'image' | 'both'
   /** ボタン・画像: リンク先の種類(省略は campaign) */
   link?: LinkKind
   /** ボタン・画像: 計測用の名前(クリックの集計で使う) */
@@ -124,7 +134,7 @@ export interface TablePart {
   align?: TextAlign
   /** 箱・画像: 写真・画像の形(省略は、箱は縦長 portrait・写真だけの箱はマスの形・画像は横長 wide) */
   ratio?: MediaRatio
-  /** 画像: 画像の URL(部品の画像のライブラリから選ぶと、その URL が入る) */
+  /** 画像・画像のボタン: 画像の URL(部品の画像のライブラリから選ぶと、その URL が入る) */
   src?: string
   /** 画像: 部品の画像のライブラリの ID(どの画像を使ったかの記録) */
   imageId?: string
@@ -132,7 +142,10 @@ export interface TablePart {
   video?: string
   /** 画像: 画像が出ないときの文(代わりの文) */
   alt?: string
-  /** 画像: true のとき、配信ごとに差し替える(キャンペーンのバナーなど。省略はテンプレートの画像のまま) */
+  /**
+   * 画像: true のとき、配信ごとに差し替える(キャンペーンのバナーなど。省略はテンプレートの画像のまま)。
+   * ボタンの画像は逆で、省略は差し替えてよい・false のとき、テンプレートの画像のまま(8.7)
+   */
   swap?: boolean
 }
 

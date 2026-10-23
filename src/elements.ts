@@ -45,7 +45,8 @@ export function partElements(p: TablePart): PartElement[] {
     const fields = boxFields(p)
     return [el(p.id, 'image', 'image', true), ...fields.map((f) => el(p.id, f, 'text', f === 'name' || f === 'button'))]
   }
-  if (p.type === 'button') return [el(p.id, 'label', 'text', true)]
+  // 画像のボタンは、画像と文言を別の要素に(画像だけのときは、文言はメールに出ない)
+  if (p.type === 'button') return p.face === 'image' ? [el(p.id, 'image', 'image', true)] : p.face === 'both' ? [el(p.id, 'image', 'image', true), el(p.id, 'label', 'text', true)] : [el(p.id, 'label', 'text', true)]
   if (p.type === 'text') return [el(p.id, 'text', 'text', false)]
   if (p.type === 'media') return [el(p.id, 'image', 'image', true)]
   return []
