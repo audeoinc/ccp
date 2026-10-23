@@ -118,6 +118,10 @@ def generate(spec: dict, only: list[str], redo: list[int]) -> None:
                 continue
             ref = None
             prompt = f"{shot['prompt']} {style[shot['style']]}"
+            if i > 0 and not main_file.exists():
+                # メインが作れなかった(429 が続いた など)。サブはメインを手本にするので、この商品は次に流したときに作る
+                print(f"  {prod['key']}: メインがないので、サブは飛ばします")
+                break
             if i > 0:
                 # サブは、メインの画像を手本に渡して、同じ商品として作る
                 ref = main_file.read_bytes()
