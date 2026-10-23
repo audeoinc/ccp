@@ -12,6 +12,8 @@ const useStyles = makeStyles({
   group: { display: 'grid', rowGap: '2px' },
   label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 },
+  // 名前が長くても、既定の札は潰さない
+  badge: { flexShrink: 0, whiteSpace: 'nowrap' },
   desc: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
   note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' },
@@ -33,10 +35,12 @@ interface Props {
   /** 国の名前(確かめる文に出す) */
   countryName: string
   items: ApplyItem[]
+  /** 決めていないときに使うか(項目ごと。渡さなければ種類の既定。学びは、出元の国だけ使う) */
+  defaultUse?: (id: string) => boolean
   onSaved?: () => void
 }
 
-export function CountryApplyList({ kind, country, countryName, items, onSaved }: Props) {
+export function CountryApplyList({ kind, country, countryName, items, defaultUse, onSaved }: Props) {
   const s = useStyles()
   const t = useT()
   useCountryApply()
@@ -46,7 +50,7 @@ export function CountryApplyList({ kind, country, countryName, items, onSaved }:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const current = (id: string) => appliesIn(kind, id, country)
+  const current = (id: string) => appliesIn(kind, id, country, defaultUse?.(id))
   const shown = (id: string) => edits.get(id) ?? current(id)
   const changes = [...edits.entries()].filter(([id, use]) => use !== current(id)).map(([id, use]) => ({ id, use }))
   const set = (id: string, use: boolean) => setDraft({ country, map: new Map(edits).set(id, use) })
@@ -86,7 +90,12 @@ export function CountryApplyList({ kind, country, countryName, items, onSaved }:
               <div key={x.id} className={s.row}>
                 <Checkbox checked={shown(x.id)} onChange={(_, d) => set(x.id, !!d.checked)} label={x.label} />
                 {!applyDecided(kind, x.id, country) && !edits.has(x.id) && (
-                  <Badge size="small" appearance="outline" title={t('まだ決めていないので、既定(使う)です', 'Not decided yet, so the default (use) applies')}>
+                  <Badge
+                    className={s.badge}
+                    size="small"
+                    appearance="outline"
+                    title={current(x.id) ? t('まだ決めていないので、既定(使う)です', 'Not decided yet, so the default (use) applies') : t('まだ決めていないので、既定(使わない)です', 'Not decided yet, so the default (not used) applies')}
+                  >
                     {t('既定', 'Default')}
                   </Badge>
                 )}

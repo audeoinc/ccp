@@ -9,7 +9,10 @@ import type { CountryApplicationKind, CountryApplicationMode } from './models/co
 
 export type ApplyKind = CountryApplicationKind
 
-/** 行がないときに使うか(種類ごと)。テンプレートは、全部の国で使う(今あるテンプレートが、どの国でも出なくならないように) */
+/**
+ * 行がないときに使うか(種類ごと)。テンプレートは、全部の国で使う(今あるテンプレートが、どの国でも出なくならないように)。
+ * 学びは、出元の国によって既定が変わる(出元の国は使う・ほかの国は使わない)ので、呼ぶ側が appliesIn の fallback で渡す
+ */
 const DEFAULT_USE: Record<ApplyKind, boolean> = { template: true, learning: true, policy: true }
 
 /** 変えた記録 1 件 */
@@ -42,9 +45,15 @@ export async function loadCountryApply(): Promise<void> {
   notify()
 }
 
-/** その国で使うか。国を渡さない(すべての国)ときは、使う */
-export const appliesIn = (kind: ApplyKind, id: string, country?: string | null): boolean =>
-  !country ? true : (history.get(keyOf(kind, id, country))?.[0]?.use ?? DEFAULT_USE[kind])
+/**
+ * その国で使うか。国を渡さない(すべての国)ときは、使う。
+ * fallback: 決めていないときの値(種類の既定と違うときに渡す。学びは、出元の国だけ使うので、ほかの国では false)
+ */
+export const appliesIn = (kind: ApplyKind, id: string, country?: string | null, fallback: boolean = DEFAULT_USE[kind]): boolean =>
+  !country ? true : (history.get(keyOf(kind, id, country))?.[0]?.use ?? fallback)
+
+/** 学びを、その国で使うか(ST5)。出元の国は決めていなければ使う。ほかの国は、人が「使う」と決めたときだけ(国で客層が違うため) */
+export const learningUsableIn = (id: string, origin: string, country: string) => appliesIn('learning', id, country, origin === country)
 
 /** 国で使うかを、決めたか(行があるか)。決めていなければ既定 */
 export const applyDecided = (kind: ApplyKind, id: string, country: string): boolean => history.has(keyOf(kind, id, country))

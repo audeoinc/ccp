@@ -197,29 +197,57 @@ export interface LearningEval {
   notes: string
   source: DeliveryCard
   sourceAt: string
-  /** この学びを渡した配信 */
+  /** どの国で評価したか(画面で国を選んでいればその国、すべての国なら出元の国) */
+  country: string
+  /** 出元がほかの国の学び(この国で「使う」と決めて渡したもの。ST5) */
+  foreign: boolean
+  /** この学びを渡した配信(評価する国の配信) */
   used: DeliveryImpact[]
-  /** 比べる相手: 同じ国・チャネルで、この学びができたあとに送り、この学びを渡さなかった配信(ほかの学びは渡していてもよい) */
+  /** 比べる相手: 評価する国の、出元と同じチャネルで、この学びができたあとに送り、この学びを渡さなかった配信(ほかの学びは渡していてもよい) */
   baseline: DeliveryImpact[]
   lift: Diff
   ctr: Diff
+  /** この国での判定 */
   review?: LearningReview
   /** 数字から見た、おすすめの扱い */
   suggestion: LearningReviewStatus
 }
 
-export function evaluateLearnings(cards: DeliveryCard[], results: DeliveryResult[], impacts: DeliveryImpact[], reviews: LearningReview[]): LearningEval[] {
-  const byCard = new Map(cards.map((c) => [c.id, c]))
-  const reviewBy = new Map<string, LearningReview>()
-  // 同じ学びに何度か決め直していれば、新しいほうを使う
-  for (const r of [...reviews].sort((a, b) => String(a.decided_at ?? a.created_on ?? '').localeCompare(String(b.decided_at ?? b.created_on ?? '')))) if (r.learning_id) reviewBy.set(r.learning_id, r)
+const reviewTime = (r: LearningReview) => String(r.decided_at ?? r.created_on ?? '')
+
+/**
+ * 学びと国の組の、いまの判定(ST5)。その国の行のうち新しいもの。
+ * なければ、出元の国なら、国を分ける前の行(国が空。分ける前は、学びは出元の国でしか使っていなかったため)
+ */
+export function reviewIn(reviews: LearningReview[], id: string, country: string, origin: string): LearningReview | undefined {
+  const mine = reviews.filter((r) => r.learning_id === id).sort((a, b) => reviewTime(b).localeCompare(reviewTime(a)))
+  return mine.find((r) => r.country === country) ?? (country === origin ? mine.find((r) => !r.country) : undefined)
+}
+
+/**
+ * 評価する国の、学びの評価。country が空(すべての国)なら、学びごとに出元の国で評価する。
+ * 国を決めていれば、その国の学びと、その国で使うと決めたほかの国の学びを並べる。
+ * usableIn: 学びをその国で使うか(learningUsableIn。この部品は撮影用の見本のデータからも読まれるので、国の適用の表はここで読まない)
+ */
+export function evaluateLearnings(
+  allCards: DeliveryCard[],
+  results: DeliveryResult[],
+  impacts: DeliveryImpact[],
+  reviews: LearningReview[],
+  country: string,
+  usableIn: (id: string, origin: string, country: string) => boolean,
+): LearningEval[] {
+  const byCard = new Map(allCards.map((c) => [c.id, c]))
   const out: LearningEval[] = []
   for (const r of results) {
     const source = r.delivery_card_id ? byCard.get(r.delivery_card_id) : undefined
     if (!source || !r.notes?.trim()) continue
-    const used = impacts.filter((d) => d.learningIds.includes(r.id))
-    const at = r.sent_at ?? source.scheduled_at ?? ''
-    const baseline = impacts.filter((d) => d.withLearnings != null && !d.learningIds.includes(r.id) && d.sentAt > at && d.card.country === source.country && d.card.channel === source.channel)
+    const origin = String(source.country ?? '')
+    const at = country || origin
+    if (country && origin !== country && !usableIn(r.id, origin, country)) continue
+    const used = impacts.filter((d) => d.learningIds.includes(r.id) && String(d.card.country ?? '') === at)
+    const sentAt = r.sent_at ?? source.scheduled_at ?? ''
+    const baseline = impacts.filter((d) => d.withLearnings != null && !d.learningIds.includes(r.id) && d.sentAt > sentAt && String(d.card.country ?? '') === at && d.card.channel === source.channel)
     const lift = compare(
       used.map((d) => d.liftRate),
       baseline.map((d) => d.liftRate),
@@ -229,16 +257,18 @@ export function evaluateLearnings(cards: DeliveryCard[], results: DeliveryResult
       baseline.map((d) => d.ctr),
     )
     const suggestion: LearningReviewStatus = lift.verdict === 'up' ? 'keep' : lift.verdict === 'down' ? 'retired' : lift.verdict === 'flat' && lift.a.n >= 6 ? 'retired' : 'watch'
-    out.push({ id: r.id, notes: r.notes.trim(), source, sourceAt: r.sent_at ?? source.scheduled_at ?? '', used, baseline, lift, ctr, review: reviewBy.get(r.id), suggestion })
+    out.push({ id: r.id, notes: r.notes.trim(), source, sourceAt: sentAt, country: at, foreign: at !== origin, used, baseline, lift, ctr, review: reviewIn(reviews, r.id, at, origin), suggestion })
   }
   return out.sort((a, b) => b.used.length - a.used.length || b.sourceAt.localeCompare(a.sourceAt))
 }
 
-/** 外した学び(配信カードの「これまでの学び」と AI への依頼から除く) */
-export function retiredLearningIds(reviews: LearningReview[]): Set<string> {
-  const latest = new Map<string, LearningReview>()
-  for (const r of [...reviews].sort((a, b) => String(a.decided_at ?? a.created_on ?? '').localeCompare(String(b.decided_at ?? b.created_on ?? '')))) if (r.learning_id) latest.set(r.learning_id, r)
-  return new Set([...latest.values()].filter((r) => r.status === 'retired').map((r) => r.learning_id!))
+/**
+ * その国で外した学び(配信カードの「これまでの学び」と AI への依頼から除く)。判定は学びと国の組ごと(ST5)。
+ * originOf: 学びの出元の国(国を分ける前の判定を、出元の国の判定として読むため)。country が空なら、出元の国の判定を見る
+ */
+export function retiredLearningIds(reviews: LearningReview[], country: string, originOf: (id: string) => string): Set<string> {
+  const ids = new Set(reviews.map((r) => r.learning_id).filter((x): x is string => !!x))
+  return new Set([...ids].filter((id) => reviewIn(reviews, id, country || originOf(id), originOf(id))?.status === 'retired'))
 }
 
 // ---- 見本(撮影用のビルドの初期データ。サーバーの server/ccp/impact.py と同じ考え方)

@@ -9,6 +9,8 @@ import { DataTable, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
 import { locale, priceText, useT, type Market } from './i18n'
 import { mergeResultsByCard } from './results'
+import { learningUsableIn, useCountryApply } from './countryApply'
+import { myName } from './history'
 import { IMPACT_TAB_EVENT, takePendingImpactTab, buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
 
 // 結果の面の見せ方「効果」。配信が売上をどれだけ増やしたか(ホールドアウトとの差)と、AI に渡した学びが効いているかを見る。
@@ -137,6 +139,10 @@ type TabKey = 'lift' | 'log' | 'metrics' | 'sales' | 'learnings'
 interface Props {
   /** 絞り込み済みの配信(国・チャネル・種類 など) */
   cards: DeliveryCard[]
+  /** すべての配信(ほかの国の学びの出元を引くため。ST5) */
+  allCards: DeliveryCard[]
+  /** 画面で選んでいる国(空 = すべての国)。学びの判定は、学びと国の組ごと */
+  country: string
   onOpenResult: (id: string) => void
 }
 
@@ -181,7 +187,7 @@ function savePeriod(p: Period) {
   }
 }
 
-export function ImpactView({ cards, onOpenResult }: Props) {
+export function ImpactView({ cards, allCards, country, onOpenResult }: Props) {
   const s = useStyles()
   const t = useT()
   // 詳しい結果の「効果で見る」から来たときは、そのタブで開く
@@ -237,7 +243,14 @@ export function ImpactView({ cards, onOpenResult }: Props) {
   )
   // 学びは、絞り込み済みの配信(国・チャネル)の分だけを並べる(その国・チャネルの学びだけが並ぶほうが分かりやすい)。
   // 学びの出どころは期間の前でもよい(期間の中の配信に渡していれば、比べられる)
-  const evals = useMemo(() => (merged ? evaluateLearnings(cards, merged, impacts, reviews) : []), [cards, merged, impacts, reviews])
+  // 国を選んでいれば、その国で使うと決めたほかの国の学びも並べ、その国での判定を決める(ST5)
+  const applyVersion = useCountryApply()
+  const evals = useMemo(
+    () => (merged ? evaluateLearnings(allCards, merged, impacts, reviews, country, learningUsableIn) : []),
+    // 国の適用を変えたら(⚙ や配信カードで)、並べ直す
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allCards, merged, impacts, reviews, country, applyVersion],
+  )
 
   if (error) {
     return (
@@ -688,9 +701,10 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
       `リフト率の差 ${pt(e.lift.diff)}(${e.lift.a.n} 本 / ${e.lift.b.n} 本)`,
       `Lift gap ${pt(e.lift.diff)} (${e.lift.a.n} / ${e.lift.b.n} deliveries)`,
     )
-    const fields = { learning_id: e.id, status, reason, decided_at: new Date().toISOString() }
+    const fields = { learning_id: e.id, status, reason, decided_at: new Date().toISOString(), country: e.country, decided_by: myName() || undefined }
     try {
-      if (e.review) await LearningReviewsService.update(e.review.id, fields)
+      // 判定は学びと国の組ごと。国を分ける前の行(国が空)は直さず、その国の行を作る(前の判定は記録として残す)
+      if (e.review && e.review.country === e.country) await LearningReviewsService.update(e.review.id, fields)
       else await LearningReviewsService.create(fields)
     } finally {
       setBusy(null)
@@ -712,6 +726,7 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
           <span className={mergeClasses(s.notes, s.clamp)}>{e.notes}</span>
           <span className={s.sub}>
             {e.source.name} · {e.sourceAt ? new Date(e.sourceAt).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : ''}
+            {e.foreign && ` · ${t(`${e.source.country ?? ''} の学び`, `From ${e.source.country ?? ''}`)}`}
           </span>
         </span>
       ),
@@ -756,8 +771,8 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
     <div className={s.section}>
       <span className={s.intro}>
         {t(
-          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「これまでの学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。',
-          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Select a row to see where it was used on the right. Learnings that are always passed together cannot be told apart.',
+          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「これまでの学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。判定は国ごとです(上で国を選ぶと、その国の学びと、その国で使うと決めたほかの国の学びを、その国の配信で比べ、その国での扱いを決めます)。',
+          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Select a row to see where it was used on the right. Learnings that are always passed together cannot be told apart. Decisions are per country (choose a country above to compare its own learnings, and those from other countries it uses, on its deliveries).',
         )}
       </span>
       <div className={s.bar}>

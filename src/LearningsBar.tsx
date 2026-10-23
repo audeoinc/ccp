@@ -6,8 +6,11 @@ import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { LearningReviewsService, type LearningReview } from './data/learningReviews'
 import { retiredLearningIds } from './impact'
+import { applyDecided, learningUsableIn, saveApply, useCountryApply } from './countryApply'
+import { myName } from './history'
 import { setActiveLearnings } from './aiSelect'
-import { locale, useT } from './i18n'
+import { locale, optionLabel, useT } from './i18n'
+import { countryOptions } from './status'
 import { templateIdOf } from './results'
 import { guessThemeType, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 
@@ -32,6 +35,9 @@ const useStyles = makeStyles({
   item: { display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', columnGap: '12px', fontSize: tokens.fontSizeBase200 },
   itemHead: { display: 'grid', rowGap: '2px', color: tokens.colorNeutralForeground2 },
   itemNotes: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
+  // ほかの国の学び(使えるかもしれない。ST5)。この国で使うかを、ここで決める
+  otherHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, paddingTop: '4px' },
+  otherActions: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', paddingTop: '2px' },
 })
 
 interface Props {
@@ -52,6 +58,8 @@ interface Props {
 
 interface Learning {
   id: string
+  /** 出元の国(この配信の国と違えば、ほかの国の学び) */
+  origin: string
   at: string
   name: string
   notes: string
@@ -61,9 +69,12 @@ interface Learning {
 
 const MAX = 8
 
+const countryName = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
+
 /**
  * 配信カードの「これまでの学び」。同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」を出す(新しい順)。
- * 出している間は、AI の下書きの依頼にも、学びを渡す(setActiveLearnings)。テーマの種類も、ここで直せる
+ * 出している間は、AI の下書きの依頼にも、学びを渡す(setActiveLearnings)。テーマの種類も、ここで直せる。
+ * 学びは共通で 1 つ持ち、国ごとに使うかを決める(ST5)。この国の学びは使い、ほかの国の学びは「使えるかもしれない学び」として並べて、人が使うかを決める
  */
 export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType, onCount }: Props) {
   const styles = useStyles()
@@ -73,6 +84,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   // 学びの判定(結果の面の「効果」で、外した学びは、ここにも AI にも出さない)
   const [reviews, setReviews] = useState<LearningReview[]>([])
   const [open, setOpen] = useState(false)
+  const [deciding, setDeciding] = useState<string | null>(null)
+  useCountryApply()
   // テーマの種類: 配信情報の Type(書きかけの値)。なければ、いま画面にある言葉から推し量る(X41。直すのは配信情報)
   const type: { type: ThemeType; guessed: boolean } = themeType
     ? themeTypeOf({ ...card, theme_type: themeType })
@@ -90,22 +103,56 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
       .catch(() => undefined)
   }, [])
 
-  const retired = useMemo(() => retiredLearningIds(reviews), [reviews])
-  const learnings: Learning[] = useMemo(() => {
-    const byId = new Map(cards.map((c) => [c.id, c]))
-    return results
-      .filter((r) => r.notes?.trim() && r.delivery_card_id && r.delivery_card_id !== card.id && !retired.has(r.id))
-      .flatMap((r): Learning[] => {
-        const c = byId.get(r.delivery_card_id!)
-        if (!c || String(c.country ?? '') !== country || String(c.channel ?? '') !== channel) return []
-        const sameTemplate = templateIdOf(c) === templateId
-        const sameType = themeTypeOf(c).type === type.type
-        if (!sameTemplate && !sameType) return []
-        return [{ id: r.id, at: r.sent_at ?? c.scheduled_at ?? '', name: c.name ?? '', notes: r.notes!.trim(), sameTemplate, sameType }]
-      })
-      .sort((a, b) => b.at.localeCompare(a.at))
-      .slice(0, MAX)
-  }, [cards, results, retired, card.id, country, channel, templateId, type.type])
+  const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards])
+  // 学び(配信結果の id)の出元の国
+  const originOf = useMemo(() => {
+    const m = new Map(results.map((r) => [r.id, String(byId.get(r.delivery_card_id ?? '')?.country ?? '')]))
+    return (id: string) => m.get(id) ?? ''
+  }, [results, byId])
+  // この国で外した学び(ほかの国の学びは、出元の国で外したものも勧めない)
+  const retired = useMemo(() => retiredLearningIds(reviews, country, originOf), [reviews, country, originOf])
+  const retiredAtOrigin = useMemo(() => retiredLearningIds(reviews, '', originOf), [reviews, originOf])
+  // 同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学び(国はまだ見ない)
+  const matching: Learning[] = useMemo(
+    () =>
+      results
+        .filter((r) => r.notes?.trim() && r.delivery_card_id && r.delivery_card_id !== card.id)
+        .flatMap((r): Learning[] => {
+          const c = byId.get(r.delivery_card_id!)
+          if (!c || String(c.channel ?? '') !== channel) return []
+          const sameTemplate = templateIdOf(c) === templateId
+          const sameType = themeTypeOf(c).type === type.type
+          if (!sameTemplate && !sameType) return []
+          return [{ id: r.id, origin: String(c.country ?? ''), at: r.sent_at ?? c.scheduled_at ?? '', name: c.name ?? '', notes: r.notes!.trim(), sameTemplate, sameType }]
+        })
+        .sort((a, b) => b.at.localeCompare(a.at)),
+    [byId, results, card.id, channel, templateId, type.type],
+  )
+  // 使う学び: この国の学び(外していなければ)と、この国で使うと決めたほかの国の学び
+  const learnings = matching
+    .filter((l) => !retired.has(l.id) && (l.origin === country ? learningUsableIn(l.id, l.origin, country) || !country : !!country && learningUsableIn(l.id, l.origin, country)))
+    .slice(0, MAX)
+  // 使えるかもしれない学び: ほかの国の学びで、この国ではまだ決めていないもの
+  const candidates = country ? matching.filter((l) => l.origin !== country && !applyDecided('learning', l.id, country) && !retiredAtOrigin.has(l.id)).slice(0, MAX) : []
+  const decide = async (l: Learning, use: boolean) => {
+    if (
+      !window.confirm(
+        t(
+          `${countryName(country)}の全員に効きます(⚙ →「国」→「この国で使う学び」でも直せます)。よろしいですか?`,
+          `This applies to everyone working on ${countryName(country)} (you can change it in ⚙ → Country → Learnings used in this country). Continue?`,
+        ),
+      )
+    )
+      return
+    setDeciding(l.id)
+    try {
+      await saveApply('learning', country, [{ id: l.id, use }], myName() || t('(名前なし)', '(no name)'))
+    } finally {
+      setDeciding(null)
+    }
+  }
+  // 学びの並び(描くたびに配列を作るので、AI に渡し直すかは id の並びで見る)
+  const learnKey = learnings.map((l) => l.id).join(',')
 
   // AI の下書きに、学びを渡す(この帯が出ている間だけ)
   useEffect(() => {
@@ -115,7 +162,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
       card.id,
     )
     return () => setActiveLearnings([])
-  }, [learnings, card.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learnKey, card.id])
 
   useEffect(() => {
     onCount?.(learnings.length)
@@ -142,7 +190,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
             </Badge>
           )}
         </span>
-        {learnings.length > 0 && (
+        {learnings.length + candidates.length > 0 && (
           <Button size="small" appearance="subtle" className={styles.toggle} icon={open ? <ChevronUpRegular /> : <ChevronDownRegular />} onClick={() => setOpen(!open)}>
             {open ? t('閉じる', 'Hide') : t('見る', 'Show')}
           </Button>
@@ -151,6 +199,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
           {learnings.length > 0
             ? t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」。AI の下書きにも渡します', 'Notes for next time from past deliveries with the same template or theme type. Also passed to AI drafts.')
             : t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」は、まだありません', 'No notes yet from past deliveries with the same template or theme type.')}
+          {candidates.length > 0 && t(`(ほかの国の、使えるかもしれない学びが ${candidates.length} 件)`, ` (${candidates.length} learning(s) from other countries may apply)`)}
         </span>
         <Tooltip
           content={t('テーマの種類。同じ種類の過去の配信の学びを集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type, used to find learnings from past deliveries of the same type. "guessed" is inferred from the wording.')}
@@ -170,12 +219,44 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
                 <span>{dateText(l.at)}</span>
                 <span>{l.name}</span>
                 <span className={styles.muted}>
-                  {[l.sameTemplate ? t('同じテンプレート', 'Same template') : '', l.sameType ? t('同じ種類', 'Same type') : ''].filter(Boolean).join(' / ')}
+                  {[l.sameTemplate ? t('同じテンプレート', 'Same template') : '', l.sameType ? t('同じ種類', 'Same type') : '', l.origin !== country ? t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`) : '']
+                    .filter(Boolean)
+                    .join(' / ')}
                 </span>
               </span>
               <span className={styles.itemNotes}>{l.notes}</span>
             </div>
           ))}
+          {candidates.length > 0 && (
+            <>
+              <span className={styles.otherHead}>
+                {t(
+                  `ほかの国の学び(使えるかもしれない)。国で客層が違うので、${countryName(country)}で使うかを決めてください。使うと決めたものだけ、AI に渡します`,
+                  `Learnings from other countries (may apply). Audiences differ by country, so decide whether to use each in ${countryName(country)}. Only the ones you use are passed to AI.`,
+                )}
+              </span>
+              {candidates.map((l) => (
+                <div key={l.id} className={styles.item}>
+                  <span className={styles.itemHead}>
+                    <span>{dateText(l.at)}</span>
+                    <span>{l.name}</span>
+                    <span className={styles.muted}>{t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`)}</span>
+                  </span>
+                  <span>
+                    <span className={styles.itemNotes}>{l.notes}</span>
+                    <span className={styles.otherActions}>
+                      <Button size="small" disabled={deciding === l.id} onClick={() => void decide(l, true)}>
+                        {t(`${countryName(country)}で使う`, `Use in ${countryName(country)}`)}
+                      </Button>
+                      <Button size="small" appearance="subtle" disabled={deciding === l.id} onClick={() => void decide(l, false)}>
+                        {t('使わない', 'Don’t use')}
+                      </Button>
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

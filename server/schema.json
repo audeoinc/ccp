@@ -726,7 +726,8 @@
     ["status", "choice"],
     ["reason", "text"],
     ["decided_by", "text"],
-    ["decided_at", "timestamptz"]
+    ["decided_at", "timestamptz"],
+    ["country", "text", {"index": true}]
    ],
    "lookups": [
    ]

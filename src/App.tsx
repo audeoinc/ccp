@@ -41,6 +41,7 @@ import {
   DeleteRegular,
   DismissRegular,
   DocumentBulletListRegular,
+  LightbulbFilamentRegular,
   DocumentPdfRegular,
   GlobeRegular,
   HistoryRegular,
@@ -112,6 +113,7 @@ import { PolicyManager } from './PolicyManager'
 import { PatternManager } from './PatternManager'
 import { CountryCriteriaDialog } from './CountryCriteriaDialog'
 import { CountryTemplatesDialog } from './CountryTemplatesDialog'
+import { CountryLearningsDialog } from './CountryLearningsDialog'
 import { loadCountryApply } from './countryApply'
 import { criteriaFor, loadCountrySettings, useCountrySettings } from './countrySettings'
 import { createUsSamplePatterns } from './samplePatterns'
@@ -478,6 +480,7 @@ function App() {
   const [criteriaOpen, setCriteriaOpen] = useState(false)
   // この国で使うテンプレート(ST1。共通のマスタ + 国ごとの適用 ST7)
   const [countryTplOpen, setCountryTplOpen] = useState(false)
+  const [countryLearnOpen, setCountryLearnOpen] = useState(false)
   useEffect(() => {
     void loadCountrySettings()
     void loadCountryApply()
@@ -1461,6 +1464,7 @@ function App() {
       <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} onChanged={() => void loadPatterns()} />
       <CountryCriteriaDialog open={criteriaOpen} onClose={() => setCriteriaOpen(false)} country={filters.country} />
       <CountryTemplatesDialog open={countryTplOpen} onClose={() => setCountryTplOpen(false)} country={filters.country} />
+      <CountryLearningsDialog open={countryLearnOpen} onClose={() => setCountryLearnOpen(false)} country={filters.country} cards={cards} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
@@ -1592,6 +1596,10 @@ function App() {
                 {/* この国で使うテンプレート(ST1): テンプレートは共通。国では、使う・使わないだけを決める(ST7 の適用の表) */}
                 <MenuItem icon={<LayoutColumnTwoRegular />} onClick={() => setCountryTplOpen(true)}>
                   {t('この国で使うテンプレート', 'Templates used in this country')}
+                </MenuItem>
+                {/* この国で使う学び(ST5): 学びは共通。出元の国は使い、ほかの国の学びは、使うと決めたものだけ(ST7 の適用の表) */}
+                <MenuItem icon={<LightbulbFilamentRegular />} onClick={() => setCountryLearnOpen(true)}>
+                  {t('この国で使う学び', 'Learnings used in this country')}
                 </MenuItem>
                 {/* 国ごとの配信の型(ST9): 曜日・時刻・チャネル・種類・テンプレートの組。「まとめて作る」が、この型どおりに枠を作る */}
                 <MenuItem icon={<CalendarClockRegular />} onClick={() => setPatternOpen(true)}>
@@ -2113,7 +2121,7 @@ function App() {
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {view === 'impact' ? (
               // 見せ方「効果」: 配信の増分と、学びの記録・指標・売上・評価。期間によらず、絞り込みの国・チャネルのすべての配信で見る(件数が少ないと比べられないため)
-              <ImpactView key={impactKey} cards={filtered} onOpenResult={setPeekResult} />
+              <ImpactView key={impactKey} cards={filtered} allCards={cards} country={filters.country} onOpenResult={setPeekResult} />
             ) : view === 'products' ? (
               <>
               {/* 期間の近道(見せ方「商品」) */}

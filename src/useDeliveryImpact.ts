@@ -6,7 +6,7 @@ import { DeliveryLiftsService } from './data/deliveryLifts'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { LearningReviewsService } from './data/learningReviews'
-import { learningIdsOf, liftOf, retiredLearningIds } from './impact'
+import { learningIdsOf, liftOf, reviewIn } from './impact'
 
 export interface UsedLearning {
   /** 学びの id(配信結果の id) */
@@ -27,7 +27,8 @@ export interface DeliveryImpactInfo {
   learnings: UsedLearning[]
 }
 
-export function useDeliveryImpact(cardId: string): DeliveryImpactInfo | null {
+/** country: その配信の国(学びを外したかは、学びと国の組で決めるため。ST5) */
+export function useDeliveryImpact(cardId: string, country: string): DeliveryImpactInfo | null {
   const [info, setInfo] = useState<DeliveryImpactInfo | null>(null)
   useEffect(() => {
     let alive = true
@@ -39,7 +40,7 @@ export function useDeliveryImpact(cardId: string): DeliveryImpactInfo | null {
         const l = liftOf(liftRow)
         const runRows = runs.success ? (runs.data ?? []) : []
         const ids = [...new Set(runRows.flatMap(learningIdsOf))]
-        const retired = retiredLearningIds(reviews.success ? (reviews.data ?? []) : [])
+        const reviewRows = reviews.success ? (reviews.data ?? []) : []
         // 学びの中身(配信結果のメモ)は、学びを渡したときだけ読む。出どころの配信の名前は、学びの数件だけ 1 件ずつ読む
         const all = ids.length ? await DeliveryResultsService.getAll() : null
         const byId = new Map((all?.success ? (all.data ?? []) : []).map((r) => [r.id, r]))
@@ -49,12 +50,13 @@ export function useDeliveryImpact(cardId: string): DeliveryImpactInfo | null {
               const r = byId.get(id)
               if (!r?.notes?.trim()) return null
               const c = r.delivery_card_id ? await DeliveryCardsService.get(r.delivery_card_id) : null
+              const origin = c?.success ? String(c.data?.country ?? '') : ''
               return {
                 id,
                 notes: r.notes.trim(),
                 sourceName: c?.success ? (c.data?.name ?? '') : '',
                 sourceAt: r.sent_at ?? (c?.success ? (c.data?.scheduled_at ?? '') : ''),
-                retired: retired.has(id),
+                retired: reviewIn(reviewRows, id, country || origin, origin)?.status === 'retired',
               }
             }),
           )
@@ -67,6 +69,6 @@ export function useDeliveryImpact(cardId: string): DeliveryImpactInfo | null {
     return () => {
       alive = false
     }
-  }, [cardId])
+  }, [cardId, country])
   return info
 }

@@ -89,7 +89,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   const previewH = Math.max(480, window.innerHeight * 0.94 - 220)
   const themeType = themeTypeOf(card)
   // 効果(ホールドアウトとの比べ・AI に渡した学び。X56)。ここで 1 回だけ読み、主な数字と右の列に渡す
-  const impact = useDeliveryImpact(card.id)
+  const impact = useDeliveryImpact(card.id, String(card.country ?? ''))
   // AI の振り返りを、次に生かすメモの末尾に足す
   const adopt = async (text: string) => {
     const now = row.result.notes?.trim()

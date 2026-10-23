@@ -1,5 +1,6 @@
 // 表「学びの判定」(server/schema.json の learning_reviews)。学び(過去の配信の「次に生かすメモ」)ごとに、残す・様子を見る・外す を人が決める。
-// 外した学びは、配信カードの「これまでの学び」にも、AI への依頼にも渡さない(効かない学びを淘汰するため)。学び 1 つにつき 1 行。
+// 外した学びは、配信カードの「これまでの学び」にも、AI への依頼にも渡さない(効かない学びを淘汰するため)。
+// 判定は学びと国の組ごと(ST5。国で客層が違い、ある国で効く学びが、ほかの国でも効くとは限らないため)。決め直すたびに行を足し、新しい行が今の判定。
 import { tableService } from '../gcp/services'
 
 export const LearningReviewStatus = {
@@ -17,6 +18,8 @@ export interface LearningReviewFields {
   reason?: string
   decided_by?: string
   decided_at?: string
+  /** どの国での判定か。空の行は国を分ける前の判定で、学びの出元の国の判定として読む */
+  country?: string
 }
 
 export interface LearningReview extends LearningReviewFields {
