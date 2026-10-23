@@ -70,6 +70,8 @@ interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'h
   name: string
   description: string
   sections: Section[]
+  /** ヒーローのすぐ下の表(ボタン・テキスト・画像。セクションの番号には数えない。T8 の 8.1) */
+  heroTable?: Section
   /** アプリのテンプレート: 通知の形(メールのテンプレートでは undefined) */
   push?: PushSpec
   /** 変更のメモ(版の履歴に残す) */
@@ -77,13 +79,16 @@ interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'h
 }
 
 /** 編集中の内容から、保存・見取り図に使う構成を作る */
-const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections: d.sections })
+const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}) })
 
 /** セクションの形(表に直して、部品の種類・位置・大きさ・見せ方)。ID・文言・見出しは比べない */
 const sectionShape = (sec: Section) =>
   JSON.stringify([sec.cols, sec.rows, [...(sec.parts ?? [])].sort((a, b) => a.r - b.r || a.c - b.c).map((p) => [p.type, p.c, p.r, p.w, p.h, p.view ?? 'card'])])
 /** 構成の形の並び。以前の種類のテンプレートも、表に直してから比べる(同じ見た目なら、同じ形になる) */
-const shapesOf = (l: TemplateLayout) => toTableLayout(l).sections.map(sectionShape)
+const shapesOf = (l: TemplateLayout) => {
+  const t = toTableLayout(l)
+  return [...(t.heroTable ? ['hero:' + sectionShape(t.heroTable)] : []), ...t.sections.map(sectionShape)]
+}
 /** 構成の形。同じなら、見た目の設定のほかは同じテンプレート */
 const shapeOf = (l: TemplateLayout) => JSON.stringify(shapesOf(l))
 /** 似ている度(0〜1): セクションの形の並びが、どれだけ同じ順に重なるか(最長共通部分列 ÷ 長いほうの数) */
@@ -146,7 +151,7 @@ const newDraft = (): Draft => ({
   description: '',
   hero: 'standard',
   heroText: 'below',
-  sections: toTableLayout({ hero: 'standard', sections: [{ kind: 'grid', slots: 4 }], buttonBlocks: [{ at: 0, buttons: [{ id: newButtonId() }] }] }).sections,
+  ...(({ sections, heroTable }) => ({ sections, heroTable }))(toTableLayout({ hero: 'standard', sections: [{ kind: 'grid', slots: 4 }], buttonBlocks: [{ at: 0, buttons: [{ id: newButtonId() }] }] })),
 })
 
 const useStyles = makeStyles({
@@ -566,6 +571,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
       topBar: selected.topBar,
       heroLink: selected.heroLink,
       sections: toTableLayout(selected).sections,
+      heroTable: toTableLayout(selected).heroTable,
       push: selected.push ? { ...selected.push, buttons: [...selected.push.buttons] } : undefined,
     })
     setSelectedId('')
@@ -576,7 +582,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     if (!selected || !canEdit(selected)) return
     setError(null)
     setCompareId(null)
-    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, sections: toTableLayout(selected).sections, push: selected.push })
+    setDraft({ id: selected.id, name: selected.label, description: selected.description, hero: selected.hero, heroText: selected.heroText, topBar: selected.topBar, heroLink: selected.heroLink, sections: toTableLayout(selected).sections, heroTable: toTableLayout(selected).heroTable, push: selected.push })
   }
 
   // ---- 元に戻す・やり直す。編集中の内容が変わるたびに、前の内容を残す(続けて打った文字は 0.6 秒の間をまとめて 1 つにする)
@@ -620,11 +626,14 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   }
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d))
   const setSections = (fn: (list: Section[]) => Section[]) => setDraft((d) => (d ? { ...d, sections: fn(d.sections) } : d))
+  const setHeroTable = (sec: Section | undefined) => setDraft((d) => (d ? { ...d, heroTable: sec } : d))
   // 右のタブ「テンプレート」の、全体の見た目の欄(キャンバスのヒーローを押したときに、そこを見せる)
   const heroRef = useRef<HTMLDivElement>(null)
   const editor = useTableEditor({
     active: editing,
     sections: draft?.sections ?? [],
+    heroTable: draft?.heroTable,
+    setHeroTable,
     setSections,
     hero: draft?.hero ?? 'standard',
     heroText: draft?.heroText,

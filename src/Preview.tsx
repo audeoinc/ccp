@@ -826,7 +826,11 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
               </div>
             )
           }
-          if (p.type === 'text') return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
+          if (p.type === 'text') {
+            // 文が空のときは、部品を選ぶ見せ方(シンプルな配信カード)でだけ、薄い印を出す(押して選べるように。メールには何も出さない)
+            if (!p.text && pickMode) return <div style={{ fontSize: '0.75rem', color: '#bbb', minHeight: '1.6em', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{t('(テキスト)', '(Text)')}</div>
+            return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
+          }
           if (p.type === 'media') {
             // 画像・動画: 押すとリンク先へ(URL は配信ごと。ボタンと同じ目印で、リンクの設定と計測に乗る)。
             // 動画は、メールでは再生できないので、画像をサムネイルにして ▶ を重ねる
@@ -835,7 +839,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                 data-link="button"
                 data-link-id={p.id}
                 data-anchor={`button:${p.id}`}
-                data-part={`button:${p.id}`}
+                data-part={`image:${p.id}`}
                 style={{ position: 'relative', aspectRatio: String(ratioValue(p.ratio ?? 'wide')), borderRadius: 8, overflow: 'hidden', backgroundColor: '#eef0f3', display: 'grid', placeItems: 'center', alignSelf: 'center' }}
               >
                 {p.src ? (
@@ -854,7 +858,8 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         // 均等に並べる行は、列に合わせず、行いっぱいの帯の中で、中身のある部品(空きは除く)を同じ幅で並べる
         const even = sec.evenRows ?? []
         const cell = (p: TablePart, area?: React.CSSProperties) => (
-          <div key={p.id} data-part-id={p.id} style={{ ...area, minWidth: 0, minHeight: 0, display: 'grid' }}>
+          // テキストの目印はマスの外枠に付ける(文が空でも、マスを押せば選べるように。シンプルな配信カード)
+          <div key={p.id} data-part-id={p.id} data-part={p.type === 'text' ? `text:${p.id}` : undefined} style={{ ...area, minWidth: 0, minHeight: 0, display: 'grid' }}>
             {body(p)}
           </div>
         )
@@ -895,6 +900,9 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const sp = sectionSpace(sec.space)
     return { padding: `${sec.bg || sec.divider ? sp : 0}px 16px ${sp}px`, ...(sec.bg ? { backgroundColor: SECTION_BG[sec.bg] } : {}), ...(sec.divider ? { borderTop: '1px solid #e2e2e2' } : {}) }
   }
+
+  // ---- ヒーローのすぐ下の表(T8 の 8.1。ボタン・テキスト・画像。セクションの番号には数えない)
+  const heroTableEl = tpl.heroTable && (tpl.heroTable.parts ?? []).some((p) => p.type !== 'empty') ? <div data-anchor="herotable" style={{ padding: '0 16px 12px' }}>{sectionBody(tpl.heroTable, 0, [])}</div> : null
 
   // ---- 本文(商品)。free は連続する同カテゴリごとに見出しを付け、それ以外はテンプレートの枠に流し込む
   let body: React.ReactNode
@@ -987,6 +995,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>SHOP</div>
         {heroBox}
         {heroAfter}
+        {heroTableEl}
         {body}
         {!compact && <div data-anchor="footer" style={{ backgroundColor: '#f5f5f5', color: SUB, fontSize: '0.75rem', textAlign: 'center', padding: '12px 0' }}>{t('配信停止はこちら', 'Unsubscribe')}</div>}
       </div>
