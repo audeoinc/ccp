@@ -1,5 +1,7 @@
 import type { LinkState } from './deepLink'
 import type { DevRequest } from './models/devRequests'
+import type { DevRequestVote } from './models/devRequestVotes'
+import { DevRequestVotesService } from './data/devRequestVotes'
 import { anchorLabel } from './pinStore'
 import { loadPref, savePref } from './settings'
 import { tr } from './i18n'
@@ -104,7 +106,8 @@ export function capturePlace(x: number, y: number, cardName: (id: string) => str
     else partLabel = partLabelOf(v)
   } else if (el) {
     const named = el.closest('[aria-label], button, a, [role="tab"], h1, h2, h3, label')
-    const text = named?.getAttribute('aria-label') || named?.textContent || el.textContent || ''
+    // 名前の付いた部品がなければ、押した要素そのものの文字だけ(中に部品を持つ大きな枠の文字を、まるごと使わない)
+    const text = named?.getAttribute('aria-label') || named?.textContent || (el.children.length === 0 ? el.textContent : '') || ''
     partLabel = snippet(text)
   }
   if (!anchorEl) return { anchor: '', view_x, view_y, partLabel }
@@ -186,4 +189,18 @@ export const subscribeDevRequests = (f: () => void) => {
 export function bumpDevRequests() {
   version += 1
   listeners.forEach((f) => f())
+}
+
+// ---- 賛同(いいね)。1 人 1 回。同じ名前でもう一度押すと取り消す(フロートと一覧で同じ処理)
+/** そのリクエストへの賛同(古い順) */
+export const votesOf = (votes: DevRequestVote[], id: string) => votes.filter((v) => v.dev_request_id === id).sort((a, b) => (a.created_on ?? '').localeCompare(b.created_on ?? ''))
+
+export async function toggleVote(id: string, name: string, votes: DevRequestVote[]) {
+  const mine = votes.filter((v) => v.dev_request_id === id && (v.voter_name ?? '').trim() === name.trim())
+  if (mine.length) for (const v of mine) await DevRequestVotesService.delete(v.id)
+  else {
+    const r = await DevRequestVotesService.create({ dev_request_id: id, voter_name: name.trim() })
+    if (!r.success) throw new Error(r.error?.message ?? tr('賛同できませんでした', 'Could not add your vote'))
+  }
+  bumpDevRequests()
 }

@@ -637,6 +637,15 @@
     ["delivery_card_id", "delivery_cards", {"onDelete": "SET NULL"}]
    ]
   },
+  "dev_request_votes": {
+   "_comment": "開発へのリクエストへの賛同(いいね)。1 人 1 回(同じ名前でもう一度押すと消す)。import-pack の入れ替えでも消さない(pack.py の KEEP_ON_REPLACE)",
+   "columns": [
+    ["voter_name", "text"]
+   ],
+   "lookups": [
+    ["dev_request_id", "dev_requests", {"onDelete": "CASCADE"}]
+   ]
+  },
   "ad_spends": {
    "columns": [
     ["date", "date", {"index": true}],

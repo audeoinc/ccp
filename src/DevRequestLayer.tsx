@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Badge, Button, Field, Input, Popover, Portal, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { CheckmarkRegular, DismissRegular, LightbulbRegular, LocationOffRegular } from '@fluentui/react-icons'
+import { CheckmarkRegular, DismissRegular, LightbulbRegular, LocationOffRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
 import type { LinkState } from './deepLink'
 import { DevRequestsService } from './data/devRequests'
+import { DevRequestVotesService } from './data/devRequestVotes'
+import type { DevRequestVote } from './models/devRequestVotes'
 import type { DevRequest } from './models/devRequests'
 import { keepBrowserMenu, setGlobalMenuItems, useContextMenu } from './ContextMenu'
 import {
@@ -19,6 +21,8 @@ import {
   screenLabel,
   setDevRequestName,
   subscribeDevRequests,
+  toggleVote,
+  votesOf,
   type CapturedPlace,
 } from './devRequestPlace'
 import { usePinAnchor } from './pinAnchor'
@@ -76,7 +80,27 @@ const useStyles = makeStyles({
   trayBody: { fontSize: tokens.fontSizeBase200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   badgeIcon: { width: '18px', height: '18px', display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: '3px', transform: 'rotate(45deg)', backgroundColor: tokens.colorNeutralBackgroundStatic, color: tokens.colorPaletteYellowBackground3 },
   nameRow: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  status: { display: 'flex', alignItems: 'center', columnGap: '6px' },
+  status: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
+  // ピンの右上に、賛同の数(ひし形は回っているので、ピンの外に重ねる)
+  votes: {
+    position: 'absolute',
+    marginLeft: `${PIN / 2 - 2}px`,
+    marginTop: `-${PIN / 2 + 8}px`,
+    minWidth: '16px',
+    height: '16px',
+    padding: '0 4px',
+    boxSizing: 'border-box',
+    borderRadius: '8px',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: '10px',
+    fontWeight: tokens.fontWeightBold,
+    backgroundColor: tokens.colorPaletteYellowBackground3,
+    color: tokens.colorNeutralForegroundStaticInverted,
+    boxShadow: tokens.shadow4,
+    pointerEvents: 'none',
+  },
+  voters: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
 
 /** いま開いているフロート: 刺さっているリクエスト(ID)か、打ったばかり(場所だけ) */
@@ -105,6 +129,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
   const t = useT()
   const version = useSyncExternalStore(subscribeDevRequests, devRequestsVersion)
   const [rows, setRows] = useState<DevRequest[]>([])
+  const [votes, setVotes] = useState<DevRequestVote[]>([])
   const [target, setTarget] = useState<Target | null>(() => {
     const id = linkedRequest()
     return id ? { id } : null
@@ -118,6 +143,9 @@ export function DevRequestLayer({ link, cardName }: Props) {
     let alive = true
     void DevRequestsService.getAll({ orderBy: ['created_on asc'] }).then((r) => {
       if (alive && r.success) setRows(r.data ?? [])
+    })
+    void DevRequestVotesService.getAll().then((r) => {
+      if (alive && r.success) setVotes(r.data ?? [])
     })
     return () => {
       alive = false
@@ -212,9 +240,15 @@ export function DevRequestLayer({ link, cardName }: Props) {
           )
         const q = byId.get(p.id)
         if (!q) return null
+        const n = votesOf(votes, q.id).length
         return (
+          <span key={p.id} style={{ display: 'contents' }}>
+          {n > 0 && (
+            <span className={s.votes} style={{ left: p.left, top: p.top }} aria-hidden>
+              {n}
+            </span>
+          )}
           <button
-            key={p.id}
             type="button"
             data-pin-id={`dr:${p.id}`}
             className={mergeClasses(s.pin, q.status === 'done' && s.pinDone, q.status === 'declined' && s.pinDeclined)}
@@ -228,6 +262,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
           >
             <span className={s.pinIcon}>{q.status === 'done' ? <CheckmarkRegular /> : q.status === 'declined' ? <DismissRegular /> : <LightbulbRegular />}</span>
           </button>
+          </span>
         )
       })}
       {lost.length > 0 && (
@@ -252,14 +287,14 @@ export function DevRequestLayer({ link, cardName }: Props) {
           </Popover>
         </div>
       )}
-      {target && <DevRequestFloat key={'id' in target ? target.id : 'pending'} target={target} rows={rows} onTarget={setTarget} onClose={close} />}
+      {target && <DevRequestFloat key={'id' in target ? target.id : 'pending'} target={target} rows={rows} votes={votes} onTarget={setTarget} onClose={close} />}
     </div>
     </Portal>
   )
 }
 
 /** リクエストのフロート(打ったら書く・刺さっているものを読む・返信する)。見た目はレビューのピンと同じ PinThreadView */
-function DevRequestFloat({ target, rows, onTarget, onClose }: { target: Target; rows: DevRequest[]; onTarget: (t: Target) => void; onClose: () => void }) {
+function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: Target; rows: DevRequest[]; votes: DevRequestVote[]; onTarget: (t: Target) => void; onClose: () => void }) {
   const s = useStyles()
   const t = useT()
   const name = useSyncExternalStore(onDevRequestName, devRequestName)
@@ -273,6 +308,29 @@ function DevRequestFloat({ target, rows, onTarget, onClose }: { target: Target; 
   const root = id ? rows.find((q) => q.id === id) : undefined
   const replies = root ? rows.filter((q) => q.source_request === root.id) : []
   const author = (nameEdit ?? name).trim()
+  const rootVotes = root ? votesOf(votes, root.id) : []
+  const mineVoted = !!author && rootVotes.some((v) => (v.voter_name ?? '').trim() === author)
+  const vote = async () => {
+    if (!root) return
+    if (!author) {
+      setNameEdit('')
+      setError(tr('賛同するには、名前を入れてください(次からは聞きません)', 'Enter your name to agree (asked only once)'))
+      return
+    }
+    setWorking(true)
+    setError(null)
+    try {
+      if (nameEdit !== null) {
+        setDevRequestName(author)
+        setNameEdit(null)
+      }
+      await toggleVote(root.id, author, votes)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setWorking(false)
+    }
+  }
 
   const send = async () => {
     const body = text.trim()
@@ -343,6 +401,11 @@ function DevRequestFloat({ target, rows, onTarget, onClose }: { target: Target; 
               <Badge appearance="tint" color={root.status === 'done' ? 'success' : root.status === 'declined' ? 'subtle' : 'important'} size="small">
                 {statusText(root)}
               </Badge>
+              {/* 賛同(いいね)。1 人 1 回、もう一度押すと取り消す */}
+              <Button size="small" appearance={mineVoted ? 'primary' : 'outline'} icon={mineVoted ? <ThumbLikeFilled /> : <ThumbLikeRegular />} disabled={working} onClick={() => void vote()}>
+                {t(`賛同する ${rootVotes.length}`, `Agree ${rootVotes.length}`)}
+              </Button>
+              {rootVotes.length > 0 && <span className={s.voters}>{rootVotes.map((v) => v.voter_name).join('、')}</span>}
             </span>
           )}
           {nameEdit !== null ? (
