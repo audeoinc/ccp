@@ -8,8 +8,6 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Field,
-  Select,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
@@ -53,26 +51,13 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
               )}
             </span>
 
-            <Field label={t('在庫が、配信日に何週分を切ったら「在庫僅少」にするか', 'Low stock when, on the delivery day, fewer weeks than')} size="small">
-              <Select value={String(draft.lowWeeks)} onChange={(_, d) => setDraft({ ...draft, lowWeeks: Number(d.value) })}>
-                {[...new Set([1, 1.5, 2, 3, 4, 6, 8, draft.lowWeeks])].sort((x, y) => x - y).map((v) => (
-                  <option key={v} value={String(v)}>{t(`${v} 週分`, `${v} weeks`)}</option>
-                ))}
-              </Select>
-            </Field>
-
-            {/* 週の上限(C3)。決まり(⚙ の「方針・決まり」)に「上限 週 N 回」があれば、そちらが優先 */}
-            <Field
-              label={t('週の上限(同じ商品を、同じ週に何本の配信まで載せてよいか)', 'Weekly limit (how many deliveries the same product may appear in per week)')}
-              hint={t('マーケティングの決まり(⚙ の「方針・決まり」)に「上限 週 N 回」があり、配信の国・チャネル・配信日に当てはまれば、そちらを使います', 'If a marketing rule (⚙ Policies & rules) says "上限 週 N 回" and matches the delivery’s country, channel and date, that rule is used instead')}
-              size="small"
-            >
-              <Select value={String(draft.weeklyLimit)} onChange={(_, d) => setDraft({ ...draft, weeklyLimit: Number(d.value) })}>
-                {[1, 2, 3, 4, 5, 6].map((v) => (
-                  <option key={v} value={String(v)}>{t(`${v} 本まで`, `Up to ${v}`)}</option>
-                ))}
-              </Select>
-            </Field>
+            {/* 在庫僅少の週数・週の上限は、国の基準に移した(ST2)。何を問題とみなすかは国で決めるため */}
+            <span className={styles.note}>
+              {t(
+                '在庫僅少とみなす週数・週の上限は、国の基準になりました(⚙ →「国」→「アラートの基準」)。',
+                'Low-stock weeks and the weekly limit are now country criteria (⚙ → Country → Alert criteria).',
+              )}
+            </span>
 
             <div className={styles.group}>
               <span className={styles.groupTitle}>{t('出す種類', 'Kinds to show')}</span>

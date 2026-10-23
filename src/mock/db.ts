@@ -48,6 +48,8 @@ export const tables: Record<string, Row[]> = {
   ProductPoliciesService: structuredClone(policies),
   // 商品ページから取り込んだ画像(B11)。見本では空(画像を選ぶ窓は、見本の EC サイトのページを読む)
   ProductImagesService: [],
+  // 国ごとの設定(ST2)。見本では空(既定の値)
+  CountrySettingsService: [],
   // 国ごとの配信の型(ST9)の見本: JP は月・水・金のメールと土曜のアプリ、US は火・木のメール
   DeliveryPatternsService: [
     { id: guid('pattern:jp-mon'), name: '週はじめの新作', country: 'JP', weekday: 1, time: '10:00', channel: 'email', theme_type: 'new', layout_key: 'standard4', sort_order: 0 },

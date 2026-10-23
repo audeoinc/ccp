@@ -1,7 +1,7 @@
 // 週の上限(同じ商品を、同じ週に何本の配信まで載せてよいか。C3)。
 // 決め方(利用者と決めた 2026-10-21): マーケティングの決まり(⚙ の「方針・決まり」)に「上限 週 N 回」があり、配信の国・チャネル・配信日に当てはまれば、それを使う。
 // なければ、⚙ のアラートの条件の「週の上限」(ブラウザごとに覚える。既定 2)。決まりは ⚙ の「方針・決まり」の「週の上限の決まりを足す」で画面から作れる(X61)
-import { getAlertSettings } from './alertSettings'
+import { criteriaFor } from './countrySettings'
 import { tr } from './i18n'
 
 /** 上限の決まり(policy_rules の行のうち、check_spec が「上限 週 N 回」のもの) */
@@ -45,7 +45,7 @@ export interface WeeklyLimit {
   rule?: string
 }
 
-/** この配信に効く週の上限。配信を渡さないときは、アラートの条件の値 */
+/** この配信に効く週の上限。決まりがなければ、配信の国の基準(⚙ →「国」→「アラートの基準」) */
 export function weeklyLimitFor(card?: CardLike): WeeklyLimit {
   if (card) {
     const day = (card.scheduled_at ?? '').slice(0, 10)
@@ -62,7 +62,8 @@ export function weeklyLimitFor(card?: CardLike): WeeklyLimit {
       return { n: r.n, rule: r.title }
     }
   }
-  return { n: getAlertSettings().weeklyLimit }
+  // 決まりがなければ、配信の国の基準(ST2。配信を渡さないときは既定値)
+  return { n: criteriaFor(card?.country).weeklyLimit }
 }
 
 export const weeklyLimit = (card?: CardLike) => weeklyLimitFor(card).n

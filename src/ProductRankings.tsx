@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Input, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { RANKING_CHANNELS, type ProductRanking, type RankingChannel } from './models/productRankings'
 import { ProductRankingsService } from './data/productRankings'
 import { locale, useT } from './i18n'
-import { setRankTopN, useRankTopN } from './rankingSettings'
+import { criteriaFor, useCountrySettings } from './countrySettings'
 import { sentAtOf, type ResultRow } from './results'
 
 const useStyles = makeStyles({
@@ -49,10 +49,11 @@ function addWeeks(week: string, n: number): string {
 export function ProductRankings({ row, productIds, products }: { row: ResultRow; productIds: string[]; products: Product[] }) {
   const styles = useStyles()
   const t = useT()
-  const topN = useRankTopN()
-  const [draft, setDraft] = useState(String(topN))
+  useCountrySettings()
   const [rankings, setRankings] = useState<ProductRanking[] | null>(null)
   const market = row.card.country
+  // 上位とみなす線は、配信の国の基準(ST2。⚙ →「国」→「アラートの基準」で変える。国の全員に効くため、ここでは変えない)
+  const topN = criteriaFor(market).rankTopN
   const placed = productIds.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => !!p?.product_code)
   const codes = placed.map((p) => p.product_code as string)
   const codesKey = codes.join('|')
@@ -77,11 +78,6 @@ export function ProductRankings({ row, productIds, products }: { row: ResultRow;
 
   const channelLabel = (ch: RankingChannel) => (ch === 'all' ? t('全社', 'All channels') : ch === 'ec' ? t('EC', 'EC') : t('配信経由', 'Via deliveries'))
   const n = (v?: number) => (v ?? 0).toLocaleString(locale())
-  const commit = () => {
-    const v = Number(draft)
-    if (Number.isInteger(v) && v >= 1) setRankTopN(v)
-    else setDraft(String(topN))
-  }
 
   const rankCell = (key: string, r: ProductRanking | undefined) => (
     <td key={key} className={styles.td}>
@@ -101,18 +97,7 @@ export function ProductRankings({ row, productIds, products }: { row: ResultRow;
         <h3 className={styles.h3}>{t('商品: 販売チャネルごとの順位(数量)', 'Products: sales rank by channel (units)')}</h3>
         <span className={styles.topN}>
           {t('上位とみなす線', 'Top line')}
-          <Input
-            size="small"
-            type="number"
-            min={1}
-            value={draft}
-            onChange={(_, d) => setDraft(d.value)}
-            onBlur={commit}
-            onKeyDown={(e) => e.key === 'Enter' && commit()}
-            contentBefore={<span className={styles.muted}>Top</span>}
-            style={{ width: '96px' }}
-            aria-label={t('上位とみなす順位', 'Rank counted as top')}
-          />
+          <span title={t('変えるのは ⚙ →「国」→「アラートの基準」', 'Change it in ⚙ → Country → Alert criteria')}>{` Top ${topN}`}</span>
         </span>
       </div>
       <div className={styles.note}>

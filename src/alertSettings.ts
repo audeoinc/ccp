@@ -7,24 +7,19 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { ChangeAlert, StockAlert } from './alerts'
 
 export interface AlertSettings {
-  /** 在庫が、配信日に何週分を切ったら「在庫僅少」にするか */
-  lowWeeks: number
   /** 対象にする種別(配信の部署。空は、すべて) */
   departments: string[]
   /** 対象にする担当(企画・制作のどちらか。空は、すべて) */
   owners: string[]
   /** 出す種類 */
   kinds: { outOfStock: boolean; lowStock: boolean; policyChanged: boolean; dateChanged: boolean }
-  /** 週の上限(同じ商品を、同じ週に何本の配信まで載せてよいか。C3)。マーケティングの決まりに「上限 週 N 回」があれば、そちらが優先(src/weeklyLimit.ts) */
-  weeklyLimit: number
 }
+// 在庫僅少の週数・週の上限は、国の基準に移した(ST2。src/countrySettings.ts。何を問題とみなすかは国の基準のため)
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
-  lowWeeks: 2,
   departments: [],
   owners: [],
   kinds: { outOfStock: true, lowStock: true, policyChanged: true, dateChanged: true },
-  weeklyLimit: 2,
 }
 
 const KEY = 'alerts.settings'
@@ -39,7 +34,8 @@ function load(): AlertSettings {
     // 種別は、以前は数値で覚えていた。文字の値でないものは捨てる(絞り込みが外れるだけ)
     // 対象の種類(X41。これまでの種別の値 promotion などは、種類にないので捨てる)
     const departments = (o.departments ?? []).filter((d) => typeof d === 'string' && (THEME_TYPES as string[]).includes(d))
-    return { ...DEFAULT_ALERT_SETTINGS, ...o, departments, kinds: { ...DEFAULT_ALERT_SETTINGS.kinds, ...o.kinds } }
+    // 前に覚えていた lowWeeks・weeklyLimit は使わない(国の基準に移した。国の設定の画面で、1 回だけ取り込める)
+    return { departments, owners: o.owners ?? [], kinds: { ...DEFAULT_ALERT_SETTINGS.kinds, ...o.kinds } }
   } catch {
     return DEFAULT_ALERT_SETTINGS
   }

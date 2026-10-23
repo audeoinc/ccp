@@ -170,6 +170,17 @@
     ["product_id", "products", {"onDelete": "CASCADE"}]
    ]
   },
+  "country_settings": {
+   "_comment": "国ごとの設定(ST2。BACKLOG 13 章)。変えるたびに 1 行足す(いちばん新しい行が、いまの値。前の行は、変えた人・日時の履歴)。name は設定の種類(criteria = アラートの基準: 在庫僅少の週数・週の上限・販売順位の上位の線)。value は JSON",
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["country", "text", {"index": true}],
+    ["value", "text"],
+    ["changed_by", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "delivery_patterns": {
    "_comment": "国ごとの配信の型(ST9)。曜日・時刻・チャネル・種類・テンプレートの決まった組。「まとめて作る」(W14)が、この型どおりに枠を作る。型は既定値で縛りではない。作るときに写すので、型を変えても、もう作った配信には効かない。テンプレートは id だけ持ち、作るときの最新の版を使う",
    "columns": [

@@ -134,7 +134,8 @@ export function computeStockAlerts(args: {
   weekly: WeeklyPerformance[]
   results: DeliveryResult[]
   now?: Date
-  lowWeeks?: number
+  /** 在庫僅少の週数(配信ごと。国の基準 ST2 のため、配信の国で変わる) */
+  lowWeeks?: number | ((card: DeliveryCard) => number)
 }): StockAlert[] {
   const { cards, products, placements, now = new Date(), lowWeeks = LOW_STOCK_WEEKS } = args
   const model = makeStockModel(args)
@@ -165,7 +166,7 @@ export function computeStockAlerts(args: {
       before += uplift
       const weeksLeft = rate > 0 ? Math.max(0, projected) / rate : undefined
       const problem: AffectedDelivery['problem'] =
-        projected <= 0 ? 'soldOut' : after < 0 || (weeksLeft !== undefined && weeksLeft < lowWeeks) ? 'low' : 'none'
+        projected <= 0 ? 'soldOut' : after < 0 || (weeksLeft !== undefined && weeksLeft < (typeof lowWeeks === 'function' ? lowWeeks(card) : lowWeeks)) ? 'low' : 'none'
       return { card, sections, projected, after, weeksLeft, problem }
     })
     const hit = deliveries.filter((d) => d.problem !== 'none')
@@ -181,7 +182,7 @@ export function computeStockAlerts(args: {
  * アラートを読む(画面を開いたときに計算する)。配信カード・商品は App が持っているものを使い、
  * 週ごとの実績・配信の結果・配信の商品(載っている場所)は、ここで読む。reloadKey が変わったら読み直す
  */
-export function useStockAlerts(cards: DeliveryCard[], products: Product[], reloadKey: unknown, lowWeeks: number = LOW_STOCK_WEEKS) {
+export function useStockAlerts(cards: DeliveryCard[], products: Product[], reloadKey: unknown, lowWeeks: number | ((card: DeliveryCard) => number) = LOW_STOCK_WEEKS) {
   const [weekly, setWeekly] = useState<WeeklyPerformance[]>([])
   const [results, setResults] = useState<DeliveryResult[]>([])
   const [placements, setPlacements] = useState<Map<string, Placement[]>>(new Map())

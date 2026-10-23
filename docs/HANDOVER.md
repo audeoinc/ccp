@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(新しい順。詳しくは [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md))
 
+- 2026-10-23: **ST 設定の段階(UI 2)**: ⚙ を「あなた / 国 / システム」に並べ直し(d0035fc)。ST9 国ごとの配信の型(表 `delivery_patterns`・⚙ →「国」→「配信の型」・「まとめて作る」が型どおりに行を作る・US の見本)。ST2 国のアラートの基準(表 `country_settings`・⚙ →「国」→「アラートの基準」)。次は ST7 → ST1(テンプレートの担当と範囲を相談)→ ST4 → ST3(W8 と)→ ST5・ST8 → ST6
 - 2026-10-23: **B11 商品ページの画像を取り込む**([PRODUCT_IMAGES.md](PRODUCT_IMAGES.md))。手元の PC の `scripts/collect-product-images.py` → ZIP → Workbench の `ccp.cli import-images`(表 `product_images`)。本物の EC サイト・Workbench では未確認。「この配信で使う画像」の窓で、取り込んだ画像を候補に並べ、AI の勧めにも使う
 - 2026-10-22〜23: **B10 Workbench の開発用の画面**([DEVTOOLS.md](DEVTOOLS.md)。`/dev/`、`CCP_DEVTOOLS=1`)。BigQuery を見る・SELECT・Gemini と SQL を作る会話(セッション)・出力ごとの版と答え合わせ・作業ファイル・実行の履歴・列を調べる・ポリシーの文書。Workbench で試すのは利用者。全文は 2026-10-20_21.md の末尾
 - 2026-10-23 午後: **素材を消す(だれでも)・ピンのフロート(`PinFloat`)・右クリックのメニュー(`ContextMenu`)**。ピンを置ける 3 つのプレビュー(シンプル・詳しい配信カード、制作のページの iframe)すべてで、右クリック → ピン → フロートで書く・読む・返す。右クリックの項目(部品・商品・メイン画像・ピン・週月の一覧・素材の行)もすべて入れ、本番に反映。未確認: ピンのリンク `pin=` を開いたとき・制作のページのピンの右クリック・英語の画面。[SIMPLE_CARD.md](SIMPLE_CARD.md) の 18 章の末尾
