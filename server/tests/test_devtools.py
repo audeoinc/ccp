@@ -112,7 +112,7 @@ class ToolTest(unittest.TestCase):
 
     def test_tools_declared(self) -> None:
         names = [f.name for f in devtools.tool_declarations()[0].function_declarations]
-        self.assertEqual(names, ["list_datasets", "list_tables", "describe_table", "describe_view_sources", "dry_run", "run_select"])
+        self.assertEqual(names, ["list_datasets", "list_tables", "describe_table", "describe_view_sources", "dry_run", "list_files", "read_file", "save_file", "run_select"])
 
     def test_view_sources(self) -> None:
         refs = [SimpleNamespace(project="p", dataset_id="v", table_id="vw"), SimpleNamespace(project="p", dataset_id="raw", table_id="item"),
@@ -207,6 +207,25 @@ class WorkTest(unittest.TestCase):
         self.assertEqual([c["id"] for c in self.run_async(devtools.chats())["chats"]], ["def456"])
         with self.assertRaises(Exception):
             devtools._chat_path("../x")
+
+    def test_work_files_and_pinned_context(self) -> None:
+        self.run_async(devtools.put_file("コーディングルール.md", devtools.FileIn(content="# SQL の決まり\n- 予約語は大文字")))
+        self.run_async(devtools.put_file("spu.sql", devtools.FileIn(content="SELECT 1")))
+        self.run_async(devtools.pin_file("コーディングルール.md", devtools.PinIn(pinned=True)))
+        names = {f["name"]: f["pinned"] for f in self.run_async(devtools.files())["files"]}
+        self.assertEqual(names, {"コーディングルール.md": True, "spu.sql": False})
+        # いつも渡すファイルは、前提の頭のほう(仕様より前)に入る
+        c = devtools.build_context(devtools.ChatIn(), None)
+        self.assertIn("### コーディングルール.md", c)
+        self.assertLess(c.index("## いつも渡すファイル"), c.index("## CCP が読む出力の仕様"))
+        self.assertNotIn("SELECT 1", c)
+        # AI の道具でも読み書きできる(上書きかどうかも返す)
+        out, step = devtools.run_tool(None, "save_file", {"name": "引き継ぎ.md", "content": "## 決まったこと"}, devtools.ChatIn())
+        self.assertEqual((out["overwritten"], devtools.read_work_file("引き継ぎ.md")), (False, "## 決まったこと"))
+        out, _ = devtools.run_tool(None, "save_file", {"name": "../外.md", "content": "x"}, devtools.ChatIn())
+        self.assertIn("error", out)
+        self.run_async(devtools.delete_file("コーディングルール.md"))
+        self.assertEqual(devtools.pinned_names(), [])
 
     def test_check_runs_validate_with_context(self) -> None:
         self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT spu")))
