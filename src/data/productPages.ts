@@ -7,6 +7,8 @@ import { CreativeFiles } from './creativeFiles'
 export interface PageImage {
   src: string
   alt: string
+  /** 取り込んだ商品の画像のうち、メイン画像(商品のマスタにある画像) */
+  main?: boolean
 }
 
 /** AI が見た、画像ごとのアングル(index は渡した画像の番号) */

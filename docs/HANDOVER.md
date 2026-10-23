@@ -18,7 +18,7 @@
 
 ## 2. 最近の作業(新しい順。詳しくは [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md))
 
-- 2026-10-23: **B11 商品ページの画像を取り込む**([PRODUCT_IMAGES.md](PRODUCT_IMAGES.md))。手元の PC の `scripts/collect-product-images.py` → ZIP → Workbench の `ccp.cli import-images`(表 `product_images`)。本物の EC サイト・Workbench では未確認。次は、画像を選ぶ・AI の勧めで候補にする
+- 2026-10-23: **B11 商品ページの画像を取り込む**([PRODUCT_IMAGES.md](PRODUCT_IMAGES.md))。手元の PC の `scripts/collect-product-images.py` → ZIP → Workbench の `ccp.cli import-images`(表 `product_images`)。本物の EC サイト・Workbench では未確認。「この配信で使う画像」の窓で、取り込んだ画像を候補に並べ、AI の勧めにも使う
 - 2026-10-22〜23: **B10 Workbench の開発用の画面**([DEVTOOLS.md](DEVTOOLS.md)。`/dev/`、`CCP_DEVTOOLS=1`)。BigQuery を見る・SELECT・Gemini と SQL を作る会話(セッション)・出力ごとの版と答え合わせ・作業ファイル・実行の履歴・列を調べる・ポリシーの文書。Workbench で試すのは利用者。全文は 2026-10-20_21.md の末尾
 - 2026-10-22〜23: **SU1・SU2 シンプルな配信カード**([SIMPLE_CARD.md](SIMPLE_CARD.md) の 12〜18 章)。(a)〜(d)・AB テスト・上の帯(StageHeader)・右端の帯(やり取り / 素材 / 渡すもの)・制作へのメモ・メイン画像のペインまで作り、本番に反映。2026-10-23 に本番が真っ白になった不具合(getTemplate)を直し、ErrorBoundary を足した。clear のあとの引き継ぎは 2026-10-20_21.md の末尾「SU1 の引き継ぎ(2026-10-23 午後)」
 - 2026-10-22〜23: **T8 テンプレートの作り直し**(セクション = 表、部品ごとに ID。編集画面は 一覧の帯 | パーツ | キャンバス | 右のタブ「テンプレート / セクションと部品」。箱の見せ方(出すもの・価格の見せ方・バッジ・見本・写真の形)とまとめて直す・ほかの箱にも当てる、画像・動画の部品、ボタンの文字のリンクと色、揃え、均等に並べる行、スマホで縦に積む、背景・余白・区切り線、行の複製・コピー。すべて本番に反映(最後は deployed-gcp/20261023-131257)。設計は [TEMPLATE_OBJECTS.md](TEMPLATE_OBJECTS.md)、記録は 2026-10-20_21.md の末尾。**10-22 の反映に「まとめて作る」の作るチャネルの移動が一緒に入った**(main にも入れてある)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownloadRegular, DismissRegular, DocumentArrowUpRegular, OpenRegular } from '@fluentui/react-icons'
 import { ProductPages, type ImageAngle, type ImagePick, type PageImage } from './data/productPages'
+import { ProductImagesService } from './data/productImages'
 import { appPath } from './appRoot'
 import { productUrl } from './links'
 import { productImage } from './images'
@@ -68,7 +69,9 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
   const t = useT()
   const [url, setUrl] = useState(() => pageUrlOf(product))
   const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState<{ sample: boolean; page: string; images: PageImage[] } | null>(null)
+  // stored = 取り込んだ商品の画像(表 product_images。B11)。ページを読まずに、それを候補に並べる
+  const [page, setPage] = useState<{ sample: boolean; page: string; images: PageImage[]; stored?: boolean } | null>(null)
+  const [stored, setStored] = useState<PageImage[]>([])
   const [error, setError] = useState<string | null>(null)
   const [angles, setAngles] = useState<ImageAngle[]>([])
   const [picks, setPicks] = useState<ImagePick[] | null>(null)
@@ -97,10 +100,26 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
       setLoading(false)
     }
   }
-  // 開いたら、商品の URL のページをすぐ読む
+  /** 取り込んだ画像を、候補に並べる(ページを読まない) */
+  const showStored = (imgs: PageImage[]) => {
+    setError(null)
+    setAngles([])
+    setPicks(null)
+    setChosen((c) => (c?.kind === 'page' ? null : c))
+    setPage({ sample: false, page: '', images: imgs, stored: true })
+  }
+  // 開いたら: 取り込んだ商品の画像があれば、それを並べる(Workbench は EC サイトを読めないため)。なければ、商品の URL のページを読む
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void read(url)
+    void (async () => {
+      const r = await ProductImagesService.getAll({ filter: `product_id eq '${product.id}'`, orderBy: ['sort_order'] })
+      const imgs = (r.success ? r.data ?? [] : [])
+        .filter((x) => x.image_url)
+        .map((x) => ({ src: x.image_url as string, alt: x.alt ?? '', main: x.is_main === 1 }))
+      if (imgs.length) {
+        setStored(imgs)
+        showStored(imgs)
+      } else await read(url)
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -178,7 +197,7 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
     }
     const src = chosen.kind === 'own' ? chosen.url : page?.images[chosen.index]?.src
     if (!src) return
-    const source = chosen.kind === 'own' ? chosen.source : url.trim()
+    const source = chosen.kind === 'own' ? chosen.source : page?.stored ? t('取り込んだ画像', 'Imported image') : url.trim()
     setBusy(true)
     setError(null)
     try {
@@ -207,10 +226,20 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
               <Button size="small" icon={<ArrowDownloadRegular />} disabled={loading || !url.trim()} onClick={() => void read(url)}>
                 {t('ページを読む', 'Read the page')}
               </Button>
-              {page && (
+              {stored.length > 0 && !page?.stored && (
+                <Button size="small" appearance="subtle" onClick={() => showStored(stored)}>
+                  {t(`取り込んだ画像に戻す(${stored.length})`, `Back to imported images (${stored.length})`)}
+                </Button>
+              )}
+              {page && !page.stored && (
                 <Button size="small" appearance="subtle" icon={<OpenRegular />} as="a" href={page.sample ? ProductPages.pageUrl(page.page) : page.page} target="_blank" rel="noreferrer">
                   {t('ページを開く', 'Open the page')}
                 </Button>
+              )}
+              {page?.stored && (
+                <Badge appearance="tint" color="success" title={t('商品ページから集めて取り込んだ画像です(メインを含む)。ページを読み直すときは「ページを読む」', 'Images collected from the product page and imported (incl. the main image). Use “Read the page” to read it again.')}>
+                  {t('取り込んだ画像', 'Imported images')}
+                </Badge>
               )}
               {page?.sample && (
                 <Badge appearance="tint" color="informative" title={t('本物の EC サイトの代わりに、CCP が作った見本のページです(外に出られない環境でも試せるように)', 'A sample page made by CCP in place of the real shop (so it works without outside access)')}>
@@ -228,7 +257,9 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
             <div className={s.cols}>
               <div className={s.left}>
                 <div className={s.urlRow}>
-                  <span className={s.head}>{t(`ページの画像${page ? `(${page.images.length})` : ''}`, `Images on the page${page ? ` (${page.images.length})` : ''}`)}</span>
+                  <span className={s.head}>{page?.stored
+                    ? t(`取り込んだ画像(${page.images.length})`, `Imported images (${page.images.length})`)
+                    : t(`ページの画像${page ? `(${page.images.length})` : ''}`, `Images on the page${page ? ` (${page.images.length})` : ''}`)}</span>
                   <Button size="small" appearance="primary" icon={<AiIcon tone="white" size={14} />} disabled={!page?.images.length || asking} onClick={() => void askAi()}>
                     {picks ? t('AI にもう一度選んでもらう', 'Ask AI again') : t('AI に選んでもらう', 'Ask AI to choose')}
                   </Button>
@@ -246,6 +277,11 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
                         <button key={img.src} type="button" className={mergeClasses(s.tile, chosen?.kind === 'page' && chosen.index === i && s.tileOn)} onClick={() => setChosen({ kind: 'page', index: i })}>
                           <img className={s.thumb} src={shownSrc(img.src)} alt={img.alt} draggable={false} />
                           <span className={s.marks}>
+                            {img.main && (
+                              <Badge size="small" appearance="filled" color="informative">
+                                {t('メイン', 'Main')}
+                              </Badge>
+                            )}
                             {rank >= 0 && (
                               <Badge size="small" appearance="filled" color="brand">
                                 {t(`AI のおすすめ ${rank + 1}`, `AI pick ${rank + 1}`)}

@@ -46,6 +46,8 @@ export const tables: Record<string, Row[]> = {
   WeeklyPerformancesService: structuredClone(weekly),
   ProductRankingsService: structuredClone(productRankings),
   ProductPoliciesService: structuredClone(policies),
+  // 商品ページから取り込んだ画像(B11)。見本では空(画像を選ぶ窓は、見本の EC サイトのページを読む)
+  ProductImagesService: [],
   LayoutTemplatesService: structuredClone(layoutTemplates),
   LayoutTemplateVersionsService: [],
   AiRequestsService: [],

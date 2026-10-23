@@ -7,6 +7,9 @@ AI が選んだ商品の画像は、最初は商品のマスタの 1 枚(product
   POST /api/product-pages/images    {"url": "..."}           ページを読み、載っている画像の一覧を返す
   POST /api/product-pages/suggest   {"images": [...], ...}   画像を Gemini に見せ、アングルと、この配信に合う画像(理由つき)を返す
   POST /api/product-pages/adopt     {"src": "..."}           選んだ画像を、素材の置き場所(ccp/creative.py)に写し、その URL を返す
+
+取り込んだ商品の画像(表 product_images。B11。docs/PRODUCT_IMAGES.md)があれば、画面はページを読まずに、それを候補に並べる。
+その画像(/img/products/…)は、AI に見せるときも、このサーバーの置き場所から読む(Workbench は EC サイトを読めないため)
   GET  /sample-shop/p/{code}                                 見本の商品ページ
   GET  /sample-shop/img/{code}/{angle}.svg                   見本の商品ページの画像
 
@@ -36,7 +39,7 @@ from google.genai import types
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from . import creative, linkpreview
+from . import assets, creative, linkpreview
 from . import schema as sc
 from .ai import _get_client
 from .data_api import db, fail, ok
@@ -240,8 +243,19 @@ def _read(src: str) -> tuple[bytes, str]:
     m = SAMPLE_IMG.match(src)
     if m:
         return sample_svg(m.group(1), m.group(2)).encode("utf-8"), "image/svg+xml"
+    s = STORED_IMG.match(src)
+    if s:
+        # 取り込んだ商品の画像(表 product_images。B11)は、このサーバーの置き場所から読む(外に出られない環境でも AI に見せられる)
+        got = assets.read_image("products", s.group(1))
+        if got is None:
+            raise FileNotFoundError(src)
+        return got
     _, data, ctype = linkpreview.fetch(src, linkpreview.MAX_IMAGE, "image/*")
     return data, ctype
+
+
+# 取り込んだ商品の画像(/img/products/<ファイル>。pack.IMG_URL と同じ形)
+STORED_IMG = re.compile(r"^/img/products/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
 
 
 ANGLE_NAMES = "front(正面)・back(後ろ)・side(横)・worn(着用・人が身に着けている)・detail(ディテールの寄り: ボタン・縫い目・ポケットなど)・texture(素材の寄り)・scene(使っている場面・背景つき)・flat(平置き)・package(箱・付属品)・other"
@@ -317,8 +331,8 @@ class AdoptIn(BaseModel):
 async def adopt(body: AdoptIn):
     """選んだ画像を写す。本物のページの画像は、あとで消えたり替わったりするので、素材の置き場所に写して、その URL を返す"""
     src = body.src.strip()
-    if SAMPLE_IMG.match(src):
-        # 見本の画像は、アプリの中でいつも同じものが作られるので、写さない
+    if SAMPLE_IMG.match(src) or STORED_IMG.match(src):
+        # 見本の画像は、アプリの中でいつも同じものが作られる。取り込んだ商品の画像は、もうこのサーバーにある。どちらも写さない
         return ok({"image_url": src, "copied": False})
     try:
         data, ctype = await asyncio.to_thread(_read, src)
