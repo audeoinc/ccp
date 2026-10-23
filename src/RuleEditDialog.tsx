@@ -208,7 +208,7 @@ export function RuleEditDialog({ rule, initial, markets, onDone, onClose }: Prop
               {checkKind && form.strength !== 'must' && <span className={s.warn}>{t('確かめ方は「必ず守る(must)」の決まりだけで使われます(週の上限もそう)', 'Checks are used only by Must rules (the weekly cap too)')}</span>}
               {checkKind === 'limit' && <span className={s.note}>{t('週の上限は、この決まりが配信の国・チャネル・配信日に当てはまれば、⚙ のアラートの条件の「週の上限」より優先されます(いくつも当てはまれば、いちばん小さい数)', 'When this rule matches a delivery’s country, channel and date, it overrides the weekly cap in ⚙ Alert settings (the smallest wins if several match)')}</span>}
               <Field label={t('本文(AI にそのまま渡す。300 字まで)', 'Body (passed to AI as is; up to 300 chars)')} size="small" hint={`${form.body.length} / 300`}>
-                <AutoTextarea size="small" rows={4} value={form.body} onChange={(_, d) => set('body', d.value)} />
+                <AutoTextarea heightKey="RuleEditDialog.form_body" size="small" rows={4} value={form.body} onChange={(_, d) => set('body', d.value)} />
               </Field>
               {error && (
                 <MessageBar intent="error" layout="multiline">

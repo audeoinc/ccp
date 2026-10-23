@@ -49,7 +49,7 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
         </span>
       ))}
       <div className={s.input}>
-        <AutoTextarea
+        <AutoTextarea heightKey="ProductionMemo.text"
           size="small"
           rows={1}
           value={text}

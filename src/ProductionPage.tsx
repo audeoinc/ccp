@@ -409,7 +409,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                 </>
               )}
               <span className={s.note}>{t('ひとこと・できたもののリンクを添えられます(どちらも任意)', 'You can add a note and a link to the result (both optional)')}</span>
-              <AutoTextarea rows={1} size="small" value={doneNote} onChange={(_, d) => setDoneNote(d.value)} placeholder={t('ひとこと', 'Note')} />
+              <AutoTextarea heightKey="ProductionPage.doneNote" rows={1} size="small" value={doneNote} onChange={(_, d) => setDoneNote(d.value)} placeholder={t('ひとこと', 'Note')} />
               <Input size="small" value={doneLink} onChange={(_, d) => setDoneLink(d.value)} placeholder="https://" />
               <Button size="small" appearance="primary" icon={<CheckmarkRegular />} disabled={busy || anyDirty} title={anyDirty ? t('保存していない HTML があります(案を切り替えて保存してください)', 'Some HTML is not saved (switch variants and save)') : undefined} onClick={() => void run(() => ProductionService.done(live.id, { actor, note: doneNote, link: doneLink, week_start: weekStart }), tr('制作が終わりました', 'Marked as done'))}>
                 {t('制作が終わった', 'Production done')}
@@ -444,7 +444,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
             <PopoverSurface>
               <div className={s.doneBox}>
                 <span className={s.note}>{t('直してほしいことを書いて、制作に戻します(③ 制作する に戻ります)', 'Write what to fix and send it back to production (back to step 3)')}</span>
-                <AutoTextarea rows={2} size="small" value={reviseNote} onChange={(_, d) => setReviseNote(d.value)} placeholder={t('例: ボタンの文言を「今すぐ見る」に', 'e.g. Change the button text to "Shop now"')} />
+                <AutoTextarea heightKey="ProductionPage.reviseNote" rows={2} size="small" value={reviseNote} onChange={(_, d) => setReviseNote(d.value)} placeholder={t('例: ボタンの文言を「今すぐ見る」に', 'e.g. Change the button text to "Shop now"')} />
                 <Button
                   size="small"
                   appearance="primary"

@@ -118,7 +118,7 @@ export function PinThreadView(p: Props) {
             )}
             {p.composerTop}
             <div className={s.input}>
-              <AutoTextarea
+              <AutoTextarea heightKey="PinThreadView.p_text"
                 size="small"
                 rows={p.entries.length ? 1 : 2}
                 autoFocus

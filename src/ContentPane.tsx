@@ -389,7 +389,7 @@ function IdeaTab(props: {
               placeholder={t('「- 」で箇条書き、「1. 」で番号つき、「### 」で見出し', 'Type "- " for bullets, "1. " for numbers, "### " for a heading')}
             />
           ) : (
-            <AutoTextarea rows={2} value={value} onChange={(_, d) => onChange(d.value)} />
+            <AutoTextarea heightKey="ContentPane.value" rows={2} value={value} onChange={(_, d) => onChange(d.value)} />
           )}
         </Field>
         {(note || chip) && value && (
@@ -472,7 +472,7 @@ function CopyTab(props: {
         }
         size="small"
       >
-        <AutoTextarea rows={1} value={headline} onChange={(_, d) => onHeadline(d.value)} placeholder={subject?.deliveryName} />
+        <AutoTextarea heightKey="ContentPane.headline" rows={1} value={headline} onChange={(_, d) => onHeadline(d.value)} placeholder={subject?.deliveryName} />
       </Field>
       <Field
         label={
@@ -488,7 +488,7 @@ function CopyTab(props: {
         }
         size="small"
       >
-        <AutoTextarea rows={2} value={lead} onChange={(_, d) => onLead(d.value)} />
+        <AutoTextarea heightKey="ContentPane.lead" rows={2} value={lead} onChange={(_, d) => onLead(d.value)} />
       </Field>
       {savedAngle && (headline || lead) && (
         <div className={s.noteBox}>
@@ -880,7 +880,7 @@ function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: Regis
           }
         >
           <Field label={t('セクションのコピー(見出しの下に入ります)', 'Section copy (placed below the heading)')} size="small">
-            <AutoTextarea rows={2} size="small" value={currentCopy} onChange={(_, d) => p.onSectionCopy(i, d.value)} />
+            <AutoTextarea heightKey="ContentPane.currentCopy" rows={2} size="small" value={currentCopy} onChange={(_, d) => p.onSectionCopy(i, d.value)} />
           </Field>
           {copies.map((c) => {
             const current = currentCopy === c.copy

@@ -154,7 +154,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           <div className={s.read}>{e.form.instructions.trim() ? <MarkdownLite text={e.form.instructions} /> : <span className={s.caption}>{t('(なし)', '(none)')}</span>}</div>
         ) : (
           <>
-            <AutoTextarea size="small" rows={4} value={e.form.instructions} placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。セールの期間を目立たせる', 'e.g. Feature the model large in the main image; headline below it; make the sale period stand out')} onChange={(_, d) => e.setField('instructions', d.value)} />
+            <AutoTextarea heightKey="HandoffSheet.e_form_instructions" size="small" rows={4} value={e.form.instructions} placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。セールの期間を目立たせる', 'e.g. Feature the model large in the main image; headline below it; make the sale period stand out')} onChange={(_, d) => e.setField('instructions', d.value)} />
             <PartAiChat
               kind="instructions"
               label={t('渡す文章', 'Production notes')}

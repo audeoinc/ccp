@@ -203,7 +203,7 @@ function EditFloat({ edit, current, original, htmlCustom, products, allProducts,
     nowValue = getText(current, edit.field)
     wasValue = getText(original, edit.field)
     ready = text !== nowValue
-    body = <AutoTextarea size="small" value={text} onChange={(_, d) => setText(d.value)} autoFocus />
+    body = <AutoTextarea heightKey="ProductionChat.text" size="small" value={text} onChange={(_, d) => setText(d.value)} autoFocus />
   } else if (edit.kind === 'link') {
     nowValue = linkRows(current).find((r) => r.slotKey === edit.slotKey)?.base ?? ''
     wasValue = linkRows(original).find((r) => r.slotKey === edit.slotKey)?.base ?? ''

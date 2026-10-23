@@ -302,10 +302,10 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
                   </Field>
                 </div>
                 <Field label={t('タグ(テーマ・色・写っているもの)', 'Tags (theme, colors, subjects)')} size="small">
-                  <AutoTextarea size="small" rows={2} value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
+                  <AutoTextarea heightKey="HeroUploadDialog.form_tags" size="small" rows={2} value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
                 </Field>
                 <Field label={t('説明', 'Description')} size="small">
-                  <AutoTextarea size="small" rows={4} value={form.description} onChange={(_, d) => set('description')(d.value)} />
+                  <AutoTextarea heightKey="HeroUploadDialog.form_description" size="small" rows={4} value={form.description} onChange={(_, d) => set('description')(d.value)} />
                 </Field>
                 {editing ? (
                   <div className={s.two}>

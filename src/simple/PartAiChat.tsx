@@ -158,7 +158,7 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
       {busy && <Spinner size="tiny" label={t('AI が案を考えています', 'AI is thinking')} labelPosition="after" />}
       {error && <span className={s.error}>{error}</span>}
       <div className={s.input}>
-        <AutoTextarea
+        <AutoTextarea heightKey="PartAiChat.draft"
           data-part-ai-input=""
           size="small"
           rows={1}

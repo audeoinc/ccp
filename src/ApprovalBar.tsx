@@ -285,7 +285,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
             </Dropdown>
           </Field>
           <Field label={t('ひとこと(任意)', 'Note (optional)')} size="small">
-            <AutoTextarea rows={1} size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: 金曜の配信なので、木曜までにお願いします', 'e.g. Goes out Friday, please review by Thursday')} />
+            <AutoTextarea heightKey="ApprovalBar.note" rows={1} size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: 金曜の配信なので、木曜までにお願いします', 'e.g. Goes out Friday, please review by Thursday')} />
           </Field>
           <div className={s.boxActions}>
             <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Back')}</Button>
@@ -305,7 +305,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
       {mode === 'reject' && live && (
         <div className={s.box}>
           <Field label={t('差し戻しの理由(コメントにも残ります。1 人でも差し戻すと、この依頼は止まります)', 'Reason for sending back (also saved as a comment; one send-back stops this request)')} required size="small">
-            <AutoTextarea rows={2} size="small" autoFocus value={reason} onChange={(_, d) => setReason(d.value)} placeholder={t('例: 前日のメールと商品がかぶっているので、入れ替えてください', 'e.g. Same products as the previous day. Please swap some.')} />
+            <AutoTextarea heightKey="ApprovalBar.reason" rows={2} size="small" autoFocus value={reason} onChange={(_, d) => setReason(d.value)} placeholder={t('例: 前日のメールと商品がかぶっているので、入れ替えてください', 'e.g. Same products as the previous day. Please swap some.')} />
           </Field>
           <div className={s.boxActions}>
             <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Back')}</Button>

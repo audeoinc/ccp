@@ -278,7 +278,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   const text = (k: SimpleField, label: string, opts: { rows?: number; placeholder?: string; hint?: string } = {}) => (
     <>
       <Field label={label} hint={opts.hint} size="small">
-        <AutoTextarea size="small" rows={opts.rows ?? 2} autoFocus value={e.form[k]} placeholder={opts.placeholder} onChange={(_, d) => e.setField(k, d.value)} />
+        <AutoTextarea heightKey={`PartPane.${k}`} size="small" rows={opts.rows ?? 2} autoFocus value={e.form[k]} placeholder={opts.placeholder} onChange={(_, d) => e.setField(k, d.value)} />
       </Field>
       {aiChat(k, label, e.form[k], (v) => e.setField(k, v))}
     </>
@@ -394,7 +394,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         return (
           <>
             <Field label={label} size="small" hint={isTitle && !value ? t('空のときは、商品のカテゴリ名を出します', 'Empty shows the product category') : undefined}>
-              <AutoTextarea size="small" rows={isTitle ? 1 : 2} autoFocus value={value} onChange={(_, d) => setValue(d.value)} />
+              <AutoTextarea heightKey="PartPane.value" size="small" rows={isTitle ? 1 : 2} autoFocus value={value} onChange={(_, d) => setValue(d.value)} />
             </Field>
             {aiChat(part.kind, label, value, setValue)}
           </>
@@ -710,7 +710,7 @@ function Aim({ editor: e }: { editor: SimpleEditor }) {
   if (editing)
     return (
       <div className={s.aim}>
-        <AutoTextarea size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
+        <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
       </div>
     )
   return (
@@ -730,7 +730,7 @@ function ManageFields({ editor: e }: { editor: SimpleEditor }) {
   return (
     <>
       <Field label={t('制作指示', 'Production notes')} size="small" data-field="instructions">
-        <AutoTextarea size="small" rows={3} value={e.form.instructions} onChange={(_, d) => e.setField('instructions', d.value)} />
+        <AutoTextarea heightKey="PartPane.e_form_instructions" size="small" rows={3} value={e.form.instructions} onChange={(_, d) => e.setField('instructions', d.value)} />
       </Field>
       <div className={s.twoCol}>
         <Field label={t('種類', 'Type')} size="small" data-field="themeType">

@@ -340,7 +340,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                   {canSwap && (
                     <div className={s.swapBox}>
                       <Field label={t('差し替えの理由(任意。配信のメモに残ります)', 'Reason for the swap (optional; kept in the delivery notes)')} size="small">
-                        <AutoTextarea size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
+                        <AutoTextarea heightKey="ProductActionFloat.reason" size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
                       </Field>
                       <div className={s.swapActions}>
                         <Button size="small" onClick={() => setFocus({ kind: 'current' })}>

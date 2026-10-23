@@ -461,7 +461,7 @@ export function CommPane(props: Props) {
                     </div>
                   ))}
                   <div className={s.input}>
-                    <AutoTextarea size="small" rows={1} value={replyText} placeholder={t('返信', 'Reply')} onChange={(_, d) => setReplyText(d.value)} />
+                    <AutoTextarea heightKey="CommPane.replyText" size="small" rows={1} value={replyText} placeholder={t('返信', 'Reply')} onChange={(_, d) => setReplyText(d.value)} />
                     <Button size="small" icon={<SendRegular />} disabled={working || !replyText.trim()} onClick={() => void sendReply(n)} aria-label={t('返信する', 'Send reply')} />
                   </div>
                 </div>
@@ -524,7 +524,7 @@ export function CommPane(props: Props) {
         </div>
         {error && <span className={s.error}>{error}</span>}
         <div className={s.input}>
-          <AutoTextarea
+          <AutoTextarea heightKey="CommPane.text"
             size="small"
             rows={1}
             value={text}

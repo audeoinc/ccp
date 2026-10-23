@@ -55,7 +55,7 @@ export function ReasonText({ value, onChange }: { value: string; onChange?: (v: 
   if (onChange && editing) {
     return (
       <Field label={t('選定理由', 'Selection reason')} size="small" data-no-float>
-        <AutoTextarea
+        <AutoTextarea heightKey="ProductRow.value"
           autoFocus
           size="small"
                     value={value}

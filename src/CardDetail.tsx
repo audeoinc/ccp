@@ -2156,7 +2156,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     {changeReason !== null && lockedWeeks.length > 0 && (
       <div className={styles.reasonBox}>
         <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
-          <AutoTextarea
+          <AutoTextarea heightKey="CardDetail.changeReason"
             rows={2}
             size="small"
             autoFocus
@@ -2687,7 +2687,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               </Field>
               <Text weight="semibold" size={300} className={styles.sectionHead}>{t('工程', 'Steps')}</Text>
               <Field label={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise for the whole delivery; not shown in the email)')}>
-                <AutoTextarea
+                <AutoTextarea heightKey="CardDetail.form_theme"
                   size="small"
                   rows={2}
                                     className={form.theme ? styles.filled : undefined}
@@ -2700,7 +2700,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 {t(`掲載商品: ${items.length}件(中央の「セクション」タブで選びます)`, `Products in this delivery: ${items.length} (choose them in the Sections tab in the middle)`)}
               </Caption1>
               <Field label={t('ヘッドライン(メイン画像に載せる大見出し)', 'Headline (the large heading on the hero image)')}>
-                <AutoTextarea
+                <AutoTextarea heightKey="CardDetail.form_headline"
                   size="small"
                   rows={1}
                                     className={form.headline ? styles.filled : undefined}
@@ -2709,7 +2709,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 />
               </Field>
               <Field label={t('コピー(ヘッドラインの下の導入文)', 'Copy (intro text below the headline)')}>
-                <AutoTextarea
+                <AutoTextarea heightKey="CardDetail.form_copy"
                   size="small"
                   rows={2}
                                     className={form.copy ? styles.filled : undefined}

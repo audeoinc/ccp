@@ -546,7 +546,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       )
     return (
       <div style={{ textAlign: 'center', marginTop: hasHeading ? 6 : 22, marginBottom: 4, padding: '0 8px' }}>
-        <AutoTextarea
+        <AutoTextarea heightKey="Preview.text"
           className={classes.copyTextarea}
           appearance="outline"
           rows={Math.max(1, text.split('\n').length)}

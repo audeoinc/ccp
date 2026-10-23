@@ -135,7 +135,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
             {label}
             {changed && mark}
           </span>
-          {editing === id ? <AutoTextarea size="small" value={value} onChange={(_, d) => onChange(setText(current, field, d.value))} autoFocus /> : value || <span className={s.note}>{t('(空)', '(empty)')}</span>}
+          {editing === id ? <AutoTextarea heightKey="ProductionInfoPane.value" size="small" value={value} onChange={(_, d) => onChange(setText(current, field, d.value))} autoFocus /> : value || <span className={s.note}>{t('(空)', '(empty)')}</span>}
           {changed && <span className={s.was}>{was || t('(空)', '(empty)')}</span>}
         </span>
         <span className={s.tools}>

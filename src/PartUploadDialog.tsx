@@ -234,10 +234,10 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
                   <Input size="small" value={form.alt} onChange={(_, d) => set('alt')(d.value)} />
                 </Field>
                 <Field label={t('タグ(色・形・文言・用途)', 'Tags (color, shape, wording, use)')} size="small">
-                  <AutoTextarea size="small" rows={2} value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
+                  <AutoTextarea heightKey="PartUploadDialog.form_tags" size="small" rows={2} value={form.tags} onChange={(_, d) => set('tags')(d.value)} />
                 </Field>
                 <Field label={t('説明', 'Description')} size="small">
-                  <AutoTextarea size="small" rows={4} value={form.description} onChange={(_, d) => set('description')(d.value)} />
+                  <AutoTextarea heightKey="PartUploadDialog.form_description" size="small" rows={4} value={form.description} onChange={(_, d) => set('description')(d.value)} />
                 </Field>
                 <div className={s.two}>
                   <Field label={t('出どころ(任意)', 'Source (optional)')} size="small">
