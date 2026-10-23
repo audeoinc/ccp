@@ -132,6 +132,8 @@ interface Props {
   onOpenProduction?: (cardId: string, opts?: { request?: boolean }) => void
   /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav)。新規作成のときはなく、面の札を出す */
   stageNav?: ReactNode
+  /** 同じ段階の帯の、タブの見せ方(シンプルな配信カードの上の帯の 2 段目。StageHeader) */
+  stageTabs?: ReactNode
   /** 最初に開く工程のタブ(リンクから開いたとき。X36) */
   initialTab?: string
   /** 工程のタブが変わったとき(URL に持たせる) */
@@ -498,7 +500,7 @@ const useStyles = makeStyles({
   // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
 })
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
   const styles = useStyles()
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -2274,7 +2276,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             }
           />
         ),
-        stageNav,
+        stageNav: stageTabs ?? stageNav,
         viewSwitch: <ViewSwitch simple onChange={changeView} />,
         preview: simplePreview,
         device: previewDevice,

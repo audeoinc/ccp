@@ -625,7 +625,7 @@ function App() {
       setPeekResult(id)
     }
   }
-  const stageNav = (c: DeliveryCard, f: Face) => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => goStage(c.id, to)} />
+  const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
   const productionTone = (c: DeliveryCard) => {
@@ -2217,6 +2217,7 @@ function App() {
             setProductionAuto(!!opts?.request)
           }}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
+          stageTabs={selected ? stageNav(selected, 'calendar', 'tabs') : undefined}
           initialTab={selected && selected.id === link.card ? link.tab : undefined}
           onTabChange={setCardTab}
           next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}

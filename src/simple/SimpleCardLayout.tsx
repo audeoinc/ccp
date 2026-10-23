@@ -1,6 +1,6 @@
-import { cloneElement, isValidElement, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { Button, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, ColumnTripleRegular, CommentRegular, PersonAvailableRegular, SettingsRegular, TaskListSquareLtrRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { Button, ToggleButton, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
@@ -14,7 +14,6 @@ import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
-import { statusRank } from '../status'
 import { getTemplate, sectionsOf } from '../templates'
 import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
@@ -22,8 +21,9 @@ import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
 import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
+import { StageHeader } from './StageHeader'
 import { HandoffSheet } from './HandoffSheet'
-import { ProductionRequestsService } from '../data/productionRequests'
+import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
@@ -33,13 +33,14 @@ import type { PartTurn } from './partAi'
 const WIDTH_KEY = 'simpleCard.paneWidths.v2'
 const PRODUCTS_KEY = 'simpleCard.productsOpen'
 const RAIL_W = 32
-type Widths = { mobile: number; pc: number; list: number; comm: number }
-const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320 }
+type Widths = { mobile: number; pc: number; list: number; comm: number; hand: number }
+const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, hand: 400 }
 // コミュニケーションのペインの開閉(既定は畳む。自分宛てのものがあれば、開いたときに広げる)
-const COMM_KEY = 'simpleCard.commOpen'
-// PLAN(配信カード)の中の見せ方: 直す(AI の下書きを直す・承認者とのやり取り)/ 渡す(制作に渡すもの)。
-// 制作・結果は、上の段の帯(PLAN › PRODUCTION › RESULTS)の側で、別のページに移る
-type Stage = 'plan' | 'handoff'
+// 右端のサイドパネル(2026-10-23 利用者と決めた): アイコンの帯 1 本に「やり取り(承認者と)」「渡すもの(制作へ)」をプロセスの順に並べ、
+// 押した方を 1 つだけ開く(もう片方は入れ替わる。開いている方を押すと閉じる)。どれを開いていたかは人ごとに覚える
+const SIDE_KEY = 'simpleCard.sidePanel'
+type Side = 'comm' | 'handoff' | null
+const SIDE_W = 56
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
 // 目印の出し分け(人の設定)。学びは帯で場所を取るので、既定は隠す(隠していても、AI の依頼には渡す)
@@ -49,8 +50,6 @@ const DEFAULT_MARKS: MarkKind[] = ['unchecked', 'alert']
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
-  // 上の帯: 配信名・配信日時・チャネル・ステータス と、次にやること・⋯
-  top: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 12px 10px 20px', minWidth: 0 },
   topField: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -79,7 +78,8 @@ const useStyles = makeStyles({
     flexGrow: 1,
     minHeight: 0,
     display: 'grid',
-    gridTemplateColumns: 'var(--wv) 1px minmax(320px, 1fr) 1px var(--wl) 1px var(--wc)',
+    // 狭い画面では、商品の一覧とサイドパネルが縮む(右端のアイコンの帯は、いつも見えるように)
+    gridTemplateColumns: `var(--wv) 1px minmax(280px, 1fr) 1px minmax(0, var(--wl)) 1px minmax(0, var(--ws)) ${SIDE_W}px`,
     gridTemplateRows: 'minmax(0, 1fr)',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -88,7 +88,6 @@ const useStyles = makeStyles({
   pane: { minHeight: 0, overflow: 'auto', padding: '12px 14px', backgroundColor: tokens.colorNeutralBackground1 },
   previewPane: { display: 'grid', gridTemplateRows: 'auto auto auto auto minmax(0, 1fr)', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
-  deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
   inbox: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase200, flexShrink: 0 },
@@ -96,6 +95,8 @@ const useStyles = makeStyles({
   inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)。押したら Tab・Esc が効くよう、フォーカスを受け取る
   boxWrap: { position: 'relative', minHeight: 0, display: 'grid' },
+  pinBox: { position: 'absolute', right: '14px', top: '6px', zIndex: 5, display: 'flex', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow4 },
+  viewBox: { position: 'absolute', left: '6px', top: '6px', zIndex: 5, display: 'flex', columnGap: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow4 },
   // 部品の外の地は、つかんで動かせる(手のひら)。部品は押して選ぶ(指)
   box: {
     position: 'relative',
@@ -125,24 +126,25 @@ const useStyles = makeStyles({
   },
   zoomLabel: { minWidth: '44px', padding: '0 2px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '8px', paddingTop: '10px', minHeight: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground2 },
-  commRail: { border: 'none', fontFamily: 'inherit', cursor: 'pointer', color: tokens.colorNeutralForeground2, ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
-  railIcon: { color: tokens.colorBrandForeground1, fontSize: '16px' },
-  railCount: { display: 'grid', justifyItems: 'center', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2 },
-  railMine: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
   commPane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
-  commHead: { display: 'flex', justifyContent: 'flex-end', padding: '2px 4px 0' },
   railLabel: { writingMode: 'vertical-rl', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, letterSpacing: '0.1em' },
   railDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' },
-  listHead: { display: 'flex', justifyContent: 'flex-end', marginBottom: '-6px' },
+  listHead: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '-6px' },
+  colTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: '10px' },
+  // 右端のサイドパネルと、アイコンの帯
+  sidePane: { display: 'grid', minHeight: 0, minWidth: 0, overflow: 'hidden' },
+  sideRail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '4px', paddingTop: '8px', borderLeft: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
+  sideBtn: { display: 'grid', justifyItems: 'center', rowGap: '2px', width: '48px', padding: '6px 0', border: 'none', borderRadius: tokens.borderRadiusMedium, backgroundColor: 'transparent', fontFamily: 'inherit', color: tokens.colorNeutralForeground2, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover, color: tokens.colorNeutralForeground1 } },
+  sideOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
+  sideIcon: { position: 'relative', fontSize: '20px', lineHeight: 1 },
+  sideBadge: { position: 'absolute', top: '-6px', right: '-12px', minWidth: '16px', height: '16px', padding: '0 4px', boxSizing: 'border-box', borderRadius: '8px', fontSize: '10px', lineHeight: '16px', textAlign: 'center', color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground },
+  sideDot: { position: 'absolute', top: '-3px', left: '-6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
+  sideLabel: { fontSize: '10px', lineHeight: 1.2 },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
   candRow: { display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', width: '100%', padding: '6px 4px', border: 'none', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: 'transparent', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2 } },
   candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  // PLAN の中の「直す | 渡す」(段の帯の PLAN の札のすぐ右)
-  stages: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', flexShrink: 0, marginLeft: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
-  stageBtn: { border: 'none', padding: '3px 10px', borderRadius: '999px', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'pointer', whiteSpace: 'nowrap', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover, color: tokens.colorNeutralForeground1 } },
-  stageOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   // 案のタブ(SU2)
   abRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px', minHeight: '28px' },
   abTab: { display: 'inline-flex', alignItems: 'center', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
@@ -177,33 +179,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const t = useT()
   const s = useStyles()
   const [part, setPart] = useState<PartRef | null>(null)
-  // 段階(2026-10-22 利用者と決めた): 企画(AI の下書きを直す・承認者とのやり取り)→ 渡す(制作に渡すもの)→ 制作(渡したあと)。
-  // 承認されたら「渡す」に切り替えるが、承認の前でも、いつでも切り替えられる(人がいない・先に進めたいときがあるため)
-  const [stage, setStage] = useState<Stage>(() => (statusRank(e.card.status) >= statusRank('approved') ? 'handoff' : 'plan'))
-  const stageChosen = useRef(false)
-  const chooseStage = (v: Stage) => {
-    stageChosen.current = true
-    setStage(v)
-  }
-  // 制作に依頼してあれば、開いたときは「渡す」(渡したものを読むだけで見せる)
-  useEffect(() => {
-    let alive = true
-    void ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${e.card.id}'` }).then((r) => {
-      if (!alive || !r.success || stageChosen.current) return
-      const latest = [...(r.data ?? [])].sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0))[0]
-      if (latest && ['requested', 'in_progress', 'done', 'checked', 'sent'].includes(latest.status ?? '')) setStage('handoff')
-    })
-    return () => {
-      alive = false
-    }
-  }, [e.card.id])
-  // 開いている間に承認されたら、「渡す」に切り替える
-  const prevStatus = useRef(e.card.status)
-  useEffect(() => {
-    const before = prevStatus.current
-    prevStatus.current = e.card.status
-    if (statusRank(before) < statusRank('approved') && statusRank(e.card.status) >= statusRank('approved')) setStage('handoff')
-  }, [e.card.status])
   // 商品の一覧で押した商品(選んでいる枠と見比べる)
   const [compareKey, setCompareKey] = useState<string | null>(null)
   // 部品ごとの AI とのやり取り(開いている間だけ)
@@ -211,7 +186,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const setChat = (key: string, f: (prev: PartTurn[]) => PartTurn[]) => setChats((c) => ({ ...c, [key]: f(c[key] ?? []) }))
   const [widths, setWidths] = useState<Widths>(() => {
     const v = loadPref<Partial<Widths> | null>(WIDTH_KEY, null)
-    return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)), comm: clampList(Number(v?.comm ?? DEFAULT_WIDTHS.comm)) }
+    return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)), comm: clampList(Number(v?.comm ?? DEFAULT_WIDTHS.comm)), hand: clampList(Number(v?.hand ?? DEFAULT_WIDTHS.hand)) }
   })
   // アプリの配信は、スマホの幅
   const widthKey: 'mobile' | 'pc' = e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile'
@@ -233,7 +208,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
   const select = (p: PartRef | null) => {
-    if (p && stage !== 'plan') chooseStage('plan')
     if (samePart(p, part)) return
     void onCommit()
     setPart(p)
@@ -248,32 +222,36 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
-  const resizeComm = (dx: number) => setWidths((w) => ({ ...w, comm: clampList(w.comm - dx) }))
-  const [commOpen, setCommOpen] = useState(() => loadPref<boolean>(COMM_KEY, false))
-  const toggleComm = (v = !commOpen) => {
-    setCommOpen(v)
-    savePref(COMM_KEY, v)
+  const [side, setSide] = useState<Side>(() => loadPref<Side>(SIDE_KEY, null))
+  /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
+  const showSide = (v: 'comm' | 'handoff', open = false) => {
+    const next = !open && side === v ? null : v
+    setSide(next)
+    savePref(SIDE_KEY, next)
   }
+  const resizeSide = (dx: number) => setWidths((w) => (side === 'handoff' ? { ...w, hand: clampList(w.hand - dx) } : { ...w, comm: clampList(w.comm - dx) }))
   const [counts, setCounts] = useState<{ open: number; tasks: number; mine: boolean; waiting: boolean }>({ open: 0, tasks: 0, mine: false, waiting: false })
-  // 自分宛ての書き込み・承認の番があれば、開いたときに一度だけ広げる(設定は変えない)
-  const autoOpened = useRef(false)
-  const onCounts = useCallback((c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => {
-    setCounts(c)
-    if (c.mine && !autoOpened.current) {
-      autoOpened.current = true
-      setCommOpen(true)
-    }
-  }, [])
-  // 渡す・制作の段階では、コミュニケーションは畳んでおく(開けば使える)。企画に戻ったら、人の設定に戻す
+  // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、帯のアイコンの赤い点で知らせる。2026-10-23 利用者)
+  const onCounts = useCallback((c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => setCounts(c), [])
+  // 畳んだ帯に出す、参考の素材の数(帯の数を合わせるため、開いていなくても数える)
+  const [assetCount, setAssetCount] = useState(0)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCommOpen(stage === 'plan' ? loadPref<boolean>(COMM_KEY, false) : false)
-  }, [stage])
-  const noop = useCallback(() => undefined, [])
+    let alive = true
+    void CardAssetsService.getAll({ filter: `delivery_card_id eq ${e.card.id}` }).then((r) => {
+      if (alive && r.success) setAssetCount((r.data ?? []).length)
+    })
+    return () => {
+      alive = false
+    }
+  }, [e.card.id, side])
+  const memoLines = e.form.instructions.split('\n').filter((x) => x.trim()).length
+  // プレビューの場所を押してコメントを書く(PreviewPins の覆い。押した場所はコミュニケーションの書く欄に渡る)
+  const [placing, setPlacing] = useState(false)
+  const endPlacing = useCallback(() => setPlacing(false), [])
   // プレビューの書き込みの番号を押したら、コミュニケーションを開く
   const openThreads = useCallback(() => {
-    setCommOpen(true)
-    savePref(COMM_KEY, true)
+    setSide('comm')
+    savePref(SIDE_KEY, 'comm')
   }, [])
   const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
   const saveWidths = () => savePref(WIDTH_KEY, widths)
@@ -315,82 +293,59 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const tpl = getTemplate(e.template)
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時 未設定', 'No send date')
 
-  const modeSwitch = (
-    <span className={s.stages} role="tablist" aria-label={t('配信カードの見せ方', 'Card mode')}>
-      {(
-        [
-          ['plan', t('直す', 'Edit'), t('AI の下書きを直し、承認者とやり取りする', 'Edit the AI draft and work with approvers')],
-          ['handoff', t('渡す', 'Hand off'), t('制作に渡すもの(文章・参考の画像と URL・担当と締め切り)。承認の前でも開けます', 'What goes to production (notes, reference images and URLs, assignee and due date). Available before approval')],
-        ] as const
-      ).map(([v, label, hint]) => (
-        <Tooltip key={v} content={hint} relationship="description">
-          <button type="button" role="tab" aria-selected={stage === v} className={mergeClasses(s.stageBtn, stage === v && s.stageOn)} onClick={() => chooseStage(v)}>
-            {label}
-          </button>
-        </Tooltip>
-      ))}
-    </span>
-  )
 
   return (
     <div className={s.root}>
-      <div className={s.top}>
-        {/* 段の帯(PLAN › PRODUCTION › RESULTS)の PLAN の中に、「直す | 渡す」を入れる(帯を 2 本にしない。ステータスも PLAN の札に出ているので、ここには出さない) */}
-        {isValidElement<{ planSlot?: ReactNode }>(e.stageNav) ? cloneElement(e.stageNav, { planSlot: modeSwitch }) : (
+      <StageHeader
+        title={
           <>
-            {e.stageNav}
-            {modeSwitch}
+            <ChannelBadge channel={e.form.channel} />
+            {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
+            {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
           </>
-        )}
-        <ChannelBadge channel={e.form.channel} />
-        {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
-        {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
-        <span className={s.grow} />
-        {/* 反映の様子: 保存中 / 保存しました / 未反映の変更あり */}
-        {e.saving ? (
-          <Spinner size="extra-tiny" label={t('反映しています', 'Saving')} labelPosition="after" />
-        ) : e.justSaved ? (
-          <span className={mergeClasses(s.state, s.saved)}>{t('反映しました', 'Saved')}</span>
-        ) : null}
-        <Tooltip content={t('元に戻す: 前に反映した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
-          <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
-        </Tooltip>
-        {e.dirty && (
-          <Tooltip content={e.locked ? t('確定した週の配信です。変えた理由を入力してから反映します', 'Confirmed week: enter a reason to save') : t('まだ反映していない変更があります。ほかの部品を押しても反映します', 'Unsaved changes. Picking another part also saves them')} relationship="description">
-            <Button type="button" size="small" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
-              {t('反映', 'Save')}
-            </Button>
-          </Tooltip>
-        )}
-        <NextAction
-          step={e.nextStep}
-          busy={e.saving}
-          // 承認・制作への依頼は、コミュニケーションのペインで行う(承認は ⋯、引き継ぎは制作の札)。確認した・制作のページは、CardDetail の側
-          onRun={(step) => (step === 'requestApproval' || step === 'watchApproval' || step === 'requestProduction' ? toggleComm(true) : onRunNext(step))}
-        />
-        {e.viewSwitch}
-        {e.menu}
-        <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
-      </div>
+        }
+        actions={
+          <>
+            {/* 反映の様子: 保存中 / 保存しました */}
+            {e.saving ? (
+              <Spinner size="extra-tiny" label={t('反映しています', 'Saving')} labelPosition="after" />
+            ) : e.justSaved ? (
+              <span className={mergeClasses(s.state, s.saved)}>{t('反映しました', 'Saved')}</span>
+            ) : null}
+            <Tooltip content={t('元に戻す: 前に反映した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
+              <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
+            </Tooltip>
+            {e.dirty && (
+              <Tooltip content={e.locked ? t('確定した週の配信です。変えた理由を入力してから反映します', 'Confirmed week: enter a reason to save') : t('まだ反映していない変更があります。ほかの部品を押しても反映します', 'Unsaved changes. Picking another part also saves them')} relationship="description">
+                <Button type="button" size="small" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
+                  {t('反映', 'Save')}
+                </Button>
+              </Tooltip>
+            )}
+            <NextAction
+              step={e.nextStep}
+              busy={e.saving}
+              // 承認はやり取りの列(⋯ から依頼)、制作への依頼は渡すものの列で行う。確認した・制作のページは、CardDetail の側
+              onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'watchApproval' ? showSide('comm', true) : onRunNext(step))}
+            />
+            {e.viewSwitch}
+            {e.menu}
+            <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
+          </>
+        }
+        // 面のタブ(PLAN | PRODUCTION | RESULTS)。配信が主役で、面はその見方なので、題名の下に
+        tabs={e.stageNav}
+      />
       <div className={s.notices}>
         {e.notices}
         {/* 学びの帯は、隠していても描く(AI の依頼に学びを渡すのは、この帯の役目のため) */}
         <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
       </div>
 
-      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--wc': `${commOpen ? widths.comm : RAIL_W}px`, ...(stage !== 'plan' ? { gridTemplateColumns: 'var(--wv) 1px minmax(320px, 1fr) 1px var(--wc)' } : {}) } as React.CSSProperties}>
+      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${side === 'comm' ? widths.comm : side === 'handoff' ? widths.hand : 0}px` } as React.CSSProperties}>
         {/* プレビュー(いちばん広い) */}
         <div className={s.previewPane}>
           <div className={s.toolbar}>
-            {e.channel === 'email' && (
-              <span role="tablist" aria-label={t('プレビューの幅', 'Preview width')} style={{ display: 'inline-flex', columnGap: 2 }}>
-                {(['mobile', 'pc'] as const).map((d) => (
-                  <Button key={d} type="button" size="small" role="tab" aria-selected={e.device === d} appearance={e.device === d ? 'primary' : 'subtle'} className={s.deviceBtn} icon={d === 'mobile' ? <PhoneRegular /> : <DesktopRegular />} onClick={() => e.setDevice(d)}>
-                    {d === 'mobile' ? t('スマホ', 'Mobile') : t('PC', 'Desktop')}
-                  </Button>
-                ))}
-              </span>
-            )}
             {/* テンプレートの札(押すと、選んだ部品のペインにテンプレート。選び直しは段階 b) */}
             <Button type="button" size="small" appearance={isOn({ kind: 'template' }) ? 'primary' : 'outline'} icon={<LayoutColumnTwoRegular />} onClick={() => select({ kind: 'template' })}>
               {t(`テンプレート: ${tpl.label}`, `Template: ${tpl.label}`)}
@@ -500,12 +455,27 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <span className={s.hint}>{t('通知のタイトル・本文・画像・商品は、プレビューを押して直します', 'Click the preview to edit the notification title, body, image and products')}</span>
           )}
           <div className={s.boxWrap}>
+          {/* プレビューの左上 = 見え方(スマホ / PC の幅)、右上 = 書き込む(場所を押してコメント)。役割で分け、場所を取らないようアイコンだけ */}
+          {e.channel === 'email' && (
+            <div className={s.viewBox}>
+              {(['mobile', 'pc'] as const).map((d) => (
+                <Tooltip key={d} content={d === 'mobile' ? t('スマホの幅', 'Mobile width') : t('PC の幅', 'Desktop width')} relationship="label">
+                  <ToggleButton type="button" size="small" appearance={e.device === d ? 'primary' : 'subtle'} checked={e.device === d} icon={d === 'mobile' ? <PhoneRegular /> : <DesktopRegular />} onClick={() => e.setDevice(d)} />
+                </Tooltip>
+              ))}
+            </div>
+          )}
+          <div className={s.pinBox}>
+            <Tooltip content={placing ? t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to comment (Esc to cancel)') : t('プレビューの場所を押して、コメントを書く', 'Click a spot in the preview to comment')} relationship="label">
+              <ToggleButton type="button" size="small" appearance={placing ? 'primary' : 'subtle'} checked={placing} icon={<CommentAddRegular />} onClick={() => setPlacing(!placing)} />
+            </Tooltip>
+          </div>
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
             {markOn('alert') && e.alertOverlay}
-            <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={false} onPlacingEnd={noop} onOpenThreads={openThreads} />
+            <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} />
             {uncheckedMarks.length + diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={[...uncheckedMarks, ...diffMarks]} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
@@ -522,8 +492,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         <Splitter onDrag={resizePreview} onDone={saveWidths} />
 
-        {stage === 'plan' ? (
-          <>
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
           <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} />
@@ -594,22 +562,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           </div>
         )}
 
-          </>
-        ) : (
-          // 渡す・制作: 制作に渡すもの(文章・参考の画像と URL・担当と締め切り)の 1 枚。プレビューは見本として残す
-          <div className={s.pane}>
-            <HandoffSheet editor={e} onCommit={onCommit} />
-          </div>
-        )}
 
-        <Splitter onDrag={commOpen ? resizeComm : () => undefined} onDone={saveWidths} />
+        <Splitter onDrag={side ? resizeSide : () => undefined} onDone={saveWidths} />
 
-        {/* コミュニケーション(段階 d): 状態と次に動く人・1 本の流れ・書く欄 1 つ。畳むと、件数だけの帯 */}
-        {commOpen ? (
-          <div className={s.commPane}>
-            <div className={s.commHead}>
-              <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={() => toggleComm(false)} aria-label={t('コミュニケーションを畳む', 'Collapse communication')} />
-            </div>
+        {/* サイドパネル(開いている 1 つ)。やり取りは、閉じていても帯の数を合わせるため、中身は描いたまま隠す */}
+        <div className={s.sidePane}>
+          <div className={s.commPane} style={side === 'comm' ? undefined : { display: 'none' }}>
             <CommPane
               card={e.card}
               part={part}
@@ -631,26 +589,37 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               onCounts={onCounts}
             />
           </div>
-        ) : (
-          <button type="button" className={mergeClasses(s.rail, s.commRail)} onClick={() => toggleComm(true)} title={t('コミュニケーションを開く', 'Open communication')}>
-            <ChevronLeftRegular />
-            {counts.waiting && <PersonAvailableRegular className={s.railIcon} />}
-            {counts.open > 0 && (
-              <span className={s.railCount}>
+          {side === 'handoff' && (
+            // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
+            <div className={s.pane}>
+              <div className={s.colTitle}>{t('渡すもの(制作へ)', 'For production')}</div>
+              <HandoffSheet editor={e} onCommit={onCommit} />
+            </div>
+          )}
+        </div>
+
+        {/* 右端のアイコンの帯。上から、プロセスの順(承認者とのやり取り → 制作へ渡すもの)。数と赤い点で、開かなくても様子が分かる */}
+        <nav className={s.sideRail} aria-label={t('サイドパネル', 'Side panels')}>
+          <Tooltip content={t('やり取り(承認者と。書き込み・タスク・承認)', 'Conversation (with approvers: comments, tasks, approval)')} relationship="description" positioning="before">
+            <button type="button" className={mergeClasses(s.sideBtn, side === 'comm' && s.sideOn)} aria-pressed={side === 'comm'} onClick={() => showSide('comm')}>
+              <span className={s.sideIcon}>
                 <CommentRegular />
-                {counts.open}
+                {counts.open + counts.tasks > 0 && <span className={s.sideBadge}>{counts.open + counts.tasks}</span>}
+                {(counts.mine || counts.waiting) && <span className={s.sideDot} style={counts.mine ? undefined : { backgroundColor: tokens.colorPaletteMarigoldBackground3 }} />}
               </span>
-            )}
-            {counts.tasks > 0 && (
-              <span className={s.railCount}>
-                <TaskListSquareLtrRegular />
-                {counts.tasks}
+              <span className={s.sideLabel}>{t('やり取り', 'Talk')}</span>
+            </button>
+          </Tooltip>
+          <Tooltip content={t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)')} relationship="description" positioning="before">
+            <button type="button" className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn)} aria-pressed={side === 'handoff'} onClick={() => showSide('handoff')}>
+              <span className={s.sideIcon}>
+                <BoxMultipleArrowRightRegular />
+                {memoLines + assetCount > 0 && <span className={s.sideBadge}>{memoLines + assetCount}</span>}
               </span>
-            )}
-            {counts.mine && <span className={s.railMine} />}
-            <span className={s.railLabel}>{t('コミュニケーション', 'Communication')}</span>
-          </button>
-        )}
+              <span className={s.sideLabel}>{t('渡すもの', 'Handoff')}</span>
+            </button>
+          </Tooltip>
+        </nav>
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, useState } from 'react'
 import { Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronRightRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -34,6 +34,24 @@ const useStyles = makeStyles({
   name: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightBold, letterSpacing: '0.04em' },
   state: { fontSize: tokens.fontSizeBase100 },
   arrow: { color: tokens.colorNeutralForeground4, fontSize: '12px' },
+  // タブの見せ方(シンプルな画面の上の帯の 2 段目。StageHeader)。いまの面は、面の色の下線
+  tabs: { display: 'flex', alignItems: 'flex-end', columnGap: '4px' },
+  tab: {
+    display: 'inline-flex',
+    alignItems: 'baseline',
+    columnGap: '6px',
+    padding: '6px 12px 7px',
+    border: 'none',
+    borderBottom: '2px solid transparent',
+    backgroundColor: 'transparent',
+    fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    color: tokens.colorNeutralForeground3,
+    ':hover': { color: tokens.colorNeutralForeground1, backgroundColor: tokens.colorNeutralBackground1Hover },
+    ':disabled': { cursor: 'default', opacity: 0.45, backgroundColor: 'transparent' },
+  },
+  tabHere: { cursor: 'default', ':hover': { backgroundColor: 'transparent' } },
 })
 
 const SHORT: Record<ProductionView, () => string> = {
@@ -55,8 +73,8 @@ interface Props {
   production?: ProductionRequest
   /** 押した段のフロートに切り替える(同じ配信のまま)。なければ、いまの段の札だけを出す */
   onGo?: (face: Face) => void
-  /** PLAN の札のすぐ右に置くもの(シンプルな配信カードの「直す | 渡す」。PLAN の中の切り替えなので、段の帯の中に置き、別の帯を作らない) */
-  planSlot?: ReactNode
+  /** tabs = 題名の下のタブ(シンプルな画面の StageHeader)。既定は、題名の左の札の並び */
+  variant?: 'chips' | 'tabs'
 }
 
 /**
@@ -64,7 +82,7 @@ interface Props {
  * 3 つのフロート(配信カード・制作のページ・詳しい結果)の題名の左に出し、押すと同じ配信の隣の段に切り替える。
  * 段ごとに短い状態を添えるので、この配信がいまどこまで進んでいるかも分かる。まだ入れない段は押せない(承認前の制作、配信日前の結果)
  */
-export function StageNav({ face, card, production, onGo, planSlot }: Props) {
+export function StageNav({ face, card, production, onGo, variant = 'chips' }: Props) {
   const s = useStyles()
   const t = useT()
   const pv = productionView(card, production)
@@ -83,6 +101,36 @@ export function StageNav({ face, card, production, onGo, planSlot }: Props) {
     { face: 'results', name: 'RESULTS', state: sent ? t('結果を見る', 'See results') : t('配信の前', 'Not sent yet'), enabled: sent, why: t('配信日のあとに、結果を見られます', 'Results are available after the send date') },
   ]
   const shown = onGo ? stages : stages.filter((x) => x.face === face)
+  // タブ: 配信(題名)が主役で、面はその見方なので、題名の下に並べる。矢印は付けない(順に進む道のりではなく、見方の切り替え)
+  if (variant === 'tabs')
+    return (
+      <nav className={s.tabs} aria-label={t('配信の段階', 'Delivery stages')}>
+        {shown.map((x) => {
+          const here = x.face === face
+          const tab = (
+            <button
+              key={x.face}
+              type="button"
+              className={mergeClasses(s.tab, here && s.tabHere)}
+              style={here ? { color: FACE_COLOR[x.face], borderBottomColor: FACE_COLOR[x.face] } : undefined}
+              disabled={!here && !x.enabled}
+              aria-current={here ? 'page' : undefined}
+              onClick={() => !here && onGo?.(x.face)}
+            >
+              <span className={s.name}>{x.name}</span>
+              <span className={s.state}>{x.state}</span>
+            </button>
+          )
+          return !here && !x.enabled && x.why ? (
+            <Tooltip key={x.face} content={x.why} relationship="description">
+              <span>{tab}</span>
+            </Tooltip>
+          ) : (
+            tab
+          )
+        })}
+      </nav>
+    )
   return (
     <nav className={s.root} aria-label={t('配信の段階', 'Delivery stages')}>
       {shown.map((x, i) => {
@@ -110,7 +158,6 @@ export function StageNav({ face, card, production, onGo, planSlot }: Props) {
             ) : (
               button
             )}
-            {x.face === 'calendar' && planSlot}
           </Fragment>
         )
       })}

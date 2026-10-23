@@ -35,7 +35,7 @@ import { AutoTextarea } from '../AutoTextarea'
 import { eligibleReviewers } from '../approvals'
 import { myName, myUserId, onMeChange } from '../history'
 import { activeUsers, groupsOf, usePeople } from '../people'
-import { bumpNotes, focusPin, focusedPin, notesVersion, pinNumbers, subscribePins } from '../pinStore'
+import { bumpNotes, focusPin, focusedPin, notesVersion, pendingPin, pinNumbers, setPendingPin, subscribePins } from '../pinStore'
 import { isThreadRoot, stageOf } from '../notesStage'
 import { locale, tr, useT } from '../i18n'
 import { statusLabel, statusRank } from '../status'
@@ -181,6 +181,9 @@ export function CommPane(props: Props) {
   const meName = useSyncExternalStore(subscribeMe, myName)
   const version = useSyncExternalStore(subscribePins, notesVersion)
   const focus = useSyncExternalStore(subscribePins, focusedPin)
+  // プレビューで押した場所(まだ書いていない)。この配信の、企画の段階のものだけ
+  const pendingAll = useSyncExternalStore(subscribePins, pendingPin)
+  const pending = pendingAll && pendingAll.cardId === card.id && pendingAll.stage === 'plan' ? pendingAll : null
   const [notes, setNotes] = useState<CardNote[]>([])
   const [events, setEvents] = useState<CardEvent[]>([])
   const [request, setRequest] = useState<ApprovalRequest | null>(null)
@@ -269,7 +272,8 @@ export function CommPane(props: Props) {
 
   // ---- 書く
   const productIdOf = (key: string) => props.items.find((i) => i.key === key)?.productId
-  const place = anchorOfPart(props.part, productIdOf)
+  // 書き込みの場所: プレビューで押した場所があれば、それ(その中の位置まで)。なければ、選んでいる部品
+  const place = pending ? { anchor: pending.anchor, productId: pending.productId } : anchorOfPart(props.part, productIdOf)
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string } }>) => {
     setWorking(true)
     setError(null)
@@ -297,13 +301,14 @@ export function CommPane(props: Props) {
         author: meName || card.owner || '',
         body,
         ...(assignee ? { assignee } : {}),
-        ...(place ? { anchor: place.anchor, anchor_x: 0.97, anchor_y: 0.08, anchor_view: props.view, ...(place.productId ? { product_id: place.productId } : {}) } : {}),
+        ...(place ? { anchor: place.anchor, anchor_x: pending ? pending.x : 0.97, anchor_y: pending ? pending.y : 0.08, anchor_view: pending ? pending.view : props.view, ...(place.productId ? { product_id: place.productId } : {}) } : {}),
       }),
     )
     if (ok) {
       setText('')
       setAsTask(false)
       setAssignee('')
+      setPendingPin(null)
     }
   }
   const sendReply = async (root: CardNote) => {
@@ -575,7 +580,12 @@ export function CommPane(props: Props) {
           <Tooltip content={place ? t('プレビューで選んでいる部品に書きます(番号の点が付きます)', 'Posts on the part selected in the preview (adds a numbered dot)') : t('部品を選ばずに書くと、配信の全体への書き込みです', 'With no part selected, it is about the whole delivery')} relationship="description">
             <span className={mergeClasses(s.chip, !!place && s.chipOn)}>
               <LocationRegular />
-              {place ? partName(props.part) : t('全体', 'Whole')}
+              {pending ? t('押した場所', 'Clicked spot') : place ? partName(props.part) : t('全体', 'Whole')}
+              {pending && (
+                <button type="button" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }} onClick={() => setPendingPin(null)} aria-label={t('場所を外す', 'Remove the spot')}>
+                  ×
+                </button>
+              )}
             </span>
           </Tooltip>
           <Popover positioning="above-start">
