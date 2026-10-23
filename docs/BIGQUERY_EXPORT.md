@@ -84,6 +84,7 @@ CCP が利用先の BigQuery から取り込むデータの、**列の名前・�
 | `sku_code` | STRING | × | SKU のコード |
 | `product_code` | STRING | × | 属する SPU のコード(2 章の SPU に、必ずあること) |
 | `color` | STRING | ○ | 色 |
+| `color_hex` | STRING | ○ | 色の番号(`#c8b29a` の形。テンプレートの箱のカラーチップに使う。ない列・空の行は、色の名前から引く。2026-10-23 に足した) |
 | `size` | STRING | ○ | サイズ |
 | `length` | STRING | ○ | レングス(丈。パンツの股下・スカートの丈 など。ない商品は空) |
 | `price` | NUMERIC | ○ | SKU の価格(SPU の価格と同じなら空でよい) |

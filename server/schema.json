@@ -339,6 +339,7 @@
     ["sku_code", "text", {"index": true}],
     ["product_code", "text", {"index": true}],
     ["color", "text"],
+    ["color_hex", "text"],
     ["size", "text"],
     ["length", "text"],
     ["price", "numeric"],

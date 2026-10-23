@@ -18,6 +18,7 @@ import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons,
 import { SECTION_BG, boxFields, boxesOf, buttonColor, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
+import { STAR_COLOR, stars, useProductSwatches } from './swatches'
 import { locale, optionLabel, useT } from './i18n'
 
 interface Props {
@@ -239,6 +240,9 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   }, [selectedKey])
   const byId = new Map(products.map((p) => [p.id, p]))
   const tpl = getTemplate(template)
+  // カラーチップを出す箱があるときだけ、載せた商品の SKU の色を読む
+  const wantSwatches = [tpl.heroTable, ...tpl.sections].some((sec) => sec?.parts?.some((q) => q.type === 'box' && boxFields(q).includes('swatches')))
+  const swatches = useProductSwatches(items.map((it) => byId.get(it.productId)).filter((x): x is Product => !!x), wantSwatches)
   const offer = tpl.hero === 'offer'
   const heroText = tpl.heroText ?? 'band'
   const jaHeadline = /[\u3000-\u9fff\uff00-\uffef]/.test(headline)
@@ -434,12 +438,38 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       <span data-el={`${part.id}.badge`} style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4, color: '#fff', backgroundColor: /sale|限定|off/i.test(badgeText) || sale ? '#d32f2f' : INK }}>{badgeText}</span>
     )
     const name = has('name') && <div data-el={`${part.id}.name`} className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, color: INK }}>{p?.name}</div>
+    // カラーチップ(SKU の色)。色のわからないものは、名前の札。上限を超えた分は「+3」
+    const sw = has('swatches') ? (swatches.get(it.productId) ?? []) : []
+    const max = part.swatchMax ?? 5
+    const chips = sw.length > 0 && (
+      <div data-el={`${part.id}.swatches`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 2 }}>
+        {sw.slice(0, max).map((c) =>
+          c.hex ? (
+            <span key={c.name} title={c.name} style={{ width: 12, height: 12, borderRadius: part.swatchShape === 'square' ? 2 : '50%', backgroundColor: c.hex, border: '1px solid #cfcfcf', boxSizing: 'border-box' }} />
+          ) : (
+            <span key={c.name} style={{ fontSize: '0.6rem', color: SUB, border: '1px solid #cfcfcf', borderRadius: 3, padding: '0 3px' }}>{c.name}</span>
+          ),
+        )}
+        {sw.length > max && <span style={{ fontSize: '0.65rem', color: SUB }}>+{sw.length - max}</span>}
+      </div>
+    )
+    // レビュー: 件数が少ない・点が低い商品では出さない(テンプレートで決めた線)
+    const showRating = has('rating') && p?.rating !== undefined && p.rating !== null && (p.review_count ?? 0) >= (part.ratingMin ?? 3) && p.rating >= (part.ratingFloor ?? 0)
+    const rating = showRating && (
+      <div data-el={`${part.id}.rating`} style={{ fontSize: '0.72rem', color: SUB, whiteSpace: 'nowrap' }}>
+        <span style={{ color: STAR_COLOR, letterSpacing: 1 }}>{stars(p.rating!)}</span>
+        {!part.ratingShow && <span> {p.rating!.toFixed(1)}</span>}
+        {part.ratingShow !== 'stars' && <span> ({(p.review_count ?? 0).toLocaleString(locale())})</span>}
+      </div>
+    )
     const desc = has('desc') && p?.description && <div data-el={`${part.id}.desc`} style={{ fontSize: '0.75rem', color: SUB, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
     const button = has('button') && <div data-el={`${part.id}.button`}>{cta}</div>
-    const text = (name || price || desc || button) && (
+    const text = (name || price || chips || rating || desc || button) && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         {name}
         {price}
+        {chips}
+        {rating}
         {desc}
         {button}
       </div>

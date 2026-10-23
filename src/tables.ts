@@ -50,7 +50,7 @@ const DEFAULT_FIELDS: Record<CellView, BoxField[]> = {
 /** 箱に出すもの(設定がなければ、見せ方の既定) */
 export const boxFields = (p: Pick<TablePart, 'view' | 'fields'>): BoxField[] => p.fields ?? DEFAULT_FIELDS[p.view ?? 'card']
 export const boxFieldLabel = (f: BoxField): string =>
-  ({ name: tr('名前', 'Name'), price: tr('価格', 'Price'), badge: tr('バッジ', 'Badge'), desc: tr('説明', 'Description'), button: tr('ボタン', 'Button') })[f]
+  ({ name: tr('名前', 'Name'), price: tr('価格', 'Price'), swatches: tr('カラーチップ', 'Color chips'), rating: tr('レビュー', 'Reviews'), badge: tr('バッジ', 'Badge'), desc: tr('説明', 'Description'), button: tr('ボタン', 'Button') })[f]
 export const priceStyleLabel = (v?: TablePart['priceStyle']): string =>
   v === 'sale' ? tr('セール(元の価格に取り消し線)', 'Sale (original price struck through)') : v === 'from' ? tr('〜から', 'From …') : tr('ふつう', 'Regular')
 
@@ -534,7 +534,7 @@ const str = (v: unknown, max: number): string | undefined => (typeof v === 'stri
 
 /** 保存してよい要素の名前(種類ごと。箱は、出すものを外しても設定は残す。elements.ts の partElements と合わせる) */
 const ELEMENT_KEYS: Record<PartType, string[]> = {
-  box: ['image', 'name', 'price', 'badge', 'desc', 'button'],
+  box: ['image', 'name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button'],
   button: ['label'],
   text: ['text'],
   media: ['image'],
@@ -577,6 +577,11 @@ export function parsePart(raw: unknown): TablePart | null {
     const badge = str(o.badge, 12)
     if (badge) part.badge = badge
     if (MEDIA_RATIOS.includes(o.ratio as MediaRatio)) part.ratio = o.ratio as MediaRatio
+    if (o.swatchShape === 'square') part.swatchShape = 'square'
+    if (typeof o.swatchMax === 'number' && Number.isInteger(o.swatchMax) && o.swatchMax >= 1 && o.swatchMax <= 12 && o.swatchMax !== 5) part.swatchMax = o.swatchMax
+    if (o.ratingShow === 'stars' || o.ratingShow === 'starsCount') part.ratingShow = o.ratingShow
+    if (typeof o.ratingMin === 'number' && Number.isInteger(o.ratingMin) && o.ratingMin >= 0 && o.ratingMin <= 1000 && o.ratingMin !== 3) part.ratingMin = o.ratingMin
+    if (typeof o.ratingFloor === 'number' && o.ratingFloor > 0 && o.ratingFloor <= 5) part.ratingFloor = o.ratingFloor
   } else if (type === 'button') {
     const label = str(o.label, 30)
     if (label) part.label = label

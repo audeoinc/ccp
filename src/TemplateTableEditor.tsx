@@ -10,6 +10,7 @@ import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, t
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
 import { elementClickable, elementDesc, partElements } from './elements'
+import { STAR_COLOR } from './swatches'
 
 // テンプレートの編集画面の、表の部分(T8。docs/TEMPLATE_OBJECTS.md の 5.2。触れる試作で利用者と決めた形)。
 // パーツ(足すだけ)・表のキャンバス(押す・なぞるで選ぶ、右クリック・行と列の帯で操作)・右の「セクションと部品」のタブを作る。
@@ -836,7 +837,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     </>
   )
   // 箱の見せ方として、ほかの箱にそろえる項目(AI への一言は、枠ごとに中身が違うのでそろえない)
-  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio })
+  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio, swatchShape: p.swatchShape, swatchMax: p.swatchMax, ratingShow: p.ratingShow, ratingMin: p.ratingMin, ratingFloor: p.ratingFloor })
   /** 箱の設定を、いくつかの箱にまとめて入れる(形は変わらないので、ID はそのまま) */
   const patchBoxes = (sec: Section, ps: TablePart[], x: Partial<TablePart> | ((q: TablePart) => Partial<TablePart>)) => {
     const ids = new Set(ps.map((q) => q.id))
@@ -919,6 +920,48 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             </Select>
           </Field>
         )}
+        {has('swatches') > 0 && (
+          <Field label={t('カラーチップ(商品の SKU の色を並べる)', 'Color chips (the colors of the product SKUs)')} size="small">
+            <div className={s.row2}>
+              <Select size="small" value={common((q) => q.swatchShape ?? '') === MIXED ? MIXED : (p.swatchShape ?? '')} onChange={(_, d) => patchBoxes(sec, ps, { swatchShape: d.value === 'square' ? 'square' : undefined })}>
+                {common((q) => q.swatchShape ?? '') === MIXED && mixedOption}
+                <option value="">{t('丸', 'Round')}</option>
+                <option value="square">{t('四角', 'Square')}</option>
+              </Select>
+              <Select size="small" value={common((q) => q.swatchMax ?? 5) === MIXED ? MIXED : String(p.swatchMax ?? 5)} onChange={(_, d) => patchBoxes(sec, ps, { swatchMax: Number(d.value) === 5 ? undefined : Number(d.value) })}>
+                {common((q) => q.swatchMax ?? 5) === MIXED && mixedOption}
+                {[3, 4, 5, 6, 8].map((n) => (
+                  <option key={n} value={n}>{t(`${n} 色まで`, `Up to ${n}`)}</option>
+                ))}
+              </Select>
+            </div>
+          </Field>
+        )}
+        {has('rating') > 0 && (
+          <Field label={t('レビュー(商品の平均点・件数から)', 'Reviews (from the product rating and count)')} hint={t('件数が少ない・点が低い商品では、レビューを出しません', 'Hidden for items with few reviews or a low rating')} size="small">
+            <Select size="small" value={common((q) => q.ratingShow ?? '') === MIXED ? MIXED : (p.ratingShow ?? '')} onChange={(_, d) => patchBoxes(sec, ps, { ratingShow: d.value === 'stars' || d.value === 'starsCount' ? d.value : undefined })}>
+              {common((q) => q.ratingShow ?? '') === MIXED && mixedOption}
+              <option value="">{t('★ 4.2 (128)', '★ 4.2 (128)')}</option>
+              <option value="starsCount">{t('★ (128)', '★ (128)')}</option>
+              <option value="stars">{t('★ だけ', 'Stars only')}</option>
+            </Select>
+            <div className={s.row2}>
+              <Select size="small" value={common((q) => q.ratingMin ?? 3) === MIXED ? MIXED : String(p.ratingMin ?? 3)} onChange={(_, d) => patchBoxes(sec, ps, { ratingMin: Number(d.value) === 3 ? undefined : Number(d.value) })}>
+                {common((q) => q.ratingMin ?? 3) === MIXED && mixedOption}
+                {[1, 3, 5, 10, 30].map((n) => (
+                  <option key={n} value={n}>{t(`${n} 件以上で出す`, `Show with ${n}+ reviews`)}</option>
+                ))}
+              </Select>
+              <Select size="small" value={common((q) => q.ratingFloor ?? 0) === MIXED ? MIXED : String(p.ratingFloor ?? 0)} onChange={(_, d) => patchBoxes(sec, ps, { ratingFloor: Number(d.value) || undefined })}>
+                {common((q) => q.ratingFloor ?? 0) === MIXED && mixedOption}
+                <option value="0">{t('点では隠さない', 'Any rating')}</option>
+                {[3, 3.5, 4].map((n) => (
+                  <option key={n} value={n}>{t(`${n} 点以上で出す`, `Show at ${n}+`)}</option>
+                ))}
+              </Select>
+            </div>
+          </Field>
+        )}
         {has('badge') > 0 && (
           <Field label={t('バッジの文言', 'Badge text')} size="small">
             <Input size="small" value={badge === MIXED ? '' : badge} placeholder={badge === MIXED ? t('(ばらばら)', '(mixed)') : 'NEW'} maxLength={12} onChange={(_, d) => patchBoxes(sec, ps, { badge: d.value || undefined })} />
@@ -995,6 +1038,14 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               <span style={{ color: sale || hero === 'offer' ? '#d32f2f' : MAIL.sub, fontWeight: sale ? 700 : 400 }}>{sample ? (p.priceStyle === 'from' ? t(`${sample.price}〜`, `From ${sample.price}`) : sample.price) : p.priceStyle === 'from' ? t('価格〜', 'From price') : sale ? t('セール価格', 'Sale price') : t('価格', 'Price')}</span>
             </span>
           )}
+          {fields.includes('swatches') && (
+            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {['#222222', '#d8c7a8', '#1f2a44'].map((c) => (
+                <i key={c} style={{ width: 8, height: 8, borderRadius: p.swatchShape === 'square' ? 1 : '50%', backgroundColor: c, border: '1px solid #ccc' }} />
+              ))}
+            </span>
+          )}
+          {fields.includes('rating') && <span style={{ color: STAR_COLOR }}>★★★★☆{p.ratingShow !== 'stars' && p.ratingShow !== 'starsCount' && <span style={{ color: MAIL.sub }}> 4.2</span>}{p.ratingShow !== 'stars' && <span style={{ color: MAIL.sub }}> (128)</span>}</span>}
           {fields.includes('desc') && <span>{t('説明', 'Description')}</span>}
           {fields.includes('button') && <span className={s.miniCta}>{t('詳細はこちら', 'View details')}</span>}
         </>

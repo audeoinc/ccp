@@ -40,7 +40,7 @@ OUTPUTS: tuple[Output, ...] = (
         ("category", "category_path", "gender", "season", "price", "description", "sales_trend", "units_4w", "revenue_4w", "revenue_yoy", "views_4w", "cvr_4w",
          "rating", "review_count", "last_review_at", "review_texts", "lift_hot", "lift_cold", "lift_rain", "hot_days", "cold_days", "rain_days", "weather_basis"),
     ),
-    Output("sku", "BQ_SKU", "SKU", ("market", "sku_code", "product_code", "as_of"), ("color", "size", "length", "price", "units_4w")),
+    Output("sku", "BQ_SKU", "SKU", ("market", "sku_code", "product_code", "as_of"), ("color", "color_hex", "size", "length", "price", "units_4w")),
     Output("sku_stock", "BQ_SKU_STOCK", "SKU の在庫", ("market", "sku_code", "stock", "as_of")),
     Output("weekly", "BQ_WEEKLY", "週ごとの実績", ("market", "product_code", "week_start", "units", "revenue", "as_of"), ("stock",)),
     Output("forecast", "BQ_FORECAST", "天気予報", ("market", "date", "issued_at"), ("temp_max", "temp_min", "precip_prob", "weather")),

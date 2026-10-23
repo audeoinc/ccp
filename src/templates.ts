@@ -58,8 +58,9 @@ export type ButtonColor = 'black' | 'red' | 'navy' | 'green' | 'gray'
 export type TextAlign = 'left' | 'center' | 'right'
 
 /** 箱に出すもの(写真のほか)。名前・価格は商品のデータから出す(テンプレートでは文言を打たない。値段の食い違いを防ぐため) */
-export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button'
-export const BOX_FIELDS: BoxField[] = ['name', 'price', 'badge', 'desc', 'button']
+/** 箱に出すもの。swatches: カラーチップ(SKU の色)/ rating: レビュー(星・平均点・件数)。T8 の 8.5 */
+export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button' | 'swatches' | 'rating'
+export const BOX_FIELDS: BoxField[] = ['name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button']
 
 /**
  * 表の部品(マス)。列 c・行 r(0 から)に置き、横 w・縦 h マス分を使う(結合したマスも 1 つの部品)。
@@ -95,6 +96,16 @@ export interface TablePart {
   priceStyle?: 'sale' | 'from'
   /** 箱: バッジの文言(出すものに badge があるとき。空は NEW) */
   badge?: string
+  /** 箱: カラーチップの形(省略は丸) */
+  swatchShape?: 'square'
+  /** 箱: カラーチップを並べる数の上限(超えた分は「+3」。省略は 5) */
+  swatchMax?: number
+  /** 箱: レビューの見せ方(省略は 星・平均点・件数のすべて) */
+  ratingShow?: 'stars' | 'starsCount'
+  /** 箱: レビューの件数がこれより少ない商品では、レビューを出さない(省略は 3) */
+  ratingMin?: number
+  /** 箱: 平均点がこれより低い商品では、レビューを出さない(省略は、点では隠さない) */
+  ratingFloor?: number
   /** ボタン: 文言(空は、既定の文言) */
   label?: string
   /** ボタン: 見た目(省略は fill)。text: 文字のリンク(WOMEN / MEN のような、枠のない文字) */

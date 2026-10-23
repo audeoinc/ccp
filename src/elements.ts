@@ -23,6 +23,8 @@ export const elementLabel = (key: string): string =>
     image: tr('写真', 'photo'),
     name: tr('名前', 'name'),
     price: tr('価格', 'price'),
+    swatches: tr('カラーチップ', 'color chips'),
+    rating: tr('レビュー', 'reviews'),
     badge: tr('バッジ', 'badge'),
     desc: tr('説明', 'description'),
     button: tr('ボタン', 'button'),
