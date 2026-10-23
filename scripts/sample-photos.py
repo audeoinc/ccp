@@ -10,6 +10,8 @@
   python scripts/sample-photos.py draft --products 商品.json --spec import/prod.json   商品の一覧から、注文の文・見出し・説明を AI で下書きする
   python scripts/sample-photos.py generate --spec import/prod.json --out import/prod-photos   下書きで作る
   python scripts/sample-photos.py zip                      ZIP にする(⚙ →「商品の写真の ZIP を取り込む」か、python -m ccp.cli import-images で取り込む)
+  python scripts/sample-photos.py draft-heroes --products 商品.json --spec import/heroes.json   メイン画像(ヒーロー)の注文の文を下書きする
+  python scripts/sample-photos.py generate --spec import/heroes.json --out import/hero-photos    ヒーローの写真(横長 1 枚)を作る。zip も同じ
 
 - 何を作るかは scripts/sample-photos.json(商品ごとの注文の文・見出し・説明)。先頭の 1 枚がメイン。2 枚目からは、メインの画像を
   手本として渡し、同じ商品として作る(色・形がそろう)
@@ -17,6 +19,8 @@
   行に source = sample が入り、本物の画像を取り込んだ商品では、本物が優先される
 - 本物の商品(利用先・本番の商品の一覧)に合わせて作るときは、draft で下書きを import/ の下に作る(商品の名前・説明は実データなので、
   リポジトリに入れない)。商品の一覧は、⚙ の「データと画像を書き出す」の ZIP の data.json の products(か、その形の JSON)
+- メイン画像(表 hero_images)も、同じ流れで 1 枚ずつ作る(spec の kind = heroes)。ZIP は同じ入口で取り込み、hero_images の画像を差し替える
+  (前の画像は original_image_url に控える)。行は id で探す(本番のパックから下書きしたなら、本番の行に当たる)
 - 認証は、この PC の gcloud(gcloud auth print-access-token と、いまのプロジェクト)。プロジェクト ID・トークンは、ファイルに書かない
 """
 from __future__ import annotations
@@ -41,6 +45,7 @@ OUT = ROOT / "import" / "sample-photos"
 MODEL = "gemini-3-pro-image"  # --model で替えられる(gemini-2.5-flash-image は安く速いが、質は下がる)
 TEXT_MODEL = "gemini-3.5-flash"
 MAX_SIDE = 1200
+HERO_SIDE = 1600  # メイン画像は横長で、テンプレートごとに切り出して大きく出すので、商品より大きく
 PAUSE = 6  # 1 枚ごとに待つ秒(回数の上限に当たりにくくする)
 MARKETS = ("JP", "US")  # sample-photos.json の codes・title・caption の並び(商品に markets がなければ)
 
@@ -50,22 +55,37 @@ def gcloud(*args: str) -> str:
     return subprocess.run(["gcloud", *args], capture_output=True, text=True, check=True, shell=sys.platform == "win32").stdout.strip()
 
 
-def to_jpeg(data: bytes) -> bytes:
+class Auth:
+    """gcloud のトークンは 1 時間で切れるので、40 分ごとに取り直す(数時間かかる生成を、途中で全部失敗させないため)"""
+
+    def __init__(self) -> None:
+        self.project = gcloud("config", "get-value", "project")
+        self.at = 0.0
+        self._token = ""
+
+    @property
+    def token(self) -> str:
+        if time.time() - self.at > 40 * 60:
+            self._token, self.at = gcloud("auth", "print-access-token"), time.time()
+        return self._token
+
+
+def to_jpeg(data: bytes, side: int = MAX_SIDE) -> bytes:
     from PIL import Image
 
     im = Image.open(io.BytesIO(data)).convert("RGB")
-    im.thumbnail((MAX_SIDE, MAX_SIDE))
+    im.thumbnail((side, side))
     buf = io.BytesIO()
     im.save(buf, "JPEG", quality=88, optimize=True, progressive=True)
     return buf.getvalue()
 
 
-def ask(project: str, token: str, prompt: str, ref: bytes | None) -> bytes:
+def ask(project: str, token: str, prompt: str, ref: bytes | None, aspect: str = "3:4") -> bytes:
     parts: list[dict] = []
     if ref is not None:
         parts.append({"inlineData": {"mimeType": "image/jpeg", "data": base64.b64encode(ref).decode()}})
     parts.append({"text": prompt})
-    body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": "3:4"}}}
+    body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspect}}}
     url = f"https://aiplatform.googleapis.com/v1/projects/{project}/locations/global/publishers/google/models/{MODEL}:generateContent"
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=180) as r:
@@ -81,7 +101,8 @@ def shot_file(prod: dict, i: int, shot: dict) -> Path:
 
 
 def generate(spec: dict, only: list[str], redo: list[int]) -> None:
-    project, token = gcloud("config", "get-value", "project"), gcloud("auth", "print-access-token")
+    auth = Auth()
+    hero = spec.get("kind") == "heroes"
     # 下書き(draft)には撮り方の決まりを持たせず、ここの sample-photos.json のものを使う(どの商品も同じ撮り方にそろえる)
     style = spec.get("style") or json.loads(SPEC.read_text(encoding="utf-8"))["style"]
     made = 0
@@ -103,7 +124,7 @@ def generate(spec: dict, only: list[str], redo: list[int]) -> None:
             for attempt in range(6):
                 try:
                     t0 = time.time()
-                    data = ask(project, token, prompt, ref)
+                    data = ask(auth.project, auth.token, prompt, ref, "4:3" if hero else "3:4")
                     break
                 except (urllib.error.URLError, RuntimeError) as e:
                     # 429(1 分あたりの回数の上限)が出やすいので、長めに待ってやり直す
@@ -114,12 +135,42 @@ def generate(spec: dict, only: list[str], redo: list[int]) -> None:
                 continue
             # 一時ファイルに書いてから名前を替える(途中で止めても、壊れた写真が「できた」として飛ばされないように)
             tmp = f.with_suffix(".tmp")
-            tmp.write_bytes(to_jpeg(data))
+            tmp.write_bytes(to_jpeg(data, HERO_SIDE if hero else MAX_SIDE))
             tmp.replace(f)
             made += 1
             time.sleep(PAUSE)
             print(f"{prod['key']} {i + 1}/{len(prod['shots'])} {shot['angle']}: {f}({time.time() - t0:.0f} 秒)")
     print(f"作った写真: {made} 枚")
+
+
+def make_hero_zip(spec: dict, path: Path, max_mb: float) -> None:
+    """メイン画像の ZIP。目録の kind = heroes で、商品の ZIP と同じ入口(⚙・import-images)が見分ける。行は id(なければ画像コードと市場)で探す"""
+    groups: list[list[dict]] = [[]]
+    size = 0.0
+    for h in spec["products"]:
+        f = shot_file(h, 0, h["shots"][0])
+        if not f.exists():
+            print(f"  {h['key']}: 写真がないので入れません")
+            continue
+        mb = f.stat().st_size / 1024 / 1024
+        if groups[-1] and size + mb > max_mb:
+            groups.append([])
+            size = 0.0
+        groups[-1].append(h)
+        size += mb
+    for n, group in enumerate(groups, start=1):
+        target = path if len(groups) == 1 else path.with_name(f"{path.stem}_{n}{path.suffix}")
+        heroes = []
+        with zipfile.ZipFile(target, "w", zipfile.ZIP_STORED) as z:
+            for h in group:
+                f = shot_file(h, 0, h["shots"][0])
+                data = f.read_bytes()
+                z.write(f, f"heroes/{h['key']}/{f.name}")
+                heroes.append({"id": h.get("id"), "image_code": h.get("image_code"), "market": h.get("market"), "file": f"{h['key']}/{f.name}",
+                               "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(), "content_type": "image/jpeg"})
+            manifest = {"made_at": datetime.now().astimezone().isoformat(timespec="seconds"), "sample": True, "kind": "heroes", "heroes": heroes, "images": len(heroes)}
+            z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        print(f"メイン画像 {len(heroes)} 枚({target.stat().st_size / 1024 / 1024:.1f}MB) → {target}")
 
 
 def make_zip(spec: dict, path: Path, max_mb: float) -> None:
@@ -190,7 +241,7 @@ def draft(products_path: Path, spec_path: Path) -> None:
     rows = src.get("products") or src.get("tables", {}).get("products") or []
     spec = json.loads(spec_path.read_text(encoding="utf-8")) if spec_path.exists() else {"products": []}
     done = {p["key"] for p in spec["products"]}
-    project, token = gcloud("config", "get-value", "project"), gcloud("auth", "print-access-token")
+    auth = Auth()
     for row in rows:
         code, market = str(row.get("product_code") or ""), row.get("market") or "JP"
         key = f"{market}-{code}".lower()
@@ -201,7 +252,7 @@ def draft(products_path: Path, spec_path: Path) -> None:
         out = None
         for attempt in range(4):
             try:
-                out = ask_text(project, token, prompt)
+                out = ask_text(auth.project, auth.token, prompt)
                 break
             except Exception as e:  # noqa: BLE001 — 429 などは待ってやり直す。だめなら飛ばし、あとで流し直す
                 print(f"  {key}: やり直し({e})")
@@ -218,10 +269,47 @@ def draft(products_path: Path, spec_path: Path) -> None:
     print(f"下書き: {len(spec['products'])} 商品 → {spec_path}")
 
 
+DRAFT_HERO = """You plan a NEW, generic seasonal key visual for an apparel online store. Below is the description of the store's current
+key visual; write one English sentence for an image generator that keeps its idea (season, items, colors, setting, mood) but is a new
+photograph (no brand, no logo, not a copy of any real photo). Return JSON only: {"prompt": "<one English sentence>"}
+- Never describe people's faces, brands, logos or text. If people appear, show them from behind, turned away, or cropped below the face.
+- Keep the apparel items clearly visible; they are what the campaign sells.
+Key visual: %HERO%"""
+
+
+def draft_heroes(products_path: Path, spec_path: Path) -> None:
+    """メイン画像(hero_images)の一覧から、1 枚ずつの注文の文を AI で下書きする。済んだものは飛ばす"""
+    src = json.loads(products_path.read_text(encoding="utf-8"))
+    rows = src.get("hero_images") or src.get("tables", {}).get("hero_images") or []
+    spec = json.loads(spec_path.read_text(encoding="utf-8")) if spec_path.exists() else {"kind": "heroes", "products": []}
+    done = {p["key"] for p in spec["products"]}
+    auth = Auth()
+    for row in rows:
+        key = f"hero-{row.get('market') or ''}-{row.get('image_code') or row['id'][:8]}".lower()
+        if key in done:
+            continue
+        info = {k: row.get(k) for k in ("name", "season", "tags", "description")}
+        out = None
+        for attempt in range(4):
+            try:
+                out = ask_text(auth.project, auth.token, DRAFT_HERO.replace("%HERO%", json.dumps(info, ensure_ascii=False)))
+                break
+            except Exception as e:  # noqa: BLE001 — 429 などは待ってやり直す。だめなら飛ばし、あとで流し直す
+                print(f"  {key}: やり直し({e})")
+                time.sleep(20 * (attempt + 1))
+        if not out or not out.get("prompt"):
+            continue
+        spec["products"].append({"key": key, "id": row["id"], "image_code": row.get("image_code"), "market": row.get("market"),
+                                 "shots": [{"angle": "hero", "style": "hero", "prompt": out["prompt"]}]})
+        spec_path.write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"{key}: {row.get('name')}")
+    print(f"下書き: メイン画像 {len(spec['products'])} 枚 → {spec_path}")
+
+
 def main() -> int:
     global OUT, MODEL
     ap = argparse.ArgumentParser(description="見本の商品の写真を AI で作り、取り込める ZIP にする")
-    ap.add_argument("cmd", choices=["draft", "generate", "zip"])
+    ap.add_argument("cmd", choices=["draft", "draft-heroes", "generate", "zip"])
     ap.add_argument("--spec", type=Path, default=SPEC, help="何を作るか(既定 scripts/sample-photos.json)")
     ap.add_argument("--out", type=Path, default=None, help="写真を置くフォルダ(既定 import/sample-photos)")
     ap.add_argument("--model", default=MODEL, help=f"画像のモデル(既定 {MODEL}。安く速くするなら gemini-2.5-flash-image。モデルを替えたら --out も替える)")
@@ -234,14 +322,14 @@ def main() -> int:
     MODEL = args.model
     if args.out:
         OUT = args.out.resolve()
-    if args.cmd == "draft":
-        draft(args.products, args.spec)
+    if args.cmd in ("draft", "draft-heroes"):
+        (draft if args.cmd == "draft" else draft_heroes)(args.products, args.spec)
         return 0
     spec = json.loads(args.spec.read_text(encoding="utf-8"))
     if args.cmd == "generate":
         generate(spec, args.only, args.redo)
     else:
-        make_zip(spec, args.zip or OUT / "sample_photos.zip", args.max_mb)
+        (make_hero_zip if spec.get("kind") == "heroes" else make_zip)(spec, args.zip or OUT / "sample_photos.zip", args.max_mb)
     return 0
 
 

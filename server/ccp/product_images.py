@@ -18,6 +18,11 @@ Workbench のサーバーは、利用先の EC サイトを読めない。手元
 - 商品のマスタのメイン画像は、空か仮の画像(placehold.co)のときにも、見本のメインで埋める。--main-to-master(⚙ では「メイン画像も置き換える」)なら
   今の画像も置き換え、前の画像は source = master の行に控える(元に戻すときは、その行の image_url を products.image_url に戻す)
 
+メイン画像(ヒーロー)の見本の写真(sample-photos.py の spec が kind = heroes。目録に "kind": "heroes")も、同じ入口で取り込む:
+- 画像は <images>/heroes/s-<中身の sha256 の頭>.jpg に置き、表 hero_images の行の image_url を差し替える。行は id(なければ画像コードと市場)で探す
+- 前の画像は original_image_url に控える(最初の 1 度だけ。元に戻すときは、それを image_url に戻す)。前の画像のファイルは消さない
+- 焦点(focal_*)は前の画像に合わせたものなので、空に戻す(真ん中から切り出す)
+
 ファイル(ASSET_DIR)は Git に入らないので、コードを更新しても消えない。
 本番のパックで DB を置き換えた(import-pack --yes)あとは、表 product_images の行が消えるので、同じ ZIP をもう一度取り込む。
 """
@@ -46,6 +51,44 @@ SAMPLE = "sample"
 MASTER = "master"
 # 見本のデータの、仮の画像(見本の写真で置き換えてよいもの)
 PLACEHOLDER = ("https://placehold.co/",)
+
+
+HEROES = "heroes"
+
+
+def hero_plan(manifest: dict[str, Any], heroes: list[dict[str, Any]]) -> dict[str, Any]:
+    """ZIP のメイン画像を、表 hero_images の行に当てる(DB もファイルも変えない)"""
+    by_id = {str(h["id"]): h for h in heroes}
+    by_code = {(h.get("image_code"), h.get("market")): h for h in heroes if h.get("image_code")}
+    items, missing = [], []
+    for r in manifest.get("heroes", []):
+        if r.get("content_type") not in SERVED:
+            continue
+        h = by_id.get(str(r.get("id"))) or by_code.get((r.get("image_code"), r.get("market")))
+        if h:
+            items.append({"hero": h, "image": r})
+        else:
+            missing.append(f"{r.get('market') or ''}/{r.get('image_code') or r.get('id')}")
+    return {"items": items, "missing": missing}
+
+
+def hero_file_name(img: dict[str, Any]) -> str:
+    # 今のメイン画像(画像コードの名前)と重ならない名前にする(前の画像のファイルを残し、元に戻せるように)
+    return f"s-{img['sha256'][:24]}.{SERVED[img['content_type']]}"
+
+
+async def hero_apply(conn: Any, p: dict[str, Any]) -> int:
+    for it in p["items"]:
+        await conn.execute(
+            text("UPDATE hero_images SET original_image_url = COALESCE(original_image_url, image_url), image_url = :u, "
+                 "focal_x = NULL, focal_y = NULL, focal_zoom = NULL, modified_on = now() WHERE id = :id"),
+            {"u": f"/img/heroes/{hero_file_name(it['image'])}", "id": it["hero"]["id"]},
+        )
+    return len(p["items"])
+
+
+async def load_heroes(conn: Any) -> list[dict[str, Any]]:
+    return [dict(r) for r in (await conn.execute(text("SELECT id, image_code, market FROM hero_images"))).mappings().all()]
 
 
 def read_zip(path: Path) -> tuple[dict[str, Any], zipfile.ZipFile]:
@@ -145,6 +188,25 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
     # 表がまだない環境でも取り込めるよう、先に表を作る(何度実行してもよい)
     await migrate()
     engine = await get_engine()
+    if manifest.get("kind") == HEROES:
+        async with engine.connect() as conn:
+            hp = hero_plan(manifest, await load_heroes(conn))
+        print(f"  取り込む: メイン画像 {len(hp['items'])} 枚")
+        if hp["missing"]:
+            print(f"  表にないメイン画像(飛ばす): {len(hp['missing'])} 件(例: {', '.join(hp['missing'][:5])})")
+        if not yes:
+            print()
+            print("確認だけです。取り込むときは --yes を付けて実行してください(メイン画像の image_url が差し替わります。前の画像は original_image_url に控えます)")
+            return
+        dest = images / HEROES
+        dest.mkdir(parents=True, exist_ok=True)
+        for it in hp["items"]:
+            (dest / hero_file_name(it["image"])).write_bytes(z.read(f"heroes/{it['image']['file']}"))
+        async with engine.begin() as conn:
+            n = await hero_apply(conn, hp)
+        print(f"取り込みました: メイン画像 {n} 枚を {dest} に置き、表 hero_images を差し替えました")
+        print(f"サーバーは、環境変数 ASSET_DIR={images} で起動してください(画像をこのフォルダから配る)")
+        return
     async with engine.connect() as conn:
         products = [dict(r) for r in (await conn.execute(text("SELECT id, product_code, market, image_url FROM products WHERE product_code IS NOT NULL"))).mappings().all()]
     p = plan(manifest, products)
@@ -194,6 +256,8 @@ async def import_endpoint(request: Request, yes: int = 0, main: int = 0):
         manifest = json.loads(z.read("manifest.json").decode("utf-8"))
     except (zipfile.BadZipFile, KeyError, ValueError):
         return fail(400, "商品の画像の ZIP ではありません(manifest.json がありません)", "bad_zip")
+    if manifest.get("kind") == HEROES:
+        return await import_heroes(z, manifest, bool(yes))
     async with db() as conn:
         products = [dict(r) for r in (await conn.execute(text("SELECT id, product_code, market, image_url FROM products WHERE product_code IS NOT NULL"))).mappings().all()]
     p = plan(manifest, products)
@@ -207,3 +271,19 @@ async def import_endpoint(request: Request, yes: int = 0, main: int = 0):
     async with db(write=True) as conn:
         r = await apply(conn, z, p, lambda *_: False, bool(main), out["sample"])
     return ok({**out, **r, "placed": sum(len(i["images"]) for i in p["items"])})
+
+
+async def import_heroes(z: zipfile.ZipFile, manifest: dict[str, Any], yes: bool):
+    """⚙ からメイン画像の見本の写真を取り込む(import_endpoint から。目録の kind = heroes)"""
+    from .heroes import save
+
+    async with db() as conn:
+        hp = hero_plan(manifest, await load_heroes(conn))
+    out = {"sample": True, "kind": HEROES, "products": 0, "images": len(hp["items"]), "missing": hp["missing"], "unsupported": 0, "errors": []}
+    if not yes:
+        return ok(out)
+    for it in hp["items"]:
+        await asyncio.to_thread(save, hero_file_name(it["image"]), z.read(f"heroes/{it['image']['file']}"), it["image"]["content_type"])
+    async with db(write=True) as conn:
+        n = await hero_apply(conn, hp)
+    return ok({**out, "mains": n, "placed": n})

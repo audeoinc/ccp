@@ -117,7 +117,8 @@
     ["focal_y", "numeric"],
     ["focal_zoom", "numeric"],
     ["uploaded_by", "text"],
-    ["first_card_id", "text"]
+    ["first_card_id", "text"],
+    ["original_image_url", "text"]
    ],
    "lookups": [
    ]

@@ -45,6 +45,8 @@ export interface HeroImageFields {
   /** 上げた人と、最初に使った配信(delivery_cards の id。参照にはしない) */
   uploaded_by?: string
   first_card_id?: string
+  /** 見本の写真(AI)で置き換える前の画像の URL(元に戻すため。B12。server/ccp/product_images.py) */
+  original_image_url?: string | null
   state_code?: number
 }
 

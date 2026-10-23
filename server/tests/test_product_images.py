@@ -110,5 +110,26 @@ class ApplyTest(unittest.TestCase):
         self.assertIn("NOT EXISTS", [c[0] for c in conn.calls if c[0].startswith("INSERT") and c[1].get("source") == "master"][0])
 
 
+
+class HeroTest(unittest.TestCase):
+    def test_hero_plan_and_apply(self) -> None:
+        # 行は id で、なければ画像コードと市場で探す。前の画像は original_image_url に控え(COALESCE で最初の 1 度だけ)、焦点を空に戻す
+        manifest = {"kind": "heroes", "heroes": [
+            {"id": "h1", "image_code": "X", "market": "JP", "file": "a/01.jpg", "sha256": "a" * 64, "content_type": "image/jpeg"},
+            {"id": "gone", "image_code": "UH2", "market": "US", "file": "b/01.jpg", "sha256": "b" * 64, "content_type": "image/jpeg"},
+            {"id": "gone2", "image_code": "H9", "market": "JP", "file": "c/01.jpg", "sha256": "c" * 64, "content_type": "image/jpeg"},
+        ]}
+        heroes = [{"id": "h1", "image_code": "H1", "market": "JP"}, {"id": "h2", "image_code": "UH2", "market": "US"}]
+        p = pi.hero_plan(manifest, heroes)
+        self.assertEqual([i["hero"]["id"] for i in p["items"]], ["h1", "h2"])
+        self.assertEqual(p["missing"], ["JP/H9"])
+        conn = FakeConn()
+        self.assertEqual(asyncio.run(pi.hero_apply(conn, p)), 2)
+        sql, params = conn.calls[0]
+        self.assertIn("COALESCE(original_image_url, image_url)", sql)
+        self.assertIn("focal_x = NULL", sql)
+        self.assertEqual(params, {"u": "/img/heroes/s-" + "a" * 24 + ".jpg", "id": "h1"})
+
+
 if __name__ == "__main__":
     unittest.main()

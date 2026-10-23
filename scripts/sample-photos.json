@@ -5,7 +5,8 @@
     "detail": "Professional e-commerce macro detail photograph. Photorealistic, shallow depth of field, soft diffused studio light, neutral background, true-to-life material texture, 3:4 portrait framing. No logo, no brand name, no text, no watermark, no person, no hands.",
     "worn": "Professional e-commerce lookbook photograph. Photorealistic, light warm-grey studio background, soft natural light, a model wearing the item, framed from the neck down so no part of the face (no eyes, nose, mouth or chin) is visible, relaxed natural pose, 3:4 portrait framing. The model must not resemble any real person. No logo, no brand name, no text, no watermark.",
     "scene": "Professional lifestyle photograph for an online store. Photorealistic, natural daylight, calm and tidy setting, the item is the clear subject, 3:4 portrait framing. No people's faces, no logo, no brand name, no text, no watermark.",
-    "reference": "The attached image is the main product photo. Show exactly the same product (same color, material, shape and details) as in the attached image."
+    "reference": "The attached image is the main product photo. Show exactly the same product (same color, material, shape and details) as in the attached image.",
+    "hero": "Professional seasonal campaign key visual for an apparel online store's email and banners. Photorealistic editorial fashion photograph, natural light, calm and refined mood, 4:3 landscape framing with the main subject near the center and generous margins on every side (the image is cropped to different shapes later). People, if any, are shown from behind, from the side with the face turned away, or framed so no part of the face (no eyes, nose, mouth or chin) is visible; they must not resemble any real person. No logo, no brand name, no text, no watermark."
   },
   "products": [
     {

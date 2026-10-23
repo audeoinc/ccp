@@ -1,4 +1,4 @@
-// ⚙ →「見本のデータ」→「商品の写真の ZIP を取り込む」(サーバーの /api/product-images/import。server/ccp/product_images.py)。
+// ⚙ →「見本のデータ」→「商品・メイン画像の写真の ZIP を取り込む」(サーバーの /api/product-images/import。server/ccp/product_images.py)。
 // コマンドを使えない環境(本番)でも、AI で作った見本の写真(scripts/sample-photos.py)や、集めた商品ページの画像を取り込めるように。
 // まず確認だけを頼んで件数を見せ、OK のときだけ取り込む。
 import { appPath } from './appRoot'
@@ -6,6 +6,8 @@ import { tr } from './i18n'
 
 interface ImportSummary {
   sample: boolean
+  /** heroes = メイン画像(ヒーロー)の見本の写真の ZIP(scripts/sample-photos.py の kind = heroes) */
+  kind?: 'heroes'
   products: number
   images: number
   missing: string[]
@@ -31,6 +33,7 @@ export async function importProductImagesZip(): Promise<string | null> {
   })
   if (!file) return null
   const s = await post(file, false)
+  if (s.kind === 'heroes') return importHeroes(file, s)
   const kind = s.sample ? tr('AI で作った見本の写真', 'AI-made sample photos') : tr('集めた商品ページの画像', 'collected product page images')
   const missing = s.missing.length ? tr(`\nマスタにない商品(飛ばす): ${s.missing.length} 件`, `\nProducts not in the master (skipped): ${s.missing.length}`) : ''
   const msg = tr(
@@ -49,4 +52,22 @@ export async function importProductImagesZip(): Promise<string | null> {
     )
   const r = await post(file, true, main)
   return tr(`商品 ${r.products} 件の画像 ${r.images} 枚を取り込みました(メイン画像を ${r.mains ?? 0} 件置き換え)`, `Imported ${r.images} images for ${r.products} products (${r.mains ?? 0} main images replaced)`)
+}
+
+// メイン画像は、行の画像を差し替えるだけ(前の画像は original_image_url に控える)なので、確かめは 1 回
+async function importHeroes(file: File, s: ImportSummary): Promise<string | null> {
+  const missing = s.missing.length ? tr(`
+表にないメイン画像(飛ばす): ${s.missing.length} 件`, `
+Hero images not in the library (skipped): ${s.missing.length}`) : ''
+  const ok = window.confirm(
+    tr(
+      `AI で作ったメイン画像の見本の写真を取り込みます: ${s.images} 枚。${missing}
+このメイン画像の画像は差し替わります(前の画像は控えとして残します)。よろしいですか?`,
+      `Import AI-made sample hero photos: ${s.images} images.${missing}
+These hero images are replaced (the current images are kept as a backup). Continue?`,
+    ),
+  )
+  if (!ok) return null
+  const r = await post(file, true)
+  return tr(`メイン画像 ${r.mains ?? 0} 枚を差し替えました`, `Replaced ${r.mains ?? 0} hero images`)
 }

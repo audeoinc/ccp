@@ -1729,7 +1729,7 @@ function App() {
                     }
                   }}
                 >
-                  {t('商品の写真の ZIP を取り込む', 'Import a product photo ZIP')}
+                  {t('商品・メイン画像の写真の ZIP を取り込む', 'Import a product or hero photo ZIP')}
                 </MenuItem>
                 <MenuItem
                   icon={<DeleteRegular />}

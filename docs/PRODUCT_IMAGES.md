@@ -77,6 +77,7 @@ cd ~/ccp/server
 
 - 作る(開発側の手元の PC。この PC の認証で Vertex AI の画像のモデルを呼ぶ。1 枚ごとに費用がかかる): `python scripts/sample-photos.py generate`。何を作るかは `scripts/sample-photos.json`(先頭がメイン。サブはメインを手本に作る)。写真は `import/sample-photos/`(Git に入れない)
 - ZIP にする: `python scripts/sample-photos.py zip`(25MB ごとに分ける)。目録に `"sample": true`
-- 取り込む: 上の 3 章と同じ `ccp.cli import-images`、または画面の ⚙ →「見本のデータ」→「商品の写真の ZIP を取り込む」(確認のあとで取り込む)
+- 取り込む: 上の 3 章と同じ `ccp.cli import-images`、または画面の ⚙ →「見本のデータ」→「商品・メイン画像の写真の ZIP を取り込む」(確認のあとで取り込む)
 - 表 `product_images` の `source = sample` の行になり、`alt` が見出し・`caption` が説明の文・`angle` がアングル。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替えます。本物の画像がある商品では、画面は本物を使います
 - 商品のメイン画像(マスタ)は、空か仮の画像(placehold.co)のときだけ、見本のメインで置き換えます。⚙ で「メイン画像も置き換える」(OK)を選ぶか、`--main-to-master` を付けると、今のメイン画像も置き換えます。前の画像は `source = master` の行に控えとして 1 度だけ残すので、元に戻せます(その行の `image_url` を商品の `image_url` に戻す)。控えの行は、画像を選ぶ窓の候補には出ません
+- **メイン画像(ヒーロー。表 `hero_images`)の見本の写真**: `python scripts/sample-photos.py draft-heroes --products <商品の一覧の JSON> --spec import/heroes.json`(名前・説明・季節から、新しい写真の注文の文を AI が下書き。人は顔が写らない構図だけ)→ `generate --spec import/heroes.json --out import/hero-photos`(横長 4:3 を 1 枚、長い辺 1600px。テンプレートごとに切り出すので、主役を真ん中に)→ `zip` も同じ指定で。目録に `"kind": "heroes"` が入り、上と同じ入口(`import-images`・⚙)で取り込めます。行は `id`(なければ画像コードと市場)で探し、`image_url` を `/img/heroes/s-<sha256 の頭>.jpg` に差し替え、前の画像は `original_image_url` に 1 度だけ控えます(ファイルは消さない。元に戻すときは、それを `image_url` に戻す)。焦点(`focal_*`)は空に戻ります
