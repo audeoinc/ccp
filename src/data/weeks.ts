@@ -7,8 +7,12 @@ export type WeekStatus = 'draft' | 'review' | 'confirmed'
 
 export interface WeekRow {
   id: string
-  /** 週の初め(日曜日。YYYY-MM-DD)。1 週に 1 行 */
+  /** 週の初め(日曜日。YYYY-MM-DD)。週・国・チャネルで 1 行(ST3・W8) */
   week_start?: string
+  /** 国のコード。空の行は国を分ける前の行で、その週のすべての国・チャネルに効く(国とチャネルの行がなければ使う) */
+  country?: string
+  /** チャネル(email / app)。メールとアプリの計画を、別の人・別のときに確定できるように分ける */
+  channel?: string
   status?: WeekStatus
   /** レビューに出した日時(ISO) */
   submitted_at?: string

@@ -10,7 +10,7 @@ import { cancelDelivery } from './cancel'
 import { LOW_STOCK_WEEKS, type Placement, type StockModel } from './alerts'
 import { locale, priceText, useT } from './i18n'
 import { productImage } from './images'
-import { confirmedWeekOf } from './weekLock'
+import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { statusRank } from './status'
 
 const useStyles = makeStyles({
@@ -70,7 +70,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const t = useT()
   const approved = statusRank(card.status) >= statusRank(STATUS_APPROVED)
   const subject = product ? `${product.name}: ` : ''
-  const locked = !!confirmedWeekOf(weeks, card.scheduled_at)
+  const locked = !!confirmedWeekOf(weeks, card.scheduled_at, scopeOfCard(card))
   const [reason, setReason] = useState(
     mode === 'replace'
       ? t(`${subject}${why}。差し替えた`, `${subject}${why}. Replaced.`)

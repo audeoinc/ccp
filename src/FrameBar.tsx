@@ -60,7 +60,7 @@ export function FrameBar({ frames, weekStart, weeks, visibleIds }: Props) {
 
   // 最初のステップ: 国・チャネル
   if (frames.setupOpen) {
-    const lock = lockedWeekOf(weeks, weekStart.toISOString())
+    const lock = lockedWeekOf(weeks, weekStart.toISOString(), { country: frames.pickCountry, channel: frames.pickChannel })
     const days = frames.freeDays()
     const channelName = optionText(channelOptions, frames.pickChannel)
     return (

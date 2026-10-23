@@ -6,6 +6,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import type { WeekRow } from './data/weeks'
+import { scopeOfCard } from './weekLock'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { suggestNames } from './aiDraft'
 import { channelOptions, departmentOptions, CHANNEL_EMAIL } from './status'
@@ -77,7 +78,7 @@ export function useWeekFrames({ cards, cardProducts, products, heroes, weeks, we
     [cards, cardProducts, weekStart],
   )
   const frameIds = useMemo(() => new Set(frames.map((c) => c.id)), [frames])
-  const isLocked = (c: DeliveryCard) => !!lockedWeekOf(weeks, c.scheduled_at)
+  const isLocked = (c: DeliveryCard) => !!lockedWeekOf(weeks, c.scheduled_at, scopeOfCard(c))
   const ready = frames.filter((c) => frameReady(c) && !isLocked(c) && !progress.has(c.id))
   const chosen = ready.filter((c) => selected.has(c.id))
 

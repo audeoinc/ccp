@@ -68,7 +68,7 @@ import type { HeroImage } from './models/heroImages'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
-import { WeekReviewBar } from './WeekReviewBar'
+import { WeekReviewBar, WeekScopeBar } from './WeekReviewBar'
 import { MePicker, SignInDialog } from './MePicker'
 import { PrevMonthRetro, WeekRetro } from './WeekRetro'
 import { WeekHistory } from './WeekHistory'
@@ -140,7 +140,7 @@ import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, statusColor, statusOptions, statusRank, statusView } from './status'
 import { THEME_TYPES, classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
-import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
+import { confirmedWeekOf, dayKeyOf, saveWeekRow, scopeLabel, scopeOfCard, segmentsOf, sundayOf, weekConfirmedIn, weekKeyOf, weekRowOf } from './weekLock'
 import { logEvent, myName, myUserId, onMeChange } from './history'
 import { EventsService, type CardEvent } from './data/events'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
@@ -989,14 +989,26 @@ function App() {
   }, [rows, weekStart])
   // 週の表示に出ている配信(絞り込みのあと)。週の枠の帯は、見えている枠だけを数える
   const weekVisibleIds = useMemo(() => new Set(weekRows.map((r) => r.card.id)), [weekRows])
-  // 週の状態: この週の行と、この週のすべての配信(絞り込みに関係なく、週の単位で進める)
+  // 週の状態は、週・国・チャネルごと(ST3・W8。メールとアプリを、別の人・別のときに確定できるように)。
+  // 画面の国とチャネルが決まっているときだけ、その組の行を進める。決まっていなければ、組ごとの状態を並べて選んでもらう
   const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
   const weekEvents = useMemo(() => events.filter((e) => e.week_start?.slice(0, 10) === weekKey), [events, weekKey])
-  const thisWeek = weeks.find((w) => w.week_start?.slice(0, 10) === weekKey)
+  const weekScope = useMemo(() => ({ country: filters.country, channel: filters.channel }), [filters.country, filters.channel])
+  const weekScoped = !!(filters.country && filters.channel)
+  const thisWeek = weekScoped ? weekRowOf(weeks, weekKey, weekScope) : undefined
+  // この週の、その国・チャネルのすべての配信(ほかの絞り込み(担当・ステータスなど)に関係なく、週の単位で進める)
+  const inScope = useCallback(
+    (c: DeliveryCard) => {
+      const sc = scopeOfCard(c)
+      return (!filters.country || sc.country === filters.country) && (!filters.channel || sc.channel === filters.channel)
+    },
+    [filters.country, filters.channel],
+  )
   const weekCards = useMemo(() => {
     const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
-    return activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= weekStart && new Date(c.scheduled_at) < end)
-  }, [activeCards, weekStart])
+    return activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= weekStart && new Date(c.scheduled_at) < end && inScope(c))
+  }, [activeCards, weekStart, inScope])
+  const weekSegments = useMemo(() => segmentsOf(weekCards, weekScope), [weekCards, weekScope])
   // まとめて作る作業画面(W14 の作り直し)。中身のない枠は保存せず、中身ができた配信から下書きとして保存する
   const bulk = useBulkWorkspace({
     cards: activeCards,
@@ -1048,12 +1060,12 @@ function App() {
   const prevWeek = useMemo(() => {
     const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    return weeks.find((w) => w.week_start?.slice(0, 10) === k)
-  }, [weeks, weekStart])
-  // 週の振り返りのメモを保存する(週の行がなければ、下書きの行を作る)
+    return weekRowOf(weeks, k, weekScope)
+  }, [weeks, weekStart, weekScope])
+  // 週の振り返りのメモを保存する(その国・チャネルの行がなければ作る)
   const saveRetro = async (key: string, row: WeekRow | undefined, text: string): Promise<boolean> => {
     setError(null)
-    const res = row ? await WeeksService.update(row.id, { retro: text }) : await WeeksService.create({ week_start: key, status: 'draft', retro: text })
+    const res = await saveWeekRow(row, key, weekScope, { retro: text })
     if (!res.success || !res.data) {
       setError(res.error?.message ?? t('振り返りを保存できませんでした', 'Could not save the retrospective'))
       return false
@@ -1087,7 +1099,7 @@ function App() {
         ...(next === 'review' && thisWeek?.status !== 'confirmed' ? { submitted_at: now } : {}),
         ...(next === 'confirmed' ? { confirmed_at: now } : {}),
       }
-      const res = thisWeek ? await WeeksService.update(thisWeek.id, fields) : await WeeksService.create({ week_start: weekKey, ...fields })
+      const res = await saveWeekRow(thisWeek, weekKey, weekScope, fields)
       if (!res.success) throw new Error(res.error?.message ?? tr('週の状態を保存できませんでした', 'Could not save the week status'))
       // 承認の履歴(W6)。まとめて状態を変えた配信は、1 本ずつではなく、週の出来事 1 つに名前を並べて残す(履歴が埋もれないように)
       const wasConfirmed = thisWeek?.status === 'confirmed'
@@ -1104,7 +1116,8 @@ function App() {
                 ? { from: 'not_started' as const, to: 'reviewing' as const }
                 : {}
           : {}),
-        note: moved.join(' / ') || undefined,
+        // どの国・チャネルの週か(週の履歴は週ごとに並ぶので、組の名前を頭に付ける)
+        note: [`[${scopeLabel(weekScope)}]`, moved.join(' / ')].filter(Boolean).join(' '),
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -1277,7 +1290,7 @@ function App() {
   // 承認済み・確定した週の配信は、理由の記録と承認のやり直しが要るので、ここでは動かさず、配信カードで変えてもらう
   const moveBlockedReason = (c: DeliveryCard, to?: string): string | null => {
     if (statusRank(c.status) >= statusRank('approved')) return tr('承認済みの配信は、配信カードを開いて時刻を変えてください(承認のやり直しが要るため)', 'Approved deliveries: change the time in the delivery card (re-approval is needed)')
-    if (confirmedWeekOf(weeks, c.scheduled_at) || (to && confirmedWeekOf(weeks, to))) return tr('確定した週の配信は、配信カードを開いて時刻を変えてください(理由の記録が要るため)', 'Deliveries in a confirmed week: change the time in the delivery card (a reason is needed)')
+    if (confirmedWeekOf(weeks, c.scheduled_at, scopeOfCard(c)) || (to && confirmedWeekOf(weeks, to, scopeOfCard(c)))) return tr('確定した週の配信は、配信カードを開いて時刻を変えてください(理由の記録が要るため)', 'Deliveries in a confirmed week: change the time in the delivery card (a reason is needed)')
     return null
   }
   const [moveNotice, setMoveNotice] = useState<{ text: string; undo?: () => void } | null>(null)
@@ -1332,25 +1345,30 @@ function App() {
     for (let sun = sundayOf(month); sun <= last; sun = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 7)) {
       const sat = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 6)
       if (dayKeyOf(sat) < todayKey) continue
-      const key = dayKeyOf(sun)
-      if (weeks.find((w) => w.week_start?.slice(0, 10) === key)?.status === 'confirmed') continue
       const end = new Date(sat.getFullYear(), sat.getMonth(), sat.getDate() + 1)
-      const n = activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= sun && new Date(c.scheduled_at) < end).length
+      const inWeek = activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= sun && new Date(c.scheduled_at) < end && inScope(c))
+      if (weekConfirmedIn(weeks, dayKeyOf(sun), segmentsOf(inWeek, weekScope))) continue
+      const n = inWeek.length
       if (!best || n < best.n) best = { sun, n }
     }
     return best?.sun
-  }, [month, weeks, activeCards])
-  // 月の要約の帯(X25): 表示中の月の配信(絞り込みを反映しない。週の帯と同じ)の状態ごとの件数と、月にかかる週のうち確定した週の数
+  }, [month, weeks, activeCards, inScope, weekScope])
+  // 月の要約の帯(X25): 表示中の月の配信(国・チャネル以外の絞り込みを反映しない。週の帯と同じ)の状態ごとの件数と、月にかかる週のうち確定した週の数
+  // (週は、見ている国・チャネルの組すべてで確定していれば、確定と数える)
   const monthSummary = useMemo(() => {
     if (!month) return undefined
     const first = new Date(month.getFullYear(), month.getMonth(), 1)
     const next = new Date(month.getFullYear(), month.getMonth() + 1, 1)
-    const inMonth = activeCards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= first && new Date(c.scheduled_at) < next)
+    const scoped = activeCards.filter((c) => c.scheduled_at && inScope(c))
+    const inMonth = scoped.filter((c) => new Date(c.scheduled_at!) >= first && new Date(c.scheduled_at!) < next)
     const sundays: Date[] = []
     for (let sun = sundayOf(first); sun < next; sun = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 7)) sundays.push(sun)
-    const isConfirmed = (sun: Date) => weeks.find((w) => w.week_start?.slice(0, 10) === dayKeyOf(sun))?.status === 'confirmed'
+    const isConfirmed = (sun: Date) => {
+      const end = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 7)
+      return weekConfirmedIn(weeks, dayKeyOf(sun), segmentsOf(scoped.filter((c) => new Date(c.scheduled_at!) >= sun && new Date(c.scheduled_at!) < end), weekScope))
+    }
     return { cards: inMonth, sundays, confirmed: sundays.filter(isConfirmed).length, firstOpen: sundays.find((d) => !isConfirmed(d)) }
-  }, [month, activeCards, weeks])
+  }, [month, activeCards, weeks, inScope, weekScope])
   const monthBar = monthSummary && (
     <MonthSummaryBar
       counts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: monthSummary.cards.filter((c) => statusView(c.status) === o.value).length }))}
@@ -2133,6 +2151,7 @@ function App() {
               <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={view === 'week' || view === 'month'}>
               <ResultsPage
                 stageNav={(c) => stageNav(c, 'results')}
+                country={filters.country}
                 cards={filtered}
                 products={products}
                 heroes={heroes}
@@ -2147,7 +2166,16 @@ function App() {
                 onCardsChanged={load}
                 onOpenWeek={(d) => goTo('week', d)}
                 onDataActions={setResultsData}
-                retro={(draft) => <WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} onDraft={draft} />}
+                retro={(draft) =>
+                  // 週の振り返りは、週・国・チャネルの行に書く(ST3)。組が決まっていなければ、書く所を決められない
+                  weekScoped ? (
+                    <WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} onDraft={draft} />
+                  ) : (
+                    <MessageBar intent="info" layout="multiline">
+                      <MessageBarBody>{t('週の振り返りは、国とチャネルごとに書きます。上で国とチャネルを選んでください', 'Weekly retrospectives are per country and channel. Choose both above.')}</MessageBarBody>
+                    </MessageBar>
+                  )
+                }
               />
               </SwipePager>
             ) : view === 'list' ? (
@@ -2158,7 +2186,17 @@ function App() {
             ) : view === 'week' ? (
               <>
               {/* 承認のバーと週の振り返りは、計画の面だけ(制作の面では、制作の状態を箱の色で見る) */}
-              {!onProduction && (
+              {!onProduction && !weekScoped && (
+                <WeekScopeBar
+                  segments={weekSegments.map((sc) => ({ scope: sc, week: weekRowOf(weeks, weekKey, sc), n: weekCards.filter((c) => scopeOfCard(c).country === sc.country && scopeOfCard(c).channel === sc.channel).length }))}
+                  onPick={(sc) => {
+                    // 国は画面のすべてに効き、次に開いたときも覚える(ヘッダーの国と同じ)
+                    setCountry(sc.country ?? '')
+                    setFilters((f) => ({ ...f, channel: sc.channel ?? '' }))
+                  }}
+                />
+              )}
+              {!onProduction && weekScoped && (
               <WeekReviewBar week={thisWeek} cards={weekCards} changes={changeNotes} onRequestAll={requestWeek} toRequest={requestable.length} onApproveMine={approveMineWeek} mine={inbox.mineFor(weekCards.map((c) => c.id)).length} hasMe={!!inbox.meId} onChange={changeWeek}
                 statusCounts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: weekCards.filter((c) => statusView(c.status) === o.value).length }))}
                 toFix={checklist.filter((i) => !i.ok).length}
@@ -2259,6 +2297,7 @@ function App() {
               {!onProduction && month && (
                 <PrevMonthRetro
                   month={month}
+                  country={filters.country}
                   onOpenResults={() => {
                     setPage('results')
                     goTo('month', new Date(month.getFullYear(), month.getMonth() - 1, 1))

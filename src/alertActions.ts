@@ -6,11 +6,11 @@ import type { Product } from './models/products'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { CardNotesService } from './data/cardNotes'
-import { WeeksService, type WeekRow } from './data/weeks'
+import type { WeekRow } from './data/weeks'
 import { askAgent } from './aiSelect'
 import { logEvent, myName } from './history'
 import { tr } from './i18n'
-import { confirmedWeekOf } from './weekLock'
+import { confirmedWeekOf, reopenWeek, scopeOfCard } from './weekLock'
 import { statusRank } from './status'
 import { LOW_STOCK_WEEKS, type StockModel } from './alerts'
 
@@ -29,7 +29,7 @@ async function afterChange(card: DeliveryCard, reason: string, backToReview: boo
   const locked = [...new Map(weeksTouched.filter((w): w is WeekRow => !!w).map((w) => [w.id, w])).values()]
   // 確定した週は、理由を残して、レビュー中に戻す(確定した計画を、黙って変えないため)
   for (const w of locked) {
-    fail(await WeeksService.update(w.id, { status: 'review', submitted_at: new Date().toISOString() }), '週をレビュー中に戻せませんでした', 'Could not put the week back in review')
+    fail(await reopenWeek(w, scopeOfCard(card)), '週をレビュー中に戻せませんでした', 'Could not put the week back in review')
   }
   fail(
     await CardNotesService.create({
@@ -69,7 +69,7 @@ export async function replaceProduct(args: { card: DeliveryCard; rowId: string; 
     '商品を差し替えられませんでした',
     'Could not replace the product',
   )
-  await afterChange(card, reason, backToReview, [confirmedWeekOf(weeks, card.scheduled_at)])
+  await afterChange(card, reason, backToReview, [confirmedWeekOf(weeks, card.scheduled_at, scopeOfCard(card))])
 }
 
 /** 配信を延期する(配信日時を移す) */
@@ -77,7 +77,7 @@ export async function postponeDelivery(args: { card: DeliveryCard; to: string; r
   const { card, to, reason, backToReview, weeks } = args
   const iso = new Date(to).toISOString()
   fail(await DeliveryCardsService.update(card.id, { scheduled_at: iso }), '配信日時を変えられませんでした', 'Could not change the date')
-  await afterChange({ ...card, scheduled_at: iso }, reason, backToReview, [confirmedWeekOf(weeks, card.scheduled_at), confirmedWeekOf(weeks, iso)])
+  await afterChange({ ...card, scheduled_at: iso }, reason, backToReview, [confirmedWeekOf(weeks, card.scheduled_at, scopeOfCard(card)), confirmedWeekOf(weeks, iso, scopeOfCard(card))])
 }
 
 // ---- 差し替えの候補(AI が、在庫のある同じカテゴリの商品から選ぶ)

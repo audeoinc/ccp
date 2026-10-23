@@ -19,7 +19,7 @@ import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
 import { weeklyLimit } from './weeklyLimit'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { isCancelled } from './cancel'
-import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
+import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf, type WeekScope } from './weekLock'
 import { logEvent } from './history'
 import { tr } from './i18n'
 
@@ -257,7 +257,7 @@ export function overusedInWeek(when: string | undefined, cards: { id: string; sc
 }
 
 /** 確定した週に入る配信か(枠を作れず、中身も作らない。確定した週を変えるときは、配信カードで理由を残す流れのため) */
-export const lockedWeekOf = (weeks: WeekRow[], when?: string) => confirmedWeekOf(weeks, when)
+export const lockedWeekOf = (weeks: WeekRow[], when: string | undefined, scope: WeekScope) => confirmedWeekOf(weeks, when, scope)
 
 /** 作業画面の、週の 1 日。作れない日も、理由と、その日にもうある配信を見せる(空いている日だけを出すと、なぜその日がないのか分からないため) */
 export interface WeekDay {
@@ -273,7 +273,7 @@ export interface WeekDay {
 export function weekDays(weekStart: Date, cards: { id: string; name: string; scheduled_at?: string; channel?: string; country?: string }[], weeks: WeekRow[], channel: string, country: string): WeekDay[] {
   const today = dayKeyOf(new Date())
   const start = sundayOf(weekStart)
-  const locked = !!confirmedWeekOf(weeks, start.toISOString())
+  const locked = !!confirmedWeekOf(weeks, start.toISOString(), { country, channel })
   const same = (c: { channel?: string; country?: string }) => (c.channel ?? CHANNEL_EMAIL) === channel && (!country || !c.country || c.country === country)
   return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
@@ -291,7 +291,7 @@ export function weekDays(weekStart: Date, cards: { id: string; name: string; sch
 export function emptyDays(weekStart: Date, cards: { scheduled_at?: string; channel?: string; country?: string }[], weeks: WeekRow[], channel: string, country: string): string[] {
   const today = dayKeyOf(new Date())
   const start = sundayOf(weekStart)
-  if (confirmedWeekOf(weeks, start.toISOString())) return []
+  if (confirmedWeekOf(weeks, start.toISOString(), { country, channel })) return []
   const same = (c: { channel?: string; country?: string }) => (c.channel ?? CHANNEL_EMAIL) === channel && (!country || !c.country || c.country === country)
   const used = new Set(cards.filter((c) => same(c) && c.scheduled_at).map((c) => dayKeyOf(new Date(c.scheduled_at!))))
   const out: string[] = []

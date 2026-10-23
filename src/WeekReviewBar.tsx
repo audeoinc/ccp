@@ -7,6 +7,7 @@ import type { CardNote } from './data/cardNotes'
 import { locale, useT } from './i18n'
 import { statusRank } from './status'
 import { StatusFlow } from './StatusFlow'
+import { scopeLabel, type WeekScope } from './weekLock'
 
 const useStyles = makeStyles({
   // 記録・資料(名前・履歴・PDF)と、週を進める操作の間の区切り
@@ -33,6 +34,9 @@ const useStyles = makeStyles({
   changesHead: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold },
   changeRow: { color: tokens.colorNeutralForeground2, overflowWrap: 'anywhere' },
   name: { width: '140px' },
+  // 国・チャネルを決めていないときの説明
+  hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
+  segment: { display: 'inline-flex', alignItems: 'center', columnGap: '6px' },
 })
 
 interface Props {
@@ -222,5 +226,31 @@ export function WeekStatusBadge({ week }: { week?: WeekRow }) {
         <Badge appearance="outline" color="informative" tabIndex={0}>{t('確定前', 'Not confirmed')}</Badge>
       )}
     </Tooltip>
+  )
+}
+
+/**
+ * 国かチャネルを「すべて」にしているときの週の帯(ST3・W8)。週の提出・確定・振り返りは国・チャネルの組ごとなので、
+ * 組ごとの状態と配信の数を並べ、押すとその組に絞って、いつもの週の帯(WeekReviewBar)を出す
+ */
+export function WeekScopeBar({ segments, onPick }: { segments: { scope: WeekScope; week?: WeekRow; n: number }[]; onPick: (scope: WeekScope) => void }) {
+  const styles = useStyles()
+  const t = useT()
+  return (
+    <div className={styles.root}>
+      <span className={styles.hint}>
+        {t('週の提出・確定は、国とチャネルごとです。組を選ぶと、承認・確定ができます', 'Weeks are confirmed per country and channel. Pick one to approve and confirm.')}
+      </span>
+      {segments.length === 0 && <span className={styles.hint}>{t('(この週の配信はまだありません。上の国とチャネルを選んでください)', '(No deliveries this week yet. Choose a country and channel above.)')}</span>}
+      {segments.map(({ scope, week, n }) => (
+        <Button key={`${scope.country}|${scope.channel}`} size="small" appearance="subtle" onClick={() => onPick(scope)}>
+          <span className={styles.segment}>
+            {scopeLabel(scope)}
+            <WeekStatusBadge week={week} />
+            {t(`${n} 本`, `${n}`)}
+          </span>
+        </Button>
+      ))}
+    </div>
   )
 }

@@ -8,7 +8,7 @@ import { CardNotesService } from './data/cardNotes'
 import { logEvent, myName } from './history'
 import { tr } from './i18n'
 import type { WeekRow } from './data/weeks'
-import { confirmedWeekOf } from './weekLock'
+import { confirmedWeekOf, scopeOfCard } from './weekLock'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -19,13 +19,13 @@ export const toLocalInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() 
  * 複製の配信日時の初めの値: 元の配信の 1 週間あと(同じ曜日・時刻)。その週が確定していれば、確定していない週まで送る
  * (毎週の配信を、次の週に作ることがいちばん多いため)。元の配信日時がないときは、いまを基にする
  */
-export function defaultDuplicateAt(card: Pick<DeliveryCard, 'scheduled_at'>, weeks: WeekRow[]): string {
+export function defaultDuplicateAt(card: Pick<DeliveryCard, 'scheduled_at' | 'country' | 'channel'>, weeks: WeekRow[]): string {
   const base = card.scheduled_at ? new Date(card.scheduled_at) : new Date()
   const d = Number.isNaN(base.getTime()) ? new Date() : base
   let at = ''
   for (let w = 1; w <= 12; w++) {
     at = toLocalInput(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7 * w, d.getHours(), d.getMinutes()))
-    if (!confirmedWeekOf(weeks, at)) break
+    if (!confirmedWeekOf(weeks, at, scopeOfCard(card))) break
   }
   return at
 }

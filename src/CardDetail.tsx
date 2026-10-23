@@ -54,9 +54,9 @@ import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, loadSimpleCard, savePref, saveSimpleCard } from './settings'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
-import { WeeksService, type WeekRow } from './data/weeks'
+import type { WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
-import { confirmedWeekOf } from './weekLock'
+import { confirmedWeekOf, reopenWeek, scopeOfCard } from './weekLock'
 import { logEvent, myName } from './history'
 import { ProcessPane, ProcessRail, type TalkTab } from './ProcessPane'
 import type { TopTab } from './ContentPane'
@@ -1310,7 +1310,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
 
   // 確定した週に入っている配信か(配信日時を変えるときは、移す前と移したあとの両方の週)。同じ週は 1 つにまとめる
-  const lockedWeeks = [confirmedWeekOf(weeks, card?.scheduled_at), confirmedWeekOf(weeks, form.scheduledAt)].filter(
+  const lockedWeeks = [confirmedWeekOf(weeks, card?.scheduled_at, scopeOfCard(card ?? form)), confirmedWeekOf(weeks, form.scheduledAt, scopeOfCard(form))].filter(
     (w, i, all): w is WeekRow => !!w && all.findIndex((x) => x?.id === w.id) === i,
   )
   const weekRange = (w: WeekRow) => {
@@ -1555,9 +1555,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       // 作業画面の案を、ここで新規作成として保存した(作業画面で、その案を保存済みにする)
       if (!card) onCreated?.(cardId)
       if (reason !== undefined) {
-        const now = new Date().toISOString()
         for (const w of lockedWeeks) {
-          const r = await WeeksService.update(w.id, { status: 'review', submitted_at: now })
+          const r = await reopenWeek(w, w.country ? { country: w.country, channel: w.channel } : scopeOfCard(form))
           if (!r.success) throw new Error(r.error?.message ?? tr('週をレビュー中に戻せませんでした', 'Could not put the week back in review'))
         }
         const n = await CardNotesService.create({

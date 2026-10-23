@@ -3,6 +3,7 @@ import { Button, Spinner, Textarea, makeStyles, tokens } from '@fluentui/react-c
 import { ArrowRightRegular, EditRegular, LightbulbRegular, SaveRegular, SparkleRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { MonthsService, type MonthRow } from './data/months'
+import { monthRowOf } from './weekLock'
 
 const useStyles = makeStyles({
   root: {
@@ -205,7 +206,7 @@ export function WeekRetro(props: Props) {
  * 計画の面の月の表示に出す「前月の振り返り」。月の振り返り(表 months)は結果の面だけが持つので、ここで読む
  * (面を切り替えるたびに作り直されるので、結果の面で保存した文も、計画の面に戻れば出る)
  */
-export function PrevMonthRetro({ month, onOpenResults }: { month: Date; onOpenResults: () => void }) {
+export function PrevMonthRetro({ month, country, onOpenResults }: { month: Date; country: string; onOpenResults: () => void }) {
   const [rows, setRows] = useState<MonthRow[]>([])
   useEffect(() => {
     MonthsService.getAll()
@@ -214,6 +215,7 @@ export function PrevMonthRetro({ month, onOpenResults }: { month: Date; onOpenRe
   }, [])
   const prev = new Date(month.getFullYear(), month.getMonth() - 1, 1)
   const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
-  const text = rows.find((r) => r.month_start?.slice(0, 7) === key)?.retro ?? ''
+  // その国の振り返り(国の行がなければ、国を分ける前の行)
+  const text = monthRowOf(rows, key, country)?.retro ?? ''
   return <WeekRetro period="month" mode="plan" text={text} onOpenResults={onOpenResults} />
 }

@@ -28,6 +28,7 @@ import { ResultsSummaryBar } from './ResultsSummaryBar'
 import { WeekRetro } from './WeekRetro'
 import { MonthsService, type MonthRow } from './data/months'
 import { WeeksService } from './data/weeks'
+import { monthRowOf, scopeLabel } from './weekLock'
 import { draftRetro } from './aiRetro'
 
 const useStyles = makeStyles({
@@ -73,6 +74,8 @@ interface Props {
   onOpenWeek?: (sunday: Date) => void
   /** 週の表示の上に置く、この週の振り返りのメモ(App が WeekRetro を渡す。週の行は App が持つため)。draft は、この週の AI の下書きを作る */
   retro?: (draft: () => Promise<string>) => ReactNode
+  /** 画面で選んでいる国(空 = すべての国)。月の振り返りは月と国で 1 行(ST3) */
+  country?: string
   /** 結果のデータの操作(書き出し・取り込み・AI で分ける)。App が ⚙ のメニューの「データ」に並べる */
   onDataActions?: (a: ResultsDataActions | null) => void
   /** 詳しい結果の題名の左に出す段階の帯(PLAN → PRODUCTION → RESULTS。配信カード・制作のページとそろえる) */
@@ -97,7 +100,7 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro, onDataActions, stageNav }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro, country = '', onDataActions, stageNav }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
@@ -185,9 +188,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     // その月の各週の振り返り(週の初めがこの月にある週)も渡す。担当者の気づきを、月のまとめに生かすため
     const weeks = await WeeksService.getAll().catch(() => null)
     const weekRetros = (weeks?.success ? (weeks.data ?? []) : [])
-      .filter((w) => w.week_start?.slice(0, 7) === month && w.retro?.trim())
+      // その国の週(国を分ける前の行も)の振り返りだけ。ほかの国の気づきを混ぜない
+      .filter((w) => w.week_start?.slice(0, 7) === month && w.retro?.trim() && (!w.country || w.country === country))
       .sort((a, b) => (a.week_start ?? '').localeCompare(b.week_start ?? ''))
-      .map((w) => ({ week: w.week_start!.slice(0, 10), text: w.retro!.trim() }))
+      .map((w) => ({ week: w.week_start!.slice(0, 10), text: (w.channel ? `[${scopeLabel(w)}] ` : '') + w.retro!.trim() }))
     return draftRetro({
       period: 'month',
       label: month,
@@ -197,11 +201,11 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       weekRetros,
     })
   }
-  const thisMonth = months.find((m) => m.month_start?.slice(0, 7) === month)
-  // 月の振り返りを保存する(その月の行がなければ作る)
+  const thisMonth = monthRowOf(months, month, country)
+  // 月の振り返りを保存する(その月・国の行がなければ作る。国を分ける前の行を見ていたときも、その国の行を新しく作る)
   const saveMonthRetro = async (text: string): Promise<boolean> => {
     setError(null)
-    const res = thisMonth ? await MonthsService.update(thisMonth.id, { retro: text }) : await MonthsService.create({ month_start: `${month}-01`, retro: text })
+    const res = thisMonth && thisMonth.country === country ? await MonthsService.update(thisMonth.id, { retro: text }) : await MonthsService.create({ month_start: `${month}-01`, country, retro: text })
     if (!res.success || !res.data) {
       setError(res.error?.message ?? t('振り返りを保存できませんでした', 'Could not save the retrospective'))
       return false
@@ -498,7 +502,13 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         ) : view === 'month' ? (
           <>
           {monthBar}
-          <WeekRetro period="month" mode="results" text={thisMonth?.retro ?? ''} onSave={saveMonthRetro} onDraft={draftMonth} />
+          {country ? (
+            <WeekRetro period="month" mode="results" text={thisMonth?.retro ?? ''} onSave={saveMonthRetro} onDraft={draftMonth} />
+          ) : (
+            <MessageBar intent="info" layout="multiline">
+              <MessageBarBody>{t('月の振り返りは、国ごとに書きます。上で国を選んでください', 'Monthly retrospectives are per country. Choose a country above.')}</MessageBarBody>
+            </MessageBar>
+          )}
           <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} onOpenWeek={onOpenWeek} />
           </>
         ) : view === 'compare' ? (

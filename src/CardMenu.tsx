@@ -27,7 +27,7 @@ import { DeliveryCardsService } from './data/deliveryCards'
 import type { WeekRow } from './data/weeks'
 import { cancelDelivery, isCancelled, undoCancel } from './cancel'
 import { defaultDuplicateAt, defaultDuplicateName, duplicateDelivery } from './duplicate'
-import { confirmedWeekOf } from './weekLock'
+import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { logEvent } from './history'
 import { useT } from './i18n'
 
@@ -189,7 +189,7 @@ export function DuplicateDialog({ card, weeks, onClose, onDuplicated }: { card: 
   const [dupAt, setDupAt] = useState(() => defaultDuplicateAt(card, weeks))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const dupLocked = confirmedWeekOf(weeks, dupAt)
+  const dupLocked = confirmedWeekOf(weeks, dupAt, scopeOfCard(card))
   const duplicate = async () => {
     setBusy(true)
     setError(null)

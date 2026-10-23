@@ -4,10 +4,10 @@ import type { CSSProperties } from 'react'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { CardNotesService } from './data/cardNotes'
-import { WeeksService, type WeekRow } from './data/weeks'
+import type { WeekRow } from './data/weeks'
 import { logEvent, myName } from './history'
 import { tr } from './i18n'
-import { confirmedWeekOf } from './weekLock'
+import { confirmedWeekOf, reopenWeek, scopeOfCard } from './weekLock'
 
 /** 取りやめた配信か */
 export const isCancelled = (c?: Pick<DeliveryCard, 'cancelled_at'>) => !!c?.cancelled_at
@@ -36,9 +36,9 @@ export async function cancelDelivery(card: DeliveryCard, reason: string, weeks: 
     '取りやめの理由を記録できませんでした',
     'Could not record the reason',
   )
-  const week = confirmedWeekOf(weeks, card.scheduled_at)
+  const week = confirmedWeekOf(weeks, card.scheduled_at, scopeOfCard(card))
   if (week) {
-    fail(await WeeksService.update(week.id, { status: 'review', submitted_at: now }), '週をレビュー中に戻せませんでした', 'Could not put the week back in review')
+    fail(await reopenWeek(week, scopeOfCard(card)), '週をレビュー中に戻せませんでした', 'Could not put the week back in review')
     await logEvent({
       action: 'reopen',
       card: { id: card.id, name: card.name, scheduledAt: card.scheduled_at },
