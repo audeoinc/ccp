@@ -3,7 +3,7 @@
 // 出元の国では、決めていなければ使う。ほかの国では、決めていなければ使わない(国で客層が違うので、黙って全部の国に効かせない)。
 // 配信カードの「これまでの学び」でも、ほかの国の学びを 1 件ずつ決められる。ここは、まとめて見直す所
 import { useEffect, useMemo, useState } from 'react'
-import { Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Button, Select, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Button, MessageBar, MessageBarBody, Select, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { CountryApplyList } from './CountryApplyList'
@@ -34,11 +34,17 @@ export function CountryLearningsDialog({ open, onClose, country: headerCountry, 
   const country = headerCountry || picked
   const nameOf = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
+  // 読めなかったとき(サーバーが混んでいるときなど)は、「学びがない」と見分けがつくように、そう出す
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     if (!open) return
     DeliveryResultsService.getAll()
-      .then((r) => setResults(r.success ? (r.data ?? []) : []))
-      .catch(() => setResults([]))
+      .then((r) => {
+        // 開き直したときに、前の失敗を消す
+        setError(r.success ? null : (r.error?.message ?? 'error'))
+        if (r.success) setResults(r.data ?? [])
+      })
+      .catch((e: unknown) => setError(String(e)))
   }, [open])
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards])
@@ -88,7 +94,11 @@ export function CountryLearningsDialog({ open, onClose, country: headerCountry, 
                 'Learnings are shared across countries. This country’s own learnings are used unless you decide otherwise. Learnings from other countries are not used unless you check them, since audiences differ. Only checked learnings appear in this country’s delivery cards and AI drafts (applies to everyone on this country). Keep / watch / retire is decided per country in Results → Impact → Evaluate learnings.',
               )}
             </span>
-            {results === null ? (
+            {error ? (
+              <MessageBar intent="error" layout="multiline">
+                <MessageBarBody>{t(`学びを読めませんでした。閉じて、開き直してください(${error})`, `Could not load the learnings. Close and open this again (${error})`)}</MessageBarBody>
+              </MessageBar>
+            ) : results === null ? (
               <Spinner size="small" />
             ) : items.length === 0 ? (
               <span className={s.note}>{t('学び(結果の「次に生かすメモ」)はまだありません', 'No learnings (notes for next time) yet.')}</span>

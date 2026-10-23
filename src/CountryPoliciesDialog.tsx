@@ -3,7 +3,7 @@
 // 決まりの「市場」の列は、決めていないときの既定として読む(空 = ブランド全体の決まりで全部の国、書いてあれば その国だけ。法律・表記など)。
 // 中身が国で違う決まりは、適用では表せないので、別の決まりとして持つ(「方針・決まり」で足す)。決まりの id は rule_id(取り込み直しても変わらない)
 import { useEffect, useState } from 'react'
-import { Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Button, Select, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Button, MessageBar, MessageBarBody, Select, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { PolicyRulesService } from './data/policyRules'
 import type { PolicyRule } from './models/policyRules'
 import { CountryApplyList } from './CountryApplyList'
@@ -34,11 +34,17 @@ export function CountryPoliciesDialog({ open, onClose, country: headerCountry }:
   const country = headerCountry || picked
   const nameOf = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
   const [rules, setRules] = useState<PolicyRule[] | null>(null)
+  // 読めなかったとき(サーバーが混んでいるときなど)は、「決まりがない」と見分けがつくように、そう出す
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     if (!open) return
     PolicyRulesService.getAll({ top: 5000 })
-      .then((r) => setRules(r.success ? (r.data ?? []) : []))
-      .catch(() => setRules([]))
+      .then((r) => {
+        // 開き直したときに、前の失敗を消す
+        setError(r.success ? null : (r.error?.message ?? 'error'))
+        if (r.success) setRules(r.data ?? [])
+      })
+      .catch((e: unknown) => setError(String(e)))
   }, [open])
 
   const list = (rules ?? []).filter((r) => r.rule_id).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.rule_id ?? '').localeCompare(b.rule_id ?? ''))
@@ -85,7 +91,11 @@ export function CountryPoliciesDialog({ open, onClose, country: headerCountry }:
                 'Marketing rules are shared across countries. Undecided rules follow their Market column (empty = brand-wide, used everywhere; otherwise only those countries). Changing a check affects this country’s AI requests and weekly limits (applies to everyone on this country). Rules whose content differs by country cannot be expressed here — add them as separate rules in Marketing policies.',
               )}
             </span>
-            {rules === null ? (
+            {error ? (
+              <MessageBar intent="error" layout="multiline">
+                <MessageBarBody>{t(`決まりを読めませんでした。閉じて、開き直してください(${error})`, `Could not load the rules. Close and open this again (${error})`)}</MessageBarBody>
+              </MessageBar>
+            ) : rules === null ? (
               <Spinner size="small" />
             ) : items.length === 0 ? (
               <span className={s.note}>{t('決まりはまだありません(⚙ →「方針・決まり」で取り込めます)', 'No rules yet (import them in ⚙ → Marketing policies).')}</span>
