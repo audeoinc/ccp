@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { tokens } from '@fluentui/react-components'
 import { CardNotesService, type CardNote } from './data/cardNotes'
-import { tr } from './i18n'
+import { CommentAddRegular } from '@fluentui/react-icons'
+import { tr, useT } from './i18n'
+import { keepBrowserMenu, useContextMenu } from './ContextMenu'
 import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins, type PendingPin } from './pinStore'
 
 const PIN = 22
@@ -15,8 +17,8 @@ interface Props {
   /** 場所を選んでいる間 */
   placing: boolean
   onPlacingEnd: () => void
-  /** ピンを押した・場所を選んだとき(制作のやり取りを開く) */
-  onOpenThreads: () => void
+  /** ピンを押した(その書き込みの ID)・場所を選んだ(ID なし)とき。ピンのフロートを開く */
+  onOpenThreads: (noteId?: string) => void
 }
 
 /** メールの箱(本文の最初の、見える要素)。制作ツールで作った HTML には目印がないので、ピンはこの箱の中の割合で持つ */
@@ -42,7 +44,12 @@ interface MountArgs {
   lastFocus: { seq: number }
   placing: boolean
   view: string
-  handlers: { onPlacingEnd: () => void; onOpenThreads: () => void }
+  handlers: {
+    onPlacingEnd: () => void
+    onOpenThreads: (noteId?: string) => void
+    /** 枠の中の右クリック(画面の座標と、そこにピンを打つ処理)。右クリックのメニューは親の文書に出す */
+    onMenu: (x: number, y: number, place: () => void) => void
+  }
 }
 
 /** 枠の中の文書に、ピンの層を足す(戻り値で外す)。React の外の DOM なので、部品の外の関数にする */
@@ -82,12 +89,14 @@ function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, la
     const b = pin(Number(n.anchor_x ?? 0.5), Number(n.anchor_y ?? 0.5), String(numbers.get(n.id) ?? ''), n.resolved ? grey : orange, n.resolved ? greyText : '#fff')
     b.title = `${n.author || tr('(名前なし)', '(no name)')}: ${(n.body ?? '').split('\n')[0]}`
     b.setAttribute('aria-label', tr(`書き込み ${numbers.get(n.id)} を開く`, `Open comment ${numbers.get(n.id)}`))
+    // ピンのフロートが、この印の横に出る
+    b.setAttribute('data-pin-id', n.id)
     if (focus?.noteId === n.id) b.style.outline = `3px solid ${ring}`
     b.addEventListener('click', (e) => {
       e.preventDefault()
       e.stopPropagation()
       focusPin(n.id)
-      handlers.onOpenThreads()
+      handlers.onOpenThreads(n.id)
     })
     if (focus && focus.noteId === n.id && focus.seq !== lastFocus.seq) {
       lastFocus.seq = focus.seq
@@ -97,6 +106,7 @@ function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, la
   if (myPending) {
     const b = pin(myPending.x, myPending.y, '+', brand, '#fff')
     b.style.cursor = 'default'
+    b.setAttribute('data-pin-id', 'pending')
   }
   box.appendChild(layer)
 
@@ -109,16 +119,30 @@ function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, la
   const mo = new MutationObserver(fit)
   mo.observe(doc.documentElement, { attributes: true, attributeFilter: ['style'] })
 
-  // 場所を選ぶ間は、押した点をメールの箱の中の割合にする(HTML の中のリンクは開かない)
-  const onPick = (e: MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  // 押した点を、メールの箱の中の割合にしてピンを打つ
+  const placeAt = (clientX: number, clientY: number) => {
     const r = box.getBoundingClientRect()
     const clamp = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000
-    setPendingPin({ cardId, stage: 'production', anchor: 'page', x: clamp((e.clientX - r.left) / (r.width || 1)), y: clamp((e.clientY - r.top) / (r.height || 1)), view })
+    setPendingPin({ cardId, stage: 'production', anchor: 'page', x: clamp((clientX - r.left) / (r.width || 1)), y: clamp((clientY - r.top) / (r.height || 1)), view })
     handlers.onPlacingEnd()
     handlers.onOpenThreads()
   }
+  // 場所を選ぶ間は、押した点にピンを打つ(HTML の中のリンクは開かない)
+  const onPick = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    placeAt(e.clientX, e.clientY)
+  }
+  // 右クリック →「ここにピンを打ってコメントする」(ブラウザのメニューの逃げ道は keepBrowserMenu。ピンの上では出さない)
+  const onMenu = (e: MouseEvent) => {
+    if (keepBrowserMenu(e, doc) || (e.target as Element | null)?.closest?.('[data-ccp-pins]')) return
+    e.preventDefault()
+    const f = frame.getBoundingClientRect()
+    const k = frame.offsetWidth > 0 ? f.width / frame.offsetWidth : 1
+    const { clientX: x, clientY: y } = e
+    handlers.onMenu(f.left + (frame.clientLeft + x) * k, f.top + (frame.clientTop + y) * k, () => placeAt(x, y))
+  }
+  doc.addEventListener('contextmenu', onMenu)
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') handlers.onPlacingEnd()
   }
@@ -133,6 +157,7 @@ function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, la
     layer.remove()
     doc.documentElement.style.cursor = ''
     doc.removeEventListener('click', onPick, true)
+    doc.removeEventListener('contextmenu', onMenu)
     doc.removeEventListener('keydown', onKey)
     window.removeEventListener('keydown', onKey)
   }
@@ -151,10 +176,17 @@ export function HtmlPins({ frame, cardId, view, placing, onPlacingEnd, onOpenThr
   // HTML を描き直す(srcDoc が変わる)と、枠の中の文書が新しくなるので、描き直しの回数で層を付け直す
   const [loads, setLoads] = useState(0)
   const lastFocus = useRef({ seq: 0 })
-  const handlers = useRef({ onPlacingEnd, onOpenThreads })
+  const t = useT()
+  const ctx = useContextMenu()
+  const { openAt } = ctx
+  const onMenu = useCallback(
+    (x: number, y: number, place: () => void) => openAt(x, y, [{ key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: place }]),
+    [openAt, t],
+  )
+  const handlers = useRef({ onPlacingEnd, onOpenThreads, onMenu })
   useEffect(() => {
-    handlers.current = { onPlacingEnd, onOpenThreads }
-  }, [onPlacingEnd, onOpenThreads])
+    handlers.current = { onPlacingEnd, onOpenThreads, onMenu }
+  }, [onPlacingEnd, onOpenThreads, onMenu])
 
   useEffect(() => {
     if (!cardId) return
@@ -179,5 +211,5 @@ export function HtmlPins({ frame, cardId, view, placing, onPlacingEnd, onOpenThr
     return mountPins(frame, { cardId, notes, pending, focus, lastFocus: lastFocus.current, placing, view, handlers: handlers.current })
   }, [frame, loads, notes, pending, focus, placing, view, cardId])
 
-  return null
+  return <>{ctx.menu}</>
 }

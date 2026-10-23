@@ -86,6 +86,7 @@ import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
 import type { PartRef } from './simple/parts'
+import { PinFloat, type PinTarget } from './PinFloat'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -592,6 +593,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // プレビュー上の場所を指して書き込む(ピン)。選んでいる間は、プレビューを押しても編集しない
   const [placingPin, setPlacingPin] = useState(false)
   const endPlacingPin = useCallback(() => setPlacingPin(false), [])
+  // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右のやり取りの欄は、全部の流れとして残す)
+  const [pinTarget, setPinTarget] = useState<PinTarget | null>(null)
   // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
   // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
   const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
@@ -2828,11 +2831,20 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                   items={items}
                   placing={placingPin}
                   onPlacingEnd={endPlacingPin}
-                  onOpenThreads={() => {
-                    if (!processOpen) toggleProcess()
-                    setTabRequest((r) => ({ tab: 'threads', seq: (r?.seq ?? 0) + 1 }))
-                  }}
+                  onOpenThreads={(noteId) => setPinTarget(noteId ? { noteId } : { pending: true })}
                 />
+                {card && pinTarget && (
+                  <PinFloat
+                    cardId={card.id}
+                    cardOwner={form.owner}
+                    stage="plan"
+                    root={() => previewBoxRef.current}
+                    target={pinTarget}
+                    productName={(id) => products.find((p) => p.id === id)?.name ?? ''}
+                    onTarget={setPinTarget}
+                    onClose={() => setPinTarget(null)}
+                  />
+                )}
                 <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
               </div>
             </div>

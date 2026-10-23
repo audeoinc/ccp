@@ -8,7 +8,7 @@ import { PreviewPartPicker } from '../PreviewPartPicker'
 import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
 import { CommPane } from './CommPane'
-import { PinFloat, type PinTarget } from './PinFloat'
+import { PinFloat, type PinTarget } from '../PinFloat'
 import { Splitter } from '../Splitter'
 import { ImageThumb } from '../ImageThumb'
 import { ALERT_COLOR } from '../alertColors'
@@ -20,7 +20,7 @@ import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
 import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
-import { partKey, samePart, type PartRef } from './parts'
+import { partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import { StageHeader } from './StageHeader'
 import { HandoffSheet } from './HandoffSheet'
@@ -497,14 +497,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} />
             {pinTarget && (
               <PinFloat
-                card={e.card}
-                boxRef={boxRef}
+                cardId={e.card.id}
+                cardOwner={e.card.owner}
+                stage="plan"
+                root={() => boxRef.current}
                 target={pinTarget}
-                items={e.items}
                 productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
                 onTarget={setPinTarget}
                 onClose={() => setPinTarget(null)}
-                onPick={select}
+                editSpot={(anchor, productId) => {
+                  const p = partOfAnchor(anchor, (pid) => e.items.find((i) => i.productId === pid)?.key, productId)
+                  return p ? () => select(p) : null
+                }}
               />
             )}
             {uncheckedMarks.length + diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={[...uncheckedMarks, ...diffMarks]} onSelect={select} />}

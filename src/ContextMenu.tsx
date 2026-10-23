@@ -19,7 +19,8 @@ export interface ContextItem {
 /** ブラウザのメニューのままにする右クリックか */
 export function keepBrowserMenu(e: { shiftKey: boolean; target: EventTarget | null }, doc: Document = document): boolean {
   if (e.shiftKey) return true
-  const el = e.target instanceof Element ? e.target : null
+  // iframe の中の要素は、別の文書の Element なので instanceof では見分けない
+  const el = e.target && typeof (e.target as Element).closest === 'function' ? (e.target as Element) : null
   if (el?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return true
   const sel = doc.getSelection()
   return !!sel && !sel.isCollapsed && sel.toString().trim() !== ''
@@ -53,7 +54,8 @@ export function useContextMenu(): { openAt: (x: number, y: number, items: Contex
                 disabled={it.disabled}
                 onClick={() => {
                   close()
-                  it.onSelect()
+                  // 押した click が終わってから動かす(項目で開いたフロートが、同じ click を「外を押した」と受け取って閉じないように)
+                  window.setTimeout(it.onSelect, 0)
                 }}
               >
                 {it.label}

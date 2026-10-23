@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from 'react'
-import { Avatar, Button, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Avatar, Button, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens, type PositioningImperativeRef, type PositioningVirtualElement } from '@fluentui/react-components'
 import { ArrowRepeatAllRegular, CheckmarkRegular, DeleteRegular, DismissRegular, EditRegular, MentionRegular, SendRegular } from '@fluentui/react-icons'
-import type { DeliveryCard } from '../models/deliveryCards'
-import { CardNotesService, type CardNote } from '../data/cardNotes'
-import { AutoTextarea } from '../AutoTextarea'
-import { myName, onMeChange } from '../history'
-import { activeUsers, usePeople } from '../people'
-import { anchorLabel, bumpNotes, focusPin, notesVersion, pendingPin, pinNumbers, setPendingPin, subscribePins } from '../pinStore'
-import { locale, tr, useT } from '../i18n'
-import { partOfAnchor, type PartRef } from './parts'
+import { CardNotesService, type CardNote } from './data/cardNotes'
+import { AutoTextarea } from './AutoTextarea'
+import { myName, onMeChange } from './history'
+import { activeUsers, usePeople } from './people'
+import { anchorLabel, bumpNotes, focusPin, notesVersion, pendingPin, pinNumbers, setPendingPin, subscribePins } from './pinStore'
+import type { NoteStage } from './notesStage'
+import { locale, tr, useT } from './i18n'
 
 const useStyles = makeStyles({
   surface: { width: '320px', padding: '10px 12px', display: 'grid', rowGap: '8px' },
@@ -41,33 +40,52 @@ const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { m
 export type PinTarget = { noteId: string } | { pending: true }
 
 interface Props {
-  card: DeliveryCard
-  /** プレビューの枠(ピンの要素 data-pin-id を探す) */
-  boxRef: RefObject<HTMLDivElement | null>
+  cardId: string
+  /** 名前を選んでいない人が書いたときの書き手(配信の担当) */
+  cardOwner?: string
+  /** どの段階のやり取りか(配信カードのプレビュー = plan、制作のページのプレビュー = production) */
+  stage: NoteStage
+  /** ピンの要素(data-pin-id)を探す所。プレビューの枠か、制作のページの iframe の文書 */
+  root: () => ParentNode | null
   target: PinTarget
-  /** 載せた商品(商品の枠のピンから、その商品の部品を選ぶ) */
-  items: { key: string; productId: string }[]
-  productName: (productId: string) => string
+  productName?: (productId: string) => string
   /** 書いたら、そのスレッドに切り替える */
   onTarget: (t: PinTarget) => void
   onClose: () => void
-  /** 「この部品を直す」: ピンの場所の部品を選ぶ */
-  onPick: (p: PartRef | null) => void
+  /** 「この部品を直す」: ピンの場所の部品を選ぶ処理(選べる部品がない場所・画面では null) */
+  editSpot?: (anchor: string, productId?: string) => (() => void) | null
+}
+
+/** iframe の中の要素は、枠の位置を足した仮の要素にする(フロートは親の文書に出すため) */
+function anchorOf(el: Element): Element | PositioningVirtualElement {
+  const frame = el.ownerDocument.defaultView?.frameElement
+  if (!frame || el.ownerDocument === document) return el
+  return {
+    contextElement: frame,
+    getBoundingClientRect: () => {
+      const f = frame.getBoundingClientRect()
+      const r = el.getBoundingClientRect()
+      // 枠ごと縮めて見せている(表示の大きさ)ときは、その比で合わせる
+      const k = (frame as HTMLElement).offsetWidth > 0 ? f.width / (frame as HTMLElement).offsetWidth : 1
+      return DOMRect.fromRect({ x: f.left + frame.clientLeft * k + r.left * k, y: f.top + frame.clientTop * k + r.top * k, width: r.width * k, height: r.height * k })
+    },
+  }
 }
 
 /**
- * プレビューのピンのフロート(SU1。2026-10-23 利用者: コメントはほとんどピン経由になるので、ピンだけで作業を進められるように)。
+ * プレビューのピンのフロート(2026-10-23 利用者: コメントはほとんどピン経由になるので、ピンだけで作業を進められるように)。
  * ピンを打ったら、その場で書く。刺さっているピンを押したら、そのやり取りを読んで、返信・解決する。
- * 右の帯の「やり取り」(CommPane)は、ピンのないものも含めた全部の流れとして残す。データは同じ card_notes で、書いたら bumpNotes で両方とピンを読み直す
+ * 配信カード(シンプル・詳しい)と制作のページの、ピンを置けるプレビューすべてで使う。右のやり取りの欄は、ピンのないものも含めた全部の流れとして残す。
+ * データは同じ card_notes で、書いたら bumpNotes で、やり取りの欄とピンを読み直す
  */
-export function PinFloat({ card, boxRef, target, items, productName, onTarget, onClose, onPick }: Props) {
+export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, productName = () => '', onTarget, onClose, editSpot }: Props) {
   const s = useStyles()
   const t = useT()
   const meName = useSyncExternalStore(subscribeMe, myName)
   const people = usePeople()
   const version = useSyncExternalStore(subscribePins, notesVersion)
   const pendingAll = useSyncExternalStore(subscribePins, pendingPin)
-  const pending = 'pending' in target && pendingAll && pendingAll.cardId === card.id ? pendingAll : null
+  const pending = 'pending' in target && pendingAll && pendingAll.cardId === cardId && pendingAll.stage === stage ? pendingAll : null
   const noteId = 'noteId' in target ? target.noteId : null
   const [notes, setNotes] = useState<CardNote[] | null>(null)
   const [text, setText] = useState('')
@@ -75,22 +93,34 @@ export function PinFloat({ card, boxRef, target, items, productName, onTarget, o
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // フロートを付けるピンの要素。ピンは間隔を空けて描き直されるので、見つかるまで探す(打った直後・書いた直後は、まだ無い)
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const [anchorEl, setAnchorEl] = useState<Element | null>(null)
   const pinKey = noteId ?? 'pending'
+  const rootRef = useRef(findRoot)
+  useEffect(() => {
+    rootRef.current = findRoot
+  })
+  // iframe の中のスクロール・倍率の変化は、フロートの位置の自動の追従に入らないので、間隔を空けて置き直す
+  const positioningRef = useRef<PositioningImperativeRef>(null)
   useEffect(() => {
     const find = () => {
-      const el = boxRef.current?.querySelector<HTMLElement>(`[data-pin-id="${CSS.escape(pinKey)}"]`) ?? null
-      setAnchorEl((o) => (o === el || (!el && o?.isConnected) ? o : el))
+      const el = rootRef.current()?.querySelector(`[data-pin-id="${CSS.escape(pinKey)}"]`) ?? null
+      setAnchorEl((o) => (o === el ? o : el))
+      positioningRef.current?.updatePosition()
     }
     find()
     const timer = window.setInterval(find, 200)
     return () => window.clearInterval(timer)
-  }, [boxRef, pinKey])
+  }, [pinKey])
+  const [anchor_, setAnchor_] = useState<Element | PositioningVirtualElement | null>(null)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnchor_(anchorEl ? anchorOf(anchorEl) : null)
+  }, [anchorEl])
 
   const load = useCallback(async () => {
-    const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] })
+    const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
     if (res.success) setNotes(res.data ?? [])
-  }, [card.id])
+  }, [cardId])
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
@@ -105,11 +135,11 @@ export function PinFloat({ card, boxRef, target, items, productName, onTarget, o
 
   const root = noteId ? (notes ?? []).find((n) => n.id === noteId) : undefined
   const replies = root ? (notes ?? []).filter((n) => n.kind === 'reply' && n.source_note === root.id).sort((a, b) => (a.created_on ?? '').localeCompare(b.created_on ?? '')) : []
-  const no = root ? pinNumbers(notes ?? []).get(root.id) : undefined
+  const no = root ? pinNumbers(notes ?? [], stage).get(root.id) : undefined
   const anchor = root?.anchor ?? pending?.anchor ?? ''
   const productId = root?.product_id ?? pending?.productId
   const place = anchorLabel(anchor, productId ? productName(productId) : undefined)
-  const part = partOfAnchor(anchor, (pid) => items.find((i) => i.productId === pid)?.key, productId)
+  const edit = editSpot?.(anchor, productId) ?? null
   const userNames = activeUsers(people).map((u) => u.name ?? '').filter(Boolean)
   const me = meName.trim()
 
@@ -135,10 +165,10 @@ export function PinFloat({ card, boxRef, target, items, productName, onTarget, o
     if (!body || !pending) return
     const r = await run(() =>
       CardNotesService.create({
-        delivery_card_id: card.id,
+        delivery_card_id: cardId,
         kind: 'comment',
-        stage: 'plan',
-        author: me || card.owner || '',
+        stage,
+        author: me || cardOwner || '',
         body,
         ...(assignee ? { assignee } : {}),
         anchor: pending.anchor,
@@ -161,7 +191,7 @@ export function PinFloat({ card, boxRef, target, items, productName, onTarget, o
   const sendReply = async () => {
     const body = text.trim()
     if (!body || !root) return
-    const r = await run(() => CardNotesService.create({ delivery_card_id: card.id, kind: 'reply', stage: 'plan', author: me || card.owner || '', body, source_note: root.id }))
+    const r = await run(() => CardNotesService.create({ delivery_card_id: cardId, kind: 'reply', stage, author: me || cardOwner || '', body, source_note: root.id }))
     if (r) setText('')
   }
   const toggleResolved = () => root && void run(() => CardNotesService.update(root.id, root.resolved ? { resolved: 0 } : { resolved: 1, replied_by: me, replied_at: new Date().toISOString() }))
@@ -197,11 +227,11 @@ export function PinFloat({ card, boxRef, target, items, productName, onTarget, o
     </div>
   )
 
-  if (!anchorEl) return null
+  if (!anchor_) return null
   return (
     <Popover
       open
-      positioning={{ target: anchorEl, position: 'after', align: 'top', offset: 8 }}
+      positioning={{ target: anchor_, positioningRef, position: 'after', align: 'top', offset: 8 }}
       withArrow
       trapFocus={false}
       onOpenChange={(ev, d) => {
@@ -213,9 +243,9 @@ export function PinFloat({ card, boxRef, target, items, productName, onTarget, o
         <div className={s.head}>
           <span className={mergeClasses(s.pin, !root && s.pinNew, !!root?.resolved && s.pinDone)}>{no ?? '+'}</span>
           <span className={s.headText}>{place}</span>
-          {part && (
+          {edit && (
             <Tooltip content={t('この場所の部品を選んで、直す', 'Select this part to edit it')} relationship="label">
-              <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => onPick(part)} />
+              <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={edit} />
             </Tooltip>
           )}
           {root && me && (root.author ?? '').trim() === me && (

@@ -36,6 +36,7 @@ import { canGoProduction } from './productionGate'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
+import { PinFloat, type PinTarget } from './PinFloat'
 import { CopyLinkButton } from './CopyLinkButton'
 
 const RAIL_W = 32
@@ -171,6 +172,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const [placingPin, setPlacingPin] = useState(false)
   const endPlacingPin = useCallback(() => setPlacingPin(false), [])
   const [previewFrame, setPreviewFrame] = useState<HTMLIFrameElement | null>(null)
+  // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右の制作のやり取りは、全部の流れとして残す)
+  const [pinTarget, setPinTarget] = useState<PinTarget | null>(null)
   const [pasting, setPasting] = useState<string | null>(null)
   // 仕上がりを見る(X58 段階 4)
   const [finishedOpen, setFinishedOpen] = useState(false)
@@ -862,10 +865,19 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   view={pinView(previewView === 'plan' ? 'html-plan' : 'html-made', '', cur)}
                   placing={placingPin}
                   onPlacingEnd={endPlacingPin}
-                  onOpenThreads={() => {
-                    if (!talkOpen) toggleTalk()
-                    setSide('talk')
-                  }}
+                  onOpenThreads={(noteId) => setPinTarget(noteId ? { noteId } : { pending: true })}
+                />
+              )}
+              {previewView !== 'compare' && pinTarget && (
+                <PinFloat
+                  cardId={card.id}
+                  cardOwner={owner}
+                  stage="production"
+                  root={() => previewFrame?.contentDocument ?? null}
+                  target={pinTarget}
+                  productName={(id) => snap.products.find((p) => p.id === id)?.name ?? ''}
+                  onTarget={setPinTarget}
+                  onClose={() => setPinTarget(null)}
                 />
               )}
             </div>
