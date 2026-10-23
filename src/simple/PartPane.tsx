@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Badge, Button, Field, Input, Select, Text, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownRegular, ArrowSwapRegular, ArrowUpRegular, DeleteRegular, ImageAddRegular } from '@fluentui/react-icons'
+import { Badge, Button, Field, Input, Select, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowDownRegular, ArrowSwapRegular, ArrowUpRegular, ChevronUpRegular, DeleteRegular, DismissRegular, EditRegular, ImageAddRegular, ImageEditRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
 import { HeroCandidates } from '../HeroCandidates'
@@ -28,6 +28,13 @@ const useStyles = makeStyles({
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
   title: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  deselect: { marginLeft: 'auto' },
+  warn: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteMarigoldForeground2 },
+  grow: { flexGrow: 1, minWidth: 0 },
+  linkLine: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
+  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200 },
+  // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
+  chooser: { display: 'grid', rowGap: '12px', padding: '10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
@@ -89,6 +96,15 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
 
   // 文言の案を仮に写している間の、元の文言(マウスが離れたら戻す。描画をまたいで持つので ref)
   const textOriginal = useRef<string | null>(null)
+  // メイン画像を変える欄を開いている部品(部品を移ると畳む。まだ画像がなければ、はじめから開く)
+  const [heroOpenKey, setHeroOpenKey] = useState<string | null>(null)
+  const heroOpen = !!part && (!e.hero || heroOpenKey === partKey(part))
+  const [linkEditing, setLinkEditing] = useState(false)
+  const heroDefaultLink = e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl
+  // 使える期限が配信日より前(選んだあとで期限が来た画像。入れ替えを促す)
+  const heroExpired = !!e.hero?.usable_until && !!e.form.scheduledAt && e.hero.usable_until < e.form.scheduledAt.slice(0, 10)
+  /** 管理画面と照らし合わせるための 1 行(番号・季節・用途) */
+  const heroFacts = (h: NonNullable<typeof e.hero>) => [h.image_code, h.season_name, h.purpose_name].filter(Boolean).join(' ・ ')
   const chatOf = (p: PartRef | 'whole') => {
     const key = p === 'whole' ? 'whole' : partKey(p)
     return { turns: chats[key] ?? [], setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => setChat(key, f) }
@@ -378,12 +394,25 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               <span className={s.productText}>
                 <span className={s.name}>{e.hero?.name ?? t('まだ選んでいません', 'Not chosen yet')}</span>
                 {e.heroReason && <span className={s.caption}>{e.heroReason}</span>}
+                {e.hero && heroFacts(e.hero) && <span className={s.caption}>{heroFacts(e.hero)}</span>}
+                {heroExpired && (
+                  <span className={s.warn}>
+                    <WarningRegular />
+                    {t(`使える期限(${e.hero?.usable_until})が配信日より前です`, `Usable until ${e.hero?.usable_until}, before the delivery date`)}
+                  </span>
+                )}
                 <span className={s.row}>
-                  <Button size="small" icon={<ImageAddRegular />} onClick={e.uploadHero}>{t('持っている画像を上げる…', 'Upload an image…')}</Button>
+                  {heroOpen ? (
+                    <Button size="small" icon={<ChevronUpRegular />} onClick={() => setHeroOpenKey(null)}>{t('入れ替えるのを終える', 'Done replacing')}</Button>
+                  ) : (
+                    <Button size="small" appearance="primary" icon={<ImageEditRegular />} onClick={() => setHeroOpenKey(part ? partKey(part) : null)}>{t('入れ替える', 'Replace')}</Button>
+                  )}
                   {e.hero && <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => e.setHero(undefined, '')}>{t('外す', 'Remove')}</Button>}
                 </span>
               </span>
             </div>
+            {heroOpen && (
+              <div className={s.chooser}>
             {part && (
               <PartAiChat
                 key={partKey(part)}
@@ -429,10 +458,28 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             )}
             <span className={s.label}>{t('すべての画像から選ぶ', 'Choose from all images')}</span>
             <HeroCandidates heroes={e.poolHeroes} selectedId={e.hero?.id} onSelect={(id) => e.setHero(id, '')} />
+            {/* 合う画像がなければ、持っている画像を上げる(ライブラリに入り、この配信のメイン画像になる) */}
+            <span className={s.row}>
+              <span className={s.caption}>{t('合う画像がないとき', 'Nothing fits?')}</span>
+              <Button size="small" icon={<ImageAddRegular />} onClick={e.uploadHero}>{t('持っている画像を上げる…', 'Upload an image…')}</Button>
+            </span>
+              </div>
+            )}
             {e.channel === 'email' && (
-              <Field label={t('メイン画像のリンク先(空は既定)', 'Main image link (empty uses the default)')} size="small">
-                <Input size="small" value={e.links.hero ?? ''} placeholder={e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, hero: d.value })} />
-              </Field>
+              linkEditing ? (
+                <Field label={t('メイン画像のリンク先(空は既定)', 'Main image link (empty uses the default)')} size="small">
+                  <span className={s.row}>
+                    <Input className={s.grow} size="small" autoFocus value={e.links.hero ?? ''} placeholder={heroDefaultLink} onChange={(_, d) => e.setLinks({ ...e.links, hero: d.value })} />
+                    <Button size="small" onClick={() => setLinkEditing(false)}>{t('閉じる', 'Close')}</Button>
+                  </span>
+                </Field>
+              ) : (
+                <span className={s.linkLine}>
+                  <span className={s.label}>{t('リンク先', 'Link')}</span>
+                  <span className={s.linkText}>{e.links.hero?.trim() || (heroDefaultLink ? t(`既定(${heroDefaultLink})`, `Default (${heroDefaultLink})`) : t('既定', 'Default'))}</span>
+                  <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => setLinkEditing(true)}>{t('直す', 'Edit')}</Button>
+                </span>
+              )
             )}
           </>
         )
@@ -544,9 +591,9 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       <div className={s.head}>
         <span className={s.title}>{titleOf(part)}</span>
         {part && (
-          <Button size="small" appearance="subtle" onClick={() => onPick(null)}>
-            {t('選ぶのをやめる', 'Deselect')}
-          </Button>
+          <Tooltip content={t('選ぶのをやめる(Esc)', 'Deselect (Esc)')} relationship="label">
+            <Button className={s.deselect} size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => onPick(null)} />
+          </Tooltip>
         )}
       </div>
       {/* 文言・画像・商品を直すときの手がかり(この配信のねらい)。配信の情報を直すときは出さない */}
