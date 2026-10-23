@@ -731,8 +731,10 @@ export function sectionsOf(id: EmailTemplateId): SectionInfo[] {
   if (id === 'free') {
     return [{ index: 0, start: 0, slots: Infinity, kind: 'grid', wantTitle: false, label: tr('全体', 'All') }]
   }
+  // 中身の形が変わり続けるので、セクションが読めなくても止めない(一覧・月の画面がこれを呼ぶので、ここで止まると画面全体が描けない)
+  const secs: Section[] = Array.isArray(tpl?.sections) ? tpl.sections : []
   // 同じ種類が複数あるときは、番号を付けて区別する(タブの名前になる)
-  const countOf = (kind: SectionKind, upto = tpl.sections.length) => tpl.sections.slice(0, upto).filter((s) => s.kind === kind).length
+  const countOf = (kind: SectionKind, upto = secs.length) => secs.slice(0, upto).filter((s) => s.kind === kind).length
   const kindName: Record<SectionKind, () => string> = {
     grid: () => tr('グリッド', 'Grid'),
     photos: () => tr('写真', 'Photos'),
@@ -743,9 +745,9 @@ export function sectionsOf(id: EmailTemplateId): SectionInfo[] {
     cells: () => tr('箱', 'Box'),
     table: () => tr('表', 'Table'),
   }
-  return tpl.sections.map((sec, i) => {
-    const start = tpl.sections.slice(0, i).reduce((n, s) => n + s.slots, 0)
-    const name = kindName[sec.kind]()
+  return secs.map((sec, i) => {
+    const start = secs.slice(0, i).reduce((n, s) => n + s.slots, 0)
+    const name = kindName[sec.kind]?.() ?? sec.kind
     // 表は、テンプレートで付けた名前があれば、それを使う(テンプレートの編集画面の札と同じ呼び名に)
     const label = sec.name?.trim()
       ? sec.name.trim()

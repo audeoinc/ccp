@@ -98,6 +98,7 @@ import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from '.
 import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
 import { loadCustomTemplates } from './layoutTemplates'
+import { ErrorBoundary } from './ErrorBoundary'
 import { TemplateManager } from './TemplateManager'
 import { PolicyManager } from './PolicyManager'
 import { PolicyRulesService } from './data/policyRules'
@@ -1726,6 +1727,8 @@ function App() {
             />
           </MessageBar>
         )}
+        {/* 画面の一部で失敗しても、ヘッダーと、ほかの画面は使えるように(画面・見せ方を移ると描き直す) */}
+        <ErrorBoundary resetKey={`${page}:${view}:${month?.getTime() ?? ''}`}>
         {!loading && !error && month && (
           <>
             {/* アラートの画面は、期間・見せ方を使わないので、ツールバーを出さない */}
@@ -2140,6 +2143,7 @@ function App() {
             )}
           </>
         )}
+        </ErrorBoundary>
       </div>
       {/* アラート(フロート)。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
       <WeekHistory open={historyOpen} onClose={() => setHistoryOpen(false)} events={weekEvents} />
@@ -2164,6 +2168,16 @@ function App() {
         onFinish={(d) => goTo('week', d)}
       />
       {(selected || creating || draftOpen) && (
+        // 配信カードで失敗しても、閉じて、ほかの配信を開けるように
+        <ErrorBoundary
+          resetKey={selected?.id ?? 'new'}
+          overlay
+          onClose={() => {
+            setSelectedId(null)
+            setCreating(null)
+            setDraftOpen(null)
+          }}
+        >
         <CardDetail
           key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
@@ -2227,6 +2241,7 @@ function App() {
             setSelectedId(nextOf.id)
           }}
         />
+        </ErrorBoundary>
       )}
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       {heroLibraryOpen && <HeroLibrary heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} onClose={() => setHeroLibraryOpen(false)} />}
