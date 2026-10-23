@@ -298,6 +298,43 @@ class CancelTest(unittest.TestCase):
         devtools._running.clear()
 
 
+class TaskTest(unittest.TestCase):
+    def test_tasks_run_in_background(self) -> None:
+        import asyncio
+
+        async def main() -> list:
+            async def slow() -> dict:
+                await asyncio.sleep(0.05)
+                return {"ok": True, "rows": 3}
+
+            async def events():  # noqa: ANN202
+                yield {"type": "thought", "text": "a"}
+                raise RuntimeError("落ちた")
+
+            t1 = devtools.start_call(slow())
+            t2 = devtools.start_events(events())
+            first = await devtools.task_status(t1)
+            await asyncio.sleep(0.1)
+            done = await devtools.task_status(t1)
+            err = await devtools.task_status(t2)
+            more = await devtools.task_status(t2, after=1)
+            return [first, done, err, more, await devtools.task_status("nope")]
+
+        first, done, err, more, nope = asyncio.run(main())
+        # 受付はすぐ返り、あとで結果が届く。途中で落ちても、エラーとして届く
+        self.assertFalse(first["done"])
+        self.assertEqual((done["done"], done["events"][0]["result"]["rows"]), (True, 3))
+        self.assertEqual([e["type"] for e in err["events"]], ["thought", "error"])
+        self.assertEqual([e["type"] for e in more["events"]], ["error"])
+        self.assertFalse(nope["ok"])
+
+    def test_task_call_rejects_unknown(self) -> None:
+        import asyncio
+
+        r = asyncio.run(devtools.task_call(devtools.CallIn(path="files", body={})))
+        self.assertFalse(r["ok"])
+
+
 class PolicyDocTest(unittest.TestCase):
     def test_xlsx_text(self) -> None:
         import io

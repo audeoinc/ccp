@@ -25,6 +25,8 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/gcs/extract     選んだ文書を文字にする(Excel はシートごとに CSV の形。PDF は文字にしない)
   POST /api/dev/policy/convert  文書を POLICY_FORMAT の形に書き直す(NDJSON。PDF は Gemini にそのまま渡す)
   GET  /api/dev/policy/drafts   前に書き直したファイル(server/devwork/policies/)
+  POST /api/dev/tasks/chat・/tasks/policy-convert・/tasks/call  時間のかかる処理を裏で走らせ、受付番号を返す
+  GET  /api/dev/tasks/{受付}?after=  ここまでの出来事と、終わったか(画面が 1 秒ごとに聞きに来る。中継の 524 を避けるため)
   GET  /api/dev/history         実行の履歴(server/devwork/history.jsonl。画面・AI・列を調べる、で流した SQL)
   POST /api/dev/bq/profile      列の中身を調べる(行数・空・値の種類・最小・最大・よく出る値)
   GET  /api/dev/files           作業ファイル(server/devwork/files/)  GET/PUT/DELETE /api/dev/files/{名前}  PUT …/pin  POST …/from-xlsx
@@ -46,6 +48,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from datetime import date, datetime, time as dtime
 from decimal import Decimal
 from pathlib import Path
@@ -1792,3 +1795,93 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
         return await asyncio.to_thread(profile_column, bq.client(), body.table, body.column, body.confirm)
     except Exception as e:  # noqa: BLE001
         return _error(e)
+
+
+# ---- 時間のかかる処理は、裏で走らせて、画面は進み具合を聞きに来る(2026-10-23)
+# Workbench の画面は Jupyter の中継を通る。中継は、返り終わらない要求を 100〜120 秒ほどで打ち切る(524)。
+# 流し続ける返事(NDJSON)も、中継が最後までためてから返すと、合図が届かない。
+# そこで、要求はすぐ返し(受付番号)、画面が 1 秒ごとに「ここまでの出来事」を聞きに来る形にする。どの要求もすぐ終わる。
+# 受付はこのプロセスのメモリに置く(Workbench はサーバー 1 つ。開発用の画面は本番では使わない)
+
+TASK_KEEP = 3600  # 終わった受付を残す秒(画面が結果を取りに来るまで)
+_tasks: dict[str, dict[str, Any]] = {}
+
+
+def _sweep() -> None:
+    now = time.monotonic()
+    for k in [k for k, v in _tasks.items() if v["done"] and now - v["ended"] > TASK_KEEP]:
+        _tasks.pop(k, None)
+
+
+def start_events(events: AsyncIterator[dict[str, Any]]) -> str:
+    """出来事を順に出す処理(会話・書き直し)を裏で走らせ、受付番号を返す"""
+    _sweep()
+    tid = uuid.uuid4().hex
+    task = {"events": [], "done": False, "ended": 0.0}
+    _tasks[tid] = task
+
+    async def go() -> None:
+        try:
+            async for ev in events:
+                task["events"].append(ev)
+        except Exception as e:  # noqa: BLE001 — 途中で落ちても、画面にエラーとして届ける
+            task["events"].append({"type": "error", "error": f"{type(e).__name__}: {e}"[:2000]})
+        finally:
+            task["done"] = True
+            task["ended"] = time.monotonic()
+
+    task["job"] = asyncio.ensure_future(go())
+    return tid
+
+
+def start_call(coro: Any) -> str:
+    """結果を 1 つ返す処理(流す・答え合わせ・列を調べる など)を裏で走らせ、受付番号を返す"""
+
+    async def events() -> AsyncIterator[dict[str, Any]]:
+        yield {"type": "result", "result": await coro}
+
+    return start_events(events())
+
+
+@router.get("/tasks/{tid}")
+async def task_status(tid: str, after: int = 0) -> dict[str, Any]:
+    """受付の、after 番めより後の出来事と、終わったか"""
+    t = _tasks.get(tid)
+    if t is None:
+        return {"ok": False, "error": "受付が見つかりません(サーバーを起動し直した、または 1 時間以上たった)"}
+    return {"ok": True, "events": t["events"][after:], "next": len(t["events"]), "done": t["done"]}
+
+
+@router.post("/tasks/chat")
+async def task_chat(body: ChatIn) -> dict[str, Any]:
+    return {"ok": True, "task": start_events(chat_events(body))}
+
+
+@router.post("/tasks/policy-convert")
+async def task_policy_convert(body: ConvertIn) -> dict[str, Any]:
+    return {"ok": True, "task": start_events(convert_events(body))}
+
+
+class CallIn(BaseModel):
+    path: str
+    body: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/tasks/call")
+async def task_call(c: CallIn) -> dict[str, Any]:
+    """時間のかかる窓口を、裏で呼ぶ(中身は、それぞれの窓口と同じ)"""
+    handlers: dict[str, tuple[Any, Any]] = {
+        "bq/run": (SqlIn, run),
+        "bq/dryrun": (SqlIn, dryrun),
+        "check": (CheckIn, check),
+        "bq/profile": (ProfileIn, profile),
+        "gcs/extract": (DocsIn, gcs_extract),
+    }
+    if c.path not in handlers:
+        return {"ok": False, "error": f"裏で呼べない窓口です: {c.path}"}
+    model, fn = handlers[c.path]
+    try:
+        body = model(**c.body)
+    except Exception as e:  # noqa: BLE001 — 入力の誤りは、すぐ返す
+        return {"ok": False, "error": f"入力が正しくありません: {e}"[:1000]}
+    return {"ok": True, "task": start_call(fn(body))}

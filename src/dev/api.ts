@@ -77,53 +77,58 @@ export type ChatEvent =
  * signal で止められる。つながらない・途中で切れたときも、error として渡す
  */
 export function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
-  return ndjson<ChatEvent>('/api/dev/ai/chat', { messages, ...ctx }, onEvent, signal)
+  return taskEvents<ChatEvent>('/tasks/chat', { messages, ...ctx }, onEvent, signal)
 }
 
-/** 起きた順に届く返事(NDJSON)を読み、1 行ずつ onEvent に渡す。最後が final か error でなければ、error を足す */
-async function ndjson<E extends { type: string }>(path: string, body: unknown, onEvent: (e: E) => void, signal?: AbortSignal): Promise<void> {
+// 時間のかかる処理は、サーバーが裏で走らせ、画面は 1 秒ごとに「ここまでの出来事」を聞きに行く。
+// Workbench の画面は Jupyter の中継を通り、返り終わらない要求は 100〜120 秒ほどで打ち切られる(524)ため、
+// どの要求もすぐ終わる形にする(server/ccp/devtools.py の「時間のかかる処理は、裏で走らせて…」)
+const POLL_MS = 1000
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((ok) => {
+    const id = window.setTimeout(ok, ms)
+    signal?.addEventListener('abort', () => {
+      window.clearTimeout(id)
+      ok()
+    })
+  })
+
+/** 受付を始め、終わるまで出来事を onEvent に渡す。つながらないことが続いたら、error を渡す */
+async function taskEvents<E extends { type: string }>(start: string, body: unknown, onEvent: (e: E) => void, signal?: AbortSignal): Promise<void> {
   const fail = (error: string) => onEvent({ type: 'error', error } as unknown as E)
-  let res: Response
-  try {
-    res = await fetch(appPath(path), { ...post(body), signal })
-  } catch (e) {
-    if (signal?.aborted) return
-    fail(`サーバーにつながりません(${e instanceof Error ? e.message : String(e)})`)
-    return
-  }
-  if (!res.ok || !res.body) {
-    fail(res.status === 404 ? '開発用の画面が無効です(CCP_DEVTOOLS=1)' : `サーバーの返事を読めませんでした(${res.status})`)
-    return
-  }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buf = ''
+  const begun = await call<{ ok: true; task: string }>(start, post(body))
+  if (isFailure(begun)) return fail(begun.error)
+  let after = 0
+  let misses = 0
   let ended = false
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      let i: number
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i).trim()
-        buf = buf.slice(i + 1)
-        if (!line) continue
-        try {
-          const ev = JSON.parse(line) as E
-          if (ev.type === 'final' || ev.type === 'error') ended = true
-          onEvent(ev)
-        } catch {
-          // 壊れた行は飛ばす
-        }
-      }
+  while (!signal?.aborted) {
+    const r = await call<{ ok: true; events: E[]; next: number; done: boolean }>(`/tasks/${begun.task}?after=${after}`)
+    if (isFailure(r)) {
+      // 中継の一時的な失敗は、少し待ってもう一度(続けて 10 回で、あきらめる)
+      if (++misses >= 10) return fail(r.error)
+      await sleep(POLL_MS * 2, signal)
+      continue
     }
-  } catch (e) {
-    if (signal?.aborted) return
-    fail(`途中で切れました(${e instanceof Error ? e.message : String(e)})`)
-    return
+    misses = 0
+    for (const ev of r.events) {
+      if (ev.type === 'final' || ev.type === 'error' || ev.type === 'result') ended = true
+      onEvent(ev)
+    }
+    after = r.next
+    if (r.done) break
+    await sleep(POLL_MS, signal)
   }
   if (!ended && !signal?.aborted) fail('返事が最後まで届きませんでした(サーバーのログを見てください)')
+}
+
+/** 結果を 1 つ返す窓口を、裏で呼んで、結果を待つ(流す・答え合わせ・列を調べる など。中継の 524 を避ける) */
+async function callLong<T>(path: string, body: Record<string, unknown>): Promise<T | Failure> {
+  let out: T | Failure = { ok: false, error: '返事が届きませんでした' }
+  await taskEvents<{ type: string; result?: T; error?: string }>('/tasks/call', { path, body }, (ev) => {
+    if (ev.type === 'result') out = ev.result as T
+    else if (ev.type === 'error') out = { ok: false, error: ev.error ?? 'うまくいきませんでした' }
+  })
+  return out
 }
 
 export interface TableInfo {
@@ -212,8 +217,8 @@ export const DevApi = {
   tables: (dataset: string) => call<{ ok: true; tables: { id: string; ref: string; type: string }[] }>(`/bq/tables?dataset=${q(dataset)}`),
   table: (ref: string) => call<TableInfo>(`/bq/table?ref=${q(ref)}`),
   preview: (ref: string) => call<{ ok: true; columns: Column[]; rows: Row[] }>(`/bq/preview?ref=${q(ref)}`),
-  dryrun: (sql: string) => call<DryRun>('/bq/dryrun', post({ sql })),
-  run: (sql: string, maxRows: number, runId = '') => call<RunResult>('/bq/run', post({ sql, max_rows: maxRows, run_id: runId })),
+  dryrun: (sql: string) => callLong<DryRun>('bq/dryrun', { sql }),
+  run: (sql: string, maxRows: number, runId = '') => callLong<RunResult>('bq/run', { sql, max_rows: maxRows, run_id: runId }),
   cancel: (runId: string) => call<{ ok: true; cancelled: boolean }>('/bq/cancel', post({ run_id: runId })),
   projects: () => call<{ ok: true; default: string | null; projects: string[] }>('/bq/projects'),
   models: () => call<{ ok: true; default: string; models: string[]; thinking: string }>('/ai/models'),
@@ -335,9 +340,9 @@ async function policyCall(path: string, body: unknown): Promise<PolicyPreview | 
 export const PolicyApi = {
   list: (bucket: string, prefix: string) => call<{ ok: true; bucket: string; prefix: string; folders: string[]; files: GcsFile[] }>(`/gcs/list?bucket=${q(bucket)}&prefix=${q(prefix)}`),
   extract: (bucket: string, names: string[]) =>
-    call<{ ok: true; docs: { name: string; kind: string; text?: string; chars?: number; size?: number; truncated?: boolean; error?: string }[] }>('/gcs/extract', post({ bucket, names })),
+    callLong<{ ok: true; docs: { name: string; kind: string; text?: string; chars?: number; size?: number; truncated?: boolean; error?: string }[] }>('gcs/extract', { bucket, names }),
   convert: (body: { bucket: string; names: string[]; messages: ChatTurn[]; model: string | null }, onEvent: (e: ConvertEvent) => void, signal?: AbortSignal) =>
-    ndjson<ConvertEvent>('/api/dev/policy/convert', body, onEvent, signal),
+    taskEvents<ConvertEvent>('/tasks/policy-convert', body, onEvent, signal),
   drafts: () => call<{ ok: true; drafts: (PolicyDraft & { updated: string })[] }>('/policy/drafts'),
   preview: (d: PolicyDraft) => policyCall('/preview', d),
   import: (d: PolicyDraft) => policyCall('/import', d),
@@ -405,7 +410,7 @@ export interface ColumnProfile {
 
 export const RunApi = {
   history: (q = '') => call<{ ok: true; runs: RunEntry[] }>(`/history?q=${encodeURIComponent(q)}`),
-  profile: (table: string, column: string, confirm = false) => call<ColumnProfile>('/bq/profile', post({ table, column, confirm })),
+  profile: (table: string, column: string, confirm = false) => callLong<ColumnProfile>('bq/profile', { table, column, confirm }),
 }
 
 export const WorkApi = {
@@ -415,7 +420,7 @@ export const WorkApi = {
   adopt: (output: string, v: number | null) => call<{ ok: true }>(`/work/${output}/adopt`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v }) }),
   target: (dataset: string, prefix: string) => call<{ ok: true }>('/work/target', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset, prefix }) }),
   check: (output: string, sql: string, opts: { version?: number | null; withContext: boolean; run: boolean }) =>
-    call<CheckResult>('/check', post({ output, sql, version: opts.version ?? null, with_context: opts.withContext, run: opts.run })),
+    callLong<CheckResult>('check', { output, sql, version: opts.version ?? null, with_context: opts.withContext, run: opts.run }),
 }
 
 export const isFailure = (v: unknown): v is Failure => !!v && typeof v === 'object' && (v as { ok?: unknown }).ok === false
