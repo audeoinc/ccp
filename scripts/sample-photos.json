@@ -1,0 +1,132 @@
+{
+  "_comment": "見本の商品の写真(AI で作る)と、見本の商品ページの説明。scripts/sample-photos.py が読む。codes は、同じ商品の JP・US の商品コード(画像は共通、説明は市場の言語)。shots の先頭がメイン。2 枚目からは、メインの画像を手本に渡して、同じ商品として作る。実在のブランド・ロゴ・人に似せない(人は顔が写らない構図だけ)",
+  "style": {
+    "product": "Professional e-commerce product photograph for an apparel online store. Photorealistic, shot with a DSLR, pure white seamless background, soft even studio lighting, subtle natural shadow under the item, sharp focus, true-to-life fabric texture and stitching, centered, 3:4 portrait framing. No logo, no brand name, no text, no watermark, no person, no hands.",
+    "detail": "Professional e-commerce macro detail photograph. Photorealistic, shallow depth of field, soft diffused studio light, neutral background, true-to-life material texture, 3:4 portrait framing. No logo, no brand name, no text, no watermark, no person, no hands.",
+    "worn": "Professional e-commerce lookbook photograph. Photorealistic, light warm-grey studio background, soft natural light, a model wearing the item, framed from the neck down so no part of the face (no eyes, nose, mouth or chin) is visible, relaxed natural pose, 3:4 portrait framing. The model must not resemble any real person. No logo, no brand name, no text, no watermark.",
+    "scene": "Professional lifestyle photograph for an online store. Photorealistic, natural daylight, calm and tidy setting, the item is the clear subject, 3:4 portrait framing. No people's faces, no logo, no brand name, no text, no watermark.",
+    "reference": "The attached image is the main product photo. Show exactly the same product (same color, material, shape and details) as in the attached image."
+  },
+  "products": [
+    {
+      "key": "wool-coat", "codes": ["P01", "U01"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A long single-breasted charcoal grey wool overcoat with notch lapels, shown on an invisible ghost mannequin, front view."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the coat's dense brushed wool fabric and a horn-style button, showing the soft fibers.",
+          "title": ["密に織ったウール", "Densely woven wool"], "caption": ["起毛した厚手のウールが、風を通さず体温を逃がしません。ボタンは手に取りやすい大きめのサイズ。", "Brushed, heavy wool blocks the wind and holds in warmth. The large buttons are easy to grab with cold hands."]},
+        {"angle": "worn", "style": "worn", "prompt": "The coat worn open over a cream knit sweater and dark trousers, full-length below the chin, showing the long straight silhouette.",
+          "title": ["膝が隠れるロング丈", "Knee-length cut"], "caption": ["膝まで隠れる丈で、通勤のスーツにも休日のニットにも合わせやすいまっすぐなシルエット。", "A straight, knee-length line that works over a suit on weekdays and a sweater on weekends."]},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the coat's inside: a smooth lining and a neat inner pocket, the coat partly opened on a white surface.",
+          "title": ["裏地と内ポケット", "Lining and inner pocket"], "caption": ["すべりのよい裏地で、厚手のニットの上からでもすっと羽織れます。内ポケットにはスマートフォンが入ります。", "A smooth lining slides easily over thick knits, and the inner pocket fits a phone."]}
+      ]
+    },
+    {
+      "key": "crewneck-knit", "codes": ["P07", "U07"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A fine-gauge merino wool crew-neck sweater in heather oatmeal beige, neatly folded flat lay seen from above."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the fine, smooth merino jersey knit stitches with a soft sheen.",
+          "title": ["なめらかなメリノウール", "Smooth merino wool"], "caption": ["細い糸で編んだメリノウールは、チクチクしにくく、素肌に着ても心地よい肌触り。", "Fine-spun merino is soft enough to wear next to the skin, without the itch."]},
+        {"angle": "worn", "style": "worn", "prompt": "The sweater worn tucked loosely into light grey trousers, framed from the chin to the hips.",
+          "title": ["一枚でも、重ねても", "On its own or layered"], "caption": ["薄手で着ぶくれしないので、ジャケットやコートの下にも。一枚で着ても形がきれいに出ます。", "Thin enough to layer under a jacket or coat without bulk, and neat enough to wear alone."]},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the sweater's ribbed crew neckline and ribbed cuff laid on a white surface.",
+          "title": ["伸びにくいリブ", "Ribs that keep their shape"], "caption": ["首元と袖口はしっかりしたリブ編み。洗っても伸びにくく、きれいな形が続きます。", "Firm rib knit at the neck and cuffs holds its shape wash after wash."]}
+      ]
+    },
+    {
+      "key": "cable-knit", "codes": ["P09", "U09"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A navy blue chunky cable-knit wool crew-neck sweater, shown on an invisible ghost mannequin, front view."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the raised cable-knit pattern in thick navy wool yarn.",
+          "title": ["立体的なケーブル編み", "Raised cable pattern"], "caption": ["太い糸で編んだ縄編みの柄が立体的に浮かび、着るだけで表情のある装いに。", "Thick yarn makes the cables stand out, so the sweater adds texture to any outfit."]},
+        {"angle": "worn", "style": "worn", "prompt": "The sweater worn with light blue jeans, framed from the chin to the thighs, relaxed fit.",
+          "title": ["ゆとりのあるシルエット", "Relaxed fit"], "caption": ["身幅にゆとりがあり、シャツの上からも重ねやすい形。デニムと合わせるだけで秋冬らしく。", "Roomy through the body to layer over a shirt. Pair with denim for an easy cold-weather look."]},
+        {"angle": "scene", "style": "scene", "prompt": "The sweater folded on a wooden chair by a window with a mug of coffee, cozy autumn morning light.",
+          "title": ["寒い日の定番に", "A cold-day staple"], "caption": ["厚みのある編み地で、肌寒い朝もこれ一枚で暖か。家でも外でも頼れる一着です。", "The thick knit keeps chilly mornings warm on its own, at home or out."]}
+      ]
+    },
+    {
+      "key": "denim", "codes": ["P12", "U12"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "Mid-wash blue straight-leg stretch denim jeans, laid flat, front view, full length."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of indigo stretch denim twill weave with fine fading and orange top-stitching.",
+          "title": ["よく伸びるデニム", "Denim with stretch"], "caption": ["ストレッチ糸を織り込んだデニムで、しゃがんだり歩いたりしても突っ張りません。", "Woven with stretch yarn, so it moves with you when you walk, sit or crouch."]},
+        {"angle": "worn", "style": "worn", "prompt": "The jeans worn with a white t-shirt and white sneakers, framed from the waist down to the feet, straight leg.",
+          "title": ["まっすぐなストレート", "A clean straight leg"], "caption": ["腰から裾までまっすぐなラインで、脚をすっきり見せます。スニーカーにも革靴にも。", "A straight line from hip to hem looks clean with sneakers or leather shoes."]},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the jeans' back pocket and belt loop with neat double stitching, plain pocket without any logo or patch.",
+          "title": ["丈夫な二重のステッチ", "Strong double stitching"], "caption": ["ポケットやベルト通しは二重のステッチで縫い、毎日はいてもほつれにくく仕上げています。", "Double stitching on pockets and belt loops stands up to everyday wear."]}
+      ]
+    },
+    {
+      "key": "pleated-skirt", "codes": ["P15", "U15"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A dusty sage green pleated midi skirt with an elastic waistband, shown on an invisible ghost mannequin, front view."},
+        {"angle": "texture", "style": "detail", "prompt": "Close-up of the skirt's crisp, even fine pleats in a soft matte fabric.",
+          "title": ["くずれにくいプリーツ", "Pleats that stay crisp"], "caption": ["細かいプリーツは、たたんでも洗っても折り目が残りやすく、アイロンいらず。", "The fine pleats keep their creases after folding and washing, no ironing needed."]},
+        {"angle": "worn", "style": "worn", "prompt": "The skirt worn with a cream knit top and ankle boots, mid-stride so the pleats swing, framed from the chest down.",
+          "title": ["歩くたびに揺れる", "Moves as you walk"], "caption": ["軽い生地のプリーツが、歩くたびにやわらかく揺れて、きれいな動きを見せます。", "Light pleats swing softly with every step."]},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the skirt's soft elastic waistband from the inside, stretched slightly by the fabric itself, on a white surface.",
+          "title": ["楽なウエスト", "Comfortable waist"], "caption": ["後ろがゴムのウエストで、締め付けすぎず、長い時間はいても楽です。", "An elastic back waist is comfortable for long days without feeling tight."]}
+      ]
+    },
+    {
+      "key": "leather-boots", "codes": ["P16", "U16"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A pair of dark brown full-grain leather lace-up ankle boots, three-quarter side view."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the boot's smooth full-grain brown leather with natural grain and a subtle polished sheen.",
+          "title": ["育つ本革", "Leather that ages well"], "caption": ["表面を削らない本革は、履くほど足に馴染み、つやと深みが増していきます。", "Full-grain leather softens to your foot and gains depth and shine over time."]},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the boot's thick rubber lug sole and welt stitching, the boot tilted to show the sole.",
+          "title": ["すべりにくい底", "Grippy sole"], "caption": ["溝の深いゴム底で、雨の日や落ち葉の道でもすべりにくく安心です。", "A deep-lug rubber sole grips on wet streets and fallen leaves."]},
+        {"angle": "worn", "style": "worn", "prompt": "The boots worn with cuffed dark jeans, framed from the knees down, standing on a stone pavement.",
+          "title": ["パンツにも合う短め丈", "Ankle height for any pants"], "caption": ["くるぶしが隠れる短め丈で、デニムにもスラックスにも合わせやすい一足。", "Ankle height pairs easily with jeans or tailored trousers."]}
+      ]
+    },
+    {
+      "key": "sneakers", "codes": ["P18", "U18"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A pair of minimal white leather low-top sneakers with a white rubber sole, three-quarter side view."},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the sneaker's lightweight cushioned sole cut-away feel, the shoe tilted to show the side of the sole and heel.",
+          "title": ["軽くて弾むクッション", "Light, springy cushioning"], "caption": ["軽いクッション材の底で、一日歩いても足が疲れにくい履き心地です。", "A lightweight cushioned sole keeps your feet comfortable all day."]},
+        {"angle": "worn", "style": "worn", "prompt": "The sneakers worn with cropped beige chinos, framed from the knees down, walking on a light concrete floor.",
+          "title": ["どんな服にも", "Goes with everything"], "caption": ["飾りのない白いスニーカーは、きれいめにもカジュアルにも合う毎日の一足。", "Plain white sneakers that go with smart and casual outfits alike."]},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the sneaker's smooth white leather upper and neat stitching near the toe.",
+          "title": ["汚れを拭けるレザー", "Wipe-clean leather"], "caption": ["なめらかなレザーのアッパーは、汚れてもさっと拭くだけで白さが戻ります。", "The smooth leather upper wipes clean, so it stays white."]}
+      ]
+    },
+    {
+      "key": "wool-scarf", "codes": ["P21", "U21"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A large wool scarf in a camel and grey tartan check with fringed ends, loosely folded on a white background."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the scarf's soft brushed wool weave and fringe.",
+          "title": ["ふんわり起毛", "Soft brushed finish"], "caption": ["起毛させたウールは、ふんわり軽く、首に巻いてもチクチクしにくい肌触り。", "Brushed wool feels light and soft around the neck."]},
+        {"angle": "worn", "style": "worn", "prompt": "The scarf wrapped loosely around the neck over a navy coat, framed from the chin to the waist.",
+          "title": ["大判で巻きやすい", "Generous size"], "caption": ["大判なので、ぐるぐる巻いても、肩にかけても。巻き方を変えて長く楽しめます。", "Big enough to wrap twice or drape over the shoulders."]},
+        {"angle": "scene", "style": "scene", "prompt": "The scarf neatly folded with a pair of gloves on a wooden bench outdoors, crisp winter morning light.",
+          "title": ["贈り物にも", "A good gift"], "caption": ["季節を問わず使える定番の柄で、冬の贈り物にも選ばれています。", "A classic check that makes an easy winter gift."]}
+      ]
+    },
+    {
+      "key": "tote-bag", "codes": ["P25", "U25"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A sturdy natural beige canvas tote bag with olive green leather-trim handles, standing upright, front view, plain with no print."},
+        {"angle": "detail", "style": "detail", "prompt": "View looking into the open tote bag showing a roomy interior, an inner zip pocket and a laptop-sized document folder inside.",
+          "title": ["A4 が入る広さ", "Fits A4 documents"], "caption": ["A4 の書類やノートパソコンも入る広さ。内ポケットで小物も迷子になりません。", "Room for A4 papers or a laptop, with an inner pocket for small things."]},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the thick canvas weave and the stitched join between the canvas and leather handle.",
+          "title": ["丈夫な厚手キャンバス", "Heavy canvas"], "caption": ["厚手のキャンバスと、しっかり縫い付けた持ち手で、重い荷物でも安心です。", "Heavy canvas and firmly stitched handles carry heavy loads."]},
+        {"angle": "worn", "style": "worn", "prompt": "The tote carried on the shoulder with a light trench coat, framed from the chin to the hips.",
+          "title": ["肩に掛けられる持ち手", "Shoulder-length handles"], "caption": ["持ち手は肩に掛けられる長さ。コートの上からでも楽に持てます。", "Handles long enough to wear on the shoulder, even over a coat."]}
+      ]
+    },
+    {
+      "key": "blanket", "codes": ["P29", "U29"],
+      "shots": [
+        {"angle": "front", "style": "product", "prompt": "A plush soft throw blanket in warm oatmeal color, neatly folded in a stack, front view."},
+        {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the blanket's dense, fluffy plush pile.",
+          "title": ["ふわふわの手触り", "Plush and soft"], "caption": ["毛足のある、ふわふわの生地で、触れた瞬間から暖かさを感じられます。", "A dense, fluffy pile that feels warm the moment you touch it."]},
+        {"angle": "scene", "style": "scene", "prompt": "The blanket draped over the arm of a light grey sofa in a calm living room, warm evening lamp light.",
+          "title": ["ソファでも、ひざ掛けにも", "For the sofa or your lap"], "caption": ["ソファに掛けても、ひざ掛けにしても。部屋になじむやさしい色です。", "Drape it over the sofa or across your lap. A soft color that suits any room."]},
+        {"angle": "detail", "style": "detail", "prompt": "Close-up of the blanket's neatly finished, stitched edge, folded corner on a white surface.",
+          "title": ["洗っても長持ち", "Made to last"], "caption": ["端はていねいに始末してあり、家で洗ってもほつれにくく長く使えます。", "Neatly finished edges hold up to washing at home."]}
+      ]
+    }
+  ]
+}

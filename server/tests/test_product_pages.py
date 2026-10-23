@@ -18,6 +18,17 @@ class SampleShopTest(unittest.TestCase):
         paths = [f["src"].split("shop.example.com")[1] for f in found]
         self.assertEqual(paths, [f"/sample-shop/img/P01/{a}.svg" for a in pp.ANGLES])
 
+    def test_photo_page_shows_photos_and_captions_through_the_real_parser(self):
+        photos = [{"image_url": "/img/products/m.jpg", "alt": "", "caption": "", "angle": "front", "is_main": 1},
+                  {"image_url": "/img/products/t.jpg", "alt": "Wool", "caption": "Warm <b>", "angle": "texture", "is_main": 0}]
+        html = pp.sample_html("U01", {"name": "Coat", "description": "warm", "price": 198, "market": "US", "photos": photos})
+        self.assertIn("Sample", html)
+        self.assertIn("$198", html)
+        self.assertIn("Warm &lt;b&gt;", html)
+        found = pp.extract(html, "https://shop.example.com/sample-shop/p/U01")
+        # メインが先頭。小さな写真の列は除き、特長の写真を拾う
+        self.assertEqual([f["src"] for f in found], ["https://shop.example.com/img/products/m.jpg", "https://shop.example.com/img/products/t.jpg"])
+
     def test_sample_svg_gets_colors_per_product(self):
         a, b = pp.sample_svg("P01", "front"), pp.sample_svg("P02", "front")
         self.assertNotIn("{{", a)

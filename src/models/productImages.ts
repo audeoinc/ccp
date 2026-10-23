@@ -13,8 +13,15 @@ export interface ProductImageFields {
   is_main?: number
   /** 集めた元の URL */
   source_url?: string
+  /** 画像の説明(見本の写真では、商品ページの見出し) */
   alt?: string
   sha256?: string
+  /** 商品ページで画像に添える説明の文(素材の強み・ディテールなど) */
+  caption?: string
+  /** アングル(front / texture / detail / worn / scene など。ProductImagePicker の angleName) */
+  angle?: string
+  /** sample = AI で作った見本の写真。本物の画像(空)がある商品では、見本を使わない */
+  source?: string
   product_id?: string
   state_code?: number
 }

@@ -4,7 +4,7 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-10-22(T8 段階 4: セクションを表に・テンプレートの編集画面の作り直し)
+- 最終更新: 2026-10-23(B12 見本の EC と商品の写真)
 
 ---
 
@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(新しい順。詳しくは [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md))
 
+- 2026-10-23 夜: **B12 見本の EC と商品の写真(UI 3)**。AI の商品写真(`scripts/sample-photos.py`)・見本の商品ページを写真と説明に・⚙ の「商品の写真の ZIP を取り込む」(メイン画像も置き換え、前の画像は `source = master` に控える)。**写真の生成の再開のしかた・どこまでできたかは、記録 2026-10-20_21.md の末尾「B12」**
 - 2026-10-23: **ST 設定の段階(UI 2)**: ⚙ を「あなた / 国 / システム」に。済み: ST9 配信の型・ST2 国の基準(`country_settings`)・ST7 国ごとの適用(`country_applications`・`CountryApplyList`)・ST1 テンプレートの使える国・ST4 承認の国。**次は ST3(W8 と。始める前に利用者に確かめる)→ ST5・ST8(ST7 の表と部品を使い回す)→ ST6**。ファイルの役割・落とし穴は 2026-10-20_21.md の末尾「ST の引き継ぎ」
 - 2026-10-23: **B11 商品ページの画像を取り込む**([PRODUCT_IMAGES.md](PRODUCT_IMAGES.md))。手元の PC の `scripts/collect-product-images.py` → ZIP → Workbench の `ccp.cli import-images`(表 `product_images`)。本物の EC サイト・Workbench では未確認。「この配信で使う画像」の窓で、取り込んだ画像を候補に並べ、AI の勧めにも使う
 - 2026-10-22〜23: **B10 Workbench の開発用の画面**([DEVTOOLS.md](DEVTOOLS.md)。`/dev/`、`CCP_DEVTOOLS=1`)。BigQuery を見る・SELECT・Gemini と SQL を作る会話(セッション)・出力ごとの版と答え合わせ・作業ファイル・実行の履歴・列を調べる・ポリシーの文書。Workbench で試すのは利用者。全文は 2026-10-20_21.md の末尾
@@ -31,6 +32,7 @@
 
 BACKLOG の ☐ / ❓ / ▶ の行が正。いま目に付くもの:
 
+1. **B12 見本の写真(UI 3)**: 本番の 100 商品 + ヒーロー 44 の写真を夜中に作る(約 444 枚)→ ZIP → 本番の ⚙ で取り込む(連絡係が段取り)。手順は記録 2026-10-20_21.md の末尾「B12」。次の作業の予約: 開発用の画面に「画像の一覧」(連絡係から)
 1. **UI 1(SU1・共通部品化)**: **最初に、記録 2026-10-20_21.md の末尾「UI 1 の引き継ぎ(2026-10-23 夜)」を読む**(済んだこと・次の順番・落とし穴)。次は共通部品化の続き(ペインの幅 → 足すボタン)。SU1 の素材を消す・ピンでその場でコメントは済み。SU1 の残り: テンプレートが見つからない配信の AI ドラフトのやり直し(利用者 OK・未着手)、案ごとのテンプレート(SU2 ⑤⑧)。1 日の終わり(2026-10-23)の FEATURE_REASONS と Workbench 版の公開は、まだ(`python scripts/feature-reasons.py` → `npm run release:workbench -- --publish`)。
 1. **本番で確かめる**: X63 の SKU のタブは本番で本物の SKU が見えるのを利用者が確かめた(2026-10-21)。**次の BigQuery の取り込みのあと、列 `source`(見本の印)を足しても取り込みが通っているか**(bq_imports の記録・products.stock)を見る。ほかに、テンプレートの版(表 `layout_template_versions`・列 `layout_version`)、素材・画像のライブラリ(バケットへの保存・Gemini での画像の読み取り)、X58 の素材の見本(利用者が本番の ⚙ で押す)。
 1. **X64 は本番で動くことを利用者が確かめた**(2026-10-21。deployed-gcp/20261021-173437。見本の EC サイトのページで、本物の Gemini がアングルとおすすめを返す)。本物の写真での効き目は、本物の商品ページの URL が決まってから(BACKLOG の X64 の残り)。

@@ -5,26 +5,47 @@ Workbench のサーバーは、利用先の EC サイトを読めない。手元
 
   python -m ccp.cli import-images <ZIP>          中身を見るだけ(何も変えない)
   python -m ccp.cli import-images <ZIP> --yes    取り込む
+  POST /api/product-images/import[?yes=1]        本文 = ZIP。画面の ⚙ から(コマンドを使えない環境: 本番)。yes がなければ確認だけ
 
 - 画像は <images>/products/<中身の sha256 の頭>.<拡張子> に置く(同じ画像は 1 つだけ)。/img/products/… で配る
 - 表 product_images に、商品ごとの画像を並べる。ZIP に入っている商品の行は、入れ替える(何度流しても同じ結果)
 - 商品は、商品コード(と、ZIP に市場があれば市場)で探す。マスタにない商品は、飛ばして件数を出す
 - 商品のマスタのメイン画像(products.image_url)は、空のときだけ、取り込んだメイン画像で埋める(--main-to-master なら置き換える)
 
+見本の写真(AI で作った。scripts/sample-photos.py が作る ZIP。目録に "sample": true)も、同じ入口で取り込む:
+- 行に source = sample と、見出し(alt)・説明の文(caption)・アングル(angle)を入れる。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替える
+  (本物の画像がある商品では、画面・見本の商品ページが本物を優先する。見本の SKU と同じ考え方)
+- 商品のマスタのメイン画像は、空か仮の画像(placehold.co)のときにも、見本のメインで埋める。--main-to-master(⚙ では「メイン画像も置き換える」)なら
+  今の画像も置き換え、前の画像は source = master の行に控える(元に戻すときは、その行の image_url を products.image_url に戻す)
+
 ファイル(ASSET_DIR)は Git に入らないので、コードを更新しても消えない。
 本番のパックで DB を置き換えた(import-pack --yes)あとは、表 product_images の行が消えるので、同じ ZIP をもう一度取り込む。
 """
 from __future__ import annotations
 
+import asyncio
+import io
 import json
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
+
+from .data_api import db, fail, ok, require_db
+
+router = APIRouter(dependencies=[Depends(require_db)])
+# ZIP の大きさの上限(サーバーが 1 回で受け取れる大きさより小さく。大きいときは、ZIP を分ける)
+MAX_ZIP = 30 * 1024 * 1024
 
 # サーバーが配れる画像の種類(assets.CONTENT_TYPES・pack.IMG_URL と同じ)
 SERVED = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+SAMPLE = "sample"
+# 見本のメインで置き換える前の、商品のマスタのメイン画像の控え(元に戻すため。画面の候補には出さない)
+MASTER = "master"
+# 見本のデータの、仮の画像(見本の写真で置き換えてよいもの)
+PLACEHOLDER = ("https://placehold.co/",)
 
 
 def read_zip(path: Path) -> tuple[dict[str, Any], zipfile.ZipFile]:
@@ -62,32 +83,54 @@ def file_name(img: dict[str, Any]) -> str:
     return f"{img['sha256'][:24]}.{SERVED[img['content_type']]}"
 
 
-async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], images: Path, main_to_master: bool) -> dict[str, int]:
-    """取り込む。画像を置き、商品ごとに product_images を入れ替え、空のメイン画像を埋める"""
+def local_put(images: Path) -> Callable[[str, bytes, str], bool]:
+    """画像をフォルダ(<images>/products/)に置く。もうあれば置かない(置いたら True)"""
     dest = images / "products"
     dest.mkdir(parents=True, exist_ok=True)
+
+    def put(name: str, data: bytes, content_type: str) -> bool:
+        f = dest / name
+        if f.exists():
+            return False
+        f.write_bytes(data)
+        return True
+
+    return put
+
+
+async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[[str, bytes, str], bool], main_to_master: bool, sample: bool = False) -> dict[str, int]:
+    """取り込む。画像を置き(put)、商品ごとに product_images を入れ替え、空のメイン画像を埋める"""
     placed = rows = mains = 0
     for it in p["items"]:
         prod = it["product"]
-        await conn.execute(text("DELETE FROM product_images WHERE product_id = :id"), {"id": prod["id"]})
+        # 見本の ZIP は見本の行だけ、本物の ZIP は本物の行(source が空)だけを入れ替える。元のメイン画像の控え(master)は残す
+        scope = "source = :s" if sample else "source IS NULL"
+        await conn.execute(text(f"DELETE FROM product_images WHERE product_id = :id AND {scope}"), {"id": prod["id"], "s": SAMPLE})
         main_url = None
         for order, img in enumerate(it["images"], start=1):
             name = file_name(img)
-            f = dest / name
-            if not f.exists():
-                f.write_bytes(z.read(f"products/{img['file']}"))
+            if put(name, z.read(f"products/{img['file']}"), img["content_type"]):
                 placed += 1
             url = f"/img/products/{name}"
             if img.get("main") and not main_url:
                 main_url = url
             await conn.execute(
-                text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, product_id) "
-                     "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :pid)"),
+                text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, caption, angle, source, product_id) "
+                     "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :caption, :angle, :source, :pid)"),
                 {"name": name, "code": prod["product_code"], "market": prod.get("market"), "url": url, "sort": order, "main": 1 if img.get("main") else 0,
-                 "src": img.get("src"), "alt": (img.get("alt") or "")[:500], "sha": img["sha256"], "pid": prod["id"]},
+                 "src": img.get("src"), "alt": (img.get("alt") or "")[:500], "sha": img["sha256"], "caption": (img.get("caption") or "")[:2000] or None,
+                 "angle": img.get("angle") or None, "source": SAMPLE if sample else None, "pid": prod["id"]},
             )
             rows += 1
-        if main_url and (main_to_master or not prod.get("image_url")):
+        current = str(prod.get("image_url") or "")
+        if main_url and (main_to_master or not current or (sample and current.startswith(PLACEHOLDER))):
+            if current and current != main_url and not current.startswith(PLACEHOLDER):
+                # 置き換える前のメイン画像を、控え(source = master)として 1 度だけ残す(元に戻せるように。2 回目からは、最初の控えを残す)
+                await conn.execute(
+                    text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source, product_id) "
+                         "SELECT :name, :code, :market, :url, 0, 0, :source, :pid WHERE NOT EXISTS (SELECT 1 FROM product_images WHERE product_id = :pid AND source = :source)"),
+                    {"name": current.rsplit("/", 1)[-1][:200], "code": prod["product_code"], "market": prod.get("market"), "url": current, "source": MASTER, "pid": prod["id"]},
+                )
             await conn.execute(text("UPDATE products SET image_url = :u, modified_on = now() WHERE id = :id"), {"u": main_url, "id": prod["id"]})
             mains += 1
     return {"placed": placed, "rows": rows, "mains": mains}
@@ -98,7 +141,7 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
     from .db import get_engine
 
     manifest, z = read_zip(path)
-    print(f"ZIP: {path.name}(作った日時 {manifest.get('made_at')}。商品 {len(manifest.get('products', []))}・画像 {manifest.get('images')} 枚)")
+    print(f"ZIP: {path.name}{'(見本の写真)' if manifest.get('sample') else ''}(作った日時 {manifest.get('made_at')}。商品 {len(manifest.get('products', []))}・画像 {manifest.get('images')} 枚)")
     # 表がまだない環境でも取り込めるよう、先に表を作る(何度実行してもよい)
     await migrate()
     engine = await get_engine()
@@ -117,7 +160,50 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
         print()
         print("確認だけです。取り込むときは --yes を付けて実行してください(ZIP に入っている商品の画像の行は、入れ替わります)")
         return
+    sample = bool(manifest.get("sample"))
     async with engine.begin() as conn:
-        r = await apply(conn, z, p, images, main_to_master)
+        r = await apply(conn, z, p, local_put(images), main_to_master, sample)
     print(f"取り込みました: 画像のファイル {r['placed']} 点を {images / 'products'} に置き、行 {r['rows']} 件。商品のメイン画像を {r['mains']} 件埋めました")
     print(f"サーバーは、環境変数 ASSET_DIR={images} で起動してください(画像をこのフォルダから配る)")
+
+
+def remote_put(name: str, data: bytes, content_type: str) -> bool:
+    """画像を、サーバーの置き場所(ASSET_DIR のフォルダか、バケット)に置く。名前は中身から決まるので、上書きしてよい"""
+    from .heroes import save
+
+    save(name, data, content_type, kind="products")
+    return True
+
+
+def summary(manifest: dict[str, Any], p: dict[str, Any]) -> dict[str, Any]:
+    return {"sample": bool(manifest.get("sample")), "products": len(p["items"]), "images": sum(len(i["images"]) for i in p["items"]),
+            "missing": p["missing"], "unsupported": p["unsupported"], "errors": p["errors"][:20]}
+
+
+@router.post("/api/product-images/import")
+async def import_endpoint(request: Request, yes: int = 0, main: int = 0):
+    """⚙ から商品の画像の ZIP(見本の写真・集めた画像)を取り込む。yes = 0 は確認だけ(DB もファイルも変えない)。
+    main = 1 は、商品のマスタのメイン画像も、ZIP のメインで置き換える(前のメイン画像は source = master の行に控える)"""
+    body = await request.body()
+    if not body:
+        return fail(400, "ZIP が空です", "empty")
+    if len(body) > MAX_ZIP:
+        return fail(400, f"ZIP が大きすぎます({MAX_ZIP // 1024 // 1024}MB まで。分けて取り込んでください)", "too_large")
+    try:
+        z = zipfile.ZipFile(io.BytesIO(body))
+        manifest = json.loads(z.read("manifest.json").decode("utf-8"))
+    except (zipfile.BadZipFile, KeyError, ValueError):
+        return fail(400, "商品の画像の ZIP ではありません(manifest.json がありません)", "bad_zip")
+    async with db() as conn:
+        products = [dict(r) for r in (await conn.execute(text("SELECT id, product_code, market, image_url FROM products WHERE product_code IS NOT NULL"))).mappings().all()]
+    p = plan(manifest, products)
+    out = summary(manifest, p)
+    if not yes:
+        return ok(out)
+    # 画像を置く間も DB の取引を開いたままにしないよう、先に画像を置く
+    for it in p["items"]:
+        for img in it["images"]:
+            await asyncio.to_thread(remote_put, file_name(img), z.read(f"products/{img['file']}"), img["content_type"])
+    async with db(write=True) as conn:
+        r = await apply(conn, z, p, lambda *_: False, bool(main), out["sample"])
+    return ok({**out, **r, "placed": sum(len(i["images"]) for i in p["items"])})

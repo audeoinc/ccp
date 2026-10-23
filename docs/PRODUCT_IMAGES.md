@@ -70,3 +70,13 @@ cd ~/ccp/server
 - 商品のマスタのメイン画像(`image_url`)は、空のときだけ、取り込んだメイン画像で埋めます。置き換えるときは `--main-to-master`
 - マスタにない商品・配れない種類の画像(GIF・AVIF)は飛ばして、件数を出します
 - **引っ越し用のパックで DB を置き換えた(`import-pack --yes`)あとは、表 `product_images` の行が消えます。** 画像のファイルは残るので、同じ ZIP をもう一度取り込んでください
+
+## 4. 見本の写真(AI で作る。B12)
+
+見本のデータの商品に、EC の商品写真のような写真(メイン + 素材・ディテール・着用などのサブ)と、その説明の文を持たせます。見本の商品ページ(`/sample-shop/p/<商品コード>`)が、本物の商品ページのように見え、ここまでの「取り込んだ画像」と同じ道で使われます。
+
+- 作る(開発側の手元の PC。この PC の認証で Vertex AI の画像のモデルを呼ぶ。1 枚ごとに費用がかかる): `python scripts/sample-photos.py generate`。何を作るかは `scripts/sample-photos.json`(先頭がメイン。サブはメインを手本に作る)。写真は `import/sample-photos/`(Git に入れない)
+- ZIP にする: `python scripts/sample-photos.py zip`(25MB ごとに分ける)。目録に `"sample": true`
+- 取り込む: 上の 3 章と同じ `ccp.cli import-images`、または画面の ⚙ →「見本のデータ」→「商品の写真の ZIP を取り込む」(確認のあとで取り込む)
+- 表 `product_images` の `source = sample` の行になり、`alt` が見出し・`caption` が説明の文・`angle` がアングル。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替えます。本物の画像がある商品では、画面は本物を使います
+- 商品のメイン画像(マスタ)は、空か仮の画像(placehold.co)のときだけ、見本のメインで置き換えます。⚙ で「メイン画像も置き換える」(OK)を選ぶか、`--main-to-master` を付けると、今のメイン画像も置き換えます。前の画像は `source = master` の行に控えとして 1 度だけ残すので、元に戻せます(その行の `image_url` を商品の `image_url` に戻す)。控えの行は、画像を選ぶ窓の候補には出ません

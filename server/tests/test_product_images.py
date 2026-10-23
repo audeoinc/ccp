@@ -65,7 +65,7 @@ class ApplyTest(unittest.TestCase):
                                               {"id": "p2", "product_code": "A1", "market": "JP", "image_url": "https://cdn/main.jpg"}])
         with tempfile.TemporaryDirectory() as d:
             conn = FakeConn()
-            r = asyncio.run(pi.apply(conn, z, p, Path(d), main_to_master=False))
+            r = asyncio.run(pi.apply(conn, z, p, pi.local_put(Path(d)), main_to_master=False))
             files = sorted(x.name for x in (Path(d) / "products").iterdir())
         # 同じ画像は 1 つだけ置く。行は商品ごと。メイン画像は、空の商品だけ埋める
         self.assertEqual(files, ["a" * 24 + ".jpg", "b" * 24 + ".jpg"])
@@ -77,6 +77,37 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(sum(1 for c in conn.calls if c[0].startswith("DELETE")), 2)
         updates = [c for c in conn.calls if c[0].startswith("UPDATE")]
         self.assertEqual([u[1]["id"] for u in updates], ["p1"])
+        # 本物の ZIP は、本物の行だけを消す(見本の行は残す)
+        self.assertTrue(all("source IS NULL" in c[0] for c in conn.calls if c[0].startswith("DELETE")))
+        self.assertTrue(all(c[1]["source"] is None for c in inserts))
+
+    def test_sample_zip(self) -> None:
+        # 見本の写真: 見本の行だけを入れ替え、説明・アングルを入れ、仮の画像(placehold.co)のメインは置き換える(本物の画像は置き換えない)
+        products = [{"product_code": "A1", "market": "JP", "images": [{**img("A1/01.jpg", "a", True), "angle": "front"}, {**img("A1/02.jpg", "b"), "alt": "見出し", "caption": "説明", "angle": "texture"}]}]
+        z = make_zip(products)
+        p = pi.plan({"products": products}, [{"id": "p1", "product_code": "A1", "market": "JP", "image_url": "https://placehold.co/400x400?text=A1"},
+                                              {"id": "p2", "product_code": "A1", "market": "JP", "image_url": "/img/products/real.jpg"}])
+        put_names: list[str] = []
+        conn = FakeConn()
+        r = asyncio.run(pi.apply(conn, z, p, lambda n, d, c: put_names.append(n) is None, main_to_master=False, sample=True))
+        self.assertEqual(r["mains"], 1)
+        self.assertTrue(all("source = :s" in c[0] for c in conn.calls if c[0].startswith("DELETE")))
+        inserts = [c[1] for c in conn.calls if c[0].startswith("INSERT")]
+        self.assertEqual([(i["source"], i["angle"], i["caption"]) for i in inserts[:2]], [("sample", "front", None), ("sample", "texture", "説明")])
+        self.assertEqual(len(put_names), 4)
+        # 仮の画像は控えない
+        self.assertFalse([c for c in conn.calls if c[0].startswith("INSERT") and c[1].get("source") == "master"])
+
+    def test_sample_replaces_real_main_and_keeps_a_copy(self) -> None:
+        # 「メイン画像も置き換える」: 本物のメイン画像を置き換え、前の画像は master の行に控える
+        products = [{"product_code": "A1", "market": "JP", "images": [img("A1/01.jpg", "a", True)]}]
+        p = pi.plan({"products": products}, [{"id": "p1", "product_code": "A1", "market": "JP", "image_url": "/img/products/real.jpg"}])
+        conn = FakeConn()
+        r = asyncio.run(pi.apply(conn, make_zip(products), p, lambda *_: False, main_to_master=True, sample=True))
+        self.assertEqual(r["mains"], 1)
+        kept = [c[1] for c in conn.calls if c[0].startswith("INSERT") and c[1].get("source") == "master"]
+        self.assertEqual([k["url"] for k in kept], ["/img/products/real.jpg"])
+        self.assertIn("NOT EXISTS", [c[0] for c in conn.calls if c[0].startswith("INSERT") and c[1].get("source") == "master"][0])
 
 
 if __name__ == "__main__":

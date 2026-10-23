@@ -154,7 +154,7 @@
    ]
   },
   "product_images": {
-   "_comment": "商品の画像(メインを含め、商品ページに載っている画像)。手元の PC で集めて、python -m ccp.cli import-images で取り込む(docs/PRODUCT_IMAGES.md)。画像を選ぶとき・AI が配信に合う画像を勧めるときの候補",
+   "_comment": "商品の画像(メインを含め、商品ページに載っている画像)。手元の PC で集めて、python -m ccp.cli import-images で取り込む(docs/PRODUCT_IMAGES.md)。画像を選ぶとき・AI が配信に合う画像を勧めるときの候補。source = sample は AI で作った見本の写真(scripts/sample-photos.py。見本の商品ページに出す)で、alt が見出し・caption が説明の文・angle がアングル。本物の画像(source が空)がある商品では、見本を使わない。source = master は見本で置き換える前の商品のメイン画像の控え(元に戻すため。候補に出さない)",
    "columns": [
     ["name", "text", {"required": true}],
     ["product_code", "text", {"index": true}],
@@ -164,7 +164,10 @@
     ["is_main", "int"],
     ["source_url", "text"],
     ["alt", "text"],
-    ["sha256", "text"]
+    ["sha256", "text"],
+    ["caption", "text"],
+    ["angle", "text"],
+    ["source", "text"]
    ],
    "lookups": [
     ["product_id", "products", {"onDelete": "CASCADE"}]

@@ -16,7 +16,10 @@ AI が選んだ商品の画像は、最初は商品のマスタの 1 枚(product
 見本の EC サイト: 商品ページの URL は、いま仮の https://shop.example.com/p/<商品コード>(src/links.ts の SHOP_URL)。
 外に出られない環境(Workbench)でも流れを最後まで試せるよう、その URL(と /sample-shop/ の下)は、通信せずに、ここで作った見本のページを読む。
 ページの画像を拾う処理は、本物のページと同じものを通す。本物の URL は、サーバーが読む(ccp/linkpreview.py と同じ安全策。外に出られない環境では失敗する)。
-見本の画像は絵(SVG。sample_shop/ の型に、商品ごとの色を入れる)なので、AI には画像ではなく SVG のソースを文字で見せる(Gemini は SVG を画像として受け付けないため)。
+見本の写真(AI で作った EC の商品写真。表 product_images の source = sample。scripts/sample-photos.py → ccp.cli import-images)があれば、
+ページは本物の商品ページのように、メインの写真・素材やディテールの写真と、その説明の文を出す(左上に小さく「見本」)。写真は /img/products/… なので、
+AI にも写真として見せられる。写真がない商品は、これまでの絵(SVG。sample_shop/ の型に、商品ごとの色を入れる)のページ。
+絵は、AI には画像ではなく SVG のソースを文字で見せる(Gemini は SVG を画像として受け付けないため)。
 """
 from __future__ import annotations
 
@@ -80,16 +83,90 @@ def sample_svg(code: str, angle: str) -> str:
 
 
 async def _product(code: str) -> dict[str, Any] | None:
+    """商品と、見本の写真(sort_order の順。先頭がメイン)"""
     t = sc.load().table("products")
     try:
         async with db() as conn:
-            row = (await conn.execute(text(f"SELECT name, description FROM {t.pg} WHERE product_code = :c LIMIT 1"), {"c": code})).mappings().first()
+            row = (await conn.execute(text(f"SELECT id, name, description, price, market FROM {t.pg} WHERE product_code = :c ORDER BY market LIMIT 1"), {"c": code})).mappings().first()
+            if not row:
+                return None
+            photos = (await conn.execute(text(
+                "SELECT image_url, alt, caption, angle, is_main FROM product_images WHERE product_id = :id AND source = 'sample' AND image_url IS NOT NULL ORDER BY sort_order"
+            ), {"id": row["id"]})).mappings().all()
     except Exception:  # noqa: BLE001 — DB につながらなくても、見本のページは出す(名前は商品コード)
         return None
-    return dict(row) if row else None
+    return {**dict(row), "photos": [dict(x) for x in photos]}
+
+
+def _price(product: dict[str, Any]) -> str:
+    price = product.get("price")
+    if price is None:
+        return ""
+    return f"${price:,.0f}" if product.get("market") == "US" else f"¥{price:,.0f}"
 
 
 def sample_html(code: str, product: dict[str, Any] | None) -> str:
+    if product and product.get("photos"):
+        return photo_html(code, product)
+    return svg_html(code, product)
+
+
+def photo_html(code: str, product: dict[str, Any]) -> str:
+    """見本の写真のページ。本物の EC の商品ページの形(メインの写真・小さな写真の列・名前・価格・説明・特長の写真と説明)。
+    ページの画像を拾う処理(extract)が、本物のページと同じように読めるよう、<img> と og:image で書く"""
+    en = product.get("market") == "US"
+    name = escape(product.get("name") or code)
+    desc = escape(product.get("description") or "")
+    photos = product["photos"]
+    # 画像は相対のパスで書く(/sample-shop/p/<code> から /img/products/…。Workbench の中継 /proxy/<port>/ の下でも見えるように)
+    src = lambda ph: "../.." + escape(ph["image_url"])  # noqa: E731
+    main = next((ph for ph in photos if ph.get("is_main")), photos[0])
+    subs = [ph for ph in photos if ph is not main]
+    thumbs = "".join(f'<img src="{src(ph)}" alt="{escape(ph.get("alt") or "")}" width="72" height="96">' for ph in photos)
+    feats = "\n".join(
+        f'<section class="f"><img src="{src(ph)}" alt="{escape(ph.get("alt") or "")}" width="420" height="560" loading="lazy">'
+        f'<div><h3>{escape(ph.get("alt") or "")}</h3><p>{escape(ph.get("caption") or "")}</p></div></section>'
+        for ph in subs
+    )
+    label = ("Sample", "This is a sample product page made by CCP for trying things out. Not a real shop or product.") if en else ("見本", "CCP が試すために作った見本の商品ページです(実在のお店・商品ではありません)。")
+    return f"""<!doctype html>
+<html lang="{'en' if en else 'ja'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{name} | Sample shop</title>
+<meta property="og:title" content="{name}"><meta property="og:image" content="{src(main)}"><meta property="og:site_name" content="Sample shop">
+<style>
+*{{box-sizing:border-box}}body{{font-family:"Helvetica Neue",Arial,"Hiragino Sans","Yu Gothic",sans-serif;margin:0;color:#222;background:#fff}}
+.bar{{display:flex;align-items:center;gap:10px;padding:12px 24px;border-bottom:1px solid #eee;font-size:13px;letter-spacing:.2em}}
+.tag{{font-size:11px;letter-spacing:0;padding:2px 8px;border:1px solid #c8a24a;color:#8a6d1f;border-radius:10px;background:#fff8e6}}
+.wrap{{max-width:1080px;margin:0 auto;padding:24px}}.top{{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px}}
+.main{{width:100%;aspect-ratio:3/4;object-fit:cover;background:#f6f6f6}}.th{{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}}.th img{{width:72px;height:96px;object-fit:cover;background:#f6f6f6}}
+h1{{font-size:22px;font-weight:500;margin:8px 0}}.price{{font-size:20px;margin:8px 0 20px}}.desc{{line-height:1.8;font-size:14px}}
+.code{{color:#888;font-size:12px}}.btn{{display:block;width:100%;padding:14px;margin:24px 0 8px;border:0;background:#222;color:#fff;font-size:14px;letter-spacing:.1em}}
+.note{{color:#888;font-size:11px;line-height:1.6}}h2{{font-size:16px;font-weight:500;letter-spacing:.15em;margin:56px 0 8px;text-align:center}}
+.f{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:center;margin:32px 0}}.f:nth-of-type(even) img{{order:2}}
+.f img{{width:100%;aspect-ratio:3/4;object-fit:cover;background:#f6f6f6}}.f h3{{font-size:17px;font-weight:500;margin:0 0 10px}}.f p{{line-height:1.9;font-size:14px;margin:0}}
+@media (max-width:720px){{.top,.f{{grid-template-columns:1fr;gap:16px}}.f:nth-of-type(even) img{{order:0}}}}
+</style>
+</head><body>
+<div class="bar"><span>SAMPLE SHOP</span><span class="tag" title="{label[1]}">{label[0]}</span></div>
+<div class="wrap">
+  <div class="top">
+    <div><img class="main" src="{src(main)}" alt="{name}" width="600" height="800"><div class="th">{thumbs}</div></div>
+    <div>
+      <div class="code">{escape(code)}</div>
+      <h1>{name}</h1>
+      <div class="price">{_price(product)}</div>
+      <p class="desc">{desc}</p>
+      <button class="btn" type="button" disabled>{'Add to bag' if en else 'カートに入れる'}</button>
+      <p class="note">{label[1]}</p>
+    </div>
+  </div>
+  <h2>{'FEATURES' if en else '特長'}</h2>
+{feats}
+</div>
+</body></html>"""
+
+
+def svg_html(code: str, product: dict[str, Any] | None) -> str:
     # 画像は相対のパスで書く(Workbench の中継 /proxy/<port>/ の下で、ブラウザで開いても見えるように)
     name = escape((product or {}).get("name") or code)
     desc = escape((product or {}).get("description") or "")
@@ -236,8 +313,12 @@ async def images(body: ImagesIn):
     code = sample_code(url)
     if code:
         # 見本: 通信せずに、ここで作ったページを、本物と同じ処理で読む。画像の場所は、アプリの中のパス
-        html = sample_html(code, await _product(code))
+        product = await _product(code)
+        html = sample_html(code, product)
         found = [{**i, "src": urlparse(i["src"]).path} for i in extract(html, f"https://{SAMPLE_HOST}/sample-shop/p/{code}")]
+        # 見本の写真は、ページで写真に添えた説明の文も、AI の判断の材料に渡す(本物のページでは、写真の近くの文にあたる)
+        captions = {ph["image_url"]: ph.get("caption") or "" for ph in (product or {}).get("photos") or []}
+        found = [{**i, "alt": f"{i['alt']}: {captions[i['src']]}" if captions.get(i["src"]) else i["alt"]} for i in found]
         return ok({"sample": True, "page": f"/sample-shop/p/{code}", "images": found})
     try:
         final, data, ctype = await asyncio.to_thread(linkpreview.fetch, url, linkpreview.MAX_PAGE, "text/html,application/xhtml+xml")

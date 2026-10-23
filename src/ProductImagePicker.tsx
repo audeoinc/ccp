@@ -113,9 +113,16 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
   useEffect(() => {
     void (async () => {
       const r = await ProductImagesService.getAll({ filter: `product_id eq '${product.id}'`, orderBy: ['sort_order'] })
-      const imgs = (r.success ? r.data ?? [] : [])
-        .filter((x) => x.image_url)
-        .map((x) => ({ src: x.image_url as string, alt: x.alt ?? '', main: x.is_main === 1 }))
+      // master = 見本で置き換える前のメイン画像の控え(元に戻すため。候補には出さない)
+      const rows = (r.success ? r.data ?? [] : []).filter((x) => x.image_url && x.source !== 'master')
+      // 本物の画像(B11 で取り込んだ)があれば、AI で作った見本の写真(source = sample)は使わない
+      const real = rows.filter((x) => !x.source)
+      const imgs = (real.length ? real : rows).map((x) => ({
+        src: x.image_url as string,
+        // 見本の写真の説明の文も、AI の判断の材料に渡す
+        alt: x.caption ? `${x.alt ?? ''}: ${x.caption}` : x.alt ?? '',
+        main: x.is_main === 1,
+      }))
       if (imgs.length) {
         setStored(imgs)
         showStored(imgs)

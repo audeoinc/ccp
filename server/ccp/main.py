@@ -35,6 +35,7 @@ from .impact import router as impact_router
 from .policies import router as policies_router
 from .metrics import router as metrics_router
 from .pack import router as pack_router
+from .product_images import router as product_images_router
 from sqlalchemy import text
 
 from .data_api import db, register_errors, router as data_router
@@ -113,6 +114,7 @@ app.include_router(data_router)
 app.include_router(ai_router)
 app.include_router(assets_router)
 app.include_router(pack_router)
+app.include_router(product_images_router)
 app.include_router(bq_router)
 app.include_router(policies_router)
 app.include_router(metrics_router)

@@ -42,6 +42,8 @@ const RULES = [
   // (利用者の指示 2026-10-23。取り込み(ccp.cli import-images)・画像を選ぶ窓は入れる)
   ['exclude', /^(docs\/PRODUCT_IMAGES\.md|scripts\/collect-product-images\.py)$/],
   ['exclude', /^release\//],
+  // 見本の商品の写真を AI で作る道具(開発側の手元で作り、写真は ZIP・パックで届ける)
+  ['exclude', /^scripts\/sample-photos\.(py|json)$/],
   // 撮影用(手元の Edge を使う開発の道具)
   ['exclude', /^scripts\/screenshots\.mjs$/],
   // 画面

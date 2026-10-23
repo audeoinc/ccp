@@ -85,6 +85,7 @@ import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
+import { importProductImagesZip } from './productImageImport'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
 import { clearProductDataCache } from './useProductData'
 import { clearProductMetricsCache } from './useProductMetrics'
@@ -1713,6 +1714,22 @@ function App() {
                   }}
                 >
                   {skuBusy ? t('見本の SKU を作っています…', 'Creating sample SKUs…') : t('見本の SKU を作る', 'Create sample SKUs')}
+                </MenuItem>
+                {/* 商品の写真の ZIP(AI で作った見本の写真 scripts/sample-photos.py・集めた商品ページの画像)を取り込む。見本の商品ページ・「この配信で使う画像」に出る */}
+                <MenuItem
+                  icon={<ImageMultipleRegular />}
+                  onClick={async () => {
+                    try {
+                      const done = await importProductImagesZip()
+                      if (!done) return
+                      await loadProducts()
+                      setBqNotice({ intent: 'success', text: done })
+                    } catch (e) {
+                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                    }
+                  }}
+                >
+                  {t('商品の写真の ZIP を取り込む', 'Import a product photo ZIP')}
                 </MenuItem>
                 <MenuItem
                   icon={<DeleteRegular />}
