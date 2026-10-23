@@ -29,6 +29,7 @@ const useStyles = makeStyles({
   read: { padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   pair: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '10px' },
   fold: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: 0, border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'left' },
+  count: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   foot: { display: 'flex', alignItems: 'center', columnGap: '10px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
 
@@ -40,6 +41,10 @@ interface Props {
   onRequest?: (req: ProductionRequest | undefined) => void
   /** 参考の素材が外(右端の帯へのドラッグ)で増えたら変わる(素材の欄を読み直す) */
   assetsVersion?: number
+  /** 参考の素材の数(畳んでいても見出しに出す。右端の帯と同じ数) */
+  assetCount?: number
+  /** 素材の欄で数が変わったとき(右端の帯の数を合わせる) */
+  onAssetCount?: (n: number) => void
 }
 
 /**
@@ -48,7 +53,7 @@ interface Props {
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
-export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0 }: Props) {
+export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0, assetCount = 0, onAssetCount }: Props) {
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -57,8 +62,8 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   const [busy, setBusy] = useState(false)
   // 「制作に渡す」を押したあと、依頼ができたかを読み直す回数(制作のページで HTML を作ってから依頼するので、少し遅れる)
   const [poll, setPoll] = useState(0)
-  // 参考の素材の欄の開閉(人ごとに覚える)
-  const [assetsOpen, setAssetsOpen] = useState(() => loadPref<boolean>(ASSETS_KEY, true))
+  // 参考の素材の欄の開閉(人ごとに覚える。既定は畳む: 右端の帯の「素材」でいつでも開けるので、ここは数が見えればよい)
+  const [assetsOpen, setAssetsOpen] = useState(() => loadPref<boolean>(ASSETS_KEY, false))
   const toggleAssets = () => {
     setAssetsOpen(!assetsOpen)
     savePref(ASSETS_KEY, !assetsOpen)
@@ -191,6 +196,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         <button type="button" className={s.fold} onClick={toggleAssets} aria-expanded={assetsOpen}>
           <span className={s.num}>3</span>
           {t('参考の画像・資料・URL', 'Reference images, files and URLs')}
+          <span className={s.count}>{t(`${assetCount} 件`, `${assetCount}`)}</span>
           {assetsOpen ? <ChevronUpRegular /> : <ChevronDownRegular />}
         </button>
         {assetsOpen && (
@@ -208,6 +214,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
             productionDue={e.form.productionDue}
             productIds={e.items.map((i) => i.productId)}
             products={e.products}
+            onCount={onAssetCount}
           />
         )}
       </div>

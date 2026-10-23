@@ -265,7 +265,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       alive = false
     }
   }, [e.card.id, side, assetsVersion])
-  const memoLines = e.form.instructions.split('\n').filter((x) => x.trim()).length
+  // 渡す前に、制作の担当か締め切りが空いている(帯の「渡すもの」に点を付ける。渡す準備ができていないことに気づけるように)
+  const handoffMissing = !e.form.handedOffAt && (!e.form.productionOwner.trim() || !e.form.productionDue)
   // プレビューの場所を押してコメントを書く(PreviewPins の覆い。押した場所はコミュニケーションの書く欄に渡る)
   const [placing, setPlacing] = useState(false)
   const endPlacing = useCallback(() => setPlacing(false), [])
@@ -635,7 +636,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
             <div className={s.pane}>
               <div className={s.colTitle}>{t('渡すもの(制作へ)', 'For production')}</div>
-              <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} />
+              <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} />
             </div>
           )}
         </div>
@@ -676,7 +677,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <span className={s.sideLabel}>{t('素材', 'Assets')}</span>
             </button>
           </Tooltip>
-          <Tooltip content={t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)')} relationship="description" positioning="before">
+          <Tooltip content={handoffMissing ? t('渡すもの(制作へ)。制作の担当か締め切りが、まだ空いています', 'Handoff (to production). Assignee or due date is still empty') : t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)')} relationship="description" positioning="before">
             <button
               type="button"
               className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn, dropOver === 'handoff' && s.sideDrop)}
@@ -695,7 +696,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             >
               <span className={s.sideIcon}>
                 <BoxMultipleArrowRightRegular />
-                {memoLines > 0 && <span className={s.sideBadge}>{memoLines}</span>}
+                {handoffMissing && <span className={s.sideDot} style={{ backgroundColor: tokens.colorPaletteMarigoldBackground3 }} />}
               </span>
               <span className={s.sideLabel}>{t('渡すもの', 'Handoff')}</span>
             </button>
