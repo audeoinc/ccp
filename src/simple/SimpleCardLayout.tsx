@@ -9,6 +9,12 @@ import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
 import { CommPane } from './CommPane'
 import { PinFloat, type PinTarget } from '../PinFloat'
+import { focusSoon, type ContextItem } from '../ContextMenu'
+import { focusPin } from '../pinStore'
+import { forgetLinkedPin, linkedPin } from '../pinActions'
+import { heroImage } from '../images'
+import { productUrl } from '../links'
+import { EditRegular, ImageEditRegular, OpenRegular, ArrowSwapRegular, DeleteRegular, SparkleRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { ImageThumb } from '../ImageThumb'
 import { ALERT_COLOR } from '../alertColors'
@@ -20,7 +26,7 @@ import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
 import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
-import { partKey, partOfAnchor, samePart, type PartRef } from './parts'
+import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import { StageHeader } from './StageHeader'
 import { HandoffSheet } from './HandoffSheet'
@@ -272,8 +278,76 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 右の帯のやり取りは開かない(2026-10-23 利用者: ほとんどのコメントはピン経由なので、ピンだけで進められるように)
   const [placing, setPlacing] = useState(false)
   const endPlacing = useCallback(() => setPlacing(false), [])
-  const [pinTarget, setPinTarget] = useState<PinTarget | null>(null)
+  // リンク(pin=…)で開いたときは、そのピンのフロートを開いて始める
+  const [pinTarget, setPinTarget] = useState<PinTarget | null>(() => {
+    const id = linkedPin()
+    return id ? { noteId: id } : null
+  })
+  useEffect(() => {
+    const id = linkedPin()
+    if (id) focusPin(id)
+  }, [])
   const openThreads = useCallback((noteId?: string) => setPinTarget(noteId ? { noteId } : { pending: true }), [])
+  const closePin = () => {
+    forgetLinkedPin()
+    setPinTarget(null)
+  }
+  // 右クリックの「画像を入れ替える」(メイン画像のペインの「入れ替える」を開く)
+  const [heroReplace, setHeroReplace] = useState(0)
+  /**
+   * プレビューの右クリックの項目(「ここにピンを打つ」のあと)。押した所の部品について、部品のペイン・商品のフロートのボタンと同じ処理を呼ぶ。
+   * 反映中は、中身を変える項目を押せなくする(ボタンと同じ)
+   */
+  const previewMenu = (under: Element): ContextItem[] => {
+    const root = boxRef.current
+    const p = root ? partFromElement(under, root) : null
+    if (!p) return []
+    const askAi = () => {
+      select(p)
+      focusSoon('[data-part-ai-input]')
+    }
+    const list: ContextItem[] = [{ key: 'edit', label: t('この部品を直す', 'Edit this part'), icon: <EditRegular />, onSelect: () => select(p) }]
+    if (p.kind !== 'slot') list.push({ key: 'ai', label: t('この部品について AI に頼む', 'Ask AI about this part'), icon: <SparkleRegular />, onSelect: askAi })
+    // ボタンと同じく、反映中だけ押せなくする(確定した週は、保存のときに理由を聞く)
+    const busy = e.saving
+    if (p.kind === 'product') {
+      const it = e.items.find((i) => i.key === p.itemKey)
+      const url = productUrl(e.products.find((x) => x.id === it?.productId))
+      list.push(
+        { key: 'swap', label: t('商品を差し替える', 'Swap the product'), icon: <ArrowSwapRegular />, divider: true, disabled: busy, onSelect: () => e.openProduct(p.itemKey) },
+        { key: 'page', label: t('商品ページを開く', 'Open the product page'), icon: <OpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
+        {
+          key: 'remove',
+          label: t('この商品を外す', 'Remove this product'),
+          icon: <DeleteRegular />,
+          disabled: busy,
+          // 部品のペインの「外す(候補に戻す)」と同じ
+          onSelect: () => {
+            e.removeItem(p.itemKey)
+            if (part && samePart(part, p)) select(null)
+          },
+        },
+      )
+    }
+    if (p.kind === 'hero') {
+      const src = heroImage(e.hero)
+      list.push(
+        {
+          key: 'replace',
+          label: t('画像を入れ替える', 'Replace the image'),
+          icon: <ImageEditRegular />,
+          divider: true,
+          disabled: busy,
+          onSelect: () => {
+            select(p)
+            setHeroReplace((n) => n + 1)
+          },
+        },
+        { key: 'tab', label: t('画像を新しいタブで開く', 'Open the image in a new tab'), icon: <OpenRegular />, disabled: !src, onSelect: () => window.open(src, '_blank', 'noreferrer') },
+      )
+    }
+    return list
+  }
   const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
   const saveWidths = () => savePref(WIDTH_KEY, widths)
   const toggleProducts = () => {
@@ -494,7 +568,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
             {markOn('alert') && e.alertOverlay}
-            <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} />
+            <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />
             {pinTarget && (
               <PinFloat
                 cardId={e.card.id}
@@ -504,7 +578,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 target={pinTarget}
                 productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
                 onTarget={setPinTarget}
-                onClose={() => setPinTarget(null)}
+                onClose={closePin}
                 editSpot={(anchor, productId) => {
                   const p = partOfAnchor(anchor, (pid) => e.items.find((i) => i.productId === pid)?.key, productId)
                   return p ? () => select(p) : null
@@ -531,7 +605,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} />
           {e.dirty && (
             <div className={s.applyBox}>
               <span className={s.hint}>

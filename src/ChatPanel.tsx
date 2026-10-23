@@ -258,6 +258,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro,
         {open && messages.length > 0 && chips}
         <div className={s.inputRow}>
           <AutoTextarea
+            data-ai-chat-input=""
             className={s.input}
             size="small"
             rows={1}

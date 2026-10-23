@@ -4,6 +4,8 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import { CommentAddRegular } from '@fluentui/react-icons'
 import { tr, useT } from './i18n'
 import { keepBrowserMenu, useContextMenu } from './ContextMenu'
+import { pinMenuItems } from './pinMenu'
+import { myName, onMeChange } from './history'
 import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins, type PendingPin } from './pinStore'
 
 const PIN = 22
@@ -49,6 +51,8 @@ interface MountArgs {
     onOpenThreads: (noteId?: string) => void
     /** 枠の中の右クリック(画面の座標と、そこにピンを打つ処理)。右クリックのメニューは親の文書に出す */
     onMenu: (x: number, y: number, place: () => void) => void
+    /** 枠の中のピンの右クリック(解決にする・リンクをコピー) */
+    onPinMenu: (x: number, y: number, noteId: string) => void
   }
 }
 
@@ -135,12 +139,22 @@ function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, la
   }
   // 右クリック →「ここにピンを打ってコメントする」(ブラウザのメニューの逃げ道は keepBrowserMenu。ピンの上では出さない)
   const onMenu = (e: MouseEvent) => {
-    if (keepBrowserMenu(e, doc) || (e.target as Element | null)?.closest?.('[data-ccp-pins]')) return
-    e.preventDefault()
+    if (keepBrowserMenu(e, doc)) return
     const f = frame.getBoundingClientRect()
     const k = frame.offsetWidth > 0 ? f.width / frame.offsetWidth : 1
     const { clientX: x, clientY: y } = e
-    handlers.onMenu(f.left + (frame.clientLeft + x) * k, f.top + (frame.clientTop + y) * k, () => placeAt(x, y))
+    const sx = f.left + (frame.clientLeft + x) * k
+    const sy = f.top + (frame.clientTop + y) * k
+    const target = e.target as Element | null
+    if (target?.closest?.('[data-ccp-pins]')) {
+      const id = target.closest('[data-pin-id]')?.getAttribute('data-pin-id')
+      if (!id || id === 'pending') return
+      e.preventDefault()
+      handlers.onPinMenu(sx, sy, id)
+      return
+    }
+    e.preventDefault()
+    handlers.onMenu(sx, sy, () => placeAt(x, y))
   }
   doc.addEventListener('contextmenu', onMenu)
   const onKey = (e: KeyboardEvent) => {
@@ -183,10 +197,18 @@ export function HtmlPins({ frame, cardId, view, placing, onPlacingEnd, onOpenThr
     (x: number, y: number, place: () => void) => openAt(x, y, [{ key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: place }]),
     [openAt, t],
   )
-  const handlers = useRef({ onPlacingEnd, onOpenThreads, onMenu })
+  const me = useSyncExternalStore(onMeChange, myName).trim()
+  const onPinMenu = useCallback(
+    (x: number, y: number, noteId: string) => {
+      const n = notes.find((v) => v.id === noteId)
+      if (n) openAt(x, y, pinMenuItems(n, me))
+    },
+    [notes, me, openAt],
+  )
+  const handlers = useRef({ onPlacingEnd, onOpenThreads, onMenu, onPinMenu })
   useEffect(() => {
-    handlers.current = { onPlacingEnd, onOpenThreads, onMenu }
-  }, [onPlacingEnd, onOpenThreads, onMenu])
+    handlers.current = { onPlacingEnd, onOpenThreads, onMenu, onPinMenu }
+  }, [onPlacingEnd, onOpenThreads, onMenu, onPinMenu])
 
   useEffect(() => {
     if (!cardId) return

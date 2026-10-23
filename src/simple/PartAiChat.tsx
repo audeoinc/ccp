@@ -159,6 +159,7 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
       {error && <span className={s.error}>{error}</span>}
       <div className={s.input}>
         <AutoTextarea
+          data-part-ai-input=""
           size="small"
           rows={1}
           value={draft}

@@ -8,6 +8,7 @@ import { activeUsers, usePeople } from './people'
 import { anchorLabel, bumpNotes, focusPin, notesVersion, pendingPin, pinNumbers, setPendingPin, subscribePins } from './pinStore'
 import type { NoteStage } from './notesStage'
 import { locale, tr, useT } from './i18n'
+import { setNoteResolved } from './pinActions'
 
 const useStyles = makeStyles({
   surface: { width: '320px', padding: '10px 12px', display: 'grid', rowGap: '8px' },
@@ -194,7 +195,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
     const r = await run(() => CardNotesService.create({ delivery_card_id: cardId, kind: 'reply', stage, author: me || cardOwner || '', body, source_note: root.id }))
     if (r) setText('')
   }
-  const toggleResolved = () => root && void run(() => CardNotesService.update(root.id, root.resolved ? { resolved: 0 } : { resolved: 1, replied_by: me, replied_at: new Date().toISOString() }))
+  const toggleResolved = () => root && void run(() => setNoteResolved(root, !root.resolved, me))
   /** 自分の書き込みを消す(返信もまとめて。返信だけが残っても、読めないため) */
   const remove = async () => {
     if (!root) return

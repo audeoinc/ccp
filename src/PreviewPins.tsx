@@ -4,7 +4,9 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Item } from './items'
 import { CommentAddRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
-import { keepBrowserMenu, useContextMenu } from './ContextMenu'
+import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
+import { pinMenuItems } from './pinMenu'
+import { myName, onMeChange } from './history'
 import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins } from './pinStore'
 
 const PIN = 22
@@ -57,6 +59,11 @@ interface Props {
   onPlacingEnd: () => void
   /** ピンを押した(その書き込みの ID)・場所を選んだ(ID なし)とき。やり取りの欄か、ピンのフロートを開く */
   onOpenThreads: (noteId?: string) => void
+  /**
+   * 右クリックのメニューに、「ここにピンを打つ」のあとに足す項目(押した所のプレビューの要素から、画面ごとに作る。
+   * 部品を直す・商品を差し替えるなど、その画面のボタンと同じ処理を呼ぶ)
+   */
+  menuItems?: (under: Element) => ContextItem[]
 }
 
 interface Spot {
@@ -70,7 +77,7 @@ interface Spot {
  * その中の割合の位置にピンを重ねる。プレビューの部品はほかの画面とも共通なので、目印を読むだけにする(アラートの印と同じやり方)。
  * 場所を選ぶ間は、プレビューを覆う層で押した点を受け取り、その下のブロックを目印にする
  */
-export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd, onOpenThreads }: Props) {
+export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd, onOpenThreads, menuItems }: Props) {
   const s = useStyles()
   const t = useT()
   const version = useSyncExternalStore(subscribePins, notesVersion)
@@ -194,21 +201,36 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
   // 右クリックで「ここにピンを打ってコメントする」(ボタンで場所を選ぶ形に切り替えずに打てる)。ブラウザのメニューの逃げ道は keepBrowserMenu
   const ctx = useContextMenu()
   const { openAt } = ctx
-  const placeRef = useRef(placeAt)
+  const me = useSyncExternalStore(onMeChange, myName).trim()
+  // 右クリックの処理は、いまの値(ピン・書き込み・画面の項目)で動かす(登録し直さないよう、ref で持つ)
+  const live = useRef({ placeAt, notes, menuItems, me })
   useEffect(() => {
-    placeRef.current = placeAt
+    live.current = { placeAt, notes, menuItems, me }
   })
   useEffect(() => {
     const box = boxRef.current
     if (!box || !cardId) return
     const onMenu = (e: MouseEvent) => {
       if (keepBrowserMenu(e)) return
-      // ピンの上・場所の目印のない所(プレビューの外の余白)では出さない
-      const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => box.contains(el) && !layerRef.current?.contains(el))
-      if (!under?.closest('[data-item-key], [data-anchor]') || (e.target instanceof Element && e.target.closest('[data-pin-id]'))) return
-      e.preventDefault()
       const { clientX: x, clientY: y } = e
-      openAt(x, y, [{ key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: () => void placeRef.current(x, y) }])
+      // ピンの上: そのピンへの操作(解決にする・リンクをコピー)
+      const pinId = (e.target as Element | null)?.closest?.('[data-pin-id]')?.getAttribute('data-pin-id')
+      if (pinId) {
+        const n = live.current.notes.find((x) => x.id === pinId)
+        if (!n) return
+        e.preventDefault()
+        openAt(x, y, pinMenuItems(n, live.current.me))
+        return
+      }
+      // 場所の目印のない所(プレビューの外の余白)では出さない
+      const under = document.elementsFromPoint(x, y).find((el) => box.contains(el) && !layerRef.current?.contains(el))
+      if (!under?.closest('[data-item-key], [data-anchor]')) return
+      e.preventDefault()
+      const extra = live.current.menuItems?.(under) ?? []
+      openAt(x, y, [
+        { key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: () => void live.current.placeAt(x, y) },
+        ...extra.map((it, i) => (i === 0 ? { ...it, divider: true } : it)),
+      ])
     }
     box.addEventListener('contextmenu', onMenu)
     return () => box.removeEventListener('contextmenu', onMenu)

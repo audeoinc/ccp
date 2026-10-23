@@ -37,6 +37,8 @@ import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
 import { PinFloat, type PinTarget } from './PinFloat'
+import { focusPin } from './pinStore'
+import { forgetLinkedPin, linkedPin } from './pinActions'
 import { CopyLinkButton } from './CopyLinkButton'
 
 const RAIL_W = 32
@@ -173,7 +175,15 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const endPlacingPin = useCallback(() => setPlacingPin(false), [])
   const [previewFrame, setPreviewFrame] = useState<HTMLIFrameElement | null>(null)
   // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右の制作のやり取りは、全部の流れとして残す)
-  const [pinTarget, setPinTarget] = useState<PinTarget | null>(null)
+  // リンク(pin=…)で開いたときは、そのピンのフロートを開いて始める(制作のピンでなければ、ピンが見つからず出ない)
+  const [pinTarget, setPinTarget] = useState<PinTarget | null>(() => {
+    const id = linkedPin()
+    return id ? { noteId: id } : null
+  })
+  useEffect(() => {
+    const id = linkedPin()
+    if (id) focusPin(id)
+  }, [])
   const [pasting, setPasting] = useState<string | null>(null)
   // 仕上がりを見る(X58 段階 4)
   const [finishedOpen, setFinishedOpen] = useState(false)
@@ -877,7 +887,10 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   target={pinTarget}
                   productName={(id) => snap.products.find((p) => p.id === id)?.name ?? ''}
                   onTarget={setPinTarget}
-                  onClose={() => setPinTarget(null)}
+                  onClose={() => {
+                    forgetLinkedPin()
+                    setPinTarget(null)
+                  }}
                 />
               )}
             </div>

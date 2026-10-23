@@ -68,3 +68,14 @@ export function useContextMenu(): { openAt: (x: number, y: number, items: Contex
   ) : null
   return { openAt, close, menu }
 }
+
+/**
+ * 項目を選んだあとで、入力欄などに焦点を移す(「AI に頼む」で AI の入力欄へ)。
+ * メニューが閉じるときに焦点を戻す・開いたタブが焦点を取るので、少しの間、移るまで繰り返す
+ */
+export function focusSoon(selector: string, tries = 8) {
+  const el = document.querySelector<HTMLElement>(selector)
+  if (el && document.activeElement === el) return
+  el?.focus()
+  if (tries > 0) window.setTimeout(() => focusSoon(selector, tries - 1), 100)
+}

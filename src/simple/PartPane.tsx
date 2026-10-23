@@ -85,10 +85,12 @@ interface Props {
   /** 部品ごとの AI とのやり取り(部品を選び直しても残るよう、画面の側が持つ) */
   chats: Record<string, PartTurn[]>
   setChat: (key: string, f: (prev: PartTurn[]) => PartTurn[]) => void
+  /** 増えたら、メイン画像を入れ替える欄を開く(プレビューの右クリックの「画像を入れ替える」) */
+  heroReplace?: number
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
-export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat }: Props) {
+export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace }: Props) {
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
@@ -99,6 +101,12 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   // メイン画像を変える欄を開いている部品(部品を移ると畳む。まだ画像がなければ、はじめから開く)
   const [heroOpenKey, setHeroOpenKey] = useState<string | null>(null)
   const heroOpen = !!part && (!e.hero || heroOpenKey === partKey(part))
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (heroReplace && part?.kind === 'hero') setHeroOpenKey(partKey(part))
+    // 頼まれたとき(数が増えたとき)だけ開く。部品を選び直したときには開かない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroReplace])
   const [linkEditing, setLinkEditing] = useState(false)
   const heroDefaultLink = e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl
   // 使える期限が配信日より前(選んだあとで期限が来た画像。入れ替えを促す)

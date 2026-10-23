@@ -87,6 +87,11 @@ import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
 import type { PartRef } from './simple/parts'
 import { PinFloat, type PinTarget } from './PinFloat'
+import { focusSoon, type ContextItem } from './ContextMenu'
+import { focusPin } from './pinStore'
+import { forgetLinkedPin, linkedPin } from './pinActions'
+import { heroImage } from './images'
+import { ArrowSwapRegular as CtxSwapRegular, DeleteRegular as CtxDeleteRegular, EditRegular as CtxEditRegular, ImageEditRegular as CtxImageEditRegular, OpenRegular as CtxOpenRegular, SparkleRegular as CtxSparkleRegular } from '@fluentui/react-icons'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -594,7 +599,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [placingPin, setPlacingPin] = useState(false)
   const endPlacingPin = useCallback(() => setPlacingPin(false), [])
   // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右のやり取りの欄は、全部の流れとして残す)
-  const [pinTarget, setPinTarget] = useState<PinTarget | null>(null)
+  // リンク(pin=…)で開いたときは、そのピンのフロートを開いて始める(企画のピンでなければ、ピンが見つからず出ない)
+  const [pinTarget, setPinTarget] = useState<PinTarget | null>(() => {
+    const id = linkedPin()
+    return id ? { noteId: id } : null
+  })
+  useEffect(() => {
+    const id = linkedPin()
+    if (id) focusPin(id)
+  }, [])
   // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
   // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
   const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
@@ -2172,6 +2185,62 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     )}
     </>
   )
+  /**
+   * 詳しい画面のプレビューの右クリックの項目(「ここにピンを打つ」のあと)。押した所について、工程のタブ・商品のフロート・プレビューの「外す」と同じ処理を呼ぶ。
+   * 直す・AI に頼むは、その部品を直す工程のタブを開く(AI は、そのタブの AI チャットの入力欄へ)。保存中は、中身を変える項目を押せなくする
+   */
+  const detailPreviewMenu = (under: Element): ContextItem[] => {
+    const itemKey = under.closest('[data-item-key]')?.getAttribute('data-item-key') ?? undefined
+    const anchor = under.closest('[data-anchor]')?.getAttribute('data-anchor') ?? ''
+    const kind = anchor.split(':')[0]
+    const tab: TopTab | null = itemKey ? 'sections' : kind === 'hero' || kind === 'herotext' || kind === 'subject' ? 'hero' : kind === 'section' ? 'sections' : kind === 'button' ? 'links' : kind === 'push' ? 'notice' : null
+    // ボタンと同じく、保存中だけ押せなくする(確定した週は、保存のときに理由を聞く)
+    const busy = saving
+    const openTab = (to: TopTab) => setStepRequest((r) => ({ tab: to, seq: (r?.seq ?? 0) + 1 }))
+    const list: ContextItem[] = []
+    if (tab) {
+      list.push(
+        { key: 'edit', label: t('この部品を直す', 'Edit this part'), icon: <CtxEditRegular />, onSelect: () => openTab(tab) },
+        {
+          key: 'ai',
+          label: t('この部品について AI に頼む', 'Ask AI about this part'),
+          icon: <CtxSparkleRegular />,
+          onSelect: () => {
+            openTab(tab)
+            focusSoon('[data-ai-chat-input]')
+          },
+        },
+      )
+    }
+    if (itemKey) {
+      const it = items.find((i) => i.key === itemKey)
+      const url = productUrl(products.find((x) => x.id === it?.productId))
+      list.push(
+        {
+          key: 'swap',
+          label: t('商品を差し替える', 'Swap the product'),
+          icon: <CtxSwapRegular />,
+          divider: true,
+          disabled: busy,
+          // 商品の箱を押したときと同じ、商品のフロート
+          onSelect: () => {
+            setActAlert(null)
+            setSlotAction(null)
+            setProductOpen(itemKey)
+          },
+        },
+        { key: 'page', label: t('商品ページを開く', 'Open the product page'), icon: <CtxOpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
+        { key: 'remove', label: t('この商品を外す', 'Remove this product'), icon: <CtxDeleteRegular />, disabled: busy, onSelect: () => removeItem(itemKey) },
+      )
+    } else if (kind === 'hero') {
+      const src = heroImage(hero)
+      list.push(
+        { key: 'replace', label: t('画像を入れ替える', 'Replace the image'), icon: <CtxImageEditRegular />, divider: true, disabled: busy, onSelect: () => openTab('hero') },
+        { key: 'tab', label: t('画像を新しいタブで開く', 'Open the image in a new tab'), icon: <CtxOpenRegular />, disabled: !src, onSelect: () => window.open(src, '_blank', 'noreferrer') },
+      )
+    }
+    return list
+  }
   const simpleAlertOverlay = (
     <>
     {itemAlertKinds.size > 0 && (
@@ -2832,6 +2901,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                   placing={placingPin}
                   onPlacingEnd={endPlacingPin}
                   onOpenThreads={(noteId) => setPinTarget(noteId ? { noteId } : { pending: true })}
+                  menuItems={detailPreviewMenu}
                 />
                 {card && pinTarget && (
                   <PinFloat
@@ -2842,7 +2912,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     target={pinTarget}
                     productName={(id) => products.find((p) => p.id === id)?.name ?? ''}
                     onTarget={setPinTarget}
-                    onClose={() => setPinTarget(null)}
+                    onClose={() => {
+                      forgetLinkedPin()
+                      setPinTarget(null)
+                    }}
                   />
                 )}
                 <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
