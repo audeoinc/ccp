@@ -24,6 +24,7 @@ import {
   type HeroText,
   type LinkKind,
   type Section,
+  type SectionBg,
   type SectionKind,
   type TemplateLayout,
   type PushSpec,
@@ -31,7 +32,7 @@ import {
 } from './templates'
 import { tr } from './i18n'
 import { CELL_VIEWS, MAX_CELL_COLS, MAX_CELL_ROWS, cellRows, normalizeCells, type Cell, type CellView } from './cells'
-import { normalizeTable, parsePart, storedPart } from './tables'
+import { SECTION_BG, normalizeTable, parsePart, storedPart } from './tables'
 
 /** 保存されたマス目の枠を読む(数でないもの・欠けたものは外す。形は toStored で整える) */
 function parseCells(v: unknown): Cell[] {
@@ -76,6 +77,11 @@ export function toStored(s: Section): Section {
       cols: t.cols,
       rows: t.rows,
       parts: (t.parts ?? []).map(storedPart),
+      ...(t.evenRows ? { evenRows: t.evenRows } : {}),
+      ...(s.mobile === 'stack' ? { mobile: 'stack' as const } : {}),
+      ...(s.bg && s.bg in SECTION_BG ? { bg: s.bg } : {}),
+      ...(s.space === 'tight' || s.space === 'wide' ? { space: s.space } : {}),
+      ...(s.divider ? { divider: true } : {}),
       ...(s.categoryHeading ? { categoryHeading: true } : {}),
       ...(s.copy === false ? { copy: false } : {}),
     }
@@ -171,7 +177,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
     const sections: Section[] = []
     const buttonBlocks: ButtonBlock[] = []
     for (const r of raw) {
-      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string; id?: unknown; name?: unknown; aiNote?: unknown; rows?: unknown; parts?: unknown }
+      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string; id?: unknown; name?: unknown; aiNote?: unknown; rows?: unknown; parts?: unknown; evenRows?: unknown; mobile?: unknown; bg?: unknown; space?: unknown; divider?: unknown }
       if (o?.kind === 'hero' || o?.kind === 'app') continue
       if (o?.kind === 'table') {
         // 表: 箱がなくても(ボタンだけのセクションも)読む。埋めた空きの ID は、位置から決める(読むたびに同じ ID に)
@@ -188,6 +194,11 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
               cols: Number(o.cols),
               rows: Number(o.rows),
               parts,
+              ...(o.mobile === 'stack' ? { mobile: 'stack' as const } : {}),
+              ...(typeof o.bg === 'string' && o.bg in SECTION_BG ? { bg: o.bg as SectionBg } : {}),
+              ...(o.space === 'tight' || o.space === 'wide' ? { space: o.space as 'tight' | 'wide' } : {}),
+              ...(o.divider === true ? { divider: true } : {}),
+              ...(Array.isArray(o.evenRows) ? { evenRows: o.evenRows.filter((x): x is number => typeof x === 'number') } : {}),
               slots: 0,
               ...(o.categoryHeading ? { categoryHeading: true } : {}),
               ...(o.copy === false ? { copy: false } : {}),

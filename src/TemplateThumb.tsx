@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { makeStyles, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
-import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout } from './templates'
+import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout, ratioValue } from './templates'
 import { cellRows, isTextView } from './cells'
-import { boxFields } from './tables'
+import { SECTION_BG, boxFields, buttonColor } from './tables'
 
 // 見取り図は、受信側のメールの見た目を写したものなので、テーマに依らず固定の配色にする
 const HERO_COLOR: Record<HeroKind, string> = { standard: '#cfd2dc', collab: '#b9a9d6', offer: '#f0a5a0' }
@@ -156,6 +156,9 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
         const colW = (inner - (cols - 1) * px(2)) / cols
         const rowH = Array.from({ length: rows }, (_, r) => {
           const on = parts.filter((p) => r >= p.r && r < p.r + p.h)
+          // 画像・動画は、選んだ形の高さ(省略は横に広い 2:1)
+          const media = on.filter((p) => p.type === 'media' && p.h === 1).map((p) => (p.w * colW) / ratioValue(p.ratio ?? 'wide'))
+          if (media.length > 0) return Math.max(...media)
           if (on.some((p) => p.type === 'box' && p.h === 1 && !isTextView(p.view))) return colW
           if (on.some((p) => p.type === 'box' && isTextView(p.view))) return Math.max(colW * 0.6, inner * 0.3)
           if (on.some((p) => p.type === 'box')) return colW * 0.8
@@ -170,10 +173,9 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
             <div style={{ height: px(1.5), width: '40%', background: offer ? RED : LINE }} />
           </div>
         )
-        body = (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: rowH.map((h) => `${Math.round(h)}px`).join(' '), gap: px(2) }}>
-            {parts.map((p) => {
-              const area = { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}`, minHeight: 0, minWidth: 0 }
+        // 部品を 1 つ描く(area: 置く場所。均等に並べる行では、帯の中に順に並べるので、場所は持たない)
+        const draw = (p: (typeof parts)[number], place: React.CSSProperties = {}) => {
+              const area = { ...place, minHeight: 0, minWidth: 0 }
               if (p.type === 'box') {
                 if (isTextView(p.view)) {
                   return (
@@ -194,7 +196,12 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
               if (p.type === 'button') {
                 return (
                   <div key={p.id} style={{ ...area, display: 'grid', alignContent: 'center', padding: `0 ${p.w === cols && cols > 1 ? '20%' : px(2) + 'px'}` }}>
-                    <div style={{ height: px(5), borderRadius: 99, background: p.style === 'outline' ? '#fff' : offer ? RED : '#222', border: p.style === 'outline' ? '1px solid #222' : 'none' }} />
+                    {/* 文字のリンクは、細い線だけ(枠のない文字) */}
+                    {p.style === 'text' ? (
+                      <div style={{ height: px(1.5), width: '50%', justifySelf: 'center', background: buttonColor(p, offer) }} />
+                    ) : (
+                      <div style={{ height: px(5), borderRadius: 99, background: p.style === 'outline' ? '#fff' : buttonColor(p, offer), border: p.style === 'outline' ? `1px solid ${buttonColor(p, offer)}` : 'none' }} />
+                    )}
                   </div>
                 )
               }
@@ -206,7 +213,27 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                   </div>
                 )
               }
+              if (p.type === 'media') {
+                return (
+                  <div key={p.id} style={{ ...area, display: 'grid', placeItems: 'center', background: p.src ? `center / cover no-repeat url("${p.src.replace(/"/g, '%22')}")` : IMG }}>
+                    {p.video && <div style={{ width: px(6), height: px(6), borderRadius: '50%', background: 'rgba(0,0,0,0.55)' }} />}
+                  </div>
+                )
+              }
               return <div key={p.id} style={area} />
+        }
+        // 均等に並べる行は、行いっぱいの帯の中で、中身のある部品を同じ幅で並べる
+        const even = sec.evenRows ?? []
+        body = (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: rowH.map((h) => `${Math.round(h)}px`).join(' '), gap: px(2) }}>
+            {parts.filter((p) => !even.includes(p.r)).map((p) => draw(p, { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}` }))}
+            {even.map((r) => {
+              const row = parts.filter((p) => p.r === r && p.type !== 'empty').sort((a, b) => a.c - b.c)
+              return (
+                <div key={`even${r}`} style={{ gridColumn: '1 / -1', gridRow: r + 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, row.length)}, 1fr)`, gap: px(2) }}>
+                  {row.map((p) => draw(p))}
+                </div>
+              )
             })}
           </div>
         )
@@ -279,7 +306,7 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
         )
     }
     return (
-      <div key={i} style={{ display: 'grid', gap: px(2), paddingTop: px(3) }}>
+      <div key={i} style={{ display: 'grid', gap: px(2), paddingTop: px(3), ...(sec.bg ? { background: SECTION_BG[sec.bg], padding: px(2) } : {}), ...(sec.divider ? { borderTop: `1px solid ${LINE}` } : {}) }}>
         {sec.categoryHeading && line('40%', 2.5, INK)}
         {sec.copy !== false && line('55%', 1.5, '#c7ccd4')}
         {body}

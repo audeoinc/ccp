@@ -28,8 +28,20 @@ export type HeroText = 'band' | 'overlay' | 'below'
 export type SectionKind = 'grid' | 'photos' | 'wide' | 'mosaic' | 'story' | 'feature' | 'cells' | 'table'
 export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic', 'story', 'feature', 'cells', 'table']
 
-/** 表の部品の種類。箱 = 商品 1 点 */
-export type PartType = 'box' | 'button' | 'text' | 'empty'
+/** 表の部品の種類。箱 = 商品 1 点。media = 画像・動画(バナー・タイル・アイコン。動画は、メールではサムネイル + ▶ で動画のページへ) */
+export type PartType = 'box' | 'button' | 'text' | 'media' | 'empty'
+
+/** 写真・画像の形(縦:横)。square 1:1 / portrait 3:4 / landscape 4:3 / wide 2:1 */
+export type MediaRatio = 'square' | 'portrait' | 'landscape' | 'wide'
+export const MEDIA_RATIOS: MediaRatio[] = ['square', 'portrait', 'landscape', 'wide']
+/** 形の、横 / 縦 */
+export const ratioValue = (r: MediaRatio): number => ({ square: 1, portrait: 3 / 4, landscape: 4 / 3, wide: 2 })[r]
+
+/** ボタンの色(tables.ts の BUTTON_COLORS) */
+export type ButtonColor = 'black' | 'red' | 'navy' | 'green' | 'gray'
+
+/** 文字の揃え */
+export type TextAlign = 'left' | 'center' | 'right'
 
 /** 箱に出すもの(写真のほか)。名前・価格は商品のデータから出す(テンプレートでは文言を打たない。値段の食い違いを防ぐため) */
 export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button'
@@ -59,17 +71,36 @@ export interface TablePart {
   badge?: string
   /** ボタン: 文言(空は、既定の文言) */
   label?: string
-  /** ボタン: 見た目(省略は fill) */
-  style?: 'fill' | 'outline'
-  /** ボタン: リンク先の種類(省略は campaign) */
+  /** ボタン: 見た目(省略は fill)。text: 文字のリンク(WOMEN / MEN のような、枠のない文字) */
+  style?: 'fill' | 'outline' | 'text'
+  /** ボタン: 色(決まった色から選ぶ。ブランドの見た目をそろえるため、自由な色は持たない。省略は黒。期間限定のヒーローでは赤) */
+  color?: ButtonColor
+  /** ボタン・画像: リンク先の種類(省略は campaign) */
   link?: LinkKind
-  /** ボタン: 計測用の名前(クリックの集計で使う) */
+  /** ボタン・画像: 計測用の名前(クリックの集計で使う) */
   track?: string
   /** テキスト: 固定の文 */
   text?: string
   /** テキスト: false のとき、配信ごとに書き換えない(省略は書き換えてよい) */
   overridable?: boolean
+  /** テキスト・ボタン: 揃え(省略は、テキストは左・ボタンは中央) */
+  align?: TextAlign
+  /** 箱・画像: 写真・画像の形(省略は、箱は縦長 portrait・写真だけの箱はマスの形・画像は横長 wide) */
+  ratio?: MediaRatio
+  /** 画像: 画像の URL(部品の画像のライブラリから選ぶと、その URL が入る) */
+  src?: string
+  /** 画像: 部品の画像のライブラリの ID(どの画像を使ったかの記録) */
+  imageId?: string
+  /** 画像: 動画の URL。あると動画として扱い、メールでは src をサムネイルにして ▶ を重ね、押すと動画へ */
+  video?: string
+  /** 画像: 画像が出ないときの文(代わりの文) */
+  alt?: string
+  /** 画像: true のとき、配信ごとに差し替える(キャンペーンのバナーなど。省略はテンプレートの画像のまま) */
+  swap?: boolean
 }
+
+/** セクションの背景の色(受信側の見た目なので、メールの中の色は固定。tables.ts の SECTION_BG) */
+export type SectionBg = 'gray' | 'beige' | 'blue' | 'pink'
 
 export interface Section {
   kind: SectionKind
@@ -81,6 +112,19 @@ export interface Section {
   aiNote?: string
   /** 表: 行の数(0 は、まだ最初の行を作っていない) */
   rows?: number
+  /**
+   * 表: 均等に並べる行の番号(0 から)。その行は、列に合わせず、中身のある部品を同じ幅で並べる
+   * (例: 3 列の表の下に、ボタン 2 つを半分ずつ。2026-10-23 利用者と決めた)。縦に結合した部品がかかる行には付けない
+   */
+  evenRows?: number[]
+  /** 表: スマホでの並び方。stack: 縦に積む(上の行から、同じ行は左から)。省略は、列のまま縮める */
+  mobile?: 'stack'
+  /** 表: 背景の色(薄い色から選ぶ。省略は白) */
+  bg?: SectionBg
+  /** 表: 上下の余白(省略はふつう) */
+  space?: 'tight' | 'wide'
+  /** 表: セクションの上に区切り線を引く */
+  divider?: boolean
   /** 表: 部品(すき間なく敷き詰める)。商品の載る順は、上の行から・同じ行は左から(tables.ts の boxesOf) */
   parts?: TablePart[]
   slots: number

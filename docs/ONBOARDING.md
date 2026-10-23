@@ -22,7 +22,7 @@ GitHub の**公開**リポジトリ(`audeoinc/ccp`)。だれでも読めるの�
 
 ## 2. 環境を整える
 
-1. **Node.js** をインストールする(動作確認済み: Node 24、npm 11)。
+1. **Node.js** をインストールする(本番のビルドと CI は Node 26。手元は Node 24・npm 11 でも動く)。
 2. リポジトリを取得する。
    ```bash
    git clone https://github.com/audeoinc/ccp.git

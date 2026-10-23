@@ -6,8 +6,9 @@ import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
 import { MAX_SECTIONS } from './layoutTemplates'
 import { getUiScale } from './uiScale'
-import { BOX_FIELDS, LINK_KINDS, defaultButtonLabel, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
+import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
+import { PartImagePick } from './PartImagePick'
 
 // テンプレートの編集画面の、表の部分(T8。docs/TEMPLATE_OBJECTS.md の 5.2。触れる試作で利用者と決めた形)。
 // パーツ(足すだけ)・表のキャンバス(押す・なぞるで選ぶ、右クリック・行と列の帯で操作)・右の「セクションと部品」のタブを作る。
@@ -137,6 +138,10 @@ const useStyles = makeStyles({
     ':hover': { opacity: 1 },
   },
   cell: { position: 'relative', minWidth: 0, minHeight: 0, borderRadius: '3px', cursor: 'cell', userSelect: 'none', touchAction: 'none', display: 'grid' },
+  evenStrip: { display: 'grid', columnGap: `${GAP}px`, alignItems: 'stretch', minWidth: 0 },
+  evenEmpty: { display: 'grid', placeItems: 'center', fontSize: '10px', color: tokens.colorNeutralForeground3, border: `1px dashed ${tokens.colorNeutralStroke2}`, borderRadius: '3px' },
+  evenPlus: { padding: 0, fontSize: '12px', border: `1px dashed ${tokens.colorNeutralStroke1}`, borderRadius: '3px', backgroundColor: 'transparent', color: tokens.colorNeutralForeground3, cursor: 'pointer', ':hover': { color: tokens.colorBrandForeground1, border: `1px dashed ${tokens.colorBrandStroke1}` }, ':disabled': { opacity: 0.4, cursor: 'default' } },
+  cellSel: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px' },
   peek: { boxShadow: `0 0 0 3px ${tokens.colorPaletteYellowBorderActive}` },
   hot: { boxShadow: `inset 0 0 0 2px ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   eTop: { boxShadow: `inset 0 4px 0 ${tokens.colorBrandBackground}` },
@@ -154,6 +159,10 @@ const useStyles = makeStyles({
   split: { display: 'grid', gridTemplateColumns: '1fr 1fr', backgroundColor: MAIL.panel, borderRadius: '3px', overflow: 'hidden', position: 'relative' },
   splitText: { display: 'grid', alignContent: 'center', rowGap: '3px', padding: '6px', fontSize: '10px', color: MAIL.sub },
   pill: { justifySelf: 'center', alignSelf: 'center', maxWidth: '100%', minWidth: '60%', padding: '5px 12px', borderRadius: '999px', fontSize: '11px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', backgroundColor: MAIL.ink, color: '#fff' },
+  pillText: { backgroundColor: 'transparent', minWidth: 0, padding: '5px 4px', fontWeight: 600, letterSpacing: '1px' },
+  media: { position: 'relative', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '4px', fontSize: '10px', color: MAIL.sub, backgroundColor: MAIL.img, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '3px', overflow: 'hidden' },
+  play: { width: '30px', height: '30px', borderRadius: '50%', display: 'grid', placeItems: 'center', backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '12px' },
+  swapTag: { position: 'absolute', top: '3px', left: '3px', fontSize: '9px', padding: '0 5px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.9)', color: MAIL.ink },
   pillOutline: { backgroundColor: '#fff', color: MAIL.ink, border: `1px solid ${MAIL.ink}` },
   ptext: { alignSelf: 'center', fontSize: '11px', lineHeight: 1.5, color: MAIL.sub, whiteSpace: 'pre-wrap', overflow: 'hidden', padding: '2px 4px' },
   empty: { border: `1px dashed ${MAIL.line}`, borderRadius: '3px', display: 'grid', placeItems: 'center' },
@@ -208,6 +217,8 @@ const useStyles = makeStyles({
   pbody: { display: 'grid', rowGap: '8px', padding: '4px 8px 8px' },
   kv: { display: 'flex', justifyContent: 'space-between', columnGap: '8px', fontSize: '12px' },
   kvLabel: { color: tokens.colorNeutralForeground3 },
+  swatch: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: '11px', padding: '2px 6px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', '& span': { width: '12px', height: '12px', borderRadius: '50%' } },
+  swatchOn: { border: `2px solid ${tokens.colorBrandStroke1}` },
   pid: { fontFamily: tokens.fontFamilyMonospace, fontSize: '11px', color: tokens.colorNeutralForeground3 },
 })
 
@@ -239,6 +250,8 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   const [peek, setPeek] = useState<string | null>(null)
   // キャンバスの箱の ⚙ で開いている箱(見せ方をその場で直す)
   const [quickId, setQuickId] = useState<string | null>(null)
+  // 写した部品(Ctrl+C)。この画面の中だけで持つ
+  const [clip, setClip] = useState<T.Clip | null>(null)
   // 右のタブ: 自分でタブを押したら固定。押していなければ、選んだものがあれば「セクションと部品」
   const [tab, setTab] = useState<'tpl' | 'obj'>('tpl')
   const [pinned, setPinned] = useState(false)
@@ -563,10 +576,17 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     { label: t('下に行を挿入', 'Insert row below'), onClick: () => run(sec.id!, (x) => T.insertRow(x, r + 1)) },
     { label: t('上へ移動', 'Move up'), disabled: r === 0, onClick: () => run(sec.id!, (x) => T.moveRow(x, r, -1)) },
     { label: t('下へ移動', 'Move down'), disabled: r === (sec.rows ?? 1) - 1, onClick: () => run(sec.id!, (x) => T.moveRow(x, r, 1)) },
+    { label: t('この行を複製(すぐ下に)', 'Duplicate this row (below)'), onClick: () => run(sec.id!, (x) => T.duplicateRow(x, r)) },
+    {
+      label: T.isEvenRow(sec, r) ? t('均等に並べるのをやめる(列に合わせる)', 'Stop spreading evenly (align to columns)') : t('この行を均等に並べる(中身のある部品を同じ幅で)', 'Spread this row evenly (same width for each filled part)'),
+      onClick: () => run(sec.id!, (x) => T.toggleEvenRow(x, r)),
+    },
     { label: t('この行から下を、新しいセクションに', 'Split into a new section from this row'), disabled: r === 0, onClick: () => splitAt(sec.id!, r) },
     { label: t('行を削除', 'Delete row'), onClick: () => run(sec.id!, (x) => T.deleteRow(x, r)) },
   ]
   const cellMenu = (sec: Section, ps: TablePart[], rc: T.Rect): MenuItem[] => [
+    { label: t('コピー(Ctrl+C)', 'Copy (Ctrl+C)'), disabled: !ps.some((p) => p.type !== 'empty'), onClick: () => copy(sec, { a: [rc.c, rc.r], b: [rc.c + rc.w - 1, rc.r + rc.h - 1] }) },
+    { label: t('貼り付け(Ctrl+V。空きのマスに)', 'Paste (Ctrl+V, into empty cells)'), disabled: !clip, onClick: () => paste(sec.id!, rc.c, rc.r) },
     { label: t('結合(Ctrl+M)', 'Merge (Ctrl+M)'), disabled: ps.length < 2, onClick: () => run(sec.id!, (x) => T.mergeCells(x, { a: [rc.c, rc.r], b: [rc.c + rc.w - 1, rc.r + rc.h - 1] })) },
     { label: t('分割', 'Split'), disabled: !ps.some((p) => p.w * p.h > 1), onClick: () => run(sec.id!, (x) => T.splitCells(x, ps.map((p) => p.id))) },
     { label: t('空きにする(Delete)', 'Make empty (Delete)'), onClick: () => replace(sec.id!, T.clearCells(sec, ps.map((p) => p.id))) },
@@ -581,7 +601,17 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     { label: t('箱(商品 1 点)', 'Box (1 product)'), onClick: () => placeType(sec.id!, p.id, 'box') },
     { label: t('ボタン', 'Button'), onClick: () => placeType(sec.id!, p.id, 'button') },
     { label: t('テキスト', 'Text'), onClick: () => placeType(sec.id!, p.id, 'text') },
+    { label: t('画像・動画', 'Image / video'), onClick: () => placeType(sec.id!, p.id, 'media') },
   ]
+
+  // ---- コピーと貼り付け(写すのは、範囲に丸ごと入る中身のある部品。貼るのは空きのマスだけ。貼った部品は新しい ID)
+  const copy = (sec: Section, cs: T.CellSel) => {
+    const c = T.copyCells(sec, cs)
+    if (c.parts.length === 0) return setToast(t('写すものがありません(空きのマスは写しません)', 'Nothing to copy (empty cells are not copied)'))
+    setClip(c)
+    setToast(t(`${c.parts.length} 個の部品を写しました。空きのマスを選んで Ctrl+V で貼れます`, `Copied ${c.parts.length} part(s). Select empty cells and press Ctrl+V`))
+  }
+  const paste = (secId: string, c: number, r: number) => clip && run(secId, (x) => T.pasteCells(x, c, r, clip))
 
   // ---- 文字を、その場で直す(ダブルクリック・Enter)
   const startEdit = (p?: TablePart) => {
@@ -619,6 +649,12 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       if (mod && e.key.toLowerCase() === 'm') {
         e.preventDefault()
         merge()
+      } else if (mod && e.key.toLowerCase() === 'c') {
+        e.preventDefault()
+        copy(selSec, sel)
+      } else if (mod && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        paste(sel.sec, selRect.c, selRect.r)
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         clear()
@@ -647,20 +683,29 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   })
 
   // ---- 描く
-  const typeName = (type: PartType) => ({ box: t('箱', 'Box'), button: t('ボタン', 'Button'), text: t('テキスト', 'Text'), empty: t('空き', 'Empty') })[type]
+  const typeName = (type: PartType) => ({ box: t('箱', 'Box'), button: t('ボタン', 'Button'), text: t('テキスト', 'Text'), media: t('画像', 'Image'), empty: t('空き', 'Empty') })[type]
   const partName = (p: TablePart) =>
-    p.type === 'box' ? t(`${boxNo.get(p.id)} 番目`, `No. ${boxNo.get(p.id)}`) : p.type === 'button' ? p.label || defaultButtonLabel(0) : p.type === 'text' ? (p.text ?? '').split('\n')[0] || t('(文なし)', '(no text)') : t('余白', 'Spacer')
+    p.type === 'box' ? t(`${boxNo.get(p.id)} 番目`, `No. ${boxNo.get(p.id)}`) : p.type === 'button' ? p.label || defaultButtonLabel(0) : p.type === 'text' ? (p.text ?? '').split('\n')[0] || t('(文なし)', '(no text)') : p.type === 'media' ? p.alt || (p.video ? t('動画', 'Video') : p.src ? t('画像', 'Image') : t('(画像なし)', '(no image)')) : t('余白', 'Spacer')
   const secLabel = (sec: Section, si: number) => `S${si + 1}${sec.name?.trim() ? ` · ${sec.name.trim()}` : ''}`
 
   const colW = (sec: Section) => (mailW - 20 - HEAD - ADD - 2 * GAP - ((sec.cols ?? 1) - 1) * GAP) / (sec.cols ?? 1)
   const rowHeights = (sec: Section) => {
     const cw = colW(sec)
-    return Array.from({ length: sec.rows ?? 0 }, (_, r) => {
-      const on = (sec.parts ?? []).filter((p) => r >= p.r && r < p.r + p.h)
-      if (on.some((p) => p.type === 'box' && isTextView(p.view))) return Math.round(Math.max(90, Math.min(cw * 0.6, 160)))
-      if (on.some((p) => p.type === 'box')) return Math.round(Math.max(64, Math.min(cw * ((sec.cols ?? 1) === 1 ? 0.5 : 0.9), 200)))
-      if (on.some((p) => p.type === 'text')) return 60
+    // 1 行分の部品が欲しい高さ(写真・画像は、選んだ形で。名前・価格などを出す箱は、文の分を足す)。キャンバスが縦に長くなりすぎないよう、上限を付ける
+    const want = (p: TablePart): number => {
+      const wpx = p.w * cw + (p.w - 1) * GAP
+      if (p.type === 'box') {
+        if (isTextView(p.view)) return Math.max(90, Math.min(cw * 0.6, 160))
+        const text = T.boxFields(p).some((f) => f !== 'badge') ? 28 : 0
+        return wpx / ratioValue(p.ratio ?? (p.view === 'photo' ? 'square' : 'portrait')) + text
+      }
+      if (p.type === 'media') return wpx / ratioValue(p.ratio ?? 'wide')
+      if (p.type === 'text') return 60
       return 36
+    }
+    return Array.from({ length: sec.rows ?? 0 }, (_, r) => {
+      const on = (sec.parts ?? []).filter((p) => p.r === r && p.h === 1)
+      return Math.round(Math.max(30, Math.min(280, ...on.map(want), 36)))
     })
   }
 
@@ -675,6 +720,53 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
    * 箱の設定(見本・見せ方・出すもの・価格の見せ方・バッジ・AI への一言)。右のタブと、キャンバスの ⚙(ダブルクリック)の両方で同じものを出す。
    * 名前・価格の文言は、商品のデータから出すので、ここでは打たない
    */
+  const alignField = (sec: Section, p: TablePart, fallback: TextAlign) => (
+    <Field label={t('揃え', 'Alignment')} size="small">
+      <div className={s.row2}>
+        {(['left', 'center', 'right'] as TextAlign[]).map((a) => {
+          const on = (p.align ?? fallback) === a
+          return (
+            <Button key={a} size="small" appearance={on ? 'primary' : 'outline'} aria-pressed={on} onClick={() => patch(sec, p, { align: a === fallback ? undefined : a })}>
+              {T.alignLabel(a)}
+            </Button>
+          )
+        })}
+      </div>
+    </Field>
+  )
+  /** 画像・動画の設定。画像は、部品の画像のライブラリから選ぶか URL を入れる。動画は URL を入れ、画像をサムネイルにする(メールでは動画を再生できないため) */
+  const mediaSettings = (sec: Section, p: TablePart) => (
+    <>
+      <Field label={t('画像(ライブラリから選ぶか、URL を入れる)', 'Image (pick from the library or enter a URL)')} size="small">
+        <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
+        <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
+      </Field>
+      <Field label={t('動画の URL(任意)', 'Video URL (optional)')} hint={t('メールでは動画は再生されません。上の画像をサムネイルにして ▶ を重ね、押すと動画のページを開きます', "Emails can't play video: the image above becomes the thumbnail with a ▶, linking to the video")} size="small">
+        <Input size="small" value={p.video ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { video: d.value.trim() || undefined })} />
+      </Field>
+      <Field label={t('代わりの文(画像が出ないとき)', 'Alt text (when images are off)')} size="small">
+        <Input size="small" value={p.alt ?? ''} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+      </Field>
+      <Field label={t('形', 'Shape')} size="small">
+        <Select size="small" value={p.ratio ?? 'wide'} onChange={(_, d) => patch(sec, p, { ratio: d.value === 'wide' ? undefined : (d.value as MediaRatio) })}>
+          {MEDIA_RATIOS.map((r) => (
+            <option key={r} value={r}>{T.ratioLabel(r)}</option>
+          ))}
+        </Select>
+      </Field>
+      <Field label={t('押したときのリンク先の種類(実際の URL は配信ごと)', 'Link kind on click (the actual URL is set per delivery)')} size="small">
+        <Select size="small" value={p.link ?? 'campaign'} onChange={(_, d) => patch(sec, p, { link: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
+          {LINK_KINDS.map((k) => (
+            <option key={k} value={k}>{linkKindLabel(k)}</option>
+          ))}
+        </Select>
+      </Field>
+      <Field label={t('計測用の名前(クリックの集計で使う)', 'Tracking name (for click reports)')} size="small">
+        <Input size="small" value={p.track ?? ''} maxLength={60} onChange={(_, d) => patch(sec, p, { track: d.value || undefined })} />
+      </Field>
+      <Checkbox label={t('配信ごとに差し替える(キャンペーンのバナーなど)', 'Swap per delivery (e.g. campaign banners)')} checked={!!p.swap} onChange={(_, d) => patch(sec, p, { swap: d.checked === true || undefined })} />
+    </>
+  )
   const boxSettings = (sec: Section, p: TablePart) => {
     const fields = T.boxFields(p)
     const cur = T.presetOf(p)
@@ -697,6 +789,16 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             ))}
           </Select>
         </Field>
+        {!isTextView(p.view) && (
+          <Field label={t('写真の形', 'Photo shape')} size="small">
+            <Select size="small" value={p.ratio ?? ''} onChange={(_, d) => patch(sec, p, { ratio: (d.value || undefined) as MediaRatio | undefined })}>
+              <option value="">{t('既定(箱は縦長・写真だけはマスの形)', 'Default (portrait; photo-only fills the cell)')}</option>
+              {MEDIA_RATIOS.map((r) => (
+                <option key={r} value={r}>{T.ratioLabel(r)}</option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label={t('出すもの(写真のほか)', 'Show (besides the photo)')} size="small">
           <div className={s.row2}>
             {BOX_FIELDS.map((f) => (
@@ -821,8 +923,42 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
         </div>
       )
     }
-    if (p.type === 'button') return <div className={mergeClasses(s.pill, p.style === 'outline' && s.pillOutline)} style={hero === 'offer' && p.style !== 'outline' ? { backgroundColor: '#d32f2f' } : undefined}>{p.label || defaultButtonLabel(0)}</div>
-    if (p.type === 'text') return <div className={s.ptext}>{p.text || t('(テキスト。ダブルクリックで書く)', '(Text — double-click to write)')}</div>
+    if (p.type === 'button') {
+      const color = T.buttonColor(p, hero === 'offer')
+      const align = p.align ?? 'center'
+      return (
+        <div
+          className={mergeClasses(s.pill, p.style === 'outline' && s.pillOutline, p.style === 'text' && s.pillText)}
+          style={{ justifySelf: align === 'left' ? 'start' : align === 'right' ? 'end' : 'center', ...(p.style === 'outline' ? { borderColor: color, color } : p.style === 'text' ? { color } : { backgroundColor: color }) }}
+        >
+          {p.label || defaultButtonLabel(0)}
+        </div>
+      )
+    }
+    if (p.type === 'text') return <div className={s.ptext} style={{ textAlign: p.align ?? 'left' }}>{p.text || t('(テキスト。ダブルクリックで書く)', '(Text — double-click to write)')}</div>
+    if (p.type === 'media') {
+      const one = selParts.length === 1 && selParts[0].id === p.id
+      return (
+        <div className={s.media} style={p.src ? { backgroundImage: `url("${p.src.replace(/"/g, '%22')}")` } : undefined}>
+          {!p.src && <span>{p.video ? t('動画(サムネイルの画像を選ぶ)', 'Video (pick a thumbnail image)') : t('画像(押して ⚙ で選ぶ)', 'Image (select, then ⚙)')}</span>}
+          {p.video && <span className={s.play}>▶</span>}
+          {p.swap && <span className={s.swapTag}>{t('配信ごと', 'Per delivery')}</span>}
+          {(one || quickId === p.id) && (
+            <Popover open={quickId === p.id} onOpenChange={(_, d) => setQuickId(d.open ? p.id : null)} positioning="after-top" withArrow>
+              <PopoverTrigger disableButtonEnhancement>
+                <button type="button" className={s.quickBtn} aria-label={t('この画像・動画の設定', 'Image / video settings')} title={t('この画像・動画の設定(ダブルクリックでも開く)', 'Image / video settings (or double-click)')} onPointerDown={(e) => e.stopPropagation()}>
+                  <SettingsRegular />
+                </button>
+              </PopoverTrigger>
+              <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
+                <span className={s.quickHead}>{t('画像・動画', 'Image / video')}</span>
+                {mediaSettings(sec, p)}
+              </PopoverSurface>
+            </Popover>
+          )}
+        </div>
+      )
+    }
     return (
       <div className={s.empty}>
         <button
@@ -857,6 +993,31 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     const fullCol = mine && mine.r === 0 && mine.h === rows
     const fullRow = mine && mine.c === 0 && mine.w === cols
     const tg = drag?.target
+    const even = sec.evenRows ?? []
+    const cellEl = (p: TablePart, place: React.CSSProperties, extra?: string) => (
+      <div
+        key={p.id}
+        data-cell={p.id}
+        data-type={p.type}
+        className={mergeClasses(s.cell, peek === p.id && s.peek, edgeClass(p.id), extra)}
+        style={place}
+        onPointerDown={(e) => startSelect(e, sec, p)}
+        onDoubleClick={() => (p.type === 'box' || p.type === 'media' ? setQuickId(p.id) : startEdit(p))}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          let ps = mine && selParts.some((x) => x.id === p.id) ? selParts : [p]
+          let rc = mine && selParts.some((x) => x.id === p.id) ? mine : { c: p.c, r: p.r, w: p.w, h: p.h }
+          if (ps.length === 1) {
+            selectCell(sec.id!, p.c, p.r)
+            ps = [p]
+            rc = { c: p.c, r: p.r, w: p.w, h: p.h }
+          }
+          openMenu(e.clientX, e.clientY, cellMenu(sec, ps, rc))
+        }}
+      >
+        {cellBody(sec, p)}
+      </div>
+    )
     return (
       <div data-tbl={sec.id} className={s.tbl} style={{ gridTemplateColumns: `${HEAD}px repeat(${cols}, minmax(0, 1fr)) ${ADD}px`, gridTemplateRows: `16px ${rh.map((h) => `${h}px`).join(' ')} ${ADD}px` }}>
         {Array.from({ length: cols }, (_, c) => (
@@ -893,7 +1054,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             key={`r${r}`}
             className={mergeClasses(s.rowHead, !!fullRow && r >= mine.r && r < mine.r + mine.h && s.headOn)}
             style={{ gridColumn: 1, gridRow: r + 2 }}
-            title={t(`行 ${r + 1}`, `Row ${r + 1}`)}
+            title={T.isEvenRow(sec, r) ? t(`行 ${r + 1}(均等に並べる。メールでは、中身のある部品を同じ幅で並べます)`, `Row ${r + 1} (spread evenly: filled parts get equal widths in the email)`) : t(`行 ${r + 1}`, `Row ${r + 1}`)}
             onClick={(e) => {
               setSel({ kind: 'cells', sec: sec.id!, a: [0, r], b: [cols - 1, r] })
               // 行のメニューは、行の帯の右横に出す(押した行が隠れないように)
@@ -901,7 +1062,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
               openMenu(b.right + 4, b.top - 4, rowMenu(sec, r))
             }}
           >
-            …
+            {T.isEvenRow(sec, r) ? '＝' : '…'}
             {r > 0 && (
               <button
                 type="button"
@@ -918,30 +1079,34 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             )}
           </div>
         ))}
-        {(sec.parts ?? []).map((p) => (
-          <div
-            key={p.id}
-            data-cell={p.id}
-            data-type={p.type}
-            className={mergeClasses(s.cell, peek === p.id && s.peek, edgeClass(p.id))}
-            style={{ gridColumn: `${p.c + 2} / span ${p.w}`, gridRow: `${p.r + 2} / span ${p.h}` }}
-            onPointerDown={(e) => startSelect(e, sec, p)}
-            onDoubleClick={() => (p.type === 'box' ? setQuickId(p.id) : startEdit(p))}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              let ps = mine && selParts.some((x) => x.id === p.id) ? selParts : [p]
-              let rc = mine && selParts.some((x) => x.id === p.id) ? mine : { c: p.c, r: p.r, w: p.w, h: p.h }
-              if (ps.length === 1) {
-                selectCell(sec.id!, p.c, p.r)
-                ps = [p]
-                rc = { c: p.c, r: p.r, w: p.w, h: p.h }
-              }
-              openMenu(e.clientX, e.clientY, cellMenu(sec, ps, rc))
-            }}
-          >
-            {cellBody(sec, p)}
-          </div>
-        ))}
+        {(sec.parts ?? []).filter((p) => !even.includes(p.r)).map((p) => cellEl(p, { gridColumn: `${p.c + 2} / span ${p.w}`, gridRow: `${p.r + 2} / span ${p.h}` }))}
+        {/* 均等に並べる行: メールと同じく、中身のある部品を同じ幅で並べる(空きは隠し、右端の + で、空いているマスに置く) */}
+        {even.map((r) => {
+          const row = (sec.parts ?? []).filter((p) => p.r === r)
+          const filledParts = row.filter((p) => p.type !== 'empty').sort((a, b) => a.c - b.c)
+          const free = row.filter((p) => p.type === 'empty').sort((a, b) => a.c - b.c)[0]
+          return (
+            <div key={`even${r}`} className={s.evenStrip} style={{ gridColumn: `2 / span ${cols}`, gridRow: r + 2, gridTemplateColumns: `${filledParts.length > 0 ? `repeat(${filledParts.length}, minmax(0, 1fr)) ` : 'minmax(0, 1fr) '}20px` }}>
+              {filledParts.length === 0 && <span className={s.evenEmpty}>{t('均等の行(右の + で部品を置く)', 'Even row (use + to add parts)')}</span>}
+              {filledParts.map((p) => cellEl(p, {}, selParts.some((x) => x.id === p.id) ? s.cellSel : undefined))}
+              <button
+                type="button"
+                className={s.evenPlus}
+                disabled={!free}
+                title={free ? t('この行に部品を足す(均等に並べ直す)', 'Add a part to this row (re-spread evenly)') : t('この行に空きがありません(列を足すと置けます)', 'No empty cell in this row (add a column first)')}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  if (!free) return
+                  selectCell(sec.id!, free.c, free.r)
+                  const b = e.currentTarget.getBoundingClientRect()
+                  openMenu(b.left, b.bottom + 2, placeMenu(sec, free))
+                }}
+              >
+                +
+              </button>
+            </div>
+          )
+        })}
         <div
           data-drop="col"
           className={mergeClasses(s.addCol, tg?.kind === 'add' && tg.sec === sec.id && tg.dir === 'col' && s.hot)}
@@ -960,7 +1125,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
         >
           {t('+ 行を足す', '+ Add a row')}
         </div>
-        {mine && <div className={s.selRect} style={{ gridColumn: `${mine.c + 2} / span ${mine.w}`, gridRow: `${mine.r + 2} / span ${mine.h}` }} />}
+        {mine && !(mine.h === 1 && even.includes(mine.r)) && <div className={s.selRect} style={{ gridColumn: `${mine.c + 2} / span ${mine.w}`, gridRow: `${mine.r + 2} / span ${mine.h}` }} />}
       </div>
     )
   }
@@ -992,6 +1157,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
               <div
                 data-sec={sec.id}
                 className={mergeClasses(s.sec, secSel && s.secSel, drag?.section === sec.id && s.secMoving)}
+                style={{ ...(sec.bg ? { backgroundColor: T.SECTION_BG[sec.bg], paddingLeft: 6, paddingRight: 6 } : {}), paddingBottom: 4 + T.sectionSpace(sec.space) / 2, ...(sec.divider ? { borderTop: `1px solid ${MAIL.line}` } : {}) }}
                 onPointerDown={(e) => {
                   if (e.target === e.currentTarget) setSel({ kind: 'section', sec: sec.id! })
                 }}
@@ -1003,6 +1169,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                   onPointerDown={(e) => startDrag(e, 'section', t(`${secLabel(sec, si)} を動かす`, `Move ${secLabel(sec, si)}`), () => setSel({ kind: 'section', sec: sec.id! }), sec.id)}
                 >
                   ⠿ {secLabel(sec, si)}
+                  {sec.mobile === 'stack' ? t('・スマホは縦に', ' · stacks on phones') : ''}
                 </button>
                 {(sec.categoryHeading || sec.copy !== false) && (
                   <div className={s.shead}>
@@ -1070,6 +1237,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
 
   // ---- パーツ(足すだけ。押すと、選んでいるセクションのいちばん下に 1 行足す)
   const icon = (k: string) => {
+    if (k === 'media') return <span style={{ width: 20, height: 12, background: tokens.colorPaletteBerryBorderActive, borderRadius: 2 }} />
     if (k === 'box') return <span style={{ width: 12, height: 14, background: tokens.colorPaletteBlueBorderActive, borderRadius: 2 }} />
     if (k === 'button') return <span style={{ width: 20, height: 6, background: tokens.colorNeutralForeground1, borderRadius: 6 }} />
     if (k === 'text') return <span style={{ width: 18, height: 2, background: tokens.colorPaletteGreenBorderActive, boxShadow: `0 4px 0 ${tokens.colorPaletteGreenBorderActive}` }} />
@@ -1120,6 +1288,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       {palItem('box', t('箱(商品 1 点)', 'Box (1 product)'), icon('box'))}
       {palItem('button', t('ボタン', 'Button'), icon('button'))}
       {palItem('text', t('テキスト', 'Text'), icon('text'))}
+      {palItem('media', t('画像・動画(バナー・タイル)', 'Image / video (banner, tile)'), icon('media'))}
       <span className={s.palHead}>{t('よく使う行(1 行まとめて置く)', 'Common rows (place a whole row)')}</span>
       {T.ROW_PRESETS.map((p) => palItem(`row:${p.id}`, p.label(), presetThumb(p)))}
       <span className={s.palHead}>{t('セクション', 'Section')}</span>
@@ -1164,11 +1333,26 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             <Input size="small" value={p.label ?? ''} placeholder={defaultButtonLabel(0)} maxLength={30} onChange={(_, d) => patch(sec, p, { label: d.value || undefined })} />
           </Field>
           <Field label={t('見た目', 'Style')} size="small">
-            <Select size="small" value={p.style ?? 'fill'} onChange={(_, d) => patch(sec, p, { style: d.value === 'outline' ? 'outline' : undefined })}>
+            <Select size="small" value={p.style ?? 'fill'} onChange={(_, d) => patch(sec, p, { style: d.value === 'outline' || d.value === 'text' ? d.value : undefined })}>
               <option value="fill">{t('塗り', 'Filled')}</option>
               <option value="outline">{t('枠線', 'Outline')}</option>
+              <option value="text">{t('文字のリンク(枠なし)', 'Text link (no box)')}</option>
             </Select>
           </Field>
+          <Field label={t('色(決まった色から選ぶ)', 'Color (from the set colors)')} size="small">
+            <div className={s.row2}>
+              {(Object.keys(T.BUTTON_COLORS) as ButtonColor[]).map((c) => {
+                const on = (p.color ?? 'black') === c
+                return (
+                  <button key={c} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} title={T.buttonColorLabel(c)} onClick={() => patch(sec, p, { color: c === 'black' ? undefined : c })}>
+                    <span style={{ backgroundColor: T.BUTTON_COLORS[c] }} />
+                    {T.buttonColorLabel(c)}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+          {alignField(sec, p, 'center')}
           <Field label={t('リンク先の種類(実際の URL は配信ごと)', 'Link kind (the actual URL is set per delivery)')} size="small">
             <Select size="small" value={p.link ?? 'campaign'} onChange={(_, d) => patch(sec, p, { link: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
               {LINK_KINDS.map((k) => (
@@ -1187,8 +1371,10 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             <AutoTextarea rows={3} size="small" value={p.text ?? ''} onChange={(_, d) => patch(sec, p, { text: d.value || undefined })} />
           </Field>
           <Checkbox label={t('配信ごとに書き換えてよい', 'Can be rewritten per delivery')} checked={p.overridable !== false} onChange={(_, d) => patch(sec, p, { overridable: d.checked === true ? undefined : false })} />
+          {alignField(sec, p, 'left')}
         </>
       )}
+      {p.type === 'media' && mediaSettings(sec, p)}
       {p.type === 'empty' && <span className={s.hint}>{t('空きのマス。左のパーツを落とすと、そのパーツになります。メールでは何も出ない余白です。', 'An empty cell. Drop a part here to fill it. It shows as blank space in the email.')}</span>}
       {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}
       {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{p.id}</span>)}
@@ -1213,6 +1399,33 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       </Field>
       <Checkbox label={t('見出しを置く(AI が配信ごとに書く)', 'Show a heading (AI writes it per delivery)')} checked={!!sec.categoryHeading} onChange={(_, d) => replace(sec.id!, { ...sec, categoryHeading: d.checked === true || undefined })} />
       <Checkbox label={t('コピーを置く(AI が配信ごとに書く)', 'Show copy (AI writes it per delivery)')} checked={sec.copy !== false} onChange={(_, d) => replace(sec.id!, { ...sec, copy: d.checked === true ? undefined : false })} />
+      <Field label={t('スマホでの並び方', 'On phones')} size="small">
+        <Select size="small" value={sec.mobile ?? ''} onChange={(_, d) => replace(sec.id!, { ...sec, mobile: d.value === 'stack' ? 'stack' : undefined })}>
+          <option value="">{t('列のまま縮める', 'Keep the columns')}</option>
+          <option value="stack">{t('縦に積む(上の行から、左から)', 'Stack vertically (top to bottom, left to right)')}</option>
+        </Select>
+      </Field>
+      <Field label={t('背景の色', 'Background')} size="small">
+        <div className={s.row2}>
+          {([undefined, 'gray', 'beige', 'blue', 'pink'] as (SectionBg | undefined)[]).map((b) => {
+            const on = sec.bg === b
+            return (
+              <button key={b ?? 'white'} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} onClick={() => replace(sec.id!, { ...sec, bg: b })}>
+                <span style={{ backgroundColor: b ? T.SECTION_BG[b] : '#fff', border: `1px solid ${tokens.colorNeutralStroke2}` }} />
+                {T.sectionBgLabel(b)}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+      <Field label={t('上下の余白', 'Spacing')} size="small">
+        <Select size="small" value={sec.space ?? ''} onChange={(_, d) => replace(sec.id!, { ...sec, space: d.value === 'tight' || d.value === 'wide' ? d.value : undefined })}>
+          <option value="tight">{t('狭い', 'Tight')}</option>
+          <option value="">{t('ふつう', 'Normal')}</option>
+          <option value="wide">{t('広い', 'Wide')}</option>
+        </Select>
+      </Field>
+      <Checkbox label={t('セクションの上に区切り線を引く', 'Divider line above the section')} checked={!!sec.divider} onChange={(_, d) => replace(sec.id!, { ...sec, divider: d.checked === true || undefined })} />
       <Field label={t('AI の切り口のメモ(商品を選ぶ・見出しを書くときに渡す)', 'Angle for AI (used when picking products and writing headings)')} size="small">
         <AutoTextarea rows={2} size="small" value={sec.aiNote ?? ''} placeholder={t('例: セール対象を、価格の安い順に', 'e.g. Sale items, cheapest first')} onChange={(_, d) => replace(sec.id!, { ...sec, aiNote: d.value || undefined })} />
       </Field>
