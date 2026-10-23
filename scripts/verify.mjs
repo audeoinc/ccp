@@ -39,13 +39,15 @@ function changedFiles() {
 
 const full = process.argv.includes('--full') || process.env.VERIFY_FULL === '1'
 const files = full ? null : changedFiles()
-const docsOnly = !!files && files.length > 0 && files.every((f) => /\.md$/i.test(f))
+// .claude/ は手元の Claude の設定(起動の設定など。Git に入れない)で、型チェック・ビルドに関わらないので数えない
+const counted = files?.filter((f) => !f.startsWith('.claude/')) ?? []
+const docsOnly = counted.length > 0 && counted.every((f) => /\.md$/i.test(f))
 
 run('node', ['scripts/check-schema.mjs'])
 run('node', ['scripts/check-approvals.mjs'])
 run('node', ['scripts/check-policy.mjs'])
 if (docsOnly) {
-  console.log(`\n変えたファイルは文書だけ(${files.length} 件)なので、型チェック・lint・ビルドは飛ばしました(全部を通すときは npm run verify -- --full)。`)
+  console.log(`\n変えたファイルは文書だけ(${counted.length} 件)なので、型チェック・lint・ビルドは飛ばしました(全部を通すときは npm run verify -- --full)。`)
 } else {
   run('npx', ['tsc', '-b'])
   run('npx', ['eslint', '.'])
