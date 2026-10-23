@@ -597,8 +597,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               products={e.products}
               view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
               handoff={{ productionOwner: e.form.productionOwner, handedOffAt: e.form.handedOffAt, productionDue: e.form.productionDue }}
-              onHandoff={e.setHandoff}
-              remaining={e.remaining}
               people={e.people}
               onCommit={onCommit}
               isDirty={isDirty}
