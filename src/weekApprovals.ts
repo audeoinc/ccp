@@ -4,7 +4,7 @@ import { ApprovalsService, type Actor } from './data/approvals'
 import type { DeliveryCard } from './models/deliveryCards'
 import { parseIds } from './approvals'
 import { isCancelled } from './cancel'
-import { activeUsers, ruleFor, type People } from './people'
+import { activeUsers, groupInCountry, ruleFor, type People } from './people'
 import { statusRank } from './status'
 import type { InboxItem } from './useApprovalInbox'
 import { tr } from './i18n'
@@ -16,16 +16,17 @@ export const needsRequest = (cards: DeliveryCard[], hasOpen: (cardId: string) =>
   cards.filter((c) => !isCancelled(c) && statusRank(c.status) < statusRank(STATUS_APPROVED) && !hasOpen(c.id))
 
 /**
- * 週の未依頼の配信を、既定の相手と決まり(すべての配信に同じ)で、まとめて依頼する。
+ * 週の未依頼の配信を、既定の相手と決まり(配信の国の決まり。なければ共通)で、まとめて依頼する。
  * 既定の相手がいなければ飛ばして、名前を返す(配信カードで相手を選んで依頼してもらう)
  */
 export async function requestAll(cards: DeliveryCard[], people: People, actor: Actor, weekStart: string): Promise<{ done: string[]; skipped: string[] }> {
   const done: string[] = []
   const skipped: string[] = []
   const users = new Set(activeUsers(people).map((u) => u.id))
-  const groups = new Set(people.groups.filter((g) => (g.status ?? 'active') === 'active').map((g) => g.id))
   for (const c of cards) {
-    const def = ruleFor(people)
+    // 既定の相手と決まりは、配信の国のもの(ST4。国の決まりがなければ共通)。グループも、その国を承認するものだけ
+    const def = ruleFor(people, c.country)
+    const groups = new Set(people.groups.filter((g) => (g.status ?? 'active') === 'active' && groupInCountry(g, c.country)).map((g) => g.id))
     const group_ids = parseIds(def?.group_ids).filter((id) => groups.has(id))
     const user_ids = parseIds(def?.user_ids).filter((id) => users.has(id))
     if (group_ids.length === 0 && user_ids.length === 0) {

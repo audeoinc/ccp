@@ -452,7 +452,8 @@
    "columns": [
     ["name", "text", {"required": true}],
     ["description", "text"],
-    ["status", "choice"]
+    ["status", "choice"],
+    ["countries", "text"]
    ],
    "lookups": [
    ]
@@ -468,6 +469,7 @@
   "approval_rules": {
    "columns": [
     ["department", "text", {"index": true}],
+    ["country", "text", {"index": true}],
     ["rule", "choice"],
     ["group_ids", "text"],
     ["user_ids", "text"]

@@ -9,7 +9,7 @@ import { ApprovalReviewersService } from './data/approvalReviewers'
 import { ApprovalsService } from './data/approvals'
 import { eligibleReviewers, parseIds } from './approvals'
 import { myName, myUserId, onMeChange } from './history'
-import { activeUsers, groupsOf, ruleFor, usePeople } from './people'
+import { activeUsers, groupInCountry, groupsOf, ruleFor, usePeople } from './people'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { statusColor, statusLabel } from './status'
 import { weekKeyOf } from './weekLock'
@@ -77,6 +77,8 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
   // 依頼の入力
   const [rule, setRule] = useState<ApprovalRequestRule>('all')
   const [groupIds, setGroupIds] = useState<string[]>([])
+  // 依頼できるグループは、有効で、この配信の国を承認するもの(ST4。国を決めていないグループは、すべての国)
+  const countryGroups = people.groups.filter((g) => (g.status ?? 'active') === 'active' && groupInCountry(g, card.country))
   const [userIds, setUserIds] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [reason, setReason] = useState('')
@@ -124,8 +126,8 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
 
   // 「承認を依頼」を開くとき、既定の相手と決まりを入れる(依頼のときに足し引きできる)
   const openRequest = () => {
-    const def = ruleFor(people)
-    const activeGroups = new Set(people.groups.filter((g) => (g.status ?? 'active') === 'active').map((g) => g.id))
+    const def = ruleFor(people, card.country)
+    const activeGroups = new Set(countryGroups.map((g) => g.id))
     setRule(def?.rule ?? 'all')
     setGroupIds(parseIds(def?.group_ids).filter((id) => activeGroups.has(id)))
     setUserIds(parseIds(def?.user_ids).filter((id) => activeUsers(people).some((u) => u.id === id)))
@@ -150,9 +152,9 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
   const firstSlot = reviewers.find((r) => r.id === eligible[0])?.reviewer_name ?? ''
 
   // 既定の依頼先(⚙ →「承認の決まり」。すべての配信に同じ)。依頼の入力を開く前に、だれに届くかを見せる(例: 依頼先: MD・Brand(全員))
-  const def = ruleFor(people)
+  const def = ruleFor(people, card.country)
   const defNames = [
-    ...parseIds(def?.group_ids).map((id) => people.groups.find((g) => g.id === id && (g.status ?? 'active') === 'active')?.name),
+    ...parseIds(def?.group_ids).map((id) => countryGroups.find((g) => g.id === id)?.name),
     ...parseIds(def?.user_ids).map((id) => activeUsers(people).find((u) => u.id === id)?.name),
   ].filter(Boolean)
   const defaultTarget = usersOk && (
@@ -263,10 +265,10 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
           </Field>
           <Field label={t('承認グループ', 'Approval groups')} size="small">
             <div className={s.groups}>
-              {people.groups.filter((g) => (g.status ?? 'active') === 'active').map((g) => (
+              {countryGroups.map((g) => (
                 <Checkbox key={g.id} size="medium" label={g.description ? `${g.name} — ${g.description}` : g.name} checked={groupIds.includes(g.id)} onChange={(_, d) => setGroupIds((x) => (d.checked ? [...x, g.id] : x.filter((id) => id !== g.id)))} />
               ))}
-              {people.groups.length === 0 && <span className={s.note}>{t('承認グループがありません', 'No approval groups')}</span>}
+              {countryGroups.length === 0 && <span className={s.note}>{t('承認グループがありません', 'No approval groups')}</span>}
             </div>
           </Field>
           <Field label={t('承認者(人を直接指名)', 'Approvers (named people)')} size="small">

@@ -29,9 +29,9 @@ GitHub のプルリクエストのように、配信カードごとに「承認�
 | 表 | 列 | 中身 |
 |---|---|---|
 | `users`(U1) | `name`・`email`・`role`(`member` / `admin`)・`status`(`active` / `inactive`) | だれがいるか。**メールアドレスが、本人を見分けるかぎ**(ログイン・通知の宛先)。消さずに `inactive` にする(履歴に名前が残るように) |
-| `approval_groups`(U1) | `name`・`description`・`status` | 承認グループ(MD・ブランド・法務 など)。配信の種別とは分けて持つ(どの部署の配信か と、だれが承認するか は別のため) |
+| `approval_groups`(U1) | `name`・`description`・`status`・`countries`(承認する国のコードの配列の JSON。空はすべての国。ST4) | 承認グループ(MD・ブランド・法務 など)。国を絞ったグループは、ほかの国の配信の依頼先に出ない。配信の種別とは分けて持つ(どの部署の配信か と、だれが承認するか は別のため) |
 | `approval_group_members`(U1) | `approval_group_id`・`user_id` | だれがどのグループにいるか(1 人が複数のグループに入ってよい) |
-| `approval_rules`(U3) | `department`・`rule`(`all` / `any`)・`group_ids`・`user_ids`(id の配列の JSON) | 既定の承認者と決まり。すべての配信に同じで、`department` が空の行を使う(`ruleFor(people)`)。まだなければ、以前の種別ごとの行のうち、相手が入っているいちばん古い行を使い、⚙ で直すと空の行を作る(古い行は消さずに残す)。⚙ →「ユーザーと承認グループ」→「承認の決まり」 |
+| `approval_rules`(U3) | `department`・`country`(ST4。空は共通)・`rule`(`all` / `any`)・`group_ids`・`user_ids`(id の配列の JSON) | 既定の承認者と決まり。`department` が空の行を使う(`ruleFor(people, 配信の国)`)。国ごとに決められ(ST4)、その国の行がなければ `country` も空の共通の行を使う。まだなければ、以前の種別ごとの行のうち、相手が入っているいちばん古い行を使い、⚙ で直すと空の行を作る(古い行は消さずに残す)。⚙ →「ユーザーと承認グループ」→「承認の決まり」 |
 | `approval_requests`(U3) | `delivery_card_id`・`card_name`・`requested_by`(ユーザーの id)・`requested_by_name`・`rule`・`status`(`open` / `approved` / `changes_requested` / `stale` / `withdrawn`)・`requested_at`・`closed_at`・`note` | 依頼 1 回分。内容を変える・出し直す・取り下げると、生きている依頼(`open` / `approved` / `changes_requested`)は `stale` になる |
 | `approval_reviewers`(U3) | `approval_request_id`・`approval_group_id` または `user_id`・`reviewer_name`・`decision`(`pending` / `approved` / `changes_requested`)・`decided_by`(ユーザーの id)・`decided_by_name`・`decided_at`・`note` | 依頼の相手ごとの状態。グループのときは、だれが済ませたかを `decided_by` に残す。名前は、その時のものを残す(消しても読めるように) |
 | `notifications`(U5) | `user_id`・`email`・`kind`(`review_requested` / `approved` / `changes_requested` / `withdrawn`)・`subject`・`body`・`delivery_card_id`・`approval_request_id`・`status`(`pending` / `sent` / `skipped`)・`sent_at` | 送る箱。承認の操作のたびに、サーバー(`approvals.py` の `_notify`)が宛先ごとに 1 行積む(操作した本人には積まない。グループ宛ては、メンバー全員)。宛先のメールアドレスは、積んだ時点のものを残す。送る仕組みは U8 |

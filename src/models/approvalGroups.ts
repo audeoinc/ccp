@@ -13,6 +13,8 @@ export interface ApprovalGroupFields {
   name: string
   description?: string
   status?: ApprovalGroupStatus
+  /** 承認する国のコードの配列(JSON。ST4)。空はすべての国。あとで「管理地域」に広げるときも、この列で複数の国を指す */
+  countries?: string
 }
 
 /** 読んだ 1 行 */

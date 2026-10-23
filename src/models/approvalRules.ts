@@ -13,6 +13,8 @@ export type ApprovalRuleRule = keyof typeof ApprovalRuleRule
 export interface ApprovalRuleFields {
   /** 配信の種別(delivery_cards.department の値)。1 種別に 1 行 */
   department?: string
+  /** 国のコード(ST4)。空は、すべての国の共通の決まり。国の行があれば、その国の配信はそちらを使う */
+  country?: string
   rule?: ApprovalRuleRule
   /** 既定の承認グループの id の配列(JSON) */
   group_ids?: string

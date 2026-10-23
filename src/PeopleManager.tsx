@@ -21,7 +21,8 @@ import { AddRegular, DismissRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { logEvent, meLock, myName, myUserId, onMeChange } from './history'
 import { useSyncExternalStore } from 'react'
-import { activeUsers, groupUsers, reloadPeople, ruleFor, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
+import { activeUsers, groupCountries, groupInCountry, groupUsers, reloadPeople, ruleFor, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
+import { countryOptions } from './status'
 import { UsersService } from './data/users'
 import { ApprovalGroupsService } from './data/approvalGroups'
 import { ApprovalGroupMembersService } from './data/approvalGroupMembers'
@@ -30,7 +31,7 @@ import { ApprovalRuleRule, type ApprovalRule } from './models/approvalRules'
 import { parseIds } from './approvals'
 import { EventsService, type CardEvent } from './data/events'
 import { UserRole, UserStatus, type User, type UserFields } from './models/users'
-import { ApprovalGroupStatus, type ApprovalGroup, type ApprovalGroupFields } from './models/approvalGroups'
+import { ApprovalGroupStatus, type ApprovalGroup } from './models/approvalGroups'
 
 const useStyles = makeStyles({
   surface: { width: 'min(880px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(90vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', rowGap: '12px' },
@@ -70,6 +71,8 @@ export function PeopleManager() {
   const t = useT()
   const people = usePeople()
   const [tab, setTab] = useState<TabKey>('users')
+  // 承認の決まりを見る・変える国(ST4。空は共通)
+  const [ruleCountry, setRuleCountry] = useState('')
   const [working, setWorking] = useState(false)
   // ログインしているとき(U7)は、管理者だけが編集できる。ログインがなければ、だれでも(いまの運用。変更は履歴に残る)
   const lock = useSyncExternalStore(onMeChange, meLock)
@@ -149,13 +152,20 @@ export function PeopleManager() {
     if (await run(() => ApprovalGroupsService.create({ name, description: description || undefined, status: 'active' }), 'group_change', tr(`追加: ${name}`, `Added: ${name}`))) setNewGroup({ name: '', description: '' })
   }
 
-  const updateGroup = (g: ApprovalGroup, field: keyof ApprovalGroupFields, value: string) => {
+  const updateGroup = (g: ApprovalGroup, field: 'name' | 'description' | 'status', value: string) => {
     const v = value.trim()
     if ((g[field] ?? '') === v) return
     if (field === 'name' && !v) return setError(t('名前は空にできません', 'The name cannot be empty'))
     const shown = (x?: string) => (field === 'status' ? optionLabel(ApprovalGroupStatus[x as keyof typeof ApprovalGroupStatus]) : x) || '—'
     const what = { name: tr('名前', 'name'), description: tr('説明', 'description'), status: tr('状態', 'status') }[field]
     void run(() => ApprovalGroupsService.update(g.id, { [field]: v || undefined }), 'group_change', tr(`${g.name} の${what}: ${shown(g[field])} → ${shown(v)}`, `${g.name} ${what}: ${shown(g[field])} → ${shown(v)}`))
+  }
+
+  // 承認する国(ST4)。空はすべての国。国を絞ると、ほかの国の配信の依頼先に出なくなる
+  const countryName = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
+  const setGroupCountries = (g: ApprovalGroup, next: string[]) => {
+    const shown = (list: string[]) => (list.length ? list.map(countryName).join(' / ') : tr('すべての国', 'all countries'))
+    void run(() => ApprovalGroupsService.update(g.id, { countries: next.length ? JSON.stringify(next) : '' }), 'group_change', tr(`${g.name} の国: ${shown(groupCountries(g))} → ${shown(next)}`, `${g.name} countries: ${shown(groupCountries(g))} → ${shown(next)}`))
   }
 
   const addMember = (g: ApprovalGroup, u: User) =>
@@ -179,13 +189,29 @@ export function PeopleManager() {
    * 共通の行(department が空)に書く。まだなければ、いま使っている行(以前の種別ごとの行)を写して作る。変えた項目だけを書く
    */
   const saveRule = (patch: Partial<Pick<ApprovalRule, 'rule' | 'group_ids' | 'user_ids'>>, what: string) => {
-    const common = people.rules.find((r) => !r.department)
-    const base = ruleFor(people)
+    // 国を選んでいれば、その国の行(ST4)。まだなければ、いまその国で使っている決まり(共通)を写して作る
+    const own = people.rules.find((r) => !r.department && (r.country ?? '') === ruleCountry)
+    const base = ruleFor(people, ruleCountry || undefined)
     const write = () =>
-      common
-        ? ApprovalRulesService.update(common.id, patch)
-        : ApprovalRulesService.create({ department: '', rule: base?.rule ?? 'all', group_ids: base?.group_ids ?? '[]', user_ids: base?.user_ids ?? '[]', ...patch })
-    void run(write, 'rule_change', tr(`既定: ${what}`, `Default: ${what}`))
+      own
+        ? ApprovalRulesService.update(own.id, patch)
+        : ApprovalRulesService.create({ department: '', country: ruleCountry || undefined, rule: base?.rule ?? 'all', group_ids: base?.group_ids ?? '[]', user_ids: base?.user_ids ?? '[]', ...patch })
+    const scope = ruleCountry ? countryName(ruleCountry) : tr('共通', 'common')
+    void run(write, 'rule_change', tr(`既定(${scope}): ${what}`, `Default (${scope}): ${what}`))
+  }
+
+  // 国の決まりをやめて、共通に戻す(ST4)
+  const dropCountryRule = () => {
+    const own = people.rules.find((r) => !r.department && r.country === ruleCountry)
+    if (!own || !window.confirm(t(`${countryName(ruleCountry)}の決まりをやめて、共通の決まりを使いますか?`, `Stop using a separate rule for ${countryName(ruleCountry)} and use the common rule?`))) return
+    void run(
+      async () => {
+        await ApprovalRulesService.delete(own.id)
+        return { success: true }
+      },
+      'rule_change',
+      tr(`既定(${countryName(ruleCountry)}): 共通に戻した`, `Default (${countryName(ruleCountry)}): back to common`),
+    )
   }
 
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
@@ -238,6 +264,24 @@ export function PeopleManager() {
               </Select>
             </div>
             <div className={s.members}>
+              <span className={s.label}>{t('承認する国', 'Countries')}</span>
+              <Dropdown
+                size="small"
+                multiselect
+                placeholder={t('すべての国', 'All countries')}
+                disabled={busy}
+                value={groupCountries(g).map(countryName).join(', ')}
+                selectedOptions={groupCountries(g)}
+                onOptionSelect={(_, d) => setGroupCountries(g, d.selectedOptions)}
+              >
+                {countryOptions.map((o) => (
+                  <Option key={o.value} value={String(o.value)} text={optionLabel(o.label)}>
+                    {optionLabel(o.label)}
+                  </Option>
+                ))}
+              </Dropdown>
+            </div>
+            <div className={s.members}>
               <span className={s.label}>{t(`メンバー ${inGroup.length} 人`, `${inGroup.length} member(s)`)}</span>
               {inGroup.map((u) => (
                 <Button key={u.id} size="small" shape="circular" appearance="secondary" icon={<DismissRegular />} iconPosition="after" disabled={busy} title={t(`${u.name} をグループから外す`, `Remove ${u.name} from the group`)} onClick={() => removeMember(g, u)}>
@@ -273,20 +317,41 @@ export function PeopleManager() {
     <>
       <span className={s.note}>
         {t(
-          '配信カードで「承認を依頼」を押したときの、最初の相手と決まりです。すべての配信に同じです(依頼のときに足し引きできます)。全員 = 指名したそれぞれから 1 人ずつ、1 人 = だれか 1 人。',
-          'The default approvers and rule when "Request approval" is pressed on a delivery card. The same for all deliveries (adjustable per request). Everyone = one from each; Any one = any single approver.',
+          '配信カードで「承認を依頼」を押したときの、最初の相手と決まりです(依頼のときに足し引きできます)。国ごとに決められます。国の決まりがなければ、共通の決まりを使います。全員 = 指名したそれぞれから 1 人ずつ、1 人 = だれか 1 人。',
+          'The default approvers and rule when "Request approval" is pressed on a delivery card (adjustable per request). You can set them per country; countries without their own rule use the common one. Everyone = one from each; Any one = any single approver.',
         )}
       </span>
+      <div className={s.members}>
+        <span className={s.label}>{t('国', 'Country')}</span>
+        <Select size="small" value={ruleCountry} onChange={(_, d) => setRuleCountry(d.value)}>
+          <option value="">{t('共通(国の決まりがない国)', 'Common (countries without their own)')}</option>
+          {countryOptions.map((o) => (
+            <option key={o.value} value={String(o.value)}>
+              {optionLabel(o.label)}
+              {people.rules.some((r) => !r.department && r.country === String(o.value)) ? t('(国の決まり)', ' (own rule)') : ''}
+            </option>
+          ))}
+        </Select>
+        {ruleCountry &&
+          (people.rules.some((r) => !r.department && r.country === ruleCountry) ? (
+            <Button size="small" appearance="subtle" disabled={busy} onClick={dropCountryRule}>
+              {t('共通に戻す', 'Use the common rule')}
+            </Button>
+          ) : (
+            <span className={s.note}>{t('いまは共通の決まりを使っています。変えると、この国の決まりになります。', 'Uses the common rule now. Changing it creates a rule for this country.')}</span>
+          ))}
+      </div>
       {(() => {
-        const r = ruleFor(people)
-        const activeGroups = people.groups.filter((g) => (g.status ?? 'active') === 'active')
+        const r = ruleFor(people, ruleCountry || undefined)
+        // その国を承認するグループだけを選べる(国を決めていないグループは、すべての国)
+        const activeGroups = people.groups.filter((g) => (g.status ?? 'active') === 'active' && groupInCountry(g, ruleCountry || undefined))
         const users = activeUsers(people)
         const gids = parseIds(r?.group_ids)
         const uids = parseIds(r?.user_ids)
         return (
           <div className={s.group}>
             <div className={s.groupHead}>
-              <span className={s.colHead}>{t('すべての配信', 'All deliveries')}</span>
+              <span className={s.colHead}>{ruleCountry ? t(`${countryName(ruleCountry)}の配信`, `${countryName(ruleCountry)} deliveries`) : t('共通', 'Common')}</span>
               <Select size="small" value={r?.rule ?? 'all'} aria-label={t('決まり', 'Rule')} disabled={busy} onChange={(_, v) => saveRule({ rule: v.value as ApprovalRule['rule'] }, `${t('決まり', 'rule')} ${optionLabel(ApprovalRuleRule[v.value as keyof typeof ApprovalRuleRule])}`)}>
                 {ruleOptions.map(([v, l]) => (
                   <option key={v} value={v}>{optionLabel(l)}</option>

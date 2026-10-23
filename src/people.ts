@@ -83,11 +83,24 @@ export const groupsOf = (p: People, userId: string) => p.members.filter((m) => m
 
 /**
  * 承認の既定の相手と決まり(なければ undefined)。すべての配信に同じルール(2026-10-19、利用者の判断: 配信カードの「種別」をやめたため)。
- * 共通のルールは department が空の行。まだなければ、以前の種別ごとの行のうち、相手が入っているいちばん古い行を使う(作り直さなくても、これまでの設定で依頼できるように)
+ * 国ごとに決められる(ST4。country の列。国の行がなければ共通)。
+ * 共通のルールは department と country が空の行。まだなければ、以前の種別ごとの行のうち、相手が入っているいちばん古い行を使う(作り直さなくても、これまでの設定で依頼できるように)
  */
-export const ruleFor = (p: People): ApprovalRule | undefined => {
-  const common = p.rules.find((r) => !r.department)
+export const ruleFor = (p: People, country?: string | null): ApprovalRule | undefined => {
+  // 国の決まり(ST4)があれば、その国の配信はそちらを使う。なければ共通
+  const own = country ? p.rules.find((r) => !r.department && r.country === country) : undefined
+  if (own) return own
+  const common = p.rules.find((r) => !r.department && !r.country)
   if (common) return common
-  const filled = p.rules.filter((r) => parseIds(r.group_ids).length || parseIds(r.user_ids).length)
+  const filled = p.rules.filter((r) => !r.country && (parseIds(r.group_ids).length || parseIds(r.user_ids).length))
   return [...filled].sort((a, b) => (a.created_on ?? '').localeCompare(b.created_on ?? ''))[0]
+}
+
+/** 承認グループが承認する国(ST4。空はすべての国) */
+export const groupCountries = (g: ApprovalGroup): string[] => parseIds(g.countries)
+
+/** その国の配信を承認するグループか(国を渡さないときは、すべて) */
+export const groupInCountry = (g: ApprovalGroup, country?: string | null): boolean => {
+  const list = groupCountries(g)
+  return !country || list.length === 0 || list.includes(country)
 }
