@@ -14,8 +14,8 @@ import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
-import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart } from './templates'
-import { boxFields, boxesOf } from './tables'
+import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
+import { SECTION_BG, boxFields, boxesOf, buttonColor, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { locale, optionLabel, useT } from './i18n'
@@ -449,7 +449,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     if (part.view === 'detail' || part.view === 'story') {
       const reverse = part.view === 'story' && j % 2 === 1
       const body = <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: part.view === 'story' ? '12px 14px' : 0, minWidth: 0 }}>{text}</div>
-      const photo = <div style={{ position: 'relative' }}>{badge}{img({ aspectRatio: '3 / 4', borderRadius: part.view === 'story' ? 0 : 8 })}</div>
+      const photo = <div style={{ position: 'relative' }}>{badge}{img({ aspectRatio: part.ratio ? String(ratioValue(part.ratio)) : '3 / 4', borderRadius: part.view === 'story' ? 0 : 8 })}</div>
       return (
         <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), ...(part.view === 'story' ? { padding: 0, backgroundColor: '#f1f1f3' } : {}) }}>
           <div style={{ display: 'grid', gridTemplateColumns: part.view === 'story' ? '1fr 1fr' : '44% 1fr', gap: part.view === 'story' ? 0 : 12, alignItems: 'center' }}>
@@ -475,7 +475,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     return (
       <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={frameStyle(it, idx)}>
         {badge}
-        {img({ aspectRatio: compact ? '1 / 1' : '3 / 4' })}
+        {img({ aspectRatio: part.ratio ? String(ratioValue(part.ratio)) : compact ? '1 / 1' : '3 / 4' })}
         {text && <div style={{ marginTop: 4 }}>{text}</div>}
         {controls(it, idx)}
       </div>
@@ -796,14 +796,17 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             const tile = (it: Item, idx: number) => boxTile(it, idx, p, j)
             const fill = !text && (big || p.view === 'photo')
             return (
-              <div style={fill ? { aspectRatio: `${p.w} / ${p.h}`, height: '100%', minHeight: 0 } : undefined}>
+              <div style={fill ? { aspectRatio: p.ratio ? String(ratioValue(p.ratio)) : `${p.w} / ${p.h}`, height: '100%', minHeight: 0 } : undefined}>
                 {slot(j, tile, fill ? { aspectRatio: 'auto', height: '100%' } : undefined, p.view === 'detail')}
               </div>
             )
           }
           if (p.type === 'button') {
+            const color = buttonColor(p, offer)
+            const align = p.align ?? 'center'
+            const text = p.style === 'text'
             return (
-              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 ? '0 20%' : 0 }}>
+              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 && !text && align === 'center' ? '0 20%' : 0, justifyItems: text ? (align === 'left' ? 'start' : align === 'right' ? 'end' : 'center') : 'stretch' }}>
                 <div
                   data-link="button"
                   data-link-id={p.id}
@@ -811,11 +814,11 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                   data-part={`button:${p.id}`}
                   className={classes.noWrap}
                   style={{
-                    textAlign: 'center',
-                    padding: '8px 4px',
+                    textAlign: align,
+                    padding: text ? '8px 2px' : '8px 12px',
                     borderRadius: 999,
                     fontSize: '0.8rem',
-                    ...(p.style === 'outline' ? { border: `1px solid ${INK}`, color: INK } : { backgroundColor: offer ? '#d32f2f' : '#222', color: '#fff' }),
+                    ...(p.style === 'outline' ? { border: `1px solid ${color}`, color } : text ? { color, fontWeight: 600, letterSpacing: 1 } : { backgroundColor: color, color: '#fff' }),
                   }}
                 >
                   {p.label || defaultButtonLabel(0)}
@@ -823,7 +826,29 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
               </div>
             )
           }
-          if (p.type === 'text') return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center' }}>{p.text ?? ''}</div>
+          if (p.type === 'text') return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
+          if (p.type === 'media') {
+            // 画像・動画: 押すとリンク先へ(URL は配信ごと。ボタンと同じ目印で、リンクの設定と計測に乗る)。
+            // 動画は、メールでは再生できないので、画像をサムネイルにして ▶ を重ねる
+            return (
+              <div
+                data-link="button"
+                data-link-id={p.id}
+                data-anchor={`button:${p.id}`}
+                data-part={`button:${p.id}`}
+                style={{ position: 'relative', aspectRatio: String(ratioValue(p.ratio ?? 'wide')), borderRadius: 8, overflow: 'hidden', backgroundColor: '#eef0f3', display: 'grid', placeItems: 'center', alignSelf: 'center' }}
+              >
+                {p.src ? (
+                  <img src={p.src} alt={p.alt ?? ''} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: SUB }}>{p.video ? t('動画(サムネイル未設定)', 'Video (no thumbnail)') : t('画像(未設定)', 'Image (not set)')}</span>
+                )}
+                {p.video && (
+                  <span style={{ position: 'absolute', width: 44, height: 44, borderRadius: '50%', display: 'grid', placeItems: 'center', backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 18 }}>▶</span>
+                )}
+              </div>
+            )
+          }
           return null
         }
         // 均等に並べる行は、列に合わせず、行いっぱいの帯の中で、中身のある部品(空きは除く)を同じ幅で並べる
@@ -833,6 +858,10 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             {body(p)}
           </div>
         )
+        // スマホで「縦に積む」セクションは、スマホの見え方のとき、中身のある部品を上の行から・左から 1 列に並べる
+        if (device === 'mobile' && sec.mobile === 'stack') {
+          return <div style={{ display: 'grid', gap: 8 }}>{[...(sec.parts ?? [])].filter((p) => p.type !== 'empty').sort((a, b) => a.r - b.r || a.c - b.c).map((p) => cell(p))}</div>
+        }
         return (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 8 }}>
             {(sec.parts ?? []).filter((p) => !even.includes(p.r)).map((p) => cell(p, { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}` }))}
@@ -858,6 +887,13 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: cols === 3 ? 8 : 12, alignItems: 'start' }}>{slots.map((j) => slot(j, gridTile))}</div>
         )
     }
+  }
+
+  // セクションの外枠。表のセクションは、背景の色・上下の余白・区切り線を持てる(以前の種類は、いままでどおり)
+  const sectionStyle = (sec: Section): React.CSSProperties => {
+    if (sec.kind !== 'table' || (!sec.bg && !sec.space && !sec.divider)) return { padding: '0 16px 16px' }
+    const sp = sectionSpace(sec.space)
+    return { padding: `${sec.bg || sec.divider ? sp : 0}px 16px ${sp}px`, ...(sec.bg ? { backgroundColor: SECTION_BG[sec.bg] } : {}), ...(sec.divider ? { borderTop: '1px solid #e2e2e2' } : {}) }
   }
 
   // ---- 本文(商品)。free は連続する同カテゴリごとに見出しを付け、それ以外はテンプレートの枠に流し込む
@@ -908,7 +944,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         {sections.map(({ sec, start, list }, si) => {
           const category = sec.categoryHeading ? byId.get(list[0]?.productId ?? '')?.category_name : undefined
           return (
-            <div key={start} data-anchor={`section:${si}`} style={{ padding: '0 16px 16px' }}>
+            <div key={start} data-anchor={`section:${si}`} style={sectionStyle(sec)}>
               {sec.categoryHeading && editableHeading(si, category ? optionLabel(category) : `CATEGORY ${si + 1}`)}
               {sec.copy !== false && sectionCopyEl(si, !!sec.categoryHeading)}
               {sectionBody(sec, start, list)}
