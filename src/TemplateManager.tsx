@@ -27,6 +27,10 @@ import { AutoTextarea } from './AutoTextarea'
 import { locale, useT } from './i18n'
 import { MAX_BUTTON_LABEL, deleteTemplate, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
 import type { DeliveryCard } from './models/deliveryCards'
+import type { Product } from './models/products'
+import { productImage } from './images'
+import { productMarket } from './market'
+import { yen } from './items'
 import { statusLabel, statusRank } from './status'
 import { TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
@@ -392,7 +396,7 @@ function buildUsage(cards: DeliveryCard[]): Map<string, Usage> {
  * 編集しても、すでにある配信は使った版の形のまま(見た目・見出し・商品の位置は変わらない)。前の版に戻すときも、新しい版として上に積む。
  * 標準も編集できる(コードの定義が版 0。上書きの行で置き換える)。使っているテンプレートは削除せず、使わない(無効)にする
  */
-export function TemplateManager({ cards, country, onChanged, onOpenCard }: { cards: DeliveryCard[]; country?: string; onChanged: () => Promise<void>; onOpenCard: (id: string) => void }) {
+export function TemplateManager({ cards, products = [], country, onChanged, onOpenCard }: { cards: DeliveryCard[]; products?: Product[]; country?: string; onChanged: () => Promise<void>; onOpenCard: (id: string) => void }) {
   const open = useTemplateManagerOpen()
   useTemplates() // 登録が変わったら、一覧を描き直す
   const t = useT()
@@ -629,6 +633,17 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
   const setHeroTable = (sec: Section | undefined) => setDraft((d) => (d ? { ...d, heroTable: sec } : d))
   // 右のタブ「テンプレート」の、全体の見た目の欄(キャンバスのヒーローを押したときに、そこを見せる)
   const heroRef = useRef<HTMLDivElement>(null)
+  // 見本の写真: ヘッダーの国の市場の商品(なければ、すべて)から、写真のあるものを 24 点まで(セールの見せ方を確かめられるように、元の価格があるものを先に)
+  const samples = useMemo(() => {
+    const market = country === 'US' || country === 'JP' ? country : undefined
+    const pool = products.filter((p) => !!productImage(p) && (!market || productMarket(p) === market))
+    return [...pool.filter((p) => p.regular_price), ...pool.filter((p) => !p.regular_price)].slice(0, 24).map((p) => ({
+      src: productImage(p)!,
+      name: p.name,
+      price: yen(p.price, productMarket(p)),
+      ...(p.regular_price ? { regular: yen(p.regular_price, productMarket(p)) } : {}),
+    }))
+  }, [products, country])
   const editor = useTableEditor({
     active: editing,
     sections: draft?.sections ?? [],
@@ -638,6 +653,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
     hero: draft?.hero ?? 'standard',
     heroText: draft?.heroText,
     topBar: draft?.topBar,
+    samples,
     onSelectHero: () => window.setTimeout(() => heroRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0),
   })
 
@@ -1189,6 +1205,7 @@ export function TemplateManager({ cards, country, onChanged, onOpenCard }: { car
                       <Text size={200} weight="semibold">{t('キャンバス', 'Canvas')}</Text>
                       <span className={s.caption} style={{ marginLeft: 8 }}>{t(`商品の枠 ${boxCount} 点`, `${boxCount} product slots`)}</span>
                       <span className={s.grow} />
+                      {editor.samplesToggle}
                       {editor.zoomBar}
                       <Tooltip relationship="label" content={t('元に戻す(Ctrl+Z)', 'Undo (Ctrl+Z)')}>
                         <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0} onClick={undo} />

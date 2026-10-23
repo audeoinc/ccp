@@ -36,6 +36,7 @@ const MAIL_BASE = 600
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 1.6
 const CANVAS_ZOOM_KEY = 'ccp.templateCanvasZoom'
+const SAMPLES_KEY = 'ccp.templateCanvasSamples'
 
 const useStyles = makeStyles({
   // ---- パーツ
@@ -208,6 +209,7 @@ const useStyles = makeStyles({
   sbody: { display: 'grid', rowGap: '4px', padding: '0 8px 8px' },
   secFields: { display: 'grid', rowGap: '8px', padding: '6px 0 8px', borderBottom: `1px dashed ${tokens.colorNeutralStroke2}`, marginBottom: '4px' },
   pcard: { borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, borderLeftWidth: '3px', minWidth: 0 },
+  pcardDim: { opacity: 0.55 },
   pcardCur: { backgroundColor: tokens.colorBrandBackground2 },
   tBox: { borderLeftColor: tokens.colorPaletteBlueBorderActive },
   tButton: { borderLeftColor: tokens.colorNeutralForeground1 },
@@ -241,6 +243,8 @@ export interface TableEditorArgs {
   hero: HeroKind
   heroText?: HeroText
   topBar?: boolean
+  /** 見本の写真(T8 の確認 4・案 A): 箱に、商品のデータの写真・名前・価格を仮に入れて見せる(保存しない。並びの順に使い回す) */
+  samples?: { src: string; name: string; price: string; regular?: string }[]
   /** ヒーローを押した(右のテンプレートのタブの、全体の見た目へ) */
   onSelectHero: () => void
 }
@@ -249,7 +253,7 @@ export interface TableEditorArgs {
  * 表の編集。パーツの列・キャンバス・右のタブ(テンプレート / セクションと部品)を返す(並べ方とスプリッターは、呼ぶ側が決める)。
  * テンプレートのタブの中身は、呼ぶ側が作って rightPane に渡す
  */
-export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroText, topBar, onSelectHero }: TableEditorArgs) {
+export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroText, topBar, samples = [], onSelectHero }: TableEditorArgs) {
   const t = useT()
   const s = useStyles()
   const [sel, setSel] = useState<Sel>(null)
@@ -302,6 +306,28 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       // 覚えられなくても、大きさは変えられる
     }
   }, [zoom])
+  const [showSamples, setShowSamples] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SAMPLES_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleSamples = () =>
+    setShowSamples((v) => {
+      try {
+        localStorage.setItem(SAMPLES_KEY, v ? '0' : '1')
+      } catch {
+        // 覚えられなくても、切り替えはできる
+      }
+      return !v
+    })
+  const sampleOf = (n: number) => (showSamples && samples.length > 0 ? samples[(Math.max(1, n) - 1) % samples.length] : undefined)
+  const samplesToggle = (
+    <Button size="small" appearance={showSamples ? 'primary' : 'subtle'} aria-pressed={showSamples} disabled={samples.length === 0} onClick={toggleSamples} title={t('箱に、商品のデータの写真・名前・価格を仮に入れて見せる(保存はしない)', 'Fill boxes with sample product photos, names and prices (not saved)')}>
+      {t('見本の写真', 'Sample photos')}
+    </Button>
+  )
   const fitW = Math.max(300, Math.min(640, canvasW - 8))
   const mailW = zoom === 'fit' ? fitW : Math.round(MAIL_BASE * zoom)
   const shownZoom = mailW / MAIL_BASE
@@ -952,14 +978,15 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       const n = boxNo.get(p.id) ?? 0
       const fields = T.boxFields(p)
       const sale = p.priceStyle === 'sale'
+      const sample = sampleOf(n)
       // 写真のほかに出すもの(名前・価格・説明・ボタン)を、メールと同じ並びで、仮の文字で見せる
       const lines = (
         <>
-          {fields.includes('name') && <span style={{ color: MAIL.ink, fontWeight: 600 }}>{t('商品名', 'Product')}</span>}
+          {fields.includes('name') && <span style={{ color: MAIL.ink, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sample?.name ?? t('商品名', 'Product')}</span>}
           {fields.includes('price') && (
             <span>
-              {sale && <s style={{ color: MAIL.sub, marginRight: 4 }}>{t('元の価格', 'Was')}</s>}
-              <span style={{ color: sale || hero === 'offer' ? '#d32f2f' : MAIL.sub, fontWeight: sale ? 700 : 400 }}>{p.priceStyle === 'from' ? t('価格〜', 'From price') : sale ? t('セール価格', 'Sale price') : t('価格', 'Price')}</span>
+              {sale && <s style={{ color: MAIL.sub, marginRight: 4 }}>{sample?.regular ?? t('元の価格', 'Was')}</s>}
+              <span style={{ color: sale || hero === 'offer' ? '#d32f2f' : MAIL.sub, fontWeight: sale ? 700 : 400 }}>{sample ? (p.priceStyle === 'from' ? t(`${sample.price}〜`, `From ${sample.price}`) : sample.price) : p.priceStyle === 'from' ? t('価格〜', 'From price') : sale ? t('セール価格', 'Sale price') : t('価格', 'Price')}</span>
             </span>
           )}
           {fields.includes('desc') && <span>{t('説明', 'Description')}</span>}
@@ -987,7 +1014,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )
       if (isTextView(p.view)) {
         const text = <div className={s.splitText}>{lines}</div>
-        const img = <div style={{ backgroundColor: MAIL.img, position: 'relative' }}>{badge}</div>
+        const img = <div style={{ backgroundColor: MAIL.img, position: 'relative', ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>{badge}</div>
         return (
           <div className={s.split}>
             {p.view === 'story' && n % 2 === 0 ? (
@@ -1007,7 +1034,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         )
       }
       return (
-        <div className={s.tile} style={{ backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile }}>
+        <div className={s.tile} style={{ backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile, ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
           <span className={s.tileNo}>{n}</span>
           {badge}
           {quick}
@@ -1144,6 +1171,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         onPointerDown={(e) => startSelect(e, sec, p)}
         onDoubleClick={() => (p.type === 'box' || p.type === 'media' ? setQuickId(p.id) : startEdit(p))}
         onContextMenu={(e) => {
+          // Shift + 右クリックは、ブラウザのメニューのまま(調べる・写すなど。よくある決まり)
+          if (e.shiftKey) return
           e.preventDefault()
           let ps = mine && selParts.some((x) => x.id === p.id) ? selParts : [p]
           let rc = mine && selParts.some((x) => x.id === p.id) ? mine : { c: p.c, r: p.r, w: p.w, h: p.h }
@@ -1678,10 +1707,12 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {
                       const pOpen = isOpen(p.id, p.id === one)
+                      // 均等の行の空きは、メールに出ない余白なので薄く出す(分析・位置の数え方でも数えない)
+                      const evenEmpty = p.type === 'empty' && T.isEvenRow(sec, p.r)
                       return (
                         <div
                           key={p.id}
-                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : p.type === 'media' ? s.tMedia : s.tEmpty, selIds.has(p.id) && s.pcardCur)}
+                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : p.type === 'media' ? s.tMedia : s.tEmpty, selIds.has(p.id) && s.pcardCur, evenEmpty && s.pcardDim)}
                           onMouseEnter={() => setPeek(p.id)}
                           onMouseLeave={() => setPeek(null)}
                         >
@@ -1697,7 +1728,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                           >
                             {mini(sec, p)}
                             <span className={s.tchip}>{typeName(p.type)}</span>
-                            <span className={s.pn}>{partName(p)}</span>
+                            <span className={s.pn}>{evenEmpty ? t('均等の行の空き(メールには出ない)', 'Spare cell in an even row (not in the email)') : partName(p)}</span>
                             <span className={s.ps}>{p.w * p.h > 1 ? `${p.w}×${p.h}` : ''}</span>
                             <span
                               className={s.chev}
@@ -1752,5 +1783,5 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     document.querySelector(`[data-sec="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
 
-  return { palette, canvas, zoomBar, rightPane, goSection, clearSelection: () => setSel(null) }
+  return { palette, canvas, zoomBar, samplesToggle, rightPane, goSection, clearSelection: () => setSel(null) }
 }

@@ -132,7 +132,18 @@ export const isEvenRow = (sec: Section, r: number) => (sec.evenRows ?? []).inclu
 export function toggleEvenRow(sec: Section, r: number): TableOp {
   if (isEvenRow(sec, r)) return { sec: { ...sec, evenRows: shiftEven(sec, (x) => (x === r ? undefined : x)) } }
   if (partsOf(sec).some((p) => p.h > 1 && p.r <= r && p.r + p.h > r)) return { error: tr('縦に結合したマスがかかっている行は、均等に並べられません', "A row with a vertically merged cell can't be spread evenly") }
-  return { sec: { ...sec, evenRows: [...(sec.evenRows ?? []), r].sort((a, b) => a - b) } }
+  // 中身のある部品を左に詰める(データの並び = メールの見た目の並びにする。位置で比べるときに、列の番号で迷わないように。ID はそのまま)
+  let cur = 0
+  const packed = partsOf(sec)
+    .filter((p) => p.r === r && p.type !== 'empty')
+    .sort((a, b) => a.c - b.c)
+    .map((p) => {
+      const q = { ...p, c: cur }
+      cur += p.w
+      return q
+    })
+  const others = partsOf(sec).filter((p) => p.r !== r)
+  return { sec: normalizeTable({ ...sec, parts: [...others, ...packed], evenRows: [...(sec.evenRows ?? []), r].sort((a, b) => a - b) }) }
 }
 
 /** 空きのマスを埋める(操作のあと) */
