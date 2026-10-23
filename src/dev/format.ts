@@ -1,5 +1,5 @@
 // 開発用の画面で、表・列を写すときの形(スプレッドシートに貼る TSV、Gemini・Claude に渡す Markdown)
-import type { Column, Row } from './api'
+import type { Column, ColumnProfile, Row } from './api'
 
 const cell = (v: unknown): string => {
   if (v == null) return ''
@@ -30,3 +30,25 @@ export function columnsMarkdown(ref: string, columns: Column[], description?: st
 }
 
 export const cellText = cell
+
+/** 割合の表示(小さい割合は桁を増やす) */
+export const pct = (v: number | null | undefined) => (v == null ? '—' : `${(v * 100).toFixed(v < 0.01 && v > 0 ? 2 : 1)}%`)
+
+/** 列の中身を、AI・Claude に渡す形(Markdown)にする */
+export function profileMarkdown(p: ColumnProfile): string {
+  const lines = [
+    `### 列の中身: \`${p.table}\`.\`${p.column}\`(${p.type}${p.mode !== 'NULLABLE' ? `、${p.mode}` : ''})`,
+    ...(p.description ? [p.description] : []),
+    '',
+    `- 行数: ${p.total?.toLocaleString() ?? '?'}`,
+    `- 空(NULL): ${p.nulls?.toLocaleString() ?? '?'}(${pct(p.null_rate)})`,
+    ...(p.distinct_approx != null ? [`- 値の種類(近似): ${p.distinct_approx.toLocaleString()}`] : []),
+    ...(p.min_value != null ? [`- 最小: ${p.min_value} / 最大: ${p.max_value}`] : []),
+    ...(p.min_len != null ? [`- 文字の長さ: ${p.min_len}〜${p.max_len}`] : []),
+  ]
+  if (p.top?.length) {
+    lines.push('', '| 値 | 件数 |', '|---|---|', ...p.top.map((t) => `| ${t.value ?? '(NULL)'} | ${t.n.toLocaleString()} |`))
+  }
+  return lines.join('\n')
+}
+

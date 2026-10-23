@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Dropdown, Input, MessageBar, MessageBarBody, Option, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular } from '@fluentui/react-icons'
+import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular } from '@fluentui/react-icons'
 import { DevApi, bytesLabel, isFailure, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
@@ -11,6 +11,7 @@ import { DatasetPicker } from './DatasetPicker'
 import { ChatPanel } from './ChatPanel'
 import { JobInfo } from './JobInfo'
 import { WorkPanel } from './WorkPanel'
+import { HistoryDialog } from './HistoryDialog'
 
 const useStyles = makeStyles({
   // 左: データセットと表 / 中: 表の中身と SQL / 右: Gemini との会話(SQL を見ながら話せるように、並べて置く)
@@ -138,6 +139,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   const [sql, setSql] = useState(readDraft)
   // 作る出力(SPU など)。版・答え合わせと、AI に渡す手本の SQL に使う
   const [output, setOutput] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
   // AI に頼む(答え合わせの結果から)。id を変えて、同じ文でも送り直せるように
   const [ask, setAsk] = useState<{ id: number; text: string } | null>(null)
   const [widths, setWidths] = useState(readWidths)
@@ -303,11 +305,14 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
 
       <div className={s.splitter} role="separator" aria-orientation="vertical" title="ドラッグで幅を変える(ダブルクリックで元に戻す)" onPointerDown={(e) => widths.leftOpen && drag(e, 'left')} onDoubleClick={() => setWidths(WIDTHS)} />
       <div className={s.main}>
-        {selected && <TableDetail refName={selected} info={info} error={infoError} loading={busy === 'info'} onOpenTable={(r) => void openTable(r)} onUseSql={changeSql} />}
+        {selected && <TableDetail refName={selected} info={info} error={infoError} loading={busy === 'info'} onOpenTable={(r) => void openTable(r)} onUseSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />}
 
         <div className={s.card}>
           <div className={s.row}>
             <span className={mergeClasses(s.heading, s.grow)}>SQL を試す</span>
+            <Button size="small" appearance="subtle" icon={<HistoryRegular />} onClick={() => setHistoryOpen(true)} title="前に流した SQL(画面・AI・列を調べる)">
+              履歴
+            </Button>
             <CopyButton label="SQL をコピー" text={() => sql} />
             <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!sql.trim()} onClick={() => download('query.sql', sql)}>
               .sql で保存
@@ -372,6 +377,14 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
           <span className={s.foldedLabel}>AI と SQL を作る</span>
         </button>
       )}
+      <HistoryDialog
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onUseSql={(text, run) => {
+          changeSql(text)
+          if (run) void runSql(text)
+        }}
+      />
       {/* 畳んでも消さない(考えている途中の会話が止まらないように) */}
       <div style={widths.rightOpen ? { minWidth: 0 } : { display: 'none' }}>
         <ChatPanel

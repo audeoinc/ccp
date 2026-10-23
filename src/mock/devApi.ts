@@ -1,6 +1,6 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { ChatContext, ChatEvent, ChatTurn, CheckResult, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ChatContext, ChatEvent, ChatTurn, CheckResult, ColumnProfile, RunEntry, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
 
 export * from '../dev/api'
 
@@ -326,5 +326,31 @@ export const FilesApi = {
   fromXlsx: (name: string) => {
     workFiles[name] = { content: '### シート: Sheet1\n\n```csv\na,b\n```', pinned: false, updated: new Date().toISOString() }
     return wait({ ok: true as const, overwritten: false, chars: 30 })
+  },
+}
+
+// 実行の履歴と、列の中身(身代わり)
+const runs: RunEntry[] = [
+  { id: 1, at: '2026-10-23T09:10:00+09:00', source: 'AI', sql: `SELECT country_cd, COUNT(*) AS n\nFROM \`${DS}.m_item\`\nGROUP BY country_cd`, ok: true, rows: 2, processed: 1_048_576, billed: 10_485_760, cost_usd: 0.0001, seconds: 0.6, error: '' },
+  { id: 2, at: '2026-10-23T09:12:00+09:00', source: '画面', sql: `SELECT itm_cd FROM \`${DS}.m_item\``, ok: false, rows: null, processed: null, billed: null, cost_usd: null, seconds: null, error: 'BadRequest: 400 Unrecognized name: itm_cd; Did you mean item_cd? at [1:8]' },
+]
+export const RunApi = {
+  history: (q = '') => wait({ ok: true as const, runs: [...runs].reverse().filter((r) => !q || r.sql.toLowerCase().includes(q.toLowerCase()) || r.error.toLowerCase().includes(q.toLowerCase())) }),
+  profile: (table: string, column: string, confirm = false) => {
+    const t = TABLES[idOf(table)]
+    const col = t?.columns.find((c) => c.name === column)
+    if (!t || !col) return fail(`列 ${column} が ${table} にありません`)
+    const base: ColumnProfile = { ok: true, table, column, type: col.type, mode: col.mode ?? 'NULLABLE', description: col.description ?? '', bytes: column === 'item_nm' ? 3 * 1024 ** 3 : 52_428_800, cost_usd: column === 'item_nm' ? 0.02 : 0.0003, sql: '' }
+    if (base.bytes > 1024 ** 3 && !confirm) return wait({ ...base, needs_confirm: true })
+    const counts = new Map<string | null, number>()
+    for (const r of t.rows) {
+      const v = r[column] == null ? null : String(r[column])
+      counts.set(v, (counts.get(v) ?? 0) + 1)
+    }
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, n]) => ({ value, n: n * 1000 }))
+    const nulls = counts.get(null) ?? 0
+    runs.push({ id: runs.length + 1, at: new Date().toISOString(), source: '列を調べる', sql: `SELECT COUNT(*) AS total … FROM \`${table}\``, ok: true, rows: t.rows.length * 1000, processed: base.bytes, billed: null, cost_usd: null, seconds: 0.9, error: '' })
+    const vals = top.map((x) => x.value).filter((v): v is string => v != null).sort()
+    return wait({ ...base, total: t.rows.length * 1000, nulls: nulls * 1000, null_rate: nulls / t.rows.length, distinct_approx: counts.size, min_value: vals[0] ?? null, max_value: vals[vals.length - 1] ?? null, top, seconds: 0.9 })
   },
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Spinner, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronRightRegular, EyeRegular, PlayRegular, TableRegular } from '@fluentui/react-icons'
-import { DevApi, bytesLabel, isFailure, type Column, type Row, type TableInfo } from './api'
+import { DevApi, RunApi, bytesLabel, isFailure, type Column, type ColumnProfile, type Row, type TableInfo } from './api'
+import { ColumnProfileView } from './ColumnProfileView'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
 import { columnsMarkdown } from './format'
@@ -29,9 +30,13 @@ const useStyles = makeStyles({
   row: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
   sql: { margin: 0, fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   muted: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  cols: { borderCollapse: 'collapse', fontSize: tokens.fontSizeBase200 },
+  th: { position: 'sticky', top: 0, textAlign: 'left', padding: '3px 8px', backgroundColor: tokens.colorNeutralBackground3, fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
+  td: { padding: '1px 8px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}`, verticalAlign: 'middle' },
+  mono: { fontFamily: tokens.fontFamilyMonospace, whiteSpace: 'nowrap' },
 })
 
-type TabKey = 'columns' | 'rows' | 'view' | 'sources'
+type TabKey = 'columns' | 'profile' | 'rows' | 'view' | 'sources'
 
 const OPEN_KEY = 'ccp-dev-detail-open'
 const readOpen = () => {
@@ -49,10 +54,12 @@ interface Props {
   loading: boolean
   onOpenTable: (ref: string) => void
   onUseSql: (sql: string) => void
+  /** AI に聞く(列の中身を会話に送る) */
+  onAsk?: (text: string) => void
 }
 
 /** 選んだ表・ビューの詳細(概要は横に並べ、列・先頭の行・ビューの SQL・参照先はタブで切り替える。畳める) */
-export function TableDetail({ refName, info, error, loading, onOpenTable, onUseSql }: Props) {
+export function TableDetail({ refName, info, error, loading, onOpenTable, onUseSql, onAsk }: Props) {
   const s = useStyles()
   const [open, setOpen] = useState(readOpen)
   const [tab, setTab] = useState<TabKey>('columns')
@@ -60,6 +67,23 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
   const [rows, setRows] = useState<{ ref: string; columns: Column[]; rows: Row[] } | null>(null)
   const [rowsError, setRowsError] = useState('')
   const [rowsBusy, setRowsBusy] = useState(false)
+  // 列の中身(「調べる」を押した列。表を変えたら消える)
+  const [profile, setProfile] = useState<ColumnProfile | null>(null)
+  const [profileBusy, setProfileBusy] = useState<string | null>(null)
+  const [profileError, setProfileError] = useState('')
+
+  const runProfile = async (column: string, confirm = false) => {
+    setProfileBusy(column)
+    setProfileError('')
+    setTab('profile')
+    const r = await RunApi.profile(refName, column, confirm)
+    setProfileBusy(null)
+    if (isFailure(r)) {
+      setProfile(null)
+      return setProfileError(r.error)
+    }
+    setProfile(r)
+  }
 
   const toggle = () => {
     setOpen((v) => {
@@ -82,7 +106,9 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
   }
 
   const isView = !!info && info.type !== 'TABLE'
-  const shownTab: TabKey = !info ? 'columns' : (tab === 'view' && !info.view_sql) || (tab === 'sources' && !info.sources.length) ? 'columns' : tab
+  const profileHere = profile && profile.table === refName ? profile : null
+  const shownTab: TabKey =
+    !info ? 'columns' : (tab === 'view' && !info.view_sql) || (tab === 'sources' && !info.sources.length) || (tab === 'profile' && !profileHere && !profileBusy && !profileError) ? 'columns' : tab
   const rowsHere = rows && rows.ref === refName ? rows : null
 
   return (
@@ -148,6 +174,7 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
             if (d.value === 'rows' && !rowsHere && !isView) void loadRows()
           }}>
             <Tab value="columns">列 {info.columns.length}</Tab>
+            {(profileHere || profileBusy || profileError) && <Tab value="profile">列の中身{profileHere ? `: ${profileHere.column}` : ''}</Tab>}
             <Tab value="rows" disabled={isView} title={isView ? 'ビューは、SQL の欄で SELECT を流して見てください' : '料金はかかりません'}>
               先頭の行
             </Tab>
@@ -156,17 +183,45 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
           </TabList>
           <div className={s.body}>
             {shownTab === 'columns' && (
-              <ResultGrid
-                compact
-                note=""
-                columns={[
-                  { name: '列', type: '' },
-                  { name: '型', type: '' },
-                  { name: 'モード', type: '' },
-                  { name: '説明', type: '' },
-                ]}
-                rows={info.columns.map((c) => ({ 列: c.name, 型: c.type, モード: c.mode, 説明: c.description }))}
-              />
+              <table className={s.cols}>
+                <thead>
+                  <tr>
+                    <th className={s.th}>列</th>
+                    <th className={s.th}>型</th>
+                    <th className={s.th}>モード</th>
+                    <th className={s.th}>説明</th>
+                    <th className={s.th} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {info.columns.map((c) => (
+                    <tr key={c.name}>
+                      <td className={mergeClasses(s.td, s.mono)}>{c.name}</td>
+                      <td className={mergeClasses(s.td, s.mono)}>{c.type}</td>
+                      <td className={mergeClasses(s.td, s.mono)}>{c.mode}</td>
+                      <td className={s.td}>{c.description}</td>
+                      <td className={s.td}>
+                        {c.type !== 'RECORD' && c.type !== 'STRUCT' && (
+                          <Button size="small" appearance="subtle" disabled={!!profileBusy} onClick={() => void runProfile(c.name)} title="空の数・値の種類・最小・最大・よく出る値を調べる(この列を全件読む。多いときは先に確かめる)">
+                            {profileBusy === c.name ? '調べています…' : '調べる'}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {shownTab === 'profile' && (
+              <>
+                {profileBusy && <Spinner size="tiny" label={`${profileBusy} を調べています`} />}
+                {profileError && (
+                  <MessageBar intent="error" layout="multiline">
+                    <MessageBarBody>{profileError}</MessageBarBody>
+                  </MessageBar>
+                )}
+                {profileHere && !profileBusy && <ColumnProfileView profile={profileHere} onConfirm={() => void runProfile(profileHere.column, true)} onAsk={onAsk} />}
+              </>
             )}
             {shownTab === 'rows' && (
               <>

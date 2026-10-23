@@ -112,7 +112,7 @@ class ToolTest(unittest.TestCase):
 
     def test_tools_declared(self) -> None:
         names = [f.name for f in devtools.tool_declarations()[0].function_declarations]
-        self.assertEqual(names, ["list_datasets", "list_tables", "describe_table", "describe_view_sources", "dry_run", "list_files", "read_file", "save_file", "run_select"])
+        self.assertEqual(names, ["list_datasets", "list_tables", "describe_table", "describe_view_sources", "dry_run", "profile_column", "list_files", "read_file", "save_file", "run_select"])
 
     def test_view_sources(self) -> None:
         refs = [SimpleNamespace(project="p", dataset_id="v", table_id="vw"), SimpleNamespace(project="p", dataset_id="raw", table_id="item"),
@@ -226,6 +226,33 @@ class WorkTest(unittest.TestCase):
         self.assertIn("error", out)
         self.run_async(devtools.delete_file("コーディングルール.md"))
         self.assertEqual(devtools.pinned_names(), [])
+
+    def test_history(self) -> None:
+        devtools.record_run("画面", "SELECT 1", rows=1, processed=100, billed=10485760, seconds=0.5)
+        devtools.record_run("AI", "SELECT bad", error="BadRequest: x")
+        runs = devtools.read_history()
+        # 新しい順。失敗も残る
+        self.assertEqual([(r["source"], r["ok"]) for r in runs], [("AI", False), ("画面", True)])
+        self.assertEqual([r["sql"] for r in devtools.read_history(q="bad")], ["SELECT bad"])
+
+    def test_profile_column(self) -> None:
+        f = SimpleNamespace(name="country_cd", field_type="STRING", mode="NULLABLE", description="", fields=[])
+        t = SimpleNamespace(project="p", dataset_id="d", table_id="t", schema=[f])
+        big = {"n": 2 * 1024**3}
+
+        def query(sql, job_config=None):  # noqa: ANN001, ANN202
+            if getattr(job_config, "dry_run", False):
+                return SimpleNamespace(total_bytes_processed=big["n"])
+            rows = [SimpleNamespace(items=lambda: {"total": 4, "nulls": 1, "distinct_approx": 2, "min_value": "JPN", "max_value": "USA"}.items())] if "COUNT(*) AS total" in sql                 else [SimpleNamespace(items=lambda: {"value": "JPN", "n": 2}.items()), SimpleNamespace(items=lambda: {"value": "USA", "n": 1}.items())]
+            return SimpleNamespace(result=lambda: rows)
+
+        c = SimpleNamespace(get_table=lambda ref: t, query=query)
+        # 1 GB を超えると、確かめてから
+        self.assertTrue(devtools.profile_column(c, "p.d.t", "country_cd", confirm=False).get("needs_confirm"))
+        r = devtools.profile_column(c, "p.d.t", "country_cd", confirm=True)
+        self.assertEqual((r["total"], r["nulls"], r["null_rate"], [v["value"] for v in r["top"]]), (4, 1, 0.25, ["JPN", "USA"]))
+        self.assertEqual(devtools.read_history()[0]["source"], "列を調べる")
+        self.assertFalse(devtools.profile_column(c, "p.d.t", "nope", confirm=True)["ok"])
 
     def test_check_runs_validate_with_context(self) -> None:
         self.run_async(devtools.save_version("spu", devtools.VersionIn(sql="SELECT spu")))

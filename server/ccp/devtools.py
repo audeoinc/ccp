@@ -24,6 +24,8 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/gcs/extract     選んだ文書を文字にする(Excel はシートごとに CSV の形。PDF は文字にしない)
   POST /api/dev/policy/convert  文書を POLICY_FORMAT の形に書き直す(NDJSON。PDF は Gemini にそのまま渡す)
   GET  /api/dev/policy/drafts   前に書き直したファイル(server/devwork/policies/)
+  GET  /api/dev/history         実行の履歴(server/devwork/history.jsonl。画面・AI・列を調べる、で流した SQL)
+  POST /api/dev/bq/profile      列の中身を調べる(行数・空・値の種類・最小・最大・よく出る値)
   GET  /api/dev/files           作業ファイル(server/devwork/files/)  GET/PUT/DELETE /api/dev/files/{名前}  PUT …/pin  POST …/from-xlsx
   GET  /api/dev/chats           AI との会話の一覧   GET/PUT/DELETE /api/dev/chats/{id}  会話を開く・残す・消す(server/devwork/chats/)
   POST /api/dev/ai/context      Gemini に渡す前提を、そのまま返す(見る・コピーする)
@@ -368,7 +370,7 @@ async def run(body: SqlIn) -> dict[str, Any]:
         job = c.query(body.sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=max_bytes()))
         it = job.result(max_results=body.max_rows)
         rows = [plain(dict(r.items())) for r in it]
-        return {
+        out = {
             "ok": True,
             "columns": schema_columns(it.schema),
             "rows": rows,
@@ -379,11 +381,18 @@ async def run(body: SqlIn) -> dict[str, Any]:
             "cached": bool(job.cache_hit),
             "job": job_info(c, body.sql, job),
         }
+        record_run("画面", body.sql, rows=it.total_rows, processed=job.total_bytes_processed, billed=job.total_bytes_billed, seconds=out["seconds"])
+        return out
 
     try:
-        return await asyncio.to_thread(go)
+        r = await asyncio.to_thread(go)
+        if not r.get("ok"):
+            record_run("画面", body.sql, error=r.get("error", ""))
+        return r
     except Exception as e:  # noqa: BLE001
-        return _error(e)
+        err = _error(e)
+        record_run("画面", body.sql, error=err["error"])
+        return err
 
 
 @router.get("/bq/projects")
@@ -444,6 +453,7 @@ BigQuery を調べる道具(関数)を使えます:
 - describe_table: 表の列・型・説明・パーティションと、先頭の数行
 - dry_run: SQL を料金なしで確かめる(文法・列の有無・読む量)
 - describe_view_sources: ビューが参照している元の表(ビューの中のビューもたどる)と、それぞれの列の定義
+- profile_column: 列の中身(空の数・値の種類の数・最小・最大・よく出る値の上位)。CCP の列に当てる前に、値の形を確かめるのに使う
 - run_select: SELECT を流して、先頭の行を見る(値の種類を確かめる SELECT DISTINCT など。読む量に上限がある)
 推測で書かず、道具で表と列を確かめてから SQL を書いてください。SQL を返す前に、dry_run で通ることを確かめてください。
 利用者が名前の一部しか言わないとき(「ctlg が含まれた表」など)は、list_tables で探してください。
@@ -636,6 +646,8 @@ def tool_declarations() -> list[Any]:
                                   parameters=S(type=T.OBJECT, properties={"view": S(type=T.STRING, description="プロジェクト.データセット.ビュー")}, required=["view"])),
         types.FunctionDeclaration(name="dry_run", description="SQL を料金なしで確かめる。文の種類・読む量・結果の列、またはエラー",
                                   parameters=S(type=T.OBJECT, properties={"sql": S(type=T.STRING)}, required=["sql"])),
+        types.FunctionDeclaration(name="profile_column", description="列の中身を調べる(行数・空の数・値の種類の数・最小・最大・よく出る値の上位 20)。CCP の列に当てる前に、値の形を確かめるのに使う。その列を全件読む(読む量が多いときは止まる)",
+                                  parameters=S(type=T.OBJECT, properties={"table": S(type=T.STRING, description="プロジェクト.データセット.表"), "column": S(type=T.STRING)}, required=["table", "column"])),
         types.FunctionDeclaration(name="list_files", description="作業ファイルの一覧(名前・大きさ・更新日時・いつも渡すか)",
                                   parameters=S(type=T.OBJECT, properties={})),
         types.FunctionDeclaration(name="read_file", description="作業ファイルの中身",
@@ -681,6 +693,13 @@ def run_tool(c: Any, name: str, args: dict[str, Any], body: ChatIn) -> tuple[dic
             job = c.query(str(args.get("sql") or ""), job_config=bigquery.QueryJobConfig(dry_run=True, use_query_cache=False))
             return ({"statement_type": job.statement_type, "bytes": job.total_bytes_processed, "columns": schema_columns(job.schema)},
                     f"SQL を確かめた(通った。読む量 {job.total_bytes_processed or 0:,} バイト)")
+        if name == "profile_column":
+            ref = _qualify(c, str(args.get("table") or ""))
+            col = str(args.get("column") or "")
+            r = profile_column(c, ref, col, confirm=False)
+            if r.get("needs_confirm"):
+                return {"error": f"読む量が {r['bytes'] / 1024**3:.1f} GB あり、利用者の確かめが要ります。run_select で期間を絞って調べてください"}, f"列の中身を調べようとした({ref}.{col}。読む量が多いので止めた)"
+            return r, f"列の中身を調べた({ref}.{col}、{(r.get('total') or 0):,} 行)"
         if name == "list_files":
             return {"files": list_work_files()}, "作業ファイルの一覧を見た"
         if name == "read_file":
@@ -697,9 +716,14 @@ def run_tool(c: Any, name: str, args: dict[str, Any], body: ChatIn) -> tuple[dic
             dry = _dry_run(c, sql)
             if (why := only_select(dry.statement_type)) is not None:
                 return {"error": why}, "SELECT 以外を流そうとした(止めた)"
-            job = c.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=max_bytes()))
-            it = job.result(max_results=TOOL_ROWS)
+            try:
+                job = c.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=max_bytes()))
+                it = job.result(max_results=TOOL_ROWS)
+            except Exception as e:  # noqa: BLE001
+                record_run("AI", sql, error=_error(e)["error"])
+                raise
             rows = [plain(dict(r.items())) for r in it]
+            record_run("AI", sql, rows=it.total_rows, processed=job.total_bytes_processed, billed=job.total_bytes_billed)
             return ({"columns": schema_columns(it.schema), "rows": rows, "total_rows": it.total_rows},
                     f"SELECT を流した({it.total_rows or 0:,} 行、読んだ量 {job.total_bytes_processed or 0:,} バイト)")
         return {"error": f"知らない道具です: {name}"}, f"知らない道具 {name}"
@@ -1603,3 +1627,135 @@ async def file_from_xlsx(name: str, body: XlsxIn) -> dict[str, Any]:
         return _error(e)
     existed = write_work_file(name, text)
     return {"ok": True, "overwritten": existed, "chars": len(text)}
+
+
+# ---- 実行の履歴(server/devwork/history.jsonl): 流した SQL を、画面からも AI からも、成功も失敗も残す
+# 「さっき流したあの SQL」に戻れるように。1 行 1 件の JSON を足していく(ファイルが大きくなったら、古い半分を落とす)
+
+HISTORY_MAX = 5000
+
+
+def _history_path() -> Path:
+    return DEVWORK / "history.jsonl"
+
+
+def record_run(source: str, sql: str, rows: int | None = None, processed: int | None = None, billed: int | None = None,
+               seconds: float | None = None, error: str = "") -> None:
+    try:
+        p = _history_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        entry = {"at": _now_iso(), "source": source, "sql": sql, "ok": not error, "rows": rows, "processed": processed, "billed": billed,
+                 "cost_usd": cost_usd(billed), "seconds": seconds, "error": error[:2000]}
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+        if p.stat().st_size > 20 * 1024**2:
+            lines = p.read_text(encoding="utf-8").splitlines()[-HISTORY_MAX // 2:]
+            p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        log.info("実行の履歴を残せませんでした", exc_info=True)
+
+
+def read_history(limit: int = 300, q: str = "") -> list[dict[str, Any]]:
+    p = _history_path()
+    if not p.is_file():
+        return []
+    out = []
+    key = q.strip().lower()
+    for i, line in enumerate(p.read_text(encoding="utf-8").splitlines()):
+        try:
+            v = json.loads(line)
+        except ValueError:
+            continue
+        if key and key not in str(v.get("sql", "")).lower() and key not in str(v.get("error", "")).lower():
+            continue
+        v["id"] = i
+        out.append(v)
+    return list(reversed(out))[:limit]
+
+
+@router.get("/history")
+async def history(q: str = "", limit: int = 300) -> dict[str, Any]:
+    """実行の履歴(新しい順)。q で SQL・エラーの文字を探す"""
+    return {"ok": True, "runs": read_history(max(1, min(limit, 2000)), q)}
+
+
+# ---- 列の中身を調べる(CCP の列に当てる前に、値の形を見る)
+
+PROFILE_TOP = 20
+# これより多く読むときは、利用者に確かめてから流す
+PROFILE_CONFIRM_BYTES = 1024**3
+# 最小・最大を出せる型(並べられる型)
+ORDERABLE = {"STRING", "INTEGER", "INT64", "FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC", "DATE", "DATETIME", "TIME", "TIMESTAMP", "BOOLEAN", "BOOL"}
+
+
+def _column_field(t: Any, column: str) -> Any:
+    """列の定義(入れ子は a.b の形で探す)"""
+    fields = t.schema or []
+    found = None
+    for part in column.split("."):
+        found = next((f for f in fields if f.name.lower() == part.lower()), None)
+        if found is None:
+            return None
+        fields = getattr(found, "fields", None) or []
+    return found
+
+
+def profile_sql(ref: str, column: str, field_type: str, repeated: bool) -> tuple[str, str]:
+    """集計の SQL と、よく出る値の SQL。入れ子の列は、そのまま a.b で書ける(繰り返しの列は UNNEST する)"""
+    col = ".".join(f"`{p}`" for p in column.split("."))
+    src = f"`{ref}`"
+    if repeated:
+        # 繰り返しの列(配列)は、要素ごとに数える
+        src = f"`{ref}` AS t, UNNEST(t.{col}) AS v"
+        col = "v"
+    stats = [f"COUNT(*) AS total", f"COUNTIF({col} IS NULL) AS nulls"]
+    if field_type in ORDERABLE:
+        stats += [f"APPROX_COUNT_DISTINCT({col}) AS distinct_approx", f"CAST(MIN({col}) AS STRING) AS min_value", f"CAST(MAX({col}) AS STRING) AS max_value"]
+    if field_type == "STRING":
+        stats += [f"MIN(LENGTH({col})) AS min_len", f"MAX(LENGTH({col})) AS max_len"]
+    summary = f"SELECT {', '.join(stats)} FROM {src}"
+    top = (f"SELECT CAST({col} AS STRING) AS value, COUNT(*) AS n FROM {src} GROUP BY value ORDER BY n DESC LIMIT {PROFILE_TOP}"
+           if field_type in ORDERABLE else "")
+    return summary, top
+
+
+def profile_column(c: Any, ref: str, column: str, confirm: bool) -> dict[str, Any]:
+    from google.cloud import bigquery
+
+    t = c.get_table(ref.strip("`"))
+    f = _column_field(t, column)
+    if f is None:
+        return {"ok": False, "error": f"列 {column} が {ref} にありません"}
+    if f.field_type in ("RECORD", "STRUCT"):
+        return {"ok": False, "error": f"{column} は入れ子の列(RECORD)です。中の列(例: {column}.xxx)を調べてください"}
+    full = f"{t.project}.{t.dataset_id}.{t.table_id}"
+    summary, top = profile_sql(full, column, f.field_type, f.mode == "REPEATED")
+    est = (_dry_run(c, summary).total_bytes_processed or 0) + ((_dry_run(c, top).total_bytes_processed or 0) if top else 0)
+    base = {"ok": True, "table": full, "column": column, "type": f.field_type, "mode": f.mode or "NULLABLE", "description": f.description or "",
+            "bytes": est, "cost_usd": cost_usd(max(est, 10 * 1024**2)), "sql": summary + (";\n\n" + top if top else "")}
+    if est > PROFILE_CONFIRM_BYTES and not confirm:
+        return {**base, "needs_confirm": True}
+    cfg = bigquery.QueryJobConfig(maximum_bytes_billed=max_bytes())
+    t0 = time.monotonic()
+    row = next(iter(c.query(summary, job_config=cfg).result()), None)
+    stats = plain(dict(row.items())) if row is not None else {}
+    values = [plain(dict(r.items())) for r in c.query(top, job_config=cfg).result()] if top else []
+    total = stats.get("total") or 0
+    record_run("列を調べる", base["sql"], rows=total, processed=est, seconds=round(time.monotonic() - t0, 2))
+    return {**base, **stats, "null_rate": (stats.get("nulls") or 0) / total if total else None, "top": values,
+            "seconds": round(time.monotonic() - t0, 2)}
+
+
+class ProfileIn(BaseModel):
+    table: str = Field(min_length=3, max_length=500)
+    column: str = Field(min_length=1, max_length=300)
+    # 読む量が多いとき(1 GB 超)に、確かめたうえで流す
+    confirm: bool = False
+
+
+@router.post("/bq/profile")
+async def profile(body: ProfileIn) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(profile_column, bq.client(), body.table, body.column, body.confirm)
+    except Exception as e:  # noqa: BLE001
+        return _error(e)

@@ -362,6 +362,51 @@ export const FilesApi = {
   fromXlsx: (name: string, data: string) => call<{ ok: true; overwritten: boolean; chars: number }>(`${fileUrl(name)}/from-xlsx`, post({ data })),
 }
 
+/** 実行の履歴(server/devwork/history.jsonl)の 1 件 */
+export interface RunEntry {
+  id: number
+  at: string
+  /** 画面 / AI / 列を調べる */
+  source: string
+  sql: string
+  ok: boolean
+  rows: number | null
+  processed: number | null
+  billed: number | null
+  cost_usd: number | null
+  seconds: number | null
+  error: string
+}
+
+/** 列の中身(POST /api/dev/bq/profile) */
+export interface ColumnProfile {
+  ok: true
+  table: string
+  column: string
+  type: string
+  mode: string
+  description: string
+  bytes: number
+  cost_usd: number | null
+  sql: string
+  needs_confirm?: boolean
+  total?: number
+  nulls?: number
+  null_rate?: number | null
+  distinct_approx?: number
+  min_value?: string | null
+  max_value?: string | null
+  min_len?: number | null
+  max_len?: number | null
+  top?: { value: string | null; n: number }[]
+  seconds?: number
+}
+
+export const RunApi = {
+  history: (q = '') => call<{ ok: true; runs: RunEntry[] }>(`/history?q=${encodeURIComponent(q)}`),
+  profile: (table: string, column: string, confirm = false) => call<ColumnProfile>('/bq/profile', post({ table, column, confirm })),
+}
+
 export const WorkApi = {
   list: () => call<WorkInfo>('/work'),
   save: (output: string, sql: string, note = '') => call<{ ok: true; v: number; same: boolean }>(`/work/${output}`, post({ sql, note })),
