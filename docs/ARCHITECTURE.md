@@ -156,7 +156,7 @@
 
 - **画面の部品の決まり**(2026-10-23 利用者と決めた。CLAUDE.md の「コードの約束」にも同じ):
   - 足すボタン: 一覧の見出しの右に「＋ ○○を足す」(`src/ListHeader.tsx` の `ListHeader`)。足した行は一覧のいちばん上に、少しのあいだ印つきで出す(`useJustAdded`)。名前の順などで並ぶ一覧も、並びは変えず、足した行だけを上に出す。チャットの形の欄は、書く欄が下のまま。
-  - フロート(大きなダイアログ): `DialogSurface` の代わりに `ResizableSurface`(`src/ResizableSurface.tsx`。中で `floatLayout.ts` の `useFloatSize` と `ResizeHandles` を使う)。辺・角をつかんで大きさを変え、種類ごとの鍵(`float.<名前>.size`)で覚える。ダブルクリックで既定に戻す。小さい確かめの窓・小さいポップアップは固定でよい(利用者に確かめ済み)。
+  - フロート(大きなダイアログ): `DialogSurface` の代わりに `ResizableSurface`(`src/ResizableSurface.tsx`。中で `floatLayout.ts` の `useFloatSize` と `ResizeHandles` を使う)。辺・角をつかんで大きさを変え、種類ごとの鍵(`float.<名前>.size`)で覚える。ダブルクリックで既定に戻す。ピンのフロート(コメント・リクエスト共通の `PinThreadView`)も、右・下の端で大きさを変えられる(`ResizeHandles` の `anchored`。鍵は `float.pin.size`)。小さい確かめの窓・人を選ぶ所・右クリックのメニュー・のぞき見は固定でよい(利用者に確かめ済み)。
   - ペインの境目: `Splitter` と `usePaneWidths`(`floatLayout.ts`)。幅は画面ごとの鍵で覚える。
   - 固定にしたいときは、作る前に利用者に理由を伝えて確かめる。
 ## 8. 画面を開いている間の保存先(ブラウザの localStorage)
@@ -175,6 +175,7 @@
 | `calendar.view` / `week.lens` | 見せ方(月 / 週 / 一覧 / 商品別 / 比べる)/ 週の見方(商品 / 進み具合 / 時刻) |
 | `list.columns.v2` | 一覧の列の選び方 |
 | `ccp.country` | ヘッダーで選んだ国(X33) |
+| `float.<種類>.size` | 大きさを変えたフロートの大きさ(`ResizableSurface`。alerts・finished・productAction・bulk・abCompare・asset・devRequests・heroLibrary・heroUpload・partUpload・people・policy・ruleEdit・productImages・productionChat・resultDetail・resultPeek・weekHistory・pin) |
 | `devRequest.name` | 開発へのリクエストに残す名前(CCP の名前の設定 `me.name` とは別。初めて書くときに聞く。X69) |
 | `alerts.settings` | アラートの条件 |
 | `results.rankTopN` | 販売順位で「上位」とみなす線(既定 60) |

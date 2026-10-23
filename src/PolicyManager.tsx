@@ -12,7 +12,6 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
-  DialogSurface,
   DialogTitle,
   MessageBar,
   MessageBarBody,
@@ -30,6 +29,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { AddRegular, ArrowDownloadRegular, ArrowUploadRegular, DeleteRegular, DismissRegular, EditRegular, TopSpeedRegular } from '@fluentui/react-icons'
 import { appPath } from './appRoot'
 import { PolicyRulesService } from './data/policyRules'
@@ -251,7 +251,7 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
 
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={styles.surface}>
+      <ResizableSurface sizeKey="policy" className={styles.surface}>
         {/* 広いフロートの中を自分で並べるので、DialogBody は使わない(ARCHITECTURE の落とし穴) */}
         <div className={styles.body}>
           <div className={styles.row}>
@@ -494,7 +494,7 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
           </div>
         </div>
         {editing && <RuleEditDialog rule={editing.rule} initial={editing.initial} markets={markets} onClose={() => setEditing(null)} onDone={afterEdit} />}
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Dialog, DialogSurface, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -58,10 +59,10 @@ export function ResultPeek({ cardId: firstId, cards, cardProducts, products, her
   if (!row) {
     return (
       <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-        <DialogSurface className={styles.surface}>
+        <ResizableSurface sizeKey="resultPeek" className={styles.surface}>
           {results === null ? <Spinner /> : <span className={styles.muted}>{t('この配信の結果は、まだ取り込まれていません', 'No results have been imported for this delivery yet')}</span>}
           <Button onClick={onClose}>{t('閉じる', 'Close')}</Button>
-        </DialogSurface>
+        </ResizableSurface>
       </Dialog>
     )
   }

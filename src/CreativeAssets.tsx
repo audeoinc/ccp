@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogTitle, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { AddRegular, ArrowDownloadRegular, ArrowSyncRegular, AttachRegular, DeleteRegular, DismissRegular, DocumentPdfRegular, DocumentRegular, EditRegular, LinkRegular, OpenRegular } from '@fluentui/react-icons'
 import { CardAssetsService } from './data/cardAssets'
 import { CardNotesService } from './data/cardNotes'
@@ -562,7 +563,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="asset" className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.titleRow}>
             <DialogTitle className={s.grow}>{a.name}</DialogTitle>
@@ -675,7 +676,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
             </div>
           </div>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

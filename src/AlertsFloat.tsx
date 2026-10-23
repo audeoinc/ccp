@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Button, Dialog, DialogSurface, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { AlertRegular, DismissRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { CopyLinkButton } from './CopyLinkButton'
@@ -27,7 +28,7 @@ export function AlertsFloat({ open, onClose, children }: Props) {
   const t = useT()
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface} aria-label={t('アラート', 'Alerts')}>
+      <ResizableSurface sizeKey="alerts" className={s.surface} aria-label={t('アラート', 'Alerts')}>
         <div className={s.head}>
           <AlertRegular fontSize={20} />
           <h2 className={s.title}>{t('アラート', 'Alerts')}</h2>
@@ -37,7 +38,7 @@ export function AlertsFloat({ open, onClose, children }: Props) {
           <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('アラートを閉じる', 'Close alerts')} onClick={onClose} />
         </div>
         {children}
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

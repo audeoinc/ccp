@@ -1,4 +1,5 @@
-import { Button, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogBody, DialogContent, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { CardEvent } from './data/events'
 import { actionText } from './weekLabels'
@@ -31,7 +32,7 @@ export function WeekHistory({ open, onClose, events }: Props) {
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="weekHistory" className={s.surface}>
         <DialogBody>
           <DialogTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />}>
             {t('この週の承認の履歴', 'Approval history for this week')}
@@ -54,7 +55,7 @@ export function WeekHistory({ open, onClose, events }: Props) {
             </div>
           </DialogContent>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

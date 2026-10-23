@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Input, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Input, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { ArrowSyncRegular, CheckmarkRegular, EditRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -261,7 +262,7 @@ function EditFloat({ edit, current, original, htmlCustom, products, allProducts,
   return (
     <>
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="productionChat" className={s.surface}>
         <DialogBody>
           <DialogTitle>
             {title} <Badge appearance="tint" color="brand">{t('AI の案', 'AI suggestion')}</Badge>
@@ -297,7 +298,7 @@ function EditFloat({ edit, current, original, htmlCustom, products, allProducts,
             </Button>
           </DialogActions>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
       {uploading && (
         <HeroUploadDialog

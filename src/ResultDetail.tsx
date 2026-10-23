@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { Button, Dialog, DialogSurface, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { DismissRegular, DocumentPdfRegular, OpenRegular } from '@fluentui/react-icons'
 import { printReport } from './printReport'
 import type { Product } from './models/products'
@@ -94,7 +95,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       {/* data-print-report: 「PDF で書き出す」で印刷するのは、このフロートだけ(index.css のレポートの印刷) */}
-      <DialogSurface className={styles.surface} data-print-report>
+      <ResizableSurface sizeKey="resultDetail" className={styles.surface} data-print-report>
         <div className={styles.body}>
           <div className={styles.reportHead} data-print-only>
             {t(`配信結果のレポート · 作成 ${new Date().toLocaleDateString(locale())}`, `Delivery results report · created ${new Date().toLocaleDateString(locale())}`)}
@@ -209,7 +210,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
           <ProductRankings row={row} productIds={productIds} products={products} />
           <ResultCompare row={row} history={history} cardProducts={cardProducts} products={products} heroes={heroes} money={money} onOpenOther={onOpenOther} onAdopt={adopt} />
         </div>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

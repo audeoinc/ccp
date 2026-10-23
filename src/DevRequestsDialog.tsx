@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Spinner, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogContent, DialogTitle, Select, Spinner, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { CheckmarkRegular, CopyRegular, DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import { DevRequestsService } from './data/devRequests'
 import type { DevRequest, DevRequestStatus } from './models/devRequests'
@@ -91,7 +92,7 @@ export function DevRequestsDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="devRequests" className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.titleRow}>
             <DialogTitle className={s.grow}>{t('開発へのリクエスト', 'Requests to developers')}</DialogTitle>
@@ -164,7 +165,7 @@ export function DevRequestsDialog({ onClose }: { onClose: () => void }) {
             )}
           </DialogContent>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

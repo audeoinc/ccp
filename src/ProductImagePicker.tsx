@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, MessageBar, MessageBarBody, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { ArrowDownloadRegular, DismissRegular, DocumentArrowUpRegular, OpenRegular } from '@fluentui/react-icons'
 import { ProductPages, type ImageAngle, type ImagePick, type PageImage } from './data/productPages'
 import { ProductImagesService } from './data/productImages'
@@ -213,7 +214,7 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
 
   return (
     <Dialog open modalType="modal" onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface} onPaste={onPaste}>
+      <ResizableSurface sizeKey="productImages" className={s.surface} onPaste={onPaste}>
         <DialogBody>
           <DialogTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />}>
             {t(`この配信で使う画像 — ${product.name}`, `Image for this delivery — ${product.name}`)}
@@ -377,7 +378,7 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
             </Button>
           </DialogActions>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

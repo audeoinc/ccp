@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogSurface, Field, MessageBar, MessageBarBody, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, Field, MessageBar, MessageBarBody, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -179,7 +180,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
     // 下の配信カード(プレビュー・中ペイン)も見て触れるよう、背景を暗くしない
     <>
       <Dialog open modalType="non-modal" onOpenChange={(_, d) => !d.open && onClose()}>
-        <DialogSurface className={s.surface} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+        <ResizableSurface sizeKey="productAction" className={s.surface} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
           <DialogBody className={s.body}>
             <div
               className={s.grab}
@@ -356,7 +357,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
               </div>
             )}
           </DialogBody>
-        </DialogSurface>
+        </ResizableSurface>
       </Dialog>
       {picking && product && onImage && (
         <ProductImagePicker

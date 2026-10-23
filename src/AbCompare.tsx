@@ -1,4 +1,5 @@
-import { Button, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogBody, DialogContent, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { DismissRegular } from '@fluentui/react-icons'
 import { CardPreview } from './CardPreview'
 import { isChoose, splitOf, targetLabel, type AbTarget, type AbTest, type VariantKey, type VariantText } from './abTest'
@@ -62,7 +63,7 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
   const heroName = (id?: string) => heroes.find((h) => h.id === id)?.name ?? t('(なし)', '(none)')
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="abCompare" className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.head}>
             <DialogTitle className={s.grow}>{t('案を並べて比べる', 'Compare variants side by side')}</DialogTitle>
@@ -111,7 +112,7 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
             </div>
           </DialogContent>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

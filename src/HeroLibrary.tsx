@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Input, Switch, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogTitle, Input, Switch, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { CalendarCancelRegular, DeleteRegular, DismissRegular, EditRegular, ImageAddRegular, SearchRegular, SparkleRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload } from './data/heroUpload'
@@ -171,7 +172,7 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="heroLibrary" className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.titleRow}>
             <DialogTitle className={s.grow}>{t('画像のライブラリ', 'Image library')}</DialogTitle>
@@ -278,7 +279,7 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
             />
           )}
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

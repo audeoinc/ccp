@@ -26,6 +26,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import {
   CalendarLtrRegular,
   CheckmarkCircleFilled,
@@ -727,7 +728,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
   return (
     <>
       <Dialog open={ws.open} modalType="modal" onOpenChange={(_, d) => !d.open && ws.close()}>
-        <DialogSurface className={s.surface} aria-label={t('まとめて作る', 'Create in bulk')}>
+        <ResizableSurface sizeKey="bulk" className={s.surface} aria-label={t('まとめて作る', 'Create in bulk')}>
           <div className={s.head}>
             <AiIcon size={20} />
             <h2 className={s.title}>{t('まとめて作る', 'Create in bulk')}</h2>
@@ -770,7 +771,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
             <span className={s.footHint}>{footHint}</span>
             {actions()}
           </div>
-        </DialogSurface>
+        </ResizableSurface>
       </Dialog>
       {/* 保存していない案があるまま閉じるとき。選ぶのは 2 つだけ(やめるときは × で、作業画面に戻る) */}
       <Dialog open={ws.closeAsk} modalType="alert" onOpenChange={(_, d) => !d.open && ws.setCloseAsk(false)}>

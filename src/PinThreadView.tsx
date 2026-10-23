@@ -1,17 +1,21 @@
-import type { ReactNode, RefObject } from 'react'
+import { useRef, type ReactNode, type RefObject } from 'react'
 import { Avatar, Button, Popover, PopoverSurface, Spinner, makeStyles, mergeClasses, tokens, type PositioningImperativeRef, type PositioningVirtualElement } from '@fluentui/react-components'
 import { DismissRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { Linkify } from './LinkText'
 import { locale, useT } from './i18n'
+import { ResizeHandles } from './ResizeHandles'
+import { useFloatSize } from './floatLayout'
 
 const useStyles = makeStyles({
-  // 列は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように。minmax(0, 1fr))
-  surface: { width: '320px', boxSizing: 'border-box', padding: '10px 12px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '8px' },
+  // 縦に並べ、中身は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように)。大きさは、右・下の端をつかんで変えられる
+  surface: { width: '320px', boxSizing: 'border-box', padding: '10px 12px', display: 'flex', flexDirection: 'column', rowGap: '8px', '& > *': { minWidth: 0, flexShrink: 0 } },
   head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   headText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   // 元の書き込みと返信を、上から読む(長くなったら、この中だけスクロール)
-  thread: { display: 'grid', rowGap: '8px', maxHeight: 'calc(46vh / var(--ui-zoom, 1))', overflowY: 'auto' },
+  thread: { display: 'grid', rowGap: '8px', alignContent: 'start', maxHeight: 'calc(46vh / var(--ui-zoom, 1))', overflowY: 'auto' },
+  // 高さを広げたときは、やり取りの欄が残りの高さを取る
+  threadGrow: { maxHeight: 'none', flexGrow: 1, flexShrink: 1, minHeight: 0 },
   entry: { display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
   reply: { marginLeft: '16px' },
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -72,6 +76,9 @@ interface Props {
 export function PinThreadView(p: Props) {
   const s = useStyles()
   const t = useT()
+  // 大きさは、コメントのピン・リクエストのピンで共通に覚える(やり取りが長いと読みにくいため。2026-10-23 利用者)
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const size = useFloatSize('float.pin.size', surfaceRef, { w: 280, h: 200 })
   if (!p.target) return null
   return (
     <Popover
@@ -84,7 +91,8 @@ export function PinThreadView(p: Props) {
         if (!d.open && !(ev.target instanceof Element && ev.target.closest('[data-pin-id]'))) p.onClose()
       }}
     >
-      <PopoverSurface className={s.surface} aria-label={p.ariaLabel}>
+      <PopoverSurface ref={surfaceRef} className={s.surface} style={size.style} aria-label={p.ariaLabel}>
+        <ResizeHandles {...size.handles} anchored />
         <div className={s.head}>
           {p.badge}
           <span className={s.headText} title={p.place}>{p.place}</span>
@@ -96,7 +104,7 @@ export function PinThreadView(p: Props) {
         ) : (
           <>
             {p.entries.length > 0 && (
-              <div className={s.thread}>
+              <div className={mergeClasses(s.thread, !!size.style && s.threadGrow)}>
                 {p.entries.map((n) => (
                   <div key={n.id} className={mergeClasses(s.entry, n.isReply && s.reply)}>
                     <Avatar size={24} name={n.author || '?'} color="colorful" />

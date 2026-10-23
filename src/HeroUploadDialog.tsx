@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Slider, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, Select, Slider, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { HeroImagesService } from './data/heroImages'
@@ -201,7 +202,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && !busy && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="heroUpload" className={s.surface}>
         <DialogBody>
           <DialogTitle>{editing ? t(`メイン画像を直す — ${hero?.image_code ?? ''}`, `Edit hero image — ${hero?.image_code ?? ''}`) : t('持っている画像を上げる(メイン画像のライブラリへ)', 'Upload your own image (to the hero library)')}</DialogTitle>
           <DialogContent>
@@ -354,7 +355,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
             </Button>
           </DialogActions>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { AutoTextarea } from './AutoTextarea'
 import { PolicyEdit, type RuleInput } from './data/policyEdit'
 import { tr, useT } from './i18n'
@@ -124,7 +125,7 @@ export function RuleEditDialog({ rule, initial, markets, onDone, onClose }: Prop
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && !busy && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="ruleEdit" className={s.surface}>
         <DialogBody>
           <DialogTitle>{rule ? t(`決まりを直す — ${rule.rule_id}`, `Edit rule — ${rule.rule_id}`) : t('決まりを足す', 'Add a rule')}</DialogTitle>
           <DialogContent>
@@ -223,7 +224,7 @@ export function RuleEditDialog({ rule, initial, markets, onDone, onClose }: Prop
             </Button>
           </DialogActions>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

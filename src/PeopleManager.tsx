@@ -3,7 +3,6 @@ import {
   Badge,
   Button,
   Dialog,
-  DialogSurface,
   DialogTitle,
   Dropdown,
   Input,
@@ -17,6 +16,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { AddRegular, DismissRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { logEvent, meLock, myName, myUserId, onMeChange } from './history'
@@ -345,7 +345,7 @@ export function PeopleManager() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(_, d) => !d.open && setOpen(false)}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="people" className={s.surface}>
         <div className={s.head}>
           <DialogTitle className={s.grow}>{t('ユーザーと承認グループ', 'Users and approval groups')}</DialogTitle>
           {working && <Spinner size="extra-tiny" />}
@@ -379,7 +379,7 @@ export function PeopleManager() {
           <Tab value="history">{t('変更の履歴', 'Change history')}</Tab>
         </TabList>
         <div className={s.scroll}>{!people.loaded ? <Spinner size="tiny" /> : tab === 'users' ? usersTab : tab === 'groups' ? groupsTab : tab === 'rules' ? rulesTab : historyTab}</div>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

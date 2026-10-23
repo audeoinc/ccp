@@ -11,6 +11,11 @@ interface Props {
   onDone?: () => void
   /** ダブルクリックで、既定の大きさに戻す */
   onReset?: () => void
+  /**
+   * 左上が決まっている(中央に置かない)フロート: 右・下・右下だけにつまみを置き、動いた分そのまま広げる
+   * (ピンのフロートのように、ピンの横に付くもの)
+   */
+  anchored?: boolean
 }
 
 const EDGE = 6 // 掴める幅(px)
@@ -30,7 +35,7 @@ const useStyles = makeStyles({
  * ダイアログの辺と角に置く、大きさを変えるつまみ。
  * ダイアログは画面の中央に置いているので、両側が同時に広がる。つまみがポインタに付いてくるよう、移動量の 2 倍を変化量にする。
  */
-export function ResizeHandles({ onResize, onDone, onReset }: Props) {
+export function ResizeHandles({ onResize, onDone, onReset, anchored = false }: Props) {
   const styles = useStyles()
 
   const start = (edge: Edge) => (e: React.PointerEvent<HTMLDivElement>) => {
@@ -40,8 +45,9 @@ export function ResizeHandles({ onResize, onDone, onReset }: Props) {
     el.setPointerCapture(e.pointerId)
     let lastX = e.clientX
     let lastY = e.clientY
-    const sx = edge.includes('e') ? 2 : edge.includes('w') ? -2 : 0
-    const sy = edge.includes('s') ? 2 : edge.includes('n') ? -2 : 0
+    const k = anchored ? 1 : 2
+    const sx = edge.includes('e') ? k : edge.includes('w') ? -k : 0
+    const sy = edge.includes('s') ? k : edge.includes('n') ? -k : 0
     const move = (ev: PointerEvent) => {
       // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
       onResize(((ev.clientX - lastX) * sx) / getUiScale(), ((ev.clientY - lastY) * sy) / getUiScale())
@@ -61,7 +67,7 @@ export function ResizeHandles({ onResize, onDone, onReset }: Props) {
 
   return (
     <>
-      {EDGES.map((edge) => (
+      {(anchored ? (['e', 's', 'se'] as Edge[]) : EDGES).map((edge) => (
         <div key={edge} aria-hidden className={mergeClasses(styles.base, styles[edge])} onPointerDown={start(edge)} onDoubleClick={onReset} />
       ))}
     </>

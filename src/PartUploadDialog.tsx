@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { PartImagesService } from './data/partImages'
@@ -153,7 +154,7 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && !busy && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="partUpload" className={s.surface}>
         <DialogBody>
           <DialogTitle>{editing ? t(`部品の画像を直す — ${part?.name ?? ''}`, `Edit part image — ${part?.name ?? ''}`) : t('部品の画像を上げる(ボタン・バナー・ロゴ・アイコン)', 'Upload a part image (button, banner, logo, icon)')}</DialogTitle>
           <DialogContent>
@@ -257,7 +258,7 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
             </Button>
           </DialogActions>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

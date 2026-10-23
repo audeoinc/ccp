@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { ResizableSurface } from './ResizableSurface'
 import { DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import { CreativeAssets } from './CreativeAssets'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
@@ -55,7 +56,7 @@ export function FinishedFloat({ card, request: r, people, productIds, products, 
   const html = variant === 'A' ? (r.html ?? '') : (others[variant]?.html ?? '')
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="finished" className={s.surface}>
         <DialogBody className={s.body}>
           <div className={s.titleRow}>
             <DialogTitle className={s.grow}>{t(`仕上がり — ${card.name ?? ''}`, `Result — ${card.name ?? ''}`)}</DialogTitle>
@@ -136,7 +137,7 @@ export function FinishedFloat({ card, request: r, people, productIds, products, 
             </div>
           </div>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }
