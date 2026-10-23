@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, ToggleButton, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
@@ -23,6 +23,7 @@ import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import { StageHeader } from './StageHeader'
 import { HandoffSheet } from './HandoffSheet'
+import { CreativeAssets } from '../CreativeAssets'
 import { addDroppedAssets, canDropAsset } from './assetDrop'
 import { myName } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
@@ -41,7 +42,7 @@ const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, han
 // 右端のサイドパネル(2026-10-23 利用者と決めた): アイコンの帯 1 本に「やり取り(承認者と)」「渡すもの(制作へ)」をプロセスの順に並べ、
 // 押した方を 1 つだけ開く(もう片方は入れ替わる。開いている方を押すと閉じる)。どれを開いていたかは人ごとに覚える
 const SIDE_KEY = 'simpleCard.sidePanel'
-type Side = 'comm' | 'handoff' | null
+type Side = 'comm' | 'assets' | 'handoff' | null
 const SIDE_W = 56
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
@@ -229,21 +230,21 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
   const [side, setSide] = useState<Side>(() => loadPref<Side>(SIDE_KEY, null))
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
-  const showSide = (v: 'comm' | 'handoff', open = false) => {
+  const showSide = (v: 'comm' | 'assets' | 'handoff', open = false) => {
     const next = !open && side === v ? null : v
     setSide(next)
     savePref(SIDE_KEY, next)
   }
-  const resizeSide = (dx: number) => setWidths((w) => (side === 'handoff' ? { ...w, hand: clampList(w.hand - dx) } : { ...w, comm: clampList(w.comm - dx) }))
+  const resizeSide = (dx: number) => setWidths((w) => (side === 'comm' ? { ...w, comm: clampList(w.comm - dx) } : { ...w, hand: clampList(w.hand - dx) }))
   const [counts, setCounts] = useState<{ open: number; tasks: number; mine: boolean; waiting: boolean }>({ open: 0, tasks: 0, mine: false, waiting: false })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、帯のアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => setCounts(c), [])
   // 右端の帯の「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
   const [assetsVersion, setAssetsVersion] = useState(0)
-  const [dropOver, setDropOver] = useState(false)
+  const [dropOver, setDropOver] = useState<'assets' | 'handoff' | null>(null)
   const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
   const dropAssets = async (dt: DataTransfer) => {
-    setDropOver(false)
+    setDropOver(null)
     try {
       const r = await addDroppedAssets(e.card.id, myName() || e.form.owner || '', dt)
       setDropNote(r.error ? { ok: false, text: r.error } : { ok: true, text: t(`${r.added} 件を参考の素材に入れました`, `Added ${r.added} to reference assets`) })
@@ -362,7 +363,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
       </div>
 
-      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${side === 'comm' ? widths.comm : side === 'handoff' ? widths.hand : 0}px` } as React.CSSProperties}>
+      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${side === 'comm' ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
         {/* プレビュー(いちばん広い) */}
         <div className={s.previewPane}>
           <div className={s.toolbar}>
@@ -607,6 +608,29 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               onCounts={onCounts}
             />
           </div>
+          {side === 'assets' && (
+            // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
+            <div className={s.pane}>
+              <div className={s.colTitle}>{t('素材', 'Assets')}</div>
+              <span className={s.hint}>{t('承認のときのイメージにも、制作の参考にもなる画像・資料・URL。ここに落としても足せます。', 'Images, files and URLs that show the idea to approvers and guide production. Drop them here to add.')}</span>
+              <CreativeAssets
+                key={assetsVersion}
+                cardId={e.card.id}
+                stage="plan"
+                title=" "
+                hideCaption
+                compactAdd
+                owner={e.card.owner}
+                people={e.people}
+                cardName={e.form.name}
+                productionOwner={e.form.productionOwner}
+                productionDue={e.form.productionDue}
+                productIds={e.items.map((i) => i.productId)}
+                products={e.products}
+                onCount={setAssetCount}
+              />
+            </div>
+          )}
           {side === 'handoff' && (
             // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
             <div className={s.pane}>
@@ -628,18 +652,42 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <span className={s.sideLabel}>{t('やり取り', 'Talk')}</span>
             </button>
           </Tooltip>
+          <Tooltip content={t('素材(承認のときのイメージにも、制作の参考にも。画像・資料・URL を落としても足せる)', 'Assets (images, files and URLs for approvers and production; drop to add)')} relationship="description" positioning="before">
+            <button
+              type="button"
+              className={mergeClasses(s.sideBtn, side === 'assets' && s.sideOn, dropOver === 'assets' && s.sideDrop)}
+              aria-pressed={side === 'assets'}
+              onClick={() => showSide('assets')}
+              onDragOver={(ev) => {
+                if (!canDropAsset(ev.dataTransfer)) return
+                ev.preventDefault()
+                setDropOver('assets')
+              }}
+              onDragLeave={() => setDropOver(null)}
+              onDrop={(ev) => {
+                ev.preventDefault()
+                void dropAssets(ev.dataTransfer)
+              }}
+            >
+              <span className={s.sideIcon}>
+                <ImageMultipleRegular />
+                {assetCount > 0 && <span className={s.sideBadge}>{assetCount}</span>}
+              </span>
+              <span className={s.sideLabel}>{t('素材', 'Assets')}</span>
+            </button>
+          </Tooltip>
           <Tooltip content={t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)')} relationship="description" positioning="before">
             <button
               type="button"
-              className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn, dropOver && s.sideDrop)}
+              className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn, dropOver === 'handoff' && s.sideDrop)}
               aria-pressed={side === 'handoff'}
               onClick={() => showSide('handoff')}
               onDragOver={(ev) => {
                 if (!canDropAsset(ev.dataTransfer)) return
                 ev.preventDefault()
-                setDropOver(true)
+                setDropOver('handoff')
               }}
-              onDragLeave={() => setDropOver(false)}
+              onDragLeave={() => setDropOver(null)}
               onDrop={(ev) => {
                 ev.preventDefault()
                 void dropAssets(ev.dataTransfer)
@@ -647,7 +695,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             >
               <span className={s.sideIcon}>
                 <BoxMultipleArrowRightRegular />
-                {memoLines + assetCount > 0 && <span className={s.sideBadge}>{memoLines + assetCount}</span>}
+                {memoLines > 0 && <span className={s.sideBadge}>{memoLines}</span>}
               </span>
               <span className={s.sideLabel}>{t('渡すもの', 'Handoff')}</span>
             </button>

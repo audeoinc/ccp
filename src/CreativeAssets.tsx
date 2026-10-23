@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Field, Input, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowSyncRegular, AttachRegular, DeleteRegular, DismissRegular, DocumentPdfRegular, DocumentRegular, EditRegular, LinkRegular, OpenRegular } from '@fluentui/react-icons'
+import { Badge, Button, Dialog, DialogBody, DialogSurface, DialogTitle, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, ArrowDownloadRegular, ArrowSyncRegular, AttachRegular, DeleteRegular, DismissRegular, DocumentPdfRegular, DocumentRegular, EditRegular, LinkRegular, OpenRegular } from '@fluentui/react-icons'
 import { CardAssetsService } from './data/cardAssets'
 import { CardNotesService } from './data/cardNotes'
 import { CreativeFiles } from './data/creativeFiles'
@@ -32,6 +32,8 @@ const useStyles = makeStyles({
   dropOn: { border: `1px dashed ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   // 狭いペイン(配信カードの右端)でもはみ出さないよう、縦に積む
   urlRow: { display: 'grid', rowGap: '6px', justifyItems: 'stretch' },
+  // 足す欄を「＋」だけにしたとき(ファイルを落とせる所も兼ねる)
+  compactDrop: { display: 'grid', padding: '4px', borderRadius: tokens.borderRadiusMedium, border: '1px dashed transparent' },
   addBtn: { justifySelf: 'start' },
   list: { display: 'grid', rowGap: '6px' },
   // 1 行: 左に小さな画像、右に題名・制作へのメッセージ(全文)・だれがいつ・未解決のコメント(利用者と決めた: メッセージが主役)
@@ -121,6 +123,11 @@ interface Props {
   title?: string
   /** 説明の文を出さない(制作指示の下など、続けて読む場所) */
   hideCaption?: boolean
+  /**
+   * 足す欄を「＋」だけにする(シンプルな配信カード。縦に長くならないように)。押すと「ファイル / URL」を選び、選んだものに要ることだけを聞く。
+   * 一覧の上にファイルを落としても足せる
+   */
+  compactAdd?: boolean
 }
 
 /**
@@ -128,11 +135,13 @@ interface Props {
  * 配信ごとに、ファイル(画像・PDF・Office)と参考の URL を置き、素材ごとにやり取り(コメント)できる。配信カードと制作のページの両方で、同じものを出す。
  * だれでも足せて、コメントできる。消せるのは、入れた本人と配信の担当者。制作の依頼の写しには入れない(いつも最新を見る)
  */
-export function CreativeAssets({ cardId, stage, owner, people, cardName, productionOwner, productionDue, productIds, products, onCount, title, hideCaption }: Props) {
+export function CreativeAssets({ cardId, stage, owner, people, cardName, productionOwner, productionDue, productIds, products, onCount, title, hideCaption, compactAdd = false }: Props) {
   const s = useStyles()
   const t = useT()
   const me = useSyncExternalStore(onMeChange, myName).trim()
   const [assets, setAssets] = useState<CardAsset[] | null>(null)
+  // 足す欄を「＋」だけにしているとき、いま聞いているもの(null = ＋だけ / url = URL と題名・ひとこと)
+  const [adding, setAdding] = useState<null | 'url'>(null)
   const [talk, setTalk] = useState<Map<string, number>>(new Map())
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -278,6 +287,87 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
               ))}
             </div>
           )}
+          {compactAdd ? (
+            <>
+              {/* 一覧の上にファイルを落としても足せる */}
+              <div
+                className={mergeClasses(s.compactDrop, over && s.dropOn)}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('Files')) return
+                  e.preventDefault()
+                  setOver(true)
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setOver(false)
+                  if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files)
+                }}
+              >
+                {adding === null ? (
+                  <Menu>
+                    <MenuTrigger disableButtonEnhancement>
+                      <Button size="small" icon={busy ? <Spinner size="extra-tiny" /> : <AddRegular />} disabled={busy}>
+                        {t('素材を足す', 'Add an asset')}
+                      </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                      <MenuList>
+                        <MenuItem icon={<AttachRegular />} onClick={() => fileRef.current?.click()}>
+                          {t('ファイル(画像・PDF・Office)', 'File (image, PDF, Office)')}
+                        </MenuItem>
+                        <MenuItem icon={<LinkRegular />} onClick={() => setAdding('url')}>
+                          {t('参考のページ(URL)', 'Reference page (URL)')}
+                        </MenuItem>
+                      </MenuList>
+                    </MenuPopover>
+                  </Menu>
+                ) : (
+                  <div className={s.urlRow}>
+                    <Field label={t('参考のページ(URL)', 'Reference page (URL)')} size="small">
+                      <Input size="small" autoFocus value={url} onChange={(_, d) => setUrl(d.value)} placeholder="https://" />
+                    </Field>
+                    <Field label={t('題名(任意)', 'Title (optional)')} size="small">
+                      <Input size="small" value={urlName} onChange={(_, d) => setUrlName(d.value)} placeholder={t('例: 競合の秋特集', 'e.g. Competitor fall feature')} />
+                    </Field>
+                    <Field label={t('ひとこと(任意)', 'Message (optional)')} size="small">
+                      <Input size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: このような雰囲気で', 'e.g. A mood like this')} />
+                    </Field>
+                    <span style={{ display: 'flex', columnGap: 6 }}>
+                      <Button
+                        size="small"
+                        appearance="primary"
+                        icon={<LinkRegular />}
+                        disabled={busy || !url.trim()}
+                        onClick={async () => {
+                          await addUrl()
+                          setAdding(null)
+                        }}
+                      >
+                        {t('URL を追加', 'Add URL')}
+                      </Button>
+                      <Button size="small" onClick={() => setAdding(null)}>
+                        {t('やめる', 'Cancel')}
+                      </Button>
+                    </span>
+                  </div>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  hidden
+                  accept={CREATIVE_EXTS.map((x) => `.${x}`).join(',')}
+                  onChange={(e) => {
+                    const f = e.target.files
+                    if (f?.length) void addFiles(f)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
           <div
             className={mergeClasses(s.drop, over && s.dropOn)}
             onDragOver={(e) => {
@@ -323,6 +413,8 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
           <Field label={t('制作へのメッセージ(次に足す素材に付きます。任意)', 'Message for production (added to the next asset; optional)')} size="small">
             <Textarea size="small" resize="vertical" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: このような雰囲気で。背景は明るめに。/ この資料の数字を使って', 'e.g. A mood like this, with a lighter background. / Use the figures in this document')} />
           </Field>
+            </>
+          )}
           {error && <div className={s.error}>{error}</div>}
         </>
       )}

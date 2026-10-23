@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Spinner, makeStyles, tokens } from '@fluentui/react-components'
-import { OpenRegular, SendRegular } from '@fluentui/react-icons'
+import { Button, Field, Input, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { CreativeAssets } from '../CreativeAssets'
-import { HandoffPanel } from '../HandoffPanel'
+import { loadPref, savePref } from '../settings'
 import { MarkdownLite } from '../MarkdownLite'
+import { DeliveryCardsService } from '../data/deliveryCards'
 import { ProductionRequestsService } from '../data/productionRequests'
 import type { ProductionRequest } from '../models/productionRequests'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
@@ -12,6 +13,9 @@ import { useT } from '../i18n'
 import { PartAiChat } from './PartAiChat'
 import { askPartRewrite, type PartTurn } from './partAi'
 import type { SimpleEditor } from './editor'
+
+// 参考の素材の欄の開閉(人の設定)
+const ASSETS_KEY = 'simpleCard.handoffAssetsOpen'
 
 const useStyles = makeStyles({
   root: { display: 'grid', alignContent: 'start', rowGap: '18px', maxWidth: '760px' },
@@ -23,6 +27,8 @@ const useStyles = makeStyles({
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   grow: { flexGrow: 1, minWidth: 0 },
   read: { padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
+  pair: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '10px' },
+  fold: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: 0, border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'left' },
   foot: { display: 'flex', alignItems: 'center', columnGap: '10px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
 
@@ -38,7 +44,7 @@ interface Props {
 
 /**
  * 制作に渡すもの(SU1 の見直し。2026-10-22 利用者と決めた: 企画で直し・承認をもらったら、文章とイメージ画像・URL を制作に渡す)。
- * 上から 渡す文章(制作指示。AI に頼める)・参考の素材(画像・資料・URL)・担当と締め切り、いちばん下に「制作に渡す」1 つ。
+ * 上から 担当と締め切り・渡す文章(制作指示。AI に頼める)・参考の素材(画像・資料・URL。畳める)、いちばん下に「制作に渡す」1 つ(引き継いだ日時もここで残す)。
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
@@ -51,6 +57,12 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   const [busy, setBusy] = useState(false)
   // 「制作に渡す」を押したあと、依頼ができたかを読み直す回数(制作のページで HTML を作ってから依頼するので、少し遅れる)
   const [poll, setPoll] = useState(0)
+  // 参考の素材の欄の開閉(人ごとに覚える)
+  const [assetsOpen, setAssetsOpen] = useState(() => loadPref<boolean>(ASSETS_KEY, true))
+  const toggleAssets = () => {
+    setAssetsOpen(!assetsOpen)
+    savePref(ASSETS_KEY, !assetsOpen)
+  }
   // 渡す文章の案を仮に写している間の、元の文章
   const original = useRef<string | null>(null)
 
@@ -83,6 +95,12 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
     setBusy(true)
     try {
       await onCommit()
+      // 引き継いだ日時も残す(一覧の「引き継ぎ」に出る)。保存は、いま押した時点の form で走るので、別に書く
+      if (!e.form.handedOffAt) {
+        const at = new Date().toISOString()
+        const r = await DeliveryCardsService.update(e.card.id, { handed_off_at: at })
+        if (r.success) e.setHandoff('handedOffAt', at)
+      }
       e.openProduction?.({ request: !requested })
       setPoll(1)
     } finally {
@@ -103,9 +121,28 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         )}
       </div>
 
+      {/* 1. 制作の担当と締め切り(いちばん上に。下にあると気づかなかったため) */}
       <div className={s.section}>
         <span className={s.head}>
           <span className={s.num}>1</span>
+          {t('制作の担当と締め切り', 'Production assignee and due date')}
+        </span>
+        <div className={s.pair}>
+          <Field label={t('担当', 'Assignee')} size="small">
+            <Input size="small" list="ccp-handoff-people" value={e.form.productionOwner} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionOwner', d.value)} />
+            <datalist id="ccp-handoff-people">
+              {e.people.map((o) => <option key={o} value={o} />)}
+            </datalist>
+          </Field>
+          <Field label={t('締め切り', 'Due')} size="small">
+            <Input size="small" type="date" value={e.form.productionDue} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionDue', d.value)} />
+          </Field>
+        </div>
+      </div>
+
+      <div className={s.section}>
+        <span className={s.head}>
+          <span className={s.num}>2</span>
           {t('渡す文章(制作指示)', 'Text for production (notes)')}
         </span>
         {readOnly ? (
@@ -149,42 +186,30 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         )}
       </div>
 
+      {/* 3. 参考の画像・資料・URL(縦に長くなりやすいので畳める。足すのは「＋」から。右の帯の「素材」でも同じものを開ける) */}
       <div className={s.section}>
-        <span className={s.head}>
-          <span className={s.num}>2</span>
-          {t('参考の画像・資料・URL', 'Reference images, files and URLs')}
-        </span>
-        <CreativeAssets
-          key={assetsVersion}
-          cardId={e.card.id}
-          stage="plan"
-          title=" "
-          hideCaption
-          owner={e.card.owner}
-          people={e.people}
-          cardName={e.form.name}
-          productionOwner={e.form.productionOwner}
-          productionDue={e.form.productionDue}
-          productIds={e.items.map((i) => i.productId)}
-          products={e.products}
-        />
-      </div>
-
-      <div className={s.section}>
-        <span className={s.head}>
+        <button type="button" className={s.fold} onClick={toggleAssets} aria-expanded={assetsOpen}>
           <span className={s.num}>3</span>
-          {t('制作の担当と締め切り', 'Production assignee and due date')}
-        </span>
-        <HandoffPanel
-          productionOwner={e.form.productionOwner}
-          onProductionOwner={(v) => e.setHandoff('productionOwner', v)}
-          handedOffAt={e.form.handedOffAt}
-          onHandedOffAt={(v) => e.setHandoff('handedOffAt', v)}
-          productionDue={e.form.productionDue}
-          onProductionDue={(v) => e.setHandoff('productionDue', v)}
-          remaining={e.remaining}
-          people={e.people}
-        />
+          {t('参考の画像・資料・URL', 'Reference images, files and URLs')}
+          {assetsOpen ? <ChevronUpRegular /> : <ChevronDownRegular />}
+        </button>
+        {assetsOpen && (
+          <CreativeAssets
+            key={assetsVersion}
+            cardId={e.card.id}
+            stage="plan"
+            title=" "
+            hideCaption
+            compactAdd
+            owner={e.card.owner}
+            people={e.people}
+            cardName={e.form.name}
+            productionOwner={e.form.productionOwner}
+            productionDue={e.form.productionDue}
+            productIds={e.items.map((i) => i.productId)}
+            products={e.products}
+          />
+        )}
       </div>
 
       {(
