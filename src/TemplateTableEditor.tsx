@@ -691,21 +691,25 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   const colW = (sec: Section) => (mailW - 20 - HEAD - ADD - 2 * GAP - ((sec.cols ?? 1) - 1) * GAP) / (sec.cols ?? 1)
   const rowHeights = (sec: Section) => {
     const cw = colW(sec)
-    // 1 行分の部品が欲しい高さ(写真・画像は、選んだ形で。名前・価格などを出す箱は、文の分を足す)。キャンバスが縦に長くなりすぎないよう、上限を付ける
-    const want = (p: TablePart): number => {
+    // 箱の行は、以前と同じ決め方(写真の形を選んでいない箱)。写真の形を選んだ箱・画像は、その形の高さにする。
+    // キャンバスが縦に長くなりすぎないよう、上限を付ける
+    const sized = (p: TablePart): number | undefined => {
       const wpx = p.w * cw + (p.w - 1) * GAP
-      if (p.type === 'box') {
-        if (isTextView(p.view)) return Math.max(90, Math.min(cw * 0.6, 160))
-        const text = T.boxFields(p).some((f) => f !== 'badge') ? 28 : 0
-        return wpx / ratioValue(p.ratio ?? (p.view === 'photo' ? 'square' : 'portrait')) + text
-      }
       if (p.type === 'media') return wpx / ratioValue(p.ratio ?? 'wide')
-      if (p.type === 'text') return 60
-      return 36
+      if (p.type === 'box' && p.ratio && !isTextView(p.view)) return wpx / ratioValue(p.ratio) + (T.boxFields(p).some((f) => f !== 'badge') ? 28 : 0)
+      return undefined
     }
     return Array.from({ length: sec.rows ?? 0 }, (_, r) => {
-      const on = (sec.parts ?? []).filter((p) => p.r === r && p.h === 1)
-      return Math.round(Math.max(30, Math.min(280, ...on.map(want), 36)))
+      const on = (sec.parts ?? []).filter((p) => r >= p.r && r < p.r + p.h)
+      const fixed = on.filter((p) => p.h === 1).map(sized).filter((x): x is number => x !== undefined)
+      const base = on.some((p) => p.type === 'box' && isTextView(p.view))
+        ? Math.max(90, Math.min(cw * 0.6, 160))
+        : on.some((p) => p.type === 'box')
+          ? Math.max(64, Math.min(cw * ((sec.cols ?? 1) === 1 ? 0.5 : 0.9), 200))
+          : on.some((p) => p.type === 'text')
+            ? 60
+            : 36
+      return Math.round(Math.min(280, Math.max(base, ...fixed)))
     })
   }
 
