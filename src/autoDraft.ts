@@ -20,7 +20,7 @@ import {
   type ThemeSuggestion,
 } from './aiDraft'
 import { tr } from './i18n'
-import { DEFAULT_PUSH_TEMPLATE, FREE_DEFAULT_SLOTS, getTemplate, sectionsOf, type EmailTemplateId, type TemplateChannel } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, FREE_DEFAULT_SLOTS, baseTemplateId, getTemplate, hasTemplate, sectionsOf, type EmailTemplateId, type TemplateChannel } from './templates'
 
 /** 「すべてAIで下書き」の入力。内容(テーマなど)は空から作るので、配信の基本情報だけを渡す */
 export interface AutoDraftInput {
@@ -33,6 +33,8 @@ export interface AutoDraftInput {
   channel?: TemplateChannel
   /** 選ばない商品(まとめて作るとき、同じ週に、もう上限まで載せた商品。W14) */
   avoidProductIds?: string[]
+  /** 決まったテンプレート(国ごとの配信の型 ST9 で決めたもの)。あれば AI には選ばせない(id だけ。作るときの最新の版を使う) */
+  template?: EmailTemplateId
   /** テーマのヒント(まとめて作るとき、担当者が行ごとに書く。W14) */
   themeHint?: string
   /** テーマが決まったとき(失敗したときは空)に知らせる。まとめて作るとき、次の下書きが、このテーマを避けられるように */
@@ -102,10 +104,14 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   input.onTheme?.(result.theme ?? '')
   if (!result.theme) return finish() // テーマがないと、以降の工程は進められない
   const withTheme: AiCard = { ...base, theme: result.theme }
+  // 型で決めたテンプレート(あって、このチャネルのものなら、それを使う)
+  const fixedTemplate = input.template && hasTemplate(baseTemplateId(input.template)) && (getTemplate(input.template).channel ?? 'email') === (input.channel === 'push' ? 'push' : 'email') ? input.template : undefined
 
   // ② テンプレートとメイン画像(互いに独立なので、並行して実行する)
   const [tpl, hero] = await Promise.all([
-    step(tr('テンプレートとメイン画像を選んでいます', 'Choosing a template and hero image'), () => suggestTemplate({ card: withTheme, channel: input.channel })),
+    fixedTemplate
+      ? Promise.resolve({ template: fixedTemplate, reason: tr('配信の型で決めたテンプレート', 'Template set by the delivery pattern') })
+      : step(tr('テンプレートとメイン画像を選んでいます', 'Choosing a template and hero image'), () => suggestTemplate({ card: withTheme, channel: input.channel })),
     (async () => {
       try {
         return await proposeHero({ card: withTheme, heroes, productNames: [] })

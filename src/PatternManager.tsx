@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
-  DialogSurface,
   DialogTitle,
   Input,
   MessageBar,
@@ -20,6 +19,7 @@ import {
 } from '@fluentui/react-components'
 import { AddRegular, DeleteRegular, DismissRegular } from '@fluentui/react-icons'
 import { DeliveryPatternsService } from './data/deliveryPatterns'
+import { ResizableSurface } from './ResizableSurface'
 import type { DeliveryPattern, DeliveryPatternFields } from './models/deliveryPatterns'
 import { CHANNEL_EMAIL, channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
@@ -127,7 +127,7 @@ export function PatternManager({ open, onClose, country: headerCountry, onChange
 
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface className={s.surface}>
+      <ResizableSurface sizeKey="patterns" className={s.surface}>
         <DialogBody>
           <DialogTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />}>
             {t('配信の型(国ごと)', 'Delivery patterns (per country)')}
@@ -226,7 +226,7 @@ export function PatternManager({ open, onClose, country: headerCountry, onChange
             )}
           </DialogContent>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

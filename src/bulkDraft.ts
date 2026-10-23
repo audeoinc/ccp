@@ -14,7 +14,7 @@ import { runAutoDraft, type AutoDraftProgress, type AutoDraftResult } from './au
 import { cardMarket, heroMarket, productMarket } from './market'
 import { isUsableHero } from './heroRights'
 import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH, statusRank } from './status'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, currentVersion } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, baseTemplateId, channelOf, hasTemplate, sectionIndexAt, sectionsOf, currentVersion } from './templates'
 import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
 import { weeklyLimit } from './weeklyLimit'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
@@ -68,7 +68,10 @@ export async function createFrames(days: string[], setup: { country: string; cha
 }
 
 /** 中身を作るのに要る、配信の基本情報(保存した枠でも、作業画面の、まだ保存していない行でもよい) */
-export type DraftBase = Pick<DeliveryCard, 'name' | 'scheduled_at' | 'country' | 'channel' | 'department' | 'theme_type' | 'target_gender' | 'target_ages' | 'audience'>
+export type DraftBase = Pick<DeliveryCard, 'name' | 'scheduled_at' | 'country' | 'channel' | 'department' | 'theme_type' | 'target_gender' | 'target_ages' | 'audience'> & {
+  /** 配信の型(ST9)で決めたテンプレート(あれば AI に選ばせない) */
+  layout_key?: string
+}
 
 /** 中身を作るときに、AI に渡す配信の基本情報(配信名・種類は、人が決めたもの) */
 function aiCardOf(c: DraftBase): AiCard {
@@ -104,7 +107,7 @@ export async function generateFor(c: DraftBase, ctx: DraftContext, onStep: AutoD
   // 使える期限を過ぎた画像は、AI の候補から外す(X59)
   const heroes = ctx.heroes.filter((h) => (!market || heroMarket(h) === market) && isUsableHero(h))
   return runAutoDraft(
-    { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme },
+    { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme, template: c.layout_key || undefined },
     onStep,
     isStopped,
   )
@@ -157,6 +160,8 @@ export async function createDraft(base: DraftBase, r: AutoDraftResult, products:
 
 /** 作業画面で、中身を作らずに保存する(配信名・日時・国・チャネル・種類だけの「未起案」。1 本ずつ新規作成して、中身を入れずに保存したのと同じ) */
 export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
+  // 配信の型(ST9)でテンプレートが決まっていれば、それも入れる(作るときの最新の版)
+  const tpl = base.layout_key && hasTemplate(baseTemplateId(base.layout_key)) && channelOf(base.layout_key) === (isPush(base) ? 'push' : 'email') ? base.layout_key : undefined
   const res = await DeliveryCardsService.create({
     name: base.name,
     scheduled_at: base.scheduled_at,
@@ -166,6 +171,7 @@ export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
     theme_type: base.theme_type,
     status: 'not_started',
     state_code: 0,
+    ...(tpl ? { email_template: TEMPLATE_VALUES[tpl], layout_key: tpl, layout_version: currentVersion(tpl) } : {}),
   })
   if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
   return res.data

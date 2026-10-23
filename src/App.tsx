@@ -109,6 +109,8 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { TemplateManager } from './TemplateManager'
 import { PolicyManager } from './PolicyManager'
 import { PatternManager } from './PatternManager'
+import { DeliveryPatternsService } from './data/deliveryPatterns'
+import type { DeliveryPattern } from './models/deliveryPatterns'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
 import { PeopleManager } from './PeopleManager'
@@ -466,6 +468,18 @@ function App() {
   const [policyOpen, setPolicyOpen] = useState(false)
   // 国ごとの配信の型(ST9)。⚙ →「国」から開く
   const [patternOpen, setPatternOpen] = useState(false)
+  const [patterns, setPatterns] = useState<DeliveryPattern[]>([])
+  const loadPatterns = useCallback(async () => {
+    const r = await DeliveryPatternsService.getAll()
+    if (r.success) setPatterns(r.data ?? [])
+  }, [])
+  // 開いたときに 1 回読む(型を変えたら、型の画面が読み直しを頼む)
+  useEffect(() => {
+    void (async () => {
+      const r = await DeliveryPatternsService.getAll()
+      if (r.success) setPatterns(r.data ?? [])
+    })()
+  }, [])
   // AI の案が、作り直しても must の決まりを破っていたとき(M5)。案は使えるが、人が確かめる
   const [policyWarning, setPolicyWarning] = useState<string | null>(null)
   useEffect(
@@ -973,6 +987,7 @@ function App() {
     products,
     heroes,
     weeks,
+    patterns,
     defaults: { country: filters.country, channel: filters.channel },
     onChanged: load,
   })
@@ -1408,7 +1423,7 @@ function App() {
         }}
       />
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
-      <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} />
+      <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} onChanged={() => void loadPatterns()} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />

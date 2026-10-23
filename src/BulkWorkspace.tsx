@@ -50,6 +50,8 @@ import { ChannelBadge } from './ChannelBadge'
 import { channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
+import { dayOfKey, timeOfKey } from './useBulkWorkspace'
+import { getTemplate } from './templates'
 import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
@@ -223,7 +225,8 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
   const t = useT()
   // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
   const finishRef = useRef(false)
-  const dayText = (key: string) => new Date(`${key}T00:00`).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
+  const dayText = (key: string) =>
+    new Date(`${dayOfKey(key)}T00:00`).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' }) + (timeOfKey(key) ? ` ${timeOfKey(key)}` : '')
   const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
   const weekEnd = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 6)
   const weekText = `${f(ws.weekStart)} – ${f(weekEnd)}`
@@ -320,11 +323,12 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
       <h3 className={s.h3}>{t('この週の配信', 'This week')}</h3>
       {ws.days.map((d) => {
         const list = inWeek.filter((c) => dayKeyOf(new Date(c.scheduled_at!)) === d.key).sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
-        const planned = ws.targets.includes(d.key) && !list.some((c) => madeIds.has(c.id))
+        // 作る予定の行(型の行なら、その日の型の数だけ)。もう作った配信があれば出さない
+        const planned = ws.targets.filter((k) => dayOfKey(k) === d.key && !list.some((c) => madeIds.has(c.id)))
         return (
           <div key={d.key} className={s.sideDay}>
             <span className={s.label}>{dayText(d.key)}</span>
-            {list.length === 0 && !planned && <span className={s.muted}>—</span>}
+            {list.length === 0 && planned.length === 0 && <span className={s.muted}>—</span>}
             {list.map((c) => (
               <span key={c.id} className={mergeClasses(s.sideItem, !madeIds.has(c.id) && s.sideOld)}>
                 <ChannelBadge channel={c.channel} size="small" />
@@ -336,18 +340,19 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                 )}
               </span>
             ))}
-            {planned && (
-              <span className={s.sidePlanned}>
+            {planned.map((k) => (
+              <span key={k} className={s.sidePlanned}>
                 <span className={s.sideItem}>
                   <Badge size="small" appearance="filled" color="brand" className={s.newBadge}>
                     {t('作る予定', 'Planned')}
                   </Badge>
                   <ChannelBadge channel={ws.channel} size="small" />
-                  <span className={s.sideName}>{ws.rowOf(d.key).name || t('(配信名はまだ)', '(no name yet)')}</span>
+                  {timeOfKey(k) && <span className={s.muted}>{timeOfKey(k)}</span>}
+                  <span className={s.sideName}>{ws.rowOf(k).name || t('(配信名はまだ)', '(no name yet)')}</span>
                 </span>
-                {ws.rowOf(d.key).themeType && <span className={s.muted}>{themeTypeLabel(ws.rowOf(d.key).themeType as ThemeType)}</span>}
+                {ws.rowOf(k).themeType && <span className={s.muted}>{themeTypeLabel(ws.rowOf(k).themeType as ThemeType)}</span>}
               </span>
-            )}
+            ))}
           </div>
         )
       })}
@@ -356,12 +361,13 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
 
   // ---- ① 計画する(作る日と、その日の種類・配信名を、1 つの表で)
   const step1 = () => {
-    const locked = ws.days.some((d) => d.state === 'locked')
+    const locked = ws.lines.some((d) => d.state === 'locked')
     // AI でまとめて入れる行(種類か配信名が空)
     const unfilled = ws.targets.filter((d) => !ws.rowOf(d).name.trim() || !ws.rowOf(d).themeType)
-    const note = (d: (typeof ws.days)[number]): string => {
+    const note = (d: (typeof ws.lines)[number]): string => {
       if (d.state === 'locked') return t('確定した週', 'Confirmed week')
       if (d.state === 'past') return t('過ぎた日', 'Past')
+      if (d.state === 'nopattern') return t('この曜日の型はありません', 'No pattern on this day')
       return t(`${channelName}あり: ${d.same.map((x) => x.name || '(配信名なし)').join('、')}`, `Has ${channelName}: ${d.same.map((x) => x.name || '(no name)').join(', ')}`)
     }
     return (
@@ -374,7 +380,12 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
               : locked
                 ? t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')
-                : t(
+                : ws.byPattern
+                  ? t(
+                      `この国の配信の型どおりに、${channelName}の枠を作ります(種類・テンプレートは型の既定値。行ごとに変えられます)。同じ時刻の${channelName}がもうある型は作りません。作る行にチェックを入れてください。ここではまだ保存しません。型は ⚙ →「国」→「配信の型」。`,
+                      `Slots for ${channelName} from this country’s delivery patterns (type and template are the pattern’s defaults; change them per row). Patterns that already have a ${channelName} at the same time are skipped. Check the rows to create. Nothing is saved yet. Edit patterns in ⚙ → Country → Delivery patterns.`,
+                    )
+                  : t(
                     `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れてください。種類と配信名は、AI に入れてもらい、あとで直せます。ここではまだ保存しません。`,
                     `One delivery per day on days without ${channelName} (from today). Check the days. Let AI fill the type and name, then adjust. Nothing is saved yet.`,
                   )}
@@ -406,7 +417,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                 <span className={s.thNote}>{t('社内で配信を見分けるための名前です(メールには出ません)', 'An internal label to tell deliveries apart (not shown in the email)')}</span>
               </span>
             </div>
-            {ws.days.map((d) => {
+            {ws.lines.map((d) => {
               const free = d.state === 'free'
               const on = free && ws.chosen.has(d.key)
               const r = ws.rowOf(d.key)
@@ -414,7 +425,15 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               return (
                 <div key={d.key} className={mergeClasses(s.tr, !free && s.dayOff, on && s.dayOn)} role="row">
                   {free ? <Checkbox checked={on} onChange={(_, v) => ws.toggleDay(d.key, !!v.checked)} aria-label={t(`${dayText(d.key)} に作る`, `Create on ${dayText(d.key)}`)} /> : d.state === 'locked' ? <LockClosedRegular /> : <span />}
-                  <span className={s.dayDate}>{dayText(d.key)}</span>
+                  <span className={s.dayDate}>
+                    {dayText(d.key)}
+                    {/* 型の行: 型の名前(なければテンプレート)を添える。種類・テンプレートは型の既定値 */}
+                    {d.pattern && (
+                      <Badge size="small" appearance="tint" color="informative" className={s.newBadge} title={t('配信の型(⚙ →「国」→「配信の型」)で決めた枠です', 'A slot from the delivery patterns (⚙ → Country → Delivery patterns)')}>
+                        {d.pattern.name || (d.pattern.layout_key ? getTemplate(d.pattern.layout_key).label : t('型', 'Pattern'))}
+                      </Badge>
+                    )}
+                  </span>
                   {!free ? (
                     <span className={mergeClasses(s.dayNote, s.span2)}>{note(d)}</span>
                   ) : !on ? (

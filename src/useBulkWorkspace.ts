@@ -21,6 +21,8 @@ import type { CardAlert } from './cardAlerts'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { Progress } from './useWeekFrames'
+import type { DeliveryPattern } from './models/deliveryPatterns'
+import { dayKeyOf } from './weekLock'
 
 interface Ctx {
   /** すべての配信(取りやめを除く) */
@@ -29,6 +31,8 @@ interface Ctx {
   products: Product[]
   heroes: HeroImage[]
   weeks: WeekRow[]
+  /** 国ごとの配信の型(ST9)。選んだ国・チャネルの型があれば、型どおりに行を作る */
+  patterns: DeliveryPattern[]
   /** 国・チャネル・種別の既定(画面の絞り込み) */
   defaults: { country?: string; channel?: string; department?: string }
   /** 保存したら、配信を読み直す */
@@ -71,7 +75,31 @@ const mostCommon = (vs: string[]) => {
 const label = (opts: { value: string; label: string }[], v?: string | null) => opts.find((o) => String(o.value) === String(v ?? ''))?.label ?? ''
 const draftId = (day: string) => `draft:${day}`
 
-export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks, defaults, onChanged }: Ctx) {
+/**
+ * ① の 1 行。型(ST9)がなければ 1 日 = 1 行(鍵は日付)、あれば型の 1 本 = 1 行(鍵は「日付T時刻@型の id」)。
+ * 同じ日・チャネルに 2 本以上の型がありうるので、鍵に時刻と型を入れる(利用者 2026-10-22 ③)
+ */
+export interface Line {
+  key: string
+  /** YYYY-MM-DD */
+  day: string
+  /** free = 作れる、used = 同じ国・チャネル(型なら同じ時刻)の配信がもうある、past = 過ぎた日、locked = 確定した週、nopattern = この曜日の型がない */
+  state: 'free' | 'used' | 'past' | 'locked' | 'nopattern'
+  same: { id: string; name: string }[]
+  /** 型の時刻(HH:MM) */
+  time?: string
+  pattern?: DeliveryPattern
+}
+
+/** 鍵の日付(YYYY-MM-DD)と、時刻(型の行だけ。HH:MM) */
+export const dayOfKey = (key: string) => key.slice(0, 10)
+export const timeOfKey = (key: string) => (key[10] === 'T' ? key.slice(11, 16) : undefined)
+const hhmm = (iso: string) => {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks, patterns, defaults, onChanged }: Ctx) {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<Step>(1)
   const [weekStart, setWeekStart] = useState(() => sundayOf(new Date()))
@@ -109,11 +137,27 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   )
 
   const days = useMemo(() => weekDays(weekStart, cards, weeks, channel, country), [weekStart, cards, weeks, channel, country])
+  /** 選んだ国・チャネルの型(曜日・時刻・並び順の順) */
+  const pats = useMemo(
+    () =>
+      patterns
+        .filter((p) => (p.country ?? '') === country && (p.channel || CHANNEL_EMAIL) === channel && p.weekday !== undefined && p.weekday !== null)
+        .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? '') || (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [patterns, country, channel],
+  )
+  const byPattern = pats.length > 0
+  const lines = useMemo(() => linesOf(days, pats, cards, channel, country), [days, pats, cards, channel, country])
   // 中身を作り始めたとき(または保存を始めたとき)の作る日。保存すると、その日は「配信あり」に変わるので、① の判定から毎回求めると、行が消えてしまう
   const [plan, setPlan] = useState<string[] | null>(null)
   /** 作る日(① では、選んだ作れる日。作り始めたら、その時の日。日付の順) */
-  const targets = plan ?? days.filter((d) => d.state === 'free' && chosen.has(d.key)).map((d) => d.key)
-  const rowOf = (day: string): Row => rows.get(day) ?? { name: '', themeType: '' }
+  const targets = plan ?? lines.filter((d) => d.state === 'free' && chosen.has(d.key)).map((d) => d.key)
+  /** 鍵の型(型の行だけ。型を消しても、作り始めた行は鍵から時刻が分かる) */
+  const patternOf = (key: string) => {
+    const id = key.split('@')[1]
+    return id ? patterns.find((p) => p.id === id) : undefined
+  }
+  // 種類は、型の行なら型の種類で始める(既定値。人が変えられる)
+  const rowOf = (day: string): Row => rows.get(day) ?? { name: '', themeType: patternOf(day)?.theme_type ?? '' }
   /** AI で中身を作れる行(配信名と種類。方向を決めてから作ると、作り直しが減る) */
   const ready = (day: string) => !!rowOf(day).name.trim() && !!rowOf(day).themeType
   const allReady = targets.length > 0 && targets.every(ready)
@@ -125,7 +169,10 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const started = plan !== null
 
   // 国・チャネル・週を変えたら、作れる日を選び直す(既定は、作れる日すべて)
-  const pickFree = (ws: Date, ch: string, co: string) => setChosen(new Set(weekDays(ws, cards, weeks, ch, co).filter((d) => d.state === 'free').map((d) => d.key)))
+  const pickFree = (ws: Date, ch: string, co: string) => {
+    const ps = patterns.filter((p) => (p.country ?? '') === co && (p.channel || CHANNEL_EMAIL) === ch && p.weekday !== undefined && p.weekday !== null)
+    setChosen(new Set(linesOf(weekDays(ws, cards, weeks, ch, co), ps, cards, ch, co).filter((d) => d.state === 'free').map((d) => d.key)))
+  }
 
   /** 作業画面を開く。既定は、見ている週と、画面の絞り込み。国の絞り込みがなければ、いちばん多く配信している国(国が空だと、日本とアメリカの商品が混ざるため) */
   function openFor(viewWeek: Date) {
@@ -161,7 +208,10 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   /** 行を、AI に渡す配信の形に(まだ保存していない) */
   const baseOf = (day: string): DraftBase => ({
     name: rowOf(day).name.trim(),
-    scheduled_at: new Date(`${day}T${BULK_TIME}`).toISOString(),
+    // 型の行は型の時刻、それ以外は既定の時刻
+    scheduled_at: new Date(`${dayOfKey(day)}T${timeOfKey(day) ?? BULK_TIME}`).toISOString(),
+    // 型で決めたテンプレート(作るときの最新の版。中身を作るときは AI に選ばせない)
+    layout_key: patternOf(day)?.layout_key || undefined,
     country: (country || undefined) as DeliveryCardFields['country'],
     channel: (channel || undefined) as DeliveryCardFields['channel'],
     department: (defaults.department || undefined) as DeliveryCardFields['department'],
@@ -537,6 +587,10 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     channel,
     setChannel,
     days,
+    /** ① の行(型があれば型の 1 本ずつ、なければ 1 日ずつ) */
+    lines,
+    /** 選んだ国・チャネルに型があるか */
+    byPattern,
     chosen,
     toggleDay,
     targets,
@@ -585,3 +639,33 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
 }
 
 export type BulkWorkspaceState = ReturnType<typeof useBulkWorkspace>
+
+/**
+ * ① の行を作る。型がなければ 1 日 = 1 行。型があれば、その週の日ごとに、曜日の合う型の 1 本 = 1 行
+ * (すでにその日・チャネル・時刻の配信があれば、その型の行は作れない。利用者 2026-10-22 ③)
+ */
+function linesOf(
+  days: ReturnType<typeof weekDays>,
+  pats: DeliveryPattern[],
+  cards: { id: string; name: string; scheduled_at?: string; channel?: string; country?: string }[],
+  channel: string,
+  country: string,
+): Line[] {
+  if (pats.length === 0) return days.map((d) => ({ key: d.key, day: d.key, state: d.state, same: d.same }))
+  const same = (c: { channel?: string; country?: string }) => (c.channel ?? CHANNEL_EMAIL) === channel && (!country || !c.country || c.country === country)
+  const out: Line[] = []
+  for (const d of days) {
+    const ps = pats.filter((p) => p.weekday === d.date.getDay())
+    if (ps.length === 0) {
+      out.push({ key: d.key, day: d.key, state: d.state === 'past' || d.state === 'locked' ? d.state : 'nopattern', same: d.same })
+      continue
+    }
+    for (const p of ps) {
+      const time = p.time || BULK_TIME
+      const at = cards.filter((c) => same(c) && c.scheduled_at && dayKeyOf(new Date(c.scheduled_at)) === d.key && hhmm(c.scheduled_at) === time)
+      const state: Line['state'] = d.state === 'past' || d.state === 'locked' ? d.state : at.length > 0 ? 'used' : 'free'
+      out.push({ key: `${d.key}T${time}@${p.id}`, day: d.key, time, pattern: p, state, same: at.map((c) => ({ id: c.id, name: c.name })) })
+    }
+  }
+  return out
+}
