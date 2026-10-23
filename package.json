@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verify": "node scripts/check-schema.mjs && node scripts/check-approvals.mjs && node scripts/check-policy.mjs && tsc -b && eslint . && vite build",
+    "verify": "node scripts/verify.mjs",
     "deploy:gcp": "node scripts/deploy-gcp.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "dev:gcp": "vite",

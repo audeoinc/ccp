@@ -56,7 +56,7 @@ const RULES = [
   ['include', /^server\/tests\//],
   ['include', /^server\/(requirements(-tools)?\.txt|schema\.json|seed\.json|workbench\.env\.example)$/],
   // 道具(Workbench の操作・npm run verify の確認・初期データ・文書の生成)
-  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy)\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
+  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
   // 文書(Workbench の手引き・設計・機能・開発の経緯・バックログ・ソースマップ)
   ['include', /^docs\//],
 ]
@@ -237,7 +237,8 @@ const run = (cmd, a, cwd = app) => {
   if (r.status !== 0) fail(`${cmd} ${a.join(' ')} が失敗しました(展開した先: ${relative(ROOT, app)})`)
 }
 run('npm', ['ci', '--no-audit', '--no-fund'])
-run('npm', ['run', 'verify'])
+// 渡す前の確かめは、変えたファイルにかかわらず全部を通す(scripts/verify.mjs の --full)
+run('npm', ['run', 'verify', '--', '--full'])
 const python = findPython()
 run(python, ['-m', 'venv', '.venv'], join(app, 'server'))
 const venvPy = join(app, 'server', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')

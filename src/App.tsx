@@ -1488,7 +1488,8 @@ function App() {
         {/* 開発へのリクエスト(画面のどこでも右クリック →「開発に伝える」で書いたもの)の一覧 */}
         <Tooltip content={t('開発へのリクエストの一覧(画面のどこでも、右クリック →「開発に伝える」で書けます)', 'Requests to developers (write one anywhere: right-click → "Tell the developers")')} relationship="label">
           <Button appearance="subtle" size="small" icon={<DevRequestIcon />} onClick={() => setDevRequestsOpen(true)}>
-            {t('リクエスト', 'Requests')}
+            {/* 依頼の InboxButton も英語は Requests なので、こちらは Dev requests にして見分ける */}
+            {t('リクエスト', 'Dev requests')}
           </Button>
         </Tooltip>
         {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}

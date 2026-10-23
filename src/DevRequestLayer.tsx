@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Badge, Button, Field, Input, Popover, Portal, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { CheckmarkRegular, DismissRegular, LightbulbRegular, LocationOffRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
+import { CheckmarkRegular, DismissRegular, LightbulbFilled, LightbulbRegular, LocationOffRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
 import type { LinkState } from './deepLink'
 import { DevRequestsService } from './data/devRequests'
 import { DevRequestVotesService } from './data/devRequestVotes'
@@ -36,7 +36,8 @@ const useStyles = makeStyles({
   // ほかのダイアログ・メニューに隠れた所のピンは出さない(devRequestPlace の uncovered)
   layer: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1000001 },
   // レビューのピン(丸い吹き出し・橙)・アプリの色(紫)・アラートの色と見分けるため、ひし形の墨色に黄色の電球にする(2026-10-23 利用者。
-  // 画面のどこにも使っていない組み合わせで、業務の印ではなく開発への付箋と分かるように)。明暗のテーマで反転しない色を使う
+  // 画面のどこにも使っていない組み合わせで、業務の印ではなく開発への付箋と分かるように)。明暗のテーマで反転しない色を使う。
+  // 電球は、ピンとフロートの札だけ塗りにして目に付くように(メニュー・ヘッダーは線のまま。2026-10-23 利用者)
   pin: {
     position: 'absolute',
     width: `${PIN}px`,
@@ -260,7 +261,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
               setTarget({ id: q.id })
             }}
           >
-            <span className={s.pinIcon}>{q.status === 'done' ? <CheckmarkRegular /> : q.status === 'declined' ? <DismissRegular /> : <LightbulbRegular />}</span>
+            <span className={s.pinIcon}>{q.status === 'done' ? <CheckmarkRegular /> : q.status === 'declined' ? <DismissRegular /> : <LightbulbFilled />}</span>
           </button>
           </span>
         )
@@ -386,7 +387,7 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
       ariaLabel={t('開発へのリクエスト', 'Request to developers')}
       badge={
         <span className={s.badgeIcon}>
-          <LightbulbRegular style={{ transform: 'rotate(-45deg)' }} />
+          <LightbulbFilled style={{ transform: 'rotate(-45deg)' }} />
         </span>
       }
       place={root?.place_text ?? pending?.place_text ?? ''}
