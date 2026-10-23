@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button, Checkbox, Field, Input, Popover, PopoverSurface, PopoverTrigger, Portal, Select, Slider, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Checkbox, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Portal, Select, Slider, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, ArrowDownRegular, ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, SettingsRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { useT } from './i18n'
@@ -206,6 +206,7 @@ const useStyles = makeStyles({
   tBox: { borderLeftColor: tokens.colorPaletteBlueBorderActive },
   tButton: { borderLeftColor: tokens.colorNeutralForeground1 },
   tText: { borderLeftColor: tokens.colorPaletteGreenBorderActive },
+  tMedia: { borderLeftColor: tokens.colorPaletteBerryBorderActive },
   tEmpty: { borderLeftColor: tokens.colorNeutralStroke1 },
   phd: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '4px 6px', cursor: 'pointer', minWidth: 0 },
   mini: { display: 'grid', gap: '1px', width: '28px', height: '20px', flexShrink: 0 },
@@ -255,7 +256,8 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   // 右のタブ: 自分でタブを押したら固定。押していなければ、選んだものがあれば「セクションと部品」
   const [tab, setTab] = useState<'tpl' | 'obj'>('tpl')
   const [pinned, setPinned] = useState(false)
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  // 右のカードの開け閉め。選んでいるものは自動で開くが、その選び方のあいだは、閉じたら閉じたまま(key: 閉じたときの選び方)
+  const [fold, setFold] = useState<Record<string, { open: boolean; key: string }>>({})
 
   useEffect(() => {
     if (!toast) return
@@ -771,31 +773,66 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       <Checkbox label={t('配信ごとに差し替える(キャンペーンのバナーなど)', 'Swap per delivery (e.g. campaign banners)')} checked={!!p.swap} onChange={(_, d) => patch(sec, p, { swap: d.checked === true || undefined })} />
     </>
   )
-  const boxSettings = (sec: Section, p: TablePart) => {
-    const fields = T.boxFields(p)
-    const cur = T.presetOf(p)
-    const toggle = (f: BoxField, on: boolean) => patch(sec, p, { fields: BOX_FIELDS.filter((x) => (x === f ? on : fields.includes(x))) })
+  // 箱の見せ方として、ほかの箱にそろえる項目(AI への一言は、枠ごとに中身が違うのでそろえない)
+  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio })
+  /** 箱の設定を、いくつかの箱にまとめて入れる(形は変わらないので、ID はそのまま) */
+  const patchBoxes = (sec: Section, ps: TablePart[], x: Partial<TablePart> | ((q: TablePart) => Partial<TablePart>)) => {
+    const ids = new Set(ps.map((q) => q.id))
+    replace(sec.id!, { ...sec, parts: (sec.parts ?? []).map((q) => (ids.has(q.id) ? { ...q, ...(typeof x === 'function' ? x(q) : x), id: q.id, type: q.type } : q)) })
+  }
+  /** 1 つの箱の見せ方を、ほかの箱にも当てる(同じ行 / このセクション / すべてのセクション) */
+  const applyLook = (sec: Section, p: TablePart, scope: 'row' | 'section' | 'all') => {
+    const look = lookOf(p)
+    const target = (sx: Section, q: TablePart) => q.type === 'box' && q.id !== p.id && (scope === 'all' || sx.id === sec.id) && (scope !== 'row' || q.r === p.r)
+    const n = sections.reduce((k, sx) => k + (sx.parts ?? []).filter((q) => target(sx, q)).length, 0)
+    if (n === 0) return setToast(t('当てる箱がありません', 'No other boxes to apply to'))
+    setSections((list) => list.map((sx) => ({ ...sx, parts: (sx.parts ?? []).map((q) => (target(sx, q) ? { ...q, ...look } : q)) })))
+    setToast(t(`${n} 個の箱に、同じ見せ方を当てました(Ctrl+Z で戻す)`, `Applied the same look to ${n} box(es) (Ctrl+Z to undo)`))
+  }
+  /**
+   * 箱の設定(見本・見せ方・写真の形・出すもの・価格の見せ方・バッジ・AI への一言)。右のタブと、キャンバスの ⚙(ダブルクリック)の両方で同じものを出す。
+   * いくつかの箱を選んでいるときは、まとめて直す(値が箱ごとに違う項目は「ばらばら」と出す)。名前・価格の文言は、商品のデータから出すので、ここでは打たない
+   */
+  const boxSettings = (sec: Section, ps: TablePart[]) => {
+    const p = ps[0]
+    const many = ps.length > 1
+    const MIXED = '__mixed__'
+    const common = <V,>(fn: (q: TablePart) => V): V | typeof MIXED => {
+      const vs = ps.map((q) => JSON.stringify(fn(q) ?? null))
+      return vs.every((v) => v === vs[0]) ? fn(p) : MIXED
+    }
+    const view = common((q) => q.view ?? 'card')
+    const ratio = common((q) => q.ratio ?? '')
+    const priceStyle = common((q) => q.priceStyle ?? '')
+    const badge = common((q) => q.badge ?? '')
+    const has = (f: BoxField) => ps.filter((q) => T.boxFields(q).includes(f)).length
+    const cur = common((q) => T.presetOf(q)?.id ?? '')
+    const toggle = (f: BoxField, on: boolean) => patchBoxes(sec, ps, (q) => ({ fields: BOX_FIELDS.filter((x) => (x === f ? on : T.boxFields(q).includes(x))) }))
+    const mixedOption = <option value={MIXED} disabled>{t('(ばらばら)', '(mixed)')}</option>
     return (
       <>
+        {many && <span className={s.hint}>{t(`選んだ ${ps.length} 個の箱を、まとめて直します`, `Editing ${ps.length} boxes together`)}</span>}
         <Field label={t('見本(押すと、まとめて入れる)', 'Presets (click to apply)')} size="small">
           <div className={s.row2}>
             {T.BOX_PRESETS.map((x) => (
-              <Button key={x.id} size="small" appearance={cur?.id === x.id ? 'primary' : 'outline'} aria-pressed={cur?.id === x.id} onClick={() => patch(sec, p, T.presetPatch(p, x))}>
+              <Button key={x.id} size="small" appearance={cur === x.id ? 'primary' : 'outline'} aria-pressed={cur === x.id} onClick={() => patchBoxes(sec, ps, (q) => T.presetPatch(q, x))}>
                 {x.label()}
               </Button>
             ))}
           </div>
         </Field>
         <Field label={t('見せ方', 'Look')} size="small">
-          <Select size="small" value={p.view ?? 'card'} onChange={(_, d) => patch(sec, p, { view: d.value === 'card' ? undefined : (d.value as CellView) })}>
+          <Select size="small" value={view} onChange={(_, d) => patchBoxes(sec, ps, { view: d.value === 'card' ? undefined : (d.value as CellView) })}>
+            {view === MIXED && mixedOption}
             {CELL_VIEWS.map((v) => (
               <option key={v} value={v}>{cellViewLabel(v)}</option>
             ))}
           </Select>
         </Field>
-        {!isTextView(p.view) && (
+        {!ps.every((q) => isTextView(q.view)) && (
           <Field label={t('写真の形', 'Photo shape')} size="small">
-            <Select size="small" value={p.ratio ?? ''} onChange={(_, d) => patch(sec, p, { ratio: (d.value || undefined) as MediaRatio | undefined })}>
+            <Select size="small" value={ratio} onChange={(_, d) => patchBoxes(sec, ps, { ratio: (d.value || undefined) as MediaRatio | undefined })}>
+              {ratio === MIXED && mixedOption}
               <option value="">{t('既定(箱は縦長・写真だけはマスの形)', 'Default (portrait; photo-only fills the cell)')}</option>
               {MEDIA_RATIOS.map((r) => (
                 <option key={r} value={r}>{T.ratioLabel(r)}</option>
@@ -806,27 +843,46 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
         <Field label={t('出すもの(写真のほか)', 'Show (besides the photo)')} size="small">
           <div className={s.row2}>
             {BOX_FIELDS.map((f) => (
-              <Checkbox key={f} label={T.boxFieldLabel(f)} checked={fields.includes(f)} onChange={(_, d) => toggle(f, d.checked === true)} />
+              <Checkbox key={f} label={T.boxFieldLabel(f)} checked={has(f) === ps.length ? true : has(f) > 0 ? 'mixed' : false} onChange={(_, d) => toggle(f, d.checked === true)} />
             ))}
           </div>
         </Field>
-        {fields.includes('price') && (
-          <Field label={t('価格の見せ方', 'Price style')} hint={p.priceStyle === 'sale' ? t('元の価格は、商品のデータ(元の価格)から出します。ない商品は、赤い価格だけです', 'The original price comes from the product data; items without one show only the red price') : undefined} size="small">
-            <Select size="small" value={p.priceStyle ?? ''} onChange={(_, d) => patch(sec, p, { priceStyle: d.value === 'sale' || d.value === 'from' ? d.value : undefined })}>
+        {has('price') > 0 && (
+          <Field label={t('価格の見せ方', 'Price style')} hint={priceStyle === 'sale' ? t('元の価格は、商品のデータ(元の価格)から出します。ない商品は、赤い価格だけです', 'The original price comes from the product data; items without one show only the red price') : undefined} size="small">
+            <Select size="small" value={priceStyle} onChange={(_, d) => patchBoxes(sec, ps, { priceStyle: d.value === 'sale' || d.value === 'from' ? d.value : undefined })}>
+              {priceStyle === MIXED && mixedOption}
               {(['', 'sale', 'from'] as const).map((v) => (
                 <option key={v} value={v}>{T.priceStyleLabel(v || undefined)}</option>
               ))}
             </Select>
           </Field>
         )}
-        {fields.includes('badge') && (
+        {has('badge') > 0 && (
           <Field label={t('バッジの文言', 'Badge text')} size="small">
-            <Input size="small" value={p.badge ?? ''} placeholder="NEW" maxLength={12} onChange={(_, d) => patch(sec, p, { badge: d.value || undefined })} />
+            <Input size="small" value={badge === MIXED ? '' : badge} placeholder={badge === MIXED ? t('(ばらばら)', '(mixed)') : 'NEW'} maxLength={12} onChange={(_, d) => patchBoxes(sec, ps, { badge: d.value || undefined })} />
           </Field>
         )}
-        <Field label={t('AI に伝える一言(この枠に、どんな商品を置くか)', 'Note for AI (what to put in this slot)')} size="small">
-          <AutoTextarea rows={2} size="small" value={p.aiNote ?? ''} placeholder={t('例: 主役の新作を置く', 'e.g. The lead new arrival')} onChange={(_, d) => patch(sec, p, { aiNote: d.value || undefined })} />
-        </Field>
+        {!many && (
+          <Field label={t('AI に伝える一言(この枠に、どんな商品を置くか)', 'Note for AI (what to put in this slot)')} size="small">
+            <AutoTextarea rows={2} size="small" value={p.aiNote ?? ''} placeholder={t('例: 主役の新作を置く', 'e.g. The lead new arrival')} onChange={(_, d) => patch(sec, p, { aiNote: d.value || undefined })} />
+          </Field>
+        )}
+        {!many && (
+          <Menu positioning="below-start">
+            <MenuTrigger disableButtonEnhancement>
+              <Button size="small" icon={<CopyRegular />}>
+                {t('この見せ方を、ほかの箱にも当てる', 'Apply this look to other boxes')}
+              </Button>
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem onClick={() => applyLook(sec, p, 'row')}>{t('同じ行の箱', 'Boxes in this row')}</MenuItem>
+                <MenuItem onClick={() => applyLook(sec, p, 'section')}>{t('このセクションの箱', 'Boxes in this section')}</MenuItem>
+                <MenuItem onClick={() => applyLook(sec, p, 'all')}>{t('テンプレートのすべての箱', 'All boxes in the template')}</MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+        )}
       </>
     )
   }
@@ -882,7 +938,9 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       )
       const hasText = fields.some((f) => f !== 'badge')
       const badge = fields.includes('badge') && <span className={s.boxBadge} style={{ backgroundColor: sale || /sale|限定|off/i.test(p.badge ?? '') ? '#d32f2f' : MAIL.ink }}>{p.badge?.trim() || 'NEW'}</span>
-      const one = selParts.length === 1 && selParts[0].id === p.id
+      const selBoxes = selParts.filter((q) => q.type === 'box').sort((x, y) => x.r - y.r || x.c - y.c)
+      const one = (selParts.length === 1 && selParts[0].id === p.id) || (selBoxes.length > 1 && selBoxes[0].id === p.id)
+      const quickBoxes = selBoxes.length > 1 && selBoxes[0].id === p.id ? selBoxes : [p]
       // 選んだ箱の右上の ⚙: 押すと、その場で見せ方を直す(右のタブまで行かなくて済むように。ダブルクリックでも開く)
       const quick = (one || quickId === p.id) && (
         <Popover open={quickId === p.id} onOpenChange={(_, d) => setQuickId(d.open ? p.id : null)} positioning="after-top" withArrow>
@@ -892,8 +950,8 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             </button>
           </PopoverTrigger>
           <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
-            <span className={s.quickHead}>{t(`箱 ${n} の見せ方`, `Box ${n} display`)}</span>
-            {boxSettings(sec, p)}
+            <span className={s.quickHead}>{quickBoxes.length > 1 ? t(`選んだ ${quickBoxes.length} 個の箱の見せ方`, `Display of ${quickBoxes.length} boxes`) : t(`箱 ${n} の見せ方`, `Box ${n} display`)}</span>
+            {boxSettings(sec, quickBoxes)}
           </PopoverSurface>
         </Popover>
       )
@@ -1308,13 +1366,14 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   )
 
   // ---- 右のタブ: セクションと部品(セクションのカードと、部品の行。利用者の指示で「オブジェクト」から改名。中身はセクションの内容なので)
-  const toggleOpen = (id: string) =>
-    setOpenIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const selKey = sel ? `${sel.kind}:${sel.sec}:${selParts.map((p) => p.id).join(',')}` : ''
+  /** カードが開いているか(auto: 選んでいるので、ふだんは開く) */
+  const isOpen = (id: string, auto: boolean) => {
+    const f = fold[id]
+    if (auto) return f && f.key === selKey ? f.open : true
+    return f ? f.open : false
+  }
+  const setOpen = (id: string, open: boolean) => setFold((prev) => ({ ...prev, [id]: { open, key: selKey } }))
   const mini = (sec: Section, p: TablePart) => (
     <span className={s.mini} style={{ gridTemplateColumns: `repeat(${sec.cols ?? 1}, 1fr)`, gridTemplateRows: `repeat(${Math.max(1, sec.rows ?? 1)}, 1fr)` }}>
       {(sec.parts ?? []).map((q) => (
@@ -1330,7 +1389,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   )
   const partDetail = (sec: Section, p: TablePart) => (
     <div className={s.pbody}>
-      {p.type === 'box' && boxSettings(sec, p)}
+      {p.type === 'box' && boxSettings(sec, [p])}
       {p.type === 'button' && (
         <>
           <Field label={t('文言', 'Label')} size="small">
@@ -1474,18 +1533,22 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                 </Button>
               )}
             </div>
+            {selSec && selParts.filter((p) => p.type === 'box').length > 1 && boxSettings(selSec, selParts.filter((p) => p.type === 'box').sort((x, y) => x.r - y.r || x.c - y.c))}
           </div>
         )}
         {sections.map((sec, si) => {
           const cur = sel?.sec === sec.id
-          const open = cur || openIds.has(sec.id!)
+          const open = isOpen(sec.id!, cur)
           const n = (type: PartType) => (sec.parts ?? []).filter((p) => p.type === type).length
           return (
             <div key={sec.id} className={mergeClasses(s.scard, sel?.kind === 'section' && cur && s.scardCur)}>
               <div
                 className={s.shd}
                 onClick={() => {
+                  // 選んでいるセクションの見出しをもう一度押したら、閉じる(開くのは、選んだとき)
+                  if (sel?.kind === 'section' && cur && open) return setOpen(sec.id!, false)
                   setSel({ kind: 'section', sec: sec.id! })
+                  setFold((prev) => ({ ...prev, [sec.id!]: { open: true, key: '' } }))
                   document.querySelector(`[data-sec="${CSS.escape(sec.id!)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
                 }}
               >
@@ -1493,7 +1556,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                   className={s.chev}
                   onClick={(e) => {
                     e.stopPropagation()
-                    toggleOpen(sec.id!)
+                    setOpen(sec.id!, !open)
                   }}
                 >
                   {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
@@ -1508,17 +1571,20 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                   {[...(sec.parts ?? [])]
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {
-                      const pOpen = p.id === one || openIds.has(p.id)
+                      const pOpen = isOpen(p.id, p.id === one)
                       return (
                         <div
                           key={p.id}
-                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : s.tEmpty, selIds.has(p.id) && s.pcardCur)}
+                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : p.type === 'media' ? s.tMedia : s.tEmpty, selIds.has(p.id) && s.pcardCur)}
                           onMouseEnter={() => setPeek(p.id)}
                           onMouseLeave={() => setPeek(null)}
                         >
                           <div
                             className={s.phd}
                             onClick={() => {
+                              // 選んでいる部品の行をもう一度押したら、閉じる
+                              if (p.id === one && pOpen) return setOpen(p.id, false)
+                              setOpen(p.id, true)
                               selectCell(sec.id!, p.c, p.r)
                               document.querySelector(`[data-cell="${CSS.escape(p.id)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
                             }}
@@ -1531,7 +1597,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                               className={s.chev}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                toggleOpen(p.id)
+                                setOpen(p.id, !pOpen)
                               }}
                             >
                               {pOpen ? <ChevronDownRegular /> : <ChevronRightRegular />}
