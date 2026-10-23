@@ -76,6 +76,7 @@ export function toStored(s: Section): Section {
       cols: t.cols,
       rows: t.rows,
       parts: (t.parts ?? []).map(storedPart),
+      ...(t.evenRows ? { evenRows: t.evenRows } : {}),
       ...(s.categoryHeading ? { categoryHeading: true } : {}),
       ...(s.copy === false ? { copy: false } : {}),
     }
@@ -171,7 +172,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
     const sections: Section[] = []
     const buttonBlocks: ButtonBlock[] = []
     for (const r of raw) {
-      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string; id?: unknown; name?: unknown; aiNote?: unknown; rows?: unknown; parts?: unknown }
+      const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string; id?: unknown; name?: unknown; aiNote?: unknown; rows?: unknown; parts?: unknown; evenRows?: unknown }
       if (o?.kind === 'hero' || o?.kind === 'app') continue
       if (o?.kind === 'table') {
         // 表: 箱がなくても(ボタンだけのセクションも)読む。埋めた空きの ID は、位置から決める(読むたびに同じ ID に)
@@ -188,6 +189,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
               cols: Number(o.cols),
               rows: Number(o.rows),
               parts,
+              ...(Array.isArray(o.evenRows) ? { evenRows: o.evenRows.filter((x): x is number => typeof x === 'number') } : {}),
               slots: 0,
               ...(o.categoryHeading ? { categoryHeading: true } : {}),
               ...(o.copy === false ? { copy: false } : {}),

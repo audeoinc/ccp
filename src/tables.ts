@@ -115,7 +115,24 @@ export function normalizeTable(sec: Section, idOf?: (c: number, r: number) => st
     out.push({ ...p, c, r, w, h })
   }
   for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) if (!used[i][j]) out.push({ id: idOf ? idOf(j, i) : newPartId('empty'), type: 'empty', c: j, r: i, w: 1, h: 1 })
-  return withSlots({ ...sec, kind: 'table', id: sec.id || newSectionId(), cols, rows, parts: out })
+  const even = [...new Set(sec.evenRows ?? [])].filter((r) => Number.isInteger(r) && r >= 0 && r < rows && !out.some((p) => p.h > 1 && p.r <= r && p.r + p.h > r)).sort((a, b) => a - b)
+  return withSlots({ ...sec, kind: 'table', id: sec.id || newSectionId(), cols, rows, parts: out, evenRows: even.length > 0 ? even : undefined })
+}
+
+/** 均等の行の番号を、行の増減に合わせてずらす(fn が undefined を返した行は外す) */
+const shiftEven = (sec: Section, fn: (r: number) => number | undefined): number[] | undefined => {
+  const next = (sec.evenRows ?? []).map(fn).filter((r): r is number => r !== undefined)
+  return next.length > 0 ? next : undefined
+}
+
+/** 均等に並べる行か */
+export const isEvenRow = (sec: Section, r: number) => (sec.evenRows ?? []).includes(r)
+
+/** 行を均等に並べる・やめる(縦に結合した部品がかかる行は、均等にできない) */
+export function toggleEvenRow(sec: Section, r: number): TableOp {
+  if (isEvenRow(sec, r)) return { sec: { ...sec, evenRows: shiftEven(sec, (x) => (x === r ? undefined : x)) } }
+  if (partsOf(sec).some((p) => p.h > 1 && p.r <= r && p.r + p.h > r)) return { error: tr('縦に結合したマスがかかっている行は、均等に並べられません', "A row with a vertically merged cell can't be spread evenly") }
+  return { sec: { ...sec, evenRows: [...(sec.evenRows ?? []), r].sort((a, b) => a - b) } }
 }
 
 /** 空きのマスを埋める(操作のあと) */
@@ -200,7 +217,7 @@ export function insertRow(sec: Section, i: number, type: PartType = 'empty', pla
   const parts = partsOf(sec).map((p) => (p.r >= i ? { ...p, r: p.r + 1 } : p.r + p.h > i ? { ...p, h: p.h + 1 } : p))
   const cols = sec.cols ?? 1
   const added = type !== 'empty' ? newPart(type, place ? place.c : 0, i, place ? place.w : cols, 1) : null
-  const next = filled({ ...sec, rows: rows + 1, parts: added ? [...parts, added] : parts })
+  const next = filled({ ...sec, rows: rows + 1, parts: added ? [...parts, added] : parts, evenRows: shiftEven(sec, (x) => (x >= i ? x + 1 : x)) })
   return { sec: next, sel: added ? { a: [added.c, i], b: [added.c, i] } : { a: [0, i], b: [cols - 1, i] } }
 }
 
@@ -222,7 +239,7 @@ export function deleteRow(sec: Section, r: number): TableOp {
   const parts = partsOf(sec)
     .filter((p) => !(p.r === r && p.h === 1))
     .map((p) => (p.r > r ? { ...p, r: p.r - 1 } : p.r + p.h > r ? { ...p, h: p.h - 1 } : p))
-  return { sec: filled({ ...sec, rows: rows - 1, parts }) }
+  return { sec: filled({ ...sec, rows: rows - 1, parts, evenRows: shiftEven(sec, (x) => (x === r ? undefined : x > r ? x - 1 : x)) }) }
 }
 
 export function deleteCol(sec: Section, c: number): TableOp {
@@ -240,7 +257,7 @@ export function moveRow(sec: Section, r: number, d: number): TableOp {
   if (o < 0 || o >= (sec.rows ?? 0)) return { error: '' }
   if (partsOf(sec).some((p) => p.h > 1 && ((p.r <= r && p.r + p.h > r) || (p.r <= o && p.r + p.h > o)))) return { error: tr('結合したマスがまたがっているので、この行は動かせません', "A merged cell spans this row, so it can't be moved") }
   const parts = partsOf(sec).map((p) => (p.r === r ? { ...p, r: o } : p.r === o ? { ...p, r } : p))
-  return { sec: { ...sec, parts }, sel: { a: [0, o], b: [(sec.cols ?? 1) - 1, o] } }
+  return { sec: { ...sec, parts, evenRows: shiftEven(sec, (x) => (x === r ? o : x === o ? r : x)) }, sel: { a: [0, o], b: [(sec.cols ?? 1) - 1, o] } }
 }
 
 export function moveCol(sec: Section, c: number, d: number): TableOp {
@@ -255,7 +272,7 @@ export function moveCol(sec: Section, c: number, d: number): TableOp {
 export const emptySection = (): Section => ({ kind: 'table', id: newSectionId(), cols: 2, rows: 0, parts: [], slots: 0, categoryHeading: true })
 
 /** 空のセクションの最初の行を、n 列で作る */
-export const firstRow = (sec: Section, n: number): TableOp => ({ sec: filled({ ...sec, cols: n, rows: 1, parts: [] }), sel: { a: [0, 0], b: [n - 1, 0] } })
+export const firstRow = (sec: Section, n: number): TableOp => ({ sec: filled({ ...sec, cols: n, rows: 1, parts: [], evenRows: undefined }), sel: { a: [0, 0], b: [n - 1, 0] } })
 
 /** よく使う行(1 行まとめて置く)。parts は [種類, 列, 行, 幅(0 は行いっぱい), 高さ] */
 export interface RowPreset {
@@ -264,6 +281,8 @@ export interface RowPreset {
   cols: number
   rows: number
   parts: [PartType, number, number, number?, number?][]
+  /** 置いた行を、均等に並べる */
+  even?: boolean
 }
 export const ROW_PRESETS: RowPreset[] = [
   { id: 'x2', label: () => tr('箱 × 2', 'Box × 2'), cols: 2, rows: 1, parts: [['box', 0, 0], ['box', 1, 0]] },
@@ -271,6 +290,7 @@ export const ROW_PRESETS: RowPreset[] = [
   { id: 'big', label: () => tr('大 1 + 小 2', '1 large + 2 small'), cols: 2, rows: 2, parts: [['box', 0, 0, 1, 2], ['box', 1, 0], ['box', 1, 1]] },
   { id: 'tb', label: () => tr('文 + 箱', 'Text + box'), cols: 2, rows: 1, parts: [['text', 0, 0], ['box', 1, 0]] },
   { id: 'btn', label: () => tr('ボタンの行', 'Button row'), cols: 0, rows: 1, parts: [['button', 0, 0, 0, 1]] },
+  { id: 'btn2', label: () => tr('ボタン × 2(均等)', 'Button × 2 (even)'), cols: 2, rows: 1, parts: [['button', 0, 0], ['button', 1, 0]], even: true },
 ]
 
 /** よく使う行を、i 行目に差し込む(列が足りなければ、セクションの列を増やす。余るマスは空き) */
@@ -280,22 +300,24 @@ export function insertPreset(sec: Section, i: number, preset: RowPreset): TableO
   const cols = rows === 0 ? Math.max(1, preset.cols) : Math.max(sec.cols ?? 1, preset.cols)
   const parts = partsOf(sec).map((p) => (p.r >= i ? { ...p, r: p.r + preset.rows } : p.r + p.h > i ? { ...p, h: p.h + preset.rows } : p))
   const added = preset.parts.map(([type, c, r, w = 1, h = 1]) => newPart(type, c, i + r, w || cols, h))
-  return { sec: filled({ ...sec, cols, rows: rows + preset.rows, parts: [...parts, ...added] }), sel: { a: [0, i], b: [cols - 1, i + preset.rows - 1] } }
+  const shifted = rows === 0 ? undefined : shiftEven(sec, (x) => (x >= i ? x + preset.rows : x))
+  const evenRows = preset.even ? [...(shifted ?? []), i] : shifted
+  return { sec: filled({ ...sec, cols, rows: rows + preset.rows, parts: [...parts, ...added], evenRows }), sel: { a: [0, i], b: [cols - 1, i + preset.rows - 1] } }
 }
 
 /** r 行目から下を、新しいセクションに分ける */
 export function splitSection(sec: Section, r: number): { error: string } | { top: Section; bottom: Section } {
   if (r <= 0) return { error: tr('いちばん上の行では分けられません', "Can't split at the top row") }
   if (partsOf(sec).some((p) => p.r < r && p.r + p.h > r)) return { error: tr('結合したマスがまたがっているので、ここでは分けられません', "A merged cell spans this row, so it can't be split here") }
-  const top = withSlots({ ...sec, rows: r, parts: partsOf(sec).filter((p) => p.r < r) })
-  const bottom = withSlots({ kind: 'table', id: newSectionId(), cols: sec.cols, rows: (sec.rows ?? 0) - r, categoryHeading: true, slots: 0, parts: partsOf(sec).filter((p) => p.r >= r).map((p) => ({ ...p, r: p.r - r })) })
+  const top = withSlots({ ...sec, rows: r, parts: partsOf(sec).filter((p) => p.r < r), evenRows: shiftEven(sec, (x) => (x < r ? x : undefined)) })
+  const bottom = withSlots({ kind: 'table', id: newSectionId(), cols: sec.cols, rows: (sec.rows ?? 0) - r, categoryHeading: true, slots: 0, parts: partsOf(sec).filter((p) => p.r >= r).map((p) => ({ ...p, r: p.r - r })), evenRows: shiftEven(sec, (x) => (x >= r ? x - r : undefined)) })
   return { top, bottom }
 }
 
 /** 下のセクションを、上のセクションにまとめる(列の数は多いほうに合わせる。見出し・名前は上のもの) */
 export function mergeSections(up: Section, cur: Section): Section {
   const upRows = up.rows ?? 0
-  return filled({ ...up, cols: Math.max(up.cols ?? 1, cur.cols ?? 1), rows: upRows + (cur.rows ?? 0), parts: [...partsOf(up), ...partsOf(cur).map((p) => ({ ...p, r: p.r + upRows }))] })
+  return filled({ ...up, cols: Math.max(up.cols ?? 1, cur.cols ?? 1), rows: upRows + (cur.rows ?? 0), parts: [...partsOf(up), ...partsOf(cur).map((p) => ({ ...p, r: p.r + upRows }))], evenRows: [...(up.evenRows ?? []), ...(cur.evenRows ?? []).map((x) => x + upRows)] })
 }
 
 /** セクションを複製する(形を写した別のものなので、セクションも部品も新しい ID) */

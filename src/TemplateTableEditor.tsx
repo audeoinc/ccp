@@ -563,6 +563,10 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     { label: t('下に行を挿入', 'Insert row below'), onClick: () => run(sec.id!, (x) => T.insertRow(x, r + 1)) },
     { label: t('上へ移動', 'Move up'), disabled: r === 0, onClick: () => run(sec.id!, (x) => T.moveRow(x, r, -1)) },
     { label: t('下へ移動', 'Move down'), disabled: r === (sec.rows ?? 1) - 1, onClick: () => run(sec.id!, (x) => T.moveRow(x, r, 1)) },
+    {
+      label: T.isEvenRow(sec, r) ? t('均等に並べるのをやめる(列に合わせる)', 'Stop spreading evenly (align to columns)') : t('この行を均等に並べる(中身のある部品を同じ幅で)', 'Spread this row evenly (same width for each filled part)'),
+      onClick: () => run(sec.id!, (x) => T.toggleEvenRow(x, r)),
+    },
     { label: t('この行から下を、新しいセクションに', 'Split into a new section from this row'), disabled: r === 0, onClick: () => splitAt(sec.id!, r) },
     { label: t('行を削除', 'Delete row'), onClick: () => run(sec.id!, (x) => T.deleteRow(x, r)) },
   ]
@@ -893,7 +897,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             key={`r${r}`}
             className={mergeClasses(s.rowHead, !!fullRow && r >= mine.r && r < mine.r + mine.h && s.headOn)}
             style={{ gridColumn: 1, gridRow: r + 2 }}
-            title={t(`行 ${r + 1}`, `Row ${r + 1}`)}
+            title={T.isEvenRow(sec, r) ? t(`行 ${r + 1}(均等に並べる。メールでは、中身のある部品を同じ幅で並べます)`, `Row ${r + 1} (spread evenly: filled parts get equal widths in the email)`) : t(`行 ${r + 1}`, `Row ${r + 1}`)}
             onClick={(e) => {
               setSel({ kind: 'cells', sec: sec.id!, a: [0, r], b: [cols - 1, r] })
               // 行のメニューは、行の帯の右横に出す(押した行が隠れないように)
@@ -901,7 +905,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
               openMenu(b.right + 4, b.top - 4, rowMenu(sec, r))
             }}
           >
-            …
+            {T.isEvenRow(sec, r) ? '＝' : '…'}
             {r > 0 && (
               <button
                 type="button"
