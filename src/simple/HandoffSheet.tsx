@@ -32,6 +32,8 @@ interface Props {
   onCommit: () => Promise<void>
   /** 制作の依頼の最新の版を読んだとき(段階を決めるため) */
   onRequest?: (req: ProductionRequest | undefined) => void
+  /** 参考の素材が外(右端の帯へのドラッグ)で増えたら変わる(素材の欄を読み直す) */
+  assetsVersion?: number
 }
 
 /**
@@ -40,7 +42,7 @@ interface Props {
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
-export function HandoffSheet({ editor: e, onCommit, onRequest }: Props) {
+export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0 }: Props) {
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -153,6 +155,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest }: Props) {
           {t('参考の画像・資料・URL', 'Reference images, files and URLs')}
         </span>
         <CreativeAssets
+          key={assetsVersion}
           cardId={e.card.id}
           stage="plan"
           title=" "

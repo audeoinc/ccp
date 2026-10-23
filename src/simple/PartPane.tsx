@@ -20,6 +20,7 @@ import { PushThumb } from '../PushThumb'
 import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
 import { PartAiChat } from './PartAiChat'
+import { ProductionMemo } from './ProductionMemo'
 import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
 import type { SimpleEditor, SimpleField } from './editor'
 
@@ -552,6 +553,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {part?.kind !== 'meta' && part?.kind !== 'overview' && <Aim editor={e} />}
       {compareBlock}
       {body}
+      {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
+      {part && part.kind !== 'meta' && part.kind !== 'overview' && part.kind !== 'template' && <ProductionMemo editor={e} label={titleOf(part)} />}
     </div>
   )
 }

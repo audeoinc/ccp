@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, ToggleButton, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
@@ -23,6 +23,8 @@ import { partKey, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import { StageHeader } from './StageHeader'
 import { HandoffSheet } from './HandoffSheet'
+import { addDroppedAssets, canDropAsset } from './assetDrop'
+import { myName } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
@@ -140,6 +142,9 @@ const useStyles = makeStyles({
   sideBadge: { position: 'absolute', top: '-6px', right: '-12px', minWidth: '16px', height: '16px', padding: '0 4px', boxSizing: 'border-box', borderRadius: '8px', fontSize: '10px', lineHeight: '16px', textAlign: 'center', color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground },
   sideDot: { position: 'absolute', top: '-3px', left: '-6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
   sideLabel: { fontSize: '10px', lineHeight: 1.2 },
+  // 画像・URL を落とせる所(ドラッグ中)
+  sideDrop: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px', backgroundColor: tokens.colorBrandBackground2 },
+  dropNote: { fontSize: '16px' },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
   candRow: { display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', width: '100%', padding: '6px 4px', border: 'none', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: 'transparent', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2 } },
   candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -233,7 +238,22 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const [counts, setCounts] = useState<{ open: number; tasks: number; mine: boolean; waiting: boolean }>({ open: 0, tasks: 0, mine: false, waiting: false })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、帯のアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => setCounts(c), [])
-  // 畳んだ帯に出す、参考の素材の数(帯の数を合わせるため、開いていなくても数える)
+  // 右端の帯の「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
+  const [assetsVersion, setAssetsVersion] = useState(0)
+  const [dropOver, setDropOver] = useState(false)
+  const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const dropAssets = async (dt: DataTransfer) => {
+    setDropOver(false)
+    try {
+      const r = await addDroppedAssets(e.card.id, myName() || e.form.owner || '', dt)
+      setDropNote(r.error ? { ok: false, text: r.error } : { ok: true, text: t(`${r.added} 件を参考の素材に入れました`, `Added ${r.added} to reference assets`) })
+      if (r.added > 0) setAssetsVersion((v) => v + 1)
+    } catch (err) {
+      setDropNote({ ok: false, text: err instanceof Error ? err.message : String(err) })
+    }
+    window.setTimeout(() => setDropNote(null), 4000)
+  }
+  // 帯に出す、参考の素材の数(帯の数を合わせるため、開いていなくても数える)
   const [assetCount, setAssetCount] = useState(0)
   useEffect(() => {
     let alive = true
@@ -243,7 +263,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     return () => {
       alive = false
     }
-  }, [e.card.id, side])
+  }, [e.card.id, side, assetsVersion])
   const memoLines = e.form.instructions.split('\n').filter((x) => x.trim()).length
   // プレビューの場所を押してコメントを書く(PreviewPins の覆い。押した場所はコミュニケーションの書く欄に渡る)
   const [placing, setPlacing] = useState(false)
@@ -593,7 +613,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
             <div className={s.pane}>
               <div className={s.colTitle}>{t('渡すもの(制作へ)', 'For production')}</div>
-              <HandoffSheet editor={e} onCommit={onCommit} />
+              <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} />
             </div>
           )}
         </div>
@@ -611,7 +631,22 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             </button>
           </Tooltip>
           <Tooltip content={t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)')} relationship="description" positioning="before">
-            <button type="button" className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn)} aria-pressed={side === 'handoff'} onClick={() => showSide('handoff')}>
+            <button
+              type="button"
+              className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn, dropOver && s.sideDrop)}
+              aria-pressed={side === 'handoff'}
+              onClick={() => showSide('handoff')}
+              onDragOver={(ev) => {
+                if (!canDropAsset(ev.dataTransfer)) return
+                ev.preventDefault()
+                setDropOver(true)
+              }}
+              onDragLeave={() => setDropOver(false)}
+              onDrop={(ev) => {
+                ev.preventDefault()
+                void dropAssets(ev.dataTransfer)
+              }}
+            >
               <span className={s.sideIcon}>
                 <BoxMultipleArrowRightRegular />
                 {memoLines + assetCount > 0 && <span className={s.sideBadge}>{memoLines + assetCount}</span>}
@@ -619,6 +654,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <span className={s.sideLabel}>{t('渡すもの', 'Handoff')}</span>
             </button>
           </Tooltip>
+          {/* 落としたものを入れた・入れられなかったを、帯の下に短く知らせる */}
+          {dropNote && (
+            <Tooltip content={dropNote.text} relationship="label" positioning="before" visible>
+              <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
+                {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
+              </span>
+            </Tooltip>
+          )}
         </nav>
       </div>
     </div>
