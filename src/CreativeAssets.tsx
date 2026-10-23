@@ -7,6 +7,7 @@ import { CreativeFiles } from './data/creativeFiles'
 import { CREATIVE_EXTS, CREATIVE_MAX_BYTES, IMAGE_EXTS, extOf } from './creativeConst'
 import { CommentsPanel } from './CommentsPanel'
 import { refreshPreview } from './creativePreview'
+import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
 import { myName, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import type { CardAsset } from './models/cardAssets'
@@ -127,6 +128,17 @@ async function deleteAsset(a: CardAsset, me: string): Promise<boolean> {
   // ファイルが消せなくても、素材の行はもう無い(置き場所に残るだけ)ので、失敗にしない
   for (const f of [a.stored, a.preview_image]) if (f) await CreativeFiles.remove(f).catch(() => undefined)
   return true
+}
+
+/** ファイルの素材を落とす(フロートの「ダウンロード」と同じ URL。名前を付けて落とす) */
+function downloadAsset(a: CardAsset) {
+  if (!a.stored) return
+  const link = document.createElement('a')
+  link.href = CreativeFiles.url(a.stored, a.file_name)
+  link.download = a.file_name ?? ''
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
 }
 
 interface Props {
@@ -265,6 +277,29 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
 
   const opened = assets?.find((a) => a.id === openId) ?? null
 
+  const remove = async (a: CardAsset) => {
+    setError(null)
+    try {
+      if (await deleteAsset(a, me)) await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  // 行の右クリック: 開く・ダウンロード(URL はページを開く)・消す。行のボタン・フロートのボタンと同じ処理を呼ぶ
+  const ctx = useContextMenu()
+  const rowMenu = (e: React.MouseEvent, a: CardAsset) => {
+    if (keepBrowserMenu(e)) return
+    e.preventDefault()
+    const items: ContextItem[] = [
+      { key: 'open', label: t('開く', 'Open'), icon: <OpenRegular />, onSelect: () => setOpenId(a.id) },
+      a.kind === 'url'
+        ? { key: 'page', label: t('ページを開く', 'Open page'), icon: <LinkRegular />, onSelect: () => window.open(a.url, '_blank', 'noreferrer') }
+        : { key: 'download', label: t('ダウンロード', 'Download'), icon: <ArrowDownloadRegular />, disabled: !a.stored, onSelect: () => downloadAsset(a) },
+      { key: 'delete', label: t('消す', 'Delete'), icon: <DeleteRegular />, divider: true, onSelect: () => void remove(a) },
+    ]
+    ctx.openAt(e.clientX, e.clientY, items)
+  }
+
   return (
     <div className={s.root}>
       <div>
@@ -292,7 +327,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
           ) : (
             <div className={s.list}>
               {assets.map((a) => (
-                <div key={a.id} className={s.rowWrap}>
+                <div key={a.id} className={s.rowWrap} onContextMenu={(e) => rowMenu(e, a)}>
                 <button type="button" className={mergeClasses(s.row, s.rowPad)} onClick={() => setOpenId(a.id)} title={t('押すと大きく見て、この素材についてやり取りできます', 'Click to view it and discuss it')}>
                   {isImage(a) && a.stored ? (
                     <img className={s.rowThumb} src={CreativeFiles.url(a.stored)} alt="" loading="lazy" />
@@ -319,14 +354,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
                   disabled={busy}
                   aria-label={t(`素材「${a.name}」を消す`, `Delete "${a.name}"`)}
                   title={t('この素材を消す', 'Delete this asset')}
-                  onClick={async () => {
-                    setError(null)
-                    try {
-                      if (await deleteAsset(a, me)) await load()
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : String(e))
-                    }
-                  }}
+                  onClick={() => void remove(a)}
                 />
                 </div>
               ))}
@@ -463,6 +491,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
           {error && <div className={s.error}>{error}</div>}
         </>
       )}
+      {ctx.menu}
       {opened && cardId && (
         <AssetFloat
           asset={opened}
