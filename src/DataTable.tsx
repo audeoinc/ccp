@@ -60,6 +60,8 @@ interface Props<T> {
   /** 選んでいる行(色を付ける) */
   selectedKey?: string
   rowStyle?: (row: T) => CSSProperties | undefined
+  /** 行に付ける data-* の印(右クリックのメニューが、どの行かを知るため) */
+  rowData?: (row: T) => Record<`data-${string}`, string> | undefined
   defaultSort?: { key: string; dir: 'ascending' | 'descending' }
   /** 同じ値のときの順(例: 配信日時) */
   tieBreak?: (a: T, b: T) => number
@@ -69,7 +71,7 @@ interface Props<T> {
  * 一覧の表(計画の一覧・結果の一覧で共通)。列見出しを押すと並べ替える。
  * 計画と結果は同じ配信の表と裏なので、一覧の見た目(外枠・見出し・行・サムネイル)をそろえる
  */
-export function DataTable<T>({ rows, columns, rowKey, ariaLabel, empty, onRowClick, selectedKey, rowStyle, defaultSort, tieBreak }: Props<T>) {
+export function DataTable<T>({ rows, columns, rowKey, ariaLabel, empty, onRowClick, selectedKey, rowStyle, rowData, defaultSort, tieBreak }: Props<T>) {
   const styles = useStyles()
   const [sort, setSort] = useState(defaultSort)
 
@@ -121,6 +123,7 @@ export function DataTable<T>({ rows, columns, rowKey, ariaLabel, empty, onRowCli
                 key={key}
                 className={mergeClasses(onRowClick && styles.row, selectedKey === key && styles.rowOn)}
                 style={rowStyle?.(r)}
+                {...rowData?.(r)}
                 onClick={onRowClick ? () => onRowClick(r) : undefined}
                 aria-selected={selectedKey === undefined ? undefined : selectedKey === key}
               >

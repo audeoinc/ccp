@@ -257,6 +257,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                   <button
                     key={c.id}
                     type="button"
+                    data-card-id={c.id}
                     // マスの「新規作成」まで届かないように止める(既存のカードを開くだけ)
                     onClick={(e) => {
                       e.stopPropagation()

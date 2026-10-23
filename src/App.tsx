@@ -51,6 +51,9 @@ import {
   SettingsRegular,
   TableRegular,
 } from '@fluentui/react-icons'
+import { CopyRegular as CtxCopyRegular, DataBarVerticalRegular as CtxResultsRegular, OpenRegular as CtxOpenRegular, PaintBrushRegular as CtxProductionRegular } from '@fluentui/react-icons'
+import { keepBrowserMenu, useContextMenu } from './ContextMenu'
+import { DuplicateDialog } from './CardMenu'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ProductsService } from './data/products'
@@ -629,6 +632,31 @@ function App() {
   const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
+  // 週・月・一覧の配信の右クリック: 開く・複製…・制作のページ・結果。押したときと、配信カードの「…」・段階の帯と同じ処理を呼ぶ
+  const cardMenu = useContextMenu()
+  const [dupCard, setDupCard] = useState<DeliveryCard | null>(null)
+  const cardMenuRef = useRef<(e: MouseEvent) => void>(() => undefined)
+  useEffect(() => {
+    cardMenuRef.current = (e: MouseEvent) => {
+      // ほかの右クリック(プレビューのピンなど)が受けたもの・ブラウザのメニューの逃げ道は、そのまま
+      if (e.defaultPrevented || keepBrowserMenu(e)) return
+      const id = (e.target as Element | null)?.closest?.('[data-card-id]')?.getAttribute('data-card-id')
+      const c = id ? cards.find((x) => x.id === id) : undefined
+      if (!c) return
+      e.preventDefault()
+      cardMenu.openAt(e.clientX, e.clientY, [
+        { key: 'open', label: tr('開く', 'Open'), icon: <CtxOpenRegular />, onSelect: () => openCard(c.id) },
+        { key: 'duplicate', label: tr('複製…', 'Duplicate…'), icon: <CtxCopyRegular />, onSelect: () => setDupCard(c) },
+        { key: 'production', label: tr('制作のページを開く', 'Open the production page'), icon: <CtxProductionRegular />, divider: true, onSelect: () => goStage(c.id, 'production') },
+        { key: 'results', label: tr('結果を見る', 'See results'), icon: <CtxResultsRegular />, onSelect: () => goStage(c.id, 'results') },
+      ])
+    }
+  })
+  useEffect(() => {
+    const on = (e: MouseEvent) => cardMenuRef.current(e)
+    document.addEventListener('contextmenu', on)
+    return () => document.removeEventListener('contextmenu', on)
+  }, [])
   const productionTone = (c: DeliveryCard) => {
     const color = productionColor(productionView(c, production.latest.get(c.id)))
     return { line: color, background: `color-mix(in srgb, ${color} 14%, var(--colorNeutralBackground1))` }
@@ -2245,6 +2273,19 @@ function App() {
       )}
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       {heroLibraryOpen && <HeroLibrary heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} onClose={() => setHeroLibraryOpen(false)} />}
+      {cardMenu.menu}
+      {dupCard && (
+        <DuplicateDialog
+          card={dupCard}
+          weeks={weeks}
+          onClose={() => setDupCard(null)}
+          // 配信カードの「…」の複製と同じく、読み直してから、複製した配信を開く
+          onDuplicated={async (id) => {
+            await load()
+            setSelectedId(id)
+          }}
+        />
+      )}
       <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
         <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} />

@@ -382,6 +382,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
         type="button"
         className={mergeClasses(styles.card, !!focus?.cards.size && (focus.cards.has(id) ? styles.cardFocus : styles.cardDim))}
         onClick={() => onSelect(id)}
+        data-card-id={id}
         title={c.name}
         // 取りやめた配信は、消さずに薄く、取り消し線で出す
         style={isCancelled(c) ? CANCELLED_STYLE : undefined}

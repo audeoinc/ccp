@@ -98,6 +98,7 @@ export function ListView({ rows, columns, onSelect, cardProducts, products, hero
       empty={t('この月の配信はありません', 'No deliveries this month')}
       onRowClick={(r) => onSelect(r.card.id)}
       rowStyle={(r) => (isCancelled(r.card) ? CANCELLED_STYLE : undefined)}
+      rowData={(r) => ({ 'data-card-id': r.card.id })}
       defaultSort={{ key: 'date', dir: 'ascending' }}
       // 同じ値なら、配信日時の順
       tieBreak={(a, b) => (a.card.scheduled_at ?? '').localeCompare(b.card.scheduled_at ?? '')}

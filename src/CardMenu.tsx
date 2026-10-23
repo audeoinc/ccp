@@ -59,13 +59,9 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
   const t = useT()
   const [dialog, setDialog] = useState<'duplicate' | 'cancel' | 'delete' | null>(null)
   const [reason, setReason] = useState('')
-  const [dupName, setDupName] = useState('')
-  const [dupAt, setDupAt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cancelled = isCancelled(card)
-  // 確定した週には複製しない(確定した計画に、黙って配信が増えるため。週をレビューに戻してから作る)
-  const dupLocked = confirmedWeekOf(weeks, dupAt)
 
   const run = async (fn: () => Promise<void>, after: () => Promise<void>) => {
     setBusy(true)
@@ -101,15 +97,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
                 <MenuDivider />
               </>
             )}
-            <MenuItem
-              icon={<CopyRegular />}
-              onClick={() => {
-                setDupName(defaultDuplicateName(card))
-                setDupAt(defaultDuplicateAt(card, weeks))
-                setError(null)
-                setDialog('duplicate')
-              }}
-            >
+            <MenuItem icon={<CopyRegular />} onClick={() => setDialog('duplicate')}>
               {t('複製…', 'Duplicate…')}
             </MenuItem>
             {cancelled ? (
@@ -128,61 +116,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
         </MenuPopover>
       </Menu>
 
-      <Dialog open={dialog === 'duplicate'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle>{t(`「${card.name}」を複製する`, `Duplicate "${card.name}"`)}</DialogTitle>
-            <DialogContent className={styles.body}>
-              <span>
-                {t(
-                  'テーマ・コピー・テンプレート・載せた商品・AB テストの案を写した、新しい配信カードを作ります。承認・制作への引き継ぎ・素材は写しません(新しい配信は、もう一度承認を通します)',
-                  'Creates a new delivery card with the same theme, copy, template, products and AB test variants. Approvals, hand-off to production and assets are not copied (the new delivery goes through approval again).',
-                )}
-              </span>
-              <Field label={t('配信名', 'Name')} required size="small">
-                <Input value={dupName} onChange={(_, d) => setDupName(d.value)} />
-              </Field>
-              <Field
-                label={t('配信日時', 'Send date and time')}
-                required
-                size="small"
-                validationState={dupLocked ? 'error' : 'none'}
-                validationMessage={
-                  dupLocked
-                    ? t('この週は確定しています。ほかの日にするか、週をレビューに戻してから複製してください', 'This week is confirmed. Pick another date, or put the week back in review first.')
-                    : undefined
-                }
-              >
-                <Input type="datetime-local" value={dupAt} onChange={(_, d) => setDupAt(d.value)} />
-              </Field>
-              {error && (
-                <MessageBar intent="error">
-                  <MessageBarBody>{error}</MessageBarBody>
-                </MessageBar>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" onClick={() => setDialog(null)}>{t('やめる', 'Back')}</Button>
-              <Button
-                appearance="primary"
-                icon={<CopyRegular />}
-                disabled={busy || !dupName.trim() || !dupAt || !!dupLocked}
-                onClick={() => {
-                  let id = ''
-                  void run(
-                    async () => {
-                      id = await duplicateDelivery(card, dupName, dupAt)
-                    },
-                    () => onDuplicated(id),
-                  )
-                }}
-              >
-                {t('複製して開く', 'Duplicate')}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      {dialog === 'duplicate' && <DuplicateDialog card={card} weeks={weeks} onClose={() => setDialog(null)} onDuplicated={onDuplicated} />}
 
       <Dialog open={dialog === 'cancel'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
         <DialogSurface>
@@ -241,5 +175,81 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
         </DialogSurface>
       </Dialog>
     </>
+  )
+}
+
+/**
+ * 配信を複製するダイアログ(配信カードの「…」と、週・月の一覧の右クリックの「複製…」から開く)。
+ * 確定した週の日時には複製しない(確定した計画に、黙って配信が増えるため。週をレビューに戻してから作る)
+ */
+export function DuplicateDialog({ card, weeks, onClose, onDuplicated }: { card: DeliveryCard; weeks: WeekRow[]; onClose: () => void; onDuplicated: (id: string) => Promise<void> }) {
+  const styles = useStyles()
+  const t = useT()
+  const [dupName, setDupName] = useState(() => defaultDuplicateName(card))
+  const [dupAt, setDupAt] = useState(() => defaultDuplicateAt(card, weeks))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const dupLocked = confirmedWeekOf(weeks, dupAt)
+  const duplicate = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const id = await duplicateDelivery(card, dupName, dupAt)
+      onClose()
+      await onDuplicated(id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
+      <DialogSurface>
+        <DialogBody>
+          <DialogTitle>{t(`「${card.name}」を複製する`, `Duplicate "${card.name}"`)}</DialogTitle>
+          <DialogContent className={styles.body}>
+            <span>
+              {t(
+                'テーマ・コピー・テンプレート・載せた商品・AB テストの案を写した、新しい配信カードを作ります。承認・制作への引き継ぎ・素材は写しません(新しい配信は、もう一度承認を通します)',
+                'Creates a new delivery card with the same theme, copy, template, products and AB test variants. Approvals, hand-off to production and assets are not copied (the new delivery goes through approval again).',
+              )}
+            </span>
+            <Field label={t('配信名', 'Name')} required size="small">
+              <Input value={dupName} onChange={(_, d) => setDupName(d.value)} />
+            </Field>
+            <Field
+              label={t('配信日時', 'Send date and time')}
+              required
+              size="small"
+              validationState={dupLocked ? 'error' : 'none'}
+              validationMessage={
+                dupLocked
+                  ? t('この週は確定しています。ほかの日にするか、週をレビューに戻してから複製してください', 'This week is confirmed. Pick another date, or put the week back in review first.')
+                  : undefined
+              }
+            >
+              <Input type="datetime-local" value={dupAt} onChange={(_, d) => setDupAt(d.value)} />
+            </Field>
+            {error && (
+              <MessageBar intent="error">
+                <MessageBarBody>{error}</MessageBarBody>
+              </MessageBar>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button appearance="secondary" onClick={onClose}>{t('やめる', 'Back')}</Button>
+            <Button
+              appearance="primary"
+              icon={<CopyRegular />}
+              disabled={busy || !dupName.trim() || !dupAt || !!dupLocked}
+              onClick={() => void duplicate()}
+            >
+              {t('複製して開く', 'Duplicate')}
+            </Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
   )
 }
