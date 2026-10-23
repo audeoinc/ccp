@@ -31,7 +31,8 @@ const useStyles = makeStyles({
   // 画面の上に重ねる層。層は押せない(ピンだけ押せる)。配信カードなどのダイアログの上にも出すので、いちばん上に置き、
   // ほかのダイアログ・メニューに隠れた所のピンは出さない(devRequestPlace の uncovered)
   layer: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1000001 },
-  // レビューのピン(丸い吹き出し・橙)と見分けるため、ひし形・紫にする
+  // レビューのピン(丸い吹き出し・橙)・アプリの色(紫)・アラートの色と見分けるため、ひし形の墨色に黄色の電球にする(2026-10-23 利用者。
+  // 画面のどこにも使っていない組み合わせで、業務の印ではなく開発への付箋と分かるように)。明暗のテーマで反転しない色を使う
   pin: {
     position: 'absolute',
     width: `${PIN}px`,
@@ -44,8 +45,8 @@ const useStyles = makeStyles({
     transform: 'rotate(45deg)',
     borderRadius: '4px',
     border: `2px solid ${tokens.colorNeutralForegroundOnBrand}`,
-    backgroundColor: tokens.colorPaletteBerryBackground3,
-    color: tokens.colorNeutralForegroundOnBrand,
+    backgroundColor: tokens.colorNeutralBackgroundStatic,
+    color: tokens.colorPaletteYellowBackground3,
     boxShadow: tokens.shadow8,
     cursor: 'pointer',
     pointerEvents: 'auto',
@@ -53,7 +54,7 @@ const useStyles = makeStyles({
   },
   // 中の印は、ひし形の回転を戻して正しい向きに
   pinIcon: { transform: 'rotate(-45deg)', display: 'grid', placeItems: 'center', fontSize: '13px' },
-  pinDone: { backgroundColor: tokens.colorPaletteGreenBackground3 },
+  pinDone: { backgroundColor: tokens.colorPaletteGreenBackground3, color: tokens.colorNeutralForegroundOnBrand },
   pinDeclined: { backgroundColor: tokens.colorNeutralBackground5, color: tokens.colorNeutralForeground2 },
   pinNew: { backgroundColor: tokens.colorBrandBackground, cursor: 'default' },
   // 場所が見つからないリクエストの置き場(画面の左下)
@@ -73,7 +74,7 @@ const useStyles = makeStyles({
   },
   trayPlace: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   trayBody: { fontSize: tokens.fontSizeBase200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  badgeIcon: { width: '18px', height: '18px', display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: '3px', transform: 'rotate(45deg)', backgroundColor: tokens.colorPaletteBerryBackground3, color: tokens.colorNeutralForegroundOnBrand },
+  badgeIcon: { width: '18px', height: '18px', display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: '3px', transform: 'rotate(45deg)', backgroundColor: tokens.colorNeutralBackgroundStatic, color: tokens.colorPaletteYellowBackground3 },
   nameRow: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   status: { display: 'flex', alignItems: 'center', columnGap: '6px' },
 })
@@ -97,7 +98,7 @@ const statusText = (q: DevRequest) =>
 /**
  * 開発へのリクエスト(2026-10-23 利用者: 使っている人が、画面のどこでも、直したい所に右クリックでピンを打って要望を書き、要件が CCP の中に貯まるように)。
  * どの右クリックのメニューにも「開発に伝える」を足し(ContextMenu の setGlobalMenuItems)、メニューのない所の右クリックでは、これだけのメニューを出す。
- * いまの画面のリクエストをピン(紫のひし形)で出し、目印が見つからないものは、左下の置き場にまとめて、場所の文を見せる
+ * いまの画面のリクエストをピン(墨色のひし形に黄色の電球)で出し、目印が見つからないものは、左下の置き場にまとめて、場所の文を見せる
  */
 export function DevRequestLayer({ link, cardName }: Props) {
   const s = useStyles()
