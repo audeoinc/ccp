@@ -601,7 +601,8 @@ const currentOf = (id: EmailTemplateId): EmailTemplate | undefined => custom[id]
  */
 export function getTemplate(key: EmailTemplateId): EmailTemplate {
   const { id, version: v } = splitTemplateKey(key)
-  if (v !== undefined) return versions[key] ?? (v === 0 && BUILTIN[id]) ?? currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
+  // `v === 0 && …` は版が 0 以外だと false になり、?? では飛ばされない(テンプレートの代わりに false を返し、画面全体が止まった。2026-10-23)
+  if (v !== undefined) return versions[key] ?? (v === 0 ? BUILTIN[id] : undefined) ?? currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
   return currentOf(id) ?? BUILTIN[DEFAULT_TEMPLATE]
 }
 
