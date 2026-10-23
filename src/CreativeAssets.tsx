@@ -10,6 +10,8 @@ import { CommentsPanel } from './CommentsPanel'
 import { refreshPreview } from './creativePreview'
 import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
 import { Linkify, OpenLink } from './LinkText'
+import { Splitter } from './Splitter'
+import { usePaneWidths } from './floatLayout'
 import { myName, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import type { CardAsset } from './models/cardAssets'
@@ -85,7 +87,8 @@ const useStyles = makeStyles({
   body: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
   titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   grow: { flexGrow: 1, minWidth: 0 },
-  floatCols: { display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(300px, 2fr)', columnGap: '16px', minHeight: 0, flexGrow: 1, marginTop: '8px' },
+  // 列の幅は usePaneWidths(右の説明・やり取りの列を境目で変え、見る所が残りを取る)
+  floatCols: { display: 'grid', columnGap: '8px', minHeight: 0, flexGrow: 1, marginTop: '8px' },
   viewer: { display: 'grid', rowGap: '8px', alignContent: 'start', minHeight: 0, overflow: 'auto' },
   big: { maxWidth: '100%', maxHeight: 'calc(64vh / var(--ui-zoom, 1))', objectFit: 'contain', justifySelf: 'center', border: `1px solid ${tokens.colorNeutralStroke2}` },
   frame: { width: '100%', height: 'calc(64vh / var(--ui-zoom, 1))', border: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -533,6 +536,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
 /** 素材 1 つを大きく見て、題名・ひとことを直し、やり取りする */
 function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { asset: CardAsset; me: string; canEdit: boolean; onChanged: () => Promise<void>; onClose: () => void; comments: React.ReactNode }) {
   const s = useStyles()
+  const panes = usePaneWidths('assetFloat.paneWidths.v1', [0, 400], 0, { min: 300, max: 800 })
   const t = useT()
   const [edit, setEdit] = useState<{ name: string; note: string } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -569,7 +573,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
             <DialogTitle className={s.grow}>{a.name}</DialogTitle>
             <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
           </div>
-          <div className={s.floatCols}>
+          <div className={s.floatCols} style={{ gridTemplateColumns: panes.columns }}>
             <div className={s.viewer}>
               {isImage(a) ? (
                 <img className={s.big} src={fileUrl} alt={a.name} />
@@ -634,6 +638,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
                 )}
               </div>
             </div>
+            <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
             <div className={s.side}>
               {edit ? (
                 <div className={s.meta}>

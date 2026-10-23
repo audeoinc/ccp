@@ -5,7 +5,8 @@ import { AiIcon } from './AiMark'
 import { AutoTextarea } from './AutoTextarea'
 import { Linkify } from './LinkText'
 import { useT } from './i18n'
-import { getUiScale, viewHeight } from './uiScale'
+import { Splitter } from './Splitter'
+import { viewHeight } from './uiScale'
 
 export interface ChatMsg {
   role: 'user' | 'assistant'
@@ -56,31 +57,6 @@ const useStyles = makeStyles({
     minWidth: 0,
     minHeight: 0,
     backgroundColor: tokens.colorNeutralBackground1,
-  },
-  // 高さを変える境目: 線を少し濃くし、中央に「つまみ」を付けて、ここをドラッグして伸ばせると分かるようにする
-  split: {
-    flexShrink: 0,
-    position: 'relative',
-    height: '1px',
-    backgroundColor: tokens.colorNeutralStroke1,
-    cursor: 'ns-resize',
-    touchAction: 'none',
-    '::before': {
-      content: '""',
-      position: 'absolute',
-      left: '50%',
-      top: '-3px',
-      width: '44px',
-      height: '5px',
-      marginLeft: '-22px',
-      borderRadius: '3px',
-      backgroundColor: tokens.colorNeutralStroke1Pressed,
-      boxShadow: `0 0 0 2px ${tokens.colorNeutralBackground1}`,
-    },
-    // つかみやすいよう、見た目より広く反応させる
-    '::after': { content: '""', position: 'absolute', left: 0, right: 0, top: '-7px', bottom: '-7px' },
-    ':hover': { backgroundColor: tokens.colorBrandStroke1 },
-    ':hover::before': { backgroundColor: tokens.colorBrandStroke1 },
   },
   // 見出しの帯: ペインの見出しと同じ、平らな作り
   band: {
@@ -161,32 +137,17 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro,
     if (el) el.scrollTop = el.scrollHeight
   }, [messages.length, busy, open])
 
-  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    const el = e.currentTarget
-    el.setPointerCapture(e.pointerId)
-    const startY = e.clientY
-    const startH = height
-    // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
-    const move = (ev: PointerEvent) => setHeight(clampHeight(startH + (startY - ev.clientY) / getUiScale()))
-    const end = () => {
-      el.removeEventListener('pointermove', move)
-      el.removeEventListener('pointerup', end)
-      el.removeEventListener('pointercancel', end)
-      setHeight((h) => {
-        try {
-          localStorage.setItem(HEIGHT_KEY, String(h))
-        } catch {
-          // 保存できなくても動作には影響しない
-        }
-        return h
-      })
-    }
-    el.addEventListener('pointermove', move)
-    el.addEventListener('pointerup', end)
-    el.addEventListener('pointercancel', end)
-    if (!open) setOpen(true)
-  }
+  // 境目は上にある。上へ動かす(dy が負)と、チャットが高くなる
+  const dragHeight = (dy: number) => setHeight((h) => clampHeight(h - dy))
+  const saveHeight = () =>
+    setHeight((h) => {
+      try {
+        localStorage.setItem(HEIGHT_KEY, String(h))
+      } catch {
+        // 保存できなくても動作には影響しない
+      }
+      return h
+    })
 
   const disabled = title === null
   const send = () => {
@@ -207,7 +168,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro,
 
   return (
     <div className={s.dock} style={open ? { height } : undefined}>
-      <div className={s.split} onPointerDown={startDrag} role="separator" aria-orientation="horizontal" aria-label={t('上下にドラッグして、チャットの高さを変える', 'Drag up or down to resize the chat')} />
+      <Splitter direction="row" onDrag={dragHeight} onDone={saveHeight} onStart={() => !open && setOpen(true)} label={t('上下にドラッグして、チャットの高さを変える', 'Drag up or down to resize the chat')} />
       <div className={s.band}>
         <AiIcon />
         <Text size={200} className={s.title}>

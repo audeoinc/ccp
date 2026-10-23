@@ -16,6 +16,7 @@ import { heroImage } from '../images'
 import { productUrl } from '../links'
 import { EditRegular, ImageEditRegular, OpenRegular, ArrowSwapRegular, DeleteRegular, SparkleRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
+import { useStoredWidths } from '../floatLayout'
 import { ImageThumb } from '../ImageThumb'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
@@ -197,8 +198,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 部品ごとの AI とのやり取り(開いている間だけ)
   const [chats, setChats] = useState<Record<string, PartTurn[]>>({})
   const setChat = (key: string, f: (prev: PartTurn[]) => PartTurn[]) => setChats((c) => ({ ...c, [key]: f(c[key] ?? []) }))
-  const [widths, setWidths] = useState<Widths>(() => {
-    const v = loadPref<Partial<Widths> | null>(WIDTH_KEY, null)
+  const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, (saved) => {
+    const v = saved as Partial<Widths> | null
     return { mobile: clampPreview(Number(v?.mobile ?? DEFAULT_WIDTHS.mobile)), pc: clampPreview(Number(v?.pc ?? DEFAULT_WIDTHS.pc)), list: clampList(Number(v?.list ?? DEFAULT_WIDTHS.list)), comm: clampList(Number(v?.comm ?? DEFAULT_WIDTHS.comm)), hand: clampList(Number(v?.hand ?? DEFAULT_WIDTHS.hand)) }
   })
   // アプリの配信は、スマホの幅
@@ -349,7 +350,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     return list
   }
   const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
-  const saveWidths = () => savePref(WIDTH_KEY, widths)
   const toggleProducts = () => {
     setProductsOpen(!productsOpen)
     savePref(PRODUCTS_KEY, !productsOpen)

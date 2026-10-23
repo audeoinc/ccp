@@ -1,4 +1,4 @@
-import { Fragment, useRef, type ReactNode } from 'react'
+import { Fragment, useRef, type CSSProperties, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -55,6 +55,8 @@ import { getTemplate } from './templates'
 import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
+import { Splitter } from './Splitter'
+import { usePaneWidths } from './floatLayout'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -108,7 +110,8 @@ const useStyles = makeStyles({
   body: { minHeight: 0, overflowY: 'auto', padding: '16px 20px' },
   msg: { marginBottom: '12px' },
   // ① の横に、その週にもうある配信(見るだけ)。重なりを見ながら決められるように
-  withSide: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', columnGap: '20px', alignItems: 'start', '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '16px' } },
+  // 右の一覧の幅は usePaneWidths で変える(--cols)。狭い画面では縦に並べ、境目も出さない
+  withSide: { display: 'grid', gridTemplateColumns: 'var(--cols)', columnGap: '10px', alignItems: 'start', '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '16px' } },
   main: { display: 'grid', rowGap: '14px', minWidth: 0 },
   panel: { display: 'grid', rowGap: '10px', padding: '14px 16px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
   h3: { margin: 0, fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
@@ -222,6 +225,7 @@ interface Props {
  */
 export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFinish }: Props) {
   const s = useStyles()
+  const panes = usePaneWidths('bulkWorkspace.paneWidths.v1', [0, 280], 0, { min: 220, max: 600 })
   const t = useT()
   // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
   const finishRef = useRef(false)
@@ -772,13 +776,15 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               </MessageBar>
             )}
             {plainDone ? (
-              <div className={s.withSide}>
+              <div className={s.withSide} style={{ '--cols': panes.columns } as CSSProperties}>
                 {plainView()}
+                <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
                 {side}
               </div>
             ) : ws.step === 1 ? (
-              <div className={s.withSide}>
+              <div className={s.withSide} style={{ '--cols': panes.columns } as CSSProperties}>
                 {step1()}
+                <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
                 {side}
               </div>
             ) : (

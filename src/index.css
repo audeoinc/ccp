@@ -111,7 +111,10 @@ body.printing-report [data-print-grid] {
 body.printing-report [data-print-grid] > :first-child {
   zoom: 0.8;
 }
-body.printing-report [data-print-grid] > :nth-child(3) {
+body.printing-report [data-print-grid] > [role='separator'] {
+  display: none;
+}
+body.printing-report [data-print-grid] > :last-child {
   grid-column: 1 / -1;
 }
 body.printing-report [data-print-cols] {

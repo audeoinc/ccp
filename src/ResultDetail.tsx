@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Button, Dialog, Switch, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
+import { Splitter } from './Splitter'
+import { usePaneWidths } from './floatLayout'
 import { DismissRegular, DocumentPdfRegular, OpenRegular } from '@fluentui/react-icons'
 import { printReport } from './printReport'
 import type { Product } from './models/products'
@@ -32,7 +34,8 @@ const useStyles = makeStyles({
   typeTag: { display: 'inline-flex', alignItems: 'center', height: '24px', padding: '0 10px', borderRadius: tokens.borderRadiusCircular, border: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: tokens.colorNeutralBackground2, color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, whiteSpace: 'nowrap', cursor: 'default' },
   headActions: { marginLeft: 'auto', display: 'flex', columnGap: '4px' },
   // プレビュー(クリックを重ねる) | リンクの表 | メモ・商品・AI の案
-  grid: { display: 'grid', gridTemplateColumns: 'auto minmax(320px, 1fr) minmax(320px, 1fr)', columnGap: '24px', alignItems: 'start' },
+  // 列の幅は usePaneWidths(リンクの表を境目で広げ、メモ・商品・AI の案が残りを取る)。境目は、間の真ん中に線
+  grid: { display: 'grid', columnGap: '16px', alignItems: 'start' },
   linkCol: { display: 'grid', rowGap: '8px', minWidth: 0 },
   linkHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '8px' },
   h3: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
@@ -74,6 +77,7 @@ interface Props {
  */
 export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved, stageNav }: Props) {
   const styles = useStyles()
+  const panes = usePaneWidths('resultDetail.paneWidths.v1', [520, 0], 1, { min: 320, max: 900 })
   const t = useT()
   const { card } = row
   const push = isPush(card)
@@ -141,7 +145,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
           <ResultKpis row={row} money={money} lift={impact?.lift} />
           {/* AB テストの配信だけ(案ごとの結果があるとき)。主な数字は全体、ここは案ごと */}
           {row.parts.length > 0 && <AbResult row={row} heroes={heroes} money={money} onAdopt={adopt} />}
-          <div className={styles.grid} data-print-grid>
+          <div className={styles.grid} data-print-grid style={{ gridTemplateColumns: `auto ${panes.columns}` }}>
             <HeatPreview
               row={row}
               productIds={productIds}
@@ -191,6 +195,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
                 </div>
               )}
             />
+            <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
             <ResultInsights
               key={`${row.result.id}:${row.result.notes ?? ''}`}
               row={row}

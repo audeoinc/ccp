@@ -13,7 +13,8 @@ import { ChatPanel } from './ChatPanel'
 import { JobInfo } from './JobInfo'
 import { WorkPanel } from './WorkPanel'
 import { ResizeBar } from './ResizeBar'
-import { startDrag, useStoredHeight } from './drag'
+import { useStoredHeight } from './drag'
+import { Splitter } from '../Splitter'
 import { saveSqlFile, sqlFileName } from './saveSql'
 import { HistoryDialog } from './HistoryDialog'
 
@@ -21,13 +22,8 @@ const useStyles = makeStyles({
   // 左: データセットと表 / 中: 表の中身と SQL / 右: Gemini との会話(SQL を見ながら話せるように、並べて置く)
   root: { display: 'grid', columnGap: '2px', alignItems: 'start' },
   // ペインの境目(ドラッグで幅を変える)
-  splitter: {
-    alignSelf: 'stretch',
-    cursor: 'col-resize',
-    borderRadius: tokens.borderRadiusMedium,
-    touchAction: 'none',
-    ':hover': { backgroundColor: tokens.colorNeutralStroke2 },
-  },
+  // 境目は画面と同じ Splitter。10px の列の真ん中に線を引く
+  splitter: { alignSelf: 'stretch', display: 'flex', justifyContent: 'center' },
   side: { display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '12px', minWidth: 0 },
   // 畳んだペインの帯(押すと開く)
   folded: {
@@ -154,13 +150,8 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   }, [widths])
 
   /** 境目のドラッグ。左の境目は左のペイン、右の境目は右のペインの幅を変える(真ん中は残りを使う) */
-  const drag = (e: React.PointerEvent<HTMLDivElement>, side: 'left' | 'right') => {
-    const w0 = widths
-    startDrag(e, (dx) => {
-      if (side === 'left') setWidths({ ...w0, left: Math.min(Math.max(w0.left + dx, 200), 600) })
-      else setWidths({ ...w0, right: Math.min(Math.max(w0.right - dx, 320), Math.round(window.innerWidth * 0.7)) })
-    })
-  }
+  const dragLeft = (dx: number) => setWidths((w) => ({ ...w, left: Math.min(Math.max(w.left + dx, 200), 600) }))
+  const dragRight = (dx: number) => setWidths((w) => ({ ...w, right: Math.min(Math.max(w.right - dx, 320), Math.round(window.innerWidth * 0.7)) }))
   // SQL の欄の高さ(下の境目で変える)
   const [editorH, setEditorH] = useStoredHeight('ccp-dev-editor-h', 260)
   const [saveNote, setSaveNote] = useState('')
@@ -347,7 +338,9 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
         </div>
       </div>
 
-      <div className={s.splitter} role="separator" aria-orientation="vertical" title="ドラッグで幅を変える(ダブルクリックで元に戻す)" onPointerDown={(e) => widths.leftOpen && drag(e, 'left')} onDoubleClick={() => setWidths(WIDTHS)} />
+      <div className={s.splitter}>
+        <Splitter label="ドラッグで幅を変える(ダブルクリックで元に戻す)" onDrag={widths.leftOpen ? dragLeft : () => undefined} onReset={() => setWidths(WIDTHS)} />
+      </div>
       <div className={s.main}>
         {selected && <TableDetail refName={selected} info={info} error={infoError} loading={busy === 'info'} onOpenTable={(r) => void openTable(r)} onUseSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />}
 
@@ -448,7 +441,9 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
         </div>
       </div>
 
-      <div className={s.splitter} role="separator" aria-orientation="vertical" title="ドラッグで幅を変える(ダブルクリックで元に戻す)" onPointerDown={(e) => widths.rightOpen && drag(e, 'right')} onDoubleClick={() => setWidths(WIDTHS)} />
+      <div className={s.splitter}>
+        <Splitter label="ドラッグで幅を変える(ダブルクリックで元に戻す)" onDrag={widths.rightOpen ? dragRight : () => undefined} onReset={() => setWidths(WIDTHS)} />
+      </div>
       {!widths.rightOpen && (
         <button type="button" className={s.folded} onClick={() => setWidths((w) => ({ ...w, rightOpen: true }))} title="AI との会話を開く">
           <PanelRightExpandRegular />

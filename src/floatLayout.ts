@@ -1,6 +1,6 @@
 // フロート(大きなダイアログ)の大きさと、その中のペインの幅を変えて覚える、共通のしくみ(2026-10-19、利用者の要望: 計画の配信カードと同じ動きを全体でそろえる)。
 // つまみは ResizeHandles(辺・角)と Splitter(ペインの境界)。ここは、その変化量を受けて、大きさ・幅を決め、ブラウザに覚える。
-// 配信カード(CardDetail)は、これより前から同じ動きを自前で持っている。新しいフロートは、これを使う
+// 配信カード(CardDetail)・シンプルな配信カードのように、幅の形が違うペインは useStoredWidths を使う
 import { useState, type CSSProperties, type RefObject } from 'react'
 import { loadPref, savePref } from './settings'
 import { viewHeight, viewWidth } from './uiScale'
@@ -40,15 +40,26 @@ export function useFloatSize(key: string, surfaceRef: RefObject<HTMLElement | nu
 }
 
 /**
+ * 覚えるペインの幅。幅の形(配列・名前ごと)と範囲は呼ぶ側の read で決め、変えるのは setWidths、離したときに onDone で覚える。
+ * 覚えるときは、関数の形の setState で最新の幅を取る(ドラッグを始めたときの描画の幅を覚えてしまわないように)
+ */
+export function useStoredWidths<T>(key: string, read: (saved: unknown) => T) {
+  const [widths, setWidths] = useState<T>(() => read(loadPref<unknown>(key, null)))
+  const onDone = () =>
+    setWidths((w) => {
+      savePref(key, w)
+      return w
+    })
+  return { widths, setWidths, onDone }
+}
+
+/**
  * ペインの幅。flex 番目のペインだけ残りの幅を取り(1fr)、ほかは px で持つ。
  * 境界 i(i 番目と i+1 番目のあいだ)をドラッグすると、伸び縮みする側でないペインの幅を変える
  */
 export function usePaneWidths(key: string, defaults: number[], flex: number, range: { min: number; max: number } = { min: 200, max: 900 }) {
   const clamp = (v: number) => Math.min(range.max, Math.max(range.min, Math.round(v)))
-  const [widths, setWidths] = useState<number[]>(() => {
-    const v = loadPref<number[] | null>(key, null)
-    return Array.isArray(v) && v.length === defaults.length ? v.map(clamp) : defaults
-  })
+  const { widths, setWidths, onDone } = useStoredWidths<number[]>(key, (v) => (Array.isArray(v) && v.length === defaults.length ? v.map((x) => clamp(Number(x))) : defaults))
   const onDrag = (i: number) => (dx: number) =>
     setWidths((w) => {
       const next = [...w]
@@ -56,11 +67,6 @@ export function usePaneWidths(key: string, defaults: number[], flex: number, ran
       if (i !== flex) next[i] = clamp(next[i] + dx)
       else next[i + 1] = clamp(next[i + 1] - dx)
       return next
-    })
-  const onDone = () =>
-    setWidths((w) => {
-      savePref(key, w)
-      return w
     })
   /** CSS の grid-template-columns(ペインのあいだに 1px の境界を挟む) */
   const columns = widths.map((w, i) => (i === flex ? 'minmax(280px, 1fr)' : `${w}px`)).join(' 1px ')

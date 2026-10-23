@@ -44,6 +44,7 @@ import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, se
 import { remapSectionTexts } from './tables'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
+import { useStoredWidths } from './floatLayout'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
@@ -312,13 +313,8 @@ function loadOpen(key: string): boolean {
 }
 
 type Widths = [number, number, number, number]
-function loadWidths(): Widths {
-  try {
-    const v = JSON.parse(localStorage.getItem(WIDTH_KEY) ?? 'null')
-    if (Array.isArray(v) && v.length === 4) return [clamp(Number(v[0])), clampMid(Number(v[1])), clamp(Number(v[2])), clamp(Number(v[3]))]
-  } catch {
-    // 保存値が読めなければ既定値を使う
-  }
+function readWidths(v: unknown): Widths {
+  if (Array.isArray(v) && v.length === 4) return [clamp(Number(v[0])), clampMid(Number(v[1])), clamp(Number(v[2])), clamp(Number(v[3]))]
   // 既定値: ダイアログの幅(最大 1800px)に合わせる。左 18%・中 26%・商品情報 15%・プロセス(右端)17%・プレビューは残り
   const total = Math.min(1800, viewWidth() * 0.98)
   return [clamp(Math.round(total * 0.18)), clamp(Math.round(total * 0.26)), clamp(Math.round(total * 0.15)), clamp(Math.round(total * 0.17))]
@@ -589,7 +585,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     for (const k of a?.variants ?? []) out[k] = { items: [], heroId: a?.heroes[k]?.heroId, heroReason: a?.heroes[k]?.heroReason ?? '', texts: a?.texts?.[k] }
     return out
   })
-  const [widths, setWidths] = useState<Widths>(loadWidths)
+  const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
   const [links, setLinks] = useState<Links>(() => parseLinks(card?.links))
   // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
   const [linksTab, setLinksTab] = useState(false)
@@ -821,26 +817,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   const panesRef = useRef<HTMLDivElement>(null)
   // 中央の上限: ダイアログの中の幅から、左・商品情報・境界線・プレビューの最小幅を引いた残り
-  const midMax = (w: Widths) => {
+  // (中の幅は、ドラッグのたびに、幅を変える前に測る。幅を決める関数の中では ref を読まない)
+  const midMax = (w: Widths, total: number) => total - w[0] - (infoOpen ? w[2] : RAIL_W) - (processOpen ? w[3] : RAIL_W) - 4 - MIN_PREVIEW
+  const resizeLeft = (dx: number) => setWidths((w) => [clamp(w[0] + dx), w[1], w[2], w[3]])
+  const resizeMid = (dx: number) => {
     const total = panesRef.current?.clientWidth ?? viewWidth()
-    return total - w[0] - (infoOpen ? w[2] : RAIL_W) - (processOpen ? w[3] : RAIL_W) - 4 - MIN_PREVIEW
+    setWidths((w) => [w[0], clampMid(Math.min(w[1], midMax(w, total)) + dx, midMax(w, total)), w[2], w[3]])
   }
-  const resize = (i: 0 | 1 | 2) => (dx: number) =>
-    setWidths((w) => {
-      const next: Widths = [w[0], w[1], w[2], w[3]]
-      if (i === 1) next[1] = clampMid(Math.min(next[1], midMax(w)) + dx, midMax(w))
-      else next[i] = clamp(next[i] + dx)
-      return next
-    })
   const resizeInfo = (dx: number) => setWidths((w) => [w[0], w[1], clamp(w[2] - dx), w[3]])
   const resizeProcess = (dx: number) => setWidths((w) => [w[0], w[1], w[2], clamp(w[3] - dx)])
-  const saveWidths = () => {
-    try {
-      localStorage.setItem(WIDTH_KEY, JSON.stringify(widths))
-    } catch {
-      // 保存できなくても動作には影響しない
-    }
-  }
 
   // エージェントに渡す、配信カードの現在の入力内容
   const buildAiCard = (): AiCard => {
@@ -2721,7 +2706,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               {/* 制作指示は、作るのは中ペインの「⑥ 制作指示」、引き継ぐ前に確かめるのは右のプロセスのペインの「渡す制作指示」。左には置かない(書き換える場所を 1 つにする。X26) */}
             </div>
 
-            <Splitter onDrag={resize(0)} onDone={saveWidths} />
+            <Splitter onDrag={resizeLeft} onDone={saveWidths} />
 
             {/* 中: コンテンツ生成(テーマ・商品選定・コピー・制作指示) */}
             <div className={mergeClasses(styles.pane, styles.paneMid)}>
@@ -2808,7 +2793,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               />
             </div>
 
-            <Splitter onDrag={resize(1)} onDone={saveWidths} />
+            <Splitter onDrag={resizeMid} onDone={saveWidths} />
 
             {/* 右: プレビュー */}
             <div className={mergeClasses(styles.pane, styles.panePreview)}>
