@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Item } from './items'
+import { CommentAddRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
+import { keepBrowserMenu, useContextMenu } from './ContextMenu'
 import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins } from './pinStore'
 
 const PIN = 22
@@ -167,28 +169,55 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     return () => window.removeEventListener('keydown', onKey)
   }, [placing, onPlacingEnd])
 
-  const place = (e: React.MouseEvent) => {
+  /** 画面の点にピンを打つ(場所を選ぶ覆いを押した・右クリックの「ここにピンを打つ」)。打てたら true */
+  const placeAt = (clientX: number, clientY: number): boolean => {
     const box = boxRef.current
-    if (!box || !cardId) return
+    if (!box || !cardId) return false
     // 覆いの下の要素を探す(覆いとピンの層は除く)
-    const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => box.contains(el) && !layerRef.current?.contains(el))
-    if (!under) return
+    const under = document.elementsFromPoint(clientX, clientY).find((el) => box.contains(el) && !layerRef.current?.contains(el))
+    if (!under) return false
     const item = under.closest('[data-item-key]')
     const block = item && box.contains(item) ? item : under.closest('[data-anchor]')
-    if (!block || !box.contains(block)) return
+    if (!block || !box.contains(block)) return false
     const r = block.getBoundingClientRect()
     const clamp = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000
-    const x = clamp((e.clientX - r.left) / (r.width || 1))
-    const y = clamp((e.clientY - r.top) / (r.height || 1))
+    const x = clamp((clientX - r.left) / (r.width || 1))
+    const y = clamp((clientY - r.top) / (r.height || 1))
     const productId = item ? items.find((i) => i.key === item.getAttribute('data-item-key'))?.productId : undefined
     setPendingPin({ cardId, stage: 'plan', anchor: productId ? 'product' : (block.getAttribute('data-anchor') ?? 'preview'), x, y, view, productId })
     onPlacingEnd()
     onOpenThreads()
+    return true
   }
+  const place = (e: React.MouseEvent) => void placeAt(e.clientX, e.clientY)
+
+  // 右クリックで「ここにピンを打ってコメントする」(ボタンで場所を選ぶ形に切り替えずに打てる)。ブラウザのメニューの逃げ道は keepBrowserMenu
+  const ctx = useContextMenu()
+  const { openAt } = ctx
+  const placeRef = useRef(placeAt)
+  useEffect(() => {
+    placeRef.current = placeAt
+  })
+  useEffect(() => {
+    const box = boxRef.current
+    if (!box || !cardId) return
+    const onMenu = (e: MouseEvent) => {
+      if (keepBrowserMenu(e)) return
+      // ピンの上・場所の目印のない所(プレビューの外の余白)では出さない
+      const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => box.contains(el) && !layerRef.current?.contains(el))
+      if (!under?.closest('[data-item-key], [data-anchor]') || (e.target instanceof Element && e.target.closest('[data-pin-id]'))) return
+      e.preventDefault()
+      const { clientX: x, clientY: y } = e
+      openAt(x, y, [{ key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: () => void placeRef.current(x, y) }])
+    }
+    box.addEventListener('contextmenu', onMenu)
+    return () => box.removeEventListener('contextmenu', onMenu)
+  }, [boxRef, cardId, openAt, t])
 
   const byId = new Map(notes.map((n) => [n.id, n]))
   return (
     <div ref={layerRef} className={s.layer}>
+      {ctx.menu}
       {placing && <div className={s.catcher} style={{ width: size.w, height: size.h }} onClick={place} role="presentation" />}
       {spots.map((p) => {
         if (!p.id)
