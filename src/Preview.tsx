@@ -826,13 +826,24 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           if (p.type === 'text') return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center' }}>{p.text ?? ''}</div>
           return null
         }
+        // 均等に並べる行は、列に合わせず、行いっぱいの帯の中で、中身のある部品(空きは除く)を同じ幅で並べる
+        const even = sec.evenRows ?? []
+        const cell = (p: TablePart, area?: React.CSSProperties) => (
+          <div key={p.id} data-part-id={p.id} style={{ ...area, minWidth: 0, minHeight: 0, display: 'grid' }}>
+            {body(p)}
+          </div>
+        )
         return (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 8 }}>
-            {(sec.parts ?? []).map((p) => (
-              <div key={p.id} data-part-id={p.id} style={{ gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}`, minWidth: 0, minHeight: 0, display: 'grid' }}>
-                {body(p)}
-              </div>
-            ))}
+            {(sec.parts ?? []).filter((p) => !even.includes(p.r)).map((p) => cell(p, { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}` }))}
+            {even.map((r) => {
+              const row = (sec.parts ?? []).filter((p) => p.r === r && p.type !== 'empty').sort((a, b) => a.c - b.c)
+              return (
+                <div key={`even${r}`} style={{ gridColumn: '1 / -1', gridRow: r + 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, row.length)}, minmax(0, 1fr))`, gap: 8 }}>
+                  {row.map((p) => cell(p))}
+                </div>
+              )
+            })}
           </div>
         )
       }

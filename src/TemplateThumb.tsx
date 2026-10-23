@@ -170,10 +170,9 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
             <div style={{ height: px(1.5), width: '40%', background: offer ? RED : LINE }} />
           </div>
         )
-        body = (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: rowH.map((h) => `${Math.round(h)}px`).join(' '), gap: px(2) }}>
-            {parts.map((p) => {
-              const area = { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}`, minHeight: 0, minWidth: 0 }
+        // 部品を 1 つ描く(area: 置く場所。均等に並べる行では、帯の中に順に並べるので、場所は持たない)
+        const draw = (p: (typeof parts)[number], place: React.CSSProperties = {}) => {
+              const area = { ...place, minHeight: 0, minWidth: 0 }
               if (p.type === 'box') {
                 if (isTextView(p.view)) {
                   return (
@@ -207,6 +206,19 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                 )
               }
               return <div key={p.id} style={area} />
+        }
+        // 均等に並べる行は、行いっぱいの帯の中で、中身のある部品を同じ幅で並べる
+        const even = sec.evenRows ?? []
+        body = (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: rowH.map((h) => `${Math.round(h)}px`).join(' '), gap: px(2) }}>
+            {parts.filter((p) => !even.includes(p.r)).map((p) => draw(p, { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}` }))}
+            {even.map((r) => {
+              const row = parts.filter((p) => p.r === r && p.type !== 'empty').sort((a, b) => a.c - b.c)
+              return (
+                <div key={`even${r}`} style={{ gridColumn: '1 / -1', gridRow: r + 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, row.length)}, 1fr)`, gap: px(2) }}>
+                  {row.map((p) => draw(p))}
+                </div>
+              )
             })}
           </div>
         )

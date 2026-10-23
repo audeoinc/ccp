@@ -81,6 +81,11 @@ export interface Section {
   aiNote?: string
   /** 表: 行の数(0 は、まだ最初の行を作っていない) */
   rows?: number
+  /**
+   * 表: 均等に並べる行の番号(0 から)。その行は、列に合わせず、中身のある部品を同じ幅で並べる
+   * (例: 3 列の表の下に、ボタン 2 つを半分ずつ。2026-10-23 利用者と決めた)。縦に結合した部品がかかる行には付けない
+   */
+  evenRows?: number[]
   /** 表: 部品(すき間なく敷き詰める)。商品の載る順は、上の行から・同じ行は左から(tables.ts の boxesOf) */
   parts?: TablePart[]
   slots: number
