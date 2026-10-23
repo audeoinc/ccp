@@ -1542,6 +1542,9 @@ function App() {
                 <MenuItem icon={<PeopleTeamRegular />} onClick={openPeopleManager}>
                   {t('ユーザーと承認グループ', 'Users and approval groups')}
                 </MenuItem>
+                <MenuItem icon={<DevRequestIcon />} onClick={() => setDevRequestsOpen(true)}>
+                  {t('開発へのリクエストの一覧', 'Requests to developers')}
+                </MenuItem>
               </MenuGroup>
               <MenuGroup>
                 <MenuGroupHeader>{t('データの取り込み・書き出し', 'Data import and export')}</MenuGroupHeader>
