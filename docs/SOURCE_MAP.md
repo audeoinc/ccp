@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-10-21(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-10-23(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -56,6 +56,8 @@ flowchart TD
         aidraft["案(テーマ・コピー・制作指示)<br/>aiDraft.ts"]
         aiselect["選定(商品・メイン画像)と AI の呼び出し<br/>aiSelect.ts"]
         tmgr["テンプレートの管理<br/>TemplateManager.tsx"]
+        tedit["テンプレートの編集(表)<br/>TemplateTableEditor.tsx・tables.ts"]
+        simple["シンプルな配信カード<br/>simple/SimpleCardLayout.tsx"]
         tdef["テンプレートの定義<br/>templates.ts・layoutTemplates.ts"]
     end
 
@@ -300,6 +302,24 @@ flowchart TD
 | `useProductData.ts` | 83 | 商品の週ごとの実績などを読む(開いている間だけ覚える) |
 | `ImageThumb.tsx` | 44 | 画像のサムネイル |
 
+### 3.3.1 シンプルな配信カード(`src/simple/`。SU1・SU2)
+
+プレビューを主役にし、プレビューの部品を押してその部品だけを直す画面(配信カードの上の帯の「シンプル | 詳しい」で切り替える)。状態と保存は `CardDetail` の 1 つだけを使い、複製しない。設計は [SIMPLE_CARD.md](SIMPLE_CARD.md)。
+
+| ファイル | 行数 | 役割 |
+|---|---|---|
+| `SimpleCardLayout.tsx` | 716 | 画面の並び(プレビュー \| 選んだ部品のペイン \| 商品の一覧 \| 右端の帯のやり取り / 渡すもの / 素材)、幅と開閉 |
+| `parts.ts` | 143 | 「部品」の型(プレビューの上で押して選ぶ単位)と、プレビューの目印(`data-part`・`data-anchor`)との読み替え |
+| `PartPane.tsx` | 795 | 選んだ部品のペイン(文言・メイン画像・商品・空いた枠・リンク先など、部品ごとの欄) |
+| `PartAiChat.tsx` / `partAi.ts` | 180 / 265 | 選んだ部品を AI に頼む(指示の例の札・案 3 つ・乗せると仮に写る・押すと採用。何も選んでいないときは配信の全体) |
+| `editor.ts` | 160 | シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部) |
+| `CommPane.tsx` | 571 | やり取りのペイン(状態の道のりと次に動く人・書き込み / タスク / 承認の 1 本の流れ・書く欄。承認・差し戻しも) |
+| `HandoffSheet.tsx` / `ProductionMemo.tsx` / `assetDrop.ts` | 239 / 69 / 35 | 制作に渡すもの(担当・締め切り・文章・素材・「制作に渡す」)/ 部品から 1 行で渡すものに書き留める「制作へのメモ」/ 画像・資料・URL のドラッグ |
+| `AbSettings.tsx` | 85 | AB テストの設定(SU2。案のタブの横の ⚙) |
+| `StageHeader.tsx` / `ViewSwitch.tsx` / `NextAction.tsx` / `nextStep.ts` | 33 / 38 / 26 / 13 | 上の帯(題名と PLAN \| PRODUCTION \| RESULTS のタブ。制作のシンプルな画面でも使う)/ シンプル \| 詳しい の切り替え / 次にやることのボタン |
+| `PreviewMarks.tsx` | 78 | プレビューの上の目印(AI 下書き・未確認 / アラート / 学び) |
+| `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 126 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
+
 ### 3.4 AI
 
 AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文は日本語で書き、English の画面では `localizePrompt` が言い換える。
@@ -349,11 +369,15 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `templates.ts` | 554 | **テンプレートの定義**(標準 10 種はコードに持つ)と `getTemplate(id)`。以前からの標準 6 種は、セクションの構成を変えない |
-| `layoutTemplates.ts` | 225 | ユーザーが作ったテンプレート(DB)の読み書き、上限。版の表は `data/layoutTemplateVersions.ts` |
+| `templates.ts` | 771 | **テンプレートの定義**(標準 10 種はコードに持つ)と `getTemplate(id)`。以前からの標準 6 種は、セクションの構成を変えない。表のセクション(種類 `table`)と部品 `TablePart`(箱・ボタン・テキスト・画像・空き。部品 ID・見せ方・写真の形・揃え・色)の型も |
+| `layoutTemplates.ts` | 405 | ユーザーが作ったテンプレート(DB)の読み書き、上限。版の表は `data/layoutTemplateVersions.ts`。表のセクションは、以前と同じ配列の中に `kind: "table"` で持つ(以前の版のアプリはグリッドとして読む) |
+| `tables.ts` | 547 | **表のセクションの計算と操作**(T8): 結合・分割・行と列の挿入 / 削除 / 移動・均等に並べる行・行の複製・コピーと貼り付け・よく使う行・セクションを分ける / まとめる。以前の種類から表への変換 `toTableLayout`(ID は順番から)、箱の見せ方(出すもの・価格の見せ方・バッジ・見本)、ボタンの色、セクションの背景・余白、保存の形の読み書き |
+| `TemplateTableEditor.tsx` | 1650 | **テンプレートの編集画面の本体**(T8。`useTableEditor`): パーツ(足すだけ)・表のキャンバス(選ぶ・なぞる・右クリック・行と列の帯・キーの操作・大きさの変更・箱の ⚙)・右のタブ「セクションと部品」(位置の絵つきの部品の行・箱をまとめて直す・ほかの箱にも当てる)。テンプレートのタブの中身は TemplateManager が作る |
+| `PartImagePick.tsx` | 89 | 部品の画像のライブラリから 1 枚選ぶ(テンプレートの画像・動画の部品で使う) |
+| `cells.ts` | 62 | 以前の「箱(cells)」のセクションの形の処理と、箱の見せ方の種類(`CellView`)。編集は表に移ったので、保存済みのデータを読む・描くためだけに残す |
 | `templateUse.ts` | 49 | テンプレートの最近の使用回数(X4。② テンプレートで選ぶとき。前 4 週・同じ週・最後に使った日。版が違っても同じテンプレートとして数える) |
-| `TemplateManager.tsx` | 704 | テンプレートの管理画面 |
-| `TemplateThumb.tsx` / `PushThumb.tsx` | 241 / 55 | テンプレートの見取り図(メール / アプリの通知) |
+| `TemplateManager.tsx` | 1324 | テンプレートの管理画面(一覧・詳しい欄・版の履歴・使っている配信)と、編集の並び(一覧の帯 \| パーツ \| キャンバス \| 右のタブ)・右のタブ「テンプレート」の中身 |
+| `TemplateThumb.tsx` / `PushThumb.tsx` | 377 / 55 | テンプレートの見取り図(メール / アプリの通知)。表のセクションも描く |
 
 ### 3.8 共通の小さな部品・値
 
@@ -400,6 +424,21 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `gcp/dbWake.ts` | 「データベースを準備中」の表示 |
 | `mock/db.ts` ・ `mock/agent.ts` ・ `mock/seed.ts` | 撮影・デモ用の、DB と AI の身代わりと、サンプルデータ(本番のビルドには入らない) |
 | `mock/approvals.ts` ・ `mock/production.ts` ・ `mock/me.ts` ・ `mock/metricsImport.ts` ・ `mock/ads.ts` ・ `mock/csv.ts` | 撮影・デモ用の、サーバーの窓口(`/api/approvals`・`/api/production`・`/api/me`・指標の取り込み)の身代わりと、外部広告の出稿の見本(`server/ccp/ads.py` と同じ作り方) |
+
+### 3.10 開発用の画面(`src/dev/`。B10。Workbench だけ)
+
+`/dev/` で開く、CCP の画面とは別のページ(`CCP_DEVTOOLS=1` のときだけ)。BigQuery を見る・SELECT を試す・Gemini と会話して SQL を作る・出力ごとの版と答え合わせ・ポリシーの文書の取り込み。設計は [DEVTOOLS.md](DEVTOOLS.md)、サーバーは `server/ccp/devtools.py`。
+
+| ファイル | 行数 | 役割 |
+|---|---|---|
+| `main.tsx` / `DevApp.tsx` / `api.ts` | 14 / 96 / 428 | 入り口・画面の枠・サーバーの API の窓口 |
+| `BqTab.tsx` / `DatasetPicker.tsx` / `TableDetail.tsx` / `ColumnProfileView.tsx` | 410 / 143 / 265 / 117 | データセットと表を見る・表の中身・列の中身を調べる |
+| `SqlEditor.tsx` / `ResultGrid.tsx` / `JobInfo.tsx` / `HistoryDialog.tsx` | 86 / 87 / 91 / 124 | SQL を流す・結果の表・ジョブの実行情報・実行の履歴 |
+| `ChatPanel.tsx` / `ChatMarkdown.tsx` | 759 / 172 | Gemini との会話(思考・調べたこと・返事・SQL を届いたそばから。会話のセッション) |
+| `WorkPanel.tsx` / `work.ts` | 419 / 65 | 出力ごとの作業(版・違い・採用・答え合わせ) |
+| `FilesDialog.tsx` | 243 | 作業ファイル(引き継ぎ・SQL・コーディングルール。AI に毎回渡せる) |
+| `PolicyTab.tsx` | 550 | ポリシーの文書(GCS の Excel・PDF を AI で決まりの形に書き直して取り込む) |
+| `CopyButton.tsx` / `format.ts` | 35 / 54 | 表・列を写す(TSV・AI に渡す形) |
 
 ## 4. サーバー(`server/`)
 
