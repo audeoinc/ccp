@@ -41,7 +41,7 @@ import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, getTemplate, splitTemplateKey, templateKeyOfCard, templateMissing, templatesSettled, useTemplates } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, getTemplate, splitTemplateKey, pinnedTemplateKey, templateKeyOfCard, templateMissing, templatesSettled, useTemplates } from './templates'
 import { remapSectionTexts } from './tables'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
@@ -73,7 +73,7 @@ import { isUsableHero } from './heroRights'
 import { AbCompare } from './AbCompare'
 import { draftVariant } from './abAi'
 import { templateUse } from './templateUse'
-import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
+import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsTemplate, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import { PreviewPins } from './PreviewPins'
@@ -341,6 +341,8 @@ interface VariantData {
   heroReason: string
   /** 文言(比べる要素が all のとき。X57) */
   texts?: VariantText
+  /** テンプレートの鍵(比べる要素が all のとき。SU2 ⑤⑧) */
+  template?: EmailTemplateId
 }
 
 /** 元に戻す(SU1 ⑫)の 1 つ分: 反映の前の、配信カードの中身 */
@@ -583,7 +585,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [stash, setStash] = useState<Partial<Record<VariantKey, VariantData>>>(() => {
     const a = parseAbTest(card?.ab_test ?? draft?.card.ab_test)
     const out: Partial<Record<VariantKey, VariantData>> = {}
-    for (const k of a?.variants ?? []) out[k] = { items: [], heroId: a?.heroes[k]?.heroId, heroReason: a?.heroes[k]?.heroReason ?? '', texts: a?.texts?.[k] }
+    const aTemplate = card ? templateKeyOfCard(card) : draft ? templateKeyOfCard(draft.card) : undefined
+    for (const k of a?.variants ?? []) out[k] = { items: [], heroId: a?.heroes[k]?.heroId, heroReason: a?.heroes[k]?.heroReason ?? '', texts: a?.texts?.[k], template: a?.templates?.[k] ?? aTemplate }
     return out
   })
   const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
@@ -991,14 +994,17 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       const to = getTemplate(id)
       setSectionTitles((prev) => remapSectionTexts(from, to, prev))
       setSectionCopies((prev) => remapSectionTexts(from, to, prev))
-      setStash((prev) =>
-        Object.fromEntries(
-          Object.entries(prev).map(([k, v]) => [
-            k,
-            v?.texts ? { ...v, texts: { ...v.texts, sectionTitles: remapSectionTexts(from, to, v.texts.sectionTitles), sectionCopies: remapSectionTexts(from, to, v.texts.sectionCopies) } } : v,
-          ]),
-        ) as Partial<Record<VariantKey, VariantData>>,
-      )
+      // テンプレートを案ごとに持つときは、ほかの案はそれぞれのテンプレートのまま(読み替えない)
+      if (!ownsTemplate(ab)) {
+        setStash((prev) =>
+          Object.fromEntries(
+            Object.entries(prev).map(([k, v]) => [
+              k,
+              v?.texts ? { ...v, texts: { ...v.texts, sectionTitles: remapSectionTexts(from, to, v.texts.sectionTitles), sectionCopies: remapSectionTexts(from, to, v.texts.sectionCopies) } } : v,
+            ]),
+          ) as Partial<Record<VariantKey, VariantData>>,
+        )
+      }
     }
     setTemplate(id)
     setCandidates([])
@@ -1029,6 +1035,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     k === active || !ownsHero(ab) ? { heroId, heroReason } : { heroId: stash[k]?.heroId, heroReason: stash[k]?.heroReason ?? '' }
   // 件名だけを比べるときも、文言を案ごとに持つ(読むのは件名・プリヘッダーだけ)
   const textsOf = (k: VariantKey): VariantText => (k === active || !ownsAnyText(ab) ? curText() : (stash[k]?.texts ?? curText()))
+  /** 案のテンプレート(案ごとに持たないときは、全案で共通 = いまの state) */
+  const templateOfV = (k: VariantKey): EmailTemplateId => (k === active || !ownsTemplate(ab) ? template : (stash[k]?.template ?? template))
   /** 保存する設定(B・C 案のメイン画像・文言を入れる) */
   const abForSave = (): AbTest | null => {
     if (!ab) return null
@@ -1036,7 +1044,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const owner = savedTargetAb() ?? ab
     const heroes = ownsHero(owner) ? Object.fromEntries(ab.variants.map((k) => [k, heroOf(k)])) : {}
     const texts = ownsAnyText(owner) ? Object.fromEntries(ab.variants.map((k) => [k, textsOf(k)])) : undefined
-    return { ...ab, target: owner.target, heroes, ...(texts ? { texts } : {}) }
+    // テンプレートは、A と違う案だけ、版まで決めて書く
+    const aTpl = pinnedTemplateKey(templateOfV('A'))
+    const tplEntries = ownsTemplate(owner) ? ab.variants.map((k) => [k, pinnedTemplateKey(templateOfV(k))] as const).filter(([, v]) => v !== aTpl) : []
+    const { templates: _old, ...rest } = ab
+    void _old
+    return { ...rest, target: owner.target, heroes, ...(texts ? { texts } : {}), ...(tplEntries.length ? { templates: Object.fromEntries(tplEntries) } : {}) }
   }
   /** 文言を画面に出す(ヘッドライン・コピー・通知の文・セクションの見出しとコピー) */
   /** 文言を画面に出す。full でなければ(件名だけを比べるとき)件名・プリヘッダーだけ */
@@ -1055,7 +1068,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   /** いま編集している案を stash に置き、to の案の中身を出す(案ごとに持つものだけ。共通のものはそのまま) */
   const loadVariant = (to: VariantKey, data: VariantData, base: AbTest | null) => {
-    setStash((prev) => ({ ...prev, [active]: { items, heroId, heroReason, texts: curText() } }))
+    setStash((prev) => ({ ...prev, [active]: { items, heroId, heroReason, texts: curText(), template } }))
     if (ownsProducts(base)) {
       setItems(data.items)
       setSelectedKey(null)
@@ -1065,6 +1078,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       setHeroReason(data.heroReason)
     }
     if (ownsAnyText(base) && data.texts) showText(data.texts, ownsText(base))
+    // テンプレートが案で違えば、その案のテンプレートで描く(セクションの候補は、テンプレートの形ごとなので捨てる)
+    if (ownsTemplate(base) && data.template && data.template !== template) {
+      setTemplate(data.template)
+      setCandidates([])
+    }
     setActive(to)
   }
   const switchVariant = (to: VariantKey) => {
@@ -1080,6 +1098,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       heroId: h.heroId,
       heroReason: h.heroReason,
       texts: { ...x, sectionTitles: [...x.sectionTitles], sectionCopies: [...x.sectionCopies] },
+      template: templateOfV('A'),
     }
   }
   const startAbTest = (purpose: AbPurpose = 'test') => {
@@ -1179,6 +1198,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           heroId: addHero ? a.heroId : cur.heroId,
           heroReason: addHero ? a.heroReason : cur.heroReason,
           texts: addText ? a.texts : cur.texts,
+          // 全体でなくなるときは、テンプレートは全案で共通(A のもの)に戻す
+          template: ownsTemplate(next) && ownsTemplate(ab) ? cur.template : a.template,
         }
       }
       return out
@@ -1201,8 +1222,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       ...(ownsHero(ab) ? heroOf(x) : {}),
       productIds: ownsProducts(ab) ? itemsOf(x).map((i) => i.productId) : [],
       ...(ownsAnyText(ab) ? { texts: textsOf(x) } : {}),
+      ...(ownsTemplate(ab) ? { template: pinnedTemplateKey(templateOfV(x)) } : {}),
     }))
-    const chosen: VariantData = { items: itemsOf(k), ...heroOf(k), texts: textsOf(k) }
+    const chosen: VariantData = { items: itemsOf(k), ...heroOf(k), texts: textsOf(k), template: templateOfV(k) }
     // 決めた案の中身を、配信そのもの(A)にする。B・C 案の行は、保存で A の行になる(行 ID はそのまま使い、variant を空に)
     if (ownsProducts(ab)) setItems(chosen.items)
     if (ownsHero(ab)) {
@@ -1210,6 +1232,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       setHeroReason(chosen.heroReason)
     }
     if (ownsAnyText(ab) && chosen.texts) showText(chosen.texts, ownsText(ab))
+    if (ownsTemplate(ab) && chosen.template) setTemplate(chosen.template)
     setSelectedKey(null)
     setStash({})
     setActive('A')
@@ -1249,7 +1272,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       products = true
       parts.push(xi[i] ? { kind: 'product', itemKey: xi[i].key } : { kind: 'slot', index: i })
     }
-    return { parts, text, subject, hero, products }
+    // テンプレート(案ごとに持つときだけ)。違えば、プレビューのテンプレートの札に目印
+    const tpl = ownsTemplate(ab) && pinnedTemplateKey(templateOfV(k)) !== pinnedTemplateKey(templateOfV('A'))
+    if (tpl) parts.push({ kind: 'template' })
+    return { parts, text, subject, hero, products, template: tpl }
   }
   // 開いたときの比べる要素(どの案も A と違わないときは、これを使う)
   const [abBaseTarget] = useState<AbTarget>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test)?.target ?? 'hero')
@@ -1262,6 +1288,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const subject = ds.some((d) => d.subject)
     const hero = ds.some((d) => d.hero)
     const products = ds.some((d) => d.products)
+    // テンプレートが違えば、見出し・コピー・商品の枠も案ごとに要るので、全体
+    if (ds.some((d) => d.template)) return 'all'
     if (text || (subject && (hero || products))) return 'all'
     if (subject) return 'subject'
     if (hero && products) return 'both'
@@ -1402,10 +1430,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         hero_reason: heroOf('A').heroReason,
         ab_test: encodeAbTest(abForSave(), decision),
         // 標準のテンプレートは、以前の選択肢の列にも書く(互換)。作ったテンプレートは、layoutkey だけ
-        email_template: TEMPLATE_VALUES[baseTemplateId(template)],
-        // テンプレートの ID と、使った版の番号を分けて書く(いまの版を選んだときは、いまの版の番号)
-        layout_key: baseTemplateId(template),
-        layout_version: splitTemplateKey(template).version ?? currentVersion(template),
+        email_template: TEMPLATE_VALUES[baseTemplateId(templateOfV('A'))],
+        // テンプレートの ID と、使った版の番号を分けて書く(いまの版を選んだときは、いまの版の番号)。B・C 案を直している間も、A のもの
+        layout_key: baseTemplateId(templateOfV('A')),
+        layout_version: splitTemplateKey(templateOfV('A')).version ?? currentVersion(baseTemplateId(templateOfV('A'))),
         section_titles: textsOf('A').sectionTitles.join('\n').replace(/\n+$/, ''),
         section_copies: encodeCopies(textsOf('A').sectionCopies),
         // AI でまとめて作った中身を、人が配信カードで確かめて保存したら、未確認の印を外す(W14)
@@ -1834,6 +1862,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       heroId: h.heroId,
       heroReason: h.heroReason,
       texts: { ...x, sectionTitles: [...x.sectionTitles], sectionCopies: [...x.sectionCopies] },
+      template: templateOfV(k),
     }
   }
   // 「AI で別の案を作る」: 案を足した次の描画で、その案を AI に作らせる(作るのは、いま編集している案)
@@ -1884,8 +1913,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abAuto, stash])
   // A を直したら、B・C でまだ直していない部品(A の前の中身と同じ所)も、A に合わせる(SU2 ⑥。「B は A とこの部分だけが違う」を保つ)
-  const prevA = useRef<{ texts: VariantText; heroId?: string; productIds: string[] } | null>(null)
-  const aNow = { texts: curText(), heroId, productIds: items.map((i) => i.productId) }
+  const prevA = useRef<{ texts: VariantText; heroId?: string; productIds: string[]; template: string } | null>(null)
+  const aNow = { texts: curText(), heroId, productIds: items.map((i) => i.productId), template: pinnedTemplateKey(template) }
   const aKey = JSON.stringify(aNow)
   useEffect(() => {
     if (!ab || !abAuto || active !== 'A') {
@@ -1893,7 +1922,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       return
     }
     const before = prevA.current
-    prevA.current = { texts: { ...aNow.texts, sectionTitles: [...aNow.texts.sectionTitles], sectionCopies: [...aNow.texts.sectionCopies] }, heroId: aNow.heroId, productIds: [...aNow.productIds] }
+    prevA.current = { texts: { ...aNow.texts, sectionTitles: [...aNow.texts.sectionTitles], sectionCopies: [...aNow.texts.sectionCopies] }, heroId: aNow.heroId, productIds: [...aNow.productIds], template: aNow.template }
     if (!before) return
     setStash((prev) => {
       let changedAny = false
@@ -1939,7 +1968,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         }
         if (aNow.productIds.length > before.productIds.length && list.length === before.productIds.length)
           for (let i = before.productIds.length; i < aNow.productIds.length; i++) list.push({ ...items[i], key: crypto.randomUUID(), rowId: undefined })
-        out[k] = { ...v, texts: tx, heroId: hero, heroReason: heroReason2, items: list }
+        // テンプレート: B が A の前のテンプレートのままなら、A のいまのテンプレートにする
+        let tpl = v.template
+        if (v.template && pinnedTemplateKey(v.template) === before.template && aNow.template !== before.template) {
+          tpl = template
+          changedAny = true
+        }
+        out[k] = { ...v, texts: tx, heroId: hero, heroReason: heroReason2, items: list, template: tpl }
       }
       return changedAny ? out : prev
     })
@@ -1953,7 +1988,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         <AbCompare
           ab={ab}
           base={{ id: card?.id ?? 'draft', ...buildContent(), hero_image_id: null } as DeliveryCard}
-          variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined }))}
+          variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined, template: templateOfV(k) }))}
           products={products}
           heroes={heroes}
           onEdit={switchVariant}
@@ -2542,7 +2577,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             <AbCompare
               ab={ab}
               base={{ id: card?.id ?? 'draft', ...buildContent(), hero_image_id: null } as DeliveryCard}
-              variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined }))}
+              variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined, template: templateOfV(k) }))}
               products={products}
               heroes={heroes}
               onEdit={switchVariant}
@@ -2562,6 +2597,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                   productIds: ownsProducts(asTarget(decision.target)) ? r.productIds : items.map((i) => i.productId),
                   heroId: ownsHero(asTarget(decision.target)) ? r.heroId : heroId,
                   texts: r.texts,
+                  template: r.template,
                   tag: t('配信しなかった', 'Not sent'),
                 })),
               ]}

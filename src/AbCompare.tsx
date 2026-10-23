@@ -2,6 +2,7 @@ import { Button, Dialog, DialogBody, DialogContent, DialogTitle, makeStyles, tok
 import { ResizableSurface } from './ResizableSurface'
 import { DismissRegular } from '@fluentui/react-icons'
 import { CardPreview } from './CardPreview'
+import { currentVersion, getTemplate, pinnedTemplateKey, splitTemplateKey } from './templates'
 import { isChoose, splitOf, targetLabel, type AbTarget, type AbTest, type VariantKey, type VariantText } from './abTest'
 import { useT } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -32,6 +33,8 @@ export interface CompareVariant {
   texts?: VariantText
   /** 見出しの横の札(例: 「配信しなかった」) */
   tag?: string
+  /** 案のテンプレートの鍵(案ごとに持つとき。なければ共通の中身のまま) */
+  template?: string
 }
 
 interface Props {
@@ -59,6 +62,13 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
   // 案の文言を、配信の列の形にして重ねる
   const withTexts = (x?: VariantText): Partial<DeliveryCard> =>
     x ? { headline: x.headline, copy: x.copy, push_title: x.pushTitle, push_body: x.pushBody, subject: x.subject, preheader: x.preheader, section_titles: x.sectionTitles.join('\n'), section_copies: x.sectionCopies.some(Boolean) ? JSON.stringify(x.sectionCopies) : '' } : {}
+  // 案のテンプレートを、配信の列(テンプレートの ID と版)にして重ねる
+  const withTemplate = (key?: string): Partial<DeliveryCard> => {
+    if (!key) return {}
+    const { id, version } = splitTemplateKey(key)
+    return { layout_key: id, layout_version: version ?? currentVersion(id) }
+  }
+  const templatesDiffer = new Set(variants.map((v) => (v.template ? pinnedTemplateKey(v.template) : ''))).size > 1
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   const heroName = (id?: string) => heroes.find((h) => h.id === id)?.name ?? t('(なし)', '(none)')
   return (
@@ -97,6 +107,8 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
                         </Button>
                       )}
                     </div>
+                    {/* 案でテンプレートが違うときだけ、どの案がどのテンプレートかを出す */}
+                    {templatesDiffer && v.template && <span className={s.note}>{t(`テンプレート: ${getTemplate(v.template).label}`, `Template: ${getTemplate(v.template).label}`)}</span>}
                     {v.texts && (target === 'subject' || target === 'all') && <span className={s.note}>{t(`件名: ${v.texts.subject || '(配信名)'}`, `Subject: ${v.texts.subject || '(delivery name)'}`)}</span>}
                     {v.texts && target !== 'subject' && <span className={s.note}>{t(`ヘッドライン: ${v.texts.headline || '(なし)'}`, `Headline: ${v.texts.headline || '(none)'}`)}</span>}
                     {target !== 'products' && target !== 'subject' && <span className={s.note}>{t(`メイン画像: ${heroName(v.heroId)}`, `Hero: ${heroName(v.heroId)}`)}</span>}
@@ -104,7 +116,7 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
                   </div>
                   <div className={s.scroll}>
                     <div className={s.zoom}>
-                      <CardPreview card={{ ...base, ...withTexts(v.texts), hero_image_id: v.heroId ?? null }} productIds={v.productIds} products={products} heroes={heroes} />
+                      <CardPreview card={{ ...base, ...withTexts(v.texts), ...withTemplate(v.template), hero_image_id: v.heroId ?? null }} productIds={v.productIds} products={products} heroes={heroes} />
                     </div>
                   </div>
                 </div>

@@ -2,6 +2,7 @@
 // 実際に受信者を分けて送るのは、配信システム(CCP は送らない)。CCP は、テストの設計・案の中身・制作への受け渡し・案ごとの結果を受け持つ。
 // 案ごとに持てるのは、メイン画像と商品だけ(比べる要素を絞るため)。テーマ・コピー・リンク先・時刻などは全案で共通。
 // 保存先: テストの設定と B・C 案のメイン画像は delivery_cards.ab_test(JSON)、B・C 案の商品は delivery_products の variant 列('B'・'C'。A は空)
+// 比べる要素が all(全体)のときは、テンプレートも案ごとに持てる(SU2 ⑤⑧。B・C 案のテンプレートは ab_test の templates。A は配信の layout_key・layout_version)
 import { tr } from './i18n'
 
 /** 案の記号。A はいまの配信そのもの */
@@ -52,6 +53,8 @@ export interface RejectedVariant {
   heroReason?: string
   productIds: string[]
   texts?: VariantText
+  /** その案のテンプレート(鍵「ID@v版」。案ごとに持っていたときだけ) */
+  template?: string
 }
 
 export interface AbTest {
@@ -73,6 +76,11 @@ export interface AbTest {
   heroes: Partial<Record<VariantKey, VariantHero>>
   /** B・C 案の文言(比べる要素が all のとき) */
   texts?: Partial<Record<VariantKey, VariantText>>
+  /**
+   * B・C 案のテンプレート(比べる要素が all のとき。A と同じ案は持たない)。鍵は版まで決めた「ID@v版」
+   * (テンプレートを編集しても、保存した案の形が変わらないように。A の layout_version と同じ考え)
+   */
+  templates?: Partial<Record<VariantKey, string>>
   /** 案から選んだ結果。決めたあとは variants が空になり、AB テスト(案を持つ配信)としては扱わない */
   decided?: AbDecision
 }
@@ -128,6 +136,11 @@ export const ownsText = (ab: AbTest | null) => !!ab && ab.target === 'all'
 export const ownsSubject = (ab: AbTest | null) => !!ab && (ab.target === 'subject' || ab.target === 'all')
 /** 文言(件名・プリヘッダーを含む)を、案ごとに保存するか */
 export const ownsAnyText = (ab: AbTest | null) => ownsText(ab) || ownsSubject(ab)
+/**
+ * テンプレートを案ごとに持つか。全体を比べるときだけ(テンプレートが違えば、見出し・コピー・商品の枠も合わせて違うため。
+ * 文言を案ごとに持たないのにテンプレートだけ違うと、セクションの番号で持つ見出し・コピーがずれる)
+ */
+export const ownsTemplate = (ab: AbTest | null) => ownsText(ab)
 
 /** A を含む、すべての案 */
 export const allVariants = (ab: AbTest | null): VariantKey[] => (ab ? ['A', ...ab.variants] : ['A'])

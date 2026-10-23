@@ -9,9 +9,9 @@ import { SOURCE_MANUAL, type Item } from './items'
 import { UTM_SCHEME, campaignId, campaignSlug, encodeLinks, productContent, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
-import { sectionRange, sectionsOf, type EmailTemplateId, templateKeyOfCard } from './templates'
+import { sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
 import { priceText, tr } from './i18n'
-import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, parseAbTest, type VariantKey, type VariantText } from './abTest'
+import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, ownsTemplate, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
 /** 写しに入れる配信カードの列(制作に要るものだけ。AI の案・理由は入れない) */
 const CARD_KEYS = [
@@ -65,6 +65,8 @@ export interface SnapshotVariant {
   hero: HeroImage | null
   /** 案ごとの文言(X57。比べる要素が all のとき) */
   texts?: VariantText
+  /** 案のテンプレート(「ID@v版」。A と違うときだけ。SU2 ⑤) */
+  template?: string
 }
 
 /** variantIds: B・C 案の商品 ID(メールの並び順。AB テストで商品を比べるとき) */
@@ -77,6 +79,7 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     productIds: ownsProducts(ab) ? (variantIds?.[k] ?? []) : productIds,
     hero: ownsHero(ab) ? (heroes.find((h) => h.id === ab.heroes[k]?.heroId) ?? null) : hero,
     ...(ownsAnyText(ab) && ab.texts?.[k] ? { texts: ab.texts[k] } : {}),
+    ...(ownsTemplate(ab) && ab.templates?.[k] ? { template: ab.templates[k] } : {}),
   }))
   const used = new Set([...productIds, ...(variants ?? []).flatMap((v) => v.productIds)])
   return {
@@ -206,26 +209,23 @@ export const snapshotOf = (s: Snapshot, k: VariantKey): Snapshot => {
 
 export const variantUtmCampaign = (s: Snapshot, variant: VariantKey) => (isPushCard(s) ? campaignOf(s, variant) : utmOf(s, variant).campaign)
 /** 案の中身で作った写し(商品・メイン画像を、その案のものに。リンクの行を案ごとに作るため) */
-export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => ({
-  ...s,
-  productIds: v.productIds,
-  hero: v.hero,
-  ...(v.texts
+export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => {
+  // 案のテンプレート(A と違うとき)。templateOf が、その案の形でセクション・リンクの枠を作る
+  const layout = v.template ? { layout_key: splitTemplateKey(v.template).id, layout_version: splitTemplateKey(v.template).version ?? null } : {}
+  const texts = v.texts
     ? {
-        card: {
-          ...s.card,
-          headline: v.texts.headline,
-          copy: v.texts.copy,
-          push_title: v.texts.pushTitle,
-          push_body: v.texts.pushBody,
-          subject: v.texts.subject ?? s.card.subject,
-          preheader: v.texts.preheader ?? s.card.preheader,
-          section_titles: v.texts.sectionTitles.join('\n'),
-          section_copies: v.texts.sectionCopies.some(Boolean) ? JSON.stringify(v.texts.sectionCopies) : '',
-        },
+        headline: v.texts.headline,
+        copy: v.texts.copy,
+        push_title: v.texts.pushTitle,
+        push_body: v.texts.pushBody,
+        subject: v.texts.subject ?? s.card.subject,
+        preheader: v.texts.preheader ?? s.card.preheader,
+        section_titles: v.texts.sectionTitles.join('\n'),
+        section_copies: v.texts.sectionCopies.some(Boolean) ? JSON.stringify(v.texts.sectionCopies) : '',
       }
-    : {}),
-})
+    : {}
+  return { ...s, productIds: v.productIds, hero: v.hero, card: { ...s.card, ...layout, ...texts } }
+}
 
 export interface ProductRow {
   section: string

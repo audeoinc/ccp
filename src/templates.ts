@@ -706,6 +706,15 @@ export const currentVersion = (id: EmailTemplateId): number => currentOf(id)?.ve
 /** テンプレートの ID と版の番号から、引くときの鍵を作る(いまの版なら ID のまま) */
 export const templateKey = (id: EmailTemplateId, v?: number | null): EmailTemplateId => (v === undefined || v === null || v === currentVersion(id) ? id : `${id}@v${v}`)
 
+/**
+ * 版まで決めた鍵(「ID@v版」。いまの版も番号で書く)。AB テストの案のテンプレートを保存するとき、
+ * 2 つの鍵が同じ形かを比べるときに使う(いまの版を「ID」と書いた鍵と「ID@v版」と書いた鍵を、同じとみなすため)
+ */
+export const pinnedTemplateKey = (key: EmailTemplateId): string => {
+  const { id, version: v } = splitTemplateKey(key)
+  return `${id}@v${v ?? currentVersion(id)}`
+}
+
 /** 鍵から、テンプレートの ID(版を外す)。結果をテンプレートごとにまとめるときなどに使う */
 export const baseTemplateId = (key: EmailTemplateId): EmailTemplateId => splitTemplateKey(key).id
 

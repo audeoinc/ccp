@@ -442,7 +442,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         <div className={s.previewPane}>
           <div className={s.toolbar}>
             {/* テンプレートの札(押すと、選んだ部品のペインにテンプレート。選び直しは段階 b) */}
-            <Button type="button" size="small" appearance={isOn({ kind: 'template' }) ? 'primary' : 'outline'} icon={<LayoutColumnTwoRegular />} onClick={() => select({ kind: 'template' })}>
+            {/* AB テストで、この案のテンプレートが A と違えば、ほかの部品と同じ下線の目印(SU2 ⑤) */}
+            <Button
+              type="button"
+              size="small"
+              appearance={isOn({ kind: 'template' }) ? 'primary' : 'outline'}
+              icon={<LayoutColumnTwoRegular />}
+              className={e.abDiffParts.some((p) => p.kind === 'template') ? s.abDiff : undefined}
+              title={e.abDiffParts.some((p) => p.kind === 'template') ? t('この案のテンプレートは A と違います', 'This variant uses a different template from A') : undefined}
+              onClick={() => select({ kind: 'template' })}
+            >
               {t(`テンプレート: ${tpl.label}`, `Template: ${tpl.label}`)}
             </Button>
             <Menu
@@ -535,6 +544,10 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {/* 違いが多いときは知らせる(止めない)。案から選ぶときは、違ってよいので出さない */}
           {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length >= 3 && (
             <span className={s.abWarn}>{t(`A と違う所が ${e.abDiffParts.length} か所あります。結果の原因を切り分けにくくなります`, `${e.abDiffParts.length} places differ from A. It will be harder to tell what caused the result.`)}</span>
+          )}
+          {/* テンプレートを替えたうえに、ほかの所も違うときは、数によらず知らせる(SU2 ④。テンプレートの差と中身の差を分けられなくなるため) */}
+          {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length < 3 && e.abDiffParts.length > 1 && e.abDiffParts.some((p) => p.kind === 'template') && (
+            <span className={s.abWarn}>{t('テンプレートと、ほかの所も A と違います。結果がテンプレートの差か中身の差か、分けにくくなります', 'Both the template and other parts differ from A. It will be hard to tell which caused the result.')}</span>
           )}
           {e.channel === 'email' ? (
             <div className={s.inbox}>
