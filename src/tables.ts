@@ -1,6 +1,6 @@
 import { tr } from './i18n'
 import { CELL_VIEWS, type CellView } from './cells'
-import { BOX_FIELDS, gridColumns, placedButtons, type BoxField, type ButtonBlock, type ButtonSpec, type LinkKind, type PartType, type Section, type TablePart, type TemplateLayout } from './templates'
+import { BOX_FIELDS, MEDIA_RATIOS, gridColumns, placedButtons, type BoxField, type ButtonBlock, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, type ButtonSpec, type LinkKind, type PartType, type Section, type TablePart, type TemplateLayout } from './templates'
 
 // 表のセクション(種類 'table'。T8、docs/TEMPLATE_OBJECTS.md)の計算と操作。
 // 部品は {列 c, 行 r, 幅 w, 高さ h} で、表をすき間なく敷き詰める(空いた所は「空き」の部品)。
@@ -25,7 +25,7 @@ export interface CellSel {
 /** 操作の結果。できないときは、理由(画面に出す) */
 export type TableOp = { sec: Section; sel?: CellSel } | { error: string }
 
-const PREFIX: Record<PartType, string> = { box: 'box', button: 'btn', text: 'txt', empty: 'emp' }
+const PREFIX: Record<PartType, string> = { box: 'box', button: 'btn', text: 'txt', media: 'med', empty: 'emp' }
 // ID は、種類の頭 + 短いランダムな文字。テンプレートの中で重ならなければよい(比べるときは、いつもテンプレート ID と組で見る)
 const rand = () => Math.random().toString(36).slice(2, 8)
 export const newPartId = (type: PartType) => `${PREFIX[type]}_${rand()}`
@@ -169,8 +169,8 @@ const retype = (p: TablePart, type: PartType): TablePart => ({ id: newPartId(typ
 
 /** 種類ごとの設定だけを写す(分割したマスに、もとの見せ方・文言を残すため) */
 const settingsOf = (p: TablePart): Partial<TablePart> => {
-  const { view, aiNote, fields, priceStyle, badge, label, style, link, track, text, overridable } = p
-  return Object.fromEntries(Object.entries({ view, aiNote, fields, priceStyle, badge, label, style, link, track, text, overridable }).filter(([, v]) => v !== undefined))
+  const { view, aiNote, fields, priceStyle, badge, label, style, color, link, track, text, overridable, align, ratio, src, imageId, video, alt, swap } = p
+  return Object.fromEntries(Object.entries({ view, aiNote, fields, priceStyle, badge, label, style, color, link, track, text, overridable, align, ratio, src, imageId, video, alt, swap }).filter(([, v]) => v !== undefined))
 }
 
 /** 選んだ範囲を 1 つの部品にまとめる。中身は、左上(空きなら、最初の中身のある部品)のものを残し、新しい ID にする */
@@ -267,6 +267,61 @@ export function moveCol(sec: Section, c: number, d: number): TableOp {
   const parts = partsOf(sec).map((p) => (p.c === c ? { ...p, c: o } : p.c === o ? { ...p, c } : p))
   return { sec: { ...sec, parts }, sel: { a: [o, 0], b: [o, (sec.rows ?? 1) - 1] } }
 }
+
+/** r 行目を複製して、すぐ下に入れる(写した部品は、形を写した別のものなので新しい ID。縦に結合したマスがかかる行は複製できない) */
+export function duplicateRow(sec: Section, r: number): TableOp {
+  const rows = sec.rows ?? 0
+  if (rows >= MAX_TABLE_ROWS) return { error: tr(`行は ${MAX_TABLE_ROWS} 行まで`, `Up to ${MAX_TABLE_ROWS} rows`) }
+  if (partsOf(sec).some((p) => p.h > 1 && p.r <= r && p.r + p.h > r)) return { error: tr('縦に結合したマスがかかっている行は、複製できません', "A row with a vertically merged cell can't be duplicated") }
+  const parts = partsOf(sec).map((p) => (p.r > r ? { ...p, r: p.r + 1 } : p))
+  const copies = partsOf(sec)
+    .filter((p) => p.r === r)
+    .map((p) => ({ ...p, id: newPartId(p.type), r: r + 1 }))
+  const shifted = shiftEven(sec, (x) => (x > r ? x + 1 : x))
+  const evenRows = isEvenRow(sec, r) ? [...(shifted ?? []), r + 1] : shifted
+  return { sec: filled({ ...sec, rows: rows + 1, parts: [...parts, ...copies], evenRows }), sel: { a: [0, r + 1], b: [(sec.cols ?? 1) - 1, r + 1] } }
+}
+
+/** 写した部品(左上からの位置で持つ。貼るときに、新しい ID にする) */
+export interface Clip {
+  w: number
+  h: number
+  parts: TablePart[]
+}
+/** 選んだ範囲を写す(範囲に丸ごと入る部品だけ。空きは写さない) */
+export function copyCells(sec: Section, sel: CellSel): Clip {
+  const rc = rectOf(sec, sel)
+  const parts = partsOf(sec)
+    .filter((p) => p.type !== 'empty' && p.c >= rc.c && p.r >= rc.r && p.c + p.w <= rc.c + rc.w && p.r + p.h <= rc.r + rc.h)
+    .map((p) => ({ ...p, c: p.c - rc.c, r: p.r - rc.r }))
+  return { w: rc.w, h: rc.h, parts }
+}
+/** 写した部品を、(c, r) を左上にして貼る。貼る所は、空きのマスだけ(中身のある部品を上書きしない。パーツと同じ「足すだけ」) */
+export function pasteCells(sec: Section, c: number, r: number, clip: Clip): TableOp {
+  if (clip.parts.length === 0) return { error: tr('写したものがありません(空きのマスは写しません)', 'Nothing copied (empty cells are not copied)') }
+  if (c + clip.w > (sec.cols ?? 1) || r + clip.h > (sec.rows ?? 0)) return { error: tr('貼る所が表からはみ出します。行・列を足してから貼ってください', "It doesn't fit here. Add rows or columns first") }
+  const placed = clip.parts.map((p) => ({ ...p, id: newPartId(p.type), c: p.c + c, r: p.r + r }))
+  if (placed.some((p) => partsOf(sec).some((q) => q.type !== 'empty' && hit(q, p)))) return { error: tr('貼る所が空いていません(中身のあるマスには貼りません)', 'The target cells are not empty') }
+  const covered = partsOf(sec).filter((q) => placed.some((p) => hit(q, p)))
+  if (covered.some((q) => !placed.some((p) => q.c >= p.c && q.r >= p.r && q.c + q.w <= p.c + p.w && q.r + q.h <= p.r + p.h))) return { error: tr('貼る所の空きの形が合いません(結合した空きがはみ出します)', "The empty cells don't match the pasted shape") }
+  return { sec: filled({ ...sec, parts: [...partsOf(sec).filter((q) => !covered.includes(q)), ...placed] }), sel: { a: [c, r], b: [c + clip.w - 1, r + clip.h - 1] } }
+}
+
+// ---- ボタンの色(メールの中の色なので固定の値)
+export const BUTTON_COLORS: Record<ButtonColor, string> = { black: '#222222', red: '#d32f2f', navy: '#1f3a5f', green: '#2e7d4f', gray: '#6b6b6b' }
+export const buttonColorLabel = (c: ButtonColor): string => ({ black: tr('黒', 'Black'), red: tr('赤', 'Red'), navy: tr('紺', 'Navy'), green: tr('緑', 'Green'), gray: tr('グレー', 'Gray') })[c]
+/** ボタンの色を求める(色を選んでいなければ、期間限定のヒーローでは赤、ほかは黒。以前の見た目と同じ) */
+export const buttonColor = (p: Pick<TablePart, 'color'>, offer: boolean): string => BUTTON_COLORS[p.color ?? (offer ? 'red' : 'black')]
+
+// ---- セクションの見た目(背景・余白・区切り線)。メールの中の色なので固定の値
+export const SECTION_BG: Record<SectionBg, string> = { gray: '#f4f4f5', beige: '#f6f1ea', blue: '#eef4fb', pink: '#fbeff1' }
+export const sectionBgLabel = (b?: SectionBg): string =>
+  b ? ({ gray: tr('グレー', 'Gray'), beige: tr('ベージュ', 'Beige'), blue: tr('ブルー', 'Blue'), pink: tr('ピンク', 'Pink') })[b] : tr('白', 'White')
+/** 上下の余白(px) */
+export const sectionSpace = (s?: Section['space']): number => (s === 'tight' ? 6 : s === 'wide' ? 32 : 16)
+export const ratioLabel = (r?: MediaRatio): string =>
+  r ? ({ square: tr('正方形(1:1)', 'Square (1:1)'), portrait: tr('縦長(3:4)', 'Portrait (3:4)'), landscape: tr('横長(4:3)', 'Landscape (4:3)'), wide: tr('横に広い(2:1)', 'Wide (2:1)') })[r] : tr('既定', 'Default')
+export const alignLabel = (a: TextAlign): string => ({ left: tr('左', 'Left'), center: tr('中央', 'Center'), right: tr('右', 'Right') })[a]
 
 /** 空のセクション(見出しだけ。最初の行は、列の数を選んで作る) */
 export const emptySection = (): Section => ({ kind: 'table', id: newSectionId(), cols: 2, rows: 0, parts: [], slots: 0, categoryHeading: true })
@@ -414,10 +469,16 @@ export function toTableLayout(layout: TemplateLayout): TemplateLayout {
 /** 表の中のボタンを、セクションの後のボタンとして返す(リンク先の一覧で、以前のボタンと同じに扱う) */
 export function tableButtonBlocks(layout: TemplateLayout): ButtonBlock[] {
   return layout.sections.flatMap((sec, i) => {
+    // 画像・動画も、押して飛ぶ先を配信ごとに決めるので、ボタンと同じ一覧に入れる(名前は代わりの文)
     const buttons = partsOf(sec)
-      .filter((p) => p.type === 'button')
+      .filter((p) => p.type === 'button' || p.type === 'media')
       .sort(byPosition)
-      .map((p): ButtonSpec => ({ id: p.id, ...(p.label ? { label: p.label } : {}), ...(p.style ? { style: p.style } : {}), ...(p.link ? { link: p.link } : {}) }))
+      .map((p): ButtonSpec => ({
+        id: p.id,
+        ...(p.type === 'media' ? { label: p.alt || (p.video ? tr('動画', 'Video') : tr('画像', 'Image')) } : p.label ? { label: p.label } : {}),
+        ...(p.style === 'fill' || p.style === 'outline' ? { style: p.style } : {}),
+        ...(p.link ? { link: p.link } : {}),
+      }))
     return isTable(sec) && buttons.length > 0 ? [{ at: i + 1, buttons }] : []
   })
 }
@@ -425,7 +486,10 @@ export function tableButtonBlocks(layout: TemplateLayout): ButtonBlock[] {
 // ---- 保存・読み込み(layoutTemplates.ts)
 
 const LINKS: LinkKind[] = ['campaign', 'category', 'top', 'custom']
-const TYPES: PartType[] = ['box', 'button', 'text', 'empty']
+const TYPES: PartType[] = ['box', 'button', 'text', 'media', 'empty']
+const ALIGNS: TextAlign[] = ['left', 'center', 'right']
+/** 画像・動画の URL は、http(s) か、アプリの中の道(/ で始まる)だけ(javascript: などを入れさせない) */
+const url = (v: unknown): string | undefined => (typeof v === 'string' && /^(https?:\/\/|\/)/i.test(v.trim()) ? v.trim().slice(0, 1000) : undefined)
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined)
 
 /** 保存されている部品を読む(知らない値は外す) */
@@ -444,10 +508,13 @@ export function parsePart(raw: unknown): TablePart | null {
     if (o.priceStyle === 'sale' || o.priceStyle === 'from') part.priceStyle = o.priceStyle
     const badge = str(o.badge, 12)
     if (badge) part.badge = badge
+    if (MEDIA_RATIOS.includes(o.ratio as MediaRatio)) part.ratio = o.ratio as MediaRatio
   } else if (type === 'button') {
     const label = str(o.label, 30)
     if (label) part.label = label
-    if (o.style === 'outline') part.style = 'outline'
+    if (o.style === 'outline' || o.style === 'text') part.style = o.style
+    if (typeof o.color === 'string' && o.color !== 'black' && o.color in BUTTON_COLORS) part.color = o.color as ButtonColor
+    if (ALIGNS.includes(o.align as TextAlign) && o.align !== 'center') part.align = o.align as TextAlign
     if (LINKS.includes(o.link as LinkKind) && o.link !== 'campaign') part.link = o.link as LinkKind
     const track = str(o.track, 60)
     if (track) part.track = track
@@ -455,6 +522,20 @@ export function parsePart(raw: unknown): TablePart | null {
     const text = str(o.text, 1000)
     if (text) part.text = text
     if (o.overridable === false) part.overridable = false
+    if (ALIGNS.includes(o.align as TextAlign) && o.align !== 'left') part.align = o.align as TextAlign
+  } else if (type === 'media') {
+    const src = url(o.src)
+    if (src) part.src = src
+    if (typeof o.imageId === 'string' && o.imageId) part.imageId = o.imageId.slice(0, 60)
+    const video = url(o.video)
+    if (video) part.video = video
+    const alt = str(o.alt, 120)
+    if (alt) part.alt = alt
+    if (MEDIA_RATIOS.includes(o.ratio as MediaRatio) && o.ratio !== 'wide') part.ratio = o.ratio as MediaRatio
+    if (LINKS.includes(o.link as LinkKind) && o.link !== 'campaign') part.link = o.link as LinkKind
+    const track = str(o.track, 60)
+    if (track) part.track = track
+    if (o.swap === true) part.swap = true
   }
   return part
 }
