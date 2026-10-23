@@ -122,17 +122,24 @@ def photo_html(code: str, product: dict[str, Any]) -> str:
     src = lambda ph: "../.." + escape(ph["image_url"])  # noqa: E731
     main = next((ph for ph in photos if ph.get("is_main")), photos[0])
     subs = [ph for ph in photos if ph is not main]
-    thumbs = "".join(f'<img src="{src(ph)}" alt="{escape(ph.get("alt") or "")}" width="72" height="96">' for ph in photos)
+    # 画像ごとの説明(description)は、本物のページでよくある書き方(img の alt・<figure> の <figcaption>・JSON-LD の ImageObject)で書く。
+    # ページを読む処理(extract)・手元の収集(collect-product-images.py)が、本物と同じ道で説明を拾えるように(利用者の依頼 2026-10-23)
+    desc_of = lambda ph: ph.get("caption") or ph.get("alt") or product.get("name") or code  # noqa: E731
+    thumbs = "".join(f'<img src="{src(ph)}" alt="{escape(desc_of(ph))}" width="72" height="96">' for ph in photos)
     feats = "\n".join(
-        f'<section class="f"><img src="{src(ph)}" alt="{escape(ph.get("alt") or "")}" width="420" height="560" loading="lazy">'
-        f'<div><h3>{escape(ph.get("alt") or "")}</h3><p>{escape(ph.get("caption") or "")}</p></div></section>'
+        f'<section class="f"><figure><img src="{src(ph)}" alt="{escape(desc_of(ph))}" width="420" height="560" loading="lazy">'
+        f'<figcaption>{escape(ph.get("caption") or "")}</figcaption></figure><div><h3>{escape(ph.get("alt") or "")}</h3><p>{escape(ph.get("caption") or "")}</p></div></section>'
         for ph in subs
     )
+    ld = json.dumps({"@context": "https://schema.org", "@type": "Product", "name": product.get("name") or code, "sku": code,
+                     "image": [{"@type": "ImageObject", "contentUrl": src(ph), "name": ph.get("alt") or "", "caption": desc_of(ph)} for ph in photos]},
+                    ensure_ascii=False).replace("</", "<\\/")
     label = ("Sample", "This is a sample product page made by CCP for trying things out. Not a real shop or product.") if en else ("見本", "CCP が試すために作った見本の商品ページです(実在のお店・商品ではありません)。")
     return f"""<!doctype html>
 <html lang="{'en' if en else 'ja'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} | Sample shop</title>
 <meta property="og:title" content="{name}"><meta property="og:image" content="{src(main)}"><meta property="og:site_name" content="Sample shop">
+<script type="application/ld+json">{ld}</script>
 <style>
 *{{box-sizing:border-box}}body{{font-family:"Helvetica Neue",Arial,"Hiragino Sans","Yu Gothic",sans-serif;margin:0;color:#222;background:#fff}}
 .bar{{display:flex;align-items:center;gap:10px;padding:12px 24px;border-bottom:1px solid #eee;font-size:13px;letter-spacing:.2em}}
@@ -142,15 +149,15 @@ def photo_html(code: str, product: dict[str, Any]) -> str:
 h1{{font-size:22px;font-weight:500;margin:8px 0}}.price{{font-size:20px;margin:8px 0 20px}}.desc{{line-height:1.8;font-size:14px}}
 .code{{color:#888;font-size:12px}}.btn{{display:block;width:100%;padding:14px;margin:24px 0 8px;border:0;background:#222;color:#fff;font-size:14px;letter-spacing:.1em}}
 .note{{color:#888;font-size:11px;line-height:1.6}}h2{{font-size:16px;font-weight:500;letter-spacing:.15em;margin:56px 0 8px;text-align:center}}
-.f{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:center;margin:32px 0}}.f:nth-of-type(even) img{{order:2}}
-.f img{{width:100%;aspect-ratio:3/4;object-fit:cover;background:#f6f6f6}}.f h3{{font-size:17px;font-weight:500;margin:0 0 10px}}.f p{{line-height:1.9;font-size:14px;margin:0}}
-@media (max-width:720px){{.top,.f{{grid-template-columns:1fr;gap:16px}}.f:nth-of-type(even) img{{order:0}}}}
+.f{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:center;margin:32px 0}}.f:nth-of-type(even) figure{{order:2}}
+.f figure{{margin:0}}.f figcaption{{display:none}}.f img{{width:100%;aspect-ratio:3/4;object-fit:cover;background:#f6f6f6}}.f h3{{font-size:17px;font-weight:500;margin:0 0 10px}}.f p{{line-height:1.9;font-size:14px;margin:0}}
+@media (max-width:720px){{.top,.f{{grid-template-columns:1fr;gap:16px}}.f:nth-of-type(even) figure{{order:0}}}}
 </style>
 </head><body>
 <div class="bar"><span>SAMPLE SHOP</span><span class="tag" title="{label[1]}">{label[0]}</span></div>
 <div class="wrap">
   <div class="top">
-    <div><img class="main" src="{src(main)}" alt="{name}" width="600" height="800"><div class="th">{thumbs}</div></div>
+    <div><img class="main" src="{src(main)}" alt="{escape(desc_of(main))}" width="600" height="800"><div class="th">{thumbs}</div></div>
     <div>
       <div class="code">{escape(code)}</div>
       <h1>{name}</h1>
@@ -221,21 +228,80 @@ def sample_code(url: str) -> str | None:
 
 
 class ImageParser(HTMLParser):
-    """<img>(src・data-src・srcset のいちばん大きいもの)と og:image を、出てきた順に拾う"""
+    """<img>(src・data-src・srcset のいちばん大きいもの)と og:image を、出てきた順に拾う。
+    画像ごとの説明(description)の材料として、alt・title・入っている <figure> の <figcaption>・JSON-LD(application/ld+json)も拾う
+    (利用者の依頼 2026-10-23。本物のページは、画像のパスと一緒に説明を持つ。どこに書くかはサイトによるので、よくある場所を順に見る)"""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.found: list[dict[str, Any]] = []
+        self.figures: list[dict[str, Any]] = []  # 開いている <figure>(中の画像と、figcaption の文)
+        self.caption: list[str] | None = None  # 読んでいる <figcaption> の文
+        self.ld: list[str] = []  # JSON-LD の中身
+        self.in_ld = False
 
     def handle_starttag(self, tag, attrs):
         a = {k.lower(): (v or "") for k, v in attrs}
-        if tag == "meta" and (a.get("property") or a.get("name") or "").lower() in ("og:image", "og:image:url") and a.get("content"):
+        if tag == "script" and a.get("type", "").lower() == "application/ld+json":
+            self.in_ld = True
+            self.ld.append("")
+        elif tag == "figure":
+            self.figures.append({"imgs": [], "caption": ""})
+        elif tag == "figcaption":
+            self.caption = []
+        elif tag == "meta" and (a.get("property") or a.get("name") or "").lower() in ("og:image", "og:image:url") and a.get("content"):
             self.found.append({"src": a["content"].strip(), "alt": "", "og": True})
         elif tag in ("img", "source"):
             src = a.get("data-src") or a.get("data-original") or a.get("src") or ""
             best = _largest(a.get("srcset") or a.get("data-srcset") or "")
             w = _int(a.get("width"))
-            self.found.append({"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "width": w})
+            item = {"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "title": a.get("title", "").strip()[:2000], "width": w}
+            self.found.append(item)
+            if self.figures:
+                self.figures[-1]["imgs"].append(item)
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            self.in_ld = False
+        elif tag == "figcaption" and self.caption is not None:
+            if self.figures:
+                self.figures[-1]["caption"] = " ".join("".join(self.caption).split())[:2000]
+            self.caption = None
+        elif tag == "figure" and self.figures:
+            fig = self.figures.pop()
+            for item in fig["imgs"]:
+                item["figcaption"] = fig["caption"]
+
+    def handle_data(self, data):
+        if self.in_ld:
+            self.ld[-1] += data
+        elif self.caption is not None:
+            self.caption.append(data)
+
+
+def ld_captions(blocks: list[str], base: str) -> dict[str, str]:
+    """JSON-LD の画像(ImageObject。Product の image の中など)の URL → 説明(caption → description → name)"""
+    out: dict[str, str] = {}
+
+    def walk(o: Any) -> None:
+        if isinstance(o, list):
+            for x in o:
+                walk(x)
+        elif isinstance(o, dict):
+            url = o.get("contentUrl") or o.get("url")
+            if (o.get("@type") == "ImageObject" or "contentUrl" in o) and isinstance(url, str):
+                d = next((v for v in (o.get("caption"), o.get("description"), o.get("name")) if isinstance(v, str) and v.strip()), "")
+                if d:
+                    out.setdefault(original_size(urljoin(base, url.strip())), d.strip()[:2000])
+            for v in o.values():
+                walk(v)
+
+    for b in blocks:
+        try:
+            walk(json.loads(b))
+        except ValueError:  # 壊れた JSON-LD は飛ばす
+            continue
+    return out
 
 
 def _int(v: str | None) -> int | None:
@@ -281,11 +347,13 @@ def original_size(url: str) -> str:
 
 
 def extract(html: str, base: str) -> list[dict[str, str]]:
+    """ページの画像の一覧(src・alt・description)。description は alt → title → figcaption → JSON-LD の、最初にあるもの"""
     p = ImageParser()
     try:
         p.feed(html)
     except Exception:  # noqa: BLE001 — 壊れた HTML でも、拾えたところまで使う
         pass
+    ld = ld_captions(p.ld, base)
     out: list[dict[str, str]] = []
     seen: set[str] = set()
     for f in p.found:
@@ -299,7 +367,8 @@ def extract(html: str, base: str) -> list[dict[str, str]]:
         if f.get("width") is not None and f["width"] < 120:
             continue
         seen.add(absolute)
-        out.append({"src": absolute, "alt": f.get("alt") or ""})
+        desc = next((v for v in (f.get("alt"), f.get("title"), f.get("figcaption"), ld.get(absolute)) if v), "")
+        out.append({"src": absolute, "alt": f.get("alt") or "", "description": desc})
     return out[:MAX_IMAGES]
 
 
@@ -315,10 +384,8 @@ async def images(body: ImagesIn):
         # 見本: 通信せずに、ここで作ったページを、本物と同じ処理で読む。画像の場所は、アプリの中のパス
         product = await _product(code)
         html = sample_html(code, product)
+        # 見本の写真の説明の文は、ページの alt・figcaption・JSON-LD に書いてあり、本物のページと同じ処理で description に入る
         found = [{**i, "src": urlparse(i["src"]).path} for i in extract(html, f"https://{SAMPLE_HOST}/sample-shop/p/{code}")]
-        # 見本の写真は、ページで写真に添えた説明の文も、AI の判断の材料に渡す(本物のページでは、写真の近くの文にあたる)
-        captions = {ph["image_url"]: ph.get("caption") or "" for ph in (product or {}).get("photos") or []}
-        found = [{**i, "alt": f"{i['alt']}: {captions[i['src']]}" if captions.get(i["src"]) else i["alt"]} for i in found]
         return ok({"sample": True, "page": f"/sample-shop/p/{code}", "images": found})
     try:
         final, data, ctype = await asyncio.to_thread(linkpreview.fetch, url, linkpreview.MAX_PAGE, "text/html,application/xhtml+xml")
@@ -369,6 +436,7 @@ PROMPT = """あなたは、EC のメール・アプリの配信で、商品の�
 class SuggestImage(BaseModel):
     src: str
     alt: str = ""
+    description: str = ""
 
 
 class SuggestIn(BaseModel):
@@ -391,7 +459,8 @@ async def suggest(body: SuggestIn):
             data, ctype = await asyncio.to_thread(_read, img.src)
         except Exception:  # noqa: BLE001 — 読めない画像は飛ばす(番号は変えない)
             continue
-        label = f"画像 {i}" + (f"(ページの説明: {img.alt})" if img.alt else "")
+        note = img.description or img.alt
+        label = f"画像 {i}" + (f"(ページの説明: {note})" if note else "")
         if ctype in RASTER:
             contents += [label, types.Part.from_bytes(data=data, mime_type=ctype)]
         elif ctype == "image/svg+xml":

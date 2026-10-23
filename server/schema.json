@@ -78,6 +78,7 @@
     ["weather", "choice"],
     ["description", "text"],
     ["image_url", "text"],
+    ["image_caption", "text"],
     ["market", "choice"],
     ["category_path", "text"],
     ["gender", "choice"],

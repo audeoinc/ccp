@@ -7,6 +7,8 @@ import { CreativeFiles } from './creativeFiles'
 export interface PageImage {
   src: string
   alt: string
+  /** 画像の説明(ページの alt → title → figcaption → JSON-LD の、最初にあるもの。AI に画像を勧めてもらうときの材料) */
+  description?: string
   /** 取り込んだ商品の画像のうち、メイン画像(商品のマスタにある画像) */
   main?: boolean
 }

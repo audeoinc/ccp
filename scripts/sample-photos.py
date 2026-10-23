@@ -10,6 +10,7 @@
   python scripts/sample-photos.py draft --products 商品.json --spec import/prod.json   商品の一覧から、注文の文・見出し・説明を AI で下書きする
   python scripts/sample-photos.py generate --spec import/prod.json --out import/prod-photos   下書きで作る
   python scripts/sample-photos.py zip                      ZIP にする(⚙ →「商品の写真の ZIP を取り込む」か、python -m ccp.cli import-images で取り込む)
+  python scripts/sample-photos.py fill-main --spec import/prod.json [--products 商品.json]   メインの写真に説明の文がなければ、AI で足す
   python scripts/sample-photos.py draft-heroes --products 商品.json --spec import/heroes.json   メイン画像(ヒーロー)の注文の文を下書きする
   python scripts/sample-photos.py generate --spec import/heroes.json --out import/hero-photos    ヒーローの写真(横長 1 枚)を作る。zip も同じ
 
@@ -215,7 +216,7 @@ def make_zip(spec: dict, path: Path, max_mb: float) -> None:
 DRAFT = """You plan photos for a sample e-commerce product page. The product below is a real item in a store's catalog; we need four
 NEW, generic photos of a similar product (no brand, no logo, not a copy of any real product). Return JSON only:
 {"shots": [
-  {"angle": "front", "style": "product", "prompt": "<one English sentence: the item itself, color, material, shape, how it is shown (ghost mannequin, flat lay, pair at three-quarter angle, ...)>"},
+  {"angle": "front", "style": "product", "prompt": "<one English sentence: the item itself, color, material, shape, how it is shown (ghost mannequin, flat lay, pair at three-quarter angle, ...)>", "title": "<short heading>", "caption": "<one or two sentences describing the item as a whole>"},
   {"angle": "texture" | "detail", "style": "detail", "prompt": "<English: a macro close-up that shows the material or a key detail>", "title": "<short heading>", "caption": "<one or two sentences>"},
   {"angle": "worn" | "scene", "style": "worn" | "scene", "prompt": "<English: the item worn (face not visible) or in a calm lifestyle scene>", "title": "...", "caption": "..."},
   {"angle": "detail" | "texture" | "scene", "style": "detail" | "scene", "prompt": "<English: another strength>", "title": "...", "caption": "..."}
@@ -306,10 +307,55 @@ def draft_heroes(products_path: Path, spec_path: Path) -> None:
     print(f"下書き: メイン画像 {len(spec['products'])} 枚 → {spec_path}")
 
 
+FILL_MAIN = """Write the description of the MAIN photo of an apparel product on a calm online store's product page. The photo shows
+the item itself (no person). Return JSON only: {"items": [{"title": "<short heading>", "caption": "<one or two sentences describing the item as a whole>"}, ...]}
+with one item per language, in this order: %LANGS%. Base it on the product and the photo order below; do not invent certifications,
+percentages or claims. Product: %PRODUCT%"""
+
+
+def fill_main(spec_path: Path, products_path: Path | None) -> None:
+    """メインの写真に説明の文がない商品に、見出しと説明を AI で足す(画像 1 枚ごとに説明を持たせる。利用者の依頼 2026-10-23)。
+    済んだ商品は飛ばす。商品の一覧(--products)があれば、名前・説明も材料に渡す"""
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    rows = {}
+    if products_path:
+        src = json.loads(products_path.read_text(encoding="utf-8"))
+        rows = {f"{r.get('market') or 'JP'}-{r.get('product_code')}".lower(): r for r in src.get("products") or src.get("tables", {}).get("products") or []}
+    auth = Auth()
+    done = 0
+    for prod in spec["products"]:
+        main = prod["shots"][0]
+        if main.get("caption"):
+            continue
+        markets = prod.get("markets") or MARKETS
+        langs = ", ".join("Japanese" if m == "JP" else "English" for m in markets)
+        row = rows.get(prod["key"]) or {}
+        info = {**{k: row.get(k) for k in ("name", "category", "description") if row.get(k)}, "main_photo": main["prompt"],
+                "other_photos": [(sh.get("title") or [""])[0] for sh in prod["shots"][1:]]}
+        out = None
+        for attempt in range(4):
+            try:
+                out = ask_text(auth.project, auth.token, FILL_MAIN.replace("%LANGS%", langs).replace("%PRODUCT%", json.dumps(info, ensure_ascii=False)))
+                break
+            except Exception as e:  # noqa: BLE001 — 429 などは待ってやり直す。だめなら飛ばし、あとで流し直す
+                print(f"  {prod['key']}: やり直し({e})")
+                time.sleep(20 * (attempt + 1))
+        items = (out or {}).get("items") or []
+        if len(items) != len(markets):
+            print(f"  {prod['key']}: 説明を作れませんでした")
+            continue
+        main["title"] = [i.get("title") or "" for i in items]
+        main["caption"] = [i.get("caption") or "" for i in items]
+        spec_path.write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
+        done += 1
+        print(f"{prod['key']}: {main['caption'][0][:60]}")
+    print(f"メインの説明を足した商品: {done}")
+
+
 def main() -> int:
     global OUT, MODEL
     ap = argparse.ArgumentParser(description="見本の商品の写真を AI で作り、取り込める ZIP にする")
-    ap.add_argument("cmd", choices=["draft", "draft-heroes", "generate", "zip"])
+    ap.add_argument("cmd", choices=["draft", "draft-heroes", "fill-main", "generate", "zip"])
     ap.add_argument("--spec", type=Path, default=SPEC, help="何を作るか(既定 scripts/sample-photos.json)")
     ap.add_argument("--out", type=Path, default=None, help="写真を置くフォルダ(既定 import/sample-photos)")
     ap.add_argument("--model", default=MODEL, help=f"画像のモデル(既定 {MODEL}。安く速くするなら gemini-2.5-flash-image。モデルを替えたら --out も替える)")
@@ -322,6 +368,9 @@ def main() -> int:
     MODEL = args.model
     if args.out:
         OUT = args.out.resolve()
+    if args.cmd == "fill-main":
+        fill_main(args.spec, args.products)
+        return 0
     if args.cmd in ("draft", "draft-heroes"):
         (draft if args.cmd == "draft" else draft_heroes)(args.products, args.spec)
         return 0

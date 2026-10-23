@@ -62,6 +62,8 @@ export interface ProductFields {
   weather?: ProductWeather
   description?: string
   image_url?: string
+  /** メイン画像(image_url)の説明の文(商品ページの画像の description。取り込みでメイン画像を設定するときに入る。B12) */
+  image_caption?: string | null
   market?: ProductMarket
   // ここから下は、BigQuery の SPU の出力から取り込む列(docs/BIGQUERY_EXPORT.md の 2 章)。画面からは書かない
   /** カテゴリの階層(上の段から ' > ' でつないだもの) */

@@ -50,6 +50,7 @@ python scripts/collect-product-images.py 商品.csv --limit 5
 
 - 途中で止めても、同じコマンドをもう一度流せば、済んだ商品を飛ばして続きから集めます(`product_images_out/results.jsonl` に記録)
 - 拾い方は、CCP の「商品ページから画像を選ぶ」と同じです(`<img>` の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く)
+- **画像ごとの説明(description)も取ります**(利用者の依頼 2026-10-23)。`alt` → `title` → 画像が入っている `<figure>` の `<figcaption>` → JSON-LD(`application/ld+json` の `ImageObject` の `caption` / `description` / `name`。URL で画像に当てる)の、最初にあるものを、目録の `caption` に入れます。取り込むと `product_images.caption`(1 枚ごと)に、メイン画像を設定するときは商品のマスタの `products.image_caption` にも入ります。見本の EC サイトのページも、同じ書き方(alt・figcaption・JSON-LD)で説明を出しています
 - 画像の URL の大きさの指定 `?width=…`(大文字・小文字は問わない)は外して、元の大きさで取ります(2026-10-23)。ほかのクエリ(`w=`・`height=` なども)はそのまま残します
 - 最後に、画像と目録(`manifest.json`。商品・元の URL・メインかどうか・読めなかったページと理由)を 1 つの ZIP にまとめます
 
@@ -78,6 +79,6 @@ cd ~/ccp/server
 - 作る(開発側の手元の PC。この PC の認証で Vertex AI の画像のモデルを呼ぶ。1 枚ごとに費用がかかる): `python scripts/sample-photos.py generate`。何を作るかは `scripts/sample-photos.json`(先頭がメイン。サブはメインを手本に作る)。写真は `import/sample-photos/`(Git に入れない)
 - ZIP にする: `python scripts/sample-photos.py zip`(25MB ごとに分ける)。目録に `"sample": true`
 - 取り込む: 上の 3 章と同じ `ccp.cli import-images`、または画面の ⚙ →「見本のデータ」→「商品・メイン画像の写真の ZIP を取り込む」(確認のあとで取り込む)
-- 表 `product_images` の `source = sample` の行になり、`alt` が見出し・`caption` が説明の文・`angle` がアングル。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替えます。本物の画像がある商品では、画面は本物を使います
+- 表 `product_images` の `source = sample` の行になり、`alt` が見出し・`caption` が説明の文(メインの写真にも。メインの説明がない下書きには `python scripts/sample-photos.py fill-main --spec …` で AI が足す)・`angle` がアングル。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替えます。本物の画像がある商品では、画面は本物を使います
 - 商品のメイン画像(マスタ)は、空か仮の画像(placehold.co)のときだけ、見本のメインで置き換えます。⚙ で「メイン画像も置き換える」(OK)を選ぶか、`--main-to-master` を付けると、今のメイン画像も置き換えます。前の画像は `source = master` の行に控えとして 1 度だけ残すので、元に戻せます(その行の `image_url` を商品の `image_url` に戻す)。控えの行は、画像を選ぶ窓の候補には出ません
 - **メイン画像(ヒーロー。表 `hero_images`)の見本の写真**: `python scripts/sample-photos.py draft-heroes --products <商品の一覧の JSON> --spec import/heroes.json`(名前・説明・季節から、新しい写真の注文の文を AI が下書き。人は顔が写らない構図だけ)→ `generate --spec import/heroes.json --out import/hero-photos`(横長 4:3 を 1 枚、長い辺 1600px。テンプレートごとに切り出すので、主役を真ん中に)→ `zip` も同じ指定で。目録に `"kind": "heroes"` が入り、上と同じ入口(`import-images`・⚙)で取り込めます。行は `id`(なければ画像コードと市場)で探し、`image_url` を `/img/heroes/s-<sha256 の頭>.jpg` に差し替え、前の画像は `original_image_url` に 1 度だけ控えます(ファイルは消さない。元に戻すときは、それを `image_url` に戻す)。焦点(`focal_*`)は空に戻ります

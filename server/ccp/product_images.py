@@ -11,6 +11,7 @@ Workbench のサーバーは、利用先の EC サイトを読めない。手元
 - 表 product_images に、商品ごとの画像を並べる。ZIP に入っている商品の行は、入れ替える(何度流しても同じ結果)
 - 商品は、商品コード(と、ZIP に市場があれば市場)で探す。マスタにない商品は、飛ばして件数を出す
 - 商品のマスタのメイン画像(products.image_url)は、空のときだけ、取り込んだメイン画像で埋める(--main-to-master なら置き換える)
+- 画像ごとの説明(ページの description。目録の caption)は product_images.caption に、メイン画像を埋めるときは products.image_caption にも入れる
 
 見本の写真(AI で作った。scripts/sample-photos.py が作る ZIP。目録に "sample": true)も、同じ入口で取り込む:
 - 行に source = sample と、見出し(alt)・説明の文(caption)・アングル(angle)を入れる。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替える
@@ -149,14 +150,14 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
         # 見本の ZIP は見本の行だけ、本物の ZIP は本物の行(source が空)だけを入れ替える。元のメイン画像の控え(master)は残す
         scope = "source = :s" if sample else "source IS NULL"
         await conn.execute(text(f"DELETE FROM product_images WHERE product_id = :id AND {scope}"), {"id": prod["id"], "s": SAMPLE})
-        main_url = None
+        main_url = main_caption = None
         for order, img in enumerate(it["images"], start=1):
             name = file_name(img)
             if put(name, z.read(f"products/{img['file']}"), img["content_type"]):
                 placed += 1
             url = f"/img/products/{name}"
             if img.get("main") and not main_url:
-                main_url = url
+                main_url, main_caption = url, (img.get("caption") or "")[:2000] or None
             await conn.execute(
                 text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, caption, angle, source, product_id) "
                      "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :caption, :angle, :source, :pid)"),
@@ -174,7 +175,9 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
                          "SELECT :name, :code, :market, :url, 0, 0, :source, :pid WHERE NOT EXISTS (SELECT 1 FROM product_images WHERE product_id = :pid AND source = :source)"),
                     {"name": current.rsplit("/", 1)[-1][:200], "code": prod["product_code"], "market": prod.get("market"), "url": current, "source": MASTER, "pid": prod["id"]},
                 )
-            await conn.execute(text("UPDATE products SET image_url = :u, modified_on = now() WHERE id = :id"), {"u": main_url, "id": prod["id"]})
+            # メイン画像の説明(ページの description)も一緒に入れる(利用者の依頼 2026-10-23。画像のパスと説明を組で持つ)
+            await conn.execute(text("UPDATE products SET image_url = :u, image_caption = :c, modified_on = now() WHERE id = :id"),
+                               {"u": main_url, "c": main_caption, "id": prod["id"]})
             mains += 1
     return {"placed": placed, "rows": rows, "mains": mains}
 

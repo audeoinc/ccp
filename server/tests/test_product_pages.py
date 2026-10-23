@@ -28,6 +28,8 @@ class SampleShopTest(unittest.TestCase):
         found = pp.extract(html, "https://shop.example.com/sample-shop/p/U01")
         # メインが先頭。小さな写真の列は除き、特長の写真を拾う
         self.assertEqual([f["src"] for f in found], ["https://shop.example.com/img/products/m.jpg", "https://shop.example.com/img/products/t.jpg"])
+        # 画像ごとの説明: 特長の写真は説明の文、説明のないメインは商品の名前
+        self.assertEqual([f["description"] for f in found], ["Coat", "Warm <b>"])
 
     def test_sample_svg_gets_colors_per_product(self):
         a, b = pp.sample_svg("P01", "front"), pp.sample_svg("P02", "front")
@@ -50,6 +52,20 @@ class ExtractTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DescriptionTest(unittest.TestCase):
+    PAGE = """<html><head><script type="application/ld+json">{"@type": "Product", "image": [
+      {"@type": "ImageObject", "contentUrl": "/d.jpg?width=300", "caption": "from json-ld"}]}</script></head><body>
+      <img src="/a.jpg" alt="alt text" title="title text">
+      <img src="/b.jpg" title="title only">
+      <figure><figcaption>caption first</figcaption><img src="/c.jpg"></figure>
+      <img src="/d.jpg"><img src="/e.jpg"></body></html>"""
+
+    def test_alt_then_title_then_figcaption_then_json_ld(self) -> None:
+        found = pp.extract(self.PAGE, "https://shop/p/1")
+        self.assertEqual([(f["src"].rsplit("/", 1)[1], f["description"]) for f in found],
+                         [("a.jpg", "alt text"), ("b.jpg", "title only"), ("c.jpg", "caption first"), ("d.jpg", "from json-ld"), ("e.jpg", "")])
 
 
 class OriginalSizeTest(unittest.TestCase):
@@ -91,3 +107,5 @@ class CollectScriptTest(unittest.TestCase):
             self.assertEqual(mod.original_size(u), pp.original_size(u))
         got = [i["src"] for i in mod.extract('<img src="/a.jpg?width=200"><img src="/a.jpg?width=800">', "https://shop/p/1")]
         self.assertEqual(got, ["https://shop/a.jpg"])
+        # 説明の拾い方も同じ
+        self.assertEqual(mod.extract(DescriptionTest.PAGE, "https://shop/p/1"), pp.extract(DescriptionTest.PAGE, "https://shop/p/1"))

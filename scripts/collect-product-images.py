@@ -15,6 +15,7 @@ CSV の列(1 行目は列名):
 
 ページの拾い方は、CCP の「商品ページから画像を選ぶ」(server/ccp/product_pages.py の extract)と同じ
 (<img> の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く。
+画像ごとの説明(description)は alt → title → <figcaption> → JSON-LD の順に拾い、目録の caption に入れる(取り込むと product_images.caption)。
 画像の URL の大きさの指定 ?width= は外して、元の大きさで取る)。
 直すときは、両方を合わせる。
 
@@ -49,20 +50,55 @@ NOISE = re.compile(r"(logo|icon|sprite|badge|banner|pixel|tracking|spacer|avatar
 
 
 class ImageParser(HTMLParser):
-    """<img>(src・data-src・srcset のいちばん大きいもの)と og:image を、出てきた順に拾う(product_pages.py と同じ)"""
+    """<img>(src・data-src・srcset のいちばん大きいもの)と og:image を、出てきた順に拾う。
+    画像ごとの説明(description)の材料として、alt・title・入っている <figure> の <figcaption>・JSON-LD(application/ld+json)も拾う
+    (利用者の依頼 2026-10-23。本物のページは、画像のパスと一緒に説明を持つ。どこに書くかはサイトによるので、よくある場所を順に見る)"""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.found: list[dict] = []
+        self.figures: list[dict] = []  # 開いている <figure>(中の画像と、figcaption の文)
+        self.caption: list[str] | None = None  # 読んでいる <figcaption> の文
+        self.ld: list[str] = []  # JSON-LD の中身
+        self.in_ld = False
 
     def handle_starttag(self, tag, attrs):
         a = {k.lower(): (v or "") for k, v in attrs}
-        if tag == "meta" and (a.get("property") or a.get("name") or "").lower() in ("og:image", "og:image:url") and a.get("content"):
-            self.found.append({"src": a["content"].strip(), "alt": ""})
+        if tag == "script" and a.get("type", "").lower() == "application/ld+json":
+            self.in_ld = True
+            self.ld.append("")
+        elif tag == "figure":
+            self.figures.append({"imgs": [], "caption": ""})
+        elif tag == "figcaption":
+            self.caption = []
+        elif tag == "meta" and (a.get("property") or a.get("name") or "").lower() in ("og:image", "og:image:url") and a.get("content"):
+            self.found.append({"src": a["content"].strip(), "alt": "", "og": True})
         elif tag in ("img", "source"):
             src = a.get("data-src") or a.get("data-original") or a.get("src") or ""
             best = largest(a.get("srcset") or a.get("data-srcset") or "")
-            self.found.append({"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "width": to_int(a.get("width"))})
+            w = to_int(a.get("width"))
+            item = {"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "title": a.get("title", "").strip()[:2000], "width": w}
+            self.found.append(item)
+            if self.figures:
+                self.figures[-1]["imgs"].append(item)
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            self.in_ld = False
+        elif tag == "figcaption" and self.caption is not None:
+            if self.figures:
+                self.figures[-1]["caption"] = " ".join("".join(self.caption).split())[:2000]
+            self.caption = None
+        elif tag == "figure" and self.figures:
+            fig = self.figures.pop()
+            for item in fig["imgs"]:
+                item["figcaption"] = fig["caption"]
+
+    def handle_data(self, data):
+        if self.in_ld:
+            self.ld[-1] += data
+        elif self.caption is not None:
+            self.caption.append(data)
 
 
 def to_int(v):
@@ -103,12 +139,39 @@ def original_size(url: str) -> str:
     return base + ("?" + "&".join(kept) if kept else "") + (hsep + frag if hsep else "")
 
 
+def ld_captions(blocks: list[str], base: str) -> dict:
+    """JSON-LD の画像(ImageObject。Product の image の中など)の URL → 説明(caption → description → name)"""
+    out: dict = {}
+
+    def walk(o):
+        if isinstance(o, list):
+            for x in o:
+                walk(x)
+        elif isinstance(o, dict):
+            url = o.get("contentUrl") or o.get("url")
+            if (o.get("@type") == "ImageObject" or "contentUrl" in o) and isinstance(url, str):
+                d = next((v for v in (o.get("caption"), o.get("description"), o.get("name")) if isinstance(v, str) and v.strip()), "")
+                if d:
+                    out.setdefault(original_size(urljoin(base, url.strip())), d.strip()[:2000])
+            for v in o.values():
+                walk(v)
+
+    for b in blocks:
+        try:
+            walk(json.loads(b))
+        except ValueError:  # 壊れた JSON-LD は飛ばす
+            continue
+    return out
+
+
 def extract(html: str, base: str) -> list[dict]:
+    """ページの画像の一覧(src・alt・description)。description は alt → title → figcaption → JSON-LD の、最初にあるもの"""
     p = ImageParser()
     try:
         p.feed(html)
     except Exception:  # 壊れた HTML でも、拾えたところまで使う
         pass
+    ld = ld_captions(p.ld, base)
     out, seen = [], set()
     for f in p.found:
         src = f["src"]
@@ -121,7 +184,8 @@ def extract(html: str, base: str) -> list[dict]:
         if f.get("width") is not None and f["width"] < 120:
             continue
         seen.add(absolute)
-        out.append({"src": absolute, "alt": f.get("alt") or ""})
+        desc = next((v for v in (f.get("alt"), f.get("title"), f.get("figcaption"), ld.get(absolute)) if v), "")
+        out.append({"src": absolute, "alt": f.get("alt") or "", "description": desc})
     return out
 
 
@@ -196,7 +260,7 @@ def collect(row: dict, out: Path, args) -> dict:
     main = original_size(row.get("main_image_url") or "")
     seen_hash: set[str] = set()
 
-    def keep(body: bytes, itype: str, src: str, alt: str, is_main: bool) -> str:
+    def keep(body: bytes, itype: str, src: str, alt: str, is_main: bool, caption: str = "") -> str:
         """画像を保存して、目録に足す。足さなかったときは、その理由を返す"""
         ext = EXT.get(itype)
         if not ext:
@@ -209,14 +273,16 @@ def collect(row: dict, out: Path, args) -> dict:
         seen_hash.add(h)
         name = f"{len(result['images']) + 1:02d}_{'main_' if is_main else ''}{h[:12]}.{ext}"
         (folder / name).write_bytes(body)
-        result["images"].append({"file": f"{folder.name}/{name}", "src": src, "alt": alt, "bytes": len(body), "sha256": h, "content_type": itype, "main": is_main})
+        result["images"].append({"file": f"{folder.name}/{name}", "src": src, "alt": alt, "caption": caption, "bytes": len(body), "sha256": h, "content_type": itype, "main": is_main})
         return ""
 
     if main:
         # メイン画像(商品のマスタにある)を先頭に。ページ上の同じ画像は、URL か中身で見分けて重ねない
         try:
             _, body, itype, _ = get(main, MAX_IMAGE, "image/*")
-            why = keep(body, itype, main, "", True)
+            # メイン画像の説明は、ページの上の同じ画像の説明(なければ空)
+            on_page = next((i for i in found if same_image(i["src"], main)), None)
+            why = keep(body, itype, main, (on_page or {}).get("alt", ""), True, (on_page or {}).get("description", ""))
             if why:
                 result["skipped"].append({"src": main, "reason": f"メイン画像: {why}"})
         except Exception as e:
@@ -243,7 +309,7 @@ def collect(row: dict, out: Path, args) -> dict:
             continue
         finally:
             time.sleep(args.sleep)
-        why = keep(body, itype, src, img["alt"], False)
+        why = keep(body, itype, src, img["alt"], False, img.get("description", ""))
         if why:
             result["skipped"].append({"src": src, "reason": why})
     return result

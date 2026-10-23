@@ -12,7 +12,8 @@
     {
       "key": "wool-coat", "codes": ["P01", "U01"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A long single-breasted charcoal grey wool overcoat with notch lapels, shown on an invisible ghost mannequin, front view."},
+        {"angle": "front", "style": "product", "prompt": "A long single-breasted charcoal grey wool overcoat with notch lapels, shown on an invisible ghost mannequin, front view.",
+          "title": ["ウール シングル ロングコート", "Charcoal Grey Wool Long Overcoat"], "caption": ["上質なチャコールグレーのウールを使用した、クラシックなノッチドラペルのシングルブレストロングコート。洗練されたシンプルなシルエットが、落ち着きのある上品な佇まいを演出します。", "A classic single-breasted long overcoat crafted from charcoal grey wool, featuring elegant notch lapels. Its clean, structured silhouette offers a sophisticated and timeless look."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the coat's dense brushed wool fabric and a horn-style button, showing the soft fibers.",
           "title": ["密に織ったウール", "Densely woven wool"], "caption": ["起毛した厚手のウールが、風を通さず体温を逃がしません。ボタンは手に取りやすい大きめのサイズ。", "Brushed, heavy wool blocks the wind and holds in warmth. The large buttons are easy to grab with cold hands."]},
         {"angle": "worn", "style": "worn", "prompt": "The coat worn open over a cream knit sweater and dark trousers, full-length below the chin, showing the long straight silhouette.",
@@ -24,7 +25,8 @@
     {
       "key": "crewneck-knit", "codes": ["P07", "U07"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A fine-gauge merino wool crew-neck sweater in heather oatmeal beige, neatly folded flat lay seen from above."},
+        {"angle": "front", "style": "product", "prompt": "A fine-gauge merino wool crew-neck sweater in heather oatmeal beige, neatly folded flat lay seen from above.",
+          "title": ["メリノウール クルーネックセーター", "Merino Wool Crew-Neck Sweater"], "caption": ["細番手の糸でなめらかに編み上げた、ヘザーオートミールベージュのクルーネックセーター。丁寧に折りたたまれた平置きの佇まいから、上質なメリノウールの柔らかな質感と、シンプルで美しい仕立てが伝わります。", "A fine-gauge merino wool crew-neck sweater in heather oatmeal beige, neatly folded in a flat lay from above. This classic piece showcases the smooth texture of high-quality knitwear, designed for effortless and timeless wear."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the fine, smooth merino jersey knit stitches with a soft sheen.",
           "title": ["なめらかなメリノウール", "Smooth merino wool"], "caption": ["細い糸で編んだメリノウールは、チクチクしにくく、素肌に着ても心地よい肌触り。", "Fine-spun merino is soft enough to wear next to the skin, without the itch."]},
         {"angle": "worn", "style": "worn", "prompt": "The sweater worn tucked loosely into light grey trousers, framed from the chin to the hips.",
@@ -36,7 +38,8 @@
     {
       "key": "cable-knit", "codes": ["P09", "U09"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A navy blue chunky cable-knit wool crew-neck sweater, shown on an invisible ghost mannequin, front view."},
+        {"angle": "front", "style": "product", "prompt": "A navy blue chunky cable-knit wool crew-neck sweater, shown on an invisible ghost mannequin, front view.",
+          "title": ["ウール ケーブルニット クルーネックセーター", "Chunky Cable-Knit Wool Sweater"], "caption": ["立体感のある美しいケーブル編みが引き立つ、ネイビーのクルーネックセーター。ゆとりのあるシルエットで、寒い季節の定番として長く寄り添う一着です。", "A front view of this classic navy blue crew-neck sweater, crafted from wool with a rich, dimensional cable-knit pattern. Its relaxed silhouette makes it a timeless, comforting staple for cold days."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the raised cable-knit pattern in thick navy wool yarn.",
           "title": ["立体的なケーブル編み", "Raised cable pattern"], "caption": ["太い糸で編んだ縄編みの柄が立体的に浮かび、着るだけで表情のある装いに。", "Thick yarn makes the cables stand out, so the sweater adds texture to any outfit."]},
         {"angle": "worn", "style": "worn", "prompt": "The sweater worn with light blue jeans, framed from the chin to the thighs, relaxed fit.",
@@ -48,7 +51,8 @@
     {
       "key": "denim", "codes": ["P12", "U12"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "Mid-wash blue straight-leg stretch denim jeans, laid flat, front view, full length."},
+        {"angle": "front", "style": "product", "prompt": "Mid-wash blue straight-leg stretch denim jeans, laid flat, front view, full length.",
+          "title": ["ミッドウォッシュ ストレッチストレートデニム", "Mid-Wash Straight-Leg Stretch Jeans"], "caption": ["美しいストレートシルエットが引き立つ、ミッドウォッシュブルーのストレッチデニムです。平置きで撮影されたフロントの全体像から、シンプルで飽きのこないデザインが伝わります。", "A full-length, front-facing flat lay of our mid-wash blue straight-leg stretch denim jeans, showcasing their clean silhouette and classic style."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of indigo stretch denim twill weave with fine fading and orange top-stitching.",
           "title": ["よく伸びるデニム", "Denim with stretch"], "caption": ["ストレッチ糸を織り込んだデニムで、しゃがんだり歩いたりしても突っ張りません。", "Woven with stretch yarn, so it moves with you when you walk, sit or crouch."]},
         {"angle": "worn", "style": "worn", "prompt": "The jeans worn with a white t-shirt and white sneakers, framed from the waist down to the feet, straight leg.",
@@ -60,7 +64,8 @@
     {
       "key": "pleated-skirt", "codes": ["P15", "U15"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A dusty sage green pleated midi skirt with an elastic waistband, shown on an invisible ghost mannequin, front view."},
+        {"angle": "front", "style": "product", "prompt": "A dusty sage green pleated midi skirt with an elastic waistband, shown on an invisible ghost mannequin, front view.",
+          "title": ["上品なダスティセージのプリーツミディスカート", "Dusty Sage Green Pleated Midi Skirt"], "caption": ["落ち着いたダスティセージグリーンが美しい、細やかなプリーツのミディ丈スカートです。ウエストは快適なゴム仕様になっており、上品さとリラックスした着心地を両立しています。", "A pleated midi skirt in a calm, dusty sage green featuring a comfortable elastic waistband. This piece offers an elegant silhouette with structured pleats for a refined yet relaxed look."]},
         {"angle": "texture", "style": "detail", "prompt": "Close-up of the skirt's crisp, even fine pleats in a soft matte fabric.",
           "title": ["くずれにくいプリーツ", "Pleats that stay crisp"], "caption": ["細かいプリーツは、たたんでも洗っても折り目が残りやすく、アイロンいらず。", "The fine pleats keep their creases after folding and washing, no ironing needed."]},
         {"angle": "worn", "style": "worn", "prompt": "The skirt worn with a cream knit top and ankle boots, mid-stride so the pleats swing, framed from the chest down.",
@@ -72,7 +77,8 @@
     {
       "key": "leather-boots", "codes": ["P16", "U16"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A pair of dark brown full-grain leather lace-up ankle boots, three-quarter side view."},
+        {"angle": "front", "style": "product", "prompt": "A pair of dark brown full-grain leather lace-up ankle boots, three-quarter side view.",
+          "title": ["風合い豊かな本革レースアップアンクルブーツ", "Classic Full-Grain Leather Lace-Up Ankle Boots"], "caption": ["深みのあるダークブラウンのフルグレインレザーで仕立てた、クラシカルなレースアップアンクルブーツ。上質な本革の質感と端正なシルエットが際立つ、斜めからのアングルで仕上げた一枚です。", "Crafted from rich, dark brown full-grain leather, these classic lace-up ankle boots are captured in a three-quarter side view. The clean perspective highlights the premium texture of the leather and their timeless silhouette."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the boot's smooth full-grain brown leather with natural grain and a subtle polished sheen.",
           "title": ["育つ本革", "Leather that ages well"], "caption": ["表面を削らない本革は、履くほど足に馴染み、つやと深みが増していきます。", "Full-grain leather softens to your foot and gains depth and shine over time."]},
         {"angle": "detail", "style": "detail", "prompt": "Close-up of the boot's thick rubber lug sole and welt stitching, the boot tilted to show the sole.",
@@ -84,7 +90,8 @@
     {
       "key": "sneakers", "codes": ["P18", "U18"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A pair of minimal white leather low-top sneakers with a white rubber sole, three-quarter side view."},
+        {"angle": "front", "style": "product", "prompt": "A pair of minimal white leather low-top sneakers with a white rubber sole, three-quarter side view.",
+          "title": ["ミニマルなレザースニーカー", "Minimalist Leather Sneakers"], "caption": ["上質な白レザーとシンプルなソールで仕上げた、クリーンな佇まいのローカットスニーカー。無駄のない洗練されたミニマルなデザインは、あらゆるコーディネートに優しく寄り添います。", "A pair of low-top sneakers featuring clean white leather and a matching white rubber sole. Their refined, minimalist design effortlessly complements any style in your wardrobe."]},
         {"angle": "detail", "style": "detail", "prompt": "Close-up of the sneaker's lightweight cushioned sole cut-away feel, the shoe tilted to show the side of the sole and heel.",
           "title": ["軽くて弾むクッション", "Light, springy cushioning"], "caption": ["軽いクッション材の底で、一日歩いても足が疲れにくい履き心地です。", "A lightweight cushioned sole keeps your feet comfortable all day."]},
         {"angle": "worn", "style": "worn", "prompt": "The sneakers worn with cropped beige chinos, framed from the knees down, walking on a light concrete floor.",
@@ -96,7 +103,8 @@
     {
       "key": "wool-scarf", "codes": ["P21", "U21"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A large wool scarf in a camel and grey tartan check with fringed ends, loosely folded on a white background."},
+        {"angle": "front", "style": "product", "prompt": "A large wool scarf in a camel and grey tartan check with fringed ends, loosely folded on a white background.",
+          "title": ["ウール大判タータンチェックマフラー", "Large Wool Tartan Check Scarf"], "caption": ["キャメルとグレーの上品なタータンチェック柄にフリンジをあしらった、大判のウールマフラーです。白背景にふんわりと畳まれた様子が、その温かみのある柔らかな質感を伝えます。", "A large wool scarf in a classic camel and grey tartan check with fringed ends, loosely folded against a clean white background to showcase its soft and warm texture."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the scarf's soft brushed wool weave and fringe.",
           "title": ["ふんわり起毛", "Soft brushed finish"], "caption": ["起毛させたウールは、ふんわり軽く、首に巻いてもチクチクしにくい肌触り。", "Brushed wool feels light and soft around the neck."]},
         {"angle": "worn", "style": "worn", "prompt": "The scarf wrapped loosely around the neck over a navy coat, framed from the chin to the waist.",
@@ -108,7 +116,8 @@
     {
       "key": "tote-bag", "codes": ["P25", "U25"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A sturdy natural beige canvas tote bag with olive green leather-trim handles, standing upright, front view, plain with no print."},
+        {"angle": "front", "style": "product", "prompt": "A sturdy natural beige canvas tote bag with olive green leather-trim handles, standing upright, front view, plain with no print.",
+          "title": ["キャンバストートバッグ", "Canvas Tote Bag"], "caption": ["オリーブグリーンのレザーハンドルをあしらった、ナチュラルなベージュのキャンバストートバッグです。プリントのないシンプルなデザインで、しっかりと自立する美しい佇まいが魅力です。", "A sturdy, natural beige canvas tote bag featuring elegant olive green leather-trim handles. This print-free, minimalist bag stands upright on its own, showcasing its clean and structured front view."]},
         {"angle": "detail", "style": "detail", "prompt": "View looking into the open tote bag showing a roomy interior, an inner zip pocket and a laptop-sized document folder inside.",
           "title": ["A4 が入る広さ", "Fits A4 documents"], "caption": ["A4 の書類やノートパソコンも入る広さ。内ポケットで小物も迷子になりません。", "Room for A4 papers or a laptop, with an inner pocket for small things."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the thick canvas weave and the stitched join between the canvas and leather handle.",
@@ -120,7 +129,8 @@
     {
       "key": "blanket", "codes": ["P29", "U29"],
       "shots": [
-        {"angle": "front", "style": "product", "prompt": "A plush soft throw blanket in warm oatmeal color, neatly folded in a stack, front view."},
+        {"angle": "front", "style": "product", "prompt": "A plush soft throw blanket in warm oatmeal color, neatly folded in a stack, front view.",
+          "title": ["ふんわりと畳まれたオーツ麦色のブランケット", "Neatly Folded Oatmeal Throw Blanket"], "caption": ["温かみのあるオーツ麦色のブランケットが、端正に折り畳まれて重なっています。見るだけで伝わるふっくらと柔らかな質感が、お部屋に優しいぬくもりを添えます。", "A plush, soft throw blanket in a warm oatmeal color, beautifully folded and stacked. The front view highlights its incredibly gentle texture and comforting weight."]},
         {"angle": "texture", "style": "detail", "prompt": "Extreme close-up of the blanket's dense, fluffy plush pile.",
           "title": ["ふわふわの手触り", "Plush and soft"], "caption": ["毛足のある、ふわふわの生地で、触れた瞬間から暖かさを感じられます。", "A dense, fluffy pile that feels warm the moment you touch it."]},
         {"angle": "scene", "style": "scene", "prompt": "The blanket draped over the arm of a light grey sofa in a calm living room, warm evening lamp light.",
