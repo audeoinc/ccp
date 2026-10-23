@@ -33,6 +33,7 @@ npm run release:workbench -- --publish     # すべて通ったら、GitHub の 
 | `docs/` の Workbench の手引き・設計・機能・開発の理由(FEATURE_REASONS)・BACKLOG・SOURCE_MAP・BigQuery・承認・方針・スクリーンショット・ワイヤーフレーム | `docs/GCP.md`・`HANDOVER.md`・`handover-archive/`(作業の記録)・`CLOUD.md`・`ONBOARDING.md`・`RELEASE.md`(この文書)・`UPDATE.md`(利用先の Git への入れ方。別に渡す)・`font-compare.html` |
 | `release/workbench/files/` の中身(Workbench 版の `README.md`・`CLAUDE.md`)を、ルートに置く | 開発側の `README.md`・`CLAUDE.md` |
 | `VERSION.txt`(スクリプトが作る。版・元のコミット・日付) | Git の履歴(`.git`) |
+| | 当面入れない(2026-10-23 利用者の指示): 商品ページの画像を、リストを渡してまとめてダウンロードする道具(B11)の `scripts/collect-product-images.py` と、その手順書 `docs/PRODUCT_IMAGES.md`。ほかの文書のこの道具の行は `<!-- hosted -->` で消す。取り込み(`ccp.cli import-images`・`server/ccp/product_images.py`)・表 `product_images`・画像を選ぶ窓は入る |
 
 ## 3. 本番だけの処理の置き場所(コード)
 
