@@ -141,3 +141,20 @@ export function anchorOfPart(p: PartRef | null, productIdOf: (itemKey: string) =
       return null
   }
 }
+
+/** 書き込みの場所から、選ぶ部品へ(書き込みを押したときに、その部品を選ぶ。ピンのフロートの「この部品を直す」も) */
+export function partOfAnchor(anchor: string | undefined, itemKeyOf: (productId: string) => string | undefined, productId?: string): PartRef | null {
+  if (!anchor) return null
+  const [kind, arg] = anchor.split(':')
+  if (kind === 'hero') return { kind: 'hero' }
+  if (kind === 'herotext') return { kind: 'headline' }
+  if (kind === 'subject') return { kind: 'subject' }
+  if (kind === 'push') return { kind: 'pushTitle' }
+  if (kind === 'section' && Number.isInteger(Number(arg))) return { kind: 'sectionTitle', index: Number(arg) }
+  if (kind === 'button' && arg) return { kind: 'button', id: arg }
+  if (kind === 'product' && productId) {
+    const key = itemKeyOf(productId)
+    return key ? { kind: 'product', itemKey: key } : null
+  }
+  return null
+}

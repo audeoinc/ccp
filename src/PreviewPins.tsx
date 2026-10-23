@@ -53,8 +53,8 @@ interface Props {
   placing: boolean
   /** 場所を選んだ・やめたとき */
   onPlacingEnd: () => void
-  /** ピンを押した・場所を選んだとき(やり取りの欄を開く) */
-  onOpenThreads: () => void
+  /** ピンを押した(その書き込みの ID)・場所を選んだ(ID なし)とき。やり取りの欄か、ピンのフロートを開く */
+  onOpenThreads: (noteId?: string) => void
 }
 
 interface Spot {
@@ -193,7 +193,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
       {spots.map((p) => {
         if (!p.id)
           return (
-            <span key="pending" className={mergeClasses(s.pin, s.pending)} style={{ left: p.left, top: p.top }} aria-label={t('ここに書き込みます', 'Posting here')}>
+            <span key="pending" data-pin-id="pending" className={mergeClasses(s.pin, s.pending)} style={{ left: p.left, top: p.top }} aria-label={t('ここに書き込みます', 'Posting here')}>
               +
             </span>
           )
@@ -210,7 +210,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
               onClick={(e) => {
                 e.stopPropagation()
                 focusPin(p.id)
-                onOpenThreads()
+                onOpenThreads(p.id)
               }}
               aria-label={t(`書き込み ${numbers.get(p.id)} を開く`, `Open comment ${numbers.get(p.id)}`)}
             >

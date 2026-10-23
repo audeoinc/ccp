@@ -31,12 +31,12 @@ import { AutoTextarea } from '../AutoTextarea'
 import { eligibleReviewers } from '../approvals'
 import { myName, myUserId, onMeChange } from '../history'
 import { activeUsers, groupsOf, usePeople } from '../people'
-import { bumpNotes, focusPin, focusedPin, notesVersion, pendingPin, pinNumbers, setPendingPin, subscribePins } from '../pinStore'
+import { bumpNotes, focusPin, focusedPin, notesVersion, pinNumbers, subscribePins } from '../pinStore'
 import { isThreadRoot, stageOf } from '../notesStage'
 import { locale, tr, useT } from '../i18n'
 import { statusLabel, statusRank } from '../status'
 import { weekKeyOf } from '../weekLock'
-import { anchorOfPart, type PartRef } from './parts'
+import { anchorOfPart, partOfAnchor, type PartRef } from './parts'
 
 const useStyles = makeStyles({
   root: { display: 'grid', gridTemplateRows: 'auto auto minmax(0, 1fr) auto', height: '100%', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
@@ -76,23 +76,6 @@ const useStyles = makeStyles({
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, padding: '8px 2px' },
 })
-
-/** 書き込みの場所から、選ぶ部品へ(書き込みを押したときに、その部品を選ぶ) */
-function partOfAnchor(anchor: string | undefined, itemKeyOf: (productId: string) => string | undefined, productId?: string): PartRef | null {
-  if (!anchor) return null
-  const [kind, arg] = anchor.split(':')
-  if (kind === 'hero') return { kind: 'hero' }
-  if (kind === 'herotext') return { kind: 'headline' }
-  if (kind === 'subject') return { kind: 'subject' }
-  if (kind === 'push') return { kind: 'pushTitle' }
-  if (kind === 'section' && Number.isInteger(Number(arg))) return { kind: 'sectionTitle', index: Number(arg) }
-  if (kind === 'button' && arg) return { kind: 'button', id: arg }
-  if (kind === 'product' && productId) {
-    const key = itemKeyOf(productId)
-    return key ? { kind: 'product', itemKey: key } : null
-  }
-  return null
-}
 
 const partName = (p: PartRef | null): string => {
   if (!p) return tr('配信の全体', 'Whole delivery')
@@ -175,9 +158,6 @@ export function CommPane(props: Props) {
   const meName = useSyncExternalStore(subscribeMe, myName)
   const version = useSyncExternalStore(subscribePins, notesVersion)
   const focus = useSyncExternalStore(subscribePins, focusedPin)
-  // プレビューで押した場所(まだ書いていない)。この配信の、企画の段階のものだけ
-  const pendingAll = useSyncExternalStore(subscribePins, pendingPin)
-  const pending = pendingAll && pendingAll.cardId === card.id && pendingAll.stage === 'plan' ? pendingAll : null
   const [notes, setNotes] = useState<CardNote[]>([])
   const [events, setEvents] = useState<CardEvent[]>([])
   const [request, setRequest] = useState<ApprovalRequest | null>(null)
@@ -254,8 +234,8 @@ export function CommPane(props: Props) {
 
   // ---- 書く
   const productIdOf = (key: string) => props.items.find((i) => i.key === key)?.productId
-  // 書き込みの場所: プレビューで押した場所があれば、それ(その中の位置まで)。なければ、選んでいる部品
-  const place = pending ? { anchor: pending.anchor, productId: pending.productId } : anchorOfPart(props.part, productIdOf)
+  // 書き込みの場所は、選んでいる部品(プレビューの場所を押して書くのは、ピンのフロート PinFloat が受け持つ)
+  const place = anchorOfPart(props.part, productIdOf)
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string } }>) => {
     setWorking(true)
     setError(null)
@@ -283,14 +263,13 @@ export function CommPane(props: Props) {
         author: meName || card.owner || '',
         body,
         ...(assignee ? { assignee } : {}),
-        ...(place ? { anchor: place.anchor, anchor_x: pending ? pending.x : 0.97, anchor_y: pending ? pending.y : 0.08, anchor_view: pending ? pending.view : props.view, ...(place.productId ? { product_id: place.productId } : {}) } : {}),
+        ...(place ? { anchor: place.anchor, anchor_x: 0.97, anchor_y: 0.08, anchor_view: props.view, ...(place.productId ? { product_id: place.productId } : {}) } : {}),
       }),
     )
     if (ok) {
       setText('')
       setAsTask(false)
       setAssignee('')
-      setPendingPin(null)
     }
   }
   const sendReply = async (root: CardNote) => {
@@ -516,12 +495,7 @@ export function CommPane(props: Props) {
           <Tooltip content={place ? t('プレビューで選んでいる部品に書きます(番号の点が付きます)', 'Posts on the part selected in the preview (adds a numbered dot)') : t('部品を選ばずに書くと、配信の全体への書き込みです', 'With no part selected, it is about the whole delivery')} relationship="description">
             <span className={mergeClasses(s.chip, !!place && s.chipOn)}>
               <LocationRegular />
-              {pending ? t('押した場所', 'Clicked spot') : place ? partName(props.part) : t('全体', 'Whole')}
-              {pending && (
-                <button type="button" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }} onClick={() => setPendingPin(null)} aria-label={t('場所を外す', 'Remove the spot')}>
-                  ×
-                </button>
-              )}
+              {place ? partName(props.part) : t('全体', 'Whole')}
             </span>
           </Tooltip>
           <Popover positioning="above-start">

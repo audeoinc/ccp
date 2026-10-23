@@ -8,6 +8,7 @@ import { PreviewPartPicker } from '../PreviewPartPicker'
 import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
 import { CommPane } from './CommPane'
+import { PinFloat, type PinTarget } from './PinFloat'
 import { Splitter } from '../Splitter'
 import { ImageThumb } from '../ImageThumb'
 import { ALERT_COLOR } from '../alertColors'
@@ -267,14 +268,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }, [e.card.id, side, assetsVersion])
   // 渡す前に、制作の担当か締め切りが空いている(帯の「渡すもの」に点を付ける。渡す準備ができていないことに気づけるように)
   const handoffMissing = !e.form.handedOffAt && (!e.form.productionOwner.trim() || !e.form.productionDue)
-  // プレビューの場所を押してコメントを書く(PreviewPins の覆い。押した場所はコミュニケーションの書く欄に渡る)
+  // プレビューの場所を押してコメントを書く(PreviewPins の覆い)。打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す。
+  // 右の帯のやり取りは開かない(2026-10-23 利用者: ほとんどのコメントはピン経由なので、ピンだけで進められるように)
   const [placing, setPlacing] = useState(false)
   const endPlacing = useCallback(() => setPlacing(false), [])
-  // プレビューの書き込みの番号を押したら、コミュニケーションを開く
-  const openThreads = useCallback(() => {
-    setSide('comm')
-    savePref(SIDE_KEY, 'comm')
-  }, [])
+  const [pinTarget, setPinTarget] = useState<PinTarget | null>(null)
+  const openThreads = useCallback((noteId?: string) => setPinTarget(noteId ? { noteId } : { pending: true }), [])
   const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
   const saveWidths = () => savePref(WIDTH_KEY, widths)
   const toggleProducts = () => {
@@ -496,6 +495,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {e.preview}
             {markOn('alert') && e.alertOverlay}
             <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} />
+            {pinTarget && (
+              <PinFloat
+                card={e.card}
+                boxRef={boxRef}
+                target={pinTarget}
+                items={e.items}
+                productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
+                onTarget={setPinTarget}
+                onClose={() => setPinTarget(null)}
+                onPick={select}
+              />
+            )}
             {uncheckedMarks.length + diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={[...uncheckedMarks, ...diffMarks]} onSelect={select} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} />
           </div>
