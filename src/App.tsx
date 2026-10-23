@@ -109,6 +109,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { TemplateManager } from './TemplateManager'
 import { PolicyManager } from './PolicyManager'
 import { PatternManager } from './PatternManager'
+import { createUsSamplePatterns } from './samplePatterns'
 import { DeliveryPatternsService } from './data/deliveryPatterns'
 import type { DeliveryPattern } from './models/deliveryPatterns'
 import { PolicyRulesService } from './data/policyRules'
@@ -1726,6 +1727,26 @@ function App() {
                   }}
                 >
                   {t('AB テスト・案から選ぶの例を作る', 'Create A/B and choose-a-variant examples')}
+                </MenuItem>
+                {/* 配信の型(ST9)の見本: US の 1 週間の型(利用者の依頼 2026-10-23。本番にも用意する)。US の型がもうあれば作らない */}
+                <MenuItem
+                  icon={<CalendarClockRegular />}
+                  onClick={async () => {
+                    if (!window.confirm(tr('US の配信の型の見本(月〜日の 6 本: メール 4・アプリ 2)を作ります。US の型がもうあれば、何も作りません。よろしいですか?', 'Create sample US delivery patterns (6 per week: 4 emails, 2 app)? Nothing is created if US already has patterns.'))) return
+                    try {
+                      const n = await createUsSamplePatterns()
+                      await loadPatterns()
+                      setBqNotice(
+                        n
+                          ? { intent: 'success', text: tr(`US の配信の型を ${n} 本作りました(⚙ →「国」→「配信の型」で見られます)`, `Created ${n} US delivery patterns (see ⚙ → Country → Delivery patterns)`) }
+                          : { intent: 'warning', text: tr('US の配信の型はもうあるので、作りませんでした', 'US already has delivery patterns; nothing created') },
+                      )
+                    } catch (e) {
+                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                    }
+                  }}
+                >
+                  {t('配信の型の見本を作る(US)', 'Create sample delivery patterns (US)')}
                 </MenuItem>
               </MenuGroup>
             </MenuList>
