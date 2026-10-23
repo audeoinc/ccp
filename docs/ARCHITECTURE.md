@@ -84,6 +84,8 @@
 - **開発用の画面(`/dev/`。B10・[DEVTOOLS.md](DEVTOOLS.md))は、CCP の画面とは別のページ**(`dev/index.html` → `src/dev/`。Vite の入り口が 2 つ)。API は `/api/dev/*`(`server/ccp/devtools.py`)。`CCP_DEVTOOLS=1` のときだけ、サーバーが画面も API も出す(ほかは 404)。CCP の画面から入る道は置かない。
 - 商品が載るメールの構成(セクション)は、テンプレートで決まる(後述)。
 
+- **URL は開けるように**(2026-10-23 利用者): URL を出す所には、新しいタブで開く `OpenLink`(アイコンのボタン)を添え、コメント・メッセージ・AI の文など本文の中の URL は `Linkify` で押せるようにする(`src/LinkText.tsx`。`MarkdownLite` も通す)。押しても、まわりの行・カードは押したことにしない。行そのものがボタンの所(素材の一覧など)は、中に `Linkify` を入れず、行の横に `OpenLink` を置く。
+
 ## 4. データの読み書き(`CardDetail.tsx`)
 
 - 配信カード: 表 `delivery_cards`。AI の理由・切り口(`theme_reason` など)、セクションの見出し(`section_titles`)・コピー(`section_copies`、JSON)も、ここに保存する。

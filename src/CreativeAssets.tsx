@@ -8,6 +8,7 @@ import { CREATIVE_EXTS, CREATIVE_MAX_BYTES, IMAGE_EXTS, extOf } from './creative
 import { CommentsPanel } from './CommentsPanel'
 import { refreshPreview } from './creativePreview'
 import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
+import { Linkify, OpenLink } from './LinkText'
 import { myName, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import type { CardAsset } from './models/cardAssets'
@@ -39,7 +40,7 @@ const useStyles = makeStyles({
   list: { display: 'grid', rowGap: '6px' },
   // 行と、その右上に重ねる「消す」(行そのものがボタンなので、中に入れずに重ねる)
   rowWrap: { position: 'relative', ':hover > .ccp-asset-del': { opacity: 1 }, ':focus-within > .ccp-asset-del': { opacity: 1 } },
-  rowDel: { position: 'absolute', top: '4px', right: '4px', opacity: 0.55, backgroundColor: tokens.colorNeutralBackground1 },
+  rowDel: { position: 'absolute', top: '4px', right: '4px', display: 'flex', opacity: 0.55, backgroundColor: tokens.colorNeutralBackground1 },
   // 1 行: 左に小さな画像、右に題名・制作へのメッセージ(全文)・だれがいつ・未解決のコメント(利用者と決めた: メッセージが主役)
   row: {
     display: 'grid',
@@ -57,6 +58,8 @@ const useStyles = makeStyles({
   },
   // 右上の「消す」に題名が隠れないように
   rowPad: { paddingRight: '36px' },
+  // URL の素材は「開く」も並ぶので、もう 1 つ分
+  rowPadWide: { paddingRight: '68px' },
   rowThumb: { width: '72px', height: '72px', objectFit: 'cover', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
   rowIcon: { display: 'grid', placeItems: 'center', width: '72px', height: '72px', fontSize: '28px', color: tokens.colorNeutralForeground3, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
   rowBody: { display: 'grid', rowGap: '3px', minWidth: 0 },
@@ -328,7 +331,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
             <div className={s.list}>
               {assets.map((a) => (
                 <div key={a.id} className={s.rowWrap} onContextMenu={(e) => rowMenu(e, a)}>
-                <button type="button" className={mergeClasses(s.row, s.rowPad)} onClick={() => setOpenId(a.id)} title={t('押すと大きく見て、この素材についてやり取りできます', 'Click to view it and discuss it')}>
+                <button type="button" className={mergeClasses(s.row, a.kind === 'url' ? s.rowPadWide : s.rowPad)} onClick={() => setOpenId(a.id)} title={t('押すと大きく見て、この素材についてやり取りできます', 'Click to view it and discuss it')}>
                   {isImage(a) && a.stored ? (
                     <img className={s.rowThumb} src={CreativeFiles.url(a.stored)} alt="" loading="lazy" />
                   ) : a.kind === 'url' && a.preview_image ? (
@@ -346,16 +349,19 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
                     </span>
                   </span>
                 </button>
-                <Button
-                  size="small"
-                  appearance="subtle"
-                  className={mergeClasses('ccp-asset-del', s.rowDel)}
-                  icon={<DeleteRegular />}
-                  disabled={busy}
-                  aria-label={t(`素材「${a.name}」を消す`, `Delete "${a.name}"`)}
-                  title={t('この素材を消す', 'Delete this asset')}
-                  onClick={() => void remove(a)}
-                />
+                <span className={mergeClasses('ccp-asset-del', s.rowDel)}>
+                  {/* URL の素材は、フロートを開かずに、そのページを開ける */}
+                  {a.kind === 'url' && <OpenLink url={a.url} />}
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    icon={<DeleteRegular />}
+                    disabled={busy}
+                    aria-label={t(`素材「${a.name}」を消す`, `Delete "${a.name}"`)}
+                    title={t('この素材を消す', 'Delete this asset')}
+                    onClick={() => void remove(a)}
+                  />
+                </span>
                 </div>
               ))}
             </div>
@@ -576,7 +582,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
                     {a.preview_site && <span className={s.caption}>{a.preview_site}</span>}
                     <span className={s.linkTitle}>{a.preview_title || a.name}</span>
                     {a.preview_description && <span className={s.linkDesc}>{a.preview_description}</span>}
-                    <span className={s.url}>{a.url}</span>
+                    <span className={s.url}><Linkify text={a.url} /></span>
                     {!a.preview_at && <span className={s.caption}>{t('まだ見本カードがありません。「見本カードを取る」で、ページの題名・説明・代表の画像を取ります。', 'No preview card yet. Use "Get preview" to fetch the page title, description and image.')}</span>}
                   </div>
                 </div>
@@ -648,7 +654,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
               ) : (
                 <div className={s.meta}>
                   <span className={s.caption}>{t('制作へのメッセージ', 'Message for production')}</span>
-                  {a.note ? <span className={s.message}>{a.note}</span> : <span className={s.caption}>{t('(なし)', '(none)')}</span>}
+                  {a.note ? <span className={s.message}><Linkify text={a.note} /></span> : <span className={s.caption}>{t('(なし)', '(none)')}</span>}
                   <span className={s.caption}>
                     {[a.added_by, when(a.created_on), a.kind === 'file' ? `${a.file_name} ${sizeText(a.size)}` : ''].filter(Boolean).join(' ・ ')}
                   </span>

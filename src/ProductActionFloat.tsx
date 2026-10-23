@@ -14,6 +14,8 @@ import { AutoTextarea } from './AutoTextarea'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { priceText, tr, useT } from './i18n'
+import { OpenLink } from './LinkText'
+import { productUrl } from './links'
 import { productMarket } from './market'
 import { weeklyLimit } from './weeklyLimit'
 import { AiIcon } from './AiMark'
@@ -198,6 +200,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
             >
               <ArrowMoveRegular className={s.muted} />
               <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と差し替え', 'Product details and swap')}{product ? ` — ${product.name}` : ''}</span>
+              {productUrl(product) && <OpenLink url={productUrl(product)} label={t('商品ページ', 'Product page')} />}
               <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
               <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
             </div>

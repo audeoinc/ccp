@@ -4,6 +4,7 @@ import { ChevronDownRegular, ChevronRightRegular, OpenRegular } from '@fluentui/
 import type { Product } from './models/products'
 import type { Item } from './items'
 import { useT } from './i18n'
+import { OpenLink } from './LinkText'
 import { type LinkSlot, type Links, defaultUtm, isUrl, productContent, productUrl, variantCampaign, withUtm } from './links'
 import { linkKindLabel } from './templates'
 
@@ -12,6 +13,9 @@ const useStyles = makeStyles({
   head: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase200 },
   slot: { display: 'grid', rowGap: '2px', minWidth: 0 },
+  // URL の欄と、そのページを開くボタン
+  inputRow: { display: 'flex', alignItems: 'center', columnGap: '4px' },
+  grow: { flexGrow: 1, minWidth: 0 },
   slotHead: { display: 'flex', alignItems: 'baseline', columnGap: '8px', flexWrap: 'wrap', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
   kind: { fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   // utm_content は自動で決まる値(手で変えると計測が壊れるので、見せるだけ)
@@ -99,7 +103,10 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
               <span className={styles.kind}>{linkKindLabel(s.linkKind)}</span>
               <span className={styles.content}>utm_content={s.content}</span>
             </div>
-            <Input size="small" value={v} placeholder={s.defaultUrl || t('URL を入れてください', 'Enter a URL')} onChange={(_, d) => setSlot(s, d.value)} />
+            <span className={styles.inputRow}>
+              <Input className={styles.grow} size="small" value={v} placeholder={s.defaultUrl || t('URL を入れてください', 'Enter a URL')} onChange={(_, d) => setSlot(s, d.value)} />
+              <OpenLink url={url} />
+            </span>
             {!url && <span className={styles.warn}>{t('このボタンは、配信ごとに URL を決める設定です。URL を入れてください', 'This button needs a URL for each delivery. Enter one.')}</span>}
             {url && !isUrl(url) && <span className={styles.warn}>{t('URL の形式が正しくありません(https:// から始めてください)', 'This doesn’t look like a URL (start with https://)')}</span>}
             {url && isUrl(url) && <span className={styles.final}>{t('計測用のパラメーターつき: ', 'With tracking: ')}{withUtm(url, utm, s.content)}</span>}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
+import { Linkify } from './LinkText'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
 import { locale, optionLabel, tr, useT } from './i18n'
@@ -371,7 +372,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             </div>
           </div>
         ) : (
-          <div className={styles.body}>{n.body}</div>
+          <div className={styles.body}><Linkify text={n.body} /></div>
         )}
         {!readOnly && <ReactionBar noteId={n.id} reactions={reactions.filter((r) => r.card_note_id === n.id)} onChanged={() => void load()} />}
       </div>

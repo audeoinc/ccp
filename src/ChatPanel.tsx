@@ -3,6 +3,7 @@ import { Button, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluent
 import { ChevronDownRegular, ChevronUpRegular, DeleteRegular, SendRegular } from '@fluentui/react-icons'
 import { AiIcon } from './AiMark'
 import { AutoTextarea } from './AutoTextarea'
+import { Linkify } from './LinkText'
 import { useT } from './i18n'
 import { getUiScale, viewHeight } from './uiScale'
 
@@ -240,7 +241,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro,
             <div key={i} className={mergeClasses(s.msg, m.role === 'assistant' && s.msgAi)}>
               <span className={mergeClasses(s.who, m.role === 'assistant' && s.whoAi)}>{m.role === 'user' ? 'You' : 'AI'}</span>
               <span>
-                {m.text}
+                <Linkify text={m.text} />
                 {m.extra}
               </span>
             </div>

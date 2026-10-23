@@ -37,6 +37,7 @@ import { locale, tr, useT } from '../i18n'
 import { statusLabel, statusRank } from '../status'
 import { weekKeyOf } from '../weekLock'
 import { anchorOfPart, partOfAnchor, type PartRef } from './parts'
+import { Linkify } from '../LinkText'
 
 const useStyles = makeStyles({
   root: { display: 'grid', gridTemplateRows: 'auto auto minmax(0, 1fr) auto', height: '100%', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
@@ -430,7 +431,7 @@ export function CommPane(props: Props) {
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', columnGap: 6 }}>
                   {task && <Checkbox checked={!!n.resolved} onClick={(ev) => ev.stopPropagation()} onChange={() => toggleResolved(n)} aria-label={t('済みにする', 'Mark done')} />}
-                  <span className={isOpen ? s.full : s.one} style={n.resolved ? { color: tokens.colorNeutralForeground3, textDecoration: task ? 'line-through' : undefined } : undefined}>{n.body}</span>
+                  <span className={isOpen ? s.full : s.one} style={n.resolved ? { color: tokens.colorNeutralForeground3, textDecoration: task ? 'line-through' : undefined } : undefined}><Linkify text={n.body} /></span>
                 </div>
                 <div className={s.meta}>
                   {[ago(n.created_on), n.assignee ? `→ ${n.assignee}` : '', task && n.due ? `〆 ${n.due.slice(5).replace('-', '/')}` : '', reps.length ? t(`返信 ${reps.length}`, `${reps.length} replies`) : ''].filter(Boolean).join(' · ')}
@@ -456,7 +457,7 @@ export function CommPane(props: Props) {
                   {reps.map((x) => (
                     <div key={x.id} className={s.reply}>
                       <span className={s.meta}>{x.author} · {ago(x.created_on)}</span>
-                      <div className={s.full}>{x.body}</div>
+                      <div className={s.full}><Linkify text={x.body} /></div>
                     </div>
                   ))}
                   <div className={s.input}>

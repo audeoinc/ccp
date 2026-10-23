@@ -9,6 +9,7 @@ import { anchorLabel, bumpNotes, focusPin, notesVersion, pendingPin, pinNumbers,
 import type { NoteStage } from './notesStage'
 import { locale, tr, useT } from './i18n'
 import { setNoteResolved } from './pinActions'
+import { Linkify } from './LinkText'
 
 const useStyles = makeStyles({
   surface: { width: '320px', padding: '10px 12px', display: 'grid', rowGap: '8px' },
@@ -223,7 +224,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
       <Avatar size={24} name={n.author || '?'} color="colorful" />
       <div style={{ minWidth: 0 }}>
         <div className={s.meta}>{[n.author || t('(名前なし)', '(no name)'), !isReply && n.assignee ? `→ ${n.assignee}` : '', when(n.created_on)].filter(Boolean).join(' · ')}</div>
-        <div className={mergeClasses(s.body, !!root?.resolved && s.done)}>{n.body}</div>
+        <div className={mergeClasses(s.body, !!root?.resolved && s.done)}><Linkify text={n.body} /></div>
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { makeStyles, tokens } from '@fluentui/react-components'
+import { Linkify } from './LinkText'
 
 const useStyles = makeStyles({
   root: { fontSize: tokens.fontSizeBase200, lineHeight: '20px', color: tokens.colorNeutralForeground1, minWidth: 0 },
@@ -8,9 +9,9 @@ const useStyles = makeStyles({
   list: { margin: '0 0 4px', paddingLeft: '20px' },
 })
 
-// **太字** だけを読む(制作指示の案で使う書式は、見出し・箇条書き・太字だけ)
+// **太字** だけを読む(制作指示の案で使う書式は、見出し・箇条書き・太字だけ)。中の URL は押して開ける
 const inline = (text: string): ReactNode[] =>
-  text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part))
+  text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (part.startsWith('**') && part.endsWith('**') ? <strong key={i}><Linkify text={part.slice(2, -2)} /></strong> : <Linkify key={i} text={part} />))
 
 /**
  * Markdown(見出し ###、箇条書き -、番号つき 1.、太字 **)の簡易表示。AI の案のカードで使う(読むだけ)。

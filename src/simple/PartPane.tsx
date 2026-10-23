@@ -10,6 +10,8 @@ import { LowStockBadge } from '../ProductMarks'
 import { heroImage, productImage } from '../images'
 import { yen } from '../items'
 import { locale, optionLabel, useT } from '../i18n'
+import { OpenLink } from '../LinkText'
+import { productUrl } from '../links'
 import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
 import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges, type TargetGender } from '../target'
@@ -31,7 +33,8 @@ const useStyles = makeStyles({
   deselect: { marginLeft: 'auto' },
   warn: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteMarigoldForeground2 },
   grow: { flexGrow: 1, minWidth: 0 },
-  linkLine: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
+  // 名前・直す・開くは縮めず、URL の文だけを省略する
+  linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
   linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200 },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
   chooser: { display: 'grid', rowGap: '12px', padding: '10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -292,7 +295,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           </span>
           <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))}`}</span>
           <span className={s.meta}>{t(`在庫 ${p.stock ?? '-'}`, `Stock ${p.stock ?? '-'}`)}{p.sales_trend_name ? ` ・ ${optionLabel(p.sales_trend_name)}` : ''}</span>
-          <span className={s.row}><LowStockBadge product={p} /></span>
+          <span className={s.row}>
+            <LowStockBadge product={p} />
+            {productUrl(p) && <OpenLink url={productUrl(p)} label={t('商品ページ', 'Product page')} />}
+          </span>
           {extra}
         </span>
       </div>
@@ -485,6 +491,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 <span className={s.linkLine}>
                   <span className={s.label}>{t('リンク先', 'Link')}</span>
                   <span className={s.linkText}>{e.links.hero?.trim() || (heroDefaultLink ? t(`既定(${heroDefaultLink})`, `Default (${heroDefaultLink})`) : t('既定', 'Default'))}</span>
+                  <OpenLink url={e.links.hero?.trim() || heroDefaultLink} />
                   <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => setLinkEditing(true)}>{t('直す', 'Edit')}</Button>
                 </span>
               )
@@ -557,7 +564,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' ? (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
-                <Input size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
+                <span className={s.row}>
+                  <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
+                  <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
+                </span>
               </Field>
             ) : (
               <span className={s.caption}>{t('アプリで開く画面は、詳しい画面の「⑤ リンク先」で決めます。', 'The app screen to open is set in “⑤ Links” of the full view.')}</span>
@@ -574,7 +584,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' && (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
-                <Input size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
+                <span className={s.row}>
+                  <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
+                  <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
+                </span>
               </Field>
             )}
           </>

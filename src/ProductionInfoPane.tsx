@@ -10,6 +10,7 @@ import { AutoTextarea } from './AutoTextarea'
 import { HeroUploadDialog } from './HeroUploadDialog'
 import { myName } from './history'
 import { useT } from './i18n'
+import { Linkify } from './LinkText'
 
 const useStyles = makeStyles({
   preLine: { whiteSpace: 'pre-line' },
@@ -260,7 +261,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
                     {changed && mark}
                   </span>
                   {`${r.product.name} ・ ${r.product.product_code ?? ''} ・ ${r.price}`}
-                  <span className={s.note}>{r.url}</span>
+                  <span className={s.note}><Linkify text={r.url} /></span>
                   {changed && <span className={s.was}>{wasName || t('(企画にはない枠)', '(not in the plan)')}</span>}
                 </span>
                 <span className={s.tools}>
