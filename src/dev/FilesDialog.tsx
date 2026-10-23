@@ -9,6 +9,11 @@ import {
   DialogSurface,
   DialogTitle,
   Input,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   MessageBar,
   MessageBarBody,
   Switch,
@@ -17,14 +22,15 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowDownloadRegular, ArrowUploadRegular, DeleteRegular, SaveRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownloadRegular, ArrowUploadRegular, DeleteRegular, MoreHorizontalRegular, PinRegular, SaveRegular } from '@fluentui/react-icons'
 import { FilesApi, bytesLabel, isFailure, type WorkFile } from './api'
 import { CopyButton } from './CopyButton'
 
 const useStyles = makeStyles({
   body: { display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '12px', minHeight: '60vh' },
   list: { display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto', maxHeight: '64vh', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, paddingRight: '8px' },
-  item: { border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', padding: '4px 6px', borderRadius: tokens.borderRadiusMedium, display: 'flex', flexDirection: 'column', color: tokens.colorNeutralForeground1, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  line: { display: 'flex', alignItems: 'center', gap: '2px', borderRadius: tokens.borderRadiusMedium, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  item: { border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', padding: '4px 6px', display: 'flex', flexDirection: 'column', color: tokens.colorNeutralForeground1, flexGrow: 1, minWidth: 0 },
   itemOn: { backgroundColor: tokens.colorBrandBackground2 },
   name: { fontSize: tokens.fontSizeBase200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' },
   meta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
@@ -192,19 +198,46 @@ export function FilesDialog({ open, onClose, initial, onChanged }: { open: boole
               <div className={s.list}>
                 {files.length === 0 && <span className={s.muted}>まだファイルはありません</span>}
                 {files.map((f) => (
-                  <button key={f.name} type="button" className={mergeClasses(s.item, f.name === current && s.itemOn)} onClick={() => void openFile(f.name)} title={f.name}>
-                    <span className={s.name}>
-                      {f.pinned && (
-                        <Badge size="small" appearance="filled" color="brand">
-                          いつも
-                        </Badge>
-                      )}
-                      {f.name}
-                    </span>
-                    <span className={s.meta}>
-                      {new Date(f.updated).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' })}・{bytesLabel(f.size)}
-                    </span>
-                  </button>
+                  <div key={f.name} className={mergeClasses(s.line, f.name === current && s.itemOn)}>
+                    <button type="button" className={s.item} onClick={() => void openFile(f.name)} title={f.name}>
+                      <span className={s.name}>
+                        {f.pinned && (
+                          <Badge size="small" appearance="filled" color="brand">
+                            いつも
+                          </Badge>
+                        )}
+                        {f.name}
+                      </span>
+                      <span className={s.meta}>
+                        {new Date(f.updated).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' })}・{bytesLabel(f.size)}
+                      </span>
+                    </button>
+                    {/* 行の「…」: 開かずに、ダウンロード・いつも渡す・削除(BigQuery のコンソールと同じ形) */}
+                    <Menu positioning="below-end">
+                      <MenuTrigger disableButtonEnhancement>
+                        <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={`${f.name} の操作`} />
+                      </MenuTrigger>
+                      <MenuPopover>
+                        <MenuList>
+                          <MenuItem
+                            icon={<ArrowDownloadRegular />}
+                            onClick={async () => {
+                              const r = await FilesApi.get(f.name)
+                              if (!isFailure(r)) download(f.name, r.content)
+                            }}
+                          >
+                            ダウンロード
+                          </MenuItem>
+                          <MenuItem icon={<PinRegular />} onClick={() => void pin(f.name, !f.pinned)}>
+                            {f.pinned ? 'いつも AI に渡す、をやめる' : 'いつも AI に渡す'}
+                          </MenuItem>
+                          <MenuItem icon={<DeleteRegular />} onClick={() => void remove(f.name)}>
+                            削除
+                          </MenuItem>
+                        </MenuList>
+                      </MenuPopover>
+                    </Menu>
+                  </div>
                 ))}
               </div>
               <div className={s.edit}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Dropdown, Input, MessageBar, MessageBarBody, Option, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular, StopRegular } from '@fluentui/react-icons'
+import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular, StopRegular, SaveRegular } from '@fluentui/react-icons'
 import { DevApi, bytesLabel, isFailure, type Column, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
@@ -12,6 +12,9 @@ import { DatasetPicker } from './DatasetPicker'
 import { ChatPanel } from './ChatPanel'
 import { JobInfo } from './JobInfo'
 import { WorkPanel } from './WorkPanel'
+import { ResizeBar } from './ResizeBar'
+import { startDrag, useStoredHeight } from './drag'
+import { saveSqlFile, sqlFileName } from './saveSql'
 import { HistoryDialog } from './HistoryDialog'
 
 const useStyles = makeStyles({
@@ -78,7 +81,7 @@ const useStyles = makeStyles({
   itemOn: { backgroundColor: tokens.colorBrandBackground2, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
   itemName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1 },
   mono: { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
-  editor: { height: '260px', resize: 'vertical', overflow: 'hidden' },
+  editor: { overflow: 'hidden' },
   muted: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
 
@@ -114,15 +117,6 @@ const readWidths = (): typeof WIDTHS => {
   } catch {
     return WIDTHS
   }
-}
-
-function download(name: string, text: string, type = 'text/plain') {
-  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 export function BqTab({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
@@ -161,22 +155,21 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
 
   /** 境目のドラッグ。左の境目は左のペイン、右の境目は右のペインの幅を変える(真ん中は残りを使う) */
   const drag = (e: React.PointerEvent<HTMLDivElement>, side: 'left' | 'right') => {
-    e.preventDefault()
-    const x0 = e.clientX
     const w0 = widths
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - x0
+    startDrag(e, (dx) => {
       if (side === 'left') setWidths({ ...w0, left: Math.min(Math.max(w0.left + dx, 200), 600) })
       else setWidths({ ...w0, right: Math.min(Math.max(w0.right - dx, 320), Math.round(window.innerWidth * 0.7)) })
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      document.body.style.userSelect = ''
-    }
-    document.body.style.userSelect = 'none'
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
+    })
+  }
+  // SQL の欄の高さ(下の境目で変える)
+  const [editorH, setEditorH] = useStoredHeight('ccp-dev-editor-h', 260)
+  const [saveNote, setSaveNote] = useState('')
+  /** SQL の欄の中身を、作業ファイルに保存する(会話の「保存」と同じ置き場所・同じ名前の付け方) */
+  const saveToFile = async () => {
+    const r = await saveSqlFile(sql, sqlFileName(sql, { output }))
+    if (!r.note) return
+    setSaveNote(r.note)
+    window.setTimeout(() => setSaveNote(''), 4000)
   }
   const [maxRows, setMaxRows] = useState(200)
   const [dry, setDry] = useState<DryRun | null>(null)
@@ -365,15 +358,17 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
               履歴
             </Button>
             <CopyButton label="SQL をコピー" text={() => sql} />
-            <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!sql.trim()} onClick={() => download('query.sql', sql)}>
-              .sql で保存
+            <Button size="small" appearance="subtle" icon={<SaveRegular />} disabled={!sql.trim()} onClick={() => void saveToFile()} title="作業ファイル(会話の「保存」と同じ置き場所)に .sql で保存">
+              保存
             </Button>
           </div>
           <WorkPanel output={output} onOutput={setOutput} sql={sql} onLoadSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />
           <span className={s.muted}>流せるのは SELECT だけです(表を作る SQL は、BigQuery のコンソールで実行します)。Ctrl + Enter で流します(一部を選ぶと、その部分だけ)。表・列の名前は、打つと候補が出ます。</span>
-          <div className={s.editor}>
+          {saveNote && <span className={s.muted}>{saveNote}</span>}
+          <div className={s.editor} style={{ height: `${editorH}px` }}>
             <SqlEditor value={sql} onChange={changeSql} onRun={() => void runSql(selection.trim() ? selection : sql)} onSelection={setSelection} catalog={catalog} />
           </div>
+          <ResizeBar height={editorH} onHeight={setEditorH} min={120} reset={260} />
           <div className={s.row}>
             <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => void dryRun()} disabled={!sql.trim() || !!busy} title="BigQuery の dry-run。料金はかかりません">
               料金なしで確かめる

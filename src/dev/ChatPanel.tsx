@@ -42,6 +42,7 @@ import {
 } from '@fluentui/react-icons'
 import { ChatMarkdown } from './ChatMarkdown'
 import { FilesDialog } from './FilesDialog'
+import { saveSqlFile, sqlFileName } from './saveSql'
 import { ChatApi, DevApi, FilesApi, isFailure, type WorkFile, type ChatContext, type ChatEvent, type ChatMeta, type ChatTurn, type SqlBlock } from './api'
 import { CopyButton } from './CopyButton'
 
@@ -279,15 +280,11 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
   }, [])
 
   /** 返事の SQL を、作業ファイルに保存する(名前を聞く。同じ名前は上書きを確かめる) */
-  const saveSql = async (code: string) => {
-    const d = new Date()
-    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
-    const name = window.prompt('作業ファイルに保存する名前(.sql)', `${output || 'query'}_${stamp}.sql`)?.trim()
-    if (!name) return
-    const n = /\.(sql|md|txt)$/i.test(name) ? name : `${name}.sql`
-    if (workFiles.some((f) => f.name === n) && !window.confirm(`${n} は、もうあります。上書きしますか?`)) return
-    const r = await FilesApi.save(n, code)
-    setSavedNote(isFailure(r) ? r.error : `${n} に保存しました`)
+  /** 返事の SQL を、作業ファイルに保存する(名前の初期値は、AI が付けた英語の短い名前。作る出力があれば、取り込み先の表の名前を頭に) */
+  const saveSql = async (code: string, name?: string) => {
+    const r = await saveSqlFile(code, sqlFileName(code, { name, output }))
+    if (!r.note) return
+    setSavedNote(r.note)
     window.setTimeout(() => setSavedNote(''), 4000)
     await refreshFiles()
   }
@@ -680,7 +677,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
                     <Button size="small" icon={<ArrowLeftRegular />} onClick={() => onUseSql(b.sql, false)} title="SQL の欄に入れる(流さない)">
                       欄に入れる
                     </Button>
-                    <Button size="small" appearance="subtle" icon={<SaveRegular />} onClick={() => void saveSql(b.sql)} title="作業ファイルに .sql で保存">
+                    <Button size="small" appearance="subtle" icon={<SaveRegular />} onClick={() => void saveSql(b.sql, b.name)} title="作業ファイルに .sql で保存">
                       保存
                     </Button>
                     <CopyButton text={() => b.sql} />

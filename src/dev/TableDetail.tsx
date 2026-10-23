@@ -3,6 +3,8 @@ import { Badge, Button, MessageBar, MessageBarBody, Spinner, Tab, TabList, makeS
 import { ChevronDownRegular, ChevronRightRegular, EyeRegular, PlayRegular, TableRegular } from '@fluentui/react-icons'
 import { DevApi, RunApi, bytesLabel, isFailure, type Column, type ColumnProfile, type Row, type TableInfo } from './api'
 import { ColumnProfileView } from './ColumnProfileView'
+import { ResizeBar } from './ResizeBar'
+import { useStoredHeight } from './drag'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
 import { columnsMarkdown } from './format'
@@ -26,7 +28,7 @@ const useStyles = makeStyles({
   key: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold, marginRight: '4px' },
   desc: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   // タブの中身。高さは右下をドラッグして変えられる
-  body: { height: '220px', minHeight: '80px', resize: 'vertical', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' },
+  body: { overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' },
   row: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
   sql: { margin: 0, fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   muted: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -63,6 +65,8 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
   const s = useStyles()
   const [open, setOpen] = useState(readOpen)
   const [tab, setTab] = useState<TabKey>('columns')
+  // タブの中身の高さ(下の境目で変える)
+  const [bodyH, setBodyH] = useStoredHeight('ccp-dev-detail-h', 220)
   // 先頭の行(タブを開いたときに読む。表を変えたら読み直す)
   const [rows, setRows] = useState<{ ref: string; columns: Column[]; rows: Row[] } | null>(null)
   const [rowsError, setRowsError] = useState('')
@@ -181,7 +185,7 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
             {info.view_sql && <Tab value="view">ビューの SQL</Tab>}
             {info.sources.length > 0 && <Tab value="sources">参照している表 {info.sources.length}</Tab>}
           </TabList>
-          <div className={s.body}>
+          <div className={s.body} style={{ height: `${bodyH}px` }}>
             {shownTab === 'columns' && (
               <table className={s.cols}>
                 <thead>
@@ -258,6 +262,7 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
               </>
             )}
           </div>
+          <ResizeBar height={bodyH} onHeight={setBodyH} min={80} reset={220} />
         </>
       )}
     </div>

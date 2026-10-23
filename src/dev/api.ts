@@ -60,6 +60,8 @@ export interface ChatTurn {
 
 export interface SqlBlock {
   title: string
+  /** 保存するときのファイル名の候補(AI が title を英語にして短くしたもの) */
+  name?: string
   sql: string
 }
 

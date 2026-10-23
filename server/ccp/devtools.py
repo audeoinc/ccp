@@ -498,7 +498,7 @@ CCP の列に合う元の列を探してください。ビューに出ていな�
 
 最後の返答は、次の形の JSON だけにしてください(```json で囲まない):
 {"reply": "利用者への返事(日本語。Markdown の見出し・箇条書き・**太字**・表を使ってよい。SQL はここに書かない)",
- "sqls": [{"title": "何の SQL か(短く)", "sql": "SQL の全文"}],
+ "sqls": [{"title": "何の SQL か(短く。日本語)", "name": "保存するときのファイル名(title を英語にして短くしたもの。英小文字・数字・_ だけ。例: spu_from_ctlg)", "sql": "SQL の全文"}],
  "questions": ["決めきれなかったこと・利用者に確かめたいこと(なければ空の配列)"]}
 sqls は、新しく書いた・直した SQL があるときだけ(なければ空の配列)。直すときも、部分ではなく、そのまま流せる全文。
 値を確かめる SQL と、本番の SQL のように、いくつか出すときは並べる(利用者は 1 つずつ試す)。
@@ -654,10 +654,11 @@ def parse_reply(text: str) -> dict[str, Any]:
             continue
         if isinstance(v, dict) and ("reply" in v or "sql" in v or "sqls" in v):
             q = v.get("questions")
-            sqls = [{"title": str(x.get("title") or ""), "sql": str(x.get("sql") or "").strip()} for x in (v.get("sqls") or []) if isinstance(x, dict)]
+            sqls = [{"title": str(x.get("title") or ""), "name": str(x.get("name") or ""), "sql": str(x.get("sql") or "").strip()}
+                    for x in (v.get("sqls") or []) if isinstance(x, dict)]
             # 1 つだけの形(sql)で返してきたときも受ける
             if isinstance(v.get("sql"), str) and v["sql"].strip():
-                sqls.insert(0, {"title": "", "sql": v["sql"].strip()})
+                sqls.insert(0, {"title": "", "name": "", "sql": v["sql"].strip()})
             return {"reply": str(v.get("reply") or ""), "sqls": [x for x in sqls if x["sql"]],
                     "questions": [str(x) for x in q if x] if isinstance(q, list) else []}
     return {"reply": text, "sqls": [], "questions": []}

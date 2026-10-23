@@ -74,7 +74,7 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(devtools.chapters(md, (1, 3)), "## 1. 全体\nA\n\n## 3. SKU\nC")
 
     def test_parse_reply(self) -> None:
-        self.assertEqual(devtools.parse_reply('{"reply": "直しました", "sql": " SELECT 1 ", "questions": ["q", ""]}'), {"reply": "直しました", "sqls": [{"title": "", "sql": "SELECT 1"}], "questions": ["q"]})
+        self.assertEqual(devtools.parse_reply('{"reply": "直しました", "sql": " SELECT 1 ", "questions": ["q", ""]}'), {"reply": "直しました", "sqls": [{"title": "", "name": "", "sql": "SELECT 1"}], "questions": ["q"]})
         # JSON が崩れていても、本文を返事として見せる
         self.assertEqual(devtools.parse_reply("ただの文")["reply"], "ただの文")
 

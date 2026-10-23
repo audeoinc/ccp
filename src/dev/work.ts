@@ -2,14 +2,15 @@
 import type { VersionMeta } from './api'
 
 /** 出力の名前・仕様の章・更新の目安(BIGQUERY_EXPORT.md の 1 章の表) */
-export function outputs(): { value: string; label: string; chapter: string; refresh: string }[] {
+export function outputs(): { value: string; label: string; chapter: string; refresh: string; pg: string }[] {
+  // pg = 取り込み先の PostgreSQL の表(server/ccp/bq_import.py の _write)。保存する SQL のファイル名の頭にも使う
   return [
-    { value: 'spu', label: 'SPU', chapter: '2 章', refresh: '1 日 1 回' },
-    { value: 'sku', label: 'SKU', chapter: '3 章', refresh: '1 日 1 回' },
-    { value: 'sku_stock', label: 'SKU の在庫', chapter: '4 章', refresh: '元の在庫の更新に合わせる(1 時間に数回)' },
-    { value: 'weekly', label: '週ごとの実績', chapter: '5 章', refresh: '1 日 1 回' },
-    { value: 'forecast', label: '天気予報', chapter: '6 章', refresh: '予報の更新に合わせる' },
-    { value: 'ranking', label: '販売チャネルごとの順位', chapter: '9 章', refresh: '1 日 1 回' },
+    { value: 'spu', label: 'SPU', chapter: '2 章', refresh: '1 日 1 回', pg: 'products' },
+    { value: 'sku', label: 'SKU', chapter: '3 章', refresh: '1 日 1 回', pg: 'sku' },
+    { value: 'sku_stock', label: 'SKU の在庫', chapter: '4 章', refresh: '元の在庫の更新に合わせる(1 時間に数回)', pg: 'sku_stock' },
+    { value: 'weekly', label: '週ごとの実績', chapter: '5 章', refresh: '1 日 1 回', pg: 'weekly_performances' },
+    { value: 'forecast', label: '天気予報', chapter: '6 章', refresh: '予報の更新に合わせる', pg: 'weather_forecast' },
+    { value: 'ranking', label: '販売チャネルごとの順位', chapter: '9 章', refresh: '1 日 1 回', pg: 'product_rankings' },
   ]
 }
 
