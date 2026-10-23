@@ -107,7 +107,7 @@ export async function generateFor(c: DraftBase, ctx: DraftContext, onStep: AutoD
   // 使える期限を過ぎた画像は、AI の候補から外す(X59)
   const heroes = ctx.heroes.filter((h) => (!market || heroMarket(h) === market) && isUsableHero(h))
   return runAutoDraft(
-    { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme, template: c.layout_key || undefined },
+    { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', country: String(c.country ?? '') || undefined, avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme, template: c.layout_key || undefined },
     onStep,
     isStopped,
   )

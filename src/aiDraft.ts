@@ -249,10 +249,10 @@ export interface TemplateChoice {
   reason: string
 }
 
-/** テーマなどから、テンプレートを選ばせる(配信カードのチャネルのテンプレートだけから) */
-export async function suggestTemplate(args: { card: AiCard; channel?: TemplateChannel }): Promise<TemplateChoice> {
+/** テーマなどから、テンプレートを選ばせる(配信カードのチャネルの、配信の国で使うテンプレートだけから。country は国のコード) */
+export async function suggestTemplate(args: { card: AiCard; channel?: TemplateChannel; country?: string }): Promise<TemplateChoice> {
   const channel = args.channel ?? 'email'
-  const options = templateOptions(channel)
+  const options = templateOptions(channel, false, args.country)
   const parsed = (await askAgent(TEMPLATE_PROMPT, {
     task: 'suggest_template',
     today: new Date().toISOString().slice(0, 10),

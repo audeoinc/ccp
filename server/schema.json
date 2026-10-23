@@ -181,6 +181,18 @@
    "lookups": [
    ]
   },
+  "country_applications": {
+   "_comment": "共通のマスタの、国ごとの適用(ST7)。テンプレート(ST1)・学び(ST5)・ポリシー(ST8)で使い回す。それぞれの表に列を足さず、ここに 1 つ持つ。変えるたびに 1 行足す(種類・マスタの id・国の組で、いちばん新しい行が、いまの値。前の行は、変えた人・日時の履歴)。行がなければ、種類ごとの既定(テンプレートは全部の国で使う)",
+   "columns": [
+    ["kind", "choice", {"required": true}],
+    ["item_id", "text", {"required": true, "index": true}],
+    ["country", "text", {"index": true}],
+    ["mode", "choice"],
+    ["changed_by", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "delivery_patterns": {
    "_comment": "国ごとの配信の型(ST9)。曜日・時刻・チャネル・種類・テンプレートの決まった組。「まとめて作る」(W14)が、この型どおりに枠を作る。型は既定値で縛りではない。作るときに写すので、型を変えても、もう作った配信には効かない。テンプレートは id だけ持ち、作るときの最新の版を使う",
    "columns": [
@@ -718,6 +730,8 @@
  },
  "choices": {
   "delivery_cards.country": ["US", "JP"],
+  "country_applications.kind": ["template", "learning", "policy"],
+  "country_applications.mode": ["use", "skip"],
   "delivery_cards.channel": ["email", "app"],
   "delivery_cards.department": ["promotion", "crm", "ec"],
   "delivery_cards.target_gender": ["women", "men"],

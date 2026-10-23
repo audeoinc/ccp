@@ -6,6 +6,7 @@ import type { DeliveryCardEmailTemplate } from './models/deliveryCards'
 // ユーザーが作ったテンプレートの ID は、表 layout_templates の行の ID。配信カードは、この ID(layout_key)で、テンプレートを指す。
 
 import { useSyncExternalStore } from 'react'
+import { appliesIn } from './countryApply'
 import { tr } from './i18n'
 import { cellRows, cellViewLabel, type Cell, type CellView } from './cells'
 
@@ -642,12 +643,14 @@ export const templateKeyOfCard = (c: { layout_key?: string; layout_version?: num
 
 /**
  * 選べるテンプレートの一覧(標準 → ユーザーが作ったもの)。channel を渡すと、そのチャネルのものだけ。
- * 使わない(無効)のものは、includeHidden のときだけ出す(管理の画面)。過去の版は出さない
+ * 使わない(無効)のものは、includeHidden のときだけ出す(管理の画面)。過去の版は出さない。
+ * country を渡すと、その国で使うものだけ(ST1。⚙ →「国」→「この国で使うテンプレート」。決めていなければ使う)
  */
-export function templateOptions(channel?: TemplateChannel, includeHidden = false): ({ id: EmailTemplateId; label: string; description: string; builtin: boolean; edited: boolean; hidden: boolean; channel: TemplateChannel; push?: PushSpec } & TemplateLayout)[] {
+export function templateOptions(channel?: TemplateChannel, includeHidden = false, country?: string | null): ({ id: EmailTemplateId; label: string; description: string; builtin: boolean; edited: boolean; hidden: boolean; channel: TemplateChannel; push?: PushSpec } & TemplateLayout)[] {
   return [...BUILTIN_IDS, ...Object.keys(custom)]
     .filter((id) => !channel || (getTemplate(id).channel ?? 'email') === channel)
     .filter((id) => includeHidden || !getTemplate(id).hidden)
+    .filter((id) => appliesIn('template', id, country))
     .map((id) => {
     const tpl = getTemplate(id)
     return {

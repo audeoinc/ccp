@@ -33,6 +33,8 @@ export interface AutoDraftInput {
   channel?: TemplateChannel
   /** 選ばない商品(まとめて作るとき、同じ週に、もう上限まで載せた商品。W14) */
   avoidProductIds?: string[]
+  /** 配信の国のコード(テンプレートを、その国で使うものから選ぶ。ST1) */
+  country?: string
   /** 決まったテンプレート(国ごとの配信の型 ST9 で決めたもの)。あれば AI には選ばせない(id だけ。作るときの最新の版を使う) */
   template?: EmailTemplateId
   /** テーマのヒント(まとめて作るとき、担当者が行ごとに書く。W14) */
@@ -111,7 +113,7 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   const [tpl, hero] = await Promise.all([
     fixedTemplate
       ? Promise.resolve({ template: fixedTemplate, reason: tr('配信の型で決めたテンプレート', 'Template set by the delivery pattern') })
-      : step(tr('テンプレートとメイン画像を選んでいます', 'Choosing a template and hero image'), () => suggestTemplate({ card: withTheme, channel: input.channel })),
+      : step(tr('テンプレートとメイン画像を選んでいます', 'Choosing a template and hero image'), () => suggestTemplate({ card: withTheme, channel: input.channel, country: input.country })),
     (async () => {
       try {
         return await proposeHero({ card: withTheme, heroes, productNames: [] })

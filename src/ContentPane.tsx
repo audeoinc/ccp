@@ -25,7 +25,8 @@ import { AlertChip, LowStockBadge } from './ProductMarks'
 import type { CardAlertKind } from './cardAlerts'
 import { useSelection } from './useSelection'
 import { progressOf } from './progress'
-import { getTemplate, hasTemplate, openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel, currentVersion, splitTemplateKey } from './templates'
+import { baseTemplateId, getTemplate, hasTemplate, openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel, currentVersion, splitTemplateKey } from './templates'
+import { appliesIn, useCountryApply } from './countryApply'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { AppLinksEditor } from './AppLinksEditor'
@@ -127,6 +128,8 @@ interface Props {
   cardName: string
   /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③ 通知 ④ メッセージ ⑤ リンク先。送る相手は配信情報) */
   channel: TemplateChannel
+  /** 配信の国(テンプレートの選択肢を、その国で使うものに絞る。ST1) */
+  country?: string
   pushLink: PushLink | null
   onPushLink: (l: PushLink) => void
   /** 送る日時(datetime-local の値) */
@@ -544,9 +547,10 @@ function TemplateUseLine({ u }: { u?: TemplateUse }) {
   )
 }
 
-function TemplateTab({ template, onTemplate, hasCandidates, channel, use }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel; use?: Map<string, TemplateUse> }) {
+function TemplateTab({ template, onTemplate, hasCandidates, channel, country, use }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel; country?: string; use?: Map<string, TemplateUse> }) {
   const s = useStyles()
   const t = useT()
+  useCountryApply()
   return (
     <div className={s.grid12}>
       <span className={s.caption}>
@@ -563,7 +567,9 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel, use }: { te
         const cur = getTemplate(template)
         const { id: base, version: v } = splitTemplateKey(template)
         const old = v !== undefined
-        if (!old && !cur.hidden) return null
+        // この国で使わないテンプレートも、選択肢に出ないので、ここに出す(ST1)
+        const offCountry = !appliesIn('template', baseTemplateId(template), country)
+        if (!old && !cur.hidden && !offCountry) return null
         const canUpdate = old && hasTemplate(base) && !getTemplate(base).hidden
         return (
           <div className={mergeClasses(s.tplCard, s.tplCardSelected)}>
@@ -580,7 +586,9 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel, use }: { te
                       `このテンプレートは、この配信のあとに編集されました(この配信は版 ${v}、いまは版 ${currentVersion(base)})。この配信は、版 ${v} の形のままです。`,
                       `This template was edited after this delivery was made (this delivery uses v${v}; the latest is v${currentVersion(base)}). It keeps the v${v} layout.`,
                     )
-                  : t('このテンプレートは、使わない(無効)になっています。この配信は、そのまま使えます。', 'This template is inactive. This delivery can keep using it.')}
+                  : cur.hidden
+                    ? t('このテンプレートは、使わない(無効)になっています。この配信は、そのまま使えます。', 'This template is inactive. This delivery can keep using it.')
+                    : t('このテンプレートは、この国では使わないことになっています(⚙ →「国」)。この配信は、そのまま使えます。', 'This template is not used in this country (⚙ → Country). This delivery can keep using it.')}
               </span>
               {canUpdate && (
                 <div>
@@ -593,7 +601,7 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel, use }: { te
           </div>
         )
       })()}
-      {templateOptions(channel).map((o) => {
+      {templateOptions(channel, false, country).map((o) => {
         const selected = o.id === template
         return (
           <div key={o.id} onClick={() => onTemplate(o.id)} className={mergeClasses(s.tplCard, selected && s.tplCardSelected)}>
@@ -1387,7 +1395,7 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runTheme}
         />
       )}
-      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} use={props.templateUse} />}
+      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} country={props.country} use={props.templateUse} />}
       {tab === 'notice' && (
         <CopyTab
           push

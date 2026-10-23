@@ -110,6 +110,8 @@ import { TemplateManager } from './TemplateManager'
 import { PolicyManager } from './PolicyManager'
 import { PatternManager } from './PatternManager'
 import { CountryCriteriaDialog } from './CountryCriteriaDialog'
+import { CountryTemplatesDialog } from './CountryTemplatesDialog'
+import { loadCountryApply } from './countryApply'
 import { criteriaFor, loadCountrySettings, useCountrySettings } from './countrySettings'
 import { createUsSamplePatterns } from './samplePatterns'
 import { DeliveryPatternsService } from './data/deliveryPatterns'
@@ -473,8 +475,11 @@ function App() {
   const [patternOpen, setPatternOpen] = useState(false)
   // 国のアラートの基準(ST2)
   const [criteriaOpen, setCriteriaOpen] = useState(false)
+  // この国で使うテンプレート(ST1。共通のマスタ + 国ごとの適用 ST7)
+  const [countryTplOpen, setCountryTplOpen] = useState(false)
   useEffect(() => {
     void loadCountrySettings()
+    void loadCountryApply()
   }, [])
   const [patterns, setPatterns] = useState<DeliveryPattern[]>([])
   const loadPatterns = useCallback(async () => {
@@ -1436,6 +1441,7 @@ function App() {
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
       <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} onChanged={() => void loadPatterns()} />
       <CountryCriteriaDialog open={criteriaOpen} onClose={() => setCriteriaOpen(false)} country={filters.country} />
+      <CountryTemplatesDialog open={countryTplOpen} onClose={() => setCountryTplOpen(false)} country={filters.country} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
@@ -1562,6 +1568,10 @@ function App() {
                 {/* 国のアラートの基準(ST2): 在庫僅少の週数・週の上限・販売順位の上位の線。国の全員に効くので、変えた人・日時を残す */}
                 <MenuItem icon={<AlertRegular />} onClick={() => setCriteriaOpen(true)}>
                   {t('アラートの基準(在庫僅少・週の上限・販売順位)', 'Alert criteria (low stock, weekly limit, rankings)')}
+                </MenuItem>
+                {/* この国で使うテンプレート(ST1): テンプレートは共通。国では、使う・使わないだけを決める(ST7 の適用の表) */}
+                <MenuItem icon={<LayoutColumnTwoRegular />} onClick={() => setCountryTplOpen(true)}>
+                  {t('この国で使うテンプレート', 'Templates used in this country')}
                 </MenuItem>
                 {/* 国ごとの配信の型(ST9): 曜日・時刻・チャネル・種類・テンプレートの組。「まとめて作る」が、この型どおりに枠を作る */}
                 <MenuItem icon={<CalendarClockRegular />} onClick={() => setPatternOpen(true)}>

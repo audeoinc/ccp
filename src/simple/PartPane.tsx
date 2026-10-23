@@ -667,7 +667,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
     <>
       <span className={s.caption}>{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</span>
       <div className={s.tplList} onMouseLeave={() => e.setAiPreview(null)}>
-        {templateOptions(e.channel).map((o) => {
+        {templateOptions(e.channel, false, e.card.country).map((o) => {
           const slots = o.id === 'free' ? Infinity : slotsOf(o.sections)
           const over = Number.isFinite(slots) ? Math.max(0, e.items.length - slots) : 0
           const on = o.id === current

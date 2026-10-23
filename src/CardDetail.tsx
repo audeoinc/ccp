@@ -947,7 +947,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setError(null)
     setAuto({ label: t('準備しています', 'Getting ready'), done: 0, total: 7 })
     const res = await runAutoDraft(
-      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel },
+      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel, country: form.country || undefined },
       (label, done, total) => setAuto({ label, done, total }),
       () => cancelRef.current || !aliveRef.current,
     )
@@ -2740,6 +2740,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 onField={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
                 template={template}
                 onTemplate={changeTemplate}
+                country={form.country}
                 templateUse={templateUseMap}
                 sectionTitles={sectionTitles}
                 onSectionTitle={setSectionTitle}

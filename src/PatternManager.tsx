@@ -89,7 +89,7 @@ export function PatternManager({ open, onClose, country: headerCountry, onChange
     setError(null)
     // チャネルを変えて、テンプレートがそのチャネルのものでなくなったら、テンプレートを外す
     const next = { ...row, ...p }
-    if (p.channel && next.layout_key && !templateOptions(p.channel as TemplateChannel).some((o) => o.id === next.layout_key)) next.layout_key = ''
+    if (p.channel && next.layout_key && !templateOptions(p.channel as TemplateChannel, false, country).some((o) => o.id === next.layout_key)) next.layout_key = ''
     setRows((rs) => (rs ?? []).map((r) => (r.id === row.id ? next : r)))
     const r = await DeliveryPatternsService.update(row.id, { ...p, ...(next.layout_key !== row.layout_key ? { layout_key: next.layout_key } : {}) })
     if (!r.success) setError(r.error?.message ?? t('保存できませんでした', 'Could not save'))
@@ -208,7 +208,7 @@ export function PatternManager({ open, onClose, country: headerCountry, onChange
                           </Select>
                           <Select size="small" value={r.layout_key ?? ''} onChange={(_, v) => void patch(r, { layout_key: v.value })} aria-label={t('テンプレート', 'Template')}>
                             <option value="">{t('(AI が選ぶ)', '(AI chooses)')}</option>
-                            {templateOptions((r.channel === 'app' ? 'push' : 'email') as TemplateChannel).map((o) => (
+                            {templateOptions((r.channel === 'app' ? 'push' : 'email') as TemplateChannel, false, country).map((o) => (
                               <option key={o.id} value={o.id}>
                                 {o.label}
                               </option>
