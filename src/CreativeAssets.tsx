@@ -36,6 +36,9 @@ const useStyles = makeStyles({
   compactDrop: { display: 'grid', padding: '4px', borderRadius: tokens.borderRadiusMedium, border: '1px dashed transparent' },
   addBtn: { justifySelf: 'start' },
   list: { display: 'grid', rowGap: '6px' },
+  // 行と、その右上に重ねる「消す」(行そのものがボタンなので、中に入れずに重ねる)
+  rowWrap: { position: 'relative', ':hover > .ccp-asset-del': { opacity: 1 }, ':focus-within > .ccp-asset-del': { opacity: 1 } },
+  rowDel: { position: 'absolute', top: '4px', right: '4px', opacity: 0.55, backgroundColor: tokens.colorNeutralBackground1 },
   // 1 行: 左に小さな画像、右に題名・制作へのメッセージ(全文)・だれがいつ・未解決のコメント(利用者と決めた: メッセージが主役)
   row: {
     display: 'grid',
@@ -51,6 +54,8 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     ':hover': { border: `1px solid ${tokens.colorBrandStroke1}` },
   },
+  // 右上の「消す」に題名が隠れないように
+  rowPad: { paddingRight: '36px' },
   rowThumb: { width: '72px', height: '72px', objectFit: 'cover', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
   rowIcon: { display: 'grid', placeItems: 'center', width: '72px', height: '72px', fontSize: '28px', color: tokens.colorNeutralForeground3, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
   rowBody: { display: 'grid', rowGap: '3px', minWidth: 0 },
@@ -104,12 +109,32 @@ const hostOf = (u?: string) => {
   }
 }
 
+/**
+ * 素材を 1 つ消す(確かめてから。ファイルも置き場所から消す。この素材へのやり取りは、DB の CASCADE で一緒に消える)。
+ * 消したら true。入れた人がほかの人なら、確かめの文で名前を出す(だれでも消せるので、うっかり人の素材を消さないように)
+ */
+async function deleteAsset(a: CardAsset, me: string): Promise<boolean> {
+  const by = (a.added_by ?? '').trim()
+  const other = by && by !== me
+  const ok = window.confirm(
+    other
+      ? tr(`素材「${a.name}」は ${by} さんが入れたものです。消しますか?(この素材へのやり取りも消えます)`, `"${a.name}" was added by ${by}. Delete it? Its conversation is deleted too.`)
+      : tr(`素材「${a.name}」を消します(この素材へのやり取りも消えます)。よろしいですか?`, `Delete "${a.name}"? Its conversation is deleted too.`),
+  )
+  if (!ok) return false
+  // 消せないときは投げる(呼ぶ側が文言を出す)
+  await CardAssetsService.delete(a.id)
+  // ファイルが消せなくても、素材の行はもう無い(置き場所に残るだけ)ので、失敗にしない
+  for (const f of [a.stored, a.preview_image]) if (f) await CreativeFiles.remove(f).catch(() => undefined)
+  return true
+}
+
 interface Props {
   /** 保存済みの配信カードの ID(新規作成中は undefined。素材は、保存してから) */
   cardId?: string
   /** どこで開いているか(素材へのやり取りを、その段階の話として書く) */
   stage: 'plan' | 'production'
-  /** 配信の担当者(入れた本人のほかに、素材を消せる人) */
+  /** 配信の担当者(いまは使っていない。消すのは、だれでもできる) */
   owner?: string
   people: string[]
   cardName: string
@@ -133,9 +158,10 @@ interface Props {
 /**
  * 素材(Creative Assets。X58。利用者の要望 2026-10-21: マーケ担当などから、制作に使ってほしい画像・ページのイメージを伝えたい)。
  * 配信ごとに、ファイル(画像・PDF・Office)と参考の URL を置き、素材ごとにやり取り(コメント)できる。配信カードと制作のページの両方で、同じものを出す。
- * だれでも足せて、コメントできる。消せるのは、入れた本人と配信の担当者。制作の依頼の写しには入れない(いつも最新を見る)
+ * だれでも足せて、コメントでき、消せる(2026-10-23 利用者: 消す場所がない。名前の設定が無い・担当が違うと消せなかったので、だれでも消せるようにし、
+ * 人の入れた素材は確かめの文で名前を出す)。一覧の行の右上と、素材のフロートから消す。制作の依頼の写しには入れない(いつも最新を見る)
  */
-export function CreativeAssets({ cardId, stage, owner, people, cardName, productionOwner, productionDue, productIds, products, onCount, title, hideCaption, compactAdd = false }: Props) {
+export function CreativeAssets({ cardId, stage, people, cardName, productionOwner, productionDue, productIds, products, onCount, title, hideCaption, compactAdd = false }: Props) {
   const s = useStyles()
   const t = useT()
   const me = useSyncExternalStore(onMeChange, myName).trim()
@@ -266,7 +292,8 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
           ) : (
             <div className={s.list}>
               {assets.map((a) => (
-                <button key={a.id} type="button" className={s.row} onClick={() => setOpenId(a.id)} title={t('押すと大きく見て、この素材についてやり取りできます', 'Click to view it and discuss it')}>
+                <div key={a.id} className={s.rowWrap}>
+                <button type="button" className={mergeClasses(s.row, s.rowPad)} onClick={() => setOpenId(a.id)} title={t('押すと大きく見て、この素材についてやり取りできます', 'Click to view it and discuss it')}>
                   {isImage(a) && a.stored ? (
                     <img className={s.rowThumb} src={CreativeFiles.url(a.stored)} alt="" loading="lazy" />
                   ) : a.kind === 'url' && a.preview_image ? (
@@ -284,6 +311,24 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
                     </span>
                   </span>
                 </button>
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  className={mergeClasses('ccp-asset-del', s.rowDel)}
+                  icon={<DeleteRegular />}
+                  disabled={busy}
+                  aria-label={t(`素材「${a.name}」を消す`, `Delete "${a.name}"`)}
+                  title={t('この素材を消す', 'Delete this asset')}
+                  onClick={async () => {
+                    setError(null)
+                    try {
+                      if (await deleteAsset(a, me)) await load()
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : String(e))
+                    }
+                  }}
+                />
+                </div>
               ))}
             </div>
           )}
@@ -421,7 +466,7 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
       {opened && cardId && (
         <AssetFloat
           asset={opened}
-          canDelete={!!me && (me === (opened.added_by ?? '').trim() || me === (owner ?? '').trim())}
+          me={me}
           canEdit={!!me}
           onChanged={load}
           onClose={() => {
@@ -450,7 +495,7 @@ export function CreativeAssets({ cardId, stage, owner, people, cardName, product
 }
 
 /** 素材 1 つを大きく見て、題名・ひとことを直し、やり取りする */
-function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments }: { asset: CardAsset; canDelete: boolean; canEdit: boolean; onChanged: () => Promise<void>; onClose: () => void; comments: React.ReactNode }) {
+function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { asset: CardAsset; me: string; canEdit: boolean; onChanged: () => Promise<void>; onClose: () => void; comments: React.ReactNode }) {
   const s = useStyles()
   const t = useT()
   const [edit, setEdit] = useState<{ name: string; note: string } | null>(null)
@@ -470,13 +515,9 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
     }
   }
   const remove = async () => {
-    if (!window.confirm(tr(`素材「${a.name}」を消します(この素材へのやり取りも消えます)。よろしいですか?`, `Delete "${a.name}"? Its conversation is deleted too.`))) return
     setBusy(true)
     try {
-      await CardAssetsService.delete(a.id)
-      if (a.stored) await CreativeFiles.remove(a.stored)
-      if (a.preview_image) await CreativeFiles.remove(a.preview_image)
-      onClose()
+      if (await deleteAsset(a, me)) onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : tr('消せませんでした', 'Could not delete'))
     } finally {
@@ -588,11 +629,9 @@ function AssetFloat({ asset: a, canDelete, canEdit, onChanged, onClose, comments
                         {t('題名・メッセージを直す', 'Edit title and message')}
                       </Button>
                     )}
-                    {canDelete && (
-                      <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void remove()}>
-                        {t('消す', 'Delete')}
-                      </Button>
-                    )}
+                    <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void remove()}>
+                      {t('消す', 'Delete')}
+                    </Button>
                   </div>
                 </div>
               )}
