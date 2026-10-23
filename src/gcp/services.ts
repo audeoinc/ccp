@@ -39,13 +39,27 @@ interface GetAllOptions {
 
 type Rec = Record<string, unknown>
 
+// 混み合い(429)のときに、やり直すまでの待ち(ミリ秒)。
+// 本番は、DB の起動の直後に、画面の読み込みが一度に重なって、Cloud Run が「空いているインスタンスがない」と 429 で断ることがある。
+// この 429 は、サーバーに届く前に断られたもの(書き込みも行われていない)なので、書き込みも含めて、少し待ってやり直してよい
+const RETRY_WAITS = [1000, 2000, 4000]
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 async function call<T>(method: string, path: string, query?: URLSearchParams, body?: unknown): Promise<Result<T>> {
   try {
-    const res = await fetch(appPath(`/api/data/${path}${query && [...query].length ? `?${query}` : ''}`), {
-      method,
-      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), 'x-ccp-actor': encodeURIComponent(actorName()) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    const send = () =>
+      fetch(appPath(`/api/data/${path}${query && [...query].length ? `?${query}` : ''}`), {
+        method,
+        headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), 'x-ccp-actor': encodeURIComponent(actorName()) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+    let res = await send()
+    for (const wait of RETRY_WAITS) {
+      if (res.status !== 429) break
+      // 同時に断られた読み込みが、同じ時刻にそろってやり直さないように、少しずらす
+      await sleep(wait + Math.random() * 500)
+      res = await send()
+    }
     const json = (await res.json().catch(() => null)) as Result<T> | null
     if (!json) return { success: false, error: { message: `サーバーの応答が正しくありません(${res.status})` } }
     // DB が止まっている(起動中)ときは、準備中の表示を出す(準備ができたら、自動で読み込み直す)
