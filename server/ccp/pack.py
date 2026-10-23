@@ -52,7 +52,8 @@ async def read_tables() -> dict[str, list[dict[str, Any]]]:
 def image_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
     """DB の画像 URL のうち、このサーバーが配っている画像(/img/…)の、種類とファイル名"""
     refs: set[tuple[str, str]] = set()
-    for name in ("products", "hero_images", "part_images"):
+    # product_images: 商品ページから集めた画像(メインを含む)。パックで運ぶときも、画像のファイルを一緒に入れる
+    for name in ("products", "hero_images", "part_images", "product_images"):
         for row in tables.get(name, []):
             m = IMG_URL.match(str(row.get("image_url") or ""))
             if m:

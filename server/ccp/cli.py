@@ -158,6 +158,11 @@ def main() -> None:
     bd.add_argument("--pack", type=Path, default=None)
     bd.add_argument("--touch-stock", action="store_true")
     bd.add_argument("--yes", action="store_true")
+    ii = sub.add_parser("import-images")
+    ii.add_argument("path", type=Path)
+    ii.add_argument("--images", type=Path, default=DEFAULT_IMAGES)
+    ii.add_argument("--yes", action="store_true")
+    ii.add_argument("--main-to-master", action="store_true")
     rd = sub.add_parser("ranking-dummy")
     rd.add_argument("--yes", action="store_true")
     args = p.parse_args()
@@ -183,6 +188,10 @@ def main() -> None:
         asyncio.run(ranking_dummy(args.yes))
     elif args.cmd == "import-metrics":
         asyncio.run(import_metrics(args.path, args.yes))
+    elif args.cmd == "import-images":
+        from .product_images import import_images
+
+        asyncio.run(import_images(args.path, args.images, args.yes, args.main_to_master))
     elif args.cmd == "import-pack":
         asyncio.run(import_pack(args.path, args.images, args.yes, args.add))
     else:

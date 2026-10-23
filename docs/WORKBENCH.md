@@ -77,6 +77,7 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 | やりたいこと | コマンド |
 |---|---|
 | BigQuery の出力を、値まで確かめる(何も変えない) | `bq-check` |
+| 手元の PC で集めた商品ページの画像を取り込む([PRODUCT_IMAGES.md](PRODUCT_IMAGES.md)) | `import-images <ZIP> [--yes]` |
 | 商品・カテゴリの週の指標を取り込む(CSV) | `import-metrics <CSV> [--yes]` |
 | BigQuery の販売順位がないとき、結果の画面の「販売チャネルごとの順位」のダミーを作る | `ranking-dummy [--yes]` |
 

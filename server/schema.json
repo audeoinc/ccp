@@ -153,6 +153,23 @@
    "lookups": [
    ]
   },
+  "product_images": {
+   "_comment": "商品の画像(メインを含め、商品ページに載っている画像)。手元の PC で集めて、python -m ccp.cli import-images で取り込む(docs/PRODUCT_IMAGES.md)。画像を選ぶとき・AI が配信に合う画像を勧めるときの候補",
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["product_code", "text", {"index": true}],
+    ["market", "text"],
+    ["image_url", "text"],
+    ["sort_order", "int"],
+    ["is_main", "int"],
+    ["source_url", "text"],
+    ["alt", "text"],
+    ["sha256", "text"]
+   ],
+   "lookups": [
+    ["product_id", "products", {"onDelete": "CASCADE"}]
+   ]
+  },
   "product_policies": {
    "columns": [
     ["name", "text", {"required": true}],
