@@ -1002,7 +1002,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
               fontSize: '0.85rem',
             }}
           >
-            {items.length === 0 ? t('ここに商品をドロップ', 'Drop a product here') : t('＋ ここにドロップで末尾に追加', '+ Drop here to add to the end')}
+            {items.length === 0 ? t('ここに商品をドロップ', 'Drop a product here') : t('＋ ここに落とすと、いちばん後ろに足す', '+ Drop here to add to the end')}
           </div>
         </div>
       </>
@@ -1278,7 +1278,7 @@ function PushPreview(props: Props) {
           className={classes.pushDrop}
           style={{ borderColor: over === items.length ? tokens.colorBrandForeground1 : tokens.colorNeutralStroke2 }}
         >
-          {items.length === 0 ? t('ここに商品をドロップ', 'Drop a product here') : t('＋ ここにドロップで末尾に追加', '+ Drop here to add to the end')}
+          {items.length === 0 ? t('ここに商品をドロップ', 'Drop a product here') : t('＋ ここに落とすと、いちばん後ろに足す', '+ Drop here to add to the end')}
         </div>
       </div>
     </div>

@@ -38,6 +38,8 @@ import { PolicyEdit, type RuleInput } from './data/policyEdit'
 import { PolicyRuleEditsService } from './data/policyRuleEdits'
 import type { PolicyRuleEdit } from './models/policyRuleEdits'
 import { RuleEditDialog } from './RuleEditDialog'
+import { ListHeader } from './ListHeader'
+import { useJustAdded } from './useJustAdded'
 import { LIMIT_TEMPLATE } from './ruleTemplates'
 import { downloadText } from './productionSnapshot'
 import { locale, tr, useT } from './i18n'
@@ -105,6 +107,8 @@ const fmtDate = (v?: string) => (v ? new Date(v).toLocaleString(locale(), { mont
 
 export function PolicyManager({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: () => void }) {
   const styles = useStyles()
+  const justAdded = useJustAdded()
+  const clearAdded = justAdded.clear
   const t = useT()
   const [kind, setKind] = useState<ListTab>('rules')
   // 画面で足す・直す(X61)
@@ -144,8 +148,10 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
     setFile(null)
     setError(null)
     setDone(null)
+    // 前に開いたときに足した決まりも、いつもの並びに戻す
+    clearAdded()
     void reload()
-  }, [open, reload])
+  }, [open, reload, clearAdded])
 
   const pick = async (f: File | undefined) => {
     if (!f) return
@@ -187,11 +193,12 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
   }
 
   // 画面で足した・直した・消したあと: 一覧と、AI・週の上限が使う決まりを読み直す
-  const afterEdit = async (message: string) => {
+  const afterEdit = async (message: string, added?: string) => {
     setEditing(null)
     setError(null)
     setDone(message)
     await reload()
+    justAdded.mark(added)
     onImported()
   }
   const removeRule = async (r: PolicyRule) => {
@@ -349,13 +356,16 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
             )}
           </div>
           {kind === 'rules' && (
-            <div className={styles.row}>
-              <Button size="small" icon={<AddRegular />} onClick={() => setEditing({})}>
-                {t('決まりを足す', 'Add a rule')}
-              </Button>
-              <Button size="small" icon={<TopSpeedRegular />} onClick={() => setEditing({ initial: limitTemplate() })} title={t('「同じ商品は週 N 回まで」の決まりを、ひな形から足します(アラートの条件の週の上限より優先)', 'Add a "same product at most N times a week" rule from a template (overrides the alert setting)')}>
-                {t('週の上限の決まりを足す', 'Add a weekly cap rule')}
-              </Button>
+            <ListHeader
+              title={t('ルール系の決まり', 'Rules')}
+              caption={t('画面で足した決まりは「画面で作成」に入り、取り込み直しても消えません。取り込んだ決まりを直すと、同じファイルを取り込み直したときに戻ります。', 'Rules added here go to "画面で作成" and survive re-imports. Edits to imported rules are reverted when that file is re-imported.')}
+              addLabel={t('決まりを足す', 'Add a rule')}
+              choices={[
+                { key: 'blank', label: t('決まり(白紙から)', 'Rule (blank)'), icon: <AddRegular />, onSelect: () => setEditing({}) },
+                // 「同じ商品は週 N 回まで」(アラートの条件の週の上限より優先)
+                { key: 'cap', label: t('週の上限の決まり(ひな形から)', 'Weekly cap rule (from a template)'), icon: <TopSpeedRegular />, onSelect: () => setEditing({ initial: limitTemplate() }) },
+              ]}
+              actions={
               <Menu>
                 <MenuTrigger disableButtonEnhancement>
                   <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!rules.length}>
@@ -371,8 +381,8 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                   </MenuList>
                 </MenuPopover>
               </Menu>
-              <Text className={styles.small}>{t('画面で足した決まりは「画面で作成」に入り、取り込み直しても消えません。取り込んだ決まりを直すと、同じファイルを取り込み直したときに戻ります。', 'Rules added here go to "画面で作成" and survive re-imports. Edits to imported rules are reverted when that file is re-imported.')}</Text>
-            </div>
+              }
+            />
           )}
           <div className={styles.scroll}>
             {loading && <Spinner size="tiny" />}
@@ -391,8 +401,8 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {shownRules.map((r) => (
-                    <TableRow key={r.id}>
+                  {justAdded.order(shownRules, (r) => r.rule_id ?? r.id).map((r) => (
+                    <TableRow key={r.id} className={justAdded.freshClass(r.rule_id ?? r.id)}>
                       <TableCell className={styles.small}>{r.rule_id}</TableCell>
                       <TableCell>
                         <div className={styles.small}>

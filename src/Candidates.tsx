@@ -141,7 +141,7 @@ export function Candidates({ products, usedIds, onAdd, onPick, pickedId, marks }
             {used ? (
               <Badge appearance="tint" color="informative">{t('掲載中', 'Included')}</Badge>
             ) : onPick ? null : (
-              <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => onAdd(p.id)} aria-label={t('追加', 'Add')} />
+              <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => onAdd(p.id)} aria-label={t('足す', 'Add')} />
             )}
           </div>
         )

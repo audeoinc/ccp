@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Checkbox, Field, Input, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DeleteRegular, LinkRegular, TaskListLtrRegular } from '@fluentui/react-icons'
+import { ListHeader } from './ListHeader'
+import { useJustAdded } from './useJustAdded'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { locale, tr, useT } from './i18n'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
-  head: { display: 'flex', alignItems: 'center', columnGap: '8px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, lineHeight: tokens.lineHeightBase200 },
   row: {
     display: 'grid',
@@ -24,9 +25,10 @@ const useStyles = makeStyles({
   source: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', border: 'none', padding: 0, background: 'none', color: tokens.colorBrandForeground1, cursor: 'pointer', fontSize: tokens.fontSizeBase100, fontFamily: 'inherit' },
   // 入力欄は既定の最小幅を持つので、列の幅に合わせて縮める(隣の欄と重ならないように)
   // タスクの文は 1 行目に広く、担当と期日は 2 行目に並べる(中央のペインが狭くても、文が読めるように)
-  form: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', rowGap: '6px', alignItems: 'end', '& .fui-Input': { minWidth: 0, width: '100%' } },
+  // 足す欄は、見出しの「＋ タスクを足す」で開き、一覧の上に出す
+  form: { display: 'grid', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', rowGap: '6px', alignItems: 'end', '& .fui-Input': { minWidth: 0, width: '100%' } },
   wide: { gridColumn: '1 / -1' },
-  actions: { display: 'flex', columnGap: '8px' },
+  actions: { gridColumn: '1 / -1', display: 'flex', columnGap: '8px' },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
@@ -62,6 +64,8 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
   const [text, setText] = useState('')
   const [assignee, setAssignee] = useState(productionOwner)
   const [due, setDue] = useState(productionDue)
+  const [adding, setAdding] = useState(false)
+  const justAdded = useJustAdded()
 
   const load = useCallback(async () => {
     if (!cardId) return
@@ -88,9 +92,11 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
     setBusy(false)
   }
 
-  const tasks = (notes ?? []).filter((n) => n.kind === 'task')
-  // 未完了を上に、期日の早い順。完了は下に
-  tasks.sort((a, b) => (a.resolved ?? 0) - (b.resolved ?? 0) || (a.due || '9999').localeCompare(b.due || '9999'))
+  // 未完了を上に、期日の早い順。完了は下に。いま足したタスクだけは、いちばん上に出す
+  const tasks = justAdded.order(
+    (notes ?? []).filter((n) => n.kind === 'task').sort((a, b) => (a.resolved ?? 0) - (b.resolved ?? 0) || (a.due || '9999').localeCompare(b.due || '9999')),
+    (n) => n.id,
+  )
   const questionOf = (id?: string) => (notes ?? []).find((n) => n.id === id)
   const today = todayYmd()
 
@@ -104,21 +110,45 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
         due: due || undefined,
         resolved: 0,
       })
-      if (res.success) setText('')
+      if (res.success) {
+        setText('')
+        justAdded.mark(res.data?.id)
+      }
       return res
     })
 
   return (
     <div className={styles.root}>
-      <div>
-        <div className={styles.head}>
-          <TaskListLtrRegular />
-          {t('タスク', 'Tasks')}
+      <ListHeader
+        icon={<TaskListLtrRegular />}
+        title={t('タスク', 'Tasks')}
+        caption={t('制作とのやり取りから AI が出した案を採用するか、ここで足します。その場で保存します。', 'Adopt AI ideas from the production Q&A (Handoff tab), or add tasks here. Saved right away.')}
+        addLabel={t('タスクを足す', 'Add a task')}
+        addDisabled={!cardId || adding}
+        onAdd={() => setAdding(true)}
+      />
+      {cardId && adding && (
+        <div className={styles.form}>
+          <Field label={t('タスク', 'Task')} size="small" className={styles.wide}>
+            <Input size="small" autoFocus value={text} onChange={(_, d) => setText(d.value)} onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && text.trim() && !busy && void add()} />
+          </Field>
+          <Field label={t('担当', 'Assignee')} size="small">
+            <Input size="small" list="ccp-owners" value={assignee} onChange={(_, d) => setAssignee(d.value)} />
+          </Field>
+          <Field label={t('期日', 'Due')} size="small">
+            <Input size="small" type="date" value={due} onChange={(_, d) => setDue(d.value)} />
+          </Field>
+          {/* 続けていくつも足せるように、足したあとも欄は開いたまま */}
+          <div className={styles.actions}>
+            <Button size="small" appearance="primary" disabled={busy || !text.trim()} onClick={() => void add()}>
+              {t('足す', 'Add')}
+            </Button>
+            <Button size="small" onClick={() => setAdding(false)}>
+              {t('閉じる', 'Close')}
+            </Button>
+          </div>
         </div>
-        <div className={styles.caption}>
-          {t('制作とのやり取りから AI が出した案を採用するか、ここで足します。その場で保存します。', 'Adopt AI ideas from the production Q&A (Handoff tab), or add tasks here. Saved right away.')}
-        </div>
-      </div>
+      )}
       {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、タスクを足せます。', 'Save the delivery card to add tasks.')}</div>}
       {cardId && notes === null && <Spinner size="tiny" />}
       {error && <div className={styles.error}>{error}</div>}
@@ -126,7 +156,7 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
         const src = questionOf(n.source_note)
         const overdue = !n.resolved && !!n.due && n.due.slice(0, 10) < today
         return (
-          <div key={n.id} className={mergeClasses(styles.row, !!n.resolved && styles.done)}>
+          <div key={n.id} className={mergeClasses(styles.row, !!n.resolved && styles.done, justAdded.freshClass(n.id))}>
             <Checkbox
               checked={!!n.resolved}
               disabled={busy}
@@ -161,26 +191,6 @@ export function TasksPanel({ cardId, productionOwner, productionDue, onOpenSourc
         )
       })}
       {cardId && notes && tasks.length === 0 && <div className={styles.caption}>{t('まだタスクはありません。', 'No tasks yet.')}</div>}
-      {cardId && (
-        <div className={styles.form}>
-          <Field label={t('タスク', 'Task')} size="small" className={styles.wide}>
-            <Input size="small" value={text} onChange={(_, d) => setText(d.value)} />
-          </Field>
-          <Field label={t('担当', 'Assignee')} size="small">
-            <Input size="small" list="ccp-owners" value={assignee} onChange={(_, d) => setAssignee(d.value)} />
-          </Field>
-          <Field label={t('期日', 'Due')} size="small">
-            <Input size="small" type="date" value={due} onChange={(_, d) => setDue(d.value)} />
-          </Field>
-        </div>
-      )}
-      {cardId && (
-        <div className={styles.actions}>
-          <Button size="small" disabled={busy || !text.trim()} onClick={() => void add()}>
-            {t('タスクを追加', 'Add task')}
-          </Button>
-        </div>
-      )}
     </div>
   )
 }

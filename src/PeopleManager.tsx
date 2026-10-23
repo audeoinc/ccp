@@ -14,9 +14,12 @@ import {
   Tab,
   TabList,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
+import { ListHeader } from './ListHeader'
+import { useJustAdded } from './useJustAdded'
 import { AddRegular, DismissRegular } from '@fluentui/react-icons'
 import { locale, optionLabel, tr, useT } from './i18n'
 import { logEvent, meLock, myName, myUserId, onMeChange } from './history'
@@ -41,7 +44,10 @@ const useStyles = makeStyles({
   scroll: { overflowY: 'auto', minHeight: '240px', display: 'grid', rowGap: '8px', alignContent: 'start' },
   grid: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.4fr) 120px 100px', columnGap: '8px', rowGap: '6px', alignItems: 'center' },
   colHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
-  addRow: { display: 'flex', columnGap: '8px', alignItems: 'center', flexWrap: 'wrap', paddingBottom: '8px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  // 見出しの「＋ ○○を足す」で開く足す欄(一覧の上)
+  addRow: { display: 'flex', columnGap: '8px', alignItems: 'center', flexWrap: 'wrap', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  // ユーザーの 1 行(表の列にそろえたまま、行ごとに足したばかりの印を付けられるように、subgrid で包む)
+  userRow: { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', alignItems: 'center', borderRadius: tokens.borderRadiusMedium },
   group: { display: 'grid', rowGap: '6px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   groupHead: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 2fr) 100px', columnGap: '8px', alignItems: 'center' },
   members: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', rowGap: '6px', alignItems: 'center' },
@@ -85,6 +91,9 @@ export function PeopleManager() {
   // 足すユーザー・グループの入力
   const [newUser, setNewUser] = useState({ name: '', email: '' })
   const [newGroup, setNewGroup] = useState({ name: '', description: '' })
+  const [adding, setAdding] = useState<null | 'user' | 'group'>(null)
+  const justAdded = useJustAdded()
+  const clearAdded = justAdded.clear
 
   const loadLog = async () => {
     const r = await EventsService.getAll({ orderBy: ['created_on desc'] })
@@ -92,11 +101,14 @@ export function PeopleManager() {
   }
   useEffect(() => {
     if (!isOpen) return
+    // 開き直したら、いつもの並び(名前の順)に戻し、足す欄も閉じる
+    clearAdded()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAdding(null)
     void reloadPeople()
     // 開いたときに、変更の履歴を読み直す(ほかの人の変更も見えるように)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadLog()
-  }, [isOpen])
+  }, [isOpen, clearAdded])
 
   /** 書き込み → 履歴に残す → 読み直す。失敗したら理由を出して、履歴は残さない */
   const run = async (write: () => Promise<{ success: boolean; error?: { message: string } }>, action: 'user_change' | 'group_change' | 'rule_change', note: string) => {
@@ -129,7 +141,20 @@ export function PeopleManager() {
     const email = newUser.email.trim()
     const bad = checkEmail(email)
     if (bad) return setError(bad)
-    if (await run(() => UsersService.create({ name, email: email || undefined, role: 'member', status: 'active' }), 'user_change', tr(`追加: ${name}`, `Added: ${name}`))) setNewUser({ name: '', email: '' })
+    let id: string | undefined
+    const ok = await run(
+      async () => {
+        const r = await UsersService.create({ name, email: email || undefined, role: 'member', status: 'active' })
+        id = r.data?.id
+        return r
+      },
+      'user_change',
+      tr(`追加: ${name}`, `Added: ${name}`),
+    )
+    if (ok) {
+      setNewUser({ name: '', email: '' })
+      justAdded.mark(id)
+    }
   }
 
   /** ユーザーの 1 項目を変える(入力欄は、離れたときに保存する) */
@@ -149,7 +174,20 @@ export function PeopleManager() {
   const addGroup = async () => {
     const name = newGroup.name.trim()
     const description = newGroup.description.trim()
-    if (await run(() => ApprovalGroupsService.create({ name, description: description || undefined, status: 'active' }), 'group_change', tr(`追加: ${name}`, `Added: ${name}`))) setNewGroup({ name: '', description: '' })
+    let id: string | undefined
+    const ok = await run(
+      async () => {
+        const r = await ApprovalGroupsService.create({ name, description: description || undefined, status: 'active' })
+        id = r.data?.id
+        return r
+      },
+      'group_change',
+      tr(`追加: ${name}`, `Added: ${name}`),
+    )
+    if (ok) {
+      setNewGroup({ name: '', description: '' })
+      justAdded.mark(id)
+    }
   }
 
   const updateGroup = (g: ApprovalGroup, field: 'name' | 'description' | 'status', value: string) => {
@@ -218,21 +256,29 @@ export function PeopleManager() {
 
   const usersTab = (
     <>
+      <ListHeader title={t('ユーザー', 'Users')} addLabel={t('ユーザーを足す', 'Add a user')} addDisabled={busy || adding === 'user'} onAdd={() => setAdding('user')} />
+      {adding === 'user' && (
       <div className={s.addRow}>
-        <Input size="small" placeholder={t('名前', 'Name')} value={newUser.name} onChange={(_, d) => setNewUser((x) => ({ ...x, name: d.value }))} />
+        <Input size="small" autoFocus placeholder={t('名前', 'Name')} value={newUser.name} onChange={(_, d) => setNewUser((x) => ({ ...x, name: d.value }))} />
         <Input size="small" type="email" placeholder={t('メールアドレス(ログイン・通知に使う)', 'Email (for sign-in and notifications)')} value={newUser.email} onChange={(_, d) => setNewUser((x) => ({ ...x, email: d.value }))} style={{ minWidth: '260px' }} />
         <Button size="small" icon={<AddRegular />} disabled={busy || !newUser.name.trim()} onClick={() => void addUser()}>
-          {t('ユーザーを足す', 'Add user')}
+          {t('足す', 'Add')}
+        </Button>
+        <Button size="small" onClick={() => setAdding(null)}>
+          {t('閉じる', 'Close')}
         </Button>
       </div>
+      )}
       <div className={s.grid}>
         <span className={s.colHead}>{t('名前', 'Name')}</span>
         <span className={s.colHead}>{t('メールアドレス', 'Email')}</span>
         <span className={s.colHead}>{t('役割', 'Role')}</span>
         <span className={s.colHead}>{t('状態', 'Status')}</span>
-        {people.users.map((u) => (
+        {justAdded.order(people.users, (u) => u.id).map((u) => (
           // key に更新の時刻を含め、保存し直したら入力欄を、保存した値で作り直す(入れかけの値が残らないように)
-          <UserRow key={`${u.id}:${u.modified_on ?? ''}:${u.name}:${u.email ?? ''}`} user={u} disabled={busy} onChange={(f, v) => updateUser(u, f, v)} />
+          <div key={`${u.id}:${u.modified_on ?? ''}:${u.name}:${u.email ?? ''}`} className={mergeClasses(s.userRow, justAdded.freshClass(u.id))}>
+            <UserRow user={u} disabled={busy} onChange={(f, v) => updateUser(u, f, v)} />
+          </div>
         ))}
       </div>
       {people.loaded && people.users.length === 0 && <span className={s.note}>{t('まだユーザーがいません。上で足すと、「あなた」をユーザーから選べるようになります。', 'No users yet. Once you add some, "You" is chosen from the users.')}</span>}
@@ -241,19 +287,25 @@ export function PeopleManager() {
 
   const groupsTab = (
     <>
+      <ListHeader title={t('承認グループ', 'Approval groups')} addLabel={t('グループを足す', 'Add a group')} addDisabled={busy || adding === 'group'} onAdd={() => setAdding('group')} />
+      {adding === 'group' && (
       <div className={s.addRow}>
-        <Input size="small" placeholder={t('グループの名前(例: MD・ブランド)', 'Group name (e.g. MD, Brand)')} value={newGroup.name} onChange={(_, d) => setNewGroup((x) => ({ ...x, name: d.value }))} />
+        <Input size="small" autoFocus placeholder={t('グループの名前(例: MD・ブランド)', 'Group name (e.g. MD, Brand)')} value={newGroup.name} onChange={(_, d) => setNewGroup((x) => ({ ...x, name: d.value }))} />
         <Input size="small" placeholder={t('何を見るグループか', 'What the group checks')} value={newGroup.description} onChange={(_, d) => setNewGroup((x) => ({ ...x, description: d.value }))} style={{ minWidth: '260px' }} />
         <Button size="small" icon={<AddRegular />} disabled={busy || !newGroup.name.trim()} onClick={() => void addGroup()}>
-          {t('グループを足す', 'Add group')}
+          {t('足す', 'Add')}
+        </Button>
+        <Button size="small" onClick={() => setAdding(null)}>
+          {t('閉じる', 'Close')}
         </Button>
       </div>
+      )}
       <span className={s.note}>{t('承認を依頼すると、グループのだれか 1 人が承認すれば、そのグループは済みになります。', 'When approval is requested from a group, one approval from any member completes that group.')}</span>
-      {people.groups.map((g) => {
+      {justAdded.order(people.groups, (g) => g.id).map((g) => {
         const inGroup = groupUsers(people, g.id)
         const candidates = activeUsers(people).filter((u) => !inGroup.some((x) => x.id === u.id))
         return (
-          <div key={`${g.id}:${g.modified_on ?? ''}:${g.name}:${g.description ?? ''}`} className={s.group}>
+          <div key={`${g.id}:${g.modified_on ?? ''}:${g.name}:${g.description ?? ''}`} className={mergeClasses(s.group, justAdded.freshClass(g.id))}>
             <div className={s.groupHead}>
               <Input size="small" defaultValue={g.name} aria-label={t('グループの名前', 'Group name')} disabled={busy} onBlur={(e) => updateGroup(g, 'name', e.target.value)} />
               <Input size="small" defaultValue={g.description ?? ''} placeholder={t('何を見るグループか', 'What the group checks')} aria-label={t('説明', 'Description')} disabled={busy} onBlur={(e) => updateGroup(g, 'description', e.target.value)} />

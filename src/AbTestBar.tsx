@@ -100,7 +100,7 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
           ))}
           {canAdd && (
             <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={onAdd} title={t('A 案の写しから、新しい案を作ります', 'Create a new variant as a copy of A')}>
-              {t('案を追加', 'Add variant')}
+              {t('案を足す', 'Add a variant')}
             </Button>
           )}
         </span>

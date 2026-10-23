@@ -11,6 +11,7 @@ import { HeroUploadDialog } from './HeroUploadDialog'
 import { myName } from './history'
 import { useT } from './i18n'
 import { Linkify } from './LinkText'
+import { useJustAdded } from './useJustAdded'
 
 const useStyles = makeStyles({
   preLine: { whiteSpace: 'pre-line' },
@@ -88,6 +89,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
   const s = useStyles()
   const t = useT()
   const [editing, setEditing] = useState<string | null>(null)
+  const justAdded = useJustAdded()
   // 持っている画像を上げる(X59。制作のページから。上げた画像はライブラリにも入る)
   const [uploading, setUploading] = useState(false)
   const market = cardMarket(current.card.country ?? '')
@@ -253,7 +255,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
             const changed = wasId !== r.product.id
             const wasName = wasId ? (original.products.find((p) => p.id === wasId)?.name ?? '') : ''
             return (
-              <div key={`${r.product.id}-${i}`} className={mergeClasses(s.product, changed && s.changed)}>
+              <div key={`${r.product.id}-${i}`} className={mergeClasses(s.product, changed && s.changed, justAdded.freshClass(`${r.product.id}-${i}`))}>
                 <img className={s.thumb} src={productImage(r.product) ?? ''} alt="" />
                 <span className={s.rowValue}>
                   <span className={s.rowLabel}>
@@ -279,13 +281,17 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
             )
           })}
           {removed.length > 0 && <span className={s.note}>{t(`企画から外した商品: ${removed.join('、')}`, `Removed from the plan: ${removed.join(', ')}`)}</span>}
-          {editable && (
-            <span className={s.tools}>
-              {productPicker(<Button size="small" appearance="subtle" icon={<AddRegular />}>{t('商品を足す', 'Add a product')}</Button>, (id) => onChange(setProducts(current, [...current.productIds, id], products)))}
-              {productsChanged && undo(() => onChange(setProducts(current, original.productIds, original.products)))}
-            </span>
-          )}
         </>,
+        // 足すボタンは見出しの右(画面の部品の決まり 1)。ただし、商品の並びはメールの枠の順なので、足した商品は上に動かさず、入った枠(いちばん下)で印を付ける
+        editable && (
+          <>
+            {productsChanged && undo(() => onChange(setProducts(current, original.productIds, original.products)))}
+            {productPicker(<Button size="small" appearance="subtle" icon={<AddRegular />}>{t('商品を足す', 'Add a product')}</Button>, (id) => {
+              justAdded.mark(`${id}-${current.productIds.length}`)
+              onChange(setProducts(current, [...current.productIds, id], products))
+            })}
+          </>
+        ),
       )}
       {section(
         t('リンク先', 'Links'),

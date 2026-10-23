@@ -68,7 +68,8 @@ interface Props {
   initial?: RuleInput
   /** 使える市場(すでにある決まりと配信から) */
   markets: string[]
-  onDone: (message: string) => void | Promise<void>
+  /** 保存したあと。added は、新しく足した決まりの番号(一覧で、いちばん上に印つきで出すため) */
+  onDone: (message: string, added?: string) => void | Promise<void>
   onClose: () => void
 }
 
@@ -115,7 +116,7 @@ export function RuleEditDialog({ rule, initial, markets, onDone, onClose }: Prop
     try {
       const res = rule ? await PolicyEdit.update(rule.id, input) : await PolicyEdit.create(input)
       const notes = res.problems.map((p) => p.message).join(' / ')
-      await onDone((rule ? tr(`決まり ${input.rule_id} を直しました`, `Updated rule ${input.rule_id}`) : tr(`決まり ${input.rule_id} を足しました`, `Added rule ${input.rule_id}`)) + (notes ? tr(`(気になること: ${notes})`, ` (note: ${notes})`) : ''))
+      await onDone((rule ? tr(`決まり ${input.rule_id} を直しました`, `Updated rule ${input.rule_id}`) : tr(`決まり ${input.rule_id} を足しました`, `Added rule ${input.rule_id}`)) + (notes ? tr(`(気になること: ${notes})`, ` (note: ${notes})`) : ''), rule ? undefined : input.rule_id)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
