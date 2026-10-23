@@ -66,6 +66,8 @@ export const products: Row[] = [...csv('products.csv'), ...csv('products_us.csv'
   season: SEASON[r['季節']],
   sales_trend: TREND[r['売上トレンド']],
   rating: Number(r['レビュー評価']),
+  // 撮影用: レビューの件数(箱の「レビュー」で、件数が少ない商品は隠れることも確かめられるように、0〜299 件)
+  review_count: parseInt(guid(`${r['商品コード']}:reviews`).slice(0, 8), 16) % 300,
   weather: WEATHER[r['天候適性']],
   description: r['商品説明'],
   image_url: r['画像URL'],

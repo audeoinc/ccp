@@ -15,9 +15,10 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
-import { SECTION_BG, boxFields, boxesOf, buttonColor, sectionSpace } from './tables'
+import { SECTION_BG, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
+import { STAR_COLOR, stars, useProductSwatches } from './swatches'
 import { locale, optionLabel, useT } from './i18n'
 
 interface Props {
@@ -239,6 +240,9 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   }, [selectedKey])
   const byId = new Map(products.map((p) => [p.id, p]))
   const tpl = getTemplate(template)
+  // カラーチップを出す箱があるときだけ、載せた商品の SKU の色を読む
+  const wantSwatches = [tpl.heroTable, ...tpl.sections].some((sec) => sec?.parts?.some((q) => q.type === 'box' && boxFields(q).includes('swatches')))
+  const swatches = useProductSwatches(items.map((it) => byId.get(it.productId)).filter((x): x is Product => !!x), wantSwatches)
   const offer = tpl.hero === 'offer'
   const heroText = tpl.heroText ?? 'band'
   const jaHeadline = /[\u3000-\u9fff\uff00-\uffef]/.test(headline)
@@ -422,7 +426,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const sale = part.priceStyle === 'sale'
     const regular = sale && p?.regular_price && p.price !== undefined && p.regular_price > p.price ? p.regular_price : undefined
     const price = has('price') && (
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+      <div data-el={`${part.id}.price`} style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
         {regular !== undefined && <span style={{ fontSize: '0.72rem', color: SUB, textDecoration: 'line-through' }}>{yen(regular, market)}</span>}
         <span style={{ fontSize: sale ? '0.95rem' : '0.8rem', fontWeight: sale ? 800 : 700, color: sale || offer ? '#d32f2f' : INK }}>
           {part.priceStyle === 'from' ? t(`${yen(p?.price, market)}〜`, `From ${yen(p?.price, market)}`) : yen(p?.price, market)}
@@ -431,20 +435,46 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     )
     const badgeText = part.badge?.trim() || 'NEW'
     const badge = has('badge') && (
-      <span style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4, color: '#fff', backgroundColor: /sale|限定|off/i.test(badgeText) || sale ? '#d32f2f' : INK }}>{badgeText}</span>
+      <span data-el={`${part.id}.badge`} style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4, color: '#fff', backgroundColor: /sale|限定|off/i.test(badgeText) || sale ? '#d32f2f' : INK }}>{badgeText}</span>
     )
-    const name = has('name') && <div className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, color: INK }}>{p?.name}</div>
-    const desc = has('desc') && p?.description && <div style={{ fontSize: '0.75rem', color: SUB, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
-    const button = has('button') && cta
-    const text = (name || price || desc || button) && (
+    const name = has('name') && <div data-el={`${part.id}.name`} className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, color: INK }}>{p?.name}</div>
+    // カラーチップ(SKU の色)。色のわからないものは、名前の札。上限を超えた分は「+3」
+    const sw = has('swatches') ? (swatches.get(it.productId) ?? []) : []
+    const max = part.swatchMax ?? 5
+    const chips = sw.length > 0 && (
+      <div data-el={`${part.id}.swatches`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 2 }}>
+        {sw.slice(0, max).map((c) =>
+          c.hex ? (
+            <span key={c.name} title={c.name} style={{ width: 12, height: 12, borderRadius: part.swatchShape === 'square' ? 2 : '50%', backgroundColor: c.hex, border: '1px solid #cfcfcf', boxSizing: 'border-box' }} />
+          ) : (
+            <span key={c.name} style={{ fontSize: '0.6rem', color: SUB, border: '1px solid #cfcfcf', borderRadius: 3, padding: '0 3px' }}>{c.name}</span>
+          ),
+        )}
+        {sw.length > max && <span style={{ fontSize: '0.65rem', color: SUB }}>+{sw.length - max}</span>}
+      </div>
+    )
+    // レビュー: 件数が少ない・点が低い商品では出さない(テンプレートで決めた線)
+    const showRating = has('rating') && p?.rating !== undefined && p.rating !== null && (p.review_count ?? 0) >= (part.ratingMin ?? 3) && p.rating >= (part.ratingFloor ?? 0)
+    const rating = showRating && (
+      <div data-el={`${part.id}.rating`} style={{ fontSize: '0.72rem', color: SUB, whiteSpace: 'nowrap' }}>
+        <span style={{ color: STAR_COLOR, letterSpacing: 1 }}>{stars(p.rating!)}</span>
+        {!part.ratingShow && <span> {p.rating!.toFixed(1)}</span>}
+        {part.ratingShow !== 'stars' && <span> ({(p.review_count ?? 0).toLocaleString(locale())})</span>}
+      </div>
+    )
+    const desc = has('desc') && p?.description && <div data-el={`${part.id}.desc`} style={{ fontSize: '0.75rem', color: SUB, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
+    const button = has('button') && <div data-el={`${part.id}.button`}>{cta}</div>
+    const text = (name || price || chips || rating || desc || button) && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         {name}
         {price}
+        {chips}
+        {rating}
         {desc}
         {button}
       </div>
     )
-    const img = (style: React.CSSProperties) => <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...style }} />
+    const img = (style: React.CSSProperties) => <img data-el={`${part.id}.image`} className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...style }} />
     // 文を写真の横に置く見せ方(特集・ストーリー)
     if (part.view === 'detail' || part.view === 'story') {
       const reverse = part.view === 'story' && j % 2 === 1
@@ -560,6 +590,13 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   }
 
   // ---- ヒーロー(メイン画像 + 見出し)。種類によって装飾が変わる
+  // 細かい見た目(T8 の 8.6): 写真の形・ヘッドラインの位置・文字の色・重ねる暗さ。省略は以前の見た目
+  const hs = tpl.heroStyle ?? {}
+  const heroInk = hs.color === 'dark' ? INK : '#fff'
+  const bandShade = [0, 0.25, 0.42, 0.6][hs.shade ?? 2]
+  const coverShade = [0, 0.15, 0.3, 0.45][hs.shade ?? 0]
+  const alignOf = (v?: 'top' | 'middle' | 'bottom') => (v === 'top' ? 'start' : v === 'bottom' ? 'end' : 'center')
+  const justifyOf = (h?: 'left' | 'center' | 'right') => (h === 'left' ? 'start' : h === 'right' ? 'end' : 'center')
   const heroBox = (
     <div
       className={classes.hero}
@@ -579,7 +616,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         if (id) onDropHero(id)
       }}
       style={{
-        aspectRatio: heroText === 'band' ? (compact ? '3 / 1' : '8 / 3') : compact ? '2 / 1' : heroText === 'overlay' ? '4 / 5' : '1 / 1',
+        aspectRatio: hs.ratio ? String(ratioValue(hs.ratio)) : heroText === 'band' ? (compact ? '3 / 1' : '8 / 3') : compact ? '2 / 1' : heroText === 'overlay' ? '4 / 5' : '1 / 1',
         backgroundColor: heroOver ? 'rgba(103,80,164,0.15)' : '#e9e9ee',
         // 拡大して切り出すとき(X59 ④)に、はみ出しを隠す
         overflow: 'hidden',
@@ -602,6 +639,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
       ) : (
         t('メインビジュアル(候補から画像をドロップ)', 'Main visual (drop an image from the candidates)')
       )}
+      {heroText !== 'band' && coverShade > 0 && <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${coverShade})`, pointerEvents: 'none' }} />}
       {tpl.hero === 'offer' && (
         <div style={{ position: 'absolute', top: 12, left: 12, backgroundColor: '#d32f2f', color: '#fff', fontWeight: 800, letterSpacing: 2, fontSize: '0.75rem', padding: '4px 10px', borderRadius: 4 }}>
           LIMITED OFFER
@@ -619,11 +657,11 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: 0,
+          ...(hs.v === 'top' ? { top: 0 } : hs.v === 'middle' ? { top: '50%', transform: 'translateY(-50%)' } : { bottom: 0 }),
           padding: `${compact ? '1.2cqw' : '2.2cqw'} 5cqw`,
-          backgroundColor: 'rgba(0,0,0,0.42)',
-          color: '#fff',
-          textAlign: 'left',
+          backgroundColor: hs.color === 'dark' ? `rgba(255,255,255,${bandShade})` : `rgba(0,0,0,${bandShade})`,
+          color: heroInk,
+          textAlign: hs.h ?? 'left',
           // 部品を選ぶ見せ方では、見出しとコピーを、メイン画像とは別に押せるようにする
           pointerEvents: pickMode ? 'auto' : 'none',
         }}
@@ -660,11 +698,12 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         <div
           style={{
             position: 'absolute',
-            inset: '0 6cqw',
+            inset: '4cqw 6cqw',
             display: 'grid',
-            placeItems: 'center',
-            color: '#fff',
-            textAlign: 'center',
+            alignItems: alignOf(hs.v),
+            justifyItems: justifyOf(hs.h),
+            color: heroInk,
+            textAlign: hs.h ?? 'center',
             pointerEvents: 'none',
             fontFamily: hf.family,
             fontWeight: hf.weight,
@@ -672,7 +711,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             lineHeight: 1.15,
             letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking,
             textTransform: hf.upper ? 'uppercase' : 'none',
-            textShadow: '0 2px 12px rgba(0,0,0,0.35)',
+            textShadow: hs.color === 'dark' ? 'none' : '0 2px 12px rgba(0,0,0,0.35)',
             overflowWrap: 'anywhere',
           }}
         >
@@ -717,14 +756,14 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
   const heroAfter = (
     <>
       {heroText === 'below' && (
-        <div data-anchor="herotext" style={{ textAlign: 'center', padding: '16px 16px 0', color: INK }}>
+        <div data-anchor="herotext" style={{ textAlign: hs.h ?? 'center', padding: '16px 16px 0', color: INK }}>
           <div data-part="headline" style={{ fontFamily: hf.family, fontWeight: hf.weight, fontSize: `calc(1.5rem * ${hf.scale})`, lineHeight: 1.25, letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking, textTransform: hf.upper ? 'uppercase' : 'none' }}>
             {headline || t('(ヘッドライン未入力)', '(No headline)')}
           </div>
         </div>
       )}
       {heroText !== 'band' && (
-        <div data-anchor="herotext" data-part="copy" style={{ textAlign: 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
+        <div data-anchor="herotext" data-part="copy" style={{ textAlign: heroText === 'below' ? (hs.h ?? 'center') : 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
       )}
       {buttonsAfter(0, 12)}
       <div style={{ height: 8 }} />
@@ -804,24 +843,52 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           if (p.type === 'button') {
             const color = buttonColor(p, offer)
             const align = p.align ?? 'center'
-            const text = p.style === 'text'
+            const under = p.shape === 'underline'
+            const text = p.style === 'text' || under
+            const justify = align === 'left' ? 'start' : align === 'right' ? 'end' : 'center'
+            const label = buttonText(p, defaultButtonLabel(0))
+            const fontSize = p.size === 'small' ? '0.72rem' : p.size === 'large' ? '0.92rem' : '0.8rem'
+            // 画像のボタン(画像だけ / 画像の上に文字。T8 の 8.7)。リンクと計測の目印は、文字のボタンと同じ
+            if (p.face) {
+              return (
+                <div style={{ display: 'grid', alignItems: 'center', height: '100%', justifyItems: p.fit ? justify : 'stretch' }}>
+                  <div
+                    data-link="button"
+                    data-link-id={p.id}
+                    data-anchor={`button:${p.id}`}
+                    data-part={`button:${p.id}`}
+                    style={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 36, minWidth: p.fit ? 120 : undefined, borderRadius: Math.min(buttonRadius(p), 12), overflow: 'hidden', backgroundColor: p.src ? undefined : '#eef0f3' }}
+                  >
+                    {p.src ? (
+                      <img data-el={`${p.id}.image`} src={p.src} alt={p.alt ?? label} draggable={false} style={{ ...(p.fit ? { maxWidth: '100%' } : { width: '100%' }), display: 'block' }} />
+                    ) : (
+                      <span data-el={`${p.id}.image`} style={{ fontSize: '0.72rem', color: SUB, padding: 8 }}>{t('ボタンの画像(未設定)', 'Button image (not set)')}</span>
+                    )}
+                    {p.face === 'both' && (
+                      <span data-el={`${p.id}.label`} style={{ ...(p.src ? { position: 'absolute', inset: 0 } : {}), display: 'grid', placeItems: 'center', padding: p.src ? '0 8px' : '8px 12px', color: p.src ? '#fff' : INK, fontWeight: 700, fontSize, textShadow: p.src ? '0 1px 4px rgba(0,0,0,0.5)' : 'none', whiteSpace: 'nowrap' }}>{label}</span>
+                    )}
+                  </div>
+                </div>
+              )
+            }
             return (
-              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 && !text && align === 'center' ? '0 20%' : 0, justifyItems: text ? (align === 'left' ? 'start' : align === 'right' ? 'end' : 'center') : 'stretch' }}>
+              <div style={{ display: 'grid', alignItems: 'center', height: '100%', padding: p.w === cols && cols > 1 && !text && !p.fit && align === 'center' ? '0 20%' : 0, justifyItems: text || p.fit ? justify : 'stretch' }}>
                 <div
                   data-link="button"
                   data-link-id={p.id}
                   data-anchor={`button:${p.id}`}
                   data-part={`button:${p.id}`}
+                  data-el={`${p.id}.label`}
                   className={classes.noWrap}
                   style={{
                     textAlign: align,
-                    padding: text ? '8px 2px' : '8px 12px',
-                    borderRadius: 999,
-                    fontSize: '0.8rem',
-                    ...(p.style === 'outline' ? { border: `1px solid ${color}`, color } : text ? { color, fontWeight: 600, letterSpacing: 1 } : { backgroundColor: color, color: '#fff' }),
+                    padding: text ? '8px 2px' : p.size === 'small' ? '5px 10px' : p.size === 'large' ? '12px 20px' : '8px 12px',
+                    borderRadius: buttonRadius(p),
+                    fontSize,
+                    ...(text ? { color, fontWeight: 600, letterSpacing: 1, ...(under ? { textDecoration: 'underline', textUnderlineOffset: 3 } : {}) } : p.style === 'outline' ? { border: `1px solid ${color}`, color } : { backgroundColor: color, color: '#fff' }),
                   }}
                 >
-                  {p.label || defaultButtonLabel(0)}
+                  {label}
                 </div>
               </div>
             )
@@ -829,7 +896,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           if (p.type === 'text') {
             // 文が空のときは、部品を選ぶ見せ方(シンプルな配信カード)でだけ、薄い印を出す(押して選べるように。メールには何も出さない)
             if (!p.text && pickMode) return <div style={{ fontSize: '0.75rem', color: '#bbb', minHeight: '1.6em', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{t('(テキスト)', '(Text)')}</div>
-            return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
+            return <div data-el={`${p.id}.text`} style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
           }
           if (p.type === 'media') {
             // 画像・動画: 押すとリンク先へ(URL は配信ごと。ボタンと同じ目印で、リンクの設定と計測に乗る)。
@@ -840,6 +907,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                 data-link-id={p.id}
                 data-anchor={`button:${p.id}`}
                 data-part={`image:${p.id}`}
+                data-el={`${p.id}.image`}
                 style={{ position: 'relative', aspectRatio: String(ratioValue(p.ratio ?? 'wide')), borderRadius: 8, overflow: 'hidden', backgroundColor: '#eef0f3', display: 'grid', placeItems: 'center', alignSelf: 'center' }}
               >
                 {p.src ? (
@@ -989,7 +1057,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         {/* お知らせ帯: 配信名を、メールの最上部に細い帯で出す */}
         {tpl.topBar && (
           <div data-anchor="topbar" className={classes.noWrap} style={{ backgroundColor: '#555', color: '#fff', textAlign: 'center', padding: '6px 12px', fontSize: '0.75rem', letterSpacing: 2 }}>
-            {subject || t('(配信名未入力)', '(No name)')} ›
+            {hs.barText || subject || t('(配信名未入力)', '(No name)')} ›
           </div>
         )}
         <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>SHOP</div>

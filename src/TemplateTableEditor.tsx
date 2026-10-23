@@ -6,9 +6,11 @@ import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
 import { MAX_SECTIONS } from './layoutTemplates'
 import { getUiScale } from './uiScale'
-import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
+import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
+import { elementClickable, elementDesc, partElements } from './elements'
+import { STAR_COLOR } from './swatches'
 
 // テンプレートの編集画面の、表の部分(T8。docs/TEMPLATE_OBJECTS.md の 5.2。触れる試作で利用者と決めた形)。
 // パーツ(足すだけ)・表のキャンバス(押す・なぞるで選ぶ、右クリック・行と列の帯で操作)・右の「セクションと部品」のタブを作る。
@@ -36,6 +38,7 @@ const MAIL_BASE = 600
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 1.6
 const CANVAS_ZOOM_KEY = 'ccp.templateCanvasZoom'
+const SAMPLES_KEY = 'ccp.templateCanvasSamples'
 
 const useStyles = makeStyles({
   // ---- パーツ
@@ -208,6 +211,7 @@ const useStyles = makeStyles({
   sbody: { display: 'grid', rowGap: '4px', padding: '0 8px 8px' },
   secFields: { display: 'grid', rowGap: '8px', padding: '6px 0 8px', borderBottom: `1px dashed ${tokens.colorNeutralStroke2}`, marginBottom: '4px' },
   pcard: { borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, borderLeftWidth: '3px', minWidth: 0 },
+  pcardDim: { opacity: 0.55 },
   pcardCur: { backgroundColor: tokens.colorBrandBackground2 },
   tBox: { borderLeftColor: tokens.colorPaletteBlueBorderActive },
   tButton: { borderLeftColor: tokens.colorNeutralForeground1 },
@@ -227,6 +231,9 @@ const useStyles = makeStyles({
   swatch: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: '11px', padding: '2px 6px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', '& span': { width: '12px', height: '12px', borderRadius: '50%' } },
   swatchOn: { border: `2px solid ${tokens.colorBrandStroke1}` },
   pid: { fontFamily: tokens.fontFamilyMonospace, fontSize: '11px', color: tokens.colorNeutralForeground3 },
+  elHead: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginTop: '4px' },
+  elRow: { display: 'grid', rowGap: '2px', paddingLeft: '6px', borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
+  elTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '6px', minWidth: 0 },
 })
 
 export interface TableEditorArgs {
@@ -239,8 +246,12 @@ export interface TableEditorArgs {
   /** セクションの並びを変える(元に戻すは、呼ぶ側の編集中の内容の履歴で行う) */
   setSections: (fn: (list: Section[]) => Section[]) => void
   hero: HeroKind
+  /** ヒーローの細かい見た目(キャンバスの絵に写す) */
+  heroStyle?: HeroStyle
   heroText?: HeroText
   topBar?: boolean
+  /** 見本の写真(T8 の確認 4・案 A): 箱に、商品のデータの写真・名前・価格を仮に入れて見せる(保存しない。並びの順に使い回す) */
+  samples?: { src: string; name: string; price: string; regular?: string }[]
   /** ヒーローを押した(右のテンプレートのタブの、全体の見た目へ) */
   onSelectHero: () => void
 }
@@ -249,7 +260,7 @@ export interface TableEditorArgs {
  * 表の編集。パーツの列・キャンバス・右のタブ(テンプレート / セクションと部品)を返す(並べ方とスプリッターは、呼ぶ側が決める)。
  * テンプレートのタブの中身は、呼ぶ側が作って rightPane に渡す
  */
-export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroText, topBar, onSelectHero }: TableEditorArgs) {
+export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroStyle, heroText, topBar, samples = [], onSelectHero }: TableEditorArgs) {
   const t = useT()
   const s = useStyles()
   const [sel, setSel] = useState<Sel>(null)
@@ -302,6 +313,28 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       // 覚えられなくても、大きさは変えられる
     }
   }, [zoom])
+  const [showSamples, setShowSamples] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SAMPLES_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleSamples = () =>
+    setShowSamples((v) => {
+      try {
+        localStorage.setItem(SAMPLES_KEY, v ? '0' : '1')
+      } catch {
+        // 覚えられなくても、切り替えはできる
+      }
+      return !v
+    })
+  const sampleOf = (n: number) => (showSamples && samples.length > 0 ? samples[(Math.max(1, n) - 1) % samples.length] : undefined)
+  const samplesToggle = (
+    <Button size="small" appearance={showSamples ? 'primary' : 'subtle'} aria-pressed={showSamples} disabled={samples.length === 0} onClick={toggleSamples} title={t('箱に、商品のデータの写真・名前・価格を仮に入れて見せる(保存はしない)', 'Fill boxes with sample product photos, names and prices (not saved)')}>
+      {t('見本の写真', 'Sample photos')}
+    </Button>
+  )
   const fitW = Math.max(300, Math.min(640, canvasW - 8))
   const mailW = zoom === 'fit' ? fitW : Math.round(MAIL_BASE * zoom)
   const shownZoom = mailW / MAIL_BASE
@@ -804,7 +837,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     </>
   )
   // 箱の見せ方として、ほかの箱にそろえる項目(AI への一言は、枠ごとに中身が違うのでそろえない)
-  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio })
+  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio, swatchShape: p.swatchShape, swatchMax: p.swatchMax, ratingShow: p.ratingShow, ratingMin: p.ratingMin, ratingFloor: p.ratingFloor })
   /** 箱の設定を、いくつかの箱にまとめて入れる(形は変わらないので、ID はそのまま) */
   const patchBoxes = (sec: Section, ps: TablePart[], x: Partial<TablePart> | ((q: TablePart) => Partial<TablePart>)) => {
     const ids = new Set(ps.map((q) => q.id))
@@ -887,6 +920,48 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             </Select>
           </Field>
         )}
+        {has('swatches') > 0 && (
+          <Field label={t('カラーチップ(商品の SKU の色を並べる)', 'Color chips (the colors of the product SKUs)')} size="small">
+            <div className={s.row2}>
+              <Select size="small" value={common((q) => q.swatchShape ?? '') === MIXED ? MIXED : (p.swatchShape ?? '')} onChange={(_, d) => patchBoxes(sec, ps, { swatchShape: d.value === 'square' ? 'square' : undefined })}>
+                {common((q) => q.swatchShape ?? '') === MIXED && mixedOption}
+                <option value="">{t('丸', 'Round')}</option>
+                <option value="square">{t('四角', 'Square')}</option>
+              </Select>
+              <Select size="small" value={common((q) => q.swatchMax ?? 5) === MIXED ? MIXED : String(p.swatchMax ?? 5)} onChange={(_, d) => patchBoxes(sec, ps, { swatchMax: Number(d.value) === 5 ? undefined : Number(d.value) })}>
+                {common((q) => q.swatchMax ?? 5) === MIXED && mixedOption}
+                {[3, 4, 5, 6, 8].map((n) => (
+                  <option key={n} value={n}>{t(`${n} 色まで`, `Up to ${n}`)}</option>
+                ))}
+              </Select>
+            </div>
+          </Field>
+        )}
+        {has('rating') > 0 && (
+          <Field label={t('レビュー(商品の平均点・件数から)', 'Reviews (from the product rating and count)')} hint={t('件数が少ない・点が低い商品では、レビューを出しません', 'Hidden for items with few reviews or a low rating')} size="small">
+            <Select size="small" value={common((q) => q.ratingShow ?? '') === MIXED ? MIXED : (p.ratingShow ?? '')} onChange={(_, d) => patchBoxes(sec, ps, { ratingShow: d.value === 'stars' || d.value === 'starsCount' ? d.value : undefined })}>
+              {common((q) => q.ratingShow ?? '') === MIXED && mixedOption}
+              <option value="">{t('★ 4.2 (128)', '★ 4.2 (128)')}</option>
+              <option value="starsCount">{t('★ (128)', '★ (128)')}</option>
+              <option value="stars">{t('★ だけ', 'Stars only')}</option>
+            </Select>
+            <div className={s.row2}>
+              <Select size="small" value={common((q) => q.ratingMin ?? 3) === MIXED ? MIXED : String(p.ratingMin ?? 3)} onChange={(_, d) => patchBoxes(sec, ps, { ratingMin: Number(d.value) === 3 ? undefined : Number(d.value) })}>
+                {common((q) => q.ratingMin ?? 3) === MIXED && mixedOption}
+                {[1, 3, 5, 10, 30].map((n) => (
+                  <option key={n} value={n}>{t(`${n} 件以上で出す`, `Show with ${n}+ reviews`)}</option>
+                ))}
+              </Select>
+              <Select size="small" value={common((q) => q.ratingFloor ?? 0) === MIXED ? MIXED : String(p.ratingFloor ?? 0)} onChange={(_, d) => patchBoxes(sec, ps, { ratingFloor: Number(d.value) || undefined })}>
+                {common((q) => q.ratingFloor ?? 0) === MIXED && mixedOption}
+                <option value="0">{t('点では隠さない', 'Any rating')}</option>
+                {[3, 3.5, 4].map((n) => (
+                  <option key={n} value={n}>{t(`${n} 点以上で出す`, `Show at ${n}+`)}</option>
+                ))}
+              </Select>
+            </div>
+          </Field>
+        )}
         {has('badge') > 0 && (
           <Field label={t('バッジの文言', 'Badge text')} size="small">
             <Input size="small" value={badge === MIXED ? '' : badge} placeholder={badge === MIXED ? t('(ばらばら)', '(mixed)') : 'NEW'} maxLength={12} onChange={(_, d) => patchBoxes(sec, ps, { badge: d.value || undefined })} />
@@ -952,16 +1027,25 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       const n = boxNo.get(p.id) ?? 0
       const fields = T.boxFields(p)
       const sale = p.priceStyle === 'sale'
+      const sample = sampleOf(n)
       // 写真のほかに出すもの(名前・価格・説明・ボタン)を、メールと同じ並びで、仮の文字で見せる
       const lines = (
         <>
-          {fields.includes('name') && <span style={{ color: MAIL.ink, fontWeight: 600 }}>{t('商品名', 'Product')}</span>}
+          {fields.includes('name') && <span style={{ color: MAIL.ink, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sample?.name ?? t('商品名', 'Product')}</span>}
           {fields.includes('price') && (
             <span>
-              {sale && <s style={{ color: MAIL.sub, marginRight: 4 }}>{t('元の価格', 'Was')}</s>}
-              <span style={{ color: sale || hero === 'offer' ? '#d32f2f' : MAIL.sub, fontWeight: sale ? 700 : 400 }}>{p.priceStyle === 'from' ? t('価格〜', 'From price') : sale ? t('セール価格', 'Sale price') : t('価格', 'Price')}</span>
+              {sale && <s style={{ color: MAIL.sub, marginRight: 4 }}>{sample?.regular ?? t('元の価格', 'Was')}</s>}
+              <span style={{ color: sale || hero === 'offer' ? '#d32f2f' : MAIL.sub, fontWeight: sale ? 700 : 400 }}>{sample ? (p.priceStyle === 'from' ? t(`${sample.price}〜`, `From ${sample.price}`) : sample.price) : p.priceStyle === 'from' ? t('価格〜', 'From price') : sale ? t('セール価格', 'Sale price') : t('価格', 'Price')}</span>
             </span>
           )}
+          {fields.includes('swatches') && (
+            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {['#222222', '#d8c7a8', '#1f2a44'].map((c) => (
+                <i key={c} style={{ width: 8, height: 8, borderRadius: p.swatchShape === 'square' ? 1 : '50%', backgroundColor: c, border: '1px solid #ccc' }} />
+              ))}
+            </span>
+          )}
+          {fields.includes('rating') && <span style={{ color: STAR_COLOR }}>★★★★☆{p.ratingShow !== 'stars' && p.ratingShow !== 'starsCount' && <span style={{ color: MAIL.sub }}> 4.2</span>}{p.ratingShow !== 'stars' && <span style={{ color: MAIL.sub }}> (128)</span>}</span>}
           {fields.includes('desc') && <span>{t('説明', 'Description')}</span>}
           {fields.includes('button') && <span className={s.miniCta}>{t('詳細はこちら', 'View details')}</span>}
         </>
@@ -987,7 +1071,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )
       if (isTextView(p.view)) {
         const text = <div className={s.splitText}>{lines}</div>
-        const img = <div style={{ backgroundColor: MAIL.img, position: 'relative' }}>{badge}</div>
+        const img = <div style={{ backgroundColor: MAIL.img, position: 'relative', ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>{badge}</div>
         return (
           <div className={s.split}>
             {p.view === 'story' && n % 2 === 0 ? (
@@ -1007,7 +1091,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         )
       }
       return (
-        <div className={s.tile} style={{ backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile }}>
+        <div className={s.tile} style={{ backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile, ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
           <span className={s.tileNo}>{n}</span>
           {badge}
           {quick}
@@ -1018,12 +1102,33 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     if (p.type === 'button') {
       const color = T.buttonColor(p, hero === 'offer')
       const align = p.align ?? 'center'
+      const text = p.style === 'text' || p.shape === 'underline'
+      const label = T.buttonText(p, defaultButtonLabel(0))
+      const fontSize = p.size === 'small' ? 10 : p.size === 'large' ? 13 : 11
+      // 画像のボタン: 画像を敷いて(画像の上に文字なら、文字を重ねる)
+      if (p.face) {
+        return (
+          <div
+            className={s.pill}
+            style={{ justifySelf: p.fit ? (align === 'left' ? 'start' : align === 'right' ? 'end' : 'center') : 'stretch', minWidth: p.fit ? undefined : 0, minHeight: 24, borderRadius: Math.min(T.buttonRadius(p), 8), color: p.src ? '#fff' : MAIL.sub, backgroundColor: MAIL.img, fontSize, ...(p.src ? { backgroundImage: `url("${p.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.5)' } : {}) }}
+          >
+            {p.face === 'both' ? label : p.src ? '' : t('ボタンの画像', 'Button image')}
+          </div>
+        )
+      }
       return (
         <div
-          className={mergeClasses(s.pill, p.style === 'outline' && s.pillOutline, p.style === 'text' && s.pillText)}
-          style={{ justifySelf: align === 'left' ? 'start' : align === 'right' ? 'end' : 'center', ...(p.style === 'outline' ? { borderColor: color, color } : p.style === 'text' ? { color } : { backgroundColor: color }) }}
+          className={mergeClasses(s.pill, p.style === 'outline' && !text && s.pillOutline, text && s.pillText)}
+          style={{
+            justifySelf: align === 'left' ? 'start' : align === 'right' ? 'end' : 'center',
+            borderRadius: T.buttonRadius(p),
+            fontSize,
+            ...(p.fit ? { minWidth: 0 } : {}),
+            ...(p.size === 'large' ? { padding: '8px 16px' } : p.size === 'small' ? { padding: '3px 10px' } : {}),
+            ...(text ? { color, ...(p.shape === 'underline' ? { textDecoration: 'underline' } : {}) } : p.style === 'outline' ? { borderColor: color, color } : { backgroundColor: color }),
+          }}
         >
-          {p.label || defaultButtonLabel(0)}
+          {label}
         </div>
       )
     }
@@ -1144,6 +1249,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         onPointerDown={(e) => startSelect(e, sec, p)}
         onDoubleClick={() => (p.type === 'box' || p.type === 'media' ? setQuickId(p.id) : startEdit(p))}
         onContextMenu={(e) => {
+          // Shift + 右クリックは、ブラウザのメニューのまま(調べる・写すなど。よくある決まり)
+          if (e.shiftKey) return
           e.preventDefault()
           let ps = mine && selParts.some((x) => x.id === p.id) ? selParts : [p]
           let rc = mine && selParts.some((x) => x.id === p.id) ? mine : { c: p.c, r: p.r, w: p.w, h: p.h }
@@ -1308,7 +1415,17 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         {topBar && <div className={s.topBar} />}
         <div
           className={s.hero}
-          style={{ backgroundColor: MAIL.hero[hero] }}
+          style={{
+            backgroundColor: MAIL.hero[hero],
+            // 写真の形を選んでいれば、その形の高さ(キャンバスが縦に長くなりすぎないよう上限)
+            ...(heroStyle?.ratio ? { height: Math.round(Math.min(300, Math.max(80, (mailW - 20) / ratioValue(heroStyle.ratio)))) } : {}),
+            // ヘッドラインの位置を、絵の中の文字の位置で見せる(写真の下のときは、横だけ)
+            ...(heroText !== 'below'
+              ? { alignItems: heroStyle?.v === 'top' ? 'start' : heroStyle?.v === 'middle' || (!heroStyle?.v && heroText === 'overlay') ? 'center' : 'end', justifyItems: heroStyle?.h === 'right' ? 'end' : heroStyle?.h === 'center' || (!heroStyle?.h && heroText === 'overlay') ? 'center' : 'start', padding: 10 }
+              : {}),
+            color: heroStyle?.color === 'dark' ? MAIL.ink : heroText === 'below' ? MAIL.ink : '#fff',
+            textShadow: heroText !== 'below' && heroStyle?.color !== 'dark' ? '0 1px 4px rgba(0,0,0,0.45)' : 'none',
+          }}
           onClick={() => {
             // ヒーローの設定は、テンプレートのタブにある
             setSel(null)
@@ -1492,6 +1609,39 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       {value}
     </div>
   )
+  /** 部品の場所の呼び名(説明の自動の文に使う。例「S1 箱 1」「H ボタン」) */
+  const whereOf = (sec: Section, p: TablePart) =>
+    `${isHero(sec.id) ? 'H' : `S${sections.findIndex((x) => x.id === sec.id) + 1}`} ${typeName(p.type)}${p.type === 'box' ? ` ${boxNo.get(p.id)}` : ''}`
+  /**
+   * 部品の説明と、要素(写真・名前・価格・文言…)の ID・説明・押せるか(T8 の 8.4)。
+   * ID は「部品 ID.要素の名前」で、説明を書き直しても変わらない(計測・ピン・分析は ID で数える)
+   */
+  const elementsBlock = (sec: Section, p: TablePart) => {
+    const where = whereOf(sec, p)
+    const setEl = (key: string, x: { desc?: string; click?: boolean }) => {
+      const spec = Object.fromEntries(Object.entries({ ...(p.els?.[key] ?? {}), ...x }).filter(([, v]) => v !== undefined))
+      const els = { ...(p.els ?? {}), [key]: spec }
+      if (Object.keys(spec).length === 0) delete els[key]
+      patch(sec, p, { els: Object.keys(els).length > 0 ? els : undefined })
+    }
+    return (
+      <>
+        <Field label={t('部品の説明(任意。分析・計測の対応表・制作への指示に出す)', 'Part description (optional; shown in reports, the tracking map and production notes)')} size="small">
+          <Input size="small" value={p.desc ?? ''} placeholder={where} maxLength={200} onChange={(_, d) => patch(sec, p, { desc: d.value || undefined })} />
+        </Field>
+        <span className={s.elHead}>{t('要素(ID は計測・ピンで使う。説明を変えても ID は変わらない)', 'Elements (IDs are used for tracking and pins; editing a description keeps the ID)')}</span>
+        {partElements(p).map((e) => (
+          <div key={e.key} className={s.elRow}>
+            <div className={s.elTop}>
+              <span className={s.pid} title={e.id}>{e.id}</span>
+              <Checkbox label={t('押せる', 'Clickable')} checked={elementClickable(p, e)} onChange={(_, d) => setEl(e.key, { click: (d.checked === true) === e.click ? undefined : d.checked === true })} />
+            </div>
+            <Input size="small" value={p.els?.[e.key]?.desc ?? ''} placeholder={elementDesc({ ...p, els: undefined }, e, p.desc?.trim() || where)} maxLength={200} onChange={(_, d) => setEl(e.key, { desc: d.value || undefined })} />
+          </div>
+        ))}
+      </>
+    )
+  }
   const partDetail = (sec: Section, p: TablePart) => (
     <div className={s.pbody}>
       {p.type === 'box' && boxSettings(sec, [p])}
@@ -1507,6 +1657,56 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               <option value="text">{t('文字のリンク(枠なし)', 'Text link (no box)')}</option>
             </Select>
           </Field>
+          <Field label={t('形', 'Shape')} size="small">
+            <div className={s.row2}>
+              {([undefined, 'rounded', 'square', 'underline'] as TablePart['shape'][]).map((x) => (
+                <Button key={x ?? 'pill'} size="small" appearance={p.shape === x ? 'primary' : 'outline'} aria-pressed={p.shape === x} onClick={() => patch(sec, p, { shape: x })}>
+                  {x === 'rounded' ? t('角丸', 'Rounded') : x === 'square' ? t('四角', 'Square') : x === 'underline' ? t('下線だけ', 'Underline') : t('丸', 'Pill')}
+                </Button>
+              ))}
+            </div>
+          </Field>
+          <div className={s.row2}>
+            <Field label={t('大きさ', 'Size')} size="small">
+              <Select size="small" value={p.size ?? ''} onChange={(_, d) => patch(sec, p, { size: d.value === 'small' || d.value === 'large' ? d.value : undefined })}>
+                <option value="small">{t('小', 'Small')}</option>
+                <option value="">{t('中', 'Medium')}</option>
+                <option value="large">{t('大', 'Large')}</option>
+              </Select>
+            </Field>
+            <Field label={t('幅', 'Width')} size="small">
+              <Select size="small" value={p.fit ? 'fit' : ''} onChange={(_, d) => patch(sec, p, { fit: d.value === 'fit' || undefined })}>
+                <option value="">{t('マスいっぱい', 'Fill the cell')}</option>
+                <option value="fit">{t('文字に合わせる', 'Fit the text')}</option>
+              </Select>
+            </Field>
+            <Field label={t('矢印(›)', 'Arrow (›)')} size="small">
+              <Select size="small" value={p.icon ?? ''} onChange={(_, d) => patch(sec, p, { icon: d.value === 'right' || d.value === 'left' ? d.value : undefined })}>
+                <option value="">{t('なし', 'None')}</option>
+                <option value="right">{t('右に', 'Right')}</option>
+                <option value="left">{t('左に', 'Left')}</option>
+              </Select>
+            </Field>
+          </div>
+          <Field label={t('見せ方(文字 / 画像)', 'Face (text / image)')} size="small">
+            <Select size="small" value={p.face ?? ''} onChange={(_, d) => patch(sec, p, { face: d.value === 'image' || d.value === 'both' ? d.value : undefined })}>
+              <option value="">{t('文字だけ', 'Text only')}</option>
+              <option value="image">{t('画像だけ', 'Image only')}</option>
+              <option value="both">{t('画像の上に文字', 'Text over an image')}</option>
+            </Select>
+          </Field>
+          {p.face && (
+            <>
+              <Field label={t('ボタンの画像(ライブラリから選ぶか、URL を入れる)', 'Button image (pick from the library or enter a URL)')} size="small">
+                <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
+                <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
+              </Field>
+              <Field label={t('代わりの文(画像が出ないとき)', 'Alt text (when images are off)')} size="small">
+                <Input size="small" value={p.alt ?? ''} placeholder={p.label || defaultButtonLabel(0)} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+              </Field>
+              <Checkbox label={t('配信ごとに画像を差し替えてよい', 'Image can be swapped per delivery')} checked={p.swap !== false} onChange={(_, d) => patch(sec, p, { swap: d.checked === true ? undefined : false })} />
+            </>
+          )}
           <Field label={t('色(決まった色から選ぶ)', 'Color (from the set colors)')} size="small">
             <div className={s.row2}>
               {(Object.keys(T.BUTTON_COLORS) as ButtonColor[]).map((c) => {
@@ -1544,6 +1744,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )}
       {p.type === 'media' && mediaSettings(sec, p)}
       {p.type === 'empty' && <span className={s.hint}>{t('空きのマス。左のパーツを落とすと、そのパーツになります。メールでは何も出ない余白です。', 'An empty cell. Drop a part here to fill it. It shows as blank space in the email.')}</span>}
+      {p.type !== 'empty' && elementsBlock(sec, p)}
       {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}
       {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{p.id}</span>)}
       <div className={s.row2}>
@@ -1678,10 +1879,12 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {
                       const pOpen = isOpen(p.id, p.id === one)
+                      // 均等の行の空きは、メールに出ない余白なので薄く出す(分析・位置の数え方でも数えない)
+                      const evenEmpty = p.type === 'empty' && T.isEvenRow(sec, p.r)
                       return (
                         <div
                           key={p.id}
-                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : p.type === 'media' ? s.tMedia : s.tEmpty, selIds.has(p.id) && s.pcardCur)}
+                          className={mergeClasses(s.pcard, p.type === 'box' ? s.tBox : p.type === 'button' ? s.tButton : p.type === 'text' ? s.tText : p.type === 'media' ? s.tMedia : s.tEmpty, selIds.has(p.id) && s.pcardCur, evenEmpty && s.pcardDim)}
                           onMouseEnter={() => setPeek(p.id)}
                           onMouseLeave={() => setPeek(null)}
                         >
@@ -1697,7 +1900,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                           >
                             {mini(sec, p)}
                             <span className={s.tchip}>{typeName(p.type)}</span>
-                            <span className={s.pn}>{partName(p)}</span>
+                            <span className={s.pn}>{evenEmpty ? t('均等の行の空き(メールには出ない)', 'Spare cell in an even row (not in the email)') : partName(p)}</span>
                             <span className={s.ps}>{p.w * p.h > 1 ? `${p.w}×${p.h}` : ''}</span>
                             <span
                               className={s.chev}
@@ -1752,5 +1955,5 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     document.querySelector(`[data-sec="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
 
-  return { palette, canvas, zoomBar, rightPane, goSection, clearSelection: () => setSel(null) }
+  return { palette, canvas, zoomBar, samplesToggle, rightPane, goSection, clearSelection: () => setSel(null) }
 }

@@ -169,7 +169,7 @@ async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -
               AND sku_code IN (SELECT sku_code FROM sku WHERE source = :sample AND product_code = ANY(:codes))
         """), {"sample": SAMPLE, "codes": codes})
         await conn.execute(text("DELETE FROM sku WHERE source = :sample AND product_code = ANY(:codes)"), {"sample": SAMPLE, "codes": codes})
-        return await _replace(conn, "sku", rows, ["market", "sku_code", "product_code", "color", "size", "length", "price", "units_4w", "as_of"], keep_sample=True)
+        return await _replace(conn, "sku", rows, ["market", "sku_code", "product_code", "color", "color_hex", "size", "length", "price", "units_4w", "as_of"], keep_sample=True)
     if name == "sku_stock":
         return await _replace(conn, "sku_stock", rows, ["market", "sku_code", "stock", "as_of"], keep_sample=True)
     if name == "weekly":

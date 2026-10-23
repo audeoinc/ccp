@@ -50,7 +50,7 @@ const DEFAULT_FIELDS: Record<CellView, BoxField[]> = {
 /** 箱に出すもの(設定がなければ、見せ方の既定) */
 export const boxFields = (p: Pick<TablePart, 'view' | 'fields'>): BoxField[] => p.fields ?? DEFAULT_FIELDS[p.view ?? 'card']
 export const boxFieldLabel = (f: BoxField): string =>
-  ({ name: tr('名前', 'Name'), price: tr('価格', 'Price'), badge: tr('バッジ', 'Badge'), desc: tr('説明', 'Description'), button: tr('ボタン', 'Button') })[f]
+  ({ name: tr('名前', 'Name'), price: tr('価格', 'Price'), swatches: tr('カラーチップ', 'Color chips'), rating: tr('レビュー', 'Reviews'), badge: tr('バッジ', 'Badge'), desc: tr('説明', 'Description'), button: tr('ボタン', 'Button') })[f]
 export const priceStyleLabel = (v?: TablePart['priceStyle']): string =>
   v === 'sale' ? tr('セール(元の価格に取り消し線)', 'Sale (original price struck through)') : v === 'from' ? tr('〜から', 'From …') : tr('ふつう', 'Regular')
 
@@ -132,7 +132,18 @@ export const isEvenRow = (sec: Section, r: number) => (sec.evenRows ?? []).inclu
 export function toggleEvenRow(sec: Section, r: number): TableOp {
   if (isEvenRow(sec, r)) return { sec: { ...sec, evenRows: shiftEven(sec, (x) => (x === r ? undefined : x)) } }
   if (partsOf(sec).some((p) => p.h > 1 && p.r <= r && p.r + p.h > r)) return { error: tr('縦に結合したマスがかかっている行は、均等に並べられません', "A row with a vertically merged cell can't be spread evenly") }
-  return { sec: { ...sec, evenRows: [...(sec.evenRows ?? []), r].sort((a, b) => a - b) } }
+  // 中身のある部品を左に詰める(データの並び = メールの見た目の並びにする。位置で比べるときに、列の番号で迷わないように。ID はそのまま)
+  let cur = 0
+  const packed = partsOf(sec)
+    .filter((p) => p.r === r && p.type !== 'empty')
+    .sort((a, b) => a.c - b.c)
+    .map((p) => {
+      const q = { ...p, c: cur }
+      cur += p.w
+      return q
+    })
+  const others = partsOf(sec).filter((p) => p.r !== r)
+  return { sec: normalizeTable({ ...sec, parts: [...others, ...packed], evenRows: [...(sec.evenRows ?? []), r].sort((a, b) => a - b) }) }
 }
 
 /** 空きのマスを埋める(操作のあと) */
@@ -521,6 +532,37 @@ const ALIGNS: TextAlign[] = ['left', 'center', 'right']
 const url = (v: unknown): string | undefined => (typeof v === 'string' && /^(https?:\/\/|\/)/i.test(v.trim()) ? v.trim().slice(0, 1000) : undefined)
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined)
 
+/** ボタンの文言に、矢印(›)を付ける(T8 の 8.7) */
+export const buttonText = (p: Pick<TablePart, 'label' | 'icon'>, fallback: string): string => {
+  const label = p.label || fallback
+  return p.icon === 'right' ? `${label} ›` : p.icon === 'left' ? `› ${label}` : label
+}
+/** ボタンの角の丸み(px。丸は 999) */
+export const buttonRadius = (p: Pick<TablePart, 'shape'>): number => (p.shape === 'square' ? 0 : p.shape === 'rounded' ? 6 : 999)
+
+/** 保存してよい要素の名前(種類ごと。箱は、出すものを外しても設定は残す。elements.ts の partElements と合わせる) */
+const ELEMENT_KEYS: Record<PartType, string[]> = {
+  box: ['image', 'name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button'],
+  button: ['label', 'image'],
+  text: ['text'],
+  media: ['image'],
+  empty: [],
+}
+
+/** 要素ごとの設定を読む(知らない要素・空の設定は外す) */
+function parseEls(type: PartType, raw: unknown): TablePart['els'] {
+  if (!raw || typeof raw !== 'object') return undefined
+  const out: NonNullable<TablePart['els']> = {}
+  for (const k of ELEMENT_KEYS[type]) {
+    const o = (raw as Record<string, unknown>)[k] as Record<string, unknown> | undefined
+    if (!o || typeof o !== 'object') continue
+    const desc = str(o.desc, 200)
+    const spec = { ...(desc ? { desc } : {}), ...(typeof o.click === 'boolean' ? { click: o.click } : {}) }
+    if (Object.keys(spec).length > 0) out[k] = spec
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** 保存されている部品を読む(知らない値は外す) */
 export function parsePart(raw: unknown): TablePart | null {
   const o = raw as Record<string, unknown> | null
@@ -529,6 +571,11 @@ export function parsePart(raw: unknown): TablePart | null {
   if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
   const type = o.type as PartType
   const part: TablePart = { id: o.id.slice(0, 40), type, c: o.c as number, r: o.r as number, w: o.w as number, h: o.h as number }
+  // 説明と要素ごとの設定(8.4)。空きのマスは持たない
+  const desc = type !== 'empty' ? str(o.desc, 200) : undefined
+  if (desc) part.desc = desc
+  const els = parseEls(type, o.els)
+  if (els) part.els = els
   if (type === 'box') {
     if (CELL_VIEWS.includes(o.view as CellView) && o.view !== 'card') part.view = o.view as CellView
     const note = str(o.aiNote, 300)
@@ -538,10 +585,28 @@ export function parsePart(raw: unknown): TablePart | null {
     const badge = str(o.badge, 12)
     if (badge) part.badge = badge
     if (MEDIA_RATIOS.includes(o.ratio as MediaRatio)) part.ratio = o.ratio as MediaRatio
+    if (o.swatchShape === 'square') part.swatchShape = 'square'
+    if (typeof o.swatchMax === 'number' && Number.isInteger(o.swatchMax) && o.swatchMax >= 1 && o.swatchMax <= 12 && o.swatchMax !== 5) part.swatchMax = o.swatchMax
+    if (o.ratingShow === 'stars' || o.ratingShow === 'starsCount') part.ratingShow = o.ratingShow
+    if (typeof o.ratingMin === 'number' && Number.isInteger(o.ratingMin) && o.ratingMin >= 0 && o.ratingMin <= 1000 && o.ratingMin !== 3) part.ratingMin = o.ratingMin
+    if (typeof o.ratingFloor === 'number' && o.ratingFloor > 0 && o.ratingFloor <= 5) part.ratingFloor = o.ratingFloor
   } else if (type === 'button') {
     const label = str(o.label, 30)
     if (label) part.label = label
     if (o.style === 'outline' || o.style === 'text') part.style = o.style
+    if (o.shape === 'rounded' || o.shape === 'square' || o.shape === 'underline') part.shape = o.shape
+    if (o.size === 'small' || o.size === 'large') part.size = o.size
+    if (o.fit === true) part.fit = true
+    if (o.icon === 'right' || o.icon === 'left') part.icon = o.icon
+    if (o.face === 'image' || o.face === 'both') {
+      part.face = o.face
+      const src = url(o.src)
+      if (src) part.src = src
+      if (typeof o.imageId === 'string' && o.imageId) part.imageId = o.imageId.slice(0, 60)
+      const alt = str(o.alt, 120)
+      if (alt) part.alt = alt
+      if (o.swap === false) part.swap = false
+    }
     if (typeof o.color === 'string' && o.color !== 'black' && o.color in BUTTON_COLORS) part.color = o.color as ButtonColor
     if (ALIGNS.includes(o.align as TextAlign) && o.align !== 'center') part.align = o.align as TextAlign
     if (LINKS.includes(o.link as LinkKind) && o.link !== 'campaign') part.link = o.link as LinkKind

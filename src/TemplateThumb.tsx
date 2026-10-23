@@ -65,10 +65,12 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
 
   // ---- ヒーロー
   const heroBg = HERO_COLOR[layout.hero]
+  // 写真の形を選んでいれば、その形(T8 の 8.6)
+  const heroAspect = (fallback: string) => (layout.heroStyle?.ratio ? String(ratioValue(layout.heroStyle.ratio)) : fallback)
   const hero =
     heroText === 'overlay' ? (
       <>
-        <div style={{ aspectRatio: '4 / 5', background: heroBg, display: 'grid', alignContent: 'center', gap: px(3) }}>
+        <div style={{ aspectRatio: heroAspect('4 / 5'), background: heroBg, display: 'grid', alignContent: 'center', gap: px(3) }}>
           {line('70%', 4, '#fff')}
           {line('50%', 4, '#fff')}
         </div>
@@ -76,12 +78,12 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
       </>
     ) : heroText === 'below' ? (
       <>
-        <div style={{ aspectRatio: '1 / 1', background: heroBg }} />
+        <div style={{ aspectRatio: heroAspect('1 / 1'), background: heroBg }} />
         {line('55%', 3, INK)}
         {line('70%')}
       </>
     ) : (
-      <div style={{ aspectRatio: '8 / 3', background: heroBg, position: 'relative' }}>
+      <div style={{ aspectRatio: heroAspect('8 / 3'), background: heroBg, position: 'relative' }}>
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%', background: 'rgba(0,0,0,0.28)', display: 'grid', alignContent: 'center', paddingLeft: px(4) }}>
           <div style={{ height: px(2), width: '50%', background: '#fff' }} />
         </div>

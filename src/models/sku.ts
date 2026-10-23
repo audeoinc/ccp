@@ -8,6 +8,8 @@ export interface SkuFields {
   /** 属する SPU(products.product_code) */
   product_code?: string
   color?: string
+  /** 色の番号(#c8b29a の形。任意。テンプレートの箱のカラーチップに使う。なければ色の名前から引く) */
+  color_hex?: string
   size?: string
   /** レングス(丈) */
   length?: string

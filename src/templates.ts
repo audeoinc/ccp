@@ -15,6 +15,20 @@ export type EmailTemplateId = string
 
 export type HeroKind = 'standard' | 'collab' | 'offer'
 
+/**
+ * ヒーローの細かい見た目(T8 の 8.6)。どれも省略は、以前の見た目(帯は下・左、大きく重ねるは中央、写真の下は中央)。
+ * ratio: 写真の形 / v・h: ヘッドラインの位置(帯は上か下、大きく重ねるは 9 か所、写真の下は左右だけ)/
+ * color: 文字の色(light 白・dark 黒)/ shade: 写真に重ねる暗さ(0 なし〜3 濃く)/ barText: お知らせの帯の文言(空は配信名)
+ */
+export interface HeroStyle {
+  ratio?: MediaRatio
+  v?: 'top' | 'middle' | 'bottom'
+  h?: 'left' | 'center' | 'right'
+  color?: 'light' | 'dark'
+  shade?: 0 | 1 | 2 | 3
+  barText?: string
+}
+
 /** ヘッドラインの見せ方。band: 写真の下部に帯で重ねる / overlay: 写真の中央に大きく重ねる / below: 写真の下に置く */
 export type HeroText = 'band' | 'overlay' | 'below'
 
@@ -45,14 +59,23 @@ export type ButtonColor = 'black' | 'red' | 'navy' | 'green' | 'gray'
 export type TextAlign = 'left' | 'center' | 'right'
 
 /** 箱に出すもの(写真のほか)。名前・価格は商品のデータから出す(テンプレートでは文言を打たない。値段の食い違いを防ぐため) */
-export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button'
-export const BOX_FIELDS: BoxField[] = ['name', 'price', 'badge', 'desc', 'button']
+/** 箱に出すもの。swatches: カラーチップ(SKU の色)/ rating: レビュー(星・平均点・件数)。T8 の 8.5 */
+export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button' | 'swatches' | 'rating'
+export const BOX_FIELDS: BoxField[] = ['name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button']
 
 /**
  * 表の部品(マス)。列 c・行 r(0 から)に置き、横 w・縦 h マス分を使う(結合したマスも 1 つの部品)。
  * id は、動かしても・中身の設定を変えても・版が変わっても同じ。形が変わったら(結合・分割・種類の変更・複製)新しい ID にする
  * (コメント・成績を、条件の違う部品と混ぜないため。docs/TEMPLATE_OBJECTS.md の 2.2)
  */
+/** 要素ごとの設定(どれも省略は既定) */
+export interface ElementSpec {
+  /** 説明(空なら場所から自動。例「S1 箱 1 の写真」) */
+  desc?: string
+  /** 押せる(メールの中でリンクになる)か。省略は要素の既定(写真・名前・ボタンは押せる) */
+  click?: boolean
+}
+
 export interface TablePart {
   id: string
   type: PartType
@@ -60,6 +83,10 @@ export interface TablePart {
   r: number
   w: number
   h: number
+  /** 部品の説明(人が読むため。任意で、空なら場所から自動。分析・UTM の対応表・制作への指示に出す。T8 の 8.4) */
+  desc?: string
+  /** 要素ごとの設定(キーは要素の名前 image / name / price …。要素の ID は「部品 ID.要素の名前」。elements.ts) */
+  els?: Record<string, ElementSpec>
   /** 箱: 見せ方(省略は card) */
   view?: CellView
   /** 箱: AI に伝える一言(この枠に、どんな商品を置くか) */
@@ -70,12 +97,32 @@ export interface TablePart {
   priceStyle?: 'sale' | 'from'
   /** 箱: バッジの文言(出すものに badge があるとき。空は NEW) */
   badge?: string
+  /** 箱: カラーチップの形(省略は丸) */
+  swatchShape?: 'square'
+  /** 箱: カラーチップを並べる数の上限(超えた分は「+3」。省略は 5) */
+  swatchMax?: number
+  /** 箱: レビューの見せ方(省略は 星・平均点・件数のすべて) */
+  ratingShow?: 'stars' | 'starsCount'
+  /** 箱: レビューの件数がこれより少ない商品では、レビューを出さない(省略は 3) */
+  ratingMin?: number
+  /** 箱: 平均点がこれより低い商品では、レビューを出さない(省略は、点では隠さない) */
+  ratingFloor?: number
   /** ボタン: 文言(空は、既定の文言) */
   label?: string
   /** ボタン: 見た目(省略は fill)。text: 文字のリンク(WOMEN / MEN のような、枠のない文字) */
   style?: 'fill' | 'outline' | 'text'
   /** ボタン: 色(決まった色から選ぶ。ブランドの見た目をそろえるため、自由な色は持たない。省略は黒。期間限定のヒーローでは赤) */
   color?: ButtonColor
+  /** ボタン: 形(省略は丸 pill)。rounded 角丸 / square 四角 / underline 下線だけの文字(T8 の 8.7) */
+  shape?: 'rounded' | 'square' | 'underline'
+  /** ボタン: 大きさ(省略は中) */
+  size?: 'small' | 'large'
+  /** ボタン: true のとき、幅を文字に合わせる(省略はマスいっぱい) */
+  fit?: boolean
+  /** ボタン: 矢印(›)を文字の右・左に付ける(省略はなし) */
+  icon?: 'right' | 'left'
+  /** ボタン: 画像のボタン。image 画像だけ / both 画像の上に文字(省略は文字だけ)。画像は src・imageId・alt を使う */
+  face?: 'image' | 'both'
   /** ボタン・画像: リンク先の種類(省略は campaign) */
   link?: LinkKind
   /** ボタン・画像: 計測用の名前(クリックの集計で使う) */
@@ -88,7 +135,7 @@ export interface TablePart {
   align?: TextAlign
   /** 箱・画像: 写真・画像の形(省略は、箱は縦長 portrait・写真だけの箱はマスの形・画像は横長 wide) */
   ratio?: MediaRatio
-  /** 画像: 画像の URL(部品の画像のライブラリから選ぶと、その URL が入る) */
+  /** 画像・画像のボタン: 画像の URL(部品の画像のライブラリから選ぶと、その URL が入る) */
   src?: string
   /** 画像: 部品の画像のライブラリの ID(どの画像を使ったかの記録) */
   imageId?: string
@@ -96,7 +143,10 @@ export interface TablePart {
   video?: string
   /** 画像: 画像が出ないときの文(代わりの文) */
   alt?: string
-  /** 画像: true のとき、配信ごとに差し替える(キャンペーンのバナーなど。省略はテンプレートの画像のまま) */
+  /**
+   * 画像: true のとき、配信ごとに差し替える(キャンペーンのバナーなど。省略はテンプレートの画像のまま)。
+   * ボタンの画像は逆で、省略は差し替えてよい・false のとき、テンプレートの画像のまま(8.7)
+   */
   swap?: boolean
 }
 
@@ -270,6 +320,8 @@ export interface EmailTemplate {
   heroText?: HeroText
   /** ヒーローの下に置くボタンの数(省略は 0。以前の形。今は、位置 0 の ButtonBlock で表す) */
   heroButtons?: 0 | 1 | 2
+  /** ヒーローの細かい見た目(T8 の 8.6。省略は以前の見た目) */
+  heroStyle?: HeroStyle
   /** メールの最上部に、お知らせの帯を置く */
   topBar?: boolean
   /** メイン画像のリンク先の種類(省略は campaign) */
@@ -301,7 +353,7 @@ export interface EmailTemplate {
 }
 
 /** 構成の見た目に関わる部分(見取り図、プレビュー、編集中の内容で共通に使う) */
-export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'>
+export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable' | 'heroStyle'>
 
 // ---- 標準のテンプレート ----
 
@@ -573,7 +625,7 @@ const changed = () => {
 export function setCustomTemplates(list: ({ id: string; overrides?: string } & Omit<EmailTemplate, 'builtin'>)[]) {
   custom = Object.fromEntries(list.filter((x) => !x.overrides || !BUILTIN[x.overrides]).map((x) => [x.id, { ...x, rowId: x.id, builtin: false, version: x.version ?? 1 }]))
   // 使わない(無効)にしただけの上書きの行は、中身が標準と同じ。中身が違うときだけ「編集済み」にする
-  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null, x.heroTable ?? null])
+  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null, x.heroTable ?? null, x.heroStyle ?? null])
   overrides = Object.fromEntries(
     list.filter((x) => x.overrides && BUILTIN[x.overrides]).map(({ id, overrides: o, ...rest }) => [o!, { ...rest, rowId: id, builtin: true, edited: shape(rest) !== shape(BUILTIN[o!]), version: rest.version ?? 0 }]),
   )
@@ -670,6 +722,7 @@ export function templateOptions(channel?: TemplateChannel, includeHidden = false
       sections: tpl.sections,
       buttonBlocks: tpl.buttonBlocks,
       heroTable: tpl.heroTable,
+      heroStyle: tpl.heroStyle,
     }
   })
 }
