@@ -211,7 +211,46 @@ async function call<T>(path: string, init?: RequestInit): Promise<T | Failure> {
 const post = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 const q = encodeURIComponent
 
+/** 画像の一覧の種類(server/ccp/devimages.py) */
+export type ImageKind = 'heroes' | 'parts' | 'creative' | 'products'
+
+/** ok = ファイルがある / missing = ない(壊れたリンク) / external = 外の URL(確かめない) / empty = 画像がない / unknown = 確かめられない */
+export type LinkState = 'ok' | 'missing' | 'external' | 'empty' | 'unknown'
+
+/** 画像を使っている所(配信カードか、テンプレート) */
+export interface ImageUse {
+  type: 'card' | 'template'
+  id: string
+  name: string
+  at?: string | null
+}
+
+/** 画像の 1 行。種類ごとの列(image_code・kind・product_code・role など)も、そのまま入る */
+export interface ImageRow {
+  id: string
+  name?: string | null
+  market?: string | null
+  image_url?: string | null
+  origin?: string | null
+  uploaded_by?: string | null
+  created_on?: string | null
+  used: ImageUse[]
+  link: LinkState
+  [key: string]: unknown
+}
+
+export interface ImageList {
+  ok?: true
+  kind: ImageKind
+  rows: ImageRow[]
+  truncated: boolean
+  note: string
+  /** 画像の置き場所(folder = ASSET_DIR / bucket / none) */
+  store: string
+}
+
 export const DevApi = {
+  images: (kind: ImageKind) => call<ImageList>(`/images?kind=${kind}`),
   status: () => call<Status & { ok?: true }>('/status'),
   settings: () => call<Settings>('/settings'),
   saveSettings: (s: Settings) => call<{ ok: true }>('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }),

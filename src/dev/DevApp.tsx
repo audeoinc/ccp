@@ -3,6 +3,7 @@ import { FluentProvider, MessageBar, MessageBarBody, Tab, TabList, makeStyles, t
 import { WrenchRegular } from '@fluentui/react-icons'
 import { DevApi, isFailure, type Settings, type Status } from './api'
 import { BqTab } from './BqTab'
+import { ImagesTab } from './ImagesTab'
 import { PolicyTab } from './PolicyTab'
 import { useFluentTheme } from '../theme'
 
@@ -14,7 +15,7 @@ const useStyles = makeStyles({
   key: { fontWeight: tokens.fontWeightSemibold },
 })
 
-type TabKey = 'bq' | 'policy'
+type TabKey = 'bq' | 'policy' | 'images'
 
 // AI のモデルは、SQL の会話の欄で選んだものを使う(ChatPanel が覚えている。なければサーバーの既定)
 const chosenModel = (): string | null => {
@@ -59,6 +60,7 @@ function DevApp() {
         <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabKey)}>
           <Tab value="bq">BigQuery</Tab>
           <Tab value="policy">ポリシーの文書</Tab>
+          <Tab value="images">画像の一覧</Tab>
         </TabList>
         {status && (
           <span className={s.status}>
@@ -81,6 +83,7 @@ function DevApp() {
       )}
       {settings && tab === 'bq' && <BqTab settings={settings} onSettings={saveSettings} />}
       {settings && tab === 'policy' && <PolicyTab settings={settings} onSettings={saveSettings} model={chosenModel()} />}
+      {tab === 'images' && <ImagesTab />}
     </div>
   )
 }

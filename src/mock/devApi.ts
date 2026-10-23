@@ -1,6 +1,6 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { ChatContext, ChatEvent, ChatTurn, CheckResult, ColumnProfile, RunEntry, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ImageKind, ImageList, ImageRow, ChatContext, ChatEvent, ChatTurn, CheckResult, ColumnProfile, RunEntry, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
 
 export * from '../dev/api'
 
@@ -68,7 +68,34 @@ const fail = (error: string) => wait({ ok: false as const, error })
 /** SQL の中の、見本の表の名前を拾う(身代わりなので、FROM の表をそのまま返すだけ) */
 const tableIn = (sql: string) => Object.keys(TABLES).find((t) => sql.includes(t))
 
+// 画像の一覧の見本(絵は、色の付いた四角に文字。外の画像を読まずに、壊れたリンク・外の URL・未使用の見え方を確かめられるように)
+const swatch = (label: string, color: string, w = 160, h = 120) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><text x="50%" y="55%" font-size="16" text-anchor="middle" fill="#fff" font-family="sans-serif">${label}</text></svg>`)}`
+const card = (n: number, name: string) => ({ type: 'card' as const, id: `card-${n}`, name, at: `2026-11-0${n}T09:00:00` })
+const IMAGES: Record<ImageKind, ImageRow[]> = {
+  heroes: [
+    { id: 'h-0001', name: '秋のトレンチで散歩', image_code: 'H01', market: 'JP', image_url: swatch('H01', '#b08060', 160, 120), origin: 'AI の見本', created_on: '2026-10-06T09:00:00', used: [card(1, '秋の新作 第 1 週'), card(3, '週末のコート特集')], link: 'ok' },
+    { id: 'h-0002', name: 'Cozy Bookshop Afternoon', image_code: 'UH04', market: 'US', image_url: swatch('UH04', '#a33', 160, 120), origin: '最初から', created_on: '2026-10-06T09:00:00', used: [], link: 'ok' },
+    { id: 'h-0003', name: '冬のダウンの通勤', image_code: 'H12', market: 'JP', image_url: '/img/heroes/H12.jpg', origin: '上げた画像', uploaded_by: '見本 太郎', created_on: '2026-10-20T15:10:00', used: [card(2, '冬のアウター')], link: 'missing' },
+  ],
+  parts: [
+    { id: 'p-0001', name: '黒の「今すぐ見る」ボタン', kind: 'button', market: 'JP', image_url: swatch('BUTTON', '#222', 200, 60), origin: '自社で作成', created_on: '2026-10-12T10:00:00', used: [{ type: 'template', id: 't-1', name: '標準: 1 枚の写真' }], link: 'ok' },
+    { id: 'p-0002', name: 'Logo (white)', kind: 'logo', market: 'US', image_url: 'https://cdn.example.com/logo-white.png', origin: '', created_on: '2026-10-13T10:00:00', used: [], link: 'external' },
+  ],
+  creative: [
+    { id: 'a-0001', name: '撮影の参考(スタイリング)', image_url: swatch('REF', '#5a7', 160, 120), market: 'JP', origin: 'ファイル', uploaded_by: '見本 花子', created_on: '2026-10-21T11:00:00', used: [card(1, '秋の新作 第 1 週')], link: 'ok' },
+    { id: 'a-0002', name: 'ブランドのページ', image_url: '/api/creative/files/0123456789abcdef0123456789abcdef.jpg', market: 'US', origin: 'URL の見本(https://example.com/)', created_on: '2026-10-22T11:00:00', used: [card(4, 'Holiday gifts')], link: 'missing' },
+  ],
+  products: [
+    { id: 'i-0001', name: 'ウールのロングコート', product_code: 'P01', market: 'JP', role: 'main', angle: 'front', image_url: swatch('P01 正面', '#555', 120, 160), caption: 'チャコールグレーのウールのロングコート。', origin: 'AI の見本', created_on: '2026-10-23T22:00:00', used: [card(3, '週末のコート特集')], link: 'ok' },
+    { id: 'i-0002', name: 'ウールのロングコート', product_code: 'P01', market: 'JP', role: 'sub', angle: 'texture', image_url: swatch('P01 素材', '#777', 120, 160), caption: '起毛した厚手のウールが、風を通しません。', origin: 'AI の見本', created_on: '2026-10-23T22:00:00', used: [], link: 'ok' },
+    { id: 'master:prod-2', name: 'Straight Jeans', product_code: 'U12', market: 'US', role: 'master_main', image_url: 'https://placehold.co/300x400', origin: '商品のマスタ', created_on: '2026-10-01T00:00:00', used: [card(4, 'Holiday gifts')], link: 'external' },
+    { id: 'master:prod-3', name: 'リネンのシャツ', product_code: 'P30', market: 'JP', role: 'master_main', image_url: '', origin: '商品のマスタ', created_on: '2026-10-01T00:00:00', used: [], link: 'empty' },
+  ],
+}
+
 export const DevApi = {
+  images: (kind: ImageKind) => wait<ImageList>({ ok: true, kind, rows: IMAGES[kind], truncated: false, note: '', store: 'folder' }),
   status: () => wait({ enabled: true, project: 'demo-project', account: 'demo@demo-project.iam.gserviceaccount.com', devwork: 'server/devwork', max_gb: 10 }),
   settings: () => wait(settings),
   saveSettings: (s: Settings) => {

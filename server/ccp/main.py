@@ -22,7 +22,7 @@ from .ai import router as ai_router
 from .approvals import router as approvals_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
-from . import devtools
+from . import devimages, devtools
 from .identity import router as me_router
 from .production import router as production_router
 from .ads import router as ads_router
@@ -129,6 +129,7 @@ app.include_router(linkpreview_router)
 app.include_router(product_pages_router)
 app.include_router(impact_router)
 app.include_router(devtools.router)
+app.include_router(devimages.router)
 if hosted_router is not None:
     app.include_router(hosted_router)
 
