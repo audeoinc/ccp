@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Dropdown, Input, MessageBar, MessageBarBody, Option, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular } from '@fluentui/react-icons'
-import { DevApi, bytesLabel, isFailure, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
+import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, ArrowDownloadRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular, StopRegular } from '@fluentui/react-icons'
+import { DevApi, bytesLabel, isFailure, type Column, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
-import { SqlEditor } from './SqlEditor'
+import { SqlEditor, type SqlCatalog } from './SqlEditor'
+import { cteQuery, listCtes } from './cte'
 import { toMarkdown } from './format'
 import { TableDetail } from './TableDetail'
 import { DatasetPicker } from './DatasetPicker'
@@ -140,6 +141,13 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   // 作る出力(SPU など)。版・答え合わせと、AI に渡す手本の SQL に使う
   const [output, setOutput] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
+  // エディタで選んでいる文字(選んでいれば「選んだ部分を流す」)
+  const [selection, setSelection] = useState('')
+  // 流している途中の実行の印(「止める」で使う)と、止めたか
+  const runId = useRef('')
+  const [stopped, setStopped] = useState(false)
+  // 入力補完に使う、表ごとの列(開いた表・SQL に書いた表を読んだもの)
+  const [columnsOf, setColumnsOf] = useState<Record<string, Column[]>>({})
   // AI に頼む(答え合わせの結果から)。id を変えて、同じ文でも送り直せるように
   const [ask, setAsk] = useState<{ id: number; text: string } | null>(null)
   const [widths, setWidths] = useState(readWidths)
@@ -236,16 +244,59 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
     if (!text.trim() || busy) return
     setBusy('run')
     setSqlError('')
-    const r = await DevApi.run(text, maxRows)
+    setStopped(false)
+    const id = `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+    runId.current = id
+    const r = await DevApi.run(text, maxRows, id)
+    runId.current = ''
     setBusy('')
     if (isFailure(r)) {
       setResult(null)
-      setSqlError(r.error)
+      setSqlError(/cancel/i.test(r.error) ? `止めました(${r.error})` : r.error)
     } else {
       setResult(r)
       setDry(null)
     }
   }
+
+  /** 流している途中の SELECT を止める(BigQuery のジョブそのものを止める) */
+  const stop = async () => {
+    if (!runId.current) return
+    setStopped(true)
+    await DevApi.cancel(runId.current)
+  }
+
+  // CTE(WITH 名前 AS (…))。1 つだけを試せるように
+  const ctes = useMemo(() => listCtes(sql), [sql])
+
+  // 開いた表の列は、入力補完に使う
+  useEffect(() => {
+    if (!info) return
+    const id = window.setTimeout(() => setColumnsOf((c) => (c[info.ref] ? c : { ...c, [info.ref]: info.columns })))
+    return () => window.clearTimeout(id)
+  }, [info])
+
+  // SQL に書いた表の列も、読んでおく(打ち終わって少し待ってから。読めない名前は空で覚えて、読み直さない)
+  useEffect(() => {
+    const refs = [...new Set([...sql.matchAll(/`([\w-]+\.[\w]+\.[\w$]+)`/g)].map((m) => m[1]))].filter((r) => !(r in columnsOf)).slice(0, 10)
+    if (!refs.length) return
+    const id = window.setTimeout(() => {
+      void Promise.all(refs.map(async (r) => [r, await DevApi.table(r)] as const)).then((got) =>
+        setColumnsOf((c) => ({ ...c, ...Object.fromEntries(got.map(([r, t]) => [r, isFailure(t) ? [] : t.columns])) })),
+      )
+    }, 800)
+    return () => window.clearTimeout(id)
+  }, [sql, columnsOf])
+
+  // エディタは打つたびに候補を聞くので、いまの一覧を ref で渡す(エディタを作り直さない)
+  const catalogRef = useRef<SqlCatalog>({ tables: [], columns: [] })
+  useEffect(() => {
+    catalogRef.current = {
+      tables: (tables ?? []).map((t) => ({ ref: t.ref, type: t.type })),
+      columns: Object.entries(columnsOf).flatMap(([table, cols]) => cols.map((c) => ({ name: c.name, type: c.type, table, description: c.description }))),
+    }
+  }, [tables, columnsOf])
+  const catalog = useCallback(() => catalogRef.current, [])
 
   // AI に渡す「いまの SQL を流した結果」(エラー、または結果の先頭 20 行)
   const last = useMemo(() => {
@@ -319,17 +370,50 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
             </Button>
           </div>
           <WorkPanel output={output} onOutput={setOutput} sql={sql} onLoadSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />
-          <span className={s.muted}>流せるのは SELECT だけです(表を作る SQL は、BigQuery のコンソールで実行します)。Ctrl + Enter で流します。</span>
+          <span className={s.muted}>流せるのは SELECT だけです(表を作る SQL は、BigQuery のコンソールで実行します)。Ctrl + Enter で流します(一部を選ぶと、その部分だけ)。表・列の名前は、打つと候補が出ます。</span>
           <div className={s.editor}>
-            <SqlEditor value={sql} onChange={changeSql} onRun={() => void runSql()} />
+            <SqlEditor value={sql} onChange={changeSql} onRun={() => void runSql(selection.trim() ? selection : sql)} onSelection={setSelection} catalog={catalog} />
           </div>
           <div className={s.row}>
             <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => void dryRun()} disabled={!sql.trim() || !!busy} title="BigQuery の dry-run。料金はかかりません">
               料金なしで確かめる
             </Button>
-            <Button size="small" appearance="primary" icon={<PlayRegular />} onClick={() => void runSql()} disabled={!sql.trim() || !!busy}>
-              流す
-            </Button>
+            {busy === 'run' ? (
+              <Button size="small" icon={<StopRegular />} onClick={() => void stop()} disabled={stopped} title="BigQuery の問い合わせを止める(止まるまでに読んだ分は、課金されることがある)">
+                {stopped ? '止めています…' : '止める'}
+              </Button>
+            ) : (
+              <Button
+                size="small"
+                appearance="primary"
+                icon={<PlayRegular />}
+                onClick={() => void runSql(selection.trim() ? selection : sql)}
+                disabled={!sql.trim() || !!busy}
+                title={selection.trim() ? 'エディタで選んでいる部分だけを流す' : 'SQL の欄の全部を流す(一部を選ぶと、その部分だけ)'}
+              >
+                {selection.trim() ? '選んだ部分を流す' : '流す'}
+              </Button>
+            )}
+            {ctes.length > 0 && (
+              <Dropdown
+                size="small"
+                style={{ minWidth: '150px' }}
+                placeholder="CTE を試す"
+                value=""
+                selectedOptions={[]}
+                disabled={!!busy}
+                onOptionSelect={(_, d) => {
+                  const c = ctes.find((x) => x.name === d.optionValue)
+                  if (c) void runSql(cteQuery(sql, c, maxRows))
+                }}
+              >
+                {ctes.map((c) => (
+                  <Option key={c.name} value={c.name} text={c.name}>
+                    {c.name} の中身を見る
+                  </Option>
+                ))}
+              </Dropdown>
+            )}
             <Dropdown size="small" style={{ minWidth: '120px' }} value={`先頭 ${maxRows} 行`} selectedOptions={[String(maxRows)]} onOptionSelect={(_, d) => setMaxRows(Number(d.optionValue))}>
               {ROW_CHOICES.map((n) => (
                 <Option key={n} value={String(n)}>{`先頭 ${n} 行`}</Option>

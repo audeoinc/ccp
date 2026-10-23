@@ -157,6 +157,7 @@ ${ctx.sql}
     const d: DryRun = { ok: true, statement_type: st, bytes: 52_428_800, columns: TABLES[t].columns.map(({ name, type }) => ({ name, type })), runnable: st === 'SELECT', reason: st === 'SELECT' ? null : `SELECT ではないので流しません(文の種類: ${st})。表を作る SQL は、BigQuery のコンソールで実行してください`, max_bytes: 10 * 1024 ** 3, cost_usd: 0.0003, price_per_tib: 6.25, weight: '軽い', tables: [ref(t)], views: [] }
     return wait(d)
   },
+  cancel: () => wait({ ok: true as const, cancelled: true }),
   run: (sql: string, maxRows: number) => {
     const t = tableIn(sql)
     if (!t) return fail('BadRequest: 400 Not found: Table demo-project:ccp_dummy_src.xxx was not found in location asia-northeast1')

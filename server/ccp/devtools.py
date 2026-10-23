@@ -11,7 +11,8 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   GET  /api/dev/bq/table        ?ref=<プロジェクト>.<データセット>.<表>  列(入れ子は a.b の形に開く)・行数・パーティション
   GET  /api/dev/bq/preview      ?ref=…  先頭の行(list_rows。問い合わせではないので料金なし)
   POST /api/dev/bq/dryrun       {sql}  料金なしの試し。文の種類・読む量・結果の列
-  POST /api/dev/bq/run          {sql, max_rows}  SELECT だけを、読む量の上限を付けて流す
+  POST /api/dev/bq/run          {sql, max_rows, run_id}  SELECT だけを、読む量の上限を付けて流す
+  POST /api/dev/bq/cancel       {run_id}  流している途中の SELECT を止める(BigQuery のジョブを取り消す)
   GET  /api/dev/bq/projects     見られるプロジェクト(データセットを、名前の一部で探すため)
   POST /api/dev/ai/chat         Gemini と会話して SQL を組み立てる。前提(仕様・手本・表の列・まとめ・いまの SQL)はサーバーで組み立てる。
                                 思考・調べたこと・返事を、起きた順に NDJSON で返す
@@ -133,6 +134,12 @@ def only_select(statement_type: str | None) -> str | None:
 class SqlIn(BaseModel):
     sql: str = Field(min_length=1, max_length=200_000)
     max_rows: int = Field(200, ge=1, le=MAX_ROWS)
+    # 画面が付ける、この実行の印(「止める」で、どのジョブを止めるかを知るため)
+    run_id: str = Field("", max_length=64, pattern=r"^[A-Za-z0-9_-]*$")
+
+
+# 流している途中のジョブ(画面の run_id → (ジョブ ID, 場所))。「止める」で BigQuery のジョブそのものを止める
+_running: dict[str, tuple[str, str | None]] = {}
 
 
 def _error(e: Exception) -> dict[str, Any]:
@@ -368,7 +375,12 @@ async def run(body: SqlIn) -> dict[str, Any]:
             return {"ok": False, "error": why}
         t0 = time.monotonic()
         job = c.query(body.sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=max_bytes()))
-        it = job.result(max_results=body.max_rows)
+        if body.run_id:
+            _running[body.run_id] = (job.job_id, job.location)
+        try:
+            it = job.result(max_results=body.max_rows)
+        finally:
+            _running.pop(body.run_id, None)
         rows = [plain(dict(r.items())) for r in it]
         out = {
             "ok": True,
@@ -393,6 +405,27 @@ async def run(body: SqlIn) -> dict[str, Any]:
         err = _error(e)
         record_run("画面", body.sql, error=err["error"])
         return err
+
+
+class CancelIn(BaseModel):
+    run_id: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/bq/cancel")
+async def cancel(body: CancelIn) -> dict[str, Any]:
+    """流している途中の SELECT を止める(BigQuery のジョブを取り消す。止まるまでに読んだ分は、課金されることがある)"""
+    got = _running.get(body.run_id)
+    if not got:
+        return {"ok": True, "cancelled": False, "note": "もう終わっています"}
+
+    def go() -> dict[str, Any]:
+        bq.client().cancel_job(got[0], location=got[1])
+        return {"ok": True, "cancelled": True, "job_id": got[0]}
+
+    try:
+        return await asyncio.to_thread(go)
+    except Exception as e:  # noqa: BLE001
+        return _error(e)
 
 
 @router.get("/bq/projects")

@@ -284,6 +284,20 @@ class WorkTest(unittest.TestCase):
         self.assertTrue(any("SELECT DISTINCT market, product_code FROM (" in q for q in sqls))
 
 
+class CancelTest(unittest.TestCase):
+    def test_cancel(self) -> None:
+        import asyncio
+
+        cancelled = []
+        devtools._running["r1"] = ("job_1", "asia-northeast1")
+        with mock.patch.object(devtools.bq, "client", return_value=SimpleNamespace(cancel_job=lambda j, location=None: cancelled.append((j, location)))):
+            r = asyncio.run(devtools.cancel(devtools.CancelIn(run_id="r1")))
+            done = asyncio.run(devtools.cancel(devtools.CancelIn(run_id="nope")))
+        self.assertEqual((r["cancelled"], cancelled), (True, [("job_1", "asia-northeast1")]))
+        self.assertFalse(done["cancelled"])
+        devtools._running.clear()
+
+
 class PolicyDocTest(unittest.TestCase):
     def test_xlsx_text(self) -> None:
         import io
