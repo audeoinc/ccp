@@ -1,42 +1,27 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Avatar, Button, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens, type PositioningImperativeRef, type PositioningVirtualElement } from '@fluentui/react-components'
-import { ArrowRepeatAllRegular, CheckmarkRegular, DeleteRegular, DismissRegular, EditRegular, MentionRegular, SendRegular } from '@fluentui/react-icons'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { Button, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowRepeatAllRegular, CheckmarkRegular, DeleteRegular, EditRegular, MentionRegular } from '@fluentui/react-icons'
 import { CardNotesService, type CardNote } from './data/cardNotes'
-import { AutoTextarea } from './AutoTextarea'
 import { myName, onMeChange } from './history'
 import { activeUsers, usePeople } from './people'
 import { anchorLabel, bumpNotes, focusPin, notesVersion, pendingPin, pinNumbers, setPendingPin, subscribePins } from './pinStore'
 import type { NoteStage } from './notesStage'
-import { locale, tr, useT } from './i18n'
+import { tr, useT } from './i18n'
 import { setNoteResolved } from './pinActions'
-import { Linkify } from './LinkText'
+import { usePinAnchor } from './pinAnchor'
+import { PinThreadView } from './PinThreadView'
 
 const useStyles = makeStyles({
-  surface: { width: '320px', padding: '10px 12px', display: 'grid', rowGap: '8px' },
-  head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  headText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   pin: { width: '18px', height: '18px', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '11px', fontWeight: tokens.fontWeightBold, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorPaletteDarkOrangeBackground3 },
   pinNew: { backgroundColor: tokens.colorBrandBackground },
   pinDone: { backgroundColor: tokens.colorNeutralBackground5, color: tokens.colorNeutralForeground3 },
-  // 元の書き込みと返信を、上から読む(長くなったら、この中だけスクロール)
-  thread: { display: 'grid', rowGap: '8px', maxHeight: 'calc(46vh / var(--ui-zoom, 1))', overflowY: 'auto' },
-  entry: { display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
-  reply: { marginLeft: '16px' },
-  meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  body: { fontSize: tokens.fontSizeBase300, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
-  done: { color: tokens.colorNeutralForeground3 },
-  input: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'end' },
   chips: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' },
   chip: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', padding: '2px 8px', borderRadius: '999px', border: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, cursor: 'pointer' },
   chipOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
   people: { display: 'grid', rowGap: '2px', maxHeight: '220px', overflowY: 'auto' },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '4px' },
-  hint: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, marginLeft: 'auto' },
-  error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
 const subscribeMe = (f: () => void) => onMeChange(f)
-const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
 /** いま開いているフロート: 刺さっているピンのスレッド(書き込みの ID)か、打ったばかりのピン(まだ書いていない) */
 export type PinTarget = { noteId: string } | { pending: true }
@@ -56,22 +41,6 @@ interface Props {
   onClose: () => void
   /** 「この部品を直す」: ピンの場所の部品を選ぶ処理(選べる部品がない場所・画面では null) */
   editSpot?: (anchor: string, productId?: string) => (() => void) | null
-}
-
-/** iframe の中の要素は、枠の位置を足した仮の要素にする(フロートは親の文書に出すため) */
-function anchorOf(el: Element): Element | PositioningVirtualElement {
-  const frame = el.ownerDocument.defaultView?.frameElement
-  if (!frame || el.ownerDocument === document) return el
-  return {
-    contextElement: frame,
-    getBoundingClientRect: () => {
-      const f = frame.getBoundingClientRect()
-      const r = el.getBoundingClientRect()
-      // 枠ごと縮めて見せている(表示の大きさ)ときは、その比で合わせる
-      const k = (frame as HTMLElement).offsetWidth > 0 ? f.width / (frame as HTMLElement).offsetWidth : 1
-      return DOMRect.fromRect({ x: f.left + frame.clientLeft * k + r.left * k, y: f.top + frame.clientTop * k + r.top * k, width: r.width * k, height: r.height * k })
-    },
-  }
 }
 
 /**
@@ -94,30 +63,8 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
   const [assignee, setAssignee] = useState('')
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // フロートを付けるピンの要素。ピンは間隔を空けて描き直されるので、見つかるまで探す(打った直後・書いた直後は、まだ無い)
-  const [anchorEl, setAnchorEl] = useState<Element | null>(null)
   const pinKey = noteId ?? 'pending'
-  const rootRef = useRef(findRoot)
-  useEffect(() => {
-    rootRef.current = findRoot
-  })
-  // iframe の中のスクロール・倍率の変化は、フロートの位置の自動の追従に入らないので、間隔を空けて置き直す
-  const positioningRef = useRef<PositioningImperativeRef>(null)
-  useEffect(() => {
-    const find = () => {
-      const el = rootRef.current()?.querySelector(`[data-pin-id="${CSS.escape(pinKey)}"]`) ?? null
-      setAnchorEl((o) => (o === el ? o : el))
-      positioningRef.current?.updatePosition()
-    }
-    find()
-    const timer = window.setInterval(find, 200)
-    return () => window.clearInterval(timer)
-  }, [pinKey])
-  const [anchor_, setAnchor_] = useState<Element | PositioningVirtualElement | null>(null)
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAnchor_(anchorEl ? anchorOf(anchorEl) : null)
-  }, [anchorEl])
+  const { target: anchorTarget, positioningRef } = usePinAnchor(findRoot, pinKey)
 
   const load = useCallback(async () => {
     const res = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
@@ -219,32 +166,15 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
     onClose()
   }
 
-  const entry = (n: CardNote, isReply = false) => (
-    <div key={n.id} className={mergeClasses(s.entry, isReply && s.reply)}>
-      <Avatar size={24} name={n.author || '?'} color="colorful" />
-      <div style={{ minWidth: 0 }}>
-        <div className={s.meta}>{[n.author || t('(名前なし)', '(no name)'), !isReply && n.assignee ? `→ ${n.assignee}` : '', when(n.created_on)].filter(Boolean).join(' · ')}</div>
-        <div className={mergeClasses(s.body, !!root?.resolved && s.done)}><Linkify text={n.body} /></div>
-      </div>
-    </div>
-  )
-
-  if (!anchor_) return null
   return (
-    <Popover
-      open
-      positioning={{ target: anchor_, positioningRef, position: 'after', align: 'top', offset: 8 }}
-      withArrow
-      trapFocus={false}
-      onOpenChange={(ev, d) => {
-        // 別のピンを押したときは、そのピンが開き直す(ここで閉じると、押した順によっては開かない)
-        if (!d.open && !(ev.target instanceof Element && ev.target.closest('[data-pin-id]'))) close()
-      }}
-    >
-      <PopoverSurface className={s.surface} aria-label={t('ピンのコメント', 'Pin comment')}>
-        <div className={s.head}>
-          <span className={mergeClasses(s.pin, !root && s.pinNew, !!root?.resolved && s.pinDone)}>{no ?? '+'}</span>
-          <span className={s.headText}>{place}</span>
+    <PinThreadView
+      target={anchorTarget}
+      positioningRef={positioningRef}
+      ariaLabel={t('ピンのコメント', 'Pin comment')}
+      badge={<span className={mergeClasses(s.pin, !root && s.pinNew, !!root?.resolved && s.pinDone)}>{no ?? '+'}</span>}
+      place={place}
+      headActions={
+        <>
           {edit && (
             <Tooltip content={t('この場所の部品を選んで、直す', 'Select this part to edit it')} relationship="label">
               <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={edit} />
@@ -255,70 +185,51 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
               <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={working} onClick={() => void remove()} />
             </Tooltip>
           )}
-          <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={close} aria-label={t('閉じる', 'Close')} />
-        </div>
-        {noteId && !root ? (
-          notes === null ? <Spinner size="tiny" /> : <span className={s.meta}>{t('このコメントは消されました', 'This comment was deleted')}</span>
-        ) : (
-          <>
-            {root && (
-              <div className={s.thread}>
-                {entry(root)}
-                {replies.map((r) => entry(r, true))}
-              </div>
-            )}
-            {!root && (
-              <div className={s.chips}>
-                <Popover positioning="below-start">
-                  <PopoverTrigger disableButtonEnhancement>
-                    <button type="button" className={mergeClasses(s.chip, !!assignee && s.chipOn)}>
-                      <MentionRegular />
-                      {assignee || t('宛先', 'To')}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverSurface>
-                    <div className={s.people}>
-                      <Button size="small" appearance="subtle" onClick={() => setAssignee('')}>{t('宛先なし', 'No one')}</Button>
-                      {userNames.map((n) => (
-                        <Button key={n} size="small" appearance={assignee === n ? 'primary' : 'subtle'} onClick={() => setAssignee(n)} style={{ justifyContent: 'flex-start' }}>
-                          {n}
-                        </Button>
-                      ))}
-                    </div>
-                  </PopoverSurface>
-                </Popover>
-              </div>
-            )}
-            <div className={s.input}>
-              <AutoTextarea
-                size="small"
-                rows={root ? 1 : 2}
-                autoFocus
-                value={text}
-                disabled={working}
-                placeholder={root ? t('返信', 'Reply') : t('この場所へのコメント', 'Comment on this spot')}
-                onChange={(_, d) => setText(d.value)}
-                onKeyDown={(ev) => {
-                  if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
-                    ev.preventDefault()
-                    void (root ? sendReply() : post())
-                  }
-                }}
-              />
-              <Button size="small" appearance="primary" icon={working ? <Spinner size="extra-tiny" /> : <SendRegular />} disabled={working || !text.trim()} onClick={() => void (root ? sendReply() : post())} aria-label={root ? t('返信する', 'Send reply') : t('書き込む', 'Post')} />
-            </div>
-            <div className={s.actions}>
-              {root && (
-                <Button size="small" appearance="subtle" icon={root.resolved ? <ArrowRepeatAllRegular /> : <CheckmarkRegular />} disabled={working} onClick={toggleResolved}>
-                  {root.resolved ? t('未解決に戻す', 'Reopen') : t('解決にする', 'Resolve')}
-                </Button>
-              )}
-              <span className={s.hint}>{t('Ctrl + Enter で送る', 'Ctrl + Enter to send')}</span>
-            </div>
-          </>
-        )}
-        {error && <span className={s.error}>{error}</span>}
-      </PopoverSurface>
-    </Popover>
+        </>
+      }
+      state={noteId && !root ? (notes === null ? 'loading' : 'gone') : 'ok'}
+      goneText={t('このコメントは消されました', 'This comment was deleted')}
+      entries={root ? [root, ...replies].map((n) => ({ id: n.id, author: n.author, body: n.body, at: n.created_on, extra: n === root && n.assignee ? `→ ${n.assignee}` : undefined, isReply: n !== root })) : []}
+      dimmed={!!root?.resolved}
+      composerTop={
+        !root && (
+          <div className={s.chips}>
+            <Popover positioning="below-start">
+              <PopoverTrigger disableButtonEnhancement>
+                <button type="button" className={mergeClasses(s.chip, !!assignee && s.chipOn)}>
+                  <MentionRegular />
+                  {assignee || t('宛先', 'To')}
+                </button>
+              </PopoverTrigger>
+              <PopoverSurface>
+                <div className={s.people}>
+                  <Button size="small" appearance="subtle" onClick={() => setAssignee('')}>{t('宛先なし', 'No one')}</Button>
+                  {userNames.map((n) => (
+                    <Button key={n} size="small" appearance={assignee === n ? 'primary' : 'subtle'} onClick={() => setAssignee(n)} style={{ justifyContent: 'flex-start' }}>
+                      {n}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverSurface>
+            </Popover>
+          </div>
+        )
+      }
+      text={text}
+      onText={setText}
+      placeholder={root ? t('返信', 'Reply') : t('この場所へのコメント', 'Comment on this spot')}
+      sendLabel={root ? t('返信する', 'Send reply') : t('書き込む', 'Post')}
+      working={working}
+      onSend={() => void (root ? sendReply() : post())}
+      footer={
+        root && (
+          <Button size="small" appearance="subtle" icon={root.resolved ? <ArrowRepeatAllRegular /> : <CheckmarkRegular />} disabled={working} onClick={toggleResolved}>
+            {root.resolved ? t('未解決に戻す', 'Reopen') : t('解決にする', 'Resolve')}
+          </Button>
+        )
+      }
+      error={error}
+      onClose={close}
+    />
   )
 }

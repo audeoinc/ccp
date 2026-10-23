@@ -576,6 +576,28 @@
     ["user_id", "users", {"onDelete": "CASCADE"}]
    ]
   },
+  "dev_requests": {
+   "_comment": "開発へのリクエスト(画面のどこでも右クリックで打つピン)。返信は source_request で元につなぐ。import-pack の入れ替えでも消さない(pack.py の KEEP_ON_REPLACE)",
+   "columns": [
+    ["body", "text"],
+    ["author_name", "text"],
+    ["status", "choice"],
+    ["source_request", "text"],
+    ["screen", "text", {"index": true}],
+    ["url", "text"],
+    ["place_text", "text"],
+    ["anchor", "text"],
+    ["anchor_x", "numeric"],
+    ["anchor_y", "numeric"],
+    ["view_x", "numeric"],
+    ["view_y", "numeric"],
+    ["done_at", "timestamptz"],
+    ["done_version", "text"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "SET NULL"}]
+   ]
+  },
   "ad_spends": {
    "columns": [
     ["date", "date", {"index": true}],
@@ -701,6 +723,7 @@
   "notifications.status": ["pending", "sent", "skipped"],
   "production_requests.status": ["requested", "in_progress", "done", "checked", "sent", "stale", "withdrawn"],
   "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"],
+  "dev_requests.status": ["open", "done", "declined"],
   "ad_spends.market": ["JP", "US"],
   "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"],
   "ai_runs.adoption": ["as_is", "edited", "rejected"],

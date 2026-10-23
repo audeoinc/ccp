@@ -111,8 +111,13 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
     return data, images
 
 
+# 入れ替えでも消さない表(その環境で書いたものを残す)。パックの行は、まだない行(id で見る)だけを足す。
+# 開発へのリクエストは、使っている環境で書かれるので、本番のパックで入れ替えても残す(参照先の配信が消えると、配信への参照だけが空になる)
+KEEP_ON_REPLACE = {"dev_requests"}
+
+
 async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
-    """DB の中身を、パックの内容に置き換える(作った日時・変えた日時も、元のまま残す)"""
+    """DB の中身を、パックの内容に置き換える(作った日時・変えた日時も、元のまま残す)。KEEP_ON_REPLACE の表は消さずに足す"""
     from .db import get_engine
 
     schema = sc.load()
@@ -120,8 +125,11 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
     async with engine.begin() as conn:
         order = schema.creation_order()
         for t in reversed(order):
+            if t.name in KEEP_ON_REPLACE:
+                continue
             await conn.execute(text(f"DELETE FROM {t.pg}"))
         for t in order:
+            keep = t.name in KEEP_ON_REPLACE
             rows = tables.get(t.name, [])
             for rec in rows:
                 values = t.to_db(rec)
@@ -131,8 +139,9 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
                     if rec.get(dv):
                         values[pg] = sc.coerce("timestamptz", rec[dv])
                 cols = list(values)
-                await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"), values)
-            print(f"{t.pg}: {len(rows)} 件")
+                conflict = " ON CONFLICT (id) DO NOTHING" if keep else ""
+                await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}){conflict}"), values)
+            print(f"{t.pg}: {len(rows)} 件" + ("(残して足した)" if keep else ""))
 
 
 async def add_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, tuple[int, int, int]]:

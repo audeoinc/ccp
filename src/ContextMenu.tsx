@@ -26,6 +26,16 @@ export function keepBrowserMenu(e: { shiftKey: boolean; target: EventTarget | nu
   return !!sel && !sel.isCollapsed && sel.toString().trim() !== ''
 }
 
+/**
+ * どの右クリックのメニューにも、最後に足す項目(開発へのリクエスト「開発に伝える」など)。押した画面の点を受け取り、項目を返す。
+ * 足す側(DevRequestLayer)が、画面を開いている間だけ置く
+ */
+type GlobalItems = (x: number, y: number) => ContextItem[]
+let globalItems: GlobalItems | null = null
+export function setGlobalMenuItems(f: GlobalItems | null) {
+  globalItems = f
+}
+
 interface At {
   x: number
   y: number
@@ -38,7 +48,11 @@ interface At {
  */
 export function useContextMenu(): { openAt: (x: number, y: number, items: ContextItem[]) => void; close: () => void; menu: ReactNode } {
   const [at, setAt] = useState<At | null>(null)
-  const openAt = useCallback((x: number, y: number, items: ContextItem[]) => setAt(items.length ? { x, y, items } : null), [])
+  const openAt = useCallback((x: number, y: number, items: ContextItem[]) => {
+    const extra = globalItems?.(x, y) ?? []
+    const all = [...items, ...extra.map((it, i) => (i === 0 && items.length ? { ...it, divider: true } : it))]
+    setAt(all.length ? { x, y, items: all } : null)
+  }, [])
   const close = useCallback(() => setAt(null), [])
   // 押した点を、大きさ 0 の要素としてメニューの位置の基準にする
   const target = at ? { getBoundingClientRect: () => DOMRect.fromRect({ x: at.x, y: at.y, width: 0, height: 0 }) } : undefined

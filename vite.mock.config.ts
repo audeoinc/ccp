@@ -1,6 +1,18 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { execSync } from 'node:child_process'
+
+// 画面の版(ビルドしたときのコミットと日付)。開発へのリクエストを「対応済み」にしたときに残す(どの版で直ったかが、書いた人に分かるように)。
+// Git がない所でビルドしたときは、日付だけ
+const buildId = () => {
+  const day = new Date().toISOString().slice(0, 10)
+  try {
+    return `${day} ${execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()}`
+  } catch {
+    return day
+  }
+}
 
 // 撮影・デモ用の設定: データと AI を、サンプルデータ(src/mock)に差し替えて、アプリを動かす。
 //   npx vite --config vite.mock.config.ts
@@ -42,5 +54,6 @@ const mockServices = (): Plugin => ({
 
 export default defineConfig({
   plugins: [mockServices(), react()],
+  define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId()) },
   server: { port: 5190, strictPort: true },
 })

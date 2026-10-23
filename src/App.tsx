@@ -54,6 +54,9 @@ import {
 import { CopyRegular as CtxCopyRegular, DataBarVerticalRegular as CtxResultsRegular, OpenRegular as CtxOpenRegular, PaintBrushRegular as CtxProductionRegular } from '@fluentui/react-icons'
 import { keepBrowserMenu, useContextMenu } from './ContextMenu'
 import { DuplicateDialog } from './CardMenu'
+import { LightbulbRegular as DevRequestIcon } from '@fluentui/react-icons'
+import { DevRequestLayer } from './DevRequestLayer'
+import { DevRequestsDialog } from './DevRequestsDialog'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ProductsService } from './data/products'
@@ -634,6 +637,8 @@ function App() {
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
   // 週・月・一覧の配信の右クリック: 開く・複製…・制作のページ・結果。押したときと、配信カードの「…」・段階の帯と同じ処理を呼ぶ
   const cardMenu = useContextMenu()
+  // 開発へのリクエストの一覧(⚙ と、ヘッダーのリンクから)
+  const [devRequestsOpen, setDevRequestsOpen] = useState(false)
   const [dupCard, setDupCard] = useState<DeliveryCard | null>(null)
   const cardMenuRef = useRef<(e: MouseEvent) => void>(() => undefined)
   useEffect(() => {
@@ -1439,6 +1444,12 @@ function App() {
                 {alertCount}
               </Badge>
             )}
+          </Button>
+        </Tooltip>
+        {/* 開発へのリクエスト(画面のどこでも右クリック →「開発に伝える」で書いたもの)の一覧 */}
+        <Tooltip content={t('開発へのリクエストの一覧(画面のどこでも、右クリック →「開発に伝える」で書けます)', 'Requests to developers (write one anywhere: right-click → "Tell the developers")')} relationship="label">
+          <Button appearance="subtle" size="small" icon={<DevRequestIcon />} onClick={() => setDevRequestsOpen(true)}>
+            {t('リクエスト', 'Requests')}
           </Button>
         </Tooltip>
         {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
@@ -2284,6 +2295,9 @@ function App() {
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       {heroLibraryOpen && <HeroLibrary heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} onClose={() => setHeroLibraryOpen(false)} />}
       {cardMenu.menu}
+      {/* 開発へのリクエストのピン(どの画面にも重ねる)と、その一覧 */}
+      <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} />
+      {devRequestsOpen && <DevRequestsDialog onClose={() => setDevRequestsOpen(false)} />}
       {dupCard && (
         <DuplicateDialog
           card={dupCard}
