@@ -9,6 +9,7 @@ import { getUiScale } from './uiScale'
 import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
+import { elementClickable, elementDesc, partElements } from './elements'
 
 // テンプレートの編集画面の、表の部分(T8。docs/TEMPLATE_OBJECTS.md の 5.2。触れる試作で利用者と決めた形)。
 // パーツ(足すだけ)・表のキャンバス(押す・なぞるで選ぶ、右クリック・行と列の帯で操作)・右の「セクションと部品」のタブを作る。
@@ -229,6 +230,9 @@ const useStyles = makeStyles({
   swatch: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: '11px', padding: '2px 6px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', '& span': { width: '12px', height: '12px', borderRadius: '50%' } },
   swatchOn: { border: `2px solid ${tokens.colorBrandStroke1}` },
   pid: { fontFamily: tokens.fontFamilyMonospace, fontSize: '11px', color: tokens.colorNeutralForeground3 },
+  elHead: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginTop: '4px' },
+  elRow: { display: 'grid', rowGap: '2px', paddingLeft: '6px', borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
+  elTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '6px', minWidth: 0 },
 })
 
 export interface TableEditorArgs {
@@ -1533,6 +1537,39 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       {value}
     </div>
   )
+  /** 部品の場所の呼び名(説明の自動の文に使う。例「S1 箱 1」「H ボタン」) */
+  const whereOf = (sec: Section, p: TablePart) =>
+    `${isHero(sec.id) ? 'H' : `S${sections.findIndex((x) => x.id === sec.id) + 1}`} ${typeName(p.type)}${p.type === 'box' ? ` ${boxNo.get(p.id)}` : ''}`
+  /**
+   * 部品の説明と、要素(写真・名前・価格・文言…)の ID・説明・押せるか(T8 の 8.4)。
+   * ID は「部品 ID.要素の名前」で、説明を書き直しても変わらない(計測・ピン・分析は ID で数える)
+   */
+  const elementsBlock = (sec: Section, p: TablePart) => {
+    const where = whereOf(sec, p)
+    const setEl = (key: string, x: { desc?: string; click?: boolean }) => {
+      const spec = Object.fromEntries(Object.entries({ ...(p.els?.[key] ?? {}), ...x }).filter(([, v]) => v !== undefined))
+      const els = { ...(p.els ?? {}), [key]: spec }
+      if (Object.keys(spec).length === 0) delete els[key]
+      patch(sec, p, { els: Object.keys(els).length > 0 ? els : undefined })
+    }
+    return (
+      <>
+        <Field label={t('部品の説明(任意。分析・計測の対応表・制作への指示に出す)', 'Part description (optional; shown in reports, the tracking map and production notes)')} size="small">
+          <Input size="small" value={p.desc ?? ''} placeholder={where} maxLength={200} onChange={(_, d) => patch(sec, p, { desc: d.value || undefined })} />
+        </Field>
+        <span className={s.elHead}>{t('要素(ID は計測・ピンで使う。説明を変えても ID は変わらない)', 'Elements (IDs are used for tracking and pins; editing a description keeps the ID)')}</span>
+        {partElements(p).map((e) => (
+          <div key={e.key} className={s.elRow}>
+            <div className={s.elTop}>
+              <span className={s.pid} title={e.id}>{e.id}</span>
+              <Checkbox label={t('押せる', 'Clickable')} checked={elementClickable(p, e)} onChange={(_, d) => setEl(e.key, { click: (d.checked === true) === e.click ? undefined : d.checked === true })} />
+            </div>
+            <Input size="small" value={p.els?.[e.key]?.desc ?? ''} placeholder={elementDesc({ ...p, els: undefined }, e, p.desc?.trim() || where)} maxLength={200} onChange={(_, d) => setEl(e.key, { desc: d.value || undefined })} />
+          </div>
+        ))}
+      </>
+    )
+  }
   const partDetail = (sec: Section, p: TablePart) => (
     <div className={s.pbody}>
       {p.type === 'box' && boxSettings(sec, [p])}
@@ -1585,6 +1622,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )}
       {p.type === 'media' && mediaSettings(sec, p)}
       {p.type === 'empty' && <span className={s.hint}>{t('空きのマス。左のパーツを落とすと、そのパーツになります。メールでは何も出ない余白です。', 'An empty cell. Drop a part here to fill it. It shows as blank space in the email.')}</span>}
+      {p.type !== 'empty' && elementsBlock(sec, p)}
       {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}
       {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{p.id}</span>)}
       <div className={s.row2}>

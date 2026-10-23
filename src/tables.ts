@@ -532,6 +532,29 @@ const ALIGNS: TextAlign[] = ['left', 'center', 'right']
 const url = (v: unknown): string | undefined => (typeof v === 'string' && /^(https?:\/\/|\/)/i.test(v.trim()) ? v.trim().slice(0, 1000) : undefined)
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.slice(0, max) : undefined)
 
+/** 保存してよい要素の名前(種類ごと。箱は、出すものを外しても設定は残す。elements.ts の partElements と合わせる) */
+const ELEMENT_KEYS: Record<PartType, string[]> = {
+  box: ['image', 'name', 'price', 'badge', 'desc', 'button'],
+  button: ['label'],
+  text: ['text'],
+  media: ['image'],
+  empty: [],
+}
+
+/** 要素ごとの設定を読む(知らない要素・空の設定は外す) */
+function parseEls(type: PartType, raw: unknown): TablePart['els'] {
+  if (!raw || typeof raw !== 'object') return undefined
+  const out: NonNullable<TablePart['els']> = {}
+  for (const k of ELEMENT_KEYS[type]) {
+    const o = (raw as Record<string, unknown>)[k] as Record<string, unknown> | undefined
+    if (!o || typeof o !== 'object') continue
+    const desc = str(o.desc, 200)
+    const spec = { ...(desc ? { desc } : {}), ...(typeof o.click === 'boolean' ? { click: o.click } : {}) }
+    if (Object.keys(spec).length > 0) out[k] = spec
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** 保存されている部品を読む(知らない値は外す) */
 export function parsePart(raw: unknown): TablePart | null {
   const o = raw as Record<string, unknown> | null
@@ -540,6 +563,11 @@ export function parsePart(raw: unknown): TablePart | null {
   if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
   const type = o.type as PartType
   const part: TablePart = { id: o.id.slice(0, 40), type, c: o.c as number, r: o.r as number, w: o.w as number, h: o.h as number }
+  // 説明と要素ごとの設定(8.4)。空きのマスは持たない
+  const desc = type !== 'empty' ? str(o.desc, 200) : undefined
+  if (desc) part.desc = desc
+  const els = parseEls(type, o.els)
+  if (els) part.els = els
   if (type === 'box') {
     if (CELL_VIEWS.includes(o.view as CellView) && o.view !== 'card') part.view = o.view as CellView
     const note = str(o.aiNote, 300)

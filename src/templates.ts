@@ -66,6 +66,14 @@ export const BOX_FIELDS: BoxField[] = ['name', 'price', 'badge', 'desc', 'button
  * id は、動かしても・中身の設定を変えても・版が変わっても同じ。形が変わったら(結合・分割・種類の変更・複製)新しい ID にする
  * (コメント・成績を、条件の違う部品と混ぜないため。docs/TEMPLATE_OBJECTS.md の 2.2)
  */
+/** 要素ごとの設定(どれも省略は既定) */
+export interface ElementSpec {
+  /** 説明(空なら場所から自動。例「S1 箱 1 の写真」) */
+  desc?: string
+  /** 押せる(メールの中でリンクになる)か。省略は要素の既定(写真・名前・ボタンは押せる) */
+  click?: boolean
+}
+
 export interface TablePart {
   id: string
   type: PartType
@@ -73,6 +81,10 @@ export interface TablePart {
   r: number
   w: number
   h: number
+  /** 部品の説明(人が読むため。任意で、空なら場所から自動。分析・UTM の対応表・制作への指示に出す。T8 の 8.4) */
+  desc?: string
+  /** 要素ごとの設定(キーは要素の名前 image / name / price …。要素の ID は「部品 ID.要素の名前」。elements.ts) */
+  els?: Record<string, ElementSpec>
   /** 箱: 見せ方(省略は card) */
   view?: CellView
   /** 箱: AI に伝える一言(この枠に、どんな商品を置くか) */

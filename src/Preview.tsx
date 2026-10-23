@@ -422,7 +422,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     const sale = part.priceStyle === 'sale'
     const regular = sale && p?.regular_price && p.price !== undefined && p.regular_price > p.price ? p.regular_price : undefined
     const price = has('price') && (
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+      <div data-el={`${part.id}.price`} style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
         {regular !== undefined && <span style={{ fontSize: '0.72rem', color: SUB, textDecoration: 'line-through' }}>{yen(regular, market)}</span>}
         <span style={{ fontSize: sale ? '0.95rem' : '0.8rem', fontWeight: sale ? 800 : 700, color: sale || offer ? '#d32f2f' : INK }}>
           {part.priceStyle === 'from' ? t(`${yen(p?.price, market)}〜`, `From ${yen(p?.price, market)}`) : yen(p?.price, market)}
@@ -431,11 +431,11 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
     )
     const badgeText = part.badge?.trim() || 'NEW'
     const badge = has('badge') && (
-      <span style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4, color: '#fff', backgroundColor: /sale|限定|off/i.test(badgeText) || sale ? '#d32f2f' : INK }}>{badgeText}</span>
+      <span data-el={`${part.id}.badge`} style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontSize: '0.65rem', fontWeight: 700, letterSpacing: 1, padding: '2px 8px', borderRadius: 4, color: '#fff', backgroundColor: /sale|限定|off/i.test(badgeText) || sale ? '#d32f2f' : INK }}>{badgeText}</span>
     )
-    const name = has('name') && <div className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, color: INK }}>{p?.name}</div>
-    const desc = has('desc') && p?.description && <div style={{ fontSize: '0.75rem', color: SUB, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
-    const button = has('button') && cta
+    const name = has('name') && <div data-el={`${part.id}.name`} className={classes.noWrap} style={{ fontSize: '0.85rem', fontWeight: 600, color: INK }}>{p?.name}</div>
+    const desc = has('desc') && p?.description && <div data-el={`${part.id}.desc`} style={{ fontSize: '0.75rem', color: SUB, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
+    const button = has('button') && <div data-el={`${part.id}.button`}>{cta}</div>
     const text = (name || price || desc || button) && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         {name}
@@ -444,7 +444,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
         {button}
       </div>
     )
-    const img = (style: React.CSSProperties) => <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...style }} />
+    const img = (style: React.CSSProperties) => <img data-el={`${part.id}.image`} className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...style }} />
     // 文を写真の横に置く見せ方(特集・ストーリー)
     if (part.view === 'detail' || part.view === 'story') {
       const reverse = part.view === 'story' && j % 2 === 1
@@ -821,6 +821,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                   data-link-id={p.id}
                   data-anchor={`button:${p.id}`}
                   data-part={`button:${p.id}`}
+                  data-el={`${p.id}.label`}
                   className={classes.noWrap}
                   style={{
                     textAlign: align,
@@ -838,7 +839,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
           if (p.type === 'text') {
             // 文が空のときは、部品を選ぶ見せ方(シンプルな配信カード)でだけ、薄い印を出す(押して選べるように。メールには何も出さない)
             if (!p.text && pickMode) return <div style={{ fontSize: '0.75rem', color: '#bbb', minHeight: '1.6em', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{t('(テキスト)', '(Text)')}</div>
-            return <div style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
+            return <div data-el={`${p.id}.text`} style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
           }
           if (p.type === 'media') {
             // 画像・動画: 押すとリンク先へ(URL は配信ごと。ボタンと同じ目印で、リンクの設定と計測に乗る)。
@@ -849,6 +850,7 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
                 data-link-id={p.id}
                 data-anchor={`button:${p.id}`}
                 data-part={`image:${p.id}`}
+                data-el={`${p.id}.image`}
                 style={{ position: 'relative', aspectRatio: String(ratioValue(p.ratio ?? 'wide')), borderRadius: 8, overflow: 'hidden', backgroundColor: '#eef0f3', display: 'grid', placeItems: 'center', alignSelf: 'center' }}
               >
                 {p.src ? (
