@@ -170,6 +170,22 @@
     ["product_id", "products", {"onDelete": "CASCADE"}]
    ]
   },
+  "delivery_patterns": {
+   "_comment": "国ごとの配信の型(ST9)。曜日・時刻・チャネル・種類・テンプレートの決まった組。「まとめて作る」(W14)が、この型どおりに枠を作る。型は既定値で縛りではない。作るときに写すので、型を変えても、もう作った配信には効かない。テンプレートは id だけ持ち、作るときの最新の版を使う",
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["country", "text", {"index": true}],
+    ["weekday", "int"],
+    ["time", "text"],
+    ["channel", "text"],
+    ["theme_type", "text"],
+    ["layout_key", "text"],
+    ["sort_order", "int"],
+    ["note", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "product_policies": {
    "columns": [
     ["name", "text", {"required": true}],

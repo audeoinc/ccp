@@ -49,6 +49,7 @@ import {
   PaintBrushRegular,
   PeopleTeamRegular,
   SettingsRegular,
+  CalendarClockRegular,
   TableRegular,
 } from '@fluentui/react-icons'
 import { CopyRegular as CtxCopyRegular, DataBarVerticalRegular as CtxResultsRegular, OpenRegular as CtxOpenRegular, PaintBrushRegular as CtxProductionRegular } from '@fluentui/react-icons'
@@ -107,6 +108,7 @@ import { loadCustomTemplates } from './layoutTemplates'
 import { ErrorBoundary } from './ErrorBoundary'
 import { TemplateManager } from './TemplateManager'
 import { PolicyManager } from './PolicyManager'
+import { PatternManager } from './PatternManager'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
 import { PeopleManager } from './PeopleManager'
@@ -462,6 +464,8 @@ function App() {
   const [skuBusy, setSkuBusy] = useState(false)
   // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
   const [policyOpen, setPolicyOpen] = useState(false)
+  // 国ごとの配信の型(ST9)。⚙ →「国」から開く
+  const [patternOpen, setPatternOpen] = useState(false)
   // AI の案が、作り直しても must の決まりを破っていたとき(M5)。案は使えるが、人が確かめる
   const [policyWarning, setPolicyWarning] = useState<string | null>(null)
   useEffect(
@@ -1404,6 +1408,7 @@ function App() {
         }}
       />
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
+      <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
@@ -1526,6 +1531,10 @@ function App() {
                 {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}
                 <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
                   {t('方針・決まり(取り込み・一覧・直す)', 'Marketing policies (import, list, edit)')}
+                </MenuItem>
+                {/* 国ごとの配信の型(ST9): 曜日・時刻・チャネル・種類・テンプレートの組。「まとめて作る」が、この型どおりに枠を作る */}
+                <MenuItem icon={<CalendarClockRegular />} onClick={() => setPatternOpen(true)}>
+                  {t('配信の型(曜日ごとの決まった配信)', 'Delivery patterns (weekly)')}
                 </MenuItem>
               </MenuGroup>
               <MenuDivider />
