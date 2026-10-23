@@ -39,3 +39,44 @@ class ExtractTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OriginalSizeTest(unittest.TestCase):
+    """画像の URL の ?width= だけを外して、元の大きさで取る(2026-10-23)"""
+
+    def test_removes_width_only(self) -> None:
+        f = pp.original_size
+        self.assertEqual(f("https://shop/a.jpg?width=600"), "https://shop/a.jpg")
+        self.assertEqual(f("https://shop/a.jpg?v=12&width=600&crop=center"), "https://shop/a.jpg?v=12&crop=center")
+        self.assertEqual(f("https://shop/a.jpg?WIDTH=600&v=1"), "https://shop/a.jpg?v=1")
+        # ほかのクエリ・書き方(エンコード)・# の後ろは、そのまま
+        self.assertEqual(f("https://shop/a.jpg?name=a%20b&width=1#x"), "https://shop/a.jpg?name=a%20b#x")
+        # width がない URL・別の名前(w・height・widths)は、そのまま
+        for u in ("https://shop/a.jpg", "https://shop/a.jpg?w=600", "https://shop/a.jpg?height=400", "https://shop/a.jpg?widths=1", "/img/products/x.jpg"):
+            self.assertEqual(f(u), u)
+
+    def test_extract_strips_width_and_merges_sizes(self) -> None:
+        html = '<img src="/a.jpg?width=200"><img srcset="/a.jpg?width=400 400w, /a.jpg?width=1200 1200w"><img src="/b.jpg?v=3&width=300">'
+        got = [i["src"] for i in pp.extract(html, "https://shop/p/1")]
+        # 大きさ違いの同じ画像は、1 つにまとまる
+        self.assertEqual(got, ["https://shop/a.jpg", "https://shop/b.jpg?v=3"])
+
+
+class CollectScriptTest(unittest.TestCase):
+    """手元の PC で集めるスクリプト(scripts/collect-product-images.py)も、同じ外し方をする。
+    スクリプトは Workbench 版の ZIP に入らないので、ないときは飛ばす"""
+
+    def test_script_strips_width(self) -> None:
+        import importlib.util
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[2] / "scripts" / "collect-product-images.py"
+        if not path.is_file():
+            self.skipTest("スクリプトがない(Workbench 版の ZIP)")
+        spec = importlib.util.spec_from_file_location("collect_product_images", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        for u in ("https://shop/a.jpg?width=600", "https://shop/a.jpg?v=12&width=600&crop=center", "https://shop/a.jpg", "https://shop/a.jpg?w=600"):
+            self.assertEqual(mod.original_size(u), pp.original_size(u))
+        got = [i["src"] for i in mod.extract('<img src="/a.jpg?width=200"><img src="/a.jpg?width=800">', "https://shop/p/1")]
+        self.assertEqual(got, ["https://shop/a.jpg"])

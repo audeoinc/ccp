@@ -14,7 +14,8 @@ CSV の列(1 行目は列名):
   market         市場(あれば。JP など。なければ、同じ商品コードのすべての市場の商品につなぐ)
 
 ページの拾い方は、CCP の「商品ページから画像を選ぶ」(server/ccp/product_pages.py の extract)と同じ
-(<img> の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く)。
+(<img> の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く。
+画像の URL の大きさの指定 ?width= は外して、元の大きさで取る)。
 直すときは、両方を合わせる。
 
 Python の標準の機能だけで動く(追加のインストールは要らない)。
@@ -88,6 +89,20 @@ def largest(srcset: str) -> str:
     return best
 
 
+def original_size(url: str) -> str:
+    """画像の URL から、大きさの指定のクエリ width(大文字・小文字は問わない)だけを外して、元の大きさで取る(利用者の指示 2026-10-23)。
+    ほかのクエリは、書き方(エンコード)も含めてそのまま残す。width がなければ、URL はそのまま"""
+    base, sep, query = url.partition("?")
+    if not sep:
+        return url
+    query, hsep, frag = query.partition("#")
+    parts = [p for p in query.split("&") if p]
+    kept = [p for p in parts if p.split("=", 1)[0].lower() != "width"]
+    if len(kept) == len(parts):
+        return url
+    return base + ("?" + "&".join(kept) if kept else "") + (hsep + frag if hsep else "")
+
+
 def extract(html: str, base: str) -> list[dict]:
     p = ImageParser()
     try:
@@ -99,7 +114,8 @@ def extract(html: str, base: str) -> list[dict]:
         src = f["src"]
         if not src or src.startswith("data:"):
             continue
-        absolute = urljoin(base, src)
+        # 大きさの指定(?width=)は外して、元の大きさの画像を拾う(product_pages.py と同じ)
+        absolute = original_size(urljoin(base, src))
         if absolute in seen or NOISE.search(urlparse(absolute).path) or NOISE.search(f.get("alt") or ""):
             continue
         if f.get("width") is not None and f["width"] < 120:
@@ -177,7 +193,7 @@ def collect(row: dict, out: Path, args) -> dict:
     except Exception as e:  # 読めなかったページは、理由を残して次へ
         result["error"] = f"{type(e).__name__}: {e}"[:500]
         return result
-    main = row.get("main_image_url") or ""
+    main = original_size(row.get("main_image_url") or "")
     seen_hash: set[str] = set()
 
     def keep(body: bytes, itype: str, src: str, alt: str, is_main: bool) -> str:

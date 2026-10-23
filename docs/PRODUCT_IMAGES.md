@@ -50,6 +50,7 @@ python scripts/collect-product-images.py 商品.csv --limit 5
 
 - 途中で止めても、同じコマンドをもう一度流せば、済んだ商品を飛ばして続きから集めます(`product_images_out/results.jsonl` に記録)
 - 拾い方は、CCP の「商品ページから画像を選ぶ」と同じです(`<img>` の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く)
+- 画像の URL の大きさの指定 `?width=…`(大文字・小文字は問わない)は外して、元の大きさで取ります(2026-10-23)。ほかのクエリ(`w=`・`height=` なども)はそのまま残します
 - 最後に、画像と目録(`manifest.json`。商品・元の URL・メインかどうか・読めなかったページと理由)を 1 つの ZIP にまとめます
 
 ## 2. ZIP を Workbench に運ぶ

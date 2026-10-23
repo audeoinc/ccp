@@ -189,6 +189,20 @@ def _largest(srcset: str) -> str:
 NOISE = re.compile(r"(logo|icon|sprite|badge|banner|pixel|tracking|spacer|avatar|flag|payment|social)", re.I)
 
 
+def original_size(url: str) -> str:
+    """画像の URL から、大きさの指定のクエリ width(大文字・小文字は問わない)だけを外して、元の大きさで取る(利用者の指示 2026-10-23)。
+    ほかのクエリは、書き方(エンコード)も含めてそのまま残す。width がなければ、URL はそのまま"""
+    base, sep, query = url.partition("?")
+    if not sep:
+        return url
+    query, hsep, frag = query.partition("#")
+    parts = [p for p in query.split("&") if p]
+    kept = [p for p in parts if p.split("=", 1)[0].lower() != "width"]
+    if len(kept) == len(parts):
+        return url
+    return base + ("?" + "&".join(kept) if kept else "") + (hsep + frag if hsep else "")
+
+
 def extract(html: str, base: str) -> list[dict[str, str]]:
     p = ImageParser()
     try:
@@ -201,7 +215,8 @@ def extract(html: str, base: str) -> list[dict[str, str]]:
         src = f["src"]
         if not src or src.startswith("data:"):
             continue
-        absolute = urljoin(base, src)
+        # 大きさの指定(?width=)は外して、元の大きさの画像を拾う(同じ画像の大きさ違いも、1 つにまとまる)
+        absolute = original_size(urljoin(base, src))
         if absolute in seen or NOISE.search(urlparse(absolute).path) or NOISE.search(f.get("alt") or ""):
             continue
         if f.get("width") is not None and f["width"] < 120:
