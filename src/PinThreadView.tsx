@@ -6,7 +6,8 @@ import { Linkify } from './LinkText'
 import { locale, useT } from './i18n'
 
 const useStyles = makeStyles({
-  surface: { width: '320px', padding: '10px 12px', display: 'grid', rowGap: '8px' },
+  // 列は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように。minmax(0, 1fr))
+  surface: { width: '320px', boxSizing: 'border-box', padding: '10px 12px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '8px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   headText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   // 元の書き込みと返信を、上から読む(長くなったら、この中だけスクロール)
