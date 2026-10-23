@@ -114,6 +114,12 @@ const useStyles = makeStyles({
   shead: { textAlign: 'center', padding: '2px 0 6px', display: 'grid', rowGap: '2px' },
   sheadTitle: { fontSize: '12px', fontWeight: 700, letterSpacing: '2px' },
   sheadCopy: { fontSize: '10px', color: MAIL.sub },
+  // 表の幅に収める(狭いときは 2 段に折り返す。キャンバスの外にはみ出して、横のスクロールが出ないように)
+  bar: { justifySelf: 'start', alignSelf: 'start', maxWidth: '100%', flexWrap: 'wrap', rowGap: '2px', transform: 'translateY(calc(-100% - 4px))', zIndex: 4, display: 'flex', alignItems: 'center', columnGap: '2px', padding: '2px 4px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow8, border: `1px solid ${tokens.colorNeutralStroke2}`, pointerEvents: 'auto' },
+  barBtn: { fontSize: '11px', lineHeight: '18px', padding: '1px 6px', border: 'none', borderRadius: tokens.borderRadiusSmall, backgroundColor: 'transparent', color: tokens.colorNeutralForeground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover }, ':disabled': { color: tokens.colorNeutralForegroundDisabled, cursor: 'default', backgroundColor: 'transparent' } },
+  barSep: { width: '1px', height: '14px', backgroundColor: tokens.colorNeutralStroke2, margin: '0 2px' },
+  heroSec: { margin: '6px 10px 0', padding: '18px 0 4px', borderTop: `1px dashed ${MAIL.line}` },
+  heroTag: { position: 'absolute', top: '2px', left: 0, fontSize: '10px', color: tokens.colorNeutralForeground3 },
   first: { margin: `0 ${ADD}px 0 ${HEAD}px`, padding: '10px', border: `1px dashed ${tokens.colorNeutralStroke1}`, borderRadius: '4px', fontSize: '12px', color: tokens.colorNeutralForeground3, display: 'grid', rowGap: '6px', justifyItems: 'center' },
   firstHot: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   firstOpts: { display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' },
@@ -224,6 +230,9 @@ const useStyles = makeStyles({
 })
 
 export interface TableEditorArgs {
+  /** ヒーローのすぐ下の表(なければ、空の表として扱う。セクションの並びには入れない。T8 の 8.1) */
+  heroTable?: Section
+  setHeroTable: (sec: Section | undefined) => void
   /** 編集中か(編集していないときは、キー操作を受けない) */
   active: boolean
   sections: Section[]
@@ -240,7 +249,7 @@ export interface TableEditorArgs {
  * 表の編集。パーツの列・キャンバス・右のタブ(テンプレート / セクションと部品)を返す(並べ方とスプリッターは、呼ぶ側が決める)。
  * テンプレートのタブの中身は、呼ぶ側が作って rightPane に渡す
  */
-export function useTableEditor({ active, sections, setSections, hero, heroText, topBar, onSelectHero }: TableEditorArgs) {
+export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroText, topBar, onSelectHero }: TableEditorArgs) {
   const t = useT()
   const s = useStyles()
   const [sel, setSel] = useState<Sel>(null)
@@ -309,7 +318,10 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     </div>
   )
 
-  const secOf = (id?: string) => sections.find((x) => x.id === id)
+  // ヒーローの下の表(なければ空)。表の操作は、ほかのセクションと同じものを使う
+  const heroSec: Section = heroTable ?? { kind: 'table', id: T.HERO_TABLE_ID, cols: 1, rows: 0, parts: [], slots: 0, copy: false }
+  const isHero = (id?: string) => id === T.HERO_TABLE_ID
+  const secOf = (id?: string) => (isHero(id) ? heroSec : sections.find((x) => x.id === id))
   const selSec = sel ? secOf(sel.sec) : undefined
   const selRect = sel?.kind === 'cells' && selSec ? T.rectOf(selSec, sel) : null
   const selParts = sel?.kind === 'cells' && selSec ? T.partsIn(selSec, sel) : []
@@ -317,7 +329,17 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   const boxNo = new Map<string, number>()
   sections.forEach((sec) => T.boxesOf(sec).forEach((p) => boxNo.set(p.id, boxNo.size + 1)))
 
-  const replace = (id: string, next: Section) => setSections((list) => list.map((x) => (x.id === id ? next : x)))
+  const replace = (id: string, next: Section) => (isHero(id) ? setHeroTable(next) : setSections((list) => list.map((x) => (x.id === id ? next : x))))
+  /** ヒーローの下には、箱(商品)は置かない(商品の枠の順・セクションの番号を変えないため) */
+  const noBoxInHero = (secId: string | undefined, key: string): boolean => {
+    const preset = key.startsWith('row:') ? T.ROW_PRESETS.find((x) => x.id === key.slice(4)) : undefined
+    const hasBox = key === 'box' || !!preset?.parts.some(([type]) => type === 'box')
+    if (isHero(secId) && hasBox) {
+      setToast(t('ヒーローの下には、箱(商品)は置けません。ボタン・テキスト・画像を置けます', 'Boxes (products) can’t go under the hero. Use buttons, text or images'))
+      return true
+    }
+    return false
+  }
   /** 表の操作を行う(できなければ、理由を知らせる) */
   const run = (secId: string, op: (sec: Section) => T.TableOp) => {
     const sec = secOf(secId)
@@ -343,6 +365,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     setSel({ kind: 'section', sec: sec.id! })
   }
   const moveSection = (id: string, to: number) => {
+    if (isHero(id)) return
     setSections((list) => {
       const from = list.findIndex((x) => x.id === id)
       if (from < 0) return list
@@ -354,6 +377,11 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     setSel({ kind: 'section', sec: id })
   }
   const removeSection = (id: string) => {
+    if (isHero(id)) {
+      setHeroTable(undefined)
+      setSel(null)
+      return
+    }
     setSections((list) => list.filter((x) => x.id !== id))
     setSel(null)
     setToast(t('セクションを削除しました(Ctrl+Z で戻す)', 'Section removed (Ctrl+Z to undo)'))
@@ -406,7 +434,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
   }
   const placeType = (secId: string, id: string, type: PartType) => {
     const sec = secOf(secId)
-    if (!sec) return
+    if (!sec || noBoxInHero(secId, type)) return
     const old = sec.parts?.find((x) => x.id === id)
     replace(secId, T.setPartType(sec, id, type))
     if (old) selectCell(secId, old.c, old.r)
@@ -419,6 +447,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       return addSection(i >= 0 ? i + 1 : sections.length)
     }
     let sec = secId ? secOf(secId) : sel ? secOf(sel.sec) : sections[sections.length - 1]
+    if (noBoxInHero(sec?.id, key)) return
     let isNew = false
     if (!sec) {
       if (sections.length >= MAX_SECTIONS) return
@@ -440,7 +469,8 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       return
     }
     const next = res.sec
-    setSections((list) => (isNew ? [...list, next] : list.map((x) => (x.id === next.id ? next : x))))
+    if (isHero(next.id)) setHeroTable(next)
+    else setSections((list) => (isNew ? [...list, next] : list.map((x) => (x.id === next.id ? next : x))))
     if (res.sel) setSel({ kind: 'cells', sec: next.id!, ...res.sel })
   }
 
@@ -449,7 +479,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     if (tg.kind === 'gap') return addSection(tg.at)
     if (tg.kind === 'first') return addPart(key, tg.sec)
     const sec = secOf(tg.sec)
-    if (!sec) return
+    if (!sec || noBoxInHero(tg.sec, key)) return
     const preset = key.startsWith('row:') ? T.ROW_PRESETS.find((p) => p.id === key.slice(4)) : undefined
     const type = key as PartType
     const p = tg.kind === 'cell' ? sec.parts?.find((x) => x.id === tg.id) : undefined
@@ -583,7 +613,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
       label: T.isEvenRow(sec, r) ? t('均等に並べるのをやめる(列に合わせる)', 'Stop spreading evenly (align to columns)') : t('この行を均等に並べる(中身のある部品を同じ幅で)', 'Spread this row evenly (same width for each filled part)'),
       onClick: () => run(sec.id!, (x) => T.toggleEvenRow(x, r)),
     },
-    { label: t('この行から下を、新しいセクションに', 'Split into a new section from this row'), disabled: r === 0, onClick: () => splitAt(sec.id!, r) },
+    { label: t('この行から下を、新しいセクションに', 'Split into a new section from this row'), disabled: r === 0 || isHero(sec.id), onClick: () => splitAt(sec.id!, r) },
     { label: t('行を削除', 'Delete row'), onClick: () => run(sec.id!, (x) => T.deleteRow(x, r)) },
   ]
   const cellMenu = (sec: Section, ps: TablePart[], rc: T.Rect): MenuItem[] => [
@@ -1047,6 +1077,54 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
     </div>
   )
 
+  /**
+   * 操作の帯(T8 の 8.2): 選んだマスのすぐ上に、よく使う操作を並べる(右クリックを知らなくても操作できるように。
+   * Google ドキュメント・Figma の、選ぶと出る道具の帯と同じ考え)。右クリックとキーの操作は、そのまま
+   */
+  const actionBar = (sec: Section, rc: T.Rect) => {
+    const ps = selParts
+    const boxes = ps.filter((p) => p.type === 'box')
+    const one = rc.h === 1
+    const btn = (label: string, onClick: () => void, title?: string, disabled = false) => (
+      <button
+        type="button"
+        className={s.barBtn}
+        disabled={disabled}
+        title={title ?? label}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick()
+        }}
+      >
+        {label}
+      </button>
+    )
+    const cs: T.CellSel = { a: [rc.c, rc.r], b: [rc.c + rc.w - 1, rc.r + rc.h - 1] }
+    return (
+      <div className={s.bar} style={{ gridColumn: `2 / span ${sec.cols ?? 1}`, gridRow: rc.r + 2 }}>
+        {btn(t('結合', 'Merge'), () => run(sec.id!, (x) => T.mergeCells(x, cs)), t('結合(Ctrl+M)', 'Merge (Ctrl+M)'), ps.length < 2)}
+        {ps.some((p) => p.w * p.h > 1) && btn(t('分割', 'Split'), () => run(sec.id!, (x) => T.splitCells(x, ps.map((p) => p.id))))}
+        {btn(t('空きに', 'Empty'), () => replace(sec.id!, T.clearCells(sec, ps.map((p) => p.id))), t('空きにする(Delete)', 'Make empty (Delete)'), !ps.some((p) => p.type !== 'empty'))}
+        <span className={s.barSep} />
+        {btn(t('コピー', 'Copy'), () => copy(sec, cs), 'Ctrl+C', !ps.some((p) => p.type !== 'empty'))}
+        {btn(t('貼り付け', 'Paste'), () => paste(sec.id!, rc.c, rc.r), t('空きのマスに貼る(Ctrl+V)', 'Paste into empty cells (Ctrl+V)'), !clip)}
+        <span className={s.barSep} />
+        {btn(t('↑行', '↑Row'), () => run(sec.id!, (x) => T.insertRow(x, rc.r)), t('上に行を挿入', 'Insert row above'))}
+        {btn(t('↓行', '↓Row'), () => run(sec.id!, (x) => T.insertRow(x, rc.r + rc.h)), t('下に行を挿入', 'Insert row below'))}
+        {btn(t('←列', '←Col'), () => run(sec.id!, (x) => T.insertCol(x, rc.c)), t('左に列を挿入', 'Insert column left'))}
+        {btn(t('→列', '→Col'), () => run(sec.id!, (x) => T.insertCol(x, rc.c + rc.w)), t('右に列を挿入', 'Insert column right'))}
+        {one && btn(T.isEvenRow(sec, rc.r) ? t('均等をやめる', 'Unspread') : t('均等', 'Spread'), () => run(sec.id!, (x) => T.toggleEvenRow(x, rc.r)), t('この行を均等に並べる(中身のある部品を同じ幅で)', 'Spread this row evenly'))}
+        {(boxes.length > 0 || (ps.length === 1 && ps[0].type === 'media')) && (
+          <>
+            <span className={s.barSep} />
+            {btn('⚙', () => setQuickId((boxes[0] ?? ps[0]).id), boxes.length > 1 ? t('選んだ箱の見せ方をまとめて直す', 'Edit the look of the selected boxes') : t('見せ方', 'Display settings'))}
+          </>
+        )}
+      </div>
+    )
+  }
+
   const table = (sec: Section) => {
     const cols = sec.cols ?? 1
     const rows = sec.rows ?? 0
@@ -1187,7 +1265,37 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
         >
           {t('+ 行を足す', '+ Add a row')}
         </div>
+        {mine && actionBar(sec, mine)}
         {mine && !(mine.h === 1 && even.includes(mine.r)) && <div className={s.selRect} style={{ gridColumn: `${mine.c + 2} / span ${mine.w}`, gridRow: `${mine.r + 2} / span ${mine.h}` }} />}
+      </div>
+    )
+  }
+
+  /** 空の表(最初の行がまだない)。パーツを落とすか、「＋ 置く」で選ぶと、その部品で最初の行ができる(T8 の 8.3) */
+  const firstBlock = (sec: Section) => {
+    const hero = isHero(sec.id)
+    const items: MenuItem[] = [
+      { header: t('最初の行に置く', 'Place in the first row') },
+      ...(hero ? [] : [{ label: t('箱(商品 1 点)', 'Box (1 product)'), onClick: () => addPart('box', sec.id) }]),
+      { label: t('ボタン', 'Button'), onClick: () => addPart('button', sec.id) },
+      { label: t('テキスト', 'Text'), onClick: () => addPart('text', sec.id) },
+      { label: t('画像・動画', 'Image / video'), onClick: () => addPart('media', sec.id) },
+      { header: t('よく使う行', 'Common rows') },
+      ...T.ROW_PRESETS.filter((x) => !hero || !x.parts.some(([type]) => type === 'box')).map((x) => ({ label: x.label(), onClick: () => addPart(`row:${x.id}`, sec.id) })),
+    ]
+    return (
+      <div data-first={sec.id} className={mergeClasses(s.first, drag?.target?.kind === 'first' && drag.target.sec === sec.id && s.firstHot)}>
+        {hero ? t('ボタン・テキスト・画像を置けます(左のパーツを落とすか、＋ 置く)', 'Add buttons, text or images (drop a part, or + Place)') : t('左のパーツを落とすか、＋ 置く で、最初の行を作ります', 'Drop a part from the left, or use + Place, to create the first row')}
+        <Button
+          size="small"
+          appearance="outline"
+          onClick={(e) => {
+            const b = e.currentTarget.getBoundingClientRect()
+            openMenu(b.left, b.bottom + 2, items)
+          }}
+        >
+          {t('＋ 置く', '+ Place')}
+        </Button>
       </div>
     )
   }
@@ -1210,6 +1318,16 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
           title={t('押すと、テンプレートのタブで見た目を直せます', 'Click to edit the look in the Template tab')}>
           {t('メイン画像', 'Main image')}
           {heroText === 'below' ? t('(ヘッドラインは写真の下)', ' (headline below)') : heroText === 'overlay' ? t('(ヘッドラインを大きく重ねる)', ' (large headline overlay)') : t('(ヘッドラインを帯で重ねる)', ' (headline band)')}
+        </div>
+        <div
+          data-sec={T.HERO_TABLE_ID}
+          className={mergeClasses(s.sec, s.heroSec, sel?.kind === 'section' && isHero(sel.sec) && s.secSel)}
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setSel({ kind: 'section', sec: T.HERO_TABLE_ID })
+          }}
+        >
+          <span className={s.heroTag}>{t('ヒーローの下(ボタン・テキスト・画像。セクションの番号には数えない)', 'Under the hero (buttons, text, images; not counted as a section)')}</span>
+          {(heroSec.rows ?? 0) === 0 ? firstBlock(heroSec) : table(heroSec)}
         </div>
         {gap(0)}
         {sections.map((sec, si) => {
@@ -1239,20 +1357,7 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                     {sec.copy !== false && <span className={s.sheadCopy}>{t('AI が配信ごとに書くコピー', 'Copy written by AI per delivery')}</span>}
                   </div>
                 )}
-                {(sec.rows ?? 0) === 0 ? (
-                  <div data-first={sec.id} className={mergeClasses(s.first, drag?.target?.kind === 'first' && drag.target.sec === sec.id && s.firstHot)}>
-                    {t('最初の行を作る(列の数を選ぶ。左のパーツを落としても作れる)', 'Create the first row (pick the number of columns, or drop a part here)')}
-                    <div className={s.firstOpts}>
-                      {[1, 2, 3, 4].map((n) => (
-                        <Button key={n} size="small" appearance="outline" onClick={() => run(sec.id!, (x) => T.firstRow(x, n))}>
-                          {t(`${n} 列`, `${n} col`)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  table(sec)
-                )}
+                {(sec.rows ?? 0) === 0 ? firstBlock(sec) : table(sec)}
               </div>
               {gap(si + 1)}
             </Fragment>
@@ -1536,7 +1641,8 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
             {selSec && selParts.filter((p) => p.type === 'box').length > 1 && boxSettings(selSec, selParts.filter((p) => p.type === 'box').sort((x, y) => x.r - y.r || x.c - y.c))}
           </div>
         )}
-        {sections.map((sec, si) => {
+        {[...((heroSec.rows ?? 0) > 0 ? [heroSec] : []), ...sections].map((sec) => {
+          const si = sections.indexOf(sec)
           const cur = sel?.sec === sec.id
           const open = isOpen(sec.id!, cur)
           const n = (type: PartType) => (sec.parts ?? []).filter((p) => p.type === type).length
@@ -1561,13 +1667,13 @@ export function useTableEditor({ active, sections, setSections, hero, heroText, 
                 >
                   {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
                 </span>
-                <span className={s.sbadge}>S{si + 1}</span>
-                <span className={s.sname}>{sec.name?.trim() || t('(名前なし)', '(no name)')}</span>
+                <span className={s.sbadge}>{si < 0 ? 'H' : `S${si + 1}`}</span>
+                <span className={s.sname}>{si < 0 ? t('ヒーローの下', 'Under the hero') : sec.name?.trim() || t('(名前なし)', '(no name)')}</span>
                 <span className={s.smeta}>{(sec.rows ?? 0) > 0 ? t(`${sec.cols}×${sec.rows} · 商品 ${n('box')}`, `${sec.cols}×${sec.rows} · ${n('box')} items`) : t('空', 'Empty')}</span>
               </div>
               {open && (
                 <div className={s.sbody}>
-                  {sel?.kind === 'section' && cur && secDetail(sec, si)}
+                  {sel?.kind === 'section' && cur && si >= 0 && secDetail(sec, si)}
                   {[...(sec.parts ?? [])]
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {

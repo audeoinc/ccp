@@ -322,6 +322,8 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
         {layout.topBar && <div style={{ height: px(4), background: '#555' }} />}
         {hero}
         {pillsAt(0)}
+        {/* ヒーローのすぐ下の表(セクションの番号には数えない。番号 -2 で、セクションの後のボタンを重ねない) */}
+        {layout.heroTable && (layout.heroTable.parts ?? []).some((p) => p.type !== 'empty') && section(layout.heroTable, -2)}
         {free ? (
           // 見出し + 2 列のまとまりが続き、いくつでも足せる(点線の枠)ことを描く
           <>

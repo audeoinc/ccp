@@ -32,7 +32,7 @@ import {
 } from './templates'
 import { tr } from './i18n'
 import { CELL_VIEWS, MAX_CELL_COLS, MAX_CELL_ROWS, cellRows, normalizeCells, type Cell, type CellView } from './cells'
-import { SECTION_BG, normalizeTable, parsePart, storedPart } from './tables'
+import { HERO_TABLE_ID, SECTION_BG, normalizeTable, parsePart, storedPart } from './tables'
 
 /** 保存されたマス目の枠を読む(数でないもの・欠けたものは外す。形は toStored で整える) */
 function parseCells(v: unknown): Cell[] {
@@ -164,7 +164,7 @@ function parseButtons(raw: unknown): ButtonSpec[] {
 }
 
 /** 保存されている JSON から、ヒーローの見せ方と、セクションの一覧を読む(壊れていても、読める分だけ) */
-function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'> & { channel?: TemplateChannel; push?: PushSpec } {
+function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'> & { channel?: TemplateChannel; push?: PushSpec } {
   const empty = { sections: [] }
   if (!text) return empty
   try {
@@ -176,19 +176,17 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
     // 並びの順に読む。ボタンの部品の位置は、それまでに読んだセクションの数で表す
     const sections: Section[] = []
     const buttonBlocks: ButtonBlock[] = []
+    let heroTable: Section | undefined
     for (const r of raw) {
       const o = r as { kind?: string; slots?: number; columns?: number; flip?: boolean; categoryHeading?: boolean; copy?: boolean; buttons?: unknown; cols?: number; cells?: unknown; view?: string; id?: unknown; name?: unknown; aiNote?: unknown; rows?: unknown; parts?: unknown; evenRows?: unknown; mobile?: unknown; bg?: unknown; space?: unknown; divider?: unknown }
       if (o?.kind === 'hero' || o?.kind === 'app') continue
-      if (o?.kind === 'table') {
-        // 表: 箱がなくても(ボタンだけのセクションも)読む。埋めた空きの ID は、位置から決める(読むたびに同じ ID に)
-        if (sections.length >= MAX_SECTIONS) continue
-        const si = sections.length
+      // 表(と、ヒーローの下の表)を読む。箱がなくても(ボタンだけの表も)読む。埋めた空きの ID は、位置から決める(読むたびに同じ ID に)
+      const readTable = (si: number): Section => {
         const parts = Array.isArray(o.parts) ? o.parts.map(parsePart).filter((x) => x !== null) : []
-        sections.push(
-          normalizeTable(
+        return normalizeTable(
             {
               kind: 'table',
-              id: typeof o.id === 'string' && o.id ? o.id.slice(0, 40) : `sec_${si + 1}`,
+              id: typeof o.id === 'string' && o.id ? o.id.slice(0, 40) : si < 0 ? HERO_TABLE_ID : `sec_${si + 1}`,
               ...(typeof o.name === 'string' && o.name.trim() ? { name: o.name.slice(0, 40) } : {}),
               ...(typeof o.aiNote === 'string' && o.aiNote.trim() ? { aiNote: o.aiNote.slice(0, 300) } : {}),
               cols: Number(o.cols),
@@ -203,9 +201,16 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
               ...(o.categoryHeading ? { categoryHeading: true } : {}),
               ...(o.copy === false ? { copy: false } : {}),
             },
-            (c, r) => `emp_${si + 1}_${c + 1}_${r + 1}`,
-          ),
-        )
+            (c, r) => `emp_${si < 0 ? 'hero' : si + 1}_${c + 1}_${r + 1}`,
+          )
+      }
+      if (o?.kind === 'heroTable') {
+        heroTable = { ...readTable(-1), id: HERO_TABLE_ID, categoryHeading: undefined, copy: false, slots: 0 }
+        continue
+      }
+      if (o?.kind === 'table') {
+        if (sections.length >= MAX_SECTIONS) continue
+        sections.push(readTable(sections.length))
         continue
       }
       if (o?.kind === 'buttons') {
@@ -238,6 +243,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
       heroButtons: meta?.buttons === 1 || meta?.buttons === 2 ? meta.buttons : undefined,
       topBar: meta?.topBar ? true : undefined,
       heroLink: meta && meta.link !== 'campaign' && LINK_KINDS.includes(meta.link as LinkKind) ? meta.link : undefined,
+      ...(heroTable ? { heroTable } : {}),
     }
   } catch {
     return empty
@@ -248,7 +254,7 @@ function parseLayout(text?: string): Pick<TemplateLayout, 'heroText' | 'heroButt
  * セクションの JSON を作る。ボタンの部品は、置く位置(at)に挟む。
  * ヒーローの見せ方が既定(帯・ボタンなし・お知らせ帯なし・配信のページ)で、ボタンの部品もないときは、以前と同じ形(セクションの配列だけ)
  */
-function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'> & { push?: PushSpec }): string {
+function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'> & { push?: PushSpec }): string {
   const meta: HeroMeta = {
     kind: 'hero',
     ...(layout.heroText && layout.heroText !== 'band' ? { text: layout.heroText } : {}),
@@ -259,12 +265,13 @@ function stringifyLayout(layout: Pick<TemplateLayout, 'heroText' | 'heroButtons'
   const blocks = (layout.buttonBlocks ?? []).filter((b) => b.buttons.length > 0).slice(0, MAX_BUTTON_BLOCKS)
   const buttonsAt = (at: number): StoredButtons[] =>
     blocks.filter((b) => Math.max(0, Math.min(b.at, layout.sections.length)) === at).map((b) => ({ kind: 'buttons', buttons: b.buttons.slice(0, MAX_BUTTONS_PER_BLOCK).map(toStoredButton) }))
-  const parts = [...buttonsAt(0), ...layout.sections.flatMap((sec, i) => [toStored(sec), ...buttonsAt(i + 1)])]
+  const hero = layout.heroTable && (layout.heroTable.parts ?? []).some((p) => p.type !== 'empty') ? [{ ...toStored({ ...layout.heroTable, id: HERO_TABLE_ID }), kind: 'heroTable' as SectionKind, slots: 0 }] : []
+  const parts = [...hero, ...buttonsAt(0), ...layout.sections.flatMap((sec, i) => [toStored(sec), ...buttonsAt(i + 1)])]
   const app: AppMeta[] = layout.push ? [{ kind: 'app', push: { image: layout.push.image, buttons: layout.push.buttons.map((b) => b.trim()).filter(Boolean).slice(0, 2) } }] : []
   return JSON.stringify(Object.keys(meta).length > 1 || app.length ? [...app, ...(Object.keys(meta).length > 1 ? [meta] : []), ...parts] : parts)
 }
 
-export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'buttonBlocks'> {
+export interface TemplateInput extends Pick<TemplateLayout, 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'buttonBlocks' | 'heroTable'> {
   id?: string
   name: string
   description: string
@@ -326,6 +333,7 @@ export const inputOf = (tpl: EmailTemplate): TemplateInput => ({
   heroLink: tpl.heroLink,
   sections: tpl.sections,
   buttonBlocks: tpl.buttonBlocks,
+  heroTable: tpl.heroTable,
   push: tpl.push,
 })
 

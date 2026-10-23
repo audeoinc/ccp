@@ -274,6 +274,11 @@ export interface EmailTemplate {
   /** メイン画像のリンク先の種類(省略は campaign) */
   heroLink?: LinkKind
   sections: Section[]
+  /**
+   * ヒーローのすぐ下の表(T8 の 8.1・8.6。ID は sec_hero)。ボタン・テキスト・画像を置く(箱は置かない)。
+   * セクションの並び(sections)には入れない: 配信カードの見出し・コピーはセクションの番号で持つので、番号をずらさないため
+   */
+  heroTable?: Section
   /** 独立したボタンの部品(セクションとは別に持つ。商品の枠の位置の計算に関わらないように) */
   buttonBlocks?: ButtonBlock[]
   /** 標準のテンプレート(コードに持つもの。編集すると、上書きの行で置き換わる) */
@@ -295,7 +300,7 @@ export interface EmailTemplate {
 }
 
 /** 構成の見た目に関わる部分(見取り図、プレビュー、編集中の内容で共通に使う) */
-export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks'>
+export type TemplateLayout = Pick<EmailTemplate, 'hero' | 'heroText' | 'heroButtons' | 'topBar' | 'heroLink' | 'sections' | 'buttonBlocks' | 'heroTable'>
 
 // ---- 標準のテンプレート ----
 
@@ -567,7 +572,7 @@ const changed = () => {
 export function setCustomTemplates(list: ({ id: string; overrides?: string } & Omit<EmailTemplate, 'builtin'>)[]) {
   custom = Object.fromEntries(list.filter((x) => !x.overrides || !BUILTIN[x.overrides]).map((x) => [x.id, { ...x, rowId: x.id, builtin: false, version: x.version ?? 1 }]))
   // 使わない(無効)にしただけの上書きの行は、中身が標準と同じ。中身が違うときだけ「編集済み」にする
-  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null])
+  const shape = (x: Partial<EmailTemplate>) => JSON.stringify([x.label, x.description, x.hero, x.heroText ?? 'band', !!x.topBar, x.heroLink ?? 'campaign', x.sections, x.buttonBlocks ?? [], x.push ?? null, x.heroTable ?? null])
   overrides = Object.fromEntries(
     list.filter((x) => x.overrides && BUILTIN[x.overrides]).map(({ id, overrides: o, ...rest }) => [o!, { ...rest, rowId: id, builtin: true, edited: shape(rest) !== shape(BUILTIN[o!]), version: rest.version ?? 0 }]),
   )
@@ -661,6 +666,7 @@ export function templateOptions(channel?: TemplateChannel, includeHidden = false
       heroLink: tpl.heroLink,
       sections: tpl.sections,
       buttonBlocks: tpl.buttonBlocks,
+      heroTable: tpl.heroTable,
     }
   })
 }

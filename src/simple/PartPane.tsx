@@ -557,6 +557,24 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           </>
         )
       }
+      case 'image': {
+        // テンプレートの表の画像・動画(T8)。画像そのものはテンプレートで決まる(配信ごとの差し替えは、これから。T8 段階 6)。リンク先は、ボタンと同じく配信ごと
+        const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
+        return (
+          <>
+            <span className={s.caption}>{t('画像はテンプレートで決まっています(配信ごとの差し替えは、これからです)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (swapping per delivery is coming). The link on click can be set for this delivery.')}</span>
+            {slot && <Text size={200}>{slot.label}</Text>}
+            {e.channel === 'email' && (
+              <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
+                <Input size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
+              </Field>
+            )}
+          </>
+        )
+      }
+      case 'text':
+        // テンプレートの表のテキスト(T8)。いまはテンプレートの文のまま(配信ごとの書き換えは、これから。T8 段階 6)
+        return <span className={s.caption}>{t('この文はテンプレートで決まっています(テンプレートの管理で変えます)。配信ごとの書き換えは、これからです。', 'This text comes from the template (change it in Manage templates). Rewriting per delivery is coming.')}</span>
       case 'template':
         return <TemplatePicker editor={e} />
       case 'overview':
@@ -580,6 +598,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'product': return t('商品', 'Product')
       case 'slot': return t('空いた枠', 'Empty slot')
       case 'button': return t('ボタン', 'Button')
+      case 'image': return t('画像', 'Image')
+      case 'text': return t('テキスト', 'Text')
       case 'template': return t('テンプレート', 'Template')
       case 'overview':
       case 'meta': return t('配信の情報', 'Delivery info')

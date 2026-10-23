@@ -454,21 +454,50 @@ function appendButtons(sec: Section, buttons: ButtonSpec[]): Section {
  * 独立したボタンの部品は、その前のセクションの表の下に、ボタンの行として足す。ヒーローの直後のボタンは、いちばん上のボタンだけのセクションにする
  */
 export function toTableLayout(layout: TemplateLayout): TemplateLayout {
-  const blocks = placedButtons(layout)
-  const n = layout.sections.length
+  // 2026-10-22〜23 の版は、ヒーローの直後のボタンを、いちばん上の「ボタンだけのセクション」(sec_0)として持っていた。
+  // セクションの番号がずれるので、編集で開いたときに、ヒーローの下の表へ移す(保存済みの版そのものは変えない)
+  const legacyHead = layout.sections[0]?.kind === 'table' && layout.sections[0].id === 'sec_0' && isHeadOnly(layout.sections[0])
+  const body = legacyHead ? layout.sections.slice(1) : layout.sections
+  const blocks = placedButtons({ ...layout, sections: body })
+  const n = body.length
   const at = (i: number) => blocks.filter((b) => Math.max(0, Math.min(b.at, n)) === i).flatMap((b) => [b.buttons])
-  const sections = layout.sections.map((sec, i) => at(i + 1).reduce(appendButtons, toTableSection({ ...sec, buttons: undefined }, i)))
+  const sections = body.map((sec, i) => at(i + 1).reduce(appendButtons, toTableSection({ ...sec, buttons: undefined }, i)))
+  // ヒーローの下の表: すでにあればそれ、なければ以前の形のヒーローの直後のボタン(と、移した sec_0)から作る
   const top = at(0)
-  if (top.length > 0) {
-    const head = top.reduce(appendButtons, { kind: 'table', id: 'sec_0', cols: Math.max(...top.map((b) => b.length)), rows: 0, parts: [], slots: 0, copy: false } as Section)
-    sections.unshift(head)
-  }
-  return { hero: layout.hero, heroText: layout.heroText, topBar: layout.topBar, heroLink: layout.heroLink, sections }
+  let heroTable = layout.heroTable ? normalizeTable({ ...layout.heroTable, id: HERO_TABLE_ID }) : undefined
+  if (!heroTable && legacyHead) heroTable = normalizeTable({ ...layout.sections[0], id: HERO_TABLE_ID, categoryHeading: undefined, copy: false })
+  if (!heroTable && top.length > 0) heroTable = top.reduce(appendButtons, { kind: 'table', id: HERO_TABLE_ID, cols: Math.max(...top.map((b) => b.length)), rows: 0, parts: [], slots: 0, copy: false } as Section)
+  return { hero: layout.hero, heroText: layout.heroText, topBar: layout.topBar, heroLink: layout.heroLink, sections, ...(heroTable ? { heroTable } : {}) }
+}
+
+/** ヒーローの下の表の ID */
+export const HERO_TABLE_ID = 'sec_hero'
+
+/** 箱・見出し・コピーのない、ボタンなどだけの表か(以前の sec_0 を見分ける) */
+const isHeadOnly = (sec: Section) => !sec.categoryHeading && sec.copy === false && partsOf(sec).every((p) => p.type !== 'box')
+
+/** テンプレートのセクションの ID の並び(配信カードの見出し・コピーの番号を、版をまたいで読み替えるため)。以前の種類は、表に直したときの ID(sec_番号) */
+export const sectionIdsOf = (layout: TemplateLayout): string[] => layout.sections.map((sec, i) => (sec.kind === 'table' && sec.id ? sec.id : `sec_${i + 1}`))
+
+/**
+ * 同じテンプレートの版を替えたとき、番号で持っている文(セクションの見出し・コピー)を、セクションの ID で読み替える。
+ * 2026-10-22〜23 の版の、いちばん上のボタンだけのセクション(sec_0)の分のずれも、これで戻る。ID が 1 つも重ならなければ、そのまま
+ */
+export function remapSectionTexts(from: TemplateLayout, to: TemplateLayout, texts: string[]): string[] {
+  const a = sectionIdsOf(from)
+  const b = sectionIdsOf(to)
+  if (!a.some((id) => b.includes(id))) return texts
+  return b.map((id) => {
+    const i = a.indexOf(id)
+    return i >= 0 ? (texts[i] ?? '') : ''
+  })
 }
 
 /** 表の中のボタンを、セクションの後のボタンとして返す(リンク先の一覧で、以前のボタンと同じに扱う) */
 export function tableButtonBlocks(layout: TemplateLayout): ButtonBlock[] {
-  return layout.sections.flatMap((sec, i) => {
+  // ヒーローの下の表は、ヒーローの直後(at 0)。そのあと、セクションの順
+  const list: [Section, number][] = [...(layout.heroTable ? [[layout.heroTable, 0] as [Section, number]] : []), ...layout.sections.map((sec, i): [Section, number] => [sec, i + 1])]
+  return list.flatMap(([sec, at]) => {
     // 画像・動画も、押して飛ぶ先を配信ごとに決めるので、ボタンと同じ一覧に入れる(名前は代わりの文)
     const buttons = partsOf(sec)
       .filter((p) => p.type === 'button' || p.type === 'media')
@@ -479,7 +508,7 @@ export function tableButtonBlocks(layout: TemplateLayout): ButtonBlock[] {
         ...(p.style === 'fill' || p.style === 'outline' ? { style: p.style } : {}),
         ...(p.link ? { link: p.link } : {}),
       }))
-    return isTable(sec) && buttons.length > 0 ? [{ at: i + 1, buttons }] : []
+    return isTable(sec) && buttons.length > 0 ? [{ at, buttons }] : []
   })
 }
 

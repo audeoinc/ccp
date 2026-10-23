@@ -40,7 +40,8 @@ import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, splitTemplateKey, templateKeyOfCard } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, getTemplate, splitTemplateKey, templateKeyOfCard } from './templates'
+import { remapSectionTexts } from './tables'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
@@ -966,6 +967,22 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // テンプレートを変えると、セクションの構成が変わるので、候補と商品選定の案は破棄する
   const changeTemplate = (id: EmailTemplateId) => {
     if (id === template) return
+    // 同じテンプレートの版を替えるときは、番号で持っている見出し・コピーを、セクションの ID で読み替える
+    // (セクションの並びが版で違っても、文が別のセクションへずれないように。T8 の 8.1。AB テストのほかの案の文も同じ)
+    if (baseTemplateId(id) === baseTemplateId(template)) {
+      const from = getTemplate(template)
+      const to = getTemplate(id)
+      setSectionTitles((prev) => remapSectionTexts(from, to, prev))
+      setSectionCopies((prev) => remapSectionTexts(from, to, prev))
+      setStash((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, v]) => [
+            k,
+            v?.texts ? { ...v, texts: { ...v.texts, sectionTitles: remapSectionTexts(from, to, v.texts.sectionTitles), sectionCopies: remapSectionTexts(from, to, v.texts.sectionCopies) } } : v,
+          ]),
+        ) as Partial<Record<VariantKey, VariantData>>,
+      )
+    }
     setTemplate(id)
     setCandidates([])
     drafts.discardProposals()

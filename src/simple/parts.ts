@@ -19,6 +19,9 @@ export type PartRef =
   // 空いた枠。index は、商品の並び全体の中の位置(そこへ入れると、その位置の商品になる)
   | { kind: 'slot'; index: number }
   | { kind: 'button'; id: string }
+  // テンプレートの表の画像・動画と、テキスト(T8。id は部品 ID)
+  | { kind: 'image'; id: string }
+  | { kind: 'text'; id: string }
   | { kind: 'template' }
   | { kind: 'overview'; field?: string }
   | { kind: 'meta'; field: string }
@@ -35,6 +38,10 @@ export function partKey(p: PartRef): string {
       return `product:${p.itemKey}`
     case 'button':
       return `button:${p.id}`
+    case 'image':
+      return `image:${p.id}`
+    case 'text':
+      return `text:${p.id}`
     case 'overview':
       return p.field ? `overview:${p.field}` : 'overview'
     case 'meta':
@@ -61,6 +68,8 @@ export function parsePart(v: string | null | undefined): PartRef | null {
   if (head === 'slot' && Number.isInteger(n)) return { kind: 'slot', index: n }
   if (head === 'product' && rest) return { kind: 'product', itemKey: rest }
   if (head === 'button' && rest) return { kind: 'button', id: rest }
+  if (head === 'image' && rest) return { kind: 'image', id: rest }
+  if (head === 'text' && rest) return { kind: 'text', id: rest }
   if (head === 'overview') return { kind: 'overview', field: rest || undefined }
   if (head === 'meta' && rest) return { kind: 'meta', field: rest }
   return null
@@ -132,6 +141,7 @@ export function anchorOfPart(p: PartRef | null, productIdOf: (itemKey: string) =
     case 'sectionCopy':
       return { anchor: `section:${p.index}` }
     case 'button':
+    case 'image':
       return { anchor: `button:${p.id}` }
     case 'product': {
       const productId = productIdOf(p.itemKey)
