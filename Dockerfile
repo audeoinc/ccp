@@ -3,7 +3,7 @@
 #   普段は npm run deploy:gcp(cloudbuild.yaml の kaniko で、層をキャッシュしてビルドする。手順は docs/GCP.md)
 # 層のキャッシュが効くように、変わりにくいもの(依存の一覧 → 依存の導入)を先に、変わりやすいもの(ソース)を後に置く。
 
-FROM node:24-slim AS web
+FROM node:26-slim AS web
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
