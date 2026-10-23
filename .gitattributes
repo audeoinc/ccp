@@ -1,2 +1,6 @@
+# 改行は、すべて LF にそろえる(2026-10-23、利用者の指示)。Windows で取り出しても、保存しても、Git に入るのは LF。
+# 画像などのバイナリは、Git が中身から見分けて触らない(text=auto)。
+* text=auto eol=lf
+
 # シェルスクリプトは、Linux(Workbench)で動かすので、改行は LF のまま(Windows で取り出しても CRLF にしない)
 *.sh text eol=lf
