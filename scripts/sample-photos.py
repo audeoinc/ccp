@@ -38,7 +38,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = Path(__file__).with_suffix(".json")
 OUT = ROOT / "import" / "sample-photos"
-MODEL = "gemini-3-pro-image"
+MODEL = "gemini-3-pro-image"  # --model で替えられる(gemini-2.5-flash-image は安く速いが、質は下がる)
 TEXT_MODEL = "gemini-3.5-flash"
 MAX_SIDE = 1200
 PAUSE = 6  # 1 枚ごとに待つ秒(回数の上限に当たりにくくする)
@@ -102,6 +102,7 @@ def generate(spec: dict, only: list[str], redo: list[int]) -> None:
                 prompt = f"{style['reference']} {prompt}"
             for attempt in range(6):
                 try:
+                    t0 = time.time()
                     data = ask(project, token, prompt, ref)
                     break
                 except (urllib.error.URLError, RuntimeError) as e:
@@ -117,7 +118,7 @@ def generate(spec: dict, only: list[str], redo: list[int]) -> None:
             tmp.replace(f)
             made += 1
             time.sleep(PAUSE)
-            print(f"{prod['key']} {i + 1}/{len(prod['shots'])} {shot['angle']}: {f}")
+            print(f"{prod['key']} {i + 1}/{len(prod['shots'])} {shot['angle']}: {f}({time.time() - t0:.0f} 秒)")
     print(f"作った写真: {made} 枚")
 
 
@@ -146,7 +147,7 @@ def make_zip(spec: dict, path: Path, max_mb: float) -> None:
                 for f in files:
                     z.write(f, f"products/{prod['key']}/{f.name}")
                 markets = prod.get("markets") or MARKETS
-            for m, code in enumerate(prod["codes"]):
+                for m, code in enumerate(prod["codes"]):
                     imgs = []
                     for i, (shot, f) in enumerate(zip(prod["shots"], files)):
                         data = f.read_bytes()
@@ -218,17 +219,19 @@ def draft(products_path: Path, spec_path: Path) -> None:
 
 
 def main() -> int:
+    global OUT, MODEL
     ap = argparse.ArgumentParser(description="見本の商品の写真を AI で作り、取り込める ZIP にする")
     ap.add_argument("cmd", choices=["draft", "generate", "zip"])
     ap.add_argument("--spec", type=Path, default=SPEC, help="何を作るか(既定 scripts/sample-photos.json)")
     ap.add_argument("--out", type=Path, default=None, help="写真を置くフォルダ(既定 import/sample-photos)")
+    ap.add_argument("--model", default=MODEL, help=f"画像のモデル(既定 {MODEL}。安く速くするなら gemini-2.5-flash-image。モデルを替えたら --out も替える)")
     ap.add_argument("--products", type=Path, help="draft: 商品の一覧の JSON(パックの data.json など)")
     ap.add_argument("--only", nargs="*", default=[], help="この商品(sample-photos.json の key)だけ")
     ap.add_argument("--redo", nargs="*", type=int, default=[], help="この番号の写真(1 がメイン)を作り直す")
     ap.add_argument("--zip", type=Path, default=None, help="作る ZIP(既定 <写真のフォルダ>/sample_photos.zip)")
     ap.add_argument("--max-mb", type=float, default=25, help="1 つの ZIP の大きさの上限(MB。⚙ から取り込むときの上限 30MB より小さく)")
     args = ap.parse_args()
-    global OUT
+    MODEL = args.model
     if args.out:
         OUT = args.out.resolve()
     if args.cmd == "draft":
