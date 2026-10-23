@@ -30,6 +30,9 @@ import {
   PlayRegular,
   ArrowLeftRegular,
   AddRegular,
+  FolderRegular,
+  NotepadRegular,
+  SaveRegular,
   HistoryRegular,
   RenameRegular,
   PanelRightContractRegular,
@@ -38,7 +41,8 @@ import {
   TableAddRegular,
 } from '@fluentui/react-icons'
 import { ChatMarkdown } from './ChatMarkdown'
-import { ChatApi, DevApi, isFailure, type ChatContext, type ChatEvent, type ChatMeta, type ChatTurn, type SqlBlock } from './api'
+import { FilesDialog } from './FilesDialog'
+import { ChatApi, DevApi, FilesApi, isFailure, type WorkFile, type ChatContext, type ChatEvent, type ChatMeta, type ChatTurn, type SqlBlock } from './api'
 import { CopyButton } from './CopyButton'
 
 const useStyles = makeStyles({
@@ -202,6 +206,11 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
   const [chats, setChats] = useState<ChatMeta[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
+  // 作業ファイル(いつも渡すもの・引き継ぎ)と、その窓
+  const [workFiles, setWorkFiles] = useState<WorkFile[]>([])
+  const [filesOpen, setFilesOpen] = useState(false)
+  const [fileToOpen, setFileToOpen] = useState<string | null>(null)
+  const [savedNote, setSavedNote] = useState('')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -257,6 +266,42 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
     sql: withSql ? sql : '',
     last: withSql ? last : '',
   })
+
+  const refreshFiles = async () => {
+    const r = await FilesApi.list()
+    if (!isFailure(r)) setWorkFiles(r.files)
+  }
+  useEffect(() => {
+    void (async () => {
+      const r = await FilesApi.list()
+      if (!isFailure(r)) setWorkFiles(r.files)
+    })()
+  }, [])
+
+  /** 返事の SQL を、作業ファイルに保存する(名前を聞く。同じ名前は上書きを確かめる) */
+  const saveSql = async (code: string) => {
+    const d = new Date()
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+    const name = window.prompt('作業ファイルに保存する名前(.sql)', `${output || 'query'}_${stamp}.sql`)?.trim()
+    if (!name) return
+    const n = /\.(sql|md|txt)$/i.test(name) ? name : `${name}.sql`
+    if (workFiles.some((f) => f.name === n) && !window.confirm(`${n} は、もうあります。上書きしますか?`)) return
+    const r = await FilesApi.save(n, code)
+    setSavedNote(isFailure(r) ? r.error : `${n} に保存しました`)
+    window.setTimeout(() => setSavedNote(''), 4000)
+    await refreshFiles()
+  }
+
+  /** 引き継ぎを作る: AI に会話をまとめさせ、作業ファイルに保存させる(新しい会話で「いつも渡す」にすれば続きから話せる) */
+  const makeHandover = () => {
+    const d = new Date()
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+    void send(
+      `この会話の引き継ぎを書いてください。新しい会話の AI が、これだけを読めば続きから作業できるようにします。\n` +
+        `Markdown で、次の見出しで書いてください: 目的 / 接続しているプロジェクトとデータセット / 見つけた表と列(ビューは参照先も) / CCP の列への当て方(表) / 作った SQL(採用したものは全文。版として保存したならその版) / 決まったこと / 残っている疑問 / 次にやること。\n` +
+        `書いたら save_file で「引き継ぎ_${stamp}.md」に保存し、返事には保存した名前と、要点を 3 行で書いてください。`,
+    )
+  }
 
   const refreshChats = async () => {
     const r = await ChatApi.list()
@@ -365,7 +410,10 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
       (ev: ChatEvent) => {
         if (ev.type === 'start') apply({ model: ev.model })
         else if (ev.type === 'thought') apply({ thoughts: (answer.thoughts ?? '') + ev.text })
-        else if (ev.type === 'step') apply({ steps: [...(answer.steps ?? []), ev.text] })
+        else if (ev.type === 'step') {
+          apply({ steps: [...(answer.steps ?? []), ev.text] })
+          if (ev.text.startsWith('作業ファイルに保存した')) void refreshFiles()
+        }
         else if (ev.type === 'final') apply({ text: ev.reply, sqls: ev.sqls, questions: ev.questions })
         else if (ev.type === 'error') apply({ text: ev.error, error: true })
       },
@@ -410,6 +458,12 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
         </Button>
         <Button size="small" appearance={historyOpen ? 'secondary' : 'subtle'} icon={<HistoryRegular />} disabled={busy} onClick={() => setHistoryOpen((v) => !v)} title="前の会話を開く">
           履歴 {chats.length || ''}
+        </Button>
+        <Button size="small" appearance="subtle" icon={<FolderRegular />} onClick={() => setFilesOpen(true)} title="作業ファイル(引き継ぎ・SQL・コーディングルール)">
+          ファイル
+        </Button>
+        <Button size="small" appearance="subtle" icon={<NotepadRegular />} disabled={busy || !messages.length} onClick={makeHandover} title="この会話をまとめて、作業ファイルに引き継ぎ(Markdown)を保存する">
+          引き継ぎを作る
         </Button>
         {onFold && <Button size="small" appearance="subtle" icon={<PanelRightContractRegular />} onClick={onFold} title="畳む(会話は続きます)" />}
         <div className={s.row} style={{ width: '100%' }}>
@@ -483,7 +537,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
       <div className={s.ctx}>
         <button type="button" className={s.toggle} onClick={() => setCtxOpen((v) => !v)}>
           {ctxOpen ? <ChevronDownRegular /> : <ChevronRightRegular />}
-          AI に渡すもの({output ? `${OUTPUTS.find((o) => o.value === output)?.label}・` : ''}表 {tables.length}・まとめ {draftNotes.trim() ? 'あり' : 'なし'})
+          AI に渡すもの({output ? `${OUTPUTS.find((o) => o.value === output)?.label}・` : ''}表 {tables.length}・まとめ {draftNotes.trim() ? 'あり' : 'なし'}・いつも渡すファイル {workFiles.filter((f) => f.pinned).length})
         </button>
         {ctxOpen && (
           <>
@@ -516,6 +570,18 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
             <Checkbox label="表の先頭の数行も渡す(名前・住所・レビューなどの列は外す)" checked={sampleRows} onChange={(_, d) => setSampleRows(!!d.checked)} />
             <Checkbox label="AI に SELECT を流させる(値の確かめ。読む量の上限つき)" checked={allowRun} onChange={(_, d) => setAllowRun(!!d.checked)} />
             <Checkbox label="いまの SQL と、流した結果・エラーを渡す" checked={withSql} onChange={(_, d) => setWithSql(!!d.checked)} />
+            <div className={s.row}>
+              <span className={s.label}>いつも渡すファイル</span>
+              {workFiles.filter((f) => f.pinned).map((f) => (
+                <Button key={f.name} size="small" appearance="secondary" onClick={() => { setFileToOpen(f.name); setFilesOpen(true) }} title="開く">
+                  {f.name}
+                </Button>
+              ))}
+              <Button size="small" appearance="subtle" onClick={() => { setFileToOpen(null); setFilesOpen(true) }}>
+                選ぶ・上げる
+              </Button>
+            </div>
+            <span className={s.label}>コーディングルール・引き継ぎは、作業ファイルに置いて「いつも AI に渡す」にすると、毎回 AI が読んで守ります。</span>
             <span className={s.label}>仕様のまとめ(コンフルなどから。保存して次も使う)</span>
             <Textarea
               size="small"
@@ -531,6 +597,30 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
       </div>
 
       <div className={s.log}>
+        {messages.length === 0 && workFiles.some((f) => f.name.startsWith('引き継ぎ')) && (
+          <div className={s.empty}>
+            <div>引き継ぎから始める(押すと「いつも AI に渡す」になり、続きから話せます):</div>
+            <div className={s.row} style={{ marginTop: '4px' }}>
+              {workFiles
+                .filter((f) => f.name.startsWith('引き継ぎ'))
+                .slice(0, 5)
+                .map((f) => (
+                  <Button
+                    key={f.name}
+                    size="small"
+                    appearance={f.pinned ? 'primary' : 'secondary'}
+                    onClick={async () => {
+                      await FilesApi.pin(f.name, !f.pinned)
+                      await refreshFiles()
+                    }}
+                  >
+                    {f.pinned ? '✓ ' : ''}
+                    {f.name}
+                  </Button>
+                ))}
+            </div>
+          </div>
+        )}
         {messages.length === 0 && (
           <div className={s.empty}>
             たとえば:
@@ -572,7 +662,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
                   ))}
                 </ul>
               )}
-              {m.error ? <div className={s.error}>{m.text}</div> : m.text ? <ChatMarkdown text={m.text} onUseSql={onUseSql} /> : null}
+              {m.error ? <div className={s.error}>{m.text}</div> : m.text ? <ChatMarkdown text={m.text} onUseSql={onUseSql} onSaveSql={(code) => void saveSql(code)} /> : null}
               {m.questions && m.questions.length > 0 && (
                 <ul className={s.questions}>
                   {m.questions.map((q, j) => (
@@ -590,6 +680,9 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
                     <Button size="small" icon={<ArrowLeftRegular />} onClick={() => onUseSql(b.sql, false)} title="SQL の欄に入れる(流さない)">
                       欄に入れる
                     </Button>
+                    <Button size="small" appearance="subtle" icon={<SaveRegular />} onClick={() => void saveSql(b.sql)} title="作業ファイルに .sql で保存">
+                      保存
+                    </Button>
                     <CopyButton text={() => b.sql} />
                   </div>
                   <pre className={s.sql}>{b.sql}</pre>
@@ -603,6 +696,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
       </div>
 
       <div className={s.input}>
+        {savedNote && <span className={s.label}>{savedNote}</span>}
         {hasError && withSql && !busy && (
           <div className={s.row}>
             <Button size="small" onClick={() => void send('いまの SQL のエラーを直してください。')}>
@@ -638,6 +732,15 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
         </div>
       </div>
 
+      <FilesDialog
+        open={filesOpen}
+        initial={fileToOpen}
+        onClose={() => {
+          setFilesOpen(false)
+          setFileToOpen(null)
+        }}
+        onChanged={() => void refreshFiles()}
+      />
       <Dialog open={preview !== null} onOpenChange={(_, d) => !d.open && setPreview(null)}>
         <DialogSurface style={{ maxWidth: '900px', width: '90vw' }}>
           <DialogBody>

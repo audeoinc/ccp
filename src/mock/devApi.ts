@@ -302,3 +302,29 @@ function mockPreview(d: PolicyDraft): PolicyPreview {
     rules: ok.map((b) => ({ rule_id: b.split(' ')[1], title: b.split('\n')[0].split(' ').slice(2).join(' '), strength: b.includes('must') ? 'must' : 'should', market: b.includes('市場: JP') ? 'JP' : null, channel: null })),
   }
 }
+
+// 作業ファイル(身代わり。ブラウザのメモリの中だけ)
+const workFiles: Record<string, { content: string; pinned: boolean; updated: string }> = {
+  'コーディングルール.md': { content: '# SQL のコーディングルール(見本)\n- 予約語は大文字\n- CTE の名前は小文字のスネークケース\n', pinned: true, updated: '2026-10-23T09:00:00Z' },
+}
+export const FilesApi = {
+  list: () => wait({ ok: true as const, files: Object.entries(workFiles).map(([name, f]) => ({ name, size: f.content.length, updated: f.updated, pinned: f.pinned })).sort((a, b) => b.updated.localeCompare(a.updated)) }),
+  get: (name: string) => (workFiles[name] ? wait({ ok: true as const, name, content: workFiles[name].content, pinned: workFiles[name].pinned }) : fail(`${name} はありません`)),
+  save: (name: string, content: string) => {
+    const overwritten = !!workFiles[name]
+    workFiles[name] = { content, pinned: workFiles[name]?.pinned ?? false, updated: new Date().toISOString() }
+    return wait({ ok: true as const, overwritten })
+  },
+  remove: (name: string) => {
+    delete workFiles[name]
+    return wait({ ok: true as const })
+  },
+  pin: (name: string, pinned: boolean) => {
+    if (workFiles[name]) workFiles[name].pinned = pinned
+    return wait({ ok: true as const })
+  },
+  fromXlsx: (name: string) => {
+    workFiles[name] = { content: '### シート: Sheet1\n\n```csv\na,b\n```', pinned: false, updated: new Date().toISOString() }
+    return wait({ ok: true as const, overwritten: false, chars: 30 })
+  },
+}

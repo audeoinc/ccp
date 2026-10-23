@@ -342,6 +342,26 @@ export const PolicyApi = {
   import: (d: PolicyDraft) => policyCall('/import', d),
 }
 
+/** 作業ファイル(server/devwork/files/。引き継ぎ・SQL・コーディングルールなど)。pinned は「いつも AI に渡す」 */
+export interface WorkFile {
+  name: string
+  size: number
+  updated: string
+  pinned: boolean
+}
+
+const put = (body: unknown): RequestInit => ({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+const fileUrl = (name: string) => `/files/${encodeURIComponent(name)}`
+
+export const FilesApi = {
+  list: () => call<{ ok: true; files: WorkFile[] }>('/files'),
+  get: (name: string) => call<{ ok: true; name: string; content: string; pinned: boolean }>(fileUrl(name)),
+  save: (name: string, content: string) => call<{ ok: true; overwritten: boolean }>(fileUrl(name), put({ content })),
+  remove: (name: string) => call<{ ok: true }>(fileUrl(name), { method: 'DELETE' }),
+  pin: (name: string, pinned: boolean) => call<{ ok: true }>(`${fileUrl(name)}/pin`, put({ pinned })),
+  fromXlsx: (name: string, data: string) => call<{ ok: true; overwritten: boolean; chars: number }>(`${fileUrl(name)}/from-xlsx`, post({ data })),
+}
+
 export const WorkApi = {
   list: () => call<WorkInfo>('/work'),
   save: (output: string, sql: string, note = '') => call<{ ok: true; v: number; same: boolean }>(`/work/${output}`, post({ sql, note })),

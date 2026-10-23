@@ -24,6 +24,7 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/gcs/extract     選んだ文書を文字にする(Excel はシートごとに CSV の形。PDF は文字にしない)
   POST /api/dev/policy/convert  文書を POLICY_FORMAT の形に書き直す(NDJSON。PDF は Gemini にそのまま渡す)
   GET  /api/dev/policy/drafts   前に書き直したファイル(server/devwork/policies/)
+  GET  /api/dev/files           作業ファイル(server/devwork/files/)  GET/PUT/DELETE /api/dev/files/{名前}  PUT …/pin  POST …/from-xlsx
   GET  /api/dev/chats           AI との会話の一覧   GET/PUT/DELETE /api/dev/chats/{id}  会話を開く・残す・消す(server/devwork/chats/)
   POST /api/dev/ai/context      Gemini に渡す前提を、そのまま返す(見る・コピーする)
 
@@ -462,6 +463,13 @@ sqls は、新しく書いた・直した SQL があるときだけ(なければ
 - CCP の列に当てるときは、仕様のとおりに AS で付け替える。当て方を表にして reply に書く(元の列 → CCP の列、変換、自信のなさ)
 - 読む量を抑える(パーティションの列があれば、期間で絞る。SELECT * を避ける)
 - 「いまの SQL」とエラーが渡されたら、まずエラーの原因を reply で短く説明し、直した全文を sql に入れる
+- 「いつも渡すファイル」にコーディングルールがあれば、SQL はそれに必ず従う(名前の付け方・書き方・コメント など)。従えないところは reply で理由を書く
+- 「いつも渡すファイル」に引き継ぎがあれば、その続きとして話す(決まったことを、もう一度聞かない)
+
+作業ファイル(Workbench のフォルダ。利用者も画面で見られる)を使う道具もあります:
+- list_files・read_file: 作業ファイルの一覧と中身
+- save_file: 作業ファイルに保存する(.md / .sql / .txt / .csv)。利用者に「保存して」と頼まれたとき、引き継ぎを作るときに使う。
+  同じ名前があると上書きするので、上書きしてよいか分からないときは、別の名前にする
 """
 
 TABLE_POLICY = """## 出力の方針(利用者が決めたこと)
@@ -556,6 +564,9 @@ def describe(c: Any, ref: str, with_rows: bool) -> str:
 def build_context(body: ChatIn, client: Any | None) -> str:
     """Gemini に渡す前提(DEVTOOLS.md の 4 章の順。上ほど変わらない内容)"""
     parts = [ROLE, TABLE_POLICY]
+    pinned = pinned_context()
+    if pinned:
+        parts.append(pinned)
     if client is not None:
         where = [f"- 接続しているプロジェクト(問い合わせを走らせるプロジェクト): `{client.project}`"]
         if body.dataset:
@@ -625,6 +636,13 @@ def tool_declarations() -> list[Any]:
                                   parameters=S(type=T.OBJECT, properties={"view": S(type=T.STRING, description="プロジェクト.データセット.ビュー")}, required=["view"])),
         types.FunctionDeclaration(name="dry_run", description="SQL を料金なしで確かめる。文の種類・読む量・結果の列、またはエラー",
                                   parameters=S(type=T.OBJECT, properties={"sql": S(type=T.STRING)}, required=["sql"])),
+        types.FunctionDeclaration(name="list_files", description="作業ファイルの一覧(名前・大きさ・更新日時・いつも渡すか)",
+                                  parameters=S(type=T.OBJECT, properties={})),
+        types.FunctionDeclaration(name="read_file", description="作業ファイルの中身",
+                                  parameters=S(type=T.OBJECT, properties={"name": S(type=T.STRING)}, required=["name"])),
+        types.FunctionDeclaration(name="save_file", description="作業ファイルに保存する(.md / .sql / .txt / .csv)。同じ名前は上書き",
+                                  parameters=S(type=T.OBJECT, properties={"name": S(type=T.STRING, description="ファイル名(例: 引き継ぎ_20261023.md、spu_from_ctlg.sql)"),
+                                                                          "content": S(type=T.STRING)}, required=["name", "content"])),
         types.FunctionDeclaration(name="run_select", description=f"SELECT を流して、先頭 {TOOL_ROWS} 行を見る(値の種類・件数の確かめ)。SELECT 以外と、読む量が上限を超えるものは流れない",
                                   parameters=S(type=T.OBJECT, properties={"sql": S(type=T.STRING)}, required=["sql"])),
     ])]
@@ -663,6 +681,15 @@ def run_tool(c: Any, name: str, args: dict[str, Any], body: ChatIn) -> tuple[dic
             job = c.query(str(args.get("sql") or ""), job_config=bigquery.QueryJobConfig(dry_run=True, use_query_cache=False))
             return ({"statement_type": job.statement_type, "bytes": job.total_bytes_processed, "columns": schema_columns(job.schema)},
                     f"SQL を確かめた(通った。読む量 {job.total_bytes_processed or 0:,} バイト)")
+        if name == "list_files":
+            return {"files": list_work_files()}, "作業ファイルの一覧を見た"
+        if name == "read_file":
+            n = str(args.get("name") or "")
+            return {"name": n, "content": read_work_file(n)}, f"作業ファイルを読んだ({n})"
+        if name == "save_file":
+            n = str(args.get("name") or "")
+            existed = write_work_file(n, str(args.get("content") or ""))
+            return {"saved": n, "overwritten": existed}, f"作業ファイルに保存した({n}{'。上書き' if existed else ''})"
         if name == "run_select":
             if not body.allow_run:
                 return {"error": "利用者が、SQL を流すことを止めています。dry_run で確かめてください"}, "SELECT を流そうとした(止めてある)"
@@ -1445,3 +1472,134 @@ async def policy_drafts() -> dict[str, Any]:
             out.append({"filename": p.name, "kind": "sales" if p.suffix.lower() == ".csv" else "rules", "content": p.read_text(encoding="utf-8"),
                         "updated": datetime.fromtimestamp(p.stat().st_mtime).astimezone().isoformat(timespec="seconds")})
     return {"ok": True, "drafts": out}
+
+
+# ---- 作業ファイル(server/devwork/files/): 引き継ぎ・SQL・コーディングルールなど。AI も道具で読み書きする
+# 「いつも渡す」の印を付けたファイルは、会話の前提に毎回入れる(コーディングルールを守らせる・引き継ぎから続ける)
+
+FILE_NAME = re.compile(r"^[^\\/:*?\"<>|\x00-\x1f]{1,120}\.(md|sql|txt|csv)$", re.I)
+# いつも渡すファイルの、前提に入れる量の上限(全部で)
+PINNED_MAX = 200_000
+
+
+def _files_dir() -> Path:
+    return DEVWORK / "files"
+
+
+def _file_path(name: str) -> Path:
+    name = name.strip()
+    if not FILE_NAME.match(name) or name.startswith("."):
+        raise HTTPException(400, f"ファイル名は .md / .sql / .txt / .csv で、/ や \\ を含めない名前にしてください: {name}")
+    return _files_dir() / name
+
+
+def pinned_names() -> list[str]:
+    v = _read_json(_files_dir() / ".pinned.json", [])
+    return [x for x in v if isinstance(x, str)] if isinstance(v, list) else []
+
+
+def list_work_files() -> list[dict[str, Any]]:
+    pins = set(pinned_names())
+    out = []
+    for p in _files_dir().glob("*"):
+        if p.is_file() and not p.name.startswith(".") and FILE_NAME.match(p.name):
+            st = p.stat()
+            out.append({"name": p.name, "size": st.st_size, "updated": datetime.fromtimestamp(st.st_mtime).astimezone().isoformat(timespec="seconds"),
+                        "pinned": p.name in pins})
+    out.sort(key=lambda x: x["updated"], reverse=True)
+    return out
+
+
+def read_work_file(name: str) -> str:
+    p = _file_path(name)
+    if not p.is_file():
+        raise HTTPException(404, f"{name} はありません")
+    return p.read_text(encoding="utf-8")
+
+
+def write_work_file(name: str, content: str) -> bool:
+    """保存する。もとからあったか(上書きしたか)を返す"""
+    p = _file_path(name)
+    existed = p.is_file()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    return existed
+
+
+def pinned_context() -> str:
+    """いつも渡すファイルを、前提の 1 節にする(量の上限を超えたら、後ろを切って、切ったと書く)"""
+    parts = []
+    used = 0
+    for n in pinned_names():
+        try:
+            text = read_work_file(n)
+        except Exception:  # noqa: BLE001 — 消されたファイルは飛ばす
+            continue
+        room = PINNED_MAX - used
+        if room <= 0:
+            parts.append(f"### {n}\n(量の上限を超えたので、渡していません)")
+            continue
+        cut = text[:room]
+        used += len(cut)
+        parts.append(f"### {n}\n\n{cut}" + ("\n\n(量の上限で、ここまで)" if len(text) > room else ""))
+    if not parts:
+        return ""
+    return "## いつも渡すファイル(守ること・引き継ぎ。利用者が印を付けたもの。必ず読んで従う)\n\n" + "\n\n".join(parts)
+
+
+@router.get("/files")
+async def files() -> dict[str, Any]:
+    return {"ok": True, "files": list_work_files()}
+
+
+@router.get("/files/{name}")
+async def get_file(name: str) -> dict[str, Any]:
+    return {"ok": True, "name": name, "content": read_work_file(name), "pinned": name in pinned_names()}
+
+
+class FileIn(BaseModel):
+    content: str = Field("", max_length=2_000_000)
+
+
+@router.put("/files/{name}")
+async def put_file(name: str, body: FileIn) -> dict[str, Any]:
+    existed = write_work_file(name, body.content)
+    return {"ok": True, "overwritten": existed}
+
+
+@router.delete("/files/{name}")
+async def delete_file(name: str) -> dict[str, Any]:
+    p = _file_path(name)
+    if p.is_file():
+        p.unlink()
+    _write_json(_files_dir() / ".pinned.json", [x for x in pinned_names() if x != name])
+    return {"ok": True}
+
+
+class PinIn(BaseModel):
+    pinned: bool
+
+
+@router.put("/files/{name}/pin")
+async def pin_file(name: str, body: PinIn) -> dict[str, Any]:
+    _file_path(name)
+    pins = [x for x in pinned_names() if x != name]
+    if body.pinned:
+        pins.append(name)
+    _write_json(_files_dir() / ".pinned.json", pins)
+    return {"ok": True}
+
+
+class XlsxIn(BaseModel):
+    # PC から上げた Excel(base64)。コーディングルールが Excel のときに、シートごとの表の形の Markdown にして置く
+    data: str = Field(min_length=1, max_length=30_000_000)
+
+
+@router.post("/files/{name}/from-xlsx")
+async def file_from_xlsx(name: str, body: XlsxIn) -> dict[str, Any]:
+    try:
+        text = await asyncio.to_thread(xlsx_text, base64.b64decode(body.data))
+    except Exception as e:  # noqa: BLE001
+        return _error(e)
+    existed = write_work_file(name, text)
+    return {"ok": True, "overwritten": existed, "chars": len(text)}

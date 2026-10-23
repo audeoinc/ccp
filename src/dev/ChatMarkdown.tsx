@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Button, makeStyles, tokens } from '@fluentui/react-components'
-import { ArrowLeftRegular, PlayRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, PlayRegular, SaveRegular } from '@fluentui/react-icons'
 import { CopyButton } from './CopyButton'
 
 const useStyles = makeStyles({
@@ -23,6 +23,8 @@ interface Props {
   text: string
   /** SQL のブロックを、SQL の欄に入れる(run なら、入れてすぐ流す)。なければボタンを出さない */
   onUseSql?: (sql: string, run: boolean) => void
+  /** SQL のブロックを、作業ファイルに保存する。なければボタンを出さない */
+  onSaveSql?: (sql: string) => void
 }
 
 /**
@@ -30,7 +32,7 @@ interface Props {
  * MarkdownLite(見出し・箇条書き・太字)に加えて、コードのブロック(```)・`コード`・表を読む。
  * SQL のブロックには、その場に「入れて流す」「欄に入れる」を付ける(返事の中に SQL がいくつあっても、どれを使うか迷わないように)
  */
-export function ChatMarkdown({ text, onUseSql }: Props) {
+export function ChatMarkdown({ text, onUseSql, onSaveSql }: Props) {
   const s = useStyles()
 
   // **太字** と `コード`
@@ -81,6 +83,11 @@ export function ChatMarkdown({ text, onUseSql }: Props) {
                   欄に入れる
                 </Button>
               </>
+            )}
+            {isSql && onSaveSql && (
+              <Button size="small" appearance="subtle" icon={<SaveRegular />} onClick={() => onSaveSql(code)} title="作業ファイルに .sql で保存">
+                保存
+              </Button>
             )}
             <CopyButton text={() => code} />
           </div>
