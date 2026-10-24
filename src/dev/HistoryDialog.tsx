@@ -8,13 +8,13 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Input,
+  SearchBox,
   Spinner,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowLeftRegular, PlayRegular, SearchRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, PlayRegular} from '@fluentui/react-icons'
 import { RunApi, bytesLabel, isFailure, type RunEntry } from './api'
 import { CopyButton } from './CopyButton'
 
@@ -63,7 +63,7 @@ export function HistoryDialog({ open, onClose, onUseSql }: { open: boolean; onCl
           <DialogTitle>実行の履歴</DialogTitle>
           <DialogContent>
             <div className={s.row} style={{ marginBottom: '8px' }}>
-              <Input size="small" style={{ minWidth: '320px' }} contentBefore={<SearchRegular />} value={q} placeholder="SQL・エラーの文字で探す(表の名前 など)" onChange={(_, d) => setQ(d.value)} />
+              <SearchBox size="small" style={{ minWidth: '320px' }} value={q} placeholder="SQL・エラーの文字で探す(表の名前 など)" onChange={(_, d) => setQ(d.value)} />
               <span className={s.muted}>画面で流したもの・AI が値を確かめるために流したもの・列を調べたものが、成功も失敗も残ります(Workbench の server/devwork/history.jsonl)。</span>
             </div>
             {!runs ? (

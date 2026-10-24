@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Button, Dropdown, Input, MessageBar, MessageBarBody, Option, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { DatabaseRegular, PlayRegular, SearchRegular, TableRegular, EyeRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular, StopRegular, SaveRegular } from '@fluentui/react-icons'
+import { Badge, Button, Dropdown, MessageBar, MessageBarBody, Option, SearchBox, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { DatabaseRegular, PlayRegular, TableRegular, EyeRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular, StopRegular, SaveRegular } from '@fluentui/react-icons'
 import { DevApi, bytesLabel, isFailure, type Column, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
@@ -322,7 +322,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
           {loadingTables && <Spinner size="tiny" label="表の一覧を読んでいます" />}
           {tables && (
             <>
-              <Input size="small" contentBefore={<SearchRegular />} placeholder={`表を絞り込む(${tables.length} 件)`} value={filter} onChange={(_, d) => setFilter(d.value)} />
+              <SearchBox size="small" placeholder={`表を絞り込む(${tables.length} 件)`} value={filter} onChange={(_, d) => setFilter(d.value)} />
               <div className={s.list}>
                 {shown.map((t) => (
                   <button key={t.ref} type="button" className={mergeClasses(s.item, selected === t.ref && s.itemOn)} onClick={() => void openTable(t.ref)} title={t.ref}>

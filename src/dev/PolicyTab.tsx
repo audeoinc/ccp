@@ -6,6 +6,7 @@ import {
   Input,
   MessageBar,
   MessageBarBody,
+  SearchBox,
   Spinner,
   Tab,
   TabList,
@@ -25,7 +26,6 @@ import {
   DocumentRegular,
   DocumentTextRegular,
   FolderRegular,
-  SearchRegular,
   SparkleRegular,
   StopRegular,
 } from '@fluentui/react-icons'
@@ -300,7 +300,7 @@ export function PolicyTab({ settings, onSettings, model }: { settings: Settings;
         {listBusy && <Spinner size="tiny" label="一覧を読んでいます" />}
         {listing && (
           <>
-            <Input size="small" contentBefore={<SearchRegular />} placeholder={`ファイルを絞り込む(${listing.files.length} 件)`} value={filter} onChange={(_, d) => setFilter(d.value)} />
+            <SearchBox size="small" placeholder={`ファイルを絞り込む(${listing.files.length} 件)`} value={filter} onChange={(_, d) => setFilter(d.value)} />
             <div className={s.list}>
               {listing.folders.map((f) => (
                 <button key={f} type="button" className={s.folder} onClick={() => void open(f)}>

@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogTitle, Input, Switch, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogTitle, Switch, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
-import { CalendarCancelRegular, DeleteRegular, DismissRegular, EditRegular, ImageAddRegular, SearchRegular, SparkleRegular } from '@fluentui/react-icons'
+import { CalendarCancelRegular, DeleteRegular, DismissRegular, EditRegular, ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload } from './data/heroUpload'
 import { HeroUploadDialog } from './HeroUploadDialog'
 import { PartLibrary } from './PartLibrary'
+import { FilterChips, SearchField } from './SearchField'
 import { heroCropStyle, isUsableHero } from './heroRights'
 import { heroImage } from './images'
 import { rasterize } from './imageConvert'
@@ -21,7 +22,7 @@ const useStyles = makeStyles({
   titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   grow: { flexGrow: 1, minWidth: 0 },
   tools: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '6px', margin: '8px 0' },
-  chip: { minWidth: 'auto', height: '26px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
+  search: { flexBasis: '320px', flexGrow: 1, maxWidth: '480px' },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gridAutoRows: 'max-content', gap: '10px', overflow: 'auto', minHeight: 0, flexGrow: 1, flexBasis: 0, alignContent: 'start', paddingBottom: '8px' },
@@ -192,15 +193,10 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
           ) : (
           <>
           <div className={s.tools}>
-            <Input size="small" contentBefore={<SearchRegular />} value={q} onChange={(_, d) => setQ(d.value)} placeholder={t('名前・コード・タグ・出どころで探す', 'Search name, code, tags, source')} />
-            {(['', 'US', 'JP'] as const).map((m) => (
-              <Button key={m || 'all'} size="small" shape="circular" className={s.chip} appearance={market === m ? 'primary' : 'outline'} onClick={() => setMarket(m)}>
-                {m || t('すべての国', 'All countries')}
-              </Button>
-            ))}
+            <SearchField className={s.search} value={q} onChange={setQ} placeholder={t('名前・コード・タグ・出どころで探す', 'Search name, code, tags, source')} count={list.length} unit={(n) => t(`${n} 点`, `${n} images`)} />
+            <FilterChips label={t('国', 'Country')} allLabel={t('すべての国', 'All countries')} options={[{ value: 'US', label: 'US' }, { value: 'JP', label: 'JP' }]} value={market} onChange={setMarket} />
             <Switch checked={onlyUploaded} onChange={(_, d) => setOnlyUploaded(d.checked)} label={t('上げた画像だけ', 'Uploaded only')} />
             <Switch checked={showExpired} onChange={(_, d) => setShowExpired(d.checked)} label={t('期限切れも出す', 'Show expired')} />
-            <span className={s.note}>{t(`${list.length} 点`, `${list.length} images`)}</span>
             {filling ? (
               <>
                 <span className={s.note}>{t(`AI で埋めています… ${filling.done} / ${filling.total}`, `Filling with AI… ${filling.done} / ${filling.total}`)}</span>

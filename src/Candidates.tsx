@@ -1,12 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
-import { AddRegular, DismissRegular, SearchRegular } from '@fluentui/react-icons'
+import { Badge, Button, Caption1, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
+import { AddRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import { DND_PRODUCT, yen } from './items'
 import { productMarket } from './market'
 import { optionLabel, useT } from './i18n'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
+import { FilterChips, SearchField } from './SearchField'
 
 interface Props {
   products: Product[]
@@ -22,7 +23,6 @@ interface Props {
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
-  chips: { display: 'flex', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px' },
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular },
   item: {
     display: 'flex',
@@ -78,36 +78,32 @@ export function Candidates({ products, usedIds, onAdd, onPick, pickedId, marks }
 
   return (
     <div className={styles.root}>
-      <Input
-        size="small"
+      <SearchField
         placeholder={t('商品名・コード・説明で検索', 'Search by name, code or description')}
         value={query}
-        onChange={(_, d) => {
-          setQuery(d.value)
+        count={searching ? matched.length : undefined}
+        onChange={(v) => {
+          setQuery(v)
           setLimit(PAGE)
         }}
-        contentBefore={<SearchRegular />}
-        contentAfter={
-          query ? (
-            <Button size="small" appearance="transparent" icon={<DismissRegular />} onClick={() => setQuery('')} aria-label={t('検索語を消す', 'Clear search')} />
-          ) : undefined
-        }
       />
-      <div className={styles.chips}>
-        <Button size="small" shape="circular" appearance={category === '' ? 'primary' : 'outline'} onClick={() => { setCategory(''); setLimit(PAGE) }}>{t('すべて', 'All')}</Button>
-        {categories.map((c) => (
-          <Button key={c} size="small" shape="circular" appearance={category === c ? 'primary' : 'outline'} onClick={() => { setCategory(c === category ? '' : c); setLimit(PAGE) }}>
-            {optionLabel(c)}
-          </Button>
-        ))}
-      </div>
+      <FilterChips
+        allLabel={t('すべて', 'All')}
+        toggle
+        options={categories.map((c) => ({ value: c, label: optionLabel(c) }))}
+        value={category}
+        onChange={(c) => {
+          setCategory(c)
+          setLimit(PAGE)
+        }}
+      />
       {!searching ? (
         <Caption1 className={styles.caption}>
           {t(`商品名・コードで検索するか、カテゴリを選ぶと、商品が表示されます(対象 ${products.length}件)。`, `Search by name or code, or pick a category, to see products (${products.length} available).`)}
         </Caption1>
       ) : (
         <Caption1 className={styles.caption}>
-          {t(`${matched.length}件`, `${matched.length} items`)} ・ {onPick ? t('押すと、右に詳しい情報が出ます', 'Click to see details on the right') : t('右のプレビューへドラッグして掲載', 'Drag to the preview on the right to include')}
+          {onPick ? t('押すと、右に詳しい情報が出ます', 'Click to see details on the right') : t('右のプレビューへドラッグして掲載', 'Drag to the preview on the right to include')}
         </Caption1>
       )}
       {searching && matched.length === 0 && <Caption1 className={styles.caption}>{t('該当する商品がありません。', 'No matching products.')}</Caption1>}

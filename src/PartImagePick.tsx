@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Button, Input, Popover, PopoverSurface, PopoverTrigger, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Popover, PopoverSurface, PopoverTrigger, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { ImageRegular } from '@fluentui/react-icons'
 import { PartImagesService } from './data/partImages'
 import { isUsablePart } from './heroRights'
 import { partImage } from './images'
+import { SearchField } from './SearchField'
 import { optionLabel, useT } from './i18n'
 import { PartImageKind, type PartImage } from './models/partImages'
 
@@ -58,7 +59,7 @@ export function PartImagePick({ onPick }: { onPick: (img: { id: string; url: str
         </Button>
       </PopoverTrigger>
       <PopoverSurface className={s.surface}>
-        <Input size="small" value={q} placeholder={t('名前で探す', 'Search by name')} onChange={(_, d) => setQ(d.value)} />
+        <SearchField value={q} placeholder={t('名前で探す', 'Search by name')} onChange={setQ} count={list ? shown.length : undefined} autoFocus />
         {!list ? (
           <Spinner size="tiny" />
         ) : shown.length === 0 ? (

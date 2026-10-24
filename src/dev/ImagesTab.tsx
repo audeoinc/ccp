@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Button, Dropdown, Input, MessageBar, MessageBarBody, Option, Spinner, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowClockwiseRegular, SearchRegular } from '@fluentui/react-icons'
+import { Badge, Button, Dropdown, MessageBar, MessageBarBody, Option, SearchBox, Spinner, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowClockwiseRegular } from '@fluentui/react-icons'
 import { appPath } from '../appRoot'
 import { CopyButton } from './CopyButton'
 import { DevApi, isFailure, type ImageKind, type ImageList, type ImageRow, type LinkState } from './api'
@@ -160,7 +160,7 @@ export function ImagesTab() {
             </Tab>
           ))}
         </TabList>
-        <Input className={s.search} size="small" contentBefore={<SearchRegular />} placeholder="名前・ID・コード・使われている所で探す" value={query} onChange={(_, d) => setQuery(d.value)} />
+        <SearchBox className={s.search} size="small" placeholder="名前・ID・コード・使われている所で探す" value={query} onChange={(_, d) => setQuery(d.value)} />
         <Dropdown size="small" style={{ minWidth: '110px' }} value={market || '市場: すべて'} selectedOptions={[market]} onOptionSelect={(_, d) => setMarket(d.optionValue ?? '')}>
           <Option value="">市場: すべて</Option>
           {markets.map((m) => (

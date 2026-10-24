@@ -11,6 +11,7 @@ import { HeroUploadDialog } from './HeroUploadDialog'
 import { myName } from './history'
 import { useT } from './i18n'
 import { Linkify } from './LinkText'
+import { SearchField } from './SearchField'
 import { useJustAdded } from './useJustAdded'
 
 const useStyles = makeStyles({
@@ -349,16 +350,17 @@ export function ProductPicker({ trigger, products, onPick }: { trigger: ReactNod
   const t = useT()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
-  const hits = useMemo(() => {
+  const matched = useMemo(() => {
     const k = q.trim().toLowerCase()
-    return (k ? products.filter((p) => p.name.toLowerCase().includes(k) || (p.product_code ?? '').toLowerCase().includes(k)) : products).slice(0, 40)
+    return k ? products.filter((p) => p.name.toLowerCase().includes(k) || (p.product_code ?? '').toLowerCase().includes(k)) : products
   }, [products, q])
+  const hits = matched.slice(0, 40)
   return (
     <Popover open={open} onOpenChange={(_, d) => setOpen(d.open)} withArrow positioning="below-end">
       <PopoverTrigger disableButtonEnhancement>{trigger as never}</PopoverTrigger>
       <PopoverSurface>
         <div className={s.picker}>
-          <Input size="small" value={q} onChange={(_, d) => setQ(d.value)} placeholder={t('商品名・商品コードで探す', 'Search by name or code')} autoFocus />
+          <SearchField value={q} onChange={setQ} placeholder={t('商品名・商品コードで探す', 'Search by name or code')} count={matched.length} autoFocus />
           <div className={s.pickList}>
             {hits.map((p) => (
               <button

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Badge, Button, Caption1, Input, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
-import { SearchRegular } from '@fluentui/react-icons'
+import { Badge, Caption1, Text, makeStyles, mergeClasses, shorthands, tokens } from '@fluentui/react-components'
 import type { HeroImage } from './models/heroImages'
 import { DND_HERO } from './items'
 import { optionLabel, useT } from './i18n'
 import { ImageThumb } from './ImageThumb'
 import { heroImage } from './images'
+import { FilterChips, SearchField } from './SearchField'
 
 interface Props {
   heroes: HeroImage[]
@@ -15,7 +15,6 @@ interface Props {
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
-  chips: { display: 'flex', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px' },
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', columnGap: '8px', rowGap: '8px' },
   card: {
@@ -63,23 +62,10 @@ export function HeroCandidates({ heroes, selectedId, onSelect }: Props) {
 
   return (
     <div className={styles.root}>
-      <Input
-        size="small"
-        placeholder={t('画像名・タグ・説明で検索', 'Search by name, tag or description')}
-        value={query}
-        onChange={(_, d) => setQuery(d.value)}
-        contentBefore={<SearchRegular />}
-      />
-      <div className={styles.chips}>
-        <Button size="small" shape="circular" appearance={purpose === '' ? 'primary' : 'outline'} onClick={() => setPurpose('')}>{t('すべて', 'All')}</Button>
-        {purposes.map((c) => (
-          <Button key={c} size="small" shape="circular" appearance={purpose === c ? 'primary' : 'outline'} onClick={() => setPurpose(c === purpose ? '' : c)}>
-            {optionLabel(c)}
-          </Button>
-        ))}
-      </div>
+      <SearchField placeholder={t('画像名・タグ・説明で検索', 'Search by name, tag or description')} value={query} count={shown.length} onChange={setQuery} />
+      <FilterChips allLabel={t('すべて', 'All')} toggle options={purposes.map((c) => ({ value: c, label: optionLabel(c) }))} value={purpose} onChange={setPurpose} />
       <Caption1 className={styles.caption}>
-        {t(`${shown.length}件`, `${shown.length} items`)} ・ {t('クリックで設定(ドラッグ&ドロップでも設定できます)', 'Click to set (drag and drop also works)')}
+        {t('クリックで設定(ドラッグ&ドロップでも設定できます)', 'Click to set (drag and drop also works)')}
       </Caption1>
       <div className={styles.grid}>
         {shown.map((h) => {

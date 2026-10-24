@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Badge, Button, Input, Spinner, Switch, makeStyles, tokens } from '@fluentui/react-components'
-import { CalendarCancelRegular, DeleteRegular, EditRegular, ImageAddRegular, SearchRegular } from '@fluentui/react-icons'
+import { Badge, Button, Spinner, Switch, makeStyles, tokens } from '@fluentui/react-components'
+import { CalendarCancelRegular, DeleteRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import { PartImagesService } from './data/partImages'
 import { PartUpload } from './data/partUpload'
 import { PartUploadDialog } from './PartUploadDialog'
+import { FilterChips, SearchField } from './SearchField'
 import { isUsablePart, today } from './heroRights'
 import { partImage } from './images'
 import { optionLabel, tr, useT } from './i18n'
@@ -12,8 +13,7 @@ import { PartImageKind, type PartImage } from './models/partImages'
 const useStyles = makeStyles({
   wrap: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1 },
   tools: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '6px', margin: '8px 0' },
-  chip: { minWidth: 'auto', height: '26px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
-  note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  search: { flexBasis: '320px', flexGrow: 1, maxWidth: '480px' },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gridAutoRows: 'max-content', gap: '10px', overflow: 'auto', minHeight: 0, flexGrow: 1, flexBasis: 0, alignContent: 'start', paddingBottom: '8px' },
   card: { display: 'grid', gridTemplateRows: '120px auto', alignSelf: 'start', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
@@ -103,20 +103,16 @@ export function PartLibrary({ country, me }: { country: string; me: string }) {
   return (
     <div className={s.wrap}>
       <div className={s.tools}>
-        <Input size="small" contentBefore={<SearchRegular />} value={q} onChange={(_, d) => setQ(d.value)} placeholder={t('名前・タグ・代替テキストで探す', 'Search name, tags, alt text')} />
-        {(['', 'US', 'JP'] as const).map((m) => (
-          <Button key={m || 'all'} size="small" shape="circular" className={s.chip} appearance={market === m ? 'primary' : 'outline'} onClick={() => setMarket(m)}>
-            {m || t('すべての国', 'All countries')}
-          </Button>
-        ))}
-        <span className={s.note}>|</span>
-        {(['', ...Object.keys(PartImageKind)] as ('' | keyof typeof PartImageKind)[]).map((k) => (
-          <Button key={k || 'all'} size="small" shape="circular" className={s.chip} appearance={kind === k ? 'primary' : 'outline'} onClick={() => setKind(k)}>
-            {k ? optionLabel(PartImageKind[k]) : t('すべての種類', 'All kinds')}
-          </Button>
-        ))}
+        <SearchField className={s.search} value={q} onChange={setQ} placeholder={t('名前・タグ・代替テキストで探す', 'Search name, tags, alt text')} count={list.length} unit={(n) => t(`${n} 点`, `${n} images`)} />
+        <FilterChips label={t('国', 'Country')} allLabel={t('すべての国', 'All countries')} options={[{ value: 'US', label: 'US' }, { value: 'JP', label: 'JP' }]} value={market} onChange={setMarket} />
+        <FilterChips
+          label={t('種類', 'Kind')}
+          allLabel={t('すべての種類', 'All kinds')}
+          options={(Object.keys(PartImageKind) as (keyof typeof PartImageKind)[]).map((k) => ({ value: k, label: optionLabel(PartImageKind[k]) }))}
+          value={kind}
+          onChange={setKind}
+        />
         <Switch checked={showExpired} onChange={(_, d) => setShowExpired(d.checked)} label={t('期限切れも出す', 'Show expired')} />
-        <span className={s.note}>{t(`${list.length} 点`, `${list.length} images`)}</span>
         <Button size="small" appearance="primary" icon={<ImageAddRegular />} onClick={() => setUploading(true)}>
           {t('部品の画像を上げる', 'Upload a part image')}
         </Button>
