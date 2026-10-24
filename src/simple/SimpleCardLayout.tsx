@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Button, CounterBadge, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, CounterBadge, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
@@ -15,7 +15,7 @@ import { focusPin } from '../pinStore'
 import { forgetLinkedPin, linkedPin } from '../pinActions'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
-import { EditRegular, ImageEditRegular, OpenRegular, ArrowSwapRegular, DeleteRegular, SparkleRegular } from '@fluentui/react-icons'
+import { EditRegular, ImageEditRegular, MoreHorizontalRegular, OpenRegular, ArrowSwapRegular, DeleteRegular, SparkleRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { useStoredWidths } from '../floatLayout'
 import { ImageThumb } from '../ImageThumb'
@@ -101,7 +101,8 @@ const useStyles = makeStyles({
     overflow: 'hidden',
   },
   pane: { minHeight: 0, overflow: 'auto', padding: '12px 14px', backgroundColor: tokens.colorNeutralBackground1 },
-  previewPane: { display: 'grid', gridTemplateRows: 'auto auto auto auto minmax(0, 1fr)', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
+  // 上から 道具の行・(AB テストの知らせ)・受信箱の 1 行・プレビュー。行の数が変わってもプレビューが残りの高さを取るよう、縦の flex
+  previewPane: { display: 'flex', flexDirection: 'column', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
   inbox: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
@@ -109,7 +110,7 @@ const useStyles = makeStyles({
   inboxPart: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: tokens.borderRadiusSmall, border: '1px solid transparent', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, cursor: 'pointer', textAlign: 'left', color: tokens.colorNeutralForeground1, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)。押したら Tab・Esc が効くよう、フォーカスを受け取る
-  boxWrap: { position: 'relative', minHeight: 0, display: 'grid' },
+  boxWrap: { position: 'relative', flexGrow: 1, minHeight: 0, display: 'grid' },
   pinBox: { position: 'absolute', right: '14px', top: '6px', zIndex: 5, display: 'flex', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow4 },
   viewBox: { position: 'absolute', left: '6px', top: '6px', zIndex: 5, display: 'flex', columnGap: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow4 },
   // 部品の外の地は、つかんで動かせる(手のひら)。部品は押して選ぶ(指)
@@ -167,11 +168,8 @@ const useStyles = makeStyles({
   candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   // 案のタブ(SU2)
-  abRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px', rowGap: '4px', minHeight: '28px' },
-  abTab: { display: 'inline-flex', alignItems: 'center', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
-  abTabOn: { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1, backgroundColor: tokens.colorBrandBackground2 },
-  abTabBtn: { border: 'none', backgroundColor: 'transparent', padding: '3px 10px', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, cursor: 'pointer', color: tokens.colorNeutralForeground1 },
-  abTabX: { border: 'none', backgroundColor: 'transparent', padding: '0 8px 0 0', fontFamily: 'inherit', cursor: 'pointer', color: tokens.colorNeutralForeground3 },
+  // 上の帯の AB テストの案(SU8)。面のタブのあとに、線で区切って並べる
+  abBar: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, flexShrink: 0, paddingLeft: '10px', marginLeft: '2px', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
   abWarn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   abDiff: { boxShadow: `inset 0 -2px 0 ${tokens.colorPaletteDarkOrangeBorder2}` },
   applyBox: { display: 'grid', rowGap: '6px', marginTop: '14px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
@@ -215,6 +213,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 「A と違う」の目印(B・C 案を直しているとき)
   const diffMarks: Mark[] = e.abDiffParts.map((part) => ({ part, color: tokens.colorPaletteDarkOrangeBackground3, label: t('A と違う', 'Differs from A') }))
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
+  const [abSettingsOpen, setAbSettingsOpen] = useState(false)
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
   const select = (p: PartRef | null) => {
@@ -420,6 +419,83 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     { v: 'history', icon: <HistoryRegular />, label: t('変更', 'Changes'), tip: t('変更の記録(差し替えの理由・ステータスの変化)', 'Change log (swap reasons, status changes)'), count: 0, gap: true },
   ]
 
+  /**
+   * AB テストの案(SU8。2026-10-24 利用者と決めた)。AB に分けるのは配信の大前提で、プレビュー(1 つの案)の話ではないので、上の帯に置く。
+   * 案が 1 つのときは「＋ AB テストの案を足す」だけ、2 つ以上のときは「案 A | 案 B」のタブ(押すと、プレビューと中身がその案になる)。
+   * アイコンに頼らず文字で書き、何をするものかは ⓘ(InfoLabel)に
+   */
+  const addVariantMenu = (
+    <Menu>
+      <MenuTrigger disableButtonEnhancement>
+        <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} disabled={e.saving || e.ab?.busy}>
+          {e.ab ? t('案を足す', 'Add a variant') : t('AB テストの案を足す', 'Add an A/B test variant')}
+        </Button>
+      </MenuTrigger>
+      <MenuPopover>
+        <MenuList>
+          {(e.ab?.keys ?? ['A']).map((k) => (
+            <MenuItem key={k} onClick={() => (void onCommit(), e.abAdd(k))}>
+              {t(`案 ${k} を写して直す`, `Copy variant ${k} and edit`)}
+            </MenuItem>
+          ))}
+          <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
+            {t('AI で別の案を作る', 'Let AI make another variant')}
+          </MenuItem>
+        </MenuList>
+      </MenuPopover>
+    </Menu>
+  )
+  const abBar = (
+    <div className={s.abBar}>
+      <InfoLabel
+        size="small"
+        info={t('同じ配信を、見出しや画像を変えて複数作り、どれがよいかを比べます。タブを押すと、プレビューと中身がその案に切り替わります', 'Make several versions of the same delivery with different headlines or images, and compare which works better. Pick a tab to switch the preview and content to that variant.')}
+      >
+        {e.ab ? t('AB テスト', 'A/B test') : ''}
+      </InfoLabel>
+      {e.ab && (
+        <TabList size="small" selectedValue={e.ab.active} onTabSelect={(_, d) => d.value !== e.ab?.active && (void onCommit(), e.abSwitch(d.value as typeof e.ab.active))}>
+          {e.ab.keys.map((k) => (
+            <Tab key={k} value={k}>
+              {t(`案 ${k}`, `Variant ${k}`)}
+            </Tab>
+          ))}
+        </TabList>
+      )}
+      {(!e.ab || e.ab.canAdd) && addVariantMenu}
+      {e.ab && (
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <Button type="button" size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('AB テストの操作', 'A/B test actions')} />
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<ColumnTripleRegular />} onClick={e.abCompare}>
+                {t('案を並べて比べる', 'Compare variants side by side')}
+              </MenuItem>
+              <MenuItem icon={<SettingsRegular />} onClick={() => setAbSettingsOpen(true)}>
+                {t('テストの設定', 'Test settings')}
+              </MenuItem>
+              {e.ab.active !== 'A' && (
+                <MenuItem icon={<DeleteRegular />} onClick={() => e.ab && window.confirm(t(`案 ${e.ab.active} を消します(保存で確定)。よろしいですか?`, `Remove variant ${e.ab.active}? (on save)`)) && e.abRemove(e.ab.active)}>
+                  {t(`案 ${e.ab.active} を消す`, `Remove variant ${e.ab.active}`)}
+                </MenuItem>
+              )}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+      )}
+      {/* テストの設定(⋯ から開く。中身は CardDetail の AbSettings) */}
+      <Popover open={abSettingsOpen} onOpenChange={(_, d) => setAbSettingsOpen(d.open)} positioning="below-end" withArrow>
+        <PopoverTrigger disableButtonEnhancement>
+          <span />
+        </PopoverTrigger>
+        <PopoverSurface>{e.abSettings}</PopoverSurface>
+      </Popover>
+      {e.ab?.busy && <Spinner size="extra-tiny" label={t('AI が案を作っています', 'AI is drafting')} labelPosition="after" />}
+    </div>
+  )
+
   return (
     <div className={s.root}>
       <StageHeader
@@ -461,6 +537,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         }
         // 面のタブ(PLAN | PRODUCTION | RESULTS)。配信が主役で、面はその見方なので、題名の下に
         tabs={e.stageNav}
+        // AB テストの案(SU8)。1 段目に置くと配信名が縮むので、同じ帯の 2 段目、面のタブの右に
+        tabsExtra={abBar}
       />
       <div className={s.notices}>
         {e.notices}
@@ -603,65 +681,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             >
               {t(`テンプレート: ${tpl.label}`, `Template: ${tpl.label}`)}
             </Button>
-          </div>
-          {/* 案のタブ(SU2): A | B | C | ＋。切り替えると、プレビューとペインがその案の中身になる */}
-          <div className={s.abRow}>
-            {e.ab ? (
-              e.ab.keys.map((k) => (
-                <span key={k} className={mergeClasses(s.abTab, e.ab?.active === k && s.abTabOn)}>
-                  <button type="button" className={s.abTabBtn} onClick={() => k !== e.ab?.active && (void onCommit(), e.abSwitch(k))} aria-pressed={e.ab?.active === k}>
-                    {t(`${k} 案`, `Variant ${k}`)}
-                  </button>
-                  {k !== 'A' && e.ab?.active === k && (
-                    <button
-                      type="button"
-                      className={s.abTabX}
-                      aria-label={t(`${k} 案を消す`, `Remove variant ${k}`)}
-                      onClick={() => window.confirm(t(`${k} 案を消します(保存で確定)。よろしいですか?`, `Remove variant ${k}? (on save)`)) && e.abRemove(k)}
-                    >
-                      ×
-                    </button>
-                  )}
-                </span>
-              ))
-            ) : (
-              <span className={s.hint}>{t('案は 1 つ', 'One variant')}</span>
-            )}
-            {(!e.ab || e.ab.canAdd) && (
-              <Menu>
-                <MenuTrigger disableButtonEnhancement>
-                  <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} disabled={e.saving || e.ab?.busy}>
-                    {e.ab ? t('案を足す', 'Add variant') : t('案を足す(AB テスト)', 'Add variant (A/B)')}
-                  </Button>
-                </MenuTrigger>
-                <MenuPopover>
-                  <MenuList>
-                    {(e.ab?.keys ?? ['A']).map((k) => (
-                      <MenuItem key={k} onClick={() => (void onCommit(), e.abAdd(k))}>
-                        {t(`${k} 案を写して直す`, `Copy variant ${k} and edit`)}
-                      </MenuItem>
-                    ))}
-                    <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
-                      {t('AI で別の案を作る', 'Let AI make another variant')}
-                    </MenuItem>
-                  </MenuList>
-                </MenuPopover>
-              </Menu>
-            )}
-            {e.ab && (
-              <>
-                <Button type="button" size="small" appearance="subtle" icon={<ColumnTripleRegular />} onClick={e.abCompare}>
-                  {t('並べて比べる', 'Compare')}
-                </Button>
-                <Popover positioning="below-start" withArrow>
-                  <PopoverTrigger disableButtonEnhancement>
-                    <Button type="button" size="small" appearance="subtle" icon={<SettingsRegular />} aria-label={t('テストの設定', 'Test settings')} />
-                  </PopoverTrigger>
-                  <PopoverSurface>{e.abSettings}</PopoverSurface>
-                </Popover>
-              </>
-            )}
-            {e.ab?.busy && <Spinner size="extra-tiny" label={t('AI が案を作っています', 'AI is drafting')} labelPosition="after" />}
           </div>
           {/* 違いが多いときは知らせる(止めない)。案から選ぶときは、違ってよいので出さない */}
           {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length >= 3 && (
