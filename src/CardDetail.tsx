@@ -90,10 +90,9 @@ import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
 import type { PartRef } from './simple/parts'
-import { PinFloat, type PinTarget } from './PinFloat'
+import { PinFloat } from './PinFloat'
 import { focusSoon, type ContextItem } from './ContextMenu'
-import { focusPin } from './pinStore'
-import { forgetLinkedPin, linkedPin } from './pinActions'
+import { usePreviewPins } from './usePreviewPins'
 import { heroImage } from './images'
 import { ArrowSwapRegular as CtxSwapRegular, DeleteRegular as CtxDeleteRegular, EditRegular as CtxEditRegular, ImageEditRegular as CtxImageEditRegular, OpenRegular as CtxOpenRegular, SparkleRegular as CtxSparkleRegular } from '@fluentui/react-icons'
 
@@ -573,18 +572,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
   const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
   // プレビュー上の場所を指して書き込む(ピン)。選んでいる間は、プレビューを押しても編集しない
-  const [placingPin, setPlacingPin] = useState(false)
-  const endPlacingPin = useCallback(() => setPlacingPin(false), [])
   // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右のやり取りの欄は、全部の流れとして残す)
-  // リンク(pin=…)で開いたときは、そのピンのフロートを開いて始める(企画のピンでなければ、ピンが見つからず出ない)
-  const [pinTarget, setPinTarget] = useState<PinTarget | null>(() => {
-    const id = linkedPin()
-    return id ? { noteId: id } : null
-  })
-  useEffect(() => {
-    const id = linkedPin()
-    if (id) focusPin(id)
-  }, [])
+  const { placing: placingPin, setPlacing: setPlacingPin, endPlacing: endPlacingPin, target: pinTarget, setTarget: setPinTarget, openThreads: openPinThreads, close: closePin } = usePreviewPins()
   // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
   // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
   const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
@@ -2903,7 +2892,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                   items={items}
                   placing={placingPin}
                   onPlacingEnd={endPlacingPin}
-                  onOpenThreads={(noteId) => setPinTarget(noteId ? { noteId } : { pending: true })}
+                  onOpenThreads={openPinThreads}
                   menuItems={detailPreviewMenu}
                 />
                 {card && pinTarget && (
@@ -2915,10 +2904,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     target={pinTarget}
                     productName={(id) => productById.get(id)?.name ?? ''}
                     onTarget={setPinTarget}
-                    onClose={() => {
-                      forgetLinkedPin()
-                      setPinTarget(null)
-                    }}
+                    onClose={closePin}
                   />
                 )}
                 <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />

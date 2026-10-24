@@ -11,10 +11,9 @@ import { pinView } from '../pinStore'
 import { CommPane, type CommCounts, type CommSection } from './CommPane'
 import { CardAlertsBar } from '../CardAlertsBar'
 import { Hint } from '../Hint'
-import { PinFloat, type PinTarget } from '../PinFloat'
+import { PinFloat } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
-import { focusPin } from '../pinStore'
-import { forgetLinkedPin, linkedPin } from '../pinActions'
+import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
 import { EditRegular, ImageEditRegular, MoreHorizontalRegular, OpenRegular, ArrowSwapRegular, DeleteRegular, SparkleRegular } from '@fluentui/react-icons'
@@ -342,22 +341,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const handoffMissing = !e.form.handedOffAt && (!e.form.productionOwner.trim() || !e.form.productionDue)
   // プレビューの場所を押してコメントを書く(PreviewPins の覆い)。打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す。
   // 右の帯のやり取りは開かない(2026-10-23 利用者: ほとんどのコメントはピン経由なので、ピンだけで進められるように)
-  const [placing, setPlacing] = useState(false)
-  const endPlacing = useCallback(() => setPlacing(false), [])
-  // リンク(pin=…)で開いたときは、そのピンのフロートを開いて始める
-  const [pinTarget, setPinTarget] = useState<PinTarget | null>(() => {
-    const id = linkedPin()
-    return id ? { noteId: id } : null
-  })
-  useEffect(() => {
-    const id = linkedPin()
-    if (id) focusPin(id)
-  }, [])
-  const openThreads = useCallback((noteId?: string) => setPinTarget(noteId ? { noteId } : { pending: true }), [])
-  const closePin = () => {
-    forgetLinkedPin()
-    setPinTarget(null)
-  }
+  const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
   // 右クリックの「画像を入れ替える」(メイン画像のペインの「入れ替える」を開く)
   const [heroReplace, setHeroReplace] = useState(0)
   /**

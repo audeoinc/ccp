@@ -36,11 +36,11 @@ import { canGoProduction } from './productionGate'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
-import { PinFloat, type PinTarget } from './PinFloat'
-import { focusPin, focusedPin, subscribePins } from './pinStore'
+import { PinFloat } from './PinFloat'
+import { focusedPin, subscribePins } from './pinStore'
 import { CardNotesService } from './data/cardNotes'
 import { stageOf } from './notesStage'
-import { forgetLinkedPin, linkedPin } from './pinActions'
+import { usePreviewPins } from './usePreviewPins'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DevRequestMoreMenu } from './DevRequestMenu'
 import { ResolvedPinsToggle } from './ResolvedPinsToggle'
@@ -174,19 +174,9 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const [htmlView, setHtmlView] = useState<'made' | 'plan'>('made')
   const [previewView, setPreviewView] = useState<'made' | 'plan' | 'compare'>('made')
   // プレビューの場所を指して書き込む(ピン。X65)。制作のやり取りに、場所つきで書く
-  const [placingPin, setPlacingPin] = useState(false)
-  const endPlacingPin = useCallback(() => setPlacingPin(false), [])
-  const [previewFrame, setPreviewFrame] = useState<HTMLIFrameElement | null>(null)
   // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右の制作のやり取りは、全部の流れとして残す)
-  // リンク(pin=…)で開いたときは、そのピンのフロートを開いて始める(制作のピンでなければ、ピンが見つからず出ない)
-  const [pinTarget, setPinTarget] = useState<PinTarget | null>(() => {
-    const id = linkedPin()
-    return id ? { noteId: id } : null
-  })
-  useEffect(() => {
-    const id = linkedPin()
-    if (id) focusPin(id)
-  }, [])
+  const { placing: placingPin, setPlacing: setPlacingPin, endPlacing: endPlacingPin, target: pinTarget, setTarget: setPinTarget, openThreads: openPinThreads, close: closePin } = usePreviewPins()
+  const [previewFrame, setPreviewFrame] = useState<HTMLIFrameElement | null>(null)
   const [pasting, setPasting] = useState<string | null>(null)
   // 仕上がりを見る(X58 段階 4)
   const [finishedOpen, setFinishedOpen] = useState(false)
@@ -903,7 +893,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   view={pinView(previewView === 'plan' ? 'html-plan' : 'html-made', '', cur)}
                   placing={placingPin}
                   onPlacingEnd={endPlacingPin}
-                  onOpenThreads={(noteId) => setPinTarget(noteId ? { noteId } : { pending: true })}
+                  onOpenThreads={openPinThreads}
                 />
               )}
               {previewView !== 'compare' && pinTarget && (
@@ -915,10 +905,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   target={pinTarget}
                   productName={(id) => snap.products.find((p) => p.id === id)?.name ?? ''}
                   onTarget={setPinTarget}
-                  onClose={() => {
-                    forgetLinkedPin()
-                    setPinTarget(null)
-                  }}
+                  onClose={closePin}
                 />
               )}
             </div>
