@@ -43,6 +43,7 @@ import { stageOf } from './notesStage'
 import { forgetLinkedPin, linkedPin } from './pinActions'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DevRequestMoreMenu } from './DevRequestMenu'
+import { ResolvedPinsToggle } from './ResolvedPinsToggle'
 
 const RAIL_W = 32
 
@@ -831,6 +832,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                     </Button>
                   </Tooltip>
                 )}
+                {previewView !== 'compare' && curProposal === null && <ResolvedPinsToggle />}
               </div>
               {curBeforeAdopt !== null && curProposal === null && (
                 <div className={s.editBar}>

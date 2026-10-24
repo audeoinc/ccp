@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Item } from './items'
-import { CommentAddRegular } from '@fluentui/react-icons'
+import { CommentAddRegular, CommentCheckmarkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
 import { pinMenuItems } from './pinMenu'
 import { myName, onMeChange } from './history'
-import { anchorOfBlock, findSectionBlock, focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins } from './pinStore'
+import { anchorOfBlock, findSectionBlock, focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, setShowResolvedPins, showResolvedPins, subscribePins } from './pinStore'
 
 const PIN = 22
 
@@ -83,6 +83,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
   const version = useSyncExternalStore(subscribePins, notesVersion)
   const pending = useSyncExternalStore(subscribePins, pendingPin)
   const focus = useSyncExternalStore(subscribePins, focusedPin)
+  const withResolved = useSyncExternalStore(subscribePins, showResolvedPins)
   const [notes, setNotes] = useState<CardNote[]>([])
   const [spots, setSpots] = useState<Spot[]>([])
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -101,8 +102,8 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
   }, [cardId, version])
 
   const numbers = pinNumbers(notes)
-  // 出すのは、同じチャネル・案の、未解決のもの。解決したものも、いま光らせているものは出す
-  const shown = notes.filter((n) => isPinned(n) && sameSurface(n.anchor_view, view) && (!n.resolved || focus?.noteId === n.id))
+  // 出すのは、同じチャネル・案の、未解決のもの。解決したものも、いま光らせているもの・「解決したピンも出す」のときは出す(X65 (c))
+  const shown = notes.filter((n) => isPinned(n) && sameSurface(n.anchor_view, view) && (!n.resolved || withResolved || focus?.noteId === n.id))
   const myPending = pending && pending.cardId === cardId ? pending : null
 
   /** 目印のブロックを探す。商品は、その商品の最初の枠(並べ替えても、商品について行く) */
@@ -234,6 +235,12 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
       const extra = live.current.menuItems?.(under) ?? []
       openAt(x, y, [
         { key: 'pin', label: t('ここにピンを打って、コメントを書く', 'Pin here and write a comment'), icon: <CommentAddRegular />, onSelect: () => void live.current.placeAt(x, y) },
+        {
+          key: 'resolved',
+          label: showResolvedPins() ? t('解決したピンを隠す', 'Hide resolved pins') : t('解決したピンも出す', 'Show resolved pins'),
+          icon: <CommentCheckmarkRegular />,
+          onSelect: () => setShowResolvedPins(!showResolvedPins()),
+        },
         ...extra.map((it, i) => (i === 0 ? { ...it, divider: true } : it)),
       ])
     }

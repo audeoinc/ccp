@@ -6,7 +6,7 @@ import { tr, useT } from './i18n'
 import { keepBrowserMenu, useContextMenu } from './ContextMenu'
 import { pinMenuItems } from './pinMenu'
 import { myName, onMeChange } from './history'
-import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins, type PendingPin } from './pinStore'
+import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, showResolvedPins, subscribePins, type PendingPin } from './pinStore'
 
 const PIN = 22
 
@@ -46,6 +46,8 @@ interface MountArgs {
   lastFocus: { seq: number }
   placing: boolean
   view: string
+  /** 解決したピンも出す(X65 (c)) */
+  withResolved: boolean
   handlers: {
     onPlacingEnd: () => void
     onOpenThreads: (noteId?: string) => void
@@ -57,12 +59,12 @@ interface MountArgs {
 }
 
 /** 枠の中の文書に、ピンの層を足す(戻り値で外す)。React の外の DOM なので、部品の外の関数にする */
-function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, lastFocus, placing, view, handlers }: MountArgs): (() => void) | undefined {
+function mountPins(frame: HTMLIFrameElement, { cardId, notes, pending, focus, lastFocus, placing, view, withResolved, handlers }: MountArgs): (() => void) | undefined {
   const doc = frame.contentDocument
   const box = doc && mailBox(doc)
   if (!doc || !box) return undefined
   const numbers = pinNumbers(notes, 'production')
-  const shown = notes.filter((n) => isPinned(n, 'production') && n.anchor === 'page' && sameSurface(n.anchor_view, view) && (!n.resolved || focus?.noteId === n.id))
+  const shown = notes.filter((n) => isPinned(n, 'production') && n.anchor === 'page' && sameSurface(n.anchor_view, view) && (!n.resolved || withResolved || focus?.noteId === n.id))
   const myPending = pending && pending.cardId === cardId && pending.stage === 'production' && sameSurface(pending.view, view) ? pending : null
 
   const orange = resolve(frame, tokens.colorPaletteDarkOrangeBackground3)
@@ -186,6 +188,7 @@ export function HtmlPins({ frame, cardId, view, placing, onPlacingEnd, onOpenThr
   const version = useSyncExternalStore(subscribePins, notesVersion)
   const pending = useSyncExternalStore(subscribePins, pendingPin)
   const focus = useSyncExternalStore(subscribePins, focusedPin)
+  const withResolved = useSyncExternalStore(subscribePins, showResolvedPins)
   const [notes, setNotes] = useState<CardNote[]>([])
   // HTML を描き直す(srcDoc が変わる)と、枠の中の文書が新しくなるので、描き直しの回数で層を付け直す
   const [loads, setLoads] = useState(0)
@@ -230,8 +233,8 @@ export function HtmlPins({ frame, cardId, view, placing, onPlacingEnd, onOpenThr
 
   useEffect(() => {
     if (!frame || !cardId) return
-    return mountPins(frame, { cardId, notes, pending, focus, lastFocus: lastFocus.current, placing, view, handlers: handlers.current })
-  }, [frame, loads, notes, pending, focus, placing, view, cardId])
+    return mountPins(frame, { cardId, notes, pending, focus, lastFocus: lastFocus.current, placing, view, withResolved, handlers: handlers.current })
+  }, [frame, loads, notes, pending, focus, placing, view, cardId, withResolved])
 
   return <>{ctx.menu}</>
 }

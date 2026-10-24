@@ -6,6 +6,7 @@ import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
 import { PreviewPins } from '../PreviewPins'
+import { ResolvedPinsToggle } from '../ResolvedPinsToggle'
 import { pinView } from '../pinStore'
 import { CommPane, type CommCounts, type CommSection } from './CommPane'
 import { CardAlertsBar } from '../CardAlertsBar'
@@ -829,6 +830,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             >
               <ToggleButton type="button" size="small" appearance={placing ? 'primary' : 'subtle'} checked={placing} icon={<CommentAddRegular />} onClick={() => setPlacing(!placing)} />
             </Tooltip>
+            <ResolvedPinsToggle />
           </div>
           {placing && (
             <MessageBar intent="info" className={s.placingBar}>

@@ -1,6 +1,7 @@
 import type { CardNote } from './data/cardNotes'
 import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
 import { tr } from './i18n'
+import { loadPref, savePref } from './settings'
 
 /**
  * プレビュー上の場所に置く書き込み(ピン)の、画面どうしの受け渡し。
@@ -44,6 +45,16 @@ export const focusPin = (noteId: string) => {
   focus = { noteId, seq: (focus?.seq ?? 0) + 1 }
   emit()
 }
+/** 解決したピンも出すか(X65 (c)。人ごとに覚える。配信カード・制作のページのプレビューで共通) */
+const RESOLVED_KEY = 'pins.showResolved'
+let showResolved = loadPref<boolean>(RESOLVED_KEY, false)
+export const showResolvedPins = () => showResolved
+export const setShowResolvedPins = (v: boolean) => {
+  showResolved = v
+  savePref(RESOLVED_KEY, v)
+  emit()
+}
+
 /** やり取りを読み直したとき(ピンも読み直す) */
 export const notesVersion = () => version
 export const bumpNotes = () => {

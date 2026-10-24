@@ -65,6 +65,7 @@ import { ApprovalsService } from './data/approvals'
 import { CHANNEL_PUSH, channelOptions, countryOptions, statusColor, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
+import { ResolvedPinsToggle } from './ResolvedPinsToggle'
 import { CardAlertsBar } from './CardAlertsBar'
 import { AbDecidedBar, AbTestBar } from './AbTestBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
@@ -2897,6 +2898,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     {placingPin ? t('場所を押す…', 'Click a spot…') : t('コメントを置く', 'Place comment')}
                   </ToggleButton>
                 </Tooltip>
+                {card && <ResolvedPinsToggle />}
                 {previewTab === 'email' && template === 'free' && (
                   <>
                     <Switch label={t('カテゴリ見出し', 'Category headings')} checked={showHeadings} onChange={(_, d) => setShowHeadings(d.checked)} />
