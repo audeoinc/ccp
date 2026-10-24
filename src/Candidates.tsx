@@ -17,6 +17,8 @@ interface Props {
   onPick?: (productId: string) => void
   /** 選ぶ使い方で、選んでいる商品 */
   pickedId?: string
+  /** 選ぶ使い方で、件数の横に出す説明(既定は「押すと、右に詳しい情報が出ます」) */
+  pickHint?: string
   /** 行に添える印(残少・週の上限 など) */
   marks?: (p: Product) => ReactNode
 }
@@ -56,7 +58,7 @@ const PAGE = 20
 
 const trendMark = (label?: string) => (label === '上昇' ? '▲ ' : label === '下降' ? '▼ ' : '— ') + optionLabel(label === '上昇' || label === '下降' ? label : '横ばい')
 
-export function Candidates({ products, usedIds, onAdd, onPick, pickedId, marks }: Props) {
+export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHint, marks }: Props) {
   const t = useT()
   const styles = useStyles()
   const [query, setQuery] = useState('')
@@ -103,7 +105,7 @@ export function Candidates({ products, usedIds, onAdd, onPick, pickedId, marks }
         </Caption1>
       ) : (
         <Caption1 className={styles.caption}>
-          {onPick ? t('押すと、右に詳しい情報が出ます', 'Click to see details on the right') : t('右のプレビューへドラッグして掲載', 'Drag to the preview on the right to include')}
+          {onPick ? (pickHint ?? t('押すと、右に詳しい情報が出ます', 'Click to see details on the right')) : t('右のプレビューへドラッグして掲載', 'Drag to the preview on the right to include')}
         </Caption1>
       )}
       {searching && matched.length === 0 && <Caption1 className={styles.caption}>{t('該当する商品がありません。', 'No matching products.')}</Caption1>}

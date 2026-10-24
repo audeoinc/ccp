@@ -1,12 +1,13 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
-import { Button, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
-import { DismissRegular } from '@fluentui/react-icons'
+import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { Button, Tab, TabList, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ChevronUpRegular, DismissRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 
 /*
  * 「選び直す」の共通の枠(SU3)。メイン画像の入れ替え・商品の差し替え・部品の画像の選び直しで同じ形にする。
  * 下に伸びるだけだと開いたことが分かりにくく、中の選び方も並列に見えなかったので、
  * 枠と見出し(閉じる ×)で元の表示と分け、選び方は TabList で並べて、選んだタブの中身だけを出す。
+ * 開くのは対象(画像・商品)の真下のボタンから(ChooseDrawer)。ボタンと枠を同じ色の線でつなげ、引き出しを開けたように見せる(2026-10-24 利用者と決めた)。
  */
 
 const useStyles = makeStyles({
@@ -18,6 +19,24 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
     boxShadow: tokens.shadow4,
     overflow: 'hidden',
+  },
+  // ボタンから引き出した枠: ボタンの下の角とつながるよう、左上の角を立て、線の色をボタンにそろえる
+  attached: { borderTopLeftRadius: 0, border: `1px solid ${tokens.colorBrandStroke1}` },
+  drawer: { display: 'grid', justifyItems: 'start', minWidth: 0 },
+  drawerPanel: { justifySelf: 'stretch' },
+  // 開いている間のボタン: 押されたままの見た目で、下の線をなくして枠の見出しと同じ色にし、枠の上の線に 1px 重ねてつなぐ
+  triggerOpen: {
+    position: 'relative',
+    zIndex: 1,
+    marginBottom: '-1px',
+    border: `1px solid ${tokens.colorBrandStroke1}`,
+    borderBottomColor: tokens.colorBrandBackground2,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorNeutralForeground1,
+    ':hover': { backgroundColor: tokens.colorBrandBackground2Hover, color: tokens.colorNeutralForeground1, borderBottomColor: tokens.colorBrandBackground2 },
+    ':hover:active': { backgroundColor: tokens.colorBrandBackground2Pressed, color: tokens.colorNeutralForeground1 },
   },
   head: {
     display: 'flex',
@@ -47,15 +66,18 @@ interface Props<V extends string> {
   defaultTab?: V
   /** 閉じる。渡さなければ × を出さない(まだ何も選んでいなくて、閉じられないとき) */
   onClose?: () => void
+  /** ボタンから引き出した枠(ChooseDrawer の中で使う) */
+  attached?: boolean
+  id?: string
 }
 
-export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose }: Props<V>) {
+export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, id }: Props<V>) {
   const s = useStyles()
   const t = useT()
   const [tab, setTab] = useState<V>(defaultTab ?? tabs[0].value)
   const current = tabs.find((x) => x.value === tab) ?? tabs[0]
   return (
-    <section className={s.root} aria-label={typeof title === 'string' ? title : undefined}>
+    <section id={id} className={mergeClasses(s.root, attached && s.attached)} aria-label={typeof title === 'string' ? title : undefined}>
       <div className={s.head}>
         <span className={s.title}>{title}</span>
         {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} title={t('閉じる', 'Close')} />}
@@ -71,5 +93,50 @@ export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose
         {current.content}
       </div>
     </section>
+  )
+}
+
+interface DrawerProps<V extends string> extends Omit<Props<V>, 'attached' | 'id' | 'onClose'> {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /** 開くボタンの文言(例: 入れ替える・差し替える) */
+  label: ReactNode
+  icon?: ReactElement
+  disabled?: boolean
+  /** 閉じられない(まだ何も選んでいない)ときは false。ボタンも × も出さず、枠だけを出す */
+  closable?: boolean
+}
+
+/**
+ * 対象の真下に置く「選び直す」のボタンと、そこから引き出す枠(SU3)。同じボタンをもう一度押すか、枠の × で閉じる。
+ * 開いている間は、ボタンが押されたままの見た目(▲)で、枠とつながる
+ */
+export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon, disabled, closable = true, ...panel }: DrawerProps<V>) {
+  const s = useStyles()
+  const t = useT()
+  const id = useId()
+  if (!closable) return open ? <ChoosePanel {...panel} /> : null
+  return (
+    <div className={s.drawer}>
+      <ToggleButton
+        size="small"
+        appearance={open ? 'secondary' : 'primary'}
+        checked={open}
+        className={open ? s.triggerOpen : undefined}
+        icon={open ? <ChevronUpRegular /> : icon}
+        disabled={disabled}
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        title={open ? t('閉じる', 'Close') : undefined}
+        onClick={() => onOpenChange(!open)}
+      >
+        {label}
+      </ToggleButton>
+      {open && (
+        <div className={s.drawerPanel}>
+          <ChoosePanel {...panel} id={id} attached onClose={() => onOpenChange(false)} />
+        </div>
+      )}
+    </div>
   )
 }

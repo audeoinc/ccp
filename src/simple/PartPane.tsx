@@ -3,7 +3,7 @@ import { Badge, Button, Field, Input, Select, Spinner, Text, ToggleButton, Toolt
 import { ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
-import { ChoosePanel } from '../ChoosePanel'
+import { ChooseDrawer, ChoosePanel } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
 import { ImageThumb } from '../ImageThumb'
@@ -22,12 +22,10 @@ import { baseTemplateId, sectionIndexAt, sectionsOf, templateOptions } from '../
 import { TemplateThumb } from '../TemplateThumb'
 import { PushThumb } from '../PushThumb'
 import type { Product } from '../models/products'
-import type { HeroImage } from '../models/heroImages'
-import type { ProposedHero } from '../aiSelect'
 import { partKey, type PartRef } from './parts'
 import { PartAiChat } from './PartAiChat'
 import { ProductionMemo } from './ProductionMemo'
-import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartIdea, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
+import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartIdea, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
 import type { SimpleEditor, SimpleField } from './editor'
 
 const useStyles = makeStyles({
@@ -69,6 +67,7 @@ const useStyles = makeStyles({
   num: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, textAlign: 'right' },
   heroNow: { display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: '10px', alignItems: 'start' },
   heroCands: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '6px' },
+  pickRow: { display: 'grid', rowGap: '2px', padding: '6px 8px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   heroCandOn: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
@@ -114,24 +113,44 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     // 頼まれたとき(数が増えたとき)だけ開く。部品を選び直したときには開かない
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heroReplace])
-  const [heroPicks, setHeroPicks] = useState<HeroPicks | null>(null)
-  const recommendHeroes = async (key: string) => {
-    setHeroPicks({ key, ideas: [], busy: true })
+  const [aiPicks, setAiPicks] = useState<Picks | null>(null)
+  const picksOf = (key: string) => (aiPicks?.key === key ? aiPicks : undefined)
+  const recommend = async (key: string, ask: () => Promise<PartAnswer>) => {
+    setAiPicks({ key, ideas: [], busy: true })
     try {
-      const r = await askHeroPick({
+      const r = await ask()
+      setAiPicks({ key, ideas: r.ideas, busy: false, error: r.ideas.length ? undefined : r.reply || tr('おすすめが見つかりませんでした', 'No recommendations found') })
+    } catch (err) {
+      setAiPicks({ key, ideas: [], busy: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  const productNames = () => e.items.flatMap((i) => byId.get(i.productId)?.name ?? [])
+  const recommendHeroes = (key: string) =>
+    recommend(key, () =>
+      askHeroPick({
         card: e.aiCard(),
         angle: e.form.copyAngle,
         current: e.hero,
         heroes: e.poolHeroes,
-        productNames: e.items.flatMap((i) => byId.get(i.productId)?.name ?? []),
+        productNames: productNames(),
         request: tr('この配信のテーマと商品に合うメイン画像を、3〜4 枚おすすめしてください。', 'Recommend 3 or 4 main images that fit this delivery\'s theme and products.'),
         history: [],
-      })
-      setHeroPicks({ key, ideas: r.ideas, busy: false, error: r.ideas.length ? undefined : r.reply || tr('おすすめが見つかりませんでした', 'No recommendations found') })
-    } catch (err) {
-      setHeroPicks({ key, ideas: [], busy: false, error: err instanceof Error ? err.message : String(err) })
-    }
-  }
+      }),
+    )
+  const recommendProducts = (key: string, current?: Product) =>
+    recommend(key, () =>
+      askProductPick({
+        card: e.aiCard(),
+        angle: e.form.copyAngle,
+        current,
+        products: e.poolProducts,
+        inCard: e.items.flatMap((i) => byId.get(i.productId) ?? []),
+        request: tr('この枠の商品の代わりになる、この配信に合う商品を 3〜4 点おすすめしてください。', 'Recommend 3 or 4 products that could replace this one and fit the delivery.'),
+        history: [],
+      }),
+    )
+  // 商品を差し替える枠を開いている部品(部品を移ると畳む)
+  const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null)
   const [linkEditing, setLinkEditing] = useState(false)
   const heroDefaultLink = e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl
   // 使える期限が配信日より前(選んだあとで期限が来た画像。入れ替えを促す)
@@ -454,14 +473,26 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                     label: t('AI のおすすめ', 'AI picks'),
                     icon: <SparkleRegular />,
                     content: (
-                      <HeroRecommend
-                        heroes={e.poolHeroes}
-                        currentId={e.hero?.id}
-                        picks={heroPicks?.key === partKey(part) ? heroPicks : undefined}
-                        fallback={e.heroCandidates}
+                      <AiPicks
+                        hint={t('この配信のテーマと商品に合いそうな画像を、AI が挙げます。押すと入れ替わります', 'AI suggests images that fit this delivery. Click one to use it')}
+                        picks={picksOf(partKey(part))}
+                        hasFallback={e.heroCandidates.length > 0}
                         onAsk={() => void recommendHeroes(partKey(part))}
-                        onPick={(id, why) => e.setHero(id, why)}
-                      />
+                      >
+                        {(picksOf(partKey(part))?.ideas.map((i) => ({ id: i.value, why: i.why })) ?? e.heroCandidates.map((c) => ({ id: c.heroId, why: c.reason }))).length > 0 && (
+                          <div className={s.heroCands}>
+                            {(picksOf(partKey(part))?.ideas.map((i) => ({ id: i.value, why: i.why })) ?? e.heroCandidates.map((c) => ({ id: c.heroId, why: c.reason }))).map((c) => {
+                              const h = e.poolHeroes.find((x) => x.id === c.id)
+                              return h ? (
+                                <button key={c.id} type="button" className={mergeClasses(s.heroCand, h.id === e.hero?.id && s.heroCandOn)} title={c.why} onClick={() => e.setHero(h.id, c.why)}>
+                                  <ImageThumb src={heroImage(h)} alt={h.name} width={80} height={60} />
+                                  <span className={s.caption}>{h.name}</span>
+                                </button>
+                              ) : null
+                            })}
+                          </div>
+                        )}
+                      </AiPicks>
                     ),
                   },
                   {
@@ -545,12 +576,75 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         if (!it) return <span className={s.caption}>{t('この商品は、もう載っていません', 'This product is no longer in the delivery')}</span>
         const idx = e.items.indexOf(it)
         const sec = sections[sectionIndexAt(sections, idx)]
+        // 同じセクションの、AI がはじめに挙げた残りの候補(AI のおすすめがまだないときに出す)
+        const swapCands = e.candidates.filter((c) => c.section === sectionIndexAt(sections, idx))
+        const swapTo = (productId: string, why: string) => {
+          e.replaceItem(it.key, productId, why)
+          setSwapOpenKey(null)
+        }
+        const swapWith = (candKey: string, why: string) => {
+          e.swapWithCandidate(it.key, candKey, why)
+          setSwapOpenKey(null)
+        }
         return (
           <>
             {/* 箱を押すと、詳しい情報・差し替え・この配信で使う画像のフロート */}
             <div role="button" tabIndex={0} className={s.productOpen} title={t('押すと、詳しい情報・差し替え・画像', 'Click for details, swap and image')} onClick={() => e.openProduct(it.key)} onKeyDown={(ev) => ev.key === 'Enter' && e.openProduct(it.key)}>
               {productBox(byId.get(it.productId), it.reason ? <span className={s.caption}>{it.reason}</span> : undefined, it.imageUrl)}
             </div>
+            {/* 差し替えは、箱の真下のボタンから開く(どの商品を替えるのかが、ひと目で分かるように) */}
+            <ChooseDrawer
+                key={partKey(part)}
+                open={swapOpenKey === partKey(part)}
+                onOpenChange={(o) => setSwapOpenKey(o ? partKey(part) : null)}
+                label={t('差し替える', 'Swap')}
+                icon={<ArrowSwapRegular />}
+                disabled={e.saving}
+                title={t('この枠の商品を差し替える', 'Swap this product')}
+                tabs={[
+                  {
+                    value: 'recommend',
+                    label: t('AI のおすすめ', 'AI picks'),
+                    icon: <SparkleRegular />,
+                    content: (
+                      <AiPicks
+                        hint={t('この枠の代わりになりそうな商品を、AI が挙げます。押すと差し替わります', 'AI suggests products to replace this one. Click one to swap')}
+                        picks={picksOf(partKey(part))}
+                        hasFallback={swapCands.length > 0}
+                        onAsk={() => void recommendProducts(partKey(part), byId.get(it.productId))}
+                      >
+                        {picksOf(partKey(part))
+                          ? picksOf(partKey(part))!.ideas.map((i) => (
+                              <button key={i.value} type="button" className={s.pickRow} title={i.why} disabled={e.saving} onClick={() => swapTo(i.value, i.why)}>
+                                {productLine(byId.get(i.value))}
+                                {i.why && <span className={s.caption}>{i.why}</span>}
+                              </button>
+                            ))
+                          : swapCands.map((c) => (
+                              <button key={c.key} type="button" className={s.pickRow} title={c.reason} disabled={e.saving} onClick={() => swapWith(c.key, c.reason ?? '')}>
+                                {productLine(byId.get(c.productId))}
+                                {c.reason && <span className={s.caption}>{c.reason}</span>}
+                              </button>
+                            ))}
+                      </AiPicks>
+                    ),
+                  },
+                  { value: 'ask', label: t('AI に頼む', 'Ask AI'), icon: <ChatRegular />, content: productChat(it.key) },
+                  {
+                    value: 'all',
+                    label: t('すべての商品', 'All products'),
+                    content: (
+                      <Candidates
+                        products={e.poolProducts}
+                        usedIds={new Set(e.items.map((i) => i.productId))}
+                        onAdd={() => undefined}
+                        onPick={(id) => swapTo(id, '')}
+                        pickHint={t('押すと、この枠の商品と差し替わります', 'Click to swap it into this slot')}
+                      />
+                    ),
+                  },
+                ]}
+              />
             <span className={s.caption}>{t(`${idx + 1} 番目${sec ? `(${sec.label})` : ''}`, `Position ${idx + 1}${sec ? ` (${sec.label})` : ''}`)}</span>
             <span className={s.row}>
               <Button size="small" icon={<ArrowUpRegular />} disabled={idx === 0 || e.saving} onClick={() => e.moveItem(idx, idx - 1)}>{t('前へ', 'Earlier')}</Button>
@@ -568,8 +662,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 {t('外す(候補に戻す)', 'Remove (back to candidates)')}
               </Button>
             </span>
-            {productChat(it.key)}
-            <span className={s.caption}>{t('箱を押すと、詳しい情報・差し替え・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details, swap and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</span>
+            <span className={s.caption}>{t('箱を押すと、詳しい情報・見比べての差し替え・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details, side-by-side swap and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</span>
           </>
         )
       }
@@ -689,27 +782,25 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   )
 }
 
-/**
- * テンプレートの選び直し(SU1 ⑧・段階 b)。チャネルのテンプレートを、見取り図と一緒に並べる。乗せるとプレビューに仮で写し(この配信の商品・画像のまま)、
- * 押すと替える。枠に収まらない商品は「枠外」として、メールには載らないことを知らせる(載せたままにするので、戻せば元の枠に戻る)。
- * 国ごとに使えるテンプレートの絞り込み(ST1)は、まだない
- */
-interface HeroPicks {
+interface Picks {
   key: string
   ideas: PartIdea[]
   busy: boolean
   error?: string
 }
 
-/** 「選び直す」の最初のタブ: AI が挙げたメイン画像。案がまだなければ、開いたときに 1 回だけ AI に頼む */
-function HeroRecommend({ heroes, currentId, picks, fallback, onAsk, onPick }: { heroes: HeroImage[]; currentId?: string; picks?: HeroPicks; fallback: ProposedHero[]; onAsk: () => void; onPick: (id: string, why: string) => void }) {
+/**
+ * 「選び直す」の最初のタブ(AI のおすすめ)の共通の形。メイン画像と商品の枠で使う。並べ方(画像の格子・商品の行)は children で渡す。
+ * 案がまだなく、はじめの候補(hasFallback)もなければ、開いたときに 1 回だけ AI に頼む
+ */
+function AiPicks({ hint, picks, hasFallback, onAsk, children }: { hint: string; picks?: Picks; hasFallback: boolean; onAsk: () => void; children: ReactNode }) {
   const t = useT()
   const s = useStyles()
-  const list = picks ? picks.ideas.map((i) => ({ heroId: i.value, reason: i.why })) : fallback
   const busy = !!picks?.busy
+  const any = picks ? picks.ideas.length > 0 : hasFallback
   const asked = useRef(false)
   useEffect(() => {
-    if (asked.current || picks || fallback.length) return
+    if (asked.current || picks || hasFallback) return
     asked.current = true
     // 描画の中で親の状態を変えないよう、次の番に回す
     void Promise.resolve().then(onAsk)
@@ -717,33 +808,22 @@ function HeroRecommend({ heroes, currentId, picks, fallback, onAsk, onPick }: { 
   }, [])
   return (
     <>
-      <span className={s.caption}>{t('この配信のテーマと商品に合いそうな画像を、AI が挙げます。押すと入れ替わります', 'AI suggests images that fit this delivery. Click one to use it')}</span>
-      {busy ? (
-        <Spinner size="tiny" label={t('AI が選んでいます…', 'AI is choosing…')} />
-      ) : list.length > 0 ? (
-        <div className={s.heroCands}>
-          {list.map((c) => {
-            const h = heroes.find((x) => x.id === c.heroId)
-            return h ? (
-              <button key={c.heroId} type="button" className={mergeClasses(s.heroCand, h.id === currentId && s.heroCandOn)} title={c.reason} onClick={() => onPick(h.id, c.reason)}>
-                <ImageThumb src={heroImage(h)} alt={h.name} width={80} height={60} />
-                <span className={s.caption}>{h.name}</span>
-              </button>
-            ) : null
-          })}
-        </div>
-      ) : (
-        picks?.error && <span className={s.caption}>{picks.error}</span>
-      )}
+      <span className={s.caption}>{hint}</span>
+      {busy ? <Spinner size="tiny" label={t('AI が選んでいます…', 'AI is choosing…')} /> : any ? children : picks?.error && <span className={s.caption}>{picks.error}</span>}
       <span className={s.row}>
         <Button size="small" icon={<SparkleRegular />} disabled={busy} onClick={onAsk}>
-          {list.length ? t('ほかのおすすめを挙げてもらう', 'Suggest others') : t('AI におすすめを挙げてもらう', 'Ask AI for picks')}
+          {any ? t('ほかのおすすめを挙げてもらう', 'Suggest others') : t('AI におすすめを挙げてもらう', 'Ask AI for picks')}
         </Button>
       </span>
     </>
   )
 }
 
+/**
+ * テンプレートの選び直し(SU1 ⑧・段階 b)。チャネルのテンプレートを、見取り図と一緒に並べる。乗せるとプレビューに仮で写し(この配信の商品・画像のまま)、
+ * 押すと替える。枠に収まらない商品は「枠外」として、メールには載らないことを知らせる(載せたままにするので、戻せば元の枠に戻る)。
+ * 国ごとに使えるテンプレートの絞り込み(ST1)は、まだない
+ */
 function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
