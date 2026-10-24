@@ -4,14 +4,11 @@ import {
   ArrowRepeatAllRegular,
   CheckmarkCircleRegular,
   CheckmarkRegular,
-  ChevronDownRegular,
-  ChevronRightRegular,
   DismissCircleRegular,
   EditRegular,
   HistoryRegular,
   LocationRegular,
   MentionRegular,
-  MoreHorizontalRegular,
   PaintBrushRegular,
   PersonAvailableRegular,
   SendRegular,
@@ -40,7 +37,8 @@ import { anchorOfPart, partOfAnchor, type PartRef } from './parts'
 import { Linkify } from '../LinkText'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', gridTemplateRows: 'auto auto minmax(0, 1fr) auto', height: '100%', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
+  // やり取り: 絞り込み・流れ・書く欄(承認の様子・変更の記録は、描くときに行を替える)
+  root: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) auto', height: '100%', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
   top: { display: 'grid', rowGap: '10px', padding: '12px 12px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   track: { display: 'flex', alignItems: 'center', columnGap: '4px' },
   stepIcon: { fontSize: '18px', flexShrink: 0 },
@@ -141,8 +139,23 @@ interface Props {
   canReview: boolean
   /** 制作のページを開く */
   onOpenProduction?: () => void
-  /** 自分宛ての書き込み・承認の番があるか(畳んだ帯の印と、自動で開くため) */
-  onCounts?: (c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => void
+  /** 自分宛ての書き込み・承認の番・変更の数(左のバーの数と点のため) */
+  onCounts?: (c: CommCounts) => void
+  /** 左のバーで開いているもの(SU4)。やり取り / 承認の様子 / 変更の記録。中身は 1 つの部品で持ち、書きかけの文を共にする */
+  section: CommSection
+}
+
+export type CommSection = 'talk' | 'approval' | 'history'
+export interface CommCounts {
+  open: number
+  tasks: number
+  /** 自分宛ての書き込みがある */
+  mine: boolean
+  /** 自分が承認する番 */
+  myTurn: boolean
+  /** 承認待ち */
+  waiting: boolean
+  changes: number
 }
 
 /**
@@ -166,7 +179,6 @@ export function CommPane(props: Props) {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'open' | 'all'>('open')
   const [openId, setOpenId] = useState<string | null>(null)
-  const [showChanges, setShowChanges] = useState(false)
   const [text, setText] = useState('')
   const [assignee, setAssignee] = useState('')
   const [asTask, setAsTask] = useState(false)
@@ -230,8 +242,8 @@ export function CommPane(props: Props) {
   const mine = !!meName && roots.some((n) => !n.resolved && n.assignee === meName)
   const { onCounts } = props
   useEffect(() => {
-    onCounts?.({ open: openCount, tasks: taskCount, mine: mine || eligible.length > 0, waiting })
-  }, [openCount, taskCount, mine, eligible.length, waiting, onCounts])
+    onCounts?.({ open: openCount, tasks: taskCount, mine, myTurn: eligible.length > 0, waiting, changes: changes.length })
+  }, [openCount, taskCount, mine, eligible.length, waiting, changes.length, onCounts])
 
   // ---- 書く
   const productIdOf = (key: string) => props.items.find((i) => i.key === key)?.productId
@@ -325,73 +337,116 @@ export function CommPane(props: Props) {
   const userNames = activeUsers(people).map((u) => u.name ?? '').filter(Boolean)
   const names = userNames.length > 0 ? userNames : props.people
 
+  // 変更の記録(差し替えの理由・ステータスの変化。新しい順)
+  if (props.section === 'history')
+    return (
+      <div className={s.root} style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
+      <div className={s.stream}>
+        {loading && <Spinner size="tiny" />}
+        {!loading && changes.length === 0 && <span className={s.empty}>{t('まだ変更の記録はありません', 'No changes yet')}</span>}
+        {[...changes]
+          .sort((a, b) => (b.created_on ?? '').localeCompare(a.created_on ?? ''))
+          .map((c) => (
+            <div key={c.id} className={s.quiet}>
+              <HistoryRegular />
+              <span className={s.full}>
+                {'kind' in c ? c.body : `${(c as CardEvent).actor ?? ''} ${statusLabel((c as CardEvent).from_status)} → ${statusLabel((c as CardEvent).to_status)}`} · {ago(c.created_on)}
+              </span>
+            </div>
+          ))}
+      </div>
+      </div>
+    )
+
+  // 承認の様子(状態の道のりと次に動く人・自分の番なら承認と差し戻し・依頼と取り下げ・承認の出来事)
+  if (props.section === 'approval')
+    return (
+      <div className={s.root} style={{ gridTemplateRows: 'auto auto minmax(0, 1fr)' }}>
+        {/* 1. 状態の道のりと、次に動く人 */}
+        <div className={s.top}>
+          <div className={s.track}>
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} style={{ display: 'contents' }}>
+                {i > 0 && <span className={mergeClasses(s.line, (sent || i <= step) && s.lineDone)} />}
+                {stepIcon(i)}
+              </span>
+            ))}
+          </div>
+          <div className={s.who}>
+            {waiting ? (
+              <>
+                {pendingNames.slice(0, 3).map((n) => (
+                  <Avatar key={n} size={24} name={n} initials={initials(n)} color="colorful" />
+                ))}
+                <span className={s.whoText}>
+                  {t('承認待ち', 'Awaiting approval')} <span className={s.muted}>· {ago(request?.requested_at)}</span>
+                </span>
+              </>
+            ) : step >= 2 && !props.handoff.handedOffAt ? (
+              <span className={s.whoText}>{t('承認済み。制作に渡せます', 'Approved. Ready for production')}</span>
+            ) : props.handoff.handedOffAt ? (
+              <>
+                <Avatar size={24} name={props.handoff.productionOwner || '?'} initials={initials(props.handoff.productionOwner)} color="colorful" />
+                <span className={s.whoText}>{t('制作中', 'In production')}</span>
+              </>
+            ) : step === 1 ? (
+              // 承認待ちのステータスだが、いまの依頼がない(取り下げた・内容を変えて古くなった)。依頼は下の承認の部品から
+              <span className={s.whoText}>{t('承認待ち', 'Awaiting approval')} <span className={s.muted}>· {t('依頼はまだ', 'not requested yet')}</span></span>
+            ) : (
+              <span className={s.whoText}>{t('下書き', 'Draft')}</span>
+            )}
+          </div>
+          {/* 自分が承認する番なら、ここで決める(書いた文が理由・ひとことになる) */}
+          {eligible.length > 0 && (
+            <AutoTextarea heightKey="CommPane.decideText" size="small" rows={2} value={text} disabled={working} placeholder={t('ひとこと(差し戻すときは理由)', 'A note (the reason, when requesting changes)')} onChange={(_, d) => setText(d.value)} />
+          )}
+          {error && <span className={s.error}>{error}</span>}
+          {eligible.length > 0 && (
+            <div className={s.actions}>
+              <Button size="small" appearance="primary" icon={<CheckmarkCircleRegular />} disabled={working || props.busy} onClick={() => void decide('approved')}>
+                {t('承認', 'Approve')}
+              </Button>
+              <Button size="small" icon={<DismissCircleRegular />} disabled={working || props.busy} onClick={() => void decide('changes_requested')}>
+                {t('差し戻し', 'Request changes')}
+              </Button>
+            </div>
+          )}
+          {props.handoff.handedOffAt && props.onOpenProduction && (
+            <div className={s.actions}>
+              <Button size="small" icon={<PaintBrushRegular />} onClick={props.onOpenProduction}>
+                {t('制作のページ', 'Production page')}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className={s.top}>
+          {props.canReview ? (
+            // 依頼・取り下げ・相手ごとの状態(詳しい画面と同じ部品)
+            <ApprovalBar card={card} isDirty={props.isDirty} busy={props.busy} onChanged={async () => { await props.onChanged(); await load() }} />
+          ) : (
+            <span className={s.muted}>{t('確定した週の配信は、承認の依頼を出しません', 'Approval requests are not available for a confirmed week')}</span>
+          )}
+        </div>
+        <div className={s.stream}>
+          {approvalEvents.length === 0 && !loading && <span className={s.empty}>{t('まだ承認のやり取りはありません', 'No approval activity yet')}</span>}
+          {[...approvalEvents].reverse().map((e) => {
+            const icon = e.action === 'approve' ? <CheckmarkCircleRegular /> : e.action === 'reject' ? <DismissCircleRegular /> : <PersonAvailableRegular />
+            const what = { request: t('承認を依頼', 'requested approval'), approve: t('承認', 'approved'), reject: t('差し戻し', 'requested changes'), withdraw: t('依頼を取り下げ', 'withdrew the request') }[e.action as 'request' | 'approve' | 'reject' | 'withdraw']
+            return (
+              <div key={e.id} className={s.quiet}>
+                {icon}
+                <span className={s.full}>{`${e.actor ?? ''} ${what}`}{e.note ? `: ${e.note}` : ''}</span>
+                <span>· {ago(e.created_on)}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+
   return (
     <div className={s.root}>
-      {/* 1. 状態の道のりと、次に動く人 */}
-      <div className={s.top}>
-        <div className={s.track}>
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} style={{ display: 'contents' }}>
-              {i > 0 && <span className={mergeClasses(s.line, (sent || i <= step) && s.lineDone)} />}
-              {stepIcon(i)}
-            </span>
-          ))}
-        </div>
-        <div className={s.who}>
-          {waiting ? (
-            <>
-              {pendingNames.slice(0, 3).map((n) => (
-                <Avatar key={n} size={24} name={n} initials={initials(n)} color="colorful" />
-              ))}
-              <span className={s.whoText}>
-                {t('承認待ち', 'Awaiting approval')} <span className={s.muted}>· {ago(request?.requested_at)}</span>
-              </span>
-            </>
-          ) : step >= 2 && !props.handoff.handedOffAt ? (
-            <span className={s.whoText}>{t('承認済み。制作に渡せます', 'Approved. Ready for production')}</span>
-          ) : props.handoff.handedOffAt ? (
-            <>
-              <Avatar size={24} name={props.handoff.productionOwner || '?'} initials={initials(props.handoff.productionOwner)} color="colorful" />
-              <span className={s.whoText}>{t('制作中', 'In production')}</span>
-            </>
-          ) : step === 1 ? (
-            // 承認待ちのステータスだが、いまの依頼がない(取り下げた・内容を変えて古くなった)。依頼は ⋯ から
-            <span className={s.whoText}>{t('承認待ち', 'Awaiting approval')} <span className={s.muted}>· {t('依頼はまだ', 'not requested yet')}</span></span>
-          ) : (
-            <span className={s.whoText}>{t('下書き', 'Draft')}</span>
-          )}
-          {/* 依頼・取り下げ・相手ごとの状態は、今の承認の部品で(押したときだけ開く) */}
-          {props.canReview && (
-            <Popover positioning="below-end" withArrow>
-              <PopoverTrigger disableButtonEnhancement>
-                <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('承認の詳しい様子', 'Approval details')} />
-              </PopoverTrigger>
-              <PopoverSurface style={{ width: 340 }}>
-                <ApprovalBar card={card} isDirty={props.isDirty} busy={props.busy} onChanged={async () => { await props.onChanged(); await load() }} />
-              </PopoverSurface>
-            </Popover>
-          )}
-        </div>
-        {/* 自分が承認する番なら、ここで決める(書いた文が理由・ひとことになる) */}
-        {eligible.length > 0 && (
-          <div className={s.actions}>
-            <Button size="small" appearance="primary" icon={<CheckmarkCircleRegular />} disabled={working || props.busy} onClick={() => void decide('approved')}>
-              {t('承認', 'Approve')}
-            </Button>
-            <Button size="small" icon={<DismissCircleRegular />} disabled={working || props.busy} onClick={() => void decide('changes_requested')}>
-              {t('差し戻し', 'Request changes')}
-            </Button>
-          </div>
-        )}
-        {props.handoff.handedOffAt && props.onOpenProduction && (
-          <div className={s.actions}>
-            <Button size="small" icon={<PaintBrushRegular />} onClick={props.onOpenProduction}>
-              {t('制作のページ', 'Production page')}
-            </Button>
-          </div>
-        )}
-      </div>
-
       {/* 2. 絞り込み(参考の素材・制作の担当と締め切りは、制作向けなので「渡すもの」の側に置く) */}
       <div className={s.bar}>
         <button type="button" className={mergeClasses(s.pill, filter === 'open' && s.pillOn)} onClick={() => setFilter('open')}>
@@ -469,25 +524,6 @@ export function CommPane(props: Props) {
             </div>
           )
         })}
-        {/* 変更の記録(差し替えの理由・ステータスの変化)は、畳んで 1 行に */}
-        {changes.length > 0 && (
-          <div>
-            <button type="button" className={s.quiet} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setShowChanges(!showChanges)}>
-              <HistoryRegular />
-              <span>{t(`変更 ${changes.length} 件`, `${changes.length} changes`)}</span>
-              {showChanges ? <ChevronDownRegular /> : <ChevronRightRegular />}
-            </button>
-            {showChanges && (
-              <div style={{ display: 'grid', rowGap: 4, paddingLeft: 22, paddingTop: 4 }}>
-                {changes.map((c) => (
-                  <span key={c.id} className={s.meta}>
-                    {'kind' in c ? c.body : `${(c as CardEvent).actor ?? ''} ${statusLabel((c as CardEvent).from_status)} → ${statusLabel((c as CardEvent).to_status)}`} · {ago(c.created_on)}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* 4. 書く欄は 1 つ。場所は、プレビューで選んでいる部品 */}

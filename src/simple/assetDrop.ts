@@ -7,7 +7,7 @@ import { tr } from '../i18n'
 export const canDropAsset = (dt: DataTransfer) => dt.types.includes('Files') || dt.types.includes('text/uri-list') || dt.types.includes('text/plain')
 
 /**
- * 右端の帯の「渡すもの」に落とした画像・資料・URL を、参考の素材(card_assets)に入れる(SU1。PLAN の途中で思いついたイメージを、列を開かずに書き留めるため)。
+ * 左のバーの「渡すもの」に落とした画像・資料・URL を、参考の素材(card_assets)に入れる(SU1。PLAN の途中で思いついたイメージを、列を開かずに書き留めるため)。
  * 入れ方は素材の欄(CreativeAssets)と同じ(ファイルは置き場所に上げてから行を作る。形式と大きさの決まりも同じ)。入れた数と、入れられなかった理由を返す
  */
 export async function addDroppedAssets(cardId: string, me: string, dt: DataTransfer): Promise<{ added: number; error?: string }> {

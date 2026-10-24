@@ -39,11 +39,11 @@ interface Props {
   onCommit: () => Promise<void>
   /** 制作の依頼の最新の版を読んだとき(段階を決めるため) */
   onRequest?: (req: ProductionRequest | undefined) => void
-  /** 参考の素材が外(右端の帯へのドラッグ)で増えたら変わる(素材の欄を読み直す) */
+  /** 参考の素材が外(左のバーへのドラッグ)で増えたら変わる(素材の欄を読み直す) */
   assetsVersion?: number
-  /** 参考の素材の数(畳んでいても見出しに出す。右端の帯と同じ数) */
+  /** 参考の素材の数(畳んでいても見出しに出す。左のバーと同じ数) */
   assetCount?: number
-  /** 素材の欄で数が変わったとき(右端の帯の数を合わせる) */
+  /** 素材の欄で数が変わったとき(左のバーの数を合わせる) */
   onAssetCount?: (n: number) => void
 }
 
@@ -62,7 +62,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   const [busy, setBusy] = useState(false)
   // 「制作に渡す」を押したあと、依頼ができたかを読み直す回数(制作のページで HTML を作ってから依頼するので、少し遅れる)
   const [poll, setPoll] = useState(0)
-  // 参考の素材の欄の開閉(人ごとに覚える。既定は畳む: 右端の帯の「素材」でいつでも開けるので、ここは数が見えればよい)
+  // 参考の素材の欄の開閉(人ごとに覚える。既定は畳む: 左のバーの「素材」でいつでも開けるので、ここは数が見えればよい)
   const [assetsOpen, setAssetsOpen] = useState(() => loadPref<boolean>(ASSETS_KEY, false))
   const toggleAssets = () => {
     setAssetsOpen(!assetsOpen)

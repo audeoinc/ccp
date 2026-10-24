@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Button, ToggleButton, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, LayoutColumnTwoRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { Button, CounterBadge, ToggleButton, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, HistoryRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
 import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
-import { CommPane } from './CommPane'
+import { CommPane, type CommCounts, type CommSection } from './CommPane'
 import { PinFloat, type PinTarget } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
 import { focusPin } from '../pinStore'
@@ -46,11 +46,17 @@ const PRODUCTS_KEY = 'simpleCard.productsOpen'
 const RAIL_W = 32
 type Widths = { mobile: number; pc: number; list: number; comm: number; hand: number }
 const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, hand: 400 }
-// コミュニケーションのペインの開閉(既定は畳む。自分宛てのものがあれば、開いたときに広げる)
-// 右端のサイドパネル(2026-10-23 利用者と決めた): アイコンの帯 1 本に「やり取り(承認者と)」「渡すもの(制作へ)」をプロセスの順に並べ、
-// 押した方を 1 つだけ開く(もう片方は入れ替わる。開いている方を押すと閉じる)。どれを開いていたかは人ごとに覚える
+// 左のバーと、開くパネル(SU4。2026-10-24 利用者と決めた。以前は右端にあり、気づかれなかった)。
+// 配信の全体にかかわる情報とメニュー(やり取り・承認の様子・素材・渡すもの・変更の記録)をここにまとめ、真ん中は作業する場所にする。
+// VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。どれを開いていたかと幅は、人ごとに覚える
 const SIDE_KEY = 'simpleCard.sidePanel'
-type Side = 'comm' | 'assets' | 'handoff' | null
+type Side = CommSection | 'assets' | 'handoff' | null
+const isComm = (v: Side): v is CommSection => v === 'talk' || v === 'approval' || v === 'history'
+// 右端にあったころの「comm」は、やり取りとして開く
+const loadSide = (): Side => {
+  const v = loadPref<Side | 'comm'>(SIDE_KEY, null)
+  return v === 'comm' ? 'talk' : v
+}
 const SIDE_W = 56
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
@@ -89,8 +95,9 @@ const useStyles = makeStyles({
     flexGrow: 1,
     minHeight: 0,
     display: 'grid',
-    // 狭い画面では、商品の一覧とサイドパネルが縮む(右端のアイコンの帯は、いつも見えるように)
-    gridTemplateColumns: `var(--wv) 1px minmax(280px, 1fr) 1px minmax(0, var(--wl)) 1px minmax(0, var(--ws)) ${SIDE_W}px`,
+    // 左のバー + 開くパネル | プレビュー | 選んだ部品 | 商品の一覧。開いたパネルは、つかんで決めた幅のまま(縮めると、幅を変えても広がらないため)。
+    // 狭い画面では、選んだ部品のペインと商品の一覧が縮む
+    gridTemplateColumns: `${SIDE_W}px var(--ws) 1px var(--wv) 1px minmax(280px, 1fr) 1px minmax(0, var(--wl))`,
     gridTemplateRows: 'minmax(0, 1fr)',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -142,13 +149,16 @@ const useStyles = makeStyles({
   railDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' },
   listHead: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '-6px' },
   colTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: '10px' },
-  // 右端のサイドパネルと、アイコンの帯
-  sidePane: { display: 'grid', minHeight: 0, minWidth: 0, overflow: 'hidden' },
-  sideRail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '4px', paddingTop: '8px', borderLeft: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
+  // 左のバーと、開くパネル
+  sidePane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
+  sideHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 6px 6px 12px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap', overflow: 'hidden' },
+  sideBody: { display: 'grid', minHeight: 0, minWidth: 0, overflow: 'hidden' },
+  sideRail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '4px', paddingTop: '8px', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2, overflowY: 'auto' },
+  sideGap: { width: '32px', height: '1px', margin: '4px 0', backgroundColor: tokens.colorNeutralStroke2, flexShrink: 0 },
   sideBtn: { display: 'grid', justifyItems: 'center', rowGap: '2px', width: '48px', padding: '6px 0', border: 'none', borderRadius: tokens.borderRadiusMedium, backgroundColor: 'transparent', fontFamily: 'inherit', color: tokens.colorNeutralForeground2, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover, color: tokens.colorNeutralForeground1 } },
   sideOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
   sideIcon: { position: 'relative', fontSize: '20px', lineHeight: 1 },
-  sideBadge: { position: 'absolute', top: '-6px', right: '-12px', minWidth: '16px', height: '16px', padding: '0 4px', boxSizing: 'border-box', borderRadius: '8px', fontSize: '10px', lineHeight: '16px', textAlign: 'center', color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground },
+  sideBadge: { position: 'absolute', top: '-7px', right: '-13px' },
   sideDot: { position: 'absolute', top: '-3px', left: '-6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
   sideLabel: { fontSize: '10px', lineHeight: 1.2 },
   // 画像・URL を落とせる所(ドラッグ中)
@@ -236,18 +246,25 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
-  const [side, setSide] = useState<Side>(() => loadPref<Side>(SIDE_KEY, null))
+  const [side, setSide] = useState<Side>(loadSide)
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
-  const showSide = (v: 'comm' | 'assets' | 'handoff', open = false) => {
+  const showSide = (v: Exclude<Side, null>, open = false) => {
     const next = !open && side === v ? null : v
     setSide(next)
     savePref(SIDE_KEY, next)
+    if (isComm(next)) setCommSection(next)
   }
-  const resizeSide = (dx: number) => setWidths((w) => (side === 'comm' ? { ...w, comm: clampList(w.comm - dx) } : { ...w, hand: clampList(w.hand - dx) }))
-  const [counts, setCounts] = useState<{ open: number; tasks: number; mine: boolean; waiting: boolean }>({ open: 0, tasks: 0, mine: false, waiting: false })
-  // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、帯のアイコンの赤い点で知らせる。2026-10-23 利用者)
-  const onCounts = useCallback((c: { open: number; tasks: number; mine: boolean; waiting: boolean }) => setCounts(c), [])
-  // 右端の帯の「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
+  // パネルは左にあるので、境目を右へ動かすと広がる
+  const resizeSide = (dx: number) => setWidths((w) => (isComm(side) ? { ...w, comm: clampList(w.comm + dx) } : { ...w, hand: clampList(w.hand + dx) }))
+  // やり取りの部品は、閉じていても描いておき、バーの数と点を合わせる。最後に開いた見方を覚える(書きかけの文を、見方の間で共にするため 1 つの部品)
+  const [commSection, setCommSection] = useState<CommSection>(() => {
+    const v = loadSide()
+    return isComm(v) ? v : 'talk'
+  })
+  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changes: 0 })
+  // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、バーのアイコンの赤い点で知らせる。2026-10-23 利用者)
+  const onCounts = useCallback((c: CommCounts) => setCounts(c), [])
+  // 左のバーの「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
   const [assetsVersion, setAssetsVersion] = useState(0)
   const [dropOver, setDropOver] = useState<'assets' | 'handoff' | null>(null)
   const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
@@ -388,6 +405,31 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const tpl = getTemplate(e.template)
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時 未設定', 'No send date')
 
+  const sideTitle = (v: Exclude<Side, null>) =>
+    ({ talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の記録', 'Change log'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'For production') })[v]
+  /** 左のバーの並び(アイコンの下に名前。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
+  const rails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
+    { v: 'talk', icon: <CommentRegular />, label: t('やり取り', 'Talk'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
+    {
+      v: 'approval',
+      icon: <PersonAvailableRegular />,
+      label: t('承認', 'Approval'),
+      tip: counts.myTurn ? t('承認の様子。あなたが承認する番です', 'Approval. It is your turn to review') : t('承認の様子(依頼・取り下げ・相手ごとの状態)', 'Approval (request, withdraw, reviewers)'),
+      count: 0,
+      dot: counts.myTurn ? 'red' : counts.waiting ? 'amber' : undefined,
+    },
+    { v: 'assets', icon: <ImageMultipleRegular />, label: t('素材', 'Assets'), tip: t('素材(承認のときのイメージにも、制作の参考にも。画像・資料・URL を落としても足せる)', 'Assets (images, files and URLs for approvers and production; drop to add)'), count: assetCount, drop: true },
+    {
+      v: 'handoff',
+      icon: <BoxMultipleArrowRightRegular />,
+      label: t('渡すもの', 'Handoff'),
+      tip: handoffMissing ? t('渡すもの(制作へ)。制作の担当か締め切りが、まだ空いています', 'Handoff (to production). Assignee or due date is still empty') : t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)'),
+      count: 0,
+      dot: handoffMissing ? 'amber' : undefined,
+      drop: true,
+    },
+    { v: 'history', icon: <HistoryRegular />, label: t('変更', 'Changes'), tip: t('変更の記録(差し替えの理由・ステータスの変化)', 'Change log (swap reasons, status changes)'), count: 0, gap: true },
+  ]
 
   return (
     <div className={s.root}>
@@ -420,8 +462,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <NextAction
               step={e.nextStep}
               busy={e.saving}
-              // 承認はやり取りの列(⋯ から依頼)、制作への依頼は渡すものの列で行う。確認した・制作のページは、CardDetail の側
-              onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'watchApproval' ? showSide('comm', true) : onRunNext(step))}
+              // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。確認した・制作のページは、CardDetail の側
+              onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'watchApproval' ? showSide('approval', true) : onRunNext(step))}
             />
             {e.viewSwitch}
             {e.menu}
@@ -437,7 +479,110 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
       </div>
 
-      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${side === 'comm' ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
+      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${isComm(side) ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
+        {/* 左のバー。上から、プロセスの順(承認者とのやり取り → 承認 → 素材 → 制作へ渡すもの)、線の下に記録。数と点で、開かなくても様子が分かる */}
+        <nav className={s.sideRail} aria-label={t('配信の全体の情報とメニュー', 'Delivery info and menus')}>
+          {rails.map((r) => (
+            <span key={r.v} style={{ display: 'contents' }}>
+              {r.gap && <span className={s.sideGap} />}
+              <Tooltip content={r.tip} relationship="description" positioning="after">
+                <button
+                  type="button"
+                  className={mergeClasses(s.sideBtn, side === r.v && s.sideOn, r.drop && dropOver === r.v && s.sideDrop)}
+                  aria-pressed={side === r.v}
+                  onClick={() => showSide(r.v)}
+                  onDragOver={(ev) => {
+                    if (!r.drop || !canDropAsset(ev.dataTransfer)) return
+                    ev.preventDefault()
+                    setDropOver(r.v === 'assets' ? 'assets' : 'handoff')
+                  }}
+                  onDragLeave={() => r.drop && setDropOver(null)}
+                  onDrop={(ev) => {
+                    if (!r.drop) return
+                    ev.preventDefault()
+                    void dropAssets(ev.dataTransfer)
+                  }}
+                >
+                  <span className={s.sideIcon}>
+                    {r.icon}
+                    {r.count > 0 && <CounterBadge className={s.sideBadge} count={r.count} size="small" color="brand" />}
+                    {r.dot && <span className={s.sideDot} style={r.dot === 'amber' ? { backgroundColor: tokens.colorPaletteMarigoldBackground3 } : undefined} />}
+                  </span>
+                  <span className={s.sideLabel}>{r.label}</span>
+                </button>
+              </Tooltip>
+            </span>
+          ))}
+          {/* 落としたものを入れた・入れられなかったを、バーの下に短く知らせる */}
+          {dropNote && (
+            <Tooltip content={dropNote.text} relationship="label" positioning="after" visible>
+              <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
+                {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
+              </span>
+            </Tooltip>
+          )}
+        </nav>
+
+        {/* 開いているパネル(1 つ)。やり取りの部品は、閉じていてもバーの数を合わせるため、描いたまま隠す */}
+        <div className={s.sidePane} style={side ? undefined : { display: 'none' }}>
+          <div className={s.sideHead}>
+            <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{side ? sideTitle(side) : ''}</span>
+            <Button type="button" size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => side && showSide(side)} aria-label={t('パネルを閉じる', 'Close the panel')} />
+          </div>
+          <div className={s.sideBody}>
+            <div style={isComm(side) ? { display: 'grid', minHeight: 0 } : { display: 'none' }}>
+              <CommPane
+                section={commSection}
+                card={e.card}
+                part={part}
+                onPick={select}
+                items={e.items}
+                productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
+                products={e.products}
+                view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
+                handoff={{ productionOwner: e.form.productionOwner, handedOffAt: e.form.handedOffAt, productionDue: e.form.productionDue }}
+                people={e.people}
+                onCommit={onCommit}
+                isDirty={isDirty}
+                busy={e.saving}
+                onChanged={e.reload}
+                canReview={e.canReview}
+                onOpenProduction={e.openProduction}
+                onCounts={onCounts}
+              />
+            </div>
+            {side === 'assets' && (
+              // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
+              <div className={s.pane}>
+                <span className={s.hint}>{t('承認のときのイメージにも、制作の参考にもなる画像・資料・URL。ここに落としても足せます。', 'Images, files and URLs that show the idea to approvers and guide production. Drop them here to add.')}</span>
+                <CreativeAssets
+                  key={assetsVersion}
+                  cardId={e.card.id}
+                  stage="plan"
+                  title=" "
+                  hideCaption
+                  compactAdd
+                  owner={e.card.owner}
+                  people={e.people}
+                  cardName={e.form.name}
+                  productionOwner={e.form.productionOwner}
+                  productionDue={e.form.productionDue}
+                  productIds={e.items.map((i) => i.productId)}
+                  products={e.products}
+                  onCount={setAssetCount}
+                />
+              </div>
+            )}
+            {side === 'handoff' && (
+              // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
+              <div className={s.pane}>
+                <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} />
+              </div>
+            )}
+          </div>
+        </div>
+        <Splitter onDrag={side ? resizeSide : () => undefined} onDone={saveWidths} />
+
         {/* プレビュー(いちばん広い) */}
         <div className={s.previewPane}>
           <div className={s.toolbar}>
@@ -685,133 +830,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <span className={s.railLabel}>{t('商品の一覧', 'Products')}</span>
           </div>
         )}
-
-
-        <Splitter onDrag={side ? resizeSide : () => undefined} onDone={saveWidths} />
-
-        {/* サイドパネル(開いている 1 つ)。やり取りは、閉じていても帯の数を合わせるため、中身は描いたまま隠す */}
-        <div className={s.sidePane}>
-          <div className={s.commPane} style={side === 'comm' ? undefined : { display: 'none' }}>
-            <CommPane
-              card={e.card}
-              part={part}
-              onPick={select}
-              items={e.items}
-              productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
-              products={e.products}
-              view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
-              handoff={{ productionOwner: e.form.productionOwner, handedOffAt: e.form.handedOffAt, productionDue: e.form.productionDue }}
-              people={e.people}
-              onCommit={onCommit}
-              isDirty={isDirty}
-              busy={e.saving}
-              onChanged={e.reload}
-              canReview={e.canReview}
-              onOpenProduction={e.openProduction}
-              onCounts={onCounts}
-            />
-          </div>
-          {side === 'assets' && (
-            // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
-            <div className={s.pane}>
-              <div className={s.colTitle}>{t('素材', 'Assets')}</div>
-              <span className={s.hint}>{t('承認のときのイメージにも、制作の参考にもなる画像・資料・URL。ここに落としても足せます。', 'Images, files and URLs that show the idea to approvers and guide production. Drop them here to add.')}</span>
-              <CreativeAssets
-                key={assetsVersion}
-                cardId={e.card.id}
-                stage="plan"
-                title=" "
-                hideCaption
-                compactAdd
-                owner={e.card.owner}
-                people={e.people}
-                cardName={e.form.name}
-                productionOwner={e.form.productionOwner}
-                productionDue={e.form.productionDue}
-                productIds={e.items.map((i) => i.productId)}
-                products={e.products}
-                onCount={setAssetCount}
-              />
-            </div>
-          )}
-          {side === 'handoff' && (
-            // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
-            <div className={s.pane}>
-              <div className={s.colTitle}>{t('渡すもの(制作へ)', 'For production')}</div>
-              <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} />
-            </div>
-          )}
-        </div>
-
-        {/* 右端のアイコンの帯。上から、プロセスの順(承認者とのやり取り → 制作へ渡すもの)。数と赤い点で、開かなくても様子が分かる */}
-        <nav className={s.sideRail} aria-label={t('サイドパネル', 'Side panels')}>
-          <Tooltip content={t('やり取り(承認者と。書き込み・タスク・承認)', 'Conversation (with approvers: comments, tasks, approval)')} relationship="description" positioning="before">
-            <button type="button" className={mergeClasses(s.sideBtn, side === 'comm' && s.sideOn)} aria-pressed={side === 'comm'} onClick={() => showSide('comm')}>
-              <span className={s.sideIcon}>
-                <CommentRegular />
-                {counts.open + counts.tasks > 0 && <span className={s.sideBadge}>{counts.open + counts.tasks}</span>}
-                {(counts.mine || counts.waiting) && <span className={s.sideDot} style={counts.mine ? undefined : { backgroundColor: tokens.colorPaletteMarigoldBackground3 }} />}
-              </span>
-              <span className={s.sideLabel}>{t('やり取り', 'Talk')}</span>
-            </button>
-          </Tooltip>
-          <Tooltip content={t('素材(承認のときのイメージにも、制作の参考にも。画像・資料・URL を落としても足せる)', 'Assets (images, files and URLs for approvers and production; drop to add)')} relationship="description" positioning="before">
-            <button
-              type="button"
-              className={mergeClasses(s.sideBtn, side === 'assets' && s.sideOn, dropOver === 'assets' && s.sideDrop)}
-              aria-pressed={side === 'assets'}
-              onClick={() => showSide('assets')}
-              onDragOver={(ev) => {
-                if (!canDropAsset(ev.dataTransfer)) return
-                ev.preventDefault()
-                setDropOver('assets')
-              }}
-              onDragLeave={() => setDropOver(null)}
-              onDrop={(ev) => {
-                ev.preventDefault()
-                void dropAssets(ev.dataTransfer)
-              }}
-            >
-              <span className={s.sideIcon}>
-                <ImageMultipleRegular />
-                {assetCount > 0 && <span className={s.sideBadge}>{assetCount}</span>}
-              </span>
-              <span className={s.sideLabel}>{t('素材', 'Assets')}</span>
-            </button>
-          </Tooltip>
-          <Tooltip content={handoffMissing ? t('渡すもの(制作へ)。制作の担当か締め切りが、まだ空いています', 'Handoff (to production). Assignee or due date is still empty') : t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)')} relationship="description" positioning="before">
-            <button
-              type="button"
-              className={mergeClasses(s.sideBtn, side === 'handoff' && s.sideOn, dropOver === 'handoff' && s.sideDrop)}
-              aria-pressed={side === 'handoff'}
-              onClick={() => showSide('handoff')}
-              onDragOver={(ev) => {
-                if (!canDropAsset(ev.dataTransfer)) return
-                ev.preventDefault()
-                setDropOver('handoff')
-              }}
-              onDragLeave={() => setDropOver(null)}
-              onDrop={(ev) => {
-                ev.preventDefault()
-                void dropAssets(ev.dataTransfer)
-              }}
-            >
-              <span className={s.sideIcon}>
-                <BoxMultipleArrowRightRegular />
-                {handoffMissing && <span className={s.sideDot} style={{ backgroundColor: tokens.colorPaletteMarigoldBackground3 }} />}
-              </span>
-              <span className={s.sideLabel}>{t('渡すもの', 'Handoff')}</span>
-            </button>
-          </Tooltip>
-          {/* 落としたものを入れた・入れられなかったを、帯の下に短く知らせる */}
-          {dropNote && (
-            <Tooltip content={dropNote.text} relationship="label" positioning="before" visible>
-              <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
-                {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
-              </span>
-            </Tooltip>
-          )}
-        </nav>
       </div>
     </div>
   )
