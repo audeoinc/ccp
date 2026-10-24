@@ -88,7 +88,8 @@ export interface SimpleEditor {
   heroReason: string
   heroCandidates: ProposedHero[]
   setHero: (id: string | undefined, reason: string) => void
-  uploadHero: () => void
+  /** 持っている画像を上げる(file を渡すと、そのファイルを上げながら開く) */
+  uploadHero: (file?: File) => void
   sectionTitles: string[]
   sectionCopies: string[]
   setSectionTitle: (i: number, v: string) => void

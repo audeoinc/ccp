@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, Select, Slider, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
@@ -54,6 +54,8 @@ interface Props {
   onClose: () => void
   /** 直すとき(ライブラリの管理画面。X59 ②)。画像は差し替えず、名前・用途・季節・タグ・説明・焦点・出どころ・期限を直す */
   hero?: HeroImage
+  /** 開く前に選んだファイル(「選び直す」のアップロードのタブに落としたもの)。開いたらすぐ上げる */
+  file?: File
 }
 
 /**
@@ -62,7 +64,7 @@ interface Props {
  * テンプレートの縦横比に切り出したときの見え方を確かめる。出どころと使える期限(過ぎたら候補から外す)も入れる。
  * 上げた画像は配信ではなくライブラリに入り、同じ国の次の配信からは、選ぶ候補にも AI の候補にも出る
  */
-export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: Props) {
+export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero, file: firstFile }: Props) {
   const s = useStyles()
   const t = useT()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -146,6 +148,14 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero }: 
       setBusy('')
     }
   }
+  // 落としたファイルを持って開いたときは、すぐ上げる(開発時の StrictMode で 2 回上げないよう、1 回だけ)
+  const startedRef = useRef(false)
+  useEffect(() => {
+    if (!firstFile || startedRef.current) return
+    startedRef.current = true
+    void Promise.resolve().then(() => pick(firstFile))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いたときの 1 回だけ
+  }, [firstFile])
 
   const save = async () => {
     setBusy('save')

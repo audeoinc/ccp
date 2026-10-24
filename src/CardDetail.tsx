@@ -578,7 +578,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [heroId, setHeroId] = useState<string | undefined>(card?.hero_image_id ?? undefined)
   const [heroReason, setHeroReason] = useState(card?.hero_reason ?? '')
   // 持っている画像を上げる(X59)
-  const [heroUpload, setHeroUpload] = useState(false)
+  // true = 空で開く、File = そのファイルを上げながら開く(シンプルの「アップロード」のタブに落としたとき)
+  const [heroUpload, setHeroUpload] = useState<boolean | File>(false)
   // AB テスト(X55)。ab = 設定(null = しない)、active = いま編集している案、stash = 編集していない案の中身(A を含む)
   const [ab, setAb] = useState<AbTest | null>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test))
   const [active, setActive] = useState<VariantKey>('A')
@@ -1813,6 +1814,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         market={cardMarket(form.country)}
         cardId={card?.id}
         me={myName() || form.owner}
+        file={heroUpload instanceof File ? heroUpload : undefined}
         onClose={() => setHeroUpload(false)}
         onDone={async (h) => {
           await onHeroesChanged?.()
@@ -2350,7 +2352,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           setHeroId(id)
           setHeroReason(reason)
         },
-        uploadHero: () => setHeroUpload(true),
+        uploadHero: (file?: File) => setHeroUpload(file ?? true),
         sectionTitles,
         sectionCopies,
         setSectionTitle,
