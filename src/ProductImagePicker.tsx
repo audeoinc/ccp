@@ -122,6 +122,7 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
         // 見本の写真の説明の文も、AI の判断の材料に渡す
         alt: x.caption ? `${x.alt ?? ''}: ${x.caption}` : x.alt ?? '',
         main: x.is_main === 1,
+        model_usable_until: x.model_usable_until?.slice(0, 10) || undefined,
       }))
       if (imgs.length) {
         setStored(imgs)
@@ -210,6 +211,22 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
     setError(null)
     try {
       const r = await ProductPages.adopt(src)
+      // ページの画像にモデルの使用期限があれば、写した画像を商品の画像の表に残す(配信日より前に切れるときのアラートが、この画像を見つけられるように。X77)。
+      // 取り込んだ画像・見本の写真は、もう表にあって期限も持っているので、足さない
+      const img = chosen.kind === 'page' ? page?.images[chosen.index] : undefined
+      if (img?.model_usable_until && r.copied) {
+        await ProductImagesService.create({
+          name: img.alt || product.name,
+          product_id: product.id,
+          product_code: product.product_code,
+          market: product.market,
+          image_url: r.image_url,
+          source_url: src,
+          alt: img.alt || undefined,
+          caption: img.description || undefined,
+          model_usable_until: img.model_usable_until,
+        }).catch(() => undefined)
+      }
       onPick(r.image_url, source)
     } catch {
       // 写せない(外に出られない など)ときは、画像の URL のまま使う(ブラウザからは見えるため)。あとで消えることがある
@@ -298,6 +315,11 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
                             {a && (
                               <Badge size="small" appearance="tint" color="informative">
                                 {angleName(a.angle)}
+                              </Badge>
+                            )}
+                            {img.model_usable_until && (
+                              <Badge size="small" appearance="tint" color="warning" title={t('写っているモデルの使用期限。配信日より前に切れると、アラートが出ます', 'Model usage rights end on this date. An alert shows if it ends before the delivery day')}>
+                                {t(`モデルの期限 ${img.model_usable_until}`, `Model rights ${img.model_usable_until}`)}
                               </Badge>
                             )}
                           </span>

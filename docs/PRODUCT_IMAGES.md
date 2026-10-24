@@ -51,6 +51,7 @@ python scripts/collect-product-images.py 商品.csv --limit 5
 - 途中で止めても、同じコマンドをもう一度流せば、済んだ商品を飛ばして続きから集めます(`product_images_out/results.jsonl` に記録)
 - 拾い方は、CCP の「商品ページから画像を選ぶ」と同じです(`<img>` の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く)
 - **画像ごとの説明(description)も取ります**(利用者の依頼 2026-10-23)。`alt` → `title` → 画像が入っている `<figure>` の `<figcaption>` → JSON-LD(`application/ld+json` の `ImageObject` の `caption` / `description` / `name`。URL で画像に当てる)の、最初にあるものを、目録の `caption` に入れます。取り込むと `product_images.caption`(1 枚ごと)に、メイン画像を設定するときは商品のマスタの `products.image_caption` にも入ります。見本の EC サイトのページも、同じ書き方(alt・figcaption・JSON-LD)で説明を出しています
+- **写っているモデル(人物)の使用期限も取ります**(X77。2026-10-24)。`<img>` の `data-model-expiration-date` → JSON-LD の `ImageObject` の `modelExpirationDate` / `expires` → ページの中の JSON(画像の URL の近くの `modelExpirationDate`)の、最初にあるものを、目録の `model_usable_until`(YYYY-MM-DD)に入れます。取り込むと `product_images.model_usable_until`。配信に載せた商品の画像が配信日より前に切れるとき、配信カードにアラート(左のバーのアラート・プレビューの印・部品のペイン)が出ます。画面の「ページを読む」も同じ道で拾い、期限のある画像を写したときは、その画像を `product_images` に残します。見本の EC サイトのページは、写真に期限があれば同じ書き方で出します
 - 画像の URL の大きさの指定 `?width=…`(大文字・小文字は問わない)は外して、元の大きさで取ります(2026-10-23)。ほかのクエリ(`w=`・`height=` なども)はそのまま残します
 - 最後に、画像と目録(`manifest.json`。商品・元の URL・メインかどうか・読めなかったページと理由)を 1 つの ZIP にまとめます
 

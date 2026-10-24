@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 import zipfile
 from pathlib import Path
 from typing import Any, Callable
@@ -159,11 +160,14 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
             if img.get("main") and not main_url:
                 main_url, main_caption = url, (img.get("caption") or "")[:2000] or None
             await conn.execute(
-                text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, caption, angle, source, product_id) "
-                     "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :caption, :angle, :source, :pid)"),
+                text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, caption, angle, source, model_usable_until, product_id) "
+                     "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :caption, :angle, :source, CAST(:until AS date), :pid)"),
                 {"name": name, "code": prod["product_code"], "market": prod.get("market"), "url": url, "sort": order, "main": 1 if img.get("main") else 0,
                  "src": img.get("src"), "alt": (img.get("alt") or "")[:500], "sha": img["sha256"], "caption": (img.get("caption") or "")[:2000] or None,
-                 "angle": img.get("angle") or None, "source": SAMPLE if sample else None, "pid": prod["id"]},
+                 "angle": img.get("angle") or None, "source": SAMPLE if sample else None,
+                 # 写っているモデルの使用期限(目録の model_usable_until。X77)。日付として読めないものは入れない
+                 "until": (str(img.get("model_usable_until") or "")[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(img.get("model_usable_until") or "")[:10]) else None),
+                 "pid": prod["id"]},
             )
             rows += 1
         current = str(prod.get("image_url") or "")

@@ -91,7 +91,7 @@ async def _product(code: str) -> dict[str, Any] | None:
             if not row:
                 return None
             photos = (await conn.execute(text(
-                "SELECT image_url, alt, caption, angle, is_main FROM product_images WHERE product_id = :id AND source = 'sample' AND image_url IS NOT NULL ORDER BY sort_order"
+                "SELECT image_url, alt, caption, angle, is_main, model_usable_until FROM product_images WHERE product_id = :id AND source = 'sample' AND image_url IS NOT NULL ORDER BY sort_order"
             ), {"id": row["id"]})).mappings().all()
     except Exception:  # noqa: BLE001 — DB につながらなくても、見本のページは出す(名前は商品コード)
         return None
@@ -125,14 +125,20 @@ def photo_html(code: str, product: dict[str, Any]) -> str:
     # 画像ごとの説明(description)は、本物のページでよくある書き方(img の alt・<figure> の <figcaption>・JSON-LD の ImageObject)で書く。
     # ページを読む処理(extract)・手元の収集(collect-product-images.py)が、本物と同じ道で説明を拾えるように(利用者の依頼 2026-10-23)
     desc_of = lambda ph: ph.get("caption") or ph.get("alt") or product.get("name") or code  # noqa: E731
-    thumbs = "".join(f'<img src="{src(ph)}" alt="{escape(desc_of(ph))}" width="72" height="96">' for ph in photos)
+    # 写っているモデル(人物)の使用期限(X77)。本物のページでありそうな書き方(img の data 属性・JSON-LD の modelExpirationDate / expires)と、
+    # 見て分かる一言で書く。ページを読む処理が、本物と同じ道で期限を拾えるように
+    until = lambda ph: str(ph.get("model_usable_until") or "")[:10]  # noqa: E731
+    exp_attr = lambda ph: f' data-model-expiration-date="{escape(until(ph))}"' if until(ph) else ""  # noqa: E731
+    exp_note = lambda ph: (f'<p class="model">{"Model usage rights until" if en else "モデルの使用期限"}: {escape(until(ph))}</p>' if until(ph) else "")  # noqa: E731
+    thumbs = "".join(f'<img src="{src(ph)}" alt="{escape(desc_of(ph))}" width="72" height="96"{exp_attr(ph)}>' for ph in photos)
     feats = "\n".join(
-        f'<section class="f"><figure><img src="{src(ph)}" alt="{escape(desc_of(ph))}" width="420" height="560" loading="lazy">'
-        f'<figcaption>{escape(ph.get("caption") or "")}</figcaption></figure><div><h3>{escape(ph.get("alt") or "")}</h3><p>{escape(ph.get("caption") or "")}</p></div></section>'
+        f'<section class="f"><figure><img src="{src(ph)}" alt="{escape(desc_of(ph))}" width="420" height="560" loading="lazy"{exp_attr(ph)}>'
+        f'<figcaption>{escape(ph.get("caption") or "")}</figcaption></figure><div><h3>{escape(ph.get("alt") or "")}</h3><p>{escape(ph.get("caption") or "")}</p>{exp_note(ph)}</div></section>'
         for ph in subs
     )
     ld = json.dumps({"@context": "https://schema.org", "@type": "Product", "name": product.get("name") or code, "sku": code,
-                     "image": [{"@type": "ImageObject", "contentUrl": src(ph), "name": ph.get("alt") or "", "caption": desc_of(ph)} for ph in photos]},
+                     "image": [{"@type": "ImageObject", "contentUrl": src(ph), "name": ph.get("alt") or "", "caption": desc_of(ph),
+                                **({"modelExpirationDate": until(ph), "expires": until(ph)} if until(ph) else {})} for ph in photos]},
                     ensure_ascii=False).replace("</", "<\\/")
     label = ("Sample", "This is a sample product page made by CCP for trying things out. Not a real shop or product.") if en else ("見本", "CCP が試すために作った見本の商品ページです(実在のお店・商品ではありません)。")
     return f"""<!doctype html>
@@ -148,7 +154,7 @@ def photo_html(code: str, product: dict[str, Any]) -> str:
 .main{{width:100%;aspect-ratio:3/4;object-fit:cover;background:#f6f6f6}}.th{{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}}.th img{{width:72px;height:96px;object-fit:cover;background:#f6f6f6}}
 h1{{font-size:22px;font-weight:500;margin:8px 0}}.price{{font-size:20px;margin:8px 0 20px}}.desc{{line-height:1.8;font-size:14px}}
 .code{{color:#888;font-size:12px}}.btn{{display:block;width:100%;padding:14px;margin:24px 0 8px;border:0;background:#222;color:#fff;font-size:14px;letter-spacing:.1em}}
-.note{{color:#888;font-size:11px;line-height:1.6}}h2{{font-size:16px;font-weight:500;letter-spacing:.15em;margin:56px 0 8px;text-align:center}}
+.note{{color:#888;font-size:11px;line-height:1.6}}.model{{color:#8a6d1f;font-size:12px;margin:6px 0 0}}h2{{font-size:16px;font-weight:500;letter-spacing:.15em;margin:56px 0 8px;text-align:center}}
 .f{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:center;margin:32px 0}}.f:nth-of-type(even) figure{{order:2}}
 .f figure{{margin:0}}.f figcaption{{display:none}}.f img{{width:100%;aspect-ratio:3/4;object-fit:cover;background:#f6f6f6}}.f h3{{font-size:17px;font-weight:500;margin:0 0 10px}}.f p{{line-height:1.9;font-size:14px;margin:0}}
 @media (max-width:720px){{.top,.f{{grid-template-columns:1fr;gap:16px}}.f:nth-of-type(even) figure{{order:0}}}}
@@ -157,7 +163,7 @@ h1{{font-size:22px;font-weight:500;margin:8px 0}}.price{{font-size:20px;margin:8
 <div class="bar"><span>SAMPLE SHOP</span><span class="tag" title="{label[1]}">{label[0]}</span></div>
 <div class="wrap">
   <div class="top">
-    <div><img class="main" src="{src(main)}" alt="{escape(desc_of(main))}" width="600" height="800"><div class="th">{thumbs}</div></div>
+    <div><img class="main" src="{src(main)}" alt="{escape(desc_of(main))}" width="600" height="800"{exp_attr(main)}>{exp_note(main)}<div class="th">{thumbs}</div></div>
     <div>
       <div class="code">{escape(code)}</div>
       <h1>{name}</h1>
@@ -255,7 +261,8 @@ class ImageParser(HTMLParser):
             src = a.get("data-src") or a.get("data-original") or a.get("src") or ""
             best = _largest(a.get("srcset") or a.get("data-srcset") or "")
             w = _int(a.get("width"))
-            item = {"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "title": a.get("title", "").strip()[:2000], "width": w}
+            item = {"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "title": a.get("title", "").strip()[:2000], "width": w,
+                    "expires": a.get("data-model-expiration-date") or a.get("data-model-expires") or ""}
             self.found.append(item)
             if self.figures:
                 self.figures[-1]["imgs"].append(item)
@@ -304,6 +311,58 @@ def ld_captions(blocks: list[str], base: str) -> dict[str, str]:
     return out
 
 
+def norm_date(v: Any) -> str:
+    """日付らしい文字(2026-10-31・2026/10/31・2026-10-31T00:00:00Z など)を YYYY-MM-DD に。読めなければ空"""
+    m = re.match(r"\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", str(v or ""))
+    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}" if m else ""
+
+
+EXPIRY_KEYS = ("modelExpirationDate", "model_expiration_date", "modelExpiresAt", "expires")
+
+
+def ld_expiry(blocks: list[str], base: str) -> dict[str, str]:
+    """JSON-LD の画像(ImageObject)の URL → 写っているモデルの使用期限(modelExpirationDate → expires。X77)"""
+    out: dict[str, str] = {}
+
+    def walk(o: Any) -> None:
+        if isinstance(o, list):
+            for x in o:
+                walk(x)
+        elif isinstance(o, dict):
+            url = o.get("contentUrl") or o.get("url")
+            if isinstance(url, str):
+                d = next((norm_date(o.get(k)) for k in EXPIRY_KEYS if norm_date(o.get(k))), "")
+                if d:
+                    out.setdefault(original_size(urljoin(base, url.strip())), d)
+            for v in o.values():
+                walk(v)
+
+    for b in blocks:
+        try:
+            walk(json.loads(b))
+        except ValueError:
+            continue
+    return out
+
+
+# ページの中の JSON(画面を作るためのデータなど)で、画像の URL と modelExpirationDate が近くに並んでいるもの(順はどちらでも)
+_URL_KEYS = r'"(?:contentUrl|url|src|imageUrl|image_url|image)"\s*:\s*"([^"]+)"'
+_EXP_KEY = r'"(?:modelExpirationDate|model_expiration_date|modelExpiresAt)"\s*:\s*"([^"]+)"'
+_TEXT_EXPIRY = (re.compile(_URL_KEYS + r"[^{}]{0,600}?" + _EXP_KEY), re.compile(_EXP_KEY + r"[^{}]{0,600}?" + _URL_KEYS))
+
+
+def text_expiry(html: str, base: str) -> dict[str, str]:
+    """JSON-LD の外の JSON から拾う、画像の URL → モデルの使用期限(サイトによっては、画面のデータの JSON にだけ書いてある)"""
+    out: dict[str, str] = {}
+    for i, rx in enumerate(_TEXT_EXPIRY):
+        for m in rx.finditer(html):
+            url, d = (m.group(1), m.group(2)) if i == 0 else (m.group(2), m.group(1))
+            d = norm_date(d)
+            if d and not url.startswith("data:"):
+                out.setdefault(original_size(urljoin(base, url.replace("\\/", "/").strip())), d)
+    return out
+
+
 def _int(v: str | None) -> int | None:
     try:
         return int(str(v).strip().rstrip("px"))
@@ -347,13 +406,15 @@ def original_size(url: str) -> str:
 
 
 def extract(html: str, base: str) -> list[dict[str, str]]:
-    """ページの画像の一覧(src・alt・description)。description は alt → title → figcaption → JSON-LD の、最初にあるもの"""
+    """ページの画像の一覧(src・alt・description・model_usable_until)。description は alt → title → figcaption → JSON-LD の、最初にあるもの。
+    model_usable_until(写っているモデルの使用期限。X77)は img の data 属性 → JSON-LD → ページの中の JSON の、最初にあるもの"""
     p = ImageParser()
     try:
         p.feed(html)
     except Exception:  # noqa: BLE001 — 壊れた HTML でも、拾えたところまで使う
         pass
     ld = ld_captions(p.ld, base)
+    exp = {**text_expiry(html, base), **ld_expiry(p.ld, base)}
     out: list[dict[str, str]] = []
     seen: set[str] = set()
     for f in p.found:
@@ -368,7 +429,8 @@ def extract(html: str, base: str) -> list[dict[str, str]]:
             continue
         seen.add(absolute)
         desc = next((v for v in (f.get("alt"), f.get("title"), f.get("figcaption"), ld.get(absolute)) if v), "")
-        out.append({"src": absolute, "alt": f.get("alt") or "", "description": desc})
+        until = norm_date(f.get("expires")) or exp.get(absolute, "")
+        out.append({"src": absolute, "alt": f.get("alt") or "", "description": desc, **({"model_usable_until": until} if until else {})})
     return out[:MAX_IMAGES]
 
 
@@ -437,6 +499,7 @@ class SuggestImage(BaseModel):
     src: str
     alt: str = ""
     description: str = ""
+    model_usable_until: str = ""
 
 
 class SuggestIn(BaseModel):

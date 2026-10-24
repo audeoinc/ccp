@@ -89,6 +89,30 @@ class OriginalSizeTest(unittest.TestCase):
         self.assertEqual(got, ["https://shop/a.jpg", "https://shop/b.jpg?v=3"])
 
 
+class ExpiryTest(unittest.TestCase):
+    """写っているモデルの使用期限(X77)を、img の data 属性 → JSON-LD → ページの中の JSON の順に拾う"""
+
+    PAGE = """<html><head><script type="application/ld+json">
+      {"@type": "Product", "image": [{"@type": "ImageObject", "contentUrl": "/b.jpg", "modelExpirationDate": "2026-11-30T00:00:00Z"},
+                                     {"@type": "ImageObject", "contentUrl": "/c.jpg", "expires": "2026/12/1"}]}</script>
+      <script>window.__DATA__ = {"images": [{"src": "https:\\/\\/shop\\/d.jpg?width=300", "modelExpirationDate": "2027-01-15"}]}</script>
+      </head><body>
+      <img src="/a.jpg" data-model-expiration-date="2026-10-20"><img src="/b.jpg"><img src="/c.jpg"><img src="/d.jpg"><img src="/e.jpg"></body></html>"""
+
+    def test_attribute_then_json_ld_then_page_json(self) -> None:
+        found = pp.extract(self.PAGE, "https://shop/p/1")
+        self.assertEqual([(f["src"].rsplit("/", 1)[1], f.get("model_usable_until")) for f in found],
+                         [("a.jpg", "2026-10-20"), ("b.jpg", "2026-11-30"), ("c.jpg", "2026-12-01"), ("d.jpg", "2027-01-15"), ("e.jpg", None)])
+
+    def test_sample_page_writes_the_expiry_so_the_parser_reads_it(self) -> None:
+        photos = [{"image_url": "/img/products/m.jpg", "alt": "", "caption": "", "angle": "front", "is_main": 1, "model_usable_until": "2026-10-20"},
+                  {"image_url": "/img/products/t.jpg", "alt": "Wool", "caption": "Warm", "angle": "texture", "is_main": 0}]
+        html = pp.sample_html("U01", {"name": "Coat", "description": "warm", "price": 198, "market": "US", "photos": photos})
+        self.assertIn("Model usage rights until: 2026-10-20", html)
+        found = pp.extract(html, "https://shop.example.com/sample-shop/p/U01")
+        self.assertEqual([f.get("model_usable_until") for f in found], ["2026-10-20", None])
+
+
 class CollectScriptTest(unittest.TestCase):
     """手元の PC で集めるスクリプト(scripts/collect-product-images.py)も、同じ外し方をする。
     スクリプトは Workbench 版の ZIP に入らないので、ないときは飛ばす"""
@@ -109,3 +133,5 @@ class CollectScriptTest(unittest.TestCase):
         self.assertEqual(got, ["https://shop/a.jpg"])
         # 説明の拾い方も同じ
         self.assertEqual(mod.extract(DescriptionTest.PAGE, "https://shop/p/1"), pp.extract(DescriptionTest.PAGE, "https://shop/p/1"))
+        # モデルの使用期限の拾い方も同じ(X77)
+        self.assertEqual(mod.extract(ExpiryTest.PAGE, "https://shop/p/1"), pp.extract(ExpiryTest.PAGE, "https://shop/p/1"))

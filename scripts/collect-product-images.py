@@ -16,6 +16,8 @@ CSV の列(1 行目は列名):
 ページの拾い方は、CCP の「商品ページから画像を選ぶ」(server/ccp/product_pages.py の extract)と同じ
 (<img> の src・data-src・srcset のいちばん大きいもの、og:image。ロゴ・アイコンなどの小さな飾りは除く。
 画像ごとの説明(description)は alt → title → <figcaption> → JSON-LD の順に拾い、目録の caption に入れる(取り込むと product_images.caption)。
+写っているモデルの使用期限(modelExpirationDate)は img の data 属性 → JSON-LD → ページの中の JSON の順に拾い、目録の model_usable_until に入れる
+(取り込むと product_images.model_usable_until。配信日より前に切れる画像を載せると、配信カードにアラートが出る)。
 画像の URL の大きさの指定 ?width= は外して、元の大きさで取る)。
 直すときは、両方を合わせる。
 
@@ -77,7 +79,8 @@ class ImageParser(HTMLParser):
             src = a.get("data-src") or a.get("data-original") or a.get("src") or ""
             best = largest(a.get("srcset") or a.get("data-srcset") or "")
             w = to_int(a.get("width"))
-            item = {"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "title": a.get("title", "").strip()[:2000], "width": w}
+            item = {"src": (best or src).strip(), "alt": a.get("alt", "").strip()[:200], "title": a.get("title", "").strip()[:2000], "width": w,
+                    "expires": a.get("data-model-expiration-date") or a.get("data-model-expires") or ""}
             self.found.append(item)
             if self.figures:
                 self.figures[-1]["imgs"].append(item)
@@ -164,14 +167,68 @@ def ld_captions(blocks: list[str], base: str) -> dict:
     return out
 
 
+def norm_date(v) -> str:
+    """日付らしい文字(2026-10-31・2026/10/31・2026-10-31T00:00:00Z など)を YYYY-MM-DD に。読めなければ空"""
+    m = re.match(r"\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", str(v or ""))
+    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}" if m else ""
+
+
+EXPIRY_KEYS = ("modelExpirationDate", "model_expiration_date", "modelExpiresAt", "expires")
+
+
+def ld_expiry(blocks: list[str], base: str) -> dict:
+    """JSON-LD の画像(ImageObject)の URL → 写っているモデルの使用期限(modelExpirationDate → expires。product_pages.py と同じ)"""
+    out: dict = {}
+
+    def walk(o):
+        if isinstance(o, list):
+            for x in o:
+                walk(x)
+        elif isinstance(o, dict):
+            url = o.get("contentUrl") or o.get("url")
+            if isinstance(url, str):
+                d = next((norm_date(o.get(k)) for k in EXPIRY_KEYS if norm_date(o.get(k))), "")
+                if d:
+                    out.setdefault(original_size(urljoin(base, url.strip())), d)
+            for v in o.values():
+                walk(v)
+
+    for b in blocks:
+        try:
+            walk(json.loads(b))
+        except ValueError:
+            continue
+    return out
+
+
+# ページの中の JSON(画面を作るためのデータなど)で、画像の URL と modelExpirationDate が近くに並んでいるもの(順はどちらでも)
+_URL_KEYS = r'"(?:contentUrl|url|src|imageUrl|image_url|image)"\s*:\s*"([^"]+)"'
+_EXP_KEY = r'"(?:modelExpirationDate|model_expiration_date|modelExpiresAt)"\s*:\s*"([^"]+)"'
+_TEXT_EXPIRY = (re.compile(_URL_KEYS + r"[^{}]{0,600}?" + _EXP_KEY), re.compile(_EXP_KEY + r"[^{}]{0,600}?" + _URL_KEYS))
+
+
+def text_expiry(html: str, base: str) -> dict:
+    """JSON-LD の外の JSON から拾う、画像の URL → モデルの使用期限(サイトによっては、画面のデータの JSON にだけ書いてある)"""
+    out: dict = {}
+    for i, rx in enumerate(_TEXT_EXPIRY):
+        for m in rx.finditer(html):
+            url, d = (m.group(1), m.group(2)) if i == 0 else (m.group(2), m.group(1))
+            d = norm_date(d)
+            if d and not url.startswith("data:"):
+                out.setdefault(original_size(urljoin(base, url.replace("\\/", "/").strip())), d)
+    return out
+
+
 def extract(html: str, base: str) -> list[dict]:
-    """ページの画像の一覧(src・alt・description)。description は alt → title → figcaption → JSON-LD の、最初にあるもの"""
+    """ページの画像の一覧(src・alt・description・model_usable_until)。description は alt → title → figcaption → JSON-LD の、最初にあるもの。
+    model_usable_until(写っているモデルの使用期限)は img の data 属性 → JSON-LD → ページの中の JSON の、最初にあるもの"""
     p = ImageParser()
     try:
         p.feed(html)
     except Exception:  # 壊れた HTML でも、拾えたところまで使う
         pass
     ld = ld_captions(p.ld, base)
+    exp = {**text_expiry(html, base), **ld_expiry(p.ld, base)}
     out, seen = [], set()
     for f in p.found:
         src = f["src"]
@@ -185,7 +242,8 @@ def extract(html: str, base: str) -> list[dict]:
             continue
         seen.add(absolute)
         desc = next((v for v in (f.get("alt"), f.get("title"), f.get("figcaption"), ld.get(absolute)) if v), "")
-        out.append({"src": absolute, "alt": f.get("alt") or "", "description": desc})
+        until = norm_date(f.get("expires")) or exp.get(absolute, "")
+        out.append({"src": absolute, "alt": f.get("alt") or "", "description": desc, **({"model_usable_until": until} if until else {})})
     return out
 
 
@@ -260,7 +318,7 @@ def collect(row: dict, out: Path, args) -> dict:
     main = original_size(row.get("main_image_url") or "")
     seen_hash: set[str] = set()
 
-    def keep(body: bytes, itype: str, src: str, alt: str, is_main: bool, caption: str = "") -> str:
+    def keep(body: bytes, itype: str, src: str, alt: str, is_main: bool, caption: str = "", until: str = "") -> str:
         """画像を保存して、目録に足す。足さなかったときは、その理由を返す"""
         ext = EXT.get(itype)
         if not ext:
@@ -273,7 +331,7 @@ def collect(row: dict, out: Path, args) -> dict:
         seen_hash.add(h)
         name = f"{len(result['images']) + 1:02d}_{'main_' if is_main else ''}{h[:12]}.{ext}"
         (folder / name).write_bytes(body)
-        result["images"].append({"file": f"{folder.name}/{name}", "src": src, "alt": alt, "caption": caption, "bytes": len(body), "sha256": h, "content_type": itype, "main": is_main})
+        result["images"].append({"file": f"{folder.name}/{name}", "src": src, "alt": alt, "caption": caption, **({"model_usable_until": until} if until else {}), "bytes": len(body), "sha256": h, "content_type": itype, "main": is_main})
         return ""
 
     if main:
@@ -282,7 +340,7 @@ def collect(row: dict, out: Path, args) -> dict:
             _, body, itype, _ = get(main, MAX_IMAGE, "image/*")
             # メイン画像の説明は、ページの上の同じ画像の説明(なければ空)
             on_page = next((i for i in found if same_image(i["src"], main)), None)
-            why = keep(body, itype, main, (on_page or {}).get("alt", ""), True, (on_page or {}).get("description", ""))
+            why = keep(body, itype, main, (on_page or {}).get("alt", ""), True, (on_page or {}).get("description", ""), (on_page or {}).get("model_usable_until", ""))
             if why:
                 result["skipped"].append({"src": main, "reason": f"メイン画像: {why}"})
         except Exception as e:
@@ -309,7 +367,7 @@ def collect(row: dict, out: Path, args) -> dict:
             continue
         finally:
             time.sleep(args.sleep)
-        why = keep(body, itype, src, img["alt"], False, img.get("description", ""))
+        why = keep(body, itype, src, img["alt"], False, img.get("description", ""), img.get("model_usable_until", ""))
         if why:
             result["skipped"].append({"src": src, "reason": why})
     return result
