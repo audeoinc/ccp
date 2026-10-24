@@ -9,6 +9,8 @@ type Props = ComponentProps<typeof DialogSurface> & {
   sizeKey: string
   /** これより小さくしない(既定 420 × 280) */
   min?: FloatSize
+  /** 以前から別の鍵で覚えていたフロート(配信カードの cardDetail.size・制作のページの productionPage.size)は、その鍵をそのまま使う(覚えた大きさを引き継ぐ) */
+  prefKey?: string
 }
 
 /**
@@ -17,10 +19,10 @@ type Props = ComponentProps<typeof DialogSurface> & {
  * ダブルクリックで既定の大きさに戻す。狭い画面(900px 未満)では、つまみを出さず、既定の大きさのまま。
  * 小さい確かめの窓・小さいポップアップは固定でよい(利用者に確かめ済み。ARCHITECTURE の「見た目の約束事」)
  */
-export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, style, children, ...rest }, ref) {
+export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, prefKey, style, children, ...rest }, ref) {
   const inner = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => inner.current as HTMLDivElement)
-  const float = useFloatSize(floatSizeKey(sizeKey), inner, min)
+  const float = useFloatSize(prefKey ?? floatSizeKey(sizeKey), inner, min)
   return (
     <DialogSurface ref={inner} {...rest} style={{ ...style, ...float.style }}>
       {children}

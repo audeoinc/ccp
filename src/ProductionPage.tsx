@@ -24,9 +24,9 @@ import { cardMarket } from './market'
 import { CopyButton, ProductionInfoPane } from './ProductionInfoPane'
 import { ProductionChat } from './ProductionChat'
 import { syncHtml } from './productionRevise'
-import { ResizeHandles } from './ResizeHandles'
+import { ResizableSurface } from './ResizableSurface'
 import { Splitter } from './Splitter'
-import { useFloatSize, usePaneWidths } from './floatLayout'
+import { usePaneWidths } from './floatLayout'
 import type { VariantKey } from './abTest'
 import { buildSnapshot, downloadText, htmlLinks, parseSnapshot, parseVariantHtml, previewHtml, productionVariants, snapshotOf, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
@@ -152,8 +152,6 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const t = useT()
   const meId = useSyncExternalStore(subscribeMe, myUserId)
   const meName = useSyncExternalStore(subscribeMe, myName)
-  const surfaceRef = useRef<HTMLDivElement>(null)
-  const float = useFloatSize(PREF.productionSize, surfaceRef)
   // 既定の幅: プレビューに、メールの幅(600px 前後)が収まるよう残す
   const panes = usePaneWidths(PREF.productionPaneWidths, [300, 440, 0, 320], 2)
   const [infoOpen, setInfoOpen] = useState(() => loadPref<boolean>(INFO_KEY, true))
@@ -525,8 +523,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface ref={surfaceRef} className={s.surface} style={float.style} aria-label={t(`制作のページ: ${card.name}`, `Production page: ${card.name}`)}>
-        <ResizeHandles {...float.handles} />
+      {/* 大きさの鍵は、以前からの productionPage.size を引き継ぐ */}
+      <ResizableSurface sizeKey="productionPage" prefKey={PREF.productionSize} min={{ w: 900, h: 560 }} className={s.surface} aria-label={t(`制作のページ: ${card.name}`, `Production page: ${card.name}`)}>
         <div className={s.head}>
           {stageNav ?? <FaceBadge face="production" />}
           <ChannelBadge channel={card.channel} />
@@ -1001,7 +999,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
             </DialogSurface>
           </Dialog>
         )}
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

@@ -5,7 +5,6 @@ import {
   Button,
   Caption1,
   Dialog,
-  DialogSurface,
   Field,
   Input,
   MenuItem,
@@ -50,7 +49,7 @@ import { useStoredWidths } from './floatLayout'
 import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, swapNote, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
-import { ResizeHandles } from './ResizeHandles'
+import { ResizableSurface } from './ResizableSurface'
 import { campaignId, campaignSlug, encodeLinks, productContent, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links, utmFor, variantCampaign } from './links'
 import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
@@ -83,7 +82,7 @@ import { PreviewPins } from './PreviewPins'
 import { pinView } from './pinStore'
 import type { StockModel } from './alerts'
 import { CARD_ALERT_ORDER, type CardAlert } from './cardAlerts'
-import { viewHeight, viewWidth } from './uiScale'
+import { viewWidth } from './uiScale'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
 import type { AiPreview, FloatAction, SimpleEditor } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
@@ -269,14 +268,8 @@ const autoDrafted = new Set<string>()
 
 // 4 つめの幅(右端のプロセスのペイン)を足したので、版を上げた(2026-10-17)
 const WIDTH_KEY = PREF.cardPaneWidths
-// ダイアログの大きさ(辺・角のドラッグで変える。null は既定の大きさ)
-const SIZE_KEY = PREF.cardSize
+// ダイアログの大きさ(辺・角のドラッグで変える。ResizableSurface。鍵は以前からの cardDetail.size)
 const MIN_DIALOG = { w: 900, h: 560 }
-type DialogSize = { w: number; h: number }
-const clampSize = (s: DialogSize): DialogSize => ({
-  w: Math.round(Math.min(viewWidth(), Math.max(MIN_DIALOG.w, s.w))),
-  h: Math.round(Math.min(viewHeight(), Math.max(MIN_DIALOG.h, s.h))),
-})
 // 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
 const INFO_KEY = PREF.cardInfoOpen
 const RAIL_W = 32
@@ -597,16 +590,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
   const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState<DialogSize | null>(() => loadPref<DialogSize | null>(SIZE_KEY, null))
-  const resizeDialog = (dw: number, dh: number) =>
-    setSize((s) => {
-      // まだ既定の大きさなら、今の大きさから始める
-      const r = surfaceRef.current?.getBoundingClientRect()
-      const cur = s ?? (r ? { w: r.width, h: r.height } : null)
-      return cur ? clampSize({ w: cur.w + dw, h: cur.h + dh }) : s
-    })
-  // 画面より大きく保存されていても、画面に収める(狭い画面では、既定の全画面表示のまま)
-  const sizeStyle = size && viewWidth() >= 900 ? (() => { const c = clampSize(size); return { width: `${c.w}px`, height: `${c.h}px`, maxHeight: `${c.h}px` } })() : undefined
   // 商品情報の行にマウスが乗っている商品(プレビューで光らせる)と、商品情報ペインの開閉
   const [hoverKey, setHoverKey] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState<boolean>(loadInfoOpen)
@@ -2424,20 +2407,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   return (
     <Dialog open onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
-      <DialogSurface ref={surfaceRef} className={styles.surface} style={sizeStyle} aria-label={card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}>
-        <ResizeHandles
-          onResize={resizeDialog}
-          onDone={() =>
-            setSize((s) => {
-              savePref(SIZE_KEY, s)
-              return s
-            })
-          }
-          onReset={() => {
-            setSize(null)
-            savePref(SIZE_KEY, null)
-          }}
-        />
+      <ResizableSurface ref={surfaceRef} sizeKey="cardDetail" prefKey={PREF.cardSize} min={MIN_DIALOG} className={styles.surface} aria-label={card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}>
         <form onSubmit={submit} className={styles.form}>
           {auto && (
             <div className={styles.overlay}>
@@ -3044,7 +3014,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           </>
           )}
         </form>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }
