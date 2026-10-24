@@ -9,6 +9,7 @@ import asyncio
 import os
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from . import optional
 
 _engine: AsyncEngine | None = None
 _lock: asyncio.Lock | None = None
@@ -37,10 +38,9 @@ async def get_engine() -> AsyncEngine:
             _engine = create_async_engine(url, pool_size=3, max_overflow=2, pool_pre_ping=True)
             return _engine
 
-        try:
-            from .hosted.connect import create_engine
-        except ImportError:
+        create_engine = optional.hosted("connect", "create_engine")
+        if create_engine is None:
             # KeyError にして、DB につながらない理由として画面に出す(data_api.db)
-            raise KeyError("DATABASE_URL") from None
+            raise KeyError("DATABASE_URL")
         _engine = create_engine()
         return _engine

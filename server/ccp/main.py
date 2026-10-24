@@ -40,12 +40,10 @@ from .product_images import router as product_images_router
 from sqlalchemy import text
 
 from .data_api import db, register_errors, router as data_router
+from . import optional
 
-try:
-    # 環境ごとの追加の API(ccp/hosted/)。そのフォルダがない環境では、登録しない
-    from .hosted.routes import router as hosted_router
-except ImportError:
-    hosted_router = None
+# 環境ごとの追加の API(ccp/hosted/)。そのフォルダがない環境では、登録しない(あるのに読めなければ、理由をログに)
+hosted_router = optional.hosted("routes", "router")
 
 logging.basicConfig(level=logging.INFO)  # DB の状態の記録などを、サーバーのログに出す
 

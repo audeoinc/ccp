@@ -6,15 +6,13 @@ from __future__ import annotations
 
 import google.auth
 from google.auth.credentials import Credentials
+from . import optional
 
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 
 def get_credentials() -> Credentials:
-    try:
-        from .hosted.devtoken import dev_credentials
-    except ImportError:
-        dev_credentials = None
+    dev_credentials = optional.hosted("devtoken", "dev_credentials")
     if dev_credentials is not None and (creds := dev_credentials()) is not None:
         return creds
     creds, _ = google.auth.default(scopes=SCOPES)

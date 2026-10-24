@@ -27,6 +27,11 @@ jobs:
         run: npx eslint .
       - name: Build
         run: npm run build
+      # 画面とサーバーで同じ判定になるかの確かめ(npm run verify に含むものを、CI でも)
+      - name: Approvals and policy checks
+        run: |
+          node scripts/check-approvals.mjs
+          node scripts/check-policy.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -36,3 +41,14 @@ jobs:
       - name: Server tests
         working-directory: server
         run: python -m unittest discover -s tests
+      # Workbench 版と同じく、ccp/hosted/ と、その依存(requirements-hosted.txt)がなくても、サーバーが読み込めてテストが通るか
+      # (hosted が読めないと黙って切り替わるので、外のコードが hosted に頼っていても、ここで見つける)
+      - name: Server without hosted
+        working-directory: server
+        run: |
+          python -m venv /tmp/nohosted
+          /tmp/nohosted/bin/pip install -q -r requirements.txt
+          mv ccp/hosted /tmp/ccp-hosted
+          mv tests/test_hosted_dbctl.py /tmp/
+          /tmp/nohosted/bin/python -c "import ccp.main; assert ccp.main.hosted_router is None"
+          /tmp/nohosted/bin/python -m unittest discover -s tests

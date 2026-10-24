@@ -7,6 +7,7 @@ DB につながらないときは、どの環境でも DbNotReady を投げる(�
 from __future__ import annotations
 
 from typing import Any, Protocol
+from . import optional
 
 
 class DbNotReady(RuntimeError):
@@ -25,8 +26,5 @@ class Controller(Protocol):
 
 def controller() -> Any:
     """DB の起動・停止を受け持つものを返す。その仕組みがない環境では None"""
-    try:
-        from .hosted import db_controller
-    except ImportError:
-        return None
-    return db_controller()
+    db_controller = optional.hosted("", "db_controller")
+    return db_controller() if db_controller is not None else None
