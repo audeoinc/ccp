@@ -123,8 +123,8 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
             </span>
             <div className={s.bar}>
               <TabList size="small" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as 'open' | 'all')}>
-                <Tab value="open">{t(`未対応 ${openCount}`, `Open ${openCount}`)}</Tab>
-                <Tab value="all">{t(`すべて ${roots.length}`, `All ${roots.length}`)}</Tab>
+                <Tab value="open">{t(`未対応(${openCount})`, `Open (${openCount})`)}</Tab>
+                <Tab value="all">{t(`すべて(${roots.length})`, `All (${roots.length})`)}</Tab>
               </TabList>
               <Select size="small" value={order} onChange={(_, d) => setOrder(d.value as 'new' | 'votes')} aria-label={t('並べ方', 'Order')}>
                 <option value="new">{t('新しい順', 'Newest first')}</option>
