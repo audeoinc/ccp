@@ -31,7 +31,7 @@ import {
 } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { AddRegular, ArrowDownloadRegular, ArrowUploadRegular, DeleteRegular, DismissRegular, EditRegular, TopSpeedRegular } from '@fluentui/react-icons'
-import { appPath } from './appRoot'
+import { callApi } from './gcp/services'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
 import { PolicyEdit, type RuleInput } from './data/policyEdit'
@@ -95,9 +95,8 @@ const kindOf = (name: string): Kind => (/\.csv$/i.test(name) ? 'sales' : 'rules'
 
 async function postPolicy(path: 'preview' | 'import', body: { kind: Kind; filename: string; content: string }): Promise<{ data?: Preview; error?: string }> {
   try {
-    const res = await fetch(appPath(`/api/policies/${path}`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const json = (await res.json().catch(() => null)) as { success: boolean; data?: Preview; error?: { message: string } } | null
-    if (!json) return { error: `${res.status}` }
+    // 取り込んだ人を記録に残すため、書いた人の印を送る呼び方を使う
+    const json = await callApi<Preview>('POST', `/api/policies/${path}`, body)
     return json.success ? { data: json.data } : { data: json.data, error: json.error?.message ?? 'error' }
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) }

@@ -2,7 +2,7 @@
 // 表(production_requests)を画面から直接書かないのは、承認済みかの確かめ・版の数え方・前の版を古くする、をサーバーでまとめて行うため。
 // 読むだけなら、表のサービス(ProductionRequestsService)でよい。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、src/mock/production.ts(同じ流れをメモリ上で行う)に差し替える。
-import { appPath } from '../appRoot'
+import { callApi } from '../gcp/services'
 import type { ProductionRequest } from '../models/productionRequests'
 import type { Actor } from './approvals'
 
@@ -27,15 +27,8 @@ interface Result<T> {
   error?: { message: string; code?: string }
 }
 
-async function post<T>(path: string, body: unknown): Promise<Result<T>> {
-  try {
-    const res = await fetch(appPath(`/api/production${path}`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const json = (await res.json().catch(() => null)) as Result<T> | null
-    return json ?? { success: false, error: { message: `サーバーの応答が正しくありません(${res.status})` } }
-  } catch (e) {
-    return { success: false, error: { message: e instanceof Error ? e.message : String(e) } }
-  }
-}
+// 書いた人の印・混み合いのやり直しは、表の読み書きと同じ呼び方に任せる
+const post = <T>(path: string, body: unknown) => callApi<T>('POST', `/api/production${path}`, body) as Promise<Result<T>>
 
 export const ProductionService = {
   /** 「この内容で制作に依頼する」(写しを固める) */

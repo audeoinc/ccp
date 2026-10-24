@@ -45,10 +45,15 @@ type Rec = Record<string, unknown>
 const RETRY_WAITS = [1000, 2000, 4000]
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-async function call<T>(method: string, path: string, query?: URLSearchParams, body?: unknown): Promise<Result<T>> {
+/**
+ * サーバーの窓口を呼ぶ(表の読み書き /api/data/… と、承認・制作の依頼・方針の取り込みなど、専用の窓口の両方)。
+ * 書いた人の印(x-ccp-actor)・混み合いのやり直し・DB の起動中の表示を、どの窓口でも同じにする
+ * (以前は専用の窓口が自前の fetch で、書いた人がサーバーに届かず、記録が空になっていた)
+ */
+export async function callApi<T>(method: string, url: string, body?: unknown): Promise<Result<T>> {
   try {
     const send = () =>
-      fetch(appPath(`/api/data/${path}${query && [...query].length ? `?${query}` : ''}`), {
+      fetch(appPath(url), {
         method,
         headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), 'x-ccp-actor': encodeURIComponent(actorName()) },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -71,6 +76,8 @@ async function call<T>(method: string, path: string, query?: URLSearchParams, bo
     return { success: false, error: { message: e instanceof Error ? e.message : String(e) } }
   }
 }
+
+const call = <T>(method: string, path: string, query?: URLSearchParams, body?: unknown) => callApi<T>(method, `/api/data/${path}${query && [...query].length ? `?${query}` : ''}`, body)
 
 export function makeService(table: string) {
   return {
