@@ -660,9 +660,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   // 左ペインで手で書き換えたら、採用した案の補足は消す
   const STALE: Partial<Record<keyof Form, keyof Form>> = { theme: 'themeReason', headline: 'copyAngle', copy: 'copyAngle', instructions: 'instructionsAngle' }
+  // いまの form に重ねる(描いたときの form に重ねると、同じ流れで先に変えた欄を、古い値で戻してしまうため)
   const set = <K extends keyof Form>(k: K) => (v: Form[K]) => {
     const stale = STALE[k]
-    setForm({ ...form, [k]: v, ...(stale ? { [stale]: '' } : {}) })
+    setForm((f) => ({ ...f, [k]: v, ...(stale ? { [stale]: '' } : {}) }))
   }
   const num = (v: string) => (v === '' ? undefined : (v as never))
   // 商品の引き当ては、1 つの表で(打つたびの描き直しで、一覧を何度も端から探さないように)
