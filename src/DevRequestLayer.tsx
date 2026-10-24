@@ -158,21 +158,48 @@ export function DevRequestLayer({ link, cardName }: Props) {
   const pending = target && 'pending' in target ? target.pending : null
 
   // 位置は、画面の中身・スクロール・大きさが変わるたびに変わるので、間隔を空けて測り直す(プレビューのピンと同じ)
-  const hereKey = here.map((q) => q.id).join(',') + (pending ? `|${pending.view_x}:${pending.view_y}` : '')
-  const live = useRef({ here, pending })
+  // 一覧の「この画面を開く」などで開いたリクエスト。この画面のものでなくても、置き場に出してフロートを付ける(どこにも出ないことがないように)
+  const openId = target && 'id' in target ? target.id : null
+  const opened = openId ? roots.find((q) => q.id === openId) : undefined
+  const openedElsewhere = !!opened && opened.screen !== screen
+  const hereKey = here.map((q) => q.id).join(',') + (pending ? `|${pending.view_x}:${pending.view_y}` : '') + `|${openId ?? ''}`
+  const live = useRef({ here, pending, openId })
   useEffect(() => {
-    live.current = { here, pending }
+    live.current = { here, pending, openId }
   })
+  // 開いたリクエストの目印を、画面に見えるところまで一度だけ送る(開き直すとスクロールが戻り、目印がペインの外に隠れていることがあるため)
+  const scrolledTo = useRef<string | null>(null)
   const layerRef = useRef<HTMLDivElement>(null)
+  // Fluent の Portal の置き場は、どれも z-index 1000000 で、あとから body に足したものが上になる。この層の置き場はアプリを開いたときに作るので、
+  // あとから開く配信カードなどのダイアログの下に隠れ、ピンが見えず押せなかった(2026-10-24、一覧の「この画面を開く」で開いてもピンが出なかった)。
+  // 置き場だけを一段上げ、どのダイアログよりも上にする(ダイアログに隠れた所のピンは、uncovered で出さない)
+  useEffect(() => {
+    const host = layerRef.current?.parentElement
+    if (host && host !== document.body) host.style.zIndex = '1000001'
+  })
   const inFloat = /^(card|production|result):|^alerts$/.test(screen)
   useEffect(() => {
     const update = () => {
       const next: { id: string; left: number; top: number }[] = []
       const lost: string[] = []
       for (const q of live.current.here) {
-        const p = locate(q)
+        let p = locate(q)
         if (!p) lost.push(q.id)
         else if (uncovered(p.left, p.top, q.anchor, layerRef.current, inFloat)) next.push({ id: q.id, ...p })
+        else if (q.id === live.current.openId) {
+          // 開いたリクエストは、隠れていても出す(人が開きに来たもの。2026-10-24、一覧の「この画面を開く」で開いてもピンが出なかった)。
+          // 目印がスクロールの外なら、見えるところまで送ってから測り直す
+          if (q.anchor && scrolledTo.current !== q.id) {
+            scrolledTo.current = q.id
+            try {
+              document.querySelector(q.anchor)?.scrollIntoView({ block: 'center', inline: 'center' })
+            } catch {
+              // 目印の書き方が古い(querySelector が投げる)ときは、そのまま
+            }
+            p = locate(q) ?? p
+          }
+          next.push({ id: q.id, ...p })
+        }
       }
       const pd = live.current.pending
       if (pd) {
@@ -222,10 +249,9 @@ export function DevRequestLayer({ link, cardName }: Props) {
     forgetLinkedRequest()
     setTarget(null)
   }
-  const lost = missing.map((id) => byId.get(id)).filter((q): q is DevRequest => !!q)
-  // 一覧から開いたリクエストの場所が見つからないときは、置き場を開いて、そこにフロートを付ける
-  const openId = target && 'id' in target ? target.id : null
-  const trayShown = trayOpen || (!!openId && missing.includes(openId))
+  const lost = [...missing.map((id) => byId.get(id)).filter((q): q is DevRequest => !!q), ...(openedElsewhere && opened ? [opened] : [])]
+  // 一覧から開いたリクエストの場所が見つからない(画面の作りが変わった・別の画面のもの)ときは、置き場を開いて、そこにフロートを付ける
+  const trayShown = trayOpen || (!!openId && (missing.includes(openId) || openedElsewhere))
 
   // テーマの色(CSS の変数)が届くよう、Fluent の Portal に出す(document.body に直接出すと、色が付かない)
   return (
