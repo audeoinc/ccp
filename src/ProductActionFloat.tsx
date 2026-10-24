@@ -39,7 +39,9 @@ export interface SwapOption {
 type Focus = { kind: 'current' } | { kind: 'cand'; key: string; product: Product } | { kind: 'ai'; product: Product; why: string } | { kind: 'search'; product: Product }
 
 const useStyles = makeStyles({
-  surface: { width: 'min(1040px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(88vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
+  // 高さを中身に合わせると、右のタブ(売上・在庫 / 詳細 / SKU …)を替えるたびに高さが変わり、真ん中に置いたフロートの上端が動いた(X70)。
+  // 高さを決めて、中身は左右の欄の中でスクロールさせる(つまみで変えた大きさを覚えていれば、そちらが勝つ)
+  surface: { width: 'min(1040px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'min(760px, calc(88vh / var(--ui-zoom, 1)))', maxHeight: 'calc(88vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
   body: { display: 'flex', flexDirection: 'column', rowGap: '10px', minHeight: 0, flexGrow: 1 },
   // 題名の行の全体をつかんで動かす(プレビューを見ながら選べるように)
   grab: { display: 'flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
