@@ -199,7 +199,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
     setTarget({ pending: { ...place, screen: screenKey(l), url: window.location.search, place_text: [head, place.partLabel].filter(Boolean).join(' > ') } })
   }, [])
   useEffect(() => {
-    setGlobalMenuItems((x, y) => [{ key: 'dev-request', label: tr('開発に伝える(リクエスト)', 'Tell the developers (request)'), icon: <LightbulbRegular />, onSelect: () => begin(x, y) }])
+    setGlobalMenuItems((x, y) => [{ key: 'dev-request', label: tr('ピンを打って、開発へのリクエストを書く', 'Pin here and write a request to developers'), icon: <LightbulbRegular />, onSelect: () => begin(x, y) }])
     return () => setGlobalMenuItems(null)
   }, [begin])
   // メニューのない所の右クリック: 「開発に伝える」だけのメニュー。ほかの右クリックが受けたもの・ブラウザのメニューの逃げ道は、そのまま

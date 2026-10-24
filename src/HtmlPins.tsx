@@ -194,7 +194,7 @@ export function HtmlPins({ frame, cardId, view, placing, onPlacingEnd, onOpenThr
   const ctx = useContextMenu()
   const { openAt } = ctx
   const onMenu = useCallback(
-    (x: number, y: number, place: () => void) => openAt(x, y, [{ key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: place }]),
+    (x: number, y: number, place: () => void) => openAt(x, y, [{ key: 'pin', label: t('ここにピンを打って、コメントを書く', 'Pin here and write a comment'), icon: <CommentAddRegular />, onSelect: place }]),
     [openAt, t],
   )
   const me = useSyncExternalStore(onMeChange, myName).trim()

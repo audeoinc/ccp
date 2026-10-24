@@ -166,14 +166,18 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     return () => window.clearTimeout(timer)
   }, [focus])
 
-  // Esc で、場所を選ぶのをやめる
+  // Esc で、場所を選ぶのをやめる。先に(capture で)受け取り、配信カードの窓には渡さない
+  // (渡すと、ピンを打つのをやめるつもりの Esc で、窓まで閉じてしまうため。X73 で「Esc でやめる」と案内している)
   useEffect(() => {
     if (!placing) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onPlacingEnd()
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      onPlacingEnd()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [placing, onPlacingEnd])
 
   /** 画面の点にピンを打つ(場所を選ぶ覆いを押した・右クリックの「ここにピンを打つ」)。打てたら true */
@@ -228,7 +232,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
       e.preventDefault()
       const extra = live.current.menuItems?.(under) ?? []
       openAt(x, y, [
-        { key: 'pin', label: t('ここにピンを打ってコメントする', 'Pin a comment here'), icon: <CommentAddRegular />, onSelect: () => void live.current.placeAt(x, y) },
+        { key: 'pin', label: t('ここにピンを打って、コメントを書く', 'Pin here and write a comment'), icon: <CommentAddRegular />, onSelect: () => void live.current.placeAt(x, y) },
         ...extra.map((it, i) => (i === 0 ? { ...it, divider: true } : it)),
       ])
     }

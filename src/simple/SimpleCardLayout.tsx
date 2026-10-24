@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Button, CounterBadge, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
@@ -121,6 +121,10 @@ const useStyles = makeStyles({
   inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)。押したら Tab・Esc が効くよう、フォーカスを受け取る
   boxWrap: { position: 'relative', flexGrow: 1, minHeight: 0, display: 'grid' },
+  // ピンを打つ状態のあいだの案内の帯(X73。マウスの形だけでは、何を待っているか分からないため)
+  // 左上・右上のボタンに重ならないよう、ボタンの下に出す
+  placingBar: { position: 'absolute', left: '50%', top: '44px', transform: 'translateX(-50%)', zIndex: 6, maxWidth: 'calc(100% - 28px)', boxShadow: tokens.shadow8 },
+  tipSub: { display: 'block', marginTop: '2px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   pinBox: { position: 'absolute', right: '14px', top: '6px', zIndex: 5, display: 'flex', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow4 },
   viewBox: { position: 'absolute', left: '6px', top: '6px', zIndex: 5, display: 'flex', columnGap: '2px', padding: '2px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow4 },
   // 部品の外の地は、つかんで動かせる(手のひら)。部品は押して選ぶ(指)
@@ -765,10 +769,28 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             </div>
           )}
           <div className={s.pinBox}>
-            <Tooltip content={placing ? t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to comment (Esc to cancel)') : t('プレビューの場所を押して、コメントを書く', 'Click a spot in the preview to comment')} relationship="label">
+            {/* バルーンは 2 行(X73。1 行目に何ができるか、2 行目に打ち方。右クリックでも打てることを知らせる) */}
+            <Tooltip
+              content={
+                placing ? (
+                  t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to comment (Esc to cancel)')
+                ) : (
+                  <>
+                    {t('ピンを打って、コメントを書く', 'Pin and write a comment')}
+                    <span className={s.tipSub}>{t('押してから、プレビューの場所を押す。右クリックでも打てます', 'Press this, then click a spot in the preview. Right-click also works')}</span>
+                  </>
+                )
+              }
+              relationship="label"
+            >
               <ToggleButton type="button" size="small" appearance={placing ? 'primary' : 'subtle'} checked={placing} icon={<CommentAddRegular />} onClick={() => setPlacing(!placing)} />
             </Tooltip>
           </div>
+          {placing && (
+            <MessageBar intent="info" className={s.placingBar}>
+              <MessageBarBody>{t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to write a comment (Esc to cancel)')}</MessageBarBody>
+            </MessageBar>
+          )}
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
             {e.alertOverlay}
