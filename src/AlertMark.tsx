@@ -8,6 +8,6 @@ import { useT } from './i18n'
 export function AlertMark({ kind }: { kind?: CardAlertKind }) {
   const t = useT()
   if (!kind) return null
-  const label = { outOfStock: t('在庫切れの見込みあり', 'Out of stock expected'), lowStock: t('在庫僅少あり', 'Low stock'), policyChanged: t('MD 方針の変更あり', 'MD policy changed'), dateChanged: t('日程の変更あり', 'Date changed'), overLimit: t('週の上限を超えた商品あり', 'Over the weekly limit') }[kind]
+  const label = { outOfStock: t('在庫切れの見込みあり', 'Out of stock expected'), lowStock: t('在庫僅少あり', 'Low stock'), policyChanged: t('MD 方針の変更あり', 'MD policy changed'), dateChanged: t('日程の変更あり', 'Date changed'), overLimit: t('週の上限を超えた商品あり', 'Over the weekly limit'), imageExpired: t('商品画像のモデルの使用期限が切れる', 'Model usage rights on the image expire') }[kind]
   return <AlertFilled aria-label={label} style={{ color: ALERT_COLOR[kind], flexShrink: 0, verticalAlign: '-2px', marginRight: '2px' }} fontSize={13} />
 }

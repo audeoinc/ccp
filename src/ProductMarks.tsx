@@ -14,6 +14,7 @@ const ALERT_BG: Record<CardAlertKind, string> = {
   policyChanged: tokens.colorPalettePurpleBorderActive,
   dateChanged: tokens.colorPaletteBlueBorderActive,
   overLimit: tokens.colorPaletteBrownBorderActive,
+  imageExpired: tokens.colorPaletteTealBorderActive,
 }
 
 const useStyles = makeStyles({
@@ -50,7 +51,7 @@ export function AlertChip({ kind, onClick, className }: { kind: CardAlertKind; o
       }}
       title={t('このアラートへの対応を開く', 'Handle this alert')}
     >
-      {{ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date'), overLimit: t('週の上限', 'Weekly limit') }[kind]}
+      {{ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date'), overLimit: t('週の上限', 'Weekly limit'), imageExpired: t('モデルの期限', 'Model rights') }[kind]}
     </button>
   )
 }

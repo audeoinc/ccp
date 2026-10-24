@@ -46,8 +46,11 @@ export const tables: Record<string, Row[]> = {
   WeeklyPerformancesService: structuredClone(weekly),
   ProductRankingsService: structuredClone(productRankings),
   ProductPoliciesService: structuredClone(policies),
-  // 商品ページから取り込んだ画像(B11)。見本では空(画像を選ぶ窓は、見本の EC サイトのページを読む)
-  ProductImagesService: [],
+  // 商品ページから取り込んだ画像(B11)。見本では、モデルの使用期限のアラートを見せる 1 枚だけ(U05 のメイン。10/1 の Fall Arrivals に載っている)。
+  // 画像を選ぶ窓は、見本の EC サイトのページを読む
+  ProductImagesService: products
+    .filter((p) => p.product_code === 'U05')
+    .map((p) => ({ id: guid('pimg:U05'), name: `${p.name}`, product_id: p.id, product_code: p.product_code, market: p.market, image_url: p.image_url, is_main: 1, model_usable_until: '2026-09-30' })),
   // 国ごとの設定(ST2)。見本では空(既定の値)
   CountrySettingsService: [],
   // 国ごとの適用(ST7)。見本では空(すべての国で、すべてのテンプレートを使う)
@@ -133,9 +136,11 @@ interface Options {
   top?: number
 }
 
-/** `項目 eq 値`(値は、'文字' か、そのままの文字)だけを読む簡単な絞り込み */
+/** `項目 eq 値`(値は、'文字' か、そのままの文字)と `項目 ne null` だけを読む簡単な絞り込み */
 function matches(row: Row, filter?: string): boolean {
   if (!filter) return true
+  const nn = filter.match(/^\s*(\S+)\s+ne\s+null\s*$/i)
+  if (nn) return row[nn[1]] !== undefined && row[nn[1]] !== null && row[nn[1]] !== ''
   const m = filter.match(/^\s*(\S+)\s+eq\s+(.+?)\s*$/)
   if (!m) return true
   const value = m[2].replace(/^'(.*)'$/, '$1').replace(/''/g, "'")

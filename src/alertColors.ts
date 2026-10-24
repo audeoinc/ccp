@@ -8,4 +8,5 @@ export const ALERT_COLOR: Record<CardAlertKind, string> = {
   policyChanged: tokens.colorPalettePurpleForeground2,
   dateChanged: tokens.colorPaletteBlueForeground2,
   overLimit: tokens.colorPaletteMarigoldForeground2,
+  imageExpired: tokens.colorPaletteTealForeground2,
 }

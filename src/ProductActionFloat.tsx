@@ -125,6 +125,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
   // AI の差し替え案(在庫・週の上限のアラートから開いたとき。開いたときに 1 回だけ)
   const overLimit = alert?.kind === 'overLimit'
   const stockAlert = !!alert && (alert.kind === 'outOfStock' || alert.kind === 'lowStock' || overLimit)
+  // モデルの使用期限(アラートの画面には出ない。この配信で使う画像を替えるか、商品を差し替えて直す)
+  const imageAlert = alert?.kind === 'imageExpired'
   const [picks, setPicks] = useState<{ c: ReplacementCandidate; reason: string }[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
@@ -145,7 +147,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const kindName = (k: CardAlertKind) => ({ outOfStock: t('在庫切れの見込み', 'Out of stock (expected)'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy change'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over the weekly limit') })[k]
+  const kindName = (k: CardAlertKind) => ({ outOfStock: t('在庫切れの見込み', 'Out of stock (expected)'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy change'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over the weekly limit'), imageExpired: t('商品画像のモデルの使用期限', 'Model rights expired on the image') })[k]
   // 候補の商品の印(差し替えた先が、別のアラートにならないように)
   const marks = (p: Product) => {
     const kind = alertKinds?.get(p.id)
@@ -220,7 +222,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     {alert.detail}
                     {product && stockAlert && t(` ・ いまの在庫 ${num(product.stock)}`, ` · Stock now ${num(product.stock)}`)}
                   </span>
-                  {!stockAlert && <span className={s.alertDetail}>{t('この変更は、確かめて「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
+                  {imageAlert && <span className={s.alertDetail}>{t('この配信で使う画像を、期限のない(まだ切れない)画像に替えるか、商品を差し替えてください', 'Switch to an image without this expiry, or swap the product')}</span>}
+                  {!stockAlert && !imageAlert && <span className={s.alertDetail}>{t('この変更は、確かめて「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
                 </span>
                 <span className={s.others}>
                   {stockAlert && onPostpone && (
@@ -228,7 +231,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                       {t('配信日を変える', 'Change the send date')}
                     </Button>
                   )}
-                  {!overLimit && onOpenAlerts && (
+                  {!overLimit && !imageAlert && onOpenAlerts && (
                     <Button size="small" appearance={stockAlert ? 'subtle' : 'primary'} icon={<OpenRegular />} onClick={onOpenAlerts}>
                       {t('アラートの画面で詳しく', 'Open in Alerts')}
                     </Button>

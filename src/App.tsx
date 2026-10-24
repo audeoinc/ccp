@@ -71,6 +71,8 @@ import { HeroImagesService } from './data/heroImages'
 import { ProductPoliciesService } from './data/productPolicies'
 import type { HeroImage } from './models/heroImages'
 import { DeliveryProductsService } from './data/deliveryProducts'
+import { ProductImagesService } from './data/productImages'
+import type { ProductImage } from './models/productImages'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar, WeekScopeBar } from './WeekReviewBar'
@@ -87,7 +89,7 @@ import { AlertsFloat } from './AlertsFloat'
 import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
 import { dateOf, dateText, hasFloat, linkSearch, parseLink, type LinkState } from './deepLink'
 import { useChangeAlerts, useStockAlerts } from './alerts'
-import { buildCardAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
+import { buildCardAlerts, imageExpiryAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
 import { importProductImagesZip } from './productImageImport'
@@ -576,6 +578,8 @@ function App() {
   const [variantProducts, setVariantProducts] = useState<Map<string, Partial<Record<VariantKey, string[]>>>>(new Map())
   // 配信ごとに選んだ商品の画像(配信 ID → 商品 ID → 画像の URL。X64。制作のページに渡す)
   const [cardImages, setCardImages] = useState<Map<string, Map<string, string>>>(new Map())
+  // モデルの使用期限が入っている商品画像だけ(配信日より前に切れる画像のアラート。期限のない画像は読まない)
+  const [expiringImages, setExpiringImages] = useState<ProductImage[]>([])
   // 週の上限(同じ商品を週に何回載せたか)に使う、AB テストの B・C 案の商品も足した中身(X55 段階 3)。
   // B・C 案も実際に一部の受信者に送るので、安全側に数える。同じ配信の中で A と同じ商品は 1 回だけ
   const cardProductsAll = useMemo(() => {
@@ -736,10 +740,14 @@ function App() {
   // 配信ごとのアラート(配信カードの帯・カレンダーの印)
   // 配信ごとのアラート: 在庫・方針・日程に、週の上限を超えた商品を足す(直す場所を配信カードにそろえるため)
   const cardAlerts = useMemo(
-    () => mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProductsAll, (id) => products.find((p) => p.id === id)?.name ?? '')),
+    () =>
+      mergeCardAlerts(
+        mergeCardAlerts(buildCardAlerts(alerts, changeAlerts), overLimitAlerts(activeCards, cardProductsAll, (id) => products.find((p) => p.id === id)?.name ?? '')),
+        imageExpiryAlerts(activeCards, cardProductsAll, cardImages, products, expiringImages),
+      ),
     // 週の上限(アラートの条件・決まり)が変わったら、作り直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [alerts, changeAlerts, activeCards, cardProductsAll, products, countryVersion, limitRules, applyVersion],
+    [alerts, changeAlerts, activeCards, cardProductsAll, cardImages, expiringImages, products, countryVersion, limitRules, applyVersion],
   )
   const weekUseAll = useMemo(() => weeklyUse(activeCards, cardProductsAll), [activeCards, cardProductsAll])
   const alertKinds = useMemo(() => new Map([...cardAlerts].map(([id, list]) => [id, topKind(list)]).filter((e): e is [string, CardAlertKind] => !!e[1])), [cardAlerts])
@@ -805,6 +813,9 @@ function App() {
           }
           setCardImages(images)
         })
+        .catch(() => undefined)
+      ProductImagesService.getAll({ filter: 'model_usable_until ne null' })
+        .then((res) => res.success && setExpiringImages(res.data ?? []))
         .catch(() => undefined)
       CardNotesService.getAll()
         .then((res) => {

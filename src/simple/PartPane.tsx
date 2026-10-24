@@ -599,6 +599,15 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             <div role="button" tabIndex={0} className={s.productOpen} title={t('押すと、詳しい情報・差し替え・画像', 'Click for details, swap and image')} onClick={() => e.openProduct(it.key)} onKeyDown={(ev) => ev.key === 'Enter' && e.openProduct(it.key)}>
               {productBox(byId.get(it.productId), it.reason ? <span className={s.caption}>{it.reason}</span> : undefined, it.imageUrl)}
             </div>
+            {/* 商品画像のモデルの使用期限(メイン画像の期限の警告と同じ形。画像を替えるか、商品を差し替える) */}
+            {e.alerts
+              .filter((a) => a.kind === 'imageExpired' && a.productId === it.productId)
+              .map((a) => (
+                <span key={a.kind} className={s.warn}>
+                  <WarningRegular />
+                  {a.detail}
+                </span>
+              ))}
             {/* 差し替えは、箱の真下のボタンから開く(どの商品を替えるのかが、ひと目で分かるように) */}
             <ChooseDrawer
                 key={partKey(part)}

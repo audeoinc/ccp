@@ -39,6 +39,7 @@ const BG: Record<CardAlertKind, string> = {
   policyChanged: tokens.colorPalettePurpleBorderActive,
   dateChanged: tokens.colorPaletteBlueBorderActive,
   overLimit: tokens.colorPaletteBrownBorderActive,
+  imageExpired: tokens.colorPaletteTealBorderActive,
 }
 
 interface Box {
@@ -64,7 +65,7 @@ export function ItemAlertOverlay({ boxRef, kinds, onOpen }: Props) {
   const s = useStyles()
   const t = useT()
   const [boxes, setBoxes] = useState<Map<string, Box>>(new Map())
-  const label = (k: CardAlertKind) => ({ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date'), overLimit: t('週の上限', 'Weekly limit') })[k]
+  const label = (k: CardAlertKind) => ({ outOfStock: t('在庫切れ', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('方針の変更', 'Policy'), dateChanged: t('日程', 'Date'), overLimit: t('週の上限', 'Weekly limit'), imageExpired: t('モデルの期限', 'Model rights') })[k]
 
   const measure = useCallback(
     (el: Element): Box | null => {

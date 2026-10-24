@@ -5,7 +5,7 @@ import { locale, tr } from './i18n'
 import { limitText, weeklyLimitFor } from './weeklyLimit'
 import { weekKeyOf } from './weekLock'
 
-export type CardAlertKind = 'outOfStock' | 'lowStock' | 'policyChanged' | 'dateChanged' | 'overLimit'
+export type CardAlertKind = 'outOfStock' | 'lowStock' | 'policyChanged' | 'dateChanged' | 'overLimit' | 'imageExpired'
 
 export interface CardAlert {
   kind: CardAlertKind
@@ -17,7 +17,7 @@ export interface CardAlert {
 }
 
 /** 強い順(カレンダーの印の色に使う) */
-export const CARD_ALERT_ORDER: CardAlertKind[] = ['outOfStock', 'policyChanged', 'lowStock', 'overLimit', 'dateChanged']
+export const CARD_ALERT_ORDER: CardAlertKind[] = ['outOfStock', 'imageExpired', 'policyChanged', 'lowStock', 'overLimit', 'dateChanged']
 
 const dateText = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
@@ -112,6 +112,47 @@ export function overLimitAlerts(cards: { id: string; scheduled_at?: string; coun
         label: productName(pid),
         detail: tr(`この週に ${m?.get(pid) ?? 0} 本の配信に載っている(${limitText(lim)})`, `In ${m?.get(pid) ?? 0} deliveries this week (${limitText(lim)})`),
       }))
+    if (list.length > 0) out.set(c.id, list)
+  }
+  return out
+}
+
+/**
+ * 商品画像のモデル(人物)の使用期限のアラート(2026-10-24 利用者と決めた)。載せた商品の画像(配信で選んだ画像、なければ商品のメイン画像)に
+ * 期限があり、配信日より前に切れる(もう切れている)ものを出す。候補から外すのではなく、アラートとして出し、画像か商品を替えてもらう
+ */
+export function imageExpiryAlerts(
+  cards: { id: string; scheduled_at?: string }[],
+  cardProducts: Map<string, string[]>,
+  cardImages: Map<string, Map<string, string>>,
+  products: { id: string; name?: string; image_url?: string }[],
+  images: { product_id?: string; image_url?: string; is_main?: number; model_usable_until?: string | null }[],
+): Map<string, CardAlert[]> {
+  const out = new Map<string, CardAlert[]>()
+  if (images.length === 0) return out
+  const byProduct = new Map<string, typeof images>()
+  for (const im of images) if (im.product_id && im.model_usable_until) byProduct.set(im.product_id, [...(byProduct.get(im.product_id) ?? []), im])
+  const productOf = new Map(products.map((p) => [p.id, p]))
+  for (const c of cards) {
+    if (!c.scheduled_at) continue
+    const day = c.scheduled_at.slice(0, 10)
+    const list: CardAlert[] = []
+    for (const pid of new Set(cardProducts.get(c.id) ?? [])) {
+      const rows = byProduct.get(pid)
+      if (!rows) continue
+      const p = productOf.get(pid)
+      const used = cardImages.get(c.id)?.get(pid) || p?.image_url
+      // 配信で選んだ画像の行。画像を選んでいなければ、商品のメイン画像の行(URL が違っても、メインの印のある行)
+      const row = rows.find((r) => r.image_url && r.image_url === used) ?? (cardImages.get(c.id)?.get(pid) ? undefined : rows.find((r) => r.is_main))
+      const until = row?.model_usable_until?.slice(0, 10)
+      if (!until || until >= day) continue
+      list.push({
+        kind: 'imageExpired',
+        productId: pid,
+        label: p?.name ?? '',
+        detail: tr(`商品画像のモデルの使用期限(${until})が、配信日より前に切れる`, `The model's usage rights on the product image end ${until}, before the delivery day`),
+      })
+    }
     if (list.length > 0) out.set(c.id, list)
   }
   return out

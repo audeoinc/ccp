@@ -22,6 +22,8 @@ export interface ProductImageFields {
   angle?: string
   /** sample = AI で作った見本の写真。本物の画像(空)がある商品では、見本を使わない */
   source?: string
+  /** 写っているモデル(人物)の使用期限(YYYY-MM-DD)。配信日より前に切れる画像を載せていれば、アラート(cardAlerts の imageExpiryAlerts) */
+  model_usable_until?: string | null
   product_id?: string
   state_code?: number
 }

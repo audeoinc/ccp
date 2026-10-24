@@ -42,6 +42,7 @@ const KIND_BG: Record<CardAlertKind, string> = {
   policyChanged: tokens.colorPalettePurpleBorderActive,
   dateChanged: tokens.colorPaletteBlueBorderActive,
   overLimit: tokens.colorPaletteBrownBorderActive,
+  imageExpired: tokens.colorPaletteTealBorderActive,
 }
 
 interface Props {
@@ -67,10 +68,10 @@ export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAc
   const t = useT()
   const [open, setOpen] = useState(defaultOpen)
   // 種類ごとの件数(たたんでいるときの要約)。並びは、強い順(在庫切れ → 在庫僅少 → 方針 → 週の上限超え → 日程)
-  const ORDER: CardAlertKind[] = ['outOfStock', 'lowStock', 'policyChanged', 'overLimit', 'dateChanged']
+  const ORDER: CardAlertKind[] = ['outOfStock', 'imageExpired', 'lowStock', 'policyChanged', 'overLimit', 'dateChanged']
   const counts = ORDER.map((k) => ({ k, n: alerts.filter((a) => a.kind === k).length })).filter((c) => c.n > 0)
   const kindLabel = (k: CardAlertKind) =>
-    ({ outOfStock: t('在庫切れの見込み', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over weekly limit') })[k]
+    ({ outOfStock: t('在庫切れの見込み', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over weekly limit'), imageExpired: t('モデルの使用期限', 'Model rights') })[k]
   if (panel)
     return (
       <div className={styles.panel}>
