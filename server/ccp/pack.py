@@ -114,6 +114,7 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
 # 入れ替えでも消さない表(その環境で書いたものを残す)。パックの行は、まだない行(id で見る)だけを足す。
 # 開発へのリクエストは、使っている環境で書かれるので、本番のパックで入れ替えても残す(参照先の配信が消えると、配信への参照だけが空になる)
 KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes"}
+# 人の設定(user_prefs。ST6)は残さない: ユーザー(users)と一緒に置き換わり、消えたユーザーの設定は参照先がなくなるため
 
 
 async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
