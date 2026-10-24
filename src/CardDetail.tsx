@@ -2082,40 +2082,44 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     moveItem(i, i + d)
   })
   const previewDropAt = useStableCallback(dropAt)
+  // 詳しい画面とシンプルな画面のプレビューに、同じく渡すもの(違うのは、商品・選んだ枠・テンプレート・画像・押したとき・部品を選ぶ見せ方)
+  const previewCommon = {
+    channel: previewTab,
+    country: form.country,
+    pushLinkKind: pushLink?.kind,
+    pushTitle: form.pushTitle,
+    pushBody: form.pushBody,
+    subject: form.name,
+    subjectLine: form.subject,
+    preheader: form.preheader,
+    device: previewDevice,
+    headline: form.headline,
+    copy: form.copy,
+    products,
+    hoverKey,
+    showHeadings,
+    scheduledAt: form.scheduledAt,
+    sectionTitles,
+    onSectionTitle: previewSectionTitle,
+    sectionCopies,
+    onSectionCopy: previewSectionCopy,
+    onDropHero: setHeroId,
+    onClearHero: previewClearHero,
+    onRemove: previewRemove,
+    onMove: previewMove,
+    onDropAt: previewDropAt,
+  }
   const simplePreview = (
     <>
       <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
         <Preview
-          channel={previewTab}
-          country={form.country}
-          pushLinkKind={pushLink?.kind}
-          pushTitle={form.pushTitle}
-          pushBody={form.pushBody}
-          subject={form.name}
-          subjectLine={form.subject}
-          preheader={form.preheader}
-          device={previewDevice}
-          headline={form.headline}
-          copy={form.copy}
+          {...previewCommon}
           items={shownItems}
-          products={products}
           // 選んだ部品の枠は、部品を選ぶ層が描く(二重に光らせない)
           selectedKey={null}
-          hoverKey={hoverKey}
-          showHeadings={showHeadings}
           template={aiPreview?.templateId ?? template}
-          scheduledAt={form.scheduledAt}
-          sectionTitles={sectionTitles}
-          onSectionTitle={previewSectionTitle}
-          sectionCopies={sectionCopies}
-          onSectionCopy={previewSectionCopy}
           hero={shownHero}
-          onDropHero={setHeroId}
-          onClearHero={previewClearHero}
           onSelect={previewNoSelect}
-          onRemove={previewRemove}
-          onMove={previewMove}
-          onDropAt={previewDropAt}
           pickMode
         />
       </div>
@@ -2227,20 +2231,44 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       hero: !itemKey && kind === 'hero' ? { src: heroImage(hero), replace: () => openTab('hero') } : undefined,
     })
   }
+  // 商品の枠のアラートの印(押すと、その商品のアラートへの対応を開く)。詳しい画面とシンプルな画面で同じ
+  const itemAlertOverlay = (
+    <ItemAlertOverlay
+      boxRef={previewBoxRef}
+      kinds={itemAlertKinds}
+      onOpen={(key) => {
+        const it = items.find((i) => i.key === key)
+        if (it) openAlertFor(it.productId)
+      }}
+    />
+  )
+  /** 配信カードの ⋯ のメニュー(複製・取りやめ・削除。保存済みの配信だけ)。シンプルな画面は、項目を足して使う */
+  const cardMenu = (extra?: ReactNode) =>
+    card && (
+      <CardMenu
+        card={card}
+        weeks={weeks}
+        onChanged={async () => {
+          await onSaved()
+          onBack()
+        }}
+        onDeleted={async () => {
+          await onSaved()
+          onBack()
+        }}
+        // 複製した配信を読み込んでから、それに開き直す(onReopen は開く配信を差し替える)
+        onDuplicated={async (id) => {
+          await onSaved()
+          onReopen?.(id)
+        }}
+        extra={extra}
+      />
+    )
   const simpleAlertOverlay = (
     <>
     {itemAlertKinds.size > 0 && (
       // アラートの印を押しても、部品を選び直さない
-      <div data-no-pick>
-        <ItemAlertOverlay
-          boxRef={previewBoxRef}
-          kinds={itemAlertKinds}
-          onOpen={(key) => {
-            const it = items.find((i) => i.key === key)
-            if (it) openAlertFor(it.productId)
-          }}
-        />
-      </div>
+      <div data-no-pick>{itemAlertOverlay}</div>
     )}
     </>
   )
@@ -2317,47 +2345,29 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         justSaved,
         canUndo: undoStack.canUndo,
         nextStep,
-        menu: (
-          <CardMenu
-            card={card}
-            weeks={weeks}
-            onChanged={async () => {
-              await onSaved()
-              onBack()
-            }}
-            onDeleted={async () => {
-              await onSaved()
-              onBack()
-            }}
-            onDuplicated={async (id) => {
-              await onSaved()
-              onReopen?.(id)
-            }}
-            extra={
-              <>
-                <MenuItem icon={<AiIcon size={16} />} disabled={!!auto || saving} onClick={runAllManual}>
-                  {t('すべて AI で下書き', 'Draft everything with AI')}
-                </MenuItem>
-                {next !== undefined && (
-                  <MenuItem icon={<ArrowNextRegular />} disabled={saving || !next} onClick={saveAndNext}>
-                    {next ? t(`保存して次へ(${next.name})`, `Save and next (${next.name})`) : t('保存して次へ(次の配信はありません)', 'Save and next (no next delivery)')}
-                  </MenuItem>
-                )}
-                {onOpenResults && card.scheduled_at && new Date(card.scheduled_at) < new Date() && (
-                  <MenuItem icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.id)}>
-                    {t('結果を見る', 'View results')}
-                  </MenuItem>
-                )}
-              </>
-            }
-          />
+        menu: cardMenu(
+          <>
+            <MenuItem icon={<AiIcon size={16} />} disabled={!!auto || saving} onClick={runAllManual}>
+              {t('すべて AI で下書き', 'Draft everything with AI')}
+            </MenuItem>
+            {next !== undefined && (
+              <MenuItem icon={<ArrowNextRegular />} disabled={saving || !next} onClick={saveAndNext}>
+                {next ? t(`保存して次へ(${next.name})`, `Save and next (${next.name})`) : t('保存して次へ(次の配信はありません)', 'Save and next (no next delivery)')}
+              </MenuItem>
+            )}
+            {onOpenResults && card.scheduled_at && new Date(card.scheduled_at) < new Date() && (
+              <MenuItem icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.id)}>
+                {t('結果を見る', 'View results')}
+              </MenuItem>
+            )}
+          </>,
         ),
         stageNav: stageTabs ?? stageNav,
         viewSwitch: <ViewSwitch simple onChange={changeView} />,
         preview: simplePreview,
         device: previewDevice,
         setDevice: pickDevice,
-        zoom: { mode: zoom, shown: shownZoom, set: setZoom, min: ZOOM_MIN, max: ZOOM_MAX },
+        zoom: { mode: zoom, shown: shownZoom, set: setZoom, min: ZOOM_MIN, max: ZOOM_MAX, step: stepZoom },
         // アラートは左のバーの「アラート」に出す(SU6。上の帯に置くと、作業する場所を狭めるため)
         notices: noticesNode,
         footer: footerNode,
@@ -2431,25 +2441,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             {card && <ViewSwitch simple={false} onChange={changeView} />}
             {card && <CopyLinkButton />}
             {/* 複製・取りやめ・削除(保存済みの配信だけ) */}
-            {card && (
-              <CardMenu
-                card={card}
-                weeks={weeks}
-                onChanged={async () => {
-                  await onSaved()
-                  onBack()
-                }}
-                onDeleted={async () => {
-                  await onSaved()
-                  onBack()
-                }}
-                // 複製した配信を読み込んでから、それに開き直す(onReopen は開く配信を差し替える)
-                onDuplicated={async (id) => {
-                  await onSaved()
-                  onReopen?.(id)
-                }}
-              />
-            )}
+            {cardMenu()}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
           </div>
           {noticesNode}
@@ -2480,17 +2472,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           )}
           {/* 案から選んだあと(X57): 決めた案と、配信しなかった案の入り口 */}
           {!ab && decision && <AbDecidedBar decision={decision} onView={() => setComparing('decided')} />}
-          {ab && comparing === 'live' && (
-            <AbCompare
-              ab={ab}
-              base={{ id: card?.id ?? 'draft', ...buildContent(), hero_image_id: null } as DeliveryCard}
-              variants={allVariants(ab).map((k) => ({ key: k, productIds: itemsOf(k).map((i) => i.productId), heroId: heroOf(k).heroId, texts: ownsAnyText(ab) ? textsOf(k) : undefined, template: templateOfV(k) }))}
-              products={products}
-              heroes={heroes}
-              onEdit={switchVariant}
-              onClose={() => setComparing(null)}
-            />
-          )}
+          {abCompareNode}
           {!ab && decision && comparing === 'decided' && (
             <AbCompare
               ab={null}
@@ -2824,48 +2806,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               </div>
               <div ref={previewBoxRef} className={styles.previewBox}>
                 <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
-                  <Preview
-                    channel={previewTab}
-                    country={form.country}
-                    pushLinkKind={pushLink?.kind}
-                    pushTitle={form.pushTitle}
-                    pushBody={form.pushBody}
-                    subject={form.name}
-                    subjectLine={form.subject}
-                    preheader={form.preheader}
-                    device={previewDevice}
-                    headline={form.headline}
-                    copy={form.copy}
-                    items={items}
-                    products={products}
-                    selectedKey={selectedKey}
-                    hoverKey={hoverKey}
-                    showHeadings={showHeadings}
-                    template={template}
-                    scheduledAt={form.scheduledAt}
-                    sectionTitles={sectionTitles}
-                    onSectionTitle={previewSectionTitle}
-                    sectionCopies={sectionCopies}
-                    onSectionCopy={previewSectionCopy}
-                    hero={hero}
-                    onDropHero={setHeroId}
-                    onClearHero={previewClearHero}
-                    onSelect={setSelectedKey}
-                    onRemove={previewRemove}
-                    onMove={previewMove}
-                    onDropAt={previewDropAt}
-                  />
+                  <Preview {...previewCommon} items={items} selectedKey={selectedKey} template={template} hero={hero} onSelect={setSelectedKey} />
                 </div>
-                {card && itemAlertKinds.size > 0 && (
-                  <ItemAlertOverlay
-                    boxRef={previewBoxRef}
-                    kinds={itemAlertKinds}
-                    onOpen={(key) => {
-                      const it = items.find((i) => i.key === key)
-                      if (it) openAlertFor(it.productId)
-                    }}
-                  />
-                )}
+                {card && itemAlertKinds.size > 0 && itemAlertOverlay}
                 <PreviewPins
                   boxRef={previewBoxRef}
                   cardId={card?.id}

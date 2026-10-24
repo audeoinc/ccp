@@ -8,6 +8,8 @@ export interface PreviewZoom {
   set: (z: number | 'fit') => void
   min: number
   max: number
+  /** 倍率を d だけ変える(5% 刻み・範囲の中に。−・＋ のボタン) */
+  step: (d: number) => void
 }
 
 /** 押して選ぶ部品と、並べ替えでつかむ商品の枠(ここでは移動を始めない) */

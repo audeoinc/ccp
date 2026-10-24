@@ -390,7 +390,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           : undefined,
     })
   }
-  const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
+  const stepZoom = e.zoom.step
   const toggleProducts = () => {
     setProductsOpen(!productsOpen)
     savePref(PRODUCTS_KEY, !productsOpen)
