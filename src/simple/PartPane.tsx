@@ -3,7 +3,7 @@ import { Badge, Button, Field, Input, Select, Spinner, Text, ToggleButton, Toolt
 import { ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
-import { ChooseDrawer, ChoosePanel } from '../ChoosePanel'
+import { ChooseDrawer } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
 import { ImageThumb } from '../ImageThumb'
@@ -456,17 +456,23 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                     {t(`使える期限(${e.hero?.usable_until})が配信日より前です`, `Usable until ${e.hero?.usable_until}, before the delivery date`)}
                   </span>
                 )}
-                <span className={s.row}>
-                  {!heroOpen && <Button size="small" appearance="primary" icon={<ImageEditRegular />} onClick={() => setHeroOpenKey(part ? partKey(part) : null)}>{t('入れ替える', 'Replace')}</Button>}
-                  {e.hero && <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => e.setHero(undefined, '')}>{t('外す', 'Remove')}</Button>}
-                </span>
+                {e.hero && (
+                  <span className={s.row}>
+                    <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => e.setHero(undefined, '')}>{t('外す', 'Remove')}</Button>
+                  </span>
+                )}
               </span>
             </div>
-            {heroOpen && part && (
-              <ChoosePanel
+            {/* 「入れ替える」は画像の真下。そこから選び直す枠を引き出す(まだ画像がなければ、ボタンなしで枠を開いたまま) */}
+            {part && (
+              <ChooseDrawer
                 key={partKey(part)}
+                open={heroOpen}
+                onOpenChange={(o) => setHeroOpenKey(o ? partKey(part) : null)}
+                closable={!!e.hero}
+                label={t('入れ替える', 'Replace')}
+                icon={<ImageEditRegular />}
                 title={e.hero ? t('メイン画像を選び直す', 'Choose another main image') : t('メイン画像を選ぶ', 'Choose the main image')}
-                onClose={e.hero ? () => setHeroOpenKey(null) : undefined}
                 tabs={[
                   {
                     value: 'recommend',
