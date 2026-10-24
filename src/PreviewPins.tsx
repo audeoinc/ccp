@@ -7,7 +7,7 @@ import { useT } from './i18n'
 import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
 import { pinMenuItems } from './pinMenu'
 import { myName, onMeChange } from './history'
-import { focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins } from './pinStore'
+import { anchorOfBlock, findSectionBlock, focusPin, focusedPin, isPinned, notesVersion, pendingPin, pinNumbers, sameSurface, setPendingPin, subscribePins } from './pinStore'
 
 const PIN = 22
 
@@ -114,6 +114,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
         const it = items.find((i) => i.productId === productId)
         return it ? root.querySelector(`[data-item-key="${CSS.escape(it.key)}"]`) : null
       }
+      if (anchor.startsWith('section:')) return findSectionBlock(root, anchor)
       return root.querySelector(`[data-anchor="${CSS.escape(anchor)}"]`)
     },
     [boxRef, items],
@@ -195,7 +196,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     const x = clamp((clientX - r.left) / (r.width || 1))
     const y = clamp((clientY - r.top) / (r.height || 1))
     const productId = item ? items.find((i) => i.key === item.getAttribute('data-item-key'))?.productId : undefined
-    setPendingPin({ cardId, stage: 'plan', anchor: productId ? 'product' : (block.getAttribute('data-anchor') ?? 'preview'), x, y, view, productId })
+    setPendingPin({ cardId, stage: 'plan', anchor: productId ? 'product' : anchorOfBlock(block), x, y, view, productId })
     onPlacingEnd()
     onOpenThreads()
     return true

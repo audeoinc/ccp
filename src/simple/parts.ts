@@ -5,6 +5,8 @@
  * プレビューの目印は 3 つ: 商品の枠の data-item-key、部品の data-part、ピンの場所の data-anchor。
  * data-anchor はピン(X65)の場所の目印なので名前を変えない。細かく見分けたい所には data-part を足す(Preview.tsx)
  */
+import { anchorOfBlock, findSectionBlock, sectionOfAnchor } from '../pinStore'
+
 export type PartRef =
   | { kind: 'subject' }
   | { kind: 'preheader' }
@@ -138,8 +140,11 @@ export function anchorOfPart(p: PartRef | null, productIdOf: (itemKey: string) =
     case 'pushBody':
       return { anchor: 'push' }
     case 'sectionTitle':
-    case 'sectionCopy':
-      return { anchor: `section:${p.index}` }
+    case 'sectionCopy': {
+      // セクションの ID も添える(構成を変えた版でも同じセクションに付くように。X65 (d))。ID はプレビューの目印から読む
+      const block = typeof document !== 'undefined' ? document.querySelector(`[data-anchor="section:${p.index}"]`) : null
+      return { anchor: block ? anchorOfBlock(block) : `section:${p.index}` }
+    }
     case 'button':
     case 'image':
       return { anchor: `button:${p.id}` }
@@ -160,7 +165,14 @@ export function partOfAnchor(anchor: string | undefined, itemKeyOf: (productId: 
   if (kind === 'herotext') return { kind: 'headline' }
   if (kind === 'subject') return { kind: 'subject' }
   if (kind === 'push') return { kind: 'pushTitle' }
-  if (kind === 'section' && Number.isInteger(Number(arg))) return { kind: 'sectionTitle', index: Number(arg) }
+  if (kind === 'section') {
+    // ID があれば、いまのプレビューでの番号に読み替える(構成を変えた版。X65 (d))
+    const sec = sectionOfAnchor(anchor)
+    const block = sec && typeof document !== 'undefined' ? findSectionBlock(document, anchor) : null
+    const now = block ? sectionOfAnchor(block.getAttribute('data-anchor') ?? '') : null
+    const index = now?.index ?? sec?.index
+    if (index !== undefined && Number.isInteger(index)) return { kind: 'sectionTitle', index }
+  }
   if (kind === 'button' && arg) return { kind: 'button', id: arg }
   if (kind === 'product' && productId) {
     const key = itemKeyOf(productId)

@@ -68,6 +68,27 @@ export function pinNumbers(notes: CardNote[], stage: NoteStage = 'plan'): Map<st
   return new Map(list.map((n, i) => [n.id, i + 1]))
 }
 
+/**
+ * セクションの場所は「section:番号@ID」で持つ(X65 (d)。2026-10-24)。番号は並びの順なので、テンプレートの構成を変えた版ではずれる。
+ * ID(Preview.tsx の data-section-id。tables.ts の sectionIdsOf)があれば ID で探し、なければ番号で探す。前に書いた「section:番号」も、そのまま読む
+ */
+export function sectionOfAnchor(anchor: string): { index: number; id?: string } | null {
+  const m = /^section:(\d+)(?:@(.+))?$/.exec(anchor)
+  return m ? { index: Number(m[1]), id: m[2] } : null
+}
+/** いまのプレビューで、そのセクションのブロック(ID が見つかれば ID で、なければ番号で) */
+export function findSectionBlock(root: ParentNode, anchor: string): Element | null {
+  const sec = sectionOfAnchor(anchor)
+  if (!sec) return null
+  return (sec.id ? root.querySelector(`[data-section-id="${CSS.escape(sec.id)}"]`) : null) ?? root.querySelector(`[data-anchor="section:${sec.index}"]`)
+}
+/** ブロックから、書き込みの場所の名前を作る(セクションは ID を添える) */
+export function anchorOfBlock(block: Element): string {
+  const anchor = block.getAttribute('data-anchor') ?? 'preview'
+  const id = block.getAttribute('data-section-id')
+  return id && sectionOfAnchor(anchor) ? `${anchor}@${id}` : anchor
+}
+
 /** 場所の名前(スレッドの札・入力欄に出す) */
 export function anchorLabel(anchor: string, productName?: string): string {
   const [kind, arg] = anchor.split(':')
@@ -84,8 +105,13 @@ export function anchorLabel(anchor: string, productName?: string): string {
       return tr('ヘッドライン・コピー', 'Headline / copy')
     case 'button':
       return tr('ボタン', 'Button')
-    case 'section':
-      return tr(`セクション ${Number(arg) + 1}`, `Section ${Number(arg) + 1}`)
+    case 'section': {
+      // 構成を変えた版では、いまの番号(ID で探したブロックの番号)で呼ぶ
+      const sec = sectionOfAnchor(anchor)
+      const now = sec?.id && typeof document !== 'undefined' ? document.querySelector(`[data-section-id="${CSS.escape(sec.id)}"]`)?.getAttribute('data-anchor') : null
+      const n = (now ? (sectionOfAnchor(now)?.index ?? sec?.index) : (sec?.index ?? Number(arg))) ?? 0
+      return tr(`セクション ${n + 1}`, `Section ${n + 1}`)
+    }
     case 'product':
       return productName ? tr(`商品: ${productName}`, `Product: ${productName}`) : tr('商品', 'Product')
     case 'footer':
