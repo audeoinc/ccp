@@ -19,7 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import dbready, schema as sc
+from . import dbready, repo, schema as sc
 from .identity import people_edit_denied
 from .db import get_engine, reset_engine
 
@@ -150,14 +150,6 @@ class Fail(Exception):
         self.status, self.message, self.code = status, message, code
 
 
-def _columns_sql(t: sc.Table, names: list[str] | None) -> str:
-    if not names:
-        cols = ["id"] + [c.pg for c in t.all_columns] + [lk.pg for lk in t.lookups]
-    else:
-        cols = ["id"] + [t.resolve(n.strip())[0] for n in names if n.strip() != "id"]
-    return ", ".join(dict.fromkeys(cols))
-
-
 @router.get("/{table}")
 async def list_rows(
     table: str,
@@ -170,7 +162,7 @@ async def list_rows(
     t = SCHEMA.table(table)
     where, params = sc.parse_filter(t, filter)
     order = sc.parse_order(t, [orderBy] if orderBy else None) or "created_on ASC, id ASC"
-    sql = f"SELECT {_columns_sql(t, select.split(',') if select else None)} FROM {t.pg}"
+    sql = f"SELECT {repo.columns_sql(t, select.split(',') if select else None)} FROM {t.pg}"
     if where:
         sql += f" WHERE {where}"
     sql += f" ORDER BY {order}"
@@ -190,7 +182,7 @@ async def get_row(table: str, row_id: str):
     t = SCHEMA.table(table)
     rid = sc.coerce("uuid", row_id)
     async with db() as conn:
-        row = (await conn.execute(text(f"SELECT {_columns_sql(t, None)} FROM {t.pg} WHERE id = :id"), {"id": rid})).mappings().first()
+        row = (await conn.execute(text(f"SELECT {repo.columns_sql(t, None)} FROM {t.pg} WHERE id = :id"), {"id": rid})).mappings().first()
     if row is None:
         return fail(404, "レコードが見つかりません")
     return ok(t.to_api(dict(row)))
@@ -234,13 +226,9 @@ async def create_row(table: str, request: Request):
     t = SCHEMA.table(table)
     if denied := write_denied(t.name, "create"):
         return fail(403, denied)
-    values = t.to_db(await _body(request))
+    values = t.to_db(await read_body(request))
     cols = list(values)
-    returning = _columns_sql(t, None)
-    if cols:
-        sql = f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) RETURNING {returning}"
-    else:
-        sql = f"INSERT INTO {t.pg} DEFAULT VALUES RETURNING {returning}"
+    sql = repo.insert_sql(t, cols, f" RETURNING {repo.columns_sql(t)}")
     async with db(write=True) as conn:
         # ユーザー・承認グループなどは、ログインしているときは管理者だけが変えられる(U7。ログインなしは、だれでも = いまの運用)
         denied = await people_edit_denied(conn, request, t.name)
@@ -297,11 +285,11 @@ async def _log_changes(conn: AsyncConnection, t: sc.Table, row_id: Any, before: 
 @router.patch("/{table}/{row_id}")
 async def update_row(table: str, row_id: str, request: Request):
     t = SCHEMA.table(table)
-    values = t.to_db(await _body(request))
+    values = t.to_db(await read_body(request))
     if denied := write_denied(t.name, "update", list(values)):
         return fail(403, denied)
     sets = [f"{c} = :{c}" for c in values] + ["modified_on = now()"]
-    sql = f"UPDATE {t.pg} SET {', '.join(sets)} WHERE id = :_id RETURNING {_columns_sql(t, None)}"
+    sql = f"UPDATE {t.pg} SET {', '.join(sets)} WHERE id = :_id RETURNING {repo.columns_sql(t, None)}"
     rid = sc.coerce("uuid", row_id)
     watched = WATCHED.get(t.name)
     async with db(write=True) as conn:
@@ -335,7 +323,7 @@ async def delete_row(table: str, row_id: str, request: Request):
     return ok(None)
 
 
-async def _body(request: Request) -> dict[str, Any]:
+async def read_body(request: Request) -> dict[str, Any]:
     try:
         body = await request.json()
     except ValueError as e:  # 壊れた JSON・UTF-8 ではない文字(UnicodeDecodeError も ValueError の仲間)

@@ -36,7 +36,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from . import schema as sc
+from . import repo, schema as sc
 from .db import get_engine
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed.json"
@@ -67,11 +67,7 @@ async def seed(reset: bool) -> None:
             for rec in rows:
                 values = t.to_db(rec)
                 values["id"] = sc.coerce("uuid", rec["id"])
-                cols = list(values)
-                await conn.execute(
-                    text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) ON CONFLICT (id) DO NOTHING"),
-                    values,
-                )
+                await conn.execute(text(repo.insert_sql(t, list(values), " ON CONFLICT (id) DO NOTHING")), values)
             print(f"{t.pg}: {len(rows)} 件")
 
 

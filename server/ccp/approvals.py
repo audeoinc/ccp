@@ -17,17 +17,17 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
-from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import schema as sc
-from .data_api import Fail, _columns_sql, db, fail, ok, require_db
-from .identity import resolve_user
+from . import repo, schema as sc
+from .data_api import Fail, db, fail, ok, read_body, require_db
+from .identity import request_actor
+from .production import stale_live
 
 router = APIRouter(prefix="/api/approvals", dependencies=[Depends(require_db)])
 
@@ -61,43 +61,6 @@ def eligible_reviewers(reviewers: list[dict[str, Any]], actor_id: str, actor_gro
     return direct + via_group
 
 
-# ---- DB の小さな道具(schema.json の表の定義で、値を確かめてから書く)
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-async def _insert(conn: AsyncConnection, table: str, record: dict[str, Any]) -> dict[str, Any]:
-    t = sc.load().table(table)
-    values = t.to_db(record)
-    cols = list(values)
-    sql = f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) RETURNING {_columns_sql(t, None)}"
-    return t.to_api(dict((await conn.execute(text(sql), values)).mappings().one()))
-
-
-async def _update(conn: AsyncConnection, table: str, row_id: str, record: dict[str, Any]) -> dict[str, Any] | None:
-    t = sc.load().table(table)
-    values = t.to_db(record)
-    sets = [f"{c} = :{c}" for c in values] + ["modified_on = now()"]
-    sql = f"UPDATE {t.pg} SET {', '.join(sets)} WHERE id = :_id RETURNING {_columns_sql(t, None)}"
-    row = (await conn.execute(text(sql), {**values, "_id": sc.coerce("uuid", row_id)})).mappings().first()
-    return t.to_api(dict(row)) if row else None
-
-
-async def _select(conn: AsyncConnection, table: str, where: str, params: dict[str, Any], order: str = "created_on") -> list[dict[str, Any]]:
-    t = sc.load().table(table)
-    rows = (await conn.execute(text(f"SELECT {_columns_sql(t, None)} FROM {t.pg} WHERE {where} ORDER BY {order}"), params)).mappings().all()
-    return [t.to_api(dict(r)) for r in rows]
-
-
-async def _one(conn: AsyncConnection, table: str, row_id: str, lock: bool = False) -> dict[str, Any] | None:
-    t = sc.load().table(table)
-    sql = f"SELECT {_columns_sql(t, None)} FROM {t.pg} WHERE id = :id" + (" FOR UPDATE" if lock else "")
-    row = (await conn.execute(text(sql), {"id": sc.coerce("uuid", row_id)})).mappings().first()
-    return t.to_api(dict(row)) if row else None
-
-
 async def _actor_groups(conn: AsyncConnection, user_id: str) -> list[str]:
     rows = (await conn.execute(text("SELECT approval_group_id FROM approval_group_members WHERE user_id = :u ORDER BY created_on"), {"u": sc.coerce("uuid", user_id)})).all()
     return [str(r[0]) for r in rows]
@@ -109,7 +72,7 @@ async def _set_card_status(conn: AsyncConnection, card_id: str, status: str) -> 
 
 async def _event(conn: AsyncConnection, action: str, actor: dict[str, str], card: dict[str, Any], week_start: str | None, from_status: str | None, to_status: str | None, note: str | None) -> None:
     """操作の履歴(W6)。配信カードで承認したときと同じ形で残す"""
-    await _insert(
+    await repo.insert(
         conn,
         "events",
         {
@@ -142,41 +105,14 @@ async def _notify(conn: AsyncConnection, user_ids: list[str], exclude: str, kind
     for uid in dict.fromkeys(user_ids):
         if uid == exclude:
             continue
-        u = await _one(conn, "users", uid)
+        u = await repo.one(conn, "users", uid)
         if u is None or (u.get("status") or "active") != "active" or not u.get("email"):
             continue
-        await _insert(
+        await repo.insert(
             conn,
             "notifications",
             {"user_id": uid, "email": u["email"], "kind": kind, "subject": subject, "body": body, "delivery_card_id": card_id, "approval_request_id": request_id, "status": "pending"},
         )
-
-
-async def _body(request: Request) -> dict[str, Any]:
-    try:
-        body = await request.json()
-    except ValueError as e:
-        raise sc.BadRequest("本文が正しい JSON(UTF-8)ではありません") from e
-    if not isinstance(body, dict):
-        raise sc.BadRequest("本文は、オブジェクトで指定してください")
-    return body
-
-
-async def _actor(conn: AsyncConnection, body: dict[str, Any], request: Request) -> dict[str, str]:
-    """操作した人。ログインしていれば(U7)、その人(画面が送った「あなた」は見ない。なりすましを防ぐ)。
-    ログインがなければ、画面が選んだ「あなた」(users の id と名前)。名前は、なければ x-ccp-actor の見出しから"""
-    ident, user = await resolve_user(conn, request)
-    if ident is not None:
-        if user is None:
-            raise sc.BadRequest(f"ログインした {ident.email} は、ユーザーに登録されていません(⚙ →「ユーザーと承認グループ」で足してください)")
-        return {"id": user["id"], "name": str(user.get("name") or ident.email)[:100]}
-    a = body.get("actor") or {}
-    user_id = str(a.get("id") or "").strip()
-    name = str(a.get("name") or unquote(request.headers.get("x-ccp-actor", ""))).strip()[:100]
-    if not user_id:
-        raise sc.BadRequest("「あなた」を選んでください(承認の依頼・承認には、ユーザーの選択が要ります)")
-    sc.coerce("uuid", user_id)
-    return {"id": user_id, "name": name}
 
 
 def _view(req: dict[str, Any], reviewers: list[dict[str, Any]]) -> dict[str, Any]:
@@ -197,7 +133,7 @@ async def _stale_live_requests(conn: AsyncConnection, card_id: str, now: datetim
 
 @router.post("/requests")
 async def create_request(request: Request):
-    body = await _body(request)
+    body = await read_body(request)
     card_id = str(body.get("delivery_card_id") or "")
     rule = str(body.get("rule") or "all")
     group_ids = [str(x) for x in (body.get("group_ids") or []) if x]
@@ -208,10 +144,10 @@ async def create_request(request: Request):
         return fail(400, "決まりは all か any です")
     if not group_ids and not user_ids:
         return fail(400, "承認グループか承認者を、1 つ以上選んでください")
-    now = _now()
+    now = repo.now()
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        card = await _one(conn, "delivery_cards", card_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        card = await repo.one(conn, "delivery_cards", card_id, lock=True)
         if card is None:
             raise Fail(404, "配信カードが見つかりません")
         if card.get("status") == "confirmed":
@@ -219,17 +155,17 @@ async def create_request(request: Request):
         # 相手の名前は、その時のものを残す(グループ・人を消しても、記録が読めるように)
         reviewers_in: list[dict[str, Any]] = []
         for gid in dict.fromkeys(group_ids):
-            g = await _one(conn, "approval_groups", gid)
+            g = await repo.one(conn, "approval_groups", gid)
             if g is None or (g.get("status") or "active") != "active":
                 raise Fail(400, "使えない承認グループが含まれています(消された、または無効)")
             reviewers_in.append({"approval_group_id": gid, "reviewer_name": g.get("name")})
         for uid in dict.fromkeys(user_ids):
-            u = await _one(conn, "users", uid)
+            u = await repo.one(conn, "users", uid)
             if u is None or (u.get("status") or "active") != "active":
                 raise Fail(400, "使えない承認者が含まれています(消された、または無効)")
             reviewers_in.append({"user_id": uid, "reviewer_name": u.get("name")})
         await _stale_live_requests(conn, card_id, now)
-        req = await _insert(
+        req = await repo.insert(
             conn,
             "approval_requests",
             {
@@ -243,7 +179,7 @@ async def create_request(request: Request):
                 "note": note,
             },
         )
-        reviewers = [await _insert(conn, "approval_reviewers", {**r, "approval_request_id": req["id"], "decision": "pending"}) for r in reviewers_in]
+        reviewers = [await repo.insert(conn, "approval_reviewers", {**r, "approval_request_id": req["id"], "decision": "pending"}) for r in reviewers_in]
         # 依頼が出た配信は「承認待ち」(reviewing)。承認済みの配信を依頼し直したときも、承認待ちに戻る
         before = card.get("status") or "not_started"
         if before != "reviewing":
@@ -265,7 +201,7 @@ async def create_request(request: Request):
 
 @router.post("/requests/{request_id}/decide")
 async def decide(request_id: str, request: Request):
-    body = await _body(request)
+    body = await read_body(request)
     decision = str(body.get("decision") or "")
     note = (str(body.get("note") or "")).strip() or None
     wanted = str(body.get("reviewer_id") or "") or None
@@ -274,38 +210,38 @@ async def decide(request_id: str, request: Request):
         return fail(400, "decision は approved か changes_requested です")
     if decision == "changes_requested" and not note:
         return fail(400, "差し戻しには、理由が要ります")
-    now = _now()
+    now = repo.now()
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        req = await _one(conn, "approval_requests", request_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        req = await repo.one(conn, "approval_requests", request_id, lock=True)
         if req is None:
             raise Fail(404, "承認の依頼が見つかりません")
         if req.get("status") != "open":
             raise Fail(409, "この依頼は、もう受け付けていません(承認済み・差し戻し・古い依頼・取り下げ)")
-        reviewers = await _select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
+        reviewers = await repo.select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
         able = eligible_reviewers(reviewers, actor["id"], await _actor_groups(conn, actor["id"]), req.get("requested_by"))
         if not able:
             raise Fail(403, "この配信の承認者に指名されていません(または、もう決めています)")
         if wanted is not None and wanted not in able:
             raise Fail(403, "その相手の分は、あなたは決められません")
         target = wanted or able[0]
-        updated = await _update(conn, "approval_reviewers", target, {"decision": decision, "decided_by": actor["id"], "decided_by_name": actor["name"], "decided_at": now, "note": note})
+        updated = await repo.update(conn, "approval_reviewers", target, {"decision": decision, "decided_by": actor["id"], "decided_by_name": actor["name"], "decided_at": now, "note": note})
         reviewers = [updated if r["id"] == target else r for r in reviewers if updated is not None]
         outcome = request_outcome(str(req.get("rule") or "all"), [r.get("decision") for r in reviewers])
-        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]), lock=True)
+        card = await repo.one(conn, "delivery_cards", str(req["delivery_card_id"]), lock=True)
         if card is None:
             raise Fail(404, "配信カードが見つかりません")
         before = card.get("status") or "not_started"
         slot = str((updated or {}).get("reviewer_name") or "")
         if outcome == "approved":
-            req = await _update(conn, "approval_requests", request_id, {"status": "approved", "closed_at": now}) or req
+            req = await repo.update(conn, "approval_requests", request_id, {"status": "approved", "closed_at": now}) or req
             await _set_card_status(conn, card["id"], "approved")
             await _event(conn, "approve", actor, card, week_start, before, "approved", f"{slot} — これで承認がそろった")
             await _notify(conn, [str(req.get("requested_by") or "")], actor["id"], "approved", f"承認されました: {card.get('name') or ''}", f"{actor['name']}({slot})の承認で、「{card.get('name') or ''}」の承認がそろいました。", card["id"], req["id"])
         elif outcome == "changes_requested":
-            req = await _update(conn, "approval_requests", request_id, {"status": "changes_requested", "closed_at": now}) or req
+            req = await repo.update(conn, "approval_requests", request_id, {"status": "changes_requested", "closed_at": now}) or req
             # 差し戻しの理由は、レビューのコメント(W5)にも残す(対応済みにするまで、未対応として数える)
-            await _insert(conn, "card_notes", {"delivery_card_id": card["id"], "kind": "comment", "author": actor["name"], "body": note, "resolved": 0})
+            await repo.insert(conn, "card_notes", {"delivery_card_id": card["id"], "kind": "comment", "author": actor["name"], "body": note, "resolved": 0})
             await _event(conn, "reject", actor, card, week_start, before, before, f"{slot} — {note}")
             await _notify(conn, [str(req.get("requested_by") or "")], actor["id"], "changes_requested", f"差し戻されました: {card.get('name') or ''}", f"{actor['name']}({slot})が「{card.get('name') or ''}」を差し戻しました。理由: {note}", card["id"], req["id"])
         else:
@@ -315,22 +251,22 @@ async def decide(request_id: str, request: Request):
 
 @router.post("/requests/{request_id}/withdraw")
 async def withdraw(request_id: str, request: Request):
-    body = await _body(request)
+    body = await read_body(request)
     note = (str(body.get("note") or "")).strip() or None
     week_start = body.get("week_start") or None
-    now = _now()
+    now = repo.now()
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        req = await _one(conn, "approval_requests", request_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        req = await repo.one(conn, "approval_requests", request_id, lock=True)
         if req is None:
             raise Fail(404, "承認の依頼が見つかりません")
         if req.get("status") not in ("open", "changes_requested"):
             raise Fail(409, "この依頼は、取り下げられません(承認済み・古い依頼・取り下げ)")
         if actor["id"] != req.get("requested_by"):
             raise Fail(403, "依頼を取り下げられるのは、依頼した人だけです")
-        req = await _update(conn, "approval_requests", request_id, {"status": "withdrawn", "closed_at": now}) or req
-        reviewers = await _select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
-        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]), lock=True)
+        req = await repo.update(conn, "approval_requests", request_id, {"status": "withdrawn", "closed_at": now}) or req
+        reviewers = await repo.select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
+        card = await repo.one(conn, "delivery_cards", str(req["delivery_card_id"]), lock=True)
         if card is not None:
             # 承認待ちだった配信は、依頼がなくなるので「未起案」に戻す(承認済みなど、ほかの状態はそのまま)
             before = card.get("status") or "not_started"
@@ -346,14 +282,12 @@ async def withdraw(request_id: str, request: Request):
 @router.post("/reset")
 async def reset(request: Request):
     """内容が変わった(承認後の変更・確定後の変更)ので、生きている依頼を古いものにする。配信のステータス・履歴は、画面が保存のときに書く"""
-    body = await _body(request)
+    body = await read_body(request)
     card_id = str(body.get("delivery_card_id") or "")
     if not card_id:
         return fail(400, "delivery_card_id が要ります")
     async with db(write=True) as conn:
-        n = await _stale_live_requests(conn, card_id, _now())
+        n = await _stale_live_requests(conn, card_id, repo.now())
         # 制作の依頼も、企画が変わったので古い版にする(制作のページに「企画が変わりました」と出す。PR2)
-        from .production import stale_live
-
         await stale_live(conn, card_id)
     return ok({"stale": n})

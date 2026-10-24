@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
-from . import schema as sc
+from . import repo, schema as sc
 from .data_api import db, ok, require_db
 
 router = APIRouter(prefix="/api/impact", dependencies=[Depends(require_db)])
@@ -108,15 +108,6 @@ def generate(cards: list[dict[str, Any]], results: list[dict[str, Any]]) -> tupl
     return runs, lifts
 
 
-async def _insert(conn: Any, table: str, rows: list[dict[str, Any]]) -> None:
-    if not rows:
-        return
-    t = sc.load().table(table)
-    values = [t.to_db(r) for r in rows]
-    cols = list(values[0])
-    await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"), values)
-
-
 @router.post("/sample")
 async def sample() -> dict[str, Any]:
     s = sc.load()
@@ -128,7 +119,7 @@ async def sample() -> dict[str, Any]:
         # 見本の行だけを消す(画面から記録した本物の行は残す)
         await conn.execute(text(f"DELETE FROM {runs_t.pg} WHERE sample = 1"))
         await conn.execute(text(f"DELETE FROM {lifts_t.pg} WHERE sample = 1"))
-        await _insert(conn, "ai_runs", runs)
-        await _insert(conn, "delivery_lifts", lifts)
+        await repo.insert_many(conn, "ai_runs", runs)
+        await repo.insert_many(conn, "delivery_lifts", lifts)
         await conn.commit()
     return ok({"runs": len(runs), "lifts": len(lifts)})

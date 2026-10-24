@@ -18,16 +18,15 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import schema as sc
-from .approvals import _actor, _body, _insert, _one, _update
-from .data_api import Fail, db, fail, ok, require_db
+from . import repo, schema as sc
+from .data_api import Fail, db, fail, ok, read_body, require_db
+from .identity import request_actor
 
 router = APIRouter(prefix="/api/production", dependencies=[Depends(require_db)])
 
@@ -37,12 +36,8 @@ APPROVED = ("approved", "confirmed")
 REQUIRE_APPROVAL = False
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 async def _event(conn: AsyncConnection, action: str, actor: dict[str, str], card: dict[str, Any], week_start: str | None, note: str | None) -> None:
-    await _insert(conn, "events", {"action": action, "week_start": week_start, "delivery_card_id": card["id"], "card_name": card.get("name"), "actor": actor["name"], "note": note})
+    await repo.insert(conn, "events", {"action": action, "week_start": week_start, "delivery_card_id": card["id"], "card_name": card.get("name"), "actor": actor["name"], "note": note})
 
 
 async def _next_version(conn: AsyncConnection, card_id: str) -> int:
@@ -101,7 +96,7 @@ def _fields(body: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _approved_card(conn: AsyncConnection, card_id: str) -> tuple[dict[str, Any] | None, str | None]:
-    card = await _one(conn, "delivery_cards", card_id, lock=True)
+    card = await repo.one(conn, "delivery_cards", card_id, lock=True)
     if card is None:
         return None, "配信カードが見つかりません"
     if REQUIRE_APPROVAL and card.get("status") not in APPROVED:
@@ -111,22 +106,22 @@ async def _approved_card(conn: AsyncConnection, card_id: str) -> tuple[dict[str,
 
 @router.post("/requests")
 async def create_request(request: Request):
-    body = await _body(request)
+    body = await read_body(request)
     card_id = str(body.get("delivery_card_id") or "")
     week_start = body.get("week_start") or None
     if not body.get("snapshot"):
         return fail(400, "写し(snapshot)が要ります")
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
+        actor = await request_actor(conn, body, request)
         card, err = await _approved_card(conn, card_id)
         if card is None:
             raise Fail(400, err or "")
         await stale_live(conn, card_id)
         version = await _next_version(conn, card_id)
-        row = await _insert(
+        row = await repo.insert(
             conn,
             "production_requests",
-            {**_fields(body), "delivery_card_id": card_id, "version": version, "status": "requested", "requested_at": _now(), "requested_by_name": actor["name"]},
+            {**_fields(body), "delivery_card_id": card_id, "version": version, "status": "requested", "requested_at": repo.now(), "requested_by_name": actor["name"]},
         )
         owner = row.get("production_owner")
         await _event(conn, "production_request", actor, card, week_start, f"版 {version}" + (f"・担当 {owner}" if owner else ""))
@@ -135,19 +130,19 @@ async def create_request(request: Request):
 
 async def _advance(request: Request, request_id: str, allowed: tuple[str, ...], fields: dict[str, Any], action: str, note: str | None, refuse: str):
     """状態を進める(受け取った・終わった)。"@now" と "@actor" は、その時刻と操作した人の名前に置き換える"""
-    body = await _body(request)
+    body = await read_body(request)
     week_start = body.get("week_start") or None
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        req = await _one(conn, "production_requests", request_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        req = await repo.one(conn, "production_requests", request_id, lock=True)
         if req is None:
             raise Fail(404, "制作の依頼が見つかりません")
         if req.get("status") not in allowed:
             raise Fail(409, refuse)
-        now = _now()
+        now = repo.now()
         stamped = {k: (now if v == "@now" else actor["name"] if v == "@actor" else v) for k, v in fields.items()}
-        row = await _update(conn, "production_requests", request_id, stamped) or req
-        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
+        row = await repo.update(conn, "production_requests", request_id, stamped) or req
+        card = await repo.one(conn, "delivery_cards", str(req["delivery_card_id"]))
         if card is not None:
             await _event(conn, action, actor, card, week_start, note)
     return ok(row)
@@ -168,7 +163,7 @@ async def receive(request_id: str, request: Request):
 
 @router.post("/requests/{request_id}/done")
 async def done(request_id: str, request: Request):
-    body = await _body(request)
+    body = await read_body(request)
     note = (str(body.get("note") or "")).strip() or None
     link = (str(body.get("link") or "")).strip() or None
     return await _advance(
@@ -185,24 +180,24 @@ async def done(request_id: str, request: Request):
 @router.post("/requests/{request_id}/html")
 async def save_html(request_id: str, request: Request):
     """制作のページで直した HTML を保存する(版ごとに 1 つ。主に制作の人、企画の人も直せる)。古い版には保存しない"""
-    body = await _body(request)
+    body = await read_body(request)
     html = str(body.get("html") or "")
     variant = str(body.get("variant") or "A").upper()
     if variant not in ("A", *VARIANTS):
         return fail(400, "案は A・B・C のどれかです")
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        req = await _one(conn, "production_requests", request_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        req = await repo.one(conn, "production_requests", request_id, lock=True)
         if req is None:
             raise Fail(404, "制作の依頼が見つかりません")
         if req.get("status") == "stale":
             raise Fail(409, "古い版には保存できません(企画が変わりました)")
-        now = _now()
+        now = repo.now()
         if variant == "A":
             fields: dict[str, Any] = {"html": html, "html_saved_at": now, "html_saved_by_name": actor["name"]}
         else:
             fields = {"variant_html": merge_variant_html(req.get("variant_html"), variant, html, now.isoformat(), actor["name"])}
-        row = await _update(conn, "production_requests", request_id, fields) or req
+        row = await repo.update(conn, "production_requests", request_id, fields) or req
     return ok(row)
 
 
@@ -211,17 +206,17 @@ async def save_edits(request_id: str, request: Request):
     """制作のページの左で直した中身を保存する(2026-10-19、利用者と決めた: 承認のあとの文言・画像・商品・リンク先の調整は、
     企画と制作のあいだで決めてよく、承認のやり直しは要らない)。承認された snapshot と配信カードは書き換えず、別の列に持つ。
     空の文字を送ると、直したものを捨てて、承認された写しに戻す"""
-    body = await _body(request)
+    body = await read_body(request)
     edited = str(body.get("edited_snapshot") or "") or None
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        req = await _one(conn, "production_requests", request_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        req = await repo.one(conn, "production_requests", request_id, lock=True)
         if req is None:
             raise Fail(404, "制作の依頼が見つかりません")
         if req.get("status") == "stale":
             raise Fail(409, "古い版には保存できません(企画が変わりました)")
-        row = await _update(conn, "production_requests", request_id, {"edited_snapshot": edited, "edited_at": _now(), "edited_by_name": actor["name"]}) or req
-        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
+        row = await repo.update(conn, "production_requests", request_id, {"edited_snapshot": edited, "edited_at": repo.now(), "edited_by_name": actor["name"]}) or req
+        card = await repo.one(conn, "delivery_cards", str(req["delivery_card_id"]))
         if card is not None:
             await _event(conn, "production_edit", actor, card, body.get("week_start") or None, f"版 {req.get('version')}" + ("" if edited else "(承認された写しに戻した)"))
     return ok(row)
@@ -241,10 +236,10 @@ _UNDO: dict[str, tuple[str, tuple[str, ...]]] = {
 async def undo(request_id: str, request: Request):
     """工程を 1 段戻す(2026-10-19、利用者の要望: 押し間違い・やり直しのとき)。いちばん新しく終わった段だけを戻す。
     制作を通さずに送った版(受け取り・終わりの記録がない)は、取り下げにする(① からやり直す)"""
-    body = await _body(request)
+    body = await read_body(request)
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
-        req = await _one(conn, "production_requests", request_id, lock=True)
+        actor = await request_actor(conn, body, request)
+        req = await repo.one(conn, "production_requests", request_id, lock=True)
         if req is None:
             raise Fail(404, "制作の依頼が見つかりません")
         status = str(req.get("status") or "")
@@ -254,8 +249,8 @@ async def undo(request_id: str, request: Request):
         if status == "sent" and not req.get("checked_at"):
             # 仕上がりの確認より前に送った版(確認を作る前の記録)は、終わったに戻す。制作を通さずに送った版は、取り下げ
             to, clear = ("done", ("sent_at", "sent_by_name")) if req.get("done_at") else ("withdrawn", ())
-        row = await _update(conn, "production_requests", request_id, {"status": to, **{k: None for k in clear}}) or req
-        card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
+        row = await repo.update(conn, "production_requests", request_id, {"status": to, **{k: None for k in clear}}) or req
+        card = await repo.one(conn, "delivery_cards", str(req["delivery_card_id"]))
         if card is not None:
             await _event(conn, "production_undo", actor, card, body.get("week_start") or None, f"版 {req.get('version')}: {status} → {to}")
     return ok(row)
@@ -270,7 +265,7 @@ async def check(request_id: str, request: Request):
 @router.post("/requests/{request_id}/revise")
 async def revise(request_id: str, request: Request):
     """企画が「直してほしい」と制作に戻す(PR7)。版は変えず、制作している に戻し、終わった の記録を消して、直してほしいことを残す"""
-    body = await _body(request)
+    body = await read_body(request)
     note = (str(body.get("note") or "")).strip()
     if not note:
         return fail(400, "直してほしいことを書いてください")
@@ -298,7 +293,7 @@ async def revise(request_id: str, request: Request):
 async def send_request(request_id: str, request: Request):
     """仕上がりを確認した版を、配信のしくみに送る(工程の最後。2026-10-19、利用者と決めた: 送るのは最後の最後なので、確認が済んでから)。
     新しい版は作らず、この版を「送った」にする。HTML は、いまのエディタのもの。送り先は、まだ仮(実際には送らない)"""
-    body = await _body(request)
+    body = await read_body(request)
     html = str(body.get("html") or "") or None
     fields: dict[str, Any] = {"status": "sent", "sent_at": "@now", "sent_by_name": "@actor"}
     if html:
@@ -314,20 +309,20 @@ async def send_request(request_id: str, request: Request):
 @router.post("/send")
 async def send(request: Request):
     """制作を通さず、配信のしくみに送る。いまは送り先の窓口だけで、実際には送らない(配信のしくみの API が決まったら、ここで呼ぶ。HTML は body["html"])"""
-    body = await _body(request)
+    body = await read_body(request)
     card_id = str(body.get("delivery_card_id") or "")
     week_start = body.get("week_start") or None
     if not body.get("snapshot"):
         return fail(400, "写し(snapshot)が要ります")
     async with db(write=True) as conn:
-        actor = await _actor(conn, body, request)
+        actor = await request_actor(conn, body, request)
         card, err = await _approved_card(conn, card_id)
         if card is None:
             raise Fail(400, err or "")
-        now = _now()
+        now = repo.now()
         await stale_live(conn, card_id)
         version = await _next_version(conn, card_id)
-        row = await _insert(
+        row = await repo.insert(
             conn,
             "production_requests",
             {

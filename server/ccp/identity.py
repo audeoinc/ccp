@@ -17,10 +17,13 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
+
+from . import schema as sc
 
 log = logging.getLogger("ccp.identity")
 router = APIRouter(prefix="/api")
@@ -94,3 +97,20 @@ async def me(request: Request):
     async with db() as conn:
         user = await find_user(conn, ident.email)
     return ok({"email": ident.email, "source": ident.source, "user": user})
+
+
+async def request_actor(conn: AsyncConnection, body: dict[str, Any], request: Request) -> dict[str, str]:
+    """操作した人。ログインしていれば(U7)、その人(画面が送った「あなた」は見ない。なりすましを防ぐ)。
+    ログインがなければ、画面が選んだ「あなた」(users の id と名前)。名前は、なければ x-ccp-actor の見出しから"""
+    ident, user = await resolve_user(conn, request)
+    if ident is not None:
+        if user is None:
+            raise sc.BadRequest(f"ログインした {ident.email} は、ユーザーに登録されていません(⚙ →「ユーザーと承認グループ」で足してください)")
+        return {"id": user["id"], "name": str(user.get("name") or ident.email)[:100]}
+    a = body.get("actor") or {}
+    user_id = str(a.get("id") or "").strip()
+    name = str(a.get("name") or unquote(request.headers.get("x-ccp-actor", ""))).strip()[:100]
+    if not user_id:
+        raise sc.BadRequest("「あなた」を選んでください(承認の依頼・承認には、ユーザーの選択が要ります)")
+    sc.coerce("uuid", user_id)
+    return {"id": user_id, "name": name}

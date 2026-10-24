@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from sqlalchemy import text
 
-from . import assets, creative, schema as sc
+from . import assets, creative, repo, schema as sc
 from .data_api import db, require_db
 
 PACK_VERSION = 2
@@ -134,15 +134,9 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
             keep = t.name in KEEP_ON_REPLACE
             rows = tables.get(t.name, [])
             for rec in rows:
-                values = t.to_db(rec)
-                values["id"] = sc.coerce("uuid", rec["id"])
-                # 作った日時は、確定後の変更・承認の履歴の並びに使うので、元のまま残す
-                for dv, pg in (("created_on", "created_on"), ("modified_on", "modified_on")):
-                    if rec.get(dv):
-                        values[pg] = sc.coerce("timestamptz", rec[dv])
-                cols = list(values)
+                values = repo.import_values(t, rec)
                 conflict = " ON CONFLICT (id) DO NOTHING" if keep else ""
-                await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}){conflict}"), values)
+                await conn.execute(text(repo.insert_sql(t, list(values), conflict)), values)
             print(f"{t.pg}: {len(rows)} 件" + ("(残して足した)" if keep else ""))
 
 
@@ -166,15 +160,10 @@ async def add_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, tuple
                 if str(rec["id"]) in have:
                     skipped += 1
                     continue
-                values = t.to_db(rec)
-                values["id"] = sc.coerce("uuid", rec["id"])
-                for dv, pg in (("created_on", "created_on"), ("modified_on", "modified_on")):
-                    if rec.get(dv):
-                        values[pg] = sc.coerce("timestamptz", rec[dv])
-                cols = list(values)
+                values = repo.import_values(t, rec)
                 try:
                     async with conn.begin_nested():
-                        r = await conn.execute(text(f"INSERT INTO {t.pg} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) ON CONFLICT DO NOTHING"), values)
+                        r = await conn.execute(text(repo.insert_sql(t, list(values), " ON CONFLICT DO NOTHING")), values)
                     if r.rowcount:
                         added += 1
                     else:
