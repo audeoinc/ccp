@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import {
-  Badge,
   Button,
   Dialog,
   DialogTitle,
@@ -486,12 +485,9 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
           </MessageBar>
         )}
         <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TabKey)}>
-          <Tab value="users">
-            {t('ユーザー', 'Users')} <Badge size="small" appearance="tint" color="informative">{people.users.length}</Badge>
-          </Tab>
-          <Tab value="groups">
-            {t('承認グループ', 'Approval groups')} <Badge size="small" appearance="tint" color="informative">{people.groups.length}</Badge>
-          </Tab>
+          {/* 件数は見出しの「名前(件数)」に(X75 のタブの決まり) */}
+          <Tab value="users">{t(`ユーザー(${people.users.length})`, `Users (${people.users.length})`)}</Tab>
+          <Tab value="groups">{t(`承認グループ(${people.groups.length})`, `Approval groups (${people.groups.length})`)}</Tab>
           <Tab value="rules">{t('承認の決まり', 'Approval rules')}</Tab>
           <Tab value="history">{t('変更の履歴', 'Change history')}</Tab>
         </TabList>

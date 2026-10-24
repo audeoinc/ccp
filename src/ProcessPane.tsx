@@ -122,7 +122,8 @@ export function ProcessPane(props: Props) {
     }
   }, [cardId, noteVersion])
 
-  const count = (n: number) => (n ? ` (${n})` : '')
+  // 件数は「名前(件数)」で、0 も出す(X75 のタブの決まり。数が出たり消えたりして、タブの幅が変わらないように)
+  const count = (n: number) => t(`(${n})`, ` (${n})`)
 
   return (
     <div className={s.shell}>

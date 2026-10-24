@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Dialog, DialogBody, DialogTitle, Switch, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { CalendarCancelRegular, DeleteRegular, DismissRegular, EditRegular, ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
 import { HeroImagesService } from './data/heroImages'
 import { HeroUpload } from './data/heroUpload'
+import { PartImagesService } from './data/partImages'
 import { HeroUploadDialog } from './HeroUploadDialog'
 import { PartLibrary } from './PartLibrary'
 import { FilterChips, SearchField } from './SearchField'
@@ -66,6 +67,15 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, in
   const t = useT()
   // メイン画像 / 部品の画像(X59 ③)
   const [tab, setTab] = useState<'heroes' | 'parts'>('heroes')
+  // 部品の画像の件数(タブの見出しに出す。X75 のタブの決まり。部品のタブを開く前から数を見せるため、先に数える)
+  const [partCount, setPartCount] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    void PartImagesService.getAll().then((r) => alive && r.success && setPartCount((r.data ?? []).length))
+    return () => {
+      alive = false
+    }
+  }, [])
   const [q, setQ] = useState('')
   const [market, setMarket] = useState<'' | 'US' | 'JP'>(country === 'US' || country === 'JP' ? country : '')
   const [onlyUploaded, setOnlyUploaded] = useState(false)
@@ -184,10 +194,12 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, in
     <>
           <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as 'heroes' | 'parts')}>
             <Tab value="heroes">{t(`メイン画像(${heroes.length})`, `Hero images (${heroes.length})`)}</Tab>
-            <Tab value="parts">{t('部品の画像(ボタン・バナー・ロゴ・アイコン)', 'Part images (buttons, banners, logos, icons)')}</Tab>
+            <Tab value="parts" title={t('ボタン・バナー・ロゴ・アイコン', 'Buttons, banners, logos, icons')}>
+              {partCount === null ? t('部品の画像', 'Part images') : t(`部品の画像(${partCount})`, `Part images (${partCount})`)}
+            </Tab>
           </TabList>
           {tab === 'parts' ? (
-            <PartLibrary country={country} me={me} />
+            <PartLibrary country={country} me={me} onCount={setPartCount} />
           ) : (
           <>
           <div className={s.tools}>

@@ -42,7 +42,8 @@ const useStyles = makeStyles({
  * 部品の画像のライブラリ(X59 ③。画像のライブラリの「部品の画像」のタブ)。ボタン・バナー・ロゴ・アイコンを、上げる・直す・消す。
  * 配信とは結びつけない(使うのは制作のページ。URL か <img> のタグをコピーして、HTML に貼る)ので、消すときは確かめるだけ
  */
-export function PartLibrary({ country, me }: { country: string; me: string }) {
+/** onCount: 読み直したときの件数(画像のライブラリのタブの見出しに出す。X75) */
+export function PartLibrary({ country, me, onCount }: { country: string; me: string; onCount?: (n: number) => void }) {
   const s = useStyles()
   const t = useT()
   const [parts, setParts] = useState<PartImage[] | null>(null)
@@ -58,7 +59,10 @@ export function PartLibrary({ country, me }: { country: string; me: string }) {
   const load = useCallback(async () => {
     const r = await PartImagesService.getAll()
     setParts(r.success ? (r.data ?? []) : [])
+    if (r.success) onCount?.((r.data ?? []).length)
     if (!r.success) setError(r.error?.message ?? tr('部品の画像を読めませんでした', 'Could not load part images'))
+    // 件数を知らせる先は、開いている間は変わらない(読み直しのたびに作り直さない)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
