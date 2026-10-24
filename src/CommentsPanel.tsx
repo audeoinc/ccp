@@ -12,6 +12,7 @@ import { AiButton } from './AiButton'
 import { suggestTasks, type TaskIdea } from './aiTasks'
 import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
 import { anchorLabel, bumpNotes, focusPin, focusedPin, pinNumbers, subscribePins, viewLabel } from './pinStore'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -265,12 +266,12 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
     })
 
   /** 消す。書き込みを消すときは、返信もまとめて消す(返信だけが残っても、読めないため) */
-  const remove = (n: CardNote) => {
+  const remove = async (n: CardNote) => {
     const replies = isRoot(n) ? repliesOf(n.id) : []
     const ask = isRoot(n)
       ? t(`この書き込みを削除します${replies.length ? `(返信 ${replies.length} 件も削除)` : ''}。よろしいですか?`, `Delete this post${replies.length ? ` and its ${replies.length} replies` : ''}?`)
       : t('この返信を削除します。よろしいですか?', 'Delete this reply?')
-    if (!window.confirm(ask)) return
+    if (!(await confirmDialog(ask))) return
     void run(async () => {
       try {
         for (const r of replies) await CardNotesService.delete(r.id)

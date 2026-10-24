@@ -31,6 +31,7 @@ import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { AiPicks, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
+import { confirmDialog } from '../confirm'
 
 const useStyles = makeStyles({
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
@@ -788,9 +789,9 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   const s = useStyles()
   const current = baseTemplateId(e.template)
   const slotsOf = (sections?: { slots: number }[]) => (sections ?? []).reduce((n, x) => n + x.slots, 0)
-  const pick = (id: string) => {
+  const pick = async (id: string) => {
     if (id === current) return
-    if (e.candidates.length > 0 && !window.confirm(t('テンプレートを替えると、セクションの構成が変わるので、残りの候補(AI が出した商品の案)は外れます。替えますか?', 'Changing the template changes the sections, so the remaining candidates (AI product ideas) are cleared. Change it?'))) return
+    if (e.candidates.length > 0 && !(await confirmDialog(t('テンプレートを替えると、セクションの構成が変わるので、残りの候補(AI が出した商品の案)は外れます。替えますか?', 'Changing the template changes the sections, so the remaining candidates (AI product ideas) are cleared. Change it?')))) return
     e.setAiPreview(null)
     e.setTemplate(id)
   }

@@ -78,6 +78,7 @@ import { templateUse } from './templateUse'
 import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsTemplate, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
+import { confirmDialog } from './confirm'
 import { PreviewPins } from './PreviewPins'
 import { pinView } from './pinStore'
 import type { StockModel } from './alerts'
@@ -901,8 +902,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || items.length > 0 || heroId)
 
-  function runAllManual() {
-    if (hasContent && !window.confirm(t('現在のテーマ・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, headline, copy, products, hero image, and production notes with an AI draft. Continue?'))) return
+  async function runAllManual() {
+    if (hasContent && !(await confirmDialog(t('現在のテーマ・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
     void startAutoDraft()
   }
 
@@ -1164,10 +1165,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 決めたときの比べる要素から、案ごとに持っていたものを判定する(ownsProducts などは設定の形で受け取るため)
   const asTarget = (target: AbTarget): AbTest => ({ ...newAbTest(), target })
   const [decision, setDecision] = useState<AbDecision | null>(() => parseDecision(card?.ab_test ?? draft?.card.ab_test))
-  const decideVariant = (k: VariantKey) => {
+  const decideVariant = async (k: VariantKey) => {
     if (!ab) return
     const others = allVariants(ab).filter((x) => x !== k)
-    if (!window.confirm(tr(`${k} 案に決めます。配信するのは ${k} 案だけになり、${others.join('・')} 案は「配信しなかった案」として残します(保存で確定)。よろしいですか?`, `Go with variant ${k}? Only ${k} will be sent; ${others.join(', ')} will be kept as variants not sent (on save).`))) return
+    if (!(await confirmDialog(tr(`${k} 案に決めます。配信するのは ${k} 案だけになり、${others.join('・')} 案は「配信しなかった案」として残します(保存で確定)。よろしいですか?`, `Go with variant ${k}? Only ${k} will be sent; ${others.join(', ')} will be kept as variants not sent (on save).`)))) return
     const rejected: RejectedVariant[] = others.map((x) => ({
       key: x,
       ...(ownsHero(ab) ? heroOf(x) : {}),
@@ -1491,9 +1492,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       input?.focus()
     }, 50)
   }
-  const openAlertsScreen = (productId?: string) => {
+  const openAlertsScreen = async (productId?: string) => {
     // 変更の有無は、state の changed で見る(ref を読む isDirty は、描画の中で渡す関数から呼べないため)
-    if (changed && !window.confirm(tr('保存していない変更があります。破棄して、アラートの画面を開きますか?', 'You have unsaved changes. Discard them and open the Alerts screen?'))) return
+    if (changed && !(await confirmDialog(tr('保存していない変更があります。破棄して、アラートの画面を開きますか?', 'You have unsaved changes. Discard them and open the Alerts screen?')))) return
     setActAlert(null)
     onOpenAlerts?.(productId)
   }
@@ -1974,16 +1975,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setSaveMode('stay')
     setChangeReason((r) => r ?? '')
   }
-  const confirmRevoke = () => {
+  const confirmRevoke = async () => {
     if (!approvedBefore || revokeOk.current) return true
-    if (!window.confirm(tr('承認済みの配信です。変更を反映すると「承認待ち」に戻り、承認の依頼からやり直しになります。反映しますか?(以後、この配信を開いている間は聞きません)', 'This delivery is approved. Saving the change puts it back to awaiting approval and needs a new request. Save? (Not asked again while this card is open.)'))) return false
+    if (!(await confirmDialog(tr('承認済みの配信です。変更を反映すると「承認待ち」に戻り、承認の依頼からやり直しになります。反映しますか?(以後、この配信を開いている間は聞きません)', 'This delivery is approved. Saving the change puts it back to awaiting approval and needs a new request. Save? (Not asked again while this card is open.)')))) return false
     revokeOk.current = true
     return true
   }
   /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
   const commitSimple = async () => {
     if (saving || locked || !isDirty()) return
-    if (!confirmRevoke()) return
+    if (!(await confirmRevoke())) return
     await saveStaying()
   }
   const applySimple = () => {
@@ -2048,17 +2049,17 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     } else openDetailed(step === 'requestProduction' ? 'handoff' : undefined)
   }
   /** 閉じる: 変更があれば反映してから閉じる(確定した週の配信は、捨てるかを聞く) */
-  const closeSimple = () => {
+  const closeSimple = async () => {
     if (saving) return
     if (!isDirty()) {
       onBack()
       return
     }
     if (locked) {
-      if (window.confirm(tr('確定した週の配信の変更を、反映せずに閉じます。よろしいですか?(反映するときは「理由を入力して反映」)', 'Close without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)'))) onBack()
+      if (await confirmDialog(tr('確定した週の配信の変更を、反映せずに閉じます。よろしいですか?(反映するときは「理由を入力して反映」)', 'Close without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)'))) onBack()
       return
     }
-    if (!confirmRevoke()) return
+    if (!(await confirmRevoke())) return
     goNextRef.current = false
     stayRef.current = false
     setSaveMode('close')

@@ -15,6 +15,7 @@ import { statusColor, statusLabel } from './status'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
 import { LockMark } from './LockMark'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   // 左ペインの「ステータス」の直下に置く、縦のブロック(利用者の指摘 2026-10-17: 横一列では読めず、配信の状態と離れていた)
@@ -226,9 +227,9 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
               <>
                 <span className={mergeClasses(s.note, s.wide)}>{t(`あなたは ${firstSlot} として承認できます`, `You can approve as ${firstSlot}`)}</span>
                 <Tooltip content={blockedBy ?? t(`${firstSlot} として承認します`, `Approve as ${firstSlot}`)} relationship="description">
-                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => {
+                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={async () => {
                       // 自分の依頼を自分で承認する(先に進めたいとき。2026-10-19 から認めた)ときは、念のため確かめる
-                      if (isRequester && !window.confirm(t(`自分で依頼した配信を、${firstSlot} として自分で承認します。よろしいですか?`, `Approve your own request as ${firstSlot}?`))) return
+                      if (isRequester && !(await confirmDialog(t(`自分で依頼した配信を、${firstSlot} として自分で承認します。よろしいですか?`, `Approve your own request as ${firstSlot}?`)))) return
                       void run(() => ApprovalsService.decide(live.id, { actor, decision: 'approved', reviewer_id: eligible[0], week_start: weekStart }))
                     }}>
                     {t('承認', 'Approve')}

@@ -3,6 +3,7 @@ import { AddRegular, BeakerRegular, CheckmarkCircleRegular, DismissRegular, Spli
 import { AiIcon } from './AiMark'
 import { allVariants, isChoose, metricLabel, nextVariant, splitOf, targetLabel, type AbDecision, type AbMetric, type AbMode, type AbPurpose, type AbTarget, type AbTest, type VariantKey } from './abTest'
 import { useT } from './i18n'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   bar: {
@@ -91,8 +92,8 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
                   icon={<DismissRegular />}
                   aria-label={t(`${k} 案を外す`, `Remove variant ${k}`)}
                   title={t(`${k} 案を外す`, `Remove variant ${k}`)}
-                  onClick={() => {
-                    if (window.confirm(t(`${k} 案を外します。${k} 案だけのメイン画像・商品は消えます(保存で確定)。よろしいですか?`, `Remove variant ${k}? Its own hero image and products will be discarded (on save).`))) onRemove(k)
+                  onClick={async () => {
+                    if (await confirmDialog(t(`${k} 案を外します。${k} 案だけのメイン画像・商品は消えます(保存で確定)。よろしいですか?`, `Remove variant ${k}? Its own hero image and products will be discarded (on save).`))) onRemove(k)
                   }}
                 />
               )}
@@ -143,8 +144,8 @@ export function AbTestBar({ ab, active, onSwitch, onChange, onAdd, onRemove, onS
           type="button"
           size="small"
           appearance="subtle"
-          onClick={() => {
-            if (window.confirm(t('案をやめて、A 案だけに戻します。B・C 案は消えます(保存で確定)。よろしいですか?', 'Stop and keep only variant A? Variants B and C will be discarded (on save).'))) onStop()
+          onClick={async () => {
+            if (await confirmDialog(t('案をやめて、A 案だけに戻します。B・C 案は消えます(保存で確定)。よろしいですか?', 'Stop and keep only variant A? Variants B and C will be discarded (on save).'))) onStop()
           }}
         >
           {choose ? t('案をやめる', 'Stop') : t('AB テストをやめる', 'Stop A/B test')}

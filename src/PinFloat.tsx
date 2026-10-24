@@ -12,6 +12,7 @@ import { usePinAnchor } from './pinAnchor'
 import { PinThreadView } from './PinThreadView'
 import { attachCapture, captureKey } from './pinSnapshot'
 import { CreativeFiles } from './data/creativeFiles'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   pin: { width: '18px', height: '18px', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '11px', fontWeight: tokens.fontWeightBold, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorPaletteDarkOrangeBackground3 },
@@ -158,7 +159,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
   /** 自分の書き込みを消す(返信もまとめて。返信だけが残っても、読めないため) */
   const remove = async () => {
     if (!root) return
-    if (!window.confirm(replies.length ? tr(`このコメントを消します(返信 ${replies.length} 件も消えます)。よろしいですか?`, `Delete this comment and its ${replies.length} replies?`) : tr('このコメントを消します。よろしいですか?', 'Delete this comment?'))) return
+    if (!(await confirmDialog(replies.length ? tr(`このコメントを消します(返信 ${replies.length} 件も消えます)。よろしいですか?`, `Delete this comment and its ${replies.length} replies?`) : tr('このコメントを消します。よろしいですか?', 'Delete this comment?')))) return
     const r = await run(async () => {
       try {
         for (const x of replies) await CardNotesService.delete(x.id)

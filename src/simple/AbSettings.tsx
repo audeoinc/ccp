@@ -2,6 +2,7 @@ import { Button, Field, Input, Select, makeStyles, tokens } from '@fluentui/reac
 import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-icons'
 import { useT } from '../i18n'
 import { allVariants, metricLabel, splitOf, targetLabel, type AbMetric, type AbMode, type AbPurpose, type AbTarget, type AbTest, type VariantKey } from '../abTest'
+import { confirmDialog } from '../confirm'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '10px', width: '340px' },
@@ -73,8 +74,8 @@ export function AbSettings({ ab, active, target, onChange, onDecide, onStop }: {
           size="small"
           appearance="subtle"
           icon={<DismissCircleRegular />}
-          onClick={() => {
-            if (window.confirm(t('案をやめて、A 案だけに戻します。B・C 案は消えます(保存で確定)。よろしいですか?', 'Stop and keep only variant A? Variants B and C will be discarded (on save).'))) onStop()
+          onClick={async () => {
+            if (await confirmDialog(t('案をやめて、A 案だけに戻します。B・C 案は消えます(保存で確定)。よろしいですか?', 'Stop and keep only variant A? Variants B and C will be discarded (on save).'))) onStop()
           }}
         >
           {choose ? t('案をやめる', 'Stop') : t('AB テストをやめる', 'Stop A/B test')}

@@ -45,6 +45,7 @@ import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
 import { SenderName } from '../SenderName'
+import { confirmDialog } from '../confirm'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
@@ -517,7 +518,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 {t('テストの設定', 'Test settings')}
               </MenuItem>
               {e.ab.active !== 'A' && (
-                <MenuItem icon={<DeleteRegular />} onClick={() => e.ab && window.confirm(t(`案 ${e.ab.active} を消します(保存で確定)。よろしいですか?`, `Remove variant ${e.ab.active}? (on save)`)) && e.abRemove(e.ab.active)}>
+                <MenuItem icon={<DeleteRegular />} onClick={async () => {
+                  if (e.ab && (await confirmDialog(t(`案 ${e.ab.active} を消します(保存で確定)。よろしいですか?`, `Remove variant ${e.ab.active}? (on save)`)))) e.abRemove(e.ab.active)
+                }}>
                   {t(`案 ${e.ab.active} を消す`, `Remove variant ${e.ab.active}`)}
                 </MenuItem>
               )}

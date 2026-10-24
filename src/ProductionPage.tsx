@@ -45,6 +45,7 @@ import { CopyLinkButton } from './CopyLinkButton'
 import { DevRequestMoreMenu } from './DevRequestMenu'
 import { ResolvedPinsToggle } from './ResolvedPinsToggle'
 import { PREF } from './prefKeys'
+import { confirmDialog } from './confirm'
 
 const RAIL_W = 32
 
@@ -489,8 +490,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
             appearance="primary"
             icon={<SendRegular />}
             disabled={busy || !meId || !shownOf('A')}
-            onClick={() => {
-              if (!window.confirm(t('配信のしくみに送ります。よろしいですか?', 'Send to the delivery system?'))) return
+            onClick={async () => {
+              if (!(await confirmDialog(t('配信のしくみに送ります。よろしいですか?', 'Send to the delivery system?')))) return
               void run(() => ProductionService.sendRequest(live.id, { actor, html: shownOf('A'), variant_html: variantHtmlJson(), week_start: weekStart }), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
             }}
           >
@@ -559,8 +560,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                           className={s.undo}
                           icon={<ArrowUndoRegular />}
                           disabled={busy || !meId}
-                          onClick={() => {
-                            if (!window.confirm(i === 0 ? t('依頼を取り下げます。よろしいですか?', 'Withdraw the request?') : t(`「${st.name}」をやり直します。よろしいですか?`, `Redo "${st.name}"?`))) return
+                          onClick={async () => {
+                            if (!(await confirmDialog(i === 0 ? t('依頼を取り下げます。よろしいですか?', 'Withdraw the request?') : t(`「${st.name}」をやり直します。よろしいですか?`, `Redo "${st.name}"?`)))) return
                             void run(() => ProductionService.undo(live.id, { actor, week_start: weekStart }), i === 0 ? tr('依頼を取り下げました', 'Withdrew the request') : tr('1 つ前の段に戻しました', 'Went back one step'))
                           }}
                         >
@@ -585,8 +586,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                     icon={<SendRegular />}
                     disabled={busy || !meId || choosing || !shownOf('A')}
                     title={needChoice ?? undefined}
-                    onClick={() => {
-                      if (!window.confirm(t('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?'))) return
+                    onClick={async () => {
+                      if (!(await confirmDialog(t('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?')))) return
                       void run(() => ProductionService.send(requestInput()))
                     }}
                   >

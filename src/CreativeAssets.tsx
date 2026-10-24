@@ -19,6 +19,7 @@ import { locale, tr, useT } from './i18n'
 import type { CardAsset } from './models/cardAssets'
 import type { Product } from './models/products'
 import { PREF } from './prefKeys'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '10px', alignContent: 'start' },
@@ -128,7 +129,7 @@ const hostOf = (u?: string) => {
 async function deleteAsset(a: CardAsset, me: string): Promise<boolean> {
   const by = (a.added_by ?? '').trim()
   const other = by && by !== me
-  const ok = window.confirm(
+  const ok = await confirmDialog(
     other
       ? tr(`素材「${a.name}」は ${by} さんが入れたものです。消しますか?(この素材へのやり取りも消えます)`, `"${a.name}" was added by ${by}. Delete it? Its conversation is deleted too.`)
       : tr(`素材「${a.name}」を消します(この素材へのやり取りも消えます)。よろしいですか?`, `Delete "${a.name}"? Its conversation is deleted too.`),
