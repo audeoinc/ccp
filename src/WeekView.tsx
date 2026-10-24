@@ -149,8 +149,8 @@ const useStyles = makeStyles({
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
   strip: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '3px 8px', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   // 帯は、配信カードの札と同じ、塗りつぶしの地に白抜き(メール = 青、アプリ = ベリー)
-  stripEmail: { backgroundColor: tokens.colorPaletteBlueBorderActive, color: '#ffffff' },
-  stripPush: { backgroundColor: tokens.colorPaletteBerryBorderActive, color: '#ffffff' },
+  stripEmail: { backgroundColor: tokens.colorPaletteBlueBorderActive, color: tokens.colorNeutralForegroundOnBrand },
+  stripPush: { backgroundColor: tokens.colorPaletteBerryBorderActive, color: tokens.colorNeutralForegroundOnBrand },
   stripNone: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground3 },
   stripTime: { marginLeft: 'auto', fontWeight: tokens.fontWeightRegular },
   inner: { display: 'grid', rowGap: '5px', padding: '6px 8px 8px', minWidth: 0 },

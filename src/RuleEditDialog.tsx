@@ -51,15 +51,18 @@ function joinCheck(kind: CheckKind, value: string): string {
   return kind === 'limit' ? `上限 週 ${v} 回` : kind === 'exclude_stage' ? `除く 段階=${v}` : kind === 'include_re' ? `含める /${v}/` : kind === 'exclude_re' ? `含めない /${v}/` : `含めない ${v}`
 }
 
-const TARGET_LABEL: Record<string, [string, string]> = {
-  theme: ['テーマ', 'Theme'],
-  selection: ['商品の選定', 'Product selection'],
-  hero: ['メイン画像', 'Hero image'],
-  headline: ['ヘッドライン・見出し', 'Headline'],
-  copy: ['コピー', 'Copy'],
-  instructions: ['制作指示', 'Production notes'],
-  schedule: ['配信日時', 'Schedule'],
-}
+const targetLabel = (key: string): string =>
+  (
+    ({
+      theme: tr('テーマ', 'Theme'),
+      selection: tr('商品の選定', 'Product selection'),
+      hero: tr('メイン画像', 'Hero image'),
+      headline: tr('ヘッドライン・見出し', 'Headline'),
+      copy: tr('コピー', 'Copy'),
+      instructions: tr('制作指示', 'Production notes'),
+      schedule: tr('配信日時', 'Schedule'),
+    }) as Record<string, string>
+  )[key] ?? key
 
 interface Props {
   /** 直すとき(なければ足す) */
@@ -152,7 +155,7 @@ export function RuleEditDialog({ rule, initial, markets, onDone, onClose }: Prop
               <Field label={t('対象(効く AI の依頼。1 つ以上)', 'Applies to (AI tasks; at least one)')} size="small">
                 <div className={s.checks}>
                   {RULE_TARGETS.map((x) => (
-                    <Checkbox key={x} label={t(TARGET_LABEL[x][0], TARGET_LABEL[x][1])} checked={has(form.applies_to, x)} onChange={(_, d) => toggle('applies_to', x, !!d.checked)} />
+                    <Checkbox key={x} label={targetLabel(x)} checked={has(form.applies_to, x)} onChange={(_, d) => toggle('applies_to', x, !!d.checked)} />
                   ))}
                 </div>
               </Field>

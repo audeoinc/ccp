@@ -4,6 +4,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 面(計画・制作・結果)の色の、暗いテーマの値(src/faces.ts。明るいテーマは、faces.ts に書いた色のまま) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ccp-face-calendar: #9ea2f0;
+    --ccp-face-production: #f0915f;
+    --ccp-face-results: #4cc4a8;
+    --ccp-face-calendar-tint: #23244a;
+    --ccp-face-production-tint: #3d2417;
+    --ccp-face-results-tint: #12332b;
+  }
+}
+
 .fui-Field .fui-Field__label,
 .fui-Field .fui-Label {
   font-size: 12px;
