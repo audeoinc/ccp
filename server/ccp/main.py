@@ -24,6 +24,7 @@ from .assets import router as assets_router
 from .bq_import import router as bq_router
 from . import devimages, devtools
 from .identity import router as me_router
+from .prefs import router as prefs_router
 from .production import router as production_router
 from .ads import router as ads_router
 from .creative import router as creative_router
@@ -120,6 +121,7 @@ app.include_router(policies_router)
 app.include_router(metrics_router)
 app.include_router(approvals_router)
 app.include_router(me_router)
+app.include_router(prefs_router)
 app.include_router(production_router)
 app.include_router(ads_router)
 app.include_router(creative_router)

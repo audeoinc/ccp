@@ -459,6 +459,16 @@
    "lookups": [
    ]
   },
+  "user_prefs": {
+   "_comment": "人の設定(ペインの幅・言語など。ST6)。人と名前で 1 行、値は画面の localStorage の文字のまま。読み書きは /api/prefs(server/ccp/prefs.py)だけ",
+   "columns": [
+    ["name", "text", {"required": true, "index": true}],
+    ["value", "text"]
+   ],
+   "lookups": [
+    ["user_id", "users", {"onDelete": "CASCADE"}]
+   ]
+  },
   "approval_groups": {
    "columns": [
     ["name", "text", {"required": true}],

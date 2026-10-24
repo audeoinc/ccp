@@ -170,6 +170,8 @@
   - 選び直す(メイン画像の入れ替え・商品の差し替え・部品の画像の選び直し): 共通の `ChoosePanel`(`src/ChoosePanel.tsx`。枠と見出し・閉じる ×、選び方は `TabList`)。開くボタンは対象(画像・商品)の真下に置き、`ChooseDrawer` でボタンから枠を引き出す(ボタンと枠を同じ色の線でつなぐ。開いている間はボタンが押されたまま・▲。もう一度押すか × で閉じる。2026-10-24 利用者と決めた)。ファイルを落とせる枠は `DropZone`(`src/DropZone.tsx`。Fluent に部品がないので自前)(SU3)。
 ## 8. 画面を開いている間の保存先(ブラウザの localStorage)
 
+**ログインしている人がいれば、ユーザーごとにも保存する(ST6。`src/userPrefs.ts`・`server/ccp/prefs.py`・表 `user_prefs`)。** 読み書きは、これまでどおり localStorage。開いたときにその人の設定をサーバーから localStorage に入れてから描き(待つのは 1.5 秒まで)、変わった値を 1 秒まとめて `PUT /api/prefs` で写す。書き込みは `Storage.prototype.setItem` で 1 か所で拾うので、新しい設定も、そのまま人に付いてくる。人を見分ける記録・書きかけ・開発用の記録(`me.`・`comment.author`・`devRequest.`・`ccp-dev-` で始まる鍵)は送らない(ブラウザのもの)。ログインがなければ、ブラウザにだけ覚える(人 = ブラウザ)。
+
 | キー | 内容 |
 |---|---|
 | `ui.lang` | 画面の言語(ja / en) |
