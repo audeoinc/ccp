@@ -4,6 +4,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { AlertRegular, DismissRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { CopyLinkButton } from './CopyLinkButton'
+import { DevRequestMoreMenu } from './DevRequestMenu'
 
 const useStyles = makeStyles({
   // 配信カード・詳しい結果と同じ、全画面に近いフロート
@@ -34,6 +35,7 @@ export function AlertsFloat({ open, onClose, children }: Props) {
           <h2 className={s.title}>{t('アラート', 'Alerts')}</h2>
           <span className={s.close}>
             <CopyLinkButton />
+            <DevRequestMoreMenu />
           </span>
           <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('アラートを閉じる', 'Close alerts')} onClick={onClose} />
         </div>

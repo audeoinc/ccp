@@ -42,6 +42,7 @@ import { CardNotesService } from './data/cardNotes'
 import { stageOf } from './notesStage'
 import { forgetLinkedPin, linkedPin } from './pinActions'
 import { CopyLinkButton } from './CopyLinkButton'
+import { DevRequestMoreMenu } from './DevRequestMenu'
 
 const RAIL_W = 32
 
@@ -544,6 +545,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
             {t('企画を見る', 'Open the plan')}
           </Button>
           <CopyLinkButton />
+          <DevRequestMoreMenu />
           <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
         </div>
 

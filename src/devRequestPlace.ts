@@ -176,6 +176,16 @@ export const forgetLinkedRequest = () => {
   initialRequest = null
 }
 
+// ---- 一覧を開く(ヘッダーの「リクエスト」と、ヘッダーを隠すフロートの「⋯」の項目から。開くのは App)
+const openListeners = new Set<() => void>()
+export const openDevRequestList = () => openListeners.forEach((f) => f())
+export const onOpenDevRequestList = (f: () => void) => {
+  openListeners.add(f)
+  return () => {
+    openListeners.delete(f)
+  }
+}
+
 // ---- 書いた・状態を変えたら、ピンの層・フロート・一覧が読み直す(離れた部品なので、ここで知らせる)
 let version = 0
 const listeners = new Set<() => void>()

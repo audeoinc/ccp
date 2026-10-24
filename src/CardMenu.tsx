@@ -30,6 +30,7 @@ import { defaultDuplicateAt, defaultDuplicateName, duplicateDelivery } from './d
 import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { logEvent } from './history'
 import { useT } from './i18n'
+import { DevRequestMenuItem } from './DevRequestMenu'
 
 const useStyles = makeStyles({
   danger: { color: tokens.colorPaletteRedForeground1 },
@@ -51,7 +52,7 @@ interface Props {
 }
 
 /**
- * 配信カードの「…」のメニュー: 複製 / 取りやめにする / 取りやめを取り消す / 削除。
+ * 配信カードの「…」のメニュー: 複製 / 取りやめにする / 取りやめを取り消す / 削除 / 開発へのリクエストの一覧(X69)。
  * 取りやめは、経緯を残すふだんの操作(カレンダーに薄く残る)。削除は、間違えて作ったものを消すためのもので、元に戻せない
  */
 export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extra }: Props) {
@@ -112,6 +113,8 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
             <MenuItem icon={<DeleteRegular className={styles.danger} />} onClick={() => { setError(null); setDialog('delete') }}>
               <span className={styles.danger}>{t('削除…', 'Delete…')}</span>
             </MenuItem>
+            <MenuDivider />
+            <DevRequestMenuItem />
           </MenuList>
         </MenuPopover>
       </Menu>

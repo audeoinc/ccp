@@ -62,8 +62,6 @@ const useStyles = makeStyles({
   pinDone: { backgroundColor: tokens.colorPaletteGreenBackground3, color: tokens.colorNeutralForegroundOnBrand },
   pinDeclined: { backgroundColor: tokens.colorNeutralBackground5, color: tokens.colorNeutralForeground2 },
   pinNew: { backgroundColor: tokens.colorBrandBackground, cursor: 'default' },
-  // 一覧を開くボタン(配信カードなどのフロートがヘッダーを隠している間だけ、右下に出す)
-  listBtn: { position: 'absolute', right: '12px', bottom: '12px', pointerEvents: 'auto', boxShadow: tokens.shadow8 },
   // 場所が見つからないリクエストの置き場(画面の左下)
   tray: { position: 'absolute', left: '12px', bottom: '12px', pointerEvents: 'auto' },
   trayList: { display: 'grid', rowGap: '4px', maxWidth: '360px', maxHeight: '50vh', overflowY: 'auto' },
@@ -113,10 +111,6 @@ interface Props {
   /** いまの画面(App の URL の状態) */
   link: Partial<LinkState>
   cardName: (id: string) => string
-  /** 開発へのリクエストの一覧を開く(ヘッダーの「リクエスト」と同じ) */
-  onOpenList: () => void
-  /** 一覧を開いている間は、右下のボタンを出さない */
-  listOpen: boolean
 }
 
 const statusText = (q: DevRequest) =>
@@ -131,7 +125,7 @@ const statusText = (q: DevRequest) =>
  * どの右クリックのメニューにも「開発に伝える」を足し(ContextMenu の setGlobalMenuItems)、メニューのない所の右クリックでは、これだけのメニューを出す。
  * いまの画面のリクエストをピン(墨色のひし形に黄色の電球)で出し、目印が見つからないものは、左下の置き場にまとめて、場所の文を見せる
  */
-export function DevRequestLayer({ link, cardName, onOpenList, listOpen }: Props) {
+export function DevRequestLayer({ link, cardName }: Props) {
   const s = useStyles()
   const t = useT()
   const version = useSyncExternalStore(subscribeDevRequests, devRequestsVersion)
@@ -160,7 +154,11 @@ export function DevRequestLayer({ link, cardName, onOpenList, listOpen }: Props)
   }, [version])
 
   const roots = rows.filter((q) => !q.source_request)
-  const here = roots.filter((q) => q.screen === screen)
+  // 画面に出すのは未対応だけ(対応済み・見送りは一覧にだけ残す。2026-10-24 利用者: 対象がないのにピンが残っているのが不思議だった)。
+  // 一覧の「この画面を開く」で開いたものは、状態によらず出す(人が開きに来たもの)
+  const isOpen = (q: DevRequest) => !q.status || q.status === 'open'
+  const linked = target && 'id' in target ? target.id : null
+  const here = roots.filter((q) => q.screen === screen && (isOpen(q) || q.id === linked))
   const pending = target && 'pending' in target ? target.pending : null
 
   // 位置は、画面の中身・スクロール・大きさが変わるたびに変わるので、間隔を空けて測り直す(プレビューのピンと同じ)
@@ -298,13 +296,6 @@ export function DevRequestLayer({ link, cardName, onOpenList, listOpen }: Props)
           </span>
         )
       })}
-      {/* 開発へのリクエストは、どの画面でも、だれでも開けるように(2026-10-24 利用者)。ヘッダーが見えている画面はヘッダーの「リクエスト」、
-          配信カード・制作のページ・結果・アラートのフロートがヘッダーを隠している間は、右下のこのボタン */}
-      {inFloat && !listOpen && (
-        <Button className={s.listBtn} size="small" icon={<LightbulbRegular />} onClick={onOpenList} title={t('開発へのリクエストの一覧(画面のどこでも、右クリックでピンを打って書けます)', 'Requests to developers (right-click anywhere to pin and write one)')}>
-          {t('リクエスト', 'Dev requests')}
-        </Button>
-      )}
       {lost.length > 0 && (
         <div className={s.tray}>
           <Popover open={trayShown} onOpenChange={(_, d) => setTrayOpen(d.open)} positioning="above-start">

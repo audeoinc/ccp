@@ -21,6 +21,7 @@ import { AbResult } from './AbResult'
 import { isPush, sentAtOf, type ResultRow } from './results'
 import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
+import { DevRequestMoreMenu } from './DevRequestMenu'
 import { FaceBadge } from './FaceBadge'
 
 const useStyles = makeStyles({
@@ -139,6 +140,7 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
               )}
               {/* 開いたときに最初に選ばれて説明が出ないよう、ほかのボタンの後ろに置く */}
               {onOpenCard && <CopyLinkButton />}
+              <DevRequestMoreMenu />
               <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
             </span>
           </div>

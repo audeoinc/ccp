@@ -61,6 +61,7 @@ import { DuplicateDialog } from './CardMenu'
 import { LightbulbRegular as DevRequestIcon } from '@fluentui/react-icons'
 import { DevRequestLayer } from './DevRequestLayer'
 import { DevRequestsDialog } from './DevRequestsDialog'
+import { onOpenDevRequestList } from './devRequestPlace'
 import { SampleShopPanel } from './SampleShopPanel'
 import { SettingsDialog } from './SettingsDialog'
 import { BrandPanel } from './BrandPanel'
@@ -675,6 +676,8 @@ function App() {
   const cardMenu = useContextMenu()
   // 開発へのリクエストの一覧(⚙ と、ヘッダーのリンクから)
   const [devRequestsOpen, setDevRequestsOpen] = useState(false)
+  // ヘッダーを隠すフロート(配信カード・制作のページ・結果・アラート)の「⋯」から開く(X69)
+  useEffect(() => onOpenDevRequestList(() => setDevRequestsOpen(true)), [])
   const [dupCard, setDupCard] = useState<DeliveryCard | null>(null)
   const cardMenuRef = useRef<(e: MouseEvent) => void>(() => undefined)
   useEffect(() => {
@@ -2504,7 +2507,7 @@ function App() {
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       {cardMenu.menu}
       {/* 開発へのリクエストのピン(どの画面にも重ねる)と、その一覧 */}
-      <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} onOpenList={() => setDevRequestsOpen(true)} listOpen={devRequestsOpen} />
+      <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} />
       {devRequestsOpen && <DevRequestsDialog onClose={() => setDevRequestsOpen(false)} />}
       {dupCard && (
         <DuplicateDialog
