@@ -46,7 +46,7 @@
 
 テーマ → テンプレート + メイン画像 → ヘッドライン・コピー → 各セクション(順に)→ 制作指示。結果は画面に反映するだけで、保存はしない。
 
-週の枠からまとめて AI で中身を作る(W14。`src/bulkDraft.ts`・`src/useWeekFrames.ts`)も、同じ `runAutoDraft` を使う(作り方を、配信カードとずらさないため)。保存は、配信カードの保存(`buildContent`・`syncItems`)と同じ形にそろえる。配信カードの保存の形を変えたら、`bulkDraft.ts` の `contentFields`・`saveProducts`(週の枠に書き込む `applyResult` と、作業画面で新しく保存する `createDraft` が使う)も直す。まとめて作る作業画面(`src/useBulkWorkspace.ts`・`src/BulkWorkspace.tsx`)は、中身のない枠を保存せず、中身ができた配信から「未起案」で新規作成する。
+週の枠からまとめて AI で中身を作る(W14。`src/bulkDraft.ts`・作業画面の `src/useBulkWorkspace.ts`)も、同じ `runAutoDraft` を使う(作り方を、配信カードとずらさないため)。保存は、配信カードの保存(`buildContent`・`syncItems`)と同じ形にそろえる。配信カードの保存の形を変えたら、`bulkDraft.ts` の `contentFields`・`saveProducts`(週の枠に書き込む `applyResult` と、作業画面で新しく保存する `createDraft` が使う)も直す。まとめて作る作業画面(`src/useBulkWorkspace.ts`・`src/BulkWorkspace.tsx`)は、中身のない枠を保存せず、中身ができた配信から「未起案」で新規作成する。
 
 ## 3. 画面の構成
 

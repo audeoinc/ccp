@@ -22,13 +22,6 @@ const pushLabelsNow = (): string[] => [
   tr('⑤ リンク先', '5. Links'),
 ]
 
-/** 工程の名前。読むたびに現在の言語で返す(インデックスのゲッター) */
-export const PROGRESS_LABELS: readonly string[] = (() => {
-  const a: string[] = []
-  for (let i = 0; i < 6; i++) Object.defineProperty(a, i, { get: () => labelsNow()[i], enumerable: true })
-  return a
-})()
-
 export interface Progress {
   theme: boolean
   template: boolean

@@ -14,8 +14,6 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/bq/run          {sql, max_rows, run_id}  SELECT だけを、読む量の上限を付けて流す
   POST /api/dev/bq/cancel       {run_id}  流している途中の SELECT を止める(BigQuery のジョブを取り消す)
   GET  /api/dev/bq/projects     見られるプロジェクト(データセットを、名前の一部で探すため)
-  POST /api/dev/ai/chat         Gemini と会話して SQL を組み立てる。前提(仕様・手本・表の列・まとめ・いまの SQL)はサーバーで組み立てる。
-                                思考・調べたこと・返事を、起きた順に NDJSON で返す
   GET  /api/dev/ai/models       使えるモデル(賢い順)と既定
   GET  /api/dev/work            6 つの出力の版の一覧・採用の版・出す先
   POST /api/dev/work/{出力}     SQL を新しい版として保存する   GET /api/dev/work/{出力}/{版}  版を開く
@@ -23,9 +21,9 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
   POST /api/dev/check           答え合わせ(全件を流して bq_validate。run=false なら読む量の見積もりだけ)
   GET  /api/dev/gcs/list        ?bucket=&prefix=  GCS のフォルダ 1 段分(読むだけ)
   POST /api/dev/gcs/extract     選んだ文書を文字にする(Excel はシートごとに CSV の形。PDF は文字にしない)
-  POST /api/dev/policy/convert  文書を POLICY_FORMAT の形に書き直す(NDJSON。PDF は Gemini にそのまま渡す)
   GET  /api/dev/policy/drafts   前に書き直したファイル(server/devwork/policies/)
   POST /api/dev/tasks/chat・/tasks/policy-convert・/tasks/call  時間のかかる処理を裏で走らせ、受付番号を返す
+                                chat = Gemini と会話して SQL を組み立てる(前提はサーバーで組み立てる)。policy-convert = 文書を POLICY_FORMAT の形に書き直す
   GET  /api/dev/tasks/{受付}?after=  ここまでの出来事と、終わったか(画面が 1 秒ごとに聞きに来る。中継の 524 を避けるため)
   GET  /api/dev/history         実行の履歴(server/devwork/history.jsonl。画面・AI・列を調べる、で流した SQL)
   POST /api/dev/bq/profile      列の中身を調べる(行数・空・値の種類・最小・最大・よく出る値)
@@ -55,7 +53,6 @@ from pathlib import Path
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import bq
@@ -857,10 +854,6 @@ async def models() -> dict[str, Any]:
             "thinking": (os.getenv("DEVTOOLS_THINKING") or "high").lower()}
 
 
-def _line(obj: dict[str, Any]) -> bytes:
-    return (json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8")
-
-
 async def chat_events(body: ChatIn) -> AsyncIterator[dict[str, Any]]:
     """会話の 1 回分を、起きた順に返す(画面が、思考・調べたこと・返事を、届いたそばから出せるように)。
       {"type": "start", "model": …}       {"type": "thought", "text": …}(思考の要約。少しずつ届く)
@@ -934,35 +927,6 @@ async def chat_events(body: ChatIn) -> AsyncIterator[dict[str, Any]]:
         yield {"type": "error", "error": "返答が空でした(安全フィルターなどで止まった可能性があります)"}
         return
     yield {"type": "final", **parse_reply(text), "context_chars": len(context)}
-
-
-def _ndjson(events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
-    """起きた順に、1 行 1 つの JSON(NDJSON)で返す。考えている間も、15 秒ごとに合図を送る
-    (中継(Jupyter のプロキシ)が、黙っている接続を切らないように。画面も「止まっていない」と分かる)"""
-
-    async def gen() -> AsyncIterator[bytes]:
-        it = events.__aiter__()
-        pending = asyncio.ensure_future(it.__anext__())
-        while True:
-            done, _ = await asyncio.wait({pending}, timeout=15)
-            if not done:
-                yield _line({"type": "ping"})
-                continue
-            try:
-                ev = pending.result()
-            except StopAsyncIteration:
-                return
-            yield _line(ev)
-            pending = asyncio.ensure_future(it.__anext__())
-
-    # X-Accel-Buffering: 途中の中継が、まとめて送らないように
-    return StreamingResponse(gen(), media_type="application/x-ndjson", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-
-@router.post("/ai/chat")
-async def chat(body: ChatIn) -> StreamingResponse:
-    """会話の 1 回分(思考・調べたこと・返事を、起きた順に)"""
-    return _ndjson(chat_events(body))
 
 
 @router.post("/ai/context")
@@ -1516,12 +1480,6 @@ def parse_files(text: str) -> dict[str, Any]:
             q = v.get("questions")
             return {"reply": str(v.get("reply") or ""), "files": files, "questions": [str(x) for x in q if x] if isinstance(q, list) else []}
     return {"reply": text, "files": [], "questions": []}
-
-
-@router.post("/policy/convert")
-async def policy_convert(body: ConvertIn) -> StreamingResponse:
-    """文書を書き直す(NDJSON。会話の /ai/chat と同じ形で、15 秒ごとに合図を送る)"""
-    return _ndjson(convert_events(body))
 
 
 @router.get("/policy/drafts")

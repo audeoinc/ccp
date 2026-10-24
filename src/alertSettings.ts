@@ -51,9 +51,6 @@ export function setAlertSettings(next: AlertSettings) {
   for (const l of listeners) l()
 }
 
-/** いまの条件(描画の外で読むとき。描画の中は useAlertSettings) */
-export const getAlertSettings = (): AlertSettings => current
-
 export function useAlertSettings(): AlertSettings {
   return useSyncExternalStore(
     (l) => {

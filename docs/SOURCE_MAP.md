@@ -217,8 +217,7 @@ flowchart TD
 | `WeekReport.tsx` / `printWeek.ts` | 203 / 48 | 週の資料(A4 の PDF)と、その印刷 |
 | `ListView.tsx` / `listRows.ts` | 100 / 110 | 表の形の一覧と、その列の定義(CSV の書き出しも同じ定義) |
 | `MiniCalendar.tsx` | 166 | ツールバーのミニカレンダー(月・週・日へ移る) |
-| `useWeekFrames.ts` / `bulkDraft.ts` | 298 / 293 | 週の枠とまとめて AI で中身を作る(W14)の、画面の状態と操作(App が持つ) / 枠を作る・中身を作る・書き込む部分(React を使わない) |
-| `FrameBar.tsx` / `FrameCard.tsx` / `CheckDrawer.tsx` | 150 / 136 / 162 | 週の枠の帯(国・チャネル、配信名の案、中身を作る) / 週の列の枠(配信名・種類) / 作った中身・前後の配信との比べるの表示(`CheckView`。作業画面で使う。引き出しは 2026-10-24 にやめた) |
+| `bulkDraft.ts` | — | まとめて AI で中身を作る(W14)の、中身を作る・下書きを保存する・週の日の一覧(作業画面 `useBulkWorkspace.ts` が使う。2026-10-24 に、比べるために残していた週の枠の作り(`useWeekFrames`・`FrameBar`・`FrameCard`・`CheckDrawer`)を消した) |
 | `useBulkWorkspace.ts` / `BulkWorkspace.tsx` | 585 / 891 | まとめて作る作業画面(W14 の 4 回目の見直し)の状態と操作(App が持つ。① は保存しない) / 画面(① 対象と方向 → ② 中身を AI で作る → ③ 確かめる。① のあと、中身を作らずに保存もできる) |
 | `DeliveryPeek.tsx` / `CardPreview.tsx` | 34 / 68 | 配信にマウスを重ねたときのプレビュー / 保存済みの配信カードのプレビュー |
 | `status.ts` / `progress.ts` | 53 / 167 | 配信のステータスの色・チャネル / 工程(進み具合) |

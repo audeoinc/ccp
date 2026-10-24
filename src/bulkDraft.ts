@@ -19,7 +19,7 @@ import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
 import { weeklyLimit } from './weeklyLimit'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { isCancelled } from './cancel'
-import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf, type WeekScope } from './weekLock'
+import { confirmedWeekOf, dayKeyOf, sundayOf, weekKeyOf } from './weekLock'
 import { logEvent } from './history'
 import { tr } from './i18n'
 
@@ -41,30 +41,6 @@ export function isFrame(c: DeliveryCard, productCount: number): boolean {
   if (isCancelled(c) || statusRank(c.status) > statusRank('not_started')) return false
   if (!c.frame_at && c.name?.trim()) return false
   return !c.theme?.trim() && !c.headline?.trim() && !c.push_title?.trim() && !c.hero_image_id && productCount === 0
-}
-
-/** 中身を作れる枠か(配信名と種類を、人が決めたもの。決めてから作ると、方向が合わずに作り直すことが減る) */
-export const frameReady = (c: DeliveryCard) => !!c.name?.trim() && !!c.theme_type
-
-/** 週の、空いている日に、枠(中身のない「未起案」の配信カード)を作る */
-export async function createFrames(days: string[], setup: { country: string; channel: string; department: string }): Promise<number> {
-  let n = 0
-  for (const day of days) {
-    const res = await DeliveryCardsService.create({
-      // 配信名は、あとで人が入れる(AI の案も出せる)。列は空を許さないので、空の文字にする
-      name: '',
-      scheduled_at: new Date(`${day}T${BULK_TIME}`).toISOString(),
-      country: (setup.country || undefined) as DeliveryCardFields['country'],
-      channel: (setup.channel || undefined) as DeliveryCardFields['channel'],
-      department: (setup.department || undefined) as DeliveryCardFields['department'],
-      status: 'not_started',
-      state_code: 0,
-      frame_at: new Date().toISOString(),
-    })
-    if (!res.success) throw new Error(res.error?.message ?? tr('枠を作れませんでした', 'Could not create the slot'))
-    n += 1
-  }
-  return n
 }
 
 /** 中身を作るのに要る、配信の基本情報(保存した枠でも、作業画面の、まだ保存していない行でもよい) */
@@ -121,18 +97,6 @@ const templateOf = (c: DraftBase, r: AutoDraftResult) => {
 
 /** 載せる商品(選定済み。メールの並び順) */
 export const productIdsOf = (r: AutoDraftResult): string[] => r.sections.flatMap((s) => s.selected.map((x) => x.productId))
-
-/**
- * 作った中身を、枠の配信カードに書き込む(配信カードの buildContent・syncItems と同じ形)。
- * 配信名・日時・国・チャネル・種類は、人が決めたものなので変えない。
- * 人の確認は、承認で担う(2026-10-24 SU7。以前の「AI 下書き・未確認」の印はやめた)
- */
-export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products: Product[]): Promise<void> {
-  const res = await DeliveryCardsService.update(c.id, contentFields(c, r, products))
-  if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
-  await saveProducts(c.id, c.name, r, templateOf(c, r), products)
-  await logEvent({ action: 'bulk_create', card: { id: c.id, name: c.name, scheduledAt: c.scheduled_at }, to: 'not_started' })
-}
 
 /**
  * 作業画面(BulkWorkspace)で作った中身を、新しい配信カードとして保存する。
@@ -248,9 +212,6 @@ export function overusedInWeek(when: string | undefined, cards: { id: string; sc
   return [...count].filter(([, n]) => n >= lim).map(([pid]) => pid)
 }
 
-/** 確定した週に入る配信か(枠を作れず、中身も作らない。確定した週を変えるときは、配信カードで理由を残す流れのため) */
-export const lockedWeekOf = (weeks: WeekRow[], when: string | undefined, scope: WeekScope) => confirmedWeekOf(weeks, when, scope)
-
 /** 作業画面の、週の 1 日。作れない日も、理由と、その日にもうある配信を見せる(空いている日だけを出すと、なぜその日がないのか分からないため) */
 export interface WeekDay {
   key: string
@@ -261,7 +222,7 @@ export interface WeekDay {
   same: { id: string; name: string }[]
 }
 
-/** 週の 7 日と、選んだ国・チャネルで作れるか(作業画面の ① で使う。作れる日の決め方は emptyDays と同じ) */
+/** 週の 7 日と、選んだ国・チャネルで作れるか(作業画面の ① で使う) */
 export function weekDays(weekStart: Date, cards: { id: string; name: string; scheduled_at?: string; channel?: string; country?: string }[], weeks: WeekRow[], channel: string, country: string): WeekDay[] {
   const today = dayKeyOf(new Date())
   const start = sundayOf(weekStart)
@@ -274,22 +235,4 @@ export function weekDays(weekStart: Date, cards: { id: string; name: string; sch
     const state: WeekDay['state'] = locked ? 'locked' : key < today ? 'past' : onDay.length > 0 ? 'used' : 'free'
     return { key, date, state, same: onDay }
   })
-}
-
-/**
- * 週の、選んだ国・チャネルの配信がない日(今日より前の日と、確定した週は除く)。枠を作る日に使う。
- * 国・チャネルで見るのは、「今週の US 向けメール」のように、国とチャネルを決めてから、まとめて作るため
- */
-export function emptyDays(weekStart: Date, cards: { scheduled_at?: string; channel?: string; country?: string }[], weeks: WeekRow[], channel: string, country: string): string[] {
-  const today = dayKeyOf(new Date())
-  const start = sundayOf(weekStart)
-  if (confirmedWeekOf(weeks, start.toISOString(), { country, channel })) return []
-  const same = (c: { channel?: string; country?: string }) => (c.channel ?? CHANNEL_EMAIL) === channel && (!country || !c.country || c.country === country)
-  const used = new Set(cards.filter((c) => same(c) && c.scheduled_at).map((c) => dayKeyOf(new Date(c.scheduled_at!))))
-  const out: string[] = []
-  for (let i = 0; i < 7; i++) {
-    const key = dayKeyOf(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
-    if (key >= today && !used.has(key)) out.push(key)
-  }
-  return out
 }

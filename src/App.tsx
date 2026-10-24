@@ -141,9 +141,7 @@ import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { markTemplatesLoadFailed, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
-import { FrameBar } from './FrameBar'
-import { FrameCard } from './FrameCard'
-import { useWeekFrames } from './useWeekFrames'
+import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
@@ -1005,8 +1003,6 @@ function App() {
       return d >= weekStart && d < end
     })
   }, [rows, weekStart])
-  // 週の表示に出ている配信(絞り込みのあと)。週の枠の帯は、見えている枠だけを数える
-  const weekVisibleIds = useMemo(() => new Set(weekRows.map((r) => r.card.id)), [weekRows])
   // 週の状態は、週・国・チャネルごと(ST3・W8。メールとアプリを、別の人・別のときに確定できるように)。
   // 画面の国とチャネルが決まっているときだけ、その組の行を進める。決まっていなければ、組ごとの状態を並べて選んでもらう
   const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
@@ -1038,17 +1034,10 @@ function App() {
     defaults: { country: filters.country, channel: filters.channel },
     onChanged: load,
   })
-  // 週の枠と、まとめて AI で中身を作る(W14)。枠は、中身のない配信カードとして保存する。作業画面と比べるために残す
-  const frames = useWeekFrames({
-    cards: activeCards,
-    cardProducts,
-    products,
-    heroes,
-    weeks,
-    weekStart,
-    defaults: { country: filters.country, channel: filters.channel },
-    onChanged: load,
-  })
+  // 以前の「週の枠」(W14 の最初の作り。中身のない配信カードを保存していた)が残っていれば、その配信。
+  // 作り方は作業画面(useBulkWorkspace)だけにした(2026-10-24 の整理。比べるために残していた方を消した)が、
+  // 保存済みの枠は、承認のまとめて依頼から外し、時刻の表示で枠として見分けるために、見分け方だけ残す
+  const frameIds = useMemo(() => new Set(weekCards.filter((c) => isFrame(c, (cardProducts.get(c.id) ?? []).length)).map((c) => c.id)), [weekCards, cardProducts])
   const checklist = useMemo(
     () =>
       buildChecklist({
@@ -1145,7 +1134,7 @@ function App() {
   // 週の承認(U6): 未依頼の配信をまとめて依頼する / 自分宛ての依頼をまとめて承認する(配信カードと同じ窓口 /api/approvals を、順に呼ぶ)
   const actor = () => ({ id: myUserId(), name: myName() })
   // まとめて依頼の対象。中身のない週の枠(W14)は、承認するものがないので外す(中身を作ってから依頼する)
-  const requestable = needsRequest(weekCards.filter((c) => !frames.frameIds.has(c.id)), inbox.hasOpen)
+  const requestable = needsRequest(weekCards.filter((c) => !frameIds.has(c.id)), inbox.hasOpen)
   const requestWeek = async () => {
     setError(null)
     try {
@@ -1536,14 +1525,6 @@ function App() {
               </MenuItem>
               <MenuItem icon={<AiIcon size={16} />} secondaryContent={t('作業画面', 'Workspace')} onClick={() => bulk.openFor(weekStart)}>
                 {t('まとめて作る(週・国・チャネルを選び、AI で中身まで)', 'Create in bulk (week, country & channel, then AI content)')}
-              </MenuItem>
-              <MenuItem
-                icon={<AiIcon size={16} />}
-                disabled={!canBulk}
-                secondaryContent={canBulkReason}
-                onClick={frames.openSetup}
-              >
-                {t('この週の枠を作る(週の表示の上で作る、これまでの形)', 'Create slots for this week (in the week view, previous way)')}
               </MenuItem>
             </MenuList>
           </MenuPopover>
@@ -2113,10 +2094,10 @@ function App() {
                   </MenuTrigger>
                   <MenuPopover>
                     <MenuList>
-                      {/* 週の枠を作る(X24 を W14 の枠の形に読み替え。2026-10-19)。週は表示中の週、月・一覧は「この月の空いている週から」(その週に移ってから、枠を作るステップを開く)。「新規作成 ▾」にも同じ入口がある */}
+                      {/* 週の配信をまとめて作る(W14)。週は表示中の週、月・一覧は「この月の空いている週から」。開くのは作業画面(「新規作成 ▾」の「まとめて作る」と同じ) */}
                       {page === 'calendar' && view === 'week' && (
-                        <MenuItem icon={<AiIcon size={16} />} disabled={!canBulk} onClick={frames.openSetup} secondaryContent={canBulkReason || t('表示中の週', 'This week')}>
-                          {t('この週の枠を作る', 'Create frames for this week')}
+                        <MenuItem icon={<AiIcon size={16} />} disabled={!canBulk} onClick={() => bulk.openFor(weekStart)} secondaryContent={canBulkReason || t('表示中の週', 'This week')}>
+                          {t('この週の配信をまとめて作る', 'Create this week\'s deliveries in bulk')}
                         </MenuItem>
                       )}
                       {page === 'calendar' && view !== 'week' && (
@@ -2126,7 +2107,7 @@ function App() {
                           onClick={() => {
                             if (!monthBulkWeek) return
                             goTo('week', monthBulkWeek)
-                            frames.openSetup()
+                            bulk.openFor(monthBulkWeek)
                           }}
                           secondaryContent={
                             monthBulkWeek
@@ -2134,7 +2115,7 @@ function App() {
                               : t('作れる週がありません', 'No week to plan')
                           }
                         >
-                          {t('この月の空いている週から、枠を作る', 'Create frames from an open week in this month')}
+                          {t('この月の空いている週から、まとめて作る', 'Create in bulk from an open week in this month')}
                         </MenuItem>
                       )}
                       {page === 'calendar' && <MenuDivider />}
@@ -2329,7 +2310,6 @@ function App() {
                   </div>
                 </Portal>
               )}
-              {!onProduction && <FrameBar frames={frames} weekStart={weekStart} weeks={weeks} visibleIds={weekVisibleIds} />}
               {/* 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子。計画の面だけ */}
               {/* 地の部分をつかんで横に引くと、前後の週へ(SwipePager) */}
               <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
@@ -2344,7 +2324,7 @@ function App() {
                   cardProducts={cardProducts}
                   products={products}
                   heroes={heroes}
-                  isFrame={(c) => frames.frameIds.has(c.id)}
+                  isFrame={(c) => frameIds.has(c.id)}
                 />
               ) : (
               <WeekView
@@ -2368,8 +2348,6 @@ function App() {
                 renderMeta={onProduction ? productionMeta : undefined}
                 // 下書きモードでは、日の「＋」で、その日に下書きを足す
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
-                // 中身のない配信(週の枠)は、その場で配信名・種類を入れられる形で出す(W14)
-                renderCard={(c) => (frames.frameIds.has(c.id) ? <FrameCard key={`${c.id}:${c.name}`} card={c} frames={frames} onOpen={setSelectedId} /> : null)}
               />
               )}
               </SwipePager>

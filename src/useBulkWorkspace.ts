@@ -20,7 +20,6 @@ import { limitText, weeklyLimit, weeklyLimitFor } from './weeklyLimit'
 import type { CardAlert } from './cardAlerts'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
-import type { Progress } from './useWeekFrames'
 import type { DeliveryPattern } from './models/deliveryPatterns'
 import { dayKeyOf } from './weekLock'
 
@@ -40,6 +39,13 @@ interface Ctx {
 }
 
 /** 1 = 計画する(週・チャネル・作る日と、配信名・種類)、2 = 作って決める(AI で作った案を並べ、1 本ずつ保存・破棄) */
+
+/** 中身を作っている途中の段階(配信ごと) */
+export interface Progress {
+  step: string
+  done: number
+  total: number
+}
 export type Step = 1 | 2
 
 /** ① で入れる、1 日分の行(まだ保存しない) */

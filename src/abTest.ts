@@ -8,9 +8,6 @@ import { tr } from './i18n'
 /** 案の記号。A はいまの配信そのもの */
 export type VariantKey = 'A' | 'B' | 'C'
 export const VARIANT_KEYS: VariantKey[] = ['A', 'B', 'C']
-/** 案の数の上限(A・B・C) */
-export const MAX_VARIANTS = 3
-
 /** 比べる要素(all = メイン画像・商品・文言(ヘッドライン・コピー・セクションの見出しとコピー・通知の文)のすべて) */
 export type AbTarget = 'hero' | 'products' | 'both' | 'all' | 'subject'
 /** 使い方(test = AB テスト: 全案を分けて送る / choose = 案から選ぶ: 決めた 1 案だけを送る。X57) */

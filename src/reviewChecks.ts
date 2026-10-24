@@ -7,10 +7,6 @@ import { tr } from './i18n'
 import { statusRank } from './status'
 import { weeklyLimit } from './weeklyLimit'
 
-/** 同じ商品を、週に何本の配信まで載せてよいか。設定(C3)ができるまでの、仮の値 */
-/** 週の上限の既定(アラートの条件の既定と同じ)。実際の値は src/weeklyLimit.ts の weeklyLimitFor(決まり → アラートの条件) */
-export const WEEKLY_PRODUCT_LIMIT = 2
-
 const EMAIL = 'email'
 const PUSH = 'app'
 const STATUS_APPROVED = 'approved'

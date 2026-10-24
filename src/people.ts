@@ -69,7 +69,6 @@ export const setPeopleManagerOpen = (v: boolean) => {
   managerOpen = v
   managerListeners.forEach((f) => f())
 }
-export const openPeopleManager = () => setPeopleManagerOpen(true)
 const subscribeManager = (f: () => void) => {
   managerListeners.add(f)
   return () => {
