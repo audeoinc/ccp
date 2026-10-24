@@ -313,34 +313,69 @@ def serialize(v: Any) -> Any:
     return v
 
 
-# ---- 絞り込み(eq / ne / gt / ge / lt / le を and でつなぐ範囲だけ)
-_CLAUSE = re.compile(r"\s*(\w+)\s+(eq|ne|gt|ge|lt|le)\s+('(?:[^']|'')*'|[^\s']+)\s*(?:and\b|$)", re.IGNORECASE)
+# ---- 絞り込み(eq / ne / gt / ge / lt / le と in を、and / or でつなぐ範囲だけ。かっこは使えない)
+# in は、配信のいくつかの id の行をまとめて読むため(表をまるごと読んでから画面で絞らないように。2026-10-25 の整理 第 2 段)
+_VALUE = r"'(?:[^']|'')*'|[^\s',()]+"
+_CLAUSE = re.compile(rf"\s*(\w+)\s+(?:(eq|ne|gt|ge|lt|le)\s+({_VALUE})|(in)\s*\(\s*((?:{_VALUE})(?:\s*,\s*(?:{_VALUE}))*)\s*\))\s*", re.IGNORECASE)
+_JOIN = re.compile(r"(and|or)\b", re.IGNORECASE)
+_ITEM = re.compile(_VALUE)
 _OPS = {"eq": "=", "ne": "<>", "gt": ">", "ge": ">=", "lt": "<", "le": "<="}
+# in に並べられる数(とても長い URL・SQL にしないため)
+MAX_IN = 500
+
+
+def _unquote(raw: str) -> str:
+    return raw[1:-1].replace("''", "'") if raw.startswith("'") else raw
 
 
 def parse_filter(table: Table, text: str | None) -> tuple[str, dict[str, Any]]:
+    """画面の絞り込み(OData に似た書き方)を、SQL の条件とパラメータにする。and は or より先につながる(SQL と同じ)"""
     if not text or not text.strip():
         return "", {}
-    clauses: list[str] = []
+    parts: list[str] = []
     params: dict[str, Any] = {}
     pos = 0
-    while pos < len(text):
+    while True:
         m = _CLAUSE.match(text, pos)
         if not m:
             raise BadRequest(f"絞り込みの書き方に対応していません: {text!r}")
-        name, op, raw = m.group(1), m.group(2).lower(), m.group(3)
+        name = m.group(1)
         col, type_ = table.resolve(name)
-        if raw.lower() == "null":
-            if op not in ("eq", "ne"):
-                raise BadRequest("null は eq / ne だけ使えます")
-            clauses.append(f"{col} IS {'NOT ' if op == 'ne' else ''}NULL")
+        if m.group(4):
+            items = _ITEM.findall(m.group(5))
+            if len(items) > MAX_IN:
+                raise BadRequest(f"in に並べられるのは {MAX_IN} 個までです")
+            if any(x.lower() == "null" for x in items):
+                raise BadRequest("in に null は使えません(ne null / eq null を or でつないでください)")
+            keys = []
+            for x in items:
+                key = f"f{len(params)}"
+                params[key] = coerce(type_, _unquote(x))
+                keys.append(":" + key)
+            parts.append(f"{col} IN ({', '.join(keys)})")
         else:
-            val = raw[1:-1].replace("''", "'") if raw.startswith("'") else raw
-            key = f"f{len(params)}"
-            params[key] = coerce(type_, val)
-            clauses.append(f"{col} {_OPS[op]} :{key}")
+            op, raw = m.group(2).lower(), m.group(3)
+            if raw.lower() == "null":
+                if op not in ("eq", "ne"):
+                    raise BadRequest("null は eq / ne だけ使えます")
+                parts.append(f"{col} IS {'NOT ' if op == 'ne' else ''}NULL")
+            else:
+                key = f"f{len(params)}"
+                params[key] = coerce(type_, _unquote(raw))
+                parts.append(f"{col} {_OPS[op]} :{key}")
         pos = m.end()
-    return " AND ".join(clauses), params
+        if pos >= len(text):
+            break
+        j = _JOIN.match(text, pos)
+        if not j:
+            raise BadRequest(f"絞り込みの書き方に対応していません: {text!r}")
+        parts.append(j.group(1).upper())
+        pos = j.end()
+        if pos >= len(text) or not text[pos:].strip():
+            raise BadRequest(f"絞り込みの書き方に対応していません: {text!r}")
+    # or を使うときは、ほかの条件(画面がつなぐもの)と混ざらないよう、全体をかっこでくくる
+    sql = " ".join(parts)
+    return (f"({sql})" if "OR" in parts else sql), params
 
 
 def parse_order(table: Table, items: list[str] | None) -> str:

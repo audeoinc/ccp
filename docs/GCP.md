@@ -44,7 +44,7 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 `GET/POST /api/data/{テーブル}`、`GET/PATCH/DELETE /api/data/{テーブル}/{id}`。テーブル名は、画面が使う名前(`delivery_cards`)。
 戻り値は `{success, data}` / `{success:false, error:{message, code?}}`。
 
-- 絞り込み(`filter`): `項目 eq 値` を `and` でつなぐ範囲(`eq/ne/gt/ge/lt/le`、`null`)。値は必ずパラメータとして渡す。
+- 絞り込み(`filter`): `項目 eq 値` を `and` / `or` でつなぐ範囲(`eq/ne/gt/ge/lt/le`、`null`、`項目 in ('a', 'b')`。`in` は 500 個まで。`and` は `or` より先につながり、`or` を使うと全体をかっこでくくる。かっこは書けない)。値は必ずパラメータとして渡す。撮影・デモ用のビルドの偽の DB(`src/mock/db.ts`)は、いまも `eq` 1 つと `ne null` だけを読む。
 - 並べ替え(`orderBy`)、`select`、`top`、`skip`。
 - 書き込みの参照は、参照の列に、相手の `id` をそのまま入れる(例: `hero_image_id: "<id>"`。`null` で参照を外す)。
 - DB に接続できないときは 503 + `code: "db_unavailable"`。

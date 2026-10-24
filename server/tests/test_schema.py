@@ -104,9 +104,29 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(sql, "delivery_card_id = :f0")
         self.assertEqual(params["f0"], uuid.UUID(GUID))
 
+    def test_filter_in(self) -> None:
+        t = self.s.table("delivery_products")
+        other = str(uuid.uuid4())
+        sql, params = sc.parse_filter(t, f"delivery_card_id in ({GUID}, '{other}')")
+        self.assertEqual(sql, "delivery_card_id IN (:f0, :f1)")
+        self.assertEqual(params, {"f0": uuid.UUID(GUID), "f1": uuid.UUID(other)})
+
+    def test_filter_or_is_wrapped_and_binds_after_and(self) -> None:
+        t = self.s.table("product_policies")
+        sql, params = sc.parse_filter(t, "stage eq 'a' and product_code eq 'P1' or stage eq null")
+        self.assertEqual(sql, "(stage = :f0 AND product_code = :f1 OR stage IS NULL)")
+        self.assertEqual(params, {"f0": "a", "f1": "P1"})
+
+    def test_filter_in_limits(self) -> None:
+        t = self.s.table("product_policies")
+        for bad in ["stage in ()", "stage in ('a', null)", "stage in ('a'", f"stage in ({', '.join(['x'] * (sc.MAX_IN + 1))})", "stage eq 'a' and", "stage eq 'a' or"]:
+            with self.assertRaises(sc.BadRequest, msg=bad):
+                sc.parse_filter(t, bad)
+
     def test_filter_rejects_unsupported_syntax_and_sql_injection(self) -> None:
         t = self.s.table("products")
-        for bad in ["name eq 'a' or 1 eq 1", "name eq 'a'; drop table products", "contains(name,'a')", "nope eq 1"]:
+        # or が使えても、列でないもの(1 eq 1)は受け付けない
+        for bad in ["name eq 'a' or 1 eq 1", "name eq 'a'; drop table products", "contains(name,'a')", "nope eq 1", "name in ('a') ) or (1 eq 1"]:
             with self.assertRaises(sc.BadRequest, msg=bad):
                 sc.parse_filter(t, bad)
 
