@@ -37,7 +37,9 @@ import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
 import { PinFloat, type PinTarget } from './PinFloat'
-import { focusPin } from './pinStore'
+import { focusPin, focusedPin, subscribePins } from './pinStore'
+import { CardNotesService } from './data/cardNotes'
+import { stageOf } from './notesStage'
 import { forgetLinkedPin, linkedPin } from './pinActions'
 import { CopyLinkButton } from './CopyLinkButton'
 
@@ -229,6 +231,29 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   // AB テスト(全案を送る)は、案ごとに HTML を作る(案から選ぶは、決めた 1 案だけ)。直せるのは A 案の要素だけ(B・C 案の中身は配信カードで直す)
   const keys = productionVariants(snap)
   const cur: VariantKey = keys.includes(variant) ? variant : 'A'
+  // やり取りの札・ピンのリンクで書き込みを開いたとき、その書き込みを打った見せ方(制作した HTML / 企画の見本)と案に切り替える。
+  // 見せ方が違うとピンが出ず、どこへの書き込みか分からなかった(X65 (e))
+  const focus = useSyncExternalStore(subscribePins, focusedPin)
+  const keysRef = useRef(keys)
+  useEffect(() => {
+    keysRef.current = keys
+  })
+  useEffect(() => {
+    if (!focus) return
+    let alive = true
+    void CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}` }).then((r) => {
+      const n = r.success ? (r.data ?? []).find((x) => x.id === focus.noteId) : undefined
+      if (!alive || !n?.anchor || stageOf(n) !== 'production') return
+      const [ch, , v] = (n.anchor_view ?? '').split('|')
+      const want = ch === 'html-plan' ? 'plan' : ch === 'html-made' ? 'made' : null
+      if (!want) return
+      setPreviewView((o) => (o === want ? o : want))
+      if (v && (keysRef.current as string[]).includes(v)) setVariant(v as VariantKey)
+    })
+    return () => {
+      alive = false
+    }
+  }, [focus, card.id])
   const curSnap = snapshotOf(snap, cur)
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
