@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Button, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { ArrowUploadRegular, ImageMultipleRegular, ImageRegular } from '@fluentui/react-icons'
-import { ChoosePanel } from './ChoosePanel'
+import { ChooseDrawer } from './ChoosePanel'
 import { DropZone } from './DropZone'
 import { myName } from './history'
 import { PartUploadDialog } from './PartUploadDialog'
@@ -36,7 +36,7 @@ const useStyles = makeStyles({
 
 /**
  * 部品の画像のライブラリ(バナー・ボタン・ロゴ・アイコン。X59)から 1 枚選ぶ(テンプレートの画像・動画・ボタンの部品で使う)。
- * メイン画像の入れ替えと同じ「選び直す」の枠(ChoosePanel。SU3)で、ライブラリから選ぶか、持っている画像を上げる。
+ * メイン画像の入れ替えと同じ「選び直す」の枠(ChooseDrawer。SU3)で、ライブラリから選ぶか、持っている画像を上げる。
  * 選んだ画像の URL を返す(メールのプレビューは、ライブラリを読まずに、その URL で描ける)。期限の切れた画像は出さない
  */
 export function PartImagePick({ onPick }: { onPick: (img: { id: string; url: string; alt?: string }) => void }) {
@@ -66,66 +66,61 @@ export function PartImagePick({ onPick }: { onPick: (img: { id: string; url: str
   }
   return (
     <div className={s.root}>
-      {!open && (
-        <span>
-          <Button size="small" icon={<ImageRegular />} onClick={() => setOpen(true)}>
-            {t('ライブラリから選ぶ', 'Pick from the library')}
-          </Button>
-        </span>
-      )}
-      {open && (
-        <ChoosePanel
-          title={t('部品の画像を選ぶ', 'Choose a part image')}
-          onClose={() => setOpen(false)}
-          tabs={[
-            {
-              value: 'library',
-              label: t('ライブラリから', 'From the library'),
-              icon: <ImageMultipleRegular />,
-              content: (
-                <>
-                  <SearchField value={q} placeholder={t('名前・代替テキスト・タグで探す', 'Search name, alt text, tags')} onChange={setQ} count={list ? shown.length : undefined} autoFocus />
-                  {kinds.length > 1 && (
-                    <FilterChips
-                      allLabel={t('すべて', 'All')}
-                      toggle
-                      options={kinds.map((k) => ({ value: k, label: optionLabel(PartImageKind[k]) }))}
-                      value={kind}
-                      onChange={setKind}
-                    />
-                  )}
-                  {!list ? (
-                    <Spinner size="tiny" />
-                  ) : shown.length === 0 ? (
-                    <span className={s.note}>{t('使える部品の画像がありません(「アップロード」のタブで上げられます)', 'No usable part images (upload one in the Upload tab)')}</span>
-                  ) : (
-                    <div className={s.grid}>
-                      {shown.map((p) => (
-                        <button key={p.id} type="button" className={s.item} title={p.name} onClick={() => choose(p)}>
-                          <img className={s.img} src={partImage(p)} alt={p.alt_text ?? p.name} />
-                          <span className={s.name}>{p.name}</span>
-                          <span className={s.kind}>{optionLabel(p.kind_name ?? (p.kind ? PartImageKind[p.kind] : ''))}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ),
-            },
-            {
-              value: 'upload',
-              label: t('アップロード', 'Upload'),
-              icon: <ArrowUploadRegular />,
-              content: (
-                <>
-                  <DropZone accept=".png,.jpg,.jpeg,.webp,.avif" hint={t('持っている画像をここに落とす(PNG・JPEG・WebP・AVIF)', 'Drop your own image here (PNG, JPEG, WebP, AVIF)')} onFile={setUploading} />
-                  <span className={s.note}>{t('上げた画像は部品の画像のライブラリに入り、ここで選んだことになります。名前・代替テキストは AI が下書きします', 'The image goes into the part library and is picked here. AI drafts its name and alt text')}</span>
-                </>
-              ),
-            },
-          ]}
-        />
-      )}
+      {/* メイン画像・商品の差し替えと同じく、ボタンから選び直す枠を引き出す(もう一度押すか × で閉じる) */}
+      <ChooseDrawer
+        open={open}
+        onOpenChange={setOpen}
+        label={t('ライブラリから選ぶ', 'Pick from the library')}
+        icon={<ImageRegular />}
+        title={t('部品の画像を選ぶ', 'Choose a part image')}
+        tabs={[
+          {
+            value: 'library',
+            label: t('ライブラリから', 'From the library'),
+            icon: <ImageMultipleRegular />,
+            content: (
+              <>
+                <SearchField value={q} placeholder={t('名前・代替テキスト・タグで探す', 'Search name, alt text, tags')} onChange={setQ} count={list ? shown.length : undefined} autoFocus />
+                {kinds.length > 1 && (
+                  <FilterChips
+                    allLabel={t('すべて', 'All')}
+                    toggle
+                    options={kinds.map((k) => ({ value: k, label: optionLabel(PartImageKind[k]) }))}
+                    value={kind}
+                    onChange={setKind}
+                  />
+                )}
+                {!list ? (
+                  <Spinner size="tiny" />
+                ) : shown.length === 0 ? (
+                  <span className={s.note}>{t('使える部品の画像がありません(「アップロード」のタブで上げられます)', 'No usable part images (upload one in the Upload tab)')}</span>
+                ) : (
+                  <div className={s.grid}>
+                    {shown.map((p) => (
+                      <button key={p.id} type="button" className={s.item} title={p.name} onClick={() => choose(p)}>
+                        <img className={s.img} src={partImage(p)} alt={p.alt_text ?? p.name} />
+                        <span className={s.name}>{p.name}</span>
+                        <span className={s.kind}>{optionLabel(p.kind_name ?? (p.kind ? PartImageKind[p.kind] : ''))}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            value: 'upload',
+            label: t('アップロード', 'Upload'),
+            icon: <ArrowUploadRegular />,
+            content: (
+              <>
+                <DropZone accept=".png,.jpg,.jpeg,.webp,.avif" hint={t('持っている画像をここに落とす(PNG・JPEG・WebP・AVIF)', 'Drop your own image here (PNG, JPEG, WebP, AVIF)')} onFile={setUploading} />
+                <span className={s.note}>{t('上げた画像は部品の画像のライブラリに入り、ここで選んだことになります。名前・代替テキストは AI が下書きします', 'The image goes into the part library and is picked here. AI drafts its name and alt text')}</span>
+              </>
+            ),
+          },
+        ]}
+      />
       {uploading && (
         <PartUploadDialog
           market={null}
