@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button, MessageBar, MessageBarActions, MessageBarBody, MessageBarTitle, tokens } from '@fluentui/react-components'
 import { tr } from './i18n'
+import { Z } from './layers'
 
 interface Props {
   children: ReactNode
@@ -62,7 +63,7 @@ export class ErrorBoundary extends Component<Props, State> {
     )
     if (!this.props.overlay) return <div style={{ padding: 16 }}>{bar}</div>
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'start center', paddingTop: 80, backgroundColor: tokens.colorBackgroundOverlay }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: Z.errorOverlay, display: 'grid', placeItems: 'start center', paddingTop: 80, backgroundColor: tokens.colorBackgroundOverlay }}>
         <div style={{ width: 'min(640px, calc(100vw - 32px))' }}>{bar}</div>
       </div>
     )

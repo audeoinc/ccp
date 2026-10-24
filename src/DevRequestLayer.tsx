@@ -28,13 +28,18 @@ import {
 import { usePinAnchor } from './pinAnchor'
 import { PinThreadView } from './PinThreadView'
 import { locale, tr, useT } from './i18n'
+import { Z } from './layers'
 
 const PIN = 22
 
 const useStyles = makeStyles({
   // 画面の上に重ねる層。層は押せない(ピンだけ押せる)。配信カードなどのダイアログの上にも出すので、いちばん上に置き、
   // ほかのダイアログ・メニューに隠れた所のピンは出さない(devRequestPlace の uncovered)
-  layer: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1000001 },
+  layer: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: Z.devRequests },
+  // 層の置き場(Fluent の Portal が body の下に作る箱)。Fluent の置き場は、どれも z-index 1000000 で、あとから body に足したものが上になる。
+  // この層の置き場はアプリを開いたときに作るので、そのままでは、あとから開く配信カードなどのダイアログの下に隠れ、ピンが見えず押せなかった
+  // (2026-10-24)。置き場だけを一段上げ、どのダイアログよりも上にする(ダイアログに隠れた所のピンは、uncovered で出さない)
+  host: { zIndex: Z.devRequests },
   // レビューのピン(丸い吹き出し・橙)・アプリの色(紫)・アラートの色と見分けるため、ひし形の墨色に黄色の電球にする(2026-10-23 利用者。
   // 画面のどこにも使っていない組み合わせで、業務の印ではなく開発への付箋と分かるように)。明暗のテーマで反転しない色を使う。
   // 電球は、ピンとフロートの札だけ塗りにして目に付くように(メニュー・ヘッダーは線のまま。2026-10-23 利用者)
@@ -174,13 +179,6 @@ export function DevRequestLayer({ link, cardName }: Props) {
   // 開いたリクエストの目印を、画面に見えるところまで一度だけ送る(開き直すとスクロールが戻り、目印がペインの外に隠れていることがあるため)
   const scrolledTo = useRef<string | null>(null)
   const layerRef = useRef<HTMLDivElement>(null)
-  // Fluent の Portal の置き場は、どれも z-index 1000000 で、あとから body に足したものが上になる。この層の置き場はアプリを開いたときに作るので、
-  // あとから開く配信カードなどのダイアログの下に隠れ、ピンが見えず押せなかった(2026-10-24、一覧の「この画面を開く」で開いてもピンが出なかった)。
-  // 置き場だけを一段上げ、どのダイアログよりも上にする(ダイアログに隠れた所のピンは、uncovered で出さない)
-  useEffect(() => {
-    const host = layerRef.current?.parentElement
-    if (host && host !== document.body) host.style.zIndex = '1000001'
-  })
   const inFloat = /^(card|production|result):|^alerts$/.test(screen)
   useEffect(() => {
     const update = () => {
@@ -259,7 +257,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
 
   // テーマの色(CSS の変数)が届くよう、Fluent の Portal に出す(document.body に直接出すと、色が付かない)
   return (
-    <Portal>
+    <Portal mountNode={{ className: s.host }}>
     <div ref={layerRef} className={s.layer}>
       {ctx.menu}
       {spots.map((p) => {

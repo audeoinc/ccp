@@ -146,6 +146,7 @@ import { localDate } from './results'
 import { PREF } from './prefKeys'
 import { confirmDialog } from './confirm'
 import { ConfirmHost } from './ConfirmHost'
+import { Z } from './layers'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -179,7 +180,7 @@ const initialFilters = (): Filters => ({ ...noFilter, country: loadPref<string>(
 
 const useStyles = makeStyles({
   // ヘッダーと面の帯を、ひとまとめで上に留める
-  headerWrap: { position: 'sticky', top: 0, zIndex: 10, boxShadow: tokens.shadow2 },
+  headerWrap: { position: 'sticky', top: 0, zIndex: Z.header, boxShadow: tokens.shadow2 },
   header: {
     display: 'flex',
     flexWrap: 'wrap',

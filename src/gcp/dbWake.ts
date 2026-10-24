@@ -7,6 +7,7 @@
 import { appPath } from '../appRoot'
 import { PREF } from '../prefKeys'
 import { readRaw } from '../settings'
+import { Z } from '../layers'
 
 const POLL_MS = 4000
 const GIVE_UP_MS = 25 * 60 * 1000
@@ -43,7 +44,7 @@ export function showDbWake(detail?: string): void {
   const u = UNREACHABLE[lang()]
   const root = document.createElement('div')
   root.setAttribute('role', 'status')
-  root.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.92);font-family:Inter,"Noto Sans JP",system-ui,sans-serif;color:#242424'
+  root.style.cssText = `position:fixed;inset:0;z-index:${Z.dbWake};display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.92);font-family:Inter,"Noto Sans JP",system-ui,sans-serif;color:#242424`
   root.innerHTML = `
     <style>@keyframes ccp-spin{to{transform:rotate(360deg)}}</style>
     <div style="max-width:420px;padding:28px 32px;text-align:center">
