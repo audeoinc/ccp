@@ -45,7 +45,7 @@ async def plan(conn: Any, count: int) -> list[dict[str, Any]]:
 
 
 async def run(count: int, yes: bool) -> None:
-    async with get_engine().begin() as conn:
+    async with (await get_engine()).begin() as conn:
         picked = await plan(conn, count)
         if not picked:
             print("入れる画像がありません(これからの配信に、見本の写真のメインを使っている商品がない。または、もう期限が入っている)")
