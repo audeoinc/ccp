@@ -46,7 +46,7 @@ import { remapSectionTexts } from './tables'
 import { parsePushLink, tapComplete, type PushLink } from './pushLink'
 import { Splitter } from './Splitter'
 import { useStoredWidths } from './floatLayout'
-import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
+import { DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, swapNote, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
 import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
@@ -1502,8 +1502,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const from = products.find((p) => p.id === alert.productId)
     // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
     setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
-    const why = reason.trim()
-    setAlertNotes((prev) => [...prev, tr(`${from?.name ?? alert.label}: ${alert.detail}。${to.name} に差し替えた${why ? `。理由: ${why}` : ''}`, `${from?.name ?? alert.label}: ${alert.detail}. Replaced with ${to.name}.${why ? ` Reason: ${why}` : ''}`)])
+    setAlertNotes((prev) => [...prev, swapNote(from?.name ?? alert.label, to.name, { detail: alert.detail, why: reason })])
     setActAlert(null)
   }
   // 商品のフロートの「ほかの候補から選ぶ」(X47): 選定済みの商品と、残りの候補を入れ替える(中ペインの「選ぶ」と同じく、外した商品は候補に戻す)。
@@ -1514,15 +1513,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (!it || !c) return
     const from = products.find((p) => p.id === it.productId)
     const to = products.find((p) => p.id === c.productId)
-    const why = reason.trim()
     setItems((prev) => prev.map((i) => (i.key === itemKey ? { key: c.key, rowId: c.rowId, productId: c.productId, reason: c.reason, source: c.source } : i)))
     setCandidates((prev) => [{ ...it, section: c.section }, ...prev.filter((x) => x.key !== candKey)])
-    setAlertNotes((prev) => [
-      ...prev,
-      why
-        ? tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた。理由: ${why}`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}. Reason: ${why}`)
-        : tr(`${from?.name ?? ''} を ${to?.name ?? ''} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to?.name ?? ''}.`),
-    ])
+    setAlertNotes((prev) => [...prev, swapNote(from?.name ?? '', to?.name ?? '', { why: reason })])
   }
   // 商品のフロートで、この配信で使う画像を替える(X64。url が空なら、商品のマスタの画像に戻す)。確定は保存のとき
   const setItemImage = (itemKey: string, url: string, source: string) => {
@@ -1536,10 +1529,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const from = products.find((p) => p.id === it.productId)
     const why = reason.trim()
     setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
-    setAlertNotes((prev) => [
-      ...prev,
-      why ? tr(`${from?.name ?? ''} を ${to.name} に差し替えた。理由: ${why}`, `Replaced ${from?.name ?? ''} with ${to.name}. Reason: ${why}`) : tr(`${from?.name ?? ''} を ${to.name} に差し替えた`, `Replaced ${from?.name ?? ''} with ${to.name}.`),
-    ])
+    setAlertNotes((prev) => [...prev, swapNote(from?.name ?? '', to.name, { why })])
   }
   // 商品 ID → いちばん強いアラートの種類(中ペインの選定済みの行と、商品情報の行の札)
   const productAlertKinds = new Map([...alertByProduct].map(([id, a]) => [id, a.kind] as const))
@@ -1763,6 +1753,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             postponeForAlert()
           }}
           onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
+          aiCard={buildAiCard}
+          angle={form.copyAngle}
           onOpenSwap={
             floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction
               ? () => {

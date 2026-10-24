@@ -28,7 +28,8 @@ import { partKey, type PartRef } from './parts'
 import { PartAiChat } from './PartAiChat'
 import { ProductionMemo } from './ProductionMemo'
 import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
-import { AiPicks, ProductSwap, type Picks, type SwapAt } from './ProductSwap'
+import { ProductSwap, type SwapAt } from './ProductSwap'
+import { AiPicks, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
 
 const useStyles = makeStyles({

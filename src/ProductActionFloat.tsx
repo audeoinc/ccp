@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, Field, MessageBar, MessageBarBody, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { useRef, useState } from 'react'
+import { Badge, Button, Dialog, DialogBody, Field, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -7,9 +7,10 @@ import type { Product } from './models/products'
 import type { DeliveryProductSource as Source } from './models/deliveryProducts'
 import type { CardAlert, CardAlertKind } from './cardAlerts'
 import type { StockModel } from './alerts'
-import { replacementCandidates, suggestReplacements, type ReplacementCandidate } from './alertActions'
+import { replacementCandidates, type ReplacementCandidate } from './alertActions'
+import { ProductChooser } from './ProductChooser'
+import type { AiCard } from './aiSelect'
 import { ProductDetail } from './ProductDetail'
-import { Candidates } from './Candidates'
 import { LowStockBadge } from './ProductMarks'
 import { AutoTextarea } from './AutoTextarea'
 import { ImageThumb } from './ImageThumb'
@@ -19,7 +20,6 @@ import { OpenLink } from './LinkText'
 import { productUrl } from './links'
 import { productMarket } from './market'
 import { weeklyLimit } from './weeklyLimit'
-import { AiIcon } from './AiMark'
 import { getUiScale } from './uiScale'
 import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 
@@ -108,13 +108,17 @@ interface Props {
   onOpenAlerts?: () => void
   /** 選んでいる枠への操作(シンプルな配信カードで、プレビューの枠を選んでから一覧の商品を押したとき。「この枠の商品と入れ替える」など。SU1 ⑩) */
   slotAction?: { label: string; run: () => void }
+  /** AI に渡す、配信のいまの入力(差し替えの候補を AI に選んでもらうとき) */
+  aiCard: () => AiCard
+  /** 配信の切り口(AI に渡す) */
+  angle: string
   /** 入れ替えを、配信カードの画面の入れ替えの引き出しで行う(シンプルな配信カード。SU9)。渡すと、左の差し替えの候補の代わりに「入れ替える」を出す(別の入れ替え方を作らない) */
   onOpenSwap?: () => void
   onClose: () => void
 }
 
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, onOpenSwap, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, onOpenSwap, aiCard, angle, onClose }: Props) {
   const s = useStyles()
   const t = useT()
   // つかんで動かした量
@@ -129,25 +133,14 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
   const stockAlert = !!alert && (alert.kind === 'outOfStock' || alert.kind === 'lowStock' || overLimit)
   // モデルの使用期限(アラートの画面には出ない。この配信で使う画像を替えるか、商品を差し替えて直す)
   const imageAlert = alert?.kind === 'imageExpired'
-  const [picks, setPicks] = useState<{ c: ReplacementCandidate; reason: string }[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    if (!stockAlert || !product || !model || !card) return
-    let alive = true
+  // 差し替えの候補(在庫・週の上限のアラートから開いたとき): 在庫の見込みを確かめた、同じカテゴリの商品。AI はこの中から選ぶ
+  const [stockCandidates] = useState<ReplacementCandidate[] | undefined>(() => {
+    if (!stockAlert || !product || !model || !card) return undefined
     const when = scheduledAt ? new Date(scheduledAt).toISOString() : (card.scheduled_at ?? new Date().toISOString())
-    const candidates = replacementCandidates({ card, removed: product, products, model, inCard, when }).filter((c) => !overLimit || (weekUse?.get(c.product.id) ?? 0) < weeklyLimit(card))
-    suggestReplacements({ card, removed: product, candidates, ...(overLimit ? { why: tr(`この週に ${weeklyLimit(card)} 本を超えて載せている`, `featured in more than ${weeklyLimit(card)} deliveries this week`) } : {}) })
-      .then((r) => alive && setPicks(r))
-      .catch((e: unknown) => {
-        if (!alive) return
-        setError(e instanceof Error ? e.message : String(e))
-        setPicks([])
-      })
-    return () => {
-      alive = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    return replacementCandidates({ card, removed: product, products, model, inCard, when }).filter((c) => !overLimit || (weekUse?.get(c.product.id) ?? 0) < weeklyLimit(card))
+  })
+  // 差し替える理由(AI に渡す)
+  const swapWhy = !stockAlert ? undefined : overLimit ? tr(`この週に ${weeklyLimit(card)} 本を超えて載せている`, `featured in more than ${weeklyLimit(card)} deliveries this week`) : alert?.detail || tr('在庫が持たない見込み', 'likely to run out of stock')
 
   const kindName = (k: CardAlertKind) => ({ outOfStock: t('在庫切れの見込み', 'Out of stock (expected)'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy change'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over the weekly limit'), imageExpired: t('商品画像のモデルの使用期限', 'Model rights expired on the image') })[k]
   // 候補の商品の印(差し替えた先が、別のアラートにならないように)
@@ -270,60 +263,40 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     </div>
                   </div>
                 ) : (
-                <div className={s.left}>
-                  {stockAlert && (
-                    <div className={s.section}>
-                      <span className={s.sectionHead}>
-                        <AiIcon size={14} />
-                        {t('AI の差し替え案', 'AI replacement ideas')}
-                      </span>
-                      <span className={s.caption}>
-                        {overLimit
-                          ? t(`在庫があり、同じカテゴリで、この週にまだ ${weeklyLimit(card)} 本載せていない商品から`, `In stock, same category, fewer than ${weeklyLimit(card)} uses this week`)
-                          : t('在庫のある、同じカテゴリの商品から', 'In stock, same category')}
-                      </span>
-                      {error && (
-                        <MessageBar intent="error">
-                          <MessageBarBody>{error}</MessageBarBody>
-                        </MessageBar>
-                      )}
-                      {picks === null ? (
-                        <Spinner size="small" label={t('AI が候補を選んでいます', 'AI is choosing candidates')} />
-                      ) : picks.length === 0 ? (
-                        <span className={s.caption}>{t('条件に合う商品がありません。下の「ほかの商品を探す」から選んでください', 'No matching products. Search other products below.')}</span>
-                      ) : (
-                        picks.map(({ c, reason: why }) =>
-                          row(`ai:${c.product.id}`, c.product, focus.kind === 'ai' && focus.product.id === c.product.id, () => setFocus({ kind: 'ai', product: c.product, why }), why, c.weeksLeft !== undefined ? t(`配信日に ${c.weeksLeft.toFixed(1)} 週分`, `${c.weeksLeft.toFixed(1)} wks on the day`) : undefined),
-                        )
-                      )}
-                    </div>
-                  )}
-                  <div className={s.section}>
-                    <span className={s.sectionHead}>
-                      <ArrowSwapRegular />
-                      {t(`残りの候補(${options.length})`, `Remaining candidates (${options.length})`)}
-                    </span>
-                    {options.length === 0 ? (
-                      <span className={s.caption}>{t('このセクションの残りの候補はありません(中ペインの「AIで選ぶ」で案を出すと、ここに並びます)', 'No remaining candidates for this section (use "Select with AI" in the middle pane).')}</span>
-                    ) : (
-                      options.map((o) => row(`cand:${o.key}`, o.product, focus.kind === 'cand' && focus.key === o.key, () => setFocus({ kind: 'cand', key: o.key, product: o.product }), o.reason))
-                    )}
-                  </div>
-                  <div className={s.section}>
-                    <span className={s.sectionHead}>{t('ほかの商品を探す', 'Search other products')}</span>
-                    <Candidates
+                  // 選び直す枠は、シンプルな配信カードの入れ替え・アラートへの対応と同じ形(ProductChooser)。選ぶと、右に詳しい情報と「差し替える」
+                  <div className={s.left}>
+                    <ProductChooser
+                      title={t('ほかの商品を選ぶ', 'Choose another product')}
+                      frame={{ kind: 'panel' }}
+                      card={aiCard()}
+                      angle={angle}
+                      current={product}
                       products={poolProducts}
-                      usedIds={inCard}
-                      onAdd={() => undefined}
-                      onPick={(id) => {
-                        const p = poolProducts.find((x) => x.id === id)
-                        if (p) setFocus({ kind: 'search', product: p })
+                      inCard={poolProducts.filter((p) => inCard.has(p.id))}
+                      why={swapWhy}
+                      candidates={stockCandidates}
+                      // アラートから開いたときは AI のおすすめから、商品の行から開いたときは AI を呼ばずに残りの候補から
+                      defaultTab={stockAlert ? 'recommend' : options.length ? 'cands' : 'all'}
+                      extraTabs={[
+                        {
+                          value: 'cands',
+                          label: t(`残りの候補(${options.length})`, `Remaining (${options.length})`),
+                          content:
+                            options.length === 0 ? (
+                              <span className={s.caption}>{t('このセクションの残りの候補はありません(中ペインの「AIで選ぶ」で案を出すと、ここに並びます)', 'No remaining candidates for this section (use "Select with AI" in the middle pane).')}</span>
+                            ) : (
+                              <div className={s.section}>{options.map((o) => row(`cand:${o.key}`, o.product, focus.kind === 'cand' && focus.key === o.key, () => setFocus({ kind: 'cand', key: o.key, product: o.product }), o.reason))}</div>
+                            ),
+                        },
+                      ]}
+                      onPick={(id, why) => {
+                        const p = poolProducts.find((x) => x.id === id) ?? stockCandidates?.find((c) => c.product.id === id)?.product
+                        if (p) setFocus(why ? { kind: 'ai', product: p, why } : { kind: 'search', product: p })
                       }}
-                      pickedId={focus.kind === 'search' ? focus.product.id : undefined}
+                      pickedId={focus.kind === 'current' ? undefined : focus.product.id}
                       marks={marks}
                     />
                   </div>
-                </div>
                 )}
 
                 {/* 右: 選んでいる商品の詳しい情報(最初は、いまの商品) */}

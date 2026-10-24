@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Field, Input, MessageBar, MessageBarBody, Spinner, Switch, Textarea, makeStyles, tokens } from '@fluentui/react-components'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { WeekRow } from './data/weeks'
-import { AiIcon } from './AiMark'
-import { postponeDelivery, replaceProduct, suggestReplacements, type ReplacementCandidate } from './alertActions'
+import { postponeDelivery, replaceProduct, replacementCandidates, type ReplacementCandidate } from './alertActions'
+import { ProductChooser } from './ProductChooser'
+import { aiCardOfSaved } from './bulkDraft'
 import { cancelDelivery } from './cancel'
 import { LOW_STOCK_WEEKS, type Placement, type StockModel } from './alerts'
-import { locale, priceText, useT } from './i18n'
+import { locale, useT } from './i18n'
 import { productImage } from './images'
 import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { statusRank } from './status'
@@ -22,13 +23,6 @@ const useStyles = makeStyles({
   // 差し替えられる側の商品(画像・名前・いまの在庫)
   replacing: { display: 'inline-flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   replacingImg: { width: '32px', height: '32px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
-  picks: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '12px', rowGap: '12px' },
-  pick: { display: 'grid', gridTemplateColumns: '84px minmax(0, 1fr)', columnGap: '10px', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
-  img: { width: '84px', height: '84px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
-  pickBody: { display: 'grid', rowGap: '2px', alignContent: 'start', fontSize: tokens.fontSizeBase200, minWidth: 0 },
-  pickName: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  pickReason: { color: tokens.colorNeutralForeground2 },
-  pickUse: { justifySelf: 'start', marginTop: '4px' },
   row: { display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', columnGap: '16px', rowGap: '8px' },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
 })
@@ -51,9 +45,6 @@ interface Props {
 const STATUS_APPROVED = 'approved'
 /** 在庫の数の表記(なければ 0) */
 const num = (v?: number) => Math.round(v ?? 0).toLocaleString()
-const US = 'US'
-const US_MARKET = 'US'
-const JP_MARKET = 'JP'
 
 /** datetime-local の値(ブラウザの時刻) */
 const localInput = (d: Date) => {
@@ -82,7 +73,6 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const [backToReview, setBackToReview] = useState(approved)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [picks, setPicks] = useState<{ c: ReplacementCandidate; reason: string }[] | null>(null)
   const [to, setTo] = useState(() => {
     const d = new Date(card.scheduled_at ?? Date.now())
     d.setDate(d.getDate() + 7)
@@ -91,32 +81,10 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const when = card.scheduled_at ?? new Date().toISOString()
   const rows = (placements.get(card.id) ?? []).filter((p) => p.productId === product?.id)
 
-  // 差し替えの候補: 配信の国の市場の、同じカテゴリの商品で、配信日に在庫が持つもの(この配信に載っている商品は除く)
-  useEffect(() => {
-    if (mode !== 'replace' || !product) return
-    const market = card.country === US ? US_MARKET : JP_MARKET
-    const inCard = new Set((placements.get(card.id) ?? []).map((p) => p.productId))
-    const candidates: ReplacementCandidate[] = products
-      .filter((p) => p.market === market && p.category === product.category && !inCard.has(p.id))
-      .map((p) => {
-        const { projected, weeksLeft } = model.projectAt(p, when, card.id)
-        return { product: p, projected, weeksLeft, ...model.exposures(p.id, when) }
-      })
-      .filter((c) => c.projected - model.upliftOf(c.product) > 0 && (c.weeksLeft === undefined || c.weeksLeft >= LOW_STOCK_WEEKS))
-    let alive = true
-    suggestReplacements({ card, removed: product, candidates })
-      .then((r) => alive && setPicks(r))
-      .catch((e: unknown) => {
-        if (!alive) return
-        setError(e instanceof Error ? e.message : String(e))
-        setPicks([])
-      })
-    return () => {
-      alive = false
-    }
-    // 開いたときに 1 回だけ選ぶ(在庫の見込みが読み直されても、提案は変えない)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, card.id, product?.id])
+  // 差し替えの候補: 配信の国の市場の、同じカテゴリの商品で、配信日に在庫が持つもの(この配信に載っている商品は除く)。
+  // 配信カードの中の差し替えと同じ決め方(replacementCandidates)。開いたときに 1 回だけ決める(在庫の見込みが読み直されても、候補は変えない)
+  const inCardIds = new Set((placements.get(card.id) ?? []).map((p) => p.productId))
+  const [candidates] = useState<ReplacementCandidate[]>(() => (mode === 'replace' && product ? replacementCandidates({ card, removed: product, products, model, inCard: inCardIds, when }) : []))
 
   const run = async (fn: () => Promise<void>, message: string) => {
     if (!reason.trim()) {
@@ -141,7 +109,6 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const postpone = () =>
     run(() => postponeDelivery({ card, to, reason, backToReview, weeks }), t(`${card.name} を ${new Date(to).toLocaleDateString(locale())} に延期しました`, `Postponed ${card.name} to ${new Date(to).toLocaleDateString(locale())}`))
 
-  const market = card.country === US ? 'US' : 'JP'
   return (
     <div className={styles.root}>
       <div className={styles.head}>
@@ -165,35 +132,26 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
               {t(`差し替える商品: ${product.name} ・ いまの在庫 ${num(product.stock)}`, `Replacing: ${product.name} · Stock now ${num(product.stock)}`)}
             </span>
           )}
-          <span className={styles.sub}>
-            <AiIcon size={14} /> {t(`AI の提案(在庫のある、同じカテゴリの商品。配信日に ${LOW_STOCK_WEEKS} 週分以上ある見込みのもの)`, `AI suggestions (in stock, same category, ${LOW_STOCK_WEEKS}+ weeks on the day)`)}
-          </span>
-          {picks === null ? (
-            <Spinner size="small" label={t('AI が候補を選んでいます', 'AI is choosing candidates')} />
-          ) : picks.length === 0 ? (
+          {/* 選び直す枠は、配信カードの中の差し替えと同じ形(AI のおすすめ / AI に頼む / すべての商品)。AI は在庫の見込みを確かめた候補から選ぶ */}
+          {candidates.length === 0 ? (
             <span className={styles.sub}>{t('条件に合う商品がありません。配信カードを開いて、ほかのカテゴリから選んでください', 'No matching products. Open the delivery card to choose from other categories.')}</span>
           ) : (
-            <div className={styles.picks}>
-              {picks.map(({ c, reason: why2 }) => (
-                <div key={c.product.id} className={styles.pick}>
-                  <img className={styles.img} src={productImage(c.product)} alt={c.product.name} />
-                  <div className={styles.pickBody}>
-                    <span className={styles.pickName} title={c.product.name}>{c.product.name}</span>
-                    <span>{priceText(c.product.price, market)}</span>
-                    {/* いまの在庫の数と、配信日に何週分残るかを、同じ行で読めるように */}
-                    <span>
-                      {t(`いまの在庫 ${num(c.product.stock)}`, `Stock now ${num(c.product.stock)}`)}
-                      {c.weeksLeft !== undefined && t(` ・ 配信日に ${c.weeksLeft.toFixed(1)} 週分`, ` · ${c.weeksLeft.toFixed(1)} wks on the day`)}
-                    </span>
-                    <span className={styles.sub}>{t(`載せた回数 今週 ${c.thisWeek} ・ 前週 ${c.lastWeek}`, `Featured: this wk ${c.thisWeek} · last wk ${c.lastWeek}`)}</span>
-                    {why2 && <span className={styles.pickReason}>{why2}</span>}
-                    <Button className={styles.pickUse} size="small" appearance="primary" disabled={busy || rows.length === 0} onClick={() => void use(c.product)}>
-                      {t('使う', 'Use')}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ProductChooser
+              title={t(`差し替える商品を選ぶ(在庫のある同じカテゴリ。配信日に ${LOW_STOCK_WEEKS} 週分以上)`, `Choose a replacement (same category, ${LOW_STOCK_WEEKS}+ weeks of stock on the day)`)}
+              frame={{ kind: 'panel' }}
+              card={aiCardOfSaved(card)}
+              angle=""
+              current={product}
+              products={candidates.map((c) => c.product)}
+              inCard={products.filter((p) => inCardIds.has(p.id))}
+              why={why}
+              candidates={candidates}
+              disabled={busy || rows.length === 0}
+              onPick={(id) => {
+                const to = candidates.find((c) => c.product.id === id)?.product
+                if (to) void use(to)
+              }}
+            />
           )}
         </>
       )}

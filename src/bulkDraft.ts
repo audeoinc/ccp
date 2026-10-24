@@ -66,6 +66,11 @@ function aiCardOf(c: DraftBase): AiCard {
   }
 }
 
+/** 保存した配信の、AI に渡す基本情報(アラートへの対応で、差し替えの候補を AI に選んでもらうとき) */
+export function aiCardOfSaved(c: DeliveryCard): AiCard {
+  return { ...aiCardOf(c), theme: c.theme ?? '', headline: c.headline ?? '', copy: c.copy ?? '', instructions: c.instructions ?? '' }
+}
+
 export interface DraftContext {
   products: Product[]
   heroes: HeroImage[]

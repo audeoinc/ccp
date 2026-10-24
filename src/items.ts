@@ -1,4 +1,4 @@
-import { priceText } from './i18n'
+import { priceText, tr } from './i18n'
 import type { DeliveryProductSource as Source } from './models/deliveryProducts'
 
 export const SOURCE_AI: Source = 'ai'
@@ -40,3 +40,15 @@ export interface Candidate extends Item {
 export const STATE_SELECTED = 'selected'
 export const STATE_CANDIDATE = 'candidate'
 export const DND_CAND = 'application/x-candidate' // 中ペインの候補の行(値は Candidate.key)
+
+/**
+ * 商品を差し替えたときの、配信のメモの文(差し替えのどの道 — アラートへの対応・残りの候補と入れ替え・ほかの商品に置き換え — でも同じ形。2026-10-24 の整理)。
+ * detail はアラートの中身(在庫が持たない見込み など)、why は人が書いた理由(任意)
+ */
+export function swapNote(from: string, to: string, opts: { detail?: string; why?: string } = {}): string {
+  const why = opts.why?.trim()
+  return tr(
+    `${from} を ${to} に差し替えた${opts.detail ? `(${opts.detail})` : ''}${why ? `。理由: ${why}` : ''}`,
+    `Replaced ${from} with ${to}${opts.detail ? ` (${opts.detail})` : ''}.${why ? ` Reason: ${why}` : ''}`,
+  )
+}

@@ -46,20 +46,6 @@ export function mockAgent(message: string): string {
     return { mode: 'update', reply: hasJa(last) ? jaDefault : enDefault }
   }
 
-  // 差し替えの候補: 今週・前週の訴求が少なく、在庫に余裕のある順に 3 つ
-  if (task === 'suggest_replacements') {
-    type C = { id: string; name: string; price?: number; weeksLeft: number | null; thisWeek: number; lastWeek: number }
-    const cs = [...((p.candidates as C[] | undefined) ?? [])].sort((a, b) => a.thisWeek + a.lastWeek - (b.thisWeek + b.lastWeek) || (b.weeksLeft ?? 0) - (a.weeksLeft ?? 0)).slice(0, 3)
-    return J({
-      picks: cs.map((c) => ({
-        id: c.id,
-        reason: en
-          ? `${c.weeksLeft ?? '-'} weeks of stock on the day; featured ${c.thisWeek + c.lastWeek} times this/last week.`
-          : `配信日に在庫 ${c.weeksLeft ?? '-'} 週分。今週・前週の訴求は ${c.thisWeek + c.lastWeek} 回。`,
-      })),
-    })
-  }
-
   // 並べた配信の評価: 1 通あたりの売上の高い・低い配信と、ばらつきの大きい位置から、決まった形の文を作る
   if (task === 'compare_results') {
     type D = { id: string; date: string; name: string; slots?: string[]; kpis: { revenuePerRecipient?: number; clickRate?: number }; positions?: Record<string, number> }
@@ -274,12 +260,18 @@ export function mockAgent(message: string): string {
     const ja = hasJa(req)
     if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? 'テーマに合っています。もう少し明るい画像にすると、季節感が伝わりやすくなります。' : 'It fits the theme. A brighter image would convey the season better.' })
     const hero = task === 'suggest_part_hero'
-    const list = ((hero ? p.heroes : p.products) as { code?: string; name?: string; stock?: number }[] | undefined) ?? []
-    const picks = hero ? list.slice(0, 3) : [...list].sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0)).slice(0, 3)
-    const why = (x: { name?: string; stock?: number }) =>
+    type X = { code?: string; name?: string; stock?: number; weeksLeft?: number | null; thisWeek?: number; lastWeek?: number }
+    const list = ((hero ? p.heroes : p.products) as X[] | undefined) ?? []
+    // 在庫の見込みを確かめた候補(アラートからの差し替え)なら、今週・前週の訴求が少なく、在庫に余裕のある順
+    const seen = (x: X) => (x.thisWeek ?? 0) + (x.lastWeek ?? 0)
+    const stockFirst = list.some((x) => x.thisWeek !== undefined)
+    const picks = hero ? list.slice(0, 3) : [...list].sort((a, b) => (stockFirst ? seen(a) - seen(b) || (b.weeksLeft ?? 0) - (a.weeksLeft ?? 0) : (b.stock ?? 0) - (a.stock ?? 0))).slice(0, 3)
+    const why = (x: X) =>
       hero
         ? ja ? `「${req}」に近い、${x.name ?? ''}を選びました。` : `${x.name ?? ''} is closest to "${req}".`
-        : ja ? `在庫 ${x.stock ?? '-'} で、「${req}」に合います。` : `Stock ${x.stock ?? '-'}; fits "${req}".`
+        : stockFirst
+          ? ja ? `配信日に在庫 ${x.weeksLeft ?? '-'} 週分。今週・前週の訴求は ${seen(x)} 回。` : `${x.weeksLeft ?? '-'} weeks of stock on the day; featured ${seen(x)} times this/last week.`
+          : ja ? `在庫 ${x.stock ?? '-'} で、「${req}」に合います。` : `Stock ${x.stock ?? '-'}; fits "${req}".`
     return J({ mode: 'update', reply: ja ? `「${req}」に合う候補を 3 つ選びました。` : `Here are three picks for "${req}".`, ideas: picks.map((x) => ({ code: x.code, why: why(x) })) })
   }
 

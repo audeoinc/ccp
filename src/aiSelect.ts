@@ -306,7 +306,6 @@ export const TASK_TARGETS: Record<string, string[]> = {
   suggest_themes: ['theme'],
   select_section: ['selection', 'headline', 'copy'],
   select_section_products: ['selection'],
-  suggest_replacements: ['selection'],
   select_hero: ['hero'],
   select_section_titles: ['headline'],
   select_section_copies: ['copy'],

@@ -2,6 +2,7 @@ import { askAgent, heroPayload, productPayload, type AiCard } from '../aiSelect'
 import { tr } from '../i18n'
 import type { HeroImage } from '../models/heroImages'
 import type { Product } from '../models/products'
+import type { ReplacementCandidate } from '../alertActions'
 
 /** AI の案の 1 つ。value は、文言なら新しい文言、メイン画像・商品なら id */
 export interface PartIdea {
@@ -60,13 +61,15 @@ ${COMMON}
 
 const PRODUCT_PROMPT = `あなたは、メールマガジンに載せる商品を選ぶ手伝いをする。担当者は、1 つの枠(current = いまの商品。空の枠なら null)を見て「在庫の多いものに」のように頼む。
 入力の products が選べる商品(code・name・category・price・stock・season・salesTrend・rating・description・md)、in_card がこの配信に載せている商品の名前。
+why があれば、いまの商品を差し替える理由(例: 在庫が持たない見込み・週の上限を超えた)。products に weeksLeft(配信日に在庫が何週分残るか)・thisWeek・lastWeek(今週・前週に配信に載せた回数)があれば、在庫の見込みを確かめた候補。
 ${COMMON}
 次の JSON だけを返す:
 {"mode":"update","reply":"依頼にどう応えたかを 1 文で","ideas":[{"code":"products の code","why":"この商品を選んだ理由を 1 文で(在庫・価格など、数字の根拠があれば添える)"}]}
 
 決まり:
-1. ideas は 3 つまで。code は必ず products の中から選ぶ。in_card の商品は選ばない。
-2. 依頼に合うものを、テーマと季節に合い、在庫のある商品から優先する。
+1. ideas は 3 つまで。code は必ず products の中から選ぶ。in_card の商品は選ばない。ふさわしい順に並べる。
+2. 依頼に合うものを、テーマと季節に合い、在庫のある商品から優先する。current があれば、その役割(価格帯・見せ方)に近いものを選ぶ。
+3. weeksLeft があれば、余裕のあるものを選び、thisWeek・lastWeek の多い商品は、なるべく避ける。why の理由を、選んだ商品で繰り返さない(在庫が理由なら、在庫に余裕のあるものを)。
 
 入力:
 `
@@ -132,26 +135,62 @@ export async function askHeroPick(args: { card: AiCard; angle: string; current?:
   return finish(out, ideas)
 }
 
-/** 枠の商品を、頼んだとおりに選び直した案をもらう(案の value は商品の id) */
-export async function askProductPick(args: { card: AiCard; angle: string; current?: Product; products: Product[]; inCard: Product[]; request: string; history: PartTurn[] }): Promise<PartAnswer> {
+/** AI が使えないときの候補: 在庫の見込みを確かめた候補のうち、訴求(今週・前週に載せた回数)が少なく、在庫に余裕のある順に 3 つ */
+const byRule = (candidates: ReplacementCandidate[]): PartIdea[] =>
+  [...candidates]
+    .sort((a, b) => a.thisWeek + a.lastWeek - (b.thisWeek + b.lastWeek) || (b.weeksLeft ?? 0) - (a.weeksLeft ?? 0))
+    .slice(0, 3)
+    .map((c) => ({ value: c.product.id, why: '' }))
+
+/**
+ * 枠の商品を選び直す案をもらう(案の value は商品の id)。商品の差し替えで AI に聞くのは、すべてここ 1 つ
+ * (2026-10-24 の整理。以前はアラートからの差し替えに別の聞き方 suggestReplacements があった)。
+ * why = 差し替える理由(アラートなど)、request = 担当者の頼みごと(「AI に頼む」)。どちらか、または両方。
+ * candidates を渡すと、その中(在庫の見込みを確かめた、同じカテゴリの商品。alertActions の replacementCandidates)からだけ選び、
+ * AI が使えないときも、決まった並べ方で 3 つ返す
+ */
+export async function askProductPick(args: {
+  card: AiCard
+  angle: string
+  current?: Product
+  products: Product[]
+  inCard: Product[]
+  request: string
+  history: PartTurn[]
+  why?: string
+  candidates?: ReplacementCandidate[]
+}): Promise<PartAnswer> {
   const inCard = new Set(args.inCard.map((p) => p.id))
-  const pool = args.products.filter((p) => !inCard.has(p.id) && (p.stock ?? 1) > 0).slice(0, MAX_PRODUCTS)
+  const facts = new Map((args.candidates ?? []).map((c) => [c.product.id, c]))
+  const pool = (args.candidates ? args.candidates.map((c) => c.product) : args.products).filter((p) => !inCard.has(p.id) && (p.stock ?? 1) > 0).slice(0, MAX_PRODUCTS)
+  if (args.candidates && pool.length === 0) return { reply: tr('条件に合う商品がありません', 'No products match'), ideas: [], answered: false }
   const byCode = new Map(pool.map((p) => [p.product_code, p.id]))
   const nameOf = (id: string) => args.products.find((p) => p.id === id)?.name ?? id
-  const out = await askAgent(PRODUCT_PROMPT, {
-    task: 'suggest_part_product',
-    card: { ...args.card, angle: args.angle },
-    current: args.current ? productPayload(args.current) : null,
-    products: pool.map(productPayload),
-    in_card: args.inCard.map((p) => p.name),
-    request: args.request,
-    chat: historyOf(args.history, nameOf),
-  })
-  const ideas = readIdeas(out, 'code').flatMap((x) => {
-    const id = byCode.get(x.value)
-    return id ? [{ value: id, why: x.why }] : []
-  })
-  return finish(out, ideas)
+  const payload = (p: Product) => {
+    const c = facts.get(p.id)
+    return c ? { ...productPayload(p), weeksLeft: c.weeksLeft === undefined ? null : Math.round(c.weeksLeft * 10) / 10, thisWeek: c.thisWeek, lastWeek: c.lastWeek } : productPayload(p)
+  }
+  try {
+    const out = await askAgent(PRODUCT_PROMPT, {
+      task: 'suggest_part_product',
+      card: { ...args.card, angle: args.angle },
+      current: args.current ? productPayload(args.current) : null,
+      ...(args.why ? { why: args.why } : {}),
+      products: pool.map(payload),
+      in_card: args.inCard.map((p) => p.name),
+      request: args.request,
+      chat: historyOf(args.history, nameOf),
+    })
+    const ideas = readIdeas(out, 'code').flatMap((x) => {
+      const id = byCode.get(x.value)
+      return id ? [{ value: id, why: x.why }] : []
+    })
+    if (args.candidates && ideas.length === 0 && out.mode !== 'answer') return { reply: '', ideas: byRule(args.candidates), answered: false }
+    return finish(out, ideas)
+  } catch (e) {
+    if (args.candidates) return { reply: '', ideas: byRule(args.candidates), answered: false }
+    throw e
+  }
 }
 
 /** 配信の全体への依頼で、まとめて変える文言(変えないものは入れない) */

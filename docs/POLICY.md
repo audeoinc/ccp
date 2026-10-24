@@ -80,7 +80,7 @@
 | 対象(`対象` に書く名前) | CCP の依頼(`task`) | 渡すもの |
 |---|---|---|
 | `theme` | `suggest_themes` | 販売系の `all` の行(重点)、`theme` の決まり |
-| `selection` | `select_section`・`select_section_products`・`suggest_replacements` | 販売系の `product` / `category` の行(商品の候補に付ける)、`selection` の決まり |
+| `selection` | `select_section`・`select_section_products`・`suggest_part_product`(商品の差し替え・選び直し) | 販売系の `product` / `category` の行(商品の候補に付ける)、`selection` の決まり |
 | `hero` | `select_hero` | `hero` の決まり |
 | `headline` | `select_section_titles`・`select_section`(見出し)・`suggest_copies`(ヘッドライン) | `headline` の決まり |
 | `copy` | `select_section_copies`・`select_section`(コピー)・`suggest_copies`・`suggest_push` | `copy` の決まり |
