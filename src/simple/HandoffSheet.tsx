@@ -4,6 +4,7 @@ import { AttachRegular, ChevronDownRegular, ChevronUpRegular, OpenRegular, SendR
 import { AutoTextarea } from '../AutoTextarea'
 import { CreativeAssets } from '../CreativeAssets'
 import { loadPref, savePref } from '../settings'
+import { PREF } from '../prefKeys'
 import { MarkdownLite } from '../MarkdownLite'
 import { CardAssetsService } from '../data/cardAssets'
 import { DeliveryCardsService } from '../data/deliveryCards'
@@ -17,7 +18,7 @@ import { askPartRewrite, type PartTurn } from './partAi'
 import type { SimpleEditor } from './editor'
 
 // 参考の素材の欄の開閉(人の設定)
-const ASSETS_KEY = 'simpleCard.handoffAssetsOpen'
+const ASSETS_KEY = PREF.simpleHandoffAssetsOpen
 
 const useStyles = makeStyles({
   root: { display: 'grid', alignContent: 'start', rowGap: '18px', maxWidth: '760px' },

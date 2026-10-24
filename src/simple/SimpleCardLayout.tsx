@@ -25,6 +25,7 @@ import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
+import { PREF } from '../prefKeys'
 import { getTemplate } from '../templates'
 import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
@@ -47,15 +48,15 @@ import { SenderName } from '../SenderName'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
-const WIDTH_KEY = 'simpleCard.paneWidths.v2'
-const PRODUCTS_KEY = 'simpleCard.productsOpen'
+const WIDTH_KEY = PREF.simplePaneWidths
+const PRODUCTS_KEY = PREF.simpleProductsOpen
 const RAIL_W = 32
 type Widths = { mobile: number; pc: number; list: number; comm: number; hand: number }
 const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, hand: 400 }
 // 左のバーと、開くパネル(SU4。2026-10-24 利用者と決めた。以前は右端にあり、気づかれなかった)。
 // 配信の全体にかかわる情報とメニュー(やり取り・承認の様子・素材・渡すもの・変更の記録)をここにまとめ、真ん中は作業する場所にする。
 // VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。どれを開いていたかと幅は、人ごとに覚える
-const SIDE_KEY = 'simpleCard.sidePanel'
+const SIDE_KEY = PREF.simpleSidePanel
 type Side = CommSection | 'alerts' | 'learn' | 'assets' | 'handoff' | null
 const isComm = (v: Side): v is CommSection => v === 'talk' || v === 'approval' || v === 'history'
 // 右端にあったころの「comm」は、やり取りとして開く

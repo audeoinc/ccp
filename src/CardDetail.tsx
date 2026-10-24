@@ -52,7 +52,8 @@ import { progressOf } from './progress'
 import { ResizeHandles } from './ResizeHandles'
 import { campaignId, campaignSlug, encodeLinks, productContent, fcmText, linkSlots, linksComplete, parseLinks, productUrl, screenOf, withUtm, type LinkSlot, type Links, utmFor, variantCampaign } from './links'
 import { LinkOverlay } from './LinkOverlay'
-import { loadAutoDraft, loadPref, loadSimpleCard, savePref, saveSimpleCard } from './settings'
+import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
+import { PREF } from './prefKeys'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import type { WeekRow } from './data/weeks'
@@ -247,20 +248,17 @@ function OptionSelect({ label, value, options, onChange }: {
   )
 }
 
-// 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない
-const ZOOM_KEY = 'cardDetail.previewZoom.v2'
+// 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない(鍵は prefKeys.ts)
+const ZOOM_KEY = PREF.cardPreviewZoom
 const ZOOM_MIN = 0.15  // 長いテンプレートも、「全体」で収まるように、小さくできる
 const ZOOM_MAX = 1.2
 
 /** プレビューの倍率: 数値(1 = 現在のサイズ)または 'fit'(メール全体を画面の高さに収める) */
 function loadZoom(): number | 'fit' {
-  try {
-    const v = JSON.parse(localStorage.getItem(ZOOM_KEY) ?? 'null')
-    if (v === 'fit') return 'fit'
-    if (typeof v === 'number' && v >= ZOOM_MIN && v <= ZOOM_MAX) return v
-  } catch {
-    // 読めなければ既定値を使う
-  }
+  // 読めなければ既定値を使う
+  const v = loadPref<unknown>(ZOOM_KEY, null)
+  if (v === 'fit') return 'fit'
+  if (typeof v === 'number' && v >= ZOOM_MIN && v <= ZOOM_MAX) return v
   // 既定は、メール全体が見える倍率(作り始めに、構成の全体を見渡せるように)
   return 'fit'
 }
@@ -269,9 +267,9 @@ function loadZoom(): number | 'fit' {
 const autoDrafted = new Set<string>()
 
 // 4 つめの幅(右端のプロセスのペイン)を足したので、版を上げた(2026-10-17)
-const WIDTH_KEY = 'cardDetail.paneWidths.v6'
+const WIDTH_KEY = PREF.cardPaneWidths
 // ダイアログの大きさ(辺・角のドラッグで変える。null は既定の大きさ)
-const SIZE_KEY = 'cardDetail.size'
+const SIZE_KEY = PREF.cardSize
 const MIN_DIALOG = { w: 900, h: 560 }
 type DialogSize = { w: number; h: number }
 const clampSize = (s: DialogSize): DialogSize => ({
@@ -279,22 +277,14 @@ const clampSize = (s: DialogSize): DialogSize => ({
   h: Math.round(Math.min(viewHeight(), Math.max(MIN_DIALOG.h, s.h))),
 })
 // 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
-const INFO_KEY = 'cardDetail.infoOpen.v2'
+const INFO_KEY = PREF.cardInfoOpen
 const RAIL_W = 32
 // 右端のプロセスのペイン(状態・承認・やり取り)の開閉。既定は開く
-const PROCESS_KEY = 'cardDetail.processOpen.v1'
+const PROCESS_KEY = PREF.cardProcessOpen
 
 /** 商品情報ペインを開くか。保存がなければ、開いておく(選んだ商品の売上・在庫を、すぐ確かめられるように) */
-function loadInfoOpen(): boolean {
-  try {
-    const v = localStorage.getItem(INFO_KEY)
-    if (v === 'open') return true
-    if (v === 'closed') return false
-  } catch {
-    // 保存を読めないときは、既定(開く)にする
-  }
-  return true
-}
+// 保存は 'open' / 'closed' の文字のまま(以前からの形)。読めないときは、既定(開く)にする
+const loadInfoOpen = (): boolean => readRaw(INFO_KEY) !== 'closed'
 const MIN_W = 220
 const MAX_W = 640
 const clamp = (v: number) => Math.min(MAX_W, Math.max(MIN_W, v))
@@ -303,16 +293,7 @@ const clamp = (v: number) => Math.min(MAX_W, Math.max(MIN_W, v))
 const MIN_PREVIEW = 320
 const clampMid = (v: number, max = 4000) => Math.min(Math.max(MIN_W, max), Math.max(MIN_W, v))
 
-function loadOpen(key: string): boolean {
-  try {
-    const v = localStorage.getItem(key)
-    if (v === 'open') return true
-    if (v === 'closed') return false
-  } catch {
-    // 保存を読めないときは、既定(開く)にする
-  }
-  return true
-}
+const loadOpen = (key: string): boolean => readRaw(key) !== 'closed'
 
 type Widths = [number, number, number, number]
 function readWidths(v: unknown): Widths {
@@ -533,10 +514,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // プレビューの倍率(15〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
   const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
   // メールのプレビューの幅(X3。スマホ / PC。ブラウザごとに覚える)
-  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'pc'>(() => loadPref<'mobile' | 'pc'>('cardDetail.previewDevice', 'mobile'))
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'pc'>(() => loadPref<'mobile' | 'pc'>(PREF.cardPreviewDevice, 'mobile'))
   const pickDevice = (d: 'mobile' | 'pc') => {
     setPreviewDevice(d)
-    savePref('cardDetail.previewDevice', d)
+    savePref(PREF.cardPreviewDevice, d)
   }
   const [fitZoom, setFitZoom] = useState(1)
   // 「すべてAIで下書き」の進み具合(実行中だけ、画面全体に「推論中」を出す)
@@ -631,20 +612,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [processOpen, setProcessOpen] = useState<boolean>(() => loadOpen(PROCESS_KEY))
   const toggleProcess = () =>
     setProcessOpen((open) => {
-      try {
-        localStorage.setItem(PROCESS_KEY, open ? 'closed' : 'open')
-      } catch {
-        // 保存できなくても動作には影響しない
-      }
+      writeRaw(PROCESS_KEY, open ? 'closed' : 'open')
       return !open
     })
   const toggleInfo = () =>
     setInfoOpen((open) => {
-      try {
-        localStorage.setItem(INFO_KEY, open ? 'closed' : 'open')
-      } catch {
-        // 保存できなくても動作には影響しない
-      }
+      writeRaw(INFO_KEY, open ? 'closed' : 'open')
       return !open
     })
   const [saving, setSaving] = useState(false)
@@ -763,11 +736,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
 
   useEffect(() => {
-    try {
-      localStorage.setItem(ZOOM_KEY, JSON.stringify(zoom))
-    } catch {
-      // 保存できなくても動作には影響しない
-    }
+    savePref(ZOOM_KEY, zoom)
   }, [zoom])
 
   // 全体表示: 倍率 1 での高さを測り、プレビューの枠に収まる倍率を求める(内容や窓の大きさが変わったら、測り直す)
