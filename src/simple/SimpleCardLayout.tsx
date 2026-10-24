@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
@@ -226,6 +226,8 @@ interface Props {
 export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply, onUndo, onRunNext, onClose }: Props) {
   const t = useT()
   const s = useStyles()
+  // 商品の引き当ては、1 つの表で(打つたびの描き直しで、一覧を何度も端から探さないように)
+  const productById = useMemo(() => new Map(e.products.map((p) => [p.id, p])), [e.products])
   const [part, setPart] = useState<PartRef | null>(null)
   // 商品の一覧で押した商品(選んでいる枠と見比べる)
   const [compareKey, setCompareKey] = useState<string | null>(null)
@@ -376,7 +378,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const busy = e.saving
     if (p.kind === 'product') {
       const it = e.items.find((i) => i.key === p.itemKey)
-      const url = productUrl(e.products.find((x) => x.id === it?.productId))
+      const url = productUrl(productById.get(it?.productId ?? ''))
       list.push(
         { key: 'swap', label: t('入れ替える', 'Replace'), icon: <ArrowSwapRegular />, divider: true, disabled: busy, onSelect: () => openSwap(p.itemKey) },
         { key: 'page', label: t('商品ページを開く', 'Open the product page'), icon: <OpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
@@ -672,7 +674,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 part={part}
                 onPick={select}
                 items={e.items}
-                productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
+                productName={(id) => productById.get(id)?.name ?? ''}
                 products={e.products}
                 view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
                 handoff={{ productionOwner: e.form.productionOwner, handedOffAt: e.form.handedOffAt, productionDue: e.form.productionDue }}
@@ -849,7 +851,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 stage="plan"
                 root={() => boxRef.current}
                 target={pinTarget}
-                productName={(id) => e.products.find((p) => p.id === id)?.name ?? ''}
+                productName={(id) => productById.get(id)?.name ?? ''}
                 onTarget={setPinTarget}
                 onClose={closePin}
                 editSpot={(anchor, productId) => {
@@ -929,7 +931,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <>
                 <div className={s.candHead}>{t(`候補(${e.candidates.length})`, `Candidates (${e.candidates.length})`)}</div>
                 {e.candidates.map((c) => {
-                  const p = e.products.find((x) => x.id === c.productId)
+                  const p = productById.get(c.productId)
                   return p ? (
                     <div key={c.key} className={s.candWrap}>
                       <button type="button" className={s.candRow} onClick={() => openFromList(c.key)} title={c.reason}>
@@ -952,7 +954,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                               <MenuList>
                                 {e.items.map((it, i) => (
                                   <MenuItem key={it.key} icon={<ArrowSwapRegular />} onClick={() => e.swapWithCandidate(it.key, c.key, '')}>
-                                    {t(`${i + 1}. ${e.products.find((x) => x.id === it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${e.products.find((x) => x.id === it.productId)?.name ?? ''}`)}
+                                    {t(`${i + 1}. ${productById.get(it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${productById.get(it.productId)?.name ?? ''}`)}
                                   </MenuItem>
                                 ))}
                               </MenuList>
@@ -971,7 +973,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <Button type="button" size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleProducts} aria-label={t('商品の一覧を開く', 'Open the product list')} />
             {e.items.map((it) => {
               const kind = e.alertKinds.get(it.productId)
-              const name = e.products.find((p) => p.id === it.productId)?.name ?? ''
+              const name = productById.get(it.productId)?.name ?? ''
               return (
                 <Tooltip key={it.key} content={name} relationship="label">
                   <button type="button" className={s.railDot} style={{ backgroundColor: kind ? ALERT_COLOR[kind] : tokens.colorNeutralStroke1 }} onClick={() => select({ kind: 'product', itemKey: it.key })} />

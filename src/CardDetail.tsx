@@ -692,7 +692,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setForm({ ...form, [k]: v, ...(stale ? { [stale]: '' } : {}) })
   }
   const num = (v: string) => (v === '' ? undefined : (v as never))
-  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
+  // 商品の引き当ては、1 つの表で(打つたびの描き直しで、一覧を何度も端から探さないように)
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
+  const productName = (id: string) => productById.get(id)?.name ?? ''
 
   const addProduct = (productId: string, at = items.length) => {
     if (items.some((i) => i.productId === productId)) return
@@ -730,7 +732,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   // 同じカテゴリの商品を隣り合わせにする(カテゴリの並びは、現在の登場順を保つ)
   const groupByCategory = () => {
-    const cat = (i: Item) => products.find((p) => p.id === i.productId)?.category_name ?? ''
+    const cat = (i: Item) => productById.get(i.productId)?.category_name ?? ''
     const order = [...new Set(items.map(cat))]
     setItems([...items].sort((a, b) => order.indexOf(cat(a)) - order.indexOf(cat(b))))
   }
@@ -787,7 +789,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const productLinkOf = (itemKey: string) => {
     const index = items.findIndex((x) => x.key === itemKey)
     const it = items[index]
-    const p = it && products.find((x) => x.id === it.productId)
+    const p = it && productById.get(it.productId)
     if (!p) return undefined
     if (previewTab === 'push') return { name: p.name, url: p.product_code ? `data: ${fcmText({ kind: 'product', value: p.product_code }, fcmCampaign)}` : '' }
     return { name: p.name, url: withUtm(productUrl(p), linkUtm, productContent(index, p.product_code)) }
@@ -1468,7 +1470,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // アラートへの対応で使う配信(保存した配信か、作業画面から開いた、まだ保存していない案)
   const alertCard = card ?? draft?.card
   const replaceForAlert = (alert: CardAlert, to: Product, reason = '') => {
-    const from = products.find((p) => p.id === alert.productId)
+    const from = productById.get(alert.productId ?? '')
     // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
     setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
     setAlertNotes((prev) => [...prev, swapNote(from?.name ?? alert.label, to.name, { detail: alert.detail, why: reason })])
@@ -1480,8 +1482,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const it = items.find((i) => i.key === itemKey)
     const c = candidates.find((x) => x.key === candKey)
     if (!it || !c) return
-    const from = products.find((p) => p.id === it.productId)
-    const to = products.find((p) => p.id === c.productId)
+    const from = productById.get(it.productId)
+    const to = productById.get(c.productId)
     setItems((prev) => prev.map((i) => (i.key === itemKey ? { key: c.key, rowId: c.rowId, productId: c.productId, reason: c.reason, source: c.source } : i)))
     setCandidates((prev) => [{ ...it, section: c.section }, ...prev.filter((x) => x.key !== candKey)])
     setAlertNotes((prev) => [...prev, swapNote(from?.name ?? '', to?.name ?? '', { why: reason })])
@@ -1495,7 +1497,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const replaceItemWith = (itemKey: string, to: Product, reason: string) => {
     const it = items.find((i) => i.key === itemKey)
     if (!it) return
-    const from = products.find((p) => p.id === it.productId)
+    const from = productById.get(it.productId)
     const why = reason.trim()
     setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
     setAlertNotes((prev) => [...prev, swapNote(from?.name ?? '', to.name, { why })])
@@ -1670,11 +1672,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       const item = actAlert ? items.find((i) => i.productId === actAlert.productId) : items.find((i) => i.key === productOpen)
       // シンプルな配信カードの商品の一覧では、候補の行からも開く(詳しい情報を見るだけ。差し替えは、選んだ枠への操作で)
       const cand = !actAlert && !item ? candidates.find((c) => c.key === productOpen) : undefined
-      const product = products.find((p) => p.id === (item?.productId ?? cand?.productId ?? actAlert?.productId))
+      const product = productById.get(item?.productId ?? cand?.productId ?? actAlert?.productId ?? '')
       const idx = item ? items.indexOf(item) : -1
       const section = idx >= 0 ? sectionIndexAt(sectionsOf(template), idx) : -1
       const options: SwapOption[] = candidates.filter((c) => c.section === section).flatMap((c) => {
-        const p = products.find((x) => x.id === c.productId)
+        const p = productById.get(c.productId)
         return p ? [{ key: c.key, product: p, reason: c.reason, source: c.source }] : []
       })
       const closeAction = () => {
@@ -2232,7 +2234,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     if (itemKey) {
       const it = items.find((i) => i.key === itemKey)
-      const url = productUrl(products.find((x) => x.id === it?.productId))
+      const url = productUrl(productById.get(it?.productId ?? ''))
       list.push(
         {
           key: 'swap',
@@ -2338,7 +2340,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         },
         hoverProduct: setHoverKey,
         replaceItem: (itemKey, productId, reason) => {
-          const to = products.find((p) => p.id === productId)
+          const to = productById.get(productId)
           if (to) replaceItemWith(itemKey, to, reason)
         },
         setAiPreview,
@@ -2931,7 +2933,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     stage="plan"
                     root={() => previewBoxRef.current}
                     target={pinTarget}
-                    productName={(id) => products.find((p) => p.id === id)?.name ?? ''}
+                    productName={(id) => productById.get(id)?.name ?? ''}
                     onTarget={setPinTarget}
                     onClose={() => {
                       forgetLinkedPin()

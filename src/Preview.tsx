@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownRegular,
@@ -243,7 +243,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     if (!selectedKey) return
     document.querySelector(`[data-item-key="${selectedKey}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [selectedKey])
-  const byId = new Map(products.map((p) => [p.id, p]))
+  const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const tpl = getTemplate(template)
   // カラーチップを出す箱があるときだけ、載せた商品の SKU の色を読む
   const wantSwatches = [tpl.heroTable, ...tpl.sections].some((sec) => sec?.parts?.some((q) => q.type === 'box' && boxFields(q).includes('swatches')))
@@ -1088,7 +1088,7 @@ function PushPreview(props: Props) {
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
   const [style, setStyle] = useState<'ios' | 'android'>('ios')
-  const byId = new Map(products.map((p) => [p.id, p]))
+  const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const firstProduct = items[0] && byId.get(items[0].productId)
   // 通知の画像: 「画像つき」は、メッセージのメイン画像(押して開いたメッセージの一番上と、同じ画像)。「テキストだけ」は画像なし
   const heroSrc = spec.image && pickedHero ? heroImage(pickedHero) : undefined
