@@ -61,6 +61,7 @@ import { DuplicateDialog } from './CardMenu'
 import { LightbulbRegular as DevRequestIcon } from '@fluentui/react-icons'
 import { DevRequestLayer } from './DevRequestLayer'
 import { DevRequestsDialog } from './DevRequestsDialog'
+import { SampleShopPanel } from './SampleShopPanel'
 import { SettingsDialog } from './SettingsDialog'
 import { BrandPanel } from './BrandPanel'
 import { DeliveryCardsService } from './data/deliveryCards'
@@ -1874,6 +1875,13 @@ function App() {
                   setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
                 }
               },
+            },
+            {
+              id: 'sampleShop',
+              section: 'shop',
+              label: t('見本の商品ページと画像', 'Sample product pages and photos'),
+              icon: <ImageMultipleRegular />,
+              render: () => <SampleShopPanel products={products} />,
             },
             {
               id: 'devRequests',

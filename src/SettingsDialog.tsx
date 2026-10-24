@@ -37,8 +37,8 @@ import { optionLabel, useT } from './i18n'
 /** 設定の画面に並べる 1 つの操作(これまでの ⚙ のメニューの 1 項目) */
 export interface SettingsAction {
   id: string
-  /** 置き場所。country = 国ごとに決める / company = 全部の国で共通 / data・samples・dev = 開発・管理(畳む) */
-  section: 'country' | 'company' | 'data' | 'samples' | 'dev'
+  /** 置き場所。country = 国ごとに決める / company = 全部の国で共通 / data・samples・shop・dev = 開発・管理(畳む) */
+  section: 'country' | 'company' | 'data' | 'samples' | 'shop' | 'dev'
   label: ReactNode
   description?: string
   icon: ReactElement
@@ -96,7 +96,7 @@ interface Props {
   actions: SettingsAction[]
 }
 
-const ADMIN = ['data', 'samples', 'dev'] as const
+const ADMIN = ['data', 'samples', 'shop', 'dev'] as const
 
 export function SettingsDialog({ open, onClose, country: headerCountry, lang, onLang, autoDraft, onAutoDraft, actions }: Props) {
   const s = useStyles()
@@ -113,7 +113,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   const panes = usePaneWidths('settings.paneWidths.v1', [240, 0], 1, { min: 180, max: 400 })
   const shown = actions.filter((a) => !a.hidden)
   const of = (section: SettingsAction['section']) => shown.filter((a) => a.section === section)
-  const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), dev: t('開発へのリクエスト', 'Requests to developers') }
+  const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), shop: t('見本の商品ページ', 'Sample product pages'), dev: t('開発へのリクエスト', 'Requests to developers') }
   const countryHead = t(`国: ${countryName}`, `Country: ${countryName}`)
 
   const actionRow = (a: SettingsAction) => (
@@ -172,7 +172,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
           <span className={s.heading}>{adminName[key]}</span>
           <span className={s.note}>{t('開発・管理の操作です。ふだんの作業では使いません。', 'Developer and admin operations. Not needed for everyday work.')}</span>
           {/* 中身を描く項目(開発へのリクエストの一覧など)は、そのまま描く。操作だけの項目は「行う」の行に並べる */}
-          <div>{of(key).map((x) => (x.render ? <div key={x.id}>{x.render(country, countryName)}</div> : actionRow(x)))}</div>
+          <div className={s.pane}>{of(key).map((x) => (x.render ? <div key={x.id} className={s.pane}>{x.render(country, countryName)}</div> : actionRow(x)))}</div>
         </>
       )
     }
