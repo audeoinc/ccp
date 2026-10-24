@@ -45,6 +45,7 @@ import { downloadText } from './productionSnapshot'
 import { locale, tr, useT } from './i18n'
 import { RULE_STRENGTHS, RULE_TARGETS, type PolicyRule } from './models/policyRules'
 import type { SalesPolicy } from './models/salesPolicies'
+import { confirmDialog } from './confirm'
 
 type Kind = 'rules' | 'sales'
 /** 一覧のタブ(直した記録は、ルール系の決まりの記録。X61) */
@@ -202,7 +203,7 @@ export function PolicyManager({ open, onClose, onImported, inline }: { open: boo
     onImported()
   }
   const removeRule = async (r: PolicyRule) => {
-    if (!window.confirm(tr(`決まり ${r.rule_id}「${r.title}」を消します。よろしいですか?` + (r.source_file !== SCREEN_FILE ? `(ファイル「${r.source_file}」を取り込み直すと、また入ります)` : ''), `Delete rule ${r.rule_id} "${r.title}"?` + (r.source_file !== SCREEN_FILE ? ` (re-importing "${r.source_file}" brings it back)` : '')))) return
+    if (!(await confirmDialog(tr(`決まり ${r.rule_id}「${r.title}」を消します。よろしいですか?` + (r.source_file !== SCREEN_FILE ? `(ファイル「${r.source_file}」を取り込み直すと、また入ります)` : ''), `Delete rule ${r.rule_id} "${r.title}"?` + (r.source_file !== SCREEN_FILE ? ` (re-importing "${r.source_file}" brings it back)` : ''))))) return
     try {
       await PolicyEdit.remove(r.id)
       await afterEdit(tr(`決まり ${r.rule_id} を消しました`, `Deleted rule ${r.rule_id}`))

@@ -58,6 +58,7 @@ import { productImage } from './images'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
 import { PREF } from './prefKeys'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -675,7 +676,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
   // ---- 下: 手順に合わせたボタン。② では、全体に効くボタンだけ(1 本ずつのボタンは、カードの中)
   const finish = () => {
     finishRef.current = true
-    if (ws.close()) onFinish(ws.weekStart)
+    void ws.close().then((closed) => closed && onFinish(ws.weekStart))
   }
   const afterAsk = () => {
     ws.setCloseAsk(false)
@@ -711,8 +712,8 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               <MenuItem
                 disabled={!ws.plainReady}
                 secondaryContent={t('配信名だけで保存できます', 'Needs names only')}
-                onClick={() => {
-                  if (window.confirm(t(`中身は作らずに、${n} 本を下書き(未起案)で保存します。中身は、あとで配信カードで作ります。よろしいですか?`, `Save ${n} as drafts (Not started) without content? You can create the content later in each card.`))) void ws.savePlainAll()
+                onClick={async () => {
+                  if (await confirmDialog(t(`中身は作らずに、${n} 本を下書き(未起案)で保存します。中身は、あとで配信カードで作ります。よろしいですか?`, `Save ${n} as drafts (Not started) without content? You can create the content later in each card.`))) void ws.savePlainAll()
                 }}
               >
                 {t(`中身は作らずに、${n} 本を下書きで保存`, `Save ${n} as drafts without content`)}
@@ -727,8 +728,8 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
           <Button
             icon={ws.savingDay ? <Spinner size="tiny" /> : <SaveRegular />}
             disabled={!!ws.savingDay || ws.running}
-            onClick={() => {
-              if (window.confirm(t(`まだ決めていない ${ws.unsavedCount} 本を、まとめて下書き(未起案)で保存します。よろしいですか?`, `Save all ${ws.unsavedCount} remaining drafts (Not started)?`))) void ws.saveAll()
+            onClick={async () => {
+              if (await confirmDialog(t(`まだ決めていない ${ws.unsavedCount} 本を、まとめて下書き(未起案)で保存します。よろしいですか?`, `Save all ${ws.unsavedCount} remaining drafts (Not started)?`))) void ws.saveAll()
             }}
           >
             {t(`残りの ${ws.unsavedCount} 本をまとめて保存`, `Save all ${ws.unsavedCount} remaining`)}
@@ -751,7 +752,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
 
   return (
     <>
-      <Dialog open={ws.open} modalType="modal" onOpenChange={(_, d) => !d.open && ws.close()}>
+      <Dialog open={ws.open} modalType="modal" onOpenChange={(_, d) => !d.open && void ws.close()}>
         <ResizableSurface sizeKey="bulk" className={s.surface} aria-label={t('まとめて作る', 'Create in bulk')}>
           <div className={s.head}>
             <AiIcon size={20} />
@@ -765,7 +766,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               aria-label={t('閉じる', 'Close')}
               onClick={() => {
                 finishRef.current = false
-                ws.close()
+                void ws.close()
               }}
             />
           </div>

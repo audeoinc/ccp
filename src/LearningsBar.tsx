@@ -13,6 +13,7 @@ import { locale, optionLabel, useT } from './i18n'
 import { countryOptions } from './status'
 import { templateIdOf } from './results'
 import { guessThemeType, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   root: {
@@ -142,12 +143,12 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   const candidates = country ? matching.filter((l) => l.origin !== country && !applyDecided('learning', l.id, country) && !retiredAtOrigin.has(l.id)).slice(0, MAX) : []
   const decide = async (l: Learning, use: boolean) => {
     if (
-      !window.confirm(
+      !(await confirmDialog(
         t(
           `${countryName(country)}の全員に効きます(⚙ →「国」→「使う学び」でも直せます)。よろしいですか?`,
           `This applies to everyone working on ${countryName(country)} (you can change it in ⚙ → Country → Learnings used). Continue?`,
         ),
-      )
+      ))
     )
       return
     setDeciding(l.id)

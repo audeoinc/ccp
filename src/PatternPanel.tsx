@@ -20,6 +20,7 @@ import { CHANNEL_EMAIL, channelOptions } from './status'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
 import { templateOptions, type TemplateChannel } from './templates'
 import { optionLabel, useT } from './i18n'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   content: { display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0, overflowX: 'auto' },
@@ -101,7 +102,7 @@ export function PatternPanel({ country, onChanged }: Props) {
   }
 
   const remove = async (row: DeliveryPattern) => {
-    if (!window.confirm(t('この型を消します(もう作った配信は、そのままです)。よろしいですか?', 'Delete this pattern? Deliveries already created are kept.'))) return
+    if (!(await confirmDialog(t('この型を消します(もう作った配信は、そのままです)。よろしいですか?', 'Delete this pattern? Deliveries already created are kept.')))) return
     try {
       await DeliveryPatternsService.delete(row.id)
     } catch (e) {

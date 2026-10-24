@@ -22,6 +22,7 @@ import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { DeliveryPattern } from './models/deliveryPatterns'
 import { dayKeyOf } from './weekLock'
+import { confirmDialog } from './confirm'
 
 interface Ctx {
   /** すべての配信(取りやめを除く) */
@@ -281,7 +282,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   }
 
   /** 閉じる。まだ保存していない入力・案があれば確かめる(保存したものは、消えない)。閉じたら true */
-  function close(): boolean {
+  // 閉じてよいかを聞くことがあるので、答えを待つ(閉じたら true)
+  async function close(): Promise<boolean> {
     if (running || savingPlain || savingDay) return false
     const lostRows = targets.some((d) => !results.has(d) && !savedIds.has(d) && !plain.has(d) && !discarded.has(d) && (rowOf(d).name.trim() || rowOf(d).themeType))
     // 保存していない案があるときは、閉じるダイアログ(まとめて保存して閉じる / 破棄して閉じる)で決めてもらう
@@ -289,7 +291,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       setCloseAsk(true)
       return false
     }
-    if (lostRows && !window.confirm(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?'))) return false
+    if (lostRows && !(await confirmDialog(tr('まだ保存していない配信名・種類は、消えます。閉じますか?', 'Names and types not saved yet will be lost. Close anyway?')))) return false
     setOpen(false)
     return true
   }
@@ -525,7 +527,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   async function discard(day: string) {
     const id = savedIds.get(day)
     if (id) {
-      if (!window.confirm(tr('保存したこの配信を消して、破棄します。よろしいですか?', 'Delete this saved delivery and discard it?'))) return
+      if (!(await confirmDialog(tr('保存したこの配信を消して、破棄します。よろしいですか?', 'Delete this saved delivery and discard it?')))) return
       setError(null)
       setSavingDay(day)
       try {

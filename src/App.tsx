@@ -144,6 +144,8 @@ import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 import { limitRulesVersion, onLimitRulesChange, setLimitRules } from './weeklyLimit'
 import { localDate } from './results'
 import { PREF } from './prefKeys'
+import { confirmDialog } from './confirm'
+import { ConfirmHost } from './ConfirmHost'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -1502,6 +1504,8 @@ function App() {
       {peopleOpened && <Later><PeopleManager /></Later>}
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
+      {/* 確かめの窓(confirmDialog。window.confirm の代わり) */}
+      <ConfirmHost />
       <div className={styles.headerWrap}>
       <header className={styles.header}>
         <CalendarLtrRegular fontSize={24} className={styles.headerIcon} />
@@ -1768,7 +1772,7 @@ function App() {
               label: t('外部広告の見本を作る', 'Create sample ad data'),
               icon: <ArrowSyncRegular />,
               onOpen: async () => {
-                if (!window.confirm(tr('外部広告の見本のデータを作り直します(前に作った見本は置き換わります。取り込んだ本物のデータは消しません)。よろしいですか?', 'Recreate sample ad data? Previous sample rows are replaced; imported data is kept.'))) return
+                if (!(await confirmDialog(tr('外部広告の見本のデータを作り直します(前に作った見本は置き換わります。取り込んだ本物のデータは消しません)。よろしいですか?', 'Recreate sample ad data? Previous sample rows are replaced; imported data is kept.')))) return
                 try {
                   const res = await fetch(appPath('/api/ads/sample'), { method: 'POST' })
                   const json = (await res.json()) as { success: boolean; data?: { rows: number } }
@@ -1784,7 +1788,7 @@ function App() {
               label: t('効果の見本を作る', 'Create sample impact data'),
               icon: <ArrowSyncRegular />,
               onOpen: async () => {
-                if (!window.confirm(tr('配信の効果の見本(AI に渡した学びの記録・ホールドアウトとの比べ)を作り直します。前に作った見本は置き換わります。画面から記録した本物の記録は消しません。よろしいですか?', 'Recreate sample impact data (learnings log and holdout comparisons)? Previous sample rows are replaced; real records are kept.'))) return
+                if (!(await confirmDialog(tr('配信の効果の見本(AI に渡した学びの記録・ホールドアウトとの比べ)を作り直します。前に作った見本は置き換わります。画面から記録した本物の記録は消しません。よろしいですか?', 'Recreate sample impact data (learnings log and holdout comparisons)? Previous sample rows are replaced; real records are kept.')))) return
                 try {
                   const res = await fetch(appPath('/api/impact/sample'), { method: 'POST' })
                   const json = (await res.json()) as { success: boolean; data?: { lifts: number } }
@@ -1806,7 +1810,7 @@ function App() {
                   const msg = have
                     ? tr(`素材の見本はすでに ${have} 件あります。もう一組作りますか?`, `${have} sample assets already exist. Create another set?`)
                     : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」(US の配信は英語で「Sample:」)です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "Sample:" ("見本:" for Japan deliveries). Existing assets are not changed. Continue?')
-                  if (!window.confirm(msg)) return
+                  if (!(await confirmDialog(msg))) return
                   const r = await createAssetExamples({ cards: activeCards, me: myName() })
                   setBqNotice({ intent: 'success', text: tr(`素材の見本を ${r.count} 件、${r.cards.join('・')} に足しました`, `Added ${r.count} sample assets to ${r.cards.join(', ')}`) })
                 } catch (e) {
@@ -1820,7 +1824,7 @@ function App() {
               label: t('素材の見本を消す', 'Delete sample assets'),
               icon: <DeleteRegular />,
               onOpen: async () => {
-                if (!window.confirm(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?'))) return
+                if (!(await confirmDialog(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?')))) return
                 try {
                   const n = await removeAssetExamples()
                   setBqNotice({ intent: 'success', text: tr(`素材の見本を ${n} 件消しました`, `Deleted ${n} sample assets`) })
@@ -1836,7 +1840,7 @@ function App() {
               icon: <BeakerRegular />,
               disabled: skuBusy,
               onOpen: async () => {
-                if (!window.confirm(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?'))) return
+                if (!(await confirmDialog(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?')))) return
                 setSkuBusy(true)
                 try {
                   const n = await createSampleSkus(products, (done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を作っています(${done} / ${total})`, `Creating sample SKUs (${done} / ${total})`) }))
@@ -1856,7 +1860,7 @@ function App() {
               icon: <DeleteRegular />,
               disabled: skuBusy,
               onOpen: async () => {
-                if (!window.confirm(tr('見本の SKU と、その在庫を消します(BigQuery から入れた本物の SKU は消しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?'))) return
+                if (!(await confirmDialog(tr('見本の SKU と、その在庫を消します(BigQuery から入れた本物の SKU は消しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?')))) return
                 setSkuBusy(true)
                 try {
                   const n = await removeSampleSkus((done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を消しています(${done} / ${total})`, `Deleting sample SKUs (${done} / ${total})`) }))
@@ -1879,7 +1883,7 @@ function App() {
                 const msg = already
                   ? tr(`例の配信はすでに ${already} 本あります。もう一組(5 本)作りますか?`, `${already} example deliveries already exist. Create another set (5)?`)
                   : tr('AB テスト(B まで・C まで)と、案から選ぶ(B まで・C まで・決めたあと)の例の配信を 5 本作ります。今ある配信は変えません。よろしいですか?', 'Create 5 example deliveries: A/B tests (up to B and C) and choose-a-variant (up to B, up to C, and already decided)? Existing deliveries are not changed.')
-                if (!window.confirm(msg)) return
+                if (!(await confirmDialog(msg))) return
                 try {
                   const n = await createAbExamples({ products, heroes, owner: myName() })
                   setBqNotice({ intent: 'success', text: tr(`例の配信を ${n} 本作りました(8〜15 日後)`, `Created ${n} example deliveries (8–15 days ahead)`) })
@@ -1895,7 +1899,7 @@ function App() {
               label: t('配信の型の見本を作る(US)', 'Create sample delivery patterns (US)'),
               icon: <CalendarClockRegular />,
               onOpen: async () => {
-                if (!window.confirm(tr('US の配信の型の見本(月〜日の 6 本: メール 4・アプリ 2)を作ります。US の型がもうあれば、何も作りません。よろしいですか?', 'Create sample US delivery patterns (6 per week: 4 emails, 2 app)? Nothing is created if US already has patterns.'))) return
+                if (!(await confirmDialog(tr('US の配信の型の見本(月〜日の 6 本: メール 4・アプリ 2)を作ります。US の型がもうあれば、何も作りません。よろしいですか?', 'Create sample US delivery patterns (6 per week: 4 emails, 2 app)? Nothing is created if US already has patterns.')))) return
                 try {
                   const n = await createUsSamplePatterns()
                   await loadPatterns()

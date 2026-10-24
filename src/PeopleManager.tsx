@@ -34,6 +34,7 @@ import { parseIds } from './approvals'
 import { EventsService, type CardEvent } from './data/events'
 import { UserRole, UserStatus, type User, type UserFields } from './models/users'
 import { ApprovalGroupStatus, type ApprovalGroup } from './models/approvalGroups'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   surface: { width: 'min(880px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(90vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', rowGap: '12px' },
@@ -239,9 +240,9 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
   }
 
   // 国の決まりをやめて、共通に戻す(ST4)
-  const dropCountryRule = () => {
+  const dropCountryRule = async () => {
     const own = people.rules.find((r) => !r.department && r.country === ruleCountry)
-    if (!own || !window.confirm(t(`${countryName(ruleCountry)}の決まりをやめて、共通の決まりを使いますか?`, `Stop using a separate rule for ${countryName(ruleCountry)} and use the common rule?`))) return
+    if (!own || !(await confirmDialog(t(`${countryName(ruleCountry)}の決まりをやめて、共通の決まりを使いますか?`, `Stop using a separate rule for ${countryName(ruleCountry)} and use the common rule?`)))) return
     void run(
       async () => {
         await ApprovalRulesService.delete(own.id)

@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardPreview, Checkbox, MessageBar, MessageBarBody,
 import { appliesIn, applyDecided, applyHistory, saveApply, useCountryApply, type ApplyKind } from './countryApply'
 import { myName } from './history'
 import { locale, useT } from './i18n'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '12px' },
@@ -82,7 +83,7 @@ export function CountryApplyList({ kind, country, countryName, items, defaultUse
     )
 
   const save = async () => {
-    if (!window.confirm(t(`${countryName}の全員に効きます。保存しますか?`, `This applies to everyone working on ${countryName}. Save?`))) return
+    if (!(await confirmDialog(t(`${countryName}の全員に効きます。保存しますか?`, `This applies to everyone working on ${countryName}. Save?`)))) return
     setBusy(true)
     setError(null)
     try {

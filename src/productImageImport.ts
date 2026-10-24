@@ -4,6 +4,7 @@
 import { appPath } from './appRoot'
 import { dropSharedReads } from './gcp/readShare'
 import { tr } from './i18n'
+import { confirmDialog } from './confirm'
 
 interface ImportSummary {
   sample: boolean
@@ -42,16 +43,16 @@ export async function importProductImagesZip(): Promise<string | null> {
     `${kind}を取り込みます: 商品 ${s.products} 件・画像 ${s.images} 枚。${missing}\nこの商品の${s.sample ? '見本の' : '(見本でない)'}画像は入れ替わります。${s.sample ? '商品のメイン画像をどうするかは、次に聞きます。' : '商品のメイン画像は、空か仮の画像のときだけ置き換えます。'}よろしいですか?`,
     `Import ${kind}: ${s.products} products, ${s.images} images.${missing}\nThe ${s.sample ? 'sample' : 'non-sample'} images of these products are replaced. ${s.sample ? 'You will be asked next about the main images.' : "A product's main image is replaced only when empty or a placeholder."} Continue?`,
   )
-  if (!window.confirm(msg)) return null
+  if (!(await confirmDialog(msg))) return null
   // 見本の写真なら、今のメイン画像も置き換えるかを聞く(前の画像は控えを残すので、元に戻せる)
   const main =
     s.sample &&
-    window.confirm(
+    (await confirmDialog(
       tr(
         '商品のメイン画像(一覧・配信に出る画像)も、見本の写真のメインで置き換えますか?\n「OK」= 置き換える(今の画像は控えとして残します)/「キャンセル」= 空か仮の画像のときだけ置き換える',
         "Also replace each product's main image (shown in lists and deliveries) with the sample main photo?\nOK = replace (the current image is kept as a backup) / Cancel = only when empty or a placeholder",
       ),
-    )
+    ))
   const r = await post(file, true, main)
   return tr(`商品 ${r.products} 件の画像 ${r.images} 枚を取り込みました(メイン画像を ${r.mains ?? 0} 件置き換え)`, `Imported ${r.images} images for ${r.products} products (${r.mains ?? 0} main images replaced)`)
 }
@@ -61,7 +62,7 @@ async function importHeroes(file: File, s: ImportSummary): Promise<string | null
   const missing = s.missing.length ? tr(`
 表にないメイン画像(飛ばす): ${s.missing.length} 件`, `
 Hero images not in the library (skipped): ${s.missing.length}`) : ''
-  const ok = window.confirm(
+  const ok = await confirmDialog(
     tr(
       `AI で作ったメイン画像の見本の写真を取り込みます: ${s.images} 枚。${missing}
 このメイン画像の画像は差し替わります(前の画像は控えとして残します)。よろしいですか?`,

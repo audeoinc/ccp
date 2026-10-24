@@ -8,6 +8,7 @@ import { locale, useT } from './i18n'
 import { statusRank } from './status'
 import { StatusFlow } from './StatusFlow'
 import { scopeLabel, type WeekScope } from './weekLock'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   // 記録・資料(名前・履歴・PDF)と、週を進める操作の間の区切り
@@ -97,7 +98,7 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
       : []
 
   const run = async (f: () => Promise<void>, confirmText?: string) => {
-    if (confirmText && !window.confirm(confirmText)) return
+    if (confirmText && !(await confirmDialog(confirmText))) return
     setBusy(true)
     try {
       await f()

@@ -6,6 +6,7 @@ import { Button, Field, Input, MessageBar, MessageBarBody, Select, makeStyles, t
 import { DEFAULT_CRITERIA, browserCriteria, criteriaFor, criteriaHistory, saveCriteria, useCountrySettings, type CountryCriteria } from './countrySettings'
 import { myName } from './history'
 import { locale, useT } from './i18n'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '14px', maxWidth: '640px' },
@@ -43,7 +44,7 @@ export function CountryCriteriaPanel({ country, countryName }: Props) {
   const when = (iso: string) => (iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' }) : '')
 
   const save = async () => {
-    if (!window.confirm(t(`${countryName}の全員に効きます。保存しますか?`, `This applies to everyone working on ${countryName}. Save?`))) return
+    if (!(await confirmDialog(t(`${countryName}の全員に効きます。保存しますか?`, `This applies to everyone working on ${countryName}. Save?`)))) return
     setBusy(true)
     setError(null)
     try {

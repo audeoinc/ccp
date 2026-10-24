@@ -16,6 +16,7 @@ import { heroMarket } from './market'
 import type { DeliveryCard } from './models/deliveryCards'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 import { weekKeyOf } from './weekLock'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   surface: { width: 'min(1400px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(90vh / var(--ui-zoom, 1))' },
@@ -136,8 +137,8 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, in
       const r = await HeroImagesService.update(h.id, { usable_until: today() })
       if (!r.success) throw new Error(r.error?.message ?? tr('期限を切れませんでした', 'Could not set the deadline'))
     })
-  const remove = (h: HeroImage) => {
-    if (!window.confirm(tr(`メイン画像「${h.name}」をライブラリから消します(上げた画像なら、ファイルも消します)。よろしいですか?`, `Delete "${h.name}" from the library (its file too, if it was uploaded)?`))) return
+  const remove = async (h: HeroImage) => {
+    if (!(await confirmDialog(tr(`メイン画像「${h.name}」をライブラリから消します(上げた画像なら、ファイルも消します)。よろしいですか?`, `Delete "${h.name}" from the library (its file too, if it was uploaded)?`)))) return
     void run(h.id, async () => {
       await HeroImagesService.delete(h.id)
       if (h.image_url) await HeroUpload.remove(h.image_url)
@@ -150,7 +151,7 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, in
   /** 空の項目だけを、AI が画像を見て埋める(入っている項目は変えない。1 点ずつ順に。途中でやめられる) */
   const fillEmpty = async () => {
     if (!toFill.length) return
-    if (!window.confirm(tr(`タグ・説明などが空の ${toFill.length} 点を、AI が画像を見て埋めます(入っている項目は変えません)。よろしいですか?`, `AI will fill the empty fields of ${toFill.length} images from the images (filled fields stay). Continue?`))) return
+    if (!(await confirmDialog(tr(`タグ・説明などが空の ${toFill.length} 点を、AI が画像を見て埋めます(入っている項目は変えません)。よろしいですか?`, `AI will fill the empty fields of ${toFill.length} images from the images (filled fields stay). Continue?`)))) return
     stopRef.current = false
     setError(null)
     const targets = [...toFill]

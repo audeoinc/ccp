@@ -6,6 +6,7 @@ import { Button, Field, Input, MessageBar, MessageBarBody, makeStyles, tokens } 
 import { SAMPLE_BRAND, brandHistoryOf, brandOwn, saveBrand, useCountrySettings, type Brand } from './countrySettings'
 import { myName } from './history'
 import { locale, useT } from './i18n'
+import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '14px', maxWidth: '640px' },
@@ -56,7 +57,7 @@ export function BrandPanel({ country, countryName }: Props) {
     const msg = isCompany
       ? t('全部の国の配信に効きます(国で上書きしている所は、国の値のまま)。保存しますか?', 'This applies to deliveries in every country (countries with their own value keep it). Save?')
       : t(`${countryName ?? country}の全員に効きます。保存しますか?`, `This applies to everyone working on ${countryName ?? country}. Save?`)
-    if (!window.confirm(msg)) return
+    if (!(await confirmDialog(msg))) return
     setBusy(true)
     setError(null)
     try {
