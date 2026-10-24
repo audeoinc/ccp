@@ -94,7 +94,7 @@ import { PinFloat } from './PinFloat'
 import { focusSoon, type ContextItem } from './ContextMenu'
 import { usePreviewPins } from './usePreviewPins'
 import { heroImage } from './images'
-import { ArrowSwapRegular as CtxSwapRegular, DeleteRegular as CtxDeleteRegular, EditRegular as CtxEditRegular, ImageEditRegular as CtxImageEditRegular, OpenRegular as CtxOpenRegular, SparkleRegular as CtxSparkleRegular } from '@fluentui/react-icons'
+import { previewMenuItems } from './previewMenu'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -2199,52 +2199,33 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const anchor = under.closest('[data-anchor]')?.getAttribute('data-anchor') ?? ''
     const kind = anchor.split(':')[0]
     const tab: TopTab | null = itemKey ? 'sections' : kind === 'hero' || kind === 'herotext' || kind === 'subject' ? 'hero' : kind === 'section' ? 'sections' : kind === 'button' ? 'links' : kind === 'push' ? 'notice' : null
-    // ボタンと同じく、保存中だけ押せなくする(確定した週は、保存のときに理由を聞く)
-    const busy = saving
     const openTab = (to: TopTab) => setStepRequest((r) => ({ tab: to, seq: (r?.seq ?? 0) + 1 }))
-    const list: ContextItem[] = []
-    if (tab) {
-      list.push(
-        { key: 'edit', label: t('この部品を直す', 'Edit this part'), icon: <CtxEditRegular />, onSelect: () => openTab(tab) },
-        {
-          key: 'ai',
-          label: t('この部品について AI に頼む', 'Ask AI about this part'),
-          icon: <CtxSparkleRegular />,
-          onSelect: () => {
+    const it = itemKey ? items.find((i) => i.key === itemKey) : undefined
+    return previewMenuItems({
+      // ボタンと同じく、保存中だけ押せなくする
+      busy: saving,
+      edit: tab ? () => openTab(tab) : undefined,
+      ai: tab
+        ? () => {
             openTab(tab)
             focusSoon('[data-ai-chat-input]')
-          },
-        },
-      )
-    }
-    if (itemKey) {
-      const it = items.find((i) => i.key === itemKey)
-      const url = productUrl(productById.get(it?.productId ?? ''))
-      list.push(
-        {
-          key: 'swap',
-          label: t('商品を差し替える', 'Swap the product'),
-          icon: <CtxSwapRegular />,
-          divider: true,
-          disabled: busy,
-          // 商品の箱を押したときと同じ、商品のフロート
-          onSelect: () => {
-            setActAlert(null)
-            setSlotAction(null)
-            setProductOpen(itemKey)
-          },
-        },
-        { key: 'page', label: t('商品ページを開く', 'Open the product page'), icon: <CtxOpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
-        { key: 'remove', label: t('この商品を外す', 'Remove this product'), icon: <CtxDeleteRegular />, disabled: busy, onSelect: () => removeItem(itemKey) },
-      )
-    } else if (kind === 'hero') {
-      const src = heroImage(hero)
-      list.push(
-        { key: 'replace', label: t('画像を入れ替える', 'Replace the image'), icon: <CtxImageEditRegular />, divider: true, disabled: busy, onSelect: () => openTab('hero') },
-        { key: 'tab', label: t('画像を新しいタブで開く', 'Open the image in a new tab'), icon: <CtxOpenRegular />, disabled: !src, onSelect: () => window.open(src, '_blank', 'noreferrer') },
-      )
-    }
-    return list
+          }
+        : undefined,
+      product: itemKey
+        ? {
+            swapLabel: t('商品を差し替える', 'Swap the product'),
+            url: productUrl(productById.get(it?.productId ?? '')),
+            // 商品の箱を押したときと同じ、商品のフロート
+            swap: () => {
+              setActAlert(null)
+              setSlotAction(null)
+              setProductOpen(itemKey)
+            },
+            remove: () => removeItem(itemKey),
+          }
+        : undefined,
+      hero: !itemKey && kind === 'hero' ? { src: heroImage(hero), replace: () => openTab('hero') } : undefined,
+    })
   }
   const simpleAlertOverlay = (
     <>

@@ -13,10 +13,11 @@ import { CardAlertsBar } from '../CardAlertsBar'
 import { Hint } from '../Hint'
 import { PinFloat } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
+import { previewMenuItems } from '../previewMenu'
 import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
-import { EditRegular, ImageEditRegular, MoreHorizontalRegular, OpenRegular, ArrowSwapRegular, DeleteRegular, SparkleRegular } from '@fluentui/react-icons'
+import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { useStoredWidths } from '../floatLayout'
 import { ImageThumb } from '../ImageThumb'
@@ -352,51 +353,42 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const root = boxRef.current
     const p = root ? partFromElement(under, root) : null
     if (!p) return []
-    const askAi = () => {
-      select(p)
-      focusSoon('[data-part-ai-input]')
-    }
-    const list: ContextItem[] = [{ key: 'edit', label: t('この部品を直す', 'Edit this part'), icon: <EditRegular />, onSelect: () => select(p) }]
-    if (p.kind !== 'slot') list.push({ key: 'ai', label: t('この部品について AI に頼む', 'Ask AI about this part'), icon: <SparkleRegular />, onSelect: askAi })
-    // ボタンと同じく、反映中だけ押せなくする(確定した週は、保存のときに理由を聞く)
-    const busy = e.saving
-    if (p.kind === 'product') {
-      const it = e.items.find((i) => i.key === p.itemKey)
-      const url = productUrl(productById.get(it?.productId ?? ''))
-      list.push(
-        { key: 'swap', label: t('入れ替える', 'Replace'), icon: <ArrowSwapRegular />, divider: true, disabled: busy, onSelect: () => openSwap(p.itemKey) },
-        { key: 'page', label: t('商品ページを開く', 'Open the product page'), icon: <OpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
-        {
-          key: 'remove',
-          label: t('この商品を外す', 'Remove this product'),
-          icon: <DeleteRegular />,
-          disabled: busy,
-          // 部品のペインの「外す(候補に戻す)」と同じ
-          onSelect: () => {
-            e.removeItem(p.itemKey)
-            if (part && samePart(part, p)) select(null)
-          },
-        },
-      )
-    }
-    if (p.kind === 'hero') {
-      const src = heroImage(e.hero)
-      list.push(
-        {
-          key: 'replace',
-          label: t('画像を入れ替える', 'Replace the image'),
-          icon: <ImageEditRegular />,
-          divider: true,
-          disabled: busy,
-          onSelect: () => {
-            select(p)
-            setHeroReplace((n) => n + 1)
-          },
-        },
-        { key: 'tab', label: t('画像を新しいタブで開く', 'Open the image in a new tab'), icon: <OpenRegular />, disabled: !src, onSelect: () => window.open(src, '_blank', 'noreferrer') },
-      )
-    }
-    return list
+    const it = p.kind === 'product' ? e.items.find((i) => i.key === p.itemKey) : undefined
+    return previewMenuItems({
+      // ボタンと同じく、反映中だけ押せなくする
+      busy: e.saving,
+      edit: () => select(p),
+      ai:
+        p.kind !== 'slot'
+          ? () => {
+              select(p)
+              focusSoon('[data-part-ai-input]')
+            }
+          : undefined,
+      product:
+        p.kind === 'product'
+          ? {
+              swapLabel: t('入れ替える', 'Replace'),
+              url: productUrl(productById.get(it?.productId ?? '')),
+              swap: () => openSwap(p.itemKey),
+              // 部品のペインの「外す(候補に戻す)」と同じ
+              remove: () => {
+                e.removeItem(p.itemKey)
+                if (part && samePart(part, p)) select(null)
+              },
+            }
+          : undefined,
+      hero:
+        p.kind === 'hero'
+          ? {
+              src: heroImage(e.hero),
+              replace: () => {
+                select(p)
+                setHeroReplace((n) => n + 1)
+              },
+            }
+          : undefined,
+    })
   }
   const stepZoom = (d: number) => e.zoom.set(Math.max(e.zoom.min, Math.min(e.zoom.max, Math.round((e.zoom.shown + d) * 20) / 20)))
   const toggleProducts = () => {
