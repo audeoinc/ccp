@@ -6,7 +6,7 @@ import type { Candidate, Item } from '../items'
 import type { AiCard, ProposedHero } from '../aiSelect'
 import type { EmailTemplateId } from '../templates'
 import type { LinkSlot, Links } from '../links'
-import type { CardAlertKind } from '../cardAlerts'
+import type { CardAlert, CardAlertKind } from '../cardAlerts'
 import type { NextStep } from './nextStep'
 import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
@@ -142,6 +142,10 @@ export interface SimpleEditor {
   footer: ReactNode
   /** 目印: 商品のアラートの印(プレビューに重ねる層)と、これまでの学びの帯(AI の依頼に学びを渡す役もあるので、隠すときも描く)と、その件数 */
   alertOverlay: ReactNode
+  /** この配信のアラート(左のバーの「アラート」。SU6) */
+  alerts: CardAlert[]
+  /** アラートへの対応を開く(対応できない配信では undefined) */
+  actAlert?: (a: CardAlert) => void
   // ---- コミュニケーションのペイン(段階 d)
   /** 制作への引き継ぎ(担当・締め切り・引き継ぎ済み) */
   setHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void

@@ -28,6 +28,11 @@ const useStyles = makeStyles({
   on: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px', borderRadius: '2px' },
   detail: { color: tokens.colorNeutralForeground2 },
   act: { minWidth: 'auto', height: '22px', padding: '0 8px' },
+  // 左のバーのパネルの中(SU6): 枠も畳む操作も要らない。1 件ずつ区切って並べる
+  panel: { display: 'grid', rowGap: '10px', padding: '10px 12px', alignContent: 'start' },
+  panelItem: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
+  panelRow: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
+  empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
 
 const KIND_BG: Record<CardAlertKind, string> = {
@@ -49,13 +54,15 @@ interface Props {
   onAct?: (alert: CardAlert) => void
   /** 最初から開いておくか(アラートの画面から開いたとき)。ふだんは、たたんで 1 行だけ(画面の縦を取りすぎないように) */
   defaultOpen?: boolean
+  /** シンプルな配信カードの左のバーのパネルの中に出す(SU6。枠なし・いつも開く) */
+  panel?: boolean
 }
 
 /**
  * 配信カードの「この配信のアラート」。ふだんは 1 行にたたみ(種類ごとの件数だけ)、「見る」で、どの商品にどんな問題があるかを出す。
  * アラートの画面から開いたときは、最初から開いておく。商品名を押すと、その商品を選び、プレビューのその枠に移る
  */
-export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAct, defaultOpen = false }: Props) {
+export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAct, defaultOpen = false, panel = false }: Props) {
   const styles = useStyles()
   const t = useT()
   const [open, setOpen] = useState(defaultOpen)
@@ -64,6 +71,35 @@ export function CardAlertsBar({ alerts, selectedProductId, onSelectProduct, onAc
   const counts = ORDER.map((k) => ({ k, n: alerts.filter((a) => a.kind === k).length })).filter((c) => c.n > 0)
   const kindLabel = (k: CardAlertKind) =>
     ({ outOfStock: t('在庫切れの見込み', 'Out of stock'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over weekly limit') })[k]
+  if (panel)
+    return (
+      <div className={styles.panel}>
+        {alerts.length === 0 && <span className={styles.empty}>{t('この配信のアラートはありません', 'No alerts for this delivery')}</span>}
+        {alerts.map((a, i) => (
+          <div key={`${a.kind}:${a.productId ?? ''}:${i}`} className={styles.panelItem}>
+            <span className={styles.panelRow}>
+              <span className={styles.kind} style={{ backgroundColor: KIND_BG[a.kind] }}>{kindLabel(a.kind)}</span>
+              {a.productId ? (
+                // 押すと、プレビューのその商品を選ぶ(SU6 ③)
+                <button type="button" className={mergeClasses(styles.link, a.productId === selectedProductId && styles.on)} onClick={() => onSelectProduct(a.productId!)} title={t('この商品を選んで、プレビューで見る', 'Select this product and show it in the preview')}>
+                  {a.label}
+                </button>
+              ) : (
+                <span className={styles.name}>{a.label}</span>
+              )}
+            </span>
+            <span className={styles.detail}>{a.detail}</span>
+            {onAct && (
+              <span>
+                <Button size="small" appearance="secondary" className={styles.act} onClick={() => onAct(a)}>
+                  {t('対応する', 'Handle')}
+                </Button>
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    )
   return (
     <div className={styles.root} role="status">
       <span className={styles.head}>

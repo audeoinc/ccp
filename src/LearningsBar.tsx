@@ -38,6 +38,10 @@ const useStyles = makeStyles({
   // ほかの国の学び(使えるかもしれない。ST5)。この国で使うかを、ここで決める
   otherHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, paddingTop: '4px' },
   otherActions: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', paddingTop: '2px' },
+  // 左のバーのパネルの中(SU6): 枠なし・いつも開く。狭いので、日付と名前を本文の上に
+  panel: { display: 'grid', rowGap: '8px', padding: '10px 12px', alignContent: 'start' },
+  panelList: { display: 'grid', rowGap: '10px' },
+  panelItem: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
 })
 
 interface Props {
@@ -52,8 +56,10 @@ interface Props {
   headline: string
   /** 配信情報の Type(テーマの種類。書きかけの値) */
   themeType?: string
-  /** 学びの件数が変わったとき(シンプルな配信カードの「目印」に出す) */
+  /** 学びの件数が変わったとき(シンプルな配信カードの左のバーの「学び」に出す) */
   onCount?: (n: number) => void
+  /** シンプルな配信カードの左のバーのパネルの中に出す(SU6。枠なし・いつも開く) */
+  panel?: boolean
 }
 
 interface Learning {
@@ -76,7 +82,7 @@ const countryName = (code: string) => optionLabel(countryOptions.find((o) => Str
  * 出している間は、AI の下書きの依頼にも、学びを渡す(setActiveLearnings)。テーマの種類も、ここで直せる。
  * 学びは共通で 1 つ持ち、国ごとに使うかを決める(ST5)。この国の学びは使い、ほかの国の学びは「使えるかもしれない学び」として並べて、人が使うかを決める
  */
-export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType, onCount }: Props) {
+export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType, onCount, panel = false }: Props) {
   const styles = useStyles()
   const t = useT()
   const [cards, setCards] = useState<DeliveryCard[]>([])
@@ -171,6 +177,67 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
 
   const dateText = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
 
+  const itemMeta = (l: Learning) =>
+    [l.sameTemplate ? t('同じテンプレート', 'Same template') : '', l.sameType ? t('同じ種類', 'Same type') : '', l.origin !== country ? t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`) : ''].filter(Boolean).join(' / ')
+  const typeLine = (
+    <Tooltip
+      content={t('テーマの種類。同じ種類の過去の配信の学びを集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type, used to find learnings from past deliveries of the same type. "guessed" is inferred from the wording.')}
+      relationship="description"
+    >
+      <span className={styles.head}>
+        <span className={styles.label}>{t('テーマの種類', 'Theme type')}</span>
+        <span>{type.guessed ? t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`) : themeTypeLabel(type.type)}</span>
+      </span>
+    </Tooltip>
+  )
+  const decideButtons = (l: Learning) => (
+    <span className={styles.otherActions}>
+      <Button size="small" disabled={deciding === l.id} onClick={() => void decide(l, true)}>
+        {t(`${countryName(country)}で使う`, `Use in ${countryName(country)}`)}
+      </Button>
+      <Button size="small" appearance="subtle" disabled={deciding === l.id} onClick={() => void decide(l, false)}>
+        {t('使わない', 'Don’t use')}
+      </Button>
+    </span>
+  )
+
+  if (panel)
+    return (
+      <div className={styles.panel}>
+        <span className={styles.muted} style={{ fontSize: tokens.fontSizeBase200 }}>
+          {learnings.length > 0
+            ? t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」。AI の下書きにも渡します', 'Notes for next time from past deliveries with the same template or theme type. Also passed to AI drafts.')
+            : t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」は、まだありません', 'No notes yet from past deliveries with the same template or theme type.')}
+        </span>
+        <span style={{ fontSize: tokens.fontSizeBase200 }}>{typeLine}</span>
+        <div className={styles.panelList}>
+          {learnings.map((l) => (
+            <div key={l.id} className={styles.panelItem}>
+              <span className={styles.muted}>{[dateText(l.at), l.name, itemMeta(l)].filter(Boolean).join(' · ')}</span>
+              <span className={styles.itemNotes}>{l.notes}</span>
+            </div>
+          ))}
+          {candidates.length > 0 && (
+            <>
+              <span className={styles.otherHead}>
+                {t(
+                  `ほかの国の学び(使えるかもしれない)。国で客層が違うので、${countryName(country)}で使うかを決めてください。使うと決めたものだけ、AI に渡します`,
+                  `Learnings from other countries (may apply). Audiences differ by country, so decide whether to use each in ${countryName(country)}. Only the ones you use are passed to AI.`,
+                )}
+              </span>
+              {candidates.map((l) => (
+                <div key={l.id} className={styles.panelItem}>
+                  <span className={styles.muted}>{[dateText(l.at), l.name, t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`)].join(' · ')}</span>
+                  <span className={styles.itemNotes}>{l.notes}</span>
+                  {decideButtons(l)}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    )
+
   return (
     <div className={styles.root}>
       <div className={styles.head}>
@@ -201,15 +268,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
             : t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」は、まだありません', 'No notes yet from past deliveries with the same template or theme type.')}
           {candidates.length > 0 && t(`(ほかの国の、使えるかもしれない学びが ${candidates.length} 件)`, ` (${candidates.length} learning(s) from other countries may apply)`)}
         </span>
-        <Tooltip
-          content={t('テーマの種類。同じ種類の過去の配信の学びを集めるのに使います。「推定」は、言葉から推し量った仮の種類です', 'Theme type, used to find learnings from past deliveries of the same type. "guessed" is inferred from the wording.')}
-          relationship="description"
-        >
-          <span className={styles.head}>
-            <span className={styles.label}>{t('テーマの種類', 'Theme type')}</span>
-            <span>{type.guessed ? t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`) : themeTypeLabel(type.type)}</span>
-          </span>
-        </Tooltip>
+        {typeLine}
       </div>
       {open && (
         <div className={styles.list}>
@@ -218,11 +277,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
               <span className={styles.itemHead}>
                 <span>{dateText(l.at)}</span>
                 <span>{l.name}</span>
-                <span className={styles.muted}>
-                  {[l.sameTemplate ? t('同じテンプレート', 'Same template') : '', l.sameType ? t('同じ種類', 'Same type') : '', l.origin !== country ? t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`) : '']
-                    .filter(Boolean)
-                    .join(' / ')}
-                </span>
+                <span className={styles.muted}>{itemMeta(l)}</span>
               </span>
               <span className={styles.itemNotes}>{l.notes}</span>
             </div>
@@ -244,14 +299,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
                   </span>
                   <span>
                     <span className={styles.itemNotes}>{l.notes}</span>
-                    <span className={styles.otherActions}>
-                      <Button size="small" disabled={deciding === l.id} onClick={() => void decide(l, true)}>
-                        {t(`${countryName(country)}で使う`, `Use in ${countryName(country)}`)}
-                      </Button>
-                      <Button size="small" appearance="subtle" disabled={deciding === l.id} onClick={() => void decide(l, false)}>
-                        {t('使わない', 'Don’t use')}
-                      </Button>
-                    </span>
+                    {decideButtons(l)}
                   </span>
                 </div>
               ))}

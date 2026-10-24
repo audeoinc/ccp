@@ -2436,21 +2436,19 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         device: previewDevice,
         setDevice: pickDevice,
         zoom: { mode: zoom, shown: shownZoom, set: setZoom, min: ZOOM_MIN, max: ZOOM_MAX },
-        notices: (
-          <>
-            {noticesNode}
-            {alertsNode}
-          </>
-        ),
+        // アラートは左のバーの「アラート」に出す(SU6。上の帯に置くと、作業する場所を狭めるため)
+        notices: noticesNode,
         footer: footerNode,
         alertOverlay: simpleAlertOverlay,
+        alerts: liveAlerts,
+        actAlert: alertCard ? setActAlert : undefined,
         setHandoff: (k, v) => setForm((f) => ({ ...f, [k]: v })),
         remaining: progress.remaining,
         people: owners,
         canReview,
         reload: onSaved,
         openProduction: onOpenProduction && card ? (opts) => onOpenProduction(card.id, opts) : undefined,
-        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} />,
+        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel />,
         learnCount,
       }
     : null

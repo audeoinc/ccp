@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { Button, CounterBadge, ToggleButton, Menu, MenuItem, MenuItemCheckbox, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, FlagRegular, HistoryRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { Button, CounterBadge, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
@@ -8,6 +8,7 @@ import { PreviewPartPicker } from '../PreviewPartPicker'
 import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
 import { CommPane, type CommCounts, type CommSection } from './CommPane'
+import { CardAlertsBar } from '../CardAlertsBar'
 import { PinFloat, type PinTarget } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
 import { focusPin } from '../pinStore'
@@ -50,7 +51,7 @@ const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, han
 // 配信の全体にかかわる情報とメニュー(やり取り・承認の様子・素材・渡すもの・変更の記録)をここにまとめ、真ん中は作業する場所にする。
 // VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。どれを開いていたかと幅は、人ごとに覚える
 const SIDE_KEY = 'simpleCard.sidePanel'
-type Side = CommSection | 'assets' | 'handoff' | null
+type Side = CommSection | 'alerts' | 'learn' | 'assets' | 'handoff' | null
 const isComm = (v: Side): v is CommSection => v === 'talk' || v === 'approval' || v === 'history'
 // 右端にあったころの「comm」は、やり取りとして開く
 const loadSide = (): Side => {
@@ -60,10 +61,6 @@ const loadSide = (): Side => {
 const SIDE_W = 56
 const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
 const clampList = (v: number) => Math.min(640, Math.max(240, v))
-// 目印の出し分け(人の設定)。学びは帯で場所を取るので、既定は隠す(隠していても、AI の依頼には渡す)
-const MARKS_KEY = 'simpleCard.marks'
-type MarkKind = 'unchecked' | 'alert' | 'learn'
-const DEFAULT_MARKS: MarkKind[] = ['unchecked', 'alert']
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
@@ -215,11 +212,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // アプリの配信は、スマホの幅
   const widthKey: 'mobile' | 'pc' = e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile'
   const nav = usePreviewNav(boxRef, e.zoom)
-  const [marks, setMarks] = useState<MarkKind[]>(() => loadPref<MarkKind[]>(MARKS_KEY, DEFAULT_MARKS))
-  const markOn = (k: MarkKind) => marks.includes(k)
   // AI 下書き・未確認の目印: AI が作った部品(文言・メイン画像・商品)の右上に点。見つからない部品(テンプレートにない枠)は出ない
   const uncheckedMarks: Mark[] =
-    e.card.ai_unchecked_at && markOn('unchecked')
+    e.card.ai_unchecked_at
       ? [
           ...(['headline', 'copy', 'hero', 'pushTitle', 'pushBody'] as const).map((kind) => ({ part: { kind } as PartRef })),
           ...sectionsOf(e.template).flatMap((_, index) => [{ part: { kind: 'sectionTitle', index } as PartRef }, { part: { kind: 'sectionCopy', index } as PartRef }]),
@@ -406,10 +401,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時 未設定', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
-    ({ talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の記録', 'Change log'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'For production') })[v]
+    ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('これまでの学び', 'Learnings so far'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の記録', 'Change log'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'For production') })[v]
   /** 左のバーの並び(アイコンの下に名前。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
-  const rails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
-    { v: 'talk', icon: <CommentRegular />, label: t('やり取り', 'Talk'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
+  const rails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
+    // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
+    { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
+    { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learnings'), tip: t('これまでの学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings (notes from past deliveries, for reference; also passed to AI drafts)'), count: e.learnCount, color: 'informative' },
+    { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Talk'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
     {
       v: 'approval',
       icon: <PersonAvailableRegular />,
@@ -475,8 +473,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       />
       <div className={s.notices}>
         {e.notices}
-        {/* 学びの帯は、隠していても描く(AI の依頼に学びを渡すのは、この帯の役目のため) */}
-        <div style={markOn('learn') ? undefined : { display: 'none' }}>{e.learnings}</div>
       </div>
 
       <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${isComm(side) ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
@@ -505,7 +501,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 >
                   <span className={s.sideIcon}>
                     {r.icon}
-                    {r.count > 0 && <CounterBadge className={s.sideBadge} count={r.count} size="small" color="brand" />}
+                    {r.count > 0 && <CounterBadge className={s.sideBadge} count={r.count} size="small" color={r.color ?? 'brand'} />}
                     {r.dot && <span className={s.sideDot} style={r.dot === 'amber' ? { backgroundColor: tokens.colorPaletteMarigoldBackground3 } : undefined} />}
                   </span>
                   <span className={s.sideLabel}>{r.label}</span>
@@ -551,6 +547,23 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 onCounts={onCounts}
               />
             </div>
+            {side === 'alerts' && (
+              <div style={{ minHeight: 0, overflowY: 'auto' }}>
+                <CardAlertsBar
+                  panel
+                  alerts={e.alerts}
+                  onAct={e.actAlert}
+                  selectedProductId={part?.kind === 'product' ? e.items.find((i) => i.key === part.itemKey)?.productId : undefined}
+                  // 押すと、プレビューのその商品を選ぶ(SU6 ③)
+                  onSelectProduct={(pid) => {
+                    const it = e.items.find((i) => i.productId === pid)
+                    if (it) select({ kind: 'product', itemKey: it.key })
+                  }}
+                />
+              </div>
+            )}
+            {/* 学びは、閉じていても描く(AI の依頼に学びを渡すのは、この部品の役目のため) */}
+            <div style={side === 'learn' ? { minHeight: 0, overflowY: 'auto' } : { display: 'none' }}>{e.learnings}</div>
             {side === 'assets' && (
               // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
               <div className={s.pane}>
@@ -599,33 +612,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             >
               {t(`テンプレート: ${tpl.label}`, `Template: ${tpl.label}`)}
             </Button>
-            <Menu
-              checkedValues={{ marks }}
-              onCheckedValueChange={(_, d) => {
-                const next = d.checkedItems as MarkKind[]
-                setMarks(next)
-                savePref(MARKS_KEY, next)
-              }}
-            >
-              <MenuTrigger disableButtonEnhancement>
-                <Button type="button" size="small" appearance="subtle" icon={<FlagRegular />}>
-                  {t('目印', 'Marks')}
-                </Button>
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  <MenuItemCheckbox name="marks" value="unchecked" disabled={!e.card.ai_unchecked_at} secondaryContent={e.card.ai_unchecked_at ? undefined : t('なし', 'None')}>
-                    {t('AI 下書き・未確認', 'AI draft, unchecked')}
-                  </MenuItemCheckbox>
-                  <MenuItemCheckbox name="marks" value="alert" secondaryContent={String(new Set(e.items.filter((i) => e.alertKinds.has(i.productId)).map((i) => i.productId)).size)}>
-                    {t('アラート(在庫など)', 'Alerts (stock etc.)')}
-                  </MenuItemCheckbox>
-                  <MenuItemCheckbox name="marks" value="learn" secondaryContent={String(e.learnCount)}>
-                    {t('これまでの学び', 'Learnings so far')}
-                  </MenuItemCheckbox>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
           </div>
           {/* 案のタブ(SU2): A | B | C | ＋。切り替えると、プレビューとペインがその案の中身になる */}
           <div className={s.abRow}>
@@ -725,7 +711,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           </div>
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
             {e.preview}
-            {markOn('alert') && e.alertOverlay}
+            {e.alertOverlay}
             <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />
             {pinTarget && (
               <PinFloat

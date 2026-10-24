@@ -308,7 +308,7 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `SimpleCardLayout.tsx` | 716 | 画面の並び(左のバーのやり取り / 承認 / 素材 / 渡すもの / 変更 + 開くパネル \| プレビュー \| 選んだ部品のペイン \| 商品の一覧)、幅と開閉 |
+| `SimpleCardLayout.tsx` | 716 | 画面の並び(左のバーのアラート / 学び / やり取り / 承認 / 素材 / 渡すもの / 変更 + 開くパネル \| プレビュー \| 選んだ部品のペイン \| 商品の一覧)、幅と開閉 |
 | `parts.ts` | 143 | 「部品」の型(プレビューの上で押して選ぶ単位)と、プレビューの目印(`data-part`・`data-anchor`)との読み替え |
 | `PartPane.tsx` | 795 | 選んだ部品のペイン(文言・メイン画像・商品・空いた枠・リンク先など、部品ごとの欄) |
 | `PartAiChat.tsx` / `partAi.ts` | 180 / 265 | 選んだ部品を AI に頼む(指示の例の札・案 3 つ・乗せると仮に写る・押すと採用。何も選んでいないときは配信の全体) |
@@ -317,7 +317,7 @@ flowchart TD
 | `HandoffSheet.tsx` / `ProductionMemo.tsx` / `assetDrop.ts` | 239 / 69 / 35 | 制作に渡すもの(担当・締め切り・文章・素材・「制作に渡す」)/ 部品から 1 行で渡すものに書き留める「制作へのメモ」/ 画像・資料・URL のドラッグ |
 | `AbSettings.tsx` | 85 | AB テストの設定(SU2。案のタブの横の ⚙) |
 | `StageHeader.tsx` / `ViewSwitch.tsx` / `NextAction.tsx` / `nextStep.ts` | 33 / 38 / 26 / 13 | 上の帯(題名と PLAN \| PRODUCTION \| RESULTS のタブ。制作のシンプルな画面でも使う)/ シンプル \| 詳しい の切り替え / 次にやることのボタン |
-| `PreviewMarks.tsx` | 78 | プレビューの上の目印(AI 下書き・未確認 / アラート / 学び) |
+| `PreviewMarks.tsx` | 78 | プレビューの上の目印(AI 下書き・未確認 / A と違う) |
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 126 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
 
 ### 3.4 AI
