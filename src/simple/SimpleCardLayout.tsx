@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, CounterBadge, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
@@ -107,8 +107,16 @@ const useStyles = makeStyles({
   previewPane: { display: 'flex', flexDirection: 'column', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
-  inbox: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
-  sender: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase200, flexShrink: 0 },
+  // 受信箱での見え方(SU5)。Gmail の一覧の 1 行のように、左に差出人を太字で、右に「件名 ― プリヘッダー」をうすく。ラベルは並べない(行が長くうるさくなるため)
+  inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
+  inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
+  sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  inboxDash: { color: tokens.colorNeutralForeground4, flexShrink: 0 },
+  // 入れ忘れの印(押すと、その欄を開いて、すぐ書ける)
+  inboxMissing: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold, textDecorationLine: 'underline', textDecorationStyle: 'dashed', textUnderlineOffset: '3px' },
+  // アプリの通知の 1 行(スマホの通知の見た目)
+  pushIcon: { width: '20px', height: '20px', borderRadius: '5px', display: 'grid', placeItems: 'center', flexShrink: 0, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground, fontSize: '12px' },
   inboxPart: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: tokens.borderRadiusSmall, border: '1px solid transparent', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, cursor: 'pointer', textAlign: 'left', color: tokens.colorNeutralForeground1, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)。押したら Tab・Esc が効くよう、フォーカスを受け取る
@@ -706,18 +714,44 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length < 3 && e.abDiffParts.length > 1 && e.abDiffParts.some((p) => p.kind === 'template') && (
             <span className={s.abWarn}>{t('テンプレートと、ほかの所も A と違います。結果がテンプレートの差か中身の差か、分けにくくなります', 'Both the template and other parts differ from A. It will be hard to tell which caused the result.')}</span>
           )}
+          {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。差出人の名前(いまは見本の SHOP)をどこで決めるかは ST10 */}
           {e.channel === 'email' ? (
-            <div className={s.inbox}>
-              <span className={s.sender}>SHOP</span>
-              <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff)} style={{ fontWeight: 600 }} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
-                {e.form.subject || e.form.name || t('(件名未入力)', '(No subject)')}
-              </button>
-              <button type="button" className={mergeClasses(s.inboxPart, s.inboxSub, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={t('プリヘッダーを直す', 'Edit the preheader')}>
-                {e.form.preheader || t('(プリヘッダー未入力)', '(No preheader)')}
-              </button>
+            <div className={s.inboxWrap}>
+              <span className={s.inboxHead}>
+                <MailRegular />
+                {t('受信箱での見え方', 'How it looks in the inbox')}
+              </span>
+              <div className={s.inbox}>
+                <span className={s.sender} title={t('差出人の名前', 'Sender name')}>SHOP</span>
+                <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(e.form.subject || e.form.name) && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '60%' }} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
+                  {e.form.subject || e.form.name || t('件名未入力', 'No subject')}
+                </button>
+                <span className={s.inboxDash}>―</span>
+                <button type="button" className={mergeClasses(s.inboxPart, e.form.preheader ? s.inboxSub : s.inboxMissing, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={e.form.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の横に出る文)', 'No preheader yet. Click to write it (shown next to the subject in the inbox)')}>
+                  {e.form.preheader || t('プリヘッダー未入力', 'No preheader')}
+                </button>
+              </div>
             </div>
           ) : (
-            <span className={s.hint}>{t('通知のタイトル・本文・画像・商品は、プレビューを押して直します', 'Click the preview to edit the notification title, body, image and products')}</span>
+            <div className={s.inboxWrap}>
+              <span className={s.inboxHead}>
+                <AlertRegular />
+                {t('スマホの通知での見え方', 'How it looks as a phone notification')}
+              </span>
+              <div className={s.inbox}>
+                <span className={s.pushIcon} aria-hidden>
+                  S
+                </span>
+                <span className={s.sender} style={{ width: 'auto' }}>SHOP</span>
+                <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'pushTitle' }) && s.on, !e.form.pushTitle && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '50%', fontWeight: 600 }} onClick={() => select({ kind: 'pushTitle' })} title={t('通知のタイトルを直す', 'Edit the notification title')}>
+                  {e.form.pushTitle || t('タイトル未入力', 'No title')}
+                </button>
+                <span className={s.inboxDash}>―</span>
+                <button type="button" className={mergeClasses(s.inboxPart, e.form.pushBody ? s.inboxSub : s.inboxMissing, isOn({ kind: 'pushBody' }) && s.on)} onClick={() => select({ kind: 'pushBody' })} title={t('通知の本文を直す', 'Edit the notification body')}>
+                  {e.form.pushBody || t('本文未入力', 'No body')}
+                </button>
+              </div>
+            </div>
           )}
           <div className={s.boxWrap}>
           {/* プレビューの左上 = 見え方(スマホ / PC の幅)、右上 = 書き込む(場所を押してコメント)。役割で分け、場所を取らないようアイコンだけ */}
