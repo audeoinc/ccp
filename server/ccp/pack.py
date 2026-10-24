@@ -20,14 +20,18 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
 import re
+import tempfile
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import Response
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from sqlalchemy import text
 
 from . import assets, creative, repo, schema as sc
@@ -61,41 +65,59 @@ def image_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]
     return sorted(refs)
 
 
-@router.get("/api/export")
-async def export_pack() -> Response:
-    tables = await read_tables()
-    refs = image_refs(tables)
-    # 画像は、同時に 8 枚ずつ読む(GCS からの読み込みを待つ間に、ほかの画像を読む)
-    sem = asyncio.Semaphore(8)
-
-    async def load(kind: str, name: str) -> tuple[str, str, bytes | None]:
-        async with sem:
-            found = await asyncio.to_thread(assets.read_image, kind, name)
-        return kind, name, found[0] if found else None
-
-    images = await asyncio.gather(*(load(k, n) for k, n in refs))
-
-    # 素材(Creative Assets)のファイル
-    async def load_creative(stored: str) -> tuple[str, str, bytes | None]:
-        async with sem:
-            data = await asyncio.to_thread(creative.load, stored)
-        return creative.KIND, stored, data
-
+def file_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
+    """パックに入れるファイル(種類・名前): /img/… の画像と、素材の置き場所のファイル"""
     # 素材のファイル・URL の見本カードの画像(preview_image)と、ピンを書いたときの様子の画像(card_notes.anchor_image。X65 (b))。どちらも素材の置き場所にある
     refs = [(r, k) for r in tables.get("card_assets", []) for k in ("stored", "preview_image")] + [(r, "anchor_image") for r in tables.get("card_notes", [])]
     stored = sorted({str(r[k]) for r, k in refs if r.get(k) and creative.STORED.match(str(r[k]))})
-    images = [*images, *await asyncio.gather(*(load_creative(n) for n in stored))]
-    now = datetime.now(timezone.utc)
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        meta = {"version": PACK_VERSION, "exportedAt": now.isoformat(), "counts": {k: len(v) for k, v in tables.items()}, "missingImages": [f"{k}/{n}" for k, n, b in images if b is None]}
-        z.writestr("data.json", json.dumps({**meta, "tables": tables}, ensure_ascii=False))
-        for kind, name, data in images:
-            if data is not None:
+    return [*image_refs(tables), *((creative.KIND, n) for n in stored)]
+
+
+def _read_file(kind: str, name: str) -> bytes | None:
+    if kind == creative.KIND:
+        return creative.load(name)
+    found = assets.read_image(kind, name)
+    return found[0] if found else None
+
+
+# 一度に読むファイルの数(バケットからの読み込みを待つ間に、ほかを読む)。読んだものから ZIP に書いて、手放す
+READ_AHEAD = 8
+
+
+def write_pack(out: Any, tables: dict[str, list[dict[str, Any]]], now: datetime) -> None:
+    """パックの ZIP を out(ファイル)に書く。画像は、まとめてメモリに載せずに、読んだ順に書き込む
+    (これまでは、すべての画像と ZIP の全体をメモリに持ってから返していて、画像が多いとサーバーのメモリの上限に当たりやすかった。
+    2026-10-25 の整理 第 2 段)。足りなかったファイルは、data.json の missingImages に書く(data.json は、最後に入れる)"""
+    refs = file_refs(tables)
+    missing: list[str] = []
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z, ThreadPoolExecutor(READ_AHEAD) as pool:
+        for start in range(0, len(refs), READ_AHEAD):
+            batch = refs[start:start + READ_AHEAD]
+            for (kind, name), data in zip(batch, pool.map(lambda r: _read_file(*r), batch)):
+                if data is None:
+                    missing.append(f"{kind}/{name}")
+                    continue
                 # 画像は、すでに圧縮されているので、縮めずに入れる(時間だけかかって、小さくならないため)
                 z.writestr(zipfile.ZipInfo(f"images/{kind}/{name}", date_time=now.timetuple()[:6]), data, compress_type=zipfile.ZIP_STORED)
+        meta = {"version": PACK_VERSION, "exportedAt": now.isoformat(), "counts": {k: len(v) for k, v in tables.items()}, "missingImages": missing}
+        with z.open("data.json", "w") as f, io.TextIOWrapper(f, encoding="utf-8") as w:
+            json.dump({**meta, "tables": tables}, w, ensure_ascii=False)
+
+
+@router.get("/api/export")
+async def export_pack() -> FileResponse:
+    tables = await read_tables()
+    now = datetime.now(timezone.utc)
+    # ZIP は一時ファイルに書いて、少しずつ返す(返し終えたら消す)
+    fd, tmp = tempfile.mkstemp(prefix="ccp-pack-", suffix=".zip")
+    try:
+        with os.fdopen(fd, "wb") as out:
+            await asyncio.to_thread(write_pack, out, tables, now)
+    except BaseException:
+        os.unlink(tmp)
+        raise
     filename = f"ccp-pack-{now.strftime('%Y%m%d-%H%M')}.zip"
-    return Response(content=buf.getvalue(), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return FileResponse(tmp, media_type="application/zip", filename=filename, background=BackgroundTask(os.unlink, tmp))
 
 
 def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
@@ -118,6 +140,25 @@ KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes"}
 # 人の設定(user_prefs。ST6)は残さない: ユーザー(users)と一緒に置き換わり、消えたユーザーの設定は参照先がなくなるため
 
 
+# まとめて INSERT する行の数(1 回の往復で送る大きさを抑える)
+BATCH = 500
+
+
+def batches(values: Any) -> Any:
+    """取り込む行を、列の並びが同じで続くものごとに、BATCH 行ずつまとめる(並びの順は変えない。同じ表の中の参照のため)"""
+    cols: list[str] | None = None
+    batch: list[dict[str, Any]] = []
+    for v in values:
+        keys = list(v)
+        if batch and (keys != cols or len(batch) >= BATCH):
+            yield cols, batch
+            batch = []
+        cols = keys
+        batch.append(v)
+    if batch:
+        yield cols, batch
+
+
 async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
     """DB の中身を、パックの内容に置き換える(作った日時・変えた日時も、元のまま残す)。KEEP_ON_REPLACE の表は消さずに足す"""
     from .db import cli_conn
@@ -132,10 +173,9 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
         for t in order:
             keep = t.name in KEEP_ON_REPLACE
             rows = tables.get(t.name, [])
-            for rec in rows:
-                values = repo.import_values(t, rec)
-                conflict = " ON CONFLICT (id) DO NOTHING" if keep else ""
-                await conn.execute(text(repo.insert_sql(t, list(values), conflict)), values)
+            conflict = " ON CONFLICT (id) DO NOTHING" if keep else ""
+            for cols, batch in batches(repo.import_values(t, rec) for rec in rows):
+                await conn.execute(text(repo.insert_sql(t, cols, conflict)), batch)
             print(f"{t.pg}: {len(rows)} 件" + ("(残して足した)" if keep else ""))
 
 
