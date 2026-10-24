@@ -52,5 +52,33 @@ class FailTest(unittest.TestCase):
         self.assertEqual(events, ["rollback"])
 
 
+
+class WriteDeniedTest(unittest.TestCase):
+    """汎用の窓口(/api/data)で、専用の窓口がある表を書かせない(整理③)"""
+
+    def test_locked_tables(self) -> None:
+        from ccp.data_api import write_denied
+
+        for table in ("approval_requests", "approval_reviewers", "production_requests", "user_prefs", "notifications"):
+            for op in ("create", "update", "delete"):
+                self.assertIsNotNone(write_denied(table, op, ["status"]), (table, op))
+
+    def test_screen_writes_still_allowed(self) -> None:
+        from ccp.data_api import write_denied
+
+        # history.ts の logEvent と、alerts.ts の「対応済みにする」
+        self.assertIsNone(write_denied("events", "create"))
+        self.assertIsNone(write_denied("change_logs", "update", ["resolved_at", "resolved_by", "resolve_note"]))
+        self.assertIsNone(write_denied("delivery_cards", "update", ["status"]))
+
+    def test_records_cannot_be_rewritten(self) -> None:
+        from ccp.data_api import write_denied
+
+        self.assertIsNotNone(write_denied("events", "update", ["note"]))
+        self.assertIsNotNone(write_denied("events", "delete"))
+        self.assertIsNotNone(write_denied("change_logs", "update", ["after_value"]))
+        self.assertIsNotNone(write_denied("change_logs", "create"))
+
+
 if __name__ == "__main__":
     unittest.main()

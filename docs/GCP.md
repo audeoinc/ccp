@@ -48,6 +48,8 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 - 並べ替え(`orderBy`)、`select`、`top`、`skip`。
 - 書き込みの参照は、参照の列に、相手の `id` をそのまま入れる(例: `hero_image_id: "<id>"`。`null` で参照を外す)。
 - DB に接続できないときは 503 + `code: "db_unavailable"`。
+- 専用の窓口がある表(承認の依頼・相手、制作の依頼、人ごとの設定、通知、取り込み・直しの記録)は、ここからは読むだけ(書くと 403。`data_api.py` の `WRITE_LOCKED`)。出来事の記録 `events` は足すだけ、変更の記録 `change_logs` は「対応済み」の 3 列だけ直せる(2026-10-24 の整理③)。
+- 書き込みのトランザクション(`db(write=True)`)の中で失敗を返すときは `raise Fail(...)`(`return fail` だと、それまでの書き込みが確定する)。
 
 ## BigQuery からの取り込み(`/api/bq`。`server/ccp/bq_import.py`)
 

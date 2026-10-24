@@ -163,9 +163,44 @@ async def get_row(table: str, row_id: str):
     return ok(t.to_api(dict(row)))
 
 
+# 専用の窓口が書く表は、この汎用の窓口からは書かせない(読むのはよい)。承認の判定・制作の工程・記録の流れを飛ばして
+# 書き換えられないように(2026-10-24 の整理③)。画面が汎用で書いているのは、出来事の記録を足す(history.ts の logEvent)と、
+# 変更の記録を「対応済み」にする(alerts.ts)だけなので、その 2 つだけを残す
+WRITE_LOCKED = {
+    "approval_requests": "承認の依頼は、承認の窓口(/api/approvals)で書きます",
+    "approval_reviewers": "承認の相手は、承認の窓口(/api/approvals)で書きます",
+    "production_requests": "制作の依頼は、制作の窓口(/api/production)で書きます",
+    "user_prefs": "人ごとの設定は、/api/prefs で書きます",
+    "bq_imports": "BigQuery の取り込みの記録は、取り込みが書きます",
+    "policy_rule_edits": "決まりの直しの記録は、決まりの窓口(/api/policies)が書きます",
+    "notifications": "通知は、承認・制作の窓口が書きます",
+}
+# 足すだけの表(直す・消すはできない)
+APPEND_ONLY = {"events"}
+# 直せる列を決めた表(ほかの列・足す・消すはできない)
+UPDATE_ONLY = {"change_logs": {"resolved_at", "resolved_by", "resolve_note"}}
+
+
+def write_denied(table: str, op: str, columns: list[str] | None = None) -> str | None:
+    """汎用の窓口で、この表に、この書き込み(create / update / delete)をしてよいか。だめなら理由"""
+    if table in WRITE_LOCKED:
+        return WRITE_LOCKED[table]
+    if table in APPEND_ONLY and op != "create":
+        return "この表は、足すだけです(記録なので、直す・消すはできません)"
+    if table in UPDATE_ONLY:
+        if op != "update":
+            return "この表は、記録なので、足す・消すはできません"
+        extra = sorted(set(columns or []) - UPDATE_ONLY[table])
+        if extra:
+            return f"この表で直せるのは {', '.join(sorted(UPDATE_ONLY[table]))} だけです({', '.join(extra)} は直せません)"
+    return None
+
+
 @router.post("/{table}")
 async def create_row(table: str, request: Request):
     t = SCHEMA.table(table)
+    if denied := write_denied(t.name, "create"):
+        return fail(403, denied)
     values = t.to_db(await _body(request))
     cols = list(values)
     returning = _columns_sql(t, None)
@@ -224,6 +259,8 @@ async def _log_changes(conn: AsyncConnection, t: sc.Table, row_id: Any, before: 
 async def update_row(table: str, row_id: str, request: Request):
     t = SCHEMA.table(table)
     values = t.to_db(await _body(request))
+    if denied := write_denied(t.name, "update", list(values)):
+        return fail(403, denied)
     sets = [f"{c} = :{c}" for c in values] + ["modified_on = now()"]
     sql = f"UPDATE {t.pg} SET {', '.join(sets)} WHERE id = :_id RETURNING {_columns_sql(t, None)}"
     rid = sc.coerce("uuid", row_id)
@@ -249,6 +286,8 @@ async def update_row(table: str, row_id: str, request: Request):
 @router.delete("/{table}/{row_id}")
 async def delete_row(table: str, row_id: str, request: Request):
     t = SCHEMA.table(table)
+    if denied := write_denied(t.name, "delete"):
+        return fail(403, denied)
     async with db(write=True) as conn:
         denied = await people_edit_denied(conn, request, t.name)
         if denied:
