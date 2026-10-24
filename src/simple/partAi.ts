@@ -31,7 +31,7 @@ const COMMON = `入力の request が最新の依頼、chat がこれまでの�
 `
 
 const TEXT_PROMPT = `あなたは、メールマガジン・アプリの通知の文言を直す手伝いをする。担当者は、配信の 1 つの部品(件名・見出し・コピーなど)を選び、「もっと短く」のように頼む。
-入力の part が直す部品(kind・label・current = いまの文言)、context がほかの部品のいまの文言。
+入力の part が直す部品(kind・label・current = いまの文言)、context がほかの部品のいまの文言。assets があれば、配信の参考の素材(name・kind = file / url・note = 説明・url)。
 ${COMMON}
 次の JSON だけを返す:
 {"mode":"update","reply":"依頼にどう応えたかを 1 文で","ideas":[{"text":"新しい文言","why":"そう直した理由を 1 文で"}]}
@@ -40,6 +40,7 @@ ${COMMON}
 1. ideas は 3 つ。それぞれ違う方向にする(同じ言い回しを並べない)。
 2. 文言は、配信の国に合わせる(US は英語、JP は日本語)。テーマと切り口から外れない。価格・割引率・期限など、入力にない事実を作らない。
 3. 長さの目安: 件名は 40 文字(英語は 50 字)まで、見出し・通知のタイトルは短く、コピー・プリヘッダー・通知の本文は 2 文まで。制作指示(kind が instructions)は、制作の人に向けた箇条書きで 10 行まで(画像・見せ方・強調する所)。依頼が長さを決めていれば、それに従う。
+4. 制作指示で assets があれば、合う素材を名前で挙げてよい(例「メイン画像は素材『秋の参考写真』の雰囲気で」。名前は assets の name をそのまま「素材『…』」の形で)。素材の中身は見ていないので、name と note から言える以上のことを書かない。
 
 入力:
 `
@@ -92,6 +93,8 @@ export async function askPartRewrite(args: {
   angle: string
   part: { kind: string; label: string; current: string }
   context: Record<string, string>
+  /** 配信の参考の素材(制作指示で名前を挙げられるように。画像の中身は渡さない: 費用と時間が増えるため。X74) */
+  assets?: { name: string; kind?: string; note?: string; url?: string }[]
   request: string
   history: PartTurn[]
 }): Promise<PartAnswer> {
@@ -100,6 +103,7 @@ export async function askPartRewrite(args: {
     card: { ...args.card, angle: args.angle },
     part: args.part,
     context: args.context,
+    ...(args.assets?.length ? { assets: args.assets } : {}),
     request: args.request,
     chat: historyOf(args.history, (v) => v),
   })

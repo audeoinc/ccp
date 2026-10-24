@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { InfoLabel, Button, Field, Input, Spinner, makeStyles, tokens } from '@fluentui/react-components'
-import { ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
+import { Button, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { AttachRegular, ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { CreativeAssets } from '../CreativeAssets'
 import { loadPref, savePref } from '../settings'
 import { MarkdownLite } from '../MarkdownLite'
+import { CardAssetsService } from '../data/cardAssets'
 import { DeliveryCardsService } from '../data/deliveryCards'
+import type { CardAsset } from '../models/cardAssets'
 import { ProductionRequestsService } from '../data/productionRequests'
 import type { ProductionRequest } from '../models/productionRequests'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
@@ -26,11 +28,12 @@ const useStyles = makeStyles({
   status: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   grow: { flexGrow: 1, minWidth: 0 },
-  read: { padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   pair: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '10px' },
   fold: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: 0, border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'left' },
   count: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
-  foot: { display: 'flex', alignItems: 'center', columnGap: '10px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  // ボタンは説明の文と横に並べず、幅いっぱいの 1 行に(狭いパネルで文字が折り返し、背の高いボタンになって浮いて見えたため。X74)
+  foot: { display: 'grid', rowGap: '8px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  tools: { display: 'flex', justifyContent: 'flex-end' },
 })
 
 interface Props {
@@ -70,6 +73,26 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   }
   // 渡す文章の案を仮に写している間の、元の文章
   const original = useRef<string | null>(null)
+  // 参考の素材(制作指示に名前を挙げる・AI に渡すため。畳んでいても読む)
+  const [assets, setAssets] = useState<CardAsset[]>([])
+  useEffect(() => {
+    let alive = true
+    void CardAssetsService.getAll({ filter: `delivery_card_id eq ${e.card.id}`, orderBy: ['created_on desc'] }).then((r) => {
+      if (alive && r.success) setAssets(r.data ?? [])
+    })
+    return () => {
+      alive = false
+    }
+  }, [e.card.id, assetsVersion, assetCount])
+  // 「素材を挿入」で差し込む位置(欄を離れたときのカーソルの位置。メニューを押すと欄から離れるため)
+  const caret = useRef<number | null>(null)
+  const insertAsset = (a: CardAsset) => {
+    const text = e.form.instructions
+    const at = Math.min(caret.current ?? text.length, text.length)
+    const piece = t(`素材「${a.name}」`, `asset "${a.name}"`)
+    e.setField('instructions', text.slice(0, at) + piece + text.slice(at))
+    caret.current = at + piece.length
+  }
 
   useEffect(() => {
     let alive = true
@@ -89,8 +112,10 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
 
   const view = productionView(e.card, req)
   const requested = view !== 'draft' && view !== 'stale' && view !== 'not_approved'
-  // 渡したあとは、渡したものを読むだけで見せる(直すと、制作に依頼し直しになるため。直すときは「直す」で)
+  // 担当と締め切りは、渡したあとは読むだけ(制作の依頼の側で決まるため)
   const readOnly = requested
+  // 制作指示は、渡したあとも直せる(2026-10-24 利用者と決めた。承認とロックは SU1 で考え直す)。直したことだけ知らせて、止めない
+  const editedAfter = requested && req?.instructions != null && req.instructions.trim() !== e.form.instructions.trim()
   useEffect(() => {
     if (poll === 0 || requested || poll > 20) return
     const timer = window.setTimeout(() => setPoll((n) => n + 1), 3000)
@@ -150,45 +175,73 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           <span className={s.num}>2</span>
           {t('渡す文章(制作指示)', 'Text for production (notes)')}
         </span>
-        {readOnly ? (
-          <div className={s.read}>{e.form.instructions.trim() ? <MarkdownLite text={e.form.instructions} /> : <span className={s.caption}>{t('(なし)', '(none)')}</span>}</div>
-        ) : (
-          <>
-            <AutoTextarea heightKey="HandoffSheet.e_form_instructions" size="small" rows={4} value={e.form.instructions} placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。セールの期間を目立たせる', 'e.g. Feature the model large in the main image; headline below it; make the sale period stand out')} onChange={(_, d) => e.setField('instructions', d.value)} />
-            <PartAiChat
-              kind="instructions"
-              label={t('渡す文章', 'Production notes')}
-              turns={turns}
-              setTurns={setTurns}
-              placeholder={t('例: 画像の指示を足して、箇条書きに', 'e.g. Add image directions, as bullet points')}
-              ask={(request, history) =>
-                askPartRewrite({
-                  card: e.aiCard(),
-                  angle: e.form.copyAngle,
-                  part: { kind: 'instructions', label: t('制作指示', 'Production notes'), current: e.form.instructions },
-                  context: { subject: e.form.subject || e.form.name, headline: e.form.headline, copy: e.form.copy, theme: e.form.theme },
-                  request,
-                  history,
-                })
-              }
-              renderIdea={(idea) => <MarkdownLite text={idea.value} />}
-              isCurrent={(idea) => idea.value === e.form.instructions}
-              onPreview={(idea) => {
-                if (idea) {
-                  if (original.current === null) original.current = e.form.instructions
-                  e.setField('instructions', idea.value)
-                } else if (original.current !== null) {
-                  e.setField('instructions', original.current)
-                  original.current = null
-                }
-              }}
-              onAdopt={(idea) => {
-                original.current = null
-                e.setField('instructions', idea.value)
-              }}
-            />
-          </>
+        {editedAfter && (
+          <MessageBar intent="info" layout="multiline">
+            <MessageBarBody>{t('渡したあとに直しました。制作に知らせるには、制作のページで依頼し直してください。', 'Edited after handoff. To let production know, request again on the production page.')}</MessageBarBody>
+          </MessageBar>
         )}
+        <AutoTextarea
+          heightKey="HandoffSheet.e_form_instructions"
+          size="small"
+          rows={4}
+          value={e.form.instructions}
+          placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。セールの期間を目立たせる', 'e.g. Feature the model large in the main image; headline below it; make the sale period stand out')}
+          onChange={(_, d) => e.setField('instructions', d.value)}
+          onBlur={(ev) => (caret.current = ev.currentTarget.selectionStart)}
+        />
+        {assets.length > 0 && (
+          <div className={s.tools}>
+            <Menu>
+              <MenuTrigger disableButtonEnhancement>
+                <Button size="small" appearance="subtle" icon={<AttachRegular />}>
+                  {t('素材を挿入', 'Insert asset')}
+                </Button>
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  {assets.map((a) => (
+                    <MenuItem key={a.id} onClick={() => insertAsset(a)}>
+                      {a.name}
+                    </MenuItem>
+                  ))}
+                </MenuList>
+              </MenuPopover>
+            </Menu>
+          </div>
+        )}
+        <PartAiChat
+          kind="instructions"
+          label={t('渡す文章', 'Production notes')}
+          turns={turns}
+          setTurns={setTurns}
+          placeholder={t('例: 画像の指示を足して、箇条書きに', 'e.g. Add image directions, as bullet points')}
+          ask={(request, history) =>
+            askPartRewrite({
+              card: e.aiCard(),
+              angle: e.form.copyAngle,
+              part: { kind: 'instructions', label: t('制作指示', 'Production notes'), current: e.form.instructions },
+              context: { subject: e.form.subject || e.form.name, headline: e.form.headline, copy: e.form.copy, theme: e.form.theme },
+              assets: assets.map((a) => ({ name: a.name, kind: a.kind, note: a.note || a.preview_description || undefined, url: a.kind === 'url' ? a.url : undefined })),
+              request,
+              history,
+            })
+          }
+          renderIdea={(idea) => <MarkdownLite text={idea.value} />}
+          isCurrent={(idea) => idea.value === e.form.instructions}
+          onPreview={(idea) => {
+            if (idea) {
+              if (original.current === null) original.current = e.form.instructions
+              e.setField('instructions', idea.value)
+            } else if (original.current !== null) {
+              e.setField('instructions', original.current)
+              original.current = null
+            }
+          }}
+          onAdopt={(idea) => {
+            original.current = null
+            e.setField('instructions', idea.value)
+          }}
+        />
       </div>
 
       {/* 3. 参考の画像・資料・URL(縦に長くなりやすいので畳める。足すのは「＋」から。右の帯の「素材」でも同じものを開ける) */}
@@ -219,21 +272,16 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         )}
       </div>
 
-      {(
-        <div className={s.foot}>
-          {readOnly ? (
-            // 渡したあとの説明は ⓘ に(X72。足もとに長い文を並べない)
-            <InfoLabel size="small" info={t('渡したものを読むだけで出しています。直すときは「直す」で直し、制作のページで依頼し直します', 'Shown read-only after handoff. To change it, edit in “Edit” and request again on the production page')}>
-              {t('渡したもの(読むだけ)', 'Handed off (read-only)')}
-            </InfoLabel>
-          ) : (
-            <span className={s.caption}>{statusNote(e.card.status, t)}</span>
-          )}
-          <Button appearance="primary" icon={<SendRegular />} disabled={busy || e.saving || !e.openProduction} onClick={() => void pass()}>
-            {requested ? t('制作のページで続きを見る', 'Continue on the production page') : t('制作に渡す', 'Hand off to production')}
-          </Button>
-        </div>
-      )}
+      <div className={s.foot}>
+        <span className={s.caption}>
+          {requested
+            ? t('渡したあとも、渡す文章は直せます。直したら、制作のページで依頼し直します。', 'You can still edit the notes after handoff. If you do, request again on the production page.')
+            : statusNote(e.card.status, t)}
+        </span>
+        <Button appearance="primary" size="medium" icon={requested ? <OpenRegular /> : <SendRegular />} disabled={busy || e.saving || !e.openProduction} onClick={() => void pass()}>
+          {requested ? t('制作のページへ', 'Open production page') : t('制作に渡す', 'Hand off to production')}
+        </Button>
+      </div>
     </div>
   )
 }
