@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, CounterBadge, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
@@ -59,8 +59,9 @@ const loadSide = (): Side => {
   return v === 'comm' ? 'talk' : v
 }
 const SIDE_W = 56
-const clampPreview = (v: number) => Math.min(1200, Math.max(360, v))
-const clampList = (v: number) => Math.min(640, Math.max(240, v))
+// 覚えた幅が数でなければ(壊れた設定)、既定の幅に戻す
+const clampPreview = (v: number) => (Number.isFinite(v) ? Math.min(1200, Math.max(360, v)) : DEFAULT_WIDTHS.mobile)
+const clampList = (v: number) => (Number.isFinite(v) ? Math.min(640, Math.max(240, v)) : DEFAULT_WIDTHS.list)
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
@@ -97,6 +98,7 @@ const useStyles = makeStyles({
     gridTemplateColumns: `${SIDE_W}px var(--ws) 1px var(--wv) 1px minmax(280px, 1fr) 1px minmax(0, var(--wl))`,
     gridTemplateRows: 'minmax(0, 1fr)',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    // パネルを開く・しまう間だけ、列の幅を動かす(引き出しのように、左のバーへしまわれる)
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     overflow: 'hidden',
   },
@@ -147,6 +149,7 @@ const useStyles = makeStyles({
   railDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' },
   listHead: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '-6px' },
   colTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: '10px' },
+  panesMoving: { transitionProperty: 'grid-template-columns', transitionDuration: '200ms', transitionTimingFunction: 'ease-out', '@media (prefers-reduced-motion: reduce)': { transitionDuration: '0ms' } },
   // 左のバーと、開くパネル
   sidePane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
   sideHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 6px 6px 12px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap', overflow: 'hidden' },
@@ -238,7 +241,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     setSide(next)
     savePref(SIDE_KEY, next)
     if (isComm(next)) setCommSection(next)
+    if (next) setLastSide(next)
+    if (next !== side) {
+      setMoving(true)
+      window.setTimeout(() => setMoving(false), 260)
+    }
   }
+  // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
+  const [lastSide, setLastSide] = useState<Exclude<Side, null>>(() => loadSide() ?? 'talk')
+  const panel = side ?? lastSide
+  const [moving, setMoving] = useState(false)
   // パネルは左にあるので、境目を右へ動かすと広がる
   const resizeSide = (dx: number) => setWidths((w) => (isComm(side) ? { ...w, comm: clampList(w.comm + dx) } : { ...w, hand: clampList(w.hand + dx) }))
   // やり取りの部品は、閉じていても描いておき、バーの数と点を合わせる。最後に開いた見方を覚える(書きかけの文を、見方の間で共にするため 1 つの部品)
@@ -544,7 +556,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         {e.notices}
       </div>
 
-      <div className={s.panes} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${isComm(side) ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
+      <div className={mergeClasses(s.panes, moving && s.panesMoving)} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${isComm(side) ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
         {/* 左のバー。上から、プロセスの順(承認者とのやり取り → 承認 → 素材 → 制作へ渡すもの)、線の下に記録。数と点で、開かなくても様子が分かる */}
         <nav className={s.sideRail} aria-label={t('配信の全体の情報とメニュー', 'Delivery info and menus')}>
           {rails.map((r) => (
@@ -588,14 +600,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           )}
         </nav>
 
-        {/* 開いているパネル(1 つ)。やり取りの部品は、閉じていてもバーの数を合わせるため、描いたまま隠す */}
-        <div className={s.sidePane} style={side ? undefined : { display: 'none' }}>
+        {/* 開いているパネル(1 つ)。しまったときも列には残し、幅 0 にする(display: none にすると、グリッドの列から外れ、プレビュー以下が 1 列ずつ左の細い列にずれる。2026-10-24 本番で起きた)。
+            しまっている間は inert で、Tab で中に入らないようにする。やり取りの部品は、バーの数を合わせるため、いつも描く */}
+        <div className={s.sidePane} inert={!side} aria-hidden={!side}>
           <div className={s.sideHead}>
-            <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{side ? sideTitle(side) : ''}</span>
-            <Button type="button" size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => side && showSide(side)} aria-label={t('パネルを閉じる', 'Close the panel')} />
+            <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{sideTitle(panel)}</span>
+            {/* × で閉じるのではなく、左のバーへしまう(2026-10-24 利用者) */}
+            <Tooltip content={t('パネルをしまう(バーのアイコンをもう一度押しても、しまえます)', 'Collapse the panel (or click its icon in the bar again)')} relationship="label">
+              <Button type="button" size="small" appearance="subtle" icon={<ChevronDoubleLeftRegular />} onClick={() => side && showSide(side)} />
+            </Tooltip>
           </div>
           <div className={s.sideBody}>
-            <div style={isComm(side) ? { display: 'grid', minHeight: 0 } : { display: 'none' }}>
+            <div style={isComm(panel) ? { display: 'grid', minHeight: 0 } : { display: 'none' }}>
               <CommPane
                 section={commSection}
                 card={e.card}
@@ -616,7 +632,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 onCounts={onCounts}
               />
             </div>
-            {side === 'alerts' && (
+            {panel === 'alerts' && (
               <div style={{ minHeight: 0, overflowY: 'auto' }}>
                 <CardAlertsBar
                   panel
@@ -632,8 +648,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               </div>
             )}
             {/* 学びは、閉じていても描く(AI の依頼に学びを渡すのは、この部品の役目のため) */}
-            <div style={side === 'learn' ? { minHeight: 0, overflowY: 'auto' } : { display: 'none' }}>{e.learnings}</div>
-            {side === 'assets' && (
+            <div style={panel === 'learn' ? { minHeight: 0, overflowY: 'auto' } : { display: 'none' }}>{e.learnings}</div>
+            {panel === 'assets' && (
               // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
               <div className={s.pane}>
                 <span className={s.hint}>{t('承認のときのイメージにも、制作の参考にもなる画像・資料・URL。ここに落としても足せます。', 'Images, files and URLs that show the idea to approvers and guide production. Drop them here to add.')}</span>
@@ -655,7 +671,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 />
               </div>
             )}
-            {side === 'handoff' && (
+            {panel === 'handoff' && (
               // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
               <div className={s.pane}>
                 <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} />
