@@ -109,7 +109,7 @@ export function ProcessPane(props: Props) {
   useEffect(() => {
     if (!cardId) return
     let alive = true
-    CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}` })
+    CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
       .then((res) => {
         if (!alive || !res.success) return
         const notes = res.data ?? []
@@ -242,7 +242,7 @@ export function ProcessRail({ card, status, onOpen }: { card?: DeliveryCard; sta
     if (!cardId) return
     let alive = true
     void (async () => {
-      const [req, notes] = await Promise.all([ApprovalRequestsService.getAll({ filter: `delivery_card_id eq '${cardId}'` }), CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}` })])
+      const [req, notes] = await Promise.all([ApprovalRequestsService.getAll({ filter: `delivery_card_id eq '${cardId}'` }), CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })])
       const open = req.success ? (req.data ?? []).find((r) => r.status === 'open') : undefined
       const rows = open ? await ApprovalReviewersService.getAll({ filter: `approval_request_id eq '${open.id}'` }) : null
       if (!alive) return

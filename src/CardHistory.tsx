@@ -60,7 +60,8 @@ export function CardHistoryList({ cardId, version, scroll }: { cardId: string; v
     void Promise.all([
       ChangeLogsService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on desc'] }),
       EventsService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on desc'] }),
-      CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on desc'] }),
+      // やり取りは、ほかの部品と同じ並び(古い順)で読む(同じ読み込みに相乗りできるように。readShare)。並びは entriesOf で新しい順にする
+      CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] }),
     ]).then(([c, e, n]) => {
       // 日程(date)と中身(edit)だけ。方針(policy)は商品の記録なので、配信の履歴には入れない
       const logs = c.success ? (c.data ?? []).filter((l) => l.kind === 'edit' || l.kind === 'date') : []

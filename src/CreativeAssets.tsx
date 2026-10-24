@@ -211,7 +211,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
     }
     setAssets(res.data ?? [])
     // 素材ごとの、未解決のやり取りの数
-    const n = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}` })
+    const n = await CardNotesService.getAll({ filter: `delivery_card_id eq ${cardId}`, orderBy: ['created_on asc'] })
     const m = new Map<string, number>()
     for (const x of n.success ? (n.data ?? []) : []) if (x.asset_id && x.kind === 'comment' && !x.resolved) m.set(x.asset_id, (m.get(x.asset_id) ?? 0) + 1)
     setTalk(m)

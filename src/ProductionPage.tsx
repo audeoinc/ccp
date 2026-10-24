@@ -232,7 +232,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   useEffect(() => {
     if (!focus) return
     let alive = true
-    void CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}` }).then((r) => {
+    void CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] }).then((r) => {
       const n = r.success ? (r.data ?? []).find((x) => x.id === focus.noteId) : undefined
       if (!alive || !n?.anchor || stageOf(n) !== 'production') return
       const [ch, , v] = (n.anchor_view ?? '').split('|')
