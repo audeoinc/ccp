@@ -18,7 +18,6 @@ import logging
 import os
 import re
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 from google.genai import types
@@ -36,17 +35,6 @@ TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": 
 URL = re.compile(r"^/img/heroes/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
 
 
-def save(name: str, data: bytes, content_type: str, kind: str = "heroes") -> None:
-    """画像を置く(kind = heroes / parts。部品の画像も同じ置き方。ccp/parts.py)"""
-    d = assets.asset_dir()
-    if d is not None or not assets.bucket():
-        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / kind
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / name).write_bytes(data)
-        return
-    assets.put_object(assets.object_name(kind, name), data, content_type)
-
-
 @router.post("/upload")
 async def upload(request: Request, name: str):
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
@@ -58,7 +46,7 @@ async def upload(request: Request, name: str):
     if len(data) > MAX_BYTES:
         return fail(400, "画像が大きすぎます(1 枚 15MB まで)", "too_large")
     stored = f"up-{uuid.uuid4().hex}.{'jpg' if ext == 'jpeg' else ext}"
-    await asyncio.to_thread(save, stored, data, TYPES[ext])
+    await asyncio.to_thread(assets.put, "heroes", stored, data, TYPES[ext])
     return ok({"image_url": f"/img/heroes/{stored}", "size": len(data)})
 
 
@@ -94,11 +82,8 @@ async def describe(body: DescribeIn):
     m = URL.match(body.image_url)
     if not m:
         return fail(400, "ライブラリの画像ではありません", "bad_url")
-    found = await asyncio.to_thread(assets.read_image, "heroes", m.group(1))
-    if found is None:
-        # 手元の開発(バケットも ASSET_DIR もない)では、置いたフォルダから読む
-        p = Path(__file__).resolve().parents[1] / "images" / "heroes" / m.group(1)
-        found = (p.read_bytes(), TYPES.get(m.group(1).rsplit(".", 1)[-1], "image/jpeg")) if p.is_file() else None
+    # 手元の開発(バケットも ASSET_DIR もない)でも、置いたフォルダから読める(assets.get)
+    found = await asyncio.to_thread(assets.get, "heroes", m.group(1))
     if found is None:
         return fail(404, "画像が見つかりません", "not_found")
     data, content_type = found
@@ -125,23 +110,10 @@ async def describe_image(request: Request, language: str = "ja"):
 UPLOADED = re.compile(r"^up-[0-9a-f]{32}\.(?:jpg|png|webp)$")
 
 
-def remove(name: str, kind: str = "heroes") -> None:
-    d = assets.asset_dir()
-    if d is not None or not assets.bucket():
-        folder = (d if d is not None else Path(__file__).resolve().parents[1] / "images") / kind
-        (folder / name).unlink(missing_ok=True)
-        return
-    from urllib.parse import quote
-
-    r = assets.session().delete(f"{assets.GCS_API}/storage/v1/b/{assets.bucket()}/o/{quote(assets.object_name(kind, name), safe='')}", timeout=30)
-    if r.status_code not in (200, 204, 404):
-        r.raise_for_status()
-
-
 @router.delete("/files/{name}")
 async def delete_file(name: str):
     """上げた画像(up-…)のファイルを消す(ライブラリの管理画面で、使っていない画像を消すとき。X59 ②)。もとからある画像は消さない"""
     if not UPLOADED.match(name):
         return fail(400, "上げた画像だけ消せます", "not_uploaded")
-    await asyncio.to_thread(remove, name)
+    await asyncio.to_thread(assets.delete, "heroes", name)
     return ok({"name": name})

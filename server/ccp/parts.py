@@ -18,7 +18,7 @@ import uuid
 from fastapi import APIRouter, Request
 from google.genai import types
 
-from . import heroes
+from . import assets, heroes
 from .ai import _get_client
 from .data_api import fail, ok
 
@@ -45,7 +45,7 @@ async def upload(request: Request, name: str):
     if len(data) > heroes.MAX_BYTES:
         return fail(400, "画像が大きすぎます(1 枚 15MB まで)", "too_large")
     stored = f"up-{uuid.uuid4().hex}.{'jpg' if ext == 'jpeg' else ext}"
-    await asyncio.to_thread(heroes.save, stored, data, heroes.TYPES[ext], KIND)
+    await asyncio.to_thread(assets.put, KIND, stored, data, heroes.TYPES[ext])
     return ok({"image_url": f"/img/{KIND}/{stored}", "size": len(data)})
 
 
@@ -78,5 +78,5 @@ async def delete_file(name: str):
     """上げた画像(up-…)のファイルを消す。もとからある画像は消さない"""
     if not heroes.UPLOADED.match(name):
         return fail(400, "上げた画像だけ消せます", "not_uploaded")
-    await asyncio.to_thread(heroes.remove, name, KIND)
+    await asyncio.to_thread(assets.delete, KIND, name)
     return ok({"name": name})

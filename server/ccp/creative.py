@@ -48,44 +48,25 @@ KIND = "creative"
 
 def local_dir() -> Path | None:
     """フォルダに置くときの場所(ASSET_DIR、なければバケットもないときの server/images)。バケットに置くときは None"""
-    d = assets.asset_dir()
-    if d is not None:
-        return d / KIND
-    if assets.bucket():
-        return None
-    return Path(__file__).resolve().parents[1] / "images" / KIND
+    return assets.local_folder(KIND)
 
 
 def ext_of(name: str) -> str:
     return name.rsplit(".", 1)[-1].lower() if "." in name else ""
 
 
+# 置き場所の読み書きは、商品画像・メイン画像と同じ(assets.put / get / delete)
 def save(stored: str, data: bytes, content_type: str) -> None:
-    d = local_dir()
-    if d is not None:
-        d.mkdir(parents=True, exist_ok=True)
-        (d / stored).write_bytes(data)
-        return
-    assets.put_object(f"{KIND}/{stored}", data, content_type)
+    assets.put(KIND, stored, data, content_type)
 
 
 def load(stored: str) -> bytes | None:
-    d = local_dir()
-    if d is not None:
-        p = d / stored
-        return p.read_bytes() if p.is_file() else None
-    found = assets._fetch(f"{KIND}/{stored}")  # noqa: SLF001 — 商品画像と同じ読み方
+    found = assets.get(KIND, stored)
     return found[0] if found else None
 
 
 def remove(stored: str) -> None:
-    d = local_dir()
-    if d is not None:
-        (d / stored).unlink(missing_ok=True)
-        return
-    r = assets.session().delete(f"{assets.GCS_API}/storage/v1/b/{assets.bucket()}/o/{quote(f'{KIND}/{stored}', safe='')}", timeout=30)
-    if r.status_code not in (200, 204, 404):
-        r.raise_for_status()
+    assets.delete(KIND, stored)
 
 
 @router.post("/files")

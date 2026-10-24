@@ -22,7 +22,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
-from . import assets, creative
+from . import assets
 from .data_api import db
 from .devtools import require_enabled
 
@@ -51,14 +51,10 @@ def _list_gcs(prefix: str) -> set[str]:
 
 def stored_names(kind: str) -> set[str] | None:
     """置き場所にあるファイルの名前(kind = products / heroes / parts / creative)。確かめられない(置き場所がない)ときは None"""
-    if kind == "creative":
-        d, prefix = creative.local_dir(), "creative/"
-    else:
-        base = assets.asset_dir()
-        d, prefix = (base / kind if base is not None else None), f"images/{kind}/"
-        if d is None and not assets.bucket():
-            # /img/… は ASSET_DIR かバケットからしか配らない(ccp/assets.py)。どちらもなければ、どの画像も出ない
-            return set()
+    if kind != "creative" and assets.asset_dir() is None and not assets.bucket():
+        # /img/… は ASSET_DIR かバケットからしか配らない(ccp/assets.py)。どちらもなければ、どの画像も出ない
+        return set()
+    d, prefix = assets.local_folder(kind), assets.object_name(kind, "")
     if d is not None:
         return {p.name for p in Path(d).iterdir() if p.is_file()} if Path(d).is_dir() else set()
     return _list_gcs(prefix)
