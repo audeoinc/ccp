@@ -6,8 +6,8 @@ import { makeService } from '../gcp/services'
 
 export interface ChangeLog {
   id: string
-  /** 種類: date = 配信日時の変更 / policy = 商品の方針の変更 */
-  kind?: 'date' | 'policy'
+  /** 種類: date = 配信日時の変更 / policy = 商品の方針の変更 / edit = 配信カードの中身の変更(X1 の変更の履歴) */
+  kind?: 'date' | 'policy' | 'edit'
   /** 変わった項目(PostgreSQL の列名: scheduled_at / stage / promo_period / policy) */
   field?: string
   before_value?: string

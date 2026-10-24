@@ -6,7 +6,6 @@ import {
   CheckmarkRegular,
   DismissCircleRegular,
   EditRegular,
-  HistoryRegular,
   LocationRegular,
   MentionRegular,
   PaintBrushRegular,
@@ -23,6 +22,7 @@ import { ApprovalRequestsService } from '../data/approvalRequests'
 import { ApprovalReviewersService } from '../data/approvalReviewers'
 import { ApprovalsService } from '../data/approvals'
 import { EventsService, type CardEvent } from '../data/events'
+import { CardHistoryList } from '../CardHistory'
 import { ApprovalBar } from '../ApprovalBar'
 import { AutoTextarea } from '../AutoTextarea'
 import { eligibleReviewers } from '../approvals'
@@ -31,7 +31,7 @@ import { activeUsers, groupsOf, usePeople } from '../people'
 import { bumpNotes, focusPin, focusedPin, notesVersion, pinNumbers, subscribePins } from '../pinStore'
 import { isThreadRoot, stageOf } from '../notesStage'
 import { locale, tr, useT } from '../i18n'
-import { statusLabel, statusRank } from '../status'
+import { statusRank } from '../status'
 import { weekKeyOf } from '../weekLock'
 import { anchorOfPart, partOfAnchor, type PartRef } from './parts'
 import { Linkify } from '../LinkText'
@@ -344,24 +344,13 @@ export function CommPane(props: Props) {
   const userNames = activeUsers(people).map((u) => u.name ?? '').filter(Boolean)
   const names = userNames.length > 0 ? userNames : props.people
 
-  // 変更の記録(差し替えの理由・ステータスの変化。新しい順)
+  // 変更の記録(中身の項目の変更・差し替えの理由・ステータスの変化。新しい順。「⋯」の「変更の履歴…」と同じもの。X1)
   if (props.section === 'history')
     return (
       <div className={s.root} style={{ gridTemplateRows: 'minmax(0, 1fr)' }}>
-      <div className={s.stream}>
-        {loading && <Spinner size="tiny" />}
-        {!loading && changes.length === 0 && <span className={s.empty}>{t('まだ変更の記録はありません', 'No changes yet')}</span>}
-        {[...changes]
-          .sort((a, b) => (b.created_on ?? '').localeCompare(a.created_on ?? ''))
-          .map((c) => (
-            <div key={c.id} className={s.quiet}>
-              <HistoryRegular />
-              <span className={s.full}>
-                {'kind' in c ? c.body : `${(c as CardEvent).actor ?? ''} ${statusLabel((c as CardEvent).from_status)} → ${statusLabel((c as CardEvent).to_status)}`} · {ago(c.created_on)}
-              </span>
-            </div>
-          ))}
-      </div>
+        <div className={s.stream}>
+          <CardHistoryList cardId={card.id} version={`${version}:${card.status}:${card.modified_on ?? ''}`} />
+        </div>
       </div>
     )
 

@@ -219,10 +219,16 @@ async def create_row(table: str, request: Request):
 
 # 変更の記録(アラートの「MD 方針の変更」「日程の変更」のため。バックログ A1)。
 # 配信日時・商品の方針が書き換わったら、変更前と変更後を change_logs に残す。どこから書き換えても漏れないよう、サーバーの側で記録する。
-# テーブル → (種類, 見張る列, 一緒に残す列)
-WATCHED: dict[str, tuple[str, list[str], str]] = {
-    "delivery_cards": ("date", ["scheduled_at"], "name"),
-    "product_policies": ("policy", ["stage", "promo_period", "policy"], "product_code"),
+# 配信カードの中身(件名・見出し・コピー・制作指示など)も、種類 edit で残す(X1 の変更の履歴。アラートは date・policy だけを見るので、edit は出ない)。
+# テーブル → ({見張る列: 種類}, 一緒に残す列)
+CARD_EDIT_FIELDS = [
+    "name", "country", "channel", "layout_key", "subject", "preheader", "theme", "headline", "copy", "section_titles", "section_copies",
+    "instructions", "hero_image_id", "links", "push_title", "push_body", "push_link", "audience", "target_gender", "target_ages",
+    "production_owner", "production_due", "theme_type",
+]
+WATCHED: dict[str, tuple[dict[str, str], str]] = {
+    "delivery_cards": ({"scheduled_at": "date", **{c: "edit" for c in CARD_EDIT_FIELDS}}, "name"),
+    "product_policies": ({c: "policy" for c in ["stage", "promo_period", "policy"]}, "product_code"),
 }
 
 
@@ -232,8 +238,8 @@ def _text(v: Any) -> str:
 
 
 async def _log_changes(conn: AsyncConnection, t: sc.Table, row_id: Any, before: dict[str, Any], after: dict[str, Any], actor: str) -> None:
-    kind, cols, extra = WATCHED[t.name]
-    for col in cols:
+    cols, extra = WATCHED[t.name]
+    for col, kind in cols.items():
         if col not in after or _text(before.get(col)) == _text(after.get(col)):
             continue
         is_card = t.name == "delivery_cards"
@@ -270,8 +276,8 @@ async def update_row(table: str, row_id: str, request: Request):
         if denied:
             raise Fail(403, denied)
         before = None
-        if watched and any(c in values for c in watched[1]):
-            cols = ", ".join([*watched[1], watched[2]])
+        if watched and any(c in values for c in watched[0]):
+            cols = ", ".join([*watched[0], watched[1]])
             before = (await conn.execute(text(f"SELECT {cols} FROM {t.pg} WHERE id = :_id FOR UPDATE"), {"_id": rid})).mappings().first()
         row = (await conn.execute(text(sql), {**values, "_id": rid})).mappings().first()
         if row is not None and before is not None:

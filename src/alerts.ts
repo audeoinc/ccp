@@ -326,7 +326,9 @@ export function useChangeAlerts(cards: DeliveryCard[], products: Product[], plac
   const [logs, setLogs] = useState<ChangeLog[]>([])
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    ChangeLogsService.getAll()
+    // 日程・方針の変更だけを読む(中身の変更 edit は配信カードの変更の履歴のためのもので、数が多い。X1)。
+    // 対応済みも読む(アラートの「対応済み」のタブに出すため)
+    ChangeLogsService.getAll({ filter: "kind ne 'edit'" })
       .then((res) => res.success && setLogs(res.data ?? []))
       .catch(() => undefined)
   }, [reloadKey, tick])

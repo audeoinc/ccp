@@ -21,7 +21,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { ArrowUndoRegular, CopyRegular, DeleteRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
+import { ArrowUndoRegular, CopyRegular, DeleteRegular, HistoryRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { WeekRow } from './data/weeks'
@@ -31,6 +31,7 @@ import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { logEvent } from './history'
 import { useT } from './i18n'
 import { DevRequestMenuItem } from './DevRequestMenu'
+import { CardHistoryDialog } from './CardHistory'
 
 const useStyles = makeStyles({
   danger: { color: tokens.colorPaletteRedForeground1 },
@@ -52,13 +53,13 @@ interface Props {
 }
 
 /**
- * 配信カードの「…」のメニュー: 複製 / 取りやめにする / 取りやめを取り消す / 削除 / 開発へのリクエストの一覧(X69)。
+ * 配信カードの「…」のメニュー: 複製 / 取りやめにする / 取りやめを取り消す / 変更の履歴(X1) / 削除 / 開発へのリクエストの一覧(X69)。
  * 取りやめは、経緯を残すふだんの操作(カレンダーに薄く残る)。削除は、間違えて作ったものを消すためのもので、元に戻せない
  */
 export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extra }: Props) {
   const styles = useStyles()
   const t = useT()
-  const [dialog, setDialog] = useState<'duplicate' | 'cancel' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'duplicate' | 'cancel' | 'delete' | 'history' | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +111,9 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
                 {t('取りやめにする…', 'Cancel delivery…')}
               </MenuItem>
             )}
+            <MenuItem icon={<HistoryRegular />} onClick={() => setDialog('history')}>
+              {t('変更の履歴…', 'Change history…')}
+            </MenuItem>
             <MenuItem icon={<DeleteRegular className={styles.danger} />} onClick={() => { setError(null); setDialog('delete') }}>
               <span className={styles.danger}>{t('削除…', 'Delete…')}</span>
             </MenuItem>
@@ -119,6 +123,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
         </MenuPopover>
       </Menu>
 
+      {dialog === 'history' && <CardHistoryDialog cardId={card.id} cardName={card.name} onClose={() => setDialog(null)} />}
       {dialog === 'duplicate' && <DuplicateDialog card={card} weeks={weeks} onClose={() => setDialog(null)} onDuplicated={onDuplicated} />}
 
       <Dialog open={dialog === 'cancel'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
