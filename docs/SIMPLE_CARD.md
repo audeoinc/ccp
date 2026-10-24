@@ -143,7 +143,7 @@ type PartRef =
 | (c) | AB テスト(SU2): 案のタブ・A を写して直す・違いの目印・案ごとのテンプレート | A → B を写して見出しだけ直す |
 | (d) | コミュニケーションのペイン(やり取り・書き込み・タスク・状態と承認・引き継ぎ。1 本の流れにまとめる案) | — |
 
-各段階: `npx tsc -b`・`npx eslint .`・`npm run build`・`npm run verify` を通し、撮影用の画面(`npx vite --config vite.mock.config.ts`、5190)で撮って利用者に見てもらってから次へ。
+各段階: `npm run verify` を通し、撮影用の画面(`npx vite --config vite.mock.config.ts`、5190)で撮って利用者に見てもらってから次へ。
 
 ## 11. 気をつけること
 

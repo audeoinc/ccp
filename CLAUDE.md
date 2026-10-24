@@ -12,12 +12,10 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 
 1. **確認してから終わる。** 変更のあとは、必ず次を通す。通らないまま、完了と言わない。
    ```bash
-   npx tsc -b
-   npx eslint .
-   npm run build
+   npm run verify
    ```
-   **文書(`docs/`・`README.md`・`CLAUDE.md` などの `.md`)だけの変更は、`npm run verify` だけでよい**(2026-10-23、利用者の指示。型チェック・lint・ビルドの結果は変わらないため)。コードやデータ(`src/`・`server/`・`scripts/`・`schema.json` など)が 1 つでも入るなら、上の 3 つも通す。
-2. **コミットと push は、確認が通ったら、指示を待たずに行ってよい**(2026-10-17、利用者の指示で変えた)。上の確認と `npm run verify` を通してからコミットし、`git pull --rebase` で、ほかの人・ほかのセッションの変更の上に載せ直して、`main` に push する(作業ブランチを指定されていれば、そこにも)。1 つのコミットは 1 つのまとまった変更にし、何をコミットしたかを報告する。**本番への反映(`npm run deploy:gcp`)、本番のデータの削除、Workbench の DB を置き換える `import-pack --yes` は、取り返しがつきにくいので、これまでどおり人が指示したときだけ**行う。
+   中で、表・承認・決まりの確かめのあとに、型チェック(`tsc -b`)と lint(`eslint`)を同時に流し、ビルド(`vite build`)を通す。**これ 1 つでよい**(2026-10-24 の整理で、3 つを別に流してから verify でもう一度流す、2 回流しをやめた)。文書(`.md`)だけの変更なら、型チェック・lint・ビルドは自動で飛ばす(2026-10-23、利用者の指示)。いつでも全部を通すときは `npm run verify -- --full`。`server/` の Python を変えたら、`cd server && .venv/Scripts/python.exe -m unittest discover tests`(Workbench は `.venv/bin/python`)も通す。
+2. **コミットと push は、確認が通ったら、指示を待たずに行ってよい**(2026-10-17、利用者の指示で変えた)。上の確認を通してからコミットし、`git pull --rebase` で、ほかの人・ほかのセッションの変更の上に載せ直して、`main` に push する(作業ブランチを指定されていれば、そこにも)。1 つのコミットは 1 つのまとまった変更にし、何をコミットしたかを報告する。**本番への反映(`npm run deploy:gcp`)、本番のデータの削除、Workbench の DB を置き換える `import-pack --yes` は、取り返しがつきにくいので、これまでどおり人が指示したときだけ**行う。
 3. **画面の見た目は、確認できていないと正直に伝える。** 画面は、撮影・デモ用のビルド(`npx vite --config vite.mock.config.ts`、5190)で確かめられる。「型チェック・lint・ビルドは通った。画面は未確認」のように、確認した範囲を分けて報告する。
 4. 小さい変更は、編集ツールで行う。複数ファイルへの一括置換は、スクリプトでもよい。**改行コードは、すべて LF**(2026-10-23、利用者の指示。`.gitattributes` の `* text=auto eol=lf` で、Git に入るのは LF になる)。CRLF で書き出さない。push の前に、`git diff --stat` と `git diff --stat --ignore-cr-at-eol` の大きさが同じか(改行だけでファイル全体が変わっていないか)を確かめる。
 5. **データの名前は、画面・API・PostgreSQL で同じ**(表 `delivery_cards`、列 `scheduled_at`、参照 `hero_image_id`、主キー `id`)。選択肢は文字の値(`email` / `app`、`not_started` / `reviewing` / `approved` / `confirmed` など。使える値は `server/schema.json` の `choices`)。状態の前後を比べるときは、文字のまま比べずに `statusRank`(`src/status.ts`)を使う。表の型は `src/models/`(一部の表は `src/data/` のサービスのファイルの中)、読み書きは `src/data/`。列を変えたら、`server/schema.json` と型を一緒に直す(`npm run verify` が食い違いを見つける)。

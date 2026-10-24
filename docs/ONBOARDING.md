@@ -34,9 +34,9 @@ GitHub の**公開**リポジトリ(`audeoinc/ccp`)。だれでも読めるの�
    npx vite --config vite.mock.config.ts    # http://localhost:5190 を、ブラウザで開く
    ```
    カレンダーに、配信カードが表示されれば成功。本物のサーバー(DB・AI)につないで動かす方法は、[GCP.md](GCP.md) の「手元での動かし方」。
-4. コミット前の確認5. コミット前の確認が通ることを確かめる。
+4. コミット前の確認が通ることを確かめる(型チェック・lint・ビルドも、この中で流す)。
    ```bash
-   npx tsc -b && npx eslint . && npm run build
+   npm run verify
    ```
 
 ## 3. 最初に読むもの

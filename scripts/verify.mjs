@@ -1,10 +1,16 @@
-// npm run verify の中身。表・承認・決まりの確かめ(速い)のあとに、型チェック・lint・ビルド(重い。2 分ほど)を通す。
+// npm run verify の中身。表・承認・決まりの確かめ(速い)のあとに、型チェック・lint(同時に)・ビルドを通す。
+// CLAUDE.md の作業の約束 1 の確かめは、これ 1 つで足りる(中で tsc -b・eslint・vite build を流す。別に 3 つを流し直さない)。
 //   node scripts/verify.mjs          ← 変えたファイルが文書(.md)だけなら、重い所を飛ばす
 //   node scripts/verify.mjs --full   ← いつでも全部(VERIFY_FULL=1 でも同じ)
 // 文書だけの変更では、型チェック・lint・ビルドの結果は変わらない(CLAUDE.md の作業の約束 1)ので、待ち時間を減らすために飛ばす(2026-10-23)。
 // 変えたファイルは、まだコミットしていないものと、origin/main にまだ入っていないコミットのもの。
 // Git がない所(Workbench 版の ZIP を展開した先など)や、変えたファイルが分からないとき・1 つもないときは、全部を通す
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createServer } from 'vite'
+import { checkApprovals, report, viteForChecks } from './check-approvals.mjs'
+import { checkPolicy } from './check-policy.mjs'
 
 const run = (cmd, args) => {
   console.log(`\n> ${[cmd, ...args].join(' ')}`)
@@ -12,6 +18,16 @@ const run = (cmd, args) => {
   const r = process.platform === 'win32' ? spawnSync([cmd, ...args].join(' '), { stdio: 'inherit', shell: true }) : spawnSync(cmd, args, { stdio: 'inherit' })
   if (r.status !== 0) process.exit(r.status ?? 1)
 }
+
+/** 終わるのを待つ(同時に流す型チェックと lint のため)。出力は終わってからまとめて出す(2 つの出力が混ざらないように) */
+const runQuiet = (cmd, args) =>
+  new Promise((resolve) => {
+    const p = process.platform === 'win32' ? spawn([cmd, ...args].join(' '), { shell: true }) : spawn(cmd, args)
+    let out = ''
+    p.stdout.on('data', (d) => (out += d))
+    p.stderr.on('data', (d) => (out += d))
+    p.on('close', (code) => resolve({ label: [cmd, ...args].join(' '), code: code ?? 1, out }))
+  })
 
 const git = (args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
 
@@ -44,12 +60,30 @@ const counted = files?.filter((f) => !f.startsWith('.claude/')) ?? []
 const docsOnly = counted.length > 0 && counted.every((f) => /\.md$/i.test(f))
 
 run('node', ['scripts/check-schema.mjs'])
-run('node', ['scripts/check-approvals.mjs'])
-run('node', ['scripts/check-policy.mjs'])
+// 承認の判定と must の決まりの確かめは、1 つの Vite のサーバーで続けて流す(別々に起動すると、その分待つ)
+{
+  const server = await createServer(viteForChecks(join(dirname(fileURLToPath(import.meta.url)), '..')))
+  try {
+    report(await checkApprovals(server))
+    report(await checkPolicy(server))
+  } finally {
+    await server.close()
+  }
+}
 if (docsOnly) {
   console.log(`\n変えたファイルは文書だけ(${counted.length} 件)なので、型チェック・lint・ビルドは飛ばしました(全部を通すときは npm run verify -- --full)。`)
 } else {
-  run('npx', ['tsc', '-b'])
-  run('npx', ['eslint', '.'])
+  // 型チェックと lint は互いに関係しないので、同時に流す(lint は前の結果を覚えて、変えたファイルだけ見る --cache)
+  console.log('\n> npx tsc -b と npx eslint . --cache(同時に)')
+  const results = await Promise.all([runQuiet('npx', ['tsc', '-b']), runQuiet('npx', ['eslint', '.', '--cache', '--cache-location', 'node_modules/.cache/eslint/'])])
+  for (const r of results) {
+    if (r.out.trim()) console.log(`\n[${r.label}]\n${r.out.trimEnd()}`)
+  }
+  const bad = results.filter((r) => r.code !== 0)
+  if (bad.length) {
+    console.error(`\n通りませんでした: ${bad.map((r) => r.label).join(' / ')}`)
+    process.exit(1)
+  }
+  console.log('型チェック・lint: OK')
   run('npx', ['vite', 'build'])
 }

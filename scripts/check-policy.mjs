@@ -2,12 +2,11 @@
 //   node scripts/check-policy.mjs        ← npm run verify に含まれる
 // 例の決まりは docs/policy_example/rules.md と同じ書き方。
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createServer } from 'vite'
+import { report, viteForChecks } from './check-approvals.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const server = await createServer({ configFile: false, root, appType: 'custom', logLevel: 'error', server: { middlewareMode: true }, optimizeDeps: { noDiscovery: true, include: [] } })
-const problems = []
 const rules = [
   { ruleId: 'R-COPY-001', title: '価格は税込み', checkSpec: '含めない /\\d[\\d,]*円(?!\\s*[(（]税込)/' },
   { ruleId: 'R-COPY-002', title: '最上級を使わない', checkSpec: '含めない 最高, 最安, best ever' },
@@ -25,7 +24,10 @@ const cases = [
   { name: '在庫調整の商品(英語の段階も)', output: { products: [{ code: 'A1' }, { code: 'B2', reason: 'x' }, { code: 'C3' }] }, expect: ['R-SEL-010'], detail: { 'R-SEL-010': 'B2, C3' } },
   { name: '文字の案がない返答では、含めるを確かめない', output: { products: [{ code: 'A1' }] }, expect: [] },
 ]
-try {
+
+/** 確かめる(server は、src を読み込む Vite のサーバー) */
+export async function checkPolicy(server) {
+  const problems = []
   const m = await server.ssrLoadModule('/src/policyCheck.ts')
   for (const c of cases) {
     const got = m.findViolations(rules, c.output, (code) => stages[code])
@@ -38,11 +40,15 @@ try {
   }
   if (m.parseCheck('なんとなく') !== undefined) problems.push('読めない確かめ方が undefined になりません')
   if (m.parseCheck('上限 週 2 回')?.n !== 2) problems.push('上限 週 2 回 を読めません')
-} finally {
-  await server.close()
+  return { problems, ok: `policy checks OK(${cases.length} 例)`, title: 'must の決まりの確かめが、例と合いません' }
 }
-if (problems.length) {
-  console.error('must の決まりの確かめが、例と合いません:\n- ' + problems.join('\n- '))
-  process.exit(1)
+
+// 単独で流したとき
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const server = await createServer(viteForChecks(root))
+  try {
+    report(await checkPolicy(server))
+  } finally {
+    await server.close()
+  }
 }
-console.log(`policy checks OK(${cases.length} 例)`)
