@@ -4,6 +4,7 @@ import { askAgent, type AiCard, type CopyLanguage } from './aiSelect'
 import { tr } from './i18n'
 import { THEME_TYPES, type ThemeType } from './themeTypes'
 import { DEFAULT_PUSH_TEMPLATE, hasTemplate, templateOptions, type EmailTemplateId, type TemplateChannel } from './templates'
+import { localDate } from './results'
 
 // テーマ・コピー・制作指示の「案」の生成。出力形式はメッセージ内で毎回指定する(aiSelect.ts と同じ理由)
 
@@ -103,7 +104,7 @@ export async function suggestThemes(args: {
   const { card, otherThemes, products, themeHint } = args
   const parsed = (await askAgent(THEME_PROMPT, {
     task: 'suggest_themes',
-    today: new Date().toISOString().slice(0, 10),
+    today: localDate(new Date().toISOString()),
     card,
     otherThemes,
     ...(themeHint?.trim() ? { themeHint: themeHint.trim() } : {}),
@@ -255,7 +256,7 @@ export async function suggestTemplate(args: { card: AiCard; channel?: TemplateCh
   const options = templateOptions(channel, false, args.country)
   const parsed = (await askAgent(TEMPLATE_PROMPT, {
     task: 'suggest_template',
-    today: new Date().toISOString().slice(0, 10),
+    today: localDate(new Date().toISOString()),
     card: args.card,
     templates: options.map((o) => ({ id: o.id, name: o.label, description: o.description, hero: o.hero, heroText: o.heroText ?? 'band', sections: o.sections, push: o.push })),
   })) as { template?: string; reason?: string }
@@ -303,7 +304,7 @@ export interface NameSlot {
 export async function suggestNames(args: { slots: NameSlot[]; others: { name: string; theme?: string; scheduledAt?: string }[] }): Promise<{ id: string; name: string; reason: string; themeType?: ThemeType }[]> {
   const parsed = (await askAgent(NAME_PROMPT, {
     task: 'suggest_names',
-    today: new Date().toISOString().slice(0, 10),
+    today: localDate(new Date().toISOString()),
     slots: args.slots,
     others: args.others,
   })) as { names?: { id?: string; name?: string; reason?: string; themeType?: string }[] }

@@ -7,6 +7,7 @@ import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
 import type { SectionKind } from './templates'
+import { localDate } from './results'
 
 // AI の依頼の状態(選択肢の値。src/gcp/ai.ts が返す)
 const STATUS_WAITING = 'waiting'
@@ -553,7 +554,8 @@ async function askText(message: string): Promise<string> {
   }
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+// この画面の時刻での今日(toISOString は UTC なので、日本の朝 9 時前は前の日になる)
+const today = () => localDate(new Date().toISOString())
 
 export const productPayload = (p: Product) => ({
   code: p.product_code,

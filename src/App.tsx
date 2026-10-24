@@ -160,6 +160,7 @@ import { printWeek } from './printWeek'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 import { limitRulesVersion, onLimitRulesChange, setLimitRules } from './weeklyLimit'
 import { HeroLibrary } from './HeroLibrary'
+import { localDate } from './results'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -710,9 +711,10 @@ function App() {
     const req = production.latest.get(c.id)
     const v = productionView(c, req)
     const due = (req?.production_due ?? c.production_due ?? '').slice(0, 10)
-    const today = new Date().toISOString().slice(0, 10)
+    // 今日と配信日は、この画面の時刻で(toISOString は UTC なので、日本の朝 9 時前は前の日になっていた)
+    const today = localDate(new Date().toISOString())
     // 締め切りを過ぎた印は、まだ配信していない(配信日が今日以降の)ものだけ(過去の配信に全部付くと、見分けがつかないため)
-    const upcoming = (c.scheduled_at ?? '').slice(0, 10) >= today
+    const upcoming = localDate(c.scheduled_at) >= today
     const late = upcoming && !!due && due < today && (v === 'draft' || v === 'requested' || v === 'in_progress')
     return `${productionLabel(v)}${due ? ` ・ ${t('締切', 'Due')} ${due.slice(5).replace('-', '/')}${late ? t('(過ぎた)', ' (late)') : ''}` : ''}`
   }
