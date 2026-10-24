@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { ImageAddRegular, SparkleRegular } from '@fluentui/react-icons'
@@ -54,6 +54,8 @@ interface Props {
   onClose: () => void
   /** 直すとき。画像は差し替えず、名前・種類・タグ・説明・代替テキスト・出どころ・期限を直す */
   part?: PartImage
+  /** 開く前に選んだファイル(「選び直す」のアップロードのタブに落としたもの)。開いたらすぐ上げる */
+  file?: File
 }
 
 /**
@@ -61,7 +63,7 @@ interface Props {
  * 上げると、AI が画像を見て名前・種類・タグ・説明・代替テキストを下書きし、人は確かめて直すだけ(メイン画像と同じ流れ)。
  * AVIF は PNG に変えて上げる(ボタン・ロゴの透明を残すため)
  */
-export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
+export function PartUploadDialog({ market, me, onDone, onClose, part, file: firstFile }: Props) {
   const s = useStyles()
   const t = useT()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -127,6 +129,13 @@ export function PartUploadDialog({ market, me, onDone, onClose, part }: Props) {
     }
     setBusy('')
   }
+  // 落としたファイルを持って開いたときは、すぐ上げる(開発時の StrictMode で 2 回上げないよう、1 回だけ)
+  const startedRef = useRef(false)
+  useEffect(() => {
+    if (!firstFile || startedRef.current) return
+    startedRef.current = true
+    void Promise.resolve().then(() => pick(firstFile))
+  }, [firstFile])
 
   const save = async () => {
     setBusy('save')
