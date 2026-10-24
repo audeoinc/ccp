@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -60,11 +60,7 @@ import { keepBrowserMenu, useContextMenu } from './ContextMenu'
 import { DuplicateDialog } from './CardMenu'
 import { LightbulbRegular as DevRequestIcon } from '@fluentui/react-icons'
 import { DevRequestLayer } from './DevRequestLayer'
-import { DevRequestsDialog } from './DevRequestsDialog'
 import { onOpenDevRequestList } from './devRequestPlace'
-import { SampleShopPanel } from './SampleShopPanel'
-import { SettingsDialog } from './SettingsDialog'
-import { BrandPanel } from './BrandPanel'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ProductsService } from './data/products'
@@ -85,9 +81,8 @@ import { WeekHistory } from './WeekHistory'
 import { MonthSummaryBar } from './MonthSummaryBar'
 import { Calendar } from './Calendar'
 import { ListView } from './ListView'
-import { ResultsPage, type ResultsDataActions } from './ResultsPage'
+import type { ResultsDataActions } from './ResultsPage'
 import { AiIcon } from './AiMark'
-import { AlertsPage } from './AlertsPage'
 import { AlertsFloat } from './AlertsFloat'
 import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
 import { dateOf, dateText, hasFloat, linkSearch, parseLink, type LinkState } from './deepLink'
@@ -102,11 +97,8 @@ import { clearProductMetricsCache } from './useProductMetrics'
 import { importMetricsCsv } from './data/metricsImport'
 import { isCancelled } from './cancel'
 import { setActivePolicies, setActiveRules, setActiveSales, onPolicyWarning } from './aiSelect'
-import { ResultPeek } from './ResultPeek'
 import { WeekView, type WeekLens } from './WeekView'
 import { WeekTimeGrid } from './WeekTimeGrid'
-import { ProductsView } from './ProductsView'
-import { ImpactView } from './ImpactView'
 import type { VariantKey } from './abTest'
 import { createAbExamples, isAbSeed } from './abSeed'
 import { createSampleSkus, removeSampleSkus } from './skuSample'
@@ -117,13 +109,6 @@ import { STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
 import { loadCustomTemplates } from './layoutTemplates'
 import { ErrorBoundary } from './ErrorBoundary'
-import { TemplateManager } from './TemplateManager'
-import { PolicyManager } from './PolicyManager'
-import { PatternPanel } from './PatternPanel'
-import { CountryCriteriaPanel } from './CountryCriteriaPanel'
-import { CountryTemplatesPanel } from './CountryTemplatesPanel'
-import { CountryLearningsPanel } from './CountryLearningsPanel'
-import { CountryPoliciesPanel } from './CountryPoliciesPanel'
 import { loadCountryApply, useCountryApply } from './countryApply'
 import { criteriaFor, loadCountrySettings, useCountrySettings } from './countrySettings'
 import { createUsSamplePatterns } from './samplePatterns'
@@ -131,12 +116,10 @@ import { DeliveryPatternsService } from './data/deliveryPatterns'
 import type { DeliveryPattern } from './models/deliveryPatterns'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
-import { PeopleManager } from './PeopleManager'
 import { usePeople, usePeopleManagerOpen } from './people'
 import { InboxButton } from './InboxButton'
 import { useApprovalInbox } from './useApprovalInbox'
 import { productionColor, productionLabel, productionView, useProductionRequests } from './useProductionRequests'
-import { ProductionPage } from './ProductionPage'
 import { StageNav } from './StageNav'
 import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
@@ -145,7 +128,6 @@ import { useOpenedOnce } from './useOpenedOnce'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
-import { BulkWorkspace } from './BulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { channelOptions, countryOptions, statusColor, statusOptions, statusRank, statusView } from './status'
@@ -154,12 +136,12 @@ import { confirmedWeekOf, dayKeyOf, saveWeekRow, scopeLabel, scopeOfCard, segmen
 import { logEvent, myName, myUserId, onMeChange } from './history'
 import { EventsService, type CardEvent } from './data/events'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
-import { WeekReport } from './WeekReport'
 import { MiniCalendar } from './MiniCalendar'
 import { printWeek } from './printWeek'
+// 週の資料は、印刷を始める直前に描くので、分けずに読み込んでおく(あとから読むと、白い紙が出る)
+import { WeekReport } from './WeekReport'
 import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 import { limitRulesVersion, onLimitRulesChange, setLimitRules } from './weeklyLimit'
-import { HeroLibrary } from './HeroLibrary'
 import { localDate } from './results'
 import { PREF } from './prefKeys'
 
@@ -456,6 +438,34 @@ function FilterSelect({ label, value, options, onChange }: {
 function bqStockTime(r: BqSyncResult): string | undefined {
   const at = r.outputs.find((o) => o.name === 'sku_stock')?.dataAsOf
   return at ? tr('在庫 ', 'Stock ') + new Date(at).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : undefined
+}
+
+// 開いたときに読み込む画面(整理 第2段 ④)。最初に開くときに、使わないかもしれない画面のプログラムまで読まないため。
+// どれも App だけが使う(ほかのファイルから読み込むと、分かれない)
+const SettingsDialog = lazy(() => import('./SettingsDialog').then((m) => ({ default: m.SettingsDialog })))
+const ResultsPage = lazy(() => import('./ResultsPage').then((m) => ({ default: m.ResultsPage })))
+const ImpactView = lazy(() => import('./ImpactView').then((m) => ({ default: m.ImpactView })))
+const ProductsView = lazy(() => import('./ProductsView').then((m) => ({ default: m.ProductsView })))
+const ResultPeek = lazy(() => import('./ResultPeek').then((m) => ({ default: m.ResultPeek })))
+const ProductionPage = lazy(() => import('./ProductionPage').then((m) => ({ default: m.ProductionPage })))
+const AlertsPage = lazy(() => import('./AlertsPage').then((m) => ({ default: m.AlertsPage })))
+const BulkWorkspace = lazy(() => import('./BulkWorkspace').then((m) => ({ default: m.BulkWorkspace })))
+const TemplateManager = lazy(() => import('./TemplateManager').then((m) => ({ default: m.TemplateManager })))
+const PolicyManager = lazy(() => import('./PolicyManager').then((m) => ({ default: m.PolicyManager })))
+const PatternPanel = lazy(() => import('./PatternPanel').then((m) => ({ default: m.PatternPanel })))
+const CountryCriteriaPanel = lazy(() => import('./CountryCriteriaPanel').then((m) => ({ default: m.CountryCriteriaPanel })))
+const CountryTemplatesPanel = lazy(() => import('./CountryTemplatesPanel').then((m) => ({ default: m.CountryTemplatesPanel })))
+const CountryLearningsPanel = lazy(() => import('./CountryLearningsPanel').then((m) => ({ default: m.CountryLearningsPanel })))
+const CountryPoliciesPanel = lazy(() => import('./CountryPoliciesPanel').then((m) => ({ default: m.CountryPoliciesPanel })))
+const PeopleManager = lazy(() => import('./PeopleManager').then((m) => ({ default: m.PeopleManager })))
+const HeroLibrary = lazy(() => import('./HeroLibrary').then((m) => ({ default: m.HeroLibrary })))
+const SampleShopPanel = lazy(() => import('./SampleShopPanel').then((m) => ({ default: m.SampleShopPanel })))
+const BrandPanel = lazy(() => import('./BrandPanel').then((m) => ({ default: m.BrandPanel })))
+const DevRequestsDialog = lazy(() => import('./DevRequestsDialog').then((m) => ({ default: m.DevRequestsDialog })))
+
+/** 分けて読み込む画面を、読み込み終えるまで待つ所。画面ごとに置く(ヘッダーなど、ほかの所は消さない) */
+function Later({ children, spin }: { children: ReactNode; /** 待つ間に、くるくるを出す(ページ・設定の欄。窓は出さない) */ spin?: boolean }) {
+  return <Suspense fallback={spin ? <Spinner size="small" /> : null}>{children}</Suspense>
 }
 
 /** App が持つ表(読み直すとき、変わった表だけを選べる) */
@@ -1466,6 +1476,7 @@ function App() {
   const templatesOpened = useOpenedOnce(useTemplateManagerOpen())
   const peopleOpened = useOpenedOnce(usePeopleManagerOpen())
   const bulkOpened = useOpenedOnce(bulk.open)
+  const settingsOpened = useOpenedOnce(settingsOpen)
   // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
@@ -1476,7 +1487,7 @@ function App() {
 
   return (
     <>
-      {templatesOpened && <TemplateManager cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} />}
+      {templatesOpened && <Later><TemplateManager cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} /></Later>}
       <input
         ref={metricsFileRef}
         type="file"
@@ -1488,7 +1499,7 @@ function App() {
           if (f) void importMetrics(f)
         }}
       />
-      {peopleOpened && <PeopleManager />}
+      {peopleOpened && <Later><PeopleManager /></Later>}
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
       <div className={styles.headerWrap}>
@@ -1571,7 +1582,7 @@ function App() {
         <Tooltip content={t('設定', 'Settings')} relationship="label">
           <Button appearance="subtle" size="small" icon={<SettingsRegular />} onClick={() => setSettingsOpen(true)} />
         </Tooltip>
-        <SettingsDialog
+        {settingsOpened && <Later><SettingsDialog
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           country={filters.country}
@@ -1593,7 +1604,7 @@ function App() {
                 'マーケティングの決まりは全部の国で共通です。決めていなければ、決まりの「市場」のとおりに使います(空ならブランド全体の決まりとして全部の国、書いてあればその国だけ)。印を変えると、この国の AI の依頼と週の上限に効きます(この国の全員に効きます)。中身が国で違う決まりは、ここでは表せないので、全社の「方針・決まり」で別の決まりとして足してください。',
                 'Marketing rules are shared across countries. Undecided rules follow their Market column (empty = brand-wide, used everywhere; otherwise only those countries). Changing a check affects this country’s AI requests and weekly limits (applies to everyone on this country). Rules whose content differs by country cannot be expressed here — add them as separate rules in Company → Marketing policies.',
               ),
-              render: (co, name) => <CountryPoliciesPanel country={co} countryName={name} />,
+              render: (co, name) => <Later spin><CountryPoliciesPanel country={co} countryName={name} /></Later>,
             },
             {
               id: 'criteria',
@@ -1605,7 +1616,7 @@ function App() {
                 '何を問題とみなすかの、国の基準です。変えると、この国の配信を扱う全員に効きます(変えた人・日時が残ります)。どのアラートを自分に出すか(種類・担当など)は、アラートの画面の「条件」で人ごとに決めます。',
                 'The country’s criteria for what counts as a problem. Changes apply to everyone working on this country (who and when are recorded). Which alerts you personally see (types, owners…) is set per person in the Alerts page “Conditions”.',
               ),
-              render: (co, name) => <CountryCriteriaPanel country={co} countryName={name} />,
+              render: (co, name) => <Later spin><CountryCriteriaPanel country={co} countryName={name} /></Later>,
             },
             {
               id: 'countryTemplates',
@@ -1617,7 +1628,7 @@ function App() {
                 'テンプレートは全部の国で共通です。印を外すと、この国の配信・まとめて作る・配信の型・AI の選定の選択肢に出なくなります(この国の全員に効きます)。すでにこのテンプレートを使った配信は、そのまま描けます。まだ決めていないものは、使います。',
                 'Templates are shared across countries. Unchecking hides a template from this country’s deliveries, bulk creation, delivery patterns and AI choices (applies to everyone on this country). Deliveries that already use it still render. Undecided templates are used.',
               ),
-              render: (co, name) => <CountryTemplatesPanel country={co} countryName={name} />,
+              render: (co, name) => <Later spin><CountryTemplatesPanel country={co} countryName={name} /></Later>,
             },
             {
               id: 'countryLearnings',
@@ -1629,7 +1640,7 @@ function App() {
                 '学びは全部の国で共通です。この国の学びは、決めていなければ使います。ほかの国の学びは、国で客層が違うので、決めていなければ使いません(使えそうなものに印を付けます)。印の付いた学びだけが、この国の配信カードの「これまでの学び」と AI の下書きに渡ります(この国の全員に効きます)。残す・様子を見る・外すの判定は、結果の面の「効果」→「学びの評価」で、国ごとに決めます。',
                 'Learnings are shared across countries. This country’s own learnings are used unless you decide otherwise. Learnings from other countries are not used unless you check them, since audiences differ. Only checked learnings appear in this country’s delivery cards and AI drafts (applies to everyone on this country). Keep / watch / retire is decided per country in Results → Impact → Evaluate learnings.',
               ),
-              render: (co, name) => <CountryLearningsPanel country={co} countryName={name} cards={cards} />,
+              render: (co, name) => <Later spin><CountryLearningsPanel country={co} countryName={name} cards={cards} /></Later>,
             },
             {
               id: 'patterns',
@@ -1641,7 +1652,7 @@ function App() {
                 '毎週の決まった配信を、曜日ごとに「型」として持ちます。「新規作成 ▾」の「まとめて作る」は、この型どおりに枠(種類・テンプレートが入った状態)を作ります。型は既定値なので、作った枠・配信では自由に変えられます。型を変えても、もう作った配信は変わりません。テンプレートは、作るときの最新の版を使います。',
                 'Weekly deliveries, kept as patterns per weekday. “Create in bulk” makes slots from these patterns (with type and template filled in). Patterns are only defaults: you can change any slot or delivery. Changing a pattern does not change deliveries already made. Templates use their latest version at creation.',
               ),
-              render: (co) => <PatternPanel country={co} onChanged={() => void loadPatterns()} />,
+              render: (co) => <Later spin><PatternPanel country={co} onChanged={() => void loadPatterns()} /></Later>,
             },
             {
               id: 'countryBrand',
@@ -1649,7 +1660,7 @@ function App() {
               label: t('差出人の名前と店の URL', 'Sender name and shop URL'),
               description: t('全社の既定を、この国だけ変えるときに入れます。空の欄は全社の値を使います。', 'Override the company defaults for this country. Empty fields use the company values.'),
               icon: <SendRegular />,
-              render: (co, name) => <BrandPanel country={co} countryName={name} />,
+              render: (co, name) => <Later spin><BrandPanel country={co} countryName={name} /></Later>,
             },
             {
               id: 'brand',
@@ -1657,7 +1668,7 @@ function App() {
               label: t('差出人の名前と店の URL', 'Sender name and shop URL'),
               description: t('受信箱・メールの上の帯・アプリの通知に出す差出人の名前と、リンクの既定・商品のページの元になる店の URL。国で上書きできます。', 'The sender name shown in the inbox, the email header and app notifications, and the shop URL used for default links and product pages. Countries can override them.'),
               icon: <SendRegular />,
-              render: () => <BrandPanel country="" />,
+              render: () => <Later spin><BrandPanel country="" /></Later>,
             },
             {
               id: 'policies',
@@ -1665,7 +1676,7 @@ function App() {
               label: t('方針・決まり', 'Marketing policies'),
               description: t('マーケティングの決まりを取り込む・一覧で見る・直す。決まりは全部の国で共通で、どの国で使うかは「国」の「使う決まり」で決めます。', 'Import, list and edit marketing rules. Rules are shared; which countries use them is set under Country → Rules used.'),
               icon: <DocumentBulletListRegular />,
-              render: () => <PolicyManager open inline onImported={() => void loadMarketingPolicies()} />,
+              render: () => <Later spin><PolicyManager open inline onImported={() => void loadMarketingPolicies()} /></Later>,
             },
             {
               id: 'templates',
@@ -1673,7 +1684,7 @@ function App() {
               label: t('テンプレート', 'Templates'),
               description: t('テンプレートを作る・直す。どの国で使うかは「国」の「使うテンプレート」で決めます。', 'Create and edit templates. Which countries use them is set under Country → Templates used.'),
               icon: <LayoutColumnTwoRegular />,
-              render: () => <TemplateManager inline cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} />,
+              render: () => <Later spin><TemplateManager inline cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} /></Later>,
             },
             {
               id: 'heroLibrary',
@@ -1681,7 +1692,7 @@ function App() {
               label: t('画像のライブラリ', 'Image library'),
               description: t('メイン画像・部品の画像。上げる・直す・期限・消す。', 'Hero and part images: upload, edit, expiry, delete.'),
               icon: <ImageMultipleRegular />,
-              render: () => <HeroLibrary inline heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} />,
+              render: () => <Later spin><HeroLibrary inline heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} /></Later>,
             },
             {
               id: 'people',
@@ -1689,7 +1700,7 @@ function App() {
               label: t('ユーザーと承認グループ', 'Users and approval groups'),
               description: t('使う人と、承認するグループ。', 'People and approval groups.'),
               icon: <PeopleTeamRegular />,
-              render: () => <PeopleManager inline />,
+              render: () => <Later spin><PeopleManager inline /></Later>,
             },
             {
               id: 'bq',
@@ -1903,7 +1914,7 @@ function App() {
               section: 'shop',
               label: t('見本の商品ページと画像', 'Sample product pages and photos'),
               icon: <ImageMultipleRegular />,
-              render: () => <SampleShopPanel products={products} />,
+              render: () => <Later spin><SampleShopPanel products={products} /></Later>,
             },
             {
               id: 'devRequests',
@@ -1911,10 +1922,10 @@ function App() {
               label: t('開発へのリクエストの一覧', 'Requests to developers'),
               description: t('画面のピンから送られた、開発へのリクエストの一覧。', 'Requests to developers sent from pins on the screen.'),
               icon: <DevRequestIcon />,
-              render: () => <DevRequestsDialog inline />,
+              render: () => <Later spin><DevRequestsDialog inline /></Later>,
             },
           ]}
-        />
+        /></Later>}
       </header>
       {/* 作業の段(X42・X43): ヘッダー(システム全体)とは分け、その下に置く。左端に面の切り替え、続いて見ている画面の配信の絞り込み */}
         <div className={styles.filterBar}>
@@ -2215,7 +2226,7 @@ function App() {
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {view === 'impact' ? (
               // 見せ方「効果」: 配信の増分と、学びの記録・指標・売上・評価。期間によらず、絞り込みの国・チャネルのすべての配信で見る(件数が少ないと比べられないため)
-              <ImpactView key={impactKey} cards={filtered} allCards={cards} country={filters.country} onOpenResult={setPeekResult} />
+              <Later spin><ImpactView key={impactKey} cards={filtered} allCards={cards} country={filters.country} onOpenResult={setPeekResult} /></Later>
             ) : view === 'products' ? (
               <>
               {/* 期間の近道(見せ方「商品」) */}
@@ -2238,7 +2249,7 @@ function App() {
                   )
                 })}
               </div>
-              <ProductsView
+              <Later spin><ProductsView
                 cards={filtered.filter((c) => !isCancelled(c))}
                 cardProducts={cardProducts}
                 products={products}
@@ -2246,12 +2257,12 @@ function App() {
                 to={range.to}
                 onOpenCard={setSelectedId}
                 onOpenResult={(id) => (page === 'results' ? setResultDetail(id) : setPeekResult(id))}
-              />
+              /></Later>
               </>
             ) : page === 'results' ? (
               // 結果の面も、週・月なら、つかんで前後へ(一覧・比べるは動かさない)
               <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={view === 'week' || view === 'month'}>
-              <ResultsPage
+              <Later spin><ResultsPage
                 stageNav={(c) => stageNav(c, 'results')}
                 country={filters.country}
                 cards={filtered}
@@ -2278,7 +2289,7 @@ function App() {
                     </MessageBar>
                   )
                 }
-              />
+              /></Later>
               </SwipePager>
             ) : view === 'list' ? (
               <>
@@ -2425,10 +2436,10 @@ function App() {
       {/* アラート(フロート)。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
       <WeekHistory open={historyOpen} onClose={() => setHistoryOpen(false)} events={weekEvents} />
       <AlertsFloat open={alertsOpen} onClose={() => { setAlertsOpen(false); setAlertsFocus(undefined) }}>
-        <AlertsPage initialProductId={alertsFocus} onSelectProduct={setAlertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
+        <Later spin><AlertsPage initialProductId={alertsFocus} onSelectProduct={setAlertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} /></Later>
       </AlertsFloat>
       {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
-      {bulkOpened && <BulkWorkspace
+      {bulkOpened && <Later><BulkWorkspace
         ws={bulk}
         cards={activeCards}
         products={products}
@@ -2443,7 +2454,7 @@ function App() {
           if (draft) setDraftOpen({ day, draft, alerts: bulk.draftAlerts(day), focus })
         }}
         onFinish={(d) => goTo('week', d)}
-      />}
+      /></Later>}
       {(selected || creating || draftOpen) && (
         // 配信カードで失敗しても、閉じて、ほかの配信を開けるように
         <ErrorBoundary
@@ -2524,7 +2535,7 @@ function App() {
       {cardMenu.menu}
       {/* 開発へのリクエストのピン(どの画面にも重ねる)と、その一覧 */}
       <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} />
-      {devRequestsOpen && <DevRequestsDialog onClose={() => setDevRequestsOpen(false)} />}
+      {devRequestsOpen && <Later><DevRequestsDialog onClose={() => setDevRequestsOpen(false)} /></Later>}
       {dupCard && (
         <DuplicateDialog
           card={dupCard}
@@ -2538,11 +2549,11 @@ function App() {
         />
       )}
       {peekResult && (
-        <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} />
+        <Later><ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} /></Later>
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
       {productionOpen && cards.find((c) => c.id === productionOpen) && (
-        <ProductionPage
+        <Later><ProductionPage
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}
@@ -2559,7 +2570,7 @@ function App() {
           onChanged={() => void production.reload()}
           autoRequest={productionAuto}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
-        />
+        /></Later>
       )}
     </>
   )
