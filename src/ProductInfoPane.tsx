@@ -1,8 +1,8 @@
-import { Avatar, Badge, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Avatar, Badge, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { productImage } from './images'
 import { yen, type Item } from './items'
-import { optionLabel, useT } from './i18n'
+import { tr, useT } from './i18n'
 import { productMarket } from './market'
 import { ProductFloat } from './ProductFloat'
 import { AlertChip, LowStockBadge } from './ProductMarks'
@@ -24,7 +24,7 @@ interface Props {
   onAlert?: (productId: string) => void
   /** 行を押したとき(商品の対応のフロートを開く。X54) */
   onOpenProduct?: (itemKey: string) => void
-  /** 一覧の上の説明(シンプルな配信カードでは、枠を選んでからの見比べも書く) */
+  /** 一覧の使い方(見出しの横の ⓘ に出す。シンプルな配信カードでは、枠を選んでからの見比べも書く) */
   hint?: string
 }
 
@@ -58,14 +58,20 @@ const useStyles = makeStyles({
   main: { minWidth: 0, flexGrow: 1, display: 'grid' },
   name: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  legend: { display: 'grid', rowGap: '6px', maxWidth: '280px', fontSize: tokens.fontSizeBase200 },
+  legendHead: { fontWeight: tokens.fontWeightSemibold, marginTop: '2px' },
+  legendSub: { color: tokens.colorNeutralForeground3 },
   trend: { flexShrink: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, width: '16px', textAlign: 'center' },
 })
 
-/** 売上トレンドの矢印と色 */
-function trendMark(name?: string): { mark: string; color: string } {
-  if (name === '上昇') return { mark: '↑', color: tokens.colorPaletteGreenForeground1 }
-  if (name === '下降') return { mark: '↓', color: tokens.colorPaletteRedForeground1 }
-  return { mark: '→', color: tokens.colorNeutralForeground3 }
+// 売れ行きの比べ方(docs/BIGQUERY_EXPORT.md の sales_trend の ※2: 直近 4 週の販売数を、その前の 4 週と比べる)
+const trendBasis = () => tr('直近 4 週の販売数を、その前の 4 週と比べて', 'units sold in the last 4 weeks vs the 4 weeks before')
+
+/** 売れ行きの矢印と色。説明は「売れ行き: 上がっている(…と比べて)」のように、何の矢印かが分かる文にする(X72。「上昇」だけでは分からなかった) */
+function trendMark(name?: string): { mark: string; color: string; text: string } {
+  if (name === '上昇') return { mark: '↑', color: tokens.colorPaletteGreenForeground1, text: tr(`売れ行き: 上がっている(${trendBasis()})`, `Sales: rising (${trendBasis()})`) }
+  if (name === '下降') return { mark: '↓', color: tokens.colorPaletteRedForeground1, text: tr(`売れ行き: 下がっている(${trendBasis()})`, `Sales: falling (${trendBasis()})`) }
+  return { mark: '→', color: tokens.colorNeutralForeground3, text: tr(`売れ行き: 横ばい(${trendBasis()})`, `Sales: flat (${trendBasis()})`) }
 }
 
 /**
@@ -82,10 +88,26 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
   return (
     <div className={s.root}>
       <div className={s.head}>
-        <Text weight="semibold" size={300}>{t('商品情報', 'Product info')}</Text>
+        {/* 一覧の使い方と印の意味は、見出しの横の ⓘ に(X72。見出しの下に説明の文を並べない。各行に「売れ行き」とは書かない) */}
+        <InfoLabel
+          size="medium"
+          weight="semibold"
+          info={
+            <div className={s.legend}>
+              <span>{hint ?? t('メールに載せる商品の一覧です。行を押すと詳細が開きます。', 'Products in the email. Click a row for details.')}</span>
+              <span className={s.legendHead}>{t('右端の印', 'Marks on the right')}</span>
+              <span>
+                <b style={{ color: tokens.colorPaletteGreenForeground1 }}>↑</b> {t('売れ行きが上がっている', 'Sales rising')} · <b style={{ color: tokens.colorPaletteRedForeground1 }}>↓</b> {t('下がっている', 'falling')} · <b>→</b> {t('横ばい', 'flat')}
+              </span>
+              <span className={s.legendSub}>{t(`売れ行きは、${trendBasis()}`, `Sales trend: ${trendBasis()}`)}</span>
+              <span>{t('「残少」= 在庫が少ない。商品名の前の印 = この配信のアラート(在庫切れの見込みなど)', '“Low” = low stock. The mark before a name = an alert for this delivery (e.g. likely out of stock)')}</span>
+            </div>
+          }
+        >
+          {t('商品情報', 'Product info')}
+        </InfoLabel>
         <Badge size="small" appearance="tint" color="informative">{items.length}</Badge>
       </div>
-      <span className={s.caption}>{hint ?? t('メールに載せる商品の一覧です。行を押すと詳細が開きます。', 'Products in the email. Click a row for details.')}</span>
 
       {items.length === 0 && <span className={s.caption}>{t('まだ商品が選定されていません。', 'No products selected yet.')}</span>}
 
@@ -138,7 +160,7 @@ function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert }: { 
         </span>
       </div>
       <LowStockBadge product={p} />
-      <span className={s.trend} style={{ color: trend.color }} title={optionLabel(p.sales_trend_name)}>{trend.mark}</span>
+      <span className={s.trend} style={{ color: trend.color }} title={trend.text} aria-label={trend.text}>{trend.mark}</span>
     </div>
   )
 }

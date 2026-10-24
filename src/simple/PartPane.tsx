@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Badge, Button, Field, Input, Select, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Button, Field, Input, Select, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -382,7 +382,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     if (!part)
       return (
         <>
-          <span className={s.caption}>{t('直したい所を、プレビューで押してください(Tab で次の部品、Esc で選ぶのをやめる)。配信の全体のことは、ここで AI に頼めます。', 'Click what you want to change in the preview (Tab for the next part, Esc to stop). Ask AI about the whole delivery here.')}</span>
+          {/* 何も選んでいないときだけの一言(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
+          <span className={s.caption}>{t('直したい所を、プレビューで押してください', 'Click what you want to change in the preview')}</span>
           {wholeChat}
           <span className={s.label}>{t(`載せた商品(${e.items.length})`, `Products (${e.items.length})`)}</span>
           {e.items.length === 0 && <span className={s.caption}>{t('まだ商品がありません。プレビューの空いた枠を押すと、商品を探せます。', 'No products yet. Click an empty slot in the preview to find one.')}</span>}
@@ -771,7 +772,21 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   return (
     <div className={s.root}>
       <div className={s.head}>
-        <span className={s.title}>{titleOf(part)}</span>
+        {part ? (
+          <span className={s.title}>{titleOf(part)}</span>
+        ) : (
+          <InfoLabel
+            className={s.title}
+            size="medium"
+            weight="semibold"
+            info={t(
+              'プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。何も選んでいないときは、配信の全体のことを AI に頼めます。',
+              'Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops. With nothing selected, ask AI about the whole delivery.',
+            )}
+          >
+            {titleOf(part)}
+          </InfoLabel>
+        )}
         {part && (
           <Tooltip content={t('選ぶのをやめる(Esc)', 'Deselect (Esc)')} relationship="label">
             <Button className={s.deselect} size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => onPick(null)} />

@@ -9,6 +9,7 @@ import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
 import { CommPane, type CommCounts, type CommSection } from './CommPane'
 import { CardAlertsBar } from '../CardAlertsBar'
+import { Hint } from '../Hint'
 import { PinFloat, type PinTarget } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
 import { focusPin } from '../pinStore'
@@ -665,7 +666,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {panel === 'assets' && (
               // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
               <div className={s.pane}>
-                <span className={s.hint}>{t('承認のときのイメージにも、制作の参考にもなる画像・資料・URL。ここに落としても足せます。', 'Images, files and URLs that show the idea to approvers and guide production. Drop them here to add.')}</span>
+                <Hint hintKey="simpleCard.assets">{t('承認のときのイメージにも、制作の参考にもなる画像・資料・URL。ここに落としても足せます。', 'Images, files and URLs that show the idea to approvers and guide production. Drop them here to add.')}</Hint>
                 <CreativeAssets
                   key={assetsVersion}
                   cardId={e.card.id}

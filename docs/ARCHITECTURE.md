@@ -163,6 +163,10 @@
 - **Fluent に部品があるものは、その部品を使う**(2026-10-24 利用者と決めた。自前の見た目だと、検索の欄なのか・押せるのかが、ぱっと見で分からないことがあったため)。作る前に Fluent UI v9 の部品の一覧を見る。ないときだけ自前で作り、共通の部品にする。
   - 検索の欄: `SearchBox`(虫眼鏡と、入力を消す × が付く)。`Input` に虫眼鏡を付けて作らない。画面では共通の `SearchField`(`src/SearchField.tsx`。SearchBox と、右に当たった件数)を使い、絞り込みのチップは `FilterChips`(「絞り込み」の見出し + Fluent の `ToggleButton`)にして、検索の欄と分ける(X71)。開発用の画面は SearchBox をそのまま使う。
   - 項目の説明: `InfoLabel`(ラベルの横の ⓘ。押すと説明が出る)。説明の文をラベルの下に長く並べない。
+- **案内の 3 つの置き方**(X72。2026-10-24 利用者と決めた。一度慣れると、説明は邪魔なだけなので):
+  1. その場の一言(例「直したい所を、プレビューで押してください」)は、何も選んでいないとき・中身が空のときだけ出す(空の状態の案内。VS Code の空の欄・Notion の空の行のうすい文字と同じ考え)。
+  2. 詳しい説明(キーの操作・印の意味・使い方)は、見出しの横の ⓘ(`InfoLabel`)に入れる。見出しの下に説明の文を並べない。例: 商品情報の見出し(↑ ↓ → の売れ行き・残少・アラートの印の意味)、選んだ部品のペインの「部品を選んでください」、渡すものの「渡したもの(読むだけ)」。
+  3. 慣れたら邪魔な案内は、`Hint`(`src/Hint.tsx`。× で閉じると次から出さない)。閉じたかどうかは人ごと(ブラウザの `hints.dismissed`)に覚え、自分の設定(ST10)の「ヒントをもう一度出す」で `resetHints()`(`src/hints.ts`)を呼んで戻す。例: 左のバーの素材のパネルの説明。
   - 選び直す(メイン画像の入れ替え・商品の差し替え・部品の画像の選び直し): 共通の `ChoosePanel`(`src/ChoosePanel.tsx`。枠と見出し・閉じる ×、選び方は `TabList`)。開くボタンは対象(画像・商品)の真下に置き、`ChooseDrawer` でボタンから枠を引き出す(ボタンと枠を同じ色の線でつなぐ。開いている間はボタンが押されたまま・▲。もう一度押すか × で閉じる。2026-10-24 利用者と決めた)。ファイルを落とせる枠は `DropZone`(`src/DropZone.tsx`。Fluent に部品がないので自前)(SU3)。
 ## 8. 画面を開いている間の保存先(ブラウザの localStorage)
 
@@ -182,6 +186,7 @@
 | `ccp.country` | ヘッダーで選んだ国(X33) |
 | `float.<種類>.size` | 大きさを変えたフロートの大きさ(`ResizableSurface`。alerts・finished・productAction・bulk・abCompare・asset・devRequests・heroLibrary・heroUpload・partUpload・people・policy・ruleEdit・productImages・productionChat・resultDetail・resultPeek・weekHistory・pin) |
 | `textarea.<heightKey>.height` | 複数行の入力欄で、つかんで決めた最低の高さ(`AutoTextarea`) |
+| `hints.dismissed` | 閉じた案内(`Hint`)の鍵の一覧(X72。自分の設定の「ヒントをもう一度出す」で空にする) |
 | `devRequest.name` | 開発へのリクエストに残す名前(CCP の名前の設定 `me.name` とは別。初めて書くときに聞く。X69) |
 | `resultDetail.paneWidths.v1` / `assetFloat.paneWidths.v1` / `bulkWorkspace.paneWidths.v1` | 詳しい結果・素材のフロート・まとめて作るのペインの幅(`usePaneWidths`) |
 | `alerts.settings` | アラートの条件 |

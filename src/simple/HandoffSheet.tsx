@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Field, Input, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { InfoLabel, Button, Field, Input, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { CreativeAssets } from '../CreativeAssets'
@@ -221,7 +221,14 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
 
       {(
         <div className={s.foot}>
-          <span className={s.caption}>{readOnly ? t('渡したものを読むだけで出しています。直すときは「直す」で直し、制作のページで依頼し直します', 'Shown read-only after handoff. To change it, edit in “Edit” and request again on the production page') : statusNote(e.card.status, t)}</span>
+          {readOnly ? (
+            // 渡したあとの説明は ⓘ に(X72。足もとに長い文を並べない)
+            <InfoLabel size="small" info={t('渡したものを読むだけで出しています。直すときは「直す」で直し、制作のページで依頼し直します', 'Shown read-only after handoff. To change it, edit in “Edit” and request again on the production page')}>
+              {t('渡したもの(読むだけ)', 'Handed off (read-only)')}
+            </InfoLabel>
+          ) : (
+            <span className={s.caption}>{statusNote(e.card.status, t)}</span>
+          )}
           <Button appearance="primary" icon={<SendRegular />} disabled={busy || e.saving || !e.openProduction} onClick={() => void pass()}>
             {requested ? t('制作のページで続きを見る', 'Continue on the production page') : t('制作に渡す', 'Hand off to production')}
           </Button>
