@@ -174,6 +174,23 @@ def batches(values: Any) -> Any:
         yield cols, batch
 
 
+def newest_per_unique(t: sc.Table, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """一意の組(schema.json の unique)が同じ行が重なっていれば、新しい(変えた日時の遅い)1 行だけを残す。並びの順は変えない。
+    一意の決まりを足す前に書き出したパックにも、重なった行がありうるため(そのままでは、置き換えの取り込みが止まる)"""
+    for cols in t.unique:
+        best: dict[tuple[str, ...], dict[str, Any]] = {}
+        for r in rows:
+            if any(r.get(c) is None for c in cols):
+                continue  # 空の値は、一意の決まりの外(PostgreSQL と同じ)
+            key = tuple(str(r[c]) for c in cols)
+            old = best.get(key)
+            if old is None or (str(old.get("modified_on") or ""), str(old["id"])) < (str(r.get("modified_on") or ""), str(r["id"])):
+                best[key] = r
+        kept = {id(r) for r in best.values()}
+        rows = [r for r in rows if id(r) in kept or any(r.get(c) is None for c in cols)]
+    return rows
+
+
 async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
     """DB の中身を、パックの内容に置き換える(作った日時・変えた日時も、元のまま残す)。KEEP_ON_REPLACE の表は消さずに足す"""
     from .db import cli_conn
@@ -187,7 +204,7 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
             await conn.execute(text(f"DELETE FROM {t.pg}"))
         for t in order:
             keep = t.name in KEEP_ON_REPLACE
-            rows = tables.get(t.name, [])
+            rows = newest_per_unique(t, tables.get(t.name, []))
             conflict = " ON CONFLICT (id) DO NOTHING" if keep else ""
             for cols, batch in batches(repo.import_values(t, rec) for rec in rows):
                 await conn.execute(text(repo.insert_sql(t, cols, conflict)), batch)

@@ -104,6 +104,14 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(sql, "delivery_card_id = :f0")
         self.assertEqual(params["f0"], uuid.UUID(GUID))
 
+    def test_unique_makes_dedupe_and_unique_index(self) -> None:
+        ddl = self.s.table("user_prefs").ddl()
+        i = next(n for n, x in enumerate(ddl) if x.startswith("DELETE FROM user_prefs"))
+        # 重なりを消してから、一意の索引を作る
+        self.assertIn("a.user_id = b.user_id AND a.name = b.name", ddl[i])
+        self.assertEqual(ddl[i + 1], "CREATE UNIQUE INDEX IF NOT EXISTS ux_user_prefs_user_id_name ON user_prefs(user_id, name)")
+        self.assertFalse(any("UNIQUE" in x for x in self.s.table("events").ddl()))
+
     def test_filter_in(self) -> None:
         t = self.s.table("delivery_products")
         other = str(uuid.uuid4())

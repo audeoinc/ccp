@@ -57,7 +57,7 @@ async def get_prefs(request: Request):
         if uid is None:
             return ok({"user_id": None, "prefs": {}})
         rows = (await conn.execute(text("SELECT name, value FROM user_prefs WHERE user_id = :u ORDER BY modified_on"), {"u": uid})).mappings().all()
-    # 同じ名前の行が重なっていたら(同時に書いたときなど)、新しいほうを使う
+    # 並びは古い順なので、もし同じ名前の行があっても、新しいほうが残る(いまは unique で重ならない)
     return ok({"user_id": uid, "prefs": {r["name"]: r["value"] for r in rows if r["value"] is not None}})
 
 
@@ -71,8 +71,12 @@ async def put_prefs(request: Request):
         if uid is None:
             raise Fail(403, "ログインしていないので、設定はこのブラウザにだけ覚えます", "not_signed_in")
         for name, value in changes.items():
-            # 表に一意の制約を持たない(schema.json の仕組みにない)ので、消してから入れる(1 つのトランザクションの中)
-            await conn.execute(text("DELETE FROM user_prefs WHERE user_id = :u AND name = :n"), {"u": uid, "n": name})
-            if value is not None:
-                await conn.execute(text("INSERT INTO user_prefs (user_id, name, value) VALUES (:u, :n, :v)"), {"u": uid, "n": name, "v": value})
+            if value is None:
+                await conn.execute(text("DELETE FROM user_prefs WHERE user_id = :u AND name = :n"), {"u": uid, "n": name})
+                continue
+            # 人と名前で 1 行(schema.json の unique)。同時に書いても重ならない(以前は、消してから入れていたので重なりえた)
+            await conn.execute(
+                text("INSERT INTO user_prefs (user_id, name, value) VALUES (:u, :n, :v) ON CONFLICT (user_id, name) DO UPDATE SET value = EXCLUDED.value, modified_on = now()"),
+                {"u": uid, "n": name, "v": value},
+            )
     return ok({"saved": len(changes)})

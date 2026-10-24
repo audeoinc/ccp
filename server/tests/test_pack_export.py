@@ -97,5 +97,21 @@ class BatchesTest(unittest.TestCase):
         self.assertEqual([len(b) for _, b in out], [2, 2, 1])
 
 
+class NewestPerUniqueTest(unittest.TestCase):
+    def test_keeps_newest_of_same_user_and_name(self) -> None:
+        from ccp import schema as sc
+
+        t = sc.load().table("user_prefs")
+        rows = [
+            {"id": "a", "user_id": "u1", "name": "lang", "value": "ja", "modified_on": "2026-10-01T00:00:00Z"},
+            {"id": "b", "user_id": "u1", "name": "zoom", "value": "1", "modified_on": "2026-10-01T00:00:00Z"},
+            {"id": "c", "user_id": "u1", "name": "lang", "value": "en", "modified_on": "2026-10-02T00:00:00Z"},
+            {"id": "d", "user_id": None, "name": "lang", "value": "x"},
+        ]
+        self.assertEqual([r["id"] for r in pack.newest_per_unique(t, rows)], ["b", "c", "d"])
+        # 一意の組のない表は、そのまま
+        self.assertEqual(pack.newest_per_unique(sc.load().table("events"), rows), rows)
+
+
 if __name__ == "__main__":
     unittest.main()

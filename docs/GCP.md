@@ -33,6 +33,8 @@ CCP を GCP で動かす仕組み。方針・進み具合・使い方をまと�
 
 **列を足したら**: `server/schema.json` に追記 → 画面の型(`src/models/`、一部の表は `src/data/`)にも足す → `npm run verify`(`scripts/check-schema.mjs` が、食い違いを検出する)→ DB には、デプロイ後にサーバーが最初に DB へつないだとき、足りないテーブル・列が自動で足される(`server/ccp/data_api.py` の `_ensure_schema`。手で `migrate` を実行してもよい。何度実行しても同じ)。
 
+一意の組は、表の `unique`(列の名前の並びの一覧。例: `user_prefs` の `["user_id", "name"]`)。テーブルの定義を流すときに、同じ組の行が重なっていれば新しい 1 行だけを残してから、一意の索引 `ux_<表>_<列>…` を作る。書くときは `ON CONFLICT (列…)` で書き換えられる。パックの置き換えの取り込みも、同じ組の行は新しい 1 行だけを入れる(2026-10-25)。
+
 選択肢の値は、文字(`text`)で持つ(例: チャネルは `email` / `app`)。使える値は `choices`。
 
 列の型は `text` / `int` / `numeric`(金額。小数 2 桁)/ `float`(率・比。購入率・前年比・天気への反応)/ `timestamptz` / `date` / `choice`。

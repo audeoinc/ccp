@@ -63,6 +63,8 @@ class Table:
     lookups: list[Lookup]
     # 使わなくなった列(schema.json の retired)。書き込みに来ても、断らずに無視する
     retired: set[str] = field(default_factory=set)
+    # 一意の組(schema.json の unique。列の名前の並び)。同じ組の行は 1 つだけ(ON CONFLICT で書き換えられるように)
+    unique: list[list[str]] = field(default_factory=list)
     by_name: dict[str, Column] = field(default_factory=dict)
     by_lookup: dict[str, Lookup] = field(default_factory=dict)
 
@@ -150,6 +152,13 @@ class Table:
         for c in self.columns:
             if c.index:
                 sql.append(f"CREATE INDEX IF NOT EXISTS ix_{self.pg}_{c.pg} ON {self.pg}({c.pg})")
+        for cols in self.unique:
+            pg = [self.resolve(c)[0] for c in cols]
+            # 一意にする前に、同じ組の行が重なっていれば、新しい 1 行だけを残す(一意の決まりがなかった間に、同時に書いて重なった行)。
+            # 重なりがなければ、何も消さない
+            same = " AND ".join(f"a.{c} = b.{c}" for c in pg)
+            sql.append(f"DELETE FROM {self.pg} AS a USING {self.pg} AS b WHERE {same} AND (a.modified_on, a.id) < (b.modified_on, b.id)")
+            sql.append(f"CREATE UNIQUE INDEX IF NOT EXISTS ux_{self.pg}_{'_'.join(pg)} ON {self.pg}({', '.join(pg)})")
         return sql
 
     def legacy_value_sql(self) -> list[str]:
@@ -225,7 +234,7 @@ def _schema() -> Schema:
         for name, t in raw["tables"].items():
             cols = [Column(c[0], c[1], **(c[2] if len(c) > 2 else {}), choices=choices.get(f"{name}.{c[0]}")) for c in t["columns"]]
             lks = [Lookup(lk[0], lk[1], (lk[2] if len(lk) > 2 else {}).get("onDelete", "NO ACTION")) for lk in t["lookups"]]
-            tables[name] = Table(name, cols, lks, set(t.get("retired", [])))
+            tables[name] = Table(name, cols, lks, set(t.get("retired", [])), [list(u) for u in t.get("unique", [])])
         _cache = Schema(tables)
     return _cache
 
