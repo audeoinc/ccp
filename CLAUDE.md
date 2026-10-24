@@ -27,6 +27,7 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 ## コードの約束
 
 - **UI は Fluent UI v9 のみ**(MUI は使わない)。スタイルは `makeStyles` と `tokens`。色の直書きは避ける(メール・プッシュのプレビュー内の、受信側の見た目だけ例外)。
+- **Fluent に部品があるものは、自前で作らず、その部品を使う**(2026-10-24、利用者と決めた。ぱっと見で何の部品か分かるように)。例: 検索の欄は `SearchBox`、項目の説明は `InfoLabel`(ラベルの横の ⓘ)。作る前に Fluent UI v9 の部品の一覧を見る。ないときだけ自前で作り、共通の部品にする。
 - **画面の文言は、その場に `t('日本語', 'English')`**(`const t = useT()`)。React の外では `tr(...)`。日本語だけの文言を、画面に書かない(開発用の画面 `src/dev/` だけは日本語のみでよい。[docs/DEVTOOLS.md](docs/DEVTOOLS.md))。最上位の定数に文言を置かない(関数か getter にする)。日付は `locale()`、価格は `yen(price, market)`、選択肢のラベルは `optionLabel(...)`。
 - 商品・メイン画像は、配信カードの国に合う市場のものだけを、AI の選定と検索の対象にする(`poolProducts` / `poolHeroes`)。載せた商品の表示には、全件を使う。
 - **AI の呼び出しは `askAgent`(`src/aiSelect.ts`)だけ**を通す(サーバーの `/api/ask` が Gemini を呼ぶ)。指示文は日本語で書き、画面が English のときの言い換えは `localizePrompt` が行う。
