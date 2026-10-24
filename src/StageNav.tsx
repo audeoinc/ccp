@@ -118,7 +118,8 @@ export function StageNav({ face, card, production, onGo, variant = 'chips' }: Pr
               onClick={() => !here && onGo?.(x.face)}
             >
               <span className={s.name}>{x.name}</span>
-              <span className={s.state}>{x.state}</span>
+              {/* 企画の面では、承認の状態を上の帯の札(ApprovalBadge)で出すので、タブは段階の名前だけ(SU11) */}
+              {!(here && x.face === 'calendar') && <span className={s.state}>{x.state}</span>}
             </button>
           )
           return !here && !x.enabled && x.why ? (

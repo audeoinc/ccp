@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
@@ -26,7 +26,8 @@ import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
 import { getTemplate } from '../templates'
 import { NextAction } from './NextAction'
-import type { NextStep } from './nextStep'
+import { myNextStep, type NextStep } from './nextStep'
+import { ApprovalBadge } from './ApprovalBadge'
 import { PartPane } from './PartPane'
 import { placeInPart } from './actions'
 import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
@@ -35,7 +36,7 @@ import { StageHeader } from './StageHeader'
 import { HandoffSheet } from './HandoffSheet'
 import { CreativeAssets } from '../CreativeAssets'
 import { addDroppedAssets, canDropAsset } from './assetDrop'
-import { myName } from '../history'
+import { myName, onMeChange } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
@@ -272,9 +273,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const v = loadSide()
     return isComm(v) ? v : 'talk'
   })
-  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changes: 0 })
+  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, changes: 0 })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、バーのアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: CommCounts) => setCounts(c), [])
+  // 右上の青いボタンは、自分がやることがあるときだけ(SU11)。作った人 = 担当。担当が空か、自分の名前を決めていないときは、作った人とみなす(だれも出せなくならないように)
+  const meName = useSyncExternalStore(onMeChange, myName)
+  const author = !e.form.owner || !meName || e.form.owner === meName
+  const myStep = myNextStep(e.nextStep, { author, myTurn: counts.myTurn, changesRequested: counts.changesRequested })
   // 左のバーの「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
   const [assetsVersion, setAssetsVersion] = useState(0)
   const [dropOver, setDropOver] = useState<'assets' | 'handoff' | null>(null)
@@ -530,6 +535,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <ChannelBadge channel={e.form.channel} />
             {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
             {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
+            {/* 承認の状態の札(SU11)。押すと左のバーの承認のパネル */}
+            <ApprovalBadge status={e.form.status} waiting={counts.waiting} changesRequested={counts.changesRequested} reviewers={counts.reviewers} approved={counts.approved} onOpen={() => showSide('approval', true)} />
           </>
         }
         actions={
@@ -550,12 +557,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 </Button>
               </Tooltip>
             )}
-            <NextAction
-              step={e.nextStep}
-              busy={e.saving}
-              // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。制作のページは、CardDetail の側
-              onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'watchApproval' ? showSide('approval', true) : onRunNext(step))}
-            />
+            {myStep && (
+              <NextAction
+                step={myStep}
+                busy={e.saving}
+                // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。制作のページは、CardDetail の側
+                onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'review' ? showSide('approval', true) : onRunNext(step))}
+              />
+            )}
             {e.viewSwitch}
             {e.menu}
             <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
