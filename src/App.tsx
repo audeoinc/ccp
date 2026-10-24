@@ -146,6 +146,7 @@ import { localDate } from './results'
 import { PREF } from './prefKeys'
 import { confirmDialog } from './confirm'
 import { ConfirmHost } from './ConfirmHost'
+import { loadChunk } from './chunkReload'
 import { Z } from './layers'
 import { todayYmd, ym, ymd } from './dates'
 
@@ -446,26 +447,26 @@ function bqStockTime(r: BqSyncResult): string | undefined {
 
 // 開いたときに読み込む画面(整理 第2段 ④)。最初に開くときに、使わないかもしれない画面のプログラムまで読まないため。
 // どれも App だけが使う(ほかのファイルから読み込むと、分かれない)
-const SettingsDialog = lazy(() => import('./SettingsDialog').then((m) => ({ default: m.SettingsDialog })))
-const ResultsPage = lazy(() => import('./ResultsPage').then((m) => ({ default: m.ResultsPage })))
-const ImpactView = lazy(() => import('./ImpactView').then((m) => ({ default: m.ImpactView })))
-const ProductsView = lazy(() => import('./ProductsView').then((m) => ({ default: m.ProductsView })))
-const ResultPeek = lazy(() => import('./ResultPeek').then((m) => ({ default: m.ResultPeek })))
-const ProductionPage = lazy(() => import('./ProductionPage').then((m) => ({ default: m.ProductionPage })))
-const AlertsPage = lazy(() => import('./AlertsPage').then((m) => ({ default: m.AlertsPage })))
-const BulkWorkspace = lazy(() => import('./BulkWorkspace').then((m) => ({ default: m.BulkWorkspace })))
-const TemplateManager = lazy(() => import('./TemplateManager').then((m) => ({ default: m.TemplateManager })))
-const PolicyManager = lazy(() => import('./PolicyManager').then((m) => ({ default: m.PolicyManager })))
-const PatternPanel = lazy(() => import('./PatternPanel').then((m) => ({ default: m.PatternPanel })))
-const CountryCriteriaPanel = lazy(() => import('./CountryCriteriaPanel').then((m) => ({ default: m.CountryCriteriaPanel })))
-const CountryTemplatesPanel = lazy(() => import('./CountryTemplatesPanel').then((m) => ({ default: m.CountryTemplatesPanel })))
-const CountryLearningsPanel = lazy(() => import('./CountryLearningsPanel').then((m) => ({ default: m.CountryLearningsPanel })))
-const CountryPoliciesPanel = lazy(() => import('./CountryPoliciesPanel').then((m) => ({ default: m.CountryPoliciesPanel })))
-const PeopleManager = lazy(() => import('./PeopleManager').then((m) => ({ default: m.PeopleManager })))
-const HeroLibrary = lazy(() => import('./HeroLibrary').then((m) => ({ default: m.HeroLibrary })))
-const SampleShopPanel = lazy(() => import('./SampleShopPanel').then((m) => ({ default: m.SampleShopPanel })))
-const BrandPanel = lazy(() => import('./BrandPanel').then((m) => ({ default: m.BrandPanel })))
-const DevRequestsDialog = lazy(() => import('./DevRequestsDialog').then((m) => ({ default: m.DevRequestsDialog })))
+const SettingsDialog = lazy(() => loadChunk(() => import('./SettingsDialog')).then((m) => ({ default: m.SettingsDialog })))
+const ResultsPage = lazy(() => loadChunk(() => import('./ResultsPage')).then((m) => ({ default: m.ResultsPage })))
+const ImpactView = lazy(() => loadChunk(() => import('./ImpactView')).then((m) => ({ default: m.ImpactView })))
+const ProductsView = lazy(() => loadChunk(() => import('./ProductsView')).then((m) => ({ default: m.ProductsView })))
+const ResultPeek = lazy(() => loadChunk(() => import('./ResultPeek')).then((m) => ({ default: m.ResultPeek })))
+const ProductionPage = lazy(() => loadChunk(() => import('./ProductionPage')).then((m) => ({ default: m.ProductionPage })))
+const AlertsPage = lazy(() => loadChunk(() => import('./AlertsPage')).then((m) => ({ default: m.AlertsPage })))
+const BulkWorkspace = lazy(() => loadChunk(() => import('./BulkWorkspace')).then((m) => ({ default: m.BulkWorkspace })))
+const TemplateManager = lazy(() => loadChunk(() => import('./TemplateManager')).then((m) => ({ default: m.TemplateManager })))
+const PolicyManager = lazy(() => loadChunk(() => import('./PolicyManager')).then((m) => ({ default: m.PolicyManager })))
+const PatternPanel = lazy(() => loadChunk(() => import('./PatternPanel')).then((m) => ({ default: m.PatternPanel })))
+const CountryCriteriaPanel = lazy(() => loadChunk(() => import('./CountryCriteriaPanel')).then((m) => ({ default: m.CountryCriteriaPanel })))
+const CountryTemplatesPanel = lazy(() => loadChunk(() => import('./CountryTemplatesPanel')).then((m) => ({ default: m.CountryTemplatesPanel })))
+const CountryLearningsPanel = lazy(() => loadChunk(() => import('./CountryLearningsPanel')).then((m) => ({ default: m.CountryLearningsPanel })))
+const CountryPoliciesPanel = lazy(() => loadChunk(() => import('./CountryPoliciesPanel')).then((m) => ({ default: m.CountryPoliciesPanel })))
+const PeopleManager = lazy(() => loadChunk(() => import('./PeopleManager')).then((m) => ({ default: m.PeopleManager })))
+const HeroLibrary = lazy(() => loadChunk(() => import('./HeroLibrary')).then((m) => ({ default: m.HeroLibrary })))
+const SampleShopPanel = lazy(() => loadChunk(() => import('./SampleShopPanel')).then((m) => ({ default: m.SampleShopPanel })))
+const BrandPanel = lazy(() => loadChunk(() => import('./BrandPanel')).then((m) => ({ default: m.BrandPanel })))
+const DevRequestsDialog = lazy(() => loadChunk(() => import('./DevRequestsDialog')).then((m) => ({ default: m.DevRequestsDialog })))
 
 /** 分けて読み込む画面を、読み込み終えるまで待つ所。画面ごとに置く(ヘッダーなど、ほかの所は消さない) */
 function Later({ children, spin }: { children: ReactNode; /** 待つ間に、くるくるを出す(ページ・設定の欄。窓は出さない) */ spin?: boolean }) {

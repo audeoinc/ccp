@@ -6,6 +6,10 @@ import Root from './Root.tsx'
 import { getLang } from './i18n'
 import { applyUiScale } from './uiScale'
 import { loadUserPrefs } from './userPrefs'
+import { watchChunkErrors } from './chunkReload'
+
+// 反映のあとに古いタブで、分けた画面のファイルが読めなかったら、一度だけ読み直す(chunkReload.ts)
+watchChunkErrors()
 
 // ログインしている人の設定(ST6)を、言語・表示の大きさ・ペインの幅などを読む前に入れる(待つのは長くても少し)
 void loadUserPrefs().then(() => {
