@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useStableCallback } from './useStableCallback'
 import {
   Badge,
   Button,
@@ -2094,6 +2095,17 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     ;[next[i], next[j]] = [next[j], next[i]]
     setItems(next)
   }
+  // プレビュー(memo)に渡す関数は、いつも同じものを渡す(打つたびに、プレビューまで描き直さないように)
+  const previewSectionTitle = useStableCallback(setSectionTitle)
+  const previewSectionCopy = useStableCallback(setSectionCopy)
+  const previewClearHero = useCallback(() => setHeroId(undefined), [])
+  const previewNoSelect = useCallback(() => undefined, [])
+  const previewRemove = useStableCallback(removeItem)
+  const previewMove = useStableCallback((key: string, d: number) => {
+    const i = items.findIndex((x) => x.key === key)
+    moveItem(i, i + d)
+  })
+  const previewDropAt = useStableCallback(dropAt)
   const simplePreview = (
     <>
       <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
@@ -2118,19 +2130,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           template={aiPreview?.templateId ?? template}
           scheduledAt={form.scheduledAt}
           sectionTitles={sectionTitles}
-          onSectionTitle={setSectionTitle}
+          onSectionTitle={previewSectionTitle}
           sectionCopies={sectionCopies}
-          onSectionCopy={setSectionCopy}
+          onSectionCopy={previewSectionCopy}
           hero={shownHero}
           onDropHero={setHeroId}
-          onClearHero={() => setHeroId(undefined)}
-          onSelect={() => undefined}
-          onRemove={removeItem}
-          onMove={(key, d) => {
-            const i = items.findIndex((x) => x.key === key)
-            moveItem(i, i + d)
-          }}
-          onDropAt={dropAt}
+          onClearHero={previewClearHero}
+          onSelect={previewNoSelect}
+          onRemove={previewRemove}
+          onMove={previewMove}
+          onDropAt={previewDropAt}
           pickMode
         />
       </div>
@@ -2891,19 +2900,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                     template={template}
                     scheduledAt={form.scheduledAt}
                     sectionTitles={sectionTitles}
-                    onSectionTitle={setSectionTitle}
+                    onSectionTitle={previewSectionTitle}
                     sectionCopies={sectionCopies}
-                    onSectionCopy={setSectionCopy}
+                    onSectionCopy={previewSectionCopy}
                     hero={hero}
                     onDropHero={setHeroId}
-                    onClearHero={() => setHeroId(undefined)}
+                    onClearHero={previewClearHero}
                     onSelect={setSelectedKey}
-                    onRemove={removeItem}
-                    onMove={(key, d) => {
-                      const i = items.findIndex((x) => x.key === key)
-                      moveItem(i, i + d)
-                    }}
-                    onDropAt={dropAt}
+                    onRemove={previewRemove}
+                    onMove={previewMove}
+                    onDropAt={previewDropAt}
                   />
                 </div>
                 {card && itemAlertKinds.size > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownRegular,
@@ -169,11 +169,13 @@ const useStyles = makeStyles({
 // ブロックの data-anchor(hero・section:N・button:… など)は、プレビュー上に置く書き込み(ピン)の場所の目印(pinStore.ts)。
 // 座標だけで持つと、幅・倍率・文言でずれるので、ブロックの中の割合で持つ。名前を変えると、置いたピンが見つからなくなる。
 // 部品を選ぶ(SU1)ための細かい目印は、別の属性 data-part に持つ(simple/parts.ts。見出しとコピー・空いた枠などを見分ける)
-export function Preview(props: Props) {
+// memo: 配信カードで、プレビューに出ない欄(テーマ・制作の指示など)を打つたびに、プレビューまで描き直さないように。
+// 渡す関数は、いつも同じものにする(CardDetail の useStableCallback)
+export const Preview = memo(function Preview(props: Props) {
   // 差出人の名前は、設定を読み直したら描き直す
   useCountrySettings()
   return props.channel === 'email' ? <EmailPreview {...props} /> : <PushPreview {...props} />
-}
+})
 
 function useDropTarget(onDropAt: Props['onDropAt']) {
   const [over, setOver] = useState<number | null>(null)
