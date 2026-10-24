@@ -4,6 +4,7 @@
 import { criteriaFor } from './countrySettings'
 import { policyUsableIn } from './countryApply'
 import { tr } from './i18n'
+import { createStore } from './store'
 
 /** 上限の決まり(policy_rules の行のうち、check_spec が「上限 週 N 回」のもの) */
 interface LimitRule {
@@ -16,24 +17,21 @@ interface LimitRule {
   periodEnd?: string
 }
 
-let rules: LimitRule[] = []
-const listeners = new Set<() => void>()
+const rules = createStore<LimitRule[]>([])
 
 /** 決まりを読み込んだときに呼ぶ(App の loadMarketingPolicies)。上限の決まりだけを残す */
 export function setLimitRules(all: { ruleId: string; title: string; checkSpec?: string; market: string[]; channel: string[]; periodStart?: string; periodEnd?: string }[]) {
-  rules = all.flatMap((r) => {
-    const m = (r.checkSpec ?? '').trim().match(/^上限\s+週\s+(\d+)\s*回$/)
-    return m ? [{ ruleId: r.ruleId, title: r.title, n: Number(m[1]), market: r.market, channel: r.channel, periodStart: r.periodStart, periodEnd: r.periodEnd }] : []
-  })
-  for (const l of listeners) l()
+  rules.set(
+    all.flatMap((r) => {
+      const m = (r.checkSpec ?? '').trim().match(/^上限\s+週\s+(\d+)\s*回$/)
+      return m ? [{ ruleId: r.ruleId, title: r.title, n: Number(m[1]), market: r.market, channel: r.channel, periodStart: r.periodStart, periodEnd: r.periodEnd }] : []
+    }),
+  )
 }
 
 /** 決まりが変わったら知らせる(上限を使う計算を、作り直すため) */
-export function onLimitRulesChange(l: () => void) {
-  listeners.add(l)
-  return () => listeners.delete(l)
-}
-export const limitRulesVersion = () => rules
+export const onLimitRulesChange = rules.subscribe
+export const limitRulesVersion = rules.get
 
 interface CardLike {
   country?: string | null
@@ -51,7 +49,7 @@ export interface WeeklyLimit {
 export function weeklyLimitFor(card?: CardLike): WeeklyLimit {
   if (card) {
     const day = (card.scheduled_at ?? '').slice(0, 10)
-    const hit = rules.filter(
+    const hit = rules.get().filter(
       (r) =>
         // 国で使うか(ST8。市場の列は既定で、国ごとに変えられる)
         policyUsableIn(r.ruleId, r.market, card.country) &&

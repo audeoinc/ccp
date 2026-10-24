@@ -2,7 +2,7 @@
 // ブラウザごとに覚える(人ごとに「自分が知らせてほしいもの」を決める)。ヘッダーの件数にも効く。
 // 在庫の見込みそのものは、すべての配信で計算する(ほかの人の配信も在庫を減らすため)。条件は、出す配信を絞るだけ
 import { THEME_TYPES, themeTypeOf } from './themeTypes'
-import { useSyncExternalStore } from 'react'
+import { createStore } from './store'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { ChangeAlert, StockAlert } from './alerts'
 import { PREF } from './prefKeys'
@@ -24,8 +24,7 @@ export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
   kinds: { outOfStock: true, lowStock: true, policyChanged: true, dateChanged: true },
 }
 
-const listeners = new Set<() => void>()
-let current: AlertSettings = load()
+const current = createStore<AlertSettings>(load())
 
 function load(): AlertSettings {
   try {
@@ -42,21 +41,12 @@ function load(): AlertSettings {
 }
 
 export function setAlertSettings(next: AlertSettings) {
-  current = next
   // 覚えられなくても、この画面では効かせる
   savePref(PREF.alertSettings, next)
-  for (const l of listeners) l()
+  current.set(next)
 }
 
-export function useAlertSettings(): AlertSettings {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => current,
-  )
-}
+export const useAlertSettings = (): AlertSettings => current.use()
 
 /** 既定から変えているか(画面に「条件で絞り込み中」と出すため) */
 export const isCustomized = (s: AlertSettings) => JSON.stringify(s) !== JSON.stringify(DEFAULT_ALERT_SETTINGS)

@@ -12,6 +12,7 @@ import type { ApprovalGroup } from './models/approvalGroups'
 import type { ApprovalGroupMember } from './models/approvalGroupMembers'
 import type { ApprovalRule } from './models/approvalRules'
 import { parseIds } from './approvals'
+import { createStore } from './store'
 
 export interface People {
   /** 読み込めたか(読み込む前・失敗したときは false。そのあいだは、名前の入力に戻す) */
@@ -23,10 +24,8 @@ export interface People {
   rules: ApprovalRule[]
 }
 
-let state: People = { loaded: false, users: [], groups: [], members: [], rules: [] }
+const state = createStore<People>({ loaded: false, users: [], groups: [], members: [], rules: [] })
 let started = false
-const listeners = new Set<() => void>()
-const emit = () => listeners.forEach((f) => f())
 
 const byName = <T extends { name?: string }>(a: T, b: T) => (a.name ?? '').localeCompare(b.name ?? '')
 
@@ -41,17 +40,17 @@ export async function reloadPeople(): Promise<void> {
   } else setMeLock(null)
   // ユーザーが読めなければ、読めていない扱いにする(「あなた」は名前の入力に戻る。いまの運用を止めないため)
   if (!u.success) return
-  state = { loaded: true, users: [...(u.data ?? [])].sort(byName), groups: g.success ? [...(g.data ?? [])].sort(byName) : [], members: m.success ? (m.data ?? []) : [], rules: r.success ? (r.data ?? []) : [] }
-  emit()
+  state.set({ loaded: true, users: [...(u.data ?? [])].sort(byName), groups: g.success ? [...(g.data ?? [])].sort(byName) : [], members: m.success ? (m.data ?? []) : [], rules: r.success ? (r.data ?? []) : [] })
 }
 
+// 初めて使われたときに読む
 const subscribe = (f: () => void) => {
-  listeners.add(f)
+  const off = state.subscribe(f)
   if (!started) void reloadPeople()
-  return () => listeners.delete(f)
+  return off
 }
 
-export const usePeople = (): People => useSyncExternalStore(subscribe, () => state)
+export const usePeople = (): People => useSyncExternalStore(subscribe, state.get)
 
 /** 選べるユーザー(有効な人だけ) */
 export const activeUsers = (p: People) => p.users.filter((u) => (u.status ?? 'active') === 'active')
@@ -63,19 +62,9 @@ export const groupUsers = (p: People, groupId: string) => {
 }
 
 // 「ユーザーと承認グループ」の画面(PeopleManager)を開く・閉じる(⚙ のメニューから開く。テンプレートの管理と同じ形)
-let managerOpen = false
-const managerListeners = new Set<() => void>()
-export const setPeopleManagerOpen = (v: boolean) => {
-  managerOpen = v
-  managerListeners.forEach((f) => f())
-}
-const subscribeManager = (f: () => void) => {
-  managerListeners.add(f)
-  return () => {
-    managerListeners.delete(f)
-  }
-}
-export const usePeopleManagerOpen = (): boolean => useSyncExternalStore(subscribeManager, () => managerOpen)
+const managerOpen = createStore(false)
+export const setPeopleManagerOpen = managerOpen.set
+export const usePeopleManagerOpen = (): boolean => managerOpen.use()
 
 /** その人が入っている承認グループの id */
 export const groupsOf = (p: People, userId: string) => p.members.filter((m) => m.user_id === userId).map((m) => m.approval_group_id)

@@ -3,7 +3,7 @@
 // (表 country_settings に、変えるたびに 1 行足す。いちばん新しい行が、いまの値)。
 // 見る人の絞り込み(対象の種類・担当・出すアラートの種類)は、人ごとのまま(src/alertSettings.ts)。
 // 店の見せ方(差出人の名前・店の URL。ST10)も同じ表に持つ。全社の既定は国を空の行、国の行は上書き(空の項目は全社の値)
-import { useSyncExternalStore } from 'react'
+import { createSignal } from './store'
 import { CountrySettingsService } from './data/countrySettings'
 import { PREF } from './prefKeys'
 import { loadPref, readRaw } from './settings'
@@ -32,12 +32,9 @@ const BRAND = 'brand'
 let history = new Map<string, CriteriaEntry[]>()
 // 国('' は全社)→ 店の見せ方の変えた記録(新しい順)
 let brandHistory = new Map<string, BrandEntry[]>()
-let version = 0
-const listeners = new Set<() => void>()
-const notify = () => {
-  version += 1
-  for (const l of listeners) l()
-}
+// 読み直したら、使っている部品を描き直す(値は上の Map。ここは版の番号だけ)
+const changed = createSignal()
+const notify = changed.notify
 
 const parse = (v?: string): CountryCriteria => {
   try {
@@ -75,13 +72,7 @@ export const criteriaHistory = (country: string): CriteriaEntry[] => history.get
 
 /** 国の設定が読み直されたら、描き直す(返す値は、読み直した回数) */
 export function useCountrySettings(): number {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => version,
-  )
+  return changed.use()
 }
 
 /** 国の基準を変える(1 行足す。国の全員に効く) */

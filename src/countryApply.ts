@@ -3,7 +3,7 @@
 // マスタは共通で 1 つ持ち、「どの国で使うか」だけを表 country_applications に持つ。
 // 変えるたびに 1 行足す(種類・マスタの id・国の組で、いちばん新しい行が、いまの値。前の行は、変えた人・日時の履歴)。
 // 行がなければ種類ごとの既定なので、今あるデータは何もしなくてもそのまま動く
-import { useSyncExternalStore } from 'react'
+import { createSignal } from './store'
 import { CountryApplicationsService } from './data/countryApplications'
 import type { CountryApplicationKind, CountryApplicationMode } from './models/countryApplications'
 
@@ -24,12 +24,9 @@ export interface ApplyEntry {
 
 // 「種類|id|国」→ 変えた記録(新しい順)
 let history = new Map<string, ApplyEntry[]>()
-let version = 0
-const listeners = new Set<() => void>()
-const notify = () => {
-  version += 1
-  for (const l of listeners) l()
-}
+// 読み直したら、使っている部品を描き直す(値は上の Map。ここは版の番号だけ)
+const changed = createSignal()
+const notify = changed.notify
 const keyOf = (kind: ApplyKind, id: string, country: string) => `${kind}|${id}|${country}`
 
 /** 国の適用を読む(開いたとき・変えたあと) */
@@ -78,13 +75,7 @@ export function applyHistory(kind: ApplyKind, country: string): { id: string; en
 
 /** 国の適用が読み直されたら、描き直す(返す値は、読み直した回数) */
 export function useCountryApply(): number {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => version,
-  )
+  return changed.use()
 }
 
 /** 国で使う・使わないを変える(変えたものだけ、1 行ずつ足す。国の全員に効く) */

@@ -8,6 +8,7 @@ import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
 import type { SectionKind } from './templates'
 import { localDate } from './results'
+import { createStore } from './store'
 
 // AI の依頼の状態(選択肢の値。src/gcp/ai.ts が返す)
 const STATUS_WAITING = 'waiting'
@@ -247,17 +248,13 @@ export interface MdPolicy {
   promoPlan?: string
   promoPeriod?: string
 }
-let activePolicies = new Map<string, MdPolicy>()
-export function setActivePolicies(map: Map<string, MdPolicy>) {
-  activePolicies = map
-}
 // 長い方針の文は切る(商品の数だけ入るので、プロンプトを大きくしすぎないように)
 const clip = (v?: string, n = 120) => {
   const s = (v ?? '').replace(/\s+/g, ' ').trim()
   return s.length > n ? `${s.slice(0, n)}…` : s || undefined
 }
-const mdOf = (code?: string) => {
-  const m = code ? activePolicies.get(code) : undefined
+const mdOf = (code: string | undefined, policies: Map<string, MdPolicy>) => {
+  const m = code ? policies.get(code) : undefined
   if (!m) return undefined
   return { stage: m.stage || undefined, policy: clip(m.policy), promoPlan: clip(m.promoPlan, 160), promoPeriod: m.promoPeriod || undefined }
 }
@@ -293,14 +290,20 @@ export interface ActiveSales {
   focus?: string
   note?: string
 }
-let activeRules: ActiveRule[] = []
-let activeSales: ActiveSales[] = []
-export function setActiveRules(rules: ActiveRule[]) {
-  activeRules = rules
+/**
+ * App が読み込んで入れる、AI の依頼の材料(MD 方針・マーケティングの決まり・販売系の方針)。読めなかったときは空のまま。
+ * 依頼のたびに 1 回だけ読み、下の関数には引数で渡す(作り直しの途中で入れ替わっても、1 つの依頼の中では同じ材料を使うため)
+ */
+export interface AiInputs {
+  policies: Map<string, MdPolicy>
+  rules: ActiveRule[]
+  sales: ActiveSales[]
 }
-export function setActiveSales(rows: ActiveSales[]) {
-  activeSales = rows
-}
+const inputs = createStore<AiInputs>({ policies: new Map(), rules: [], sales: [] })
+export const aiInputs = inputs.get
+export const setActivePolicies = (policies: Map<string, MdPolicy>) => inputs.set({ ...inputs.get(), policies })
+export const setActiveRules = (rules: ActiveRule[]) => inputs.set({ ...inputs.get(), rules })
+export const setActiveSales = (sales: ActiveSales[]) => inputs.set({ ...inputs.get(), sales })
 /** 依頼(task)→ 決まりの対象(POLICY.md の 4 章の表)。ここにない依頼(suggest_tasks など)には、決まりを渡さない */
 export const TASK_TARGETS: Record<string, string[]> = {
   suggest_themes: ['theme'],
@@ -334,11 +337,11 @@ export function mondayOf(iso?: string): string {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
 /** この依頼・この配信カードに効く決まり */
-export function rulesFor(task: unknown, card: CardLite): ActiveRule[] {
+export function rulesFor(task: unknown, card: CardLite, rules: ActiveRule[]): ActiveRule[] {
   const targets = typeof task === 'string' ? TASK_TARGETS[task] : undefined
   if (!targets) return []
   const day = (card.scheduledAt ?? '').slice(0, 10)
-  return activeRules.filter(
+  return rules.filter(
     (r) =>
       r.appliesTo.some((a) => targets.includes(a)) &&
       // 国で使うか(ST8。市場の列は既定で、国ごとに変えられる)
@@ -349,10 +352,10 @@ export function rulesFor(task: unknown, card: CardLite): ActiveRule[] {
   )
 }
 /** 配信日の週・市場の、販売系の方針 */
-export function salesFor(card: CardLite): ActiveSales[] {
+export function salesFor(card: CardLite, sales: ActiveSales[]): ActiveSales[] {
   const week = mondayOf(card.scheduledAt)
   if (!week || !card.country) return []
-  return activeSales.filter((s) => s.weekStart === week && s.market === card.country)
+  return sales.filter((s) => s.weekStart === week && s.market === card.country)
 }
 const RULES_NOTE =
   '【マーケティングの決まり】入力の rules は、この依頼に効くマーケティングの決まり(id・strength・text)。strength が must のものは必ず守り、反する案を出さない。' +
@@ -363,9 +366,9 @@ const WEEK_POLICY_NOTE =
   'md より新しいので、両方あるときは weekPolicy を優先する。\n\n'
 const categoryLabel = (key: string) => (ProductCategory as Record<string, string>)[key] ?? key
 /** 依頼に、関係する決まりと今週の方針を足す。足したものに合わせて、指示文の前書きも返す */
-function withPolicies(body: Record<string, unknown>, task: unknown, card: CardLite): { body: Record<string, unknown>; notes: string } {
-  const rules = rulesFor(task, card)
-  const sales = salesFor(card)
+function withPolicies(body: Record<string, unknown>, task: unknown, card: CardLite, ctx: AiInputs): { body: Record<string, unknown>; notes: string } {
+  const rules = rulesFor(task, card, ctx.rules)
+  const sales = salesFor(card, ctx.sales)
   const focus = sales.filter((s) => s.scope === 'all').map((s) => [s.focus, s.note].filter(Boolean).join(' — ')).filter(Boolean)
   const byProduct = new Map(sales.filter((s) => s.scope === 'product').map((s) => [s.target, s]))
   // カテゴリは、CCP の値(outer)でも表示名(アウター)でも合うように
@@ -476,14 +479,15 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
   // must の決まりを破った案は、1 回だけ作り直させる(M5)。作り直しの前書き
   let retry = ''
   const task = (payload as { task?: unknown })?.task
-  const mustRules = rulesFor(task, cardOf(payload)).filter((r) => r.strength === 'must' && r.checkSpec)
+  const ctx = inputs.get()
+  const mustRules = rulesFor(task, cardOf(payload), ctx.rules).filter((r) => r.strength === 'must' && r.checkSpec)
   if (usesLearnings(task)) recordRun(task, activeLearnings.length > 0 ? activeLearningIds : [])
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
     const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
     const base = { ...(payload as object), ...(chat && chat.length > 0 ? { chat } : {}), ...(learnings ? { learnings } : {}) }
     // マーケティングの決まり・今週の方針(M3・M4)を、この依頼に効く分だけ足す
-    const { body, notes: policyNotes } = withPolicies(base, (payload as { task?: unknown })?.task, cardOf(payload))
+    const { body, notes: policyNotes } = withPolicies(base, (payload as { task?: unknown })?.task, cardOf(payload), ctx)
     const text = await askText(
       (getLang() === 'en' ? EN_NOTE : '') + JSON_NOTE + targetNote(cardOf(payload)) + (chat && chat.length > 0 ? chatNote() : '') + (learnings ? LEARNINGS_NOTE : '') + (hasMd(body) ? MD_NOTE : '') + policyNotes + retry + localizePrompt(prompt) + JSON.stringify(body),
     )
@@ -556,6 +560,7 @@ async function askText(message: string): Promise<string> {
 // この画面の時刻での今日(toISOString は UTC なので、日本の朝 9 時前は前の日になる)
 const today = () => localDate(new Date().toISOString())
 
+// MD 方針は、App が入れたもの(aiInputs)から付ける。引数は商品だけ(pool.map(productPayload) と書けるように)
 export const productPayload = (p: Product) => ({
   code: p.product_code,
   name: p.name,
@@ -567,7 +572,7 @@ export const productPayload = (p: Product) => ({
   rating: p.rating,
   weather: p.weather_name,
   description: p.description,
-  md: mdOf(p.product_code),
+  md: mdOf(p.product_code, inputs.get().policies),
 })
 
 export interface SectionRequest {

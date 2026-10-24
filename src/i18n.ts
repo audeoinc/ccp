@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { createStore } from './store'
 import { PREF } from './prefKeys'
 import { readRaw, writeRaw } from './settings'
 
@@ -17,39 +17,32 @@ function detect(): Lang {
   return navigator.language?.toLowerCase().startsWith('ja') ? 'ja' : 'en'
 }
 
-let current: Lang = detect()
-const listeners = new Set<() => void>()
+const current = createStore<Lang>(detect())
 
-export const getLang = (): Lang => current
+export const getLang = current.get
 
 export function setLang(lang: Lang) {
-  if (lang === current) return
-  current = lang
+  if (lang === current.get()) return
   writeRaw(PREF.lang, lang)
   document.documentElement.lang = lang
-  listeners.forEach((fn) => fn())
-}
-
-const subscribe = (fn: () => void) => {
-  listeners.add(fn)
-  return () => listeners.delete(fn)
+  current.set(lang)
 }
 
 /** 現在の言語に合う文言を返す */
-export const tr = (ja: string, en: string): string => (current === 'ja' ? ja : en)
+export const tr = (ja: string, en: string): string => (current.get() === 'ja' ? ja : en)
 
 /** 言語が切り替わったら、再描画する。コンポーネントの先頭で `const t = useT()` と書く */
 export function useT(): typeof tr {
-  useSyncExternalStore(subscribe, getLang)
+  current.use()
   return tr
 }
 
 export function useLang(): Lang {
-  return useSyncExternalStore(subscribe, getLang)
+  return current.use()
 }
 
 /** 日付・数値の表記に使うロケール */
-export const locale = (): string => (current === 'ja' ? 'ja-JP' : 'en-US')
+export const locale = (): string => (current.get() === 'ja' ? 'ja-JP' : 'en-US')
 
 export type Market = 'JP' | 'US'
 
@@ -142,4 +135,4 @@ const OPTION_EN: Record<string, string> = {
 }
 
 /** 選択肢のラベルを、現在の言語で返す(辞書にないものは、そのまま) */
-export const optionLabel = (label?: string): string => (label === undefined ? '' : current === 'ja' ? label : (OPTION_EN[label] ?? label))
+export const optionLabel = (label?: string): string => (label === undefined ? '' : current.get() === 'ja' ? label : (OPTION_EN[label] ?? label))
