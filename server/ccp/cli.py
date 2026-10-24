@@ -20,6 +20,9 @@
   python -m ccp.cli ranking-dummy [--yes]
                                      商品の販売順位のダミーを、DB の商品と配信から作る(ccp/ranking_dummy.py)。
                                      BigQuery から取り込んだ順位があれば、何もしない。--yes がなければ、件数を見せるだけ
+  python -m ccp.cli sample-model-expiry [--count 3] [--yes]
+                                     見本の写真のメインに、写っているモデルの使用期限を入れる(X77 の確かめ用。ccp/model_expiry.py)。
+                                     これからの配信に載っている商品から count 件、最初に載る配信の前の日を入れる。--yes がなければ、案を見せるだけ
 
 接続先は、db.py の環境変数(DATABASE_URL)。
 """
@@ -165,6 +168,9 @@ def main() -> None:
     ii.add_argument("--main-to-master", action="store_true")
     rd = sub.add_parser("ranking-dummy")
     rd.add_argument("--yes", action="store_true")
+    me = sub.add_parser("sample-model-expiry")
+    me.add_argument("--count", type=int, default=3)
+    me.add_argument("--yes", action="store_true")
     args = p.parse_args()
     if args.cmd == "migrate":
         asyncio.run(migrate())
@@ -186,6 +192,10 @@ def main() -> None:
         from .ranking_dummy import run as ranking_dummy
 
         asyncio.run(ranking_dummy(args.yes))
+    elif args.cmd == "sample-model-expiry":
+        from .model_expiry import run as model_expiry
+
+        asyncio.run(model_expiry(args.count, args.yes))
     elif args.cmd == "import-metrics":
         asyncio.run(import_metrics(args.path, args.yes))
     elif args.cmd == "import-images":
