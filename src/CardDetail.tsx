@@ -742,7 +742,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     savePref(ZOOM_KEY, zoom)
   }, [zoom])
 
-  // 全体表示: 倍率 1 での高さを測り、プレビューの枠に収まる倍率を求める(内容や窓の大きさが変わったら、測り直す)
+  // 全体表示: 倍率 1 での高さを測り、プレビューの枠に収まる倍率を求める(内容や窓の大きさが変わったら、測り直す)。
+  // 内容の変化は、中身の大きさの変化で知る(文言・商品などを effect の依存に並べると、打つたびに測り直し、並べ忘れると測り直さないため)
   useLayoutEffect(() => {
     const box = previewBoxRef.current
     const inner = previewInnerRef.current
@@ -761,11 +762,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     calc()
     const ro = new ResizeObserver(calc)
     ro.observe(box)
+    // 中身(倍率をかける前のメール)の大きさ。倍率を変えても、この大きさは変わらないので、測り直しが続くことはない
+    const content = inner.firstElementChild
+    if (content) ro.observe(content)
     return () => {
       ro.disconnect()
       inner.style.zoom = ''
     }
-  }, [zoom, previewTab, template, items, form.headline, form.copy, sectionTitles, sectionCopies, heroId, simpleOn])
+  }, [zoom, previewTab, simpleOn])
 
   const shownZoom = zoom === 'fit' ? fitZoom : zoom
 
