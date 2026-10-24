@@ -1885,7 +1885,7 @@ function App() {
             },
             {
               id: 'devRequests',
-              section: 'dev',
+              section: 'requests',
               label: t('開発へのリクエストの一覧', 'Requests to developers'),
               description: t('画面のピンから送られた、開発へのリクエストの一覧。', 'Requests to developers sent from pins on the screen.'),
               icon: <DevRequestIcon />,
@@ -2504,7 +2504,7 @@ function App() {
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
       {cardMenu.menu}
       {/* 開発へのリクエストのピン(どの画面にも重ねる)と、その一覧 */}
-      <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} />
+      <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} onOpenList={() => setDevRequestsOpen(true)} listOpen={devRequestsOpen} />
       {devRequestsOpen && <DevRequestsDialog onClose={() => setDevRequestsOpen(false)} />}
       {dupCard && (
         <DuplicateDialog

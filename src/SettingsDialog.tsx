@@ -37,8 +37,8 @@ import { optionLabel, useT } from './i18n'
 /** 設定の画面に並べる 1 つの操作(これまでの ⚙ のメニューの 1 項目) */
 export interface SettingsAction {
   id: string
-  /** 置き場所。country = 国ごとに決める / company = 全部の国で共通 / data・samples・shop・dev = 開発・管理(畳む) */
-  section: 'country' | 'company' | 'data' | 'samples' | 'shop' | 'dev'
+  /** 置き場所。country = 国ごとに決める / company = 全部の国で共通 / requests = 開発へのリクエスト(だれでも使うので畳まない) / data・samples・shop = 開発・管理(畳む) */
+  section: 'country' | 'company' | 'requests' | 'data' | 'samples' | 'shop'
   label: ReactNode
   description?: string
   icon: ReactElement
@@ -96,7 +96,7 @@ interface Props {
   actions: SettingsAction[]
 }
 
-const ADMIN = ['data', 'samples', 'shop', 'dev'] as const
+const ADMIN = ['data', 'samples', 'shop'] as const
 
 export function SettingsDialog({ open, onClose, country: headerCountry, lang, onLang, autoDraft, onAutoDraft, actions }: Props) {
   const s = useStyles()
@@ -113,7 +113,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   const panes = usePaneWidths('settings.paneWidths.v1', [240, 0], 1, { min: 180, max: 400 })
   const shown = actions.filter((a) => !a.hidden)
   const of = (section: SettingsAction['section']) => shown.filter((a) => a.section === section)
-  const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), shop: t('見本の商品ページ', 'Sample product pages'), dev: t('開発へのリクエスト', 'Requests to developers') }
+  const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), shop: t('見本の商品ページ', 'Sample product pages') }
   const countryHead = t(`国: ${countryName}`, `Country: ${countryName}`)
 
   const actionRow = (a: SettingsAction) => (
@@ -242,6 +242,12 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
                 </NavItem>
               ))}
               <NavDivider />
+              {/* 開発へのリクエストは、使っている人みんなが見る所なので、畳んだ「開発・管理」には入れない(2026-10-24 利用者) */}
+              {of('requests').map((a) => (
+                <NavItem key={a.id} value={a.id} icon={a.icon}>
+                  {a.label}
+                </NavItem>
+              ))}
               {/* 開発・管理は畳んでおく(開くかどうかは覚えない。デモで開いたまま残らないように) */}
               <NavCategory value="admin">
                 <NavCategoryItem icon={<WrenchRegular />}>{t('開発・管理', 'Developer & admin')}</NavCategoryItem>
