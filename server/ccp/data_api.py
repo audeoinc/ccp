@@ -108,6 +108,15 @@ def fail(status: int, message: str, code: str | None = None) -> JSONResponse:
     return JSONResponse({"success": False, "error": err}, status_code=status)
 
 
+class Fail(Exception):
+    """失敗として返す(fail と同じ応答)。書き込みのトランザクション(db(write=True))の中では、return fail ではなくこれを raise する。
+    return fail は正常に抜けたとみなされ、それまでの書き込みが確定してしまうため(raise なら、取り消してから返す)"""
+
+    def __init__(self, status: int, message: str, code: str | None = None):
+        super().__init__(message)
+        self.status, self.message, self.code = status, message, code
+
+
 def _columns_sql(t: sc.Table, names: list[str] | None) -> str:
     if not names:
         cols = ["id"] + [c.pg for c in t.all_columns] + [lk.pg for lk in t.lookups]
@@ -168,7 +177,7 @@ async def create_row(table: str, request: Request):
         # ユーザー・承認グループなどは、ログインしているときは管理者だけが変えられる(U7。ログインなしは、だれでも = いまの運用)
         denied = await people_edit_denied(conn, request, t.name)
         if denied:
-            return fail(403, denied)
+            raise Fail(403, denied)
         row = (await conn.execute(text(sql), values)).mappings().one()
     return ok(t.to_api(dict(row)))
 
@@ -222,7 +231,7 @@ async def update_row(table: str, row_id: str, request: Request):
     async with db(write=True) as conn:
         denied = await people_edit_denied(conn, request, t.name)
         if denied:
-            return fail(403, denied)
+            raise Fail(403, denied)
         before = None
         if watched and any(c in values for c in watched[1]):
             cols = ", ".join([*watched[1], watched[2]])
@@ -243,7 +252,7 @@ async def delete_row(table: str, row_id: str, request: Request):
     async with db(write=True) as conn:
         denied = await people_edit_denied(conn, request, t.name)
         if denied:
-            return fail(403, denied)
+            raise Fail(403, denied)
         await conn.execute(text(f"DELETE FROM {t.pg} WHERE id = :id"), {"id": sc.coerce("uuid", row_id)})
     return ok(None)
 
@@ -265,6 +274,10 @@ def register_errors(app: FastAPI) -> None:
         if dbready.controller() is None:
             return fail(503, f"データベースにつながりません: {last_db_error or '理由は不明'}", "db_unreachable")
         return fail(503, "データベースを起動しています(10 分ほどかかることがあります)", "db_starting")
+
+    @app.exception_handler(Fail)
+    async def _fail(_: Request, e: Fail):
+        return fail(e.status, e.message, e.code)
 
     @app.exception_handler(sc.BadRequest)
     async def _bad(_: Request, e: sc.BadRequest):

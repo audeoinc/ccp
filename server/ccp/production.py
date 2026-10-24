@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from . import schema as sc
 from .approvals import _actor, _body, _insert, _one, _update
-from .data_api import db, fail, ok, require_db
+from .data_api import Fail, db, fail, ok, require_db
 
 router = APIRouter(prefix="/api/production", dependencies=[Depends(require_db)])
 
@@ -120,7 +120,7 @@ async def create_request(request: Request):
         actor = await _actor(conn, body, request)
         card, err = await _approved_card(conn, card_id)
         if card is None:
-            return fail(400, err or "")
+            raise Fail(400, err or "")
         await stale_live(conn, card_id)
         version = await _next_version(conn, card_id)
         row = await _insert(
@@ -141,9 +141,9 @@ async def _advance(request: Request, request_id: str, allowed: tuple[str, ...], 
         actor = await _actor(conn, body, request)
         req = await _one(conn, "production_requests", request_id, lock=True)
         if req is None:
-            return fail(404, "制作の依頼が見つかりません")
+            raise Fail(404, "制作の依頼が見つかりません")
         if req.get("status") not in allowed:
-            return fail(409, refuse)
+            raise Fail(409, refuse)
         now = _now()
         stamped = {k: (now if v == "@now" else actor["name"] if v == "@actor" else v) for k, v in fields.items()}
         row = await _update(conn, "production_requests", request_id, stamped) or req
@@ -194,9 +194,9 @@ async def save_html(request_id: str, request: Request):
         actor = await _actor(conn, body, request)
         req = await _one(conn, "production_requests", request_id, lock=True)
         if req is None:
-            return fail(404, "制作の依頼が見つかりません")
+            raise Fail(404, "制作の依頼が見つかりません")
         if req.get("status") == "stale":
-            return fail(409, "古い版には保存できません(企画が変わりました)")
+            raise Fail(409, "古い版には保存できません(企画が変わりました)")
         now = _now()
         if variant == "A":
             fields: dict[str, Any] = {"html": html, "html_saved_at": now, "html_saved_by_name": actor["name"]}
@@ -217,9 +217,9 @@ async def save_edits(request_id: str, request: Request):
         actor = await _actor(conn, body, request)
         req = await _one(conn, "production_requests", request_id, lock=True)
         if req is None:
-            return fail(404, "制作の依頼が見つかりません")
+            raise Fail(404, "制作の依頼が見つかりません")
         if req.get("status") == "stale":
-            return fail(409, "古い版には保存できません(企画が変わりました)")
+            raise Fail(409, "古い版には保存できません(企画が変わりました)")
         row = await _update(conn, "production_requests", request_id, {"edited_snapshot": edited, "edited_at": _now(), "edited_by_name": actor["name"]}) or req
         card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]))
         if card is not None:
@@ -246,10 +246,10 @@ async def undo(request_id: str, request: Request):
         actor = await _actor(conn, body, request)
         req = await _one(conn, "production_requests", request_id, lock=True)
         if req is None:
-            return fail(404, "制作の依頼が見つかりません")
+            raise Fail(404, "制作の依頼が見つかりません")
         status = str(req.get("status") or "")
         if status not in _UNDO:
-            return fail(409, "この版は戻せません(古い版か、取り下げた版です)")
+            raise Fail(409, "この版は戻せません(古い版か、取り下げた版です)")
         to, clear = _UNDO[status]
         if status == "sent" and not req.get("checked_at"):
             # 仕上がりの確認より前に送った版(確認を作る前の記録)は、終わったに戻す。制作を通さずに送った版は、取り下げ
@@ -323,7 +323,7 @@ async def send(request: Request):
         actor = await _actor(conn, body, request)
         card, err = await _approved_card(conn, card_id)
         if card is None:
-            return fail(400, err or "")
+            raise Fail(400, err or "")
         now = _now()
         await stale_live(conn, card_id)
         version = await _next_version(conn, card_id)

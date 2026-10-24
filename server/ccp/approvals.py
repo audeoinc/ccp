@@ -26,7 +26,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from . import schema as sc
-from .data_api import _columns_sql, db, fail, ok, require_db
+from .data_api import Fail, _columns_sql, db, fail, ok, require_db
 from .identity import resolve_user
 
 router = APIRouter(prefix="/api/approvals", dependencies=[Depends(require_db)])
@@ -213,20 +213,20 @@ async def create_request(request: Request):
         actor = await _actor(conn, body, request)
         card = await _one(conn, "delivery_cards", card_id, lock=True)
         if card is None:
-            return fail(404, "配信カードが見つかりません")
+            raise Fail(404, "配信カードが見つかりません")
         if card.get("status") == "confirmed":
-            return fail(400, "確定した週の配信です。変えるときは、配信カードで理由を入れて保存してください(週がレビューに戻ります)")
+            raise Fail(400, "確定した週の配信です。変えるときは、配信カードで理由を入れて保存してください(週がレビューに戻ります)")
         # 相手の名前は、その時のものを残す(グループ・人を消しても、記録が読めるように)
         reviewers_in: list[dict[str, Any]] = []
         for gid in dict.fromkeys(group_ids):
             g = await _one(conn, "approval_groups", gid)
             if g is None or (g.get("status") or "active") != "active":
-                return fail(400, "使えない承認グループが含まれています(消された、または無効)")
+                raise Fail(400, "使えない承認グループが含まれています(消された、または無効)")
             reviewers_in.append({"approval_group_id": gid, "reviewer_name": g.get("name")})
         for uid in dict.fromkeys(user_ids):
             u = await _one(conn, "users", uid)
             if u is None or (u.get("status") or "active") != "active":
-                return fail(400, "使えない承認者が含まれています(消された、または無効)")
+                raise Fail(400, "使えない承認者が含まれています(消された、または無効)")
             reviewers_in.append({"user_id": uid, "reviewer_name": u.get("name")})
         await _stale_live_requests(conn, card_id, now)
         req = await _insert(
@@ -279,22 +279,22 @@ async def decide(request_id: str, request: Request):
         actor = await _actor(conn, body, request)
         req = await _one(conn, "approval_requests", request_id, lock=True)
         if req is None:
-            return fail(404, "承認の依頼が見つかりません")
+            raise Fail(404, "承認の依頼が見つかりません")
         if req.get("status") != "open":
-            return fail(409, "この依頼は、もう受け付けていません(承認済み・差し戻し・古い依頼・取り下げ)")
+            raise Fail(409, "この依頼は、もう受け付けていません(承認済み・差し戻し・古い依頼・取り下げ)")
         reviewers = await _select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
         able = eligible_reviewers(reviewers, actor["id"], await _actor_groups(conn, actor["id"]), req.get("requested_by"))
         if not able:
-            return fail(403, "この配信の承認者に指名されていません(または、もう決めています)")
+            raise Fail(403, "この配信の承認者に指名されていません(または、もう決めています)")
         if wanted is not None and wanted not in able:
-            return fail(403, "その相手の分は、あなたは決められません")
+            raise Fail(403, "その相手の分は、あなたは決められません")
         target = wanted or able[0]
         updated = await _update(conn, "approval_reviewers", target, {"decision": decision, "decided_by": actor["id"], "decided_by_name": actor["name"], "decided_at": now, "note": note})
         reviewers = [updated if r["id"] == target else r for r in reviewers if updated is not None]
         outcome = request_outcome(str(req.get("rule") or "all"), [r.get("decision") for r in reviewers])
         card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]), lock=True)
         if card is None:
-            return fail(404, "配信カードが見つかりません")
+            raise Fail(404, "配信カードが見つかりません")
         before = card.get("status") or "not_started"
         slot = str((updated or {}).get("reviewer_name") or "")
         if outcome == "approved":
@@ -323,11 +323,11 @@ async def withdraw(request_id: str, request: Request):
         actor = await _actor(conn, body, request)
         req = await _one(conn, "approval_requests", request_id, lock=True)
         if req is None:
-            return fail(404, "承認の依頼が見つかりません")
+            raise Fail(404, "承認の依頼が見つかりません")
         if req.get("status") not in ("open", "changes_requested"):
-            return fail(409, "この依頼は、取り下げられません(承認済み・古い依頼・取り下げ)")
+            raise Fail(409, "この依頼は、取り下げられません(承認済み・古い依頼・取り下げ)")
         if actor["id"] != req.get("requested_by"):
-            return fail(403, "依頼を取り下げられるのは、依頼した人だけです")
+            raise Fail(403, "依頼を取り下げられるのは、依頼した人だけです")
         req = await _update(conn, "approval_requests", request_id, {"status": "withdrawn", "closed_at": now}) or req
         reviewers = await _select(conn, "approval_reviewers", "approval_request_id = :r", {"r": sc.coerce("uuid", request_id)})
         card = await _one(conn, "delivery_cards", str(req["delivery_card_id"]), lock=True)
