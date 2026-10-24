@@ -132,7 +132,7 @@ import type { DeliveryPattern } from './models/deliveryPatterns'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
 import { PeopleManager } from './PeopleManager'
-import { usePeople } from './people'
+import { usePeople, usePeopleManagerOpen } from './people'
 import { InboxButton } from './InboxButton'
 import { useApprovalInbox } from './useApprovalInbox'
 import { productionColor, productionLabel, productionView, useProductionRequests } from './useProductionRequests'
@@ -140,7 +140,8 @@ import { ProductionPage } from './ProductionPage'
 import { StageNav } from './StageNav'
 import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
-import { markTemplatesLoadFailed, useTemplates } from './templates'
+import { markTemplatesLoadFailed, useTemplateManagerOpen, useTemplates } from './templates'
+import { useOpenedOnce } from './useOpenedOnce'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
@@ -1461,6 +1462,10 @@ function App() {
   const filtering = filters.channel !== '' || filters.department !== '' || (page !== 'results' && filters.status !== '') || filters.person !== ''
   // 担当の候補: いちばん上に「自分」(ログインしている人。Jira の Me と同じ)
   const personOptions = [{ value: ME_PERSON, label: me ? t(`自分(${me})`, `Me (${me})`) : t('自分', 'Me') }, ...owners.map((o) => ({ value: o, label: o }))]
+  // 窓(テンプレートの管理・人と承認・まとめて作る)は、開くまで描かない(閉じていても、App を描くたびに中身を計算していたため)
+  const templatesOpened = useOpenedOnce(useTemplateManagerOpen())
+  const peopleOpened = useOpenedOnce(usePeopleManagerOpen())
+  const bulkOpened = useOpenedOnce(bulk.open)
   // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
@@ -1471,7 +1476,7 @@ function App() {
 
   return (
     <>
-      <TemplateManager cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} />
+      {templatesOpened && <TemplateManager cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} />}
       <input
         ref={metricsFileRef}
         type="file"
@@ -1483,7 +1488,7 @@ function App() {
           if (f) void importMetrics(f)
         }}
       />
-      <PeopleManager />
+      {peopleOpened && <PeopleManager />}
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
       <div className={styles.headerWrap}>
@@ -2423,7 +2428,7 @@ function App() {
         <AlertsPage initialProductId={alertsFocus} onSelectProduct={setAlertsFocus} onOpenAlertCard={openFromAlert} alerts={alerts} changeAlerts={changeAlerts} onResolve={(a, note) => changeState.resolve(a, myName(), note)} settings={alertSettings} owners={owners} logs={changeState.logs} cards={cards} products={products} heroes={heroes} cardProducts={cardProducts} placements={alertState.placements} model={alertState.model} weeks={weeks} onOpenCard={setSelectedId} onChanged={load} />
       </AlertsFloat>
       {/* まとめて作る作業画面。配信カードより先に置く(ここから開いた配信カードが、上に重なるように) */}
-      <BulkWorkspace
+      {bulkOpened && <BulkWorkspace
         ws={bulk}
         cards={activeCards}
         products={products}
@@ -2438,7 +2443,7 @@ function App() {
           if (draft) setDraftOpen({ day, draft, alerts: bulk.draftAlerts(day), focus })
         }}
         onFinish={(d) => goTo('week', d)}
-      />
+      />}
       {(selected || creating || draftOpen) && (
         // 配信カードで失敗しても、閉じて、ほかの配信を開けるように
         <ErrorBoundary
