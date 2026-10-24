@@ -112,11 +112,11 @@ import { loadCustomTemplates } from './layoutTemplates'
 import { ErrorBoundary } from './ErrorBoundary'
 import { TemplateManager } from './TemplateManager'
 import { PolicyManager } from './PolicyManager'
-import { PatternManager } from './PatternManager'
-import { CountryCriteriaDialog } from './CountryCriteriaDialog'
-import { CountryTemplatesDialog } from './CountryTemplatesDialog'
-import { CountryLearningsDialog } from './CountryLearningsDialog'
-import { CountryPoliciesDialog } from './CountryPoliciesDialog'
+import { PatternPanel } from './PatternPanel'
+import { CountryCriteriaPanel } from './CountryCriteriaPanel'
+import { CountryTemplatesPanel } from './CountryTemplatesPanel'
+import { CountryLearningsPanel } from './CountryLearningsPanel'
+import { CountryPoliciesPanel } from './CountryPoliciesPanel'
 import { loadCountryApply, useCountryApply } from './countryApply'
 import { criteriaFor, loadCountrySettings, useCountrySettings } from './countrySettings'
 import { createUsSamplePatterns } from './samplePatterns'
@@ -476,14 +476,6 @@ function App() {
   const [skuBusy, setSkuBusy] = useState(false)
   // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
   const [policyOpen, setPolicyOpen] = useState(false)
-  // 国ごとの配信の型(ST9)。⚙ →「国」から開く
-  const [patternOpen, setPatternOpen] = useState(false)
-  // 国のアラートの基準(ST2)
-  const [criteriaOpen, setCriteriaOpen] = useState(false)
-  // この国で使うテンプレート(ST1。共通のマスタ + 国ごとの適用 ST7)
-  const [countryTplOpen, setCountryTplOpen] = useState(false)
-  const [countryLearnOpen, setCountryLearnOpen] = useState(false)
-  const [countryPolicyOpen, setCountryPolicyOpen] = useState(false)
   // 設定の画面(ST10。⚙ から開く)
   const [settingsOpen, setSettingsOpen] = useState(false)
   useEffect(() => {
@@ -1456,11 +1448,6 @@ function App() {
         }}
       />
       <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
-      <PatternManager open={patternOpen} onClose={() => setPatternOpen(false)} country={filters.country} onChanged={() => void loadPatterns()} />
-      <CountryCriteriaDialog open={criteriaOpen} onClose={() => setCriteriaOpen(false)} country={filters.country} />
-      <CountryTemplatesDialog open={countryTplOpen} onClose={() => setCountryTplOpen(false)} country={filters.country} />
-      <CountryPoliciesDialog open={countryPolicyOpen} onClose={() => setCountryPolicyOpen(false)} country={filters.country} />
-      <CountryLearningsDialog open={countryLearnOpen} onClose={() => setCountryLearnOpen(false)} country={filters.country} cards={cards} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
@@ -1555,7 +1542,7 @@ function App() {
         <SettingsDialog
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
-          countryName={filters.country ? optionLabel(countryOptions.find((o) => String(o.value) === filters.country)?.label) || filters.country : ''}
+          country={filters.country}
           lang={lang}
           onLang={setLang}
           autoDraft={autoDraft}
@@ -1570,7 +1557,11 @@ function App() {
               label: t('使う決まり', 'Rules used'),
               description: t('全社の決まりのうち、この国で使うものを選びます。この国の AI の依頼と週の上限に効きます。', 'Choose which company rules apply in this country. Affects AI requests and weekly limits here.'),
               icon: <ShieldCheckmarkRegular />,
-              onOpen: () => setCountryPolicyOpen(true),
+              info: t(
+                'マーケティングの決まりは全部の国で共通です。決めていなければ、決まりの「市場」のとおりに使います(空ならブランド全体の決まりとして全部の国、書いてあればその国だけ)。印を変えると、この国の AI の依頼と週の上限に効きます(この国の全員に効きます)。中身が国で違う決まりは、ここでは表せないので、全社の「方針・決まり」で別の決まりとして足してください。',
+                'Marketing rules are shared across countries. Undecided rules follow their Market column (empty = brand-wide, used everywhere; otherwise only those countries). Changing a check affects this country’s AI requests and weekly limits (applies to everyone on this country). Rules whose content differs by country cannot be expressed here — add them as separate rules in Company → Marketing policies.',
+              ),
+              render: (co, name) => <CountryPoliciesPanel country={co} countryName={name} />,
             },
             {
               id: 'criteria',
@@ -1578,7 +1569,11 @@ function App() {
               label: t('アラートの基準', 'Alert criteria'),
               description: t('在庫僅少の週数・週の上限・販売順位の上位の線。この国の全員に効きます。', 'Low-stock weeks, weekly limit and top-ranking line. Applies to everyone on this country.'),
               icon: <AlertRegular />,
-              onOpen: () => setCriteriaOpen(true),
+              info: t(
+                '何を問題とみなすかの、国の基準です。変えると、この国の配信を扱う全員に効きます(変えた人・日時が残ります)。どのアラートを自分に出すか(種類・担当など)は、アラートの画面の「条件」で人ごとに決めます。',
+                'The country’s criteria for what counts as a problem. Changes apply to everyone working on this country (who and when are recorded). Which alerts you personally see (types, owners…) is set per person in the Alerts page “Conditions”.',
+              ),
+              render: (co, name) => <CountryCriteriaPanel country={co} countryName={name} />,
             },
             {
               id: 'countryTemplates',
@@ -1586,7 +1581,11 @@ function App() {
               label: t('使うテンプレート', 'Templates used'),
               description: t('全社のテンプレートのうち、この国で使うものを選びます。', 'Choose which company templates are used in this country.'),
               icon: <LayoutColumnTwoRegular />,
-              onOpen: () => setCountryTplOpen(true),
+              info: t(
+                'テンプレートは全部の国で共通です。印を外すと、この国の配信・まとめて作る・配信の型・AI の選定の選択肢に出なくなります(この国の全員に効きます)。すでにこのテンプレートを使った配信は、そのまま描けます。まだ決めていないものは、使います。',
+                'Templates are shared across countries. Unchecking hides a template from this country’s deliveries, bulk creation, delivery patterns and AI choices (applies to everyone on this country). Deliveries that already use it still render. Undecided templates are used.',
+              ),
+              render: (co, name) => <CountryTemplatesPanel country={co} countryName={name} />,
             },
             {
               id: 'countryLearnings',
@@ -1594,7 +1593,11 @@ function App() {
               label: t('使う学び', 'Learnings used'),
               description: t('過去の配信の「次に生かすメモ」のうち、この国で使うものを選びます。ほかの国の学びは、決めていなければ使いません。', 'Choose which notes from past deliveries are used here. Learnings from other countries are off unless you turn them on.'),
               icon: <LightbulbFilamentRegular />,
-              onOpen: () => setCountryLearnOpen(true),
+              info: t(
+                '学びは全部の国で共通です。この国の学びは、決めていなければ使います。ほかの国の学びは、国で客層が違うので、決めていなければ使いません(使えそうなものに印を付けます)。印の付いた学びだけが、この国の配信カードの「これまでの学び」と AI の下書きに渡ります(この国の全員に効きます)。残す・様子を見る・外すの判定は、結果の面の「効果」→「学びの評価」で、国ごとに決めます。',
+                'Learnings are shared across countries. This country’s own learnings are used unless you decide otherwise. Learnings from other countries are not used unless you check them, since audiences differ. Only checked learnings appear in this country’s delivery cards and AI drafts (applies to everyone on this country). Keep / watch / retire is decided per country in Results → Impact → Evaluate learnings.',
+              ),
+              render: (co, name) => <CountryLearningsPanel country={co} countryName={name} cards={cards} />,
             },
             {
               id: 'patterns',
@@ -1602,7 +1605,11 @@ function App() {
               label: t('配信の型', 'Delivery patterns'),
               description: t('曜日・時刻・チャネル・種類・テンプレートの組。「まとめて作る」が、この型どおりに枠を作ります。', 'Day, time, channel, type and template. Bulk creation makes slots from these.'),
               icon: <CalendarClockRegular />,
-              onOpen: () => setPatternOpen(true),
+              info: t(
+                '毎週の決まった配信を、曜日ごとに「型」として持ちます。「新規作成 ▾」の「まとめて作る」は、この型どおりに枠(種類・テンプレートが入った状態)を作ります。型は既定値なので、作った枠・配信では自由に変えられます。型を変えても、もう作った配信は変わりません。テンプレートは、作るときの最新の版を使います。',
+                'Weekly deliveries, kept as patterns per weekday. “Create in bulk” makes slots from these patterns (with type and template filled in). Patterns are only defaults: you can change any slot or delivery. Changing a pattern does not change deliveries already made. Templates use their latest version at creation.',
+              ),
+              render: (co) => <PatternPanel country={co} onChanged={() => void loadPatterns()} />,
             },
             {
               id: 'policies',

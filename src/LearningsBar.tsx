@@ -144,8 +144,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     if (
       !window.confirm(
         t(
-          `${countryName(country)}の全員に効きます(⚙ →「国」→「この国で使う学び」でも直せます)。よろしいですか?`,
-          `This applies to everyone working on ${countryName(country)} (you can change it in ⚙ → Country → Learnings used in this country). Continue?`,
+          `${countryName(country)}の全員に効きます(⚙ →「国」→「使う学び」でも直せます)。よろしいですか?`,
+          `This applies to everyone working on ${countryName(country)} (you can change it in ⚙ → Country → Learnings used). Continue?`,
         ),
       )
     )

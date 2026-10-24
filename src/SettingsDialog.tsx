@@ -2,7 +2,7 @@
 // 左に「自分 / 国 / 全社 /(畳んだ)開発・管理」の並び(Fluent の Nav)、右にその中身。
 // 実際の設定と、開発向けの操作(取り込み・見本のデータ)が混ざって乱雑だったので分け、開発向けは畳んで、すぐ見えないようにする
 // (デモで利用者に触ってもらうため。ログイン ST6 ができたら、管理者だけに見せる)。
-// いまは画面の形だけ(ST10 の (a))。国・全社の中身は、これまでの窓を「開く」で開く。OK のあと、窓の中身をここに移す((b))
+// 中身は、項目ごとに render で右に描く(ST10 の (b))。まだ移していない項目は、これまでの窓を「開く」で開く
 import { useState, type CSSProperties, type ReactElement, type ReactNode } from 'react'
 import {
   Button,
@@ -10,6 +10,7 @@ import {
   DialogBody,
   DialogContent,
   DialogTitle,
+  InfoLabel,
   Nav,
   NavCategory,
   NavCategoryItem,
@@ -20,6 +21,7 @@ import {
   NavSubItemGroup,
   Radio,
   RadioGroup,
+  Select,
   Switch,
   makeStyles,
   tokens,
@@ -28,7 +30,8 @@ import { DismissRegular, PersonRegular, SendRegular, WrenchRegular } from '@flue
 import { ResizableSurface } from './ResizableSurface'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
-import { useT } from './i18n'
+import { countryOptions } from './status'
+import { optionLabel, useT } from './i18n'
 
 /** 設定の画面に並べる 1 つの操作(これまでの ⚙ のメニューの 1 項目) */
 export interface SettingsAction {
@@ -38,12 +41,17 @@ export interface SettingsAction {
   label: ReactNode
   description?: string
   icon: ReactElement
-  onOpen: () => void
+  /** 窓を開く・操作を行う(render があれば使わない) */
+  onOpen?: () => void
   disabled?: boolean
   /** 右に添える短い情報(取り込んだ時刻・件数など) */
   secondary?: ReactNode
   /** この環境では出さない(BigQuery の設定がないときなど) */
   hidden?: boolean
+  /** 詳しい説明(見出しの横の ⓘ に出す。見出しの下に長い説明を並べない) */
+  info?: string
+  /** 右に描く中身(国の項目には、設定の画面で決めた国のコードと名前が来る)。なければ「開く」で窓を開く */
+  render?: (country: string, countryName: string) => ReactNode
 }
 
 const useStyles = makeStyles({
@@ -55,6 +63,7 @@ const useStyles = makeStyles({
   nav: { overflowY: 'auto', backgroundColor: tokens.colorNeutralBackground2, minWidth: 0, height: '100%', boxSizing: 'border-box' },
   main: { overflowY: 'auto', padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalXL}`, display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalL, minWidth: 0 },
   heading: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
+  headRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, flexWrap: 'wrap' },
   sub: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalS },
   subHead: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -75,8 +84,8 @@ const useStyles = makeStyles({
 interface Props {
   open: boolean
   onClose: () => void
-  /** ヘッダーで選んでいる国の名前(「すべての国」のときは空) */
-  countryName: string
+  /** ヘッダーで選んでいる国のコード(「すべての国」のときは空。国の項目では、この画面の中で選ぶ) */
+  country: string
   lang: 'ja' | 'en'
   onLang: (lang: 'ja' | 'en') => void
   autoDraft: boolean
@@ -86,15 +95,20 @@ interface Props {
 
 const ADMIN = ['data', 'samples', 'dev'] as const
 
-export function SettingsDialog({ open, onClose, countryName, lang, onLang, autoDraft, onAutoDraft, actions }: Props) {
+export function SettingsDialog({ open, onClose, country: headerCountry, lang, onLang, autoDraft, onAutoDraft, actions }: Props) {
   const s = useStyles()
   const t = useT()
   const [page, setPage] = useState('me')
+  // ヘッダーが「すべての国」のときに、国の項目で使う国(ヘッダーで国を選んでいれば、そちらを使う)
+  const [picked, setPicked] = useState(String(countryOptions[0]?.value ?? ''))
+  const country = headerCountry || picked
+  const nameOf = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
+  const countryName = nameOf(country)
   const panes = usePaneWidths('settings.paneWidths.v1', [240, 0], 1, { min: 180, max: 400 })
   const shown = actions.filter((a) => !a.hidden)
   const of = (section: SettingsAction['section']) => shown.filter((a) => a.section === section)
   const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), dev: t('開発へのリクエスト', 'Requests to developers') }
-  const countryHead = countryName ? t(`国: ${countryName}`, `Country: ${countryName}`) : t('国(ヘッダーで国を選ぶ)', 'Country (pick one in the header)')
+  const countryHead = t(`国: ${countryName}`, `Country: ${countryName}`)
   // 差出人の名前(SU5)を国ごとに決めるか全社で決めるかは、まだ決めていない。置き場所の案として、国に出しておく
   const senderPage = 'sender'
 
@@ -169,13 +183,35 @@ export function SettingsDialog({ open, onClose, countryName, lang, onLang, autoD
     if (!a) return null
     return (
       <>
-        <span className={s.heading}>{a.label}</span>
-        {a.description && <span className={s.note}>{a.description}</span>}
-        <span>
-          <Button appearance="primary" icon={a.icon} disabled={a.disabled} onClick={a.onOpen}>
-            {t('開く', 'Open')}
-          </Button>
+        <span className={s.headRow}>
+          {a.info ? (
+            <InfoLabel className={s.heading} info={a.info} size="large">
+              {a.label}
+            </InfoLabel>
+          ) : (
+            <span className={s.heading}>{a.label}</span>
+          )}
+          {/* ヘッダーが「すべての国」のときは、ここで国を選ぶ(ヘッダーで選んでいれば、その国に決まっている) */}
+          {a.section === 'country' && !headerCountry && (
+            <Select size="small" value={country} onChange={(_, d) => setPicked(d.value)} aria-label={t('国', 'Country')}>
+              {countryOptions.map((o) => (
+                <option key={o.value} value={String(o.value)}>
+                  {optionLabel(o.label)}
+                </option>
+              ))}
+            </Select>
+          )}
         </span>
+        {a.description && <span className={s.note}>{a.description}</span>}
+        {a.render ? (
+          <div key={`${a.id}:${country}`}>{a.render(country, countryName)}</div>
+        ) : (
+          <span>
+            <Button appearance="primary" icon={a.icon} disabled={a.disabled} onClick={a.onOpen}>
+              {t('開く', 'Open')}
+            </Button>
+          </span>
+        )}
       </>
     )
   }
