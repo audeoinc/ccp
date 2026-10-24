@@ -60,6 +60,7 @@ import { DuplicateDialog } from './CardMenu'
 import { LightbulbRegular as DevRequestIcon } from '@fluentui/react-icons'
 import { DevRequestLayer } from './DevRequestLayer'
 import { DevRequestsDialog } from './DevRequestsDialog'
+import { SettingsDialog } from './SettingsDialog'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ProductsService } from './data/products'
@@ -484,6 +485,8 @@ function App() {
   const [countryTplOpen, setCountryTplOpen] = useState(false)
   const [countryLearnOpen, setCountryLearnOpen] = useState(false)
   const [countryPolicyOpen, setCountryPolicyOpen] = useState(false)
+  // 設定の画面(ST10。⚙ から開く)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   useEffect(() => {
     void loadCountrySettings()
     void loadCountryApply()
@@ -1558,279 +1561,311 @@ function App() {
         </Menu>
         {/* ログインしている人(U9)。履歴・依頼・承認・やり取りは、すべてこの人で残す(ほかの画面では人を選ばせない) */}
         <MePicker className={styles.headerMe} ariaLabel={t('ログインしている人', 'Signed-in user')} />
-        {/* 管理系(テンプレート・言語・自動の下書き)は、毎日の作業と分けて、設定のメニューにまとめる */}
-        <Menu
-          checkedValues={{ lang: [lang], auto: autoDraft ? ['on'] : [] }}
-          onCheckedValueChange={(_, d) => {
-            if (d.name === 'lang' && (d.checkedItems[0] === 'ja' || d.checkedItems[0] === 'en')) setLang(d.checkedItems[0])
-            if (d.name === 'auto') {
-              const on = d.checkedItems.includes('on')
-              setAutoDraft(on)
-              saveAutoDraft(on)
-            }
+        {/* 設定(ST10): ⚙ は設定の画面の入口だけ。自分・国・全社・(畳んだ)開発・管理を、左の並びから選ぶ */}
+        <Tooltip content={t('設定', 'Settings')} relationship="label">
+          <Button appearance="subtle" size="small" icon={<SettingsRegular />} onClick={() => setSettingsOpen(true)} />
+        </Tooltip>
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          countryName={filters.country ? optionLabel(countryOptions.find((o) => String(o.value) === filters.country)?.label) || filters.country : ''}
+          lang={lang}
+          onLang={setLang}
+          autoDraft={autoDraft}
+          onAutoDraft={(on) => {
+            setAutoDraft(on)
+            saveAutoDraft(on)
           }}
-        >
-          <MenuTrigger disableButtonEnhancement>
-            <Tooltip content={t('設定(あなた・国・システム)', 'Settings (you, country, system)')} relationship="label">
-              <Button appearance="subtle" size="small" icon={<SettingsRegular />} />
-            </Tooltip>
-          </MenuTrigger>
-          <MenuPopover>
-            <MenuList>
-              {/* ⚙ は、設定の段階(BACKLOG 13 章)で 3 つに分ける: あなた(このブラウザ)/ 国 / システム。
-                  項目の置き場所と見出しだけ。データの形は変えていない(2026-10-23) */}
-              <MenuGroup>
-                <MenuGroupHeader>{t('あなた(このブラウザに覚える)', 'You (saved in this browser)')}</MenuGroupHeader>
-                  <MenuItemRadio name="lang" value="ja">日本語</MenuItemRadio>
-                  <MenuItemRadio name="lang" value="en">English</MenuItemRadio>
-                <MenuItemCheckbox name="auto" value="on" secondaryContent={autoDraft ? t('オン', 'On') : t('オフ', 'Off')}>
-                  {t('開いたとき自動で下書き', 'Auto-draft on open')}
-                </MenuItemCheckbox>
-              </MenuGroup>
-              <MenuDivider />
-              {/* 国: 国ごとに決める設定。いまヘッダーで選んでいる国に効く(13 章。配信の型 ST9・アラートの条件 ST2 などをここに足していく) */}
-              <MenuGroup>
-                <MenuGroupHeader>{t('国', 'Country')}</MenuGroupHeader>
-                {/* マーケティングポリシー(方針・決まり)の取り込みと一覧(M3・M4) */}
-                <MenuItem icon={<DocumentBulletListRegular />} onClick={() => setPolicyOpen(true)}>
-                  {t('方針・決まり(取り込み・一覧・直す)', 'Marketing policies (import, list, edit)')}
-                </MenuItem>
-                {/* この国で使う決まり(ST8): 決まりは共通。市場の列を既定に、国では、使う・使わないだけを決める(ST7 の適用の表) */}
-                <MenuItem icon={<ShieldCheckmarkRegular />} onClick={() => setCountryPolicyOpen(true)}>
-                  {t('この国で使う決まり', 'Rules used in this country')}
-                </MenuItem>
-                {/* 国のアラートの基準(ST2): 在庫僅少の週数・週の上限・販売順位の上位の線。国の全員に効くので、変えた人・日時を残す */}
-                <MenuItem icon={<AlertRegular />} onClick={() => setCriteriaOpen(true)}>
-                  {t('アラートの基準(在庫僅少・週の上限・販売順位)', 'Alert criteria (low stock, weekly limit, rankings)')}
-                </MenuItem>
-                {/* この国で使うテンプレート(ST1): テンプレートは共通。国では、使う・使わないだけを決める(ST7 の適用の表) */}
-                <MenuItem icon={<LayoutColumnTwoRegular />} onClick={() => setCountryTplOpen(true)}>
-                  {t('この国で使うテンプレート', 'Templates used in this country')}
-                </MenuItem>
-                {/* この国で使う学び(ST5): 学びは共通。出元の国は使い、ほかの国の学びは、使うと決めたものだけ(ST7 の適用の表) */}
-                <MenuItem icon={<LightbulbFilamentRegular />} onClick={() => setCountryLearnOpen(true)}>
-                  {t('この国で使う学び', 'Learnings used in this country')}
-                </MenuItem>
-                {/* 国ごとの配信の型(ST9): 曜日・時刻・チャネル・種類・テンプレートの組。「まとめて作る」が、この型どおりに枠を作る */}
-                <MenuItem icon={<CalendarClockRegular />} onClick={() => setPatternOpen(true)}>
-                  {t('配信の型(曜日ごとの決まった配信)', 'Delivery patterns (weekly)')}
-                </MenuItem>
-              </MenuGroup>
-              <MenuDivider />
-              {/* システム: 全部の国で共通のマスタ・ユーザー・データの出入り(13 章)。開発へのリクエストの一覧(UI 1)の入口も、この段に置く */}
-              <MenuGroup>
-                <MenuGroupHeader>{t('システム(全部の国で共通)', 'System (all countries)')}</MenuGroupHeader>
-                <MenuItem icon={<LayoutColumnTwoRegular />} onClick={openTemplateManager}>
-                  {t('テンプレートの管理', 'Manage templates')}
-                </MenuItem>
-                {/* メイン画像のライブラリ(X59 ②。一覧・上げる・直す・期限・消す) */}
-                <MenuItem icon={<ImageMultipleRegular />} onClick={() => setHeroLibraryOpen(true)}>
-                  {t('画像のライブラリ(メイン画像・部品)', 'Image library (heroes, parts)')}
-                </MenuItem>
-                <MenuItem icon={<PeopleTeamRegular />} onClick={openPeopleManager}>
-                  {t('ユーザーと承認グループ', 'Users and approval groups')}
-                </MenuItem>
-                <MenuItem icon={<DevRequestIcon />} onClick={() => setDevRequestsOpen(true)}>
-                  {t('開発へのリクエストの一覧', 'Requests to developers')}
-                </MenuItem>
-              </MenuGroup>
-              <MenuGroup>
-                <MenuGroupHeader>{t('データの取り込み・書き出し', 'Data import and export')}</MenuGroupHeader>
-                {/* BigQuery からの取り込み(設定がある環境だけ)。開いたときにも自動で確かめるが、すぐに読み直したいとき用。時刻は在庫のデータの時点 */}
-                {bq?.configured && (
-                  <MenuItem icon={<ArrowSyncRegular />} disabled={bqBusy} secondaryContent={bqStockTime(bq) ?? ''} onClick={() => void runBqSync(true)}>
-                    {bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery')}
-                  </MenuItem>
-                )}
-                {/* 商品・カテゴリの週の指標(X48。商品のフロートの「指標」)。形は docs/METRICS_FORMAT.md */}
-                <MenuItem icon={<ArrowUploadRegular />} onClick={() => metricsFileRef.current?.click()}>
-                  {t('商品・カテゴリの指標を取り込む(CSV)', 'Import product & category metrics (CSV)')}
-                </MenuItem>
-                {/* 引っ越し用のパック: すべてのデータと画像を 1 つの ZIP に書き出す(外にアクセスできない環境へ持ち込むため。server/ccp/pack.py) */}
-                <MenuItem
-                  icon={<ArrowDownloadRegular />}
-                  secondaryContent={t('ZIP', 'ZIP')}
-                  onClick={() => {
-                    const a = document.createElement('a')
-                    a.href = appPath('/api/export')
-                    a.download = ''
-                    a.click()
-                  }}
-                >
-                  {t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)')}
-                </MenuItem>
-                {/* 種類(テーマの種類)が決まっていない配信を、AI で分ける(X41。これまでの配信の書き換え。決まっている配信は触らない) */}
-                <MenuItem icon={<AiIcon size={16} />} disabled={classifying || untypedCards.length === 0} secondaryContent={t(`${untypedCards.length} 本`, `${untypedCards.length}`)} onClick={() => void classifyAll()}>
-                  {classifying ? t('種類を分けています…', 'Sorting types…') : t('種類が未設定の配信を、AI で分ける', 'Sort untyped deliveries with AI')}
-                </MenuItem>
-              </MenuGroup>
-              <MenuGroup>
-                <MenuGroupHeader>{t('見本のデータ(試すため)', 'Sample data (for trying things out)')}</MenuGroupHeader>
-                {/* 外部広告の出稿の見本を作る(X49。本物のデータを取り込むまで、見せ方「商品別」を確かめるため。表の中身は置き換わる) */}
-                <MenuItem
-                  icon={<ArrowSyncRegular />}
-                  onClick={async () => {
-                    if (!window.confirm(tr('外部広告の見本のデータを作り直します(前に作った見本は置き換わります。取り込んだ本物のデータは消しません)。よろしいですか?', 'Recreate sample ad data? Previous sample rows are replaced; imported data is kept.'))) return
-                    try {
-                      const res = await fetch(appPath('/api/ads/sample'), { method: 'POST' })
-                      const json = (await res.json()) as { success: boolean; data?: { rows: number } }
-                      setBqNotice(json.success ? { intent: 'success', text: tr(`外部広告の見本を ${json.data?.rows ?? 0} 行作りました`, `Created ${json.data?.rows ?? 0} rows of sample ad data`) } : { intent: 'error', text: tr('外部広告の見本を作れませんでした', 'Could not create sample ad data') })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('外部広告の見本を作る', 'Create sample ad data')}
-                </MenuItem>
-                {/* 配信の効果の見本を作る(AI に渡した学びの記録と、ホールドアウトとの比べ。本物を取り込むまで、見せ方「効果」を確かめるため。見本の行だけが置き換わる) */}
-                <MenuItem
-                  icon={<ArrowSyncRegular />}
-                  onClick={async () => {
-                    if (!window.confirm(tr('配信の効果の見本(AI に渡した学びの記録・ホールドアウトとの比べ)を作り直します。前に作った見本は置き換わります。画面から記録した本物の記録は消しません。よろしいですか?', 'Recreate sample impact data (learnings log and holdout comparisons)? Previous sample rows are replaced; real records are kept.'))) return
-                    try {
-                      const res = await fetch(appPath('/api/impact/sample'), { method: 'POST' })
-                      const json = (await res.json()) as { success: boolean; data?: { lifts: number } }
-                      setBqNotice(json.success ? { intent: 'success', text: tr(`配信 ${json.data?.lifts ?? 0} 本の効果の見本を作りました`, `Created sample impact data for ${json.data?.lifts ?? 0} deliveries`) } : { intent: 'error', text: tr('効果の見本を作れませんでした', 'Could not create sample impact data') })
-                      setImpactKey((k) => k + 1)
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('効果の見本を作る', 'Create sample impact data')}
-                </MenuItem>
-                {/* 素材(Creative Assets)の見本を作る・消す(X58。利用者の依頼で、本番にも用意する。名前の先頭が「見本:」のものだけを扱う) */}
-                <MenuItem
-                  icon={<AttachRegular />}
-                  onClick={async () => {
-                    try {
-                      const have = await countAssetExamples()
-                      const msg = have
-                        ? tr(`素材の見本はすでに ${have} 件あります。もう一組作りますか?`, `${have} sample assets already exist. Create another set?`)
-                        : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」(US の配信は英語で「Sample:」)です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "Sample:" ("見本:" for Japan deliveries). Existing assets are not changed. Continue?')
-                      if (!window.confirm(msg)) return
-                      const r = await createAssetExamples({ cards: activeCards, me: myName() })
-                      setBqNotice({ intent: 'success', text: tr(`素材の見本を ${r.count} 件、${r.cards.join('・')} に足しました`, `Added ${r.count} sample assets to ${r.cards.join(', ')}`) })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('素材の見本を作る', 'Create sample assets')}
-                </MenuItem>
-                <MenuItem
-                  icon={<DeleteRegular />}
-                  onClick={async () => {
-                    if (!window.confirm(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?'))) return
-                    try {
-                      const n = await removeAssetExamples()
-                      setBqNotice({ intent: 'success', text: tr(`素材の見本を ${n} 件消しました`, `Deleted ${n} sample assets`) })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('素材の見本を消す', 'Delete sample assets')}
-                </MenuItem>
-                {/* 見本の SKU(X63)。SKU がまだない商品にだけ、色 × サイズの SKU と在庫を足す。見本には印(source)があり、BigQuery の取り込みは見本を消さず、在庫の合計にも数えない */}
-                <MenuItem
-                  icon={<BeakerRegular />}
-                  disabled={skuBusy}
-                  onClick={async () => {
-                    if (!window.confirm(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?'))) return
-                    setSkuBusy(true)
-                    try {
-                      const n = await createSampleSkus(products, (done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を作っています(${done} / ${total})`, `Creating sample SKUs (${done} / ${total})`) }))
-                      clearProductSkusCache()
-                      setBqNotice({ intent: 'success', text: n ? tr(`見本の SKU を ${n} 件作りました(商品のフロートの「SKU」のタブで見られます)`, `Created ${n} sample SKUs (see the SKUs tab of a product)`) : tr('どの商品にも SKU があるので、作りませんでした', 'Every product already has SKUs; nothing created') })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    } finally {
-                      setSkuBusy(false)
-                    }
-                  }}
-                >
-                  {skuBusy ? t('見本の SKU を作っています…', 'Creating sample SKUs…') : t('見本の SKU を作る', 'Create sample SKUs')}
-                </MenuItem>
-                {/* 商品の写真の ZIP(AI で作った見本の写真 scripts/sample-photos.py・集めた商品ページの画像)を取り込む。見本の商品ページ・「この配信で使う画像」に出る */}
-                <MenuItem
-                  icon={<ImageMultipleRegular />}
-                  onClick={async () => {
-                    try {
-                      const done = await importProductImagesZip()
-                      if (!done) return
-                      await loadProducts()
-                      setBqNotice({ intent: 'success', text: done })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('商品・メイン画像の写真の ZIP を取り込む', 'Import a product or hero photo ZIP')}
-                </MenuItem>
-                <MenuItem
-                  icon={<DeleteRegular />}
-                  disabled={skuBusy}
-                  onClick={async () => {
-                    if (!window.confirm(tr('見本の SKU と、その在庫を消します(BigQuery から入れた本物の SKU は消しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?'))) return
-                    setSkuBusy(true)
-                    try {
-                      const n = await removeSampleSkus((done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を消しています(${done} / ${total})`, `Deleting sample SKUs (${done} / ${total})`) }))
-                      clearProductSkusCache()
-                      setBqNotice({ intent: 'success', text: tr(`見本の SKU を ${n} 件消しました`, `Deleted ${n} sample SKUs`) })
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    } finally {
-                      setSkuBusy(false)
-                    }
-                  }}
-                >
-                  {t('見本の SKU を消す', 'Delete sample SKUs')}
-                </MenuItem>
-                {/* AB テスト・案から選ぶの例の配信を作る(X55・X57。利用者の依頼で、本番にも用意する。新しい配信を足すだけで、今ある配信は触らない) */}
-                <MenuItem
-                  icon={<BeakerRegular />}
-                  onClick={async () => {
-                    const already = cards.filter(isAbSeed).length
-                    const msg = already
-                      ? tr(`例の配信はすでに ${already} 本あります。もう一組(5 本)作りますか?`, `${already} example deliveries already exist. Create another set (5)?`)
-                      : tr('AB テスト(B まで・C まで)と、案から選ぶ(B まで・C まで・決めたあと)の例の配信を 5 本作ります。今ある配信は変えません。よろしいですか?', 'Create 5 example deliveries: A/B tests (up to B and C) and choose-a-variant (up to B, up to C, and already decided)? Existing deliveries are not changed.')
-                    if (!window.confirm(msg)) return
-                    try {
-                      const n = await createAbExamples({ products, heroes, owner: myName() })
-                      setBqNotice({ intent: 'success', text: tr(`例の配信を ${n} 本作りました(8〜15 日後)`, `Created ${n} example deliveries (8–15 days ahead)`) })
-                      await load()
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('AB テスト・案から選ぶの例を作る', 'Create A/B and choose-a-variant examples')}
-                </MenuItem>
-                {/* 配信の型(ST9)の見本: US の 1 週間の型(利用者の依頼 2026-10-23。本番にも用意する)。US の型がもうあれば作らない */}
-                <MenuItem
-                  icon={<CalendarClockRegular />}
-                  onClick={async () => {
-                    if (!window.confirm(tr('US の配信の型の見本(月〜日の 6 本: メール 4・アプリ 2)を作ります。US の型がもうあれば、何も作りません。よろしいですか?', 'Create sample US delivery patterns (6 per week: 4 emails, 2 app)? Nothing is created if US already has patterns.'))) return
-                    try {
-                      const n = await createUsSamplePatterns()
-                      await loadPatterns()
-                      setBqNotice(
-                        n
-                          ? { intent: 'success', text: tr(`US の配信の型を ${n} 本作りました(⚙ →「国」→「配信の型」で見られます)`, `Created ${n} US delivery patterns (see ⚙ → Country → Delivery patterns)`) }
-                          : { intent: 'warning', text: tr('US の配信の型はもうあるので、作りませんでした', 'US already has delivery patterns; nothing created') },
-                      )
-                    } catch (e) {
-                      setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
-                    }
-                  }}
-                >
-                  {t('配信の型の見本を作る(US)', 'Create sample delivery patterns (US)')}
-                </MenuItem>
-              </MenuGroup>
-            </MenuList>
-          </MenuPopover>
-        </Menu>
+          actions={[
+            {
+              id: 'countryPolicies',
+              section: 'country',
+              label: t('使う決まり', 'Rules used'),
+              description: t('全社の決まりのうち、この国で使うものを選びます。この国の AI の依頼と週の上限に効きます。', 'Choose which company rules apply in this country. Affects AI requests and weekly limits here.'),
+              icon: <ShieldCheckmarkRegular />,
+              onOpen: () => setCountryPolicyOpen(true),
+            },
+            {
+              id: 'criteria',
+              section: 'country',
+              label: t('アラートの基準', 'Alert criteria'),
+              description: t('在庫僅少の週数・週の上限・販売順位の上位の線。この国の全員に効きます。', 'Low-stock weeks, weekly limit and top-ranking line. Applies to everyone on this country.'),
+              icon: <AlertRegular />,
+              onOpen: () => setCriteriaOpen(true),
+            },
+            {
+              id: 'countryTemplates',
+              section: 'country',
+              label: t('使うテンプレート', 'Templates used'),
+              description: t('全社のテンプレートのうち、この国で使うものを選びます。', 'Choose which company templates are used in this country.'),
+              icon: <LayoutColumnTwoRegular />,
+              onOpen: () => setCountryTplOpen(true),
+            },
+            {
+              id: 'countryLearnings',
+              section: 'country',
+              label: t('使う学び', 'Learnings used'),
+              description: t('過去の配信の「次に生かすメモ」のうち、この国で使うものを選びます。ほかの国の学びは、決めていなければ使いません。', 'Choose which notes from past deliveries are used here. Learnings from other countries are off unless you turn them on.'),
+              icon: <LightbulbFilamentRegular />,
+              onOpen: () => setCountryLearnOpen(true),
+            },
+            {
+              id: 'patterns',
+              section: 'country',
+              label: t('配信の型', 'Delivery patterns'),
+              description: t('曜日・時刻・チャネル・種類・テンプレートの組。「まとめて作る」が、この型どおりに枠を作ります。', 'Day, time, channel, type and template. Bulk creation makes slots from these.'),
+              icon: <CalendarClockRegular />,
+              onOpen: () => setPatternOpen(true),
+            },
+            {
+              id: 'policies',
+              section: 'company',
+              label: t('方針・決まり', 'Marketing policies'),
+              description: t('マーケティングの決まりを取り込む・一覧で見る・直す。決まりは全部の国で共通で、どの国で使うかは「国」の「使う決まり」で決めます。', 'Import, list and edit marketing rules. Rules are shared; which countries use them is set under Country → Rules used.'),
+              icon: <DocumentBulletListRegular />,
+              onOpen: () => setPolicyOpen(true),
+            },
+            {
+              id: 'templates',
+              section: 'company',
+              label: t('テンプレート', 'Templates'),
+              description: t('テンプレートを作る・直す。どの国で使うかは「国」の「使うテンプレート」で決めます。', 'Create and edit templates. Which countries use them is set under Country → Templates used.'),
+              icon: <LayoutColumnTwoRegular />,
+              onOpen: openTemplateManager,
+            },
+            {
+              id: 'heroLibrary',
+              section: 'company',
+              label: t('画像のライブラリ', 'Image library'),
+              description: t('メイン画像・部品の画像。上げる・直す・期限・消す。', 'Hero and part images: upload, edit, expiry, delete.'),
+              icon: <ImageMultipleRegular />,
+              onOpen: () => setHeroLibraryOpen(true),
+            },
+            {
+              id: 'people',
+              section: 'company',
+              label: t('ユーザーと承認グループ', 'Users and approval groups'),
+              description: t('使う人と、承認するグループ。', 'People and approval groups.'),
+              icon: <PeopleTeamRegular />,
+              onOpen: openPeopleManager,
+            },
+            {
+              id: 'bq',
+              section: 'data',
+              label: bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery'),
+              description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確かめます)。', 'Re-read stock and product data now (also checked automatically on open).'),
+              icon: <ArrowSyncRegular />,
+              disabled: bqBusy,
+              secondary: (bq && bqStockTime(bq)) ?? '',
+              hidden: !bq?.configured,
+              onOpen: () => void runBqSync(true),
+            },
+            {
+              id: 'metrics',
+              section: 'data',
+              label: t('商品・カテゴリの指標を取り込む(CSV)', 'Import product & category metrics (CSV)'),
+              description: t('商品・カテゴリの週の指標の CSV を取り込みます。', 'Import a CSV of weekly product and category metrics.'),
+              icon: <ArrowUploadRegular />,
+              onOpen: () => metricsFileRef.current?.click(),
+            },
+            {
+              id: 'export',
+              section: 'data',
+              label: t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)'),
+              description: t('すべてのデータと画像を 1 つの ZIP に書き出します(外にアクセスできない環境へ移すため)。', 'Export all data and images to one ZIP (to move to an offline environment).'),
+              icon: <ArrowDownloadRegular />,
+              secondary: t('ZIP', 'ZIP'),
+              onOpen: () => {
+                const a = document.createElement('a')
+                a.href = appPath('/api/export')
+                a.download = ''
+                a.click()
+              },
+            },
+            {
+              id: 'classify',
+              section: 'data',
+              label: classifying ? t('種類を分けています…', 'Sorting types…') : t('種類が未設定の配信を、AI で分ける', 'Sort untyped deliveries with AI'),
+              description: t('種類(テーマの種類)が決まっていない配信を、AI で分けます。決まっている配信は変えません。', 'Sort deliveries without a theme type using AI. Deliveries with a type are not changed.'),
+              icon: <AiIcon size={16} />,
+              disabled: classifying || untypedCards.length === 0,
+              secondary: t(`${untypedCards.length} 本`, `${untypedCards.length}`),
+              onOpen: () => void classifyAll(),
+            },
+            {
+              id: 'photoZip',
+              section: 'data',
+              label: t('商品・メイン画像の写真の ZIP を取り込む', 'Import a product or hero photo ZIP'),
+              description: t('AI で作った見本の写真や、集めた商品ページの画像の ZIP を取り込みます。', 'Import a ZIP of sample photos or collected product page images.'),
+              icon: <ImageMultipleRegular />,
+              onOpen: async () => {
+                try {
+                  const done = await importProductImagesZip()
+                  if (!done) return
+                  await loadProducts()
+                  setBqNotice({ intent: 'success', text: done })
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'sampleAds',
+              section: 'samples',
+              label: t('外部広告の見本を作る', 'Create sample ad data'),
+              icon: <ArrowSyncRegular />,
+              onOpen: async () => {
+                if (!window.confirm(tr('外部広告の見本のデータを作り直します(前に作った見本は置き換わります。取り込んだ本物のデータは消しません)。よろしいですか?', 'Recreate sample ad data? Previous sample rows are replaced; imported data is kept.'))) return
+                try {
+                  const res = await fetch(appPath('/api/ads/sample'), { method: 'POST' })
+                  const json = (await res.json()) as { success: boolean; data?: { rows: number } }
+                  setBqNotice(json.success ? { intent: 'success', text: tr(`外部広告の見本を ${json.data?.rows ?? 0} 行作りました`, `Created ${json.data?.rows ?? 0} rows of sample ad data`) } : { intent: 'error', text: tr('外部広告の見本を作れませんでした', 'Could not create sample ad data') })
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'sampleImpact',
+              section: 'samples',
+              label: t('効果の見本を作る', 'Create sample impact data'),
+              icon: <ArrowSyncRegular />,
+              onOpen: async () => {
+                if (!window.confirm(tr('配信の効果の見本(AI に渡した学びの記録・ホールドアウトとの比べ)を作り直します。前に作った見本は置き換わります。画面から記録した本物の記録は消しません。よろしいですか?', 'Recreate sample impact data (learnings log and holdout comparisons)? Previous sample rows are replaced; real records are kept.'))) return
+                try {
+                  const res = await fetch(appPath('/api/impact/sample'), { method: 'POST' })
+                  const json = (await res.json()) as { success: boolean; data?: { lifts: number } }
+                  setBqNotice(json.success ? { intent: 'success', text: tr(`配信 ${json.data?.lifts ?? 0} 本の効果の見本を作りました`, `Created sample impact data for ${json.data?.lifts ?? 0} deliveries`) } : { intent: 'error', text: tr('効果の見本を作れませんでした', 'Could not create sample impact data') })
+                  setImpactKey((k) => k + 1)
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'sampleAssets',
+              section: 'samples',
+              label: t('素材の見本を作る', 'Create sample assets'),
+              icon: <AttachRegular />,
+              onOpen: async () => {
+                try {
+                  const have = await countAssetExamples()
+                  const msg = have
+                    ? tr(`素材の見本はすでに ${have} 件あります。もう一組作りますか?`, `${have} sample assets already exist. Create another set?`)
+                    : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」(US の配信は英語で「Sample:」)です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "Sample:" ("見本:" for Japan deliveries). Existing assets are not changed. Continue?')
+                  if (!window.confirm(msg)) return
+                  const r = await createAssetExamples({ cards: activeCards, me: myName() })
+                  setBqNotice({ intent: 'success', text: tr(`素材の見本を ${r.count} 件、${r.cards.join('・')} に足しました`, `Added ${r.count} sample assets to ${r.cards.join(', ')}`) })
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'removeAssets',
+              section: 'samples',
+              label: t('素材の見本を消す', 'Delete sample assets'),
+              icon: <DeleteRegular />,
+              onOpen: async () => {
+                if (!window.confirm(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?'))) return
+                try {
+                  const n = await removeAssetExamples()
+                  setBqNotice({ intent: 'success', text: tr(`素材の見本を ${n} 件消しました`, `Deleted ${n} sample assets`) })
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'sampleSkus',
+              section: 'samples',
+              label: skuBusy ? t('見本の SKU を作っています…', 'Creating sample SKUs…') : t('見本の SKU を作る', 'Create sample SKUs'),
+              icon: <BeakerRegular />,
+              disabled: skuBusy,
+              onOpen: async () => {
+                if (!window.confirm(tr('SKU がまだない商品に、見本の SKU(色 × サイズ)と在庫を作ります。在庫の合計は、いまの商品の在庫と同じにします。今ある SKU は変えません。よろしいですか?', 'Create sample SKUs (color × size) and their stock for products without SKUs. Their total matches the current product stock. Existing SKUs are kept. Continue?'))) return
+                setSkuBusy(true)
+                try {
+                  const n = await createSampleSkus(products, (done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を作っています(${done} / ${total})`, `Creating sample SKUs (${done} / ${total})`) }))
+                  clearProductSkusCache()
+                  setBqNotice({ intent: 'success', text: n ? tr(`見本の SKU を ${n} 件作りました(商品のフロートの「SKU」のタブで見られます)`, `Created ${n} sample SKUs (see the SKUs tab of a product)`) : tr('どの商品にも SKU があるので、作りませんでした', 'Every product already has SKUs; nothing created') })
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                } finally {
+                  setSkuBusy(false)
+                }
+              },
+            },
+            {
+              id: 'removeSkus',
+              section: 'samples',
+              label: t('見本の SKU を消す', 'Delete sample SKUs'),
+              icon: <DeleteRegular />,
+              disabled: skuBusy,
+              onOpen: async () => {
+                if (!window.confirm(tr('見本の SKU と、その在庫を消します(BigQuery から入れた本物の SKU は消しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?'))) return
+                setSkuBusy(true)
+                try {
+                  const n = await removeSampleSkus((done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を消しています(${done} / ${total})`, `Deleting sample SKUs (${done} / ${total})`) }))
+                  clearProductSkusCache()
+                  setBqNotice({ intent: 'success', text: tr(`見本の SKU を ${n} 件消しました`, `Deleted ${n} sample SKUs`) })
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                } finally {
+                  setSkuBusy(false)
+                }
+              },
+            },
+            {
+              id: 'abExamples',
+              section: 'samples',
+              label: t('AB テスト・案から選ぶの例を作る', 'Create A/B and choose-a-variant examples'),
+              icon: <BeakerRegular />,
+              onOpen: async () => {
+                const already = cards.filter(isAbSeed).length
+                const msg = already
+                  ? tr(`例の配信はすでに ${already} 本あります。もう一組(5 本)作りますか?`, `${already} example deliveries already exist. Create another set (5)?`)
+                  : tr('AB テスト(B まで・C まで)と、案から選ぶ(B まで・C まで・決めたあと)の例の配信を 5 本作ります。今ある配信は変えません。よろしいですか?', 'Create 5 example deliveries: A/B tests (up to B and C) and choose-a-variant (up to B, up to C, and already decided)? Existing deliveries are not changed.')
+                if (!window.confirm(msg)) return
+                try {
+                  const n = await createAbExamples({ products, heroes, owner: myName() })
+                  setBqNotice({ intent: 'success', text: tr(`例の配信を ${n} 本作りました(8〜15 日後)`, `Created ${n} example deliveries (8–15 days ahead)`) })
+                  await load()
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'samplePatterns',
+              section: 'samples',
+              label: t('配信の型の見本を作る(US)', 'Create sample delivery patterns (US)'),
+              icon: <CalendarClockRegular />,
+              onOpen: async () => {
+                if (!window.confirm(tr('US の配信の型の見本(月〜日の 6 本: メール 4・アプリ 2)を作ります。US の型がもうあれば、何も作りません。よろしいですか?', 'Create sample US delivery patterns (6 per week: 4 emails, 2 app)? Nothing is created if US already has patterns.'))) return
+                try {
+                  const n = await createUsSamplePatterns()
+                  await loadPatterns()
+                  setBqNotice(
+                    n
+                      ? { intent: 'success', text: tr(`US の配信の型を ${n} 本作りました(⚙ →「国」→「配信の型」で見られます)`, `Created ${n} US delivery patterns (see ⚙ → Country → Delivery patterns)`) }
+                      : { intent: 'warning', text: tr('US の配信の型はもうあるので、作りませんでした', 'US already has delivery patterns; nothing created') },
+                  )
+                } catch (e) {
+                  setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
+                }
+              },
+            },
+            {
+              id: 'devRequests',
+              section: 'dev',
+              label: t('開発へのリクエストの一覧', 'Requests to developers'),
+              description: t('画面のピンから送られた、開発へのリクエストの一覧。', 'Requests to developers sent from pins on the screen.'),
+              icon: <DevRequestIcon />,
+              onOpen: () => setDevRequestsOpen(true),
+            },
+          ]}
+        />
       </header>
       {/* 作業の段(X42・X43): ヘッダー(システム全体)とは分け、その下に置く。左端に面の切り替え、続いて見ている画面の配信の絞り込み */}
         <div className={styles.filterBar}>
