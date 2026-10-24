@@ -17,7 +17,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from .db import get_engine
+from .db import cli_conn
 
 WEEKS = 20
 CHANNELS = (("all", 3000), ("ec", 1800), ("delivery", 500))
@@ -48,8 +48,7 @@ def build(products: list[dict[str, Any]], placed: set[tuple[str, date]], weeks: 
 
 
 async def run(yes: bool) -> None:
-    engine = await get_engine()
-    async with engine.connect() as conn:
+    async with cli_conn(write=False) as conn:
         real = (await conn.execute(text("SELECT COUNT(*) FROM product_rankings WHERE as_of IS NOT NULL"))).scalar_one()
         if real:
             print(f"BigQuery から取り込んだ順位が {real} 行あります。ダミーは作りません")
@@ -72,7 +71,7 @@ async def run(yes: bool) -> None:
     if not yes:
         print("--yes を付けると、いまのダミーの行(as_of が空)を消して、作り直します")
         return
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         await conn.execute(text("DELETE FROM product_rankings WHERE as_of IS NULL"))
         if rows:
             await conn.execute(text("""

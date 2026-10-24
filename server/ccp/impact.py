@@ -112,7 +112,7 @@ def generate(cards: list[dict[str, Any]], results: list[dict[str, Any]]) -> tupl
 async def sample() -> dict[str, Any]:
     s = sc.load()
     runs_t, lifts_t = s.table("ai_runs"), s.table("delivery_lifts")
-    async with db() as conn:
+    async with db(write=True) as conn:
         cards = [dict(r) for r in (await conn.execute(text(f"SELECT id, country, channel, scheduled_at, cancelled_at FROM {s.table('delivery_cards').pg}"))).mappings().all()]
         results = [dict(r) for r in (await conn.execute(text(f"SELECT id, delivery_card_id, sent_at, recipients, orders, revenue, notes, variant FROM {s.table('delivery_results').pg} ORDER BY sent_at"))).mappings().all()]
         runs, lifts = generate(cards, results)
@@ -121,5 +121,4 @@ async def sample() -> dict[str, Any]:
         await conn.execute(text(f"DELETE FROM {lifts_t.pg} WHERE sample = 1"))
         await repo.insert_many(conn, "ai_runs", runs)
         await repo.insert_many(conn, "delivery_lifts", lifts)
-        await conn.commit()
     return ok({"runs": len(runs), "lifts": len(lifts)})

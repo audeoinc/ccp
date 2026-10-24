@@ -37,15 +37,14 @@ from pathlib import Path
 from sqlalchemy import text
 
 from . import repo, schema as sc
-from .db import get_engine
+from .db import cli_conn
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed.json"
 DEFAULT_IMAGES = Path(__file__).resolve().parent.parent / "images"
 
 
 async def migrate() -> None:
-    engine = await get_engine()
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         # 手で流すときは、指紋が同じでも必ず流す(起動のときは、変わったときだけ流す。data_api.apply_schema)
         from .data_api import apply_schema
 
@@ -56,8 +55,7 @@ async def migrate() -> None:
 async def seed(reset: bool) -> None:
     schema = sc.load()
     data = json.loads(SEED_PATH.read_text(encoding="utf-8"))
-    engine = await get_engine()
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         order = schema.creation_order()
         if reset:
             for t in reversed(order):
@@ -72,8 +70,7 @@ async def seed(reset: bool) -> None:
 
 
 async def counts() -> None:
-    engine = await get_engine()
-    async with engine.connect() as conn:
+    async with cli_conn(write=False) as conn:
         for t in sc.load().creation_order():
             n = (await conn.execute(text(f"SELECT count(*) FROM {t.pg}"))).scalar_one()
             print(f"{t.pg}: {n}")

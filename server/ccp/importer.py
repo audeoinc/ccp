@@ -379,7 +379,7 @@ async def cmd_apply(out: Path, yes: bool, only: str | None = None) -> None:
     from sqlalchemy import text
 
     from . import schema as sc
-    from .db import get_engine
+    from .db import cli_conn
 
     data = json.loads((out / "data.json").read_text(encoding="utf-8"))
     schema = sc.load()
@@ -398,8 +398,7 @@ async def cmd_apply(out: Path, yes: bool, only: str | None = None) -> None:
     if not yes:
         print("--yes を付けると、実行します(いまは、確認だけ)")
         return
-    engine = await get_engine()
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         if only:
             p = {"m": market}
             await conn.execute(text("DELETE FROM delivery_products WHERE product_id IN (SELECT id FROM products WHERE market = :m)"), p)

@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import text
 
 from . import schema as sc
-from .db import get_engine
+from .db import cli_conn
 
 
 async def plan(conn: Any, count: int) -> list[dict[str, Any]]:
@@ -45,7 +45,7 @@ async def plan(conn: Any, count: int) -> list[dict[str, Any]]:
 
 
 async def run(count: int, yes: bool) -> None:
-    async with (await get_engine()).begin() as conn:
+    async with cli_conn() as conn:
         picked = await plan(conn, count)
         if not picked:
             print("入れる画像がありません(これからの配信に、見本の写真のメインを使っている商品がない。または、もう期限が入っている)")

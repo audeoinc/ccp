@@ -188,15 +188,14 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
 
 async def import_images(path: Path, images: Path, yes: bool, main_to_master: bool = False) -> None:
     from .cli import migrate
-    from .db import get_engine
+    from .db import cli_conn
 
     manifest, z = read_zip(path)
     print(f"ZIP: {path.name}{'(見本の写真)' if manifest.get('sample') else ''}(作った日時 {manifest.get('made_at')}。商品 {len(manifest.get('products', []))}・画像 {manifest.get('images')} 枚)")
     # 表がまだない環境でも取り込めるよう、先に表を作る(何度実行してもよい)
     await migrate()
-    engine = await get_engine()
     if manifest.get("kind") == HEROES:
-        async with engine.connect() as conn:
+        async with cli_conn(write=False) as conn:
             hp = hero_plan(manifest, await load_heroes(conn))
         print(f"  取り込む: メイン画像 {len(hp['items'])} 枚")
         if hp["missing"]:
@@ -209,12 +208,12 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
         dest.mkdir(parents=True, exist_ok=True)
         for it in hp["items"]:
             (dest / hero_file_name(it["image"])).write_bytes(z.read(f"heroes/{it['image']['file']}"))
-        async with engine.begin() as conn:
+        async with cli_conn() as conn:
             n = await hero_apply(conn, hp)
         print(f"取り込みました: メイン画像 {n} 枚を {dest} に置き、表 hero_images を差し替えました")
         print(f"サーバーは、環境変数 ASSET_DIR={images} で起動してください(画像をこのフォルダから配る)")
         return
-    async with engine.connect() as conn:
+    async with cli_conn(write=False) as conn:
         products = [dict(r) for r in (await conn.execute(text("SELECT id, product_code, market, image_url FROM products WHERE product_code IS NOT NULL"))).mappings().all()]
     p = plan(manifest, products)
     n_img = sum(len(i["images"]) for i in p["items"])
@@ -230,7 +229,7 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
         print("確認だけです。取り込むときは --yes を付けて実行してください(ZIP に入っている商品の画像の行は、入れ替わります)")
         return
     sample = bool(manifest.get("sample"))
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         r = await apply(conn, z, p, local_put(images), main_to_master, sample)
     print(f"取り込みました: 画像のファイル {r['placed']} 点を {images / 'products'} に置き、行 {r['rows']} 件。商品のメイン画像を {r['mains']} 件埋めました")
     print(f"サーバーは、環境変数 ASSET_DIR={images} で起動してください(画像をこのフォルダから配る)")

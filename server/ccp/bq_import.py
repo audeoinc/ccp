@@ -313,35 +313,37 @@ async def sync(force: bool = False) -> dict[str, Any]:
         imported: list[dict[str, Any]] = []
         async with db(write=True) as conn:
             got = (await conn.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": LOCK_KEY})).scalar_one()
-            if not got:
-                return {"configured": True, "imported": [], "failed": [], "skipped": "busy", **(await status())}
-            for name in ORDER:
-                if name in good:
-                    summary = await _write(conn, name, good[name])
-                    imported.append({"name": name, "rows": len(good[name]), "summary": summary})
-            if "sku" in good or "sku_stock" in good:
-                await _sum_stock(conn)
-            records = []
-            for name in ORDER:
-                if name in good:
-                    stamp = "issued_at" if name == "forecast" else "as_of"
-                    times = [t for t in (bv.as_ts(r.get(stamp)) for r in good[name]) if t]
-                    records.append({"source": name, "status": "ok", "source_modified": modified.get(name), "data_as_of": max(times) if times else None,
-                                    "row_count": len(good[name]), "message": notes.get(name) or None, "imported_at": now})
-            for f in failed:
-                records.append({"source": f["name"], "status": "error", "source_modified": modified.get(f["name"]), "data_as_of": None,
-                                "row_count": len(rows.get(f["name"], [])), "message": f["message"][:2000], "imported_at": now})
-            if records:
+            # ほかで取り込み中なら、書かずに抜ける(状態は、この接続を返してから読む。接続を 2 本同時に持たない)
+            if got:
+                for name in ORDER:
+                    if name in good:
+                        summary = await _write(conn, name, good[name])
+                        imported.append({"name": name, "rows": len(good[name]), "summary": summary})
+                if "sku" in good or "sku_stock" in good:
+                    await _sum_stock(conn)
+                records = []
+                for name in ORDER:
+                    if name in good:
+                        stamp = "issued_at" if name == "forecast" else "as_of"
+                        times = [t for t in (bv.as_ts(r.get(stamp)) for r in good[name]) if t]
+                        records.append({"source": name, "status": "ok", "source_modified": modified.get(name), "data_as_of": max(times) if times else None,
+                                        "row_count": len(good[name]), "message": notes.get(name) or None, "imported_at": now})
+                for f in failed:
+                    records.append({"source": f["name"], "status": "error", "source_modified": modified.get(f["name"]), "data_as_of": None,
+                                    "row_count": len(rows.get(f["name"], [])), "message": f["message"][:2000], "imported_at": now})
+                if records:
+                    await conn.execute(text("""
+                        INSERT INTO bq_imports (source, status, source_modified, data_as_of, row_count, message, imported_at)
+                        VALUES (:source, :status, :source_modified, :data_as_of, :row_count, :message, :imported_at)
+                    """), records)
+                # 記録は、出力ごとに直近 50 件だけ残す(画面を開くたびに増えるため)
                 await conn.execute(text("""
-                    INSERT INTO bq_imports (source, status, source_modified, data_as_of, row_count, message, imported_at)
-                    VALUES (:source, :status, :source_modified, :data_as_of, :row_count, :message, :imported_at)
-                """), records)
-            # 記録は、出力ごとに直近 50 件だけ残す(画面を開くたびに増えるため)
-            await conn.execute(text("""
-                DELETE FROM bq_imports WHERE id IN (
-                  SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY source ORDER BY imported_at DESC) AS n FROM bq_imports) AS x WHERE n > 50
-                )
-            """))
+                    DELETE FROM bq_imports WHERE id IN (
+                      SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY source ORDER BY imported_at DESC) AS n FROM bq_imports) AS x WHERE n > 50
+                    )
+                """))
+        if not got:
+            return {"configured": True, "imported": [], "failed": [], "skipped": "busy", **(await status())}
         if imported or failed:
             log.info("BigQuery の取り込み: 取り込んだ %s / 止めた %s", [i["name"] for i in imported], [f["name"] for f in failed])
         return {"configured": True, "imported": imported, "failed": failed, **(await status())}

@@ -120,11 +120,10 @@ KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes"}
 
 async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
     """DB の中身を、パックの内容に置き換える(作った日時・変えた日時も、元のまま残す)。KEEP_ON_REPLACE の表は消さずに足す"""
-    from .db import get_engine
+    from .db import cli_conn
 
     schema = sc.load()
-    engine = await get_engine()
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         order = schema.creation_order()
         for t in reversed(order):
             if t.name in KEEP_ON_REPLACE:
@@ -144,12 +143,11 @@ async def add_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, tuple
     """パックの行のうち、まだない行(id で見る)だけを足す。すでにある行は変えず、消さない(X58)。
     参照先がない・ほかの一意の決まりに当たる行は、その行だけ足さずに進める(1 行ずつ SAVEPOINT で試す)。
     返すのは、テーブルごとの(足した・すでにあった・足せなかった)の数"""
-    from .db import get_engine
+    from .db import cli_conn
 
     schema = sc.load()
-    engine = await get_engine()
     out: dict[str, tuple[int, int, int]] = {}
-    async with engine.begin() as conn:
+    async with cli_conn() as conn:
         for t in schema.creation_order():
             rows = tables.get(t.name, [])
             if not rows:
