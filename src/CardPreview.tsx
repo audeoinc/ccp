@@ -41,6 +41,7 @@ export function CardPreview({ card: c, productIds, products, heroes }: Props) {
   return (
     <Preview
       channel={isPush ? 'push' : 'email'}
+      country={c.country ?? undefined}
       pushLinkKind={parsePushLink(c.push_link)?.kind}
       pushTitle={c.push_title}
       pushBody={c.push_body}

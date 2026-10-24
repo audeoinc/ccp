@@ -1263,7 +1263,7 @@ export function ContentPane(props: Props) {
   }, [])
   const isPush = props.channel === 'push'
   // リンク先の場所(メイン画像・ボタン)。メールは URL、アプリは開く画面を決める
-  const slots = linkSlots(template, props.items, props.products, props.campaign)
+  const slots = linkSlots(template, props.items, props.products, props.campaign, props.country)
   const pr = progressOf({
     theme,
     template,

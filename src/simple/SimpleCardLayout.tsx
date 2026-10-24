@@ -39,6 +39,7 @@ import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
+import { SenderName } from '../SenderName'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
@@ -718,7 +719,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length < 3 && e.abDiffParts.length > 1 && e.abDiffParts.some((p) => p.kind === 'template') && (
             <span className={s.abWarn}>{t('テンプレートと、ほかの所も A と違います。結果がテンプレートの差か中身の差か、分けにくくなります', 'Both the template and other parts differ from A. It will be hard to tell which caused the result.')}</span>
           )}
-          {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。差出人の名前(いまは見本の SHOP)をどこで決めるかは ST10 */}
+          {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。差出人の名前は、設定の画面の全社の既定か国の上書き(ST10) */}
           {e.channel === 'email' ? (
             <div className={s.inboxWrap}>
               <span className={s.inboxHead}>
@@ -726,7 +727,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 {t('受信箱での見え方', 'How it looks in the inbox')}
               </span>
               <div className={s.inbox}>
-                <span className={s.sender} title={t('差出人の名前', 'Sender name')}>SHOP</span>
+                <span className={s.sender} title={t('差出人の名前(設定の画面で決める)', 'Sender name (set in Settings)')}>
+                  <SenderName country={e.form.country} />
+                </span>
                 <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(e.form.subject || e.form.name) && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '60%' }} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
                   {e.form.subject || e.form.name || t('件名未入力', 'No subject')}
                 </button>
@@ -744,9 +747,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               </span>
               <div className={s.inbox}>
                 <span className={s.pushIcon} aria-hidden>
-                  S
+                  <SenderName country={e.form.country} initial />
                 </span>
-                <span className={s.sender} style={{ width: 'auto' }}>SHOP</span>
+                <span className={s.sender} style={{ width: 'auto' }}>
+                  <SenderName country={e.form.country} />
+                </span>
                 <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'pushTitle' }) && s.on, !e.form.pushTitle && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '50%', fontWeight: 600 }} onClick={() => select({ kind: 'pushTitle' })} title={t('通知のタイトルを直す', 'Edit the notification title')}>
                   {e.form.pushTitle || t('タイトル未入力', 'No title')}
                 </button>

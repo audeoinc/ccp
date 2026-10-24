@@ -20,8 +20,11 @@ import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
 import { locale, optionLabel, useT } from './i18n'
+import { brandFor, useCountrySettings } from './countrySettings'
 
 interface Props {
+  /** 配信カードの国(差出人の名前を、設定の画面の国の値で出す。ST10) */
+  country?: string
   channel: 'email' | 'push'
   subject: string
   /** メールの件名(空は subject = 配信名)とプリヘッダー(X2) */
@@ -167,6 +170,8 @@ const useStyles = makeStyles({
 // 座標だけで持つと、幅・倍率・文言でずれるので、ブロックの中の割合で持つ。名前を変えると、置いたピンが見つからなくなる。
 // 部品を選ぶ(SU1)ための細かい目印は、別の属性 data-part に持つ(simple/parts.ts。見出しとコピー・空いた枠などを見分ける)
 export function Preview(props: Props) {
+  // 差出人の名前は、設定を読み直したら描き直す
+  useCountrySettings()
   return props.channel === 'email' ? <EmailPreview {...props} /> : <PushPreview {...props} />
 }
 
@@ -227,7 +232,7 @@ function FitLine({ baseSize, minScale = 0.55, style, children }: { baseSize: str
   )
 }
 
-function EmailPreview({ subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt, pickMode = false }: Props) {
+function EmailPreview({ country, subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt, pickMode = false }: Props) {
   const t = useT()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
@@ -1060,7 +1065,9 @@ function EmailPreview({ subject, subjectLine, preheader, device, headline, copy,
             {hs.barText || subject || t('(配信名未入力)', '(No name)')} ›
           </div>
         )}
-        <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>SHOP</div>
+        <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>
+          {brandFor(country).senderName}
+        </div>
         {heroBox}
         {heroAfter}
         {heroTableEl}
@@ -1132,7 +1139,7 @@ function PushPreview(props: Props) {
       <div style={{ backgroundColor: 'rgba(250,250,252,0.86)', color: INK, borderRadius: 22, padding: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.25)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           {appIcon(20)}
-          <div style={{ flexGrow: 1, fontSize: '0.7rem', letterSpacing: 1, color: SUB }}>SHOP</div>
+          <div style={{ flexGrow: 1, fontSize: '0.7rem', letterSpacing: 1, color: SUB }}>{brandFor(props.country).senderName}</div>
           <div style={{ fontSize: '0.7rem', color: SUB }}>{t('たった今', 'now')}</div>
         </div>
         <div data-part="pushTitle" style={{ ...titleFont, fontSize: '0.9rem', color: INK }}>{title}</div>
@@ -1145,7 +1152,7 @@ function PushPreview(props: Props) {
       <div style={{ backgroundColor: '#f3edf7', color: INK, borderRadius: 24, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           {appIcon(18)}
-          <div style={{ flexGrow: 1, fontSize: '0.7rem', color: SUB }}>SHOP ・ {t('たった今', 'now')}</div>
+          <div style={{ flexGrow: 1, fontSize: '0.7rem', color: SUB }}>{brandFor(props.country).senderName} ・ {t('たった今', 'now')}</div>
           <div style={{ fontSize: '0.8rem', color: SUB, lineHeight: 1 }}>⌃</div>
         </div>
         <div data-part="pushTitle" style={{ ...titleFont, fontSize: '0.9rem', color: INK }}>{title}</div>

@@ -3,6 +3,8 @@ import type { Item } from './items'
 import { optionLabel, tr } from './i18n'
 import { getTemplate, placedButtons, sectionRange, sectionsOf, type EmailTemplateId, type LinkKind } from './templates'
 import { tableButtonBlocks } from './tables'
+import { brandFor } from './countrySettings'
+import { productMarket } from './market'
 
 /**
  * 配信ごとのリンク先(配信カードの links に JSON で保存する)。
@@ -32,8 +34,8 @@ export interface AppScreen {
   value?: string
 }
 
-/** ショップの URL(実際の URL が決まるまでの、仮の値) */
-export const SHOP_URL = 'https://shop.example.com'
+/** 店の URL(設定の画面で、全社の既定と国の上書きを決める。ST10。決めていなければ見本の値) */
+export const shopUrl = (country?: string | null) => brandFor(country).shopUrl
 
 export function parseLinks(json?: string): Links {
   if (!json) return {}
@@ -119,20 +121,22 @@ export function utmFor(links: Links, campaign: string, variant?: string | null) 
 }
 
 /** 種類から作る、既定のリンク先。custom は既定がない(配信カードで必ず決める) */
-export function defaultUrl(kind: LinkKind, campaign: string, category?: string): string {
+export function defaultUrl(kind: LinkKind, campaign: string, category?: string, country?: string | null): string {
+  const shop = shopUrl(country)
   switch (kind) {
     case 'top':
-      return SHOP_URL
+      return shop
     case 'category':
-      return category ? `${SHOP_URL}/c/${slug(category) || encodeURIComponent(category)}` : SHOP_URL
+      return category ? `${shop}/c/${slug(category) || encodeURIComponent(category)}` : shop
     case 'custom':
       return ''
     default:
-      return `${SHOP_URL}/campaign/${campaign}`
+      return `${shop}/campaign/${campaign}`
   }
 }
 
-export const productUrl = (p?: Product) => (p?.product_code ? `${SHOP_URL}/p/${p.product_code}` : '')
+/** 商品のページ(商品の市場の店の URL) */
+export const productUrl = (p?: Product) => (p?.product_code ? `${shopUrl(productMarket(p))}/p/${p.product_code}` : '')
 
 /** 計測用のパラメーターを付けた URL(URL として読めないときは、そのまま返す)。content はリンクの場所ごと(UTM の版 1 の写しでは渡さない) */
 export function withUtm(url: string, utm: Links['utm'], content?: string): string {
@@ -173,7 +177,7 @@ export interface LinkSlot {
 }
 
 /** テンプレートと掲載商品から、リンクを付ける場所の一覧を作る(メール上の並び順) */
-export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Product[], campaign: string): LinkSlot[] {
+export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Product[], campaign: string, country?: string | null): LinkSlot[] {
   const tpl = getTemplate(templateId)
   const sections = sectionsOf(templateId)
   // セクションのカテゴリ: そのセクションの商品で、いちばん多いカテゴリ(ボタンのリンク先が「カテゴリのページ」のときに使う)
@@ -189,7 +193,7 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
   }
   const heroKind = tpl.heroLink ?? 'campaign'
-  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign), defaultScreen: defaultScreen(heroKind), content: CONTENT_HERO }]
+  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign, undefined, country), defaultScreen: defaultScreen(heroKind), content: CONTENT_HERO }]
   let buttonNo = 0
   // 表のセクションのボタンは、そのセクションの中にある(以前の形のボタンと合わせて、メールの上から順に)
   const inTable = new Set(tableButtonBlocks(tpl).flatMap((b) => b.buttons.map((x) => x.id)))
@@ -209,7 +213,7 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
         kind: 'button',
         label: tr(`${text}(${where})`, `${text} (${where})`),
         linkKind: kind,
-        defaultUrl: defaultUrl(kind, campaign, block.at > 0 ? categoryOf(block.at - 1) : undefined),
+        defaultUrl: defaultUrl(kind, campaign, block.at > 0 ? categoryOf(block.at - 1) : undefined, country),
         defaultScreen: defaultScreen(kind, block.at > 0 ? categoryOf(block.at - 1) : undefined),
         content: buttonContent(++buttonNo),
       })

@@ -50,6 +50,7 @@ import {
   LayoutColumnTwoRegular,
   PaintBrushRegular,
   PeopleTeamRegular,
+  SendRegular,
   SettingsRegular,
   CalendarClockRegular,
   TableRegular,
@@ -61,6 +62,7 @@ import { LightbulbRegular as DevRequestIcon } from '@fluentui/react-icons'
 import { DevRequestLayer } from './DevRequestLayer'
 import { DevRequestsDialog } from './DevRequestsDialog'
 import { SettingsDialog } from './SettingsDialog'
+import { BrandPanel } from './BrandPanel'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ProductsService } from './data/products'
@@ -1606,6 +1608,22 @@ function App() {
                 'Weekly deliveries, kept as patterns per weekday. “Create in bulk” makes slots from these patterns (with type and template filled in). Patterns are only defaults: you can change any slot or delivery. Changing a pattern does not change deliveries already made. Templates use their latest version at creation.',
               ),
               render: (co) => <PatternPanel country={co} onChanged={() => void loadPatterns()} />,
+            },
+            {
+              id: 'countryBrand',
+              section: 'country',
+              label: t('差出人の名前と店の URL', 'Sender name and shop URL'),
+              description: t('全社の既定を、この国だけ変えるときに入れます。空の欄は全社の値を使います。', 'Override the company defaults for this country. Empty fields use the company values.'),
+              icon: <SendRegular />,
+              render: (co, name) => <BrandPanel country={co} countryName={name} />,
+            },
+            {
+              id: 'brand',
+              section: 'company',
+              label: t('差出人の名前と店の URL', 'Sender name and shop URL'),
+              description: t('受信箱・メールの上の帯・アプリの通知に出す差出人の名前と、リンクの既定・商品のページの元になる店の URL。国で上書きできます。', 'The sender name shown in the inbox, the email header and app notifications, and the shop URL used for default links and product pages. Countries can override them.'),
+              icon: <SendRegular />,
+              render: () => <BrandPanel country="" />,
             },
             {
               id: 'policies',

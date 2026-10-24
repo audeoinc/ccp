@@ -177,7 +177,7 @@
    ]
   },
   "country_settings": {
-   "_comment": "国ごとの設定(ST2。BACKLOG 13 章)。変えるたびに 1 行足す(いちばん新しい行が、いまの値。前の行は、変えた人・日時の履歴)。name は設定の種類(criteria = アラートの基準: 在庫僅少の週数・週の上限・販売順位の上位の線)。value は JSON",
+   "_comment": "国ごとの設定(ST2。BACKLOG 13 章)。変えるたびに 1 行足す(いちばん新しい行が、いまの値。前の行は、変えた人・日時の履歴)。name は設定の種類(criteria = アラートの基準: 在庫僅少の週数・週の上限・販売順位の上位の線 / brand = 差出人の名前と店の URL。ST10。国が空の行が全社の既定、国の行は上書き)。value は JSON",
    "columns": [
     ["name", "text", {"required": true}],
     ["country", "text", {"index": true}],

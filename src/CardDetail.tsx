@@ -798,7 +798,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   // プレビューのリンクの場所と、その URL(リンク先の設定の欄と同じ決め方。W12)
   const linkCampaign = campaignSlug(form.name, form.scheduledAt)
-  const linkSpots = useMemo(() => linkSlots(template, items, products, linkCampaign), [template, items, products, linkCampaign])
+  const linkSpots = useMemo(() => linkSlots(template, items, products, linkCampaign, form.country), [template, items, products, linkCampaign, form.country])
   // AB テストの配信は、いま編集している案の印を campaign に付ける(X55)
   const linkVariant = ab ? active : null
   // utm_campaign の既定値は、配信日 + 配信カードの ID(links.ts の「UTM の決まり」)。リンク先のページの名前(linkCampaign)とは分ける
@@ -2124,6 +2124,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
         <Preview
           channel={previewTab}
+          country={form.country}
           pushLinkKind={pushLink?.kind}
           pushTitle={form.pushTitle}
           pushBody={form.pushBody}
@@ -2895,6 +2896,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
                   <Preview
                     channel={previewTab}
+                    country={form.country}
                     pushLinkKind={pushLink?.kind}
                     pushTitle={form.pushTitle}
                     pushBody={form.pushBody}

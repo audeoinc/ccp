@@ -267,7 +267,7 @@ export function linkRows(s: Snapshot, variant?: VariantKey): LinkRow[] {
   const links = parseLinks(s.card.links)
   const utm = utmOf(s, variant)
   // リンク先のページ(配信のページ)の URL は、案で変えない(案を付けるのは計測用のパラメーターだけ)
-  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? '')).map((slot) => {
+  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), s.card.country).map((slot) => {
     if (isPushCard(s)) {
       const d = fcmText(screenOf(links, slot), campaignOf(s, variant))
       return { label: slot.label, value: d ? `data: ${d}` : '' }

@@ -26,7 +26,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { DismissRegular, PersonRegular, SendRegular, WrenchRegular } from '@fluentui/react-icons'
+import { DismissRegular, PersonRegular, WrenchRegular } from '@fluentui/react-icons'
 import { ResizableSurface } from './ResizableSurface'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
@@ -111,8 +111,6 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   const of = (section: SettingsAction['section']) => shown.filter((a) => a.section === section)
   const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), dev: t('開発へのリクエスト', 'Requests to developers') }
   const countryHead = t(`国: ${countryName}`, `Country: ${countryName}`)
-  // 差出人の名前(SU5)を国ごとに決めるか全社で決めるかは、まだ決めていない。置き場所の案として、国に出しておく
-  const senderPage = 'sender'
 
   const actionRow = (a: SettingsAction) => (
     <div key={a.id} className={s.row}>
@@ -157,18 +155,6 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
             </span>
             <span className={s.note}>{t('閉じた案内を、もう一度出します(案内を閉じられるようにするときに使えるようにします)。', 'Shows the tips you closed again (available once tips can be closed).')}</span>
           </div>
-        </>
-      )
-    if (page === senderPage)
-      return (
-        <>
-          <span className={s.heading}>{t('差出人の名前', 'Sender name')}</span>
-          <span className={s.note}>
-            {t(
-              'メールの受信箱に出る差出人の名前(いまは見本の「SHOP」)。国ごとに決めるか、全社で 1 つにするかを、まだ決めていません。',
-              'The sender name shown in the inbox (currently the sample "SHOP"). Whether it is set per country or once for the company is not decided yet.',
-            )}
-          </span>
         </>
       )
     if ((ADMIN as readonly string[]).includes(page)) {
@@ -241,9 +227,6 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
                   {a.label}
                 </NavItem>
               ))}
-              <NavItem value={senderPage} icon={<SendRegular />}>
-                {t('差出人の名前(検討中)', 'Sender name (undecided)')}
-              </NavItem>
               <NavSectionHeader>{t('全社', 'Company')}</NavSectionHeader>
               {of('company').map((a) => (
                 <NavItem key={a.id} value={a.id} icon={a.icon}>
