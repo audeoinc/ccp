@@ -110,7 +110,7 @@ const useStyles = makeStyles({
   previewPane: { display: 'flex', flexDirection: 'column', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
-  // 受信箱での見え方(SU5)。Gmail の一覧の 1 行のように、左に差出人を太字で、右に「件名 ― プリヘッダー」をうすく。ラベルは並べない(行が長くうるさくなるため)
+  // 受信箱・通知での見え方(SU5)。ラベルは並べない(行が長くうるさくなるため)。アプリの通知は 1 行(左に差出人を太字、右に「タイトル ― 本文」をうすく)
   inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
@@ -122,6 +122,11 @@ const useStyles = makeStyles({
   pushIcon: { width: '20px', height: '20px', borderRadius: '5px', display: 'grid', placeItems: 'center', flexShrink: 0, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground, fontSize: '12px' },
   inboxPart: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: tokens.borderRadiusSmall, border: '1px solid transparent', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, cursor: 'pointer', textAlign: 'left', color: tokens.colorNeutralForeground1, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
+  // メールの受信箱は、スマホのメールのアプリの 3 行(差出人 / 件名 / プリヘッダー。SU10)。1 行に並べると長いと両方切れるので、行を分けて折り返し、全部読めるようにする
+  inboxMail: { display: 'grid', justifyItems: 'start', rowGap: '1px', padding: '6px 4px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
+  mailSender: { padding: '0 6px', fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  mailLine: { maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', overflow: 'visible' },
+  mailPre: { fontSize: tokens.fontSizeBase200 },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)。押したら Tab・Esc が効くよう、フォーカスを受け取る
   boxWrap: { position: 'relative', flexGrow: 1, minHeight: 0, display: 'grid' },
   // ピンを打つ状態のあいだの案内の帯(X73。マウスの形だけでは、何を待っているか分からないため)
@@ -736,15 +741,15 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 <MailRegular />
                 {t('受信箱での見え方', 'How it looks in the inbox')}
               </span>
-              <div className={s.inbox}>
-                <span className={s.sender} title={t('差出人の名前(設定の画面で決める)', 'Sender name (set in Settings)')}>
+              {/* スマホのメールのアプリの 3 行: 差出人(太字)/ 件名 / プリヘッダー(うすく)。入れ忘れの点線は、その行に出す(SU10) */}
+              <div className={s.inboxMail}>
+                <span className={s.mailSender} title={t('差出人の名前(設定の画面で決める)', 'Sender name (set in Settings)')}>
                   <SenderName country={e.form.country} />
                 </span>
-                <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(e.form.subject || e.form.name) && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '60%' }} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
+                <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(e.form.subject || e.form.name) && s.inboxMissing)} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
                   {e.form.subject || e.form.name || t('件名未入力', 'No subject')}
                 </button>
-                <span className={s.inboxDash}>―</span>
-                <button type="button" className={mergeClasses(s.inboxPart, e.form.preheader ? s.inboxSub : s.inboxMissing, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={e.form.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の横に出る文)', 'No preheader yet. Click to write it (shown next to the subject in the inbox)')}>
+                <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, s.mailPre, e.form.preheader ? s.inboxSub : s.inboxMissing, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={e.form.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の下に出る文)', 'No preheader yet. Click to write it (shown below the subject in the inbox)')}>
                   {e.form.preheader || t('プリヘッダー未入力', 'No preheader')}
                 </button>
               </div>
