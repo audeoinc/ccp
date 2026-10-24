@@ -133,7 +133,7 @@ import { ProductionPage } from './ProductionPage'
 import { StageNav } from './StageNav'
 import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
-import { markTemplatesLoadFailed, openTemplateManager, useTemplates } from './templates'
+import { markTemplatesLoadFailed, useTemplates } from './templates'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { FrameBar } from './FrameBar'
 import { FrameCard } from './FrameCard'
@@ -1621,7 +1621,7 @@ function App() {
               label: t('テンプレート', 'Templates'),
               description: t('テンプレートを作る・直す。どの国で使うかは「国」の「使うテンプレート」で決めます。', 'Create and edit templates. Which countries use them is set under Country → Templates used.'),
               icon: <LayoutColumnTwoRegular />,
-              onOpen: openTemplateManager,
+              render: () => <TemplateManager inline cards={cards} products={products} country={filters.country || undefined} onChanged={load} onOpenCard={setSelectedId} />,
             },
             {
               id: 'heroLibrary',

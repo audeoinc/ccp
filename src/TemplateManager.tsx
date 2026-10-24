@@ -5,7 +5,6 @@ import {
   Checkbox,
   Dialog,
   DialogBody,
-  DialogContent,
   DialogSurface,
   DialogTitle,
   Field,
@@ -164,6 +163,8 @@ const newDraft = (): Draft => ({
 const useStyles = makeStyles({
   surface: { width: '1360px', maxWidth: 'calc(96vw / var(--ui-zoom, 1))', height: 'calc(86vh / var(--ui-zoom, 1))', maxHeight: 'calc(86vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' },
   body: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1, padding: 0, rowGap: 0 },
+  // 設定の画面の中では、右の欄の残りの高さいっぱいに(一覧と詳しい欄は、それぞれの中で送る)
+  inline: { display: 'flex', flexDirection: 'column', minHeight: '480px', flexGrow: 1, border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden' },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '12px 16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   grow: { flexGrow: 1 },
   split: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(360px, 520px) minmax(0, 1fr)' },
@@ -399,7 +400,7 @@ function buildUsage(cards: DeliveryCard[]): Map<string, Usage> {
  * 編集しても、すでにある配信は使った版の形のまま(見た目・見出し・商品の位置は変わらない)。前の版に戻すときも、新しい版として上に積む。
  * 標準も編集できる(コードの定義が版 0。上書きの行で置き換える)。使っているテンプレートは削除せず、使わない(無効)にする
  */
-export function TemplateManager({ cards, products = [], country, onChanged, onOpenCard }: { cards: DeliveryCard[]; products?: Product[]; country?: string; onChanged: () => Promise<void>; onOpenCard: (id: string) => void }) {
+export function TemplateManager({ cards, products = [], country, onChanged, onOpenCard, inline }: { cards: DeliveryCard[]; products?: Product[]; country?: string; onChanged: () => Promise<void>; onOpenCard: (id: string) => void; /** 設定の画面(ST10)の中に描く(窓・閉じるボタンを出さない。配信カードの「テンプレートを管理」からは窓) */ inline?: boolean }) {
   const open = useTemplateManagerOpen()
   useTemplates() // 登録が変わったら、一覧を描き直す
   const t = useT()
@@ -1172,37 +1173,36 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     )
   }
 
-  return (
-    <Dialog open={open} onOpenChange={(_, d) => !d.open && close()}>
-      <DialogSurface className={s.surface}>
-        <DialogBody className={s.body}>
-          <div className={s.head}>
-            <DialogTitle className={s.grow}>
-              {draft ? (
-                <span className={s.crumbs}>
-                  {/* 見出しから一覧に戻れるように(編集した内容があれば、捨ててよいか確かめる) */}
-                  <Button
-                    appearance="transparent"
-                    className={s.crumbLink}
-                    onClick={() => {
-                      if (histCount.past > 0 && !window.confirm(t('編集中の内容を破棄します。よろしいですか?', 'Discard the current edits?'))) return
-                      setDraft(null)
-                      setError(null)
-                    }}
-                  >
-                    {t('テンプレート', 'Templates')}
-                  </Button>
-                  <ChevronRightRegular />
-                  <span className={s.crumbName}>{draft.name || t('新しいテンプレート', 'New template')}</span>
-                  <span className={s.caption}>{draft.id ? t('を編集中', '(editing)') : t('(新規)', '(new)')}</span>
-                </span>
-              ) : (
-                t('テンプレート', 'Templates')
-              )}
-            </DialogTitle>
-            <Button appearance="subtle" icon={<DismissRegular />} onClick={close} aria-label={t('閉じる', 'Close')} />
-          </div>
-          <DialogContent className={mergeClasses(s.split, editing && s.splitEditing)} style={{ padding: 0 }}>
+  // 題(編集中は、一覧に戻れるパンくず)
+  const title = (
+    <>
+      {draft ? (
+        <span className={s.crumbs}>
+          {/* 見出しから一覧に戻れるように(編集した内容があれば、捨ててよいか確かめる) */}
+          <Button
+            appearance="transparent"
+            className={s.crumbLink}
+            onClick={() => {
+              if (histCount.past > 0 && !window.confirm(t('編集中の内容を破棄します。よろしいですか?', 'Discard the current edits?'))) return
+              setDraft(null)
+              setError(null)
+            }}
+          >
+            {t('テンプレート', 'Templates')}
+          </Button>
+          <ChevronRightRegular />
+          <span className={s.crumbName}>{draft.name || t('新しいテンプレート', 'New template')}</span>
+          <span className={s.caption}>{draft.id ? t('を編集中', '(editing)') : t('(新規)', '(new)')}</span>
+        </span>
+      ) : (
+        t('テンプレート', 'Templates')
+      )}
+    </>
+  )
+
+  const content = (
+    <>
+          <div className={mergeClasses(s.split, editing && s.splitEditing)}>
             <div className={mergeClasses(s.list, editing && s.listHidden)}>
               <TabList
                 size="small"
@@ -1407,7 +1407,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
                 </div>
               ) : null}
             </div>
-          </DialogContent>
+          </div>
           {draft && (
             <div className={s.actions}>
               <span className={s.grow} />
@@ -1415,6 +1415,25 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
               <Button appearance="primary" onClick={() => void save()} disabled={!valid || busy}>{busy ? t('保存中...', 'Saving...') : t('保存', 'Save')}</Button>
             </div>
           )}
+    </>
+  )
+  if (inline)
+    return (
+      <div className={s.inline}>
+        {/* 設定の画面では、見出しは設定の画面が出すので、編集中のパンくずだけを出す */}
+        {draft && <div className={s.head}>{title}</div>}
+        {content}
+      </div>
+    )
+  return (
+    <Dialog open={open} onOpenChange={(_, d) => !d.open && close()}>
+      <DialogSurface className={s.surface}>
+        <DialogBody className={s.body}>
+          <div className={s.head}>
+            <DialogTitle className={s.grow}>{title}</DialogTitle>
+            <Button appearance="subtle" icon={<DismissRegular />} onClick={close} aria-label={t('閉じる', 'Close')} />
+          </div>
+          {content}
         </DialogBody>
       </DialogSurface>
     </Dialog>
