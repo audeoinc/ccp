@@ -20,6 +20,8 @@ import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges
 import { channelOptions, countryOptions, statusColor, statusOptions } from '../status'
 import { baseTemplateId, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
 import { TemplateThumb } from '../TemplateThumb'
+import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
+import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
 import { PushThumb } from '../PushThumb'
 import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
@@ -310,9 +312,23 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         </span>
       </span>
     ) : null
-  const text = (k: SimpleField, label: string, opts: { rows?: number; placeholder?: string; hint?: string } = {}) => (
+  const text = (k: SimpleField, label: string, opts: { rows?: number; placeholder?: string; hint?: string; max?: number } = {}) => (
     <>
-      <Field label={label} hint={opts.hint} size="small">
+      <Field
+        label={
+          opts.max ? (
+            <span className={s.row}>
+              {label}
+              {/* 受信一覧・通知で切れずに見える長さの目安(詳しい配信カードと同じ値) */}
+              <span className={e.form[k].length > opts.max ? s.warn : s.caption}>{`${e.form[k].length} / ${opts.max}`}</span>
+            </span>
+          ) : (
+            label
+          )
+        }
+        hint={opts.hint}
+        size="small"
+      >
         <AutoTextarea heightKey={`PartPane.${k}`} size="small" rows={opts.rows ?? 2} autoFocus value={e.form[k]} placeholder={opts.placeholder} onChange={(_, d) => e.setField(k, d.value)} />
       </Field>
       {aiChat(k, label, e.form[k], (v) => e.setField(k, v))}
@@ -414,13 +430,13 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       )
     switch (part.kind) {
       case 'subject':
-        return text('subject', t('件名', 'Subject'), { rows: 1, placeholder: e.form.name, hint: t('空のときは配信名が件名になります', 'Empty uses the delivery name') })
+        return text('subject', t('件名', 'Subject'), { rows: 1, placeholder: e.form.name, hint: t('空のときは配信名が件名になります', 'Empty uses the delivery name'), max: SUBJECT_MAX })
       case 'preheader':
-        return text('preheader', t('プリヘッダー(受信箱で件名の横に出る文)', 'Preheader (shown next to the subject in the inbox)'), { rows: 2 })
+        return text('preheader', t('プリヘッダー(受信箱で件名の下に出る文。目安 40〜90 文字)', 'Preheader (shown under the subject in the inbox; aim for 40–90 chars)'), { rows: 2, max: PREHEADER_MAX })
       case 'pushTitle':
-        return text('pushTitle', t('通知のタイトル', 'Notification title'), { rows: 1, placeholder: e.form.headline })
+        return text('pushTitle', t('通知のタイトル', 'Notification title'), { rows: 1, placeholder: e.form.headline, max: PUSH_TITLE_MAX })
       case 'pushBody':
-        return text('pushBody', t('通知の本文', 'Notification body'), { rows: 3, placeholder: e.form.copy })
+        return text('pushBody', t('通知の本文', 'Notification body'), { rows: 3, placeholder: e.form.copy, max: PUSH_BODY_MAX })
       case 'headline':
       case 'copy':
         return (

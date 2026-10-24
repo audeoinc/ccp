@@ -36,9 +36,7 @@ import { PushThumb } from './PushThumb'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type PushLink } from './pushLink'
 import type { TemplateUse } from './templateUse'
 
-// メールの件名・プリヘッダーの文字数の目安(受信一覧で切れずに見える長さ。端末で違うので目安。X2)
-const SUBJECT_MAX = 40
-const PREHEADER_MAX = 90
+import { PREHEADER_MAX, SUBJECT_MAX } from './textLimits'
 import { MarkdownLite } from './MarkdownLite'
 import { type Links, linkSlots, linksComplete, variantCampaign } from './links'
 
