@@ -108,11 +108,13 @@ interface Props {
   onOpenAlerts?: () => void
   /** 選んでいる枠への操作(シンプルな配信カードで、プレビューの枠を選んでから一覧の商品を押したとき。「この枠の商品と入れ替える」など。SU1 ⑩) */
   slotAction?: { label: string; run: () => void }
+  /** 入れ替えを、配信カードの画面の入れ替えの引き出しで行う(シンプルな配信カード。SU9)。渡すと、左の差し替えの候補の代わりに「入れ替える」を出す(別の入れ替え方を作らない) */
+  onOpenSwap?: () => void
   onClose: () => void
 }
 
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, onOpenSwap, onClose }: Props) {
   const s = useStyles()
   const t = useT()
   // つかんで動かした量
@@ -204,7 +206,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
               }}
             >
               <ArrowMoveRegular className={s.muted} />
-              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と差し替え', 'Product details and swap')}{product ? ` — ${product.name}` : ''}</span>
+              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : (onOpenSwap ? t('商品の詳しい情報と入れ替え', 'Product details and replace') : t('商品の詳しい情報と差し替え', 'Product details and swap'))}{product ? ` — ${product.name}` : ''}</span>
               {productUrl(product) && <OpenLink url={productUrl(product)} label={t('商品ページ', 'Product page')} />}
               <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
               <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
@@ -251,7 +253,23 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
 
             {product && (
               <div className={s.cols}>
-                {/* 左: 差し替えの候補 */}
+                {/* 左: 差し替えの候補(シンプルな配信カードでは、画面の入れ替えの引き出しを開くボタンだけ) */}
+                {onOpenSwap ? (
+                  <div className={s.left}>
+                    <div className={s.section}>
+                      <span className={s.sectionHead}>
+                        <ArrowSwapRegular />
+                        {t('入れ替える', 'Replace')}
+                      </span>
+                      <span className={s.caption}>{t('AI のおすすめ・AI に頼む・すべての商品から、ほかの商品と入れ替えます(選んだ部品のペインで開きます)。', 'Replace it with another product: AI picks, ask AI, or all products (opens in the part pane).')}</span>
+                      <span>
+                        <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={onOpenSwap}>
+                          {t('入れ替える', 'Replace')}
+                        </Button>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
                 <div className={s.left}>
                   {stockAlert && (
                     <div className={s.section}>
@@ -306,6 +324,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     />
                   </div>
                 </div>
+                )}
 
                 {/* 右: 選んでいる商品の詳しい情報(最初は、いまの商品) */}
                 <div className={s.right}>

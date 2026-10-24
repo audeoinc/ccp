@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Avatar, Badge, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { productImage } from './images'
@@ -26,6 +27,12 @@ interface Props {
   onOpenProduct?: (itemKey: string) => void
   /** 一覧の使い方(見出しの横の ⓘ に出す。シンプルな配信カードでは、枠を選んでからの見比べも書く) */
   hint?: string
+  /** 行の右に置く操作(シンプルな配信カードの「入れ替える」だけ。SU9。マウスを乗せたときに出す) */
+  rowAction?: (itemKey: string) => ReactNode
+  /** 行の操作を、マウスを乗せていなくても出しておく(引き出しを開いている行) */
+  rowActionOn?: (itemKey: string) => boolean
+  /** 行の真下に出すもの(入れ替えの引き出し) */
+  rowBelow?: (itemKey: string) => ReactNode
 }
 
 const useStyles = makeStyles({
@@ -52,6 +59,11 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     ':hover': { backgroundColor: tokens.colorNeutralBackground2 },
+    // 行の操作(SU9)は、マウスを乗せたとき・フォーカスがあるとき・引き出しを開いているときだけ見せる(一覧をうるさくしない)
+    '& [data-row-action]': { visibility: 'hidden' },
+    ':hover [data-row-action]': { visibility: 'visible' },
+    ':focus-within [data-row-action]': { visibility: 'visible' },
+    '& [data-row-action][data-on]': { visibility: 'visible' },
   },
   itemOpen: { backgroundColor: tokens.colorBrandBackground2 },
   avatar: { flexShrink: 0, width: '32px', height: '32px', borderRadius: tokens.borderRadiusMedium },
@@ -77,9 +89,9 @@ function trendMark(name?: string): { mark: string; color: string; text: string }
 /**
  * 商品情報: プレビューに載っている商品を、メールの並び順に、コンパクトな一覧で見るための参照用のペイン。
  * 行を押すと、商品のフロート(ProductFloat。中ペインの選定済みの行と同じもの)が開き、そこから残りの候補と差し替えられる。
- * 一覧そのものには、操作する部品を置かない(並べ替え・外すは中ペインだけ。X47)。
+ * 一覧そのものには、操作する部品を置かない(並べ替え・外すは中ペインだけ。X47)。シンプルな配信カードだけは、入れ替えを置いてよい(SU9。rowAction)。
  */
-export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, onOpenProduct, hint }: Props) {
+export function ProductInfoPane({ template, sectionTitles, items, products, onHover, alertKinds, onAlert, onOpenProduct, hint, rowAction, rowActionOn, rowBelow }: Props) {
   const t = useT()
   const s = useStyles()
   const productById = new Map(products.map((p) => [p.id, p]))
@@ -126,9 +138,26 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
               {list.map((it) => {
                 const p = productById.get(it.productId)
                 return p ? (
-                  <ProductFloat key={it.key} onOpen={onOpenProduct && (() => onOpenProduct(it.key))}>
-                    <ProductItem product={p} image={it.imageUrl} itemKey={it.key} onHover={onHover} alert={alertKinds?.get(it.productId)} onAlert={onAlert} />
-                  </ProductFloat>
+                  <div key={it.key}>
+                    <ProductFloat onOpen={onOpenProduct && (() => onOpenProduct(it.key))}>
+                      <ProductItem
+                        product={p}
+                        image={it.imageUrl}
+                        itemKey={it.key}
+                        onHover={onHover}
+                        alert={alertKinds?.get(it.productId)}
+                        onAlert={onAlert}
+                        action={
+                          rowAction && (
+                            <span data-row-action data-on={rowActionOn?.(it.key) || undefined}>
+                              {rowAction(it.key)}
+                            </span>
+                          )
+                        }
+                      />
+                    </ProductFloat>
+                    {rowBelow?.(it.key)}
+                  </div>
                 ) : null
               })}
             </div>
@@ -139,7 +168,7 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
   )
 }
 
-function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert }: { product: Product; image?: string; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind; onAlert?: (productId: string) => void }) {
+function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert, action }: { product: Product; image?: string; itemKey: string; onHover: (key: string | null) => void; alert?: CardAlertKind; onAlert?: (productId: string) => void; action?: ReactNode }) {
   const t = useT()
   const s = useStyles()
   const market = productMarket(p)
@@ -161,6 +190,7 @@ function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert }: { 
       </div>
       <LowStockBadge product={p} />
       <span className={s.trend} style={{ color: trend.color }} title={trend.text} aria-label={trend.text}>{trend.mark}</span>
+      {action}
     </div>
   )
 }

@@ -29,6 +29,7 @@ import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
 import { ApprovalBadge } from './ApprovalBadge'
 import { PartPane } from './PartPane'
+import { ProductSwap, type SwapAt } from './ProductSwap'
 import { placeInPart } from './actions'
 import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
@@ -187,6 +188,9 @@ const useStyles = makeStyles({
   dropNote: { fontSize: '16px' },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
   candRow: { display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', width: '100%', padding: '6px 4px', border: 'none', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: 'transparent', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2 } },
+  // 候補の行と、マウスを乗せたときの「⇄ 入れる」(SU9)
+  candWrap: { position: 'relative', '& [data-row-action]': { visibility: 'hidden' }, ':hover [data-row-action]': { visibility: 'visible' }, ':focus-within [data-row-action]': { visibility: 'visible' } },
+  candAction: { position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)' },
   candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -237,6 +241,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const diffMarks: Mark[] = e.abDiffParts.map((part) => ({ part, color: tokens.colorPaletteDarkOrangeBackground3, label: t('A と違う', 'Differs from A') }))
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
   const [abSettingsOpen, setAbSettingsOpen] = useState(false)
+  // 商品の入れ替えの引き出しを開いている所(SU9)。入口(プレビューの ⇄・右クリック・選んだ部品のペイン・真ん中の行・右の行・商品のフロート)は違っても、引き出しは 1 つ
+  const [swapAt, setSwapAt] = useState<SwapAt | null>(null)
 
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
   const select = (p: PartRef | null) => {
@@ -244,6 +250,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     void onCommit()
     setPart(p)
     setCompareKey(null)
+    // 部品を移ったら、開いていた入れ替えの引き出しは閉じる(戻ったときに勝手に開いていないように)
+    setSwapAt(null)
   }
   // 部品を選ぶ層には、変わらない関数を渡す(押すたびに、いまの値で select を呼ぶ)
   const selectRef = useRef(select)
@@ -251,6 +259,21 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     selectRef.current = select
   })
   const onPick = useCallback((p: PartRef | null) => selectRef.current(p), [])
+  /** その商品を選び、選んだ部品のペインの箱の真下の引き出しを開く(プレビューの ⇄・右クリック・商品のフロートから) */
+  const openSwap = (itemKey: string) => {
+    select({ kind: 'product', itemKey })
+    setSwapAt({ itemKey, at: 'pane' })
+  }
+  const openSwapRef = useRef(openSwap)
+  useEffect(() => {
+    openSwapRef.current = openSwap
+  })
+  const onSwapBadge = useCallback((itemKey: string) => openSwapRef.current(itemKey), [])
+  /** 入れ替えたあと。候補と入れ替えると行の鍵が変わるので、その商品を選んだままにする(select を通すと、入れ替える前の中身で保存してしまう) */
+  const swapped = (from: string, to: string) => {
+    setSwapAt(null)
+    if (from !== to && part?.kind === 'product' && part.itemKey === from) setPart({ kind: 'product', itemKey: to })
+  }
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
@@ -353,7 +376,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       const it = e.items.find((i) => i.key === p.itemKey)
       const url = productUrl(e.products.find((x) => x.id === it?.productId))
       list.push(
-        { key: 'swap', label: t('商品を差し替える', 'Swap the product'), icon: <ArrowSwapRegular />, divider: true, disabled: busy, onSelect: () => e.openProduct(p.itemKey) },
+        { key: 'swap', label: t('入れ替える', 'Replace'), icon: <ArrowSwapRegular />, divider: true, disabled: busy, onSelect: () => openSwap(p.itemKey) },
         { key: 'page', label: t('商品ページを開く', 'Open the product page'), icon: <OpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
         {
           key: 'remove',
@@ -407,7 +430,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const openFromList = (key: string) => {
     const target = part && (part.kind === 'product' || part.kind === 'slot') && !(part.kind === 'product' && part.itemKey === key) ? part : null
     if (!target) {
-      e.openProduct(key)
+      // 載せている商品なら、フロートの「入れ替える」で同じ引き出しを開く(SU9 (h))
+      e.openProduct(key, undefined, e.items.some((i) => i.key === key) ? () => openSwap(key) : undefined)
       return
     }
     setCompareKey(key)
@@ -832,7 +856,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
@@ -851,7 +875,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} />
           {e.dirty && (
             <div className={s.applyBox}>
               <span className={s.hint}>
@@ -883,7 +907,20 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               onHover={e.hoverProduct}
               alertKinds={e.alertKinds}
               onOpenProduct={openFromList}
-              hint={t('行を押すと詳細が開きます。プレビューで枠を選んでいれば、その枠の商品と見比べて入れ替えられます。', 'Click a row for details. If a slot is selected in the preview, you can compare and swap it in.')}
+              hint={t('行を押すと詳細が開きます。行にマウスを乗せると出る ⇄ で入れ替えられます。プレビューで枠を選んでいれば、その枠の商品と見比べて入れ替えられます。', 'Click a row for details. Use the ⇄ that appears on hover to replace it. If a slot is selected in the preview, you can compare and swap it in.')}
+              // 右の一覧に置くのは入れ替えだけ(並べ替え・外すは真ん中だけ。SU9 (g))
+              rowAction={(key) => {
+                const on = swapAt?.at === 'info' && swapAt.itemKey === key
+                return (
+                  <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
+                    <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={on} disabled={e.saving} onClick={() => setSwapAt(on ? null : { itemKey: key, at: 'info' })} />
+                  </Tooltip>
+                )
+              }}
+              rowActionOn={(key) => swapAt?.at === 'info' && swapAt.itemKey === key}
+              rowBelow={(key) => (
+                <ProductSwap editor={e} itemKey={key} open={swapAt?.at === 'info' && swapAt.itemKey === key} onOpenChange={(o) => setSwapAt(o ? { itemKey: key, at: 'info' } : null)} chats={chats} setChat={setChat} onDone={(k) => swapped(key, k)} trigger={false} />
+              )}
             />
             {e.candidates.length > 0 && (
               <>
@@ -891,13 +928,36 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 {e.candidates.map((c) => {
                   const p = e.products.find((x) => x.id === c.productId)
                   return p ? (
-                    <button key={c.key} type="button" className={s.candRow} onClick={() => openFromList(c.key)} title={c.reason}>
-                      <ImageThumb src={productImage(p)} alt={p.name} width={32} height={40} />
-                      <span style={{ display: 'grid', minWidth: 0 }}>
-                        <span className={s.candName}>{p.name}</span>
-                        <span className={s.candMeta}>{`${p.product_code ?? ''} ・ ${t('在庫', 'Stock ')}${p.stock ?? '-'}`}</span>
-                      </span>
-                    </button>
+                    <div key={c.key} className={s.candWrap}>
+                      <button type="button" className={s.candRow} onClick={() => openFromList(c.key)} title={c.reason}>
+                        <ImageThumb src={productImage(p)} alt={p.name} width={32} height={40} />
+                        <span style={{ display: 'grid', minWidth: 0 }}>
+                          <span className={s.candName}>{p.name}</span>
+                          <span className={s.candMeta}>{`${p.product_code ?? ''} ・ ${t('在庫', 'Stock ')}${p.stock ?? '-'}`}</span>
+                        </span>
+                      </button>
+                      {/* 候補(載せていない商品)は「⇄ 入れる」。どの枠の商品と入れ替えるかを、載せている商品から選ぶ(SU9 (f)) */}
+                      {e.items.length > 0 && (
+                        <span className={s.candAction} data-row-action>
+                          <Menu positioning="below-end">
+                            <MenuTrigger disableButtonEnhancement>
+                              <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} disabled={e.saving}>
+                                {t('入れる', 'Put in')}
+                              </Button>
+                            </MenuTrigger>
+                            <MenuPopover>
+                              <MenuList>
+                                {e.items.map((it, i) => (
+                                  <MenuItem key={it.key} icon={<ArrowSwapRegular />} onClick={() => e.swapWithCandidate(it.key, c.key, '')}>
+                                    {t(`${i + 1}. ${e.products.find((x) => x.id === it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${e.products.find((x) => x.id === it.productId)?.name ?? ''}`)}
+                                  </MenuItem>
+                                ))}
+                              </MenuList>
+                            </MenuPopover>
+                          </Menu>
+                        </span>
+                      )}
+                    </div>
                   ) : null
                 })}
               </>

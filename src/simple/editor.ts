@@ -108,8 +108,8 @@ export interface SimpleEditor {
   swapItems: (a: string, b: string) => void
   /** 載せた商品と、残りの候補を入れ替える(行 ID のまま) */
   swapWithCandidate: (itemKey: string, candKey: string, reason: string) => void
-  /** 商品のフロートを開く(載せた商品か候補の鍵。action は、選んでいる枠への操作) */
-  openProduct: (key: string, action?: FloatAction) => void
+  /** 商品のフロートを開く(載せた商品か候補の鍵。action は、選んでいる枠への操作。swap があれば、フロートの「入れ替える」でそれを呼ぶ(SU9)) */
+  openProduct: (key: string, action?: FloatAction, swap?: () => void) => void
   hoverProduct: (key: string | null) => void
   /** 載せた商品を、ほかの商品に置き換える(行は作り直す。理由は配信のメモに残す) */
   replaceItem: (itemKey: string, productId: string, reason: string) => void

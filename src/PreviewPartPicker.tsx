@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowSwapRegular } from '@fluentui/react-icons'
+import { useT } from './i18n'
 import { partElement, partFromElement, partKey, partsInOrder, samePart, type PartRef } from './simple/parts'
 
 const useStyles = makeStyles({
@@ -13,6 +15,8 @@ const useStyles = makeStyles({
     '::before': { content: '""', position: 'absolute', inset: 0, borderRadius: 'inherit', backgroundColor: tokens.colorBrandBackground2, opacity: 0.35 },
   },
   hover: { border: `1px dashed ${tokens.colorBrandStroke2}` },
+  // 商品の枠の右上の「入れ替える」(SU9)。層は押せないので、この印だけ押せるようにする
+  swap: { position: 'absolute', pointerEvents: 'auto', boxShadow: tokens.shadow8 },
 })
 
 interface Rect {
@@ -29,6 +33,8 @@ interface Props {
   onSelect: (p: PartRef | null) => void
   /** 選べないとき(保存中・ほかの層で場所を選んでいる間など) */
   disabled?: boolean
+  /** 商品の枠にマウスを乗せたとき、右上に「入れ替える」(⇄)を出す(SU9。シンプルな配信カード) */
+  onSwap?: (itemKey: string) => void
 }
 
 /**
@@ -36,10 +42,11 @@ interface Props {
  * プレビューの部品そのものは変えない(書き込みのピン PreviewPins と同じ作り。制作のページ・結果でも使えるように、配信カードには依存しない)。
  * 選んだ部品には枠と淡い色、マウスを乗せた部品には薄い枠を重ねる。Tab / Shift+Tab で次・前の部品、Esc で選ぶのをやめる
  */
-export function PreviewPartPicker({ boxRef, selected, onSelect, disabled }: Props) {
+export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap }: Props) {
   const s = useStyles()
+  const t = useT()
   const [hover, setHover] = useState<PartRef | null>(null)
-  const [rects, setRects] = useState<{ sel: Rect | null; hover: Rect | null }>({ sel: null, hover: null })
+  const [rects, setRects] = useState<{ sel: Rect | null; hover: Rect | null; swap: Rect | null }>({ sel: null, hover: null, swap: null })
   const selectedRef = useRef(selected)
   useEffect(() => {
     selectedRef.current = selected
@@ -63,13 +70,14 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled }: Prop
   // 位置は、プレビューの中身・倍率・枠の大きさで変わるので、間隔を空けて測り直す(ピン・アラートの印と同じ)
   useEffect(() => {
     const update = () => {
-      const next = { sel: rectOf(selected), hover: hover && !samePart(hover, selected) ? rectOf(hover) : null }
+      // 入れ替えの印は、選んでいる商品にマウスを乗せたときも出す
+      const next = { sel: rectOf(selected), hover: hover && !samePart(hover, selected) ? rectOf(hover) : null, swap: onSwap && hover?.kind === 'product' && !disabled ? rectOf(hover) : null }
       setRects((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next))
     }
     update()
     const timer = window.setInterval(update, 300)
     return () => window.clearInterval(timer)
-  }, [selected, hover, rectOf])
+  }, [selected, hover, rectOf, onSwap, disabled])
 
   // 選んだ部品が見えるようにスクロールする(画面の外に出ないように)
   const selKey = selected ? partKey(selected) : ''
@@ -90,6 +98,8 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled }: Prop
       onSelect(p)
     }
     const onMove = (e: MouseEvent) => {
+      // 入れ替えの印の上では、その商品に乗せたままにする(印は商品の枠の外の層にあるため)
+      if ((e.target as Element).closest('[data-swap-badge]')) return
       const p = partFromElement(e.target as Element, box)
       setHover((old) => (samePart(old, p) ? old : p))
     }
@@ -123,9 +133,24 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled }: Prop
   }, [boxRef, disabled, onSelect])
 
   return (
-    <div className={s.layer} aria-hidden>
-      {rects.hover && <div className={mergeClasses(s.box, s.hover)} style={rects.hover} />}
-      {rects.sel && <div className={mergeClasses(s.box, s.selected)} style={rects.sel} />}
+    <div className={s.layer}>
+      {rects.hover && <div className={mergeClasses(s.box, s.hover)} style={rects.hover} aria-hidden />}
+      {rects.sel && <div className={mergeClasses(s.box, s.selected)} style={rects.sel} aria-hidden />}
+      {rects.swap && hover?.kind === 'product' && (
+        <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
+          <Button
+            data-swap-badge
+            data-no-pick
+            className={s.swap}
+            style={{ left: rects.swap.left + rects.swap.width - 34, top: rects.swap.top + 6 }}
+            size="small"
+            shape="circular"
+            appearance="primary"
+            icon={<ArrowSwapRegular />}
+            onClick={() => onSwap?.(hover.itemKey)}
+          />
+        </Tooltip>
+      )}
     </div>
   )
 }

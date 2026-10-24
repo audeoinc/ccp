@@ -1477,6 +1477,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [productOpen, setProductOpen] = useState<string | null>(null)
   // シンプルな配信カード(SU1)で、プレビューの枠を選んでから一覧の商品を押したときの、その枠への操作
   const [slotAction, setSlotAction] = useState<FloatAction | null>(null)
+  // シンプルな配信カードの、フロートの「入れ替える」(画面の入れ替えの引き出しを開く。SU9)
+  const [floatSwap, setFloatSwap] = useState<{ key: string; run: () => void } | null>(null)
   // 差し替えた理由(保存したときに、配信のメモ(種類 change)に残す。アラートの画面で差し替えたときと同じ記録)。
   // アラートへの対応と、商品のフロートで残りの候補と入れ替えたとき(X47)の両方
   const [alertNotes, setAlertNotes] = useState<string[]>([])
@@ -1719,6 +1721,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         setActAlert(null)
         setProductOpen(null)
         setSlotAction(null)
+        setFloatSwap(null)
       }
       return (
         <ProductActionFloat
@@ -1759,6 +1762,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             postponeForAlert()
           }}
           onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
+          onOpenSwap={
+            floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction
+              ? () => {
+                  closeAction()
+                  floatSwap.run()
+                }
+              : undefined
+          }
           slotAction={
             slotAction && !actAlert
               ? {
@@ -2357,9 +2368,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         moveItem,
         swapItems,
         swapWithCandidate,
-        openProduct: (key, action) => {
+        openProduct: (key, action, swap) => {
           setActAlert(null)
           setSlotAction(action ?? null)
+          setFloatSwap(swap ? { key, run: swap } : null)
           setProductOpen(key)
         },
         hoverProduct: setHoverKey,

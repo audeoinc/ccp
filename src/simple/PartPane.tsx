@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { InfoLabel, Badge, Button, Field, Input, Select, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Button, Field, Input, Select, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -25,7 +25,8 @@ import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
 import { PartAiChat } from './PartAiChat'
 import { ProductionMemo } from './ProductionMemo'
-import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartIdea, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
+import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
+import { AiPicks, ProductSwap, type Picks, type SwapAt } from './ProductSwap'
 import type { SimpleEditor, SimpleField } from './editor'
 
 const useStyles = makeStyles({
@@ -93,10 +94,15 @@ interface Props {
   setChat: (key: string, f: (prev: PartTurn[]) => PartTurn[]) => void
   /** 増えたら、メイン画像を入れ替える欄を開く(プレビューの右クリックの「画像を入れ替える」) */
   heroReplace?: number
+  /** 商品の入れ替えの引き出しを開いている所(SU9。入口がいくつあっても、開くのは 1 か所) */
+  swapAt: SwapAt | null
+  onSwapAt: (at: SwapAt | null) => void
+  /** 入れ替えで、行の鍵が変わったとき(候補と入れ替えたとき) */
+  onSwapped: (from: string, to: string) => void
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
-export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace }: Props) {
+export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped }: Props) {
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
@@ -137,20 +143,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         history: [],
       }),
     )
-  const recommendProducts = (key: string, current?: Product) =>
-    recommend(key, () =>
-      askProductPick({
-        card: e.aiCard(),
-        angle: e.form.copyAngle,
-        current,
-        products: e.poolProducts,
-        inCard: e.items.flatMap((i) => byId.get(i.productId) ?? []),
-        request: tr('この枠の商品の代わりになる、この配信に合う商品を 3〜4 点おすすめしてください。', 'Recommend 3 or 4 products that could replace this one and fit the delivery.'),
-        history: [],
-      }),
-    )
-  // 商品を差し替える枠を開いている部品(部品を移ると畳む)
-  const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null)
+  /** 商品のフロートを開く。フロートの「入れ替える」は、この箱の真下の引き出しを開く(SU9 (h)) */
+  const openFloat = (itemKey: string) => e.openProduct(itemKey, undefined, () => onSwapAt({ itemKey, at: 'pane' }))
   const [linkEditing, setLinkEditing] = useState(false)
   const heroDefaultLink = e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl
   // 使える期限が配信日より前(選んだあとで期限が来た画像。入れ替えを促す)
@@ -390,8 +384,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           <div className={s.list}>
             {e.items.map((it, i) => {
               const p = byId.get(it.productId)
+              const swapOpen = swapAt?.at === 'list' && swapAt.itemKey === it.key
               return (
-                <div key={it.key} className={s.listRow} onMouseEnter={() => e.hoverProduct(it.key)} onMouseLeave={() => e.hoverProduct(null)}>
+                <div key={it.key}>
+                <div className={s.listRow} onMouseEnter={() => e.hoverProduct(it.key)} onMouseLeave={() => e.hoverProduct(null)}>
                   <span className={s.num}>{i + 1}</span>
                   <ImageThumb src={productImage(p, it.imageUrl)} alt={p?.name ?? ''} width={32} height={40} />
                   <Button size="small" appearance="transparent" style={{ justifyContent: 'flex-start', minWidth: 0, overflow: 'hidden' }} onClick={() => onPick({ kind: 'product', itemKey: it.key })}>
@@ -403,7 +399,13 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   <span className={s.row}>
                     <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0 || e.saving} onClick={() => e.moveItem(i, i - 1)} aria-label={t('前へ', 'Move up')} />
                     <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === e.items.length - 1 || e.saving} onClick={() => e.moveItem(i, i + 1)} aria-label={t('後ろへ', 'Move down')} />
+                    <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
+                      <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={swapOpen} disabled={e.saving} onClick={() => onSwapAt(swapOpen ? null : { itemKey: it.key, at: 'list' })} />
+                    </Tooltip>
                   </span>
+                </div>
+                {/* 入れ替えの引き出しは、その行の真下から(SU9) */}
+                <ProductSwap editor={e} itemKey={it.key} open={swapOpen} onOpenChange={(o) => onSwapAt(o ? { itemKey: it.key, at: 'list' } : null)} chats={chats} setChat={setChat} onDone={(k) => onSwapped(it.key, k)} trigger={false} />
                 </div>
               )
             })}
@@ -583,23 +585,13 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         if (!it) return <span className={s.caption}>{t('この商品は、もう載っていません', 'This product is no longer in the delivery')}</span>
         const idx = e.items.indexOf(it)
         const sec = sections[sectionIndexAt(sections, idx)]
-        // 同じセクションの、AI がはじめに挙げた残りの候補(AI のおすすめがまだないときに出す)
-        const swapCands = e.candidates.filter((c) => c.section === sectionIndexAt(sections, idx))
-        const swapTo = (productId: string, why: string) => {
-          e.replaceItem(it.key, productId, why)
-          setSwapOpenKey(null)
-        }
-        const swapWith = (candKey: string, why: string) => {
-          e.swapWithCandidate(it.key, candKey, why)
-          setSwapOpenKey(null)
-        }
         return (
           <>
-            {/* 箱を押すと、詳しい情報・差し替え・この配信で使う画像のフロート */}
-            <div role="button" tabIndex={0} className={s.productOpen} title={t('押すと、詳しい情報・差し替え・画像', 'Click for details, swap and image')} onClick={() => e.openProduct(it.key)} onKeyDown={(ev) => ev.key === 'Enter' && e.openProduct(it.key)}>
+            {/* 箱を押すと、詳しい情報・この配信で使う画像のフロート */}
+            <div role="button" tabIndex={0} className={s.productOpen} title={t('押すと、詳しい情報・画像', 'Click for details and image')} onClick={() => openFloat(it.key)} onKeyDown={(ev) => ev.key === 'Enter' && openFloat(it.key)}>
               {productBox(byId.get(it.productId), it.reason ? <span className={s.caption}>{it.reason}</span> : undefined, it.imageUrl)}
             </div>
-            {/* 商品画像のモデルの使用期限(メイン画像の期限の警告と同じ形。画像を替えるか、商品を差し替える) */}
+            {/* 商品画像のモデルの使用期限(メイン画像の期限の警告と同じ形。画像を替えるか、商品を入れ替える) */}
             {e.alerts
               .filter((a) => a.kind === 'imageExpired' && a.productId === it.productId)
               .map((a) => (
@@ -608,59 +600,16 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   {a.detail}
                 </span>
               ))}
-            {/* 差し替えは、箱の真下のボタンから開く(どの商品を替えるのかが、ひと目で分かるように) */}
-            <ChooseDrawer
-                key={partKey(part)}
-                open={swapOpenKey === partKey(part)}
-                onOpenChange={(o) => setSwapOpenKey(o ? partKey(part) : null)}
-                label={t('差し替える', 'Swap')}
-                icon={<ArrowSwapRegular />}
-                disabled={e.saving}
-                title={t('この枠の商品を差し替える', 'Swap this product')}
-                tabs={[
-                  {
-                    value: 'recommend',
-                    label: t('AI のおすすめ', 'AI picks'),
-                    icon: <SparkleRegular />,
-                    content: (
-                      <AiPicks
-                        hint={t('この枠の代わりになりそうな商品を、AI が挙げます。押すと差し替わります', 'AI suggests products to replace this one. Click one to swap')}
-                        picks={picksOf(partKey(part))}
-                        hasFallback={swapCands.length > 0}
-                        onAsk={() => void recommendProducts(partKey(part), byId.get(it.productId))}
-                      >
-                        {picksOf(partKey(part))
-                          ? picksOf(partKey(part))!.ideas.map((i) => (
-                              <button key={i.value} type="button" className={s.pickRow} title={i.why} disabled={e.saving} onClick={() => swapTo(i.value, i.why)}>
-                                {productLine(byId.get(i.value))}
-                                {i.why && <span className={s.caption}>{i.why}</span>}
-                              </button>
-                            ))
-                          : swapCands.map((c) => (
-                              <button key={c.key} type="button" className={s.pickRow} title={c.reason} disabled={e.saving} onClick={() => swapWith(c.key, c.reason ?? '')}>
-                                {productLine(byId.get(c.productId))}
-                                {c.reason && <span className={s.caption}>{c.reason}</span>}
-                              </button>
-                            ))}
-                      </AiPicks>
-                    ),
-                  },
-                  { value: 'ask', label: t('AI に頼む', 'Ask AI'), icon: <ChatRegular />, content: productChat(it.key) },
-                  {
-                    value: 'all',
-                    label: t('すべての商品', 'All products'),
-                    content: (
-                      <Candidates
-                        products={e.poolProducts}
-                        usedIds={new Set(e.items.map((i) => i.productId))}
-                        onAdd={() => undefined}
-                        onPick={(id) => swapTo(id, '')}
-                        pickHint={t('押すと、この枠の商品と差し替わります', 'Click to swap it into this slot')}
-                      />
-                    ),
-                  },
-                ]}
-              />
+            {/* 入れ替えは、箱の真下のボタンから開く(どの商品を替えるのかが、ひと目で分かるように。メイン画像の「入れ替える」と同じ形。SU9) */}
+            <ProductSwap
+              editor={e}
+              itemKey={it.key}
+              open={swapAt?.at === 'pane' && swapAt.itemKey === it.key}
+              onOpenChange={(o) => onSwapAt(o ? { itemKey: it.key, at: 'pane' } : null)}
+              chats={chats}
+              setChat={setChat}
+              onDone={(k) => onSwapped(it.key, k)}
+            />
             <span className={s.caption}>{t(`${idx + 1} 番目${sec ? `(${sec.label})` : ''}`, `Position ${idx + 1}${sec ? ` (${sec.label})` : ''}`)}</span>
             <span className={s.row}>
               <Button size="small" icon={<ArrowUpRegular />} disabled={idx === 0 || e.saving} onClick={() => e.moveItem(idx, idx - 1)}>{t('前へ', 'Earlier')}</Button>
@@ -678,7 +627,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 {t('外す(候補に戻す)', 'Remove (back to candidates)')}
               </Button>
             </span>
-            <span className={s.caption}>{t('箱を押すと、詳しい情報・見比べての差し替え・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details, side-by-side swap and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</span>
+            <span className={s.caption}>{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</span>
           </>
         )
       }
@@ -809,43 +758,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
       {part && part.kind !== 'meta' && part.kind !== 'overview' && part.kind !== 'template' && <ProductionMemo editor={e} label={titleOf(part)} />}
     </div>
-  )
-}
-
-interface Picks {
-  key: string
-  ideas: PartIdea[]
-  busy: boolean
-  error?: string
-}
-
-/**
- * 「選び直す」の最初のタブ(AI のおすすめ)の共通の形。メイン画像と商品の枠で使う。並べ方(画像の格子・商品の行)は children で渡す。
- * 案がまだなく、はじめの候補(hasFallback)もなければ、開いたときに 1 回だけ AI に頼む
- */
-function AiPicks({ hint, picks, hasFallback, onAsk, children }: { hint: string; picks?: Picks; hasFallback: boolean; onAsk: () => void; children: ReactNode }) {
-  const t = useT()
-  const s = useStyles()
-  const busy = !!picks?.busy
-  const any = picks ? picks.ideas.length > 0 : hasFallback
-  const asked = useRef(false)
-  useEffect(() => {
-    if (asked.current || picks || hasFallback) return
-    asked.current = true
-    // 描画の中で親の状態を変えないよう、次の番に回す
-    void Promise.resolve().then(onAsk)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いたときの 1 回だけ
-  }, [])
-  return (
-    <>
-      <span className={s.caption}>{hint}</span>
-      {busy ? <Spinner size="tiny" label={t('AI が選んでいます…', 'AI is choosing…')} /> : any ? children : picks?.error && <span className={s.caption}>{picks.error}</span>}
-      <span className={s.row}>
-        <Button size="small" icon={<SparkleRegular />} disabled={busy} onClick={onAsk}>
-          {any ? t('ほかのおすすめを挙げてもらう', 'Suggest others') : t('AI におすすめを挙げてもらう', 'Ask AI for picks')}
-        </Button>
-      </span>
-    </>
   )
 }
 
