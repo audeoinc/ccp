@@ -14,6 +14,7 @@ import { myName } from './history'
 import { IMPACT_TAB_EVENT, takePendingImpactTab, buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
 import { PREF } from './prefKeys'
 import { loadPref, savePref } from './settings'
+import { ymd } from './dates'
 
 // 結果の面の見せ方「効果」。配信が売上をどれだけ増やしたか(ホールドアウトとの差)と、AI に渡した学びが効いているかを見る。
 // 4 つの見方(記録する → 指標を見る → 売上を比べる → 学びを評価して淘汰する)を、増分の要約と並べてタブにした。
@@ -168,7 +169,6 @@ interface Period {
   from: string
   to: string
 }
-const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const dayOf = (iso: string) => (iso ? ymd(new Date(iso)) : '')
 /** 期間はブラウザごとに覚える(開き直しても同じ期間で見られるように)。読めなければ「すべて」 */
 function loadPeriod(): Period {

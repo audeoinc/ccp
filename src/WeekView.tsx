@@ -30,6 +30,7 @@ import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
 import type { CardAlertKind } from './cardAlerts'
 import { weeklyLimitFor } from './weeklyLimit'
+import { ymd } from './dates'
 
 /** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る / time = 時刻の格子(WeekTimeGrid。X46) */
 export type WeekLens = 'products' | 'progress' | 'time'
@@ -69,8 +70,7 @@ interface Props {
   renderMeta?: (c: DeliveryCard) => ReactNode
 }
 
-const pad = (n: number) => String(n).padStart(2, '0')
-const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const dayKey = ymd
 const EMAIL = 'email'
 const PUSH = 'app'
 // 1 日の並び: メールを上、プッシュを下にそろえる(週を横に見比べやすく)。同じチャネルの中は時刻順

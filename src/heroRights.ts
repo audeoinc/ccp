@@ -1,11 +1,9 @@
 // メイン画像の使える期限と焦点(X59)
 import type { HeroImage } from './models/heroImages'
 import type { PartImage } from './models/partImages'
+import { todayYmd } from './dates'
 
-export const today = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+export const today = todayYmd
 
 /** 使える期限の中か(期限なしは、いつでも使える)。期限を過ぎた画像は、選ぶ候補・AI の候補から外す */
 export const isUsableHero = (h: HeroImage, on = today()) => !h.usable_until || h.usable_until.slice(0, 10) >= on

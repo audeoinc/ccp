@@ -4,6 +4,7 @@ import { ArrowRightRegular, EditRegular, LightbulbRegular, SaveRegular, SparkleR
 import { useT } from './i18n'
 import { MonthsService, type MonthRow } from './data/months'
 import { monthRowOf } from './weekLock'
+import { ym } from './dates'
 
 const useStyles = makeStyles({
   root: {
@@ -214,7 +215,7 @@ export function PrevMonthRetro({ month, country, onOpenResults }: { month: Date;
       .catch(() => undefined)
   }, [])
   const prev = new Date(month.getFullYear(), month.getMonth() - 1, 1)
-  const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
+  const key = ym(prev)
   // その国の振り返り(国の行がなければ、国を分ける前の行)
   const text = monthRowOf(rows, key, country)?.retro ?? ''
   return <WeekRetro period="month" mode="plan" text={text} onOpenResults={onOpenResults} />

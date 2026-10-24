@@ -2,6 +2,7 @@
 // 開いている面・見せ方・日付・フロート(配信カード・詳しい結果・アラート・制作のページ)・国を、URL のクエリと行き来させる。
 // URL を送れば、受け取った人が同じ状態で開ける。ブラウザの「戻る」でフロートが閉じ、再読み込みしても開いたまま。
 // クエリだけを使う(パスは変えない)ので、Workbench の中継(…/proxy/<ポート>/)の下でも、サーバーを変えずに動く
+import { ymd } from './dates'
 
 /** 画面の中の面の名前(App の page)と、URL での名前 */
 export type Page = 'calendar' | 'production' | 'results' | 'alerts'
@@ -86,4 +87,4 @@ export function dateOf(text?: string): Date | undefined {
   return Number.isNaN(v.getTime()) ? undefined : v
 }
 
-export const dateText = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+export const dateText = ymd

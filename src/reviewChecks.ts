@@ -6,6 +6,7 @@ import { cardMarket, productMarket } from './market'
 import { tr } from './i18n'
 import { statusRank } from './status'
 import { weeklyLimit } from './weeklyLimit'
+import { ymd } from './dates'
 
 const EMAIL = 'email'
 const PUSH = 'app'
@@ -36,8 +37,6 @@ export interface CheckItem {
   details: string[]
 }
 
-const pad = (n: number) => String(n).padStart(2, '0')
-const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const norm = (s?: string) => (s ?? '').trim().replace(/\s+/g, ' ')
 const time = (c: DeliveryCard) => (c.scheduled_at ? new Date(c.scheduled_at).getTime() : 0)
 

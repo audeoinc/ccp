@@ -9,6 +9,7 @@ import { getLang, tr } from './i18n'
 import type { SectionKind } from './templates'
 import { localDate } from './results'
 import { createStore } from './store'
+import { weekStartMonday, ymd } from './dates'
 
 // AI の依頼の状態(選択肢の値。src/gcp/ai.ts が返す)
 const STATUS_WAITING = 'waiting'
@@ -332,9 +333,7 @@ const cardOf = (payload: unknown): CardLite => (payload as { card?: CardLite })?
 export function mondayOf(iso?: string): string {
   const d = iso ? new Date(iso) : null
   if (!d || Number.isNaN(d.getTime())) return ''
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
-  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  return ymd(weekStartMonday(d))
 }
 /** この依頼・この配信カードに効く決まり */
 export function rulesFor(task: unknown, card: CardLite, rules: ActiveRule[]): ActiveRule[] {

@@ -3,20 +3,16 @@
 import { WeeksService, type WeekRow } from './data/weeks'
 import { CHANNEL_EMAIL, channelOptions, countryOptions } from './status'
 import { optionLabel } from './i18n'
-
-const pad = (n: number) => String(n).padStart(2, '0')
+import { weekStartSunday, ymd } from './dates'
 
 /** その日を含む週の初め(日曜日) */
-export const sundayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay())
+export const sundayOf = weekStartSunday
 
 /** 日の鍵(YYYY-MM-DD。ローカルの日付) */
-export const dayKeyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+export const dayKeyOf = ymd
 
 /** 週の行の鍵(週の初めの日曜日。YYYY-MM-DD)。weeks の week_start と同じ形 */
-export const weekKeyOf = (d: Date) => {
-  const s = sundayOf(d)
-  return `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}`
-}
+export const weekKeyOf = (d: Date) => ymd(sundayOf(d))
 
 /** 週の行を分ける単位(ST3・W8)。国とチャネルで、提出・確定・振り返りを別々に持つ */
 export interface WeekScope {

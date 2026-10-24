@@ -17,6 +17,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 import { weekKeyOf } from './weekLock'
 import { confirmDialog } from './confirm'
+import { todayYmd } from './dates'
 
 const useStyles = makeStyles({
   surface: { width: 'min(1400px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(90vh / var(--ui-zoom, 1))' },
@@ -40,10 +41,7 @@ const useStyles = makeStyles({
   actions: { display: 'flex', flexWrap: 'wrap', columnGap: '4px', marginTop: '4px' },
 })
 
-const today = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const today = todayYmd
 const daysUntil = (ymd: string) => Math.round((new Date(`${ymd.slice(0, 10)}T00:00:00`).getTime() - new Date(`${today()}T00:00:00`).getTime()) / 86400000)
 const isUploaded = (h: HeroImage) => /^\/img\/heroes\/up-/.test(h.image_url ?? '') || !!h.uploaded_by
 

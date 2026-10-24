@@ -147,6 +147,7 @@ import { PREF } from './prefKeys'
 import { confirmDialog } from './confirm'
 import { ConfirmHost } from './ConfirmHost'
 import { Z } from './layers'
+import { todayYmd, ym, ymd } from './dates'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -862,8 +863,7 @@ function App() {
           const addParty = (id: string, name?: string) => {
             if (name?.trim()) parties.set(id, (parties.get(id) ?? new Set()).add(name.trim()))
           }
-          const d = new Date()
-          const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          const today = todayYmd()
           setChangeNotes((res.data ?? []).filter((n) => n.kind === 'change'))
           for (const n of res.data ?? []) {
             const id = n.delivery_card_id
@@ -1050,7 +1050,7 @@ function App() {
   }, [rows, weekStart])
   // 週の状態は、週・国・チャネルごと(ST3・W8。メールとアプリを、別の人・別のときに確定できるように)。
   // 画面の国とチャネルが決まっているときだけ、その組の行を進める。決まっていなければ、組ごとの状態を並べて選んでもらう
-  const weekKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
+  const weekKey = ymd(weekStart)
   const weekEvents = useMemo(() => events.filter((e) => e.week_start?.slice(0, 10) === weekKey), [events, weekKey])
   const weekScope = useMemo(() => ({ country: filters.country, channel: filters.channel }), [filters.country, filters.channel])
   const weekScoped = !!(filters.country && filters.channel)
@@ -1110,8 +1110,7 @@ function App() {
   }, [printingWeek, weekKey])
   // 前週の行(計画の面に、前週の振り返りを出す)
   const prevWeek = useMemo(() => {
-    const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)
-    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const k = ymd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7))
     return weekRowOf(weeks, k, weekScope)
   }, [weeks, weekStart, weekScope])
   // 週の振り返りのメモを保存する(その国・チャネルの行がなければ作る)
@@ -1218,13 +1217,12 @@ function App() {
   }
   const exportCsv = () => {
     if (!month) return
-    const pad = (n: number) => String(n).padStart(2, '0')
     // 書き出す列: 一覧では、表示中の列。カレンダーでは、すべての列
     if (view === 'week') {
-      downloadCsv(weekRows, DEFAULT_COLUMNS, `deliveries-week-${weekStart.getFullYear()}-${pad(weekStart.getMonth() + 1)}-${pad(weekStart.getDate())}.csv`)
+      downloadCsv(weekRows, DEFAULT_COLUMNS, `deliveries-week-${ymd(weekStart)}.csv`)
       return
     }
-    downloadCsv(monthRows, view === 'list' ? columns : DEFAULT_COLUMNS, `deliveries-${month.getFullYear()}-${pad(month.getMonth() + 1)}.csv`)
+    downloadCsv(monthRows, view === 'list' ? columns : DEFAULT_COLUMNS, `deliveries-${ym(month)}.csv`)
   }
 
   const selected = cards.find((c) => c.id === selectedId)

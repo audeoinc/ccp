@@ -5,6 +5,7 @@ import { CHANNEL_PUSH } from './status'
 import { DEFAULT_PUSH_TEMPLATE, baseTemplateId, getTemplate, templateFromValue } from './templates'
 import { parseCsv } from './csv'
 import { themeTypeOf } from './themeTypes'
+import { localDate } from './dates'
 
 export const COUNTRY_US = 'US'
 
@@ -322,12 +323,8 @@ export function parseResultsCsv(text: string, cards: DeliveryCard[]): { rows: Im
   return { rows, errors }
 }
 
-/** ブラウザの時刻での日付(YYYY-MM-DD) */
-export function localDate(iso?: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+/** ブラウザの時刻での日付(YYYY-MM-DD。dates.ts。ここから読んでいる所のために、出しておく) */
+export { localDate }
 
 /** 表の CSV を書き出す */
 export function downloadTable(head: string[], body: (string | number)[][], filename: string) {

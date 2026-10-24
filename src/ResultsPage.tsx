@@ -30,6 +30,7 @@ import { MonthsService, type MonthRow } from './data/months'
 import { WeeksService } from './data/weeks'
 import { monthRowOf, scopeLabel } from './weekLock'
 import { draftRetro } from './aiRetro'
+import { ym, ymd } from './dates'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -135,7 +136,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
 
   const allRows = useMemo(() => toResultRows(cards, results ?? []), [cards, results])
   const scoped = allRows
-  const month = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`
+  const month = ym(monthStart)
   const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
   const inPeriod = (iso?: string) => {
     if (view !== 'week') return monthKey(iso) === month
@@ -159,8 +160,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const prevMonth = (() => {
     if (!month) return ''
     const [y, m] = month.split('-').map(Number)
-    const d = new Date(y, m - 2, 1)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    return ym(new Date(y, m - 2, 1))
   })()
 
   // ---- 週・月の振り返りの AI の下書き。前の期間は、週なら 4 週、月なら 3 か月(1 回分だと、ぶれが大きいため)
@@ -171,10 +171,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     const from = weekStart.getTime()
     const to = weekEnd.getTime()
     const pastFrom = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7 * PAST_WEEKS).getTime()
-    const ymd = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
+    const day = ymd(weekStart)
     return draftRetro({
       period: 'week',
-      label: t(`${ymd} の週`, `Week of ${ymd}`),
+      label: t(`${day} の週`, `Week of ${day}`),
       now: allRows.filter((r) => sentMs(r) >= from && sentMs(r) < to),
       past: allRows.filter((r) => sentMs(r) >= pastFrom && sentMs(r) < from),
       pastPeriods: PAST_WEEKS,
@@ -182,8 +182,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   }
   const draftMonth = async () => {
     const pastKeys = Array.from({ length: PAST_MONTHS }, (_, i) => {
-      const d = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1 - i, 1)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      return ym(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1 - i, 1))
     })
     // その月の各週の振り返り(週の初めがこの月にある週)も渡す。担当者の気づきを、月のまとめに生かすため
     const weeks = await WeeksService.getAll().catch(() => null)

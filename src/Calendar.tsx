@@ -9,6 +9,7 @@ import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
 import type { CardAlertKind } from './cardAlerts'
+import { ymd } from './dates'
 
 interface Props {
   month: Date
@@ -33,8 +34,7 @@ interface Props {
 
 // 選択肢の値から、画面の言葉を求める
 const label = (options: { value: string; label: string }[], v?: string) => optionLabel(options.find((o) => o.value === v)?.label)
-const pad = (n: number) => String(n).padStart(2, '0')
-const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const dayKey = ymd
 // 日曜始まり。表記は現在の言語に従う(2024-01-07 は日曜日)
 const weekdays = () =>
   Array.from({ length: 7 }, (_, i) =>

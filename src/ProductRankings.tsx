@@ -6,6 +6,7 @@ import { ProductRankingsService } from './data/productRankings'
 import { locale, useT } from './i18n'
 import { criteriaFor, useCountrySettings } from './countrySettings'
 import { sentAtOf, type ResultRow } from './results'
+import { weekStartMonday, ymd } from './dates'
 
 const useStyles = makeStyles({
   head: { display: 'flex', alignItems: 'center', columnGap: '12px', marginBottom: '6px' },
@@ -32,8 +33,7 @@ const useStyles = makeStyles({
 
 /** 週の始まり(月曜。週ごとの実績・順位の week_start と同じ)を YYYY-MM-DD で */
 function weekStartOf(d: Date): string {
-  const m = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
-  return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`
+  return ymd(weekStartMonday(d))
 }
 
 function addWeeks(week: string, n: number): string {

@@ -19,6 +19,7 @@ import { weekKeyOf } from './weekLock'
 import { CHANNEL_PUSH } from './status'
 import { productGenderLabel } from './target'
 import { ProductHeadImage } from './ProductHeadImage'
+import { localDate } from './dates'
 
 // 見せ方「商品」(X49): 商品を軸に、期間の中で、どの配信に何回載せたか・その結果・週ごとの実績・外部広告の出稿を並べる。
 // 外部に出稿している商品を、配信でも推すべきかを決める材料にする。SPU(商品)とカテゴリの 2 つの粒度で見られる
@@ -102,11 +103,7 @@ interface Row {
   overLimit: boolean
 }
 
-const dayKey = (iso?: string) => {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const dayKey = localDate
 
 /** 見せ方「商品」(X49) */
 export function ProductsView({ cards, cardProducts, products, from, to, onOpenCard, onOpenResult }: Props) {
