@@ -302,7 +302,9 @@
     ["anchor", "text"],
     ["anchor_x", "numeric"],
     ["anchor_y", "numeric"],
-    ["anchor_view", "text"]
+    ["anchor_view", "text"],
+    ["anchor_image", "text"],
+    ["anchor_snapshot", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],

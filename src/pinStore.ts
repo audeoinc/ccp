@@ -20,6 +20,8 @@ export interface PendingPin {
   view: string
   /** 商品の枠を押したとき、その商品(書き込みの「対象」にも入れる) */
   productId?: string
+  /** 打ったときの、その場所の中身(pinSnapshot の snapshotOf。書き込みの anchor_snapshot に入れる。X65 (b)) */
+  snapshot?: string
 }
 
 let pending: PendingPin | null = null

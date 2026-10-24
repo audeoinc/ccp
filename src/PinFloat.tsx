@@ -10,6 +10,8 @@ import { tr, useT } from './i18n'
 import { setNoteResolved } from './pinActions'
 import { usePinAnchor } from './pinAnchor'
 import { PinThreadView } from './PinThreadView'
+import { attachCapture, captureKey } from './pinSnapshot'
+import { CreativeFiles } from './data/creativeFiles'
 
 const useStyles = makeStyles({
   pin: { width: '18px', height: '18px', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '11px', fontWeight: tokens.fontWeightBold, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorPaletteDarkOrangeBackground3 },
@@ -19,6 +21,10 @@ const useStyles = makeStyles({
   chip: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', padding: '2px 8px', borderRadius: '999px', border: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, cursor: 'pointer' },
   chipOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
   people: { display: 'grid', rowGap: '2px', maxHeight: '220px', overflowY: 'auto' },
+  // 書いたときの様子(X65 (b))。全景が見えるよう、切らずに縮める
+  then: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  thenImg: { display: 'block', maxWidth: '100%', maxHeight: '160px', objectFit: 'contain', justifySelf: 'start', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground1 },
+  changed: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
 })
 
 const subscribeMe = (f: () => void) => onMeChange(f)
@@ -91,6 +97,8 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
   const edit = editSpot?.(anchor, productId) ?? null
   const userNames = activeUsers(people).map((u) => u.name ?? '').filter(Boolean)
   const me = meName.trim()
+  // ピンの層が、書いたときと中身が違うピンに印(data-changed)を付けている(PreviewPins)
+  const changed = anchorTarget instanceof Element && anchorTarget.hasAttribute('data-changed')
 
   const run = async (f: () => Promise<{ success: boolean; data?: CardNote; error?: { message: string } }>) => {
     setWorking(true)
@@ -125,10 +133,13 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
         anchor_y: pending.y,
         anchor_view: pending.view,
         ...(pending.productId ? { product_id: pending.productId } : {}),
+        // 書いたときの様子(X65 (b))。文字はここで、画像は打ったときに作り始めていて、できたら付ける(attachCapture)
+        ...(pending.snapshot ? { anchor_snapshot: pending.snapshot } : {}),
         resolved: 0,
       }),
     )
     if (r?.data) {
+      attachCapture(captureKey(cardId, pending.anchor, pending.x, pending.y), r.data.id, bumpNotes)
       setText('')
       setAssignee('')
       setPendingPin(null)
@@ -192,7 +203,21 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
       entries={root ? [root, ...replies].map((n) => ({ id: n.id, author: n.author, body: n.body, at: n.created_on, extra: n === root && n.assignee ? `→ ${n.assignee}` : undefined, isReply: n !== root })) : []}
       dimmed={!!root?.resolved}
       composerTop={
-        !root && (
+        root ? (
+          (root.anchor_image || changed) && (
+            <div className={s.then}>
+              {changed && <span className={s.changed}>{t('書いたあとに、この場所が変わりました', 'This spot has changed since the comment was written')}</span>}
+              {root.anchor_image && (
+                <>
+                  <span>{t('書いたときの様子', 'How it looked when written')}</span>
+                  <a href={CreativeFiles.url(root.anchor_image)} target="_blank" rel="noreferrer" title={t('大きく見る', 'Open full size')}>
+                    <img className={s.thenImg} src={CreativeFiles.url(root.anchor_image)} alt={t('書いたときの様子', 'How it looked when written')} />
+                  </a>
+                </>
+              )}
+            </div>
+          )
+        ) : (
           <div className={s.chips}>
             <Popover positioning="below-start">
               <PopoverTrigger disableButtonEnhancement>

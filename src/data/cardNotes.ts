@@ -42,6 +42,10 @@ export interface CardNote {
   anchor_y?: number
   /** どの見た目の上で置いたか(「チャネル|幅|AB の案」。例 email|mobile|A) */
   anchor_view?: string
+  /** 書いたときの、その場所のまわりの画像(素材の置き場所の名前。CreativeFiles.url で開く。X65 (b)) */
+  anchor_image?: string
+  /** 書いたときの、その場所の中身(文字と画像の URL。いまの中身と比べて「変わった」の印を出す。X65 (b)) */
+  anchor_snapshot?: string
   created_on?: string
 }
 

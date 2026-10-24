@@ -26,6 +26,7 @@ import { CardHistoryList } from '../CardHistory'
 import { ApprovalBar } from '../ApprovalBar'
 import { AutoTextarea } from '../AutoTextarea'
 import { eligibleReviewers } from '../approvals'
+import { attachCapture, blockOfAnchor, captureKey, snapshotOf, startCapture } from '../pinSnapshot'
 import { myName, myUserId, onMeChange } from '../history'
 import { activeUsers, groupsOf, usePeople } from '../people'
 import { bumpNotes, focusPin, focusedPin, notesVersion, pinNumbers, subscribePins } from '../pinStore'
@@ -275,17 +276,26 @@ export function CommPane(props: Props) {
   const post = async () => {
     const body = text.trim()
     if (!body) return
-    const ok = await run(() =>
-      CardNotesService.create({
+    // 選んでいる部品の場所に書くときも、書いたときの様子を残す(X65 (b))
+    const block = place ? blockOfAnchor(place.anchor, props.part?.kind === 'product' ? props.part.itemKey : undefined) : null
+    const key = place ? captureKey(card.id, place.anchor, 0.97, 0.08) : ''
+    if (block) startCapture(key, block)
+    const then = block ? { anchor_snapshot: snapshotOf(block) } : {}
+    let createdId = ''
+    const ok = await run(async () => {
+      const r = await CardNotesService.create({
         delivery_card_id: card.id,
         kind: asTask ? 'task' : 'comment',
         stage: 'plan',
         author: meName || card.owner || '',
         body,
         ...(assignee ? { assignee } : {}),
-        ...(place ? { anchor: place.anchor, anchor_x: 0.97, anchor_y: 0.08, anchor_view: props.view, ...(place.productId ? { product_id: place.productId } : {}) } : {}),
-      }),
-    )
+        ...(place ? { anchor: place.anchor, anchor_x: 0.97, anchor_y: 0.08, anchor_view: props.view, ...(place.productId ? { product_id: place.productId } : {}), ...then } : {}),
+      })
+      createdId = r.data?.id ?? ''
+      return r
+    })
+    if (ok && block && createdId) attachCapture(key, createdId, bumpNotes)
     if (ok) {
       setText('')
       setAsTask(false)

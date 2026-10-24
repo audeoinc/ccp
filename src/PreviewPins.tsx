@@ -4,6 +4,7 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Item } from './items'
 import { CommentAddRegular, CommentCheckmarkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
+import { captureKey, changedSince, snapshotOf, startCapture } from './pinSnapshot'
 import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
 import { pinMenuItems } from './pinMenu'
 import { myName, onMeChange } from './history'
@@ -43,6 +44,8 @@ const useStyles = makeStyles({
   resolved: { backgroundColor: tokens.colorNeutralBackground5, color: tokens.colorNeutralForeground2 },
   focused: { outline: `3px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px', transform: 'scale(1.2)' },
   pending: { backgroundColor: tokens.colorBrandBackground, cursor: 'default' },
+  // 書いたあとに場所の中身が変わったピン: 右上に小さな点(X65 (b))
+  changed: { '::after': { content: '""', position: 'absolute', right: '-4px', top: '-4px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorBrandBackground, border: `1.5px solid ${tokens.colorNeutralForegroundOnBrand}` } },
 })
 
 interface Props {
@@ -70,6 +73,8 @@ interface Spot {
   id: string
   left: number
   top: number
+  /** 書いたあとに、その場所の中身が変わった(X65 (b)) */
+  changed?: boolean
 }
 
 /**
@@ -145,7 +150,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
       for (const n of shown) {
         const el = findBlock(n.anchor ?? '', n.product_id)
         const p = el && pointIn(el, Number(n.anchor_x ?? 0.5), Number(n.anchor_y ?? 0.5))
-        if (p) next.push({ id: n.id, ...p })
+        if (p) next.push({ id: n.id, ...p, ...(changedSince(el, n.anchor_snapshot) ? { changed: true } : {}) })
       }
       if (myPending) {
         const el = findBlock(myPending.anchor, myPending.productId)
@@ -197,7 +202,10 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     const x = clamp((clientX - r.left) / (r.width || 1))
     const y = clamp((clientY - r.top) / (r.height || 1))
     const productId = item ? items.find((i) => i.key === item.getAttribute('data-item-key'))?.productId : undefined
-    setPendingPin({ cardId, stage: 'plan', anchor: productId ? 'product' : anchorOfBlock(block), x, y, view, productId })
+    const anchor = productId ? 'product' : anchorOfBlock(block)
+    // 書いたときの様子を残す(画像は、書くまでの間に作っておく。X65 (b))
+    startCapture(captureKey(cardId, anchor, x, y), block as HTMLElement)
+    setPendingPin({ cardId, stage: 'plan', anchor, x, y, view, productId, snapshot: snapshotOf(block) })
     onPlacingEnd()
     onOpenThreads()
     return true
@@ -268,7 +276,8 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
             <button
               type="button"
               data-pin-id={p.id}
-              className={mergeClasses(s.pin, !!n.resolved && s.resolved, focus?.noteId === p.id && s.focused)}
+              className={mergeClasses(s.pin, !!n.resolved && s.resolved, focus?.noteId === p.id && s.focused, p.changed && s.changed)}
+              data-changed={p.changed ? '' : undefined}
               style={{ left: p.left, top: p.top }}
               onClick={(e) => {
                 e.stopPropagation()

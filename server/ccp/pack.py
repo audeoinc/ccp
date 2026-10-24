@@ -81,8 +81,9 @@ async def export_pack() -> Response:
             data = await asyncio.to_thread(creative.load, stored)
         return creative.KIND, stored, data
 
-    # 添付のファイルと、URL の見本カードの画像(preview_image)
-    stored = sorted({str(r[k]) for r in tables.get("card_assets", []) for k in ("stored", "preview_image") if r.get(k) and creative.STORED.match(str(r[k]))})
+    # 素材のファイル・URL の見本カードの画像(preview_image)と、ピンを書いたときの様子の画像(card_notes.anchor_image。X65 (b))。どちらも素材の置き場所にある
+    refs = [(r, k) for r in tables.get("card_assets", []) for k in ("stored", "preview_image")] + [(r, "anchor_image") for r in tables.get("card_notes", [])]
+    stored = sorted({str(r[k]) for r, k in refs if r.get(k) and creative.STORED.match(str(r[k]))})
     images = [*images, *await asyncio.gather(*(load_creative(n) for n in stored))]
     now = datetime.now(timezone.utc)
     buf = io.BytesIO()
