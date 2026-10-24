@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
@@ -196,6 +197,19 @@ class Schema:
 
     def ddl(self) -> list[str]:
         return [s for t in self.creation_order() for s in t.ddl()]
+
+    def ddl_hash(self) -> str:
+        """テーブルを作る SQL の全体の指紋。列・型・参照・索引・以前の選択肢の置き換えのどれかが変われば変わる
+        (起動のたびに約 1000 本の SQL を流さず、変わったときだけ流すため。整理⑥)"""
+        return hashlib.sha256("\n".join(self.ddl()).encode("utf-8")).hexdigest()
+
+    def expected_columns(self) -> set[tuple[str, str]]:
+        """DB にあるはずの (テーブル, 列)。指紋が同じでも、表・列が欠けていれば SQL を流す(手で消した・古い写しを戻した など)"""
+        out: set[tuple[str, str]] = set()
+        for t in self.tables.values():
+            for name in ["id", "state_code", "created_on", "modified_on", *[c.pg for c in t.columns], *[lk.pg for lk in t.lookups]]:
+                out.add((t.pg, name))
+        return out
 
 
 _cache: Schema | None = None

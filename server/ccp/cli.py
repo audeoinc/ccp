@@ -46,8 +46,10 @@ DEFAULT_IMAGES = Path(__file__).resolve().parent.parent / "images"
 async def migrate() -> None:
     engine = await get_engine()
     async with engine.begin() as conn:
-        for stmt in sc.load().ddl():
-            await conn.execute(text(stmt))
+        # 手で流すときは、指紋が同じでも必ず流す(起動のときは、変わったときだけ流す。data_api.apply_schema)
+        from .data_api import apply_schema
+
+        await apply_schema(conn, force=True)
     print("テーブルを作成・更新しました")
 
 

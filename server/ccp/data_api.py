@@ -45,8 +45,38 @@ _schema_ready = False
 _schema_lock = asyncio.Lock()
 
 
+# 流した SQL の指紋を覚える表(schema.json の外。画面からは見えない)。1 行だけ
+_STATE_DDL = "CREATE TABLE IF NOT EXISTS ccp_schema_state (id smallint PRIMARY KEY, ddl_hash text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())"
+# 同時に起動した複数のサーバーが、同じ SQL を重ねて流さないための鍵(pg_advisory_xact_lock の番号。値に意味はない)
+_SCHEMA_LOCK_KEY = 7262023
+
+
+async def apply_schema(conn: AsyncConnection, force: bool = False) -> bool:
+    """schema.json の列・テーブルを DB に反映する(足りない列を足す・型をそろえる。何度実行してもよい)。流したら True。
+    起動のたびに約 1000 本(ALTER COLUMN TYPE は型が同じでも表全体を強くロックする)を流していたので、
+    前に流した SQL の指紋が同じで、表・列も欠けていなければ流さない(整理⑥)。force は、指紋を見ずに流す(ccp.cli migrate)。
+    呼ぶ側でトランザクションを始めておく"""
+    schema = sc.load()
+    want = schema.ddl_hash()
+    await conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _SCHEMA_LOCK_KEY})
+    await conn.execute(text(_STATE_DDL))
+    if not force:
+        have = (await conn.execute(text("SELECT ddl_hash FROM ccp_schema_state WHERE id = 1"))).scalar()
+        if have == want:
+            rows = await conn.execute(text("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = current_schema()"))
+            if schema.expected_columns() <= {(r[0], r[1]) for r in rows}:
+                return False
+    for stmt in schema.ddl():
+        await conn.execute(text(stmt))
+    await conn.execute(
+        text("INSERT INTO ccp_schema_state (id, ddl_hash, applied_at) VALUES (1, :h, now()) ON CONFLICT (id) DO UPDATE SET ddl_hash = :h, applied_at = now()"),
+        {"h": want},
+    )
+    return True
+
+
 async def _ensure_schema(conn: AsyncConnection) -> None:
-    """プロセスで最初に接続できたとき、schema.json の列・テーブルを DB に反映する(足りない列を足すだけ。何度実行してもよい)。
+    """プロセスで最初に接続できたとき、schema.json の列・テーブルを DB に反映する(変わったときだけ。apply_schema)。
     列を足したときに、手で migrate を実行しなくても、反映(デプロイ)だけで使えるようにするため"""
     global _schema_ready
     if _schema_ready:
@@ -56,8 +86,11 @@ async def _ensure_schema(conn: AsyncConnection) -> None:
             return
         try:
             async with conn.begin():
-                for stmt in sc.load().ddl():
-                    await conn.execute(text(stmt))
+                # 反映のあとに、流したか・流さなかったかをログで確かめられるように、どちらも 1 行出す
+                if await apply_schema(conn):
+                    print(f"[schema] テーブルの定義を流しました(指紋 {sc.load().ddl_hash()[:12]})")
+                else:
+                    print(f"[schema] 指紋が同じなので、テーブルの定義は流しませんでした(指紋 {sc.load().ddl_hash()[:12]})")
         except SQLAlchemyError as e:  # 反映できなくても、既存の列の読み書きは続ける(次のプロセスで、また試す)
             print(f"[schema] 列の反映に失敗しました: {e}")
         _schema_ready = True
