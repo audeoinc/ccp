@@ -3,7 +3,7 @@
 // 実際の設定と、開発向けの操作(取り込み・見本のデータ)が混ざって乱雑だったので分け、開発向けは畳んで、すぐ見えないようにする
 // (デモで利用者に触ってもらうため。ログイン ST6 ができたら、管理者だけに見せる)。
 // 中身は、項目ごとに render で右に描く(ST10 の (b))。まだ移していない項目は、これまでの窓を「開く」で開く
-import { useState, type CSSProperties, type ReactElement, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react'
 import {
   Button,
   Dialog,
@@ -31,6 +31,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
 import { countryOptions } from './status'
+import { dismissedHintCount, getHintsVersion, resetHints, subscribeHints } from './hints'
 import { optionLabel, useT } from './i18n'
 
 /** 設定の画面に並べる 1 つの操作(これまでの ⚙ のメニューの 1 項目) */
@@ -101,6 +102,9 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   const s = useStyles()
   const t = useT()
   const [page, setPage] = useState('me')
+  // 戻したら(版が上がる)数を数え直す。閉じたときは版が上がらないが、窓を開くたびに描き直すので、数は新しい
+  useSyncExternalStore(subscribeHints, getHintsVersion)
+  const hintCount = dismissedHintCount()
   // ヘッダーが「すべての国」のときに、国の項目で使う国(ヘッダーで国を選んでいれば、そちらを使う)
   const [picked, setPicked] = useState(String(countryOptions[0]?.value ?? ''))
   const country = headerCountry || picked
@@ -147,13 +151,17 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
           </div>
           <div className={s.sub}>
             <span className={s.subHead}>{t('ヒント', 'Tips')}</span>
-            {/* 閉じた案内を戻す(X72 の具体例 2)。案内を閉じられるようにするときに、ここにつなぐ */}
+            {/* 閉じた案内(Hint)を戻す(X72 の具体例 2)。閉じたものがないときは押せない(押しても何も起きないため) */}
             <span>
-              <Button size="small" disabled>
+              <Button size="small" disabled={hintCount === 0} onClick={resetHints}>
                 {t('ヒントをもう一度出す', 'Show tips again')}
               </Button>
             </span>
-            <span className={s.note}>{t('閉じた案内を、もう一度出します(案内を閉じられるようにするときに使えるようにします)。', 'Shows the tips you closed again (available once tips can be closed).')}</span>
+            <span className={s.note}>
+              {hintCount > 0
+                ? t(`閉じた案内(${hintCount} 件)を、もう一度出します。`, `Shows the ${hintCount} tip(s) you closed again.`)
+                : t('閉じた案内はありません。案内の × で閉じると、ここで戻せます。', 'No closed tips. Tips you close with × can be restored here.')}
+            </span>
           </div>
         </>
       )
