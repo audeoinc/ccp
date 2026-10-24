@@ -77,6 +77,7 @@ interface Preview {
 const useStyles = makeStyles({
   surface: { maxWidth: '1100px', width: 'calc(96vw / var(--ui-zoom, 1))' },
   body: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, maxHeight: 'calc(80vh / var(--ui-zoom, 1))' },
+  inline: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, minWidth: 0 },
   row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
   grow: { flexGrow: 1 },
   scroll: { overflow: 'auto', minHeight: 0 },
@@ -105,7 +106,7 @@ async function postPolicy(path: 'preview' | 'import', body: { kind: Kind; filena
 
 const fmtDate = (v?: string) => (v ? new Date(v).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
-export function PolicyManager({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: () => void }) {
+export function PolicyManager({ open, onClose, onImported, inline }: { open: boolean; onClose?: () => void; onImported: () => void; inline?: boolean }) {
   const styles = useStyles()
   const justAdded = useJustAdded()
   const clearAdded = justAdded.clear
@@ -256,15 +257,8 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
   const strengthClass = (s?: string) => `${styles.strength} ${s === 'must' ? styles.must : s === 'should' ? styles.should : styles.info}`
   const scopeLabel = (s?: string) => (s === 'product' ? t('商品', 'Product') : s === 'category' ? t('カテゴリ', 'Category') : t('全体', 'All'))
 
-  return (
-    <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <ResizableSurface sizeKey="policy" className={styles.surface}>
-        {/* 広いフロートの中を自分で並べるので、DialogBody は使わない(ARCHITECTURE の落とし穴) */}
-        <div className={styles.body}>
-          <div className={styles.row}>
-            <DialogTitle className={styles.grow}>{t('方針・決まり(マーケティングポリシー)', 'Marketing policies')}</DialogTitle>
-            <Button appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
-          </div>
+  const content = (
+    <>
           <div className={styles.row}>
             <input ref={inputRef} type="file" accept=".md,.markdown,.txt,.csv" hidden onChange={(e) => void pick(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
             <Button appearance="primary" size="small" icon={<ArrowUploadRegular />} disabled={busy !== null} onClick={() => inputRef.current?.click()}>
@@ -502,8 +496,28 @@ export function PolicyManager({ open, onClose, onImported }: { open: boolean; on
               </Table>
             )}
           </div>
+    </>
+  )
+  const editor = editing && <RuleEditDialog rule={editing.rule} initial={editing.initial} markets={markets} onClose={() => setEditing(null)} onDone={afterEdit} />
+  if (inline)
+    return (
+      <div className={styles.inline}>
+        {content}
+        {editor}
+      </div>
+    )
+  return (
+    <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose?.()}>
+      <ResizableSurface sizeKey="policy" className={styles.surface}>
+        {/* 広いフロートの中を自分で並べるので、DialogBody は使わない(ARCHITECTURE の落とし穴) */}
+        <div className={styles.body}>
+          <div className={styles.row}>
+            <DialogTitle className={styles.grow}>{t('方針・決まり(マーケティングポリシー)', 'Marketing policies')}</DialogTitle>
+            <Button appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
+          </div>
+          {content}
         </div>
-        {editing && <RuleEditDialog rule={editing.rule} initial={editing.initial} markets={markets} onClose={() => setEditing(null)} onDone={afterEdit} />}
+        {editor}
       </ResizableSurface>
     </Dialog>
   )

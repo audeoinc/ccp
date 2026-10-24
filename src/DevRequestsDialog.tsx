@@ -14,6 +14,7 @@ import { locale, tr, useT } from './i18n'
 const useStyles = makeStyles({
   surface: { width: 'min(1100px, (94vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(86vh / var(--ui-zoom, 1))' },
   body: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
+  inline: { display: 'flex', flexDirection: 'column', minWidth: 0 },
   titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   grow: { flexGrow: 1, minWidth: 0 },
   bar: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap', margin: '4px 0 8px' },
@@ -50,10 +51,10 @@ function copyTextOf(list: DevRequest[], repliesOf: (id: string) => DevRequest[],
 }
 
 /**
- * 開発へのリクエストの一覧(⚙ と、ヘッダーのリンクから)。状態(未対応 / 対応済み / 見送り)を変え、「まとめてコピー」で要件の材料にする。
+ * 開発へのリクエストの一覧(ヘッダーのリンクからは窓で、設定の画面の「開発・管理」では中に描く)。状態(未対応 / 対応済み / 見送り)を変え、「まとめてコピー」で要件の材料にする。
  * 対応済みにすると、その日時と画面の版を残す(ピン・フロートで「対応済み(日付・版)」と、書いた人に分かる)
  */
-export function DevRequestsDialog({ onClose }: { onClose: () => void }) {
+export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; inline?: boolean }) {
   const s = useStyles()
   const t = useT()
   const version = useSyncExternalStore(subscribeDevRequests, devRequestsVersion)
@@ -112,15 +113,8 @@ export function DevRequestsDialog({ onClose }: { onClose: () => void }) {
     window.location.assign(`${window.location.pathname}?${p.toString()}`)
   }
 
-  return (
-    <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <ResizableSurface sizeKey="devRequests" className={s.surface}>
-        <DialogBody className={s.body}>
-          <div className={s.titleRow}>
-            <DialogTitle className={s.grow}>{t('開発へのリクエスト', 'Requests to developers')}</DialogTitle>
-            <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
-          </div>
-          <DialogContent style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1 }}>
+  const content = (
+    <>
             <span className={s.caption}>
               {t(
                 '画面のどこでも、右クリック →「開発に伝える」で書いたものです。状態を変えると、その場で保存します。「まとめてコピー」の文を貼ると、要件として整理できます。',
@@ -216,7 +210,18 @@ export function DevRequestsDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             )}
-          </DialogContent>
+    </>
+  )
+  if (inline) return <div className={s.inline}>{content}</div>
+  return (
+    <Dialog open onOpenChange={(_, d) => !d.open && onClose?.()}>
+      <ResizableSurface sizeKey="devRequests" className={s.surface}>
+        <DialogBody className={s.body}>
+          <div className={s.titleRow}>
+            <DialogTitle className={s.grow}>{t('開発へのリクエスト', 'Requests to developers')}</DialogTitle>
+            <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
+          </div>
+          <DialogContent style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1 }}>{content}</DialogContent>
         </DialogBody>
       </ResizableSurface>
     </Dialog>

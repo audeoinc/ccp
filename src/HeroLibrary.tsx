@@ -19,6 +19,8 @@ import { weekKeyOf } from './weekLock'
 const useStyles = makeStyles({
   surface: { width: 'min(1400px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(90vh / var(--ui-zoom, 1))' },
   body: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
+  // 設定の画面の中では、右の欄の高さに合わせて、一覧の中だけを送る
+  inline: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1 },
   titleRow: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   grow: { flexGrow: 1, minWidth: 0 },
   tools: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '6px', margin: '8px 0' },
@@ -50,14 +52,16 @@ interface Props {
   country: string
   me: string
   onChanged: () => Promise<void>
-  onClose: () => void
+  onClose?: () => void
+  /** 設定の画面(ST10)の中に描く(窓・題・閉じるボタンを出さない) */
+  inline?: boolean
 }
 
 /**
- * メイン画像のライブラリの管理画面(X59 ②。⚙ から)。一覧(画像・国・用途・季節・出どころ・使える期限・使っている配信の数と今週・前週)、
+ * メイン画像のライブラリの管理画面(X59 ②。設定の画面の「全社」の中に描く)。一覧(画像・国・用途・季節・出どころ・使える期限・使っている配信の数と今週・前週)、
  * 絞り込み、画像を上げる、直す(名前・タグ・焦点・出どころ・期限)、期限を今日で切る、消す(使っている配信がない画像だけ)
  */
-export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: Props) {
+export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, inline }: Props) {
   const s = useStyles()
   const t = useT()
   // メイン画像 / 部品の画像(X59 ③)
@@ -171,19 +175,13 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
     if (state.failed) setError(tr(`${state.failed} 点は AI で読めませんでした(画像を開けないか、AI が答えませんでした。直すから手で入れられます)`, `${state.failed} images could not be read by AI (enter them via Edit)`))
   }
 
-  return (
-    <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <ResizableSurface sizeKey="heroLibrary" className={s.surface}>
-        <DialogBody className={s.body}>
-          <div className={s.titleRow}>
-            <DialogTitle className={s.grow}>{t('画像のライブラリ', 'Image library')}</DialogTitle>
-            {tab === 'heroes' && (
-              <Button appearance="primary" icon={<ImageAddRegular />} onClick={() => setUploading(true)}>
-                {t('画像を上げる', 'Upload an image')}
-              </Button>
-            )}
-            <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
-          </div>
+  const upload = tab === 'heroes' && (
+    <Button appearance="primary" icon={<ImageAddRegular />} onClick={() => setUploading(true)}>
+      {t('画像を上げる', 'Upload an image')}
+    </Button>
+  )
+  const content = (
+    <>
           <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as 'heroes' | 'parts')}>
             <Tab value="heroes">{t(`メイン画像(${heroes.length})`, `Hero images (${heroes.length})`)}</Tab>
             <Tab value="parts">{t('部品の画像(ボタン・バナー・ロゴ・アイコン)', 'Part images (buttons, banners, logos, icons)')}</Tab>
@@ -274,6 +272,28 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose }: 
               }}
             />
           )}
+    </>
+  )
+  if (inline)
+    return (
+      <div className={s.inline}>
+        <div className={s.titleRow}>
+          <span className={s.grow} />
+          {upload}
+        </div>
+        {content}
+      </div>
+    )
+  return (
+    <Dialog open onOpenChange={(_, d) => !d.open && onClose?.()}>
+      <ResizableSurface sizeKey="heroLibrary" className={s.surface}>
+        <DialogBody className={s.body}>
+          <div className={s.titleRow}>
+            <DialogTitle className={s.grow}>{t('画像のライブラリ', 'Image library')}</DialogTitle>
+            {upload}
+            <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
+          </div>
+          {content}
         </DialogBody>
       </ResizableSurface>
     </Dialog>

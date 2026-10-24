@@ -125,7 +125,7 @@ import type { DeliveryPattern } from './models/deliveryPatterns'
 import { PolicyRulesService } from './data/policyRules'
 import { SalesPoliciesService } from './data/salesPolicies'
 import { PeopleManager } from './PeopleManager'
-import { openPeopleManager, usePeople } from './people'
+import { usePeople } from './people'
 import { InboxButton } from './InboxButton'
 import { useApprovalInbox } from './useApprovalInbox'
 import { productionColor, productionLabel, productionView, useProductionRequests } from './useProductionRequests'
@@ -465,7 +465,6 @@ function App() {
     const res = await HeroImagesService.getAll({ orderBy: ['image_code asc'] })
     if (res.success) setHeroes((res.data ?? []).map(withHeroLabels))
   }, [])
-  const [heroLibraryOpen, setHeroLibraryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // BigQuery からの取り込み(B2・B4)。設定がない環境では configured: false のまま、何も出さない
@@ -474,8 +473,6 @@ function App() {
   const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
   // 見本の SKU を作っている間(X63。数千行になることがあるので、終わるまで押せなくする)
   const [skuBusy, setSkuBusy] = useState(false)
-  // マーケティングポリシー(M3・M4)。⚙ から取り込み・一覧。AI の依頼に足すため、読んだら aiSelect に渡す
-  const [policyOpen, setPolicyOpen] = useState(false)
   // 設定の画面(ST10。⚙ から開く)
   const [settingsOpen, setSettingsOpen] = useState(false)
   useEffect(() => {
@@ -1447,7 +1444,6 @@ function App() {
           if (f) void importMetrics(f)
         }}
       />
-      <PolicyManager open={policyOpen} onClose={() => setPolicyOpen(false)} onImported={() => void loadMarketingPolicies()} />
       <PeopleManager />
       {/* 初めて開いたとき、だれでログインするかを選んでもらう(U9) */}
       <SignInDialog />
@@ -1617,7 +1613,7 @@ function App() {
               label: t('方針・決まり', 'Marketing policies'),
               description: t('マーケティングの決まりを取り込む・一覧で見る・直す。決まりは全部の国で共通で、どの国で使うかは「国」の「使う決まり」で決めます。', 'Import, list and edit marketing rules. Rules are shared; which countries use them is set under Country → Rules used.'),
               icon: <DocumentBulletListRegular />,
-              onOpen: () => setPolicyOpen(true),
+              render: () => <PolicyManager open inline onImported={() => void loadMarketingPolicies()} />,
             },
             {
               id: 'templates',
@@ -1633,7 +1629,7 @@ function App() {
               label: t('画像のライブラリ', 'Image library'),
               description: t('メイン画像・部品の画像。上げる・直す・期限・消す。', 'Hero and part images: upload, edit, expiry, delete.'),
               icon: <ImageMultipleRegular />,
-              onOpen: () => setHeroLibraryOpen(true),
+              render: () => <HeroLibrary inline heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} />,
             },
             {
               id: 'people',
@@ -1641,7 +1637,7 @@ function App() {
               label: t('ユーザーと承認グループ', 'Users and approval groups'),
               description: t('使う人と、承認するグループ。', 'People and approval groups.'),
               icon: <PeopleTeamRegular />,
-              onOpen: openPeopleManager,
+              render: () => <PeopleManager inline />,
             },
             {
               id: 'bq',
@@ -1856,7 +1852,7 @@ function App() {
               label: t('開発へのリクエストの一覧', 'Requests to developers'),
               description: t('画面のピンから送られた、開発へのリクエストの一覧。', 'Requests to developers sent from pins on the screen.'),
               icon: <DevRequestIcon />,
-              onOpen: () => setDevRequestsOpen(true),
+              render: () => <DevRequestsDialog inline />,
             },
           ]}
         />
@@ -2469,7 +2465,6 @@ function App() {
         </ErrorBoundary>
       )}
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
-      {heroLibraryOpen && <HeroLibrary heroes={heroes} cards={cards} country={filters.country} me={myName()} onChanged={reloadHeroes} onClose={() => setHeroLibraryOpen(false)} />}
       {cardMenu.menu}
       {/* 開発へのリクエストのピン(どの画面にも重ねる)と、その一覧 */}
       <DevRequestLayer link={linkState} cardName={(id) => cards.find((c) => c.id === id)?.name ?? ''} />

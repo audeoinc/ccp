@@ -39,6 +39,7 @@ import { ApprovalGroupStatus, type ApprovalGroup } from './models/approvalGroups
 const useStyles = makeStyles({
   surface: { width: 'min(880px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', maxHeight: 'calc(90vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', rowGap: '12px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px' },
+  inline: { display: 'flex', flexDirection: 'column', rowGap: '12px', minWidth: 0 },
   grow: { flexGrow: 1 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   scroll: { overflowY: 'auto', minHeight: '240px', display: 'grid', rowGap: '8px', alignContent: 'start' },
@@ -68,11 +69,11 @@ const ruleOptions = Object.entries(ApprovalRuleRule) as [keyof typeof ApprovalRu
 const looksLikeEmail = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
 
 /**
- * ユーザーと承認グループ(バックログ U1。docs/APPROVAL.md)。⚙ のメニューから開く。
+ * ユーザーと承認グループ(バックログ U1。docs/APPROVAL.md)。設定の画面の「全社」の中に描く(ほかの所から開くときは窓)。
  * ログインが入るまでは、だれでも編集できる。そのかわり、変更はすべて操作の履歴に残し、ここの「変更の履歴」で見られるようにする
  */
-export function PeopleManager() {
-  const isOpen = usePeopleManagerOpen()
+export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に描く(窓・題・閉じるボタンを出さない) */ inline?: boolean } = {}) {
+  const isOpen = usePeopleManagerOpen() || !!inline
   const s = useStyles()
   const t = useT()
   const people = usePeople()
@@ -460,16 +461,15 @@ export function PeopleManager() {
     </div>
   )
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(_, d) => !d.open && setOpen(false)}>
-      <ResizableSurface sizeKey="people" className={s.surface}>
-        <div className={s.head}>
-          <DialogTitle className={s.grow}>{t('ユーザーと承認グループ', 'Users and approval groups')}</DialogTitle>
-          {working && <Spinner size="extra-tiny" />}
-          {/* 変更の履歴に残るのは、右上のログインしている人(U9。ここでは選ばせない) */}
-          <span className={s.note}>{meName ? t(`${meName} として変更します`, `Editing as ${meName}`) : t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right')}</span>
-          <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setOpen(false)} />
-        </div>
+  // 変更の履歴に残るのは、右上のログインしている人(U9。ここでは選ばせない)
+  const editingAs = (
+    <>
+      {working && <Spinner size="extra-tiny" />}
+      <span className={s.note}>{meName ? t(`${meName} として変更します`, `Editing as ${meName}`) : t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right')}</span>
+    </>
+  )
+  const content = (
+    <>
         <span className={s.note}>
           {lock
             ? canEdit
@@ -496,6 +496,27 @@ export function PeopleManager() {
           <Tab value="history">{t('変更の履歴', 'Change history')}</Tab>
         </TabList>
         <div className={s.scroll}>{!people.loaded ? <Spinner size="tiny" /> : tab === 'users' ? usersTab : tab === 'groups' ? groupsTab : tab === 'rules' ? rulesTab : historyTab}</div>
+    </>
+  )
+  if (inline)
+    return (
+      <div className={s.inline}>
+        <div className={s.head}>
+          <span className={s.grow} />
+          {editingAs}
+        </div>
+        {content}
+      </div>
+    )
+  return (
+    <Dialog open={isOpen} onOpenChange={(_, d) => !d.open && setOpen(false)}>
+      <ResizableSurface sizeKey="people" className={s.surface}>
+        <div className={s.head}>
+          <DialogTitle className={s.grow}>{t('ユーザーと承認グループ', 'Users and approval groups')}</DialogTitle>
+          {editingAs}
+          <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => setOpen(false)} />
+        </div>
+        {content}
       </ResizableSurface>
     </Dialog>
   )

@@ -63,6 +63,8 @@ const useStyles = makeStyles({
   nav: { overflowY: 'auto', backgroundColor: tokens.colorNeutralBackground2, minWidth: 0, height: '100%', boxSizing: 'border-box' },
   main: { overflowY: 'auto', padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalXL}`, display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalL, minWidth: 0 },
   heading: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
+  // 中身の欄は、右の残りの高さいっぱいに(画像のライブラリのように、中で一覧だけを送るものがあるため)
+  pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
   headRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, flexWrap: 'wrap' },
   sub: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalS },
   subHead: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
@@ -175,7 +177,8 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
         <>
           <span className={s.heading}>{adminName[key]}</span>
           <span className={s.note}>{t('開発・管理の操作です。ふだんの作業では使いません。', 'Developer and admin operations. Not needed for everyday work.')}</span>
-          <div>{of(key).map(actionRow)}</div>
+          {/* 中身を描く項目(開発へのリクエストの一覧など)は、そのまま描く。操作だけの項目は「行う」の行に並べる */}
+          <div>{of(key).map((x) => (x.render ? <div key={x.id}>{x.render(country, countryName)}</div> : actionRow(x)))}</div>
         </>
       )
     }
@@ -204,7 +207,9 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
         </span>
         {a.description && <span className={s.note}>{a.description}</span>}
         {a.render ? (
-          <div key={`${a.id}:${country}`}>{a.render(country, countryName)}</div>
+          <div key={`${a.id}:${country}`} className={s.pane}>
+            {a.render(country, countryName)}
+          </div>
         ) : (
           <span>
             <Button appearance="primary" icon={a.icon} disabled={a.disabled} onClick={a.onOpen}>
