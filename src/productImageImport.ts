@@ -2,6 +2,7 @@
 // コマンドを使えない環境(本番)でも、AI で作った見本の写真(scripts/sample-photos.py)や、集めた商品ページの画像を取り込めるように。
 // まず確認だけを頼んで件数を見せ、OK のときだけ取り込む。
 import { appPath } from './appRoot'
+import { dropSharedReads } from './gcp/readShare'
 import { tr } from './i18n'
 
 interface ImportSummary {
@@ -17,6 +18,7 @@ interface ImportSummary {
 
 async function post(file: File, yes: boolean, main = false): Promise<ImportSummary> {
   const res = await fetch(appPath(`/api/product-images/import${yes ? `?yes=1&main=${main ? 1 : 0}` : ''}`), { method: 'POST', body: file, headers: { 'Content-Type': 'application/zip' } })
+  dropSharedReads() // 書いたので、途中の読み込みに相乗りさせない(gcp/readShare.ts)
   const json = (await res.json()) as { success: boolean; data?: ImportSummary; error?: { message?: string } }
   if (!json.success || !json.data) throw new Error(json.error?.message ?? tr('ZIP を取り込めませんでした', 'Could not import the ZIP'))
   return json.data

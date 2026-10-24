@@ -1,6 +1,7 @@
 // 撮影・デモ用の、データベースの身代わり(メモリ上のデータ)。表ごとのサービス(src/data)と、同じ形で呼べる。
 // vite.mock.config.ts が、サービスの読み込みを、ここに差し替える。ページを読み込み直すと、データは、最初に戻る。
 
+import { dropSharedReads, shareRead } from '../gcp/readShare'
 import { mockAgent } from './agent'
 import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, categoryMetrics, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, productMetrics, products, users, weekly, type Row } from './seed'
 import { sampleAds } from './ads'
@@ -162,7 +163,8 @@ export function makeService(name: string) {
   const key = 'id'
   const find = (id: string) => rows.find((r) => r[key] === id)
   return {
-    async getAll(options?: Options) {
+    // 本物と同じく、同じ条件の読み込みが重なったら分け合う(src/gcp/readShare.ts。デモでも同じ動きを確かめられるように)
+    getAll: (options?: Options) => shareRead(`${name}?${JSON.stringify(options ?? {})}`, async () => {
       let list = rows.filter((r) => matches(r, options?.filter)).map(clone)
       const ob = options?.orderBy?.[0]?.split(' ')
       if (ob?.[0]) {
@@ -171,7 +173,7 @@ export function makeService(name: string) {
       }
       if (options?.top) list = list.slice(0, options.top)
       return { success: true, data: list }
-    },
+    }),
     async get(id: string) {
       const r = find(id)
       if (!r) return { success: false, error: { message: 'not found' } }
@@ -186,6 +188,7 @@ export function makeService(name: string) {
       return { success: true, data: clone(r) }
     },
     async create(record: Row) {
+      dropSharedReads()
       const row: Row = { [key]: guid(`${name}:${Math.random()}:${Date.now()}`), created_on: new Date().toISOString() }
       applyBinds(row, record)
       rows.push(row)
@@ -195,11 +198,13 @@ export function makeService(name: string) {
     async update(id: string, fields: Row) {
       const r = find(id)
       if (!r) return { success: false, error: { message: 'not found' } }
+      dropSharedReads()
       logChange(name, r, fields)
       applyBinds(r, fields)
       return { success: true, data: clone(r) }
     },
     async delete(id: string) {
+      dropSharedReads()
       const i = rows.findIndex((r) => r[key] === id)
       if (i >= 0) rows.splice(i, 1)
     },

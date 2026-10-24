@@ -1,6 +1,7 @@
 // メイン画像のライブラリに画像を上げる窓口(server/ccp/heroes.py。X59)。表ではなくサーバーの API。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、ブラウザの中だけに置く身代わり(src/mock/heroUpload.ts)に差し替える。
 import { appPath } from '../appRoot'
+import { dropSharedReads } from '../gcp/readShare'
 
 /** AI が画像を見て作った下書き(どれも空のことがある。人が確かめて直す) */
 export interface HeroDraft {
@@ -16,6 +17,7 @@ export interface HeroDraft {
 
 async function post<T>(path: string, init: RequestInit): Promise<T> {
   const res = await fetch(appPath(path), { method: 'POST', ...init })
+  dropSharedReads() // 書いたので、途中の読み込みに相乗りさせない(gcp/readShare.ts)
   const json = (await res.json().catch(() => null)) as { success: boolean; data?: T; error?: { message: string } } | null
   if (!json?.success || !json.data) throw new Error(json?.error?.message ?? `うまくいきませんでした(${res.status})`)
   return json.data

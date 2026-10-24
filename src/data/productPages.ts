@@ -1,6 +1,7 @@
 // 商品ページから、配信で使う商品の画像を選ぶ窓口(server/ccp/product_pages.py。X64)。表ではなくサーバーの API。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、ブラウザの中で見本のページを作る身代わり(src/mock/productPages.ts)に差し替える。
 import { appPath } from '../appRoot'
+import { dropSharedReads } from '../gcp/readShare'
 import { CreativeFiles } from './creativeFiles'
 
 /** ページに載っている画像 1 枚(src は、見本ならアプリの中のパス、本物なら https://…) */
@@ -30,6 +31,7 @@ export interface ImagePick {
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(appPath(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  dropSharedReads() // 書いたので、途中の読み込みに相乗りさせない(gcp/readShare.ts)
   const json = (await res.json().catch(() => null)) as { success: boolean; data?: T; error?: { message: string } } | null
   if (!json?.success || !json.data) throw new Error(json?.error?.message ?? `うまくいきませんでした(${res.status})`)
   return json.data
