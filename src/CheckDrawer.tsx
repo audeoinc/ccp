@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { Button, DrawerBody, DrawerHeader, DrawerHeaderTitle, OverlayDrawer, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { CheckmarkRegular, DismissRegular, EditRegular, MailRegular, PhoneRegular, WarningFilled } from '@fluentui/react-icons'
+import { type ReactNode } from 'react'
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { MailRegular, PhoneRegular, WarningFilled } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -12,14 +12,8 @@ import { CHANNEL_PUSH } from './status'
 import { getTemplate } from './templates'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
-import type { WeekFrames } from './useWeekFrames'
 
 const useStyles = makeStyles({
-  // 週の表示を見ながら使うので、画面全体は覆わず、右に重ねる
-  drawer: { width: 'min(760px, (92vw / var(--ui-zoom, 1)))' },
-  head: { display: 'grid', rowGap: '8px' },
-  tools: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
-  spacer: { flexGrow: 1 },
   content: { display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', columnGap: '16px', alignItems: 'start', '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '12px' } },
   previewBox: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, padding: '8px', backgroundColor: tokens.colorNeutralBackground2, display: 'grid', justifyItems: 'center' },
   facts: { display: 'grid', rowGap: '10px', minWidth: 0 },
@@ -40,71 +34,9 @@ const useStyles = makeStyles({
   prodHit: { border: `1.5px solid ${tokens.colorPaletteDarkOrangeBorder2}`, fontWeight: tokens.fontWeightSemibold },
 })
 
-interface Props {
-  frames: WeekFrames
-  /** すべての配信(取りやめを除く) */
-  cards: DeliveryCard[]
-  cardProducts: Map<string, string[]>
-  products: Product[]
-  heroes: HeroImage[]
-  /** 配信カードを開いて直す */
-  onOpen: (id: string) => void
-}
 
 const timeOf = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
 const norm = (s?: string) => (s ?? '').trim().replace(/\s+/g, ' ')
-
-/**
- * AI でまとめて作った配信を、確かめる引き出し(W14)。中身(プレビュー・全項目・AI の理由)と、前後の配信との比較を見て、
- * 「確認した」で「AI 下書き・未確認」の印を外す。直すときは、配信カードを開く(保存すると、印は外れる)。
- * 週の表示は、引き出しの左に見えたままにする(並びと見比べられるように)
- */
-export function CheckDrawer({ frames, cards, cardProducts, products, heroes, onOpen }: Props) {
-  const s = useStyles()
-  const t = useT()
-  const [tab, setTab] = useState<CheckTab>('content')
-  const c = cards.find((x) => x.id === frames.checkId)
-  return (
-    <OverlayDrawer open={!!c} position="end" modalType="non-modal" className={s.drawer} onOpenChange={(_, v) => !v.open && frames.openCheck(null)}>
-      {c && (
-        <>
-          <DrawerHeader>
-            <DrawerHeaderTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={() => frames.openCheck(null)} />}>{c.name}</DrawerHeaderTitle>
-            <div className={s.head}>
-              <span className={s.muted}>{whenOf(c.scheduled_at)}</span>
-              <div className={s.tools}>
-                <TabList size="small" selectedValue={tab} onTabSelect={(_, v) => setTab(v.value as CheckTab)}>
-                  <Tab value="content">{t('中身', 'Content')}</Tab>
-                  <Tab value="compare">{t('比べる', 'Compare')}</Tab>
-                </TabList>
-                <span className={s.spacer} />
-                <Button size="small" icon={<EditRegular />} onClick={() => onOpen(c.id)}>
-                  {t('開いて直す', 'Open & edit')}
-                </Button>
-                {c.ai_unchecked_at && (
-                  <Button
-                    size="small"
-                    appearance="primary"
-                    icon={<CheckmarkRegular />}
-                    onClick={async () => {
-                      await frames.check(c.id)
-                      frames.openCheck(null)
-                    }}
-                  >
-                    {t('確認した', 'Checked')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DrawerHeader>
-          <DrawerBody>
-            <CheckView card={c} tab={tab} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} />
-          </DrawerBody>
-        </>
-      )}
-    </OverlayDrawer>
-  )
-}
 
 export type CheckTab = 'content' | 'compare'
 

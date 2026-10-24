@@ -93,7 +93,6 @@ export interface DeliveryCardFields {
   /** 取りやめの理由 */
   cancel_reason?: string
   /** AI でまとめて中身を作り、まだ人が確かめていない(作った日時。確かめたら空。W14) */
-  ai_unchecked_at?: string | null
   /** 週の表示の上の「この週の枠を作る」で、中身のない枠として作った日時(W14 の古い形)。中身のない配信のうち、これがあるものだけを枠として出す */
   frame_at?: string | null
   /** 使っているテンプレートの版の番号(layout_key のテンプレートの。空は、版を管理する前の配信で、いまの版として扱う) */

@@ -218,7 +218,7 @@ flowchart TD
 | `ListView.tsx` / `listRows.ts` | 100 / 110 | 表の形の一覧と、その列の定義(CSV の書き出しも同じ定義) |
 | `MiniCalendar.tsx` | 166 | ツールバーのミニカレンダー(月・週・日へ移る) |
 | `useWeekFrames.ts` / `bulkDraft.ts` | 298 / 293 | 週の枠とまとめて AI で中身を作る(W14)の、画面の状態と操作(App が持つ) / 枠を作る・中身を作る・書き込む部分(React を使わない) |
-| `FrameBar.tsx` / `FrameCard.tsx` / `CheckDrawer.tsx` | 150 / 136 / 230 | 週の枠の帯(国・チャネル、配信名の案、中身を作る) / 週の列の枠(配信名・種類) / 未確認の AI 下書きを確かめる引き出し(中身・比べる・確認した)。中身・比べるの表示は `CheckView` として作業画面でも使う |
+| `FrameBar.tsx` / `FrameCard.tsx` / `CheckDrawer.tsx` | 150 / 136 / 162 | 週の枠の帯(国・チャネル、配信名の案、中身を作る) / 週の列の枠(配信名・種類) / 作った中身・前後の配信との比べるの表示(`CheckView`。作業画面で使う。引き出しは 2026-10-24 にやめた) |
 | `useBulkWorkspace.ts` / `BulkWorkspace.tsx` | 585 / 891 | まとめて作る作業画面(W14 の 4 回目の見直し)の状態と操作(App が持つ。① は保存しない) / 画面(① 対象と方向 → ② 中身を AI で作る → ③ 確かめる。① のあと、中身を作らずに保存もできる) |
 | `DeliveryPeek.tsx` / `CardPreview.tsx` | 34 / 68 | 配信にマウスを重ねたときのプレビュー / 保存済みの配信カードのプレビュー |
 | `status.ts` / `progress.ts` | 53 / 167 | 配信のステータスの色・チャネル / 工程(進み具合) |
@@ -317,7 +317,7 @@ flowchart TD
 | `HandoffSheet.tsx` / `ProductionMemo.tsx` / `assetDrop.ts` | 239 / 69 / 35 | 制作に渡すもの(担当・締め切り・文章・素材・「制作に渡す」)/ 部品から 1 行で渡すものに書き留める「制作へのメモ」/ 画像・資料・URL のドラッグ |
 | `AbSettings.tsx` | 85 | AB テストの設定(SU2。案のタブの横の ⚙) |
 | `StageHeader.tsx` / `ViewSwitch.tsx` / `NextAction.tsx` / `nextStep.ts` | 33 / 38 / 26 / 13 | 上の帯(題名と PLAN \| PRODUCTION \| RESULTS のタブ。制作のシンプルな画面でも使う)/ シンプル \| 詳しい の切り替え / 次にやることのボタン |
-| `PreviewMarks.tsx` | 78 | プレビューの上の目印(AI 下書き・未確認 / A と違う) |
+| `PreviewMarks.tsx` | 78 | プレビューの上の目印(A と違う) |
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 126 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
 
 ### 3.4 AI

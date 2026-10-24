@@ -15,7 +15,6 @@ export const checkTitle = (t: T, k: CheckKey): string =>
     repeat: t('テーマ・メイン画像の連続', 'Same main image or theme in a row'),
     openComments: t('未解決のやり取り', 'Open conversations'),
     openQuestions: t('未解決の質問', 'Open questions'),
-    aiUnchecked: t('未確認の AI 下書き', 'Unchecked AI drafts'),
     approved: t('承認済みの配信', 'Approved deliveries'),
   })[k]
 
@@ -28,7 +27,6 @@ export const checkHint = (t: T, k: CheckKey): string =>
     repeat: t('同じチャネルで、すぐ前の配信と同じ(前の週の最後の配信を含む)', 'Same as the previous delivery on the same channel (including the last one of the previous week)'),
     openComments: t('配信カードのやり取り(質問・指摘)で、まだ解決にしていないもの', 'Conversations (questions, feedback) on delivery cards not resolved yet'),
     openQuestions: t('質問で、まだ解決していないもの', 'Questions that are not resolved yet'),
-    aiUnchecked: t('AI でまとめて中身を作り、まだ人が確かめていない配信(配信カードを開いて保存するか、「確認した」を押すと外れる)', 'Deliveries whose content AI created in bulk and nobody has checked yet (cleared when you save the card or press “Checked”)'),
     approved: t('まだ承認されていない配信', 'Deliveries not approved yet'),
   })[k]
 
@@ -41,7 +39,6 @@ export const checkAction = (t: T, k: CheckKey): string =>
     repeat: t('テーマかメイン画像を変える', 'Change the theme or main image'),
     openComments: t('返信して、解決にする', 'Reply and resolve'),
     openQuestions: t('質問に返信して、解決にする', 'Reply to and resolve the questions'),
-    aiUnchecked: t('中身を確かめて「確認した」を押す(直すなら、配信カードで保存)', 'Check the content and press “Checked” (or fix and save the card)'),
     approved: t('配信を承認する', 'Approve the deliveries'),
   })[k]
 

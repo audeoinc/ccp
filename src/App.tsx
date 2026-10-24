@@ -137,7 +137,6 @@ import { markTemplatesLoadFailed, openTemplateManager, useTemplates } from './te
 import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { FrameBar } from './FrameBar'
 import { FrameCard } from './FrameCard'
-import { CheckDrawer } from './CheckDrawer'
 import { useWeekFrames } from './useWeekFrames'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { BulkWorkspace } from './BulkWorkspace'
@@ -1140,18 +1139,6 @@ function App() {
   // まとめて依頼の対象。中身のない週の枠(W14)は、承認するものがないので外す(中身を作ってから依頼する)
   const requestable = needsRequest(weekCards.filter((c) => !frames.frameIds.has(c.id)), inbox.hasOpen)
   const requestWeek = async () => {
-    // まだ誰も確かめていない AI の下書き(W14)が入っていれば、依頼の前に知らせる(確かめずに承認者へ回さないように)
-    const unchecked = requestable.filter((c) => !!c.ai_unchecked_at).length
-    if (
-      unchecked > 0 &&
-      !window.confirm(
-        tr(
-          `依頼する配信のうち ${unchecked} 本は、AI でまとめて作り、まだ誰も確かめていない下書きです(「AI 下書き・未確認」)。このまま依頼しますか?`,
-          `${unchecked} of the deliveries to request are AI drafts nobody has checked yet (“AI draft, unchecked”). Request anyway?`,
-        ),
-      )
-    )
-      return
     setError(null)
     try {
       const { skipped } = await requestAll(requestable, people, actor(), weekKey)
@@ -2338,7 +2325,6 @@ function App() {
                 onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
                 // 中身のない配信(週の枠)は、その場で配信名・種類を入れられる形で出す(W14)
                 renderCard={(c) => (frames.frameIds.has(c.id) ? <FrameCard key={`${c.id}:${c.name}`} card={c} frames={frames} onOpen={setSelectedId} /> : null)}
-                onCheck={frames.openCheck}
               />
               )}
               </SwipePager>
@@ -2493,7 +2479,6 @@ function App() {
           }}
         />
       )}
-      <CheckDrawer frames={frames} cards={activeCards} cardProducts={cardProducts} products={products} heroes={heroes} onOpen={setSelectedId} />
       {peekResult && (
         <ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} />
       )}

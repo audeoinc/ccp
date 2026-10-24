@@ -23,7 +23,7 @@ import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
-import { getTemplate, sectionsOf } from '../templates'
+import { getTemplate } from '../templates'
 import { NextAction } from './NextAction'
 import type { NextStep } from './nextStep'
 import { PartPane } from './PartPane'
@@ -212,15 +212,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // アプリの配信は、スマホの幅
   const widthKey: 'mobile' | 'pc' = e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile'
   const nav = usePreviewNav(boxRef, e.zoom)
-  // AI 下書き・未確認の目印: AI が作った部品(文言・メイン画像・商品)の右上に点。見つからない部品(テンプレートにない枠)は出ない
-  const uncheckedMarks: Mark[] =
-    e.card.ai_unchecked_at
-      ? [
-          ...(['headline', 'copy', 'hero', 'pushTitle', 'pushBody'] as const).map((kind) => ({ part: { kind } as PartRef })),
-          ...sectionsOf(e.template).flatMap((_, index) => [{ part: { kind: 'sectionTitle', index } as PartRef }, { part: { kind: 'sectionCopy', index } as PartRef }]),
-          ...e.items.map((it) => ({ part: { kind: 'product', itemKey: it.key } as PartRef })),
-        ].map((x) => ({ ...x, color: tokens.colorPaletteBerryBackground3, label: t('AI 下書き・未確認(確かめたら、上の「確認した」)', 'AI draft, unchecked (press “Mark as checked” above when done)') }))
-      : []
   // 「A と違う」の目印(B・C 案を直しているとき)
   const diffMarks: Mark[] = e.abDiffParts.map((part) => ({ part, color: tokens.colorPaletteDarkOrangeBackground3, label: t('A と違う', 'Differs from A') }))
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
@@ -460,7 +451,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <NextAction
               step={e.nextStep}
               busy={e.saving}
-              // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。確認した・制作のページは、CardDetail の側
+              // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。制作のページは、CardDetail の側
               onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'watchApproval' ? showSide('approval', true) : onRunNext(step))}
             />
             {e.viewSwitch}
@@ -729,7 +720,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 }}
               />
             )}
-            {uncheckedMarks.length + diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={[...uncheckedMarks, ...diffMarks]} onSelect={select} />}
+            {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}

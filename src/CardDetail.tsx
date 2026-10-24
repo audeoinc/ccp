@@ -1398,7 +1398,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
 
   /** 保存する内容(ステータスを除く)。保存と、承認済みの配信の内容が変わったかの判定(再承認)の両方で使う */
-  function buildContent(clearUnchecked = true) {
+  function buildContent() {
     return {
         name: form.name,
         scheduled_at: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
@@ -1437,9 +1437,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         layout_version: splitTemplateKey(templateOfV('A')).version ?? currentVersion(baseTemplateId(templateOfV('A'))),
         section_titles: textsOf('A').sectionTitles.join('\n').replace(/\n+$/, ''),
         section_copies: encodeCopies(textsOf('A').sectionCopies),
-        // AI でまとめて作った中身を、人が配信カードで確かめて保存したら、未確認の印を外す(W14)
-        // シンプルな画面の自動の反映(SU1)では外さない(外すのは「確認した」のボタン)
-        ...(card?.ai_unchecked_at && clearUnchecked ? { ai_unchecked_at: null as never } : {}),
         // 外したときは null を送ってルックアップを空にする
         hero_image_id: heroOf('A').heroId
           ? heroOf('A').heroId
@@ -1451,9 +1448,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 再承認の判定に使う、内容の要約。商品の名前の列は、商品の一覧の読み込みで変わるので、商品 ID の並びで比べる。
   // 開いたときの値(下の baseline)と比べる(保存済みの行と比べると、表し方の違いだけで「変わった」になるため)
   const contentKey = () => {
-    const { products: _names, ai_unchecked_at: _unchecked, ...rest } = buildContent()
+    const { products: _names, ...rest } = buildContent()
     void _names
-    void _unchecked
     return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(savedTargetAb()) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
   }
   const baseline = useRef<string | null>(null)
@@ -1579,7 +1575,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
    * 承認済みの配信の内容を変えたときは、承認のやり直しが必要なので「承認待ち」に戻し、いまの承認の依頼を古いものにする。
    * 承認・差し戻しそのものは、ここではなく ApprovalBar(サーバーの窓口 /api/approvals)で行う(U4)
    */
-  async function save(reason?: string, keepUnchecked = false): Promise<boolean> {
+  async function save(reason?: string): Promise<boolean> {
     const goNext = goNextRef.current
     const stay = stayRef.current
     setSaving(true)
@@ -1589,7 +1585,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       const revoke = reason === undefined && approvedBefore && formStatus === card?.status && baseline.current !== null && baseline.current !== contentKey()
       // 確定後に変えた配信・承認済みの内容を変えた配信は、もう一度承認を受けるので「承認待ち」(reviewing)にする
       const status = reason !== undefined || revoke ? STATUS_REVIEW : formStatus
-      const fields = { ...buildContent(!keepUnchecked), status: status as DeliveryCard['status'] }
+      const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
       const res = card
         ? await DeliveryCardsService.update(card.id, fields)
         : await DeliveryCardsService.create({ ...fields, state_code: 0 })
@@ -1683,16 +1679,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </MessageBar>
     )}
 
-    {card?.ai_unchecked_at && (
-      <MessageBar layout="multiline" intent="info" className={styles.locked}>
-        <MessageBarBody>
-          {t(
-            'この配信の中身は、週の枠から AI でまとめて作ったもので、まだ誰も確かめていません。中身を確かめて保存すると、「AI 下書き・未確認」の印が外れます。',
-            'This content was created by AI in bulk from a week slot and nobody has checked it yet. Check it and save to clear the “AI draft, unchecked” mark.',
-          )}
-        </MessageBarBody>
-      </MessageBar>
-    )}
     {approvedBefore && lockedWeeks.length === 0 && changed && (
       <MessageBar layout="multiline" intent="info" className={styles.locked}>
         <MessageBarBody>
@@ -2016,17 +2002,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   // 承認済みの配信を自動で反映すると承認待ちに戻るので、最初の反映の前に一度だけ確かめる
   const revokeOk = useRef(false)
-  // 確定した週の配信で、元に戻す・確認したの保存を、理由の入力を待って行うとき(履歴に積まない・未確認の印を外す)
+  // 確定した週の配信で、元に戻すの保存を、理由の入力を待って行うとき(履歴に積まない)
   const undoingRef = useRef(false)
-  const checkingRef = useRef(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
-  const saveStaying = async (reason?: string, push = true, keepUnchecked = true) => {
+  const saveStaying = async (reason?: string, push = true) => {
     const before = committedSnap.current
     goNextRef.current = false
     stayRef.current = true
     setSaveMode('stay')
-    const ok = await save(reason, keepUnchecked)
+    const ok = await save(reason)
     if (ok && push && before) undoStack.push(before)
   }
   /** 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying) */
@@ -2091,12 +2076,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       return
     }
     const push = !undoingRef.current
-    const keep = !checkingRef.current
     undoingRef.current = false
-    checkingRef.current = false
-    void saveStaying(reason, push, keep)
+    void saveStaying(reason, push)
   }
-  const nextStep = nextStepOf({ status: form.status, aiUnchecked: !!card?.ai_unchecked_at, handedOff: !!form.handedOffAt })
+  const nextStep = nextStepOf({ status: form.status, handedOff: !!form.handedOffAt })
   /** 詳しい画面(今の配信カード)で続ける。コミュニケーションの段階(d)ができるまで、承認・制作への依頼はこちらで */
   const openDetailed = (tab?: TalkTab) => {
     changeView(false, false)
@@ -2104,13 +2087,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (tab) setTabRequest((r) => ({ tab, seq: (r?.seq ?? 0) + 1 }))
   }
   const runNext = (step: NextStep) => {
-    if (step === 'check') {
-      // 中身を確かめたので、保存して「AI 下書き・未確認」の印を外す(変わっていなくても保存する)
-      if (locked) {
-        checkingRef.current = true
-        askReason()
-      } else if (confirmRevoke()) void saveStaying(undefined, isDirty(), false)
-    } else if (step === 'openProduction') {
+    if (step === 'openProduction') {
       if (card) {
         void commitSimple()
         onOpenProduction?.(card.id)
@@ -2132,7 +2109,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     goNextRef.current = false
     stayRef.current = false
     setSaveMode('close')
-    void save(undefined, true)
+    void save()
   }
   const swapItems = (a: string, b: string) => {
     const i = items.findIndex((x) => x.key === a)

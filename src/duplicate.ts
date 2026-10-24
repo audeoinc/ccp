@@ -43,7 +43,7 @@ const initialStatus = (card: DeliveryCard) => (card.theme?.trim() || card.headli
 /** 写さない列: 読んだときだけの列(id・*_name・作った日時)と、その配信に起きた出来事の列 */
 const NOT_COPIED = [
   'id', 'country_name', 'channel_name', 'department_name', 'status_name', 'email_template_name', 'created_on', 'modified_on',
-  'status', 'handed_off_at', 'production_due', 'cancelled_at', 'cancel_reason', 'ai_unchecked_at', 'frame_at',
+  'status', 'handed_off_at', 'production_due', 'cancelled_at', 'cancel_reason', 'frame_at',
 ] as const
 
 /** 新しい配信に写す列。読んだときだけの列(id・*_name・作った日時)と、出来事の列は外す */

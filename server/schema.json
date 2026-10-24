@@ -2,6 +2,8 @@
  "_comment": "CCP のデータ定義(唯一の正)。表・列の名前は、画面・API・PostgreSQL で同じ。ここから、表を作る SQL・API の許可リスト・値の変換を作る(server/ccp/schema.py)。列を足したら、画面の型(src/models、src/data)にも足す(scripts/check-schema.mjs が食い違いを見つける)。",
  "tables": {
   "delivery_cards": {
+   "_retired": "使わなくなった列。書き込みに来ても無視する(反映の直後に開いていた古い画面や、前に書き出した引っ越し用のパックが送ってくるため)。DB の列は自動では消さない",
+   "retired": ["ai_unchecked_at"],
    "columns": [
     ["name", "text", {"required": true}],
     ["scheduled_at", "timestamptz"],
@@ -36,7 +38,6 @@
     ["theme_type", "text"],
     ["cancelled_at", "timestamptz"],
     ["cancel_reason", "text"],
-    ["ai_unchecked_at", "timestamptz"],
     ["frame_at", "timestamptz"],
     ["layout_version", "int"],
     ["ab_test", "text"],

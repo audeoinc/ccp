@@ -28,7 +28,6 @@ import { LockMark } from './LockMark'
 import { getTemplate, sectionRange, sectionsOf, templateKeyOfCard } from './templates'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
-import { AiIcon } from './AiMark'
 import type { CardAlertKind } from './cardAlerts'
 import { weeklyLimitFor } from './weeklyLimit'
 
@@ -64,8 +63,6 @@ interface Props {
   onCreate: (day: string) => void
   /** 配信の描き方を差し替える(中身のない配信(週の枠)を、その場で入力できる形で出す。W14)。null なら、ふつうに描く */
   renderCard?: (c: DeliveryCard) => ReactNode | null
-  /** 「AI 下書き・未確認」の印を押したとき(確かめる引き出しを開く。W14) */
-  onCheck?: (id: string) => void
   /** 配信の状態の色と名前を差し替える(制作の面では、制作の状態。なければ計画のステータス) */
   stateOf?: (c: DeliveryCard) => { color: string; label: string }
   /** 配信名の下に出す 1 行(制作の面の、状態と締め切り) */
@@ -149,7 +146,6 @@ const useStyles = makeStyles({
   cardFocus: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
   cardDim: { opacity: 0.4 },
   // AI でまとめて作り、まだ人が確かめていない配信の印(押すと、確かめる引き出し。破線で、ふつうの印と形を分ける)
-  issueAi: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, border: `1px dashed ${tokens.colorBrandStroke1}`, cursor: 'pointer' },
   // チャネルの帯(メールとアプリを、色とアイコンで見分ける)
   strip: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: '3px 8px', fontSize: tokens.fontSizeBase100, fontWeight: tokens.fontWeightSemibold },
   // 帯は、配信カードの札と同じ、塗りつぶしの地に白抜き(メール = 青、アプリ = ベリー)
@@ -240,7 +236,7 @@ const useStyles = makeStyles({
  * - 進み具合: ステータス・工程・担当・締め切り・引き継ぎ・タスク
  * どちらの見方でも、問題(締め切りが近いのに未着手・期日を過ぎたタスク・未解決の質問)は、色の印で出す。
  */
-export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, weekUse, onSelect, onCreate, renderCard, onCheck, stateOf, renderMeta }: Props) {
+export function WeekView({ start, cards, cardProducts, questionCounts, taskCounts, commentCounts, overdueTasks, lens, products, heroes, dueSoon, focus, alertKinds, weekUse, onSelect, onCreate, renderCard, stateOf, renderMeta }: Props) {
   const styles = useStyles()
   const t = useT()
   const [hover, setHover] = useState<string | null>(null)
@@ -335,30 +331,9 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
             {t(`コメント ${comments}`, `${comments} comment${comments === 1 ? '' : 's'}`)}
           </span>
         )}
-        {c.ai_unchecked_at && (
-          <span
-            role="button"
-            tabIndex={0}
-            className={mergeClasses(styles.issue, styles.issueAi)}
-            title={t('AI でまとめて作った中身を、まだ誰も確かめていません。押すと、中身と前後の配信を確かめられます', 'Nobody has checked this AI-made content yet. Click to check it against nearby deliveries')}
-            onClick={(e) => {
-              e.stopPropagation()
-              onCheck?.(id)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.stopPropagation()
-                onCheck?.(id)
-              }
-            }}
-          >
-            <AiIcon size={10} />
-            {t('AI 下書き・未確認', 'AI draft, unchecked')}
-          </span>
-        )}
       </>
     )
-    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0 || comments > 0 || !!c.ai_unchecked_at
+    const hasIssues = !!dueSoon?.has(id) || overdue > 0 || questions > 0 || comments > 0
 
     const pushBox = hasPushText && (
       <div className={styles.push}>

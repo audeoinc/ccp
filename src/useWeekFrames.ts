@@ -12,7 +12,7 @@ import { suggestNames } from './aiDraft'
 import { channelOptions, departmentOptions, CHANNEL_EMAIL } from './status'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { tr } from './i18n'
-import { BULK_PARALLEL, applyResult, createFrames, emptyDays, frameReady, generateFor, isFrame, lockedWeekOf, markChecked, overusedInWeek } from './bulkDraft'
+import { BULK_PARALLEL, applyResult, createFrames, emptyDays, frameReady, generateFor, isFrame, lockedWeekOf, overusedInWeek } from './bulkDraft'
 
 interface Ctx {
   /** すべての配信(取りやめを除く) */
@@ -57,7 +57,6 @@ export function useWeekFrames({ cards, cardProducts, products, heroes, weeks, we
   const [naming, setNaming] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   // 確かめる引き出しで開いている配信
-  const [checkId, setCheckId] = useState<string | null>(null)
   const stopRef = useRef(false)
   const running = progress.size > 0
 
@@ -251,17 +250,6 @@ export function useWeekFrames({ cards, cardProducts, products, heroes, weeks, we
     stopRef.current = true
   }
 
-  /** 「確認した」: AI 下書き・未確認の印を外す */
-  async function check(id: string) {
-    setError(null)
-    try {
-      await markChecked(id)
-      await onChanged()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
   return {
     setupOpen,
     openSetup,
@@ -290,9 +278,6 @@ export function useWeekFrames({ cards, cardProducts, products, heroes, weeks, we
     nameFrames,
     generate,
     stop,
-    check,
-    checkId,
-    openCheck: setCheckId,
   }
 }
 

@@ -472,7 +472,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setError(null)
     setSavingDay(day)
     try {
-      const card = await createDraft(baseOf(day), r, products, false)
+      const card = await createDraft(baseOf(day), r, products)
       setSavedIds((m) => new Map(m).set(day, card.id))
       setDiscarded((s) => {
         const n = new Set(s)
@@ -498,7 +498,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       if (!r) continue
       setSavingDay(day)
       try {
-        const card = await createDraft(baseOf(day), r, products, false)
+        const card = await createDraft(baseOf(day), r, products)
         setSavedIds((m) => new Map(m).set(day, card.id))
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))

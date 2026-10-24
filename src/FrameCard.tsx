@@ -44,7 +44,7 @@ interface Props {
 
 /**
  * 枠 1 本。配信名(AI の案も出せる)と種類を入れると、中身を作れるようになる。
- * 中身を作ると、ふつうの配信として並び、「AI 下書き・未確認」の印が付く
+ * 中身を作ると、ふつうの配信として並ぶ(人の確認は承認で担う)
  */
 export function FrameCard({ card: c, frames, onOpen }: Props) {
   const s = useStyles()

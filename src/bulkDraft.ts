@@ -125,7 +125,7 @@ export const productIdsOf = (r: AutoDraftResult): string[] => r.sections.flatMap
 /**
  * 作った中身を、枠の配信カードに書き込む(配信カードの buildContent・syncItems と同じ形)。
  * 配信名・日時・国・チャネル・種類は、人が決めたものなので変えない。
- * 「AI 下書き・未確認」の印(ai_unchecked_at)を付ける(人が配信カードで保存するか、「確認した」を押すと外れる)
+ * 人の確認は、承認で担う(2026-10-24 SU7。以前の「AI 下書き・未確認」の印はやめた)
  */
 export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products: Product[]): Promise<void> {
   const res = await DeliveryCardsService.update(c.id, contentFields(c, r, products))
@@ -136,10 +136,9 @@ export async function applyResult(c: DeliveryCard, r: AutoDraftResult, products:
 
 /**
  * 作業画面(BulkWorkspace)で作った中身を、新しい配信カードとして保存する。
- * 中身のない枠は作らず、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。
- * 作業画面は、人が中身を見て 1 本ずつ「保存」したものだけを保存するので、「AI 下書き・未確認」の印は付けない(unchecked = false)
+ * 中身のない枠は作らず、1 本ずつ新規作成した下書きと同じ「未起案」で保存する
  */
-export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[], unchecked = true): Promise<DeliveryCard> {
+export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[]): Promise<DeliveryCard> {
   const res = await DeliveryCardsService.create({
     name: base.name,
     scheduled_at: base.scheduled_at,
@@ -149,7 +148,7 @@ export async function createDraft(base: DraftBase, r: AutoDraftResult, products:
     theme_type: base.theme_type,
     status: 'not_started',
     state_code: 0,
-    ...contentFields(base, r, products, unchecked),
+    ...contentFields(base, r, products),
   })
   if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
   const card = res.data
@@ -182,11 +181,11 @@ export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
  * id は仮のもの(保存すると、本当の id の配信カードになる)
  */
 export function previewCard(id: string, base: DraftBase, r: AutoDraftResult, products: Product[]): DeliveryCard {
-  return { id, ...base, status: 'not_started', ...contentFields(base, r, products, false) } as DeliveryCard
+  return { id, ...base, status: 'not_started', ...contentFields(base, r, products) } as DeliveryCard
 }
 
 /** 作った中身の列(配信カードの buildContent と同じ形) */
-function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[], unchecked = true): Partial<DeliveryCardFields> {
+function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[]): Partial<DeliveryCardFields> {
   const template = templateOf(c, r)
   const pname = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   const copies = r.sections.map((s) => s.copy)
@@ -208,7 +207,6 @@ function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[], un
     section_titles: r.sections.map((s) => s.title).join('\n').replace(/\n+$/, ''),
     section_copies: copies.some(Boolean) ? JSON.stringify(copies) : '',
     ...(r.hero?.hero?.heroId ? { hero_image_id: r.hero.hero.heroId } : {}),
-    ...(unchecked ? { ai_unchecked_at: new Date().toISOString() } : {}),
   }
 }
 
@@ -235,12 +233,6 @@ async function saveProducts(cardId: string, cardName: string, r: AutoDraftResult
     })
     if (!p.success) throw new Error(p.error?.message ?? tr('掲載商品の保存に失敗しました', 'Failed to save the products in this delivery'))
   }
-}
-
-/** 「確認した」: AI 下書き・未確認の印を外す */
-export async function markChecked(id: string): Promise<void> {
-  const res = await DeliveryCardsService.update(id, { ai_unchecked_at: null as never })
-  if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
 }
 
 /** その週に、上限まで載せた商品。確認の一覧(W4)の「載せすぎ」を、作る前に避ける。上限は、作る配信(target。国・チャネル)に効くもの */

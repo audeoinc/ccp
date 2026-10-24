@@ -60,6 +60,8 @@ class Table:
     pg: str
     columns: list[Column]
     lookups: list[Lookup]
+    # 使わなくなった列(schema.json の retired)。書き込みに来ても、断らずに無視する
+    retired: set[str] = field(default_factory=set)
     by_name: dict[str, Column] = field(default_factory=dict)
     by_lookup: dict[str, Lookup] = field(default_factory=dict)
 
@@ -91,7 +93,7 @@ class Table:
     def to_db(self, record: dict[str, Any]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for key, value in record.items():
-            if key in IGNORED_ON_WRITE or self._is_label(key):
+            if key in IGNORED_ON_WRITE or key in self.retired or self._is_label(key):
                 continue
             if key in self.by_lookup:
                 out[key] = _lookup_id(value)
@@ -209,7 +211,7 @@ def _schema() -> Schema:
         for name, t in raw["tables"].items():
             cols = [Column(c[0], c[1], **(c[2] if len(c) > 2 else {}), choices=choices.get(f"{name}.{c[0]}")) for c in t["columns"]]
             lks = [Lookup(lk[0], lk[1], (lk[2] if len(lk) > 2 else {}).get("onDelete", "NO ACTION")) for lk in t["lookups"]]
-            tables[name] = Table(name, cols, lks)
+            tables[name] = Table(name, cols, lks, set(t.get("retired", [])))
         _cache = Schema(tables)
     return _cache
 

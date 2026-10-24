@@ -145,8 +145,8 @@ export function FrameBar({ frames, weekStart, weeks, visibleIds }: Props) {
       </div>
       <div className={s.hint}>
         {t(
-          '枠に配信名と種類を入れると、中身を作れます(AI は、配信名と種類に沿って作ります)。作った中身は保存され、「AI 下書き・未確認」の印が付きます。',
-          'Enter a name and a type in a slot to create its content (AI follows them). The content is saved with an “AI draft, unchecked” mark.',
+          '枠に配信名と種類を入れると、中身を作れます(AI は、配信名と種類に沿って作ります)。作った中身は保存されます(承認の前に、配信カードで確かめてください)。',
+          'Enter a name and a type in a slot to create its content (AI follows them). The content is saved (check it on the card before approval).',
         )}
       </div>
       {error}
