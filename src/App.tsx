@@ -75,6 +75,7 @@ import type { HeroImage } from './models/heroImages'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { ProductImagesService } from './data/productImages'
 import type { ProductImage } from './models/productImages'
+import type { DeliveryProduct } from './models/deliveryProducts'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { WeeksService, type WeekRow, type WeekStatus } from './data/weeks'
 import { WeekReviewBar, WeekScopeBar } from './WeekReviewBar'
@@ -456,6 +457,10 @@ function bqStockTime(r: BqSyncResult): string | undefined {
   return at ? tr('在庫 ', 'Stock ') + new Date(at).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : undefined
 }
 
+/** App が持つ表(読み直すとき、変わった表だけを選べる) */
+type LoadPart = 'cards' | 'cardProducts' | 'notes' | 'weeks' | 'events' | 'images'
+const ALL_PARTS: readonly LoadPart[] = ['cards', 'cardProducts', 'notes', 'weeks', 'events', 'images']
+
 function App() {
   // 開いたときの URL(リンクから開いたら、その画面で始める。X36)
   const [link] = useState(() => parseLink(window.location.search))
@@ -581,6 +586,12 @@ function App() {
   const [cardImages, setCardImages] = useState<Map<string, Map<string, string>>>(new Map())
   // モデルの使用期限が入っている商品画像だけ(配信日より前に切れる画像のアラート。期限のない画像は読まない)
   const [expiringImages, setExpiringImages] = useState<ProductImage[]>([])
+  // 配信の商品の行のすべて(在庫・方針のアラートが、載っている場所に使う)
+  const [productRows, setProductRows] = useState<DeliveryProduct[]>([])
+  // アラートの読み直しの合図。結果・実績は、すべてを読み直すときだけ(配信カードの保存では変わらない)。
+  // 変更の記録は、配信カードを読み直すとき(日程の変更は、配信の保存でサーバーが残す)
+  const [resultsKey, setResultsKey] = useState(0)
+  const [changeKey, setChangeKey] = useState(0)
   // 週の上限(同じ商品を週に何回載せたか)に使う、AB テストの B・C 案の商品も足した中身(X55 段階 3)。
   // B・C 案も実際に一部の受信者に送るので、安全側に数える。同じ配信の中で A と同じ商品は 1 回だけ
   const cardProductsAll = useMemo(() => {
@@ -732,10 +743,10 @@ function App() {
   // 国で使う決まり(ST8)を変えたら、週の上限を使う計算を作り直す
   const applyVersion = useCountryApply()
   const lowWeeksOf = useCallback((c: DeliveryCard) => criteriaFor(c.country).lowWeeks, [countryVersion]) // eslint-disable-line react-hooks/exhaustive-deps
-  const alertState = useStockAlerts(activeCards, products, cards, lowWeeksOf)
+  const alertState = useStockAlerts(activeCards, products, productRows, resultsKey, lowWeeksOf)
   const alerts = filterStockAlerts(alertSettings, alertState.alerts)
   // 変更のアラート(MD 方針の変更・日程の変更)。件数は、在庫のアラートと合わせて、ヘッダーに出す
-  const changeState = useChangeAlerts(activeCards, products, alertState.placements, cards)
+  const changeState = useChangeAlerts(activeCards, products, alertState.placements, changeKey)
   // 配信のない変更の知らせ(主力になった など)は、商品の市場で国に合わせる
   const changeAlerts = filterChangeAlerts(alertSettings, changeState.changeAlerts).filter(
     (a) => !filters.country || a.card || a.deliveries.length > 0 || !a.product?.market || a.product.market === filters.country,
@@ -785,11 +796,15 @@ function App() {
   })
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
 
-  const load = useCallback(async () => {
+  // 表を読み直す。parts で、変わった表だけにできる(保存のたびに、すべての表を読み直さないため)
+  const fetchParts = useCallback(async (parts: readonly LoadPart[]) => {
+    const has = (p: LoadPart) => parts.includes(p)
     try {
-      DeliveryProductsService.getAll()
+      if (has('cardProducts')) DeliveryProductsService.getAll()
         .then((res) => {
           if (!res.success) return // 数が出ないだけで、画面は使える
+          // 在庫・方針のアラートも、同じ行を使う(2 回読まない)
+          setProductRows(res.data ?? [])
           const rows = (res.data ?? [])
             .filter((r) => r.delivery_card_id && r.state !== STATE_CANDIDATE && !r.variant) // AB テストの B・C 案の商品は、配信の中身(A 案)に入れない(X55)
             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -818,10 +833,10 @@ function App() {
           setCardImages(images)
         })
         .catch(() => undefined)
-      ProductImagesService.getAll({ filter: 'model_usable_until ne null' })
+      if (has('images')) ProductImagesService.getAll({ filter: 'model_usable_until ne null' })
         .then((res) => res.success && setExpiringImages(res.data ?? []))
         .catch(() => undefined)
-      CardNotesService.getAll()
+      if (has('notes')) CardNotesService.getAll()
         .then((res) => {
           if (!res.success) return
           const counts = new Map<string, number>()
@@ -869,16 +884,17 @@ function App() {
           setOpenComments(commentNotes)
         })
         .catch(() => undefined)
-      WeeksService.getAll()
+      if (has('weeks')) WeeksService.getAll()
         .then((res) => {
           if (res.success) setWeeks(res.data ?? [])
         })
         .catch(() => undefined)
-      EventsService.getAll({ orderBy: ['created_on desc'] })
+      if (has('events')) EventsService.getAll({ orderBy: ['created_on desc'] })
         .then((res) => {
           if (res.success) setEvents(res.data ?? [])
         })
         .catch(() => undefined)
+      if (!has('cards')) return
       const res = await DeliveryCardsService.getAll({ orderBy: ['scheduled_at asc'] })
       if (!res.success) throw new Error(res.error?.message ?? tr('配信カードの取得に失敗しました', 'Failed to load delivery cards'))
       const data = res.data ?? []
@@ -901,6 +917,20 @@ function App() {
       setLoading(false)
     }
   }, [])
+  const loadParts = useCallback(
+    async (parts: readonly LoadPart[]) => {
+      if (parts.includes('cards')) setChangeKey((k) => k + 1)
+      await fetchParts(parts)
+    },
+    [fetchParts],
+  )
+  // 配信カードの保存など、結果・実績は変わらない操作のあと(App が持つ表は、すべて読み直す)
+  const reloadCards = useCallback(() => loadParts(ALL_PARTS), [loadParts])
+  // すべてを読み直す(結果の取り込み・⚙ の見本など、何が変わったか分からない操作のあと)
+  const load = useCallback(async () => {
+    setResultsKey((k) => k + 1)
+    await loadParts(ALL_PARTS)
+  }, [loadParts])
 
   const loadProducts = useCallback(
     () =>
@@ -946,8 +976,9 @@ function App() {
   )
 
   useEffect(() => {
+    // 開いたときは、アラートも自分で読むので、読み直しの合図は出さない(2 回読まないため)
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load()
+    void fetchParts(ALL_PARTS)
     // 商品を読めたら(DB が使えるとわかってから)、BigQuery の更新を確かめる
     void loadProducts().then((ok) => {
       if (ok) void runBqSync(false)
@@ -968,7 +999,7 @@ function App() {
         else setError(res.error?.message ?? tr('メイン画像の取得に失敗しました', 'Failed to load hero images'))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-  }, [load, loadProducts, runBqSync, loadMarketingPolicies])
+  }, [fetchParts, loadProducts, runBqSync, loadMarketingPolicies])
 
   const filtered = useMemo(() => {
     const match = (f: string, v?: string) => f === '' || String(v) === f
@@ -1032,7 +1063,7 @@ function App() {
     weeks,
     patterns,
     defaults: { country: filters.country, channel: filters.channel },
-    onChanged: load,
+    onChanged: reloadCards,
   })
   // 以前の「週の枠」(W14 の最初の作り。中身のない配信カードを保存していた)が残っていれば、その配信。
   // 作り方は作業画面(useBulkWorkspace)だけにした(2026-10-24 の整理。比べるために残していた方を消した)が、
@@ -1129,7 +1160,7 @@ function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-    await load()
+    await loadParts(['cards', 'weeks', 'events'])
   }
   // 週の承認(U6): 未依頼の配信をまとめて依頼する / 自分宛ての依頼をまとめて承認する(配信カードと同じ窓口 /api/approvals を、順に呼ぶ)
   const actor = () => ({ id: myUserId(), name: myName() })
@@ -1143,7 +1174,7 @@ function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-    await load()
+    await loadParts(['cards', 'events'])
   }
   const approveMineWeek = async () => {
     setError(null)
@@ -1152,7 +1183,7 @@ function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-    await load()
+    await loadParts(['cards', 'events'])
   }
   // 週の見方(商品 / 進み具合)は、計画の面の、週の表示だけで使う
   const lensOn = page === 'calendar' && view === 'week'
@@ -1301,14 +1332,14 @@ function App() {
       setMoveNotice({ text: res.error?.message ?? tr('配信日時を変えられませんでした', 'Could not change the send time') })
       return
     }
-    await load()
+    await loadParts(['cards'])
     const fmt = (v?: string) => (v ? new Date(v).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '')
     setMoveNotice({
       text: tr(`「${c.name}」を ${fmt(before)} → ${fmt(iso)} に動かしました`, `Moved "${c.name}" from ${fmt(before)} to ${fmt(iso)}`),
       undo: async () => {
         setMoveNotice(null)
         await DeliveryCardsService.update(c.id, { scheduled_at: before })
-        await load()
+        await loadParts(['cards'])
       },
     })
   }
@@ -1396,7 +1427,7 @@ function App() {
         const types = await classifyThemeTypes(untypedCards.slice(i, i + 20))
         for (const [id, type] of types) if ((await DeliveryCardsService.update(id, { theme_type: type })).success) done++
       }
-      await load()
+      await loadParts(['cards'])
       setBqNotice({ intent: 'success', text: tr(`${done} 本の配信の種類を、AI が分けました`, `AI sorted the type of ${done} deliveries`) })
     } catch (e) {
       setBqNotice({ intent: 'error', text: e instanceof Error ? e.message : String(e) })
@@ -2446,9 +2477,9 @@ function App() {
             setCreating(null)
             setDraftOpen(null)
             // 質問・返信は、保存を待たずに書き込むので、閉じたときにも読み直す
-            void load()
+            void reloadCards()
           }}
-          onSaved={load}
+          onSaved={reloadCards}
           // 結果は、面を切り替えずに、配信カードの上に重ねて見る。結果の面で、その結果から開いた配信カードでは出さない(下に結果があるため)
           onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
           alerts={selected ? cardAlerts.get(selected.id) : draftOpen?.alerts}
@@ -2496,7 +2527,7 @@ function App() {
           onClose={() => setDupCard(null)}
           // 配信カードの「…」の複製と同じく、読み直してから、複製した配信を開く
           onDuplicated={async (id) => {
-            await load()
+            await reloadCards()
             setSelectedId(id)
           }}
         />

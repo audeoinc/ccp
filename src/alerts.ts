@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { WeeklyPerformance } from './models/weeklyPerformances'
-import { DeliveryProductsService } from './data/deliveryProducts'
+import type { DeliveryProduct } from './models/deliveryProducts'
 import { WeeklyPerformancesService } from './data/weeklyPerformances'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { ChangeLogsService, type ChangeLog } from './data/changeLogs'
@@ -179,13 +179,28 @@ export function computeStockAlerts(args: {
 }
 
 /**
- * アラートを読む(画面を開いたときに計算する)。配信カード・商品は App が持っているものを使い、
- * 週ごとの実績・配信の結果・配信の商品(載っている場所)は、ここで読む。reloadKey が変わったら読み直す
+ * アラートを読む(画面を開いたときに計算する)。配信カード・商品・配信の商品の行は App が読んだものを使い
+ * (配信の商品を、App とここで 2 回読まないため)、週ごとの実績・配信の結果は、ここで読む。
+ * 実績・結果は配信カードの保存では変わらないので、reloadKey(結果を取り込んだあとなど)が変わったときだけ読み直す
  */
-export function useStockAlerts(cards: DeliveryCard[], products: Product[], reloadKey: unknown, lowWeeks: number | ((card: DeliveryCard) => number) = LOW_STOCK_WEEKS) {
+export function useStockAlerts(
+  cards: DeliveryCard[],
+  products: Product[],
+  productRows: DeliveryProduct[],
+  reloadKey: unknown,
+  lowWeeks: number | ((card: DeliveryCard) => number) = LOW_STOCK_WEEKS,
+) {
   const [weekly, setWeekly] = useState<WeeklyPerformance[]>([])
   const [results, setResults] = useState<DeliveryResult[]>([])
-  const [placements, setPlacements] = useState<Map<string, Placement[]>>(new Map())
+  // 配信の商品(載っている場所)。選定済みの行だけ
+  const placements = useMemo(() => {
+    const map = new Map<string, Placement[]>()
+    for (const r of productRows) {
+      if (!r.delivery_card_id || !r.product_id || r.state !== STATE_SELECTED) continue
+      map.set(r.delivery_card_id, [...(map.get(r.delivery_card_id) ?? []), { rowId: r.id, productId: r.product_id, section: r.section ?? 0 }])
+    }
+    return map
+  }, [productRows])
   useEffect(() => {
     WeeklyPerformancesService.getAll()
       .then((res) => res.success && setWeekly(res.data ?? []))
@@ -193,17 +208,6 @@ export function useStockAlerts(cards: DeliveryCard[], products: Product[], reloa
     DeliveryResultsService.getAll()
       // AB テストの配信は、案ごとの行を配信 1 本に合計する(売れた数を、配信ごとの実績として数えるため)
       .then((res) => res.success && setResults(mergeResultsByCard(res.data ?? [])))
-      .catch(() => undefined)
-    DeliveryProductsService.getAll()
-      .then((res) => {
-        if (!res.success) return
-        const map = new Map<string, Placement[]>()
-        for (const r of res.data ?? []) {
-          if (!r.delivery_card_id || !r.product_id || r.state !== STATE_SELECTED) continue
-          map.set(r.delivery_card_id, [...(map.get(r.delivery_card_id) ?? []), { rowId: r.id, productId: r.product_id, section: r.section ?? 0 }])
-        }
-        setPlacements(map)
-      })
       .catch(() => undefined)
   }, [reloadKey])
   return useMemo(
@@ -321,7 +325,7 @@ export function computeChangeAlerts(args: {
   return out.sort((a, b) => b.changedAt.localeCompare(a.changedAt))
 }
 
-/** 変更のアラートを読む(変更の記録を読み、計算する)。reloadKey が変わったら読み直す */
+/** 変更のアラートを読む(変更の記録を読み、計算する)。reloadKey が変わったら読み直す(配信カードを読み直したとき。日程の変更は、配信の保存でサーバーが残すため) */
 export function useChangeAlerts(cards: DeliveryCard[], products: Product[], placements: Map<string, Placement[]>, reloadKey: unknown) {
   const [logs, setLogs] = useState<ChangeLog[]>([])
   const [tick, setTick] = useState(0)
