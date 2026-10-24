@@ -1,7 +1,8 @@
 // 閉じた案内(Hint)の覚え(X72)。部品(Hint.tsx)と分けるのは、設定の画面(ST10)から resetHints を呼ぶため(部品のファイルから関数を出すと、画面の差し替え(fast refresh)が効かない)
 import { loadPref, savePref } from './settings'
+import { PREF } from './prefKeys'
 
-const KEY = 'hints.dismissed'
+const KEY = PREF.hintsDismissed
 const listeners = new Set<() => void>()
 let version = 0
 export const subscribeHints = (f: () => void) => {

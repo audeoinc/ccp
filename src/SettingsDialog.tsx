@@ -33,6 +33,7 @@ import { usePaneWidths } from './floatLayout'
 import { countryOptions } from './status'
 import { dismissedHintCount, getHintsVersion, resetHints, subscribeHints } from './hints'
 import { optionLabel, useT } from './i18n'
+import { PREF } from './prefKeys'
 
 /** 設定の画面に並べる 1 つの操作(これまでの ⚙ のメニューの 1 項目) */
 export interface SettingsAction {
@@ -110,7 +111,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   const country = headerCountry || picked
   const nameOf = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
   const countryName = nameOf(country)
-  const panes = usePaneWidths('settings.paneWidths.v1', [240, 0], 1, { min: 180, max: 400 })
+  const panes = usePaneWidths(PREF.settingsPaneWidths, [240, 0], 1, { min: 180, max: 400 })
   const shown = actions.filter((a) => !a.hidden)
   const of = (section: SettingsAction['section']) => shown.filter((a) => a.section === section)
   const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), shop: t('見本の商品ページ', 'Sample product pages') }

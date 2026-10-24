@@ -5,6 +5,8 @@ import { THEME_TYPES, themeTypeOf } from './themeTypes'
 import { useSyncExternalStore } from 'react'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { ChangeAlert, StockAlert } from './alerts'
+import { PREF } from './prefKeys'
+import { loadPref, savePref } from './settings'
 
 export interface AlertSettings {
   /** 対象にする種別(配信の部署。空は、すべて) */
@@ -22,15 +24,13 @@ export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
   kinds: { outOfStock: true, lowStock: true, policyChanged: true, dateChanged: true },
 }
 
-const KEY = 'alerts.settings'
 const listeners = new Set<() => void>()
 let current: AlertSettings = load()
 
 function load(): AlertSettings {
   try {
-    const v = localStorage.getItem(KEY)
-    if (!v) return DEFAULT_ALERT_SETTINGS
-    const o = JSON.parse(v) as Partial<AlertSettings>
+    const o = loadPref<Partial<AlertSettings> | null>(PREF.alertSettings, null)
+    if (!o) return DEFAULT_ALERT_SETTINGS
     // 種別は、以前は数値で覚えていた。文字の値でないものは捨てる(絞り込みが外れるだけ)
     // 対象の種類(X41。これまでの種別の値 promotion などは、種類にないので捨てる)
     const departments = (o.departments ?? []).filter((d) => typeof d === 'string' && (THEME_TYPES as string[]).includes(d))
@@ -43,11 +43,8 @@ function load(): AlertSettings {
 
 export function setAlertSettings(next: AlertSettings) {
   current = next
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next))
-  } catch {
-    // 覚えられなくても、この画面では効かせる
-  }
+  // 覚えられなくても、この画面では効かせる
+  savePref(PREF.alertSettings, next)
   for (const l of listeners) l()
 }
 

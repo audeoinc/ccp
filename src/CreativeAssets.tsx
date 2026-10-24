@@ -18,6 +18,7 @@ import { myName, onMeChange } from './history'
 import { locale, tr, useT } from './i18n'
 import type { CardAsset } from './models/cardAssets'
 import type { Product } from './models/products'
+import { PREF } from './prefKeys'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '10px', alignContent: 'start' },
@@ -494,7 +495,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
 /** 素材 1 つを大きく見て、題名・ひとことを直し、やり取りする */
 function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { asset: CardAsset; me: string; canEdit: boolean; onChanged: () => Promise<void>; onClose: () => void; comments: React.ReactNode }) {
   const s = useStyles()
-  const panes = usePaneWidths('assetFloat.paneWidths.v1', [0, 400], 0, { min: 300, max: 800 })
+  const panes = usePaneWidths(PREF.assetPaneWidths, [0, 400], 0, { min: 300, max: 800 })
   const t = useT()
   const [edit, setEdit] = useState<{ name: string; note: string } | null>(null)
   const [busy, setBusy] = useState(false)

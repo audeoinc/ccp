@@ -23,6 +23,7 @@ import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DevRequestMoreMenu } from './DevRequestMenu'
 import { FaceBadge } from './FaceBadge'
+import { PREF } from './prefKeys'
 
 const useStyles = makeStyles({
   // 配信カードと同じく、画面いっぱいのフロートで開く
@@ -78,7 +79,7 @@ interface Props {
  */
 export function ResultDetail({ row, history, cardProducts, onOpenOther, productIds, products, heroes, weekly, money, onClose, onOpenCard, onSaved, stageNav }: Props) {
   const styles = useStyles()
-  const panes = usePaneWidths('resultDetail.paneWidths.v1', [520, 0], 1, { min: 320, max: 900 })
+  const panes = usePaneWidths(PREF.resultPaneWidths, [520, 0], 1, { min: 320, max: 900 })
   const t = useT()
   const { card } = row
   const push = isPush(card)

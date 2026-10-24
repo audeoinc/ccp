@@ -1,21 +1,18 @@
 // 画面全体の表示の大きさ(X60。利用者の要望 2026-10-21: ノート PC で見ると、作業の領域がかなり狭くなる)。
 // 文字も部品もまとめて縮める・広げる(html に CSS の zoom を掛ける。ダイアログ・フロートも body の中なので、同じく効く)。ブラウザごとに覚える
 import { useSyncExternalStore } from 'react'
+import { PREF } from './prefKeys'
+import { readRaw, writeRaw } from './settings'
 
 // 70% は、利用者の要望(2026-10-21: もう一回り小さく)で足した
 export const UI_SCALES = [0.7, 0.8, 0.9, 1, 1.1] as const
 export type UiScale = (typeof UI_SCALES)[number]
 
-const KEY = 'ui.scale'
 const listeners = new Set<() => void>()
 
 function load(): UiScale {
-  try {
-    const v = Number(localStorage.getItem(KEY))
-    return (UI_SCALES as readonly number[]).includes(v) ? (v as UiScale) : 1
-  } catch {
-    return 1
-  }
+  const v = Number(readRaw(PREF.uiScale))
+  return (UI_SCALES as readonly number[]).includes(v) ? (v as UiScale) : 1
 }
 
 let current: UiScale = load()
@@ -34,11 +31,8 @@ export const viewHeight = () => window.innerHeight / current
 
 export function setUiScale(v: UiScale) {
   current = v
-  try {
-    localStorage.setItem(KEY, String(v))
-  } catch {
-    // 覚えられなくても、この画面では効かせる
-  }
+  // 覚えられなくても、この画面では効かせる
+  writeRaw(PREF.uiScale, String(v))
   applyUiScale()
   for (const l of listeners) l()
 }

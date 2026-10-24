@@ -6,6 +6,7 @@ import { Linkify } from './LinkText'
 import { locale, useT } from './i18n'
 import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize } from './floatLayout'
+import { PREF } from './prefKeys'
 
 const useStyles = makeStyles({
   // 縦に並べ、中身は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように)。大きさは、右・下の端をつかんで変えられる
@@ -78,7 +79,7 @@ export function PinThreadView(p: Props) {
   const t = useT()
   // 大きさは、コメントのピン・リクエストのピンで共通に覚える(やり取りが長いと読みにくいため。2026-10-23 利用者)
   const surfaceRef = useRef<HTMLDivElement>(null)
-  const size = useFloatSize('float.pin.size', surfaceRef, { w: 280, h: 200 })
+  const size = useFloatSize(PREF.pinFloatSize, surfaceRef, { w: 280, h: 200 })
   if (!p.target) return null
   return (
     <Popover

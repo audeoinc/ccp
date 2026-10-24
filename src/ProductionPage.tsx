@@ -44,6 +44,7 @@ import { forgetLinkedPin, linkedPin } from './pinActions'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DevRequestMoreMenu } from './DevRequestMenu'
 import { ResolvedPinsToggle } from './ResolvedPinsToggle'
+import { PREF } from './prefKeys'
 
 const RAIL_W = 32
 
@@ -137,8 +138,8 @@ interface Props {
 
 const subscribeMe = (f: () => void) => onMeChange(f)
 const LIVE = new Set(['requested', 'in_progress', 'done', 'checked', 'sent'])
-const INFO_KEY = 'productionPage.infoOpen'
-const TALK_KEY = 'productionPage.talkOpen'
+const INFO_KEY = PREF.productionInfoOpen
+const TALK_KEY = PREF.productionTalkOpen
 
 /**
  * 制作のページ(バックログ PR3。docs/PRODUCTION.md)。承認された配信を、制作に渡す材料のページ。制作の人は、ここだけを見ればよい。
@@ -152,9 +153,9 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const meId = useSyncExternalStore(subscribeMe, myUserId)
   const meName = useSyncExternalStore(subscribeMe, myName)
   const surfaceRef = useRef<HTMLDivElement>(null)
-  const float = useFloatSize('productionPage.size', surfaceRef)
+  const float = useFloatSize(PREF.productionSize, surfaceRef)
   // 既定の幅: プレビューに、メールの幅(600px 前後)が収まるよう残す
-  const panes = usePaneWidths('productionPage.paneWidths.v1', [300, 440, 0, 320], 2)
+  const panes = usePaneWidths(PREF.productionPaneWidths, [300, 440, 0, 320], 2)
   const [infoOpen, setInfoOpen] = useState(() => loadPref<boolean>(INFO_KEY, true))
   const [talkOpen, setTalkOpen] = useState(() => loadPref<boolean>(TALK_KEY, true))
   const toggleInfo = () => setInfoOpen((v) => (savePref(INFO_KEY, !v), !v))

@@ -5,6 +5,8 @@
 // 店の見せ方(差出人の名前・店の URL。ST10)も同じ表に持つ。全社の既定は国を空の行、国の行は上書き(空の項目は全社の値)
 import { useSyncExternalStore } from 'react'
 import { CountrySettingsService } from './data/countrySettings'
+import { PREF } from './prefKeys'
+import { loadPref, readRaw } from './settings'
 
 export interface CountryCriteria {
   /** 在庫が、配信日に何週分を切ったら「在庫僅少」にするか */
@@ -148,10 +150,10 @@ export async function saveBrand(country: string, next: Brand, by: string): Promi
 export function browserCriteria(): Partial<CountryCriteria> | null {
   const out: Partial<CountryCriteria> = {}
   try {
-    const a = JSON.parse(localStorage.getItem('alerts.settings') ?? '{}') as Partial<CountryCriteria>
+    const a = loadPref<Partial<CountryCriteria>>(PREF.alertSettings, {})
     if (typeof a.lowWeeks === 'number' && a.lowWeeks !== DEFAULT_CRITERIA.lowWeeks) out.lowWeeks = a.lowWeeks
     if (typeof a.weeklyLimit === 'number' && a.weeklyLimit !== DEFAULT_CRITERIA.weeklyLimit) out.weeklyLimit = a.weeklyLimit
-    const n = Number(localStorage.getItem('results.rankTopN'))
+    const n = Number(readRaw(PREF.legacyRankTopN))
     if (Number.isInteger(n) && n >= 1 && n !== DEFAULT_CRITERIA.rankTopN) out.rankTopN = n
   } catch {
     return null

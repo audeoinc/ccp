@@ -159,6 +159,7 @@ import { buildChecklist, type CheckKey, type PolicyLite } from './reviewChecks'
 import { limitRulesVersion, onLimitRulesChange, setLimitRules } from './weeklyLimit'
 import { HeroLibrary } from './HeroLibrary'
 import { localDate } from './results'
+import { PREF } from './prefKeys'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -169,10 +170,9 @@ const weekLabel = (start: Date) => {
 // 表示の切り替え(月のカレンダー / 週 / 表の一覧)。ブラウザごとに覚える
 // compare(比べる)は、結果の面だけの見せ方
 type View = 'month' | 'week' | 'list' | 'compare' | 'products' | 'impact'
-const VIEW_KEY = 'calendar.view'
-const LENS_KEY = 'week.lens'
-// 列を足したら、版を上げる(以前に選んだ列の設定では、新しい列が出ないため)
-const COLUMNS_KEY = 'list.columns.v2'
+const VIEW_KEY = PREF.calendarView
+const LENS_KEY = PREF.weekLens
+const COLUMNS_KEY = PREF.listColumns
 
 interface Filters {
   country: string
@@ -187,7 +187,7 @@ const ME_PERSON = '__me__'
 const noFilter: Filters = { country: '', channel: '', department: '', status: '', person: '' }
 // 国(X33): 表示の絞り込みではなく、ヘッダーで選ぶ「どの国の仕事をしているか」。人ごと(ブラウザごと)に覚える。
 // 初めて開いたときは、ビルドの設定(VITE_DEFAULT_COUNTRY。US)の国。'' = すべての国
-const COUNTRY_KEY = 'ccp.country'
+const COUNTRY_KEY = PREF.country
 const defaultCountry = String(countryOptions.find((o) => o.label === import.meta.env.VITE_DEFAULT_COUNTRY)?.value ?? '')
 const initialFilters = (): Filters => ({ ...noFilter, country: loadPref<string>(COUNTRY_KEY, defaultCountry) })
 

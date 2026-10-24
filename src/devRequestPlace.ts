@@ -5,6 +5,7 @@ import { DevRequestVotesService } from './data/devRequestVotes'
 import { anchorLabel } from './pinStore'
 import { loadPref, savePref } from './settings'
 import { tr } from './i18n'
+import { PREF } from './prefKeys'
 
 /**
  * 開発へのリクエストのピンの、場所の記録と探し方(2026-10-23 利用者と決めた)。
@@ -155,7 +156,7 @@ export function uncovered(left: number, top: number, anchor: string | undefined,
 export const buildId = (): string => String(import.meta.env.VITE_BUILD_ID ?? '')
 
 // ---- リクエスト用の名前(CCP の名前の設定とは別。ブラウザごとに覚える。ログイン(U7)が入ったら、ログインの名前を先に使う形にする)
-const NAME_KEY = 'devRequest.name'
+const NAME_KEY = PREF.devRequestName
 const nameListeners = new Set<() => void>()
 export const devRequestName = (): string => loadPref<string>(NAME_KEY, '')
 export function setDevRequestName(v: string) {

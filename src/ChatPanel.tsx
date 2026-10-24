@@ -7,6 +7,8 @@ import { Linkify } from './LinkText'
 import { useT } from './i18n'
 import { Splitter } from './Splitter'
 import { viewHeight } from './uiScale'
+import { PREF } from './prefKeys'
+import { readRaw, writeRaw } from './settings'
 
 export interface ChatMsg {
   role: 'user' | 'assistant'
@@ -32,20 +34,15 @@ interface Props {
   onClear: () => void
 }
 
-const HEIGHT_KEY = 'chat.paneHeight'
 const MIN_H = 140
 const DEFAULT_H = 260
 
 const clampHeight = (h: number) => Math.min(Math.round(viewHeight() * 0.65), Math.max(MIN_H, h))
 
 function loadHeight(): number {
-  try {
-    const v = Number(localStorage.getItem(HEIGHT_KEY))
-    if (Number.isFinite(v) && v >= MIN_H) return clampHeight(v)
-  } catch {
-    // 保存を読めないときは、既定の高さにする
-  }
-  return DEFAULT_H
+  // 保存を読めないときは、既定の高さにする
+  const v = Number(readRaw(PREF.chatHeight))
+  return Number.isFinite(v) && v >= MIN_H ? clampHeight(v) : DEFAULT_H
 }
 
 const useStyles = makeStyles({
@@ -141,11 +138,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro,
   const dragHeight = (dy: number) => setHeight((h) => clampHeight(h - dy))
   const saveHeight = () =>
     setHeight((h) => {
-      try {
-        localStorage.setItem(HEIGHT_KEY, String(h))
-      } catch {
-        // 保存できなくても動作には影響しない
-      }
+      writeRaw(PREF.chatHeight, String(h))
       return h
     })
 

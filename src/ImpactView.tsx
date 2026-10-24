@@ -12,6 +12,8 @@ import { mergeResultsByCard } from './results'
 import { learningUsableIn, useCountryApply } from './countryApply'
 import { myName } from './history'
 import { IMPACT_TAB_EVENT, takePendingImpactTab, buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
+import { PREF } from './prefKeys'
+import { loadPref, savePref } from './settings'
 
 // 結果の面の見せ方「効果」。配信が売上をどれだけ増やしたか(ホールドアウトとの差)と、AI に渡した学びが効いているかを見る。
 // 4 つの見方(記録する → 指標を見る → 売上を比べる → 学びを評価して淘汰する)を、増分の要約と並べてタブにした。
@@ -166,25 +168,17 @@ interface Period {
   from: string
   to: string
 }
-const PERIOD_KEY = 'ccp.impactPeriod'
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const dayOf = (iso: string) => (iso ? ymd(new Date(iso)) : '')
 /** 期間はブラウザごとに覚える(開き直しても同じ期間で見られるように)。読めなければ「すべて」 */
 function loadPeriod(): Period {
-  try {
-    const v = JSON.parse(window.localStorage.getItem(PERIOD_KEY) ?? 'null') as Period | null
-    if (v && typeof v.from === 'string' && typeof v.to === 'string') return v
-  } catch {
-    // 読めないときは「すべて」
-  }
-  return { from: '', to: '' }
+  // 読めないときは「すべて」
+  const v = loadPref<Period | null>(PREF.impactPeriod, null)
+  return v && typeof v.from === 'string' && typeof v.to === 'string' ? v : { from: '', to: '' }
 }
 function savePeriod(p: Period) {
-  try {
-    window.localStorage.setItem(PERIOD_KEY, JSON.stringify(p))
-  } catch {
-    // 覚えられなくても、画面はそのまま使える
-  }
+  // 覚えられなくても、画面はそのまま使える
+  savePref(PREF.impactPeriod, p)
 }
 
 export function ImpactView({ cards, allCards, country, onOpenResult }: Props) {

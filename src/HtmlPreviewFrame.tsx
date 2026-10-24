@@ -3,11 +3,12 @@ import { Button, Caption1, Slider, makeStyles, mergeClasses, tokens } from '@flu
 import { AddRegular, SubtractRegular } from '@fluentui/react-icons'
 import { loadPref, savePref } from './settings'
 import { useT } from './i18n'
+import { PREF } from './prefKeys'
 
 // 配信カードのプレビューと同じ範囲・同じ既定(全体)。操作をそろえる(2026-10-19、利用者の要望)
 const ZOOM_MIN = 0.15
 const ZOOM_MAX = 1.2
-const ZOOM_KEY = 'productionPage.previewZoom'
+const ZOOM_KEY = PREF.productionPreviewZoom
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, rowGap: '4px' },

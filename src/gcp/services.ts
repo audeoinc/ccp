@@ -6,18 +6,11 @@ import { showDbWake } from './dbWake'
 // 書き換えた人(画面で入れた名前。src/history.ts の myName と同じ記録を読む)。サーバーは、変更の記録(配信日時・商品の方針)に残す。
 // history.ts は、このファイルを使うサービスを読み込むので、ここでは読み込まず、同じ記録を直接読む(読み込みの輪を作らないため)
 const actorName = (): string => {
-  for (const key of ['me.name', 'comment.author']) {
-    try {
-      const v = localStorage.getItem(key)
-      const name = v === null ? '' : (JSON.parse(v) as string)
-      if (name) return name
-    } catch {
-      /* 読めなければ、次の記録を見る */
-    }
-  }
-  return ''
+  return loadPref<string>(PREF.myName, '') || loadPref<string>(PREF.legacyCommentAuthor, '')
 }
 import { appPath } from '../appRoot'
+import { PREF } from '../prefKeys'
+import { loadPref } from '../settings'
 
 interface ErrorBody {
   message: string

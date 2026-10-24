@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Textarea, type TextareaProps } from '@fluentui/react-components'
 import { loadPref, savePref } from './settings'
+import { textareaHeightKey } from './prefKeys'
 
 type Props = TextareaProps & {
   /**
@@ -16,7 +17,7 @@ type Props = TextareaProps & {
  */
 export function AutoTextarea({ value, rows = 1, textarea, heightKey, ...rest }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
-  const prefKey = heightKey ? `textarea.${heightKey}.height` : null
+  const prefKey = heightKey ? textareaHeightKey(heightKey) : null
   // 人が決めた最低の高さ(px)。描画には使わないので ref で持つ(最初の値だけ、覚えた値から)
   const [savedMin] = useState(() => (prefKey ? loadPref<number>(prefKey, 0) : 0))
   const minHeight = useRef(savedMin)

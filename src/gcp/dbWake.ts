@@ -5,17 +5,15 @@
 // 画面のコード(React)には手を入れず、ここで、画面の上に直接かぶせる(どの画面からのデータの読み書きでも、同じように出すため)。
 
 import { appPath } from '../appRoot'
+import { PREF } from '../prefKeys'
+import { readRaw } from '../settings'
 
 const POLL_MS = 4000
 const GIVE_UP_MS = 25 * 60 * 1000
 let shown = false
 
 const lang = (): 'ja' | 'en' => {
-  try {
-    return localStorage.getItem('ui.lang') === 'en' ? 'en' : 'ja'
-  } catch {
-    return 'ja'
-  }
+  return readRaw(PREF.lang) === 'en' ? 'en' : 'ja'
 }
 
 const TEXT = {

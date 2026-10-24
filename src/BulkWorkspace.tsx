@@ -57,6 +57,7 @@ import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
+import { PREF } from './prefKeys'
 
 const useStyles = makeStyles({
   // 配信カード・アラートと同じ、全画面に近いフロート。カレンダーの上に重ね、閉じれば元の場所に戻る
@@ -225,7 +226,7 @@ interface Props {
  */
 export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFinish }: Props) {
   const s = useStyles()
-  const panes = usePaneWidths('bulkWorkspace.paneWidths.v1', [0, 280], 0, { min: 220, max: 600 })
+  const panes = usePaneWidths(PREF.bulkPaneWidths, [0, 280], 0, { min: 220, max: 600 })
   const t = useT()
   // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
   const finishRef = useRef(false)

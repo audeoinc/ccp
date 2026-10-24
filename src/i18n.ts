@@ -1,18 +1,16 @@
 import { useSyncExternalStore } from 'react'
+import { PREF } from './prefKeys'
+import { readRaw, writeRaw } from './settings'
 
 // 画面の言語(日本語 / English)。ブラウザごとに保存し、初期値はビルドの設定(VITE_DEFAULT_LANG)、なければブラウザの言語。
 // 文言は、その場に「日本語, English」の組で書く: tr('保存', 'Save')。React の外(AI の処理など)でも使える。
 export type Lang = 'ja' | 'en'
 
-const KEY = 'ui.lang'
 
 function detect(): Lang {
-  try {
-    const v = localStorage.getItem(KEY)
-    if (v === 'ja' || v === 'en') return v
-  } catch {
-    // 保存を読めないときは、ブラウザの言語に従う
-  }
+  // 保存を読めないときは、ブラウザの言語に従う
+  const v = readRaw(PREF.lang)
+  if (v === 'ja' || v === 'en') return v
   // ビルドの設定(English)があれば、それを初期値にする。なければ、ブラウザの言語
   const preset = import.meta.env.VITE_DEFAULT_LANG
   if (preset === 'ja' || preset === 'en') return preset
@@ -27,11 +25,7 @@ export const getLang = (): Lang => current
 export function setLang(lang: Lang) {
   if (lang === current) return
   current = lang
-  try {
-    localStorage.setItem(KEY, lang)
-  } catch {
-    // 保存できなくても動作には影響しない
-  }
+  writeRaw(PREF.lang, lang)
   document.documentElement.lang = lang
   listeners.forEach((fn) => fn())
 }

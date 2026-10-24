@@ -6,10 +6,10 @@
 // 書き込みは約 50 か所から localStorage.setItem を直接呼んでいるので、1 つずつ直さずに、ここで Storage の書き込みを拾う
 // (直し漏れで、一部の設定だけ人に付いてこない、ということを避けるため。値の形もそれぞれのまま)。
 import { appPath } from './appRoot'
+import { LOCAL_ONLY_PREFIXES } from './prefKeys'
 
 // 送らない鍵(人を見分ける記録・書きかけ・開発用の画面の記録。だれの設定でもなく、そのブラウザのもの)
-const LOCAL_ONLY = ['me.', 'comment.author', 'devRequest.', 'ccp-dev-']
-const isShared = (key: string) => !LOCAL_ONLY.some((p) => key.startsWith(p))
+const isShared = (key: string) => !LOCAL_ONLY_PREFIXES.some((p) => key.startsWith(p))
 // 開いたときに待つ長さ。DB が起きていないなどで返らなければ、ブラウザの値のまま描く(画面を待たせないため)
 const WAIT_MS = 1500
 const FLUSH_MS = 1000

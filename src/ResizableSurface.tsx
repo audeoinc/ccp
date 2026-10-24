@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, type ComponentProps } from 're
 import { DialogSurface } from '@fluentui/react-components'
 import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize, type FloatSize } from './floatLayout'
+import { floatSizeKey } from './prefKeys'
 
 type Props = ComponentProps<typeof DialogSurface> & {
   /** 大きさを覚える鍵(フロートの種類ごと。localStorage の `float.<sizeKey>.size`) */
@@ -19,7 +20,7 @@ type Props = ComponentProps<typeof DialogSurface> & {
 export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, style, children, ...rest }, ref) {
   const inner = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => inner.current as HTMLDivElement)
-  const float = useFloatSize(`float.${sizeKey}.size`, inner, min)
+  const float = useFloatSize(floatSizeKey(sizeKey), inner, min)
   return (
     <DialogSurface ref={inner} {...rest} style={{ ...style, ...float.style }}>
       {children}
