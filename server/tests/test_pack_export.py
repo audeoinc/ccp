@@ -1,7 +1,6 @@
 """パックの書き出し(server/ccp/pack.py の write_pack・export_pack)と、置き換えの取り込みのまとめ方(batches)。DB には接続しない"""
 from __future__ import annotations
 
-import asyncio
 import io
 import json
 import os
@@ -14,6 +13,9 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 from ccp import pack  # noqa: E402
 
@@ -47,17 +49,39 @@ class WritePackTest(unittest.TestCase):
         self.assertEqual(data["counts"]["products"], 2)
         self.assertEqual(data["tables"]["hero_images"][0]["id"], "h1")
 
-    def test_export_returns_file_and_removes_it_after(self) -> None:
+    def test_large_export_is_chunked_without_length_and_removes_file(self) -> None:
+        """32MiB を超える ZIP でも、大きさ(Content-Length)を付けずに分けて返す(応答の大きさの上限に当たらないように)"""
+        big = os.urandom(1024 * 1024)
+        names = [f"p{i}.jpg" for i in range(34)]
+        rows = {"products": [{"id": n, "image_url": f"/img/products/{n}"} for n in names]}
+        made: list[str] = []
+        real = tempfile.mkstemp
+
+        def mkstemp(**kw):
+            fd, path = real(**kw)
+            made.append(path)
+            return fd, path
+
+        app = FastAPI()
+        app.include_router(pack.router)
+        app.dependency_overrides[pack.require_db] = lambda: None
         with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"ASSET_DIR": d}), \
-                mock.patch.object(pack, "read_tables", mock.AsyncMock(return_value=tables())):
-            res = asyncio.run(pack.export_pack())
-            path = res.path
-            self.assertTrue(os.path.isfile(path))
-            self.assertIn("attachment", res.headers["content-disposition"])
-            with zipfile.ZipFile(path) as z:
-                self.assertIn("data.json", z.namelist())
-            asyncio.run(res.background())
-            self.assertFalse(os.path.exists(path))
+                mock.patch.object(pack, "read_tables", mock.AsyncMock(return_value=rows)), \
+                mock.patch.object(pack.tempfile, "mkstemp", mkstemp):
+            (Path(d) / "products").mkdir()
+            for n in names:
+                (Path(d) / "products" / n).write_bytes(big)
+            with TestClient(app) as client:
+                r = client.get("/api/export")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("content-length", r.headers)
+        self.assertIn("attachment", r.headers["content-disposition"])
+        self.assertGreater(len(r.content), 32 * 1024 * 1024)
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            self.assertEqual(z.read("images/products/p0.jpg"), big)
+            self.assertEqual(json.loads(z.read("data.json"))["missingImages"], [])
+        self.assertEqual(len(made), 1)
+        self.assertFalse(os.path.exists(made[0]))
 
 
 class BatchesTest(unittest.TestCase):

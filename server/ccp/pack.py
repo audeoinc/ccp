@@ -30,8 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
-from starlette.background import BackgroundTask
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
 from . import assets, creative, repo, schema as sc
@@ -80,6 +79,20 @@ def _read_file(kind: str, name: str) -> bytes | None:
     return found[0] if found else None
 
 
+# 返すときに一度に読む大きさ
+CHUNK = 1024 * 1024
+
+
+def stream_file(path: str) -> Any:
+    """ファイルを CHUNK ずつ返して、返し終えたら(途中で切れても)消す"""
+    try:
+        with open(path, "rb") as f:
+            while data := f.read(CHUNK):
+                yield data
+    finally:
+        os.unlink(path)
+
+
 # 一度に読むファイルの数(バケットからの読み込みを待つ間に、ほかを読む)。読んだものから ZIP に書いて、手放す
 READ_AHEAD = 8
 
@@ -105,10 +118,12 @@ def write_pack(out: Any, tables: dict[str, list[dict[str, Any]]], now: datetime)
 
 
 @router.get("/api/export")
-async def export_pack() -> FileResponse:
+async def export_pack() -> StreamingResponse:
     tables = await read_tables()
     now = datetime.now(timezone.utc)
-    # ZIP は一時ファイルに書いて、少しずつ返す(返し終えたら消す)
+    # ZIP は一時ファイルに書いて、少しずつ返す(返し終えたら消す)。
+    # 大きさ(Content-Length)を付けずに、分けて送る(chunked)。大きさを付けて返すと、サーバーの置き場所によっては
+    # 応答の大きさの上限(32MiB など)に当たって、500 になるため(2026-10-25、写真が多い環境で書き出しが失敗した)
     fd, tmp = tempfile.mkstemp(prefix="ccp-pack-", suffix=".zip")
     try:
         with os.fdopen(fd, "wb") as out:
@@ -117,7 +132,7 @@ async def export_pack() -> FileResponse:
         os.unlink(tmp)
         raise
     filename = f"ccp-pack-{now.strftime('%Y%m%d-%H%M')}.zip"
-    return FileResponse(tmp, media_type="application/zip", filename=filename, background=BackgroundTask(os.unlink, tmp))
+    return StreamingResponse(stream_file(tmp), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
