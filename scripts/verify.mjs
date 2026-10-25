@@ -78,8 +78,11 @@ if (docsOnly) {
   console.log(`\n変えたファイルは文書だけ(${counted.length} 件)なので、型チェック・lint・ビルドは飛ばしました(全部を通すときは npm run verify -- --full)。`)
 } else {
   // 型チェックと lint は互いに関係しないので、同時に流す(lint は前の結果を覚えて、変えたファイルだけ見る --cache)
-  console.log('\n> npx tsc -b と npx eslint . --cache(同時に)')
-  const results = await Promise.all([runQuiet('npx', ['tsc', '-b']), runQuiet('npx', ['eslint', '.', '--cache', '--cache-location', 'node_modules/.cache/eslint/'])])
+  // 変わったかは、ファイルの中身で見分ける(--cache-strategy content)。既定の日時と大きさでは、rebase・切り替えのあとに古い結果を使って、
+  // CI では落ちる誤りを見逃したことがあるため(2026-10-25、6518fb2)。--full(いつでも全部)は、CI と同じく前の結果を使わない
+  const lintArgs = full ? ['eslint', '.'] : ['eslint', '.', '--cache', '--cache-strategy', 'content', '--cache-location', 'node_modules/.cache/eslint-content/']
+  console.log(`\n> npx tsc -b と npx eslint .${full ? '' : ' --cache'}(同時に)`)
+  const results = await Promise.all([runQuiet('npx', ['tsc', '-b']), runQuiet('npx', lintArgs)])
   for (const r of results) {
     if (r.out.trim()) console.log(`\n[${r.label}]\n${r.out.trimEnd()}`)
   }
