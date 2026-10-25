@@ -46,6 +46,7 @@ import { DevRequestMoreMenu } from './DevRequestMenu'
 import { ResolvedPinsToggle } from './ResolvedPinsToggle'
 import { PREF } from './prefKeys'
 import { confirmDialog } from './confirm'
+import { PaneRail } from './PaneRail'
 
 const RAIL_W = 32
 
@@ -78,8 +79,6 @@ const useStyles = makeStyles({
   colTalk: { backgroundColor: tokens.colorNeutralBackground2 },
   paneTool: { display: 'flex', justifyContent: 'flex-end', marginBottom: '-10px' },
   // たたんだペインの細い帯(押すと開く)
-  rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '10px', paddingTop: '10px', minHeight: 0, border: 'none', backgroundColor: tokens.colorNeutralBackground2, cursor: 'pointer', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
-  railLabel: { writingMode: 'vertical-rl', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, letterSpacing: '0.1em' },
   editor: { flexGrow: 1, minHeight: 0 },
   // HTML の下書きを作るためだけに描く、見えないプレビュー(画面の外に置く)
   offscreen: { position: 'fixed', left: '-10000px', top: 0, width: '640px', pointerEvents: 'none' },
@@ -502,12 +501,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
     },
   ]
 
-  const rail = (label: string, onOpen: () => void) => (
-    <button type="button" className={s.rail} onClick={onOpen} aria-label={t(`${label}を開く`, `Open ${label}`)}>
-      <ChevronLeftRegular />
-      <span className={s.railLabel}>{label}</span>
-    </button>
-  )
+  const rail = (label: string, onOpen: () => void) => <PaneRail label={label} onOpen={onOpen} />
 
   // たたんだペインは、細い帯の幅にする(幅は覚えたまま)
   const columns = panes.widths.map((w, i) => (i === 2 ? 'minmax(400px, 1fr)' : (i === 0 && !infoOpen) || (i === 3 && !talkOpen) ? `${RAIL_W}px` : `${w}px`)).join(' 1px ')

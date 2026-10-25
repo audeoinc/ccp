@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Badge, Button, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ChevronLeftRegular, EditRegular } from '@fluentui/react-icons'
+import { EditRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import { CardNotesService, type CardNote } from './data/cardNotes'
@@ -21,6 +21,7 @@ import { productionColor, productionLabel, productionView } from './useProductio
 import { canGoProduction } from './productionGate'
 import { statusColor, statusLabel } from './status'
 import { useT } from './i18n'
+import { PaneRail } from './PaneRail'
 
 const useStyles = makeStyles({
   // 上: 状態と承認(いつも見える) / 下: タブ(スクロール)
@@ -42,7 +43,6 @@ const useStyles = makeStyles({
   productionText: { display: 'grid', flexGrow: 1, minWidth: 0 },
   productionNext: { backgroundColor: tokens.colorBrandBackground2, borderLeft: `3px solid ${tokens.colorBrandStroke1}` },
   // 閉じた帯(状態を縦書きで。押すと開く)
-  rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '10px', paddingTop: '10px', minHeight: 0, height: '100%', border: 'none', backgroundColor: tokens.colorNeutralBackground2, cursor: 'pointer', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
   railStatus: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, letterSpacing: '0.05em' },
   railNote: { writingMode: 'vertical-rl', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, letterSpacing: '0.05em' },
 })
@@ -256,8 +256,7 @@ export function ProcessRail({ card, status, onOpen }: { card?: DeliveryCard; sta
 
   const v = card?.status ?? status
   return (
-    <button type="button" className={s.rail} onClick={onOpen} title={t('状態・承認・やり取りを開く', 'Open status, approval and conversation')} aria-label={t('プロセスを開く', 'Open process')}>
-      <ChevronLeftRegular />
+    <PaneRail label={t('プロセス', 'Process')} onOpen={onOpen} title={t('状態・承認・やり取りを開く', 'Open status, approval and conversation')}>
       <span className={s.dot} style={{ backgroundColor: statusColor(v) }} />
       <span className={s.railStatus} style={{ color: statusColor(v) }}>{statusLabel(v)}</span>
       <LockMark status={card?.status} />
@@ -267,7 +266,7 @@ export function ProcessRail({ card, status, onOpen }: { card?: DeliveryCard; sta
           {openThreads}
         </Badge>
       )}
-    </button>
+    </PaneRail>
   )
 }
 

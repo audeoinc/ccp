@@ -22,7 +22,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, CommentAddRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, CommentAddRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
@@ -96,6 +96,7 @@ import { focusSoon, type ContextItem } from './ContextMenu'
 import { usePreviewPins } from './usePreviewPins'
 import { heroImage } from './images'
 import { previewMenuItems } from './previewMenu'
+import { PaneRail } from './PaneRail'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -394,17 +395,6 @@ const useStyles = makeStyles({
   paneMid: { backgroundColor: tokens.colorNeutralBackground1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   panePreview: { gridTemplateRows: 'auto minmax(0, 1fr)' },
   infoToolbar: { display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' },
-  // 商品情報ペインを閉じたときの、細い帯(押すと開く)
-  rail: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    rowGap: '10px',
-    paddingTop: '10px',
-    minHeight: 0,
-    backgroundColor: tokens.colorNeutralBackground2,
-  },
-  railLabel: { writingMode: 'vertical-rl', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, letterSpacing: '0.1em' },
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular },
   lead: { fontWeight: tokens.fontWeightSemibold },
   captionTight: { marginTop: '-4px' },
@@ -2782,10 +2772,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 />
               </div>
             ) : (
-              <div className={styles.rail}>
-                <Button type="button" size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleInfo} aria-label={t('商品情報を開く', 'Open product info')} />
-                <span className={styles.railLabel}>{t('商品情報', 'Product info')}</span>
-              </div>
+              <PaneRail label={t('商品情報', 'Product info')} onOpen={toggleInfo} />
             )}
 
             <Splitter onDrag={processOpen ? resizeProcess : () => undefined} onDone={saveWidths} />
