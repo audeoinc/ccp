@@ -1,4 +1,4 @@
-// 開発用の画面(/dev/)の、サーバーの API の窓口(server/ccp/devtools.py。設計は docs/DEVTOOLS.md)。
+// 開発用の画面(/dev/)の、サーバーの API の窓口(server/ccp/devtools/。設計は docs/DEVTOOLS.md)。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、見本の表を返す身代わり(src/mock/devApi.ts)に差し替える。
 import { appPath } from '../appRoot'
 
@@ -84,7 +84,7 @@ export function chatStream(messages: ChatTurn[], ctx: ChatContext, onEvent: (e: 
 
 // 時間のかかる処理は、サーバーが裏で走らせ、画面は 1 秒ごとに「ここまでの出来事」を聞きに行く。
 // Workbench の画面は Jupyter の中継を通り、返り終わらない要求は 100〜120 秒ほどで打ち切られる(524)ため、
-// どの要求もすぐ終わる形にする(server/ccp/devtools.py の「時間のかかる処理は、裏で走らせて…」)
+// どの要求もすぐ終わる形にする(server/ccp/devtools/tasks.py の「時間のかかる処理は、裏で走らせて…」)
 const POLL_MS = 1000
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((ok) => {

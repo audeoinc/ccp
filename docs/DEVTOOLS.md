@@ -153,7 +153,7 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 
 | 順 | 作るもの | 中身 |
 |---|---|---|
-| 1 | 入り口 | `/dev/` の画面(Vite の別の入り口 `dev.html`。CCP の画面の部品・`useT` を使う)、`/api/dev/*` のルーター(`server/ccp/devtools.py`)、`CCP_DEVTOOLS`、`server/devwork/` |
+| 1 | 入り口 | `/dev/` の画面(Vite の別の入り口 `dev.html`。CCP の画面の部品・`useT` を使う)、`/api/dev/*` のルーター(`server/ccp/devtools/`)、`CCP_DEVTOOLS`、`server/devwork/` |
 | 2 | BigQuery を見る | 表と列の一覧、先頭の数行、dry-run、試しに流す(6 章の上限付き) |
 | 3 | Gemini と SQL | 前提の組み立て(4 章)、SQL の案、版と差分、答え合わせ(`bq_validate`)、NG を返して直す |
 | 4 | 持ち出し | 7 章(コピー 3 通り・ファイル・出す先の名前・前提・報告) |
@@ -167,7 +167,7 @@ CCP の取り込みは、表の最終更新の日時を見て、変わったと�
 
 | 順 | 状態 | 中身 |
 |---|---|---|
-| 1 | ✅ | `dev/index.html` → `src/dev/`(`DevApp`・`BqTab`・`SqlEditor`(CodeMirror + `@codemirror/lang-sql`)・`ResultGrid`・`CopyButton`)、`server/ccp/devtools.py`(テスト `server/tests/test_devtools.py`)、`CCP_DEVTOOLS`・`DEVTOOLS_MAX_GB`・`DEVTOOLS_DIR`、`server/devwork/settings.json`(よく見るデータセット) |
+| 1 | ✅ | `dev/index.html` → `src/dev/`(`DevApp`・`BqTab`・`SqlEditor`(CodeMirror + `@codemirror/lang-sql`)・`ResultGrid`・`CopyButton`)、`server/ccp/devtools/`(窓口のまとまりごとのモジュール。`__init__.py` の頭に一覧。テスト `server/tests/test_devtools.py`)、`CCP_DEVTOOLS`・`DEVTOOLS_MAX_GB`・`DEVTOOLS_DIR`、`server/devwork/settings.json`(よく見るデータセット) |
 | 2 | ✅(本物の BigQuery では、画面が開くところまで確認) | データセットを開く(**名前の一部で探す**: 接続しているプロジェクトのデータセット・前に開いたもの・プロジェクト名の一部。`DatasetPicker`) → 表の一覧(絞り込み)→ 表の列・行数・パーティション・ビューの SQL → 先頭の 20 行(料金なし)。SQL を試す: 料金なしで確かめる(文の種類・読む量)/ 流す(SELECT だけ、先頭 20・200・1000 行、Ctrl + Enter)。写す: 場所・列の一覧(Markdown)・SQL・結果(TSV / Markdown)・エラー・`.sql` で保存。ビューは、参照している元の表を出す(押すと開く) |
 | 3 の一部 | ✅(本物の Gemini では未確認) | 右の「Gemini と SQL を作る」(`ChatPanel`、`POST /api/dev/tasks/chat`)。**Gemini が BigQuery を調べる道具を使う**(関数の呼び出し。1 回の発言で 16 回まで): `list_datasets`・`list_tables`(名前の一部で)・`describe_table`(列・説明・パーティション・先頭の 5 行。ビューは SQL と参照先)・`describe_view_sources`(ビューが参照している元の表を dry-run でたどり、列の定義を返す)・`dry_run`・`run_select`(SELECT だけ、20 行、読む量の上限つき。画面で止められる)。何を調べたかは、返事の上に出す。前提には、CCP の 6 つの出力の仕様をいつも全文入れる(どの列に当てるかを考えられるように)。作る出力を選ぶと手本の SQL も。仕様のまとめは `server/devwork/settings.json` に残す。会話は `server/devwork/chats/` に残す(下の「会話のセッション」)。返事の SQL は「SQL の欄に入れる」で試せる。エラーのあとは「このエラーを直して」。「前提」で、渡す前提を見る・コピーする。残り: 版・差分、`bq_validate` の答え合わせ、表を作る SQL |
 | 3 の残り | ✅(デモ用のビルドで確認) | SQL の欄の上に「作る出力」(AI の欄と共通)。**版**: 「版として保存」で `server/devwork/outputs/<出力>/v<番号>.sql` と `.json`(作った日時・答え合わせの結果。同じ SQL では増やさない)、版を開く・「違い」(2 つの版、またはいまの欄との行の違い)・「採用」(`index.json`)。**答え合わせ**(`POST /api/dev/check`): まず dry-run で必須の列・読む量・概算の料金を見せ、「全件で答え合わせ」で全件を流して `bq_validate.validate`(取り込みと同じ)。結びつき(SKU → SPU、在庫 → SKU、週ごと → SPU)は、相手の出力の採用の版をキーだけにして流して確かめる。結果は版に記録。「AI に直してもらう」で結果を会話に送る。**表を作る SQL**: 出す先のデータセットと表の名前の頭(既定 `ccp_`)を 1 度入れる(`server/devwork/target.json`)と、`CREATE OR REPLACE TABLE` に組み立てる(先頭のコメントに版・答え合わせ・更新の目安)。`BQ_<名前>=…` の行のコピー、`.sql` で保存、採用の版をまとめて 1 ファイルに |

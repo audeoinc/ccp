@@ -426,7 +426,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 ### 3.10 開発用の画面(`src/dev/`。B10。Workbench だけ)
 
-`/dev/` で開く、CCP の画面とは別のページ(`CCP_DEVTOOLS=1` のときだけ)。BigQuery を見る・SELECT を試す・Gemini と会話して SQL を作る・出力ごとの版と答え合わせ・ポリシーの文書の取り込み。設計は [DEVTOOLS.md](DEVTOOLS.md)、サーバーは `server/ccp/devtools.py`。
+`/dev/` で開く、CCP の画面とは別のページ(`CCP_DEVTOOLS=1` のときだけ)。BigQuery を見る・SELECT を試す・Gemini と会話して SQL を作る・出力ごとの版と答え合わせ・ポリシーの文書の取り込み。設計は [DEVTOOLS.md](DEVTOOLS.md)、サーバーは `server/ccp/devtools/`。
 
 | ファイル | 行数 | 役割 |
 |---|---|---|

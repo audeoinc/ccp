@@ -1,4 +1,4 @@
-"""devtools.py(開発用の画面の API)の単体テスト。BigQuery には接続しない。
+"""devtools(開発用の画面の API。server/ccp/devtools/)の単体テスト。BigQuery には接続しない。
 
   cd server && python -m unittest discover tests
 """
@@ -167,7 +167,7 @@ class WorkTest(unittest.TestCase):
         import tempfile
 
         self.tmp = tempfile.TemporaryDirectory()
-        self.patch = mock.patch.object(devtools, "DEVWORK", Path(self.tmp.name))
+        self.patch = mock.patch.object(devtools.common, "DEVWORK", Path(self.tmp.name))
         self.patch.start()
 
     def tearDown(self) -> None:
@@ -376,7 +376,7 @@ class PolicyDocTest(unittest.TestCase):
 
         pages = [{"prefixes": ["policy/2026/"], "items": [{"name": "policy/", "size": "0"}, {"name": "policy/a.xlsx", "size": "120", "updated": "t", "contentType": "x"}], "nextPageToken": "n"},
                  {"items": [{"name": "policy/b.pdf", "size": "9"}]}]
-        with mock.patch.object(devtools, "_gcs_get", side_effect=pages):
+        with mock.patch.object(devtools.gcs_policy, "_gcs_get", side_effect=pages):
             r = asyncio.run(devtools.gcs_list("gs://bkt/", "policy/"))
         self.assertEqual((r["bucket"], r["folders"], [f["name"] for f in r["files"]]), ("bkt", ["policy/2026/"], ["policy/a.xlsx", "policy/b.pdf"]))
 

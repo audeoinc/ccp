@@ -58,7 +58,7 @@ register_errors(app)
 async def basic_auth(request: Request, call_next):
     # 死活確認(中身は何も返さない)と、内部の呼び出し(/internal/。呼ばれる側で、署名つきトークンを確認する)は、Basic 認証の対象外
     path = request.url.path
-    # 開発用の画面(/dev/)と API は、CCP_DEVTOOLS=1 のときだけ見せる(ccp/devtools.py)
+    # 開発用の画面(/dev/)と API は、CCP_DEVTOOLS=1 のときだけ見せる(ccp/devtools/)
     if devtools.blocks(path):
         return PlainTextResponse("Not Found", status_code=404)
     if APP_PASSWORD and path != "/ping" and not path.startswith("/internal/"):
