@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { InfoLabel, Badge, Button, Field, Input, Select, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Button, Field, Input, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -16,8 +16,7 @@ import { OpenLink } from '../LinkText'
 import { productUrl } from '../links'
 import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
-import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges, type TargetGender } from '../target'
-import { channelOptions, countryOptions, statusColor, statusOptions } from '../status'
+import { channelOptions, countryOptions } from '../status'
 import { baseTemplateId, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
 import { TemplateThumb } from '../TemplateThumb'
 import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
@@ -32,6 +31,7 @@ import { ProductSwap, type SwapAt } from './ProductSwap'
 import { AiPicks, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
 import { confirmDialog } from '../confirm'
+import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
 
 const useStyles = makeStyles({
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
@@ -48,7 +48,6 @@ const useStyles = makeStyles({
   label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '10px', rowGap: '10px' },
-  chip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
   // 商品の見比べ・情報の箱
   product: { display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr)', columnGap: '10px', alignItems: 'start', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
   productText: { display: 'grid', rowGap: '2px', minWidth: 0 },
@@ -75,7 +74,6 @@ const useStyles = makeStyles({
   pickRow: { display: 'grid', rowGap: '2px', padding: '6px 8px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   heroCandOn: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
-  dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   // この配信のねらい(テーマ・切り口)。直す部品の上の、控えめな箱
   aim: { display: 'grid', rowGap: '2px', width: '100%', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, boxSizing: 'border-box' },
   aimBtn: { border: 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
@@ -858,53 +856,17 @@ function Aim({ editor: e }: { editor: SimpleEditor }) {
 function ManageFields({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
-  const ages = parseAges(e.form.targetAges)
   return (
     <>
       <Field label={t('制作指示', 'Production notes')} size="small" data-field="instructions">
         <AutoTextarea heightKey="PartPane.e_form_instructions" size="small" rows={3} value={e.form.instructions} onChange={(_, d) => e.setField('instructions', d.value)} />
       </Field>
       <div className={s.twoCol}>
-        <Field label={t('種類', 'Type')} size="small" data-field="themeType">
-          <Select size="small" value={e.form.themeType} onChange={(_, d) => e.setField('themeType', d.value)}>
-            <option value="">{t('未設定', 'Not set')}</option>
-            {THEME_TYPES.map((v) => <option key={v} value={v}>{themeTypeLabel(v)}</option>)}
-          </Select>
-        </Field>
-        <Field label={t('国', 'Country')} size="small" data-field="country">
-          <Select size="small" value={e.form.country} onChange={(_, d) => e.setField('country', d.value)}>
-            <option value="">{t('未設定', 'Not set')}</option>
-            {countryOptions.map((o) => <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>)}
-          </Select>
-        </Field>
+        <ChoiceField label={t('種類', 'Type')} value={e.form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={(v) => e.setField('themeType', v)} size="small" field="themeType" />
+        <ChoiceField label={t('国', 'Country')} value={e.form.country} options={countryOptions} onChange={(v) => e.setField('country', v)} size="small" field="country" />
       </div>
-      <Field label={t('ターゲット', 'Target')} size="small" data-field="target">
-        <div className={s.root} style={{ rowGap: 6 }}>
-          <span className={s.row}>
-            {(['', ...TARGET_GENDERS] as TargetGender[]).map((g) => (
-              <ToggleButton key={g || 'none'} className={s.chip} size="small" shape="circular" checked={e.form.targetGender === g} appearance={e.form.targetGender === g ? 'primary' : 'outline'} onClick={() => e.setField('targetGender', g)}>
-                {genderLabel(g)}
-              </ToggleButton>
-            ))}
-          </span>
-          <span className={s.row}>
-            <ToggleButton className={s.chip} size="small" shape="circular" checked={!e.form.targetAges} appearance={!e.form.targetAges ? 'primary' : 'outline'} onClick={() => e.setField('targetAges', '')}>
-              {t('指定なし', 'Not specified')}
-            </ToggleButton>
-            {AGE_BANDS.map((a) => {
-              const on = ages.includes(a)
-              return (
-                <ToggleButton key={a} className={s.chip} size="small" shape="circular" checked={on} appearance={on ? 'primary' : 'outline'} onClick={() => e.setField('targetAges', formatAges(on ? ages.filter((x) => x !== a) : [...ages, a]))}>
-                  {ageLabel(a)}
-                </ToggleButton>
-              )
-            })}
-          </span>
-        </div>
-      </Field>
-      <Field label={t('担当', 'Owner')} size="small" data-field="owner">
-        <Input size="small" value={e.form.owner} onChange={(_, d) => e.setField('owner', d.value)} />
-      </Field>
+      <TargetField gender={e.form.targetGender} ages={e.form.targetAges} onGender={(v) => e.setField('targetGender', v)} onAges={(v) => e.setField('targetAges', v)} size="small" field="target" />
+      <OwnerField value={e.form.owner} onChange={(v) => e.setField('owner', v)} owners={e.people} size="small" field="owner" />
       {/* 制作の担当・締め切りは、引き継ぎのタブだけで決める(2 か所で入力しない。FLOWS の C-3) */}
       <div className={s.readonly} data-field="due">
         <span className={s.label}>{t('制作の締め切り・担当', 'Production due & assignee')}</span>
@@ -926,27 +888,10 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
   const ref = useFocusField(focus)
   return (
     <div ref={ref} className={s.root}>
-      <Field label={t('配信名', 'Delivery name')} size="small" required data-field="name">
-        <Input size="small" value={e.form.name} onChange={(_, d) => e.setField('name', d.value)} />
-      </Field>
-      <Field label={t('配信日時', 'Send date & time')} size="small" required data-field="scheduledAt">
-        <Input size="small" type="datetime-local" value={e.form.scheduledAt} onChange={(_, d) => e.setField('scheduledAt', d.value)} />
-      </Field>
-      <Field label={t('チャネル', 'Channel')} size="small" data-field="channel" hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')}>
-        <Select size="small" value={e.form.channel} onChange={(_, d) => e.setField('channel', d.value)}>
-          <option value="">{t('未設定', 'Not set')}</option>
-          {channelOptions.map((o) => <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>)}
-        </Select>
-      </Field>
-      <Field label={t('ステータス', 'Status')} size="small" data-field="status">
-        <span className={s.row}>
-          <span className={s.dot} style={{ backgroundColor: statusColor(e.form.status) }} />
-          <Select size="small" value={e.form.status} onChange={(_, d) => e.setField('status', d.value)} style={{ flexGrow: 1 }}>
-            {statusOptions.map((o) => <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>)}
-            {e.form.status === 'confirmed' && <option value="confirmed">{t('承認済み(週が確定)', 'Approved (week confirmed)')}</option>}
-          </Select>
-        </span>
-      </Field>
+      <NameField value={e.form.name} onChange={(v) => e.setField('name', v)} size="small" field="name" />
+      <ScheduledAtField value={e.form.scheduledAt} onChange={(v) => e.setField('scheduledAt', v)} size="small" field="scheduledAt" />
+      <ChoiceField label={t('チャネル', 'Channel')} value={e.form.channel} options={channelOptions} onChange={(v) => e.setField('channel', v)} hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')} size="small" field="channel" />
+      <StatusField value={e.form.status} onChange={(v) => e.setField('status', v)} size="small" field="status" />
       <ManageFields editor={e} />
     </div>
   )

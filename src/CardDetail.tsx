@@ -6,7 +6,6 @@ import {
   Caption1,
   Dialog,
   Field,
-  Input,
   MenuItem,
   MessageBar,
   MessageBarActions,
@@ -24,7 +23,7 @@ import {
   tokens,
 } from '@fluentui/react-components'
 import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, CommentAddRegular, ChevronLeftRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
-import { locale, optionLabel, tr, useT } from './i18n'
+import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
 import { cardMarket, heroMarket, productMarket } from './market'
@@ -38,7 +37,7 @@ import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
 import { FaceBadge } from './FaceBadge'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
-import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, fitsTarget, formatAges, genderLabel, parseAges, targetText, type TargetGender } from './target'
+import { AUDIENCES, audienceLabel, fitsTarget, targetText } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, channelOf, sectionIndexAt, sectionsOf, templateFromValue, type EmailTemplateId, type TemplateChannel, baseTemplateId, currentVersion, getTemplate, splitTemplateKey, pinnedTemplateKey, templateKeyOfCard, templateMissing, templatesSettled, useTemplates } from './templates'
@@ -63,7 +62,7 @@ import { logEvent, myName } from './history'
 import { ProcessPane, ProcessRail, type TalkTab } from './ProcessPane'
 import type { TopTab } from './ContentPane'
 import { ApprovalsService } from './data/approvals'
-import { CHANNEL_PUSH, channelOptions, countryOptions, statusColor, statusOptions, statusRank } from './status'
+import { CHANNEL_PUSH, channelOptions, countryOptions, statusOptions, statusRank } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
 import { ResolvedPinsToggle } from './ResolvedPinsToggle'
@@ -78,6 +77,7 @@ import { templateUse } from './templateUse'
 import { allVariants, encodeAbTest, isChoose, metricLabel, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, ownsTemplate, ownsText, parseAbTest, parseDecision, targetLabel, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
+import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from './DeliveryInfoFields'
 import { confirmDialog } from './confirm'
 import { PreviewPins } from './PreviewPins'
 import { pinView } from './pinStore'
@@ -228,25 +228,6 @@ const toForm = (c?: DeliveryCard): Form => ({
   copyAngle: c?.copy_angle ?? '',
   instructionsAngle: c?.instructions_angle ?? '',
 })
-
-function OptionSelect({ label, value, options, onChange }: {
-  label: string
-  value: string
-  options: { value: string; label: string }[]
-  onChange: (v: string) => void
-}) {
-  const t = useT()
-  return (
-    <Field label={label}>
-      <Select size="small" value={value} onChange={(_, d) => onChange(d.value)}>
-        <option value="">{t('未設定', 'Not set')}</option>
-        {options.map((o) => (
-          <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
-        ))}
-      </Select>
-    </Field>
-  )
-}
 
 // 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない(鍵は prefKeys.ts)
 const ZOOM_KEY = PREF.cardPreviewZoom
@@ -434,10 +415,8 @@ const useStyles = makeStyles({
   deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
   previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
   // 配信の対象(X40)
-  targetBox: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
   targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
   savedNote: { alignSelf: 'center', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteGreenForeground1 },
-  targetChip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
   targetLabel: { width: '44px', flexShrink: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
   // 左の「制作への引き継ぎ」(表示だけ。押すと、やり取りの「引き継ぎ」のタブが開く)
@@ -463,8 +442,6 @@ const useStyles = makeStyles({
   },
   handoffItem: { whiteSpace: 'nowrap' },
   handoffLink: { marginLeft: '6px', color: tokens.colorBrandForegroundLink, whiteSpace: 'nowrap' },
-  statusRow: { display: 'flex', alignItems: 'center', columnGap: '6px' },
-  dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   grow: { flexGrow: 1 },
   filled: { borderBottomColor: tokens.colorPaletteGreenBorder2 },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
@@ -2514,86 +2491,31 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 {t('テーマ・メイン画像・ヘッドライン・セクション・制作指示を、まとめてAIが下書きします', 'AI drafts the theme, hero image, headline, sections, and production notes all at once')}
               </Caption1>
               <Text weight="semibold" size={300}>{t('配信情報', 'Delivery info')}</Text>
-              <Field label={t('配信名', 'Delivery name')} required>
-                <Input size="small" required value={form.name} onChange={(_, d) => set('name')(d.value)} />
-              </Field>
-              <Field label={t('配信日時', 'Send date & time')} required>
-                <Input size="small" required type="datetime-local" value={form.scheduledAt} onChange={(_, d) => set('scheduledAt')(d.value)} />
-              </Field>
+              <NameField value={form.name} onChange={set('name')} />
+              <ScheduledAtField value={form.scheduledAt} onChange={set('scheduledAt')} />
               <div className={styles.twoCol}>
-                <OptionSelect label={t('国', 'Country')} value={form.country} options={countryOptions} onChange={set('country')} />
-                <OptionSelect label={t('チャネル', 'Channel')} value={form.channel} options={channelOptions} onChange={set('channel')} />
-                <OptionSelect label={t('種類', 'Type')} value={form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={set('themeType')} />
-                <Field label={t('ステータス', 'Status')}>
-                  <div className={styles.statusRow}>
-                    <span className={styles.dot} style={{ backgroundColor: statusColor(form.status) }} />
-                    <Select size="small" className={styles.grow} value={form.status} onChange={(_, d) => set('status')(d.value)}>
-                      {statusOptions.map((o) => (
-                        <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
-                      ))}
-                      {/* 確定した週の配信の値(confirmed)は、画面の選択肢にはない(確定は週の言葉)ので、その値のときだけ出す */}
-                      {form.status === 'confirmed' && <option value="confirmed">{t('承認済み(週が確定)', 'Approved (week confirmed)')}</option>}
-                    </Select>
-                  </div>
-                </Field>
+                <ChoiceField label={t('国', 'Country')} value={form.country} options={countryOptions} onChange={set('country')} />
+                <ChoiceField label={t('チャネル', 'Channel')} value={form.channel} options={channelOptions} onChange={set('channel')} />
+                <ChoiceField label={t('種類', 'Type')} value={form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={set('themeType')} />
+                <StatusField value={form.status} onChange={set('status')} />
               </div>
               {/* 配信の対象(X40): 誰に向けて作るか。最初に決め、AI の下書きと商品の候補をこれに合わせる */}
-              <Field label={t('配信の対象', 'Target')} hint={t('AI の下書きと商品の候補が、これに合わせます', 'AI drafts and product candidates follow this')}>
-                <div className={styles.targetBox}>
+              <TargetField gender={form.targetGender} ages={form.targetAges} onGender={set('targetGender')} onAges={set('targetAges')}>
+                {/* アプリの送る相手(これまでの ⑥ 時刻・相手 から移した) */}
+                {templateChannel === 'push' && (
                   <div className={styles.targetRow}>
-                    <span className={styles.targetLabel}>{t('性別', 'Gender')}</span>
-                    {(['', ...TARGET_GENDERS] as TargetGender[]).map((g) => (
-                      <ToggleButton key={g || 'none'} className={styles.targetChip} size="small" shape="circular" checked={form.targetGender === g} appearance={form.targetGender === g ? 'primary' : 'outline'} onClick={() => set('targetGender')(g)}>
-                        {genderLabel(g)}
-                      </ToggleButton>
-                    ))}
+                    <span className={styles.targetLabel}>{t('送る相手', 'Send to')}</span>
+                    <Select size="small" className={styles.grow} value={audience} onChange={(_, d) => setAudience(d.value)}>
+                      <option value="" disabled>{t('選んでください', 'Choose')}</option>
+                      {AUDIENCES.map((v) => (
+                        <option key={v} value={v}>{audienceLabel(v)}</option>
+                      ))}
+                    </Select>
                   </div>
-                  <div className={styles.targetRow}>
-                    <span className={styles.targetLabel}>{t('年代', 'Age')}</span>
-                    <ToggleButton className={styles.targetChip} size="small" shape="circular" checked={!form.targetAges} appearance={!form.targetAges ? 'primary' : 'outline'} onClick={() => set('targetAges')('')}>
-                      {t('指定なし', 'Not specified')}
-                    </ToggleButton>
-                    {AGE_BANDS.map((a) => {
-                      const on = parseAges(form.targetAges).includes(a)
-                      return (
-                        <ToggleButton
-                          key={a}
-                          className={styles.targetChip}
-                          size="small"
-                          shape="circular"
-                          checked={on}
-                          appearance={on ? 'primary' : 'outline'}
-                          onClick={() => {
-                            const now = parseAges(form.targetAges)
-                            set('targetAges')(formatAges(on ? now.filter((x) => x !== a) : [...now, a]))
-                          }}
-                        >
-                          {ageLabel(a)}
-                        </ToggleButton>
-                      )
-                    })}
-                  </div>
-                  {/* アプリの送る相手(これまでの ⑥ 時刻・相手 から移した) */}
-                  {templateChannel === 'push' && (
-                    <div className={styles.targetRow}>
-                      <span className={styles.targetLabel}>{t('送る相手', 'Send to')}</span>
-                      <Select size="small" className={styles.grow} value={audience} onChange={(_, d) => setAudience(d.value)}>
-                        <option value="" disabled>{t('選んでください', 'Choose')}</option>
-                        {AUDIENCES.map((v) => (
-                          <option key={v} value={v}>{audienceLabel(v)}</option>
-                        ))}
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              </Field>
+                )}
+              </TargetField>
               <div className={styles.twoCol}>
-                <Field label={t('担当者', 'Owner')}>
-                  <Input size="small" list="ccp-owners" value={form.owner} onChange={(_, d) => set('owner')(d.value)} />
-                  <datalist id="ccp-owners">
-                    {owners.map((o) => <option key={o} value={o} />)}
-                  </datalist>
-                </Field>
+                <OwnerField value={form.owner} onChange={set('owner')} owners={owners} />
                 {/* 制作の担当者・締め切り・引き継ぎ済みは、右端のプロセスのペインの「引き継ぎ」だけで決める(2 か所で入力しない。FLOWS の C-3)。ここは表示だけで、押すとそのタブが開く(閉じていれば開く) */}
                 <Field label={t('制作への引き継ぎ', 'Handoff to production')} className={styles.handoffField}>
                   <button type="button" className={styles.handoffSummary} onClick={() => {
