@@ -57,6 +57,7 @@ import { isCancelled } from './cancel'
 import { onPolicyWarning } from './aiSelect'
 import { WeekView, type WeekLens } from './WeekView'
 import { WeekTimeGrid } from './WeekTimeGrid'
+import { WeekCompare } from './WeekCompare'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
 import { loadCustomTemplates } from './layoutTemplates'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -1097,7 +1098,7 @@ function App() {
               <span className={styles.lensGroup}>
                 <span className={mergeClasses(styles.lensLabel, !lensOn && styles.lensLabelOff)}>{t('週の見方', 'Week lens')}</span>
                 <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('週の見方', 'Week lens')} aria-disabled={!lensOn}>
-                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')], ['time', t('時刻', 'Time')]] as const).map(([v, name]) => (
+                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')], ['time', t('時刻', 'Time')], ['compare', t('前週と比べる', 'vs last week')]] as const).map(([v, name]) => (
                     <button
                       key={v}
                       type="button"
@@ -1360,7 +1361,10 @@ function App() {
               {/* 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子。計画の面だけ */}
               {/* 地の部分をつかんで横に引くと、前後の週へ(SwipePager) */}
               <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
-              {lens === 'time' && !onProduction ? (
+              {/* 週の見方「前週と比べる」(C1): 当週と前週を上下に、縮小のプレビューで並べる。絞り込み済みの配信を渡し、週で分けるのは中で */}
+              {lens === 'compare' && !onProduction ? (
+                <WeekCompare start={weekStart} cards={filtered} cardProducts={cardProducts} products={products} heroes={heroes} onSelect={openCard} />
+              ) : lens === 'time' && !onProduction ? (
                 <WeekTimeGrid
                   start={weekStart}
                   cards={weekRows.map((r) => r.card)}
