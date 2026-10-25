@@ -39,7 +39,8 @@ import { AutoTextarea } from './AutoTextarea'
 import { PinFloat } from './PinFloat'
 import { focusedPin, subscribePins } from './pinStore'
 import { CardNotesService } from './data/cardNotes'
-import { stageOf } from './notesStage'
+import { isThreadRoot, stageOf } from './notesStage'
+import { CardAssetsService } from './data/cardAssets'
 import { usePreviewPins } from './usePreviewPins'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DevRequestMoreMenu } from './DevRequestMenu'
@@ -166,6 +167,22 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const [doneLink, setDoneLink] = useState('')
   const [reviseNote, setReviseNote] = useState('')
   const [side, setSide] = useState<'talk' | 'tasks' | 'assets'>('talk')
+  // タブに出す件数(X75。名前(件数)、0 件でも出す): 未解決の制作のやり取り・未完了のタスク・素材。タブを替えるたびに数え直す(欄の中で増減するため)
+  const [tabCounts, setTabCounts] = useState({ talk: 0, tasks: 0, assets: 0 })
+  useEffect(() => {
+    let alive = true
+    // 読む形(並び)は、欄の中の読み方と同じにする(同じ表・同じ問い合わせは 1 回の読み込みにまとまる)
+    void Promise.all([CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] }), CardAssetsService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on desc'] })])
+      .then(([n, a]) => {
+        if (!alive) return
+        const notes = n.success ? (n.data ?? []) : []
+        setTabCounts({ talk: notes.filter((x) => !x.resolved && isThreadRoot(x) && stageOf(x) === 'production').length, tasks: notes.filter((x) => !x.resolved && x.kind === 'task').length, assets: a.success ? (a.data ?? []).length : 0 })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [card.id, side])
   // プレビューから作った HTML(下書き)と、エディタの中身(ない = まだ直していない)。AB テスト(全案を送る)は案ごと
   const [generatedMap, setGeneratedMap] = useState<Partial<Record<VariantKey, string>>>({})
   const [htmls, setHtmls] = useState<Partial<Record<VariantKey, string>>>({})
@@ -914,9 +931,9 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   <Button size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleTalk} aria-label={t('やり取りをたたむ', 'Collapse the conversation')} />
                 </div>
                 <TabList size="small" selectedValue={side} onTabSelect={(_, d) => setSide(d.value as 'talk' | 'tasks' | 'assets')}>
-                  <Tab value="talk">{t('制作のやり取り', 'Production conversation')}</Tab>
-                  <Tab value="assets" icon={<AttachRegular />}>{t('素材', 'Assets')}</Tab>
-                  <Tab value="tasks" icon={<TaskListLtrRegular />}>{t('タスク', 'Tasks')}</Tab>
+                  <Tab value="talk">{t(`制作のやり取り(${tabCounts.talk})`, `Production conversation (${tabCounts.talk})`)}</Tab>
+                  <Tab value="assets" icon={<AttachRegular />}>{t(`素材(${tabCounts.assets})`, `Assets (${tabCounts.assets})`)}</Tab>
+                  <Tab value="tasks" icon={<TaskListLtrRegular />}>{t(`タスク(${tabCounts.tasks})`, `Tasks (${tabCounts.tasks})`)}</Tab>
                 </TabList>
                 {side === 'talk' ? (
                   <CommentsPanel cardId={card.id} stage="production" productIds={snap.productIds} products={snap.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} />

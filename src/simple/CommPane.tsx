@@ -246,6 +246,7 @@ export function CommPane(props: Props) {
   }, [notes, events, filter])
   const openCount = roots.filter((n) => !n.resolved && n.kind !== 'task').length
   const taskCount = roots.filter((n) => !n.resolved && n.kind === 'task').length
+  const allCount = roots.length + approvalEvents.length
   const mine = !!meName && roots.some((n) => !n.resolved && n.assignee === meName)
   const { onCounts } = props
   useEffect(() => {
@@ -459,10 +460,10 @@ export function CommPane(props: Props) {
     <div className={s.root}>
       {/* 2. 絞り込み(参考の素材・制作の担当と締め切りは、制作向けなので「渡すもの」の側に置く) */}
       <div className={s.bar}>
-        {/* 絞り込みは Fluent の TabList(配信カードの見せ方の切り替えと同じ形。整理 #11) */}
-        <TabList size="small" appearance="subtle-circular" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as typeof filter)}>
-          <Tab value="open">{t(`未解決 ${openCount + taskCount}`, `Open ${openCount + taskCount}`)}</Tab>
-          <Tab value="all">{t('すべて', 'All')}</Tab>
+        {/* 絞り込みは、一覧を切り替えるタブ(ARCHITECTURE の X75: Fluent の TabList の small、名前(件数)、0 件でも出す) */}
+        <TabList size="small" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as typeof filter)}>
+          <Tab value="open">{t(`未解決(${openCount + taskCount})`, `Open (${openCount + taskCount})`)}</Tab>
+          <Tab value="all">{t(`すべて(${allCount})`, `All (${allCount})`)}</Tab>
         </TabList>
       </div>
 
