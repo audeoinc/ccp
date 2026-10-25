@@ -32,8 +32,8 @@ import type { CardAlertKind } from './cardAlerts'
 import { weeklyLimitFor } from './weeklyLimit'
 import { ymd } from './dates'
 
-/** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る / time = 時刻の格子(WeekTimeGrid。X46) */
-export type WeekLens = 'products' | 'progress' | 'time'
+/** 週の表示の見方。products = 商品のバランスを見る / progress = 進み具合を見る / time = 時刻の格子(WeekTimeGrid。X46) / compare = 前週と比べる(WeekCompare。C1) */
+export type WeekLens = 'products' | 'progress' | 'time' | 'compare'
 
 interface Props {
   /** 週の初め(日曜日) */
