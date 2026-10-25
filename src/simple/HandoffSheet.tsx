@@ -12,6 +12,7 @@ import type { CardAsset } from '../models/cardAssets'
 import { ProductionRequestsService } from '../data/productionRequests'
 import type { ProductionRequest } from '../models/productionRequests'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
+import { typo } from '../typo'
 import { useT } from '../i18n'
 import { PartAiChat } from './PartAiChat'
 import { askPartRewrite, type PartTurn } from './partAi'
@@ -23,16 +24,16 @@ import { readinessBlocked, type ReadinessItem, type ReadinessTarget } from './re
 const ASSETS_KEY = PREF.simpleHandoffAssetsOpen
 
 const useStyles = makeStyles({
-  root: { display: 'grid', alignContent: 'start', rowGap: '18px', maxWidth: '760px' },
+  root: { display: 'grid', alignContent: 'start', rowGap: '12px', maxWidth: '760px' },
   section: { display: 'grid', rowGap: '8px' },
-  head: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  head: { ...typo.heading, display: 'flex', alignItems: 'center', columnGap: '8px' },
   num: { width: '20px', height: '20px', borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground },
-  caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  caption: typo.caption,
   status: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   grow: { flexGrow: 1, minWidth: 0 },
   pair: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '10px' },
-  fold: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: 0, border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'left' },
+  fold: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: 0, border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', ...typo.heading, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'left' },
   count: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   // ボタンは説明の文と横に並べず、幅いっぱいの 1 行に(狭いパネルで文字が折り返し、背の高いボタンになって浮いて見えたため。X74)
   foot: { display: 'grid', rowGap: '8px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -177,7 +178,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           {t('制作の担当と締め切り', 'Production assignee and due date')}
         </span>
         <div className={s.pair}>
-          <Field label={t('担当', 'Assignee')} size="small">
+          <Field label={t('制作の担当', 'Production assignee')} size="small">
             <Input ref={ownerRef} size="small" list="ccp-handoff-people" value={e.form.productionOwner} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionOwner', d.value)} />
             <datalist id="ccp-handoff-people">
               {e.people.map((o) => <option key={o} value={o} />)}
@@ -196,7 +197,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         </span>
         {editedAfter && (
           <MessageBar intent="info" layout="multiline">
-            <MessageBarBody>{t('渡したあとに直しました。制作に知らせるには、制作のページで依頼し直してください。', 'Edited after handoff. To let production know, request again on the production page.')}</MessageBarBody>
+            <MessageBarBody>{t('渡したあとに直しました。制作に知らせるには、制作のページで渡し直してください。', 'Edited after handoff. To let production know, hand off again on the production page.')}</MessageBarBody>
           </MessageBar>
         )}
         <AutoTextarea
@@ -289,10 +290,10 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           {blocked
             ? t('制作の担当と締め切りを入れると、渡せます', 'Enter the production assignee and due date to hand off')
             : requested
-            ? t('渡したあとも、渡す文章は直せます。直したら、制作のページで依頼し直します。', 'You can still edit the notes after handoff. If you do, request again on the production page.')
+            ? t('渡したあとも、渡す文章は直せます。直したら、制作のページで渡し直します。', 'You can still edit the notes after handoff. If you do, hand off again on the production page.')
             : statusNote(e.card.status, t)}
         </span>
-        <Button appearance="primary" size="medium" icon={requested ? <OpenRegular /> : <SendRegular />} disabled={busy || e.saving || !e.openProduction || blocked} onClick={() => void pass()}>
+        <Button appearance="primary" size="small" icon={requested ? <OpenRegular /> : <SendRegular />} disabled={busy || e.saving || !e.openProduction || blocked} onClick={() => void pass()}>
           {requested ? t('制作のページへ', 'Open production page') : t('制作に渡す', 'Hand off to production')}
         </Button>
       </div>
@@ -303,6 +304,6 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
 /** 渡すボタンの横の説明(承認の前でも渡せることを、短く) */
 function statusNote(status: string | undefined, t: (ja: string, en: string) => string) {
   return status === 'approved' || status === 'confirmed'
-    ? t('保存してから、制作のページで依頼まで進めます', 'Saves, then requests on the production page')
-    : t('承認の前でも渡せます(承認はあとからもらえます)。保存してから、制作のページで依頼まで進めます', 'You can hand off before approval (get it later). Saves, then requests on the production page')
+    ? t('保存してから、制作のページで渡すまで進めます', 'Saves, then hands off on the production page')
+    : t('承認の前でも渡せます(承認はあとからもらえます)。保存してから、制作のページで渡すまで進めます', 'You can hand off before approval (get it later). Saves, then hands off on the production page')
 }
