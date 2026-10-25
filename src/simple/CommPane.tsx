@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Avatar, Button, Checkbox, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Avatar, Button, MessageBar, MessageBarBody, Checkbox, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowRepeatAllRegular,
   CheckmarkCircleRegular,
@@ -71,7 +71,6 @@ const useStyles = makeStyles({
   chipOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, borderTopColor: tokens.colorBrandStroke2, borderRightColor: tokens.colorBrandStroke2, borderBottomColor: tokens.colorBrandStroke2, borderLeftColor: tokens.colorBrandStroke2 },
   input: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'end' },
   people: { display: 'grid', rowGap: '2px', maxHeight: '220px', overflowY: 'auto' },
-  error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, padding: '8px 2px' },
 })
 
@@ -406,7 +405,11 @@ export function CommPane(props: Props) {
           {eligible.length > 0 && (
             <AutoTextarea heightKey="CommPane.decideText" size="small" rows={2} value={text} disabled={working} placeholder={t('ひとこと(差し戻すときは理由)', 'A note (the reason, when requesting changes)')} onChange={(_, d) => setText(d.value)} />
           )}
-          {error && <span className={s.error}>{error}</span>}
+          {error && (
+          <MessageBar intent="error" layout="multiline">
+            <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
           {eligible.length > 0 && (
             <div className={s.actions}>
               <Button size="small" appearance="primary" icon={<CheckmarkCircleRegular />} disabled={working || props.busy} onClick={() => void decide('approved')}>
@@ -564,7 +567,11 @@ export function CommPane(props: Props) {
             {t('タスク', 'Task')}
           </button>
         </div>
-        {error && <span className={s.error}>{error}</span>}
+        {error && (
+          <MessageBar intent="error" layout="multiline">
+            <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
         <div className={s.input}>
           <AutoTextarea heightKey="CommPane.text"
             size="small"

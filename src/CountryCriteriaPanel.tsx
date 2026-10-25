@@ -66,7 +66,7 @@ export function CountryCriteriaPanel({ country, countryName }: Props) {
         </MessageBar>
       )}
       {saved && (
-        <MessageBar intent="success">
+        <MessageBar intent="success" layout="multiline">
           <MessageBarBody>{t('保存しました', 'Saved')}</MessageBarBody>
         </MessageBar>
       )}

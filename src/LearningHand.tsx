@@ -19,7 +19,6 @@ import {
   MenuTrigger,
   Option,
   SearchBox,
-  Spinner,
   Switch,
   makeStyles,
   tokens,
@@ -36,6 +35,7 @@ import { confirmDialog } from './confirm'
 import { LearningCard } from './LearningCard'
 import { useLearningCards } from './useLearningCards'
 import { sortLearningCards, stateLabel, type LearningCardData, type LearningSort, type LearningState } from './learningCards'
+import { PaneSpinner } from './PaneSpinner'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '12px' },
@@ -121,7 +121,7 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
   }
 
   if (error) return <div className={s.empty}>{t(`学びを読めませんでした: ${error}`, `Could not load learnings: ${error}`)}</div>
-  if (loading) return <Spinner size="small" />
+  if (loading) return <PaneSpinner />
 
   const sortName = (v: LearningSort) => (v === 'strength' ? t('強い順', 'Strongest') : v === 'newest' ? t('新しい順', 'Newest') : t('よく使われた順', 'Most used'))
   const channelName = (v: string) => (v ? optionLabel(channelOptions.find((o) => String(o.value) === v)?.label) || v : t('すべてのチャネル', 'All channels'))

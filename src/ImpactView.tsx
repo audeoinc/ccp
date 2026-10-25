@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Badge, Button, MessageBar, MessageBarBody, Spinner, Tab, TabList, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { AiRunsService, type AiRun, type AiRunAdoption } from './data/aiRuns'
@@ -15,6 +15,7 @@ import { IMPACT_TAB_EVENT, takePendingImpactTab, buildImpacts, compare, evaluate
 import { PREF } from './prefKeys'
 import { loadPref, savePref } from './settings'
 import { ymd } from './dates'
+import { PaneSpinner } from './PaneSpinner'
 
 // 結果の面の見せ方「効果」。配信が売上をどれだけ増やしたか(ホールドアウトとの差)と、AI に渡した学びが効いているかを見る。
 // 4 つの見方(記録する → 指標を見る → 売上を比べる → 学びを評価して淘汰する)を、増分の要約と並べてタブにした。
@@ -248,12 +249,12 @@ export function ImpactView({ cards, allCards, country, onOpenResult }: Props) {
 
   if (error) {
     return (
-      <MessageBar intent="error">
+      <MessageBar intent="error" layout="multiline">
         <MessageBarBody>{t(`結果を読めませんでした: ${error}`, `Could not load results: ${error}`)}</MessageBarBody>
       </MessageBar>
     )
   }
-  if (!results) return <Spinner size="small" label={t('読み込み中…', 'Loading…')} />
+  if (!results) return <PaneSpinner />
 
   const noData = runs.length === 0 && lifts.length === 0
   return (
@@ -267,7 +268,7 @@ export function ImpactView({ cards, allCards, country, onOpenResult }: Props) {
         <Tab value="learnings">{t('④ 学びの評価', '④ Evaluate learnings')}</Tab>
       </TabList>
       {noData && (
-        <MessageBar intent="info">
+        <MessageBar intent="info" layout="multiline">
           <MessageBarBody>
             {t(
               'まだ記録がありません。配信カードで AI の案を頼むと、渡した学びが記録されます。ホールドアウトとの比べは、配信の仕組みとデータ基盤から取り込む予定です。いまは ⚙ の「効果の見本を作る」で見本を作れます。',

@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import {
   MessageBar,
   MessageBarBody,
-  Spinner,
   ToggleButton,
   Tooltip,
   makeStyles,
@@ -31,6 +30,7 @@ import { WeeksService } from './data/weeks'
 import { monthRowOf, scopeLabel } from './weekLock'
 import { draftRetro } from './aiRetro'
 import { ym, ymd } from './dates'
+import { PaneSpinner } from './PaneSpinner'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -487,17 +487,17 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       {toolbarSlot && createPortal(tools, toolbarSlot)}
       <div className={styles.main}>
         {error && (
-          <MessageBar intent="error">
+          <MessageBar intent="error" layout="multiline">
             <MessageBarBody>{error}</MessageBarBody>
           </MessageBar>
         )}
         {message && (
-          <MessageBar intent="info" style={{ marginBottom: 8 }}>
+          <MessageBar intent="info" layout="multiline" style={{ marginBottom: 8 }}>
             <MessageBarBody>{message}</MessageBarBody>
           </MessageBar>
         )}
         {results === null && !error ? (
-          <Spinner />
+          <PaneSpinner />
         ) : view === 'month' ? (
           <>
           {monthBar}

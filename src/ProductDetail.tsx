@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Badge, Button, Spinner, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import { ImageThumb } from './ImageThumb'
@@ -11,6 +11,7 @@ import { MiniChart } from './MiniChart'
 import { useProductData } from './useProductData'
 import { ProductMetrics } from './ProductMetrics'
 import { ProductSkus } from './ProductSkus'
+import { PaneSpinner } from './PaneSpinner'
 
 /** 在庫が少ないとみなす数(AI の商品選定の基準と同じ) */
 const LOW_STOCK = 50
@@ -33,7 +34,6 @@ const useStyles = makeStyles({
   facts: { display: 'grid', gridTemplateColumns: 'minmax(56px, auto) minmax(0, 1fr)', columnGap: '10px', rowGap: '3px', margin: 0 },
   label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   value: { margin: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
-  center: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
 })
 
 export type ProductDetailTab = 'trend' | 'sku' | 'metrics' | 'plan' | 'details'
@@ -84,8 +84,12 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
         <Tab value="plan">{t('販売方針・販促', 'MD plan')}</Tab>
       </TabList>
 
-      {(tab === 'trend' || tab === 'plan') && loading && <div className={s.center}><Spinner size="small" /></div>}
-      {(tab === 'trend' || tab === 'plan') && error && <span className={s.muted}>{error}</span>}
+      {(tab === 'trend' || tab === 'plan') && loading && <PaneSpinner />}
+      {(tab === 'trend' || tab === 'plan') && error && (
+        <MessageBar intent="error" layout="multiline">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
 
       {tab === 'trend' && !loading && !error && (
         weekly.length === 0 ? (

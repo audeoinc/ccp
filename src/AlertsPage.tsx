@@ -416,7 +416,7 @@ export function AlertsPage({ initialProductId, onSelectProduct, onOpenAlertCard,
             </table>
           </div>
           {done && (
-            <MessageBar intent="success">
+            <MessageBar intent="success" layout="multiline">
               <MessageBarBody>{done}</MessageBarBody>
             </MessageBar>
           )}

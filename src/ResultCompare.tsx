@@ -263,7 +263,7 @@ export function ResultCompare({ row, history, cardProducts, products, heroes, mo
               </span>
             </div>
             {reviewError && (
-              <MessageBar intent="error">
+              <MessageBar intent="error" layout="multiline">
                 <MessageBarBody>{reviewError}</MessageBarBody>
               </MessageBar>
             )}

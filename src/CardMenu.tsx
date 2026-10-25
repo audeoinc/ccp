@@ -141,7 +141,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
                 <Textarea value={reason} onChange={(_, d) => setReason(d.value)} rows={3} />
               </Field>
               {error && (
-                <MessageBar intent="error">
+                <MessageBar intent="error" layout="multiline">
                   <MessageBarBody>{error}</MessageBarBody>
                 </MessageBar>
               )}
@@ -168,7 +168,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
                 )}
               </span>
               {error && (
-                <MessageBar intent="error">
+                <MessageBar intent="error" layout="multiline">
                   <MessageBarBody>{error}</MessageBarBody>
                 </MessageBar>
               )}
@@ -240,7 +240,7 @@ export function DuplicateDialog({ card, weeks, onClose, onDuplicated }: { card: 
               <Input type="datetime-local" value={dupAt} onChange={(_, d) => setDupAt(d.value)} />
             </Field>
             {error && (
-              <MessageBar intent="error">
+              <MessageBar intent="error" layout="multiline">
                 <MessageBarBody>{error}</MessageBarBody>
               </MessageBar>
             )}

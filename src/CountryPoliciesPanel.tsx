@@ -3,11 +3,12 @@
 // 決まりの「市場」の列は、決めていないときの既定として読む(空 = ブランド全体の決まりで全部の国、書いてあれば その国だけ。法律・表記など)。
 // 中身が国で違う決まりは、適用では表せないので、別の決まりとして持つ(全社の「方針・決まり」で足す)。決まりの id は rule_id(取り込み直しても変わらない)
 import { useEffect, useState } from 'react'
-import { MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
 import { PolicyRulesService } from './data/policyRules'
 import type { PolicyRule } from './models/policyRules'
 import { CountryApplyList } from './CountryApplyList'
 import { useT } from './i18n'
+import { PaneSpinner } from './PaneSpinner'
 
 const useStyles = makeStyles({
   note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -60,7 +61,7 @@ export function CountryPoliciesPanel({ country, countryName }: Props) {
         <MessageBarBody>{t(`決まりを読めませんでした。ほかの項目を開いてから、開き直してください(${error})`, `Could not load the rules. Open another item and come back (${error})`)}</MessageBarBody>
       </MessageBar>
     )
-  if (rules === null) return <Spinner size="small" />
+  if (rules === null) return <PaneSpinner />
   if (items.length === 0) return <span className={s.note}>{t('決まりはまだありません(全社の「方針・決まり」で取り込めます)', 'No rules yet (import them in Company → Marketing policies).')}</span>
   return (
     <CountryApplyList

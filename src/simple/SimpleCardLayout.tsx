@@ -984,7 +984,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <ResolvedPinsToggle />
           </div>
           {placing && (
-            <MessageBar intent="info" className={s.placingBar}>
+            <MessageBar intent="info" layout="multiline" className={s.placingBar}>
               <MessageBarBody>{t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to write a comment (Esc to cancel)')}</MessageBarBody>
             </MessageBar>
           )}

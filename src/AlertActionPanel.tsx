@@ -185,7 +185,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
       {locked && <span className={styles.note}>{t('この配信の週は確定済みなので、変えると、週の確定は解けます', 'This week is confirmed, so changing it makes the week no longer confirmed')}</span>}
       {busy && <Spinner size="extra-tiny" />}
       {error && (
-        <MessageBar intent="error">
+        <MessageBar intent="error" layout="multiline">
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}

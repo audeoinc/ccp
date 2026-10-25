@@ -190,7 +190,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
       )}
 
       {done && (
-        <MessageBar intent="success">
+        <MessageBar intent="success" layout="multiline">
           <MessageBarBody>{done}</MessageBarBody>
         </MessageBar>
       )}
@@ -228,7 +228,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
           </span>
         </div>
         {error && (
-          <MessageBar intent="error">
+          <MessageBar intent="error" layout="multiline">
             <MessageBarBody>{error}</MessageBarBody>
           </MessageBar>
         )}

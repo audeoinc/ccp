@@ -3,7 +3,7 @@
 // 出元の国では、決めていなければ使う。ほかの国では、決めていなければ使わない(国で客層が違うので、黙って全部の国に効かせない)。
 // 配信カードの「これまでの学び」でも、ほかの国の学びを 1 件ずつ決められる。ここは、まとめて見直す所
 import { useMemo, type ReactNode } from 'react'
-import { MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
 import { CountryApplyList } from './CountryApplyList'
 import { LearningCard } from './LearningCard'
@@ -11,6 +11,7 @@ import { useLearningCards } from './useLearningCards'
 import { sortLearningCards } from './learningCards'
 import { countryOptions } from './status'
 import { optionLabel, useT } from './i18n'
+import { PaneSpinner } from './PaneSpinner'
 
 const useStyles = makeStyles({
   note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -50,7 +51,7 @@ export function CountryLearningsPanel({ country, countryName, cards }: Props) {
         <MessageBarBody>{t(`学びを読めませんでした。ほかの項目を開いてから、開き直してください(${error})`, `Could not load the learnings. Open another item and come back (${error})`)}</MessageBarBody>
       </MessageBar>
     )
-  if (loading) return <Spinner size="small" />
+  if (loading) return <PaneSpinner />
   if (items.length === 0) return <span className={s.note}>{t('学び(結果の「次に生かすメモ」)はまだありません', 'No learnings (notes for next time) yet.')}</span>
   const originOf = new Map(learnings.map((l) => [l.id, l.origin]))
   return <CountryApplyList key={country} kind="learning" country={country} countryName={countryName} items={items} defaultUse={(id) => originOf.get(id) === country} />

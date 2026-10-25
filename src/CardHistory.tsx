@@ -2,7 +2,7 @@
 // ステータスの変化(events)、差し替えの理由(メモの種類 change)を、新しい順に 1 本に並べる。
 // 「⋯」の「変更の履歴…」のフロートと、シンプルな配信カードの左の「変更」で、同じものを出す
 import { useEffect, useState } from 'react'
-import { Button, Dialog, DialogBody, DialogContent, DialogTitle, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogBody, DialogContent, DialogTitle, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DismissRegular, HistoryRegular } from '@fluentui/react-icons'
 import { ResizableSurface } from './ResizableSurface'
 import { ChangeLogsService, type ChangeLog } from './data/changeLogs'
@@ -11,6 +11,7 @@ import { EventsService, type CardEvent } from './data/events'
 import { locale, useT } from './i18n'
 import { statusLabel } from './status'
 import { typo } from './typo'
+import { PaneSpinner } from './PaneSpinner'
 
 const useStyles = makeStyles({
   surface: { width: 'min(560px, (94vw / var(--ui-zoom, 1)))' },
@@ -146,7 +147,7 @@ export function CardHistoryList({ cardId, version, scroll }: { cardId: string; v
     )
   }
 
-  if (entries === null) return <Spinner size="tiny" />
+  if (entries === null) return <PaneSpinner />
   return (
     <div className={mergeClasses(s.list, scroll && s.scroll)}>
       {entries.length === 0 && <span className={s.empty}>{t('まだ変更の履歴はありません', 'No changes yet')}</span>}

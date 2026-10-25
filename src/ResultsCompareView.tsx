@@ -257,7 +257,7 @@ export function ResultsCompareView({ rows, cardProducts, products, heroes, money
               </span>
             </div>
             {error && (
-              <MessageBar intent="error">
+              <MessageBar intent="error" layout="multiline">
                 <MessageBarBody>{error}</MessageBarBody>
               </MessageBar>
             )}

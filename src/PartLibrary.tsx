@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Badge, Button, Spinner, Switch, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Switch, makeStyles, tokens } from '@fluentui/react-components'
 import { CalendarCancelRegular, DeleteRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import { PartImagesService } from './data/partImages'
 import { PartUpload } from './data/partUpload'
@@ -10,6 +10,7 @@ import { partImage } from './images'
 import { optionLabel, tr, useT } from './i18n'
 import { PartImageKind, type PartImage } from './models/partImages'
 import { confirmDialog } from './confirm'
+import { PaneSpinner } from './PaneSpinner'
 
 const useStyles = makeStyles({
   wrap: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1 },
@@ -124,7 +125,7 @@ export function PartLibrary({ country, me, onCount }: { country: string; me: str
       </div>
       {error && <span className={s.error}>{error}</span>}
       {parts === null ? (
-        <Spinner size="small" />
+        <PaneSpinner />
       ) : list.length === 0 ? (
         <div className={s.empty}>
           <span>{t('部品の画像はまだありません。ボタン・バナー・ロゴ・アイコンを上げると、制作のページから URL や <img> のタグをコピーして使えます。', 'No part images yet. Upload buttons, banners, logos and icons, then copy their URL or <img> tag on the production page.')}</span>

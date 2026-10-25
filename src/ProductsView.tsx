@@ -360,7 +360,7 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
         {ads.length === 0 && <Badge appearance="tint" color="warning">{t('外部広告のデータがありません(⚙ の「外部広告の見本を作る」)', 'No ad data yet (⚙ > Create sample ad data)')}</Badge>}
       </div>
       {error && (
-        <MessageBar intent="error">
+        <MessageBar intent="error" layout="multiline">
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
