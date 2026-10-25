@@ -33,6 +33,8 @@ const useStyles = makeStyles({
     minWidth: 0,
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
   },
+  // 詰めた形(フロート・シンプルの一覧・右の商品情報。並べて見比べる所)。形は同じで、余白と写真を小さくする
+  rowDense: { columnGap: '8px', padding: '6px 8px', alignItems: 'center' },
   rowSelected: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   rowClickable: { cursor: 'pointer' },
   rowHighlight: {
@@ -45,6 +47,9 @@ const useStyles = makeStyles({
   rowBody: { flexGrow: 1, minWidth: 0, display: 'grid', rowGap: '2px' },
   noWrap: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   rowActions: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', flexShrink: 0 },
+  rowActionsInline: { flexDirection: 'row', alignItems: 'center', columnGap: '2px' },
+  lead: { alignSelf: 'center', flexShrink: 0 },
+  nameDense: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
 })
 
 /** 理由の表示。2 行で省略し、クリックすると全文を編集できる(onChange なしなら読み取り専用) */
@@ -84,7 +89,8 @@ export interface RowProps {
   wide?: boolean
   title: string
   meta: string
-  reason: string
+  /** 理由(なければ出さない) */
+  reason?: string
   onReason?: (v: string) => void
   source?: string
   badge?: string
@@ -92,6 +98,16 @@ export interface RowProps {
   marks?: ReactNode
   actions?: ReactNode
   dim?: boolean
+  /** 詰めた形(写真を小さく、名前は 1 行で省略、操作は横に並べる) */
+  dense?: boolean
+  /** 写真の前に置くもの(並びの番号) */
+  lead?: ReactNode
+  /** 名前の行の下に足すもの(アラートの札など) */
+  below?: ReactNode
+  /** 行の上に重ねる見た目(操作をマウスを乗せたときだけ出す、など) */
+  className?: string
+  /** 名前に添える説明(マウスを乗せたとき) */
+  tip?: string
   /** ドラッグ&ドロップ(ドラッグ元・ドロップ先) */
   drag?: {
     draggable?: boolean
@@ -109,22 +125,38 @@ export interface RowProps {
   onHover?: (on: boolean) => void
 }
 
-export function Row({ image, wide, title, meta, reason, onReason, source, badge, marks, actions, dim, drag, highlight, selected, onClick, onHover }: RowProps) {
+export function Row({ image, wide, title, meta, reason, onReason, source, badge, marks, actions, dim, dense, lead, below, className, tip, drag, highlight, selected, onClick, onHover }: RowProps) {
   const s = useStyles()
   const t = useT()
+  // 行の中のボタン・入力欄・理由の文を押したときは、行の動き(onClick)にしない(ProductFloat と同じ決まり)。
+  // 行の中のメニュー(Portal で外に出る)から上がってきた押下も、行の動きにしない
+  const own = (e: React.SyntheticEvent) => {
+    const el = e.target as HTMLElement
+    if (el === e.currentTarget) return true
+    return e.currentTarget.contains(el) && !el.closest?.('button, a, input, textarea, select, [data-no-float]')
+  }
   return (
     <div
       {...drag}
-      onClick={onClick}
+      onClick={onClick && ((e) => own(e) && onClick())}
+      onKeyDown={onClick && ((e) => {
+        if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+        e.preventDefault()
+        onClick()
+      })}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-pressed={onClick && selected !== undefined ? selected : undefined}
       onMouseEnter={onHover ? () => onHover(true) : undefined}
       onMouseLeave={onHover ? () => onHover(false) : undefined}
-      className={mergeClasses(s.row, selected && s.rowSelected, highlight && s.rowHighlight, dim && s.rowDim, drag?.draggable && s.rowDraggable, onClick && !drag?.draggable && s.rowClickable)}
+      className={mergeClasses(s.row, dense && s.rowDense, selected && s.rowSelected, highlight && s.rowHighlight, dim && s.rowDim, drag?.draggable && s.rowDraggable, onClick && !drag?.draggable && s.rowClickable, className)}
     >
       {drag?.draggable && <ReOrderDotsVerticalRegular className={s.dragIcon} />}
-      <ImageThumb src={image} alt={title} width={wide ? 80 : 56} height={72} />
+      {lead !== undefined && <span className={s.lead}>{lead}</span>}
+      <ImageThumb src={image} alt={title} width={dense ? (wide ? 56 : 40) : wide ? 80 : 56} height={dense ? 52 : 72} />
       <div className={s.rowBody}>
-        <div className={s.flexRowTight}>
-          <Text weight="semibold" size={300}>{title}</Text>
+        <div className={s.flexRowTight} style={dense ? { flexWrap: 'nowrap' } : undefined}>
+          <Text weight="semibold" size={dense ? 200 : 300} className={dense ? s.nameDense : undefined} title={tip}>{title}</Text>
           {source !== undefined && (
             <Badge size="small" appearance="tint" color={source === SOURCE_AI ? 'brand' : 'informative'}>{source === SOURCE_AI ? 'AI' : t('手動', 'Manual')}</Badge>
           )}
@@ -132,9 +164,10 @@ export function Row({ image, wide, title, meta, reason, onReason, source, badge,
           {marks}
         </div>
         <span className={s.noWrap}>{meta}</span>
-        <ReasonText value={reason} onChange={onReason} />
+        {below}
+        {reason !== undefined && <ReasonText value={reason} onChange={onReason} />}
       </div>
-      {actions && <div className={s.rowActions}>{actions}</div>}
+      {actions && <div className={mergeClasses(s.rowActions, dense && s.rowActionsInline)}>{actions}</div>}
     </div>
   )
 }

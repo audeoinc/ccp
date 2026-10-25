@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Avatar, Badge, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { productImage } from './images'
 import { yen, type Item } from './items'
@@ -10,6 +10,7 @@ import { AlertChip, LowStockBadge } from './ProductMarks'
 import { sectionRange, sectionsOf, type EmailTemplateId } from './templates'
 import { AlertMark } from './AlertMark'
 import { productGenderLabel } from './target'
+import { Row } from './ProductRow'
 import type { CardAlertKind } from './cardAlerts'
 
 interface Props {
@@ -48,28 +49,15 @@ const useStyles = makeStyles({
     borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
     minWidth: 0,
   },
-  list: { display: 'grid', minWidth: 0 },
-  // 一覧の1行: 一覧性を高めるため、画像・名前・コード・価格・在庫・トレンドだけを、2行で見せる
+  list: { display: 'grid', rowGap: '6px', paddingTop: '6px', minWidth: 0 },
+  // 一覧の1行(形は Row)。行の操作(SU9)は、マウスを乗せたとき・フォーカスがあるとき・引き出しを開いているときだけ見せる(一覧をうるさくしない)
   item: {
-    display: 'flex',
-    alignItems: 'center',
-    columnGap: '8px',
-    padding: '6px 4px',
-    minWidth: 0,
     cursor: 'pointer',
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    ':hover': { backgroundColor: tokens.colorNeutralBackground2 },
-    // 行の操作(SU9)は、マウスを乗せたとき・フォーカスがあるとき・引き出しを開いているときだけ見せる(一覧をうるさくしない)
     '& [data-row-action]': { visibility: 'hidden' },
     ':hover [data-row-action]': { visibility: 'visible' },
     ':focus-within [data-row-action]': { visibility: 'visible' },
     '& [data-row-action][data-on]': { visibility: 'visible' },
   },
-  itemOpen: { backgroundColor: tokens.colorBrandBackground2 },
-  avatar: { flexShrink: 0, width: '32px', height: '32px', borderRadius: tokens.borderRadiusMedium },
-  main: { minWidth: 0, flexGrow: 1, display: 'grid' },
-  name: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   legend: { display: 'grid', rowGap: '6px', maxWidth: '280px', fontSize: tokens.fontSizeBase200 },
   legendHead: { fontWeight: tokens.fontWeightSemibold, marginTop: '2px' },
   legendSub: { color: tokens.colorNeutralForeground3 },
@@ -173,24 +161,29 @@ function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert, acti
   const s = useStyles()
   const market = productMarket(p)
   const trend = trendMark(p.sales_trend_name)
+  // 中ペインの商品の行(ProductRow の Row)と同じ形を、詰めて使う(整理 #7)。右端の売れ行きの矢印と、行の操作は、この一覧だけのもの
   return (
-    <div className={s.item} onMouseEnter={() => onHover(itemKey)} onMouseLeave={() => onHover(null)} role="button" tabIndex={0}>
-      <Avatar shape="square" image={{ src: productImage(p, image), alt: p.name }} name={p.name} className={s.avatar} />
-      <div className={s.main}>
-        <Text size={200} weight="semibold" className={s.name}>
+    <Row
+      dense
+      className={s.item}
+      image={productImage(p, image)}
+      title={p.name}
+      meta={`${p.product_code} ・ ${yen(p.price, market)} ・ ${t('在庫', 'Stock ')}${p.stock ?? '-'}${p.gender ? ` ・ ${productGenderLabel(p.gender)}` : ''}`}
+      marks={
+        <>
           {!onAlert && <AlertMark kind={alert} />}
-          {p.name}
-        </Text>
-        {/* アラートのある商品は、種類のラベル(押すと、そのアラートへの対応を開く。行のクリック = 商品のフロート とは分ける) */}
-        {alert && onAlert && <AlertChip kind={alert} onClick={() => onAlert(p.id)} className={s.alertChip} />}
-        <span className={s.sub}>
-          {p.product_code} ・ {yen(p.price, market)} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
-          {p.gender && ` ・ ${productGenderLabel(p.gender)}`}
-        </span>
-      </div>
-      <LowStockBadge product={p} />
-      <span className={s.trend} style={{ color: trend.color }} title={trend.text} aria-label={trend.text}>{trend.mark}</span>
-      {action}
-    </div>
+          <LowStockBadge product={p} />
+        </>
+      }
+      // アラートのある商品は、種類のラベル(押すと、そのアラートへの対応を開く。行のクリック = 商品のフロート とは分ける)
+      below={alert && onAlert && <AlertChip kind={alert} onClick={() => onAlert(p.id)} className={s.alertChip} />}
+      onHover={(on) => onHover(on ? itemKey : null)}
+      actions={
+        <>
+          <span className={s.trend} style={{ color: trend.color }} title={trend.text} aria-label={trend.text}>{trend.mark}</span>
+          {action}
+        </>
+      }
+    />
   )
 }

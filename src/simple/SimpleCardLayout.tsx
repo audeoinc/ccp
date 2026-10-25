@@ -20,7 +20,7 @@ import { productUrl } from '../links'
 import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { useStoredWidths } from '../floatLayout'
-import { ImageThumb } from '../ImageThumb'
+import { Row, productMeta } from '../ProductRow'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, useT } from '../i18n'
@@ -190,12 +190,10 @@ const useStyles = makeStyles({
   sideDrop: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px', backgroundColor: tokens.colorBrandBackground2 },
   dropNote: { fontSize: '16px' },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
-  candRow: { display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', width: '100%', padding: '6px 4px', border: 'none', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: 'transparent', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2 } },
   // 候補の行と、マウスを乗せたときの「⇄ 入れる」(SU9)
-  candWrap: { position: 'relative', '& [data-row-action]': { visibility: 'hidden' }, ':hover [data-row-action]': { visibility: 'visible' }, ':focus-within [data-row-action]': { visibility: 'visible' } },
-  candAction: { position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)' },
-  candName: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  candMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  // 「入れる」は、マウスを乗せたとき・フォーカスがあるときだけ見せる(一覧をうるさくしない)
+  candList: { display: 'grid', rowGap: '6px', marginTop: '6px' },
+  candWrap: { '& [data-row-action]': { visibility: 'hidden' }, ':hover [data-row-action]': { visibility: 'visible' }, ':focus-within [data-row-action]': { visibility: 'visible' } },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   // 案のタブ(SU2)
   // 上の帯の AB テストの案(SU8)。面のタブのあとに、線で区切って並べる
@@ -909,41 +907,46 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {e.candidates.length > 0 && (
               <>
                 <div className={s.candHead}>{t(`候補(${e.candidates.length})`, `Candidates (${e.candidates.length})`)}</div>
+                <div className={s.candList}>
                 {e.candidates.map((c) => {
                   const p = productById.get(c.productId)
                   return p ? (
-                    <div key={c.key} className={s.candWrap}>
-                      <button type="button" className={s.candRow} onClick={() => openFromList(c.key)} title={c.reason}>
-                        <ImageThumb src={productImage(p)} alt={p.name} width={32} height={40} />
-                        <span style={{ display: 'grid', minWidth: 0 }}>
-                          <span className={s.candName}>{p.name}</span>
-                          <span className={s.candMeta}>{`${p.product_code ?? ''} ・ ${t('在庫', 'Stock ')}${p.stock ?? '-'}`}</span>
-                        </span>
-                      </button>
-                      {/* 候補(載せていない商品)は「⇄ 入れる」。どの枠の商品と入れ替えるかを、載せている商品から選ぶ(SU9 (f)) */}
-                      {e.items.length > 0 && (
-                        <span className={s.candAction} data-row-action>
-                          <Menu positioning="below-end">
-                            <MenuTrigger disableButtonEnhancement>
-                              <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} disabled={e.saving}>
-                                {t('入れる', 'Put in')}
-                              </Button>
-                            </MenuTrigger>
-                            <MenuPopover>
-                              <MenuList>
-                                {e.items.map((it, i) => (
-                                  <MenuItem key={it.key} icon={<ArrowSwapRegular />} onClick={() => e.swapWithCandidate(it.key, c.key, '')}>
-                                    {t(`${i + 1}. ${productById.get(it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${productById.get(it.productId)?.name ?? ''}`)}
-                                  </MenuItem>
-                                ))}
-                              </MenuList>
-                            </MenuPopover>
-                          </Menu>
-                        </span>
-                      )}
-                    </div>
+                    <Row
+                      key={c.key}
+                      dense
+                      className={s.candWrap}
+                      image={productImage(p)}
+                      title={p.name}
+                      meta={productMeta(p)}
+                      reason={c.reason}
+                      onClick={() => openFromList(c.key)}
+                      actions={
+                        // 候補(載せていない商品)は「⇄ 入れる」。どの枠の商品と入れ替えるかを、載せている商品から選ぶ(SU9 (f))
+                        e.items.length > 0 && (
+                          <span data-row-action>
+                              <Menu positioning="below-end">
+                                <MenuTrigger disableButtonEnhancement>
+                                  <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} disabled={e.saving}>
+                                    {t('入れる', 'Put in')}
+                                  </Button>
+                                </MenuTrigger>
+                                <MenuPopover>
+                                  <MenuList>
+                                    {e.items.map((it, i) => (
+                                      <MenuItem key={it.key} icon={<ArrowSwapRegular />} onClick={() => e.swapWithCandidate(it.key, c.key, '')}>
+                                        {t(`${i + 1}. ${productById.get(it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${productById.get(it.productId)?.name ?? ''}`)}
+                                      </MenuItem>
+                                    ))}
+                                  </MenuList>
+                                </MenuPopover>
+                              </Menu>
+                          </span>
+                        )
+                      }
+                    />
                   ) : null
                 })}
+                </div>
               </>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, Field, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, Field, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -14,11 +14,11 @@ import { ProductDetail } from './ProductDetail'
 import { LowStockBadge } from './ProductMarks'
 import { AutoTextarea } from './AutoTextarea'
 import { ImageThumb } from './ImageThumb'
+import { Row, productMeta } from './ProductRow'
 import { productImage } from './images'
-import { priceText, tr, useT } from './i18n'
+import { tr, useT } from './i18n'
 import { OpenLink } from './LinkText'
 import { productUrl } from './links'
-import { productMarket } from './market'
 import { weeklyLimit } from './weeklyLimit'
 import { getUiScale } from './uiScale'
 import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
@@ -57,11 +57,6 @@ const useStyles = makeStyles({
   section: { display: 'grid', rowGap: '6px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  row: { display: 'grid', gridTemplateColumns: '40px minmax(0, 1fr)', columnGap: '10px', alignItems: 'center', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
-  rowOn: { outline: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
-  rowName: { fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  rowMeta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  rowWhy: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   marks: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
   rightHead: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300 },
   swapBox: { display: 'grid', rowGap: '8px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -155,18 +150,9 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
       </span>
     )
   }
-  const market = productMarket(product ?? poolProducts[0])
   const num = (v?: number) => Math.round(v ?? 0).toLocaleString()
-  const row = (key: string, p: Product, on: boolean, onClick: () => void, why?: string, extra?: string) => (
-    <button key={key} type="button" className={mergeClasses(s.row, on && s.rowOn)} onClick={onClick}>
-      <ImageThumb src={productImage(p)} alt={p.name} width={40} height={52} />
-      <span style={{ display: 'grid', rowGap: 2, minWidth: 0 }}>
-        <span className={s.rowName}>{p.name}</span>
-        <span className={s.rowMeta}>{`${p.product_code ?? ''} ・ ${priceText(p.price, market)} ・ ${t(`在庫 ${num(p.stock)}`, `Stock ${num(p.stock)}`)}${extra ? ` ・ ${extra}` : ''}`}</span>
-        {why && <span className={s.rowWhy}>{why}</span>}
-        {marks(p)}
-      </span>
-    </button>
+  const row = (key: string, p: Product, on: boolean, onClick: () => void, why?: string) => (
+    <Row key={key} dense image={productImage(p)} title={p.name} meta={productMeta(p)} reason={why} marks={marks(p)} selected={on} onClick={onClick} />
   )
   const shown = focus.kind === 'current' ? product : focus.product
   const canSwap = focus.kind !== 'current' && (focus.kind === 'cand' ? !!onSwapCandidate : !!onReplace)

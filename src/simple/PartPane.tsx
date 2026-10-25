@@ -7,6 +7,7 @@ import { ChooseDrawer } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
 import { ImageThumb } from '../ImageThumb'
+import { Row, productMeta } from '../ProductRow'
 import { AlertMark } from '../AlertMark'
 import { LowStockBadge } from '../ProductMarks'
 import { heroImage, productImage } from '../images'
@@ -67,7 +68,6 @@ const useStyles = makeStyles({
   compareBox: { display: 'grid', rowGap: '8px', padding: '10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorBrandBackground2 },
   // 何も選んでいないときの、載せた商品の一覧
   list: { display: 'grid', rowGap: '4px' },
-  listRow: { display: 'grid', gridTemplateColumns: '20px 32px minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'center', padding: '2px 0', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
   num: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, textAlign: 'right' },
   heroNow: { display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: '10px', alignItems: 'start' },
   heroCands: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '6px' },
@@ -403,23 +403,25 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               const swapOpen = swapAt?.at === 'list' && swapAt.itemKey === it.key
               return (
                 <div key={it.key}>
-                <div className={s.listRow} onMouseEnter={() => e.hoverProduct(it.key)} onMouseLeave={() => e.hoverProduct(null)}>
-                  <span className={s.num}>{i + 1}</span>
-                  <ImageThumb src={productImage(p, it.imageUrl)} alt={p?.name ?? ''} width={32} height={40} />
-                  <Button size="small" appearance="transparent" style={{ justifyContent: 'flex-start', minWidth: 0, overflow: 'hidden' }} onClick={() => onPick({ kind: 'product', itemKey: it.key })}>
-                    <span className={s.name}>
-                      <AlertMark kind={e.alertKinds.get(it.productId)} />
-                      {p?.name}
-                    </span>
-                  </Button>
-                  <span className={s.row}>
-                    <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0 || e.saving} onClick={() => e.moveItem(i, i - 1)} aria-label={t('前へ', 'Move up')} />
-                    <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === e.items.length - 1 || e.saving} onClick={() => e.moveItem(i, i + 1)} aria-label={t('後ろへ', 'Move down')} />
-                    <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
-                      <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={swapOpen} disabled={e.saving} onClick={() => onSwapAt(swapOpen ? null : { itemKey: it.key, at: 'list' })} />
-                    </Tooltip>
-                  </span>
-                </div>
+                <Row
+                  dense
+                  lead={<span className={s.num}>{i + 1}</span>}
+                  image={productImage(p, it.imageUrl)}
+                  title={p?.name ?? ''}
+                  meta={productMeta(p)}
+                  marks={<AlertMark kind={e.alertKinds.get(it.productId)} />}
+                  onClick={() => onPick({ kind: 'product', itemKey: it.key })}
+                  onHover={(on) => e.hoverProduct(on ? it.key : null)}
+                  actions={
+                    <>
+                      <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0 || e.saving} onClick={() => e.moveItem(i, i - 1)} aria-label={t('前へ', 'Move up')} />
+                      <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === e.items.length - 1 || e.saving} onClick={() => e.moveItem(i, i + 1)} aria-label={t('後ろへ', 'Move down')} />
+                      <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
+                        <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={swapOpen} disabled={e.saving} onClick={() => onSwapAt(swapOpen ? null : { itemKey: it.key, at: 'list' })} />
+                      </Tooltip>
+                    </>
+                  }
+                />
                 {/* 入れ替えの引き出しは、その行の真下から(SU9) */}
                 <ProductSwap editor={e} itemKey={it.key} open={swapOpen} onOpenChange={(o) => onSwapAt(o ? { itemKey: it.key, at: 'list' } : null)} chats={chats} setChat={setChat} onDone={(k) => onSwapped(it.key, k)} trigger={false} />
                 </div>
