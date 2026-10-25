@@ -92,7 +92,8 @@ export function PinThreadView(p: Props) {
         if (!d.open && !(ev.target instanceof Element && ev.target.closest('[data-pin-id]'))) p.onClose()
       }}
     >
-      <PopoverSurface ref={surfaceRef} className={s.surface} style={size.style} aria-label={p.ariaLabel}>
+      {/* data-pin-thread: 書いたときの様子を写すとき、このフロートは写さない(pinSnapshot) */}
+      <PopoverSurface ref={surfaceRef} data-pin-thread className={s.surface} style={size.style} aria-label={p.ariaLabel}>
         <ResizeHandles {...size.handles} anchored />
         <div className={s.head}>
           {p.badge}

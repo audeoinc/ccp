@@ -13,7 +13,7 @@ ZIP の中身:
   data.json                 {"version": 2, "exportedAt": ..., "tables": {テーブル名: [行, ...]}}
                             (版 1 は、2026-10-16 より前の形。以前の名前(cr854_…)と選択肢の数。取り込むときに、いまの形に直す)
   images/<種類>/<ファイル名>  商品(products)・ヒーロー画像(heroes)・部品の画像(parts)の画像。DB の画像 URL(/img/<種類>/<名前>)のもの
-  images/creative/<名前>    素材(Creative Assets。表 card_assets)のファイル(ccp/creative.py。取り込み先のフォルダの creative/ が、そのまま置き場所になる)
+  images/creative/<名前>    素材(Creative Assets。表 card_assets)のファイルと、ピンを書いたときの様子の画像(ccp/creative.py。取り込み先のフォルダの creative/ が、そのまま置き場所になる)
 """
 from __future__ import annotations
 
@@ -66,8 +66,11 @@ def image_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]
 
 def file_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
     """パックに入れるファイル(種類・名前): /img/… の画像と、素材の置き場所のファイル"""
-    # 素材のファイル・URL の見本カードの画像(preview_image)と、ピンを書いたときの様子の画像(card_notes.anchor_image。X65 (b))。どちらも素材の置き場所にある
-    refs = [(r, k) for r in tables.get("card_assets", []) for k in ("stored", "preview_image")] + [(r, "anchor_image") for r in tables.get("card_notes", [])]
+    # 素材のファイル・URL の見本カードの画像(preview_image)と、ピンを書いたときの様子の画像(配信カードのコメント card_notes と、
+    # 開発へのリクエスト dev_requests の anchor_image。X65 (b))。どれも素材の置き場所にある
+    refs = [(r, k) for r in tables.get("card_assets", []) for k in ("stored", "preview_image")] + [
+        (r, "anchor_image") for t in ("card_notes", "dev_requests") for r in tables.get(t, [])
+    ]
     stored = sorted({str(r[k]) for r, k in refs if r.get(k) and creative.STORED.match(str(r[k]))})
     return [*image_refs(tables), *((creative.KIND, n) for n in stored)]
 

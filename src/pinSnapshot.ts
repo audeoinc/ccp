@@ -1,10 +1,11 @@
-import { toBlob } from 'html-to-image'
+import { toBlob, toCanvas } from 'html-to-image'
 import { CreativeFiles } from './data/creativeFiles'
 import { CardNotesService } from './data/cardNotes'
 import { findSectionBlock } from './pinStore'
 
 /**
- * ピンを書いたときの、その場所の様子を残す(X65 (b)。2026-10-24 利用者: どう直ったかを確かめるために、元の状態が見たい)。
+ * ピンを書いたときの、その場所の様子を残す(X65 (b)。2026-10-24 利用者: どう直ったかを確かめるために、元の状態が見たい。
+ * 2026-10-25 から、開発へのリクエストのピンにも)。
  * 2 つ残す: (1) ブロックの画像(PNG。素材と同じ置き場所)、(2) 文字と画像の URL(いまの中身と比べて「変わった」の印を出す用)。
  * よそのサーバーの画像は、ブラウザの決まり(CORS)で画像に写らないことがある。そのときも (2) の比べ方は動く
  */
@@ -22,36 +23,80 @@ export const changedSince = (el: Element, snapshot?: string) => !!snapshot && sn
 // 打ってから書くまでの間に、画像を作って置いておく(書くときに待たないように)。鍵は、打った場所
 const captures = new Map<string, Promise<string | null>>()
 
-/** ブロックの画像を作り、素材の置き場所に置き始める。置けなければ null(書き込みは画像なしで残す) */
-export function startCapture(key: string, el: HTMLElement) {
+/** 作った画像を、素材の置き場所に置く。置けなければ null(書き込みは画像なしで残す) */
+const store = (blob: Blob | null) => (blob ? CreativeFiles.upload(new File([blob], 'pin-snapshot.png', { type: 'image/png' })).then((u) => u.stored) : Promise.resolve(null))
+
+function begin(key: string, made: () => Promise<Blob | null>) {
   captures.clear()
-  captures.set(
-    key,
+  captures.set(key, made().then(store).catch(() => null))
+}
+
+/** ブロックの画像を作り、素材の置き場所に置き始める */
+export function startCapture(key: string, el: HTMLElement) {
+  begin(key, () =>
     toBlob(el, {
       pixelRatio: 1,
       backgroundColor: '#ffffff',
       // ピン・選んだ印の層は写さない(プレビューの中身だけ)
       filter: (node) => !(node instanceof Element && node.hasAttribute('data-pin-id')),
-    })
-      .then(async (blob) => (blob ? (await CreativeFiles.upload(new File([blob], 'pin-snapshot.png', { type: 'image/png' }))).stored : null))
-      .catch(() => null),
+    }),
   )
 }
 
+// 開発へのリクエストの写す大きさの目安(画面のどこでも打てるので、写すのは打った所のまわりだけ)
+const AROUND = { w: 800, h: 500 }
+const fits = (r: DOMRect) => r.width <= AROUND.w && r.height <= AROUND.h
+
 /**
- * 書き込みに、作った画像を付ける(書くのは待たせない。画像は、できたら書き込みの anchor_image に入れて、ピンとフロートを読み直す)。
+ * 画面の点のまわりの画像を作り始める(開発へのリクエストのピン)。
+ * 目印の要素(mark)が目安に収まれば、それを写す。収まらなければ、押した要素から外へたどって、目安に収まるいちばん大きい部品を写す。
+ * 押した要素からして大きいとき(広い背景など)は、その要素を写して、点のまわりの目安の大きさだけを切り出す。
+ * skip は写さないもの(ピンの層など)。メニューが消えてから写すため、2 回の描画を待つ
+ */
+export function startCaptureAt(key: string, x: number, y: number, mark: Element | null, skip: (el: Element) => boolean) {
+  begin(key, async () => {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const hit = document.elementFromPoint(x, y)
+    if (!hit) return null
+    // ピン・ピンのフロート・右クリックのメニューも写さない
+    const filter = (node: Node) => !(node instanceof Element && (skip(node) || node.matches('[data-pin-id], [data-pin-thread], [role="menu"]')))
+    let el: Element | null = mark && fits(mark.getBoundingClientRect()) ? mark : null
+    if (!el && fits(hit.getBoundingClientRect())) {
+      el = hit
+      while (el.parentElement && el.parentElement !== document.body && fits(el.parentElement.getBoundingClientRect())) el = el.parentElement
+    }
+    if (el) return toBlob(el as HTMLElement, { pixelRatio: 1, backgroundColor: '#ffffff', filter })
+    const r = hit.getBoundingClientRect()
+    const w = Math.min(AROUND.w, r.width)
+    const h = Math.min(AROUND.h, r.height)
+    const left = Math.min(Math.max(x - w / 2, r.left), r.right - w)
+    const top = Math.min(Math.max(y - h / 2, r.top), r.bottom - h)
+    const whole = await toCanvas(hit as HTMLElement, { pixelRatio: 1, backgroundColor: '#ffffff', filter })
+    const out = document.createElement('canvas')
+    out.width = Math.round(w)
+    out.height = Math.round(h)
+    out.getContext('2d')?.drawImage(whole, left - r.left, top - r.top, w, h, 0, 0, w, h)
+    return new Promise<Blob | null>((ok) => out.toBlob(ok, 'image/png'))
+  })
+}
+
+/**
+ * 書き込みに、作った画像を付ける(書くのは待たせない。画像は、できたら save で書き込みに入れて、ピンとフロートを読み直す)。
  * 初めての画像は、字の形(フォント)の読み込みなどで数秒かかることがあるため
  */
-export function attachCapture(key: string, noteId: string, onDone: () => void) {
+export function attachCapture(key: string, save: (stored: string) => Promise<{ success: boolean }>, onDone: () => void) {
   const p = captures.get(key)
   if (!p) return
   captures.delete(key)
   void p.then(async (stored) => {
     if (!stored) return
-    const r = await CardNotesService.update(noteId, { anchor_image: stored })
+    const r = await save(stored)
     if (r.success) onDone()
   })
 }
+
+/** 書き込みの表(card_notes)の anchor_image に入れる */
+export const saveNoteImage = (noteId: string) => (stored: string) => CardNotesService.update(noteId, { anchor_image: stored })
 
 /** 場所の名前から、いまのプレビューのブロック(商品は、その枠の data-item-key) */
 export function blockOfAnchor(anchor: string, itemKey?: string): HTMLElement | null {

@@ -27,12 +27,15 @@ import {
 } from './devRequestPlace'
 import { usePinAnchor } from './pinAnchor'
 import { PinThreadView } from './PinThreadView'
+import { PinThenImage } from './PinThenImage'
+import { attachCapture, startCaptureAt } from './pinSnapshot'
 import { locale, tr, useT } from './i18n'
 import { Z } from './layers'
 
 const PIN = 22
 
 const useStyles = makeStyles({
+  then: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   // 画面の上に重ねる層。層は押せない(ピンだけ押せる)。配信カードなどのダイアログの上にも出すので、いちばん上に置き、
   // ほかのダイアログ・メニューに隠れた所のピンは出さない(devRequestPlace の uncovered)
   layer: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: Z.devRequests },
@@ -217,14 +220,16 @@ export function DevRequestLayer({ link, cardName }: Props) {
   }, [hereKey, screen, inFloat])
 
   // 右クリックの「開発に伝える」(どのメニューにも足す)
-  const linkRef = useRef({ link, cardName })
+  const linkRef = useRef({ link, cardName, hostClass: s.host })
   useEffect(() => {
-    linkRef.current = { link, cardName }
+    linkRef.current = { link, cardName, hostClass: s.host }
   })
   const begin = useCallback((x: number, y: number) => {
-    const { link: l, cardName: name } = linkRef.current
+    const { link: l, cardName: name, hostClass } = linkRef.current
     const place = capturePlace(x, y, name)
     const head = screenLabel(l, name)
+    // 書いたときの様子を残す(画像は、書くまでの間に作っておく。開発へのリクエストのピンの層は写さない)
+    startCaptureAt(devCaptureKey(place.view_x, place.view_y), x, y, place.anchor ? document.querySelector(place.anchor) : null, (el) => el.classList.contains(hostClass))
     setTarget({ pending: { ...place, screen: screenKey(l), url: window.location.search, place_text: [head, place.partLabel].filter(Boolean).join(' > ') } })
   }, [])
   useEffect(() => {
@@ -392,6 +397,8 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
           delivery_card_id: cardOf(p.screen),
         })
         if (!r.success || !r.data) throw new Error(r.error?.message ?? tr('保存できませんでした', 'Could not save'))
+        const created = r.data.id
+        attachCapture(devCaptureKey(p.view_x, p.view_y), (stored) => DevRequestsService.update(created, { anchor_image: stored }), bumpDevRequests)
         setText('')
         bumpDevRequests()
         onTarget({ id: r.data.id })
@@ -425,6 +432,12 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
       dimmed={root?.status === 'done' || root?.status === 'declined'}
       composerTop={
         <>
+          {root?.anchor_image && (
+            <div className={s.then}>
+              <span>{t('書いたときの様子', 'How it looked when written')}</span>
+              <PinThenImage stored={root.anchor_image} />
+            </div>
+          )}
           {root && (
             <span className={s.status}>
               <Badge appearance="tint" color={root.status === 'done' ? 'success' : root.status === 'declined' ? 'subtle' : 'important'} size="small">
@@ -462,6 +475,9 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
     />
   )
 }
+
+/** 書いたときの様子の画像の鍵(打ってから書くまでの間に作っておく。pinSnapshot) */
+const devCaptureKey = (viewX: number, viewY: number) => `dev|${viewX}|${viewY}`
 
 /** 画面の鍵から、配信カード(・制作のページ・結果)の ID を取る(リクエストの表の配信カードへの参照) */
 const cardOf = (screen: string): string | undefined => {

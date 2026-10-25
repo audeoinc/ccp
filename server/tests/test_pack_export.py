@@ -49,6 +49,13 @@ class WritePackTest(unittest.TestCase):
         self.assertEqual(data["counts"]["products"], 2)
         self.assertEqual(data["tables"]["hero_images"][0]["id"], "h1")
 
+    def test_file_refs_include_pin_images(self) -> None:
+        """ピンを書いたときの様子の画像(配信カードのコメントと、開発へのリクエスト)も、パックに入れる"""
+        note = "11111111111111111111111111111111.png"
+        dev = "22222222222222222222222222222222.png"
+        rows = {"card_notes": [{"id": "n1", "anchor_image": note}, {"id": "n2"}], "dev_requests": [{"id": "d1", "anchor_image": dev}, {"id": "d2", "anchor_image": None}]}
+        self.assertEqual(sorted(pack.file_refs(rows)), [("creative", note), ("creative", dev)])
+
     def test_large_export_is_chunked_without_length_and_removes_file(self) -> None:
         """32MiB を超える ZIP でも、大きさ(Content-Length)を付けずに分けて返す(応答の大きさの上限に当たらないように)"""
         big = os.urandom(1024 * 1024)

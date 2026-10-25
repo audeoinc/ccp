@@ -10,6 +10,7 @@ import { buildId, bumpDevRequests, devRequestName, devRequestsVersion, onDevRequ
 import { copyText } from './clipboard'
 import { Linkify } from './LinkText'
 import { locale, tr, useT } from './i18n'
+import { PinThenImage } from './PinThenImage'
 
 const useStyles = makeStyles({
   surface: { width: 'min(1100px, (94vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(86vh / var(--ui-zoom, 1))' },
@@ -179,6 +180,8 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
                       ))}
                     </div>
                     <div className={s.side}>
+                      {/* 書いたときの様子(押すと大きく開く) */}
+                      {q.anchor_image && <PinThenImage stored={q.anchor_image} small />}
                       {/* 賛同(いいね)。1 人 1 回、もう一度押すと取り消す。名前は上の欄で決める */}
                       <Button
                         size="small"

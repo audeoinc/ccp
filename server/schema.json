@@ -658,6 +658,7 @@
     ["anchor_y", "numeric"],
     ["view_x", "numeric"],
     ["view_y", "numeric"],
+    ["anchor_image", "text"],
     ["done_at", "timestamptz"],
     ["done_version", "text"]
    ],

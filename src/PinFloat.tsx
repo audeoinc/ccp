@@ -10,8 +10,8 @@ import { tr, useT } from './i18n'
 import { setNoteResolved } from './pinActions'
 import { usePinAnchor } from './pinAnchor'
 import { PinThreadView } from './PinThreadView'
-import { attachCapture, captureKey } from './pinSnapshot'
-import { CreativeFiles } from './data/creativeFiles'
+import { PinThenImage } from './PinThenImage'
+import { attachCapture, saveNoteImage, captureKey } from './pinSnapshot'
 import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
@@ -24,7 +24,6 @@ const useStyles = makeStyles({
   people: { display: 'grid', rowGap: '2px', maxHeight: '220px', overflowY: 'auto' },
   // 書いたときの様子(X65 (b))。全景が見えるよう、切らずに縮める
   then: { display: 'grid', rowGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  thenImg: { display: 'block', maxWidth: '100%', maxHeight: '160px', objectFit: 'contain', justifySelf: 'start', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground1 },
   changed: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
 })
 
@@ -140,7 +139,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
       }),
     )
     if (r?.data) {
-      attachCapture(captureKey(cardId, pending.anchor, pending.x, pending.y), r.data.id, bumpNotes)
+      attachCapture(captureKey(cardId, pending.anchor, pending.x, pending.y), saveNoteImage(r.data.id), bumpNotes)
       setText('')
       setAssignee('')
       setPendingPin(null)
@@ -211,9 +210,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
               {root.anchor_image && (
                 <>
                   <span>{t('書いたときの様子', 'How it looked when written')}</span>
-                  <a href={CreativeFiles.url(root.anchor_image)} target="_blank" rel="noreferrer" title={t('大きく見る', 'Open full size')}>
-                    <img className={s.thenImg} src={CreativeFiles.url(root.anchor_image)} alt={t('書いたときの様子', 'How it looked when written')} />
-                  </a>
+                  <PinThenImage stored={root.anchor_image} />
                 </>
               )}
             </div>

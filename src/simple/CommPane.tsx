@@ -26,7 +26,7 @@ import { CardHistoryList } from '../CardHistory'
 import { ApprovalBar } from '../ApprovalBar'
 import { AutoTextarea } from '../AutoTextarea'
 import { eligibleReviewers } from '../approvals'
-import { attachCapture, blockOfAnchor, captureKey, snapshotOf, startCapture } from '../pinSnapshot'
+import { attachCapture, saveNoteImage, blockOfAnchor, captureKey, snapshotOf, startCapture } from '../pinSnapshot'
 import { myName, myUserId, onMeChange } from '../history'
 import { activeUsers, groupsOf, usePeople } from '../people'
 import { bumpNotes, focusPin, focusedPin, notesVersion, pinNumbers, subscribePins } from '../pinStore'
@@ -295,7 +295,7 @@ export function CommPane(props: Props) {
       createdId = r.data?.id ?? ''
       return r
     })
-    if (ok && block && createdId) attachCapture(key, createdId, bumpNotes)
+    if (ok && block && createdId) attachCapture(key, saveNoteImage(createdId), bumpNotes)
     if (ok) {
       setText('')
       setAsTask(false)

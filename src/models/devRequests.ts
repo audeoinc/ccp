@@ -28,6 +28,8 @@ export interface DevRequestFields {
   anchor_y?: number
   view_x?: number
   view_y?: number
+  /** 書いたときの、打った所のまわりの画像(素材の置き場所の名前。pinSnapshot の startCaptureAt) */
+  anchor_image?: string
   /** 対応済みにした日時と、そのときの画面の版(ビルドのコミット) */
   done_at?: string
   done_version?: string
