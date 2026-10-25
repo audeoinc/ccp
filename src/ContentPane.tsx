@@ -4,7 +4,6 @@ import {
   ArrowDownRegular,
   ArrowUpRegular,
   ChevronDownRegular,
-  ChevronRightRegular,
   DismissRegular,
   ImageAddRegular,
 } from '@fluentui/react-icons'
@@ -206,20 +205,9 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
   blockHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
-  // ブロックの見出し行(押すと開閉する)
-  blockToggle: {
-    display: 'flex',
-    alignItems: 'center',
-    columnGap: '4px',
-    minWidth: 0,
-    padding: 0,
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    textAlign: 'left',
-    fontFamily: 'inherit',
-    color: tokens.colorNeutralForeground1,
-  },
+  // 開閉できるブロック(Fluent の Accordion。整理 #11)。見出しの行は箱の端まで、中身は余白なしで並べる
+  blockHeader: { '& > button': { paddingLeft: 0, paddingRight: 0, minHeight: 'auto', height: 'auto' } },
+  blockPanel: { display: 'grid', rowGap: '8px', margin: '8px 0 0 0' },
   blockSummary: {
     minWidth: 0,
     overflow: 'hidden',
@@ -318,20 +306,28 @@ const heroMeta = (h?: HeroImage) => (h ? `${h.image_code} ・ ${optionLabel(h.pu
 function Block({ title, right, children, open = true, onToggle, summary }: { title: string; right?: ReactNode; children: ReactNode; open?: boolean; onToggle?: () => void; summary?: string }) {
   const s = useStyles()
   const t = useT()
-  return (
-    <div className={s.block}>
-      {onToggle ? (
-        <button type="button" className={s.blockToggle} onClick={onToggle} aria-expanded={open} title={open ? t('折りたたむ', 'Collapse') : t('開く', 'Expand')}>
-          {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
-          <span className={s.bold}>{title}</span>
-          {!open && summary && <span className={s.blockSummary}>— {summary}</span>}
-        </button>
-      ) : (
+  if (!onToggle)
+    return (
+      <div className={s.block}>
         <span className={s.bold}>{title}</span>
-      )}
-      {open && right && <div className={s.flexRow}>{right}</div>}
-      {open && children}
-    </div>
+        {right && <div className={s.flexRow}>{right}</div>}
+        {children}
+      </div>
+    )
+  // 開閉は親が覚える(open・onToggle)。Fluent の Accordion を、その値で開け閉めする
+  return (
+    <Accordion collapsible openItems={open ? ['block'] : []} onToggle={onToggle} className={s.block} style={{ display: 'block' }}>
+      <AccordionItem value="block">
+        <AccordionHeader size="small" className={s.blockHeader} button={{ title: open ? t('折りたたむ', 'Collapse') : t('開く', 'Expand') }}>
+          <span className={s.bold}>{title}</span>
+          {!open && summary && <span className={s.blockSummary}>{` — ${summary}`}</span>}
+        </AccordionHeader>
+        <AccordionPanel className={s.blockPanel}>
+          {right && <div className={s.flexRow}>{right}</div>}
+          {children}
+        </AccordionPanel>
+      </AccordionItem>
+    </Accordion>
   )
 }
 
