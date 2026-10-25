@@ -26,7 +26,8 @@ import { CHANNEL_PUSH, channelOptions, countryOptions, statusRank } from './stat
 import { isUsableHero } from './heroRights'
 import { encodeAbTest, ownsProducts, ownsSubject, ownsTemplate, type VariantKey } from './abTest'
 import { useAbVariants, type VariantData } from './useAbVariants'
-import { STATUS_APPROVED, STATUS_NOT_STARTED, STATUS_REVIEW, toForm, type Form } from './cardForm'
+import { STATUS_APPROVED, STATUS_NOT_STARTED, toForm, type Form } from './cardForm'
+import { planSave, runSave } from './saveFlow'
 
 /** 読み込み時点の配信商品の行(保存時の差分判定用) */
 export interface RowSnap {
@@ -519,54 +520,64 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setSaving(true)
     setError(null)
     try {
-      const formStatus = num(form.status) as DeliveryCard['status']
-      const revoke = reason === undefined && approvedBefore && formStatus === card?.status && baseline.current !== null && baseline.current !== contentKey()
-      // 確定後に変えた配信・承認済みの内容を変えた配信は、もう一度承認を受けるので「承認待ち」(reviewing)にする
-      const status = reason !== undefined || revoke ? STATUS_REVIEW : formStatus
+      // 何をするかを決めて(planSave)、決まった順に行う(runSave。順番は scripts/check-save.mjs が確かめる)
+      const plan = planSave({
+        isNew: !card,
+        savedStatus: card?.status,
+        formStatus: num(form.status),
+        reason,
+        approvedBefore,
+        contentChanged: baseline.current !== null && baseline.current !== contentKey(),
+      })
+      const status = plan.status
       const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
-      const res = card
-        ? await DeliveryCardsService.update(card.id, fields)
-        : await DeliveryCardsService.create({ ...fields, state_code: 0 })
-      if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
-      const cardId = card?.id ?? res.data?.id
-      if (!cardId) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
-      if (original) await syncItems(cardId, form.name, original)
-      // 作業画面の案を、ここで新規作成として保存した(作業画面で、その案を保存済みにする)
-      if (!card) onCreated?.(cardId)
-      if (reason !== undefined) {
-        for (const w of lockedWeeks) {
-          const r = await reopenWeek(w, w.country ? { country: w.country, channel: w.channel } : scopeOfCard(form))
-          if (!r.success) throw new Error(r.error?.message ?? tr('週をレビュー中に戻せませんでした', 'Could not put the week back in review'))
-        }
-        const n = await CardNotesService.create({
-          kind: 'change',
-          body: reason.trim(),
-          author: form.owner.trim(),
-          delivery_card_id: cardId,
-        })
-        if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
-      }
-      // 内容が変わったので、いまの承認の依頼は古いものにする(依頼し直してもらう。U4)
-      if (card && (reason !== undefined || revoke)) {
-        const a = await ApprovalsService.reset({ delivery_card_id: cardId })
-        if (!a.success) throw new Error(a.error?.message ?? tr('承認の依頼を古いものにできませんでした', 'Could not mark the approval request as stale'))
-      }
-      // 承認の履歴(W6): 保存済みの配信のステータスが変わったら、誰が・いつ・何から何にしたかを残す
-      if (card && (reason !== undefined || card.status !== fields.status)) {
-        await logEvent({
-          action: reason !== undefined ? 'reopen' : revoke ? 'revoke' : 'status',
-          card: { id: cardId, name: form.name, scheduledAt: fields.scheduled_at },
-          from: card.status,
-          to: fields.status,
-          note: reason?.trim(),
-        })
-      }
-      // アラートへの対応で差し替えた理由を、配信のメモ(種類 change)に残す
-      if (cardId && alertNotes.length > 0) {
-        for (const body of alertNotes) await CardNotesService.create({ kind: 'change', body, author: myName() || form.owner || '', delivery_card_id: cardId })
-        setAlertNotes([])
-      }
-      await onSaved()
+      const cardId = await runSave(plan, !card, {
+        writeCard: async () => {
+          const res = card ? await DeliveryCardsService.update(card.id, fields) : await DeliveryCardsService.create({ ...fields, state_code: 0 })
+          if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
+          const id = card?.id ?? res.data?.id
+          if (!id) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))
+          return id
+        },
+        syncItems: original ? (id) => syncItems(id, form.name, original) : null,
+        // 作業画面の案を、ここで新規作成として保存した(作業画面で、その案を保存済みにする)
+        created: (id) => onCreated?.(id),
+        reopenWeeks: async () => {
+          for (const w of lockedWeeks) {
+            const r = await reopenWeek(w, w.country ? { country: w.country, channel: w.channel } : scopeOfCard(form))
+            if (!r.success) throw new Error(r.error?.message ?? tr('週をレビュー中に戻せませんでした', 'Could not put the week back in review'))
+          }
+        },
+        noteReason: async (id) => {
+          const n = await CardNotesService.create({
+            kind: 'change',
+            body: (reason ?? '').trim(),
+            author: form.owner.trim(),
+            delivery_card_id: id,
+          })
+          if (!n.success) throw new Error(n.error?.message ?? tr('変更の理由を記録できませんでした', 'Could not record the reason for the change'))
+        },
+        resetApproval: async (id) => {
+          const a = await ApprovalsService.reset({ delivery_card_id: id })
+          if (!a.success) throw new Error(a.error?.message ?? tr('承認の依頼を古いものにできませんでした', 'Could not mark the approval request as stale'))
+        },
+        logEvent: async (id, action) => {
+          await logEvent({
+            action,
+            card: { id, name: form.name, scheduledAt: fields.scheduled_at },
+            from: card?.status,
+            to: fields.status,
+            note: reason?.trim(),
+          })
+        },
+        // アラートへの対応で差し替えた理由を、配信のメモ(種類 change)に残す
+        saveAlertNotes: async (id) => {
+          if (alertNotes.length === 0) return
+          for (const body of alertNotes) await CardNotesService.create({ kind: 'change', body, author: myName() || form.owner || '', delivery_card_id: id })
+          setAlertNotes([])
+        },
+        reload: onSaved,
+      })
       goNextRef.current = false
       stayRef.current = false
       if (stay) {
