@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, Field, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
-import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { DeliveryProductSource as Source } from './models/deliveryProducts'
@@ -12,9 +12,7 @@ import { ProductChooser } from './ProductChooser'
 import type { AiCard } from './aiSelect'
 import { ProductDetail } from './ProductDetail'
 import { LowStockBadge } from './ProductMarks'
-import { AutoTextarea } from './AutoTextarea'
 import { ImageThumb } from './ImageThumb'
-import { Row, productMeta } from './ProductRow'
 import { productImage } from './images'
 import { num, tr, useT } from './i18n'
 import { OpenLink } from './LinkText'
@@ -25,8 +23,10 @@ import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 import { typo } from './typo'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
-// どこから開いても同じ形: 左に、差し替えの候補(AI の差し替え案・残りの候補・ほかの商品を探す)、右に、選んでいる商品の詳しい情報。
-// アラートの札から開くと、上にアラートの内容とアラートごとの操作(配信日を変える など)。差し替えは配信カードの中で置き換え、保存で確定する
+// どこから開いても同じ形: 左に、入れ替えの候補(AI のおすすめ・AI に頼む・すべての商品)、右に、いまの商品の詳しい情報。
+// アラートの札から開くと、上にアラートの内容とアラートごとの操作(配信日を変える など)。
+// 入れ替えの流れは、シンプルな配信カードの引き出し(simple/ProductSwap)と 1 つにした(simple-ui-review-2 の 16。2026-10-25 利用者と決めた):
+// 候補を押すとすぐ入れ替わり、理由は聞かない(戻すのは「元に戻す」か、保存しないこと。理由は、確定した週の保存の理由と変更の履歴に任せる)
 
 /** 残りの候補(中ペインの「残りの候補」と同じもの・同じ順番) */
 export interface SwapOption {
@@ -36,19 +36,14 @@ export interface SwapOption {
   source: Source
 }
 
-/** 右に出している商品(いまの商品か、候補のどれか) */
-type Focus = { kind: 'current' } | { kind: 'cand'; key: string; product: Product } | { kind: 'ai'; product: Product; why: string } | { kind: 'search'; product: Product }
-
 const useStyles = makeStyles({
   // 高さを中身に合わせると、右のタブ(売上・在庫 / 詳細 / SKU …)を替えるたびに高さが変わり、真ん中に置いたフロートの上端が動いた(X70)。
   // 高さを決めて、中身は左右の欄の中でスクロールさせる(つまみで変えた大きさを覚えていれば、そちらが勝つ)
   surface: { width: 'min(1040px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'min(760px, calc(88vh / var(--ui-zoom, 1)))', maxHeight: 'calc(88vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
   body: { display: 'flex', flexDirection: 'column', rowGap: '10px', minHeight: 0, flexGrow: 1 },
-  // 題名の行の全体をつかんで動かす(プレビューを見ながら選べるように)
+  // 題の行(ほかのフロートと同じ形: 題・右端に ×)。行をつかむと動かせる(プレビューを見ながら選べるように)
   grab: { display: 'flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
-  grabTitle: { ...typo.heading, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  grabHint: { marginLeft: 'auto', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  muted: { color: tokens.colorNeutralForeground3 },
+  grabTitle: { ...typo.heading, minWidth: 0, flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   alert: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '10px', rowGap: '6px', padding: '8px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteDarkOrangeBackground1, border: `1px solid ${tokens.colorPaletteDarkOrangeBorder1}` },
   alertText: { display: 'grid', rowGap: '2px', flexGrow: 1, minWidth: 0 },
   alertDetail: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
@@ -59,9 +54,7 @@ const useStyles = makeStyles({
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.heading },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   marks: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
-  rightHead: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300 },
-  swapBox: { display: 'grid', rowGap: '8px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
-  swapActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
+  rightHead: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   others: { display: 'flex', flexWrap: 'wrap', columnGap: '8px', rowGap: '6px' },
   imageBox: { display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr)', columnGap: '10px', alignItems: 'center', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   imageText: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
@@ -88,9 +81,9 @@ interface Props {
   alertKinds?: Map<string, CardAlertKind>
   /** 残りの候補(このセクション) */
   options: SwapOption[]
-  /** 残りの候補と入れ替える(行 ID のまま入れ替わる) */
+  /** 残りの候補と入れ替える(行 ID のまま入れ替わる。reason は候補の AI の理由) */
   onSwapCandidate?: (candKey: string, reason: string) => void
-  /** ほかの商品(AI の案・検索)に置き換える */
+  /** ほかの商品(AI の案・検索)に置き換える(reason は AI の理由。すべての商品から選んだときは空) */
   onReplace?: (to: Product, reason: string) => void
   /** この配信で使う、この商品の画像(空 = 商品のマスタの画像。X64) */
   image?: string
@@ -120,8 +113,6 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
   // つかんで動かした量
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
-  const [focus, setFocus] = useState<Focus>({ kind: 'current' })
-  const [reason, setReason] = useState('')
   const [picking, setPicking] = useState(false)
 
   // AI の差し替え案(在庫・週の上限のアラートから開いたとき。開いたときに 1 回だけ)
@@ -151,15 +142,13 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
       </span>
     )
   }
-  const row = (key: string, p: Product, on: boolean, onClick: () => void, why?: string) => (
-    <Row key={key} dense image={productImage(p)} title={p.name} meta={productMeta(p)} reason={why} marks={marks(p)} selected={on} onClick={onClick} />
-  )
-  const shown = focus.kind === 'current' ? product : focus.product
-  const canSwap = focus.kind !== 'current' && (focus.kind === 'cand' ? !!onSwapCandidate : !!onReplace)
-  const doSwap = () => {
-    if (focus.kind === 'cand') onSwapCandidate?.(focus.key, reason)
-    else if (focus.kind !== 'current') onReplace?.(focus.product, reason)
+  // 候補を押したら、すぐ入れ替える(シンプルな配信カードの引き出しと同じ)
+  const pickProduct = (id: string, why: string) => {
+    const p = poolProducts.find((x) => x.id === id) ?? stockCandidates?.find((c) => c.product.id === id)?.product
+    if (p) onReplace?.(p, why)
   }
+  // 残りの候補(このセクション)。商品の行から開いたときは、AI のおすすめのタブの最初に並べる(シンプルな配信カードの引き出しと同じ)
+  const fallback = onSwapCandidate ? options.map((o) => ({ key: o.key, productId: o.product.id, reason: o.reason, onPick: () => onSwapCandidate(o.key, o.reason) })) : []
 
   return (
     // 下の配信カード(プレビュー・中ペイン)も見て触れるよう、背景を暗くしない
@@ -184,10 +173,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                 drag.current = null
               }}
             >
-              <ArrowMoveRegular className={s.muted} />
-              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : (onOpenSwap ? t('商品の詳しい情報と入れ替え', 'Product details and replace') : t('商品の詳しい情報と入れ替え', 'Product details and replace'))}{product ? ` — ${product.name}` : ''}</span>
+              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と入れ替え', 'Product details and replace')}{product ? ` — ${product.name}` : ''}</span>
               {productUrl(product) && <OpenLink url={productUrl(product)} label={t('商品ページ', 'Product page')} />}
-              <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
               <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
             </div>
 
@@ -251,10 +238,10 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     </div>
                   </div>
                 ) : (
-                  // 選び直す枠は、シンプルな配信カードの入れ替え・アラートへの対応と同じ形(ProductChooser)。選ぶと、右に詳しい情報と「差し替える」
+                  // 選び直す枠は、シンプルな配信カードの入れ替えの引き出し・アラートへの対応と同じ形(ProductChooser)。押すと、すぐ入れ替える
                   <div className={s.left}>
                     <ProductChooser
-                      title={t('ほかの商品を選ぶ', 'Choose another product')}
+                      title={t(`「${product.name}」を入れ替える`, `Replace "${product.name}"`)}
                       frame={{ kind: 'panel' }}
                       card={aiCard()}
                       angle={angle}
@@ -263,25 +250,10 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                       inCard={poolProducts.filter((p) => inCard.has(p.id))}
                       why={swapWhy}
                       candidates={stockCandidates}
-                      // アラートから開いたときは AI のおすすめから、商品の行から開いたときは AI を呼ばずに残りの候補から
-                      defaultTab={stockAlert ? 'recommend' : options.length ? 'cands' : 'all'}
-                      extraTabs={[
-                        {
-                          value: 'cands',
-                          label: t(`残りの候補(${options.length})`, `Remaining (${options.length})`),
-                          content:
-                            options.length === 0 ? (
-                              <span className={s.caption}>{t('このセクションの残りの候補はありません(中ペインの「AIで選ぶ」で案を出すと、ここに並びます)', 'No remaining candidates for this section (use "Select with AI" in the middle pane).')}</span>
-                            ) : (
-                              <div className={s.section}>{options.map((o) => row(`cand:${o.key}`, o.product, focus.kind === 'cand' && focus.key === o.key, () => setFocus({ kind: 'cand', key: o.key, product: o.product }), o.reason))}</div>
-                            ),
-                        },
-                      ]}
-                      onPick={(id, why) => {
-                        const p = poolProducts.find((x) => x.id === id) ?? stockCandidates?.find((c) => c.product.id === id)?.product
-                        if (p) setFocus(why ? { kind: 'ai', product: p, why } : { kind: 'search', product: p })
-                      }}
-                      pickedId={focus.kind === 'current' ? undefined : focus.product.id}
+                      // アラートから開いたときは、在庫の見込みを確かめた候補から AI が選ぶ(残りの候補は先に出さない)。
+                      // 商品の行から開いたときは、AI を呼ばずに、まず残りの候補を出す(シンプルな配信カードの引き出しと同じ)
+                      fallback={stockAlert ? [] : fallback}
+                      onPick={pickProduct}
                       marks={marks}
                     />
                   </div>
@@ -290,19 +262,10 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                 {/* 右: 選んでいる商品の詳しい情報(最初は、いまの商品) */}
                 <div className={s.right}>
                   <div className={s.rightHead}>
-                    {focus.kind === 'current' ? (
-                      <Text weight="semibold">{t('いまの商品', 'Current product')}</Text>
-                    ) : (
-                      <>
-                        <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => setFocus({ kind: 'current' })}>
-                          {t('いまの商品に戻る', 'Back to current')}
-                        </Button>
-                        <Text weight="semibold">{t('候補', 'Candidate')}</Text>
-                      </>
-                    )}
+                    <Text weight="semibold">{t('いまの商品', 'Current product')}</Text>
                   </div>
-                  {/* この配信で使う画像(X64)。いまの商品のときだけ。商品のマスタの画像は変えない */}
-                  {focus.kind === 'current' && onImage && (
+                  {/* この配信で使う画像(X64)。商品のマスタの画像は変えない */}
+                  {onImage && (
                     <div className={s.imageBox}>
                       <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
                       <span className={s.imageText}>
@@ -321,31 +284,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                       </span>
                     </div>
                   )}
-                  {shown && <ProductDetail key={shown.id} product={shown} />}
-                  {canSwap && (
-                    <div className={s.swapBox}>
-                      <Field
-                        label={{
-                          children: (_: unknown, props: { className?: string }) => (
-                            <InfoLabel {...props} size="small" info={t('この配信の中で入れ替えます(保存で確定。保存しなければ元のまま)', 'Replaces it in this delivery (confirmed when you save).')}>
-                              {t('入れ替えの理由(任意。配信のメモに残ります)', 'Reason for replacing (optional; kept in the delivery notes)')}
-                            </InfoLabel>
-                          ),
-                        }}
-                        size="small"
-                      >
-                        <AutoTextarea heightKey="ProductActionFloat.reason" size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
-                      </Field>
-                      <div className={s.swapActions}>
-                        <Button size="small" onClick={() => setFocus({ kind: 'current' })}>
-                          {t('やめる', 'Cancel')}
-                        </Button>
-                        <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={doSwap}>
-                          {t(`「${product.name}」をこの商品に入れ替える`, `Replace "${product.name}" with this`)}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <ProductDetail key={product.id} product={product} />
                 </div>
               </div>
             )}
