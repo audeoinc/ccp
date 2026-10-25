@@ -90,6 +90,7 @@ import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, imageExpiryAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
 import { appPath } from './appRoot'
+import { downloadPack, megabytes } from './exportPack'
 import { importProductImagesZip } from './productImageImport'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
 import { clearProductDataCache } from './useProductData'
@@ -286,6 +287,8 @@ const useStyles = makeStyles({
   containerWide: { maxWidth: '1600px' },
   center: { textAlign: 'center', padding: `${tokens.spacingVerticalXXXL} 0` },
   alert: { marginBottom: tokens.spacingVerticalL },
+  exportDone: { color: tokens.colorPaletteGreenForeground1 },
+  exportError: { color: tokens.colorPaletteRedForeground1 },
   filterRow: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -496,6 +499,8 @@ function App() {
   // BigQuery からの取り込み(B2・B4)。設定がない環境では configured: false のまま、何も出さない
   const [bq, setBq] = useState<BqSyncResult | null>(null)
   const [bqBusy, setBqBusy] = useState(false)
+  // ⚙ の「データと画像を書き出す」の様子(作っている間は何も届かないので、押したことと進み具合を、その行に出す)
+  const [exportState, setExportState] = useState<{ kind: 'working'; bytes: number } | { kind: 'done'; bytes: number } | { kind: 'error'; message: string } | null>(null)
   const [bqNotice, setBqNotice] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
   // 見本の SKU を作っている間(X63。数千行になることがあるので、終わるまで押せなくする)
   const [skuBusy, setSkuBusy] = useState(false)
@@ -1729,14 +1734,40 @@ function App() {
               id: 'export',
               section: 'data',
               label: t('データと画像を書き出す(別の環境へ移す)', 'Export data and images (to another environment)'),
-              description: t('すべてのデータと画像を 1 つの ZIP に書き出します(外にアクセスできない環境へ移すため)。', 'Export all data and images to one ZIP (to move to an offline environment).'),
+              // 右には短い様子だけを出し、長い説明・失敗の理由は説明の行に出す(右が長いと、見出しの欄が細くなるため)
+              description:
+                exportState?.kind === 'working'
+                  ? t('写真が多いと 1 分ほどかかります。この窓を閉じても続き、できたら保存されます。', 'This takes about a minute with many photos. It continues if you close this window and saves when ready.')
+                  : exportState?.kind === 'error'
+                    ? exportState.message
+                    : t('すべてのデータと画像を 1 つの ZIP に書き出します(外にアクセスできない環境へ移すため)。', 'Export all data and images to one ZIP (to move to an offline environment).'),
               icon: <ArrowDownloadRegular />,
-              secondary: t('ZIP', 'ZIP'),
-              onOpen: () => {
-                const a = document.createElement('a')
-                a.href = appPath('/api/export')
-                a.download = ''
-                a.click()
+              disabled: exportState?.kind === 'working',
+              secondary:
+                exportState?.kind === 'working' ? (
+                  <Spinner
+                    size="extra-tiny"
+                    label={
+                      exportState.bytes
+                        ? t(`受け取っています… ${megabytes(exportState.bytes)}`, `Downloading… ${megabytes(exportState.bytes)}`)
+                        : t('書き出しています…', 'Exporting…')
+                    }
+                  />
+                ) : exportState?.kind === 'done' ? (
+                  <span className={styles.exportDone}>{t(`書き出しました(${megabytes(exportState.bytes)})`, `Exported (${megabytes(exportState.bytes)})`)}</span>
+                ) : exportState?.kind === 'error' ? (
+                  <span className={styles.exportError}>{t('書き出せませんでした', 'Export failed')}</span>
+                ) : (
+                  t('ZIP', 'ZIP')
+                ),
+              onOpen: async () => {
+                setExportState({ kind: 'working', bytes: 0 })
+                try {
+                  const { bytes } = await downloadPack((b) => setExportState({ kind: 'working', bytes: b }))
+                  setExportState({ kind: 'done', bytes })
+                } catch (e) {
+                  setExportState({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
+                }
               },
             },
             {
