@@ -126,6 +126,13 @@ export interface SimpleEditor {
   justSaved: boolean
   /** 最後に保存した日時(ISO。上の帯の「保存済み · 12:03」) */
   savedAt?: string
+  /** 保存の失敗(上の帯に「保存できませんでした・再試行」) */
+  saveError: string | null
+  retrySave: () => void
+  /** 確定した週の、変えた理由の入力欄(上の帯の保存のボタンの下の Popover に出す) */
+  reasonOpen: boolean
+  reasonForm: ReactNode
+  cancelReason: () => void
   canUndo: boolean
   // ---- 上の帯
   nextStep: NextStep
@@ -141,7 +148,7 @@ export interface SimpleEditor {
   zoom: PreviewZoom
   /** 上の知らせ(取りやめ・AI 下書き・承認済みの変更・確定した週) */
   notices: ReactNode
-  /** 下の知らせ(エラー・確定した週の理由の入力欄) */
+  /** 下の知らせ(テンプレートが見つからない・AI などのエラー。保存の失敗と理由の入力は上の帯) */
   footer: ReactNode
   /** 目印: 商品のアラートの印(プレビューに重ねる層)と、これまでの学びの帯(AI の依頼に学びを渡す役もあるので、隠すときも描く)と、その件数 */
   alertOverlay: ReactNode

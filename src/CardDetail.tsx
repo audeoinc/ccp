@@ -166,7 +166,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
-  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey } = editor
+  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError } = editor
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
@@ -684,12 +684,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // シンプルな配信カードは、入力が止まって約 1.5 秒で保存する(Notion などと同じ。部品を選び直すまで保存しないと、タブを閉じたときに消えるため)。
   // 確定した週の配信は、理由が要るので自動では保存しない(上の帯の保存のボタンで)。保存中に書き換えた分は、保存が終わってから、また待って保存する
   useEffect(() => {
-    if (!simpleOn || locked || !changed || saving || draftPending || currentKey === draftKey) return
+    if (!simpleOn || locked || !changed || saving || draftPending || currentKey === draftKey || saveError?.key === currentKey) return
     const id = window.setTimeout(() => void commitSimple(), 1500)
     return () => window.clearTimeout(id)
     // 待つのは、中身が変わるたびに数え直す(commitSimple は、その描画の中身で保存する)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentKey, simpleOn, locked, changed, saving, draftPending, draftKey])
+  }, [currentKey, simpleOn, locked, changed, saving, draftPending, draftKey, saveError])
   // 保存していない変更がある間は、タブを閉じる・読み直すときに、ブラウザに確かめてもらう
   useEffect(() => {
     if (!changed) return
@@ -827,6 +827,34 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </div>
     </>
   )
+  // 確定した週の、変えた理由の入力欄(詳しい画面はフッター、シンプルな画面は上の帯の保存のボタンの下の Popover)
+  const reasonForm = changeReason !== null && (
+    <>
+      <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
+        <AutoTextarea heightKey="CardDetail.changeReason"
+          rows={2}
+          size="small"
+          autoFocus
+          value={changeReason}
+          onChange={(_, d) => setChangeReason(d.value)}
+          placeholder={t('例: 在庫切れのため、商品を差し替え', 'e.g. Swapped a product that went out of stock')}
+        />
+      </Field>
+      <div className={styles.reasonActions}>
+        <Button
+          type="button"
+          size="small"
+          onClick={cancelReason}
+          disabled={saving}
+        >
+          {t('やめる', 'Back')}
+        </Button>
+        <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => saveWithReason(changeReason)}>
+          {t('保存して、レビューに戻す', 'Save and send back to review')}
+        </Button>
+      </div>
+    </>
+  )
   const footerNode = (
     <>
     {missingTemplate && (
@@ -864,33 +892,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         <MessageBarBody>{error}</MessageBarBody>
       </MessageBar>
     )}
-    {changeReason !== null && lockedWeeks.length > 0 && (
-      <div className={styles.reasonBox}>
-        <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
-          <AutoTextarea heightKey="CardDetail.changeReason"
-            rows={2}
-            size="small"
-            autoFocus
-            value={changeReason}
-            onChange={(_, d) => setChangeReason(d.value)}
-            placeholder={t('例: 在庫切れのため、商品を差し替え', 'e.g. Swapped a product that went out of stock')}
-          />
-        </Field>
-        <div className={styles.reasonActions}>
-          <Button
-            type="button"
-            size="small"
-            onClick={cancelReason}
-            disabled={saving}
-          >
-            {t('やめる', 'Back')}
-          </Button>
-          <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => saveWithReason(changeReason)}>
-            {t('保存して、レビューに戻す', 'Save and send back to review')}
-          </Button>
-        </div>
-      </div>
+    {/* 保存の失敗(シンプルな配信カードは、上の帯に出す) */}
+    {saveError && !simpleOn && (
+      <MessageBar layout="multiline" intent="error" className={styles.error}>
+        <MessageBarBody>{saveError.message}</MessageBarBody>
+      </MessageBar>
     )}
+    {/* 確定した週の、変えた理由の入力(シンプルな配信カードは、上の帯の保存のボタンの下に出す) */}
+    {changeReason !== null && lockedWeeks.length > 0 && !simpleOn && <div className={styles.reasonBox}>{reasonForm}</div>}
     </>
   )
   // 商品の枠のアラートの印(押すと、その商品のアラートへの対応を開く)。詳しい画面とシンプルな画面で同じ
@@ -1006,6 +1015,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         locked,
         justSaved,
         savedAt,
+        saveError: saveError?.message ?? null,
+        retrySave: applySimple,
+        reasonOpen: changeReason !== null && lockedWeeks.length > 0,
+        reasonForm,
+        cancelReason,
         canUndo: undoStack.canUndo,
         nextStep,
         menu: cardMenu(

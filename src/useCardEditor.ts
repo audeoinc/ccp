@@ -101,6 +101,9 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   const [justSaved, setJustSaved] = useState(false)
+  // 保存の失敗(AI などのエラーとは分ける。シンプルな配信カードは上の帯に「保存できませんでした・再試行」)。
+  // key は失敗したときの中身(同じ中身のままなら、自動の保存で何度もやり直さない)
+  const [saveError, setSaveError] = useState<{ message: string; key: string } | null>(null)
   // 最後に保存した日時(上の帯の「保存済み · 12:03」。開いたときは、配信の最後の更新)
   const [savedAt, setSavedAt] = useState<string | undefined>(card?.modified_on)
   // 保存中の、保存のあとにすること(どのボタンの文字を「保存中...」にするか。保存していないときは null)
@@ -535,6 +538,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setSaving(true)
     setSavingAfter(after)
     setError(null)
+    setSaveError(null)
     try {
       // 何をするかを決めて(planSave)、決まった順に行う(runSave。順番は scripts/check-save.mjs が確かめる)
       const plan = planSave({
@@ -616,7 +620,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
       else onBack()
       return true
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setSaveError({ message: err instanceof Error ? err.message : String(err), key: startKey })
       return false
     } finally {
       setSaving(false)
@@ -644,5 +648,5 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setItems(next)
   }
 
-  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey }
+  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError }
 }

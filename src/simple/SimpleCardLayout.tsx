@@ -17,7 +17,7 @@ import { previewMenuItems } from '../previewMenu'
 import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
-import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular } from '@fluentui/react-icons'
+import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular, ArrowClockwiseRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { useStoredWidths } from '../floatLayout'
 import { Row, productMeta } from '../ProductRow'
@@ -119,6 +119,9 @@ const useStyles = makeStyles({
   nameField: { flexShrink: 1, minWidth: '80px' },
   grow: { flexGrow: 1 },
   state: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  saveFailed: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', whiteSpace: 'nowrap' },
+  saveFailedText: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
+  reasonPop: { display: 'grid', rowGap: '8px', width: '320px' },
   saved: { color: tokens.colorPaletteGreenForeground1 },
   notices: { display: 'grid', rowGap: '4px' },
   panes: {
@@ -608,6 +611,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {/* 保存の様子をいつも出す: 保存中… / 未保存 / 保存済み · 12:03(入力が止まって約 1.5 秒で自動で保存する) */}
             {e.saving ? (
               <Spinner size="extra-tiny" label={t('保存中…', 'Saving…')} labelPosition="after" />
+            ) : e.saveError ? (
+              // 保存の失敗は、作業している所から見える上の帯に(以前はペインのいちばん下で、画面の外になっていた)
+              <span className={s.saveFailed}>
+                <Tooltip content={e.saveError} relationship="description">
+                  <span className={s.saveFailedText}>{t('保存できませんでした', 'Could not save')}</span>
+                </Tooltip>
+                <Button type="button" size="small" appearance="subtle" icon={<ArrowClockwiseRegular />} onClick={e.retrySave}>
+                  {t('再試行', 'Retry')}
+                </Button>
+              </span>
             ) : e.dirty ? (
               <span className={s.state}>{t('未保存', 'Unsaved')}</span>
             ) : e.savedAt ? (
@@ -619,12 +632,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
             </Tooltip>
             {/* 保存のボタンは、確定した週の配信だけ(ほかは自動で保存する。理由を入れてから保存する) */}
-            {e.dirty && e.locked && (
-              <Tooltip content={t('確定した週の配信です。変えた理由を入力してから保存します', 'Confirmed week: enter a reason to save')} relationship="description">
-                <Button type="button" size="small" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
-                  {t('理由を入力して保存', 'Save with a reason')}
-                </Button>
-              </Tooltip>
+            {/* 理由の入力は、このボタンの真下に出す(操作を止める確かめなので、小さな Popover。外を押すと、やめる) */}
+            {e.locked && (e.dirty || e.reasonOpen) && (
+              <Popover open={e.reasonOpen} onOpenChange={(_, d) => !d.open && e.cancelReason()} positioning="below-end" withArrow trapFocus>
+                <PopoverTrigger disableButtonEnhancement>
+                  <Tooltip content={t('確定した週の配信です。変えた理由を入力してから保存します', 'Confirmed week: enter a reason to save')} relationship="description">
+                    <Button type="button" size="small" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
+                      {t('理由を入力して保存', 'Save with a reason')}
+                    </Button>
+                  </Tooltip>
+                </PopoverTrigger>
+                <PopoverSurface className={s.reasonPop}>{e.reasonForm}</PopoverSurface>
+              </Popover>
             )}
             {myStep && (
               <NextAction
