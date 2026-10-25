@@ -50,6 +50,13 @@
 
 ## 3. 画面の構成
 
+配信カードのファイルの分け方(整理 第3段。2026-10-25):
+- `CardDetail.tsx`: 配信カードのダイアログ。AI の下書き・プレビューの倍率・2 つの画面で共通の部品(知らせ・商品のフロート・フッター)を持ち、詳しい画面(`ClassicCardLayout.tsx`)かシンプルな画面(`simple/SimpleCardLayout.tsx`)で描く。
+- `useCardEditor.ts`: **配信カードの中身(入力欄・商品・候補・テンプレート・見出し・メイン画像・リンク)と、変えたかの判定・保存。状態と保存はここの 1 か所だけ**(2 つの画面は、ここが返すものをそのまま使う)。AB テストの案の出し入れ(`useAbVariants.ts`)も、ここで呼ぶ。
+- `useCardAlerts.ts`: アラートへの対応と、商品の差し替え(差し替えた理由は、保存で配信のメモに残す)。
+- 保存の流れ(`saveFlow.ts`): `planSave` が何をするか(ステータス・承認のやり直し・確定した週を戻す・承認の依頼を古くする・履歴)を決め、`runSave` が決まった順に行う。**保存は `save({ after: 'close' | 'stay' | 'next', reason })` で呼ぶ**(以前の、押したボタンが ref の目印を立てて保存が読む形はやめた)。確定した週の配信は、理由の欄(`askReason(after)`・`pendingSave`)を出して、理由の欄のボタンで保存する。決めることと順番は `scripts/check-save.mjs`(npm run verify)が例で確かめるので、保存の流れを直すときは、例も直す。
+- 中ペイン `ContentPane.tsx` は、`editor`(useCardEditor の返すもの)をそのまま受け取り、③ ヒーローは `HeroTab.tsx`、④ セクションは `SectionsTab.tsx`(共通の部品は `contentPaneParts.tsx`)。
+
 `CardDetail.tsx`(ダイアログ)が、5 つのペインを持つ(幅は、境界のドラッグで変更。保存される。キーは `cardDetail.paneWidths.v6`)。左〜商品情報は配信を「作る」、右端のプロセスは配信を「進める」(2026-10-17、利用者と決めた)。
 
 | ペイン | 内容 |
