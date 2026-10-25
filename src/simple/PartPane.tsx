@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { InfoLabel, Badge, Button, Field, Input, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
+import { InfoLabel, Badge, Button, Field, Input, Link, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { LockClosedRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
 import { ChooseDrawer } from '../ChoosePanel'
@@ -18,7 +18,7 @@ import { productUrl } from '../links'
 import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
 import { channelOptions, countryOptions } from '../status'
-import { baseTemplateId, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
+import { baseTemplateId, openTemplateManager, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
 import { TemplateThumb } from '../TemplateThumb'
 import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
@@ -36,6 +36,9 @@ import { confirmDialog } from '../confirm'
 import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
 
 const useStyles = makeStyles({
+  // テンプレートで決まっている部品の知らせ(鍵の印 + 文 + テンプレートの管理へのリンク)
+  lockedNote: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '6px', alignItems: 'start', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  lockedIcon: { marginTop: '2px' },
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
   title: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
@@ -102,6 +105,23 @@ interface Props {
   onSwapAt: (at: SwapAt | null) => void
   /** 入れ替えで、行の鍵が変わったとき(候補と入れ替えたとき) */
   onSwapped: (from: string, to: string) => void
+}
+
+/** テンプレートで決まっていて、この配信では直せない部品の知らせ(鍵の印と、テンプレートの管理へのリンク。行き止まりにしない。レビューの 9) */
+function TemplateLocked({ text }: { text: string }) {
+  const t = useT()
+  const s = useStyles()
+  return (
+    <span className={s.lockedNote}>
+      <LockClosedRegular className={s.lockedIcon} />
+      <span>
+        {text}{' '}
+        <Link as="button" onClick={openTemplateManager}>
+          {t('テンプレートの管理で直す', 'Edit in Manage templates')}
+        </Link>
+      </span>
+    </span>
+  )
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
@@ -667,7 +687,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
         return (
           <>
-            <span className={s.caption}>{t('ボタンの文言はテンプレートで決まっています(テンプレートの管理で変えます)。', 'The button text comes from the template (change it in Manage templates).')}{e.ab ? t('リンク先は全部の案で共通です。', ' Links are shared by all variants.') : ''}</span>
+            <TemplateLocked text={t('ボタンの文言はテンプレートで決まっています。', 'The button text comes from the template.')} />
+            {e.ab && <span className={s.caption}>{t('リンク先は全部の案で共通です。', 'Links are shared by all variants.')}</span>}
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' ? (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
@@ -687,7 +708,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
         return (
           <>
-            <span className={s.caption}>{t('画像はテンプレートで決まっています(配信ごとの差し替えは、これからです)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (swapping per delivery is coming). The link on click can be set for this delivery.')}</span>
+            <TemplateLocked text={t('画像はテンプレートで決まっています(配信ごとの差し替えは、これからです)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (swapping per delivery is coming). The link on click can be set for this delivery.')} />
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' && (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
@@ -702,7 +723,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       }
       case 'text':
         // テンプレートの表のテキスト(T8)。いまはテンプレートの文のまま(配信ごとの書き換えは、これから。T8 段階 6)
-        return <span className={s.caption}>{t('この文はテンプレートで決まっています(テンプレートの管理で変えます)。配信ごとの書き換えは、これからです。', 'This text comes from the template (change it in Manage templates). Rewriting per delivery is coming.')}</span>
+        return <TemplateLocked text={t('この文はテンプレートで決まっています(配信ごとの書き換えは、これからです)。', 'This text comes from the template (rewriting per delivery is coming).')} />
       case 'template':
         return <TemplatePicker editor={e} />
       case 'overview':

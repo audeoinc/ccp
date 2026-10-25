@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowSwapRegular } from '@fluentui/react-icons'
+import { ArrowSwapRegular, LockClosedRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { partElement, partFromElement, partKey, partsInOrder, samePart, type PartRef } from './simple/parts'
 
@@ -15,9 +15,15 @@ const useStyles = makeStyles({
     '::before': { content: '""', position: 'absolute', inset: 0, borderRadius: 'inherit', backgroundColor: tokens.colorBrandBackground2, opacity: 0.35 },
   },
   hover: { border: `1px dashed ${tokens.colorBrandStroke2}` },
+  // テンプレートで決まっていて、この配信では中身を直せない部品(ボタンの文言・テンプレートの画像・文)。うすい点線と鍵の印(レビューの 9)
+  locked: { border: `1px dotted ${tokens.colorNeutralStroke1}` },
+  lock: { position: 'absolute', top: '2px', right: '2px', display: 'inline-flex', padding: '2px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorNeutralForeground3, fontSize: '12px' },
   // 商品の枠の右上の「入れ替える」(SU9)。層は押せないので、この印だけ押せるようにする
   swap: { position: 'absolute', pointerEvents: 'auto', boxShadow: tokens.shadow8 },
 })
+
+/** 中身がテンプレートで決まっている部品(ボタン・テンプレートの画像・文。リンク先は、ボタンと画像は配信ごとに決められる) */
+const lockedPart = (p: PartRef) => p.kind === 'button' || p.kind === 'image' || p.kind === 'text'
 
 interface Rect {
   left: number
@@ -134,7 +140,15 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
 
   return (
     <div className={s.layer}>
-      {rects.hover && <div className={mergeClasses(s.box, s.hover)} style={rects.hover} aria-hidden />}
+      {rects.hover && (
+        <div className={mergeClasses(s.box, hover && lockedPart(hover) ? s.locked : s.hover)} style={rects.hover} aria-hidden>
+          {hover && lockedPart(hover) && (
+            <span className={s.lock}>
+              <LockClosedRegular />
+            </span>
+          )}
+        </div>
+      )}
       {rects.sel && <div className={mergeClasses(s.box, s.selected)} style={rects.sel} aria-hidden />}
       {rects.swap && hover?.kind === 'product' && (
         <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
