@@ -28,7 +28,7 @@ async function afterChange(card: DeliveryCard, reason: string, backToReview: boo
   const locked = [...new Map(weeksTouched.filter((w): w is WeekRow => !!w).map((w) => [w.id, w])).values()]
   // 確定した週は、理由を残して、レビュー中に戻す(確定した計画を、黙って変えないため)
   for (const w of locked) {
-    fail(await reopenWeek(w, scopeOfCard(card)), '週をレビュー中に戻せませんでした', 'Could not put the week back in review')
+    fail(await reopenWeek(w, scopeOfCard(card)), '週の確定を解けませんでした', 'Could not undo the week confirmation')
   }
   fail(
     await CardNotesService.create({

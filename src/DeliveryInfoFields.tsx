@@ -55,7 +55,7 @@ export function ChoiceField({ label, value, options, onChange, hint, size, field
   return (
     <Field label={label} hint={hint} size={size} data-field={field}>
       <Select size="small" value={value} onChange={(_, d) => onChange(d.value)}>
-        <option value="">{t('未設定', 'Not set')}</option>
+        <option value="">{t('(未設定)', '(not set)')}</option>
         {options.map((o) => (
           <option key={o.value} value={String(o.value)}>{optionLabel(o.label)}</option>
         ))}
@@ -134,7 +134,7 @@ export function TargetField({ gender, ages, onGender, onAges, size, field, child
 export function OwnerField({ value, onChange, owners, size, field }: { value: string; onChange: (v: string) => void; owners: string[]; size?: Size; field?: string }) {
   const t = useT()
   return (
-    <Field label={t('担当者', 'Owner')} size={size} data-field={field}>
+    <Field label={t('担当', 'Owner')} size={size} data-field={field}>
       <PersonInput value={value} onChange={onChange} people={owners} />
     </Field>
   )

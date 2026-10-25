@@ -93,7 +93,7 @@ export function PartLibrary({ country, me, onCount }: { country: string; me: str
     }
   }
   const remove = async (p: PartImage) => {
-    if (!(await confirmDialog(tr(`部品の画像「${p.name}」を消します(上げた画像なら、ファイルも消します。すでに HTML に貼った画像は見えなくなります)。よろしいですか?`, `Delete "${p.name}" (its file too, if uploaded; HTML that already uses it will lose the image)?`)))) return
+    if (!(await confirmDialog(tr(`部品の画像「${p.name}」を削除します(上げた画像なら、ファイルも削除します。すでに HTML に貼った画像は見えなくなります)。よろしいですか?`, `Delete "${p.name}" (its file too, if uploaded; HTML that already uses it will lose the image)?`)))) return
     void run(p.id, async () => {
       await PartImagesService.delete(p.id)
       if (p.image_url) await PartUpload.remove(p.image_url)

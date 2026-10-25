@@ -158,7 +158,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
   /** 自分の書き込みを消す(返信もまとめて。返信だけが残っても、読めないため) */
   const remove = async () => {
     if (!root) return
-    if (!(await confirmDialog(replies.length ? tr(`このコメントを消します(返信 ${replies.length} 件も消えます)。よろしいですか?`, `Delete this comment and its ${replies.length} replies?`) : tr('このコメントを消します。よろしいですか?', 'Delete this comment?')))) return
+    if (!(await confirmDialog(replies.length ? tr(`このコメントを削除します(返信 ${replies.length} 件も削除されます)。よろしいですか?`, `Delete this comment and its ${replies.length} replies?`) : tr('このコメントを削除します。よろしいですか?', 'Delete this comment?')))) return
     const r = await run(async () => {
       try {
         for (const x of replies) await CardNotesService.delete(x.id)
@@ -192,7 +192,7 @@ export function PinFloat({ cardId, cardOwner, stage, root: findRoot, target, pro
             </Tooltip>
           )}
           {root && me && (root.author ?? '').trim() === me && (
-            <Tooltip content={t('このコメントを消す', 'Delete this comment')} relationship="label">
+            <Tooltip content={t('このコメントを削除', 'Delete this comment')} relationship="label">
               <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={working} onClick={() => void remove()} />
             </Tooltip>
           )}

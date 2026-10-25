@@ -317,7 +317,7 @@ export function CommPane(props: Props) {
     }
     await props.onCommit()
     if (props.isDirty()) {
-      setError(tr('直した中身を反映してから、承認してください', 'Save your changes before approving'))
+      setError(tr('直した中身を保存してから、承認してください', 'Save your changes before approving'))
       return
     }
     const ok = await run(() =>
@@ -411,7 +411,7 @@ export function CommPane(props: Props) {
                 {t('承認', 'Approve')}
               </Button>
               <Button size="small" icon={<DismissCircleRegular />} disabled={working || props.busy} onClick={() => void decide('changes_requested')}>
-                {t('差し戻し', 'Request changes')}
+                {t('差し戻す', 'Request changes')}
               </Button>
             </div>
           )}

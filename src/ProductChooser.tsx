@@ -77,7 +77,7 @@ export function ProductLine({ product: p, fact }: { product?: Product; fact?: Re
       <ImageThumb src={productImage(p)} alt={p.name} width={36} height={44} />
       <span style={{ display: 'grid', minWidth: 0 }}>
         <span className={s.name}>{p.name}</span>
-        <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '-'}`, `Stock ${p.stock ?? '-'}`)}`}</span>
+        <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '—'}`, `Stock ${p.stock ?? '—'}`)}`}</span>
         {fact && (
           <span className={s.meta}>
             {fact.weeksLeft !== undefined && t(`配信日に ${fact.weeksLeft.toFixed(1)} 週分 ・ `, `${fact.weeksLeft.toFixed(1)} wks on the day · `)}
@@ -141,7 +141,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
     setPicks({ key: '', ideas: [], busy: true })
     try {
       const request = why
-        ? tr(`いまの商品を、次の理由で差し替えます: ${why}。代わりになる、この配信に合う商品を 3 点おすすめしてください。`, `Replacing the current product because: ${why}. Recommend 3 products that could replace it and fit the delivery.`)
+        ? tr(`いまの商品を、次の理由で入れ替えます: ${why}。代わりになる、この配信に合う商品を 3 点おすすめしてください。`, `Replacing the current product because: ${why}. Recommend 3 products that could replace it and fit the delivery.`)
         : tr('この枠の商品の代わりになる、この配信に合う商品を 3〜4 点おすすめしてください。', 'Recommend 3 or 4 products that could replace this one and fit the delivery.')
       const r = await ask(request, [])
       setPicks({ key: '', ideas: r.ideas, busy: false, error: r.ideas.length ? undefined : r.reply || tr('おすすめが見つかりませんでした', 'No recommendations found') })
@@ -162,7 +162,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       icon: <SparkleRegular />,
       content: (
         <AiPicks
-          hint={why ? t(`差し替える理由(${why})に合わせて、AI が候補を挙げます。押すと選びます`, `AI suggests replacements for: ${why}. Click one to choose it`) : t('この枠の代わりになりそうな商品を、AI が挙げます。押すと選びます', 'AI suggests products to replace this one. Click one to choose it')}
+          hint={why ? t(`入れ替える理由(${why})に合わせて、AI が候補を挙げます。押すと選びます`, `AI suggests replacements for: ${why}. Click one to choose it`) : t('この枠の代わりになりそうな商品を、AI が挙げます。押すと選びます', 'AI suggests products to replace this one. Click one to choose it')}
           picks={picks ?? undefined}
           hasFallback={fallback.length > 0}
           onAsk={() => void recommend()}

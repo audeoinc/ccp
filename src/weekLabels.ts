@@ -33,7 +33,7 @@ export const checkHint = (t: T, k: CheckKey): string =>
 /** 確認の一覧の項目で、問題があるときに何をするか(項目の横と、選んだときに出す) */
 export const checkAction = (t: T, k: CheckKey): string =>
   ({
-    overLimit: t('ほかの商品に差し替える', 'Swap in other products'),
+    overLimit: t('ほかの商品に入れ替える', 'Replace with other products'),
     pushAlign: t('プッシュのテーマを、同じ日のメールにそろえる', 'Match the push theme to the same-day email'),
     leadMissing: t('どれかの配信に載せる', 'Feature them in a delivery'),
     repeat: t('テーマかメイン画像を変える', 'Change the theme or main image'),
@@ -45,14 +45,14 @@ export const checkAction = (t: T, k: CheckKey): string =>
 /** 承認の履歴の、操作の文言 */
 export const actionText = (t: T, a?: EventAction): string =>
   ({
-    submit: t('週をレビューに出した', 'Submitted the week for review'),
+    submit: t('週の承認を依頼した', 'Requested approval for the week'),
     draft: t('週を下書きに戻した', 'Put the week back to draft'),
     confirm: t('週を確定した', 'Confirmed the week'),
     unconfirm: t('週の確定を取り消した', 'Undid the week confirmation'),
     status: t('ステータスを変えた', 'Changed the status'),
     reopen: t('確定後に変えた(週の確定を解いた)', 'Changed after confirmation (week no longer confirmed)'),
     approve: t('承認した', 'Approved'),
-    reject: t('差し戻した', 'Sent back'),
+    reject: t('差し戻した', 'Requested changes'),
     revoke: t('承認後に内容が変わったので、承認待ちに戻した', 'Content changed after approval, back to awaiting approval'),
     bulk_create: t('AI でまとめて作成した', 'Created with AI in bulk'),
     user_change: t('ユーザーを変えた', 'Changed a user'),

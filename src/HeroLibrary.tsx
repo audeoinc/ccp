@@ -136,7 +136,7 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, in
       if (!r.success) throw new Error(r.error?.message ?? tr('期限を切れませんでした', 'Could not set the deadline'))
     })
   const remove = async (h: HeroImage) => {
-    if (!(await confirmDialog(tr(`メイン画像「${h.name}」をライブラリから消します(上げた画像なら、ファイルも消します)。よろしいですか?`, `Delete "${h.name}" from the library (its file too, if it was uploaded)?`)))) return
+    if (!(await confirmDialog(tr(`メイン画像「${h.name}」をライブラリから削除します(上げた画像なら、ファイルも削除します)。よろしいですか?`, `Delete "${h.name}" from the library (its file too, if it was uploaded)?`)))) return
     void run(h.id, async () => {
       await HeroImagesService.delete(h.id)
       if (h.image_url) await HeroUpload.remove(h.image_url)

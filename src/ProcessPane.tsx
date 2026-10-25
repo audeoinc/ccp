@@ -154,7 +154,7 @@ export function ProcessPane(props: Props) {
       </div>
       {props.card && props.onOpenProduction && canGoProduction(props.card) && <ProductionChip card={props.card} onOpen={props.onOpenProduction} people={props.people} productIds={props.productIds} products={props.products} />}
       <TabList size="small" className={s.tabs} selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as TalkTab)}>
-        <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('引き継ぎ', 'Handoff')}`}</Tab>
+        <Tab value="handoff">{`${props.handoff.handedOffAt ? '✓ ' : ''}${t('渡すもの', 'Handoff')}`}</Tab>
         <Tab value="threads">{`${t('やり取り', 'Conversation')}${count(openThreads)}`}</Tab>
         <Tab value="tasks">{`${t('タスク', 'Tasks')}${count(openTasks)}`}</Tab>
         <Tab value="assets">{`${t('素材', 'Assets')}${count(assetCount)}`}</Tab>
@@ -297,13 +297,13 @@ function ProductionChip({ card, onOpen, people, productIds, products }: { card: 
     <div className={mergeClasses(s.production, next && s.productionNext)}>
       <span className={s.dot} style={{ backgroundColor: productionColor(v) }} />
       <span className={s.productionText}>
-        <span className={s.head}>{next ? t('次: 制作に依頼する', 'Next: request production') : t('制作', 'Production')}</span>
+        <span className={s.head}>{next ? t('次: 制作に渡す', 'Next: hand off to production') : t('制作', 'Production')}</span>
         <span className={s.note}>
-          {next ? t('制作のページで中身を確かめて、「この内容で依頼する」を押します', 'Check the content on the production page, then press "Request with this content"') : productionLabel(v)}
+          {next ? t('制作のページで中身を確かめて、「この内容で渡す」を押します', 'Check the content on the production page, then press "Hand off with this content"') : productionLabel(v)}
         </span>
       </span>
       <Button size="small" appearance={next ? 'primary' : 'secondary'} onClick={() => onOpen(card.id)}>
-        {next ? t('制作に依頼する', 'Request production') : t('制作のページ', 'Production page')}
+        {next ? t('制作に渡す', 'Hand off to production') : t('制作のページ', 'Production page')}
       </Button>
       {/* 制作したもの(HTML・ひとこと・リンク)ができたら、仕上がりを見る(X58 段階 4) */}
       {req && (req.done_at || req.html) && (

@@ -29,7 +29,7 @@ export function ApprovalBadge({ status, waiting, changesRequested, reviewers, ap
   const rank = statusRank(status)
   // 差し戻しは、配信のステータスが承認待ちのまま、依頼だけが差し戻しになる(server/ccp/approvals.py)ので、依頼の状態を先に見る
   const spec = changesRequested
-    ? { color: 'danger' as const, label: t('差し戻し', 'Changes requested'), tip: t('差し戻されました。直して、承認に出し直します', 'Changes were requested. Fix and request approval again') }
+    ? { color: 'danger' as const, label: t('差し戻し', 'Changes requested'), tip: t('差し戻されました。直して、承認を依頼し直します', 'Changes were requested. Fix and request approval again') }
     : rank >= statusRank('approved')
       ? { color: 'success' as const, label: t('承認済み', 'Approved'), tip: t('承認されました。制作に渡せます', 'Approved. Ready for production') }
       : rank >= statusRank('reviewing')
@@ -39,7 +39,7 @@ export function ApprovalBadge({ status, waiting, changesRequested, reviewers, ap
             tip: waiting ? t('承認を待っています。押すと、相手ごとの状態が見られます', 'Waiting for approval. Click to see each reviewer') : t('承認待ちですが、依頼はまだです', 'Awaiting approval, but not requested yet'),
           }
         : // 一覧・絞り込みと同じ呼び方(未起案)にする
-          { color: 'informative' as const, label: statusLabel('not_started'), tip: t('まだ承認に出していません', 'Not sent for approval yet') }
+          { color: 'informative' as const, label: statusLabel('not_started'), tip: t('まだ承認を依頼していません', 'Approval not requested yet') }
   return (
     <Tooltip content={spec.tip} relationship="description">
       <button type="button" className={s.button} onClick={onOpen} aria-label={t(`承認の状態: ${spec.label}。承認のパネルを開く`, `Approval: ${spec.label}. Open the approval panel`)}>

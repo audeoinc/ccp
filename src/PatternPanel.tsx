@@ -102,7 +102,7 @@ export function PatternPanel({ country, onChanged }: Props) {
   }
 
   const remove = async (row: DeliveryPattern) => {
-    if (!(await confirmDialog(t('この型を消します(もう作った配信は、そのままです)。よろしいですか?', 'Delete this pattern? Deliveries already created are kept.')))) return
+    if (!(await confirmDialog(t('この型を削除します(もう作った配信は、そのままです)。よろしいですか?', 'Delete this pattern? Deliveries already created are kept.')))) return
     try {
       await DeliveryPatternsService.delete(row.id)
     } catch (e) {
@@ -169,7 +169,7 @@ export function PatternPanel({ country, onChanged }: Props) {
                     </Select>
                     <Input size="small" defaultValue={r.name ?? ''} placeholder={t('例: 週末のセール', 'e.g. Weekend sale')} onBlur={(e) => e.target.value !== (r.name ?? '') && void patch(r, { name: e.target.value })} aria-label={t('型の名前', 'Pattern name')} />
                     <Input size="small" defaultValue={r.note ?? ''} onBlur={(e) => e.target.value !== (r.note ?? '') && void patch(r, { note: e.target.value })} aria-label={t('メモ', 'Note')} />
-                    <Button size="small" appearance="subtle" icon={<DeleteRegular />} aria-label={t('この型を消す', 'Delete this pattern')} onClick={() => void remove(r)} />
+                    <Button size="small" appearance="subtle" icon={<DeleteRegular />} aria-label={t('この型を削除', 'Delete this pattern')} onClick={() => void remove(r)} />
                   </div>
                 ))}
               </div>

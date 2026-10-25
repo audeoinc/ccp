@@ -174,4 +174,4 @@ export function Row({ image, wide, title, meta, reason, onReason, source, badge,
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const productMeta = (p?: Product) =>
-  p ? `${p.product_code} ・ ${yen(p.price, productMarket(p))} ・ ${tr('在庫', 'Stock ')}${p.stock ?? '-'} ・ ${optionLabel(p.sales_trend_name)} ・ ★${p.rating ?? '-'}` : ''
+  p ? `${p.product_code} ・ ${yen(p.price, productMarket(p))} ・ ${tr('在庫', 'Stock ')}${p.stock ?? '—'} ・ ${optionLabel(p.sales_trend_name)} ・ ★${p.rating ?? '—'}` : ''

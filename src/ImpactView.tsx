@@ -149,19 +149,19 @@ interface Props {
   onOpenResult: (id: string) => void
 }
 
-const pct = (v: number | null | undefined, digits = 1) => (v == null ? '-' : `${(v * 100).toFixed(digits)}%`)
+const pct = (v: number | null | undefined, digits = 1) => (v == null ? '—' : `${(v * 100).toFixed(digits)}%`)
 /** 率の差(ポイント) */
-const pt = (v: number | null | undefined, digits = 1) => (v == null ? '-' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}pt`)
+const pt = (v: number | null | undefined, digits = 1) => (v == null ? '—' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}pt`)
 /** 金額。1 人あたりは、円でも小数 1 桁まで出す(数円の差を見るため) */
 function money(v: number | null | undefined, market: Market, perUser = false): string {
-  if (v == null) return '-'
+  if (v == null) return '—'
   // 合計は整数で(ドルのセントまでは要らない)。1 人あたりは、ドルはセント・円は小数 1 桁まで
   const r = !perUser ? Math.round(v) : market === 'US' ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10
   return priceText(r, market)
 }
 /** 1 通あたりの金額は小さすぎて差が読めないので、1,000 通あたりで出す */
 const PER = 1000
-const signedMoney = (v: number | null, market: Market, perUser = false) => (v == null ? '-' : `${v >= 0 ? '+' : '−'}${money(Math.abs(v), market, perUser)}`)
+const signedMoney = (v: number | null, market: Market, perUser = false) => (v == null ? '—' : `${v >= 0 ? '+' : '−'}${money(Math.abs(v), market, perUser)}`)
 const MARKETS: Market[] = ['US', 'JP']
 
 /** 対象の期間(配信日。YYYY-MM-DD。'' = 端を決めない) */
@@ -419,7 +419,7 @@ function LiftTab({ impacts, onOpenResult }: { impacts: DeliveryImpact[]; onOpenR
     { key: 'name', label: t('配信', 'Delivery'), cell: (d) => <DeliveryName d={d} />, sort: (d) => d.sentAt, wide: true },
     { key: 'channel', label: t('チャネル', 'Channel'), cell: (d) => <ChannelBadge size="small" channel={String(d.card.channel ?? '')} /> },
     { key: 'country', label: t('国', 'Country'), cell: (d) => d.market, sort: (d) => d.market },
-    { key: 'users', label: t('送った人 / 送らなかった人', 'Sent / holdout'), numeric: true, cell: (d) => (d.lift ? `${(d.lift.treated_users ?? 0).toLocaleString()} / ${(d.lift.holdout_users ?? 0).toLocaleString()}` : '-'), sort: (d) => d.lift?.treated_users },
+    { key: 'users', label: t('送った人 / 送らなかった人', 'Sent / holdout'), numeric: true, cell: (d) => (d.lift ? `${(d.lift.treated_users ?? 0).toLocaleString()} / ${(d.lift.holdout_users ?? 0).toLocaleString()}` : '—'), sort: (d) => d.lift?.treated_users },
     { key: 'attr', label: t('配信を通った売上', 'Attributed sales'), numeric: true, cell: (d) => money(d.result.revenue, d.market), sort: (d) => d.result.revenue },
     { key: 'inc', label: t('増えた売上', 'Incremental sales'), numeric: true, cell: (d) => money(d.incRevenue, d.market), sort: (d) => d.incRevenue ?? undefined },
     { key: 'lift', label: t('リフト率', 'Lift'), numeric: true, cell: (d) => pct(d.liftRate), sort: (d) => d.liftRate ?? undefined },
@@ -428,8 +428,8 @@ function LiftTab({ impacts, onOpenResult }: { impacts: DeliveryImpact[]; onOpenR
       label: t('測定', 'Measured'),
       cell: (d) =>
         d.lift
-          ? t(`${d.lift.window_days ?? '-'} 日 · 送らず ${Math.round((d.lift.holdout_rate ?? 0) * 100)}%`, `${d.lift.window_days ?? '-'} days · holdout ${Math.round((d.lift.holdout_rate ?? 0) * 100)}%`)
-          : '-',
+          ? t(`${d.lift.window_days ?? '—'} 日 · 送らず ${Math.round((d.lift.holdout_rate ?? 0) * 100)}%`, `${d.lift.window_days ?? '—'} days · holdout ${Math.round((d.lift.holdout_rate ?? 0) * 100)}%`)
+          : '—',
     },
     { key: 'learn', label: t('学び', 'Learnings'), cell: (d) => <LearningsMark d={d} />, sort: (d) => d.learningIds.length },
   ]

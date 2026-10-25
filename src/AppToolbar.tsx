@@ -333,14 +333,14 @@ export function AppToolbar({
         <FilterSelect label={t('種類', 'Type')} value={filters.department} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={setFilter('department')} />
         {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
         {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
-        <FilterSelect label={t('担当', 'Person')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
+        <FilterSelect label={t('担当', 'Owner')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
         {filtering && <Button size="small" appearance="subtle" onClick={() => onFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
       </div>
     {/* 面の帯(X38): いまどの面にいるかを、面の色の線とロゴ風の名前で示す */}
     <div className={styles.faceBand} style={{ backgroundColor: FACE_TINT[face], borderBottomColor: FACE_COLOR[face] }}>
       <span className={styles.faceLogo} style={{ color: FACE_COLOR[face] }}>{FACE_LOGO[face]}</span>
       <span className={styles.faceHint}>
-        {{ calendar: t('配信の企画と承認', 'Plan and approve deliveries'), production: t('制作の依頼と進み具合', 'Production requests and progress'), results: t('送ったあとの数字と振り返り', 'Numbers and lessons after sending') }[face]}
+        {{ calendar: t('配信の企画と承認', 'Plan and approve deliveries'), production: t('制作に渡したものと進み具合', 'Handoffs and production progress'), results: t('送ったあとの数字と振り返り', 'Numbers and lessons after sending') }[face]}
       </span>
     </div>
     </div>

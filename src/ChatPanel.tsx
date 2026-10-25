@@ -168,7 +168,7 @@ export function ChatPanel({ title, messages, busy, suggestions, idleHint, intro,
           {disabled ? t('AIチャット', 'AI chat') : t(`AIチャット — ${title}`, `AI chat — ${title}`)}
         </Text>
         {messages.length > 0 && !busy && (
-          <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={onClear} aria-label={t('この会話を消す', 'Clear this conversation')} />
+          <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={onClear} aria-label={t('この会話を削除', 'Clear this conversation')} />
         )}
         <Button
           size="small"

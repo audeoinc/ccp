@@ -129,10 +129,10 @@ export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHin
             <div className={styles.body}>
               <Text weight="semibold" size={300} truncate wrap={false} block>{p.name}</Text>
               <Caption1 className={styles.line}>
-                {p.product_code} ・ {yen(p.price, productMarket(p))} ・ {t('在庫', 'Stock ')}{p.stock ?? '-'}
+                {p.product_code} ・ {yen(p.price, productMarket(p))} ・ {t('在庫', 'Stock ')}{p.stock ?? '—'}
               </Caption1>
               <Caption1 className={styles.line}>
-                {trendMark(p.sales_trend_name)} ・ ★{p.rating ?? '-'} ・ {optionLabel(p.weather_name)}
+                {trendMark(p.sales_trend_name)} ・ ★{p.rating ?? '—'} ・ {optionLabel(p.weather_name)}
               </Caption1>
               {marks?.(p)}
             </div>

@@ -56,13 +56,13 @@ const useStyles = makeStyles({
 
 const SHORT: Record<ProductionView, () => string> = {
   not_approved: () => tr('承認のあと', 'After approval'),
-  draft: () => tr('依頼の前', 'Not requested'),
-  requested: () => tr('依頼済み', 'Requested'),
+  draft: () => tr('渡す前', 'Not handed off'),
+  requested: () => tr('渡し済み', 'Handed off'),
   in_progress: () => tr('制作中', 'In production'),
   done: () => tr('確認待ち', 'To check'),
   checked: () => tr('確認済み', 'Checked'),
   sent: () => tr('送った', 'Sent'),
-  stale: () => tr('依頼し直す', 'Request again'),
+  stale: () => tr('渡し直す', 'Hand off again'),
 }
 
 interface Props {

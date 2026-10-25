@@ -131,8 +131,8 @@ async function deleteAsset(a: CardAsset, me: string): Promise<boolean> {
   const other = by && by !== me
   const ok = await confirmDialog(
     other
-      ? tr(`素材「${a.name}」は ${by} さんが入れたものです。消しますか?(この素材へのやり取りも消えます)`, `"${a.name}" was added by ${by}. Delete it? Its conversation is deleted too.`)
-      : tr(`素材「${a.name}」を消します(この素材へのやり取りも消えます)。よろしいですか?`, `Delete "${a.name}"? Its conversation is deleted too.`),
+      ? tr(`素材「${a.name}」は ${by} さんが入れたものです。削除しますか?(この素材へのやり取りも削除されます)`, `"${a.name}" was added by ${by}. Delete it? Its conversation is deleted too.`)
+      : tr(`素材「${a.name}」を削除します(この素材へのやり取りも削除されます)。よろしいですか?`, `Delete "${a.name}"? Its conversation is deleted too.`),
   )
   if (!ok) return false
   // 消せないときは投げる(呼ぶ側が文言を出す)
@@ -449,8 +449,8 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
                     appearance="subtle"
                     icon={<DeleteRegular />}
                     disabled={busy}
-                    aria-label={t(`素材「${a.name}」を消す`, `Delete "${a.name}"`)}
-                    title={t('この素材を消す', 'Delete this asset')}
+                    aria-label={t(`素材「${a.name}」を削除`, `Delete "${a.name}"`)}
+                    title={t('この素材を削除', 'Delete this asset')}
                     onClick={() => void remove(a)}
                   />
                 </span>

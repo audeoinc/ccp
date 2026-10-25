@@ -94,7 +94,7 @@ export function CardHistoryList({ cardId, version, scroll }: { cardId: string; v
         push_title: t('通知のタイトル', 'Push title'),
         push_body: t('通知の本文', 'Push body'),
         push_link: t('通知のリンク', 'Push link'),
-        audience: t('配信先', 'Audience'),
+        audience: t('送る相手', 'Send to'),
         target_gender: t('性別', 'Gender'),
         target_ages: t('年代', 'Ages'),
         production_owner: t('制作の担当', 'Production assignee'),
@@ -148,7 +148,7 @@ export function CardHistoryList({ cardId, version, scroll }: { cardId: string; v
   if (entries === null) return <Spinner size="tiny" />
   return (
     <div className={mergeClasses(s.list, scroll && s.scroll)}>
-      {entries.length === 0 && <span className={s.empty}>{t('まだ変更の記録はありません', 'No changes yet')}</span>}
+      {entries.length === 0 && <span className={s.empty}>{t('まだ変更の履歴はありません', 'No changes yet')}</span>}
       {entries.map((e, i) => (
         <div key={`${e.kind}:${e.at}:${i}`} className={s.group}>
           <span className={s.meta}>

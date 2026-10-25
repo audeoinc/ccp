@@ -21,8 +21,8 @@ export function productionView(card: DeliveryCard, req?: ProductionRequest): Pro
 export const productionLabel = (v: ProductionView): string =>
   ({
     not_approved: tr('承認待ち(制作の前)', 'Awaiting approval (before production)'),
-    draft: tr('制作に依頼する前', 'Not requested yet'),
-    requested: tr('依頼済み(受け取り待ち)', 'Requested'),
+    draft: tr('制作に渡す前', 'Not handed off yet'),
+    requested: tr('渡し済み(受け取り待ち)', 'Handed off'),
     in_progress: tr('制作している', 'In production'),
     done: tr('制作が終わった(確認待ち)', 'Production done (to check)'),
     checked: tr('仕上がりを確認した', 'Result checked'),

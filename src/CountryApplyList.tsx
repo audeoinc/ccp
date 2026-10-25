@@ -175,7 +175,7 @@ export function CountryApplyList({ kind, country, countryName, items, defaultUse
         )}
       </div>
       <div>
-        <span className={s.label}>{t('変えた記録', 'Change history')}</span>
+        <span className={s.label}>{t('変更の履歴', 'Change history')}</span>
         {past.length === 0 ? (
           <div className={s.note}>{t('まだ変えていません(すべて既定)', 'Not changed yet (all defaults)')}</div>
         ) : (

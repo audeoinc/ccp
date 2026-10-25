@@ -185,7 +185,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
               }}
             >
               <ArrowMoveRegular className={s.muted} />
-              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : (onOpenSwap ? t('商品の詳しい情報と入れ替え', 'Product details and replace') : t('商品の詳しい情報と差し替え', 'Product details and swap'))}{product ? ` — ${product.name}` : ''}</span>
+              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : (onOpenSwap ? t('商品の詳しい情報と入れ替え', 'Product details and replace') : t('商品の詳しい情報と入れ替え', 'Product details and replace'))}{product ? ` — ${product.name}` : ''}</span>
               {productUrl(product) && <OpenLink url={productUrl(product)} label={t('商品ページ', 'Product page')} />}
               <span className={s.grabHint}>{t('つかんで動かせます', 'Drag to move')}</span>
               <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
@@ -203,7 +203,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     {alert.detail}
                     {product && stockAlert && t(` ・ いまの在庫 ${num(product.stock)}`, ` · Stock now ${num(product.stock)}`)}
                   </span>
-                  {imageAlert && <span className={s.alertDetail}>{t('この配信で使う画像を、期限のない(まだ切れない)画像に替えるか、商品を差し替えてください', 'Switch to an image without this expiry, or swap the product')}</span>}
+                  {imageAlert && <span className={s.alertDetail}>{t('この配信で使う画像を、期限のない(まだ切れない)画像に替えるか、商品を入れ替えてください', 'Switch to an image without this expiry, or replace the product')}</span>}
                   {!stockAlert && !imageAlert && <span className={s.alertDetail}>{t('この変更は、確かめて「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
                 </span>
                 <span className={s.others}>
@@ -322,7 +322,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                   {shown && <ProductDetail key={shown.id} product={shown} />}
                   {canSwap && (
                     <div className={s.swapBox}>
-                      <Field label={t('差し替えの理由(任意。配信のメモに残ります)', 'Reason for the swap (optional; kept in the delivery notes)')} size="small">
+                      <Field label={t('入れ替えの理由(任意。配信のメモに残ります)', 'Reason for replacing (optional; kept in the delivery notes)')} size="small">
                         <AutoTextarea heightKey="ProductActionFloat.reason" size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
                       </Field>
                       <div className={s.swapActions}>
@@ -330,10 +330,10 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                           {t('やめる', 'Cancel')}
                         </Button>
                         <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={doSwap}>
-                          {t(`「${product.name}」をこの商品に差し替える`, `Replace "${product.name}" with this`)}
+                          {t(`「${product.name}」をこの商品に入れ替える`, `Replace "${product.name}" with this`)}
                         </Button>
                       </div>
-                      <span className={s.caption}>{t('この配信の中で置き換えます(保存で確定。保存しなければ元のまま)', 'Swaps it in this delivery (confirmed when you save).')}</span>
+                      <span className={s.caption}>{t('この配信の中で入れ替えます(保存で確定。保存しなければ元のまま)', 'Replaces it in this delivery (confirmed when you save).')}</span>
                     </div>
                   )}
                 </div>

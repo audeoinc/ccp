@@ -207,7 +207,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
         : undefined,
       product: itemKey
         ? {
-            swapLabel: t('商品を差し替える', 'Swap the product'),
+            swapLabel: t('商品を入れ替える', 'Replace the product'),
             url: productUrl(productById.get(it?.productId ?? '')),
             // 商品の箱を押したときと同じ、商品のフロート
             swap: () => {
@@ -343,11 +343,11 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
                 <div className={styles.twoCol}>
                   <OwnerField value={form.owner} onChange={set('owner')} owners={owners} />
                   {/* 制作の担当者・締め切り・引き継ぎ済みは、右端のプロセスのペインの「引き継ぎ」だけで決める(2 か所で入力しない。FLOWS の C-3)。ここは表示だけで、押すとそのタブが開く(閉じていれば開く) */}
-                  <Field label={t('制作への引き継ぎ', 'Handoff to production')} className={styles.handoffField}>
+                  <Field label={t('制作に渡す', 'Hand off to production')} className={styles.handoffField}>
                     <button type="button" className={styles.handoffSummary} onClick={() => {
                       if (!processOpen) toggleProcess()
                       setTabRequest((r) => ({ tab: 'handoff', seq: (r?.seq ?? 0) + 1 }))
-                    }} title={t('引き継ぎのタブで決める', 'Set in the Handoff tab')}>
+                    }} title={t('渡すもののタブで決める', 'Set in the Handoff tab')}>
                       <span>
                         <span className={styles.caption}>{t('担当 ', 'Assignee ')}</span>
                         {form.productionOwner.trim() || <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
@@ -356,11 +356,11 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
                       </span>
                       <span>
                         {form.handedOffAt ? (
-                          <span className={mergeClasses(styles.success, styles.handoffItem)}>{t('引き継ぎ済み ', 'Handed off ')}{new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className={mergeClasses(styles.success, styles.handoffItem)}>{t('渡し済み ', 'Handed off ')}{new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                         ) : (
-                          <span className={styles.caption}>{t('まだ引き継いでいない', 'Not handed off yet')}</span>
+                          <span className={styles.caption}>{t('まだ渡していない', 'Not handed off yet')}</span>
                         )}
-                        <span className={styles.handoffLink}>{t('引き継ぎのタブで決める ›', 'Set in the Handoff tab ›')}</span>
+                        <span className={styles.handoffLink}>{t('渡すもののタブで決める ›', 'Set in the Handoff tab ›')}</span>
                       </span>
                     </button>
                   </Field>
@@ -602,7 +602,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
 
             {footerNode}
             <div className={styles.actions}>
-              <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
+              <Button type="button" onClick={onBack} disabled={saving}>{t('やめる', 'Cancel')}</Button>
               {/* 次がないときも消さずに、選べないだけにする(ボタンの位置を変えない。PRINCIPLES.md 2-2) */}
               {next !== undefined && (
                 <Tooltip

@@ -38,7 +38,7 @@ export function ProductMetrics({ product: p }: { product: Product }) {
   }
 
   const value = (d: MetricDef, v?: number) => {
-    if (v === undefined || v === null) return '-'
+    if (v === undefined || v === null) return '—'
     if (d.kind === 'money') return yen(Math.round(v), market)
     if (d.kind === 'rate') return `${(Math.round(v * 1000) / 10).toFixed(1)}%`
     return Math.round(v).toLocaleString(locale())
@@ -62,7 +62,7 @@ export function ProductMetrics({ product: p }: { product: Product }) {
                 {t(`${r.rank}位`, `#${r.rank}`)}
                 {r.rank_of ? <span className={s.of}> / {r.rank_of.toLocaleString(locale())}</span> : null}
               </>
-            ) : '-'}
+            ) : '—'}
           </td>
           {change(d, r?.wow)}
           {change(d, r?.mom)}
@@ -107,7 +107,7 @@ export function ProductMetrics({ product: p }: { product: Product }) {
           {data.product.length > 0 ? rows(productMetricDefs(), data.product) : (
             <tr><td colSpan={6} className={mergeClasses(s.label, s.muted)}>{t('まだ取り込まれていません', 'Not imported yet')}</td></tr>
           )}
-          {group(t(`カテゴリ: ${optionLabel(p.category_name) || p.category || '-'}`, `Category: ${optionLabel(p.category_name) || p.category || '-'}`), cWeek !== pWeek ? cWeek : undefined)}
+          {group(t(`カテゴリ: ${optionLabel(p.category_name) || p.category || '—'}`, `Category: ${optionLabel(p.category_name) || p.category || '—'}`), cWeek !== pWeek ? cWeek : undefined)}
           {data.category.length > 0 ? rows(categoryMetricDefs(), data.category) : (
             <tr><td colSpan={6} className={mergeClasses(s.label, s.muted)}>{t('まだ取り込まれていません', 'Not imported yet')}</td></tr>
           )}

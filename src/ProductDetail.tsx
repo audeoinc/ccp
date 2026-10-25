@@ -106,7 +106,7 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
               </div>
               <div className={s.kpi}>
                 <span className={s.kpiLabel}>{t('在庫の持ち', 'Weeks of stock')}</span>
-                <span className={s.kpiValue}>{cover !== undefined ? t(`約${cover}週`, `~${cover} wk`) : '-'}</span>
+                <span className={s.kpiValue}>{cover !== undefined ? t(`約${cover}週`, `~${cover} wk`) : '—'}</span>
               </div>
               <div className={s.kpi}>
                 <span className={s.kpiLabel}>{t('12週の売上', '12-week revenue')}</span>
@@ -148,12 +148,12 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
           <>
             <div className={s.section}>
               <span className={s.sectionTitle}>{t('MDの販売方針', 'MD sales policy')}</span>
-              <p className={s.text}>{data.policy.policy || '-'}</p>
+              <p className={s.text}>{data.policy.policy || '—'}</p>
             </div>
             <div className={s.section}>
               <span className={s.sectionTitle}>{t('販促計画', 'Promotion plan')}</span>
               {data.policy.promoPeriod && <span className={s.muted}>{t('期間', 'Period')}: {data.policy.promoPeriod}</span>}
-              <p className={s.text}>{data.policy.promoPlan || '-'}</p>
+              <p className={s.text}>{data.policy.promoPlan || '—'}</p>
             </div>
           </>
         ) : (
@@ -166,17 +166,17 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
           <dt className={s.label}>{t('価格', 'Price')}</dt>
           <dd className={s.value}>{yen(p.price, market)}</dd>
           <dt className={s.label}>{t('在庫', 'Stock')}</dt>
-          <dd className={s.value}>{p.stock ?? '-'}</dd>
+          <dd className={s.value}>{p.stock ?? '—'}</dd>
           <dt className={s.label}>{t('売上トレンド', 'Sales trend')}</dt>
-          <dd className={s.value}>{optionLabel(p.sales_trend_name) || '-'}</dd>
+          <dd className={s.value}>{optionLabel(p.sales_trend_name) || '—'}</dd>
           <dt className={s.label}>{t('評価', 'Rating')}</dt>
-          <dd className={s.value}>{p.rating !== undefined ? `★${p.rating}` : '-'}</dd>
+          <dd className={s.value}>{p.rating !== undefined ? `★${p.rating}` : '—'}</dd>
           <dt className={s.label}>{t('季節', 'Season')}</dt>
-          <dd className={s.value}>{optionLabel(p.season_name) || '-'}</dd>
+          <dd className={s.value}>{optionLabel(p.season_name) || '—'}</dd>
           <dt className={s.label}>{t('天候適性', 'Weather')}</dt>
-          <dd className={s.value}>{optionLabel(p.weather_name) || '-'}</dd>
+          <dd className={s.value}>{optionLabel(p.weather_name) || '—'}</dd>
           <dt className={s.label}>{t('説明', 'Description')}</dt>
-          <dd className={s.value}>{p.description || '-'}</dd>
+          <dd className={s.value}>{p.description || '—'}</dd>
         </dl>
       )}
 

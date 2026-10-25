@@ -396,7 +396,7 @@ export function AlertsPage({ initialProductId, onSelectProduct, onOpenAlertCard,
                     <td className={styles.td}>
                       <span className={styles.actions}>
                         <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.id })}>
-                          {t('差し替え', 'Replace')}
+                          {t('入れ替え', 'Replace')}
                         </Button>
                         {/* 延期・開くは、表が横に長くならないよう、アイコンだけ(名前は、マウスを乗せると出る) */}
                         <Tooltip content={t('延期', 'Postpone')} relationship="label">

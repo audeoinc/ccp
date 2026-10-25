@@ -64,7 +64,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const locked = !!confirmedWeekOf(weeks, card.scheduled_at, scopeOfCard(card))
   const [reason, setReason] = useState(
     mode === 'replace'
-      ? t(`${subject}${why}。差し替えた`, `${subject}${why}. Replaced.`)
+      ? t(`${subject}${why}。入れ替えた`, `${subject}${why}. Replaced.`)
       : mode === 'postpone'
         ? t(`${subject}${why}。延期した`, `${subject}${why}. Postponed.`)
         : t(`${subject}${why}。取りやめた`, `${subject}${why}. Cancelled.`),
@@ -105,7 +105,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
   const use = (to: Product) =>
     run(async () => {
       for (const r of rows) await replaceProduct({ card, rowId: r.rowId, to, reason, backToReview, weeks })
-    }, t(`${card.name} の ${product?.name} を、${to.name} に差し替えました`, `Replaced ${product?.name} with ${to.name} in ${card.name}`))
+    }, t(`${card.name} の ${product?.name} を、${to.name} に入れ替えました`, `Replaced ${product?.name} with ${to.name} in ${card.name}`))
   const postpone = () =>
     run(() => postponeDelivery({ card, to, reason, backToReview, weeks }), t(`${card.name} を ${new Date(to).toLocaleDateString(locale())} に延期しました`, `Postponed ${card.name} to ${new Date(to).toLocaleDateString(locale())}`))
 
@@ -114,7 +114,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
       <div className={styles.head}>
         <h3 className={styles.title}>
           {mode === 'replace'
-            ? t(`商品の差し替え — ${card.name}`, `Replace product — ${card.name}`)
+            ? t(`商品の入れ替え — ${card.name}`, `Replace product — ${card.name}`)
             : mode === 'postpone'
               ? t(`延期 — ${card.name}`, `Postpone — ${card.name}`)
               : t(`取りやめ — ${card.name}`, `Cancel — ${card.name}`)}
@@ -129,7 +129,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
           {product && (
             <span className={styles.replacing}>
               {productImage(product) && <img className={styles.replacingImg} src={productImage(product)} alt="" draggable={false} />}
-              {t(`差し替える商品: ${product.name} ・ いまの在庫 ${num(product.stock)}`, `Replacing: ${product.name} · Stock now ${num(product.stock)}`)}
+              {t(`入れ替える商品: ${product.name} ・ いまの在庫 ${num(product.stock)}`, `Replacing: ${product.name} · Stock now ${num(product.stock)}`)}
             </span>
           )}
           {/* 選び直す枠は、配信カードの中の差し替えと同じ形(AI のおすすめ / AI に頼む / すべての商品)。AI は在庫の見込みを確かめた候補から選ぶ */}
@@ -137,7 +137,7 @@ export function AlertActionPanel({ mode, card, product, why, products, placement
             <span className={styles.sub}>{t('条件に合う商品がありません。配信カードを開いて、ほかのカテゴリから選んでください', 'No matching products. Open the delivery card to choose from other categories.')}</span>
           ) : (
             <ProductChooser
-              title={t(`差し替える商品を選ぶ(在庫のある同じカテゴリ。配信日に ${LOW_STOCK_WEEKS} 週分以上)`, `Choose a replacement (same category, ${LOW_STOCK_WEEKS}+ weeks of stock on the day)`)}
+              title={t(`入れ替える商品を選ぶ(在庫のある同じカテゴリ。配信日に ${LOW_STOCK_WEEKS} 週分以上)`, `Choose a replacement (same category, ${LOW_STOCK_WEEKS}+ weeks of stock on the day)`)}
               frame={{ kind: 'panel' }}
               card={aiCardOfSaved(card)}
               angle=""

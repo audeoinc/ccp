@@ -8,7 +8,7 @@ const useStyles = makeStyles({
   // 小さい確かめの窓は、大きさを変えない(決まりの例外。ARCHITECTURE「見た目の約束事」)
   surface: { maxWidth: '480px' },
   message: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
-  // 見た目は、ほかの窓と同じく「キャンセル」「OK」の順(右に OK)
+  // 見た目は、ほかの窓と同じく「やめる」「OK」の順(右に OK)
   last: { order: 1 },
 })
 
@@ -31,7 +31,7 @@ export function ConfirmHost() {
               {shown?.okLabel ?? tr('OK', 'OK')}
             </Button>
             <Button appearance="secondary" onClick={() => answerConfirm(false)}>
-              {t('キャンセル', 'Cancel')}
+              {t('やめる', 'Cancel')}
             </Button>
           </DialogActions>
         </DialogBody>

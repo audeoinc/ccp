@@ -168,7 +168,7 @@ function ProductItem({ product: p, image, itemKey, onHover, alert, onAlert, acti
       className={s.item}
       image={productImage(p, image)}
       title={p.name}
-      meta={`${p.product_code} ・ ${yen(p.price, market)} ・ ${t('在庫', 'Stock ')}${p.stock ?? '-'}${p.gender ? ` ・ ${productGenderLabel(p.gender)}` : ''}`}
+      meta={`${p.product_code} ・ ${yen(p.price, market)} ・ ${t('在庫', 'Stock ')}${p.stock ?? '—'}${p.gender ? ` ・ ${productGenderLabel(p.gender)}` : ''}`}
       marks={
         <>
           {!onAlert && <AlertMark kind={alert} />}

@@ -138,7 +138,7 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
               </Tooltip>
             )}
             {onApproveMine && (
-              <Tooltip content={needMe ?? t('この週の、自分宛ての依頼を、まとめて承認します(差し戻すときは、配信カードで 1 本ずつ)', 'Approves every request in this week that is addressed to you (to send one back, open its card)')} relationship="description">
+              <Tooltip content={needMe ?? t('この週の、自分宛ての依頼を、まとめて承認します(差し戻すときは、配信カードで 1 本ずつ)', 'Approves every request in this week that is addressed to you (to request changes on one, open its card)')} relationship="description">
                 <Button
                   size="small"
                   icon={<CheckmarkCircleRegular />}

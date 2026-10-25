@@ -372,7 +372,7 @@ export function useSettingsActions(ctx: {
           const have = await countAssetExamples()
           const msg = have
             ? tr(`素材の見本はすでに ${have} 件あります。もう一組作りますか?`, `${have} sample assets already exist. Create another set?`)
-            : tr('制作の依頼のある配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」(US の配信は英語で「Sample:」)です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones with a production request. Names start with "Sample:" ("見本:" for Japan deliveries). Existing assets are not changed. Continue?')
+            : tr('制作に渡した配信を先に、2〜3 本に素材の見本(イラスト・PDF・参考の URL)を足します。名前の先頭は「見本:」(US の配信は英語で「Sample:」)です。今ある素材は変えません。よろしいですか?', 'Add sample assets (illustrations, a PDF and reference URLs) to 2–3 deliveries, preferring ones handed off to production. Names start with "Sample:" ("見本:" for Japan deliveries). Existing assets are not changed. Continue?')
           if (!(await confirmDialog(msg))) return
           const r = await createAssetExamples({ cards: activeCards, me: myName() })
           setBqNotice({ intent: 'success', text: tr(`素材の見本を ${r.count} 件、${r.cards.join('・')} に足しました`, `Added ${r.count} sample assets to ${r.cards.join(', ')}`) })
@@ -384,10 +384,10 @@ export function useSettingsActions(ctx: {
     {
       id: 'removeAssets',
       section: 'samples',
-      label: t('素材の見本を消す', 'Delete sample assets'),
+      label: t('素材の見本を削除', 'Delete sample assets'),
       icon: <DeleteRegular />,
       onOpen: async () => {
-        if (!(await confirmDialog(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを消します(ほかの素材は消しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?')))) return
+        if (!(await confirmDialog(tr('名前の先頭が「見本:」か「Sample:」の素材と、そのファイルを削除します(ほかの素材は削除しません)。よろしいですか?', 'Delete the assets whose names start with "Sample:" or "見本:" and their files (other assets are kept)?')))) return
         try {
           const n = await removeAssetExamples()
           setBqNotice({ intent: 'success', text: tr(`素材の見本を ${n} 件消しました`, `Deleted ${n} sample assets`) })
@@ -419,11 +419,11 @@ export function useSettingsActions(ctx: {
     {
       id: 'removeSkus',
       section: 'samples',
-      label: t('見本の SKU を消す', 'Delete sample SKUs'),
+      label: t('見本の SKU を削除', 'Delete sample SKUs'),
       icon: <DeleteRegular />,
       disabled: skuBusy,
       onOpen: async () => {
-        if (!(await confirmDialog(tr('見本の SKU と、その在庫を消します(BigQuery から入れた本物の SKU は消しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?')))) return
+        if (!(await confirmDialog(tr('見本の SKU と、その在庫を削除します(BigQuery から入れた本物の SKU は削除しません)。よろしいですか?', 'Delete the sample SKUs and their stock (real SKUs from BigQuery are kept)?')))) return
         setSkuBusy(true)
         try {
           const n = await removeSampleSkus((done, total) => setBqNotice({ intent: 'warning', text: tr(`見本の SKU を消しています(${done} / ${total})`, `Deleting sample SKUs (${done} / ${total})`) }))

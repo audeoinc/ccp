@@ -125,7 +125,7 @@ export function CountryCriteriaPanel({ country, countryName }: Props) {
         </Button>
       </div>
       <div>
-        <span className={s.label}>{t('変えた記録', 'Change history')}</span>
+        <span className={s.label}>{t('変更の履歴', 'Change history')}</span>
         {past.length === 0 ? (
           <div className={s.note}>{t('まだ変えていません(既定の値)', 'Not changed yet (defaults)')}</div>
         ) : (

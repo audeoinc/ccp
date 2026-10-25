@@ -41,13 +41,13 @@ export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, 
   return (
     <div className={styles.root}>
       <div>
-        <div className={styles.head}>{t('制作への引き継ぎ', 'Handoff to production')}</div>
+        <div className={styles.head}>{t('制作に渡す', 'Hand off to production')}</div>
         <div className={styles.caption}>
-          {t('制作の担当者と締め切りを決めて「制作に引き継ぐ」を押し、保存します。左の配信情報には、ここで決めた内容が出ます。', 'Choose the production assignee and due date, press “Hand off to production”, then save. Delivery info on the left shows what you set here.')}
+          {t('制作の担当と締め切りを決めて「制作に渡す」を押し、保存します。左の配信情報には、ここで決めた内容が出ます。', 'Choose the production assignee and due date, press “Hand off to production”, then save. Delivery info on the left shows what you set here.')}
         </div>
       </div>
       <div className={styles.row}>
-        <Field label={t('制作の担当者', 'Production assignee')} size="small">
+        <Field label={t('制作の担当', 'Production assignee')} size="small">
           <PersonInput value={productionOwner} onChange={onProductionOwner} people={people} />
         </Field>
         <Field label={t('制作の締め切り', 'Production due')} size="small">
@@ -57,7 +57,7 @@ export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, 
       {handedOffAt ? (
         <div className={styles.done}>
           <Badge appearance="tint" color="success" icon={<CheckmarkCircleRegular />}>
-            {t('引き継ぎ済み', 'Handed off')}
+            {t('渡し済み', 'Handed off')}
           </Badge>
           {new Date(handedOffAt).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           {productionOwner && ` · ${productionOwner}`}
@@ -70,10 +70,10 @@ export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, 
           {remaining.length > 0 && (
             <div className={styles.warn}>{t(`まだ終わっていない工程があります: ${remaining.join('、')}`, `Some steps are not done yet: ${remaining.join(', ')}`)}</div>
           )}
-          {!productionOwner.trim() && <div className={styles.warn}>{t('制作の担当者を入れてください', 'Enter the production assignee')}</div>}
+          {!productionOwner.trim() && <div className={styles.warn}>{t('制作の担当を入れてください', 'Enter the production assignee')}</div>}
           <div className={styles.actions}>
             <Button size="small" appearance="primary" icon={<SendRegular />} disabled={!productionOwner.trim()} onClick={() => onHandedOffAt(new Date().toISOString())}>
-              {t('制作に引き継ぐ', 'Hand off to production')}
+              {t('制作に渡す', 'Hand off to production')}
             </Button>
           </div>
         </>

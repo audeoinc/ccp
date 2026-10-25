@@ -439,7 +439,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
               size="small"
               resize="vertical"
               autoFocus
-              placeholder={t('返信を書く(例: 商品を差し替えました)', 'Write a reply (e.g. swapped the product)')}
+              placeholder={t('返信を書く(例: 商品を入れ替えました)', 'Write a reply (e.g. replaced the product)')}
               value={drafts[id]}
               onChange={(_, d) => setDrafts((x) => ({ ...x, [id]: d.value }))}
               onKeyDown={submitOnCtrlEnter(() => void reply(n))}

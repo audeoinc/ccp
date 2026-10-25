@@ -108,7 +108,7 @@ export function BrandPanel({ country, countryName }: Props) {
         </Button>
       </div>
       <div>
-        <span className={s.label}>{t('変えた記録', 'Change history')}</span>
+        <span className={s.label}>{t('変更の履歴', 'Change history')}</span>
         {past.length === 0 ? (
           <div className={s.note}>{isCompany ? t('まだ変えていません(見本の値)', 'Not changed yet (sample values)') : t('まだ変えていません(全社の値)', 'Not changed yet (company values)')}</div>
         ) : (

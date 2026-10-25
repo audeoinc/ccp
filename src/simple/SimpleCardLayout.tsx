@@ -472,7 +472,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     }
     setCompareKey(key)
     e.openProduct(key, {
-      label: target.kind === 'product' ? t('この枠の商品と入れ替える', 'Swap with the product in this slot') : t('この枠に入れる', 'Put in this slot'),
+      label: target.kind === 'product' ? t('この枠の商品と入れ替える', 'Replace with the product in this slot') : t('この枠に入れる', 'Put in this slot'),
       run: () => placed(target, key),
     })
   }
@@ -484,16 +484,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     </button>
   )
   const tpl = getTemplate(e.template)
-  const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時 未設定', 'No send date')
+  const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
-    ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('これまでの学び', 'Learnings so far'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の記録', 'Change log'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'For production') })[v]
+    ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('これまでの学び', 'Learnings so far'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
   /** 左のバーの並び(アイコンの下に名前。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
   const rails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
     // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
     { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
     { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learnings'), tip: t('これまでの学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings (notes from past deliveries, for reference; also passed to AI drafts)'), count: e.learnCount, color: 'informative' },
-    { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Talk'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
+    { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Conversation'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
     {
       v: 'approval',
       icon: <PersonAvailableRegular />,
@@ -507,12 +507,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       v: 'handoff',
       icon: <BoxMultipleArrowRightRegular />,
       label: t('渡すもの', 'Handoff'),
-      tip: handoffMissing ? t('渡すもの(制作へ)。制作の担当か締め切りが、まだ空いています', 'Handoff (to production). Assignee or due date is still empty') : t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'For production (notes, reference images and URLs, assignee and due date)'),
+      tip: handoffMissing ? t('渡すもの(制作へ)。制作の担当か締め切りが、まだ空いています', 'Handoff (to production). Assignee or due date is still empty') : t('渡すもの(制作へ。文章・参考の画像と URL・担当と締め切り)', 'Handoff (to production: notes, reference images and URLs, assignee and due date)'),
       count: 0,
       dot: handoffMissing ? 'amber' : undefined,
       drop: true,
     },
-    { v: 'history', icon: <HistoryRegular />, label: t('変更', 'Changes'), tip: t('変更の記録(差し替えの理由・ステータスの変化)', 'Change log (swap reasons, status changes)'), count: 0, gap: true },
+    { v: 'history', icon: <HistoryRegular />, label: t('履歴', 'History'), tip: t('変更の履歴(入れ替えの理由・ステータスの変化)', 'Change history (replacement reasons, status changes)'), count: 0, gap: true },
   ]
 
   /**
@@ -649,7 +649,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 {t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}
               </span>
             ) : null}
-            <Tooltip content={t('元に戻す: 前に反映した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
+            <Tooltip content={t('元に戻す: 前に保存した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
               <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
             </Tooltip>
             {/* 保存のボタンは、確定した週の配信だけ(ほかは自動で保存する。理由を入れてから保存する) */}
@@ -977,7 +977,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               onHover={e.hoverProduct}
               alertKinds={e.alertKinds}
               onOpenProduct={openFromList}
-              hint={t('行を押すと詳細が開きます。行にマウスを乗せると出る ⇄ で入れ替えられます。プレビューで枠を選んでいれば、その枠の商品と見比べて入れ替えられます。', 'Click a row for details. Use the ⇄ that appears on hover to replace it. If a slot is selected in the preview, you can compare and swap it in.')}
+              hint={t('行を押すと詳細が開きます。行にマウスを乗せると出る ⇄ で入れ替えられます。プレビューで枠を選んでいれば、その枠の商品と見比べて入れ替えられます。', 'Click a row for details. Use the ⇄ that appears on hover to replace it. If a slot is selected in the preview, you can compare and replace it.')}
               // 右の一覧に置くのは入れ替えだけ(並べ替え・外すは真ん中だけ。SU9 (g))
               rowAction={(key) => {
                 const on = swapAt?.at === 'info' && swapAt.itemKey === key

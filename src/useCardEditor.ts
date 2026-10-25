@@ -574,7 +574,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         reopenWeeks: async () => {
           for (const w of lockedWeeks) {
             const r = await reopenWeek(w, w.country ? { country: w.country, channel: w.channel } : scopeOfCard(form))
-            if (!r.success) throw new Error(r.error?.message ?? tr('週をレビュー中に戻せませんでした', 'Could not put the week back in review'))
+            if (!r.success) throw new Error(r.error?.message ?? tr('週の確定を解けませんでした', 'Could not undo the week confirmation'))
           }
         },
         noteReason: async (id) => {

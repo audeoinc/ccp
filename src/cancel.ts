@@ -38,7 +38,7 @@ export async function cancelDelivery(card: DeliveryCard, reason: string, weeks: 
   )
   const week = confirmedWeekOf(weeks, card.scheduled_at, scopeOfCard(card))
   if (week) {
-    fail(await reopenWeek(week, scopeOfCard(card)), '週をレビュー中に戻せませんでした', 'Could not put the week back in review')
+    fail(await reopenWeek(week, scopeOfCard(card)), '週の確定を解けませんでした', 'Could not undo the week confirmation')
     await logEvent({
       action: 'reopen',
       card: { id: card.id, name: card.name, scheduledAt: card.scheduled_at },

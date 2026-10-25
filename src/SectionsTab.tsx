@@ -206,7 +206,7 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
         {sec.wantTitle && (
           <Block
             {...fold(`${i}:title`)}
-            summary={currentTitle || t('(未設定)', '(Not set)')}
+            summary={currentTitle || t('(未設定)', '(not set)')}
             title={t('① 見出し(切り口)', '1. Heading (angle)')}
             right={
               <AiButton busy={busyTitle} disabled={noTheme || disabled || anyBusy} onClick={() => selectTitles(sec)}>
@@ -214,7 +214,7 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
               </AiButton>
             }
           >
-            <span className={s.value}>{currentTitle || t('(未設定)', '(Not set)')}</span>
+            <span className={s.value}>{currentTitle || t('(未設定)', '(not set)')}</span>
             {titles.map((ti) => {
               const current = currentTitle === ti.title
               return (
@@ -233,7 +233,7 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
 
         <Block
           {...fold(`${i}:copy`)}
-          summary={currentCopy || t('(未設定)', '(Not set)')}
+          summary={currentCopy || t('(未設定)', '(not set)')}
           title={`${sec.wantTitle ? '② ' : '① '}${t('コピー', 'Copy')}`}
           right={
             <>

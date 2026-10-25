@@ -59,11 +59,11 @@ export const COLUMNS: Column[] = [
   // Type = テーマの種類(X41。列のキーは、覚えている列の設定を壊さないよう department のまま)
   { key: 'department', label: () => tr('種類', 'Type'), text: (r) => (r.card.theme_type ? themeTypeLabel(r.card.theme_type as ThemeType) : '') },
   { key: 'status', label: () => tr('ステータス', 'Status'), text: (r) => statusLabel(r.card.status), sort: (r) => statusRank(r.card.status) },
-  { key: 'owner', label: () => tr('担当者', 'Owner'), text: (r) => r.card.owner ?? '' },
+  { key: 'owner', label: () => tr('担当', 'Owner'), text: (r) => r.card.owner ?? '' },
   { key: 'due', label: () => tr('制作の締め切り', 'Production due'), text: (r) => dueText(r.card.production_due), sort: (r) => r.card.production_due ?? '' },
   {
     key: 'handoff',
-    label: () => tr('制作への引き継ぎ', 'Handoff'),
+    label: () => tr('制作に渡す', 'Handoff'),
     text: (r) =>
       r.card.handed_off_at
         ? `${new Date(r.card.handed_off_at).toLocaleDateString(locale(), { month: '2-digit', day: '2-digit' })}${r.card.production_owner ? ` · ${r.card.production_owner}` : ''}`

@@ -94,7 +94,7 @@ export function ProductionChat({ current, original, editable, html, htmlCustom, 
         }
         if (a.html.failed) parts.push(tr(`HTML の ${a.html.failed} か所は、場所が見つからず当てられませんでした。`, `${a.html.failed} change(s) could not be placed in the HTML.`))
       }
-      if (a.edits.length) parts.push(editable ? tr('文言などの直しは、下のボタンから確かめて入れてください。', 'Check and apply the text and other changes with the buttons below.') : tr('文言などの直しは、依頼したあとの A 案でだけ入れられます。', 'Text and other changes can only be applied to variant A after the request.'))
+      if (a.edits.length) parts.push(editable ? tr('文言などの直しは、下のボタンから確かめて入れてください。', 'Check and apply the text and other changes with the buttons below.') : tr('文言などの直しは、渡したあとの A 案でだけ入れられます。', 'Text and other changes can only be applied to variant A after the handoff.'))
       if (!a.answered && !a.html && !a.edits.length && !a.reply) parts.push(tr('直す所が見つかりませんでした。もう少し具体的に頼んでみてください。', 'Nothing to change was found. Try asking more specifically.'))
       next = { role: 'assistant', text: parts.filter(Boolean).join('\n'), edits: a.edits, warnings: a.html?.warnings }
     } catch (e) {

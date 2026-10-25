@@ -364,7 +364,7 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
       >
         <div className={mergeClasses(styles.strip, channel === 'email' ? styles.stripEmail : channel === 'push' ? styles.stripPush : styles.stripNone)}>
           {channel === 'push' ? <PhoneFilled /> : <MailFilled />}
-          {channel === 'email' ? t('メール', 'Email') : channel === 'push' ? t('アプリ', 'App') : t('チャネル未設定', 'No channel')}
+          {channel === 'email' ? t('メール', 'Email') : channel === 'push' ? t('アプリ', 'App') : t('チャネル(未設定)', 'No channel')}
           <span className={styles.stripTime}>{time}</span>
         </div>
         <div className={styles.inner}>
@@ -412,11 +412,11 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
               )}
               {!isPush && <span className={styles.text}>{`${getTemplate(templateId).label} · ${t(`商品 ${ids.length}`, `${ids.length} products`)}`}</span>}
               <div className={styles.facts}>
-                <span className={mergeClasses(styles.fact, !c.owner && styles.faint)} title={t('企画の担当者', 'Owner')}>
+                <span className={mergeClasses(styles.fact, !c.owner && styles.faint)} title={t('担当', 'Owner')}>
                   <PersonRegular />
                   {firstName(c.owner) || '—'}
                 </span>
-                <span className={mergeClasses(styles.fact, !c.production_owner && styles.faint)} title={t('制作の担当者', 'Production assignee')}>
+                <span className={mergeClasses(styles.fact, !c.production_owner && styles.faint)} title={t('制作の担当', 'Production assignee')}>
                   <WrenchRegular />
                   {firstName(c.production_owner) || '—'}
                 </span>
@@ -424,9 +424,9 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
                   <CalendarRegular />
                   {shortDate(c.production_due) || '—'}
                 </span>
-                <span className={mergeClasses(styles.fact, c.handed_off_at ? styles.good : styles.faint)} title={t('制作への引き継ぎ', 'Handoff')}>
+                <span className={mergeClasses(styles.fact, c.handed_off_at ? styles.good : styles.faint)} title={t('制作に渡す', 'Handoff')}>
                   {c.handed_off_at ? <CheckmarkCircleFilled /> : <CircleRegular />}
-                  {c.handed_off_at ? t('引き継ぎ済', 'Handed off') : t('未引き継ぎ', 'Not handed off')}
+                  {c.handed_off_at ? t('渡し済み', 'Handed off') : t('まだ渡していない', 'Not handed off')}
                 </span>
                 <span className={mergeClasses(styles.fact, !tasks && styles.faint)} title={t('未完了のタスク', 'Open tasks')}>
                   <TaskListLtrRegular />

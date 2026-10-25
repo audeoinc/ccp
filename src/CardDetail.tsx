@@ -775,7 +775,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       return
     }
     if (locked) {
-      if (await confirmDialog(tr('確定した週の配信の変更を、反映せずに閉じます。よろしいですか?(反映するときは「理由を入力して反映」)', 'Close without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)'))) onBack()
+      if (await confirmDialog(tr('確定した週の配信の変更を、保存せずに閉じます。よろしいですか?(保存するときは「理由を入力して保存」)', 'Close without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)'))) onBack()
       return
     }
     void save({ after: 'close' })
@@ -859,7 +859,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           autoFocus
           value={changeReason}
           onChange={(_, d) => setChangeReason(d.value)}
-          placeholder={t('例: 在庫切れのため、商品を差し替え', 'e.g. Swapped a product that went out of stock')}
+          placeholder={t('例: 在庫切れのため、商品を入れ替え', 'e.g. Replaced a product that went out of stock')}
         />
       </Field>
       <div className={styles.reasonActions}>
@@ -869,10 +869,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           onClick={cancelReason}
           disabled={saving}
         >
-          {t('やめる', 'Back')}
+          {t('やめる', 'Cancel')}
         </Button>
         <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={saving || !changeReason.trim()} onClick={() => saveWithReason(changeReason)}>
-          {t('保存して、レビューに戻す', 'Save and send back to review')}
+          {t('保存して、週の確定を解く', 'Save and undo the week confirmation')}
         </Button>
       </div>
     </>

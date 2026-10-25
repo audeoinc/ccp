@@ -183,7 +183,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
         </div>
         {ab.choose && (
           <span className={s.warn}>
-            {t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードで「この案に決める」を押して保存するまで、制作に依頼できません', 'This delivery is still choosing between variants. You can request production after choosing one in the delivery card and saving.')}
+            {t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードで「この案に決める」を押して保存するまで、制作に渡せません', 'This delivery is still choosing between variants. You can hand off to production after choosing one in the delivery card and saving.')}
           </span>
         )}
         {[{ key: 'A' as const, productIds: current.productIds, hero: current.hero }, ...ab.variants].map((v) => {

@@ -159,7 +159,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
       <Dialog open={dialog === 'delete'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
         <DialogSurface>
           <DialogBody>
-            <DialogTitle>{t(`「${card.name}」を削除する`, `Delete "${card.name}"`)}</DialogTitle>
+            <DialogTitle>{t(`「${card.name}」を削除`, `Delete "${card.name}"`)}</DialogTitle>
             <DialogContent className={styles.body}>
               <span>
                 {t(
@@ -176,7 +176,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
             <DialogActions>
               <Button appearance="secondary" onClick={() => setDialog(null)}>{t('やめる', 'Back')}</Button>
               <Button className={styles.dangerBtn} icon={<DeleteRegular />} disabled={busy} onClick={() => void remove()}>
-                {t('削除する', 'Delete')}
+                {t('削除', 'Delete')}
               </Button>
             </DialogActions>
           </DialogBody>
@@ -233,7 +233,7 @@ export function DuplicateDialog({ card, weeks, onClose, onDuplicated }: { card: 
               validationState={dupLocked ? 'error' : 'none'}
               validationMessage={
                 dupLocked
-                  ? t('この週は確定しています。ほかの日にするか、週をレビューに戻してから複製してください', 'This week is confirmed. Pick another date, or put the week back in review first.')
+                  ? t('この週は確定しています。ほかの日にするか、週の確定を解いてから複製してください', 'This week is confirmed. Pick another date, or undo the week confirmation first.')
                   : undefined
               }
             >

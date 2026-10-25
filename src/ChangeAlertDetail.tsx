@@ -122,7 +122,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
       <div className={styles.sub}>
         {policy
           ? alert.deliveries.length > 0
-            ? t('この商品を載せている、まだ送っていない配信。新しい位置づけ・方針に合っているかを確かめ、合わなければ差し替えます', 'Upcoming deliveries that include this product. Check that they still fit the new role; replace the product if not.')
+            ? t('この商品を載せている、まだ送っていない配信。新しい位置づけ・方針に合っているかを確かめ、合わなければ入れ替えます', 'Upcoming deliveries that include this product. Check that they still fit the new role; replace the product if not.')
             : isLeadStage(stage?.after)
               ? t('主力になりましたが、まだ送っていない配信には、どれにも載っていません。販促の期間の配信に載せることを検討してください', 'It is now a core product but is not in any upcoming delivery. Consider adding it during its promotion period.')
               : ''
@@ -168,7 +168,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
                     <span className={styles.actions}>
                       {policy && (
                         <Button size="small" appearance="secondary" icon={<ArrowSwapRegular />} onClick={() => setAction({ mode: 'replace', cardId: d.card.id })}>
-                          {t('差し替え', 'Replace')}
+                          {t('入れ替え', 'Replace')}
                         </Button>
                       )}
                       <Tooltip content={t('延期', 'Postpone')} relationship="label">
@@ -216,7 +216,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
 
       <div className={styles.resolve}>
         <Field label={t('確かめた結果(対応済みにするときのメモ。任意)', 'What you checked (note when marking as handled, optional)')} size="small">
-          <Textarea value={note} onChange={(_, d) => setNote(d.value)} rows={2} placeholder={t('例: 2 本とも差し替えた / このままでよいと判断した', 'e.g. Replaced in both / Decided to keep as is')} />
+          <Textarea value={note} onChange={(_, d) => setNote(d.value)} rows={2} placeholder={t('例: 2 本とも入れ替えた / このままでよいと判断した', 'e.g. Replaced in both / Decided to keep as is')} />
         </Field>
         <div className={styles.resolveRow}>
           <Button appearance="primary" size="small" icon={<CheckmarkCircleRegular />} disabled={busy} onClick={() => void resolve()}>

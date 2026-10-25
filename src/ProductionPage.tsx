@@ -250,7 +250,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
   // 案から選ぶ配信(X57)は、1 案に決めるまで制作に依頼しない(決まらない案まで作り込むのは無駄なため。2026-10-21 利用者の判断)
   const choosing = !live && !!draft.ab?.choose
-  const needChoice = choosing ? t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードの上の帯で「この案に決める」を押して保存してから、依頼してください', 'This delivery is still choosing between variants. Choose one in the bar at the top of the delivery card and save before requesting.') : null
+  const needChoice = choosing ? t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードの上の帯で「この案に決める」を押して保存してから、制作に渡してください', 'This delivery is still choosing between variants. Choose one in the bar at the top of the delivery card and save before handing off.') : null
 
   // 見えないプレビューを描いたあとに、HTML の下書きを作る(画面に描いたものから、書式を直接書いた形にする)
   useEffect(() => {
@@ -345,7 +345,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   useEffect(() => {
     if (!autoReady || autoDone.current) return
     autoDone.current = true
-    void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))
+    void run(() => ProductionService.request(requestInput()), tr('制作に渡しました', 'Handed off to production'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoReady])
 
@@ -360,14 +360,14 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   const steps: { key: string; name: string; who: string; info?: string; skipped?: boolean; action?: ReactNode }[] = [
     {
       key: 'request',
-      name: t('制作に依頼する', 'Request production'),
+      name: t('制作に渡す', 'Hand off to production'),
       who: t('企画', 'Planner'),
       // 案から選ぶ配信の、依頼できない理由は、段の中に出す(押せないボタンには、ヒントが出ないため)
-      info: live?.requested_by_name ? `${live.requested_by_name} ${when(live.requested_at)}` : choosing ? t('1 案に決めてから依頼できます(案から選ぶ)', 'Choose a variant first') : undefined,
+      info: live?.requested_by_name ? `${live.requested_by_name} ${when(live.requested_at)}` : choosing ? t('1 案に決めてから渡せます(案から選ぶ)', 'Choose a variant first') : undefined,
       action: (
-        <Tooltip content={needMe ?? needChoice ?? t('いまの配信カードの中身と HTML を固めて、制作に依頼します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and requests production (later changes to the card do not change this page)')} relationship="description">
-          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || choosing || !shownOf('A')} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に依頼しました', 'Requested production'))}>
-            {t('この内容で依頼する', 'Request with this content')}
+        <Tooltip content={needMe ?? needChoice ?? t('いまの配信カードの中身と HTML を固めて、制作に渡します(このあと配信カードを変えても、このページは変わりません)', 'Freezes the current content and HTML and hands off to production (later changes to the card do not change this page)')} relationship="description">
+          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={busy || !meId || choosing || !shownOf('A')} onClick={() => void run(() => ProductionService.request(requestInput()), tr('制作に渡しました', 'Handed off to production'))}>
+            {t('この内容で渡す', 'Hand off with this content')}
           </Button>
         </Tooltip>
       ),
@@ -417,7 +417,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                         ) : by ? (
                           <span className={s.note}>{t(`保存: ${by} ${when(at)}`, `Saved by ${by} ${when(at)}`)}</span>
                         ) : (
-                          <span className={s.note}>{t('依頼したときの HTML のまま', 'Still the HTML from the request')}</span>
+                          <span className={s.note}>{t('渡したときの HTML のまま', 'Still the HTML from the handoff')}</span>
                         )}
                       </span>
                     )
@@ -515,7 +515,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
           <ChannelBadge channel={card.channel} />
           <span className={s.title}>{card.name}</span>
           <span className={s.meta}>{card.scheduled_at ? new Date(card.scheduled_at).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
-          {frozen && <Badge appearance="tint" color="informative">{t(`版 ${live?.version} ・ ${when(live?.requested_at)} に依頼`, `v${live?.version} · requested ${when(live?.requested_at)}`)}</Badge>}
+          {frozen && <Badge appearance="tint" color="informative">{t(`版 ${live?.version} ・ ${when(live?.requested_at)} に渡した`, `v${live?.version} · handed off ${when(live?.requested_at)}`)}</Badge>}
           {keys.length > 1 && (
             <span className={s.variantSwitch} role="tablist" aria-label={t('AB テストの案', 'A/B test variants')} title={t('AB テストは全案を送るので、案ごとに HTML を作ります。左の要素・HTML・プレビューが、選んだ案のものになります', 'An A/B test sends every variant, so each variant gets its own HTML. The info, HTML and preview follow the selected variant')}>
               {keys.map((k) => (
@@ -547,7 +547,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                     <span className={s.note}>{at === 'skipped' ? t('飛ばした(制作を通さずに送った)', 'Skipped (sent without production)') : st.info || st.who}</span>
                     {at === 'current' && st.action}
                     {i === current - 1 && live && (
-                      <Tooltip content={i === 0 ? t('依頼を取り下げて、① に戻します(この版は記録に残ります。やり直すときは、新しい版で依頼し直します)', 'Withdraws the request and goes back to step 1 (this version stays on record; request again with a new version)') : t('この段を、まだ終えていない状態に戻します', 'Puts this step back to not done')} relationship="description">
+                      <Tooltip content={i === 0 ? t('渡したのを取り下げて、① に戻します(この版は記録に残ります。やり直すときは、新しい版で渡し直します)', 'Withdraws the handoff and goes back to step 1 (this version stays on record; hand off again with a new version)') : t('この段を、まだ終えていない状態に戻します', 'Puts this step back to not done')} relationship="description">
                         <Button
                           size="small"
                           appearance="transparent"
@@ -555,11 +555,11 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                           icon={<ArrowUndoRegular />}
                           disabled={busy || !meId}
                           onClick={async () => {
-                            if (!(await confirmDialog(i === 0 ? t('依頼を取り下げます。よろしいですか?', 'Withdraw the request?') : t(`「${st.name}」をやり直します。よろしいですか?`, `Redo "${st.name}"?`)))) return
-                            void run(() => ProductionService.undo(live.id, { actor, week_start: weekStart }), i === 0 ? tr('依頼を取り下げました', 'Withdrew the request') : tr('1 つ前の段に戻しました', 'Went back one step'))
+                            if (!(await confirmDialog(i === 0 ? t('渡したのを取り下げます。よろしいですか?', 'Withdraw the handoff?') : t(`「${st.name}」をやり直します。よろしいですか?`, `Redo "${st.name}"?`)))) return
+                            void run(() => ProductionService.undo(live.id, { actor, week_start: weekStart }), i === 0 ? tr('渡したのを取り下げました', 'Withdrew the handoff') : tr('1 つ前の段に戻しました', 'Went back one step'))
                           }}
                         >
-                          {i === 0 ? t('依頼を取り下げる', 'Withdraw') : t('やり直す', 'Redo')}
+                          {i === 0 ? t('取り下げる', 'Withdraw') : t('やり直す', 'Redo')}
                         </Button>
                       </Tooltip>
                     )}
@@ -596,7 +596,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
           <div className={s.messages}>
             {staleLatest && !live && (
               <MessageBar intent="warning" layout="multiline">
-                <MessageBarBody>{t(`企画が変わりました(版 ${staleLatest.version} は古い版です)。承認されたら、新しい版で依頼し直してください。`, `The plan changed (v${staleLatest.version} is outdated). Request again with a new version after approval.`)}</MessageBarBody>
+                <MessageBarBody>{t(`企画が変わりました(版 ${staleLatest.version} は古い版です)。承認されたら、新しい版で渡し直してください。`, `The plan changed (v${staleLatest.version} is outdated). Hand off again with a new version after approval.`)}</MessageBarBody>
               </MessageBar>
             )}
             {error && (
@@ -648,7 +648,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                             )}
                           </span>
                           {hasEdits && (
-                            <Tooltip content={t('直したものを捨てて、企画で承認された内容に戻します(保存すると反映)', 'Discard the edits and go back to the approved plan (applies when saved)')} relationship="label">
+                            <Tooltip content={t('直したものを捨てて、企画で承認された内容に戻します(保存すると入ります)', 'Discard the edits and go back to the approved plan (applies when saved)')} relationship="label">
                               <Button size="small" appearance="subtle" icon={<ArrowResetRegular />} onClick={() => setWork(approvedSnap)} />
                             </Tooltip>
                           )}
@@ -682,7 +682,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                         ) : (
                           <span className={s.note}>{t('制作指示がありません(企画の配信カードの ⑥ で作ります)', 'No production notes (create them in step 6 of the plan card)')}</span>
                         )}
-                        {!frozen && <span className={s.note}>{t('依頼する前は、いまの配信カードの中身を出しています。直すときは、企画の配信カードで直します(依頼したあとは、ここで直せます)。', 'Before the request, this shows the current card. Edit it in the plan card (after the request, you can edit here).')}</span>}
+                        {!frozen && <span className={s.note}>{t('渡す前は、いまの配信カードの中身を出しています。直すときは、企画の配信カードで直します(渡したあとは、ここで直せます)。', 'Before the handoff, this shows the current card. Edit it in the plan card (after the handoff, you can edit here).')}</span>}
                       </div>
                       {/* 参考の素材(X58): 制作指示のすぐ下。指示と参考を上から順に読む */}
                       <div className={s.section}>
@@ -735,7 +735,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                 <Tooltip content={t('.html として保存', 'Download as .html')} relationship="label">
                   <Button size="small" appearance="subtle" icon={<ArrowDownloadRegular />} disabled={!shown} onClick={() => downloadText(`${(card.name ?? 'delivery').replace(/[\\/:*?"<>|]/g, '_')}${keys.length > 1 ? `-${cur.toLowerCase()}` : ''}.html`, shown)} />
                 </Tooltip>
-                <Tooltip content={live ? (needMe ?? t('この HTML を、この版に保存します', 'Save this HTML to this version')) : t('依頼したあとに保存できます(依頼するときは、この HTML も一緒に固めます)', 'You can save after the request (requesting freezes this HTML too)')} relationship="label">
+                <Tooltip content={live ? (needMe ?? t('この HTML を、この版に保存します', 'Save this HTML to this version')) : t('渡したあとに保存できます(渡すときは、この HTML も一緒に固めます)', 'You can save after the handoff (handing off freezes this HTML too)')} relationship="label">
                   <Button size="small" appearance="primary" icon={<SaveRegular />} disabled={busy || !live || !meId || !dirty} onClick={() => live && void run(() => ProductionService.saveHtml(live.id, { actor, html: shown, variant: cur }), keys.length > 1 ? tr(`${cur} 案の HTML を保存しました`, `Saved variant ${cur}'s HTML`) : tr('HTML を保存しました', 'Saved the HTML'))}>
                     {t('保存', 'Save')}
                   </Button>
@@ -755,7 +755,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   ))}
                 </span>
                 {htmlView === 'made' && (
-                  <Button size="small" appearance="secondary" className={s.segBtn} icon={<ClipboardPasteRegular />} disabled={!live} title={live ? t('制作ツールなどで作った HTML を貼り付けて、いまの HTML と置き換えます(保存で確定)', 'Paste HTML made elsewhere to replace the current HTML (confirmed on save)') : t('依頼したあとに貼り付けられます', 'You can paste after the request')} onClick={() => setPasting('')}>
+                  <Button size="small" appearance="secondary" className={s.segBtn} icon={<ClipboardPasteRegular />} disabled={!live} title={live ? t('制作ツールなどで作った HTML を貼り付けて、いまの HTML と置き換えます(保存で確定)', 'Paste HTML made elsewhere to replace the current HTML (confirmed on save)') : t('渡したあとに貼り付けられます', 'You can paste after the handoff')} onClick={() => setPasting('')}>
                     {t('貼り付けて置き換える', 'Paste to replace')}
                   </Button>
                 )}
