@@ -35,7 +35,7 @@
 
 BACKLOG の ☐ / ❓ / ▶ の行が正。いま目に付くもの:
 
-1. **UI 3(2026-10-25)**: 整理の第 2 段・第 3 段のサーバーの側は済み(devtools/ パッケージ・裏の処理の上限・履歴を後ろから読む・テスト 233 件)。本番の書き出しの 500 は e943cd1 で直した(**大きい応答は Content-Length を付けずに返す**)。一覧の件数の上限は UI 2 と合わせてから。くわしくは記録 2026-10-20_21.md の末尾「UI 3: ソースの整理 第 2 段」「第 3 段」
+1. **UI 3(2026-10-25)**: 整理の第 3 段のサーバーの側は済み。App.tsx の分割は ①〜⑤ 済み(useAppData・useCardNoteStats・useUrlSync・settingsActions・AppToolbar)。**残りの CalendarViews と memo は、UI 1 の C1 と重なるので連絡係と合わせてから**。本番の書き出しの 500 は e943cd1 で直した(大きい応答は Content-Length を付けずに返す)。くわしくは記録 2026-10-20_21.md の末尾「UI 3: …第 3 段」「App.tsx の分割」
 1. **B12 見本の写真(UI 3)**: 写真はすべてできた(2026-10-24 朝)。本番 100 商品 400 枚の ZIP は `import/prod-photos/sample_photos_1〜3.zip`、ヒーロー 44 枚は `import/hero-photos/sample_photos.zip`。**2026-10-24 朝、利用者が本番に取り込み、写真が変わったことを確かめた**(バケットに商品 400・ヒーロー 44)。開発用の画面の「画像の一覧」も済み(DEVTOOLS.md の 9 章。本物の DB・バケットでは未確認)。手順は記録 2026-10-20_21.md の末尾「B12」
 1. **UI 1(ソースの整理 第 2 段・配信カードの側)**: 2026-10-25 に ③ まで済み(#6 配信の情報の欄 `DeliveryInfoFields`・#7 商品の 1 行 `Row` の dense・#11 Fluent の部品 5 件(TabList・Accordion・`PersonInput`・`PaneRail`)・#12 編集の印の色)。開発へのリクエストのピンにも「書いたときの様子」(dev_requests.anchor_image、a237b5b)。やりかけはなし。第 3 段(CardDetail の分割)はまだ。くわしくは記録 2026-10-20_21.md の末尾「UI 1: ソースの整理 第 2 段」
 1. **UI 2(ソースの整理 第 2 段・画面全体の側)**: 2026-10-25 に ①〜⑧ をすべて push(9d2311b〜4a247d0。読み直しを変わった表だけに・同時の読み込みの相乗り `gcp/readShare.ts`・閉じた窓を描かない `useOpenedOnce`・画面の lazy・`confirmDialog`・`layers.ts` の `Z`・`store.ts` の `createStore`・`dates.ts`)。やりかけはなし。残り・落とし穴は 2026-10-20_21.md の末尾「UI 2: 整理 第 2 段」
