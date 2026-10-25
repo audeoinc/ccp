@@ -21,6 +21,8 @@ const useStyles = makeStyles({
   // 見本の縮小を並べるとき(テンプレート)。実物を見ながら、使う・使わないを決められるように
   cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' },
   card: { minWidth: 0 },
+  // 学びのカード(X78)は、文が多いので少し広く
+  deck: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', alignItems: 'start' },
   cardOff: { opacity: 0.55 },
   preview: { display: 'flex', justifyContent: 'center', padding: '8px', backgroundColor: tokens.colorNeutralBackground3, minHeight: '120px' },
   cardBody: { display: 'grid', rowGap: '4px', padding: '0 4px 4px', minWidth: 0 },
@@ -36,6 +38,11 @@ export interface ApplyItem {
   group?: string
   /** 見本の縮小(あれば、カードを並べる形で出す) */
   thumb?: ReactNode
+  /**
+   * カードを自分で描く(学びのカード X78)。control は「使う」の印と既定の札、on は保存前の値を含めた、使うか。
+   * あれば、カードを並べる形で出す
+   */
+  card?: (control: ReactNode, on: boolean) => ReactNode
 }
 
 interface Props {
@@ -107,7 +114,23 @@ export function CountryApplyList({ kind, country, countryName, items, defaultUse
       {groups.map((g) => (
         <div key={g} className={s.group}>
           {g && <span className={s.label}>{g}</span>}
-          {items.some((x) => (x.group ?? '') === g && x.thumb) ? (
+          {items.some((x) => (x.group ?? '') === g && x.card) ? (
+            <div className={s.deck}>
+              {items
+                .filter((x) => (x.group ?? '') === g)
+                .map((x) => (
+                  <div key={x.id}>
+                    {x.card?.(
+                      <span className={s.row}>
+                        <Checkbox checked={shown(x.id)} onChange={(_, d) => set(x.id, !!d.checked)} label={t('使う', 'Use')} />
+                        {defaultBadge(x.id)}
+                      </span>,
+                      shown(x.id),
+                    )}
+                  </div>
+                ))}
+            </div>
+          ) : items.some((x) => (x.group ?? '') === g && x.thumb) ? (
             <div className={s.cards}>
               {items
                 .filter((x) => (x.group ?? '') === g)
