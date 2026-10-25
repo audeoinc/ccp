@@ -117,13 +117,15 @@ export interface SimpleEditor {
   setAiPreview: (p: AiPreview | null) => void
   /** テンプレートを替える(セクションの構成が変わるので、残りの候補と AI の案は捨てる。CardDetail の changeTemplate) */
   setTemplate: (id: EmailTemplateId) => void
-  // ---- 反映(保存)と元に戻す
+  // ---- 保存(入力が止まって約 1.5 秒で自動。CardDetail)と元に戻す
   saving: boolean
-  /** 開いたとき・前に反映したときから、内容が変わったか */
+  /** 開いたとき・前に保存したときから、内容が変わったか */
   dirty: boolean
-  /** 確定した週の配信(自動では反映せず、反映のボタンで理由を聞く) */
+  /** 確定した週の配信(自動では保存せず、上の帯の保存のボタンで理由を聞く) */
   locked: boolean
   justSaved: boolean
+  /** 最後に保存した日時(ISO。上の帯の「保存済み · 12:03」) */
+  savedAt?: string
   canUndo: boolean
   // ---- 上の帯
   nextStep: NextStep

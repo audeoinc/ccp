@@ -101,6 +101,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   const [justSaved, setJustSaved] = useState(false)
+  // 最後に保存した日時(上の帯の「保存済み · 12:03」。開いたときは、配信の最後の更新)
+  const [savedAt, setSavedAt] = useState<string | undefined>(card?.modified_on)
   // 保存中の、保存のあとにすること(どのボタンの文字を「保存中...」にするか。保存していないときは null)
   const [savingAfter, setSavingAfter] = useState<SaveAfter | null>(null)
   // 確定した週の配信で、理由の入力を待っている保存(理由の欄を出している間だけ)。保存のあとにすることと、元に戻すの履歴に積むか。
@@ -478,6 +480,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(savedTargetAb()) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
   }
   const baseline = useRef<string | null>(null)
+  // 保存の途中で書き換えた(読み直したあとの基準を「変えた」のままにして、次の保存で書く。自動保存で、保存中に打った分を取りこぼさないため)
+  const editedDuringSaveRef = useRef(false)
   // 基準にした時点の中身(シンプルな配信カードの「元に戻す」で、反映の前に戻す)
   const committedSnap = useRef<Snapshot | null>(null)
   // 基準を取り直した回数(保存して開いたままのとき、「変えたか」を測り直すため)
@@ -486,7 +490,9 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   useEffect(() => {
     // 掲載商品を読み込んだ時点(自動の下書きより前)の内容を、基準にする
     if (card && original !== null && baseline.current === null) {
-      baseline.current = contentKey()
+      // 保存の途中で書き換えていたら、基準を空にして「変えた」のままにする(次の保存で書く)
+      baseline.current = editedDuringSaveRef.current ? '' : contentKey()
+      editedDuringSaveRef.current = false
       committedSnap.current = takeSnapshot()
       setBaseVersion((v) => v + 1)
     }
@@ -500,6 +506,11 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   // 開いてから内容を変えたか(承認済み・確定した週の帯は、変えたときだけ出す。ふだんの説明は、右のプロセスのペインの状態の下)
   const [changed, setChanged] = useState(false)
   const currentKey = contentKey()
+  // いまの中身の要約(保存の途中で書き換えたかを、保存の終わりに見るため。保存は、押したときの描画の中身で動くので、ref で最新を読む)
+  const latestKeyRef = useRef('')
+  useEffect(() => {
+    latestKeyRef.current = currentKey
+  })
   useEffect(() => {
     setChanged(baseline.current !== null && baseline.current !== currentKey)
   }, [currentKey, baseVersion])
@@ -519,6 +530,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
    * after: 保存のあとに、閉じる / 開いたまま続ける / 次の配信を開く(次がなければ閉じる)
    */
   async function save({ after, reason }: { after: SaveAfter; reason?: string }): Promise<boolean> {
+    const startKey = contentKey()
+    let editedDuring = false
     setSaving(true)
     setSavingAfter(after)
     setError(null)
@@ -579,11 +592,17 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
           for (const body of alertNotes) await CardNotesService.create({ kind: 'change', body, author: myName() || form.owner || '', delivery_card_id: id })
           setAlertNotes([])
         },
-        reload: onSaved,
+        reload: async () => {
+          // 読み直すと配信の行が変わり、中身の要約も変わることがある(外したメイン画像など)ので、その前に比べる
+          editedDuring = latestKeyRef.current !== startKey
+          await onSaved()
+        },
       })
+      setSavedAt(new Date().toISOString())
       if (after === 'stay') {
         // 開いたまま続ける: 保存した内容を、変更の基準にし直す(掲載商品は、読み直した配信カードから読み直される)
         baseline.current = null
+        editedDuringSaveRef.current = editedDuring
         setForm((f) => ({ ...f, status: String(status) }))
         setChangeReason(null)
         setPendingSave(null)
@@ -625,5 +644,5 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setItems(next)
   }
 
-  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason }
+  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey }
 }

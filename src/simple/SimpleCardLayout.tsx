@@ -224,7 +224,6 @@ const useStyles = makeStyles({
   abBar: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, flexShrink: 0, paddingLeft: '10px', marginLeft: '2px', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
   abWarn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   abDiff: { boxShadow: `inset 0 -2px 0 ${tokens.colorPaletteDarkOrangeBorder2}` },
-  applyBox: { display: 'grid', rowGap: '6px', marginTop: '14px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
 })
 
 interface Props {
@@ -240,6 +239,13 @@ interface Props {
   onUndo: () => void
   onRunNext: (step: NextStep) => void
   onClose: () => void
+}
+
+/** 保存した時刻(上の帯の「保存済み · 12:03」。今日でなければ日付も) */
+const savedTime = (iso: string) => {
+  const d = new Date(iso)
+  const today = new Date().toDateString() === d.toDateString()
+  return d.toLocaleString(locale(), today ? { hour: '2-digit', minute: '2-digit' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 /**
@@ -599,19 +605,24 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         }
         actions={
           <>
-            {/* 反映の様子: 保存中 / 保存しました */}
+            {/* 保存の様子をいつも出す: 保存中… / 未保存 / 保存済み · 12:03(入力が止まって約 1.5 秒で自動で保存する) */}
             {e.saving ? (
-              <Spinner size="extra-tiny" label={t('反映しています', 'Saving')} labelPosition="after" />
-            ) : e.justSaved ? (
-              <span className={mergeClasses(s.state, s.saved)}>{t('反映しました', 'Saved')}</span>
+              <Spinner size="extra-tiny" label={t('保存中…', 'Saving…')} labelPosition="after" />
+            ) : e.dirty ? (
+              <span className={s.state}>{t('未保存', 'Unsaved')}</span>
+            ) : e.savedAt ? (
+              <span className={mergeClasses(s.state, e.justSaved && s.saved)}>
+                {t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}
+              </span>
             ) : null}
             <Tooltip content={t('元に戻す: 前に反映した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
               <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
             </Tooltip>
-            {e.dirty && (
-              <Tooltip content={e.locked ? t('確定した週の配信です。変えた理由を入力してから反映します', 'Confirmed week: enter a reason to save') : t('まだ反映していない変更があります。ほかの部品を押しても反映します', 'Unsaved changes. Picking another part also saves them')} relationship="description">
+            {/* 保存のボタンは、確定した週の配信だけ(ほかは自動で保存する。理由を入れてから保存する) */}
+            {e.dirty && e.locked && (
+              <Tooltip content={t('確定した週の配信です。変えた理由を入力してから保存します', 'Confirmed week: enter a reason to save')} relationship="description">
                 <Button type="button" size="small" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
-                  {t('反映', 'Save')}
+                  {t('理由を入力して保存', 'Save with a reason')}
                 </Button>
               </Tooltip>
             )}
@@ -907,18 +918,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'}>
           <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} />
-          {e.dirty && (
-            <div className={s.applyBox}>
-              <span className={s.hint}>
-                {e.locked
-                  ? t('確定した週の配信です。変えた理由を入力してから反映します。', 'This delivery is in a confirmed week. Enter a reason to save.')
-                  : t('ほかの部品を押すと、自動で反映(保存)します。すぐに反映するときは、ここで。', 'Changes are saved when you pick another part. To save now, use this button.')}
-              </span>
-              <Button type="button" size="small" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
-                {e.locked ? t('理由を入力して反映', 'Save with a reason') : t('反映', 'Save')}
-              </Button>
-            </div>
-          )}
           {e.footer}
         </div>
 

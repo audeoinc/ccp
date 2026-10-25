@@ -166,7 +166,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
-  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason } = editor
+  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey } = editor
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
@@ -350,6 +350,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (res.errors.length > 0) setError(t(`一部の工程で失敗しました: ${res.errors.join(' / ')}`, `Some steps failed: ${res.errors.join(' / ')}`))
   }
 
+  // すべて AI で下書きした中身は、自動では保存しない(下書きの知らせのとおり、気に入らなければ保存せずに閉じられるように)。
+  // 下書きが済んだときの中身を覚え、人がそこから直したら、下書きの分も一緒に保存する
+  const [draftPending, setDraftPending] = useState(false)
+  const [draftKey, setDraftKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (!draftPending || auto !== null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftPending(false)
+    setDraftKey(currentKey)
+  }, [draftPending, auto, currentKey])
   async function startAutoDraft() {
     if (!form.scheduledAt) {
       setError(t('すべてAIで下書きするには、先に配信日時を入力してください', 'Enter the send date & time first to draft everything with AI'))
@@ -357,6 +367,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     cancelRef.current = false
     setError(null)
+    setDraftPending(true)
     setAuto({ label: t('準備しています', 'Getting ready'), done: 0, total: 7 })
     const res = await runAutoDraft(
       { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel, country: form.country || undefined },
@@ -670,6 +681,25 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (!(await confirmRevoke())) return
     await saveStaying()
   }
+  // シンプルな配信カードは、入力が止まって約 1.5 秒で保存する(Notion などと同じ。部品を選び直すまで保存しないと、タブを閉じたときに消えるため)。
+  // 確定した週の配信は、理由が要るので自動では保存しない(上の帯の保存のボタンで)。保存中に書き換えた分は、保存が終わってから、また待って保存する
+  useEffect(() => {
+    if (!simpleOn || locked || !changed || saving || draftPending || currentKey === draftKey) return
+    const id = window.setTimeout(() => void commitSimple(), 1500)
+    return () => window.clearTimeout(id)
+    // 待つのは、中身が変わるたびに数え直す(commitSimple は、その描画の中身で保存する)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentKey, simpleOn, locked, changed, saving, draftPending, draftKey])
+  // 保存していない変更がある間は、タブを閉じる・読み直すときに、ブラウザに確かめてもらう
+  useEffect(() => {
+    if (!changed) return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [changed])
   const applySimple = () => {
     if (saving) return
     // 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying)
@@ -975,6 +1005,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         dirty: changed,
         locked,
         justSaved,
+        savedAt,
         canUndo: undoStack.canUndo,
         nextStep,
         menu: cardMenu(
