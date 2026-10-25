@@ -85,8 +85,8 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
     if (target.kind === 'handoffField') (target.field === 'productionOwner' ? ownerRef : dueRef).current?.focus()
     else onPickCheck?.(target)
   }
-  // 渡す文章の案を仮に写している間の、元の文章
-  const original = useRef<string | null>(null)
+  // 渡す文章の AI の案を、マウスを乗せている間だけ欄に見せる(本物の値は変えない。自動保存で案が保存されないように。UX 10)
+  const [previewing, setPreviewing] = useState<string | null>(null)
   // 参考の素材(制作指示に名前を挙げる・AI に渡すため。畳んでいても読む)
   const [assets, setAssets] = useState<CardAsset[]>([])
   useEffect(() => {
@@ -203,7 +203,8 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           heightKey="HandoffSheet.e_form_instructions"
           size="small"
           rows={4}
-          value={e.form.instructions}
+          value={previewing ?? e.form.instructions}
+          readOnly={previewing !== null}
           placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。セールの期間を目立たせる', 'e.g. Feature the model large in the main image; headline below it; make the sale period stand out')}
           onChange={(_, d) => e.setField('instructions', d.value)}
           onBlur={(ev) => (caret.current = ev.currentTarget.selectionStart)}
@@ -247,17 +248,9 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           }
           renderIdea={(idea) => <MarkdownLite text={idea.value} />}
           isCurrent={(idea) => idea.value === e.form.instructions}
-          onPreview={(idea) => {
-            if (idea) {
-              if (original.current === null) original.current = e.form.instructions
-              e.setField('instructions', idea.value)
-            } else if (original.current !== null) {
-              e.setField('instructions', original.current)
-              original.current = null
-            }
-          }}
+          onPreview={(idea) => setPreviewing(idea ? idea.value : null)}
           onAdopt={(idea) => {
-            original.current = null
+            setPreviewing(null)
             e.setField('instructions', idea.value)
           }}
         />
