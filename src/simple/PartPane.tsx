@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { InfoLabel, Badge, Button, Field, Input, Link, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { LockClosedRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DeleteRegular, DismissRegular, EditRegular, ImageEditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
+import { LockClosedRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
 import { ChooseDrawer } from '../ChoosePanel'
@@ -12,7 +12,8 @@ import { AlertMark } from '../AlertMark'
 import { LowStockBadge } from '../ProductMarks'
 import { heroImage, productImage } from '../images'
 import { yen } from '../items'
-import { locale, optionLabel, tr, useT } from '../i18n'
+import { day, optionLabel, tr, useT } from '../i18n'
+import { typo } from '../typo'
 import { OpenLink } from '../LinkText'
 import { productUrl } from '../links'
 import { productMarket } from '../market'
@@ -41,7 +42,7 @@ const useStyles = makeStyles({
   lockedIcon: { marginTop: '2px' },
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
-  title: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  title: typo.heading,
   deselect: { marginLeft: 'auto' },
   warn: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteMarigoldForeground2 },
   grow: { flexGrow: 1, minWidth: 0 },
@@ -49,8 +50,8 @@ const useStyles = makeStyles({
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
   linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200 },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
-  caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  caption: typo.caption,
+  label: typo.label,
   row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '10px', rowGap: '10px' },
   // 商品の見比べ・情報の箱
@@ -105,6 +106,8 @@ interface Props {
   onSwapAt: (at: SwapAt | null) => void
   /** 入れ替えで、行の鍵が変わったとき(候補と入れ替えたとき) */
   onSwapped: (from: string, to: string) => void
+  /** 左のバーの「渡すもの」を開く(制作の担当・締め切りを決める所) */
+  onOpenHandoff?: () => void
 }
 
 /** テンプレートで決まっていて、この配信では直せない部品の知らせ(鍵の印と、テンプレートの管理へのリンク。行き止まりにしない。レビューの 9) */
@@ -125,7 +128,7 @@ function TemplateLocked({ text }: { text: string }) {
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
-export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped }: Props) {
+export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped, onOpenHandoff }: Props) {
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
@@ -312,7 +315,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         <ImageThumb src={productImage(p)} alt={p.name} width={36} height={44} />
         <span style={{ display: 'grid', minWidth: 0 }}>
           <span className={s.name}>{p.name}</span>
-          <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '-'}`, `Stock ${p.stock ?? '-'}`)}`}</span>
+          <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '—'}`, `Stock ${p.stock ?? '—'}`)}`}</span>
         </span>
       </span>
     ) : null
@@ -349,7 +352,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             {p.name}
           </span>
           <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))}`}</span>
-          <span className={s.meta}>{t(`在庫 ${p.stock ?? '-'}`, `Stock ${p.stock ?? '-'}`)}{p.sales_trend_name ? ` ・ ${optionLabel(p.sales_trend_name)}` : ''}</span>
+          <span className={s.meta}>{t(`在庫 ${p.stock ?? '—'}`, `Stock ${p.stock ?? '—'}`)}{p.sales_trend_name ? ` ・ ${optionLabel(p.sales_trend_name)}` : ''}</span>
           <span className={s.row}>
             <LowStockBadge product={p} />
             {productUrl(p) && <OpenLink url={productUrl(p)} label={t('商品ページ', 'Product page')} />}
@@ -384,7 +387,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         </div>
         <div className={s.row}>
           <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={run}>
-            {cur ? t('この枠の商品と入れ替える', 'Swap with the product in this slot') : t('この枠に入れる', 'Put in this slot')}
+            {cur ? t('この枠の商品と入れ替える', 'Replace the product in this slot') : t('この枠に入れる', 'Put in this slot')}
           </Button>
           <Button size="small" onClick={onCompareDone}>{t('やめる', 'Cancel')}</Button>
         </div>
@@ -488,7 +491,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 )}
                 {e.hero && (
                   <span className={s.row}>
-                    <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => e.setHero(undefined, '')}>{t('外す', 'Remove')}</Button>
+                    <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => e.setHero(undefined, '')}>{t('外す', 'Remove')}</Button>
                   </span>
                 )}
               </span>
@@ -501,7 +504,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 onOpenChange={(o) => setHeroOpenKey(o ? partKey(part) : null)}
                 closable={!!e.hero}
                 label={t('入れ替える', 'Replace')}
-                icon={<ImageEditRegular />}
+                icon={<ArrowSwapRegular />}
                 title={e.hero ? t('メイン画像を選び直す', 'Choose another main image') : t('メイン画像を選ぶ', 'Choose the main image')}
                 tabs={[
                   {
@@ -644,7 +647,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               <Button
                 size="small"
                 appearance="subtle"
-                icon={<DeleteRegular />}
+                icon={<DismissRegular />}
                 disabled={e.saving}
                 onClick={() => {
                   e.removeItem(it.key)
@@ -708,7 +711,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
         return (
           <>
-            <TemplateLocked text={t('画像はテンプレートで決まっています(配信ごとの差し替えは、これからです)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (swapping per delivery is coming). The link on click can be set for this delivery.')} />
+            <TemplateLocked text={t('画像はテンプレートで決まっています(配信ごとの入れ替えは、これからです)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (swapping per delivery is coming). The link on click can be set for this delivery.')} />
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' && (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
@@ -728,7 +731,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         return <TemplatePicker editor={e} />
       case 'overview':
       case 'meta':
-        return <MetaFields editor={e} focus={part.field} />
+        return <MetaFields editor={e} focus={part.field} onOpenHandoff={onOpenHandoff} />
     }
   })()
 
@@ -857,7 +860,7 @@ function Aim({ editor: e }: { editor: SimpleEditor }) {
     )
   return (
     <button type="button" className={mergeClasses(s.aim, s.aimBtn)} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
-      <span className={e.form.theme ? s.aimTheme : s.caption}>{e.form.theme || t('テーマを入れる', 'Add a theme')}</span>
+      <span className={e.form.theme ? s.aimTheme : s.caption}>{e.form.theme || t('テーマを足す', 'Add a theme')}</span>
       {e.form.copyAngle && <span className={s.caption}>{e.form.copyAngle}</span>}
       {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
     </button>
@@ -865,7 +868,7 @@ function Aim({ editor: e }: { editor: SimpleEditor }) {
 }
 
 /** 配信の管理の項目(制作指示・種類・国・ターゲット・担当・締め切り)。文言を直すときには使わないので、配信の情報の中に置く */
-function ManageFields({ editor: e }: { editor: SimpleEditor }) {
+function ManageFields({ editor: e, onOpenHandoff }: { editor: SimpleEditor; onOpenHandoff?: () => void }) {
   const t = useT()
   const s = useStyles()
   return (
@@ -879,22 +882,28 @@ function ManageFields({ editor: e }: { editor: SimpleEditor }) {
       </div>
       <TargetField gender={e.form.targetGender} ages={e.form.targetAges} onGender={(v) => e.setField('targetGender', v)} onAges={(v) => e.setField('targetAges', v)} size="small" field="target" />
       <OwnerField value={e.form.owner} onChange={(v) => e.setField('owner', v)} owners={e.people} size="small" field="owner" />
-      {/* 制作の担当・締め切りは、引き継ぎのタブだけで決める(2 か所で入力しない。FLOWS の C-3) */}
+      {/* 制作の担当・締め切りは、渡すものだけで決める(2 か所で入力しない。FLOWS の C-3)。ここからは渡すものを開く */}
       <div className={s.readonly} data-field="due">
         <span className={s.label}>{t('制作の締め切り・担当', 'Production due & assignee')}</span>
         <span>
-          {e.form.productionDue ? new Date(`${e.form.productionDue}T00:00:00`).toLocaleDateString(locale()) : t('(締め切り未設定)', '(no due date)')}
+          {e.form.productionDue ? day(e.form.productionDue) : t('(未設定)', '(not set)')}
           {' ・ '}
-          {e.form.productionOwner || t('(担当未設定)', '(no assignee)')}
+          {e.form.productionOwner || t('(未設定)', '(not set)')}
         </span>
-        <span className={s.caption}>{t('詳しい画面のプロセスのペインの「引き継ぎ」で決めます', 'Set in the Handoff tab of the full view')}</span>
+        {onOpenHandoff ? (
+          <Link as="button" className={s.caption} onClick={onOpenHandoff}>
+            {t('渡すもので決めます(開く)', 'Set in Handoff (open)')}
+          </Link>
+        ) : (
+          <span className={s.caption}>{t('渡すもので決めます', 'Set in Handoff')}</span>
+        )}
       </div>
     </>
   )
 }
 
 /** 配信の情報(上の帯の配信名・配信日時・ステータスを押したとき)。配信の管理の項目も、ここにまとめる */
-function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string }) {
+function MetaFields({ editor: e, focus, onOpenHandoff }: { editor: SimpleEditor; focus?: string; onOpenHandoff?: () => void }) {
   const t = useT()
   const s = useStyles()
   const ref = useFocusField(focus)
@@ -904,7 +913,7 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
       <ScheduledAtField value={e.form.scheduledAt} onChange={(v) => e.setField('scheduledAt', v)} size="small" field="scheduledAt" />
       <ChoiceField label={t('チャネル', 'Channel')} value={e.form.channel} options={channelOptions} onChange={(v) => e.setField('channel', v)} hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')} size="small" field="channel" />
       <StatusField value={e.form.status} onChange={(v) => e.setField('status', v)} size="small" field="status" />
-      <ManageFields editor={e} />
+      <ManageFields editor={e} onOpenHandoff={onOpenHandoff} />
     </div>
   )
 }

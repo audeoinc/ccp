@@ -1070,7 +1070,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'} ref={paneRef}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} onOpenHandoff={() => showSide('handoff', true)} />
           {e.footer}
         </div>
 
