@@ -26,6 +26,7 @@ import { PushThumb } from '../PushThumb'
 import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
 import { PartAiChat } from './PartAiChat'
+import { Hint } from '../Hint'
 import { ProductionMemo } from './ProductionMemo'
 import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
 import { ProductSwap, type SwapAt } from './ProductSwap'
@@ -554,7 +555,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                           hint={t('持っている画像をここに落とす(JPEG・PNG・WebP・AVIF)', 'Drop your own image here (JPEG, PNG, WebP, AVIF)')}
                           onFile={(f) => e.uploadHero(f)}
                         />
-                        <span className={s.caption}>{t('上げた画像はライブラリに入り、この配信のメイン画像になります。名前・タグは AI が下書きします', 'The image goes into the library and becomes this delivery\'s main image. AI drafts its name and tags')}</span>
+                        <Hint hintKey="simpleCard.heroUpload">{t('上げた画像はライブラリに入り、この配信のメイン画像になります。名前・タグは AI が下書きします', 'The image goes into the library and becomes this delivery\'s main image. AI drafts its name and tags')}</Hint>
                       </>
                     ),
                   },
@@ -633,7 +634,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 {t('外す(候補に戻す)', 'Remove (back to candidates)')}
               </Button>
             </span>
-            <span className={s.caption}>{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</span>
+            <Hint hintKey="simpleCard.productSlot">{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</Hint>
           </>
         )
       }
@@ -785,7 +786,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   }
   return (
     <>
-      <span className={s.caption}>{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</span>
+      <Hint hintKey="simpleCard.templatePick">{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</Hint>
       <div className={s.tplList} onMouseLeave={() => e.setAiPreview(null)}>
         {templateOptions(e.channel, false, e.card.country).map((o) => {
           const slots = o.id === 'free' ? Infinity : slotsOf(o.sections)

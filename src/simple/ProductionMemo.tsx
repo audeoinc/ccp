@@ -25,6 +25,8 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
   const t = useT()
   const s = useStyles()
   const [text, setText] = useState('')
+  // 書く欄を開いているか(ふだんは「＋ 制作へのメモ」の 1 行。部品のペインを短くするため。レビューの 11)
+  const [writing, setWriting] = useState(false)
   const prefix = prefixOf(label)
   const lines = e.form.instructions.split('\n')
   const mine = lines.map((l, i) => ({ l, i })).filter((x) => x.l.startsWith(prefix))
@@ -34,22 +36,33 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
     const base = e.form.instructions.replace(/\s+$/, '')
     e.setField('instructions', `${base ? `${base}\n` : ''}${prefix}${v}`)
     setText('')
+    setWriting(false)
   }
   const remove = (index: number) => e.setField('instructions', lines.filter((_, i) => i !== index).join('\n'))
   return (
     <div className={s.root}>
-      <span className={s.head}>
-        <BoxMultipleArrowRightRegular />
-        {t('制作へのメモ(渡すものに入ります)', 'Note for production (goes to Handoff)')}
-      </span>
+      {writing ? (
+        <span className={s.head}>
+          <BoxMultipleArrowRightRegular />
+          {t('制作へのメモ(渡すものに入ります)', 'Note for production (goes to Handoff)')}
+        </span>
+      ) : (
+        <span>
+          <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => setWriting(true)}>
+            {t('制作へのメモ', 'Note for production')}
+          </Button>
+        </span>
+      )}
       {mine.map((x) => (
         <span key={x.i} className={s.line}>
           <span>{x.l.slice(prefix.length)}</span>
           <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => remove(x.i)} aria-label={t('このメモを外す', 'Remove this note')} />
         </span>
       ))}
+      {writing && (
       <div className={s.input}>
         <AutoTextarea heightKey="ProductionMemo.text"
+          autoFocus
           size="small"
           rows={1}
           value={text}
@@ -64,6 +77,7 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
         />
         <Button size="small" icon={<AddRegular />} disabled={!text.trim()} onClick={add} aria-label={t('メモを足す', 'Add the note')} />
       </div>
+      )}
     </div>
   )
 }

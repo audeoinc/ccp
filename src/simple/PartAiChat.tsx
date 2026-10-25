@@ -29,6 +29,9 @@ const useStyles = makeStyles({
   ideaUsed: { borderTopColor: tokens.colorPaletteGreenBorder2, borderRightColor: tokens.colorPaletteGreenBorder2, borderBottomColor: tokens.colorPaletteGreenBorder2, borderLeftColor: tokens.colorPaletteGreenBorder2 },
   ideaWhy: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   input: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'end' },
+  // たたんでいるときの 1 行(AI の印 + 入力欄 + 送る)
+  inputFolded: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'center' },
+  rootFolded: { paddingTop: '8px' },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
@@ -63,6 +66,9 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
   const [error, setError] = useState<string | null>(null)
   // 仮に写している案(描画で「採用済み」の印を分けるため)
   const [hovering, setHovering] = useState<PartIdea | null>(null)
+  // 広げているか(ふだんは 1 行。部品のペインを短くして、主役の入力欄を埋もれさせないため。レビューの 11)
+  const [opened, setOpened] = useState(false)
+  const open = opened || turns.length > 0 || busy
   // 仮に写したまま部品を離れたときも、元に戻す
   const previewRef = useRef(onPreview)
   useEffect(() => {
@@ -106,11 +112,14 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
   }
 
   return (
-    <div className={s.root}>
+    <div className={mergeClasses(s.root, !open && s.rootFolded)}>
+      {open && (
       <span className={s.head}>
         <AiIcon size={14} />
         {t(`AI に頼む(${label})`, `Ask AI (${label})`)}
       </span>
+      )}
+      {open && (
       <div className={s.samples}>
         {requestSamples(kind).map((x) => (
           <Button key={x} size="small" shape="circular" className={s.sample} disabled={busy} onClick={() => void send(x)}>
@@ -118,6 +127,7 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
           </Button>
         ))}
       </div>
+      )}
       {turns.length > 0 && (
         <div className={s.log}>
           {turns.map((x, i) =>
@@ -160,14 +170,17 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
       )}
       {busy && <Spinner size="tiny" label={t('AI が案を考えています', 'AI is thinking')} labelPosition="after" />}
       {error && <span className={s.error}>{error}</span>}
-      <div className={s.input}>
+      <div className={open ? s.input : s.inputFolded}>
+        {!open && <AiIcon size={14} />}
         <AutoTextarea heightKey="PartAiChat.draft"
           data-part-ai-input=""
           size="small"
           rows={1}
           value={draft}
           disabled={busy}
-          placeholder={placeholder ?? t('例: 20 文字以内で、数字を入れて', 'e.g. Under 40 characters, include a number')}
+          placeholder={open ? (placeholder ?? t('例: 20 文字以内で、数字を入れて', 'e.g. Under 40 characters, include a number')) : t(`AI に頼む(${label})`, `Ask AI (${label})`)}
+          aria-label={t(`AI に頼む(${label})`, `Ask AI (${label})`)}
+          onFocus={() => setOpened(true)}
           onChange={(_, d) => setDraft(d.value)}
           onKeyDown={(ev) => {
             // Enter で送る(Shift + Enter は改行。日本語の変換の確定では送らない)
