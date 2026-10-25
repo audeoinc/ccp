@@ -131,6 +131,7 @@ import { ConfirmHost } from './ConfirmHost'
 import { loadChunk } from './chunkReload'
 import { Z } from './layers'
 import { useAppData } from './useAppData'
+import { useCardNoteStats } from './useCardNoteStats'
 import { ym, ymd } from './dates'
 
 const weekLabel = (start: Date) => {
@@ -494,8 +495,7 @@ function App() {
   const {
     cards, products, heroes, loading, error, setError, bq, bqBusy, patterns, policies,
     cardProducts, variantProducts, cardImages, expiringImages, productRows, resultsKey, changeKey,
-    questionCounts, noteParties, taskCounts, commentCounts, openComments, overdueTasks, changeNotes,
-    weeks, setWeeks, events,
+    notes, weeks, setWeeks, events,
     reloadHeroes, loadPatterns, loadMarketingPolicies, loadParts, reloadCards, load, loadProducts, runBqSync,
   } = useAppData({
     notify: setBqNotice,
@@ -512,6 +512,8 @@ function App() {
         return new Date(base.getFullYear(), base.getMonth(), 1)
       }),
   })
+  // やり取りから数えたもの(質問・タスク・コメントの件数、担当の候補、確定後の変更)
+  const { questionCounts, noteParties, taskCounts, commentCounts, openComments, overdueTasks, changeNotes } = useCardNoteStats(notes)
   // リンクの国は、そのときだけ合わせる(ふだんの国の設定は書き換えない)
   const [filters, setFilters] = useState<Filters>(() => ({ ...initialFilters(), ...(link.country !== undefined ? { country: link.country } : {}) }))
   // 国を変える(ヘッダー)。覚えておき、次に開いたときも同じ国で始める

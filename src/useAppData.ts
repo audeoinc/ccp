@@ -27,7 +27,6 @@ import { loadCountrySettings } from './countrySettings'
 import { setActivePolicies, setActiveRules, setActiveSales } from './aiSelect'
 import { setLimitRules } from './weeklyLimit'
 import type { PolicyLite } from './reviewChecks'
-import { todayYmd } from './dates'
 import { tr } from './i18n'
 import { useStableCallback } from './useStableCallback'
 
@@ -131,24 +130,12 @@ export function useAppData(opts: {
   // 変更の記録は、配信カードを読み直すとき(日程の変更は、配信の保存でサーバーが残す)
   const [resultsKey, setResultsKey] = useState(0)
   const [changeKey, setChangeKey] = useState(0)
-  // 配信カードごとの、質問の未解決の数(一覧の列)
-  const [questionCounts, setQuestionCounts] = useState<Map<string, number>>(new Map())
-  // 配信カードごとの、未解決の質問の宛先・質問した人と、未完了のタスクの担当(絞り込みの「担当」で、その人がかかわる配信も出すため)
-  const [noteParties, setNoteParties] = useState<Map<string, Set<string>>>(new Map())
-  // 配信カードごとの、未完了のタスクの数(一覧の列・週の表示)
-  const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map())
-  // 配信カードごとの、未対応のレビューのコメントの数(週の表示・確認の一覧)
-  const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map())
-  // 配信カードごとの、未対応のレビューのコメント(週の資料に、本文を載せる)
-  const [openComments, setOpenComments] = useState<Map<string, CardNote[]>>(new Map())
+  // やり取りの行(配信カードごとの件数は、useCardNoteStats で数える)
+  const [notes, setNotes] = useState<CardNote[]>([])
   // 週の計画(週のレビューの状態)
   const [weeks, setWeeks] = useState<WeekRow[]>([])
-  // 確定した週の配信を変えたときの理由(週の状態の帯に、確定後の変更として出す)
-  const [changeNotes, setChangeNotes] = useState<CardNote[]>([])
   // 承認の履歴(週の操作・配信のステータスの変更。週の状態の帯で、週ごとに出す)
   const [events, setEvents] = useState<CardEvent[]>([])
-  // 配信カードごとの、期日を過ぎた未完了のタスクの数(週の表示で、問題として目立たせる)
-  const [overdueTasks, setOverdueTasks] = useState<Map<string, number>>(new Map())
   // 商品の販売方針(商品コードごと。週の確認の一覧で、主力の漏れを見るため)
   const [policies, setPolicies] = useState<Map<string, PolicyLite>>(new Map())
 
@@ -194,49 +181,7 @@ export function useAppData(opts: {
         .catch(() => undefined)
       if (has('notes')) CardNotesService.getAll()
         .then((res) => {
-          if (!res.success) return
-          const counts = new Map<string, number>()
-          const tasks = new Map<string, number>()
-          const overdue = new Map<string, number>()
-          const comments = new Map<string, number>()
-          const commentNotes = new Map<string, CardNote[]>()
-          const parties = new Map<string, Set<string>>()
-          const addParty = (id: string, name?: string) => {
-            if (name?.trim()) parties.set(id, (parties.get(id) ?? new Set()).add(name.trim()))
-          }
-          const today = todayYmd()
-          setChangeNotes((res.data ?? []).filter((n) => n.kind === 'change'))
-          for (const n of res.data ?? []) {
-            const id = n.delivery_card_id
-            if (!id || n.resolved) continue
-            // 変更の理由は記録、コメントへの返信はスレッドの一部なので、質問・タスクの数には入れない
-            if (n.kind === 'change' || n.kind === 'reply') continue
-            if (n.kind === 'comment') {
-              // やり取り(2026-10-17 に質問と 1 つにした)は宛先を持てるので、「担当」の絞り込みの候補に足す
-              addParty(id, n.assignee)
-              comments.set(id, (comments.get(id) ?? 0) + 1)
-              commentNotes.set(id, [...(commentNotes.get(id) ?? []), n])
-              continue
-            }
-            if (n.kind === 'task') {
-              addParty(id, n.assignee)
-              tasks.set(id, (tasks.get(id) ?? 0) + 1)
-              if (n.due && n.due.slice(0, 10) < today) overdue.set(id, (overdue.get(id) ?? 0) + 1)
-            }
-            else {
-              // 質問: 誰からでも、誰にでも(宛先は assignee の列)。週の資料では、コメントと同じ「未解決のやり取り」に並べる
-              addParty(id, n.author)
-              addParty(id, n.assignee)
-              counts.set(id, (counts.get(id) ?? 0) + 1)
-              commentNotes.set(id, [...(commentNotes.get(id) ?? []), n])
-            }
-          }
-          setNoteParties(parties)
-          setQuestionCounts(counts)
-          setTaskCounts(tasks)
-          setOverdueTasks(overdue)
-          setCommentCounts(comments)
-          setOpenComments(commentNotes)
+          if (res.success) setNotes(res.data ?? [])
         })
         .catch(() => undefined)
       if (has('weeks')) WeeksService.getAll()
@@ -349,8 +294,7 @@ export function useAppData(opts: {
   return {
     cards, products, heroes, loading, error, setError, bq, bqBusy, patterns, policies,
     cardProducts, variantProducts, cardImages, expiringImages, productRows, resultsKey, changeKey,
-    questionCounts, noteParties, taskCounts, commentCounts, openComments, overdueTasks, changeNotes,
-    weeks, setWeeks, events,
+    notes, weeks, setWeeks, events,
     reloadHeroes, loadPatterns, loadMarketingPolicies, loadParts, reloadCards, load, loadProducts, runBqSync,
   }
 }
