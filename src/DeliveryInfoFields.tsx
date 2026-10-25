@@ -3,6 +3,7 @@ import { Field, Input, Select, ToggleButton, makeStyles, tokens } from '@fluentu
 import { optionLabel, useT } from './i18n'
 import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges, type TargetGender } from './target'
 import { statusColor, statusOptions } from './status'
+import { PersonInput } from './PersonInput'
 
 /**
  * 配信の情報の入力欄(配信名・配信日時・選択肢・ステータス・配信の対象・担当)。
@@ -134,10 +135,7 @@ export function OwnerField({ value, onChange, owners, size, field }: { value: st
   const t = useT()
   return (
     <Field label={t('担当者', 'Owner')} size={size} data-field={field}>
-      <Input size="small" list="ccp-owners" value={value} onChange={(_, d) => onChange(d.value)} />
-      <datalist id="ccp-owners">
-        {owners.map((o) => <option key={o} value={o} />)}
-      </datalist>
+      <PersonInput value={value} onChange={onChange} people={owners} />
     </Field>
   )
 }

@@ -1,6 +1,7 @@
 import { Badge, Button, Field, Input, makeStyles, tokens } from '@fluentui/react-components'
 import { CheckmarkCircleRegular, SendRegular } from '@fluentui/react-icons'
 import { locale, useT } from './i18n'
+import { PersonInput } from './PersonInput'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -47,10 +48,7 @@ export function HandoffPanel({ productionOwner, onProductionOwner, handedOffAt, 
       </div>
       <div className={styles.row}>
         <Field label={t('制作の担当者', 'Production assignee')} size="small">
-          <Input size="small" list="ccp-people" value={productionOwner} onChange={(_, d) => onProductionOwner(d.value)} />
-          <datalist id="ccp-people">
-            {people.map((o) => <option key={o} value={o} />)}
-          </datalist>
+          <PersonInput value={productionOwner} onChange={onProductionOwner} people={people} />
         </Field>
         <Field label={t('制作の締め切り', 'Production due')} size="small">
           <Input size="small" type="date" value={productionDue} onChange={(_, d) => onProductionDue(d.value)} />

@@ -13,6 +13,7 @@ import { suggestTasks, type TaskIdea } from './aiTasks'
 import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
 import { anchorLabel, bumpNotes, focusPin, focusedPin, pinNumbers, subscribePins, viewLabel } from './pinStore'
 import { confirmDialog } from './confirm'
+import { PersonInput } from './PersonInput'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -509,7 +510,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             {list.map((idea, i) => (
               <div key={i} className={styles.idea}>
                 <Input size="small" className={styles.ideaText} value={idea.text} onChange={(_, d) => editIdea(id, i, { text: d.value })} aria-label={t('タスク', 'Task')} />
-                <Input size="small" list="ccp-thread-people" value={idea.assignee} onChange={(_, d) => editIdea(id, i, { assignee: d.value })} aria-label={t('担当', 'Assignee')} />
+                <PersonInput value={idea.assignee} onChange={(v) => editIdea(id, i, { assignee: v })} people={people} ariaLabel={t('担当', 'Assignee')} />
                 <Input size="small" type="date" value={idea.due} onChange={(_, d) => editIdea(id, i, { due: d.value })} aria-label={t('期日', 'Due')} />
                 <Button size="small" appearance="primary" disabled={busy || !idea.text.trim()} onClick={() => void adopt(id, i, idea)}>{t('採用', 'Adopt')}</Button>
                 <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('外す', 'Dismiss')} onClick={() => dropIdea(id, i)} />
@@ -543,7 +544,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         <div className={styles.form}>
           <div className={styles.formRow}>
             <Field label={t('宛先(任意)', 'To (optional)')} size="small">
-              <Input size="small" list="ccp-thread-people" value={to} onChange={(_, d) => setTo(d.value)} placeholder={t('返事を求める人', 'Who should reply')} />
+              <PersonInput value={to} onChange={setTo} people={people} placeholder={t('返事を求める人', 'Who should reply')} />
             </Field>
             {!assetId && (
               <Field label={t('対象', 'About')} size="small">
@@ -556,11 +557,6 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
               </Field>
             )}
           </div>
-          <datalist id="ccp-thread-people">
-            {people.map((p) => (
-              <option key={p} value={p} />
-            ))}
-          </datalist>
           {pinStage && <span className={styles.hint}>{t('場所を指して書くときは、プレビューを右クリック(または「コメントを置く」)。', 'To point at a spot, right-click the preview (or use "Place comment").')}</span>}
           <Textarea
             size="small"
