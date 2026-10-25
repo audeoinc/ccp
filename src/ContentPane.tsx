@@ -261,6 +261,7 @@ const useStyles = makeStyles({
   thumb: {
     width: '84px',
     flexShrink: 0,
+    // テンプレートの縮図は、メールの見た目(白い紙)なので、画面の色に合わせない(受信側の見た目の例外)
     backgroundColor: '#fff',
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusSmall,
@@ -269,6 +270,7 @@ const useStyles = makeStyles({
     rowGap: '4px',
     alignContent: 'start',
   },
+  // 縮図の中の文字(白い紙の上なので、画面の色に合わせない)
   thumbFree: { color: '#888', fontSize: '10px', textAlign: 'center' },
   // Drop zones
   dropZone: { display: 'grid', rowGap: '8px', borderRadius: tokens.borderRadiusMedium, minWidth: 0 },

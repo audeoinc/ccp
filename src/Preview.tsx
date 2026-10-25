@@ -77,8 +77,11 @@ interface Props {
 // メール・プッシュは受信側の見た目なので、テーマに依らず固定の配色にする
 const INK = '#222'
 const SUB = '#666'
-const ACCENT = '#6750a4'
-const ACCENT_BG = 'rgba(103,80,164,0.08)'
+// 選んだ枠・ドラッグの印は、メールの見た目ではなく編集の印なので、画面の色(tokens)に合わせる(整理 #12)
+const ACCENT = tokens.colorBrandStroke1
+const ACCENT_BG = tokens.colorBrandBackground2
+// 空いた枠・未入力の印(編集のときだけ出る)
+const SLOT_LINE = tokens.colorNeutralStroke1
 
 const useStyles = makeStyles({
   fit: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
@@ -94,11 +97,12 @@ const useStyles = makeStyles({
   },
   controlsGroup: { display: 'flex', gap: '4px', pointerEvents: 'auto' },
   ctlRight: { pointerEvents: 'auto' },
+  // プレビューの上に重ねる編集のボタン(画面の色)
   ctl: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    color: INK,
-    '&:hover': { backgroundColor: '#fff', color: INK },
-    '&:hover:active': { backgroundColor: '#fff', color: INK },
+    backgroundColor: tokens.colorNeutralBackgroundAlpha2,
+    color: tokens.colorNeutralForeground1,
+    '&:hover': { backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorNeutralForeground1 },
+    '&:hover:active': { backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorNeutralForeground1 },
   },
   heroClear: { position: 'absolute', top: '8px', right: '8px', opacity: 0 },
   frame: {
@@ -115,18 +119,19 @@ const useStyles = makeStyles({
   img: { objectFit: 'contain', borderRadius: '8px', backgroundColor: '#f1f1f4', display: 'block' },
   noWrap: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   slot: {
-    border: '2px dashed #bbb',
+    border: `2px dashed ${SLOT_LINE}`,
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: SUB,
+    color: tokens.colorNeutralForeground3,
     textAlign: 'center',
   },
   hero: {
     position: 'relative',
     containerType: 'inline-size',
-    color: '#999',
+    // 画像のないときの案内の文字(編集の印)
+    color: tokens.colorNeutralForeground3,
     display: 'grid',
     placeItems: 'center',
     fontSize: '12.8px',
@@ -312,7 +317,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
 
   const frameStyle = (it: Item, idx: number): React.CSSProperties => ({
     borderColor: over === idx ? tokens.colorBrandForeground1 : it.key === selectedKey || it.key === hoverKey ? ACCENT : 'transparent',
-    backgroundColor: over === idx ? 'rgba(103,80,164,0.08)' : 'transparent',
+    backgroundColor: over === idx ? ACCENT_BG : 'transparent',
   })
 
   const priceEl = (price?: number, market?: 'JP' | 'US') =>
@@ -530,7 +535,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
         aspectRatio: feature ? undefined : compact ? '1 / 1' : '3 / 4',
         minHeight: feature ? 120 : undefined,
         ...shape,
-        borderColor: over === items.length ? ACCENT : '#bbb',
+        borderColor: over === items.length ? ACCENT : SLOT_LINE,
         backgroundColor: over === items.length ? ACCENT_BG : 'transparent',
         fontSize: '0.8rem',
         padding: 8,
@@ -624,7 +629,8 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
       }}
       style={{
         aspectRatio: hs.ratio ? String(ratioValue(hs.ratio)) : heroText === 'band' ? (compact ? '3 / 1' : '8 / 3') : compact ? '2 / 1' : heroText === 'overlay' ? '4 / 5' : '1 / 1',
-        backgroundColor: heroOver ? 'rgba(103,80,164,0.15)' : '#e9e9ee',
+        // メイン画像の置き場所(画像のないとき・ドラッグ中)は、編集の印
+        backgroundColor: heroOver ? ACCENT_BG : tokens.colorNeutralBackground3,
         // 拡大して切り出すとき(X59 ④)に、はみ出しを隠す
         overflow: 'hidden',
         outline: heroOver ? `3px solid ${ACCENT}` : 'none',
@@ -902,7 +908,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           }
           if (p.type === 'text') {
             // 文が空のときは、部品を選ぶ見せ方(シンプルな配信カード)でだけ、薄い印を出す(押して選べるように。メールには何も出さない)
-            if (!p.text && pickMode) return <div style={{ fontSize: '0.75rem', color: '#bbb', minHeight: '1.6em', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{t('(テキスト)', '(Text)')}</div>
+            if (!p.text && pickMode) return <div style={{ fontSize: '0.75rem', color: tokens.colorNeutralForegroundDisabled, minHeight: '1.6em', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{t('(テキスト)', '(Text)')}</div>
             return <div data-el={`${p.id}.text`} style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
           }
           if (p.type === 'media') {
@@ -1004,7 +1010,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
             className={classes.slot}
             style={{
               minHeight: items.length === 0 ? 96 : 44,
-              borderColor: over === items.length ? ACCENT : '#bbb',
+              borderColor: over === items.length ? ACCENT : SLOT_LINE,
               backgroundColor: over === items.length ? ACCENT_BG : 'transparent',
               fontSize: '0.85rem',
             }}
@@ -1039,7 +1045,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
         })}
         {overflow.length > 0 && (
           <div style={{ padding: '0 16px 24px' }}>
-            <div style={{ fontSize: '0.75rem', color: '#b26a00', backgroundColor: '#fff4e0', borderRadius: 8, padding: '4px 8px', marginBottom: 8 }}>
+            <div style={{ fontSize: '0.75rem', color: tokens.colorStatusWarningForeground1, backgroundColor: tokens.colorStatusWarningBackground1, borderRadius: 8, padding: '4px 8px', marginBottom: 8 }}>
               {t(`枠外(${overflow.length}件): このテンプレートの枠を超えているため、メールには載りません`, `Out of slots (${overflow.length}): these exceed the template's slots and won't appear in the email`)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, opacity: 0.55 }}>
