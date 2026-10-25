@@ -347,7 +347,8 @@
     ["links", "text"],
     ["notes", "text"],
     ["variant", "text"],
-    ["segment", "text"]
+    ["segment", "text"],
+    ["learning_title", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
@@ -750,6 +751,16 @@
    "lookups": [
    ]
   },
+  "card_learnings": {
+   "columns": [
+    ["learning_id", "text", {"index": true}],
+    ["mode", "choice"],
+    ["changed_by", "text"]
+   ],
+   "lookups": [
+    ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
+   ]
+  },
   "delivery_lifts": {
    "columns": [
     ["holdout_rate", "float"],
@@ -807,6 +818,7 @@
   "ad_spends.market": ["JP", "US"],
   "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"],
   "ai_runs.adoption": ["as_is", "edited", "rejected"],
-  "learning_reviews.status": ["keep", "watch", "retired"]
+  "learning_reviews.status": ["keep", "watch", "retired", "resting"],
+  "card_learnings.mode": ["equip", "unequip"]
  }
 }

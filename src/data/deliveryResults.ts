@@ -42,6 +42,8 @@ export interface DeliveryResult {
   links?: string
   /** 振り返りのメモ(次に生かすこと) */
   notes?: string
+  /** 学び(notes)の名前。学びのカードの見出し(X78)。空なら、メモの 1 行目の先頭を出す */
+  learning_title?: string
   /** AB テストの案('A'・'B'・'C'。AB テストでない配信は空。X55 の段階 2) */
   variant?: string
   /** AB テストの区分('test' = テストに回した分 / 'rollout' = 勝ち案を残りに送った分。空 = 配信全体) */

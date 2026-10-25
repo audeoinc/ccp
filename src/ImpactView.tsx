@@ -688,7 +688,8 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
   const t = useT()
   const [showRetired, setShowRetired] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const statusLabel = (v: LearningReviewStatus) => (v === 'keep' ? t('残す', 'Keep') : v === 'watch' ? t('様子を見る', 'Watch') : t('外す', 'Retire'))
+  const statusLabel = (v: LearningReviewStatus) =>
+    v === 'keep' ? t('残す', 'Keep') : v === 'watch' ? t('様子を見る', 'Watch') : v === 'resting' ? t('休ませる', 'Rest') : t('外す', 'Retire')
   const decide = async (e: LearningEval, status: LearningReviewStatus) => {
     setBusy(e.id)
     const reason = t(
