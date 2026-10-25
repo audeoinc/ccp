@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
@@ -70,6 +70,30 @@ const SIDE_W = 56
 // 覚えた幅が数でなければ(壊れた設定)、既定の幅に戻す
 const clampPreview = (v: number) => (Number.isFinite(v) ? Math.min(1200, Math.max(360, v)) : DEFAULT_WIDTHS.mobile)
 const clampList = (v: number) => (Number.isFinite(v) ? Math.min(640, Math.max(240, v)) : DEFAULT_WIDTHS.list)
+
+// 狭い画面の割り振り(simple-ui-review-1 の 4。1,366〜1,440px のノート PC で、商品の一覧が開いたまま幅 0 に潰れていた)。
+// 選んだ部品のペインの最低の幅と、プレビューの下限。境目の線(1px)は 3 本
+const PART_MIN = 280
+const PREVIEW_MIN = 360
+const LINES = 3
+/**
+ * 列の幅が足りないとき、次の順で収める: ① 商品の一覧を細い帯にする(insist = 人が自動で畳んだのを開き直したときは、しない)
+ * ② プレビューを下限まで縮める ③ 開いた左のパネルを、プレビューの上に重ねて出す(列の幅は 0 にし、その分をプレビューに戻す)。
+ * 覚えている幅・開閉は変えない(幅が戻れば、元の割り振りに戻る)
+ */
+function fitPanes(total: number, w: { side: number; preview: number; list: number; listOpen: boolean; insist: boolean }) {
+  const need = (side: number, preview: number, list: number) => SIDE_W + side + preview + PART_MIN + list + LINES
+  if (!total) return { listOpen: w.listOpen, preview: w.preview, overlay: false, auto: false, fits: true }
+  const fits = need(w.side, w.preview, w.listOpen ? w.list : RAIL_W) <= total
+  const auto = w.listOpen && !w.insist && need(w.side, w.preview, w.list) > total
+  const listOpen = w.listOpen && !auto
+  const list = listOpen ? w.list : RAIL_W
+  let preview = w.preview
+  if (need(w.side, preview, list) > total) preview = Math.max(PREVIEW_MIN, total - (SIDE_W + w.side + PART_MIN + list + LINES))
+  const overlay = w.side > 0 && need(w.side, preview, list) > total
+  if (overlay) preview = Math.min(w.preview, Math.max(PREVIEW_MIN, total - (SIDE_W + PART_MIN + list + LINES)))
+  return { listOpen, preview, overlay, auto, fits }
+}
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
@@ -174,6 +198,7 @@ const useStyles = makeStyles({
   colTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, marginBottom: '10px' },
   panesMoving: { transitionProperty: 'grid-template-columns', transitionDuration: '200ms', transitionTimingFunction: 'ease-out', '@media (prefers-reduced-motion: reduce)': { transitionDuration: '0ms' } },
   // 左のバーと、開くパネル
+  sideOverlay: { position: 'relative', zIndex: 3, boxShadow: tokens.shadow16, borderRight: `1px solid ${tokens.colorNeutralStroke2}` },
   sidePane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
   sideHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 6px 6px 12px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap', overflow: 'hidden' },
   sideBody: { display: 'grid', minHeight: 0, minWidth: 0, overflow: 'hidden' },
@@ -242,6 +267,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 「A と違う」の目印(B・C 案を直しているとき)
   const diffMarks: Mark[] = e.abDiffParts.map((part) => ({ part, color: tokens.colorPaletteDarkOrangeBackground3, label: t('A と違う', 'Differs from A') }))
   const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
+  // 自動で畳んだ商品の一覧を、人が開き直した(幅が足りるようになるまで、自動では畳まない)
+  const [insist, setInsist] = useState(false)
   const [abSettingsOpen, setAbSettingsOpen] = useState(false)
   // 商品の入れ替えの引き出しを開いている所(SU9)。入口(プレビューの ⇄・右クリック・選んだ部品のペイン・真ん中の行・右の行・商品のフロート)は違っても、引き出しは 1 つ
   const [swapAt, setSwapAt] = useState<SwapAt | null>(null)
@@ -298,6 +325,24 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const [moving, setMoving] = useState(false)
   // パネルは左にあるので、境目を右へ動かすと広がる
   const resizeSide = (dx: number) => setWidths((w) => (isComm(side) ? { ...w, comm: clampList(w.comm + dx) } : { ...w, hand: clampList(w.hand + dx) }))
+  // 列の並びの幅を見て、狭いときの割り振りを決める(fitPanes)
+  const panesRef = useRef<HTMLDivElement>(null)
+  const [panesW, setPanesW] = useState(0)
+  useLayoutEffect(() => {
+    const el = panesRef.current
+    if (!el) return
+    const measure = () => setPanesW(el.clientWidth)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const sideW = isComm(side) ? widths.comm : side ? widths.hand : 0
+  const fit = fitPanes(panesW, { side: sideW, preview: widths[widthKey], list: widths.list, listOpen: productsOpen, insist })
+  // 幅が足りるようになったら、「開き直した」は忘れる(次に狭くなったら、また自動で畳む)
+  useEffect(() => {
+    if (insist && fit.fits && !fit.auto && fitPanes(panesW, { side: sideW, preview: widths[widthKey], list: widths.list, listOpen: true, insist: false }).fits) setInsist(false)
+  }, [insist, fit.fits, fit.auto, panesW, sideW, widths, widthKey])
   // やり取りの部品は、閉じていても描いておき、バーの数と点を合わせる。最後に開いた見方を覚える(書きかけの文を、見方の間で共にするため 1 つの部品)
   const [commSection, setCommSection] = useState<CommSection>(() => {
     const v = loadSide()
@@ -390,6 +435,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }
   const stepZoom = e.zoom.step
   const toggleProducts = () => {
+    // 自動で畳んでいるときは、覚えている開閉(開く)はそのままで、開き直す
+    if (fit.auto) {
+      setInsist(true)
+      return
+    }
+    setInsist(false)
     setProductsOpen(!productsOpen)
     savePref(PRODUCTS_KEY, !productsOpen)
   }
@@ -588,7 +639,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         {e.notices}
       </div>
 
-      <div className={mergeClasses(s.panes, moving && s.panesMoving)} style={{ '--wv': `${widths[widthKey]}px`, '--wl': `${productsOpen ? widths.list : RAIL_W}px`, '--ws': `${isComm(side) ? widths.comm : side ? widths.hand : 0}px` } as React.CSSProperties}>
+      <div ref={panesRef} className={mergeClasses(s.panes, moving && s.panesMoving)} style={{ '--wv': `${fit.preview}px`, '--wl': `${fit.listOpen ? widths.list : RAIL_W}px`, '--ws': `${fit.overlay ? 0 : sideW}px` } as React.CSSProperties}>
         {/* 左のバー。上から、プロセスの順(承認者とのやり取り → 承認 → 素材 → 制作へ渡すもの)、線の下に記録。数と点で、開かなくても様子が分かる */}
         <nav className={s.sideRail} aria-label={t('配信の全体の情報とメニュー', 'Delivery info and menus')}>
           {rails.map((r) => (
@@ -634,7 +685,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 開いているパネル(1 つ)。しまったときも列には残し、幅 0 にする(display: none にすると、グリッドの列から外れ、プレビュー以下が 1 列ずつ左の細い列にずれる。2026-10-24 本番で起きた)。
             しまっている間は inert で、Tab で中に入らないようにする。やり取りの部品は、バーの数を合わせるため、いつも描く */}
-        <div className={s.sidePane} inert={!side} aria-hidden={!side}>
+        {/* 狭くて収まらないときは、列の幅を 0 にしたまま、パネルをプレビューの上に重ねて出す(fitPanes の ③) */}
+        <div className={mergeClasses(s.sidePane, fit.overlay && s.sideOverlay)} style={fit.overlay ? { width: sideW } : undefined} inert={!side} aria-hidden={!side}>
           <div className={s.sideHead}>
             <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{sideTitle(panel)}</span>
             {/* × で閉じるのではなく、左のバーへしまう(2026-10-24 利用者) */}
@@ -872,10 +924,10 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {e.footer}
         </div>
 
-        <Splitter onDrag={productsOpen ? resizeList : () => undefined} onDone={saveWidths} />
+        <Splitter onDrag={fit.listOpen ? resizeList : () => undefined} onDone={saveWidths} />
 
         {/* 商品の一覧(畳める)。畳んでいても、商品ごとの点とアラートの色を出す */}
-        {productsOpen ? (
+        {fit.listOpen ? (
           <div className={s.pane}>
             <div className={s.listHead}>
               <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleProducts} aria-label={t('商品の一覧を畳む', 'Collapse the product list')} />
