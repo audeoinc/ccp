@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { Avatar, Button, Checkbox, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Avatar, Button, Checkbox, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowRepeatAllRegular,
   CheckmarkCircleRegular,
@@ -53,8 +53,6 @@ const useStyles = makeStyles({
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', columnGap: '6px', flexWrap: 'wrap' },
   bar: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  pill: { whiteSpace: 'nowrap', flexShrink: 0, border: 'none', padding: '2px 10px', borderRadius: '999px', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, cursor: 'pointer' },
-  pillOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
   handoff: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', columnGap: '4px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'pointer', maxWidth: '50%', overflow: 'hidden', whiteSpace: 'nowrap' },
   stream: { overflowY: 'auto', minHeight: 0, padding: '8px 12px', display: 'grid', alignContent: 'start', rowGap: '10px' },
   item: { display: 'grid', gridTemplateColumns: '20px 24px minmax(0, 1fr) auto', columnGap: '8px', alignItems: 'start', fontSize: tokens.fontSizeBase300, cursor: 'pointer', borderRadius: tokens.borderRadiusMedium, padding: '2px', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
@@ -455,12 +453,11 @@ export function CommPane(props: Props) {
     <div className={s.root}>
       {/* 2. 絞り込み(参考の素材・制作の担当と締め切りは、制作向けなので「渡すもの」の側に置く) */}
       <div className={s.bar}>
-        <button type="button" className={mergeClasses(s.pill, filter === 'open' && s.pillOn)} onClick={() => setFilter('open')}>
-          {t(`未解決 ${openCount + taskCount}`, `Open ${openCount + taskCount}`)}
-        </button>
-        <button type="button" className={mergeClasses(s.pill, filter === 'all' && s.pillOn)} onClick={() => setFilter('all')}>
-          {t('すべて', 'All')}
-        </button>
+        {/* 絞り込みは Fluent の TabList(配信カードの見せ方の切り替えと同じ形。整理 #11) */}
+        <TabList size="small" appearance="subtle-circular" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as typeof filter)}>
+          <Tab value="open">{t(`未解決 ${openCount + taskCount}`, `Open ${openCount + taskCount}`)}</Tab>
+          <Tab value="all">{t('すべて', 'All')}</Tab>
+        </TabList>
       </div>
 
       {/* 3. 1 本の流れ */}
