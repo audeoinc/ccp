@@ -2,7 +2,8 @@
 // 演出は入れない(利用者 2026-10-24: さりげなく)。カードの形と、強さ・使われた回数の控えめな表示だけ
 import { useState, type ReactNode } from 'react'
 import { Badge, Card, Link, Tag, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { locale, optionLabel, useT } from './i18n'
+import { day, optionLabel, useT } from './i18n'
+import { typo } from './typo'
 import { channelOptions, countryOptions } from './status'
 import { themeTypeLabel } from './themeTypes'
 import { seasonLabel, stateLabel, type LearningCardData } from './learningCards'
@@ -12,7 +13,7 @@ const useStyles = makeStyles({
   // 休ませた・外した・この国のデッキにない学びは、薄く(並びからは消さない)
   off: { backgroundColor: tokens.colorNeutralBackground2 },
   head: { display: 'flex', alignItems: 'flex-start', columnGap: '8px' },
-  title: { flex: 1, minWidth: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, overflowWrap: 'anywhere' },
+  title: { ...typo.heading, flex: 1, minWidth: 0, overflowWrap: 'anywhere' },
   titleOff: { color: tokens.colorNeutralForeground3 },
   notes: {
     fontSize: tokens.fontSizeBase200,
@@ -46,6 +47,8 @@ interface Props {
   actions?: ReactNode
   /** 小さく(配信カードの装備。名前・強さ・操作だけ) */
   compact?: boolean
+  /** 足したばかりの印など(useJustAdded の freshClass) */
+  className?: string
 }
 
 /** 強さの点(1〜5)。材料不足なら言葉で */
@@ -61,12 +64,11 @@ export function StrengthDots({ strength }: { strength: number | null }) {
   )
 }
 
-export function LearningCard({ data: l, onOpenSource, actions, compact = false }: Props) {
+export function LearningCard({ data: l, onOpenSource, actions, compact = false, className }: Props) {
   const s = useStyles()
   const t = useT()
   const [full, setFull] = useState(false)
   const off = l.state !== 'use' || !l.inDeck
-  const day = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : '')
   const badge =
     l.state !== 'use' ? (
       <Badge appearance="tint" size="small" color={l.state === 'resting' ? 'warning' : 'informative'}>
@@ -79,7 +81,7 @@ export function LearningCard({ data: l, onOpenSource, actions, compact = false }
     ) : null
 
   return (
-    <Card size="small" className={mergeClasses(s.card, off && s.off)}>
+    <Card size="small" className={mergeClasses(s.card, off && s.off, className)}>
       <div className={s.head}>
         <span className={mergeClasses(s.title, off && s.titleOff)}>{l.title || t('(名前なし)', '(untitled)')}</span>
         {badge}

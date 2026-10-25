@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Dialog, DialogBody, DialogContent, DialogTitle, SearchBox, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogBody, DialogContent, DialogTitle, InfoLabel, SearchBox, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { AddRegular, ChevronDownRegular, ChevronUpRegular, DismissRegular, LightbulbRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { applyDecided, saveApply, useCountryApply } from './countryApply'
 import { myName } from './history'
 import { setActiveLearnings } from './aiSelect'
-import { locale, optionLabel, useT } from './i18n'
+import { day, optionLabel, useT } from './i18n'
 import { countryOptions } from './status'
 import { guessThemeType, themeTypeLabel, themeTypeOf, type ThemeType } from './themeTypes'
 import { confirmDialog } from './confirm'
@@ -16,6 +16,9 @@ import { sortLearningCards, type LearningCardData } from './learningCards'
 import { LearningCard } from './LearningCard'
 import { ListHeader } from './ListHeader'
 import { ResizableSurface } from './ResizableSurface'
+import { PaneSpinner } from './PaneSpinner'
+import { typo } from './typo'
+import { useJustAdded } from './useJustAdded'
 
 const useStyles = makeStyles({
   root: {
@@ -28,9 +31,10 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2,
   },
   head: { display: 'flex', alignItems: 'center', columnGap: '10px', flexWrap: 'wrap', fontSize: tokens.fontSizeBase200 },
-  title: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   muted: { color: tokens.colorNeutralForeground3 },
-  label: { color: tokens.colorNeutralForeground3 },
+  caption: typo.caption,
+  label: typo.label,
+  heading: typo.heading,
   // 「見る / 閉じる」は、件数のすぐ右(アラートの帯と同じ。右端だと遠い。X45)
   toggle: { minWidth: 'auto' },
   // 装備中の学び(X78)。小さなカードを並べる(帯の中は横に、左のバーのパネルの中は縦に 1 列)
@@ -40,13 +44,13 @@ const useStyles = makeStyles({
   itemHead: { display: 'grid', rowGap: '2px', color: tokens.colorNeutralForeground2 },
   itemNotes: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   // ほかの国の学び(使えるかもしれない。ST5)。この国で使うかを、ここで決める
-  otherHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, paddingTop: '4px' },
+  otherHead: { ...typo.label, paddingTop: '4px' },
   otherActions: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', paddingTop: '2px' },
-  // 左のバーのパネルの中(SU6): 枠なし・いつも開く。狭いので、日付と名前を本文の上に
-  panel: { display: 'grid', rowGap: '8px', padding: '10px 12px', alignContent: 'start' },
+  // 左のバーのパネルの中(SU6): 枠なし・いつも開く。狭いので、日付と名前を本文の上に。余白は左のバーのほかのパネルと同じ(simple-ui-review-2 の 20)
+  panel: { display: 'grid', rowGap: '12px', padding: '12px 14px', alignContent: 'start' },
   panelList: { display: 'grid', rowGap: '10px' },
   panelItem: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
-  // 学びを付ける窓(手札から選ぶ。大きさを変えられる)
+  // 学びを足す窓(手札から選ぶ。大きさを変えられる)
   surface: { width: 'min(980px, (92vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(80vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column' },
   pickBody: { display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 },
   pickHead: { display: 'flex', alignItems: 'center', gap: '8px' },
@@ -90,6 +94,9 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   const styles = useStyles()
   const t = useT()
   const [cards, setCards] = useState<DeliveryCard[]>([])
+  // 読み込み中は、空の案内ではなく読み込み中の印を出す(simple-ui-review-2 の 24)
+  const [loaded, setLoaded] = useState(false)
+  const justAdded = useJustAdded()
   const [open, setOpen] = useState(false)
   const [deciding, setDeciding] = useState<string | null>(null)
   const [overrides, setOverrides] = useState<EquipOverrides>(new Map())
@@ -106,6 +113,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     DeliveryCardsService.getAll()
       .then((res) => res.success && setCards(res.data ?? []))
       .catch(() => undefined)
+      .finally(() => setLoaded(true))
   }, [])
   const loadOverrides = useCallback(() => {
     loadCardLearnings(card.id)
@@ -166,6 +174,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     setBusy(l.id)
     try {
       await saveCardLearning(card.id, l.id, on ? 'equip' : 'unequip', myName() || t('(名前なし)', '(no name)'))
+      // 足した学びは、装備中のいちばん上に出し、少しのあいだ印を付ける(画面の部品の決まり 1)
+      if (on) justAdded.mark(l.id)
     } finally {
       setBusy(null)
       loadOverrides()
@@ -189,7 +199,6 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     onCount?.(learnings.length)
   }, [learnings.length, onCount])
 
-  const dateText = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : '')
 
   const typeLine = (
     <Tooltip
@@ -212,16 +221,28 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
       </Button>
     </span>
   )
-  const caption =
-    learnings.length > 0
-      ? t('この配信の AI の下書きに渡す学び。× で外すと、この配信だけ渡しません', 'Learnings passed to AI drafts for this delivery. × removes one for this delivery only.')
-      : t('同じテンプレートか同じテーマの種類の、過去の配信の「次に生かすメモ」は、まだありません。手札から付けられます', 'No notes yet from past deliveries with the same template or theme type. You can add from your learnings.')
+  // 見出しの下に長い説明を並べない。説明は見出しの横の ⓘ に(X72。simple-ui-review-2 の 21)
+  const title = (
+    <InfoLabel
+      label={{ className: styles.heading }}
+      info={t(
+        '同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学びを自動で足します。足した学びは、この配信の AI の下書きに渡します。× で外すと、この配信だけ渡しません',
+        'Learnings from past deliveries on the same channel with the same template or theme type are added automatically and passed to AI drafts for this delivery. × removes one for this delivery only.',
+      )}
+    >
+      {t('装備中の学び', 'Learnings in use')}
+    </InfoLabel>
+  )
+  const empty = (
+    <span className={styles.caption}>{t('同じテンプレートか同じテーマの種類の、過去の配信の学びは、まだありません', 'No learnings yet from past deliveries with the same template or theme type')}</span>
+  )
   const equippedCards = (
     <div className={panel ? styles.equippedPanel : styles.equipped}>
-      {learnings.map((l) => (
+      {justAdded.order(learnings, (l) => l.id).map((l) => (
         <LearningCard
           key={l.id}
           data={l}
+          className={justAdded.freshClass(l.id)}
           compact
           actions={
             <Button size="small" appearance="subtle" icon={<DismissRegular />} disabled={busy === l.id} onClick={() => void equip(l, false)} aria-label={t(`「${l.title}」を外す`, `Remove "${l.title}"`)} title={t('この配信では外す(AI に渡さない)', 'Remove for this delivery (not passed to AI)')} />
@@ -232,23 +253,27 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   )
   const candidateList = candidates.length > 0 && (
     <>
-      <span className={styles.otherHead}>
-        {t(
-          `ほかの国の学び(使えるかもしれない)。国で客層が違うので、${countryName(country)}で使うかを決めてください。使うと決めたものだけ、AI に渡します`,
-          `Learnings from other countries (may apply). Audiences differ by country, so decide whether to use each in ${countryName(country)}. Only the ones you use are passed to AI.`,
+      <InfoLabel
+        className={styles.otherHead}
+        size="small"
+        info={t(
+          `国で客層が違うので、${countryName(country)}で使うかを決めてください。使うと決めたものだけ、AI に渡します`,
+          `Audiences differ by country, so decide whether to use each in ${countryName(country)}. Only the ones you use are passed to AI.`,
         )}
-      </span>
+      >
+        {t('ほかの国の学び(使えるかもしれない)', 'Learnings from other countries (may apply)')}
+      </InfoLabel>
       {candidates.map((l) =>
         panel ? (
           <div key={l.id} className={styles.panelItem}>
-            <span className={styles.muted}>{[dateText(l.sentAt), l.source.name ?? '', t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`)].join(' · ')}</span>
+            <span className={styles.muted}>{[day(l.sentAt), l.source.name ?? '', t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`)].join(' · ')}</span>
             <span className={styles.itemNotes}>{l.notes}</span>
             {decideButtons(l)}
           </div>
         ) : (
           <div key={l.id} className={styles.item}>
             <span className={styles.itemHead}>
-              <span>{dateText(l.sentAt)}</span>
+              <span>{day(l.sentAt)}</span>
               <span>{l.source.name ?? ''}</span>
               <span className={styles.muted}>{t(`${countryName(l.origin)}の学び`, `From ${countryName(l.origin)}`)}</span>
             </span>
@@ -264,19 +289,24 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   // 手札から付ける窓
   const picker = (
     <Dialog open={picking} onOpenChange={(_, d) => !d.open && setPicking(false)}>
-      <ResizableSurface sizeKey="learningPick" className={styles.surface} aria-label={t('学びを付ける', 'Add a learning')}>
+      <ResizableSurface sizeKey="learningPick" className={styles.surface} aria-label={t('学びを足す', 'Add a learning')}>
         <DialogBody className={styles.pickBody}>
           <div className={styles.pickHead}>
-            <DialogTitle className={styles.grow}>{t('学びを付ける', 'Add a learning')}</DialogTitle>
+            <DialogTitle className={styles.grow}>
+              <InfoLabel
+                size="large"
+                weight="semibold"
+                info={t(`${countryName(country)}で使う学びから選びます(強い順)。足すと、この配信の AI の下書きに渡します`, `Choose from learnings used in ${countryName(country)} (strongest first). Added learnings are passed to AI drafts for this delivery.`)}
+              >
+                {t('学びを足す', 'Add a learning')}
+              </InfoLabel>
+            </DialogTitle>
             <Button appearance="subtle" icon={<DismissRegular />} onClick={() => setPicking(false)} aria-label={t('閉じる', 'Close')} />
           </div>
           <DialogContent className={styles.pickContent}>
-            <span className={styles.muted} style={{ fontSize: tokens.fontSizeBase200 }}>
-              {t(`${countryName(country)}で使う学びから選びます(強い順)。付けると、この配信の AI の下書きに渡します`, `Choose from learnings used in ${countryName(country)} (strongest first). Added learnings are passed to AI drafts for this delivery.`)}
-            </span>
             <SearchBox size="small" placeholder={t('名前・メモ・配信名で探す', 'Search name, note or delivery')} value={query} onChange={(_, d) => setQuery(d.value)} />
             {pickable.length === 0 ? (
-              <span className={styles.muted}>{t('付けられる学びはありません', 'No learnings to add')}</span>
+              <span className={styles.caption}>{t('足せる学びはありません', 'No learnings to add')}</span>
             ) : (
               <div className={styles.pickGrid}>
                 {pickable.map((l) => (
@@ -285,7 +315,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
                     data={l}
                     actions={
                       <Button size="small" icon={<AddRegular />} disabled={busy === l.id} onClick={() => void equip(l, true)}>
-                        {t('付ける', 'Add')}
+                        {t('足す', 'Add')}
                       </Button>
                     }
                   />
@@ -300,9 +330,9 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   const header = (
     <ListHeader
       icon={<LightbulbRegular />}
-      title={t('装備中の学び', 'Learnings in use')}
+      title={title}
       count={learnings.length}
-      addLabel={t('学びを付ける', 'Add a learning')}
+      addLabel={t('学びを足す', 'Add a learning')}
       onAdd={() => setPicking(true)}
       actions={
         !panel &&
@@ -318,18 +348,18 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   if (panel)
     return (
       <div className={styles.panel}>
-        {/* パネルには、左のバーの見出し(これまでの学び)があり、幅も狭いので、見出しは出さず、付けるボタンだけ */}
-        <span>
-          <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => setPicking(true)}>
-            {t('学びを付ける', 'Add a learning')}
-          </Button>
-        </span>
-        <span className={styles.muted} style={{ fontSize: tokens.fontSizeBase200 }}>
-          {caption}
-        </span>
-        <span style={{ fontSize: tokens.fontSizeBase200 }}>{typeLine}</span>
-        {equippedCards}
-        <div className={styles.panelList}>{candidateList}</div>
+        {/* パネルでも、足すボタンは見出しの右(ListHeader。画面の部品の決まり 1。simple-ui-review-2 の 29) */}
+        {header}
+        {typeLine}
+        {!loaded ? (
+          <PaneSpinner />
+        ) : (
+          <>
+            {learnings.length === 0 && empty}
+            {equippedCards}
+            <div className={styles.panelList}>{candidateList}</div>
+          </>
+        )}
         {picker}
       </div>
     )
@@ -338,10 +368,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     <div className={styles.root}>
       {header}
       <div className={styles.head}>
-        <span className={styles.muted}>
-          {caption}
-          {candidates.length > 0 && t(`(ほかの国の、使えるかもしれない学びが ${candidates.length} 件)`, ` (${candidates.length} learning(s) from other countries may apply)`)}
-        </span>
+        {loaded && learnings.length === 0 && empty}
+        {candidates.length > 0 && <span className={styles.caption}>{t(`ほかの国の、使えるかもしれない学びが ${candidates.length} 件`, `${candidates.length} learning(s) from other countries may apply`)}</span>}
         {typeLine}
       </div>
       {open && (
