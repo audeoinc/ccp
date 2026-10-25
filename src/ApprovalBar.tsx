@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Badge, Button, Checkbox, Dropdown, Field, MessageBar, MessageBarBody, Option, Radio, RadioGroup, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowUndoRegular, CheckmarkCircleFilled, CircleRegular, DeleteRegular, DismissCircleFilled, PeopleTeamRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
+import { ArrowUndoRegular, CheckmarkCircleRegular, CircleRegular, DismissCircleRegular, PeopleTeamRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ApprovalRequestStatus, type ApprovalRequest, type ApprovalRequestRule } from './models/approvalRequests'
 import type { ApprovalReviewer } from './models/approvalReviewers'
@@ -10,7 +10,7 @@ import { ApprovalsService } from './data/approvals'
 import { eligibleReviewers, parseIds } from './approvals'
 import { myName, myUserId, onMeChange } from './history'
 import { activeUsers, groupInCountry, groupsOf, ruleFor, usePeople } from './people'
-import { locale, optionLabel, tr, useT } from './i18n'
+import { optionLabel, tr, useT, when } from './i18n'
 import { statusColor, statusLabel } from './status'
 import { weekKeyOf } from './weekLock'
 import { AutoTextarea } from './AutoTextarea'
@@ -123,7 +123,6 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
   const eligible = live?.status === 'open' ? eligibleReviewers(reviewers, meId, myGroups, live.requested_by) : []
   const isRequester = !!live && !!meId && live.requested_by === meId
   const usersOk = people.loaded && activeUsers(people).length > 0
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
   const run = async (f: () => Promise<{ success: boolean; error?: { message: string } }>) => {
     setWorking(true)
@@ -178,7 +177,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
   }, [quick, canRequest, people.loaded])
 
   const decisionIcon = (d?: string | null) =>
-    d === 'approved' ? <CheckmarkCircleFilled className={s.ok} /> : d === 'changes_requested' ? <DismissCircleFilled className={s.ng} /> : <CircleRegular className={s.pending} />
+    d === 'approved' ? <CheckmarkCircleRegular className={s.ok} /> : d === 'changes_requested' ? <DismissCircleRegular className={s.ng} /> : <CircleRegular className={s.pending} />
   const requestColor = (st?: string): 'success' | 'warning' | 'danger' | 'informative' => (st === 'approved' ? 'success' : st === 'open' ? 'warning' : st === 'changes_requested' ? 'danger' : 'informative')
   const firstSlot = reviewers.find((r) => r.id === eligible[0])?.reviewer_name ?? ''
 
@@ -200,7 +199,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
   const requestButton = (
     <Tooltip content={blockedBy ?? t('承認グループ・承認者を指名して、承認を依頼します', 'Choose approval groups or approvers and request approval')} relationship="description">
       <Button type="button" size="small" appearance="primary" icon={<SendRegular />} disabled={disabled || !!blockedBy} onClick={openRequest}>
-        {live?.status === 'changes_requested' || card.status === 'reviewing' ? t('もう一度依頼', 'Request again') : t('承認を依頼', 'Request approval')}
+        {live?.status === 'changes_requested' || card.status === 'reviewing' ? t('もう一度、承認を依頼する', 'Request approval again') : t('承認を依頼する', 'Request approval')}
       </Button>
     </Tooltip>
   )
@@ -266,11 +265,11 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
             {blockedBy && <span className={s.note}>{blockedBy}</span>}
             <div className={s.boxActions}>
               <Tooltip content={reason.trim() ? t('差し戻します(ひとことは理由として、コメントにも残ります)', 'Request changes (the note is saved as the reason)') : t('差し戻すときは、ひとことに理由を書いてください', 'Write the reason in the note to request changes')} relationship="description">
-                <Button type="button" size="small" icon={<ArrowUndoRegular />} disabled={disabled || !!blockedBy || !reason.trim()} onClick={sendBack}>
+                <Button type="button" size="small" icon={<DismissCircleRegular />} disabled={disabled || !!blockedBy || !reason.trim()} onClick={sendBack}>
                   {t('差し戻す', 'Request changes')}
                 </Button>
               </Tooltip>
-              <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy} onClick={() => void approve(reason.trim() || undefined)}>
+              <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleRegular />} disabled={disabled || !!blockedBy} onClick={() => void approve(reason.trim() || undefined)}>
                 {t('承認する', 'Approve')}
               </Button>
             </div>
@@ -342,8 +341,8 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
             {isRequester && (
               <>
                 <span className={mergeClasses(s.note, s.wide)}>{t('あなたが依頼しました', 'You requested this')}</span>
-                <Button type="button" size="small" icon={<DeleteRegular />} disabled={disabled} onClick={() => void run(() => ApprovalsService.withdraw(live.id, { actor, week_start: weekStart }))}>
-                  {t('取り下げ', 'Withdraw')}
+                <Button type="button" size="small" icon={<ArrowUndoRegular />} disabled={disabled} onClick={() => void run(() => ApprovalsService.withdraw(live.id, { actor, week_start: weekStart }))}>
+                  {t('取り下げる', 'Withdraw')}
                 </Button>
               </>
             )}
@@ -351,12 +350,12 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
               <>
                 <span className={mergeClasses(s.note, s.wide)}>{t(`あなたは ${firstSlot} として承認できます`, `You can approve as ${firstSlot}`)}</span>
                 <Tooltip content={blockedBy ?? t(`${firstSlot} として承認します`, `Approve as ${firstSlot}`)} relationship="description">
-                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => void approve()}>
-                    {t('承認', 'Approve')}
+                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleRegular />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => void approve()}>
+                    {t('承認する', 'Approve')}
                   </Button>
                 </Tooltip>
-                <Button type="button" size="small" icon={<ArrowUndoRegular />} disabled={disabled || mode === 'reject'} onClick={() => { setReason(''); setError(null); setMode('reject') }}>
-                  {t('差し戻す', 'Send back')}
+                <Button type="button" size="small" icon={<DismissCircleRegular />} disabled={disabled || mode === 'reject'} onClick={() => { setReason(''); setError(null); setMode('reject') }}>
+                  {t('差し戻す', 'Request changes')}
                 </Button>
               </>
             )}
@@ -380,7 +379,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
         <div className={s.box}>
           {requestFields}
           <div className={s.boxActions}>
-            <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Back')}</Button>
+            <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Cancel')}</Button>
             <Button
               type="button"
               size="small"
@@ -389,27 +388,27 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
               disabled={disabled || (groupIds.length === 0 && userIds.length === 0)}
               onClick={sendRequest}
             >
-              {t('依頼する', 'Send request')}
+              {t('承認を依頼する', 'Request approval')}
             </Button>
           </div>
         </div>
       )}
       {mode === 'reject' && live && (
         <div className={s.box}>
-          <Field label={t('差し戻しの理由(コメントにも残ります。1 人でも差し戻すと、この依頼は止まります)', 'Reason for sending back (also saved as a comment; one send-back stops this request)')} required size="small">
+          <Field label={t('差し戻しの理由(コメントにも残ります。1 人でも差し戻すと、この依頼は止まります)', 'Reason for requesting changes (also saved as a comment; one request for changes stops this request)')} required size="small">
             <AutoTextarea heightKey="ApprovalBar.reason" rows={2} size="small" autoFocus value={reason} onChange={(_, d) => setReason(d.value)} placeholder={t('例: 前日のメールと商品がかぶっているので、入れ替えてください', 'e.g. Same products as the previous day. Please swap some.')} />
           </Field>
           <div className={s.boxActions}>
-            <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Back')}</Button>
+            <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Cancel')}</Button>
             <Button
               type="button"
               size="small"
               appearance="primary"
-              icon={<ArrowUndoRegular />}
+              icon={<DismissCircleRegular />}
               disabled={disabled || !reason.trim()}
               onClick={sendBack}
             >
-              {t('差し戻す', 'Send back')}
+              {t('差し戻す', 'Request changes')}
             </Button>
           </div>
         </div>
