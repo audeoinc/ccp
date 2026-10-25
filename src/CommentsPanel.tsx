@@ -14,6 +14,7 @@ import { isThreadRoot, stageOf, type NoteStage } from './notesStage'
 import { anchorLabel, bumpNotes, focusPin, focusedPin, pinNumbers, subscribePins, viewLabel } from './pinStore'
 import { confirmDialog } from './confirm'
 import { PersonInput } from './PersonInput'
+import { typo } from './typo'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -45,7 +46,7 @@ const useStyles = makeStyles({
   // 1 件(書き込み・返信)。顔 + 名前・日時 + 本文
   entry: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
   entryBody: { display: 'grid', rowGap: '2px', minWidth: 0 },
-  meta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  meta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '6px', ...typo.caption },
   who: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, fontSize: tokens.fontSizeBase200 },
   to: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   body: { fontSize: tokens.fontSizeBase200, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: tokens.colorNeutralForeground1 },
@@ -56,13 +57,13 @@ const useStyles = makeStyles({
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
   form: { display: 'grid', rowGap: '6px' },
   formRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', rowGap: '6px' },
-  hint: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  hint: typo.caption,
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   // AI のタスクの案(採用するまで保存しない)
   ideas: { display: 'grid', rowGap: '6px', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   idea: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto auto', columnGap: '6px', rowGap: '4px', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}`, '& .fui-Input': { minWidth: 0, width: '100%' } },
   ideaText: { gridColumn: '1 / -1' },
-  taskChip: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: tokens.fontSizeBase100, color: tokens.colorBrandForeground1 },
+  taskChip: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', fontSize: tokens.fontSizeBase200, color: tokens.colorBrandForeground1 },
   // プレビュー上の場所(ピン)。押すと、プレビューのそのピンを光らせる
   pinChip: {
     display: 'inline-flex',

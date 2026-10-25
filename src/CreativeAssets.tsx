@@ -20,9 +20,10 @@ import type { CardAsset } from './models/cardAssets'
 import type { Product } from './models/products'
 import { PREF } from './prefKeys'
 import { confirmDialog } from './confirm'
+import { typo } from './typo'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', rowGap: '10px', alignContent: 'start' },
+  root: { display: 'grid', rowGap: '12px', alignContent: 'start' },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
   drop: {
@@ -73,7 +74,7 @@ const useStyles = makeStyles({
   rowBody: { display: 'grid', rowGap: '3px', minWidth: 0 },
   rowTitle: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   rowMessage: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
-  rowMeta: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  rowMeta: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px', ...typo.caption },
   tile: {
     display: 'grid',
     gridTemplateRows: '96px auto',

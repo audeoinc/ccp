@@ -10,13 +10,14 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import { EventsService, type CardEvent } from './data/events'
 import { locale, useT } from './i18n'
 import { statusLabel } from './status'
+import { typo } from './typo'
 
 const useStyles = makeStyles({
   surface: { width: 'min(560px, (94vw / var(--ui-zoom, 1)))' },
   list: { display: 'grid', alignContent: 'start', rowGap: '10px', fontSize: tokens.fontSizeBase200 },
   scroll: { maxHeight: 'calc(70vh / var(--ui-zoom, 1))', overflowY: 'auto' },
   group: { display: 'grid', rowGap: '4px', paddingBottom: '8px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
-  meta: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  meta: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.caption },
   line: { display: 'grid', rowGap: '1px', minWidth: 0 },
   field: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
   values: { color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' },

@@ -7,6 +7,7 @@ import {
   DialogBody,
   DialogContent,
   DialogTitle,
+  InfoLabel,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
@@ -19,7 +20,6 @@ const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '16px' },
   group: { display: 'grid', rowGap: '2px' },
   groupTitle: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, marginBottom: '2px' },
-  note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   owners: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', maxHeight: '180px', overflowY: 'auto' },
 })
 
@@ -42,22 +42,26 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
       <ResizableSurface sizeKey="alertSettings">
         <DialogBody>
-          <DialogTitle>{t('アラートの条件', 'Alert conditions')}</DialogTitle>
+          {/* 説明は題の横の ⓘ に(題の下に長い文を並べない。X72) */}
+          <DialogTitle>
+            <InfoLabel
+              size="large"
+              weight="semibold"
+              info={
+                <>
+                  {t(
+                    'このブラウザで覚えます(人ごとに、知らせてほしいものを決める)。ヘッダーの件数にも効きます。在庫の見込みは、すべての配信で計算し、条件は、出す配信を絞るだけです。',
+                    'Saved in this browser (each person decides what to be told about). Also applies to the header count. Stock is still projected from all deliveries; these only narrow what is shown.',
+                  )}{' '}
+                  {/* 在庫僅少の週数・週の上限は、国の基準に移した(ST2)。何を問題とみなすかは国で決めるため */}
+                  {t('在庫僅少とみなす週数・週の上限は、国の基準です(⚙ →「国」→「アラートの基準」)。', 'Low-stock weeks and the weekly limit are country criteria (⚙ → Country → Alert criteria).')}
+                </>
+              }
+            >
+              {t('アラートの条件', 'Alert conditions')}
+            </InfoLabel>
+          </DialogTitle>
           <DialogContent className={styles.body}>
-            <span className={styles.note}>
-              {t(
-                'このブラウザで覚えます(人ごとに、知らせてほしいものを決める)。ヘッダーの件数にも効きます。在庫の見込みは、すべての配信で計算し、条件は、出す配信を絞るだけです',
-                'Saved in this browser (each person decides what to be told about). Also applies to the header count. Stock is still projected from all deliveries; these only narrow what is shown.',
-              )}
-            </span>
-
-            {/* 在庫僅少の週数・週の上限は、国の基準に移した(ST2)。何を問題とみなすかは国で決めるため */}
-            <span className={styles.note}>
-              {t(
-                '在庫僅少とみなす週数・週の上限は、国の基準になりました(⚙ →「国」→「アラートの基準」)。',
-                'Low-stock weeks and the weekly limit are now country criteria (⚙ → Country → Alert criteria).',
-              )}
-            </span>
 
             <div className={styles.group}>
               <span className={styles.groupTitle}>{t('出す種類', 'Kinds to show')}</span>

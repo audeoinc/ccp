@@ -4,6 +4,7 @@ import { optionLabel, useT } from './i18n'
 import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges, type TargetGender } from './target'
 import { statusColor, statusOptions } from './status'
 import { PersonInput } from './PersonInput'
+import { typo } from './typo'
 
 /**
  * 配信の情報の入力欄(配信名・配信日時・選択肢・ステータス・配信の対象・担当)。
@@ -17,7 +18,7 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1, minWidth: 0 },
   targetBox: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
   targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
-  targetLabel: { width: '44px', flexShrink: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  targetLabel: { width: '44px', flexShrink: 0, ...typo.label },
   chip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
 })
 

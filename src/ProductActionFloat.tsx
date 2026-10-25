@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, Field, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, Field, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowLeftRegular, ArrowMoveRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -22,6 +22,7 @@ import { productUrl } from './links'
 import { weeklyLimit } from './weeklyLimit'
 import { getUiScale } from './uiScale'
 import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
+import { typo } from './typo'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
 // どこから開いても同じ形: 左に、差し替えの候補(AI の差し替え案・残りの候補・ほかの商品を探す)、右に、選んでいる商品の詳しい情報。
@@ -45,7 +46,7 @@ const useStyles = makeStyles({
   body: { display: 'flex', flexDirection: 'column', rowGap: '10px', minHeight: 0, flexGrow: 1 },
   // 題名の行の全体をつかんで動かす(プレビューを見ながら選べるように)
   grab: { display: 'flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
-  grabTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  grabTitle: { ...typo.heading, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   grabHint: { marginLeft: 'auto', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   muted: { color: tokens.colorNeutralForeground3 },
   alert: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '10px', rowGap: '6px', padding: '8px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteDarkOrangeBackground1, border: `1px solid ${tokens.colorPaletteDarkOrangeBorder1}` },
@@ -55,7 +56,7 @@ const useStyles = makeStyles({
   left: { display: 'grid', alignContent: 'start', rowGap: '14px', overflowY: 'auto', minHeight: 0, paddingRight: '6px' },
   right: { display: 'grid', alignContent: 'start', rowGap: '10px', overflowY: 'auto', minHeight: 0, borderLeft: `1px solid ${tokens.colorNeutralStroke2}`, paddingLeft: '16px' },
   section: { display: 'grid', rowGap: '6px' },
-  sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.heading },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   marks: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
   rightHead: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase300 },
@@ -236,11 +237,13 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                 {onOpenSwap ? (
                   <div className={s.left}>
                     <div className={s.section}>
+                      {/* 説明は見出しの横の ⓘ に(見出しの下に長い文を並べない。X72) */}
                       <span className={s.sectionHead}>
                         <ArrowSwapRegular />
-                        {t('入れ替える', 'Replace')}
+                        <InfoLabel size="small" weight="semibold" info={t('AI のおすすめ・AI に頼む・すべての商品から、ほかの商品と入れ替えます(選んだ部品のペインで開きます)。', 'Replace it with another product: AI picks, ask AI, or all products (opens in the part pane).')}>
+                          {t('入れ替える', 'Replace')}
+                        </InfoLabel>
                       </span>
-                      <span className={s.caption}>{t('AI のおすすめ・AI に頼む・すべての商品から、ほかの商品と入れ替えます(選んだ部品のペインで開きます)。', 'Replace it with another product: AI picks, ask AI, or all products (opens in the part pane).')}</span>
                       <span>
                         <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={onOpenSwap}>
                           {t('入れ替える', 'Replace')}
@@ -322,7 +325,16 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                   {shown && <ProductDetail key={shown.id} product={shown} />}
                   {canSwap && (
                     <div className={s.swapBox}>
-                      <Field label={t('入れ替えの理由(任意。配信のメモに残ります)', 'Reason for replacing (optional; kept in the delivery notes)')} size="small">
+                      <Field
+                        label={{
+                          children: (_: unknown, props: { className?: string }) => (
+                            <InfoLabel {...props} size="small" info={t('この配信の中で入れ替えます(保存で確定。保存しなければ元のまま)', 'Replaces it in this delivery (confirmed when you save).')}>
+                              {t('入れ替えの理由(任意。配信のメモに残ります)', 'Reason for replacing (optional; kept in the delivery notes)')}
+                            </InfoLabel>
+                          ),
+                        }}
+                        size="small"
+                      >
                         <AutoTextarea heightKey="ProductActionFloat.reason" size="small" value={reason} onChange={(_, d) => setReason(d.value)} />
                       </Field>
                       <div className={s.swapActions}>
@@ -333,7 +345,6 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                           {t(`「${product.name}」をこの商品に入れ替える`, `Replace "${product.name}" with this`)}
                         </Button>
                       </div>
-                      <span className={s.caption}>{t('この配信の中で入れ替えます(保存で確定。保存しなければ元のまま)', 'Replaces it in this delivery (confirmed when you save).')}</span>
                     </div>
                   )}
                 </div>

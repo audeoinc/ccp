@@ -29,7 +29,7 @@ const useStyles = makeStyles({
   detail: { color: tokens.colorNeutralForeground2 },
   act: { minWidth: 'auto', height: '22px', padding: '0 8px' },
   // 左のバーのパネルの中(SU6): 枠も畳む操作も要らない。1 件ずつ区切って並べる
-  panel: { display: 'grid', rowGap: '10px', padding: '10px 12px', alignContent: 'start' },
+  panel: { display: 'grid', rowGap: '12px', padding: '12px 14px', alignContent: 'start' },
   panelItem: { display: 'grid', rowGap: '4px', paddingBottom: '10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, fontSize: tokens.fontSizeBase200 },
   panelRow: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
