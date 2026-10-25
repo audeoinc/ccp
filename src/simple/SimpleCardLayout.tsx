@@ -5,6 +5,7 @@ import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
+import { useStableCallback } from '../useStableCallback'
 import { PreviewPins } from '../PreviewPins'
 import { ResolvedPinsToggle } from '../ResolvedPinsToggle'
 import { pinView } from '../pinStore'
@@ -200,7 +201,19 @@ const useStyles = makeStyles({
   },
   zoomLabel: { minWidth: '44px', padding: '0 2px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
   commPane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
-  railDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' },
+  // 押せる所は 24px(見える点は 10px のまま。WCAG 2.5.8。レビューの 13)。点の色は --dot
+  railDot: {
+    width: '24px',
+    height: '24px',
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    backgroundColor: 'transparent',
+    '::before': { content: '""', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--dot)' },
+  },
   listHead: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '-6px' },
   colTitle: { ...typo.heading, marginBottom: '10px' },
   panesMoving: { transitionProperty: 'grid-template-columns', transitionDuration: '200ms', transitionTimingFunction: 'ease-out', '@media (prefers-reduced-motion: reduce)': { transitionDuration: '0ms' } },
@@ -216,7 +229,7 @@ const useStyles = makeStyles({
   sideIcon: { position: 'relative', fontSize: '20px', lineHeight: 1 },
   sideBadge: { position: 'absolute', top: '-7px', right: '-13px' },
   sideDot: { position: 'absolute', top: '-3px', left: '-6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
-  sideLabel: { fontSize: '10px', lineHeight: 1.2 },
+  sideLabel: { fontSize: '11px', lineHeight: 1.2 },
   // 画像・URL を落とせる所(ドラッグ中)
   sideDrop: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px', backgroundColor: tokens.colorBrandBackground2 },
   dropNote: { fontSize: '16px' },
@@ -624,6 +637,31 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     </div>
   )
 
+  // 選んだ部品のペイン(プレビューで Enter を押したとき、ここの最初の入力欄へ移る)
+  const paneRef = useRef<HTMLDivElement>(null)
+  const focusPane = () => (paneRef.current?.querySelector<HTMLElement>('textarea, input, select') ?? paneRef.current?.querySelector<HTMLElement>('button'))?.focus()
+  // Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の中の Ctrl + Z は、ふつうの文字の取り消しにする。レビューの 6)
+  const applyKey = useStableCallback(onApply)
+  const undoKey = useStableCallback(onUndo)
+  useEffect(() => {
+    const editing = () => {
+      const el = document.activeElement
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el as HTMLElement).isContentEditable)
+    }
+    const onKey = (ev: KeyboardEvent) => {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.isComposing) return
+      const k = ev.key.toLowerCase()
+      if (k === 's') {
+        ev.preventDefault()
+        applyKey()
+      } else if (k === 'z' && !ev.shiftKey && !editing()) {
+        ev.preventDefault()
+        undoKey()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [applyKey, undoKey])
   // 受信箱の行に出す文言(AI の案を写している間は、その案。保存する中身は変えない)
   const shown = { ...e.form, ...(e.previewTexts ?? {}) }
   return (
@@ -950,7 +988,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <MessageBarBody>{t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to write a comment (Esc to cancel)')}</MessageBarBody>
             </MessageBar>
           )}
-          <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。Tab で次の部品、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; Tab for the next part, Esc to stop)')}>
+          <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; ↑ ↓ for the previous or next part, Enter to edit, Esc to stop)')}>
             {e.preview}
             {e.alertOverlay}
             <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />
@@ -971,10 +1009,20 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onEnter={focusPane} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
+            {/* キーの操作の一覧(案内の 3 つの置き方の 2: ⓘ に入れる) */}
+            <InfoLabel
+              size="small"
+              info={t(
+                'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
+                'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
+              )}
+            >
+              {t('キー', 'Keys')}
+            </InfoLabel>
             <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
             <Tooltip content={e.zoom.mode === 'fit' ? t('100% にする', 'Set to 100%') : t('全体を表示', 'Fit the whole email')} relationship="description">
               <button type="button" className={s.zoomLabel} onClick={() => e.zoom.set(e.zoom.mode === 'fit' ? 1 : 'fit')}>
@@ -989,7 +1037,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         <Splitter onDrag={resizePreview} onDone={saveWidths} />
 
         {/* 選んだ部品のペイン */}
-        <div className={s.pane} key={part ? partKey(part) : 'none'}>
+        <div className={s.pane} key={part ? partKey(part) : 'none'} ref={paneRef}>
           <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} />
           {e.footer}
         </div>
@@ -1077,8 +1125,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               const kind = e.alertKinds.get(it.productId)
               const name = productById.get(it.productId)?.name ?? ''
               return (
-                <Tooltip key={it.key} content={name} relationship="label">
-                  <button type="button" className={s.railDot} style={{ backgroundColor: kind ? ALERT_COLOR[kind] : tokens.colorNeutralStroke1 }} onClick={() => select({ kind: 'product', itemKey: it.key })} />
+                // 色だけで知らせないよう、名前にアラートの有無も入れる(読み上げ・ツールチップ)
+                <Tooltip key={it.key} content={kind ? t(`${name}(アラートあり)`, `${name} (has an alert)`) : name} relationship="label">
+                  <button type="button" className={s.railDot} style={{ '--dot': kind ? ALERT_COLOR[kind] : tokens.colorNeutralStroke1 } as React.CSSProperties} onClick={() => select({ kind: 'product', itemKey: it.key })} />
                 </Tooltip>
               )
             })}

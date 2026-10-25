@@ -41,6 +41,8 @@ interface Props {
   disabled?: boolean
   /** 商品の枠にマウスを乗せたとき、右上に「入れ替える」(⇄)を出す(SU9。シンプルな配信カード) */
   onSwap?: (itemKey: string) => void
+  /** 部品を選んでいるときに Enter: その部品のペインの入力欄へ移る */
+  onEnter?: () => void
 }
 
 /**
@@ -48,8 +50,12 @@ interface Props {
  * プレビューの部品そのものは変えない(書き込みのピン PreviewPins と同じ作り。制作のページ・結果でも使えるように、配信カードには依存しない)。
  * 選んだ部品には枠と淡い色、マウスを乗せた部品には薄い枠を重ねる。Tab / Shift+Tab で次・前の部品、Esc で選ぶのをやめる
  */
-export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap }: Props) {
+export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onEnter }: Props) {
   const s = useStyles()
+  const onEnterRef = useRef(onEnter)
+  useEffect(() => {
+    onEnterRef.current = onEnter
+  })
   const t = useT()
   const [hover, setHover] = useState<PartRef | null>(null)
   const [rects, setRects] = useState<{ sel: Rect | null; hover: Rect | null; swap: Rect | null }>({ sel: null, hover: null, swap: null })
@@ -118,13 +124,24 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
         onSelect(null)
         return
       }
-      if (e.key !== 'Tab') return
+      // Enter で、選んだ部品のペインへ移る(直す欄に入る)
+      if (e.key === 'Enter') {
+        if (!selectedRef.current || !onEnterRef.current) return
+        e.preventDefault()
+        onEnterRef.current()
+        return
+      }
+      // ↑ ↓ で、前・次の部品へ(端では止まる)。Tab はプレビューから出る(以前は Tab で部品を回り、プレビューの外へ出られなかった。レビューの 6)
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
       const list = partsInOrder(box)
       if (list.length === 0) return
       e.preventDefault()
+      const up = e.key === 'ArrowUp'
       const cur = selectedRef.current ? list.findIndex((p) => samePart(p, selectedRef.current)) : -1
-      const next = cur < 0 ? (e.shiftKey ? list.length - 1 : 0) : (cur + (e.shiftKey ? -1 : 1) + list.length) % list.length
+      const next = cur < 0 ? (up ? list.length - 1 : 0) : Math.min(list.length - 1, Math.max(0, cur + (up ? -1 : 1)))
       onSelect(list[next])
+      // 選んだ部品のペインの入力欄が、開いたときに選ばれる(autoFocus)ので、キーで動かしているときは、プレビューに戻す(続けて ↑ ↓ を押せるように)
+      window.setTimeout(() => box.focus({ preventScroll: true }), 0)
     }
     box.addEventListener('click', onClick)
     box.addEventListener('mousemove', onMove)
