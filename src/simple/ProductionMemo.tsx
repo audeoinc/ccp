@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Button, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, BoxMultipleArrowRightRegular, DismissRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
+import { ListHeader } from '../ListHeader'
+import { useJustAdded } from '../useJustAdded'
 import { useT } from '../i18n'
 import type { SimpleEditor } from './editor'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '6px', paddingTop: '10px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
-  head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
   line: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, padding: '2px 6px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground2 },
   input: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'end' },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -29,7 +30,9 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
   const [writing, setWriting] = useState(false)
   const prefix = prefixOf(label)
   const lines = e.form.instructions.split('\n')
-  const mine = lines.map((l, i) => ({ l, i })).filter((x) => x.l.startsWith(prefix))
+  const justAdded = useJustAdded()
+  // 制作指示の中の並びは変えない。見せるときだけ、足した行を上に出す
+  const mine = justAdded.order(lines.map((l, i) => ({ l, i })).filter((x) => x.l.startsWith(prefix)), (x) => x.l)
   const add = () => {
     const v = text.trim().replace(/\n+/g, ' ')
     if (!v) return
@@ -37,28 +40,14 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
     e.setField('instructions', `${base ? `${base}\n` : ''}${prefix}${v}`)
     setText('')
     setWriting(false)
+    // 足した行は、この画面を開いている間だけ上に出し、少しのあいだ印を付ける(画面の部品の決まり 1)
+    justAdded.mark(`${prefix}${v}`)
   }
   const remove = (index: number) => e.setField('instructions', lines.filter((_, i) => i !== index).join('\n'))
   return (
     <div className={s.root}>
-      {writing ? (
-        <span className={s.head}>
-          <BoxMultipleArrowRightRegular />
-          {t('制作へのメモ(渡すものに入ります)', 'Note for production (goes to Handoff)')}
-        </span>
-      ) : (
-        <span>
-          <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => setWriting(true)}>
-            {t('制作へのメモ', 'Note for production')}
-          </Button>
-        </span>
-      )}
-      {mine.map((x) => (
-        <span key={x.i} className={s.line}>
-          <span>{x.l.slice(prefix.length)}</span>
-          <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => remove(x.i)} aria-label={t('このメモを外す', 'Remove this note')} />
-        </span>
-      ))}
+      {/* 見出しの右に「＋ メモを足す」、書く欄は一覧の上に開く(ListHeader。画面の部品の決まり 1) */}
+      <ListHeader title={t('制作へのメモ(渡すものに入ります)', 'Note for production (goes to Handoff)')} icon={<BoxMultipleArrowRightRegular />} count={mine.length} addLabel={t('メモを足す', 'Add a note')} onAdd={() => setWriting(true)} addDisabled={writing} />
       {writing && (
       <div className={s.input}>
         <AutoTextarea heightKey="ProductionMemo.text"
@@ -78,6 +67,12 @@ export function ProductionMemo({ editor: e, label }: { editor: SimpleEditor; lab
         <Button size="small" icon={<AddRegular />} disabled={!text.trim()} onClick={add} aria-label={t('メモを足す', 'Add the note')} />
       </div>
       )}
+      {mine.map((x) => (
+        <span key={x.i} className={mergeClasses(s.line, justAdded.freshClass(x.l))}>
+          <span>{x.l.slice(prefix.length)}</span>
+          <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => remove(x.i)} aria-label={t('このメモを外す', 'Remove this note')} />
+        </span>
+      ))}
     </div>
   )
 }
