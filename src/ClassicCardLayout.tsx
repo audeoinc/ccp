@@ -48,7 +48,7 @@ import { AbDecidedBar, AbTestBar } from './AbTestBar'
 import { CreativeAssets } from './CreativeAssets'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
-import { isChoose, metricLabel, ownsHero, ownsProducts, ownsSubject, targetLabel } from './abTest'
+import { isChoose, metricLabel, ownsHero, ownsProducts, targetLabel } from './abTest'
 import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from './DeliveryInfoFields'
 import { PreviewPins } from './PreviewPins'
 import { pinView } from './pinStore'
@@ -92,8 +92,8 @@ type CardEditor = ReturnType<typeof useCardEditor>
 type CardAlertsApi = ReturnType<typeof useCardAlerts>
 type PreviewPins = ReturnType<typeof usePreviewPins>
 
-export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'active' | 'addVariant' | 'asTarget' | 'audience' | 'buildContent' | 'canReview' | 'candidates' | 'changeReason' | 'changeTarget' | 'comparing' | 'decideVariant' | 'decision' | 'draftActiveVariant' | 'form' | 'groupByCategory' | 'heroCandidates' | 'heroId' | 'heroReason' | 'isDirty' | 'items' | 'justSaved' | 'links' | 'lockedWeeks' | 'poolHeroes' | 'poolProducts' | 'productById' | 'pushLink' | 'removeItem' | 'removeVariant' | 'saveAndNext' | 'saveAndStay' | 'saveMode' | 'saving' | 'sectionCopies' | 'sectionTitles' | 'selectedKey' | 'set' | 'setAb' | 'setAudience' | 'setCandidates' | 'setComparing' | 'setForm' | 'setHeroCandidates' | 'setHeroId' | 'setHeroReason' | 'setItems' | 'setLinks' | 'setPushLink' | 'setSectionCopy' | 'setSectionTitle' | 'setSelectedKey' | 'startAbTest' | 'stopAbTest' | 'switchVariant' | 'template' | 'templateChannel'> &
-  Pick<CardAlertsApi, 'alertCard' | 'itemAlertKinds' | 'openAlertFor' | 'productAlertKinds' | 'setActAlert' | 'setProductOpen' | 'setSlotAction'> & {
+export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'active' | 'addVariant' | 'asTarget' | 'audience' | 'buildContent' | 'canReview' | 'changeReason' | 'changeTarget' | 'comparing' | 'decideVariant' | 'decision' | 'draftActiveVariant' | 'form' | 'groupByCategory' | 'heroId' | 'isDirty' | 'items' | 'justSaved' | 'lockedWeeks' | 'productById' | 'removeItem' | 'removeVariant' | 'saveAndNext' | 'saveAndStay' | 'saveMode' | 'saving' | 'sectionTitles' | 'selectedKey' | 'set' | 'setAb' | 'setAudience' | 'setComparing' | 'setForm' | 'setSelectedKey' | 'startAbTest' | 'stopAbTest' | 'switchVariant' | 'template' | 'templateChannel'> &
+  { editor: CardEditor } & Pick<CardAlertsApi, 'alertCard' | 'itemAlertKinds' | 'openAlertFor' | 'productAlertKinds' | 'setActAlert' | 'setProductOpen' | 'setSlotAction'> & {
     abCompareNode: ReactNode
     alertsNode: ReactNode
     footerNode: ReactNode
@@ -154,7 +154,7 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     onTabChange: ((tab: string) => void) | undefined
   }
 
-export function ClassicCardLayout({ ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, candidates, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroCandidates, heroId, heroReason, isDirty, items, justSaved, links, lockedWeeks, poolHeroes, poolProducts, productById, pushLink, removeItem, removeVariant, saveAndNext, saveAndStay, saveMode, saving, sectionCopies, sectionTitles, selectedKey, set, setAb, setAudience, setCandidates, setComparing, setForm, setHeroCandidates, setHeroId, setHeroReason, setItems, setLinks, setPushLink, setSectionCopy, setSectionTitle, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }: ClassicCardLayoutProps) {
+export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, saveMode, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }: ClassicCardLayoutProps) {
   const t = useT()
   const styles = useCardDetailStyles()
   const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
@@ -431,31 +431,12 @@ export function ClassicCardLayout({ ab, abAiBusy, active, addVariant, asTarget, 
               {/* 中: コンテンツ生成(テーマ・商品選定・コピー・制作指示) */}
               <div className={mergeClasses(styles.pane, styles.paneMid)}>
                 <ContentPane
-                  theme={form.theme}
-                  headline={form.headline}
-                  copy={form.copy}
-                  subject={form.subject}
-                  preheader={form.preheader}
-                  deliveryName={form.name}
-                  subjectAbKey={ab && active !== 'A' && ownsSubject(ab) ? active : undefined}
-                  instructions={form.instructions}
-                  themeReason={form.themeReason}
-                  copyAngle={form.copyAngle}
-                  instructionsAngle={form.instructionsAngle}
-                  onField={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
-                  template={template}
-                  onTemplate={changeTemplate}
-                  country={form.country}
-                  templateUse={templateUseMap}
-                  sectionTitles={sectionTitles}
-                  onSectionTitle={setSectionTitle}
-                  sectionCopies={sectionCopies}
-                  onSectionCopy={setSectionCopy}
+                  editor={editor}
+                  drafts={drafts}
                   products={products}
                   heroes={heroes}
-                  poolProducts={poolProducts}
-                  poolHeroes={poolHeroes}
-                  onUploadHero={() => setHeroUpload(true)}
+                  onTemplate={changeTemplate}
+                  templateUse={templateUseMap}
                   assetsSlot={
                     <CreativeAssets
                       cardId={card?.id}
@@ -470,40 +451,14 @@ export function ClassicCardLayout({ ab, abAiBusy, active, addVariant, asTarget, 
                       products={products}
                     />
                   }
-                  items={items}
-                  setItems={setItems}
-                  candidates={candidates}
-                  setCandidates={setCandidates}
+                  onUploadHero={() => setHeroUpload(true)}
                   alertKinds={productAlertKinds}
                   onAlert={alertCard ? openAlertFor : undefined}
                   onOpenProduct={(key) => {
                     setActAlert(null)
                     setProductOpen(key)
                   }}
-                  heroId={heroId}
-                  setHeroId={setHeroId}
-                  heroReason={heroReason}
-                  setHeroReason={setHeroReason}
-                  heroCandidates={heroCandidates}
-                  setHeroCandidates={setHeroCandidates}
-                  drafts={drafts}
-                  disabled={saving}
-                  links={links}
-                  onLinks={setLinks}
-                  handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
-                  onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
                   tabRequest={stepRequest}
-                  people={owners}
-                  cardId={card?.id}
-                  owner={form.owner}
-                  cardName={form.name}
-                  channel={templateChannel}
-                  pushLink={pushLink}
-                  onPushLink={setPushLink}
-                  pushTitle={form.pushTitle}
-                  pushBody={form.pushBody}
-                  onPush={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
-                  scheduledAt={form.scheduledAt}
                   campaign={campaignSlug(form.name, form.scheduledAt)}
                   utmCampaign={utmCampaign}
                   linkVariant={linkVariant}

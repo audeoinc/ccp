@@ -1,30 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { Accordion, AccordionHeader, AccordionItem, AccordionPanel, Badge, Button, Divider, Field, MessageBar, MessageBarActions, MessageBarBody, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import {
-  ArrowDownRegular,
-  ArrowUpRegular,
-  ChevronDownRegular,
-  DismissRegular,
-  ImageAddRegular,
-} from '@fluentui/react-icons'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Badge, Button, Field, Tab, TabList, Tooltip, mergeClasses } from '@fluentui/react-components'
 import { TemplateThumb } from './TemplateThumb'
 import { ChatPanel, type ChatMsg } from './ChatPanel'
 import { AutoTextarea } from './AutoTextarea'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { Candidates } from './Candidates'
-import { HeroCandidates } from './HeroCandidates'
-import { heroImage, productImage } from './images'
-import { DND_HERO, SOURCE_AI, type Candidate, type Item } from './items'
-import { withChat, type ProposedHero } from './aiSelect'
-import { optionLabel, tr, useT } from './i18n'
-import { Row, productMeta } from './ProductRow'
-import { ProductFloat } from './ProductFloat'
-import { AlertChip, LowStockBadge } from './ProductMarks'
+import { withChat } from './aiSelect'
+import { tr, useT } from './i18n'
 import type { CardAlertKind } from './cardAlerts'
-import { useSelection } from './useSelection'
 import { progressOf } from './progress'
-import { baseTemplateId, getTemplate, hasTemplate, openTemplateManager, sectionRange, sectionsOf, templateOptions, type EmailTemplateId, type SectionInfo, type TemplateChannel, currentVersion, splitTemplateKey } from './templates'
+import { baseTemplateId, getTemplate, hasTemplate, openTemplateManager, sectionsOf, templateOptions, type EmailTemplateId, type TemplateChannel, currentVersion, splitTemplateKey } from './templates'
 import { appliesIn, useCountryApply } from './countryApply'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
@@ -32,72 +17,44 @@ import { AppLinksEditor } from './AppLinksEditor'
 import { AiButton } from './AiButton'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
-import { PUSH_BODY_MAX, PUSH_TITLE_MAX, tapComplete, type PushLink } from './pushLink'
+import { tapComplete } from './pushLink'
 import type { TemplateUse } from './templateUse'
+import type { useCardEditor } from './useCardEditor'
+import { ownsSubject } from './abTest'
+import { HeroTab } from './HeroTab'
+import { SectionsTab } from './SectionsTab'
+import { useContentPaneStyles } from './contentPaneStyles'
+import { CopyTab } from './contentPaneParts'
+import { revealTab, type FieldKey, type RegisterChat } from './contentPaneUtil'
 
-import { PREHEADER_MAX, SUBJECT_MAX } from './textLimits'
 import { MarkdownLite } from './MarkdownLite'
-import { type Links, linkSlots, linksComplete, variantCampaign } from './links'
+import { linkSlots, linksComplete, variantCampaign } from './links'
 
 // 中ペインは、コンテンツを作る工程だけ。人とのやり取り(引き継ぎ・質問・タスク・コメント)は、右端の「プロセス」のペイン(ProcessPane)に移した(2026-10-17)
 export type TopTab = 'theme' | 'template' | 'hero' | 'sections' | 'instructions' | 'links' | 'notice' | 'message' | 'timing'
-type FieldKey = 'theme' | 'headline' | 'copy' | 'instructions' | 'themeReason' | 'copyAngle' | 'instructionsAngle' | 'subject' | 'preheader'
+type CardEditor = ReturnType<typeof useCardEditor>
 
 interface Props {
-  /** メールの件名・プリヘッダー(X2)と、件名が空のときに使う配信名 */
-  subject?: string
-  preheader?: string
-  deliveryName?: string
-  /** AB テストで件名を案ごとに持ち、B・C 案を編集中なら、その案の記号(件名の案を A 案と違う切り口にする) */
-  subjectAbKey?: string
-  theme: string
-  headline: string
-  copy: string
-  instructions: string
-  /** 採用した案の補足(保存される) */
-  themeReason: string
-  copyAngle: string
-  instructionsAngle: string
-  onField: (key: FieldKey, value: string) => void
-  template: EmailTemplateId
-  /** テンプレートごとの最近の使用回数(X4。選ぶときに出す) */
-  templateUse?: Map<string, TemplateUse>
-  onTemplate: (id: EmailTemplateId) => void
-  sectionTitles: string[]
-  onSectionTitle: (index: number, text: string) => void
-  sectionCopies: string[]
-  onSectionCopy: (index: number, text: string) => void
+  /** 配信カードの中身と直し方(useCardEditor が返すもの。状態と保存は配信カードの 1 か所。整理 第3段 ③) */
+  editor: CardEditor
+  drafts: AiDrafts
+  /** すべての商品・メイン画像(載せたものの表示用。選ぶ対象は editor の poolProducts / poolHeroes) */
   products: Product[]
   heroes: HeroImage[]
-  /** 選定の対象(配信カードの国に合う市場のもの)。products / heroes は、すでに載せたものの表示用に全件を持つ */
-  poolProducts: Product[]
-  poolHeroes: HeroImage[]
+  /** テンプレートを変える(セクションの構成が変わるので、AI の案も破棄する。配信カードの changeTemplate) */
+  onTemplate: (id: EmailTemplateId) => void
+  /** テンプレートごとの最近の使用回数(X4。選ぶときに出す) */
+  templateUse?: Map<string, TemplateUse>
   /** ⑥ 制作指示の下に出す「参考の素材」(X58。素材は配信カードが持つので、出来上がった部品を受け取る) */
   assetsSlot?: ReactNode
   /** 持っている画像を上げる(メイン画像のライブラリへ。X59) */
   onUploadHero?: () => void
-  items: Item[]
-  setItems: Dispatch<SetStateAction<Item[]>>
-  candidates: Candidate[]
-  setCandidates: Dispatch<SetStateAction<Candidate[]>>
   /** アラートのある商品(商品 ID → いちばん強い種類)。選定済みの行に札を出す(商品情報の一覧と同じ) */
   alertKinds?: Map<string, CardAlertKind>
   /** アラートの札を押したとき(その商品のアラートへの対応を開く) */
   onAlert?: (productId: string) => void
   /** 選定済みの行を押したとき(商品の対応のフロートを開く。X54) */
   onOpenProduct?: (itemKey: string) => void
-  heroId?: string
-  setHeroId: (id?: string) => void
-  heroReason: string
-  setHeroReason: (text: string) => void
-  heroCandidates: ProposedHero[]
-  setHeroCandidates: Dispatch<SetStateAction<ProposedHero[]>>
-  /** コピー・ヘッドラインの言語 */
-  drafts: AiDrafts
-  disabled: boolean
-  /** 配信ごとのリンク先(制作指示のタブで設定する) */
-  links: Links
-  onLinks: (l: Links) => void
   /** リンク先のタブを開いた・閉じた(プレビューに、リンクの場所の番号を出すため。W12) */
   onLinksTab?: (open: boolean) => void
   /** 開いているタブが変わったとき(URL に持たせる。X36) */
@@ -110,228 +67,11 @@ interface Props {
   utmCampaign: string
   /** AB テストの、いま編集している案(計測用のパラメーターの campaign の末尾に付ける。AB テストでなければ null。X55) */
   linkVariant?: string | null
-  /** 制作への引き継ぎ(やり取りの「引き継ぎ」のタブ。担当・締め切り・引き継ぎ済みは、ここだけで決める) */
-  handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
-  onHandoff: (key: 'productionOwner' | 'handedOffAt' | 'productionDue', value: string) => void
   /** 外から、工程のタブを開く頼み。seq が変わるたびに開く */
   tabRequest?: { tab: TopTab; seq: number }
-  /** これまでに入れた人の名前(入力の候補) */
-  people: string[]
-  /** 保存済みの配信カードの ID(新規作成中は undefined) */
-  cardId?: string
-  /** 企画の担当者(質問の宛先・返信する人の既定値) */
-  owner: string
-  /** 配信名(AI にタスクの案を頼むときに渡す) */
-  cardName: string
-  /** 配信カードのチャネル。アプリのときは、工程をプッシュ向けにする(③ 通知 ④ メッセージ ⑤ リンク先。送る相手は配信情報) */
-  channel: TemplateChannel
-  /** 配信の国(テンプレートの選択肢を、その国で使うものに絞る。ST1) */
-  country?: string
-  pushLink: PushLink | null
-  onPushLink: (l: PushLink) => void
-  /** 送る日時(datetime-local の値) */
-  scheduledAt: string
-  /** アプリ: 通知のタイトル・本文(メッセージのヘッドライン・コピーとは別) */
-  pushTitle: string
-  pushBody: string
-  onPush: (key: 'pushTitle' | 'pushBody', value: string) => void
 }
 
-// ------------------------------------------------------------------ スタイル
 
-const useStyles = makeStyles({
-  inboxBlock: { display: 'grid', rowGap: '8px', marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
-  assetsBlock: { marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
-  uploadRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '4px' },
-  // グリッドの子は、中身が長くても列を押し広げない(帯や長い文がペインからはみ出さないように)
-  // 中ペイン全体: 上は内容(スクロール)、下は AI チャット(固定)
-  shell: { flexGrow: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' },
-  // 見出しとタブは、内容をスクロールしても見えるように、スクロールの外に固定する
-  head: { display: 'grid', rowGap: '8px', minWidth: 0, padding: '16px 16px 0', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  scroll: { flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: '16px' },
-  grid12: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '12px', minWidth: 0 },
-  grid8: { display: 'grid', rowGap: '8px', minWidth: 0 },
-  grid4: { display: 'grid', rowGap: '4px', minWidth: 0 },
-  grid2: { display: 'grid', rowGap: '2px', minWidth: 0 },
-  flexRow: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap', minWidth: 0 },
-  flexRowTight: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '4px', flexWrap: 'wrap', minWidth: 0 },
-  flexEnd: { display: 'flex', justifyContent: 'flex-end' },
-  caption: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, lineHeight: tokens.lineHeightBase200, color: tokens.colorNeutralForeground3 },
-  lead: { fontWeight: tokens.fontWeightSemibold },
-  value: { fontWeight: tokens.fontWeightRegular, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1 },
-  // 値と、それに付く補足(AIの理由など)は 1 つのグループ。補足は小さく薄く、値の真下に寄せる
-  group: { display: 'grid', rowGap: '2px', minWidth: 0 },
-  noteBox: {
-    display: 'flex',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-    columnGap: '6px',
-    paddingLeft: '8px',
-    borderLeft: `2px solid ${tokens.colorNeutralStroke1}`,
-    fontSize: '11px',
-    lineHeight: '16px',
-    color: tokens.colorNeutralForeground3,
-  },
-  // 案の一覧の見出し。上の「現在の値」のグループとは、区切って別のグループにする
-  listHead: {
-    marginTop: '8px',
-    paddingTop: '12px',
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
-  },
-  warn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
-  bold: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
-  semibold: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
-  tabs: {
-    minWidth: 0,
-    maxWidth: '100%',
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    flexWrap: 'nowrap',
-    columnGap: '4px',
-    '& button': { flexShrink: 0, whiteSpace: 'nowrap' },
-  },
-  // 面の切り替え(コンテンツ生成 / やり取り)。見出しの代わりに置き、その下のタブとは大きさで区別する
-  areas: { minWidth: 0 },
-  // Block
-  block: {
-    display: 'grid',
-    rowGap: '8px',
-    padding: '12px',
-    borderRadius: tokens.borderRadiusLarge,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    minWidth: 0,
-  },
-  blockHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
-  // 開閉できるブロック(Fluent の Accordion。整理 #11)。見出しの行は箱の端まで、中身は余白なしで並べる
-  blockHeader: { '& > button': { paddingLeft: 0, paddingRight: 0, minHeight: 'auto', height: 'auto' } },
-  blockPanel: { display: 'grid', rowGap: '8px', margin: '8px 0 0 0' },
-  blockSummary: {
-    minWidth: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
-  },
-  // Idea cards
-  card: {
-    padding: '12px',
-    borderRadius: tokens.borderRadiusLarge,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    display: 'grid',
-    rowGap: '4px',
-    minWidth: 0,
-  },
-  cardAdopted: { border: `1px solid ${tokens.colorPaletteGreenBorderActive}` },
-  pre: { whiteSpace: 'pre-wrap', fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
-  // 制作指示のような長文は、タイトルではなく本文なので、太字にしない
-  preBody: { whiteSpace: 'pre-wrap', fontSize: tokens.fontSizeBase200, lineHeight: '20px', fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground1 },
-  copyHeadline: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1, letterSpacing: '0.04em', lineHeight: 1.5 },
-  chipStart: { justifySelf: 'start' },
-  pick: {
-    cursor: 'pointer',
-    padding: '8px',
-    borderRadius: tokens.borderRadiusLarge,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    minWidth: 0,
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-  },
-  pickCurrent: {
-    border: `1px solid ${tokens.colorBrandStroke1}`,
-    backgroundColor: tokens.colorBrandBackground2,
-  },
-  // Template
-  tplCard: {
-    display: 'flex',
-    columnGap: '12px',
-    padding: '12px',
-    cursor: 'pointer',
-    borderRadius: tokens.borderRadiusLarge,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    minWidth: 0,
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-  },
-  tplCardSelected: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, ':hover': { backgroundColor: tokens.colorBrandBackground2 } },
-  thumb: {
-    width: '84px',
-    flexShrink: 0,
-    // テンプレートの縮図は、メールの見た目(白い紙)なので、画面の色に合わせない(受信側の見た目の例外)
-    backgroundColor: '#fff',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
-    padding: '4px',
-    display: 'grid',
-    rowGap: '4px',
-    alignContent: 'start',
-  },
-  // 縮図の中の文字(白い紙の上なので、画面の色に合わせない)
-  thumbFree: { color: '#888', fontSize: '10px', textAlign: 'center' },
-  // Drop zones
-  dropZone: { display: 'grid', rowGap: '8px', borderRadius: tokens.borderRadiusMedium, minWidth: 0 },
-  dropActive: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '2px' },
-  heroEmpty: {
-    padding: '12px',
-    border: `2px dashed ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusLarge,
-  },
-  heroEmptyActive: { border: `2px dashed ${tokens.colorBrandStroke1}` },
-  accordion: {
-    marginTop: '8px',
-    minWidth: 0,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusLarge,
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-  accordionPanel: { padding: '12px', minWidth: 0 },
-})
-
-// ------------------------------------------------------------------ 共通の部品
-
-/** クリックしたタブを中央へ寄せる(端のタブを選んでも、次のタブが見えて、続けて選べる) */
-const revealTab = (e: React.MouseEvent<HTMLElement>) => {
-  const el = e.currentTarget
-  requestAnimationFrame(() => el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }))
-}
-
-const heroMeta = (h?: HeroImage) => (h ? `${h.image_code} ・ ${optionLabel(h.purpose_name)} ・ ${optionLabel(h.season_name)} ・ ${h.tags ?? ''}` : '')
-
-/**
- * セクションの中の 1 つのブロック(見出し / コピー / 商品)。右上に、そのブロックの AI ボタンなどを置く。
- * 見出しの行を押すと、中身を折りたたむ(商品の一覧が長いとき、他のブロックを見やすくするため)。折りたたみ中は、summary を 1 行で出す
- */
-function Block({ title, right, children, open = true, onToggle, summary }: { title: string; right?: ReactNode; children: ReactNode; open?: boolean; onToggle?: () => void; summary?: string }) {
-  const s = useStyles()
-  const t = useT()
-  if (!onToggle)
-    return (
-      <div className={s.block}>
-        <span className={s.bold}>{title}</span>
-        {right && <div className={s.flexRow}>{right}</div>}
-        {children}
-      </div>
-    )
-  // 開閉は親が覚える(open・onToggle)。Fluent の Accordion を、その値で開け閉めする
-  return (
-    <Accordion collapsible openItems={open ? ['block'] : []} onToggle={onToggle} className={s.block} style={{ display: 'block' }}>
-      <AccordionItem value="block">
-        <AccordionHeader size="small" className={s.blockHeader} button={{ title: open ? t('折りたたむ', 'Collapse') : t('開く', 'Expand') }}>
-          <span className={s.bold}>{title}</span>
-          {!open && summary && <span className={s.blockSummary}>{` — ${summary}`}</span>}
-        </AccordionHeader>
-        <AccordionPanel className={s.blockPanel}>
-          {right && <div className={s.flexRow}>{right}</div>}
-          {children}
-        </AccordionPanel>
-      </AccordionItem>
-    </Accordion>
-  )
-}
 
 // ------------------------------------------------------------------ テーマ・コピー・制作指示: 案 → 採用
 
@@ -357,7 +97,7 @@ function IdeaTab(props: {
   /** 見たまま編集の入力欄(見出し・箇条書き。保存は Markdown)。制作指示で使う */
   rich?: boolean
 }) {
-  const s = useStyles()
+  const s = useContentPaneStyles()
   const t = useT()
   const { label, value, onChange, ideas, savedNote, savedChip, onAdopt, busy, blocked, onGenerate, rich } = props
   const current = ideas.find((i) => i.text === value)
@@ -420,114 +160,12 @@ function IdeaTab(props: {
   )
 }
 
-// ------------------------------------------------------------------ ヘッドライン + コピー: 案 → 採用
-
-function CopyTab(props: {
-  headline: string
-  lead: string
-  onHeadline: (v: string) => void
-  onLead: (v: string) => void
-  ideas: { headline: string; lead: string; angle: string }[]
-  /** 保存済みの、採用した案の切り口 */
-  savedAngle?: string
-  onAdopt: (idea: { headline: string; lead: string; angle: string }) => void
-  busy: boolean
-  blocked?: string
-  onGenerate: () => void
-  /** アプリ(プッシュ通知)の文面: ヘッドライン = 通知のタイトル、コピー = 本文。文字数の目安を出す */
-  push?: boolean
-  /** メールの件名・プリヘッダー: ヘッドライン = 件名、コピー = プリヘッダー(X2) */
-  subject?: { deliveryName: string; abKey?: string }
-}) {
-  const s = useStyles()
-  const t = useT()
-  const { headline, lead, onHeadline, onLead, ideas, savedAngle, onAdopt, busy, blocked, onGenerate, push, subject } = props
-  // 通知に収まる文字数の目安(端末で切れ方が違うので、目安として出す)
-  const count = (text: string, max: number) =>
-    push || subject ? <span className={text.length > max ? s.warn : s.caption}>{` ${text.length} / ${max}`}</span> : null
-  const firstMax = subject ? SUBJECT_MAX : PUSH_TITLE_MAX
-  const secondMax = subject ? PREHEADER_MAX : PUSH_BODY_MAX
-  return (
-    <div className={s.grid12}>
-      <div className={s.flexRow}>
-        <AiButton busy={busy} disabled={!!blocked} onClick={onGenerate}>
-          {ideas.length ? t('案を作り直す', 'Regenerate ideas') : subject ? t('AIで件名の案を出す', 'Suggest subjects with AI') : t('AIで案を出す', 'Suggest with AI')}
-        </AiButton>
-        {subject?.abKey && <span className={s.caption}>{t(`${subject.abKey} 案: A 案と違う切り口の件名を出します`, `Variant ${subject.abKey}: ideas with a different angle from A`)}</span>}
-        {blocked && <span className={s.warn}>{blocked}</span>}
-      </div>
-      <div className={s.group}>
-      <Field
-        label={
-          <span className={s.flexRowTight}>
-            {subject
-              ? t(`件名(空なら配信名「${subject.deliveryName}」)`, `Subject (empty uses the delivery name "${subject.deliveryName}")`)
-              : push
-                ? t('通知のタイトル', 'Notification title')
-                : t('現在のヘッドライン(メイン画像に載ります)', 'Current headline (shown on the main image)')}
-            <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
-            {count(headline, firstMax)}
-          </span>
-        }
-        size="small"
-      >
-        <AutoTextarea heightKey="ContentPane.headline" rows={1} value={headline} onChange={(_, d) => onHeadline(d.value)} placeholder={subject?.deliveryName} />
-      </Field>
-      <Field
-        label={
-          <span className={s.flexRowTight}>
-            {subject
-              ? t('プリヘッダー(受信一覧で件名の横・下に出る短い文。目安 40〜90 文字)', 'Preheader (short text next to or under the subject in the inbox; aim for 40–90 chars)')
-              : push
-                ? t('通知の本文', 'Notification body')
-                : t('現在のコピー(ヘッドラインの下に入ります)', 'Current copy (placed below the headline)')}
-            <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
-            {count(lead, secondMax)}
-          </span>
-        }
-        size="small"
-      >
-        <AutoTextarea heightKey="ContentPane.lead" rows={2} value={lead} onChange={(_, d) => onLead(d.value)} />
-      </Field>
-      {savedAngle && (headline || lead) && (
-        <div className={s.noteBox}>
-          <span><span className={s.lead}>{t('切り口:', 'Angle:')}</span>{` ${savedAngle}`}</span>
-        </div>
-      )}
-      </div>
-      {ideas.length > 0 && <span className={s.listHead}><span className={s.lead}>{t('AIの案(未採用):', 'AI ideas (not adopted):')}</span> {subject ? t('「採用」を押すと、件名とプリヘッダーの両方が反映されます', 'Press "Adopt" to apply both the subject and the preheader') : t('「採用」を押すと、ヘッドラインとコピーの両方が反映されます', 'Press "Adopt" to apply both the headline and the copy')}</span>}
-      {ideas.map((idea) => {
-        const adopted = idea.headline === headline && idea.lead === lead
-        return (
-          <div key={`${idea.headline}|${idea.lead}`} className={mergeClasses(s.card, adopted && s.cardAdopted)}>
-            {idea.angle && <Badge className={s.chipStart} size="small" appearance="tint" color="informative">{idea.angle}</Badge>}
-            <span className={s.copyHeadline}>{idea.headline}</span>
-            <span className={s.caption}>{idea.lead}</span>
-            <div className={s.flexEnd}>
-              {adopted ? (
-                <Badge size="small" appearance="filled" color="success">{t('採用中', 'In use')}</Badge>
-              ) : (
-                <Button
-                  size="small"
-                  appearance="primary"
-                  onClick={() => onAdopt(idea)}
-                >
-                  {t('採用', 'Adopt')}
-                </Button>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 // ------------------------------------------------------------------ テンプレート
 
 /** テンプレートの最近の使用回数の行(X4)。同じ国の配信を、この配信の配信日の前 4 週間・同じ週で数える */
 function TemplateUseLine({ u }: { u?: TemplateUse }) {
-  const s = useStyles()
+  const s = useContentPaneStyles()
   const t = useT()
   const recent = u?.recent ?? 0
   const week = u?.sameWeek ?? 0
@@ -544,7 +182,7 @@ function TemplateUseLine({ u }: { u?: TemplateUse }) {
 }
 
 function TemplateTab({ template, onTemplate, hasCandidates, channel, country, use }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel; country?: string; use?: Map<string, TemplateUse> }) {
-  const s = useStyles()
+  const s = useContentPaneStyles()
   const t = useT()
   useCountryApply()
   return (
@@ -617,601 +255,6 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel, country, us
   )
 }
 
-// ------------------------------------------------------------------ 商品選定タブ(メイン画像 + セクション)
-
-/** mode = hero: メイン画像 / ヘッドライン・コピー。mode = sections: セクション(見出し・コピー・商品) */
-type ChatTargetInfo = { key: string; title: string }
-type RegisterChat = (target: ChatTargetInfo | null, run?: () => Promise<unknown>) => void
-
-function ProductsTab(p: Props & { mode: 'hero' | 'sections'; registerChat: RegisterChat; only?: 'hero' | 'copy' }) {
-  const s = useStyles()
-  const t = useT()
-  const { template, sectionTitles, products, heroes, items, setItems, candidates, setCandidates, drafts, disabled } = p
-  const { sections, listOf, isFull, moveInSection, demote, dropKey, setDropKey, startDrag, overTarget, leaveTarget, dropOnSelected, dropOnSelectedArea, dropOnCandidates, promote, addManual, setItemReason, setCandReason, toItems } = useSelection({ template, items, setItems, candidates, setCandidates })
-  const [sub, setSub] = useState<number | 'hero' | 'copy'>(p.only ?? (p.mode === 'hero' ? 'hero' : 0))
-  // 折りたたんだブロック(「セクション番号:ブロック」)。セクションを切り替えても、それぞれの開閉を覚えておく
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
-  const fold = (key: string) => ({
-    open: !collapsed.has(key),
-    onToggle: () =>
-      setCollapsed((prev) => {
-        const next = new Set(prev)
-        if (next.has(key)) next.delete(key)
-        else next.add(key)
-        return next
-      }),
-  })
-  const active: number | 'hero' | 'copy' =
-    p.mode === 'hero' ? (sub === 'copy' ? 'copy' : 'hero') : typeof sub === 'number' ? Math.min(sub, sections.length - 1) : 0
-  const productById = new Map(products.map((x) => [x.id, x]))
-  const heroById = new Map(heroes.map((x) => [x.id, x]))
-  const noTheme = !p.theme.trim()
-
-  // ---- AI の選定結果は、そのまま設定する。直前の状態は「元に戻す」で復元できる
-  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
-
-  // 見出しを変えたら、コピー・商品の作り直しをゆるやかに促す(自動では作り直さない)
-  const [hint, setHint] = useState<string | null>(null)
-  const changeTitle = (sec: SectionInfo, title: string) => {
-    p.onSectionTitle(sec.index, title)
-    if ((p.sectionCopies[sec.index] ?? '') || listOf(sec).length > 0) setHint(t('見出しを変更しました。必要なら、② コピー・③ 商品を作り直してください。', 'The heading was changed. If needed, regenerate (2) Copy and (3) Products.'))
-  }
-
-  const sectionLabel = (sec: SectionInfo) => (sec.wantTitle ? sectionTitles[sec.index] || sec.label : sec.label)
-
-  /** セクション 1 つを一括で(見出し・コピー・商品を、それぞれ第 1 候補で設定する) */
-  const selectSection = async (sec: SectionInfo) => {
-    const prevItems = items
-    const prevCands = candidates
-    const prevTitle = sectionTitles[sec.index] ?? ''
-    const prevCopy = p.sectionCopies[sec.index] ?? ''
-    const result = await drafts.runSection(sec.index)
-    if (!result) return false
-    const [from, to] = sectionRange(sections, sec, prevItems.length)
-    setItems([...prevItems.slice(0, from), ...toItems(result.selected), ...prevItems.slice(to)])
-    setCandidates([...prevCands.filter((c) => c.section !== sec.index), ...toItems(result.candidates).map((c) => ({ ...c, section: sec.index }))])
-    if (sec.wantTitle && result.title.trim()) p.onSectionTitle(sec.index, result.title.trim())
-    if (result.copy.trim()) p.onSectionCopy(sec.index, result.copy.trim())
-    setHint(null)
-    setUndo({
-      message: tr(`AIが${sectionLabel(sec)}の選定をしました(直す場合は、ドラッグ&ドロップで入れ替えられます)`, `AI re-selected ${sectionLabel(sec)} (to adjust, swap items by drag & drop)`),
-      run: () => {
-        setItems(prevItems)
-        setCandidates(prevCands)
-        if (sec.wantTitle) p.onSectionTitle(sec.index, prevTitle)
-        p.onSectionCopy(sec.index, prevCopy)
-      },
-    })
-    return true
-  }
-
-  /** 見出しだけ作り直す(第 1 候補を設定) */
-  const selectTitles = async (sec: SectionInfo) => {
-    const prevTitle = sectionTitles[sec.index] ?? ''
-    const titles = await drafts.runSectionTitles(sec.index)
-    if (!titles?.[0]) return
-    changeTitle(sec, titles[0].title)
-    setUndo({ message: tr(`AIが${sectionLabel(sec)}の見出しの作り直しをしました(直す場合は、ドラッグ&ドロップで入れ替えられます)`, `AI regenerated the heading for ${sectionLabel(sec)} (to adjust, swap items by drag & drop)`), run: () => p.onSectionTitle(sec.index, prevTitle) })
-  }
-
-  /** コピーだけ作り直す(第 1 候補を設定。現在の見出しと、選ばれた商品を踏まえる) */
-  const selectCopies = async (sec: SectionInfo) => {
-    const prevCopy = p.sectionCopies[sec.index] ?? ''
-    const copies = await drafts.runSectionCopies(sec.index)
-    if (!copies?.[0]) return
-    p.onSectionCopy(sec.index, copies[0].copy)
-    setUndo({ message: tr(`AIが${sectionLabel(sec)}のコピーの作り直しをしました(直す場合は、ドラッグ&ドロップで入れ替えられます)`, `AI regenerated the copy for ${sectionLabel(sec)} (to adjust, swap items by drag & drop)`), run: () => p.onSectionCopy(sec.index, prevCopy) })
-  }
-
-  /** 商品だけ選び直す(現在の見出しとコピーを踏まえる) */
-  const selectProducts = async (sec: SectionInfo) => {
-    const prevItems = items
-    const prevCands = candidates
-    const result = await drafts.runSectionProducts(sec.index)
-    if (!result) return
-    const [from, to] = sectionRange(sections, sec, prevItems.length)
-    setItems([...prevItems.slice(0, from), ...toItems(result.selected), ...prevItems.slice(to)])
-    setCandidates([...prevCands.filter((c) => c.section !== sec.index), ...toItems(result.candidates).map((c) => ({ ...c, section: sec.index }))])
-    setUndo({
-      message: tr(`AIが${sectionLabel(sec)}の商品の選び直しをしました(直す場合は、ドラッグ&ドロップで入れ替えられます)`, `AI re-selected the products for ${sectionLabel(sec)} (to adjust, swap items by drag & drop)`),
-      run: () => {
-        setItems(prevItems)
-        setCandidates(prevCands)
-      },
-    })
-  }
-
-  const selectHero = async () => {
-    const prev = { id: p.heroId, reason: p.heroReason, cands: p.heroCandidates }
-    const result = await drafts.runHero()
-    if (!result) return false
-    if (result.hero) {
-      p.setHeroId(result.hero.heroId)
-      p.setHeroReason(result.hero.reason)
-    }
-    p.setHeroCandidates(result.candidates)
-    setUndo({
-      message: tr('AIがメイン画像の選定をしました(直す場合は、ドラッグ&ドロップで入れ替えられます)', 'AI selected the main image (to adjust, swap items by drag & drop)'),
-      run: () => {
-        p.setHeroId(prev.id)
-        p.setHeroReason(prev.reason)
-        p.setHeroCandidates(prev.cands)
-      },
-    })
-    return true
-  }
-
-  // チャットの対象: 開いているサブタブ(メイン画像 / ヘッドライン・コピー / 各セクション)
-  useEffect(() => {
-    if (p.mode === 'hero') {
-      if (active === 'copy') p.registerChat({ key: 'hero-copy', title: tr('ヘッドライン・コピー', 'Headline & copy') }, () => drafts.runCopy())
-      else p.registerChat({ key: 'hero-image', title: tr('メイン画像', 'Main image') }, selectHero)
-    } else {
-      const sec = sections[active as number]
-      if (sec) p.registerChat({ key: `section-${sec.index}`, title: sectionLabel(sec) }, () => selectSection(sec))
-    }
-  })
-
-  const undoAlert = undo && (
-    <MessageBar layout="multiline" intent="success">
-      <MessageBarBody>{undo.message}</MessageBarBody>
-      <MessageBarActions
-        containerAction={<Button appearance="transparent" size="small" aria-label={t('閉じる', 'Close')} icon={<DismissRegular />} onClick={() => setUndo(null)} />}
-      >
-        <Button
-          size="small"
-          onClick={() => {
-            undo.run()
-            setUndo(null)
-          }}
-        >
-          {t('元に戻す', 'Undo')}
-        </Button>
-      </MessageBarActions>
-    </MessageBar>
-  )
-
-  // ---- 下段のタブ(ヒーロー: メイン画像 / ヘッドライン・コピー、セクション: 各セクション)
-  const subTabs = (
-    <TabList
-      size="small"
-      className={s.tabs}
-      selectedValue={active}
-      onTabSelect={(_, d) => {
-        setSub(d.value as number | 'hero' | 'copy')
-        setUndo(null)
-      }}
-    >
-      {p.mode === 'hero' && <Tab value="hero" onClick={revealTab}>{`${p.heroId ? '✓ ' : ''}${t('メイン画像', 'Main image')}`}</Tab>}
-      {p.mode === 'hero' && <Tab value="copy" onClick={revealTab}>{`${p.headline || p.copy ? '✓ ' : ''}${drafts.copyIdeas.length ? '● ' : ''}${t('ヘッドライン・コピー', 'Headline & copy')}`}</Tab>}
-      {p.mode === 'sections' &&
-        sections.map((sec) => {
-          const title = sec.wantTitle ? sectionTitles[sec.index] || sec.label : sec.label
-          const n = listOf(sec).length
-          const count = Number.isFinite(sec.slots) ? `${n}/${sec.slots}` : `${n}`
-          return <Tab key={sec.index} value={sec.index} onClick={revealTab}>{`${title}(${count})`}</Tab>
-        })}
-    </TabList>
-  )
-
-  /** 「すべての…から探す」の折りたたみ */
-  const finder = (label: string, body: ReactNode) => (
-    <Accordion collapsible className={s.accordion}>
-      <AccordionItem value="all">
-        <AccordionHeader expandIcon={<ChevronDownRegular />} size="small">{label}</AccordionHeader>
-        <AccordionPanel className={s.accordionPanel}>{body}</AccordionPanel>
-      </AccordionItem>
-    </Accordion>
-  )
-
-  // ---- セクションの表示(① 見出し → ② コピー → ③ 商品)
-  const sectionView = (sec: SectionInfo) => {
-    const i = sec.index
-    const busyAll = !!drafts.busy[`section:${i}`]
-    const busyTitle = !!drafts.busy[`section:${i}:title`]
-    const busyCopy = !!drafts.busy[`section:${i}:copy`]
-    const busyProducts = !!drafts.busy[`section:${i}:products`]
-    const anyBusy = busyAll || busyTitle || busyCopy || busyProducts
-
-    const list = listOf(sec)
-    const cands = candidates.filter((c) => c.section === i)
-    const usedIds = new Set([...items, ...candidates].map((x) => x.productId))
-    const titles = drafts.titleCandidates[i] ?? []
-    const copies = drafts.sectionCopyCandidates[i] ?? []
-    const currentTitle = sectionTitles[i] ?? ''
-    const currentCopy = p.sectionCopies[i] ?? ''
-
-    const header = (
-      <div className={s.flexRow}>
-        <AiButton busy={busyAll} disabled={noTheme || disabled || anyBusy} onClick={() => selectSection(sec)}>
-          {t('このセクションをまとめてAIで選定', 'Select this whole section with AI')}
-        </AiButton>
-        {noTheme && <span className={s.warn}>{t('先にテーマを決めてください', 'Set a theme first')}</span>}
-      </div>
-    )
-
-    return (
-      <div className={s.grid12}>
-        {header}
-        {undoAlert}
-        {hint && (
-          <MessageBar layout="multiline" intent="info">
-            <MessageBarBody>{hint}</MessageBarBody>
-            <MessageBarActions
-              containerAction={<Button appearance="transparent" size="small" aria-label={t('閉じる', 'Close')} icon={<DismissRegular />} onClick={() => setHint(null)} />}
-            />
-          </MessageBar>
-        )}
-
-        {sec.wantTitle && (
-          <Block
-            {...fold(`${i}:title`)}
-            summary={currentTitle || t('(未設定)', '(Not set)')}
-            title={t('① 見出し(切り口)', '1. Heading (angle)')}
-            right={
-              <AiButton busy={busyTitle} disabled={noTheme || disabled || anyBusy} onClick={() => selectTitles(sec)}>
-                {titles.length ? t('作り直す', 'Regenerate') : t('AIで作る', 'Generate with AI')}
-              </AiButton>
-            }
-          >
-            <span className={s.value}>{currentTitle || t('(未設定)', '(Not set)')}</span>
-            {titles.map((ti) => {
-              const current = currentTitle === ti.title
-              return (
-                <div key={ti.title} onClick={() => changeTitle(sec, ti.title)} className={mergeClasses(s.pick, current && s.pickCurrent)}>
-                  <div className={s.flexRowTight}>
-                    <span className={s.semibold}>{ti.title}</span>
-                    {current && <Badge size="small" appearance="filled" color="brand">{t('設定中', 'Current')}</Badge>}
-                  </div>
-                  <span className={s.caption}>{ti.reason}</span>
-                </div>
-              )
-            })}
-            {titles.length > 0 && <span className={s.caption}>{t('クリックで差し替えます。書き換えは、プレビューの見出しから。', 'Click to swap. To rewrite it, edit the heading in the preview.')}</span>}
-          </Block>
-        )}
-
-        <Block
-          {...fold(`${i}:copy`)}
-          summary={currentCopy || t('(未設定)', '(Not set)')}
-          title={`${sec.wantTitle ? '② ' : '① '}${t('コピー', 'Copy')}`}
-          right={
-            <>
-              <AiButton busy={busyCopy} disabled={noTheme || disabled || anyBusy} onClick={() => selectCopies(sec)}>
-                {copies.length ? t('作り直す', 'Regenerate') : t('AIで作る', 'Generate with AI')}
-              </AiButton>
-            </>
-          }
-        >
-          <Field label={t('セクションのコピー(見出しの下に入ります)', 'Section copy (placed below the heading)')} size="small">
-            <AutoTextarea heightKey="ContentPane.currentCopy" rows={2} size="small" value={currentCopy} onChange={(_, d) => p.onSectionCopy(i, d.value)} />
-          </Field>
-          {copies.map((c) => {
-            const current = currentCopy === c.copy
-            return (
-              <div key={c.copy} onClick={() => p.onSectionCopy(i, c.copy)} className={mergeClasses(s.pick, current && s.pickCurrent)}>
-                <div className={s.flexRowTight}>
-                  {c.angle && <Badge size="small" appearance="tint" color="informative">{c.angle}</Badge>}
-                  {current && <Badge size="small" appearance="filled" color="brand">{t('設定中', 'Current')}</Badge>}
-                </div>
-                <span style={{ fontSize: tokens.fontSizeBase200, lineHeight: tokens.lineHeightBase200 }}>{c.copy}</span>
-              </div>
-            )
-          })}
-          {copies.length > 0 && <span className={s.caption}>{t('クリックで差し替えます。商品を選んだあとに「作り直す」と、商品を踏まえたコピーになります。', 'Click to swap. After selecting products, press "Regenerate" to get copy based on them.')}</span>}
-        </Block>
-
-        <Block
-          {...fold(`${i}:products`)}
-          summary={
-            list.length
-              ? `${list.map((it) => productById.get(it.productId)?.name ?? '').filter(Boolean).join(' / ')}${Number.isFinite(sec.slots) ? `(${list.length} / ${sec.slots})` : ''}`
-              : t('(未選定)', '(None selected)')
-          }
-          title={`${sec.wantTitle ? '③ ' : '② '}${t('商品', 'Products')}`}
-          right={
-            <AiButton busy={busyProducts} disabled={noTheme || disabled || anyBusy} onClick={() => selectProducts(sec)}>
-              {list.length ? t('選び直す', 'Re-select') : t('AIで選ぶ', 'Select with AI')}
-            </AiButton>
-          }
-        >
-          <span className={s.semibold} style={{ fontSize: tokens.fontSizeBase200 }}>
-            {t(`選定済み(${list.length}${Number.isFinite(sec.slots) ? ` / ${sec.slots}` : ''}件)`, `Selected (${list.length}${Number.isFinite(sec.slots) ? ` / ${sec.slots}` : ''})`)}
-          </span>
-          <div
-            onDragOver={overTarget('sel')}
-            onDragLeave={leaveTarget('sel')}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDropKey(null)
-              dropOnSelectedArea(sec, e.dataTransfer)
-            }}
-            className={mergeClasses(s.dropZone, dropKey === 'sel' && !isFull(sec) && s.dropActive)}
-          >
-            {list.length === 0 && <span className={s.caption}>{t('まだ選定されていません。「AIで案出し」か、下の候補・一覧から選んでください(ドラッグでも追加できます)。', 'Nothing selected yet. Use AI suggestions or pick from the candidates and list below (you can also drag to add).')}</span>}
-            {list.map((it, k) => {
-              const prod = productById.get(it.productId)
-              const outside = Number.isFinite(sec.slots) && k >= sec.slots
-              const alert = p.alertKinds?.get(it.productId)
-              const row = (
-                <Row
-                  key={it.key}
-                  drag={{
-                    draggable: true,
-                    onDragStart: startDrag('item', it.key, it.productId),
-                    onDragOver: overTarget(it.key),
-                    onDragLeave: leaveTarget(it.key),
-                    onDrop: (e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setDropKey(null)
-                      dropOnSelected(sec, it, e.dataTransfer)
-                    },
-                  }}
-                  highlight={dropKey === it.key}
-                  image={productImage(prod)}
-                  title={prod?.name ?? ''}
-                  meta={productMeta(prod)}
-                  reason={it.reason}
-                  onReason={(v) => setItemReason(it.key, v)}
-                  source={it.source}
-                  badge={outside ? t('枠外', 'Outside slots') : undefined}
-                  marks={
-                    <>
-                      <LowStockBadge product={prod} />
-                      {alert && p.onAlert && <AlertChip kind={alert} onClick={() => p.onAlert?.(it.productId)} />}
-                    </>
-                  }
-                  actions={
-                    <>
-                      <div>
-                        <Button appearance="subtle" size="small" icon={<ArrowUpRegular />} disabled={k === 0} onClick={() => moveInSection(sec, it.key, -1)} aria-label={t('上へ', 'Move up')} />
-                        <Button appearance="subtle" size="small" icon={<ArrowDownRegular />} disabled={k === list.length - 1} onClick={() => moveInSection(sec, it.key, 1)} aria-label={t('下へ', 'Move down')} />
-                      </div>
-                      <Button appearance="subtle" size="small" onClick={() => demote(sec, it)}>{t('外す', 'Remove')}</Button>
-                    </>
-                  }
-                />
-              )
-              // 行を押すと、商品のフロート(右端の商品情報と同じもの)。そこから残りの候補と入れ替えられる(X47)
-              return prod ? (
-                <ProductFloat key={it.key} onOpen={p.onOpenProduct && (() => p.onOpenProduct?.(it.key))}>
-                  {row}
-                </ProductFloat>
-              ) : (
-                row
-              )
-            })}
-          </div>
-          <div
-            onDragOver={overTarget('cands')}
-            onDragLeave={leaveTarget('cands')}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDropKey(null)
-              dropOnCandidates(sec, e.dataTransfer)
-            }}
-            className={mergeClasses(s.dropZone, dropKey === 'cands' && s.dropActive)}
-          >
-            <Divider alignContent="start"><span className={s.caption}>{t(`残りの候補(${cands.length}件)`, `Remaining candidates (${cands.length})`)}</span></Divider>
-            {cands.length === 0 && <span className={s.caption}>{t('候補はありません(選定済みの行をここへドラッグすると、候補へ戻せます)。', 'No candidates (drag a selected row here to move it back to candidates).')}</span>}
-            {cands.map((c) => {
-              const prod = productById.get(c.productId)
-              return (
-                <Row
-                  key={c.key}
-                  drag={{ draggable: true, onDragStart: startDrag('cand', c.key, c.productId) }}
-                  dim
-                  image={productImage(prod)}
-                  title={prod?.name ?? ''}
-                  meta={productMeta(prod)}
-                  reason={c.reason}
-                  onReason={(v) => setCandReason(c.key, v)}
-                  source={c.source}
-                  actions={<Button size="small" appearance="outline" onClick={() => promote(sec, c)}>{t('選ぶ', 'Select')}</Button>}
-                />
-              )
-            })}
-          </div>
-          {finder(t('すべての商品から探す', 'Browse all products'), <Candidates products={p.poolProducts} usedIds={usedIds} onAdd={(id) => addManual(sec, id)} />)}
-        </Block>
-      </div>
-    )
-  }
-
-  // ---- メイン画像の表示
-  const setHero = (heroId: string, reason: string) => {
-    // いま設定中の画像は、候補へ回す
-    if (p.heroId && p.heroId !== heroId) {
-      p.setHeroCandidates((prev) => [{ heroId: p.heroId!, reason: p.heroReason }, ...prev.filter((c) => c.heroId !== heroId && c.heroId !== p.heroId)])
-    } else {
-      p.setHeroCandidates((prev) => prev.filter((c) => c.heroId !== heroId))
-    }
-    p.setHeroId(heroId)
-    p.setHeroReason(reason)
-  }
-
-  const startHeroDrag = (heroId: string) => (e: React.DragEvent) => {
-    e.dataTransfer.setData(DND_HERO, heroId)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-  const dropHero = (onId: (id: string) => void) => (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDropKey(null)
-    const id = e.dataTransfer.getData(DND_HERO)
-    if (id) onId(id)
-  }
-  /** 選定中のメイン画像を、候補へ戻す */
-  const demoteHero = () => {
-    const cur = heroById.get(p.heroId ?? '')
-    if (!cur) return
-    p.setHeroCandidates((prev) => [{ heroId: cur.id, reason: p.heroReason }, ...prev])
-    p.setHeroId(undefined)
-    p.setHeroReason('')
-  }
-
-  const heroView = () => {
-    const busy = !!drafts.busy.hero
-    const header = (
-      <div className={s.flexRow}>
-        <AiButton busy={busy} disabled={noTheme || disabled} onClick={selectHero}>
-          {t('メイン画像をAIで選定', 'Select main image with AI')}
-        </AiButton>
-        {noTheme && <span className={s.warn}>{t('先にテーマを決めてください', 'Set a theme first')}</span>}
-      </div>
-    )
-
-    const current = heroById.get(p.heroId ?? '')
-    return (
-      <div className={s.grid8}>
-        {header}
-        {undoAlert}
-        <span className={s.semibold} style={{ fontSize: tokens.fontSizeBase200 }}>{t('選定済み(メイン画像)', 'Selected (main image)')}</span>
-        {current ? (
-          <Row
-            wide
-            drag={{
-              draggable: true,
-              onDragStart: startHeroDrag(current.id),
-              onDragOver: overTarget('hero-sel'),
-              onDragLeave: leaveTarget('hero-sel'),
-              onDrop: dropHero((id) => {
-                if (id === current.id) return
-                setHero(id, p.heroCandidates.find((c) => c.heroId === id)?.reason ?? '')
-              }),
-            }}
-            highlight={dropKey === 'hero-sel'}
-            image={heroImage(current)}
-            title={current.name}
-            meta={heroMeta(current)}
-            reason={p.heroReason}
-            onReason={p.setHeroReason}
-            actions={
-              <Button
-                size="small"
-                appearance="subtle"
-                onClick={() => {
-                  p.setHeroCandidates((prev) => [{ heroId: current.id, reason: p.heroReason }, ...prev])
-                  p.setHeroId(undefined)
-                  p.setHeroReason('')
-                }}
-              >
-                {t('外す', 'Remove')}
-              </Button>
-            }
-          />
-        ) : (
-          <div
-            onDragOver={overTarget('hero-sel')}
-            onDragLeave={leaveTarget('hero-sel')}
-            onDrop={dropHero((id) => setHero(id, p.heroCandidates.find((c) => c.heroId === id)?.reason ?? ''))}
-            className={mergeClasses(s.heroEmpty, dropKey === 'hero-sel' && s.heroEmptyActive)}
-          >
-            <span className={s.caption}>{t('まだ選定されていません。「AIで案出し」か、下の候補・一覧から選んでください(ドラッグでも設定できます)。', 'Nothing selected yet. Use AI suggestions or pick from the candidates and list below (you can also drag to set).')}</span>
-          </div>
-        )}
-        <div
-          onDragOver={overTarget('hero-cands')}
-          onDragLeave={leaveTarget('hero-cands')}
-          onDrop={dropHero((id) => {
-            if (id === p.heroId) demoteHero()
-          })}
-          className={mergeClasses(s.dropZone, dropKey === 'hero-cands' && s.dropActive)}
-        >
-          <Divider alignContent="start"><span className={s.caption}>{t(`残りの候補(${p.heroCandidates.length}件)`, `Remaining candidates (${p.heroCandidates.length})`)}</span></Divider>
-          {p.heroCandidates.length === 0 && <span className={s.caption}>{t('候補はありません(候補は、AIが案を出したときだけ表示されます。保存はされません。選定中の画像をここへドラッグすると、候補へ戻せます)。', 'No candidates (candidates appear only when AI suggests them and are not saved. Drag the selected image here to move it back to candidates).')}</span>}
-          {p.heroCandidates.map((c) => {
-            const h = heroById.get(c.heroId)
-            return (
-              <Row
-                key={c.heroId}
-                wide
-                dim
-                drag={{ draggable: true, onDragStart: startHeroDrag(c.heroId) }}
-                image={heroImage(h)}
-                title={h?.name ?? ''}
-                meta={heroMeta(h)}
-                reason={c.reason}
-                source={SOURCE_AI}
-                actions={<Button size="small" appearance="outline" onClick={() => setHero(c.heroId, c.reason)}>{t('選ぶ', 'Select')}</Button>}
-              />
-            )
-          })}
-        </div>
-        {finder(t('すべての画像から探す', 'Browse all images'), <HeroCandidates heroes={p.poolHeroes} selectedId={p.heroId} onSelect={(id) => setHero(id, '')} />)}
-        {/* AI の案 → 頼み直す → ほかから選ぶ、で合わなければ、持っている画像を上げる(X59) */}
-        {p.onUploadHero && (
-          <div className={s.uploadRow}>
-            <Button size="small" icon={<ImageAddRegular />} onClick={p.onUploadHero}>
-              {t('持っている画像を上げる', 'Upload your own image')}
-            </Button>
-            <span className={s.caption}>{t('ライブラリに入り、この配信のメイン画像になります。次の配信からは候補にも出ます', 'It goes into the library and becomes this delivery’s hero. Later deliveries can pick it too')}</span>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ---- ヘッドライン・コピー(メイン画像の上に載るヘッドラインと、その下のコピー。組で案を出す)
-  const copyView = (
-    <CopyTab
-      headline={p.headline}
-      lead={p.copy}
-      onHeadline={(v) => {
-        p.onField('headline', v)
-        p.onField('copyAngle', '')
-      }}
-      onLead={(v) => {
-        p.onField('copy', v)
-        p.onField('copyAngle', '')
-      }}
-      ideas={drafts.copyIdeas}
-      savedAngle={p.copyAngle}
-      onAdopt={(idea) => {
-        p.onField('headline', idea.headline)
-        p.onField('copy', idea.lead)
-        p.onField('copyAngle', idea.angle)
-      }}
-      busy={!!drafts.busy.copy}
-      blocked={noTheme ? t('先にテーマを決めてください', 'Set a theme first') : undefined}
-      onGenerate={drafts.runCopy}
-    />
-  )
-  // メールの件名・プリヘッダー(X2)。受信一覧で最初に目に入る文。プレビューの上に、受信一覧での見え方を出す
-  const inboxView = p.channel !== 'push' && (
-    <div className={s.inboxBlock}>
-      <CopyTab
-        subject={{ deliveryName: p.deliveryName ?? '', abKey: p.subjectAbKey }}
-        headline={p.subject ?? ''}
-        lead={p.preheader ?? ''}
-        onHeadline={(v) => p.onField('subject', v)}
-        onLead={(v) => p.onField('preheader', v)}
-        ideas={drafts.subjectIdeas}
-        onAdopt={(idea) => {
-          p.onField('subject', idea.headline)
-          p.onField('preheader', idea.lead)
-        }}
-        busy={!!drafts.busy.subject}
-        blocked={noTheme ? t('先にテーマを決めてください', 'Set a theme first') : undefined}
-        onGenerate={drafts.runSubject}
-      />
-    </div>
-  )
-
-
-  return (
-    <div className={s.grid12}>
-      {!p.only && subTabs}
-      {active === 'hero' ? heroView() : active === 'copy' ? (
-        <>
-          {copyView}
-          {inboxView}
-        </>
-      ) : sectionView(sections[active])}
-    </div>
-  )
-}
 
 // ------------------------------------------------------------------ 中ペイン全体
 
@@ -1226,9 +269,14 @@ function chatSuggestions(key?: string): string[] {
 }
 
 export function ContentPane(props: Props) {
-  const s = useStyles()
+  const s = useContentPaneStyles()
   const t = useT()
-  const { theme, headline, instructions, onField, drafts, template, onTemplate, candidates } = props
+  const { drafts, onTemplate } = props
+  const { form, setForm, template, candidates, items, heroId, links, setLinks, pushLink, setPushLink, templateChannel: channel, ab, active } = props.editor
+  const { theme, headline, instructions } = form
+  const onField = (key: FieldKey, value: string) => setForm((f) => ({ ...f, [key]: value }))
+  // AB テストで件名を案ごとに持ち、B・C 案を編集中なら、その案の記号(件名の案を A 案と違う切り口にする)
+  const subjectAbKey = ab && active !== 'A' && ownsSubject(ab) ? active : undefined
   const [tab, setTab] = useState<TopTab>('theme')
   const openTab = (next: TopTab) => setTab(next)
   // 外からのタブを開く頼み(左の配信情報の「引き継ぎのタブで決める」など)。seq が変わったときだけ開く
@@ -1257,18 +305,18 @@ export function ContentPane(props: Props) {
     chatRun.current = run ?? null
     setChatTarget((prev) => (prev?.key === target?.key && prev?.title === target?.title ? prev : target))
   }, [])
-  const isPush = props.channel === 'push'
+  const isPush = channel === 'push'
   // リンク先の場所(メイン画像・ボタン)。メールは URL、アプリは開く画面を決める
-  const slots = linkSlots(template, props.items, props.products, props.campaign, props.country)
+  const slots = linkSlots(template, items, props.products, props.campaign, form.country)
   const pr = progressOf({
     theme,
     template,
-    heroId: props.heroId,
+    heroId: heroId,
     headline,
-    items: props.items,
+    items: items,
     instructions,
-    links: linksComplete(slots, props.links, isPush ? { tapDone: tapComplete(props.pushLink) } : undefined),
-    push: isPush ? { title: props.pushTitle, body: props.pushBody } : undefined,
+    links: linksComplete(slots, links, isPush ? { tapDone: tapComplete(pushLink) } : undefined),
+    push: isPush ? { title: form.pushTitle, body: form.pushBody } : undefined,
   })
 
   const mark = (filled: boolean, hasIdeas: boolean) => `${filled ? '✓ ' : ''}${hasIdeas ? '● ' : ''}`
@@ -1313,7 +361,7 @@ export function ContentPane(props: Props) {
   }, [compact, isPush])
   const needTheme = theme.trim() ? undefined : t('先にテーマを決めてください', 'Set a theme first')
 
-  // テーマ・テンプレート・制作指示のタブの対象(ヒーロー・セクションは、各タブ(ProductsTab)が知らせる)
+  // テーマ・テンプレート・制作指示のタブの対象(ヒーロー・セクションは、各タブ(HeroTab・SectionsTab)が知らせる)
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (tab === 'theme') registerChat({ key: 'theme', title: t('テーマ', 'Theme') }, () => drafts.runTheme())
@@ -1382,7 +430,7 @@ export function ContentPane(props: Props) {
             onField('themeReason', '')
           }}
           ideas={drafts.themeIdeas.map((th) => ({ text: th.theme, note: th.reason }))}
-          savedNote={props.themeReason}
+          savedNote={form.themeReason}
           onAdopt={(idea) => {
             onField('theme', idea.text)
             onField('themeReason', idea.note ?? '')
@@ -1391,18 +439,18 @@ export function ContentPane(props: Props) {
           onGenerate={drafts.runTheme}
         />
       )}
-      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={props.channel} country={props.country} use={props.templateUse} />}
+      {tab === 'template' && <TemplateTab template={template} onTemplate={onTemplate} hasCandidates={candidates.length > 0} channel={channel} country={form.country} use={props.templateUse} />}
       {tab === 'notice' && (
         <CopyTab
           push
-          headline={props.pushTitle}
-          lead={props.pushBody}
-          onHeadline={(v) => props.onPush('pushTitle', v)}
-          onLead={(v) => props.onPush('pushBody', v)}
+          headline={form.pushTitle}
+          lead={form.pushBody}
+          onHeadline={(v) => onField('pushTitle', v)}
+          onLead={(v) => onField('pushBody', v)}
           ideas={drafts.pushIdeas}
           onAdopt={(idea) => {
-            props.onPush('pushTitle', idea.headline)
-            props.onPush('pushBody', idea.lead)
+            onField('pushTitle', idea.headline)
+            onField('pushBody', idea.lead)
           }}
           busy={!!drafts.busy.push}
           blocked={needTheme}
@@ -1414,12 +462,12 @@ export function ContentPane(props: Props) {
           <span className={s.caption}>
             {t('通知を押すと、アプリの中で開くメッセージです。メールと同じ部品(メイン画像・見出し・セクション)で組みます。', 'The message opened in the app when the notification is tapped. It uses the same parts as an email (main image, headline, sections).')}
           </span>
-          <ProductsTab {...props} mode="hero" registerChat={registerChat} />
-          {sectionsOf(template).length > 0 && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
+          <HeroTab editor={props.editor} drafts={drafts} heroes={props.heroes} registerChat={registerChat} subjectAbKey={subjectAbKey} onUploadHero={props.onUploadHero} />
+          {sectionsOf(template).length > 0 && <SectionsTab editor={props.editor} drafts={drafts} products={props.products} registerChat={registerChat} alertKinds={props.alertKinds} onAlert={props.onAlert} onOpenProduct={props.onOpenProduct} />}
         </>
       )}
-      {tab === 'hero' && <ProductsTab {...props} mode="hero" registerChat={registerChat} />}
-      {tab === 'sections' && <ProductsTab {...props} mode="sections" registerChat={registerChat} />}
+      {tab === 'hero' && <HeroTab editor={props.editor} drafts={drafts} heroes={props.heroes} registerChat={registerChat} subjectAbKey={subjectAbKey} onUploadHero={props.onUploadHero} />}
+      {tab === 'sections' && <SectionsTab editor={props.editor} drafts={drafts} products={props.products} registerChat={registerChat} alertKinds={props.alertKinds} onAlert={props.onAlert} onOpenProduct={props.onOpenProduct} />}
       {tab === 'instructions' && (
         <IdeaTab
           label={t('制作指示', 'Production notes')}
@@ -1430,7 +478,7 @@ export function ContentPane(props: Props) {
             onField('instructionsAngle', '')
           }}
           ideas={drafts.instructionIdeas.map((c) => ({ text: c.text, chip: c.angle }))}
-          savedChip={props.instructionsAngle}
+          savedChip={form.instructionsAngle}
           onAdopt={(idea) => {
             onField('instructions', idea.text)
             onField('instructionsAngle', idea.chip ?? '')
@@ -1444,23 +492,23 @@ export function ContentPane(props: Props) {
       {tab === 'instructions' && props.assetsSlot && <div className={s.assetsBlock}>{props.assetsSlot}</div>}
       {tab === 'links' && isPush && (
         <AppLinksEditor
-          links={props.links}
-          onLinks={props.onLinks}
+          links={links}
+          onLinks={setLinks}
           slots={slots}
-          items={props.items}
+          items={items}
           products={props.products}
           campaign={variantCampaign(props.campaign, props.linkVariant)}
-          pushLink={props.pushLink}
-          onPushLink={props.onPushLink}
+          pushLink={pushLink}
+          onPushLink={setPushLink}
           onFocusSlot={props.onLinkFocus}
         />
       )}
       {tab === 'links' && !isPush && (
         <LinksEditor
-          links={props.links}
-          onLinks={props.onLinks}
+          links={links}
+          onLinks={setLinks}
           slots={slots}
-          items={props.items}
+          items={items}
           products={props.products}
           campaign={props.utmCampaign}
           variant={props.linkVariant}
