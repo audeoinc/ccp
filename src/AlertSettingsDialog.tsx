@@ -6,12 +6,12 @@ import {
   DialogActions,
   DialogBody,
   DialogContent,
-  DialogSurface,
   DialogTitle,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
 import { DEFAULT_ALERT_SETTINGS, setAlertSettings, type AlertSettings } from './alertSettings'
+import { ResizableSurface } from './ResizableSurface'
 import { useT } from './i18n'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
 
@@ -40,7 +40,7 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface>
+      <ResizableSurface sizeKey="alertSettings">
         <DialogBody>
           <DialogTitle>{t('アラートの条件', 'Alert conditions')}</DialogTitle>
           <DialogContent className={styles.body}>
@@ -105,7 +105,7 @@ export function AlertSettingsDialog({ open, settings, owners, onClose }: Props) 
             </Button>
           </DialogActions>
         </DialogBody>
-      </DialogSurface>
+      </ResizableSurface>
     </Dialog>
   )
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, ClipboardPasteRegular, CommentAddRegular, DismissRegular, EyeRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -531,7 +531,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
           </Button>
           <CopyLinkButton />
           <DevRequestMoreMenu />
-          <Button size="small" appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
+          <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
         </div>
 
         {/* 状態と操作(いつも見える) */}
@@ -955,11 +955,11 @@ export function ProductionPage({ card, productIds, variantIds, products, product
         {/* 制作した HTML を貼り付けて置き換える(X58) */}
         {pasting !== null && (
           <Dialog open onOpenChange={(_, d) => !d.open && setPasting(null)}>
-            <DialogSurface>
+            <ResizableSurface sizeKey="pasteHtml" min={{ w: 480, h: 320 }}>
               <DialogBody>
                 <DialogTitle>{t('制作した HTML を貼り付ける', 'Paste the production HTML')}</DialogTitle>
                 <DialogContent>
-                  <Textarea className={s.pasteBox} value={pasting} onChange={(_, d) => setPasting(d.value)} placeholder={t('ここに HTML を貼り付けます(<html> から </html> まで、まるごと)', 'Paste the whole HTML here (from <html> to </html>)')} />
+                  <AutoTextarea heightKey="ProductionPage.pasteHtml" className={s.pasteBox} value={pasting} onChange={(_, d) => setPasting(d.value)} placeholder={t('ここに HTML を貼り付けます(<html> から </html> まで、まるごと)', 'Paste the whole HTML here (from <html> to </html>)')} />
                   <span className={s.note}>{t('いまの HTML と置き換わります。保存するまでは、この版には残りません。', 'This replaces the current HTML. It is not kept in this version until you save.')}</span>
                 </DialogContent>
                 <DialogActions>
@@ -978,7 +978,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   </Button>
                 </DialogActions>
               </DialogBody>
-            </DialogSurface>
+            </ResizableSurface>
           </Dialog>
         )}
       </ResizableSurface>

@@ -513,7 +513,7 @@ export function PolicyManager({ open, onClose, onImported, inline }: { open: boo
         <div className={styles.body}>
           <div className={styles.row}>
             <DialogTitle className={styles.grow}>{t('方針・決まり(マーケティングポリシー)', 'Marketing policies')}</DialogTitle>
-            <Button appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
+            <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
           </div>
           {content}
         </div>
