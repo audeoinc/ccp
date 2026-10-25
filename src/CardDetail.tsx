@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useStableCallback } from './useStableCallback'
 import {
-  Badge,
   Button,
   Caption1,
   Dialog,
@@ -11,85 +10,59 @@ import {
   MessageBarActions,
   MessageBarBody,
   ProgressBar,
-  Select,
   Slider,
   Spinner,
-  Switch,
   Text,
-  ToggleButton,
-  Tooltip,
-  makeStyles,
-  mergeClasses,
-  tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, CommentAddRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, DataBarVerticalRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
-import { ProductInfoPane } from './ProductInfoPane'
 import { cardMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { ChannelBadge } from './ChannelBadge'
-import { CopyLinkButton } from './CopyLinkButton'
-import { FaceBadge } from './FaceBadge'
-import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
-import { AUDIENCES, audienceLabel } from './target'
-import { ContentPane } from './ContentPane'
+import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { Preview } from './Preview'
 import { sectionIndexAt, sectionsOf, type EmailTemplateId, getTemplate, splitTemplateKey, templateKeyOfCard, templateMissing, templatesSettled, useTemplates } from './templates'
 import { tapComplete } from './pushLink'
-import { Splitter } from './Splitter'
-import { useStoredWidths } from './floatLayout'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { progressOf } from './progress'
 import { ResizableSurface } from './ResizableSurface'
 import { campaignId, campaignSlug, productContent, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
-import { LinkOverlay } from './LinkOverlay'
 import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
 import { PREF } from './prefKeys'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { useCardEditor, type Snapshot } from './useCardEditor'
+import { ClassicCardLayout } from './ClassicCardLayout'
+import { useCardDetailStyles } from './cardDetailStyles'
 import { useCardAlerts } from './useCardAlerts'
 import type { Form } from './cardForm'
 import type { WeekRow } from './data/weeks'
 import { myName } from './history'
-import { ProcessPane, ProcessRail, type TalkTab } from './ProcessPane'
+import { type TalkTab } from './ProcessPane'
 import type { TopTab } from './ContentPane'
-import { CHANNEL_PUSH, channelOptions, countryOptions } from './status'
+import { CHANNEL_PUSH } from './status'
 import { LearningsBar } from './LearningsBar'
 import { CardMenu } from './CardMenu'
-import { ResolvedPinsToggle } from './ResolvedPinsToggle'
 import { CardAlertsBar } from './CardAlertsBar'
-import { AbDecidedBar, AbTestBar } from './AbTestBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
-import { CreativeAssets } from './CreativeAssets'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
-import { allVariants, isChoose, metricLabel, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsSubject, targetLabel } from './abTest'
+import { allVariants, nextVariant, ownsAnyText, ownsSubject } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
-import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from './DeliveryInfoFields'
 import { confirmDialog } from './confirm'
-import { PreviewPins } from './PreviewPins'
-import { pinView } from './pinStore'
 import type { StockModel } from './alerts'
 import type { CardAlert } from './cardAlerts'
-import { viewWidth } from './uiScale'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
 import type { AiPreview, SimpleEditor } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
-import { PinFloat } from './PinFloat'
-import { focusSoon, type ContextItem } from './ContextMenu'
 import { usePreviewPins } from './usePreviewPins'
-import { heroImage } from './images'
-import { previewMenuItems } from './previewMenu'
-import { PaneRail } from './PaneRail'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -168,159 +141,20 @@ function loadZoom(): number | 'fit' {
 /** 自動下書きを済ませたカード(同じカードを開き直しても、再実行しない) */
 const autoDrafted = new Set<string>()
 
-// 4 つめの幅(右端のプロセスのペイン)を足したので、版を上げた(2026-10-17)
-const WIDTH_KEY = PREF.cardPaneWidths
 // ダイアログの大きさ(辺・角のドラッグで変える。ResizableSurface。鍵は以前からの cardDetail.size)
 const MIN_DIALOG = { w: 900, h: 560 }
-// 既定を「開く」に変えたので、キーの版を上げて、以前に保存した開閉は使わない
-const INFO_KEY = PREF.cardInfoOpen
-const RAIL_W = 32
 // 右端のプロセスのペイン(状態・承認・やり取り)の開閉。既定は開く
 const PROCESS_KEY = PREF.cardProcessOpen
 
-/** 商品情報ペインを開くか。保存がなければ、開いておく(選んだ商品の売上・在庫を、すぐ確かめられるように) */
-// 保存は 'open' / 'closed' の文字のまま(以前からの形)。読めないときは、既定(開く)にする
-const loadInfoOpen = (): boolean => readRaw(INFO_KEY) !== 'closed'
-const MIN_W = 220
-const MAX_W = 640
-const clamp = (v: number) => Math.min(MAX_W, Math.max(MIN_W, v))
-// 中央(コンテンツ生成)は、プレビューと商品情報がつぶれない範囲で、いくらでも広げられる
-// (上限は、ドラッグのときに、その時のダイアログの幅から求める。CSS でも、プレビューの最小幅を残すよう抑える)
-const MIN_PREVIEW = 320
-const clampMid = (v: number, max = 4000) => Math.min(Math.max(MIN_W, max), Math.max(MIN_W, v))
 
 const loadOpen = (key: string): boolean => readRaw(key) !== 'closed'
 
-type Widths = [number, number, number, number]
-function readWidths(v: unknown): Widths {
-  if (Array.isArray(v) && v.length === 4) return [clamp(Number(v[0])), clampMid(Number(v[1])), clamp(Number(v[2])), clamp(Number(v[3]))]
-  // 既定値: ダイアログの幅(最大 1800px)に合わせる。左 18%・中 26%・商品情報 15%・プロセス(右端)17%・プレビューは残り
-  const total = Math.min(1800, viewWidth() * 0.98)
-  return [clamp(Math.round(total * 0.18)), clamp(Math.round(total * 0.26)), clamp(Math.round(total * 0.15)), clamp(Math.round(total * 0.17))]
-}
 
 
-const useStyles = makeStyles({
-  surface: {
-    // fixed + inset 0 + margin auto で、画面の中央に置く(relative にすると、標準の中央寄せが効かず、上端に貼りつく)。中の絶対配置の基準にもなる
-    position: 'fixed',
-    inset: 0,
-    margin: 'auto',
-    padding: 0,
-    overflow: 'hidden',
-    maxWidth: 'none',
-    width: 'min(1800px, (98vw / var(--ui-zoom, 1)))',
-    height: 'calc(92vh / var(--ui-zoom, 1))',
-    maxHeight: 'calc(92vh / var(--ui-zoom, 1))',
-    '@media (max-width: 899px)': {
-      width: 'calc(100vw / var(--ui-zoom, 1))',
-      height: 'calc(100vh / var(--ui-zoom, 1))',
-      maxHeight: 'calc(100vh / var(--ui-zoom, 1))',
-      borderRadius: 0,
-    },
-  },
-  form: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
-  overlay: {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 20,
-    display: 'grid',
-    placeContent: 'center',
-    justifyItems: 'center',
-    rowGap: '16px',
-    paddingLeft: '24px',
-    paddingRight: '24px',
-    textAlign: 'center',
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-  overlayBar: { width: '320px' },
-  titleRow: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '12px 12px 12px 24px', backgroundColor: tokens.colorNeutralBackground1 },
-  titleText: { flexGrow: 1, minWidth: 0 },
-  panes: {
-    flexGrow: 1,
-    minHeight: 0,
-    display: 'grid',
-    gridTemplateColumns: '1fr',
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    overflow: 'auto',
-    '@media (min-width: 900px)': {
-      gridTemplateColumns: `var(--w0) 1px min(var(--w1), max(${MIN_W}px, calc(100% - var(--w0) - var(--w2) - var(--w3) - 4px - ${MIN_PREVIEW}px))) 1px minmax(0, 1fr) 1px var(--w2) 1px var(--w3)`,
-      gridTemplateRows: 'minmax(0, 1fr)',
-      overflow: 'hidden',
-    },
-  },
-  pane: {
-    padding: '16px',
-    overflow: 'auto',
-    minHeight: 0,
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    rowGap: '12px',
-    backgroundColor: tokens.colorNeutralBackground1,
-    alignContent: 'start',
-  },
-  // 中ペインは、余白と、スクロールを内側(ContentPane)に任せる: 上に内容、下にチャットを固定する
-  paneMid: { backgroundColor: tokens.colorNeutralBackground1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  panePreview: { gridTemplateRows: 'auto minmax(0, 1fr)' },
-  infoToolbar: { display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' },
-  caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular },
-  lead: { fontWeight: tokens.fontWeightSemibold },
-  captionTight: { marginTop: '-4px' },
-  success: { color: tokens.colorPaletteGreenForeground1 },
-  fullWidth: { width: '100%', flexShrink: 0, minHeight: '32px' },
-  sectionHead: { marginTop: '12px' },
-  deviceSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: '4px' },
-  deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
-  previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
-  // 配信の対象(X40)
-  targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
-  savedNote: { alignSelf: 'center', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteGreenForeground1 },
-  targetLabel: { width: '44px', flexShrink: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
-  // 左の「制作への引き継ぎ」(表示だけ。押すと、やり取りの「引き継ぎ」のタブが開く)
-  handoffField: { gridColumn: '1 / -1' },
-  handoffSummary: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: '12px',
-    rowGap: '2px',
-    width: '100%',
-    minHeight: '32px',
-    padding: '4px 8px',
-    textAlign: 'left',
-    fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground1,
-    border: `1px solid ${tokens.colorNeutralStroke1}`,
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground1,
-    cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-  },
-  handoffItem: { whiteSpace: 'nowrap' },
-  handoffLink: { marginLeft: '6px', color: tokens.colorBrandForegroundLink, whiteSpace: 'nowrap' },
-  grow: { flexGrow: 1 },
-  filled: { borderBottomColor: tokens.colorPaletteGreenBorder2 },
-  toolbar: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
-  zoomBox: { display: 'flex', alignItems: 'center', columnGap: '2px' },
-  slider: { width: '90px', minWidth: '90px' },
-  zoomLabel: { width: '34px', textAlign: 'right' },
-  // position: relative は、リンクの場所の番号・URL の吹き出し(LinkOverlay)を、プレビューに重ねて置くため
-  previewBox: { position: 'relative', overflow: 'auto', minHeight: 0, paddingTop: '8px', paddingBottom: '8px' },
-  error: { margin: '12px 12px 0' },
-  // 確定した週の配信: 上の知らせと、保存の前の理由の入力欄
-  locked: { margin: '0 24px 8px' },
-  reasonBox: { display: 'grid', rowGap: '8px', margin: '12px 24px 0', padding: '12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorPaletteMarigoldBorder2}`, backgroundColor: tokens.colorPaletteMarigoldBackground1 },
-  reasonActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
-  actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
-  // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
-})
 
 export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext }: Props) {
   const t = useT()
-  const styles = useStyles()
+  const styles = useCardDetailStyles()
   // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
   // 保存済みの配信だけ(新規作成・まとめて作った案は、自動の反映で新しい配信を作らないよう、詳しい画面)
   const [simpleView, setSimpleView] = useState(loadSimpleCard)
@@ -355,9 +189,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 持っている画像を上げる(X59)
   // true = 空で開く、File = そのファイルを上げながら開く(シンプルの「アップロード」のタブに落としたとき)
   const [heroUpload, setHeroUpload] = useState<boolean | File>(false)
-  const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
-  // リンク先のタブを開いているか・設定の欄で選んでいる場所(プレビューに、番号と枠を重ねる。W12)
-  const [linksTab, setLinksTab] = useState(false)
   // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
   const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
   // プレビュー上の場所を指して書き込む(ピン)。選んでいる間は、プレビューを押しても編集しない
@@ -366,20 +197,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
   // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
   const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
-  const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   // 商品情報の行にマウスが乗っている商品(プレビューで光らせる)と、商品情報ペインの開閉
   const [hoverKey, setHoverKey] = useState<string | null>(null)
-  const [infoOpen, setInfoOpen] = useState<boolean>(loadInfoOpen)
   const [processOpen, setProcessOpen] = useState<boolean>(() => loadOpen(PROCESS_KEY))
   const toggleProcess = () =>
     setProcessOpen((open) => {
       writeRaw(PROCESS_KEY, open ? 'closed' : 'open')
-      return !open
-    })
-  const toggleInfo = () =>
-    setInfoOpen((open) => {
-      writeRaw(INFO_KEY, open ? 'closed' : 'open')
       return !open
     })
   // 使ったテンプレートが見つからなかった配信(見せるテンプレートの名前と、AI で下書きし直したか)
@@ -451,17 +275,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
-  const panesRef = useRef<HTMLDivElement>(null)
-  // 中央の上限: ダイアログの中の幅から、左・商品情報・境界線・プレビューの最小幅を引いた残り
-  // (中の幅は、ドラッグのたびに、幅を変える前に測る。幅を決める関数の中では ref を読まない)
-  const midMax = (w: Widths, total: number) => total - w[0] - (infoOpen ? w[2] : RAIL_W) - (processOpen ? w[3] : RAIL_W) - 4 - MIN_PREVIEW
-  const resizeLeft = (dx: number) => setWidths((w) => [clamp(w[0] + dx), w[1], w[2], w[3]])
-  const resizeMid = (dx: number) => {
-    const total = panesRef.current?.clientWidth ?? viewWidth()
-    setWidths((w) => [w[0], clampMid(Math.min(w[1], midMax(w, total)) + dx, midMax(w, total)), w[2], w[3]])
-  }
-  const resizeInfo = (dx: number) => setWidths((w) => [w[0], w[1], clamp(w[2] - dx), w[3]])
-  const resizeProcess = (dx: number) => setWidths((w) => [w[0], w[1], w[2], clamp(w[3] - dx)])
 
 
 
@@ -1069,43 +882,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     )}
     </>
   )
-  /**
-   * 詳しい画面のプレビューの右クリックの項目(「ここにピンを打つ」のあと)。押した所について、工程のタブ・商品のフロート・プレビューの「外す」と同じ処理を呼ぶ。
-   * 直す・AI に頼むは、その部品を直す工程のタブを開く(AI は、そのタブの AI チャットの入力欄へ)。保存中は、中身を変える項目を押せなくする
-   */
-  const detailPreviewMenu = (under: Element): ContextItem[] => {
-    const itemKey = under.closest('[data-item-key]')?.getAttribute('data-item-key') ?? undefined
-    const anchor = under.closest('[data-anchor]')?.getAttribute('data-anchor') ?? ''
-    const kind = anchor.split(':')[0]
-    const tab: TopTab | null = itemKey ? 'sections' : kind === 'hero' || kind === 'herotext' || kind === 'subject' ? 'hero' : kind === 'section' ? 'sections' : kind === 'button' ? 'links' : kind === 'push' ? 'notice' : null
-    const openTab = (to: TopTab) => setStepRequest((r) => ({ tab: to, seq: (r?.seq ?? 0) + 1 }))
-    const it = itemKey ? items.find((i) => i.key === itemKey) : undefined
-    return previewMenuItems({
-      // ボタンと同じく、保存中だけ押せなくする
-      busy: saving,
-      edit: tab ? () => openTab(tab) : undefined,
-      ai: tab
-        ? () => {
-            openTab(tab)
-            focusSoon('[data-ai-chat-input]')
-          }
-        : undefined,
-      product: itemKey
-        ? {
-            swapLabel: t('商品を差し替える', 'Swap the product'),
-            url: productUrl(productById.get(it?.productId ?? '')),
-            // 商品の箱を押したときと同じ、商品のフロート
-            swap: () => {
-              setActAlert(null)
-              setSlotAction(null)
-              setProductOpen(itemKey)
-            },
-            remove: () => removeItem(itemKey),
-          }
-        : undefined,
-      hero: !itemKey && kind === 'hero' ? { src: heroImage(hero), replace: () => openTab('hero') } : undefined,
-    })
-  }
   // 商品の枠のアラートの印(押すと、その商品のアラートへの対応を開く)。詳しい画面とシンプルな画面で同じ
   const itemAlertOverlay = (
     <ItemAlertOverlay
@@ -1294,450 +1070,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             </>
           ) : (
           <>
-          <div className={styles.titleRow}>
-            {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
-            {stageNav ?? <FaceBadge face="calendar" />}
-            <ChannelBadge channel={form.channel} />
-            <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
-            <Tooltip
-              relationship="description"
-              content={progress.remaining.length ? t(`未完了: ${progress.remaining.join('、')}`, `Incomplete: ${progress.remaining.join(', ')}`) : t('すべての工程が完了しています', 'All steps are complete')}
-            >
-              <Badge appearance="tint" color={progress.done === progress.total ? 'success' : 'informative'} size="large">
-                {t(`工程 ${progress.done} / ${progress.total}`, `Steps ${progress.done} / ${progress.total}`)}
-              </Badge>
-            </Tooltip>
-            {card && onOpenResults && card.scheduled_at && new Date(card.scheduled_at) < new Date() && (
-              <Button type="button" size="small" appearance="secondary" icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.id)}>
-                {t('結果を見る', 'View results')}
-              </Button>
-            )}
-            {/* この配信カードを開くリンク(保存済みの配信だけ。X36) */}
-            {card && <ViewSwitch simple={false} onChange={changeView} />}
-            {card && <CopyLinkButton />}
-            {/* 複製・取りやめ・削除(保存済みの配信だけ) */}
-            {cardMenu()}
-            <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
-          </div>
-          {noticesNode}
-          {productFloat}
-          {alertsNode}
-          {/* これまでの学び(同じテンプレート・テーマの種類の、過去の配信のメモ)。保存済みの配信だけ */}
-          {card && (
-            <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} />
-          )}
-
-          {heroUploadNode}
-          {/* AB テストの帯(X55): 案の切り替えと、テストの設定 */}
-          {ab && (
-            <AbTestBar
-              ab={ab}
-              active={active}
-              onSwitch={switchVariant}
-              onChange={setAb}
-              onAdd={addVariant}
-              onRemove={removeVariant}
-              onStop={stopAbTest}
-              onTarget={changeTarget}
-              onAiDraft={() => void draftActiveVariant()}
-              aiBusy={abAiBusy}
-              onCompare={() => setComparing('live')}
-              onDecide={decideVariant}
-            />
-          )}
-          {/* 案から選んだあと(X57): 決めた案と、配信しなかった案の入り口 */}
-          {!ab && decision && <AbDecidedBar decision={decision} onView={() => setComparing('decided')} />}
-          {abCompareNode}
-          {!ab && decision && comparing === 'decided' && (
-            <AbCompare
-              ab={null}
-              target={decision.target}
-              base={{ id: card?.id ?? 'draft', ...buildContent() } as DeliveryCard}
-              variants={[
-                { key: decision.variant, productIds: items.map((i) => i.productId), heroId, tag: t('配信した案', 'Sent') },
-                ...decision.rejected.map((r) => ({
-                  key: r.key,
-                  // 案ごとに持たなかったもの(比べる要素でないもの)は、配信の中身と同じ。持っていたものは、空でもその案の中身のまま
-                  productIds: ownsProducts(asTarget(decision.target)) ? r.productIds : items.map((i) => i.productId),
-                  heroId: ownsHero(asTarget(decision.target)) ? r.heroId : heroId,
-                  texts: r.texts,
-                  template: r.template,
-                  tag: t('配信しなかった', 'Not sent'),
-                })),
-              ]}
-              products={products}
-              heroes={heroes}
-              onClose={() => setComparing(null)}
-            />
-          )}
-
-          <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px`, '--w3': `${processOpen ? widths[3] : RAIL_W}px` } as React.CSSProperties}>
-            {/* 左: 配信の情報 */}
-            <div className={styles.pane}>
-              <Button
-                appearance="primary"
-                icon={<AiIcon tone="white" size={18} />}
-                onClick={runAllManual}
-                disabled={!!auto || saving}
-                className={styles.fullWidth}
-              >
-                {t('すべてAIで下書き', 'Draft everything with AI')}
-              </Button>
-              <Caption1 className={mergeClasses(styles.caption, styles.captionTight)}>
-                {t('テーマ・メイン画像・ヘッドライン・セクション・制作指示を、まとめてAIが下書きします', 'AI drafts the theme, hero image, headline, sections, and production notes all at once')}
-              </Caption1>
-              <Text weight="semibold" size={300}>{t('配信情報', 'Delivery info')}</Text>
-              <NameField value={form.name} onChange={set('name')} />
-              <ScheduledAtField value={form.scheduledAt} onChange={set('scheduledAt')} />
-              <div className={styles.twoCol}>
-                <ChoiceField label={t('国', 'Country')} value={form.country} options={countryOptions} onChange={set('country')} />
-                <ChoiceField label={t('チャネル', 'Channel')} value={form.channel} options={channelOptions} onChange={set('channel')} />
-                <ChoiceField label={t('種類', 'Type')} value={form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={set('themeType')} />
-                <StatusField value={form.status} onChange={set('status')} />
-              </div>
-              {/* 配信の対象(X40): 誰に向けて作るか。最初に決め、AI の下書きと商品の候補をこれに合わせる */}
-              <TargetField gender={form.targetGender} ages={form.targetAges} onGender={set('targetGender')} onAges={set('targetAges')}>
-                {/* アプリの送る相手(これまでの ⑥ 時刻・相手 から移した) */}
-                {templateChannel === 'push' && (
-                  <div className={styles.targetRow}>
-                    <span className={styles.targetLabel}>{t('送る相手', 'Send to')}</span>
-                    <Select size="small" className={styles.grow} value={audience} onChange={(_, d) => setAudience(d.value)}>
-                      <option value="" disabled>{t('選んでください', 'Choose')}</option>
-                      {AUDIENCES.map((v) => (
-                        <option key={v} value={v}>{audienceLabel(v)}</option>
-                      ))}
-                    </Select>
-                  </div>
-                )}
-              </TargetField>
-              <div className={styles.twoCol}>
-                <OwnerField value={form.owner} onChange={set('owner')} owners={owners} />
-                {/* 制作の担当者・締め切り・引き継ぎ済みは、右端のプロセスのペインの「引き継ぎ」だけで決める(2 か所で入力しない。FLOWS の C-3)。ここは表示だけで、押すとそのタブが開く(閉じていれば開く) */}
-                <Field label={t('制作への引き継ぎ', 'Handoff to production')} className={styles.handoffField}>
-                  <button type="button" className={styles.handoffSummary} onClick={() => {
-                    if (!processOpen) toggleProcess()
-                    setTabRequest((r) => ({ tab: 'handoff', seq: (r?.seq ?? 0) + 1 }))
-                  }} title={t('引き継ぎのタブで決める', 'Set in the Handoff tab')}>
-                    <span>
-                      <span className={styles.caption}>{t('担当 ', 'Assignee ')}</span>
-                      {form.productionOwner.trim() || <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
-                      <span className={styles.caption}>{t(' ・ 締め切り ', ' · Due ')}</span>
-                      {form.productionDue ? form.productionDue.replace(/-/g, '/') : <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
-                    </span>
-                    <span>
-                      {form.handedOffAt ? (
-                        <span className={mergeClasses(styles.success, styles.handoffItem)}>{t('引き継ぎ済み ', 'Handed off ')}{new Date(form.handedOffAt).toLocaleString(locale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                      ) : (
-                        <span className={styles.caption}>{t('まだ引き継いでいない', 'Not handed off yet')}</span>
-                      )}
-                      <span className={styles.handoffLink}>{t('引き継ぎのタブで決める ›', 'Set in the Handoff tab ›')}</span>
-                    </span>
-                  </button>
-                </Field>
-              </div>
-              {/* AB テスト(X55)・案から選ぶ(X57)。始めると、題名の下に案の切り替えと設定の帯が出る */}
-              <Field label={t('案(AB テスト・案から選ぶ)', 'Variants (A/B test or choose one)')}>
-                {ab && isChoose(ab) ? (
-                  <Caption1 className={styles.caption}>
-                    {t(`${['A', ...ab.variants].join('・')} の ${ab.variants.length + 1} 案から、1 案に決めて配信する(${targetLabel(ab.target)}を案ごとに)。上の帯で決める`, `Choose one of ${ab.variants.length + 1} variants to send (${targetLabel(ab.target).toLowerCase()} per variant). Decide in the bar above.`)}
-                  </Caption1>
-                ) : ab ? (
-                  <Caption1 className={styles.caption}>
-                    {t(
-                      `${['A', ...ab.variants].join('・')} の ${ab.variants.length + 1} 案で、${targetLabel(ab.target)}を比べる(判定: ${metricLabel(ab.metric)})。設定と案の切り替えは、上の帯で`,
-                      `${ab.variants.length + 1} variants (${['A', ...ab.variants].join(', ')}) comparing the ${targetLabel(ab.target).toLowerCase()} (judged by ${metricLabel(ab.metric).toLowerCase()}). Settings and switching are in the bar above.`,
-                    )}
-                  </Caption1>
-                ) : (
-                  <div className={styles.targetRow}>
-                    <Button type="button" size="small" icon={<BeakerRegular />} onClick={() => startAbTest('test')} title={t('A 案(いまの配信)の写しから B 案を作り、メイン画像や商品を比べます。全案を、受信者を分けて送ります(C 案まで)', 'Create variant B as a copy of A to compare the hero image or products. All variants are sent to split recipients (up to C)')}>
-                      {t('AB テストにする', 'Make it an A/B test')}
-                    </Button>
-                    <Button type="button" size="small" icon={<CheckmarkCircleRegular />} onClick={() => startAbTest('choose')} title={t('A 案の写しから B 案を作り、クリエイティブ全体(画像・商品・文言)を変えて比べ、決めた 1 案だけを配信します(C 案まで)', 'Create variant B as a copy of A, vary the whole creative (image, products, text), and send only the one you choose (up to C)')}>
-                      {t('案を出して選ぶ', 'Make variants to choose from')}
-                    </Button>
-                    {decision && <Caption1 className={styles.caption}>{t(`前回は ${decision.variant} 案に決めた(上の帯)`, `Last time: went with ${decision.variant} (bar above)`)}</Caption1>}
-                  </div>
-                )}
-              </Field>
-              <Text weight="semibold" size={300} className={styles.sectionHead}>{t('工程', 'Steps')}</Text>
-              <Field label={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise for the whole delivery; not shown in the email)')}>
-                <AutoTextarea heightKey="CardDetail.form_theme"
-                  size="small"
-                  rows={2}
-                                    className={form.theme ? styles.filled : undefined}
-                  value={form.theme}
-                  onChange={(_, d) => set('theme')(d.value)}
-                />
-              </Field>
-              {form.theme && form.themeReason && <Caption1 className={styles.caption}><span className={styles.lead}>{t('AIの理由:', 'AI rationale:')}</span>{` ${form.themeReason}`}</Caption1>}
-              <Caption1 className={items.length ? styles.success : styles.caption}>
-                {t(`掲載商品: ${items.length}件(中央の「セクション」タブで選びます)`, `Products in this delivery: ${items.length} (choose them in the Sections tab in the middle)`)}
-              </Caption1>
-              <Field label={t('ヘッドライン(メイン画像に載せる大見出し)', 'Headline (the large heading on the hero image)')}>
-                <AutoTextarea heightKey="CardDetail.form_headline"
-                  size="small"
-                  rows={1}
-                                    className={form.headline ? styles.filled : undefined}
-                  value={form.headline}
-                  onChange={(_, d) => set('headline')(d.value)}
-                />
-              </Field>
-              <Field label={t('コピー(ヘッドラインの下の導入文)', 'Copy (intro text below the headline)')}>
-                <AutoTextarea heightKey="CardDetail.form_copy"
-                  size="small"
-                  rows={2}
-                                    className={form.copy ? styles.filled : undefined}
-                  value={form.copy}
-                  onChange={(_, d) => set('copy')(d.value)}
-                />
-              </Field>
-              {(form.headline || form.copy) && form.copyAngle && <Caption1 className={styles.caption}><span className={styles.lead}>{t('切り口:', 'Angle:')}</span>{` ${form.copyAngle}`}</Caption1>}
-              {/* 制作指示は、作るのは中ペインの「⑥ 制作指示」、引き継ぐ前に確かめるのは右のプロセスのペインの「渡す制作指示」。左には置かない(書き換える場所を 1 つにする。X26) */}
-            </div>
-
-            <Splitter onDrag={resizeLeft} onDone={saveWidths} />
-
-            {/* 中: コンテンツ生成(テーマ・商品選定・コピー・制作指示) */}
-            <div className={mergeClasses(styles.pane, styles.paneMid)}>
-              <ContentPane
-                theme={form.theme}
-                headline={form.headline}
-                copy={form.copy}
-                subject={form.subject}
-                preheader={form.preheader}
-                deliveryName={form.name}
-                subjectAbKey={ab && active !== 'A' && ownsSubject(ab) ? active : undefined}
-                instructions={form.instructions}
-                themeReason={form.themeReason}
-                copyAngle={form.copyAngle}
-                instructionsAngle={form.instructionsAngle}
-                onField={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
-                template={template}
-                onTemplate={changeTemplate}
-                country={form.country}
-                templateUse={templateUseMap}
-                sectionTitles={sectionTitles}
-                onSectionTitle={setSectionTitle}
-                sectionCopies={sectionCopies}
-                onSectionCopy={setSectionCopy}
-                products={products}
-                heroes={heroes}
-                poolProducts={poolProducts}
-                poolHeroes={poolHeroes}
-                onUploadHero={() => setHeroUpload(true)}
-                assetsSlot={
-                  <CreativeAssets
-                    cardId={card?.id}
-                    stage="plan"
-                    title={t('参考の素材(制作に使ってほしい画像・資料・ページ)', 'Reference assets (images, documents and pages for production)')}
-                    owner={card?.owner}
-                    people={owners}
-                    cardName={form.name}
-                    productionOwner={form.productionOwner}
-                    productionDue={form.productionDue}
-                    productIds={items.map((i) => i.productId)}
-                    products={products}
-                  />
-                }
-                items={items}
-                setItems={setItems}
-                candidates={candidates}
-                setCandidates={setCandidates}
-                alertKinds={productAlertKinds}
-                onAlert={alertCard ? openAlertFor : undefined}
-                onOpenProduct={(key) => {
-                  setActAlert(null)
-                  setProductOpen(key)
-                }}
-                heroId={heroId}
-                setHeroId={setHeroId}
-                heroReason={heroReason}
-                setHeroReason={setHeroReason}
-                heroCandidates={heroCandidates}
-                setHeroCandidates={setHeroCandidates}
-                drafts={drafts}
-                disabled={saving}
-                links={links}
-                onLinks={setLinks}
-                handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
-                onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
-                tabRequest={stepRequest}
-                people={owners}
-                cardId={card?.id}
-                owner={form.owner}
-                cardName={form.name}
-                channel={templateChannel}
-                pushLink={pushLink}
-                onPushLink={setPushLink}
-                pushTitle={form.pushTitle}
-                pushBody={form.pushBody}
-                onPush={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
-                scheduledAt={form.scheduledAt}
-                campaign={campaignSlug(form.name, form.scheduledAt)}
-                utmCampaign={utmCampaign}
-                linkVariant={linkVariant}
-                onLinksTab={setLinksTab}
-                onLinkFocus={setLinkFocus}
-                onTabChange={onTabChange}
-              />
-            </div>
-
-            <Splitter onDrag={resizeMid} onDone={saveWidths} />
-
-            {/* 右: プレビュー */}
-            <div className={mergeClasses(styles.pane, styles.panePreview)}>
-              <div className={styles.toolbar}>
-                <div className={mergeClasses(styles.grow, styles.previewHead)}>
-                  {previewTab === 'push' ? <PhoneRegular /> : <MailRegular />}
-                  <Text weight="semibold" size={300}>{previewTab === 'push' ? t('アプリのプレビュー', 'App preview') : t('メールのプレビュー', 'Email preview')}</Text>
-                  {!form.channel && <Caption1 className={styles.caption}>{t('チャネルが未設定のため、メールで表示しています', 'No channel set — showing the email')}</Caption1>}
-                  {previewTab !== 'push' && (
-                    <span className={styles.deviceSwitch} role="tablist" aria-label={t('プレビューの幅', 'Preview width')}>
-                      {(['mobile', 'pc'] as const).map((d) => (
-                        <Button key={d} type="button" size="small" role="tab" aria-selected={previewDevice === d} appearance={previewDevice === d ? 'primary' : 'subtle'} className={styles.deviceBtn} icon={d === 'mobile' ? <PhoneRegular /> : <DesktopRegular />} onClick={() => pickDevice(d)}>
-                          {d === 'mobile' ? t('スマホ', 'Mobile') : t('PC', 'Desktop')}
-                        </Button>
-                      ))}
-                    </span>
-                  )}
-                  {ab && (
-                    <Badge appearance="filled" color="brand">
-                      {t(`${active} 案`, `Variant ${active}`)}
-                    </Badge>
-                  )}
-                </div>
-                {zoomBox}
-                <Tooltip
-                  relationship="description"
-                  content={card ? t('プレビューの場所を押して、そこへの書き込み(承認者のコメント・制作への問い合わせなど)を始めます。Esc でやめます。', 'Click a spot in the preview to start a comment there (approver feedback, questions to production, etc.). Esc to cancel.') : t('配信カードを保存すると、使えます', 'Save the delivery card first')}
-                >
-                  <ToggleButton type="button" size="small" appearance={placingPin ? 'primary' : 'subtle'} checked={placingPin} icon={<CommentAddRegular />} disabled={!card} onClick={() => setPlacingPin((v) => !v)}>
-                    {placingPin ? t('場所を押す…', 'Click a spot…') : t('コメントを置く', 'Place comment')}
-                  </ToggleButton>
-                </Tooltip>
-                {card && <ResolvedPinsToggle />}
-                {previewTab === 'email' && template === 'free' && (
-                  <>
-                    <Switch label={t('カテゴリ見出し', 'Category headings')} checked={showHeadings} onChange={(_, d) => setShowHeadings(d.checked)} />
-                    <Button type="button" size="small" appearance="subtle" onClick={groupByCategory} disabled={items.length < 2}>{t('カテゴリでまとめる', 'Group by category')}</Button>
-                  </>
-                )}
-              </div>
-              <div ref={previewBoxRef} className={styles.previewBox}>
-                <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
-                  <Preview {...previewCommon} items={items} selectedKey={selectedKey} template={template} hero={hero} onSelect={setSelectedKey} />
-                </div>
-                {card && itemAlertKinds.size > 0 && itemAlertOverlay}
-                <PreviewPins
-                  boxRef={previewBoxRef}
-                  cardId={card?.id}
-                  view={pinView(previewTab, previewDevice, ab ? active : 'A')}
-                  items={items}
-                  placing={placingPin}
-                  onPlacingEnd={endPlacingPin}
-                  onOpenThreads={openPinThreads}
-                  menuItems={detailPreviewMenu}
-                />
-                {card && pinTarget && (
-                  <PinFloat
-                    cardId={card.id}
-                    cardOwner={form.owner}
-                    stage="plan"
-                    root={() => previewBoxRef.current}
-                    target={pinTarget}
-                    productName={(id) => productById.get(id)?.name ?? ''}
-                    onTarget={setPinTarget}
-                    onClose={closePin}
-                  />
-                )}
-                <LinkOverlay boxRef={previewBoxRef} slots={linkSpots} urlOf={linkUrlOf} productLink={productLinkOf} linksMode={linksTab} focusKey={linkFocus} />
-              </div>
-            </div>
-
-            <Splitter onDrag={infoOpen ? resizeInfo : () => undefined} onDone={saveWidths} />
-
-            {/* 右端: 商品情報(参照用。操作はしない) */}
-            {infoOpen ? (
-              <div className={styles.pane}>
-                <div className={styles.infoToolbar}>
-                  <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleInfo} aria-label={t('商品情報を閉じる', 'Collapse product info')} />
-                </div>
-                <ProductInfoPane
-                  template={template}
-                  sectionTitles={sectionTitles}
-                  items={items}
-                  products={products}
-                  onHover={setHoverKey}
-                  alertKinds={productAlertKinds}
-                  onAlert={alertCard ? openAlertFor : undefined}
-                  onOpenProduct={(key) => {
-                    setActAlert(null)
-                    setProductOpen(key)
-                  }}
-                />
-              </div>
-            ) : (
-              <PaneRail label={t('商品情報', 'Product info')} onOpen={toggleInfo} />
-            )}
-
-            <Splitter onDrag={processOpen ? resizeProcess : () => undefined} onDone={saveWidths} />
-
-            {/* 右端: プロセス(状態・承認・引き継ぎ・質問・タスク・コメント)。作る(左〜商品情報)と、進めるを分ける */}
-            {processOpen ? (
-              <div className={mergeClasses(styles.pane, styles.paneMid)}>
-                <div className={styles.infoToolbar} style={{ padding: '4px 4px 0', marginBottom: 0 }}>
-                  <Button type="button" size="small" appearance="subtle" icon={<ChevronRightRegular />} onClick={toggleProcess} aria-label={t('プロセスを閉じる', 'Collapse process')} />
-                </div>
-                <ProcessPane
-                  card={card}
-                  onOpenProduction={onOpenProduction}
-                  status={form.status}
-                  canReview={canReview}
-                  locked={lockedWeeks.length > 0}
-                  isDirty={isDirty}
-                  busy={saving}
-                  onChanged={onSaved}
-                  handoff={{ productionOwner: form.productionOwner, handedOffAt: form.handedOffAt, productionDue: form.productionDue }}
-                  onHandoff={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
-                  instructions={form.instructions}
-                  onEditInstructions={() => setStepRequest((r) => ({ tab: 'instructions', seq: (r?.seq ?? 0) + 1 }))}
-                  remaining={progress.remaining}
-                  people={owners}
-                  cardName={form.name}
-                  productIds={items.map((it) => it.productId)}
-                  products={products}
-                  tabRequest={tabRequest}
-                />
-              </div>
-            ) : (
-              <ProcessRail card={card} status={form.status} onOpen={toggleProcess} />
-            )}
-          </div>
-
-          {footerNode}
-          <div className={styles.actions}>
-            <Button type="button" onClick={onBack} disabled={saving}>{t('キャンセル', 'Cancel')}</Button>
-            {/* 次がないときも消さずに、選べないだけにする(ボタンの位置を変えない。PRINCIPLES.md 2-2) */}
-            {next !== undefined && (
-              <Tooltip
-                relationship="description"
-                content={next ? t(`保存して、次の配信「${next.name}」を開きます(${next.position})`, `Save and open the next delivery "${next.name}" (${next.position})`) : t('次の配信はありません(この週・この確認の項目の、最後の配信です)', 'No next delivery (this is the last one in this week or check item)')}
-              >
-                <Button type="button" icon={<ArrowNextRegular />} iconPosition="after" disabled={saving || !next || (changeReason !== null && lockedWeeks.length > 0)} onClick={saveAndNext}>
-                  {t('保存して次へ', 'Save and next')}
-                </Button>
-              </Tooltip>
-            )}
-            {/* 保存(閉じない)と、保存して閉じる(X52。保存のたびに閉じると、続けて直しにくいため) */}
-            {justSaved && <span className={styles.savedNote}>{t('保存しました', 'Saved')}</span>}
-            <Button type="button" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)} onClick={saveAndStay}>
-              {saving && saveMode === 'stay' ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
-            </Button>
-            <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)}>
-              {saving && saveMode === 'close' ? t('保存中...', 'Saving...') : t('保存して閉じる', 'Save & close')}
-            </Button>
-          </div>
+          <ClassicCardLayout
+            {...{ ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, candidates, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroCandidates, heroId, heroReason, isDirty, items, justSaved, links, lockedWeeks, poolHeroes, poolProducts, productById, pushLink, removeItem, removeVariant, saveAndNext, saveAndStay, saveMode, saving, sectionCopies, sectionTitles, selectedKey, set, setAb, setAudience, setCandidates, setComparing, setForm, setHeroCandidates, setHeroId, setHeroReason, setItems, setLinks, setPushLink, setSectionCopy, setSectionTitle, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }}
+          />
           </>
           )}
         </form>

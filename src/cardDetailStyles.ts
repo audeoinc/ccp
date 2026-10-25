@@ -1,0 +1,125 @@
+// 配信カードの見た目(詳しい画面 ClassicCardLayout と、2 つの画面で共通の部品)。CardDetail から分けた(整理 第3段 ②)
+import { makeStyles, tokens } from '@fluentui/react-components'
+
+/** ペインの最小の幅(詳しい画面の左・中・商品情報・プロセス) */
+export const MIN_W = 220
+/** プレビューの最小の幅(中央を広げても、プレビューがつぶれないように) */
+export const MIN_PREVIEW = 320
+
+export const useCardDetailStyles = makeStyles({
+  surface: {
+    // fixed + inset 0 + margin auto で、画面の中央に置く(relative にすると、標準の中央寄せが効かず、上端に貼りつく)。中の絶対配置の基準にもなる
+    position: 'fixed',
+    inset: 0,
+    margin: 'auto',
+    padding: 0,
+    overflow: 'hidden',
+    maxWidth: 'none',
+    width: 'min(1800px, (98vw / var(--ui-zoom, 1)))',
+    height: 'calc(92vh / var(--ui-zoom, 1))',
+    maxHeight: 'calc(92vh / var(--ui-zoom, 1))',
+    '@media (max-width: 899px)': {
+      width: 'calc(100vw / var(--ui-zoom, 1))',
+      height: 'calc(100vh / var(--ui-zoom, 1))',
+      maxHeight: 'calc(100vh / var(--ui-zoom, 1))',
+      borderRadius: 0,
+    },
+  },
+  form: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 20,
+    display: 'grid',
+    placeContent: 'center',
+    justifyItems: 'center',
+    rowGap: '16px',
+    paddingLeft: '24px',
+    paddingRight: '24px',
+    textAlign: 'center',
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  overlayBar: { width: '320px' },
+  titleRow: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '12px 12px 12px 24px', backgroundColor: tokens.colorNeutralBackground1 },
+  titleText: { flexGrow: 1, minWidth: 0 },
+  panes: {
+    flexGrow: 1,
+    minHeight: 0,
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    overflow: 'auto',
+    '@media (min-width: 900px)': {
+      gridTemplateColumns: `var(--w0) 1px min(var(--w1), max(${MIN_W}px, calc(100% - var(--w0) - var(--w2) - var(--w3) - 4px - ${MIN_PREVIEW}px))) 1px minmax(0, 1fr) 1px var(--w2) 1px var(--w3)`,
+      gridTemplateRows: 'minmax(0, 1fr)',
+      overflow: 'hidden',
+    },
+  },
+  pane: {
+    padding: '16px',
+    overflow: 'auto',
+    minHeight: 0,
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    rowGap: '12px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    alignContent: 'start',
+  },
+  // 中ペインは、余白と、スクロールを内側(ContentPane)に任せる: 上に内容、下にチャットを固定する
+  paneMid: { backgroundColor: tokens.colorNeutralBackground1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  panePreview: { gridTemplateRows: 'auto minmax(0, 1fr)' },
+  infoToolbar: { display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' },
+  caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular },
+  lead: { fontWeight: tokens.fontWeightSemibold },
+  captionTight: { marginTop: '-4px' },
+  success: { color: tokens.colorPaletteGreenForeground1 },
+  fullWidth: { width: '100%', flexShrink: 0, minHeight: '32px' },
+  sectionHead: { marginTop: '12px' },
+  deviceSwitch: { display: 'inline-flex', columnGap: '2px', marginLeft: '4px' },
+  deviceBtn: { minWidth: 'auto', height: '24px', padding: '0 8px', fontWeight: tokens.fontWeightRegular },
+  previewHead: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap', minWidth: 0 },
+  // 配信の対象(X40)
+  targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
+  savedNote: { alignSelf: 'center', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteGreenForeground1 },
+  targetLabel: { width: '44px', flexShrink: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '12px', rowGap: '12px' },
+  // 左の「制作への引き継ぎ」(表示だけ。押すと、やり取りの「引き継ぎ」のタブが開く)
+  handoffField: { gridColumn: '1 / -1' },
+  handoffSummary: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: '12px',
+    rowGap: '2px',
+    width: '100%',
+    minHeight: '32px',
+    padding: '4px 8px',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  handoffItem: { whiteSpace: 'nowrap' },
+  handoffLink: { marginLeft: '6px', color: tokens.colorBrandForegroundLink, whiteSpace: 'nowrap' },
+  grow: { flexGrow: 1 },
+  filled: { borderBottomColor: tokens.colorPaletteGreenBorder2 },
+  toolbar: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
+  zoomBox: { display: 'flex', alignItems: 'center', columnGap: '2px' },
+  slider: { width: '90px', minWidth: '90px' },
+  zoomLabel: { width: '34px', textAlign: 'right' },
+  // position: relative は、リンクの場所の番号・URL の吹き出し(LinkOverlay)を、プレビューに重ねて置くため
+  previewBox: { position: 'relative', overflow: 'auto', minHeight: 0, paddingTop: '8px', paddingBottom: '8px' },
+  error: { margin: '12px 12px 0' },
+  // 確定した週の配信: 上の知らせと、保存の前の理由の入力欄
+  locked: { margin: '0 24px 8px' },
+  reasonBox: { display: 'grid', rowGap: '8px', margin: '12px 24px 0', padding: '12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorPaletteMarigoldBorder2}`, backgroundColor: tokens.colorPaletteMarigoldBackground1 },
+  reasonActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
+  actions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px', padding: '12px 24px' },
+  // 承認・差し戻しは、保存・キャンセルと離して左に置く(押し間違えないように)
+})
