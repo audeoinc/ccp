@@ -458,7 +458,17 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </MessageBar>
     )}
 
-    {approvedBefore && lockedWeeks.length === 0 && changed && (
+    {/* 承認済みの配信: シンプルな画面は自動で保存するので、確かめの窓は出さず、開いたときから帯で知らせ、最初の書き換えで帯の文を変える(レビューの 7) */}
+    {approvedBefore && lockedWeeks.length === 0 && simpleOn && (
+      <MessageBar layout="multiline" intent={changed ? 'warning' : 'info'} className={styles.locked}>
+        <MessageBarBody>
+          {changed
+            ? t('承認待ちに戻ります。保存すると、承認の依頼からやり直しになります。', 'This goes back to awaiting approval. Saving needs a new approval request.')
+            : t('承認済みです。直すと承認待ちに戻ります。', 'Approved. Editing puts it back to awaiting approval.')}
+        </MessageBarBody>
+      </MessageBar>
+    )}
+    {approvedBefore && lockedWeeks.length === 0 && !simpleOn && changed && (
       <MessageBar layout="multiline" intent="info" className={styles.locked}>
         <MessageBarBody>
           {t(
@@ -660,8 +670,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       : [...items, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI }]
     : items
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
-  // 承認済みの配信を自動で反映すると承認待ちに戻るので、最初の反映の前に一度だけ確かめる
-  const revokeOk = useRef(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
   const saveStaying = async (reason?: string, push = true) => {
@@ -669,16 +677,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const ok = await save({ after: 'stay', reason })
     if (ok && push && before) undoStack.push(before)
   }
-  const confirmRevoke = async () => {
-    if (!approvedBefore || revokeOk.current) return true
-    if (!(await confirmDialog(tr('承認済みの配信です。変更を反映すると「承認待ち」に戻り、承認の依頼からやり直しになります。反映しますか?(以後、この配信を開いている間は聞きません)', 'This delivery is approved. Saving the change puts it back to awaiting approval and needs a new request. Save? (Not asked again while this card is open.)')))) return false
-    revokeOk.current = true
-    return true
-  }
   /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
   const commitSimple = async () => {
     if (saving || locked || !isDirty()) return
-    if (!(await confirmRevoke())) return
     await saveStaying()
   }
   // シンプルな配信カードは、入力が止まって約 1.5 秒で保存する(Notion などと同じ。部品を選び直すまで保存しないと、タブを閉じたときに消えるため)。
@@ -770,7 +771,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       if (await confirmDialog(tr('確定した週の配信の変更を、反映せずに閉じます。よろしいですか?(反映するときは「理由を入力して反映」)', 'Close without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)'))) onBack()
       return
     }
-    if (!(await confirmRevoke())) return
     void save({ after: 'close' })
   }
   // プレビュー(memo)に渡す関数は、いつも同じものを渡す(打つたびに、プレビューまで描き直さないように)
