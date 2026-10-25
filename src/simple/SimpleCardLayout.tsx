@@ -339,10 +339,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }, [])
   const sideW = isComm(side) ? widths.comm : side ? widths.hand : 0
   const fit = fitPanes(panesW, { side: sideW, preview: widths[widthKey], list: widths.list, listOpen: productsOpen, insist })
-  // 幅が足りるようになったら、「開き直した」は忘れる(次に狭くなったら、また自動で畳む)
-  useEffect(() => {
-    if (insist && fit.fits && !fit.auto && fitPanes(panesW, { side: sideW, preview: widths[widthKey], list: widths.list, listOpen: true, insist: false }).fits) setInsist(false)
-  }, [insist, fit.fits, fit.auto, panesW, sideW, widths, widthKey])
+  // 幅が足りるようになったら、「開き直した」は忘れる(次に狭くなったら、また自動で畳む)。描くときに直す(effect で直すと、1 回余計に描くため)
+  if (insist && fitPanes(panesW, { side: sideW, preview: widths[widthKey], list: widths.list, listOpen: true, insist: false }).fits) setInsist(false)
   // やり取りの部品は、閉じていても描いておき、バーの数と点を合わせる。最後に開いた見方を覚える(書きかけの文を、見方の間で共にするため 1 つの部品)
   const [commSection, setCommSection] = useState<CommSection>(() => {
     const v = loadSide()
