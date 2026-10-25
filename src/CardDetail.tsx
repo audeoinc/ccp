@@ -166,7 +166,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
-  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, goNextRef, stayRef, justSaved, saveMode, setSaveMode, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems } = editor
+  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason } = editor
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
@@ -651,24 +651,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   // 承認済みの配信を自動で反映すると承認待ちに戻るので、最初の反映の前に一度だけ確かめる
   const revokeOk = useRef(false)
-  // 確定した週の配信で、元に戻すの保存を、理由の入力を待って行うとき(履歴に積まない)
-  const undoingRef = useRef(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
   const saveStaying = async (reason?: string, push = true) => {
     const before = committedSnap.current
-    goNextRef.current = false
-    stayRef.current = true
-    setSaveMode('stay')
-    const ok = await save(reason)
+    const ok = await save({ after: 'stay', reason })
     if (ok && push && before) undoStack.push(before)
-  }
-  /** 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying) */
-  const askReason = () => {
-    goNextRef.current = false
-    stayRef.current = true
-    setSaveMode('stay')
-    setChangeReason((r) => r ?? '')
   }
   const confirmRevoke = async () => {
     if (!approvedBefore || revokeOk.current) return true
@@ -684,7 +672,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   const applySimple = () => {
     if (saving) return
-    if (locked) askReason()
+    // 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying)
+    if (locked) askReason('stay')
     else void commitSimple()
   }
   /** 元に戻す: 前に反映したときの中身に戻して、保存する(行 ID は、いまも残っている行だけ使う。消えた行は新しい行として作り直す) */
@@ -712,21 +701,18 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (!pendingUndoSave) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingUndoSave(false)
-    if (lockedWeeks.length > 0) {
-      undoingRef.current = true
-      askReason()
-    } else void saveStaying(undefined, false)
+    // 確定した週の配信は、理由の入力を待って保存する(元に戻すの保存は、履歴に積まない)
+    if (lockedWeeks.length > 0) askReason('stay', false)
+    else void saveStaying(undefined, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingUndoSave])
   /** 確定した週の、理由の欄の保存のボタン */
   const saveWithReason = (reason: string) => {
     if (!simpleOn) {
-      void save(reason)
+      void save({ after: pendingSave?.after ?? 'close', reason })
       return
     }
-    const push = !undoingRef.current
-    undoingRef.current = false
-    void saveStaying(reason, push)
+    void saveStaying(reason, pendingSave?.recordUndo ?? true)
   }
   const nextStep = nextStepOf({ status: form.status, handedOff: !!form.handedOffAt })
   /** 詳しい画面(今の配信カード)で続ける。コミュニケーションの段階(d)ができるまで、承認・制作への依頼はこちらで */
@@ -755,10 +741,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       return
     }
     if (!(await confirmRevoke())) return
-    goNextRef.current = false
-    stayRef.current = false
-    setSaveMode('close')
-    void save()
+    void save({ after: 'close' })
   }
   // プレビュー(memo)に渡す関数は、いつも同じものを渡す(打つたびに、プレビューまで描き直さないように)
   const previewSectionTitle = useStableCallback(setSectionTitle)
@@ -867,10 +850,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           <Button
             type="button"
             size="small"
-            onClick={() => {
-              goNextRef.current = false
-              setChangeReason(null)
-            }}
+            onClick={cancelReason}
             disabled={saving}
           >
             {t('やめる', 'Back')}
@@ -1072,7 +1052,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           ) : (
           <>
           <ClassicCardLayout
-            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, saveMode, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }}
+            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }}
           />
           </>
           )}

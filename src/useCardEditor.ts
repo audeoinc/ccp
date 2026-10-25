@@ -27,7 +27,7 @@ import { isUsableHero } from './heroRights'
 import { encodeAbTest, ownsProducts, ownsSubject, ownsTemplate, type VariantKey } from './abTest'
 import { useAbVariants, type VariantData } from './useAbVariants'
 import { STATUS_APPROVED, STATUS_NOT_STARTED, toForm, type Form } from './cardForm'
-import { planSave, runSave } from './saveFlow'
+import { planSave, runSave, type SaveAfter } from './saveFlow'
 
 /** 読み込み時点の配信商品の行(保存時の差分判定用) */
 export interface RowSnap {
@@ -100,13 +100,12 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const [original, setOriginal] = useState<Map<string, RowSnap> | null>(card ? null : new Map())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
-  // 保存のあとに、閉じずに次の配信を開くか(「保存して次へ」で立てる。確定した週の、理由を入力する流れでも引き継ぐ)
-  const goNextRef = useRef(false)
-  // 「保存」(閉じない)か「保存して閉じる」か(X52)
-  const stayRef = useRef(false)
   const [justSaved, setJustSaved] = useState(false)
-  // どちらのボタンで保存中か(ボタンの文字を「保存中...」にするため)
-  const [saveMode, setSaveMode] = useState<'stay' | 'close'>('close')
+  // 保存中の、保存のあとにすること(どのボタンの文字を「保存中...」にするか。保存していないときは null)
+  const [savingAfter, setSavingAfter] = useState<SaveAfter | null>(null)
+  // 確定した週の配信で、理由の入力を待っている保存(理由の欄を出している間だけ)。保存のあとにすることと、元に戻すの履歴に積むか。
+  // 以前は ref の目印(閉じるか・次へ進むか)を、押したボタンが立てて、保存が読んでいた(整理 第3段 ④)
+  const [pendingSave, setPendingSave] = useState<{ after: SaveAfter; recordUndo: boolean } | null>(null)
 
   // コピー・ヘッドラインの言語(AI に渡す。保存はしない)
   // コピー・ヘッドラインの言語は、配信の国に合わせる(US は英語、JP は日本語)。以前は切り替えられたが、2026-10-16 に外した
@@ -389,34 +388,38 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    goNextRef.current = false
-    stayRef.current = false
-    setSaveMode('close')
-    requestSave()
+    requestSave('close')
   }
 
   /** 保存して、開いたまま続ける(X52。「保存して閉じる」とは別) */
   function saveAndStay() {
-    goNextRef.current = false
-    stayRef.current = true
-    setSaveMode('stay')
-    requestSave()
+    requestSave('stay')
   }
 
   /** 保存して、次の配信を開く(週のレビュー・確定で、閉じてカレンダーで探し直さずに済むように。FLOWS.md の C-1) */
   function saveAndNext() {
-    goNextRef.current = true
-    stayRef.current = false
-    requestSave()
+    requestSave('next')
   }
 
-  function requestSave() {
+  /** 確定した週の配信の、理由の入力欄を出す(保存は、理由の欄のボタンから。そのときに after をする) */
+  function askReason(after: SaveAfter, recordUndo = true) {
+    setChangeReason((r) => r ?? '')
+    setPendingSave({ after, recordUndo })
+  }
+
+  /** 理由の入力をやめる */
+  function cancelReason() {
+    setChangeReason(null)
+    setPendingSave(null)
+  }
+
+  function requestSave(after: SaveAfter) {
     // 確定した週の配信は、すぐには保存しない。理由を入力してもらってから、保存して、週をレビューに戻す
     if (lockedWeeks.length > 0) {
-      setChangeReason((r) => r ?? '')
+      askReason(after)
       return
     }
-    void save()
+    void save({ after })
   }
 
   /** 保存する内容(ステータスを除く)。保存と、承認済みの配信の内容が変わったかの判定(再承認)の両方で使う */
@@ -512,12 +515,12 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   /**
    * 保存する。reason を渡したとき(確定した週の変更)は、配信を「承認待ち」に戻し、週をレビュー中に戻して、理由を記録する。
    * 承認済みの配信の内容を変えたときは、承認のやり直しが必要なので「承認待ち」に戻し、いまの承認の依頼を古いものにする。
-   * 承認・差し戻しそのものは、ここではなく ApprovalBar(サーバーの窓口 /api/approvals)で行う(U4)
+   * 承認・差し戻しそのものは、ここではなく ApprovalBar(サーバーの窓口 /api/approvals)で行う(U4)。
+   * after: 保存のあとに、閉じる / 開いたまま続ける / 次の配信を開く(次がなければ閉じる)
    */
-  async function save(reason?: string): Promise<boolean> {
-    const goNext = goNextRef.current
-    const stay = stayRef.current
+  async function save({ after, reason }: { after: SaveAfter; reason?: string }): Promise<boolean> {
     setSaving(true)
+    setSavingAfter(after)
     setError(null)
     try {
       // 何をするかを決めて(planSave)、決まった順に行う(runSave。順番は scripts/check-save.mjs が確かめる)
@@ -578,20 +581,19 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         },
         reload: onSaved,
       })
-      goNextRef.current = false
-      stayRef.current = false
-      if (stay) {
+      if (after === 'stay') {
         // 開いたまま続ける: 保存した内容を、変更の基準にし直す(掲載商品は、読み直した配信カードから読み直される)
         baseline.current = null
         setForm((f) => ({ ...f, status: String(status) }))
         setChangeReason(null)
+        setPendingSave(null)
         setJustSaved(true)
         window.setTimeout(() => setJustSaved(false), 3000)
         // 新しい配信は、保存した配信として開き直す
         if (!card) onReopen?.(cardId)
         return true
       }
-      if (goNext && next && onNext) onNext()
+      if (after === 'next' && next && onNext) onNext()
       else onBack()
       return true
     } catch (err) {
@@ -599,6 +601,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
       return false
     } finally {
       setSaving(false)
+      setSavingAfter(null)
     }
   }
 
@@ -622,5 +625,5 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setItems(next)
   }
 
-  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, goNextRef, stayRef, justSaved, saveMode, setSaveMode, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems }
+  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason }
 }

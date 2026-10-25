@@ -92,7 +92,7 @@ type CardEditor = ReturnType<typeof useCardEditor>
 type CardAlertsApi = ReturnType<typeof useCardAlerts>
 type PreviewPins = ReturnType<typeof usePreviewPins>
 
-export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'active' | 'addVariant' | 'asTarget' | 'audience' | 'buildContent' | 'canReview' | 'changeReason' | 'changeTarget' | 'comparing' | 'decideVariant' | 'decision' | 'draftActiveVariant' | 'form' | 'groupByCategory' | 'heroId' | 'isDirty' | 'items' | 'justSaved' | 'lockedWeeks' | 'productById' | 'removeItem' | 'removeVariant' | 'saveAndNext' | 'saveAndStay' | 'saveMode' | 'saving' | 'sectionTitles' | 'selectedKey' | 'set' | 'setAb' | 'setAudience' | 'setComparing' | 'setForm' | 'setSelectedKey' | 'startAbTest' | 'stopAbTest' | 'switchVariant' | 'template' | 'templateChannel'> &
+export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'active' | 'addVariant' | 'asTarget' | 'audience' | 'buildContent' | 'canReview' | 'changeReason' | 'changeTarget' | 'comparing' | 'decideVariant' | 'decision' | 'draftActiveVariant' | 'form' | 'groupByCategory' | 'heroId' | 'isDirty' | 'items' | 'justSaved' | 'lockedWeeks' | 'productById' | 'removeItem' | 'removeVariant' | 'saveAndNext' | 'saveAndStay' | 'savingAfter' | 'saving' | 'sectionTitles' | 'selectedKey' | 'set' | 'setAb' | 'setAudience' | 'setComparing' | 'setForm' | 'setSelectedKey' | 'startAbTest' | 'stopAbTest' | 'switchVariant' | 'template' | 'templateChannel'> &
   { editor: CardEditor } & Pick<CardAlertsApi, 'alertCard' | 'itemAlertKinds' | 'openAlertFor' | 'productAlertKinds' | 'setActAlert' | 'setProductOpen' | 'setSlotAction'> & {
     abCompareNode: ReactNode
     alertsNode: ReactNode
@@ -154,7 +154,7 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     onTabChange: ((tab: string) => void) | undefined
   }
 
-export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, saveMode, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }: ClassicCardLayoutProps) {
+export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }: ClassicCardLayoutProps) {
   const t = useT()
   const styles = useCardDetailStyles()
   const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
@@ -617,10 +617,10 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
               {/* 保存(閉じない)と、保存して閉じる(X52。保存のたびに閉じると、続けて直しにくいため) */}
               {justSaved && <span className={styles.savedNote}>{t('保存しました', 'Saved')}</span>}
               <Button type="button" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)} onClick={saveAndStay}>
-                {saving && saveMode === 'stay' ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
+                {saving && savingAfter === 'stay' ? t('保存中...', 'Saving...') : lockedWeeks.length > 0 ? t('理由を入力して保存', 'Save with a reason') : t('保存', 'Save')}
               </Button>
               <Button type="submit" appearance="primary" icon={<SaveRegular />} disabled={saving || (changeReason !== null && lockedWeeks.length > 0)}>
-                {saving && saveMode === 'close' ? t('保存中...', 'Saving...') : t('保存して閉じる', 'Save & close')}
+                {saving && savingAfter !== 'stay' ? t('保存中...', 'Saving...') : t('保存して閉じる', 'Save & close')}
               </Button>
             </div>
     </>
