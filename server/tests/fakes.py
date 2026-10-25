@@ -63,6 +63,7 @@ _INSERT = re.compile(r"^INSERT INTO (\w+) (?:\((.*?)\) VALUES \((.*?)\)|DEFAULT 
 _UPDATE = re.compile(r"^UPDATE (\w+) SET (.*?) WHERE id = :(\w+)(?: RETURNING (.*))?$", re.S)
 _SELECT = re.compile(r"^SELECT (.*?) FROM (\w+)(?: WHERE (.*?))?(?: ORDER BY .*?)?(?: LIMIT \d+)?( FOR UPDATE)?$", re.S)
 _DELETE = re.compile(r"^DELETE FROM (\w+) WHERE id = :(\w+)$")
+_DELETE_ALL = re.compile(r"^DELETE FROM (\w+)$")
 _COND = re.compile(r"^(\w+) = :(\w+)$")
 
 
@@ -74,6 +75,8 @@ class FakeConn:
         sql = " ".join(str(stmt).split())
         self.store.log.append(sql)
         if isinstance(params, list):
+            # まとめて送った(executemany)回と、その行の数
+            self.store.batches.append((sql, len(params)))
             for p in params:
                 await self.execute(stmt, p)
             return Result(rowcount=len(params))
@@ -94,6 +97,10 @@ class FakeConn:
             return self.store.update(m.group(1), params[m.group(3)], sets, m.group(4))
         if m := _DELETE.match(sql):
             return self.store.delete(m.group(1), params[m.group(2)])
+        if m := _DELETE_ALL.match(sql):
+            n = len(self.store.tables.get(m.group(1), {}))
+            self.store.tables[m.group(1)] = {}
+            return Result(rowcount=n)
         if m := _SELECT.match(sql):
             return self.store.select(m.group(2), m.group(1), m.group(3), params)
         raise AssertionError(f"偽の DB が知らない SQL です: {sql}")
@@ -122,6 +129,7 @@ class FakeStore:
         self.log: list[str] = []
         self.commits = 0
         self.rollbacks = 0
+        self.batches: list[tuple[str, int]] = []
         self.statements: list[tuple[str, Callable[["FakeStore", re.Match[str], dict[str, Any]], Result]]] = list(STATEMENTS)
 
     # ---- 表の中身
@@ -201,6 +209,12 @@ class FakeStore:
 
 
 # ---- 窓口が直接書いている決まった文(正規表現 → 働き)
+def _find_user(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
+    found = [r for r in store.rows("users") if str(r.get("email") or "").lower() == p["e"] and r.get("status") in (None, "active")]
+    found.sort(key=lambda r: r["created_on"])
+    return Result([Row({k: r.get(k) for k in ("id", "name", "email", "role", "status")}) for r in found[:1]])
+
+
 def _group_ids(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
     rows = [r for r in store.rows("approval_group_members", user_id=p["u"])]
     return Result([Row({"approval_group_id": r["approval_group_id"]}) for r in rows])
@@ -232,6 +246,7 @@ def _max_version(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Resul
 
 
 STATEMENTS: list[tuple[str, Callable[[FakeStore, re.Match[str], dict[str, Any]], Result]]] = [
+    (r"^SELECT id, name, email, role, status FROM users WHERE lower\(email\) = :e", _find_user),
     (r"^SELECT approval_group_id FROM approval_group_members WHERE user_id = :u", _group_ids),
     (r"^SELECT user_id FROM approval_group_members WHERE approval_group_id = :g", _group_users),
     (r"^UPDATE delivery_cards SET status = :s, modified_on = now\(\) WHERE id = :id$", _card_status),

@@ -166,6 +166,49 @@ class DataWriteTest(Base):
         self.assertEqual(r.status_code, 404)
 
 
+class PeopleAdminTest(Base):
+    """ユーザー・承認グループなどの書き込みは、ログインしているときは管理者だけ(ログインなしは、だれでも)"""
+
+    def signed_in(self, email: str):  # noqa: ANN201
+        p = mock.patch.dict(os.environ, {"CCP_DEV_USER_EMAIL": email})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_signed_out_anyone_can_edit(self) -> None:
+        r = self.client.post("/api/data/users", json={"name": "新しい人"})
+        self.assertEqual(r.status_code, 200, r.text)
+
+    def test_member_is_refused_without_writing(self) -> None:
+        self.signed_in("req@example.com")
+        before = len(self.store.rows("users"))
+        r = self.client.post("/api/data/users", json={"name": "新しい人"})
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("管理者だけ", r.json()["error"]["message"])
+        self.assertEqual(self.client.patch(f"/api/data/users/{self.other}", json={"name": "x"}).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/data/users/{self.other}").status_code, 403)
+        self.assertEqual(len(self.store.rows("users")), before)
+        self.assertEqual(self.store.row("users", self.other)["name"], "ほかの人")
+
+    def test_unregistered_is_refused(self) -> None:
+        self.signed_in("nobody@example.com")
+        r = self.client.post("/api/data/approval_groups", json={"name": "班"})
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("登録されていません", r.json()["error"]["message"])
+
+    def test_admin_can_edit(self) -> None:
+        self.store.row("users", self.reviewer)["role"] = "admin"
+        # 大文字小文字は区別しない
+        self.signed_in("REV@example.com")
+        r = self.client.patch(f"/api/data/users/{self.other}", json={"name": "名前を直した"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.store.row("users", self.other)["name"], "名前を直した")
+
+    def test_other_tables_are_not_limited(self) -> None:
+        self.signed_in("req@example.com")
+        r = self.client.post("/api/data/delivery_cards", json={"name": "冬の特集"})
+        self.assertEqual(r.status_code, 200, r.text)
+
+
 class BasicAuthTest(unittest.TestCase):
     def setUp(self) -> None:
         from ccp import main
