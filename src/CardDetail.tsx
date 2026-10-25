@@ -57,7 +57,7 @@ import { confirmDialog } from './confirm'
 import type { StockModel } from './alerts'
 import type { CardAlert } from './cardAlerts'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
-import type { AiPreview, SimpleEditor } from './simple/editor'
+import { simpleEditorOf, type AiPreview } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
@@ -166,7 +166,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
-  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError } = editor
+  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, savingAfter, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
@@ -984,14 +984,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     )}
     </>
   )
-  const simpleEditor: SimpleEditor | null = card
-    ? {
+  // editor の値はそのまま渡し、この画面だけのものを足す(simple/editor.ts の simpleEditorOf)
+  const simpleEditor = card
+    ? simpleEditorOf(editor, {
         card,
-        form,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
         channel: previewTab,
-        template,
         ab: ab ? { keys: allVariants(ab), active, purpose: ab.purpose ?? 'test', canAdd: !!nextVariant(ab), busy: abAiBusy } : null,
         abSwitch: switchVariant,
         abAdd: abAddSimple,
@@ -999,23 +998,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         abCompare: () => setComparing('live'),
         abSettings: ab ? <AbSettings ab={ab} active={active} target={saveTarget() ?? ab.target} onChange={setAb} onDecide={decideVariant} onStop={stopAbTest} /> : null,
         abDiffParts: abDiff?.parts ?? [],
-        items,
-        candidates,
         products,
-        poolProducts,
-        poolHeroes,
         hero,
-        heroReason,
-        heroCandidates,
         setHero: (id, reason) => {
           setHeroId(id)
           setHeroReason(reason)
         },
         uploadHero: (file?: File) => setHeroUpload(file ?? true),
-        sectionTitles,
-        sectionCopies,
-        setSectionTitle,
-        setSectionCopy,
         applyTexts: (x) => {
           setForm((f) => ({
             ...f,
@@ -1029,14 +1018,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           if (x.sectionTitles) setSectionTitles(x.sectionTitles)
           if (x.sectionCopies) setSectionCopies(x.sectionCopies)
         },
-        links,
-        setLinks,
         linkSpots,
         alertKinds: productAlertKinds,
-        addProduct,
-        removeItem,
-        moveItem,
-        swapItems,
         swapWithCandidate,
         openProduct: (key, action, swap) => {
           setActAlert(null)
@@ -1052,11 +1035,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         setAiPreview,
         previewTexts: aiPreview?.texts ?? null,
         setTemplate: changeTemplate,
-        saving,
         dirty: changed,
         locked,
-        justSaved,
-        savedAt,
         saveError: saveError?.message ?? null,
         saveConflict: saveError?.conflict ? { at: conflictTime, overwrite: overwriteSave, reload: onBack } : null,
         retrySave: applySimple,
@@ -1097,12 +1077,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         setHandoff: (k, v) => setForm((f) => ({ ...f, [k]: v })),
         remaining: progress.remaining,
         people: owners,
-        canReview,
         reload: onSaved,
         openProduction: onOpenProduction && card ? (opts) => onOpenProduction(card.id, opts) : undefined,
         learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel />,
         learnCount,
-      }
+      })
     : null
 
   return (

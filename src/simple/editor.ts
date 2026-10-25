@@ -2,16 +2,18 @@ import type { ReactNode } from 'react'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
-import type { Candidate, Item } from '../items'
-import type { AiCard, ProposedHero } from '../aiSelect'
+import type { AiCard } from '../aiSelect'
 import type { EmailTemplateId } from '../templates'
-import type { LinkSlot, Links } from '../links'
+import type { LinkSlot } from '../links'
 import type { CardAlert, CardAlertKind } from '../cardAlerts'
 import type { NextStep } from './nextStep'
 import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
 import type { PreviewZoom } from './usePreviewNav'
+import type { useCardEditor } from '../useCardEditor'
+
+type CardEditor = ReturnType<typeof useCardEditor>
 
 /** シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部。名前は Form と同じ) */
 export type SimpleField =
@@ -33,14 +35,6 @@ export type SimpleField =
   | 'copy'
   | 'instructions'
 
-export type SimpleForm = Record<SimpleField, string> & {
-  copyAngle: string
-  themeReason: string
-  productionOwner: string
-  productionDue: string
-  handedOffAt: string
-}
-
 /** プレビューにだけ仮に写す、AI の案(メイン画像・商品) */
 export interface AiPreview {
   /** 文言の案(件名・見出し・セクションなど)。保存する中身は変えず、プレビューと受信箱の行にだけ写す(dirty にしない) */
@@ -58,18 +52,32 @@ export interface FloatAction {
 }
 
 /**
- * シンプルな配信カード(SU1)が使う、値と操作のまとまり。状態と保存は CardDetail のものをそのまま使い、ここでは複製しない
- * (2 つの画面で振る舞いがずれないように。docs/SIMPLE_CARD.md の 3 章)。あとで useCardEditor のようなフックに切り出すときの形も兼ねる。
+ * 配信カードの editor(useCardEditor)から、そのまま渡すもの。名前と型は editor と同じ(写しの型を書かない。2 つの画面で、ずれないように)。
+ * form は詳しい画面と同じ Form、savedAt は最後に保存した日時(ISO。上の帯の「保存済み · 12:03」)、canReview は承認の依頼・承認を出せるか(確定した週の配信は、出さない)
+ */
+const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'links', 'setLinks', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview'] as const
+type FromEditor = Pick<CardEditor, (typeof FROM_EDITOR)[number]>
+
+/**
+ * シンプルな配信カード(SU1)が使う、値と操作のまとまり = editor の値(FromEditor)+ この画面だけのもの(SimpleExtras)。
+ * 状態と保存は CardDetail・useCardEditor のものをそのまま使い、ここでは複製しない(docs/SIMPLE_CARD.md の 3 章)。
  * 保存・元に戻すなど ref を読む操作は、ここに入れず、SimpleCardLayout の引数で渡す(描画の中で ref を読まないため。react-hooks/refs)
  */
-export interface SimpleEditor {
+export type SimpleEditor = FromEditor & SimpleExtras
+
+/** editor の値に、この画面だけのものを足して、SimpleEditor を作る(CardDetail が呼ぶ) */
+export function simpleEditorOf(editor: CardEditor, extras: SimpleExtras): SimpleEditor {
+  const picked = Object.fromEntries(FROM_EDITOR.map((k) => [k, editor[k]])) as FromEditor
+  return { ...picked, ...extras }
+}
+
+/** シンプルな配信カードだけのもの(editor にない値・この画面向けに形を変えた操作。上の帯・プレビュー・知らせの部品など) */
+export interface SimpleExtras {
   card: DeliveryCard
-  form: SimpleForm
   /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
   channel: 'email' | 'push'
-  template: EmailTemplateId
   /** AB テスト(SU2)。keys は A を含む案、active はいま直している案(プレビューとペインは、この案の中身) */
   ab: { keys: VariantKey[]; active: VariantKey; purpose: AbPurpose; canAdd: boolean; busy: boolean } | null
   abSwitch: (k: VariantKey) => void
@@ -81,33 +89,16 @@ export interface SimpleEditor {
   abSettings: ReactNode
   /** いまの案が A と違う部品(「A と違う」の目印) */
   abDiffParts: PartRef[]
-  items: Item[]
-  candidates: Candidate[]
   products: Product[]
-  poolProducts: Product[]
-  poolHeroes: HeroImage[]
   hero?: HeroImage
-  heroReason: string
-  heroCandidates: ProposedHero[]
   setHero: (id: string | undefined, reason: string) => void
   /** 持っている画像を上げる(file を渡すと、そのファイルを上げながら開く) */
   uploadHero: (file?: File) => void
-  sectionTitles: string[]
-  sectionCopies: string[]
-  setSectionTitle: (i: number, v: string) => void
-  setSectionCopy: (i: number, v: string) => void
   /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
   applyTexts: (t: WholeTexts) => void
-  links: Links
-  setLinks: (l: Links) => void
   linkSpots: LinkSlot[]
   /** 商品 ID → いちばん強いアラートの種類 */
   alertKinds: Map<string, CardAlertKind>
-  addProduct: (productId: string, at?: number) => void
-  removeItem: (key: string) => void
-  moveItem: (from: number, to: number) => void
-  /** 載せた商品どうしの位置を入れ替える */
-  swapItems: (a: string, b: string) => void
   /** 載せた商品と、残りの候補を入れ替える(行 ID のまま) */
   swapWithCandidate: (itemKey: string, candKey: string, reason: string) => void
   /** 商品のフロートを開く(載せた商品か候補の鍵。action は、選んでいる枠への操作。swap があれば、フロートの「入れ替える」でそれを呼ぶ(SU9)) */
@@ -122,14 +113,10 @@ export interface SimpleEditor {
   /** テンプレートを替える(セクションの構成が変わるので、残りの候補と AI の案は捨てる。CardDetail の changeTemplate) */
   setTemplate: (id: EmailTemplateId) => void
   // ---- 保存(入力が止まって約 1.5 秒で自動。CardDetail)と元に戻す
-  saving: boolean
   /** 開いたとき・前に保存したときから、内容が変わったか */
   dirty: boolean
   /** 確定した週の配信(自動では保存せず、上の帯の保存のボタンで理由を聞く) */
   locked: boolean
-  justSaved: boolean
-  /** 最後に保存した日時(ISO。上の帯の「保存済み · 12:03」) */
-  savedAt?: string
   /** 保存の失敗(上の帯に「保存できませんでした・再試行」) */
   saveError: string | null
   /** ほかの人が先に保存していた(上の帯で、上書きする / 閉じて読み直す) */
@@ -169,8 +156,6 @@ export interface SimpleEditor {
   remaining: string[]
   /** これまでに入れた人の名前(宛先の候補) */
   people: string[]
-  /** 承認の依頼・承認を出せるか(確定した週の配信は、出さない) */
-  canReview: boolean
   /** 承認・依頼のあとに、配信カードを読み直す */
   reload: () => Promise<void>
   /** 制作のページを開く(request: 開いたら、そのまま制作に依頼する。シンプルな画面の「制作に渡す」) */

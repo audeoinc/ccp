@@ -49,7 +49,7 @@
 | `src/PreviewPartPicker.tsx`(`PartPicker.tsx` は部品の画像(X59)で使っていたので、この名前にした) | プレビューの上に重ねる層。押した所の部品を見分けて選び、選んだ部品に枠を描く(`PreviewPins.tsx` と同じ作り。制作・結果でも使う) |
 | `src/simple/PartPane.tsx` | 選んだ部品のペイン。`PartRef` の種類ごとに編集の欄を出す |
 | `src/simple/NextAction.tsx`・`nextStep.ts` | 次にやることのボタンと、ステータスからの決め方 |
-| `src/simple/editor.ts`・`actions.ts` | `SimpleEditor`(CardDetail から渡す値と操作の型)と、一覧で押した商品を選んだ枠に置く処理 |
+| `src/simple/editor.ts`・`actions.ts` | `SimpleEditor`(CardDetail から渡す値と操作の型。editor の値はそのまま、この画面だけのものは `SimpleExtras`。`simpleEditorOf` で作る)と、一覧で押した商品を選んだ枠に置く処理 |
 | `src/simple/useUndo.ts` | 元に戻すの履歴(開いている間だけ) |
 | `src/settings.ts` | トグルの値 `simpleCard.on`(`loadSimpleCard` / `saveSimpleCard`) |
 | `src/App.tsx` | ヘッダーのツールバーにトグル |
