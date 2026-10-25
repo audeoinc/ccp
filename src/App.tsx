@@ -95,7 +95,7 @@ import { useUrlSync } from './useUrlSync'
 import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
-import { Later, SettingsDialog, ResultsPage, ImpactView, ProductsView, ResultPeek, ProductionPage, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 
 const weekLabel = (start: Date) => {
@@ -106,7 +106,9 @@ const weekLabel = (start: Date) => {
 
 // 表示の切り替え(月のカレンダー / 週 / 表の一覧)。ブラウザごとに覚える
 // compare(比べる)は、結果の面だけの見せ方
-type View = 'month' | 'week' | 'list' | 'compare' | 'products' | 'impact'
+type View = 'month' | 'week' | 'list' | 'compare' | 'products' | 'impact' | 'learnings'
+// 結果の面だけの見せ方(計画の面に戻るときは、月にする)
+const RESULTS_ONLY: View[] = ['compare', 'impact', 'learnings']
 const VIEW_KEY = PREF.calendarView
 const LENS_KEY = PREF.weekLens
 const COLUMNS_KEY = PREF.listColumns
@@ -469,16 +471,16 @@ function App() {
   const showFace = (p: 'calendar' | 'production' | 'results' | 'alerts') => {
     setResultDetail(null)
     // 「比べる」「効果」は結果の面だけ。計画の面に戻るときは、月にする
-    if (p === 'calendar' && (view === 'compare' || view === 'impact')) setView('month')
+    if (p === 'calendar' && RESULTS_ONLY.includes(view)) setView('month')
     setPage(p)
   }
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   // 最初は計画の面なので、「比べる」を覚えていても、月で始める
   const [view, setView] = useState<View>(() => {
     // リンクの見せ方を優先する(「比べる」「効果」は結果の面だけ)
-    if (link.view && ((link.view !== 'compare' && link.view !== 'impact') || link.page === 'results')) return link.view
+    if (link.view && (!RESULTS_ONLY.includes(link.view) || link.page === 'results')) return link.view
     const v = loadPref<View>(VIEW_KEY, 'month')
-    return v === 'compare' || v === 'impact' ? 'month' : v
+    return RESULTS_ONLY.includes(v) ? 'month' : v
   })
   const [columns, setColumns] = useState<ColumnKey[]>(() => loadPref<ColumnKey[]>(COLUMNS_KEY, DEFAULT_COLUMNS))
 
@@ -993,12 +995,14 @@ function App() {
             {page !== 'alerts' && (
             <>
             <div className={styles.monthRow}>
-              <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={view === 'compare' || view === 'impact'} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
+              <Button appearance="subtle" size="small" icon={<ChevronLeftRegular />} disabled={RESULTS_ONLY.includes(view)} onClick={() => shift(-1)} aria-label={view === 'week' ? t('前の週', 'Previous week') : t('前の月', 'Previous month')} />
               <span className={mergeClasses(styles.monthLabel, lang === 'ja' ? styles.weekLabelJa : styles.weekLabel, view === 'products' && styles.rangeLabel)}>
                 {view === 'compare' ? (
                   t('絞り込んで比べる', 'Filter and compare')
                 ) : view === 'impact' ? (
                   t('配信の効果と、学びの効き目', 'Delivery impact and learnings')
+                ) : view === 'learnings' ? (
+                  t('学びのカード', 'Learning cards')
                 ) : view === 'products' ? (
                   // 見せ方「商品」: 期間を自由に(開始〜終了)。近道は「この画面」の右の札
                   <span className={styles.rangeRow}>
@@ -1026,7 +1030,7 @@ function App() {
                   />
                 )}
               </span>
-              <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={view === 'compare' || view === 'impact'} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
+              <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={RESULTS_ONLY.includes(view)} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
               {/* 結果の面の「先週を振り返る」: 振り返りは先週から始まるので、1 回で先週の週表示へ(FLOWS の C-7)。
                   「前週」だけでは、比べる相手の切り替えにも見えるので、何が起きるかを名前にする */}
               {page === 'results' && (
@@ -1064,6 +1068,12 @@ function App() {
                       t('効果', 'Impact'),
                       page !== 'results',
                       page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('配信で増えた売上(送らなかった人との差)と、AI に渡した学びが効いているかを見ます', 'See incremental sales vs. a holdout, and whether learnings passed to AI work'),
+                    ],
+                    [
+                      'learnings',
+                      t('学び', 'Learnings'),
+                      page !== 'results',
+                      page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('結果の「次に生かすメモ」を、学びのカードで並べます。強さ・使われた回数を見て、使う・休ませる・外すを決めます', 'See notes for next time as learning cards. Check strength and use, and decide to use, rest or retire each.'),
                     ],
                   ] as const
                 ).map(([v, label, off, title]) => (
@@ -1211,7 +1221,10 @@ function App() {
             </>
             )}
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
-            {view === 'impact' ? (
+            {view === 'learnings' ? (
+              // 見せ方「学び」(X78 の手札): すべての学びをカードで。期間・チャネルの絞り込みによらず、学びの側の絞り込みで見る
+              <Later spin><LearningHand allCards={cards} country={filters.country} onOpenResult={setPeekResult} /></Later>
+            ) : view === 'impact' ? (
               // 見せ方「効果」: 配信の増分と、学びの記録・指標・売上・評価。期間によらず、絞り込みの国・チャネルのすべての配信で見る(件数が少ないと比べられないため)
               <Later spin><ImpactView key={impactKey} cards={filtered} allCards={cards} country={filters.country} onOpenResult={setPeekResult} /></Later>
             ) : view === 'products' ? (

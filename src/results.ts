@@ -172,6 +172,8 @@ function mergeRows(rows: DeliveryResult[]): { result: DeliveryResult; parts: Del
       products: products.size ? JSON.stringify([...products.values()]) : undefined,
       links: Object.keys(links).length ? JSON.stringify(links) : undefined,
       notes: primary.notes,
+      // 学びの名前(X78)も、メモと一緒に運ぶ
+      learning_title: primary.learning_title,
     },
     parts,
   }

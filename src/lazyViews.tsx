@@ -7,6 +7,7 @@ import { loadChunk } from './chunkReload'
 export const SettingsDialog = lazy(() => loadChunk(() => import('./SettingsDialog')).then((m) => ({ default: m.SettingsDialog })))
 export const ResultsPage = lazy(() => loadChunk(() => import('./ResultsPage')).then((m) => ({ default: m.ResultsPage })))
 export const ImpactView = lazy(() => loadChunk(() => import('./ImpactView')).then((m) => ({ default: m.ImpactView })))
+export const LearningHand = lazy(() => loadChunk(() => import('./LearningHand')).then((m) => ({ default: m.LearningHand })))
 export const ProductsView = lazy(() => loadChunk(() => import('./ProductsView')).then((m) => ({ default: m.ProductsView })))
 export const ResultPeek = lazy(() => loadChunk(() => import('./ResultPeek')).then((m) => ({ default: m.ResultPeek })))
 export const ProductionPage = lazy(() => loadChunk(() => import('./ProductionPage')).then((m) => ({ default: m.ProductionPage })))
