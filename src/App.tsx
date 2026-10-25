@@ -75,7 +75,7 @@ import type { ResultsDataActions } from './ResultsPage'
 import { AiIcon } from './AiMark'
 import { AlertsFloat } from './AlertsFloat'
 import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
-import { dateOf, dateText, hasFloat, linkSearch, parseLink, type LinkState } from './deepLink'
+import { dateOf, dateText, parseLink, type LinkState } from './deepLink'
 import { useChangeAlerts, useStockAlerts } from './alerts'
 import { buildCardAlerts, imageExpiryAlerts, mergeCardAlerts, overLimitAlerts, topKind, weeklyUse, type CardAlert, type CardAlertKind } from './cardAlerts'
 import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alertSettings'
@@ -132,6 +132,7 @@ import { loadChunk } from './chunkReload'
 import { Z } from './layers'
 import { useAppData } from './useAppData'
 import { useCardNoteStats } from './useCardNoteStats'
+import { useUrlSync } from './useUrlSync'
 import { ym, ymd } from './dates'
 
 const weekLabel = (start: Date) => {
@@ -984,42 +985,26 @@ function App() {
     production: productionOpen ?? undefined,
     alerts: alertsOpen ? (alertsFocus ?? '') : undefined,
   }
-  const search = linkSearch(linkState)
-  const floatKey = (l: Partial<LinkState>) => [l.card, l.result, l.production, l.alerts].join('|')
-  const currentFloat = floatKey(linkState)
-  useEffect(() => {
-    if (search === window.location.search) return
-    const url = `${window.location.pathname}${search}${window.location.hash}`
-    // フロートを新しく開いた(別のものに替えた)ときは履歴に積み、「戻る」で閉じられるようにする。ほかは書き換えるだけ
-    const before = parseLink(window.location.search)
-    if (hasFloat(linkState) && floatKey(before) !== currentFloat) window.history.pushState(null, '', url)
-    else window.history.replaceState(null, '', url)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
-  useEffect(() => {
-    const onPop = () => {
-      const l = parseLink(window.location.search)
-      setPage(l.page ?? 'calendar')
-      if (l.view) setView(l.view)
-      const d = dateOf(l.date)
-      if (d) {
-        const mid = l.view === 'week' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3) : d
-        setWeekStart(sundayOf(d))
-        setMonth(new Date(mid.getFullYear(), mid.getMonth(), 1))
-      }
-      if (l.country !== undefined) setFilters((f) => ({ ...f, country: l.country! }))
-      if (l.from && l.to) setRange({ from: l.from, to: l.to })
-      setSelectedId(l.card ?? null)
-      setCreating(null)
-      setDraftOpen(null)
-      setResultDetail(l.result ?? null)
-      setProductionOpen(l.production ?? null)
-      setAlertsOpen(l.alerts !== undefined)
-      setAlertsFocus(l.alerts || undefined)
+  // 「戻る」「進む」で、URL の状態に戻す
+  useUrlSync(linkState, (l) => {
+    setPage(l.page ?? 'calendar')
+    if (l.view) setView(l.view)
+    const d = dateOf(l.date)
+    if (d) {
+      const mid = l.view === 'week' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3) : d
+      setWeekStart(sundayOf(d))
+      setMonth(new Date(mid.getFullYear(), mid.getMonth(), 1))
     }
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
+    if (l.country !== undefined) setFilters((f) => ({ ...f, country: l.country! }))
+    if (l.from && l.to) setRange({ from: l.from, to: l.to })
+    setSelectedId(l.card ?? null)
+    setCreating(null)
+    setDraftOpen(null)
+    setResultDetail(l.result ?? null)
+    setProductionOpen(l.production ?? null)
+    setAlertsOpen(l.alerts !== undefined)
+    setAlertsFocus(l.alerts || undefined)
+  })
   // リンクの配信が見つからない(消した・国が違うなど、ほかの環境のリンク)ときは、知らせて、ふつうの画面で始める
   const [linkChecked, setLinkChecked] = useState(false)
   if (!linkChecked && !loading && cards.length > 0) {
