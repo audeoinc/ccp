@@ -16,6 +16,8 @@ import { useT } from '../i18n'
 import { PartAiChat } from './PartAiChat'
 import { askPartRewrite, type PartTurn } from './partAi'
 import type { SimpleEditor } from './editor'
+import { ReadinessList } from './ReadinessList'
+import { readinessBlocked, type ReadinessItem, type ReadinessTarget } from './readiness'
 
 // 参考の素材の欄の開閉(人の設定)
 const ASSETS_KEY = PREF.simpleHandoffAssetsOpen
@@ -49,6 +51,10 @@ interface Props {
   assetCount?: number
   /** 素材の欄で数が変わったとき(左のバーの数を合わせる) */
   onAssetCount?: (n: number) => void
+  /** 送る前の確かめ(制作に渡す前の一覧。担当・締め切りが空なら渡せない) */
+  checks?: ReadinessItem[]
+  /** 確かめの行を押したとき(部品を選ぶ。担当・締め切りの欄は、ここで受け持つ) */
+  onPickCheck?: (target: ReadinessTarget) => void
 }
 
 /**
@@ -57,7 +63,7 @@ interface Props {
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
-export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0, assetCount = 0, onAssetCount }: Props) {
+export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0, assetCount = 0, onAssetCount, checks, onPickCheck }: Props) {
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -71,6 +77,13 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   const toggleAssets = () => {
     setAssetsOpen(!assetsOpen)
     savePref(ASSETS_KEY, !assetsOpen)
+  }
+  // 確かめの行から、担当・締め切りの欄へ動く
+  const ownerRef = useRef<HTMLInputElement>(null)
+  const dueRef = useRef<HTMLInputElement>(null)
+  const pickCheck = (target: ReadinessTarget) => {
+    if (target.kind === 'handoffField') (target.field === 'productionOwner' ? ownerRef : dueRef).current?.focus()
+    else onPickCheck?.(target)
   }
   // 渡す文章の案を仮に写している間の、元の文章
   const original = useRef<string | null>(null)
@@ -115,6 +128,8 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   const requested = view !== 'draft' && view !== 'stale' && view !== 'not_approved'
   // 担当と締め切りは、渡したあとは読むだけ(制作の依頼の側で決まるため)
   const readOnly = requested
+  // 止めるのは、まだ渡していないときの、担当・締め切りが空のときだけ(ほかは警告にとどめる)
+  const blocked = !requested && !!checks && readinessBlocked(checks)
   // 制作指示は、渡したあとも直せる(2026-10-24 利用者と決めた。承認とロックは SU1 で考え直す)。直したことだけ知らせて、止めない
   const editedAfter = requested && req?.instructions != null && req.instructions.trim() !== e.form.instructions.trim()
   useEffect(() => {
@@ -152,6 +167,9 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         )}
       </div>
 
+      {/* 送る前の確かめ(渡す前だけ。渡したあとは、制作の状態が主役) */}
+      {!requested && checks && <ReadinessList items={checks} onPick={pickCheck} />}
+
       {/* 1. 制作の担当と締め切り(いちばん上に。下にあると気づかなかったため) */}
       <div className={s.section}>
         <span className={s.head}>
@@ -160,13 +178,13 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         </span>
         <div className={s.pair}>
           <Field label={t('担当', 'Assignee')} size="small">
-            <Input size="small" list="ccp-handoff-people" value={e.form.productionOwner} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionOwner', d.value)} />
+            <Input ref={ownerRef} size="small" list="ccp-handoff-people" value={e.form.productionOwner} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionOwner', d.value)} />
             <datalist id="ccp-handoff-people">
               {e.people.map((o) => <option key={o} value={o} />)}
             </datalist>
           </Field>
           <Field label={t('締め切り', 'Due')} size="small">
-            <Input size="small" type="date" value={e.form.productionDue} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionDue', d.value)} />
+            <Input ref={dueRef} size="small" type="date" value={e.form.productionDue} disabled={readOnly} onChange={(_, d) => e.setHandoff('productionDue', d.value)} />
           </Field>
         </div>
       </div>
@@ -275,11 +293,13 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
 
       <div className={s.foot}>
         <span className={s.caption}>
-          {requested
+          {blocked
+            ? t('制作の担当と締め切りを入れると、渡せます', 'Enter the production assignee and due date to hand off')
+            : requested
             ? t('渡したあとも、渡す文章は直せます。直したら、制作のページで依頼し直します。', 'You can still edit the notes after handoff. If you do, request again on the production page.')
             : statusNote(e.card.status, t)}
         </span>
-        <Button appearance="primary" size="medium" icon={requested ? <OpenRegular /> : <SendRegular />} disabled={busy || e.saving || !e.openProduction} onClick={() => void pass()}>
+        <Button appearance="primary" size="medium" icon={requested ? <OpenRegular /> : <SendRegular />} disabled={busy || e.saving || !e.openProduction || blocked} onClick={() => void pass()}>
           {requested ? t('制作のページへ', 'Open production page') : t('制作に渡す', 'Hand off to production')}
         </Button>
       </div>

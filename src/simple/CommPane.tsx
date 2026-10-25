@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Avatar, Button, Checkbox, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowRepeatAllRegular,
@@ -142,6 +142,8 @@ interface Props {
   onCounts?: (c: CommCounts) => void
   /** 左のバーで開いているもの(SU4)。やり取り / 承認の様子 / 変更の記録。中身は 1 つの部品で持ち、書きかけの文を共にする */
   section: CommSection
+  /** 承認の様子のいちばん上に出す、送る前の確かめ(承認を依頼する前の一覧。出さないときは省く) */
+  checks?: ReactNode
 }
 
 export type CommSection = 'talk' | 'approval' | 'history'
@@ -425,6 +427,7 @@ export function CommPane(props: Props) {
         </div>
 
         <div className={s.top}>
+          {props.checks}
           {props.canReview ? (
             // 依頼・取り下げ・相手ごとの状態(詳しい画面と同じ部品)
             <ApprovalBar card={card} isDirty={props.isDirty} busy={props.busy} onChanged={async () => { await props.onChanged(); await load() }} />

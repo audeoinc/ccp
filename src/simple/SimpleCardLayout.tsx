@@ -26,7 +26,10 @@ import { productImage } from '../images'
 import { locale, useT } from '../i18n'
 import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
-import { getTemplate } from '../templates'
+import { getTemplate, slotsOf } from '../templates'
+import { statusRank } from '../status'
+import { ReadinessList } from './ReadinessList'
+import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
 import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
 import { ApprovalBadge } from './ApprovalBadge'
@@ -327,6 +330,32 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       setMoving(true)
       window.setTimeout(() => setMoving(false), 260)
     }
+  }
+  // 送る前の確かめ(承認を依頼する・制作に渡す の前の一覧。中身は readiness.ts。2026-10-25 利用者と決めた)
+  const checkInput = {
+    channel: e.channel,
+    subject: e.form.subject,
+    name: e.form.name,
+    preheader: e.form.preheader,
+    pushTitle: e.form.pushTitle,
+    pushBody: e.form.pushBody,
+    headline: e.form.headline,
+    copy: e.form.copy,
+    hasHero: !!e.hero,
+    items: e.items,
+    slots: slotsOf(e.template),
+    alerts: e.alerts,
+    status: e.form.status,
+    productionOwner: e.form.productionOwner,
+    productionDue: e.form.productionDue,
+  }
+  const approvalChecks = readinessOf({ ...checkInput, purpose: 'approval' })
+  const handoffChecks = readinessOf({ ...checkInput, purpose: 'handoff' })
+  // 行を押したら、その部品を選ぶ。アラート・承認はそのパネル、担当・締め切りは渡すもの(欄へは HandoffSheet が動く)
+  const pickCheck = (target: ReadinessTarget) => {
+    if (target.kind === 'panel') showSide(target.panel, true)
+    else if (target.kind === 'handoffField') showSide('handoff', true)
+    else select(target)
   }
   // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
   const [lastSide, setLastSide] = useState<Exclude<Side, null>>(() => loadSide() ?? 'talk')
@@ -669,6 +698,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {myStep && (
               <NextAction
                 step={myStep}
+                issues={myStep === 'requestApproval' ? readinessIssues(approvalChecks) : myStep === 'requestProduction' ? readinessIssues(handoffChecks) : 0}
                 busy={e.saving}
                 // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。制作のページは、CardDetail の側
                 onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'review' ? showSide('approval', true) : onRunNext(step))}
@@ -763,6 +793,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 canReview={e.canReview}
                 onOpenProduction={e.openProduction}
                 onCounts={onCounts}
+                // 承認の前だけ(承認が済んだら、確かめは渡すものの側で)
+                checks={statusRank(e.form.status) < statusRank('approved') ? <ReadinessList items={approvalChecks} onPick={pickCheck} /> : undefined}
               />
             </div>
             {panel === 'alerts' && (
@@ -807,7 +839,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {panel === 'handoff' && (
               // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
               <div className={s.pane}>
-                <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} />
+                <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} checks={handoffChecks} onPickCheck={pickCheck} />
               </div>
             )}
           </div>
