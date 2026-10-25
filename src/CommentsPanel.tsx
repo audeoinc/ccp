@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
+import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, CheckmarkRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { Linkify } from './LinkText'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
@@ -448,7 +448,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             <div className={styles.actions}>
               <Button size="small" appearance="primary" disabled={busy || !me || !drafts[id].trim()} onClick={() => void reply(n)}>{t('返信', 'Reply')}</Button>
               {!resolved && (
-                <Button size="small" icon={<CheckmarkCircleRegular />} disabled={busy || !me} onClick={() => void reply(n, true)}>
+                <Button size="small" icon={<CheckmarkRegular />} disabled={busy || !me} onClick={() => void reply(n, true)}>
                   {drafts[id].trim() ? t('返信して解決にする', 'Reply and resolve') : t('解決にする', 'Resolve')}
                 </Button>
               )}
@@ -486,7 +486,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             </>
           ) : (
             !replying && (
-              <Button size="small" appearance="subtle" icon={<CheckmarkCircleRegular />} disabled={busy || !me} onClick={() => void reply(n, true)}>
+              <Button size="small" appearance="subtle" icon={<CheckmarkRegular />} disabled={busy || !me} onClick={() => void reply(n, true)}>
                 {t('解決にする', 'Resolve')}
               </Button>
             )

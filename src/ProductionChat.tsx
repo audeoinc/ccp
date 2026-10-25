@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Input, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
-import { ArrowSyncRegular, CheckmarkRegular, EditRegular } from '@fluentui/react-icons'
+import { ArrowSwapRegular, CheckmarkRegular, EditRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { ChatPanel, type ChatMsg } from './ChatPanel'
@@ -249,7 +249,7 @@ function EditFloat({ edit, current, original, htmlCustom, products, allProducts,
         <span>
           <span className={s.row}>
             <span className={s.label}>{t('替えたあと', 'After')}</span>
-            <ProductPicker trigger={<Button size="small" appearance="subtle" icon={<ArrowSyncRegular />} aria-label={t('ほかの商品を選ぶ', 'Pick another product')} />} products={products} onPick={setProductId} />
+            <ProductPicker trigger={<Button size="small" appearance="subtle" icon={<ArrowSwapRegular />} aria-label={t('ほかの商品を選ぶ', 'Pick another product')} />} products={products} onPick={setProductId} />
           </span>
           {line(next)}
         </span>

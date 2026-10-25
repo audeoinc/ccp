@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DeleteRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DismissRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getText, linkRows, productRows, rowsText, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
@@ -272,8 +272,8 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
                     <>
                       <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={() => moveProduct(i, -1)} aria-label={t('上へ', 'Move up')} />
                       <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === prows.length - 1} onClick={() => moveProduct(i, 1)} aria-label={t('下へ', 'Move down')} />
-                      {productPicker(<Button size="small" appearance="subtle" icon={<ArrowSyncRegular />} aria-label={t('ほかの商品に替える', 'Replace with another product')} />, (id) => replaceProduct(i, id))}
-                      <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => removeProduct(i)} aria-label={t('外す', 'Remove')} />
+                      {productPicker(<Button size="small" appearance="subtle" icon={<ArrowSwapRegular />} aria-label={t('ほかの商品に入れ替える', 'Replace with another product')} />, (id) => replaceProduct(i, id))}
+                      <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => removeProduct(i)} aria-label={t('外す', 'Remove')} />
                     </>
                   )}
                   <CopyButton text={[r.product.name, r.product.product_code, r.price, r.url].filter(Boolean).join('\t')} />
@@ -395,7 +395,7 @@ export function HeroPicker({ heroes, onPick, onUpload }: { heroes: HeroImage[]; 
     <Popover open={open} onOpenChange={(_, d) => setOpen(d.open)} withArrow positioning="below-end">
       <PopoverTrigger disableButtonEnhancement>
         <Tooltip content={t('ほかの画像に替える', 'Replace the image')} relationship="label">
-          <Button size="small" appearance="subtle" icon={<ArrowSyncRegular />} />
+          <Button size="small" appearance="subtle" icon={<ArrowSwapRegular />} />
         </Tooltip>
       </PopoverTrigger>
       <PopoverSurface>
