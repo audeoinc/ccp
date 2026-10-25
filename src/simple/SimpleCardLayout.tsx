@@ -594,6 +594,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     </div>
   )
 
+  // 受信箱の行に出す文言(AI の案を写している間は、その案。保存する中身は変えない)
+  const shown = { ...e.form, ...(e.previewTexts ?? {}) }
   return (
     <div className={s.root}>
       <StageHeader
@@ -830,11 +832,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 <span className={s.mailSender} title={t('差出人の名前(設定の画面で決める)', 'Sender name (set in Settings)')}>
                   <SenderName country={e.form.country} />
                 </span>
-                <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(e.form.subject || e.form.name) && s.inboxMissing)} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
-                  {e.form.subject || e.form.name || t('件名未入力', 'No subject')}
+                <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(shown.subject || e.form.name) && s.inboxMissing)} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
+                  {shown.subject || e.form.name || t('件名未入力', 'No subject')}
                 </button>
-                <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, s.mailPre, e.form.preheader ? s.inboxSub : s.inboxMissing, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={e.form.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の下に出る文)', 'No preheader yet. Click to write it (shown below the subject in the inbox)')}>
-                  {e.form.preheader || t('プリヘッダー未入力', 'No preheader')}
+                <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, s.mailPre, shown.preheader ? s.inboxSub : s.inboxMissing, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={shown.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の下に出る文)', 'No preheader yet. Click to write it (shown below the subject in the inbox)')}>
+                  {shown.preheader || t('プリヘッダー未入力', 'No preheader')}
                 </button>
               </div>
             </div>
@@ -851,12 +853,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 <span className={s.sender} style={{ width: 'auto' }}>
                   <SenderName country={e.form.country} />
                 </span>
-                <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'pushTitle' }) && s.on, !e.form.pushTitle && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '50%', fontWeight: 600 }} onClick={() => select({ kind: 'pushTitle' })} title={t('通知のタイトルを直す', 'Edit the notification title')}>
-                  {e.form.pushTitle || t('タイトル未入力', 'No title')}
+                <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'pushTitle' }) && s.on, !shown.pushTitle && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '50%', fontWeight: 600 }} onClick={() => select({ kind: 'pushTitle' })} title={t('通知のタイトルを直す', 'Edit the notification title')}>
+                  {shown.pushTitle || t('タイトル未入力', 'No title')}
                 </button>
                 <span className={s.inboxDash}>―</span>
-                <button type="button" className={mergeClasses(s.inboxPart, e.form.pushBody ? s.inboxSub : s.inboxMissing, isOn({ kind: 'pushBody' }) && s.on)} onClick={() => select({ kind: 'pushBody' })} title={t('通知の本文を直す', 'Edit the notification body')}>
-                  {e.form.pushBody || t('本文未入力', 'No body')}
+                <button type="button" className={mergeClasses(s.inboxPart, shown.pushBody ? s.inboxSub : s.inboxMissing, isOn({ kind: 'pushBody' }) && s.on)} onClick={() => select({ kind: 'pushBody' })} title={t('通知の本文を直す', 'Edit the notification body')}>
+                  {shown.pushBody || t('本文未入力', 'No body')}
                 </button>
               </div>
             </div>

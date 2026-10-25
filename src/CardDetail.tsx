@@ -811,11 +811,26 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     onMove: previewMove,
     onDropAt: previewDropAt,
   }
+  // AI の文言の案を、プレビューにだけ重ねる(保存する中身は変えない)
+  const pt = aiPreview?.texts
+  const shownTexts = pt
+    ? {
+        headline: pt.headline ?? form.headline,
+        copy: pt.copy ?? form.copy,
+        subjectLine: pt.subject ?? form.subject,
+        preheader: pt.preheader ?? form.preheader,
+        pushTitle: pt.pushTitle ?? form.pushTitle,
+        pushBody: pt.pushBody ?? form.pushBody,
+        sectionTitles: pt.sectionTitles ?? sectionTitles,
+        sectionCopies: pt.sectionCopies ?? sectionCopies,
+      }
+    : {}
   const simplePreview = (
     <>
       <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
         <Preview
           {...previewCommon}
+          {...shownTexts}
           items={shownItems}
           // 選んだ部品の枠は、部品を選ぶ層が描く(二重に光らせない)
           selectedKey={null}
@@ -1009,6 +1024,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           if (to) replaceItemWith(itemKey, to, reason)
         },
         setAiPreview,
+        previewTexts: aiPreview?.texts ?? null,
         setTemplate: changeTemplate,
         saving,
         dirty: changed,

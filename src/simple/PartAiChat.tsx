@@ -136,11 +136,14 @@ export function PartAiChat({ kind, label, ask, renderIdea, isCurrent, onPreview,
                       className={mergeClasses(s.idea, used && s.ideaUsed)}
                       onMouseEnter={() => preview(idea)}
                       onMouseLeave={() => preview(null)}
+                      // キーボードで選んだときも写す(マウスだけだと、キーボードで使う人には見えないため)
+                      onFocus={() => preview(idea)}
+                      onBlur={() => preview(null)}
                       onClick={() => adopt(idea)}
                       onKeyDown={(ev) => {
                         if (ev.key === 'Enter') adopt(idea)
                       }}
-                      title={t('マウスを乗せるとプレビューに写します。押すと採用します', 'Hover to preview; click to use')}
+                      title={t('マウスを乗せる・選ぶとプレビューに写します。押すと採用します', 'Hover or focus to preview; click to use')}
                     >
                       <span style={{ display: 'grid', rowGap: 2, minWidth: 0 }}>
                         {renderIdea(idea)}

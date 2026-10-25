@@ -43,6 +43,8 @@ export type SimpleForm = Record<SimpleField, string> & {
 
 /** プレビューにだけ仮に写す、AI の案(メイン画像・商品) */
 export interface AiPreview {
+  /** 文言の案(件名・見出し・セクションなど)。保存する中身は変えず、プレビューと受信箱の行にだけ写す(dirty にしない) */
+  texts?: WholeTexts
   heroId?: string
   /** テンプレートの選び直しで、乗せているテンプレート */
   templateId?: EmailTemplateId
@@ -115,6 +117,8 @@ export interface SimpleEditor {
   replaceItem: (itemKey: string, productId: string, reason: string) => void
   /** AI の案を、保存する中身を変えずに、プレビューにだけ仮に写す(null で戻す)。商品の item.key が空なら、空いた枠に足して見せる */
   setAiPreview: (p: AiPreview | null) => void
+  /** プレビューに写している AI の文言の案(受信箱の行も、これで描く) */
+  previewTexts: WholeTexts | null
   /** テンプレートを替える(セクションの構成が変わるので、残りの候補と AI の案は捨てる。CardDetail の changeTemplate) */
   setTemplate: (id: EmailTemplateId) => void
   // ---- 保存(入力が止まって約 1.5 秒で自動。CardDetail)と元に戻す

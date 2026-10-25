@@ -110,8 +110,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   const byId = new Map(e.products.map((p) => [p.id, p]))
   const sections = sectionsOf(e.template)
 
-  // 文言の案を仮に写している間の、元の文言(マウスが離れたら戻す。描画をまたいで持つので ref)
-  const textOriginal = useRef<string | null>(null)
   // メイン画像を変える欄を開いている部品(部品を移ると畳む。まだ画像がなければ、はじめから開く)
   const [heroOpenKey, setHeroOpenKey] = useState<string | null>(null)
   const heroOpen = !!part && (!e.hero || heroOpenKey === partKey(part))
@@ -157,8 +155,11 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     const key = p === 'whole' ? 'whole' : partKey(p)
     return { turns: chats[key] ?? [], setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => setChat(key, f) }
   }
-  /** 文言の部品: 入力欄と、その部品を AI に頼む欄。案はそのまま文言に入れて写し、離したら元の文言に戻す */
-  const aiChat = (kind: string, label: string, value: string, onChange: (v: string) => void) => {
+  /**
+   * 文言の部品: 入力欄と、その部品を AI に頼む欄。乗せた・選んだ案は、保存する中身に入れず、プレビューにだけ写す(shown が、その案を写した文言。
+   * 以前は文言そのものを書き換えて写していたので、自動の保存で、乗せただけの案が保存されかねなかった)。押すと採用
+   */
+  const aiChat = (kind: string, label: string, value: string, onChange: (v: string) => void, shown: (v: string) => WholeTexts) => {
     if (!part) return null
     return (
       <PartAiChat
@@ -178,17 +179,9 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         }
         renderIdea={(idea) => <span className={s.ideaText}>{idea.value}</span>}
         isCurrent={(idea) => idea.value === value}
-        onPreview={(idea) => {
-          if (idea) {
-            if (textOriginal.current === null) textOriginal.current = value
-            onChange(idea.value)
-          } else if (textOriginal.current !== null) {
-            onChange(textOriginal.current)
-            textOriginal.current = null
-          }
-        }}
+        onPreview={(idea) => e.setAiPreview(idea ? { texts: shown(idea.value) } : null)}
         onAdopt={(idea) => {
-          textOriginal.current = null
+          e.setAiPreview(null)
           onChange(idea.value)
         }}
       />
@@ -225,8 +218,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         }}
       />
     )
-  // 全体への依頼の案を仮に写している間の、元の文言(描画をまたいで持つ)
-  const wholeOriginal = useRef<WholeTexts | null>(null)
   const currentTexts = (): WholeTexts => ({
     subject: e.form.subject,
     preheader: e.form.preheader,
@@ -280,20 +271,12 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         return !!c && Object.entries(c.texts).every(([k, v]) => JSON.stringify(now[k as keyof WholeTexts]) === JSON.stringify(v)) && (!c.heroId || c.heroId === e.hero?.id)
       }}
       onPreview={(idea) => {
+        // 案の文言とメイン画像を、プレビューにだけ写す(保存する中身は変えない)
         const c = idea && readWhole(idea.value)
-        if (c) {
-          if (wholeOriginal.current === null) wholeOriginal.current = currentTexts()
-          e.applyTexts(c.texts)
-          e.setAiPreview(c.heroId ? { heroId: c.heroId } : null)
-        } else {
-          if (wholeOriginal.current) e.applyTexts(wholeOriginal.current)
-          wholeOriginal.current = null
-          e.setAiPreview(null)
-        }
+        e.setAiPreview(c ? { texts: c.texts, ...(c.heroId ? { heroId: c.heroId } : {}) } : null)
       }}
       onAdopt={(idea) => {
         const c = readWhole(idea.value)
-        wholeOriginal.current = null
         e.setAiPreview(null)
         if (!c) return
         e.applyTexts(c.texts)
@@ -331,7 +314,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       >
         <AutoTextarea heightKey={`PartPane.${k}`} size="small" rows={opts.rows ?? 2} autoFocus value={e.form[k]} placeholder={opts.placeholder} onChange={(_, d) => e.setField(k, d.value)} />
       </Field>
-      {aiChat(k, label, e.form[k], (v) => e.setField(k, v))}
+      {aiChat(k, label, e.form[k], (v) => e.setField(k, v), (v) => ({ [k]: v }))}
     </>
   )
 
@@ -458,7 +441,12 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             <Field label={label} size="small" hint={isTitle && !value ? t('空のときは、商品のカテゴリ名を出します', 'Empty shows the product category') : undefined}>
               <AutoTextarea heightKey="PartPane.value" size="small" rows={isTitle ? 1 : 2} autoFocus value={value} onChange={(_, d) => setValue(d.value)} />
             </Field>
-            {aiChat(part.kind, label, value, setValue)}
+            {aiChat(part.kind, label, value, setValue, (v) => {
+              const list = [...(isTitle ? e.sectionTitles : e.sectionCopies)]
+              while (list.length <= i) list.push('')
+              list[i] = v
+              return isTitle ? { sectionTitles: list } : { sectionCopies: list }
+            })}
           </>
         )
       }
