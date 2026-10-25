@@ -19,7 +19,7 @@ from fastapi import APIRouter, Request
 from google.genai import types
 
 from . import assets, heroes
-from .ai import _get_client
+from .ai import get_client
 from .data_api import fail, ok
 
 log = logging.getLogger("ccp.parts")
@@ -61,7 +61,7 @@ async def describe_image(request: Request, language: str = "ja"):
         return fail(400, "画像が大きすぎます(1 枚 15MB まで)", "too_large")
     prompt = PROMPT.replace("%LANG%", "英語" if language == "en" else "日本語")
     try:
-        resp = await _get_client().aio.models.generate_content(
+        resp = await get_client().aio.models.generate_content(
             model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
             contents=[types.Part.from_bytes(data=data, mime_type=content_type), prompt],
             config=types.GenerateContentConfig(response_mime_type="application/json"),

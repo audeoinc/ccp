@@ -24,7 +24,7 @@ from google.genai import types
 from pydantic import BaseModel
 
 from . import assets
-from .ai import _get_client
+from .ai import get_client
 from .data_api import fail, ok
 
 log = logging.getLogger("ccp.heroes")
@@ -65,7 +65,7 @@ PROMPT = """あなたは、EC のメール・アプリの配信で使うメイ�
 async def _describe(data: bytes, content_type: str, language: str):
     prompt = PROMPT.replace("%LANG%", "英語" if language == "en" else "日本語")
     try:
-        resp = await _get_client().aio.models.generate_content(
+        resp = await get_client().aio.models.generate_content(
             model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
             contents=[types.Part.from_bytes(data=data, mime_type=content_type), prompt],
             config=types.GenerateContentConfig(response_mime_type="application/json"),

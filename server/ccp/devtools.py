@@ -801,7 +801,7 @@ async def available_models() -> list[str]:
 
         names: list[str] = []
         try:
-            pager = await ai._get_client().aio.models.list(config={"query_base": True, "page_size": 200})
+            pager = await ai.get_client().aio.models.list(config={"query_base": True, "page_size": 200})
             async for m in pager:
                 names.append(m.name or "")
         except Exception:  # noqa: BLE001 — 一覧を出せない環境でも、設定のモデルで動く
@@ -830,7 +830,7 @@ async def default_model() -> str:
             from . import ai
 
             try:
-                await ai._get_client().aio.models.get(model=guess)
+                await ai.get_client().aio.models.get(model=guess)
                 _pro_guess = guess
             except Exception:  # noqa: BLE001 — その Pro がない・権限がない。CCP のモデルのまま
                 log.info("%s は使えませんでした。%s を使います", guess, base)
@@ -893,7 +893,7 @@ async def chat_events(body: ChatIn) -> AsyncIterator[dict[str, Any]]:
             parts: list[Any] = []
             calls: list[Any] = []
             text = ""
-            stream = await ai._get_client().aio.models.generate_content_stream(model=model, contents=contents, config=config)
+            stream = await ai.get_client().aio.models.generate_content_stream(model=model, contents=contents, config=config)
             async for chunk in stream:
                 for cand in chunk.candidates or []:
                     for p in (cand.content.parts if cand.content else None) or []:
@@ -1435,7 +1435,7 @@ async def convert_events(body: ConvertIn) -> AsyncIterator[dict[str, Any]]:
     )
     text = ""
     try:
-        stream = await ai._get_client().aio.models.generate_content_stream(model=model, contents=contents, config=config)
+        stream = await ai.get_client().aio.models.generate_content_stream(model=model, contents=contents, config=config)
         async for chunk in stream:
             for cand in chunk.candidates or []:
                 for p in (cand.content.parts if cand.content else None) or []:

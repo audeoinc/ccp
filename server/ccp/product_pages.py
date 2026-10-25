@@ -44,7 +44,7 @@ from sqlalchemy import text
 
 from . import assets, creative, linkpreview
 from . import schema as sc
-from .ai import _get_client
+from .ai import get_client
 from .data_api import db, fail, ok
 
 log = logging.getLogger("ccp.product_pages")
@@ -534,7 +534,7 @@ async def suggest(body: SuggestIn):
     if shown == 0:
         return fail(502, "画像を読めませんでした", "no_images")
     try:
-        resp = await _get_client().aio.models.generate_content(
+        resp = await get_client().aio.models.generate_content(
             model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
             contents=contents,
             config=types.GenerateContentConfig(response_mime_type="application/json"),

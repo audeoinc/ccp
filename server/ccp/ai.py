@@ -44,7 +44,8 @@ _gate: asyncio.Semaphore | None = None
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=30.0, exp_base=2.0, jitter=1.0, http_status_codes=[429, 500, 503, 504])
 
 
-def _get_client() -> genai.Client:
+def get_client() -> genai.Client:
+    """Gemini(Vertex AI)の呼び出し口。プロセスで 1 つを使い回す(ほかのモジュールも、これを通す)"""
     global _client
     if _client is None:
         _client = genai.Client(
@@ -70,7 +71,7 @@ async def ask(body: AskIn):
         _gate = asyncio.Semaphore(int(os.getenv("GEMINI_CONCURRENCY", "4")))
     try:
         async with _gate:
-            resp = await _get_client().aio.models.generate_content(
+            resp = await get_client().aio.models.generate_content(
                 model=model,
                 contents=body.prompt,
                 config=types.GenerateContentConfig(
