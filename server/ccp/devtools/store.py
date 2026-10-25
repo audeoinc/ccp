@@ -279,22 +279,72 @@ def record_run(source: str, sql: str, rows: int | None = None, processed: int | 
         log.info("実行の履歴を残せませんでした", exc_info=True)
 
 
+# 履歴のファイルの、数え終えた所(パス → (数え終えた大きさ, そこまでの改行の数, 先頭の数バイト))。
+# id(何行めか)を出すのに、行の数が要る。足していくだけのファイルなので、増えた分だけを数える。
+# 先頭が変わったら(古い半分を落として書き直した)、数え直す
+_history_count: dict[str, tuple[int, int, bytes]] = {}
+HEAD_BYTES = 64
+BLOCK = 64 * 1024
+
+
+def _newlines_before(p: Path, size: int) -> int:
+    with p.open("rb") as f:
+        head = f.read(HEAD_BYTES)
+        done, n, was = _history_count.get(str(p), (0, 0, b""))
+        if done > size or head[: len(was)] != was:
+            done, n = 0, 0
+        f.seek(done)
+        while done < size:
+            chunk = f.read(min(BLOCK * 16, size - done))
+            if not chunk:
+                break
+            n += chunk.count(b"\n")
+            done += len(chunk)
+    _history_count[str(p)] = (done, n, head)
+    return n
+
+
+def _lines_from_end(p: Path, size: int) -> Any:
+    """(何行めか, 行) を、後ろの行から順に返す(新しい順に読むとき、ファイルの全体を読まずに済むように)"""
+    idx = _newlines_before(p, size)
+    with p.open("rb") as f:
+        pos, rest, last = size, b"", True
+        while pos > 0:
+            step = min(BLOCK, pos)
+            pos -= step
+            f.seek(pos)
+            parts = (f.read(step) + rest).split(b"\n")
+            rest = parts[0]
+            for line in reversed(parts[1:]):
+                # 最後の改行の後ろが空なのは、行ではない
+                if not (last and not line):
+                    yield idx, line
+                last = False
+                idx -= 1
+        if rest or not last:
+            yield idx, rest
+
+
 def read_history(limit: int = 300, q: str = "") -> list[dict[str, Any]]:
     p = _history_path()
     if not p.is_file():
         return []
     out = []
     key = q.strip().lower()
-    for i, line in enumerate(p.read_text(encoding="utf-8").splitlines()):
+    for i, line in _lines_from_end(p, p.stat().st_size):
         try:
-            v = json.loads(line)
+            v = json.loads(line.decode("utf-8"))
         except ValueError:
+            continue
+        if not isinstance(v, dict):
             continue
         if key and key not in str(v.get("sql", "")).lower() and key not in str(v.get("error", "")).lower():
             continue
         v["id"] = i
         out.append(v)
-    return list(reversed(out))[:limit]
+        if len(out) >= limit:
+            break
+    return out
 
 
 @router.get("/history")

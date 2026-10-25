@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from datetime import date, datetime, timezone
@@ -235,6 +236,38 @@ class WorkTest(unittest.TestCase):
         self.assertEqual([(r["source"], r["ok"]) for r in runs], [("AI", False), ("画面", True)])
         self.assertEqual([r["sql"] for r in devtools.read_history(q="bad")], ["SELECT bad"])
 
+    def test_history_reads_from_end_with_same_ids(self) -> None:
+        """後ろから読んでも、id(何行めか)は前から数えたのと同じ。壊れた行・空の行も 1 行に数える。足した分だけ数え直す"""
+        from ccp.devtools import store
+
+        p = devtools.common.DEVWORK / "history.jsonl"
+        lines = [json.dumps({"sql": f"SELECT {i}"}) for i in range(3000)]
+        lines[5] = "{壊れた行"
+        lines[6] = ""
+        p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        def expected(limit: int, q: str = "") -> list[tuple[int, str]]:
+            out = []
+            for i, line in enumerate(p.read_text(encoding="utf-8").splitlines()):
+                try:
+                    v = json.loads(line)
+                except ValueError:
+                    continue
+                if q in v["sql"]:
+                    out.append((i, v["sql"]))
+            return list(reversed(out))[:limit]
+
+        got = lambda **kw: [(r["id"], r["sql"]) for r in devtools.read_history(**kw)]  # noqa: E731
+        with mock.patch.object(store, "BLOCK", 1000):
+            self.assertEqual(got(limit=10), expected(10))
+            self.assertEqual(got(limit=5000), expected(5000))
+            self.assertEqual(got(limit=50, q="SELECT 4"), expected(50, "SELECT 4"))
+            devtools.record_run("画面", "SELECT 足した")
+            self.assertEqual(got(limit=2), [(3000, "SELECT 足した"), (2999, "SELECT 2999")])
+            # 古い半分を落とした(先頭が変わった)ら、数え直す
+            p.write_text("\n".join(lines[2000:]) + "\n", encoding="utf-8")
+            self.assertEqual(got(limit=1), [(999, "SELECT 2999")])
+
     def test_profile_column(self) -> None:
         f = SimpleNamespace(name="country_cd", field_type="STRING", mode="NULLABLE", description="", fields=[])
         t = SimpleNamespace(project="p", dataset_id="d", table_id="t", schema=[f])
@@ -327,6 +360,26 @@ class TaskTest(unittest.TestCase):
         self.assertEqual([e["type"] for e in err["events"]], ["thought", "error"])
         self.assertEqual([e["type"] for e in more["events"]], ["error"])
         self.assertFalse(nope["ok"])
+
+    def test_events_are_capped_but_result_is_kept(self) -> None:
+        import asyncio
+
+        from ccp.devtools import tasks
+
+        async def main() -> dict:
+            async def events():  # noqa: ANN202
+                for i in range(10):
+                    yield {"type": "thought", "text": str(i)}
+                yield {"type": "final", "reply": "おわり"}
+
+            tid = devtools.start_events(events())
+            await asyncio.sleep(0.05)
+            return await devtools.task_status(tid)
+
+        with mock.patch.object(tasks, "TASK_MAX_EVENTS", 3):
+            r = asyncio.run(main())
+        self.assertTrue(r["done"])
+        self.assertEqual([e["type"] for e in r["events"]], ["thought", "thought", "thought", "step", "final"])
 
     def test_task_call_rejects_unknown(self) -> None:
         import asyncio

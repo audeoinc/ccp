@@ -24,6 +24,11 @@ router = APIRouter()
 # 受付はこのプロセスのメモリに置く(Workbench はサーバー 1 つ。開発用の画面は本番では使わない)
 
 TASK_KEEP = 3600  # 終わった受付を残す秒(画面が結果を取りに来るまで)
+# 1 つの受付に残す出来事の数の上限。思考の要約は少しずつ届くので、長い会話だと出来事がいくらでも増え、
+# 終わった受付を残す 1 時間のあいだ、メモリに残り続けるため。上限を超えたら、思考・調べたことは省き(省いたと 1 度だけ伝える)、
+# 結果・エラーなど、最後の出来事はいつも残す
+TASK_MAX_EVENTS = 2000
+SKIPPABLE = ("thought", "step")
 _tasks: dict[str, dict[str, Any]] = {}
 
 
@@ -43,7 +48,13 @@ def start_events(events: AsyncIterator[dict[str, Any]]) -> str:
     async def go() -> None:
         try:
             async for ev in events:
-                task["events"].append(ev)
+                got = task["events"]
+                if len(got) >= TASK_MAX_EVENTS and ev.get("type") in SKIPPABLE:
+                    if not task.get("skipped"):
+                        task["skipped"] = True
+                        got.append({"type": "step", "text": f"出来事が {TASK_MAX_EVENTS:,} 件を超えたので、ここから先の思考・調べたことは省きます"})
+                    continue
+                got.append(ev)
         except Exception as e:  # noqa: BLE001 — 途中で落ちても、画面にエラーとして届ける
             task["events"].append({"type": "error", "error": f"{type(e).__name__}: {e}"[:2000]})
         finally:
