@@ -4,7 +4,7 @@ import { ArrowUndoRegular, CheckmarkCircleRegular, LockClosedRegular, SendRegula
 import type { DeliveryCard } from './models/deliveryCards'
 import type { WeekRow, WeekStatus } from './data/weeks'
 import type { CardNote } from './data/cardNotes'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { statusRank } from './status'
 import { StatusFlow } from './StatusFlow'
 import { scopeLabel, type WeekScope } from './weekLock'
@@ -83,7 +83,6 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
   const [busy, setBusy] = useState(false)
   const status: WeekStatus = week?.status ?? 'draft'
   const confirmed = status === 'confirmed'
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const notApproved = cards.filter((c) => statusRank(c.status) < statusRank(STATUS_APPROVED)).length
   // 確定後の変更: この週の配信の、最後に確定した日時より後の理由。もう一度確定すると、それより前のものは出なくなる
   const cardName = new Map(cards.map((c) => [c.id, c.name]))
@@ -215,7 +214,6 @@ export function WeekReviewBar({ week, cards, changes = [], onRequestAll, toReque
 export function WeekStatusBadge({ week }: { week?: WeekRow }) {
   const t = useT()
   const confirmed = week?.status === 'confirmed'
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const tip = confirmed
     ? t(`週の状態: 確定(${when(week?.confirmed_at)})。配信には鍵がかかっています`, `Week status: Confirmed (${when(week?.confirmed_at)}). Deliveries are locked.`)
     : t('週の状態: 確定前(配信ごとに承認を進め、そろったら「週を確定」)', 'Week status: Not confirmed (approve each delivery, then confirm the week)')

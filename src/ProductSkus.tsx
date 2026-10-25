@@ -1,7 +1,7 @@
 import { Badge, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { sortSizes, stockoutRate, useProductSkus, type SkuRow } from './useProductSkus'
-import { locale, useT } from './i18n'
+import { locale, num, useT } from './i18n'
 
 /** SKU の在庫が少ないとみなす数(SPU の残少 50 を、SKU に割った目安) */
 const LOW_SKU = 3
@@ -51,7 +51,6 @@ export function ProductSkus({ product: p }: { product: Product }) {
   const sizes = sortSizes([...new Set(data.map(sizeKey))])
   const byKey = new Map(data.map((r) => [`${r.color || '—'}|${sizeKey(r)}`, r]))
   const asOf = data.reduce((a, r) => ((r.as_of ?? '') > a ? (r.as_of ?? '') : a), '')
-  const num = (n: number) => n.toLocaleString(locale())
   const sample = data.some((r) => r.sample)
 
   return (

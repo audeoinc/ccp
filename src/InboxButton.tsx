@@ -1,6 +1,6 @@
 import { Badge, Button, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { MailInboxRegular } from '@fluentui/react-icons'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import type { ApprovalInbox } from './useApprovalInbox'
 
 const useStyles = makeStyles({
@@ -25,7 +25,6 @@ interface Props {
 export function InboxButton({ inbox, onOpenCard }: Props) {
   const s = useStyles()
   const t = useT()
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const n = inbox.mine.length
   return (
     <Popover withArrow positioning="below-end">

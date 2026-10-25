@@ -9,7 +9,7 @@ import { ProductChooser } from './ProductChooser'
 import { aiCardOfSaved } from './bulkDraft'
 import { cancelDelivery } from './cancel'
 import { LOW_STOCK_WEEKS, type Placement, type StockModel } from './alerts'
-import { locale, useT } from './i18n'
+import { locale, num, useT } from './i18n'
 import { productImage } from './images'
 import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { statusRank } from './status'
@@ -44,7 +44,6 @@ interface Props {
 
 const STATUS_APPROVED = 'approved'
 /** 在庫の数の表記(なければ 0) */
-const num = (v?: number) => Math.round(v ?? 0).toLocaleString()
 
 /** datetime-local の値(ブラウザの時刻) */
 const localInput = (d: Date) => {

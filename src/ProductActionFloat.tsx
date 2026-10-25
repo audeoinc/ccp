@@ -16,7 +16,7 @@ import { AutoTextarea } from './AutoTextarea'
 import { ImageThumb } from './ImageThumb'
 import { Row, productMeta } from './ProductRow'
 import { productImage } from './images'
-import { tr, useT } from './i18n'
+import { num, tr, useT } from './i18n'
 import { OpenLink } from './LinkText'
 import { productUrl } from './links'
 import { weeklyLimit } from './weeklyLimit'
@@ -151,7 +151,6 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
       </span>
     )
   }
-  const num = (v?: number) => Math.round(v ?? 0).toLocaleString()
   const row = (key: string, p: Product, on: boolean, onClick: () => void, why?: string) => (
     <Row key={key} dense image={productImage(p)} title={p.name} meta={productMeta(p)} reason={why} marks={marks(p)} selected={on} onClick={onClick} />
   )

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Button, Field, Input, MessageBar, MessageBarBody, Select, makeStyles, tokens } from '@fluentui/react-components'
 import { DEFAULT_CRITERIA, browserCriteria, criteriaFor, criteriaHistory, saveCriteria, useCountrySettings, type CountryCriteria } from './countrySettings'
 import { myName } from './history'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
@@ -41,7 +41,6 @@ export function CountryCriteriaPanel({ country, countryName }: Props) {
   const past = criteriaHistory(country)
   const fromBrowser = browserCriteria()
   const changed = JSON.stringify(draft) !== JSON.stringify(saved0)
-  const when = (iso: string) => (iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' }) : '')
 
   const save = async () => {
     if (!(await confirmDialog(t(`${countryName}の全員に効きます。保存しますか?`, `This applies to everyone working on ${countryName}. Save?`)))) return

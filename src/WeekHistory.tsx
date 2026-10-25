@@ -3,7 +3,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { CardEvent } from './data/events'
 import { actionText } from './weekLabels'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { statusLabel } from './status'
 
 const useStyles = makeStyles({
@@ -29,7 +29,6 @@ interface Props {
 export function WeekHistory({ open, onClose, events }: Props) {
   const s = useStyles()
   const t = useT()
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
       <ResizableSurface sizeKey="weekHistory" className={s.surface}>

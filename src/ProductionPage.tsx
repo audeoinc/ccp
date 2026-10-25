@@ -30,7 +30,7 @@ import { usePaneWidths } from './floatLayout'
 import type { VariantKey } from './abTest'
 import { buildSnapshot, downloadText, htmlLinks, parseSnapshot, parseVariantHtml, previewHtml, productionVariants, snapshotOf, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
-import { locale, tr, useT } from './i18n'
+import { day, locale, tr, useT, when } from './i18n'
 import { loadPref, savePref } from './settings'
 import { canGoProduction } from './productionGate'
 import { themeTypeLabel, themeTypeOf } from './themeTypes'
@@ -263,7 +263,6 @@ export function ProductionPage({ card, productIds, variantIds, products, product
     }
   }, [focus, card.id])
   const curSnap = snapshotOf(snap, cur)
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
   // 案から選ぶ配信(X57)は、1 案に決めるまで制作に依頼しない(決まらない案まで作り込むのは無駄なため。2026-10-21 利用者の判断)
   const choosing = !live && !!draft.ab?.choose
@@ -691,7 +690,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                           <span className={s.grow}>{t('制作指示', 'Production notes')}</span>
                           <CopyButton text={instructions} label={t('まとめてコピー', 'Copy all')} />
                         </div>
-                        <span className={s.note}>{t(`担当: ${owner || '(未設定)'} ・ 締め切り: ${due ? due.slice(0, 10).replace(/-/g, '/') : '(未設定)'}`, `Assignee: ${owner || '(not set)'} · Due: ${due ? due.slice(0, 10) : '(not set)'}`)}</span>
+                        <span className={s.note}>{t(`担当: ${owner || '(未設定)'} ・ 締め切り: ${due ? day(due.slice(0, 10)) : '(未設定)'}`, `Assignee: ${owner || '(not set)'} · Due: ${due ? day(due.slice(0, 10)) : '(not set)'}`)}</span>
                         {instructions.trim() ? (
                           <div className={s.notes}>
                             <MarkdownLite text={instructions} />

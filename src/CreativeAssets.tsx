@@ -15,7 +15,7 @@ import { useJustAdded } from './useJustAdded'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
 import { myName, onMeChange } from './history'
-import { locale, tr, useT } from './i18n'
+import { tr, useT, when } from './i18n'
 import type { CardAsset } from './models/cardAssets'
 import type { Product } from './models/products'
 import { PREF } from './prefKeys'
@@ -112,7 +112,6 @@ const useStyles = makeStyles({
 })
 
 const sizeText = (n?: number) => (!n ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`)
-const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const isImage = (a: CardAsset) => a.kind === 'file' && IMAGE_EXTS.includes(extOf(a.file_name || a.stored))
 const isPdf = (a: CardAsset) => a.kind === 'file' && extOf(a.file_name || a.stored) === 'pdf'
 const hostOf = (u?: string) => {

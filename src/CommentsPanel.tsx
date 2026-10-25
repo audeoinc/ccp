@@ -4,7 +4,7 @@ import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleR
 import { Linkify } from './LinkText'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Product } from './models/products'
-import { locale, optionLabel, tr, useT } from './i18n'
+import { optionLabel, tr, useT, when } from './i18n'
 import { myName, myUserId, onMeChange } from './history'
 import { NoteReactionsService } from './data/noteReactions'
 import { NoteReactionKind, type NoteReaction } from './models/noteReactions'
@@ -121,7 +121,6 @@ interface Props {
   compact?: boolean
 }
 
-const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const time = (iso?: string) => (iso ? new Date(iso).getTime() : 0)
 /** スレッドの元になる書き込みか(以前の「質問」と「レビューのコメント」の両方。種類のない古い行は質問) */
 const isRoot = isThreadRoot

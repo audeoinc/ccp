@@ -8,7 +8,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { ChangeLogsService, type ChangeLog } from './data/changeLogs'
 import { CardNotesService, type CardNote } from './data/cardNotes'
 import { EventsService, type CardEvent } from './data/events'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { statusLabel } from './status'
 import { typo } from './typo'
 import { PaneSpinner } from './PaneSpinner'
@@ -74,7 +74,6 @@ export function CardHistoryList({ cardId, version, scroll }: { cardId: string; v
     }
   }, [cardId, version])
 
-  const when = (iso: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
   const fieldName = (f?: string): string =>
     (
       ({

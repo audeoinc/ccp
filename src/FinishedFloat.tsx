@@ -5,7 +5,7 @@ import { DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import { CreativeAssets } from './CreativeAssets'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { MarkdownLite } from './MarkdownLite'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { ProductionRequest } from './models/productionRequests'
 import type { Product } from './models/products'
@@ -29,7 +29,6 @@ const useStyles = makeStyles({
   empty: { display: 'grid', placeItems: 'center', flexGrow: 1, color: tokens.colorNeutralForeground3, border: `1px dashed ${tokens.colorNeutralStroke1}`, borderRadius: tokens.borderRadiusMedium },
 })
 
-const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
 interface Props {
   card: DeliveryCard

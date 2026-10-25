@@ -9,7 +9,7 @@ import type { DevRequest, DevRequestStatus } from './models/devRequests'
 import { buildId, bumpDevRequests, devRequestName, devRequestsVersion, onDevRequestName, setDevRequestName, subscribeDevRequests, toggleVote, votesOf } from './devRequestPlace'
 import { copyText } from './clipboard'
 import { Linkify } from './LinkText'
-import { locale, tr, useT } from './i18n'
+import { locale, tr, useT, when } from './i18n'
 import { PinThenImage } from './PinThenImage'
 
 const useStyles = makeStyles({
@@ -30,7 +30,6 @@ const useStyles = makeStyles({
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
-const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const statusName = (v?: string) => (v === 'done' ? tr('対応済み', 'Done') : v === 'declined' ? tr('見送り', 'Declined') : tr('未対応', 'Open'))
 
 /** まとめてコピーの文(連絡係に貼って、要件として整理できる形。画面の場所・配信カードの ID・書いた人・時刻・本文・返信・状態) */

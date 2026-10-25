@@ -3,7 +3,7 @@ import { Avatar, Button, Popover, PopoverSurface, Spinner, makeStyles, mergeClas
 import { DismissRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { Linkify } from './LinkText'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize } from './floatLayout'
 import { PREF } from './prefKeys'
@@ -28,7 +28,6 @@ const useStyles = makeStyles({
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
-const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
 /** フロートに並べる 1 件(元の書き込みか返信) */
 export interface ThreadEntry {

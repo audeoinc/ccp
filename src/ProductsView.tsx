@@ -11,7 +11,7 @@ import { WeeklyPerformancesService } from './data/weeklyPerformances'
 import { DataTable, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
 import { productImage } from './images'
-import { locale, optionLabel, priceText, useT, type Market } from './i18n'
+import { locale, optionLabel, pct, priceText, type Market, useT } from './i18n'
 import { mergeResultsByCard, parseProductResults } from './results'
 import { productMarket } from './market'
 import { weeklyLimit } from './weeklyLimit'
@@ -258,7 +258,6 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
     if (c !== undefined && r.placements.length >= 2 && c < 0.01) out.push({ text: t('CTR が低い', 'Low CTR'), color: tokens.colorPaletteDarkOrangeBorderActive, tip: t('何度も載せているのに、クリック率が 1% 未満', 'Featured often but CTR below 1%') })
     return out
   }
-  const pct = (v?: number) => (v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
   const dateText = (ymd?: string) => (ymd ? new Date(`${ymd}T00:00:00`).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : '—')
 
   const columns: DataColumn<Row>[] = [

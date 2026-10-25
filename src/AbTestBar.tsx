@@ -2,7 +2,7 @@ import { Button, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from
 import { AddRegular, BeakerRegular, CheckmarkCircleRegular, DismissRegular, SplitVerticalRegular } from '@fluentui/react-icons'
 import { AiIcon } from './AiMark'
 import { allVariants, isChoose, metricLabel, nextVariant, splitOf, targetLabel, type AbDecision, type AbMetric, type AbMode, type AbPurpose, type AbTarget, type AbTest, type VariantKey } from './abTest'
-import { useT } from './i18n'
+import { useT, when } from './i18n'
 import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
@@ -241,7 +241,7 @@ export function AbDecidedBar({ decision, onView }: { decision: AbDecision; onVie
   const s = useStyles()
   const t = useT()
   const others = decision.rejected.map((r) => r.key)
-  const when = new Date(decision.at).toLocaleString(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const at = when(decision.at)
   return (
     <div className={s.bar} role="region" aria-label={t('案から選んだ結果', 'Chosen variant')}>
       <div className={s.row}>
@@ -251,8 +251,8 @@ export function AbDecidedBar({ decision, onView }: { decision: AbDecision; onVie
         </span>
         <span className={mergeClasses(s.note, s.grow)}>
           {t(
-            `${when}${decision.by ? `・${decision.by}` : ''}。${others.join('・')} 案は配信しませんでした(中身は残してあります)。いまの配信の中身が ${decision.variant} 案です`,
-            `${when}${decision.by ? ` · ${decision.by}` : ''}. ${others.length === 1 ? `Variant ${others[0]} was` : `Variants ${others.join(', ')} were`} not sent (kept for reference). The current content is variant ${decision.variant}.`,
+            `${at}${decision.by ? `・${decision.by}` : ''}。${others.join('・')} 案は配信しませんでした(中身は残してあります)。いまの配信の中身が ${decision.variant} 案です`,
+            `${at}${decision.by ? ` · ${decision.by}` : ''}. ${others.length === 1 ? `Variant ${others[0]} was` : `Variants ${others.join(', ')} were`} not sent (kept for reference). The current content is variant ${decision.variant}.`,
           )}
         </span>
         <Button type="button" size="small" appearance="secondary" icon={<SplitVerticalRegular />} onClick={onView}>

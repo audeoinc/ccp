@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react'
 import { Badge, Button, Card, CardPreview, Checkbox, MessageBar, MessageBarBody, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { appliesIn, applyDecided, applyHistory, saveApply, useCountryApply, type ApplyKind } from './countryApply'
 import { myName } from './history'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
@@ -73,7 +73,6 @@ export function CountryApplyList({ kind, country, countryName, items, defaultUse
   const set = (id: string, use: boolean) => setDraft({ country, map: new Map(edits).set(id, use) })
   const groups = [...new Set(items.map((x) => x.group ?? ''))]
   const nameOf = (id: string) => items.find((x) => x.id === id)?.label ?? id
-  const when = (iso: string) => (iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' }) : '')
   const past = applyHistory(kind, country)
   // まだ決めていない項目の印(既定のとおり)
   const defaultBadge = (id: string) =>

@@ -6,6 +6,9 @@ import { DEFAULT_PUSH_TEMPLATE, baseTemplateId, getTemplate, templateFromValue }
 import { parseCsv } from './csv'
 import { themeTypeOf } from './themeTypes'
 import { localDate } from './dates'
+import { pct } from './i18n'
+// 率の書き方は i18n の pct に 1 つ(ここから読んでいる画面のために、同じ名前でも出す)
+export { pct }
 
 export const COUNTRY_US = 'US'
 
@@ -54,7 +57,6 @@ export function parseLinkResults(v?: string): LinkResults {
 }
 
 /** 割合の表記(1 桁の小数) */
-export const pct = (v?: number) => (v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
 
 /** 送った日時(結果になければ、配信の予定日時) */
 export const sentAtOf = (r: ResultRow) => r.result.sent_at ?? r.card.scheduled_at

@@ -20,7 +20,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { ListHeader } from './ListHeader'
 import { useJustAdded } from './useJustAdded'
 import { AddRegular, DismissRegular } from '@fluentui/react-icons'
-import { locale, optionLabel, tr, useT } from './i18n'
+import { optionLabel, tr, useT, when } from './i18n'
 import { logEvent, meLock, myName, myUserId, onMeChange } from './history'
 import { useSyncExternalStore } from 'react'
 import { activeUsers, groupCountries, groupInCountry, groupUsers, reloadPeople, ruleFor, setPeopleManagerOpen as setOpen, usePeople, usePeopleManagerOpen } from './people'
@@ -253,7 +253,6 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
     )
   }
 
-  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
   const usersTab = (
     <>

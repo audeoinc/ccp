@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Button, Field, Input, MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
 import { SAMPLE_BRAND, brandHistoryOf, brandOwn, saveBrand, useCountrySettings, type Brand } from './countrySettings'
 import { myName } from './history'
-import { locale, useT } from './i18n'
+import { useT, when } from './i18n'
 import { confirmDialog } from './confirm'
 
 const useStyles = makeStyles({
@@ -51,7 +51,6 @@ export function BrandPanel({ country, countryName }: Props) {
   const changed = JSON.stringify(clean(draft)) !== JSON.stringify(clean(current))
   const urlBad = !!draft.shopUrl?.trim() && !isUrl(draft.shopUrl.trim())
   const past = brandHistoryOf(country)
-  const when = (iso: string) => (iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' }) : '')
 
   const save = async () => {
     const msg = isCompany

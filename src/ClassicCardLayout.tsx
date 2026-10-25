@@ -14,7 +14,7 @@ import {
   mergeClasses,
 } from '@fluentui/react-components'
 import { ArrowNextRegular, BeakerRegular, CheckmarkCircleRegular, CommentAddRegular, ChevronRightRegular, DataBarVerticalRegular, DesktopRegular, DismissRegular, MailRegular, PhoneRegular, SaveRegular } from '@fluentui/react-icons'
-import { locale, useT } from './i18n'
+import { day, locale, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ProductInfoPane } from './ProductInfoPane'
 import { AutoTextarea } from './AutoTextarea'
@@ -352,7 +352,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
                         <span className={styles.caption}>{t('担当 ', 'Assignee ')}</span>
                         {form.productionOwner.trim() || <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
                         <span className={styles.caption}>{t(' ・ 締め切り ', ' · Due ')}</span>
-                        {form.productionDue ? form.productionDue.replace(/-/g, '/') : <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
+                        {form.productionDue ? day(form.productionDue) : <span className={styles.caption}>{t('(未設定)', '(not set)')}</span>}
                       </span>
                       <span>
                         {form.handedOffAt ? (

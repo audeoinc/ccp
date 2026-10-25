@@ -44,6 +44,16 @@ export function useLang(): Lang {
 /** 日付・数値の表記に使うロケール */
 export const locale = (): string => (current.get() === 'ja' ? 'ja-JP' : 'en-US')
 
+// 日付・数の書き方は、ここの 4 つに 1 つにする(画面ごとに月が short / numeric、年つき / なし、締め切りの / と - がまざっていた。simple-ui-review-2 の 27・28)
+/** 日時(「10月25日 14:05」/ Oct 25, 02:05 PM)。空なら空 */
+export const when = (iso?: string | null): string => (iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
+/** 日付(「10月25日」/ Oct 25)。「年-月-日」だけの値は、その日の 0 時として読む(UTC で 1 日ずれないように)。空なら空 */
+export const day = (iso?: string | null): string => (iso ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00` : iso).toLocaleDateString(locale(), { month: 'short', day: 'numeric' }) : '')
+/** 数(3 桁の区切り。digits は小数の桁の上限)。ないときは「—」 */
+export const num = (v?: number | null, digits = 0): string => (v == null || !Number.isFinite(v) ? '—' : v.toLocaleString(locale(), { maximumFractionDigits: digits }))
+/** 率(0.123 → 12.3%)。ないときは「—」 */
+export const pct = (v?: number | null, digits = 1): string => (v == null || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(digits)}%`)
+
 export type Market = 'JP' | 'US'
 
 /** 価格の表記。US の商品はドル、JP の商品は円 */

@@ -6,7 +6,7 @@ import { isChoose, metricLabel, ownsHero, parseAbTest, targetLabel, type AbMetri
 import { abVerdict, confidenceLabel, learningText, metricValue, perRecipientMoney } from './abResults'
 import { ImageThumb } from './ImageThumb'
 import { heroImage } from './images'
-import { locale, useT } from './i18n'
+import { num, useT } from './i18n'
 import { isPush, pct, type ResultRow } from './results'
 
 const useStyles = makeStyles({
@@ -46,7 +46,6 @@ export function AbResult({ row, heroes, money, onAdopt }: { row: ResultRow; hero
   // 案から選ぶ配信(X57)は 1 案だけを送るので、案ごとの勝ち負けは出さない
   if (v.stats.length === 0 || isChoose(ab)) return null
 
-  const num = (x: number) => x.toLocaleString(locale())
   const rate = (a: number, b: number) => (b ? a / b : undefined)
   const heroOf = (key: string) => {
     const id = key === 'A' ? row.card.hero_image_id : ab?.heroes[key as 'B' | 'C']?.heroId

@@ -7,7 +7,7 @@ import { DeliveryLiftsService, type DeliveryLift } from './data/deliveryLifts'
 import { LearningReviewsService, type LearningReview, type LearningReviewStatus } from './data/learningReviews'
 import { DataTable, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
-import { locale, priceText, useT, type Market } from './i18n'
+import { locale, pct, priceText, type Market, useT } from './i18n'
 import { mergeResultsByCard } from './results'
 import { learningUsableIn, useCountryApply } from './countryApply'
 import { myName } from './history'
@@ -150,7 +150,6 @@ interface Props {
   onOpenResult: (id: string) => void
 }
 
-const pct = (v: number | null | undefined, digits = 1) => (v == null ? '—' : `${(v * 100).toFixed(digits)}%`)
 /** 率の差(ポイント) */
 const pt = (v: number | null | undefined, digits = 1) => (v == null ? '—' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}pt`)
 /** 金額。1 人あたりは、円でも小数 1 桁まで出す(数円の差を見るため) */
