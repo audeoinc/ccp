@@ -613,6 +613,25 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {/* 保存の様子をいつも出す: 保存中… / 未保存 / 保存済み · 12:03(入力が止まって約 1.5 秒で自動で保存する) */}
             {e.saving ? (
               <Spinner size="extra-tiny" label={t('保存中…', 'Saving…')} labelPosition="after" />
+            ) : e.saveConflict ? (
+              // ほかの人が先に保存していた: 黙って上書きせず、どうするかを聞く
+              <span className={s.saveFailed}>
+                <Tooltip
+                  content={t(
+                    `ほかの人が、この配信を先に保存しました${e.saveConflict.at ? `(${e.saveConflict.at})` : ''}。上書きすると、その変更は消えます。閉じて読み直すと、ほかの人の中身を開けます(こちらの変更は消えます)`,
+                    `Someone else saved this delivery first${e.saveConflict.at ? ` (${e.saveConflict.at})` : ''}. Overwriting discards their changes; closing and reloading discards yours.`,
+                  )}
+                  relationship="description"
+                >
+                  <span className={s.saveFailedText}>{t('ほかの人が先に保存しました', 'Someone else saved first')}</span>
+                </Tooltip>
+                <Button type="button" size="small" appearance="subtle" onClick={e.saveConflict.overwrite}>
+                  {t('上書きする', 'Overwrite')}
+                </Button>
+                <Button type="button" size="small" appearance="subtle" onClick={e.saveConflict.reload}>
+                  {t('閉じて読み直す', 'Close and reload')}
+                </Button>
+              </span>
             ) : e.saveError ? (
               // 保存の失敗は、作業している所から見える上の帯に(以前はペインのいちばん下で、画面の外になっていた)
               <span className={s.saveFailed}>

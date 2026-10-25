@@ -132,6 +132,8 @@ export interface SimpleEditor {
   savedAt?: string
   /** 保存の失敗(上の帯に「保存できませんでした・再試行」) */
   saveError: string | null
+  /** ほかの人が先に保存していた(上の帯で、上書きする / 閉じて読み直す) */
+  saveConflict: { at: string; overwrite: () => void; reload: () => void } | null
   retrySave: () => void
   /** 確定した週の、変えた理由の入力欄(上の帯の保存のボタンの下の Popover に出す) */
   reasonOpen: boolean

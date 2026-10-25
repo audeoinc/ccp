@@ -60,6 +60,14 @@ const cases = [
     steps: ['writeCard:not_started', 'saveAlertNotes', 'reload'],
   },
   {
+    name: 'ほかの人が先に保存していた(何も書かずに止める)',
+    input: { isNew: false, savedStatus: 'not_started', formStatus: 'not_started', approvedBefore: false, contentChanged: true },
+    conflict: true,
+    fail: 'checkConflict',
+    plan: { status: 'not_started', revoke: false, reopen: false, resetApproval: false, event: null },
+    steps: ['checkConflict'],
+  },
+  {
     name: '週を戻せなかった(承認の依頼・履歴・読み直しには進まない)',
     input: { isNew: false, savedStatus: 'confirmed', formStatus: 'confirmed', reason: '差し替え', approvedBefore: true, contentChanged: true },
     fail: 'reopenWeeks',
@@ -81,6 +89,7 @@ export async function checkSave(server) {
       if (c.fail === name) throw new Error('fail')
     }
     const io = {
+      checkConflict: c.conflict ? step('checkConflict') : null,
       writeCard: async (status) => {
         log.push(`writeCard:${status}`)
         return 'card-1'
@@ -105,7 +114,14 @@ export async function checkSave(server) {
     if (failed !== !!c.fail) problems.push(`「${c.name}」: ${failed ? '途中で止まった' : '止まらなかった'}`)
     if (JSON.stringify(log) !== JSON.stringify(c.steps)) problems.push(`「${c.name}」の順番: ${log.join(' → ')}(期待: ${c.steps.join(' → ')})`)
   }
-  return { problems, ok: `save flow OK(${cases.length} 例)`, title: '配信カードの保存の流れが、例と合いません' }
+  // ほかの人が保存したかの判定(どちらかが分からなければ比べない)
+  const stale = [
+    [undefined, '2026-10-25T03:00:00Z', false],
+    ['2026-10-25T03:00:00Z', '2026-10-25T03:00:00Z', false],
+    ['2026-10-25T03:00:00Z', '2026-10-25T03:05:00Z', true],
+  ]
+  for (const [base, cur, expect] of stale) if (m.isStale(base, cur) !== expect) problems.push(`isStale(${base}, ${cur}): ${!expect}(期待: ${expect})`)
+  return { problems, ok: `save flow OK(${cases.length + stale.length} 例)`, title: '配信カードの保存の流れが、例と合いません' }
 }
 
 // 単独で流したとき

@@ -27,7 +27,7 @@ import { isUsableHero } from './heroRights'
 import { encodeAbTest, ownsProducts, ownsSubject, ownsTemplate, type VariantKey } from './abTest'
 import { useAbVariants, type VariantData } from './useAbVariants'
 import { STATUS_APPROVED, STATUS_NOT_STARTED, toForm, type Form } from './cardForm'
-import { planSave, runSave, type SaveAfter } from './saveFlow'
+import { SaveConflictError, isStale, planSave, runSave, type SaveAfter } from './saveFlow'
 
 /** 読み込み時点の配信商品の行(保存時の差分判定用) */
 export interface RowSnap {
@@ -103,7 +103,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const [justSaved, setJustSaved] = useState(false)
   // 保存の失敗(AI などのエラーとは分ける。シンプルな配信カードは上の帯に「保存できませんでした・再試行」)。
   // key は失敗したときの中身(同じ中身のままなら、自動の保存で何度もやり直さない)
-  const [saveError, setSaveError] = useState<{ message: string; key: string } | null>(null)
+  // conflict: ほかの人が先に保存していた(上書きするか、閉じて読み直すかを聞く。at はその日時)
+  const [saveError, setSaveError] = useState<{ message: string; key: string; conflict?: { at?: string } } | null>(null)
   // 最後に保存した日時(上の帯の「保存済み · 12:03」。開いたときは、配信の最後の更新)
   const [savedAt, setSavedAt] = useState<string | undefined>(card?.modified_on)
   // 保存中の、保存のあとにすること(どのボタンの文字を「保存中...」にするか。保存していないときは null)
@@ -532,7 +533,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
    * 承認・差し戻しそのものは、ここではなく ApprovalBar(サーバーの窓口 /api/approvals)で行う(U4)。
    * after: 保存のあとに、閉じる / 開いたまま続ける / 次の配信を開く(次がなければ閉じる)
    */
-  async function save({ after, reason }: { after: SaveAfter; reason?: string }): Promise<boolean> {
+  async function save({ after, reason, force = false }: { after: SaveAfter; reason?: string; force?: boolean }): Promise<boolean> {
     const startKey = contentKey()
     let editedDuring = false
     setSaving(true)
@@ -552,6 +553,14 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
       const status = plan.status
       const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
       const cardId = await runSave(plan, !card, {
+        // ほかの人が、開いてから(前に保存してから)この配信を保存していたら、書かずに止める(黙って上書きしない。上書きは force)
+        checkConflict:
+          card && !force
+            ? async () => {
+                const cur = await DeliveryCardsService.get(card.id)
+                if (cur.success && isStale(card.modified_on, cur.data?.modified_on)) throw new SaveConflictError(cur.data?.modified_on)
+              }
+            : null,
         writeCard: async () => {
           const res = card ? await DeliveryCardsService.update(card.id, fields) : await DeliveryCardsService.create({ ...fields, state_code: 0 })
           if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
@@ -620,7 +629,9 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
       else onBack()
       return true
     } catch (err) {
-      setSaveError({ message: err instanceof Error ? err.message : String(err), key: startKey })
+      if (err instanceof SaveConflictError)
+        setSaveError({ message: tr('ほかの人が、この配信を先に保存しました', 'Someone else saved this delivery first'), key: startKey, conflict: { at: err.at } })
+      else setSaveError({ message: err instanceof Error ? err.message : String(err), key: startKey })
       return false
     } finally {
       setSaving(false)

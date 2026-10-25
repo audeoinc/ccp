@@ -48,8 +48,23 @@ export function planSave(i: SaveInput): SavePlan {
   return { status, revoke, reopen, resetApproval, event }
 }
 
+/** ほかの人が、開いてから(前に保存してから)この配信を保存していた(黙って上書きしないよう、書く前に止める) */
+export class SaveConflictError extends Error {
+  /** ほかの人が保存した日時(ISO) */
+  at?: string
+  constructor(at?: string) {
+    super('conflict')
+    this.at = at
+  }
+}
+
+/** 開いた(前に保存した)ときの更新日時 base と、いまのサーバーの更新日時 current が違えば、ほかの人が保存している。どちらかが分からなければ、比べない */
+export const isStale = (base?: string | null, current?: string | null) => !!base && !!current && base !== current
+
 /** 保存の読み書き(呼ぶ側が、サーバーの窓口とつなぐ)。失敗は例外で知らせる(そこで止める) */
 export interface SaveIO {
+  /** 書く前に、ほかの人が先に保存していないかを確かめる(していれば SaveConflictError。上書きするときと新規作成は null) */
+  checkConflict: (() => Promise<void>) | null
   /** 配信カードを書く(新規作成なら作る)。配信の id を返す */
   writeCard: (status: string | undefined) => Promise<string>
   /** 商品の行を、開いた時点との差分で書く(開いた時点の行を読めていないときは null。消してしまわないように書かない) */
@@ -72,6 +87,7 @@ export interface SaveIO {
 
 /** 決めたことを、決まった順に行う。保存した配信の id を返す */
 export async function runSave(plan: SavePlan, isNew: boolean, io: SaveIO): Promise<string> {
+  if (io.checkConflict) await io.checkConflict()
   const cardId = await io.writeCard(plan.status)
   if (io.syncItems) await io.syncItems(cardId)
   if (isNew) io.created(cardId)

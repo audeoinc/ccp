@@ -672,9 +672,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
-  const saveStaying = async (reason?: string, push = true) => {
+  const saveStaying = async (reason?: string, push = true, force = false) => {
     const before = committedSnap.current
-    const ok = await save({ after: 'stay', reason })
+    const ok = await save({ after: 'stay', reason, force })
     if (ok && push && before) undoStack.push(before)
   }
   /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
@@ -701,6 +701,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [changed])
+  // ほかの人が先に保存していたとき: 上書きする(確定した週なら、入れた理由で)か、閉じて読み直す(閉じると一覧を読み直すので、開き直すと、ほかの人の中身)
+  const overwriteSave = () => {
+    const reason = lockedWeeks.length > 0 && changeReason?.trim() ? changeReason : undefined
+    if (simpleOn) void saveStaying(reason, true, true)
+    else void save({ after: 'stay', reason, force: true })
+  }
+  const conflictTime = saveError?.conflict?.at ? new Date(saveError.conflict.at).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
   const applySimple = () => {
     if (saving) return
     // 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying)
@@ -908,9 +915,28 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </MessageBar>
     )}
     {/* 保存の失敗(シンプルな配信カードは、上の帯に出す) */}
-    {saveError && !simpleOn && (
+    {saveError && !simpleOn && !saveError.conflict && (
       <MessageBar layout="multiline" intent="error" className={styles.error}>
         <MessageBarBody>{saveError.message}</MessageBarBody>
+      </MessageBar>
+    )}
+    {/* ほかの人が先に保存していた(黙って上書きしない) */}
+    {saveError?.conflict && !simpleOn && (
+      <MessageBar layout="multiline" intent="warning" className={styles.error}>
+        <MessageBarBody>
+          {t(
+            `ほかの人が、この配信を先に保存しました${conflictTime ? `(${conflictTime})` : ''}。上書きすると、その変更は消えます。`,
+            `Someone else saved this delivery first${conflictTime ? ` (${conflictTime})` : ''}. Overwriting discards their changes.`,
+          )}
+        </MessageBarBody>
+        <MessageBarActions>
+          <Button size="small" disabled={saving} onClick={overwriteSave}>
+            {t('上書きする', 'Overwrite')}
+          </Button>
+          <Button size="small" appearance="primary" disabled={saving} onClick={onBack}>
+            {t('閉じて読み直す', 'Close and reload')}
+          </Button>
+        </MessageBarActions>
       </MessageBar>
     )}
     {/* 確定した週の、変えた理由の入力(シンプルな配信カードは、上の帯の保存のボタンの下に出す) */}
@@ -1032,6 +1058,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         justSaved,
         savedAt,
         saveError: saveError?.message ?? null,
+        saveConflict: saveError?.conflict ? { at: conflictTime, overwrite: overwriteSave, reload: onBack } : null,
         retrySave: applySimple,
         reasonOpen: changeReason !== null && lockedWeeks.length > 0,
         reasonForm,
