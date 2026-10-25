@@ -143,6 +143,8 @@ interface Props {
   section: CommSection
   /** 承認の様子のいちばん上に出す、送る前の確かめ(承認を依頼する前の一覧。出さないときは省く) */
   checks?: ReactNode
+  /** 変わったら読み直す(右上の Popover で承認の依頼・承認・差し戻しをしたとき。配信のステータスが変わらないことがあるため) */
+  refreshKey?: number
 }
 
 export type CommSection = 'talk' | 'approval' | 'history'
@@ -214,7 +216,7 @@ export function CommPane(props: Props) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
-  }, [load, version, card.status])
+  }, [load, version, card.status, props.refreshKey])
 
   // ---- 状態の道のりと、次に動く人
   const rank = statusRank(card.status)
@@ -434,7 +436,7 @@ export function CommPane(props: Props) {
           {props.checks}
           {props.canReview ? (
             // 依頼・取り下げ・相手ごとの状態(詳しい画面と同じ部品)
-            <ApprovalBar card={card} isDirty={props.isDirty} busy={props.busy} onChanged={async () => { await props.onChanged(); await load() }} />
+            <ApprovalBar card={card} isDirty={props.isDirty} busy={props.busy} refreshKey={props.refreshKey} onChanged={async () => { await props.onChanged(); await load() }} />
           ) : (
             <span className={s.muted}>{t('確定した週の配信は、承認の依頼を出しません', 'Approval requests are not available for a confirmed week')}</span>
           )}

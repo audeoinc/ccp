@@ -30,6 +30,7 @@ import { PREF } from '../prefKeys'
 import { getTemplate, slotsOf } from '../templates'
 import { statusRank } from '../status'
 import { ReadinessList } from './ReadinessList'
+import { ApprovalBar } from '../ApprovalBar'
 import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
 import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
@@ -401,6 +402,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, changes: 0 })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、バーのアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: CommCounts) => setCounts(c), [])
+  // 右上の Popover で承認の依頼・承認・差し戻しをしたら、左のパネル(やり取り・承認の様子)も読み直す
+  const [approvalTick, setApprovalTick] = useState(0)
   // 右上の青いボタンは、自分がやることがあるときだけ(SU11)。作った人 = 担当。担当が空か、自分の名前を決めていないときは、作った人とみなす(だれも出せなくならないように)
   const meName = useSyncExternalStore(onMeChange, myName)
   const author = !e.form.owner || !meName || e.form.owner === meName
@@ -739,8 +742,36 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 step={myStep}
                 issues={myStep === 'requestApproval' ? readinessIssues(approvalChecks) : myStep === 'requestProduction' ? readinessIssues(handoffChecks) : 0}
                 busy={e.saving}
-                // 承認は左のバーの「承認」、制作への依頼は「渡すもの」で行う。制作のページは、CardDetail の側
+                // 承認はボタンの真下の Popover でその場で(左のバーの「承認」でも)、制作への依頼は「渡すもの」で行う。制作のページは、CardDetail の側
                 onRun={(step) => (step === 'requestProduction' ? showSide('handoff', true) : step === 'requestApproval' || step === 'review' ? showSide('approval', true) : onRunNext(step))}
+                // 承認の処理は、パネルと同じ ApprovalBar(見せ方だけ quick)。保存していない変更は、依頼・承認の前に保存する
+                renderQuick={
+                  e.canReview
+                    ? (close) => (
+                        <ApprovalBar
+                          variant="quick"
+                          card={e.card}
+                          isDirty={isDirty}
+                          busy={e.saving}
+                          onChanged={async () => {
+                            await e.reload()
+                            setApprovalTick((n) => n + 1)
+                          }}
+                          onSave={onCommit}
+                          onDone={close}
+                          checks={
+                            <ReadinessList
+                              items={approvalChecks}
+                              onPick={(target) => {
+                                close()
+                                pickCheck(target)
+                              }}
+                            />
+                          }
+                        />
+                      )
+                    : undefined
+                }
               />
             )}
             {e.viewSwitch}
@@ -832,6 +863,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 canReview={e.canReview}
                 onOpenProduction={e.openProduction}
                 onCounts={onCounts}
+                refreshKey={approvalTick}
                 // 承認の前だけ(承認が済んだら、確かめは渡すものの側で)
                 checks={statusRank(e.form.status) < statusRank('approved') ? <ReadinessList items={approvalChecks} onPick={pickCheck} /> : undefined}
               />

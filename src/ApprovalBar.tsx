@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Badge, Button, Checkbox, Dropdown, Field, MessageBar, MessageBarBody, Option, Radio, RadioGroup, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowUndoRegular, CheckmarkCircleFilled, CircleRegular, DeleteRegular, DismissCircleFilled, PeopleTeamRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -43,6 +43,8 @@ const useStyles = makeStyles({
   box: { display: 'grid', rowGap: '8px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   boxActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
   groups: { display: 'grid', rowGap: '2px' },
+  // 右上の青いボタンの真下の Popover(その場で済ませる分だけ)
+  quick: { display: 'grid', rowGap: '10px', width: '340px', maxWidth: 'calc(100vw - 32px)' },
 })
 
 interface Props {
@@ -54,6 +56,19 @@ interface Props {
   busy: boolean
   /** 依頼・承認のあとに、配信カードを読み直す(ステータスが変わるため) */
   onChanged: () => Promise<void>
+  /**
+   * 見せ方。panel = 経緯と相手ごとの状態も出す(ふだん)。quick = 右上の青いボタンの真下の Popover で、その場で済ませる分だけ
+   * (承認を依頼する: 相手・ひとこと・送る前の確かめ / 承認する・差し戻す: ひとこと + 2 つのボタン。simple-ui-review-1 の 8)
+   */
+  variant?: 'panel' | 'quick'
+  /** quick のとき: 依頼の入力の上に出す、送る前の確かめ */
+  checks?: ReactNode
+  /** quick のとき: 済んだ・やめたとき(Popover を閉じる) */
+  onDone?: () => void
+  /** quick のとき: 保存していない変更があれば、依頼・承認の前に保存する(ないときは、先に保存してもらう) */
+  onSave?: () => Promise<void>
+  /** 変わったら読み直す(ほかの所(右上の Popover)で承認・差し戻しをしたとき。配信のステータスが変わらないことがあるため) */
+  refreshKey?: number
 }
 
 const LIVE = new Set<string>(['open', 'approved', 'changes_requested'])
@@ -64,7 +79,8 @@ const subscribeMe = (f: () => void) => onMeChange(f)
  * 左ペインの「ステータス」の直下に置き、配信の状態(承認済み / 承認待ち)と承認の経緯が同じ場所で読めるようにする。
  * 依頼・承認・差し戻し・取り下げは、サーバーの窓口(ApprovalsService)で行う(本人の確かめと、まとめての更新のため)
  */
-export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
+export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel', checks, onDone, onSave, refreshKey }: Props) {
+  const quick = variant === 'quick'
   const s = useStyles()
   const t = useT()
   const people = usePeople()
@@ -99,7 +115,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
-  }, [load, card.status])
+  }, [load, card.status, refreshKey])
 
   const actor = { id: meId, name: meName }
   const weekStart = card.scheduled_at ? weekKeyOf(new Date(card.scheduled_at)) : undefined
@@ -113,11 +129,14 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
     setWorking(true)
     setError(null)
     try {
+      // その場で済ませるときは、保存していない変更を先に保存する(パネルの方は、先に保存してもらう)
+      if (onSave && isDirty()) await onSave()
       const r = await f()
       if (!r.success) throw new Error(r.error?.message ?? tr('うまくいきませんでした', 'Something went wrong'))
       setMode('idle')
       await load()
       await onChanged()
+      onDone?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -143,9 +162,20 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
     ? t('ユーザーが登録されていないので、承認の依頼は使えません(⚙ →「ユーザーと承認グループ」)', 'No users are registered, so approval requests are not available (⚙ → Users and approval groups)')
     : needMe
       ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right first')
-      : dirty
+      : dirty && !onSave
         ? t('変更があります。先に保存してください', 'There are unsaved changes. Save first.')
         : null
+
+  // quick では、依頼できるなら、開いたらすぐ依頼の入力(既定の相手を入れて)にする。読み込みが済んでから 1 回だけ
+  const canRequest = requests !== null && live?.status !== 'open' && live?.status !== 'approved'
+  const opened = useRef(false)
+  useEffect(() => {
+    if (!quick || opened.current || !canRequest || !people.loaded) return
+    opened.current = true
+    openRequest()
+    // openRequest は、いまの people・国で既定を入れる(1 回だけなので、依存に入れない)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quick, canRequest, people.loaded])
 
   const decisionIcon = (d?: string | null) =>
     d === 'approved' ? <CheckmarkCircleFilled className={s.ok} /> : d === 'changes_requested' ? <DismissCircleFilled className={s.ng} /> : <CircleRegular className={s.pending} />
@@ -174,6 +204,100 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
       </Button>
     </Tooltip>
   )
+
+  // 依頼の入力(相手と決まり・ひとこと)。パネルと Popover で同じものを使う
+  const requestFields = (
+    <>
+    <Field label={t('決まり', 'Rule')} size="small">
+      <RadioGroup value={rule} onChange={(_, d) => setRule(d.value as ApprovalRequestRule)}>
+        <Radio value="all" label={t('全員(指名したそれぞれから 1 人ずつ)', 'Everyone (one from each)')} />
+        <Radio value="any" label={t('1 人(だれか 1 人でよい)', 'Any one')} />
+      </RadioGroup>
+    </Field>
+    <Field label={t('承認グループ', 'Approval groups')} size="small">
+      <div className={s.groups}>
+        {countryGroups.map((g) => (
+          <Checkbox key={g.id} size="medium" label={g.description ? `${g.name} — ${g.description}` : g.name} checked={groupIds.includes(g.id)} onChange={(_, d) => setGroupIds((x) => (d.checked ? [...x, g.id] : x.filter((id) => id !== g.id)))} />
+        ))}
+        {countryGroups.length === 0 && <span className={s.note}>{t('承認グループがありません', 'No approval groups')}</span>}
+      </div>
+    </Field>
+    <Field label={t('承認者(人を直接指名)', 'Approvers (named people)')} size="small">
+      <Dropdown
+        size="small"
+        multiselect
+        placeholder={t('選ぶ', 'Choose')}
+        value={activeUsers(people).filter((u) => userIds.includes(u.id)).map((u) => u.name).join(', ')}
+        selectedOptions={userIds}
+        onOptionSelect={(_, d) => setUserIds(d.selectedOptions)}
+      >
+        {activeUsers(people)
+          .map((u) => (
+            <Option key={u.id} value={u.id} text={u.name}>{u.name}</Option>
+          ))}
+      </Dropdown>
+    </Field>
+    <Field label={t('ひとこと(任意)', 'Note (optional)')} size="small">
+      <AutoTextarea heightKey="ApprovalBar.note" rows={1} size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: 金曜の配信なので、木曜までにお願いします', 'e.g. Goes out Friday, please review by Thursday')} />
+    </Field>
+    </>
+  )
+  const sendRequest = () => void run(() => ApprovalsService.request({ delivery_card_id: card.id, actor, rule, group_ids: groupIds, user_ids: userIds, note: note.trim() || undefined, week_start: weekStart }))
+  const approve = async (comment?: string) => {
+    // 自分の依頼を自分で承認する(先に進めたいとき。2026-10-19 から認めた)ときは、念のため確かめる
+    if (isRequester && !(await confirmDialog(t(`自分で依頼した配信を、${firstSlot} として自分で承認します。よろしいですか?`, `Approve your own request as ${firstSlot}?`)))) return
+    void run(() => ApprovalsService.decide(live!.id, { actor, decision: 'approved', reviewer_id: eligible[0], note: comment, week_start: weekStart }))
+  }
+  const sendBack = () => void run(() => ApprovalsService.decide(live!.id, { actor, decision: 'changes_requested', reviewer_id: eligible[0], note: reason.trim(), week_start: weekStart }))
+
+  if (quick) {
+    const reviewing = live?.status === 'open' && eligible.length > 0
+    return (
+      <div className={s.quick}>
+        {requests === null || !people.loaded ? (
+          <Spinner size="tiny" />
+        ) : reviewing ? (
+          <>
+            <span className={s.note}>{t(`あなたは ${firstSlot} として承認できます`, `You can approve as ${firstSlot}`)}</span>
+            {live?.note && <span className={s.note}>{t(`依頼のひとこと: ${live.note}`, `Request note: ${live.note}`)}</span>}
+            <Field label={t('ひとこと(差し戻すときは、理由を必ず)', 'Note (required to request changes)')} size="small">
+              <AutoTextarea heightKey="ApprovalBar.quick" rows={2} size="small" autoFocus value={reason} onChange={(_, d) => setReason(d.value)} placeholder={t('例: 前日のメールと商品がかぶっているので、入れ替えてください', 'e.g. Same products as the previous day. Please swap some.')} />
+            </Field>
+            {blockedBy && <span className={s.note}>{blockedBy}</span>}
+            <div className={s.boxActions}>
+              <Tooltip content={reason.trim() ? t('差し戻します(ひとことは理由として、コメントにも残ります)', 'Request changes (the note is saved as the reason)') : t('差し戻すときは、ひとことに理由を書いてください', 'Write the reason in the note to request changes')} relationship="description">
+                <Button type="button" size="small" icon={<ArrowUndoRegular />} disabled={disabled || !!blockedBy || !reason.trim()} onClick={sendBack}>
+                  {t('差し戻す', 'Request changes')}
+                </Button>
+              </Tooltip>
+              <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy} onClick={() => void approve(reason.trim() || undefined)}>
+                {t('承認する', 'Approve')}
+              </Button>
+            </div>
+          </>
+        ) : mode === 'request' ? (
+          <>
+            {checks}
+            {blockedBy && <span className={s.note}>{blockedBy}</span>}
+            {requestFields}
+            <div className={s.boxActions}>
+              <Button type="button" size="small" onClick={onDone} disabled={working}>{t('やめる', 'Cancel')}</Button>
+              <Button type="button" size="small" appearance="primary" icon={<SendRegular />} disabled={disabled || !!blockedBy || (groupIds.length === 0 && userIds.length === 0)} onClick={sendRequest}>
+                {t('承認を依頼する', 'Request approval')}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <span className={s.note}>{live?.status === 'open' ? t('承認を待っています', 'Waiting for approval') : live?.status === 'approved' ? t('承認されました', 'Approved') : (blockedBy ?? '')}</span>
+        )}
+        {error && (
+          <MessageBar intent="error" layout="multiline">
+            <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={s.root}>
@@ -227,11 +351,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
               <>
                 <span className={mergeClasses(s.note, s.wide)}>{t(`あなたは ${firstSlot} として承認できます`, `You can approve as ${firstSlot}`)}</span>
                 <Tooltip content={blockedBy ?? t(`${firstSlot} として承認します`, `Approve as ${firstSlot}`)} relationship="description">
-                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={async () => {
-                      // 自分の依頼を自分で承認する(先に進めたいとき。2026-10-19 から認めた)ときは、念のため確かめる
-                      if (isRequester && !(await confirmDialog(t(`自分で依頼した配信を、${firstSlot} として自分で承認します。よろしいですか?`, `Approve your own request as ${firstSlot}?`)))) return
-                      void run(() => ApprovalsService.decide(live.id, { actor, decision: 'approved', reviewer_id: eligible[0], week_start: weekStart }))
-                    }}>
+                  <Button type="button" size="small" appearance="primary" icon={<CheckmarkCircleFilled />} disabled={disabled || !!blockedBy || mode === 'reject'} onClick={() => void approve()}>
                     {t('承認', 'Approve')}
                   </Button>
                 </Tooltip>
@@ -258,38 +378,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
       )}
       {mode === 'request' && (
         <div className={s.box}>
-          <Field label={t('決まり', 'Rule')} size="small">
-            <RadioGroup value={rule} onChange={(_, d) => setRule(d.value as ApprovalRequestRule)}>
-              <Radio value="all" label={t('全員(指名したそれぞれから 1 人ずつ)', 'Everyone (one from each)')} />
-              <Radio value="any" label={t('1 人(だれか 1 人でよい)', 'Any one')} />
-            </RadioGroup>
-          </Field>
-          <Field label={t('承認グループ', 'Approval groups')} size="small">
-            <div className={s.groups}>
-              {countryGroups.map((g) => (
-                <Checkbox key={g.id} size="medium" label={g.description ? `${g.name} — ${g.description}` : g.name} checked={groupIds.includes(g.id)} onChange={(_, d) => setGroupIds((x) => (d.checked ? [...x, g.id] : x.filter((id) => id !== g.id)))} />
-              ))}
-              {countryGroups.length === 0 && <span className={s.note}>{t('承認グループがありません', 'No approval groups')}</span>}
-            </div>
-          </Field>
-          <Field label={t('承認者(人を直接指名)', 'Approvers (named people)')} size="small">
-            <Dropdown
-              size="small"
-              multiselect
-              placeholder={t('選ぶ', 'Choose')}
-              value={activeUsers(people).filter((u) => userIds.includes(u.id)).map((u) => u.name).join(', ')}
-              selectedOptions={userIds}
-              onOptionSelect={(_, d) => setUserIds(d.selectedOptions)}
-            >
-              {activeUsers(people)
-                .map((u) => (
-                  <Option key={u.id} value={u.id} text={u.name}>{u.name}</Option>
-                ))}
-            </Dropdown>
-          </Field>
-          <Field label={t('ひとこと(任意)', 'Note (optional)')} size="small">
-            <AutoTextarea heightKey="ApprovalBar.note" rows={1} size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: 金曜の配信なので、木曜までにお願いします', 'e.g. Goes out Friday, please review by Thursday')} />
-          </Field>
+          {requestFields}
           <div className={s.boxActions}>
             <Button type="button" size="small" onClick={() => setMode('idle')} disabled={working}>{t('やめる', 'Back')}</Button>
             <Button
@@ -298,7 +387,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
               appearance="primary"
               icon={<SendRegular />}
               disabled={disabled || (groupIds.length === 0 && userIds.length === 0)}
-              onClick={() => void run(() => ApprovalsService.request({ delivery_card_id: card.id, actor, rule, group_ids: groupIds, user_ids: userIds, note: note.trim() || undefined, week_start: weekStart }))}
+              onClick={sendRequest}
             >
               {t('依頼する', 'Send request')}
             </Button>
@@ -318,7 +407,7 @@ export function ApprovalBar({ card, isDirty, busy, onChanged }: Props) {
               appearance="primary"
               icon={<ArrowUndoRegular />}
               disabled={disabled || !reason.trim()}
-              onClick={() => void run(() => ApprovalsService.decide(live.id, { actor, decision: 'changes_requested', reviewer_id: eligible[0], note: reason.trim(), week_start: weekStart }))}
+              onClick={sendBack}
             >
               {t('差し戻す', 'Send back')}
             </Button>
