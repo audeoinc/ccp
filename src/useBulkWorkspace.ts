@@ -405,9 +405,10 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     // 並行して作ると、同時に作っている配信のテーマが見えず、同じテーマになりやすい。
     // そこで、次の配信は、前の配信のテーマが決まってから始める(テーマのあとの工程は、並行して進む。useWeekFrames と同じ)。
     // 先に作った案(まだ保存していない)のテーマ・商品も避ける
+    // 作り直す案(regenerate)の前のテーマも避ける(同じ案に戻らないように)。商品は、作り直すと入れ替わるので、週の数には入れない
     const earlier = [...results.entries()].filter(([d]) => !discarded.has(d))
     const themes: string[] = earlier.map(([, r]) => r.theme ?? '').filter(Boolean)
-    const done: { id: string; scheduled_at?: string; products: string[] }[] = earlier.map(([d, r]) => ({ id: draftId(d), scheduled_at: baseOf(d).scheduled_at, products: productIdsOf(r) }))
+    const done: { id: string; scheduled_at?: string; products: string[] }[] = earlier.filter(([d]) => !list.includes(d)).map(([d, r]) => ({ id: draftId(d), scheduled_at: baseOf(d).scheduled_at, products: productIdsOf(r) }))
     let themeGate: Promise<void> = Promise.resolve()
     const worker = async () => {
       for (;;) {
@@ -466,6 +467,24 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   }
   const stop = () => {
     stopRef.current = true
+  }
+  /**
+   * ② この 1 本だけ、案を作り直す(まだ保存していない案・破棄した案だけ。保存したあとは、配信カードで直す)。
+   * 前の案は捨てる(案は保存しないので、戻す先は持たない)
+   */
+  async function regenerate(day: string) {
+    if (running || savedIds.has(day) || !results.has(day)) return
+    setResults((m) => {
+      const n = new Map(m)
+      n.delete(day)
+      return n
+    })
+    setDiscarded((s) => {
+      const n = new Set(s)
+      n.delete(day)
+      return n
+    })
+    await generate([day])
   }
 
   /** 次に確かめる、まだ保存も破棄もしていない案(いまの日の次から、なければ最初から) */
@@ -618,6 +637,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     results,
     running,
     generate,
+    regenerate,
     stop,
     started,
     reviewItems,

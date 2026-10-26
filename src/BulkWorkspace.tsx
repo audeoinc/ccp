@@ -23,6 +23,7 @@ import {
   Select,
   Spinner,
   SplitButton,
+  Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
@@ -546,8 +547,8 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
             <InfoLabel
               label={{ className: s.h3 }}
               info={t(
-                '保存するまでは、案はこの画面の中だけにあります。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」。保存した案は、下書き(未起案)になります。',
-                'Drafts live only in this window until saved. Use “Open & edit” to review or fix in the card, “Save” to keep as is, or “Discard” to drop. Saved drafts become regular drafts (Not started).',
+                '保存するまでは、案はこの画面の中だけにあります。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」、別の案がよければ「作り直す」(前の案は消えます)。保存した案は、下書き(未起案)になります。',
+                'Drafts live only in this window until saved. Use “Open & edit” to review or fix in the card, “Save” to keep as is, “Discard” to drop, or “Recreate” for another draft (the current one is replaced). Saved drafts become regular drafts (Not started).',
               )}
             >
               {t('できた案', 'Drafts')}
@@ -626,6 +627,19 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
             // 直すことがあれば、主のボタンを「開いて直す」にして、上限を超えた商品を選んだ状態で開く
             const fixFocus = is.over[0]
             const open = () => (item.state === 'saved' ? onOpen(c.id, fixFocus) : onOpenDraft(day, fixFocus))
+            // この 1 本だけ、別の案に作り直す(まだ保存していない案・破棄した案だけ。ほかを作っている間は待つ)。
+            // 未保存のカードはボタンが 4 つ並ぶので、破棄・作り直すは印だけにし、名前は Tooltip で出す(カードの幅で折り返さないように)
+            const regenLabel = ws.running ? t('作り直す(ほかの案を作り終えてから使えます)', 'Recreate (after the other drafts finish)') : t('作り直す(前の案は消えます)', 'Recreate (replaces this draft)')
+            const regen = (compact: boolean) =>
+              compact ? (
+                <Tooltip content={regenLabel} relationship="label">
+                  <Button size="small" appearance="subtle" icon={<AiIcon />} disabled={busy || ws.running} onClick={() => void ws.regenerate(day)} />
+                </Tooltip>
+              ) : (
+                <Button size="small" appearance="subtle" icon={<AiIcon />} disabled={busy || ws.running} title={regenLabel} onClick={() => void ws.regenerate(day)}>
+                  {t('作り直す', 'Recreate')}
+                </Button>
+              )
             return (
               <div key={day} className={mergeClasses(s.card, item.state === 'saved' && s.cardSaved, item.state === 'discarded' && s.cardOff)}>
                 {head}
@@ -662,15 +676,26 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                 </div>
                 <div className={s.cardActions}>
                   {item.state === 'discarded' ? (
-                    <Button size="small" onClick={() => ws.undoDiscard(day)}>
-                      {t('破棄を取り消す', 'Undo discard')}
-                    </Button>
+                    <>
+                      <Button size="small" onClick={() => ws.undoDiscard(day)}>
+                        {t('破棄を取り消す', 'Undo discard')}
+                      </Button>
+                      <span className={s.spacer} />
+                      {regen(false)}
+                    </>
                   ) : (
                     <>
                       {/* 保存したあとは、保存した配信を消すので「削除」。まだ保存していない案は、画面から外すだけなので「破棄」(印の決まり: 削除だけ Delete) */}
-                      <Button size="small" appearance="subtle" icon={item.state === 'saved' ? <DeleteRegular /> : <DismissRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
-                        {item.state === 'saved' ? t('削除', 'Delete') : t('破棄', 'Discard')}
-                      </Button>
+                      {item.state === 'saved' ? (
+                        <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
+                          {t('削除', 'Delete')}
+                        </Button>
+                      ) : (
+                        <Tooltip content={t('破棄(この案は保存しません)', 'Discard (don’t save this draft)')} relationship="label">
+                          <Button size="small" appearance="subtle" icon={<DismissRegular />} disabled={busy} onClick={() => void ws.discard(day)} />
+                        </Tooltip>
+                      )}
+                      {item.state === 'unsaved' && regen(true)}
                       <span className={s.spacer} />
                       {item.state === 'unsaved' && (
                         <Button size="small" icon={busy ? <Spinner size="extra-tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(day)}>
