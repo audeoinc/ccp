@@ -86,6 +86,11 @@ export function effectivePart(p: TablePart, pc?: PartContent): TablePart {
   return { ...p, text: partText(p, pc) || undefined, src: img.src, alt: img.alt, ...(img.src !== p.src ? { imageId: pc[p.id]?.imageId } : {}) }
 }
 
+/** テンプレートの部品を ID で探す(ヒーローの下の表も含む) */
+export function findPart(layout: Pick<TemplateLayout, 'sections' | 'heroTable'>, id: string): TablePart | undefined {
+  return [...(layout.heroTable ? [layout.heroTable] : []), ...layout.sections].flatMap((sec) => partsOf(sec)).find((p) => p.id === id)
+}
+
 /** テンプレート(表の部品)の中の、配信ごとに書き換えてよい部品 */
 export function rewritableParts(layout: Pick<TemplateLayout, 'sections' | 'heroTable'>): TablePart[] {
   return [...(layout.heroTable ? [layout.heroTable] : []), ...layout.sections].flatMap((sec) => partsOf(sec)).filter((p) => canRewriteText(p) || canSwapImage(p))
