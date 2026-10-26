@@ -50,6 +50,10 @@ const useStyles = makeStyles({
   // 部品のペインは狭いので、横にはみ出してスクロールさせず、折り返して全部の選び方を見せる
   tabs: { flexWrap: 'wrap', padding: '2px 4px 0', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   body: { display: 'grid', rowGap: '10px', padding: '12px', minWidth: 0 },
+  // 枠と見出しのない形(商品のフロートの中。フロートが枠と題を持つので、枠の中にもう 1 つ枠を作らない)
+  bare: { border: 'none', borderRadius: 0, boxShadow: 'none', backgroundColor: 'transparent' },
+  bareTabs: { padding: 0 },
+  bareBody: { padding: '12px 0 0' },
 })
 
 export interface ChooseTab<V extends string> {
@@ -68,28 +72,32 @@ interface Props<V extends string> {
   onClose?: () => void
   /** ボタンから引き出した枠(ChooseDrawer の中で使う) */
   attached?: boolean
+  /** 枠と見出し(題・×)を出さず、タブと中身だけ(置いた所が枠と題を持つとき) */
+  bare?: boolean
   id?: string
 }
 
-export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, id }: Props<V>) {
+export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, bare, id }: Props<V>) {
   const s = useStyles()
   const t = useT()
   const [tab, setTab] = useState<V>(defaultTab ?? tabs[0].value)
   const current = tabs.find((x) => x.value === tab) ?? tabs[0]
   return (
-    <section id={id} className={mergeClasses(s.root, attached && s.attached)} aria-label={typeof title === 'string' ? title : undefined}>
-      <div className={s.head}>
-        <span className={s.title}>{title}</span>
-        {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} title={t('閉じる', 'Close')} />}
-      </div>
-      <TabList className={s.tabs} size="small" selectedValue={current.value} onTabSelect={(_, d) => setTab(d.value as V)}>
+    <section id={id} className={mergeClasses(s.root, attached && s.attached, bare && s.bare)} aria-label={typeof title === 'string' ? title : undefined}>
+      {!bare && (
+        <div className={s.head}>
+          <span className={s.title}>{title}</span>
+          {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} title={t('閉じる', 'Close')} />}
+        </div>
+      )}
+      <TabList className={mergeClasses(s.tabs, bare && s.bareTabs)} size="small" selectedValue={current.value} onTabSelect={(_, d) => setTab(d.value as V)}>
         {tabs.map((x) => (
           <Tab key={x.value} value={x.value} icon={x.icon}>
             {x.label}
           </Tab>
         ))}
       </TabList>
-      <div className={s.body} role="tabpanel">
+      <div className={mergeClasses(s.body, bare && s.bareBody)} role="tabpanel">
         {current.content}
       </div>
     </section>

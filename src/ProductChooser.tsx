@@ -7,6 +7,7 @@ import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { yen } from './items'
 import { productMarket } from './market'
+import { stockCover, useProductData } from './useProductData'
 import { tr, useT } from './i18n'
 import type { AiCard } from './aiSelect'
 import type { ReplacementCandidate } from './alertActions'
@@ -72,12 +73,18 @@ export function AiPicks({ hint, picks, hasFallback, onAsk, children }: { hint: s
 export function ProductLine({ product: p, fact }: { product?: Product; fact?: ReplacementCandidate }) {
   const t = useT()
   const s = useStyles()
+  // 在庫の持ち(詳しい情報の「在庫の持ち」と同じ計算。いまの商品と候補を見比べられるように。2026-10-26 利用者の決め)。売れていない・読めないときは出さない
+  const { data } = useProductData(p?.product_code)
+  const cover = data ? stockCover(data.weekly, p?.stock) : undefined
   return p ? (
     <span className={s.ideaRow}>
       <ImageThumb src={productImage(p)} alt={p.name} width={36} height={44} />
       <span style={{ display: 'grid', minWidth: 0 }}>
         <span className={s.name}>{p.name}</span>
-        <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '—'}`, `Stock ${p.stock ?? '—'}`)}`}</span>
+        <span className={s.meta}>
+          {`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '—'}`, `Stock ${p.stock ?? '—'}`)}`}
+          {cover !== undefined && t(` ・ 在庫の持ち 約${cover}週`, ` · ~${cover} wk of stock`)}
+        </span>
         {fact && (
           <span className={s.meta}>
             {fact.weeksLeft !== undefined && t(`配信日に ${fact.weeksLeft.toFixed(1)} 週分 ・ `, `${fact.weeksLeft.toFixed(1)} wks on the day · `)}
@@ -92,8 +99,8 @@ export function ProductLine({ product: p, fact }: { product?: Product; fact?: Re
 type Frame =
   /** 対象の真下のボタンから引き出す(シンプルな配信カード) */
   | { kind: 'drawer'; open: boolean; onOpenChange: (open: boolean) => void; label: ReactNode; icon?: ReactElement }
-  /** 枠だけ(開くボタンは呼ぶ側。onClose がなければ × を出さない) */
-  | { kind: 'panel'; onClose?: () => void }
+  /** 枠だけ(開くボタンは呼ぶ側。onClose がなければ × を出さない。bare = 枠と見出しも出さない) */
+  | { kind: 'panel'; onClose?: () => void; bare?: boolean }
 
 interface Props {
   title: ReactNode
@@ -210,6 +217,6 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       ),
     },
   ]
-  if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} />
+  if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} bare={frame.bare} />
   return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} />
 }

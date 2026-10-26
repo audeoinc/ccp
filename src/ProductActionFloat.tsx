@@ -8,7 +8,7 @@ import type { DeliveryProductSource as Source } from './models/deliveryProducts'
 import type { CardAlert, CardAlertKind } from './cardAlerts'
 import type { StockModel } from './alerts'
 import { replacementCandidates, type ReplacementCandidate } from './alertActions'
-import { ProductChooser } from './ProductChooser'
+import { ProductChooser, ProductLine } from './ProductChooser'
 import type { AiCard } from './aiSelect'
 import { ProductDetail } from './ProductDetail'
 import { LowStockBadge } from './ProductMarks'
@@ -49,6 +49,9 @@ const useStyles = makeStyles({
   alert: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '10px', rowGap: '6px', padding: '8px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteDarkOrangeBackground1, border: `1px solid ${tokens.colorPaletteDarkOrangeBorder1}` },
   alertText: { display: 'grid', rowGap: '2px', flexGrow: 1, minWidth: 0 },
   alertDetail: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
+  // 入れ替えの画面のいちばん上の、いまの商品の 1 行
+  now: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
+  nowLabel: { ...typo.label, flexShrink: 0 },
   // 中身(詳しい情報・入れ替え)は、この中でスクロールする
   pane: { display: 'grid', alignContent: 'start', rowGap: '10px', overflowY: 'auto', minHeight: 0, flexGrow: 1, paddingRight: '6px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.heading },
@@ -181,7 +184,14 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                 drag.current = null
               }}
             >
-              <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と入れ替え', 'Product details and replace')}{product ? ` — ${product.name}` : ''}</span>
+              {/* 題は短く: 詳しい情報では商品名だけ、入れ替えでは「○○を入れ替える」(2026-10-26 利用者の決め) */}
+              <span className={s.grabTitle}>
+                {alert
+                  ? `${t('このアラートへの対応', 'Handle this alert')}${product ? ` — ${product.name}` : ''}`
+                  : product && view === 'swap'
+                    ? t(`${product.name} を入れ替える`, `Replace ${product.name}`)
+                    : (product?.name ?? t('商品', 'Product'))}
+              </span>
               {productUrl(product) && <OpenLink url={productUrl(product)} label={t('商品ページ', 'Product page')} />}
               {canSwap && view === 'detail' && (
                 <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={() => setView('swap')}>
@@ -238,6 +248,11 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     {t('詳しい情報に戻る', 'Back to details')}
                   </Button>
                 </span>
+                {/* いまの商品を、候補の行と同じ並びで 1 行(見比べられるように) */}
+                <div className={s.now}>
+                  <span className={s.nowLabel}>{t('いま', 'Now')}</span>
+                  <ProductLine product={product} />
+                </div>
                 {renderSwap ? (
                   // シンプルな配信カード: どの入口でも同じ引き出し(simple/ProductSwap)を、そのまま使う
                   renderSwap(() => setView('detail'), onClose)
@@ -245,7 +260,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                   // 詳しい画面・アラート: 同じ形の、選び直す枠(ProductChooser)。押すと、すぐ入れ替える
                   <ProductChooser
                     title={t(`「${product.name}」を入れ替える`, `Replace "${product.name}"`)}
-                    frame={{ kind: 'panel' }}
+                    frame={{ kind: 'panel', bare: true }}
                     card={aiCard()}
                     angle={angle}
                     current={product}

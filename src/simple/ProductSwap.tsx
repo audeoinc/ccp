@@ -29,12 +29,12 @@ interface Props {
   onDone?: (newKey: string) => void
   /** false = 開くボタンは行の側にあるので、枠だけを出す */
   trigger?: boolean
-  /** false = 枠の右上の × を出さない(商品のフロートの中。戻るのは「← 詳しい情報に戻る」だけにする。2026-10-26 利用者の決め) */
-  closable?: boolean
+  /** 枠と題・× を出さない(商品のフロートの中。フロートが題を持ち、戻るのは「← 詳しい情報に戻る」だけ。2026-10-26 利用者の決め) */
+  bare?: boolean
 }
 
 /** 商品の入れ替えの引き出し。trigger のときは「入れ替える」のボタンと、その真下から引き出す枠 */
-export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, setChat, onDone, trigger = true, closable = true }: Props) {
+export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, setChat, onDone, trigger = true, bare = false }: Props) {
   const t = useT()
   const key = partKey({ kind: 'product', itemKey })
   const it = e.items.find((i) => i.key === itemKey)
@@ -52,7 +52,7 @@ export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, set
     <ProductChooser
       key={key}
       title={current ? t(`「${current.name}」を入れ替える`, `Replace "${current.name}"`) : t('この枠の商品を入れ替える', 'Replace this product')}
-      frame={trigger ? { kind: 'drawer', open, onOpenChange, label: t('入れ替える', 'Replace'), icon: <ArrowSwapRegular /> } : { kind: 'panel', onClose: closable ? () => onOpenChange(false) : undefined }}
+      frame={trigger ? { kind: 'drawer', open, onOpenChange, label: t('入れ替える', 'Replace'), icon: <ArrowSwapRegular /> } : { kind: 'panel', onClose: () => onOpenChange(false), bare }}
       card={e.aiCard()}
       angle={e.form.copyAngle}
       current={current}
@@ -94,7 +94,7 @@ export function FloatSwap({ store, itemKey, back, close }: { store: LiveStore; i
         v.onSwapped(itemKey, k)
       }}
       trigger={false}
-      closable={false}
+      bare
     />
   )
 }

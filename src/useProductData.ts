@@ -25,10 +25,28 @@ export interface ProductData {
 
 // 同じ商品を開き直したときに、取り直さない(画面を開いている間だけ有効)
 const cache = new Map<string, ProductData>()
+// 読んでいる途中のもの(詳しい情報と、入れ替えの行の在庫の持ちが、同じ商品を同時に読んでも 1 回にする)
+const loading = new Map<string, Promise<ProductData>>()
 
 /** BigQuery から取り込んだあとに、覚えておいた週次実績を捨てる(開き直したときに、新しい値を読むように) */
 export function clearProductDataCache(): void {
   cache.clear()
+  loading.clear()
+}
+
+/** 在庫の持ち(いまの在庫で何週分売れるか。直近 4 週の平均の販売数で割る)。売れていない・在庫が分からないときは undefined */
+export function stockCover(weekly: WeeklyPoint[], fallbackStock?: number): number | undefined {
+  const last4 = weekly.slice(-4).reduce((n, w) => n + w.units, 0)
+  const latestStock = weekly.length > 0 ? weekly[weekly.length - 1].stock : fallbackStock
+  return last4 > 0 && latestStock !== undefined ? Math.round((latestStock / (last4 / 4)) * 10) / 10 : undefined
+}
+
+function loadShared(code: string): Promise<ProductData> {
+  const going = loading.get(code)
+  if (going) return going
+  const p = load(code).finally(() => loading.delete(code))
+  loading.set(code, p)
+  return p
 }
 
 async function load(code: string): Promise<ProductData> {
@@ -71,7 +89,7 @@ export function useProductData(code?: string) {
   useEffect(() => {
     if (!code || cache.has(code)) return
     let cancelled = false
-    load(code)
+    loadShared(code)
       .then((data) => {
         cache.set(code, data)
         if (!cancelled) setState({ data, loading: false })

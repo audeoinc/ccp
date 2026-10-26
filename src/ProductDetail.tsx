@@ -8,7 +8,7 @@ import { yen } from './items'
 import { optionLabel, useT } from './i18n'
 import { productMarket } from './market'
 import { MiniChart } from './MiniChart'
-import { useProductData } from './useProductData'
+import { useProductData, stockCover } from './useProductData'
 import { ProductMetrics } from './ProductMetrics'
 import { ProductSkus } from './ProductSkus'
 import { PaneSpinner } from './PaneSpinner'
@@ -58,8 +58,7 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
   const last4 = weekly.slice(-4).reduce((n, w) => n + w.units, 0)
   const prev4 = weekly.slice(-8, -4).reduce((n, w) => n + w.units, 0)
   const change = prev4 > 0 ? Math.round(((last4 - prev4) / prev4) * 100) : undefined
-  const latestStock = weekly.length > 0 ? weekly[weekly.length - 1].stock : p.stock
-  const cover = last4 > 0 && latestStock !== undefined ? Math.round((latestStock / (last4 / 4)) * 10) / 10 : undefined
+  const cover = stockCover(weekly, p.stock)
   const revenue = weekly.reduce((n, w) => n + w.revenue, 0)
 
   return (
