@@ -349,7 +349,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       setRows((m) => {
         const n = new Map(m)
         for (const x of names) {
-          const cur = n.get(x.id) ?? { name: '', themeType: '' }
+          // まだ触っていない行は、型の既定の種類から始める(空で始めると、型の種類が消えるため)
+          const cur = n.get(x.id) ?? rowOf(x.id)
           // 種類は、人がまだ選んでいない行だけ、AI の案で埋める(人が選んだ種類は変えない)
           const fill = !cur.themeType && !!x.themeType
           n.set(x.id, { ...cur, ...(keepNames && cur.name.trim() ? {} : { name: x.name, nameReason: x.reason }), ...(fill ? { themeType: x.themeType, typeByAi: true } : {}) })
