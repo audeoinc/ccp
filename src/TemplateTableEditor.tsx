@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Checkbox, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Portal, Select, Slider, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, SettingsRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownRegular, ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, MoreHorizontalRegular, SettingsRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
@@ -9,7 +9,7 @@ import { getUiScale } from './uiScale'
 import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
-import { elementClickable, elementDesc, partContent, partElements } from './elements'
+import { elementClickable, elementDesc, elementLabel, partContent, partElements } from './elements'
 import { STAR_COLOR } from './swatches'
 
 // テンプレートの編集画面の、表の部分(T8。docs/TEMPLATE_OBJECTS.md の 5.2。触れる試作で利用者と決めた形)。
@@ -41,6 +41,18 @@ const CANVAS_ZOOM_KEY = 'ccp.templateCanvasZoom'
 const SAMPLES_KEY = 'ccp.templateCanvasSamples'
 
 const useStyles = makeStyles({
+  // ---- 右のタブの設定のまとまり(見出し付き・畳める)と、2〜3 択の横並びのボタン(2026-10-26 利用者が見本を見て決めた)
+  grp: { display: 'grid', rowGap: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: '10px', paddingBottom: '2px', ':first-child': { borderTop: 'none', paddingTop: '2px' } },
+  grpHead: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: 0, border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '13px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, textAlign: 'left' },
+  grpBody: { display: 'grid', rowGap: '10px', '& .fui-Field .fui-Field__label': { fontSize: '12px', color: tokens.colorNeutralForeground3 } },
+  grpWrap: { display: 'grid', rowGap: '12px' },
+  two: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
+  seg: { display: 'inline-flex', flexWrap: 'wrap', border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', justifySelf: 'start' },
+  segBtn: { border: 'none', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, padding: '3px 9px', fontSize: '12px', lineHeight: '18px', backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorNeutralForeground1, cursor: 'pointer', ':last-child': { borderRight: 'none' }, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  segOn: { backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand, ':hover': { backgroundColor: tokens.colorBrandBackgroundHover } },
+  hdActs: { display: 'inline-flex', alignItems: 'center', columnGap: '0px', flexShrink: 0 },
+  openRight: { justifySelf: 'start' },
+
   // ---- パーツ
   pal: { display: 'grid', rowGap: '4px', alignContent: 'start' },
   palHead: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginTop: '6px' },
@@ -844,55 +856,6 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
   }
 
   const patch = (sec: Section, p: TablePart, x: Partial<TablePart>) => replace(sec.id!, T.patchPart(sec, p.id, x))
-  /**
-   * 箱の設定(見本・見せ方・出すもの・価格の見せ方・バッジ・AI への一言)。右のタブと、キャンバスの ⚙(ダブルクリック)の両方で同じものを出す。
-   * 名前・価格の文言は、商品のデータから出すので、ここでは打たない
-   */
-  const alignField = (sec: Section, p: TablePart, fallback: TextAlign) => (
-    <Field label={t('揃え', 'Alignment')} size="small">
-      <div className={s.row2}>
-        {(['left', 'center', 'right'] as TextAlign[]).map((a) => {
-          const on = (p.align ?? fallback) === a
-          return (
-            <Button key={a} size="small" appearance={on ? 'primary' : 'outline'} aria-pressed={on} onClick={() => patch(sec, p, { align: a === fallback ? undefined : a })}>
-              {T.alignLabel(a)}
-            </Button>
-          )
-        })}
-      </div>
-    </Field>
-  )
-  /** 画像・動画の設定。画像は、部品の画像のライブラリから選ぶか URL を入れる。動画は URL を入れ、画像をサムネイルにする(メールでは動画を再生できないため) */
-  const mediaSettings = (sec: Section, p: TablePart) => (
-    <>
-      <Field label={t('画像(ライブラリから選ぶか、URL を入れる)', 'Image (pick from the library or enter a URL)')} size="small">
-        <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
-        <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
-      </Field>
-      <Field label={t('動画の URL(任意)', 'Video URL (optional)')} hint={t('メールでは動画は再生されません。上の画像をサムネイルにして ▶ を重ね、押すと動画のページを開きます', "Emails can't play video: the image above becomes the thumbnail with a ▶, linking to the video")} size="small">
-        <Input size="small" value={p.video ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { video: d.value.trim() || undefined })} />
-      </Field>
-      <Field label={t('代わりの文(画像が出ないとき)', 'Alt text (when images are off)')} size="small">
-        <Input size="small" value={p.alt ?? ''} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
-      </Field>
-      <Field label={t('形', 'Shape')} size="small">
-        <Select size="small" value={p.ratio ?? 'wide'} onChange={(_, d) => patch(sec, p, { ratio: d.value === 'wide' ? undefined : (d.value as MediaRatio) })}>
-          {MEDIA_RATIOS.map((r) => (
-            <option key={r} value={r}>{T.ratioLabel(r)}</option>
-          ))}
-        </Select>
-      </Field>
-      <Field label={t('押したときのリンク先の種類(実際の URL は配信ごと)', 'Link kind on click (the actual URL is set per delivery)')} size="small">
-        <Select size="small" value={p.link ?? 'campaign'} onChange={(_, d) => patch(sec, p, { link: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
-          {LINK_KINDS.map((k) => (
-            <option key={k} value={k}>{linkKindLabel(k)}</option>
-          ))}
-        </Select>
-      </Field>
-      {utmField(p)}
-      <Checkbox label={t('配信ごとに差し替える(キャンペーンのバナーなど)', 'Swap per delivery (e.g. campaign banners)')} checked={!!p.swap} onChange={(_, d) => patch(sec, p, { swap: d.checked === true || undefined })} />
-    </>
-  )
   // 箱の見せ方として、ほかの箱にそろえる項目(AI への一言は、枠ごとに中身が違うのでそろえない)
   const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio, swatchShape: p.swatchShape, swatchMax: p.swatchMax, ratingShow: p.ratingShow, ratingMin: p.ratingMin, ratingFloor: p.ratingFloor })
   /** 箱の設定を、いくつかの箱にまとめて入れる(形は変わらないので、ID はそのまま) */
@@ -911,10 +874,22 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
   }
   /**
    * 箱の設定(見本・見せ方・写真の形・出すもの・価格の見せ方・バッジ・AI への一言)。右のタブと、キャンバスの ⚙(ダブルクリック)の両方で同じものを出す。
-   * いくつかの箱を選んでいるときは、まとめて直す(値が箱ごとに違う項目は「ばらばら」と出す)。名前・価格の文言は、商品のデータから出すので、ここでは打たない
+   * いくつかの箱を選んでいるときは、まとめて直す(値が箱ごとに違う項目は「ばらばら」と出す)。名前・価格の文言は、商品のデータから出すので、ここでは打たない。
+   * 1 つの箱では、要素の「押せる」もここに出す(UTM に効くので、見せ方と一緒に見えるように。2026-10-26 利用者の決め)。
+   * look のときは見せ方だけ(右のタブの「見せ方」のまとまりと ⚙。AI への一言は別のまとまり、ほかの箱に当てるは行の「…」)
    */
-  const boxSettings = (sec: Section, ps: TablePart[]) => {
+  /** 要素の「押せる」を切り替える(既定と同じなら、持たない) */
+  const setElClick = (sec: Section, p: TablePart, key: string, click: boolean | undefined) => {
+    const spec = Object.fromEntries(Object.entries({ ...(p.els?.[key] ?? {}), click }).filter(([, v]) => v !== undefined))
+    const els = { ...(p.els ?? {}), [key]: spec }
+    if (Object.keys(spec).length === 0) delete els[key]
+    patch(sec, p, { els: Object.keys(els).length > 0 ? els : undefined })
+  }
+  const boxSettings = (sec: Section, ps: TablePart[], opts?: { look?: boolean; where?: string }) => {
     const p = ps[0]
+    // 1 つの Field に並べたチェックは、Field が同じ ID を付けるので、ラベルを押すと先頭のチェックが切り替わっていた。チェックごとに ID を付ける
+    // (右のタブと ⚙ で同じ箱を同時に出すことがあるので、出す場所も ID に入れる)
+    const idPre = `${opts?.where ?? 'pane'}-${ps.map((q) => q.id).join('_')}`
     const many = ps.length > 1
     const MIXED = '__mixed__'
     const common = <V,>(fn: (q: TablePart) => V): V | typeof MIXED => {
@@ -963,10 +938,19 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         <Field label={t('出すもの(写真のほか)', 'Show (besides the photo)')} size="small">
           <div className={s.row2}>
             {BOX_FIELDS.map((f) => (
-              <Checkbox key={f} label={T.boxFieldLabel(f)} checked={has(f) === ps.length ? true : has(f) > 0 ? 'mixed' : false} onChange={(_, d) => toggle(f, d.checked === true)} />
+              <Checkbox key={f} id={`${idPre}-show-${f}`} label={T.boxFieldLabel(f)} checked={has(f) === ps.length ? true : has(f) > 0 ? 'mixed' : false} onChange={(_, d) => toggle(f, d.checked === true)} />
             ))}
           </div>
         </Field>
+        {!many && (
+          <Field label={t('押せる(メールの中で、それぞれ別のリンクになる。utm_content はその要素の ID)', 'Clickable (each is its own link in the email; utm_content is the element ID)')} size="small">
+            <div className={s.row2}>
+              {partElements(p).map((e) => (
+                <Checkbox key={e.key} id={`${idPre}-click-${e.key}`} label={elementLabel(e.key)} checked={elementClickable(p, e)} onChange={(_, d) => setElClick(sec, p, e.key, (d.checked === true) === e.click ? undefined : d.checked === true)} />
+              ))}
+            </div>
+          </Field>
+        )}
         {has('price') > 0 && (
           <Field label={t('価格の見せ方', 'Price style')} hint={priceStyle === 'sale' ? t('元の価格は、商品のデータ(元の価格)から出します。ない商品は、赤い価格だけです', 'The original price comes from the product data; items without one show only the red price') : undefined} size="small">
             <Select size="small" value={priceStyle} onChange={(_, d) => patchBoxes(sec, ps, { priceStyle: d.value === 'sale' || d.value === 'from' ? d.value : undefined })}>
@@ -1024,12 +1008,12 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             <Input size="small" value={badge === MIXED ? '' : badge} placeholder={badge === MIXED ? t('(ばらばら)', '(mixed)') : 'NEW'} maxLength={12} onChange={(_, d) => patchBoxes(sec, ps, { badge: d.value || undefined })} />
           </Field>
         )}
-        {!many && (
+        {!many && !opts?.look && (
           <Field label={t('AI に伝える一言(この枠に、どんな商品を置くか)', 'Note for AI (what to put in this slot)')} size="small">
             <AutoTextarea rows={2} size="small" value={p.aiNote ?? ''} placeholder={t('例: 主役の新作を置く', 'e.g. The lead new arrival')} onChange={(_, d) => patch(sec, p, { aiNote: d.value || undefined })} />
           </Field>
         )}
-        {!many && (
+        {!many && !opts?.look && (
           <Menu positioning="below-start">
             <MenuTrigger disableButtonEnhancement>
               <Button size="small" icon={<CopyRegular />}>
@@ -1122,7 +1106,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
           </PopoverTrigger>
           <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
             <span className={s.quickHead}>{quickBoxes.length > 1 ? t(`選んだ ${quickBoxes.length} 個の箱の見せ方`, `Display of ${quickBoxes.length} boxes`) : t(`箱 ${n} の見せ方`, `Box ${n} display`)}</span>
-            {boxSettings(sec, quickBoxes)}
+            {boxSettings(sec, quickBoxes, { look: true, where: 'quick' })}
+            {openRightLink(sec, p)}
           </PopoverSurface>
         </Popover>
       )
@@ -1215,7 +1200,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               </PopoverTrigger>
               <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
                 <span className={s.quickHead}>{t('画像・動画', 'Image / video')}</span>
-                {mediaSettings(sec, p)}
+                {mediaLook(sec, p)}
               </PopoverSurface>
             </Popover>
           )}
@@ -1757,14 +1742,14 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         </Field>
         <span className={s.elHead}>
           {p.type === 'box'
-            ? t('要素(押せる要素は、メールの中でそれぞれ別のリンクになり、utm_content はその ID。説明を変えても ID は変わらない)', 'Elements (each clickable element is its own link in the email, with its ID as utm_content; editing a description keeps the ID)')
+            ? t('要素(ID は計測・ピンで使う。説明を変えても ID は変わらない。押せるかは「見せ方」で切り替える)', 'Elements (IDs are used for tracking and pins; editing a description keeps the ID. Toggle clickable under Look)')
             : t('要素(ID は計測・ピンで使う。説明を変えても ID は変わらない)', 'Elements (IDs are used for tracking and pins; editing a description keeps the ID)')}
         </span>
         {partElements(p).map((e) => (
           <div key={e.key} className={s.elRow}>
             <div className={s.elTop}>
               <span className={s.pid} title={e.id}>{e.id}</span>
-              <Checkbox label={t('押せる', 'Clickable')} checked={elementClickable(p, e)} onChange={(_, d) => setEl(e.key, { click: (d.checked === true) === e.click ? undefined : d.checked === true })} />
+              {p.type !== 'box' && <Checkbox label={t('押せる', 'Clickable')} checked={elementClickable(p, e)} onChange={(_, d) => setEl(e.key, { click: (d.checked === true) === e.click ? undefined : d.checked === true })} />}
             </div>
             <Input size="small" value={p.els?.[e.key]?.desc ?? ''} placeholder={elementDesc({ ...p, els: undefined }, e, p.desc?.trim() || where)} maxLength={200} onChange={(_, d) => setEl(e.key, { desc: d.value || undefined })} />
           </div>
@@ -1772,244 +1757,401 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       </>
     )
   }
-  const partDetail = (sec: Section, p: TablePart) => (
-    <div className={s.pbody}>
-      {p.type === 'box' && boxSettings(sec, [p])}
-      {p.type === 'button' && (
+  // ---- 右のタブ: 操作は見出しの行の右端、設定は見出し付きのまとまり(畳める。開いた状態は覚える)。2026-10-26 利用者が見本を見て決めた
+  const [groups, setGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ccp.paneGroups') ?? '{}') as Record<string, boolean>
+    } catch {
+      return {}
+    }
+  })
+  const grp = (key: string, title: string, body: ReactNode, dflt = true) => {
+    const open = groups[key] ?? dflt
+    const flip = () =>
+      setGroups((g) => {
+        const next = { ...g, [key]: !open }
+        try {
+          localStorage.setItem('ccp.paneGroups', JSON.stringify(next))
+        } catch {
+          // 覚えられなくても、畳む・開くは効く
+        }
+        return next
+      })
+    return (
+      <div className={s.grp}>
+        <button type="button" className={s.grpHead} aria-expanded={open} onClick={flip}>
+          {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
+          {title}
+        </button>
+        {open && <div className={s.grpBody}>{body}</div>}
+      </div>
+    )
+  }
+  /** 2〜3 択は横並びのボタン(セグメント) */
+  const seg = <V extends string | number | undefined>(value: V, opts: [V, string][], on: (v: V) => void) => (
+    <div className={s.seg} role="group">
+      {opts.map(([v, l]) => (
+        <button key={String(v ?? '')} type="button" className={mergeClasses(s.segBtn, value === v && s.segOn)} aria-pressed={value === v} onClick={() => on(v)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  const iconBtn = (icon: React.ReactElement, label: string, onClick: () => void, disabled = false) => (
+    <Button size="small" appearance="subtle" icon={icon} aria-label={label} title={label} disabled={disabled} onClick={(e) => { e.stopPropagation(); onClick() }} />
+  )
+  /** セクションの見出しの行の右端: 上へ・下へ・複製と「…」(上とまとめる・削除) */
+  const secActions = (sec: Section, si: number) => (
+    <span className={s.hdActs} onClick={stop}>
+      {iconBtn(<ArrowUpRegular />, t('上へ', 'Up'), () => moveSection(sec.id!, si - 1), si === 0)}
+      {iconBtn(<ArrowDownRegular />, t('下へ', 'Down'), () => moveSection(sec.id!, si + 2), si === sections.length - 1)}
+      {iconBtn(<CopyRegular />, t('複製', 'Duplicate'), () => duplicate(sec.id!))}
+      <Menu positioning="below-end">
+        <MenuTrigger disableButtonEnhancement>
+          <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('ほかの操作', 'More')} onClick={stop} />
+        </MenuTrigger>
+        <MenuPopover>
+          <MenuList>
+            <MenuItem disabled={si === 0} onClick={() => mergeUp(sec.id!)}>{t('上のセクションとまとめる', 'Merge with the section above')}</MenuItem>
+            <MenuItem icon={<DeleteRegular />} onClick={() => removeSection(sec.id!)}>{t('セクションを削除', 'Delete section')}</MenuItem>
+          </MenuList>
+        </MenuPopover>
+      </Menu>
+    </span>
+  )
+  /** 部品の行の「…」: 分割・見せ方をほかの箱にも当てる(削除は、隣のごみ箱) */
+  const partMenu = (sec: Section, p: TablePart) =>
+    (p.w * p.h > 1 || p.type === 'box') && (
+      <span className={s.hdActs} onClick={stop}>
+        <Menu positioning="below-end">
+          <MenuTrigger disableButtonEnhancement>
+            <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('ほかの操作', 'More')} onClick={stop} />
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              {p.w * p.h > 1 && <MenuItem onClick={() => run(sec.id!, (x) => T.splitCells(x, [p.id]))}>{t('分割', 'Split')}</MenuItem>}
+              {p.type === 'box' && (
+                <>
+                  <MenuItem icon={<CopyRegular />} onClick={() => applyLook(sec, p, 'row')}>{t('見せ方を、同じ行の箱にも当てる', 'Apply look to boxes in this row')}</MenuItem>
+                  <MenuItem onClick={() => applyLook(sec, p, 'section')}>{t('見せ方を、このセクションの箱にも当てる', 'Apply look to boxes in this section')}</MenuItem>
+                  <MenuItem onClick={() => applyLook(sec, p, 'all')}>{t('見せ方を、すべての箱に当てる', 'Apply look to all boxes')}</MenuItem>
+                </>
+              )}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+      </span>
+    )
+  /** ⚙ のポップアップの下の「右のタブで開く」 */
+  // キャンバスの ⚙ のポップアップ(この下で作る canvas)から呼ぶので、関数の宣言にする(const だと、定義の前に呼ぶことになる)
+  function openRightLink(sec: Section, p: TablePart) {
+    return (
+    <Button
+      size="small"
+      appearance="transparent"
+      className={s.openRight}
+      onClick={() => {
+        setQuickId(null)
+        setPinned(false)
+        selectCell(sec.id!, p.c, p.r)
+        setOpen(p.id, true)
+      }}
+    >
+      {t('ほかの設定は、右のタブで開く ›', 'More settings in the right tab ›')}
+    </Button>
+    )
+  }
+  const linkFields = (sec: Section, p: TablePart) => (
+    <>
+      <Field label={t('リンク先の種類(実際の URL は配信ごと)', 'Link kind (the actual URL is set per delivery)')} size="small">
+        <Select size="small" value={p.link ?? 'campaign'} onChange={(_, d) => patch(sec, p, { link: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
+          {LINK_KINDS.map((k) => (
+            <option key={k} value={k}>{linkKindLabel(k)}</option>
+          ))}
+        </Select>
+      </Field>
+      {utmField(p)}
+    </>
+  )
+  const frameField = (sec: Section, p: TablePart) => (
+    <Field label={t('枠で囲む', 'Frame')} size="small">
+      {seg(p.frame, [[undefined, t('なし', 'None')], ['solid', t('線', 'Solid')], ['dashed', t('点線', 'Dashed')]], (v) => patch(sec, p, { frame: v }))}
+    </Field>
+  )
+  const alignSeg = (sec: Section, p: TablePart, fallback: TextAlign) => (
+    <Field label={t('揃え', 'Alignment')} size="small">
+      {seg(p.align ?? fallback, (['left', 'center', 'right'] as TextAlign[]).map((a) => [a, T.alignLabel(a)] as [TextAlign, string]), (a) => patch(sec, p, { align: a === fallback ? undefined : a }))}
+    </Field>
+  )
+  function imageFields(sec: Section, p: TablePart, label: string) {
+    return (
+    <Field label={label} size="small">
+      <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
+      <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
+    </Field>
+    )
+  }
+  /** 画像・動画の ⚙ のポップアップ(見せ方だけ: 画像と形) */
+  function mediaLook(sec: Section, p: TablePart) {
+    return (
+    <>
+      {imageFields(sec, p, t('画像', 'Image'))}
+      <Field label={t('形', 'Shape')} size="small">
+        <Select size="small" value={p.ratio ?? 'wide'} onChange={(_, d) => patch(sec, p, { ratio: d.value === 'wide' ? undefined : (d.value as MediaRatio) })}>
+          {MEDIA_RATIOS.map((r) => (
+            <option key={r} value={r}>{T.ratioLabel(r)}</option>
+          ))}
+        </Select>
+      </Field>
+      {openRightLink(sec, p)}
+    </>
+    )
+  }
+  const secDetail = (sec: Section) => (
+    <div className={mergeClasses(s.secFields, s.grpWrap)}>
+      {grp(
+        'sec.content',
+        t('中身', 'Content'),
         <>
-          <Field label={t('文言', 'Label')} size="small">
-            <Input size="small" value={p.label ?? ''} placeholder={defaultButtonLabel(0)} maxLength={30} onChange={(_, d) => patch(sec, p, { label: d.value || undefined })} />
+          <Field label={t('名前(キャンバスの札と構成に出る)', 'Name (canvas tag and outline)')} size="small">
+            <Input size="small" value={sec.name ?? ''} placeholder={t('例: 新作', 'e.g. New arrivals')} maxLength={40} onChange={(_, d) => replace(sec.id!, { ...sec, name: d.value || undefined })} />
           </Field>
-          <Field label={t('見た目', 'Style')} size="small">
-            <Select size="small" value={p.style ?? 'fill'} onChange={(_, d) => patch(sec, p, { style: d.value === 'outline' || d.value === 'text' ? d.value : undefined })}>
-              <option value="fill">{t('塗り', 'Filled')}</option>
-              <option value="outline">{t('枠線', 'Outline')}</option>
-              <option value="text">{t('文字のリンク(枠なし)', 'Text link (no box)')}</option>
-            </Select>
-          </Field>
-          <Field label={t('形', 'Shape')} size="small">
-            <div className={s.row2}>
-              {([undefined, 'rounded', 'square', 'underline'] as TablePart['shape'][]).map((x) => (
-                <Button key={x ?? 'pill'} size="small" appearance={p.shape === x ? 'primary' : 'outline'} aria-pressed={p.shape === x} onClick={() => patch(sec, p, { shape: x })}>
-                  {x === 'rounded' ? t('角丸', 'Rounded') : x === 'square' ? t('四角', 'Square') : x === 'underline' ? t('下線だけ', 'Underline') : t('丸', 'Pill')}
-                </Button>
-              ))}
+          <Field label={t('AI が配信ごとに書くもの', 'Written by AI per delivery')} size="small">
+            <div className={s.two}>
+              <Checkbox id={`sec-${sec.id}-heading`} label={t('見出し', 'Heading')} checked={!!sec.categoryHeading} onChange={(_, d) => replace(sec.id!, { ...sec, categoryHeading: d.checked === true || undefined })} />
+              <Checkbox id={`sec-${sec.id}-copy`} label={t('コピー', 'Copy')} checked={sec.copy !== false} onChange={(_, d) => replace(sec.id!, { ...sec, copy: d.checked === true ? undefined : false })} />
             </div>
           </Field>
-          <div className={s.row2}>
-            <Field label={t('大きさ', 'Size')} size="small">
-              <Select size="small" value={p.size ?? ''} onChange={(_, d) => patch(sec, p, { size: d.value === 'small' || d.value === 'large' ? d.value : undefined })}>
-                <option value="small">{t('小', 'Small')}</option>
-                <option value="">{t('中', 'Medium')}</option>
-                <option value="large">{t('大', 'Large')}</option>
-              </Select>
-            </Field>
-            <Field label={t('幅', 'Width')} size="small">
-              <Select size="small" value={p.fit ? 'fit' : ''} onChange={(_, d) => patch(sec, p, { fit: d.value === 'fit' || undefined })}>
-                <option value="">{t('マスいっぱい', 'Fill the cell')}</option>
-                <option value="fit">{t('文字に合わせる', 'Fit the text')}</option>
-              </Select>
-            </Field>
-            <Field label={t('矢印(›)', 'Arrow (›)')} size="small">
-              <Select size="small" value={p.icon ?? ''} onChange={(_, d) => patch(sec, p, { icon: d.value === 'right' || d.value === 'left' ? d.value : undefined })}>
-                <option value="">{t('なし', 'None')}</option>
-                <option value="right">{t('右に', 'Right')}</option>
-                <option value="left">{t('左に', 'Left')}</option>
-              </Select>
-            </Field>
-          </div>
-          <Field label={t('見せ方(文字 / 画像)', 'Face (text / image)')} size="small">
-            <Select size="small" value={p.face ?? ''} onChange={(_, d) => patch(sec, p, { face: d.value === 'image' || d.value === 'both' ? d.value : undefined })}>
-              <option value="">{t('文字だけ', 'Text only')}</option>
-              <option value="image">{t('画像だけ', 'Image only')}</option>
-              <option value="both">{t('画像の上に文字', 'Text over an image')}</option>
-            </Select>
+          <Field label={t('AI の切り口のメモ', 'Angle for AI')} size="small">
+            <AutoTextarea rows={2} size="small" value={sec.aiNote ?? ''} placeholder={t('例: セール対象を、価格の安い順に', 'e.g. Sale items, cheapest first')} onChange={(_, d) => replace(sec.id!, { ...sec, aiNote: d.value || undefined })} />
           </Field>
-          {p.face && (
-            <>
-              <Field label={t('ボタンの画像(ライブラリから選ぶか、URL を入れる)', 'Button image (pick from the library or enter a URL)')} size="small">
-                <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
-                <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
-              </Field>
-              <Field label={t('代わりの文(画像が出ないとき)', 'Alt text (when images are off)')} size="small">
-                <Input size="small" value={p.alt ?? ''} placeholder={p.label || defaultButtonLabel(0)} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
-              </Field>
-              <Checkbox label={t('配信ごとに画像を差し替えてよい', 'Image can be swapped per delivery')} checked={p.swap !== false} onChange={(_, d) => patch(sec, p, { swap: d.checked === true ? undefined : false })} />
-            </>
-          )}
-          <Field label={t('色(決まった色から選ぶ)', 'Color (from the set colors)')} size="small">
+        </>,
+      )}
+      {grp(
+        'sec.look',
+        t('見た目', 'Look'),
+        <>
+          <Field label={t('背景の色', 'Background')} size="small">
             <div className={s.row2}>
-              {(Object.keys(T.BUTTON_COLORS) as ButtonColor[]).map((c) => {
-                const on = (p.color ?? 'black') === c
+              {([undefined, 'gray', 'beige', 'blue', 'pink'] as (SectionBg | undefined)[]).map((b) => {
+                const on = sec.bg === b
                 return (
-                  <button key={c} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} title={T.buttonColorLabel(c)} onClick={() => patch(sec, p, { color: c === 'black' ? undefined : c })}>
-                    <span style={{ backgroundColor: T.BUTTON_COLORS[c] }} />
-                    {T.buttonColorLabel(c)}
+                  <button key={b ?? 'white'} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} onClick={() => replace(sec.id!, { ...sec, bg: b })}>
+                    <span style={{ backgroundColor: b ? T.SECTION_BG[b] : '#fff', border: `1px solid ${tokens.colorNeutralStroke2}` }} />
+                    {T.sectionBgLabel(b)}
                   </button>
                 )
               })}
             </div>
           </Field>
-          {alignField(sec, p, 'center')}
-          <Field label={t('リンク先の種類(実際の URL は配信ごと)', 'Link kind (the actual URL is set per delivery)')} size="small">
-            <Select size="small" value={p.link ?? 'campaign'} onChange={(_, d) => patch(sec, p, { link: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
-              {LINK_KINDS.map((k) => (
-                <option key={k} value={k}>{linkKindLabel(k)}</option>
-              ))}
-            </Select>
-          </Field>
-          {utmField(p)}
-        </>
-      )}
-      {p.type === 'text' && (
-        <>
-          <Field label={t('固定の文', 'Fixed text')} size="small">
-            <AutoTextarea rows={3} size="small" value={p.text ?? ''} onChange={(_, d) => patch(sec, p, { text: d.value || undefined })} />
-          </Field>
-          <Checkbox label={t('配信ごとに書き換えてよい', 'Can be rewritten per delivery')} checked={p.overridable !== false} onChange={(_, d) => patch(sec, p, { overridable: d.checked === true ? undefined : false })} />
-          <Field
-            label={t('向き', 'Direction')}
-            hint={p.dir ? t('Gmail・Outlook などは縦の文字に対応していないことが多いので、制作に「この文字は画像にする」と伝えます。縦に結合したマスに置くと見やすい', "Many email clients (Gmail, Outlook) don't support vertical text, so production is told to render it as an image. Works best in a vertically merged cell") : undefined}
-            size="small"
-          >
-            <Select size="small" value={p.dir ?? ''} onChange={(_, d) => patch(sec, p, { dir: d.value === 'vertical' || d.value === 'rotate' ? d.value : undefined })}>
-              <option value="">{t('横', 'Horizontal')}</option>
-              <option value="vertical">{t('縦書き(上から下)', 'Vertical (top to bottom)')}</option>
-              <option value="rotate">{t('90 度回す(英字を横倒しに)', 'Rotated 90°')}</option>
-            </Select>
-          </Field>
-          {alignField(sec, p, 'left')}
-        </>
-      )}
-      {p.type === 'media' && mediaSettings(sec, p)}
-      {p.type === 'line' && (
-        <>
-          <div className={s.row2}>
-            <Field label={t('太さ', 'Weight')} size="small">
-              <Select size="small" value={String(p.lineWidth ?? 1)} onChange={(_, d) => patch(sec, p, { lineWidth: d.value === '2' ? 2 : d.value === '4' ? 4 : undefined })}>
-                <option value="1">{t('細い', 'Thin')}</option>
-                <option value="2">{t('ふつう', 'Regular')}</option>
-                <option value="4">{t('太い', 'Thick')}</option>
-              </Select>
-            </Field>
-            <Field label={t('色', 'Color')} size="small">
-              <Select size="small" value={p.lineColor ?? ''} onChange={(_, d) => patch(sec, p, { lineColor: d.value === 'gray' || d.value === 'black' ? d.value : undefined })}>
-                <option value="">{t('薄いグレー', 'Light gray')}</option>
-                <option value="gray">{t('グレー', 'Gray')}</option>
-                <option value="black">{t('黒', 'Black')}</option>
-              </Select>
-            </Field>
-          </div>
-          <div className={s.row2}>
-            <Field label={t('長さ', 'Length')} size="small">
-              <Select size="small" value={p.lineShort ? 'short' : ''} onChange={(_, d) => patch(sec, p, { lineShort: d.value === 'short' || undefined })}>
-                <option value="">{t('全幅', 'Full width')}</option>
-                <option value="short">{t('真ん中だけ', 'Center only')}</option>
-              </Select>
-            </Field>
+          <div className={s.two}>
             <Field label={t('上下の余白', 'Spacing')} size="small">
-              <Select size="small" value={p.lineSpace ?? ''} onChange={(_, d) => patch(sec, p, { lineSpace: d.value === 'tight' || d.value === 'wide' ? d.value : undefined })}>
-                <option value="tight">{t('狭い', 'Tight')}</option>
-                <option value="">{t('ふつう', 'Normal')}</option>
-                <option value="wide">{t('広い', 'Wide')}</option>
-              </Select>
+              {seg(sec.space, [['tight', t('狭い', 'Tight')], [undefined, t('ふつう', 'Normal')], ['wide', t('広い', 'Wide')]], (v) => replace(sec.id!, { ...sec, space: v }))}
+            </Field>
+            <Field label={t('スマホ', 'On phones')} size="small">
+              {seg(sec.mobile, [[undefined, t('列のまま', 'Columns')], ['stack', t('縦に積む', 'Stack')]], (v) => replace(sec.id!, { ...sec, mobile: v }))}
             </Field>
           </div>
+          <Checkbox label={t('上に区切り線', 'Divider above')} checked={!!sec.divider} onChange={(_, d) => replace(sec.id!, { ...sec, divider: d.checked === true || undefined })} />
+        </>,
+      )}
+      {grp('sec.detail', t('詳しい', 'Details'), kv(t('セクション ID', 'Section ID'), <span className={s.pid}>{sec.id}</span>), false)}
+    </div>
+  )
+  const partDetail = (sec: Section, p: TablePart) => {
+    const details = grp(
+      `${p.type}.detail`,
+      // 箱の「押せる」は見せ方のまとまりにあるので、箱の見出しには書かない
+      p.type === 'box' ? t('詳しい(説明・要素の ID・位置)', 'Details (description, element IDs, position)') : p.type === 'empty' ? t('詳しい(位置)', 'Details (position)') : t('詳しい(説明・要素の ID・押せる・位置)', 'Details (description, element IDs, clickable, position)'),
+      <>
+        {p.type !== 'empty' && elementsBlock(sec, p)}
+        {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}
+        {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{p.id}</span>)}
+      </>,
+      false,
+    )
+    let body: ReactNode
+    if (p.type === 'box') {
+      body = (
+        <>
+          {grp('box.look', t('見せ方', 'Look'), boxSettings(sec, [p], { look: true }))}
+          {grp(
+            'box.ai',
+            t('AI への一言', 'Note for AI'),
+            <AutoTextarea rows={2} size="small" value={p.aiNote ?? ''} placeholder={t('例: 主役の新作を置く', 'e.g. The lead new arrival')} onChange={(_, d) => patch(sec, p, { aiNote: d.value || undefined })} />,
+          )}
         </>
-      )}
-      {p.type === 'spacer' && (
+      )
+    } else if (p.type === 'button') {
+      body = (
+        <>
+          {grp(
+            'button.content',
+            t('中身', 'Content'),
+            <>
+              <Field label={t('文言', 'Label')} size="small">
+                <Input size="small" value={p.label ?? ''} placeholder={defaultButtonLabel(0)} maxLength={30} onChange={(_, d) => patch(sec, p, { label: d.value || undefined })} />
+              </Field>
+              <Field label={t('文字 / 画像', 'Text / image')} size="small">
+                {seg(p.face, [[undefined, t('文字', 'Text')], ['image', t('画像', 'Image')], ['both', t('画像に文字', 'Both')]], (v) => patch(sec, p, { face: v }))}
+              </Field>
+              {p.face && (
+                <>
+                  {imageFields(sec, p, t('ボタンの画像', 'Button image'))}
+                  <Field label={t('代わりの文', 'Alt text')} size="small">
+                    <Input size="small" value={p.alt ?? ''} placeholder={p.label || defaultButtonLabel(0)} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+                  </Field>
+                  <Checkbox label={t('配信ごとに画像を差し替えてよい', 'Image can be swapped per delivery')} checked={p.swap !== false} onChange={(_, d) => patch(sec, p, { swap: d.checked === true ? undefined : false })} />
+                </>
+              )}
+            </>,
+          )}
+          {grp(
+            'button.look',
+            t('見た目', 'Look'),
+            <>
+              <Field label={t('塗り方', 'Style')} size="small">
+                {seg(p.style, [[undefined, t('塗り', 'Filled')], ['outline', t('枠線', 'Outline')], ['text', t('文字のリンク', 'Text link')]], (v) => patch(sec, p, { style: v }))}
+              </Field>
+              <Field label={t('形', 'Shape')} size="small">
+                {seg(p.shape, [[undefined, t('丸', 'Pill')], ['rounded', t('角丸', 'Rounded')], ['square', t('四角', 'Square')], ['underline', t('下線', 'Underline')]], (v) => patch(sec, p, { shape: v }))}
+              </Field>
+              <div className={s.two}>
+                <Field label={t('大きさ', 'Size')} size="small">
+                  {seg(p.size, [['small', t('小', 'S')], [undefined, t('中', 'M')], ['large', t('大', 'L')]], (v) => patch(sec, p, { size: v }))}
+                </Field>
+                <Field label={t('幅', 'Width')} size="small">
+                  {seg(p.fit ? 'fit' : undefined, [[undefined, t('いっぱい', 'Fill')], ['fit', t('文字幅', 'Fit')]], (v) => patch(sec, p, { fit: v === 'fit' || undefined }))}
+                </Field>
+              </div>
+              <div className={s.two}>
+                <Field label={t('矢印(›)', 'Arrow (›)')} size="small">
+                  {seg(p.icon, [[undefined, t('なし', 'None')], ['left', t('左', 'Left')], ['right', t('右', 'Right')]], (v) => patch(sec, p, { icon: v }))}
+                </Field>
+                {alignSeg(sec, p, 'center')}
+              </div>
+              <Field label={t('色', 'Color')} size="small">
+                <div className={s.row2}>
+                  {(Object.keys(T.BUTTON_COLORS) as ButtonColor[]).map((c) => {
+                    const on = (p.color ?? 'black') === c
+                    return (
+                      <button key={c} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} title={T.buttonColorLabel(c)} onClick={() => patch(sec, p, { color: c === 'black' ? undefined : c })}>
+                        <span style={{ backgroundColor: T.BUTTON_COLORS[c] }} />
+                        {T.buttonColorLabel(c)}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+              {frameField(sec, p)}
+            </>,
+          )}
+          {grp('button.link', t('リンク', 'Link'), linkFields(sec, p))}
+        </>
+      )
+    } else if (p.type === 'text') {
+      body = (
+        <>
+          {grp(
+            'text.content',
+            t('中身', 'Content'),
+            <>
+              <Field label={t('固定の文', 'Fixed text')} size="small">
+                <AutoTextarea rows={3} size="small" value={p.text ?? ''} onChange={(_, d) => patch(sec, p, { text: d.value || undefined })} />
+              </Field>
+              <Checkbox label={t('配信ごとに書き換えてよい', 'Can be rewritten per delivery')} checked={p.overridable !== false} onChange={(_, d) => patch(sec, p, { overridable: d.checked === true ? undefined : false })} />
+            </>,
+          )}
+          {grp(
+            'text.look',
+            t('見た目', 'Look'),
+            <>
+              <div className={s.two}>
+                <Field label={t('向き', 'Direction')} size="small">
+                  {seg(p.dir, [[undefined, t('横', 'Horiz.')], ['vertical', t('縦書き', 'Vertical')], ['rotate', t('90°', '90°')]], (v) => patch(sec, p, { dir: v }))}
+                </Field>
+                {alignSeg(sec, p, 'left')}
+              </div>
+              {frameField(sec, p)}
+            </>,
+          )}
+        </>
+      )
+    } else if (p.type === 'media') {
+      body = (
+        <>
+          {grp(
+            'media.content',
+            t('中身', 'Content'),
+            <>
+              {imageFields(sec, p, t('画像', 'Image'))}
+              <Field label={t('動画の URL(任意。メールでは画像に ▶ を重ねる)', 'Video URL (optional)')} size="small">
+                <Input size="small" value={p.video ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { video: d.value.trim() || undefined })} />
+              </Field>
+              <Field label={t('代わりの文', 'Alt text')} size="small">
+                <Input size="small" value={p.alt ?? ''} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+              </Field>
+              <Checkbox label={t('配信ごとに差し替える', 'Swap per delivery')} checked={!!p.swap} onChange={(_, d) => patch(sec, p, { swap: d.checked === true || undefined })} />
+            </>,
+          )}
+          {grp(
+            'media.look',
+            t('見た目', 'Look'),
+            <>
+              <Field label={t('形', 'Shape')} size="small">
+                <Select size="small" value={p.ratio ?? 'wide'} onChange={(_, d) => patch(sec, p, { ratio: d.value === 'wide' ? undefined : (d.value as MediaRatio) })}>
+                  {MEDIA_RATIOS.map((r) => (
+                    <option key={r} value={r}>{T.ratioLabel(r)}</option>
+                  ))}
+                </Select>
+              </Field>
+              {frameField(sec, p)}
+            </>,
+          )}
+          {grp('media.link', t('リンク', 'Link'), linkFields(sec, p))}
+        </>
+      )
+    } else if (p.type === 'line') {
+      body = grp(
+        'line.look',
+        t('見た目', 'Look'),
+        <>
+          <div className={s.two}>
+            <Field label={t('太さ', 'Weight')} size="small">
+              {seg(p.lineWidth, [[undefined, t('細い', 'Thin')], [2, t('ふつう', 'Regular')], [4, t('太い', 'Thick')]], (v) => patch(sec, p, { lineWidth: v }))}
+            </Field>
+            <Field label={t('長さ', 'Length')} size="small">
+              {seg(p.lineShort ? 'short' : undefined, [[undefined, t('全幅', 'Full')], ['short', t('真ん中', 'Center')]], (v) => patch(sec, p, { lineShort: v === 'short' || undefined }))}
+            </Field>
+          </div>
+          <Field label={t('色', 'Color')} size="small">
+            {seg(p.lineColor, [[undefined, t('薄いグレー', 'Light gray')], ['gray', t('グレー', 'Gray')], ['black', t('黒', 'Black')]], (v) => patch(sec, p, { lineColor: v }))}
+          </Field>
+          <Field label={t('上下の余白', 'Spacing')} size="small">
+            {seg(p.lineSpace, [['tight', t('狭い', 'Tight')], [undefined, t('ふつう', 'Normal')], ['wide', t('広い', 'Wide')]], (v) => patch(sec, p, { lineSpace: v }))}
+          </Field>
+        </>,
+      )
+    } else if (p.type === 'spacer') {
+      body = grp(
+        'spacer.look',
+        t('見た目', 'Look'),
         <Field label={t('高さ', 'Height')} size="small">
-          <Select size="small" value={String(p.height ?? 24)} onChange={(_, d) => patch(sec, p, { height: Number(d.value) === 24 ? undefined : Number(d.value) })}>
-            {T.SPACER_HEIGHTS.map((h) => (
-              <option key={h} value={h}>{`${h}px`}</option>
-            ))}
-          </Select>
-        </Field>
-      )}
-      {(p.type === 'text' || p.type === 'button' || p.type === 'media') && (
-        <Field label={t('枠で囲む(クーポンの番号・注意書きなど)', 'Frame (coupon codes, notes, etc.)')} size="small">
-          <Select size="small" value={p.frame ?? ''} onChange={(_, d) => patch(sec, p, { frame: d.value === 'solid' || d.value === 'dashed' ? d.value : undefined })}>
-            <option value="">{t('囲まない', 'None')}</option>
-            <option value="solid">{t('線で囲む', 'Solid')}</option>
-            <option value="dashed">{t('点線で囲む', 'Dashed')}</option>
-          </Select>
-        </Field>
-      )}
-      {p.type === 'empty' && <span className={s.hint}>{t('空きのマス。左のパーツを落とすと、そのパーツになります。メールでは何も出ない余白です。', 'An empty cell. Drop a part here to fill it. It shows as blank space in the email.')}</span>}
-      {p.type !== 'empty' && elementsBlock(sec, p)}
-      {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}
-      {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{p.id}</span>)}
-      <div className={s.row2}>
-        {p.w * p.h > 1 && (
-          <Button size="small" onClick={() => run(sec.id!, (x) => T.splitCells(x, [p.id]))}>
-            {t('分割', 'Split')}
-          </Button>
-        )}
-        {p.type !== 'empty' && (
-          <Button size="small" onClick={() => replace(sec.id!, T.clearCells(sec, [p.id]))}>
-            {t('空きにする', 'Make empty')}
-          </Button>
-        )}
+          {seg(p.height === 24 ? undefined : p.height, T.SPACER_HEIGHTS.map((h) => [h === 24 ? undefined : h, `${h}px`] as [number | undefined, string]), (v) => patch(sec, p, { height: v }))}
+        </Field>,
+      )
+    } else {
+      body = <span className={s.hint}>{t('空きのマス。左のパーツを落とすと、そのパーツになります。メールでは何も出ない余白です。', 'An empty cell. Drop a part here to fill it. It shows as blank space in the email.')}</span>
+    }
+    return (
+      <div className={mergeClasses(s.pbody, s.grpWrap)}>
+        {body}
+        {details}
       </div>
-    </div>
-  )
-  const secDetail = (sec: Section, si: number) => (
-    <div className={s.secFields}>
-      <Field label={t('名前(キャンバスの札と構成に出る)', 'Name (shown on the canvas tag and in the outline)')} size="small">
-        <Input size="small" value={sec.name ?? ''} placeholder={t('例: 新作', 'e.g. New arrivals')} maxLength={40} onChange={(_, d) => replace(sec.id!, { ...sec, name: d.value || undefined })} />
-      </Field>
-      <Checkbox label={t('見出しを置く(AI が配信ごとに書く)', 'Show a heading (AI writes it per delivery)')} checked={!!sec.categoryHeading} onChange={(_, d) => replace(sec.id!, { ...sec, categoryHeading: d.checked === true || undefined })} />
-      <Checkbox label={t('コピーを置く(AI が配信ごとに書く)', 'Show copy (AI writes it per delivery)')} checked={sec.copy !== false} onChange={(_, d) => replace(sec.id!, { ...sec, copy: d.checked === true ? undefined : false })} />
-      <Field label={t('スマホでの並び方', 'On phones')} size="small">
-        <Select size="small" value={sec.mobile ?? ''} onChange={(_, d) => replace(sec.id!, { ...sec, mobile: d.value === 'stack' ? 'stack' : undefined })}>
-          <option value="">{t('列のまま縮める', 'Keep the columns')}</option>
-          <option value="stack">{t('縦に積む(上の行から、左から)', 'Stack vertically (top to bottom, left to right)')}</option>
-        </Select>
-      </Field>
-      <Field label={t('背景の色', 'Background')} size="small">
-        <div className={s.row2}>
-          {([undefined, 'gray', 'beige', 'blue', 'pink'] as (SectionBg | undefined)[]).map((b) => {
-            const on = sec.bg === b
-            return (
-              <button key={b ?? 'white'} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} onClick={() => replace(sec.id!, { ...sec, bg: b })}>
-                <span style={{ backgroundColor: b ? T.SECTION_BG[b] : '#fff', border: `1px solid ${tokens.colorNeutralStroke2}` }} />
-                {T.sectionBgLabel(b)}
-              </button>
-            )
-          })}
-        </div>
-      </Field>
-      <Field label={t('上下の余白', 'Spacing')} size="small">
-        <Select size="small" value={sec.space ?? ''} onChange={(_, d) => replace(sec.id!, { ...sec, space: d.value === 'tight' || d.value === 'wide' ? d.value : undefined })}>
-          <option value="tight">{t('狭い', 'Tight')}</option>
-          <option value="">{t('ふつう', 'Normal')}</option>
-          <option value="wide">{t('広い', 'Wide')}</option>
-        </Select>
-      </Field>
-      <Checkbox label={t('セクションの上に区切り線を引く', 'Divider line above the section')} checked={!!sec.divider} onChange={(_, d) => replace(sec.id!, { ...sec, divider: d.checked === true || undefined })} />
-      <Field label={t('AI の切り口のメモ(商品を選ぶ・見出しを書くときに渡す)', 'Angle for AI (used when picking products and writing headings)')} size="small">
-        <AutoTextarea rows={2} size="small" value={sec.aiNote ?? ''} placeholder={t('例: セール対象を、価格の安い順に', 'e.g. Sale items, cheapest first')} onChange={(_, d) => replace(sec.id!, { ...sec, aiNote: d.value || undefined })} />
-      </Field>
-      {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{sec.id}</span>)}
-      <div className={s.row2}>
-        <Button size="small" icon={<ArrowUpRegular />} disabled={si === 0} onClick={() => moveSection(sec.id!, si - 1)}>
-          {t('上へ', 'Up')}
-        </Button>
-        <Button size="small" icon={<ArrowDownRegular />} disabled={si === sections.length - 1} onClick={() => moveSection(sec.id!, si + 2)}>
-          {t('下へ', 'Down')}
-        </Button>
-        <Button size="small" icon={<CopyRegular />} onClick={() => duplicate(sec.id!)}>
-          {t('複製', 'Duplicate')}
-        </Button>
-        <Button size="small" disabled={si === 0} onClick={() => mergeUp(sec.id!)}>
-          {t('上とまとめる', 'Merge up')}
-        </Button>
-        <Button size="small" icon={<DeleteRegular />} onClick={() => removeSection(sec.id!)}>
-          {t('削除', 'Delete')}
-        </Button>
-      </div>
-    </div>
-  )
+    )
+  }
+
   const objects = () => {
     const selIds = new Set(selParts.map((p) => p.id))
     const one = selParts.length === 1 ? selParts[0].id : null
@@ -2063,10 +2205,11 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                 <span className={s.sbadge}>{si < 0 ? 'H' : `S${si + 1}`}</span>
                 <span className={s.sname}>{si < 0 ? t('ヒーローの下', 'Under the hero') : sec.name?.trim() || t('(名前なし)', '(no name)')}</span>
                 <span className={s.smeta}>{(sec.rows ?? 0) > 0 ? t(`${sec.cols}×${sec.rows} · 商品 ${n('box')}`, `${sec.cols}×${sec.rows} · ${n('box')} items`) : t('空', 'Empty')}</span>
+                {si >= 0 && secActions(sec, si)}
               </div>
               {open && (
                 <div className={s.sbody}>
-                  {sel?.kind === 'section' && cur && si >= 0 && secDetail(sec, si)}
+                  {sel?.kind === 'section' && cur && si >= 0 && secDetail(sec)}
                   {[...(sec.parts ?? [])]
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {
@@ -2094,6 +2237,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                             <span className={s.tchip}>{typeName(p.type)}</span>
                             <span className={s.pn}>{evenEmpty ? t('均等の行の空き(メールには出ない)', 'Spare cell in an even row (not in the email)') : partName(p)}</span>
                             <span className={s.ps}>{p.w * p.h > 1 ? `${p.w}×${p.h}` : ''}</span>
+                            {partMenu(sec, p)}
                             {p.type !== 'empty' && (
                               <span
                                 role="button"
