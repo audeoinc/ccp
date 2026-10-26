@@ -3,13 +3,15 @@ import { AddRegular, WarningFilled } from '@fluentui/react-icons'
 import { ChannelBadge } from './ChannelBadge'
 import { AbBadge } from './AbBadge'
 import type { DeliveryCard } from './models/deliveryCards'
-import { countryOptions, statusColor, statusLabel } from './status'
+import { channelOptions, countryOptions, statusColor, statusLabel } from './status'
 import { LockMark } from './LockMark'
 import { locale, optionLabel, useT } from './i18n'
 import { CANCELLED_STYLE, isCancelled } from './cancel'
 import { AlertMark } from './AlertMark'
-import type { CardAlertKind } from './cardAlerts'
+import { CARD_ALERT_ORDER, type CardAlertKind } from './cardAlerts'
 import { ymd } from './dates'
+import type { Campaign } from './models/campaigns'
+import { campaignStatusOf } from './campaigns'
 
 interface Props {
   month: Date
@@ -30,7 +32,15 @@ interface Props {
   chipTone?: (card: DeliveryCard) => { line: string; background: string }
   /** 週の行の「週 ›」を押したとき(その週の日曜日)。月から、その週の週表示へ直接移る(FLOWS の C-4) */
   onOpenWeek?: (sunday: Date) => void
+  /**
+   * キャンペーン(X79)。渡すと、キャンペーンに入っているカードを、マスにキャンペーン 1 つとしてまとめて出す
+   * (中に、子のカードのチャネルの印と状態の点。AB のあるカードには AB の印)。入っていないカードは、今のまま 1 枚ずつ
+   */
+  campaigns?: Map<string, Campaign>
 }
+
+/** マスに並べるもの: 1 枚のカードか、キャンペーン(子のカードを配信時刻の順に) */
+type DayItem = { kind: 'card'; card: DeliveryCard } | { kind: 'campaign'; id: string; campaign?: Campaign; children: DeliveryCard[] }
 
 // 選択肢の値から、画面の言葉を求める
 const label = (options: { value: string; label: string }[], v?: string) => optionLabel(options.find((o) => o.value === v)?.label)
@@ -167,6 +177,10 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase100,
     fontVariantNumeric: 'tabular-nums',
   },
+  // キャンペーンの子のカード(チャネルの印 + 状態の点 + AB)。狭い画面でも出す(キャンペーンの中身が分かるように)
+  kids: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px', rowGap: '2px', marginTop: '2px', lineHeight: 1.2 },
+  kid: { display: 'inline-flex', alignItems: 'center', columnGap: '2px' },
+  kidDot: { width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0 },
   warn: { color: tokens.colorPaletteDarkOrangeForeground1, verticalAlign: 'text-bottom', marginRight: '2px' },
   pillName: {
     display: 'block',
@@ -179,7 +193,7 @@ const useStyles = makeStyles({
   },
 })
 
-export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone, onOpenWeek }: Props) {
+export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone, onOpenWeek, campaigns }: Props) {
   const styles = useStyles()
   const t = useT()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -196,8 +210,71 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
   for (const list of byDay.values()) {
     list.sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
   }
+  // キャンペーンを渡されたときは、同じキャンペーンのカードを 1 つにまとめる(並びは、いちばん早い子の配信時刻)
+  const itemsOf = (list: DeliveryCard[]): DayItem[] => {
+    if (!campaigns) return list.map((card) => ({ kind: 'card', card }))
+    const out: DayItem[] = []
+    const groups = new Map<string, Extract<DayItem, { kind: 'campaign' }>>()
+    for (const card of list) {
+      const id = card.campaign_id
+      if (!id) {
+        out.push({ kind: 'card', card })
+        continue
+      }
+      const g = groups.get(id)
+      if (g) g.children.push(card)
+      else {
+        const item = { kind: 'campaign' as const, id, campaign: campaigns.get(id), children: [card] }
+        groups.set(id, item)
+        out.push(item)
+      }
+    }
+    return out
+  }
 
   const today = dayKey(new Date())
+
+  // キャンペーンの箱(X79)。色は、子のいちばん遅れている状態。押すと、いちばん早い子のカードを開く(キャンペーンのフロートは段 ③)
+  const campaignPill = (item: Extract<DayItem, { kind: 'campaign' }>) => {
+    const first = item.children[0]
+    const status = campaignStatusOf(item.children) ?? 'not_started'
+    const tone = { line: statusColor(status), background: `color-mix(in srgb, ${statusColor(status)} 16%, var(--colorNeutralBackground1))` }
+    const name = item.campaign?.name || first.name || t('(名前のないキャンペーン)', '(unnamed campaign)')
+    const allCancelled = item.children.every((c) => isCancelled(c))
+    const due = item.children.some((c) => dueSoon?.has(c.id))
+    const kidText = (c: DeliveryCard) =>
+      `${label(channelOptions, c.channel)} ${new Date(c.scheduled_at!).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })} ${statusLabel(c.status)}${c.ab_test ? ' AB' : ''}`
+    return (
+      <button
+        key={`campaign:${item.id}`}
+        type="button"
+        data-card-id={first.id}
+        data-campaign-id={item.id}
+        onClick={(e) => {
+          e.stopPropagation()
+          onSelect(first.id)
+        }}
+        title={[`${name}(${statusLabel(status)})`, ...item.children.map(kidText)].join('\n')}
+        className={styles.pill}
+        style={{ backgroundColor: tone.background, borderLeft: `3px solid ${tone.line}`, ...(allCancelled ? CANCELLED_STYLE : {}) }}
+      >
+        <span className={styles.pillName}>
+          {item.children.some((c) => alertKinds?.get(c.id)) && <AlertMark kind={CARD_ALERT_ORDER.find((k) => item.children.some((c) => alertKinds?.get(c.id) === k))} />}
+          {due && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
+          {name}
+        </span>
+        <span className={styles.kids}>
+          {item.children.map((c) => (
+            <span key={c.id} className={styles.kid} style={isCancelled(c) ? CANCELLED_STYLE : undefined} aria-label={kidText(c)}>
+              <ChannelBadge channel={c.channel} size="icon" />
+              <span className={styles.kidDot} style={{ backgroundColor: statusColor(c.status) }} />
+              {c.ab_test && <AbBadge abTest={c.ab_test} size="icon" />}
+            </span>
+          ))}
+        </span>
+      </button>
+    )
+  }
 
   return (
     <div className={styles.root}>
@@ -251,7 +328,9 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
                   <AddRegular />
                 </button>}
               </div>
-              {(byDay.get(k) ?? []).map((c) => {
+              {itemsOf(byDay.get(k) ?? []).map((item) => {
+                if (item.kind === 'campaign') return campaignPill(item)
+                const c = item.card
                 const tone = chipTone ? chipTone(c) : { line: statusColor(c.status), background: `color-mix(in srgb, ${statusColor(c.status)} 16%, var(--colorNeutralBackground1))` }
                 return (
                   <button

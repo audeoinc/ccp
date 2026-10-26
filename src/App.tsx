@@ -93,6 +93,7 @@ import { localDate } from './results'
 import { PREF } from './prefKeys'
 import { ConfirmHost } from './ConfirmHost'
 import { useAppData } from './useAppData'
+import { useCampaigns } from './useCampaigns'
 import { useCardNoteStats } from './useCardNoteStats'
 import { useUrlSync } from './useUrlSync'
 import { useSettingsActions } from './settingsActions'
@@ -307,6 +308,8 @@ function App() {
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
   // 国(ヘッダー)で絞った配信。計画・結果・週の帯・アラート・依頼の件数など、画面のすべてがこの国の配信を見る(X33)
+  // キャンペーン(X79)。月のカレンダーはキャンペーン単位、時間帯別は札にキャンペーン名
+  const campaigns = useCampaigns(cards)
   const scopedCards = useMemo(() => (filters.country ? cards.filter((c) => c.country === filters.country) : cards), [cards, filters.country])
   const activeCards = useMemo(() => scopedCards.filter((c) => !isCancelled(c)), [scopedCards])
   // ユーザー・承認グループと、依頼中の承認(ヘッダーの「自分宛ての依頼」と、週の帯のまとめての操作に使う。U5・U6)
@@ -1334,6 +1337,7 @@ function App() {
                   products={products}
                   heroes={heroes}
                   isFrame={(c) => frameIds.has(c.id)}
+                  campaigns={campaigns}
                 />
               ) : (
               <WeekView
@@ -1387,6 +1391,8 @@ function App() {
                 // 制作の面: 箱の色は制作の状態、2 行目は状態と締め切り(PR4)
                 chipTone={onProduction ? productionTone : undefined}
                 renderMeta={onProduction ? productionMeta : undefined}
+                // キャンペーン単位で出すのは計画の面だけ(制作の面は、カードごとに制作の状態を見るため 1 枚ずつ)
+                campaigns={onProduction ? undefined : campaigns}
               />
               </SwipePager>
               </>

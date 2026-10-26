@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { CardAlertKind } from './cardAlerts'
@@ -13,6 +13,8 @@ import { locale, useT } from './i18n'
 import { statusColor } from './status'
 import { isCancelled } from './cancel'
 import { getUiScale } from './uiScale'
+import type { Campaign } from './models/campaigns'
+import { campaignCardLabel, campaignColors } from './campaignLook'
 
 // 週の表示の「時刻」の見方(X46)。Outlook の予定表のように、横 = 曜日・縦 = 時刻の格子に、配信を配信時刻の位置で置く。
 // 配信は瞬間なので、カードの高さは一定(上の端が配信時刻)。違う日の同じ時刻の配信は、同じ高さに並ぶ(横に目で追える)。
@@ -70,6 +72,8 @@ const useStyles = makeStyles({
   cardFrame: { borderTopWidth: '1px', borderRightWidth: '1px', borderBottomWidth: '1px', borderTopStyle: 'dashed', borderRightStyle: 'dashed', borderBottomStyle: 'dashed', borderTopColor: tokens.colorNeutralStroke1, borderRightColor: tokens.colorNeutralStroke1, borderBottomColor: tokens.colorNeutralStroke1 },
   cardCancelled: { opacity: 0.5, textDecorationLine: 'line-through' },
   cardDragging: { opacity: 0.35 },
+  // 同じキャンペーンのきょうだい(どれかにマウスを乗せたとき)。線の色の輪で光らせる
+  cardSibling: { zIndex: 2, outline: '2px solid var(--campaign-color)', outlineOffset: '1px', boxShadow: tokens.shadow8 },
   line1: { display: 'flex', alignItems: 'center', columnGap: '3px', minWidth: 0, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, lineHeight: 1.3 },
   name: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   meta: { display: 'flex', columnGap: '6px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' },
@@ -96,10 +100,15 @@ interface Props {
   cardProducts: Map<string, string[]>
   products: Product[]
   heroes: HeroImage[]
+  /**
+   * キャンペーン(X79)。カードの札を「キャンペーン名 › メール」にし、同じキャンペーンのカードは左の線を同じ色にする
+   * (状態は地の色で出す)。マウスを乗せると、きょうだいのカードも光る
+   */
+  campaigns?: Map<string, Campaign>
 }
 
 /** 週の表示の「時刻」の見方(X46) */
-export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, onSelect, onMove, renderMeta, isFrame, cardProducts, products, heroes }: Props) {
+export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, onSelect, onMove, renderMeta, isFrame, cardProducts, products, heroes, campaigns }: Props) {
   const s = useStyles()
   const t = useT()
   const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
@@ -183,6 +192,10 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
     return { day, m }
   }
   const timeText = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`
+  // この週に見えているキャンペーンの線の色(見えている順。日・時刻の順に並べてから割り当てる)
+  const lineColors = campaignColors([...dated].sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? '')).map((c) => (c.campaign_id && campaigns?.has(c.campaign_id) ? c.campaign_id : null)))
+  // マウスを乗せているカードのキャンペーン(きょうだいを光らせる)
+  const [hoverCampaign, setHoverCampaign] = useState<string | null>(null)
 
   return (
     <div className={s.root}>
@@ -257,21 +270,28 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
           const reason = isCancelled(c) ? t('取りやめた配信は動かせません', 'Cancelled deliveries cannot be moved') : (fixedReason?.(c) ?? null)
           const state = stateOf?.(c)
           const color = state?.color ?? statusColor(c.status)
+          const campaign = c.campaign_id ? campaigns?.get(c.campaign_id) : undefined
+          // キャンペーンに入っているカードは、左の線をキャンペーンの色に(地の色は状態のまま)
+          const line = campaign ? (lineColors.get(campaign.id) ?? color) : color
+          const label = campaign ? campaignCardLabel(campaign.name, c.channel) : c.name
           const colW = 100 / 7
           const body = (
             <div
               key={c.id}
               role="button"
               tabIndex={0}
-              className={mergeClasses(s.card, !!reason && s.cardFixed, isFrame?.(c) && s.cardFrame, isCancelled(c) && s.cardCancelled, drag?.id === c.id && drag.moved && s.cardDragging)}
+              className={mergeClasses(s.card, !!reason && s.cardFixed, isFrame?.(c) && s.cardFrame, isCancelled(c) && s.cardCancelled, drag?.id === c.id && drag.moved && s.cardDragging, !!campaign && hoverCampaign === campaign.id && s.cardSibling)}
               style={{
                 top: yOf(m),
                 left: `calc(${day * colW}% + 3px + (${colW}% - 6px) * ${pos.lane / pos.lanes})`,
                 width: `calc((${colW}% - 6px) / ${pos.lanes})`,
-                borderLeftColor: color,
+                borderLeftColor: line,
                 backgroundColor: `color-mix(in srgb, ${color} 16%, var(--colorNeutralBackground1))`,
+                ...(campaign ? ({ '--campaign-color': line } as CSSProperties) : {}),
               }}
-              title={[c.name, state?.label, reason ?? t('つかんで、別の日・時刻へ動かせます', 'Drag to another day or time')].filter(Boolean).join('\n')}
+              onPointerEnter={() => setHoverCampaign(campaign?.id ?? null)}
+              onPointerLeave={() => setHoverCampaign(null)}
+              title={[label, state?.label, reason ?? t('つかんで、別の日・時刻へ動かせます', 'Drag to another day or time')].filter(Boolean).join('\n')}
               onPointerDown={(e) => {
                 if (reason) return
                 const r = e.currentTarget.getBoundingClientRect()
@@ -290,7 +310,7 @@ export function WeekTimeGrid({ start, cards, alertKinds, stateOf, fixedReason, o
                 <AlertMark kind={alertKinds?.get(c.id)} />
                 {/* 動かせない配信(承認済み・確定した週・取りやめ)は、鍵の印 */}
                 {reason && <LockClosedRegular fontSize={12} aria-label={reason} />}
-                <span className={s.name}>{c.name || t('(配信名のない枠)', '(untitled frame)')}</span>
+                <span className={s.name}>{label || t('(配信名のない枠)', '(untitled frame)')}</span>
               </span>
               <span className={s.meta}>
                 {`${timeText(m)} ${c.country ?? ''}`.trim()}
