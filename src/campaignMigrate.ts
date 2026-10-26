@@ -10,17 +10,13 @@ import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { CampaignsService } from './data/campaigns'
-import { ApprovalRequestsService } from './data/approvalRequests'
-import { ProductionRequestsService } from './data/productionRequests'
+import { ApprovalsService } from './data/approvals'
 import { askAgent } from './aiSelect'
 import { generateFor, replaceContent } from './bulkDraft'
 import { REMAKE_CLEARED_TABLES, campaignDateOf, cardNameFor, cardsOfCampaign, remakeResetFields } from './campaigns'
 import { isCancelled } from './cancel'
 import { localDate } from './dates'
 import { THEME_TYPES } from './themeTypes'
-
-/** 消す行の表(REMAKE_CLEARED_TABLES と同じ並び)の、読み書きの窓口 */
-const CLEARED = { approval_requests: ApprovalRequestsService, production_requests: ProductionRequestsService } satisfies Record<(typeof REMAKE_CLEARED_TABLES)[number], unknown>
 
 /** カードにつながる行(承認の依頼・制作の依頼)。消す行を数え、消すのに使う */
 export interface CardRow {
@@ -198,9 +194,11 @@ export async function runMigration(plan: MigrationPlan, ctx: MigrationContext): 
           campaign = res.data
           ctx.log(`  キャンペーンを作りました: ${campaign.name}`)
         }
-        // 承認の依頼・制作の依頼の行を先に消す(campaign_id はいちばん最後。途中で止まっても、もう一度流せばここからやり直す)
-        for (const table of REMAKE_CLEARED_TABLES)
-          for (const row of ctx.rows[table].filter((x) => x.delivery_card_id === card.id)) await CLEARED[table].delete(row.id)
+        // 承認の依頼・制作の依頼の行を先に消す(campaign_id はいちばん最後。途中で止まっても、もう一度流せばここからやり直す)。
+        // 汎用の窓口(/api/data)は、この 2 つの表を 403 で断る(WRITE_LOCKED)。消すのは承認の窓口の clear-card で、失敗はカードの失敗にする
+        // (2026-10-26 の本番の移し替えで、汎用の窓口で消して結果を見ていなかったため、8 行が消えずに残った)
+        const cleared = await ApprovalsService.clearCard({ delivery_card_id: card.id })
+        fail(cleared, '承認の依頼・制作の依頼を消せませんでした')
         const extra: Partial<DeliveryCardFields> = {
           ...remakeResetFields(),
           name: cardNameFor(campaign.name, card.channel),

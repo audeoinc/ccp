@@ -158,6 +158,23 @@ export const ApprovalsService = {
     return { success: true, data: view(req, requestId) }
   },
 
+  async clearCard(input: { delivery_card_id: string }): Promise<Result<{ approval_requests: number; production_requests: number }>> {
+    // サーバーと同じく、承認の相手・通知も一緒に消す(CASCADE)
+    const drop = (key: string, gone: (r: Row) => boolean) => {
+      // 表の配列はほかの所も持っているので、差し替えずに、その場で抜く
+      const list = tables[key] ?? []
+      const before = list.length
+      for (let i = list.length - 1; i >= 0; i--) if (gone(list[i])) list.splice(i, 1)
+      return before - list.length
+    }
+    const ids = new Set(tables.ApprovalRequestsService.filter((r) => r.delivery_card_id === input.delivery_card_id).map((r) => r.id))
+    drop('ApprovalReviewersService', (r) => ids.has(r.approval_request_id))
+    drop('NotificationsService', (r) => ids.has(r.approval_request_id))
+    const approvals = drop('ApprovalRequestsService', (r) => ids.has(r.id))
+    const production = drop('ProductionRequestsService', (r) => r.delivery_card_id === input.delivery_card_id)
+    return { success: true, data: { approval_requests: approvals, production_requests: production } }
+  },
+
   async reset(input: { delivery_card_id: string }): Promise<Result<{ stale: number }>> {
     const before = tables.ApprovalRequestsService.filter((r) => r.delivery_card_id === input.delivery_card_id && LIVE.has(String(r.status))).length
     staleLive(input.delivery_card_id)

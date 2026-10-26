@@ -52,4 +52,6 @@ export const ApprovalsService = {
   withdraw: (requestId: string, input: { actor: Actor; note?: string; week_start?: string }) => post<ApprovalView>(`/requests/${encodeURIComponent(requestId)}/withdraw`, input),
   /** 内容が変わったので、いまの依頼を古いものにする(配信のステータス・履歴は、保存の側で書く) */
   reset: (input: { delivery_card_id: string }) => post<{ stale: number }>('/reset', input),
+  /** 作り直したカードの、承認の依頼と制作の依頼の行を消す(X79 の段 ⑤。汎用の窓口はこの表を書かせないので、専用の窓口で) */
+  clearCard: (input: { delivery_card_id: string }) => post<{ approval_requests: number; production_requests: number }>('/clear-card', input),
 }

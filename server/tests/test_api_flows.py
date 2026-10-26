@@ -120,6 +120,20 @@ class ApprovalFlowTest(Base):
         self.assertEqual(self.store.row("production_requests", pid)["status"], "stale")
 
 
+    def test_clear_card_deletes_requests_of_that_card_only(self) -> None:
+        # 作り直したカード(X79 の段 ⑤)の依頼は消す。汎用の窓口は 403 で断るので、この窓口で(2026-10-26 本番で消えずに残った)
+        rid = self.request_review()
+        pid = self.store.add("production_requests", delivery_card_id=self.card, version=1, status="in_progress")
+        other = self.store.add("delivery_cards", name="ほかの配信", status="not_started")
+        keep = self.store.add("production_requests", delivery_card_id=other, version=1, status="requested")
+        r = self.client.post("/api/approvals/clear-card", json={"delivery_card_id": self.card})
+        self.assertEqual(r.json()["data"], {"approval_requests": 1, "production_requests": 1})
+        self.assertIsNone(self.store.row("approval_requests", rid))
+        self.assertIsNone(self.store.row("production_requests", pid))
+        self.assertIsNotNone(self.store.row("production_requests", keep))
+        self.assertEqual(self.client.post("/api/approvals/clear-card", json={}).status_code, 400)
+
+
 class ProductionFlowTest(Base):
     def test_request_receive_and_refuse_twice(self) -> None:
         old = self.store.add("production_requests", delivery_card_id=self.card, version=1, status="requested")

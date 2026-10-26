@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from . import repo, schema as sc
 from .data_api import Fail, db, fail, ok, read_body, require_db
 from .identity import request_actor
-from .production import stale_live
+from .production import clear_card as clear_production, stale_live
 
 router = APIRouter(prefix="/api/approvals", dependencies=[Depends(require_db)])
 
@@ -277,6 +277,20 @@ async def withdraw(request_id: str, request: Request):
             pending = [r for r in reviewers if (r.get("decision") or "pending") == "pending"]
             await _notify(conn, await _reviewer_users(conn, pending), actor["id"], "withdrawn", f"依頼の取り下げ: {card.get('name') or ''}", f"{actor['name']} が「{card.get('name') or ''}」の承認の依頼を取り下げました。" + (f" {note}" if note else ""), card["id"], req["id"])
     return ok(_view(req, reviewers))
+
+
+@router.post("/clear-card")
+async def clear_card(request: Request):
+    """作り直したカード(X79 の段 ⑤。中身を作り直して未起案に戻した)の、承認の依頼と制作の依頼の行を消す。
+    承認の相手・通知は CASCADE で一緒に消える。汎用の窓口(/api/data)は、この 2 つの表を書かせない(WRITE_LOCKED)ので、ここで消す"""
+    body = await read_body(request)
+    card_id = str(body.get("delivery_card_id") or "")
+    if not card_id:
+        return fail(400, "delivery_card_id が要ります")
+    async with db(write=True) as conn:
+        res = await conn.execute(text("DELETE FROM approval_requests WHERE delivery_card_id = :c"), {"c": sc.coerce("uuid", card_id)})
+        production = await clear_production(conn, card_id)
+    return ok({"approval_requests": int(res.rowcount or 0), "production_requests": production})
 
 
 @router.post("/reset")

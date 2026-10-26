@@ -240,6 +240,14 @@ def _stale(table: str, live: tuple[str, ...], extra: Callable[[dict[str, Any]], 
     return run
 
 
+def _delete_of_card(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
+    table = m.group(1)
+    gone = [k for k, r in store.tables.get(table, {}).items() if _key(r.get("delivery_card_id")) == _key(p["c"])]
+    for k in gone:
+        del store.tables[table][k]
+    return Result(rowcount=len(gone))
+
+
 def _max_version(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
     versions = [int(r.get("version") or 0) for r in store.rows("production_requests", delivery_card_id=p["c"])]
     return Result([Row({"v": max(versions, default=0)})])
@@ -253,4 +261,5 @@ STATEMENTS: list[tuple[str, Callable[[FakeStore, re.Match[str], dict[str, Any]],
     (r"^UPDATE approval_requests SET status = 'stale'", _stale("approval_requests", ("open", "approved", "changes_requested"), lambda p: {"closed_at": p["now"]})),
     (r"^UPDATE production_requests SET status = 'stale'", _stale("production_requests", ("requested", "in_progress", "done", "checked"), lambda p: {})),
     (r"^SELECT COALESCE\(MAX\(version\), 0\) FROM production_requests", _max_version),
+    (r"^DELETE FROM (approval_requests|production_requests) WHERE delivery_card_id = :c$", _delete_of_card),
 ]

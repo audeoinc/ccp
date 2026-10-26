@@ -53,6 +53,12 @@ async def stale_live(conn: AsyncConnection, card_id: str) -> None:
     )
 
 
+async def clear_card(conn: AsyncConnection, card_id: str) -> int:
+    """カードの制作の依頼の行を、すべて消す(作り直したカード。X79 の段 ⑤)。消した行の数"""
+    res = await conn.execute(text("DELETE FROM production_requests WHERE delivery_card_id = :c"), {"c": sc.coerce("uuid", card_id)})
+    return int(res.rowcount or 0)
+
+
 VARIANTS = ("B", "C")
 
 
