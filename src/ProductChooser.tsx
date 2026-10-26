@@ -74,7 +74,7 @@ export function ProductLine({ product: p, fact }: { product?: Product; fact?: Re
   const t = useT()
   const s = useStyles()
   // 在庫の持ち(詳しい情報の「在庫の持ち」と同じ計算。いまの商品と候補を見比べられるように。2026-10-26 利用者の決め)。売れていない・読めないときは出さない
-  const cover = useStockCover(p?.product_code)
+  const cover = useStockCover(p?.product_code, p?.stock)
   return p ? (
     <span className={s.ideaRow}>
       <ImageThumb src={productImage(p)} alt={p.name} width={36} height={44} />

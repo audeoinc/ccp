@@ -41,10 +41,14 @@ export function coverOf(last4: number, latestStock: number | undefined): number 
   return last4 > 0 && latestStock !== undefined ? Math.round((latestStock / (last4 / 4)) * 10) / 10 : undefined
 }
 
-/** 週次実績(古い順)からの在庫の持ち(詳しい情報の「在庫の持ち」) */
-export function stockCover(weekly: WeeklyPoint[], fallbackStock?: number): number | undefined {
+/**
+ * 週次実績(古い順)と商品の在庫からの在庫の持ち(詳しい情報の「在庫の持ち」)。
+ * 在庫は、行に出している数と同じ商品のマスタの在庫を使う(週次実績の最後の週の在庫は 0 のことが多く、「在庫 229 ・ 約0週」と食い違ったため。2026-10-26)。
+ * 商品の在庫が分からないときだけ、週次実績のいちばん新しい週の在庫
+ */
+export function stockCover(weekly: WeeklyPoint[], stock?: number | null): number | undefined {
   const last4 = weekly.slice(-4).reduce((n, w) => n + w.units, 0)
-  return coverOf(last4, weekly.length > 0 ? weekly[weekly.length - 1].stock : fallbackStock)
+  return coverOf(last4, stock ?? (weekly.length > 0 ? weekly[weekly.length - 1].stock : undefined))
 }
 
 // ---- 在庫の持ちだけを、並べた行の分まとめて読む(商品のフロートの入れ替えの行。行ごとに週次実績を読むと、並べた数だけ問い合わせが増えたため)
@@ -80,7 +84,7 @@ async function flushCovers() {
  * 在庫の持ち(行に出す分)。詳しい情報の「在庫の持ち」と同じ数になるよう、計算は coverOf を通し、
  * 週の並び(新しい順に 4 週)と、在庫・販売数が空のときの扱い(0)も、詳しい情報の読み方と同じにする
  */
-export function useStockCover(code?: string): number | undefined {
+export function useStockCover(code?: string, stock?: number | null): number | undefined {
   const [, setTick] = useState(0)
   useEffect(() => {
     if (!code) return
@@ -92,7 +96,8 @@ export function useStockCover(code?: string): number | undefined {
     }
   }, [code])
   const v = code ? covers.get(code) : undefined
-  return v ? coverOf(v.last4, v.stock ?? 0) : undefined
+  // 在庫は、詳しい情報と同じく商品のマスタの在庫(分からないときだけ、いちばん新しい週の在庫)
+  return v ? coverOf(v.last4, stock ?? v.stock ?? 0) : undefined
 }
 
 function loadShared(code: string): Promise<ProductData> {
