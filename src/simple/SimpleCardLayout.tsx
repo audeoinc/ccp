@@ -56,6 +56,7 @@ import { confirmDialog } from '../confirm'
 import { PaneRail } from '../PaneRail'
 import { typo } from '../typo'
 import { hasPendingTrial, settlePendingTrial } from '../trial'
+import { tapComplete } from '../pushLink'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
@@ -385,6 +386,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     preheader: e.form.preheader,
     pushTitle: e.form.pushTitle,
     pushBody: e.form.pushBody,
+    pushTapDone: tapComplete(e.pushLink),
     headline: e.form.headline,
     copy: e.form.copy,
     hasHero: !!e.hero,

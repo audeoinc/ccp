@@ -81,19 +81,6 @@ export function AppLinksEditor({ links, onLinks, slots, items, products, campaig
   const styles = useStyles()
   const t = useT()
   const [showProducts, setShowProducts] = useState(false)
-  const itemProducts = items.map((it) => products.find((p) => p.id === it.productId)).filter((p): p is Product => !!p)
-  const first = itemProducts[0]
-  const tap = tapScreen(pushLink, { product_code: first?.product_code, category: optionLabel(first?.category_name) || undefined })
-
-  const tapKinds: PushLinkKind[] = ['message', 'campaign', 'product', 'category', 'home', 'custom']
-  const slotKinds: AppScreenKind[] = ['campaign', 'category', 'product', 'home', 'custom']
-  const setScreen = (slot: LinkSlot, sc: AppScreen | null) => {
-    const screens = { ...links.screens }
-    if (sc) screens[slot.key] = sc
-    else delete screens[slot.key]
-    onLinks({ ...links, screens })
-  }
-
   return (
     <div className={styles.root}>
       <div>
@@ -106,30 +93,7 @@ export function AppLinksEditor({ links, onLinks, slots, items, products, campaig
         </div>
       </div>
 
-      <div className={styles.slot}>
-        <Field label={t('通知を押したときに開く画面', 'Opens when the notification is tapped')} size="small">
-          <Select size="small" value={pushLink?.kind ?? ''} onChange={(_, d) => onPushLink({ kind: d.value as PushLinkKind, url: pushLink?.url })}>
-            <option value="" disabled>{t('選んでください', 'Choose')}</option>
-            {tapKinds.map((k) => (
-              <option key={k} value={k}>{k === 'product' ? t('紹介する商品のページ(最初の商品)', 'Featured product page (first item)') : k === 'category' ? t('カテゴリのページ(最初の商品のカテゴリ)', 'Category page (first item’s category)') : screenKindLabel(k)}</option>
-            ))}
-          </Select>
-        </Field>
-        {pushLink?.kind === 'custom' && (
-          <Field label={t('画面の名前(screen)', 'Screen name (screen)')} size="small">
-            <Input size="small" value={pushLink.url ?? ''} placeholder="coupon_list" onChange={(_, d) => onPushLink({ kind: 'custom', url: d.value })} />
-          </Field>
-        )}
-        {tap && fcmText(tap, campaign) ? (
-          <span className={styles.data}>data: {fcmText(tap, campaign)}</span>
-        ) : (
-          <span className={styles.warn}>
-            {pushLink?.kind === 'product' || pushLink?.kind === 'category'
-              ? t('メッセージに商品を入れると、開く画面が決まります', 'Add a product to the message to decide the screen')
-              : t('開く画面を決めてください', 'Choose the screen to open')}
-          </span>
-        )}
-      </div>
+      <PushTapField pushLink={pushLink} onPushLink={onPushLink} items={items} products={products} campaign={campaign} />
 
       <div>
         <div className={styles.head}>{t('メッセージのリンク先', 'Links in the message')}</div>
@@ -140,55 +104,23 @@ export function AppLinksEditor({ links, onLinks, slots, items, products, campaig
           )}
         </div>
       </div>
-      {slots.map((s, i) => {
-        const set = links.screens?.[s.key]
-        const sc = screenOf(links, s)
-        const text = fcmText(sc, campaign)
-        const needsValue = set && (set.kind === 'category' || set.kind === 'product' || set.kind === 'custom')
-        return (
-          <div
-            key={s.key}
-            className={styles.slot}
-            onMouseEnter={() => onFocusSlot?.(s.key)}
-            onMouseLeave={() => onFocusSlot?.(null)}
-            onFocus={() => onFocusSlot?.(s.key)}
-            onBlur={() => onFocusSlot?.(null)}
-          >
-            <div className={styles.slotHead}>
-              <span className={styles.num}>{i + 1}</span>
-              {s.label}
-              <span className={styles.kind}>{linkKindLabel(s.linkKind)}</span>
-            </div>
-            <div className={needsValue ? styles.row : undefined}>
-              <Select
-                size="small"
-                value={set?.kind ?? ''}
-                onChange={(_, d) => setScreen(s, d.value ? { kind: d.value as AppScreenKind, value: d.value === 'product' ? first?.product_code : undefined } : null)}
-              >
-                <option value="">{s.defaultScreen ? t(`既定(${describe(s.defaultScreen)})`, `Default (${describe(s.defaultScreen)})`) : t('選んでください', 'Choose')}</option>
-                {slotKinds.map((k) => (
-                  <option key={k} value={k}>{screenKindLabel(k)}</option>
-                ))}
-              </Select>
-              {set?.kind === 'product' && (
-                <Select size="small" value={set.value ?? ''} onChange={(_, d) => setScreen(s, { kind: 'product', value: d.value })}>
-                  <option value="" disabled>{t('商品を選んでください', 'Choose a product')}</option>
-                  {itemProducts.filter((p) => p.product_code).map((p) => (
-                    <option key={p.id} value={p.product_code}>{`${p.product_code} ${p.name}`}</option>
-                  ))}
-                </Select>
-              )}
-              {set?.kind === 'category' && (
-                <Input size="small" value={set.value ?? ''} placeholder={t('カテゴリ名', 'Category name')} onChange={(_, d) => setScreen(s, { kind: 'category', value: d.value })} />
-              )}
-              {set?.kind === 'custom' && (
-                <Input size="small" value={set.value ?? ''} placeholder="coupon_list" onChange={(_, d) => setScreen(s, { kind: 'custom', value: d.value })} />
-              )}
-            </div>
-            {text ? <span className={styles.data}>data: {text}</span> : <span className={styles.warn}>{t('開く画面を決めてください', 'Choose the screen to open')}</span>}
+      {slots.map((s, i) => (
+        <div
+          key={s.key}
+          className={styles.slot}
+          onMouseEnter={() => onFocusSlot?.(s.key)}
+          onMouseLeave={() => onFocusSlot?.(null)}
+          onFocus={() => onFocusSlot?.(s.key)}
+          onBlur={() => onFocusSlot?.(null)}
+        >
+          <div className={styles.slotHead}>
+            <span className={styles.num}>{i + 1}</span>
+            {s.label}
+            <span className={styles.kind}>{linkKindLabel(s.linkKind)}</span>
           </div>
-        )
-      })}
+          <AppScreenField links={links} onLinks={onLinks} slot={s} items={items} products={products} campaign={campaign} />
+        </div>
+      ))}
 
       <Button
         size="small"
@@ -213,6 +145,109 @@ export function AppLinksEditor({ links, onLinks, slots, items, products, campaig
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+const itemProductsOf = (items: Item[], products: Product[]) => items.map((it) => products.find((p) => p.id === it.productId)).filter((p): p is Product => !!p)
+
+interface TapProps {
+  pushLink: PushLink | null
+  onPushLink: (l: PushLink) => void
+  items: Item[]
+  products: Product[]
+  campaign: string
+}
+
+/** 通知を押したときに開く画面の欄(⑤ リンク先と、シンプルな配信カードの通知の部品のペインで使う。X81 の 2) */
+export function PushTapField({ pushLink, onPushLink, items, products, campaign }: TapProps) {
+  const styles = useStyles()
+  const t = useT()
+  const first = itemProductsOf(items, products)[0]
+  const tap = tapScreen(pushLink, { product_code: first?.product_code, category: optionLabel(first?.category_name) || undefined })
+  const tapKinds: PushLinkKind[] = ['message', 'campaign', 'product', 'category', 'home', 'custom']
+  return (
+    <div className={styles.slot}>
+      <Field label={t('通知を押したときに開く画面', 'Opens when the notification is tapped')} size="small">
+        <Select size="small" value={pushLink?.kind ?? ''} onChange={(_, d) => onPushLink({ kind: d.value as PushLinkKind, url: pushLink?.url })}>
+          <option value="" disabled>{t('選んでください', 'Choose')}</option>
+          {tapKinds.map((k) => (
+            <option key={k} value={k}>{k === 'product' ? t('紹介する商品のページ(最初の商品)', 'Featured product page (first item)') : k === 'category' ? t('カテゴリのページ(最初の商品のカテゴリ)', 'Category page (first item’s category)') : screenKindLabel(k)}</option>
+          ))}
+        </Select>
+      </Field>
+      {pushLink?.kind === 'custom' && (
+        <Field label={t('画面の名前(screen)', 'Screen name (screen)')} size="small">
+          <Input size="small" value={pushLink.url ?? ''} placeholder="coupon_list" onChange={(_, d) => onPushLink({ kind: 'custom', url: d.value })} />
+        </Field>
+      )}
+      {tap && fcmText(tap, campaign) ? (
+        <span className={styles.data}>data: {fcmText(tap, campaign)}</span>
+      ) : (
+        <span className={styles.warn}>
+          {pushLink?.kind === 'product' || pushLink?.kind === 'category'
+            ? t('メッセージに商品を入れると、開く画面が決まります', 'Add a product to the message to decide the screen')
+            : t('開く画面を決めてください', 'Choose the screen to open')}
+        </span>
+      )}
+    </div>
+  )
+}
+
+interface ScreenProps {
+  links: Links
+  onLinks: (l: Links) => void
+  slot: LinkSlot
+  items: Item[]
+  products: Product[]
+  campaign: string
+}
+
+/** メッセージのメイン画像・ボタン 1 つの、押したときに開く画面の欄(⑤ リンク先の行と、シンプルな配信カードの部品のペインで使う) */
+export function AppScreenField({ links, onLinks, slot: s, items, products, campaign }: ScreenProps) {
+  const styles = useStyles()
+  const t = useT()
+  const itemProducts = itemProductsOf(items, products)
+  const first = itemProducts[0]
+  const slotKinds: AppScreenKind[] = ['campaign', 'category', 'product', 'home', 'custom']
+  const setScreen = (sc: AppScreen | null) => {
+    const screens = { ...links.screens }
+    if (sc) screens[s.key] = sc
+    else delete screens[s.key]
+    onLinks({ ...links, screens })
+  }
+  const set = links.screens?.[s.key]
+  const text = fcmText(screenOf(links, s), campaign)
+  const needsValue = set && (set.kind === 'category' || set.kind === 'product' || set.kind === 'custom')
+  return (
+    <div className={styles.slot}>
+      <div className={needsValue ? styles.row : undefined}>
+        <Select
+          size="small"
+          value={set?.kind ?? ''}
+          onChange={(_, d) => setScreen(d.value ? { kind: d.value as AppScreenKind, value: d.value === 'product' ? first?.product_code : undefined } : null)}
+        >
+          <option value="">{s.defaultScreen ? t(`既定(${describe(s.defaultScreen)})`, `Default (${describe(s.defaultScreen)})`) : t('選んでください', 'Choose')}</option>
+          {slotKinds.map((k) => (
+            <option key={k} value={k}>{screenKindLabel(k)}</option>
+          ))}
+        </Select>
+        {set?.kind === 'product' && (
+          <Select size="small" value={set.value ?? ''} onChange={(_, d) => setScreen({ kind: 'product', value: d.value })}>
+            <option value="" disabled>{t('商品を選んでください', 'Choose a product')}</option>
+            {itemProducts.filter((p) => p.product_code).map((p) => (
+              <option key={p.id} value={p.product_code}>{`${p.product_code} ${p.name}`}</option>
+            ))}
+          </Select>
+        )}
+        {set?.kind === 'category' && (
+          <Input size="small" value={set.value ?? ''} placeholder={t('カテゴリ名', 'Category name')} onChange={(_, d) => setScreen({ kind: 'category', value: d.value })} />
+        )}
+        {set?.kind === 'custom' && (
+          <Input size="small" value={set.value ?? ''} placeholder="coupon_list" onChange={(_, d) => setScreen({ kind: 'custom', value: d.value })} />
+        )}
+      </div>
+      {text ? <span className={styles.data}>data: {text}</span> : <span className={styles.warn}>{t('開く画面を決めてください', 'Choose the screen to open')}</span>}
     </div>
   )
 }

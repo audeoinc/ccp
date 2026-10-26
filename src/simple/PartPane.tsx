@@ -27,6 +27,7 @@ import { TemplateThumb } from '../TemplateThumb'
 import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
 import { PushThumb } from '../PushThumb'
+import { AppScreenField, PushTapField } from '../AppLinksEditor'
 import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
 import { useTrial } from '../trial'
@@ -193,7 +194,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   /** 商品のフロートを開く。フロートの「入れ替える」は、フロートの中に同じ引き出しを出す(部品のペインには飛ばない。2026-10-26) */
   const openFloat = (itemKey: string) => e.openProduct(itemKey, undefined, swapInFloat?.(itemKey))
   const [linkEditing, setLinkEditing] = useState(false)
-  const heroDefaultLink = e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl
+  const heroSlot = e.linkSpots.find((x) => x.kind === 'hero')
+  const heroDefaultLink = heroSlot?.defaultUrl
   // 使える期限が配信日より前(選んだあとで期限が来た画像。入れ替えを促す)
   const heroExpired = !!e.hero?.usable_until && !!e.form.scheduledAt && e.hero.usable_until < e.form.scheduledAt.slice(0, 10)
   /** 管理画面と照らし合わせるための 1 行(番号・季節・用途) */
@@ -469,9 +471,16 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'preheader':
         return text('preheader', t('プリヘッダー(受信箱で件名の下に出る文。目安 40〜90 文字)', 'Preheader (shown under the subject in the inbox; aim for 40–90 chars)'), { rows: 2, max: PREHEADER_MAX })
       case 'pushTitle':
-        return text('pushTitle', t('通知のタイトル', 'Notification title'), { rows: 1, placeholder: e.form.headline, max: PUSH_TITLE_MAX })
       case 'pushBody':
-        return text('pushBody', t('通知の本文', 'Notification body'), { rows: 3, placeholder: e.form.copy, max: PUSH_BODY_MAX })
+        // 開く画面は、タイトル・本文のどちらを選んでも出す(通知は 1 つのまとまりで、押すのは通知の全体。X81 の 2)
+        return (
+          <>
+            {part.kind === 'pushTitle'
+              ? text('pushTitle', t('通知のタイトル', 'Notification title'), { rows: 1, placeholder: e.form.headline, max: PUSH_TITLE_MAX })
+              : text('pushBody', t('通知の本文', 'Notification body'), { rows: 3, placeholder: e.form.copy, max: PUSH_BODY_MAX })}
+            <PushTapField pushLink={e.pushLink} onPushLink={e.setPushLink} items={e.items} products={e.products} campaign={e.fcmCampaign} />
+          </>
+        )
       case 'headline':
       case 'copy':
         return (
@@ -619,6 +628,11 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 ]}
               />
             )}
+            {e.channel === 'push' && heroSlot && (
+              <Field label={t('押したときに開く画面', 'Screen opened on tap')} size="small">
+                <AppScreenField links={e.links} onLinks={e.setLinks} slot={heroSlot} items={e.items} products={e.products} campaign={e.fcmCampaign} />
+              </Field>
+            )}
             {e.channel === 'email' && (
               linkEditing ? (
                 <Field label={t('メイン画像のリンク先(空は既定)', 'Main image link (empty uses the default)')} size="small">
@@ -720,7 +734,11 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 </span>
               </Field>
             ) : (
-              <span className={s.caption}>{t('アプリで開く画面は、詳しい画面の「⑤ リンク先」で決めます。', 'The app screen to open is set in “⑤ Links” of the full view.')}</span>
+              slot && (
+                <Field label={t('押したときに開く画面', 'Screen opened on tap')} size="small">
+                  <AppScreenField links={e.links} onLinks={e.setLinks} slot={slot} items={e.items} products={e.products} campaign={e.fcmCampaign} />
+                </Field>
+              )
             )}
           </>
         )
@@ -737,13 +755,19 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               <TemplateLocked text={t('画像はテンプレートで決まっています(テンプレートで「配信ごとに差し替える」にすると、ここで替えられます)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (turn on “Swap per delivery” in the template to swap it here). The link on click can be set for this delivery.')} />
             )}
             {slot && <Text size={200}>{slot.label}</Text>}
-            {e.channel === 'email' && (
+            {e.channel === 'email' ? (
               <Field label={t('リンク先(空は既定)', 'Link (empty uses the default)')} size="small">
                 <span className={s.row}>
                   <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
                   <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
                 </span>
               </Field>
+            ) : (
+              slot && (
+                <Field label={t('押したときに開く画面', 'Screen opened on tap')} size="small">
+                  <AppScreenField links={e.links} onLinks={e.setLinks} slot={slot} items={e.items} products={e.products} campaign={e.fcmCampaign} />
+                </Field>
+              )
             )}
           </>
         )

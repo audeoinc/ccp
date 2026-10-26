@@ -14,6 +14,7 @@ import { duplicateDelivery } from './duplicate'
 import { STATE_SELECTED } from './items'
 import { tr } from './i18n'
 import type { People } from './people'
+import { parsePushLink, tapComplete } from './pushLink'
 import { readinessOf, type ReadinessItem } from './simple/readiness'
 import { CHANNEL_PUSH } from './status'
 import { slotsOf, templateKeyOfCard } from './templates'
@@ -54,6 +55,7 @@ export function cardReadiness(card: DeliveryCard, productIds: string[], alerts: 
     preheader: card.preheader ?? '',
     pushTitle: card.push_title ?? '',
     pushBody: card.push_body ?? '',
+    pushTapDone: tapComplete(parsePushLink(card.push_link)),
     headline: card.headline ?? '',
     copy: card.copy ?? '',
     hasHero: !!card.hero_image_id,

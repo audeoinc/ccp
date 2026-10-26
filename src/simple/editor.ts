@@ -63,7 +63,7 @@ export interface FloatAction {
  * 配信カードの editor(useCardEditor)から、そのまま渡すもの。名前と型は editor と同じ(写しの型を書かない。2 つの画面で、ずれないように)。
  * form は詳しい画面と同じ Form、savedAt は最後に保存した日時(ISO。上の帯の「保存済み · 12:03」)、canReview は承認の依頼・承認を出せるか(確定した週の配信は、出さない)
  */
-const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'partContent', 'setPartContent', 'links', 'setLinks', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview'] as const
+const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'partContent', 'setPartContent', 'links', 'setLinks', 'pushLink', 'setPushLink', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview'] as const
 type FromEditor = Pick<CardEditor, (typeof FROM_EDITOR)[number]>
 
 /**
@@ -107,6 +107,8 @@ export interface SimpleExtras {
   /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
   applyTexts: (t: WholeTexts) => void
   linkSpots: LinkSlot[]
+  /** アプリの開く画面の FCM の data に入れる campaign(⑤ リンク先と同じ。AB の案の印つき) */
+  fcmCampaign: string
   /** 商品 ID → いちばん強いアラートの種類 */
   alertKinds: Map<string, CardAlertKind>
   /** 載せた商品と、残りの候補を入れ替える(行 ID のまま) */

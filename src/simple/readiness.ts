@@ -35,6 +35,8 @@ export interface ReadinessInput {
   preheader: string
   pushTitle: string
   pushBody: string
+  /** アプリ: 通知を押したときに開く画面が決まっているか(pushLink.ts の tapComplete) */
+  pushTapDone: boolean
   headline: string
   copy: string
   hasHero: boolean
@@ -91,6 +93,8 @@ export function readinessOf(c: ReadinessInput): ReadinessItem[] {
   } else {
     out.push(textCheck('pushTitle', tr('通知のタイトル', 'Notification title'), c.pushTitle, { kind: 'pushTitle' }))
     out.push(textCheck('pushBody', tr('通知の本文', 'Notification body'), c.pushBody, { kind: 'pushBody' }))
+    // 開く画面の欄は、通知の部品のペインにある(X81 の 2)
+    out.push({ key: 'pushTap', level: c.pushTapDone ? 'ok' : 'warn', label: tr('通知を押したときに開く画面', 'Screen opened on tap'), detail: c.pushTapDone ? '' : UNSET(), target: { kind: 'pushTitle' } })
   }
 
   // 在庫・画像の期限は、商品ごとに 1 行(押すと、その商品の枠を選ぶ)。ほかのアラートは、まとめて 1 行

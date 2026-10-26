@@ -1123,6 +1123,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           if (x.sectionCopies) setSectionCopies(x.sectionCopies)
         },
         linkSpots,
+        fcmCampaign,
         alertKinds: productAlertKinds,
         swapWithCandidate,
         openProduct: (key, action, swap) => {
