@@ -18,7 +18,7 @@
 
 ## 2. 最近の作業(新しい順。詳しくは [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md))
 
-- 2026-10-26: **T11 の一部: テンプレートの管理の一覧の幅(作業ブランチ `claude/template-list-width`、main には未マージ)**。一覧と詳しい欄の境目(`Splitter`・`usePaneWidths`、鍵 `templateManager.paneWidths.v1`)。詳しい欄は狭いとき構成のプレビューを下に回す。編集の画面は触っていない。残りは BACKLOG の T11
+- 2026-10-26: **T11 の一部: テンプレートの管理の一覧の幅(main に入れて本番に反映: deployed-gcp/20261026-150535、main 2c7f2d4)**。一覧と詳しい欄の境目(`Splitter`・`usePaneWidths`、鍵 `templateManager.paneWidths.v1`)。詳しい欄は狭いとき構成のプレビューを下に回す。編集の画面は触っていない。残りは BACKLOG の T11
 
 - 2026-10-26: **まとめて作るの ② に案のプレビュー(main に入れて本番に反映: deployed-gcp/20261026-141152、main 075c992)**。カードの「プレビュー」→ `BulkPreviewFloat`(大きさを覚える。← → で隣の案。スマホ / PC は配信カードと同じ設定)。描き方は `CardPreview`(幅 `device` を渡せるようにした。ほかの呼び出しは変わらない)。英語の画面・本物の AI の案は未確認
 
@@ -32,7 +32,7 @@
 - 2026-10-22〜23: **B10 Workbench の開発用の画面**([DEVTOOLS.md](DEVTOOLS.md)。`/dev/`、`CCP_DEVTOOLS=1`)。BigQuery を見る・SELECT・Gemini と SQL を作る会話(セッション)・出力ごとの版と答え合わせ・作業ファイル・実行の履歴・列を調べる・ポリシーの文書。Workbench で試すのは利用者。全文は 2026-10-20_21.md の末尾
 - 2026-10-23 午後: **素材を消す(だれでも)・ピンのフロート(`PinFloat`)・右クリックのメニュー(`ContextMenu`)**。ピンを置ける 3 つのプレビュー(シンプル・詳しい配信カード、制作のページの iframe)すべてで、右クリック → ピン → フロートで書く・読む・返す。右クリックの項目(部品・商品・メイン画像・ピン・週月の一覧・素材の行)もすべて入れ、本番に反映。未確認: ピンのリンク `pin=` を開いたとき・制作のページのピンの右クリック・英語の画面。[SIMPLE_CARD.md](SIMPLE_CARD.md) の 18 章の末尾
 - 2026-10-22〜23: **SU1・SU2 シンプルな配信カード**([SIMPLE_CARD.md](SIMPLE_CARD.md) の 12〜18 章)。(a)〜(d)・AB テスト・上の帯(StageHeader)・右端の帯(やり取り / 素材 / 渡すもの)・制作へのメモ・メイン画像のペインまで作り、本番に反映。2026-10-23 に本番が真っ白になった不具合(getTemplate)を直し、ErrorBoundary を足した。clear のあとの引き継ぎは 2026-10-20_21.md の末尾「SU1 の引き継ぎ(2026-10-23 午後)」
-- 2026-10-26: **T8 段階 6 の続き**(ブランチ claude/t8-stage6b): 詳しい配信カードにも部品の書き換え・差し替えの欄(④ セクション・③ ヒーロー。共通の `PartContentFields`)、ボタンの文言を配信ごとに書き換え(印 `overridable`、入れ物 `part_content.text`)。TEMPLATE_OBJECTS.md の 6.1
+- 2026-10-26: **T8 段階 6 の続き**(main に入れて本番に反映: deployed-gcp/20261026-145039、main b9bd9e7): 詳しい配信カードにも部品の書き換え・差し替えの欄(④ セクション・③ ヒーロー。共通の `PartContentFields`)、ボタンの文言を配信ごとに書き換え(印 `overridable`、入れ物 `part_content.text`)。TEMPLATE_OBJECTS.md の 6.1
 - 2026-10-26: **すべて AI で下書きに件名・プリヘッダー(UI 2)**: `runAutoDraft` の最後の工程で `suggestSubjects`(部品ごとの AI と同じ指示文)。全上書きのまま、オプションは作らない(利用者)。アプリの通知は前から作っていた。まとめて作る・段 ⑤ の作り直しにも効く
 - 2026-10-26: **X79 段 ⑤ 移し替えの道具(UI 2。本番ではまだ流していない)**: 開発用の画面 /dev/ の「キャンペーンにまとめる」(`src/dev/CampaignTab.tsx`・`src/campaignMigrate.ts`)。「試し」は読むだけ、「実行」は組ごとに AI でキャンペーンの案 → テーマを決めてカードを作り直す(`runAutoDraft` の `fixedTheme`・`bulkDraft.replaceContent`)→ 承認の依頼・制作の依頼を消す → 最後に campaign_id。止めても続きから。見本(seed.ts・seed.json)は、同じ国・同じ日をすべてまとめた形(AI なし・中身はそのまま)
 - 2026-10-26: **開発へのリクエストの削除(UI 2)**: フロートの「⋯」と一覧に「削除」。ログインしている人なら誰でも消せる(当面。テストの書き込みが多いため)。返信も一緒に消し、賛同は CASCADE。`devRequestPlace.ts` の `deleteDevRequest`。書いたときの様子の画像のファイルは残る
