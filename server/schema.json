@@ -173,7 +173,7 @@
    ]
   },
   "product_images": {
-   "_comment": "商品の画像(メインを含め、商品ページに載っている画像)。手元の PC で集めて、python -m ccp.cli import-images で取り込む(docs/PRODUCT_IMAGES.md)。画像を選ぶとき・AI が配信に合う画像を勧めるときの候補。source = sample は AI で作った見本の写真(scripts/sample-photos.py。見本の商品ページに出す)で、alt が見出し・caption が説明の文・angle がアングル。model_usable_until は写っているモデル(人物)の使用期限(商品ページの modelExpirationDate など。配信日より前に切れる画像を載せていればアラート)。本物の画像(source が空)がある商品では、見本を使わない。source = master は見本で置き換える前の商品のメイン画像の控え(元に戻すため。候補に出さない)",
+   "_comment": "商品の画像(メインを含め、商品ページに載っている画像)。手元の PC で集めて、python -m ccp.cli import-images で取り込む(docs/PRODUCT_IMAGES.md)。画像を選ぶとき・AI が配信に合う画像を勧めるときの候補。source = sample は AI で作った見本の写真(scripts/sample-photos.py。見本の商品ページに出す)で、alt が見出し・caption が説明の文・angle がアングル。angle・angle_note(写っているもの)は、AI が画像の案(X64)で一度だけ判断して残す(次からは画像を読ませずに文字で渡す。画像が変われば行が入れ替わるので、判断し直す)。model_usable_until は写っているモデル(人物)の使用期限(商品ページの modelExpirationDate など。配信日より前に切れる画像を載せていればアラート)。本物の画像(source が空)がある商品では、見本を使わない。source = master は見本で置き換える前の商品のメイン画像の控え(元に戻すため。候補に出さない)",
    "columns": [
     ["name", "text", {"required": true}],
     ["product_code", "text", {"index": true}],
@@ -186,6 +186,7 @@
     ["sha256", "text"],
     ["caption", "text"],
     ["angle", "text"],
+    ["angle_note", "text"],
     ["source", "text"],
     ["model_usable_until", "date"]
    ],

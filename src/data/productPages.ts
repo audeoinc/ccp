@@ -40,9 +40,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export const ProductPages = {
   /** ページを読み、載っている画像の一覧を返す。sample = 見本の EC サイトのページ。page = ブラウザで開くときの URL */
   images: (url: string) => post<{ sample: boolean; page: string; images: PageImage[] }>('/api/product-pages/images', { url }),
-  /** 画像を AI に見せ、アングルと、この配信に合う画像(理由つき)を返す */
+  /** 画像を AI に見せ、アングルと、この配信に合う画像(理由つき)を返す。judged = もうアングルを見分けてあった(画像を読ませなかった)取り込んだ画像の数 */
   suggest: (input: { images: PageImage[]; product: Record<string, unknown>; delivery: Record<string, unknown>; language: 'ja' | 'en' }) =>
-    post<{ images: ImageAngle[]; picks: ImagePick[] }>('/api/product-pages/suggest', input),
+    post<{ images: ImageAngle[]; picks: ImagePick[]; judged?: number }>('/api/product-pages/suggest', input),
   /** 選んだ画像を写し、配信に入れる画像の URL を返す(見本の画像は写さない) */
   adopt: (src: string) => post<{ image_url: string; copied: boolean }>('/api/product-pages/adopt', { src }),
   /** 貼り付けた・選んだ画像のファイルを置き、配信に入れる画像の URL を返す(置き場所は素材と同じ) */

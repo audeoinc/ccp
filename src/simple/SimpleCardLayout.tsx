@@ -707,7 +707,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         approved={counts.approved}
         pendingNames={counts.pendingNames}
         changeReason={counts.changeReason}
-        dirty={e.dirty}
+        dirty={e.revokesApproval}
         save={
           e.saving ? (
             t('保存中…', 'Saving…')

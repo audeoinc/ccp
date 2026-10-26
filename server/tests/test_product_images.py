@@ -33,12 +33,26 @@ def img(file: str, sha: str, main: bool = False, ctype: str = "image/jpeg") -> d
     return {"file": file, "sha256": sha * 32, "content_type": ctype, "main": main, "src": f"https://shop/{file}", "alt": ""}
 
 
+class FakeResult:
+    def __init__(self, rows: list[dict]) -> None:
+        self.rows = rows
+
+    def mappings(self) -> "FakeResult":
+        return self
+
+    def all(self) -> list[dict]:
+        return self.rows
+
+
 class FakeConn:
-    def __init__(self) -> None:
+    def __init__(self, judged: list[dict] | None = None) -> None:
         self.calls: list[tuple[str, dict]] = []
+        # 前の取り込みで、AI がアングルを見分けていた行(SELECT sha256, angle, angle_note で返す)
+        self.judged = judged or []
 
     async def execute(self, stmt, params=None):  # noqa: ANN001, ANN201
         self.calls.append((str(stmt), params or {}))
+        return FakeResult(self.judged if str(stmt).startswith("SELECT sha256") else [])
 
 
 class PlanTest(unittest.TestCase):
@@ -109,6 +123,15 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual([k["url"] for k in kept], ["/img/products/real.jpg"])
         self.assertIn("NOT EXISTS", [c[0] for c in conn.calls if c[0].startswith("INSERT") and c[1].get("source") == "master"][0])
 
+
+    def test_apply_keeps_judged_angles_of_the_same_image(self) -> None:
+        # AI が見分けたアングル(X64)は、中身が同じ画像なら取り込み直しても残す。中身が変わった画像は空(判断し直す)
+        products = [{"product_code": "A1", "market": "JP", "images": [img("JP_A1/01_main.jpg", "a", True), img("JP_A1/02.jpg", "b")]}]
+        p = pi.plan({"products": products}, [{"id": "p1", "product_code": "A1", "market": "JP", "image_url": "x"}])
+        conn = FakeConn([{"sha256": "a" * 32, "angle": "worn", "angle_note": "着用の正面"}, {"sha256": "z" * 32, "angle": "detail", "angle_note": "古い画像"}])
+        asyncio.run(pi.apply(conn, make_zip(products), p, lambda *_: False, main_to_master=False))
+        inserts = [c[1] for c in conn.calls if c[0].startswith("INSERT")]
+        self.assertEqual([(i["angle"], i["angle_note"]) for i in inserts], [("worn", "着用の正面"), (None, None)])
 
 
 class HeroTest(unittest.TestCase):
