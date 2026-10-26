@@ -45,7 +45,8 @@ export function startCapture(key: string, el: HTMLElement) {
 
 // 開発へのリクエストの写す大きさの目安(画面のどこでも打てるので、写すのは打った所のまわりだけ)
 const AROUND = { w: 800, h: 500 }
-const fits = (r: DOMRect) => r.width <= AROUND.w && r.height <= AROUND.h
+// 大きさ 0 の要素(入れ物だけの層など)は写しても空なので、収まるとみなさない
+const fits = (r: DOMRect) => r.width > 0 && r.height > 0 && r.width <= AROUND.w && r.height <= AROUND.h
 
 /**
  * 画面の点のまわりの画像を作り始める(開発へのリクエストのピン)。
@@ -56,10 +57,17 @@ const fits = (r: DOMRect) => r.width <= AROUND.w && r.height <= AROUND.h
 export function startCaptureAt(key: string, x: number, y: number, mark: Element | null, skip: (el: Element) => boolean) {
   begin(key, async () => {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-    const hit = document.elementFromPoint(x, y)
-    if (!hit) return null
     // ピン・ピンのフロート・右クリックのメニューも写さない
-    const filter = (node: Node) => !(node instanceof Element && (skip(node) || node.matches('[data-pin-id], [data-pin-thread], [role="menu"]')))
+    const own = (node: Element) => skip(node) || node.matches('[data-pin-id], [data-pin-thread], [role="menu"]')
+    const filter = (node: Node) => !(node instanceof Element && own(node))
+    // 待つ間に、打ったピン(＋)がその点に出るので、いちばん上の要素はピンの層になる。重なった要素から、ピンの層・メニューの中でない、いちばん上のものを使う
+    // (以前は elementFromPoint で、ピンの層の入れ物(大きさ 0)を写して、空の画像になっていた。2026-10-26 本番の報告)
+    const inOwn = (el: Element) => {
+      for (let a: Element | null = el; a; a = a.parentElement) if (own(a)) return true
+      return false
+    }
+    const hit = document.elementsFromPoint(x, y).find((el) => !inOwn(el) && el !== document.documentElement && el !== document.body)
+    if (!hit) return null
     let el: Element | null = mark && fits(mark.getBoundingClientRect()) ? mark : null
     if (!el && fits(hit.getBoundingClientRect())) {
       el = hit
