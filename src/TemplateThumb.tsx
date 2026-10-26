@@ -3,7 +3,7 @@ import { makeStyles, Tooltip, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { buttonsAt, gridColumns, placedButtons, type ButtonSpec, type HeroKind, type Section, type TemplateLayout, ratioValue } from './templates'
 import { cellRows, isTextView } from './cells'
-import { SECTION_BG, boxFields, buttonColor } from './tables'
+import { boxPlace, isSideBox, SECTION_BG, boxFields, buttonColor } from './tables'
 
 // 見取り図は、受信側のメールの見た目を写したものなので、テーマに依らず固定の配色にする
 const HERO_COLOR: Record<HeroKind, string> = { standard: '#cfd2dc', collab: '#b9a9d6', offer: '#f0a5a0' }
@@ -161,8 +161,8 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
           // 画像・動画は、選んだ形の高さ(省略は横に広い 2:1)
           const media = on.filter((p) => p.type === 'media' && p.h === 1).map((p) => (p.w * colW) / ratioValue(p.ratio ?? 'wide'))
           if (media.length > 0) return Math.max(...media)
-          if (on.some((p) => p.type === 'box' && p.h === 1 && !isTextView(p.view))) return colW
-          if (on.some((p) => p.type === 'box' && isTextView(p.view))) return Math.max(colW * 0.6, inner * 0.3)
+          if (on.some((p) => p.type === 'box' && p.h === 1 && !isSideBox(p))) return colW
+          if (on.some((p) => p.type === 'box' && isSideBox(p))) return Math.max(colW * 0.6, inner * 0.3)
           if (on.some((p) => p.type === 'box')) return colW * 0.8
           if (on.some((p) => p.type === 'text')) return px(10)
           if (on.some((p) => p.type === 'button')) return px(8)
@@ -179,16 +179,28 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
         const draw = (p: (typeof parts)[number], place: React.CSSProperties = {}) => {
               const area = { ...place, minHeight: 0, minWidth: 0 }
               if (p.type === 'box') {
-                if (isTextView(p.view)) {
+                // 名前・価格などの置き場所(T12。決めていなければ見せ方から)
+                const place = boxPlace(p)
+                if (isSideBox(p)) {
                   return (
                     <div key={p.id} style={{ ...area, display: 'grid', gridTemplateColumns: '1fr 1fr', background: PANEL }}>
+                      {place === 'left' && lines}
                       <div style={{ background: IMG }} />
-                      {lines}
+                      {place !== 'left' && lines}
+                    </div>
+                  )
+                }
+                if (place === 'below') {
+                  return (
+                    <div key={p.id} style={{ ...area, position: 'relative', display: 'grid', gridTemplateRows: 'minmax(0, 1fr) auto', background: PANEL }}>
+                      <div style={{ background: p.w * p.h > 1 ? IMG : TILE }} />
+                      {boxFields(p).includes('badge') && <div style={{ position: 'absolute', top: px(2), left: px(2), width: px(8), height: px(3), background: p.priceStyle === 'sale' ? RED : INK }} />}
+                      {(boxFields(p).includes('name') || boxFields(p).includes('price')) && <div style={{ padding: px(2) }}>{caption()}</div>}
                     </div>
                   )
                 }
                 return (
-                  <div key={p.id} style={{ ...area, position: 'relative', display: 'grid', alignContent: 'end', background: p.w * p.h > 1 ? IMG : TILE }}>
+                  <div key={p.id} style={{ ...area, position: 'relative', display: 'grid', alignContent: place === 'top' ? 'start' : place === 'middle' ? 'center' : 'end', background: p.w * p.h > 1 ? IMG : TILE }}>
                     {/* 箱の「出すもの」: バッジは左上の小さな印、名前・価格は下の帯 */}
                     {boxFields(p).includes('badge') && <div style={{ position: 'absolute', top: px(2), left: px(2), width: px(8), height: px(3), background: p.priceStyle === 'sale' ? RED : INK }} />}
                     {(boxFields(p).includes('name') || boxFields(p).includes('price')) && <div style={{ padding: px(2), background: 'rgba(255,255,255,0.85)' }}>{caption()}</div>}
