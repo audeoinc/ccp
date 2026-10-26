@@ -230,7 +230,8 @@ const useStyles = makeStyles({
   sideIcon: { position: 'relative', fontSize: '20px', lineHeight: 1 },
   sideBadge: { position: 'absolute', top: '-7px', right: '-13px' },
   sideDot: { position: 'absolute', top: '-3px', left: '-6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
-  sideLabel: { fontSize: '11px', lineHeight: 1.2 },
+  // 名前はボタンの幅(48px)に収まる短い言葉にする(English で切れていた。2026-10-26 利用者)。長い名前は tip と題に書き、ここは収まらなければ … にする
+  sideLabel: { fontSize: '11px', lineHeight: 1.2, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   // 画像・URL を落とせる所(ドラッグ中)
   sideDrop: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px', backgroundColor: tokens.colorBrandBackground2 },
   dropNote: { fontSize: '16px' },
@@ -541,12 +542,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
   const sideTitle = (v: Exclude<Side, null>) =>
     ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
-  /** 左のバーの並び(アイコンの下に名前。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
+  /** 左のバーの並び(アイコンの下に名前(English も 48px に収まる短い言葉)。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
   const rails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
     // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
     { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
-    { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learnings'), tip: t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)'), count: e.learnCount, color: 'informative' },
-    { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Conversation'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
+    { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learn'), tip: t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)'), count: e.learnCount, color: 'informative' },
+    { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
     {
       v: 'approval',
       icon: <PersonAvailableRegular />,
