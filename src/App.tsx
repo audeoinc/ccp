@@ -1505,6 +1505,7 @@ function App() {
             setFocusProduct(undefined)
             setSelectedId(id)
           }}
+          alertsOf={(id) => cardAlerts.get(id)}
         />
         </ErrorBoundary>
       )}

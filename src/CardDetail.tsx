@@ -65,6 +65,8 @@ import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
 import { usePreviewPins } from './usePreviewPins'
 import { CampaignBand } from './CampaignBand'
+import { CampaignApprove } from './CampaignApprove'
+import { AddCampaignCardDialog } from './CampaignDialogs'
 import { useCampaignOf } from './useCampaignOf'
 import { cardDisplayName } from './campaigns'
 
@@ -126,6 +128,8 @@ interface Props {
   onNext?: () => void
   /** 同じキャンペーンの、ほかの配信カードに切り替える(キャンペーンの帯のタブ。X79)。保存していない変更は、ここで先に保存してから呼ぶ */
   onSwitchCard?: (id: string) => void
+  /** ほかの配信カードのアラート(キャンペーンのまとめて承認の、送る前の確かめに使う。X79 段 ④) */
+  alertsOf?: (cardId: string) => CardAlert[] | undefined
 }
 
 
@@ -158,7 +162,7 @@ const loadOpen = (key: string): boolean => readRaw(key) !== 'closed'
 
 
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext, onSwitchCard }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext, onSwitchCard, alertsOf }: Props) {
   const t = useT()
   const styles = useCardDetailStyles()
   // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
@@ -683,10 +687,42 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     onSwitchCard(id)
   }
+  // キャンペーンに配信カードを足す窓(帯の「＋ 配信カードを足す」。X79 段 ④)
+  const [addingCard, setAddingCard] = useState(false)
+  // 依頼・承認の前に、開いているカードの変更を保存する(確定した週の配信は、理由を聞くので先に保存してもらう)
+  const saveBeforeBulk = async () => {
+    if (!isDirty()) return true
+    if (locked) {
+      askReason('stay')
+      return false
+    }
+    return save({ after: 'stay' })
+  }
   const campaignBand =
     card && campaign && onSwitchCard
-      ? (variants: ReactNode) => <CampaignBand campaign={campaign} card={card} allCards={allCards ?? []} onSwitch={(id) => void switchCard(id)} variants={variants} busy={saving} />
+      ? (variants: ReactNode) => (
+          <CampaignBand
+            campaign={campaign}
+            card={card}
+            allCards={allCards ?? []}
+            onSwitch={(id) => void switchCard(id)}
+            variants={variants}
+            busy={saving}
+            actions={<CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />}
+            onAddCard={() => setAddingCard(true)}
+          />
+        )
       : undefined
+  const addCardDialog = addingCard && campaign && (
+    <AddCampaignCardDialog
+      campaign={campaign}
+      cards={allCards ?? []}
+      weeks={weeks}
+      onClose={() => setAddingCard(false)}
+      // 足したカードを開く(一覧を読み直してから。読み直す前に切り替えると、まだ一覧にないため)
+      onCreated={(id) => void onSaved().then(() => switchCard(id))}
+    />
+  )
   /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
   const commitSimple = async () => {
     if (saving || locked || !isDirty()) return
@@ -1148,6 +1184,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           </>
           )}
         </form>
+        {addCardDialog}
       </ResizableSurface>
     </Dialog>
   )
