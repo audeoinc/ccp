@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   Badge,
   Button,
@@ -34,6 +34,8 @@ import { statusLabel, statusRank } from './status'
 import { TemplateThumb } from './TemplateThumb'
 import { PushThumb } from './PushThumb'
 import { Splitter } from './Splitter'
+import { usePaneWidths } from './floatLayout'
+import { PREF } from './prefKeys'
 import { useTableEditor } from './TemplateTableEditor'
 import { ratioLabel, toTableLayout } from './tables'
 import {
@@ -167,15 +169,16 @@ const useStyles = makeStyles({
   inline: { display: 'flex', flexDirection: 'column', minHeight: '480px', flexGrow: 1, border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden' },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '12px 16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   grow: { flexGrow: 1 },
-  split: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(360px, 520px) minmax(0, 1fr)' },
-  // 一覧は 2 列。見比べやすいように、見取り図と説明を、同じ高さのカードに並べる
+  // 一覧 | 境目 | 詳しい欄。一覧の幅は境目をつかんで変え、覚える(usePaneWidths。列は --cols で渡す)。詳しい欄は残りの幅
+  split: { flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'var(--cols)' },
+  // 一覧は、広ければ 2 列、狭くしたら 1 列(カードが細くつぶれないように、1 枚の幅の下限を決める)。
+  // 見比べやすいように、見取り図と説明を、同じ高さのカードに並べる
   list: {
     minHeight: 0,
     overflowY: 'auto',
-    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
     padding: '12px',
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
     gap: '8px',
     alignContent: 'start',
     backgroundColor: tokens.colorNeutralBackground2,
@@ -228,10 +231,11 @@ const useStyles = makeStyles({
   caption: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, lineHeight: '16px' },
   editor: { minHeight: 0, overflowY: 'auto', padding: '16px', display: 'grid', rowGap: '14px', alignContent: 'start', minWidth: 0 },
   // プレビューの欄は、見取り図の大きさ(枠線・余白を含む)に合わせる。固定の幅だと、見取り図の右端が欠ける
-  editorGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '16px', alignItems: 'start' },
-  fields: { display: 'grid', rowGap: '14px', minWidth: 0 },
+  // 詳しい欄が狭いとき(一覧を広げたとき・設定の画面の中)は、プレビューを下に回す(横に並べたままだと、説明の文字が 1 文字ずつ縦に折り返して重なるため。T11)
+  editorGrid: { display: 'flex', flexWrap: 'wrap', columnGap: '16px', rowGap: '14px', alignItems: 'flex-start' },
+  fields: { display: 'grid', rowGap: '14px', minWidth: 0, flex: '1 1 260px' },
   // 縦長の見取り図をスクロールしても、編集欄と並べて見られるように、上に貼り付ける
-  preview: { display: 'grid', rowGap: '6px', justifyItems: 'start', position: 'sticky', top: 0 },
+  preview: { display: 'grid', rowGap: '6px', justifyItems: 'start', position: 'sticky', top: 0, flex: '0 0 auto', maxWidth: '100%' },
   // 縦長の見取り図は、それだけでスクロールできるようにする(長いテンプレートでも、編集しながら下まで見られる)
   // 高さを決めておく(倍率「全体」は、この高さに収める)。広げたときは、縦横にスクロール
   previewScroll: { height: 'calc((86vh / var(--ui-zoom, 1)) - 190px)', overflow: 'auto', paddingRight: '4px' },
@@ -405,6 +409,10 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
   useTemplates() // 登録が変わったら、一覧を描き直す
   const t = useT()
   const s = useStyles()
+  // 一覧の幅(T11。詳しい欄を広くしたいときは、一覧を狭める)。既定は 1 列の幅(詳しい欄を広く。広げれば 2 列になる)
+  const panes = usePaneWidths(PREF.templateListWidth, [320, 0], 1, { min: 240, max: 760 })
+  // 設定の画面の中は幅が狭いことがあるので、覚えた幅のままだと詳しい欄がはみ出す。詳しい欄に 320px は残す(一覧は 240px まで縮む)
+  const listCols = `min(${panes.widths[0]}px, max(240px, calc(100% - 321px))) 1px minmax(0, 1fr)`
   // メール用 / アプリ用を、タブで分ける(配信カードは、チャネルごとに、そのチャネルのテンプレートだけを選ぶ)
   const [channel, setChannel] = useState<TemplateChannel>('email')
   // 使わない(無効)のものも出す(一覧の下にたたむ)。過去の版は出さない(詳しい欄の、版の履歴に出す)
@@ -1202,7 +1210,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
 
   const content = (
     <>
-          <div className={mergeClasses(s.split, editing && s.splitEditing)}>
+          <div className={mergeClasses(s.split, editing && s.splitEditing)} style={editing ? undefined : ({ '--cols': listCols } as CSSProperties)}>
             <div className={mergeClasses(s.list, editing && s.listHidden)}>
               <TabList
                 size="small"
@@ -1238,6 +1246,8 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
               )}
               {showHidden && hiddenList.map(renderItem)}
             </div>
+            {/* 編集中は一覧を隠すので、境目も出さない */}
+            {!editing && <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} label={t('一覧の幅を変える', 'Resize the list')} />}
 
             <div className={s.editor}>
               {error && (

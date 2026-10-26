@@ -44,6 +44,7 @@ export const PREF = {
   productionPaneWidths: 'productionPage.paneWidths.v1',
   productionPreviewZoom: 'productionPage.previewZoom',
   bulkPaneWidths: 'bulkWorkspace.paneWidths.v1',
+  templateListWidth: 'templateManager.paneWidths.v1',
   assetPaneWidths: 'assetFloat.paneWidths.v1',
   resultPaneWidths: 'resultDetail.paneWidths.v1',
   settingsPaneWidths: 'settings.paneWidths.v1',
