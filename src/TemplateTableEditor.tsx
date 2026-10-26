@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button, Checkbox, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Portal, Select, Slider, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Checkbox, Field, Input, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Portal, Select, Slider, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, ArrowDownRegular, ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, MoreHorizontalRegular, SettingsRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
+import { SelBar } from './SelBar'
 import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
 import { MAX_SECTIONS } from './layoutTemplates'
@@ -174,7 +175,10 @@ const useStyles = makeStyles({
   // 右のタブの部品の行の削除(空きにする)
   pdel: { display: 'inline-flex', alignItems: 'center', padding: '2px', borderRadius: tokens.borderRadiusSmall, color: tokens.colorNeutralForeground3, cursor: 'pointer', ':hover': { color: tokens.colorPaletteRedForeground1, backgroundColor: tokens.colorNeutralBackground1Hover } },
   // 表の幅に収める(狭いときは 2 段に折り返す。キャンバスの外にはみ出して、横のスクロールが出ないように)
-  bar: { justifySelf: 'start', alignSelf: 'start', maxWidth: '100%', flexWrap: 'wrap', rowGap: '2px', transform: 'translateY(calc(-100% - 4px))', zIndex: 4, display: 'flex', alignItems: 'center', columnGap: '2px', padding: '2px 4px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow8, border: `1px solid ${tokens.colorNeutralStroke2}`, pointerEvents: 'auto' },
+  bar: { display: 'flex', alignItems: 'center', columnGap: '2px', whiteSpace: 'nowrap', padding: '2px 4px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow8, border: `1px solid ${tokens.colorNeutralStroke2}`, pointerEvents: 'auto' },
+  // 帯を置く層(表のマスの範囲いっぱい。帯だけが押せる)
+  barLayer: { position: 'relative', pointerEvents: 'none', zIndex: 4, minWidth: 0 },
+  barHead: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1 },
   barBtn: { fontSize: '11px', lineHeight: '18px', padding: '1px 6px', border: 'none', borderRadius: tokens.borderRadiusSmall, backgroundColor: 'transparent', color: tokens.colorNeutralForeground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover }, ':disabled': { color: tokens.colorNeutralForegroundDisabled, cursor: 'default', backgroundColor: 'transparent' } },
   barSep: { width: '1px', height: '14px', backgroundColor: tokens.colorNeutralStroke2, margin: '0 2px' },
   heroSec: { margin: '6px 10px 0', padding: '18px 0 4px', borderTop: `1px dashed ${MAIL.line}` },
@@ -214,7 +218,6 @@ const useStyles = makeStyles({
   eLeft: { boxShadow: `inset 4px 0 0 ${tokens.colorBrandBackground}` },
   eRight: { boxShadow: `inset -4px 0 0 ${tokens.colorBrandBackground}` },
   tile: { position: 'relative', backgroundColor: MAIL.tile, borderRadius: '3px', display: 'grid', alignContent: 'end', overflow: 'hidden' },
-  quickBtn: { position: 'absolute', top: '3px', right: '3px', zIndex: 2, width: '22px', height: '22px', padding: 0, display: 'grid', placeItems: 'center', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, cursor: 'pointer', fontSize: '14px' },
   quickSurface: { width: '300px', display: 'grid', rowGap: '8px' },
   quickHead: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   boxBadge: { position: 'absolute', top: '3px', left: '22px', fontSize: '9px', fontWeight: 700, lineHeight: '14px', padding: '0 5px', borderRadius: '3px', color: '#fff' },
@@ -1093,24 +1096,6 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )
       const hasText = fields.some((f) => f !== 'badge')
       const badge = fields.includes('badge') && <span className={s.boxBadge} style={{ backgroundColor: sale || /sale|限定|off/i.test(p.badge ?? '') ? '#d32f2f' : MAIL.ink }}>{p.badge?.trim() || 'NEW'}</span>
-      const selBoxes = selParts.filter((q) => q.type === 'box').sort((x, y) => x.r - y.r || x.c - y.c)
-      const one = (selParts.length === 1 && selParts[0].id === p.id) || (selBoxes.length > 1 && selBoxes[0].id === p.id)
-      const quickBoxes = selBoxes.length > 1 && selBoxes[0].id === p.id ? selBoxes : [p]
-      // 選んだ箱の右上の ⚙: 押すと、その場で見せ方を直す(右のタブまで行かなくて済むように。ダブルクリックでも開く)
-      const quick = (one || quickId === p.id) && (
-        <Popover open={quickId === p.id} onOpenChange={(_, d) => setQuickId(d.open ? p.id : null)} positioning="after-top" withArrow>
-          <PopoverTrigger disableButtonEnhancement>
-            <button type="button" className={s.quickBtn} aria-label={t('この箱の見せ方', 'Box display settings')} title={t('この箱の見せ方(ダブルクリックでも開く)', 'Box display settings (or double-click)')} onPointerDown={(e) => e.stopPropagation()}>
-              <SettingsRegular />
-            </button>
-          </PopoverTrigger>
-          <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
-            <span className={s.quickHead}>{quickBoxes.length > 1 ? t(`選んだ ${quickBoxes.length} 個の箱の見せ方`, `Display of ${quickBoxes.length} boxes`) : t(`箱 ${n} の見せ方`, `Box ${n} display`)}</span>
-            {boxSettings(sec, quickBoxes, { look: true, where: 'quick' })}
-            {openRightLink(sec, p)}
-          </PopoverSurface>
-        </Popover>
-      )
       if (isTextView(p.view)) {
         const text = <div className={s.splitText}>{lines}</div>
         const img = <div style={{ backgroundColor: MAIL.img, position: 'relative', ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>{badge}</div>
@@ -1128,7 +1113,6 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               </>
             )}
             <span className={s.tileNo}>{n}</span>
-            {quick}
           </div>
         )
       }
@@ -1136,7 +1120,6 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         <div className={s.tile} style={{ backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile, ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
           <span className={s.tileNo}>{n}</span>
           {badge}
-          {quick}
           {hasText && <div className={s.cap}>{lines}</div>}
         </div>
       )
@@ -1185,25 +1168,11 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     }
     if (p.type === 'spacer') return <div className={s.spacer}>{t(`余白 ${p.height ?? 24}px`, `Spacer ${p.height ?? 24}px`)}</div>
     if (p.type === 'media') {
-      const one = selParts.length === 1 && selParts[0].id === p.id
       return (
         <div className={s.media} style={p.src ? { backgroundImage: `url("${p.src.replace(/"/g, '%22')}")` } : undefined}>
-          {!p.src && <span>{p.video ? t('動画(サムネイルの画像を選ぶ)', 'Video (pick a thumbnail image)') : t('画像(押して ⚙ で選ぶ)', 'Image (select, then ⚙)')}</span>}
+          {!p.src && <span>{p.video ? t('動画(サムネイルの画像を選ぶ)', 'Video (pick a thumbnail image)') : t('画像(選んで、帯の ⚙ 画像で選ぶ)', 'Image (select, then ⚙ Image on the bar)')}</span>}
           {p.video && <span className={s.play}>▶</span>}
           {p.swap && <span className={s.swapTag}>{t('配信ごと', 'Per delivery')}</span>}
-          {(one || quickId === p.id) && (
-            <Popover open={quickId === p.id} onOpenChange={(_, d) => setQuickId(d.open ? p.id : null)} positioning="after-top" withArrow>
-              <PopoverTrigger disableButtonEnhancement>
-                <button type="button" className={s.quickBtn} aria-label={t('この画像・動画の設定', 'Image / video settings')} title={t('この画像・動画の設定(ダブルクリックでも開く)', 'Image / video settings (or double-click)')} onPointerDown={(e) => e.stopPropagation()}>
-                  <SettingsRegular />
-                </button>
-              </PopoverTrigger>
-              <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
-                <span className={s.quickHead}>{t('画像・動画', 'Image / video')}</span>
-                {mediaLook(sec, p)}
-              </PopoverSurface>
-            </Popover>
-          )}
         </div>
       )
     }
@@ -1278,17 +1247,26 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
    * 操作の帯(T8 の 8.2): 選んだマスのすぐ上に、よく使う操作を並べる(右クリックを知らなくても操作できるように。
    * Google ドキュメント・Figma の、選ぶと出る道具の帯と同じ考え)。右クリックとキーの操作は、そのまま
    */
+  /**
+   * 操作の帯(T8 の 8.2。2026-10-26 に作り直した): 選んだマスに付いて動く 1 本の帯(位置は SelBar)。
+   * 先頭に、選んだものの設定(箱「⚙ 見せ方」・画像「⚙ 画像」・ボタンとテキスト「✎ 文字を直す」)、続けて よく使う 結合 / 分割・削除。
+   * 残り(コピー・貼り付け・行 / 列の挿入・均等・縦線)は「…」のメニュー。右クリックのメニューとキーの操作は、そのまま
+   */
   const actionBar = (sec: Section, rc: T.Rect) => {
     const ps = selParts
-    const boxes = ps.filter((p) => p.type === 'box')
+    const boxes = ps.filter((p) => p.type === 'box').sort((x, y) => x.r - y.r || x.c - y.c)
+    const single = ps.length === 1 ? ps[0] : undefined
+    const media = single?.type === 'media' ? single : undefined
+    const textual = single && (single.type === 'button' || single.type === 'text') ? single : undefined
     const one = rc.h === 1
-    const btn = (label: ReactNode, onClick: () => void, title?: string, disabled = false) => (
+    const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+    const btn = (label: ReactNode, onClick: () => void, title?: string, disabled = false, className?: string) => (
       <button
         type="button"
-        className={s.barBtn}
+        className={mergeClasses(s.barBtn, className)}
         disabled={disabled}
         title={title ?? (typeof label === 'string' ? label : undefined)}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={stop}
         onClick={(e) => {
           e.stopPropagation()
           onClick()
@@ -1301,30 +1279,76 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     // セクション全体を選んでいるときの「削除」は、セクションを消す(ヒーローの下の表は、中身を空きにするだけ)
     const whole = !isHero(sec.id) && rc.c === 0 && rc.r === 0 && rc.w === (sec.cols ?? 1) && rc.h === (sec.rows ?? 0)
     const del = <span className={s.barIcon}><DeleteRegular />{t('削除', 'Delete')}</span>
+    // 先頭の設定: 箱・画像は、帯の ⚙ からその場のポップアップ(ダブルクリックでも開く。開いているのは quickId)
+    const quickFor = boxes[0] ?? media
+    const head = quickFor ? (
+      <Popover open={quickId === quickFor.id} onOpenChange={(_, d) => setQuickId(d.open ? quickFor.id : null)} positioning="below-start" withArrow>
+        <PopoverTrigger disableButtonEnhancement>
+          <button
+            type="button"
+            className={mergeClasses(s.barBtn, s.barHead)}
+            title={boxes.length > 1 ? t('選んだ箱の見せ方をまとめて直す(ダブルクリックでも開く)', 'Edit the look of the selected boxes (or double-click)') : media ? t('画像・動画の設定(ダブルクリックでも開く)', 'Image / video settings (or double-click)') : t('箱の見せ方(ダブルクリックでも開く)', 'Box display (or double-click)')}
+            onPointerDown={stop}
+          >
+            <span className={s.barIcon}>
+              <SettingsRegular />
+              {media ? t('画像', 'Image') : t('見せ方', 'Look')}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverSurface className={s.quickSurface} onPointerDown={stop}>
+          {media ? (
+            <>
+              <span className={s.quickHead}>{t('画像・動画', 'Image / video')}</span>
+              {mediaLook(sec, media)}
+            </>
+          ) : (
+            <>
+              <span className={s.quickHead}>{boxes.length > 1 ? t(`選んだ ${boxes.length} 個の箱の見せ方`, `Display of ${boxes.length} boxes`) : t(`箱 ${boxNo.get(boxes[0].id) ?? ''} の見せ方`, `Box ${boxNo.get(boxes[0].id) ?? ''} display`)}</span>
+              {boxSettings(sec, boxes, { look: true, where: 'quick' })}
+              {openRightLink(sec, boxes[0])}
+            </>
+          )}
+        </PopoverSurface>
+      </Popover>
+    ) : textual ? (
+      btn(<span className={s.barIcon}>✎ {t('文字を直す', 'Edit text')}</span>, () => startEdit(textual), t('その場で文字を直す(Enter・ダブルクリックでも)', 'Edit the text in place (or Enter / double-click)'), false, s.barHead)
+    ) : null
     return (
-      <div className={s.bar} style={{ gridColumn: `2 / span ${sec.cols ?? 1}`, gridRow: rc.r + 2 }}>
-        {btn(t('結合', 'Merge'), () => run(sec.id!, (x) => T.mergeCells(x, cs)), t('結合(Ctrl+M)', 'Merge (Ctrl+M)'), ps.length < 2)}
+      <SelBar key="bar" ids={ps.map((p) => p.id)} below={rc.r === 0} className={s.bar} layerClass={s.barLayer} style={{ gridColumn: `2 / span ${sec.cols ?? 1}`, gridRow: `2 / span ${Math.max(1, sec.rows ?? 1)}` }}>
+        {head}
+        {head && <span className={s.barSep} />}
+        {ps.length > 1 && btn(t('結合', 'Merge'), () => run(sec.id!, (x) => T.mergeCells(x, cs)), t('結合(Ctrl+M)', 'Merge (Ctrl+M)'))}
         {ps.some((p) => p.w * p.h > 1) && btn(t('分割', 'Split'), () => run(sec.id!, (x) => T.splitCells(x, ps.map((p) => p.id))))}
         {whole
           ? btn(del, () => removeSection(sec.id!), t('このセクションを削除(Ctrl+Z で戻す)', 'Delete this section (Ctrl+Z to undo)'))
           : btn(del, () => replace(sec.id!, T.clearCells(sec, ps.map((p) => p.id))), t('選んだ部品を削除して空きにする(Delete)', 'Delete the selected parts, leaving empty cells (Delete)'), !ps.some((p) => p.type !== 'empty'))}
-        <span className={s.barSep} />
-        {btn(t('コピー', 'Copy'), () => copy(sec, cs), 'Ctrl+C', !ps.some((p) => p.type !== 'empty'))}
-        {btn(t('貼り付け', 'Paste'), () => paste(sec.id!, rc.c, rc.r), t('空きのマスに貼る(Ctrl+V)', 'Paste into empty cells (Ctrl+V)'), !clip)}
-        <span className={s.barSep} />
-        {btn(t('↑行', '↑Row'), () => run(sec.id!, (x) => T.insertRow(x, rc.r)), t('上に行を挿入', 'Insert row above'))}
-        {btn(t('↓行', '↓Row'), () => run(sec.id!, (x) => T.insertRow(x, rc.r + rc.h)), t('下に行を挿入', 'Insert row below'))}
-        {btn(t('←列', '←Col'), () => run(sec.id!, (x) => T.insertCol(x, rc.c)), t('左に列を挿入', 'Insert column left'))}
-        {btn(t('→列', '→Col'), () => run(sec.id!, (x) => T.insertCol(x, rc.c + rc.w)), t('右に列を挿入', 'Insert column right'))}
-        {one && btn(T.isEvenRow(sec, rc.r) ? t('均等をやめる', 'Unspread') : t('均等', 'Spread'), () => run(sec.id!, (x) => T.toggleEvenRow(x, rc.r)), t('この行を均等に並べる(中身のある部品を同じ幅で)', 'Spread this row evenly'))}
-        {one && T.isEvenRow(sec, rc.r) && btn(T.isSepRow(sec, rc.r) ? t('縦線をやめる', 'No dividers') : t('縦線', 'Dividers'), () => replace(sec.id!, T.toggleSepRow(sec, rc.r)), t('部品の間に縦の区切り線を引く(WOMEN | MEN | KIDS)', 'Vertical dividers between parts (WOMEN | MEN | KIDS)'))}
-        {(boxes.length > 0 || (ps.length === 1 && ps[0].type === 'media')) && (
-          <>
-            <span className={s.barSep} />
-            {btn('⚙', () => setQuickId((boxes[0] ?? ps[0]).id), boxes.length > 1 ? t('選んだ箱の見せ方をまとめて直す', 'Edit the look of the selected boxes') : t('見せ方', 'Display settings'))}
-          </>
-        )}
-      </div>
+        <Menu positioning="below-end">
+          <MenuTrigger disableButtonEnhancement>
+            <button type="button" className={s.barBtn} aria-label={t('ほかの操作', 'More actions')} title={t('ほかの操作(コピー・貼り付け・行と列の挿入・均等)', 'More (copy, paste, insert rows/columns, spread)')} onPointerDown={stop}>
+              <MoreHorizontalRegular />
+            </button>
+          </MenuTrigger>
+          <MenuPopover onPointerDown={stop}>
+            <MenuList>
+              <MenuItem disabled={!ps.some((p) => p.type !== 'empty')} secondaryContent="Ctrl+C" onClick={() => copy(sec, cs)}>{t('コピー', 'Copy')}</MenuItem>
+              <MenuItem disabled={!clip} secondaryContent="Ctrl+V" onClick={() => paste(sec.id!, rc.c, rc.r)}>{t('空きのマスに貼り付け', 'Paste into empty cells')}</MenuItem>
+              <MenuDivider />
+              <MenuItem onClick={() => run(sec.id!, (x) => T.insertRow(x, rc.r))}>{t('上に行を挿入', 'Insert row above')}</MenuItem>
+              <MenuItem onClick={() => run(sec.id!, (x) => T.insertRow(x, rc.r + rc.h))}>{t('下に行を挿入', 'Insert row below')}</MenuItem>
+              <MenuItem onClick={() => run(sec.id!, (x) => T.insertCol(x, rc.c))}>{t('左に列を挿入', 'Insert column left')}</MenuItem>
+              <MenuItem onClick={() => run(sec.id!, (x) => T.insertCol(x, rc.c + rc.w))}>{t('右に列を挿入', 'Insert column right')}</MenuItem>
+              {one && (
+                <>
+                  <MenuDivider />
+                  <MenuItem onClick={() => run(sec.id!, (x) => T.toggleEvenRow(x, rc.r))}>{T.isEvenRow(sec, rc.r) ? t('均等に並べるのをやめる', 'Stop spreading evenly') : t('この行を均等に並べる', 'Spread this row evenly')}</MenuItem>
+                  {T.isEvenRow(sec, rc.r) && <MenuItem onClick={() => replace(sec.id!, T.toggleSepRow(sec, rc.r))}>{T.isSepRow(sec, rc.r) ? t('縦の区切り線をやめる', 'Remove vertical dividers') : t('部品の間に縦の区切り線', 'Vertical dividers between parts')}</MenuItem>}
+                </>
+              )}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+      </SelBar>
     )
   }
 
