@@ -531,7 +531,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   async function discard(day: string) {
     const id = savedIds.get(day)
     if (id) {
-      if (!(await confirmDialog(tr('保存したこの配信を消して、破棄します。よろしいですか?', 'Delete this saved delivery and discard it?')))) return
+      if (!(await confirmDialog(tr('保存したこの配信を削除します(元に戻せません)。よろしいですか?', 'Delete this saved delivery? This cannot be undone.')))) return
       setError(null)
       setSavingDay(day)
       try {

@@ -256,12 +256,13 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
       ) : (
         <span className={s.weekText}>{weekText}</span>
       )}
-      {ws.countryFixed ? (
-        <span className={s.country} title={t('国は、画面の上のヘッダーで選んだ国です', 'Country comes from the header')}>
+      {/* 選べないとき(ヘッダーで決めた国・② に進んだあと)は、週と同じく文字で出す(灰色の選択欄だと、押せそうに見えるため) */}
+      {ws.countryFixed || !editable ? (
+        <span className={s.country} title={ws.countryFixed ? t('国は、画面の上のヘッダーで選んだ国です', 'Country comes from the header') : undefined}>
           {optionText(countryOptions, ws.country)}
         </span>
       ) : (
-        <Select size="small" className={s.countryPick} value={ws.country} disabled={!editable} aria-label={t('国', 'Country')} onChange={(_, v) => ws.setCountry(v.value)}>
+        <Select size="small" className={s.countryPick} value={ws.country} aria-label={t('国', 'Country')} onChange={(_, v) => ws.setCountry(v.value)}>
           <option value="">{t('国を選んでください', 'Choose a country')}</option>
           {countryOptions.map((o) => (
             <option key={o.value} value={String(o.value)}>
@@ -666,8 +667,9 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                     </Button>
                   ) : (
                     <>
-                      <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
-                        {t('破棄', 'Discard')}
+                      {/* 保存したあとは、保存した配信を消すので「削除」。まだ保存していない案は、画面から外すだけなので「破棄」(印の決まり: 削除だけ Delete) */}
+                      <Button size="small" appearance="subtle" icon={item.state === 'saved' ? <DeleteRegular /> : <DismissRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
+                        {item.state === 'saved' ? t('削除', 'Delete') : t('破棄', 'Discard')}
                       </Button>
                       <span className={s.spacer} />
                       {item.state === 'unsaved' && (
@@ -830,7 +832,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               )}
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" icon={<DeleteRegular />} disabled={!!ws.savingDay} onClick={afterAsk}>
+              <Button appearance="secondary" icon={<DismissRegular />} disabled={!!ws.savingDay} onClick={afterAsk}>
                 {t('破棄して閉じる', 'Discard and close')}
               </Button>
               <Button
