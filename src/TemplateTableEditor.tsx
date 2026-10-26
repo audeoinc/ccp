@@ -95,10 +95,23 @@ const useStyles = makeStyles({
   sec: { position: 'relative', margin: '0 10px', padding: '22px 0 4px', borderRadius: '4px', outline: '1px dashed transparent', ':hover': { outline: `1px dashed ${MAIL.line}` } },
   secSel: { outline: `2px solid ${tokens.colorBrandStroke1}`, ':hover': { outline: `2px solid ${tokens.colorBrandStroke1}` } },
   secMoving: { opacity: 0.4 },
+  // 札(S1)と、その横のセクションの削除。札の大きさは名前で変わるので、横に並べる
+  tagRow: { position: 'absolute', top: '2px', left: 0, display: 'flex', alignItems: 'center', columnGap: '2px', maxWidth: '85%' },
+  tagDel: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '1px 3px',
+    border: 'none',
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: 'transparent',
+    color: tokens.colorNeutralForeground3,
+    fontSize: '13px',
+    cursor: 'pointer',
+    opacity: 0.6,
+    ':hover': { opacity: 1, color: tokens.colorPaletteRedForeground1, backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
   tag: {
-    position: 'absolute',
-    top: '2px',
-    left: 0,
+    minWidth: 0,
     fontSize: '11px',
     lineHeight: '16px',
     padding: '0 6px',
@@ -109,7 +122,6 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     cursor: 'grab',
     touchAction: 'none',
-    maxWidth: '70%',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -117,6 +129,38 @@ const useStyles = makeStyles({
   shead: { textAlign: 'center', padding: '2px 0 6px', display: 'grid', rowGap: '2px' },
   sheadTitle: { fontSize: '12px', fontWeight: 700, letterSpacing: '2px' },
   sheadCopy: { fontSize: '10px', color: MAIL.sub },
+  // 見出し・コピーの帯(× で消す)と、消えている所の「＋ 見出し」「＋ コピー」(キャンバスの上で出し入れする)
+  sheadItem: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', columnGap: '4px', justifySelf: 'center' },
+  sheadX: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '0 2px',
+    border: 'none',
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: 'transparent',
+    color: tokens.colorNeutralForeground3,
+    fontSize: '11px',
+    lineHeight: '14px',
+    cursor: 'pointer',
+    opacity: 0.5,
+    ':hover': { opacity: 1, color: tokens.colorPaletteRedForeground1, backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  sheadAdd: { display: 'flex', justifyContent: 'center', columnGap: '6px' },
+  sheadAddBtn: {
+    fontSize: '10px',
+    lineHeight: '14px',
+    padding: '0 6px',
+    border: `1px dashed ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: 'transparent',
+    color: tokens.colorNeutralForeground3,
+    cursor: 'pointer',
+    opacity: 0.55,
+    ':hover': { opacity: 1, color: tokens.colorBrandForeground1, border: `1px dashed ${tokens.colorBrandStroke1}` },
+  },
+  barIcon: { display: 'inline-flex', alignItems: 'center', columnGap: '2px' },
+  // 右のタブの部品の行の削除(空きにする)
+  pdel: { display: 'inline-flex', alignItems: 'center', padding: '2px', borderRadius: tokens.borderRadiusSmall, color: tokens.colorNeutralForeground3, cursor: 'pointer', ':hover': { color: tokens.colorPaletteRedForeground1, backgroundColor: tokens.colorNeutralBackground1Hover } },
   // 表の幅に収める(狭いときは 2 段に折り返す。キャンバスの外にはみ出して、横のスクロールが出ないように)
   bar: { justifySelf: 'start', alignSelf: 'start', maxWidth: '100%', flexWrap: 'wrap', rowGap: '2px', transform: 'translateY(calc(-100% - 4px))', zIndex: 4, display: 'flex', alignItems: 'center', columnGap: '2px', padding: '2px 4px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, boxShadow: tokens.shadow8, border: `1px solid ${tokens.colorNeutralStroke2}`, pointerEvents: 'auto' },
   barBtn: { fontSize: '11px', lineHeight: '18px', padding: '1px 6px', border: 'none', borderRadius: tokens.borderRadiusSmall, backgroundColor: 'transparent', color: tokens.colorNeutralForeground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover }, ':disabled': { color: tokens.colorNeutralForegroundDisabled, cursor: 'default', backgroundColor: 'transparent' } },
@@ -493,7 +537,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     let res: T.TableOp
     if (preset) res = T.insertPreset(sec, sec.rows ?? 0, preset)
     else if ((sec.rows ?? 0) === 0) {
-      const first = T.firstRow(sec, type === 'box' ? 2 : 1)
+      // 置いたものと同じ 1 列で作る(列は右の + で足せる。以前は箱だけ 2 列にしていて、勝手に 2 列になった)
+      const first = T.firstRow(sec, 1)
       if ('error' in first) return
       const p0 = T.partAt(first.sec, 0, 0)!
       res = { sec: T.setPartType(first.sec, p0.id, type), sel: { a: [0, 0], b: [0, 0] } }
@@ -1195,6 +1240,47 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     )
   }
 
+  /**
+   * セクションの見出しと、AI が配信ごとに書くコピーの帯。キャンバスの上で出し入れする(× で消す・「＋ 見出し」「＋ コピー」で入れる)。
+   * 値は右のタブのチェックと同じ(categoryHeading・copy)。セクションの数・順番は変わらないので、配信カードの見出し・コピーの番号はずれない
+   */
+  const sectionHead = (sec: Section) => {
+    const heading = !!sec.categoryHeading
+    const copyOn = sec.copy !== false
+    const x = (label: string, onClick: () => void) => (
+      <button type="button" className={s.sheadX} title={label} aria-label={label} onPointerDown={(e) => e.stopPropagation()} onClick={onClick}>
+        ×
+      </button>
+    )
+    const add = (label: string, onClick: () => void) => (
+      <button type="button" className={s.sheadAddBtn} onPointerDown={(e) => e.stopPropagation()} onClick={onClick}>
+        {label}
+      </button>
+    )
+    return (
+      <div className={s.shead}>
+        {heading && (
+          <span className={s.sheadItem}>
+            <span className={s.sheadTitle}>{t('セクションの見出し', 'Section heading')}</span>
+            {x(t('見出しを消す', 'Remove the heading'), () => replace(sec.id!, { ...sec, categoryHeading: undefined }))}
+          </span>
+        )}
+        {copyOn && (
+          <span className={s.sheadItem}>
+            <span className={s.sheadCopy}>{t('AI が配信ごとに書くコピー', 'Copy written by AI per delivery')}</span>
+            {x(t('コピーを消す', 'Remove the copy'), () => replace(sec.id!, { ...sec, copy: false }))}
+          </span>
+        )}
+        {(!heading || !copyOn) && (
+          <span className={s.sheadAdd}>
+            {!heading && add(t('＋ 見出し', '+ Heading'), () => replace(sec.id!, { ...sec, categoryHeading: true }))}
+            {!copyOn && add(t('＋ コピー', '+ Copy'), () => replace(sec.id!, { ...sec, copy: undefined }))}
+          </span>
+        )}
+      </div>
+    )
+  }
+
   const gap = (i: number) => (
     <div data-gap={i} className={mergeClasses(s.gap, drag?.target?.kind === 'gap' && drag.target.at === i && s.gapHot)}>
       <button type="button" className={s.gapPlus} onClick={() => addSection(i)} aria-label={t('ここに空のセクションを足す', 'Add an empty section here')} title={t('ここに空のセクションを足す', 'Add an empty section here')}>
@@ -1211,12 +1297,12 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     const ps = selParts
     const boxes = ps.filter((p) => p.type === 'box')
     const one = rc.h === 1
-    const btn = (label: string, onClick: () => void, title?: string, disabled = false) => (
+    const btn = (label: ReactNode, onClick: () => void, title?: string, disabled = false) => (
       <button
         type="button"
         className={s.barBtn}
         disabled={disabled}
-        title={title ?? label}
+        title={title ?? (typeof label === 'string' ? label : undefined)}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
@@ -1227,11 +1313,16 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       </button>
     )
     const cs: T.CellSel = { a: [rc.c, rc.r], b: [rc.c + rc.w - 1, rc.r + rc.h - 1] }
+    // セクション全体を選んでいるときの「削除」は、セクションを消す(ヒーローの下の表は、中身を空きにするだけ)
+    const whole = !isHero(sec.id) && rc.c === 0 && rc.r === 0 && rc.w === (sec.cols ?? 1) && rc.h === (sec.rows ?? 0)
+    const del = <span className={s.barIcon}><DeleteRegular />{t('削除', 'Delete')}</span>
     return (
       <div className={s.bar} style={{ gridColumn: `2 / span ${sec.cols ?? 1}`, gridRow: rc.r + 2 }}>
         {btn(t('結合', 'Merge'), () => run(sec.id!, (x) => T.mergeCells(x, cs)), t('結合(Ctrl+M)', 'Merge (Ctrl+M)'), ps.length < 2)}
         {ps.some((p) => p.w * p.h > 1) && btn(t('分割', 'Split'), () => run(sec.id!, (x) => T.splitCells(x, ps.map((p) => p.id))))}
-        {btn(t('空きに', 'Empty'), () => replace(sec.id!, T.clearCells(sec, ps.map((p) => p.id))), t('空きにする(Delete)', 'Make empty (Delete)'), !ps.some((p) => p.type !== 'empty'))}
+        {whole
+          ? btn(del, () => removeSection(sec.id!), t('このセクションを削除(Ctrl+Z で戻す)', 'Delete this section (Ctrl+Z to undo)'))
+          : btn(del, () => replace(sec.id!, T.clearCells(sec, ps.map((p) => p.id))), t('選んだ部品を削除して空きにする(Delete)', 'Delete the selected parts, leaving empty cells (Delete)'), !ps.some((p) => p.type !== 'empty'))}
         <span className={s.barSep} />
         {btn(t('コピー', 'Copy'), () => copy(sec, cs), 'Ctrl+C', !ps.some((p) => p.type !== 'empty'))}
         {btn(t('貼り付け', 'Paste'), () => paste(sec.id!, rc.c, rc.r), t('空きのマスに貼る(Ctrl+V)', 'Paste into empty cells (Ctrl+V)'), !clip)}
@@ -1483,21 +1574,28 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                   if (e.target === e.currentTarget) setSel({ kind: 'section', sec: sec.id! })
                 }}
               >
-                <button
-                  type="button"
-                  className={s.tag}
-                  title={t('押して選ぶ・つかんで動かす', 'Click to select, drag to move')}
-                  onPointerDown={(e) => startDrag(e, 'section', t(`${secLabel(sec, si)} を動かす`, `Move ${secLabel(sec, si)}`), () => setSel({ kind: 'section', sec: sec.id! }), sec.id)}
-                >
-                  ⠿ {secLabel(sec, si)}
-                  {sec.mobile === 'stack' ? t('・スマホは縦に', ' · stacks on phones') : ''}
-                </button>
-                {(sec.categoryHeading || sec.copy !== false) && (
-                  <div className={s.shead}>
-                    {sec.categoryHeading && <span className={s.sheadTitle}>{t('セクションの見出し', 'Section heading')}</span>}
-                    {sec.copy !== false && <span className={s.sheadCopy}>{t('AI が配信ごとに書くコピー', 'Copy written by AI per delivery')}</span>}
-                  </div>
-                )}
+                <span className={s.tagRow}>
+                  <button
+                    type="button"
+                    className={s.tag}
+                    title={t('押して選ぶ・つかんで動かす', 'Click to select, drag to move')}
+                    onPointerDown={(e) => startDrag(e, 'section', t(`${secLabel(sec, si)} を動かす`, `Move ${secLabel(sec, si)}`), () => setSel({ kind: 'section', sec: sec.id! }), sec.id)}
+                  >
+                    ⠿ {secLabel(sec, si)}
+                    {sec.mobile === 'stack' ? t('・スマホは縦に', ' · stacks on phones') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className={s.tagDel}
+                    title={t('セクションを削除(Ctrl+Z で戻す)', 'Delete section (Ctrl+Z to undo)')}
+                    aria-label={t(`${secLabel(sec, si)} を削除`, `Delete ${secLabel(sec, si)}`)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => removeSection(sec.id!)}
+                  >
+                    <DeleteRegular />
+                  </button>
+                </span>
+                {sectionHead(sec)}
                 {(sec.rows ?? 0) === 0 ? firstBlock(sec) : table(sec)}
               </div>
               {gap(si + 1)}
@@ -1996,6 +2094,27 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                             <span className={s.tchip}>{typeName(p.type)}</span>
                             <span className={s.pn}>{evenEmpty ? t('均等の行の空き(メールには出ない)', 'Spare cell in an even row (not in the email)') : partName(p)}</span>
                             <span className={s.ps}>{p.w * p.h > 1 ? `${p.w}×${p.h}` : ''}</span>
+                            {p.type !== 'empty' && (
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                className={s.pdel}
+                                title={t('この部品を削除して空きにする(Ctrl+Z で戻す)', 'Delete this part, leaving an empty cell (Ctrl+Z to undo)')}
+                                aria-label={t(`${partName(p)} を削除`, `Delete ${partName(p)}`)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  replace(sec.id!, T.clearCells(sec, [p.id]))
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter' && e.key !== ' ') return
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  replace(sec.id!, T.clearCells(sec, [p.id]))
+                                }}
+                              >
+                                <DeleteRegular />
+                              </span>
+                            )}
                             <span
                               className={s.chev}
                               onClick={(e) => {

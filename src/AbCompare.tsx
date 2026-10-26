@@ -8,6 +8,7 @@ import { useT } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { HeroImage } from './models/heroImages'
 import type { Product } from './models/products'
+import { encodePartContent } from './partContent'
 
 const useStyles = makeStyles({
   surface: { width: 'min(1500px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(90vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column' },
@@ -61,7 +62,7 @@ export function AbCompare({ ab, target: targetProp, base, variants, products, he
   const target: AbTarget = ab?.target ?? targetProp ?? 'both'
   // 案の文言を、配信の列の形にして重ねる
   const withTexts = (x?: VariantText): Partial<DeliveryCard> =>
-    x ? { headline: x.headline, copy: x.copy, push_title: x.pushTitle, push_body: x.pushBody, subject: x.subject, preheader: x.preheader, section_titles: x.sectionTitles.join('\n'), section_copies: x.sectionCopies.some(Boolean) ? JSON.stringify(x.sectionCopies) : '' } : {}
+    x ? { headline: x.headline, copy: x.copy, push_title: x.pushTitle, push_body: x.pushBody, subject: x.subject, preheader: x.preheader, section_titles: x.sectionTitles.join('\n'), section_copies: x.sectionCopies.some(Boolean) ? JSON.stringify(x.sectionCopies) : '', ...(x.parts ? { part_content: encodePartContent(x.parts) } : {}) } : {}
   // 案のテンプレートを、配信の列(テンプレートの ID と版)にして重ねる
   const withTemplate = (key?: string): Partial<DeliveryCard> => {
     if (!key) return {}

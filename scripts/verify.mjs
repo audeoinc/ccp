@@ -14,6 +14,7 @@ import { checkPolicy } from './check-policy.mjs'
 import { checkSave } from './check-save.mjs'
 import { checkReadiness } from './check-readiness.mjs'
 import { checkUtm } from './check-utm.mjs'
+import { checkParts } from './check-parts.mjs'
 
 const run = (cmd, args) => {
   console.log(`\n> ${[cmd, ...args].join(' ')}`)
@@ -63,7 +64,7 @@ const counted = files?.filter((f) => !f.startsWith('.claude/')) ?? []
 const docsOnly = counted.length > 0 && counted.every((f) => /\.md$/i.test(f))
 
 run('node', ['scripts/check-schema.mjs'])
-// 承認の判定・must の決まり・配信カードの保存の流れ・送る前の確かめ・計測の utm_content は、1 つの Vite のサーバーで続けて流す(別々に起動すると、その分待つ)
+// 承認の判定・must の決まり・配信カードの保存の流れ・送る前の確かめ・計測の utm_content・部品の配信ごとの中身は、1 つの Vite のサーバーで続けて流す(別々に起動すると、その分待つ)
 {
   const server = await createServer(viteForChecks(join(dirname(fileURLToPath(import.meta.url)), '..')))
   try {
@@ -72,6 +73,7 @@ run('node', ['scripts/check-schema.mjs'])
     report(await checkSave(server))
     report(await checkReadiness(server))
     report(await checkUtm(server))
+    report(await checkParts(server))
   } finally {
     await server.close()
   }

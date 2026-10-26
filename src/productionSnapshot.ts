@@ -11,6 +11,7 @@ import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { getTemplate, sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
 import { elementDescriptions } from './elements'
+import { canRewriteText, encodePartContent, findPart, parsePartContent, partText, rewritableParts, setPartValue } from './partContent'
 import { priceText, tr } from './i18n'
 import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, ownsTemplate, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
@@ -31,6 +32,8 @@ const CARD_KEYS = [
   'copy',
   'section_titles',
   'section_copies',
+  // テンプレートの部品の、配信ごとの中身(T8 段階 6)
+  'part_content',
   'links',
   'push_link',
   'push_title',
@@ -125,19 +128,28 @@ export interface CopyRow {
 }
 
 /** 直せるテキストの場所(配信カードの列。セクションは何番目か) */
-export type TextField = { key: 'name' | 'subject' | 'preheader' | 'push_title' | 'push_body' | 'headline' | 'copy' } | { key: 'section_titles' | 'section_copies'; index: number }
+export type TextField =
+  | { key: 'name' | 'subject' | 'preheader' | 'push_title' | 'push_body' | 'headline' | 'copy' }
+  | { key: 'section_titles' | 'section_copies'; index: number }
+  /** テンプレートのテキストの部品の、配信ごとの文(T8 段階 6。id は部品 ID) */
+  | { key: 'part_text'; id: string }
 export interface TextRow extends CopyRow {
   field: TextField
   /** 行を見分ける鍵(直した印・元の値を、同じ行どうしで比べる) */
   id: string
 }
 
-const fieldId = (f: TextField) => ('index' in f ? `${f.key}.${f.index}` : f.key)
+const fieldId = (f: TextField) => ('index' in f ? `${f.key}.${f.index}` : 'id' in f ? `part.${f.id}` : f.key)
 
 export function getText(s: Snapshot, f: TextField): string {
   const c = s.card
   if (f.key === 'section_titles') return (c.section_titles ?? '').split('\n')[f.index] ?? ''
   if (f.key === 'section_copies') return parseCopies(c.section_copies)[f.index] ?? ''
+  // 部品の文は、書き換えていなければテンプレートの文
+  if (f.key === 'part_text') {
+    const p = findPart(getTemplate(templateOf(s)), f.id)
+    return p ? partText(p, parsePartContent(c.part_content)) : ''
+  }
   // 件名は、空なら配信名(X2 より前の写しにも合う)
   if (f.key === 'subject') return c.subject || c.name || ''
   return c[f.key] ?? ''
@@ -146,7 +158,11 @@ export function getText(s: Snapshot, f: TextField): string {
 /** テキストを 1 つ直した、新しい写し(元の写しは変えない) */
 export function setText(s: Snapshot, f: TextField, value: string): Snapshot {
   const card = { ...s.card }
-  if (f.key === 'section_titles' || f.key === 'section_copies') {
+  if (f.key === 'part_text') {
+    // テンプレートの文と同じなら、書き換えをやめる(テンプレートのまま)
+    const p = findPart(getTemplate(templateOf(s)), f.id)
+    card.part_content = encodePartContent(setPartValue(parsePartContent(card.part_content), f.id, value === (p?.text ?? '') ? null : { text: value }))
+  } else if (f.key === 'section_titles' || f.key === 'section_copies') {
     const n = sectionsOf(templateOf(s)).length
     const list = f.key === 'section_titles' ? (card.section_titles ?? '').split('\n') : parseCopies(card.section_copies)
     const next = Array.from({ length: Math.max(n, list.length, f.index + 1) }, (_, i) => list[i] ?? '')
@@ -176,6 +192,12 @@ export function textRows(s: Snapshot, all = false): TextRow[] {
     fields.push({ label: tr(`${sec.label} の見出し`, `${sec.label} heading`), field: { key: 'section_titles', index: i } })
     fields.push({ label: tr(`${sec.label} のコピー`, `${sec.label} copy`), field: { key: 'section_copies', index: i } })
   })
+  // テンプレートのテキストの部品で、配信ごとに書き換えてよいもの(書き換えていなければテンプレートの文。T8 段階 6)
+  if (!isPushCard(s)) {
+    const layout = getTemplate(templateOf(s))
+    const descs = elementDescriptions(layout)
+    for (const p of rewritableParts(layout).filter(canRewriteText)) fields.push({ label: descs.get(p.id) ?? tr('テキスト', 'Text'), field: { key: 'part_text', id: p.id } })
+  }
   const rows = fields.map((x) => ({ ...x, id: fieldId(x.field), value: getText(s, x.field) }))
   return all ? rows : rows.filter((r) => r.value.trim())
 }
@@ -224,6 +246,8 @@ export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => {
         preheader: v.texts.preheader ?? s.card.preheader,
         section_titles: v.texts.sectionTitles.join('\n'),
         section_copies: v.texts.sectionCopies.some(Boolean) ? JSON.stringify(v.texts.sectionCopies) : '',
+        // 部品の中身のない古い案は、A と同じ
+        part_content: v.texts.parts ? encodePartContent(v.texts.parts) : s.card.part_content,
       }
     : {}
   return { ...s, productIds: v.productIds, hero: v.hero, card: { ...s.card, ...layout, ...texts } }

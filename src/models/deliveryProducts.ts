@@ -26,6 +26,8 @@ export interface DeliveryProductFields {
   image_url?: string
   /** その画像を選んだ元(商品ページの URL など。どこから持ってきたかを残す) */
   image_source?: string
+  /** 載る箱の部品 ID(表のテンプレートのときだけ。分析のために書くだけで、画面はテンプレートと並び順から求める。T8 段階 6) */
+  part_id?: string
   /** delivery_cards の id(参照を外すときは null) */
   delivery_card_id?: string | null
   /** products の id(参照を外すときは null) */

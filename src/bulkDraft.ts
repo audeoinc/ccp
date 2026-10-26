@@ -14,7 +14,8 @@ import { runAutoDraft, type AutoDraftProgress, type AutoDraftResult } from './au
 import { cardMarket, heroMarket, productMarket } from './market'
 import { isUsableHero } from './heroRights'
 import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH, statusRank } from './status'
-import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, baseTemplateId, channelOf, hasTemplate, sectionIndexAt, sectionsOf, currentVersion } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, baseTemplateId, channelOf, getTemplate, hasTemplate, sectionIndexAt, sectionsOf, currentVersion } from './templates'
+import { boxAt } from './links'
 import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
 import { weeklyLimit } from './weeklyLimit'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
@@ -195,6 +196,8 @@ async function saveProducts(cardId: string, cardName: string, r: AutoDraftResult
       source: SOURCE_AI,
       state: row.state,
       section: row.section,
+      // 載る箱の部品 ID(表のテンプレートの選定だけ。分析のために書く。T8 段階 6)
+      part_id: row.state === STATE_SELECTED ? (boxAt(getTemplate(template), row.order - 1)?.id ?? '') : '',
       name: `${cardName} / ${pname(row.x.productId)}`,
       delivery_card_id: cardId,
       product_id: row.x.productId,

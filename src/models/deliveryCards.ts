@@ -70,6 +70,8 @@ export interface DeliveryCardFields {
   production_due?: string
   /** リンク先の URL と計測用のパラメーター(JSON。src/links.ts) */
   links?: string
+  /** テンプレートの部品の、配信ごとの中身(JSON。部品 ID → 文・画像。src/partContent.ts。T8 段階 6) */
+  part_content?: string
   /** 制作の担当者 */
   production_owner?: string
   /** 制作に引き継いだ日時(ISO。空は、まだ) */

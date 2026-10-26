@@ -27,6 +27,7 @@
     ["owner", "text"],
     ["production_due", "date"],
     ["links", "text"],
+    ["part_content", "text"],
     ["production_owner", "text"],
     ["handed_off_at", "timestamptz"],
     ["push_link", "text"],
@@ -72,7 +73,8 @@
     ["state", "choice"],
     ["variant", "text"],
     ["image_url", "text"],
-    ["image_source", "text"]
+    ["image_source", "text"],
+    ["part_id", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],

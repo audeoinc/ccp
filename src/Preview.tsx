@@ -21,6 +21,7 @@ import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
 import { locale, optionLabel, useT } from './i18n'
 import { brandFor, useCountrySettings } from './countrySettings'
+import { effectivePart, type PartContent } from './partContent'
 
 interface Props {
   /** 配信カードの国(差出人の名前を、設定の画面の国の値で出す。ST10) */
@@ -52,6 +53,8 @@ interface Props {
   /** 各セクションのコピー(セクションの順) */
   sectionCopies: string[]
   onSectionCopy: (index: number, text: string) => void
+  /** テンプレートの部品の、配信ごとの中身(T8 段階 6。テンプレートで許した文・画像だけ差し替えて描く) */
+  partContent?: PartContent
   /** 設定中のメイン画像 */
   hero?: HeroImage
   onDropHero: (heroId: string) => void
@@ -239,7 +242,7 @@ function FitLine({ baseSize, minScale = 0.55, style, children }: { baseSize: str
   )
 }
 
-function EmailPreview({ country, subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt, pickMode = false }: Props) {
+function EmailPreview({ country, subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, partContent, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt, pickMode = false }: Props) {
   const t = useT()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
@@ -840,7 +843,9 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
         // 写真の箱は、マスの形(横 w・縦 h)の縦横比で、ほかの部品の高さに合わせて伸びる。文を並べる見せ方は、文の高さに合わせる
         const cols = sec.cols ?? 1
         const boxNo = new Map(boxesOf(sec).map((p, j) => [p.id, j]))
-        const body = (p: TablePart) => {
+        const body = (raw: TablePart) => {
+          // 配信ごとに書き換えた文・差し替えた画像を重ねる(部品 ID・目印はテンプレートのまま)
+          const p = effectivePart(raw, partContent)
           if (p.type === 'box') {
             const j = boxNo.get(p.id) ?? 0
             const text = isTextView(p.view)
