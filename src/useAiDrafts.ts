@@ -221,6 +221,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     copyIdeas: CopyIdea[]
     instructionIdeas: InstructionIdea[]
     pushIdeas?: CopyIdea[]
+    subjectIdeas?: CopyIdea[]
     titleCandidates: Record<number, TitleCandidate[]>
     sectionCopyCandidates: Record<number, CopyCandidate[]>
   }) => {
@@ -228,6 +229,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     setCopyIdeas(r.copyIdeas)
     setInstructionIdeas(r.instructionIdeas)
     setPushIdeas(r.pushIdeas ?? [])
+    if (r.subjectIdeas) setSubjectIdeas(r.subjectIdeas)
     setTitleCandidates(r.titleCandidates)
     setSectionCopyCandidates(r.sectionCopyCandidates)
   }

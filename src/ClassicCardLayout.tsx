@@ -323,7 +323,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
                   {t('すべてAIで下書き', 'Draft everything with AI')}
                 </Button>
                 <Caption1 className={mergeClasses(styles.caption, styles.captionTight)}>
-                  {t('テーマ・メイン画像・ヘッドライン・セクション・制作指示を、まとめてAIが下書きします', 'AI drafts the theme, hero image, headline, sections, and production notes all at once')}
+                  {templateChannel === 'push' ? t('テーマ・メイン画像・ヘッドライン・セクション・通知の文を、まとめてAIが下書きします', 'AI drafts the theme, hero image, headline, sections, and notification text all at once') : t('テーマ・メイン画像・ヘッドライン・セクション・制作指示・件名とプリヘッダーを、まとめてAIが下書きします', 'AI drafts the theme, hero image, headline, sections, production notes, subject, and preheader all at once')}
                 </Caption1>
                 <Text weight="semibold" size={300}>{t('配信情報', 'Delivery info')}</Text>
                 <NameField value={form.name} onChange={set('name')} />

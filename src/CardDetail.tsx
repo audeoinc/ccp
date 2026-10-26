@@ -332,6 +332,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       instructionsAngle: res.instructions ? (res.instructionIdeas[0]?.angle ?? '') : f.instructionsAngle,
       pushTitle: res.pushTitle ?? f.pushTitle,
       pushBody: res.pushBody ?? f.pushBody,
+      subject: res.subject ?? f.subject,
+      preheader: res.subject ? (res.preheader ?? '') : f.preheader,
     }))
     const toItem = (r: { productId: string; reason: string }): Item => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })
     if (res.sections.some((sec) => sec.selected.length > 0)) {
@@ -354,6 +356,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       copyIdeas: res.copyIdeas,
       instructionIdeas: res.instructionIdeas,
       pushIdeas: res.pushIdeas,
+      subjectIdeas: res.subjectIdeas,
       titleCandidates: Object.fromEntries(res.sections.map((sec, i) => [i, sec.titles])),
       sectionCopyCandidates: Object.fromEntries(res.sections.map((sec, i) => [i, sec.copies])),
     })
@@ -392,7 +395,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || items.length > 0 || heroId)
 
   async function runAllManual() {
-    if (hasContent && !(await confirmDialog(t('現在のテーマ・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
+    if (hasContent && !(await confirmDialog(form.channel === CHANNEL_PUSH ? t('現在のテーマ・通知のタイトルと本文・ヘッドライン・コピー・商品・メイン画像を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, notification title and body, headline, copy, products, and hero image with an AI draft. Continue?') : t('現在のテーマ・件名・プリヘッダー・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, subject, preheader, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
     void startAutoDraft()
   }
 

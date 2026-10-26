@@ -12,6 +12,7 @@ import {
 import {
   suggestCopies,
   suggestPushNotifications,
+  suggestSubjects,
   suggestInstructions,
   suggestTemplate,
   suggestThemes,
@@ -58,6 +59,10 @@ export interface AutoDraftResult {
   sections: SectionProposal[]
   instructions?: string
   instructionIdeas: InstructionIdea[]
+  /** メール: 件名・プリヘッダーの案と、採用したもの(2026-10-26 利用者: すべて AI で下書きの対象に) */
+  subjectIdeas?: CopyIdea[]
+  subject?: string
+  preheader?: string
   /** アプリ: 通知のタイトル・本文の案と、採用したもの */
   pushIdeas?: CopyIdea[]
   pushTitle?: string
@@ -137,7 +142,8 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   const heroReason = hero?.hero?.reason
 
   const sections = sectionsOf(result.template)
-  total = 4 + sections.length
+  // メールは、制作指示のあとに件名・プリヘッダーを足す(1 工程多い)
+  total = 4 + sections.length + (isPush ? 0 : 1)
 
   // ③ ヘッドラインとコピー(組)
   const copies = await step(tr('ヘッドラインとコピーを考えています', 'Writing headline and copy'), () =>
@@ -210,6 +216,20 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   if (instructions?.length) {
     result.instructionIdeas = instructions
     result.instructions = instructions[0].text
+  }
+  // ⑥ メールの件名・プリヘッダー(部品ごとの AI と同じ指示文。文字数の目安もそこで決めている)。見出し・商品が決まってから作る
+  const subjects = await step(tr('件名とプリヘッダーを考えています', 'Writing the subject and preheader'), () =>
+    suggestSubjects({
+      card: withCopy,
+      language,
+      items: result.sections.flatMap((s) => s.selected).map((r) => ({ product: products.find((p) => p.id === r.productId), reason: r.reason })),
+      hero: heroRow,
+    }),
+  )
+  if (subjects?.length) {
+    result.subjectIdeas = subjects
+    result.subject = subjects[0].headline
+    result.preheader = subjects[0].lead
   }
   onStep(tr('完了', 'Done'), total, total)
   return finish()
