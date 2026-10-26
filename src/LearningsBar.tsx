@@ -75,6 +75,10 @@ interface Props {
   onCount?: (n: number) => void
   /** シンプルな配信カードの左のバーのパネルの中に出す(SU6。枠なし・いつも開く) */
   panel?: boolean
+  /** 学びの元の配信の結果を開く(パネルのカードの「根拠 1 本」) */
+  onOpenSource?: (cardId: string) => void
+  /** 学びの効き目(結果の面の「効果」の「学び」のタブで、その学び)を開く(パネルのカードの「効き目を見る」) */
+  onOpenImpact?: (learningId: string) => void
 }
 
 // 自動で付ける学びの数の上限(人が付けた学びは、上限に数えない)
@@ -83,14 +87,14 @@ const MAX = 8
 const countryName = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
 
 /**
- * 配信カードの「これまでの学び」(X78 で、装備中の学びのカードに)。
+ * 配信カードの「この配信に使う学び」(X78 で、装備中の学びのカードに。2026-10-26 に「これまでの学び」から改めた)。
  * 同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学び(新しい順に最大 8 件)を、自動で装備する。
  * 人は、外す(この配信の AI に渡さない)・手札から付ける(渡す)ができ、表 card_learnings に残す。
  * 装備中の学びは、AI の下書きの依頼に渡す(setActiveLearnings)。テーマの種類も、ここで直せる。
  * 学びは共通で 1 つ持ち、国ごとに使うかを決める(ST5)。この国で休ませた・外した学びは自動では付けない。
  * ほかの国の学びは「使えるかもしれない学び」として並べて、人が使うかを決める
  */
-export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType, onCount, panel = false }: Props) {
+export function LearningsBar({ card, templateId, country, channel, name, theme, headline, themeType, onCount, panel = false, onOpenSource, onOpenImpact }: Props) {
   const styles = useStyles()
   const t = useT()
   const [cards, setCards] = useState<DeliveryCard[]>([])
@@ -222,15 +226,14 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     </span>
   )
   // 見出しの下に長い説明を並べない。説明は見出しの横の ⓘ に(X72。simple-ui-review-2 の 21)
+  const info = t(
+    '同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学びを自動で足します。足した学びは、この配信の AI の下書きに渡します。× で外すと、この配信だけ渡しません',
+    'Learnings from past deliveries on the same channel with the same template or theme type are added automatically and passed to AI drafts for this delivery. × removes one for this delivery only.',
+  )
+  // パネルでは、パネルの題(「この配信に使う学び」)と重なるので、見出しの代わりに件数だけ(2026-10-26 利用者)
   const title = (
-    <InfoLabel
-      label={{ className: styles.heading }}
-      info={t(
-        '同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学びを自動で足します。足した学びは、この配信の AI の下書きに渡します。× で外すと、この配信だけ渡しません',
-        'Learnings from past deliveries on the same channel with the same template or theme type are added automatically and passed to AI drafts for this delivery. × removes one for this delivery only.',
-      )}
-    >
-      {t('装備中の学び', 'Learnings in use')}
+    <InfoLabel label={{ className: panel ? styles.label : styles.heading }} info={info}>
+      {panel ? t(`${learnings.length} 件`, `${learnings.length}`) : t('この配信に使う学び', 'Learnings for this delivery')}
     </InfoLabel>
   )
   const empty = (
@@ -243,7 +246,10 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
           key={l.id}
           data={l}
           className={justAdded.freshClass(l.id)}
-          compact
+          // パネルでは、中身(メモ)と効き目(強さ・リフト率の差)を出し、結果の詳しい所へ行けるように。帯は狭いので小さいまま(2026-10-26 利用者: 学びの中身が分からないのは不便)
+          compact={!panel}
+          onOpenSource={panel ? onOpenSource : undefined}
+          onOpenImpact={panel ? onOpenImpact : undefined}
           actions={
             <Button size="small" appearance="subtle" icon={<DismissRegular />} disabled={busy === l.id} onClick={() => void equip(l, false)} aria-label={t(`「${l.title}」を外す`, `Remove "${l.title}"`)} title={t('この配信では外す(AI に渡さない)', 'Remove for this delivery (not passed to AI)')} />
           }
@@ -329,9 +335,9 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   )
   const header = (
     <ListHeader
-      icon={<LightbulbRegular />}
+      icon={panel ? undefined : <LightbulbRegular />}
       title={title}
-      count={learnings.length}
+      count={panel ? undefined : learnings.length}
       addLabel={t('学びを足す', 'Add a learning')}
       onAdd={() => setPicking(true)}
       actions={

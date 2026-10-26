@@ -66,21 +66,33 @@ export function liftOf(lift?: DeliveryLift): { incPerUser: number; incRevenue: n
 // 見せ方を切り替えるのは App なので、URL を書き換えて「戻る」と同じ知らせ(popstate)を出し、App に読み直させる。
 // 開くタブは、見せ方「効果」がすでに出ていれば知らせ(IMPACT_TAB_EVENT)で、まだなら開いたときに受け取る
 export const IMPACT_TAB_EVENT = 'ccp:impact-tab'
+// 配信カードの学びの「効き目を見る」から来たときは、その学びの行を選んで開く(タブと同じく、出ていれば知らせで、まだなら開いたときに受け取る)
+export const IMPACT_LEARNING_EVENT = 'ccp:impact-learning'
 let pendingTab: string | null = null
-export function openImpactView(tab: string) {
+let pendingLearning: string | null = null
+export function openImpactView(tab: string, focus?: { learningId: string; country?: string }) {
   pendingTab = tab
+  pendingLearning = focus?.learningId ?? null
   const q = new URLSearchParams(window.location.search)
   q.set('page', 'results')
   q.set('view', 'impact')
+  // 学びの判定は国ごとなので、配信の国で開く(選んでいる国が違うと、その学びの行が出ないため)
+  if (focus?.country) q.set('country', focus.country)
   for (const k of ['result', 'card', 'tab', 'production', 'alerts']) q.delete(k)
   window.history.pushState(null, '', `${window.location.pathname}?${q.toString()}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
   window.dispatchEvent(new CustomEvent(IMPACT_TAB_EVENT, { detail: tab }))
+  if (focus) window.dispatchEvent(new CustomEvent(IMPACT_LEARNING_EVENT, { detail: focus.learningId }))
 }
 export function takePendingImpactTab(): string | null {
   const t = pendingTab
   pendingTab = null
   return t
+}
+export function takePendingImpactLearning(): string | null {
+  const id = pendingLearning
+  pendingLearning = null
+  return id
 }
 
 /** results は、配信ごとに 1 行にまとめたもの(results.ts の mergeResultsByCard を通す。AB テストの配信は、案ごとに行が分かれるため) */

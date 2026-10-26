@@ -43,6 +43,8 @@ interface Props {
   data: LearningCardData
   /** 根拠の配信を開く(配信カードの id) */
   onOpenSource?: (cardId: string) => void
+  /** この学びの効き目(結果の面の「効果」の「学び」のタブ)を開く。配信カードの学びから、どう効いたかを確かめに行く */
+  onOpenImpact?: (learningId: string) => void
   /** 右下の操作(手札では状態のメニュー、配信カードでは外すボタン) */
   actions?: ReactNode
   /** 小さく(配信カードの装備。名前・強さ・操作だけ) */
@@ -64,7 +66,7 @@ export function StrengthDots({ strength }: { strength: number | null }) {
   )
 }
 
-export function LearningCard({ data: l, onOpenSource, actions, compact = false, className }: Props) {
+export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, compact = false, className }: Props) {
   const s = useStyles()
   const t = useT()
   const [full, setFull] = useState(false)
@@ -109,12 +111,17 @@ export function LearningCard({ data: l, onOpenSource, actions, compact = false, 
         {!compact && l.lastUsed && <span>{t(`最後 ${day(l.lastUsed)}`, `Last ${day(l.lastUsed)}`)}</span>}
         {!compact &&
           (onOpenSource ? (
-            <Link as="button" onClick={() => onOpenSource(l.source.id)} title={l.source.name ?? ''}>
+            <Link as="button" onClick={() => onOpenSource(l.source.id)} title={t(`元の配信「${l.source.name ?? ''}」の結果を開く`, `Open the results of "${l.source.name ?? ''}"`)}>
               {t('根拠 1 本', '1 source')}
             </Link>
           ) : (
             <span title={l.source.name ?? ''}>{t('根拠 1 本', '1 source')}</span>
           ))}
+        {!compact && onOpenImpact && (
+          <Link as="button" onClick={() => onOpenImpact(l.id)} title={t('結果の「効果」で、この学びを渡した配信と渡さなかった配信を比べた詳しい所を開く', 'Open the comparison of deliveries with and without this learning in Results > Impact')}>
+            {t('効き目を見る', 'See impact')}
+          </Link>
+        )}
         {actions && <span className={s.actions}>{actions}</span>}
       </div>
     </Card>

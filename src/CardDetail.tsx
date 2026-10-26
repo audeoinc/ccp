@@ -54,6 +54,7 @@ import { allVariants, nextVariant, ownsAnyText, ownsSubject } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import { confirmDialog } from './confirm'
+import { openImpactView } from './impact'
 import type { StockModel } from './alerts'
 import type { CardAlert } from './cardAlerts'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
@@ -780,6 +781,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     void save({ after: 'close' })
   }
+  // 学びの効き目(結果の面の「効果」)へ移る。配信カードは閉じるので、変えた分は先に保存する(確定した週は理由が要るので、保存せずに移るかを聞く)
+  const openLearningImpact = async (learningId: string) => {
+    if (saving) return
+    if (isDirty()) {
+      if (locked) {
+        if (!(await confirmDialog(tr('確定した週の配信の変更を、保存せずに移ります。よろしいですか?(保存するときは「理由を入力して保存」)', 'Leave without saving the changes to this confirmed-week delivery? (To save, use “Save with a reason”.)')))) return
+      } else if (!(await save({ after: 'stay' }))) return
+    }
+    openImpactView('learnings', { learningId, country: form.country })
+  }
   // プレビュー(memo)に渡す関数は、いつも同じものを渡す(打つたびに、プレビューまで描き直さないように)
   const previewSectionTitle = useStableCallback(setSectionTitle)
   const previewSectionCopy = useStableCallback(setSectionCopy)
@@ -1079,7 +1090,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         people: owners,
         reload: onSaved,
         openProduction: onOpenProduction && card ? (opts) => onOpenProduction(card.id, opts) : undefined,
-        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel />,
+        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel onOpenSource={onOpenResults} onOpenImpact={(id) => void openLearningImpact(id)} />,
         learnCount,
       })
     : null

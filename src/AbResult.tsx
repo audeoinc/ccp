@@ -154,7 +154,7 @@ export function AbResult({ row, heroes, money, onAdopt }: { row: ResultRow; hero
           <span className={styles.unsure}>{t('比べる相手の案の数字がありません', 'No numbers for the other variants yet')}</span>
         )}
         {v.winner && (
-          <Tooltip content={t('勝ち案と、仮説が支持されたかを、次に生かすメモに足します(同じテンプレート・テーマの配信の「これまでの学び」に出ます)', 'Adds the winner and whether the hypothesis held to the notes (shown as Learnings on similar deliveries).')} relationship="description">
+          <Tooltip content={t('勝ち案と、仮説が支持されたかを、次に生かすメモに足します(同じテンプレート・テーマの配信の、配信カードの「学び」に出ます)', 'Adds the winner and whether the hypothesis held to the notes (shown as Learnings on similar deliveries).')} relationship="description">
             <Button size="small" icon={adopted ? <CheckmarkRegular /> : <LightbulbRegular />} disabled={busy || adopted} onClick={() => void adopt()} data-noprint>
               {adopted ? t('メモに足しました', 'Added to notes') : t('学びとしてメモに採用', 'Adopt as a learning')}
             </Button>

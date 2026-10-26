@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
@@ -11,7 +11,7 @@ import { locale, pct, priceText, type Market, useT } from './i18n'
 import { mergeResultsByCard } from './results'
 import { learningUsableIn, useCountryApply } from './countryApply'
 import { myName } from './history'
-import { IMPACT_TAB_EVENT, takePendingImpactTab, buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
+import { IMPACT_LEARNING_EVENT, IMPACT_TAB_EVENT, takePendingImpactLearning, takePendingImpactTab, buildImpacts, compare, evaluateLearnings, learningIdsOf, type DeliveryImpact, type Diff, type LearningEval, type Verdict } from './impact'
 import { PREF } from './prefKeys'
 import { loadPref, savePref } from './settings'
 import { ymd } from './dates'
@@ -516,7 +516,7 @@ function LogTab({ impacts, evals, onOpenResult }: { impacts: DeliveryImpact[]; e
     <div className={s.section}>
       <span className={s.intro}>
         {t(
-          '配信カードで AI の案(テーマ・コピー・商品・メイン画像など)を頼むたびに、そのとき「これまでの学び」から渡した学びを記録します。学びを渡さなかった依頼も記録します(比べる相手になるため)。AI の案そのものは保存しません。行を選ぶと、右に、渡した学びの中身が出ます。',
+          '配信カードで AI の案(テーマ・コピー・商品・メイン画像など)を頼むたびに、そのとき「この配信に使う学び」から渡した学びを記録します。学びを渡さなかった依頼も記録します(比べる相手になるため)。AI の案そのものは保存しません。行を選ぶと、右に、渡した学びの中身が出ます。',
           'Each AI request on a delivery card records which learnings were passed. Requests without learnings are recorded too, as the comparison group. The AI ideas themselves are not saved. Select a row to see its learnings on the right.',
         )}
       </span>
@@ -708,8 +708,23 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
   }
   const rows = evals.filter((e) => showRetired || e.review?.status !== 'retired')
   const retiredCount = evals.filter((e) => e.review?.status === 'retired').length
-  // 選んだ学び(最初は、いちばん多く渡した学び)。右の欄に、その学びを渡した配信と、比べた相手を並べる
-  const [picked, setPicked] = useState<string | null>(null)
+  // 選んだ学び(最初は、いちばん多く渡した学び。配信カードの「効き目を見る」から来たときは、その学び)。右の欄に、その学びを渡した配信と、比べた相手を並べる
+  const [picked, setPicked] = useState<string | null>(takePendingImpactLearning)
+  // 来た学びの行が見えるように(表は長いので、選んだだけでは画面の外のことがある)
+  const [focusSeq, setFocusSeq] = useState(() => (picked ? 1 : 0))
+  const tableRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const on = (e: Event) => {
+      takePendingImpactLearning()
+      setPicked((e as CustomEvent<string>).detail)
+      setFocusSeq((n) => n + 1)
+    }
+    window.addEventListener(IMPACT_LEARNING_EVENT, on)
+    return () => window.removeEventListener(IMPACT_LEARNING_EVENT, on)
+  }, [])
+  useEffect(() => {
+    if (focusSeq) tableRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' })
+  }, [focusSeq])
   const on = rows.find((e) => e.id === picked) ?? rows[0]
   const columns: DataColumn<LearningEval>[] = [
     {
@@ -766,7 +781,7 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
     <div className={s.section}>
       <span className={s.intro}>
         {t(
-          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「これまでの学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。判定は国ごとです(上で国を選ぶと、その国の学びと、その国で使うと決めたほかの国の学びを、その国の配信で比べ、その国での扱いを決めます)。',
+          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「この配信に使う学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。判定は国ごとです(上で国を選ぶと、その国の学びと、その国で使うと決めたほかの国の学びを、その国の配信で比べ、その国での扱いを決めます)。',
           'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Select a row to see where it was used on the right. Learnings that are always passed together cannot be told apart. Decisions are per country (choose a country above to compare its own learnings, and those from other countries it uses, on its deliveries).',
         )}
       </span>
@@ -774,15 +789,17 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
         <Switchable on={showRetired} onToggle={() => setShowRetired(!showRetired)} label={t(`外した学びも出す(${retiredCount})`, `Show retired (${retiredCount})`)} />
       </div>
       <div className={s.split}>
-        <DataTable
-          rows={rows}
-          columns={columns}
-          rowKey={(e) => e.id}
-          ariaLabel={t('学びの評価', 'Learning evaluation')}
-          empty={t('学び(次に生かすメモ)は、まだありません', 'No learnings yet')}
-          selectedKey={on?.id}
-          onRowClick={(e) => setPicked(e.id)}
-        />
+        <div ref={tableRef}>
+          <DataTable
+            rows={rows}
+            columns={columns}
+            rowKey={(e) => e.id}
+            ariaLabel={t('学びの評価', 'Learning evaluation')}
+            empty={t('学び(次に生かすメモ)は、まだありません', 'No learnings yet')}
+            selectedKey={on?.id}
+            onRowClick={(e) => setPicked(e.id)}
+          />
+        </div>
         {on ? (
           <div className={s.pane}>
             <div className={s.learnCard}>
