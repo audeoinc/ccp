@@ -16,7 +16,8 @@ import { remapSectionTexts } from './tables'
 import { parsePushLink, type PushLink } from './pushLink'
 import { DND_ITEM, DND_PRODUCT, SOURCE_MANUAL, STATE_CANDIDATE, STATE_SELECTED, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage, ProposedHero } from './aiSelect'
-import { encodeLinks, parseLinks, type Links } from './links'
+import { boxAt, encodeLinks, parseLinks, type Links } from './links'
+import { encodePartContent, parsePartContent, prunePartContent, type PartContent } from './partContent'
 import type { WeekRow } from './data/weeks'
 import { CardNotesService } from './data/cardNotes'
 import { confirmedWeekOf, reopenWeek, scopeOfCard } from './weekLock'
@@ -40,6 +41,8 @@ export interface RowSnap {
   variant: string
   /** この配信で使う画像(X64) */
   image: string
+  /** 載る箱の部品 ID(T8 段階 6) */
+  part: string
 }
 
 
@@ -52,6 +55,7 @@ export interface Snapshot {
   heroReason: string
   sectionTitles: string[]
   sectionCopies: string[]
+  partContent: PartContent
   template: EmailTemplateId
   links: Links
   pushLink: PushLink | null
@@ -140,6 +144,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const [heroReason, setHeroReason] = useState(card?.hero_reason ?? '')
 
   const [links, setLinks] = useState<Links>(() => parseLinks(card?.links))
+  // テンプレートの部品の、配信ごとの中身(T8 段階 6。部品 ID → 文・画像。src/partContent.ts)
+  const [partContent, setPartContent] = useState<PartContent>(() => parsePartContent(card?.part_content ?? draft?.card.part_content))
 
   const [saving, setSaving] = useState(false)
   // 確定した週の変更: 保存の前に、理由を入力してもらう(null = 入力欄を出していない)
@@ -159,7 +165,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const poolHeroes = useMemo(() => heroes.filter((h) => (!market || heroMarket(h) === market) && (isUsableHero(h) || h.id === heroId)), [heroes, market, heroId])
   // AB テスト(X55)・案から選ぶ(X57)・シンプルな画面の AB テスト(SU2)の、案の中身と操作(useAbVariants.ts)
   const { ab, setAb, active, stash, setStash, itemsOf, heroOf, textsOf, templateOfV, abForSave, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, abAuto, saveTarget, savedTargetAb, abAddSimple, abUpgradedRef, abDiff } = useAbVariants({
-    card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies,
+    card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent,
     template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, simpleOn, original,
     // 押したときに呼ぶので、この下で作る関数でよい
     buildAiCard: () => buildAiCard(),
@@ -191,7 +197,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
             ...(r.image_url ? { imageUrl: r.image_url, imageSource: r.image_source ?? '' } : {}),
           }
           const variant = r.variant ?? ''
-          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '' })
+          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '', part: r.part_id ?? '' })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
           else if (variant) byVariant.set(variant, [...(byVariant.get(variant) ?? []), base])
           else sel.push(base)
@@ -368,11 +374,13 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         variant: d.variant,
         image_url: d.it.imageUrl ?? '',
         image_source: d.it.imageUrl ? (d.it.imageSource ?? '') : '',
+        // 載る箱の部品 ID(表のテンプレートの選定だけ。分析のために書くだけで、画面はテンプレートと並び順から求める。T8 段階 6)
+        part_id: d.state === STATE_SELECTED ? (boxAt(getTemplate(templateOfV(d.variant ? (d.variant as VariantKey) : 'A')), d.order - 1)?.id ?? '') : '',
       }
       let res
       if (d.it.rowId) {
         const old = before.get(d.it.rowId)
-        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant && old.image === (d.it.imageUrl ?? '')) continue
+        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant && old.image === (d.it.imageUrl ?? '') && old.part === fields.part_id) continue
         res = await DeliveryProductsService.update(d.it.rowId, fields)
       } else {
         res = await DeliveryProductsService.create({
@@ -468,6 +476,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         layout_version: splitTemplateKey(templateOfV('A')).version ?? currentVersion(baseTemplateId(templateOfV('A'))),
         section_titles: textsOf('A').sectionTitles.join('\n').replace(/\n+$/, ''),
         section_copies: encodeCopies(textsOf('A').sectionCopies),
+        // 部品の中身は、A 案のテンプレートにある、書き換えてよい部品の分だけ書く(T8 段階 6)
+        part_content: encodePartContent(prunePartContent(textsOf('A').parts ?? {}, templateOfV('A'))),
         // 外したときは null を送ってルックアップを空にする
         hero_image_id: heroOf('A').heroId
           ? heroOf('A').heroId
@@ -490,7 +500,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const committedSnap = useRef<Snapshot | null>(null)
   // 基準を取り直した回数(保存して開いたままのとき、「変えたか」を測り直すため)
   const [baseVersion, setBaseVersion] = useState(0)
-  const takeSnapshot = (): Snapshot => ({ form, items, candidates, heroId, heroReason, sectionTitles, sectionCopies, template, links, pushLink, audience })
+  const takeSnapshot = (): Snapshot => ({ form, items, candidates, heroId, heroReason, sectionTitles, sectionCopies, partContent, template, links, pushLink, audience })
   useEffect(() => {
     // 掲載商品を読み込んだ時点(自動の下書きより前)の内容を、基準にする
     if (card && original !== null && baseline.current === null) {
@@ -659,5 +669,5 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setItems(next)
   }
 
-  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError }
+  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError }
 }

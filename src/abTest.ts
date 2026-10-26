@@ -4,6 +4,7 @@
 // 保存先: テストの設定と B・C 案のメイン画像は delivery_cards.ab_test(JSON)、B・C 案の商品は delivery_products の variant 列('B'・'C'。A は空)
 // 比べる要素が all(全体)のときは、テンプレートも案ごとに持てる(SU2 ⑤⑧。B・C 案のテンプレートは ab_test の templates。A は配信の layout_key・layout_version)
 import { tr } from './i18n'
+import type { PartContent } from './partContent'
 
 /** 案の記号。A はいまの配信そのもの */
 export type VariantKey = 'A' | 'B' | 'C'
@@ -33,6 +34,8 @@ export interface VariantText {
   /** メールの件名・プリヘッダー(比べる要素が subject か all のとき。古いデータにはない) */
   subject?: string
   preheader?: string
+  /** テンプレートの部品の、配信ごとの中身(T8 段階 6。比べる要素が all のとき。古いデータにはない = 配信の part_content と同じ) */
+  parts?: PartContent
 }
 
 /** 案から選んだ結果(X57)。配信しなかった案は、中身ごと残す(あとで見返せるように) */

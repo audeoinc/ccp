@@ -14,6 +14,7 @@ import { confirmDialog } from './confirm'
 import { myName } from './history'
 import { allVariants, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsTemplate, ownsText, parseAbTest, parseDecision, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import type { PartRef } from './simple/parts'
+import { samePartContent, type PartContent } from './partContent'
 import type { Form } from './cardForm'
 
 /** AB テストの、いま編集していない案の中身(X55。編集中の案は items・heroId・heroReason にある) */
@@ -42,6 +43,9 @@ export interface AbDeps {
   setSectionTitles: Dispatch<SetStateAction<string[]>>
   sectionCopies: string[]
   setSectionCopies: Dispatch<SetStateAction<string[]>>
+  /** テンプレートの部品の、配信ごとの中身(T8 段階 6。見出し・コピーと同じく、案ごとに持つ) */
+  partContent: PartContent
+  setPartContent: Dispatch<SetStateAction<PartContent>>
   template: EmailTemplateId
   setTemplate: Dispatch<SetStateAction<EmailTemplateId>>
   setCandidates: Dispatch<SetStateAction<Candidate[]>>
@@ -59,7 +63,7 @@ export interface AbDeps {
   buildAiCard: () => AiCard
 }
 
-export function useAbVariants({ card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, simpleOn, original, buildAiCard }: AbDeps) {
+export function useAbVariants({ card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, simpleOn, original, buildAiCard }: AbDeps) {
   // AB テスト(X55)。ab = 設定(null = しない)、active = いま編集している案、stash = 編集していない案の中身(A を含む)
   const [ab, setAb] = useState<AbTest | null>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test))
   const [active, setActive] = useState<VariantKey>('A')
@@ -73,7 +77,7 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
 
   // ---- AB テスト(X55)・案から選ぶ(X57): 案の中身の出し入れ。編集中の案は items・heroId・heroReason・文言の state、それ以外は stash
   // 案ごとに持たないもの(比べる要素でないもの)は、全案で共通 = いまの state そのもの
-  const curText = (): VariantText => ({ headline: form.headline, copy: form.copy, pushTitle: form.pushTitle, pushBody: form.pushBody, sectionTitles, sectionCopies, subject: form.subject, preheader: form.preheader })
+  const curText = (): VariantText => ({ headline: form.headline, copy: form.copy, pushTitle: form.pushTitle, pushBody: form.pushBody, sectionTitles, sectionCopies, subject: form.subject, preheader: form.preheader, parts: partContent })
   const itemsOf = (k: VariantKey): Item[] => (k === active || !ownsProducts(ab) ? items : (stash[k]?.items ?? []))
   const heroOf = (k: VariantKey): { heroId?: string; heroReason: string } =>
     k === active || !ownsHero(ab) ? { heroId, heroReason } : { heroId: stash[k]?.heroId, heroReason: stash[k]?.heroReason ?? '' }
@@ -107,6 +111,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
     if (full) {
       setSectionTitles(x.sectionTitles)
       setSectionCopies(x.sectionCopies)
+      // 部品の中身のない古い案は、いまの中身のまま(A と同じだったとみなす)
+      if (x.parts) setPartContent(x.parts)
     }
   }
 
@@ -305,6 +311,13 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
       if ((x.sectionTitles[i] ?? '') !== (a.sectionTitles[i] ?? '')) parts.push({ kind: 'sectionTitle', index: i })
       if ((x.sectionCopies[i] ?? '') !== (a.sectionCopies[i] ?? '')) parts.push({ kind: 'sectionCopy', index: i })
     }
+    // テンプレートの部品の中身(T8 段階 6): 文が違えばテキスト、画像が違えば画像の部品
+    const ap = a.parts ?? {}
+    const xp = x.parts ?? ap
+    for (const id of new Set([...Object.keys(ap), ...Object.keys(xp)])) {
+      if ((xp[id]?.text ?? '') !== (ap[id]?.text ?? '')) parts.push({ kind: 'text', id })
+      if ((xp[id]?.src ?? '') !== (ap[id]?.src ?? '') || (xp[id]?.alt ?? '') !== (ap[id]?.alt ?? '')) parts.push({ kind: 'image', id })
+    }
     const text = parts.some((p) => p.kind !== 'subject' && p.kind !== 'preheader')
     const hero = (heroOf(k).heroId ?? '') !== (heroOf('A').heroId ?? '')
     if (hero) parts.push({ kind: 'hero' })
@@ -414,6 +427,18 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
         if (!v) continue
         const tx = v.texts ? { ...v.texts, sectionTitles: [...v.texts.sectionTitles], sectionCopies: [...v.texts.sectionCopies] } : undefined
         if (tx) {
+          // 部品の中身: B のその部品が A の前の中身のままなら、A のいまの中身にする
+          const bp = before.texts.parts ?? {}
+          const np = aNow.texts.parts ?? {}
+          const vp: PartContent = { ...(tx.parts ?? bp) }
+          for (const id of new Set([...Object.keys(bp), ...Object.keys(np)])) {
+            if (samePartContent({ x: vp[id] ?? {} }, { x: bp[id] ?? {} }) && !samePartContent({ x: np[id] ?? {} }, { x: bp[id] ?? {} })) {
+              if (np[id]) vp[id] = np[id]
+              else delete vp[id]
+              changedAny = true
+            }
+          }
+          tx.parts = vp
           for (const f of ['headline', 'copy', 'pushTitle', 'pushBody', 'subject', 'preheader'] as const) {
             if ((tx[f] ?? '') === (before.texts[f] ?? '') && (aNow.texts[f] ?? '') !== (before.texts[f] ?? '')) {
               tx[f] = aNow.texts[f] ?? ''

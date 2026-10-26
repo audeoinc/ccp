@@ -11,6 +11,7 @@ import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { getTemplate, sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
 import { elementDescriptions } from './elements'
+import { encodePartContent } from './partContent'
 import { priceText, tr } from './i18n'
 import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, ownsTemplate, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
@@ -31,6 +32,8 @@ const CARD_KEYS = [
   'copy',
   'section_titles',
   'section_copies',
+  // テンプレートの部品の、配信ごとの中身(T8 段階 6)
+  'part_content',
   'links',
   'push_link',
   'push_title',
@@ -224,6 +227,8 @@ export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => {
         preheader: v.texts.preheader ?? s.card.preheader,
         section_titles: v.texts.sectionTitles.join('\n'),
         section_copies: v.texts.sectionCopies.some(Boolean) ? JSON.stringify(v.texts.sectionCopies) : '',
+        // 部品の中身のない古い案は、A と同じ
+        part_content: v.texts.parts ? encodePartContent(v.texts.parts) : s.card.part_content,
       }
     : {}
   return { ...s, productIds: v.productIds, hero: v.hero, card: { ...s.card, ...layout, ...texts } }

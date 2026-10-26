@@ -6,6 +6,7 @@ import { Preview } from './Preview'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { templateKeyOfCard } from './templates'
+import { parsePartContent } from './partContent'
 
 /** セクションのコピー(JSON の配列。古い形式の改行区切りも読む) */
 const parseCopies = (v?: string): string[] => {
@@ -60,6 +61,7 @@ export function CardPreview({ card: c, productIds, products, heroes }: Props) {
       onSectionTitle={noop}
       sectionCopies={parseCopies(c.section_copies)}
       onSectionCopy={noop}
+      partContent={parsePartContent(c.part_content)}
       hero={heroes.find((h) => h.id === c.hero_image_id)}
       onDropHero={noop}
       onClearHero={noop}
