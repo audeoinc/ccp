@@ -6,13 +6,15 @@ import { Linkify } from './LinkText'
 import { useT, when } from './i18n'
 import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize } from './floatLayout'
+import { useFloatMove } from './floatMove'
 import { PREF } from './prefKeys'
 
 const useStyles = makeStyles({
   // 縦に並べ、中身は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように)。大きさは、右・下の端をつかんで変えられる。
   // 画面の高さを越えない(書いたときの様子の画像が入ると、返信の欄が枠の下にはみ出していた。2026-10-26 利用者の報告)
   surface: { width: '320px', maxHeight: 'calc(100vh / var(--ui-zoom, 1) - 24px)', boxSizing: 'border-box', padding: '10px 12px', display: 'flex', flexDirection: 'column', rowGap: '8px', '& > *': { minWidth: 0, flexShrink: 0 } },
-  head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  // 題の行。つかむとフロートを動かせる(floatMove)
+  head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'move', userSelect: 'none', touchAction: 'none' },
   headText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   // 元の書き込み・返信と、入力欄の上のもの(書いたときの様子の画像など)。枠に収まらないときは、この中だけスクロールし、
   // 入力欄と送るボタンは下に残す(縮むのはこの欄だけ。flexShrink は、枠の「子は縮めない」より強くするため、style で渡す)
@@ -80,6 +82,8 @@ export function PinThreadView(p: Props) {
   // 大きさは、コメントのピン・リクエストのピンで共通に覚える(やり取りが長いと読みにくいため。2026-10-23 利用者)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const size = useFloatSize(PREF.pinFloatSize, surfaceRef, { w: 280, h: 200 })
+  // 題の行をつかんで動かす(ピンの横に出たフロートが、確かめたい所を隠すため。2026-10-26 利用者)
+  const move = useFloatMove(surfaceRef)
   if (!p.target) return null
   return (
     <Popover
@@ -93,9 +97,9 @@ export function PinThreadView(p: Props) {
       }}
     >
       {/* data-pin-thread: 書いたときの様子を写すとき、このフロートは写さない(pinSnapshot) */}
-      <PopoverSurface ref={surfaceRef} data-pin-thread className={s.surface} style={size.style} aria-label={p.ariaLabel}>
+      <PopoverSurface ref={surfaceRef} data-pin-thread className={s.surface} style={{ ...size.style, ...move.style }} aria-label={p.ariaLabel}>
         <ResizeHandles {...size.handles} anchored />
-        <div className={s.head}>
+        <div className={s.head} onPointerDown={move.startMove}>
           {p.badge}
           <span className={s.headText} title={p.place}>{p.place}</span>
           {p.headActions}

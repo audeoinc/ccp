@@ -1,8 +1,10 @@
-import { forwardRef, useImperativeHandle, useRef, type ComponentProps } from 'react'
+import { forwardRef, useImperativeHandle, useRef, type ComponentProps, type PointerEvent as ReactPointerEvent } from 'react'
 import { DialogSurface } from '@fluentui/react-components'
 import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize, type FloatSize } from './floatLayout'
 import { floatSizeKey } from './prefKeys'
+import { isGrabbable, useFloatMove } from './floatMove'
+import { getUiScale } from './uiScale'
 
 type Props = ComponentProps<typeof DialogSurface> & {
   /** 大きさを覚える鍵(フロートの種類ごと。localStorage の `float.<sizeKey>.size`) */
@@ -17,14 +19,39 @@ type Props = ComponentProps<typeof DialogSurface> & {
  * 大きさを変えられるフロート(2026-10-23 利用者と決めた: フロートは、すべて端・角をつかんで広げられ、大きさを種類ごとに覚える)。
  * DialogSurface の代わりに使う。辺・角のつまみ(ResizeHandles)と、大きさを覚える(floatLayout の useFloatSize)を、場所ごとに作らないためにまとめる。
  * ダブルクリックで既定の大きさに戻す。狭い画面(900px 未満)では、つまみを出さず、既定の大きさのまま。
- * 小さい確かめの窓・小さいポップアップは固定でよい(利用者に確かめ済み。ARCHITECTURE の「見た目の約束事」)
+ * 小さい確かめの窓・小さいポップアップは固定でよい(利用者に確かめ済み。ARCHITECTURE の「見た目の約束事」)。
+ * 題の行をつかむと動かせる(2026-10-26 利用者と決めた。floatMove)。題の行 = DialogTitle か data-float-title の付いた所、
+ * なければフロートの上の端から GRAB px まで(フロートごとに題の行の作りが違うので、場所ごとに印を付けなくても動くように)
  */
+/** 題の行とみなす、フロートの上の端からの高さ(px) */
+const GRAB = 52
+
 export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, prefKey, style, children, ...rest }, ref) {
   const inner = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => inner.current as HTMLDivElement)
   const float = useFloatSize(prefKey ?? floatSizeKey(sizeKey), inner, min)
+  const move = useFloatMove(inner)
+  const inTitle = (e: { target: EventTarget | null; clientY: number }) => {
+    const el = inner.current
+    if (!el || !isGrabbable(e.target)) return false
+    if ((e.target as Element).closest('.fui-DialogTitle, [data-float-title]')) return true
+    return e.clientY - el.getBoundingClientRect().top <= GRAB * getUiScale()
+  }
   return (
-    <DialogSurface ref={inner} {...rest} style={{ ...style, ...float.style }}>
+    <DialogSurface
+      ref={inner}
+      {...rest}
+      style={{ ...style, ...float.style, ...move.style }}
+      onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
+        rest.onPointerDown?.(e)
+        if (!e.defaultPrevented && inTitle(e)) move.startMove(e)
+      }}
+      // 題の行に乗せたら、動かせると分かるカーソルに
+      onPointerMove={(e: ReactPointerEvent<HTMLDivElement>) => {
+        rest.onPointerMove?.(e)
+        if (e.buttons === 0 && inner.current) inner.current.style.cursor = inTitle(e) ? 'move' : ''
+      }}
+    >
       {children}
       <ResizeHandles {...float.handles} />
     </DialogSurface>

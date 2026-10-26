@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogBody, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowLeftRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
@@ -18,7 +18,6 @@ import { num, tr, useT } from './i18n'
 import { OpenLink } from './LinkText'
 import { productUrl } from './links'
 import { weeklyLimit } from './weeklyLimit'
-import { getUiScale } from './uiScale'
 import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 import { typo } from './typo'
 
@@ -118,9 +117,6 @@ export type SwapRender = (back: () => void, close: () => void) => ReactNode
 export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, aiCard, angle, onClose }: Props) {
   const s = useStyles()
   const t = useT()
-  // つかんで動かした量
-  const [pos, setPos] = useState({ x: 0, y: 0 })
-  const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const [picking, setPicking] = useState(false)
 
   // AI の差し替え案(在庫・週の上限のアラートから開いたとき。開いたときに 1 回だけ)
@@ -165,25 +161,10 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
     // 下の配信カード(プレビュー・中ペイン)も見て触れるよう、背景を暗くしない
     <>
       <Dialog open modalType="non-modal" onOpenChange={(_, d) => !d.open && onClose()}>
-        <ResizableSurface sizeKey="productAction" className={s.surface} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+        <ResizableSurface sizeKey="productAction" className={s.surface}>
           <DialogBody className={s.body}>
-            <div
-              className={s.grab}
-              title={t('つかんで動かせます', 'Drag to move')}
-              onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest('button')) return
-                drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y }
-                e.currentTarget.setPointerCapture(e.pointerId)
-              }}
-              onPointerMove={(e) => {
-                const d = drag.current
-                // 表示の大きさ(X60)を掛けた分、マウスの動きを中の大きさに直す
-                if (d) setPos({ x: d.ox + (e.clientX - d.sx) / getUiScale(), y: d.oy + (e.clientY - d.sy) / getUiScale() })
-              }}
-              onPointerUp={() => {
-                drag.current = null
-              }}
-            >
+            {/* 題の行。つかむと動かせる(どのフロートとも同じ、ResizableSurface の floatMove) */}
+            <div className={s.grab} data-float-title title={t('つかんで動かせます', 'Drag to move')}>
               {/* 題は短く: 詳しい情報では商品名だけ、入れ替えでは「○○を入れ替える」(2026-10-26 利用者の決め) */}
               <span className={s.grabTitle}>
                 {alert
