@@ -18,7 +18,7 @@
 
 ## 2. 最近の作業(新しい順。詳しくは [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md))
 
-- 2026-10-26: **まとめて作るの ② に案のプレビュー(作業ブランチ `claude/bulk-preview`、main には未マージ)**。カードの「プレビュー」→ `BulkPreviewFloat`(大きさを覚える。← → で隣の案。スマホ / PC は配信カードと同じ設定)。描き方は `CardPreview`(幅 `device` を渡せるようにした。ほかの呼び出しは変わらない)。英語の画面・本物の AI の案は未確認
+- 2026-10-26: **まとめて作るの ② に案のプレビュー(main に入れて本番に反映: deployed-gcp/20261026-141152、main 075c992)**。カードの「プレビュー」→ `BulkPreviewFloat`(大きさを覚える。← → で隣の案。スマホ / PC は配信カードと同じ設定)。描き方は `CardPreview`(幅 `device` を渡せるようにした。ほかの呼び出しは変わらない)。英語の画面・本物の AI の案は未確認
 
 - 2026-10-26: **まとめて作るのブラッシュアップ(main に入れて本番に反映: deployed-gcp/20261026-113633、main 843e9eb)**。A1 AI で配信名を入れると型の種類が消える・A2 ほかの国の配信が混ざる・A3 説明の「テンプレートは行ごとに変えられる」を直す・B1 説明を ⓘ に・B2 ② の国を文字に・C5 保存済みは「削除」・C1 1 本だけ作り直す・C2 カードにメイン画像・ヘッドライン・テンプレート・C3 ② にも右の週の一覧・C4 作れない行を詰める。触ったのは `BulkWorkspace.tsx`・`useBulkWorkspace.ts` だけ。本物の AI(Gemini)での作り直し・英語の画面は未確認
 
@@ -34,8 +34,7 @@
 - 2026-10-26: **X79 キャンペーンの段 ③(帯。UI 2)**: キャンペーンに入っている配信は、配信カードのいちばん上に `CampaignBand`(1 段目 キャンペーン・畳める / 2 段目 きょうだいのタブ / 3 段目 AB の案)。その下に承認の帯。タブの切り替えは先に保存(`CardDetail` の `switchCard`)。読むのは `useCampaignOf`。まとめて承認(`actions`)・配信カードを足す(`onAddCard`)は段 ④ の置き場所
 - 2026-10-26: **X79 キャンペーンの段 ①(データ。UI 2)**: 表 `campaigns`(name・country・theme・theme_reason・theme_type・purpose)と `delivery_cards.campaign_id`(SET NULL)。決まりは `src/campaigns.ts`(状態 = 子のいちばん遅れている状態・入れる条件 = 同じ国・同じ配信日・カード名 = キャンペーン名 + チャネル・配信日を動かす・作り直しで戻す値)。キャンペーンに入ったカードの名前は保存せず、表示のたびに `cardDisplayName` で作る。デモ用のビルドの見本に 4 つ(`src/mock/seed.ts` の `campaigns`)。チャネル app の画面の呼び方を「アプリ」(App)に(プッシュ通知の意味の所はそのまま)。画面はまだ(②〜④)、本番の移し替えと seed.json は段 ⑤
 - 2026-10-26: **T8 段階 6 配信カードの中身を部品 ID で**(テンプレートの編集の修正 3 件と一緒に、main に入れて本番に反映: deployed-gcp/20261026-134352、main d8e4bd0): 列 `delivery_cards.part_content`・`delivery_products.part_id`。シンプルな配信カードのペインで、テキストの部品の書き換え・画像の部品の差し替え(テンプレートで許したものだけ)、AB の案ごと、制作の写し・HTML にも。TEMPLATE_OBJECTS.md の 6.1。詳しい配信カードの書き換えの欄は、まだ
-- 2026-10-26: **テンプレートの編集の右のタブを整理**(ブランチ claude/t8-pane。段階 6 の上): 操作は見出しの行、設定は畳めるまとまり、箱の「押せる」は見せ方の中、⚙ は見せ方だけ。TEMPLATE_OBJECTS.md の 5.2「右のタブ」。同じ日に、削除のボタン・新しいセクションは 1 列・見出しとコピーの出し入れ(claude/t8-editor-fixes)
-- 2026-10-26: **T8 段階 6 配信カードの中身を部品 ID で**(ブランチ claude/t8-utm-4f414e。main には未マージ): 列 `delivery_cards.part_content`・`delivery_products.part_id`。シンプルな配信カードのペインで、テキストの部品の書き換え・画像の部品の差し替え(テンプレートで許したものだけ)、AB の案ごと、制作の写し・HTML にも。TEMPLATE_OBJECTS.md の 6.1。詳しい配信カードの書き換えの欄は、まだ
+- 2026-10-26: **テンプレートの編集の右のタブを整理**(main に入れて本番に反映: deployed-gcp/20261026-141152、main 075c992): 操作は見出しの行、設定は畳めるまとまり、箱の「押せる」は見せ方の中、⚙ は見せ方だけ。TEMPLATE_OBJECTS.md の 5.2「右のタブ」。同じ日に、削除のボタン・新しいセクションは 1 列・見出しとコピーの出し入れ(claude/t8-editor-fixes)
 - 2026-10-26: **T8 の 8.10 UTM を作った**(main に入れて本番に反映: deployed-gcp/20261026-102753、main a67d056): UTM の版 3。表のテンプレートの utm_content は押された要素の ID(箱は押せる要素ごとに別のリンク)、版 2 の写し・以前の形はそのまま。制作のページに「計測の対応表」、読む側は `results.ts` の `parseContent`・`linkResultsFromContents`、例は `scripts/check-utm.mjs`。TEMPLATE_OBJECTS.md の 8.10。次は段階 6(CardDetail・src/simple/ を触るので、指示役に確かめてから)
 - 2026-10-26: **T8 の 8.8 縦の文字を作った**(main に入れて本番に反映: deployed-gcp/20261026-102753、main a67d056): テキストの `dir`(縦書き / 90 度回す)、制作に渡す HTML に「画像にする」のコメント。TEMPLATE_OBJECTS.md の 8.8
 - 2026-10-26: **T8 の 8.9 区切り線と、似た部品を作った**(main に入れて本番に反映: deployed-gcp/20261026-102753、main a67d056): 部品 `line`・`spacer`、均等の行の縦線(部品の `sep`)、枠で囲む(`frame`)、よく使う行 4 つ。TEMPLATE_OBJECTS.md の 8.9
