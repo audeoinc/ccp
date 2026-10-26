@@ -1,6 +1,6 @@
 // キャンペーンの帯の 1 段目の「まとめて承認」(X79 段 ④ の 5)。子のカードをまとめて「承認を依頼する」「承認する」。
-// 依頼の前に、送る前の確かめ(readinessOf)を子のカードごとに行い、通らないカードがあれば、名前と足りない所を見せて止める
-// (まとめて出すと、1 枚ずつの確かめの一覧を見ないまま出てしまうため)。カードごとの承認は、いままでどおり各カードの承認から
+// 依頼の前に、送る前の確かめ(readinessOf)を子のカードごとに行う。線引きは 1 枚ずつの依頼と同じ: 警告は通して出し(出したあとに「警告あり」と見せる)、
+// 止めるものがあるカードだけを止めて、名前と足りない所を見せる(2026-10-26 利用者の決め)。カードごとの承認は、いままでどおり各カードの承認から
 import { useState } from 'react'
 import { Button, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { CheckmarkCircleRegular, ChevronDownRegular, SendRegular } from '@fluentui/react-icons'
@@ -54,7 +54,8 @@ export function CampaignApprove({ campaign, cards, alertsOf, beforeRun, onChange
   const mine = inbox.mineFor(children.map((c) => c.id))
   const [open, setOpen] = useState(false)
   const [running, setRunning] = useState<'request' | 'approve' | null>(null)
-  const [issues, setIssues] = useState<CampaignIssue[] | null>(null)
+  // 止めたカード(止めるものだけ)と、出したが警告があったカード
+  const [issues, setIssues] = useState<{ blocked: CampaignIssue[]; warned: CampaignIssue[] } | null>(null)
   const [message, setMessage] = useState<{ intent: 'success' | 'warning' | 'error'; text: string } | null>(null)
   const actor = () => ({ id: myUserId(), name: myName() })
 
@@ -75,18 +76,42 @@ export function CampaignApprove({ campaign, cards, alertsOf, beforeRun, onChange
   }
   const request = () =>
     run('request', async () => {
-      const found = await checkBeforeRequest(toRequest, campaign, alertsOf)
-      if (found.length) {
-        setIssues(found)
-        return
-      }
-      const skipped = await requestCampaign(toRequest, campaign, people, actor())
+      const { ready, blocked, warned } = await checkBeforeRequest(toRequest, campaign, alertsOf)
+      if (blocked.length || warned.length) setIssues({ blocked, warned })
+      if (!ready.length) return
+      const skipped = await requestCampaign(ready, campaign, people, actor())
+      const sent = ready.length - skipped.length
       setMessage(
         skipped.length
-          ? { intent: 'warning', text: t(`既定の承認者がいない配信は飛ばしました(配信カードから依頼してください): ${skipped.join(' / ')}`, `Skipped deliveries with no default approvers (request from the card): ${skipped.join(' / ')}`) }
-          : { intent: 'success', text: t(`${toRequest.length} 本の承認を依頼しました`, `Requested approval for ${toRequest.length}`) },
+          ? { intent: 'warning', text: t(`${sent} 本の承認を依頼しました。既定の承認者がいない配信は飛ばしました(配信カードから依頼してください): ${skipped.join(' / ')}`, `Requested approval for ${sent}. Skipped deliveries with no default approvers (request from the card): ${skipped.join(' / ')}`) }
+          : { intent: 'success', text: t(`${sent} 本の承認を依頼しました`, `Requested approval for ${sent}`) },
       )
     })
+  // カードごとに、名前・開く・引っかかった項目
+  const issueList = (list: CampaignIssue[]) =>
+    list.map((x) => (
+      <div key={x.card.id} className={s.issue}>
+        <span className={s.issueHead}>
+          {x.name}
+          <Button
+            type="button"
+            size="small"
+            appearance="transparent"
+            onClick={() => {
+              setOpen(false)
+              onOpenCard(x.card.id)
+            }}
+          >
+            {t('開く', 'Open')}
+          </Button>
+        </span>
+        <ul className={s.issueList}>
+          {x.issues.map((i) => (
+            <li key={i.key}>{[i.label, i.detail].filter(Boolean).join(': ')}</li>
+          ))}
+        </ul>
+      </div>
+    ))
   const approve = () =>
     run('approve', async () => {
       const done = await approveCampaign(mine, children, actor())
@@ -112,39 +137,27 @@ export function CampaignApprove({ campaign, cards, alertsOf, beforeRun, onChange
             </span>
           ))}
         </div>
-        {issues && (
+        {issues && issues.blocked.length > 0 && (
           <MessageBar intent="warning" layout="multiline">
             <MessageBarBody>
               <div className={s.rows}>
                 <span>
                   {t(
-                    '送る前の確かめに通らない配信があるので、依頼しませんでした。直してから依頼するか、配信カードごとに依頼してください',
-                    'Some deliveries did not pass the pre-send checks, so nothing was requested. Fix them first, or request approval from each card.',
+                    '次の配信は、送る前の確かめで止まるものがあるので、依頼していません。直してから、もう一度依頼してください',
+                    'These deliveries have items that block sending, so they were not requested. Fix them, then request again.',
                   )}
                 </span>
-                {issues.map((x) => (
-                  <div key={x.card.id} className={s.issue}>
-                    <span className={s.issueHead}>
-                      {x.name}
-                      <Button
-                        type="button"
-                        size="small"
-                        appearance="transparent"
-                        onClick={() => {
-                          setOpen(false)
-                          onOpenCard(x.card.id)
-                        }}
-                      >
-                        {t('開く', 'Open')}
-                      </Button>
-                    </span>
-                    <ul className={s.issueList}>
-                      {x.issues.map((i) => (
-                        <li key={i.key}>{[i.label, i.detail].filter(Boolean).join(': ')}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {issueList(issues.blocked)}
+              </div>
+            </MessageBarBody>
+          </MessageBar>
+        )}
+        {issues && issues.warned.length > 0 && (
+          <MessageBar intent="info" layout="multiline">
+            <MessageBarBody>
+              <div className={s.rows}>
+                <span>{t('警告あり(依頼は出しました。承認の前に直せます)', 'With warnings (requested anyway; you can fix them before approval)')}</span>
+                {issueList(issues.warned)}
               </div>
             </MessageBarBody>
           </MessageBar>

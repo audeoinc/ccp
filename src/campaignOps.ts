@@ -66,7 +66,7 @@ export function cardReadiness(card: DeliveryCard, productIds: string[], alerts: 
   })
 }
 
-/** 確かめに通らなかったカードと、その項目 */
+/** 確かめで引っかかったカードと、その項目 */
 export interface CampaignIssue {
   card: DeliveryCard
   /** 画面に出す名前(キャンペーン名 + チャネル) */
@@ -74,14 +74,32 @@ export interface CampaignIssue {
   issues: ReadinessItem[]
 }
 
-/** まとめて依頼する前の確かめ。通らない(警告・止めるものが 1 つでもある)カードだけを返す */
-export async function checkBeforeRequest(cards: DeliveryCard[], campaign: Pick<Campaign, 'id' | 'name'>, alertsOf?: (cardId: string) => CardAlert[] | undefined): Promise<CampaignIssue[]> {
-  const out: CampaignIssue[] = []
+/**
+ * まとめて依頼する前の確かめ。1 枚ずつの依頼と同じ線引きにする(2026-10-26 利用者の決め): 警告(件名が空・在庫など)は通し、
+ * 止めるもの(level が block)があるカードだけを止める。blocked = 止めたカード(止めるものだけ)、ready = 依頼するカード、
+ * warned = 依頼するカードのうち、警告があったもの(出したあとに「警告あり」と見せる)
+ */
+export async function checkBeforeRequest(
+  cards: DeliveryCard[],
+  campaign: Pick<Campaign, 'id' | 'name'>,
+  alertsOf?: (cardId: string) => CardAlert[] | undefined,
+): Promise<{ ready: DeliveryCard[]; blocked: CampaignIssue[]; warned: CampaignIssue[] }> {
+  const ready: DeliveryCard[] = []
+  const blocked: CampaignIssue[] = []
+  const warned: CampaignIssue[] = []
   for (const c of cards) {
-    const issues = cardReadiness(c, await selectedProductIds(c.id), alertsOf?.(c.id)).filter((i) => i.level !== 'ok')
-    if (issues.length) out.push({ card: c, name: cardDisplayName(c, [campaign]), issues })
+    const list = cardReadiness(c, await selectedProductIds(c.id), alertsOf?.(c.id))
+    const name = cardDisplayName(c, [campaign])
+    const stops = list.filter((i) => i.level === 'block')
+    if (stops.length) {
+      blocked.push({ card: c, name, issues: stops })
+      continue
+    }
+    ready.push(c)
+    const warns = list.filter((i) => i.level === 'warn')
+    if (warns.length) warned.push({ card: c, name, issues: warns })
   }
-  return out
+  return { ready, blocked, warned }
 }
 
 /** まとめて依頼の対象(承認されておらず、依頼中でもない子のカード) */
