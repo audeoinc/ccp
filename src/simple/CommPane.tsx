@@ -162,6 +162,10 @@ export interface CommCounts {
   /** いまの依頼の相手の数と、承認した数(上の帯の承認の札「承認待ち(1/2 人)」。SU11) */
   reviewers: number
   approved: number
+  /** まだ決めていない相手の名前(承認の帯「○○さんの承認を待っています」) */
+  pendingNames: string[]
+  /** 差し戻しの理由(差し戻した人のひとこと) */
+  changeReason: string
   changes: number
 }
 
@@ -228,6 +232,8 @@ export function CommPane(props: Props) {
   const waiting = request?.status === 'open'
   const changesRequested = request?.status === 'changes_requested'
   const approvedCount = reviewers.filter((r) => r.decision === 'approved').length
+  const changeReason = changesRequested ? (reviewers.find((r) => r.decision === 'changes_requested')?.note ?? '') : ''
+  const pendingKey = pendingNames.join('\n')
 
   // ---- 1 本の流れ(企画の段階のやり取り・タスク・承認の出来事。変更の記録は畳む)
   const roots = notes.filter((n) => (isThreadRoot(n) && stageOf(n) === 'plan') || n.kind === 'task')
@@ -252,8 +258,8 @@ export function CommPane(props: Props) {
   const mine = !!meName && roots.some((n) => !n.resolved && n.assignee === meName)
   const { onCounts } = props
   useEffect(() => {
-    onCounts?.({ open: openCount, tasks: taskCount, mine, myTurn: eligible.length > 0, waiting, changesRequested, reviewers: reviewers.length, approved: approvedCount, changes: changes.length })
-  }, [openCount, taskCount, mine, eligible.length, waiting, changesRequested, reviewers.length, approvedCount, changes.length, onCounts])
+    onCounts?.({ open: openCount, tasks: taskCount, mine, myTurn: eligible.length > 0, waiting, changesRequested, reviewers: reviewers.length, approved: approvedCount, pendingNames: pendingKey ? pendingKey.split('\n') : [], changeReason, changes: changes.length })
+  }, [openCount, taskCount, mine, eligible.length, waiting, changesRequested, reviewers.length, approvedCount, pendingKey, changeReason, changes.length, onCounts])
 
   // ---- 書く
   const productIdOf = (key: string) => props.items.find((i) => i.key === key)?.productId

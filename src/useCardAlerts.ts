@@ -2,6 +2,7 @@
 // 差し替えは配信カードの state(items・candidates)の中で置き換え、確定は保存のとき。差し替えた理由は、保存で配信のメモに残す(alertNotes)。
 // 状態と保存は配信カード(CardDetail)の 1 か所のまま。ここは、その state を受け取って直すだけ(整理 第3段 ①)
 import { useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import type { SwapRender } from './ProductActionFloat'
 import { tr } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
@@ -35,7 +36,7 @@ export function useCardAlerts({ alerts, items, setItems, candidates, setCandidat
   // シンプルな配信カード(SU1)で、プレビューの枠を選んでから一覧の商品を押したときの、その枠への操作
   const [slotAction, setSlotAction] = useState<FloatAction | null>(null)
   // シンプルな配信カードの、フロートの「入れ替える」(画面の入れ替えの引き出しを開く。SU9)
-  const [floatSwap, setFloatSwap] = useState<{ key: string; run: () => void } | null>(null)
+  const [floatSwap, setFloatSwap] = useState<{ key: string; render: SwapRender } | null>(null)
   // 商品ごとの、いちばん強いアラート(商品の枠の印・商品情報のラベルに使う)
   const alertByProduct = new Map<string, CardAlert>()
   // 差し替えなどでこの配信から外した商品のアラートは、保存の前でも出さない(保存すると、アラートは計算し直される)

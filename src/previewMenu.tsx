@@ -1,4 +1,4 @@
-import { ArrowSwapRegular, DismissRegular, EditRegular, OpenRegular, SparkleRegular } from '@fluentui/react-icons'
+import { ArrowDownRegular, ArrowLeftRegular, ArrowRightRegular, ArrowSwapRegular, ArrowUpRegular, DismissRegular, EditRegular, OpenRegular, SparkleRegular } from '@fluentui/react-icons'
 import type { ContextItem } from './ContextMenu'
 import { tr } from './i18n'
 
@@ -14,7 +14,14 @@ export interface PreviewMenuSpec {
   /** この部品について AI に頼む */
   ai?: () => void
   /** 押した所が商品の枠のとき */
-  product?: { swapLabel: string; url?: string; swap: () => void; remove: () => void }
+  product?: {
+    swapLabel: string
+    url?: string
+    swap: () => void
+    remove: () => void
+    /** 見たままの向き(格子の上下左右)に動かす(シンプルな画面)。その向きに動けないときは undefined(押せなくする) */
+    move?: Record<'up' | 'down' | 'left' | 'right', (() => void) | undefined>
+  }
   /** 押した所がメイン画像のとき */
   hero?: { src?: string; replace: () => void }
 }
@@ -30,6 +37,16 @@ export function previewMenuItems({ busy, edit, ai, product, hero }: PreviewMenuS
       { key: 'page', label: tr('商品ページを開く', 'Open the product page'), icon: <OpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
       { key: 'remove', label: tr('この商品を外す', 'Remove this product'), icon: <DismissRegular />, disabled: busy, onSelect: product.remove },
     )
+    const m = product.move
+    if (m) {
+      const noop = () => undefined
+      list.push(
+        { key: 'up', label: tr('上へ', 'Move up'), icon: <ArrowUpRegular />, divider: true, disabled: busy || !m.up, onSelect: m.up ?? noop },
+        { key: 'down', label: tr('下へ', 'Move down'), icon: <ArrowDownRegular />, disabled: busy || !m.down, onSelect: m.down ?? noop },
+        { key: 'left', label: tr('左へ', 'Move left'), icon: <ArrowLeftRegular />, disabled: busy || !m.left, onSelect: m.left ?? noop },
+        { key: 'right', label: tr('右へ', 'Move right'), icon: <ArrowRightRegular />, disabled: busy || !m.right, onSelect: m.right ?? noop },
+      )
+    }
   }
   if (hero) {
     const { src } = hero

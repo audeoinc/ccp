@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Button, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowSwapRegular, LockClosedRegular } from '@fluentui/react-icons'
+import { ArrowSwapRegular, DismissRegular, LockClosedRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { partElement, partFromElement, partKey, partsInOrder, samePart, type PartRef } from './simple/parts'
+import { dirOfKey, type MoveDir } from './simple/gridMove'
 
 const useStyles = makeStyles({
   // プレビューの枠(スクロールする箱)の中に重ねる。層は押せない(押すのは下のプレビュー)
@@ -41,6 +42,10 @@ interface Props {
   disabled?: boolean
   /** 商品の枠にマウスを乗せたとき、右上に「入れ替える」(⇄)を出す(SU9。シンプルな配信カード) */
   onSwap?: (itemKey: string) => void
+  /** 商品の枠にマウスを乗せたとき、⇄ の隣に「外す」(×)を出す。選んでいる商品で Delete でも呼ぶ(シンプルな配信カード。2026-10-26 利用者) */
+  onRemove?: (itemKey: string) => void
+  /** 選んでいる商品で Alt + 矢印: 見たままの向き(格子の上下左右)に動かす */
+  onMove?: (itemKey: string, dir: MoveDir) => void
   /** 部品を選んでいるときに Enter: その部品のペインの入力欄へ移る */
   onEnter?: () => void
   /** マウスで部品を押したとき(選んだあと)。キーで移ったときは呼ばない(移るたびにフロートなどが出ると邪魔なため) */
@@ -52,13 +57,17 @@ interface Props {
  * プレビューの部品そのものは変えない(書き込みのピン PreviewPins と同じ作り。制作のページ・結果でも使えるように、配信カードには依存しない)。
  * 選んだ部品には枠と淡い色、マウスを乗せた部品には薄い枠を重ねる。Tab / Shift+Tab で次・前の部品、Esc で選ぶのをやめる
  */
-export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onEnter, onClickPart }: Props) {
+export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onRemove, onMove, onEnter, onClickPart }: Props) {
   const s = useStyles()
   const onEnterRef = useRef(onEnter)
   const onClickPartRef = useRef(onClickPart)
+  const onRemoveRef = useRef(onRemove)
+  const onMoveRef = useRef(onMove)
   useEffect(() => {
     onEnterRef.current = onEnter
     onClickPartRef.current = onClickPart
+    onRemoveRef.current = onRemove
+    onMoveRef.current = onMove
   })
   const t = useT()
   const [hover, setHover] = useState<PartRef | null>(null)
@@ -129,6 +138,21 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
         onSelect(null)
         return
       }
+      // 選んでいる商品: Alt + 矢印で見たままの向きに動かす、Delete で外す(右クリックのメニュー・× と同じ。近道)
+      const sel = selectedRef.current
+      if (sel?.kind === 'product') {
+        const dir = e.altKey ? dirOfKey(e.key) : null
+        if (dir && onMoveRef.current) {
+          e.preventDefault()
+          onMoveRef.current(sel.itemKey, dir)
+          return
+        }
+        if (e.key === 'Delete' && onRemoveRef.current) {
+          e.preventDefault()
+          onRemoveRef.current(sel.itemKey)
+          return
+        }
+      }
       // Enter で、選んだ部品のペインへ移る(直す欄に入る)
       if (e.key === 'Enter') {
         if (!selectedRef.current || !onEnterRef.current) return
@@ -184,6 +208,21 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
             appearance="primary"
             icon={<ArrowSwapRegular />}
             onClick={() => onSwap?.(hover.itemKey)}
+          />
+        </Tooltip>
+      )}
+      {/* 外す(×)。入れ替えの左隣(右上の角の × は、閉じると見間違えやすいので、⇄ の内側に置く) */}
+      {rects.swap && hover?.kind === 'product' && onRemove && (
+        <Tooltip content={t('外す', 'Remove')} relationship="label">
+          <Button
+            data-swap-badge
+            data-no-pick
+            className={s.swap}
+            style={{ left: rects.swap.left + rects.swap.width - 66, top: rects.swap.top + 6 }}
+            size="small"
+            shape="circular"
+            icon={<DismissRegular />}
+            onClick={() => onRemove(hover.itemKey)}
           />
         </Tooltip>
       )}

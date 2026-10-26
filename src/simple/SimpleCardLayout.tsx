@@ -15,6 +15,7 @@ import { Hint } from '../Hint'
 import { PinFloat } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
 import { previewMenuItems } from '../previewMenu'
+import { neighborItem, type MoveDir } from './gridMove'
 import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
@@ -34,9 +35,10 @@ import { ApprovalBar } from '../ApprovalBar'
 import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
 import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
-import { ApprovalBadge } from './ApprovalBadge'
+import { ApprovalBand } from './ApprovalBadge'
 import { PartPane } from './PartPane'
 import { ProductSwap, type SwapAt } from './ProductSwap'
+import { useFloatSwap } from './floatSwap'
 import { placeInPart } from './actions'
 import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
@@ -326,18 +328,37 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     openSwapRef.current = openSwap
   })
   const onSwapBadge = useCallback((itemKey: string) => openSwapRef.current(itemKey), [])
+  /** 商品を外す(プレビューの ×・右クリック・Delete)。枠は空き枠になる。元に戻すで戻せる */
+  const removeProduct = (itemKey: string) => {
+    e.removeItem(itemKey)
+    if (part?.kind === 'product' && part.itemKey === itemKey) select(null)
+  }
+  /** 商品を、見たままの向きの隣の商品と入れ替える(Alt + 矢印・右クリック)。選んでいる枠は、その商品についていく */
+  const moveProduct = (itemKey: string, dir: MoveDir) => {
+    const box = boxRef.current
+    const to = box ? neighborItem(box, itemKey, dir) : null
+    if (to) e.swapItems(itemKey, to)
+  }
+  const productOpsRef = useRef({ removeProduct, moveProduct })
+  useEffect(() => {
+    productOpsRef.current = { removeProduct, moveProduct }
+  })
+  const onRemoveBadge = useCallback((itemKey: string) => productOpsRef.current.removeProduct(itemKey), [])
+  const onMoveKey = useCallback((itemKey: string, dir: MoveDir) => productOpsRef.current.moveProduct(itemKey, dir), [])
   /**
    * プレビューの商品をマウスで押したら、枠を選ぶのに加えて、商品のフロートも開く(部品のペインの画像を押したときと同じ導線。ピン 10-26)。
    * フロートの「入れ替える」は、同じ引き出しを開く。すぐ入れ替えたいときは ⇄ の印。キーで移ったときは開かない
    */
   const onClickPart = (p: PartRef) => {
-    if (p.kind === 'product') e.openProduct(p.itemKey, undefined, () => openSwap(p.itemKey))
+    if (p.kind === 'product') e.openProduct(p.itemKey, undefined, swapInFloat(p.itemKey))
   }
   /** 入れ替えたあと。候補と入れ替えると行の鍵が変わるので、その商品を選んだままにする(select を通すと、入れ替える前の中身で保存してしまう) */
   const swapped = (from: string, to: string) => {
     setSwapAt(null)
     if (from !== to && part?.kind === 'product' && part.itemKey === from) setPart({ kind: 'product', itemKey: to })
   }
+  // 商品のフロートの「入れ替える」で、フロートの中に出す引き出し(どの入口でも同じ ProductSwap)
+  const swapInFloat = useFloatSwap({ editor: e, chats, setChat, onSwapped: swapped })
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
@@ -407,7 +428,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const v = loadSide()
     return isComm(v) ? v : 'talk'
   })
-  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, changes: 0 })
+  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, pendingNames: [], changeReason: '', changes: 0 })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、バーのアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: CommCounts) => setCounts(c), [])
   // 右上の Popover で承認の依頼・承認・差し戻しをしたら、左のパネル(やり取り・承認の様子)も読み直す
@@ -475,11 +496,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               swapLabel: t('入れ替える', 'Replace'),
               url: productUrl(productById.get(it?.productId ?? '')),
               swap: () => openSwap(p.itemKey),
-              // 部品のペインの「外す(候補に戻す)」と同じ
-              remove: () => {
-                e.removeItem(p.itemKey)
-                if (part && samePart(part, p)) select(null)
-              },
+              // プレビューの × と同じ
+              remove: () => removeProduct(p.itemKey),
+              move: (() => {
+                const box = boxRef.current
+                const at = (d: MoveDir) => (box && neighborItem(box, p.itemKey, d) ? () => moveProduct(p.itemKey, d) : undefined)
+                return { up: at('up'), down: at('down'), left: at('left'), right: at('right') }
+              })(),
             }
           : undefined,
       hero:
@@ -521,7 +544,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const target = part && (part.kind === 'product' || part.kind === 'slot') && !(part.kind === 'product' && part.itemKey === key) ? part : null
     if (!target) {
       // 載せている商品なら、フロートの「入れ替える」で同じ引き出しを開く(SU9 (h))
-      e.openProduct(key, undefined, e.items.some((i) => i.key === key) ? () => openSwap(key) : undefined)
+      e.openProduct(key, undefined, e.items.some((i) => i.key === key) ? swapInFloat(key) : undefined)
       return
     }
     setCompareKey(key)
@@ -677,11 +700,30 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const shown = { ...e.form, ...(e.previewTexts ?? {}) }
   return (
     <div className={s.root}>
+      {/* 承認の状態の帯(2026-10-26 利用者と決めた)。題の行の札の代わりに、フロートのいちばん上(題の行の上)に、幅いっぱいに。右の端に保存の様子(入力が止まって約 1.5 秒で自動で保存する) */}
+      <ApprovalBand
+        status={e.form.status}
+        waiting={counts.waiting}
+        changesRequested={counts.changesRequested}
+        reviewers={counts.reviewers}
+        approved={counts.approved}
+        pendingNames={counts.pendingNames}
+        changeReason={counts.changeReason}
+        dirty={e.dirty}
+        save={
+          e.saving ? (
+            t('保存中…', 'Saving…')
+          ) : e.dirty ? (
+            t('未保存', 'Unsaved')
+          ) : e.savedAt ? (
+            <span className={mergeClasses(e.justSaved && s.saved)}>{t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}</span>
+          ) : null
+        }
+        onOpen={() => showSide('approval', true)}
+      />
       <StageHeader
         title={
           <>
-            {/* 承認の状態の札(SU11)。目に入るように、題の行のいちばん左(メールの印の前)に置く(ピン f24d5a87)。押すと左のバーの承認のパネル */}
-            <ApprovalBadge status={e.form.status} waiting={counts.waiting} changesRequested={counts.changesRequested} reviewers={counts.reviewers} approved={counts.approved} onOpen={() => showSide('approval', true)} />
             <ChannelBadge channel={e.form.channel} />
             {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
             {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
@@ -689,10 +731,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         }
         actions={
           <>
-            {/* 保存の様子をいつも出す: 保存中… / 未保存 / 保存済み · 12:03(入力が止まって約 1.5 秒で自動で保存する) */}
-            {e.saving ? (
-              <Spinner size="extra-tiny" label={t('保存中…', 'Saving…')} labelPosition="after" />
-            ) : e.saveConflict ? (
+            {/* 保存の様子(保存中… / 未保存 / 保存済み)は、承認の帯の右の端。ここには、手を打つことがあるとき(先に保存された・失敗)だけ */}
+            {e.saveConflict ? (
               // ほかの人が先に保存していた: 黙って上書きせず、どうするかを聞く
               <span className={s.saveFailed}>
                 <Tooltip
@@ -720,12 +760,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 <Button type="button" size="small" appearance="subtle" icon={<ArrowClockwiseRegular />} onClick={e.retrySave}>
                   {t('再試行', 'Retry')}
                 </Button>
-              </span>
-            ) : e.dirty ? (
-              <span className={s.state}>{t('未保存', 'Unsaved')}</span>
-            ) : e.savedAt ? (
-              <span className={mergeClasses(s.state, e.justSaved && s.saved)}>
-                {t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}
               </span>
             ) : null}
             <Tooltip content={t('元に戻す: 前に保存した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
@@ -1049,7 +1083,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onEnter={focusPane} onClickPart={onClickPart} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} onClickPart={onClickPart} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
@@ -1057,8 +1091,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <InfoLabel
               size="small"
               info={t(
-                'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
-                'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
+                'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。選んだ商品は Alt + 矢印で上下左右に動かす、Delete で外す。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
+                'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. For a selected product, Alt + arrow keys move it up, down, left or right, and Delete removes it. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
               )}
             >
               {t('キー', 'Keys')}
@@ -1078,7 +1112,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'} ref={paneRef}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} onOpenHandoff={() => showSide('handoff', true)} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} swapInFloat={swapInFloat} onOpenHandoff={() => showSide('handoff', true)} />
           {e.footer}
         </div>
 

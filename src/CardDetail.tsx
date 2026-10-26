@@ -460,16 +460,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </MessageBar>
     )}
 
-    {/* 承認済みの配信: シンプルな画面は自動で保存するので、確かめの窓は出さず、開いたときから帯で知らせ、最初の書き換えで帯の文を変える(レビューの 7) */}
-    {approvedBefore && lockedWeeks.length === 0 && simpleOn && (
-      <MessageBar layout="multiline" intent={changed ? 'warning' : 'info'} className={styles.locked}>
-        <MessageBarBody>
-          {changed
-            ? t('承認待ちに戻ります。保存すると、承認の依頼からやり直しになります。', 'This goes back to awaiting approval. Saving needs a new approval request.')
-            : t('承認済みです。直すと承認待ちに戻ります。', 'Approved. Editing puts it back to awaiting approval.')}
-        </MessageBarBody>
-      </MessageBar>
-    )}
+    {/* 承認済みの配信: シンプルな画面は、上の承認の帯(simple/ApprovalBadge の ApprovalBand)で「直すと承認待ちに戻ります」を知らせる(2026-10-26 帯にまとめた) */}
     {approvedBefore && lockedWeeks.length === 0 && !simpleOn && changed && (
       <MessageBar layout="multiline" intent="info" className={styles.locked}>
         <MessageBarBody>
@@ -553,14 +544,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
           aiCard={buildAiCard}
           angle={form.copyAngle}
-          onOpenSwap={
-            floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction
-              ? () => {
-                  closeAction()
-                  floatSwap.run()
-                }
-              : undefined
-          }
+          renderSwap={floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction ? floatSwap.render : undefined}
           slotAction={
             slotAction && !actAlert
               ? {
@@ -1038,7 +1022,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         openProduct: (key, action, swap) => {
           setActAlert(null)
           setSlotAction(action ?? null)
-          setFloatSwap(swap ? { key, run: swap } : null)
+          setFloatSwap(swap ? { key, render: swap } : null)
           setProductOpen(key)
         },
         hoverProduct: setHoverKey,
