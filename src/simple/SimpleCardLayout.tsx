@@ -672,11 +672,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       <StageHeader
         title={
           <>
+            {/* 承認の状態の札(SU11)。目に入るように、題の行のいちばん左(メールの印の前)に置く(ピン f24d5a87)。押すと左のバーの承認のパネル */}
+            <ApprovalBadge status={e.form.status} waiting={counts.waiting} changesRequested={counts.changesRequested} reviewers={counts.reviewers} approved={counts.approved} onOpen={() => showSide('approval', true)} />
             <ChannelBadge channel={e.form.channel} />
             {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
             {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
-            {/* 承認の状態の札(SU11)。押すと左のバーの承認のパネル */}
-            <ApprovalBadge status={e.form.status} waiting={counts.waiting} changesRequested={counts.changesRequested} reviewers={counts.reviewers} approved={counts.approved} onOpen={() => showSide('approval', true)} />
           </>
         }
         actions={
