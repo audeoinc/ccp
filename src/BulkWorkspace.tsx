@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
+  InfoLabel,
   Input,
   Menu,
   MenuItem,
@@ -22,6 +23,7 @@ import {
   Select,
   Spinner,
   SplitButton,
+  Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
@@ -47,14 +49,14 @@ import type { HeroImage } from './models/heroImages'
 import { locale, optionLabel, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ChannelBadge } from './ChannelBadge'
-import { channelOptions, countryOptions } from './status'
+import { CHANNEL_PUSH, channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
 import { dayOfKey, timeOfKey } from './useBulkWorkspace'
 import { getTemplate } from './templates'
 import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
 import { ImageThumb } from './ImageThumb'
-import { productImage } from './images'
+import { heroImage, productImage } from './images'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
 import { PREF } from './prefKeys'
@@ -115,6 +117,7 @@ const useStyles = makeStyles({
   // 右の一覧の幅は usePaneWidths で変える(--cols)。狭い画面では縦に並べ、境目も出さない
   withSide: { display: 'grid', gridTemplateColumns: 'var(--cols)', columnGap: '10px', alignItems: 'start', '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '16px' } },
   main: { display: 'grid', rowGap: '14px', minWidth: 0 },
+  step2: { minWidth: 0 },
   panel: { display: 'grid', rowGap: '10px', padding: '14px 16px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
   h3: { margin: 0, fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   hint: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
@@ -134,9 +137,8 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   span2: { gridColumn: 'span 2' },
-  thName: { display: 'grid', rowGap: '1px' },
-  thNote: { fontSize: '11px', fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
-  dayOff: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled },
+  // 作れない行(過ぎた日・型のない曜日・もうある日・確定した週)は、高さを詰めて薄く出す(作る行が埋もれないように)
+  dayOff: { minHeight: '24px', paddingTop: '1px', paddingBottom: '1px', backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled, border: `1px solid transparent` },
   dayOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   dayDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
   dayNote: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -152,7 +154,7 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorBrandStroke2}`,
     backgroundColor: tokens.colorBrandBackground2,
   },
-  aiText: { display: 'grid', rowGap: '2px', flexGrow: 1, flexBasis: '280px', minWidth: 0 },
+  aiText: { display: 'flex', alignItems: 'center', flexGrow: 1, flexBasis: '280px', minWidth: 0 },
   aiTitle: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   nameCell: { display: 'grid', rowGap: '2px', minWidth: 0 },
   nameLine: { display: 'flex', columnGap: '4px', minWidth: 0 },
@@ -190,6 +192,9 @@ const useStyles = makeStyles({
   cardHead: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '6px', rowGap: '2px', fontSize: '12px', color: tokens.colorNeutralForeground2, minWidth: 0, '& > span': { whiteSpace: 'nowrap' } },
   cardTitle: { margin: 0, fontSize: '15px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   theme: { fontSize: '12px', color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardSummary: { display: 'flex', alignItems: 'flex-start', columnGap: '8px', minWidth: 0 },
+  summaryText: { display: 'grid', rowGap: '1px', minWidth: 0, flexGrow: 1 },
+  summaryKey: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold },
   thumbs: { display: 'flex', alignItems: 'flex-start', columnGap: '6px', flexWrap: 'wrap', rowGap: '6px', minHeight: '64px' },
   thumb: { display: 'grid', justifyItems: 'center', rowGap: '2px' },
   // 週の上限を超えた商品は、赤い枠と ⚠(色だけに頼らない)
@@ -225,7 +230,7 @@ interface Props {
  * 中身を見る・直す場所は配信カードにまとめる(作業画面に、配信カードと同じ情報を並べない)。
  * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
-export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFinish }: Props) {
+export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft, onFinish }: Props) {
   const s = useStyles()
   const panes = usePaneWidths(PREF.bulkPaneWidths, [0, 280], 0, { min: 220, max: 600 })
   const t = useT()
@@ -257,12 +262,13 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
       ) : (
         <span className={s.weekText}>{weekText}</span>
       )}
-      {ws.countryFixed ? (
-        <span className={s.country} title={t('国は、画面の上のヘッダーで選んだ国です', 'Country comes from the header')}>
+      {/* 選べないとき(ヘッダーで決めた国・② に進んだあと)は、週と同じく文字で出す(灰色の選択欄だと、押せそうに見えるため) */}
+      {ws.countryFixed || !editable ? (
+        <span className={s.country} title={ws.countryFixed ? t('国は、画面の上のヘッダーで選んだ国です', 'Country comes from the header') : undefined}>
           {optionText(countryOptions, ws.country)}
         </span>
       ) : (
-        <Select size="small" className={s.countryPick} value={ws.country} disabled={!editable} aria-label={t('国', 'Country')} onChange={(_, v) => ws.setCountry(v.value)}>
+        <Select size="small" className={s.countryPick} value={ws.country} aria-label={t('国', 'Country')} onChange={(_, v) => ws.setCountry(v.value)}>
           <option value="">{t('国を選んでください', 'Choose a country')}</option>
           {countryOptions.map((o) => (
             <option key={o.value} value={String(o.value)}>
@@ -322,15 +328,19 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
 
   // ---- ① 右: その週の配信(見るだけ。作ろうとしている行も、破線で重ねて見せる)
   const weekEndNext = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 7)
-  const inWeek = cards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
+  // 選んだ国の配信だけ(ほかの国の配信が、国の印なしに混ざると、重なりを見誤るため)
+  const inWeek = cards.filter((c) => ws.inCountry(c) && c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
   const madeIds = new Set([...ws.savedIds.values(), ...ws.plainCards.map((c) => c.id)])
   const side = (
     <aside className={s.side} aria-label={t('この週の配信', 'Deliveries this week')}>
       <h3 className={s.h3}>{t('この週の配信', 'This week')}</h3>
       {ws.days.map((d) => {
         const list = inWeek.filter((c) => dayKeyOf(new Date(c.scheduled_at!)) === d.key).sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
-        // 作る予定の行(型の行なら、その日の型の数だけ)。もう作った配信があれば出さない
-        const planned = ws.targets.filter((k) => dayOfKey(k) === d.key && !list.some((c) => madeIds.has(c.id)))
+        // 作る予定の行(型の行なら、その日の型の数だけ)。保存した行・破棄した案は出さない
+        // (以前は、その日に作った配信が 1 本でもあると、同じ日のほかの型の行も消えていた)
+        const planned = ws.targets.filter(
+          (k) => dayOfKey(k) === d.key && !ws.savedIds.has(k) && !(plainDone && list.some((c) => madeIds.has(c.id))) && ws.reviewItems.find((x) => x.day === k)?.state !== 'discarded',
+        )
         return (
           <div key={d.key} className={s.sideDay}>
             <span className={s.label}>{dayText(d.key)}</span>
@@ -350,7 +360,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               <span key={k} className={s.sidePlanned}>
                 <span className={s.sideItem}>
                   <Badge size="small" appearance="filled" color="brand" className={s.newBadge}>
-                    {t('作る予定', 'Planned')}
+                    {ws.started && ws.results.has(k) ? t('未保存の案', 'Unsaved draft') : t('作る予定', 'Planned')}
                   </Badge>
                   <ChannelBadge channel={ws.channel} size="small" />
                   {timeOfKey(k) && <span className={s.muted}>{timeOfKey(k)}</span>}
@@ -379,34 +389,45 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
     return (
       <div className={s.main}>
         <section className={s.panel}>
-          <h3 className={s.h3}>{t('作る日と、配信の方向', 'Days and direction')}</h3>
+          {/* 作り方の説明は、見出しの横の ⓘ に(X72。慣れると邪魔なので、見出しの下に並べない) */}
+          <InfoLabel
+            label={{ className: s.h3 }}
+            info={
+              ws.byPattern
+                ? t(
+                    `この国の配信の型どおりに、${channelName}の枠を作ります。種類は型の既定値で、行ごとに変えられます。テンプレートは型の既定値です(型で決めていなければ、中身を作るときに AI が選びます)。同じ時刻の${channelName}がもうある型は作りません。作る行にチェックを入れてください。ここではまだ保存しません。型は ⚙ →「国」→「配信の型」。`,
+                    `Slots for ${channelName} from this country’s delivery patterns. The type is the pattern’s default and can be changed per row. The template is the pattern’s default (if the pattern has none, AI picks one when creating the content). Patterns that already have a ${channelName} at the same time are skipped. Check the rows to create. Nothing is saved yet. Edit patterns in ⚙ → Country → Delivery patterns.`,
+                  )
+                : t(
+                    `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れてください。種類と配信名は、AI に入れてもらい、あとで直せます。テンプレートは、中身を作るときに AI が選びます。ここではまだ保存しません。`,
+                    `One delivery per day on days without ${channelName} (from today). Check the days. Let AI fill the type and name, then adjust. AI picks the template when creating the content. Nothing is saved yet.`,
+                  )
+            }
+          >
+            {t('作る日と、配信の方向', 'Days and direction')}
+          </InfoLabel>
           {channelPick}
-          <span className={s.hint}>
-            {!ws.country
-              ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
-              : locked
-                ? t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')
-                : ws.byPattern
-                  ? t(
-                      `この国の配信の型どおりに、${channelName}の枠を作ります(種類・テンプレートは型の既定値。行ごとに変えられます)。同じ時刻の${channelName}がもうある型は作りません。作る行にチェックを入れてください。ここではまだ保存しません。型は ⚙ →「国」→「配信の型」。`,
-                      `Slots for ${channelName} from this country’s delivery patterns (type and template are the pattern’s defaults; change them per row). Patterns that already have a ${channelName} at the same time are skipped. Check the rows to create. Nothing is saved yet. Edit patterns in ⚙ → Country → Delivery patterns.`,
-                    )
-                  : t(
-                    `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れてください。種類と配信名は、AI に入れてもらい、あとで直せます。ここではまだ保存しません。`,
-                    `One delivery per day on days without ${channelName} (from today). Check the days. Let AI fill the type and name, then adjust. Nothing is saved yet.`,
-                  )}
-          </span>
-          {/* AI でまとめて入れる。表の上に、何をするかを書いた帯で出す(小さなボタンだけだと、何が起きるか分からないため) */}
+          {/* 作れないわけだけは、その場に出す(何もできない状態なので) */}
+          {(!ws.country || locked) && (
+            <span className={s.hint}>
+              {!ws.country
+                ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
+                : t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')}
+            </span>
+          )}
+          {/* AI でまとめて入れる。表の上に、何をするかが分かる帯で出す(小さなボタンだけだと、何が起きるか分からないため。詳しくは ⓘ) */}
           <div className={s.aiBar}>
             <AiIcon size={20} />
             <div className={s.aiText}>
-              <span className={s.aiTitle}>{t('種類と配信名を AI でまとめて入れる', 'Fill types and names with AI')}</span>
-              <span className={s.hint}>
-                {t(
+              <InfoLabel
+                label={{ className: s.aiTitle }}
+                info={t(
                   '作る日のうち、種類か配信名が空の行に、日付・前後の配信に合う案を入れます。人が選んだ種類・入れた配信名は変えません。',
                   'Fills empty types and names with ideas that fit the date and nearby deliveries. What you entered stays as it is.',
                 )}
-              </span>
+              >
+                {t('種類と配信名を AI でまとめて入れる', 'Fill types and names with AI')}
+              </InfoLabel>
             </div>
             <Button appearance="primary" icon={ws.naming.size > 0 ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" />} disabled={unfilled.length === 0 || ws.naming.size > 0} onClick={() => void ws.suggest(unfilled, true)}>
               {unfilled.length > 0 ? t(`空いている ${unfilled.length} 行に入れる`, `Fill ${unfilled.length} rows`) : t('空いている行はありません', 'Nothing to fill')}
@@ -417,11 +438,10 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               <span />
               <span className={s.label}>{t('配信日', 'Date')}</span>
               <span className={s.label}>{t('種類', 'Type')}</span>
-              {/* 配信名が何かを、見出しの下に一言(メールに出る文と間違えないように) */}
-              <span className={s.thName}>
-                <span className={s.label}>{t('配信名', 'Delivery name')}</span>
-                <span className={s.thNote}>{t('社内で配信を見分けるための名前です(メールには出ません)', 'An internal label to tell deliveries apart (not shown in the email)')}</span>
-              </span>
+              {/* 配信名が何かは ⓘ に(メールに出る文と間違えないように) */}
+              <InfoLabel label={{ className: s.label }} info={t('社内で配信を見分けるための名前です(メールには出ません)', 'An internal label to tell deliveries apart (not shown in the email)')}>
+                {t('配信名', 'Delivery name')}
+              </InfoLabel>
             </div>
             {ws.lines.map((d) => {
               const free = d.state === 'free'
@@ -526,16 +546,22 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
   const step2 = () => {
     const failedDays = ws.targets.filter((d) => ws.failed.has(d))
     return (
-      <div>
+      <div className={s.step2}>
         <div className={s.tools}>
-          <span className={s.hint}>
-            {ws.running
-              ? t('AI が中身を作っています(同時に 3 本まで)。できた案から、カードに中身が入ります。', 'AI is creating the content (up to 3 at a time). Cards fill in as they finish.')
-              : t(
-                  'できた案は、まだ保存していません。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」。',
-                  'Drafts are not saved yet. Use “Open & edit” to review or fix in the card, “Save” to keep as is, or “Discard”.',
-                )}
-          </span>
+          {/* 作っている間は、いまの様子をその場に。決め方の説明は ⓘ に(X72) */}
+          {ws.running ? (
+            <span className={s.hint}>{t('AI が中身を作っています(同時に 3 本まで)。できた案から、カードに中身が入ります。', 'AI is creating the content (up to 3 at a time). Cards fill in as they finish.')}</span>
+          ) : (
+            <InfoLabel
+              label={{ className: s.h3 }}
+              info={t(
+                '保存するまでは、案はこの画面の中だけにあります。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」、別の案がよければ「作り直す」(前の案は消えます)。保存した案は、下書き(未起案)になります。',
+                'Drafts live only in this window until saved. Use “Open & edit” to review or fix in the card, “Save” to keep as is, “Discard” to drop, or “Recreate” for another draft (the current one is replaced). Saved drafts become regular drafts (Not started).',
+              )}
+            >
+              {t('できた案', 'Drafts')}
+            </InfoLabel>
+          )}
           <span className={s.spacer} />
           {ws.running ? (
             <Button size="small" icon={<Spinner size="extra-tiny" />} onClick={ws.stop}>
@@ -609,13 +635,42 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
             // 直すことがあれば、主のボタンを「開いて直す」にして、上限を超えた商品を選んだ状態で開く
             const fixFocus = is.over[0]
             const open = () => (item.state === 'saved' ? onOpen(c.id, fixFocus) : onOpenDraft(day, fixFocus))
+            // この 1 本だけ、別の案に作り直す(まだ保存していない案・破棄した案だけ。ほかを作っている間は待つ)。
+            // 未保存のカードはボタンが 4 つ並ぶので、破棄・作り直すは印だけにし、名前は Tooltip で出す(カードの幅で折り返さないように)
+            const regenLabel = ws.running ? t('作り直す(ほかの案を作り終えてから使えます)', 'Recreate (after the other drafts finish)') : t('作り直す(前の案は消えます)', 'Recreate (replaces this draft)')
+            const regen = (compact: boolean) =>
+              compact ? (
+                <Tooltip content={regenLabel} relationship="label">
+                  <Button size="small" appearance="subtle" icon={<AiIcon />} disabled={busy || ws.running} onClick={() => void ws.regenerate(day)} />
+                </Tooltip>
+              ) : (
+                <Button size="small" appearance="subtle" icon={<AiIcon />} disabled={busy || ws.running} title={regenLabel} onClick={() => void ws.regenerate(day)}>
+                  {t('作り直す', 'Recreate')}
+                </Button>
+              )
             return (
               <div key={day} className={mergeClasses(s.card, item.state === 'saved' && s.cardSaved, item.state === 'discarded' && s.cardOff)}>
                 {head}
                 <h4 className={s.cardTitle} title={c.name}>
                   {c.name}
                 </h4>
-                <span className={s.theme} title={c.theme ?? ''}>{c.theme ? `${t('テーマ', 'Theme')}: ${c.theme}` : ''}</span>
+                {/* 開かなくても決められるように、メイン画像・ヘッドライン(プッシュはタイトル)・テンプレートも出す */}
+                <div className={s.cardSummary}>
+                  {c.channel !== CHANNEL_PUSH && (
+                    <ImageThumb src={heroImage(heroes.find((h) => h.id === c.hero_image_id))} alt={t('メイン画像', 'Hero image')} width={72} height={48} />
+                  )}
+                  <div className={s.summaryText}>
+                    {[
+                      [t('テーマ', 'Theme'), c.theme],
+                      c.channel === CHANNEL_PUSH ? [t('タイトル', 'Title'), c.push_title] : [t('ヘッドライン', 'Headline'), c.headline],
+                      [t('テンプレート', 'Template'), c.layout_key ? getTemplate(c.layout_key).label : ''],
+                    ].map(([k, v]) => (
+                      <span key={k} className={s.theme} title={v ?? ''}>
+                        <span className={s.summaryKey}>{k}</span> {v || '—'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <div className={s.thumbs}>
                     {item.productIds.map((pid, i) => {
@@ -645,14 +700,26 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                 </div>
                 <div className={s.cardActions}>
                   {item.state === 'discarded' ? (
-                    <Button size="small" onClick={() => ws.undoDiscard(day)}>
-                      {t('破棄を取り消す', 'Undo discard')}
-                    </Button>
+                    <>
+                      <Button size="small" onClick={() => ws.undoDiscard(day)}>
+                        {t('破棄を取り消す', 'Undo discard')}
+                      </Button>
+                      <span className={s.spacer} />
+                      {regen(false)}
+                    </>
                   ) : (
                     <>
-                      <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
-                        {t('破棄', 'Discard')}
-                      </Button>
+                      {/* 保存したあとは、保存した配信を消すので「削除」。まだ保存していない案は、画面から外すだけなので「破棄」(印の決まり: 削除だけ Delete) */}
+                      {item.state === 'saved' ? (
+                        <Button size="small" appearance="subtle" icon={<DeleteRegular />} disabled={busy} onClick={() => void ws.discard(day)}>
+                          {t('削除', 'Delete')}
+                        </Button>
+                      ) : (
+                        <Tooltip content={t('破棄(この案は保存しません)', 'Discard (don’t save this draft)')} relationship="label">
+                          <Button size="small" appearance="subtle" icon={<DismissRegular />} disabled={busy} onClick={() => void ws.discard(day)} />
+                        </Tooltip>
+                      )}
+                      {item.state === 'unsaved' && regen(true)}
                       <span className={s.spacer} />
                       {item.state === 'unsaved' && (
                         <Button size="small" icon={busy ? <Spinner size="extra-tiny" /> : <SaveRegular />} disabled={busy} onClick={() => void ws.save(day)}>
@@ -790,7 +857,12 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                 {side}
               </div>
             ) : (
-              step2()
+              // ② でも、週の様子を右に出す(重なりを見ながら、保存・破棄を決められるように。幅は ① と同じ)
+              <div className={s.withSide} style={{ '--cols': panes.columns } as CSSProperties}>
+                {step2()}
+                <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
+                {side}
+              </div>
             )}
           </div>
           <div className={s.foot}>
@@ -814,7 +886,7 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               )}
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" icon={<DeleteRegular />} disabled={!!ws.savingDay} onClick={afterAsk}>
+              <Button appearance="secondary" icon={<DismissRegular />} disabled={!!ws.savingDay} onClick={afterAsk}>
                 {t('破棄して閉じる', 'Discard and close')}
               </Button>
               <Button

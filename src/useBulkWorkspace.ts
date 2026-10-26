@@ -255,10 +255,13 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const weekUse = new Map<string, number>()
   for (const c of weekCards) for (const pid of new Set(compareProducts.get(c.id) ?? [])) weekUse.set(pid, (weekUse.get(pid) ?? 0) + 1)
   const norm = (s?: string | null) => (s ?? '').trim().replace(/\s+/g, ' ')
+  /** 選んだ国の配信か(国が空の配信は、どの国にも数える。weekDays と同じ見方)。ほかの国の配信は、同じテーマ・同じ画像でも重ならない */
+  const inCountry = (c: { country?: string | null }) => !country || !c.country || c.country === country
   /** 案ごとの、週の中での気になる点(上限を超えた商品・同じテーマ・同じメイン画像の配信) */
   function issuesOf(x: ReviewItem): { over: string[]; sameTheme: string[]; sameHero: string[] } {
     if (x.state === 'discarded') return { over: [], sameTheme: [], sameHero: [] }
-    const others = weekCards.filter((c) => c.id !== x.card.id)
+    // 週の上限の数(weekUse)は、アプリ全体と同じく国をまたいで数える。テーマ・メイン画像の重なりは、同じ国の中だけで見る
+    const others = weekCards.filter((c) => c.id !== x.card.id && inCountry(c))
     return {
       over: [...new Set(x.productIds)].filter((pid) => (weekUse.get(pid) ?? 0) > weeklyLimit(x.card)),
       sameTheme: norm(x.card.theme) ? others.filter((c) => norm(c.theme) === norm(x.card.theme)).map((c) => c.name) : [],
@@ -328,7 +331,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setNaming((s) => new Set([...s, ...list]))
     try {
       const others = cards
-        .filter((c) => c.name?.trim() && c.scheduled_at && Math.abs(new Date(c.scheduled_at).getTime() - weekStart.getTime()) < 21 * 86400000)
+        .filter((c) => c.name?.trim() && c.scheduled_at && inCountry(c) && Math.abs(new Date(c.scheduled_at).getTime() - weekStart.getTime()) < 21 * 86400000)
         .map((c) => ({ name: c.name, theme: c.theme, scheduledAt: c.scheduled_at }))
       const names = await suggestNames({
         slots: list.map((day) => {
@@ -349,7 +352,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       setRows((m) => {
         const n = new Map(m)
         for (const x of names) {
-          const cur = n.get(x.id) ?? { name: '', themeType: '' }
+          // まだ触っていない行は、型の既定の種類から始める(空で始めると、型の種類が消えるため)
+          const cur = n.get(x.id) ?? rowOf(x.id)
           // 種類は、人がまだ選んでいない行だけ、AI の案で埋める(人が選んだ種類は変えない)
           const fill = !cur.themeType && !!x.themeType
           n.set(x.id, { ...cur, ...(keepNames && cur.name.trim() ? {} : { name: x.name, nameReason: x.reason }), ...(fill ? { themeType: x.themeType, typeByAi: true } : {}) })
@@ -401,9 +405,10 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     // 並行して作ると、同時に作っている配信のテーマが見えず、同じテーマになりやすい。
     // そこで、次の配信は、前の配信のテーマが決まってから始める(テーマのあとの工程は、並行して進む。useWeekFrames と同じ)。
     // 先に作った案(まだ保存していない)のテーマ・商品も避ける
+    // 作り直す案(regenerate)の前のテーマも避ける(同じ案に戻らないように)。商品は、作り直すと入れ替わるので、週の数には入れない
     const earlier = [...results.entries()].filter(([d]) => !discarded.has(d))
     const themes: string[] = earlier.map(([, r]) => r.theme ?? '').filter(Boolean)
-    const done: { id: string; scheduled_at?: string; products: string[] }[] = earlier.map(([d, r]) => ({ id: draftId(d), scheduled_at: baseOf(d).scheduled_at, products: productIdsOf(r) }))
+    const done: { id: string; scheduled_at?: string; products: string[] }[] = earlier.filter(([d]) => !list.includes(d)).map(([d, r]) => ({ id: draftId(d), scheduled_at: baseOf(d).scheduled_at, products: productIdsOf(r) }))
     let themeGate: Promise<void> = Promise.resolve()
     const worker = async () => {
       for (;;) {
@@ -462,6 +467,24 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   }
   const stop = () => {
     stopRef.current = true
+  }
+  /**
+   * ② この 1 本だけ、案を作り直す(まだ保存していない案・破棄した案だけ。保存したあとは、配信カードで直す)。
+   * 前の案は捨てる(案は保存しないので、戻す先は持たない)
+   */
+  async function regenerate(day: string) {
+    if (running || savedIds.has(day) || !results.has(day)) return
+    setResults((m) => {
+      const n = new Map(m)
+      n.delete(day)
+      return n
+    })
+    setDiscarded((s) => {
+      const n = new Set(s)
+      n.delete(day)
+      return n
+    })
+    await generate([day])
   }
 
   /** 次に確かめる、まだ保存も破棄もしていない案(いまの日の次から、なければ最初から) */
@@ -527,7 +550,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   async function discard(day: string) {
     const id = savedIds.get(day)
     if (id) {
-      if (!(await confirmDialog(tr('保存したこの配信を消して、破棄します。よろしいですか?', 'Delete this saved delivery and discard it?')))) return
+      if (!(await confirmDialog(tr('保存したこの配信を削除します(元に戻せません)。よろしいですか?', 'Delete this saved delivery? This cannot be undone.')))) return
       setError(null)
       setSavingDay(day)
       try {
@@ -614,12 +637,14 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     results,
     running,
     generate,
+    regenerate,
     stop,
     started,
     reviewItems,
     unsavedCount,
     savedCount,
     savedIds,
+    inCountry,
     compareCards,
     compareProducts,
     weekUse,
