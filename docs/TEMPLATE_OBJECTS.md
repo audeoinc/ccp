@@ -236,6 +236,8 @@
 - シンプルな配信カード: プレビューでテキスト・画像の部品を押すと、右のペインで書き換え・差し替え(部品の画像のライブラリ `PartImagePick` から選ぶか URL)。「テンプレートに戻す」で列から外す。テンプレートで許していない部品は、いままでどおり鍵の表示。
 - プレビュー(`Preview` の `partContent`)・保存済みの配信のプレビュー(`CardPreview`)・制作の写し(`Snapshot` の `card.part_content`)・制作に渡す HTML は、同じ中身で描く。制作のページのテキストの一覧にも、書き換えた部品の文を出す。
 
+**作った(2026-10-26。ブランチ claude/t8-utm-4f414e)**: `src/partContent.ts`(読み書き・許した部品の判定 `canRewriteText`・`canSwapImage`・保存する分 `prunePartContent`・描く形 `effectivePart`)。`useCardEditor` の `partContent`(元に戻すの写しにも)、案の文言 `VariantText.parts`(`useAbVariants`。違いの目印・A に合わせる・保存の前に絞る)、`Preview`・`CardPreview`・`AbCompare`・制作の写し(`CARD_KEYS` と `variantSnapshot`)、制作のテキストの行 `{ key: 'part_text', id }`、シンプルな配信カードの `PartPane` のテキスト・画像のペイン、`delivery_products.part_id`(`useCardEditor` の `syncItems`・`bulkDraft`・`duplicate`)。例は `scripts/check-parts.mjs`(verify に含む)。**まだ**: 詳しい配信カードで書き換える欄(いまはシンプルな配信カードだけ。詳しい画面でも描くのは同じ)、画像の URL を手で入れる欄(ライブラリから選ぶ・上げるだけ)、ボタンの文言の書き換え(テンプレートのまま)、AI に部品の文を書かせる。撮影用のデータの部品の画像は data: の URL なので、決まり(http(s) か / で始まる URL だけ。テンプレートの画像と同じ)で選べない(本番・Workbench は `/api/…` なので選べる)
+
 ## 7. まだ決めていないこと
 
 - グローバルを編集できる人: 本部の役割をどう決めるか(いまの利用者の表 `users` の `role` に足すか、承認のグループを使うか)。

@@ -14,7 +14,7 @@ import { confirmDialog } from './confirm'
 import { myName } from './history'
 import { allVariants, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsTemplate, ownsText, parseAbTest, parseDecision, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import type { PartRef } from './simple/parts'
-import { samePartContent, type PartContent } from './partContent'
+import { prunePartContent, samePartContent, type PartContent } from './partContent'
 import type { Form } from './cardForm'
 
 /** AB テストの、いま編集していない案の中身(X55。編集中の案は items・heroId・heroReason にある) */
@@ -63,6 +63,9 @@ export interface AbDeps {
   buildAiCard: () => AiCard
 }
 
+/** 保存する案の文言(部品の中身を、その案のテンプレートの書き換えてよい部品の分に絞る) */
+const withParts = (x: VariantText, template: EmailTemplateId): VariantText => (x.parts ? { ...x, parts: prunePartContent(x.parts, template) } : x)
+
 export function useAbVariants({ card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, simpleOn, original, buildAiCard }: AbDeps) {
   // AB テスト(X55)。ab = 設定(null = しない)、active = いま編集している案、stash = 編集していない案の中身(A を含む)
   const [ab, setAb] = useState<AbTest | null>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test))
@@ -91,7 +94,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
     // 案ごとに持つものは、保存する比べる要素で決める(シンプルな画面では、A と違う所から決めた要素。saveTarget)
     const owner = savedTargetAb() ?? ab
     const heroes = ownsHero(owner) ? Object.fromEntries(ab.variants.map((k) => [k, heroOf(k)])) : {}
-    const texts = ownsAnyText(owner) ? Object.fromEntries(ab.variants.map((k) => [k, textsOf(k)])) : undefined
+    // 部品の中身は、A と同じく、その案のテンプレートにある書き換えてよい部品の分だけ(T8 段階 6)
+    const texts = ownsAnyText(owner) ? Object.fromEntries(ab.variants.map((k) => [k, withParts(textsOf(k), templateOfV(k))])) : undefined
     // テンプレートは、A と違う案だけ、版まで決めて書く
     const aTpl = pinnedTemplateKey(templateOfV('A'))
     const tplEntries = ownsTemplate(owner) ? ab.variants.map((k) => [k, pinnedTemplateKey(templateOfV(k))] as const).filter(([, v]) => v !== aTpl) : []
