@@ -137,7 +137,8 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   span2: { gridColumn: 'span 2' },
-  dayOff: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled },
+  // 作れない行(過ぎた日・型のない曜日・もうある日・確定した週)は、高さを詰めて薄く出す(作る行が埋もれないように)
+  dayOff: { minHeight: '24px', paddingTop: '1px', paddingBottom: '1px', backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled, border: `1px solid transparent` },
   dayOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   dayDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
   dayNote: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
