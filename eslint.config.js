@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // .claude/ の下には、ほかの作業チャットの worktree(リポジトリの写し)が入る。作りかけのコードで、こちらの lint が落ちないように見ない
+  globalIgnores(['dist', '.claude']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
