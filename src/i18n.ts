@@ -100,7 +100,7 @@ const OPTION_EN: Record<string, string> = {
   未定: 'Pending',
   // チャネル
   メール: 'Email',
-  プッシュ: 'Push',
+  アプリ: 'App',
   // 配信種別(部署)
   販促: 'Promotion',
   // 商品カテゴリ

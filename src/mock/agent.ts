@@ -101,7 +101,7 @@ export function mockAgent(message: string): string {
     const rev = (k: { now: Kpi; past: Kpi }) => (k.past.revenue ? Math.round((k.now.revenue / k.past.revenue - 1) * 100) : 0)
     const up = summary.filter((k) => rev(k) >= 0)
     const down = summary.filter((k) => rev(k) < 0)
-    const label = (k: { country: string; channel: string }) => (en ? `${k.country} ${k.channel}` : `${k.country} の${k.channel === 'push' ? 'プッシュ' : 'メール'}`)
+    const label = (k: { country: string; channel: string }) => (en ? `${k.country} ${k.channel}` : `${k.country} の${k.channel === 'push' ? 'アプリ' : 'メール'}`)
     return J({
       good: [
         ...up.slice(0, 1).map((k) => (en ? `${label(k)} revenue was ${rev(k)}% above the past average; click rate ${pt(k)}pt.` : `${label(k)}の売上は、前の期間の平均より ${rev(k)}% 多く、クリック率は ${pt(k)}pt。`)),

@@ -51,12 +51,27 @@ export function canJoinCampaign(
   return null
 }
 
-/** チャネルの名前(画面の言葉。メール / プッシュ) */
+/** チャネルの名前(画面の言葉。メール / アプリ) */
 const channelName = (channel?: string | null) => (channel ? optionLabel(DeliveryCardChannel[channel as keyof typeof DeliveryCardChannel] ?? channel) : '')
 
-/** 配信カードの名前(「キャンペーン名 + チャネル」。人が別に付けない) */
+/** 「キャンペーン名 + チャネル」(画面の言語で) */
 export const cardNameFor = (campaignName: string, channel?: string | null): string =>
   [campaignName.trim(), channelName(channel)].filter(Boolean).join(' ')
+
+/**
+ * 配信カードの、画面に出す名前。キャンペーンに入っているカードは、表示のたびに「キャンペーン名 + チャネル」を作る
+ * (人が別に付けない。画面の言語に合わせ、キャンペーン名を変えれば子の名前もそろって変わるように。2026-10-26 利用者)。
+ * キャンペーンに入っていない・キャンペーンが見つからないカードは、保存している name のまま。
+ * name の列は必須なので、キャンペーンに入れるカードにも、作ったときの cardNameFor を控えとして書いておく(書き出し・古い画面のため)
+ */
+export function cardDisplayName(
+  card: Pick<DeliveryCard, 'name' | 'channel' | 'campaign_id'>,
+  campaigns: Pick<Campaign, 'id' | 'name'>[] | ReadonlyMap<string, Pick<Campaign, 'name'>>,
+): string {
+  if (!card.campaign_id) return card.name
+  const campaign = 'get' in campaigns ? campaigns.get(card.campaign_id) : campaigns.find((c) => c.id === card.campaign_id)
+  return campaign?.name.trim() ? cardNameFor(campaign.name, card.channel) : card.name
+}
 
 /**
  * キャンペーンの配信日を動かしたときの、子のカードの新しい日時(ISO)。日付だけを変え、時刻(ブラウザの時刻)はそのまま。

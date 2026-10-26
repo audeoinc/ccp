@@ -3,7 +3,7 @@
 
 import { dropSharedReads, shareRead } from '../gcp/readShare'
 import { mockAgent } from './agent'
-import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, categoryMetrics, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, productMetrics, products, users, weekly, type Row } from './seed'
+import { approvalGroupMembers, approvalGroups, approvalRequests, approvalReviewers, approvalRules, campaigns, cardNotes, notifications, noteReactions, productionRequests, productRankings, cards, categoryMetrics, changeLogs, deliveryResults, events, weeks, deliveryProducts, guid, heroes, layoutTemplates, policies, productMetrics, products, users, weekly, type Row } from './seed'
 import { sampleAds } from './ads'
 import { buildSampleSkus } from '../skuSampleData'
 import { sampleImpact } from '../impact'
@@ -101,8 +101,8 @@ export const tables: Record<string, Row[]> = {
   // 配信の効果(AI の依頼の記録・ホールドアウトとの比べ)の見本。学びの判定は、人が画面で決めるので空から
   ...impactTables(),
   LearningReviewsService: [],
-  // キャンペーン(X79)。見本のカードをまとめるのは段 ⑤ で行うので、いまは空から
-  CampaignsService: [],
+  // キャンペーン(X79)。同じ国・同じ配信日のメールとアプリを 3 組と、1 枚だけのもの 1 つ(seed.ts)
+  CampaignsService: structuredClone(campaigns),
   // 配信ごとの学びの付け外し(X78)。人が配信カードで決めるので空から
   CardLearningsService: [],
   // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)

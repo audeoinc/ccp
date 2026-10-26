@@ -8,7 +8,7 @@ export type DeliveryCardCountry = keyof typeof DeliveryCardCountry
 
 export const DeliveryCardChannel = {
   email: 'メール',
-  app: 'プッシュ',
+  app: 'アプリ',
 } as const
 export type DeliveryCardChannel = keyof typeof DeliveryCardChannel
 
