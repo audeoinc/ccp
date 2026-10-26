@@ -365,7 +365,10 @@
     ["notes", "text"],
     ["variant", "text"],
     ["segment", "text"],
-    ["learning_title", "text"]
+    ["learning_title", "text"],
+    ["merged_into", "text"],
+    ["merged_at", "timestamptz"],
+    ["merged_by", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]

@@ -8,6 +8,7 @@ import { LearningReviewsService, type LearningReview, type LearningReviewStatus 
 import { DataTable, type DataColumn } from './DataTable'
 import { ChannelBadge } from './ChannelBadge'
 import { locale, pct, priceText, type Market, useT } from './i18n'
+import { aliasRuns, mergeAliases } from './learningMerge'
 import { mergeResultsByCard } from './results'
 import { learningUsableIn, useCountryApply } from './countryApply'
 import { myName } from './history'
@@ -225,7 +226,10 @@ export function ImpactView({ cards, allCards, country, onOpenResult }: Props) {
 
   // AB テストの配信は、案ごとに結果の行が分かれるので、配信ごとに 1 行にまとめてから使う(まとめた行の id は、メモのある行 = 学びの id)
   const merged = useMemo(() => (results ? mergeResultsByCard(results) : null), [results])
-  const allImpacts = useMemo(() => (merged ? buildImpacts(cards, merged, runs, lifts) : []), [cards, merged, runs, lifts])
+  // 似た学びをまとめたもの(X78)は、まとめた先の学びとして数える(学びのカードと同じ読み替え)
+  const aliases = useMemo(() => mergeAliases(results ?? []), [results])
+  const aliasedRuns = useMemo(() => aliasRuns(runs, aliases), [runs, aliases])
+  const allImpacts = useMemo(() => (merged ? buildImpacts(cards, merged, aliasedRuns, lifts) : []), [cards, merged, aliasedRuns, lifts])
   // 対象の期間(配信日)で絞る。すべてのタブの集計・比べが、この期間の配信だけになる
   const impacts = useMemo(
     () =>
@@ -240,10 +244,10 @@ export function ImpactView({ cards, allCards, country, onOpenResult }: Props) {
   // 国を選んでいれば、その国で使うと決めたほかの国の学びも並べ、その国での判定を決める(ST5)
   const applyVersion = useCountryApply()
   const evals = useMemo(
-    () => (merged ? evaluateLearnings(allCards, merged, impacts, reviews, country, learningUsableIn) : []),
+    () => (merged ? evaluateLearnings(allCards, merged.filter((r) => !aliases.has(r.id)), impacts, reviews, country, learningUsableIn) : []),
     // 国の適用を変えたら(⚙ や配信カードで)、並べ直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allCards, merged, impacts, reviews, country, applyVersion],
+    [allCards, merged, impacts, reviews, country, applyVersion, aliases],
   )
 
   if (error) {

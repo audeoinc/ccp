@@ -127,7 +127,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   useEffect(loadOverrides, [loadOverrides])
 
   // すべての学び(この国での状態・強さつき)。この配信の学びは、自分には付けない
-  const { cards: all } = useLearningCards(cards, country)
+  const { cards: all, canonical } = useLearningCards(cards, country)
   const others = useMemo(() => all.filter((l) => l.source.id !== card.id), [all, card.id])
   const byId = useMemo(() => new Map(others.map((l) => [l.id, l])), [others])
   // 同じチャネルで、同じテンプレートか同じテーマの種類の学び(新しい順)
@@ -138,9 +138,11 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   // 自動で付ける学び: この国で使う学びのうち、休ませた・外したもの以外
   const auto = matching.filter((l) => l.inDeck && l.state === 'use').slice(0, MAX)
   // 装備中: 自動 − 外したもの + 付けたもの(外した学び・この国で使わない学びは、付けていても渡さない)
+  // 付け外しの行が、まとめた元の学びのものなら、まとめた先の学びのものとして読む(X78 の似た学びのまとめ)
+  const ownOverrides: EquipOverrides = new Map([...overrides].map(([id, mode]) => [canonical(id), mode]))
   const learnings = equippedIds(
     auto.map((l) => l.id),
-    overrides,
+    ownOverrides,
   )
     .map((id) => byId.get(id))
     .filter((l): l is LearningCardData => !!l && l.inDeck && l.state !== 'retired')

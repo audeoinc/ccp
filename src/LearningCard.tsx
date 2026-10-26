@@ -33,6 +33,14 @@ const useStyles = makeStyles({
   foot: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '10px', rowGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   dots: { letterSpacing: '1px', color: tokens.colorNeutralForeground2 },
   actions: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' },
+  // 育ち(X78「育つ」): 左の縁の色を、育つほど少し濃くする。演出・動きは入れない(利用者 2026-10-24: さりげなく)
+  grown1: { boxShadow: `inset 3px 0 0 ${tokens.colorBrandStroke2}, ${tokens.shadow4}` },
+  grown2: { boxShadow: `inset 3px 0 0 ${tokens.colorBrandStroke1}, ${tokens.shadow4}` },
+  // まとめた学び(根拠)の一覧
+  members: { display: 'grid', rowGap: '6px', margin: 0, padding: '6px 0 0', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, listStyle: 'none' },
+  member: { display: 'grid', rowGap: '2px', fontSize: tokens.fontSizeBase200 },
+  memberHead: { display: 'flex', alignItems: 'center', columnGap: '6px', color: tokens.colorNeutralForeground3 },
+  memberNotes: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: tokens.colorNeutralForeground2 },
 })
 
 const countryName = (code: string) => optionLabel(countryOptions.find((o) => String(o.value) === code)?.label) || code
@@ -51,6 +59,10 @@ interface Props {
   compact?: boolean
   /** 足したばかりの印など(useJustAdded の freshClass) */
   className?: string
+  /** まとめた学びを、元に戻す(手札だけ) */
+  onUnmerge?: (memberId: string) => void
+  /** 名前のない学びに、名前を付ける(手札だけ。AI の案から始める) */
+  onName?: () => void
 }
 
 /** 強さの点(1〜5)。材料不足なら言葉で */
@@ -66,11 +78,18 @@ export function StrengthDots({ strength }: { strength: number | null }) {
   )
 }
 
-export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, compact = false, className }: Props) {
+/** 育ちの言葉(縁の色の意味。カードに乗せたときの説明) */
+const growthText = (g: 0 | 1 | 2, t: ReturnType<typeof useT>) =>
+  g === 2 ? t('よく育った学び(よく使われ、効き目も上向き)', 'Well grown (used often and working)') : g === 1 ? t('育ってきた学び', 'Growing') : undefined
+
+export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, compact = false, className, onUnmerge, onName }: Props) {
   const s = useStyles()
   const t = useT()
   const [full, setFull] = useState(false)
   const off = l.state !== 'use' || !l.inDeck
+  // 根拠の本数(まとめた学びの分だけ増える)。まとめた学びは、全文を開くと並ぶ
+  const sources = 1 + l.members.length
+  const sourcesText = t(`根拠 ${sources} 本`, sources === 1 ? '1 source' : `${sources} sources`)
   const badge =
     l.state !== 'use' ? (
       <Badge appearance="tint" size="small" color={l.state === 'resting' ? 'warning' : 'informative'}>
@@ -83,11 +102,16 @@ export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, com
     ) : null
 
   return (
-    <Card size="small" className={mergeClasses(s.card, off && s.off, className)}>
+    <Card size="small" className={mergeClasses(s.card, off && s.off, !off && l.growth === 1 && s.grown1, !off && l.growth === 2 && s.grown2, className)} title={off ? undefined : growthText(l.growth, t)}>
       <div className={s.head}>
         <span className={mergeClasses(s.title, off && s.titleOff)}>{l.title || t('(名前なし)', '(untitled)')}</span>
         {badge}
       </div>
+      {!compact && onName && !l.customTitle && (
+        <Link as="button" onClick={onName} style={{ justifySelf: 'start', fontSize: tokens.fontSizeBase200 }}>
+          {t('名前を付ける', 'Name it')}
+        </Link>
+      )}
       {!compact && (
         <>
           <button type="button" className={mergeClasses(s.notes, !full && s.clamp)} onClick={() => setFull(!full)} title={full ? undefined : t('押すと全文', 'Click for the full text')}>
@@ -112,10 +136,10 @@ export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, com
         {!compact &&
           (onOpenSource ? (
             <Link as="button" onClick={() => onOpenSource(l.source.id)} title={t(`元の配信「${l.source.name ?? ''}」の結果を開く`, `Open the results of "${l.source.name ?? ''}"`)}>
-              {t('根拠 1 本', '1 source')}
+              {sourcesText}
             </Link>
           ) : (
-            <span title={l.source.name ?? ''}>{t('根拠 1 本', '1 source')}</span>
+            <span title={l.source.name ?? ''}>{sourcesText}</span>
           ))}
         {!compact && onOpenImpact && (
           <Link as="button" onClick={() => onOpenImpact(l.id)} title={t('結果の「効果」で、この学びを渡した配信と渡さなかった配信を比べた詳しい所を開く', 'Open the comparison of deliveries with and without this learning in Results > Impact')}>
@@ -124,6 +148,31 @@ export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, com
         )}
         {actions && <span className={s.actions}>{actions}</span>}
       </div>
+      {/* まとめた学び(根拠が 2 本以上)。全文を開いたときだけ並べる */}
+      {!compact && full && l.members.length > 0 && (
+        <ul className={s.members} aria-label={t('まとめた学び', 'Merged learnings')}>
+          {l.members.map((m) => (
+            <li key={m.id} className={s.member}>
+              <span className={s.memberHead}>
+                {onOpenSource ? (
+                  <Link as="button" onClick={() => onOpenSource(m.source.id)}>
+                    {m.source.name ?? ''}
+                  </Link>
+                ) : (
+                  <span>{m.source.name ?? ''}</span>
+                )}
+                {m.mergedAt && <span>{t(`${day(m.mergedAt)} にまとめた`, `Merged ${day(m.mergedAt)}`)}</span>}
+                {onUnmerge && (
+                  <Link as="button" onClick={() => onUnmerge(m.id)}>
+                    {t('元に戻す', 'Undo')}
+                  </Link>
+                )}
+              </span>
+              <span className={s.memberNotes}>{m.notes}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   )
 }

@@ -45,6 +45,31 @@ export interface LearningCardData {
   lift: Diff
   /** 強さ(1〜5)。比べる材料が足りなければ null */
   strength: number | null
+  /** 育ち(0〜2)。使われた本数と強さから。カードの縁の色を、さりげなく変える(growthOf) */
+  growth: 0 | 1 | 2
+  /** この学びにまとめた、似た学び(根拠が増える。learningMerge) */
+  members: LearningMember[]
+}
+
+/** まとめた学び(根拠の 1 本) */
+export interface LearningMember {
+  id: string
+  title: string
+  notes: string
+  source: DeliveryCard
+  mergedAt: string
+  mergedBy: string
+}
+
+/**
+ * 育ち(X78「育つ」。演出はせず、さりげなく: 利用者 2026-10-24)。0 = ふつう、1 = 育ってきた、2 = よく育った。
+ * 使われた本数が増え、効き目が上向き(強さ 4 以上)だと上がる。効かない学び(強さ 2 以下)は育たない(点の少なさで見える)
+ */
+export function growthOf(strength: number | null, uses: number): 0 | 1 | 2 {
+  if (strength != null && strength <= 2) return 0
+  if (strength != null && strength >= 4 && uses >= 5) return 2
+  if ((strength != null && strength >= 4) || uses >= 3) return 1
+  return 0
 }
 
 /** 送った月の季節(北半球。南の国の配信が増えたら、国ごとにずらす) */
@@ -88,9 +113,16 @@ export function buildLearningCards(
   reviews: LearningReview[],
   country: string,
   usableIn: (id: string, origin: string, country: string) => boolean,
+  aliases: Map<string, string> = new Map(),
 ): LearningCardData[] {
-  const atOrigin = new Map(evaluateLearnings(allCards, results, impacts, reviews, '', usableIn).map((e) => [e.id, e]))
-  const inCountry = country ? new Map(evaluateLearnings(allCards, results, impacts, reviews, country, usableIn).map((e) => [e.id, e])) : null
+  // まとめた元の学びは、1 枚のカードにせず、まとめた先のカードの根拠にする。国のデッキは、元が入っていれば、まとめた先も入っているとみなす
+  const membersOf = new Map<string, string[]>()
+  for (const [from, into] of aliases) membersOf.set(into, [...(membersOf.get(into) ?? []), from])
+  const usable = (id: string, origin: string, c: string) => usableIn(id, origin, c) || (membersOf.get(id) ?? []).some((m) => usableIn(m, origin, c))
+  const own = aliases.size ? results.filter((r) => !aliases.has(r.id)) : results
+  const atOrigin = new Map(evaluateLearnings(allCards, own, impacts, reviews, '', usable).map((e) => [e.id, e]))
+  const inCountry = country ? new Map(evaluateLearnings(allCards, own, impacts, reviews, country, usable).map((e) => [e.id, e])) : null
+  const cardById = new Map(allCards.map((c) => [c.id, c]))
   // 学びごとの、渡した配信と最後の日(同じ配信に何度頼んでも 1 本と数える)
   const usedBy = new Map<string, { cards: Set<string>; last: string }>()
   for (const r of runs) {
@@ -128,6 +160,12 @@ export function buildLearningCards(
       lastUsed: u?.last ?? '',
       lift: ev.lift,
       strength: strengthOf(ev.lift),
+      growth: growthOf(strengthOf(ev.lift), u?.cards.size ?? 0),
+      members: (membersOf.get(e.id) ?? []).flatMap((m) => {
+        const r = byId.get(m)
+        const src = r?.delivery_card_id ? cardById.get(r.delivery_card_id) : undefined
+        return r && src ? [{ id: m, title: learningTitle(r), notes: r.notes?.trim() ?? '', source: src, mergedAt: r.merged_at ?? '', mergedBy: r.merged_by ?? '' }] : []
+      }),
     })
   }
   return out

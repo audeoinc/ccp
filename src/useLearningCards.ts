@@ -9,6 +9,7 @@ import { buildImpacts } from './impact'
 import { mergeResultsByCard } from './results'
 import { learningUsableIn, useCountryApply } from './countryApply'
 import { buildLearningCards, type LearningCardData } from './learningCards'
+import { aliasRuns, mergeAliases } from './learningMerge'
 
 export interface LearningCardsState {
   cards: LearningCardData[]
@@ -16,6 +17,8 @@ export interface LearningCardsState {
   error: string | null
   /** 状態・名前を変えたあとに読み直す */
   reload: () => void
+  /** 学びの id を、まとめた先の id に読み替える(まとめていなければ、そのまま。配信カードの付け外しの行を読むときに使う) */
+  canonical: (id: string) => string
 }
 
 export function useLearningCards(allCards: DeliveryCard[], country: string): LearningCardsState {
@@ -46,13 +49,17 @@ export function useLearningCards(allCards: DeliveryCard[], country: string): Lea
   }, [])
 
   const merged = useMemo(() => (results ? mergeResultsByCard(results) : null), [results])
-  const impacts = useMemo(() => (merged ? buildImpacts(allCards, merged, runs, lifts) : []), [allCards, merged, runs, lifts])
+  // 似た学びをまとめたもの(元 → 先)。AI の依頼の記録も、まとめた先の学びを渡したと読み替える(効き目が先に付け替わる)
+  const aliases = useMemo(() => mergeAliases(results ?? []), [results])
+  const aliasedRuns = useMemo(() => aliasRuns(runs, aliases), [runs, aliases])
+  const impacts = useMemo(() => (merged ? buildImpacts(allCards, merged, aliasedRuns, lifts) : []), [allCards, merged, aliasedRuns, lifts])
   // 国の適用を変えたら(⚙ や配信カードで)、デッキを並べ直す
   const applyVersion = useCountryApply()
   const cards = useMemo(
-    () => (merged ? buildLearningCards(allCards, merged, runs, impacts, reviews, country, learningUsableIn) : []),
+    () => (merged ? buildLearningCards(allCards, merged, aliasedRuns, impacts, reviews, country, learningUsableIn, aliases) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allCards, merged, runs, impacts, reviews, country, applyVersion],
+    [allCards, merged, aliasedRuns, impacts, reviews, country, applyVersion, aliases],
   )
-  return { cards, loading: results == null && !error, error, reload }
+  const canonical = useCallback((id: string) => aliases.get(id) ?? id, [aliases])
+  return { cards, loading: results == null && !error, error, reload, canonical }
 }

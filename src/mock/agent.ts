@@ -171,6 +171,31 @@ export function mockAgent(message: string): string {
     return J({ types: list.map((d) => ({ id: d.id, type: guessThemeType({ name: d.name, theme: d.theme, headline: d.headline }) })) })
   }
 
+  // 似た学びの組(X78): 出元の国・チャネル・テーマの種類が同じ学びを、強い方(なければ使われた本数の多い方)を残す形で 2 つずつ組にする(3 組まで)
+  if (task === 'suggest_similar_learnings') {
+    type L = { id: string; title?: string; country?: string; channel?: string; themeType?: string; strength?: number | null; uses?: number }
+    const list = (p.learnings as L[] | undefined) ?? []
+    const groups = new Map<string, L[]>()
+    for (const l of list) groups.set(`${l.country}|${l.channel}|${l.themeType}`, [...(groups.get(`${l.country}|${l.channel}|${l.themeType}`) ?? []), l])
+    const score = (l: L) => (l.strength ?? 0) * 100 + (l.uses ?? 0)
+    const pairs = [...groups.values()]
+      .filter((g) => g.length >= 2)
+      .slice(0, 3)
+      .map((g) => {
+        const [a, b] = [...g].sort((x, y) => score(y) - score(x))
+        return { into: a.id, from: b.id, why: en ? 'Both are about the same kind of delivery and suggest the same way to use it.' : '同じ種類の配信についての学びで、生かし方も同じです。' }
+      })
+    return J({ pairs })
+  }
+
+  // 学びの名前の案(X78): メモの 1 文目を短くする
+  if (task === 'suggest_learning_title') {
+    const notes = String(((p.learning ?? {}) as Obj).notes ?? '').trim()
+    const first = notes.split(/[\n。.!?！？]/)[0].trim()
+    const title = hasJa(first) ? (first.length > 16 ? `${first.slice(0, 15)}…` : first) : first.split(/\s+/).slice(0, 5).join(' ')
+    return J({ title: title || (en ? 'Untitled learning' : '名前のない学び') })
+  }
+
   // 配信名の案: 種類と曜日から、決まった形で作る。種類が空の枠は、曜日で種類も決める
   if (task === 'suggest_names') {
     const slots = (p.slots as { id: string; scheduledAt?: string; country?: string; themeType?: string }[] | undefined) ?? []

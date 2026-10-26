@@ -23,7 +23,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { MoreHorizontalRegular } from '@fluentui/react-icons'
+import { MergeRegular, MoreHorizontalRegular, SparkleRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { LearningReviewsService } from './data/learningReviews'
@@ -36,6 +36,8 @@ import { LearningCard } from './LearningCard'
 import { useLearningCards } from './useLearningCards'
 import { sortLearningCards, stateLabel, type LearningCardData, type LearningSort, type LearningState } from './learningCards'
 import { PaneSpinner } from './PaneSpinner'
+import { LearningMergeFloat } from './LearningMergeFloat'
+import { suggestLearningTitle, unmergeLearning } from './learningMerge'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '12px' },
@@ -69,7 +71,9 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
   const [deckOnly, setDeckOnly] = useState(false)
   const [sort, setSort] = useState<LearningSort>('strength')
   const [busy, setBusy] = useState<string | null>(null)
-  const [naming, setNaming] = useState<{ card: LearningCardData; title: string } | null>(null)
+  // 名前を直す窓。ai = AI の案を頼んでいる最中・案を入れた(案は保存しない。「保存」を押したときだけ書く)
+  const [naming, setNaming] = useState<{ card: LearningCardData; title: string; ai?: 'busy' | 'filled' | string } | null>(null)
+  const [merging, setMerging] = useState(false)
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -102,6 +106,28 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
       // その国の行があれば直し、なければ作る(結果の面の「効果」の ④ と同じ)
       if (l.review && l.review.country === at) await LearningReviewsService.update(l.review.id, fields)
       else await LearningReviewsService.create(fields)
+    } finally {
+      setBusy(null)
+      reload()
+    }
+  }
+
+  // AI に名前の案を出してもらい、欄に入れる(直してから保存できる)
+  const askTitle = async (card: LearningCardData) => {
+    setNaming({ card, title: card.customTitle, ai: 'busy' })
+    try {
+      const title = await suggestLearningTitle(card)
+      setNaming((n) => (n && n.card.id === card.id ? { ...n, title, ai: 'filled' } : n))
+    } catch (e) {
+      setNaming((n) => (n && n.card.id === card.id ? { ...n, ai: e instanceof Error ? e.message : String(e) } : n))
+    }
+  }
+  // まとめた学びを元に戻す(手札のカードの「元に戻す」)
+  const unmerge = async (memberId: string) => {
+    if (!(await confirmDialog(tr('まとめた学びを、元の 1 枚に戻します。よろしいですか?', 'Restore this merged learning as its own card?')))) return
+    setBusy(memberId)
+    try {
+      await unmergeLearning(memberId)
     } finally {
       setBusy(null)
       reload()
@@ -165,6 +191,10 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
         {/* 国のデッキ(この国で使う学び。ST5)だけに絞る。国を選んでいないときは、すべての学びが出元の国のデッキにある */}
         {country && <Switch checked={deckOnly} onChange={(_, d) => setDeckOnly(d.checked)} label={t(`${countryName(country)}のデッキだけ`, `${countryName(country)} deck only`)} />}
         <span className={s.count}>{t(`${shown.length} 枚 / ${cards.length} 枚`, `${shown.length} of ${cards.length}`)}</span>
+        {/* 似た学びのまとめ(AI が組を挙げ、人がまとめる) */}
+        <Button size="small" icon={<MergeRegular />} disabled={cards.length < 2} onClick={() => setMerging(true)} style={{ marginLeft: 'auto' }}>
+          {t('似た学びをまとめる', 'Merge similar learnings')}
+        </Button>
       </div>
       {shown.length === 0 ? (
         <div className={s.empty}>
@@ -179,6 +209,8 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
               key={l.id}
               data={l}
               onOpenSource={onOpenResult}
+              onUnmerge={(id) => void unmerge(id)}
+              onName={() => void askTitle(l)}
               actions={
                 <Menu>
                   <MenuTrigger disableButtonEnhancement>
@@ -207,13 +239,22 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
         <DialogSurface>
           <DialogBody>
             <DialogTitle>{t('学びの名前', 'Learning name')}</DialogTitle>
-            <DialogContent>
-              <Field label={t('一言の見出し(空にすると、メモの 1 行目を出します)', 'A short title (leave empty to show the first line of the note)')}>
-                <Input value={naming?.title ?? ''} onChange={(_, d) => naming && setNaming({ ...naming, title: d.value })} onKeyDown={(e) => e.key === 'Enter' && void saveTitle()} />
+            <DialogContent style={{ display: 'grid', rowGap: '8px' }}>
+              <Field
+                label={t('一言の見出し(空にすると、メモの 1 行目を出します)', 'A short title (leave empty to show the first line of the note)')}
+                hint={naming?.ai === 'filled' ? t('AI の案です。直してから保存できます(保存するまで、どこにも書きません)', 'Suggested by AI. Edit it if you like; nothing is saved until you click Save.') : undefined}
+                validationState={naming?.ai && naming.ai !== 'busy' && naming.ai !== 'filled' ? 'error' : 'none'}
+                validationMessage={naming?.ai && naming.ai !== 'busy' && naming.ai !== 'filled' ? naming.ai : undefined}
+              >
+                <Input value={naming?.title ?? ''} disabled={naming?.ai === 'busy'} onChange={(_, d) => naming && setNaming({ ...naming, title: d.value })} onKeyDown={(e) => e.key === 'Enter' && void saveTitle()} />
               </Field>
+              <span className={s.count}>{naming?.card.notes}</span>
+              <Button size="small" icon={<SparkleRegular />} disabled={naming?.ai === 'busy'} onClick={() => naming && void askTitle(naming.card)} style={{ justifySelf: 'start' }}>
+                {naming?.ai === 'busy' ? t('AI が考えています…', 'AI is thinking…') : t('AI に名前の案を出してもらう', 'Ask AI for a name')}
+              </Button>
             </DialogContent>
             <DialogActions>
-              <Button appearance="primary" disabled={busy != null} onClick={() => void saveTitle()}>
+              <Button appearance="primary" disabled={busy != null || naming?.ai === 'busy'} onClick={() => void saveTitle()}>
                 {t('保存', 'Save')}
               </Button>
               <Button onClick={() => setNaming(null)}>{t('やめる', 'Cancel')}</Button>
@@ -221,6 +262,7 @@ export function LearningHand({ allCards, country, onOpenResult }: Props) {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+      {merging && <LearningMergeFloat cards={cards} onClose={() => setMerging(false)} onChanged={reload} />}
     </div>
   )
 }
