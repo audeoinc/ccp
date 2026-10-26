@@ -50,7 +50,7 @@ import { CardAlertsBar } from './CardAlertsBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
-import { allVariants, nextVariant, ownsAnyText, ownsSubject } from './abTest'
+import { allVariants, nextVariant, ownsAnyText, ownsImages, ownsSubject, setVariantImage, withVariantImages } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import { confirmDialog } from './confirm'
@@ -177,6 +177,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
   const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, coreDirty, canReview, save, savingAfter, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
+  // AB テストの B・C 案を開いていて、商品が全案で共通なら、商品の画像だけはその案のもの(ab_test の images。A と違う分。X64 の e)。
+  // 保存する商品の行(items)は A のまま。プレビュー・商品のフロートには、その案の画像を重ねた並びを渡す
+  const variantImages = !!ab && active !== 'A' && ownsImages(ab)
+  const viewItems = variantImages ? withVariantImages(items, ab?.images?.[active]) : items
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
@@ -500,6 +504,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     {/* 商品の対応のフロート(X54): アラートの札・商品の行の、どこから開いても、これ 1 つ */}
     {(actAlert || productOpen) && (() => {
       const item = actAlert ? items.find((i) => i.productId === actAlert.productId) : items.find((i) => i.key === productOpen)
+      // B・C 案を開いていて、商品が全案で共通なら、画像はその案のもの(X64 の e)
+      const shownImage = item ? viewItems.find((i) => i.key === item.key)?.imageUrl : undefined
       // シンプルな配信カードの商品の一覧では、候補の行からも開く(詳しい情報を見るだけ。差し替えは、選んだ枠への操作で)
       const cand = !actAlert && !item ? candidates.find((c) => c.key === productOpen) : undefined
       // 入れ替えの候補の詳しい情報(部品のペインの候補の写真を押したとき。鍵は「pid:商品 ID」。配信に載っていない商品なので、入れ替えは帯のボタンで)
@@ -531,9 +537,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           weekUse={weekUse}
           alertKinds={productAlertKinds}
           options={options}
-          image={item?.imageUrl}
-          delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '', cardId: card?.id }}
-          onImage={item ? (url, source) => setItemImage(item.key, url, source) : undefined}
+          image={shownImage}
+          delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '', cardId: card?.id, variant: ab && active !== 'A' ? active : undefined }}
+          onImage={
+            item
+              ? (url, source) =>
+                  variantImages
+                    ? setAb((a) => (a ? setVariantImage(a, active, item.productId, url, item.imageUrl ?? '') : a))
+                    : setItemImage(item.key, url, source)
+              : undefined
+          }
           onSwapCandidate={
             item
               ? (candKey, reason) => {
@@ -668,9 +681,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const previewItem = aiPreview?.item
   const shownItems = previewItem
     ? previewItem.key
-      ? items.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
-      : [...items, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI }]
-    : items
+      ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
+      : [...viewItems, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI }]
+    : viewItems
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
@@ -1051,7 +1064,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   )
   // editor の値はそのまま渡し、この画面だけのものを足す(simple/editor.ts の simpleEditorOf)
   const simpleEditor = card
-    ? simpleEditorOf(editor, {
+    ? simpleEditorOf({ ...editor, items: viewItems }, {
         card,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
@@ -1187,7 +1200,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           ) : (
           <>
           <ClassicCardLayout
-            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
+            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items: viewItems, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
           />
           </>
           )}

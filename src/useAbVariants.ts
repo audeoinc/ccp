@@ -12,7 +12,7 @@ import type { AiCard, CopyLanguage } from './aiSelect'
 import { draftVariant } from './abAi'
 import { confirmDialog } from './confirm'
 import { myName } from './history'
-import { allVariants, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsTemplate, ownsText, parseAbTest, parseDecision, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
+import { allVariants, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsImages, ownsProducts, ownsTemplate, ownsText, parseAbTest, pruneVariantImages, withVariantImages, parseDecision, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import type { PartRef } from './simple/parts'
 import { findPart, prunePartContent, samePartContent, type PartContent } from './partContent'
 import type { Form } from './cardForm'
@@ -99,9 +99,13 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
     // テンプレートは、A と違う案だけ、版まで決めて書く
     const aTpl = pinnedTemplateKey(templateOfV('A'))
     const tplEntries = ownsTemplate(owner) ? ab.variants.map((k) => [k, pinnedTemplateKey(templateOfV(k))] as const).filter(([, v]) => v !== aTpl) : []
-    const { templates: _old, ...rest } = ab
+    const { templates: _old, images: _oldImages, ...rest } = ab
     void _old
-    return { ...rest, target: owner.target, heroes, ...(texts ? { texts } : {}), ...(tplEntries.length ? { templates: Object.fromEntries(tplEntries) } : {}) }
+    void _oldImages
+    // 商品の画像は、商品が全案で共通のときだけ、A と違う分を持つ(X64 の e)
+    // 編集の間は商品を案ごとに持っている(シンプルな画面の target all)なら、その案の商品の並びの画像から作る
+    const images = ownsImages(owner) ? pruneVariantImages(ab, itemsOf('A'), ownsProducts(ab) ? itemsOf : undefined) : undefined
+    return { ...rest, target: owner.target, heroes, ...(texts ? { texts } : {}), ...(tplEntries.length ? { templates: Object.fromEntries(tplEntries) } : {}), ...(images ? { images } : {}) }
   }
   /** 文言を画面に出す(ヘッドライン・コピー・通知の文・セクションの見出しとコピー) */
   /** 文言を画面に出す。full でなければ(件名だけを比べるとき)件名・プリヘッダーだけ */
@@ -248,7 +252,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
         const addHero = ownsHero(next) && !ownsHero(ab)
         const addText = ownsAnyText(next) && !ownsAnyText(ab)
         out[k] = {
-          items: addProducts ? a.items.map((i) => ({ ...i, key: crypto.randomUUID() })) : cur.items,
+          // 商品を案ごとに持ち始めるときは、A の写しに、その案の商品の画像(ab_test の images)を重ねる(X64 の e)
+          items: addProducts ? withVariantImages(a.items, ab.images?.[k]).map((i) => ({ ...i, key: crypto.randomUUID() })) : cur.items,
           heroId: addHero ? a.heroId : cur.heroId,
           heroReason: addHero ? a.heroReason : cur.heroReason,
           texts: addText ? a.texts : cur.texts,
@@ -258,7 +263,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
       }
       return out
     })
-    setAb(next)
+    // 商品を案ごとに持たなくなるときは、その案の商品の画像だけを、A と違う分として残す
+    setAb(ownsProducts(ab) && !ownsProducts(next) ? { ...next, images: pruneVariantImages(next, itemsOf('A'), itemsOf) } : next)
   }
   /**
    * 案から選ぶ(X57): この案に決める。決めた案が配信の中身(A)になり、ほかの案は「配信しなかった案」として中身ごと残す(保存で確定)。
@@ -281,6 +287,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
     const chosen: VariantData = { items: itemsOf(k), ...heroOf(k), texts: textsOf(k), template: templateOfV(k) }
     // 決めた案の中身を、配信そのもの(A)にする。B・C 案の行は、保存で A の行になる(行 ID はそのまま使い、variant を空に)
     if (ownsProducts(ab)) setItems(chosen.items)
+    // 商品が共通で、決めた案が商品の画像を替えていたら、その画像を配信の画像にする(X64 の e)
+    else if (ownsImages(ab) && k !== 'A' && ab?.images?.[k]) setItems((prev) => withVariantImages(prev, ab.images?.[k]))
     if (ownsHero(ab)) {
       setHeroId(chosen.heroId)
       setHeroReason(chosen.heroReason)
@@ -413,8 +421,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
   }, [simpleOn, ab, abAuto, original])
 
   // A を直したら、B・C でまだ直していない部品(A の前の中身と同じ所)も、A に合わせる(SU2 ⑥。「B は A とこの部分だけが違う」を保つ)
-  const prevA = useRef<{ texts: VariantText; heroId?: string; productIds: string[]; template: string } | null>(null)
-  const aNow = { texts: curText(), heroId, productIds: items.map((i) => i.productId), template: pinnedTemplateKey(template) }
+  const prevA = useRef<{ texts: VariantText; heroId?: string; productIds: string[]; images: string[]; template: string } | null>(null)
+  const aNow = { texts: curText(), heroId, productIds: items.map((i) => i.productId), images: items.map((i) => i.imageUrl ?? ''), template: pinnedTemplateKey(template) }
   const aKey = JSON.stringify(aNow)
   useEffect(() => {
     if (!ab || !abAuto || active !== 'A') {
@@ -422,7 +430,7 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
       return
     }
     const before = prevA.current
-    prevA.current = { texts: { ...aNow.texts, sectionTitles: [...aNow.texts.sectionTitles], sectionCopies: [...aNow.texts.sectionCopies] }, heroId: aNow.heroId, productIds: [...aNow.productIds], template: aNow.template }
+    prevA.current = { texts: { ...aNow.texts, sectionTitles: [...aNow.texts.sectionTitles], sectionCopies: [...aNow.texts.sectionCopies] }, heroId: aNow.heroId, productIds: [...aNow.productIds], images: [...aNow.images], template: aNow.template }
     if (!before) return
     setStash((prev) => {
       let changedAny = false
@@ -476,6 +484,12 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
           const src = items[i]
           if (src) list[i] = { ...src, key: crypto.randomUUID(), rowId: undefined }
           else list.splice(i, 1)
+          changedAny = true
+        }
+        // 同じ商品の枠で、B の画像が A の前の画像のままなら、A のいまの画像にする(X64 の e。画像も「A と違う所だけ」を保つ)
+        for (let i = 0; i < list.length; i++) {
+          if (!list[i] || list[i].productId !== aNow.productIds[i] || (list[i].imageUrl ?? '') !== (before.images[i] ?? '') || aNow.images[i] === (before.images[i] ?? '')) continue
+          list[i] = { ...list[i], imageUrl: aNow.images[i] || undefined, imageSource: items[i]?.imageSource }
           changedAny = true
         }
         if (aNow.productIds.length > before.productIds.length && list.length === before.productIds.length)

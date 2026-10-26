@@ -25,7 +25,7 @@ import { logEvent, myName } from './history'
 import { ApprovalsService } from './data/approvals'
 import { CHANNEL_PUSH, channelOptions, countryOptions, statusRank } from './status'
 import { isUsableHero } from './heroRights'
-import { encodeAbTest, ownsProducts, ownsSubject, ownsTemplate, type VariantKey } from './abTest'
+import { encodeAbTest, ownsProducts, ownsSubject, ownsTemplate, parseAbTest, type AbTest, type VariantKey } from './abTest'
 import { useAbVariants, type VariantData } from './useAbVariants'
 import { STATUS_APPROVED, STATUS_NOT_STARTED, toForm, type Form } from './cardForm'
 import { SaveConflictError, isStale, planSave, runSave, type SaveAfter } from './saveFlow'
@@ -96,6 +96,18 @@ export interface CardEditorDeps {
 
 // 中身の要約の、商品の画像のほかの部分と画像の部分の区切り(JSON の中には出ない文字)
 const KEY_SEP = '\n'
+
+/** 中身の要約で、ab_test から案ごとの商品の画像を外す(画像だけの変更は、承認のやり直しにしないため。X64 の g) */
+function abWithoutImages(json?: string | null): string {
+  if (!json) return ''
+  try {
+    const { images: _images, ...rest } = JSON.parse(json) as AbTest
+    void _images
+    return JSON.stringify(rest)
+  } catch {
+    return json
+  }
+}
 
 export function useCardEditor({ card, defaults, draft, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext }: CardEditorDeps) {
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
@@ -494,12 +506,13 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   // 商品の画像(この配信で使う画像。X64)は別に持つ: 画像だけを替えたときは、変えた(保存する)けれど、承認のやり直しにしない(X64 の g。2026-10-26 利用者の決め)
   const savedItemsOf = () => [itemsOf('A'), ...(ab && ownsProducts(savedTargetAb()) ? ab.variants.map((k) => itemsOf(k)) : [])]
   const coreKey = () => {
-    const { products: _names, ...rest } = buildContent()
+    const { products: _names, ab_test, ...rest } = buildContent()
     void _names
     const [a, ...variants] = savedItemsOf()
-    return JSON.stringify({ ...rest, items: a.map((i) => i.productId), variants: variants.map((list) => list.map((i) => i.productId)) })
+    // B・C 案の商品の画像(ab_test の images。X64 の e)も、画像の側に入れる
+    return JSON.stringify({ ...rest, ab_test: abWithoutImages(ab_test), items: a.map((i) => i.productId), variants: variants.map((list) => list.map((i) => i.productId)) })
   }
-  const imagesKey = () => JSON.stringify(savedItemsOf().map((list) => list.map((i) => i.imageUrl ?? '')))
+  const imagesKey = () => JSON.stringify([savedItemsOf().map((list) => list.map((i) => i.imageUrl ?? '')), abForSave()?.images ?? {}])
   const contentKey = () => `${coreKey()}${KEY_SEP}${imagesKey()}`
   /** 商品の画像を替えた枠(変更の履歴に残す文。保存済みの行だけ。新しく入れた商品は、商品が変わったので、ほかの変更として残る) */
   const imageNotes = () =>
@@ -512,7 +525,23 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
             const name = productName(i.productId)
             return [i.imageUrl ? tr(`「${name}」の画像を、この配信で使う画像に替えた`, `Changed the image of "${name}" for this delivery`) : tr(`「${name}」の画像を、商品のマスタの画像に戻した`, `Put the image of "${name}" back to the product master image`)]
           })
+          .concat(variantImageNotes())
       : []
+  /** B・C 案の商品の画像(X64 の e)を替えた分。保存済みの ab_test と比べる */
+  const variantImageNotes = (): string[] => {
+    const before = parseAbTest(card?.ab_test)?.images ?? {}
+    const after = abForSave()?.images ?? {}
+    return (['B', 'C'] as VariantKey[]).flatMap((k) => {
+      const pids = new Set([...Object.keys(before[k] ?? {}), ...Object.keys(after[k] ?? {})])
+      return [...pids].flatMap((pid) => {
+        const was = before[k]?.[pid]
+        const now = after[k]?.[pid]
+        if (was === now) return []
+        const name = productName(pid)
+        return [now === undefined ? tr(`${k} 案の「${name}」の画像を、A 案と同じに戻した`, `Variant ${k}: put the image of "${name}" back to the same as A`) : tr(`${k} 案の「${name}」の画像を替えた`, `Variant ${k}: changed the image of "${name}"`)]
+      })
+    })
+  }
   const baseline = useRef<string | null>(null)
   // 保存の途中で書き換えた(読み直したあとの基準を「変えた」のままにして、次の保存で書く。自動保存で、保存中に打った分を取りこぼさないため)
   const editedDuringSaveRef = useRef(false)

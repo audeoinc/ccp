@@ -273,14 +273,25 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
                     <span className={s.imageText}>
                       <span className={s.sectionHead}>
-                        {t('この配信で使う画像', 'Image for this delivery')}
-                        {image && (
+                        {delivery?.variant ? t(`${delivery.variant} 案で使う画像`, `Image for variant ${delivery.variant}`) : t('この配信で使う画像', 'Image for this delivery')}
+                        {delivery?.variant && (
+                          <Badge size="small" appearance="filled" color="brand">
+                            {t(`${delivery.variant} 案だけ`, `Variant ${delivery.variant} only`)}
+                          </Badge>
+                        )}
+                        {image && !delivery?.variant && (
                           <Badge size="small" appearance="tint" color="brand">
                             {t('この配信で選んだ画像', 'Chosen for this delivery')}
                           </Badge>
                         )}
                       </span>
-                      <span className={s.caption}>{image ? t('商品のマスタの画像は変えていません(ほかの配信は元のまま)', 'The product master image is unchanged (other deliveries keep it).') : t('いまは商品のマスタの画像。強みが伝わる画像に、この配信だけ替えられます', 'Uses the product master image. You can change it for this delivery only.')}</span>
+                      <span className={s.caption}>
+                        {delivery?.variant
+                          ? t(`${delivery.variant} 案だけに使う画像です。ほかの案は変わりません(A 案と同じ画像なら、A 案に合わせます)`, `Used only in variant ${delivery.variant}; other variants are unchanged (same as A means it follows A).`)
+                          : image
+                            ? t('商品のマスタの画像は変えていません(ほかの配信は元のまま)', 'The product master image is unchanged (other deliveries keep it).')
+                            : t('いまは商品のマスタの画像。強みが伝わる画像に、この配信だけ替えられます', 'Uses the product master image. You can change it for this delivery only.')}
+                      </span>
                       <Button size="small" icon={<ImageEditRegular />} onClick={() => setPicking(true)}>
                         {t('商品ページから画像を選ぶ…', 'Choose an image from the product page…')}
                       </Button>

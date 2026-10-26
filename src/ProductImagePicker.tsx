@@ -51,6 +51,8 @@ export interface DeliveryGist {
   themeType?: string
   /** 配信カードの id(AI の画像の案を、AI の依頼の記録 ai_runs に残すため。まだ保存していない配信は残さない) */
   cardId?: string
+  /** AB テストの B・C 案の画像を選んでいるとき、その案(商品は全案で共通で、画像だけ案ごと。X64 の e) */
+  variant?: string
 }
 
 /** AI の依頼の記録(ai_runs)の種類。画像の案は学びを使わないので、結果の面の「学びあり / なし」の比べには入れない(src/impact.ts) */
@@ -264,7 +266,9 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
       <ResizableSurface sizeKey="productImages" className={s.surface} onPaste={onPaste}>
         <DialogBody>
           <DialogTitle action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />}>
-            {t(`この配信で使う画像 — ${product.name}`, `Image for this delivery — ${product.name}`)}
+            {delivery.variant
+              ? t(`${delivery.variant} 案で使う画像 — ${product.name}`, `Image for variant ${delivery.variant} — ${product.name}`)
+              : t(`この配信で使う画像 — ${product.name}`, `Image for this delivery — ${product.name}`)}
           </DialogTitle>
           <DialogContent className={s.content}>
             <div className={s.urlRow}>
@@ -378,7 +382,13 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
                 <div className={s.urlRow}>
                   <span className={s.label}>{t('いまの画像', 'Current image')}</span>
                   <img src={productImage(product, current)} alt="" style={{ width: 40, height: 50, objectFit: 'contain' }} draggable={false} />
-                  <span className={s.caption}>{current ? t('この配信で選んだ画像', 'Chosen for this delivery') : t('商品のマスタの画像', 'From the product master')}</span>
+                  <span className={s.caption}>
+                    {delivery.variant
+                      ? t(`${delivery.variant} 案のいまの画像(ほかの案は変わりません)`, `Current image of variant ${delivery.variant} (other variants are unchanged)`)
+                      : current
+                        ? t('この配信で選んだ画像', 'Chosen for this delivery')
+                        : t('商品のマスタの画像', 'From the product master')}
+                  </span>
                 </div>
 
                 <div

@@ -1,6 +1,7 @@
 // AB テスト(X55)。1 つの配信カードの中に、A 案(いまの配信そのもの)と、B・C 案(A と違うところだけ)を持つ。
 // 実際に受信者を分けて送るのは、配信システム(CCP は送らない)。CCP は、テストの設計・案の中身・制作への受け渡し・案ごとの結果を受け持つ。
 // 案ごとに持てるのは、メイン画像と商品だけ(比べる要素を絞るため)。テーマ・コピー・リンク先・時刻などは全案で共通。
+// 商品が全案で共通のときも、商品の画像(この配信で使う画像。X64)だけは案ごとに替えられる(ab_test の images。A と違う商品だけ持つ)。
 // 保存先: テストの設定と B・C 案のメイン画像は delivery_cards.ab_test(JSON)、B・C 案の商品は delivery_products の variant 列('B'・'C'。A は空)
 // 比べる要素が all(全体)のときは、テンプレートも案ごとに持てる(SU2 ⑤⑧。B・C 案のテンプレートは ab_test の templates。A は配信の layout_key・layout_version)
 import { tr } from './i18n'
@@ -81,6 +82,11 @@ export interface AbTest {
    * (テンプレートを編集しても、保存した案の形が変わらないように。A の layout_version と同じ考え)
    */
   templates?: Partial<Record<VariantKey, string>>
+  /**
+   * B・C 案の商品の画像(X64 の e。商品が全案で共通のときだけ。商品を案ごとに持つときは、その案の商品の行に画像がある)。
+   * A と違う商品だけ持つ。鍵は商品 ID、値はこの配信で使う画像の URL(空 = 商品のマスタの画像)
+   */
+  images?: Partial<Record<VariantKey, Record<string, string>>>
   /** 案から選んだ結果。決めたあとは variants が空になり、AB テスト(案を持つ配信)としては扱わない */
   decided?: AbDecision
 }
@@ -132,6 +138,45 @@ export const isChoose = (ab: AbTest | null) => ab?.purpose === 'choose'
 export const ownsProducts = (ab: AbTest | null) => !!ab && (ab.target === 'products' || ab.target === 'both' || ab.target === 'all')
 export const ownsHero = (ab: AbTest | null) => !!ab && (ab.target === 'hero' || ab.target === 'both' || ab.target === 'all')
 export const ownsText = (ab: AbTest | null) => !!ab && ab.target === 'all'
+/** 商品の画像を、案ごとに ab_test の images で持つか(商品が全案で共通のとき) */
+export const ownsImages = (ab: AbTest | null) => !!ab && !ownsProducts(ab)
+
+/** 案の商品の画像(A と違う分)を、商品の並びに重ねる(プレビュー・商品のフロートで、その案の画像を出す) */
+export function withVariantImages<T extends { productId: string; imageUrl?: string }>(items: T[], over?: Record<string, string>): T[] {
+  if (!over || Object.keys(over).length === 0) return items
+  return items.map((i) => (i.productId in over ? { ...i, imageUrl: over[i.productId] || undefined } : i))
+}
+
+/** 案 k の商品の画像を決める。A と同じ画像なら持たない(A と違うところだけ持つ決まり) */
+export function setVariantImage(ab: AbTest, k: VariantKey, productId: string, url: string, aUrl: string): AbTest {
+  const cur = { ...(ab.images?.[k] ?? {}) }
+  if (url === aUrl) delete cur[productId]
+  else cur[productId] = url
+  const images = { ...(ab.images ?? {}), [k]: cur }
+  if (Object.keys(cur).length === 0) delete images[k]
+  return { ...ab, images }
+}
+
+type ImageItem = { productId: string; imageUrl?: string }
+
+/** 案の商品の並び(x)のうち、A にもある商品で、A と画像が違うもの(商品 ID → 画像の URL。空 = 商品のマスタの画像) */
+export function imagesDiff(a: ImageItem[], x: ImageItem[]): Record<string, string> {
+  const aUrl = new Map(a.map((i) => [i.productId, i.imageUrl ?? '']))
+  return Object.fromEntries(x.filter((i) => aUrl.has(i.productId) && aUrl.get(i.productId) !== (i.imageUrl ?? '')).map((i) => [i.productId, i.imageUrl ?? '']))
+}
+
+/**
+ * 保存する案の画像: 残っている案・いまの商品で、A と違うものだけ(商品を外した・案を消したときの残りを捨てる)。
+ * variantItems があれば(シンプルな画面は、編集の間はどの案も商品の並びを持つ)、その並びの画像から作る
+ */
+export function pruneVariantImages(ab: AbTest, a: ImageItem[], variantItems?: (k: VariantKey) => ImageItem[]): AbTest['images'] {
+  const out: NonNullable<AbTest['images']> = {}
+  for (const k of ab.variants) {
+    const diff = imagesDiff(a, variantItems ? variantItems(k) : withVariantImages(a, ab.images?.[k]))
+    if (Object.keys(diff).length) out[k] = diff
+  }
+  return Object.keys(out).length ? out : undefined
+}
 /** 件名・プリヘッダーを案ごとに持つか(件名だけを比べる・すべてを変える) */
 export const ownsSubject = (ab: AbTest | null) => !!ab && (ab.target === 'subject' || ab.target === 'all')
 /** 文言(件名・プリヘッダーを含む)を、案ごとに保存するか */
