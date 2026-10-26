@@ -73,7 +73,7 @@ export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, set
         done(it.key)
       }}
       onPreview={(productId) => e.setAiPreview(productId ? { item: { key: it.key, productId } } : null)}
-      // 候補の「詳しく」: フロートの中(bare)では、同じ枠の中でもう 1 段深く開く。部品のペイン・一覧の行では、商品のフロートを入れ替えのボタンつきで開く
+      // 候補の写真を押したとき: フロートの中(bare)では、同じ枠の中でもう 1 段深く開く。部品のペイン・一覧の行では、商品のフロートを入れ替えのボタンつきで開く
       onDetail={
         bare
           ? undefined
