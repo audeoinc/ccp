@@ -9,14 +9,15 @@ import { useFloatSize } from './floatLayout'
 import { PREF } from './prefKeys'
 
 const useStyles = makeStyles({
-  // 縦に並べ、中身は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように)。大きさは、右・下の端をつかんで変えられる
-  surface: { width: '320px', boxSizing: 'border-box', padding: '10px 12px', display: 'flex', flexDirection: 'column', rowGap: '8px', '& > *': { minWidth: 0, flexShrink: 0 } },
+  // 縦に並べ、中身は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように)。大きさは、右・下の端をつかんで変えられる。
+  // 画面の高さを越えない(書いたときの様子の画像が入ると、返信の欄が枠の下にはみ出していた。2026-10-26 利用者の報告)
+  surface: { width: '320px', maxHeight: 'calc(100vh / var(--ui-zoom, 1) - 24px)', boxSizing: 'border-box', padding: '10px 12px', display: 'flex', flexDirection: 'column', rowGap: '8px', '& > *': { minWidth: 0, flexShrink: 0 } },
   head: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   headText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  // 元の書き込みと返信を、上から読む(長くなったら、この中だけスクロール)
-  thread: { display: 'grid', rowGap: '8px', alignContent: 'start', maxHeight: 'calc(46vh / var(--ui-zoom, 1))', overflowY: 'auto' },
-  // 高さを広げたときは、やり取りの欄が残りの高さを取る
-  threadGrow: { maxHeight: 'none', flexGrow: 1, flexShrink: 1, minHeight: 0 },
+  // 元の書き込み・返信と、入力欄の上のもの(書いたときの様子の画像など)。枠に収まらないときは、この中だけスクロールし、
+  // 入力欄と送るボタンは下に残す(縮むのはこの欄だけ。flexShrink は、枠の「子は縮めない」より強くするため、style で渡す)
+  scroll: { display: 'flex', flexDirection: 'column', rowGap: '8px', flexGrow: 1, minHeight: 0, overflowY: 'auto' },
+  thread: { display: 'grid', rowGap: '8px', alignContent: 'start' },
   entry: { display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
   reply: { marginLeft: '16px' },
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -104,20 +105,22 @@ export function PinThreadView(p: Props) {
           p.state === 'loading' ? <Spinner size="tiny" /> : <span className={s.meta}>{p.goneText}</span>
         ) : (
           <>
-            {p.entries.length > 0 && (
-              <div className={mergeClasses(s.thread, !!size.style && s.threadGrow)}>
-                {p.entries.map((n) => (
-                  <div key={n.id} className={mergeClasses(s.entry, n.isReply && s.reply)}>
-                    <Avatar size={24} name={n.author || '?'} color="colorful" />
-                    <div style={{ minWidth: 0 }}>
-                      <div className={s.meta}>{[n.author || t('(名前なし)', '(no name)'), n.extra ?? '', when(n.at)].filter(Boolean).join(' · ')}</div>
-                      <div className={mergeClasses(s.body, !!p.dimmed && s.done)}><Linkify text={n.body} /></div>
+            <div className={s.scroll} style={{ flexShrink: 1 }}>
+              {p.entries.length > 0 && (
+                <div className={s.thread}>
+                  {p.entries.map((n) => (
+                    <div key={n.id} className={mergeClasses(s.entry, n.isReply && s.reply)}>
+                      <Avatar size={24} name={n.author || '?'} color="colorful" />
+                      <div style={{ minWidth: 0 }}>
+                        <div className={s.meta}>{[n.author || t('(名前なし)', '(no name)'), n.extra ?? '', when(n.at)].filter(Boolean).join(' · ')}</div>
+                        <div className={mergeClasses(s.body, !!p.dimmed && s.done)}><Linkify text={n.body} /></div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {p.composerTop}
+                  ))}
+                </div>
+              )}
+              {p.composerTop}
+            </div>
             <div className={s.input}>
               <AutoTextarea heightKey="PinThreadView.p_text"
                 size="small"
