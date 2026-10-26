@@ -169,9 +169,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const t = useT()
   const styles = useCardDetailStyles()
   // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
-  // 保存済みの配信だけ(新規作成・まとめて作った案は、自動の反映で新しい配信を作らないよう、詳しい画面)
+  // まとめて作った、まだ保存していない案(draft)もシンプルで開く(2026-10-26 利用者)。案のあいだは自動では保存せず、上の帯の「この案で作る」を押したときだけ配信を作る
   const [simpleView, setSimpleView] = useState(loadSimpleCard)
-  const simpleOn = simpleView && !!card
+  const simpleOn = simpleView && (!!card || !!draft)
   /** 見せ方を替える。remember が false のとき(次にやることのボタンで、承認・依頼のために詳しい画面へ移るとき)は、次に開くときの見せ方を変えない */
   const changeView = (v: boolean, remember = true) => {
     setSimpleView(v)
@@ -750,13 +750,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   )
   /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
   const commitSimple = async () => {
-    if (saving || locked || !isDirty()) return
+    // まだ保存していない案は、部品を選び直すたびに配信を作らない(作るのは「この案で作る」= applySimple だけ)
+    if (!card || saving || locked || !isDirty()) return
     await saveStaying()
   }
   // シンプルな配信カードは、入力が止まって約 1.5 秒で保存する(Notion などと同じ。部品を選び直すまで保存しないと、タブを閉じたときに消えるため)。
   // 確定した週の配信は、理由が要るので自動では保存しない(上の帯の保存のボタンで)。保存中に書き換えた分は、保存が終わってから、また待って保存する
   useEffect(() => {
-    if (!simpleOn || locked || !changed || saving || draftPending || currentKey === draftKey || saveError?.key === currentKey) return
+    if (!simpleOn || !card || locked || !changed || saving || draftPending || currentKey === draftKey || saveError?.key === currentKey) return
     const id = window.setTimeout(() => void commitSimple(), 1500)
     return () => window.clearTimeout(id)
     // 待つのは、中身が変わるたびに数え直す(commitSimple は、その描画の中身で保存する)
@@ -783,6 +784,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (saving) return
     // 確定した週の配信は、すぐには保存せず、理由の入力欄を出す(保存は、理由の欄のボタンから saveStaying)
     if (locked) askReason('stay')
+    // まだ保存していない案は、ここで初めて配信を作る(保存すると、保存した配信として開き直す。onReopen)
+    else if (!card) void saveStaying(undefined, false)
     else void commitSimple()
   }
   /** 元に戻す: 前に反映したときの中身に戻して、保存する(行 ID は、いまも残っている行だけ使う。消えた行は新しい行として作り直す) */
@@ -1084,9 +1087,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     </>
   )
   // editor の値はそのまま渡し、この画面だけのものを足す(simple/editor.ts の simpleEditorOf)
-  const simpleEditor = card
+  const simpleEditor = card || draft
     ? simpleEditorOf({ ...editor, items: viewItems }, {
-        card,
+        // まだ保存していない案は、ID のない仮のカード(ID を使う所 = やり取り・素材・ピンなどは、unsaved のときに出さない)
+        card: card ?? { ...draft!.card, id: '', name: form.name, status: form.status as DeliveryCard['status'], owner: form.owner, country: form.country as DeliveryCard['country'] },
+        unsaved: !card,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
         channel: previewTab,
@@ -1155,7 +1160,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 {next ? t(`保存して次へ(${next.name})`, `Save and next (${next.name})`) : t('保存して次へ(次の配信はありません)', 'Save and next (no next delivery)')}
               </MenuItem>
             )}
-            {onOpenResults && card.scheduled_at && new Date(card.scheduled_at) < new Date() && (
+            {onOpenResults && card?.scheduled_at && new Date(card.scheduled_at) < new Date() && (
               <MenuItem icon={<DataBarVerticalRegular />} onClick={() => onOpenResults(card.id)}>
                 {t('結果を見る', 'View results')}
               </MenuItem>
@@ -1181,7 +1186,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         people: owners,
         reload: onSaved,
         openProduction: onOpenProduction && card ? (opts) => onOpenProduction(card.id, opts) : undefined,
-        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel onOpenSource={onOpenResults} onOpenImpact={setEffectOf} />,
+        // 学びは配信カードの ID で付け外しするので、保存済みの配信だけ(詳しい画面と同じ)
+        learnings: card ? <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel onOpenSource={onOpenResults} onOpenImpact={setEffectOf} /> : null,
         learnCount,
       })
     : null

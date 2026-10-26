@@ -82,6 +82,8 @@ export function simpleEditorOf(editor: CardEditor, extras: SimpleExtras): Simple
 /** シンプルな配信カードだけのもの(editor にない値・この画面向けに形を変えた操作。上の帯・プレビュー・知らせの部品など) */
 export interface SimpleExtras {
   card: DeliveryCard
+  /** まとめて作った、まだ保存していない案(card は ID のない仮のもの)。自動では保存せず、上の帯の「この案で作る」で配信を作る */
+  unsaved: boolean
   /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void

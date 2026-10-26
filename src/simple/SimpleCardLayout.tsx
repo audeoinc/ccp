@@ -363,7 +363,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
-  const [side, setSide] = useState<Side>(loadSide)
+  // まだ保存していない案(e.unsaved)は、配信カードの ID を使うパネル(やり取り・承認・素材・渡すもの・履歴・学び)を出さない。開けるのはアラートだけ
+  const [side, setSide] = useState<Side>(() => (e.unsaved ? null : loadSide()))
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
   const showSide = (v: Exclude<Side, null>, open = false) => {
     const next = !open && side === v ? null : v
@@ -403,7 +404,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     else select(target)
   }
   // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
-  const [lastSide, setLastSide] = useState<Exclude<Side, null>>(() => loadSide() ?? 'talk')
+  const [lastSide, setLastSide] = useState<Exclude<Side, null>>(() => (e.unsaved ? 'alerts' : (loadSide() ?? 'talk')))
   const panel = side ?? lastSide
   const [moving, setMoving] = useState(false)
   // パネルは左にあるので、境目を右へ動かすと広がる
@@ -456,6 +457,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 帯に出す、参考の素材の数(帯の数を合わせるため、開いていなくても数える)
   const [assetCount, setAssetCount] = useState(0)
   useEffect(() => {
+    if (e.unsaved) return
     let alive = true
     void CardAssetsService.getAll({ filter: `delivery_card_id eq ${e.card.id}` }).then((r) => {
       if (alive && r.success) setAssetCount((r.data ?? []).length)
@@ -463,7 +465,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     return () => {
       alive = false
     }
-  }, [e.card.id, side, assetsVersion])
+  }, [e.card.id, e.unsaved, side, assetsVersion])
   // 渡す前に、制作の担当か締め切りが空いている(帯の「渡すもの」に点を付ける。渡す準備ができていないことに気づけるように)
   const handoffMissing = !e.form.handedOffAt && (!e.form.productionOwner.trim() || !e.form.productionDue)
   // プレビューの場所を押してコメントを書く(PreviewPins の覆い)。打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す。
@@ -567,7 +569,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const sideTitle = (v: Exclude<Side, null>) =>
     ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
   /** 左のバーの並び(アイコンの下に名前(English も 48px に収まる短い言葉)。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
-  const rails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
+  const allRails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
     // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
     { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
     { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learn'), tip: t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)'), count: e.learnCount, color: 'informative' },
@@ -592,6 +594,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     },
     { v: 'history', icon: <HistoryRegular />, label: t('履歴', 'History'), tip: t('変更の履歴(入れ替えの理由・ステータスの変化)', 'Change history (replacement reasons, status changes)'), count: 0, gap: true },
   ]
+  const rails = e.unsaved ? allRails.filter((r) => r.v === 'alerts') : allRails
 
   /**
    * AB テストの案(SU8。2026-10-24 利用者と決めた)。AB に分けるのは配信の大前提で、プレビュー(1 つの案)の話ではないので、上の帯に置く。
@@ -717,13 +720,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         save={
           e.saving ? (
             t('保存中…', 'Saving…')
+          ) : e.unsaved ? (
+            // まだ配信になっていない案(自動では保存しない。上の帯の「この案で作る」で作る)
+            t('まだ保存していません', 'Not saved yet')
           ) : e.dirty ? (
             t('未保存', 'Unsaved')
           ) : e.savedAt ? (
             <span className={mergeClasses(e.justSaved && s.saved)}>{t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}</span>
           ) : null
         }
-        onOpen={() => showSide('approval', true)}
+        onOpen={() => !e.unsaved && showSide('approval', true)}
       />
       <StageHeader
         title={
@@ -771,9 +777,17 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 </Button>
               </span>
             ) : null}
-            <Tooltip content={t('元に戻す: 前に保存した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
+            {e.unsaved && (
+              // まだ保存していない案は、押したときだけ配信を作る(自動では作らない。作ると、保存した配信として開き直す)
+              <Tooltip content={t('この案を配信カードとして保存します。保存するまでは、配信は作られません', 'Save this draft as a delivery card. No delivery is created until you save')} relationship="description">
+                <Button type="button" size="small" appearance="primary" icon={<SaveRegular />} disabled={e.saving} onClick={onApply}>
+                  {t('この案で作る', 'Create from this draft')}
+                </Button>
+              </Tooltip>
+            )}
+            {!e.unsaved && <Tooltip content={t('元に戻す: 前に保存した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
               <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!e.canUndo || e.saving} onClick={onUndo} aria-label={t('元に戻す', 'Undo')} />
-            </Tooltip>
+            </Tooltip>}
             {/* 保存のボタンは、確定した週の配信だけ(ほかは自動で保存する。理由を入れてから保存する) */}
             {/* 理由の入力は、このボタンの真下に出す(操作を止める確かめなので、小さな Popover。外を押すと、やめる) */}
             {e.locked && (e.dirty || e.reasonOpen) && (
@@ -788,7 +802,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 <PopoverSurface className={s.reasonPop}>{e.reasonForm}</PopoverSurface>
               </Popover>
             )}
-            {myStep && (
+            {myStep && !e.unsaved && (
               <NextAction
                 step={myStep}
                 issues={myStep === 'requestApproval' ? readinessIssues(approvalChecks) : myStep === 'requestProduction' ? readinessIssues(handoffChecks) : 0}
@@ -895,6 +909,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             </Tooltip>
           </div>
           <div className={s.sideBody}>
+            {!e.unsaved && (
             <div style={isComm(panel) ? { display: 'grid', minHeight: 0 } : { display: 'none' }}>
               <CommPane
                 section={commSection}
@@ -919,6 +934,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 checks={statusRank(e.form.status) < statusRank('approved') ? <ReadinessList items={approvalChecks} onPick={pickCheck} /> : undefined}
               />
             </div>
+            )}
             {panel === 'alerts' && (
               <div style={{ minHeight: 0, overflowY: 'auto' }}>
                 <CardAlertsBar
@@ -1047,6 +1063,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               ))}
             </div>
           )}
+          {/* ピン(コメント)は配信カードの ID に付くので、まだ保存していない案では出さない */}
+          {!e.unsaved && (
           <div className={s.pinBox}>
             {/* バルーンは 2 行(X73。1 行目に何ができるか、2 行目に打ち方。右クリックでも打てることを知らせる) */}
             <Tooltip
@@ -1066,6 +1084,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             </Tooltip>
             <ResolvedPinsToggle />
           </div>
+          )}
           {placing && (
             <MessageBar intent="info" layout="multiline" className={s.placingBar}>
               <MessageBarBody>{t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to write a comment (Esc to cancel)')}</MessageBarBody>
@@ -1074,8 +1093,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; ↑ ↓ for the previous or next part, Enter to edit, Esc to stop)')}>
             {e.preview}
             {e.alertOverlay}
-            <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />
-            {pinTarget && (
+            {!e.unsaved && <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />}
+            {pinTarget && !e.unsaved && (
               <PinFloat
                 cardId={e.card.id}
                 cardOwner={e.card.owner}
