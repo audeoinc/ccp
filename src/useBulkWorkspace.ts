@@ -255,10 +255,13 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   const weekUse = new Map<string, number>()
   for (const c of weekCards) for (const pid of new Set(compareProducts.get(c.id) ?? [])) weekUse.set(pid, (weekUse.get(pid) ?? 0) + 1)
   const norm = (s?: string | null) => (s ?? '').trim().replace(/\s+/g, ' ')
+  /** 選んだ国の配信か(国が空の配信は、どの国にも数える。weekDays と同じ見方)。ほかの国の配信は、同じテーマ・同じ画像でも重ならない */
+  const inCountry = (c: { country?: string | null }) => !country || !c.country || c.country === country
   /** 案ごとの、週の中での気になる点(上限を超えた商品・同じテーマ・同じメイン画像の配信) */
   function issuesOf(x: ReviewItem): { over: string[]; sameTheme: string[]; sameHero: string[] } {
     if (x.state === 'discarded') return { over: [], sameTheme: [], sameHero: [] }
-    const others = weekCards.filter((c) => c.id !== x.card.id)
+    // 週の上限の数(weekUse)は、アプリ全体と同じく国をまたいで数える。テーマ・メイン画像の重なりは、同じ国の中だけで見る
+    const others = weekCards.filter((c) => c.id !== x.card.id && inCountry(c))
     return {
       over: [...new Set(x.productIds)].filter((pid) => (weekUse.get(pid) ?? 0) > weeklyLimit(x.card)),
       sameTheme: norm(x.card.theme) ? others.filter((c) => norm(c.theme) === norm(x.card.theme)).map((c) => c.name) : [],
@@ -328,7 +331,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setNaming((s) => new Set([...s, ...list]))
     try {
       const others = cards
-        .filter((c) => c.name?.trim() && c.scheduled_at && Math.abs(new Date(c.scheduled_at).getTime() - weekStart.getTime()) < 21 * 86400000)
+        .filter((c) => c.name?.trim() && c.scheduled_at && inCountry(c) && Math.abs(new Date(c.scheduled_at).getTime() - weekStart.getTime()) < 21 * 86400000)
         .map((c) => ({ name: c.name, theme: c.theme, scheduledAt: c.scheduled_at }))
       const names = await suggestNames({
         slots: list.map((day) => {
@@ -621,6 +624,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     unsavedCount,
     savedCount,
     savedIds,
+    inCountry,
     compareCards,
     compareProducts,
     weekUse,

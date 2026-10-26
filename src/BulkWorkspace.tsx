@@ -322,7 +322,8 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
 
   // ---- ① 右: その週の配信(見るだけ。作ろうとしている行も、破線で重ねて見せる)
   const weekEndNext = new Date(ws.weekStart.getFullYear(), ws.weekStart.getMonth(), ws.weekStart.getDate() + 7)
-  const inWeek = cards.filter((c) => c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
+  // 選んだ国の配信だけ(ほかの国の配信が、国の印なしに混ざると、重なりを見誤るため)
+  const inWeek = cards.filter((c) => ws.inCountry(c) && c.scheduled_at && new Date(c.scheduled_at) >= ws.weekStart && new Date(c.scheduled_at) < weekEndNext)
   const madeIds = new Set([...ws.savedIds.values(), ...ws.plainCards.map((c) => c.id)])
   const side = (
     <aside className={s.side} aria-label={t('この週の配信', 'Deliveries this week')}>
