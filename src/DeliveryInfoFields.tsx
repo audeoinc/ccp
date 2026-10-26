@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Field, Input, Select, ToggleButton, makeStyles, tokens } from '@fluentui/react-components'
 import { optionLabel, useT } from './i18n'
-import { AGE_BANDS, TARGET_GENDERS, ageLabel, formatAges, genderLabel, parseAges, type TargetGender } from './target'
+import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, formatAges, genderLabel, parseAges, type TargetGender } from './target'
 import { statusColor, statusOptions } from './status'
 import { PersonInput } from './PersonInput'
 import { typo } from './typo'
@@ -18,7 +18,8 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1, minWidth: 0 },
   targetBox: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
   targetRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' },
-  targetLabel: { width: '44px', flexShrink: 0, ...typo.label },
+  // 「送る相手」(X81 の 3)も 1 行に収まる幅に(折り返さない)
+  targetLabel: { width: '56px', flexShrink: 0, whiteSpace: 'nowrap', ...typo.label },
   chip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
 })
 
@@ -128,6 +129,27 @@ export function TargetField({ gender, ages, onGender, onAges, size, field, child
         {children}
       </div>
     </Field>
+  )
+}
+
+/** アプリの送る相手(全員・会員・30 日休眠・メール未開封)。配信の対象の箱の中の続きの行(TargetField の children)。詳しい画面とシンプルで同じもの(X81 の 3) */
+export function AudienceRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useT()
+  const s = useStyles()
+  return (
+    <div className={s.targetRow} data-field="audience">
+      <span className={s.targetLabel}>{t('送る相手', 'Send to')}</span>
+      <Select size="small" className={s.grow} value={value} onChange={(_, d) => onChange(d.value)}>
+        <option value="" disabled>
+          {t('選んでください', 'Choose')}
+        </option>
+        {AUDIENCES.map((v) => (
+          <option key={v} value={v}>
+            {audienceLabel(v)}
+          </option>
+        ))}
+      </Select>
+    </div>
   )
 }
 

@@ -11,6 +11,7 @@ import type { NextStep } from './nextStep'
 import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
+import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
 
@@ -63,7 +64,7 @@ export interface FloatAction {
  * 配信カードの editor(useCardEditor)から、そのまま渡すもの。名前と型は editor と同じ(写しの型を書かない。2 つの画面で、ずれないように)。
  * form は詳しい画面と同じ Form、savedAt は最後に保存した日時(ISO。上の帯の「保存済み · 12:03」)、canReview は承認の依頼・承認を出せるか(確定した週の配信は、出さない)
  */
-const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'partContent', 'setPartContent', 'links', 'setLinks', 'pushLink', 'setPushLink', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview'] as const
+const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'partContent', 'setPartContent', 'links', 'setLinks', 'pushLink', 'setPushLink', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview', 'audience', 'setAudience'] as const
 type FromEditor = Pick<CardEditor, (typeof FROM_EDITOR)[number]>
 
 /**
@@ -87,6 +88,10 @@ export interface SimpleExtras {
   /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
+  /** テーマの AI の案(詳しい画面の ① テーマと同じ useAiDrafts。案は保存しない。X81 の 4) */
+  themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void }
+  /** テーマの案を採用する(理由も一緒に入れる。手で直したときは setField('theme') が理由を消す) */
+  adoptTheme: (theme: string, reason: string) => void
   channel: 'email' | 'push'
   /** AB テスト(SU2)。keys は A を含む案、active はいま直している案(プレビューとペインは、この案の中身) */
   ab: { keys: VariantKey[]; active: VariantKey; purpose: AbPurpose; canAdd: boolean; busy: boolean } | null
@@ -95,6 +100,10 @@ export interface SimpleExtras {
   abAdd: (from: VariantKey | 'ai') => void
   abRemove: (k: VariantKey) => void
   abCompare: () => void
+  /** 案から選んだあと(AB テストは終わっている)、決めた案。null = 決めていない(X81 の 6) */
+  abDecided: VariantKey | null
+  /** 決めた案と、配信しなかった案を並べて見る */
+  abViewDecided: () => void
   /** テストの設定(タブの横の ⚙ の中身) */
   abSettings: ReactNode
   /** いまの案が A と違う部品(「A と違う」の目印) */
