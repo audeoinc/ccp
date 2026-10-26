@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { InfoLabel, Badge, Button, Field, Input, Link, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { LockClosedRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUploadRegular, ArrowUpRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
+import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
 import { ChooseDrawer } from '../ChoosePanel'
@@ -421,8 +421,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   onHover={(on) => e.hoverProduct(on ? it.key : null)}
                   actions={
                     <>
-                      <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0 || e.saving} onClick={() => e.moveItem(i, i - 1)} aria-label={t('前へ', 'Move up')} />
-                      <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === e.items.length - 1 || e.saving} onClick={() => e.moveItem(i, i + 1)} aria-label={t('後ろへ', 'Move down')} />
                       <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
                         <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={swapOpen} disabled={e.saving} onClick={() => onSwapAt(swapOpen ? null : { itemKey: it.key, at: 'list' })} />
                       </Tooltip>
@@ -641,23 +639,9 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               onDone={(k) => onSwapped(it.key, k)}
             />
             <span className={s.caption}>{t(`${idx + 1} 番目${sec ? `(${sec.label})` : ''}`, `Position ${idx + 1}${sec ? ` (${sec.label})` : ''}`)}</span>
-            <span className={s.row}>
-              <Button size="small" icon={<ArrowUpRegular />} disabled={idx === 0 || e.saving} onClick={() => e.moveItem(idx, idx - 1)}>{t('前へ', 'Earlier')}</Button>
-              <Button size="small" icon={<ArrowDownRegular />} disabled={idx === e.items.length - 1 || e.saving} onClick={() => e.moveItem(idx, idx + 1)}>{t('後ろへ', 'Later')}</Button>
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={<DismissRegular />}
-                disabled={e.saving}
-                onClick={() => {
-                  e.removeItem(it.key)
-                  onPick(null)
-                }}
-              >
-                {t('外す(候補に戻す)', 'Remove (back to candidates)')}
-              </Button>
-            </span>
-            <Hint hintKey="simpleCard.productSlot">{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。プレビューの上で、つかんで並べ替えることもできます。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. You can also drag products in the preview to reorder.')}</Hint>
+            {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
+                (商品は上下左右に並ぶので、前後の矢印では向きを表せない。外すは、外したい商品の上で。2026-10-26 利用者) */}
+            <Hint hintKey="simpleCard.productSlot">{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。並べ替えは、プレビューでつかんで動かすか、Alt + 矢印。外すときは、プレビューの商品の × か Delete。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. To reorder, drag in the preview or press Alt + arrow keys. To remove, use the × on the product in the preview or press Delete.')}</Hint>
           </>
         )
       }

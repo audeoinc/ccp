@@ -15,6 +15,7 @@ import { Hint } from '../Hint'
 import { PinFloat } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
 import { previewMenuItems } from '../previewMenu'
+import { neighborItem, type MoveDir } from './gridMove'
 import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
@@ -326,6 +327,23 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     openSwapRef.current = openSwap
   })
   const onSwapBadge = useCallback((itemKey: string) => openSwapRef.current(itemKey), [])
+  /** 商品を外す(プレビューの ×・右クリック・Delete)。枠は空き枠になる。元に戻すで戻せる */
+  const removeProduct = (itemKey: string) => {
+    e.removeItem(itemKey)
+    if (part?.kind === 'product' && part.itemKey === itemKey) select(null)
+  }
+  /** 商品を、見たままの向きの隣の商品と入れ替える(Alt + 矢印・右クリック)。選んでいる枠は、その商品についていく */
+  const moveProduct = (itemKey: string, dir: MoveDir) => {
+    const box = boxRef.current
+    const to = box ? neighborItem(box, itemKey, dir) : null
+    if (to) e.swapItems(itemKey, to)
+  }
+  const productOpsRef = useRef({ removeProduct, moveProduct })
+  useEffect(() => {
+    productOpsRef.current = { removeProduct, moveProduct }
+  })
+  const onRemoveBadge = useCallback((itemKey: string) => productOpsRef.current.removeProduct(itemKey), [])
+  const onMoveKey = useCallback((itemKey: string, dir: MoveDir) => productOpsRef.current.moveProduct(itemKey, dir), [])
   /**
    * プレビューの商品をマウスで押したら、枠を選ぶのに加えて、商品のフロートも開く(部品のペインの画像を押したときと同じ導線。ピン 10-26)。
    * フロートの「入れ替える」は、同じ引き出しを開く。すぐ入れ替えたいときは ⇄ の印。キーで移ったときは開かない
@@ -475,11 +493,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               swapLabel: t('入れ替える', 'Replace'),
               url: productUrl(productById.get(it?.productId ?? '')),
               swap: () => openSwap(p.itemKey),
-              // 部品のペインの「外す(候補に戻す)」と同じ
-              remove: () => {
-                e.removeItem(p.itemKey)
-                if (part && samePart(part, p)) select(null)
-              },
+              // プレビューの × と同じ
+              remove: () => removeProduct(p.itemKey),
+              move: (() => {
+                const box = boxRef.current
+                const at = (d: MoveDir) => (box && neighborItem(box, p.itemKey, d) ? () => moveProduct(p.itemKey, d) : undefined)
+                return { up: at('up'), down: at('down'), left: at('left'), right: at('right') }
+              })(),
             }
           : undefined,
       hero:
@@ -1049,7 +1069,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onEnter={focusPane} onClickPart={onClickPart} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} onClickPart={onClickPart} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
@@ -1057,8 +1077,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             <InfoLabel
               size="small"
               info={t(
-                'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
-                'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
+                'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。選んだ商品は Alt + 矢印で上下左右に動かす、Delete で外す。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
+                'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. For a selected product, Alt + arrow keys move it up, down, left or right, and Delete removes it. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
               )}
             >
               {t('キー', 'Keys')}
