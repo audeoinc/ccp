@@ -249,6 +249,9 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           }
           renderIdea={(idea) => <MarkdownLite text={idea.value} />}
           isCurrent={(idea) => idea.value === e.form.instructions}
+          // 帯には、長い文章の頭だけを出す
+          nowText={e.form.instructions.split('\n')[0]}
+          ideaText={(idea) => idea.value.split('\n')[0]}
           onPreview={(idea) => setPreviewing(idea ? idea.value : null)}
           onAdopt={(idea) => {
             setPreviewing(null)

@@ -107,6 +107,8 @@ interface Props {
    * 渡さなければ、同じ形の ProductChooser を出す(詳しい画面・アラート)
    */
   renderSwap?: SwapRender
+  /** 入れ替えの候補を試すとき、プレビューにだけ当てはめる(null で戻す。試す → 確定) */
+  onPreviewProduct?: (productId: string | null) => void
   onClose: () => void
 }
 
@@ -114,7 +116,7 @@ interface Props {
 export type SwapRender = (back: () => void, close: () => void) => ReactNode
 
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, aiCard, angle, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, onPreviewProduct, aiCard, angle, onClose }: Props) {
   const s = useStyles()
   const t = useT()
   const [picking, setPicking] = useState(false)
@@ -258,6 +260,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     // 商品の行から開いたときは、AI を呼ばずに、まず残りの候補を出す(シンプルな配信カードの引き出しと同じ)
                     fallback={stockAlert ? [] : fallback}
                     onPick={pickProduct}
+                    onPreview={onPreviewProduct}
                     marks={marks}
                   />
                 )}

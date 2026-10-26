@@ -55,6 +55,7 @@ import { SenderName } from '../SenderName'
 import { confirmDialog } from '../confirm'
 import { PaneRail } from '../PaneRail'
 import { typo } from '../typo'
+import { hasPendingTrial, settlePendingTrial } from '../trial'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
@@ -308,6 +309,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   /** 部品を選ぶ。別の部品に移るときに、それまでの変更を反映(保存)する(SU1 ⑫) */
   const select = (p: PartRef | null) => {
     if (samePart(p, part)) return
+    // 試している候補があれば、確定するかを 1 回だけ聞いてから移る(試す → 確定)
+    if (hasPendingTrial()) {
+      void settlePendingTrial().then(() => selectRef.current(p))
+      return
+    }
     void onCommit()
     setPart(p)
     setCompareKey(null)

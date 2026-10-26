@@ -6,6 +6,8 @@ import { ChooseDrawer, ChoosePanel, type ChooseTab } from './ChoosePanel'
 import { ImageThumb } from './ImageThumb'
 import { ProductDetail } from './ProductDetail'
 import { ProductThumbButton } from './ProductThumbButton'
+import { useTrial } from './trial'
+import { TrialBar } from './TrialBar'
 import { productImage } from './images'
 import { yen } from './items'
 import { productMarket } from './market'
@@ -168,6 +170,20 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       setPicks({ key: '', ideas: [], busy: false, error: err instanceof Error ? err.message : String(err) })
     }
   }
+  // 試す → 確定(2026-10-26 利用者と決めた): 候補を押すとプレビューにだけ当てはめ、上の帯の「確定」で入れ替える(どのタブの候補も、1 つの帯)
+  const trial = useTrial()
+  const tryProduct = (productId: string, run: () => void) =>
+    trial.tryIt({
+      key: productId,
+      from: current?.name ?? tr('(空いた枠)', '(empty slot)'),
+      to: byId.get(productId)?.name ?? productId,
+      preview: () => onPreview?.(productId),
+      unpreview: () => onPreview?.(null),
+      apply: () => {
+        onPreview?.(null)
+        run()
+      },
+    })
   // 開いている候補の詳しい情報(この枠の中で開くとき)
   const [detail, setDetail] = useState<{ productId: string; pick: () => void } | null>(null)
   const openDetail = (productId: string, pick: () => void) => (onDetail ? onDetail(productId, pick) : setDetail({ productId, pick }))
@@ -178,13 +194,15 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
-      className={mergeClasses(s.pickRow, pickedId === productId && s.pickOn, disabled && s.pickOff)}
+      aria-pressed={trial.trial?.key === productId}
+      className={mergeClasses(s.pickRow, (trial.trial ? trial.trial.key === productId : pickedId === productId) && s.pickOn, disabled && s.pickOff)}
       title={why2}
-      onClick={disabled ? undefined : run}
+      onClick={disabled ? undefined : () => tryProduct(productId, run)}
       onKeyDown={(ev) => {
         if (disabled || (ev.key !== 'Enter' && ev.key !== ' ')) return
         ev.preventDefault()
-        run()
+        ev.stopPropagation()
+        tryProduct(productId, run)
       }}
     >
       <ProductLine product={byId.get(productId)} fact={facts.get(productId)} onDetail={disabled ? undefined : () => openDetail(productId, run)} />
@@ -198,7 +216,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       icon: <SparkleRegular />,
       content: (
         <AiPicks
-          hint={why ? t(`入れ替える理由(${why})に合わせて、AI が候補を挙げます。押すと選びます`, `AI suggests replacements for: ${why}. Click one to choose it`) : t('この枠の代わりになりそうな商品を、AI が挙げます。押すと選びます', 'AI suggests products to replace this one. Click one to choose it')}
+          hint={why ? t(`入れ替える理由(${why})に合わせて、AI が候補を挙げます。押すとプレビューで試せます`, `AI suggests replacements for: ${why}. Click one to try it in the preview`) : t('この枠の代わりになりそうな商品を、AI が挙げます。押すとプレビューで試せます', 'AI suggests products to replace this one. Click one to try it in the preview')}
           picks={picks ?? undefined}
           hasFallback={fallback.length > 0}
           onAsk={() => void recommend()}
@@ -235,6 +253,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
             />
           )}
           isCurrent={(idea) => inCard.some((p) => p.id === idea.value)}
+          onTry={(idea) => tryProduct(idea.value, () => onPick(idea.value, idea.why))}
           onPreview={(idea) => onPreview?.(idea ? idea.value : null)}
           onAdopt={(idea) => {
             onPreview?.(null)
@@ -252,10 +271,10 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
           products={products}
           usedIds={new Set(inCard.map((p) => p.id))}
           onAdd={() => undefined}
-          onPick={(id) => onPick(id, '')}
-          pickedId={pickedId}
+          onPick={(id) => tryProduct(id, () => onPick(id, ''))}
+          pickedId={trial.trial?.key ?? pickedId}
           marks={marks}
-          pickHint={t('押すと選びます', 'Click to choose')}
+          pickHint={t('押すとプレビューで試せます(上の「確定」で入れ替え)', 'Click to try it in the preview (Apply above to replace)')}
           onDetail={(id) => openDetail(id, () => onPick(id, ''))}
         />
       ),
@@ -286,6 +305,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       <ProductDetail key={shown.id} product={shown} />
     </>
   )
-  if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} bare={frame.bare} override={override || undefined} />
-  return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} override={override || undefined} />
+  const top = <TrialBar state={trial} />
+  if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} bare={frame.bare} override={override || undefined} top={top} />
+  return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} override={override || undefined} top={top} />
 }

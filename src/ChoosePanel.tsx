@@ -54,6 +54,9 @@ const useStyles = makeStyles({
   bare: { border: 'none', borderRadius: 0, boxShadow: 'none', backgroundColor: 'transparent' },
   bareTabs: { padding: 0 },
   bareBody: { padding: '12px 0 0' },
+  // 試す → 確定の帯の置き場(中身がないときは、高さを取らない)
+  top: { padding: '8px 12px 0', ':empty': { display: 'none' } },
+  bareTop: { padding: '0 0 8px' },
 })
 
 export interface ChooseTab<V extends string> {
@@ -79,10 +82,12 @@ interface Props<V extends string> {
    * (戻ったときに、選んでいたタブ・検索の文字・AI とのやり取りがそのまま残るように)
    */
   override?: ReactNode
+  /** タブの上に出すもの(試す → 確定の帯 TrialBar。どのタブで試しても、同じ所に出す) */
+  top?: ReactNode
   id?: string
 }
 
-export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, bare, override, id }: Props<V>) {
+export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, bare, override, top, id }: Props<V>) {
   const s = useStyles()
   const t = useT()
   const [tab, setTab] = useState<V>(defaultTab ?? tabs[0].value)
@@ -95,6 +100,7 @@ export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose
           {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} title={t('閉じる', 'Close')} />}
         </div>
       )}
+      {top && !override && <div className={mergeClasses(s.top, bare && s.bareTop)}>{top}</div>}
       <TabList className={mergeClasses(s.tabs, bare && s.bareTabs)} style={override ? { display: 'none' } : undefined} size="small" selectedValue={current.value} onTabSelect={(_, d) => setTab(d.value as V)}>
         {tabs.map((x) => (
           <Tab key={x.value} value={x.value} icon={x.icon}>

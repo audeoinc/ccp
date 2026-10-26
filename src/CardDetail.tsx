@@ -61,6 +61,7 @@ import type { StockModel } from './alerts'
 import type { CardAlert } from './cardAlerts'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
 import { CANDIDATE_DETAIL, simpleEditorOf, type AiPreview } from './simple/editor'
+import { settlePendingTrial } from './trial'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
@@ -574,6 +575,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           aiCard={buildAiCard}
           angle={form.copyAngle}
           renderSwap={floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction ? floatSwap.render : undefined}
+          // 試す → 確定: 試している商品を、プレビューの枠にだけ当てはめる(詳しい画面・アラートの対応)
+          onPreviewProduct={item ? (pid) => setAiPreview(pid ? { item: { key: item.key, productId: pid } } : null) : undefined}
           slotAction={
             slotAction && !actAlert
               ? {
@@ -837,8 +840,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     } else openDetailed(step === 'requestProduction' ? 'handoff' : undefined)
   }
   /** 閉じる: 変更があれば反映してから閉じる(確定した週の配信は、捨てるかを聞く) */
+  // 試している候補を確定したあとに閉じる(確定した中身を保存してから閉じるため、描き直したあとの値で閉じ直す)
+  const [closeAfterTrial, setCloseAfterTrial] = useState(false)
   const closeSimple = async () => {
     if (saving) return
+    // 試している候補があれば、確定するかを 1 回だけ聞く(試す → 確定)
+    if ((await settlePendingTrial()) === 'applied') {
+      setCloseAfterTrial(true)
+      return
+    }
     if (!isDirty()) {
       onBack()
       return
@@ -849,6 +859,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     void save({ after: 'close' })
   }
+  useEffect(() => {
+    if (!closeAfterTrial) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCloseAfterTrial(false)
+    void closeSimple()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeAfterTrial])
   // 学びの「効き目を見る」のフロート(配信カードの上に重ねる)
   const [effectOf, setEffectOf] = useState<LearningCardData | null>(null)
   // 学びの効き目(結果の面の「効果」)へ移る(フロートの「結果の画面で開く」)。配信カードは閉じるので、変えた分は先に保存する(確定した週は理由が要るので、保存せずに移るかを聞く)

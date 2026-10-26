@@ -29,6 +29,8 @@ import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
 import { PushThumb } from '../PushThumb'
 import type { Product } from '../models/products'
 import { partKey, type PartRef } from './parts'
+import { useTrial } from '../trial'
+import { TrialBar } from '../TrialBar'
 import { PartAiChat } from './PartAiChat'
 import { Hint } from '../Hint'
 import { ProductionMemo } from './ProductionMemo'
@@ -141,6 +143,22 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
 
   // メイン画像を変える欄を開いている部品(部品を移ると畳む。まだ画像がなければ、はじめから開く)
   const [heroOpenKey, setHeroOpenKey] = useState<string | null>(null)
+  // メイン画像の入れ替えは、試す → 確定(AI のおすすめ・AI に頼む・すべての画像で、1 つの帯)
+  const heroTrial = useTrial()
+  const tryHero = (id: string, why: string) => {
+    const h = e.poolHeroes.find((x) => x.id === id)
+    heroTrial.tryIt({
+      key: id,
+      from: e.hero?.name ?? '',
+      to: h?.name ?? id,
+      preview: () => e.setAiPreview({ heroId: id }),
+      unpreview: () => e.setAiPreview(null),
+      apply: () => {
+        e.setAiPreview(null)
+        e.setHero(id, why)
+      },
+    })
+  }
   const heroOpen = !!part && (!e.hero || heroOpenKey === partKey(part))
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -208,6 +226,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         }
         renderIdea={(idea) => <span className={s.ideaText}>{idea.value}</span>}
         isCurrent={(idea) => idea.value === value}
+        nowText={value}
         onPreview={(idea) => e.setAiPreview(idea ? { texts: shown(idea.value) } : null)}
         onAdopt={(idea) => {
           e.setAiPreview(null)
@@ -239,6 +258,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         }}
         renderIdea={(idea) => productLine(byId.get(idea.value))}
         isCurrent={(idea) => e.items.some((i) => i.productId === idea.value)}
+        nowText={itemKey ? (byId.get(e.items.find((i) => i.key === itemKey)?.productId ?? '')?.name ?? '') : t('(空いた枠)', '(empty slot)')}
+        ideaText={(idea) => byId.get(idea.value)?.name ?? idea.value}
         onPreview={(idea) => e.setAiPreview(idea ? { item: { key: itemKey ?? '', productId: idea.value } } : null)}
         onAdopt={(idea) => {
           e.setAiPreview(null)
@@ -294,6 +315,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           </span>
         ) : null
       }}
+      nowText={t('いまの配信', 'Current delivery')}
+      ideaText={(idea) => readWhole(idea.value)?.title ?? ''}
       isCurrent={(idea) => {
         const c = readWhole(idea.value)
         const now = currentTexts()
@@ -509,6 +532,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 label={t('入れ替える', 'Replace')}
                 icon={<ArrowSwapRegular />}
                 title={e.hero ? t('メイン画像を選び直す', 'Choose another main image') : t('メイン画像を選ぶ', 'Choose the main image')}
+                top={<TrialBar state={heroTrial} />}
                 tabs={[
                   {
                     value: 'recommend',
@@ -516,7 +540,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                     icon: <SparkleRegular />,
                     content: (
                       <AiPicks
-                        hint={t('この配信のテーマと商品に合いそうな画像を、AI が挙げます。押すと入れ替わります', 'AI suggests images that fit this delivery. Click one to use it')}
+                        hint={t('この配信のテーマと商品に合いそうな画像を、AI が挙げます。押すとプレビューで試せます(確定で入れ替え)', 'AI suggests images that fit this delivery. Click one to try it in the preview, then Apply')}
                         picks={picksOf(partKey(part))}
                         hasFallback={e.heroCandidates.length > 0}
                         onAsk={() => void recommendHeroes(partKey(part))}
@@ -526,7 +550,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                             {(picksOf(partKey(part))?.ideas.map((i) => ({ id: i.value, why: i.why })) ?? e.heroCandidates.map((c) => ({ id: c.heroId, why: c.reason }))).map((c) => {
                               const h = e.poolHeroes.find((x) => x.id === c.id)
                               return h ? (
-                                <button key={c.id} type="button" className={mergeClasses(s.heroCand, h.id === e.hero?.id && s.heroCandOn)} title={c.why} onClick={() => e.setHero(h.id, c.why)}>
+                                <button key={c.id} type="button" className={mergeClasses(s.heroCand, (heroTrial.trial ? heroTrial.trial.key === h.id : h.id === e.hero?.id) && s.heroCandOn)} title={c.why} onClick={() => tryHero(h.id, c.why)}>
                                   <ImageThumb src={heroImage(h)} alt={h.name} width={80} height={60} />
                                   <span className={s.caption}>{h.name}</span>
                                 </button>
@@ -566,6 +590,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                           e.setAiPreview(null)
                           e.setHero(idea.value, idea.why)
                         }}
+                        onTry={(idea) => tryHero(idea.value, idea.why)}
                       />
                     ),
                   },
@@ -589,7 +614,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                     value: 'all',
                     label: t('すべての画像', 'All images'),
                     icon: <ImageMultipleRegular />,
-                    content: <HeroCandidates heroes={e.poolHeroes} selectedId={e.hero?.id} onSelect={(id) => e.setHero(id, '')} />,
+                    content: <HeroCandidates heroes={e.poolHeroes} selectedId={heroTrial.trial?.key ?? e.hero?.id} onSelect={(id) => tryHero(id, '')} />,
                   },
                 ]}
               />
