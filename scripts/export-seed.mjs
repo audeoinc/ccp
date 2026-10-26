@@ -20,6 +20,7 @@ try {
   const data = {
     hero_images: m.heroes,
     products: m.products,
+    campaigns: m.campaigns,
     delivery_cards: m.cards,
     delivery_products: m.deliveryProducts,
     weekly_performances: m.weekly,
