@@ -43,6 +43,8 @@ interface Props {
   onSwap?: (itemKey: string) => void
   /** 部品を選んでいるときに Enter: その部品のペインの入力欄へ移る */
   onEnter?: () => void
+  /** マウスで部品を押したとき(選んだあと)。キーで移ったときは呼ばない(移るたびにフロートなどが出ると邪魔なため) */
+  onClickPart?: (p: PartRef) => void
 }
 
 /**
@@ -50,11 +52,13 @@ interface Props {
  * プレビューの部品そのものは変えない(書き込みのピン PreviewPins と同じ作り。制作のページ・結果でも使えるように、配信カードには依存しない)。
  * 選んだ部品には枠と淡い色、マウスを乗せた部品には薄い枠を重ねる。Tab / Shift+Tab で次・前の部品、Esc で選ぶのをやめる
  */
-export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onEnter }: Props) {
+export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onEnter, onClickPart }: Props) {
   const s = useStyles()
   const onEnterRef = useRef(onEnter)
+  const onClickPartRef = useRef(onClickPart)
   useEffect(() => {
     onEnterRef.current = onEnter
+    onClickPartRef.current = onClickPart
   })
   const t = useT()
   const [hover, setHover] = useState<PartRef | null>(null)
@@ -108,6 +112,7 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
       if ((e.target as Element).closest('[data-no-pick], button')) return
       const p = partFromElement(e.target as Element, box)
       onSelect(p)
+      if (p) onClickPartRef.current?.(p)
     }
     const onMove = (e: MouseEvent) => {
       // 入れ替えの印の上では、その商品に乗せたままにする(印は商品の枠の外の層にあるため)
