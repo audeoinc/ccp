@@ -117,6 +117,7 @@ const useStyles = makeStyles({
   // 右の一覧の幅は usePaneWidths で変える(--cols)。狭い画面では縦に並べ、境目も出さない
   withSide: { display: 'grid', gridTemplateColumns: 'var(--cols)', columnGap: '10px', alignItems: 'start', '@media (max-width: 899px)': { gridTemplateColumns: '1fr', rowGap: '16px' } },
   main: { display: 'grid', rowGap: '14px', minWidth: 0 },
+  step2: { minWidth: 0 },
   panel: { display: 'grid', rowGap: '10px', padding: '14px 16px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
   h3: { margin: 0, fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   hint: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
@@ -334,8 +335,11 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
       <h3 className={s.h3}>{t('この週の配信', 'This week')}</h3>
       {ws.days.map((d) => {
         const list = inWeek.filter((c) => dayKeyOf(new Date(c.scheduled_at!)) === d.key).sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
-        // 作る予定の行(型の行なら、その日の型の数だけ)。もう作った配信があれば出さない
-        const planned = ws.targets.filter((k) => dayOfKey(k) === d.key && !list.some((c) => madeIds.has(c.id)))
+        // 作る予定の行(型の行なら、その日の型の数だけ)。保存した行・破棄した案は出さない
+        // (以前は、その日に作った配信が 1 本でもあると、同じ日のほかの型の行も消えていた)
+        const planned = ws.targets.filter(
+          (k) => dayOfKey(k) === d.key && !ws.savedIds.has(k) && !(plainDone && list.some((c) => madeIds.has(c.id))) && ws.reviewItems.find((x) => x.day === k)?.state !== 'discarded',
+        )
         return (
           <div key={d.key} className={s.sideDay}>
             <span className={s.label}>{dayText(d.key)}</span>
@@ -355,7 +359,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
               <span key={k} className={s.sidePlanned}>
                 <span className={s.sideItem}>
                   <Badge size="small" appearance="filled" color="brand" className={s.newBadge}>
-                    {t('作る予定', 'Planned')}
+                    {ws.started && ws.results.has(k) ? t('未保存の案', 'Unsaved draft') : t('作る予定', 'Planned')}
                   </Badge>
                   <ChannelBadge channel={ws.channel} size="small" />
                   {timeOfKey(k) && <span className={s.muted}>{timeOfKey(k)}</span>}
@@ -541,7 +545,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
   const step2 = () => {
     const failedDays = ws.targets.filter((d) => ws.failed.has(d))
     return (
-      <div>
+      <div className={s.step2}>
         <div className={s.tools}>
           {/* 作っている間は、いまの様子をその場に。決め方の説明は ⓘ に(X72) */}
           {ws.running ? (
@@ -852,7 +856,12 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                 {side}
               </div>
             ) : (
-              step2()
+              // ② でも、週の様子を右に出す(重なりを見ながら、保存・破棄を決められるように。幅は ① と同じ)
+              <div className={s.withSide} style={{ '--cols': panes.columns } as CSSProperties}>
+                {step2()}
+                <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
+                {side}
+              </div>
             )}
           </div>
           <div className={s.foot}>
