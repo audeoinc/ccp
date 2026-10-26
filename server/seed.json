@@ -453,6 +453,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 119,
    "weather": "cold",
    "description": "上質なウールを使ったロング丈コート。あらゆる着こなしに合う定番",
    "image_url": "https://placehold.co/400x400?text=P01",
@@ -469,6 +470,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 194,
    "weather": "cold",
    "description": "軽量で暖かい。撥水加工で雨雪にも対応",
    "image_url": "https://placehold.co/400x400?text=P02",
@@ -481,10 +483,12 @@
    "gender": "unisex",
    "category": "outer",
    "price": 19800,
+   "regular_price": 24750,
    "stock": 200,
    "season": "autumn",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 197,
    "weather": "rainy",
    "description": "撥水素材の定番トレンチ。雨の日の通勤にも",
    "image_url": "https://placehold.co/400x400?text=P03",
@@ -501,6 +505,7 @@
    "season": "all_year",
    "sales_trend": "up",
    "rating": 4.4,
+   "review_count": 96,
    "weather": "rainy",
    "description": "防水・軽量のパッカブルパーカー",
    "image_url": "https://placehold.co/400x400?text=P04",
@@ -517,6 +522,7 @@
    "season": "autumn",
    "sales_trend": "flat",
    "rating": 4,
+   "review_count": 59,
    "weather": "sunny",
    "description": "薄手で羽織りやすい秋のジャケット",
    "image_url": "https://placehold.co/400x400?text=P05",
@@ -529,10 +535,12 @@
    "gender": "unisex",
    "category": "tops",
    "price": 8800,
+   "regular_price": 11000,
    "stock": 300,
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.2,
+   "review_count": 98,
    "weather": "cold",
    "description": "柔らかなコットンカシミヤ混のカーディガン",
    "image_url": "https://placehold.co/400x400?text=P06",
@@ -549,6 +557,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 277,
    "weather": "cold",
    "description": "肌触りの良いメリノウールのニット",
    "image_url": "https://placehold.co/400x400?text=P07",
@@ -565,6 +574,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.4,
+   "review_count": 160,
    "weather": "cold",
    "description": "首元まで暖かい定番のタートル",
    "image_url": "https://placehold.co/400x400?text=P08",
@@ -577,10 +587,12 @@
    "gender": "unisex",
    "category": "tops",
    "price": 11800,
+   "regular_price": 14750,
    "stock": 90,
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 63,
    "weather": "cold",
    "description": "編み柄が映える大人のケーブルニット",
    "image_url": "https://placehold.co/400x400?text=P09",
@@ -597,6 +609,7 @@
    "season": "autumn",
    "sales_trend": "down",
    "rating": 3.9,
+   "review_count": 225,
    "weather": "sunny",
    "description": "起毛素材の柔らかなシャツ",
    "image_url": "https://placehold.co/400x400?text=P10",
@@ -613,6 +626,7 @@
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.1,
+   "review_count": 34,
    "weather": "sunny",
    "description": "裏毛の心地よいパーカー",
    "image_url": "https://placehold.co/400x400?text=P11",
@@ -625,10 +639,12 @@
    "gender": "unisex",
    "category": "bottoms",
    "price": 9800,
+   "regular_price": 12250,
    "stock": 280,
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.2,
+   "review_count": 131,
    "weather": "sunny",
    "description": "ストレッチ入りで穿きやすい",
    "image_url": "https://placehold.co/400x400?text=P12",
@@ -645,6 +661,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.3,
+   "review_count": 184,
    "weather": "cold",
    "description": "きれいめに決まるウールスラックス",
    "image_url": "https://placehold.co/400x400?text=P13",
@@ -661,6 +678,7 @@
    "season": "autumn",
    "sales_trend": "up",
    "rating": 4.2,
+   "review_count": 261,
    "weather": "sunny",
    "description": "秋らしい質感のコーデュロイ",
    "image_url": "https://placehold.co/400x400?text=P14",
@@ -673,10 +691,12 @@
    "gender": "womens",
    "category": "bottoms",
    "price": 9800,
+   "regular_price": 12250,
    "stock": 130,
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.1,
+   "review_count": 246,
    "weather": "sunny",
    "description": "揺れ感のあるプリーツスカート",
    "image_url": "https://placehold.co/400x400?text=P15",
@@ -693,6 +713,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 191,
    "weather": "cold",
    "description": "足に馴染む本革のショートブーツ",
    "image_url": "https://placehold.co/400x400?text=P16",
@@ -709,6 +730,7 @@
    "season": "all_year",
    "sales_trend": "up",
    "rating": 4.4,
+   "review_count": 68,
    "weather": "rainy",
    "description": "履き口が広く脱ぎ履きしやすい",
    "image_url": "https://placehold.co/400x400?text=P17",
@@ -721,10 +743,12 @@
    "gender": "unisex",
    "category": "shoes",
    "price": 11800,
+   "regular_price": 14750,
    "stock": 320,
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 277,
    "weather": "sunny",
    "description": "毎日履ける軽量スニーカー",
    "image_url": "https://placehold.co/400x400?text=P18",
@@ -741,6 +765,7 @@
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4,
+   "review_count": 246,
    "weather": "sunny",
    "description": "きれいめカジュアルのローファー",
    "image_url": "https://placehold.co/400x400?text=P19",
@@ -757,6 +782,7 @@
    "season": "winter",
    "sales_trend": "down",
    "rating": 4.2,
+   "review_count": 110,
    "weather": "cold",
    "description": "内側ボアで暖かい",
    "image_url": "https://placehold.co/400x400?text=P20",
@@ -769,10 +795,12 @@
    "gender": "unisex",
    "category": "accessories",
    "price": 5800,
+   "regular_price": 7250,
    "stock": 260,
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 73,
    "weather": "cold",
    "description": "大判で巻きやすいマフラー",
    "image_url": "https://placehold.co/400x400?text=P21",
@@ -789,6 +817,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.3,
+   "review_count": 244,
    "weather": "cold",
    "description": "伸縮性のあるリブ編みニット帽",
    "image_url": "https://placehold.co/400x400?text=P22",
@@ -805,6 +834,7 @@
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.4,
+   "review_count": 219,
    "weather": "cold",
    "description": "軽くて暖かい大判ストール",
    "image_url": "https://placehold.co/400x400?text=P23",
@@ -817,10 +847,12 @@
    "gender": "mens",
    "category": "accessories",
    "price": 8800,
+   "regular_price": 11000,
    "stock": 70,
    "season": "winter",
    "sales_trend": "flat",
    "rating": 4.1,
+   "review_count": 110,
    "weather": "cold",
    "description": "スマホ対応の本革グローブ",
    "image_url": "https://placehold.co/400x400?text=P24",
@@ -837,6 +869,7 @@
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.2,
+   "review_count": 285,
    "weather": "sunny",
    "description": "A4が入る軽量トート",
    "image_url": "https://placehold.co/400x400?text=P25",
@@ -853,6 +886,7 @@
    "season": "all_year",
    "sales_trend": "up",
    "rating": 4.4,
+   "review_count": 16,
    "weather": "sunny",
    "description": "コンパクトで使いやすい",
    "image_url": "https://placehold.co/400x400?text=P26",
@@ -865,10 +899,12 @@
    "gender": "unisex",
    "category": "bags",
    "price": 5800,
+   "regular_price": 7250,
    "stock": 150,
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4,
+   "review_count": 167,
    "weather": "rainy",
    "description": "撥水加工のバッグ",
    "image_url": "https://placehold.co/400x400?text=P27",
@@ -885,6 +921,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 286,
    "weather": "cold",
    "description": "ふわふわ素材のルームウェア",
    "image_url": "https://placehold.co/400x400?text=P28",
@@ -901,6 +938,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 121,
    "weather": "cold",
    "description": "ひざ掛けにも使えるブランケット",
    "image_url": "https://placehold.co/400x400?text=P29",
@@ -913,10 +951,12 @@
    "gender": "unisex",
    "category": "home",
    "price": 4800,
+   "regular_price": 6000,
    "stock": 60,
    "season": "autumn",
    "sales_trend": "down",
    "rating": 4,
+   "review_count": 91,
    "weather": "sunny",
    "description": "ハロウィン限定のギフト詰め合わせ",
    "image_url": "https://placehold.co/400x400?text=P30",
@@ -933,6 +973,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 32,
    "weather": "cold",
    "description": "Long wool coat in a classic cut. A staple that goes with everything",
    "image_url": "https://placehold.co/400x400?text=U01",
@@ -949,6 +990,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 1,
    "weather": "cold",
    "description": "Lightweight and warm, with a water-repellent finish for rain and snow",
    "image_url": "https://placehold.co/400x400?text=U02",
@@ -961,10 +1003,12 @@
    "gender": "unisex",
    "category": "outer",
    "price": 168,
+   "regular_price": 210,
    "stock": 200,
    "season": "autumn",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 126,
    "weather": "rainy",
    "description": "Water-repellent classic trench. Made for rainy commutes",
    "image_url": "https://placehold.co/400x400?text=U03",
@@ -981,6 +1025,7 @@
    "season": "all_year",
    "sales_trend": "up",
    "rating": 4.4,
+   "review_count": 235,
    "weather": "rainy",
    "description": "Packable parka with taped seams. Easy to carry, easy to wear",
    "image_url": "https://placehold.co/400x400?text=U04",
@@ -997,6 +1042,7 @@
    "season": "autumn",
    "sales_trend": "flat",
    "rating": 4.2,
+   "review_count": 260,
    "weather": "sunny",
    "description": "Breathable layer for in-between weather. Easy to slip on",
    "image_url": "https://placehold.co/400x400?text=U05",
@@ -1009,10 +1055,12 @@
    "gender": "unisex",
    "category": "tops",
    "price": 78,
+   "regular_price": 97.5,
    "stock": 180,
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.4,
+   "review_count": 89,
    "weather": "sunny",
    "description": "Soft, relaxed cardigan that layers over anything",
    "image_url": "https://placehold.co/400x400?text=U06",
@@ -1029,6 +1077,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.7,
+   "review_count": 126,
    "weather": "cold",
    "description": "Smooth merino-blend crewneck. A fall essential",
    "image_url": "https://placehold.co/400x400?text=U07",
@@ -1045,6 +1094,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 131,
    "weather": "cold",
    "description": "Warm turtleneck with a clean neckline. Great alone or layered",
    "image_url": "https://placehold.co/400x400?text=U08",
@@ -1057,10 +1107,12 @@
    "gender": "unisex",
    "category": "tops",
    "price": 108,
+   "regular_price": 135,
    "stock": 70,
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.5,
+   "review_count": 152,
    "weather": "cold",
    "description": "Chunky cable knit with a cozy, textured look",
    "image_url": "https://placehold.co/400x400?text=U09",
@@ -1077,6 +1129,7 @@
    "season": "autumn",
    "sales_trend": "down",
    "rating": 4.1,
+   "review_count": 262,
    "weather": "sunny",
    "description": "Brushed cotton flannel in a classic plaid",
    "image_url": "https://placehold.co/400x400?text=U10",
@@ -1093,6 +1146,7 @@
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 189,
    "weather": "sunny",
    "description": "Midweight fleece hoodie for weekends",
    "image_url": "https://placehold.co/400x400?text=U11",
@@ -1105,10 +1159,12 @@
    "gender": "unisex",
    "category": "bottoms",
    "price": 88,
+   "regular_price": 110,
    "stock": 240,
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.4,
+   "review_count": 280,
    "weather": "sunny",
    "description": "Straight-fit stretch denim. Comfortable all day",
    "image_url": "https://placehold.co/400x400?text=U12",
@@ -1125,6 +1181,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 11,
    "weather": "cold",
    "description": "Tailored wool trousers with a clean drape",
    "image_url": "https://placehold.co/400x400?text=U13",
@@ -1141,6 +1198,7 @@
    "season": "autumn",
    "sales_trend": "up",
    "rating": 4.3,
+   "review_count": 298,
    "weather": "sunny",
    "description": "Soft wide-wale corduroy with a relaxed fit",
    "image_url": "https://placehold.co/400x400?text=U14",
@@ -1153,10 +1211,12 @@
    "gender": "womens",
    "category": "bottoms",
    "price": 82,
+   "regular_price": 102.5,
    "stock": 95,
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.2,
+   "review_count": 73,
    "weather": "sunny",
    "description": "Flowing midi skirt that moves beautifully",
    "image_url": "https://placehold.co/400x400?text=U15",
@@ -1173,6 +1233,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 224,
    "weather": "cold",
    "description": "Full-grain leather boots that age beautifully",
    "image_url": "https://placehold.co/400x400?text=U16",
@@ -1189,6 +1250,7 @@
    "season": "all_year",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 187,
    "weather": "rainy",
    "description": "Fully waterproof rubber boots with a comfortable lining",
    "image_url": "https://placehold.co/400x400?text=U17",
@@ -1201,10 +1263,12 @@
    "gender": "unisex",
    "category": "shoes",
    "price": 108,
+   "regular_price": 135,
    "stock": 300,
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.4,
+   "review_count": 50,
    "weather": "sunny",
    "description": "Everyday low-top sneakers with a cushioned sole",
    "image_url": "https://placehold.co/400x400?text=U18",
@@ -1221,6 +1285,7 @@
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 241,
    "weather": "sunny",
    "description": "Polished leather loafers for work and weekends",
    "image_url": "https://placehold.co/400x400?text=U19",
@@ -1237,6 +1302,7 @@
    "season": "winter",
    "sales_trend": "down",
    "rating": 4.2,
+   "review_count": 161,
    "weather": "cold",
    "description": "Shearling-lined boots for the coldest days",
    "image_url": "https://placehold.co/400x400?text=U20",
@@ -1249,10 +1315,12 @@
    "gender": "unisex",
    "category": "accessories",
    "price": 54,
+   "regular_price": 67.5,
    "stock": 210,
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 82,
    "weather": "cold",
    "description": "Generous wool scarf in a soft, warm weave",
    "image_url": "https://placehold.co/400x400?text=U21",
@@ -1269,6 +1337,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 79,
    "weather": "cold",
    "description": "Ribbed knit beanie. The easiest way to stay warm",
    "image_url": "https://placehold.co/400x400?text=U22",
@@ -1285,6 +1354,7 @@
    "season": "autumn_winter",
    "sales_trend": "flat",
    "rating": 4.2,
+   "review_count": 176,
    "weather": "cold",
    "description": "Oversized shawl that works as a scarf or a wrap",
    "image_url": "https://placehold.co/400x400?text=U23",
@@ -1297,10 +1367,12 @@
    "gender": "mens",
    "category": "accessories",
    "price": 82,
+   "regular_price": 102.5,
    "stock": 75,
    "season": "winter",
    "sales_trend": "flat",
    "rating": 4.3,
+   "review_count": 13,
    "weather": "cold",
    "description": "Lined leather gloves with touchscreen fingertips",
    "image_url": "https://placehold.co/400x400?text=U24",
@@ -1317,6 +1389,7 @@
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.4,
+   "review_count": 2,
    "weather": "sunny",
    "description": "Roomy canvas tote with an inner pocket",
    "image_url": "https://placehold.co/400x400?text=U25",
@@ -1333,6 +1406,7 @@
    "season": "all_year",
    "sales_trend": "up",
    "rating": 4.5,
+   "review_count": 63,
    "weather": "sunny",
    "description": "Structured shoulder bag that fits the essentials",
    "image_url": "https://placehold.co/400x400?text=U26",
@@ -1345,10 +1419,12 @@
    "gender": "unisex",
    "category": "bags",
    "price": 54,
+   "regular_price": 67.5,
    "stock": 160,
    "season": "all_year",
    "sales_trend": "flat",
    "rating": 4.1,
+   "review_count": 216,
    "weather": "rainy",
    "description": "Water-resistant tote that keeps your things dry",
    "image_url": "https://placehold.co/400x400?text=U27",
@@ -1365,6 +1441,7 @@
    "season": "autumn_winter",
    "sales_trend": "up",
    "rating": 4.6,
+   "review_count": 109,
    "weather": "cold",
    "description": "Soft brushed top and pants set for relaxing at home",
    "image_url": "https://placehold.co/400x400?text=U28",
@@ -1381,6 +1458,7 @@
    "season": "winter",
    "sales_trend": "up",
    "rating": 4.7,
+   "review_count": 106,
    "weather": "cold",
    "description": "Plush throw blanket in a warm, neutral tone",
    "image_url": "https://placehold.co/400x400?text=U29",
@@ -1393,14 +1471,394 @@
    "gender": "unisex",
    "category": "home",
    "price": 44,
+   "regular_price": 55,
    "stock": 90,
    "season": "autumn",
    "sales_trend": "down",
    "rating": 4,
+   "review_count": 200,
    "weather": "sunny",
    "description": "Seasonal gift set with candles and treats",
    "image_url": "https://placehold.co/400x400?text=U30",
    "market": "US"
+  }
+ ],
+ "campaigns": [
+  {
+   "id": "80c4a729-8964-41dc-ae55-5147e3857d7a",
+   "name": "Fall Arrivals",
+   "country": "US",
+   "theme": "Layered Comfort for Crisp Days",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "b0e31266-fce4-4b13-a6e6-0db0fb9c38f5",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "週末セール",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "ff0d89c5-0306-4370-abbb-29874f9d4482",
+   "name": "秋の新作を先取り",
+   "country": "JP",
+   "theme": "秋の新作を先取り",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "aeba454d-39a6-4ebc-a7c5-ca43d0edf38a",
+   "name": "Rainy Day Picks",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "47f63b42-ef8a-4d57-a2e4-73b40b6d87c9",
+   "name": "Outerwear Guide",
+   "country": "US",
+   "theme": "アウター特集",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "2d066e28-b177-4961-a133-dfe6d5bea05f",
+   "name": "Member Week",
+   "country": "US",
+   "theme": "会員感謝週間",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "c02b7fab-20fd-4d1e-ab7c-51350e8f89e0",
+   "name": "New Knits",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "a491e0a8-e122-4815-a8d5-59a65b8e5413",
+   "name": "Price Drop",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "a00d99be-611b-4dab-ac89-439cef35e879",
+   "name": "Boots Edit",
+   "country": "US",
+   "theme": "ブーツ特集",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "56623555-1b82-4fe4-ab8f-a443617e36d2",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "3cca1f0b-ce67-42be-a2a1-4095d28e93a8",
+   "name": "Holiday Preview",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "3624c4b8-0169-41c9-ac25-80c2c752779b",
+   "name": "Flash Deal",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "47aae161-83f0-4cc0-a380-5aff3dd6dbf6",
+   "name": "Halloween",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "8341ded9-8c59-4a34-aba4-ea771fd4bfd2",
+   "name": "Cozy Home",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "1f8c0fb6-d5cd-4e6f-abb6-810091226901",
+   "name": "Early Black Friday",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "05a6c24b-7b5f-4d22-a76d-b5e59ac382a4",
+   "name": "Last Call",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "b5205a7c-a82c-4b0d-a351-9a8ac854c023",
+   "name": "秋の新作ニット",
+   "country": "JP",
+   "theme": "ニットで重ねる、秋の新作",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "afa71738-17a6-4389-a706-3a3ee118e857",
+   "name": "週末セール",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "fb10584f-fa64-4142-a745-1ab1dc7b34ac",
+   "name": "アウター特集",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "0ecf5519-9eb3-4adc-a4ce-c3673b98dfb2",
+   "name": "雨の日のおすすめ",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "d6bfef19-7b49-41d0-a1b1-79cbf3c5a722",
+   "name": "会員感謝ウィーク",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "1855fb7b-d769-40d2-a9a7-17c542550c74",
+   "name": "ブーツ特集",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "85eb6af4-3674-4765-a5dc-a0661a8afa2f",
+   "name": "ハロウィン企画",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "cb4e81a1-5c68-4dd8-a978-5d2f840bb87e",
+   "name": "冬支度スタート",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "4ca5a10e-c91d-4c17-a991-4314332a542d",
+   "name": "ルームウェア特集",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "d6b29496-74c7-423b-a8e6-4790a0827185",
+   "name": "ブラックフライデー予告",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "f9aa3bbe-60e3-4e73-a3e8-8a98154624c5",
+   "name": "ラストコール",
+   "country": "JP",
+   "theme": "",
+   "theme_reason": "同じ日のメールとアプリで、同じ切り口をそろえて届けるため",
+   "purpose": "週末の来店・購入を増やす"
+  },
+  {
+   "id": "4386928b-fb23-4612-adf5-70816ea95f08",
+   "name": "Fall Arrivals",
+   "country": "US",
+   "theme": "Layered Comfort for Crisp Days",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "4d5534ff-cd05-4606-af2a-b545fc14ea4c",
+   "name": "Fall Arrivals",
+   "country": "US",
+   "theme": "Layered Comfort for Crisp Days",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "a299ff00-2d29-4969-a2f5-9c62950b9f43",
+   "name": "Fall Arrivals",
+   "country": "US",
+   "theme": "Layered Comfort for Crisp Days",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "bbc466ca-c657-47df-a4aa-4fc43cac67d9",
+   "name": "Fall Arrivals",
+   "country": "US",
+   "theme": "Layered Comfort for Crisp Days",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "6b13c798-1f95-4d61-a9ce-054626be019f",
+   "name": "Fall Arrivals",
+   "country": "US",
+   "theme": "Layered Comfort for Crisp Days",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "b34a62f2-b477-4adf-a628-7350f7a8f915",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "週末セール",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "8165169e-447c-4f4f-a824-0d9c061eb28d",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "週末セール",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "859d2cd4-55eb-4711-a365-2452b95b4407",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "週末セール",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "46512ff7-5999-471e-a673-0d155224e804",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "週末セール",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "e71502d6-ce77-492b-a4b5-ba9448dafbf1",
+   "name": "Weekend Sale",
+   "country": "US",
+   "theme": "週末セール",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "0821b52e-9574-4573-aa8b-388c6d2c8061",
+   "name": "Rainy Day Picks",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "5515caa8-00bb-4959-abe6-38d241658523",
+   "name": "Rainy Day Picks",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "d4c4ed61-b59f-4178-a7ed-cafbf4fc8f72",
+   "name": "Rainy Day Picks",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "0bfe2c73-cbb3-4bb6-a73f-04c9fcb84e1c",
+   "name": "Rainy Day Picks",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "e7341de6-0ba9-4103-a203-0730c2c5022d",
+   "name": "Rainy Day Picks",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "576f6744-65e3-4431-ad35-f88a322dfe5f",
+   "name": "New Knits",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "4134f660-8200-4c4d-ad82-ab569a80ac23",
+   "name": "New Knits",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "66915bb1-64f8-439c-a36e-80eb0b02002e",
+   "name": "New Knits",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "832dfee9-308f-4014-a10e-c3e310564736",
+   "name": "New Knits",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
+  },
+  {
+   "id": "521fa824-b666-4581-afcd-ec9283e5bacf",
+   "name": "New Knits",
+   "country": "US",
+   "theme": "",
+   "theme_reason": "Deliver the same angle by email and app on the same day",
+   "purpose": "Lift weekend visits and orders"
   }
  ],
  "delivery_cards": [
@@ -1427,7 +1885,9 @@
    "section_titles": "Outerwear for Crisp Days\nKnits That Layer Well",
    "section_copies": "[\"Light layers that move with the weather.\",\"Soft textures for cooler mornings.\"]",
    "hero_image_id": "dd1cb257-7810-4736-a06b-d765900f478c",
-   "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing."
+   "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing.",
+   "ab_test": "{\"v\":1,\"target\":\"hero\",\"testShare\":20,\"waitHours\":4,\"variants\":[\"B\"],\"metric\":\"ctr\",\"mode\":\"winner\",\"hypothesis\":\"A close-up of the knit texture draws more clicks than the full-look photo\",\"heroes\":{\"B\":{\"heroId\":\"de1cb3ea-7710-45a3-ad6b-d2ac930f4c45\",\"heroReason\":\"A close-up of the knit texture\"}}}",
+   "campaign_id": "80c4a729-8964-41dc-ae55-5147e3857d7a"
   },
   {
    "id": "5400a216-eb9b-42cd-a91b-9f981e1c462f",
@@ -1443,7 +1903,9 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-29",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-28T06:00:00.000Z"
+   "handed_off_at": "2026-09-28T06:00:00.000Z",
+   "ab_test": "{\"v\":1,\"target\":\"hero\",\"testShare\":100,\"waitHours\":4,\"variants\":[\"B\"],\"metric\":\"rpr\",\"mode\":\"even\",\"hypothesis\":\"Showing the discount on the hero lifts revenue per recipient\",\"heroes\":{\"B\":{\"heroId\":\"dd1cb257-7810-4736-a06b-d765900f478c\",\"heroReason\":\"A close-up of the knit texture\"}}}",
+   "campaign_id": "b0e31266-fce4-4b13-a6e6-0db0fb9c38f5"
   },
   {
    "id": "5df16248-d1fe-4ac7-aa11-377207d5e549",
@@ -1459,7 +1921,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-09-29",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-28T06:00:00.000Z"
+   "handed_off_at": "2026-09-28T06:00:00.000Z",
+   "campaign_id": "b0e31266-fce4-4b13-a6e6-0db0fb9c38f5"
   },
   {
    "id": "ae81cdcb-c8ec-4380-a78f-13a5803c9842",
@@ -1473,7 +1936,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-01"
+   "production_due": "2026-10-01",
+   "campaign_id": "ff0d89c5-0306-4370-abbb-29874f9d4482"
   },
   {
    "id": "d370ef63-878d-4d2e-a9a7-8d59c9a27194",
@@ -1487,7 +1951,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-03"
+   "production_due": "2026-10-03",
+   "campaign_id": "aeba454d-39a6-4ebc-a7c5-ca43d0edf38a"
   },
   {
    "id": "6b186c57-6607-4baa-a9e2-3e952bb26180",
@@ -1501,7 +1966,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-04"
+   "production_due": "2026-10-04",
+   "campaign_id": "47f63b42-ef8a-4d57-a2e4-73b40b6d87c9"
   },
   {
    "id": "1e57cab8-19a3-4825-a20f-437af5b2d41f",
@@ -1517,7 +1983,8 @@
    "owner": "Mika Tanaka",
    "production_due": "2026-10-06",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-10-05T06:00:00.000Z"
+   "handed_off_at": "2026-10-05T06:00:00.000Z",
+   "campaign_id": "2d066e28-b177-4961-a133-dfe6d5bea05f"
   },
   {
    "id": "e5b0a3f6-aafe-41e1-acfc-a9f82e691923",
@@ -1533,7 +2000,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-10-06",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-10-05T06:00:00.000Z"
+   "handed_off_at": "2026-10-05T06:00:00.000Z",
+   "campaign_id": "2d066e28-b177-4961-a133-dfe6d5bea05f"
   },
   {
    "id": "e722bf61-a979-4d08-a81e-a98b14a13f62",
@@ -1547,7 +2015,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-08"
+   "production_due": "2026-10-08",
+   "campaign_id": "c02b7fab-20fd-4d1e-ab7c-51350e8f89e0"
   },
   {
    "id": "f81243b0-2849-4443-a05a-99e2be211a1d",
@@ -1561,7 +2030,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-10"
+   "production_due": "2026-10-10",
+   "campaign_id": "a491e0a8-e122-4815-a8d5-59a65b8e5413"
   },
   {
    "id": "f21fb26a-de2c-4b49-afab-b478c9dbc327",
@@ -1575,7 +2045,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-11"
+   "production_due": "2026-10-11",
+   "campaign_id": "a00d99be-611b-4dab-ac89-439cef35e879"
   },
   {
    "id": "c5551907-d429-4fdc-af6e-f0395ac3a49e",
@@ -1589,7 +2060,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-13"
+   "production_due": "2026-10-13",
+   "campaign_id": "56623555-1b82-4fe4-ab8f-a443617e36d2"
   },
   {
    "id": "d59e0e25-80a5-4600-ae4f-2dbf71cc96f2",
@@ -1603,7 +2075,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-15"
+   "production_due": "2026-10-15",
+   "campaign_id": "3cca1f0b-ce67-42be-a2a1-4095d28e93a8"
   },
   {
    "id": "376737d5-28cd-42fa-a786-88ab32cf7410",
@@ -1617,7 +2090,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-18"
+   "production_due": "2026-10-18",
+   "campaign_id": "3624c4b8-0169-41c9-ac25-80c2c752779b"
   },
   {
    "id": "351724bc-67c5-4a39-ac7a-b64e4466cadb",
@@ -1631,7 +2105,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-20"
+   "production_due": "2026-10-20",
+   "campaign_id": "47aae161-83f0-4cc0-a380-5aff3dd6dbf6"
   },
   {
    "id": "25248639-1c20-4130-a083-c3f39e0f498a",
@@ -1645,7 +2120,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-22"
+   "production_due": "2026-10-22",
+   "campaign_id": "8341ded9-8c59-4a34-aba4-ea771fd4bfd2"
   },
   {
    "id": "59b45759-9246-4fae-af9b-4ca3b88e1da0",
@@ -1659,7 +2135,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-25"
+   "production_due": "2026-10-25",
+   "campaign_id": "1f8c0fb6-d5cd-4e6f-abb6-810091226901"
   },
   {
    "id": "8df68365-5c60-41d0-a021-96f7e32a0062",
@@ -1673,7 +2150,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-27"
+   "production_due": "2026-10-27",
+   "campaign_id": "05a6c24b-7b5f-4d22-a76d-b5e59ac382a4"
   },
   {
    "id": "302f65b2-130b-4b77-a0dd-ef6857507a0d",
@@ -1697,7 +2175,8 @@
    "email_template": "standard4",
    "section_copies": "[\"やわらかな素材で、秋の始まりを心地よく。\"]",
    "hero_image_id": "de465674-f3f3-41bb-ad61-fe3e604fa80d",
-   "hero_reason": "ニットの編み目と質感を近接で見せる画像。テーマと商品の世界観に合う。"
+   "hero_reason": "ニットの編み目と質感を近接で見せる画像。テーマと商品の世界観に合う。",
+   "campaign_id": "b5205a7c-a82c-4b0d-a351-9a8ac854c023"
   },
   {
    "id": "5a1afa3d-40fd-49ec-a4ed-a6eb08a31cca",
@@ -1713,7 +2192,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-30",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-29T06:00:00.000Z"
+   "handed_off_at": "2026-09-29T06:00:00.000Z",
+   "campaign_id": "afa71738-17a6-4389-a706-3a3ee118e857"
   },
   {
    "id": "08c00848-23d3-47c3-a165-a4721f7937ad",
@@ -1729,7 +2209,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-09-30",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-29T06:00:00.000Z"
+   "handed_off_at": "2026-09-29T06:00:00.000Z",
+   "campaign_id": "afa71738-17a6-4389-a706-3a3ee118e857"
   },
   {
    "id": "dc0b932f-3e5b-444c-aebd-fbd12fae6a4e",
@@ -1743,7 +2224,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-02"
+   "production_due": "2026-10-02",
+   "campaign_id": "fb10584f-fa64-4142-a745-1ab1dc7b34ac"
   },
   {
    "id": "9d394c2a-ac56-46b1-a20c-10601fad6b37",
@@ -1757,7 +2239,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-05"
+   "production_due": "2026-10-05",
+   "campaign_id": "0ecf5519-9eb3-4adc-a4ce-c3673b98dfb2"
   },
   {
    "id": "57bfa61a-8e55-4ce1-a8cf-2c1c5c1c9feb",
@@ -1773,7 +2256,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-10-07",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-10-06T06:00:00.000Z"
+   "handed_off_at": "2026-10-06T06:00:00.000Z",
+   "campaign_id": "d6bfef19-7b49-41d0-a1b1-79cbf3c5a722"
   },
   {
    "id": "16a9fd3c-2cd2-4afd-ab1f-9caa322662a3",
@@ -1787,7 +2271,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-09"
+   "production_due": "2026-10-09",
+   "campaign_id": "1855fb7b-d769-40d2-a9a7-17c542550c74"
   },
   {
    "id": "f37066c0-1e5d-4269-ad1a-b23242b3ac63",
@@ -1801,7 +2286,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-12"
+   "production_due": "2026-10-12",
+   "campaign_id": "85eb6af4-3674-4765-a5dc-a0661a8afa2f"
   },
   {
    "id": "07286ba6-9bb4-498f-a2e8-08989caa6dd1",
@@ -1815,7 +2301,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-16"
+   "production_due": "2026-10-16",
+   "campaign_id": "cb4e81a1-5c68-4dd8-a978-5d2f840bb87e"
   },
   {
    "id": "4c51690b-9817-4358-aea2-f045a2be05c2",
@@ -1829,7 +2316,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Mika Tanaka",
-   "production_due": "2026-10-19"
+   "production_due": "2026-10-19",
+   "campaign_id": "4ca5a10e-c91d-4c17-a991-4314332a542d"
   },
   {
    "id": "1846c242-b765-402f-a47f-c6e029c70905",
@@ -1843,7 +2331,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Jordan Lee",
-   "production_due": "2026-10-23"
+   "production_due": "2026-10-23",
+   "campaign_id": "d6b29496-74c7-423b-a8e6-4790a0827185"
   },
   {
    "id": "f315868a-f9f9-4c5d-ad62-9e20377c400b",
@@ -1857,7 +2346,8 @@
    "copy": "",
    "instructions": "",
    "owner": "Ken Sato",
-   "production_due": "2026-10-26"
+   "production_due": "2026-10-26",
+   "campaign_id": "f9aa3bbe-60e3-4e73-a3e8-8a98154624c5"
   },
   {
    "id": "e6c42998-11ee-41ff-adf8-8c3a77d5c151",
@@ -1883,7 +2373,8 @@
    "section_copies": "[\"Light layers that move with the weather.\",\"Soft textures for cooler mornings.\"]",
    "hero_image_id": "de1ef281-f70d-4d8c-a96e-24278f0d0762",
    "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing.",
-   "handed_off_at": "2026-09-24T01:00:00.000Z"
+   "handed_off_at": "2026-09-24T01:00:00.000Z",
+   "campaign_id": "4386928b-fb23-4612-adf5-70816ea95f08"
   },
   {
    "id": "e9c42e51-12ee-4392-acf8-8aa774d5bc98",
@@ -1909,7 +2400,8 @@
    "section_copies": "[\"Light layers that move with the weather.\",\"Soft textures for cooler mornings.\"]",
    "hero_image_id": "e21ef8cd-f30d-4740-a56e-1ddb8b0d0116",
    "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing.",
-   "handed_off_at": "2026-09-17T01:00:00.000Z"
+   "handed_off_at": "2026-09-17T01:00:00.000Z",
+   "campaign_id": "4d5534ff-cd05-4606-af2a-b545fc14ea4c"
   },
   {
    "id": "e8c42cbe-13ee-4525-abf8-891475d5be2b",
@@ -1935,7 +2427,8 @@
    "section_copies": "[\"Light layers that move with the weather.\",\"Soft textures for cooler mornings.\"]",
    "hero_image_id": "d81caa78-7d10-4f15-ab6b-cf868d0f42d3",
    "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing.",
-   "handed_off_at": "2026-09-10T01:00:00.000Z"
+   "handed_off_at": "2026-09-10T01:00:00.000Z",
+   "campaign_id": "a299ff00-2d29-4969-a2f5-9c62950b9f43"
   },
   {
    "id": "ebc43177-0cee-4a20-aaf8-87817ad5c60a",
@@ -1961,7 +2454,8 @@
    "section_copies": "[\"Light layers that move with the weather.\",\"Soft textures for cooler mornings.\"]",
    "hero_image_id": "e21ef8cd-f30d-4740-a56e-1ddb8b0d0116",
    "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing.",
-   "handed_off_at": "2026-09-03T01:00:00.000Z"
+   "handed_off_at": "2026-09-03T01:00:00.000Z",
+   "campaign_id": "bbc466ca-c657-47df-a4aa-4fc43cac67d9"
   },
   {
    "id": "eac42fe4-0dee-4bb3-a9f8-85ee7bd5c79d",
@@ -1987,7 +2481,8 @@
    "section_copies": "[\"Light layers that move with the weather.\",\"Soft textures for cooler mornings.\"]",
    "hero_image_id": "dd1cb257-7810-4736-a06b-d765900f478c",
    "hero_reason": "Matches the fall outerwear and knits story; warm tones suit the early-October timing.",
-   "handed_off_at": "2026-08-27T01:00:00.000Z"
+   "handed_off_at": "2026-08-27T01:00:00.000Z",
+   "campaign_id": "6b13c798-1f95-4d61-a9ce-054626be019f"
   },
   {
    "id": "893cdaaf-16fd-4ec0-a25d-8985c8ad0016",
@@ -2003,7 +2498,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-26",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-26T00:00:00.000Z"
+   "handed_off_at": "2026-09-26T00:00:00.000Z",
+   "campaign_id": "b34a62f2-b477-4adf-a628-7350f7a8f915"
   },
   {
    "id": "8a3cdc42-19fd-4379-af5d-84ccc7acfe83",
@@ -2019,7 +2515,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-19",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-19T00:00:00.000Z"
+   "handed_off_at": "2026-09-19T00:00:00.000Z",
+   "campaign_id": "8165169e-447c-4f4f-a824-0d9c061eb28d"
   },
   {
    "id": "8b3cddd5-18fd-41e6-a05d-865fc6acfcf0",
@@ -2035,7 +2532,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-12",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-12T00:00:00.000Z"
+   "handed_off_at": "2026-09-12T00:00:00.000Z",
+   "campaign_id": "859d2cd4-55eb-4711-a365-2452b95b4407"
   },
   {
    "id": "843cd2d0-1bfd-469f-ad5d-81a6cdad07f5",
@@ -2051,7 +2549,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-05",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-05T00:00:00.000Z"
+   "handed_off_at": "2026-09-05T00:00:00.000Z",
+   "campaign_id": "46512ff7-5999-471e-a673-0d155224e804"
   },
   {
    "id": "853cd463-1afd-450c-ae5d-8339ccad0662",
@@ -2067,7 +2566,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-08-29",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-08-29T00:00:00.000Z"
+   "handed_off_at": "2026-08-29T00:00:00.000Z",
+   "campaign_id": "e71502d6-ce77-492b-a4b5-ba9448dafbf1"
   },
   {
    "id": "6e3c26f1-012d-4362-add0-7fc36a95939c",
@@ -2083,7 +2583,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-09-26",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-26T09:00:00.000Z"
+   "handed_off_at": "2026-09-26T09:00:00.000Z",
+   "campaign_id": "b34a62f2-b477-4adf-a628-7350f7a8f915"
   },
   {
    "id": "6b3c2238-002d-41cf-aed0-81566d959855",
@@ -2099,7 +2600,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-09-19",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-19T09:00:00.000Z"
+   "handed_off_at": "2026-09-19T09:00:00.000Z",
+   "campaign_id": "8165169e-447c-4f4f-a824-0d9c061eb28d"
   },
   {
    "id": "6c3c23cb-ff2d-403c-afd0-82e96c9596c2",
@@ -2115,7 +2617,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-09-12",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-12T09:00:00.000Z"
+   "handed_off_at": "2026-09-12T09:00:00.000Z",
+   "campaign_id": "859d2cd4-55eb-4711-a365-2452b95b4407"
   },
   {
    "id": "713c2baa-fe2d-4ea9-a0d0-847c67958ee3",
@@ -2131,7 +2634,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-09-05",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-05T09:00:00.000Z"
+   "handed_off_at": "2026-09-05T09:00:00.000Z",
+   "campaign_id": "46512ff7-5999-471e-a673-0d155224e804"
   },
   {
    "id": "723c2d3d-fd2d-4d16-a1d0-860f66958d50",
@@ -2147,7 +2651,8 @@
    "owner": "Ken Sato",
    "production_due": "2026-08-29",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-08-29T09:00:00.000Z"
+   "handed_off_at": "2026-08-29T09:00:00.000Z",
+   "campaign_id": "e71502d6-ce77-492b-a4b5-ba9448dafbf1"
   },
   {
    "id": "6b85a8fc-717d-496f-ac9d-f7c6f68e6a21",
@@ -2162,7 +2667,8 @@
    "instructions": "",
    "owner": "Jordan Lee",
    "production_due": "2026-09-30",
-   "handed_off_at": "2026-09-30T03:00:00.000Z"
+   "handed_off_at": "2026-09-30T03:00:00.000Z",
+   "campaign_id": "0821b52e-9574-4573-aa8b-388c6d2c8061"
   },
   {
    "id": "6e85adb5-727d-4b02-ab9d-f633f38e6568",
@@ -2177,7 +2683,8 @@
    "instructions": "",
    "owner": "Jordan Lee",
    "production_due": "2026-09-23",
-   "handed_off_at": "2026-09-23T03:00:00.000Z"
+   "handed_off_at": "2026-09-23T03:00:00.000Z",
+   "campaign_id": "5515caa8-00bb-4959-abe6-38d241658523"
   },
   {
    "id": "6d85ac22-737d-4c95-aa9d-f4a0f48e66fb",
@@ -2192,7 +2699,8 @@
    "instructions": "",
    "owner": "Jordan Lee",
    "production_due": "2026-09-16",
-   "handed_off_at": "2026-09-16T03:00:00.000Z"
+   "handed_off_at": "2026-09-16T03:00:00.000Z",
+   "campaign_id": "d4c4ed61-b59f-4178-a7ed-cafbf4fc8f72"
   },
   {
    "id": "6885a443-6c7d-4190-a19d-ffa5f98e6eda",
@@ -2207,7 +2715,8 @@
    "instructions": "",
    "owner": "Jordan Lee",
    "production_due": "2026-09-09",
-   "handed_off_at": "2026-09-09T03:00:00.000Z"
+   "handed_off_at": "2026-09-09T03:00:00.000Z",
+   "campaign_id": "0bfe2c73-cbb3-4bb6-a73f-04c9fcb84e1c"
   },
   {
    "id": "6785a2b0-6d7d-4323-a09d-fe12fa8e706d",
@@ -2222,7 +2731,8 @@
    "instructions": "",
    "owner": "Jordan Lee",
    "production_due": "2026-09-02",
-   "handed_off_at": "2026-09-02T03:00:00.000Z"
+   "handed_off_at": "2026-09-02T03:00:00.000Z",
+   "campaign_id": "e7341de6-0ba9-4103-a203-0730c2c5022d"
   },
   {
    "id": "4f5b210b-9582-42ac-ad17-9b39f38381aa",
@@ -2237,7 +2747,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-10-01",
-   "handed_off_at": "2026-10-01T01:00:00.000Z"
+   "handed_off_at": "2026-10-01T01:00:00.000Z",
+   "campaign_id": "80c4a729-8964-41dc-ae55-5147e3857d7a"
   },
   {
    "id": "505b229e-9882-4765-aa17-9680f2838017",
@@ -2252,7 +2763,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-24",
-   "handed_off_at": "2026-09-24T01:00:00.000Z"
+   "handed_off_at": "2026-09-24T01:00:00.000Z",
+   "campaign_id": "4386928b-fb23-4612-adf5-70816ea95f08"
   },
   {
    "id": "515b2431-9782-45d2-ab17-9813f1837e84",
@@ -2267,7 +2779,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-17",
-   "handed_off_at": "2026-09-17T01:00:00.000Z"
+   "handed_off_at": "2026-09-17T01:00:00.000Z",
+   "campaign_id": "4d5534ff-cd05-4606-af2a-b545fc14ea4c"
   },
   {
    "id": "525b25c4-9282-4df3-a017-9ff2f0837cf1",
@@ -2282,7 +2795,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-10",
-   "handed_off_at": "2026-09-10T01:00:00.000Z"
+   "handed_off_at": "2026-09-10T01:00:00.000Z",
+   "campaign_id": "a299ff00-2d29-4969-a2f5-9c62950b9f43"
   },
   {
    "id": "535b2757-9182-4c60-a117-a185ef837b5e",
@@ -2297,7 +2811,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-03",
-   "handed_off_at": "2026-09-03T01:00:00.000Z"
+   "handed_off_at": "2026-09-03T01:00:00.000Z",
+   "campaign_id": "bbc466ca-c657-47df-a4aa-4fc43cac67d9"
   },
   {
    "id": "0e1a1555-ef27-4446-a05a-1187ce9b2478",
@@ -2313,7 +2828,8 @@
    "owner": "Mika Tanaka",
    "production_due": "2026-10-03",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-10-03T01:00:00.000Z"
+   "handed_off_at": "2026-10-03T01:00:00.000Z",
+   "campaign_id": "b0e31266-fce4-4b13-a6e6-0db0fb9c38f5"
   },
   {
    "id": "0b1a109c-ee27-42b3-a15a-131ad19b2931",
@@ -2329,7 +2845,8 @@
    "owner": "Mika Tanaka",
    "production_due": "2026-09-26",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-26T01:00:00.000Z"
+   "handed_off_at": "2026-09-26T01:00:00.000Z",
+   "campaign_id": "b34a62f2-b477-4adf-a628-7350f7a8f915"
   },
   {
    "id": "0c1a122f-ed27-4120-a25a-14add09b279e",
@@ -2345,7 +2862,8 @@
    "owner": "Mika Tanaka",
    "production_due": "2026-09-19",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-19T01:00:00.000Z"
+   "handed_off_at": "2026-09-19T01:00:00.000Z",
+   "campaign_id": "8165169e-447c-4f4f-a824-0d9c061eb28d"
   },
   {
    "id": "091a0d76-f427-4c25-ab5a-09a8d39b2c57",
@@ -2361,7 +2879,8 @@
    "owner": "Mika Tanaka",
    "production_due": "2026-09-12",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-12T01:00:00.000Z"
+   "handed_off_at": "2026-09-12T01:00:00.000Z",
+   "campaign_id": "859d2cd4-55eb-4711-a365-2452b95b4407"
   },
   {
    "id": "0a1a0f09-f327-4a92-ac5a-0b3bd29b2ac4",
@@ -2377,7 +2896,8 @@
    "owner": "Mika Tanaka",
    "production_due": "2026-09-05",
    "production_owner": "Alex Kim",
-   "handed_off_at": "2026-09-05T01:00:00.000Z"
+   "handed_off_at": "2026-09-05T01:00:00.000Z",
+   "campaign_id": "46512ff7-5999-471e-a673-0d155224e804"
   },
   {
    "id": "ab61304a-3d3d-4295-a665-020429a21a67",
@@ -2393,7 +2913,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-10-03",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-10-03T09:00:00.000Z"
+   "handed_off_at": "2026-10-03T09:00:00.000Z",
+   "campaign_id": "b0e31266-fce4-4b13-a6e6-0db0fb9c38f5"
   },
   {
    "id": "aa612eb7-3a3d-4ddc-a965-06bd2aa21bfa",
@@ -2409,7 +2930,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-26",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-26T09:00:00.000Z"
+   "handed_off_at": "2026-09-26T09:00:00.000Z",
+   "campaign_id": "b34a62f2-b477-4adf-a628-7350f7a8f915"
   },
   {
    "id": "a9612d24-3b3d-4f6f-a865-052a2ba21d8d",
@@ -2425,7 +2947,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-19",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-19T09:00:00.000Z"
+   "handed_off_at": "2026-09-19T09:00:00.000Z",
+   "campaign_id": "8165169e-447c-4f4f-a824-0d9c061eb28d"
   },
   {
    "id": "a8612b91-383d-4ab6-a364-fd4b24a21288",
@@ -2441,7 +2964,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-12",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-12T09:00:00.000Z"
+   "handed_off_at": "2026-09-12T09:00:00.000Z",
+   "campaign_id": "859d2cd4-55eb-4711-a365-2452b95b4407"
   },
   {
    "id": "a76129fe-393d-4c49-a264-fbb825a2141b",
@@ -2457,7 +2981,8 @@
    "owner": "Jordan Lee",
    "production_due": "2026-09-05",
    "production_owner": "Sam Ito",
-   "handed_off_at": "2026-09-05T09:00:00.000Z"
+   "handed_off_at": "2026-09-05T09:00:00.000Z",
+   "campaign_id": "46512ff7-5999-471e-a673-0d155224e804"
   },
   {
    "id": "9d777886-c68e-4d19-a7c0-853cb6d984df",
@@ -2472,7 +2997,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-10-05",
-   "handed_off_at": "2026-10-05T01:00:00.000Z"
+   "handed_off_at": "2026-10-05T01:00:00.000Z",
+   "campaign_id": "576f6744-65e3-4431-ad35-f88a322dfe5f"
   },
   {
    "id": "9c7776f3-c38e-4860-aac0-89f5b7d98672",
@@ -2487,7 +3013,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-28",
-   "handed_off_at": "2026-09-28T01:00:00.000Z"
+   "handed_off_at": "2026-09-28T01:00:00.000Z",
+   "campaign_id": "4134f660-8200-4c4d-ad82-ab569a80ac23"
   },
   {
    "id": "9b777560-c48e-49f3-a9c0-8862b8d98805",
@@ -2502,7 +3029,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-21",
-   "handed_off_at": "2026-09-21T01:00:00.000Z"
+   "handed_off_at": "2026-09-21T01:00:00.000Z",
+   "campaign_id": "66915bb1-64f8-439c-a36e-80eb0b02002e"
   },
   {
    "id": "a2778065-c98e-41d2-a4c0-8083b1d97d00",
@@ -2517,7 +3045,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-14",
-   "handed_off_at": "2026-09-14T01:00:00.000Z"
+   "handed_off_at": "2026-09-14T01:00:00.000Z",
+   "campaign_id": "832dfee9-308f-4014-a10e-c3e310564736"
   },
   {
    "id": "a1777ed2-ca8e-4365-a3c0-7ef0b2d97e93",
@@ -2532,7 +3061,8 @@
    "instructions": "",
    "owner": "Ken Sato",
    "production_due": "2026-09-07",
-   "handed_off_at": "2026-09-07T01:00:00.000Z"
+   "handed_off_at": "2026-09-07T01:00:00.000Z",
+   "campaign_id": "521fa824-b666-4581-afcd-ec9283e5bacf"
   }
  ],
  "delivery_products": [
@@ -10311,30 +10841,74 @@
  ],
  "delivery_results": [
   {
-   "id": "76317644-a7f4-44e5-a98c-10460158db3f",
+   "id": "960df419-0064-49da-ab94-fd5b58828e84",
    "delivery_card_id": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
    "sent_at": "2026-10-01T01:00:00.000Z",
-   "recipients": 132005,
-   "opens": 35582,
-   "clicks": 5293,
-   "orders": 347,
-   "revenue": 46716,
+   "recipients": 13201,
+   "opens": 3564,
+   "clicks": 409,
+   "orders": 16,
+   "revenue": 3610,
    "last_year_revenue": 40289,
-   "products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1904,\"units\":107,\"revenue\":13696},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":1716,\"units\":133,\"revenue\":22344},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":1583,\"units\":44,\"revenue\":3872},{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":984,\"units\":63,\"revenue\":6804}]",
-   "links": "{\"hero\":2898,\"buttons\":[821,193,133],\"other\":215}"
+   "products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":147,\"units\":8,\"revenue\":1058},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":133,\"units\":10,\"revenue\":1727},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":122,\"units\":3,\"revenue\":299},{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":76,\"units\":5,\"revenue\":526}]",
+   "links": "{\"hero\":224,\"buttons\":[63,15,10],\"other\":17}",
+   "variant": "A",
+   "segment": "test"
   },
   {
-   "id": "d31c06eb-da42-4472-a4c9-3231b4112018",
+   "id": "7f35087e-af63-4945-aebe-a38cac6dd493",
+   "delivery_card_id": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "sent_at": "2026-10-01T01:00:00.000Z",
+   "recipients": 13201,
+   "opens": 3564,
+   "clicks": 502,
+   "orders": 18,
+   "revenue": 4430,
+   "products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":181,\"units\":10,\"revenue\":1299},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":163,\"units\":13,\"revenue\":2119},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":150,\"units\":4,\"revenue\":367},{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":93,\"units\":6,\"revenue\":645}]",
+   "links": "{\"hero\":275,\"buttons\":[78,18,13],\"other\":20}",
+   "variant": "B",
+   "segment": "test"
+  },
+  {
+   "id": "8729ae13-9851-4742-a0ea-e765ea0b277c",
+   "delivery_card_id": "b4f0e54b-dce0-4caa-a0dc-15792a7987c8",
+   "sent_at": "2026-10-01T05:00:00.000Z",
+   "recipients": 105604,
+   "opens": 27457,
+   "clicks": 3907,
+   "orders": 137,
+   "revenue": 34483,
+   "products": "[{\"productId\":\"1f59977e-ea33-48df-a37a-5ea8259089f1\",\"clicks\":1405,\"units\":79,\"revenue\":10110},{\"productId\":\"21599aa4-e833-45b9-a97a-681a27908d17\",\"clicks\":1267,\"units\":98,\"revenue\":16493},{\"productId\":\"1d599458-ec33-4c05-a57a-61ce239086cb\",\"clicks\":1168,\"units\":32,\"revenue\":2858},{\"productId\":\"1b599132-ee33-4f2b-af7a-585c219083a5\",\"clicks\":726,\"units\":47,\"revenue\":5022}]",
+   "links": "{\"hero\":2139,\"buttons\":[606,142,98],\"other\":159}",
+   "variant": "B",
+   "segment": "rollout"
+  },
+  {
+   "id": "805c3254-2670-42b3-a830-09beb5a99fed",
    "delivery_card_id": "5400a216-eb9b-42cd-a91b-9f981e1c462f",
    "sent_at": "2026-10-03T00:00:00.000Z",
-   "recipients": 120546,
-   "opens": 38311,
-   "clicks": 6227,
-   "orders": 315,
-   "revenue": 52209,
+   "recipients": 60273,
+   "opens": 14466,
+   "clicks": 2411,
+   "orders": 127,
+   "revenue": 20215,
    "last_year_revenue": 60802,
-   "products": "[{\"productId\":\"23599dca-e633-4293-a77a-64f42990903d\",\"clicks\":3769,\"units\":174,\"revenue\":34452},{\"productId\":\"985ed327-7939-472a-a475-198d948b2880\",\"clicks\":3109,\"units\":76,\"revenue\":5472},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":2563,\"units\":65,\"revenue\":12285}]",
-   "links": "{\"hero\":2898,\"buttons\":[1013,323,96],\"other\":345}"
+   "products": "[{\"productId\":\"23599dca-e633-4293-a77a-64f42990903d\",\"clicks\":1459,\"units\":67,\"revenue\":13339},{\"productId\":\"985ed327-7939-472a-a475-198d948b2880\",\"clicks\":1204,\"units\":29,\"revenue\":2119},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":992,\"units\":25,\"revenue\":4757}]",
+   "links": "{\"hero\":1122,\"buttons\":[392,125,37],\"other\":134}",
+   "variant": "A"
+  },
+  {
+   "id": "7a59ea4b-2c73-4abc-aa37-922933a21782",
+   "delivery_card_id": "5400a216-eb9b-42cd-a91b-9f981e1c462f",
+   "sent_at": "2026-10-03T00:00:00.000Z",
+   "recipients": 60273,
+   "opens": 14466,
+   "clicks": 2471,
+   "orders": 133,
+   "revenue": 20717,
+   "products": "[{\"productId\":\"23599dca-e633-4293-a77a-64f42990903d\",\"clicks\":1496,\"units\":69,\"revenue\":13671},{\"productId\":\"985ed327-7939-472a-a475-198d948b2880\",\"clicks\":1234,\"units\":30,\"revenue\":2171},{\"productId\":\"22599c37-e733-4426-aa7a-69ad26908b84\",\"clicks\":1017,\"units\":26,\"revenue\":4875}]",
+   "links": "{\"hero\":1150,\"buttons\":[402,128,38],\"other\":137}",
+   "variant": "B"
   },
   {
    "id": "1770601d-9c56-4f38-af11-304784193a8a",

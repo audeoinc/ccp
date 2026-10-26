@@ -101,7 +101,7 @@ export const tables: Record<string, Row[]> = {
   // 配信の効果(AI の依頼の記録・ホールドアウトとの比べ)の見本。学びの判定は、人が画面で決めるので空から
   ...impactTables(),
   LearningReviewsService: [],
-  // キャンペーン(X79)。同じ国・同じ配信日のメールとアプリを 3 組と、1 枚だけのもの 1 つ(seed.ts)
+  // キャンペーン(X79)。移し替えのあとの形: 同じ国・同じ配信日の配信を、すべてまとめる(seed.ts)
   CampaignsService: structuredClone(campaigns),
   // 配信ごとの学びの付け外し(X78)。人が配信カードで決めるので空から
   CardLearningsService: [],

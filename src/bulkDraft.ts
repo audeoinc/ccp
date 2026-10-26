@@ -80,6 +80,8 @@ export interface DraftContext {
   /** 同じ週に、もう上限まで載せた商品(選ばない) */
   avoidProductIds: string[]
   onTheme?: (theme: string) => void
+  /** 決まったテーマ(キャンペーンのテーマで作り直すとき。X79) */
+  fixedTheme?: { theme: string; reason: string }
 }
 
 /** 枠の中身を作る(配信の国に合う市場の商品・メイン画像だけを使う) */
@@ -89,7 +91,7 @@ export async function generateFor(c: DraftBase, ctx: DraftContext, onStep: AutoD
   // 使える期限を過ぎた画像は、AI の候補から外す(X59)
   const heroes = ctx.heroes.filter((h) => (!market || heroMarket(h) === market) && isUsableHero(h))
   return runAutoDraft(
-    { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', country: String(c.country ?? '') || undefined, avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme, template: c.layout_key || undefined },
+    { card: aiCardOf(c), language: 'auto', otherThemes: ctx.otherThemes, products, heroes, channel: isPush(c) ? 'push' : 'email', country: String(c.country ?? '') || undefined, avoidProductIds: ctx.avoidProductIds, onTheme: ctx.onTheme, template: c.layout_key || undefined, fixedTheme: ctx.fixedTheme },
     onStep,
     isStopped,
   )
@@ -125,6 +127,19 @@ export async function createDraft(base: DraftBase, r: AutoDraftResult, products:
   await saveProducts(card.id, base.name, r, templateOf(base, r), products)
   await logEvent({ action: 'bulk_create', card: { id: card.id, name: card.name, scheduledAt: card.scheduled_at }, to: 'not_started' })
   return card
+}
+
+/**
+ * 保存してある配信カードの中身を、作った中身で置き換える(キャンペーンのテーマで作り直すとき。X79)。
+ * 列は新しく作るときと同じ形で書き、掲載商品の行は、いまの行を消してから作り直す。extra は一緒に書く列(状態・campaign_id など)
+ */
+export async function replaceContent(card: DeliveryCard, r: AutoDraftResult, products: Product[], extra: Partial<DeliveryCardFields>): Promise<void> {
+  const res = await DeliveryCardsService.update(card.id, { ...contentFields(card, r, products), ...extra })
+  if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
+  const old = await DeliveryProductsService.getAll({ filter: `delivery_card_id eq ${card.id}` })
+  if (!old.success) throw new Error(old.error?.message ?? tr('掲載商品を読めませんでした', 'Could not read the products in this delivery'))
+  for (const row of old.data ?? []) await DeliveryProductsService.delete(row.id)
+  await saveProducts(card.id, card.name, r, templateOf(card, r), products)
 }
 
 /** 作業画面で、中身を作らずに保存する(配信名・日時・国・チャネル・種類だけの「未起案」。1 本ずつ新規作成して、中身を入れずに保存したのと同じ) */

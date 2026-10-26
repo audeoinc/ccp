@@ -120,9 +120,6 @@ export const cards: Row[] = [...csv('delivery_cards.csv'), ...csv('delivery_card
   ...(r['ステータス'] === '確定' ? { handed_off_at: `${dueOf(r['配信日'], 1)}T06:00:00.000Z` } : {}),
 }))
 
-// 見本の CSV から読んだ配信だけ(下で足す過去の週の写しを除く)。キャンペーンの見本は、ここから選ぶ
-const csvCards = [...cards]
-
 export const deliveryProducts: Row[] = []
 
 type Pick = { code: string; reason: string }
@@ -788,23 +785,21 @@ export const productionRequests: Row[] = []
 export const noteReactions: Row[] = []
 
 /**
- * キャンペーン(X79)の見本。同じ国・同じ配信日のメールとアプリを 1 つにまとめたものを 3 組と、カード 1 枚だけのものを 1 つ。
- * カレンダー・キャンペーンのフロートの撮影に使うので、今日にいちばん近い日のものを選ぶ(見本の配信日は固定、今日は動くため)。
- * 過去の週の写し(上の pastOf)を作ったあとに付ける(写しが元の campaign_id を引き継がないように)。名前・テーマはメールのカードから取る。カードの name は残す(画面は campaigns.ts の cardDisplayName で「キャンペーン名 + チャネル」を出す)
+ * キャンペーン(X79)。本番と同じく、移し替え(段 ⑤。src/campaignMigrate.ts)をしたあとの形: 同じ国・同じ配信日の、取りやめていない
+ * すべての配信を 1 つのキャンペーンにまとめる(過去の週の写しも含む。上の pastOf を作ったあとに付ける)。
+ * 本番では名前・テーマ・目的を AI が出し、中身も作り直すが、見本は AI を呼ばずに、名前・テーマはメールのカード(なければ最初のカード)から取り、中身はそのまま。
+ * カードの name は残す(画面は campaigns.ts の cardDisplayName で「キャンペーン名 + チャネル」を出す)
  */
 export const campaigns: Row[] = (() => {
-  // 同じ配信日は、ブラウザの時刻の日付で比べる(campaigns.ts の canJoinCampaign と同じ)
-  const day = (c: Row) => new Date(String(c.scheduled_at)).toDateString()
+  // 同じ配信日は、日本の日付で比べる(見本の配信日は日本の時刻で書いてあり、seed.json に書き出すときも同じ組になるように)
+  const day = (c: Row) => new Date(new Date(String(c.scheduled_at)).getTime() + 9 * 3600000).toISOString().slice(0, 10)
   const groups = new Map<string, Row[]>()
-  for (const c of csvCards) {
+  for (const c of cards) {
+    if (c.cancelled_at || !c.scheduled_at) continue
     const key = `${c.country}|${day(c)}`
     groups.set(key, [...(groups.get(key) ?? []), c])
   }
-  const near = (g: Row[]) => Math.abs(new Date(String(g[0].scheduled_at)).getTime() - Date.now())
-  const all = [...groups.values()].sort((a, b) => near(a) - near(b))
-  const pairs = all.filter((g) => g.some((c) => c.channel === 'email') && g.some((c) => c.channel === 'app')).slice(0, 3)
-  const single = all.find((g) => g.length === 1 && g[0].channel === 'email')
-  return [...pairs, ...(single ? [single] : [])].map((g) => {
+  return [...groups.values()].map((g) => {
     const lead = g.find((c) => c.channel === 'email') ?? g[0]
     const id = guid(`campaign:${lead.id}`)
     for (const c of g) c.campaign_id = id
@@ -816,7 +811,6 @@ export const campaigns: Row[] = (() => {
       theme: lead.theme,
       theme_reason: jp ? '同じ日のメールとアプリで、同じ切り口をそろえて届けるため' : 'Deliver the same angle by email and app on the same day',
       purpose: jp ? '週末の来店・購入を増やす' : 'Lift weekend visits and orders',
-      created_on: new Date().toISOString(),
     }
   })
 })()

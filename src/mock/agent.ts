@@ -201,6 +201,19 @@ export function mockAgent(message: string): string {
     })
   }
 
+  // キャンペーンの案(X79 の段 ⑤ の移し替え)。名前はメールのカードから、テーマは最初のカードのテーマから
+  if (task === 'suggest_campaign') {
+    const cs = (p.cards as { name?: string; channel?: string; theme?: string }[] | undefined) ?? []
+    const lead = cs.find((c) => c.channel === 'email') ?? cs[0]
+    return J({
+      name: lead?.name || (p.country === 'JP' ? '週末のおすすめ' : 'Weekend Picks'),
+      theme: cs.find((c) => c.theme)?.theme || '季節の変わり目スタイル',
+      themeReason: '同じ日のメールとアプリで、在庫の多い季節の商品をそろえて届けるため。',
+      themeType: 'season',
+      purpose: '週末の来店・購入を増やす',
+    })
+  }
+
   if (task === 'suggest_themes') {
     return en
       ? J({ themes: [

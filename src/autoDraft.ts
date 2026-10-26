@@ -39,6 +39,8 @@ export interface AutoDraftInput {
   template?: EmailTemplateId
   /** テーマのヒント(まとめて作るとき、担当者が行ごとに書く。W14) */
   themeHint?: string
+  /** 決まったテーマ(キャンペーンのテーマで作り直すとき。X79)。あればテーマの工程を飛ばし、これで以降を作る */
+  fixedTheme?: ThemeSuggestion
   /** テーマが決まったとき(失敗したときは空)に知らせる。まとめて作るとき、次の下書きが、このテーマを避けられるように */
   onTheme?: (theme: string) => void
 }
@@ -96,8 +98,10 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
     return result
   }
 
-  // ① テーマ
-  const themes = await step(tr('テーマを考えています', 'Thinking up themes'), () => suggestThemes({ card: base, otherThemes: input.otherThemes, products, themeHint: input.themeHint }))
+  // ① テーマ(決まったテーマがあれば、AI に考えさせない)
+  const themes = input.fixedTheme?.theme.trim()
+    ? [input.fixedTheme]
+    : await step(tr('テーマを考えています', 'Thinking up themes'), () => suggestThemes({ card: base, otherThemes: input.otherThemes, products, themeHint: input.themeHint }))
   if (isCancelled()) return finish()
   if (themes?.length) {
     result.themeIdeas = themes
