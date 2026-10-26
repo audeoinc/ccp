@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import { ArrowSwapRegular } from '@fluentui/react-icons'
 import { ProductChooser } from '../ProductChooser'
 import { sectionIndexAt, sectionsOf } from '../templates'
@@ -5,6 +6,7 @@ import { useT } from '../i18n'
 import { partKey } from './parts'
 import type { PartTurn } from './partAi'
 import type { SimpleEditor } from './editor'
+import type { LiveStore } from './floatSwap'
 
 /*
  * 商品の入れ替えの引き出し(SU9)。シンプルな配信カードでは、入口(プレビューの ⇄・右クリック・選んだ部品のペイン・真ん中の「載せた商品」の行・
@@ -70,6 +72,26 @@ export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, set
       onPreview={(productId) => e.setAiPreview(productId ? { item: { key: it.key, productId } } : null)}
       chat={{ turns: chats[key] ?? [], setTurns: (f) => setChat(key, f) }}
       disabled={e.saving}
+    />
+  )
+}
+
+/** 商品のフロートの中に出す引き出し(画面の今の値は、入れ物から読む。作るのは floatSwap の useFloatSwap) */
+export function FloatSwap({ store, itemKey, back, close }: { store: LiveStore; itemKey: string; back: () => void; close: () => void }) {
+  const v = useSyncExternalStore(store.subscribe, store.get)
+  return (
+    <ProductSwap
+      editor={v.editor}
+      itemKey={itemKey}
+      open
+      onOpenChange={(o) => !o && back()}
+      chats={v.chats}
+      setChat={v.setChat}
+      onDone={(k) => {
+        close()
+        v.onSwapped(itemKey, k)
+      }}
+      trigger={false}
     />
   )
 }

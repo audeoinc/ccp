@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
-import { Badge, Button, Dialog, DialogBody, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { useRef, useState, type ReactNode } from 'react'
+import { Badge, Button, Dialog, DialogBody, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
-import { ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { DeliveryProductSource as Source } from './models/deliveryProducts'
@@ -23,7 +23,8 @@ import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 import { typo } from './typo'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
-// どこから開いても同じ形: 左に、入れ替えの候補(AI のおすすめ・AI に頼む・すべての商品)、右に、いまの商品の詳しい情報。
+// どこから開いても同じ形: いまの商品の詳しい情報。題の行の「入れ替える」を押すと、同じフロートの中が入れ替えの部品(AI のおすすめ・AI に頼む・すべての商品)に
+// 切り替わり、「詳しい情報に戻る」で戻る(以前は左に入れ替えの欄があったが、16 で候補の一覧をやめてボタンだけになったので、2026-10-26 利用者と決めて、なくした)。
 // アラートの札から開くと、上にアラートの内容とアラートごとの操作(配信日を変える など)。
 // 入れ替えの流れは、シンプルな配信カードの引き出し(simple/ProductSwap)と 1 つにした(simple-ui-review-2 の 16。2026-10-25 利用者と決めた):
 // 候補を押すとすぐ入れ替わり、理由は聞かない(戻すのは「元に戻す」か、保存しないこと。理由は、確定した週の保存の理由と変更の履歴に任せる)
@@ -39,7 +40,8 @@ export interface SwapOption {
 const useStyles = makeStyles({
   // 高さを中身に合わせると、右のタブ(売上・在庫 / 詳細 / SKU …)を替えるたびに高さが変わり、真ん中に置いたフロートの上端が動いた(X70)。
   // 高さを決めて、中身は左右の欄の中でスクロールさせる(つまみで変えた大きさを覚えていれば、そちらが勝つ)
-  surface: { width: 'min(1040px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'min(760px, calc(88vh / var(--ui-zoom, 1)))', maxHeight: 'calc(88vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
+  // 幅は、詳しい情報(ProductDetail の 520px。グラフは幅に合わせて文字も大きくなるので、広げない)が収まる大きさ
+  surface: { width: 'min(600px, (96vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'min(760px, calc(88vh / var(--ui-zoom, 1)))', maxHeight: 'calc(88vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: '14px 18px' },
   body: { display: 'flex', flexDirection: 'column', rowGap: '10px', minHeight: 0, flexGrow: 1 },
   // 題の行(ほかのフロートと同じ形: 題・右端に ×)。行をつかむと動かせる(プレビューを見ながら選べるように)
   grab: { display: 'flex', alignItems: 'center', columnGap: '8px', cursor: 'move', userSelect: 'none', touchAction: 'none' },
@@ -47,14 +49,11 @@ const useStyles = makeStyles({
   alert: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '10px', rowGap: '6px', padding: '8px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteDarkOrangeBackground1, border: `1px solid ${tokens.colorPaletteDarkOrangeBorder1}` },
   alertText: { display: 'grid', rowGap: '2px', flexGrow: 1, minWidth: 0 },
   alertDetail: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  cols: { display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) minmax(0, 1fr)', columnGap: '16px', minHeight: 0, flexGrow: 1 },
-  left: { display: 'grid', alignContent: 'start', rowGap: '14px', overflowY: 'auto', minHeight: 0, paddingRight: '6px' },
-  right: { display: 'grid', alignContent: 'start', rowGap: '10px', overflowY: 'auto', minHeight: 0, borderLeft: `1px solid ${tokens.colorNeutralStroke2}`, paddingLeft: '16px' },
-  section: { display: 'grid', rowGap: '6px' },
+  // 中身(詳しい情報・入れ替え)は、この中でスクロールする
+  pane: { display: 'grid', alignContent: 'start', rowGap: '10px', overflowY: 'auto', minHeight: 0, flexGrow: 1, paddingRight: '6px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.heading },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   marks: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
-  rightHead: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   others: { display: 'flex', flexWrap: 'wrap', columnGap: '8px', rowGap: '6px' },
   imageBox: { display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr)', columnGap: '10px', alignItems: 'center', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   imageText: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
@@ -101,13 +100,19 @@ interface Props {
   aiCard: () => AiCard
   /** 配信の切り口(AI に渡す) */
   angle: string
-  /** 入れ替えを、配信カードの画面の入れ替えの引き出しで行う(シンプルな配信カード。SU9)。渡すと、左の差し替えの候補の代わりに「入れ替える」を出す(別の入れ替え方を作らない) */
-  onOpenSwap?: () => void
+  /**
+   * 「入れ替える」を押したときに、フロートの中に出す入れ替えの部品(シンプルな配信カード。どの入口でも同じ引き出し simple/ProductSwap。SU9)。
+   * 渡さなければ、同じ形の ProductChooser を出す(詳しい画面・アラート)
+   */
+  renderSwap?: SwapRender
   onClose: () => void
 }
 
+/** フロートの中に出す入れ替えの部品(back = 詳しい情報に戻る、close = フロートを閉じる。入れ替えたあと) */
+export type SwapRender = (back: () => void, close: () => void) => ReactNode
+
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, onOpenSwap, aiCard, angle, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, aiCard, angle, onClose }: Props) {
   const s = useStyles()
   const t = useT()
   // つかんで動かした量
@@ -127,6 +132,9 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
     return replacementCandidates({ card, removed: product, products, model, inCard, when }).filter((c) => !overLimit || (weekUse?.get(c.product.id) ?? 0) < weeklyLimit(card))
   })
   // 差し替える理由(AI に渡す)
+  // 在庫・週の上限のアラートから開いたときは、入れ替えるのが主なので、入れ替えから始める
+  const [view, setView] = useState<'detail' | 'swap'>(stockAlert && !!product ? 'swap' : 'detail')
+  const canSwap = !!product && (!!renderSwap || !!onReplace)
   const swapWhy = !stockAlert ? undefined : overLimit ? tr(`この週に ${weeklyLimit(card)} 本を超えて載せている`, `featured in more than ${weeklyLimit(card)} deliveries this week`) : alert?.detail || tr('在庫が持たない見込み', 'likely to run out of stock')
 
   const kindName = (k: CardAlertKind) => ({ outOfStock: t('在庫切れの見込み', 'Out of stock (expected)'), lowStock: t('在庫僅少', 'Low stock'), policyChanged: t('MD 方針の変更', 'MD policy change'), dateChanged: t('日程の変更', 'Date change'), overLimit: t('週の上限超え', 'Over the weekly limit'), imageExpired: t('商品画像のモデルの使用期限', 'Model rights expired on the image') })[k]
@@ -175,6 +183,11 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
             >
               <span className={s.grabTitle}>{alert ? t('このアラートへの対応', 'Handle this alert') : t('商品の詳しい情報と入れ替え', 'Product details and replace')}{product ? ` — ${product.name}` : ''}</span>
               {productUrl(product) && <OpenLink url={productUrl(product)} label={t('商品ページ', 'Product page')} />}
+              {canSwap && view === 'detail' && (
+                <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={() => setView('swap')}>
+                  {t('入れ替える', 'Replace')}
+                </Button>
+              )}
               <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
             </div>
 
@@ -217,75 +230,63 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
               </div>
             )}
 
-            {product && (
-              <div className={s.cols}>
-                {/* 左: 差し替えの候補(シンプルな配信カードでは、画面の入れ替えの引き出しを開くボタンだけ) */}
-                {onOpenSwap ? (
-                  <div className={s.left}>
-                    <div className={s.section}>
-                      {/* 説明は見出しの横の ⓘ に(見出しの下に長い文を並べない。X72) */}
-                      <span className={s.sectionHead}>
-                        <ArrowSwapRegular />
-                        <InfoLabel size="small" weight="semibold" info={t('AI のおすすめ・AI に頼む・すべての商品から、ほかの商品と入れ替えます(選んだ部品のペインで開きます)。', 'Replace it with another product: AI picks, ask AI, or all products (opens in the part pane).')}>
-                          {t('入れ替える', 'Replace')}
-                        </InfoLabel>
-                      </span>
-                      <span>
-                        <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={onOpenSwap}>
-                          {t('入れ替える', 'Replace')}
-                        </Button>
-                      </span>
-                    </div>
-                  </div>
+            {product && view === 'swap' && (
+              // 入れ替え: 同じフロートの中で、入れ替えの部品に切り替える(部品のペインには飛ばない。2026-10-26 利用者と決めた)
+              <div className={s.pane}>
+                <span>
+                  <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => setView('detail')}>
+                    {t('詳しい情報に戻る', 'Back to details')}
+                  </Button>
+                </span>
+                {renderSwap ? (
+                  // シンプルな配信カード: どの入口でも同じ引き出し(simple/ProductSwap)を、そのまま使う
+                  renderSwap(() => setView('detail'), onClose)
                 ) : (
-                  // 選び直す枠は、シンプルな配信カードの入れ替えの引き出し・アラートへの対応と同じ形(ProductChooser)。押すと、すぐ入れ替える
-                  <div className={s.left}>
-                    <ProductChooser
-                      title={t(`「${product.name}」を入れ替える`, `Replace "${product.name}"`)}
-                      frame={{ kind: 'panel' }}
-                      card={aiCard()}
-                      angle={angle}
-                      current={product}
-                      products={poolProducts}
-                      inCard={poolProducts.filter((p) => inCard.has(p.id))}
-                      why={swapWhy}
-                      candidates={stockCandidates}
-                      // アラートから開いたときは、在庫の見込みを確かめた候補から AI が選ぶ(残りの候補は先に出さない)。
-                      // 商品の行から開いたときは、AI を呼ばずに、まず残りの候補を出す(シンプルな配信カードの引き出しと同じ)
-                      fallback={stockAlert ? [] : fallback}
-                      onPick={pickProduct}
-                      marks={marks}
-                    />
+                  // 詳しい画面・アラート: 同じ形の、選び直す枠(ProductChooser)。押すと、すぐ入れ替える
+                  <ProductChooser
+                    title={t(`「${product.name}」を入れ替える`, `Replace "${product.name}"`)}
+                    frame={{ kind: 'panel' }}
+                    card={aiCard()}
+                    angle={angle}
+                    current={product}
+                    products={poolProducts}
+                    inCard={poolProducts.filter((p) => inCard.has(p.id))}
+                    why={swapWhy}
+                    candidates={stockCandidates}
+                    // アラートから開いたときは、在庫の見込みを確かめた候補から AI が選ぶ(残りの候補は先に出さない)。
+                    // 商品の行から開いたときは、AI を呼ばずに、まず残りの候補を出す(シンプルな配信カードの引き出しと同じ)
+                    fallback={stockAlert ? [] : fallback}
+                    onPick={pickProduct}
+                    marks={marks}
+                  />
+                )}
+              </div>
+            )}
+
+            {product && view === 'detail' && (
+              // 詳しい情報(いまの商品)。左の欄はやめ、横幅はこちらに回す
+              <div className={s.pane}>
+                {/* この配信で使う画像(X64)。商品のマスタの画像は変えない */}
+                {onImage && (
+                  <div className={s.imageBox}>
+                    <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
+                    <span className={s.imageText}>
+                      <span className={s.sectionHead}>
+                        {t('この配信で使う画像', 'Image for this delivery')}
+                        {image && (
+                          <Badge size="small" appearance="tint" color="brand">
+                            {t('この配信で選んだ画像', 'Chosen for this delivery')}
+                          </Badge>
+                        )}
+                      </span>
+                      <span className={s.caption}>{image ? t('商品のマスタの画像は変えていません(ほかの配信は元のまま)', 'The product master image is unchanged (other deliveries keep it).') : t('いまは商品のマスタの画像。強みが伝わる画像に、この配信だけ替えられます', 'Uses the product master image. You can change it for this delivery only.')}</span>
+                      <Button size="small" icon={<ImageEditRegular />} onClick={() => setPicking(true)}>
+                        {t('商品ページから画像を選ぶ…', 'Choose an image from the product page…')}
+                      </Button>
+                    </span>
                   </div>
                 )}
-
-                {/* 右: 選んでいる商品の詳しい情報(最初は、いまの商品) */}
-                <div className={s.right}>
-                  <div className={s.rightHead}>
-                    <Text weight="semibold">{t('いまの商品', 'Current product')}</Text>
-                  </div>
-                  {/* この配信で使う画像(X64)。商品のマスタの画像は変えない */}
-                  {onImage && (
-                    <div className={s.imageBox}>
-                      <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
-                      <span className={s.imageText}>
-                        <span className={s.sectionHead}>
-                          {t('この配信で使う画像', 'Image for this delivery')}
-                          {image && (
-                            <Badge size="small" appearance="tint" color="brand">
-                              {t('この配信で選んだ画像', 'Chosen for this delivery')}
-                            </Badge>
-                          )}
-                        </span>
-                        <span className={s.caption}>{image ? t('商品のマスタの画像は変えていません(ほかの配信は元のまま)', 'The product master image is unchanged (other deliveries keep it).') : t('いまは商品のマスタの画像。強みが伝わる画像に、この配信だけ替えられます', 'Uses the product master image. You can change it for this delivery only.')}</span>
-                        <Button size="small" icon={<ImageEditRegular />} onClick={() => setPicking(true)}>
-                          {t('商品ページから画像を選ぶ…', 'Choose an image from the product page…')}
-                        </Button>
-                      </span>
-                    </div>
-                  )}
-                  <ProductDetail key={product.id} product={product} />
-                </div>
+                <ProductDetail key={product.id} product={product} />
               </div>
             )}
           </DialogBody>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { SwapRender } from '../ProductActionFloat'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -102,7 +103,7 @@ export interface SimpleExtras {
   /** 載せた商品と、残りの候補を入れ替える(行 ID のまま) */
   swapWithCandidate: (itemKey: string, candKey: string, reason: string) => void
   /** 商品のフロートを開く(載せた商品か候補の鍵。action は、選んでいる枠への操作。swap があれば、フロートの「入れ替える」でそれを呼ぶ(SU9)) */
-  openProduct: (key: string, action?: FloatAction, swap?: () => void) => void
+  openProduct: (key: string, action?: FloatAction, swap?: SwapRender) => void
   hoverProduct: (key: string | null) => void
   /** 載せた商品を、ほかの商品に置き換える(行は作り直す。理由は配信のメモに残す) */
   replaceItem: (itemKey: string, productId: string, reason: string) => void

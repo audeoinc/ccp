@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { SwapRender } from '../ProductActionFloat'
 import { InfoLabel, Badge, Button, Field, Input, Link, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
@@ -106,6 +107,8 @@ interface Props {
   onSwapAt: (at: SwapAt | null) => void
   /** 入れ替えで、行の鍵が変わったとき(候補と入れ替えたとき) */
   onSwapped: (from: string, to: string) => void
+  /** 商品のフロートの「入れ替える」で、フロートの中に出す引き出し(画面の側が作る。どの入口でも同じもの) */
+  swapInFloat?: (itemKey: string) => SwapRender
   /** 左のバーの「渡すもの」を開く(制作の担当・締め切りを決める所) */
   onOpenHandoff?: () => void
 }
@@ -128,7 +131,7 @@ function TemplateLocked({ text }: { text: string }) {
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
-export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped, onOpenHandoff }: Props) {
+export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped, swapInFloat, onOpenHandoff }: Props) {
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
@@ -167,8 +170,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         history: [],
       }),
     )
-  /** 商品のフロートを開く。フロートの「入れ替える」は、この箱の真下の引き出しを開く(SU9 (h)) */
-  const openFloat = (itemKey: string) => e.openProduct(itemKey, undefined, () => onSwapAt({ itemKey, at: 'pane' }))
+  /** 商品のフロートを開く。フロートの「入れ替える」は、フロートの中に同じ引き出しを出す(部品のペインには飛ばない。2026-10-26) */
+  const openFloat = (itemKey: string) => e.openProduct(itemKey, undefined, swapInFloat?.(itemKey))
   const [linkEditing, setLinkEditing] = useState(false)
   const heroDefaultLink = e.linkSpots.find((x) => x.kind === 'hero')?.defaultUrl
   // 使える期限が配信日より前(選んだあとで期限が来た画像。入れ替えを促す)

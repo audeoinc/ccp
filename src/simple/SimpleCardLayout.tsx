@@ -38,6 +38,7 @@ import { myNextStep, type NextStep } from './nextStep'
 import { ApprovalBadge } from './ApprovalBadge'
 import { PartPane } from './PartPane'
 import { ProductSwap, type SwapAt } from './ProductSwap'
+import { useFloatSwap } from './floatSwap'
 import { placeInPart } from './actions'
 import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
@@ -349,13 +350,15 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
    * フロートの「入れ替える」は、同じ引き出しを開く。すぐ入れ替えたいときは ⇄ の印。キーで移ったときは開かない
    */
   const onClickPart = (p: PartRef) => {
-    if (p.kind === 'product') e.openProduct(p.itemKey, undefined, () => openSwap(p.itemKey))
+    if (p.kind === 'product') e.openProduct(p.itemKey, undefined, swapInFloat(p.itemKey))
   }
   /** 入れ替えたあと。候補と入れ替えると行の鍵が変わるので、その商品を選んだままにする(select を通すと、入れ替える前の中身で保存してしまう) */
   const swapped = (from: string, to: string) => {
     setSwapAt(null)
     if (from !== to && part?.kind === 'product' && part.itemKey === from) setPart({ kind: 'product', itemKey: to })
   }
+  // 商品のフロートの「入れ替える」で、フロートの中に出す引き出し(どの入口でも同じ ProductSwap)
+  const swapInFloat = useFloatSwap({ editor: e, chats, setChat, onSwapped: swapped })
 
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
@@ -541,7 +544,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const target = part && (part.kind === 'product' || part.kind === 'slot') && !(part.kind === 'product' && part.itemKey === key) ? part : null
     if (!target) {
       // 載せている商品なら、フロートの「入れ替える」で同じ引き出しを開く(SU9 (h))
-      e.openProduct(key, undefined, e.items.some((i) => i.key === key) ? () => openSwap(key) : undefined)
+      e.openProduct(key, undefined, e.items.some((i) => i.key === key) ? swapInFloat(key) : undefined)
       return
     }
     setCompareKey(key)
@@ -1098,7 +1101,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'} ref={paneRef}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} onOpenHandoff={() => showSide('handoff', true)} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} swapInFloat={swapInFloat} onOpenHandoff={() => showSide('handoff', true)} />
           {e.footer}
         </div>
 

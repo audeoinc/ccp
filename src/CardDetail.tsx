@@ -553,14 +553,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           onOpenAlerts={actAlert ? () => openAlertsScreen(actAlert.productId) : undefined}
           aiCard={buildAiCard}
           angle={form.copyAngle}
-          onOpenSwap={
-            floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction
-              ? () => {
-                  closeAction()
-                  floatSwap.run()
-                }
-              : undefined
-          }
+          renderSwap={floatSwap && floatSwap.key === productOpen && !actAlert && !slotAction ? floatSwap.render : undefined}
           slotAction={
             slotAction && !actAlert
               ? {
@@ -1036,7 +1029,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         openProduct: (key, action, swap) => {
           setActAlert(null)
           setSlotAction(action ?? null)
-          setFloatSwap(swap ? { key, run: swap } : null)
+          setFloatSwap(swap ? { key, render: swap } : null)
           setProductOpen(key)
         },
         hoverProduct: setHoverKey,
