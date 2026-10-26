@@ -11,7 +11,7 @@ import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { getTemplate, sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
 import { elementDescriptions } from './elements'
-import { canRewriteText, encodePartContent, findPart, parsePartContent, partText, rewritableParts, setPartValue } from './partContent'
+import { canRewrite, encodePartContent, findPart, parsePartContent, partText, rewritableParts, setPartValue, templateText } from './partContent'
 import { priceText, tr } from './i18n'
 import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, ownsTemplate, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
@@ -161,7 +161,8 @@ export function setText(s: Snapshot, f: TextField, value: string): Snapshot {
   if (f.key === 'part_text') {
     // テンプレートの文と同じなら、書き換えをやめる(テンプレートのまま)
     const p = findPart(getTemplate(templateOf(s)), f.id)
-    card.part_content = encodePartContent(setPartValue(parsePartContent(card.part_content), f.id, value === (p?.text ?? '') ? null : { text: value }))
+    // 文だけを外す(画像の上に文字のボタンの、差し替えた画像は残す)
+    card.part_content = encodePartContent(setPartValue(parsePartContent(card.part_content), f.id, { text: p && value === templateText(p) ? '' : value }))
   } else if (f.key === 'section_titles' || f.key === 'section_copies') {
     const n = sectionsOf(templateOf(s)).length
     const list = f.key === 'section_titles' ? (card.section_titles ?? '').split('\n') : parseCopies(card.section_copies)
@@ -196,7 +197,8 @@ export function textRows(s: Snapshot, all = false): TextRow[] {
   if (!isPushCard(s)) {
     const layout = getTemplate(templateOf(s))
     const descs = elementDescriptions(layout)
-    for (const p of rewritableParts(layout).filter(canRewriteText)) fields.push({ label: descs.get(p.id) ?? tr('テキスト', 'Text'), field: { key: 'part_text', id: p.id } })
+    // ボタンは文言(要素 label の説明。例「S1 ボタン の文言」)
+    for (const p of rewritableParts(layout).filter(canRewrite)) fields.push({ label: (p.type === 'button' ? descs.get(`${p.id}.label`) : undefined) ?? descs.get(p.id) ?? tr('テキスト', 'Text'), field: { key: 'part_text', id: p.id } })
   }
   const rows = fields.map((x) => ({ ...x, id: fieldId(x.field), value: getText(s, x.field) }))
   return all ? rows : rows.filter((r) => r.value.trim())

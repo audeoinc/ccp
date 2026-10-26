@@ -32,6 +32,15 @@ const TEMPLATE = {
         part('btn_img', 'button', 2, 1, { face: 'image', src: '/img/btn.png' }),
       ],
     },
+    // ボタンの文言(段階 6 の続き): btn_t(文字。既定で書き換えてよい)・btn_n(書き換えない)・btn_b(画像の上に文字。文言と画像の両方)
+    {
+      kind: 'table',
+      id: 'sec_b',
+      cols: 3,
+      rows: 1,
+      slots: 0,
+      parts: [part('btn_t', 'button', 0, 0, { label: 'もっと見る' }), part('btn_n', 'button', 1, 0, { label: '固定', overridable: false }), part('btn_b', 'button', 2, 0, { face: 'both', src: '/img/b2.png' })],
+    },
   ],
 }
 
@@ -58,7 +67,14 @@ export async function checkParts(server) {
   // 保存する分: 書き換えてよい部品の、その種類の項目だけ
   const all = { txt_a: { text: 'A', src: '/img/x.png' }, txt_b: { text: 'B' }, txt_h: { text: 'H' }, med_a: { src: '/img/new.png', imageId: 'n1', alt: '新', text: 'x' }, med_b: { src: '/img/nb.png' }, btn_img: { src: '/img/nbtn.png' }, gone_1: { text: 'x' } }
   same(problems, '保存する分', pc.prunePartContent(all, 'parts-check'), { txt_h: { text: 'H' }, txt_a: { text: 'A' }, med_a: { src: '/img/new.png', imageId: 'n1', alt: '新' }, btn_img: { src: '/img/nbtn.png' } })
-  same(problems, '書き換えてよい部品', pc.rewritableParts(layout).map((p) => p.id), ['txt_h', 'txt_a', 'med_a', 'btn_img'])
+  same(problems, '書き換えてよい部品', pc.rewritableParts(layout).map((p) => p.id), ['txt_h', 'txt_a', 'med_a', 'btn_img', 'btn_t', 'btn_b'])
+
+  // ボタンの文言: 画像だけのボタンは文言を持たない・書き換えないボタンは使わない・画像の上に文字は文言と画像の両方
+  const btns = { btn_t: { text: '新作を見る', src: '/img/x.png' }, btn_n: { text: 'x' }, btn_img: { text: 'x', src: '/img/n.png' }, btn_b: { text: '見る', src: '/img/nb.png' } }
+  same(problems, 'ボタン: 保存する分', pc.prunePartContent(btns, 'parts-check'), { btn_img: { src: '/img/n.png' }, btn_t: { text: '新作を見る' }, btn_b: { text: '見る', src: '/img/nb.png' } })
+  const effB = (id) => pc.effectivePart(pc.findPart(layout, id), btns)
+  same(problems, 'ボタン: 描く(文言)', [effB('btn_t').label, effB('btn_n').label, effB('btn_b').label, effB('btn_b').src], ['新作を見る', '固定', '見る', '/img/nb.png'])
+  same(problems, 'ボタン: 描く(中身なし)', pc.effectivePart(pc.findPart(layout, 'btn_t'), {}).label, 'もっと見る')
 
   // 描く形: 許した部品だけ差し替える
   const eff = (id) => pc.effectivePart(pc.findPart(layout, id), all)
@@ -78,7 +94,10 @@ export async function checkParts(server) {
   const card = { id: 'c1', name: 'x', scheduled_at: '2026-10-26T00:00:00Z', country: 'JP', channel: 'email', layout_key: 'parts-check', links: '', part_content: JSON.stringify({ txt_a: { text: '配信の文' } }) }
   const s = snap.buildSnapshot(card, [], [], [])
   const rows = snap.textRows(s, true).filter((r) => r.field.key === 'part_text')
-  same(problems, '制作の写し: 行', rows.map((r) => [r.id, r.value]), [['part.txt_h', 'ヒーローの下'], ['part.txt_a', '配信の文']])
+  same(problems, '制作の写し: 行', rows.map((r) => [r.id, r.value]), [['part.txt_h', 'ヒーローの下'], ['part.txt_a', '配信の文'], ['part.btn_t', 'もっと見る'], ['part.btn_b', '']])
+  // 画像の上に文字のボタンの文言を、テンプレートの文(空)に戻しても、差し替えた画像は残る
+  const sb = snap.setText({ ...s, card: { ...s.card, part_content: JSON.stringify({ btn_b: { text: '見る', src: '/img/nb.png' } }) } }, { key: 'part_text', id: 'btn_b' }, '')
+  same(problems, '制作の写し: ボタンの文言を戻しても画像は残る', pc.parsePartContent(sb.card.part_content), { btn_b: { src: '/img/nb.png' } })
   const s2 = snap.setText(s, { key: 'part_text', id: 'txt_h' }, '直した')
   same(problems, '制作の写し: 直す', pc.parsePartContent(s2.card.part_content), { txt_a: { text: '配信の文' }, txt_h: { text: '直した' } })
   const s3 = snap.setText(s2, { key: 'part_text', id: 'txt_a' }, 'テンプレートの文')
