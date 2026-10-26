@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { Button, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ChatRegular, SparkleRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, ArrowSwapRegular, ChatRegular, SparkleRegular } from '@fluentui/react-icons'
 import { Candidates } from './Candidates'
 import { ChooseDrawer, ChoosePanel, type ChooseTab } from './ChoosePanel'
 import { ImageThumb } from './ImageThumb'
+import { ProductDetail } from './ProductDetail'
+import { ProductDetailButton } from './ProductDetailButton'
 import { productImage } from './images'
 import { yen } from './items'
 import { productMarket } from './market'
@@ -30,6 +32,13 @@ const useStyles = makeStyles({
   meta: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   pickRow: { display: 'grid', rowGap: '2px', padding: '6px 8px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   pickOn: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '-1px' },
+  // 候補の行と、その右上の「詳しく」(行のボタンの中にボタンは置けないので、重ねて置く)
+  pickWrap: { position: 'relative', display: 'grid', minWidth: 0 },
+  pickWithDetail: { paddingRight: '72px' },
+  detailAt: { position: 'absolute', top: '4px', right: '4px' },
+  ideaWithDetail: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0, '& > :first-child': { flexGrow: 1, minWidth: 0 } },
+  // 候補の詳しい情報(入れ替えの枠の中で、もう 1 段深く開く)
+  detailBar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', justifyContent: 'space-between' },
 })
 
 export interface Picks {
@@ -131,9 +140,14 @@ interface Props {
   marks?: (p: Product) => ReactNode
   /** 選んでいる商品(印を付ける) */
   pickedId?: string
+  /**
+   * 候補の行の「詳しく」を押したとき(productId と、その候補を選ぶ動き)。渡さなければ、この枠の中で、もう 1 段深く
+   * 候補の詳しい情報を開く(商品のフロートの中・アラートの画面)。部品のペインでは、商品のフロートを開く(simple/ProductSwap)
+   */
+  onDetail?: (productId: string, pick: () => void) => void
 }
 
-export function ProductChooser({ title, frame, card, angle, current, products, inCard, why, candidates, fallback = [], onPick, onPreview, chat, extraTabs = [], defaultTab, disabled, marks, pickedId }: Props) {
+export function ProductChooser({ title, frame, card, angle, current, products, inCard, why, candidates, fallback = [], onPick, onPreview, chat, extraTabs = [], defaultTab, disabled, marks, pickedId, onDetail }: Props) {
   const t = useT()
   const s = useStyles()
   const [picks, setPicks] = useState<Picks | null>(null)
@@ -155,11 +169,19 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       setPicks({ key: '', ideas: [], busy: false, error: err instanceof Error ? err.message : String(err) })
     }
   }
+  // 開いている候補の詳しい情報(この枠の中で開くとき)
+  const [detail, setDetail] = useState<{ productId: string; pick: () => void } | null>(null)
+  const openDetail = (productId: string, pick: () => void) => (onDetail ? onDetail(productId, pick) : setDetail({ productId, pick }))
   const row = (key: string, productId: string, why2: string | undefined, run: () => void) => (
-    <button key={key} type="button" className={mergeClasses(s.pickRow, pickedId === productId && s.pickOn)} title={why2} disabled={disabled} onClick={run}>
-      <ProductLine product={byId.get(productId)} fact={facts.get(productId)} />
-      {why2 && <span className={s.caption}>{why2}</span>}
-    </button>
+    <div key={key} className={s.pickWrap}>
+      <button type="button" className={mergeClasses(s.pickRow, s.pickWithDetail, pickedId === productId && s.pickOn)} title={why2} disabled={disabled} onClick={run}>
+        <ProductLine product={byId.get(productId)} fact={facts.get(productId)} />
+        {why2 && <span className={s.caption}>{why2}</span>}
+      </button>
+      <span className={s.detailAt}>
+        <ProductDetailButton disabled={disabled} onClick={() => openDetail(productId, run)} />
+      </span>
+    </div>
   )
   const tabs: ChooseTab<string>[] = [
     {
@@ -189,7 +211,20 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
           setTurns={setTurns}
           placeholder={t('例: 2 万円以下のアウターで、在庫の多いもの', 'e.g. Outerwear under $150 with plenty of stock')}
           ask={ask}
-          renderIdea={(idea) => <ProductLine product={byId.get(idea.value)} fact={facts.get(idea.value)} />}
+          renderIdea={(idea) => (
+            <span className={s.ideaWithDetail}>
+              <ProductLine product={byId.get(idea.value)} fact={facts.get(idea.value)} />
+              <ProductDetailButton
+                disabled={disabled}
+                onClick={() =>
+                  openDetail(idea.value, () => {
+                    onPreview?.(null)
+                    onPick(idea.value, idea.why)
+                  })
+                }
+              />
+            </span>
+          )}
           isCurrent={(idea) => inCard.some((p) => p.id === idea.value)}
           onPreview={(idea) => onPreview?.(idea ? idea.value : null)}
           onAdopt={(idea) => {
@@ -212,10 +247,36 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
           pickedId={pickedId}
           marks={marks}
           pickHint={t('押すと選びます', 'Click to choose')}
+          onDetail={(id) => openDetail(id, () => onPick(id, ''))}
         />
       ),
     },
   ]
-  if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} bare={frame.bare} />
-  return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} />
+  // 候補の詳しい情報: いまの商品と同じ画面(ProductDetail)に、「候補に戻る」と「この商品と入れ替える」
+  const shown = detail ? byId.get(detail.productId) : undefined
+  const override = detail && shown && (
+    <>
+      <span className={s.detailBar}>
+        <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => setDetail(null)}>
+          {t('候補に戻る', 'Back to candidates')}
+        </Button>
+        <Button
+          size="small"
+          appearance="primary"
+          icon={<ArrowSwapRegular />}
+          disabled={disabled}
+          onClick={() => {
+            const pick = detail.pick
+            setDetail(null)
+            pick()
+          }}
+        >
+          {t('この商品と入れ替える', 'Replace with this product')}
+        </Button>
+      </span>
+      <ProductDetail key={shown.id} product={shown} />
+    </>
+  )
+  if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} bare={frame.bare} override={override || undefined} />
+  return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} override={override || undefined} />
 }

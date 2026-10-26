@@ -98,7 +98,7 @@ interface Props {
   /** アラートの画面で詳しく見る */
   onOpenAlerts?: () => void
   /** 選んでいる枠への操作(シンプルな配信カードで、プレビューの枠を選んでから一覧の商品を押したとき。「この枠の商品と入れ替える」など。SU1 ⑩) */
-  slotAction?: { label: string; run: () => void }
+  slotAction?: { label: string; run: () => void; note?: string; backLabel?: string }
   /** AI に渡す、配信のいまの入力(差し替えの候補を AI に選んでもらうとき) */
   aiCard: () => AiCard
   /** 配信の切り口(AI に渡す) */
@@ -233,7 +233,12 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
 
             {slotAction && (
               <div className={s.alert} style={{ backgroundColor: tokens.colorBrandBackground2, borderColor: tokens.colorBrandStroke2 }}>
-                <span className={s.alertText}>{t('プレビューで選んでいる枠と見比べています(選んだ部品のペインにも並べています)', 'Comparing with the slot selected in the preview (also shown side by side in the part pane)')}</span>
+                {slotAction.backLabel && (
+                  <Button size="small" appearance="subtle" icon={<ArrowLeftRegular />} onClick={onClose}>
+                    {slotAction.backLabel}
+                  </Button>
+                )}
+                <span className={s.alertText}>{slotAction.note ?? t('プレビューで選んでいる枠と見比べています(選んだ部品のペインにも並べています)', 'Comparing with the slot selected in the preview (also shown side by side in the part pane)')}</span>
                 <Button size="small" appearance="primary" icon={<ArrowSwapRegular />} onClick={slotAction.run}>
                   {slotAction.label}
                 </Button>

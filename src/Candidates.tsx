@@ -5,6 +5,7 @@ import type { Product } from './models/products'
 import { DND_PRODUCT, yen } from './items'
 import { productMarket } from './market'
 import { optionLabel, useT } from './i18n'
+import { ProductDetailButton } from './ProductDetailButton'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { FilterChips, SearchField } from './SearchField'
@@ -21,6 +22,8 @@ interface Props {
   pickHint?: string
   /** 行に添える印(残少・週の上限 など) */
   marks?: (p: Product) => ReactNode
+  /** 選ぶ使い方で、行の「詳しく」を押したとき(入れ替えの候補の詳しい情報を開く) */
+  onDetail?: (productId: string) => void
 }
 
 const useStyles = makeStyles({
@@ -58,7 +61,7 @@ const PAGE = 20
 
 const trendMark = (label?: string) => (label === '上昇' ? '▲ ' : label === '下降' ? '▼ ' : '— ') + optionLabel(label === '上昇' || label === '下降' ? label : '横ばい')
 
-export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHint, marks }: Props) {
+export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHint, marks, onDetail }: Props) {
   const t = useT()
   const styles = useStyles()
   const [query, setQuery] = useState('')
@@ -138,7 +141,9 @@ export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHin
             </div>
             {used ? (
               <Badge appearance="tint" color="informative">{t('掲載中', 'Included')}</Badge>
-            ) : onPick ? null : (
+            ) : onPick ? (
+              onDetail && <ProductDetailButton onClick={() => onDetail(p.id)} />
+            ) : (
               <Button size="small" appearance="subtle" icon={<AddRegular />} onClick={() => onAdd(p.id)} aria-label={t('足す', 'Add')} />
             )}
           </div>

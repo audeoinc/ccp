@@ -58,7 +58,7 @@ import { openImpactView } from './impact'
 import type { StockModel } from './alerts'
 import type { CardAlert } from './cardAlerts'
 import { SimpleCardLayout } from './simple/SimpleCardLayout'
-import { simpleEditorOf, type AiPreview } from './simple/editor'
+import { CANDIDATE_DETAIL, simpleEditorOf, type AiPreview } from './simple/editor'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
@@ -499,7 +499,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       const item = actAlert ? items.find((i) => i.productId === actAlert.productId) : items.find((i) => i.key === productOpen)
       // シンプルな配信カードの商品の一覧では、候補の行からも開く(詳しい情報を見るだけ。差し替えは、選んだ枠への操作で)
       const cand = !actAlert && !item ? candidates.find((c) => c.key === productOpen) : undefined
-      const product = productById.get(item?.productId ?? cand?.productId ?? actAlert?.productId ?? '')
+      // 入れ替えの候補の詳しい情報(部品のペインの候補の「詳しく」。鍵は「pid:商品 ID」。配信に載っていない商品なので、入れ替えは帯のボタンで)
+      const pid = !actAlert && productOpen?.startsWith(CANDIDATE_DETAIL) ? productOpen.slice(CANDIDATE_DETAIL.length) : undefined
+      const product = productById.get(item?.productId ?? cand?.productId ?? pid ?? actAlert?.productId ?? '')
       const idx = item ? items.indexOf(item) : -1
       const section = idx >= 0 ? sectionIndexAt(sectionsOf(template), idx) : -1
       const options: SwapOption[] = candidates.filter((c) => c.section === section).flatMap((c) => {
@@ -558,6 +560,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             slotAction && !actAlert
               ? {
                   label: slotAction.label,
+                  note: slotAction.note,
+                  backLabel: slotAction.backLabel,
                   run: () => {
                     slotAction.run()
                     closeAction()

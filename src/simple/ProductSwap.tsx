@@ -4,6 +4,7 @@ import { ProductChooser } from '../ProductChooser'
 import { sectionIndexAt, sectionsOf } from '../templates'
 import { useT } from '../i18n'
 import { partKey } from './parts'
+import { CANDIDATE_DETAIL } from './editor'
 import type { PartTurn } from './partAi'
 import type { SimpleEditor } from './editor'
 import type { LiveStore } from './floatSwap'
@@ -72,6 +73,18 @@ export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, set
         done(it.key)
       }}
       onPreview={(productId) => e.setAiPreview(productId ? { item: { key: it.key, productId } } : null)}
+      // 候補の「詳しく」: フロートの中(bare)では、同じ枠の中でもう 1 段深く開く。部品のペイン・一覧の行では、商品のフロートを入れ替えのボタンつきで開く
+      onDetail={
+        bare
+          ? undefined
+          : (productId, pick) =>
+              e.openProduct(`${CANDIDATE_DETAIL}${productId}`, {
+                label: t('この商品と入れ替える', 'Replace with this product'),
+                note: current ? t(`入れ替えの候補です。押すと「${current.name}」と入れ替えます`, `A replacement candidate. Click to replace "${current.name}"`) : t('入れ替えの候補です', 'A replacement candidate'),
+                backLabel: t('候補に戻る', 'Back to candidates'),
+                run: pick,
+              })
+      }
       chat={{ turns: chats[key] ?? [], setTurns: (f) => setChat(key, f) }}
       disabled={e.saving}
     />
