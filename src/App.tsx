@@ -445,8 +445,8 @@ function App() {
   const [impactKey, setImpactKey] = useState(0)
   const showFace = (p: 'calendar' | 'production' | 'results' | 'alerts') => {
     setResultDetail(null)
-    // 「比べる」「効果」は結果の面だけ。計画の面に戻るときは、月にする
-    if (p === 'calendar' && RESULTS_ONLY.includes(view)) setView('month')
+    // 「比べる」「効果」「学び」は結果の面だけ。ほかの面に移るときは、月にする
+    if (p !== 'results' && RESULTS_ONLY.includes(view)) setView('month')
     setPage(p)
   }
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
@@ -1024,7 +1024,8 @@ function App() {
                 </Button>
               )}
               {/* 見せ方の切り替え: 枠で囲んだひとかたまりにして、操作のボタンと見分けられるようにする。
-                  比べるは結果の面だけ。計画の面では選べないだけにする(消えると、ほかのボタンの位置がずれるため) */}
+                  比べる・効果・学びは結果の面だけ。ほかの面では出さない(押せない灰色で置くと「条件が合えば見られるのか」と迷うため。
+                  2026-10-26 利用者の決め。並びの右の端なので、出し入れしても、ほかのボタンの位置は変わらない) */}
               <div className={styles.viewSwitch} role="tablist" aria-label={t('見せ方', 'View')}>
                 {(
                   [
@@ -1036,22 +1037,24 @@ function App() {
                       'compare',
                       t('比べる', 'Compare'),
                       page !== 'results',
-                      page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('配信カードの項目で絞り込み、直近の配信を並べて比べます', 'Filter by delivery card fields and compare recent deliveries side by side'),
+                      t('配信カードの項目で絞り込み、直近の配信を並べて比べます', 'Filter by delivery card fields and compare recent deliveries side by side'),
                     ],
                     [
                       'impact',
                       t('効果', 'Impact'),
                       page !== 'results',
-                      page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('配信で増えた売上(送らなかった人との差)と、AI に渡した学びが効いているかを見ます', 'See incremental sales vs. a holdout, and whether learnings passed to AI work'),
+                      t('配信で増えた売上(送らなかった人との差)と、AI に渡した学びが効いているかを見ます', 'See incremental sales vs. a holdout, and whether learnings passed to AI work'),
                     ],
                     [
                       'learnings',
                       t('学び', 'Learnings'),
                       page !== 'results',
-                      page !== 'results' ? t('結果の面で使えます', 'Available on the Results side') : t('結果の「次に生かすメモ」を、学びのカードで並べます。強さ・使われた回数を見て、使う・休ませる・外すを決めます', 'See notes for next time as learning cards. Check strength and use, and decide to use, rest or retire each.'),
+                      t('結果の「次に生かすメモ」を、学びのカードで並べます。強さ・使われた回数を見て、使う・休ませる・外すを決めます', 'See notes for next time as learning cards. Check strength and use, and decide to use, rest or retire each.'),
                     ],
                   ] as const
-                ).map(([v, label, off, title]) => (
+                )
+                  .filter(([, , off]) => !off)
+                  .map(([v, label, off, title]) => (
                   <button
                     key={v}
                     ref={v === 'week' ? setWeekBtn : undefined}
