@@ -101,6 +101,8 @@ export const tables: Record<string, Row[]> = {
   // 配信の効果(AI の依頼の記録・ホールドアウトとの比べ)の見本。学びの判定は、人が画面で決めるので空から
   ...impactTables(),
   LearningReviewsService: [],
+  // キャンペーン(X79)。見本のカードをまとめるのは段 ⑤ で行うので、いまは空から
+  CampaignsService: [],
   // 配信ごとの学びの付け外し(X78)。人が配信カードで決めるので空から
   CardLearningsService: [],
   // マーケティングポリシー(M3・M4)。撮影用には入れない(取り込みは本物のサーバーだけ)

@@ -45,7 +45,21 @@
     ["preheader", "text"]
    ],
    "lookups": [
-    ["hero_image_id", "hero_images", {"onDelete": "SET NULL"}]
+    ["hero_image_id", "hero_images", {"onDelete": "SET NULL"}],
+    ["campaign_id", "campaigns", {"onDelete": "SET NULL"}]
+   ]
+  },
+  "campaigns": {
+   "_comment": "キャンペーン(配信カードの親。X79)。1 つのキャンペーンの中に、メールとアプリの配信カードがあり、それぞれに AB の案がある。期間・配信日・状態は持たない(日付はカードの scheduled_at だけ。状態は子のカードから出す。src/campaigns.ts)。入れる条件(同じ国・同じ配信日)も、データの形ではなく関数で確かめる",
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["country", "text", {"index": true}],
+    ["theme", "text"],
+    ["theme_reason", "text"],
+    ["theme_type", "text"],
+    ["purpose", "text"]
+   ],
+   "lookups": [
    ]
   },
   "delivery_products": {

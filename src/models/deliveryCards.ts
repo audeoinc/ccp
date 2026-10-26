@@ -105,6 +105,8 @@ export interface DeliveryCardFields {
   preheader?: string
   /** hero_images の id(参照を外すときは null) */
   hero_image_id?: string | null
+  /** campaigns の id(親のキャンペーン。X79。空は、まだキャンペーンに入っていない。参照を外すときは null) */
+  campaign_id?: string | null
   state_code?: number
 }
 
