@@ -3,8 +3,8 @@
 // 部品の形が変われば部品 ID と一緒に新しくなり、見せ方・文言・説明を変えても変わらない。計測(UTM)・ピン・分析は、この ID で数える
 
 import { tr } from './i18n'
-import { HERO_TABLE_ID, boxFields } from './tables'
-import type { TablePart } from './templates'
+import { HERO_TABLE_ID, boxFields, boxesOf, partsOf } from './tables'
+import type { TablePart, TemplateLayout } from './templates'
 
 export interface PartElement {
   /** 要素の名前(部品の中で一意。image / name / price …) */
@@ -60,3 +60,43 @@ export const elementDesc = (p: TablePart, e: PartElement, where: string): string
 
 /** 要素が押せるか(要素ごとに切り替えたものが優先) */
 export const elementClickable = (p: TablePart, e: PartElement): boolean => p.els?.[e.key]?.click ?? e.click
+
+// ---- 計測(UTM)の utm_content(T8 の 8.10)
+
+/**
+ * 部品のリンクの utm_content。要素が 1 つの部品(文字のボタン・画像)は、その要素の ID。
+ * 画像の上に文字のボタンのように、部品まるごとが 1 つのリンクのときは、部品 ID(どの要素が押されたかは、メールでは分からないため)
+ */
+export const partContent = (p: TablePart): string => {
+  const els = partElements(p)
+  return els.length === 1 ? els[0].id : p.id
+}
+
+/** 箱の中で、リンクにする要素(押せる要素だけ)。それぞれが別のリンクになり、utm_content は要素の ID */
+export const boxLinkElements = (p: TablePart): PartElement[] => partElements(p).filter((e) => elementClickable(p, e))
+
+const partTypeName = (p: TablePart): string =>
+  ({ box: tr('箱', 'Box'), button: tr('ボタン', 'Button'), text: tr('テキスト', 'Text'), media: tr('画像', 'Image'), line: tr('区切り線', 'Divider'), spacer: tr('余白', 'Spacer'), empty: tr('空き', 'Empty') })[p.type]
+
+/**
+ * テンプレートの要素の ID・部品 ID → 説明(UTM の対応表・結果の画面で、ID から人の読む名前を引く。説明は UTM に入れない)。
+ * 説明を書いていなければ、テンプレートの編集画面と同じ呼び名(H / S1 + 種類 + 箱の番号)から作る。箱の番号は、テンプレート全体で通す
+ */
+export function elementDescriptions(layout: Pick<TemplateLayout, 'sections' | 'heroTable'>): Map<string, string> {
+  const out = new Map<string, string>([
+    [`${HERO_TABLE_ID}.image`, tr('メイン画像', 'Main image')],
+    [`${HERO_TABLE_ID}.headline`, tr('ヘッドライン', 'Headline')],
+    [`${HERO_TABLE_ID}.copy`, tr('コピー', 'Copy')],
+  ])
+  const boxNo = new Map<string, number>()
+  layout.sections.forEach((sec) => boxesOf(sec).forEach((p) => boxNo.set(p.id, boxNo.size + 1)))
+  const add = (sec: TemplateLayout['sections'][number], label: string) =>
+    partsOf(sec).forEach((p) => {
+      const where = p.desc?.trim() || `${label} ${partTypeName(p)}${p.type === 'box' ? ` ${boxNo.get(p.id)}` : ''}`
+      out.set(p.id, where)
+      for (const e of partElements(p)) out.set(e.id, elementDesc(p, e, where))
+    })
+  if (layout.heroTable) add(layout.heroTable, 'H')
+  layout.sections.forEach((sec, i) => add(sec, `S${i + 1}`))
+  return out
+}

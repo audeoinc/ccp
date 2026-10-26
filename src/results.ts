@@ -2,7 +2,9 @@
 import type { DeliveryCard } from './models/deliveryCards'
 import type { DeliveryResult, LinkResults, ProductResult } from './data/deliveryResults'
 import { CHANNEL_PUSH } from './status'
-import { DEFAULT_PUSH_TEMPLATE, baseTemplateId, getTemplate, templateFromValue } from './templates'
+import { DEFAULT_PUSH_TEMPLATE, baseTemplateId, getTemplate, templateFromValue, type EmailTemplateId } from './templates'
+import { CONTENT_HERO, UTM_SCHEME, linkSlots } from './links'
+import { HERO_TABLE_ID, boxesOf, isTable } from './tables'
 import { parseCsv } from './csv'
 import { themeTypeOf } from './themeTypes'
 import { localDate } from './dates'
@@ -99,6 +101,82 @@ export function positionLabel(key: string, t: (ja: string, en: string) => string
   return kind === 'button' ? t(`ボタン ${i}`, `Button ${i}`) : t(`商品の枠 ${i}`, `Product slot ${i}`)
 }
 
+// ---- utm_content を読む(GA・BigQuery の「campaign × content」の取り込み X67 の土台。決まりは links.ts の冒頭)
+// 送った配信には、版 2 の形(hero・btn1・p01-商品コード)と、版 3 の表のテンプレートの形(要素の ID・部品 ID)が混ざる。どちらも読む
+
+/** utm_content の読み。button の n・slot の index は 0 から */
+export type ContentRef =
+  | { kind: 'hero' }
+  | { kind: 'button'; n: number }
+  | { kind: 'slot'; index: number; code?: string }
+  /** 版 3: 要素の ID(box_2m8q.image)か、部品まるごとのリンクの部品 ID(btn_7d2a)。part は部品 ID */
+  | { kind: 'element'; id: string; part: string }
+
+/** utm_content を読む(読めない値は null。制作が足したリンクなど) */
+export function parseContent(value: string): ContentRef | null {
+  const v = value.trim()
+  if (v === CONTENT_HERO) return { kind: 'hero' }
+  // 以前の形を先に見る(商品コードに「.」があっても、枠として読むため)
+  const btn = /^btn(\d+)$/.exec(v)
+  if (btn && Number(btn[1]) >= 1) return { kind: 'button', n: Number(btn[1]) - 1 }
+  const slot = /^p(\d{2,})(?:-(.+))?$/.exec(v)
+  if (slot && Number(slot[1]) >= 1) return { kind: 'slot', index: Number(slot[1]) - 1, ...(slot[2] ? { code: slot[2] } : {}) }
+  // 部品 ID は、種類の頭 + 乱数(box_2m8q)のほか、以前の形から表に直したもの(box_1_3・hero-1 など)もある
+  const el = /^([A-Za-z0-9_-]+)(?:\.[A-Za-z0-9_]+)?$/.exec(v)
+  return el ? { kind: 'element', id: v, part: el[1] } : null
+}
+
+/**
+ * content ごとのクリックを、結果の形(links の hero・buttons・els と、商品ごとのクリック)にまとめる。
+ * 要素の ID は、配信が使ったテンプレートの版(鍵「ID@v版」)で、ヒーロー・何番目のボタン・何番目の商品の枠かに引く(ヒートマップ・位置の比べが、そのまま使える)。
+ * productIds は、配信の商品(メールの並び順)。引けない content(テンプレートにない ID・読めない値)は other に入れ、unknown に返す
+ */
+export function linkResultsFromContents(rows: { content: string; clicks: number }[], templateKey: EmailTemplateId, productIds: string[]): { links: LinkResults; products: ProductResult[]; unknown: string[] } {
+  const tpl = getTemplate(templateKey)
+  // ボタン・画像の部品 ID → メールの上から何番目のボタンか(以前の形の btn の番号と同じ数え方)
+  const buttonNo = new Map(linkSlots(templateKey, [], [], '', null, UTM_SCHEME).filter((s) => s.kind === 'button').map((s, i) => [s.key, i]))
+  // 箱の部品 ID → 商品の枠の番号
+  const boxNo = new Map<string, number>()
+  let start = 0
+  for (const sec of tpl.sections) {
+    if (isTable(sec)) boxesOf(sec).forEach((p, j) => boxNo.set(p.id, start + j))
+    start += sec.slots
+  }
+  const links: LinkResults = {}
+  const byProduct = new Map<string, number>()
+  const unknown: string[] = []
+  const add = <K extends 'hero' | 'other'>(k: K, n: number) => (links[k] = (links[k] ?? 0) + n)
+  const addButton = (i: number, n: number) => {
+    links.buttons = links.buttons ?? []
+    for (let k = 0; k <= i; k++) links.buttons[k] = links.buttons[k] ?? 0
+    links.buttons[i] += n
+  }
+  const addSlot = (index: number, n: number) => {
+    const pid = productIds[index]
+    if (pid) byProduct.set(pid, (byProduct.get(pid) ?? 0) + n)
+    return !!pid
+  }
+  for (const { content, clicks } of rows) {
+    const ref = parseContent(content)
+    let ok = !!ref
+    if (ref?.kind === 'hero') add('hero', clicks)
+    else if (ref?.kind === 'button') addButton(ref.n, clicks)
+    else if (ref?.kind === 'slot') ok = addSlot(ref.index, clicks)
+    else if (ref?.kind === 'element') {
+      links.els = { ...links.els, [ref.id]: (links.els?.[ref.id] ?? 0) + clicks }
+      if (ref.part === HERO_TABLE_ID) add('hero', clicks)
+      else if (buttonNo.has(ref.part)) addButton(buttonNo.get(ref.part)!, clicks)
+      else if (boxNo.has(ref.part)) ok = addSlot(boxNo.get(ref.part)!, clicks)
+      else ok = false
+    }
+    if (!ok) {
+      add('other', clicks)
+      unknown.push(content)
+    }
+  }
+  return { links, products: [...byProduct].map(([productId, clicks]) => ({ productId, clicks, units: 0, revenue: 0 })), unknown }
+}
+
 /** 比べる相手の選び方: 同じテンプレート / 同じテーマの種類 */
 export type CompareBy = 'template' | 'themeType'
 
@@ -157,6 +235,7 @@ function mergeRows(rows: DeliveryResult[]): { result: DeliveryResult; parts: Del
       links.buttons = links.buttons ?? []
       links.buttons[i] = (links.buttons[i] ?? 0) + v
     })
+    for (const [id, v] of Object.entries(l.els ?? {})) links.els = { ...links.els, [id]: (links.els?.[id] ?? 0) + v }
   }
   const sent = parts.map((r) => r.sent_at).filter((v): v is string => !!v).sort()[0]
   return {

@@ -5,8 +5,8 @@ import type { Product } from './models/products'
 import type { Item } from './items'
 import { useT } from './i18n'
 import { OpenLink } from './LinkText'
-import { type LinkSlot, type Links, defaultUtm, isUrl, productContent, productUrl, variantCampaign, withUtm } from './links'
-import { linkKindLabel } from './templates'
+import { type LinkSlot, type Links, defaultUtm, isUrl, productLinks, productUrl, variantCampaign, withUtm } from './links'
+import { linkKindLabel, type EmailTemplateId } from './templates'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '12px', minWidth: 0 },
@@ -47,6 +47,8 @@ interface Props {
   links: Links
   onLinks: (l: Links) => void
   slots: LinkSlot[]
+  /** テンプレート(商品の枠の utm_content を決める。表の箱は、押せる要素ごと) */
+  template: EmailTemplateId
   items: Item[]
   products: Product[]
   /** 計測用のパラメーターの campaign の既定値(配信日 + 配信カードの ID から作る。links.ts の campaignId) */
@@ -58,7 +60,7 @@ interface Props {
 }
 
 /** 制作指示のタブの下に置く、リンク先の設定(メイン画像・ボタンごとの URL、計測用のパラメーター、商品のリンクの一覧) */
-export function LinksEditor({ links, onLinks, slots, items, products, campaign, variant, onFocusSlot }: Props) {
+export function LinksEditor({ links, onLinks, slots, template, items, products, campaign, variant, onFocusSlot }: Props) {
   const styles = useStyles()
   const t = useT()
   const [showProducts, setShowProducts] = useState(false)
@@ -128,8 +130,8 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
         </div>
         <div className={styles.caption}>
           {t(
-            'utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所(hero・btn1…・商品の枠は p01-商品コード)から自動で決まります。GA で、どの配信のどのリンクが押されたかを見分けるためです。',
-            'utm_campaign is made from the send date and the delivery card ID, and utm_content from the link spot (hero, btn1…, and p01-product code for product slots). This lets GA tell which link in which delivery was clicked.',
+            'utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から自動で決まります。表のテンプレートは、押された要素の ID(例 box_2m8q.image。箱は写真・名前などが別々のリンク)、以前のテンプレートは hero・btn1…・商品の枠は p01-商品コード です。GA で、どの配信のどのリンクが押されたかを見分けるためです。',
+            'utm_campaign is made from the send date and the delivery card ID, and utm_content from the link spot: the ID of the clicked element for table templates (e.g. box_2m8q.image; a box’s photo, name, etc. are separate links), or hero, btn1…, and p01-product code for older templates. This lets GA tell which link in which delivery was clicked.',
           )}
           {!campaign.includes('-') && t(' まだ保存していない配信は、保存すると utm_campaign に ID が付きます。', ' For an unsaved delivery, the ID is added to utm_campaign when you save.')}
         </div>
@@ -157,12 +159,16 @@ export function LinksEditor({ links, onLinks, slots, items, products, campaign, 
         <div className={styles.products}>
           {items.map((it, i) => {
             const p = products.find((x) => x.id === it.productId)
-            const url = withUtm(productUrl(p), utm, productContent(i, p?.product_code))
+            // 表の箱は、押せる要素(写真・名前など)ごとに別のリンク。開くボタンは、いちばん上の要素のもの
+            const urls = productLinks(template, i, it.key, p?.product_code).map((l) => ({ content: l.content, url: withUtm(productUrl(p), utm, l.content) }))
+            const url = urls[0]?.url ?? ''
             return (
               <div key={it.key} className={styles.productRow}>
                 <div>
                   <div>{p?.name ?? '—'}</div>
-                  <div className={styles.productUrl}>{url || t('商品コードがないため、リンクを作れません', 'No product code, so no link')}</div>
+                  {!productUrl(p) && <div className={styles.productUrl}>{t('商品コードがないため、リンクを作れません', 'No product code, so no link')}</div>}
+                  {productUrl(p) && urls.length === 0 && <div className={styles.productUrl}>{t('この箱には押せる要素がありません(テンプレートの設定)', 'This box has no clickable elements (template setting)')}</div>}
+                  {productUrl(p) && urls.map((u) => <div key={u.content} className={styles.productUrl}>{u.url}</div>)}
                 </div>
                 {url && <Button size="small" appearance="subtle" icon={<OpenRegular />} as="a" href={url} target="_blank" rel="noreferrer" aria-label={t('開く', 'Open')} />}
               </div>

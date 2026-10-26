@@ -207,6 +207,15 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                   </div>
                 )
               }
+              if (p.type === 'text' && p.dir) {
+                // 縦の文字は、縦の細い線 2 本
+                return (
+                  <div key={p.id} style={{ ...area, display: 'grid', gridAutoFlow: 'column', justifyContent: 'center', gap: px(1.5), padding: `${px(2)}px 0` }}>
+                    <div style={{ width: px(1.5), background: LINE }} />
+                    <div style={{ width: px(1.5), height: '70%', background: LINE }} />
+                  </div>
+                )
+              }
               if (p.type === 'text') {
                 return (
                   <div key={p.id} style={{ ...area, display: 'grid', alignContent: 'center', gap: px(1.5) }}>
@@ -219,6 +228,13 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                 return (
                   <div key={p.id} style={{ ...area, display: 'grid', placeItems: 'center', background: p.src ? `center / cover no-repeat url("${p.src.replace(/"/g, '%22')}")` : IMG }}>
                     {p.video && <div style={{ width: px(6), height: px(6), borderRadius: '50%', background: 'rgba(0,0,0,0.55)' }} />}
+                  </div>
+                )
+              }
+              if (p.type === 'line') {
+                return (
+                  <div key={p.id} style={{ ...area, display: 'grid', alignContent: 'center', justifyItems: 'center' }}>
+                    <div style={{ height: Math.max(1, px(0.6)), width: p.lineShort ? '40%' : '100%', background: LINE }} />
                   </div>
                 )
               }

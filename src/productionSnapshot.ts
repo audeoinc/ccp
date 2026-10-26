@@ -6,10 +6,11 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { SOURCE_MANUAL, type Item } from './items'
-import { UTM_SCHEME, campaignId, campaignSlug, encodeLinks, productContent, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { UTM_SCHEME, campaignId, campaignSlug, encodeLinks, productLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
-import { sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
+import { getTemplate, sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
+import { elementDescriptions } from './elements'
 import { priceText, tr } from './i18n'
 import { abSummary, isChoose, ownsAnyText, ownsHero, ownsProducts, ownsTemplate, parseAbTest, type VariantKey, type VariantText } from './abTest'
 
@@ -183,7 +184,8 @@ export function textRows(s: Snapshot, all = false): TextRow[] {
 const variantOf = (s: Snapshot, variant?: VariantKey) => variant ?? (s.ab ? 'A' : undefined)
 const campaignOf = (s: Snapshot, variant?: VariantKey) => variantCampaign(campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), variantOf(s, variant))
 // utm_campaign の既定値と utm_content は、写しの UTM の版で決める(古い写しは、依頼したときの URL のまま出す)
-const scheme2 = (s: Snapshot) => (s.utm ?? 1) >= 2
+const schemeOf = (s: Snapshot) => s.utm ?? 1
+const scheme2 = (s: Snapshot) => schemeOf(s) >= 2
 const utmCampaignOf = (s: Snapshot) => (scheme2(s) ? campaignId(s.card.id, s.card.scheduled_at ?? '') : campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''))
 const utmOf = (s: Snapshot, variant?: VariantKey) => utmFor(parseLinks(s.card.links), utmCampaignOf(s), variantOf(s, variant))
 /** 案の utm_campaign(制作のページの「AB テスト」の段に出す) */
@@ -250,7 +252,8 @@ export function productRows(s: Snapshot, variant?: VariantKey): ProductRow[] {
       ? product.product_code
         ? `data: ${fcmText({ kind: 'product', value: product.product_code }, campaignOf(s, variant))}`
         : ''
-      : withUtm(productUrl(product), utm, scheme2(s) ? productContent(i, product.product_code) : undefined)
+      : // 表の箱は、押せる要素ごとにリンクが分かれる(版 3)。ここには、いちばん上の要素(ふつうは写真)のリンクを出す。全部は計測の対応表(trackingRows)に
+        withUtm(productUrl(product), utm, productLinks(templateOf(s), i, `${pid}-${i}`, product.product_code, schemeOf(s))[0]?.content)
     return [{ section: sec?.label ?? '', product, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
   })
 }
@@ -260,6 +263,8 @@ export interface LinkRow extends CopyRow {
   slotKey?: string
   /** 計測用のパラメーターを付ける前の URL(直すのは、こちら) */
   base?: string
+  /** utm_content(計測の対応表に使う) */
+  content?: string
 }
 
 /** リンク先(場所ごとの URL。アプリは開く画面) */
@@ -267,13 +272,13 @@ export function linkRows(s: Snapshot, variant?: VariantKey): LinkRow[] {
   const links = parseLinks(s.card.links)
   const utm = utmOf(s, variant)
   // リンク先のページ(配信のページ)の URL は、案で変えない(案を付けるのは計測用のパラメーターだけ)
-  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), s.card.country).map((slot) => {
+  const rows: LinkRow[] = linkSlots(templateOf(s), items(s), s.products, campaignSlug(s.card.name ?? '', s.card.scheduled_at ?? ''), s.card.country, schemeOf(s)).map((slot) => {
     if (isPushCard(s)) {
       const d = fcmText(screenOf(links, slot), campaignOf(s, variant))
       return { label: slot.label, value: d ? `data: ${d}` : '' }
     }
     const url = ((slot.kind === 'hero' ? links.hero : links.buttons?.[slot.key]) ?? '').trim() || slot.defaultUrl
-    return { label: slot.label, value: url ? withUtm(url, utm, scheme2(s) ? slot.content : undefined) : '', slotKey: slot.key, base: url }
+    return { label: slot.label, value: url ? withUtm(url, utm, slot.content) : '', slotKey: slot.key, base: url, content: slot.content }
   })
   if (isPushCard(s)) {
     const tap = parsePushLink(s.card.push_link)
@@ -285,19 +290,51 @@ export function linkRows(s: Snapshot, variant?: VariantKey): LinkRow[] {
 /**
  * 書き出す HTML に付けるリンク(プレビューの印 → 計測用のパラメーターつきの URL)。
  * 鍵は、メイン画像・ボタンは data-link の場所の鍵(hero・ボタンの id)、商品の枠は data-item-key(`商品ID-並び順`。CardPreview と同じ)。
+ * 版 3 の表の箱は、押せる要素ごとに data-el(要素の ID)を鍵にする(写真・名前・ボタンが、それぞれ別のリンクになる)。
  * アプリの配信は、リンクが URL でない(開く画面)ので空
  */
 export function htmlLinks(s: Snapshot, variant?: VariantKey): Record<string, string> {
   if (isPushCard(s)) return {}
   const out: Record<string, string> = {}
   for (const r of linkRows(s, variant)) if (r.slotKey && r.value) out[r.slotKey] = r.value
-  const utm = utmOf(s, variant)
-  s.productIds.forEach((pid, i) => {
-    const p = s.products.find((x) => x.id === pid)
-    const url = withUtm(productUrl(p), utm, scheme2(s) ? productContent(i, p?.product_code) : undefined)
-    if (url) out[`${pid}-${i}`] = url
-  })
+  for (const r of productLinkRows(s, variant)) if (r.url) out[r.key] = r.url
   return out
+}
+
+/** 商品の枠のリンク(utm_content ごと。メールの並び順) */
+function productLinkRows(s: Snapshot, variant?: VariantKey): { key: string; content: string; url: string; index: number; productCode?: string }[] {
+  const utm = utmOf(s, variant)
+  return s.productIds.flatMap((pid, i) => {
+    const p = s.products.find((x) => x.id === pid)
+    return productLinks(templateOf(s), i, `${pid}-${i}`, p?.product_code, schemeOf(s)).map((l) => ({ ...l, url: withUtm(productUrl(p), utm, l.content), index: i, productCode: p?.product_code ?? undefined }))
+  })
+}
+
+export interface TrackingRow {
+  /** utm_content */
+  content: string
+  /** 人が読む説明(テンプレートで書いた説明。なければ場所から。UTM には入れない) */
+  desc: string
+  /** 商品の枠なら、商品コード */
+  productCode?: string
+  /** 計測用のパラメーターつきの URL */
+  url: string
+}
+
+/**
+ * 計測の対応表(utm_content → 説明・商品・URL。T8 の 8.10)。制作と分析が、送った content を人の読む名前に引くため。
+ * メールだけ(アプリは content を付けていない)。版 1 の写しは content がないので空
+ */
+export function trackingRows(s: Snapshot, variant?: VariantKey): TrackingRow[] {
+  if (isPushCard(s) || !scheme2(s)) return []
+  const descs = elementDescriptions(getTemplate(templateOf(s)))
+  const links = linkRows(s, variant)
+    .filter((r) => r.content && r.value)
+    .map((r) => ({ content: r.content!, desc: descs.get(r.content!) ?? r.label, url: r.value }))
+  const products = productLinkRows(s, variant)
+    .filter((r) => r.content && r.url)
+    .map((r) => ({ content: r.content, desc: descs.get(r.content) ?? tr(`商品の枠 ${r.index + 1}`, `Product slot ${r.index + 1}`), productCode: r.productCode, url: r.url }))
+  return [...links, ...products]
 }
 
 /** リンク先を 1 つ直した、新しい写し(計測用のパラメーターは、これまでどおり後から付く) */
@@ -352,19 +389,23 @@ export function previewHtml(root: HTMLElement, title: string, links: Record<stri
   src.forEach((el, i) => {
     const out = dst[i]
     if (!out) return
-    const at = el.dataset.link === 'hero' ? 'hero' : el.dataset.link === 'button' ? el.dataset.linkId : el.dataset.itemKey
+    // 表の箱(UTM の版 3)は、枠まるごとではなく、押せる要素(data-el)ごとにリンクが来る。リンクの来ている目印を使う
+    const at = el.dataset.link === 'hero' ? 'hero' : el.dataset.link === 'button' ? el.dataset.linkId : [el.dataset.itemKey, el.dataset.el].find((k) => k && links[k])
     const href = at ? links[at] : undefined
     if (href) wraps.push({ out, href })
     const cs = getComputedStyle(el)
-    // 切り出しの書式(焦点・拡大)は、画像だけに、拡大しているときだけ書く(ほかの要素に書くと、HTML が長くなるだけ)
+    // 切り出しの書式(焦点・拡大)は、画像だけに、拡大しているときだけ書く(ほかの要素に書くと、HTML が長くなるだけ)。縦の文字の書き方も、縦のときだけ書く
     const isImg = el.tagName === 'IMG'
     const zoomed = isImg && cs.getPropertyValue('transform') !== 'none'
-    const keys = STYLE_KEYS.filter((k) => (k === 'object-position' ? isImg : k === 'transform' || k === 'transform-origin' ? zoomed : true))
+    const vertical = cs.getPropertyValue('writing-mode').startsWith('vertical')
+    const keys = [...STYLE_KEYS, ...(vertical ? (['writing-mode', 'text-orientation'] as const) : [])].filter((k) => (k === 'object-position' ? isImg : k === 'transform' || k === 'transform-origin' ? zoomed : true))
     out.setAttribute('style', keys.map((k) => `${k}:${cs.getPropertyValue(k)}`).filter((d) => !d.endsWith(':')).join(';'))
     out.removeAttribute('class')
     // 画面の操作のための印(編集・ドラッグ・リンクの場所の番号)は外す
     for (const a of Array.from(out.attributes)) if (a.name.startsWith('data-') || a.name.startsWith('aria-') || a.name === 'draggable' || a.name === 'tabindex' || a.name === 'contenteditable') out.removeAttribute(a.name)
     if (out instanceof HTMLImageElement && el instanceof HTMLImageElement) out.setAttribute('src', el.currentSrc || el.src)
+    // 縦の文字(テンプレートの 8.8): メールの多くは縦の書き方に対応しないので、制作が画像にする。その印をコメントで残す
+    if (el.dataset.asImage) out.before(document.createComment(tr(' 制作へ: この文字は画像にしてください(縦の文字は、メールで崩れやすいため) ', ' To production: render this text as an image (vertical text breaks in many email clients) ')))
   })
   clone.querySelectorAll('button, input, textarea, select, svg').forEach((n) => n.remove())
   // <a> の中に <a> は置けないので、ほかのリンクの場所を含む場所(ボタンを中に持つメイン画像など)は包まない(中のリンクを生かす)
@@ -403,6 +444,11 @@ export function prettyHtml(src: string): string {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = squash(node.textContent ?? '')
       if (text) lines.push(pad + esc(text))
+      return
+    }
+    // 制作へのコメント(縦の文字を画像にする など)は残す
+    if (node.nodeType === Node.COMMENT_NODE) {
+      lines.push(`${pad}<!--${node.textContent ?? ''}-->`)
       return
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return

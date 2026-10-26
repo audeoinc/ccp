@@ -17,6 +17,11 @@ export interface LinkResults {
   buttons?: number[]
   /** プレビューに出ないリンク(フッターなど) */
   other?: number
+  /**
+   * 要素の ID(utm_content の版 3。box_2m8q.image など)ごとのクリック(T8 の 8.10)。hero・buttons・商品の clicks にも足した上で、細かい分けを残す。
+   * 部品・セクションの単位は、ここから集計でまとめる
+   */
+  els?: Record<string, number>
 }
 
 export interface DeliveryResult {

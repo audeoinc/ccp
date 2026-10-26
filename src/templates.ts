@@ -44,7 +44,7 @@ export type SectionKind = 'grid' | 'photos' | 'wide' | 'mosaic' | 'story' | 'fea
 export const SECTION_KINDS: SectionKind[] = ['grid', 'photos', 'wide', 'mosaic', 'story', 'feature', 'cells', 'table']
 
 /** 表の部品の種類。箱 = 商品 1 点。media = 画像・動画(バナー・タイル・アイコン。動画は、メールではサムネイル + ▶ で動画のページへ) */
-export type PartType = 'box' | 'button' | 'text' | 'media' | 'empty'
+export type PartType = 'box' | 'button' | 'text' | 'media' | 'line' | 'spacer' | 'empty'
 
 /** 写真・画像の形(縦:横)。square 1:1 / portrait 3:4 / landscape 4:3 / wide 2:1 */
 export type MediaRatio = 'square' | 'portrait' | 'landscape' | 'wide'
@@ -87,6 +87,20 @@ export interface TablePart {
   desc?: string
   /** 要素ごとの設定(キーは要素の名前 image / name / price …。要素の ID は「部品 ID.要素の名前」。elements.ts) */
   els?: Record<string, ElementSpec>
+  /** 区切り線: 太さ(px。省略は 1。T8 の 8.9) */
+  lineWidth?: 2 | 4
+  /** 区切り線: 色(省略は薄いグレー。受信側の見た目なので決まった色から。tables.ts の LINE_COLORS) */
+  lineColor?: 'gray' | 'black'
+  /** 区切り線: true のとき、真ん中だけの短い線(省略は全幅) */
+  lineShort?: boolean
+  /** 区切り線: 上下の余白(省略はふつう) */
+  lineSpace?: 'tight' | 'wide'
+  /** 余白: 高さ(px。省略は 24) */
+  height?: number
+  /** テキスト・ボタン・画像: 枠で囲む(クーポンの番号・注意書きなど。省略は囲まない) */
+  frame?: 'solid' | 'dashed'
+  /** 均等の行: 部品の間に縦の区切り線(WOMEN | MEN | KIDS)。行の中のどれかに付いていれば、その行に引く(行を足し引きしても番号がずれないよう、部品に持つ) */
+  sep?: boolean
   /** 箱: 見せ方(省略は card) */
   view?: CellView
   /** 箱: AI に伝える一言(この枠に、どんな商品を置くか) */
@@ -129,6 +143,11 @@ export interface TablePart {
   track?: string
   /** テキスト: 固定の文 */
   text?: string
+  /**
+   * テキスト: 向き(T8 の 8.8。省略は横)。vertical: 縦書き(1 文字ずつ上から下)/ rotate: 90 度回す(英字を横倒しで、上から下へ)。
+   * Gmail・Outlook などは縦の書き方に対応していないことが多いので、制作には「この文字は画像にする」の印を渡す
+   */
+  dir?: 'vertical' | 'rotate'
   /** テキスト: false のとき、配信ごとに書き換えない(省略は書き換えてよい) */
   overridable?: boolean
   /** テキスト・ボタン: 揃え(省略は、テキストは左・ボタンは中央) */

@@ -508,6 +508,7 @@ export function ContentPane(props: Props) {
           links={links}
           onLinks={setLinks}
           slots={slots}
+          template={template}
           items={items}
           products={props.products}
           campaign={props.utmCampaign}
