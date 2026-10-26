@@ -123,6 +123,8 @@ export interface SimpleExtras {
   // ---- 保存(入力が止まって約 1.5 秒で自動。CardDetail)と元に戻す
   /** 開いたとき・前に保存したときから、内容が変わったか */
   dirty: boolean
+  /** 保存すると承認のやり直しになる変更があるか(商品の画像だけを替えたときは false。X64 の g) */
+  revokesApproval: boolean
   /** 確定した週の配信(自動では保存せず、上の帯の保存のボタンで理由を聞く) */
   locked: boolean
   /** 保存の失敗(上の帯に「保存できませんでした・再試行」) */

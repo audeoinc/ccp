@@ -118,7 +118,9 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
     if (!card || isCancelled(card) || !r.recipients) continue
     const cardRuns = runsBy.get(id) ?? []
     const ids = [...new Set(cardRuns.flatMap(learningIdsOf))]
-    const adoption = mainAdoption(cardRuns)
+    // 学びを渡さない依頼(商品の画像の案。X64)は、学びあり / なし と、案の扱いの比べには入れない(入れると「学びなし」の配信に見えるため)
+    const learnRuns = cardRuns.filter((r) => !NO_LEARNING_TASKS.has(r.task ?? ''))
+    const adoption = mainAdoption(learnRuns)
     const lift = liftBy.get(id)
     const l = liftOf(lift)
     out.push({
@@ -129,7 +131,7 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
       sentAt: r.sent_at ?? card.scheduled_at ?? '',
       runs: cardRuns,
       learningIds: ids,
-      withLearnings: cardRuns.length ? ids.length > 0 : null,
+      withLearnings: learnRuns.length ? ids.length > 0 : null,
       adoption,
       recipients: r.recipients,
       ctr: ratio(r.clicks, r.recipients),
@@ -142,6 +144,9 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
   }
   return out.sort((a, b) => b.sentAt.localeCompare(a.sentAt))
 }
+
+/** 学びを渡さない AI の依頼(ai_runs の task)。記録は残すが、学びの効果の比べには使わない */
+const NO_LEARNING_TASKS = new Set(['suggest_product_image'])
 
 function mainAdoption(runs: AiRun[]): AiRunAdoption | null {
   const order: AiRunAdoption[] = ['edited', 'as_is', 'rejected']

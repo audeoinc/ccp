@@ -94,6 +94,9 @@ export interface CardEditorDeps {
   onNext?: () => void
 }
 
+// 中身の要約の、商品の画像のほかの部分と画像の部分の区切り(JSON の中には出ない文字)
+const KEY_SEP = '\n'
+
 export function useCardEditor({ card, defaults, draft, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext }: CardEditorDeps) {
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
 
@@ -488,11 +491,28 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   }
   // 再承認の判定に使う、内容の要約。商品の名前の列は、商品の一覧の読み込みで変わるので、商品 ID の並びで比べる。
   // 開いたときの値(下の baseline)と比べる(保存済みの行と比べると、表し方の違いだけで「変わった」になるため)
-  const contentKey = () => {
+  // 商品の画像(この配信で使う画像。X64)は別に持つ: 画像だけを替えたときは、変えた(保存する)けれど、承認のやり直しにしない(X64 の g。2026-10-26 利用者の決め)
+  const savedItemsOf = () => [itemsOf('A'), ...(ab && ownsProducts(savedTargetAb()) ? ab.variants.map((k) => itemsOf(k)) : [])]
+  const coreKey = () => {
     const { products: _names, ...rest } = buildContent()
     void _names
-    return JSON.stringify({ ...rest, items: itemsOf('A').map((i) => i.productId), variants: ab && ownsProducts(savedTargetAb()) ? ab.variants.map((k) => itemsOf(k).map((i) => i.productId)) : [] })
+    const [a, ...variants] = savedItemsOf()
+    return JSON.stringify({ ...rest, items: a.map((i) => i.productId), variants: variants.map((list) => list.map((i) => i.productId)) })
   }
+  const imagesKey = () => JSON.stringify(savedItemsOf().map((list) => list.map((i) => i.imageUrl ?? '')))
+  const contentKey = () => `${coreKey()}${KEY_SEP}${imagesKey()}`
+  /** 商品の画像を替えた枠(変更の履歴に残す文。保存済みの行だけ。新しく入れた商品は、商品が変わったので、ほかの変更として残る) */
+  const imageNotes = () =>
+    original
+      ? savedItemsOf()
+          .flat()
+          .flatMap((i) => {
+            const before = i.rowId ? original.get(i.rowId) : undefined
+            if (!before || before.image === (i.imageUrl ?? '')) return []
+            const name = productName(i.productId)
+            return [i.imageUrl ? tr(`「${name}」の画像を、この配信で使う画像に替えた`, `Changed the image of "${name}" for this delivery`) : tr(`「${name}」の画像を、商品のマスタの画像に戻した`, `Put the image of "${name}" back to the product master image`)]
+          })
+      : []
   const baseline = useRef<string | null>(null)
   // 保存の途中で書き換えた(読み直したあとの基準を「変えた」のままにして、次の保存で書く。自動保存で、保存中に打った分を取りこぼさないため)
   const editedDuringSaveRef = useRef(false)
@@ -516,6 +536,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const approvedBefore = !!card && statusRank(savedStatus) >= statusRank(STATUS_APPROVED)
   // 開いた時点から内容が変わったか(承認・依頼の前に、保存してもらうため。基準は ref なので、描画の中では読まず、関数で渡す)
   const isDirty = () => baseline.current !== null && baseline.current !== contentKey()
+  /** 開いた時点から、商品の画像のほかに変えたか(承認のやり直しを決める。基準が空 = 保存の途中で書き換えた、は変えたとみなす) */
+  const coreChanged = () => baseline.current !== null && baseline.current.split(KEY_SEP)[0] !== coreKey()
 
   // 開いてから内容を変えたか(承認済み・確定した週の帯は、変えたときだけ出す。ふだんの説明は、右のプロセスのペインの状態の下)
   const [changed, setChanged] = useState(false)
@@ -525,8 +547,11 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   useEffect(() => {
     latestKeyRef.current = currentKey
   })
+  // 商品の画像のほかにも変えたか(承認済みの配信で「保存すると承認待ちに戻る」を出すのは、こちらのとき。X64 の g)
+  const [coreDirty, setCoreDirty] = useState(false)
   useEffect(() => {
     setChanged(baseline.current !== null && baseline.current !== currentKey)
+    setCoreDirty(baseline.current !== null && !baseline.current.startsWith(currentKey.split(KEY_SEP)[0] + KEY_SEP))
   }, [currentKey, baseVersion])
   // 承認(依頼・承認・差し戻し)を出すか: 保存済みで、確定していない配信(確定した週の配信は、確定後の変更の流れ)
   const canReview = !!card && lockedWeeks.length === 0 && statusRank(savedStatus) <= statusRank(STATUS_APPROVED)
@@ -558,7 +583,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         formStatus: num(form.status),
         reason,
         approvedBefore,
-        contentChanged: baseline.current !== null && baseline.current !== contentKey(),
+        // 商品の画像だけを替えたときは、承認済みのまま(承認のやり直しにしない。変更の履歴には残す。X64 の g)
+        contentChanged: coreChanged(),
       })
       const status = plan.status
       const fields = { ...buildContent(), status: status as DeliveryCard['status'] }
@@ -610,9 +636,11 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
           })
         },
         // アラートへの対応で差し替えた理由を、配信のメモ(種類 change)に残す
+        // 商品の画像を替えたことも、変更の履歴に残す(承認のやり直しにしないので、何が変わったかを見返せるように)
         saveAlertNotes: async (id) => {
-          if (alertNotes.length === 0) return
-          for (const body of alertNotes) await CardNotesService.create({ kind: 'change', body, author: myName() || form.owner || '', delivery_card_id: id })
+          const notes = [...alertNotes, ...imageNotes()]
+          if (notes.length === 0) return
+          for (const body of notes) await CardNotesService.create({ kind: 'change', body, author: myName() || form.owner || '', delivery_card_id: id })
           setAlertNotes([])
         },
         reload: async () => {
@@ -669,5 +697,5 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     setItems(next)
   }
 
-  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError }
+  return { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, heroCandidates, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, market, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, addProduct, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, coreDirty, canReview, save, swapItems, savingAfter, pendingSave, askReason, cancelReason, savedAt, currentKey, saveError }
 }

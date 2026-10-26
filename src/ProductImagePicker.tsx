@@ -4,6 +4,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { ArrowDownloadRegular, DismissRegular, DocumentArrowUpRegular, OpenRegular } from '@fluentui/react-icons'
 import { ProductPages, type ImageAngle, type ImagePick, type PageImage } from './data/productPages'
 import { ProductImagesService } from './data/productImages'
+import { AiRunsService, type AiRunAdoption } from './data/aiRuns'
 import { appPath } from './appRoot'
 import { productUrl } from './links'
 import { productImage } from './images'
@@ -48,7 +49,12 @@ export interface DeliveryGist {
   headline?: string
   copy?: string
   themeType?: string
+  /** 配信カードの id(AI の画像の案を、AI の依頼の記録 ai_runs に残すため。まだ保存していない配信は残さない) */
+  cardId?: string
 }
+
+/** AI の依頼の記録(ai_runs)の種類。画像の案は学びを使わないので、結果の面の「学びあり / なし」の比べには入れない(src/impact.ts) */
+export const IMAGE_SUGGEST_TASK = 'suggest_product_image'
 
 interface Props {
   product: Product
@@ -82,6 +88,13 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // いまの AI の案の記録(ai_runs の id)。決めたときに、案から選んだか(as_is)・ほかを選んだか(rejected)を書く(X64 の f)
+  const runRef = useRef<string | null>(null)
+  const settleRun = (adoption: AiRunAdoption) => {
+    const id = runRef.current
+    runRef.current = null
+    if (id) AiRunsService.update(id, { adoption }).catch(() => undefined)
+  }
 
   const read = async (target: string) => {
     if (!target.trim()) return
@@ -145,6 +158,14 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
       })
       setAngles(r.images)
       setPicks(r.picks)
+      // AI の案を頼んだことを残す(記録に失敗しても、案は使える。案そのものは保存しない)
+      runRef.current = null
+      if (delivery.cardId)
+        void AiRunsService.create({ delivery_card_id: delivery.cardId, task: IMAGE_SUGGEST_TASK, learning_ids: '[]' })
+          .then((x) => {
+            if (x.success && x.data?.id) runRef.current = x.data.id
+          })
+          .catch(() => undefined)
       if (r.picks[0]) setChosen({ kind: 'page', index: r.picks[0].index })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -199,6 +220,8 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
   const chosenSrc = chosen?.kind === 'page' ? page?.images[chosen.index]?.src : chosen?.kind === 'own' ? chosen.url : undefined
   const confirm = async () => {
     if (!chosen) return
+    // AI のおすすめ(1〜3 位のどれか)を選んだら「そのまま採用」、ほかの画像なら「使わなかった」
+    settleRun(chosen.kind === 'page' && picks?.some((x) => x.index === chosen.index) ? 'as_is' : 'rejected')
     // 上げたファイル(素材の置き場所に置いたもの)は、そのまま使う
     if (chosen.kind === 'own' && !/^https?:\/\//.test(chosen.url)) {
       onPick(chosen.url, chosen.source)
@@ -397,7 +420,13 @@ export function ProductImagePicker({ product, current, delivery, onPick, onClose
           </DialogContent>
           <DialogActions>
             {current && (
-              <Button appearance="subtle" onClick={() => onPick('', '')}>
+              <Button
+                appearance="subtle"
+                onClick={() => {
+                  settleRun('rejected')
+                  onPick('', '')
+                }}
+              >
                 {t('商品のマスタの画像に戻す', 'Back to the product master image')}
               </Button>
             )}

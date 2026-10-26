@@ -176,7 +176,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
-  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, canReview, save, savingAfter, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
+  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, coreDirty, canReview, save, savingAfter, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
@@ -473,7 +473,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     )}
 
     {/* 承認済みの配信: シンプルな画面は、上の承認の帯(simple/ApprovalBadge の ApprovalBand)で「直すと承認待ちに戻ります」を知らせる(2026-10-26 帯にまとめた) */}
-    {approvedBefore && lockedWeeks.length === 0 && !simpleOn && changed && (
+    {approvedBefore && lockedWeeks.length === 0 && !simpleOn && coreDirty && (
       <MessageBar layout="multiline" intent="info" className={styles.locked}>
         <MessageBarBody>
           {t(
@@ -532,7 +532,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           alertKinds={productAlertKinds}
           options={options}
           image={item?.imageUrl}
-          delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '' }}
+          delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '', cardId: card?.id }}
           onImage={item ? (url, source) => setItemImage(item.key, url, source) : undefined}
           onSwapCandidate={
             item
@@ -1101,6 +1101,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         previewTexts: aiPreview?.texts ?? null,
         setTemplate: changeTemplate,
         dirty: changed,
+        revokesApproval: coreDirty,
         locked,
         saveError: saveError?.message ?? null,
         saveConflict: saveError?.conflict ? { at: conflictTime, overwrite: overwriteSave, reload: onBack } : null,
