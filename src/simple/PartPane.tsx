@@ -21,8 +21,8 @@ import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
 import { channelOptions, countryOptions } from '../status'
 import { baseTemplateId, getTemplate, openTemplateManager, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
-import { canRewriteText, canSwapImage, findPart, partImageOf, setPartValue, type PartValue } from '../partContent'
-import { PartImagePick } from '../PartImagePick'
+import { findPart, hasPartFields } from '../partContent'
+import { PartContentFields } from '../PartContentFields'
 import { TemplateThumb } from '../TemplateThumb'
 import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
@@ -41,8 +41,6 @@ import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, Targ
 
 const useStyles = makeStyles({
   // テンプレートで決まっている部品の知らせ(鍵の印 + 文 + テンプレートの管理へのリンク)
-  // 差し替えた画像の見本(部品の画像は透過のものもあるので、薄い地の上に)
-  partImg: { width: '100%', maxHeight: '160px', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3, borderRadius: tokens.borderRadiusMedium },
   lockedNote: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '6px', alignItems: 'start', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   lockedIcon: { marginTop: '2px' },
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
@@ -679,9 +677,14 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       }
       case 'button': {
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
+        const tp = findPart(getTemplate(e.template), part.id)
         return (
           <>
-            <TemplateLocked text={t('ボタンの文言はテンプレートで決まっています。', 'The button text comes from the template.')} />
+            {tp && hasPartFields(tp) ? (
+              <PartContentFields part={tp} value={e.partContent} onChange={e.setPartContent} variants={!!e.ab} />
+            ) : (
+              <TemplateLocked text={t('ボタンの文言はテンプレートで決まっています(テンプレートで「配信ごとに書き換えてよい」にすると、ここで書き換えられます)。', 'The button text comes from the template (allow rewriting per delivery in the template to change it here).')} />
+            )}
             {e.ab && <span className={s.caption}>{t('リンク先は全部の案で共通です。', 'Links are shared by all variants.')}</span>}
             {slot && <Text size={200}>{slot.label}</Text>}
             {e.channel === 'email' ? (
@@ -701,31 +704,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         // テンプレートの表の画像・動画(T8)。テンプレートで差し替えを許した画像は、この配信の画像に替えられる(段階 6)。リンク先は、ボタンと同じく配信ごと
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
         const tp = findPart(getTemplate(e.template), part.id)
-        const swappable = !!tp && canSwapImage(tp)
-        const cur = tp ? partImageOf(tp, e.partContent) : {}
-        const mine = e.partContent[part.id]
-        const setPart = (patch: Partial<PartValue> | null) => e.setPartContent((pc) => setPartValue(pc, part.id, patch))
         return (
           <>
-            {swappable ? (
-              <>
-                <span className={s.caption}>
-                  {mine?.src ? t('この配信の画像に差し替えています。', 'Swapped to an image for this delivery.') : t('テンプレートの画像です。この配信の画像に差し替えられます。', 'This is the template image. You can swap it for this delivery.')}
-                  {e.ab && t(' 案ごとに替えられます。', ' Each variant can differ.')}
-                </span>
-                {cur.src && <img className={s.partImg} src={cur.src} alt={cur.alt ?? ''} />}
-                <PartImagePick onPick={(img) => setPart({ src: img.url, imageId: img.id, alt: img.alt ?? mine?.alt })} />
-                <Field label={t('代わりの文(画像が出ないときの文)', 'Alt text (shown if the image does not load)')} size="small">
-                  <Input size="small" value={mine?.alt ?? ''} placeholder={tp?.alt} maxLength={200} onChange={(_, d) => setPart({ alt: d.value })} />
-                </Field>
-                {mine && (
-                  <span className={s.row}>
-                    <Button size="small" appearance="subtle" onClick={() => setPart(null)}>
-                      {t('テンプレートの画像に戻す', 'Back to the template image')}
-                    </Button>
-                  </span>
-                )}
-              </>
+            {tp && hasPartFields(tp) ? (
+              <PartContentFields part={tp} value={e.partContent} onChange={e.setPartContent} variants={!!e.ab} />
             ) : (
               <TemplateLocked text={t('画像はテンプレートで決まっています(テンプレートで「配信ごとに差し替える」にすると、ここで替えられます)。押したときのリンク先は、この配信で決められます。', 'The image comes from the template (turn on “Swap per delivery” in the template to swap it here). The link on click can be set for this delivery.')} />
             )}
@@ -744,32 +726,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'text': {
         // テンプレートの表のテキスト(T8)。テンプレートで書き換えを許した文は、この配信の文に書き換えられる(段階 6)。空はテンプレートの文
         const tp = findPart(getTemplate(e.template), part.id)
-        if (!tp || !canRewriteText(tp)) return <TemplateLocked text={t('この文はテンプレートで決まっています(テンプレートで「配信ごとに書き換えてよい」にすると、ここで書き換えられます)。', 'This text comes from the template (allow rewriting per delivery in the template to change it here).')} />
-        const mine = e.partContent[part.id]?.text ?? ''
-        const setText = (v: string) => e.setPartContent((pc) => setPartValue(pc, part.id, { text: v }))
-        return (
-          <>
-            <span className={s.caption}>
-              {t('空にすると、テンプレートの文(薄い文字)のまま出ます。', 'Leave empty to use the template text (shown in light text).')}
-              {e.ab && t(' 案ごとに書き換えられます。', ' Each variant can differ.')}
-            </span>
-            <Field label={t('この配信の文', 'Text for this delivery')} size="small">
-              <AutoTextarea heightKey="PartPane.partText" size="small" rows={3} autoFocus value={mine} placeholder={tp.text ?? ''} maxLength={2000} onChange={(_, d) => setText(d.value)} />
-            </Field>
-            <span className={s.row}>
-              {!mine && tp.text && (
-                <Button size="small" appearance="subtle" onClick={() => setText(tp.text ?? '')}>
-                  {t('テンプレートの文を写して直す', 'Copy the template text to edit')}
-                </Button>
-              )}
-              {mine && (
-                <Button size="small" appearance="subtle" onClick={() => e.setPartContent((pc) => setPartValue(pc, part.id, null))}>
-                  {t('テンプレートの文に戻す', 'Back to the template text')}
-                </Button>
-              )}
-            </span>
-          </>
-        )
+        if (!tp || !hasPartFields(tp)) return <TemplateLocked text={t('この文はテンプレートで決まっています(テンプレートで「配信ごとに書き換えてよい」にすると、ここで書き換えられます)。', 'This text comes from the template (allow rewriting per delivery in the template to change it here).')} />
+        return <PartContentFields part={tp} value={e.partContent} onChange={e.setPartContent} variants={!!e.ab} autoFocus />
       }
       case 'template':
         return <TemplatePicker editor={e} />

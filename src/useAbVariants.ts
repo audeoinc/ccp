@@ -6,7 +6,7 @@ import { tr } from './i18n'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { pinnedTemplateKey, templateKeyOfCard, type EmailTemplateId, type TemplateChannel } from './templates'
+import { getTemplate, pinnedTemplateKey, templateKeyOfCard, type EmailTemplateId, type TemplateChannel } from './templates'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import type { AiCard, CopyLanguage } from './aiSelect'
 import { draftVariant } from './abAi'
@@ -14,7 +14,7 @@ import { confirmDialog } from './confirm'
 import { myName } from './history'
 import { allVariants, newAbTest, nextVariant, ownsHero, ownsAnyText, ownsProducts, ownsTemplate, ownsText, parseAbTest, parseDecision, type AbDecision, type AbPurpose, type AbTarget, type AbTest, type RejectedVariant, type VariantKey, type VariantText } from './abTest'
 import type { PartRef } from './simple/parts'
-import { prunePartContent, samePartContent, type PartContent } from './partContent'
+import { findPart, prunePartContent, samePartContent, type PartContent } from './partContent'
 import type { Form } from './cardForm'
 
 /** AB テストの、いま編集していない案の中身(X55。編集中の案は items・heroId・heroReason にある) */
@@ -319,7 +319,8 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
     const ap = a.parts ?? {}
     const xp = x.parts ?? ap
     for (const id of new Set([...Object.keys(ap), ...Object.keys(xp)])) {
-      if ((xp[id]?.text ?? '') !== (ap[id]?.text ?? '')) parts.push({ kind: 'text', id })
+      // 文はテキストの部品かボタンの文言(ボタンなら、ボタンの部品に目印)
+      if ((xp[id]?.text ?? '') !== (ap[id]?.text ?? '')) parts.push(findPart(getTemplate(templateOfV(k)), id)?.type === 'button' ? { kind: 'button', id } : { kind: 'text', id })
       if ((xp[id]?.src ?? '') !== (ap[id]?.src ?? '') || (xp[id]?.alt ?? '') !== (ap[id]?.alt ?? '')) parts.push({ kind: 'image', id })
     }
     const text = parts.some((p) => p.kind !== 'subject' && p.kind !== 'preheader')

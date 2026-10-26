@@ -1993,6 +1993,9 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               <Field label={t('文言', 'Label')} size="small">
                 <Input size="small" value={p.label ?? ''} placeholder={defaultButtonLabel(0)} maxLength={30} onChange={(_, d) => patch(sec, p, { label: d.value || undefined })} />
               </Field>
+              {p.face !== 'image' && (
+                <Checkbox label={t('文言を配信ごとに書き換えてよい', 'Label can be rewritten per delivery')} checked={p.overridable !== false} onChange={(_, d) => patch(sec, p, { overridable: d.checked === true ? undefined : false })} />
+              )}
               <Field label={t('文字 / 画像', 'Text / image')} size="small">
                 {seg(p.face, [[undefined, t('文字', 'Text')], ['image', t('画像', 'Image')], ['both', t('画像に文字', 'Both')]], (v) => patch(sec, p, { face: v }))}
               </Field>

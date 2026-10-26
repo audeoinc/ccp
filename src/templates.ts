@@ -148,7 +148,7 @@ export interface TablePart {
    * Gmail・Outlook などは縦の書き方に対応していないことが多いので、制作には「この文字は画像にする」の印を渡す
    */
   dir?: 'vertical' | 'rotate'
-  /** テキスト: false のとき、配信ごとに書き換えない(省略は書き換えてよい) */
+  /** テキスト・ボタン: false のとき、文(ボタンは文言)を配信ごとに書き換えない(省略は書き換えてよい) */
   overridable?: boolean
   /** テキスト・ボタン: 揃え(省略は、テキストは左・ボタンは中央) */
   align?: TextAlign

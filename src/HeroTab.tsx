@@ -14,8 +14,13 @@ import type { AiDrafts } from './useAiDrafts'
 import { AiButton } from './AiButton'
 import type { useCardEditor } from './useCardEditor'
 import { useContentPaneStyles } from './contentPaneStyles'
-import { CopyTab, Finder, UndoBar } from './contentPaneParts'
+import { Block, CopyTab, Finder, UndoBar } from './contentPaneParts'
 import { heroMeta, revealTab, type FieldKey, type RegisterChat } from './contentPaneUtil'
+import { getTemplate } from './templates'
+import { partsOf } from './tables'
+import { elementDescriptions } from './elements'
+import { TemplatePartsList } from './PartContentFields'
+import { hasPartFields } from './partContent'
 
 type CardEditor = ReturnType<typeof useCardEditor>
 
@@ -23,7 +28,7 @@ interface Props {
   /** 配信カードの中身と直し方(useCardEditor が返すもの) */
   editor: Pick<
     CardEditor,
-    'form' | 'setForm' | 'template' | 'items' | 'setItems' | 'candidates' | 'setCandidates' | 'heroId' | 'setHeroId' | 'heroReason' | 'setHeroReason' | 'heroCandidates' | 'setHeroCandidates' | 'poolHeroes' | 'saving' | 'templateChannel'
+    'form' | 'setForm' | 'template' | 'items' | 'setItems' | 'candidates' | 'setCandidates' | 'heroId' | 'setHeroId' | 'heroReason' | 'setHeroReason' | 'heroCandidates' | 'setHeroCandidates' | 'poolHeroes' | 'saving' | 'templateChannel' | 'partContent' | 'setPartContent' | 'ab'
   >
   drafts: AiDrafts
   /** すべてのメイン画像(載せた画像の表示用。選ぶ対象は editor.poolHeroes) */
@@ -127,6 +132,16 @@ export function HeroTab({ editor, drafts, heroes, registerChat, subjectAbKey, on
     setHeroId(undefined)
     setHeroReason('')
   }
+
+  // ヒーローの下の表の部品(書き換え・差し替えを許したボタン・テキスト・画像。T8 段階 6。シンプルな配信カードの部品のペインと同じ欄)
+  const layout = getTemplate(template)
+  const heroTableParts = layout.heroTable ? partsOf(layout.heroTable).filter(hasPartFields).sort((a, b) => a.r - b.r || a.c - b.c) : []
+  const descs = elementDescriptions(layout)
+  const heroParts = heroTableParts.length > 0 && (
+    <Block title={t('メイン画像の下の部品(文・画像)', 'Parts under the main image (text and images)')}>
+      <TemplatePartsList parts={heroTableParts} label={(p) => descs.get(p.id) ?? p.id} value={editor.partContent} onChange={editor.setPartContent} variants={!!editor.ab} />
+    </Block>
+  )
 
   const heroView = () => {
     const busy = !!drafts.busy.hero
@@ -281,7 +296,12 @@ export function HeroTab({ editor, drafts, heroes, registerChat, subjectAbKey, on
   return (
     <div className={s.grid12}>
       {subTabs}
-      {active === 'hero' ? heroView() : (
+      {active === 'hero' ? (
+        <>
+          {heroView()}
+          {heroParts}
+        </>
+      ) : (
         <>
           {copyView}
           {inboxView}

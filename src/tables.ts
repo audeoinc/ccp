@@ -657,6 +657,8 @@ export function parsePart(raw: unknown): TablePart | null {
     if (LINKS.includes(o.link as LinkKind) && o.link !== 'campaign') part.link = o.link as LinkKind
     const track = str(o.track, 60)
     if (track) part.track = track
+    // 文言を配信ごとに書き換えない(省略は書き換えてよい。テキストと同じ印)
+    if (o.overridable === false) part.overridable = false
   } else if (type === 'text') {
     const text = str(o.text, 1000)
     if (text) part.text = text

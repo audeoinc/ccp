@@ -13,7 +13,11 @@ import { ProductFloat } from './ProductFloat'
 import { AlertChip, LowStockBadge } from './ProductMarks'
 import type { CardAlertKind } from './cardAlerts'
 import { useSelection } from './useSelection'
-import { sectionRange, type SectionInfo } from './templates'
+import { getTemplate, sectionRange, type SectionInfo } from './templates'
+import { partsOf } from './tables'
+import { elementDescriptions } from './elements'
+import { TemplatePartsList } from './PartContentFields'
+import { hasPartFields } from './partContent'
 import type { AiDrafts } from './useAiDrafts'
 import { AiButton } from './AiButton'
 import type { useCardEditor } from './useCardEditor'
@@ -25,7 +29,7 @@ type CardEditor = ReturnType<typeof useCardEditor>
 
 interface Props {
   /** 配信カードの中身と直し方(useCardEditor が返すもの) */
-  editor: Pick<CardEditor, 'form' | 'template' | 'sectionTitles' | 'sectionCopies' | 'setSectionTitle' | 'setSectionCopy' | 'items' | 'setItems' | 'candidates' | 'setCandidates' | 'poolProducts' | 'saving'>
+  editor: Pick<CardEditor, 'form' | 'template' | 'sectionTitles' | 'sectionCopies' | 'setSectionTitle' | 'setSectionCopy' | 'items' | 'setItems' | 'candidates' | 'setCandidates' | 'poolProducts' | 'saving' | 'partContent' | 'setPartContent' | 'ab'>
   drafts: AiDrafts
   /** すべての商品(載せた商品の表示用。選ぶ対象は editor.poolProducts) */
   products: Product[]
@@ -180,6 +184,12 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
     const copies = drafts.sectionCopyCandidates[i] ?? []
     const currentTitle = sectionTitles[i] ?? ''
     const currentCopy = sectionCopies[i] ?? ''
+    // テンプレートの部品(表のセクションの、書き換え・差し替えを許したテキスト・ボタン・画像。T8 段階 6。シンプルな配信カードの部品のペインと同じ欄)
+    const layout = getTemplate(template)
+    const tparts = [...partsOf(layout.sections[i] ?? { kind: 'grid', slots: 0 })].filter(hasPartFields).sort((a, b) => a.r - b.r || a.c - b.c)
+    const descs = elementDescriptions(layout)
+    const changedParts = tparts.filter((p) => editor.partContent[p.id]).length
+    const partNo = sec.wantTitle ? 4 : 3
 
     const header = (
       <div className={s.flexRow}>
@@ -377,6 +387,16 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
             <Candidates products={poolProducts} usedIds={usedIds} onAdd={(id) => addManual(sec, id)} />
           </Finder>
         </Block>
+
+        {tparts.length > 0 && (
+          <Block
+            {...fold(`${i}:parts`)}
+            summary={changedParts ? t(`この配信で直した部品 ${changedParts}`, `${changedParts} part(s) changed for this delivery`) : t('テンプレートのまま', 'As in the template')}
+            title={`${partNo === 4 ? '④ ' : '③ '}${t('テンプレートの部品(文・画像)', 'Template parts (text and images)')}`}
+          >
+            <TemplatePartsList parts={tparts} label={(p) => descs.get(p.id) ?? p.id} value={editor.partContent} onChange={editor.setPartContent} variants={!!editor.ab} />
+          </Block>
+        )}
       </div>
     )
   }
