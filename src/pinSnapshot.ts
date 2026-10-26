@@ -80,10 +80,12 @@ export function startCaptureAt(key: string, x: number, y: number, mark: Element 
     const left = Math.min(Math.max(x - w / 2, r.left), r.right - w)
     const top = Math.min(Math.max(y - h / 2, r.top), r.bottom - h)
     const whole = await toCanvas(hit as HTMLElement, { pixelRatio: 1, backgroundColor: '#ffffff', filter })
+    // 写した画像は、表示の大きさ(CSS の zoom。X60)を掛ける前の大きさ。測った点・枠は掛けたあとの px なので、切り出す所を画像の大きさに直す
+    const k = r.width > 0 ? whole.width / r.width : 1
     const out = document.createElement('canvas')
-    out.width = Math.round(w)
-    out.height = Math.round(h)
-    out.getContext('2d')?.drawImage(whole, left - r.left, top - r.top, w, h, 0, 0, w, h)
+    out.width = Math.round(w * k)
+    out.height = Math.round(h * k)
+    out.getContext('2d')?.drawImage(whole, (left - r.left) * k, (top - r.top) * k, w * k, h * k, 0, 0, w * k, h * k)
     return new Promise<Blob | null>((ok) => out.toBlob(ok, 'image/png'))
   })
 }
