@@ -103,7 +103,15 @@ export async function checkParts(server) {
   const s3 = snap.setText(s2, { key: 'part_text', id: 'txt_a' }, 'テンプレートの文')
   same(problems, '制作の写し: テンプレートの文に戻す', pc.parsePartContent(s3.card.part_content), { txt_h: { text: '直した' } })
 
-  return { problems, ok: 'parts OK(読む・保存する分・描く・制作の写し)', title: 'テンプレートの部品の、配信ごとの中身が、例と合いません' }
+  // 箱の名前・価格などの置き場所(T12): 決めていなければ見せ方から(保存済みのテンプレートは今の見た目のまま)。読むときに知らない値は外す
+  const tb = await server.ssrLoadModule('/src/tables.ts')
+  const box = (x) => ({ id: 'b', type: 'box', c: 0, r: 0, w: 1, h: 1, ...x })
+  same(problems, '置き場所: 既定', [box({}), box({ view: 'photo' }), box({ w: 2 }), box({ view: 'detail' }), box({ view: 'story' })].map(tb.boxPlace), ['below', 'bottom', 'bottom', 'right', undefined])
+  same(problems, '置き場所: 決めた値', [box({ place: 'top' }), box({ view: 'detail', place: 'left' }), box({ view: 'story', place: 'top' })].map(tb.boxPlace), ['top', 'left', undefined])
+  same(problems, '置き場所: 横に並べる箱', [box({ place: 'left' }), box({ view: 'detail' }), box({ view: 'story' }), box({ place: 'middle' })].map(tb.isSideBox), [true, true, true, false])
+  same(problems, '置き場所: 読む', [tb.parsePart(box({ place: 'middle' }))?.place, tb.parsePart(box({ place: 'side' }))?.place], ['middle', undefined])
+
+  return { problems, ok: 'parts OK(読む・保存する分・描く・制作の写し・箱の置き場所)', title: 'テンプレートの部品の、配信ごとの中身が、例と合いません' }
 }
 
 // 単独で流したとき
