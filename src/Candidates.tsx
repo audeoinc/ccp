@@ -5,6 +5,7 @@ import type { Product } from './models/products'
 import { DND_PRODUCT, yen } from './items'
 import { productMarket } from './market'
 import { optionLabel, useT } from './i18n'
+import { ProductThumbButton } from './ProductThumbButton'
 import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { FilterChips, SearchField } from './SearchField'
@@ -21,6 +22,8 @@ interface Props {
   pickHint?: string
   /** 行に添える印(残少・週の上限 など) */
   marks?: (p: Product) => ReactNode
+  /** 選ぶ使い方で、行の写真を押したとき(入れ替えの候補の詳しい情報を開く) */
+  onDetail?: (productId: string) => void
 }
 
 const useStyles = makeStyles({
@@ -58,7 +61,7 @@ const PAGE = 20
 
 const trendMark = (label?: string) => (label === '上昇' ? '▲ ' : label === '下降' ? '▼ ' : '— ') + optionLabel(label === '上昇' || label === '下降' ? label : '横ばい')
 
-export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHint, marks }: Props) {
+export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHint, marks, onDetail }: Props) {
   const t = useT()
   const styles = useStyles()
   const [query, setQuery] = useState('')
@@ -125,7 +128,11 @@ export function Candidates({ products, usedIds, onAdd, onPick, pickedId, pickHin
             }}
             className={mergeClasses(styles.item, used && styles.itemUsed)}
           >
-            <ImageThumb src={productImage(p)} alt={p.name} width={48} height={64} />
+            {onPick && onDetail && !used ? (
+              <ProductThumbButton src={productImage(p)} name={p.name} width={48} height={64} onClick={() => onDetail(p.id)} />
+            ) : (
+              <ImageThumb src={productImage(p)} alt={p.name} width={48} height={64} />
+            )}
             <div className={styles.body}>
               <Text weight="semibold" size={300} truncate wrap={false} block>{p.name}</Text>
               <Caption1 className={styles.line}>

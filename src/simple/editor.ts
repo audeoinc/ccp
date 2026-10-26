@@ -46,10 +46,17 @@ export interface AiPreview {
   item?: { key: string; productId: string }
 }
 
+/** 商品のフロートを、入れ替えの候補(配信に載っていない商品)の詳しい情報として開くときの鍵の頭(openProduct の key に「pid:商品 ID」) */
+export const CANDIDATE_DETAIL = 'pid:'
+
 /** 商品のフロートに足す、選んでいる枠への操作(「この枠の商品と入れ替える」など) */
 export interface FloatAction {
   label: string
   run: () => void
+  /** 帯の説明(渡さなければ「プレビューで選んでいる枠と見比べています」) */
+  note?: string
+  /** 「← 候補に戻る」(入れ替えの候補の詳しい情報として開いたとき。フロートを閉じて、部品のペインの候補に戻る) */
+  backLabel?: string
 }
 
 /**

@@ -206,7 +206,7 @@
 | `calendar.view` / `week.lens` | 見せ方(月 / 週 / 一覧 / 商品別 / 比べる)/ 週の見方(商品 / 進み具合 / 時刻) |
 | `list.columns.v2` | 一覧の列の選び方 |
 | `ccp.country` | ヘッダーで選んだ国(X33) |
-| `float.<種類>.size` | 大きさを変えたフロートの大きさ(`ResizableSurface`。alerts・finished・productAction・bulk・abCompare・asset・devRequests・heroLibrary・heroUpload・partUpload・people・policy・ruleEdit・productImages・productionChat・resultDetail・resultPeek・weekHistory・pin) |
+| `float.<種類>.size` | 大きさを変えたフロートの大きさ(`ResizableSurface`。alerts・finished・productAction・bulk・bulkPreview・abCompare・asset・devRequests・heroLibrary・heroUpload・partUpload・people・policy・ruleEdit・productImages・productionChat・resultDetail・resultPeek・weekHistory・pin) |
 | `textarea.<heightKey>.height` | 複数行の入力欄で、つかんで決めた最低の高さ(`AutoTextarea`) |
 | `hints.dismissed` | 閉じた案内(`Hint`)の鍵の一覧(X72。自分の設定の「ヒントをもう一度出す」で空にする) |
 | `devRequest.name` | 開発へのリクエストに残す名前(CCP の名前の設定 `me.name` とは別。初めて書くときに聞く。X69) |

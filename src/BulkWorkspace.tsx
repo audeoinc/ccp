@@ -1,4 +1,4 @@
-import { Fragment, useRef, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -39,6 +39,7 @@ import {
   DismissRegular,
   EditRegular,
   ErrorCircleRegular,
+  EyeRegular,
   LockClosedRegular,
   SaveRegular,
   WarningFilled,
@@ -56,6 +57,7 @@ import { dayOfKey, timeOfKey } from './useBulkWorkspace'
 import { getTemplate } from './templates'
 import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
 import { ImageThumb } from './ImageThumb'
+import { BulkPreviewFloat, type BulkPreviewItem } from './BulkPreviewFloat'
 import { heroImage, productImage } from './images'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
@@ -236,6 +238,8 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
   const t = useT()
   // 「終えて、週の表示で見る」から閉じようとしたか(閉じるダイアログで決めたあとも、週の表示に移るため)
   const finishRef = useRef(false)
+  // ② の案のプレビュー(フロート)で見ている案の位置。← → で隣の案に移る
+  const [previewAt, setPreviewAt] = useState<number | null>(null)
   const dayText = (key: string) =>
     new Date(`${dayOfKey(key)}T00:00`).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' }) + (timeOfKey(key) ? ` ${timeOfKey(key)}` : '')
   const f = (d: Date) => d.toLocaleDateString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short' })
@@ -248,6 +252,8 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
   // 中身を作らずに保存したときは、② は通らない
   const plainDone = ws.plainCards.length > 0 || ws.savingPlain
   const pOf = (id: string) => products.find((p) => p.id === id)
+  /** プレビューで順に見る案(日付の順。破棄した案は除く) */
+  const previewItems: BulkPreviewItem[] = ws.reviewItems.filter((x) => x.state !== 'discarded').map((x) => ({ key: x.day, when: dayText(x.day), card: x.card, productIds: x.productIds }))
 
   // ---- 見出し: 週・国・チャネル。国はヘッダーで選んだ国(X33)。ヘッダーが「すべての国」のときだけ、ここで選ぶ
   const editable = ws.step === 1 && !ws.started
@@ -589,6 +595,12 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                 <span>{dayText(day)}</span>
                 {(item?.card.theme_type || row.themeType) && <span>{`・ ${themeTypeLabel((item?.card.theme_type || row.themeType) as ThemeType)}`}</span>}
                 <span className={s.spacer} />
+                {/* 見出し・コピー・セクションの並びが、テンプレートにどう載るかを、配信カードと同じ描き方で見る(破棄した案は出さない) */}
+                {item && item.state !== 'discarded' && (
+                  <Button size="small" appearance="subtle" icon={<EyeRegular />} onClick={() => setPreviewAt(previewItems.findIndex((x) => x.key === day))}>
+                    {t('プレビュー', 'Preview')}
+                  </Button>
+                )}
                 {item && stateBadge(item.state)}
               </div>
             )
@@ -872,6 +884,8 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
           </div>
         </ResizableSurface>
       </Dialog>
+      {/* ② の案のプレビュー。まだ保存していない案も、そのまま描く(保存はしない) */}
+      <BulkPreviewFloat items={previewItems} index={previewAt} onIndex={setPreviewAt} products={products} heroes={heroes} />
       {/* 保存していない案があるまま閉じるとき。選ぶのは 2 つだけ(やめるときは × で、作業画面に戻る) */}
       <Dialog open={ws.closeAsk} modalType="alert" onOpenChange={(_, d) => !d.open && ws.setCloseAsk(false)}>
         <DialogSurface className={s.askSurface}>

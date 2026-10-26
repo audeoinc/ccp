@@ -2,6 +2,8 @@ import type { LinkState } from './deepLink'
 import type { DevRequest } from './models/devRequests'
 import type { DevRequestVote } from './models/devRequestVotes'
 import { DevRequestVotesService } from './data/devRequestVotes'
+import { DevRequestsService } from './data/devRequests'
+import { confirmDialog } from './confirm'
 import { anchorLabel } from './pinStore'
 import { loadPref, savePref } from './settings'
 import { tr } from './i18n'
@@ -214,4 +216,18 @@ export async function toggleVote(id: string, name: string, votes: DevRequestVote
     if (!r.success) throw new Error(r.error?.message ?? tr('賛同できませんでした', 'Could not add your vote'))
   }
   bumpDevRequests()
+}
+
+// ---- 削除(フロートと一覧で同じ処理)。いまはテストで入れたものも多いので、ログインしている人なら誰でも消せる(書いた人に限らない。2026-10-26 利用者)
+/**
+ * リクエストを、返信(source_request がその ID の行)と一緒に消す。賛同は、表の決まり(CASCADE)で一緒に消える。
+ * 消す前に確かめの窓を出し、やめたら false。書いたときの様子の画像のファイルは、素材の置き場所に残る
+ */
+export async function deleteDevRequest(id: string, rows: DevRequest[]): Promise<boolean> {
+  if (!(await confirmDialog(tr('このリクエストと返信を削除します。元に戻せません', 'Delete this request and its replies? This cannot be undone.'), { okLabel: tr('削除', 'Delete') }))) return false
+  // 返信を先に消す(元を先に消すと、途中で失敗したときに、元のない返信が残るため)
+  for (const r of rows.filter((q) => q.source_request === id)) await DevRequestsService.delete(r.id)
+  await DevRequestsService.delete(id)
+  bumpDevRequests()
+  return true
 }

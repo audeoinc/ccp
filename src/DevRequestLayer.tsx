@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Field, Input, Popover, Portal, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { CheckmarkRegular, DismissRegular, LightbulbFilled, LightbulbRegular, LocationOffRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
+import { Badge, Button, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, Portal, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { CheckmarkRegular, DeleteRegular, DismissRegular, MoreHorizontalRegular, LightbulbFilled, LightbulbRegular, LocationOffRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
 import type { LinkState } from './deepLink'
 import { DevRequestsService } from './data/devRequests'
 import { DevRequestVotesService } from './data/devRequestVotes'
@@ -10,6 +10,7 @@ import { keepBrowserMenu, setGlobalMenuItems, useContextMenu } from './ContextMe
 import {
   bumpDevRequests,
   capturePlace,
+  deleteDevRequest,
   devRequestName,
   devRequestsVersion,
   forgetLinkedRequest,
@@ -415,6 +416,19 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
     }
   }
 
+  const remove = async () => {
+    if (!root) return
+    setWorking(true)
+    setError(null)
+    try {
+      if (await deleteDevRequest(root.id, rows)) onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setWorking(false)
+    }
+  }
+
   return (
     <PinThreadView
       target={anchor}
@@ -426,6 +440,24 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
         </span>
       }
       place={root?.place_text ?? pending?.place_text ?? ''}
+      // 削除は「⋯」の中に(誤って押さないように)。ログインしている人なら誰でも消せる(deleteDevRequest)。
+      // メニューは inline で、フロートの中に描く(外に描くと、押したときにフロートの「外を押した」で閉じてしまう)
+      headActions={
+        root && (
+          <Menu inline>
+            <MenuTrigger disableButtonEnhancement>
+              <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('その他の操作', 'More actions')} disabled={working} />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<DeleteRegular />} onClick={() => void remove()}>
+                  {t('削除', 'Delete')}
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+        )
+      }
       state={id && !root ? (rows.length ? 'gone' : 'loading') : 'ok'}
       goneText={t('このリクエストは消されました', 'This request was deleted')}
       entries={root ? [root, ...replies].map((q) => ({ id: q.id, author: q.author_name, body: q.body, at: q.created_on, isReply: q !== root })) : []}

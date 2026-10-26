@@ -27,14 +27,16 @@ interface Props {
   productIds: string[]
   products: Product[]
   heroes: HeroImage[]
+  /** メールの幅(スマホ / PC)。渡さなければ、これまでどおりの幅 */
+  device?: 'mobile' | 'pc'
 }
 
 /**
  * 保存されている配信カードの中身を、そのままプレビューにする(編集はしない)。
- * 週の表示・一覧のマウスを重ねたときのプレビューと、配信結果の画面で使う。
+ * 週の表示・一覧のマウスを重ねたときのプレビュー、配信結果の画面、まとめて作るの案のプレビューで使う。
  * 商品の枠には data-item-key(`商品ID-並び順`)が付くので、外から位置を探せる
  */
-export function CardPreview({ card: c, productIds, products, heroes }: Props) {
+export function CardPreview({ card: c, productIds, products, heroes, device }: Props) {
   const isPush = c.channel === CHANNEL_PUSH
   // 使った版の形で描く
   const templateId = templateKeyOfCard(c)
@@ -49,6 +51,7 @@ export function CardPreview({ card: c, productIds, products, heroes }: Props) {
       subject={c.name}
       subjectLine={c.subject}
       preheader={c.preheader}
+      device={device}
       headline={c.headline ?? ''}
       copy={c.copy ?? ''}
       items={items}

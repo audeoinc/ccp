@@ -1,12 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Badge, Button, Dialog, DialogBody, DialogContent, DialogTitle, Input, Select, Spinner, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
-import { CheckmarkRegular, CopyRegular, DismissRegular, OpenRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
+import { CheckmarkRegular, CopyRegular, DeleteRegular, DismissRegular, OpenRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
 import { DevRequestsService } from './data/devRequests'
 import { DevRequestVotesService } from './data/devRequestVotes'
 import type { DevRequestVote } from './models/devRequestVotes'
 import type { DevRequest, DevRequestStatus } from './models/devRequests'
-import { buildId, bumpDevRequests, devRequestName, devRequestsVersion, onDevRequestName, setDevRequestName, subscribeDevRequests, toggleVote, votesOf } from './devRequestPlace'
+import { buildId, bumpDevRequests, deleteDevRequest, devRequestName, devRequestsVersion, onDevRequestName, setDevRequestName, subscribeDevRequests, toggleVote, votesOf } from './devRequestPlace'
 import { copyText } from './clipboard'
 import { Linkify } from './LinkText'
 import { locale, tr, useT, when } from './i18n'
@@ -105,6 +105,15 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
     const r = await DevRequestsService.update(q.id, status === 'done' ? { status, done_at: new Date().toISOString(), done_version: buildId() } : { status, done_at: null as never, done_version: '' })
     if (!r.success) setError(r.error?.message ?? tr('保存できませんでした', 'Could not save'))
     bumpDevRequests()
+  }
+  // 削除(返信も一緒に。ログインしている人なら誰でも。確かめの窓は deleteDevRequest が出す)
+  const remove = async (q: DevRequest) => {
+    setError(null)
+    try {
+      await deleteDevRequest(q.id, all)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
   // その画面を開く(書いたときの URL に、開くリクエストを足して読み込み直す。DevRequestLayer がフロートを開く)
   const openScreen = (q: DevRequest) => {
@@ -207,6 +216,10 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
                           {t('この画面を開く', 'Open this screen')}
                         </Button>
                       )}
+                      {/* 削除は、いちばん下に目立たない形で(誤って押さないように。押すと確かめの窓が出る) */}
+                      <Button size="small" appearance="subtle" icon={<DeleteRegular />} onClick={() => void remove(q)}>
+                        {t('削除', 'Delete')}
+                      </Button>
                     </div>
                   </div>
                 ))}
