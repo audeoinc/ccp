@@ -211,7 +211,7 @@
 | `textarea.<heightKey>.height` | 複数行の入力欄で、つかんで決めた最低の高さ(`AutoTextarea`) |
 | `hints.dismissed` | 閉じた案内(`Hint`)の鍵の一覧(X72。自分の設定の「ヒントをもう一度出す」で空にする) |
 | `devRequest.name` | 開発へのリクエストに残す名前(CCP の名前の設定 `me.name` とは別。初めて書くときに聞く。X69) |
-| `resultDetail.paneWidths.v1` / `assetFloat.paneWidths.v1` / `bulkWorkspace.paneWidths.v1` | 詳しい結果・素材のフロート・まとめて作るのペインの幅(`usePaneWidths`) |
+| `resultDetail.paneWidths.v1` / `assetFloat.paneWidths.v1` / `bulkWorkspace.paneWidths.v1` / `templateManager.paneWidths.v1` | 詳しい結果・素材のフロート・まとめて作る・テンプレートの管理(一覧の幅。T11)のペインの幅(`usePaneWidths`) |
 | `alerts.settings` | アラートの条件 |
 | `results.rankTopN` | 販売順位で「上位」とみなす線(既定 60) |
 | `productionPage.size` / `productionPage.paneWidths.v1` / `productionPage.infoOpen` / `productionPage.talkOpen` / `productionPage.previewZoom` | 制作のページのフロートの大きさ・ペインの幅・左右のペインの開閉・プレビューの倍率(`floatLayout.ts`) |
