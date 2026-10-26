@@ -6,7 +6,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { SOURCE_MANUAL, type Item } from './items'
-import { UTM_SCHEME, campaignId, campaignSlug, encodeLinks, productLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { HEADER_LINKS, UTM_SCHEME, campaignId, headerLinkUrl, campaignSlug, encodeLinks, productLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { getTemplate, sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
@@ -324,7 +324,14 @@ export function htmlLinks(s: Snapshot, variant?: VariantKey): Record<string, str
   const out: Record<string, string> = {}
   for (const r of linkRows(s, variant)) if (r.slotKey && r.value) out[r.slotKey] = r.value
   for (const r of productLinkRows(s, variant)) if (r.url) out[r.key] = r.url
+  for (const r of headerLinkRows(s, variant)) out[r.key] = r.url
   return out
+}
+
+/** 上の帯の MEN / WOMEN のリンク(配信の国の店の URL。utm は、ほかのリンクと同じ決まりで付ける。版 1 の写しは content を付けない) */
+function headerLinkRows(s: Snapshot, variant?: VariantKey): { key: string; label: string; content: string; url: string }[] {
+  const utm = utmOf(s, variant)
+  return HEADER_LINKS.map((l) => ({ key: l.key, label: l.label, content: l.content, url: withUtm(headerLinkUrl(l.category, s.card.country), utm, scheme2(s) ? l.content : undefined) }))
 }
 
 /** 商品の枠のリンク(utm_content ごと。メールの並び順) */
@@ -360,7 +367,8 @@ export function trackingRows(s: Snapshot, variant?: VariantKey): TrackingRow[] {
   const products = productLinkRows(s, variant)
     .filter((r) => r.content && r.url)
     .map((r) => ({ content: r.content, desc: descs.get(r.content) ?? tr(`商品の枠 ${r.index + 1}`, `Product slot ${r.index + 1}`), productCode: r.productCode, url: r.url }))
-  return [...links, ...products]
+  const header = headerLinkRows(s, variant).map((r) => ({ content: r.content, desc: tr(`上の帯の ${r.label}`, `Header ${r.label}`), url: r.url }))
+  return [...header, ...links, ...products]
 }
 
 /** リンク先を 1 つ直した、新しい写し(計測用のパラメーターは、これまでどおり後から付く) */
@@ -416,7 +424,7 @@ export function previewHtml(root: HTMLElement, title: string, links: Record<stri
     const out = dst[i]
     if (!out) return
     // 表の箱(UTM の版 3)は、枠まるごとではなく、押せる要素(data-el)ごとにリンクが来る。リンクの来ている目印を使う
-    const at = el.dataset.link === 'hero' ? 'hero' : el.dataset.link === 'button' ? el.dataset.linkId : [el.dataset.itemKey, el.dataset.el].find((k) => k && links[k])
+    const at = el.dataset.link === 'hero' ? 'hero' : el.dataset.link === 'button' ? el.dataset.linkId : [el.dataset.itemKey, el.dataset.el, el.dataset.headerLink].find((k) => k && links[k])
     const href = at ? links[at] : undefined
     if (href) wraps.push({ out, href })
     const cs = getComputedStyle(el)

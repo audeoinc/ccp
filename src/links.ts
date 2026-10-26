@@ -174,6 +174,16 @@ export function defaultUrl(kind: LinkKind, campaign: string, category?: string, 
   }
 }
 
+/**
+ * メールのいちばん上の帯の、右のリンク(2026-10-26 利用者: 左にロゴ、右に MEN / WOMEN)。
+ * リンク先は店の URL のカテゴリのページ(defaultUrl の category と同じ形)。文字は受信側の見た目なので、画面の言葉に合わせて訳さない
+ */
+export const HEADER_LINKS = [
+  { key: 'header-men', label: 'MEN', category: 'men', content: 'header_men' },
+  { key: 'header-women', label: 'WOMEN', category: 'women', content: 'header_women' },
+] as const
+export const headerLinkUrl = (category: string, country?: string | null) => defaultUrl('category', '', category, country)
+
 /** 商品のページ(商品の市場の店の URL) */
 export const productUrl = (p?: Product) => (p?.product_code ? `${shopUrl(productMarket(p))}/p/${p.product_code}` : '')
 

@@ -74,12 +74,15 @@ export async function checkUtm(server) {
   const card = { id: 'card1234abcd', name: 'x', scheduled_at: '2026-10-26T00:00:00Z', country: 'JP', channel: 'email', layout_key: 'utm-check', links: '' }
   const s3 = snap.buildSnapshot(card, products.map((p) => p.id), products, [])
   const keys3 = Object.keys(snap.htmlLinks(s3)).sort()
-  same(problems, '書き出す HTML のリンク(版 3)', keys3, ['P3-2', 'box_a1.image', 'box_a1.name', 'box_a2.image', 'box_a2.price', 'btn_both', 'btn_top1', 'hero', 'med_x1', 's2-1'])
+  same(problems, '書き出す HTML のリンク(版 3)', keys3, ['P3-2', 'box_a1.image', 'box_a1.name', 'box_a2.image', 'box_a2.price', 'btn_both', 'btn_top1', 'header-men', 'header-women', 'hero', 'med_x1', 's2-1'])
   const keys2 = Object.keys(snap.htmlLinks({ ...s3, utm: 2 })).sort()
-  same(problems, '書き出す HTML のリンク(版 2 の写し)', keys2, ['P1-0', 'P2-1', 'P3-2', 'btn_both', 'btn_top1', 'hero', 'med_x1', 's2-1'])
+  same(problems, '書き出す HTML のリンク(版 2 の写し)', keys2, ['P1-0', 'P2-1', 'P3-2', 'btn_both', 'btn_top1', 'header-men', 'header-women', 'hero', 'med_x1', 's2-1'])
   same(problems, '版 2 の写しの URL', new URL(snap.htmlLinks({ ...s3, utm: 2 })['P1-0']).searchParams.get('utm_content'), 'p01-AB-1')
+  // メールの上の帯の MEN / WOMEN: 店の URL のカテゴリのページに、ほかのリンクと同じ utm を付ける
+  const men = new URL(snap.htmlLinks(s3)['header-men'])
+  same(problems, '上の帯の MEN のリンク', [men.pathname, men.searchParams.get('utm_medium'), men.searchParams.get('utm_content')], ['/c/men', 'email', 'header_men'])
   const map = snap.trackingRows(s3)
-  same(problems, '計測の対応表の content', map.map((r) => r.content), ['sec_hero.image', 'btn_top1.label', 'med_x1.image', 'btn_both', 'btn4', 'box_a1.image', 'box_a1.name', 'box_a2.image', 'box_a2.price', 'p03-Ef3'])
+  same(problems, '計測の対応表の content', map.map((r) => r.content), ['header_men', 'header_women', 'sec_hero.image', 'btn_top1.label', 'med_x1.image', 'btn_both', 'btn4', 'box_a1.image', 'box_a1.name', 'box_a2.image', 'box_a2.price', 'p03-Ef3'])
   same(problems, '計測の対応表の商品コード', map.find((r) => r.content === 'box_a2.price')?.productCode, 'CD-2')
   if (map.some((r) => !r.desc)) problems.push('計測の対応表に説明のない行がある')
 

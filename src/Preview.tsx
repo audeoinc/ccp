@@ -21,6 +21,7 @@ import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
 import { locale, optionLabel, useT } from './i18n'
 import { brandFor, useCountrySettings } from './countrySettings'
+import { HEADER_LINKS } from './links'
 import { effectivePart, type PartContent } from './partContent'
 
 interface Props {
@@ -1093,8 +1094,14 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
             {hs.barText || subject || t('(配信名未入力)', '(No name)')} ›
           </div>
         )}
-        <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', textAlign: 'center', padding: '12px 0', letterSpacing: 4, fontWeight: 700 }}>
-          {brandFor(country).senderName}
+        {/* 上の帯: 左にロゴ(差出人の名前)、右に MEN / WOMEN のリンク(実物のメールに合わせる。リンク先は、書き出す HTML で付く) */}
+        <div data-anchor="header" style={{ backgroundColor: '#222', color: '#fff', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+          <span style={{ flexGrow: 1, minWidth: 0, letterSpacing: 4, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brandFor(country).senderName}</span>
+          {HEADER_LINKS.map((l) => (
+            <span key={l.key} data-header-link={l.key} style={{ fontSize: '0.75rem', letterSpacing: 2, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {l.label}
+            </span>
+          ))}
         </div>
         {heroBox}
         {heroAfter}
