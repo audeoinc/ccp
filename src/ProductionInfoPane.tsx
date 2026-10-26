@@ -3,7 +3,7 @@ import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip,
 import { AddRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DismissRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { getText, linkRows, productRows, rowsText, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
+import { getText, linkRows, productRows, rowsText, trackingRows, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
 import { productImage, heroImage } from './images'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
@@ -101,6 +101,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
   const texts = textRows(current, editable).filter((r) => editable || r.value.trim() || getText(original, r.field).trim())
   const prows = productRows(current)
   const lrows = linkRows(current)
+  const trows = trackingRows(current)
   const origLinks = new Map(linkRows(original).map((r) => [r.slotKey ?? r.label, r.base ?? r.value]))
   const removed = original.productIds.filter((id) => !current.productIds.includes(id)).map((id) => original.products.find((p) => p.id === id)?.name ?? '').filter(Boolean)
 
@@ -328,6 +329,31 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
           <span className={s.note}>{t('リンク先はありません', 'No links')}</span>
         ),
       )}
+      {/* 計測の対応表(T8 の 8.10): utm_content は ID だけなので、人が読む説明・商品と並べて渡す(分析で引く。説明は UTM に入れない) */}
+      {trows.length > 0 &&
+        section(
+          t(`計測の対応表(utm_content。${trows.length})`, `Tracking map (utm_content; ${trows.length})`),
+          ['utm_content\tdescription\tproduct_code\turl', ...trows.map((r) => [r.content, r.desc, r.productCode ?? '', r.url].join('\t'))].join('\n'),
+          <>
+            {trows.map((r) => (
+              <div key={`${r.content}-${r.url}`} className={s.row}>
+                <span className={s.rowValue}>
+                  <span className={s.rowLabel}>{r.content}</span>
+                  {[r.desc, r.productCode].filter(Boolean).join(' ・ ')}
+                </span>
+                <span className={s.tools}>
+                  <CopyButton text={r.content} label={t('utm_content をコピー', 'Copy utm_content')} />
+                </span>
+              </div>
+            ))}
+            <span className={s.note}>
+              {t(
+                'リンクごとの utm_content と、その説明です。表のテンプレートは、押された要素の ID(箱の写真・名前などは別々のリンク)。コピーすると、表計算に貼れる形(タブ区切り)になります',
+                'Each link’s utm_content and what it is. Table templates use the ID of the clicked element (a box’s photo, name, etc. are separate links). Copy gives tab-separated rows for a spreadsheet.',
+              )}
+            </span>
+          </>,
+        )}
       {foot}
       {uploading && (
         <HeroUploadDialog

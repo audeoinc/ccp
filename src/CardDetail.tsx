@@ -29,7 +29,7 @@ import { tapComplete } from './pushLink'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { progressOf } from './progress'
 import { ResizableSurface } from './ResizableSurface'
-import { campaignId, campaignSlug, productContent, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
+import { campaignId, campaignSlug, productLinks, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
 import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
 import { PREF } from './prefKeys'
 import { runAutoDraft, type AutoDraftResult } from './autoDraft'
@@ -272,7 +272,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const p = it && productById.get(it.productId)
     if (!p) return undefined
     if (previewTab === 'push') return { name: p.name, url: p.product_code ? `data: ${fcmText({ kind: 'product', value: p.product_code }, fcmCampaign)}` : '' }
-    return { name: p.name, url: withUtm(productUrl(p), linkUtm, productContent(index, p.product_code)) }
+    // 表の箱は、押せる要素ごとにリンクが分かれる(UTM の版 3)。ここには、いちばん上の要素(ふつうは写真)のリンクを出す
+    return { name: p.name, url: withUtm(productUrl(p), linkUtm, productLinks(template, index, itemKey, p.product_code)[0]?.content) }
   }
   const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 

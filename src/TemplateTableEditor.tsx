@@ -9,7 +9,7 @@ import { getUiScale } from './uiScale'
 import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
-import { elementClickable, elementDesc, partElements } from './elements'
+import { elementClickable, elementDesc, partContent, partElements } from './elements'
 import { STAR_COLOR } from './swatches'
 
 // テンプレートの編集画面の、表の部分(T8。docs/TEMPLATE_OBJECTS.md の 5.2。触れる試作で利用者と決めた形)。
@@ -752,6 +752,15 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
 
   // ---- 描く
   const typeName = (type: PartType) => ({ box: t('箱', 'Box'), button: t('ボタン', 'Button'), text: t('テキスト', 'Text'), media: t('画像', 'Image'), line: t('区切り線', 'Divider'), spacer: t('余白', 'Spacer'), empty: t('空き', 'Empty') })[type]
+  /**
+   * ボタン・画像の utm_content(T8 の 8.10)。計測は要素の ID で数えるので、手で付ける名前(以前の「計測用の名前」track)はやめて、決まる値を見せるだけにした。
+   * 保存済みの track は読み込んで残す(以前の版のアプリのため)が、URL には使わない
+   */
+  const utmField = (p: TablePart) => (
+    <Field label={t('計測の utm_content(自動。押されたときに URL に付く)', 'Tracking utm_content (automatic; added to the URL on click)')} size="small">
+      <span className={s.pid}>{partContent(p)}</span>
+    </Field>
+  )
   const partName = (p: TablePart) =>
     p.type === 'box' ? t(`${boxNo.get(p.id)} 番目`, `No. ${boxNo.get(p.id)}`) : p.type === 'button' ? p.label || defaultButtonLabel(0) : p.type === 'text' ? (p.text ?? '').split('\n')[0] || t('(文なし)', '(no text)') : p.type === 'media' ? p.alt || (p.video ? t('動画', 'Video') : p.src ? t('画像', 'Image') : t('(画像なし)', '(no image)')) : p.type === 'line' ? t('区切り線', 'Divider') : p.type === 'spacer' ? t(`余白 ${p.height ?? 24}px`, `Spacer ${p.height ?? 24}px`) : t('空き', 'Empty')
   const secLabel = (sec: Section, si: number) => `S${si + 1}${sec.name?.trim() ? ` · ${sec.name.trim()}` : ''}`
@@ -835,9 +844,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
           ))}
         </Select>
       </Field>
-      <Field label={t('計測用の名前(クリックの集計で使う)', 'Tracking name (for click reports)')} size="small">
-        <Input size="small" value={p.track ?? ''} maxLength={60} onChange={(_, d) => patch(sec, p, { track: d.value || undefined })} />
-      </Field>
+      {utmField(p)}
       <Checkbox label={t('配信ごとに差し替える(キャンペーンのバナーなど)', 'Swap per delivery (e.g. campaign banners)')} checked={!!p.swap} onChange={(_, d) => patch(sec, p, { swap: d.checked === true || undefined })} />
     </>
   )
@@ -1650,7 +1657,11 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         <Field label={t('部品の説明(任意。分析・計測の対応表・制作への指示に出す)', 'Part description (optional; shown in reports, the tracking map and production notes)')} size="small">
           <Input size="small" value={p.desc ?? ''} placeholder={where} maxLength={200} onChange={(_, d) => patch(sec, p, { desc: d.value || undefined })} />
         </Field>
-        <span className={s.elHead}>{t('要素(ID は計測・ピンで使う。説明を変えても ID は変わらない)', 'Elements (IDs are used for tracking and pins; editing a description keeps the ID)')}</span>
+        <span className={s.elHead}>
+          {p.type === 'box'
+            ? t('要素(押せる要素は、メールの中でそれぞれ別のリンクになり、utm_content はその ID。説明を変えても ID は変わらない)', 'Elements (each clickable element is its own link in the email, with its ID as utm_content; editing a description keeps the ID)')
+            : t('要素(ID は計測・ピンで使う。説明を変えても ID は変わらない)', 'Elements (IDs are used for tracking and pins; editing a description keeps the ID)')}
+        </span>
         {partElements(p).map((e) => (
           <div key={e.key} className={s.elRow}>
             <div className={s.elTop}>
@@ -1749,9 +1760,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               ))}
             </Select>
           </Field>
-          <Field label={t('計測用の名前(クリックの集計で使う)', 'Tracking name (for click reports)')} size="small">
-            <Input size="small" value={p.track ?? ''} placeholder={t('例: new_more', 'e.g. new_more')} maxLength={60} onChange={(_, d) => patch(sec, p, { track: d.value || undefined })} />
-          </Field>
+          {utmField(p)}
         </>
       )}
       {p.type === 'text' && (

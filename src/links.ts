@@ -1,8 +1,9 @@
 import type { Product } from './models/products'
 import type { Item } from './items'
 import { optionLabel, tr } from './i18n'
-import { getTemplate, placedButtons, sectionRange, sectionsOf, type EmailTemplateId, type LinkKind } from './templates'
-import { tableButtonBlocks } from './tables'
+import { getTemplate, placedButtons, sectionRange, sectionsOf, type EmailTemplateId, type LinkKind, type TablePart, type TemplateLayout } from './templates'
+import { HERO_TABLE_ID, boxesOf, isTable, partsOf, tableButtonBlocks } from './tables'
+import { boxLinkElements, partContent } from './elements'
 import { brandFor } from './countrySettings'
 import { productMarket } from './market'
 
@@ -78,12 +79,15 @@ export const campaignSlug = (name: string, scheduledAt: string) => [slug(name), 
 // utm_campaign = どの配信か(配信日 + 配信カードの ID の先頭 8 文字。AB テストなら末尾に案)、utm_content = その配信の中のどのリンクか。
 // GA の「campaign × content」の数字を、配信 × リンクの位置(メイン画像・ボタン・商品の枠)に振り分けて、結果のヒートマップ・学びに使う。
 // content は位置と商品コードをそのまま書くので、取り込むときに対応表が要らない(制作に渡したあとで並べ替えても、送った値から読める)
+// 版 3(2026-10-26。T8 の 8.10): 表のテンプレートの部品は、content に「押された要素の ID」(box_2m8q.image など)を入れる。
+// 読みやすい名前・短い番号は使わない(説明は書き直すことがあり、番号は並べ替えでずれるため)。説明は ID から引く対応表(elements.ts の elementDescriptions)に出す。
+// 部品・セクション・テンプレートの単位は、要素の ID(部品 ID を含む)から集計でまとめる。以前の形のセクション・テンプレートは、版 2 の形のまま
 
 /**
  * UTM の作り方の版。制作の依頼の写しに入れ、版のない古い写しは、これまでの作り方(campaign = 配信名 + 日付、content なし)で出す。
- * もう送った配信の URL を、画面の上で黙って変えないため
+ * もう送った配信の URL を、画面の上で黙って変えないため(版 2 で依頼した配信は、表のテンプレートでも hero・btn1・p01-商品コード のまま)
  */
-export const UTM_SCHEME = 2
+export const UTM_SCHEME = 3
 
 /**
  * utm_campaign の既定値(版 2): 配信日(YYYYMMDD)+ 配信カードの ID の先頭 8 文字。例: 20261021-1a2b3c4d。
@@ -104,6 +108,41 @@ export const buttonContent = (n: number) => `btn${n}`
  */
 export const productContent = (index: number, productCode?: string | null) =>
   [`p${String(index + 1).padStart(2, '0')}`, (productCode ?? '').replace(/\s+/g, '')].filter(Boolean).join('-')
+
+/** 表のテンプレート(T8)か。要素の ID の content は、部品 ID を持つ表のテンプレートだけ(以前の形には部品 ID がない) */
+const isTableLayout = (tpl: Pick<TemplateLayout, 'sections' | 'heroTable'>) => !!tpl.heroTable || tpl.sections.some(isTable)
+
+/** utm_content: メイン画像(版 3 の表のテンプレートは、ヒーローの写真の要素の ID。版 1 は付けない) */
+export const heroContent = (tpl: Pick<TemplateLayout, 'sections' | 'heroTable'>, scheme = UTM_SCHEME) =>
+  scheme < 2 ? '' : scheme >= 3 && isTableLayout(tpl) ? `${HERO_TABLE_ID}.image` : CONTENT_HERO
+
+/** 商品の枠 index(メールの上から通しの番号。0 から)に当たる表の箱(以前の形のセクション・箱の数を超えた分は、なし) */
+export function boxAt(tpl: Pick<TemplateLayout, 'sections'>, index: number): TablePart | undefined {
+  let start = 0
+  for (const sec of tpl.sections) {
+    if (index < start + sec.slots) return isTable(sec) ? boxesOf(sec)[index - start] : undefined
+    start += sec.slots
+  }
+  return undefined
+}
+
+/** 商品の枠のリンク 1 つ */
+export interface ProductLink {
+  /** 書き出す HTML で、リンクにする所の目印(以前の形は商品の枠の data-item-key、表の箱は要素の data-el) */
+  key: string
+  /** utm_content(版 1 は空) */
+  content: string
+}
+
+/**
+ * 商品の枠のリンク(utm_content ごと)。以前の形は、枠まるごとが 1 つのリンク(p01-商品コード)。
+ * 版 3 の表の箱は、押せる要素(写真・名前・ボタンなど。テンプレートで切り替えられる)ごとに別のリンクで、content は要素の ID。押せる要素がなければ、リンクなし
+ */
+export function productLinks(templateId: EmailTemplateId, index: number, itemKey: string, productCode?: string | null, scheme = UTM_SCHEME): ProductLink[] {
+  const box = scheme >= 3 ? boxAt(getTemplate(templateId), index) : undefined
+  if (!box) return [{ key: itemKey, content: scheme >= 2 ? productContent(index, productCode) : '' }]
+  return boxLinkElements(box).map((e) => ({ key: e.id, content: e.id }))
+}
 
 /** 計測用のパラメーターの既定値 */
 export const defaultUtm = (campaign: string) => ({ source: 'newsletter', medium: 'email', campaign })
@@ -172,12 +211,12 @@ export interface LinkSlot {
   defaultUrl: string
   /** アプリの配信のときの、既定の画面(custom は null) */
   defaultScreen: AppScreen | null
-  /** utm_content(hero / btn1 …) */
+  /** utm_content(hero / btn1 …。版 3 の表のテンプレートは要素の ID か部品 ID。版 1 は空) */
   content: string
 }
 
-/** テンプレートと掲載商品から、リンクを付ける場所の一覧を作る(メール上の並び順) */
-export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Product[], campaign: string, country?: string | null): LinkSlot[] {
+/** テンプレートと掲載商品から、リンクを付ける場所の一覧を作る(メール上の並び順)。scheme は UTM の作り方の版(制作の依頼の写しは、写しの版) */
+export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Product[], campaign: string, country?: string | null, scheme = UTM_SCHEME): LinkSlot[] {
   const tpl = getTemplate(templateId)
   const sections = sectionsOf(templateId)
   // セクションのカテゴリ: そのセクションの商品で、いちばん多いカテゴリ(ボタンのリンク先が「カテゴリのページ」のときに使う)
@@ -193,8 +232,10 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
   }
   const heroKind = tpl.heroLink ?? 'campaign'
-  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign, undefined, country), defaultScreen: defaultScreen(heroKind), content: CONTENT_HERO }]
+  const slots: LinkSlot[] = [{ key: 'hero', kind: 'hero', label: tr('メイン画像', 'Main image'), linkKind: heroKind, defaultUrl: defaultUrl(heroKind, campaign, undefined, country), defaultScreen: defaultScreen(heroKind), content: heroContent(tpl, scheme) }]
   let buttonNo = 0
+  // 表の部品(ボタン・画像)。版 3 では、content を要素の ID(部品まるごとのリンクは部品 ID)にする
+  const tableParts = new Map([...(tpl.heroTable ? [tpl.heroTable] : []), ...tpl.sections].flatMap((sec) => partsOf(sec)).map((p) => [p.id, p]))
   // 表のセクションのボタンは、そのセクションの中にある(以前の形のボタンと合わせて、メールの上から順に)
   const inTable = new Set(tableButtonBlocks(tpl).flatMap((b) => b.buttons.map((x) => x.id)))
   const blocks = [...placedButtons(tpl), ...tableButtonBlocks(tpl)].sort((a, b) => a.at - b.at)
@@ -215,12 +256,15 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
         linkKind: kind,
         defaultUrl: defaultUrl(kind, campaign, block.at > 0 ? categoryOf(block.at - 1) : undefined, country),
         defaultScreen: defaultScreen(kind, block.at > 0 ? categoryOf(block.at - 1) : undefined),
-        content: buttonContent(++buttonNo),
+        content: contentOfButton(++buttonNo, tableParts.get(b.id), scheme),
       })
     })
   }
   return slots
 }
+
+/** ボタン・画像の utm_content(版 3 の表の部品は要素の ID・部品 ID、以前の形のボタンは、メールの上からの番号。版 1 は空) */
+const contentOfButton = (n: number, part: TablePart | undefined, scheme: number) => (scheme < 2 ? '' : scheme >= 3 && part ? partContent(part) : buttonContent(n))
 
 // ---- アプリの配信(FCM の data)
 
