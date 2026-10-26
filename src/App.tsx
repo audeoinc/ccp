@@ -56,6 +56,7 @@ import { filterChangeAlerts, filterStockAlerts, useAlertSettings } from './alert
 import { isCancelled } from './cancel'
 import { onPolicyWarning } from './aiSelect'
 import { WeekView, type WeekLens } from './WeekView'
+import { WeekLensTabs } from './WeekLensTabs'
 import { WeekTimeGrid } from './WeekTimeGrid'
 import { WeekCompare } from './WeekCompare'
 import { COLUMNS, DEFAULT_COLUMNS, downloadCsv, toRows, type ColumnKey } from './listRows'
@@ -178,36 +179,6 @@ const useStyles = makeStyles({
   weekLabelJa: { width: '288px' },
   // 見せ方「商品」の期間(日付の欄が 2 つ並ぶので、幅を中身に合わせる)
   rangeLabel: { width: 'auto' },
-  // 「週」の隣の、見方の小さな切り替え(週の下位の選択だと分かるよう、枠で囲んで小さく)
-  lensSwitch: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    columnGap: '2px',
-    padding: '2px',
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorBrandStroke2}`,
-    backgroundColor: tokens.colorBrandBackground2,
-  },
-  lensBtn: {
-    border: 'none',
-    borderRadius: tokens.borderRadiusSmall,
-    padding: `1px ${tokens.spacingHorizontalS}`,
-    backgroundColor: 'transparent',
-    color: tokens.colorBrandForeground2,
-    fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-  },
-  // 月・一覧では、選べないことが分かるよう、灰色にする(選んでいた見方は、薄く残す)
-  lensOff: {
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    '& button': { color: tokens.colorNeutralForegroundDisabled, cursor: 'not-allowed', ':hover': { backgroundColor: 'transparent' } },
-    '& button[class]': { boxShadow: 'none' },
-  },
-  lensBtnOn: { backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold, boxShadow: tokens.shadow2 },
   // 見せ方の切り替え(ヘッダーの計画 / 結果と同じ形の、枠で囲んだ切り替え)
   viewSwitch: {
     display: 'inline-flex',
@@ -222,9 +193,6 @@ const useStyles = makeStyles({
     padding: `3px ${tokens.spacingHorizontalM}`,
     ':disabled': { color: tokens.colorNeutralForegroundDisabled, cursor: 'not-allowed', backgroundColor: 'transparent' },
   },
-  lensGroup: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', marginLeft: tokens.spacingHorizontalS },
-  lensLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  lensLabelOff: { color: tokens.colorNeutralForegroundDisabled },
   toolbarDivider: { width: '1px', alignSelf: 'stretch', margin: `2px ${tokens.spacingHorizontalS}`, backgroundColor: tokens.colorNeutralStroke2 },
 })
 
@@ -334,6 +302,8 @@ function App() {
   const [peekResult, setPeekResult] = useState<string | null>(null)
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
+  // 週の見方を、このボタンから下に生える形に置く(WeekLensTabs)
+  const [weekBtn, setWeekBtn] = useState<HTMLButtonElement | null>(null)
   // アラート(在庫の見込み)。配信カードを読み直すたびに、計算し直す
   // 取りやめた配信を除いた配信(アラート・週の確認・件数に使う。カレンダーには、取りやめた配信も薄く出す)
   // 国(ヘッダー)で絞った配信。計画・結果・週の帯・アラート・依頼の件数など、画面のすべてがこの国の配信を見る(X33)
@@ -1081,6 +1051,7 @@ function App() {
                 ).map(([v, label, off, title]) => (
                   <button
                     key={v}
+                    ref={v === 'week' ? setWeekBtn : undefined}
                     type="button"
                     role="tab"
                     aria-selected={view === v}
@@ -1093,31 +1064,6 @@ function App() {
                   </button>
                 ))}
               </div>
-              {/* 週の見方: 見せ方の切り替えのすぐ外に、ラベルを付けて置く。計画の面の週の表示だけで使い、計画の面のほかの表示では選べないだけにする。
-                  結果の面では出さない(結果の面では使わないため。ここから右は、結果の面だけの凡例・まとめ方なので、ずれても困らない) */}
-              {page !== 'results' && (
-              <span className={styles.lensGroup}>
-                <span className={mergeClasses(styles.lensLabel, !lensOn && styles.lensLabelOff)}>{t('週の見方', 'Week lens')}</span>
-                <div className={mergeClasses(styles.lensSwitch, !lensOn && styles.lensOff)} role="group" aria-label={t('週の見方', 'Week lens')} aria-disabled={!lensOn}>
-                  {([['products', t('商品', 'Products')], ['progress', t('進み具合', 'Progress')], ['time', t('時刻', 'Time')], ['compare', t('前週と比べる', 'vs last week')]] as const).map(([v, name]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      aria-pressed={lensOn && lens === v}
-                      disabled={!lensOn}
-                      title={!lensOn ? t('週の表示で使えます', 'Available in the week view') : undefined}
-                      className={mergeClasses(styles.lensBtn, lens === v && styles.lensBtnOn)}
-                      onClick={() => {
-                        setLens(v)
-                        savePref(LENS_KEY, v)
-                      }}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </span>
-              )}
               {/* ここから右は、操作(書き出しなど)。切り替えと分けて見えるよう、区切りの線を置く */}
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
@@ -1300,6 +1246,17 @@ function App() {
               </>
             ) : view === 'week' ? (
               <>
+              {/* 週の見方は、週の表示のときだけ、「週」のボタンから生える形で、中身のいちばん上に出す(f9ea1416) */}
+              {lensOn && (
+                <WeekLensTabs
+                  anchor={weekBtn}
+                  lens={lens}
+                  onChange={(v) => {
+                    setLens(v)
+                    savePref(LENS_KEY, v)
+                  }}
+                />
+              )}
               {/* 承認のバーと週の振り返りは、計画の面だけ(制作の面では、制作の状態を箱の色で見る) */}
               {!onProduction && !weekScoped && (
                 <WeekScopeBar
