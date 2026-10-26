@@ -7,7 +7,7 @@ import { ImageThumb } from './ImageThumb'
 import { productImage } from './images'
 import { yen } from './items'
 import { productMarket } from './market'
-import { stockCover, useProductData } from './useProductData'
+import { useStockCover } from './useProductData'
 import { tr, useT } from './i18n'
 import type { AiCard } from './aiSelect'
 import type { ReplacementCandidate } from './alertActions'
@@ -74,8 +74,7 @@ export function ProductLine({ product: p, fact }: { product?: Product; fact?: Re
   const t = useT()
   const s = useStyles()
   // 在庫の持ち(詳しい情報の「在庫の持ち」と同じ計算。いまの商品と候補を見比べられるように。2026-10-26 利用者の決め)。売れていない・読めないときは出さない
-  const { data } = useProductData(p?.product_code)
-  const cover = data ? stockCover(data.weekly, p?.stock) : undefined
+  const cover = useStockCover(p?.product_code)
   return p ? (
     <span className={s.ideaRow}>
       <ImageThumb src={productImage(p)} alt={p.name} width={36} height={44} />

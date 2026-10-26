@@ -37,6 +37,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/partUpload$/.test(source)) return fileURLToPath(new URL('./src/mock/partUpload.ts', import.meta.url))
     // 商品ページから画像を選ぶ窓口(src/data/productPages。X64)は、ブラウザの中で見本のページを作る身代わりに
     if (/(?:^|\/)data\/productPages$/.test(source)) return fileURLToPath(new URL('./src/mock/productPages.ts', import.meta.url))
+    // 在庫の持ちの材料をまとめて読む窓口(src/data/stockCover)は、メモリ上の表で同じ集計をする身代わりに
+    if (/(?:^|\/)data\/stockCover$/.test(source)) return fileURLToPath(new URL('./src/mock/stockCover.ts', import.meta.url))
     // 開発用の画面の窓口(src/dev/api。/dev/)は、見本の表を返す身代わりに(BigQuery がなくても画面を確かめられるように)
     if (source === './api' && importer?.replace(/\\/g, '/').includes('/src/dev/')) return fileURLToPath(new URL('./src/mock/devApi.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに

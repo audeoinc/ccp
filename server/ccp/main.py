@@ -35,6 +35,7 @@ from .product_pages import router as product_pages_router
 from .impact import router as impact_router
 from .policies import router as policies_router
 from .metrics import router as metrics_router
+from .stock_cover import router as stock_cover_router
 from .pack import router as pack_router
 from .product_images import router as product_images_router
 from sqlalchemy import text
@@ -117,6 +118,7 @@ app.include_router(product_images_router)
 app.include_router(bq_router)
 app.include_router(policies_router)
 app.include_router(metrics_router)
+app.include_router(stock_cover_router)
 app.include_router(approvals_router)
 app.include_router(me_router)
 app.include_router(prefs_router)
