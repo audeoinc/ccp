@@ -72,6 +72,7 @@ import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { markTemplatesLoadFailed, useTemplateManagerOpen, useTemplates } from './templates'
 import { useOpenedOnce } from './useOpenedOnce'
 import { CardDetail, type NewCardDefaults } from './CardDetail'
+import { NewCampaignDialog } from './CampaignDialogs'
 import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
 import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
@@ -1459,7 +1460,18 @@ function App() {
         }}
         onFinish={(d) => goTo('week', d)}
       /></Later>}
-      {(selected || creating || draftOpen) && (
+      {/* 新規作成は、キャンペーンと最初の配信カード 1 枚を作る窓から(X79)。作ったカードを開く */}
+      {creating && (
+        <NewCampaignDialog
+          defaults={creating}
+          weeks={weeks}
+          onClose={() => setCreating(null)}
+          onCreated={(id) => {
+            void reloadCards().then(() => setSelectedId(id))
+          }}
+        />
+      )}
+      {(selected || draftOpen) && (
         // 配信カードで失敗しても、閉じて、ほかの配信を開けるように
         <ErrorBoundary
           resetKey={selected?.id ?? 'new'}
@@ -1473,7 +1485,6 @@ function App() {
         <CardDetail
           key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
-          defaults={creating ?? undefined}
           draft={selected ? undefined : draftOpen?.draft}
           // 新しい配信を「保存」(閉じない)したら、保存した配信として開き直す(X52)
           onReopen={(id) => {

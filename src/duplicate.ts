@@ -46,12 +46,17 @@ const NOT_COPIED = [
   'status', 'handed_off_at', 'production_due', 'cancelled_at', 'cancel_reason', 'frame_at',
 ] as const
 
-/** 新しい配信に写す列。読んだときだけの列(id・*_name・作った日時)と、出来事の列は外す */
-function copiedFields(card: DeliveryCard, name: string, scheduledAt: string): DeliveryCardFields {
+/** チャネルが変わるときに写さない列(テンプレートはチャネルごとなので、メールのテンプレートでアプリは作れない) */
+const CHANNEL_BOUND = ['layout_key', 'layout_version', 'email_template'] as const
+
+/** 新しい配信に写す列。読んだときだけの列(id・*_name・作った日時)と、出来事の列は外す。overrides で上書きする(キャンペーン・チャネルなど) */
+function copiedFields(card: DeliveryCard, name: string, scheduledAt: string, overrides?: Partial<DeliveryCardFields>): DeliveryCardFields {
   const rest: Record<string, unknown> = { ...card }
   for (const k of NOT_COPIED) delete rest[k]
+  if (overrides?.channel && overrides.channel !== card.channel) for (const k of CHANNEL_BOUND) delete rest[k]
   return {
     ...(rest as Partial<DeliveryCardFields>),
+    ...overrides,
     name: name.trim(),
     scheduled_at: new Date(scheduledAt).toISOString(),
     status: initialStatus(card),
@@ -61,10 +66,11 @@ function copiedFields(card: DeliveryCard, name: string, scheduledAt: string): De
 
 /**
  * 配信カードを複製し、新しい配信カードの id を返す。載せた商品(選定・候補・AB テストの案ごと)も写す。
- * 素材(card_assets)は写さない(上げたファイルを 2 つの配信で分け合うと、片方を消したときに、もう片方から消えるため)
+ * 素材(card_assets)は写さない(上げたファイルを 2 つの配信で分け合うと、片方を消したときに、もう片方から消えるため)。
+ * overrides は、写した列の上に書く(キャンペーンのきょうだいを、別のチャネルで作るときなど。X79)
  */
-export async function duplicateDelivery(card: DeliveryCard, name: string, scheduledAt: string): Promise<string> {
-  const res = await DeliveryCardsService.create(copiedFields(card, name, scheduledAt))
+export async function duplicateDelivery(card: DeliveryCard, name: string, scheduledAt: string, overrides?: Partial<DeliveryCardFields>): Promise<string> {
+  const res = await DeliveryCardsService.create(copiedFields(card, name, scheduledAt, overrides))
   fail(res, '複製できませんでした', 'Could not duplicate the delivery')
   const newId = res.data?.id
   if (!newId) throw new Error(tr('新しい配信カードの ID を取得できませんでした', 'Could not get the new delivery card ID'))
