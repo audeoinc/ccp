@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Checkbox, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Portal, Select, Slider, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, ArrowDownRegular, ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, SettingsRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowDownRegular, ArrowUpRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, MoreHorizontalRegular, SettingsRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
@@ -40,7 +40,28 @@ const ZOOM_MAX = 1.6
 const CANVAS_ZOOM_KEY = 'ccp.templateCanvasZoom'
 const SAMPLES_KEY = 'ccp.templateCanvasSamples'
 
+// 右のタブの整理の見本(試しのブランチだけ。localStorage の ccp.paneMock が 1 のとき、整理した形で出す)
+const PANE_V2 = (() => {
+  try {
+    return localStorage.getItem('ccp.paneMock') === '1'
+  } catch {
+    return false
+  }
+})()
+
 const useStyles = makeStyles({
+  // ---- 整理した形(見本)
+  grp: { display: 'grid', rowGap: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: '10px', paddingBottom: '2px', ':first-child': { borderTop: 'none', paddingTop: '2px' } },
+  grpHead: { display: 'flex', alignItems: 'center', columnGap: '4px', padding: 0, border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '13px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, textAlign: 'left' },
+  grpBody: { display: 'grid', rowGap: '10px', '& .fui-Field .fui-Field__label': { fontSize: '12px', color: tokens.colorNeutralForeground3 } },
+  grpWrap: { display: 'grid', rowGap: '12px' },
+  two: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
+  seg: { display: 'inline-flex', flexWrap: 'wrap', border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', justifySelf: 'start' },
+  segBtn: { border: 'none', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, padding: '3px 9px', fontSize: '12px', lineHeight: '18px', backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorNeutralForeground1, cursor: 'pointer', ':last-child': { borderRight: 'none' }, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  segOn: { backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand, ':hover': { backgroundColor: tokens.colorBrandBackgroundHover } },
+  hdActs: { display: 'inline-flex', alignItems: 'center', columnGap: '0px', flexShrink: 0 },
+  openRight: { justifySelf: 'start' },
+
   // ---- パーツ
   pal: { display: 'grid', rowGap: '4px', alignContent: 'start' },
   palHead: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginTop: '6px' },
@@ -913,7 +934,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
    * 箱の設定(見本・見せ方・写真の形・出すもの・価格の見せ方・バッジ・AI への一言)。右のタブと、キャンバスの ⚙(ダブルクリック)の両方で同じものを出す。
    * いくつかの箱を選んでいるときは、まとめて直す(値が箱ごとに違う項目は「ばらばら」と出す)。名前・価格の文言は、商品のデータから出すので、ここでは打たない
    */
-  const boxSettings = (sec: Section, ps: TablePart[]) => {
+  const boxSettings = (sec: Section, ps: TablePart[], opts?: { look?: boolean }) => {
     const p = ps[0]
     const many = ps.length > 1
     const MIXED = '__mixed__'
@@ -1024,12 +1045,12 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             <Input size="small" value={badge === MIXED ? '' : badge} placeholder={badge === MIXED ? t('(ばらばら)', '(mixed)') : 'NEW'} maxLength={12} onChange={(_, d) => patchBoxes(sec, ps, { badge: d.value || undefined })} />
           </Field>
         )}
-        {!many && (
+        {!many && !opts?.look && (
           <Field label={t('AI に伝える一言(この枠に、どんな商品を置くか)', 'Note for AI (what to put in this slot)')} size="small">
             <AutoTextarea rows={2} size="small" value={p.aiNote ?? ''} placeholder={t('例: 主役の新作を置く', 'e.g. The lead new arrival')} onChange={(_, d) => patch(sec, p, { aiNote: d.value || undefined })} />
           </Field>
         )}
-        {!many && (
+        {!many && !opts?.look && (
           <Menu positioning="below-start">
             <MenuTrigger disableButtonEnhancement>
               <Button size="small" icon={<CopyRegular />}>
@@ -1122,7 +1143,14 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
           </PopoverTrigger>
           <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
             <span className={s.quickHead}>{quickBoxes.length > 1 ? t(`選んだ ${quickBoxes.length} 個の箱の見せ方`, `Display of ${quickBoxes.length} boxes`) : t(`箱 ${n} の見せ方`, `Box ${n} display`)}</span>
-            {boxSettings(sec, quickBoxes)}
+            {PANE_V2 ? (
+              <>
+                {boxSettings(sec, quickBoxes, { look: true })}
+                {openRightLink(sec, p)}
+              </>
+            ) : (
+              boxSettings(sec, quickBoxes)
+            )}
           </PopoverSurface>
         </Popover>
       )
@@ -1215,7 +1243,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
               </PopoverTrigger>
               <PopoverSurface className={s.quickSurface} onPointerDown={(e) => e.stopPropagation()}>
                 <span className={s.quickHead}>{t('画像・動画', 'Image / video')}</span>
-                {mediaSettings(sec, p)}
+                {PANE_V2 ? mediaLook(sec, p) : mediaSettings(sec, p)}
               </PopoverSurface>
             </Popover>
           )}
@@ -1953,6 +1981,372 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       </div>
     </div>
   )
+  // ---- 整理した形(見本): 操作は見出しの行、設定は見出し付きのまとまり(畳める。開いた状態は覚える)
+  const [groups, setGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ccp.paneGroups') ?? '{}') as Record<string, boolean>
+    } catch {
+      return {}
+    }
+  })
+  const grp = (key: string, title: string, body: ReactNode, dflt = true) => {
+    const open = groups[key] ?? dflt
+    const flip = () =>
+      setGroups((g) => {
+        const next = { ...g, [key]: !open }
+        try {
+          localStorage.setItem('ccp.paneGroups', JSON.stringify(next))
+        } catch {
+          // 覚えられなくても、畳む・開くは効く
+        }
+        return next
+      })
+    return (
+      <div className={s.grp}>
+        <button type="button" className={s.grpHead} aria-expanded={open} onClick={flip}>
+          {open ? <ChevronDownRegular /> : <ChevronRightRegular />}
+          {title}
+        </button>
+        {open && <div className={s.grpBody}>{body}</div>}
+      </div>
+    )
+  }
+  /** 2〜3 択は横並びのボタン(セグメント) */
+  const seg = <V extends string | number | undefined>(value: V, opts: [V, string][], on: (v: V) => void) => (
+    <div className={s.seg} role="group">
+      {opts.map(([v, l]) => (
+        <button key={String(v ?? '')} type="button" className={mergeClasses(s.segBtn, value === v && s.segOn)} aria-pressed={value === v} onClick={() => on(v)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  const iconBtn = (icon: React.ReactElement, label: string, onClick: () => void, disabled = false) => (
+    <Button size="small" appearance="subtle" icon={icon} aria-label={label} title={label} disabled={disabled} onClick={(e) => { e.stopPropagation(); onClick() }} />
+  )
+  /** セクションの見出しの行の右端: 上へ・下へ・複製と「…」(上とまとめる・削除) */
+  const secActions = (sec: Section, si: number) => (
+    <span className={s.hdActs} onClick={stop}>
+      {iconBtn(<ArrowUpRegular />, t('上へ', 'Up'), () => moveSection(sec.id!, si - 1), si === 0)}
+      {iconBtn(<ArrowDownRegular />, t('下へ', 'Down'), () => moveSection(sec.id!, si + 2), si === sections.length - 1)}
+      {iconBtn(<CopyRegular />, t('複製', 'Duplicate'), () => duplicate(sec.id!))}
+      <Menu positioning="below-end">
+        <MenuTrigger disableButtonEnhancement>
+          <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('ほかの操作', 'More')} onClick={stop} />
+        </MenuTrigger>
+        <MenuPopover>
+          <MenuList>
+            <MenuItem disabled={si === 0} onClick={() => mergeUp(sec.id!)}>{t('上のセクションとまとめる', 'Merge with the section above')}</MenuItem>
+            <MenuItem icon={<DeleteRegular />} onClick={() => removeSection(sec.id!)}>{t('セクションを削除', 'Delete section')}</MenuItem>
+          </MenuList>
+        </MenuPopover>
+      </Menu>
+    </span>
+  )
+  /** 部品の行の「…」: 分割・見せ方をほかの箱にも当てる(削除は、隣のごみ箱) */
+  const partMenu = (sec: Section, p: TablePart) =>
+    (p.w * p.h > 1 || p.type === 'box') && (
+      <span className={s.hdActs} onClick={stop}>
+        <Menu positioning="below-end">
+          <MenuTrigger disableButtonEnhancement>
+            <Button size="small" appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('ほかの操作', 'More')} onClick={stop} />
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              {p.w * p.h > 1 && <MenuItem onClick={() => run(sec.id!, (x) => T.splitCells(x, [p.id]))}>{t('分割', 'Split')}</MenuItem>}
+              {p.type === 'box' && (
+                <>
+                  <MenuItem icon={<CopyRegular />} onClick={() => applyLook(sec, p, 'row')}>{t('見せ方を、同じ行の箱にも当てる', 'Apply look to boxes in this row')}</MenuItem>
+                  <MenuItem onClick={() => applyLook(sec, p, 'section')}>{t('見せ方を、このセクションの箱にも当てる', 'Apply look to boxes in this section')}</MenuItem>
+                  <MenuItem onClick={() => applyLook(sec, p, 'all')}>{t('見せ方を、すべての箱に当てる', 'Apply look to all boxes')}</MenuItem>
+                </>
+              )}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+      </span>
+    )
+  /** ⚙ のポップアップの下の「右のタブで開く」 */
+  // キャンバスの ⚙ のポップアップ(この下で作る canvas)から呼ぶので、関数の宣言にする(const だと、定義の前に呼ぶことになる)
+  function openRightLink(sec: Section, p: TablePart) {
+    return (
+    <Button
+      size="small"
+      appearance="transparent"
+      className={s.openRight}
+      onClick={() => {
+        setQuickId(null)
+        setPinned(false)
+        selectCell(sec.id!, p.c, p.r)
+        setOpen(p.id, true)
+      }}
+    >
+      {t('ほかの設定は、右のタブで開く ›', 'More settings in the right tab ›')}
+    </Button>
+    )
+  }
+  const linkFields = (sec: Section, p: TablePart) => (
+    <>
+      <Field label={t('リンク先の種類(実際の URL は配信ごと)', 'Link kind (the actual URL is set per delivery)')} size="small">
+        <Select size="small" value={p.link ?? 'campaign'} onChange={(_, d) => patch(sec, p, { link: d.value === 'campaign' ? undefined : (d.value as LinkKind) })}>
+          {LINK_KINDS.map((k) => (
+            <option key={k} value={k}>{linkKindLabel(k)}</option>
+          ))}
+        </Select>
+      </Field>
+      {utmField(p)}
+    </>
+  )
+  const frameField = (sec: Section, p: TablePart) => (
+    <Field label={t('枠で囲む', 'Frame')} size="small">
+      {seg(p.frame, [[undefined, t('なし', 'None')], ['solid', t('線', 'Solid')], ['dashed', t('点線', 'Dashed')]], (v) => patch(sec, p, { frame: v }))}
+    </Field>
+  )
+  const alignSeg = (sec: Section, p: TablePart, fallback: TextAlign) => (
+    <Field label={t('揃え', 'Alignment')} size="small">
+      {seg(p.align ?? fallback, (['left', 'center', 'right'] as TextAlign[]).map((a) => [a, T.alignLabel(a)] as [TextAlign, string]), (a) => patch(sec, p, { align: a === fallback ? undefined : a }))}
+    </Field>
+  )
+  function imageFields(sec: Section, p: TablePart, label: string) {
+    return (
+    <Field label={label} size="small">
+      <PartImagePick onPick={(img) => patch(sec, p, { src: img.url, imageId: img.id, alt: p.alt || img.alt || undefined })} />
+      <Input size="small" value={p.src ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { src: d.value.trim() || undefined, imageId: undefined })} />
+    </Field>
+    )
+  }
+  /** 画像・動画の ⚙ のポップアップ(見せ方だけ: 画像と形) */
+  function mediaLook(sec: Section, p: TablePart) {
+    return (
+    <>
+      {imageFields(sec, p, t('画像', 'Image'))}
+      <Field label={t('形', 'Shape')} size="small">
+        <Select size="small" value={p.ratio ?? 'wide'} onChange={(_, d) => patch(sec, p, { ratio: d.value === 'wide' ? undefined : (d.value as MediaRatio) })}>
+          {MEDIA_RATIOS.map((r) => (
+            <option key={r} value={r}>{T.ratioLabel(r)}</option>
+          ))}
+        </Select>
+      </Field>
+      {openRightLink(sec, p)}
+    </>
+    )
+  }
+  const secDetailV2 = (sec: Section) => (
+    <div className={mergeClasses(s.secFields, s.grpWrap)}>
+      {grp(
+        'sec.content',
+        t('中身', 'Content'),
+        <>
+          <Field label={t('名前(キャンバスの札と構成に出る)', 'Name (canvas tag and outline)')} size="small">
+            <Input size="small" value={sec.name ?? ''} placeholder={t('例: 新作', 'e.g. New arrivals')} maxLength={40} onChange={(_, d) => replace(sec.id!, { ...sec, name: d.value || undefined })} />
+          </Field>
+          <Field label={t('AI が配信ごとに書くもの', 'Written by AI per delivery')} size="small">
+            <div className={s.two}>
+              <Checkbox label={t('見出し', 'Heading')} checked={!!sec.categoryHeading} onChange={(_, d) => replace(sec.id!, { ...sec, categoryHeading: d.checked === true || undefined })} />
+              <Checkbox label={t('コピー', 'Copy')} checked={sec.copy !== false} onChange={(_, d) => replace(sec.id!, { ...sec, copy: d.checked === true ? undefined : false })} />
+            </div>
+          </Field>
+          <Field label={t('AI の切り口のメモ', 'Angle for AI')} size="small">
+            <AutoTextarea rows={2} size="small" value={sec.aiNote ?? ''} placeholder={t('例: セール対象を、価格の安い順に', 'e.g. Sale items, cheapest first')} onChange={(_, d) => replace(sec.id!, { ...sec, aiNote: d.value || undefined })} />
+          </Field>
+        </>,
+      )}
+      {grp(
+        'sec.look',
+        t('見た目', 'Look'),
+        <>
+          <Field label={t('背景の色', 'Background')} size="small">
+            <div className={s.row2}>
+              {([undefined, 'gray', 'beige', 'blue', 'pink'] as (SectionBg | undefined)[]).map((b) => {
+                const on = sec.bg === b
+                return (
+                  <button key={b ?? 'white'} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} onClick={() => replace(sec.id!, { ...sec, bg: b })}>
+                    <span style={{ backgroundColor: b ? T.SECTION_BG[b] : '#fff', border: `1px solid ${tokens.colorNeutralStroke2}` }} />
+                    {T.sectionBgLabel(b)}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+          <div className={s.two}>
+            <Field label={t('上下の余白', 'Spacing')} size="small">
+              {seg(sec.space, [['tight', t('狭い', 'Tight')], [undefined, t('ふつう', 'Normal')], ['wide', t('広い', 'Wide')]], (v) => replace(sec.id!, { ...sec, space: v }))}
+            </Field>
+            <Field label={t('スマホ', 'On phones')} size="small">
+              {seg(sec.mobile, [[undefined, t('列のまま', 'Columns')], ['stack', t('縦に積む', 'Stack')]], (v) => replace(sec.id!, { ...sec, mobile: v }))}
+            </Field>
+          </div>
+          <Checkbox label={t('上に区切り線', 'Divider above')} checked={!!sec.divider} onChange={(_, d) => replace(sec.id!, { ...sec, divider: d.checked === true || undefined })} />
+        </>,
+      )}
+      {grp('sec.detail', t('詳しい', 'Details'), kv(t('セクション ID', 'Section ID'), <span className={s.pid}>{sec.id}</span>), false)}
+    </div>
+  )
+  const partDetailV2 = (sec: Section, p: TablePart) => {
+    const details = grp(
+      `${p.type}.detail`,
+      t('詳しい(説明・要素の ID・押せる・位置)', 'Details (description, element IDs, clickable, position)'),
+      <>
+        {elementsBlock(sec, p)}
+        {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}
+        {kv(t('部品 ID', 'Part ID'), <span className={s.pid}>{p.id}</span>)}
+      </>,
+      false,
+    )
+    let body: ReactNode = null
+    if (p.type === 'box') {
+      body = (
+        <>
+          {grp('box.look', t('見せ方', 'Look'), boxSettings(sec, [p], { look: true }))}
+          {grp(
+            'box.ai',
+            t('AI への一言', 'Note for AI'),
+            <AutoTextarea rows={2} size="small" value={p.aiNote ?? ''} placeholder={t('例: 主役の新作を置く', 'e.g. The lead new arrival')} onChange={(_, d) => patch(sec, p, { aiNote: d.value || undefined })} />,
+          )}
+        </>
+      )
+    } else if (p.type === 'button') {
+      body = (
+        <>
+          {grp(
+            'button.content',
+            t('中身', 'Content'),
+            <>
+              <Field label={t('文言', 'Label')} size="small">
+                <Input size="small" value={p.label ?? ''} placeholder={defaultButtonLabel(0)} maxLength={30} onChange={(_, d) => patch(sec, p, { label: d.value || undefined })} />
+              </Field>
+              <Field label={t('文字 / 画像', 'Text / image')} size="small">
+                {seg(p.face, [[undefined, t('文字', 'Text')], ['image', t('画像', 'Image')], ['both', t('画像に文字', 'Both')]], (v) => patch(sec, p, { face: v }))}
+              </Field>
+              {p.face && (
+                <>
+                  {imageFields(sec, p, t('ボタンの画像', 'Button image'))}
+                  <Field label={t('代わりの文', 'Alt text')} size="small">
+                    <Input size="small" value={p.alt ?? ''} placeholder={p.label || defaultButtonLabel(0)} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+                  </Field>
+                  <Checkbox label={t('配信ごとに画像を差し替えてよい', 'Image can be swapped per delivery')} checked={p.swap !== false} onChange={(_, d) => patch(sec, p, { swap: d.checked === true ? undefined : false })} />
+                </>
+              )}
+            </>,
+          )}
+          {grp(
+            'button.look',
+            t('見た目', 'Look'),
+            <>
+              <Field label={t('塗り方', 'Style')} size="small">
+                {seg(p.style, [[undefined, t('塗り', 'Filled')], ['outline', t('枠線', 'Outline')], ['text', t('文字のリンク', 'Text link')]], (v) => patch(sec, p, { style: v }))}
+              </Field>
+              <Field label={t('形', 'Shape')} size="small">
+                {seg(p.shape, [[undefined, t('丸', 'Pill')], ['rounded', t('角丸', 'Rounded')], ['square', t('四角', 'Square')], ['underline', t('下線', 'Underline')]], (v) => patch(sec, p, { shape: v }))}
+              </Field>
+              <div className={s.two}>
+                <Field label={t('大きさ', 'Size')} size="small">
+                  {seg(p.size, [['small', t('小', 'S')], [undefined, t('中', 'M')], ['large', t('大', 'L')]], (v) => patch(sec, p, { size: v }))}
+                </Field>
+                <Field label={t('幅', 'Width')} size="small">
+                  {seg(p.fit ? 'fit' : undefined, [[undefined, t('いっぱい', 'Fill')], ['fit', t('文字幅', 'Fit')]], (v) => patch(sec, p, { fit: v === 'fit' || undefined }))}
+                </Field>
+              </div>
+              <div className={s.two}>
+                <Field label={t('矢印(›)', 'Arrow (›)')} size="small">
+                  {seg(p.icon, [[undefined, t('なし', 'None')], ['left', t('左', 'Left')], ['right', t('右', 'Right')]], (v) => patch(sec, p, { icon: v }))}
+                </Field>
+                {alignSeg(sec, p, 'center')}
+              </div>
+              <Field label={t('色', 'Color')} size="small">
+                <div className={s.row2}>
+                  {(Object.keys(T.BUTTON_COLORS) as ButtonColor[]).map((c) => {
+                    const on = (p.color ?? 'black') === c
+                    return (
+                      <button key={c} type="button" className={mergeClasses(s.swatch, on && s.swatchOn)} aria-pressed={on} title={T.buttonColorLabel(c)} onClick={() => patch(sec, p, { color: c === 'black' ? undefined : c })}>
+                        <span style={{ backgroundColor: T.BUTTON_COLORS[c] }} />
+                        {T.buttonColorLabel(c)}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+              {frameField(sec, p)}
+            </>,
+          )}
+          {grp('button.link', t('リンク', 'Link'), linkFields(sec, p))}
+        </>
+      )
+    } else if (p.type === 'text') {
+      body = (
+        <>
+          {grp(
+            'text.content',
+            t('中身', 'Content'),
+            <>
+              <Field label={t('固定の文', 'Fixed text')} size="small">
+                <AutoTextarea rows={3} size="small" value={p.text ?? ''} onChange={(_, d) => patch(sec, p, { text: d.value || undefined })} />
+              </Field>
+              <Checkbox label={t('配信ごとに書き換えてよい', 'Can be rewritten per delivery')} checked={p.overridable !== false} onChange={(_, d) => patch(sec, p, { overridable: d.checked === true ? undefined : false })} />
+            </>,
+          )}
+          {grp(
+            'text.look',
+            t('見た目', 'Look'),
+            <>
+              <div className={s.two}>
+                <Field label={t('向き', 'Direction')} size="small">
+                  {seg(p.dir, [[undefined, t('横', 'Horiz.')], ['vertical', t('縦書き', 'Vertical')], ['rotate', t('90°', '90°')]], (v) => patch(sec, p, { dir: v }))}
+                </Field>
+                {alignSeg(sec, p, 'left')}
+              </div>
+              {frameField(sec, p)}
+            </>,
+          )}
+        </>
+      )
+    } else if (p.type === 'media') {
+      body = (
+        <>
+          {grp(
+            'media.content',
+            t('中身', 'Content'),
+            <>
+              {imageFields(sec, p, t('画像', 'Image'))}
+              <Field label={t('動画の URL(任意。メールでは画像に ▶ を重ねる)', 'Video URL (optional)')} size="small">
+                <Input size="small" value={p.video ?? ''} placeholder="https://…" onChange={(_, d) => patch(sec, p, { video: d.value.trim() || undefined })} />
+              </Field>
+              <Field label={t('代わりの文', 'Alt text')} size="small">
+                <Input size="small" value={p.alt ?? ''} maxLength={120} onChange={(_, d) => patch(sec, p, { alt: d.value || undefined })} />
+              </Field>
+              <Checkbox label={t('配信ごとに差し替える', 'Swap per delivery')} checked={!!p.swap} onChange={(_, d) => patch(sec, p, { swap: d.checked === true || undefined })} />
+            </>,
+          )}
+          {grp(
+            'media.look',
+            t('見た目', 'Look'),
+            <>
+              <Field label={t('形', 'Shape')} size="small">
+                <Select size="small" value={p.ratio ?? 'wide'} onChange={(_, d) => patch(sec, p, { ratio: d.value === 'wide' ? undefined : (d.value as MediaRatio) })}>
+                  {MEDIA_RATIOS.map((r) => (
+                    <option key={r} value={r}>{T.ratioLabel(r)}</option>
+                  ))}
+                </Select>
+              </Field>
+              {frameField(sec, p)}
+            </>,
+          )}
+          {grp('media.link', t('リンク', 'Link'), linkFields(sec, p))}
+        </>
+      )
+    } else {
+      // 区切り線・余白・空きは、いまの形のまま(見本では、まとまりに入れるだけ)
+      return partDetail(sec, p)
+    }
+    return (
+      <div className={mergeClasses(s.pbody, s.grpWrap)}>
+        {body}
+        {details}
+      </div>
+    )
+  }
+
   const secDetail = (sec: Section, si: number) => (
     <div className={s.secFields}>
       <Field label={t('名前(キャンバスの札と構成に出る)', 'Name (shown on the canvas tag and in the outline)')} size="small">
@@ -2063,10 +2457,11 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                 <span className={s.sbadge}>{si < 0 ? 'H' : `S${si + 1}`}</span>
                 <span className={s.sname}>{si < 0 ? t('ヒーローの下', 'Under the hero') : sec.name?.trim() || t('(名前なし)', '(no name)')}</span>
                 <span className={s.smeta}>{(sec.rows ?? 0) > 0 ? t(`${sec.cols}×${sec.rows} · 商品 ${n('box')}`, `${sec.cols}×${sec.rows} · ${n('box')} items`) : t('空', 'Empty')}</span>
+                {PANE_V2 && si >= 0 && secActions(sec, si)}
               </div>
               {open && (
                 <div className={s.sbody}>
-                  {sel?.kind === 'section' && cur && si >= 0 && secDetail(sec, si)}
+                  {sel?.kind === 'section' && cur && si >= 0 && (PANE_V2 ? secDetailV2(sec) : secDetail(sec, si))}
                   {[...(sec.parts ?? [])]
                     .sort((a, b) => a.r - b.r || a.c - b.c)
                     .map((p) => {
@@ -2094,6 +2489,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                             <span className={s.tchip}>{typeName(p.type)}</span>
                             <span className={s.pn}>{evenEmpty ? t('均等の行の空き(メールには出ない)', 'Spare cell in an even row (not in the email)') : partName(p)}</span>
                             <span className={s.ps}>{p.w * p.h > 1 ? `${p.w}×${p.h}` : ''}</span>
+                            {PANE_V2 && partMenu(sec, p)}
                             {p.type !== 'empty' && (
                               <span
                                 role="button"
@@ -2125,7 +2521,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
                               {pOpen ? <ChevronDownRegular /> : <ChevronRightRegular />}
                             </span>
                           </div>
-                          {pOpen && partDetail(sec, p)}
+                          {pOpen && (PANE_V2 ? partDetailV2(sec, p) : partDetail(sec, p))}
                         </div>
                       )
                     })}
