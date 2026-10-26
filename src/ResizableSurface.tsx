@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, type ComponentProps, type PointerEvent as ReactPointerEvent } from 'react'
-import { DialogSurface } from '@fluentui/react-components'
+import { DialogSurface, makeStyles, mergeClasses } from '@fluentui/react-components'
 import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize, type FloatSize } from './floatLayout'
 import { floatSizeKey } from './prefKeys'
@@ -23,10 +23,16 @@ type Props = ComponentProps<typeof DialogSurface> & {
  * 題の行をつかむと動かせる(2026-10-26 利用者と決めた。floatMove)。題の行 = DialogTitle か data-float-title の付いた所、
  * なければフロートの上の端から GRAB px まで(フロートごとに題の行の作りが違うので、場所ごとに印を付けなくても動くように)
  */
+const useStyles = makeStyles({
+  // Fluent の既定の高さの上限(100vh)は、表示の大きさ(html の zoom)を掛けると画面の 70〜80% などになり、窓の枠が中身より短くなる。倍率で割って、画面いっぱいまでにする
+  surface: { maxHeight: 'calc(100vh / var(--ui-zoom, 1))' },
+})
+
 /** 題の行とみなす、フロートの上の端からの高さ(px) */
 const GRAB = 52
 
-export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, prefKey, style, children, ...rest }, ref) {
+export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, prefKey, style, className, children, ...rest }, ref) {
+  const s = useStyles()
   const inner = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => inner.current as HTMLDivElement)
   const float = useFloatSize(prefKey ?? floatSizeKey(sizeKey), inner, min)
@@ -41,6 +47,7 @@ export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function Resiz
     <DialogSurface
       ref={inner}
       {...rest}
+      className={mergeClasses(s.surface, className)}
       style={{ ...style, ...float.style, ...move.style }}
       onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
         rest.onPointerDown?.(e)

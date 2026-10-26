@@ -57,8 +57,9 @@ export interface SettingsAction {
 }
 
 const useStyles = makeStyles({
-  surface: { width: 'calc(92vw / var(--ui-zoom, 1))', maxWidth: '1180px', padding: 0 },
-  body: { display: 'flex', flexDirection: 'column', rowGap: 0, height: 'calc(80vh / var(--ui-zoom, 1))' },
+  // 高さは窓の枠に持たせ、中は枠いっぱいに伸ばす(中に画面の高さを持たせると、覚えた大きさ・表示の大きさによって、中が枠の下にはみ出すため)
+  surface: { width: 'calc(92vw / var(--ui-zoom, 1))', maxWidth: '1180px', height: 'calc(80vh / var(--ui-zoom, 1))', padding: 0, display: 'flex', flexDirection: 'column' },
+  body: { display: 'flex', flexDirection: 'column', rowGap: 0, flex: 1, minHeight: 0 },
   title: { display: 'flex', alignItems: 'center', padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`, borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   titleText: { flexGrow: 1 },
   content: { display: 'grid', gridTemplateColumns: 'var(--cols)', flexGrow: 1, minHeight: 0, padding: 0, overflow: 'hidden' },

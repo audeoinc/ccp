@@ -76,8 +76,9 @@ interface Preview {
 }
 
 const useStyles = makeStyles({
-  surface: { maxWidth: '1100px', width: 'calc(96vw / var(--ui-zoom, 1))' },
-  body: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, maxHeight: 'calc(80vh / var(--ui-zoom, 1))' },
+  // 覚えた大きさで窓の高さが決まっても、中が枠の下にはみ出さないように、中は枠の中に収める
+  surface: { maxWidth: '1100px', width: 'calc(96vw / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column' },
+  body: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, maxHeight: 'calc(80vh / var(--ui-zoom, 1))', flex: 1, minHeight: 0, overflowY: 'auto' },
   inline: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, minWidth: 0 },
   row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
   grow: { flexGrow: 1 },

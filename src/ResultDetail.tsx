@@ -16,6 +16,7 @@ import { themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultInsights, ResultKpis } from './ResultSummary'
 import { useDeliveryImpact } from './useDeliveryImpact'
 import { openImpactView } from './impact'
+import { viewHeight } from './uiScale'
 import { ProductRankings } from './ProductRankings'
 import { AbResult } from './AbResult'
 import { isPush, sentAtOf, type ResultRow } from './results'
@@ -88,7 +89,8 @@ export function ResultDetail({ row, history, cardProducts, onOpenOther, productI
   const n = (v: number) => v.toLocaleString(locale())
   const sent = sentAtOf(row)
   const sentText = sent ? new Date(sent).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
-  const previewH = Math.max(480, window.innerHeight * 0.94 - 220)
+  // 表示の大きさ(zoom)を掛ける前の px で測る(画面の px のままだと、縮めたときにプレビューが窓より低くなるため)
+  const previewH = Math.max(480, viewHeight() * 0.94 - 220)
   const themeType = themeTypeOf(card)
   // 効果(ホールドアウトとの比べ・AI に渡した学び。X56)。ここで 1 回だけ読み、主な数字と右の列に渡す
   const impact = useDeliveryImpact(card.id, String(card.country ?? ''))
