@@ -45,6 +45,8 @@ import { type TalkTab } from './ProcessPane'
 import type { TopTab } from './ContentPane'
 import { CHANNEL_PUSH } from './status'
 import { LearningsBar } from './LearningsBar'
+import { LearningEffectFloat, Later } from './lazyViews'
+import type { LearningCardData } from './learningCards'
 import { CardMenu } from './CardMenu'
 import { CardAlertsBar } from './CardAlertsBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
@@ -847,7 +849,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     void save({ after: 'close' })
   }
-  // 学びの効き目(結果の面の「効果」)へ移る。配信カードは閉じるので、変えた分は先に保存する(確定した週は理由が要るので、保存せずに移るかを聞く)
+  // 学びの「効き目を見る」のフロート(配信カードの上に重ねる)
+  const [effectOf, setEffectOf] = useState<LearningCardData | null>(null)
+  // 学びの効き目(結果の面の「効果」)へ移る(フロートの「結果の画面で開く」)。配信カードは閉じるので、変えた分は先に保存する(確定した週は理由が要るので、保存せずに移るかを聞く)
   const openLearningImpact = async (learningId: string) => {
     if (saving) return
     if (isDirty()) {
@@ -1160,7 +1164,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         people: owners,
         reload: onSaved,
         openProduction: onOpenProduction && card ? (opts) => onOpenProduction(card.id, opts) : undefined,
-        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel onOpenSource={onOpenResults} onOpenImpact={(id) => void openLearningImpact(id)} />,
+        learnings: <LearningsBar card={card} templateId={template} country={form.country} channel={form.channel} name={form.name} theme={form.theme} headline={form.headline} themeType={form.themeType} onCount={setLearnCount} panel onOpenSource={onOpenResults} onOpenImpact={setEffectOf} />,
         learnCount,
       })
     : null
@@ -1206,6 +1210,19 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           )}
         </form>
         {addCardDialog}
+        {effectOf && (
+          <Later>
+            <LearningEffectFloat
+              learning={effectOf}
+              onClose={() => setEffectOf(null)}
+              onOpenResult={(id) => onOpenResults?.(id)}
+              onOpenFull={() => {
+                setEffectOf(null)
+                void openLearningImpact(effectOf.id)
+              }}
+            />
+          </Later>
+        )}
       </ResizableSurface>
     </Dialog>
   )

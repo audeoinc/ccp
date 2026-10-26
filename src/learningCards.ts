@@ -5,7 +5,7 @@ import type { DeliveryCard } from './models/deliveryCards'
 import type { DeliveryResult } from './data/deliveryResults'
 import type { AiRun } from './data/aiRuns'
 import type { LearningReview } from './data/learningReviews'
-import { evaluateLearnings, learningIdsOf, reviewIn, type DeliveryImpact, type Diff } from './impact'
+import { evaluateLearnings, learningIdsOf, reviewIn, type DeliveryImpact, type Diff, type LearningEval } from './impact'
 import { learningTitle } from './learningEquip'
 import { themeTypeOf, type ThemeType } from './themeTypes'
 import { templateIdOf } from './results'
@@ -43,6 +43,8 @@ export interface LearningCardData {
   lastUsed: string
   /** 効き目(渡した配信と渡さなかった配信の、リフト率の差。X56 の ④) */
   lift: Diff
+  /** 効き目の詳しい所(渡した配信・比べた相手・おすすめ)。カードの「効き目を見る」のフロートで、そのまま出す(同じ計算の結果を使い、開くたびに求め直さない) */
+  effect: LearningEval
   /** 強さ(1〜5)。比べる材料が足りなければ null */
   strength: number | null
   /** 育ち(0〜2)。使われた本数と強さから。カードの縁の色を、さりげなく変える(growthOf) */
@@ -159,6 +161,7 @@ export function buildLearningCards(
       uses: u?.cards.size ?? 0,
       lastUsed: u?.last ?? '',
       lift: ev.lift,
+      effect: ev,
       strength: strengthOf(ev.lift),
       growth: growthOf(strengthOf(ev.lift), u?.cards.size ?? 0),
       members: (membersOf.get(e.id) ?? []).flatMap((m) => {

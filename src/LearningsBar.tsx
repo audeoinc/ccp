@@ -77,8 +77,8 @@ interface Props {
   panel?: boolean
   /** 学びの元の配信の結果を開く(パネルのカードの「根拠 1 本」) */
   onOpenSource?: (cardId: string) => void
-  /** 学びの効き目(結果の面の「効果」の「学び」のタブで、その学び)を開く(パネルのカードの「効き目を見る」) */
-  onOpenImpact?: (learningId: string) => void
+  /** 学びの効き目をフロートで開く(パネルのカードの「効き目を見る」) */
+  onOpenImpact?: (learning: LearningCardData) => void
 }
 
 // 自動で付ける学びの数の上限(人が付けた学びは、上限に数えない)

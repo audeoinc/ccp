@@ -692,8 +692,7 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
   const t = useT()
   const [showRetired, setShowRetired] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const statusLabel = (v: LearningReviewStatus) =>
-    v === 'keep' ? t('残す', 'Keep') : v === 'watch' ? t('様子を見る', 'Watch') : v === 'resting' ? t('休ませる', 'Rest') : t('外す', 'Retire')
+  const statusLabel = (v: LearningReviewStatus) => reviewLabel(v, t)
   const decide = async (e: LearningEval, status: LearningReviewStatus) => {
     setBusy(e.id)
     const reason = t(
@@ -806,40 +805,7 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
         </div>
         {on ? (
           <div className={s.pane}>
-            <div className={s.learnCard}>
-              <span className={s.notes}>{on.notes}</span>
-              <span className={s.sub}>
-                {t('出どころ: ', 'From: ')}
-                {on.source.name} · {on.sourceAt ? new Date(on.sourceAt).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : ''}
-              </span>
-            </div>
-            <div className={s.bar}>
-              <VerdictBadge verdict={on.lift.verdict} />
-              <span>
-                {t('リフト率の差', 'Lift gap')} <b className={on.lift.diff == null ? undefined : on.lift.diff >= 0 ? s.up : s.down}>{pt(on.lift.diff)}</b>
-              </span>
-              <span className={s.muted}>{t(`クリック率の差 ${pt(on.ctr.diff, 2)}`, `Click rate gap ${pt(on.ctr.diff, 2)}`)}</span>
-              <Badge appearance="outline" color="brand" size="small">
-                {t(`おすすめ: ${statusLabel(on.suggestion)}`, `Suggested: ${statusLabel(on.suggestion)}`)}
-              </Badge>
-            </div>
-            <PaneDeliveries
-              label={t(`この学びを渡した配信(${on.used.length})`, `Deliveries that received it (${on.used.length})`)}
-              avg={on.lift.a.mean}
-              rows={on.used}
-              empty={t('まだ、どの配信にも渡していません', 'Not passed to any delivery yet')}
-              onOpen={onOpenResult}
-            />
-            <PaneDeliveries
-              label={t(`比べた相手: 渡さなかった配信(${on.baseline.length})`, `Compared with: deliveries without it (${on.baseline.length})`)}
-              avg={on.lift.b.mean}
-              rows={on.baseline}
-              empty={t('比べる相手の配信が、まだありません', 'No comparison deliveries yet')}
-              onOpen={onOpenResult}
-            />
-            <Button size="small" appearance="secondary" onClick={() => onOpenResult(on.source.id)}>
-              {t('学びの出どころの配信を開く', 'Open the delivery this came from')}
-            </Button>
+            <LearningEffect on={on} onOpenResult={onOpenResult} />
           </div>
         ) : (
           <div className={s.pane}>
@@ -848,6 +814,56 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
         )}
       </div>
     </div>
+  )
+}
+
+const reviewLabel = (v: LearningReviewStatus, t: ReturnType<typeof useT>) =>
+  v === 'keep' ? t('残す', 'Keep') : v === 'watch' ? t('様子を見る', 'Watch') : v === 'resting' ? t('休ませる', 'Rest') : t('外す', 'Retire')
+
+/**
+ * 選んだ学びの効き目(見立て・リフト率の差・渡した配信と比べた相手)。学びの評価の右の欄と、配信カードの学びの「効き目を見る」のフロート(LearningEffectFloat)で同じものを出す
+ */
+export function LearningEffect({ on, onOpenResult }: { on: LearningEval; onOpenResult: (id: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const statusLabel = (v: LearningReviewStatus) => reviewLabel(v, t)
+  return (
+    <>
+      <div className={s.learnCard}>
+        <span className={s.notes}>{on.notes}</span>
+        <span className={s.sub}>
+          {t('出どころ: ', 'From: ')}
+          {on.source.name} · {on.sourceAt ? new Date(on.sourceAt).toLocaleDateString(locale(), { year: 'numeric', month: 'numeric', day: 'numeric' }) : ''}
+        </span>
+      </div>
+      <div className={s.bar}>
+        <VerdictBadge verdict={on.lift.verdict} />
+        <span>
+          {t('リフト率の差', 'Lift gap')} <b className={on.lift.diff == null ? undefined : on.lift.diff >= 0 ? s.up : s.down}>{pt(on.lift.diff)}</b>
+        </span>
+        <span className={s.muted}>{t(`クリック率の差 ${pt(on.ctr.diff, 2)}`, `Click rate gap ${pt(on.ctr.diff, 2)}`)}</span>
+        <Badge appearance="outline" color="brand" size="small">
+          {t(`おすすめ: ${statusLabel(on.suggestion)}`, `Suggested: ${statusLabel(on.suggestion)}`)}
+        </Badge>
+      </div>
+      <PaneDeliveries
+        label={t(`この学びを渡した配信(${on.used.length})`, `Deliveries that received it (${on.used.length})`)}
+        avg={on.lift.a.mean}
+        rows={on.used}
+        empty={t('まだ、どの配信にも渡していません', 'Not passed to any delivery yet')}
+        onOpen={onOpenResult}
+      />
+      <PaneDeliveries
+        label={t(`比べた相手: 渡さなかった配信(${on.baseline.length})`, `Compared with: deliveries without it (${on.baseline.length})`)}
+        avg={on.lift.b.mean}
+        rows={on.baseline}
+        empty={t('比べる相手の配信が、まだありません', 'No comparison deliveries yet')}
+        onOpen={onOpenResult}
+      />
+      <Button size="small" appearance="secondary" onClick={() => onOpenResult(on.source.id)}>
+        {t('学びの出どころの配信を開く', 'Open the delivery this came from')}
+      </Button>
+    </>
   )
 }
 

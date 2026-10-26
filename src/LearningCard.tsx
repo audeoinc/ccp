@@ -51,8 +51,8 @@ interface Props {
   data: LearningCardData
   /** 根拠の配信を開く(配信カードの id) */
   onOpenSource?: (cardId: string) => void
-  /** この学びの効き目(結果の面の「効果」の「学び」のタブ)を開く。配信カードの学びから、どう効いたかを確かめに行く */
-  onOpenImpact?: (learningId: string) => void
+  /** この学びの効き目を開く(配信カードの学びから、どう効いたかを、閉じずにフロートで確かめる) */
+  onOpenImpact?: (learning: LearningCardData) => void
   /** 右下の操作(手札では状態のメニュー、配信カードでは外すボタン) */
   actions?: ReactNode
   /** 小さく(配信カードの装備。名前・強さ・操作だけ) */
@@ -142,7 +142,7 @@ export function LearningCard({ data: l, onOpenSource, onOpenImpact, actions, com
             <span title={l.source.name ?? ''}>{sourcesText}</span>
           ))}
         {!compact && onOpenImpact && (
-          <Link as="button" onClick={() => onOpenImpact(l.id)} title={t('結果の「効果」で、この学びを渡した配信と渡さなかった配信を比べた詳しい所を開く', 'Open the comparison of deliveries with and without this learning in Results > Impact')}>
+          <Link as="button" onClick={() => onOpenImpact(l)} title={t('この学びを渡した配信と渡さなかった配信を比べた所を、フロートで開く', 'Open the comparison of deliveries with and without this learning in a float')}>
             {t('効き目を見る', 'See impact')}
           </Link>
         )}
