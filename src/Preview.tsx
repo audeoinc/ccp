@@ -15,7 +15,7 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
-import { SECTION_BG, SEP_COLOR, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, lineLook, sectionIdsOf, sectionSpace } from './tables'
+import { SECTION_BG, SEP_COLOR, textDirStyle, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, lineLook, sectionIdsOf, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
@@ -909,7 +909,8 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           if (p.type === 'text') {
             // 文が空のときは、部品を選ぶ見せ方(シンプルな配信カード)でだけ、薄い印を出す(押して選べるように。メールには何も出さない)
             if (!p.text && pickMode) return <div style={{ fontSize: '0.75rem', color: tokens.colorNeutralForegroundDisabled, minHeight: '1.6em', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{t('(テキスト)', '(Text)')}</div>
-            return <div data-el={`${p.id}.text`} style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left' }}>{p.text ?? ''}</div>
+            // 縦の文字(8.8)は、制作が画像にする(data-as-image。書き出す HTML に、制作へのコメントを付ける)
+            return <div data-el={`${p.id}.text`} data-as-image={p.dir ? '1' : undefined} style={{ fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap', alignSelf: 'center', textAlign: p.align ?? 'left', ...textDirStyle(p.dir), ...(p.dir ? { justifySelf: 'center', letterSpacing: 2 } : {}) }}>{p.text ?? ''}</div>
           }
           if (p.type === 'media') {
             // 画像・動画: 押すとリンク先へ(URL は配信ごと。ボタンと同じ目印で、リンクの設定と計測に乗る)。

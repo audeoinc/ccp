@@ -560,6 +560,9 @@ export const lineLook = (p: Pick<TablePart, 'lineWidth' | 'lineColor' | 'lineSho
   pad: p.lineSpace === 'tight' ? 4 : p.lineSpace === 'wide' ? 20 : 10,
   length: p.lineShort ? '40%' : '100%',
 })
+/** テキストの向きの書き方(縦書き・90 度回す。8.8)。横は空 */
+export const textDirStyle = (dir?: TablePart['dir']): { writingMode?: 'vertical-rl'; textOrientation?: 'upright' | 'mixed' } =>
+  dir === 'vertical' ? { writingMode: 'vertical-rl', textOrientation: 'upright' } : dir === 'rotate' ? { writingMode: 'vertical-rl', textOrientation: 'mixed' } : {}
 /** 縦の区切り線の色 */
 export const SEP_COLOR = '#cfcfcf'
 /** 均等の行に、縦の区切り線を引くか */
@@ -658,6 +661,7 @@ export function parsePart(raw: unknown): TablePart | null {
     const text = str(o.text, 1000)
     if (text) part.text = text
     if (o.overridable === false) part.overridable = false
+    if (o.dir === 'vertical' || o.dir === 'rotate') part.dir = o.dir
     if (ALIGNS.includes(o.align as TextAlign) && o.align !== 'left') part.align = o.align as TextAlign
   } else if (type === 'media') {
     const src = url(o.src)

@@ -207,6 +207,15 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                   </div>
                 )
               }
+              if (p.type === 'text' && p.dir) {
+                // 縦の文字は、縦の細い線 2 本
+                return (
+                  <div key={p.id} style={{ ...area, display: 'grid', gridAutoFlow: 'column', justifyContent: 'center', gap: px(1.5), padding: `${px(2)}px 0` }}>
+                    <div style={{ width: px(1.5), background: LINE }} />
+                    <div style={{ width: px(1.5), height: '70%', background: LINE }} />
+                  </div>
+                )
+              }
               if (p.type === 'text') {
                 return (
                   <div key={p.id} style={{ ...area, display: 'grid', alignContent: 'center', gap: px(1.5) }}>

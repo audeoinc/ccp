@@ -356,15 +356,18 @@ export function previewHtml(root: HTMLElement, title: string, links: Record<stri
     const href = at ? links[at] : undefined
     if (href) wraps.push({ out, href })
     const cs = getComputedStyle(el)
-    // 切り出しの書式(焦点・拡大)は、画像だけに、拡大しているときだけ書く(ほかの要素に書くと、HTML が長くなるだけ)
+    // 切り出しの書式(焦点・拡大)は、画像だけに、拡大しているときだけ書く(ほかの要素に書くと、HTML が長くなるだけ)。縦の文字の書き方も、縦のときだけ書く
     const isImg = el.tagName === 'IMG'
     const zoomed = isImg && cs.getPropertyValue('transform') !== 'none'
-    const keys = STYLE_KEYS.filter((k) => (k === 'object-position' ? isImg : k === 'transform' || k === 'transform-origin' ? zoomed : true))
+    const vertical = cs.getPropertyValue('writing-mode').startsWith('vertical')
+    const keys = [...STYLE_KEYS, ...(vertical ? (['writing-mode', 'text-orientation'] as const) : [])].filter((k) => (k === 'object-position' ? isImg : k === 'transform' || k === 'transform-origin' ? zoomed : true))
     out.setAttribute('style', keys.map((k) => `${k}:${cs.getPropertyValue(k)}`).filter((d) => !d.endsWith(':')).join(';'))
     out.removeAttribute('class')
     // 画面の操作のための印(編集・ドラッグ・リンクの場所の番号)は外す
     for (const a of Array.from(out.attributes)) if (a.name.startsWith('data-') || a.name.startsWith('aria-') || a.name === 'draggable' || a.name === 'tabindex' || a.name === 'contenteditable') out.removeAttribute(a.name)
     if (out instanceof HTMLImageElement && el instanceof HTMLImageElement) out.setAttribute('src', el.currentSrc || el.src)
+    // 縦の文字(テンプレートの 8.8): メールの多くは縦の書き方に対応しないので、制作が画像にする。その印をコメントで残す
+    if (el.dataset.asImage) out.before(document.createComment(tr(' 制作へ: この文字は画像にしてください(縦の文字は、メールで崩れやすいため) ', ' To production: render this text as an image (vertical text breaks in many email clients) ')))
   })
   clone.querySelectorAll('button, input, textarea, select, svg').forEach((n) => n.remove())
   // <a> の中に <a> は置けないので、ほかのリンクの場所を含む場所(ボタンを中に持つメイン画像など)は包まない(中のリンクを生かす)
@@ -403,6 +406,11 @@ export function prettyHtml(src: string): string {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = squash(node.textContent ?? '')
       if (text) lines.push(pad + esc(text))
+      return
+    }
+    // 制作へのコメント(縦の文字を画像にする など)は残す
+    if (node.nodeType === Node.COMMENT_NODE) {
+      lines.push(`${pad}<!--${node.textContent ?? ''}-->`)
       return
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return

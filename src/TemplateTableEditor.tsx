@@ -1137,7 +1137,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         </div>
       )
     }
-    if (p.type === 'text') return <div className={s.ptext} style={{ textAlign: p.align ?? 'left' }}>{p.text || t('(テキスト。ダブルクリックで書く)', '(Text — double-click to write)')}</div>
+    if (p.type === 'text') return <div className={s.ptext} style={{ textAlign: p.align ?? 'left', ...T.textDirStyle(p.dir), ...(p.dir ? { justifySelf: 'center' } : {}) }}>{p.text || t('(テキスト。ダブルクリックで書く)', '(Text — double-click to write)')}</div>
     if (p.type === 'line') {
       const lk = T.lineLook(p)
       return (
@@ -1760,6 +1760,17 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             <AutoTextarea rows={3} size="small" value={p.text ?? ''} onChange={(_, d) => patch(sec, p, { text: d.value || undefined })} />
           </Field>
           <Checkbox label={t('配信ごとに書き換えてよい', 'Can be rewritten per delivery')} checked={p.overridable !== false} onChange={(_, d) => patch(sec, p, { overridable: d.checked === true ? undefined : false })} />
+          <Field
+            label={t('向き', 'Direction')}
+            hint={p.dir ? t('Gmail・Outlook などは縦の文字に対応していないことが多いので、制作に「この文字は画像にする」と伝えます。縦に結合したマスに置くと見やすい', "Many email clients (Gmail, Outlook) don't support vertical text, so production is told to render it as an image. Works best in a vertically merged cell") : undefined}
+            size="small"
+          >
+            <Select size="small" value={p.dir ?? ''} onChange={(_, d) => patch(sec, p, { dir: d.value === 'vertical' || d.value === 'rotate' ? d.value : undefined })}>
+              <option value="">{t('横', 'Horizontal')}</option>
+              <option value="vertical">{t('縦書き(上から下)', 'Vertical (top to bottom)')}</option>
+              <option value="rotate">{t('90 度回す(英字を横倒しに)', 'Rotated 90°')}</option>
+            </Select>
+          </Field>
           {alignField(sec, p, 'left')}
         </>
       )}
