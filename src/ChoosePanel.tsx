@@ -74,10 +74,15 @@ interface Props<V extends string> {
   attached?: boolean
   /** 枠と見出し(題・×)を出さず、タブと中身だけ(置いた所が枠と題を持つとき) */
   bare?: boolean
+  /**
+   * タブの代わりに出す中身(候補の詳しい情報など)。タブと中身は隠すだけで消さない
+   * (戻ったときに、選んでいたタブ・検索の文字・AI とのやり取りがそのまま残るように)
+   */
+  override?: ReactNode
   id?: string
 }
 
-export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, bare, id }: Props<V>) {
+export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, bare, override, id }: Props<V>) {
   const s = useStyles()
   const t = useT()
   const [tab, setTab] = useState<V>(defaultTab ?? tabs[0].value)
@@ -90,16 +95,17 @@ export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose
           {onClose && <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} title={t('閉じる', 'Close')} />}
         </div>
       )}
-      <TabList className={mergeClasses(s.tabs, bare && s.bareTabs)} size="small" selectedValue={current.value} onTabSelect={(_, d) => setTab(d.value as V)}>
+      <TabList className={mergeClasses(s.tabs, bare && s.bareTabs)} style={override ? { display: 'none' } : undefined} size="small" selectedValue={current.value} onTabSelect={(_, d) => setTab(d.value as V)}>
         {tabs.map((x) => (
           <Tab key={x.value} value={x.value} icon={x.icon}>
             {x.label}
           </Tab>
         ))}
       </TabList>
-      <div className={mergeClasses(s.body, bare && s.bareBody)} role="tabpanel">
+      <div className={mergeClasses(s.body, bare && s.bareBody)} style={override ? { display: 'none' } : undefined} role="tabpanel">
         {current.content}
       </div>
+      {override && <div className={mergeClasses(s.body, bare && s.bareBody)}>{override}</div>}
     </section>
   )
 }
