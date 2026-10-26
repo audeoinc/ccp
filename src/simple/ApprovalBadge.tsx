@@ -26,17 +26,20 @@ const useBandStyles = makeStyles({
   },
   // 状態の文字は 13px(添える文・保存の様子は 12px)。弱く見えたので強めた(2026-10-26 利用者)
   state: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: '13px', fontWeight: tokens.fontWeightSemibold, color: 'var(--band-fg)', whiteSpace: 'nowrap', flexShrink: 0, '& svg': { fontSize: '16px' } },
-  dot: { color: tokens.colorNeutralForeground3, flexShrink: 0 },
-  note: { color: tokens.colorNeutralForeground3, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1 },
-  save: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 'auto' },
+  dot: { color: 'var(--band-sub)', flexShrink: 0 },
+  note: { color: 'var(--band-sub)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1 },
+  save: { color: 'var(--band-sub)', whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 'auto' },
 })
 
-/** 帯の色(線・背景・文字)。札と同じ色の並び(未起案 = 濃い灰、承認待ち = 黄、承認済み = 緑、差し戻し = 赤) */
+/**
+ * 帯の色(線・背景・状態の文字・添える文と保存の様子)。札と同じ色の並び(未起案 = 濃い灰、承認待ち = 黄、承認済み = 緑、差し戻し = 赤)。
+ * 未起案だけは、札のときと同じ濃い灰色の塗りつぶしに白系の文字(薄い灰色では、ほかの状態より弱く見えた。2026-10-26 利用者)
+ */
 const BAND_COLORS = {
-  draft: { line: tokens.colorNeutralBackgroundInverted, bg: tokens.colorNeutralBackground5, fg: tokens.colorNeutralForeground1 },
-  pending: { line: tokens.colorStatusWarningBorderActive, bg: tokens.colorStatusWarningBackground2, fg: tokens.colorStatusWarningForeground3 },
-  approved: { line: tokens.colorStatusSuccessBorderActive, bg: tokens.colorStatusSuccessBackground2, fg: tokens.colorStatusSuccessForeground1 },
-  changes: { line: tokens.colorStatusDangerBorderActive, bg: tokens.colorStatusDangerBackground2, fg: tokens.colorStatusDangerForeground1 },
+  draft: { line: tokens.colorNeutralForegroundInverted, bg: tokens.colorNeutralBackgroundInverted, fg: tokens.colorNeutralForegroundInverted, sub: tokens.colorNeutralForegroundInverted2 },
+  pending: { line: tokens.colorStatusWarningBorderActive, bg: tokens.colorStatusWarningBackground2, fg: tokens.colorStatusWarningForeground3, sub: tokens.colorNeutralForeground3 },
+  approved: { line: tokens.colorStatusSuccessBorderActive, bg: tokens.colorStatusSuccessBackground2, fg: tokens.colorStatusSuccessForeground1, sub: tokens.colorNeutralForeground3 },
+  changes: { line: tokens.colorStatusDangerBorderActive, bg: tokens.colorStatusDangerBackground2, fg: tokens.colorStatusDangerForeground1, sub: tokens.colorNeutralForeground3 },
 }
 
 /**
@@ -103,7 +106,7 @@ export function ApprovalBand({
     <button
       type="button"
       className={s.band}
-      style={{ '--band-line': c.line, '--band-bg': c.bg, '--band-fg': c.fg } as CSSProperties}
+      style={{ '--band-line': c.line, '--band-bg': c.bg, '--band-fg': c.fg, '--band-sub': c.sub } as CSSProperties}
       onClick={onOpen}
       title={spec.note}
       aria-label={t(`承認の状態: ${spec.label}。${spec.note}。承認のパネルを開く`, `Approval: ${spec.label}. ${spec.note}. Open the approval panel`)}
