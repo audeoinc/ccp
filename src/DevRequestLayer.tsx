@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Badge, Button, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, Portal, PopoverSurface, PopoverTrigger, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CheckmarkRegular, DeleteRegular, DismissRegular, MoreHorizontalRegular, LightbulbFilled, LightbulbRegular, LocationOffRegular, ThumbLikeFilled, ThumbLikeRegular } from '@fluentui/react-icons'
 import type { LinkState } from './deepLink'
+import { getUiScale } from './uiScale'
 import { DevRequestsService } from './data/devRequests'
 import { DevRequestVotesService } from './data/devRequestVotes'
 import type { DevRequestVote } from './models/devRequestVotes'
@@ -212,7 +213,11 @@ export function DevRequestLayer({ link, cardName }: Props) {
         const p = locate(pd)
         if (p) next.push({ id: 'pending', ...p })
       }
-      setSpots((o) => (JSON.stringify(o) === JSON.stringify(next) ? o : next))
+      // 測った点は、表示の大きさ(画面全体の CSS の zoom。X60)を掛けたあとの px。ピンの層の中に置く値は掛ける前の px なので、倍率で割る
+      // (割らないと、表示を小さくしたときに、押した所より左上にピンが刺さる。2026-10-26 利用者の報告。保存する割合は、どちらも掛けたあとの px で測るので、そのままでよい)
+      const z = getUiScale()
+      const placed = z === 1 ? next : next.map((p) => ({ ...p, left: p.left / z, top: p.top / z }))
+      setSpots((o) => (JSON.stringify(o) === JSON.stringify(placed) ? o : placed))
       setMissing((o) => (o.join(',') === lost.join(',') ? o : lost))
     }
     update()
