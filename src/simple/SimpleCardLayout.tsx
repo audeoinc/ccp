@@ -642,6 +642,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           ))}
         </TabList>
       )}
+      {/* 案から選んだあと: どの案に決めたかと、配信しなかった案を並べて見る入口(詳しい画面の AbDecidedBar と同じもの。X81 の 6) */}
+      {!e.ab && e.abDecided && (
+        <Button type="button" size="small" appearance="subtle" icon={<ColumnTripleRegular />} onClick={e.abViewDecided} title={t('配信しなかった案も、中身を残してあります', 'The variants not sent are kept for reference')}>
+          {t(`${e.abDecided} 案に決めた · 並べて見る`, `Went with variant ${e.abDecided} · Compare`)}
+        </Button>
+      )}
       {(!e.ab || e.ab.canAdd) && addVariantMenu}
       {e.ab && (
         <Menu>

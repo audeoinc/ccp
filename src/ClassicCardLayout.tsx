@@ -6,7 +6,6 @@ import {
   Button,
   Caption1,
   Field,
-  Select,
   Switch,
   Text,
   ToggleButton,
@@ -25,7 +24,6 @@ import { ChannelBadge } from './ChannelBadge'
 import { CopyLinkButton } from './CopyLinkButton'
 import { FaceBadge } from './FaceBadge'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
-import { AUDIENCES, audienceLabel } from './target'
 import { ContentPane } from './ContentPane'
 import { Preview } from './Preview'
 import { type EmailTemplateId } from './templates'
@@ -46,10 +44,9 @@ import { LearningsBar } from './LearningsBar'
 import { ResolvedPinsToggle } from './ResolvedPinsToggle'
 import { AbDecidedBar, AbTestBar } from './AbTestBar'
 import { CreativeAssets } from './CreativeAssets'
-import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
-import { isChoose, metricLabel, ownsHero, ownsProducts, targetLabel } from './abTest'
-import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from './DeliveryInfoFields'
+import { isChoose, metricLabel, targetLabel } from './abTest'
+import { AudienceRow, ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from './DeliveryInfoFields'
 import { PreviewPins } from './PreviewPins'
 import { pinView } from './pinStore'
 import { viewWidth } from './uiScale'
@@ -158,7 +155,7 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     campaignName?: string
   }
 
-export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }: ClassicCardLayoutProps) {
+export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, audience, canReview, changeReason, changeTarget, decideVariant, decision, draftActiveVariant, form, groupByCategory, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }: ClassicCardLayoutProps) {
   const t = useT()
   const styles = useCardDetailStyles()
   const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
@@ -287,28 +284,6 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
             {/* キャンペーンに入っている配信は、AB の帯をキャンペーンの帯の 3 段目に置く */}
             {!campaignBand && abNode}
             {abCompareNode}
-            {!ab && decision && comparing === 'decided' && (
-              <AbCompare
-                ab={null}
-                target={decision.target}
-                base={{ id: card?.id ?? 'draft', ...buildContent() } as DeliveryCard}
-                variants={[
-                  { key: decision.variant, productIds: items.map((i) => i.productId), heroId, tag: t('配信した案', 'Sent') },
-                  ...decision.rejected.map((r) => ({
-                    key: r.key,
-                    // 案ごとに持たなかったもの(比べる要素でないもの)は、配信の中身と同じ。持っていたものは、空でもその案の中身のまま
-                    productIds: ownsProducts(asTarget(decision.target)) ? r.productIds : items.map((i) => i.productId),
-                    heroId: ownsHero(asTarget(decision.target)) ? r.heroId : heroId,
-                    texts: r.texts,
-                    template: r.template,
-                    tag: t('配信しなかった', 'Not sent'),
-                  })),
-                ]}
-                products={products}
-                heroes={heroes}
-                onClose={() => setComparing(null)}
-              />
-            )}
 
             <div ref={panesRef} className={styles.panes} style={{ '--w0': `${widths[0]}px`, '--w1': `${widths[1]}px`, '--w2': `${infoOpen ? widths[2] : RAIL_W}px`, '--w3': `${processOpen ? widths[3] : RAIL_W}px` } as React.CSSProperties}>
               {/* 左: 配信の情報 */}
@@ -337,17 +312,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
                 {/* 配信の対象(X40): 誰に向けて作るか。最初に決め、AI の下書きと商品の候補をこれに合わせる */}
                 <TargetField gender={form.targetGender} ages={form.targetAges} onGender={set('targetGender')} onAges={set('targetAges')}>
                   {/* アプリの送る相手(これまでの ⑥ 時刻・相手 から移した) */}
-                  {templateChannel === 'push' && (
-                    <div className={styles.targetRow}>
-                      <span className={styles.targetLabel}>{t('送る相手', 'Send to')}</span>
-                      <Select size="small" className={styles.grow} value={audience} onChange={(_, d) => setAudience(d.value)}>
-                        <option value="" disabled>{t('選んでください', 'Choose')}</option>
-                        {AUDIENCES.map((v) => (
-                          <option key={v} value={v}>{audienceLabel(v)}</option>
-                        ))}
-                      </Select>
-                    </div>
-                  )}
+                  {templateChannel === 'push' && <AudienceRow value={audience} onChange={setAudience} />}
                 </TargetField>
                 <div className={styles.twoCol}>
                   <OwnerField value={form.owner} onChange={set('owner')} owners={owners} />

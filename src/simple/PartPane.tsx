@@ -40,7 +40,7 @@ import { ProductSwap, type SwapAt } from './ProductSwap'
 import { AiPicks, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
 import { confirmDialog } from '../confirm'
-import { ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
+import { AudienceRow, ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
 
 const useStyles = makeStyles({
   // テンプレートで決まっている部品の知らせ(鍵の印 + 文 + テンプレートの管理へのリンク)
@@ -931,7 +931,10 @@ function ManageFields({ editor: e, onOpenHandoff }: { editor: SimpleEditor; onOp
         <ChoiceField label={t('種類', 'Type')} value={e.form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={(v) => e.setField('themeType', v)} size="small" field="themeType" />
         <ChoiceField label={t('国', 'Country')} value={e.form.country} options={countryOptions} onChange={(v) => e.setField('country', v)} size="small" field="country" />
       </div>
-      <TargetField gender={e.form.targetGender} ages={e.form.targetAges} onGender={(v) => e.setField('targetGender', v)} onAges={(v) => e.setField('targetAges', v)} size="small" field="target" />
+      <TargetField gender={e.form.targetGender} ages={e.form.targetAges} onGender={(v) => e.setField('targetGender', v)} onAges={(v) => e.setField('targetAges', v)} size="small" field="target">
+        {/* アプリの送る相手(X81 の 3。詳しい画面の配信情報と同じ部品) */}
+        {e.channel === 'push' && <AudienceRow value={e.audience} onChange={e.setAudience} />}
+      </TargetField>
       <OwnerField value={e.form.owner} onChange={(v) => e.setField('owner', v)} owners={e.people} size="small" field="owner" />
       {/* 制作の担当・締め切りは、渡すものだけで決める(2 か所で入力しない。FLOWS の C-3)。ここからは渡すものを開く */}
       <div className={s.readonly} data-field="due">

@@ -52,7 +52,7 @@ import { CardAlertsBar } from './CardAlertsBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
-import { allVariants, nextVariant, ownsAnyText, ownsImages, ownsSubject, setVariantImage, withVariantImages } from './abTest'
+import { allVariants, nextVariant, ownsAnyText, ownsHero, ownsImages, ownsProducts, ownsSubject, setVariantImage, withVariantImages } from './abTest'
 import { ProductActionFloat, type SwapOption } from './ProductActionFloat'
 import { ItemAlertOverlay } from './ItemAlertOverlay'
 import { confirmDialog } from './confirm'
@@ -673,6 +673,29 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           onClose={() => setComparing(null)}
         />
       )}
+      {/* 案から選んだあと: 決めた案と、配信しなかった案を並べて見る(詳しい画面の AbDecidedBar・シンプルの上の帯の AB の入口から。X81 の 6) */}
+      {!ab && decision && comparing === 'decided' && (
+        <AbCompare
+          ab={null}
+          target={decision.target}
+          base={{ id: card?.id ?? 'draft', ...buildContent() } as DeliveryCard}
+          variants={[
+            { key: decision.variant, productIds: items.map((i) => i.productId), heroId, tag: t('配信した案', 'Sent') },
+            ...decision.rejected.map((r) => ({
+              key: r.key,
+              // 案ごとに持たなかったもの(比べる要素でないもの)は、配信の中身と同じ。持っていたものは、空でもその案の中身のまま
+              productIds: ownsProducts(asTarget(decision.target)) ? r.productIds : items.map((i) => i.productId),
+              heroId: ownsHero(asTarget(decision.target)) ? r.heroId : heroId,
+              texts: r.texts,
+              template: r.template,
+              tag: t('配信しなかった', 'Not sent'),
+            })),
+          ]}
+          products={products}
+          heroes={heroes}
+          onClose={() => setComparing(null)}
+        />
+      )}
     </>
   )
 
@@ -1100,6 +1123,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         abAdd: abAddSimple,
         abRemove: removeVariant,
         abCompare: () => setComparing('live'),
+        abDecided: !ab && decision ? decision.variant : null,
+        abViewDecided: () => setComparing('decided'),
         abSettings: ab ? <AbSettings ab={ab} active={active} target={saveTarget() ?? ab.target} onChange={setAb} onDecide={decideVariant} onStop={stopAbTest} /> : null,
         abDiffParts: abDiff?.parts ?? [],
         products,

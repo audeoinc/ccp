@@ -63,7 +63,7 @@ export interface FloatAction {
  * 配信カードの editor(useCardEditor)から、そのまま渡すもの。名前と型は editor と同じ(写しの型を書かない。2 つの画面で、ずれないように)。
  * form は詳しい画面と同じ Form、savedAt は最後に保存した日時(ISO。上の帯の「保存済み · 12:03」)、canReview は承認の依頼・承認を出せるか(確定した週の配信は、出さない)
  */
-const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'partContent', 'setPartContent', 'links', 'setLinks', 'pushLink', 'setPushLink', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview'] as const
+const FROM_EDITOR = ['form', 'template', 'items', 'candidates', 'poolProducts', 'poolHeroes', 'heroReason', 'heroCandidates', 'sectionTitles', 'sectionCopies', 'setSectionTitle', 'setSectionCopy', 'partContent', 'setPartContent', 'links', 'setLinks', 'pushLink', 'setPushLink', 'addProduct', 'removeItem', 'moveItem', 'swapItems', 'saving', 'justSaved', 'savedAt', 'canReview', 'audience', 'setAudience'] as const
 type FromEditor = Pick<CardEditor, (typeof FROM_EDITOR)[number]>
 
 /**
@@ -95,6 +95,10 @@ export interface SimpleExtras {
   abAdd: (from: VariantKey | 'ai') => void
   abRemove: (k: VariantKey) => void
   abCompare: () => void
+  /** 案から選んだあと(AB テストは終わっている)、決めた案。null = 決めていない(X81 の 6) */
+  abDecided: VariantKey | null
+  /** 決めた案と、配信しなかった案を並べて見る */
+  abViewDecided: () => void
   /** テストの設定(タブの横の ⚙ の中身) */
   abSettings: ReactNode
   /** いまの案が A と違う部品(「A と違う」の目印) */
