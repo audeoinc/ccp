@@ -32,7 +32,7 @@ import {
   PeopleManager,
   PolicyManager,
   SampleShopPanel,
-  TemplateManager,
+  TemplateSettingsPane,
 } from './lazyViews'
 import { AiIcon } from './AiMark'
 import { DeliveryCardsService } from './data/deliveryCards'
@@ -227,7 +227,8 @@ export function useSettingsActions(ctx: {
       label: t('テンプレート', 'Templates'),
       description: t('テンプレートを作る・直す。どの国で使うかは「国」の「使うテンプレート」で決めます。', 'Create and edit templates. Which countries use them is set under Country → Templates used.'),
       icon: <LayoutColumnTwoRegular />,
-      render: () => <Later spin><TemplateManager inline cards={cards} products={products} country={country || undefined} onChanged={load} onOpenCard={setSelectedId} /></Later>,
+      // 設定の画面の中では編集の場所が狭いので、選んだら別の大きなフロートで開く(2026-10-26 利用者の要望。TemplateFloat)
+      render: () => <Later spin><TemplateSettingsPane cards={cards} products={products} country={country || undefined} onChanged={load} onOpenCard={setSelectedId} /></Later>,
     },
     {
       id: 'heroLibrary',

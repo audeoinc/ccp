@@ -14,6 +14,8 @@ export const ProductionPage = lazy(() => loadChunk(() => import('./ProductionPag
 export const AlertsPage = lazy(() => loadChunk(() => import('./AlertsPage')).then((m) => ({ default: m.AlertsPage })))
 export const BulkWorkspace = lazy(() => loadChunk(() => import('./BulkWorkspace')).then((m) => ({ default: m.BulkWorkspace })))
 export const TemplateManager = lazy(() => loadChunk(() => import('./TemplateManager')).then((m) => ({ default: m.TemplateManager })))
+// 設定の画面の「テンプレート」(テンプレートの管理を、別の大きなフロートで開く)
+export const TemplateSettingsPane = lazy(() => loadChunk(() => import('./TemplateFloat')).then((m) => ({ default: m.TemplateSettingsPane })))
 export const PolicyManager = lazy(() => loadChunk(() => import('./PolicyManager')).then((m) => ({ default: m.PolicyManager })))
 export const PatternPanel = lazy(() => loadChunk(() => import('./PatternPanel')).then((m) => ({ default: m.PatternPanel })))
 export const CountryCriteriaPanel = lazy(() => loadChunk(() => import('./CountryCriteriaPanel')).then((m) => ({ default: m.CountryCriteriaPanel })))
