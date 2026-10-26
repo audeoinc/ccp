@@ -1532,6 +1532,11 @@ function App() {
             setFocusProduct(undefined)
             setSelectedId(nextOf.id)
           }}
+          // キャンペーンの帯のタブで、きょうだいの配信に切り替える(X79)
+          onSwitchCard={(id) => {
+            setFocusProduct(undefined)
+            setSelectedId(id)
+          }}
         />
         </ErrorBoundary>
       )}

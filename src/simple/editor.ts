@@ -133,6 +133,10 @@ export interface SimpleExtras {
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る・詳しい画面へ + 複製・取りやめ・削除) */
   menu: ReactNode
   stageNav?: ReactNode
+  /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。引数は 3 段目に置く AB の案の切り替え。あるときは、AB の案を上の帯の 2 段目に置かない */
+  campaignBand?: (variants: ReactNode) => ReactNode
+  /** 配信の画面に出す名前(キャンペーンに入っている配信は「キャンペーン名 + チャネル」で、直せない) */
+  campaignName?: string
   /** 「シンプル | 詳しい」の切り替え */
   viewSwitch: ReactNode
   // ---- プレビュー(倍率の計算は CardDetail のまま。箱の ref は、別の引数で渡して、この画面の箱に付ける)

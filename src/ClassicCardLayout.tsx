@@ -152,9 +152,13 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     onOpenResults: ((id: string) => void) | undefined
     onOpenProduction: ((cardId: string, opts?: { request?: boolean }) => void) | undefined
     onTabChange: ((tab: string) => void) | undefined
+    /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。引数は 3 段目に置く AB の案の帯。あるときは、AB の帯を題の下に置かない */
+    campaignBand?: (variants: ReactNode) => ReactNode
+    /** 配信の画面に出す名前(キャンペーンに入っている配信は「キャンペーン名 + チャネル」) */
+    campaignName?: string
   }
 
-export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }: ClassicCardLayoutProps) {
+export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }: ClassicCardLayoutProps) {
   const t = useT()
   const styles = useCardDetailStyles()
   const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
@@ -222,13 +226,35 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
     })
   }
 
+  // AB テストの帯(X55): 案の切り替えと、テストの設定。案から選んだあと(X57)は、決めた案と、配信しなかった案の入り口
+  const abNode = ab ? (
+    <AbTestBar
+      ab={ab}
+      active={active}
+      onSwitch={switchVariant}
+      onChange={setAb}
+      onAdd={addVariant}
+      onRemove={removeVariant}
+      onStop={stopAbTest}
+      onTarget={changeTarget}
+      onAiDraft={() => void draftActiveVariant()}
+      aiBusy={abAiBusy}
+      onCompare={() => setComparing('live')}
+      onDecide={decideVariant}
+    />
+  ) : decision ? (
+    <AbDecidedBar decision={decision} onView={() => setComparing('decided')} />
+  ) : null
+
   return (
     <>
+            {/* キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案) */}
+            {campaignBand?.(abNode ?? <Caption1 className={styles.caption}>{t('AB テストはしていません', 'No A/B test')}</Caption1>)}
             <div className={styles.titleRow}>
               {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
               {stageNav ?? <FaceBadge face="calendar" />}
               <ChannelBadge channel={form.channel} />
-              <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}</Text>
+              <Text as="h2" size={500} weight="semibold" className={styles.titleText}>{campaignName ?? (card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card'))}</Text>
               <Tooltip
                 relationship="description"
                 content={progress.remaining.length ? t(`未完了: ${progress.remaining.join('、')}`, `Incomplete: ${progress.remaining.join(', ')}`) : t('すべての工程が完了しています', 'All steps are complete')}
@@ -258,25 +284,8 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, as
             )}
 
             {heroUploadNode}
-            {/* AB テストの帯(X55): 案の切り替えと、テストの設定 */}
-            {ab && (
-              <AbTestBar
-                ab={ab}
-                active={active}
-                onSwitch={switchVariant}
-                onChange={setAb}
-                onAdd={addVariant}
-                onRemove={removeVariant}
-                onStop={stopAbTest}
-                onTarget={changeTarget}
-                onAiDraft={() => void draftActiveVariant()}
-                aiBusy={abAiBusy}
-                onCompare={() => setComparing('live')}
-                onDecide={decideVariant}
-              />
-            )}
-            {/* 案から選んだあと(X57): 決めた案と、配信しなかった案の入り口 */}
-            {!ab && decision && <AbDecidedBar decision={decision} onView={() => setComparing('decided')} />}
+            {/* キャンペーンに入っている配信は、AB の帯をキャンペーンの帯の 3 段目に置く */}
+            {!campaignBand && abNode}
             {abCompareNode}
             {!ab && decision && comparing === 'decided' && (
               <AbCompare

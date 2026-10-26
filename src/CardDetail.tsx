@@ -64,6 +64,9 @@ import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
 import { usePreviewPins } from './usePreviewPins'
+import { CampaignBand } from './CampaignBand'
+import { useCampaignOf } from './useCampaignOf'
+import { cardDisplayName } from './campaigns'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -121,6 +124,8 @@ interface Props {
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
   onNext?: () => void
+  /** 同じキャンペーンの、ほかの配信カードに切り替える(キャンペーンの帯のタブ。X79)。保存していない変更は、ここで先に保存してから呼ぶ */
+  onSwitchCard?: (id: string) => void
 }
 
 
@@ -153,7 +158,7 @@ const loadOpen = (key: string): boolean => readRaw(key) !== 'closed'
 
 
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext, onSwitchCard }: Props) {
   const t = useT()
   const styles = useCardDetailStyles()
   // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
@@ -663,6 +668,25 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const ok = await save({ after: 'stay', reason, force })
     if (ok && push && before) undoStack.push(before)
   }
+  // キャンペーン(X79)。入っている配信は、いちばん上に親・子・孫の帯を出し、名前は「キャンペーン名 + チャネル」で出す
+  const campaign = useCampaignOf(card?.campaign_id)
+  const campaignName = card && campaign ? cardDisplayName(card, [campaign]) : undefined
+  /** きょうだいの配信に切り替える。保存していない変更は、先に保存する(「保存して次へ」と同じ決まり)。確定した週の配信は、理由を入れて保存してから、もう一度押してもらう */
+  const switchCard = async (id: string) => {
+    if (!onSwitchCard || saving) return
+    if (isDirty()) {
+      if (locked) {
+        askReason('stay')
+        return
+      }
+      if (!(await save({ after: 'stay' }))) return
+    }
+    onSwitchCard(id)
+  }
+  const campaignBand =
+    card && campaign && onSwitchCard
+      ? (variants: ReactNode) => <CampaignBand campaign={campaign} card={card} allCards={allCards ?? []} onSwitch={(id) => void switchCard(id)} variants={variants} busy={saving} />
+      : undefined
   /** 別の部品を選んだときの反映。変わっていなければ何もしない。確定した週の配信は、反映のボタンで */
   const commitSimple = async () => {
     if (saving || locked || !isDirty()) return
@@ -1059,6 +1083,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           </>,
         ),
         stageNav: stageTabs ?? stageNav,
+        campaignBand,
+        campaignName,
         viewSwitch: <ViewSwitch simple onChange={changeView} />,
         preview: simplePreview,
         device: previewDevice,
@@ -1115,7 +1141,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           ) : (
           <>
           <ClassicCardLayout
-            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange }}
+            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
           />
           </>
           )}

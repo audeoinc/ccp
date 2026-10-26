@@ -246,6 +246,8 @@ const useStyles = makeStyles({
   // 案のタブ(SU2)
   // 上の帯の AB テストの案(SU8)。面のタブのあとに、線で区切って並べる
   abBar: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, flexShrink: 0, paddingLeft: '10px', marginLeft: '2px', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
+  // キャンペーンの帯の 3 段目に置くとき(帯の中では、左の区切りの線は要らない)
+  abBarInBand: { paddingLeft: 0, marginLeft: 0, borderLeft: 'none' },
   abWarn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   abDiff: { boxShadow: `inset 0 -2px 0 ${tokens.colorPaletteDarkOrangeBorder2}` },
 })
@@ -612,13 +614,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     </Menu>
   )
   const abBar = (
-    <div className={s.abBar}>
-      <InfoLabel
+    <div className={mergeClasses(s.abBar, e.campaignBand && s.abBarInBand)}>
+      {/* キャンペーンの帯の中で、AB テストをしていないときは、ⓘ だけが残らないように出さない(段の名前「案」がある) */}
+      {(!e.campaignBand || e.ab) && <InfoLabel
         size="small"
         info={t('同じ配信を、見出しや画像を変えて複数作り、どれがよいかを比べます。タブを押すと、プレビューと中身がその案に切り替わります', 'Make several versions of the same delivery with different headlines or images, and compare which works better. Pick a tab to switch the preview and content to that variant.')}
       >
         {e.ab ? t('AB テスト', 'A/B test') : ''}
-      </InfoLabel>
+      </InfoLabel>}
       {e.ab && (
         <TabList size="small" selectedValue={e.ab.active} onTabSelect={(_, d) => d.value !== e.ab?.active && (void onCommit(), e.abSwitch(d.value as typeof e.ab.active))}>
           {e.ab.keys.map((k) => (
@@ -693,6 +696,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const shown = { ...e.form, ...(e.previewTexts ?? {}) }
   return (
     <div className={s.root}>
+      {/* キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案)。承認の帯より上に置く(承認の帯は、ここで選んだ配信の状態なので) */}
+      {e.campaignBand?.(abBar)}
       {/* 承認の状態の帯(2026-10-26 利用者と決めた)。題の行の札の代わりに、フロートのいちばん上(題の行の上)に、幅いっぱいに。右の端に保存の様子(入力が止まって約 1.5 秒で自動で保存する) */}
       <ApprovalBand
         status={e.form.status}
@@ -718,7 +723,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         title={
           <>
             <ChannelBadge channel={e.form.channel} />
-            {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
+            {/* キャンペーンに入っている配信の名前は「キャンペーン名 + チャネル」で決まるので、直す入口を出さない */}
+            {e.campaignName ? (
+              <span className={s.name}>{e.campaignName}</span>
+            ) : (
+              field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)
+            )}
             {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
           </>
         }
@@ -817,7 +827,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         // 面のタブ(PLAN | PRODUCTION | RESULTS)。配信が主役で、面はその見方なので、題名の下に
         tabs={e.stageNav}
         // AB テストの案(SU8)。1 段目に置くと配信名が縮むので、同じ帯の 2 段目、面のタブの右に
-        tabsExtra={abBar}
+        tabsExtra={e.campaignBand ? undefined : abBar}
       />
       <div className={s.notices}>
         {e.notices}
