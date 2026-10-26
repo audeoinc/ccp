@@ -184,6 +184,8 @@ function contentFields(c: DraftBase, r: AutoDraftResult, products: Product[]): P
     instructions_angle: r.instructions ? (r.instructionIdeas[0]?.angle ?? '') : '',
     push_title: r.pushTitle ?? '',
     push_body: r.pushBody ?? '',
+    subject: r.subject ?? '',
+    preheader: r.preheader ?? '',
     products: productIdsOf(r).map(pname).filter(Boolean).join(' / '),
     hero_reason: r.hero?.hero?.reason ?? '',
     email_template: TEMPLATE_VALUES[template],
