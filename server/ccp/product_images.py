@@ -150,6 +150,10 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
         prod = it["product"]
         # 見本の ZIP は見本の行だけ、本物の ZIP は本物の行(source が空)だけを入れ替える。元のメイン画像の控え(master)は残す
         scope = "source = :s" if sample else "source IS NULL"
+        # AI が画像の案(X64)で見分けたアングルは、同じ画像(中身の sha256 が同じ)なら引き継ぐ(取り込み直すたびに、画像を読ませ直さないため)
+        judged = {r["sha256"]: r for r in (await conn.execute(
+            text(f"SELECT sha256, angle, angle_note FROM product_images WHERE product_id = :id AND {scope} AND sha256 IS NOT NULL AND angle IS NOT NULL"),
+            {"id": prod["id"], "s": SAMPLE})).mappings().all()}
         await conn.execute(text(f"DELETE FROM product_images WHERE product_id = :id AND {scope}"), {"id": prod["id"], "s": SAMPLE})
         main_url = main_caption = None
         for order, img in enumerate(it["images"], start=1):
@@ -157,14 +161,15 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
             if put(name, z.read(f"products/{img['file']}"), img["content_type"]):
                 placed += 1
             url = f"/img/products/{name}"
+            kept = judged.get(img["sha256"]) or {}
             if img.get("main") and not main_url:
                 main_url, main_caption = url, (img.get("caption") or "")[:2000] or None
             await conn.execute(
-                text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, caption, angle, source, model_usable_until, product_id) "
-                     "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :caption, :angle, :source, CAST(:until AS date), :pid)"),
+                text("INSERT INTO product_images (name, product_code, market, image_url, sort_order, is_main, source_url, alt, sha256, caption, angle, angle_note, source, model_usable_until, product_id) "
+                     "VALUES (:name, :code, :market, :url, :sort, :main, :src, :alt, :sha, :caption, :angle, :angle_note, :source, CAST(:until AS date), :pid)"),
                 {"name": name, "code": prod["product_code"], "market": prod.get("market"), "url": url, "sort": order, "main": 1 if img.get("main") else 0,
                  "src": img.get("src"), "alt": (img.get("alt") or "")[:500], "sha": img["sha256"], "caption": (img.get("caption") or "")[:2000] or None,
-                 "angle": img.get("angle") or None, "source": SAMPLE if sample else None,
+                 "angle": img.get("angle") or kept.get("angle") or None, "angle_note": kept.get("angle_note") if not img.get("angle") or img.get("angle") == kept.get("angle") else None, "source": SAMPLE if sample else None,
                  # 写っているモデルの使用期限(目録の model_usable_until。X77)。日付として読めないものは入れない
                  "until": (str(img.get("model_usable_until") or "")[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(img.get("model_usable_until") or "")[:10]) else None),
                  "pid": prod["id"]},

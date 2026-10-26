@@ -20,6 +20,8 @@ export interface ProductImageFields {
   caption?: string
   /** アングル(front / texture / detail / worn / scene など。ProductImagePicker の angleName) */
   angle?: string
+  /** AI が見た、写っているもの(画像の案 X64 で一度だけ判断して残す。angle と一緒に、次からは画像を読ませずに文字で渡す) */
+  angle_note?: string
   /** sample = AI で作った見本の写真。本物の画像(空)がある商品では、見本を使わない */
   source?: string
   /** 写っているモデル(人物)の使用期限(YYYY-MM-DD)。配信日より前に切れる画像を載せていれば、アラート(cardAlerts の imageExpiryAlerts) */

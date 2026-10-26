@@ -135,3 +135,41 @@ class CollectScriptTest(unittest.TestCase):
         self.assertEqual(mod.extract(DescriptionTest.PAGE, "https://shop/p/1"), pp.extract(DescriptionTest.PAGE, "https://shop/p/1"))
         # モデルの使用期限の拾い方も同じ(X77)
         self.assertEqual(mod.extract(ExpiryTest.PAGE, "https://shop/p/1"), pp.extract(ExpiryTest.PAGE, "https://shop/p/1"))
+
+
+class JudgedAngleTest(unittest.TestCase):
+    """判断済みのアングル(X64 の c): 取り込んだ画像は、一度見分けたら画像を読ませず、新しく見分けたものだけを残す"""
+
+    def test_judged_images_are_sent_as_text_and_new_angles_are_saved(self) -> None:
+        import asyncio
+        import json
+        from unittest import mock
+
+        sent: list = []
+        saved: dict = {}
+
+        class Models:
+            async def generate_content(self, model, contents, config):  # noqa: ANN001, ANN201
+                sent.extend(contents)
+                return mock.Mock(text=json.dumps({"images": [{"index": 0, "angle": "worn", "note": "着用"}, {"index": 1, "angle": "front", "note": "上書きしない"}],
+                                                  "picks": [{"index": 1, "reason": "素材が分かる"}]}))
+
+        client = mock.Mock()
+        client.aio.models = Models()
+
+        async def judged(srcs):  # noqa: ANN001, ANN202
+            return {"/img/products/b.jpg": {"angle": "texture", "note": "生地の寄り"}}
+
+        async def save(found):  # noqa: ANN001, ANN202
+            saved.update(found)
+
+        body = pp.SuggestIn(images=[pp.SuggestImage(src="/img/products/a.jpg"), pp.SuggestImage(src="/img/products/b.jpg")])
+        with mock.patch.object(pp, "judged_angles", judged), mock.patch.object(pp, "save_angles", save), \
+                mock.patch.object(pp, "get_client", lambda: client), mock.patch.object(pp, "_read", lambda src: (b"jpg", "image/jpeg")):
+            out = asyncio.run(pp.suggest(body))["data"]
+        # 判断済みの画像は、文字だけ(画像の中身は 1 枚だけ渡す)
+        self.assertTrue(any(isinstance(c, str) and "判断済み: アングル texture・生地の寄り" in c for c in sent))
+        self.assertEqual(sum(1 for c in sent if not isinstance(c, str)), 1)
+        self.assertEqual(saved, {"/img/products/a.jpg": {"angle": "worn", "note": "着用"}})
+        self.assertEqual(out["images"], [{"index": 0, "angle": "worn", "note": "着用"}, {"index": 1, "angle": "texture", "note": "生地の寄り"}])
+        self.assertEqual(out["judged"], 1)

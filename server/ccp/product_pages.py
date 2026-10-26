@@ -6,6 +6,7 @@ AI が選んだ商品の画像は、最初は商品のマスタの 1 枚(product
 
   POST /api/product-pages/images    {"url": "..."}           ページを読み、載っている画像の一覧を返す
   POST /api/product-pages/suggest   {"images": [...], ...}   画像を Gemini に見せ、アングルと、この配信に合う画像(理由つき)を返す
+                                                             取り込んだ画像のアングルは、一度見分けたら product_images に残し、次からは画像を読ませずに文字で渡す
   POST /api/product-pages/adopt     {"src": "..."}           選んだ画像を、素材の置き場所(ccp/creative.py)に写し、その URL を返す
 
 取り込んだ商品の画像(表 product_images。B11。docs/PRODUCT_IMAGES.md)があれば、画面はページを読まずに、それを候補に並べる。
@@ -483,6 +484,7 @@ def _read(src: str) -> tuple[bytes, str]:
 STORED_IMG = re.compile(r"^/img/products/([A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$")
 
 
+ANGLE_KEYS = ("front", "back", "side", "worn", "detail", "texture", "scene", "flat", "package", "other")
 ANGLE_NAMES = "front(正面)・back(後ろ)・side(横)・worn(着用・人が身に着けている)・detail(ディテールの寄り: ボタン・縫い目・ポケットなど)・texture(素材の寄り)・scene(使っている場面・背景つき)・flat(平置き)・package(箱・付属品)・other"
 
 PROMPT = """あなたは、EC のメール・アプリの配信で、商品の見せ方を決める担当です。
@@ -490,7 +492,9 @@ PROMPT = """あなたは、EC のメール・アプリの配信で、商品の�
 1. それぞれの画像のアングルを、次から 1 つ選ぶ: %ANGLES%
 2. この配信で伝えたいこと(下の「配信」。テーマ・見出し・コピー)と、商品の強み(下の「商品」)から、この配信の商品画像に合う画像を、よい順に最大 3 つ選び、理由を 1 文で書く。
    強みが素材なら素材の寄り、着たときの形ならシルエットが分かる着用、のように、伝えたいことが見て分かる画像を選ぶ。
+「判断済み」と書いた画像は、前にアングルを見分けた画像なので、画像は渡さず、アングルと写っているものを文字で渡します。それも選ぶ候補に入れる。
 返すのは JSON だけ: {"images": [{"index": 番号, "angle": 上の英語の値, "note": 写っているものを短く}], "picks": [{"index": 番号, "reason": 理由}]}
+images には、画像を渡したものだけを書く(判断済みの画像は書かなくてよい)。
 文字は %LANG% で書く。人物を特定する情報(名前など)は書かない。
 """
 
@@ -509,15 +513,54 @@ class SuggestIn(BaseModel):
     language: str = "ja"
 
 
+async def judged_angles(srcs: list[str]) -> dict[str, dict[str, str]]:
+    """取り込んだ商品の画像(表 product_images)のうち、もうアングルを見分けた画像(src → angle・note)。
+    画像を毎回 AI に読ませないため(速さ・費用。X64 の c)。行は画像の中身で入れ替わる(取り込みのファイル名が中身の sha256)ので、画像が変われば判断し直す"""
+    urls = sorted({s for s in srcs if STORED_IMG.match(s)})
+    if not urls:
+        return {}
+    try:
+        async with db() as conn:
+            rows = (await conn.execute(text(
+                "SELECT image_url, angle, angle_note FROM product_images WHERE image_url = ANY(:u) AND angle IS NOT NULL AND angle <> ''"
+            ), {"u": urls})).mappings().all()
+    except Exception:  # noqa: BLE001 — 読めなければ、これまでどおり画像を見せる
+        log.exception("判断済みのアングルを読めませんでした")
+        return {}
+    return {r["image_url"]: {"angle": r["angle"], "note": r["angle_note"] or ""} for r in rows}
+
+
+async def save_angles(found: dict[str, dict[str, str]]) -> None:
+    """AI が見分けたアングルを、取り込んだ商品の画像の行に残す(同じ画像の行すべて。もう判断してある行は変えない)"""
+    if not found:
+        return
+    try:
+        async with db(write=True) as conn:
+            for url, a in found.items():
+                await conn.execute(text(
+                    "UPDATE product_images SET angle = :a, angle_note = :n, modified_on = now() WHERE image_url = :u AND (angle IS NULL OR angle = '')"
+                ), {"a": a["angle"], "n": a["note"][:500] or None, "u": url})
+    except Exception:  # noqa: BLE001 — 残せなくても、案は返す(次にもう一度見分ける)
+        log.exception("アングルを残せませんでした")
+
+
 @router.post("/api/product-pages/suggest")
 async def suggest(body: SuggestIn):
     if not body.images:
         return fail(400, "画像がありません", "empty")
     picked = body.images[:MAX_SUGGEST]
+    judged = await judged_angles([img.src for img in picked])
     prompt = PROMPT.replace("%ANGLES%", ANGLE_NAMES).replace("%LANG%", "英語" if body.language == "en" else "日本語")
     contents: list[Any] = [prompt, "配信: " + json.dumps(body.delivery, ensure_ascii=False), "商品: " + json.dumps(body.product, ensure_ascii=False)]
     shown = 0
     for i, img in enumerate(picked):
+        known = judged.get(img.src)
+        if known:
+            # 判断済みの画像は、画像を読ませずに、アングルと写っているものを文字で渡す
+            note = img.description or img.alt
+            contents.append(f"画像 {i}(判断済み: アングル {known['angle']}" + (f"・{known['note']}" if known["note"] else "") + ")" + (f"(ページの説明: {note})" if note else ""))
+            shown += 1
+            continue
         try:
             data, ctype = await asyncio.to_thread(_read, img.src)
         except Exception:  # noqa: BLE001 — 読めない画像は飛ばす(番号は変えない)
@@ -546,9 +589,13 @@ async def suggest(body: SuggestIn):
     if not isinstance(out, dict):
         out = {}
     n = len(picked)
-    imgs = [x for x in out.get("images") or [] if isinstance(x, dict) and isinstance(x.get("index"), int) and 0 <= x["index"] < n]
+    seen = [x for x in out.get("images") or [] if isinstance(x, dict) and isinstance(x.get("index"), int) and 0 <= x["index"] < n and picked[x["index"]].src not in judged]
+    # 新しく見分けた、取り込んだ商品の画像のアングルを残す(次からは画像を読ませない)
+    await save_angles({picked[x["index"]].src: {"angle": x["angle"], "note": str(x.get("note") or "")}
+                       for x in seen if x.get("angle") in ANGLE_KEYS and STORED_IMG.match(picked[x["index"]].src)})
+    imgs = seen + [{"index": i, "angle": judged[img.src]["angle"], "note": judged[img.src]["note"]} for i, img in enumerate(picked) if img.src in judged]
     picks = [x for x in out.get("picks") or [] if isinstance(x, dict) and isinstance(x.get("index"), int) and 0 <= x["index"] < n][:3]
-    return ok({"images": imgs, "picks": picks})
+    return ok({"images": sorted(imgs, key=lambda x: x["index"]), "picks": picks, "judged": len([1 for img in picked if img.src in judged])})
 
 
 class AdoptIn(BaseModel):
