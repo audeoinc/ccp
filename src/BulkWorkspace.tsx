@@ -49,14 +49,14 @@ import type { HeroImage } from './models/heroImages'
 import { locale, optionLabel, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { ChannelBadge } from './ChannelBadge'
-import { channelOptions, countryOptions } from './status'
+import { CHANNEL_PUSH, channelOptions, countryOptions } from './status'
 import { THEME_TYPES, themeTypeLabel, type ThemeType } from './themeTypes'
 import { dayKeyOf } from './weekLock'
 import { dayOfKey, timeOfKey } from './useBulkWorkspace'
 import { getTemplate } from './templates'
 import type { BulkWorkspaceState, ReviewItem, Step } from './useBulkWorkspace'
 import { ImageThumb } from './ImageThumb'
-import { productImage } from './images'
+import { heroImage, productImage } from './images'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
 import { PREF } from './prefKeys'
@@ -190,6 +190,9 @@ const useStyles = makeStyles({
   cardHead: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '6px', rowGap: '2px', fontSize: '12px', color: tokens.colorNeutralForeground2, minWidth: 0, '& > span': { whiteSpace: 'nowrap' } },
   cardTitle: { margin: 0, fontSize: '15px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   theme: { fontSize: '12px', color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardSummary: { display: 'flex', alignItems: 'flex-start', columnGap: '8px', minWidth: 0 },
+  summaryText: { display: 'grid', rowGap: '1px', minWidth: 0, flexGrow: 1 },
+  summaryKey: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold },
   thumbs: { display: 'flex', alignItems: 'flex-start', columnGap: '6px', flexWrap: 'wrap', rowGap: '6px', minHeight: '64px' },
   thumb: { display: 'grid', justifyItems: 'center', rowGap: '2px' },
   // 週の上限を超えた商品は、赤い枠と ⚠(色だけに頼らない)
@@ -225,7 +228,7 @@ interface Props {
  * 中身を見る・直す場所は配信カードにまとめる(作業画面に、配信カードと同じ情報を並べない)。
  * ① のあと、中身を作らずに保存することもできる(1 本ずつ新規作成して、中身を入れずに保存したのと同じ)
  */
-export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFinish }: Props) {
+export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft, onFinish }: Props) {
   const s = useStyles()
   const panes = usePaneWidths(PREF.bulkPaneWidths, [0, 280], 0, { min: 220, max: 600 })
   const t = useT()
@@ -646,7 +649,23 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
                 <h4 className={s.cardTitle} title={c.name}>
                   {c.name}
                 </h4>
-                <span className={s.theme} title={c.theme ?? ''}>{c.theme ? `${t('テーマ', 'Theme')}: ${c.theme}` : ''}</span>
+                {/* 開かなくても決められるように、メイン画像・ヘッドライン(プッシュはタイトル)・テンプレートも出す */}
+                <div className={s.cardSummary}>
+                  {c.channel !== CHANNEL_PUSH && (
+                    <ImageThumb src={heroImage(heroes.find((h) => h.id === c.hero_image_id))} alt={t('メイン画像', 'Hero image')} width={72} height={48} />
+                  )}
+                  <div className={s.summaryText}>
+                    {[
+                      [t('テーマ', 'Theme'), c.theme],
+                      c.channel === CHANNEL_PUSH ? [t('タイトル', 'Title'), c.push_title] : [t('ヘッドライン', 'Headline'), c.headline],
+                      [t('テンプレート', 'Template'), c.layout_key ? getTemplate(c.layout_key).label : ''],
+                    ].map(([k, v]) => (
+                      <span key={k} className={s.theme} title={v ?? ''}>
+                        <span className={s.summaryKey}>{k}</span> {v || '—'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <div className={s.thumbs}>
                     {item.productIds.map((pid, i) => {
