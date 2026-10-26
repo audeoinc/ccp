@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
+  InfoLabel,
   Input,
   Menu,
   MenuItem,
@@ -134,8 +135,6 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   span2: { gridColumn: 'span 2' },
-  thName: { display: 'grid', rowGap: '1px' },
-  thNote: { fontSize: '11px', fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   dayOff: { backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForegroundDisabled },
   dayOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   dayDate: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold },
@@ -152,7 +151,7 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorBrandStroke2}`,
     backgroundColor: tokens.colorBrandBackground2,
   },
-  aiText: { display: 'grid', rowGap: '2px', flexGrow: 1, flexBasis: '280px', minWidth: 0 },
+  aiText: { display: 'flex', alignItems: 'center', flexGrow: 1, flexBasis: '280px', minWidth: 0 },
   aiTitle: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   nameCell: { display: 'grid', rowGap: '2px', minWidth: 0 },
   nameLine: { display: 'flex', columnGap: '4px', minWidth: 0 },
@@ -380,34 +379,45 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
     return (
       <div className={s.main}>
         <section className={s.panel}>
-          <h3 className={s.h3}>{t('作る日と、配信の方向', 'Days and direction')}</h3>
+          {/* 作り方の説明は、見出しの横の ⓘ に(X72。慣れると邪魔なので、見出しの下に並べない) */}
+          <InfoLabel
+            label={{ className: s.h3 }}
+            info={
+              ws.byPattern
+                ? t(
+                    `この国の配信の型どおりに、${channelName}の枠を作ります。種類は型の既定値で、行ごとに変えられます。テンプレートは型の既定値です(型で決めていなければ、中身を作るときに AI が選びます)。同じ時刻の${channelName}がもうある型は作りません。作る行にチェックを入れてください。ここではまだ保存しません。型は ⚙ →「国」→「配信の型」。`,
+                    `Slots for ${channelName} from this country’s delivery patterns. The type is the pattern’s default and can be changed per row. The template is the pattern’s default (if the pattern has none, AI picks one when creating the content). Patterns that already have a ${channelName} at the same time are skipped. Check the rows to create. Nothing is saved yet. Edit patterns in ⚙ → Country → Delivery patterns.`,
+                  )
+                : t(
+                    `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れてください。種類と配信名は、AI に入れてもらい、あとで直せます。テンプレートは、中身を作るときに AI が選びます。ここではまだ保存しません。`,
+                    `One delivery per day on days without ${channelName} (from today). Check the days. Let AI fill the type and name, then adjust. AI picks the template when creating the content. Nothing is saved yet.`,
+                  )
+            }
+          >
+            {t('作る日と、配信の方向', 'Days and direction')}
+          </InfoLabel>
           {channelPick}
-          <span className={s.hint}>
-            {!ws.country
-              ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
-              : locked
-                ? t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')
-                : ws.byPattern
-                  ? t(
-                      `この国の配信の型どおりに、${channelName}の枠を作ります(種類・テンプレートは型の既定値。行ごとに変えられます)。同じ時刻の${channelName}がもうある型は作りません。作る行にチェックを入れてください。ここではまだ保存しません。型は ⚙ →「国」→「配信の型」。`,
-                      `Slots for ${channelName} from this country’s delivery patterns (type and template are the pattern’s defaults; change them per row). Patterns that already have a ${channelName} at the same time are skipped. Check the rows to create. Nothing is saved yet. Edit patterns in ⚙ → Country → Delivery patterns.`,
-                    )
-                  : t(
-                    `${channelName}がまだない日(今日以降)に、1 日 1 本ずつ作ります。作る日にチェックを入れてください。種類と配信名は、AI に入れてもらい、あとで直せます。ここではまだ保存しません。`,
-                    `One delivery per day on days without ${channelName} (from today). Check the days. Let AI fill the type and name, then adjust. Nothing is saved yet.`,
-                  )}
-          </span>
-          {/* AI でまとめて入れる。表の上に、何をするかを書いた帯で出す(小さなボタンだけだと、何が起きるか分からないため) */}
+          {/* 作れないわけだけは、その場に出す(何もできない状態なので) */}
+          {(!ws.country || locked) && (
+            <span className={s.hint}>
+              {!ws.country
+                ? t('国を選んでください(画面の上のヘッダーが「すべての国」のため)。', 'Choose a country (the header is set to all countries).')
+                : t('この週は確定しています。‹ › で、別の週を選んでください。', 'This week is confirmed. Use ‹ › to pick another week.')}
+            </span>
+          )}
+          {/* AI でまとめて入れる。表の上に、何をするかが分かる帯で出す(小さなボタンだけだと、何が起きるか分からないため。詳しくは ⓘ) */}
           <div className={s.aiBar}>
             <AiIcon size={20} />
             <div className={s.aiText}>
-              <span className={s.aiTitle}>{t('種類と配信名を AI でまとめて入れる', 'Fill types and names with AI')}</span>
-              <span className={s.hint}>
-                {t(
+              <InfoLabel
+                label={{ className: s.aiTitle }}
+                info={t(
                   '作る日のうち、種類か配信名が空の行に、日付・前後の配信に合う案を入れます。人が選んだ種類・入れた配信名は変えません。',
                   'Fills empty types and names with ideas that fit the date and nearby deliveries. What you entered stays as it is.',
                 )}
-              </span>
+              >
+                {t('種類と配信名を AI でまとめて入れる', 'Fill types and names with AI')}
+              </InfoLabel>
             </div>
             <Button appearance="primary" icon={ws.naming.size > 0 ? <Spinner size="extra-tiny" /> : <AiIcon tone="white" />} disabled={unfilled.length === 0 || ws.naming.size > 0} onClick={() => void ws.suggest(unfilled, true)}>
               {unfilled.length > 0 ? t(`空いている ${unfilled.length} 行に入れる`, `Fill ${unfilled.length} rows`) : t('空いている行はありません', 'Nothing to fill')}
@@ -418,11 +428,10 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
               <span />
               <span className={s.label}>{t('配信日', 'Date')}</span>
               <span className={s.label}>{t('種類', 'Type')}</span>
-              {/* 配信名が何かを、見出しの下に一言(メールに出る文と間違えないように) */}
-              <span className={s.thName}>
-                <span className={s.label}>{t('配信名', 'Delivery name')}</span>
-                <span className={s.thNote}>{t('社内で配信を見分けるための名前です(メールには出ません)', 'An internal label to tell deliveries apart (not shown in the email)')}</span>
-              </span>
+              {/* 配信名が何かは ⓘ に(メールに出る文と間違えないように) */}
+              <InfoLabel label={{ className: s.label }} info={t('社内で配信を見分けるための名前です(メールには出ません)', 'An internal label to tell deliveries apart (not shown in the email)')}>
+                {t('配信名', 'Delivery name')}
+              </InfoLabel>
             </div>
             {ws.lines.map((d) => {
               const free = d.state === 'free'
@@ -529,14 +538,20 @@ export function BulkWorkspace({ ws, cards, products, onOpen, onOpenDraft, onFini
     return (
       <div>
         <div className={s.tools}>
-          <span className={s.hint}>
-            {ws.running
-              ? t('AI が中身を作っています(同時に 3 本まで)。できた案から、カードに中身が入ります。', 'AI is creating the content (up to 3 at a time). Cards fill in as they finish.')
-              : t(
-                  'できた案は、まだ保存していません。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」。',
-                  'Drafts are not saved yet. Use “Open & edit” to review or fix in the card, “Save” to keep as is, or “Discard”.',
-                )}
-          </span>
+          {/* 作っている間は、いまの様子をその場に。決め方の説明は ⓘ に(X72) */}
+          {ws.running ? (
+            <span className={s.hint}>{t('AI が中身を作っています(同時に 3 本まで)。できた案から、カードに中身が入ります。', 'AI is creating the content (up to 3 at a time). Cards fill in as they finish.')}</span>
+          ) : (
+            <InfoLabel
+              label={{ className: s.h3 }}
+              info={t(
+                '保存するまでは、案はこの画面の中だけにあります。中身を見る・直すときは「開いて編集」(配信カードで開きます)。そのままでよければ「保存」、いらなければ「破棄」。保存した案は、下書き(未起案)になります。',
+                'Drafts live only in this window until saved. Use “Open & edit” to review or fix in the card, “Save” to keep as is, or “Discard” to drop. Saved drafts become regular drafts (Not started).',
+              )}
+            >
+              {t('できた案', 'Drafts')}
+            </InfoLabel>
+          )}
           <span className={s.spacer} />
           {ws.running ? (
             <Button size="small" icon={<Spinner size="extra-tiny" />} onClick={ws.stop}>
