@@ -222,6 +222,13 @@ function Thumb({ layout, free = false, width = BASE_WIDTH }: { layout: TemplateL
                   </div>
                 )
               }
+              if (p.type === 'line') {
+                return (
+                  <div key={p.id} style={{ ...area, display: 'grid', alignContent: 'center', justifyItems: 'center' }}>
+                    <div style={{ height: Math.max(1, px(0.6)), width: p.lineShort ? '40%' : '100%', background: LINE }} />
+                  </div>
+                )
+              }
               return <div key={p.id} style={area} />
         }
         // 均等に並べる行は、行いっぱいの帯の中で、中身のある部品を同じ幅で並べる

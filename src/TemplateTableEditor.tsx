@@ -231,6 +231,7 @@ const useStyles = makeStyles({
   swatch: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: '11px', padding: '2px 6px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', '& span': { width: '12px', height: '12px', borderRadius: '50%' } },
   swatchOn: { border: `2px solid ${tokens.colorBrandStroke1}` },
   pid: { fontFamily: tokens.fontFamilyMonospace, fontSize: '11px', color: tokens.colorNeutralForeground3 },
+  spacer: { display: 'grid', placeItems: 'center', height: '100%', fontSize: '10px', color: tokens.colorNeutralForeground4, backgroundImage: `repeating-linear-gradient(45deg, transparent 0 6px, ${tokens.colorNeutralBackground3} 6px 7px)` },
   elHead: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginTop: '4px' },
   elRow: { display: 'grid', rowGap: '2px', paddingLeft: '6px', borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
   elTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', columnGap: '6px', minWidth: 0 },
@@ -667,6 +668,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     { label: t('ボタン', 'Button'), onClick: () => placeType(sec.id!, p.id, 'button') },
     { label: t('テキスト', 'Text'), onClick: () => placeType(sec.id!, p.id, 'text') },
     { label: t('画像・動画', 'Image / video'), onClick: () => placeType(sec.id!, p.id, 'media') },
+    { label: t('区切り線', 'Divider'), onClick: () => placeType(sec.id!, p.id, 'line') },
+    { label: t('余白', 'Spacer'), onClick: () => placeType(sec.id!, p.id, 'spacer') },
   ]
 
   // ---- コピーと貼り付け(写すのは、範囲に丸ごと入る中身のある部品。貼るのは空きのマスだけ。貼った部品は新しい ID)
@@ -748,9 +751,9 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
   })
 
   // ---- 描く
-  const typeName = (type: PartType) => ({ box: t('箱', 'Box'), button: t('ボタン', 'Button'), text: t('テキスト', 'Text'), media: t('画像', 'Image'), empty: t('空き', 'Empty') })[type]
+  const typeName = (type: PartType) => ({ box: t('箱', 'Box'), button: t('ボタン', 'Button'), text: t('テキスト', 'Text'), media: t('画像', 'Image'), line: t('区切り線', 'Divider'), spacer: t('余白', 'Spacer'), empty: t('空き', 'Empty') })[type]
   const partName = (p: TablePart) =>
-    p.type === 'box' ? t(`${boxNo.get(p.id)} 番目`, `No. ${boxNo.get(p.id)}`) : p.type === 'button' ? p.label || defaultButtonLabel(0) : p.type === 'text' ? (p.text ?? '').split('\n')[0] || t('(文なし)', '(no text)') : p.type === 'media' ? p.alt || (p.video ? t('動画', 'Video') : p.src ? t('画像', 'Image') : t('(画像なし)', '(no image)')) : t('余白', 'Spacer')
+    p.type === 'box' ? t(`${boxNo.get(p.id)} 番目`, `No. ${boxNo.get(p.id)}`) : p.type === 'button' ? p.label || defaultButtonLabel(0) : p.type === 'text' ? (p.text ?? '').split('\n')[0] || t('(文なし)', '(no text)') : p.type === 'media' ? p.alt || (p.video ? t('動画', 'Video') : p.src ? t('画像', 'Image') : t('(画像なし)', '(no image)')) : p.type === 'line' ? t('区切り線', 'Divider') : p.type === 'spacer' ? t(`余白 ${p.height ?? 24}px`, `Spacer ${p.height ?? 24}px`) : t('空き', 'Empty')
   const secLabel = (sec: Section, si: number) => `S${si + 1}${sec.name?.trim() ? ` · ${sec.name.trim()}` : ''}`
 
   const colW = (sec: Section) => (mailW - 20 - HEAD - ADD - 2 * GAP - ((sec.cols ?? 1) - 1) * GAP) / (sec.cols ?? 1)
@@ -773,7 +776,9 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
           ? Math.max(64, Math.min(cw * ((sec.cols ?? 1) === 1 ? 0.5 : 0.9), 200))
           : on.some((p) => p.type === 'text')
             ? 60
-            : 36
+            : on.some((p) => p.type === 'spacer')
+              ? Math.max(20, ...on.filter((p) => p.type === 'spacer').map((p) => p.height ?? 24))
+              : 36
       return Math.round(Math.min(280, Math.max(base, ...fixed)))
     })
   }
@@ -1133,6 +1138,15 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )
     }
     if (p.type === 'text') return <div className={s.ptext} style={{ textAlign: p.align ?? 'left' }}>{p.text || t('(テキスト。ダブルクリックで書く)', '(Text — double-click to write)')}</div>
+    if (p.type === 'line') {
+      const lk = T.lineLook(p)
+      return (
+        <div style={{ display: 'grid', alignContent: 'center', justifyItems: 'center', height: '100%' }}>
+          <div style={{ width: lk.length, borderTop: `${lk.width}px solid ${lk.color}` }} />
+        </div>
+      )
+    }
+    if (p.type === 'spacer') return <div className={s.spacer}>{t(`余白 ${p.height ?? 24}px`, `Spacer ${p.height ?? 24}px`)}</div>
     if (p.type === 'media') {
       const one = selParts.length === 1 && selParts[0].id === p.id
       return (
@@ -1220,6 +1234,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         {btn(t('←列', '←Col'), () => run(sec.id!, (x) => T.insertCol(x, rc.c)), t('左に列を挿入', 'Insert column left'))}
         {btn(t('→列', '→Col'), () => run(sec.id!, (x) => T.insertCol(x, rc.c + rc.w)), t('右に列を挿入', 'Insert column right'))}
         {one && btn(T.isEvenRow(sec, rc.r) ? t('均等をやめる', 'Unspread') : t('均等', 'Spread'), () => run(sec.id!, (x) => T.toggleEvenRow(x, rc.r)), t('この行を均等に並べる(中身のある部品を同じ幅で)', 'Spread this row evenly'))}
+        {one && T.isEvenRow(sec, rc.r) && btn(T.isSepRow(sec, rc.r) ? t('縦線をやめる', 'No dividers') : t('縦線', 'Dividers'), () => replace(sec.id!, T.toggleSepRow(sec, rc.r)), t('部品の間に縦の区切り線を引く(WOMEN | MEN | KIDS)', 'Vertical dividers between parts (WOMEN | MEN | KIDS)'))}
         {(boxes.length > 0 || (ps.length === 1 && ps[0].type === 'media')) && (
           <>
             <span className={s.barSep} />
@@ -1335,7 +1350,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
           return (
             <div key={`even${r}`} className={s.evenStrip} style={{ gridColumn: `2 / span ${cols}`, gridRow: r + 2, gridTemplateColumns: `${filledParts.length > 0 ? `repeat(${filledParts.length}, minmax(0, 1fr)) ` : 'minmax(0, 1fr) '}20px` }}>
               {filledParts.length === 0 && <span className={s.evenEmpty}>{t('均等の行(右の + で部品を置く)', 'Even row (use + to add parts)')}</span>}
-              {filledParts.map((p) => cellEl(p, {}, selParts.some((x) => x.id === p.id) ? s.cellSel : undefined))}
+              {filledParts.map((p, i) => cellEl(p, i > 0 && T.isSepRow(sec, r) ? { boxShadow: `-5px 0 0 -4px ${T.SEP_COLOR}` } : {}, selParts.some((x) => x.id === p.id) ? s.cellSel : undefined))}
               <button
                 type="button"
                 className={s.evenPlus}
@@ -1387,6 +1402,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       { label: t('ボタン', 'Button'), onClick: () => addPart('button', sec.id) },
       { label: t('テキスト', 'Text'), onClick: () => addPart('text', sec.id) },
       { label: t('画像・動画', 'Image / video'), onClick: () => addPart('media', sec.id) },
+      { label: t('区切り線', 'Divider'), onClick: () => addPart('line', sec.id) },
+      { label: t('余白', 'Spacer'), onClick: () => addPart('spacer', sec.id) },
       { header: t('よく使う行', 'Common rows') },
       ...T.ROW_PRESETS.filter((x) => !hero || !x.parts.some(([type]) => type === 'box')).map((x) => ({ label: x.label(), onClick: () => addPart(`row:${x.id}`, sec.id) })),
     ]
@@ -1525,6 +1542,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     if (k === 'box') return <span style={{ width: 12, height: 14, background: tokens.colorPaletteBlueBorderActive, borderRadius: 2 }} />
     if (k === 'button') return <span style={{ width: 20, height: 6, background: tokens.colorNeutralForeground1, borderRadius: 6 }} />
     if (k === 'text') return <span style={{ width: 18, height: 2, background: tokens.colorPaletteGreenBorderActive, boxShadow: `0 4px 0 ${tokens.colorPaletteGreenBorderActive}` }} />
+    if (k === 'line') return <span style={{ width: 22, height: 1, background: tokens.colorNeutralForeground2 }} />
+    if (k === 'spacer') return <span style={{ width: 20, height: 10, border: `1px dashed ${tokens.colorNeutralStroke1}` }} />
     return <span style={{ width: 22, height: 2, background: tokens.colorNeutralForeground3 }} />
   }
   const presetThumb = (p: T.RowPreset) => (
@@ -1536,8 +1555,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             gridColumn: `${c + 1} / span ${w || Math.max(1, p.cols)}`,
             gridRow: `${r + 1} / span ${h}`,
             borderRadius: type === 'button' ? 5 : 1,
-            background: type === 'box' ? tokens.colorPaletteBlueBorderActive : type === 'button' ? tokens.colorNeutralForeground1 : tokens.colorPaletteGreenBorderActive,
-            ...(type === 'button' ? { height: 5, alignSelf: 'center' } : type === 'text' ? { height: 2, alignSelf: 'center' } : {}),
+            background: type === 'box' ? tokens.colorPaletteBlueBorderActive : type === 'button' ? tokens.colorNeutralForeground1 : type === 'media' ? tokens.colorPaletteBerryBorderActive : type === 'line' ? tokens.colorNeutralForeground2 : tokens.colorPaletteGreenBorderActive,
+            ...(type === 'button' ? { height: 5, alignSelf: 'center' } : type === 'text' ? { height: 2, alignSelf: 'center' } : type === 'line' ? { height: 1, alignSelf: 'center' } : {}),
           }}
         />
       ))}
@@ -1573,6 +1592,8 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       {palItem('button', t('ボタン', 'Button'), icon('button'))}
       {palItem('text', t('テキスト', 'Text'), icon('text'))}
       {palItem('media', t('画像・動画(バナー・タイル)', 'Image / video (banner, tile)'), icon('media'))}
+      {palItem('line', t('区切り線', 'Divider'), icon('line'))}
+      {palItem('spacer', t('余白', 'Spacer'), icon('spacer'))}
       <span className={s.palHead}>{t('よく使う行(1 行まとめて置く)', 'Common rows (place a whole row)')}</span>
       {T.ROW_PRESETS.map((p) => palItem(`row:${p.id}`, p.label(), presetThumb(p)))}
       <span className={s.palHead}>{t('セクション', 'Section')}</span>
@@ -1743,6 +1764,59 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         </>
       )}
       {p.type === 'media' && mediaSettings(sec, p)}
+      {p.type === 'line' && (
+        <>
+          <div className={s.row2}>
+            <Field label={t('太さ', 'Weight')} size="small">
+              <Select size="small" value={String(p.lineWidth ?? 1)} onChange={(_, d) => patch(sec, p, { lineWidth: d.value === '2' ? 2 : d.value === '4' ? 4 : undefined })}>
+                <option value="1">{t('細い', 'Thin')}</option>
+                <option value="2">{t('ふつう', 'Regular')}</option>
+                <option value="4">{t('太い', 'Thick')}</option>
+              </Select>
+            </Field>
+            <Field label={t('色', 'Color')} size="small">
+              <Select size="small" value={p.lineColor ?? ''} onChange={(_, d) => patch(sec, p, { lineColor: d.value === 'gray' || d.value === 'black' ? d.value : undefined })}>
+                <option value="">{t('薄いグレー', 'Light gray')}</option>
+                <option value="gray">{t('グレー', 'Gray')}</option>
+                <option value="black">{t('黒', 'Black')}</option>
+              </Select>
+            </Field>
+          </div>
+          <div className={s.row2}>
+            <Field label={t('長さ', 'Length')} size="small">
+              <Select size="small" value={p.lineShort ? 'short' : ''} onChange={(_, d) => patch(sec, p, { lineShort: d.value === 'short' || undefined })}>
+                <option value="">{t('全幅', 'Full width')}</option>
+                <option value="short">{t('真ん中だけ', 'Center only')}</option>
+              </Select>
+            </Field>
+            <Field label={t('上下の余白', 'Spacing')} size="small">
+              <Select size="small" value={p.lineSpace ?? ''} onChange={(_, d) => patch(sec, p, { lineSpace: d.value === 'tight' || d.value === 'wide' ? d.value : undefined })}>
+                <option value="tight">{t('狭い', 'Tight')}</option>
+                <option value="">{t('ふつう', 'Normal')}</option>
+                <option value="wide">{t('広い', 'Wide')}</option>
+              </Select>
+            </Field>
+          </div>
+        </>
+      )}
+      {p.type === 'spacer' && (
+        <Field label={t('高さ', 'Height')} size="small">
+          <Select size="small" value={String(p.height ?? 24)} onChange={(_, d) => patch(sec, p, { height: Number(d.value) === 24 ? undefined : Number(d.value) })}>
+            {T.SPACER_HEIGHTS.map((h) => (
+              <option key={h} value={h}>{`${h}px`}</option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      {(p.type === 'text' || p.type === 'button' || p.type === 'media') && (
+        <Field label={t('枠で囲む(クーポンの番号・注意書きなど)', 'Frame (coupon codes, notes, etc.)')} size="small">
+          <Select size="small" value={p.frame ?? ''} onChange={(_, d) => patch(sec, p, { frame: d.value === 'solid' || d.value === 'dashed' ? d.value : undefined })}>
+            <option value="">{t('囲まない', 'None')}</option>
+            <option value="solid">{t('線で囲む', 'Solid')}</option>
+            <option value="dashed">{t('点線で囲む', 'Dashed')}</option>
+          </Select>
+        </Field>
+      )}
       {p.type === 'empty' && <span className={s.hint}>{t('空きのマス。左のパーツを落とすと、そのパーツになります。メールでは何も出ない余白です。', 'An empty cell. Drop a part here to fill it. It shows as blank space in the email.')}</span>}
       {p.type !== 'empty' && elementsBlock(sec, p)}
       {kv(t('位置 · 大きさ', 'Position · size'), <span>{t(`列 ${p.c + 1} 行 ${p.r + 1} · ${p.w} × ${p.h}`, `Col ${p.c + 1} row ${p.r + 1} · ${p.w} × ${p.h}`)}</span>)}

@@ -15,7 +15,7 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
-import { SECTION_BG, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, sectionIdsOf, sectionSpace } from './tables'
+import { SECTION_BG, SEP_COLOR, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, lineLook, sectionIdsOf, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
@@ -934,13 +934,23 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
               </div>
             )
           }
+          if (p.type === 'line') {
+            // 区切り線(8.9)。メールの中の飾りなので、部品として選ぶ目印は付けない
+            const lk = lineLook(p)
+            return (
+              <div style={{ display: 'grid', justifyItems: 'center', alignSelf: 'center', padding: `${lk.pad}px 0` }}>
+                <div style={{ width: lk.length, borderTop: `${lk.width}px solid ${lk.color}` }} />
+              </div>
+            )
+          }
+          if (p.type === 'spacer') return <div style={{ height: p.height ?? 24 }} />
           return null
         }
         // 均等に並べる行は、列に合わせず、行いっぱいの帯の中で、中身のある部品(空きは除く)を同じ幅で並べる
         const even = sec.evenRows ?? []
         const cell = (p: TablePart, area?: React.CSSProperties) => (
           // テキストの目印はマスの外枠に付ける(文が空でも、マスを押せば選べるように。シンプルな配信カード)
-          <div key={p.id} data-part-id={p.id} data-part={p.type === 'text' ? `text:${p.id}` : undefined} style={{ ...area, minWidth: 0, minHeight: 0, display: 'grid' }}>
+          <div key={p.id} data-part-id={p.id} data-part={p.type === 'text' ? `text:${p.id}` : undefined} style={{ ...area, minWidth: 0, minHeight: 0, display: 'grid', ...(p.frame ? { border: `1px ${p.frame} ${SEP_COLOR}`, borderRadius: 4, padding: 10 } : {}) }}>
             {body(p)}
           </div>
         )
@@ -953,9 +963,11 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
             {(sec.parts ?? []).filter((p) => !even.includes(p.r)).map((p) => cell(p, { gridColumn: `${p.c + 1} / span ${p.w}`, gridRow: `${p.r + 1} / span ${p.h}` }))}
             {even.map((r) => {
               const row = (sec.parts ?? []).filter((p) => p.r === r && p.type !== 'empty').sort((a, b) => a.c - b.c)
+              // 縦の区切り線(WOMEN | MEN | KIDS): すき間をなくして、2 つ目からの部品の左に線を引く
+              const sep = row.some((p) => p.sep)
               return (
-                <div key={`even${r}`} style={{ gridColumn: '1 / -1', gridRow: r + 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, row.length)}, minmax(0, 1fr))`, gap: 8 }}>
-                  {row.map((p) => cell(p))}
+                <div key={`even${r}`} style={{ gridColumn: '1 / -1', gridRow: r + 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, row.length)}, minmax(0, 1fr))`, gap: sep ? 0 : 8 }}>
+                  {row.map((p, i) => cell(p, sep ? { padding: '0 8px', ...(i > 0 ? { borderLeft: `1px solid ${SEP_COLOR}` } : {}) } : undefined))}
                 </div>
               )
             })}

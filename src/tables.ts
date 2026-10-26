@@ -25,7 +25,7 @@ export interface CellSel {
 /** 操作の結果。できないときは、理由(画面に出す) */
 export type TableOp = { sec: Section; sel?: CellSel } | { error: string }
 
-const PREFIX: Record<PartType, string> = { box: 'box', button: 'btn', text: 'txt', media: 'med', empty: 'emp' }
+const PREFIX: Record<PartType, string> = { box: 'box', button: 'btn', text: 'txt', media: 'med', line: 'line', spacer: 'spc', empty: 'emp' }
 // ID は、種類の頭 + 短いランダムな文字。テンプレートの中で重ならなければよい(比べるときは、いつもテンプレート ID と組で見る)
 const rand = () => Math.random().toString(36).slice(2, 8)
 export const newPartId = (type: PartType) => `${PREFIX[type]}_${rand()}`
@@ -349,6 +349,10 @@ export interface RowPreset {
   parts: [PartType, number, number, number?, number?][]
   /** 置いた行を、均等に並べる */
   even?: boolean
+  /** 均等の行に、縦の区切り線を引く */
+  sep?: boolean
+  /** 種類ごとに、置いた部品に入れる設定(文字のリンク・正方形の画像など) */
+  init?: Partial<Record<PartType, Partial<TablePart>>>
 }
 export const ROW_PRESETS: RowPreset[] = [
   { id: 'x2', label: () => tr('箱 × 2', 'Box × 2'), cols: 2, rows: 1, parts: [['box', 0, 0], ['box', 1, 0]] },
@@ -357,6 +361,11 @@ export const ROW_PRESETS: RowPreset[] = [
   { id: 'tb', label: () => tr('文 + 箱', 'Text + box'), cols: 2, rows: 1, parts: [['text', 0, 0], ['box', 1, 0]] },
   { id: 'btn', label: () => tr('ボタンの行', 'Button row'), cols: 0, rows: 1, parts: [['button', 0, 0, 0, 1]] },
   { id: 'btn2', label: () => tr('ボタン × 2(均等)', 'Button × 2 (even)'), cols: 2, rows: 1, parts: [['button', 0, 0], ['button', 1, 0]], even: true },
+  // 8.9 で足した行
+  { id: 'line', label: () => tr('区切り線', 'Divider'), cols: 0, rows: 1, parts: [['line', 0, 0, 0, 1]] },
+  { id: 'links', label: () => tr('文字のリンク × 3(縦線で区切る)', 'Text links × 3 (vertical dividers)'), cols: 3, rows: 1, parts: [['button', 0, 0], ['button', 1, 0], ['button', 2, 0]], even: true, sep: true, init: { button: { style: 'text' } } },
+  { id: 'icons', label: () => tr('アイコンの行(SNS など)', 'Icon row (social, etc.)'), cols: 4, rows: 1, parts: [['media', 0, 0], ['media', 1, 0], ['media', 2, 0], ['media', 3, 0]], even: true, init: { media: { ratio: 'square' } } },
+  { id: 'iconText', label: () => tr('アイコン + 文 × 3', 'Icon + text × 3'), cols: 3, rows: 2, parts: [['media', 0, 0], ['media', 1, 0], ['media', 2, 0], ['text', 0, 1], ['text', 1, 1], ['text', 2, 1]], init: { media: { ratio: 'square' }, text: { align: 'center' } } },
 ]
 
 /** よく使う行を、i 行目に差し込む(列が足りなければ、セクションの列を増やす。余るマスは空き) */
@@ -365,7 +374,7 @@ export function insertPreset(sec: Section, i: number, preset: RowPreset): TableO
   if (rows + preset.rows > MAX_TABLE_ROWS) return { error: tr(`行は ${MAX_TABLE_ROWS} 行まで`, `Up to ${MAX_TABLE_ROWS} rows`) }
   const cols = rows === 0 ? Math.max(1, preset.cols) : Math.max(sec.cols ?? 1, preset.cols)
   const parts = partsOf(sec).map((p) => (p.r >= i ? { ...p, r: p.r + preset.rows } : p.r + p.h > i ? { ...p, h: p.h + preset.rows } : p))
-  const added = preset.parts.map(([type, c, r, w = 1, h = 1]) => newPart(type, c, i + r, w || cols, h))
+  const added = preset.parts.map(([type, c, r, w = 1, h = 1]) => ({ ...newPart(type, c, i + r, w || cols, h), ...preset.init?.[type], ...(preset.sep ? { sep: true } : {}) }))
   const shifted = rows === 0 ? undefined : shiftEven(sec, (x) => (x >= i ? x + preset.rows : x))
   const evenRows = preset.even ? [...(shifted ?? []), i] : shifted
   return { sec: filled({ ...sec, cols, rows: rows + preset.rows, parts: [...parts, ...added], evenRows }), sel: { a: [0, i], b: [cols - 1, i + preset.rows - 1] } }
@@ -526,7 +535,7 @@ export function tableButtonBlocks(layout: TemplateLayout): ButtonBlock[] {
 // ---- 保存・読み込み(layoutTemplates.ts)
 
 const LINKS: LinkKind[] = ['campaign', 'category', 'top', 'custom']
-const TYPES: PartType[] = ['box', 'button', 'text', 'media', 'empty']
+const TYPES: PartType[] = ['box', 'button', 'text', 'media', 'line', 'spacer', 'empty']
 const ALIGNS: TextAlign[] = ['left', 'center', 'right']
 /** 画像・動画の URL は、http(s) か、アプリの中の道(/ で始まる)だけ(javascript: などを入れさせない) */
 const url = (v: unknown): string | undefined => (typeof v === 'string' && /^(https?:\/\/|\/)/i.test(v.trim()) ? v.trim().slice(0, 1000) : undefined)
@@ -540,12 +549,35 @@ export const buttonText = (p: Pick<TablePart, 'label' | 'icon'>, fallback: strin
 /** ボタンの角の丸み(px。丸は 999) */
 export const buttonRadius = (p: Pick<TablePart, 'shape'>): number => (p.shape === 'square' ? 0 : p.shape === 'rounded' ? 6 : 999)
 
+// ---- 区切り線・余白・縦の区切り線(T8 の 8.9。メールの中の色なので、決まった色から)
+export const LINE_COLORS = { light: '#e2e2e2', gray: '#9e9e9e', black: '#222222' } as const
+/** 余白の高さの選択肢(px) */
+export const SPACER_HEIGHTS = [8, 16, 24, 32, 48]
+/** 区切り線の描き方(色・太さ・上下の余白・長さ) */
+export const lineLook = (p: Pick<TablePart, 'lineWidth' | 'lineColor' | 'lineShort' | 'lineSpace'>) => ({
+  color: LINE_COLORS[p.lineColor ?? 'light'],
+  width: p.lineWidth ?? 1,
+  pad: p.lineSpace === 'tight' ? 4 : p.lineSpace === 'wide' ? 20 : 10,
+  length: p.lineShort ? '40%' : '100%',
+})
+/** 縦の区切り線の色 */
+export const SEP_COLOR = '#cfcfcf'
+/** 均等の行に、縦の区切り線を引くか */
+export const isSepRow = (sec: Section, r: number) => partsOf(sec).some((p) => p.r === r && p.sep)
+/** 均等の行の縦の区切り線を、引く・やめる(行の中身のある部品すべてに印を付ける・外す) */
+export const toggleSepRow = (sec: Section, r: number): Section => {
+  const on = !isSepRow(sec, r)
+  return { ...sec, parts: partsOf(sec).map((p) => (p.r === r && p.type !== 'empty' ? { ...p, sep: on || undefined } : p)) }
+}
+
 /** 保存してよい要素の名前(種類ごと。箱は、出すものを外しても設定は残す。elements.ts の partElements と合わせる) */
 const ELEMENT_KEYS: Record<PartType, string[]> = {
   box: ['image', 'name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button'],
   button: ['label', 'image'],
   text: ['text'],
   media: ['image'],
+  line: [],
+  spacer: [],
   empty: [],
 }
 
@@ -576,6 +608,16 @@ export function parsePart(raw: unknown): TablePart | null {
   if (desc) part.desc = desc
   const els = parseEls(type, o.els)
   if (els) part.els = els
+  // 均等の行の縦の区切り線・枠で囲む(8.9)
+  if (o.sep === true && type !== 'empty') part.sep = true
+  if ((type === 'text' || type === 'button' || type === 'media') && (o.frame === 'solid' || o.frame === 'dashed')) part.frame = o.frame
+  if (type === 'line') {
+    if (o.lineWidth === 2 || o.lineWidth === 4) part.lineWidth = o.lineWidth
+    if (o.lineColor === 'gray' || o.lineColor === 'black') part.lineColor = o.lineColor
+    if (o.lineShort === true) part.lineShort = true
+    if (o.lineSpace === 'tight' || o.lineSpace === 'wide') part.lineSpace = o.lineSpace
+  }
+  if (type === 'spacer' && SPACER_HEIGHTS.includes(o.height as number) && o.height !== 24) part.height = o.height as number
   if (type === 'box') {
     if (CELL_VIEWS.includes(o.view as CellView) && o.view !== 'card') part.view = o.view as CellView
     const note = str(o.aiNote, 300)
