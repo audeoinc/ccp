@@ -35,7 +35,7 @@ import { ApprovalBar } from '../ApprovalBar'
 import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
 import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
-import { ApprovalBadge } from './ApprovalBadge'
+import { ApprovalBand } from './ApprovalBadge'
 import { PartPane } from './PartPane'
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { useFloatSwap } from './floatSwap'
@@ -428,7 +428,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     const v = loadSide()
     return isComm(v) ? v : 'talk'
   })
-  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, changes: 0 })
+  const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, pendingNames: [], changeReason: '', changes: 0 })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、バーのアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: CommCounts) => setCounts(c), [])
   // 右上の Popover で承認の依頼・承認・差し戻しをしたら、左のパネル(やり取り・承認の様子)も読み直す
@@ -700,11 +700,30 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const shown = { ...e.form, ...(e.previewTexts ?? {}) }
   return (
     <div className={s.root}>
+      {/* 承認の状態の帯(2026-10-26 利用者と決めた)。題の行の札の代わりに、フロートのいちばん上(題の行の上)に、幅いっぱいに。右の端に保存の様子(入力が止まって約 1.5 秒で自動で保存する) */}
+      <ApprovalBand
+        status={e.form.status}
+        waiting={counts.waiting}
+        changesRequested={counts.changesRequested}
+        reviewers={counts.reviewers}
+        approved={counts.approved}
+        pendingNames={counts.pendingNames}
+        changeReason={counts.changeReason}
+        dirty={e.dirty}
+        save={
+          e.saving ? (
+            t('保存中…', 'Saving…')
+          ) : e.dirty ? (
+            t('未保存', 'Unsaved')
+          ) : e.savedAt ? (
+            <span className={mergeClasses(e.justSaved && s.saved)}>{t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}</span>
+          ) : null
+        }
+        onOpen={() => showSide('approval', true)}
+      />
       <StageHeader
         title={
           <>
-            {/* 承認の状態の札(SU11)。目に入るように、題の行のいちばん左(メールの印の前)に置く(ピン f24d5a87)。押すと左のバーの承認のパネル */}
-            <ApprovalBadge status={e.form.status} waiting={counts.waiting} changesRequested={counts.changesRequested} reviewers={counts.reviewers} approved={counts.approved} onOpen={() => showSide('approval', true)} />
             <ChannelBadge channel={e.form.channel} />
             {field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)}
             {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
@@ -712,10 +731,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         }
         actions={
           <>
-            {/* 保存の様子をいつも出す: 保存中… / 未保存 / 保存済み · 12:03(入力が止まって約 1.5 秒で自動で保存する) */}
-            {e.saving ? (
-              <Spinner size="extra-tiny" label={t('保存中…', 'Saving…')} labelPosition="after" />
-            ) : e.saveConflict ? (
+            {/* 保存の様子(保存中… / 未保存 / 保存済み)は、承認の帯の右の端。ここには、手を打つことがあるとき(先に保存された・失敗)だけ */}
+            {e.saveConflict ? (
               // ほかの人が先に保存していた: 黙って上書きせず、どうするかを聞く
               <span className={s.saveFailed}>
                 <Tooltip
@@ -743,12 +760,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 <Button type="button" size="small" appearance="subtle" icon={<ArrowClockwiseRegular />} onClick={e.retrySave}>
                   {t('再試行', 'Retry')}
                 </Button>
-              </span>
-            ) : e.dirty ? (
-              <span className={s.state}>{t('未保存', 'Unsaved')}</span>
-            ) : e.savedAt ? (
-              <span className={mergeClasses(s.state, e.justSaved && s.saved)}>
-                {t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}
               </span>
             ) : null}
             <Tooltip content={t('元に戻す: 前に保存した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
