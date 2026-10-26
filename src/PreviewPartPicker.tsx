@@ -48,8 +48,6 @@ interface Props {
   onMove?: (itemKey: string, dir: MoveDir) => void
   /** 部品を選んでいるときに Enter: その部品のペインの入力欄へ移る */
   onEnter?: () => void
-  /** マウスで部品を押したとき(選んだあと)。キーで移ったときは呼ばない(移るたびにフロートなどが出ると邪魔なため) */
-  onClickPart?: (p: PartRef) => void
 }
 
 /**
@@ -57,15 +55,13 @@ interface Props {
  * プレビューの部品そのものは変えない(書き込みのピン PreviewPins と同じ作り。制作のページ・結果でも使えるように、配信カードには依存しない)。
  * 選んだ部品には枠と淡い色、マウスを乗せた部品には薄い枠を重ねる。Tab / Shift+Tab で次・前の部品、Esc で選ぶのをやめる
  */
-export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onRemove, onMove, onEnter, onClickPart }: Props) {
+export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onRemove, onMove, onEnter }: Props) {
   const s = useStyles()
   const onEnterRef = useRef(onEnter)
-  const onClickPartRef = useRef(onClickPart)
   const onRemoveRef = useRef(onRemove)
   const onMoveRef = useRef(onMove)
   useEffect(() => {
     onEnterRef.current = onEnter
-    onClickPartRef.current = onClickPart
     onRemoveRef.current = onRemove
     onMoveRef.current = onMove
   })
@@ -121,7 +117,6 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
       if ((e.target as Element).closest('[data-no-pick], button')) return
       const p = partFromElement(e.target as Element, box)
       onSelect(p)
-      if (p) onClickPartRef.current?.(p)
     }
     const onMove = (e: MouseEvent) => {
       // 入れ替えの印の上では、その商品に乗せたままにする(印は商品の枠の外の層にあるため)
@@ -202,7 +197,7 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
             data-swap-badge
             data-no-pick
             className={s.swap}
-            style={{ left: rects.swap.left + rects.swap.width - 34, top: rects.swap.top + 6 }}
+            style={{ left: rects.swap.left + rects.swap.width - (onRemove ? 66 : 34), top: rects.swap.top + 6 }}
             size="small"
             shape="circular"
             appearance="primary"
@@ -211,14 +206,14 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
           />
         </Tooltip>
       )}
-      {/* 外す(×)。入れ替えの左隣(右上の角の × は、閉じると見間違えやすいので、⇄ の内側に置く) */}
+      {/* 外す(×)。入れ替えの右隣(並びは「入れ替え ×」。2026-10-26 利用者の決め) */}
       {rects.swap && hover?.kind === 'product' && onRemove && (
         <Tooltip content={t('外す', 'Remove')} relationship="label">
           <Button
             data-swap-badge
             data-no-pick
             className={s.swap}
-            style={{ left: rects.swap.left + rects.swap.width - 66, top: rects.swap.top + 6 }}
+            style={{ left: rects.swap.left + rects.swap.width - 34, top: rects.swap.top + 6 }}
             size="small"
             shape="circular"
             icon={<DismissRegular />}

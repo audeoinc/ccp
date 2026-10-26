@@ -345,13 +345,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   })
   const onRemoveBadge = useCallback((itemKey: string) => productOpsRef.current.removeProduct(itemKey), [])
   const onMoveKey = useCallback((itemKey: string, dir: MoveDir) => productOpsRef.current.moveProduct(itemKey, dir), [])
-  /**
-   * プレビューの商品をマウスで押したら、枠を選ぶのに加えて、商品のフロートも開く(部品のペインの画像を押したときと同じ導線。ピン 10-26)。
-   * フロートの「入れ替える」は、同じ引き出しを開く。すぐ入れ替えたいときは ⇄ の印。キーで移ったときは開かない
-   */
-  const onClickPart = (p: PartRef) => {
-    if (p.kind === 'product') e.openProduct(p.itemKey, undefined, swapInFloat(p.itemKey))
-  }
   /** 入れ替えたあと。候補と入れ替えると行の鍵が変わるので、その商品を選んだままにする(select を通すと、入れ替える前の中身で保存してしまう) */
   const swapped = (from: string, to: string) => {
     setSwapAt(null)
@@ -1083,7 +1076,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} onClickPart={onClickPart} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
