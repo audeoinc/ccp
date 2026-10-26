@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, Badge, Button, Field, Input, Link, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -29,6 +29,7 @@ import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
 import { PushThumb } from '../PushThumb'
 import { AppScreenField, PushTapField } from '../AppLinksEditor'
 import type { Product } from '../models/products'
+import type { ThemeSuggestion } from '../aiDraft'
 import { partKey, type PartRef } from './parts'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
@@ -87,7 +88,15 @@ const useStyles = makeStyles({
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   // この配信のねらい(テーマ・切り口)。直す部品の上の、控えめな箱
   aim: { display: 'grid', rowGap: '2px', width: '100%', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, boxSizing: 'border-box' },
-  aimBtn: { border: 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover } },
+  aimBtn: { display: 'grid', rowGap: '2px', minWidth: 0, padding: 0, border: 'none', background: 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', ':hover': { textDecorationLine: 'underline' } },
+  // テーマの箱の右に「AI で案を出す」
+  aimRow: { gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'start' },
+  aimWrap: { display: 'grid', rowGap: '6px', minWidth: 0 },
+  // 試している案を写しているあいだ(本物のテーマではないと分かるように)
+  aimTrying: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px' },
+  themeIdeas: { display: 'grid', rowGap: '6px', minWidth: 0 },
+  themeIdeasClose: { justifySelf: 'start' },
+  themeIdeaHead: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '8px', alignItems: 'baseline' },
   aimTheme: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1 },
   readonly: { display: 'grid', rowGap: '2px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
 })
@@ -897,24 +906,91 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
 
 /**
  * この配信のねらい(テーマと切り口)。直す部品の上に小さく出し、ねらいを見ながら書けるようにする。
- * テーマは押すとその場で直せる。切り口は、採用した AI の案の補足なので、読むだけ
+ * テーマは押すとその場で直せる。AI のテーマの案は、押すとこの箱にだけ仮に写し(テーマはメールに出ないので、プレビューは変わらない)、帯の「確定」で採用する(X81 の 4)。
+ * 採用した案の理由は小さく出す(手で直すと消える)。切り口は、見出し・コピーの AI の案を採用したときの補足なので、読むだけ
  */
 function Aim({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
   const [editing, setEditing] = useState(false)
-  if (editing)
-    return (
-      <div className={s.aim}>
-        <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
-      </div>
-    )
+  // 案の一覧を広げているか(開いたときの自動の下書きで作った案もあるが、どの部品にも出ると長くなるので、押したときだけ広げる)
+  const [ideasOpen, setIdeasOpen] = useState(false)
+  // 試している案(箱にだけ仮に写す。保存する中身は変えない)
+  const [trying, setTrying] = useState<ThemeSuggestion | null>(null)
+  const trial = useTrial()
+  const { ideas, busy, run } = e.themeAi
+  const keyOf = (idea: ThemeSuggestion) => `${idea.theme}
+${idea.reason}`
+  const pick = (idea: ThemeSuggestion) =>
+    trial.tryIt({
+      key: keyOf(idea),
+      from: e.form.theme || t('(テーマなし)', '(No theme)'),
+      to: idea.theme,
+      preview: () => setTrying(idea),
+      unpreview: () => setTrying(null),
+      apply: () => {
+        setTrying(null)
+        e.adoptTheme(idea.theme, idea.reason)
+      },
+    })
+  const theme = trying?.theme ?? e.form.theme
+  const reason = trying ? trying.reason : e.form.themeReason
+  const aiButton = (
+    <Tooltip content={ideas.length > 0 ? t('テーマの案を作り直す(押すと試して、確定で採用)', 'Regenerate theme ideas (click one to try, then apply)') : t('AI でテーマの案を出す(押すと試して、確定で採用)', 'Get theme ideas from AI (click one to try, then apply)')} relationship="label">
+      <Button
+        type="button"
+        size="small"
+        appearance="subtle"
+        icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
+        disabled={busy}
+        onClick={() => {
+          setIdeasOpen(true)
+          run()
+        }}
+      >
+        {ideas.length > 0 ? t('案を作り直す', 'Regenerate') : t('AI で案を出す', 'AI ideas')}
+      </Button>
+    </Tooltip>
+  )
   return (
-    <button type="button" className={mergeClasses(s.aim, s.aimBtn)} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
-      <span className={e.form.theme ? s.aimTheme : s.caption}>{e.form.theme || t('テーマを足す', 'Add a theme')}</span>
-      {e.form.copyAngle && <span className={s.caption}>{e.form.copyAngle}</span>}
-      {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
-    </button>
+    <div className={s.aimWrap}>
+      {editing ? (
+        <div className={s.aim}>
+          <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
+        </div>
+      ) : (
+        <div className={mergeClasses(s.aim, s.aimRow, !!trying && s.aimTrying)}>
+          <button type="button" className={s.aimBtn} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
+            <span className={theme ? s.aimTheme : s.caption}>{theme || t('テーマを足す', 'Add a theme')}</span>
+            {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
+            {e.form.copyAngle && <span className={s.caption}>{t(`切り口(見出し・コピー): ${e.form.copyAngle}`, `Angle (headline & copy): ${e.form.copyAngle}`)}</span>}
+            {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
+          </button>
+          {aiButton}
+        </div>
+      )}
+      {ideasOpen && (ideas.length > 0 || busy) && (
+        <div className={s.themeIdeas}>
+          <TrialBar state={trial} />
+          {ideas.map((idea) => {
+            const on = trial.trial?.key === keyOf(idea)
+            const used = !trial.trial && idea.theme === e.form.theme
+            return (
+              <button key={keyOf(idea)} type="button" aria-pressed={on} className={mergeClasses(s.pickRow, on && s.heroCandOn)} onClick={() => pick(idea)} title={t('押すと試します(上の「確定」で採用)', 'Click to try it (apply with "Apply" above)')}>
+                <span className={s.themeIdeaHead}>
+                  <span className={s.aimTheme}>{idea.theme}</span>
+                  <span className={s.caption} style={{ justifySelf: 'end' }}>{used ? t('採用中', 'In use') : on ? t('試している', 'Trying') : t('試す', 'Try')}</span>
+                </span>
+                {idea.reason && <span className={s.caption}>{idea.reason}</span>}
+              </button>
+            )
+          })}
+          <Button type="button" size="small" appearance="subtle" className={s.themeIdeasClose} onClick={() => setIdeasOpen(false)}>
+            {t('案をしまう', 'Hide ideas')}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 

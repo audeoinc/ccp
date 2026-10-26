@@ -11,6 +11,7 @@ import type { NextStep } from './nextStep'
 import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
+import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
 
@@ -87,6 +88,10 @@ export interface SimpleExtras {
   /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
+  /** テーマの AI の案(詳しい画面の ① テーマと同じ useAiDrafts。案は保存しない。X81 の 4) */
+  themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void }
+  /** テーマの案を採用する(理由も一緒に入れる。手で直したときは setField('theme') が理由を消す) */
+  adoptTheme: (theme: string, reason: string) => void
   channel: 'email' | 'push'
   /** AB テスト(SU2)。keys は A を含む案、active はいま直している案(プレビューとペインは、この案の中身) */
   ab: { keys: VariantKey[]; active: VariantKey; purpose: AbPurpose; canAdd: boolean; busy: boolean } | null

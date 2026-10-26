@@ -1117,6 +1117,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         unsaved: !card,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
+        themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme() },
+        adoptTheme: (theme, reason) => setForm((f) => ({ ...f, theme, themeReason: reason })),
         channel: previewTab,
         ab: ab ? { keys: allVariants(ab), active, purpose: ab.purpose ?? 'test', canAdd: !!nextVariant(ab), busy: abAiBusy } : null,
         abSwitch: switchVariant,
