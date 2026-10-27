@@ -19,17 +19,18 @@ import { neighborItem, type MoveDir } from './gridMove'
 import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
-import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular, ArrowClockwiseRegular } from '@fluentui/react-icons'
+import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular, ArrowClockwiseRegular, InfoRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { useStoredWidths } from '../floatLayout'
 import { Row, productMeta } from '../ProductRow'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
-import { locale, useT } from '../i18n'
+import { locale, optionLabel, useT } from '../i18n'
+import { audienceLabel, audienceSet, targetText } from '../target'
 import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
 import { getTemplate, slotsOf } from '../templates'
-import { statusRank } from '../status'
+import { countryOptions, statusRank } from '../status'
 import { ReadinessList } from './ReadinessList'
 import { ApprovalBar } from '../ApprovalBar'
 import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
@@ -154,6 +155,25 @@ const useStyles = makeStyles({
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
   // 受信箱・通知での見え方(SU5)。ラベルは並べない(行が長くうるさくなるため)。アプリの通知は 1 行(左に差出人を太字、右に「タイトル ― 本文」をうすく)
   inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
+  // 配信の情報の帯(プレビューの上の部品)。メールの中身ではないので、受信箱の見え方(白い札)と違う、薄い灰色の点線の帯にする
+  metaBand: {
+    display: 'block',
+    width: '100%',
+    minWidth: 0,
+    padding: '5px 10px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px dashed ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground3,
+    color: tokens.colorNeutralForeground2,
+    fontFamily: 'inherit',
+    fontSize: tokens.fontSizeBase200,
+    textAlign: 'left',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground3Hover },
+  },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -276,6 +296,9 @@ const savedTime = (iso: string) => {
   return d.toLocaleString(locale(), today ? { hour: '2-digit', minute: '2-digit' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+/** 配信の情報の部品(プレビューの上の帯。右のペインは配信の情報。focus に当たる欄はないので、最初の欄に入る) */
+const META_PART: PartRef = { kind: 'meta', field: 'info' }
+
 /**
  * シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。プレビューが主役で、部品を押すと、その部品だけを直すペインが出る。
  * 状態と保存は CardDetail のもの(editor)をそのまま使う。ここは並べ方と、部品の選び方・反映の時機だけを持つ
@@ -387,6 +410,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     pushTitle: e.form.pushTitle,
     pushBody: e.form.pushBody,
     pushTapDone: tapComplete(e.pushLink),
+    audienceSet: audienceSet(e.audience, e.channel),
     headline: e.form.headline,
     copy: e.form.copy,
     hasHero: !!e.hero,
@@ -400,10 +424,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const approvalChecks = readinessOf({ ...checkInput, purpose: 'approval' })
   const handoffChecks = readinessOf({ ...checkInput, purpose: 'handoff' })
   // 行を押したら、その部品を選ぶ。アラート・承認はそのパネル、担当・締め切りは渡すもの(欄へは HandoffSheet が動く)
+  // 担当・締め切りの行は、渡すものを開いて、その欄へ入る(制作の担当・締め切りは渡すものだけで決める。2026-10-27 利用者の決め)
+  const [handoffFocus, setHandoffFocus] = useState<{ field: 'productionOwner' | 'productionDue'; seq: number } | null>(null)
   const pickCheck = (target: ReadinessTarget) => {
     if (target.kind === 'panel') showSide(target.panel, true)
-    else if (target.kind === 'handoffField') showSide('handoff', true)
-    else select(target)
+    else if (target.kind === 'handoffField') {
+      showSide('handoff', true)
+      setHandoffFocus((f) => ({ field: target.field, seq: (f?.seq ?? 0) + 1 }))
+    } else select(target)
   }
   // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
   const [lastSide, setLastSide] = useState<Exclude<Side, null>>(() => (e.unsaved ? 'alerts' : (loadSide() ?? 'talk')))
@@ -560,12 +588,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }
 
   const isOn = (p: PartRef) => samePart(p, part)
-  const field = (p: PartRef, children: React.ReactNode, title?: string, className?: string) => (
-    <button type="button" className={mergeClasses(s.topField, isOn(p) && s.on, className)} onClick={() => select(p)} title={title}>
-      {children}
-    </button>
-  )
+  // 配信の情報の帯は、どの欄から入っても(帯・送る前の確かめの送る相手の行)選んだ印にする
+  const metaOn = part?.kind === 'meta'
   const tpl = getTemplate(e.template)
+  // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00 · US · 対象: 女性・30代 · 送る相手: 会員だけ」。送る相手はメールでもアプリでも)
+  const metaSummary = [
+    `${t('配信', 'Send')} ${e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('(未設定)', '(not set)')}`,
+    optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '') || t('国(未設定)', 'Country (not set)'),
+    `${t('対象', 'Target')}: ${targetText({ gender: e.form.targetGender, ages: e.form.targetAges }) ?? t('指定なし', 'Not specified')}`,
+    `${t('送る相手', 'Send to')}: ${audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : t('(未設定)', '(not set)')}`,
+  ].join(' · ')
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
@@ -747,9 +779,10 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {e.campaignName ? (
               <span className={s.name}>{e.campaignName}</span>
             ) : (
-              field({ kind: 'meta', field: 'name' }, <span className={s.name}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>, t('配信名を直す', 'Edit the name'), s.nameField)
+              // 題の行は表示だけ。直す入口は、プレビューの上の配信の情報の帯 1 つ(内容の変更は、すべてプレビューで選んで右のペインで直す。2026-10-27 利用者の決め)
+              <span className={mergeClasses(s.name, s.nameField)}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>
             )}
-            {field({ kind: 'meta', field: 'scheduledAt' }, <span>{when}</span>, t('配信日時を直す', 'Edit the send date'))}
+            <span>{when}</span>
           </>
         }
         actions={
@@ -985,7 +1018,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {panel === 'handoff' && (
               // 渡すもの(制作へ)。PLAN の途中で思いついたイメージを書き留め、承認のあと(または前でも)制作に渡す
               <div className={s.pane}>
-                <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} checks={handoffChecks} onPickCheck={pickCheck} />
+                <HandoffSheet editor={e} onCommit={onCommit} assetsVersion={assetsVersion} assetCount={assetCount} onAssetCount={setAssetCount} checks={handoffChecks} onPickCheck={pickCheck} focusField={handoffFocus} />
               </div>
             )}
           </div>
@@ -1017,6 +1050,29 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length < 3 && e.abDiffParts.length > 1 && e.abDiffParts.some((p) => p.kind === 'template') && (
             <span className={s.abWarn}>{t('テンプレートと、ほかの所も A と違います。結果がテンプレートの差か中身の差か、分けにくくなります', 'Both the template and other parts differ from A. It will be hard to tell which caused the result.')}</span>
           )}
+          {/* 配信の情報(配信日時・国・対象・送る相手)。受信者には見えないので、プレビューの枠の外に、薄い灰色の帯で置く。押すと右のペインが配信の情報になる */}
+          <div className={s.inboxWrap}>
+            <span className={s.inboxHead}>
+              <InfoRegular />
+              {t('配信の情報(受信者には見えません)', 'Delivery info (not shown to recipients)')}
+            </span>
+            <button
+              type="button"
+              className={mergeClasses(s.metaBand, metaOn && s.on)}
+              onClick={() => select(META_PART)}
+              // ↓ で、プレビューの最初の部品へ(↑ ↓ の並びの先頭がこの帯。並びはプレビューの部品を選ぶ層が持つので、そこへキーを渡す)
+              onKeyDown={(ev) => {
+                const box = boxRef.current
+                if (ev.key !== 'ArrowDown' || !box) return
+                ev.preventDefault()
+                box.focus({ preventScroll: true })
+                box.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+              }}
+              title={t('配信の情報を直す', 'Edit the delivery info')}
+            >
+              {metaSummary}
+            </button>
+          </div>
           {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。差出人の名前は、設定の画面の全社の既定か国の上書き(ST10) */}
           {e.channel === 'email' ? (
             <div className={s.inboxWrap}>
@@ -1119,7 +1175,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
-            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} />
+            <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} lead={META_PART} leadOn={metaOn} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
           <div className={s.zoomBox}>
@@ -1148,7 +1204,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'} ref={paneRef}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} swapInFloat={swapInFloat} onOpenHandoff={() => showSide('handoff', true)} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} swapInFloat={swapInFloat} />
           {e.footer}
         </div>
 

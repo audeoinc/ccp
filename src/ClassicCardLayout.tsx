@@ -312,7 +312,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
                 {/* 配信の対象(X40): 誰に向けて作るか。最初に決め、AI の下書きと商品の候補をこれに合わせる */}
                 <TargetField gender={form.targetGender} ages={form.targetAges} onGender={set('targetGender')} onAges={set('targetAges')}>
                   {/* アプリの送る相手(これまでの ⑥ 時刻・相手 から移した) */}
-                  {templateChannel === 'push' && <AudienceRow value={audience} onChange={setAudience} />}
+                  <AudienceRow value={audience} onChange={setAudience} channel={templateChannel === 'push' ? 'push' : 'email'} />
                 </TargetField>
                 <div className={styles.twoCol}>
                   <OwnerField value={form.owner} onChange={set('owner')} owners={owners} />

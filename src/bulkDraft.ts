@@ -59,7 +59,7 @@ function aiCardOf(c: DraftBase): AiCard {
     channel: label(channelOptions, c.channel),
     department: label(departmentOptions, c.department),
     themeType: c.theme_type ? themeTypeLabel(c.theme_type as ThemeType) : undefined,
-    target: targetText({ gender: c.target_gender, ages: c.target_ages, audience: c.channel === 'app' ? c.audience : '' }),
+    target: targetText({ gender: c.target_gender, ages: c.target_ages, audience: c.audience, channel: c.channel === 'app' ? 'push' : 'email' }),
     theme: '',
     headline: '',
     copy: '',
