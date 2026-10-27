@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { AddRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DismissRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -23,7 +24,7 @@ const useStyles = makeStyles({
   // 1 行(見出し・値・操作)。企画から変えた行は、左に色の線を引く
   row: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'start', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}` },
   changed: { borderLeft: `3px solid ${tokens.colorPaletteDarkOrangeBorderActive}` },
-  rowLabel: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  rowLabel: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.label },
   rowValue: { display: 'grid', rowGap: '2px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minWidth: 0 },
   // 元の値(企画で承認された値)
   was: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, textDecorationLine: 'line-through', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },

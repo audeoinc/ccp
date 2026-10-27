@@ -15,6 +15,7 @@ import { heroImage, productImage } from '../images'
 import { yen } from '../items'
 import { optionLabel, tr, useT } from '../i18n'
 import { typo } from '../typo'
+import { LabeledValue } from '../LabeledValue'
 import { OpenLink } from '../LinkText'
 import { productUrl } from '../links'
 import { productMarket } from '../market'
@@ -55,7 +56,7 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1, minWidth: 0 },
   // 名前・直す・開くは縮めず、URL の文だけを省略する
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
-  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200 },
+  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...typo.value },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
   caption: typo.caption,
   label: typo.label,
@@ -317,9 +318,9 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           <span style={{ display: 'grid', rowGap: 2 }}>
             <span className={s.name}>{c.title}</span>
             {wholeLines(c).map(([label, v]) => (
-              <span key={label} className={s.meta}>
-                <span className={s.label}>{label}</span> {v}
-              </span>
+              <LabeledValue key={label} label={label}>
+                {v}
+              </LabeledValue>
             ))}
           </span>
         ) : null

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import { ImageThumb } from './ImageThumb'
@@ -32,7 +33,7 @@ const useStyles = makeStyles({
   text: { margin: 0, fontSize: tokens.fontSizeBase200, lineHeight: '18px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   facts: { display: 'grid', gridTemplateColumns: 'minmax(56px, auto) minmax(0, 1fr)', columnGap: '10px', rowGap: '3px', margin: 0 },
-  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
+  label: typo.label,
   value: { margin: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
 })
 

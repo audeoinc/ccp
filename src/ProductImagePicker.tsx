@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, MessageBar, MessageBarBody, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowDownloadRegular, DismissRegular, DocumentArrowUpRegular, OpenRegular } from '@fluentui/react-icons'
 import { ProductPages, type ImageAngle, type ImagePick, type PageImage } from './data/productPages'
@@ -33,7 +34,7 @@ const useStyles = makeStyles({
   side: { display: 'grid', rowGap: '10px', alignContent: 'start' },
   big: { width: '100%', maxHeight: 'calc(40vh / var(--ui-zoom, 1))', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3, borderRadius: tokens.borderRadiusMedium },
   head: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   value: { fontSize: tokens.fontSizeBase200 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   reason: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },

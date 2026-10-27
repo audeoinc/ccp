@@ -159,7 +159,8 @@
 ## 7. 見た目の約束事
 
 - **Fluent UI v9** のみ。MUI は使わない。スタイルは、`makeStyles` と `tokens`(`@fluentui/react-components`)で書く。色を、直接(`#fff` など)書かない(メール・プッシュのプレビュー内の、受信側の見た目を再現する部分だけ例外)。
-- 文字の階層: ラベル(項目名)= 12px・中太・薄いグレー(`index.css` で、全入力欄に一括で効かせている)、値 = 12px・標準、見出し・カードのタイトル = 13px・中太、補足 = 12px・薄いグレー。makeStyles では `src/typo.ts` の `typo.heading` / `typo.label` / `typo.caption` を広げて使う(2026-10-25 そろえる ③)。
+- 文字の階層: ラベル(項目名)= 11px・ふつうの太さ・薄いグレー(`colorNeutralForeground3`。`index.css` で、全入力欄の Field のラベルにも一括で効かせている)、値 = 13px・ふつうの太さ・濃い色(`colorNeutralForeground1`)、いちばん大事な値(名前など)だけ太く、空の値(未設定・(未設定)・—)はラベルと同じ薄さ、見出し・カードのタイトル = 13px・中太、補足 = 12px・薄いグレー。ラベルと値が同じ大きさ・濃さ・太さだと読み取りにくいので、大きさと濃さの両方で分ける(2026-10-27 利用者。ほかの SaaS と同じ考え方)。makeStyles では `src/typo.ts` の `typo.heading` / `typo.label` / `typo.value` / `typo.valueStrong` / `typo.empty` / `typo.caption` を広げて使う(2026-10-25 そろえる ③)。
+- ラベルと値の組(表示だけのもの)は、`LabeledValue`(`src/LabeledValue.tsx`。横並び・縦並び。空の値は「未設定」などを薄く出す)で出す。場所ごとにラベルの span を作らない(2026-10-27)。
 - 日付・数の書き方は `i18n.ts` の `when`(日時)・`day`(日付。「年-月-日」はその日の 0 時)・`num`(数)・`pct`(率)の 4 つ。ないときは「—」。画面ごとに日時の関数を作らない(2026-10-25 そろえる ⑦)。
 - 空・読み込み中・エラー: ペインの中の読み込み中は `PaneSpinner`(Spinner の tiny を真ん中に、言葉なし)、エラーは `MessageBar` の error(multiline)。何もないときの印は「—」、決まっていない値は「(未設定)」。
 - 閉じる ×: フロート・ダイアログは題の行の右端に `appearance="subtle"`(普通の大きさ)、枠・パネルの中は subtle の small、お知らせの帯(MessageBar)の × は Fluent の形(transparent・small)。

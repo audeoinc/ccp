@@ -1,6 +1,7 @@
 // 試す → 確定の帯(trial.ts の useTrial と組で使う)
 import { useEffect, useRef } from 'react'
 import { Button, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ArrowRightRegular, CheckmarkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import type { useTrial } from './trial'
@@ -19,7 +20,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
   },
   pair: { display: 'flex', alignItems: 'center', columnGap: '6px', flexGrow: 1, minWidth: 0, flexWrap: 'wrap' },
-  label: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold, flexShrink: 0 },
+  label: { ...typo.label, flexShrink: 0 },
   value: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' },
   to: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   buttons: { display: 'flex', columnGap: '6px', marginLeft: 'auto' },

@@ -56,6 +56,7 @@ import { SenderName } from '../SenderName'
 import { confirmDialog } from '../confirm'
 import { PaneRail } from '../PaneRail'
 import { typo } from '../typo'
+import { LabeledValue } from '../LabeledValue'
 import { hasPendingTrial, settlePendingTrial } from '../trial'
 import { tapComplete } from '../pushLink'
 
@@ -157,7 +158,9 @@ const useStyles = makeStyles({
   inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
   // 配信の情報の帯(プレビューの上の部品)。メールの中身ではないので、受信箱の見え方(白い札)と違う、薄い灰色の点線の帯にする
   metaBand: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'baseline',
+    columnGap: '14px',
     width: '100%',
     minWidth: 0,
     padding: '5px 10px',
@@ -166,14 +169,14 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground2,
     fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
     textAlign: 'left',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground3Hover },
   },
+  // 配信日時・国は短いので縮めない(対象・送る相手が長いときは、そちらを … にする)
+  metaFixed: { flexShrink: 0 },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -591,13 +594,23 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 配信の情報の帯は、どの欄から入っても(帯・送る前の確かめの送る相手の行)選んだ印にする
   const metaOn = part?.kind === 'meta'
   const tpl = getTemplate(e.template)
-  // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00 · US · 対象: 女性・30代 · 送る相手: 会員だけ」。送る相手はメールでもアプリでも)
-  const metaSummary = [
-    `${t('配信', 'Send')} ${e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('(未設定)', '(not set)')}`,
-    optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '') || t('国(未設定)', 'Country (not set)'),
-    `${t('対象', 'Target')}: ${targetText({ gender: e.form.targetGender, ages: e.form.targetAges }) ?? t('指定なし', 'Not specified')}`,
-    `${t('送る相手', 'Send to')}: ${audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : t('(未設定)', '(not set)')}`,
-  ].join(' · ')
+  // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
+  const metaSummary = (
+    <>
+      <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
+        {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+      </LabeledValue>
+      <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
+        {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
+      </LabeledValue>
+      <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')} truncate>
+        {targetText({ gender: e.form.targetGender, ages: e.form.targetAges })}
+      </LabeledValue>
+      <LabeledValue label={t('送る相手', 'Send to')} truncate>
+        {audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}
+      </LabeledValue>
+    </>
+  )
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
