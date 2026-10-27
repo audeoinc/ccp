@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md) の末尾。「HANDOVER から移した行(10KB に縮めたとき)」に、それまでの行がある)
 
+- 2026-10-27: **AI の置き場の比較の資料** [AI_PLATFORMS.md](AI_PLATFORMS.md)(Gemini と Azure OpenAI・Foundry・Copilot Studio・AI Builder・M365 Copilot。接続の図は `ai-platform-images/`。利用先に渡す。Workbench の ZIP には入れない)
 - 2026-10-27: **T11 テンプレートの管理・編集を大きな作業のフロートで**(main に入れて本番に反映: deployed-gcp/20261027-092859、main 2156506): `BigFloat`(`ResizableSurface` + 画面いっぱいの切り替え、覚える)。設定の画面からも配信カードからも同じ。BACKLOG の T11
 - 2026-10-27: **T12 箱の名前・価格などの置き場所**(main に入れて本番に反映: deployed-gcp/20261027-091258、main de5543a): 写真の下 / 写真に重ねる(上・中央・下)/ 写真の横(左・右)。箱の `place`、省略は見せ方から(`boxPlace`)。TEMPLATE_OBJECTS.md の 8.4
 - 2026-10-26 X79 キャンペーン: 段 ①〜④ 済み(表 `campaigns`・帯 `CampaignBand`・まとめて承認・`NewCampaignDialog`)。段 ⑤ 移し替え(/dev/ の「キャンペーンにまとめる」)は本番でまだ流していない

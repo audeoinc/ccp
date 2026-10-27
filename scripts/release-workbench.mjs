@@ -40,6 +40,8 @@ const RULES = [
   // HANDOVER の作業の記録(開発元の本番の話を含む)。BACKLOG の済んだ項目(docs/backlog-archive/)は、BACKLOG と同じく入れる
   ['exclude', /^docs\/handover-archive\//],
   ['exclude', /^docs\/font-compare\.html$/],
+  // AI の置き場の比較(利用先に別に渡した資料。Copilot Studio などの名前を含むので ZIP に入れない)
+  ['exclude', /^docs\/(AI_PLATFORMS\.md|ai-platform-images\/)/],
   // 商品ページの画像を、リストを渡してまとめてダウンロードする道具(B11)と、その手順書は、当面 ZIP に入れない
   // (利用者の指示 2026-10-23。取り込み(ccp.cli import-images)・画像を選ぶ窓は入れる)
   ['exclude', /^(docs\/PRODUCT_IMAGES\.md|scripts\/collect-product-images\.py)$/],
