@@ -158,6 +158,10 @@ export interface SimpleExtras {
   reasonForm: ReactNode
   cancelReason: () => void
   canUndo: boolean
+  /** 配信の全体を AI で下書きする(request = どう作るか。空なら、いまのテーマから。中身があれば先に確かめる。済んだら保存) */
+  draftWhole: (request: string) => void
+  /** AI の下書きが動いているあいだ */
+  drafting: boolean
   // ---- 上の帯
   nextStep: NextStep
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る・詳しい画面へ + 複製・取りやめ・削除) */

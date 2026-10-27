@@ -34,7 +34,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { campaignId, campaignSlug, productLinks, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
 import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
 import { PREF } from './prefKeys'
-import { runAutoDraft, type AutoDraftResult } from './autoDraft'
+import { runAutoDraft, type AutoDraftInput, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { useCardEditor, type Snapshot } from './useCardEditor'
 import { ClassicCardLayout } from './ClassicCardLayout'
@@ -77,6 +77,9 @@ import { cardDisplayName } from './campaigns'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
+
+/** 人が始める下書きの向き(どう作るか = テーマのヒント、または、いまのテーマのまま) */
+type WholeDraftOpts = Pick<AutoDraftInput, 'themeHint' | 'fixedTheme'>
 
 interface Props {
   /** undefined のときは新規作成 */
@@ -389,11 +392,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setDraftDone(true)
   }, [draftPending, auto, currentKey])
   /** 人がボタンで始める下書き(押したことを採用とみなして、済んだら保存する) */
-  function startAdoptedDraft() {
+  function startAdoptedDraft(opts?: WholeDraftOpts) {
     setAdoptDraft(true)
-    void startAutoDraft()
+    void startAutoDraft(opts)
   }
-  async function startAutoDraft() {
+  async function startAutoDraft(opts?: WholeDraftOpts) {
     if (!form.scheduledAt) {
       setError(t('すべてAIで下書きするには、先に配信日時を入力してください', 'Enter the send date & time first to draft everything with AI'))
       return
@@ -403,7 +406,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setDraftPending(true)
     setAuto({ label: t('準備しています', 'Getting ready'), done: 0, total: 7 })
     const res = await runAutoDraft(
-      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel, country: form.country || undefined },
+      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel, country: form.country || undefined, ...opts },
       (label, done, total) => setAuto({ label, done, total }),
       () => cancelRef.current || !aliveRef.current,
     )
@@ -412,6 +415,21 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
 
   const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || filled(items).length > 0 || heroId)
+
+  /**
+   * 配信の全体を AI で下書きする(シンプルな配信カードの、何も選んでいないときのペイン。2026-10-27 利用者)。
+   * 「どう作るか」が空なら、いまのテーマのまま全体を作る(テーマがなければ、テーマから考える)。書いてあれば、それに沿ってテーマから考え直す。
+   * 中身があるカードでは、書き換わることを先に確かめる。押したことを採用とみなして、空のカードの「AI で下書きする」と同じく、済んだら保存する
+   */
+  async function draftWhole(request: string) {
+    const req = request.trim()
+    const theme = form.theme.trim()
+    const body = !!(form.headline.trim() || form.copy.trim() || form.instructions.trim() || form.subject.trim() || form.pushTitle.trim() || filled(items).length > 0 || heroId)
+    if ((body || (req && theme)) && !(await confirmDialog(t('AI が下書きを作ります。いまの見出し・コピー・商品などは、すべて書き換わります。よいですか?', 'AI will draft this delivery. The current headline, copy, products, and so on will all be replaced. Continue?'), { okLabel: t('書き換える', 'Replace') }))) return
+    if (req) startAdoptedDraft({ themeHint: theme ? `${req}(いまのテーマ: ${theme})` : req })
+    else if (theme) startAdoptedDraft({ fixedTheme: { theme, reason: form.themeReason } })
+    else startAdoptedDraft()
+  }
 
   async function runAllManual() {
     if (hasContent && !(await confirmDialog(form.channel === CHANNEL_PUSH ? t('現在のテーマ・通知のタイトルと本文・ヘッドライン・コピー・商品・メイン画像を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, notification title and body, headline, copy, products, and hero image with an AI draft. Continue?') : t('現在のテーマ・件名・プリヘッダー・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, subject, preheader, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
@@ -1033,7 +1051,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     </>
   )
   // 空のカード: プレビューの真ん中に出す(シンプル・詳しいの両方の画面。シンプルには、すべてAIで下書きのボタンがないため)
-  const emptyDraftNode = !hasContent && !auto && !missingTemplate?.redrafted ? <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={startAdoptedDraft} /> : null
+  const emptyDraftNode = !hasContent && !auto && !missingTemplate?.redrafted ? <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={() => startAdoptedDraft()} /> : null
   const footerNode = (
     <>
     {missingTemplate && (
@@ -1213,6 +1231,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         reasonForm,
         cancelReason,
         canUndo: undoStack.canUndo,
+        draftWhole: (request) => void draftWhole(request),
+        drafting: auto !== null,
         nextStep,
         menu: cardMenu(
           <>

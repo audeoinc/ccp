@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -9,12 +9,12 @@ import { ChooseDrawer } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
 import { ImageThumb } from '../ImageThumb'
-import { Row, productMeta } from '../ProductRow'
 import { AlertMark } from '../AlertMark'
 import { LowStockBadge } from '../ProductMarks'
 import { heroImage, productImage } from '../images'
 import { yen } from '../items'
-import { optionLabel, tr, useT } from '../i18n'
+import { locale, optionLabel, tr, useT } from '../i18n'
+import { audienceLabel, audienceSet, targetText } from '../target'
 import { typo } from '../typo'
 import { LabeledValue } from '../LabeledValue'
 import { OpenLink } from '../LinkText'
@@ -40,7 +40,7 @@ import { TrialBar } from '../TrialBar'
 import { PartAiChat } from './PartAiChat'
 import { Hint } from '../Hint'
 import { ProductionMemo } from './ProductionMemo'
-import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
+import { askHeroPick, askPartRewrite, askProductPick, type PartAnswer, type PartTurn, type WholeTexts } from './partAi'
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { AiPicks, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
@@ -87,9 +87,6 @@ const useStyles = makeStyles({
   nameWrap: { whiteSpace: 'normal' },
   compareCol: { display: 'grid', rowGap: '4px', alignContent: 'start', minWidth: 0 },
   compareBox: { display: 'grid', rowGap: '8px', padding: '10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorBrandBackground2 },
-  // 何も選んでいないときの、載せた商品の一覧
-  list: { display: 'grid', rowGap: '4px' },
-  num: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, textAlign: 'right' },
   heroNow: { display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: '10px', alignItems: 'start' },
   heroCands: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '6px' },
   pickRow: { display: 'grid', rowGap: '2px', padding: '6px 8px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
@@ -288,74 +285,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         }}
       />
     )
-  const currentTexts = (): WholeTexts => ({
-    subject: e.form.subject,
-    preheader: e.form.preheader,
-    headline: e.form.headline,
-    copy: e.form.copy,
-    pushTitle: e.form.pushTitle,
-    pushBody: e.form.pushBody,
-    sectionTitles: [...e.sectionTitles],
-    sectionCopies: [...e.sectionCopies],
-  })
-  /** 案で変わる文言の名前と、新しい文言(案の中に並べる) */
-  const wholeLines = (c: WholeChange) => {
-    const out: [string, string][] = []
-    const add = (label: string, v?: string) => v !== undefined && out.push([label, v])
-    add(t('件名', 'Subject'), c.texts.subject)
-    add(t('プリヘッダー', 'Preheader'), c.texts.preheader)
-    add(t('見出し', 'Headline'), c.texts.headline)
-    add(t('コピー', 'Copy'), c.texts.copy)
-    add(t('通知のタイトル', 'Notification title'), c.texts.pushTitle)
-    add(t('通知の本文', 'Notification body'), c.texts.pushBody)
-    c.texts.sectionTitles?.forEach((v, i) => v !== (e.sectionTitles[i] ?? '') && add(t(`セクション ${i + 1} の見出し`, `Section ${i + 1} heading`), v))
-    c.texts.sectionCopies?.forEach((v, i) => v !== (e.sectionCopies[i] ?? '') && add(t(`セクション ${i + 1} のコピー`, `Section ${i + 1} copy`), v))
-    if (c.heroId) add(t('メイン画像', 'Main image'), e.poolHeroes.find((h) => h.id === c.heroId)?.name ?? '')
-    return out
-  }
-  /** 何も選んでいないときの、配信の全体を AI に頼む欄。案は文言とメイン画像をまとめて写し、押すとまとめて入れる */
-  const wholeChat = (
-    <PartAiChat
-      key="whole"
-      kind="whole"
-      label={t('配信の全体', 'Whole delivery')}
-      {...chatOf('whole')}
-      placeholder={t('例: 20 代向けに、もっとカジュアルに', 'e.g. More casual, for people in their 20s')}
-      ask={(request, history) => askWholeRewrite({ card: e.aiCard(), angle: e.form.copyAngle, channel: e.channel, current: currentTexts(), hero: e.hero, heroes: e.poolHeroes, request, history })}
-      renderIdea={(idea) => {
-        const c = readWhole(idea.value)
-        return c ? (
-          <span style={{ display: 'grid', rowGap: 2 }}>
-            <span className={s.name}>{c.title}</span>
-            {wholeLines(c).map(([label, v]) => (
-              <LabeledValue key={label} label={label}>
-                {v}
-              </LabeledValue>
-            ))}
-          </span>
-        ) : null
-      }}
-      nowText={t('いまの配信', 'Current delivery')}
-      ideaText={(idea) => readWhole(idea.value)?.title ?? ''}
-      isCurrent={(idea) => {
-        const c = readWhole(idea.value)
-        const now = currentTexts()
-        return !!c && Object.entries(c.texts).every(([k, v]) => JSON.stringify(now[k as keyof WholeTexts]) === JSON.stringify(v)) && (!c.heroId || c.heroId === e.hero?.id)
-      }}
-      onPreview={(idea) => {
-        // 案の文言とメイン画像を、プレビューにだけ写す(保存する中身は変えない)
-        const c = idea && readWhole(idea.value)
-        e.setAiPreview(c ? { texts: c.texts, ...(c.heroId ? { heroId: c.heroId } : {}) } : null)
-      }}
-      onAdopt={(idea) => {
-        const c = readWhole(idea.value)
-        e.setAiPreview(null)
-        if (!c) return
-        e.applyTexts(c.texts)
-        if (c.heroId) e.setHero(c.heroId, idea.why)
-      }}
-    />
-  )
   /** 案の商品の 1 行(写真・名前・コード・価格・在庫) */
   const productLine = (p: Product | undefined) =>
     p ? (
@@ -444,45 +373,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   })()
 
   const body = (() => {
-    if (!part)
-      return (
-        <>
-          {/* 何も選んでいないときだけの一言(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
-          <span className={s.caption}>{t('直したい所を、プレビューで押してください', 'Click what you want to change in the preview')}</span>
-          {wholeChat}
-          <span className={s.label}>{t(`載せた商品(${filled(e.items).length})`, `Products (${filled(e.items).length})`)}</span>
-          {filled(e.items).length === 0 && <span className={s.caption}>{t('まだ商品がありません。プレビューの空いた枠を押すと、商品を探せます。', 'No products yet. Click an empty slot in the preview to find one.')}</span>}
-          <div className={s.list}>
-            {filled(e.items).map((it, i) => {
-              const p = byId.get(it.productId)
-              const swapOpen = swapAt?.at === 'list' && swapAt.itemKey === it.key
-              return (
-                <div key={it.key}>
-                <Row
-                  dense
-                  lead={<span className={s.num}>{i + 1}</span>}
-                  image={productImage(p, it.imageUrl)}
-                  title={p?.name ?? ''}
-                  meta={productMeta(p)}
-                  marks={<AlertMark kind={e.alertKinds.get(it.productId)} />}
-                  onClick={() => onPick({ kind: 'product', itemKey: it.key })}
-                  onHover={(on) => e.hoverProduct(on ? it.key : null)}
-                  actions={
-                    <>
-                      <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
-                        <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={swapOpen} disabled={e.saving} onClick={() => onSwapAt(swapOpen ? null : { itemKey: it.key, at: 'list' })} />
-                      </Tooltip>
-                    </>
-                  }
-                />
-                {/* 入れ替えの引き出しは、その行の真下から(SU9) */}
-                <ProductSwap editor={e} itemKey={it.key} open={swapOpen} onOpenChange={(o) => onSwapAt(o ? { itemKey: it.key, at: 'list' } : null)} chats={chats} setChat={setChat} onDone={(k) => onSwapped(it.key, k)} trigger={false} />
-                </div>
-              )
-            })}
-          </div>
-        </>
-      )
+    if (!part) return <WholePane editor={e} onEdit={() => onPick({ kind: 'meta', field: 'info' })} />
     switch (part.kind) {
       case 'subject':
         return text('subject', t('件名', 'Subject'), { rows: 1, placeholder: e.form.name, hint: t('空のときは配信名が件名になります', 'Empty uses the delivery name'), max: SUBJECT_MAX })
@@ -809,7 +700,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   })()
 
   const titleOf = (p: PartRef | null): string => {
-    if (!p) return t('部品を選んでください', 'Choose a part')
+    if (!p) return t('配信の全体', 'Whole delivery')
     switch (p.kind) {
       case 'subject': return t('件名', 'Subject')
       case 'preheader': return t('プリヘッダー', 'Preheader')
@@ -842,8 +733,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             size="medium"
             weight="semibold"
             info={t(
-              'プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。何も選んでいないときは、配信の全体のことを AI に頼めます。',
-              'Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops. With nothing selected, ask AI about the whole delivery.',
+              '何も選んでいないときは、配信の全体を扱います(配信の情報を見る・AI で全体を下書きする)。プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。',
+              'With nothing selected, this pane is about the whole delivery (view the delivery info, draft everything with AI). Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops.',
             )}
           >
             {titleOf(part)}
@@ -856,7 +747,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         )}
       </div>
       {/* 文言・画像・商品を直すときの手がかり(この配信のねらい)。配信の情報を直すときは出さない */}
-      {part?.kind !== 'meta' && part?.kind !== 'overview' && <Aim editor={e} onChange={() => onPick({ kind: 'meta', field: 'theme' })} />}
+      {part && part.kind !== 'meta' && part.kind !== 'overview' && <Aim editor={e} onChange={() => onPick({ kind: 'meta', field: 'theme' })} />}
       {compareBlock}
       {body}
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
@@ -966,6 +857,54 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
           )
         })}
       </div>
+    </>
+  )
+}
+
+/**
+ * 何も選んでいないとき = 配信の全体を選んでいる(2026-10-27 利用者)。上から、配信の情報(読むだけ)・AI で全体を下書き・案内の 1 行。
+ * 載せた商品の一覧は、右の商品情報と重なるので出さない。直すのは配信の情報のペイン(「変える」)で、状態と保存は CardDetail の 1 つ
+ */
+function WholePane({ editor: e, onEdit }: { editor: SimpleEditor; onEdit: () => void }) {
+  const t = useT()
+  const s = useStyles()
+  // どう作るか(任意)。下書きのたびに書き直すものなので、覚えない
+  const [request, setRequest] = useState('')
+  const f = e.form
+  return (
+    <>
+      <div className={s.aim}>
+        <div className={s.aimHead}>
+          <span className={s.label}>{t('配信の情報', 'Delivery info')}</span>
+          <Button type="button" size="small" appearance="transparent" className={s.aimChange} onClick={onEdit}>
+            {t('変える', 'Change')}
+          </Button>
+        </div>
+        <LabeledValue label={t('配信日', 'Send date')}>{f.scheduledAt ? new Date(f.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</LabeledValue>
+        <LabeledValue label={t('国', 'Country')}>{optionLabel(countryOptions.find((o) => String(o.value) === f.country)?.label ?? '')}</LabeledValue>
+        <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')}>
+          {targetText({ gender: f.targetGender, ages: f.targetAges })}
+        </LabeledValue>
+        <LabeledValue label={t('送る相手', 'Send to')}>{audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}</LabeledValue>
+        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
+          {f.theme}
+        </LabeledValue>
+        {f.themeReason && <span className={s.caption}>{t(`理由: ${f.themeReason}`, `Why: ${f.themeReason}`)}</span>}
+      </div>
+      <div className={s.aimWrap}>
+        <Field
+          size="small"
+          label={t('AI で全体を下書きする', 'Draft the whole delivery with AI')}
+          hint={t('どう作るか(任意)。空なら、いまのテーマから全体を作ります', 'How to make it (optional). Leave empty to build everything from the current theme')}
+        >
+          <AutoTextarea heightKey="PartPane.wholeRequest" size="small" rows={2} value={request} placeholder={t('例: 20 代向けに、もっとカジュアルに', 'e.g. More casual, for people in their 20s')} onChange={(_, d) => setRequest(d.value)} />
+        </Field>
+        <Button type="button" appearance="primary" size="small" className={s.themeIdeasClose} icon={e.drafting ? <Spinner size="extra-tiny" /> : <SparkleRegular />} disabled={e.drafting || e.saving || e.locked} onClick={() => e.draftWhole(request)}>
+          {t('AI で下書きする', 'Draft with AI')}
+        </Button>
+      </div>
+      {/* 部品ごとに直すときの入口(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
+      <span className={s.caption}>{t('直したい所は、プレビューで押してください', 'Click what you want to change in the preview')}</span>
     </>
   )
 }
