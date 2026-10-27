@@ -416,10 +416,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }, [])
 
   // 既存のカードを開いたとき、自動で下書きを作る(同じカードで、1 回だけ):
-  // ・内容が空のとき
   // ・使ったテンプレートが登録に見つからないとき(削除された・版が残っていない。代わりのテンプレートで描くので、保存した見出し・商品の枠がずれる。
   //   SU1。2026-10-23 利用者 OK)。テンプレートも AI が選び直す。保存するまでは、キャンセルで元に戻せる
-  // どちらも、テンプレートの読み込みが済んでから判定する(済む前は、作ったテンプレートがまだ登録にない)
+  // テンプレートの読み込みが済んでから判定する(済む前は、作ったテンプレートがまだ登録にない)
+  // 内容が空のカードは、自動では始めず、上の案内のボタン(emptyDraftNode)を押したときだけ下書きする
+  // (一括作成の「保存して次へ」で、次のカードを開くたびに AI が走ってしまうため。2026-10-27 利用者)
   useEffect(() => {
     if (!card || original === null) return
     if (products.length === 0 || heroes.length === 0 || !templatesSettled()) return
@@ -433,7 +434,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMissingTemplate({ key: label, redrafted: autoEnabled })
     }
-    if (autoEnabled && (!hasContent || missing)) void startAutoDraft()
+    if (autoEnabled && missing) void startAutoDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, original, products.length, heroes.length, templatesVersion])
 
@@ -1255,6 +1256,19 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
                 {t('スキップして開く', 'Skip and open')}
               </Button>
             </div>
+          )}
+          {/* 空のカード: 押したときだけ AI で下書きする(シンプルな配信カードにも、すべてAIで下書きのボタンがないので、両方の画面でここに出す) */}
+          {!hasContent && !auto && !missingTemplate?.redrafted && (
+            <MessageBar layout="multiline" intent="info" className={styles.error}>
+              <MessageBarBody>
+                {t('この配信カードは、まだ中身がありません。AI で、テーマ・コピー・商品・メイン画像をまとめて下書きできます(保存するまでは、画面に入るだけです)。', 'This delivery card is still empty. AI can draft the theme, copy, products, and hero image at once (nothing is saved until you save).')}
+              </MessageBarBody>
+              <MessageBarActions>
+                <Button type="button" size="small" appearance="primary" icon={<AiIcon size={16} />} disabled={saving} onClick={() => void startAutoDraft()}>
+                  {t('AI で下書きする', 'Draft with AI')}
+                </Button>
+              </MessageBarActions>
+            </MessageBar>
           )}
           {simpleOn ? (
             <>
