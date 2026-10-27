@@ -21,10 +21,12 @@ import { productUrl } from '../links'
 import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
 import { channelOptions, countryOptions } from '../status'
-import { baseTemplateId, getTemplate, openTemplateManager, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
+import { getTemplate, openTemplateManager, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
 import { findPart, hasPartFields } from '../partContent'
 import { PartContentFields } from '../PartContentFields'
 import { TemplateThumb } from '../TemplateThumb'
+import { TemplateKeyNote, TemplateUseLine } from '../TemplateUseLine'
+import { templateKeyState } from '../templateUse'
 import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
 import { PushThumb } from '../PushThumb'
@@ -72,6 +74,7 @@ const useStyles = makeStyles({
   compare: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8px' },
   tplList: { display: 'grid', rowGap: '8px' },
   tplCard: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '10px', alignItems: 'start', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorBrandBackground2 } },
+  tplNote: { cursor: 'default', ':hover': { backgroundColor: tokens.colorNeutralBackground1 } },
   tplOn: { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1 },
   ideaText: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap' },
   ideaRow: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', minWidth: 0 },
@@ -856,15 +859,17 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
 /**
  * テンプレートの選び直し(SU1 ⑧・段階 b)。チャネルのテンプレートを、見取り図と一緒に並べる。乗せるとプレビューに仮で写し(この配信の商品・画像のまま)、
  * 押すと替える。枠に収まらない商品は「枠外」として、メールには載らないことを知らせる(載せたままにするので、戻せば元の枠に戻る)。
- * 国ごとに使えるテンプレートの絞り込み(ST1)は、まだない
+ * 選択肢は、この国で使うテンプレートのいまの版だけ。この配信が前の版・使わない(無効)・この国で使わないのテンプレートなら、一覧の上に知らせと「いまの版にする」を出す。
+ * どの選択肢にも、最近の使われ方(最近 4 週で何本・同じ週に何本・最後に使った日)を出す(詳しい画面の ② テンプレートと同じ。X81 の 7)
  */
 function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
-  const current = baseTemplateId(e.template)
   const slotsOf = (sections?: { slots: number }[]) => (sections ?? []).reduce((n, x) => n + x.slots, 0)
+  const keyState = templateKeyState(e.template, e.card.country)
   const pick = async (id: string) => {
-    if (id === current) return
+    // 前の版を使っているときは、同じテンプレートのいまの版を押しても替える(「いまの版にする」と同じ)
+    if (id === e.template) return
     if (e.candidates.length > 0 && !(await confirmDialog(t('テンプレートを替えると、セクションの構成が変わるので、残りの候補(AI が出した商品の案)は外れます。替えますか?', 'Changing the template changes the sections, so the remaining candidates (AI product ideas) are cleared. Change it?')))) return
     e.setAiPreview(null)
     e.setTemplate(id)
@@ -872,11 +877,25 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   return (
     <>
       <Hint hintKey="simpleCard.templatePick">{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</Hint>
+      {keyState && (
+        <div className={mergeClasses(s.tplCard, s.tplOn, s.tplNote)}>
+          {keyState.cur.push ? <PushThumb spec={keyState.cur.push} width={72} /> : <TemplateThumb layout={keyState.cur} maxHeight={110} />}
+          <span style={{ display: 'grid', rowGap: 4, minWidth: 0 }}>
+            <span className={s.row}>
+              <span className={s.name}>{keyState.cur.label}</span>
+              <Badge size="small" appearance="filled" color="brand">{t('いまのテンプレート', 'Current')}</Badge>
+              {keyState.old && <Badge size="small" appearance="outline">{t(`版 ${keyState.version}`, `v${keyState.version}`)}</Badge>}
+            </span>
+            <TemplateKeyNote state={keyState} onUpdate={(id) => void pick(id)} />
+          </span>
+        </div>
+      )}
       <div className={s.tplList} onMouseLeave={() => e.setAiPreview(null)}>
         {templateOptions(e.channel, false, e.card.country).map((o) => {
           const slots = o.id === 'free' ? Infinity : slotsOf(o.sections)
           const over = Number.isFinite(slots) ? Math.max(0, e.items.length - slots) : 0
-          const on = o.id === current
+          // 前の版を使っているときは、いまの版の選択肢は「いまのテンプレート」にしない(押すといまの版に替わる)
+          const on = o.id === e.template
           return (
             <div
               key={o.id}
@@ -896,6 +915,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
                   {Number.isFinite(slots) && <span className={s.caption}>{t(`商品の枠 ${slots}`, `${slots} product slots`)}</span>}
                   {over > 0 && <Badge size="small" appearance="tint" color="warning">{t(`${over} 件が枠外(メールに載らない)`, `${over} out of slots (not in the email)`)}</Badge>}
                 </span>
+                {e.templateUse && <TemplateUseLine u={e.templateUse.get(o.id)} />}
               </span>
             </div>
           )

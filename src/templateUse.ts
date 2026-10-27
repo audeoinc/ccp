@@ -1,6 +1,7 @@
 // テンプレートの最近の使用回数(X4。配信カードの ② テンプレートで選ぶとき)。
 // 同じ国の配信のうち、取りやめていないものを数える。どの版を使っていても、同じテンプレートとして数える(管理画面の「N 本で使用」と同じ)
-import { templateIdOfCard } from './templates'
+import { baseTemplateId, currentVersion, getTemplate, hasTemplate, splitTemplateKey, templateIdOfCard, type EmailTemplateId } from './templates'
+import { appliesIn } from './countryApply'
 import { weekKeyOf } from './weekLock'
 
 /** テンプレートごとの使い方 */
@@ -47,3 +48,17 @@ export function templateUse(cards: CardLike[], at: string | undefined, country: 
   }
   return out
 }
+
+/**
+ * この配信のテンプレートが、前の版・使わない(無効)・この国で使わない(ST1)のどれかなら、その様子。どれでもなければ null。
+ * どれも選択肢の一覧には出ないので、選ぶ所の上に別に出して知らせる
+ */
+export function templateKeyState(template: EmailTemplateId, country?: string) {
+  const cur = getTemplate(template)
+  const { id: base, version } = splitTemplateKey(template)
+  const old = version !== undefined
+  const offCountry = !appliesIn('template', baseTemplateId(template), country)
+  if (!old && !cur.hidden && !offCountry) return null
+  return { cur, base, version, old, latest: currentVersion(base), canUpdate: old && hasTemplate(base) && !getTemplate(base).hidden }
+}
+export type TemplateKeyState = NonNullable<ReturnType<typeof templateKeyState>>

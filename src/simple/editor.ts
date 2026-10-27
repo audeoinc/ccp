@@ -11,6 +11,7 @@ import type { NextStep } from './nextStep'
 import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
+import type { TemplateUse } from '../templateUse'
 import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
@@ -90,6 +91,8 @@ export interface SimpleExtras {
   setField: (k: SimpleField, v: string) => void
   /** テーマの AI の案(詳しい画面の ① テーマと同じ useAiDrafts。案は保存しない。X81 の 4) */
   themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void }
+  /** テンプレートごとの最近の使われ方(詳しい画面の ② テンプレートと同じ templateUse。全部の配信が読めるまでは undefined。X81 の 7) */
+  templateUse?: Map<string, TemplateUse>
   /** テーマの案を採用する(理由も一緒に入れる。手で直したときは setField('theme') が理由を消す) */
   adoptTheme: (theme: string, reason: string) => void
   channel: 'email' | 'push'
