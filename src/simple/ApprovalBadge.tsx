@@ -6,6 +6,9 @@ import { useT } from '../i18n'
 
 const useBandStyles = makeStyles({
   // カードの幅いっぱいの 1 行。高さは状態で変えない(長い文は … で切る)。押すと承認のパネルが開く
+  // 閉じる × を並べるときの行(帯と同じ地の色。× は帯の文字の色)
+  withClose: { display: 'flex', alignItems: 'center', backgroundColor: 'var(--band-bg)', flexShrink: 0 },
+  close: { display: 'flex', alignItems: 'center', paddingRight: '8px', color: 'var(--band-fg)', '& button': { color: 'inherit' } },
   band: {
     display: 'flex',
     alignItems: 'center',
@@ -58,6 +61,7 @@ export function ApprovalBand({
   dirty,
   save,
   onOpen,
+  close,
 }: {
   status: string
   waiting: boolean
@@ -69,6 +73,8 @@ export function ApprovalBand({
   dirty: boolean
   save: ReactNode
   onOpen: () => void
+  /** 配信カードの閉じる ×。帯がフロートのいちばん上のとき(キャンペーンの帯がないとき)、帯の右の端に置く(フロートの右上の角に閉じるがあるように。2026-10-27 利用者) */
+  close?: ReactNode
 }) {
   const s = useBandStyles()
   const t = useT()
@@ -102,11 +108,12 @@ export function ApprovalBand({
           }
         : { kind: 'draft' as const, icon: <EditRegular />, label: t('未起案', 'Draft'), note: t('まだ承認を依頼していません', 'Approval not requested yet') }
   const c = BAND_COLORS[spec.kind]
-  return (
+  const vars = { '--band-line': c.line, '--band-bg': c.bg, '--band-fg': c.fg, '--band-sub': c.sub } as CSSProperties
+  const band = (
     <button
       type="button"
       className={s.band}
-      style={{ '--band-line': c.line, '--band-bg': c.bg, '--band-fg': c.fg, '--band-sub': c.sub } as CSSProperties}
+      style={vars}
       onClick={onOpen}
       title={spec.note}
       aria-label={t(`承認の状態: ${spec.label}。${spec.note}。承認のパネルを開く`, `Approval: ${spec.label}. ${spec.note}. Open the approval panel`)}
@@ -119,5 +126,13 @@ export function ApprovalBand({
       <span className={s.note}>{spec.note}</span>
       <span className={s.save}>{save}</span>
     </button>
+  )
+  if (!close) return band
+  // 帯はボタンなので、閉じるのボタンは中に入れず、同じ地の色の行に並べる
+  return (
+    <div className={s.withClose} style={vars}>
+      {band}
+      <span className={s.close}>{close}</span>
+    </div>
   )
 }

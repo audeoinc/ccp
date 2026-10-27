@@ -270,7 +270,8 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
               {card && <CopyLinkButton />}
               {/* 複製・取りやめ・削除(保存済みの配信だけ) */}
               {cardMenu()}
-              <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />
+              {/* 閉じる ×: フロートのいちばん上の右の角に。キャンペーンの帯があれば、その 1 段目の右の端(CardDetail が入れる)。なければ題の行 */}
+              {!campaignBand && <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onBack} aria-label={t('閉じる', 'Close')} />}
             </div>
             {noticesNode}
             {productFloat}
