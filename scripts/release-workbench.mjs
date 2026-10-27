@@ -26,6 +26,8 @@ const OUT = join(ROOT, 'release-out')
 const RULES = [
   // 開発元の本番(Cloud Run + Cloud SQL)だけで使うもの
   ['exclude', /^(Dockerfile|\.dockerignore|\.gcloudignore|cloudbuild\.yaml)$/],
+  // 見本の画面(デモのビルドを URL で開く。開発元だけで使う)
+  ['exclude', /^(cloudbuild-preview\.yaml|preview\/)/],
   ['exclude', /^scripts\/(deploy-gcp|gcp-smoke|release-workbench)\.mjs$/],
   ['exclude', /^server\/ccp\/hosted\//],
   ['exclude', /^server\/requirements-hosted\.txt$/],

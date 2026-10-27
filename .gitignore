@@ -48,3 +48,4 @@ release-out/
 
 # 開発用の画面(/dev/)の作業ファイル(利用先の表の名前を含む。docs/DEVTOOLS.md)
 server/devwork/
+dist-preview/
