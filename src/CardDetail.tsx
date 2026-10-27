@@ -14,7 +14,7 @@ import {
   Spinner,
   Text,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, DataBarVerticalRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowNextRegular, DataBarVerticalRegular, DismissRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { cardMarket } from './market'
@@ -756,7 +756,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             onSwitch={(id) => void switchCard(id)}
             variants={variants}
             busy={saving}
-            actions={<CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />}
+            actions={
+              <>
+                <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
+                {/* 閉じる ×: フロートのいちばん上の右の角(キャンペーンの帯の 1 段目の右の端。2026-10-27 利用者)。ボタンなので、題の行でつかんで動かす動き(floatMove)には入らない */}
+                <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => (simpleOn ? void closeSimple() : onBack())} aria-label={t('閉じる', 'Close')} />
+              </>
+            }
             onAddCard={() => setAddingCard(true)}
           />
         )

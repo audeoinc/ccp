@@ -757,6 +757,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         pendingNames={counts.pendingNames}
         changeReason={counts.changeReason}
         dirty={e.revokesApproval}
+        // 閉じる ×: フロートのいちばん上の右の角に。キャンペーンの帯があれば、その 1 段目の右の端(CardDetail が入れる)
+        close={e.campaignBand ? undefined : <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
         save={
           e.saving ? (
             t('保存中…', 'Saving…')
@@ -882,7 +884,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             )}
             {e.viewSwitch}
             {e.menu}
-            <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
           </>
         }
         // 面のタブ(PLAN | PRODUCTION | RESULTS)。配信が主役で、面はその見方なので、題名の下に
