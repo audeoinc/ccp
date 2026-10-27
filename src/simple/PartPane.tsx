@@ -97,9 +97,6 @@ const useStyles = makeStyles({
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   // この配信のねらい(テーマ・切り口)。直す部品の上の、控えめな箱
   aim: { display: 'grid', rowGap: '2px', width: '100%', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, boxSizing: 'border-box' },
-  aimBtn: { display: 'grid', rowGap: '2px', minWidth: 0, padding: 0, border: 'none', background: 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', ':hover': { textDecorationLine: 'underline' } },
-  // テーマの箱の右に「AI で案を出す」
-  aimRow: { gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'start' },
   aimWrap: { display: 'grid', rowGap: '6px', minWidth: 0 },
   // 試している案を写しているあいだ(本物のテーマではないと分かるように)
   aimTrying: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px' },
@@ -972,16 +969,35 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
 
 /**
  * この配信のねらい(テーマと切り口)。直す部品の上に小さく出し、ねらいを見ながら書けるようにする。
- * テーマは押すとその場で直せる。AI のテーマの案は、押すとこの箱にだけ仮に写し(テーマはメールに出ないので、プレビューは変わらない)、帯の「確定」で採用する(X81 の 4)。
- * 採用した案の理由は小さく出す(手で直すと消える)。切り口は、見出し・コピーの AI の案を採用したときの補足なので、読むだけ
+ * ここでは読むだけ。テーマを変えるのは、プレビューの上の配信の情報(ThemeField)の 1 か所だけ(2026-10-27 利用者。直す場所を 1 つにする)。
+ * 採用した案の理由と、切り口(見出し・コピーの AI の案を採用したときの補足)も、読むだけで添える
  */
 function Aim({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
-  const [editing, setEditing] = useState(false)
-  // 案の一覧を広げているか(開いたときの自動の下書きで作った案もあるが、どの部品にも出ると長くなるので、押したときだけ広げる)
+  return (
+    <div className={s.aim} title={t('この配信のねらい(メールには出ません)。テーマは、プレビューの上の配信の情報で変えます', 'What this delivery aims for (not in the email). Change the theme from the delivery info above the preview')}>
+      <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
+        {e.form.theme}
+      </LabeledValue>
+      {e.form.themeReason && <span className={s.caption}>{t(`理由: ${e.form.themeReason}`, `Why: ${e.form.themeReason}`)}</span>}
+      {e.form.copyAngle && <span className={s.caption}>{t(`切り口(見出し・コピー): ${e.form.copyAngle}`, `Angle (headline & copy): ${e.form.copyAngle}`)}</span>}
+      {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
+    </div>
+  )
+}
+
+/**
+ * テーマを直す欄(配信の情報の中。テーマを変えるのはここだけ)。
+ * AI のテーマの案は、押すとこの欄にだけ仮に写し(テーマはメールに出ないので、プレビューは変わらない)、帯の「確定」で採用する(X81 の 4)。
+ * 採用した案の理由は小さく出す(手で直すと消える)
+ */
+function ThemeField({ editor: e }: { editor: SimpleEditor }) {
+  const t = useT()
+  const s = useStyles()
+  // 案の一覧を広げているか(開いたときの自動の下書きで作った案もあるが、押したときだけ広げる)
   const [ideasOpen, setIdeasOpen] = useState(false)
-  // 試している案(箱にだけ仮に写す。保存する中身は変えない)
+  // 試している案(欄にだけ仮に写す。保存する中身は変えない)
   const [trying, setTrying] = useState<ThemeSuggestion | null>(null)
   const trial = useTrial()
   const { ideas, busy, run } = e.themeAi
@@ -999,42 +1015,31 @@ ${idea.reason}`
         e.adoptTheme(idea.theme, idea.reason)
       },
     })
-  const theme = trying?.theme ?? e.form.theme
   const reason = trying ? trying.reason : e.form.themeReason
-  const aiButton = (
-    <Tooltip content={ideas.length > 0 ? t('テーマの案を作り直す(押すと試して、確定で採用)', 'Regenerate theme ideas (click one to try, then apply)') : t('AI でテーマの案を出す(押すと試して、確定で採用)', 'Get theme ideas from AI (click one to try, then apply)')} relationship="label">
-      <Button
-        type="button"
-        size="small"
-        appearance="subtle"
-        icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
-        disabled={busy}
-        onClick={() => {
-          setIdeasOpen(true)
-          run()
-        }}
-      >
-        {ideas.length > 0 ? t('案を作り直す', 'Regenerate') : t('AI で案を出す', 'AI ideas')}
-      </Button>
-    </Tooltip>
-  )
   return (
-    <div className={s.aimWrap}>
-      {editing ? (
-        <div className={s.aim}>
-          <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
-        </div>
-      ) : (
-        <div className={mergeClasses(s.aim, s.aimRow, !!trying && s.aimTrying)}>
-          <button type="button" className={s.aimBtn} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
-            <span className={theme ? s.aimTheme : s.caption}>{theme || t('テーマを足す', 'Add a theme')}</span>
-            {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
-            {e.form.copyAngle && <span className={s.caption}>{t(`切り口(見出し・コピー): ${e.form.copyAngle}`, `Angle (headline & copy): ${e.form.copyAngle}`)}</span>}
-            {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
-          </button>
-          {aiButton}
-        </div>
-      )}
+    <div data-field="theme" className={s.aimWrap}>
+      <Field label={t('テーマ', 'Theme')} hint={t('配信全体の前提。メールには出ません', 'Premise for the whole delivery; not in the email')} size="small">
+        {/* 試しているあいだは、案を写して読むだけにする(本物のテーマではないと分かるように) */}
+        <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} className={trying ? s.aimTrying : undefined} readOnly={!!trying} value={trying?.theme ?? e.form.theme} placeholder={t('テーマ', 'Theme')} onChange={(_, d) => e.setField('theme', d.value)} />
+      </Field>
+      {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
+      {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
+      <Tooltip content={ideas.length > 0 ? t('テーマの案を作り直す(押すと試して、確定で採用)', 'Regenerate theme ideas (click one to try, then apply)') : t('AI でテーマの案を出す(押すと試して、確定で採用)', 'Get theme ideas from AI (click one to try, then apply)')} relationship="label">
+        <Button
+          type="button"
+          size="small"
+          appearance="subtle"
+          className={s.themeIdeasClose}
+          icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
+          disabled={busy}
+          onClick={() => {
+            setIdeasOpen(true)
+            run()
+          }}
+        >
+          {ideas.length > 0 ? t('テーマの案を作り直す', 'Regenerate theme ideas') : t('AI でテーマの案を出す', 'AI theme ideas')}
+        </Button>
+      </Tooltip>
       {ideasOpen && (ideas.length > 0 || busy) && (
         <div className={s.themeIdeas}>
           <TrialBar state={trial} />
@@ -1090,6 +1095,7 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
   return (
     <div ref={ref} className={s.root}>
       <NameField value={e.form.name} onChange={(v) => e.setField('name', v)} size="small" field="name" />
+      <ThemeField editor={e} />
       <ScheduledAtField value={e.form.scheduledAt} onChange={(v) => e.setField('scheduledAt', v)} size="small" field="scheduledAt" />
       <ChoiceField label={t('チャネル', 'Channel')} value={e.form.channel} options={channelOptions} onChange={(v) => e.setField('channel', v)} hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')} size="small" field="channel" />
       <StatusField value={e.form.status} onChange={(v) => e.setField('status', v)} size="small" field="status" />
