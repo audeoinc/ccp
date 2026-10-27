@@ -4,7 +4,7 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-10-26(10KB に縮めた)
+- 最終更新: 2026-10-27
 
 ---
 
@@ -25,6 +25,7 @@
 - 2026-10-26 T8 段階 6・8.8〜8.10・T11 の一部・テンプレートの編集の帯(`SelBar`): 本番に反映済み。TEMPLATE_OBJECTS.md
 - 2026-10-26 まとめて作る: ブラッシュアップと ② の案のプレビュー(`BulkPreviewFloat`)。本番に反映済み
 - 2026-10-26 UI 1: X79 段 ②・X64 (c)(e)(f)(g)・設定のテンプレートを別のフロート(`TemplateFloat`)まで push 済み。X64 の残りは (a)(b)。詳しくは handover-archive/2026-10-20_21.md の末尾「UI 1: 2026-10-26 午後」
+- 2026-10-27 UI 2: セクションの枠(前のセクションを空けて後ろに置いた商品が前の枠に詰まらない。空いた枠の行 `Item.gap`、`src/slots.ts`、sort_order = 枠の位置 + 1、例は `scripts/check-slots.mjs`)は main。X81 の 7 も main。8・9 は見本の確認待ちのブランチ `claude/ui2-x81-8`・`claude/ui2-x81-9`
 - 2026-10-26 UI 2: 学びの効き目のフロート・メールの上の帯 MEN / WOMEN・設定の窓の zoom の直し・開発へのリクエストの削除・AI 下書きに件名
 - 2026-10-26 UI 3: 週の見方・X79 段 ④・候補の詳しい情報・フロートを動かす・ピンと週の見方の表示の大きさのずれ・結果だけの見せ方・X78 の残りは main。「試す → 確定」(fa294e76)も main(62ff623。CLAUDE.md の入れ替えの一文は連絡係が直す)。記録は 2026-10-20_21.md の末尾
 - 2026-10-27 UI 3: **見本の画面(ccp-preview)ができた**。push のたびに約 2 分で、`/b/main/`・`/b/<ブランチ>/` のデモが新しくなる(本番と同じパスワード)。作り・権限・手で流すときは GCP.md の「見本の画面」
