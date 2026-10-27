@@ -13,6 +13,8 @@ type Props = ComponentProps<typeof DialogSurface> & {
   min?: FloatSize
   /** 以前から別の鍵で覚えていたフロート(配信カードの cardDetail.size・制作のページの productionPage.size)は、その鍵をそのまま使う(覚えた大きさを引き継ぐ) */
   prefKey?: string
+  /** 画面いっぱいに広げる(覚えた大きさ・動かした位置は使わず、辺・角のつまみも出さない。BigFloat の切り替え) */
+  maximized?: boolean
 }
 
 /**
@@ -28,10 +30,13 @@ const useStyles = makeStyles({
   surface: { maxHeight: 'calc(100vh / var(--ui-zoom, 1))' },
 })
 
+/** 画面いっぱいの大きさ(表示の大きさ(zoom)で割って、画面の端から端まで) */
+const FULL = { width: 'calc(100vw / var(--ui-zoom, 1))', height: 'calc(100vh / var(--ui-zoom, 1))', maxWidth: 'none', maxHeight: 'none', borderRadius: 0 } as const
+
 /** 題の行とみなす、フロートの上の端からの高さ(px) */
 const GRAB = 52
 
-export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, prefKey, style, className, children, ...rest }, ref) {
+export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function ResizableSurface({ sizeKey, min = { w: 420, h: 280 }, prefKey, maximized = false, style, className, children, ...rest }, ref) {
   const s = useStyles()
   const inner = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => inner.current as HTMLDivElement)
@@ -48,19 +53,19 @@ export const ResizableSurface = forwardRef<HTMLDivElement, Props>(function Resiz
       ref={inner}
       {...rest}
       className={mergeClasses(s.surface, className)}
-      style={{ ...style, ...float.style, ...move.style }}
+      style={maximized ? { ...style, ...FULL } : { ...style, ...float.style, ...move.style }}
       onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
         rest.onPointerDown?.(e)
-        if (!e.defaultPrevented && inTitle(e)) move.startMove(e)
+        if (!maximized && !e.defaultPrevented && inTitle(e)) move.startMove(e)
       }}
       // 題の行に乗せたら、動かせると分かるカーソルに
       onPointerMove={(e: ReactPointerEvent<HTMLDivElement>) => {
         rest.onPointerMove?.(e)
-        if (e.buttons === 0 && inner.current) inner.current.style.cursor = inTitle(e) ? 'move' : ''
+        if (e.buttons === 0 && inner.current) inner.current.style.cursor = !maximized && inTitle(e) ? 'move' : ''
       }}
     >
       {children}
-      <ResizeHandles {...float.handles} />
+      {!maximized && <ResizeHandles {...float.handles} />}
     </DialogSurface>
   )
 })

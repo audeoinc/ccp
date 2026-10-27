@@ -3,18 +3,13 @@
 // (テンプレートの編集の部品は、ほかのメンバーの担当なので変えない)。
 // 設定の画面で「テンプレート」を選ぶと、すぐにフロートを開く。閉じたあとは、右の「開く」でまた開ける
 import { useRef, useState, type ComponentProps } from 'react'
-import { Button, Dialog, DialogBody, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
-import { DismissRegular, LayoutColumnTwoRegular } from '@fluentui/react-icons'
-import { ResizableSurface } from './ResizableSurface'
+import { Button, makeStyles, tokens } from '@fluentui/react-components'
+import { LayoutColumnTwoRegular } from '@fluentui/react-icons'
+import { BigFloat } from './BigFloat'
 import { TemplateManager } from './TemplateManager'
 import { useT } from './i18n'
 
 const useStyles = makeStyles({
-  // 既定の幅は 1280px まで。広げた大きさ(ResizableSurface の width)を止めないよう、maxWidth は付けない
-  surface: { width: 'min(1280px, calc(94vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(86vh / var(--ui-zoom, 1))', maxHeight: 'none', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  body: { display: 'flex', flexDirection: 'column', rowGap: 0, flexGrow: 1, minHeight: 0 },
-  title: { display: 'flex', alignItems: 'center', padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`, borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
-  titleText: { flexGrow: 1 },
   // TemplateManager の inline は枠つきの入れ物なので、フロートの中では余白を取って、残りの高さいっぱいに
   content: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, padding: tokens.spacingHorizontalM },
 })
@@ -24,7 +19,7 @@ type ManagerProps = Omit<ComponentProps<typeof TemplateManager>, 'inline'>
 /** 編集の途中か。TemplateManager は編集中だけ、下に「保存」の並びを出すので、それで見る(中の部品を変えずに、閉じる前に確かめるため) */
 const isEditing = (box: HTMLElement | null) => !!box && [...box.querySelectorAll('button')].some((b) => /^(保存|Save|保存中\.\.\.|Saving\.\.\.)$/.test(b.textContent?.trim() ?? ''))
 
-/** テンプレートの管理・編集の、大きなフロート(大きさを変えられ、題の行で動かせる。大きさは覚える) */
+/** テンプレートの管理・編集の、大きなフロート(大きさを変えられ、題の行で動かせ、画面いっぱいまで広げられる。大きさは覚える。BigFloat) */
 export function TemplateFloat({ onClose, ...props }: ManagerProps & { onClose: () => void }) {
   const s = useStyles()
   const t = useT()
@@ -35,19 +30,11 @@ export function TemplateFloat({ onClose, ...props }: ManagerProps & { onClose: (
     onClose()
   }
   return (
-    <Dialog open modalType="modal" onOpenChange={(_, d) => !d.open && close()}>
-      <ResizableSurface sizeKey="templateManager" min={{ w: 760, h: 480 }} className={s.surface}>
-        <DialogBody className={s.body}>
-          <div className={s.title}>
-            <DialogTitle className={s.titleText}>{t('テンプレート', 'Templates')}</DialogTitle>
-            <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={close} />
-          </div>
-          <div ref={boxRef} className={s.content}>
-            <TemplateManager inline {...props} />
-          </div>
-        </DialogBody>
-      </ResizableSurface>
-    </Dialog>
+    <BigFloat sizeKey="templateManager" title={t('テンプレート', 'Templates')} onClose={close}>
+      <div ref={boxRef} className={s.content}>
+        <TemplateManager inline {...props} />
+      </div>
+    </BigFloat>
   )
 }
 

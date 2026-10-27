@@ -3,10 +3,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  Dialog,
-  DialogBody,
-  DialogSurface,
-  DialogTitle,
   Field,
   Input,
   MessageBar,
@@ -21,7 +17,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { locale, useT } from './i18n'
 import { MAX_BUTTON_LABEL, deleteTemplate, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
@@ -36,6 +32,7 @@ import { PushThumb } from './PushThumb'
 import { Splitter } from './Splitter'
 import { usePaneWidths } from './floatLayout'
 import { PREF } from './prefKeys'
+import { BigFloat } from './BigFloat'
 import { useTableEditor } from './TemplateTableEditor'
 import { ratioLabel, toTableLayout } from './tables'
 import {
@@ -163,8 +160,6 @@ const newDraft = (): Draft => ({
 })
 
 const useStyles = makeStyles({
-  surface: { width: '1360px', maxWidth: 'calc(96vw / var(--ui-zoom, 1))', height: 'calc(86vh / var(--ui-zoom, 1))', maxHeight: 'calc(86vh / var(--ui-zoom, 1))', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' },
-  body: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1, padding: 0, rowGap: 0 },
   // 設定の画面の中では、右の欄の残りの高さいっぱいに(一覧と詳しい欄は、それぞれの中で送る)
   inline: { display: 'flex', flexDirection: 'column', minHeight: '480px', flexGrow: 1, border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden' },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '12px 16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -1435,17 +1430,10 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
         {content}
       </div>
     )
-  return (
-    <Dialog open={open} onOpenChange={(_, d) => !d.open && close()}>
-      <DialogSurface className={s.surface}>
-        <DialogBody className={s.body}>
-          <div className={s.head}>
-            <DialogTitle className={s.grow}>{title}</DialogTitle>
-            <Button appearance="subtle" icon={<DismissRegular />} onClick={close} aria-label={t('閉じる', 'Close')} />
-          </div>
-          {content}
-        </DialogBody>
-      </DialogSurface>
-    </Dialog>
-  )
+  // 配信カードから開く窓も、設定の画面からのフロート(TemplateFloat)と同じ大きな作業のフロート(大きさを変えられ・動かせ・画面いっぱいまで広げられる。大きさは同じ鍵で覚える。T11)
+  return open ? (
+    <BigFloat sizeKey="templateManager" title={title} onClose={close}>
+      {content}
+    </BigFloat>
+  ) : null
 }
