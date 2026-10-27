@@ -405,6 +405,29 @@ export function mockAgent(message: string): string {
         ] })
   }
 
+  // テンプレートを AI で作る(T9): 商品の数と雰囲気から、主役 1 点(特集)+ 残りのグリッド + もっと見る、の決まった形
+  if (task === 'design_template') {
+    const req = (p.request ?? {}) as { purpose?: string; itemCount?: number; hero?: string; angle?: string }
+    const n = Math.max(1, Math.min(24, Math.round(Number(req.itemCount) || 4)))
+    const ja = !en
+    const sale = req.hero === 'offer'
+    const card = { type: 'box', w: 1, view: 'card', fields: sale ? ['name', 'price', 'badge'] : ['name', 'price'], ...(sale ? { badge: 'SALE' } : {}) }
+    // 残りは 2 列のグリッド(奇数の最後は、そのまま 1 マス)
+    const rest = Array.from({ length: Math.ceil((n - 1) / 2) }, (_, i) => (i * 2 + 2 <= n - 1 ? [card, card] : [card]))
+    const sections = [
+      { name: ja ? '主役' : 'Hero pick', heading: false, copy: true, aiNote: ja ? 'いちばん見せたい 1 点' : 'The one item to feature most', rows: [[{ type: 'box', w: 2, view: 'detail', fields: ['name', 'desc', 'price', 'button'], aiNote: ja ? '主役の新作' : 'The lead new arrival' }]] },
+      ...(n > 1 ? [{ name: ja ? 'おすすめ' : 'Picks', heading: true, copy: true, aiNote: ja ? '主役と合わせやすいもの' : 'Easy to pair with the hero', rows: [...rest, [{ type: 'button', w: 2, label: ja ? 'もっと見る' : 'See more', style: 'outline' }]] }] : []),
+    ]
+    return J({
+      name: ja ? (sale ? 'セールの主役 + グリッド' : '主役 1 点 + グリッド') : sale ? 'Sale hero + grid' : 'One hero + grid',
+      description: ja ? `${req.purpose || '新作の紹介'}に。主役を大きく見せ、残り ${n - 1} 点を 2 列で並べます。` : `For ${req.purpose || 'new arrivals'}. Features one item large and shows the other ${n - 1} in two columns.`,
+      hero: req.hero ?? 'standard',
+      heroButton: ja ? '商品を見る' : 'Shop now',
+      sections,
+      reason: ja ? '目的が 1 つの商品を軸にしているため、主役を特集の形で大きく見せ、残りは比べやすいグリッドにしました。' : 'The purpose centers on one product, so it is featured large and the rest are in an easy-to-compare grid.',
+    })
+  }
+
   if (task === 'suggest_template') {
     return en
       ? J({ template: 'cat2', reason: 'The theme calls for two angles (outerwear and knits) shown side by side.' })
