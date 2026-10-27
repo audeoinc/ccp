@@ -97,6 +97,9 @@ const useStyles = makeStyles({
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   // この配信のねらい(テーマ・切り口)。直す部品の上の、控えめな箱
   aim: { display: 'grid', rowGap: '2px', width: '100%', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, boxSizing: 'border-box' },
+  // テーマと、右上の「変える」
+  aimHead: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'start' },
+  aimChange: { minWidth: 0, height: 'auto', padding: '0 4px', fontSize: tokens.fontSizeBase200 },
   aimWrap: { display: 'grid', rowGap: '6px', minWidth: 0 },
   // 試している案を写しているあいだ(本物のテーマではないと分かるように)
   aimTrying: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px' },
@@ -853,7 +856,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         )}
       </div>
       {/* 文言・画像・商品を直すときの手がかり(この配信のねらい)。配信の情報を直すときは出さない */}
-      {part?.kind !== 'meta' && part?.kind !== 'overview' && <Aim editor={e} />}
+      {part?.kind !== 'meta' && part?.kind !== 'overview' && <Aim editor={e} onChange={() => onPick({ kind: 'meta', field: 'theme' })} />}
       {compareBlock}
       {body}
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
@@ -969,17 +972,25 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
 
 /**
  * この配信のねらい(テーマと切り口)。直す部品の上に小さく出し、ねらいを見ながら書けるようにする。
- * ここでは読むだけ。テーマを変えるのは、プレビューの上の配信の情報(ThemeField)の 1 か所だけ(2026-10-27 利用者。直す場所を 1 つにする)。
+ * ここでは読むだけ。テーマを変えるのは、プレビューの上の配信の情報(ThemeField)の 1 か所だけ(2026-10-27 利用者。直す場所を 1 つにする)。右上の「変える」で、そこへ移る。
  * 採用した案の理由と、切り口(見出し・コピーの AI の案を採用したときの補足)も、読むだけで添える
  */
-function Aim({ editor: e }: { editor: SimpleEditor }) {
+function Aim({ editor: e, onChange }: { editor: SimpleEditor; /** 「変える」: 配信の情報のテーマの欄を開く */ onChange: () => void }) {
   const t = useT()
   const s = useStyles()
   return (
-    <div className={s.aim} title={t('この配信のねらい(メールには出ません)。テーマは、プレビューの上の配信の情報で変えます', 'What this delivery aims for (not in the email). Change the theme from the delivery info above the preview')}>
-      <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
-        {e.form.theme}
-      </LabeledValue>
+    <div className={s.aim}>
+      <div className={s.aimHead}>
+        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
+          {e.form.theme}
+        </LabeledValue>
+        {/* 直す場所は配信の情報の 1 か所だけなので、ここからはそこへ連れて行く(どこで変えるのか分からなかった。2026-10-27 利用者) */}
+        <Tooltip content={t('配信の情報のテーマの欄を開きます', 'Opens the theme field in the delivery info')} relationship="description">
+          <Button type="button" size="small" appearance="transparent" className={s.aimChange} onClick={onChange}>
+            {t('変える', 'Change')}
+          </Button>
+        </Tooltip>
+      </div>
       {e.form.themeReason && <span className={s.caption}>{t(`理由: ${e.form.themeReason}`, `Why: ${e.form.themeReason}`)}</span>}
       {e.form.copyAngle && <span className={s.caption}>{t(`切り口(見出し・コピー): ${e.form.copyAngle}`, `Angle (headline & copy): ${e.form.copyAngle}`)}</span>}
       {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}

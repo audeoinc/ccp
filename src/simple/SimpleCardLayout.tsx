@@ -178,6 +178,8 @@ const useStyles = makeStyles({
   },
   // 配信日時・国は短いので縮めない(対象・送る相手が長いときは、そちらを … にする)
   metaFixed: { flexShrink: 0 },
+  // テーマは長くなりやすいので、ほかの組より先に縮める
+  metaTheme: { display: 'flex', minWidth: 0, flexShrink: 2, overflow: 'hidden' },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -612,6 +614,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       <LabeledValue label={t('送る相手', 'Send to')} truncate>
         {audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}
       </LabeledValue>
+      {/* テーマもここに並べる(テーマを直すのは、この帯から開く配信の情報だけなので、在りかが分かるように。2026-10-27 利用者)。長いときは 1 行で省き、全文はマウスを載せると出す */}
+      <span className={s.metaTheme} title={e.form.theme || undefined}>
+        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')} truncate>
+          {e.form.theme}
+        </LabeledValue>
+      </span>
     </>
   )
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
