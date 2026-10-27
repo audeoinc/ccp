@@ -1,19 +1,21 @@
 // ラベルと値の組(2026-10-27 利用者と決めた。ラベルと値が同じ大きさ・濃さ・太さだと読み取りにくいため)。
 // ラベル = 11px・ふつうの太さ・薄いグレー、値 = 13px・濃い色、いちばん大事な値だけ太く、空の値はラベルと同じ薄さ(src/typo.ts)。
 // 横並び(帯・1 行の一覧)と縦並び(ペインの中の項目)の両方を、この 1 つで出す。
+// 案 B(2026-10-27 見比べ): 横のまま差を強く。ラベルはさらに薄く(colorNeutralForeground4)、値は 14px・少し太く、あいだに余白。
 // Fluent v9 には、表示だけのラベルと値の組の部品がない(Label は入力欄に付けるもの)ので、ここに 1 つにする
 import type { ReactNode } from 'react'
-import { makeStyles, mergeClasses } from '@fluentui/react-components'
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import { typo } from './typo'
 
 const useStyles = makeStyles({
-  inline: { display: 'inline-flex', alignItems: 'baseline', columnGap: '6px', minWidth: 0 },
+  inline: { display: 'inline-flex', alignItems: 'baseline', columnGap: '10px', minWidth: 0 },
   stacked: { display: 'flex', flexDirection: 'column', rowGap: '2px', minWidth: 0 },
-  label: { ...typo.label, whiteSpace: 'nowrap', flexShrink: 0 },
-  value: { ...typo.value, minWidth: 0, overflowWrap: 'anywhere' },
-  strong: typo.valueStrong,
-  empty: typo.empty,
+  label: { ...typo.label, color: tokens.colorNeutralForeground4, whiteSpace: 'nowrap', flexShrink: 0 },
+  value: { ...typo.value, fontSize: '14px', lineHeight: '20px', fontWeight: tokens.fontWeightSemibold, minWidth: 0, overflowWrap: 'anywhere' },
+  strong: { fontWeight: tokens.fontWeightBold },
+  // 空の値は太くせず、ラベルと同じ薄さ
+  empty: { ...typo.empty, fontWeight: tokens.fontWeightRegular },
   // 帯の中など、1 行に収めたいとき
   truncate: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', overflowWrap: 'normal' },
 })

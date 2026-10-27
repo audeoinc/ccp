@@ -160,7 +160,7 @@ const useStyles = makeStyles({
   metaBand: {
     display: 'flex',
     alignItems: 'baseline',
-    columnGap: '14px',
+    columnGap: '20px',
     width: '100%',
     minWidth: 0,
     padding: '5px 10px',

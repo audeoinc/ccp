@@ -54,7 +54,7 @@ const useStyles = makeStyles({
   meta: { ...typo.value, whiteSpace: 'nowrap', flexShrink: 0 },
   sep: { color: tokens.colorNeutralForeground4, flexShrink: 0 },
   // 畳んでいないときの 2 行目(テーマ・目的)
-  detail: { display: 'flex', alignItems: 'baseline', columnGap: '16px', paddingLeft: '96px', paddingBottom: '4px', minWidth: 0 },
+  detail: { display: 'flex', alignItems: 'baseline', columnGap: '24px', paddingLeft: '96px', paddingBottom: '4px', minWidth: 0 },
   pairValue: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
   actions: { marginLeft: 'auto', display: 'flex', alignItems: 'center', columnGap: '4px', flexShrink: 0 },
   tabs: { minWidth: 0, overflowX: 'auto' },
