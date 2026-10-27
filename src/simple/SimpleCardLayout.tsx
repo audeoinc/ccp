@@ -160,8 +160,10 @@ const useStyles = makeStyles({
   // 配信の情報の帯(プレビューの上の部品)。メールの中身ではないので、受信箱の見え方(白い札)と違う、薄い灰色の点線の帯にする
   metaBand: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
     columnGap: '20px',
+    rowGap: '2px',
     width: '100%',
     minWidth: 0,
     padding: '5px 10px',
@@ -178,8 +180,10 @@ const useStyles = makeStyles({
   },
   // 配信日時・国は短いので縮めない(対象・送る相手が長いときは、そちらを … にする)
   metaFixed: { flexShrink: 0 },
-  // テーマは長くなりやすいので、ほかの組より先に縮める
-  metaTheme: { display: 'flex', minWidth: 0, flexShrink: 2, overflow: 'hidden' },
+  // 配信・国・対象・送る相手の 1 行。入りきらないときだけ、対象・送る相手を … にする(空の値は短いので、ふつうは切れない)
+  metaMain: { display: 'flex', alignItems: 'baseline', columnGap: '20px', minWidth: 0, maxWidth: '100%' },
+  // テーマは長くなりやすいので、ほかの組を縮めずに、入りきらなければ 2 行目に回す(2 行目でも入りきらなければ …。2026-10-27 利用者)
+  metaTheme: { display: 'flex', minWidth: 0, maxWidth: '100%', overflow: 'hidden' },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -602,20 +606,22 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
   const metaSummary = (
     <>
-      <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
-        {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-      </LabeledValue>
-      <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
-        {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
-      </LabeledValue>
-      <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')} truncate>
-        {targetText({ gender: e.form.targetGender, ages: e.form.targetAges })}
-      </LabeledValue>
-      <LabeledValue label={t('送る相手', 'Send to')} truncate>
-        {audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}
-      </LabeledValue>
-      {/* テーマもここに並べる(テーマを直すのは、この帯から開く配信の情報だけなので、在りかが分かるように。2026-10-27 利用者)。長いときは 1 行で省き、全文はマウスを載せると出す */}
-      <span className={s.metaTheme} title={e.form.theme || undefined}>
+      <span className={s.metaMain}>
+        <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
+          {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+        </LabeledValue>
+        <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
+          {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
+        </LabeledValue>
+        <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')} truncate>
+          {targetText({ gender: e.form.targetGender, ages: e.form.targetAges })}
+        </LabeledValue>
+        <LabeledValue label={t('送る相手', 'Send to')} truncate>
+          {audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}
+        </LabeledValue>
+      </span>
+      {/* テーマもここに並べる(テーマを直すのは、この帯から開く配信の情報だけなので、在りかが分かるように。2026-10-27 利用者)。… にした値の全文は、マウスを載せると出る(LabeledValue の truncate) */}
+      <span className={s.metaTheme}>
         <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')} truncate>
           {e.form.theme}
         </LabeledValue>

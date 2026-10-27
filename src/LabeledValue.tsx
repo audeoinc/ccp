@@ -33,7 +33,7 @@ interface Props {
   layout?: 'inline' | 'stacked'
   /** いちばん大事な値(名前など)だけ太く */
   strong?: boolean
-  /** 値を 1 行に収め、はみ出しは … にする */
+  /** 値を 1 行に収め、はみ出しは … にする(値が文字なら、マウスを載せると全文が出る) */
   truncate?: boolean
   /** ラベルの幅(横並びで、いくつかの組のラベルの幅をそろえたいとき) */
   labelWidth?: string
@@ -50,7 +50,8 @@ export function LabeledValue({ label, children, emptyText, layout = 'inline', st
       <span className={s.label} style={labelWidth ? { width: labelWidth } : undefined}>
         {label}
       </span>
-      <span className={mergeClasses(s.value, strong && !empty && s.strong, empty && s.empty, truncate && s.truncate, valueClassName)}>
+      {/* … にする値は、マウスを載せると全文が出るように(切れたままでは読めないため。2026-10-27 利用者) */}
+      <span className={mergeClasses(s.value, strong && !empty && s.strong, empty && s.empty, truncate && s.truncate, valueClassName)} title={truncate && !empty && typeof children === 'string' ? children : undefined}>
         {empty ? (emptyText ?? t('未設定', 'Not set')) : children}
       </span>
     </span>
