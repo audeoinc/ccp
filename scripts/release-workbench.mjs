@@ -56,7 +56,7 @@ const RULES = [
   ['include', /^server\/tests\//],
   ['include', /^server\/(requirements(-tools)?\.txt|schema\.json|seed\.json|workbench\.env\.example)$/],
   // 道具(Workbench の操作・npm run verify の確認・初期データ・文書の生成)
-  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
+  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts|template-ai)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
   // 文書(Workbench の手引き・設計・機能・開発の経緯・バックログ・ソースマップ)
   ['include', /^docs\//],
 ]

@@ -21,8 +21,11 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular, SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
+import { shapeOf, similarity } from './templateShape'
+import { TemplateAiDialog } from './TemplateAiDialog'
+import type { TemplateDraftOut } from './templateDraft'
 import { locale, useT } from './i18n'
 import { MAX_BUTTON_LABEL, deleteTemplate, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -89,25 +92,6 @@ interface Draft extends Pick<TemplateLayout, 'hero' | 'heroText' | 'topBar' | 'h
 /** 編集中の内容から、保存・見取り図に使う構成を作る */
 const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.heroText, topBar: d.topBar, heroLink: d.heroLink, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}), ...(d.heroStyle ? { heroStyle: d.heroStyle } : {}) })
 
-/** セクションの形(表に直して、部品の種類・位置・大きさ・見せ方)。ID・文言・見出しは比べない */
-const sectionShape = (sec: Section) =>
-  JSON.stringify([sec.cols, sec.rows, [...(sec.parts ?? [])].sort((a, b) => a.r - b.r || a.c - b.c).map((p) => [p.type, p.c, p.r, p.w, p.h, p.view ?? 'card'])])
-/** 構成の形の並び。以前の種類のテンプレートも、表に直してから比べる(同じ見た目なら、同じ形になる) */
-const shapesOf = (l: TemplateLayout) => {
-  const t = toTableLayout(l)
-  return [...(t.heroTable ? ['hero:' + sectionShape(t.heroTable)] : []), ...t.sections.map(sectionShape)]
-}
-/** 構成の形。同じなら、見た目の設定のほかは同じテンプレート */
-const shapeOf = (l: TemplateLayout) => JSON.stringify(shapesOf(l))
-/** 似ている度(0〜1): セクションの形の並びが、どれだけ同じ順に重なるか(最長共通部分列 ÷ 長いほうの数) */
-const similarity = (a: TemplateLayout, b: TemplateLayout) => {
-  const x = shapesOf(a)
-  const y = shapesOf(b)
-  if (x.length === 0 || y.length === 0) return 0
-  const dp = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0))
-  for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) dp[i][j] = x[i - 1] === y[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
-  return dp[x.length][y.length] / Math.max(x.length, y.length)
-}
 /** 編集中の列の幅(一覧・パーツ・右のタブ。キャンバスは残り)を覚えておく所(その人のブラウザだけ。列の並びを変えたので、以前の鍵とは別) */
 const EDITOR_WIDTHS_KEY = 'ccp.templateEditorWidths2'
 type EditorWidths = { list: number; palette: number; props: number }
@@ -575,23 +559,35 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     setCompareId(null)
     setDraft(channel === 'push' ? { ...newDraft(), push: { image: true, buttons: [] } } : newDraft())
   }
-  const startDuplicate = () => {
-    if (!selected) return
+  /** そのテンプレートを複製して、編集(新規)を始める(一覧で選んだもの・AI で作るの「近いテンプレート」) */
+  const duplicateFrom = (o: (typeof options)[number]) => {
     setError(null)
     setCompareId(null)
     setDraft({
-      name: t(`${selected.label} のコピー`, `Copy of ${selected.label}`),
-      description: selected.description,
-      hero: selected.hero,
-      heroText: selected.heroText,
-      topBar: selected.topBar,
-      heroLink: selected.heroLink,
-      heroStyle: selected.heroStyle,
-      sections: toTableLayout(selected).sections,
-      heroTable: toTableLayout(selected).heroTable,
-      push: selected.push ? { ...selected.push, buttons: [...selected.push.buttons] } : undefined,
+      name: t(`${o.label} のコピー`, `Copy of ${o.label}`),
+      description: o.description,
+      hero: o.hero,
+      heroText: o.heroText,
+      topBar: o.topBar,
+      heroLink: o.heroLink,
+      heroStyle: o.heroStyle,
+      sections: toTableLayout(o).sections,
+      heroTable: toTableLayout(o).heroTable,
+      push: o.push ? { ...o.push, buttons: [...o.push.buttons] } : undefined,
     })
     setSelectedId('')
+  }
+  const startDuplicate = () => {
+    if (selected) duplicateFrom(selected)
+  }
+  // AI でテンプレートを作る(T9)。AI の下書きは保存せず、編集(新規)に入れるだけ(保存は人が確かめてから)
+  const [aiOpen, setAiOpen] = useState(false)
+  const startFromAi = (d: TemplateDraftOut) => {
+    setAiOpen(false)
+    setError(null)
+    setCompareId(null)
+    setSelectedId('')
+    setDraft({ name: d.name, description: d.description, hero: d.hero, heroText: d.heroText, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}) })
   }
   // 自由な並び(free)は、決まった構成がないので、編集するものがない
   const canEdit = (o?: { id: string }) => !!o && o.id !== 'free'
@@ -1230,6 +1226,11 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
               <div className={mergeClasses(s.listHead, s.fullRow)}>
                 <Button size="small" appearance="primary" icon={<AddRegular />} onClick={startNew}>{t('新規作成', 'New')}</Button>
                 <Button size="small" appearance="outline" icon={<CopyRegular />} onClick={startDuplicate} disabled={!selected || (editing && !draft?.id && selectedId === '')}>{t('複製', 'Duplicate')}</Button>
+                {channel === 'email' && (
+                  <Button size="small" appearance="outline" icon={<SparkleRegular />} onClick={() => setAiOpen(true)} disabled={editing}>
+                    {t('AI で作る', 'Create with AI')}
+                  </Button>
+                )}
               </div>
               <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('作成したテンプレート', 'Your templates')}</span>
               {customs.length === 0 && <span className={mergeClasses(s.caption, s.fullRow)}>{t('まだありません。「新規作成」か、標準のテンプレートの「複製」から作れます。', 'None yet. Create one with "New", or duplicate a standard template.')}</span>}
@@ -1425,6 +1426,22 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
               <Button appearance="primary" onClick={() => void save()} disabled={!valid || busy}>{busy ? t('保存中...', 'Saving...') : t('保存', 'Save')}</Button>
             </div>
           )}
+      {aiOpen && (
+        <TemplateAiDialog
+          options={options.filter((o) => !o.hidden)}
+          onUse={(id) => {
+            setAiOpen(false)
+            choose(id)
+          }}
+          onDuplicate={(id) => {
+            const o = options.find((x) => x.id === id)
+            setAiOpen(false)
+            if (o) duplicateFrom(o)
+          }}
+          onDraft={startFromAi}
+          onClose={() => setAiOpen(false)}
+        />
+      )}
     </>
   )
   if (inline)

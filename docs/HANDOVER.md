@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md) の末尾。「HANDOVER から移した行(10KB に縮めたとき)」に、それまでの行がある)
 
+- 2026-10-27: **T9 テンプレートを AI で作る**(ブランチ claude/t9-ai-template): テンプレートの管理の「✨ AI で作る」→ 目的・商品の数・切り口・雰囲気 → 近いテンプレートを知らせる → AI の下書き(`askAgent`、task `design_template`。返答は `parsePart`・`normalizeTable` で検査)→ 編集(新規)に入れる(保存は人)。TEMPLATE_OBJECTS.md の 9 章
 - 2026-10-27: **T12 箱の名前・価格などの置き場所**(ブランチ claude/t12-box-place): 写真の下 / 写真に重ねる(上・中央・下)/ 写真の横(左・右)。箱の `place`、省略は見せ方から(`boxPlace`)。TEMPLATE_OBJECTS.md の 8.4
 - 2026-10-26 X79 キャンペーン: 段 ①〜④ 済み(表 `campaigns`・帯 `CampaignBand`・まとめて承認・`NewCampaignDialog`)。段 ⑤ 移し替え(/dev/ の「キャンペーンにまとめる」)は本番でまだ流していない
 - 2026-10-26 T8 段階 6・8.8〜8.10・T11 の一部・テンプレートの編集の帯(`SelBar`): 本番に反映済み。TEMPLATE_OBJECTS.md
