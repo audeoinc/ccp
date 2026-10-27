@@ -15,6 +15,7 @@ import { checkSave } from './check-save.mjs'
 import { checkReadiness } from './check-readiness.mjs'
 import { checkUtm } from './check-utm.mjs'
 import { checkParts } from './check-parts.mjs'
+import { checkSlots } from './check-slots.mjs'
 import { checkTemplateAi } from './check-template-ai.mjs'
 
 const run = (cmd, args) => {
@@ -75,6 +76,7 @@ run('node', ['scripts/check-schema.mjs'])
     report(await checkReadiness(server))
     report(await checkUtm(server))
     report(await checkParts(server))
+    report(await checkSlots(server))
     report(await checkTemplateAi(server))
   } finally {
     await server.close()

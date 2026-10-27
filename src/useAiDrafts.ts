@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { filled } from './slots'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { FREE_DEFAULT_SLOTS, sectionRange, sectionsOf, type EmailTemplateId } from './templates'
@@ -91,7 +92,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
   const context = () => ({
     card: inputs.buildCard(),
     language: inputs.language,
-    items: inputs.items.map((i) => ({ product: inputs.products.find((p) => p.id === i.productId), reason: i.reason })),
+    items: filled(inputs.items).map((i) => ({ product: inputs.products.find((p) => p.id === i.productId), reason: i.reason })),
     hero: inputs.heroes.find((h) => h.id === inputs.heroId),
   })
 
@@ -155,7 +156,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
       .filter((s) => s.index !== index)
       .map((s) => {
         const [a, b] = sectionRange(sections, s, inputs.items.length)
-        const list = inputs.items.slice(a, b)
+        const list = filled(inputs.items.slice(a, b))
         list.forEach((i) => excluded.add(i.productId))
         return {
           index: s.index,

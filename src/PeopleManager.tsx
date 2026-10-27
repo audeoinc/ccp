@@ -16,6 +16,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ResizableSurface } from './ResizableSurface'
 import { ListHeader } from './ListHeader'
 import { useJustAdded } from './useJustAdded'
@@ -44,7 +45,7 @@ const useStyles = makeStyles({
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   scroll: { overflowY: 'auto', minHeight: '240px', display: 'grid', rowGap: '8px', alignContent: 'start' },
   grid: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.4fr) 120px 100px', columnGap: '8px', rowGap: '6px', alignItems: 'center' },
-  colHead: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  colHead: typo.label,
   // 見出しの「＋ ○○を足す」で開く足す欄(一覧の上)
   addRow: { display: 'flex', columnGap: '8px', alignItems: 'center', flexWrap: 'wrap', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   // ユーザーの 1 行(表の列にそろえたまま、行ごとに足したばかりの印を付けられるように、subgrid で包む)
@@ -52,7 +53,7 @@ const useStyles = makeStyles({
   group: { display: 'grid', rowGap: '6px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}` },
   groupHead: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 2fr) 100px', columnGap: '8px', alignItems: 'center' },
   members: { display: 'flex', flexWrap: 'wrap', columnGap: '6px', rowGap: '6px', alignItems: 'center' },
-  label: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   history: { display: 'grid', rowGap: '6px', fontSize: tokens.fontSizeBase200 },
   historyRow: { display: 'grid', rowGap: '1px', paddingBottom: '6px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
   meta: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },

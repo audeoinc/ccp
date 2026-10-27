@@ -20,7 +20,8 @@ const useStyles = makeStyles({
   group: { display: 'grid', rowGap: '4px', paddingBottom: '8px', borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
   meta: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.caption },
   line: { display: 'grid', rowGap: '1px', minWidth: 0 },
-  field: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground2 },
+  // 値に付くラベル(直した欄の名前)。値(前 → 後)は長くなるので、大きさ・太さは変えない
+  field: typo.pairLabel,
   values: { color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' },
   before: { color: tokens.colorNeutralForeground3, textDecorationLine: 'line-through' },
   more: { justifySelf: 'start', minWidth: 0, padding: 0, height: 'auto' },
@@ -159,7 +160,7 @@ export function CardHistoryList({ cardId, version, scroll }: { cardId: string; v
           {e.kind === 'edit' && e.logs.map(line)}
           {e.kind === 'event' && (
             <span className={s.values}>
-              {t('ステータス', 'Status')}: {statusLabel(e.event.from_status, true)} → {statusLabel(e.event.to_status, true)}
+              <span className={s.field}>{t('ステータス', 'Status')}</span> {statusLabel(e.event.from_status, true)} → {statusLabel(e.event.to_status, true)}
               {e.event.note ? `(${e.event.note})` : ''}
             </span>
           )}

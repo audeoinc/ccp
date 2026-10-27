@@ -4,7 +4,7 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-10-26(10KB に縮めた)
+- 最終更新: 2026-10-27
 
 ---
 
@@ -19,19 +19,21 @@
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md) の末尾。「HANDOVER から移した行(10KB に縮めたとき)」に、それまでの行がある)
 
 - 2026-10-27: **T9 テンプレートを AI で作る**(ブランチ claude/t9-ai-template): テンプレートの管理の「✨ AI で作る」→ 目的・商品の数・切り口・雰囲気 → 近いテンプレートを知らせる → AI の下書き(`askAgent`、task `design_template`。返答は `parsePart`・`normalizeTable` で検査)→ 編集(新規)に入れる(保存は人)。TEMPLATE_OBJECTS.md の 9 章
-- 2026-10-27: **T11 テンプレートの管理・編集を大きな作業のフロートで**(ブランチ claude/t11-editor-float): `BigFloat`(`ResizableSurface` + 画面いっぱいの切り替え、覚える)。設定の画面からも配信カードからも同じ。BACKLOG の T11
-- 2026-10-27: **T12 箱の名前・価格などの置き場所**(ブランチ claude/t12-box-place): 写真の下 / 写真に重ねる(上・中央・下)/ 写真の横(左・右)。箱の `place`、省略は見せ方から(`boxPlace`)。TEMPLATE_OBJECTS.md の 8.4
+- 2026-10-27: **AI の置き場の比較の資料** [AI_PLATFORMS.md](AI_PLATFORMS.md)(Gemini と Azure OpenAI・Foundry・Copilot Studio・AI Builder・M365 Copilot。接続の図は `ai-platform-images/`。利用先に渡す。Workbench の ZIP には入れない)
+- 2026-10-27: **T11 テンプレートの管理・編集を大きな作業のフロートで**(main に入れて本番に反映: deployed-gcp/20261027-092859、main 2156506): `BigFloat`(`ResizableSurface` + 画面いっぱいの切り替え、覚える)。設定の画面からも配信カードからも同じ。BACKLOG の T11
+- 2026-10-27: **T12 箱の名前・価格などの置き場所**(main に入れて本番に反映: deployed-gcp/20261027-091258、main de5543a): 写真の下 / 写真に重ねる(上・中央・下)/ 写真の横(左・右)。箱の `place`、省略は見せ方から(`boxPlace`)。TEMPLATE_OBJECTS.md の 8.4
 - 2026-10-26 X79 キャンペーン: 段 ①〜④ 済み(表 `campaigns`・帯 `CampaignBand`・まとめて承認・`NewCampaignDialog`)。段 ⑤ 移し替え(/dev/ の「キャンペーンにまとめる」)は本番でまだ流していない
 - 2026-10-26 T8 段階 6・8.8〜8.10・T11 の一部・テンプレートの編集の帯(`SelBar`): 本番に反映済み。TEMPLATE_OBJECTS.md
 - 2026-10-26 まとめて作る: ブラッシュアップと ② の案のプレビュー(`BulkPreviewFloat`)。本番に反映済み
 - 2026-10-26 UI 1: X79 段 ②・X64 (c)(e)(f)(g)・設定のテンプレートを別のフロート(`TemplateFloat`)まで push 済み。X64 の残りは (a)(b)。詳しくは handover-archive/2026-10-20_21.md の末尾「UI 1: 2026-10-26 午後」
-- 2026-10-26 UI 2: 学びの効き目のフロート・メールの上の帯 MEN / WOMEN・設定の窓の zoom の直し・開発へのリクエストの削除・AI 下書きに件名
-- 2026-10-26 UI 3: 週の見方・X79 段 ④・候補の詳しい情報・フロートを動かす・ピンと週の見方の表示の大きさのずれ・結果だけの見せ方・X78 の残りは main。「試す → 確定」(fa294e76)も main(62ff623。CLAUDE.md の入れ替えの一文は連絡係が直す)。記録は 2026-10-20_21.md の末尾
+- 2026-10-27 UI 2: セクションの枠(空いた枠の行 `Item.gap`・`src/slots.ts`・sort_order = 枠の位置 + 1・`scripts/check-slots.mjs`)と X81 の 7・8 は main
+- 2026-10-27 UI 3: **見本の画面(ccp-preview)ができた**。push のたびに約 2 分で、`/b/main/`・`/b/<ブランチ>/` のデモが新しくなる(本番と同じパスワード)。作り・権限・手で流すときは GCP.md の「見本の画面」
+- 2026-10-27 UI 3: 空の配信カードの AI の下書きは、プレビューの真ん中のボタンを押したときだけ(開いただけでは走らない)。押した下書きは採用とみなして保存する。「すべての国」のときの新規作成・一括作成の国は、最後に選んだ国(5cf5721)
 
 ## 3. 次にやること
 
 BACKLOG の ☐ / ❓ / ▶ の行が正。
-1. **X81** シンプルにない機能を足す: UI 2 の 1 新規作成・2 アプリの通知で開く画面・4 テーマの AI の案(テーマの箱。試す → 確定。10 の切り口は読むだけのまま)は main に入れた。3・6 は UI 1。残りは 5 → 7〜9
+1. **X81** シンプルにない機能を足す: 1・2・4・7・8 は main(UI 2)、3・6 は UI 1。9 はブランチ `claude/ui2-x81-9`(見本の確認待ち)。残りは 5
 2. **X79 段 ⑤** 本番の移し替え(連絡係が反映とまとめて行う)
 3. **App.tsx の残り**(CalendarViews・memo)は UI 1 の C1 と重なるので、連絡係と合わせてから
 4. **本番で確かめる**: BigQuery の取り込み後の列 `source`・テンプレートの版・素材のライブラリ

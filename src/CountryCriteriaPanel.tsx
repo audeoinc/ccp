@@ -3,6 +3,7 @@
 // 変えると国の全員に効くので、変えた人・日時を残し、ここに出す。見る人の絞り込みは「アラートの条件」(人ごと)
 import { useState } from 'react'
 import { Button, Field, Input, MessageBar, MessageBarBody, Select, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { DEFAULT_CRITERIA, browserCriteria, criteriaFor, criteriaHistory, saveCriteria, useCountrySettings, type CountryCriteria } from './countrySettings'
 import { myName } from './history'
 import { useT, when } from './i18n'
@@ -11,7 +12,7 @@ import { confirmDialog } from './confirm'
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '14px', maxWidth: '640px' },
   note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   actions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   history: { margin: 0, paddingLeft: '18px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, maxHeight: '160px', overflowY: 'auto' },
 })

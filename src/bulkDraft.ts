@@ -2,6 +2,7 @@
 // 枠は、中身の空いた「未起案」の配信カードとして保存する(計画の骨組みとして、チームにも見え、途中でやめても残るように)。
 // 中身は、配信カードの「すべてAIで下書き」(runAutoDraft)と同じ手順で作り、保存も配信カードの保存と同じ形にする
 // (あとで配信カードを開いて直したとき、AI で 1 本ずつ作ったものと、見分けがつかないように)
+import { joinSections } from './slots'
 import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import type { Product } from './models/products'
 import { fitsTarget, targetText } from './target'
@@ -16,7 +17,7 @@ import { isUsableHero } from './heroRights'
 import { channelOptions, countryOptions, departmentOptions, CHANNEL_EMAIL, CHANNEL_PUSH, statusRank } from './status'
 import { DEFAULT_PUSH_TEMPLATE, DEFAULT_TEMPLATE, TEMPLATE_VALUES, baseTemplateId, channelOf, getTemplate, hasTemplate, sectionIndexAt, sectionsOf, currentVersion } from './templates'
 import { boxAt } from './links'
-import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED } from './items'
+import { SOURCE_AI, STATE_CANDIDATE, STATE_SELECTED, type Item } from './items'
 import { weeklyLimit } from './weeklyLimit'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { isCancelled } from './cancel'
@@ -103,8 +104,21 @@ const templateOf = (c: DraftBase, r: AutoDraftResult) => {
   return r.template && channelOf(r.template) === (isPush(c) ? 'push' : 'email') ? r.template : fallback
 }
 
-/** 載せる商品(選定済み。メールの並び順) */
+/** 載せる商品(選定済み。メールの並び順。数える・名前を並べる用で、空いた枠は入らない) */
 export const productIdsOf = (r: AutoDraftResult): string[] => r.sections.flatMap((s) => s.selected.map((x) => x.productId))
+
+/**
+ * 選定を、セクションごとにその枠に置いた並び(前のセクションの選定が枠より少なくても、後ろのセクションの商品が前の枠に詰まらない。空いた枠は gap の行。src/slots.ts)。
+ * プレビュー・配信カードで開く案・保存の位置に使う
+ */
+export const slotItemsOf = (c: DraftBase, r: AutoDraftResult, keyOf: (n: number) => string): Item[] => slotsByTemplate(templateOf(c, r), r, keyOf)
+const slotsByTemplate = (template: string, r: AutoDraftResult, keyOf: (n: number) => string): Item[] => {
+  let n = 0
+  return joinSections(
+    r.sections.map((s) => s.selected.map((x) => ({ key: keyOf(n++), productId: x.productId, reason: x.reason, source: SOURCE_AI }))),
+    sectionsOf(template),
+  )
+}
 
 /**
  * 作業画面(BulkWorkspace)で作った中身を、新しい配信カードとして保存する。
@@ -203,7 +217,8 @@ async function saveProducts(cardId: string, cardName: string, r: AutoDraftResult
   // 商品の行は、配信カードの syncItems と同じ形(選定は並び順、候補は 1000 番から)
   const sections = sectionsOf(template)
   const rows = [
-    ...r.sections.flatMap((s) => s.selected).map((x, idx) => ({ x, state: STATE_SELECTED as typeof STATE_SELECTED | typeof STATE_CANDIDATE, section: sectionIndexAt(sections, idx), order: idx + 1 })),
+    // sort_order は「枠の位置 + 1」(空いた枠は保存しない。配信カードの保存と同じ)
+    ...slotsByTemplate(template, r, (n) => String(n)).flatMap((it, idx) => (it.gap ? [] : [{ x: { productId: it.productId, reason: it.reason }, state: STATE_SELECTED as typeof STATE_SELECTED | typeof STATE_CANDIDATE, section: sectionIndexAt(sections, idx), order: idx + 1 }])),
     ...r.sections.flatMap((s, i) => s.candidates.map((x) => ({ x, section: i }))).map((y, i) => ({ ...y, state: STATE_CANDIDATE as typeof STATE_SELECTED | typeof STATE_CANDIDATE, order: 1000 + i })),
   ]
   for (const row of rows) {

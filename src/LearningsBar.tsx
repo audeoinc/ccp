@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Dialog, DialogBody, DialogContent, DialogTitle, InfoLabel, SearchBox, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { LabeledValue } from './LabeledValue'
 import { AddRegular, ChevronDownRegular, ChevronUpRegular, DismissRegular, LightbulbRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
@@ -212,8 +213,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
       relationship="description"
     >
       <span className={styles.head}>
-        <span className={styles.label}>{t('テーマの種類', 'Theme type')}</span>
-        <span>{type.guessed ? t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`) : themeTypeLabel(type.type)}</span>
+        <LabeledValue label={t('テーマの種類', 'Theme type')}>{type.guessed ? t(`${themeTypeLabel(type.type)}(推定)`, `${themeTypeLabel(type.type)} (guessed)`) : themeTypeLabel(type.type)}</LabeledValue>
       </span>
     </Tooltip>
   )

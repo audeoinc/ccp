@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react'
+import { filled } from '../slots'
 import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
@@ -56,6 +57,7 @@ import { SenderName } from '../SenderName'
 import { confirmDialog } from '../confirm'
 import { PaneRail } from '../PaneRail'
 import { typo } from '../typo'
+import { LabeledValue } from '../LabeledValue'
 import { hasPendingTrial, settlePendingTrial } from '../trial'
 import { tapComplete } from '../pushLink'
 
@@ -157,7 +159,11 @@ const useStyles = makeStyles({
   inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
   // 配信の情報の帯(プレビューの上の部品)。メールの中身ではないので、受信箱の見え方(白い札)と違う、薄い灰色の点線の帯にする
   metaBand: {
-    display: 'block',
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    columnGap: '20px',
+    rowGap: '2px',
     width: '100%',
     minWidth: 0,
     padding: '5px 10px',
@@ -166,14 +172,18 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground2,
     fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
     textAlign: 'left',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground3Hover },
   },
+  // 配信日時・国は短いので縮めない(対象・送る相手が長いときは、そちらを … にする)
+  metaFixed: { flexShrink: 0 },
+  // 配信・国・対象・送る相手の 1 行。入りきらないときだけ、対象・送る相手を … にする(空の値は短いので、ふつうは切れない)
+  metaMain: { display: 'flex', alignItems: 'baseline', columnGap: '20px', minWidth: 0, maxWidth: '100%' },
+  // テーマは長くなりやすいので、ほかの組を縮めずに、入りきらなければ 2 行目に回す(2 行目でも入りきらなければ …。2026-10-27 利用者)
+  metaTheme: { display: 'flex', minWidth: 0, maxWidth: '100%', overflow: 'hidden' },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -287,6 +297,8 @@ interface Props {
   onUndo: () => void
   onRunNext: (step: NextStep) => void
   onClose: () => void
+  /** 空のカードのとき、プレビューの真ん中に出す「AI で下書きする」 */
+  empty?: ReactNode
 }
 
 /** 保存した時刻(上の帯の「保存済み · 12:03」。今日でなければ日付も) */
@@ -303,7 +315,7 @@ const META_PART: PartRef = { kind: 'meta', field: 'info' }
  * シンプルな配信カード(SU1。docs/SIMPLE_CARD.md)。プレビューが主役で、部品を押すと、その部品だけを直すペインが出る。
  * 状態と保存は CardDetail のもの(editor)をそのまま使う。ここは並べ方と、部品の選び方・反映の時機だけを持つ
  */
-export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply, onUndo, onRunNext, onClose }: Props) {
+export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply, onUndo, onRunNext, onClose, empty }: Props) {
   const t = useT()
   const s = useStyles()
   // 商品の引き当ては、1 つの表で(打つたびの描き直しで、一覧を何度も端から探さないように)
@@ -591,13 +603,31 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 配信の情報の帯は、どの欄から入っても(帯・送る前の確かめの送る相手の行)選んだ印にする
   const metaOn = part?.kind === 'meta'
   const tpl = getTemplate(e.template)
-  // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00 · US · 対象: 女性・30代 · 送る相手: 会員だけ」。送る相手はメールでもアプリでも)
-  const metaSummary = [
-    `${t('配信', 'Send')} ${e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('(未設定)', '(not set)')}`,
-    optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '') || t('国(未設定)', 'Country (not set)'),
-    `${t('対象', 'Target')}: ${targetText({ gender: e.form.targetGender, ages: e.form.targetAges }) ?? t('指定なし', 'Not specified')}`,
-    `${t('送る相手', 'Send to')}: ${audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : t('(未設定)', '(not set)')}`,
-  ].join(' · ')
+  // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
+  const metaSummary = (
+    <>
+      <span className={s.metaMain}>
+        <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
+          {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+        </LabeledValue>
+        <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
+          {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
+        </LabeledValue>
+        <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')} truncate>
+          {targetText({ gender: e.form.targetGender, ages: e.form.targetAges })}
+        </LabeledValue>
+        <LabeledValue label={t('送る相手', 'Send to')} truncate>
+          {audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}
+        </LabeledValue>
+      </span>
+      {/* テーマもここに並べる(テーマを直すのは、この帯から開く配信の情報だけなので、在りかが分かるように。2026-10-27 利用者)。… にした値の全文は、マウスを載せると出る(LabeledValue の truncate) */}
+      <span className={s.metaTheme}>
+        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')} truncate>
+          {e.form.theme}
+        </LabeledValue>
+      </span>
+    </>
+  )
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
@@ -1010,7 +1040,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                   cardName={e.form.name}
                   productionOwner={e.form.productionOwner}
                   productionDue={e.form.productionDue}
-                  productIds={e.items.map((i) => i.productId)}
+                  productIds={filled(e.items).map((i) => i.productId)}
                   products={e.products}
                   onCount={setAssetCount}
                 />
@@ -1156,6 +1186,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             </MessageBar>
           )}
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; ↑ ↓ for the previous or next part, Enter to edit, Esc to stop)')}>
+            {empty}
             {e.preview}
             {e.alertOverlay}
             {!e.unsaved && <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />}
@@ -1258,7 +1289,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                       onClick={() => openFromList(c.key)}
                       actions={
                         // 候補(載せていない商品)は「⇄ 入れる」。どの枠の商品と入れ替えるかを、載せている商品から選ぶ(SU9 (f))
-                        e.items.length > 0 && (
+                        filled(e.items).length > 0 && (
                           <span data-row-action>
                               <Menu positioning="below-end">
                                 <MenuTrigger disableButtonEnhancement>
@@ -1268,7 +1299,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                                 </MenuTrigger>
                                 <MenuPopover>
                                   <MenuList>
-                                    {e.items.map((it, i) => (
+                                    {filled(e.items).map((it, i) => (
                                       <MenuItem key={it.key} icon={<ArrowSwapRegular />} onClick={() => e.swapWithCandidate(it.key, c.key, '')}>
                                         {t(`${i + 1}. ${productById.get(it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${productById.get(it.productId)?.name ?? ''}`)}
                                       </MenuItem>
@@ -1288,7 +1319,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           </div>
         ) : (
           <PaneRail label={t('商品の一覧', 'Products')} onOpen={toggleProducts}>
-            {e.items.map((it) => {
+            {filled(e.items).map((it) => {
               const kind = e.alertKinds.get(it.productId)
               const name = productById.get(it.productId)?.name ?? ''
               return (

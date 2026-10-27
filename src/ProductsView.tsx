@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Spinner, ToggleButton, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ProductCategory, type Product } from './models/products'
@@ -27,7 +28,7 @@ import { localDate } from './dates'
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '10px' },
   bar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  label: { color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   thumb: { display: 'block', width: '40px', height: '40px', objectFit: 'contain', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
   name: { display: 'grid', rowGap: '1px', minWidth: 0 },
   nameMain: { fontWeight: tokens.fontWeightSemibold },
@@ -41,7 +42,7 @@ const useStyles = makeStyles({
   detailTitle: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase400 },
   close: { marginLeft: 'auto' },
   lane: { position: 'relative', height: '26px', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3 },
-  laneLabel: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  laneLabel: typo.label,
   adBlock: { position: 'absolute', top: '4px', bottom: '4px', borderRadius: '2px', backgroundColor: tokens.colorPaletteMarigoldBorderActive, opacity: 0.55 },
   dot: { position: 'absolute', top: '3px', width: '20px', height: '20px', marginLeft: '-10px', border: 'none', padding: 0, background: 'none', cursor: 'pointer' },
   axis: { display: 'flex', justifyContent: 'space-between', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, fontVariantNumeric: 'tabular-nums' },

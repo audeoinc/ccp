@@ -27,6 +27,12 @@ export const loadAutoDraft = (): boolean => readRaw(PREF.autoDraft) !== 'off'
 
 export const saveAutoDraft = (on: boolean) => writeRaw(PREF.autoDraft, on ? 'on' : 'off')
 
+/** 新規作成・一括作成で最後に選んだ国。ヘッダーが「すべての国」のとき、国の初期値に使う('' = まだない) */
+export const loadLastNewCountry = (): string => loadPref<string>(PREF.lastNewCountry, '')
+export const saveLastNewCountry = (country: string) => {
+  if (country) savePref(PREF.lastNewCountry, country)
+}
+
 /** 画面の表示の好み(表示の切り替え・列の選択など)を、ブラウザごとに覚える。読めないときは既定値 */
 export function loadPref<T>(key: string, fallback: T): T {
   const v = readRaw(key)

@@ -29,6 +29,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ResizableSurface } from './ResizableSurface'
 import { AddRegular, ArrowDownloadRegular, ArrowUploadRegular, DeleteRegular, DismissRegular, EditRegular, TopSpeedRegular } from '@fluentui/react-icons'
 import { callApi } from './gcp/services'
@@ -83,7 +84,7 @@ const useStyles = makeStyles({
   row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
   grow: { flexGrow: 1 },
   scroll: { overflow: 'auto', minHeight: 0 },
-  label: { fontSize: '12px', fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   small: { fontSize: '12px' },
   pre: { whiteSpace: 'pre-wrap', fontSize: '12px', margin: 0 },
   strength: { fontSize: '11px', fontWeight: tokens.fontWeightSemibold, borderRadius: tokens.borderRadiusMedium, padding: '0 6px', display: 'inline-block' },

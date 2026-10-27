@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, Spinner, Textarea, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import type { WeeklyPerformance } from './models/weeklyPerformances'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { locale, useT } from './i18n'
@@ -10,7 +11,7 @@ const useStyles = makeStyles({
   // 主な数字: 横一列に並べる
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', columnGap: '8px', rowGap: '8px' },
   kpi: { border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, padding: '8px 12px', backgroundColor: tokens.colorNeutralBackground1 },
-  kpiLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  kpiLabel: typo.pairLabel,
   kpiValue: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   up: { color: tokens.colorPaletteGreenForeground1 },
   down: { color: tokens.colorPaletteRedForeground1 },

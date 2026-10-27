@@ -2,10 +2,11 @@
 // 「この内容で制作に依頼する」を押した時点の配信の中身を固めて保存し、制作のページはそれを見る(あとで配信カードを変えても、黙って変わらない)。
 // 依頼する前(下書き)は、いまの配信カードの中身から同じ形を作って見せる。
 // コピーしやすい行(テキスト・商品・リンク先)と、プレビューの HTML の書き出しも、ここにまとめる(React を使わない)
+import { idsToItems } from './slots'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { SOURCE_MANUAL, type Item } from './items'
+import type { Item } from './items'
 import { HEADER_LINKS, UTM_SCHEME, campaignId, headerLinkUrl, campaignSlug, encodeLinks, productLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
@@ -110,7 +111,8 @@ export function parseSnapshot(json?: string | null): Snapshot | null {
 
 const isPushCard = (s: Snapshot) => s.card.channel === CHANNEL_PUSH
 export const templateOf = (s: Snapshot): EmailTemplateId => templateKeyOfCard(s.card)
-const items = (s: Snapshot): Item[] => s.productIds.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
+// 商品の並びは枠の位置のまま(空いた枠は ''。前のセクションを空けて後ろのセクションに置いた商品を、その枠に描く。src/slots.ts)
+const items = (s: Snapshot): Item[] => idsToItems(s.productIds)
 const parseCopies = (v?: string): string[] => {
   if (!v) return []
   try {
@@ -258,6 +260,8 @@ export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => {
 export interface ProductRow {
   section: string
   product: Product
+  /** 並び(productIds)の中の位置(空いた枠があると、行の番号とずれる) */
+  at: number
   price: string
   /** 商品ページの URL(計測用のパラメーター付き)。アプリは開く画面 */
   url: string
@@ -280,7 +284,7 @@ export function productRows(s: Snapshot, variant?: VariantKey): ProductRow[] {
         : ''
       : // 表の箱は、押せる要素ごとにリンクが分かれる(版 3)。ここには、いちばん上の要素(ふつうは写真)のリンクを出す。全部は計測の対応表(trackingRows)に
         withUtm(productUrl(product), utm, productLinks(templateOf(s), i, `${pid}-${i}`, product.product_code, schemeOf(s))[0]?.content)
-    return [{ section: sec?.label ?? '', product, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
+    return [{ section: sec?.label ?? '', product, at: i, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
   })
 }
 

@@ -1,5 +1,6 @@
 // 配信カードの詳しい画面(今の配信カード)の描き方。シンプルな配信カード(simple/SimpleCardLayout)と並べる(整理 第3段 ②)。
 // 状態と保存は配信カード(CardDetail・useCardEditor)の 1 か所だけ。ここは受け取ったものを描き、この画面だけのペインの幅・開閉を持つ
+import { filled } from './slots'
 import { useRef, useState, type ReactNode } from 'react'
 import {
   Badge,
@@ -97,6 +98,7 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     heroUploadNode: ReactNode
     itemAlertOverlay: ReactNode
     noticesNode: ReactNode
+    emptyDraftNode: ReactNode
     productFloat: ReactNode
     zoomBox: ReactNode
     auto: { label: string; done: number; total: number } | null
@@ -155,7 +157,7 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     campaignName?: string
   }
 
-export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, audience, canReview, changeReason, changeTarget, decideVariant, decision, draftActiveVariant, form, groupByCategory, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }: ClassicCardLayoutProps) {
+export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, audience, canReview, changeReason, changeTarget, decideVariant, decision, draftActiveVariant, form, groupByCategory, isDirty, items, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, emptyDraftNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }: ClassicCardLayoutProps) {
   const t = useT()
   const styles = useCardDetailStyles()
   const { widths, setWidths, onDone: saveWidths } = useStoredWidths<Widths>(WIDTH_KEY, readWidths)
@@ -376,8 +378,8 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
                   />
                 </Field>
                 {form.theme && form.themeReason && <Caption1 className={styles.caption}><span className={styles.lead}>{t('AIの理由:', 'AI rationale:')}</span>{` ${form.themeReason}`}</Caption1>}
-                <Caption1 className={items.length ? styles.success : styles.caption}>
-                  {t(`掲載商品: ${items.length}件(中央の「セクション」タブで選びます)`, `Products in this delivery: ${items.length} (choose them in the Sections tab in the middle)`)}
+                <Caption1 className={filled(items).length ? styles.success : styles.caption}>
+                  {t(`掲載商品: ${filled(items).length}件(中央の「セクション」タブで選びます)`, `Products in this delivery: ${filled(items).length} (choose them in the Sections tab in the middle)`)}
                 </Caption1>
                 <Field label={t('ヘッドライン(メイン画像に載せる大見出し)', 'Headline (the large heading on the hero image)')}>
                   <AutoTextarea heightKey="CardDetail.form_headline"
@@ -422,7 +424,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
                       cardName={form.name}
                       productionOwner={form.productionOwner}
                       productionDue={form.productionDue}
-                      productIds={items.map((i) => i.productId)}
+                      productIds={filled(items).map((i) => i.productId)}
                       products={products}
                     />
                   }
@@ -480,11 +482,12 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
                   {previewTab === 'email' && template === 'free' && (
                     <>
                       <Switch label={t('カテゴリ見出し', 'Category headings')} checked={showHeadings} onChange={(_, d) => setShowHeadings(d.checked)} />
-                      <Button type="button" size="small" appearance="subtle" onClick={groupByCategory} disabled={items.length < 2}>{t('カテゴリでまとめる', 'Group by category')}</Button>
+                      <Button type="button" size="small" appearance="subtle" onClick={groupByCategory} disabled={filled(items).length < 2}>{t('カテゴリでまとめる', 'Group by category')}</Button>
                     </>
                   )}
                 </div>
                 <div ref={previewBoxRef} className={styles.previewBox}>
+                  {emptyDraftNode}
                   <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
                     <Preview {...previewCommon} items={items} selectedKey={selectedKey} template={template} hero={hero} onSelect={setSelectedKey} />
                   </div>
@@ -565,7 +568,7 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
                     remaining={progress.remaining}
                     people={owners}
                     cardName={form.name}
-                    productIds={items.map((it) => it.productId)}
+                    productIds={filled(items).map((it) => it.productId)}
                     products={products}
                     tabRequest={tabRequest}
                   />

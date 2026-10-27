@@ -31,6 +31,7 @@ import { toLocalInput } from './duplicate'
 import { locale, optionLabel, useT } from './i18n'
 import { CHANNEL_PUSH, countryOptions } from './status'
 import { confirmedWeekOf } from './weekLock'
+import { saveLastNewCountry } from './settings'
 
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '10px' },
@@ -90,6 +91,7 @@ export function NewCampaignDialog({ defaults, weeks, onClose, onCreated }: { def
     setError(null)
     try {
       const { cardId } = await createCampaignWithCard({ name, country, channel, scheduledAt: at, purpose, themeType: defaults?.themeType })
+      saveLastNewCountry(country)
       onClose()
       onCreated(cardId)
     } catch (e) {
@@ -207,17 +209,24 @@ export function AddCampaignCardDialog({ campaign, cards, weeks, onClose, onCreat
               checked={copy}
               disabled={siblings.length === 0}
               onChange={(_, d) => setCopy(!!d.checked)}
-              label={t('きょうだいの中身を写す(テーマ・コピー・商品・AB の案)', 'Copy content from a sibling (theme, copy, products, A/B variants)')}
+              // 「きょうだい」は伝わらない(2026-10-27 利用者)。1 枚なら写す元の名前、2 枚以上なら「同じキャンペーンの配信カード」と言って、下で選ぶ
+              label={
+                siblings.length === 1
+                  ? t(`「${cardDisplayName(siblings[0], [campaign])}」の中身を写す(テーマ・コピー・商品・AB の案)`, `Copy content from "${cardDisplayName(siblings[0], [campaign])}" (theme, copy, products, A/B variants)`)
+                  : t('同じキャンペーンの配信カードの中身を写す(テーマ・コピー・商品・AB の案)', 'Copy content from another delivery card in this campaign (theme, copy, products, A/B variants)')
+              }
             />
             {copy && siblings.length > 1 && (
               <div className={s.copyFrom}>
-                <Dropdown value={from ? cardDisplayName(from, [campaign]) : ''} selectedOptions={fromId ? [fromId] : []} onOptionSelect={(_, d) => setFromId(d.optionValue ?? '')} aria-label={t('写す元', 'Copy from')}>
+                <Field label={t('写す元の配信カード', 'Copy from')} size="small">
+                <Dropdown value={from ? cardDisplayName(from, [campaign]) : ''} selectedOptions={fromId ? [fromId] : []} onOptionSelect={(_, d) => setFromId(d.optionValue ?? '')}>
                   {siblings.map((c) => (
                     <Option key={c.id} value={c.id}>
                       {cardDisplayName(c, [campaign])}
                     </Option>
                   ))}
                 </Dropdown>
+                </Field>
               </div>
             )}
             {copy && from && from.channel !== channel && (

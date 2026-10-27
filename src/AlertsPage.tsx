@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ArrowSwapRegular, CalendarArrowRightRegular, FilterRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -61,7 +62,7 @@ const useStyles = makeStyles({
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   facts: { display: 'flex', flexWrap: 'wrap', columnGap: '8px', rowGap: '8px' },
   fact: { padding: '6px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
-  factLabel: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  factLabel: typo.pairLabel,
   factValue: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   tableWrap: { overflowX: 'auto', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: tokens.fontSizeBase300, fontVariantNumeric: 'tabular-nums' },

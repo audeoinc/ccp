@@ -6,6 +6,7 @@ import type { Product } from './models/products'
 import { HeroImagesService } from './data/heroImages'
 import { ProductPoliciesService } from './data/productPolicies'
 import type { HeroImage } from './models/heroImages'
+import { selectedSlots, setCardSlots } from './slots'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import { ProductImagesService } from './data/productImages'
 import type { ProductImage } from './models/productImages'
@@ -20,7 +21,7 @@ import { SalesPoliciesService } from './data/salesPolicies'
 import { bqOutputLabel, syncBigQuery, type BqSyncResult } from './gcp/bq'
 import { clearProductDataCache } from './useProductData'
 import type { VariantKey } from './abTest'
-import { STATE_CANDIDATE } from './items'
+import { SOURCE_MANUAL, STATE_CANDIDATE } from './items'
 import { withHeroLabels, withProductLabels } from './labels'
 import { loadCountryApply } from './countryApply'
 import { loadCountrySettings } from './countrySettings'
@@ -157,6 +158,11 @@ export function useAppData(opts: {
             if (r.product_id) byCard.set(id, [...(byCard.get(id) ?? []), r.product_id])
           }
           setCardProducts(byCard)
+          // プレビュー用の、枠の位置つきの並び(前のセクションを空けて後ろのセクションに置いた商品を、その枠に描く。src/slots.ts)
+          // (rows は、候補と B・C 案を除いた行。selectedSlots でも、候補の 1000 番台の行は枠に置かない)
+          const rowsByCard = new Map<string, typeof rows>()
+          for (const r of rows) if (r.product_id) rowsByCard.set(r.delivery_card_id!, [...(rowsByCard.get(r.delivery_card_id!) ?? []), r])
+          setCardSlots(new Map([...rowsByCard].map(([id, list]) => [id, selectedSlots(list, '', (r) => ({ key: r.id, productId: r.product_id!, reason: '', source: SOURCE_MANUAL })).map((i) => (i.gap ? '' : i.productId))])))
           const byVariant = new Map<string, Partial<Record<VariantKey, string[]>>>()
           for (const r of (res.data ?? []).filter((x) => x.delivery_card_id && x.variant && x.product_id && x.state !== STATE_CANDIDATE).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))) {
             const m = byVariant.get(r.delivery_card_id!) ?? {}

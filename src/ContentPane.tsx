@@ -9,8 +9,8 @@ import { withChat } from './aiSelect'
 import { tr, useT } from './i18n'
 import type { CardAlertKind } from './cardAlerts'
 import { progressOf } from './progress'
-import { baseTemplateId, getTemplate, hasTemplate, openTemplateManager, sectionsOf, templateOptions, type EmailTemplateId, type TemplateChannel, currentVersion, splitTemplateKey } from './templates'
-import { appliesIn, useCountryApply } from './countryApply'
+import { openTemplateManager, sectionsOf, templateOptions, type EmailTemplateId, type TemplateChannel } from './templates'
+import { useCountryApply } from './countryApply'
 import type { AiDrafts } from './useAiDrafts'
 import { LinksEditor } from './LinksEditor'
 import { AppLinksEditor } from './AppLinksEditor'
@@ -18,7 +18,8 @@ import { AiButton } from './AiButton'
 import { NotesEditor } from './NotesEditor'
 import { PushThumb } from './PushThumb'
 import { tapComplete } from './pushLink'
-import type { TemplateUse } from './templateUse'
+import { templateKeyState, type TemplateUse } from './templateUse'
+import { TemplateKeyNote, TemplateUseLine } from './TemplateUseLine'
 import type { useCardEditor } from './useCardEditor'
 import { ownsSubject } from './abTest'
 import { HeroTab } from './HeroTab'
@@ -164,23 +165,6 @@ function IdeaTab(props: {
 // ------------------------------------------------------------------ テンプレート
 
 /** テンプレートの最近の使用回数の行(X4)。同じ国の配信を、この配信の配信日の前 4 週間・同じ週で数える */
-function TemplateUseLine({ u }: { u?: TemplateUse }) {
-  const s = useContentPaneStyles()
-  const t = useT()
-  const recent = u?.recent ?? 0
-  const week = u?.sameWeek ?? 0
-  const last = u?.last ? u.last.slice(5).replace('-', '/') : ''
-  return (
-    <span className={s.flexRowTight}>
-      <Badge size="small" appearance={recent ? 'tint' : 'outline'} color={recent >= 4 ? 'warning' : 'informative'}>
-        {t(`最近 4 週で ${recent} 本`, `${recent} in last 4 wks`)}
-      </Badge>
-      {week > 0 && <Badge size="small" appearance="tint" color="warning">{t(`同じ週に ${week} 本`, `${week} in same week`)}</Badge>}
-      <span className={s.caption}>{last ? t(`最後に使った配信日 ${last}`, `Last used ${last}`) : t('この配信日より前の使用なし', 'Not used before this date')}</span>
-    </span>
-  )
-}
-
 function TemplateTab({ template, onTemplate, hasCandidates, channel, country, use }: { template: EmailTemplateId; onTemplate: (id: EmailTemplateId) => void; hasCandidates: boolean; channel: TemplateChannel; country?: string; use?: Map<string, TemplateUse> }) {
   const s = useContentPaneStyles()
   const t = useT()
@@ -198,39 +182,18 @@ function TemplateTab({ template, onTemplate, hasCandidates, channel, country, us
       </div>
       {/* この配信が、テンプレートの前の版や、使わない(無効)のテンプレートを使っているとき。選択肢には出ないので、ここに出して知らせる */}
       {(() => {
-        const cur = getTemplate(template)
-        const { id: base, version: v } = splitTemplateKey(template)
-        const old = v !== undefined
-        // この国で使わないテンプレートも、選択肢に出ないので、ここに出す(ST1)
-        const offCountry = !appliesIn('template', baseTemplateId(template), country)
-        if (!old && !cur.hidden && !offCountry) return null
-        const canUpdate = old && hasTemplate(base) && !getTemplate(base).hidden
+        const k = templateKeyState(template, country)
+        if (!k) return null
         return (
           <div className={mergeClasses(s.tplCard, s.tplCardSelected)}>
-            {cur.push ? <PushThumb spec={cur.push} width={110} /> : <TemplateThumb layout={cur} maxHeight={170} zoom />}
+            {k.cur.push ? <PushThumb spec={k.cur.push} width={110} /> : <TemplateThumb layout={k.cur} maxHeight={170} zoom />}
             <div style={{ minWidth: 0 }}>
               <div className={s.flexRowTight}>
-                <span className={s.bold}>{cur.label}</span>
+                <span className={s.bold}>{k.cur.label}</span>
                 <Badge size="small" appearance="filled" color="brand">{t('選択中', 'Selected')}</Badge>
-                {old && <Badge size="small" appearance="outline">{t(`版 ${v}`, `v${v}`)}</Badge>}
+                {k.old && <Badge size="small" appearance="outline">{t(`版 ${k.version}`, `v${k.version}`)}</Badge>}
               </div>
-              <span className={s.caption}>
-                {old
-                  ? t(
-                      `このテンプレートは、この配信のあとに編集されました(この配信は版 ${v}、いまは版 ${currentVersion(base)})。この配信は、版 ${v} の形のままです。`,
-                      `This template was edited after this delivery was made (this delivery uses v${v}; the latest is v${currentVersion(base)}). It keeps the v${v} layout.`,
-                    )
-                  : cur.hidden
-                    ? t('このテンプレートは、使わない(無効)になっています。この配信は、そのまま使えます。', 'This template is inactive. This delivery can keep using it.')
-                    : t('このテンプレートは、この国では使わないことになっています(⚙ →「国」)。この配信は、そのまま使えます。', 'This template is not used in this country (⚙ → Country). This delivery can keep using it.')}
-              </span>
-              {canUpdate && (
-                <div>
-                  <Button size="small" appearance="outline" onClick={() => onTemplate(base)}>
-                    {t(`いまの版(版 ${currentVersion(base)})にする`, `Use the latest (v${currentVersion(base)})`)}
-                  </Button>
-                </div>
-              )}
+              <TemplateKeyNote state={k} onUpdate={onTemplate} />
             </div>
           </div>
         )

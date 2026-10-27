@@ -10,3 +10,4 @@ server/.venv/
 **/__pycache__/
 docs/screenshots/
 *.log
+dist-preview/

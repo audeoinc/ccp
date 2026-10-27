@@ -149,7 +149,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
           </div>
           <div className={s.sub}>
             <span className={s.subHead}>{t('AI', 'AI')}</span>
-            <Switch checked={autoDraft} onChange={(_, d) => onAutoDraft(d.checked)} label={t('配信カードを開いたとき、自動で下書きする', 'Auto-draft when a delivery card opens')} />
+            <Switch checked={autoDraft} onChange={(_, d) => onAutoDraft(d.checked)} label={t('テンプレートが見つからない配信カードを開いたとき、自動で下書きし直す', 'Auto-redraft a delivery card when its template is missing')} />
           </div>
           <div className={s.sub}>
             <span className={s.subHead}>{t('ヒント', 'Tips')}</span>

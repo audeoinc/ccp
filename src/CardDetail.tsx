@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { filled, insertAt, joinSections } from './slots'
 import { useStableCallback } from './useStableCallback'
 import {
   Button,
@@ -17,6 +18,7 @@ import {
 import { AddRegular, ArrowNextRegular, DataBarVerticalRegular, DismissRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
+import { EmptyDraftCta } from './EmptyDraftCta'
 import { cardMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -32,7 +34,7 @@ import { ResizableSurface } from './ResizableSurface'
 import { campaignId, campaignSlug, productLinks, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
 import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
 import { PREF } from './prefKeys'
-import { runAutoDraft, type AutoDraftResult } from './autoDraft'
+import { runAutoDraft, type AutoDraftInput, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { useCardEditor, type Snapshot } from './useCardEditor'
 import { ClassicCardLayout } from './ClassicCardLayout'
@@ -75,6 +77,9 @@ import { cardDisplayName } from './campaigns'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
+
+/** 人が始める下書きの向き(どう作るか = テーマのヒント、または、いまのテーマのまま) */
+type WholeDraftOpts = Pick<AutoDraftInput, 'themeHint' | 'fixedTheme'>
 
 interface Props {
   /** undefined のときは新規作成 */
@@ -344,7 +349,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }))
     const toItem = (r: { productId: string; reason: string }): Item => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })
     if (res.sections.some((sec) => sec.selected.length > 0)) {
-      setItems(res.sections.flatMap((sec) => sec.selected.map(toItem)))
+      // セクションごとの選定を、そのセクションの枠に置く(前のセクションの選定が枠より少なくても、後ろのセクションの商品が前に詰まらないように)
+      setItems(joinSections(res.sections.map((sec) => sec.selected.map(toItem)), sectionsOf(res.template ?? template)))
       setCandidates(res.sections.flatMap((sec, i) => sec.candidates.map((r) => ({ ...toItem(r), section: i }))))
     }
     if (res.sections.length > 0) {
@@ -371,17 +377,26 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (res.errors.length > 0) setError(t(`一部の工程で失敗しました: ${res.errors.join(' / ')}`, `Some steps failed: ${res.errors.join(' / ')}`))
   }
 
-  // すべて AI で下書きした中身は、自動では保存しない(下書きの知らせのとおり、気に入らなければ保存せずに閉じられるように)。
-  // 下書きが済んだときの中身を覚え、人がそこから直したら、下書きの分も一緒に保存する
+  // AI の下書きは、人がボタンで始めたものは、押したことを採用とみなして、済んだらふだんの保存の道で保存する(下の adoptDraft。2026-10-27 利用者。
+  // 気に入らなければ、元に戻すか、下書きし直す)。テンプレートが見つからないときの自動の下書きし直しと、まだ作っていない案(一括作成の、作る前の案)は、
+  // これまでどおり自動では保存しない: 下書きが済んだときの中身を覚え、人がそこから直したら、下書きの分も一緒に保存する
   const [draftPending, setDraftPending] = useState(false)
   const [draftKey, setDraftKey] = useState<string | null>(null)
+  const [adoptDraft, setAdoptDraft] = useState(false)
+  const [draftDone, setDraftDone] = useState(false)
   useEffect(() => {
     if (!draftPending || auto !== null) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftPending(false)
     setDraftKey(currentKey)
+    setDraftDone(true)
   }, [draftPending, auto, currentKey])
-  async function startAutoDraft() {
+  /** 人がボタンで始める下書き(押したことを採用とみなして、済んだら保存する) */
+  function startAdoptedDraft(opts?: WholeDraftOpts) {
+    setAdoptDraft(true)
+    void startAutoDraft(opts)
+  }
+  async function startAutoDraft(opts?: WholeDraftOpts) {
     if (!form.scheduledAt) {
       setError(t('すべてAIで下書きするには、先に配信日時を入力してください', 'Enter the send date & time first to draft everything with AI'))
       return
@@ -391,7 +406,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setDraftPending(true)
     setAuto({ label: t('準備しています', 'Getting ready'), done: 0, total: 7 })
     const res = await runAutoDraft(
-      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel, country: form.country || undefined },
+      { card: buildAiCard(), language, otherThemes, products: poolProducts, heroes: poolHeroes, channel: templateChannel, country: form.country || undefined, ...opts },
       (label, done, total) => setAuto({ label, done, total }),
       () => cancelRef.current || !aliveRef.current,
     )
@@ -399,11 +414,26 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setAuto(null)
   }
 
-  const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || items.length > 0 || heroId)
+  const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || filled(items).length > 0 || heroId)
+
+  /**
+   * 配信の全体を AI で下書きする(シンプルな配信カードの、何も選んでいないときのペイン。2026-10-27 利用者)。
+   * 「どう作るか」が空なら、いまのテーマのまま全体を作る(テーマがなければ、テーマから考える)。書いてあれば、それに沿ってテーマから考え直す。
+   * 中身があるカードでは、書き換わることを先に確かめる。押したことを採用とみなして、空のカードの「AI で下書きする」と同じく、済んだら保存する
+   */
+  async function draftWhole(request: string) {
+    const req = request.trim()
+    const theme = form.theme.trim()
+    const body = !!(form.headline.trim() || form.copy.trim() || form.instructions.trim() || form.subject.trim() || form.pushTitle.trim() || filled(items).length > 0 || heroId)
+    if ((body || (req && theme)) && !(await confirmDialog(t('AI が下書きを作ります。いまの見出し・コピー・商品などは、すべて書き換わります。よいですか?', 'AI will draft this delivery. The current headline, copy, products, and so on will all be replaced. Continue?'), { okLabel: t('書き換える', 'Replace') }))) return
+    if (req) startAdoptedDraft({ themeHint: theme ? `${req}(いまのテーマ: ${theme})` : req })
+    else if (theme) startAdoptedDraft({ fixedTheme: { theme, reason: form.themeReason } })
+    else startAdoptedDraft()
+  }
 
   async function runAllManual() {
     if (hasContent && !(await confirmDialog(form.channel === CHANNEL_PUSH ? t('現在のテーマ・通知のタイトルと本文・ヘッドライン・コピー・商品・メイン画像を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, notification title and body, headline, copy, products, and hero image with an AI draft. Continue?') : t('現在のテーマ・件名・プリヘッダー・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, subject, preheader, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
-    void startAutoDraft()
+    startAdoptedDraft()
   }
 
   useEffect(() => {
@@ -414,10 +444,11 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }, [])
 
   // 既存のカードを開いたとき、自動で下書きを作る(同じカードで、1 回だけ):
-  // ・内容が空のとき
   // ・使ったテンプレートが登録に見つからないとき(削除された・版が残っていない。代わりのテンプレートで描くので、保存した見出し・商品の枠がずれる。
   //   SU1。2026-10-23 利用者 OK)。テンプレートも AI が選び直す。保存するまでは、キャンセルで元に戻せる
-  // どちらも、テンプレートの読み込みが済んでから判定する(済む前は、作ったテンプレートがまだ登録にない)
+  // テンプレートの読み込みが済んでから判定する(済む前は、作ったテンプレートがまだ登録にない)
+  // 内容が空のカードは、自動では始めず、プレビューの真ん中のボタン(emptyDraftNode)を押したときだけ下書きする
+  // (一括作成の「保存して次へ」で、次のカードを開くたびに AI が走ってしまうため。2026-10-27 利用者)
   useEffect(() => {
     if (!card || original === null) return
     if (products.length === 0 || heroes.length === 0 || !templatesSettled()) return
@@ -431,7 +462,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMissingTemplate({ key: label, redrafted: autoEnabled })
     }
-    if (autoEnabled && (!hasContent || missing)) void startAutoDraft()
+    if (autoEnabled && missing) void startAutoDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, original, products.length, heroes.length, templatesVersion])
 
@@ -710,7 +741,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const shownItems = previewItem
     ? previewItem.key
       ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
-      : [...viewItems, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI }]
+      : insertAt(viewItems, sectionsOf(template), previewItem.at ?? viewItems.length, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI })
     : viewItems
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   const locked = lockedWeeks.length > 0
@@ -720,6 +751,17 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const ok = await save({ after: 'stay', reason, force })
     if (ok && push && before) undoStack.push(before)
   }
+  // 押して始めた下書きが済んだら、保存する(ふだんの保存と同じ道。元に戻すの履歴にも積む)。
+  // 確定した週の配信は理由が要るので、ここでは保存しない(ふだんの保存のボタンで)。スキップして中身が変わっていなければ、何もしない
+  useEffect(() => {
+    if (!draftDone) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftDone(false)
+    const adopt = adoptDraft
+    setAdoptDraft(false)
+    if (adopt && card && !locked && isDirty()) void saveStaying()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftDone])
   // キャンペーン(X79)。入っている配信は、いちばん上に親・子・孫の帯を出し、名前は「キャンペーン名 + チャネル」で出す
   const campaign = useCampaignOf(card?.campaign_id)
   const campaignName = card && campaign ? cardDisplayName(card, [campaign]) : undefined
@@ -1008,6 +1050,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </div>
     </>
   )
+  // 空のカード: プレビューの真ん中に出す(シンプル・詳しいの両方の画面。シンプルには、すべてAIで下書きのボタンがないため)
+  const emptyDraftNode = !hasContent && !auto && !missingTemplate?.redrafted ? <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={() => startAdoptedDraft()} /> : null
   const footerNode = (
     <>
     {missingTemplate && (
@@ -1030,8 +1074,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               size="small"
               disabled={auto !== null}
               onClick={() => {
-                setMissingTemplate({ ...missingTemplate, redrafted: true })
-                void startAutoDraft()
+                // 押して下書きし直したものは保存するので、「キャンセルで元に戻せます」の知らせは出さずに閉じる
+                setMissingTemplate(null)
+                startAdoptedDraft()
               }}
             >
               {t('AI で下書きし直す', 'Redraft with AI')}
@@ -1124,6 +1169,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
         themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme() },
+        templateUse: templateUseMap,
         adoptTheme: (theme, reason) => setForm((f) => ({ ...f, theme, themeReason: reason })),
         channel: previewTab,
         ab: ab ? { keys: allVariants(ab), active, purpose: ab.purpose ?? 'test', canAdd: !!nextVariant(ab), busy: abAiBusy } : null,
@@ -1156,6 +1202,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           if (x.sectionCopies) setSectionCopies(x.sectionCopies)
         },
         linkSpots,
+        linkUrlOf,
+        productLinkOf,
         fcmCampaign,
         alertKinds: productAlertKinds,
         swapWithCandidate,
@@ -1183,6 +1231,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         reasonForm,
         cancelReason,
         canUndo: undoStack.canUndo,
+        draftWhole: (request) => void draftWhole(request),
+        drafting: auto !== null,
         nextStep,
         menu: cardMenu(
           <>
@@ -1237,7 +1287,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               <Text>{auto.label}({Math.min(auto.done + 1, auto.total)} / {auto.total})</Text>
               <ProgressBar className={styles.overlayBar} value={Math.min(1, auto.done / auto.total)} />
               <Caption1 className={styles.caption}>
-                {t('結果は画面に反映されるだけで、保存はされません。気に入らなければ、保存せずに閉じられます。', 'Results are only applied on screen and are not saved. If you do not like them, close without saving.')}
+                {adoptDraft && card && !locked
+                  ? t('でき上がった下書きは、そのまま保存します。気に入らなければ、元に戻すか、下書きし直せます。', 'The finished draft is saved as is. If you do not like it, undo or redraft.')
+                  : t('結果は画面に反映されるだけで、保存はされません。気に入らなければ、保存せずに閉じられます。', 'Results are only applied on screen and are not saved. If you do not like them, close without saving.')}
               </Caption1>
               <Button
                 type="button"
@@ -1256,12 +1308,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               {productFloat}
               {heroUploadNode}
               {abCompareNode}
-              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
+              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} empty={emptyDraftNode} />}
             </>
           ) : (
           <>
           <ClassicCardLayout
-            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items: viewItems, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
+            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items: viewItems, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, emptyDraftNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
           />
           </>
           )}

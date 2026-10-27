@@ -2,6 +2,7 @@
 // まとめると、まとめる元の学びは、まとめた先のカードの根拠になる(付け外し・国のデッキ・効き目も先に付け替わる。learningMerge)。元に戻せる
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogBody, DialogContent, DialogTitle, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ArrowLeftRegular, ArrowUndoRegular, DismissRegular, MergeRegular, SparkleRegular } from '@fluentui/react-icons'
 import { ResizableSurface } from './ResizableSurface'
 import { LearningCard } from './LearningCard'
@@ -21,7 +22,7 @@ const useStyles = makeStyles({
   // まとめた先(残す) ← まとめる元。2 枚を並べて見比べる
   cards: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', columnGap: '8px', alignItems: 'start' },
   arrow: { alignSelf: 'center', color: tokens.colorNeutralForeground3 },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3, marginBottom: '4px' },
+  label: { ...typo.label, marginBottom: '4px' },
   why: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   actions: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
   done: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteGreenForeground1 },

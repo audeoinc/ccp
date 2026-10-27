@@ -1,7 +1,8 @@
 import type { DeliveryCard } from './models/deliveryCards'
+import { idsToItems, slotIdsOf } from './slots'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { SOURCE_MANUAL, type Item } from './items'
+import type { Item } from './items'
 import { Preview } from './Preview'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
@@ -40,7 +41,8 @@ export function CardPreview({ card: c, productIds, products, heroes, device }: P
   const isPush = c.channel === CHANNEL_PUSH
   // 使った版の形で描く
   const templateId = templateKeyOfCard(c)
-  const items: Item[] = productIds.map((pid, i) => ({ key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL }))
+  // 空いた枠('')は、空きの枠として描く(前のセクションを空けて後ろのセクションに置いた商品を、その枠に描くため。src/slots.ts)
+  const items: Item[] = idsToItems(slotIdsOf(c.id, productIds))
   return (
     <Preview
       channel={isPush ? 'push' : 'email'}

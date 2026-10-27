@@ -1,6 +1,7 @@
 // 配信カードの学びの「効き目を見る」のフロート(2026-10-26 利用者: 効き目を、ページを移らずに見たい)。
 // 根拠の「結果を見る」と同じく、配信カードを閉じずに上に重ねる。中身は、結果の面の「④ 学びの評価」の右の欄と同じ部品(LearningEffect)
 import { Button, Caption1, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import { ResizableSurface } from './ResizableSurface'
 import { LearningEffect } from './ImpactView'
@@ -15,7 +16,7 @@ const useStyles = makeStyles({
   titleText: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   content: { display: 'grid', alignContent: 'start', rowGap: '10px', overflowY: 'auto', minHeight: 0, flex: 1, justifyItems: 'stretch' },
   strength: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: tokens.fontSizeBase200 },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  label: typo.pairLabel,
   note: { color: tokens.colorNeutralForeground3 },
 })
 

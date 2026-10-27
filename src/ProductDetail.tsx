@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { LabeledValue } from './LabeledValue'
+import { typo } from './typo'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import { ImageThumb } from './ImageThumb'
@@ -25,15 +27,15 @@ const useStyles = makeStyles({
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '8px' },
   kpi: { display: 'grid', rowGap: '1px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  kpiLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase100 },
+  kpiLabel: typo.pairLabel,
   kpiValue: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   section: { display: 'grid', rowGap: '4px' },
   sectionTitle: { color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
   text: { margin: 0, fontSize: tokens.fontSizeBase200, lineHeight: '18px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   facts: { display: 'grid', gridTemplateColumns: 'minmax(56px, auto) minmax(0, 1fr)', columnGap: '10px', rowGap: '3px', margin: 0 },
-  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  value: { margin: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
+  label: typo.pairLabel,
+  value: { ...typo.pairValue, margin: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
 })
 
 export type ProductDetailTab = 'trend' | 'sku' | 'metrics' | 'plan' | 'details'
@@ -155,7 +157,7 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
             </div>
             <div className={s.section}>
               <span className={s.sectionTitle}>{t('販促計画', 'Promotion plan')}</span>
-              {data.policy.promoPeriod && <span className={s.muted}>{t('期間', 'Period')}: {data.policy.promoPeriod}</span>}
+              {data.policy.promoPeriod && <LabeledValue label={t('期間', 'Period')}>{data.policy.promoPeriod}</LabeledValue>}
               <p className={s.text}>{data.policy.promoPlan || '—'}</p>
             </div>
           </>

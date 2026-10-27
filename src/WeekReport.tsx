@@ -1,4 +1,5 @@
 import { makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -31,8 +32,10 @@ const useStyles = makeStyles({
   preview: { width: '640px', zoom: 0.5 },
   facts: { display: 'grid', rowGap: '6px' },
   dName: { fontSize: '15px', fontWeight: 700 },
-  label: { fontSize: '10px', color: tokens.colorNeutralForeground3, fontWeight: 600 },
-  value: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
+  label: typo.pairLabel,
+  // 商品・コメントの一覧の見出しは、組のラベルではないので、ふつうのラベル
+  section: typo.label,
+  value: { ...typo.pairValue, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   list: { margin: 0, paddingLeft: '16px' },
 })
 
@@ -176,12 +179,12 @@ export function WeekReport({ weekStart, week, cards, cardProducts, products, her
                 ))}
               {ids.length > 0 && (
                 <div>
-                  <div className={s.label}>{t(`商品(${ids.length})`, `Items (${ids.length})`)}</div>
+                  <div className={s.section}>{t(`商品(${ids.length})`, `Items (${ids.length})`)}</div>
                   <div className={s.value}>{ids.map(productName).filter(Boolean).join('、')}</div>
                 </div>
               )}
               <div>
-                <div className={s.label}>{t(`未対応のコメント(${comments.length})`, `Open comments (${comments.length})`)}</div>
+                <div className={s.section}>{t(`未対応のコメント(${comments.length})`, `Open comments (${comments.length})`)}</div>
                 {comments.length === 0 ? (
                   <div className={s.muted}>{t('ありません', 'None')}</div>
                 ) : (

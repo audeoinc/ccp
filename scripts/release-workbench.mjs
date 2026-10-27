@@ -26,6 +26,8 @@ const OUT = join(ROOT, 'release-out')
 const RULES = [
   // 開発元の本番(Cloud Run + Cloud SQL)だけで使うもの
   ['exclude', /^(Dockerfile|\.dockerignore|\.gcloudignore|cloudbuild\.yaml)$/],
+  // 見本の画面(デモのビルドを URL で開く。開発元だけで使う)
+  ['exclude', /^(cloudbuild-preview\.yaml|preview\/)/],
   ['exclude', /^scripts\/(deploy-gcp|gcp-smoke|release-workbench)\.mjs$/],
   ['exclude', /^server\/ccp\/hosted\//],
   ['exclude', /^server\/requirements-hosted\.txt$/],
@@ -38,6 +40,8 @@ const RULES = [
   // HANDOVER の作業の記録(開発元の本番の話を含む)。BACKLOG の済んだ項目(docs/backlog-archive/)は、BACKLOG と同じく入れる
   ['exclude', /^docs\/handover-archive\//],
   ['exclude', /^docs\/font-compare\.html$/],
+  // AI の置き場の比較(利用先に別に渡した資料。Copilot Studio などの名前を含むので ZIP に入れない)
+  ['exclude', /^docs\/(AI_PLATFORMS\.md|ai-platform-images\/)/],
   // 商品ページの画像を、リストを渡してまとめてダウンロードする道具(B11)と、その手順書は、当面 ZIP に入れない
   // (利用者の指示 2026-10-23。取り込み(ccp.cli import-images)・画像を選ぶ窓は入れる)
   ['exclude', /^(docs\/PRODUCT_IMAGES\.md|scripts\/collect-product-images\.py)$/],
@@ -56,7 +60,7 @@ const RULES = [
   ['include', /^server\/tests\//],
   ['include', /^server\/(requirements(-tools)?\.txt|schema\.json|seed\.json|workbench\.env\.example)$/],
   // 道具(Workbench の操作・npm run verify の確認・初期データ・文書の生成)
-  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts|template-ai)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
+  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts|slots|template-ai)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
   // 文書(Workbench の手引き・設計・機能・開発の経緯・バックログ・ソースマップ)
   ['include', /^docs\//],
 ]

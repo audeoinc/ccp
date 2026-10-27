@@ -1,4 +1,5 @@
 import { Button, Input, Select, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { AddRegular, BeakerRegular, CheckmarkCircleRegular, DismissRegular, SplitVerticalRegular } from '@fluentui/react-icons'
 import { AiIcon } from './AiMark'
 import { allVariants, isChoose, metricLabel, nextVariant, splitOf, targetLabel, type AbDecision, type AbMetric, type AbMode, type AbPurpose, type AbTarget, type AbTest, type VariantKey } from './abTest'
@@ -22,7 +23,7 @@ const useStyles = makeStyles({
   remove: { minWidth: 'auto', marginLeft: '-6px' },
   grow: { flexGrow: 1 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  label: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   chip: { minWidth: 'auto', height: '24px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
   num: { width: '64px' },
   hypo: { flexGrow: 1, minWidth: '240px' },

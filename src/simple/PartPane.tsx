@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -8,22 +9,25 @@ import { ChooseDrawer } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
 import { ImageThumb } from '../ImageThumb'
-import { Row, productMeta } from '../ProductRow'
 import { AlertMark } from '../AlertMark'
 import { LowStockBadge } from '../ProductMarks'
 import { heroImage, productImage } from '../images'
 import { yen } from '../items'
-import { optionLabel, tr, useT } from '../i18n'
+import { locale, optionLabel, tr, useT } from '../i18n'
+import { audienceLabel, audienceSet, targetText } from '../target'
 import { typo } from '../typo'
+import { LabeledValue } from '../LabeledValue'
 import { OpenLink } from '../LinkText'
 import { productUrl } from '../links'
 import { productMarket } from '../market'
 import { THEME_TYPES, themeTypeLabel } from '../themeTypes'
 import { channelOptions, countryOptions } from '../status'
-import { baseTemplateId, getTemplate, openTemplateManager, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
+import { getTemplate, openTemplateManager, sectionIndexAt, sectionsOf, templateOptions } from '../templates'
 import { findPart, hasPartFields } from '../partContent'
 import { PartContentFields } from '../PartContentFields'
 import { TemplateThumb } from '../TemplateThumb'
+import { TemplateKeyNote, TemplateUseLine } from '../TemplateUseLine'
+import { templateKeyState } from '../templateUse'
 import { PREHEADER_MAX, SUBJECT_MAX } from '../textLimits'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from '../pushLink'
 import { PushThumb } from '../PushThumb'
@@ -34,9 +38,10 @@ import { partKey, type PartRef } from './parts'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
 import { PartAiChat } from './PartAiChat'
+import { TextAiPanel } from './TextAiPanel'
 import { Hint } from '../Hint'
 import { ProductionMemo } from './ProductionMemo'
-import { askHeroPick, askPartRewrite, askProductPick, askWholeRewrite, readWhole, type PartAnswer, type PartTurn, type WholeChange, type WholeTexts } from './partAi'
+import { askHeroPick, askPartRewrite, askProductPick, type PartAnswer, type PartTurn, type WholeTexts } from './partAi'
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { AiPicks, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
@@ -55,10 +60,14 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1, minWidth: 0 },
   // 名前・直す・開くは縮めず、URL の文だけを省略する
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
-  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200 },
+  trackedUrl: { display: 'grid', rowGap: '2px', minWidth: 0 },
+  trackedText: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
+  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...typo.pairValue },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
   caption: typo.caption,
   label: typo.label,
+  // 値に付くラベル(リンク先など。一覧の見出しの label とは別)
+  pairLabel: typo.pairLabel,
   row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '10px', rowGap: '10px' },
   // 商品の見比べ・情報の箱
@@ -69,6 +78,7 @@ const useStyles = makeStyles({
   compare: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8px' },
   tplList: { display: 'grid', rowGap: '8px' },
   tplCard: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '10px', alignItems: 'start', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorBrandBackground2 } },
+  tplNote: { cursor: 'default', ':hover': { backgroundColor: tokens.colorNeutralBackground1 } },
   tplOn: { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1 },
   ideaText: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap' },
   ideaRow: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '8px', alignItems: 'center', minWidth: 0 },
@@ -78,9 +88,6 @@ const useStyles = makeStyles({
   nameWrap: { whiteSpace: 'normal' },
   compareCol: { display: 'grid', rowGap: '4px', alignContent: 'start', minWidth: 0 },
   compareBox: { display: 'grid', rowGap: '8px', padding: '10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorBrandBackground2 },
-  // 何も選んでいないときの、載せた商品の一覧
-  list: { display: 'grid', rowGap: '4px' },
-  num: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, textAlign: 'right' },
   heroNow: { display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: '10px', alignItems: 'start' },
   heroCands: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '6px' },
   pickRow: { display: 'grid', rowGap: '2px', padding: '6px 8px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
@@ -88,9 +95,9 @@ const useStyles = makeStyles({
   heroCand: { display: 'grid', rowGap: '2px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   // この配信のねらい(テーマ・切り口)。直す部品の上の、控えめな箱
   aim: { display: 'grid', rowGap: '2px', width: '100%', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, boxSizing: 'border-box' },
-  aimBtn: { display: 'grid', rowGap: '2px', minWidth: 0, padding: 0, border: 'none', background: 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', ':hover': { textDecorationLine: 'underline' } },
-  // テーマの箱の右に「AI で案を出す」
-  aimRow: { gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'start' },
+  // テーマと、右上の「変える」
+  aimHead: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '6px', alignItems: 'start' },
+  aimChange: { minWidth: 0, height: 'auto', padding: '0 4px', fontSize: tokens.fontSizeBase200 },
   aimWrap: { display: 'grid', rowGap: '6px', minWidth: 0 },
   // 試している案を写しているあいだ(本物のテーマではないと分かるように)
   aimTrying: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px' },
@@ -212,18 +219,18 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     return { turns: chats[key] ?? [], setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => setChat(key, f) }
   }
   /**
-   * 文言の部品: 入力欄と、その部品を AI に頼む欄。乗せた・選んだ案は、保存する中身に入れず、プレビューにだけ写す(shown が、その案を写した文言。
-   * 以前は文言そのものを書き換えて写していたので、自動の保存で、乗せただけの案が保存されかねなかった)。押すと採用
+   * 文言の部品の AI(「AI」のボタン → 案 / 指示して直す。TextAiPanel)。試している案は、保存する中身に入れず、プレビューにだけ写す
+   * (shown が、その案を写した文言。自動の保存で、試しただけの案が保存されないように)。「確定」で入れ替える
    */
   const aiChat = (kind: string, label: string, value: string, onChange: (v: string) => void, shown: (v: string) => WholeTexts) => {
     if (!part) return null
     return (
-      <PartAiChat
+      <TextAiPanel
         key={partKey(part)}
         kind={kind}
         label={label}
-        {...chatOf(part)}
-        ask={(request, history) =>
+        value={value}
+        ask={(request, count, history) =>
           askPartRewrite({
             card: e.aiCard(),
             angle: e.form.copyAngle,
@@ -231,12 +238,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             context: { subject: e.form.subject || e.form.name, preheader: e.form.preheader, headline: e.form.headline, copy: e.form.copy, pushTitle: e.form.pushTitle, pushBody: e.form.pushBody },
             request,
             history,
+            count,
           })
         }
-        renderIdea={(idea) => <span className={s.ideaText}>{idea.value}</span>}
-        isCurrent={(idea) => idea.value === value}
-        nowText={value}
-        onPreview={(idea) => e.setAiPreview(idea ? { texts: shown(idea.value) } : null)}
+        onPreview={(v) => e.setAiPreview(v === null ? null : { texts: shown(v) })}
         onAdopt={(idea) => {
           e.setAiPreview(null)
           onChange(idea.value)
@@ -244,6 +249,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       />
     )
   }
+  // 空いた枠に入れるときの位置(押した枠のセクションに入る。src/slots.ts)
+  const slotAt = part?.kind === 'slot' ? part.index : e.items.length
   /** 商品の枠(載せた商品 itemKey / 空いた枠)を AI に頼む欄 */
   const productChat = (itemKey: string | null) =>
     part && (
@@ -269,82 +276,14 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         isCurrent={(idea) => e.items.some((i) => i.productId === idea.value)}
         nowText={itemKey ? (byId.get(e.items.find((i) => i.key === itemKey)?.productId ?? '')?.name ?? '') : t('(空いた枠)', '(empty slot)')}
         ideaText={(idea) => byId.get(idea.value)?.name ?? idea.value}
-        onPreview={(idea) => e.setAiPreview(idea ? { item: { key: itemKey ?? '', productId: idea.value } } : null)}
+        onPreview={(idea) => e.setAiPreview(idea ? { item: { key: itemKey ?? '', productId: idea.value, at: slotAt } } : null)}
         onAdopt={(idea) => {
           e.setAiPreview(null)
           if (itemKey) e.replaceItem(itemKey, idea.value, idea.why)
-          else e.addProduct(idea.value, e.items.length)
+          else e.addProduct(idea.value, slotAt)
         }}
       />
     )
-  const currentTexts = (): WholeTexts => ({
-    subject: e.form.subject,
-    preheader: e.form.preheader,
-    headline: e.form.headline,
-    copy: e.form.copy,
-    pushTitle: e.form.pushTitle,
-    pushBody: e.form.pushBody,
-    sectionTitles: [...e.sectionTitles],
-    sectionCopies: [...e.sectionCopies],
-  })
-  /** 案で変わる文言の名前と、新しい文言(案の中に並べる) */
-  const wholeLines = (c: WholeChange) => {
-    const out: [string, string][] = []
-    const add = (label: string, v?: string) => v !== undefined && out.push([label, v])
-    add(t('件名', 'Subject'), c.texts.subject)
-    add(t('プリヘッダー', 'Preheader'), c.texts.preheader)
-    add(t('見出し', 'Headline'), c.texts.headline)
-    add(t('コピー', 'Copy'), c.texts.copy)
-    add(t('通知のタイトル', 'Notification title'), c.texts.pushTitle)
-    add(t('通知の本文', 'Notification body'), c.texts.pushBody)
-    c.texts.sectionTitles?.forEach((v, i) => v !== (e.sectionTitles[i] ?? '') && add(t(`セクション ${i + 1} の見出し`, `Section ${i + 1} heading`), v))
-    c.texts.sectionCopies?.forEach((v, i) => v !== (e.sectionCopies[i] ?? '') && add(t(`セクション ${i + 1} のコピー`, `Section ${i + 1} copy`), v))
-    if (c.heroId) add(t('メイン画像', 'Main image'), e.poolHeroes.find((h) => h.id === c.heroId)?.name ?? '')
-    return out
-  }
-  /** 何も選んでいないときの、配信の全体を AI に頼む欄。案は文言とメイン画像をまとめて写し、押すとまとめて入れる */
-  const wholeChat = (
-    <PartAiChat
-      key="whole"
-      kind="whole"
-      label={t('配信の全体', 'Whole delivery')}
-      {...chatOf('whole')}
-      placeholder={t('例: 20 代向けに、もっとカジュアルに', 'e.g. More casual, for people in their 20s')}
-      ask={(request, history) => askWholeRewrite({ card: e.aiCard(), angle: e.form.copyAngle, channel: e.channel, current: currentTexts(), hero: e.hero, heroes: e.poolHeroes, request, history })}
-      renderIdea={(idea) => {
-        const c = readWhole(idea.value)
-        return c ? (
-          <span style={{ display: 'grid', rowGap: 2 }}>
-            <span className={s.name}>{c.title}</span>
-            {wholeLines(c).map(([label, v]) => (
-              <span key={label} className={s.meta}>
-                <span className={s.label}>{label}</span> {v}
-              </span>
-            ))}
-          </span>
-        ) : null
-      }}
-      nowText={t('いまの配信', 'Current delivery')}
-      ideaText={(idea) => readWhole(idea.value)?.title ?? ''}
-      isCurrent={(idea) => {
-        const c = readWhole(idea.value)
-        const now = currentTexts()
-        return !!c && Object.entries(c.texts).every(([k, v]) => JSON.stringify(now[k as keyof WholeTexts]) === JSON.stringify(v)) && (!c.heroId || c.heroId === e.hero?.id)
-      }}
-      onPreview={(idea) => {
-        // 案の文言とメイン画像を、プレビューにだけ写す(保存する中身は変えない)
-        const c = idea && readWhole(idea.value)
-        e.setAiPreview(c ? { texts: c.texts, ...(c.heroId ? { heroId: c.heroId } : {}) } : null)
-      }}
-      onAdopt={(idea) => {
-        const c = readWhole(idea.value)
-        e.setAiPreview(null)
-        if (!c) return
-        e.applyTexts(c.texts)
-        if (c.heroId) e.setHero(c.heroId, idea.why)
-      }}
-    />
-  )
   /** 案の商品の 1 行(写真・名前・コード・価格・在庫) */
   const productLine = (p: Product | undefined) =>
     p ? (
@@ -433,45 +372,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   })()
 
   const body = (() => {
-    if (!part)
-      return (
-        <>
-          {/* 何も選んでいないときだけの一言(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
-          <span className={s.caption}>{t('直したい所を、プレビューで押してください', 'Click what you want to change in the preview')}</span>
-          {wholeChat}
-          <span className={s.label}>{t(`載せた商品(${e.items.length})`, `Products (${e.items.length})`)}</span>
-          {e.items.length === 0 && <span className={s.caption}>{t('まだ商品がありません。プレビューの空いた枠を押すと、商品を探せます。', 'No products yet. Click an empty slot in the preview to find one.')}</span>}
-          <div className={s.list}>
-            {e.items.map((it, i) => {
-              const p = byId.get(it.productId)
-              const swapOpen = swapAt?.at === 'list' && swapAt.itemKey === it.key
-              return (
-                <div key={it.key}>
-                <Row
-                  dense
-                  lead={<span className={s.num}>{i + 1}</span>}
-                  image={productImage(p, it.imageUrl)}
-                  title={p?.name ?? ''}
-                  meta={productMeta(p)}
-                  marks={<AlertMark kind={e.alertKinds.get(it.productId)} />}
-                  onClick={() => onPick({ kind: 'product', itemKey: it.key })}
-                  onHover={(on) => e.hoverProduct(on ? it.key : null)}
-                  actions={
-                    <>
-                      <Tooltip content={t('入れ替える', 'Replace')} relationship="label">
-                        <ToggleButton size="small" appearance="subtle" icon={<ArrowSwapRegular />} checked={swapOpen} disabled={e.saving} onClick={() => onSwapAt(swapOpen ? null : { itemKey: it.key, at: 'list' })} />
-                      </Tooltip>
-                    </>
-                  }
-                />
-                {/* 入れ替えの引き出しは、その行の真下から(SU9) */}
-                <ProductSwap editor={e} itemKey={it.key} open={swapOpen} onOpenChange={(o) => onSwapAt(o ? { itemKey: it.key, at: 'list' } : null)} chats={chats} setChat={setChat} onDone={(k) => onSwapped(it.key, k)} trigger={false} />
-                </div>
-              )
-            })}
-          </div>
-        </>
-      )
+    if (!part) return <WholePane editor={e} onEdit={() => onPick({ kind: 'meta', field: 'info' })} />
     switch (part.kind) {
       case 'subject':
         return text('subject', t('件名', 'Subject'), { rows: 1, placeholder: e.form.name, hint: t('空のときは配信名が件名になります', 'Empty uses the delivery name'), max: SUBJECT_MAX })
@@ -650,13 +551,14 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 </Field>
               ) : (
                 <span className={s.linkLine}>
-                  <span className={s.label}>{t('リンク先', 'Link')}</span>
+                  <span className={s.pairLabel}>{t('リンク先', 'Link')}</span>
                   <span className={s.linkText}>{e.links.hero?.trim() || (heroDefaultLink ? t(`既定(${heroDefaultLink})`, `Default (${heroDefaultLink})`) : t('既定', 'Default'))}</span>
                   <OpenLink url={e.links.hero?.trim() || heroDefaultLink} />
                   <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => setLinkEditing(true)}>{t('直す', 'Edit')}</Button>
                 </span>
               )
             )}
+            {e.channel === 'email' && heroSlot && <TrackedUrl url={e.linkUrlOf(heroSlot)} />}
           </>
         )
       case 'product': {
@@ -690,6 +592,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               onDone={(k) => onSwapped(it.key, k)}
             />
             <span className={s.caption}>{t(`${idx + 1} 番目${sec ? `(${sec.label})` : ''}`, `Position ${idx + 1}${sec ? ` (${sec.label})` : ''}`)}</span>
+            {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
                 (商品は上下左右に並ぶので、前後の矢印では向きを表せない。外すは、外したい商品の上で。2026-10-26 利用者) */}
             <Hint hintKey="simpleCard.productSlot">{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。並べ替えは、プレビューでつかんで動かすか、Alt + 矢印。外すときは、プレビューの商品の × か Delete。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. To reorder, drag in the preview or press Alt + arrow keys. To remove, use the × on the product in the preview or press Delete.')}</Hint>
@@ -710,14 +613,14 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   const p = byId.get(c.productId)
                   return p ? (
                     <div key={c.key}>
-                      {productBox(p, <Button size="small" appearance="primary" disabled={e.saving} onClick={() => e.addProduct(p.id, e.items.length)}>{t('この枠に入れる', 'Put in this slot')}</Button>)}
+                      {productBox(p, <Button size="small" appearance="primary" disabled={e.saving} onClick={() => e.addProduct(p.id, slotAt)}>{t('この枠に入れる', 'Put in this slot')}</Button>)}
                     </div>
                   ) : null
                 })}
               </>
             )}
             <span className={s.label}>{t('ほかの商品を探す', 'Search other products')}</span>
-            <Candidates products={e.poolProducts} usedIds={new Set(e.items.map((i) => i.productId))} onAdd={(id) => e.addProduct(id, e.items.length)} />
+            <Candidates products={e.poolProducts} usedIds={new Set(e.items.map((i) => i.productId))} onAdd={(id) => e.addProduct(id, slotAt)} />
           </>
         )
       }
@@ -739,6 +642,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
                   <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
                 </span>
+                {slot && <TrackedUrl url={e.linkUrlOf(slot)} />}
               </Field>
             ) : (
               slot && (
@@ -768,6 +672,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
                   <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
                 </span>
+                {slot && <TrackedUrl url={e.linkUrlOf(slot)} />}
               </Field>
             ) : (
               slot && (
@@ -794,7 +699,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   })()
 
   const titleOf = (p: PartRef | null): string => {
-    if (!p) return t('部品を選んでください', 'Choose a part')
+    if (!p) return t('配信の全体', 'Whole delivery')
     switch (p.kind) {
       case 'subject': return t('件名', 'Subject')
       case 'preheader': return t('プリヘッダー', 'Preheader')
@@ -827,8 +732,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             size="medium"
             weight="semibold"
             info={t(
-              'プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。何も選んでいないときは、配信の全体のことを AI に頼めます。',
-              'Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops. With nothing selected, ask AI about the whole delivery.',
+              '何も選んでいないときは、配信の全体を扱います(配信の情報を見る・AI で全体を下書きする)。プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。',
+              'With nothing selected, this pane is about the whole delivery (view the delivery info, draft everything with AI). Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops.',
             )}
           >
             {titleOf(part)}
@@ -841,7 +746,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         )}
       </div>
       {/* 文言・画像・商品を直すときの手がかり(この配信のねらい)。配信の情報を直すときは出さない */}
-      {part?.kind !== 'meta' && part?.kind !== 'overview' && <Aim editor={e} />}
+      {part && part.kind !== 'meta' && part.kind !== 'overview' && <Aim editor={e} onChange={() => onPick({ kind: 'meta', field: 'theme' })} />}
       {compareBlock}
       {body}
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
@@ -851,17 +756,55 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
 }
 
 /**
+ * 計測用のパラメーター(utm)つきの、実際に送る URL(X81 の 8)。utm は自動で付き、手で変えると計測が壊れるので、読むだけ。
+ * 値を変える欄は詳しい画面の ⑤ リンク先にだけ置く(ふだんは変えないため)
+ */
+function TrackedUrl({ url }: { url: string }) {
+  const t = useT()
+  const s = useStyles()
+  if (!url || !/^https?:\/\//.test(url)) return null
+  // 付いている計測用のパラメーター(utm_ で始まるもの。決まった 4 つのほかに付いていれば、それも出す)
+  let params: [string, string][] = []
+  try {
+    params = [...new URL(url).searchParams.entries()].filter(([k]) => k.startsWith('utm_'))
+  } catch {
+    params = []
+  }
+  return (
+    <span className={s.trackedUrl}>
+      <InfoLabel
+        size="small"
+        info={t(
+          'utm_source・utm_medium は決まった値(詳しい画面の ⑤ リンク先で変えられます)。utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から、自動で決まります。AB テストの配信は、utm_campaign の末尾に案の印(-a・-b・-c)が自動で付きます。GA で、どの配信のどのリンクが押されたかを見分けるためです。まだ保存していない配信は、保存すると ID が付きます。',
+          'utm_source and utm_medium are fixed values (change them in ⑤ Links on the detailed view). utm_campaign comes from the send date and delivery card ID, and utm_content from the link spot, automatically. For A/B tests, the variant (-a, -b, -c) is added to the end of utm_campaign automatically. This lets GA tell which link in which delivery was clicked. An unsaved delivery gets its ID when saved.',
+        )}
+      >
+        {t('計測用のパラメーターつき', 'With tracking')}
+      </InfoLabel>
+      <span className={s.trackedText}>{url}</span>
+      {params.map(([k, v]) => (
+        <LabeledValue key={k} label={k} labelWidth="96px">
+          {v}
+        </LabeledValue>
+      ))}
+    </span>
+  )
+}
+
+/**
  * テンプレートの選び直し(SU1 ⑧・段階 b)。チャネルのテンプレートを、見取り図と一緒に並べる。乗せるとプレビューに仮で写し(この配信の商品・画像のまま)、
  * 押すと替える。枠に収まらない商品は「枠外」として、メールには載らないことを知らせる(載せたままにするので、戻せば元の枠に戻る)。
- * 国ごとに使えるテンプレートの絞り込み(ST1)は、まだない
+ * 選択肢は、この国で使うテンプレートのいまの版だけ。この配信が前の版・使わない(無効)・この国で使わないのテンプレートなら、一覧の上に知らせと「いまの版にする」を出す。
+ * どの選択肢にも、最近の使われ方(最近 4 週で何本・同じ週に何本・最後に使った日)を出す(詳しい画面の ② テンプレートと同じ。X81 の 7)
  */
 function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
-  const current = baseTemplateId(e.template)
   const slotsOf = (sections?: { slots: number }[]) => (sections ?? []).reduce((n, x) => n + x.slots, 0)
+  const keyState = templateKeyState(e.template, e.card.country)
   const pick = async (id: string) => {
-    if (id === current) return
+    // 前の版を使っているときは、同じテンプレートのいまの版を押しても替える(「いまの版にする」と同じ)
+    if (id === e.template) return
     if (e.candidates.length > 0 && !(await confirmDialog(t('テンプレートを替えると、セクションの構成が変わるので、残りの候補(AI が出した商品の案)は外れます。替えますか?', 'Changing the template changes the sections, so the remaining candidates (AI product ideas) are cleared. Change it?')))) return
     e.setAiPreview(null)
     e.setTemplate(id)
@@ -869,11 +812,25 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   return (
     <>
       <Hint hintKey="simpleCard.templatePick">{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</Hint>
+      {keyState && (
+        <div className={mergeClasses(s.tplCard, s.tplOn, s.tplNote)}>
+          {keyState.cur.push ? <PushThumb spec={keyState.cur.push} width={72} /> : <TemplateThumb layout={keyState.cur} maxHeight={110} />}
+          <span style={{ display: 'grid', rowGap: 4, minWidth: 0 }}>
+            <span className={s.row}>
+              <span className={s.name}>{keyState.cur.label}</span>
+              <Badge size="small" appearance="filled" color="brand">{t('いまのテンプレート', 'Current')}</Badge>
+              {keyState.old && <Badge size="small" appearance="outline">{t(`版 ${keyState.version}`, `v${keyState.version}`)}</Badge>}
+            </span>
+            <TemplateKeyNote state={keyState} onUpdate={(id) => void pick(id)} />
+          </span>
+        </div>
+      )}
       <div className={s.tplList} onMouseLeave={() => e.setAiPreview(null)}>
         {templateOptions(e.channel, false, e.card.country).map((o) => {
           const slots = o.id === 'free' ? Infinity : slotsOf(o.sections)
-          const over = Number.isFinite(slots) ? Math.max(0, e.items.length - slots) : 0
-          const on = o.id === current
+          const over = Number.isFinite(slots) ? Math.max(0, filled(e.items).length - slots) : 0
+          // 前の版を使っているときは、いまの版の選択肢は「いまのテンプレート」にしない(押すといまの版に替わる)
+          const on = o.id === e.template
           return (
             <div
               key={o.id}
@@ -893,6 +850,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
                   {Number.isFinite(slots) && <span className={s.caption}>{t(`商品の枠 ${slots}`, `${slots} product slots`)}</span>}
                   {over > 0 && <Badge size="small" appearance="tint" color="warning">{t(`${over} 件が枠外(メールに載らない)`, `${over} out of slots (not in the email)`)}</Badge>}
                 </span>
+                {e.templateUse && <TemplateUseLine u={e.templateUse.get(o.id)} />}
               </span>
             </div>
           )
@@ -903,17 +861,92 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
 }
 
 /**
- * この配信のねらい(テーマと切り口)。直す部品の上に小さく出し、ねらいを見ながら書けるようにする。
- * テーマは押すとその場で直せる。AI のテーマの案は、押すとこの箱にだけ仮に写し(テーマはメールに出ないので、プレビューは変わらない)、帯の「確定」で採用する(X81 の 4)。
- * 採用した案の理由は小さく出す(手で直すと消える)。切り口は、見出し・コピーの AI の案を採用したときの補足なので、読むだけ
+ * 何も選んでいないとき = 配信の全体を選んでいる(2026-10-27 利用者)。上から、配信の情報(読むだけ)・AI で全体を下書き・案内の 1 行。
+ * 載せた商品の一覧は、右の商品情報と重なるので出さない。直すのは配信の情報のペイン(「変える」)で、状態と保存は CardDetail の 1 つ
  */
-function Aim({ editor: e }: { editor: SimpleEditor }) {
+function WholePane({ editor: e, onEdit }: { editor: SimpleEditor; onEdit: () => void }) {
   const t = useT()
   const s = useStyles()
-  const [editing, setEditing] = useState(false)
-  // 案の一覧を広げているか(開いたときの自動の下書きで作った案もあるが、どの部品にも出ると長くなるので、押したときだけ広げる)
+  // どう作るか(任意)。下書きのたびに書き直すものなので、覚えない
+  const [request, setRequest] = useState('')
+  const f = e.form
+  return (
+    <>
+      <div className={s.aim}>
+        <div className={s.aimHead}>
+          <span className={s.label}>{t('配信の情報', 'Delivery info')}</span>
+          <Button type="button" size="small" appearance="transparent" className={s.aimChange} onClick={onEdit}>
+            {t('変える', 'Change')}
+          </Button>
+        </div>
+        <LabeledValue label={t('配信日', 'Send date')}>{f.scheduledAt ? new Date(f.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</LabeledValue>
+        <LabeledValue label={t('国', 'Country')}>{optionLabel(countryOptions.find((o) => String(o.value) === f.country)?.label ?? '')}</LabeledValue>
+        <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')}>
+          {targetText({ gender: f.targetGender, ages: f.targetAges })}
+        </LabeledValue>
+        <LabeledValue label={t('送る相手', 'Send to')}>{audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}</LabeledValue>
+        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
+          {f.theme}
+        </LabeledValue>
+        {f.themeReason && <span className={s.caption}>{t(`理由: ${f.themeReason}`, `Why: ${f.themeReason}`)}</span>}
+      </div>
+      <div className={s.aimWrap}>
+        <Field
+          size="small"
+          label={t('AI で全体を下書きする', 'Draft the whole delivery with AI')}
+          hint={t('どう作るか(任意)。空なら、いまのテーマから全体を作ります', 'How to make it (optional). Leave empty to build everything from the current theme')}
+        >
+          <AutoTextarea heightKey="PartPane.wholeRequest" size="small" rows={2} value={request} placeholder={t('例: 20 代向けに、もっとカジュアルに', 'e.g. More casual, for people in their 20s')} onChange={(_, d) => setRequest(d.value)} />
+        </Field>
+        <Button type="button" appearance="primary" size="small" className={s.themeIdeasClose} icon={e.drafting ? <Spinner size="extra-tiny" /> : <SparkleRegular />} disabled={e.drafting || e.saving || e.locked} onClick={() => e.draftWhole(request)}>
+          {t('AI で下書きする', 'Draft with AI')}
+        </Button>
+      </div>
+      {/* 部品ごとに直すときの入口(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
+      <span className={s.caption}>{t('直したい所は、プレビューで押してください', 'Click what you want to change in the preview')}</span>
+    </>
+  )
+}
+
+/**
+ * この配信のねらい(テーマと切り口)。直す部品の上に小さく出し、ねらいを見ながら書けるようにする。
+ * ここでは読むだけ。テーマを変えるのは、プレビューの上の配信の情報(ThemeField)の 1 か所だけ(2026-10-27 利用者。直す場所を 1 つにする)。右上の「変える」で、そこへ移る。
+ * 採用した案の理由と、切り口(見出し・コピーの AI の案を採用したときの補足)も、読むだけで添える
+ */
+function Aim({ editor: e, onChange }: { editor: SimpleEditor; /** 「変える」: 配信の情報のテーマの欄を開く */ onChange: () => void }) {
+  const t = useT()
+  const s = useStyles()
+  return (
+    <div className={s.aim}>
+      <div className={s.aimHead}>
+        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
+          {e.form.theme}
+        </LabeledValue>
+        {/* 直す場所は配信の情報の 1 か所だけなので、ここからはそこへ連れて行く(どこで変えるのか分からなかった。2026-10-27 利用者) */}
+        <Tooltip content={t('配信の情報のテーマの欄を開きます', 'Opens the theme field in the delivery info')} relationship="description">
+          <Button type="button" size="small" appearance="transparent" className={s.aimChange} onClick={onChange}>
+            {t('変える', 'Change')}
+          </Button>
+        </Tooltip>
+      </div>
+      {e.form.themeReason && <span className={s.caption}>{t(`理由: ${e.form.themeReason}`, `Why: ${e.form.themeReason}`)}</span>}
+      {e.form.copyAngle && <span className={s.caption}>{t(`切り口(見出し・コピー): ${e.form.copyAngle}`, `Angle (headline & copy): ${e.form.copyAngle}`)}</span>}
+      {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
+    </div>
+  )
+}
+
+/**
+ * テーマを直す欄(配信の情報の中。テーマを変えるのはここだけ)。
+ * AI のテーマの案は、押すとこの欄にだけ仮に写し(テーマはメールに出ないので、プレビューは変わらない)、帯の「確定」で採用する(X81 の 4)。
+ * 採用した案の理由は小さく出す(手で直すと消える)
+ */
+function ThemeField({ editor: e }: { editor: SimpleEditor }) {
+  const t = useT()
+  const s = useStyles()
+  // 案の一覧を広げているか(開いたときの自動の下書きで作った案もあるが、押したときだけ広げる)
   const [ideasOpen, setIdeasOpen] = useState(false)
-  // 試している案(箱にだけ仮に写す。保存する中身は変えない)
+  // 試している案(欄にだけ仮に写す。保存する中身は変えない)
   const [trying, setTrying] = useState<ThemeSuggestion | null>(null)
   const trial = useTrial()
   const { ideas, busy, run } = e.themeAi
@@ -931,42 +964,31 @@ ${idea.reason}`
         e.adoptTheme(idea.theme, idea.reason)
       },
     })
-  const theme = trying?.theme ?? e.form.theme
   const reason = trying ? trying.reason : e.form.themeReason
-  const aiButton = (
-    <Tooltip content={ideas.length > 0 ? t('テーマの案を作り直す(押すと試して、確定で採用)', 'Regenerate theme ideas (click one to try, then apply)') : t('AI でテーマの案を出す(押すと試して、確定で採用)', 'Get theme ideas from AI (click one to try, then apply)')} relationship="label">
-      <Button
-        type="button"
-        size="small"
-        appearance="subtle"
-        icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
-        disabled={busy}
-        onClick={() => {
-          setIdeasOpen(true)
-          run()
-        }}
-      >
-        {ideas.length > 0 ? t('案を作り直す', 'Regenerate') : t('AI で案を出す', 'AI ideas')}
-      </Button>
-    </Tooltip>
-  )
   return (
-    <div className={s.aimWrap}>
-      {editing ? (
-        <div className={s.aim}>
-          <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} autoFocus value={e.form.theme} placeholder={t('テーマ(配信全体の前提。メールには出ません)', 'Theme (premise; not in the email)')} onChange={(_, d) => e.setField('theme', d.value)} onBlur={() => setEditing(false)} />
-        </div>
-      ) : (
-        <div className={mergeClasses(s.aim, s.aimRow, !!trying && s.aimTrying)}>
-          <button type="button" className={s.aimBtn} onClick={() => setEditing(true)} title={t('この配信のねらい(テーマ・切り口。メールには出ません)。押すとテーマを直せます', 'What this delivery aims for (theme and angle; not in the email). Click to edit the theme')}>
-            <span className={theme ? s.aimTheme : s.caption}>{theme || t('テーマを足す', 'Add a theme')}</span>
-            {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
-            {e.form.copyAngle && <span className={s.caption}>{t(`切り口(見出し・コピー): ${e.form.copyAngle}`, `Angle (headline & copy): ${e.form.copyAngle}`)}</span>}
-            {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
-          </button>
-          {aiButton}
-        </div>
-      )}
+    <div data-field="theme" className={s.aimWrap}>
+      <Field label={t('テーマ', 'Theme')} hint={t('配信全体の前提。メールには出ません', 'Premise for the whole delivery; not in the email')} size="small">
+        {/* 試しているあいだは、案を写して読むだけにする(本物のテーマではないと分かるように) */}
+        <AutoTextarea heightKey="PartPane.e_form_theme" size="small" rows={2} className={trying ? s.aimTrying : undefined} readOnly={!!trying} value={trying?.theme ?? e.form.theme} placeholder={t('テーマ', 'Theme')} onChange={(_, d) => e.setField('theme', d.value)} />
+      </Field>
+      {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
+      {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
+      <Tooltip content={ideas.length > 0 ? t('テーマの案を作り直す(押すと試して、確定で採用)', 'Regenerate theme ideas (click one to try, then apply)') : t('AI でテーマの案を出す(押すと試して、確定で採用)', 'Get theme ideas from AI (click one to try, then apply)')} relationship="label">
+        <Button
+          type="button"
+          size="small"
+          appearance="subtle"
+          className={s.themeIdeasClose}
+          icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
+          disabled={busy}
+          onClick={() => {
+            setIdeasOpen(true)
+            run()
+          }}
+        >
+          {ideas.length > 0 ? t('テーマの案を作り直す', 'Regenerate theme ideas') : t('AI でテーマの案を出す', 'AI theme ideas')}
+        </Button>
+      </Tooltip>
       {ideasOpen && (ideas.length > 0 || busy) && (
         <div className={s.themeIdeas}>
           <TrialBar state={trial} />
@@ -1022,6 +1044,7 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
   return (
     <div ref={ref} className={s.root}>
       <NameField value={e.form.name} onChange={(v) => e.setField('name', v)} size="small" field="name" />
+      <ThemeField editor={e} />
       <ScheduledAtField value={e.form.scheduledAt} onChange={(v) => e.setField('scheduledAt', v)} size="small" field="scheduledAt" />
       <ChoiceField label={t('チャネル', 'Channel')} value={e.form.channel} options={channelOptions} onChange={(v) => e.setField('channel', v)} hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')} size="small" field="channel" />
       <StatusField value={e.form.status} onChange={(v) => e.setField('status', v)} size="small" field="status" />

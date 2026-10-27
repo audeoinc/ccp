@@ -28,6 +28,8 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
+import { typo } from './typo'
+import { LabeledValue } from './LabeledValue'
 import { ResizableSurface } from './ResizableSurface'
 import {
   CalendarLtrRegular,
@@ -123,7 +125,7 @@ const useStyles = makeStyles({
   panel: { display: 'grid', rowGap: '10px', padding: '14px 16px', borderRadius: tokens.borderRadiusLarge, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, minWidth: 0 },
   h3: { margin: 0, fontSize: '13px', fontWeight: tokens.fontWeightSemibold },
   hint: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
-  label: { fontSize: '12px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   channelRow: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   // ① の 7 日の表(作る日のチェック・配信日・種類・配信名)。作れない日も並べ、薄くして理由を出す
   table: { display: 'grid', rowGap: '4px' },
@@ -196,7 +198,7 @@ const useStyles = makeStyles({
   theme: { fontSize: '12px', color: tokens.colorNeutralForeground2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   cardSummary: { display: 'flex', alignItems: 'flex-start', columnGap: '8px', minWidth: 0 },
   summaryText: { display: 'grid', rowGap: '1px', minWidth: 0, flexGrow: 1 },
-  summaryKey: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold },
+  summaryKey: typo.pairLabel,
   thumbs: { display: 'flex', alignItems: 'flex-start', columnGap: '6px', flexWrap: 'wrap', rowGap: '6px', minHeight: '64px' },
   thumb: { display: 'grid', justifyItems: 'center', rowGap: '2px' },
   // 週の上限を超えた商品は、赤い枠と ⚠(色だけに頼らない)
@@ -678,14 +680,16 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                       [t('テンプレート', 'Template'), c.layout_key ? getTemplate(c.layout_key).label : ''],
                     ].map(([k, v]) => (
                       <span key={k} className={s.theme} title={v ?? ''}>
-                        <span className={s.summaryKey}>{k}</span> {v || '—'}
+                        <LabeledValue label={k} emptyText="—" truncate>
+                          {v}
+                        </LabeledValue>
                       </span>
                     ))}
                   </div>
                 </div>
                 <div>
                   <div className={s.thumbs}>
-                    {item.productIds.map((pid, i) => {
+                    {item.productIds.filter(Boolean).map((pid, i) => {
                       const over = is.over.includes(pid)
                       return (
                         <span key={`${pid}-${i}`} className={s.thumb} title={pOf(pid)?.name ?? ''}>

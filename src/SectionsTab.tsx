@@ -13,7 +13,8 @@ import { ProductFloat } from './ProductFloat'
 import { AlertChip, LowStockBadge } from './ProductMarks'
 import type { CardAlertKind } from './cardAlerts'
 import { useSelection } from './useSelection'
-import { getTemplate, sectionRange, type SectionInfo } from './templates'
+import { getTemplate, type SectionInfo } from './templates'
+import { replaceSection } from './slots'
 import { partsOf } from './tables'
 import { elementDescriptions } from './elements'
 import { TemplatePartsList } from './PartContentFields'
@@ -86,8 +87,8 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
     const prevCopy = sectionCopies[sec.index] ?? ''
     const result = await drafts.runSection(sec.index)
     if (!result) return false
-    const [from, to] = sectionRange(sections, sec, prevItems.length)
-    setItems([...prevItems.slice(0, from), ...toItems(result.selected), ...prevItems.slice(to)])
+    // そのセクションの枠に置き換える(前のセクションが空いていても、前の枠に詰まらない。src/slots.ts)
+    setItems(replaceSection(prevItems, sections, sec.index, toItems(result.selected)))
     setCandidates([...prevCands.filter((c) => c.section !== sec.index), ...toItems(result.candidates).map((c) => ({ ...c, section: sec.index }))])
     if (sec.wantTitle && result.title.trim()) onSectionTitle(sec.index, result.title.trim())
     if (result.copy.trim()) onSectionCopy(sec.index, result.copy.trim())
@@ -128,8 +129,8 @@ export function SectionsTab({ editor, drafts, products, registerChat, alertKinds
     const prevCands = candidates
     const result = await drafts.runSectionProducts(sec.index)
     if (!result) return
-    const [from, to] = sectionRange(sections, sec, prevItems.length)
-    setItems([...prevItems.slice(0, from), ...toItems(result.selected), ...prevItems.slice(to)])
+    // そのセクションの枠に置き換える(前のセクションが空いていても、前の枠に詰まらない。src/slots.ts)
+    setItems(replaceSection(prevItems, sections, sec.index, toItems(result.selected)))
     setCandidates([...prevCands.filter((c) => c.section !== sec.index), ...toItems(result.candidates).map((c) => ({ ...c, section: sec.index }))])
     setUndo({
       message: tr(`AIが${sectionLabel(sec)}の商品の選び直しをしました(直す場合は、ドラッグ&ドロップで入れ替えられます)`, `AI re-selected the products for ${sectionLabel(sec)} (to adjust, swap items by drag & drop)`),

@@ -14,6 +14,8 @@ import { isCancelled } from './cancel'
 import { statusColor, statusLabel, countryOptions } from './status'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
 import { locale, optionLabel, useT } from './i18n'
+import { LabeledValue } from './LabeledValue'
+import { typo } from './typo'
 import { loadPref, savePref } from './settings'
 import { PREF } from './prefKeys'
 
@@ -45,15 +47,14 @@ const useStyles = makeStyles({
   },
   elbowChild: { left: '8px' },
   elbowGrandchild: { left: '30px' },
-  // 段の名前(ラベル 12px 中太・薄いグレー)
-  label: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap', flexShrink: 0, minWidth: '64px' },
-  name: { fontSize: '13px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
-  meta: { color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap', flexShrink: 0 },
+  // 段の名前(ラベル 11px・薄いグレー。値と見分けられるように。src/typo.ts)
+  label: { ...typo.label, whiteSpace: 'nowrap', flexShrink: 0, minWidth: '64px' },
+  // キャンペーンの名前は、いちばん大事な値なので太く
+  name: { ...typo.valueStrong, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+  meta: { ...typo.value, whiteSpace: 'nowrap', flexShrink: 0 },
   sep: { color: tokens.colorNeutralForeground4, flexShrink: 0 },
   // 畳んでいないときの 2 行目(テーマ・目的)
-  detail: { display: 'flex', alignItems: 'baseline', columnGap: '16px', paddingLeft: '96px', paddingBottom: '4px', minWidth: 0, color: tokens.colorNeutralForeground2 },
-  pair: { display: 'flex', alignItems: 'baseline', columnGap: '6px', minWidth: 0 },
-  pairLabel: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap', flexShrink: 0 },
+  detail: { display: 'flex', alignItems: 'baseline', columnGap: '24px', paddingLeft: '96px', paddingBottom: '4px', minWidth: 0 },
   pairValue: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
   actions: { marginLeft: 'auto', display: 'flex', alignItems: 'center', columnGap: '4px', flexShrink: 0 },
   tabs: { minWidth: 0, overflowX: 'auto' },
@@ -140,16 +141,16 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, variants, act
       </div>
       {open && (
         <div className={s.detail}>
-          <span className={s.pair}>
-            <span className={s.pairLabel}>{t('テーマ', 'Theme')}</span>
-            <Tooltip content={campaign.theme_reason || theme || t('未設定', 'Not set')} relationship="description">
-              <span className={s.pairValue}>{theme || t('未設定', 'Not set')}</span>
-            </Tooltip>
-          </span>
-          <span className={s.pair}>
-            <span className={s.pairLabel}>{t('目的', 'Goal')}</span>
-            <span className={s.pairValue}>{campaign.purpose || t('未設定', 'Not set')}</span>
-          </span>
+          <LabeledValue label={t('テーマ', 'Theme')} truncate>
+            {theme && (
+              <Tooltip content={campaign.theme_reason || theme} relationship="description">
+                <span>{theme}</span>
+              </Tooltip>
+            )}
+          </LabeledValue>
+          <LabeledValue label={t('目的', 'Goal')} truncate>
+            {campaign.purpose}
+          </LabeledValue>
         </div>
       )}
       <div className={mergeClasses(s.tier, s.child)}>

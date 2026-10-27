@@ -11,6 +11,7 @@ import type { NextStep } from './nextStep'
 import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
+import type { TemplateUse } from '../templateUse'
 import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
@@ -44,7 +45,8 @@ export interface AiPreview {
   heroId?: string
   /** テンプレートの選び直しで、乗せているテンプレート */
   templateId?: EmailTemplateId
-  item?: { key: string; productId: string }
+  /** 枠の商品の案。key が空なら空いた枠への案で、at の位置(押した空いた枠)に写す */
+  item?: { key: string; productId: string; at?: number }
 }
 
 /** 商品のフロートを、入れ替えの候補(配信に載っていない商品)の詳しい情報として開くときの鍵の頭(openProduct の key に「pid:商品 ID」) */
@@ -90,6 +92,8 @@ export interface SimpleExtras {
   setField: (k: SimpleField, v: string) => void
   /** テーマの AI の案(詳しい画面の ① テーマと同じ useAiDrafts。案は保存しない。X81 の 4) */
   themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void }
+  /** テンプレートごとの最近の使われ方(詳しい画面の ② テンプレートと同じ templateUse。全部の配信が読めるまでは undefined。X81 の 7) */
+  templateUse?: Map<string, TemplateUse>
   /** テーマの案を採用する(理由も一緒に入れる。手で直したときは setField('theme') が理由を消す) */
   adoptTheme: (theme: string, reason: string) => void
   channel: 'email' | 'push'
@@ -116,6 +120,10 @@ export interface SimpleExtras {
   /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
   applyTexts: (t: WholeTexts) => void
   linkSpots: LinkSlot[]
+  /** リンクの場所の、計測用のパラメーター(utm)つきの URL(⑤ リンク先・プレビューのリンクと同じ。AB の案の印つき。X81 の 8) */
+  linkUrlOf: (slot: LinkSlot) => string
+  /** 商品の枠の、計測用のパラメーターつきの URL(表の箱は、いちばん上の要素 = ふつうは写真のリンク。プレビューと同じ) */
+  productLinkOf: (itemKey: string) => { name: string; url: string } | undefined
   /** アプリの開く画面の FCM の data に入れる campaign(⑤ リンク先と同じ。AB の案の印つき) */
   fcmCampaign: string
   /** 商品 ID → いちばん強いアラートの種類 */
@@ -150,6 +158,10 @@ export interface SimpleExtras {
   reasonForm: ReactNode
   cancelReason: () => void
   canUndo: boolean
+  /** 配信の全体を AI で下書きする(request = どう作るか。空なら、いまのテーマから。中身があれば先に確かめる。済んだら保存) */
+  draftWhole: (request: string) => void
+  /** AI の下書きが動いているあいだ */
+  drafting: boolean
   // ---- 上の帯
   nextStep: NextStep
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る・詳しい画面へ + 複製・取りやめ・削除) */

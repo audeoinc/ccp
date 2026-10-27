@@ -50,7 +50,7 @@ const useStyles = makeStyles({
   alertDetail: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   // 入れ替えの画面のいちばん上の、いまの商品の 1 行
   now: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  nowLabel: { ...typo.label, flexShrink: 0 },
+  nowLabel: { ...typo.pairLabel, flexShrink: 0 },
   // 中身(詳しい情報・入れ替え)は、この中でスクロールする
   pane: { display: 'grid', alignContent: 'start', rowGap: '10px', overflowY: 'auto', minHeight: 0, flexGrow: 1, paddingRight: '6px' },
   sectionHead: { display: 'flex', alignItems: 'center', columnGap: '6px', ...typo.heading },

@@ -1,0 +1,43 @@
+# 見本の画面(デモのビルド)を、push のたびに作って、置き場所のバケットへ送る(Cloud Build のトリガーから。どのブランチの push でも)。
+# 見本を返すサーバー(preview/server.py)は作り直さない(ファイルを送るだけなので速い)。
+#   main      → gs://<バケット>/main/
+#   ほかの枝  → gs://<バケット>/branches/<ブランチ名を URL に使える形にしたもの>/(バケットのライフサイクルで 14 日で消える)
+# バケット名はプロジェクトを含むので、ここには書かずに、トリガーの置き換えの値 _BUCKET で渡す。
+# 手で試すときは: gcloud builds submit --config cloudbuild-preview.yaml --substitutions _BUCKET=<バケット>,_BRANCH=<ブランチ名>
+# 本番の反映(scripts/deploy-gcp.mjs)は、タグ service_contents-planner のビルドを待つので、そのタグは付けない(付けると本番の反映が待たされる)
+steps:
+  - id: build
+    name: node:26-slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        npm ci --no-audit --no-fund
+        npx vite build --config vite.mock.config.ts --base=./ --outDir dist-preview --emptyOutDir
+  - id: upload
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        b="$BRANCH_NAME"
+        [ -n "$$b" ] || b="${_BRANCH}"
+        # URL に使える形(英小文字・数字・-)にそろえる。サーバー(preview/server.py)も同じ形だけを受ける
+        slug=$$(printf '%s' "$$b" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$$//' | cut -c1-60)
+        if [ "$$slug" = "main" ]; then dest="gs://${_BUCKET}/main"; else dest="gs://${_BUCKET}/branches/$$slug"; fi
+        # 古い見本を消してから置く(作り直すたびに、ファイルの日付が新しくなり、14 日で消える数え方が、最後の push から始まるように)
+        gcloud storage rm -r -q "$$dest/**" || true
+        gcloud storage cp -r dist-preview/* "$$dest/"
+        echo "見本: /b/$$slug/"
+substitutions:
+  _BUCKET: ''
+  _BRANCH: main
+options:
+  # ログは Cloud Logging だけ(ログ用のバケットを使わない。本番の cloudbuild.yaml と同じ)
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: false
+tags:
+  - ccp-preview
+timeout: 900s

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Badge, Button, Checkbox, Dropdown, Field, MessageBar, MessageBarBody, Option, Radio, RadioGroup, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { LabeledValue } from './LabeledValue'
 import { ArrowUndoRegular, CheckmarkCircleRegular, CircleRegular, DismissCircleRegular, PeopleTeamRegular, PersonRegular, SendRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { ApprovalRequestStatus, type ApprovalRequest, type ApprovalRequestRule } from './models/approvalRequests'
@@ -35,10 +36,9 @@ const useStyles = makeStyles({
   pending: { color: tokens.colorNeutralForeground4 },
   actions: { display: 'flex', alignItems: 'center', columnGap: '6px', rowGap: '6px', flexWrap: 'wrap' },
   // 承認を依頼するときの、種別の既定の依頼先(依頼の前に、だれに届くかが分かるように)
-  target: { flexBasis: '100%', display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, overflowWrap: 'anywhere' },
+  target: { flexBasis: '100%' },
   // ボタンの行の中で、案内だけは 1 行を使う(ボタンと横に並ぶと、どれの説明か分かりにくいため)
   wide: { flexBasis: '100%' },
-  targetLabel: { color: tokens.colorNeutralForeground3 },
   // 依頼・差し戻しの入力
   box: { display: 'grid', rowGap: '8px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   boxActions: { display: 'flex', justifyContent: 'flex-end', columnGap: '8px' },
@@ -188,12 +188,13 @@ export function ApprovalBar({ card, isDirty, busy, onChanged, variant = 'panel',
     ...parseIds(def?.user_ids).map((id) => activeUsers(people).find((u) => u.id === id)?.name),
   ].filter(Boolean)
   const defaultTarget = usersOk && (
-    <span className={s.target}>
-      <span className={s.targetLabel}>{t('依頼先:', 'Request to:')}</span>
-      {defNames.length > 0
-        ? t(`${defNames.join('・')}(${def?.rule === 'any' ? 'だれか 1 人' : '全員'})`, `${defNames.join(', ')} (${def?.rule === 'any' ? 'any one' : 'everyone'})`)
-        : t('既定の依頼先はありません(依頼のときに選びます。⚙ の「承認の決まり」で決められます)', 'No default approvers (choose when requesting, or set them in ⚙ Approval rules)')}
-    </span>
+    <LabeledValue
+      className={s.target}
+      label={t('依頼先', 'Request to')}
+      emptyText={t('既定の依頼先はありません(依頼のときに選びます。⚙ の「承認の決まり」で決められます)', 'No default approvers (choose when requesting, or set them in ⚙ Approval rules)')}
+    >
+      {defNames.length > 0 ? t(`${defNames.join('・')}(${def?.rule === 'any' ? 'だれか 1 人' : '全員'})`, `${defNames.join(', ')} (${def?.rule === 'any' ? 'any one' : 'everyone'})`) : ''}
+    </LabeledValue>
   )
 
   const requestButton = (

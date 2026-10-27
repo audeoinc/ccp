@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { filled } from './slots'
 import { Button, Field, Input, Select, makeStyles, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronRightRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -129,11 +130,11 @@ export function AppLinksEditor({ links, onLinks, slots, items, products, campaig
         icon={showProducts ? <ChevronDownRegular /> : <ChevronRightRegular />}
         onClick={() => setShowProducts(!showProducts)}
       >
-        {t(`商品のリンク(${items.length} 件。商品のページを自動で開きます)`, `Product links (${items.length}; open each product page automatically)`)}
+        {t(`商品のリンク(${filled(items).length} 件。商品のページを自動で開きます)`, `Product links (${filled(items).length}; open each product page automatically)`)}
       </Button>
       {showProducts && (
         <div className={styles.products}>
-          {items.map((it) => {
+          {filled(items).map((it) => {
             const p = products.find((x) => x.id === it.productId)
             const text = p?.product_code ? fcmText({ kind: 'product', value: p.product_code }, campaign) : ''
             return (
