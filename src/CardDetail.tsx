@@ -1160,6 +1160,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         },
         linkSpots,
         linkUrlOf,
+        productLinkOf,
         fcmCampaign,
         alertKinds: productAlertKinds,
         swapWithCandidate,

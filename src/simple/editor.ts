@@ -122,6 +122,8 @@ export interface SimpleExtras {
   linkSpots: LinkSlot[]
   /** リンクの場所の、計測用のパラメーター(utm)つきの URL(⑤ リンク先・プレビューのリンクと同じ。AB の案の印つき。X81 の 8) */
   linkUrlOf: (slot: LinkSlot) => string
+  /** 商品の枠の、計測用のパラメーターつきの URL(表の箱は、いちばん上の要素 = ふつうは写真のリンク。プレビューと同じ) */
+  productLinkOf: (itemKey: string) => { name: string; url: string } | undefined
   /** アプリの開く画面の FCM の data に入れる campaign(⑤ リンク先と同じ。AB の案の印つき) */
   fcmCampaign: string
   /** 商品 ID → いちばん強いアラートの種類 */
