@@ -3,6 +3,7 @@
 // 変えると全社(または国)の全員に効くので、確かめてから保存し、変えた人・日時を残す
 import { useState } from 'react'
 import { Button, Field, Input, MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { SAMPLE_BRAND, brandHistoryOf, brandOwn, saveBrand, useCountrySettings, type Brand } from './countrySettings'
 import { myName } from './history'
 import { useT, when } from './i18n'
@@ -11,7 +12,7 @@ import { confirmDialog } from './confirm'
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '14px', maxWidth: '640px' },
   note: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   actions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   history: { margin: 0, paddingLeft: '18px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, maxHeight: '160px', overflowY: 'auto' },
 })

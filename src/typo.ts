@@ -16,6 +16,10 @@ export const typo = {
   valueStrong: { fontSize: '13px', lineHeight: '18px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   /** 空の値(未設定・(未設定)・—): ラベルと同じ薄さ。値が入っている所が目に入るように */
   empty: { color: tokens.colorNeutralForeground3 },
+  /** ラベルと値の組のラベル: 10px・ごく薄い色(目印。値を読めば分かるので、ラベルは目印で足りる。2026-10-27 利用者)。LabeledValue と、数字の札(KPI)・表の形の組で使う */
+  pairLabel: { fontSize: '10px', lineHeight: '14px', fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForegroundDisabled },
+  /** ラベルと値の組の値: 14px・semibold・濃い色(主役) */
+  pairValue: { fontSize: '14px', lineHeight: '20px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   /** 補足: 12px・薄いグレー */
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 } as const

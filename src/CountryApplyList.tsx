@@ -3,6 +3,7 @@
 // 変えると国の全員に効くので、確かめてから保存し、変えた人・日時を残す(src/countryApply.ts)
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, Card, CardPreview, Checkbox, MessageBar, MessageBarBody, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { appliesIn, applyDecided, applyHistory, saveApply, useCountryApply, type ApplyKind } from './countryApply'
 import { myName } from './history'
 import { useT, when } from './i18n'
@@ -11,7 +12,7 @@ import { confirmDialog } from './confirm'
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '12px' },
   group: { display: 'grid', rowGap: '2px' },
-  label: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  label: typo.label,
   row: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 },
   // 名前が長くても、既定の札は潰さない
   badge: { flexShrink: 0, whiteSpace: 'nowrap' },

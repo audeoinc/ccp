@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import {
   AddRegular,
   CalendarRegular,
@@ -178,7 +179,7 @@ const useStyles = makeStyles({
   // 商品: メイン画像と、掲載商品の全点(セクションごと)。画像は切らずに全体を見せる
   hero: { width: '100%', aspectRatio: '16 / 9', borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground3, overflow: 'hidden' },
   img: { display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
-  secLabel: { fontSize: '10px', color: tokens.colorNeutralForeground3 },
+  secLabel: typo.label,
   grid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '3px' },
   thumb: {
     position: 'relative',

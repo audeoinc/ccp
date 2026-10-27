@@ -26,15 +26,15 @@ const useStyles = makeStyles({
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '8px' },
   kpi: { display: 'grid', rowGap: '1px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  kpiLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase100 },
+  kpiLabel: typo.pairLabel,
   kpiValue: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   section: { display: 'grid', rowGap: '4px' },
   sectionTitle: { color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
   text: { margin: 0, fontSize: tokens.fontSizeBase200, lineHeight: '18px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   facts: { display: 'grid', gridTemplateColumns: 'minmax(56px, auto) minmax(0, 1fr)', columnGap: '10px', rowGap: '3px', margin: 0 },
-  label: typo.label,
-  value: { margin: 0, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
+  label: typo.pairLabel,
+  value: { ...typo.pairValue, margin: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
 })
 
 export type ProductDetailTab = 'trend' | 'sku' | 'metrics' | 'plan' | 'details'

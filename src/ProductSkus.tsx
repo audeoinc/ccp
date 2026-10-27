@@ -1,4 +1,5 @@
 import { Badge, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import type { Product } from './models/products'
 import { sortSizes, stockoutRate, useProductSkus, type SkuRow } from './useProductSkus'
 import { locale, num, useT } from './i18n'
@@ -10,7 +11,7 @@ const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '10px' },
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '8px' },
   kpi: { display: 'grid', rowGap: '1px', padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  kpiLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase100 },
+  kpiLabel: typo.pairLabel,
   kpiValue: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   kpiSub: { marginLeft: '6px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightRegular, color: tokens.colorNeutralForeground3 },
   bad: { color: tokens.colorPaletteRedForeground1 },

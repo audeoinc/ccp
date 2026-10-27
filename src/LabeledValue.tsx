@@ -12,8 +12,8 @@ const useStyles = makeStyles({
   inline: { display: 'inline-flex', alignItems: 'baseline', columnGap: '10px', minWidth: 0 },
   stacked: { display: 'flex', flexDirection: 'column', rowGap: '2px', minWidth: 0 },
   // ラベルは 10px・ごく薄い色(2026-10-27 利用者。値を読めば分かるので、ラベルは目印で足りる。白い背景でかろうじて読める程度)
-  label: { ...typo.label, fontSize: '10px', lineHeight: '14px', color: tokens.colorNeutralForegroundDisabled, whiteSpace: 'nowrap', flexShrink: 0 },
-  value: { ...typo.value, fontSize: '14px', lineHeight: '20px', fontWeight: tokens.fontWeightSemibold, minWidth: 0, overflowWrap: 'anywhere' },
+  label: { ...typo.pairLabel, whiteSpace: 'nowrap', flexShrink: 0 },
+  value: { ...typo.pairValue, minWidth: 0, overflowWrap: 'anywhere' },
   strong: { fontWeight: tokens.fontWeightBold },
   // 空の値は太くせず、ラベルと同じ薄さ
   empty: { ...typo.empty, fontWeight: tokens.fontWeightRegular },

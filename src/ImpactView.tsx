@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { AiRunsService, type AiRun, type AiRunAdoption } from './data/aiRuns'
@@ -35,7 +36,7 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
   },
-  tileLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  tileLabel: typo.pairLabel,
   tileValue: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
   tileSub: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   section: { display: 'grid', rowGap: '8px' },
@@ -92,7 +93,7 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
     boxShadow: tokens.shadow4,
   },
-  paneLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  paneLabel: typo.label,
   learnCard: {
     display: 'grid',
     rowGap: '2px',
@@ -134,7 +135,7 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
     fontSize: tokens.fontSizeBase200,
   },
-  periodLabel: { fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightMedium, color: tokens.colorNeutralForeground3 },
+  periodLabel: typo.label,
   dateInput: { fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, padding: '2px 6px', border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: tokens.borderRadiusMedium },
   periodSummary: { color: tokens.colorNeutralForeground2, fontVariantNumeric: 'tabular-nums' },
 })
