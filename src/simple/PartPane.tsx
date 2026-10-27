@@ -873,18 +873,30 @@ function TrackedUrl({ url }: { url: string }) {
   const t = useT()
   const s = useStyles()
   if (!url || !/^https?:\/\//.test(url)) return null
+  // 付いている計測用のパラメーター(utm_ で始まるもの。決まった 4 つのほかに付いていれば、それも出す)
+  let params: [string, string][] = []
+  try {
+    params = [...new URL(url).searchParams.entries()].filter(([k]) => k.startsWith('utm_'))
+  } catch {
+    params = []
+  }
   return (
     <span className={s.trackedUrl}>
       <InfoLabel
         size="small"
         info={t(
-          'utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から、自動で決まります。GA で、どの配信のどのリンクが押されたかを見分けるためです。まだ保存していない配信は、保存すると ID が付きます。',
-          'utm_campaign comes from the send date and delivery card ID, and utm_content from the link spot, automatically. This lets GA tell which link in which delivery was clicked. An unsaved delivery gets its ID when saved.',
+          'utm_source・utm_medium は決まった値(詳しい画面の ⑤ リンク先で変えられます)。utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から、自動で決まります。AB テストの配信は、utm_campaign の末尾に案の印(-a・-b・-c)が自動で付きます。GA で、どの配信のどのリンクが押されたかを見分けるためです。まだ保存していない配信は、保存すると ID が付きます。',
+          'utm_source and utm_medium are fixed values (change them in ⑤ Links on the detailed view). utm_campaign comes from the send date and delivery card ID, and utm_content from the link spot, automatically. For A/B tests, the variant (-a, -b, -c) is added to the end of utm_campaign automatically. This lets GA tell which link in which delivery was clicked. An unsaved delivery gets its ID when saved.',
         )}
       >
         {t('計測用のパラメーターつき', 'With tracking')}
       </InfoLabel>
       <span className={s.trackedText}>{url}</span>
+      {params.map(([k, v]) => (
+        <LabeledValue key={k} label={k} labelWidth="96px">
+          {v}
+        </LabeledValue>
+      ))}
     </span>
   )
 }
