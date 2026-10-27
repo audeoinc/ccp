@@ -10,6 +10,7 @@ import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import type { WeekRow } from './data/weeks'
 import type { AutoDraftResult } from './autoDraft'
+import { loadLastNewCountry, saveLastNewCountry } from './settings'
 import { suggestNames } from './aiDraft'
 import { channelOptions, departmentOptions, CHANNEL_EMAIL } from './status'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
@@ -181,10 +182,11 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setChosen(new Set(linesOf(weekDays(ws, cards, weeks, ch, co), ps, cards, ch, co).filter((d) => d.state === 'free').map((d) => d.key)))
   }
 
-  /** 作業画面を開く。既定は、見ている週と、画面の絞り込み。国の絞り込みがなければ、いちばん多く配信している国(国が空だと、日本とアメリカの商品が混ざるため) */
+  /** 作業画面を開く。既定は、見ている週と、画面の絞り込み。国の絞り込みがなければ、その人が新規作成・一括作成で最後に選んだ国(2026-10-27 利用者)、
+   * それもなければ、いちばん多く配信している国(国が空だと、日本とアメリカの商品が混ざるため) */
   function openFor(viewWeek: Date) {
     const ws = sundayOf(viewWeek)
-    const co = defaults.country || mostCommon(cards.map((c) => String(c.country ?? ''))) || ''
+    const co = defaults.country || loadLastNewCountry() || mostCommon(cards.map((c) => String(c.country ?? ''))) || ''
     const ch = defaults.channel || CHANNEL_EMAIL
     stopRef.current = false
     setWeekStart(ws)
@@ -302,6 +304,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
 
   const setCountry = (v: string) => {
     setCountryRaw(v)
+    saveLastNewCountry(v)
     pickFree(weekStart, channel, v)
   }
   const setChannel = (v: string) => {

@@ -31,6 +31,7 @@ import { toLocalInput } from './duplicate'
 import { locale, optionLabel, useT } from './i18n'
 import { CHANNEL_PUSH, countryOptions } from './status'
 import { confirmedWeekOf } from './weekLock'
+import { saveLastNewCountry } from './settings'
 
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '10px' },
@@ -90,6 +91,7 @@ export function NewCampaignDialog({ defaults, weeks, onClose, onCreated }: { def
     setError(null)
     try {
       const { cardId } = await createCampaignWithCard({ name, country, channel, scheduledAt: at, purpose, themeType: defaults?.themeType })
+      saveLastNewCountry(country)
       onClose()
       onCreated(cardId)
     } catch (e) {

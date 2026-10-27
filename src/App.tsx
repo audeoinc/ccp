@@ -76,7 +76,7 @@ import { CardDetail, type NewCardDefaults } from './CardDetail'
 import { NewCampaignDialog } from './CampaignDialogs'
 import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
-import { loadAutoDraft, loadPref, saveAutoDraft, savePref } from './settings'
+import { loadAutoDraft, loadLastNewCountry, loadPref, saveAutoDraft, savePref } from './settings'
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { countryOptions, statusColor, statusOptions, statusRank, statusView } from './status'
 import { themeTypeOf } from './themeTypes'
@@ -876,9 +876,10 @@ function App() {
   const bulkOpened = useOpenedOnce(bulk.open)
   const settingsOpened = useOpenedOnce(settingsOpen)
   // 新規作成の初期値: 絞り込み中の国・チャネル・種別を引き継ぐ(その条件の配信を作ることが多いため)
+  // 国は、ヘッダーの国。「すべての国」のときは、その人が新規作成・一括作成で最後に選んだ国(2026-10-27 利用者)
   const newCardDefaults = (scheduledAt?: string): NewCardDefaults => ({
     ...(scheduledAt ? { scheduledAt } : {}),
-    ...(filters.country ? { country: filters.country } : {}),
+    ...((filters.country || loadLastNewCountry()) ? { country: filters.country || loadLastNewCountry() } : {}),
     ...(filters.channel ? { channel: filters.channel } : {}),
     ...(filters.department ? { themeType: filters.department } : {}),
   })

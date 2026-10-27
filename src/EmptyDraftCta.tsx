@@ -34,7 +34,8 @@ const useStyles = makeStyles({
   note: { color: tokens.colorNeutralForeground3 },
 })
 
-export function EmptyDraftCta({ disabled, onDraft }: { disabled?: boolean; onDraft: () => void }) {
+/** saves = でき上がったら保存する(作ってある配信カード)。まだ作っていない案は、画面に入るだけ */
+export function EmptyDraftCta({ disabled, saves, onDraft }: { disabled?: boolean; saves: boolean; onDraft: () => void }) {
   const t = useT()
   const s = useStyles()
   return (
@@ -44,7 +45,11 @@ export function EmptyDraftCta({ disabled, onDraft }: { disabled?: boolean; onDra
         <Button type="button" appearance="primary" size="large" icon={<AiIcon size={20} />} disabled={disabled} onClick={onDraft}>
           {t('AI で下書きする', 'Draft with AI')}
         </Button>
-        <Caption1 className={s.note}>{t('テーマ・コピー・商品・メイン画像をまとめて。保存するまでは、画面に入るだけです', 'Theme, copy, products, and hero image at once. Nothing is saved until you save.')}</Caption1>
+        <Caption1 className={s.note}>
+          {saves
+            ? t('テーマ・コピー・商品・メイン画像をまとめて。でき上がったら保存します(元に戻せます)', 'Theme, copy, products, and hero image at once. Saved when done (you can undo).')
+            : t('テーマ・コピー・商品・メイン画像をまとめて。保存するまでは、画面に入るだけです', 'Theme, copy, products, and hero image at once. Nothing is saved until you save.')}
+        </Caption1>
       </div>
     </div>
   )

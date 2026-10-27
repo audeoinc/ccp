@@ -10,6 +10,8 @@ export const PREF = {
   uiScale: 'ui.scale',
   /** 国(X33。どの国の仕事をしているか。'' = すべての国) */
   country: 'ccp.country',
+  /** 新規作成・一括作成で最後に選んだ国(ヘッダーが「すべての国」のときの、国の初期値。2026-10-27 利用者) */
+  lastNewCountry: 'create.lastCountry',
   calendarView: 'calendar.view',
   weekLens: 'week.lens',
   // 列を足したら、版を上げる(以前に選んだ列の設定では、新しい列が出ないため)

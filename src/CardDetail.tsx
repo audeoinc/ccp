@@ -374,16 +374,25 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     if (res.errors.length > 0) setError(t(`一部の工程で失敗しました: ${res.errors.join(' / ')}`, `Some steps failed: ${res.errors.join(' / ')}`))
   }
 
-  // すべて AI で下書きした中身は、自動では保存しない(下書きの知らせのとおり、気に入らなければ保存せずに閉じられるように)。
-  // 下書きが済んだときの中身を覚え、人がそこから直したら、下書きの分も一緒に保存する
+  // AI の下書きは、人がボタンで始めたものは、押したことを採用とみなして、済んだらふだんの保存の道で保存する(下の adoptDraft。2026-10-27 利用者。
+  // 気に入らなければ、元に戻すか、下書きし直す)。テンプレートが見つからないときの自動の下書きし直しと、まだ作っていない案(一括作成の、作る前の案)は、
+  // これまでどおり自動では保存しない: 下書きが済んだときの中身を覚え、人がそこから直したら、下書きの分も一緒に保存する
   const [draftPending, setDraftPending] = useState(false)
   const [draftKey, setDraftKey] = useState<string | null>(null)
+  const [adoptDraft, setAdoptDraft] = useState(false)
+  const [draftDone, setDraftDone] = useState(false)
   useEffect(() => {
     if (!draftPending || auto !== null) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftPending(false)
     setDraftKey(currentKey)
+    setDraftDone(true)
   }, [draftPending, auto, currentKey])
+  /** 人がボタンで始める下書き(押したことを採用とみなして、済んだら保存する) */
+  function startAdoptedDraft() {
+    setAdoptDraft(true)
+    void startAutoDraft()
+  }
   async function startAutoDraft() {
     if (!form.scheduledAt) {
       setError(t('すべてAIで下書きするには、先に配信日時を入力してください', 'Enter the send date & time first to draft everything with AI'))
@@ -406,7 +415,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
 
   async function runAllManual() {
     if (hasContent && !(await confirmDialog(form.channel === CHANNEL_PUSH ? t('現在のテーマ・通知のタイトルと本文・ヘッドライン・コピー・商品・メイン画像を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, notification title and body, headline, copy, products, and hero image with an AI draft. Continue?') : t('現在のテーマ・件名・プリヘッダー・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, subject, preheader, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
-    void startAutoDraft()
+    startAdoptedDraft()
   }
 
   useEffect(() => {
@@ -724,6 +733,17 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     const ok = await save({ after: 'stay', reason, force })
     if (ok && push && before) undoStack.push(before)
   }
+  // 押して始めた下書きが済んだら、保存する(ふだんの保存と同じ道。元に戻すの履歴にも積む)。
+  // 確定した週の配信は理由が要るので、ここでは保存しない(ふだんの保存のボタンで)。スキップして中身が変わっていなければ、何もしない
+  useEffect(() => {
+    if (!draftDone) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftDone(false)
+    const adopt = adoptDraft
+    setAdoptDraft(false)
+    if (adopt && card && !locked && isDirty()) void saveStaying()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftDone])
   // キャンペーン(X79)。入っている配信は、いちばん上に親・子・孫の帯を出し、名前は「キャンペーン名 + チャネル」で出す
   const campaign = useCampaignOf(card?.campaign_id)
   const campaignName = card && campaign ? cardDisplayName(card, [campaign]) : undefined
@@ -1013,7 +1033,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     </>
   )
   // 空のカード: プレビューの真ん中に出す(シンプル・詳しいの両方の画面。シンプルには、すべてAIで下書きのボタンがないため)
-  const emptyDraftNode = !hasContent && !auto && !missingTemplate?.redrafted ? <EmptyDraftCta disabled={saving} onDraft={() => void startAutoDraft()} /> : null
+  const emptyDraftNode = !hasContent && !auto && !missingTemplate?.redrafted ? <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={startAdoptedDraft} /> : null
   const footerNode = (
     <>
     {missingTemplate && (
@@ -1036,8 +1056,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               size="small"
               disabled={auto !== null}
               onClick={() => {
-                setMissingTemplate({ ...missingTemplate, redrafted: true })
-                void startAutoDraft()
+                // 押して下書きし直したものは保存するので、「キャンセルで元に戻せます」の知らせは出さずに閉じる
+                setMissingTemplate(null)
+                startAdoptedDraft()
               }}
             >
               {t('AI で下書きし直す', 'Redraft with AI')}
@@ -1246,7 +1267,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               <Text>{auto.label}({Math.min(auto.done + 1, auto.total)} / {auto.total})</Text>
               <ProgressBar className={styles.overlayBar} value={Math.min(1, auto.done / auto.total)} />
               <Caption1 className={styles.caption}>
-                {t('結果は画面に反映されるだけで、保存はされません。気に入らなければ、保存せずに閉じられます。', 'Results are only applied on screen and are not saved. If you do not like them, close without saving.')}
+                {adoptDraft && card && !locked
+                  ? t('でき上がった下書きは、そのまま保存します。気に入らなければ、元に戻すか、下書きし直せます。', 'The finished draft is saved as is. If you do not like it, undo or redraft.')
+                  : t('結果は画面に反映されるだけで、保存はされません。気に入らなければ、保存せずに閉じられます。', 'Results are only applied on screen and are not saved. If you do not like them, close without saving.')}
               </Caption1>
               <Button
                 type="button"
