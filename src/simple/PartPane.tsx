@@ -56,10 +56,12 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1, minWidth: 0 },
   // 名前・直す・開くは縮めず、URL の文だけを省略する
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
-  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...typo.value },
+  linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...typo.pairValue },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
   caption: typo.caption,
   label: typo.label,
+  // 値に付くラベル(リンク先など。一覧の見出しの label とは別)
+  pairLabel: typo.pairLabel,
   row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '10px', rowGap: '10px' },
   // 商品の見比べ・情報の箱
@@ -651,7 +653,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 </Field>
               ) : (
                 <span className={s.linkLine}>
-                  <span className={s.label}>{t('リンク先', 'Link')}</span>
+                  <span className={s.pairLabel}>{t('リンク先', 'Link')}</span>
                   <span className={s.linkText}>{e.links.hero?.trim() || (heroDefaultLink ? t(`既定(${heroDefaultLink})`, `Default (${heroDefaultLink})`) : t('既定', 'Default'))}</span>
                   <OpenLink url={e.links.hero?.trim() || heroDefaultLink} />
                   <Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => setLinkEditing(true)}>{t('直す', 'Edit')}</Button>

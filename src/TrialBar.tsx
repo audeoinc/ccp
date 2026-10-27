@@ -20,7 +20,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
   },
   pair: { display: 'flex', alignItems: 'center', columnGap: '6px', flexGrow: 1, minWidth: 0, flexWrap: 'wrap' },
-  label: { ...typo.label, flexShrink: 0 },
+  label: { ...typo.pairLabel, flexShrink: 0 },
   value: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' },
   to: { fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground1 },
   buttons: { display: 'flex', columnGap: '6px', marginLeft: 'auto' },

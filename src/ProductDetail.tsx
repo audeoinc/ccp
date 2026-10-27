@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, MessageBar, MessageBarBody, Tab, TabList, Text, makeStyles, tokens } from '@fluentui/react-components'
+import { LabeledValue } from './LabeledValue'
 import { typo } from './typo'
 import { DismissRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -156,7 +157,7 @@ export function ProductDetail({ product: p, onClose, footer, initialTab = 'trend
             </div>
             <div className={s.section}>
               <span className={s.sectionTitle}>{t('販促計画', 'Promotion plan')}</span>
-              {data.policy.promoPeriod && <span className={s.muted}>{t('期間', 'Period')}: {data.policy.promoPeriod}</span>}
+              {data.policy.promoPeriod && <LabeledValue label={t('期間', 'Period')}>{data.policy.promoPeriod}</LabeledValue>}
               <p className={s.text}>{data.policy.promoPlan || '—'}</p>
             </div>
           </>

@@ -20,7 +20,7 @@ const useStyles = makeStyles({
   sub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   changes: { display: 'grid', rowGap: '6px', padding: '10px 14px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
   change: { display: 'grid', gridTemplateColumns: '120px auto auto minmax(0, 1fr)', justifyContent: 'start', columnGap: '10px', alignItems: 'baseline', fontSize: tokens.fontSizeBase300 },
-  label: typo.label,
+  label: typo.pairLabel,
   before: { color: tokens.colorNeutralForeground3, textDecoration: 'line-through', overflowWrap: 'anywhere' },
   after: { fontWeight: tokens.fontWeightSemibold, overflowWrap: 'anywhere' },
   arrow: { color: tokens.colorNeutralForeground3 },

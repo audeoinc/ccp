@@ -15,6 +15,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
+import { typo } from './typo'
 import {
   AddRegular,
   AlertRegular,
@@ -120,7 +121,7 @@ const useStyles = makeStyles({
   },
   // 「すべて」以外を選んでいる(絞り込み中)
   filterChipOn: { border: `1px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
-  filterChipLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  filterChipLabel: { ...typo.pairLabel, whiteSpace: 'nowrap' },
   filterChipValue: { fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
   // 絞り込みの選ぶ一覧(項目の幅をそろえ、少し広めに)
   filterMenu: { minWidth: '180px' },

@@ -34,7 +34,7 @@ const useStyles = makeStyles({
   side: { display: 'grid', rowGap: '10px', alignContent: 'start' },
   big: { width: '100%', maxHeight: 'calc(40vh / var(--ui-zoom, 1))', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3, borderRadius: tokens.borderRadiusMedium },
   head: { fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
-  label: typo.label,
+  label: typo.pairLabel,
   value: { fontSize: tokens.fontSizeBase200 },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   reason: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },

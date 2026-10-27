@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Input, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { typo } from './typo'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowSwapRegular, CheckmarkRegular, EditRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -22,7 +23,7 @@ const useStyles = makeStyles({
   warn: { display: 'block', marginTop: '4px', color: tokens.colorPaletteDarkOrangeForeground1 },
   surface: { width: 'min(560px, (94vw / var(--ui-zoom, 1)))', maxWidth: 'none' },
   content: { display: 'grid', rowGap: '10px' },
-  label: { display: 'block', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
+  label: { display: 'block', ...typo.pairLabel },
   value: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   was: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
   reason: { padding: '6px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3, fontSize: tokens.fontSizeBase200 },
