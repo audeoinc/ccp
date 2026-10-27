@@ -56,6 +56,8 @@ interface Props {
   checks?: ReadinessItem[]
   /** 確かめの行を押したとき(部品を選ぶ。担当・締め切りの欄は、ここで受け持つ) */
   onPickCheck?: (target: ReadinessTarget) => void
+  /** 外(承認の確かめの行など)から、担当・締め切りの欄へ入る(seq が変わるたびに、その欄へ) */
+  focusField?: { field: 'productionOwner' | 'productionDue'; seq: number } | null
 }
 
 /**
@@ -64,7 +66,7 @@ interface Props {
  * 承認の前でも渡せる(人がいない・先に進めたいときがあるため。src/productionGate.ts と同じ考え)。
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
-export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0, assetCount = 0, onAssetCount, checks, onPickCheck }: Props) {
+export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0, assetCount = 0, onAssetCount, checks, onPickCheck, focusField }: Props) {
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -86,6 +88,18 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
     if (target.kind === 'handoffField') (target.field === 'productionOwner' ? ownerRef : dueRef).current?.focus()
     else onPickCheck?.(target)
   }
+  // 承認の確かめの行などから来たとき: パネルが開いてから、その欄へ(開く動きの間は、まだ見えていないことがあるので少し待つ)
+  const focusSeq = focusField?.seq
+  useEffect(() => {
+    if (!focusField) return
+    const ref = focusField.field === 'productionOwner' ? ownerRef : dueRef
+    const timer = window.setTimeout(() => {
+      ref.current?.scrollIntoView({ block: 'center' })
+      ref.current?.focus()
+    }, 250)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSeq])
   // 渡す文章の AI の案を、マウスを乗せている間だけ欄に見せる(本物の値は変えない。自動保存で案が保存されないように。UX 10)
   const [previewing, setPreviewing] = useState<string | null>(null)
   // 参考の素材(制作指示に名前を挙げる・AI に渡すため。畳んでいても読む)

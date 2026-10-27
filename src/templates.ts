@@ -62,6 +62,13 @@ export type TextAlign = 'left' | 'center' | 'right'
 /** 箱に出すもの。swatches: カラーチップ(SKU の色)/ rating: レビュー(星・平均点・件数)。T8 の 8.5 */
 export type BoxField = 'name' | 'price' | 'badge' | 'desc' | 'button' | 'swatches' | 'rating'
 export const BOX_FIELDS: BoxField[] = ['name', 'price', 'swatches', 'rating', 'badge', 'desc', 'button']
+/**
+ * 箱の「出すもの」(名前・価格・カラーチップ・レビュー・説明・ボタン)の置き場所(T12。2026-10-27)。
+ * below: 写真の下 / top・middle・bottom: 写真に重ねる(上・中央・下)/ left・right: 写真の横(文をその側に)。バッジは、いつも写真の左上。
+ * 箱ごとにまとめて持つ(要素ごとに持つときは、els の要素ごとの値として足せる形)
+ */
+export type BoxPlace = 'below' | 'top' | 'middle' | 'bottom' | 'left' | 'right'
+export const BOX_PLACES: BoxPlace[] = ['below', 'top', 'middle', 'bottom', 'left', 'right']
 
 /**
  * 表の部品(マス)。列 c・行 r(0 から)に置き、横 w・縦 h マス分を使う(結合したマスも 1 つの部品)。
@@ -115,6 +122,8 @@ export interface TablePart {
   swatchShape?: 'square'
   /** 箱: カラーチップを並べる数の上限(超えた分は「+3」。省略は 5) */
   swatchMax?: number
+  /** 箱: 名前・価格などの置き場所(T12。省略は見せ方から決まる場所。tables.ts の boxPlace) */
+  place?: BoxPlace
   /** 箱: レビューの見せ方(省略は 星・平均点・件数のすべて) */
   ratingShow?: 'stars' | 'starsCount'
   /** 箱: レビューの件数がこれより少ない商品では、レビューを出さない(省略は 3) */

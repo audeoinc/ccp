@@ -16,6 +16,7 @@ import { tr } from './i18n'
 import type { People } from './people'
 import { parsePushLink, tapComplete } from './pushLink'
 import { readinessOf, type ReadinessItem } from './simple/readiness'
+import { audienceSet } from './target'
 import { CHANNEL_PUSH } from './status'
 import { slotsOf, templateKeyOfCard } from './templates'
 import type { InboxItem } from './useApprovalInbox'
@@ -56,6 +57,7 @@ export function cardReadiness(card: DeliveryCard, productIds: string[], alerts: 
     pushTitle: card.push_title ?? '',
     pushBody: card.push_body ?? '',
     pushTapDone: tapComplete(parsePushLink(card.push_link)),
+    audienceSet: audienceSet(card.audience, card.channel === CHANNEL_PUSH ? 'push' : 'email'),
     headline: card.headline ?? '',
     copy: card.copy ?? '',
     hasHero: !!card.hero_image_id,

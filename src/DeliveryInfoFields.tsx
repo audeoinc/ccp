@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Field, Input, Select, ToggleButton, makeStyles, tokens } from '@fluentui/react-components'
 import { optionLabel, useT } from './i18n'
-import { AGE_BANDS, AUDIENCES, TARGET_GENDERS, ageLabel, audienceLabel, formatAges, genderLabel, parseAges, type TargetGender } from './target'
+import { AGE_BANDS, TARGET_GENDERS, ageLabel, audienceLabel, audiencesFor, formatAges, genderLabel, parseAges, type AudienceChannel, type TargetGender } from './target'
 import { statusColor, statusOptions } from './status'
 import { PersonInput } from './PersonInput'
 import { typo } from './typo'
@@ -132,20 +132,24 @@ export function TargetField({ gender, ages, onGender, onAges, size, field, child
   )
 }
 
-/** アプリの送る相手(全員・会員・30 日休眠・メール未開封)。配信の対象の箱の中の続きの行(TargetField の children)。詳しい画面とシンプルで同じもの(X81 の 3) */
-export function AudienceRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/**
+ * 送る相手(全員・会員・30 日休眠・メール未開封 / 前回のメール未開封)。配信の対象の箱の中の続きの行(TargetField の children)。
+ * 詳しい画面とシンプルで同じもの(X81 の 3)。メールでもアプリでも出し、選べる値はチャネルで絞る(target.ts の audiencesFor)
+ */
+export function AudienceRow({ value, onChange, channel }: { value: string; onChange: (v: string) => void; channel: AudienceChannel }) {
   const t = useT()
   const s = useStyles()
   return (
     <div className={s.targetRow} data-field="audience">
       <span className={s.targetLabel}>{t('送る相手', 'Send to')}</span>
-      <Select size="small" className={s.grow} value={value} onChange={(_, d) => onChange(d.value)}>
+      {/* チャネルを替えて、そのチャネルにない値が残っているときは「選んでください」に見せる(送る前の確かめも、決まっていないとして警告する) */}
+      <Select size="small" className={s.grow} value={audiencesFor(channel).includes(value) ? value : ''} onChange={(_, d) => onChange(d.value)}>
         <option value="" disabled>
           {t('選んでください', 'Choose')}
         </option>
-        {AUDIENCES.map((v) => (
+        {audiencesFor(channel).map((v) => (
           <option key={v} value={v}>
-            {audienceLabel(v)}
+            {audienceLabel(v, channel)}
           </option>
         ))}
       </Select>

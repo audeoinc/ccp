@@ -13,7 +13,7 @@ import { AlertMark } from '../AlertMark'
 import { LowStockBadge } from '../ProductMarks'
 import { heroImage, productImage } from '../images'
 import { yen } from '../items'
-import { day, optionLabel, tr, useT } from '../i18n'
+import { optionLabel, tr, useT } from '../i18n'
 import { typo } from '../typo'
 import { OpenLink } from '../LinkText'
 import { productUrl } from '../links'
@@ -123,8 +123,6 @@ interface Props {
   onSwapped: (from: string, to: string) => void
   /** 商品のフロートの「入れ替える」で、フロートの中に出す引き出し(画面の側が作る。どの入口でも同じもの) */
   swapInFloat?: (itemKey: string) => SwapRender
-  /** 左のバーの「渡すもの」を開く(制作の担当・締め切りを決める所) */
-  onOpenHandoff?: () => void
 }
 
 /** テンプレートで決まっていて、この配信では直せない部品の知らせ(鍵の印と、テンプレートの管理へのリンク。行き止まりにしない。レビューの 9) */
@@ -145,7 +143,7 @@ function TemplateLocked({ text }: { text: string }) {
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
-export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped, swapInFloat, onOpenHandoff }: Props) {
+export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped, swapInFloat }: Props) {
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
@@ -791,7 +789,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         return <TemplatePicker editor={e} />
       case 'overview':
       case 'meta':
-        return <MetaFields editor={e} focus={part.field} onOpenHandoff={onOpenHandoff} />
+        return <MetaFields editor={e} focus={part.field} />
     }
   })()
 
@@ -994,46 +992,30 @@ ${idea.reason}`
   )
 }
 
-/** 配信の管理の項目(制作指示・種類・国・ターゲット・担当・締め切り)。文言を直すときには使わないので、配信の情報の中に置く */
-function ManageFields({ editor: e, onOpenHandoff }: { editor: SimpleEditor; onOpenHandoff?: () => void }) {
+/**
+ * 配信の管理の項目(種類・国・ターゲット・担当)。文言を直すときには使わないので、配信の情報の中に置く。
+ * 制作指示・制作の担当・制作の締め切りは、渡すもの(HandoffSheet)だけで決める(2 か所で入力しない。2026-10-27 利用者の決め)
+ */
+function ManageFields({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
   return (
     <>
-      <Field label={t('制作指示', 'Production notes')} size="small" data-field="instructions">
-        <AutoTextarea heightKey="PartPane.e_form_instructions" size="small" rows={3} value={e.form.instructions} onChange={(_, d) => e.setField('instructions', d.value)} />
-      </Field>
       <div className={s.twoCol}>
         <ChoiceField label={t('種類', 'Type')} value={e.form.themeType} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={(v) => e.setField('themeType', v)} size="small" field="themeType" />
         <ChoiceField label={t('国', 'Country')} value={e.form.country} options={countryOptions} onChange={(v) => e.setField('country', v)} size="small" field="country" />
       </div>
       <TargetField gender={e.form.targetGender} ages={e.form.targetAges} onGender={(v) => e.setField('targetGender', v)} onAges={(v) => e.setField('targetAges', v)} size="small" field="target">
-        {/* アプリの送る相手(X81 の 3。詳しい画面の配信情報と同じ部品) */}
-        {e.channel === 'push' && <AudienceRow value={e.audience} onChange={e.setAudience} />}
+        {/* 送る相手(X81 の 3。メールでもアプリでも。詳しい画面の配信情報と同じ部品) */}
+        <AudienceRow value={e.audience} onChange={e.setAudience} channel={e.channel} />
       </TargetField>
       <OwnerField value={e.form.owner} onChange={(v) => e.setField('owner', v)} owners={e.people} size="small" field="owner" />
-      {/* 制作の担当・締め切りは、渡すものだけで決める(2 か所で入力しない。FLOWS の C-3)。ここからは渡すものを開く */}
-      <div className={s.readonly} data-field="due">
-        <span className={s.label}>{t('制作の締め切り・担当', 'Production due & assignee')}</span>
-        <span>
-          {e.form.productionDue ? day(e.form.productionDue) : t('(未設定)', '(not set)')}
-          {' ・ '}
-          {e.form.productionOwner || t('(未設定)', '(not set)')}
-        </span>
-        {onOpenHandoff ? (
-          <Link as="button" className={s.caption} onClick={onOpenHandoff}>
-            {t('渡すもので決めます(開く)', 'Set in Handoff (open)')}
-          </Link>
-        ) : (
-          <span className={s.caption}>{t('渡すもので決めます', 'Set in Handoff')}</span>
-        )}
-      </div>
     </>
   )
 }
 
-/** 配信の情報(上の帯の配信名・配信日時・ステータスを押したとき)。配信の管理の項目も、ここにまとめる */
-function MetaFields({ editor: e, focus, onOpenHandoff }: { editor: SimpleEditor; focus?: string; onOpenHandoff?: () => void }) {
+/** 配信の情報(プレビューの上の配信の情報の帯を押したとき)。配信の管理の項目も、ここにまとめる */
+function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string }) {
   const t = useT()
   const s = useStyles()
   const ref = useFocusField(focus)
@@ -1043,7 +1025,7 @@ function MetaFields({ editor: e, focus, onOpenHandoff }: { editor: SimpleEditor;
       <ScheduledAtField value={e.form.scheduledAt} onChange={(v) => e.setField('scheduledAt', v)} size="small" field="scheduledAt" />
       <ChoiceField label={t('チャネル', 'Channel')} value={e.form.channel} options={channelOptions} onChange={(v) => e.setField('channel', v)} hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')} size="small" field="channel" />
       <StatusField value={e.form.status} onChange={(v) => e.setField('status', v)} size="small" field="status" />
-      <ManageFields editor={e} onOpenHandoff={onOpenHandoff} />
+      <ManageFields editor={e} />
     </div>
   )
 }

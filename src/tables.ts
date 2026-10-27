@@ -1,6 +1,6 @@
 import { tr } from './i18n'
 import { CELL_VIEWS, type CellView } from './cells'
-import { BOX_FIELDS, MEDIA_RATIOS, gridColumns, placedButtons, type BoxField, type ButtonBlock, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, type ButtonSpec, type LinkKind, type PartType, type Section, type TablePart, type TemplateLayout } from './templates'
+import { BOX_FIELDS, BOX_PLACES, MEDIA_RATIOS, gridColumns, placedButtons, type BoxField, type BoxPlace, type ButtonBlock, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, type ButtonSpec, type LinkKind, type PartType, type Section, type TablePart, type TemplateLayout } from './templates'
 
 // 表のセクション(種類 'table'。T8、docs/TEMPLATE_OBJECTS.md)の計算と操作。
 // 部品は {列 c, 行 r, 幅 w, 高さ h} で、表をすき間なく敷き詰める(空いた所は「空き」の部品)。
@@ -49,6 +49,16 @@ const DEFAULT_FIELDS: Record<CellView, BoxField[]> = {
 }
 /** 箱に出すもの(設定がなければ、見せ方の既定) */
 export const boxFields = (p: Pick<TablePart, 'view' | 'fields'>): BoxField[] => p.fields ?? DEFAULT_FIELDS[p.view ?? 'card']
+/**
+ * 箱の、名前・価格などの置き場所(T12)。決めていなければ、見せ方から(保存済みのテンプレートを、今までの見た目のまま描くため):
+ * 写真の横に説明(特集)は右、写真だけ・大きい箱(結合したマス)は写真の下に重ねる、ほかは写真の下。ストーリーは左右交互なので undefined
+ */
+export const boxPlace = (p: Pick<TablePart, 'view' | 'place' | 'w' | 'h'>): BoxPlace | undefined =>
+  p.view === 'story' ? undefined : (p.place ?? (p.view === 'detail' ? 'right' : p.view === 'photo' || p.w * p.h > 1 ? 'bottom' : 'below'))
+/** 文を写真の横に並べる箱か(行の高さを、写真の形ではなく文の高さに合わせる) */
+export const isSideBox = (p: Pick<TablePart, 'view' | 'place' | 'w' | 'h'>) => p.view === 'story' || boxPlace(p) === 'left' || boxPlace(p) === 'right'
+export const boxPlaceLabel = (v: BoxPlace): string =>
+  ({ below: tr('写真の下', 'Below the photo'), top: tr('写真に重ねる(上)', 'Over the photo (top)'), middle: tr('写真に重ねる(中央)', 'Over the photo (middle)'), bottom: tr('写真に重ねる(下)', 'Over the photo (bottom)'), left: tr('写真の横(左)', 'Beside the photo (left)'), right: tr('写真の横(右)', 'Beside the photo (right)') })[v]
 export const boxFieldLabel = (f: BoxField): string =>
   ({ name: tr('名前', 'Name'), price: tr('価格', 'Price'), swatches: tr('カラーチップ', 'Color chips'), rating: tr('レビュー', 'Reviews'), badge: tr('バッジ', 'Badge'), desc: tr('説明', 'Description'), button: tr('ボタン', 'Button') })[f]
 export const priceStyleLabel = (v?: TablePart['priceStyle']): string =>
@@ -180,8 +190,8 @@ const retype = (p: TablePart, type: PartType): TablePart => ({ id: newPartId(typ
 
 /** 種類ごとの設定だけを写す(分割したマスに、もとの見せ方・文言を残すため) */
 const settingsOf = (p: TablePart): Partial<TablePart> => {
-  const { view, aiNote, fields, priceStyle, badge, label, style, color, link, track, text, overridable, align, ratio, src, imageId, video, alt, swap } = p
-  return Object.fromEntries(Object.entries({ view, aiNote, fields, priceStyle, badge, label, style, color, link, track, text, overridable, align, ratio, src, imageId, video, alt, swap }).filter(([, v]) => v !== undefined))
+  const { view, place, aiNote, fields, priceStyle, badge, label, style, color, link, track, text, overridable, align, ratio, src, imageId, video, alt, swap } = p
+  return Object.fromEntries(Object.entries({ view, place, aiNote, fields, priceStyle, badge, label, style, color, link, track, text, overridable, align, ratio, src, imageId, video, alt, swap }).filter(([, v]) => v !== undefined))
 }
 
 /** 選んだ範囲を 1 つの部品にまとめる。中身は、左上(空きなら、最初の中身のある部品)のものを残し、新しい ID にする */
@@ -623,6 +633,7 @@ export function parsePart(raw: unknown): TablePart | null {
   if (type === 'spacer' && SPACER_HEIGHTS.includes(o.height as number) && o.height !== 24) part.height = o.height as number
   if (type === 'box') {
     if (CELL_VIEWS.includes(o.view as CellView) && o.view !== 'card') part.view = o.view as CellView
+    if (BOX_PLACES.includes(o.place as BoxPlace)) part.place = o.place as BoxPlace
     const note = str(o.aiNote, 300)
     if (note) part.aiNote = note
     if (Array.isArray(o.fields)) part.fields = BOX_FIELDS.filter((f) => (o.fields as unknown[]).includes(f))

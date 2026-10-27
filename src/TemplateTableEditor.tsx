@@ -7,7 +7,7 @@ import { useT } from './i18n'
 import { CELL_VIEWS, cellViewLabel, isTextView, type CellView } from './cells'
 import { MAX_SECTIONS } from './layoutTemplates'
 import { getUiScale } from './uiScale'
-import { BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
+import { BOX_PLACES, type BoxPlace, BOX_FIELDS, LINK_KINDS, MEDIA_RATIOS, ratioValue, defaultButtonLabel, type HeroStyle, type ButtonColor, type MediaRatio, type SectionBg, type TextAlign, linkKindLabel, type HeroKind, type BoxField, type HeroText, type LinkKind, type PartType, type Section, type TablePart } from './templates'
 import * as T from './tables'
 import { PartImagePick } from './PartImagePick'
 import { elementClickable, elementDesc, elementLabel, partContent, partElements } from './elements'
@@ -833,13 +833,13 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
     const sized = (p: TablePart): number | undefined => {
       const wpx = p.w * cw + (p.w - 1) * GAP
       if (p.type === 'media') return wpx / ratioValue(p.ratio ?? 'wide')
-      if (p.type === 'box' && p.ratio && !isTextView(p.view)) return wpx / ratioValue(p.ratio) + (T.boxFields(p).some((f) => f !== 'badge') ? 28 : 0)
+      if (p.type === 'box' && p.ratio && !T.isSideBox(p)) return wpx / ratioValue(p.ratio) + (T.boxFields(p).some((f) => f !== 'badge') ? 28 : 0)
       return undefined
     }
     return Array.from({ length: sec.rows ?? 0 }, (_, r) => {
       const on = (sec.parts ?? []).filter((p) => r >= p.r && r < p.r + p.h)
       const fixed = on.filter((p) => p.h === 1).map(sized).filter((x): x is number => x !== undefined)
-      const base = on.some((p) => p.type === 'box' && isTextView(p.view))
+      const base = on.some((p) => p.type === 'box' && T.isSideBox(p))
         ? Math.max(90, Math.min(cw * 0.6, 160))
         : on.some((p) => p.type === 'box')
           ? Math.max(64, Math.min(cw * ((sec.cols ?? 1) === 1 ? 0.5 : 0.9), 200))
@@ -860,7 +860,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
 
   const patch = (sec: Section, p: TablePart, x: Partial<TablePart>) => replace(sec.id!, T.patchPart(sec, p.id, x))
   // 箱の見せ方として、ほかの箱にそろえる項目(AI への一言は、枠ごとに中身が違うのでそろえない)
-  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio, swatchShape: p.swatchShape, swatchMax: p.swatchMax, ratingShow: p.ratingShow, ratingMin: p.ratingMin, ratingFloor: p.ratingFloor })
+  const lookOf = (p: TablePart): Partial<TablePart> => ({ view: p.view, place: p.place, fields: p.fields, priceStyle: p.priceStyle, badge: p.badge, ratio: p.ratio, swatchShape: p.swatchShape, swatchMax: p.swatchMax, ratingShow: p.ratingShow, ratingMin: p.ratingMin, ratingFloor: p.ratingFloor })
   /** 箱の設定を、いくつかの箱にまとめて入れる(形は変わらないので、ID はそのまま) */
   const patchBoxes = (sec: Section, ps: TablePart[], x: Partial<TablePart> | ((q: TablePart) => Partial<TablePart>)) => {
     const ids = new Set(ps.map((q) => q.id))
@@ -900,6 +900,9 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       return vs.every((v) => v === vs[0]) ? fn(p) : MIXED
     }
     const view = common((q) => q.view ?? 'card')
+    const place = common((q) => T.boxPlace(q) ?? 'below')
+    // 見せ方から決まる場所と同じなら、持たない(見せ方を変えたときに、場所も一緒に変わるように)
+    const placeFor = (q: TablePart, v: BoxPlace): BoxPlace | undefined => (T.boxPlace({ ...q, place: undefined }) === v ? undefined : v)
     const ratio = common((q) => q.ratio ?? '')
     const priceStyle = common((q) => q.priceStyle ?? '')
     const badge = common((q) => q.badge ?? '')
@@ -927,6 +930,16 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
             ))}
           </Select>
         </Field>
+        {!ps.every((q) => q.view === 'story') && (
+          <Field label={t('名前・価格などの置き場所', 'Where the name, price, etc. go')} hint={t('バッジは、いつも写真の左上です', 'The badge is always at the photo’s top left')} size="small">
+            <Select size="small" value={place} onChange={(_, d) => patchBoxes(sec, ps, (q) => ({ place: placeFor(q, d.value as BoxPlace) }))}>
+              {place === MIXED && mixedOption}
+              {BOX_PLACES.map((v) => (
+                <option key={v} value={v}>{T.boxPlaceLabel(v)}</option>
+              ))}
+            </Select>
+          </Field>
+        )}
         {!ps.every((q) => isTextView(q.view)) && (
           <Field label={t('写真の形', 'Photo shape')} size="small">
             <Select size="small" value={ratio} onChange={(_, d) => patchBoxes(sec, ps, { ratio: (d.value || undefined) as MediaRatio | undefined })}>
@@ -1096,12 +1109,15 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
       )
       const hasText = fields.some((f) => f !== 'badge')
       const badge = fields.includes('badge') && <span className={s.boxBadge} style={{ backgroundColor: sale || /sale|限定|off/i.test(p.badge ?? '') ? '#d32f2f' : MAIL.ink }}>{p.badge?.trim() || 'NEW'}</span>
-      if (isTextView(p.view)) {
+      // 名前・価格などの置き場所(T12。決めていなければ見せ方から。メールのプレビューと同じ決め方)
+      const place = T.boxPlace(p)
+      const photoBg = sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}
+      if (p.view === 'story' || place === 'left' || place === 'right') {
         const text = <div className={s.splitText}>{lines}</div>
-        const img = <div style={{ backgroundColor: MAIL.img, position: 'relative', ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>{badge}</div>
+        const img = <div style={{ backgroundColor: MAIL.img, position: 'relative', ...photoBg }}>{badge}</div>
         return (
           <div className={s.split}>
-            {p.view === 'story' && n % 2 === 0 ? (
+            {(p.view === 'story' ? n % 2 === 0 : place === 'left') ? (
               <>
                 {text}
                 {img}
@@ -1116,11 +1132,22 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
           </div>
         )
       }
+      // 写真の下: 写真の所と、白地の文の所に分ける
+      if (place === 'below') {
+        return (
+          <div className={s.tile} style={{ gridTemplateRows: hasText ? 'minmax(0, 1fr) auto' : 'minmax(0, 1fr)', alignContent: 'stretch', backgroundColor: MAIL.panel }}>
+            <div style={{ position: 'relative', minHeight: 0, backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile, ...photoBg }}>{badge}</div>
+            <span className={s.tileNo}>{n}</span>
+            {hasText && <div className={s.cap} style={{ backgroundColor: MAIL.panel }}>{lines}</div>}
+          </div>
+        )
+      }
+      // 写真に重ねる(上・中央・下)
       return (
-        <div className={s.tile} style={{ backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile, ...(sample ? { backgroundImage: `url("${sample.src.replace(/"/g, '%22')}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
+        <div className={s.tile} style={{ alignContent: place === 'top' ? 'start' : place === 'middle' ? 'center' : 'end', backgroundColor: p.w * p.h > 1 ? MAIL.img : MAIL.tile, ...photoBg }}>
           <span className={s.tileNo}>{n}</span>
           {badge}
-          {hasText && <div className={s.cap}>{lines}</div>}
+          {hasText && <div className={s.cap} style={place === 'top' && badge ? { marginTop: 22 } : undefined}>{lines}</div>}
         </div>
       )
     }

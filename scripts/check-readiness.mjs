@@ -16,6 +16,7 @@ const base = {
   pushTitle: '',
   pushBody: '',
   pushTapDone: true,
+  audienceSet: true,
   headline: '秋の装い',
   copy: '新作がそろいました',
   hasHero: true,
@@ -55,6 +56,7 @@ const cases = [
   { name: '制作に渡す: 承認済みで、担当・締め切りあり', input: { purpose: 'handoff', status: 'approved', productionOwner: '山田', productionDue: '2026-11-01' }, levels: {}, blocked: false },
   { name: '制作に渡す: 確定(承認より後)', input: { purpose: 'handoff', status: 'confirmed', productionOwner: '山田', productionDue: '2026-11-01' }, levels: {}, blocked: false },
   { name: 'プッシュ: 本文が空(メールの行は出さない)', input: { channel: 'push', pushTitle: 'セール', pushBody: '' }, levels: { pushBody: 'warn' }, absent: ['subject', 'hero', 'slots'], blocked: false },
+  { name: '送る相手が決まっていない(メールでも警告)', input: { audienceSet: false }, levels: { audience: 'warn' }, blocked: false },
   { name: 'プッシュ: 開く画面が決まっていない(X81 の 2)', input: { channel: 'push', pushTitle: 'セール', pushBody: '本文', pushTapDone: false }, levels: { pushTap: 'warn' }, blocked: false },
 ]
 

@@ -37,6 +37,8 @@ export interface ReadinessInput {
   pushBody: string
   /** アプリ: 通知を押したときに開く画面が決まっているか(pushLink.ts の tapComplete) */
   pushTapDone: boolean
+  /** 送る相手が、そのチャネルで決まっているか(メールでもアプリでも。target.ts の audienceSet) */
+  audienceSet: boolean
   headline: string
   copy: string
   hasHero: boolean
@@ -96,6 +98,9 @@ export function readinessOf(c: ReadinessInput): ReadinessItem[] {
     // 開く画面の欄は、通知の部品のペインにある(X81 の 2)
     out.push({ key: 'pushTap', level: c.pushTapDone ? 'ok' : 'warn', label: tr('通知を押したときに開く画面', 'Screen opened on tap'), detail: c.pushTapDone ? '' : UNSET(), target: { kind: 'pushTitle' } })
   }
+
+  // 送る相手(メールでもアプリでも。2026-10-27 利用者の決め)。決まっていなければ警告(止めない)。押すと配信の情報の送る相手の欄へ
+  out.push({ key: 'audience', level: c.audienceSet ? 'ok' : 'warn', label: tr('送る相手', 'Send to'), detail: c.audienceSet ? '' : UNSET(), target: { kind: 'meta', field: 'audience' } })
 
   // 在庫・画像の期限は、商品ごとに 1 行(押すと、その商品の枠を選ぶ)。ほかのアラートは、まとめて 1 行
   const keyOf = new Map(c.items.map((it) => [it.productId, it.key]))

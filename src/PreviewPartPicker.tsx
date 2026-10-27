@@ -48,6 +48,12 @@ interface Props {
   onMove?: (itemKey: string, dir: MoveDir) => void
   /** 部品を選んでいるときに Enter: その部品のペインの入力欄へ移る */
   onEnter?: () => void
+  /**
+   * プレビューの外にある、並びの先頭の部品(シンプルな配信カードの、プレビューの上の配信の情報の帯)。↑ ↓ の並びの最初に入れる。
+   * leadOn = いまそれを選んでいる(selected はプレビューの中の部品だけなので、別に受け取る)
+   */
+  lead?: PartRef
+  leadOn?: boolean
 }
 
 /**
@@ -55,15 +61,19 @@ interface Props {
  * プレビューの部品そのものは変えない(書き込みのピン PreviewPins と同じ作り。制作のページ・結果でも使えるように、配信カードには依存しない)。
  * 選んだ部品には枠と淡い色、マウスを乗せた部品には薄い枠を重ねる。Tab / Shift+Tab で次・前の部品、Esc で選ぶのをやめる
  */
-export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onRemove, onMove, onEnter }: Props) {
+export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap, onRemove, onMove, onEnter, lead, leadOn }: Props) {
   const s = useStyles()
   const onEnterRef = useRef(onEnter)
   const onRemoveRef = useRef(onRemove)
   const onMoveRef = useRef(onMove)
+  const leadRef = useRef(leadOn ? lead : undefined)
+  const leadPartRef = useRef(lead)
   useEffect(() => {
     onEnterRef.current = onEnter
     onRemoveRef.current = onRemove
     onMoveRef.current = onMove
+    leadRef.current = leadOn ? lead : undefined
+    leadPartRef.current = lead
   })
   const t = useT()
   const [hover, setHover] = useState<PartRef | null>(null)
@@ -157,11 +167,12 @@ export function PreviewPartPicker({ boxRef, selected, onSelect, disabled, onSwap
       }
       // ↑ ↓ で、前・次の部品へ(端では止まる)。Tab はプレビューから出る(以前は Tab で部品を回り、プレビューの外へ出られなかった。レビューの 6)
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-      const list = partsInOrder(box)
+      const list = [...(leadPartRef.current ? [leadPartRef.current] : []), ...partsInOrder(box)]
       if (list.length === 0) return
       e.preventDefault()
       const up = e.key === 'ArrowUp'
-      const cur = selectedRef.current ? list.findIndex((p) => samePart(p, selectedRef.current)) : -1
+      const now = selectedRef.current ?? leadRef.current ?? null
+      const cur = now ? list.findIndex((p) => samePart(p, now)) : -1
       const next = cur < 0 ? (up ? list.length - 1 : 0) : Math.min(list.length - 1, Math.max(0, cur + (up ? -1 : 1)))
       onSelect(list[next])
       // 選んだ部品のペインの入力欄が、開いたときに選ばれる(autoFocus)ので、キーで動かしているときは、プレビューに戻す(続けて ↑ ↓ を押せるように)

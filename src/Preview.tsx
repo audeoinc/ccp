@@ -15,7 +15,7 @@ import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
 import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
-import { SECTION_BG, SEP_COLOR, textDirStyle, boxFields, boxesOf, buttonColor, buttonRadius, buttonText, lineLook, sectionIdsOf, sectionSpace } from './tables'
+import { SECTION_BG, SEP_COLOR, textDirStyle, boxFields, boxPlace, isSideBox, boxesOf, buttonColor, buttonRadius, buttonText, lineLook, sectionIdsOf, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
 import { STAR_COLOR, stars, useProductSwatches } from './swatches'
@@ -491,37 +491,43 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
       </div>
     )
     const img = (style: React.CSSProperties) => <img data-el={`${part.id}.image`} className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', ...style }} />
-    // 文を写真の横に置く見せ方(特集・ストーリー)
-    if (part.view === 'detail' || part.view === 'story') {
-      const reverse = part.view === 'story' && j % 2 === 1
-      const body = <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: part.view === 'story' ? '12px 14px' : 0, minWidth: 0 }}>{text}</div>
-      const photo = <div style={{ position: 'relative' }}>{badge}{img({ aspectRatio: part.ratio ? String(ratioValue(part.ratio)) : '3 / 4', borderRadius: part.view === 'story' ? 0 : 8 })}</div>
+    // 名前・価格などの置き場所(T12。決めていなければ見せ方から。boxPlace)。写真だけ・大きい箱は、マスの高さいっぱいに写真を敷く
+    const place = boxPlace(part)
+    const fill = part.view === 'photo' || part.w * part.h > 1
+    const ratio = part.ratio ? String(ratioValue(part.ratio)) : compact ? '1 / 1' : '3 / 4'
+    // 文を写真の横に置く(特集・ストーリー・左右を選んだ箱)。ストーリーは、枠ごとに左右を入れ替える
+    if (part.view === 'story' || place === 'left' || place === 'right') {
+      const story = part.view === 'story'
+      const textFirst = story ? j % 2 === 1 : place === 'left'
+      const body = <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: story ? '12px 14px' : 0, minWidth: 0 }}>{text}</div>
+      const photo = <div style={{ position: 'relative' }}>{badge}{img({ aspectRatio: part.ratio ? String(ratioValue(part.ratio)) : '3 / 4', borderRadius: story ? 0 : 8 })}</div>
       return (
-        <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), ...(part.view === 'story' ? { padding: 0, backgroundColor: '#f1f1f3' } : {}) }}>
-          <div style={{ display: 'grid', gridTemplateColumns: part.view === 'story' ? '1fr 1fr' : '44% 1fr', gap: part.view === 'story' ? 0 : 12, alignItems: 'center' }}>
-            {reverse || part.view === 'detail' ? photo : body}
-            {reverse || part.view === 'detail' ? body : photo}
+        <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), ...(story ? { padding: 0, backgroundColor: '#f1f1f3' } : {}) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: story ? '1fr 1fr' : textFirst ? '1fr 44%' : '44% 1fr', gap: story ? 0 : 12, alignItems: 'center' }}>
+            {textFirst ? body : photo}
+            {textFirst ? photo : body}
           </div>
           {controls(it, idx)}
         </div>
       )
     }
-    // 大きい箱・写真だけ: 写真を枠いっぱいに敷き、文は下端の白い帯に
-    if (part.view === 'photo' || part.w * part.h > 1) {
+    // 写真に重ねる(上・中央・下): 白い帯に。上のときは、左上のバッジに重ならないよう下げる
+    if (place === 'top' || place === 'middle' || place === 'bottom') {
+      const at: React.CSSProperties = place === 'top' ? { top: badge ? 34 : 0 } : place === 'middle' ? { top: '50%', transform: 'translateY(-50%)' } : { bottom: 0 }
       return (
-        <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, height: '100%' }}>
+        <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), padding: 0, ...(fill ? { height: '100%' } : {}) }}>
           {badge}
-          {img({ height: '100%' })}
-          {text && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 12px', borderRadius: '0 0 8px 8px', background: 'rgba(255,255,255,0.92)' }}>{text}</div>}
+          {img(fill ? { height: '100%' } : { aspectRatio: ratio })}
+          {text && <div style={{ position: 'absolute', left: 0, right: 0, ...at, padding: '8px 12px', borderRadius: place === 'bottom' ? '0 0 8px 8px' : 0, background: 'rgba(255,255,255,0.92)' }}>{text}</div>}
           {controls(it, idx)}
         </div>
       )
     }
-    // ふつうの箱: 写真の下に、名前・価格など
+    // 写真の下に、名前・価格など(写真だけ・大きい箱で写真の下を選んだときは、写真をのこりの高さいっぱいに)
     return (
-      <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={frameStyle(it, idx)}>
+      <div key={it.key} {...dragProps(it, idx)} className={classes.frame} style={{ ...frameStyle(it, idx), ...(fill ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}) }}>
         {badge}
-        {img({ aspectRatio: part.ratio ? String(ratioValue(part.ratio)) : compact ? '1 / 1' : '3 / 4' })}
+        {img(fill ? { flex: '1 1 0', minHeight: 0, objectFit: 'cover' } : { aspectRatio: ratio })}
         {text && <div style={{ marginTop: 4 }}>{text}</div>}
         {controls(it, idx)}
       </div>
@@ -849,13 +855,14 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           const p = effectivePart(raw, partContent)
           if (p.type === 'box') {
             const j = boxNo.get(p.id) ?? 0
-            const text = isTextView(p.view)
+            // 文を写真の横に並べる箱は、文の高さに合わせる(写真の形でマスを伸ばさない)
+            const text = isSideBox(p)
             const big = p.w * p.h > 1
             const tile = (it: Item, idx: number) => boxTile(it, idx, p, j)
             const fill = !text && (big || p.view === 'photo')
             return (
               <div style={fill ? { aspectRatio: p.ratio ? String(ratioValue(p.ratio)) : `${p.w} / ${p.h}`, height: '100%', minHeight: 0 } : undefined}>
-                {slot(j, tile, fill ? { aspectRatio: 'auto', height: '100%' } : undefined, p.view === 'detail')}
+                {slot(j, tile, fill ? { aspectRatio: 'auto', height: '100%' } : undefined, text && p.view !== 'story')}
               </div>
             )
           }
