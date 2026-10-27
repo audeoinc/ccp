@@ -192,6 +192,20 @@ python -c "import datetime as d;print(int(d.datetime(2026,10,6,12,0,tzinfo=d.tim
 echo '{"ts": 1791288000}' | gcloud storage cp - gs://<バケット名>/state/keep_until.json
 ```
 
+## 見本の画面(ccp-preview。2026-10-27)
+
+本番に入れる前に、利用者が触って確かめられるデモの画面(`vite.mock.config.ts` のビルド。サーバー・本物の DB・AI は使わない)を、push のたびに自動で更新する。本番の反映(約 10 分)を待たずに、スマホからでも触れる。
+
+- **URL**: `https://<ccp-preview のサービスの URL>/` にブランチの一覧、`/b/main/` に main、`/b/<ブランチ名>/` に作りかけのブランチ(ブランチ名は英小文字・数字・`-` にそろえる。例 `ui3-try`)。パスワードは本番と同じ(Basic 認証。ユーザー名は何でもよい)。
+- **更新**: Cloud Build のトリガー `ccp-preview`(リージョン global。GitHub の `audeoinc/ccp` の、どのブランチの push でも)が `cloudbuild-preview.yaml` を流す。デモのビルド(`--base=./`)を、バケット `<プロジェクト>-ccp-preview` の `main/` か `branches/<ブランチ名>/` へ送るだけ。push から約 2 分(ビルド 70 秒・送る 45 秒。2026-10-27 に測った)。
+- **見本を返すサービス**: Cloud Run の `ccp-preview`(`preview/server.py`。標準の部品だけ。作り直さない)。バケットを読み取り専用で `/site` につなぐ(gen2)。min 0 / max 1。入口は開けて(`--allow-unauthenticated`)、本番と同じパスワード(シークレット `contents-planner-app-password`)の Basic 認証で守る。
+- **サービスアカウント**: `ccp-preview-run`(バケットを読む・パスワードのシークレットを読む)、`ccp-preview-build`(バケットに書く・ログを書く)。本番のサービス・DB には権限がない。
+- **片付け**: バケットのライフサイクルで、`branches/` の下は 14 日で消える(最後の push から数える。送るときに置き直すため)。`main/` は消えない。
+- **本番の反映との関係**: 見本のビルドのタグは `ccp-preview`。`scripts/deploy-gcp.mjs` が待つ `service_contents-planner` は付けないので、見本のビルドが走っていても、本番の反映は待たされない。
+- **GitHub とのつなぎ**: 1 代目の Cloud Build GitHub アプリ(コンソールの「リポジトリを接続」で、利用者が許可した)。2 代目のつなぎは、Cloud Build の管理用のアカウントにシークレットを作る広い権限が要るので使わなかった。
+- **手で流すとき**: `gcloud builds triggers run ccp-preview --branch <ブランチ>`(`gcloud builds submit` で手元から流すと、`ccp-preview-build` がソースを置くバケットを読めずに止まる。その権限は付けていない)。
+- 本番だけの仕組みなので、Workbench 版の ZIP には入れない(`preview/`・`cloudbuild-preview.yaml` は `release-workbench.mjs` で外している)。
+
 ## 画像の差し替え(商品・ヒーロー画像)
 
 用意した画像から、商品・ヒーロー画像のデータを作って、DB を置き換える(`server/ccp/importer.py`)。
