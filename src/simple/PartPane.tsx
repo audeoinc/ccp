@@ -38,6 +38,7 @@ import type { ProductSelection } from '../aiSelect'
 import { partKey, type PartRef } from './parts'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
+import { setSectionGlow } from './sectionGlow'
 import { PartAiChat } from './PartAiChat'
 import { TextAiPanel } from './TextAiPanel'
 import { Hint } from '../Hint'
@@ -375,17 +376,32 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     )
   })()
 
-  // 選んでいる部品が、どのセクションのものか(メールで、セクションがあるときだけ)
+  // 選んでいる部品が、どのセクションのものか(メールで、セクションがあるときだけ)。
+  // セクションの商品を AI で選ぶボタンは、セクションの見出し・コピー・空いた枠を選んだときだけ出す(商品を選んだときは、その商品の操作だけにする。
+  // 商品のペインの「位置(セクション名)」を押すと、セクションを選んだ状態に移れる)
   const sectionOfPart = (() => {
     if (!part || e.channel !== 'email' || sections.length === 0) return null
     if (part.kind === 'sectionTitle' || part.kind === 'sectionCopy') return part.index
     if (part.kind === 'slot') return sectionIndexAt(sections, Math.max(0, part.index))
-    if (part.kind === 'product') {
-      const at = e.items.findIndex((x) => x.key === part.itemKey)
-      return at >= 0 ? sectionIndexAt(sections, at) : null
-    }
     return null
   })()
+  /** セクション i を選ぶときに選ぶ部品(見出し → コピー → そのセクションの空いた枠。どれもなければ null) */
+  const sectionPartOf = (i: number): PartRef | null => {
+    const sec = sections[i]
+    if (!sec) return null
+    if (sec.wantTitle) return { kind: 'sectionTitle', index: i }
+    if (getTemplate(e.template).sections[i]?.copy !== false) return { kind: 'sectionCopy', index: i }
+    const end = Number.isFinite(sec.slots) ? sec.start + sec.slots : e.items.length + 1
+    for (let at = sec.start; at < end; at++) if (!e.items[at] || e.items[at].gap) return { kind: 'slot', index: at }
+    return null
+  }
+  /** セクションの呼び名(右の商品の一覧と同じ名前。見出しがあれば添える。例: Grid2(秋の小物)) */
+  const sectionName = (i: number) => {
+    const sec = sections[i]
+    if (!sec) return ''
+    const heading = sec.wantTitle ? (e.sectionTitles[i] ?? '').trim() : ''
+    return heading ? t(`${sec.label}(${heading})`, `${sec.label} (${heading})`) : sec.label
+  }
   const body = (() => {
     if (!part) return <WholePane editor={e} onEdit={() => onPick({ kind: 'meta', field: 'info' })} />
     switch (part.kind) {
@@ -606,7 +622,23 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               setChat={setChat}
               onDone={(k) => onSwapped(it.key, k)}
             />
-            <span className={s.caption}>{t(`${idx + 1} 番目${sec ? `(${sec.label})` : ''}`, `Position ${idx + 1}${sec ? ` (${sec.label})` : ''}`)}</span>
+            {(() => {
+              // セクションの名前を押すと、そのセクションを選んだ状態に移る(セクションの商品を AI で選ぶボタンが出る)
+              const target = sec ? sectionPartOf(sec.index) : null
+              const name = sec && target ? (
+                <Link as="button" onClick={() => onPick(target)}>
+                  {sectionName(sec.index)}
+                </Link>
+              ) : sec ? (
+                sectionName(sec.index)
+              ) : null
+              return (
+                <span className={s.caption}>
+                  {t(`${idx + 1} 番目`, `Position ${idx + 1}`)}
+                  {name && <>{t('(', ' (')}{name}{t(')', ')')}</>}
+                </span>
+              )
+            })()}
             {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
                 (商品は上下左右に並ぶので、前後の矢印では向きを表せない。外すは、外したい商品の上で。2026-10-26 利用者) */}
@@ -765,7 +797,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {compareBlock}
       {body}
       {/* セクションの部品(見出し・コピー・商品・空いた枠)では、そのセクションの商品をまとめて AI で選べる(X81 の 9) */}
-      {sectionOfPart !== null && <SectionAiPick key={sectionOfPart} editor={e} index={sectionOfPart} />}
+      {sectionOfPart !== null && <SectionAiPick key={sectionOfPart} editor={e} index={sectionOfPart} name={sectionName(sectionOfPart)} />}
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
       {part && part.kind !== 'meta' && part.kind !== 'overview' && part.kind !== 'template' && <ProductionMemo editor={e} label={titleOf(part)} />}
     </div>
@@ -812,7 +844,7 @@ function TrackedUrl({ url }: { url: string }) {
  * セクションの商品をまとめて AI で選ぶ(X81 の 9。詳しい画面の ③ セクションの「AIで選ぶ / 選び直す」と同じ AI で、見出し・コピーを踏まえる)。
  * 案は試す → 確定: 出た案をそのセクションのプレビューにだけ仮に写し、帯の「確定」で、そのセクションの商品と候補を置き換える
  */
-function SectionAiPick({ editor: e, index }: { editor: SimpleEditor; index: number }) {
+function SectionAiPick({ editor: e, index, name }: { editor: SimpleEditor; index: number; name: string }) {
   const t = useT()
   const s = useStyles()
   const trial = useTrial()
@@ -823,6 +855,15 @@ function SectionAiPick({ editor: e, index }: { editor: SimpleEditor; index: numb
   const byId = new Map(e.products.map((p) => [p.id, p]))
   const sec = sectionsOf(e.template)[index]
   const count = sec ? filled(e.items.slice(sec.start, Number.isFinite(sec.slots) ? sec.start + sec.slots : undefined)).length : 0
+  // 案を試しているあいだは、プレビューのそのセクションを光らせ続ける(どこが変わるかを見せる)
+  const trying = !!trial.trial
+  useEffect(() => {
+    if (!trying) return
+    setSectionGlow(index)
+    return () => setSectionGlow(null)
+  }, [trying, index])
+  // ほかの部品を選んでこのボタンが消えるときに、載せていた光が残らないように
+  useEffect(() => () => setSectionGlow(null), [])
   const run = async () => {
     setError('')
     trial.cancel()
@@ -849,8 +890,20 @@ function SectionAiPick({ editor: e, index }: { editor: SimpleEditor; index: numb
   return (
     <div className={s.sectionAi}>
       <span className={s.row}>
-        <Button size="small" appearance="outline" icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />} disabled={busy || noTheme || e.saving} onClick={() => void run()}>
-          {result ? t('案を作り直す', 'Regenerate') : t(`セクション ${index + 1} の商品を AI で選ぶ`, `Pick section ${index + 1} products with AI`)}
+        {/* 載せると、プレビューのそのセクションを光らせる(どのセクションのことかを見せる) */}
+        <Button
+          size="small"
+          appearance="outline"
+          icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
+          // 押せないとき(テーマが空など)も、載せるとどのセクションかが光るように、disabled でなく disabledFocusable にする
+          disabledFocusable={busy || noTheme || e.saving}
+          onClick={() => void run()}
+          onMouseEnter={() => setSectionGlow(index)}
+          onMouseLeave={() => !trying && setSectionGlow(null)}
+          onFocus={() => setSectionGlow(index)}
+          onBlur={() => !trying && setSectionGlow(null)}
+        >
+          {result ? t(`${name} の案を作り直す`, `Regenerate ${name}`) : t(`${name} の商品を AI で選ぶ`, `Pick ${name} products with AI`)}
         </Button>
         {noTheme && <span className={s.caption}>{t('テーマを入れると使えます', 'Enter a theme to use this')}</span>}
       </span>

@@ -51,6 +51,7 @@ import { addDroppedAssets, canDropAsset } from './assetDrop'
 import { myName, onMeChange } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
+import { SectionGlowLayer } from './SectionGlowLayer'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
 import { SenderName } from '../SenderName'
@@ -1207,6 +1208,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
+            {/* セクションの商品を AI で選ぶボタンに載せている・案を試しているセクションを光らせる(X81 の 9) */}
+            <SectionGlowLayer boxRef={boxRef} />
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} lead={META_PART} leadOn={metaOn} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
