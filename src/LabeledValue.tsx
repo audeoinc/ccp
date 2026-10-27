@@ -11,7 +11,8 @@ import { typo } from './typo'
 const useStyles = makeStyles({
   inline: { display: 'inline-flex', alignItems: 'baseline', columnGap: '10px', minWidth: 0 },
   stacked: { display: 'flex', flexDirection: 'column', rowGap: '2px', minWidth: 0 },
-  label: { ...typo.label, color: tokens.colorNeutralForeground4, whiteSpace: 'nowrap', flexShrink: 0 },
+  // ラベルは 10px(2026-10-27 見比べ。利用者「もう少し小さく」。日本語の読める下限)
+  label: { ...typo.label, fontSize: '10px', lineHeight: '14px', color: tokens.colorNeutralForeground4, whiteSpace: 'nowrap', flexShrink: 0 },
   value: { ...typo.value, fontSize: '14px', lineHeight: '20px', fontWeight: tokens.fontWeightSemibold, minWidth: 0, overflowWrap: 'anywhere' },
   strong: { fontWeight: tokens.fontWeightBold },
   // 空の値は太くせず、ラベルと同じ薄さ
