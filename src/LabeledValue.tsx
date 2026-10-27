@@ -1,5 +1,5 @@
 // ラベルと値の組(2026-10-27 利用者と決めた。ラベルと値が同じ大きさ・濃さ・太さだと読み取りにくいため)。
-// ラベル = 10px・ごく薄い色(目印)、値 = 14px・semibold・濃い色(主役)、いちばん大事な値はさらに太く、空の値は薄く・ふつうの太さ。
+// ラベル = 10px・薄い色(目印。colorNeutralForeground4)、値 = 14px・semibold・濃い色(主役)、いちばん大事な値はさらに太く、空の値は薄く・ふつうの太さ。
 // 横並び(帯・1 行の一覧)と縦並び(ペインの中の項目)の両方を、この 1 つで出す。
 // 縦に積む案と見比べて、横のまま差を強くする形に決めた(2026-10-27 利用者)。ラベルと値のあいだに余白。
 // Fluent v9 には、表示だけのラベルと値の組の部品がない(Label は入力欄に付けるもの)ので、ここに 1 つにする
@@ -11,7 +11,7 @@ import { typo } from './typo'
 const useStyles = makeStyles({
   inline: { display: 'inline-flex', alignItems: 'baseline', columnGap: '10px', minWidth: 0 },
   stacked: { display: 'flex', flexDirection: 'column', rowGap: '2px', minWidth: 0 },
-  // ラベルは 10px・ごく薄い色(2026-10-27 利用者。値を読めば分かるので、ラベルは目印で足りる。白い背景でかろうじて読める程度)
+  // ラベルは 10px・薄い色(2026-10-27 利用者。値を読めば分かるので、ラベルは目印で足りる。Disabled の色は薄すぎたので 1 段濃く)
   label: { ...typo.pairLabel, whiteSpace: 'nowrap', flexShrink: 0 },
   value: { ...typo.pairValue, minWidth: 0, overflowWrap: 'anywhere' },
   strong: { fontWeight: tokens.fontWeightBold },
