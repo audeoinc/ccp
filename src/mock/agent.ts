@@ -283,13 +283,18 @@ export function mockAgent(message: string): string {
           { text: short.replace(/[、。]$/, ''), why: '前半だけを残し、ひと目で読める長さにしました。' },
           { text: `この秋、${short.replace(/[、。]$/, '')}`, why: '季節の言葉を先に置きました。' },
           { text: `${short.replace(/[、。]$/, '')}。いまチェック`, why: '行動を促す言葉で締めました。' },
+          { text: `今週だけ、${short.replace(/[、。]$/, '')}`, why: '期間を区切って、急ぎ感を出しました。' },
         ]
       : [
           { text: short.replace(/[,.]$/, ''), why: 'Kept the first phrase so it reads at a glance.' },
           { text: `This fall: ${short.replace(/[,.]$/, '').replace(/^./, (c) => c.toLowerCase())}`, why: 'Leads with the season.' },
           { text: `${short.replace(/[,.]$/, '')}. Shop now.`, why: 'Ends with a call to action.' },
+          { text: `This week only: ${short.replace(/[,.]$/, '').replace(/^./, (c) => c.toLowerCase())}`, why: 'Adds urgency with a time limit.' },
         ]
-    return J({ mode: 'update', reply: ja ? `「${req}」の方向で、3 つ考えました。` : `Here are three takes on "${req}".`, ideas })
+    // count(ほしい案の数)に合わせる。指示して直すは 1 つ
+    const count = Math.max(1, Math.min(ideas.length, Number(p.count ?? 3) || 3))
+    const picked = count === 1 ? [ideas[(req.length % (ideas.length - 1)) + 1]] : ideas.slice(0, count)
+    return J({ mode: 'update', reply: ja ? `「${req}」の方向で、${picked.length} つ考えました。` : `Here ${picked.length === 1 ? 'is a take' : `are ${picked.length} takes`} on "${req}".`, ideas: picked })
   }
 
   // シンプルな配信カードで、メイン画像・商品を AI に頼む(SU1 段階 b)。候補の先頭から 3 つ

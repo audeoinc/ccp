@@ -38,7 +38,7 @@ ${COMMON}
 {"mode":"update","reply":"依頼にどう応えたかを 1 文で","ideas":[{"text":"新しい文言","why":"そう直した理由を 1 文で"}]}
 
 決まり:
-1. ideas は 3 つ。それぞれ違う方向にする(同じ言い回しを並べない)。
+1. ideas は count の数(count がなければ 3 つ)。2 つ以上のときは、それぞれ違う方向にする(同じ言い回しを並べない)。count が 1 なら、依頼にいちばん合う 1 つだけ。
 2. 文言は、配信の国に合わせる(US は英語、JP は日本語)。テーマと切り口から外れない。価格・割引率・期限など、入力にない事実を作らない。
 3. 長さの目安: 件名は 40 文字(英語は 50 字)まで、見出し・通知のタイトルは短く、コピー・プリヘッダー・通知の本文は 2 文まで。制作指示(kind が instructions)は、制作の人に向けた箇条書きで 10 行まで(画像・見せ方・強調する所)。依頼が長さを決めていれば、それに従う。
 4. 制作指示で assets があれば、合う素材を名前で挙げてよい(例「メイン画像は素材『秋の参考写真』の雰囲気で」。名前は assets の name をそのまま「素材『…』」の形で)。素材の中身は見ていないので、name と note から言える以上のことを書かない。
@@ -83,11 +83,11 @@ const readIdeas = (out: Record<string, unknown>, key: 'text' | 'code') =>
     why: typeof x?.why === 'string' ? x.why.trim() : '',
   }))
 
-function finish(out: Record<string, unknown>, ideas: PartIdea[]): PartAnswer {
+function finish(out: Record<string, unknown>, ideas: PartIdea[], max = 3): PartAnswer {
   const reply = typeof out.reply === 'string' ? out.reply.trim() : ''
   if (out.mode === 'answer') return { reply, ideas: [], answered: true }
   if (ideas.length === 0 && !reply) throw new Error(tr('AI の案を読み取れませんでした。もう一度試してください', 'Could not read the AI suggestions. Please try again'))
-  return { reply, ideas: ideas.slice(0, 3), answered: false }
+  return { reply, ideas: ideas.slice(0, max), answered: false }
 }
 
 /** 選んだ部品の文言を、頼んだとおりに直した案をもらう */
@@ -100,6 +100,8 @@ export async function askPartRewrite(args: {
   assets?: { name: string; kind?: string; note?: string; url?: string }[]
   request: string
   history: PartTurn[]
+  /** ほしい案の数(省くと 3) */
+  count?: number
 }): Promise<PartAnswer> {
   const out = await askAgent(TEXT_PROMPT, {
     task: 'suggest_part_rewrite',
@@ -108,9 +110,10 @@ export async function askPartRewrite(args: {
     context: args.context,
     ...(args.assets?.length ? { assets: args.assets } : {}),
     request: args.request,
+    ...(args.count ? { count: args.count } : {}),
     chat: historyOf(args.history, (v) => v),
   })
-  return finish(out, readIdeas(out, 'text').filter((x) => x.value && x.value !== args.part.current))
+  return finish(out, readIdeas(out, 'text').filter((x) => x.value && x.value !== args.part.current), args.count ?? 3)
 }
 
 /** メイン画像を、頼んだとおりに選び直した案をもらう(案の value は画像の id) */
@@ -304,5 +307,22 @@ export function requestSamples(kind: string): string[] {
       return [tr('この配信に合うもの', 'Fits this delivery'), tr('在庫の多いもの', 'Well stocked'), tr('売れ行きが上がっているもの', 'Trending up'), tr('手ごろな価格のもの', 'Affordable')]
     default:
       return [tr('もっと短く', 'Shorter'), tr('ベネフィットを先に', 'Lead with the benefit'), tr('親しみやすく', 'Friendlier'), tr('行動を促す一文を足して', 'Add a call to action')]
+  }
+}
+
+/**
+ * 文の部品の「指示して直す」の例(札で出す。押すとそのまま頼む)。どの文の部品にも効く、よく使うものを先に並べ、部品ごとのものを 1 つ足す(2026-10-27 利用者)
+ */
+export function textRequestSamples(kind: string): string[] {
+  const common = [tr('短く', 'Shorter'), tr('カジュアルに', 'More casual'), tr('数字を入れる', 'Add a number'), tr('急ぎ感を出す', 'Add urgency')]
+  switch (kind) {
+    case 'subject':
+      return [...common, tr('開封したくなるように', 'More clickable')]
+    case 'headline':
+    case 'pushTitle':
+    case 'sectionTitle':
+      return [...common, tr('言い切る形に', 'More assertive')]
+    default:
+      return [...common, tr('行動を促す一文を足す', 'Add a call to action')]
   }
 }

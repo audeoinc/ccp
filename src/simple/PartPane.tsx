@@ -38,6 +38,7 @@ import { partKey, type PartRef } from './parts'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
 import { PartAiChat } from './PartAiChat'
+import { TextAiPanel } from './TextAiPanel'
 import { Hint } from '../Hint'
 import { ProductionMemo } from './ProductionMemo'
 import { askHeroPick, askPartRewrite, askProductPick, type PartAnswer, type PartTurn, type WholeTexts } from './partAi'
@@ -218,18 +219,18 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     return { turns: chats[key] ?? [], setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => setChat(key, f) }
   }
   /**
-   * 文言の部品: 入力欄と、その部品を AI に頼む欄。乗せた・選んだ案は、保存する中身に入れず、プレビューにだけ写す(shown が、その案を写した文言。
-   * 以前は文言そのものを書き換えて写していたので、自動の保存で、乗せただけの案が保存されかねなかった)。押すと採用
+   * 文言の部品の AI(「AI」のボタン → 案 / 指示して直す。TextAiPanel)。試している案は、保存する中身に入れず、プレビューにだけ写す
+   * (shown が、その案を写した文言。自動の保存で、試しただけの案が保存されないように)。「確定」で入れ替える
    */
   const aiChat = (kind: string, label: string, value: string, onChange: (v: string) => void, shown: (v: string) => WholeTexts) => {
     if (!part) return null
     return (
-      <PartAiChat
+      <TextAiPanel
         key={partKey(part)}
         kind={kind}
         label={label}
-        {...chatOf(part)}
-        ask={(request, history) =>
+        value={value}
+        ask={(request, count, history) =>
           askPartRewrite({
             card: e.aiCard(),
             angle: e.form.copyAngle,
@@ -237,12 +238,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
             context: { subject: e.form.subject || e.form.name, preheader: e.form.preheader, headline: e.form.headline, copy: e.form.copy, pushTitle: e.form.pushTitle, pushBody: e.form.pushBody },
             request,
             history,
+            count,
           })
         }
-        renderIdea={(idea) => <span className={s.ideaText}>{idea.value}</span>}
-        isCurrent={(idea) => idea.value === value}
-        nowText={value}
-        onPreview={(idea) => e.setAiPreview(idea ? { texts: shown(idea.value) } : null)}
+        onPreview={(v) => e.setAiPreview(v === null ? null : { texts: shown(v) })}
         onAdopt={(idea) => {
           e.setAiPreview(null)
           onChange(idea.value)
