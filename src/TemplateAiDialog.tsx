@@ -2,16 +2,18 @@
 // 入力 → (近いテンプレートを知らせる)→ AI の下書き → (近いテンプレートを知らせる)→ この下書きで編集を始める / 近いものを使う・複製して直す。
 // AI の案は保存しない(決まり)。保存は、テンプレートの編集の「保存」で人が確かめてから
 import { useState } from 'react'
-import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, MessageBar, MessageBarBody, Radio, RadioGroup, SpinButton, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, InfoLabel, Input, MessageBar, MessageBarBody, Radio, RadioGroup, SpinButton, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { ResizableSurface } from './ResizableSurface'
 import { TemplateThumb } from './TemplateThumb'
+import { LabeledValue } from './LabeledValue'
 import { useT } from './i18n'
 import { typo } from './typo'
 import { askTemplateDraft } from './templateAi'
 import { layoutOfDraft, nearTemplates, type NearTemplate, type TemplateAiInput, type TemplateDraftOut } from './templateDraft'
 import type { HeroKind, TemplateLayout } from './templates'
+import { boxCount } from './templateShape'
 
 const useStyles = makeStyles({
   surface: { width: '760px', maxWidth: 'calc(94vw / var(--ui-zoom, 1))' },
@@ -19,14 +21,16 @@ const useStyles = makeStyles({
   actions: { '& button': { whiteSpace: 'nowrap', flexShrink: 0 } },
   content: { display: 'grid', rowGap: '12px' },
   two: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '12px', alignItems: 'start' },
-  heading: typo.heading,
-  caption: typo.caption,
-  near: { display: 'grid', rowGap: '6px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
-  nearRow: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
-  nearName: { flexGrow: 1, minWidth: 0, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
+  // 題と ⓘ(使い方の説明は、題の横の InfoLabel に。見出しの下に説明の文を並べない決まり)
+  titleRow: { display: 'inline-flex', alignItems: 'center', columnGap: '6px' },
+  // 近いテンプレートの欄の見出し(組ではない、欄の見出しの形のラベル)
+  nearTitle: typo.label,
+  near: { display: 'grid', rowGap: '8px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
+  nearRow: { display: 'flex', alignItems: 'center', columnGap: '12px', flexWrap: 'wrap' },
+  // テンプレートの名前は、行のいちばん大事な値なので太く
+  nearName: { ...typo.valueStrong, flexGrow: 1, minWidth: 0 },
   result: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '16px', alignItems: 'start' },
-  info: { display: 'grid', rowGap: '6px', minWidth: 0 },
-  name: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
+  info: { display: 'grid', rowGap: '10px', minWidth: 0 },
 })
 
 interface Props {
@@ -65,11 +69,12 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
   const nearBox = (list: NearTemplate[], title: string) =>
     list.length > 0 && (
       <div className={s.near}>
-        <span className={s.caption}>{title}</span>
+        <span className={s.nearTitle}>{title}</span>
         {list.map((n) => (
           <div key={n.id} className={s.nearRow}>
             <span className={s.nearName}>{n.label}</span>
-            {draft && (n.same ? <Badge size="small" appearance="tint" color="brand">{t('同じ構成', 'Same layout')}</Badge> : <Badge size="small" appearance="tint" color="informative">{t(`似ている度 ${Math.round(n.score * 100)}%`, `${Math.round(n.score * 100)}% similar`)}</Badge>)}
+            {/* 作ったあとは、どれだけ近いか(作る前は、数と雰囲気が同じものだけなので出さない) */}
+            {draft && <LabeledValue label={t('似ている度', 'Similarity')}>{n.same ? t('同じ構成', 'Same layout') : `${Math.round(n.score * 100)}%`}</LabeledValue>}
             <Button size="small" onClick={() => onUse(n.id)}>{t('使う', 'Use')}</Button>
             <Button size="small" appearance="subtle" onClick={() => onDuplicate(n.id)}>{t('複製して直す', 'Duplicate and edit')}</Button>
           </div>
@@ -85,11 +90,18 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       <ResizableSurface sizeKey="templateAi" min={{ w: 560, h: 420 }} className={s.surface}>
         <DialogBody>
-          <DialogTitle>{t('AI でテンプレートを作る', 'Create a template with AI')}</DialogTitle>
+          <DialogTitle>
+            <span className={s.titleRow}>
+              {t('AI でテンプレートを作る', 'Create a template with AI')}
+              <InfoLabel
+                size="large"
+                info={t('目的と商品の数を伝えると、AI がセクションと部品(箱・ボタン・テキスト・画像・区切り線)の並びを組み立てて、下書きにします。下書きは保存されません。編集の画面で確かめてから、いつもの「保存」で保存します。', 'Tell the AI the purpose and number of products; it arranges sections and parts (boxes, buttons, text, images, dividers) into a draft. The draft is not saved; check it in the editor, then save as usual.')}
+              />
+            </span>
+          </DialogTitle>
           <DialogContent className={s.content}>
             {!draft ? (
               <>
-                <span className={s.caption}>{t('目的と商品の数を伝えると、AI がセクションと部品の並びを組み立てて、下書きにします。保存は、編集の画面で確かめてから。', 'Tell the AI the purpose and number of products; it arranges sections and parts into a draft. Save it from the editor after checking.')}</span>
                 <Field label={t('目的(何のための配信か)', 'Purpose (what the email is for)')} size="small" required>
                   <Input size="small" value={input.purpose} placeholder={t('例: 週末の新作の紹介', 'e.g. Weekend new arrivals')} maxLength={120} onChange={(_, d) => set({ purpose: d.value })} />
                 </Field>
@@ -115,16 +127,15 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
                 <div className={s.result}>
                   <TemplateThumb layout={layoutOfDraft(draft)} width={150} maxHeight={320} />
                   <div className={s.info}>
-                    <span className={s.name}>{draft.name}</span>
-                    {draft.description && <span className={s.caption}>{draft.description}</span>}
-                    {draft.reason && (
-                      <span>
-                        <span className={s.heading}>{t('この構成にした理由', 'Why this layout')}</span>
-                        <br />
-                        {draft.reason}
-                      </span>
-                    )}
-                    <span className={s.caption}>{t('AI の下書きは、まだ保存されていません。編集の画面で直して、保存してください。', 'The AI draft is not saved yet. Edit it, then save.')}</span>
+                    {/* ラベルと値の組は LabeledValue(ラベルは目印として小さく薄く、値を主役に。2026-10-27 の決まり) */}
+                    <LabeledValue layout="stacked" label={t('名前', 'Name')} strong>{draft.name}</LabeledValue>
+                    <LabeledValue layout="stacked" label={t('説明', 'Description')} emptyText="—">{draft.description}</LabeledValue>
+                    <LabeledValue label={t('商品の枠', 'Product slots')}>{t(`${boxCount(layoutOfDraft(draft))} 点`, `${boxCount(layoutOfDraft(draft))}`)}</LabeledValue>
+                    <LabeledValue label={t('セクション', 'Sections')}>{draft.sections.length}</LabeledValue>
+                    <LabeledValue layout="stacked" label={t('この構成にした理由', 'Why this layout')} emptyText="—">{draft.reason}</LabeledValue>
+                    <MessageBar intent="info" layout="multiline">
+                      <MessageBarBody>{t('AI の下書きは、まだ保存されていません。編集の画面で直して、保存してください。', 'The AI draft is not saved yet. Edit it, then save.')}</MessageBarBody>
+                    </MessageBar>
                   </div>
                 </div>
                 {nearBox(after, t('構成が近いテンプレートがあります。使い回すか、複製して直すこともできます', 'Similar templates exist. You can reuse one or duplicate and edit it.'))}
