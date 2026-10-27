@@ -130,12 +130,29 @@ console.log(`\n反映先: プロジェクト ${project} / リージョン ${REGI
 // 5. 検証 → ビルド → 反映
 // 型チェックと lint を同時に行う。画面のビルド(vite build)は、クラウドの中で行うので、ここではしない
 // (手元の dist は送らない。.gcloudignore)。
-console.log('\n[1/3] 型チェックと lint(同時に)')
-const checks = await runAll([
-  ['型チェック(tsc -b)', 'npx tsc -b'],
-  ['lint(eslint)', 'npx eslint .'],
-])
-if (checks.includes(false)) fail('型チェックか lint が通りませんでした(上の出力)。')
+// 同じコミットが GitHub の CI(.github/workflows/ci.yml。型チェック・lint・ビルド・サーバーのテストを含む)で
+// もう通っていれば、手元では流し直さない(2026-10-27 利用者と決めた。反映の待ちの大半が、この流し直しだったため)。
+// CI がまだ・失敗・gh がない・確かめられないときは、これまでどおり手元で流す。いつも手元で流すなら DEPLOY_LOCAL_CHECKS=1。
+const ciPassed = () => {
+  if (process.env.DEPLOY_LOCAL_CHECKS === '1') return false
+  try {
+    const repo = shq('gh repo view --json nameWithOwner -q .nameWithOwner')
+    const runs = JSON.parse(shq(`gh run list --repo ${repo} --workflow CI --commit ${head} --json status,conclusion --limit 5`))
+    return runs.some((r) => r.status === 'completed' && r.conclusion === 'success')
+  } catch {
+    return false
+  }
+}
+if (ciPassed()) {
+  console.log('\n[1/3] 型チェックと lint: このコミットは GitHub の CI で通っているので、手元では流しません。')
+} else {
+  console.log('\n[1/3] 型チェックと lint(同時に。CI の結果がまだないため手元で)')
+  const checks = await runAll([
+    ['型チェック(tsc -b)', 'npx tsc -b'],
+    ['lint(eslint)', 'npx eslint .'],
+  ])
+  if (checks.includes(false)) fail('型チェックか lint が通りませんでした(上の出力)。')
+}
 
 // 手元の確認のあいだに、ほかの人が反映を始めていることもあるので、クラウドでビルドする直前に見る
 await waitForOthers()
