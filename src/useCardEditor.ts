@@ -6,8 +6,7 @@ import { tr } from './i18n'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
-import { filled, insertAt, joinSections, moveTo, removeKey, slotsFromRows, splitSections } from './slots'
-import type { DeliveryProduct } from './models/deliveryProducts'
+import { filled, insertAt, joinSections, moveTo, removeKey, selectedSlots, splitSections } from './slots'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -198,11 +197,9 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
       .then((res) => {
         if (cancelled) return
         if (!res.success) throw new Error(res.error?.message ?? tr('掲載商品の取得に失敗しました', 'Failed to load the products in this delivery'))
-        const sel: Item[] = []
-        const selRows: DeliveryProduct[] = []
+        const byId = new Map<string, Item>()
         const cands: Candidate[] = []
-        const byVariant = new Map<string, Item[]>()
-        const variantRows = new Map<string, DeliveryProduct[]>()
+        const variants = new Set<string>()
         const snap = new Map<string, RowSnap>()
         for (const r of res.data ?? []) {
           const state = r.state ?? STATE_SELECTED
@@ -218,22 +215,17 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
           const variant = r.variant ?? ''
           snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '', part: r.part_id ?? '' })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
-          else if (variant) {
-            byVariant.set(variant, [...(byVariant.get(variant) ?? []), base])
-            variantRows.set(variant, [...(variantRows.get(variant) ?? []), r])
-          } else {
-            sel.push(base)
-            selRows.push(r)
+          else {
+            byId.set(r.id, base)
+            if (variant) variants.add(variant)
           }
         }
-        // 選定は、保存した枠の位置に置く(前のセクションが空いたまま後ろのセクションに置いた商品が、前の枠に詰まらないように。src/slots.ts)
-        const byRow = (list: Item[]) => new Map(list.map((i) => [i.rowId!, i]))
-        const selById = byRow(sel)
-        setItems(slotsFromRows(selRows, (r) => selById.get(r.id)!))
-        for (const [k, rows] of variantRows) {
-          const m = byRow(byVariant.get(k) ?? [])
-          byVariant.set(k, slotsFromRows(rows, (r) => m.get(r.id)!))
-        }
+        // 選定は、保存した枠の位置に置く(前のセクションが空いたまま後ろのセクションに置いた商品が、前の枠に詰まらないように。
+        // 候補の行は 1000 番台の番号なので、枠には置かない。src/slots.ts の selectedSlots)
+        const rows = res.data ?? []
+        const sel = selectedSlots(rows, '', (r) => byId.get(r.id)!)
+        setItems(sel)
+        const byVariant = new Map([...variants].map((k) => [k, selectedSlots(rows, k, (r) => byId.get(r.id)!)] as const))
         // B・C 案の商品(X55)
         if (byVariant.size > 0)
           setStash((prev) => {

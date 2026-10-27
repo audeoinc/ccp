@@ -4,7 +4,7 @@
 // 空いた枠は画面の中だけのもので、保存しない(保存は sort_order を「枠の位置 + 1」にし、空いた枠の番号は飛ぶ)。
 // 決まり: 空いた枠は、埋まっていないセクションの後ろにだけ置き、後ろのセクションに商品があるときだけ置く(最後の商品より後ろには置かない)。
 // 商品を外すと、そのセクションの中だけ詰め、ほかのセクションは動かさない
-import { SOURCE_MANUAL, type Item } from './items'
+import { SOURCE_MANUAL, STATE_CANDIDATE, type Item } from './items'
 import { sectionIndexAt, sectionRange, type SectionInfo } from './templates'
 
 /** 空いた枠の行か */
@@ -135,3 +135,12 @@ export function slotIdsOf(cardId: string | undefined, productIds: string[]): str
 // ---- 商品 ID の並び(空いた枠は '')と、行の並びの行き来(制作の写し・プレビューなど、ID だけで持つ所)
 export const idsToItems = (ids: string[]): Item[] => ids.map((pid, i) => (pid ? { key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL } : { key: `gap-${i}`, productId: '', reason: '', source: SOURCE_MANUAL, gap: true }))
 export const itemsToIds = (items: Item[]): string[] => items.map((i) => (isGap(i) ? '' : i.productId))
+
+/**
+ * 1 つの配信の保存した行(選定・候補・B・C 案が混ざったまま)から、案 variant(A は '')の選定の並びを作る。
+ * 候補の行(sort_order は 1000 番台)は枠の位置ではないので、ここでは使わない(候補は、候補の並びとして別に読む)
+ */
+export function selectedSlots<R extends { state?: string | null; variant?: string | null; sort_order?: number | null }>(rows: R[], variant: string, toItem: (r: R) => Item): Item[] {
+  const mine = rows.filter((r) => r.state !== STATE_CANDIDATE && (r.variant ?? '') === variant).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  return slotsFromRows(mine, toItem)
+}

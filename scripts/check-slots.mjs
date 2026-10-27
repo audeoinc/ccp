@@ -35,6 +35,14 @@ export async function checkSlots(server) {
   eq('番号が飛んだ保存は、その位置に置く', show(m.slotsFromRows([{ product_id: 'x', sort_order: 3 }, { product_id: 'y', sort_order: 4 }], toItem)), '_,_,x,y')
   eq('番号のない行が混ざると、順に詰める', show(m.slotsFromRows([{ product_id: 'x', sort_order: 3 }, { product_id: 'y' }], toItem)), 'x,y')
 
+  // ---- 1 つの配信の行(選定・候補・B 案が混ざったまま。本番の形: 選定は 1 から、候補は 1000 番台)
+  const row = (p, sort_order, state = 'selected', variant = '') => ({ id: p, product_id: p, sort_order, state, variant })
+  const cands = Array.from({ length: 15 }, (_, n) => row(`c${n}`, 1000 + n, 'candidate'))
+  eq('候補が 1000 番台にあるカード: 選定だけを枠に置く(候補は枠にしない)', show(m.selectedSlots([row('p1', 1), row('p2', 2), row('p3', 3), row('p4', 4), ...cands], '', toItem)), 'p1,p2,p3,p4')
+  eq('候補が 1000 番台にあり、選定に空いた枠があるカード', show(m.selectedSlots([...cands, row('x', 3), row('y', 4)], '', toItem)), '_,_,x,y')
+  eq('B 案の選定は、B 案だけで並べる(A 案・候補は混ぜない)', show(m.selectedSlots([row('p1', 1), row('b1', 1, 'selected', 'B'), row('b2', 2, 'selected', 'B'), ...cands], 'B', toItem)), 'b1,b2')
+  eq('候補だけのカードは、選定が空', show(m.selectedSlots(cands, '', toItem)), '')
+
   // ---- 入れる・外す・移す(ほかのセクションは動かさない)
   eq('前のセクションが空のまま、後ろのセクションの空いた枠に入れる', show(m.insertAt([], SECS, 2, it('x'))), '_,_,x')
   eq('そのセクションの中では前から埋まる', show(m.insertAt([it('a'), it('b')], SECS, 4, it('x'))), 'a,b,x')
