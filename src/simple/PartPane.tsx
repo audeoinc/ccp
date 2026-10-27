@@ -34,6 +34,7 @@ import { PushThumb } from '../PushThumb'
 import { AppScreenField, PushTapField } from '../AppLinksEditor'
 import type { Product } from '../models/products'
 import type { ThemeSuggestion } from '../aiDraft'
+import type { ProductSelection } from '../aiSelect'
 import { partKey, type PartRef } from './parts'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
@@ -62,6 +63,9 @@ const useStyles = makeStyles({
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
   trackedUrl: { display: 'grid', rowGap: '2px', minWidth: 0 },
   trackedText: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
+  sectionAi: { display: 'grid', rowGap: '6px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  sectionAiList: { display: 'grid', rowGap: '4px' },
+  sectionAiRow: { display: 'grid', rowGap: '1px', minWidth: 0 },
   linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...typo.pairValue },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
   caption: typo.caption,
@@ -371,6 +375,17 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     )
   })()
 
+  // 選んでいる部品が、どのセクションのものか(メールで、セクションがあるときだけ)
+  const sectionOfPart = (() => {
+    if (!part || e.channel !== 'email' || sections.length === 0) return null
+    if (part.kind === 'sectionTitle' || part.kind === 'sectionCopy') return part.index
+    if (part.kind === 'slot') return sectionIndexAt(sections, Math.max(0, part.index))
+    if (part.kind === 'product') {
+      const at = e.items.findIndex((x) => x.key === part.itemKey)
+      return at >= 0 ? sectionIndexAt(sections, at) : null
+    }
+    return null
+  })()
   const body = (() => {
     if (!part) return <WholePane editor={e} onEdit={() => onPick({ kind: 'meta', field: 'info' })} />
     switch (part.kind) {
@@ -749,6 +764,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {part && part.kind !== 'meta' && part.kind !== 'overview' && <Aim editor={e} onChange={() => onPick({ kind: 'meta', field: 'theme' })} />}
       {compareBlock}
       {body}
+      {/* セクションの部品(見出し・コピー・商品・空いた枠)では、そのセクションの商品をまとめて AI で選べる(X81 の 9) */}
+      {sectionOfPart !== null && <SectionAiPick key={sectionOfPart} editor={e} index={sectionOfPart} />}
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
       {part && part.kind !== 'meta' && part.kind !== 'overview' && part.kind !== 'template' && <ProductionMemo editor={e} label={titleOf(part)} />}
     </div>
@@ -788,6 +805,74 @@ function TrackedUrl({ url }: { url: string }) {
         </LabeledValue>
       ))}
     </span>
+  )
+}
+
+/**
+ * セクションの商品をまとめて AI で選ぶ(X81 の 9。詳しい画面の ③ セクションの「AIで選ぶ / 選び直す」と同じ AI で、見出し・コピーを踏まえる)。
+ * 案は試す → 確定: 出た案をそのセクションのプレビューにだけ仮に写し、帯の「確定」で、そのセクションの商品と候補を置き換える
+ */
+function SectionAiPick({ editor: e, index }: { editor: SimpleEditor; index: number }) {
+  const t = useT()
+  const s = useStyles()
+  const trial = useTrial()
+  const [result, setResult] = useState<ProductSelection | null>(null)
+  const [error, setError] = useState('')
+  const busy = e.sectionAi.busy(index)
+  const noTheme = !e.form.theme.trim()
+  const byId = new Map(e.products.map((p) => [p.id, p]))
+  const sec = sectionsOf(e.template)[index]
+  const count = sec ? filled(e.items.slice(sec.start, Number.isFinite(sec.slots) ? sec.start + sec.slots : undefined)).length : 0
+  const run = async () => {
+    setError('')
+    trial.cancel()
+    const r = await e.sectionAi.run(index)
+    if (!r || r.selected.length === 0) {
+      setResult(null)
+      setError(t('AI の案が出ませんでした。もう一度試してください。', 'AI returned no ideas. Please try again.'))
+      return
+    }
+    setResult(r)
+    trial.tryIt({
+      key: `section-${index}-${Date.now()}`,
+      from: t(`いまの商品 ${count} 件`, `Current ${count} products`),
+      to: t(`AI の案 ${r.selected.length} 件`, `AI idea: ${r.selected.length} products`),
+      preview: () => e.setAiPreview({ section: { index, productIds: r.selected.map((x) => x.productId) } }),
+      unpreview: () => e.setAiPreview(null),
+      apply: () => {
+        e.setAiPreview(null)
+        e.sectionAi.apply(index, r)
+        setResult(null)
+      },
+    })
+  }
+  return (
+    <div className={s.sectionAi}>
+      <span className={s.row}>
+        <Button size="small" appearance="outline" icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />} disabled={busy || noTheme || e.saving} onClick={() => void run()}>
+          {result ? t('案を作り直す', 'Regenerate') : t(`セクション ${index + 1} の商品を AI で選ぶ`, `Pick section ${index + 1} products with AI`)}
+        </Button>
+        {noTheme && <span className={s.caption}>{t('テーマを入れると使えます', 'Enter a theme to use this')}</span>}
+      </span>
+      {error && <span className={s.caption}>{error}</span>}
+      {result && trial.trial && (
+        <>
+          <TrialBar state={trial} />
+          <span className={s.caption}>{t('プレビューのこのセクションに仮に写しています。「確定」で、このセクションの商品を置き換えます(残りの案は候補に入ります)。', 'Shown in this section of the preview for now. Apply replaces this section’s products (the rest go to candidates).')}</span>
+          <div className={s.sectionAiList}>
+            {result.selected.map((r, n) => {
+              const p = byId.get(r.productId)
+              return (
+                <span key={`${r.productId}-${n}`} className={s.sectionAiRow}>
+                  <span className={s.name}>{`${n + 1}. ${p?.name ?? r.productId}`}</span>
+                  {r.reason && <span className={s.caption}>{r.reason}</span>}
+                </span>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 

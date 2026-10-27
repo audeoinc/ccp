@@ -12,6 +12,7 @@ import type { AbPurpose, VariantKey } from '../abTest'
 import type { PartRef } from './parts'
 import type { WholeTexts } from './partAi'
 import type { TemplateUse } from '../templateUse'
+import type { ProductSelection } from '../aiSelect'
 import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
@@ -47,6 +48,8 @@ export interface AiPreview {
   templateId?: EmailTemplateId
   /** 枠の商品の案。key が空なら空いた枠への案で、at の位置(押した空いた枠)に写す */
   item?: { key: string; productId: string; at?: number }
+  /** セクションの商品をまとめて AI で選んだ案(そのセクションの商品の並びを、この商品に置き換えて写す。X81 の 9) */
+  section?: { index: number; productIds: string[] }
 }
 
 /** 商品のフロートを、入れ替えの候補(配信に載っていない商品)の詳しい情報として開くときの鍵の頭(openProduct の key に「pid:商品 ID」) */
@@ -94,6 +97,8 @@ export interface SimpleExtras {
   themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void }
   /** テンプレートごとの最近の使われ方(詳しい画面の ② テンプレートと同じ templateUse。全部の配信が読めるまでは undefined。X81 の 7) */
   templateUse?: Map<string, TemplateUse>
+  /** セクションの商品をまとめて AI で選ぶ(詳しい画面の ③ セクションの「AIで選ぶ / 選び直す」と同じ。見出し・コピーを踏まえる)。apply で採用する(X81 の 9) */
+  sectionAi: { run: (index: number) => Promise<ProductSelection | undefined>; busy: (index: number) => boolean; apply: (index: number, sel: ProductSelection) => void }
   /** テーマの案を採用する(理由も一緒に入れる。手で直したときは setField('theme') が理由を消す) */
   adoptTheme: (theme: string, reason: string) => void
   channel: 'email' | 'push'

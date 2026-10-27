@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { filled, insertAt, joinSections } from './slots'
+import { filled, insertAt, joinSections, replaceSection } from './slots'
 import { useStableCallback } from './useStableCallback'
 import {
   Button,
@@ -738,11 +738,14 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [learnCount, setLearnCount] = useState(0)
   const shownHero = aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
   const previewItem = aiPreview?.item
+  const previewSection = aiPreview?.section
   const shownItems = previewItem
     ? previewItem.key
       ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
       : insertAt(viewItems, sectionsOf(template), previewItem.at ?? viewItems.length, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI })
-    : viewItems
+    : previewSection
+      ? replaceSection(viewItems, sectionsOf(template), previewSection.index, previewSection.productIds.map((productId, n) => ({ key: `__ai_section_${n}`, productId, reason: '', source: SOURCE_AI })))
+      : viewItems
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */
@@ -1170,6 +1173,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         setField: (k, v) => set(k)(v),
         themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme() },
         templateUse: templateUseMap,
+        sectionAi: {
+          run: drafts.runSectionProducts,
+          busy: (i) => !!drafts.busy[`section:${i}:products`],
+          // 詳しい画面の ③ セクションの「商品だけ選び直す」と同じ: そのセクションの商品を置き換え、そのセクションの候補も入れ替える
+          apply: (i, sel) => {
+            const toItem = (r: { productId: string; reason: string }): Item => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })
+            setItems((prev) => replaceSection(prev, sectionsOf(template), i, sel.selected.map(toItem)))
+            setCandidates((prev) => [...prev.filter((c) => c.section !== i), ...sel.candidates.map((r) => ({ ...toItem(r), section: i }))])
+          },
+        },
         adoptTheme: (theme, reason) => setForm((f) => ({ ...f, theme, themeReason: reason })),
         channel: previewTab,
         ab: ab ? { keys: allVariants(ab), active, purpose: ab.purpose ?? 'test', canAdd: !!nextVariant(ab), busy: abAiBusy } : null,
