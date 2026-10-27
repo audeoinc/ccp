@@ -38,7 +38,7 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
   - **複数行の入力欄は、下の端をつかんで高さを変えられる**(`AutoTextarea`。広げた高さを最低の高さとして、欄の種類ごと(`heightKey`)に覚える)。
   4. **固定にしたいときは、作る前に利用者に「この理由で固定にしたい」と確かめる。**
 - コメントは日本語で、**何をしているかより、なぜそうしているか**を書く。既存のコードの密度・書き方に合わせる。
-- 文字の階層(ラベル 12px 中太・薄いグレー / 値 12px / 見出し 13px 中太)は、[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) の「見た目の約束事」を守る。
+- **値に付くラベルは、すべて目印として小さく薄く**(2026-10-27 利用者と決めた): ラベル 10px・ごく薄い色、値 14px・semibold、空の値(未設定・—)は薄く。ラベルと値の組は共通の部品 `LabeledValue` で出す(新しく作る所も)。見出し 13px 中太。くわしくは [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) の「見た目の約束事」。
 
 ## Vertex AI Workbench(利用先の実行環境)で作業するとき
 
