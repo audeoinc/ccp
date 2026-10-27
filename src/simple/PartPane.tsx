@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
 import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
@@ -250,6 +251,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       />
     )
   }
+  // 空いた枠に入れるときの位置(押した枠のセクションに入る。src/slots.ts)
+  const slotAt = part?.kind === 'slot' ? part.index : e.items.length
   /** 商品の枠(載せた商品 itemKey / 空いた枠)を AI に頼む欄 */
   const productChat = (itemKey: string | null) =>
     part && (
@@ -275,11 +278,11 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         isCurrent={(idea) => e.items.some((i) => i.productId === idea.value)}
         nowText={itemKey ? (byId.get(e.items.find((i) => i.key === itemKey)?.productId ?? '')?.name ?? '') : t('(空いた枠)', '(empty slot)')}
         ideaText={(idea) => byId.get(idea.value)?.name ?? idea.value}
-        onPreview={(idea) => e.setAiPreview(idea ? { item: { key: itemKey ?? '', productId: idea.value } } : null)}
+        onPreview={(idea) => e.setAiPreview(idea ? { item: { key: itemKey ?? '', productId: idea.value, at: slotAt } } : null)}
         onAdopt={(idea) => {
           e.setAiPreview(null)
           if (itemKey) e.replaceItem(itemKey, idea.value, idea.why)
-          else e.addProduct(idea.value, e.items.length)
+          else e.addProduct(idea.value, slotAt)
         }}
       />
     )
@@ -445,10 +448,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           {/* 何も選んでいないときだけの一言(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
           <span className={s.caption}>{t('直したい所を、プレビューで押してください', 'Click what you want to change in the preview')}</span>
           {wholeChat}
-          <span className={s.label}>{t(`載せた商品(${e.items.length})`, `Products (${e.items.length})`)}</span>
-          {e.items.length === 0 && <span className={s.caption}>{t('まだ商品がありません。プレビューの空いた枠を押すと、商品を探せます。', 'No products yet. Click an empty slot in the preview to find one.')}</span>}
+          <span className={s.label}>{t(`載せた商品(${filled(e.items).length})`, `Products (${filled(e.items).length})`)}</span>
+          {filled(e.items).length === 0 && <span className={s.caption}>{t('まだ商品がありません。プレビューの空いた枠を押すと、商品を探せます。', 'No products yet. Click an empty slot in the preview to find one.')}</span>}
           <div className={s.list}>
-            {e.items.map((it, i) => {
+            {filled(e.items).map((it, i) => {
               const p = byId.get(it.productId)
               const swapOpen = swapAt?.at === 'list' && swapAt.itemKey === it.key
               return (
@@ -716,14 +719,14 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   const p = byId.get(c.productId)
                   return p ? (
                     <div key={c.key}>
-                      {productBox(p, <Button size="small" appearance="primary" disabled={e.saving} onClick={() => e.addProduct(p.id, e.items.length)}>{t('この枠に入れる', 'Put in this slot')}</Button>)}
+                      {productBox(p, <Button size="small" appearance="primary" disabled={e.saving} onClick={() => e.addProduct(p.id, slotAt)}>{t('この枠に入れる', 'Put in this slot')}</Button>)}
                     </div>
                   ) : null
                 })}
               </>
             )}
             <span className={s.label}>{t('ほかの商品を探す', 'Search other products')}</span>
-            <Candidates products={e.poolProducts} usedIds={new Set(e.items.map((i) => i.productId))} onAdd={(id) => e.addProduct(id, e.items.length)} />
+            <Candidates products={e.poolProducts} usedIds={new Set(e.items.map((i) => i.productId))} onAdd={(id) => e.addProduct(id, slotAt)} />
           </>
         )
       }
@@ -893,7 +896,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
       <div className={s.tplList} onMouseLeave={() => e.setAiPreview(null)}>
         {templateOptions(e.channel, false, e.card.country).map((o) => {
           const slots = o.id === 'free' ? Infinity : slotsOf(o.sections)
-          const over = Number.isFinite(slots) ? Math.max(0, e.items.length - slots) : 0
+          const over = Number.isFinite(slots) ? Math.max(0, filled(e.items).length - slots) : 0
           // 前の版を使っているときは、いまの版の選択肢は「いまのテンプレート」にしない(押すといまの版に替わる)
           const on = o.id === e.template
           return (

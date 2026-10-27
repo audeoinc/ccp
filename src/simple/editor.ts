@@ -45,7 +45,8 @@ export interface AiPreview {
   heroId?: string
   /** テンプレートの選び直しで、乗せているテンプレート */
   templateId?: EmailTemplateId
-  item?: { key: string; productId: string }
+  /** 枠の商品の案。key が空なら空いた枠への案で、at の位置(押した空いた枠)に写す */
+  item?: { key: string; productId: string; at?: number }
 }
 
 /** 商品のフロートを、入れ替えの候補(配信に載っていない商品)の詳しい情報として開くときの鍵の頭(openProduct の key に「pid:商品 ID」) */

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { filled, insertAt, joinSections } from './slots'
 import { useStableCallback } from './useStableCallback'
 import {
   Button,
@@ -344,7 +345,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }))
     const toItem = (r: { productId: string; reason: string }): Item => ({ key: crypto.randomUUID(), productId: r.productId, reason: r.reason, source: SOURCE_AI })
     if (res.sections.some((sec) => sec.selected.length > 0)) {
-      setItems(res.sections.flatMap((sec) => sec.selected.map(toItem)))
+      // セクションごとの選定を、そのセクションの枠に置く(前のセクションの選定が枠より少なくても、後ろのセクションの商品が前に詰まらないように)
+      setItems(joinSections(res.sections.map((sec) => sec.selected.map(toItem)), sectionsOf(res.template ?? template)))
       setCandidates(res.sections.flatMap((sec, i) => sec.candidates.map((r) => ({ ...toItem(r), section: i }))))
     }
     if (res.sections.length > 0) {
@@ -399,7 +401,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     setAuto(null)
   }
 
-  const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || items.length > 0 || heroId)
+  const hasContent = !!(form.theme.trim() || form.headline.trim() || form.copy.trim() || form.instructions.trim() || filled(items).length > 0 || heroId)
 
   async function runAllManual() {
     if (hasContent && !(await confirmDialog(form.channel === CHANNEL_PUSH ? t('現在のテーマ・通知のタイトルと本文・ヘッドライン・コピー・商品・メイン画像を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, notification title and body, headline, copy, products, and hero image with an AI draft. Continue?') : t('現在のテーマ・件名・プリヘッダー・ヘッドライン・コピー・商品・メイン画像・制作指示を、AIの下書きで置き換えます。よろしいですか?', 'This replaces the current theme, subject, preheader, headline, copy, products, hero image, and production notes with an AI draft. Continue?')))) return
@@ -710,7 +712,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const shownItems = previewItem
     ? previewItem.key
       ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
-      : [...viewItems, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI }]
+      : insertAt(viewItems, sectionsOf(template), previewItem.at ?? viewItems.length, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI })
     : viewItems
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   const locked = lockedWeeks.length > 0

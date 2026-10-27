@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import { DND_CAND, DND_ITEM, DND_PRODUCT, SOURCE_AI, SOURCE_MANUAL, type Candidate, type Item } from './items'
 import { sectionRange, sectionsOf, type EmailTemplateId, type SectionInfo } from './templates'
+import { filled, joinSections, removeKey, splitSections } from './slots'
 
 interface Args {
   template: EmailTemplateId
@@ -14,26 +15,34 @@ interface Args {
 export function useSelection({ template, items, setItems, candidates, setCandidates }: Args) {
   const sections = sectionsOf(template)
 
-  /** そのセクションの選定済み商品(最後のセクションは、枠を超えた分も含める) */
+  /** そのセクションの選定済み商品(最後のセクションは、枠を超えた分も含める。空いた枠の行は除く) */
   const listOf = (sec: SectionInfo) => {
     const [from, to] = sectionRange(sections, sec, items.length)
-    return items.slice(from, to)
+    return filled(items.slice(from, to))
   }
   const isFull = (sec: SectionInfo) => Number.isFinite(sec.slots) && listOf(sec).length >= sec.slots
 
-  const moveInSection = (sec: SectionInfo, key: string, delta: number) =>
+  // 並びの操作は、セクションごとの並びに分けて直し、戻す(ほかのセクションの商品は動かさない。src/slots.ts)
+  const inSection = (sec: SectionInfo, f: (list: Item[]) => Item[]) =>
     setItems((prev) => {
-      const [from, to] = sectionRange(sections, sec, prev.length)
-      const i = prev.findIndex((x) => x.key === key)
+      const lists = splitSections(prev, sections)
+      if (!lists[sec.index]) return prev
+      lists[sec.index] = f(lists[sec.index])
+      return joinSections(lists, sections)
+    })
+
+  const moveInSection = (sec: SectionInfo, key: string, delta: number) =>
+    inSection(sec, (list) => {
+      const i = list.findIndex((x) => x.key === key)
       const j = i + delta
-      if (i < 0 || j < from || j >= to) return prev
-      const next = [...prev]
+      if (i < 0 || j < 0 || j >= list.length) return list
+      const next = [...list]
       ;[next[i], next[j]] = [next[j], next[i]]
       return next
     })
 
   const demote = (sec: SectionInfo, item: Item) => {
-    setItems((prev) => prev.filter((x) => x.key !== item.key))
+    setItems((prev) => removeKey(prev, sections, item.key))
     setCandidates((prev) => [{ ...item, section: sec.index }, ...prev])
   }
 
@@ -41,21 +50,23 @@ export function useSelection({ template, items, setItems, candidates, setCandida
   const promote = (sec: SectionInfo, cand: Candidate) => {
     const list = listOf(sec)
     const full = isFull(sec)
-    let nextItems = [...items]
+    let nextList = [...list]
     let nextCands = candidates.filter((c) => c.key !== cand.key)
     if (full) {
       const last = list[list.length - 1]
-      nextItems = nextItems.filter((x) => x.key !== last.key)
+      nextList = nextList.filter((x) => x.key !== last.key)
       nextCands = [{ ...last, section: sec.index }, ...nextCands]
     }
-    const insertAt = sec.start + (full ? sec.slots - 1 : list.length)
-    nextItems.splice(insertAt, 0, { key: cand.key, rowId: cand.rowId, productId: cand.productId, reason: cand.reason, source: cand.source })
-    setItems(nextItems)
+    nextList.push({ key: cand.key, rowId: cand.rowId, productId: cand.productId, reason: cand.reason, source: cand.source })
+    // そのセクションの末尾に入れる(前のセクションが空いていても、このセクションの枠に入る)
+    const lists = splitSections(items, sections)
+    lists[sec.index] = nextList
+    setItems(joinSections(lists, sections))
     setCandidates(nextCands)
   }
 
   const addManual = (sec: SectionInfo, productId: string) => {
-    if (items.some((x) => x.productId === productId)) return
+    if (items.some((x) => !x.gap && x.productId === productId)) return
     const existing = candidates.find((c) => c.productId === productId)
     promote(sec, existing ?? { key: crypto.randomUUID(), productId, reason: '', source: SOURCE_MANUAL, section: sec.index })
   }
@@ -90,12 +101,11 @@ export function useSelection({ template, items, setItems, candidates, setCandida
     const productId = dt.getData(DND_PRODUCT)
     if (itemKey) {
       if (itemKey === target.key) return
-      setItems((prev) => {
-        const [from, to] = sectionRange(sections, sec, prev.length)
-        const a = prev.findIndex((x) => x.key === itemKey)
-        const b = prev.findIndex((x) => x.key === target.key)
-        if (a < from || a >= to || b < from || b >= to) return prev
-        const next = [...prev]
+      inSection(sec, (list) => {
+        const a = list.findIndex((x) => x.key === itemKey)
+        const b = list.findIndex((x) => x.key === target.key)
+        if (a < 0 || b < 0) return list
+        const next = [...list]
         const [moved] = next.splice(a, 1)
         next.splice(b, 0, moved)
         return next
@@ -103,7 +113,7 @@ export function useSelection({ template, items, setItems, candidates, setCandida
     } else if (candKey) {
       const c = candidates.find((x) => x.key === candKey)
       if (c) swapIn(sec, target, c)
-    } else if (productId && !items.some((x) => x.productId === productId)) {
+    } else if (productId && !items.some((x) => !x.gap && x.productId === productId)) {
       const c = candidates.find((x) => x.productId === productId) ?? { key: crypto.randomUUID(), productId, reason: '', source: SOURCE_MANUAL, section: sec.index }
       swapIn(sec, target, c)
     }

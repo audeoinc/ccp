@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { filled } from './slots'
 import { Badge, InfoLabel, Text, makeStyles, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import { productImage } from './images'
@@ -106,14 +107,14 @@ export function ProductInfoPane({ template, sectionTitles, items, products, onHo
         >
           {t('商品情報', 'Product info')}
         </InfoLabel>
-        <Badge size="small" appearance="tint" color="informative">{items.length}</Badge>
+        <Badge size="small" appearance="tint" color="informative">{filled(items).length}</Badge>
       </div>
 
-      {items.length === 0 && <span className={s.caption}>{t('まだ商品が選定されていません。', 'No products selected yet.')}</span>}
+      {filled(items).length === 0 && <span className={s.caption}>{t('まだ商品が選定されていません。', 'No products selected yet.')}</span>}
 
       {sections.map((sec) => {
         const [from, to] = sectionRange(sections, sec, items.length)
-        const list = items.slice(from, to)
+        const list = filled(items.slice(from, to))
         if (list.length === 0) return null
         const label = sec.wantTitle ? sectionTitles[sec.index] || sec.label : sec.label
         return (

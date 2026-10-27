@@ -1,4 +1,5 @@
 import type { Item } from './items'
+import { filled } from './slots'
 import { tr } from './i18n'
 import { linkSlots, linksComplete, parseLinks } from './links'
 import { parsePushLink, tapComplete } from './pushLink'
@@ -53,11 +54,12 @@ export function progressOf(a: {
   if (a.push) {
     // アプリ: テーマ / テンプレート / 通知(タイトル・本文)/ メッセージ(メイン画像・ヘッドライン・セクションの枠)/ リンク先
     const secs = sectionsOf(a.template)
-    const filled = secs.every((sec) => {
+    // 空いた枠の行(gap)は、埋まった枠に数えない
+    const allFilled = secs.every((sec) => {
       const [from, to] = sectionRange(secs, sec, a.items.length)
-      return Math.max(0, to - from) >= sec.slots
+      return filled(a.items.slice(from, to)).length >= sec.slots
     })
-    const message = !!a.heroId && !!a.headline.trim() && filled
+    const message = !!a.heroId && !!a.headline.trim() && allFilled
     // 送る相手は、工程ではなく配信情報で決める(X40。誰に向けるかを最初に決めて、それに合わせて中身を作る)
     const flags = [!!a.theme.trim(), true, !!a.push.title.trim() && !!a.push.body.trim(), message, a.links]
     const [theme, template, hero, sectionsOk, links] = flags
@@ -77,10 +79,10 @@ export function progressOf(a: {
   const sections = sectionsOf(a.template)
   const sectionsDone =
     a.template === 'free'
-      ? a.items.length > 0
+      ? filled(a.items).length > 0
       : sections.every((sec) => {
           const [from, to] = sectionRange(sections, sec, a.items.length)
-          return Math.max(0, to - from) >= sec.slots
+          return filled(a.items.slice(from, to)).length >= sec.slots
         })
 
   const flags = [

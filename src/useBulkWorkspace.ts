@@ -19,7 +19,7 @@ import { DeliveryCardsService } from './data/deliveryCards'
 import { limitText, weeklyLimit, weeklyLimitFor } from './weeklyLimit'
 import type { CardAlert } from './cardAlerts'
 import { SOURCE_AI, type Candidate, type Item } from './items'
-import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, weekDays, type DraftBase } from './bulkDraft'
+import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, slotItemsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { DeliveryPattern } from './models/deliveryPatterns'
 import { dayKeyOf } from './weekLock'
 import { confirmDialog } from './confirm'
@@ -235,7 +235,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       return {
         day,
         card: real ?? previewCard(id ?? draftId(day), baseOf(day), r, products),
-        productIds: (id && cardProducts.get(id)) || productIdsOf(r),
+        // まだ保存していない案は、セクションごとに枠に置いた並び(空いた枠は '')でプレビューする
+        productIds: (id && cardProducts.get(id)) || slotItemsOf(baseOf(day), r, String).map((i) => (i.gap ? '' : i.productId)),
         state: id ? 'saved' : discarded.has(day) ? 'discarded' : 'unsaved',
       }
     })
@@ -576,7 +577,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
   function draftFor(day: string): BulkDraft | null {
     const r = results.get(day)
     if (!r) return null
-    const items: Item[] = r.sections.flatMap((s) => s.selected).map((x, i) => ({ key: `ai-${day}-${i}`, productId: x.productId, reason: x.reason, source: SOURCE_AI }))
+    const items: Item[] = slotItemsOf(baseOf(day), r, (i) => `ai-${day}-${i}`)
     const candidates: Candidate[] = r.sections.flatMap((s, si) => s.candidates.map((x, i) => ({ key: `ai-${day}-c${si}-${i}`, productId: x.productId, reason: x.reason, source: SOURCE_AI, section: si })))
     return { card: previewCard(draftId(day), baseOf(day), r, products), items, candidates }
   }

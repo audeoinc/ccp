@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { slotIdsOf } from './slots'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Popover, PopoverSurface, PopoverTrigger, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { typo } from './typo'
 import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, CheckmarkRegular, ChevronLeftRegular, ChevronRightRegular, ClipboardPasteRegular, CommentAddRegular, DismissRegular, EyeRegular, HandRightRegular, MoreHorizontalRegular, OpenRegular, SaveRegular, SendRegular, TaskListLtrRegular } from '@fluentui/react-icons'
@@ -220,7 +221,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
   // 写し: 依頼したあとは固めたもの、依頼する前(下書き)は、いまの配信カードから作ったもの
   // この配信で選んだ画像は、写しの商品の画像として持つ(依頼したあとは、そのときの画像のまま。プレビュー・HTML・コピーの行がそのまま使う)
   const shownProducts = useMemo(() => (productImages?.size ? products.map((p) => (productImages.has(p.id) ? { ...p, image_url: productImages.get(p.id) } : p)) : products), [products, productImages])
-  const draft = useMemo(() => buildSnapshot(card, productIds, shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
+  const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   // 描くたびに写しを読み直すと、HTML の下書きを作り直し続けるので、固めた写しの文字が変わったときだけ読む
   const frozenSnap = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
   const approvedSnap: Snapshot = frozenSnap || draft
@@ -713,7 +714,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                           cardName={card.name ?? ''}
                           productionOwner={owner}
                           productionDue={due}
-                          productIds={snap.productIds}
+                          productIds={snap.productIds.filter(Boolean)}
                           products={snap.products}
                         />
                       </div>
@@ -936,10 +937,10 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                   <Tab value="tasks" icon={<TaskListLtrRegular />}>{t(`タスク(${tabCounts.tasks})`, `Tasks (${tabCounts.tasks})`)}</Tab>
                 </TabList>
                 {side === 'talk' ? (
-                  <CommentsPanel cardId={card.id} stage="production" productIds={snap.productIds} products={snap.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} />
+                  <CommentsPanel cardId={card.id} stage="production" productIds={snap.productIds.filter(Boolean)} products={snap.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} />
                 ) : side === 'assets' ? (
                   // 素材(Creative Assets。X58): 企画側が配信カードで置いたものと同じ。制作側からも足せる
-                  <CreativeAssets cardId={card.id} stage="production" owner={card.owner} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={snap.productIds} products={snap.products} />
+                  <CreativeAssets cardId={card.id} stage="production" owner={card.owner} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={snap.productIds.filter(Boolean)} products={snap.products} />
                 ) : (
                   <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />
                 )}
@@ -967,7 +968,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
           </div>
         )}
         {finishedOpen && live && (
-          <FinishedFloat card={card} request={live} people={people} productIds={snap.productIds} products={snap.products} onClose={() => setFinishedOpen(false)} />
+          <FinishedFloat card={card} request={live} people={people} productIds={snap.productIds.filter(Boolean)} products={snap.products} onClose={() => setFinishedOpen(false)} />
         )}
         {/* 制作した HTML を貼り付けて置き換える(X58) */}
         {pasting !== null && (

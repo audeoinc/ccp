@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { filled } from '../slots'
 import { Button, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { AttachRegular, ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
@@ -295,7 +296,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
             cardName={e.form.name}
             productionOwner={e.form.productionOwner}
             productionDue={e.form.productionDue}
-            productIds={e.items.map((i) => i.productId)}
+            productIds={filled(e.items).map((i) => i.productId)}
             products={e.products}
             onCount={onAssetCount}
           />

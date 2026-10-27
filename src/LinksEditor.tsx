@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { filled, isGap } from './slots'
 import { Button, Field, Input, makeStyles, tokens } from '@fluentui/react-components'
 import { ChevronDownRegular, ChevronRightRegular, OpenRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -153,11 +154,13 @@ export function LinksEditor({ links, onLinks, slots, template, items, products, 
         icon={showProducts ? <ChevronDownRegular /> : <ChevronRightRegular />}
         onClick={() => setShowProducts(!showProducts)}
       >
-        {t(`商品のリンク(${items.length} 件。商品ページに自動で付きます)`, `Product links (${items.length}; set automatically to each product page)`)}
+        {t(`商品のリンク(${filled(items).length} 件。商品ページに自動で付きます)`, `Product links (${filled(items).length}; set automatically to each product page)`)}
       </Button>
       {showProducts && (
         <div className={styles.products}>
           {items.map((it, i) => {
+            // 空いた枠は飛ばす(i は枠の位置のまま。utm_content の番号は枠の位置で決まる)
+            if (isGap(it)) return null
             const p = products.find((x) => x.id === it.productId)
             // 表の箱は、押せる要素(写真・名前など)ごとに別のリンク。開くボタンは、いちばん上の要素のもの
             const urls = productLinks(template, i, it.key, p?.product_code).map((l) => ({ content: l.content, url: withUtm(productUrl(p), utm, l.content) }))

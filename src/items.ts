@@ -16,6 +16,8 @@ export interface Item {
   imageUrl?: string
   /** その画像を選んだ元(商品ページの URL など) */
   imageSource?: string
+  /** 空いた枠(商品のない行。前のセクションが埋まっていないのに後ろのセクションへ置いたときの、枠の場所取り。保存しない。src/slots.ts) */
+  gap?: boolean
 }
 
 // ドラッグ&ドロップ用の MIME タイプ

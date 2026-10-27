@@ -43,7 +43,8 @@ export interface ReadinessInput {
   copy: string
   hasHero: boolean
   /** 載せた商品(並びの順) */
-  items: { key: string; productId: string }[]
+  /** 選定の並び(空いた枠の行 gap を含んでよい。src/slots.ts) */
+  items: { key: string; productId: string; gap?: boolean }[]
   /** テンプレートの商品の枠の数(枠の数が決まっていない並び(free)は 0) */
   slots: number
   alerts: CardAlert[]
@@ -83,14 +84,16 @@ export function readinessOf(c: ReadinessInput): ReadinessItem[] {
       target: noHead || !noCopy ? { kind: 'headline' } : { kind: 'copy' },
     })
     // 商品の枠: 枠の数が決まっていれば空いた枠を数える。決まっていない並びは、1 つもないときだけ
-    const empty = c.slots > 0 ? Math.max(0, c.slots - c.items.length) : c.items.length === 0 ? 1 : 0
+    const count = c.items.filter((i) => !i.gap).length
+    const empty = c.slots > 0 ? Math.max(0, c.slots - count) : count === 0 ? 1 : 0
+    // 最初の空いた枠(前のセクションの空いた枠の行か、並びの後ろ)
+    const firstGap = c.items.findIndex((i) => i.gap)
     out.push({
       key: 'slots',
       level: empty > 0 ? 'warn' : 'ok',
       label: tr('商品の枠', 'Product slots'),
-      detail: empty === 0 ? tr(`${c.items.length} 件`, `${c.items.length}`) : c.slots > 0 ? tr(`空いた枠 ${empty}`, `${empty} empty`) : tr('商品がありません', 'No products'),
-      // 空いた枠は前から埋まるので、最初の空いた枠を選ぶ
-      target: empty > 0 ? { kind: 'slot', index: c.items.length } : null,
+      detail: empty === 0 ? tr(`${count} 件`, `${count}`) : c.slots > 0 ? tr(`空いた枠 ${empty}`, `${empty} empty`) : tr('商品がありません', 'No products'),
+      target: empty > 0 ? { kind: 'slot', index: firstGap >= 0 ? firstGap : c.items.length } : null,
     })
   } else {
     out.push(textCheck('pushTitle', tr('通知のタイトル', 'Notification title'), c.pushTitle, { kind: 'pushTitle' }))
@@ -103,7 +106,7 @@ export function readinessOf(c: ReadinessInput): ReadinessItem[] {
   out.push({ key: 'audience', level: c.audienceSet ? 'ok' : 'warn', label: tr('送る相手', 'Send to'), detail: c.audienceSet ? '' : UNSET(), target: { kind: 'meta', field: 'audience' } })
 
   // 在庫・画像の期限は、商品ごとに 1 行(押すと、その商品の枠を選ぶ)。ほかのアラートは、まとめて 1 行
-  const keyOf = new Map(c.items.map((it) => [it.productId, it.key]))
+  const keyOf = new Map(c.items.filter((it) => !it.gap).map((it) => [it.productId, it.key]))
   const productTarget = (a: CardAlert): ReadinessTarget => {
     const k = a.productId ? keyOf.get(a.productId) : undefined
     return k ? { kind: 'product', itemKey: k } : { kind: 'panel', panel: 'alerts' }

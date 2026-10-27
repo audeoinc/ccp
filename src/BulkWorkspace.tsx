@@ -689,7 +689,7 @@ export function BulkWorkspace({ ws, cards, products, heroes, onOpen, onOpenDraft
                 </div>
                 <div>
                   <div className={s.thumbs}>
-                    {item.productIds.map((pid, i) => {
+                    {item.productIds.filter(Boolean).map((pid, i) => {
                       const over = is.over.includes(pid)
                       return (
                         <span key={`${pid}-${i}`} className={s.thumb} title={pOf(pid)?.name ?? ''}>

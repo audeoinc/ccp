@@ -4,7 +4,9 @@ import { typo } from './typo'
 import { AddRegular, ArrowDownRegular, ArrowSwapRegular, ArrowUndoRegular, ArrowUpRegular, CheckmarkRegular, CopyRegular, DismissRegular, EditRegular, ImageAddRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import { getText, linkRows, productRows, rowsText, trackingRows, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, textRows, type Snapshot, type TextField } from './productionSnapshot'
+import { getText, linkRows, productRows, rowsText, trackingRows, variantSnapshot, variantUtmCampaign, setHero, setLink, setProducts, setText, templateOf, textRows, type Snapshot, type TextField } from './productionSnapshot'
+import { idsToItems, itemsToIds, removeKey } from './slots'
+import { sectionsOf } from './templates'
 import { productImage, heroImage } from './images'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
@@ -154,15 +156,21 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
 
   // 商品を選ぶ(名前・商品コードで探す)。配信の国の市場の商品だけ
   const productPicker = (trigger: ReactNode, onPick: (id: string) => void) => <ProductPicker trigger={trigger} products={poolProducts} onPick={onPick} />
-  const moveProduct = (i: number, d: number) => {
+  // 商品の並びは枠の位置のまま持つ(空いた枠は '')。行の番号 n と、並びの中の位置(r.at)は、空いた枠があるとずれるので、位置で直す
+  const moveProduct = (n: number, d: number) => {
+    const a = prows[n]
+    const b = prows[n + d]
+    if (!a || !b) return
     const ids = [...current.productIds]
-    const j = i + d
-    if (j < 0 || j >= ids.length) return
-    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    ;[ids[a.at], ids[b.at]] = [ids[b.at], ids[a.at]]
     onChange(setProducts(current, ids, products))
   }
-  const replaceProduct = (i: number, id: string) => onChange(setProducts(current, current.productIds.map((x, k) => (k === i ? id : x)), products))
-  const removeProduct = (i: number) => onChange(setProducts(current, current.productIds.filter((_, k) => k !== i), products))
+  const replaceProduct = (at: number, id: string) => onChange(setProducts(current, current.productIds.map((x, k) => (k === at ? id : x)), products))
+  // 外すと、そのセクションの中だけ詰める(ほかのセクションの商品は動かさない。配信カードと同じ)
+  const removeProduct = (at: number) => {
+    const list = idsToItems(current.productIds)
+    onChange(setProducts(current, itemsToIds(removeKey(list, sectionsOf(templateOf(current)), list[at].key)), products))
+  }
   const productsChanged = current.productIds.join() !== original.productIds.join()
 
   const heroChanged = (current.hero?.id ?? '') !== (original.hero?.id ?? '')
@@ -254,7 +262,7 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
         prows.map((r) => [r.section, r.product.name, r.product.product_code, r.price, r.url].filter(Boolean).join('\t')).join('\n'),
         <>
           {prows.map((r, i) => {
-            const wasId = original.productIds[i]
+            const wasId = original.productIds[r.at]
             const changed = wasId !== r.product.id
             const wasName = wasId ? (original.products.find((p) => p.id === wasId)?.name ?? '') : ''
             return (
@@ -274,8 +282,8 @@ export function ProductionInfoPane({ original, current, editable, onChange, prod
                     <>
                       <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={i === 0} onClick={() => moveProduct(i, -1)} aria-label={t('上へ', 'Move up')} />
                       <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={i === prows.length - 1} onClick={() => moveProduct(i, 1)} aria-label={t('下へ', 'Move down')} />
-                      {productPicker(<Button size="small" appearance="subtle" icon={<ArrowSwapRegular />} aria-label={t('ほかの商品に入れ替える', 'Replace with another product')} />, (id) => replaceProduct(i, id))}
-                      <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => removeProduct(i)} aria-label={t('外す', 'Remove')} />
+                      {productPicker(<Button size="small" appearance="subtle" icon={<ArrowSwapRegular />} aria-label={t('ほかの商品に入れ替える', 'Replace with another product')} />, (id) => replaceProduct(r.at, id))}
+                      <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => removeProduct(r.at)} aria-label={t('外す', 'Remove')} />
                     </>
                   )}
                   <CopyButton text={[r.product.name, r.product.product_code, r.price, r.url].filter(Boolean).join('\t')} />

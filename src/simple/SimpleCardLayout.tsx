@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { filled } from '../slots'
 import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
@@ -1023,7 +1024,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                   cardName={e.form.name}
                   productionOwner={e.form.productionOwner}
                   productionDue={e.form.productionDue}
-                  productIds={e.items.map((i) => i.productId)}
+                  productIds={filled(e.items).map((i) => i.productId)}
                   products={e.products}
                   onCount={setAssetCount}
                 />
@@ -1271,7 +1272,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                       onClick={() => openFromList(c.key)}
                       actions={
                         // 候補(載せていない商品)は「⇄ 入れる」。どの枠の商品と入れ替えるかを、載せている商品から選ぶ(SU9 (f))
-                        e.items.length > 0 && (
+                        filled(e.items).length > 0 && (
                           <span data-row-action>
                               <Menu positioning="below-end">
                                 <MenuTrigger disableButtonEnhancement>
@@ -1281,7 +1282,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                                 </MenuTrigger>
                                 <MenuPopover>
                                   <MenuList>
-                                    {e.items.map((it, i) => (
+                                    {filled(e.items).map((it, i) => (
                                       <MenuItem key={it.key} icon={<ArrowSwapRegular />} onClick={() => e.swapWithCandidate(it.key, c.key, '')}>
                                         {t(`${i + 1}. ${productById.get(it.productId)?.name ?? ''} と入れ替える`, `${i + 1}. Replace ${productById.get(it.productId)?.name ?? ''}`)}
                                       </MenuItem>
@@ -1301,7 +1302,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           </div>
         ) : (
           <PaneRail label={t('商品の一覧', 'Products')} onOpen={toggleProducts}>
-            {e.items.map((it) => {
+            {filled(e.items).map((it) => {
               const kind = e.alertKinds.get(it.productId)
               const name = productById.get(it.productId)?.name ?? ''
               return (

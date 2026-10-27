@@ -6,6 +6,8 @@ import { tr } from './i18n'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
+import { filled, insertAt, joinSections, moveTo, removeKey, slotsFromRows, splitSections } from './slots'
+import type { DeliveryProduct } from './models/deliveryProducts'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -197,8 +199,10 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         if (cancelled) return
         if (!res.success) throw new Error(res.error?.message ?? tr('掲載商品の取得に失敗しました', 'Failed to load the products in this delivery'))
         const sel: Item[] = []
+        const selRows: DeliveryProduct[] = []
         const cands: Candidate[] = []
         const byVariant = new Map<string, Item[]>()
+        const variantRows = new Map<string, DeliveryProduct[]>()
         const snap = new Map<string, RowSnap>()
         for (const r of res.data ?? []) {
           const state = r.state ?? STATE_SELECTED
@@ -214,10 +218,22 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
           const variant = r.variant ?? ''
           snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '', part: r.part_id ?? '' })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
-          else if (variant) byVariant.set(variant, [...(byVariant.get(variant) ?? []), base])
-          else sel.push(base)
+          else if (variant) {
+            byVariant.set(variant, [...(byVariant.get(variant) ?? []), base])
+            variantRows.set(variant, [...(variantRows.get(variant) ?? []), r])
+          } else {
+            sel.push(base)
+            selRows.push(r)
+          }
         }
-        setItems(sel)
+        // 選定は、保存した枠の位置に置く(前のセクションが空いたまま後ろのセクションに置いた商品が、前の枠に詰まらないように。src/slots.ts)
+        const byRow = (list: Item[]) => new Map(list.map((i) => [i.rowId!, i]))
+        const selById = byRow(sel)
+        setItems(slotsFromRows(selRows, (r) => selById.get(r.id)!))
+        for (const [k, rows] of variantRows) {
+          const m = byRow(byVariant.get(k) ?? [])
+          byVariant.set(k, slotsFromRows(rows, (r) => m.get(r.id)!))
+        }
         // B・C 案の商品(X55)
         if (byVariant.size > 0)
           setStash((prev) => {
@@ -252,15 +268,16 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const productName = (id: string) => productById.get(id)?.name ?? ''
 
+  // 商品を入れる位置 at は、空いた枠の位置でもよい(そのセクションの中で前から詰めて入れる。src/slots.ts)
   const addProduct = (productId: string, at = items.length) => {
-    if (items.some((i) => i.productId === productId)) return
+    if (items.some((i) => !i.gap && i.productId === productId)) return
     // 候補にあった商品なら、候補から選定へ移す(理由も引き継ぐ)
     const cand = candidates.find((c) => c.productId === productId)
     if (cand) setCandidates(candidates.filter((c) => c.key !== cand.key))
     const it: Item = cand
       ? { key: cand.key, rowId: cand.rowId, productId, reason: cand.reason, source: cand.source }
       : { key: crypto.randomUUID(), productId, reason: '', source: SOURCE_MANUAL }
-    setItems([...items.slice(0, at), it, ...items.slice(at)])
+    setItems(insertAt(items, sectionsOf(template), at, it))
     setSelectedKey(it.key)
   }
 
@@ -271,26 +288,25 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     if (itemKey) {
       const from = items.findIndex((i) => i.key === itemKey)
       if (from < 0) return
-      moveItem(from, Math.min(index, items.length - 1))
+      moveItem(from, index)
     } else if (productId) {
       addProduct(productId, index)
     }
   }
 
-  // from の商品を to の位置へ移す(間の商品は1つずつずれる)
+  // from の商品を to の位置へ移す(to は空いた枠・並びの後ろの空いた枠の位置でもよい。動くのは、出たセクションと入ったセクションの中だけ)
   const moveItem = (from: number, to: number) => {
-    if (from === to || to < 0 || to >= items.length) return
-    const next = [...items]
-    const [it] = next.splice(from, 1)
-    next.splice(to, 0, it)
-    setItems(next)
+    const it = items[from]
+    if (!it || it.gap || from === to || to < 0) return
+    setItems(moveTo(items, sectionsOf(template), it.key, to))
   }
 
   // 同じカテゴリの商品を隣り合わせにする(カテゴリの並びは、現在の登場順を保つ)
   const groupByCategory = () => {
     const cat = (i: Item) => productById.get(i.productId)?.category_name ?? ''
-    const order = [...new Set(items.map(cat))]
-    setItems([...items].sort((a, b) => order.indexOf(cat(a)) - order.indexOf(cat(b))))
+    const list = filled(items)
+    const order = [...new Set(list.map(cat))]
+    setItems(list.sort((a, b) => order.indexOf(cat(a)) - order.indexOf(cat(b))))
   }
 
   // エージェントに渡す、配信カードの現在の入力内容
@@ -333,6 +349,11 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         )
       }
     }
+    // 空いた枠は、前のテンプレートのセクションの場所取りなので、新しいテンプレートで置き直す。
+    // セクションの数が同じ(同じテンプレートの版の切り替えなど)なら、セクションごとに置き直す。違えば、いままでどおり前から詰める
+    const before = sectionsOf(template)
+    const after = sectionsOf(id)
+    setItems((prev) => (before.length === after.length ? joinSections(splitSections(prev, before), after) : filled(prev)))
     setTemplate(id)
     setCandidates([])
     return true
@@ -356,11 +377,11 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
 
   const removeItem = (key: string) => {
     const idx = items.findIndex((i) => i.key === key)
-    if (idx >= 0) {
-      const section = sectionIndexAt(sectionsOf(template), idx)
-      setCandidates([{ ...items[idx], section }, ...candidates])
-    }
-    setItems(items.filter((i) => i.key !== key))
+    if (idx < 0 || items[idx].gap) return
+    const section = sectionIndexAt(sectionsOf(template), idx)
+    setCandidates([{ ...items[idx], section }, ...candidates])
+    // そのセクションの中だけ詰める(ほかのセクションの商品は動かさない。2026-10-27 利用者と決めた)
+    setItems(removeKey(items, sectionsOf(template), key))
     if (selectedKey === key) setSelectedKey(null)
   }
 
@@ -368,11 +389,12 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   async function syncItems(cardId: string, cardName: string, before: Map<string, RowSnap>) {
     const sections = sectionsOf(template)
     const desired: { it: Item; state: typeof STATE_SELECTED | typeof STATE_CANDIDATE; section: number; order: number; variant: string }[] = [
-      ...itemsOf('A').map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: '' })),
+      // sort_order は「枠の位置 + 1」(空いた枠は保存しないので、その番号は飛ぶ。読み込みは slotsFromRows)
+      ...itemsOf('A').flatMap((it, idx) => (it.gap ? [] : [{ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: '' }])),
       ...candidates.map((c, i) => ({ it: c as Item, state: STATE_CANDIDATE as typeof STATE_CANDIDATE, section: c.section, order: 1000 + i, variant: '' })),
       // AB テストで、案ごとに商品を持つとき: B・C 案の商品も、variant を付けて保存する(X55)
       ...(ab && ownsProducts(savedTargetAb())
-        ? ab.variants.flatMap((k) => itemsOf(k).map((it, idx) => ({ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: k })))
+        ? ab.variants.flatMap((k) => itemsOf(k).flatMap((it, idx) => (it.gap ? [] : [{ it, state: STATE_SELECTED as typeof STATE_SELECTED, section: sectionIndexAt(sections, idx), order: idx + 1, variant: k }])))
         : []),
     ]
     const keep = new Set(desired.map((d) => d.it.rowId).filter((id): id is string => !!id))

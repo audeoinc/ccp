@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { filled, isGap } from './slots'
 import { Button, Input, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
   ArrowDownRegular,
@@ -534,19 +535,19 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     )
   }
 
-  // 空きの枠: ここへドロップすると、末尾の空き枠から埋まる
+  // 空きの枠: ここへドロップすると、その枠のセクションに入る(セクションの中では前から埋まる。src/slots.ts)
   const emptySlot = (key: string, feature: boolean, shape?: React.CSSProperties, index = items.length) => (
     <div
       key={key}
       data-part={`slot:${index}`}
-      {...handlers(items.length)}
+      {...handlers(index)}
       className={classes.slot}
       style={{
         aspectRatio: feature ? undefined : compact ? '1 / 1' : '3 / 4',
         minHeight: feature ? 120 : undefined,
         ...shape,
-        borderColor: over === items.length ? ACCENT : SLOT_LINE,
-        backgroundColor: over === items.length ? ACCENT_BG : 'transparent',
+        borderColor: over === index ? ACCENT : SLOT_LINE,
+        backgroundColor: over === index ? ACCENT_BG : 'transparent',
         fontSize: '0.8rem',
         padding: 8,
       }}
@@ -796,7 +797,8 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
   // ---- セクションの商品の並び(種類ごと)。start は、並び全体の中での先頭の位置
   const sectionBody = (sec: Section, start: number, list: Item[]) => {
     const slot = (j: number, tile: (it: Item, idx: number) => React.ReactNode, shape?: React.CSSProperties, feature = false) =>
-      list[j] ? tile(list[j], start + j) : emptySlot(`e${start + j}`, feature, shape, start + j)
+      // 空いた枠の行(gap。商品のない行)は、空きの枠として描く
+      list[j] && !isGap(list[j]) && list[j].productId ? tile(list[j], start + j) : emptySlot(`e${start + j}`, feature, shape, start + j)
     const slots = Array.from({ length: sec.slots }, (_, j) => j)
     const cols = gridColumns(sec)
     switch (sec.kind) {
@@ -1059,7 +1061,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     body = (
       <>
         {sections.map(({ sec, start, list }, si) => {
-          const category = sec.categoryHeading ? byId.get(list[0]?.productId ?? '')?.category_name : undefined
+          const category = sec.categoryHeading ? byId.get(filled(list)[0]?.productId ?? '')?.category_name : undefined
           return (
             <div key={start} data-anchor={`section:${si}`} data-section-id={sectionIds[si]} style={sectionStyle(sec)}>
               {sec.categoryHeading && editableHeading(si, category ? optionLabel(category) : `CATEGORY ${si + 1}`)}
