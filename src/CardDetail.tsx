@@ -1159,6 +1159,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           if (x.sectionCopies) setSectionCopies(x.sectionCopies)
         },
         linkSpots,
+        linkUrlOf,
         fcmCampaign,
         alertKinds: productAlertKinds,
         swapWithCandidate,

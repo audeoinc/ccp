@@ -59,6 +59,8 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1, minWidth: 0 },
   // 名前・直す・開くは縮めず、URL の文だけを省略する
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
+  trackedUrl: { display: 'grid', rowGap: '2px', minWidth: 0 },
+  trackedText: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
   linkText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...typo.pairValue },
   // メイン画像を変える欄(開いたときだけ。いまの画像の下に、ひとまとまりで)
   caption: typo.caption,
@@ -666,6 +668,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 </span>
               )
             )}
+            {e.channel === 'email' && heroSlot && <TrackedUrl url={e.linkUrlOf(heroSlot)} />}
           </>
         )
       case 'product': {
@@ -748,6 +751,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
                   <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
                 </span>
+                {slot && <TrackedUrl url={e.linkUrlOf(slot)} />}
               </Field>
             ) : (
               slot && (
@@ -777,6 +781,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                   <Input className={s.grow} size="small" autoFocus value={e.links.buttons?.[part.id] ?? ''} placeholder={slot?.defaultUrl} onChange={(_, d) => e.setLinks({ ...e.links, buttons: { ...e.links.buttons, [part.id]: d.value } })} />
                   <OpenLink url={e.links.buttons?.[part.id]?.trim() || slot?.defaultUrl} />
                 </span>
+                {slot && <TrackedUrl url={e.linkUrlOf(slot)} />}
               </Field>
             ) : (
               slot && (
@@ -856,6 +861,30 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
       {part && part.kind !== 'meta' && part.kind !== 'overview' && part.kind !== 'template' && <ProductionMemo editor={e} label={titleOf(part)} />}
     </div>
+  )
+}
+
+/**
+ * 計測用のパラメーター(utm)つきの、実際に送る URL(X81 の 8)。utm は自動で付き、手で変えると計測が壊れるので、読むだけ。
+ * 値を変える欄は詳しい画面の ⑤ リンク先にだけ置く(ふだんは変えないため)
+ */
+function TrackedUrl({ url }: { url: string }) {
+  const t = useT()
+  const s = useStyles()
+  if (!url || !/^https?:\/\//.test(url)) return null
+  return (
+    <span className={s.trackedUrl}>
+      <InfoLabel
+        size="small"
+        info={t(
+          'utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から、自動で決まります。GA で、どの配信のどのリンクが押されたかを見分けるためです。まだ保存していない配信は、保存すると ID が付きます。',
+          'utm_campaign comes from the send date and delivery card ID, and utm_content from the link spot, automatically. This lets GA tell which link in which delivery was clicked. An unsaved delivery gets its ID when saved.',
+        )}
+      >
+        {t('計測用のパラメーターつき', 'With tracking')}
+      </InfoLabel>
+      <span className={s.trackedText}>{url}</span>
+    </span>
   )
 }
 
