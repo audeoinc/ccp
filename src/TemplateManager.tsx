@@ -266,6 +266,9 @@ const useStyles = makeStyles({
   // 境界の線は、いちばん長い列(設定)の高さまで伸ばす
   splitCell: { alignSelf: 'stretch', display: 'grid' },
   crumbs: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
+  // 題の行の「AI に頼む」: 名前が長くても縮めず、文字を折らない(1 行のボタンに見えるように)。題の文字の大きさに引きずられないよう、ふつうの太さ・大きさに戻す
+  aiAsk: { marginLeft: '12px', flexShrink: 0, whiteSpace: 'nowrap', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold },
+  aiAskIcon: { color: tokens.colorBrandForeground1 },
   crumbLink: { minWidth: 0, padding: '0 2px', fontSize: 'inherit', fontWeight: 'inherit', color: tokens.colorBrandForeground1 },
   crumbName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   areaFields: { gridArea: 'fields' },
@@ -290,7 +293,8 @@ const useStyles = makeStyles({
   },
   paletteThumb: { display: 'grid', placeItems: 'center', padding: '2px', backgroundColor: '#fff', borderRadius: tokens.borderRadiusSmall, maxHeight: '64px', overflow: 'hidden' },
   paletteName: { fontSize: '12px', overflowWrap: 'anywhere' },
-  canvasHead: { display: 'flex', alignItems: 'center', columnGap: '2px', width: '100%' },
+  // 狭いときは、文字を縦に折らずに、行を折り返す(「キャ / ン / バ / ス」のように細く並ぶと読めないため)
+  canvasHead: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '2px', rowGap: '2px', width: '100%', whiteSpace: 'nowrap' },
   // AI の直しを試しているときの帯(キャンバスのすぐ上)
   // キャンバスを下に送っても、確定・やめるが見えるように、上に貼り付ける
   trialBar: { marginBottom: '8px', position: 'sticky', top: 0, zIndex: 3 },
@@ -1161,6 +1165,12 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
           <ChevronRightRegular />
           <span className={s.crumbName}>{draft.name || t('新しいテンプレート', 'New template')}</span>
           <span className={s.caption}>{draft.id ? t('を編集中', '(editing)') : t('(新規)', '(new)')}</span>
+          {/* AI で直す(✨ AI に頼む)の入口。キャンバスの見出しは狭いと文字が縦に折れて、ボタンに見えなかった(2026-10-28 利用者)ので、いつも見える題の行の右に置く */}
+          {!draft.push && (
+            <Button size="small" appearance="outline" className={s.aiAsk} icon={<SparkleRegular className={s.aiAskIcon} />} onClick={() => setAiEditOpen(true)} disabled={!!aiTrial}>
+              {t('AI に頼む', 'Ask AI')}
+            </Button>
+          )}
         </span>
       ) : (
         t('テンプレート', 'Templates')
@@ -1252,11 +1262,6 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
                       <span className={s.grow} />
                       {editor.samplesToggle}
                       {editor.zoomBar}
-                      {!draft.push && (
-                        <Button size="small" appearance="subtle" icon={<SparkleRegular />} onClick={() => setAiEditOpen(true)} disabled={!!aiTrial}>
-                          {t('AI に頼む', 'Ask AI')}
-                        </Button>
-                      )}
                       <Tooltip relationship="label" content={t('元に戻す(Ctrl+Z)', 'Undo (Ctrl+Z)')}>
                         <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0 || !!aiTrial} onClick={undo} />
                       </Tooltip>
