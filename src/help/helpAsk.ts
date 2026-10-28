@@ -65,9 +65,10 @@ export function currentScreen(): HelpScreen {
 }
 
 /** 質問に近い材料を選ぶ */
-export function pickMaterial(m: Material, question: string, history: HelpTurn[]) {
+export function pickMaterial(m: Material, question: string, history: HelpTurn[], part?: HelpPart) {
   // 前のやり取りの言葉も少し効かせる(「それはどこ?」のような続きの質問に、前の話題の材料を渡すため)
-  const terms = termsOf([question, ...history.slice(-2).map((h) => h.question)].join(' '))
+  // 右クリックから始めたときは、押した所の名前と近くのボタンの名前も効かせる(「これは何?」だけでは、当たりの言葉がないため)
+  const terms = termsOf([question, ...history.slice(-2).map((h) => h.question), part?.label ?? '', ...(part?.near ?? [])].join(' '))
   const ranked = m.sections
     .map((s, i) => ({ s, i, score: scoreOf(s.title, terms) * 3 + scoreOf(s.text, terms) }))
     .filter((x) => x.score > 0)
@@ -94,6 +95,10 @@ export function pickMaterial(m: Material, question: string, history: HelpTurn[])
 export interface HelpTurn {
   question: string
   answer: HelpAnswer
+  /** 右クリックの「ここについて聞く」から聞いたときの部品 */
+  part?: HelpPart
+  /** 記録に渡した日時(「開発に伝える」で、同じ記録をもう一度渡すときに同じ値を使う) */
+  at?: string
 }
 
 export interface HelpAnswer {
@@ -115,6 +120,7 @@ const PROMPT = `あなたは、配信の企画・制作・結果を扱う業務�
 - toc: 文書の見出しの一覧(どんな機能があるかの全体)。
 - labels: 画面に実際に出ている文言の一覧。1 行 =「日本語 | English | 画面の場所 | 部品(ファイル)」。
 - screen: 利用者がいま見ている画面。history: これまでのやり取り。
+- part: あれば、利用者が画面の部品を右クリックして「ここについて聞く」を選んだ。label = 押した所の名前、near = 近くのボタン・見出しの名前。「これは何?」「ここで何ができる?」は、この部品のことを聞いている。
 【決まり】
 1. 材料に書いてあることだけで答える。推測で機能・手順を作らない。材料で答えられないときは known を false にし、reply に「分からない」ことと、近い機能があればその名前を書く。できないこと(未実装・制限)は、できないと答える。
 2. 手順や答えの中で、ボタン・タブ・欄・メニューの名前を書くときは、labels にある文言だけを、そのとおりに使い、[[ ]] で囲む(例: [[承認を依頼する]])。答えを English で書くときは、labels の English の文言を使う。labels にない名前は書かない(説明の言葉で言い換える)。
@@ -168,10 +174,62 @@ export interface HelpRecord {
   lang: 'ja' | 'en'
   /** 聞いたときの画面 */
   screen: HelpScreen
-  /** 右クリックの「ここについて聞く」から始めたときの部品(段 ③。data-el など) */
+  /** 右クリックの「ここについて聞く」から始めたときの部品(段 ③) */
   part?: { el?: string; label?: string }
   /** 聞いた日時(ISO) */
   at: string
+  /** 答えから「開発に伝える」に進んだ(同じ質問の記録を、これを付けてもう一度渡す) */
+  tellDev?: boolean
+}
+
+/** 右クリックの「ここについて聞く」で押した所(段 ③) */
+export interface HelpPart {
+  /** 押した点(「開発に伝える」のピンを、同じ所に打つため) */
+  x: number
+  y: number
+  /** 部品の目印(data-el。なければピンの目印と同じ書き方の選び方) */
+  el?: string
+  /** 人が読める名前(例: 商品の枠・ボタンの文字) */
+  label: string
+  /** 近くのボタン・見出しの名前(多くても 8 つ) */
+  near: string[]
+}
+
+const nameOf = (el: Element) => (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+
+/** 押した所の部品・近くの名前を集める(右クリックの「ここについて聞く」) */
+export function captureHelpPart(x: number, y: number, place: { anchor: string; partLabel: string }): HelpPart {
+  const el = document.elementFromPoint(x, y)
+  const dataEl = el?.closest('[data-el]')?.getAttribute('data-el') ?? undefined
+  // 近くの名前: 押した所を囲む、ほどよい大きさのまとまり(ペイン・フロート・帯)の中のボタン・タブ・見出し
+  const box = el?.closest('[role="dialog"], [role="tabpanel"], section, header, aside, nav, main') ?? el?.parentElement?.parentElement ?? null
+  const near: string[] = []
+  for (const b of box?.querySelectorAll('button, [role="tab"], h1, h2, h3, label') ?? []) {
+    const n = nameOf(b)
+    if (n && !near.includes(n)) near.push(n)
+    if (near.length >= 8) break
+  }
+  return { x, y, el: dataEl || place.anchor || undefined, label: place.partLabel || (el ? nameOf(el) : ''), near }
+}
+
+/** 「開発に伝える」に進んだことを、記録を受け取る所に知らせる */
+export function recordTellDev(turn: HelpTurn) {
+  const { question, answer, part } = turn
+  try {
+    // 聞いたときと同じ記録(question と at が同じ)に、tellDev を付けて渡す(保存の側が同じ行を見つけられるように)
+    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at: turn.at ?? new Date().toISOString(), tellDev: true })
+  } catch {
+    // 保存の失敗で、開発へのリクエストを書くのを止めない
+  }
+}
+
+/** 「開発に伝える」の本文の書きかけ(質問と答えを添える。続きは利用者が書く) */
+export function tellDevDraft(question: string, answer: HelpAnswer): string {
+  const plain = (s: string) => s.replace(/\[\[([^\]]+)\]\]/g, '「$1」')
+  const lines = [tr(`「？ 聞く」で聞いたこと: ${question}`, `Asked in "? Ask": ${question}`), tr(`答え: ${plain(answer.reply)}`, `Answer: ${plain(answer.reply)}`)]
+  if (answer.steps.length) lines.push(...answer.steps.map((st, i) => `${i + 1}. ${plain(st)}`))
+  lines.push('', tr('直してほしいこと: ', 'What I want changed: '))
+  return lines.join('\n')
 }
 let recorder: ((r: HelpRecord) => void) | null = null
 /** 質問と答えを受け取る所を決める(段 ④ の保存。null で外す) */
@@ -180,27 +238,29 @@ export function setHelpRecorder(fn: ((r: HelpRecord) => void) | null) {
 }
 
 /** 質問する。材料を選んで askAgent に渡し、答えを決まった形にして返す */
-export async function askHelp(question: string, history: HelpTurn[]): Promise<{ answer: HelpAnswer; stats: { docChars: number; labelCount: number; ms: number } }> {
+export async function askHelp(question: string, history: HelpTurn[], part?: HelpPart): Promise<{ answer: HelpAnswer; at: string; stats: { docChars: number; labelCount: number; ms: number } }> {
   const m = await loadMaterial()
-  const picked = pickMaterial(m, question, history)
+  const picked = pickMaterial(m, question, history, part)
   const started = performance.now()
   const raw = await askAgent(PROMPT, {
     task: 'help_ask',
     question,
     lang: getLang(),
     screen: currentScreen(),
+    ...(part ? { part: { el: part.el, label: part.label, near: part.near } } : {}),
     history: history.slice(-3).map((h) => ({ question: h.question, reply: h.answer.reply, steps: h.answer.steps })),
     toc: picked.toc,
     docs: picked.docs,
     labels: picked.labels,
   })
   const answer = normalizeAnswer(raw)
+  const at = new Date().toISOString()
   try {
-    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), at: new Date().toISOString() })
+    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at })
   } catch {
     // 保存の失敗で、答えを見せるのを止めない
   }
-  return { answer, stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
+  return { answer, at, stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
 }
 
 /** 「ここを開く」: いまの画面の状態を保ったまま、答えの画面へ移る(App は「戻る」と同じ道で URL を読み直す) */
