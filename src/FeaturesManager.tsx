@@ -11,6 +11,7 @@ import { confirmDialog } from './confirm'
 import { myName, myUserId, onMeChange } from './history'
 import { usePeople } from './people'
 import { tr, useT } from './i18n'
+import { fuzzyMatch, splitByHits, termsOf, type Match } from './fuzzySearch'
 import { typo } from './typo'
 
 const useStyles = makeStyles({
@@ -24,6 +25,8 @@ const useStyles = makeStyles({
   off: { color: tokens.colorNeutralForeground3 },
   warn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   aside: { display: 'flex', alignItems: 'center', columnGap: '6px' },
+  // 検索で当たった所
+  hit: { fontWeight: tokens.fontWeightBold, color: tokens.colorBrandForeground1 },
 })
 
 const versionName = (v: FeatureVersion) =>
@@ -87,9 +90,42 @@ export function FeaturesManager() {
     })
   }
 
-  const q = query.trim().toLowerCase()
-  const hit = (f: FeatureDef) => !q || f.id.toLowerCase().includes(q) || f.label().toLowerCase().includes(q)
-  const shownCount = useMemo(() => FEATURES.filter(hit).length, [q]) // eslint-disable-line react-hooks/exhaustive-deps -- 文言は言語で変わるが、数は変わらない
+  // あいまいな検索(2026-10-29 利用者: ID を覚えていない・名前もうろ覚えでも当たるように。fuzzySearch.ts)。
+  // 名前(日本語・英語)・ID・親(中・大)の名前のどれに当たってもよい。当たり具合の順に並べ、当たった行の親は開く
+  const terms = useMemo(() => termsOf(query), [query])
+  const searching = terms.length > 0
+  const matches = useMemo(() => {
+    const m = new Map<string, Match>()
+    for (const f of FEATURES) {
+      const g = FEATURE_GROUPS.find((x) => x.id === f.group)
+      const a = FEATURE_AREAS.find((x) => x.id === g?.area)
+      const r = fuzzyMatch(terms, [
+        { text: f.names[0], weight: 10 },
+        { text: f.names[1], weight: 8 },
+        { text: f.id, weight: 6 },
+        { text: g?.names[0] ?? '', weight: 3 },
+        { text: g?.names[1] ?? '', weight: 3 },
+        { text: a?.names[0] ?? '', weight: 2 },
+        { text: a?.names[1] ?? '', weight: 2 },
+      ])
+      if (r) m.set(f.id, r)
+    }
+    return m
+  }, [terms])
+  const scoreOf = (id: string) => matches.get(id)?.score ?? 0
+  const leavesOf = (groupId: string) => {
+    const list = FEATURES.filter((f) => f.group === groupId && matches.has(f.id))
+    return searching ? list.sort((x, y) => scoreOf(y.id) - scoreOf(x.id)) : list
+  }
+  const bestOf = (ids: string[]) => Math.max(0, ...ids.map(scoreOf))
+  const groupsOf = (areaId: string) => {
+    const list = FEATURE_GROUPS.filter((g) => g.area === areaId && leavesOf(g.id).length > 0)
+    return searching ? list.sort((x, y) => bestOf(leavesOf(y.id).map((f) => f.id)) - bestOf(leavesOf(x.id).map((f) => f.id))) : list
+  }
+  const areas = searching ? [...FEATURE_AREAS].sort((x, y) => bestOf(FEATURES.filter((f) => groupsOf(y.id).some((g) => g.id === f.group)).map((f) => f.id)) - bestOf(FEATURES.filter((f) => groupsOf(x.id).some((g) => g.id === f.group)).map((f) => f.id))) : FEATURE_AREAS
+  const shownCount = matches.size
+  /** 当たった所を太字に */
+  const marked = (text: string, ranges: [number, number][] | undefined) => splitByHits(text, ranges ?? []).map((p, i) => (p.hit ? <b key={i} className={s.hit}>{p.text}</b> : <span key={i}>{p.text}</span>))
 
   const stateBadge = (id: string, f?: FeatureDef) => {
     if (f?.version === 'always')
@@ -155,23 +191,24 @@ export function FeaturesManager() {
         </MessageBar>
       )}
       <div className={s.row}>
-        <SearchBox size="small" value={query} onChange={(_, d) => setQuery(d.value)} placeholder={t('機能の名前・ID で探す', 'Search by name or ID')} />
+        <SearchBox size="small" value={query} onChange={(_, d) => setQuery(d.value)} placeholder={t('機能の名前・ID で探す(うろ覚えでも)', 'Search by name or ID (fuzzy)')} />
         <span className={s.note}>{t(`${shownCount} / ${FEATURES.length} 件`, `${shownCount} / ${FEATURES.length}`)}</span>
         {busy && <Spinner size="extra-tiny" />}
       </div>
       <Tree aria-label={t('使える機能', 'Features')} defaultOpenItems={FEATURE_AREAS.map((a) => a.id)} size="small">
-        {FEATURE_AREAS.map((a) => {
-          const groups = FEATURE_GROUPS.filter((g) => g.area === a.id && FEATURES.some((f) => f.group === g.id && hit(f)))
+        {areas.map((a) => {
+          const groups = groupsOf(a.id)
           if (groups.length === 0) return null
           return (
-            <TreeItem key={a.id} itemType="branch" value={a.id} open={q ? true : undefined}>
+            <TreeItem key={a.id} itemType="branch" value={a.id} open={searching ? true : undefined}>
               <TreeItemLayout aside={<span className={s.aside}>{defaultNote(a.id)}{stateBadge(a.id)}{switchOf(a.id)}</span>}>{a.label()}</TreeItemLayout>
               <Tree>
                 {groups.map((g) => (
-                  <TreeItem key={g.id} itemType="branch" value={g.id} open={q ? true : undefined}>
+                  <TreeItem key={g.id} itemType="branch" value={g.id} open={searching ? true : undefined}>
                     <TreeItemLayout aside={<span className={s.aside}>{defaultNote(g.id)}{stateBadge(g.id)}{switchOf(g.id)}</span>}>{g.label()}</TreeItemLayout>
                     <Tree>
-                      {FEATURES.filter((f) => f.group === g.id && hit(f)).map((f) => {
+                      {leavesOf(g.id).map((f) => {
+                        const hits = matches.get(f.id)?.hits
                         const missing = isPublic(f.id) ? (f.requires ?? []).filter((r) => !isPublic(r)) : []
                         return (
                           <TreeItem key={f.id} itemType="leaf" value={f.id}>
@@ -191,8 +228,9 @@ export function FeaturesManager() {
                               }
                             >
                               <span className={mergeClasses(s.row, !isPublic(f.id) && f.version !== 'always' && s.off)}>
-                                {f.label()}
-                                <span className={s.id}>{f.id}</span>
+                                {/* 名前は画面の言語のもの(日本語なら 0 番、英語なら 1 番のフィールドの当たり) */}
+                                <span>{marked(f.label(), hits?.[f.label() === f.names[0] ? 0 : 1])}</span>
+                                <span className={s.id}>{marked(f.id, hits?.[2])}</span>
                                 {missing.length > 0 && (
                                   <span className={s.warn}>
                                     {t(`前提が非公開: ${missing.join('、')}`, `Prerequisite not public: ${missing.join(', ')}`)}
