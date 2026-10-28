@@ -10,6 +10,7 @@ import type { ProductionRequest } from './models/productionRequests'
 import { ProductionRequestsService } from './data/productionRequests'
 import { ProductionService } from './data/production'
 import { CardPreview } from './CardPreview'
+import { PreviewHints } from './Preview'
 import { CommentsPanel } from './CommentsPanel'
 import { TasksPanel } from './TasksPanel'
 import { MarkdownLite } from './MarkdownLite'
@@ -957,6 +958,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
             )}
 
             {/* HTML の下書きを作るためだけの、見えないプレビュー(写しの中身をそのまま描く) */}
+            {/* 空欄の案内(「(ヘッドライン未入力)」など)は、制作の見本・書き出す HTML には出さない(PreviewHints。2026-10-28 利用者) */}
+            <PreviewHints value={false}>
             <div className={s.offscreen} aria-hidden>
               {keys.map((k) => {
                 const vs = snapshotOf(snap, k)
@@ -972,6 +975,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                 )
               })}
             </div>
+            </PreviewHints>
           </div>
         )}
         {finishedOpen && live && (

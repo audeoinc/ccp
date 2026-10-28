@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { filled, isGap } from './slots'
 import { Button, Input, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import {
@@ -87,6 +87,15 @@ const ACCENT = tokens.colorBrandStroke1
 const ACCENT_BG = tokens.colorBrandBackground2
 // 空いた枠・未入力の印(編集のときだけ出る)
 const SLOT_LINE = tokens.colorNeutralStroke1
+
+// 空欄の案内(「(ヘッドライン未入力)」「ここに商品をドロップ」など)を出すか。企画で作るときの案内なので、制作の画面では出さず、空欄は空のまま見せる
+// (2026-10-28 利用者。制作のページ・制作のシンプルな画面は PreviewHints value={false} で包む。書き出す HTML にも入らない)
+const HintsContext = createContext(true)
+export const PreviewHints = HintsContext.Provider
+function useHint() {
+  const on = useContext(HintsContext)
+  return { hints: on, hint: (text: string) => (on ? text : '') }
+}
 
 const useStyles = makeStyles({
   fit: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
@@ -246,6 +255,7 @@ function FitLine({ baseSize, minScale = 0.55, style, children }: { baseSize: str
 
 function EmailPreview({ country, subject, subjectLine, preheader, device, headline, copy, items, products, selectedKey, hoverKey, showHeadings, template, sectionTitles, onSectionTitle, sectionCopies, onSectionCopy, partContent, compact = false, hero, onDropHero, onClearHero, onSelect, onRemove, onMove, onDropAt, pickMode = false }: Props) {
   const t = useT()
+  const { hints, hint } = useHint()
   const classes = useStyles()
   const { over, handlers, clear } = useDropTarget(onDropAt)
   const [heroOver, setHeroOver] = useState(false)
@@ -578,13 +588,13 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
         aspectRatio: feature ? undefined : compact ? '1 / 1' : '3 / 4',
         minHeight: feature ? 120 : undefined,
         ...shape,
-        borderColor: over === index ? ACCENT : SLOT_LINE,
+        borderColor: over === index ? ACCENT : hints ? SLOT_LINE : 'transparent',
         backgroundColor: over === index ? ACCENT_BG : 'transparent',
         fontSize: '0.8rem',
         padding: 8,
       }}
     >
-      {t('ここに商品をドロップ', 'Drop a product here')}
+      {hint(t('ここに商品をドロップ', 'Drop a product here'))}
     </div>
   )
 
@@ -626,7 +636,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     if (pickMode)
       return (
         <div data-part={`sectionCopy:${index}`} style={{ textAlign: 'center', marginTop: hasHeading ? 6 : 22, marginBottom: 4, padding: '2px 8px', fontSize: '0.85rem', color: SUB, letterSpacing: 0.5, whiteSpace: 'pre-wrap', opacity: text ? 1 : 0.6 }}>
-          {text || t('(セクションのコピー)', '(Section copy)')}
+          {text || hint(t('(セクションのコピー)', '(Section copy)'))}
         </div>
       )
     return (
@@ -693,7 +703,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           />}
         </>
       ) : (
-        t('メインビジュアル(候補から画像をドロップ)', 'Main visual (drop an image from the candidates)')
+        hint(t('メインビジュアル(候補から画像をドロップ)', 'Main visual (drop an image from the candidates)'))
       )}
       {heroText !== 'band' && coverShade > 0 && <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${coverShade})`, pointerEvents: 'none' }} />}
       {tpl.hero === 'offer' && (
@@ -736,7 +746,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
             lineHeight: 1.2,
           }}
         >
-          {headline || t('(ヘッドライン未入力)', '(No headline)')}
+          {headline || hint(t('(ヘッドライン未入力)', '(No headline)'))}
         </FitLine>
         </div>
         <div data-part="copy">
@@ -744,7 +754,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           baseSize={compact ? '2.6cqw' : '2.9cqw'}
           style={{ marginTop: '0.8cqw', fontFamily: hf.family, fontWeight: 400, letterSpacing: '0.06em', lineHeight: 1.5, opacity: 0.95 }}
         >
-          {copy || t('(コピー未入力)', '(No copy)')}
+          {copy || hint(t('(コピー未入力)', '(No copy)'))}
         </FitLine>
         </div>
       </div>
@@ -772,7 +782,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           }}
         >
           {/* 文字の所だけを押せるようにする(画像の全体を覆うと、メイン画像を選べなくなるため) */}
-          <span data-part="headline" style={{ pointerEvents: pickMode ? 'auto' : 'none' }}>{headline || t('(ヘッドライン未入力)', '(No headline)')}</span>
+          <span data-part="headline" style={{ pointerEvents: pickMode ? 'auto' : 'none' }}>{headline || hint(t('(ヘッドライン未入力)', '(No headline)'))}</span>
         </div>
       )}
     </div>
@@ -814,12 +824,12 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
       {heroText === 'below' && (
         <div data-anchor="herotext" style={{ textAlign: hs.h ?? 'center', padding: '16px 16px 0', color: INK }}>
           <div data-part="headline" style={{ fontFamily: hf.family, fontWeight: hf.weight, fontSize: `calc(1.5rem * ${hf.scale})`, lineHeight: 1.25, letterSpacing: jaHeadline ? hf.trackingJa : hf.tracking, textTransform: hf.upper ? 'uppercase' : 'none' }}>
-            {headline || t('(ヘッドライン未入力)', '(No headline)')}
+            {headline || hint(t('(ヘッドライン未入力)', '(No headline)'))}
           </div>
         </div>
       )}
       {heroText !== 'band' && (
-        <div data-anchor="herotext" data-part="copy" style={{ textAlign: heroText === 'below' ? (hs.h ?? 'center') : 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || t('(コピー未入力)', '(No copy)')}</div>
+        <div data-anchor="herotext" data-part="copy" style={{ textAlign: heroText === 'below' ? (hs.h ?? 'center') : 'center', padding: '8px 24px 0', fontSize: '0.85rem', color: SUB, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{copy || hint(t('(コピー未入力)', '(No copy)'))}</div>
       )}
       {buttonsAfter(0, 12)}
       <div style={{ height: 8 }} />
@@ -1063,7 +1073,8 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{run.items.map((it, j) => withDetail(gridTile)(it, run.start + j))}</div>
           </div>
         ))}
-        <div style={{ padding: '0 16px 24px' }}>
+        {/* いちばん後ろに足す所は、企画で作るときの案内なので、制作の画面では出さない(PreviewHints) */}
+        {hints && <div style={{ padding: '0 16px 24px' }}>
           <div
             {...handlers(items.length)}
             data-part={`slot:${items.length}`}
@@ -1077,7 +1088,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
           >
             {items.length === 0 ? t('ここに商品をドロップ', 'Drop a product here') : t('＋ ここに落とすと、いちばん後ろに足す', '+ Drop here to add to the end')}
           </div>
-        </div>
+        </div>}
       </>
     )
   } else {
@@ -1125,7 +1136,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
       {!compact && !pickMode && (
         <div data-anchor="subject" style={{ fontSize: 12, color: tokens.colorNeutralForeground2, display: 'grid', rowGap: 2 }}>
           <span>
-            {t('件名', 'Subject')}: <span style={{ color: tokens.colorNeutralForeground1, fontWeight: 600 }}>{subjectLine || subject || t('(配信名未入力)', '(No name)')}</span>
+            {t('件名', 'Subject')}: <span style={{ color: tokens.colorNeutralForeground1, fontWeight: 600 }}>{subjectLine || subject || hint(t('(配信名未入力)', '(No name)'))}</span>
           </span>
           {preheader ? <span>{t('プリヘッダー', 'Preheader')}: {preheader}</span> : null}
         </div>
@@ -1134,7 +1145,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
         {/* お知らせ帯: 配信名を、メールの最上部に細い帯で出す */}
         {tpl.topBar && (
           <div data-anchor="topbar" className={classes.noWrap} style={{ backgroundColor: '#555', color: '#fff', textAlign: 'center', padding: '6px 12px', fontSize: '0.75rem', letterSpacing: 2 }}>
-            {hs.barText || subject || t('(配信名未入力)', '(No name)')} ›
+            {hs.barText || subject || hint(t('(配信名未入力)', '(No name)'))} ›
           </div>
         )}
         {/* 上の帯: 左にロゴ(差出人の名前)、右に MEN / WOMEN のリンク(実物のメールに合わせる。リンク先は、書き出す HTML で付く) */}
@@ -1158,6 +1169,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
 
 function PushPreview(props: Props) {
   const { subject, headline, copy, scheduledAt, items, products, selectedKey, hero: pickedHero, onSelect, onRemove, onMove, onDropAt, template, pushLinkKind, pushTitle, pushBody, pickMode = false } = props
+  const { hints, hint } = useHint()
   // アプリのテンプレートの中身(画像・商品・ボタン)。アプリのテンプレートでなければ、以前と同じ(画像つき)
   const spec = getTemplate(template).push ?? { image: true, buttons: [] }
   const t = useT()
@@ -1173,8 +1185,8 @@ function PushPreview(props: Props) {
   const when = scheduledAt ? new Date(scheduledAt) : null
   const clock = when ? `${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')}` : '9:41'
   const dateText = when ? when.toLocaleDateString(locale(), { month: 'long', day: 'numeric', weekday: 'long' }) : ''
-  const title = pushTitle || headline || subject || t('(通知のタイトル未入力)', '(No notification title)')
-  const bodyText = pushBody || copy || t('(通知の本文未入力)', '(No notification body)')
+  const title = pushTitle || headline || subject || hint(t('(通知のタイトル未入力)', '(No notification title)'))
+  const bodyText = pushBody || copy || hint(t('(通知の本文未入力)', '(No notification body)'))
   const hasJa = /[\u3000-\u9fff\uff00-\uffef]/.test(title)
   const titleFont = {
     fontFamily: HEADLINE_FONT.family,
@@ -1357,14 +1369,14 @@ function PushPreview(props: Props) {
             </div>
           )
         })}
-        <div
+        {hints && <div
           {...handlers(items.length)}
           data-part={`slot:${items.length}`}
           className={classes.pushDrop}
           style={{ borderColor: over === items.length ? tokens.colorBrandForeground1 : tokens.colorNeutralStroke2 }}
         >
           {items.length === 0 ? t('ここに商品をドロップ', 'Drop a product here') : t('＋ ここに落とすと、いちばん後ろに足す', '+ Drop here to add to the end')}
-        </div>
+        </div>}
       </div>
     </div>
   )

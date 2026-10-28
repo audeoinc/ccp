@@ -13,6 +13,7 @@ import type { ProductionRequest } from '../models/productionRequests'
 import type { VariantKey } from '../abTest'
 import { ProductionRequestsService } from '../data/productionRequests'
 import { CardPreview } from '../CardPreview'
+import { PreviewHints } from '../Preview'
 import { ChannelBadge } from '../ChannelBadge'
 import { CreativeAssets } from '../CreativeAssets'
 import { LabeledValue } from '../LabeledValue'
@@ -361,6 +362,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       <ResizableSurface sizeKey="productionSimple" min={{ w: 720, h: 480 }} className={s.surface} aria-label={card.name ?? ''}>
+        {/* 空欄の案内(「(ヘッドライン未入力)」など)は企画で作るときのものなので、制作の画面では出さない(2026-10-28 利用者) */}
+        <PreviewHints value={false}>
         <StageHeader
           title={
             <>
@@ -437,6 +440,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             <CardPreview card={previewCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
           </div>
         </div>
+        </PreviewHints>
       </ResizableSurface>
     </Dialog>
   )
