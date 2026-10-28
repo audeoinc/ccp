@@ -3,9 +3,9 @@
 // MVP は「開く・読む・コピー」まで(直す・工程・やり取り・ピンは v1、制作した HTML の編集・AI は FULL)。
 // 中身は、渡した写し(制作が直していれば、その写し)。渡す前は、いまの配信カードから作った下書き。写しの作り・コピーの値は、
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Badge, Button, Dialog, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Tab, TabList, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular } from '@fluentui/react-icons'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Badge, Button, Dialog, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Tab, TabList, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowDownloadRegular, ArrowUndoRegular, AttachRegular, ChevronDoubleLeftRegular, CommentRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, EyeRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular, TaskListLtrRegular, TimelineRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -16,6 +16,17 @@ import { CardPreview } from '../CardPreview'
 import { PreviewHints } from '../Preview'
 import { ChannelBadge } from '../ChannelBadge'
 import { CreativeAssets } from '../CreativeAssets'
+import { CommentsPanel } from '../CommentsPanel'
+import { TasksPanel } from '../TasksPanel'
+import { FinishedFloat } from '../FinishedFloat'
+import { CardNotesService } from '../data/cardNotes'
+import { CardAssetsService } from '../data/cardAssets'
+import { isThreadRoot, stageOf } from '../notesStage'
+import { myName, myUserId, onMeChange } from '../history'
+import { SideRail, type RailItem } from '../simple/SideRail'
+import { StepAction } from './StepAction'
+import { useProductionFlow } from './useProductionFlow'
+import { StepsPane } from './StepsPane'
 import { LabeledValue } from '../LabeledValue'
 import { MarkdownLite } from '../MarkdownLite'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -54,6 +65,11 @@ const useStyles = makeStyles({
   state: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
   dot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   panes: { flexGrow: 1, minHeight: 0, display: 'grid' },
+  // 左のバーで開いた欄(1 つだけ。しまうと幅 0)
+  sidePane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1, borderRight: `1px solid ${tokens.colorNeutralStroke2}` },
+  sideHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 6px 6px 12px', ...typo.heading, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap', overflow: 'hidden' },
+  sideBody: { minHeight: 0, overflowY: 'auto' },
+  bar: { padding: '6px 16px 0' },
   previewPane: { display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, backgroundColor: tokens.colorNeutralBackground3 },
   previewBar: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '6px 12px' },
   grow: { flexGrow: 1 },
@@ -92,6 +108,8 @@ interface Props {
   onFullView?: () => void
   /** 題の行の面のタブ(PLAN | PRODUCTION | RESULTS。StageNav の tabs) */
   stageTabs?: ReactNode
+  /** 段を進めたあとに、外の一覧(制作の面の箱・段のタブの状態)を読み直す */
+  onChanged?: () => void
 }
 
 // 依頼として生きている状態(この状態の版の写しを見せる。ほかは、いまの配信カードからの下書き)
@@ -165,10 +183,11 @@ function textFieldsOf(p: PartRef): (f: TextField) => boolean {
   }
 }
 
-export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs }: Props) {
+export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged }: Props) {
   const s = useStyles()
   const t = useT()
-  const panes = usePaneWidths(PREF.productionSimplePaneWidths, [0, 420], 0)
+  // 左のバーの欄 | プレビュー(伸び縮み) | 右のペイン
+  const panes = usePaneWidths(PREF.productionSimplePaneWidths, [340, 0, 420], 1)
   const [requests, setRequests] = useState<ProductionRequest[] | null>(null)
   const [device, setDevice] = useState<'mobile' | 'pc'>('pc')
   const [variant, setVariant] = useState<VariantKey>('A')
@@ -183,6 +202,27 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   }
   const boxRef = useRef<HTMLDivElement>(null)
   const offscreenRef = useRef<HTMLDivElement>(null)
+  const meId = useSyncExternalStore(onMeChange, myUserId)
+  const meName = useSyncExternalStore(onMeChange, myName)
+  // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
+  type Side = 'talk' | 'tasks' | 'assets' | 'steps'
+  const [side, setSide] = useState<Side | null>(null)
+  const [finishedOpen, setFinishedOpen] = useState(false)
+  // バーの数(未解決の制作のやり取り・未完了のタスク・素材)。欄の中で増減したら、開け閉めのたびに数え直す
+  const [counts, setCounts] = useState({ talk: 0, tasks: 0, assets: 0 })
+  useEffect(() => {
+    let alive = true
+    void Promise.all([CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] }), CardAssetsService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on desc'] })])
+      .then(([n, a]) => {
+        if (!alive) return
+        const notes = n.success ? (n.data ?? []) : []
+        setCounts({ talk: notes.filter((x) => !x.resolved && isThreadRoot(x) && stageOf(x) === 'production').length, tasks: notes.filter((x) => !x.resolved && x.kind === 'task').length, assets: a.success ? (a.data ?? []).length : 0 })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [card.id, side])
 
   const load = useCallback(async () => {
     const r = await ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${card.id}'` })
@@ -214,6 +254,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const lrows = linkRows(vs, cur)
   const trows = trackingRows(vs, cur)
   const previewCard = { ...card, ...vs.card } as DeliveryCard
+  const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
+  // 工程(prod.steps)。送る HTML は、制作が保存した HTML があればそれ、なければ企画の見本
+  const flow = useProductionFlow({ card, live, actor: { id: meId, name: meName }, html: () => live?.html || sampleHtml(), variantHtml: live?.variant_html ?? undefined, onChanged: async () => {
+    await load()
+    onChanged?.()
+  } })
+  const myStep = flow.now && flow.now.key !== 'request' && flow.isMine(flow.now) ? flow.now : undefined
 
   // 企画の見本の HTML(詳しい制作のページと同じ作り方: 見えないプレビューから、書式を直接書いた形にする)。押したときに作る
   const sampleHtml = () => (offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : '')
@@ -359,6 +406,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     )
   }
 
+  const rails: RailItem<Side>[] = [
+    { v: 'talk', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
+    { v: 'tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
+    { v: 'assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
+    { v: 'steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
+  ]
+
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       <ResizableSurface sizeKey="productionSimple" min={{ w: 720, h: 480 }} className={s.surface} aria-label={card.name ?? ''}>
@@ -370,7 +424,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               <ChannelBadge channel={card.channel} />
               <span className={s.name}>{card.name}</span>
               <span>{when_}</span>
-              {/* 制作の状態(読むだけ。工程のボタンは v1) */}
+              {/* 制作の状態(読むだけ)。進めるボタンは右に、自分の番のときだけ */}
               <Tooltip content={t('制作の状態', 'Production status')} relationship="label">
                 <span className={s.state}>
                   <span className={s.dot} style={{ backgroundColor: productionColor(view) }} aria-hidden />
@@ -382,6 +436,14 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           tabs={stageTabs}
           actions={
             <>
+              {/* 仕上がりを見る [prod.result]: 制作が終わったあと(④ 以降) */}
+              {live && flow.current >= 3 && (
+                <Button size="small" appearance="subtle" icon={<EyeRegular />} onClick={() => setFinishedOpen(true)}>
+                  {t('仕上がりを見る', 'View result')}
+                </Button>
+              )}
+              {/* 自分の番のときだけの青いボタン [prod.steps](2026-10-28 利用者。だれの番でも押せるのは左のバーの「工程」) */}
+              {myStep && <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' ? undefined : () => setFinishedOpen(true)} needMe={needMe} />}
               <Menu>
                 <MenuTrigger disableButtonEnhancement>
                   <Button appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('そのほかの操作', 'More actions')} />
@@ -394,6 +456,15 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                     <MenuItem icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, sampleHtml())}>
                       {t('企画の見本を .html で保存', 'Save the plan sample as .html')}
                     </MenuItem>
+                    {flow.canUndo && (
+                      <>
+                        <MenuDivider />
+                        {/* いちばん新しく終えた段を戻す [prod.steps] */}
+                        <MenuItem icon={<ArrowUndoRegular />} disabled={flow.busy || !!needMe} onClick={() => void flow.act.undo()}>
+                          {flow.current - 1 === 0 ? t('渡したのを取り下げる', 'Withdraw the handoff') : t(`「${flow.steps[flow.current - 1]?.name}」をやり直す`, `Redo "${flow.steps[flow.current - 1]?.name}"`)}
+                        </MenuItem>
+                      </>
+                    )}
                     {onFullView && (
                       <MenuItem icon={<DocumentTextRegular />} onClick={onFullView}>
                         {t('詳しい制作のページで開く', 'Open the full production page')}
@@ -406,7 +477,31 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             </>
           }
         />
-        <div className={s.panes} style={{ gridTemplateColumns: panes.columns }}>
+        {(flow.error || flow.notice) && (
+          <div className={s.bar}>
+            <MessageBar intent={flow.error ? 'error' : 'success'} layout="multiline">
+              <MessageBarBody>{flow.error ?? flow.notice}</MessageBarBody>
+            </MessageBar>
+          </div>
+        )}
+        <div className={s.panes} style={{ gridTemplateColumns: `auto ${side ? `${panes.widths[0]}px 1px` : '0px 0px'} minmax(280px, 1fr) 1px ${panes.widths[2]}px` }}>
+          <SideRail items={rails} selected={side} onPick={(v) => setSide((o) => (o === v ? null : v))} ariaLabel={t('制作のメニュー', 'Production menus')} />
+          {/* 開いている欄(1 つ)。しまっても列には残し、幅 0 にする(グリッドの列がずれないように。配信カードと同じ) */}
+          <div className={s.sidePane} inert={!side} aria-hidden={!side}>
+            <div className={s.sideHead}>
+              <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{rails.find((r) => r.v === side)?.tip}</span>
+              <Tooltip content={t('欄をしまう(バーのアイコンをもう一度押しても、しまえます)', 'Collapse the panel (or click its icon in the bar again)')} relationship="label">
+                <Button type="button" size="small" appearance="subtle" icon={<ChevronDoubleLeftRegular />} onClick={() => setSide(null)} />
+              </Tooltip>
+            </div>
+            <div className={s.sideBody}>
+              {side === 'talk' && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
+              {side === 'tasks' && <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />}
+              {side === 'assets' && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />}
+              {side === 'steps' && <StepsPane flow={flow} onViewResult={() => setFinishedOpen(true)} needMe={needMe} />}
+            </div>
+          </div>
+          {side ? <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} /> : <span />}
           <div className={s.previewPane}>
             <div className={s.previewBar}>
               {keys.length > 1 && (
@@ -431,7 +526,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               <PreviewPartPicker boxRef={boxRef} selected={part} onSelect={pick} />
             </div>
           </div>
-          <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} />
+          <Splitter onDrag={panes.onDrag(1)} onDone={panes.onDone} />
           <div className={mergeClasses(s.side)}>{part ? partPane(part) : givenPane}</div>
         </div>
         {/* 見本の HTML を作るためだけの、見えないプレビュー(画面の大きさ・スマホの切り替えに左右されないように、別に描く) */}
@@ -440,6 +535,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             <CardPreview card={previewCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
           </div>
         </div>
+        {finishedOpen && live && <FinishedFloat card={card} request={live} people={people} productIds={vs.productIds.filter(Boolean)} products={vs.products} onClose={() => setFinishedOpen(false)} />}
         </PreviewHints>
       </ResizableSurface>
     </Dialog>

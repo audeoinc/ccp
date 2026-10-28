@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { filled } from '../slots'
-import { Button, CounterBadge, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
+import { SideRail, type RailItem } from './SideRail'
 import { useStableCallback } from '../useStableCallback'
 import { PreviewPins } from '../PreviewPins'
 import { ResolvedPinsToggle } from '../ResolvedPinsToggle'
@@ -255,17 +256,6 @@ const useStyles = makeStyles({
   sidePane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1 },
   sideHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 6px 6px 12px', ...typo.heading, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap', overflow: 'hidden' },
   sideBody: { display: 'grid', minHeight: 0, minWidth: 0, overflow: 'hidden' },
-  sideRail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '4px', paddingTop: '8px', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2, overflowY: 'auto' },
-  sideGap: { width: '32px', height: '1px', margin: '4px 0', backgroundColor: tokens.colorNeutralStroke2, flexShrink: 0 },
-  sideBtn: { display: 'grid', justifyItems: 'center', rowGap: '2px', width: '48px', padding: '6px 0', border: 'none', borderRadius: tokens.borderRadiusMedium, backgroundColor: 'transparent', fontFamily: 'inherit', color: tokens.colorNeutralForeground2, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover, color: tokens.colorNeutralForeground1 } },
-  sideOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
-  sideIcon: { position: 'relative', fontSize: '20px', lineHeight: 1 },
-  sideBadge: { position: 'absolute', top: '-7px', right: '-13px' },
-  sideDot: { position: 'absolute', top: '-3px', left: '-6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tokens.colorPaletteRedBackground3 },
-  // 名前はボタンの幅(48px)に収まる短い言葉にする(English で切れていた。2026-10-26 利用者)。長い名前は tip と題に書き、ここは収まらなければ … にする
-  sideLabel: { fontSize: '11px', lineHeight: 1.2, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  // 画像・URL を落とせる所(ドラッグ中)
-  sideDrop: { outline: `2px dashed ${tokens.colorBrandStroke1}`, outlineOffset: '-2px', backgroundColor: tokens.colorBrandBackground2 },
   dropNote: { fontSize: '16px' },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
   // 候補の行と、マウスを乗せたときの「⇄ 入れる」(SU9)
@@ -663,7 +653,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const sideTitle = (v: Exclude<Side, null>) =>
     ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
   /** 左のバーの並び(アイコンの下に名前(English も 48px に収まる短い言葉)。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
-  const allRails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
+  const allRails: RailItem<Exclude<Side, null>>[] = [
     // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
     { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
     { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learn'), tip: learnAiOn ? t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)') : t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの)', 'Learnings for this delivery (notes from past deliveries, for reference)'), count: e.learnCount, color: 'informative' },
@@ -967,38 +957,25 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
       <div ref={panesRef} className={mergeClasses(s.panes, moving && s.panesMoving)} style={{ '--wv': `${fit.preview}px`, '--wl': `${fit.listOpen ? widths.list : RAIL_W}px`, '--ws': `${fit.overlay ? 0 : sideW}px` } as React.CSSProperties}>
         {/* 左のバー。上から、プロセスの順(承認者とのやり取り → 承認 → 素材 → 制作へ渡すもの)、線の下に記録。数と点で、開かなくても様子が分かる */}
-        <nav className={s.sideRail} aria-label={t('配信の全体の情報とメニュー', 'Delivery info and menus')}>
-          {rails.map((r) => (
-            <span key={r.v} style={{ display: 'contents' }}>
-              {r.gap && <span className={s.sideGap} />}
-              <Tooltip content={r.tip} relationship="description" positioning="after">
-                <button
-                  type="button"
-                  className={mergeClasses(s.sideBtn, side === r.v && s.sideOn, r.drop && dropOver === r.v && s.sideDrop)}
-                  aria-pressed={side === r.v}
-                  onClick={() => showSide(r.v)}
-                  onDragOver={(ev) => {
-                    if (!r.drop || !canDropAsset(ev.dataTransfer)) return
-                    ev.preventDefault()
-                    setDropOver(r.v === 'assets' ? 'assets' : 'handoff')
-                  }}
-                  onDragLeave={() => r.drop && setDropOver(null)}
-                  onDrop={(ev) => {
-                    if (!r.drop) return
-                    ev.preventDefault()
-                    void dropAssets(ev.dataTransfer)
-                  }}
-                >
-                  <span className={s.sideIcon}>
-                    {r.icon}
-                    {r.count > 0 && <CounterBadge className={s.sideBadge} count={r.count} size="small" color={r.color ?? 'brand'} />}
-                    {r.dot && <span className={s.sideDot} style={r.dot === 'amber' ? { backgroundColor: tokens.colorPaletteMarigoldBackground3 } : undefined} />}
-                  </span>
-                  <span className={s.sideLabel}>{r.label}</span>
-                </button>
-              </Tooltip>
-            </span>
-          ))}
+        <SideRail
+          items={rails}
+          selected={side}
+          onPick={(v) => showSide(v)}
+          ariaLabel={t('配信の全体の情報とメニュー', 'Delivery info and menus')}
+          drop={{
+            over: dropOver,
+            onOver: (v, ev) => {
+              if (!canDropAsset(ev.dataTransfer)) return
+              ev.preventDefault()
+              setDropOver(v === 'assets' ? 'assets' : 'handoff')
+            },
+            onLeave: () => setDropOver(null),
+            onDrop: (_, ev) => {
+              ev.preventDefault()
+              void dropAssets(ev.dataTransfer)
+            },
+          }}
+        >
           {/* 落としたものを入れた・入れられなかったを、バーの下に短く知らせる */}
           {dropNote && (
             <Tooltip content={dropNote.text} relationship="label" positioning="after" visible>
@@ -1007,7 +984,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               </span>
             </Tooltip>
           )}
-        </nav>
+        </SideRail>
 
         {/* 開いているパネル(1 つ)。しまったときも列には残し、幅 0 にする(display: none にすると、グリッドの列から外れ、プレビュー以下が 1 列ずつ左の細い列にずれる。2026-10-24 本番で起きた)。
             しまっている間は inert で、Tab で中に入らないようにする。やり取りの部品は、バーの数を合わせるため、いつも描く */}

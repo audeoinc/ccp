@@ -1604,6 +1604,7 @@ function App() {
           people={owners}
           onClose={() => setProductionOpen(null)}
           onFullView={() => switchProductionView(false)}
+          onChanged={() => void production.reload()}
           stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
         /></Later>
       )}
