@@ -29,7 +29,6 @@ import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, optionLabel, useT } from '../i18n'
 import { audienceSet } from '../target'
-import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
 import { getTemplate, sectionsOf, slotsOf } from '../templates'
 import { countryOptions, statusRank } from '../status'
@@ -67,21 +66,17 @@ import { tapComplete } from '../pushLink'
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
 const WIDTH_KEY = PREF.simplePaneWidths
-const PRODUCTS_KEY = PREF.simpleProductsOpen
 const RAIL_W = 32
 type Widths = { mobile: number; pc: number; list: number; comm: number; hand: number }
 const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, hand: 400 }
 // 左のバーと、開くパネル(SU4。2026-10-24 利用者と決めた。以前は右端にあり、気づかれなかった)。
 // 配信の全体にかかわる情報とメニュー(やり取り・承認の様子・素材・渡すもの・変更の記録)をここにまとめ、真ん中は作業する場所にする。
-// VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。どれを開いていたかと幅は、人ごとに覚える
-const SIDE_KEY = PREF.simpleSidePanel
+// VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。幅は人ごとに覚える。
+// 配信カードを開いたときは、いつも「アラート」を開いた状態から始める(直さないといけないものを最初に見せる。2026-10-29 利用者。
+// 以前は最後に開いていたものを覚えて開いていたが、承認を開いたまま次のカードを開くと承認から始まっていた)
 type Side = CommSection | 'alerts' | 'learn' | 'assets' | 'handoff' | null
 const isComm = (v: Side): v is CommSection => v === 'talk' || v === 'approval' || v === 'history'
-// 右端にあったころの「comm」は、やり取りとして開く
-const loadSide = (): Side => {
-  const v = loadPref<Side | 'comm'>(SIDE_KEY, null)
-  return v === 'comm' ? 'talk' : v
-}
+const START_SIDE: Side = 'alerts'
 const SIDE_W = 56
 // 覚えた幅が数でなければ(壊れた設定)、既定の幅に戻す
 const clampPreview = (v: number) => (Number.isFinite(v) ? Math.min(1200, Math.max(360, v)) : DEFAULT_WIDTHS.mobile)
@@ -335,7 +330,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const nav = usePreviewNav(boxRef, e.zoom)
   // 「A と違う」の目印(B・C 案を直しているとき)
   const diffMarks: Mark[] = e.abDiffParts.map((part) => ({ part, color: tokens.colorPaletteDarkOrangeBackground3, label: t('A と違う', 'Differs from A') }))
-  const [productsOpen, setProductsOpen] = useState(() => loadPref<boolean>(PRODUCTS_KEY, true))
+  // 右端の商品情報は、配信カードを開いたときは閉じた状態から(プレビューを広く見せる。2026-10-29 利用者)
+  const [productsOpen, setProductsOpen] = useState(false)
   // 自動で畳んだ商品の一覧を、人が開き直した(幅が足りるようになるまで、自動では畳まない)
   const [insist, setInsist] = useState(false)
   const [abSettingsOpen, setAbSettingsOpen] = useState(false)
@@ -400,12 +396,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
   // まだ保存していない案(e.unsaved)は、配信カードの ID を使うパネル(やり取り・承認・素材・渡すもの・履歴・学び)を出さない。開けるのはアラートだけ
-  const [side, setSide] = useState<Side>(() => (e.unsaved ? null : loadSide()))
+  const [side, setSide] = useState<Side>(START_SIDE)
+  // きょうだいの配信カードに切り替えたとき(この画面は作り直されない)も、開いたときと同じ始まり方にする
+  const [shownCard, setShownCard] = useState(e.card.id)
+  if (shownCard !== e.card.id) {
+    setShownCard(e.card.id)
+    setSide(START_SIDE)
+    setProductsOpen(false)
+  }
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
   const showSide = (v: Exclude<Side, null>, open = false) => {
     const next = !open && side === v ? null : v
     setSide(next)
-    savePref(SIDE_KEY, next)
     if (isComm(next)) setCommSection(next)
     if (next) setLastSide(next)
     if (next !== side) {
@@ -446,7 +448,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     } else select(target)
   }
   // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
-  const [lastSide, setLastSide] = useState<Exclude<Side, null>>(() => (e.unsaved ? 'alerts' : (loadSide() ?? 'talk')))
+  const [lastSide, setLastSide] = useState<Exclude<Side, null>>('alerts')
   const panel = side ?? lastSide
   const [moving, setMoving] = useState(false)
   // パネルは左にあるので、境目を右へ動かすと広がる
@@ -468,10 +470,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 幅が足りるようになったら、「開き直した」は忘れる(次に狭くなったら、また自動で畳む)。描くときに直す(effect で直すと、1 回余計に描くため)
   if (insist && fitPanes(panesW, { side: sideW, preview: widths[widthKey], list: widths.list, listOpen: true, insist: false }).fits) setInsist(false)
   // やり取りの部品は、閉じていても描いておき、バーの数と点を合わせる。最後に開いた見方を覚える(書きかけの文を、見方の間で共にするため 1 つの部品)
-  const [commSection, setCommSection] = useState<CommSection>(() => {
-    const v = loadSide()
-    return isComm(v) ? v : 'talk'
-  })
+  const [commSection, setCommSection] = useState<CommSection>('talk')
   const [counts, setCounts] = useState<CommCounts>({ open: 0, tasks: 0, mine: false, myTurn: false, waiting: false, changesRequested: false, reviewers: 0, approved: 0, pendingNames: [], changeReason: '', changes: 0 })
   // 開け閉めは人に任せる(自動では開かない。自分宛てがあれば、バーのアイコンの赤い点で知らせる。2026-10-23 利用者)
   const onCounts = useCallback((c: CommCounts) => setCounts(c), [])
@@ -571,7 +570,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     }
     setInsist(false)
     setProductsOpen(!productsOpen)
-    savePref(PRODUCTS_KEY, !productsOpen)
   }
 
   /**
