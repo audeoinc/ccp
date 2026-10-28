@@ -4,7 +4,7 @@
 // 文言は、画面の言語で引く(最上位に文言の値を置かず、関数にする)。新しい機能を足したら、ここに 1 行足す(設定がなければ、'*' の扱いに従う)
 import { tr } from './i18n'
 
-export type FeatureVersion = 'always' | 'MVP' | 'v1' | 'v2' | 'v3' | 'FULL' | 'dev'
+export type FeatureVersion = 'always' | 'MVP' | 'v1' | 'v2' | 'v3' | 'v4' | 'dev'
 /** 切り替えられるようにする手間(S 小 / M 中 / L 大)。管理の画面の目安 */
 export type FeatureSize = 'S' | 'M' | 'L'
 
@@ -32,7 +32,7 @@ export interface FeatureDef extends Named {
 }
 
 /** 版の並び(まとめて当てるときは、選んだ版までを公開する) */
-export const VERSION_ORDER: FeatureVersion[] = ['always', 'MVP', 'v1', 'v2', 'v3', 'FULL']
+export const VERSION_ORDER: FeatureVersion[] = ['always', 'MVP', 'v1', 'v2', 'v3', 'v4']
 
 export const FEATURE_AREAS: FeatureArea[] = [
   { id: 'area.common', ...named('共通(画面の土台)', 'Common (screen basics)') },
@@ -133,7 +133,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'campaign.base', group: 'area.card.campaign', ...named('キャンペーンを作る・帯を出す', 'Create campaigns and show the band'), version: 'MVP' },
   { id: 'campaign.addcard', group: 'area.card.campaign', ...named('配信カードを足す(きょうだい)', 'Add delivery cards (siblings)'), version: 'MVP', size: 'S' },
   { id: 'campaign.copy', group: 'area.card.campaign', ...named('きょうだいの中身を写す', 'Copy content between siblings'), version: 'v1', size: 'S' },
-  { id: 'campaign.bulkapprove', group: 'area.card.campaign', ...named('まとめて承認', 'Approve all at once'), version: 'v2', size: 'S' },
+  { id: 'campaign.bulkapprove', group: 'area.card.campaign', ...named('まとめて承認', 'Approve all at once'), version: 'MVP', size: 'S' },
   { id: 'card.simple', group: 'area.card.card', ...named('シンプルな配信カード', 'Simple delivery card'), version: 'always' },
   { id: 'card.info', group: 'area.card.card', ...named('配信の情報(配信名・日時・国・チャネル・種類・担当)', 'Delivery info (name, date, country, channel, type, owner)'), version: 'always' },
   { id: 'card.audience', group: 'area.card.card', ...named('配信の対象(性別・年代・送る相手)', 'Audience (gender, age, recipients)'), version: 'MVP', size: 'S' },
@@ -177,10 +177,10 @@ export const FEATURES: FeatureDef[] = [
   { id: 'ai.abvariant', group: 'area.ai.ab', ...named('B 案を AI で作る', 'Make variant B with AI'), version: 'v2', size: 'S', requires: ['card.abtest'] },
   { id: 'ai.learnings', group: 'area.ai.learnings', ...named('下書きに学びを渡す', 'Pass learnings to the draft'), version: 'v3', size: 'S', requires: ['results.learnings'] },
   { id: 'approval.card', group: 'area.approval.card', ...named('承認を依頼する・承認する・差し戻す', 'Request approval / approve / send back'), version: 'MVP', size: 'M' },
-  { id: 'approval.week', group: 'area.approval.week', ...named('週の帯・週の確定・確定後の変更の理由', 'Week band, confirm the week, reasons for changes after confirming'), version: 'v1', size: 'L' },
-  { id: 'approval.week.checklist', group: 'area.approval.week', ...named('確定の前に直すこと(確認の一覧)', 'Things to fix before confirming'), version: 'v1', size: 'M' },
-  { id: 'approval.week.bulk', group: 'area.approval.week', ...named('まとめて依頼', 'Request in bulk'), version: 'v1', size: 'S' },
-  { id: 'approval.history', group: 'area.approval.week', ...named('承認の履歴', 'Approval history'), version: 'v1', size: 'S' },
+  { id: 'approval.week', group: 'area.approval.week', ...named('週の帯・週の確定・確定後の変更の理由', 'Week band, confirm the week, reasons for changes after confirming'), version: 'MVP', size: 'L' },
+  { id: 'approval.week.checklist', group: 'area.approval.week', ...named('確定の前に直すこと(確認の一覧)', 'Things to fix before confirming'), version: 'MVP', size: 'M' },
+  { id: 'approval.week.bulk', group: 'area.approval.week', ...named('まとめて依頼', 'Request in bulk'), version: 'MVP', size: 'S' },
+  { id: 'approval.history', group: 'area.approval.week', ...named('承認の履歴', 'Approval history'), version: 'MVP', size: 'S' },
   { id: 'collab.thread', group: 'area.collab.thread', ...named('書き込み・宛先・返事', 'Posts, recipients and replies'), version: 'v1', size: 'M' },
   { id: 'collab.pins', group: 'area.collab.thread', ...named('プレビューの場所へのピン', 'Pins on the preview'), version: 'v1', size: 'M' },
   { id: 'collab.reactions', group: 'area.collab.thread', ...named('リアクション', 'Reactions'), version: 'v1', size: 'S' },
@@ -189,8 +189,8 @@ export const FEATURES: FeatureDef[] = [
   { id: 'prod.handoff', group: 'area.prod.handoff', ...named('制作の担当・締め切り・制作指示・「制作に渡す」', 'Production owner, due date, notes and "Hand off to production"'), version: 'MVP' },
   { id: 'prod.page', group: 'area.prod.page', ...named('写し・要素の情報(コピー・直す・戻す)', 'Snapshot and element info (copy, edit, revert)'), version: 'MVP', size: 'M' },
   { id: 'prod.samplehtml', group: 'area.prod.page', ...named('企画の見本の HTML(見る・コピー)', 'Sample HTML from the plan (view, copy)'), version: 'MVP', size: 'S' },
-  { id: 'prod.htmledit', group: 'area.prod.page', ...named('制作した HTML の編集・版・貼り付けて置き換える', 'Edit produced HTML, versions, paste to replace'), version: 'FULL', size: 'M' },
-  { id: 'prod.ai', group: 'area.prod.page', ...named('AI チャット(制作物の手直し)', 'AI chat (touch up the production)'), version: 'FULL', size: 'M' },
+  { id: 'prod.htmledit', group: 'area.prod.page', ...named('制作した HTML の編集・版・貼り付けて置き換える', 'Edit produced HTML, versions, paste to replace'), version: 'v4', size: 'M' },
+  { id: 'prod.ai', group: 'area.prod.page', ...named('AI チャット(制作物の手直し)', 'AI chat (touch up the production)'), version: 'v4', size: 'M' },
   { id: 'prod.steps', group: 'area.prod.steps', ...named('工程の帯(受け取る・制作する・仕上がりの確認・送る)', 'Step bar (receive, produce, review, send)'), version: 'v1', size: 'M' },
   { id: 'prod.result', group: 'area.prod.steps', ...named('仕上がりを見る', 'View the finished result'), version: 'v1', size: 'S' },
   { id: 'results.views', group: 'area.results.face', ...named('月・週・一覧(ヒートマップ・要約の帯)', 'Month, week, list (heat map, summary band)'), version: 'v3', size: 'M' },
@@ -200,7 +200,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'results.ai', group: 'area.results.detail', ...named('AI で振り返る', 'Review with AI'), version: 'v3', size: 'S' },
   { id: 'results.pdf', group: 'area.results.detail', ...named('PDF で書き出す', 'Export as PDF'), version: 'v3', size: 'S' },
   { id: 'results.review', group: 'area.results.review', ...named('週・月の振り返りのメモ・AI で下書き', 'Week / month review notes, AI draft'), version: 'v3', size: 'S' },
-  { id: 'results.effect', group: 'area.results.effect', ...named('効果(増えた売上・学びの評価)', 'Impact (added sales, learning evaluation)'), version: 'FULL', size: 'M' },
+  { id: 'results.effect', group: 'area.results.effect', ...named('効果(増えた売上・学びの評価)', 'Impact (added sales, learning evaluation)'), version: 'v4', size: 'M' },
   { id: 'results.learnings', group: 'area.results.learnings', ...named('学びのカード・まとめる・国のデッキ', 'Learning cards, merging, country decks'), version: 'v3', size: 'L' },
   { id: 'results.classify', group: 'area.results.kinds', ...named('AI でテーマの種類を分ける', 'Classify theme types with AI'), version: 'v3', size: 'S' },
   { id: 'alert', group: 'area.alerts.alerts', ...named('アラートのフロート・対応・記録', 'Alert float, handling and records'), version: 'v1', size: 'L' },
@@ -213,19 +213,19 @@ export const FEATURES: FeatureDef[] = [
   { id: 'product.sku', group: 'area.alerts.product', ...named('SKU', 'SKUs'), version: 'v1', size: 'S' },
   { id: 'product.metrics', group: 'area.alerts.product', ...named('指標(週・順位)', 'Metrics (week, rank)'), version: 'v1', size: 'S' },
   { id: 'product.policy', group: 'area.alerts.product', ...named('販売方針・販促', 'Sales policy and promotions'), version: 'v1', size: 'S' },
-  { id: 'product.ads', group: 'area.alerts.ads', ...named('商品別の外部広告の列・印', 'External ad columns and marks by product'), version: 'FULL', size: 'S' },
+  { id: 'product.ads', group: 'area.alerts.ads', ...named('商品別の外部広告の列・印', 'External ad columns and marks by product'), version: 'v4', size: 'S' },
   { id: 'settings.me', group: 'area.settings.me', ...named('言語・ヒント', 'Language and hints'), version: 'always' },
   { id: 'settings.country.templates', group: 'area.settings.country', ...named('使うテンプレート', 'Templates to use'), version: 'MVP', size: 'S' },
   { id: 'settings.country.rules', group: 'area.settings.country', ...named('使う決まり・使う学び・アラートの基準', 'Rules, learnings and alert criteria to use'), version: 'v1', size: 'S', requires: ['results.learnings'] },
   { id: 'settings.sender', group: 'area.settings.company', ...named('差出人の名前と店の URL', 'Sender name and shop URL'), version: 'MVP', size: 'S' },
   { id: 'settings.utm', group: 'area.settings.company', ...named('計測用のパラメーター(utm)の決まった値', 'Fixed values for tracking parameters (utm)'), version: 'MVP', size: 'S' },
   { id: 'settings.users', group: 'area.settings.company', ...named('ユーザー・承認グループ', 'Users and approval groups'), version: 'MVP', size: 'S' },
-  { id: 'settings.templates', group: 'area.settings.company', ...named('テンプレートの管理・編集・AI で作る', 'Manage, edit and AI-create templates'), version: 'FULL', size: 'L' },
+  { id: 'settings.templates', group: 'area.settings.company', ...named('テンプレートの管理・編集・AI で作る', 'Manage, edit and AI-create templates'), version: 'v4', size: 'L' },
   { id: 'settings.library', group: 'area.settings.company', ...named('画像のライブラリ(メイン画像・部品の画像)', 'Image library (main images, part images)'), version: 'v1', size: 'M' },
-  { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'FULL', size: 'S' },
+  { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'v4', size: 'S' },
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
-  { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'FULL', size: 'M' },
+  { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'v4', size: 'M' },
   { id: 'dev.ask', group: 'area.devtools.ask', ...named('「？ 聞く」(使い方を AI に聞ける機能。要件は決めたが、まだ作っていない)', '"? Ask" (ask AI how to use CCP)'), version: 'v1', size: 'M' },
   { id: 'dev.tools', group: 'area.devtools.devscreen', ...named('`/dev/`', 'Developer screen (/dev/)'), version: 'dev', size: 'S' },
 ]

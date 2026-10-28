@@ -30,7 +30,7 @@ const useStyles = makeStyles({
 })
 
 const versionName = (v: FeatureVersion) =>
-  v === 'always' ? tr('常時', 'Always') : v === 'dev' ? tr('開発者だけ', 'Developers only') : v === 'FULL' ? 'FULL' : v
+  v === 'always' ? tr('常時', 'Always') : v === 'dev' ? tr('開発者だけ', 'Developers only') : v
 
 /** 版を当てたときに、その機能を公開にするか(選んだ版までを公開。常時は行を書かない・開発者だけは非公開) */
 const onInVersion = (f: FeatureDef, upTo: FeatureVersion) => f.version !== 'dev' && VERSION_ORDER.indexOf(f.version) <= VERSION_ORDER.indexOf(upTo)
