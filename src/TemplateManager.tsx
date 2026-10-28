@@ -17,9 +17,11 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronLeftRegular, ChevronRightRegular, CopyRegular, DeleteRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular, SparkleRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular, SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { shapeOf, similarity } from './templateShape'
+import { ImportSectionMenu, SimilarTemplates } from './SimilarTemplates'
+import { TemplateCompareFloat } from './TemplateCompare'
 import { TemplateAiDialog } from './TemplateAiDialog'
 import type { TemplateDraftOut } from './templateDraft'
 import { locale, useT } from './i18n'
@@ -37,7 +39,7 @@ import { usePaneWidths } from './floatLayout'
 import { PREF } from './prefKeys'
 import { BigFloat } from './BigFloat'
 import { useTableEditor } from './TemplateTableEditor'
-import { ratioLabel, toTableLayout } from './tables'
+import { duplicateSection, ratioLabel, toTableLayout } from './tables'
 import {
   DEFAULT_PUSH_TEMPLATE,
   LINK_KINDS,
@@ -91,10 +93,9 @@ const layoutOf = (d: Draft): TemplateLayout => ({ hero: d.hero, heroText: d.hero
 
 /** 編集中の列の幅(一覧・パーツ・右のタブ。キャンバスは残り)を覚えておく所(その人のブラウザだけ。列の並びを変えたので、以前の鍵とは別) */
 const EDITOR_WIDTHS_KEY = 'ccp.templateEditorWidths2'
-type EditorWidths = { list: number; palette: number; props: number }
-const EDITOR_WIDTHS: EditorWidths = { list: 200, palette: 190, props: 330 }
+type EditorWidths = { palette: number; props: number }
+const EDITOR_WIDTHS: EditorWidths = { palette: 190, props: 330 }
 const clampWidths = (w: EditorWidths): EditorWidths => ({
-  list: Math.round(Math.min(400, Math.max(160, w.list))),
   palette: Math.round(Math.min(300, Math.max(150, w.palette))),
   props: Math.round(Math.min(560, Math.max(260, w.props))),
 })
@@ -126,10 +127,8 @@ const PREVIEW_MAX = 560
 
 /** キャンバスの列の最小の幅(メールの形が読める大きさ)。ほかの列を広げても、これより狭くしない */
 const CANVAS_MIN = 380
-/** 列の間(境界 3 本 + 間隔 6 つ) */
-const EDITOR_GAPS = 3 + 6 * 10
-/** 編集中の左の一覧の開け閉めを覚えておく所(その人のブラウザだけ) */
-const COMPARE_OPEN_KEY = 'ccp.templateCompareOpen'
+/** 列の間(境界 2 本 + 間隔 4 つ) */
+const EDITOR_GAPS = 2 + 4 * 10
 
 /** 構成のプレビューの幅。一覧の見取り図(84px)では、枠の数や列が読み取りにくいため、大きく描く */
 const PREVIEW_WIDTH = 220
@@ -245,14 +244,14 @@ const useStyles = makeStyles({
   // 一覧を開いて見比べているときは、設定の列が狭くなるので、最小の幅を小さめにする
   buttonRow: { display: 'grid', gridTemplateColumns: '18px minmax(80px, 1fr) 76px minmax(100px, 160px) 28px', columnGap: '6px', alignItems: 'center' },
   partList: { display: 'grid', rowGap: '8px' },
-  // 編集中: 2 列の大きな一覧の代わりに、一覧(閉じられる) | 部品 | キャンバス | 設定と構成の一覧 の 4 列にする。
+  // 編集中: 2 列の大きな一覧の代わりに、部品 | キャンバス | 設定と構成の一覧 の 3 列にする(ほかのテンプレートとの比べは、右のタブの「似ているテンプレート」。2026-10-28)。
   // 部品は、主な落とし先のキャンバスの左隣に、設定は右に置く(左から取って、中で組み、右で整える。2026-10-22 利用者の指示)
   splitEditing: { gridTemplateColumns: 'minmax(0, 1fr)' },
   listHidden: { display: 'none' },
   editor3: {
     display: 'grid',
-    // 列の幅は、一覧の開け閉め・見比べで変わるので、描くときに style で決める
-    gridTemplateAreas: '"list s1 palette s2 canvas s3 fields"',
+    // 列の幅は、境目をつかんで変わるので、描くときに style で決める
+    gridTemplateAreas: '"palette s2 canvas s3 fields"',
     columnGap: '10px',
     alignItems: 'start',
   },
@@ -261,29 +260,6 @@ const useStyles = makeStyles({
   canvasScroll: { width: '100%', boxSizing: 'border-box' },
   // 境界の線は、いちばん長い列(設定)の高さまで伸ばす
   splitCell: { alignSelf: 'stretch', display: 'grid' },
-  compareCol: { gridArea: 'list', position: 'sticky', top: 0, display: 'grid', rowGap: '6px', alignContent: 'start', maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px' },
-  compareHead: { display: 'flex', alignItems: 'flex-start', columnGap: '2px' },
-  compareItem: {
-    display: 'grid',
-    gridTemplateColumns: 'auto minmax(0, 1fr)',
-    columnGap: '8px',
-    alignItems: 'start',
-    padding: '6px',
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    cursor: 'pointer',
-    ':hover': { border: `1px solid ${tokens.colorBrandStroke1}` },
-  },
-  // 閉じた一覧: 細い帯に、縦書きの「テンプレート」を残す(押せば開く)
-  rail: { gridArea: 'list', position: 'sticky', top: 0 },
-  railButton: { minWidth: 0, width: '32px', padding: '8px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '6px', backgroundColor: tokens.colorNeutralBackground3 },
-  railLabel: { writingMode: 'vertical-rl', fontSize: '12px', letterSpacing: '2px' },
-  canvasRow: { display: 'flex', columnGap: '12px', alignItems: 'flex-start' },
-  compareBox: { display: 'grid', rowGap: '4px', flexShrink: 0 },
-  compareBoxHead: { display: 'flex', alignItems: 'center', columnGap: '2px', minWidth: 0 },
-  compareBoxName: { flexGrow: 1, fontSize: '12px', fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  sameNote: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', padding: '2px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorPaletteYellowBackground1, color: tokens.colorNeutralForeground1 },
   crumbs: { display: 'flex', alignItems: 'center', columnGap: '6px', minWidth: 0 },
   crumbLink: { minWidth: 0, padding: '0 2px', fontSize: 'inherit', fontWeight: 'inherit', color: tokens.colorBrandForeground1 },
   crumbName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -351,7 +327,6 @@ const useStyles = makeStyles({
   tree: { display: 'grid', rowGap: '2px' },
   treeItem: { textAlign: 'left', fontSize: '12px', padding: '4px 6px', border: 'none', borderRadius: tokens.borderRadiusMedium, backgroundColor: 'transparent', color: tokens.colorNeutralForeground1, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   propsCol: { gridArea: 'fields', position: 'sticky', top: 0, maxHeight: 'calc((86vh / var(--ui-zoom, 1)) - 120px)', overflowY: 'auto', paddingRight: '4px', minWidth: 0 },
-  compareThumb: { paddingLeft: '4px' },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '10px 16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
 })
 
@@ -422,24 +397,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
 
   const selected = options.find((o) => o.id === selectedId) ?? options[0]
   const editing = draft !== null
-  // 編集中の左の一覧(ほかのテンプレートを見比べて、被りに気づけるように)。開け閉めは、その人のブラウザに覚えさせる
-  const [listOpen, setListOpen] = useState(() => {
-    try {
-      return localStorage.getItem(COMPARE_OPEN_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
-  const toggleList = () =>
-    setListOpen((v) => {
-      try {
-        localStorage.setItem(COMPARE_OPEN_KEY, v ? '0' : '1')
-      } catch {
-        // 覚えられなくても、開け閉めはできる
-      }
-      return !v
-    })
-  // キャンバスの隣に並べて見比べているテンプレート
+  // 見比べるフロートで、今の編集中と並べているテンプレート(似ているテンプレートの「見比べる」)
   const [compareId, setCompareId] = useState<string | null>(null)
   // プレビュー・キャンバスの倍率。見取り図の幅を変えて大きくする(CSS の zoom ではなく幅で。箱を押す・つかむ位置がずれないように)
   const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
@@ -477,7 +435,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     const ro = new ResizeObserver(calc)
     ro.observe(box)
     return () => ro.disconnect()
-  }, [zoom, draft, selectedId, viewKey, compareId, listOpen]) // 列の幅が変わったときは、枠の大きさの変化(ResizeObserver)で測り直す
+  }, [zoom, draft, selectedId, viewKey]) // 列の幅が変わったときは、枠の大きさの変化(ResizeObserver)で測り直す
   /** 倍率の操作(配信カードのプレビューと同じ並び) */
   const zoomBar = () => (
     <div className={s.zoomBar}>
@@ -518,7 +476,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
       const next = clampWidths({ ...w, [key]: w[key] + sign * dx })
       if (!gridW) return next
       // 広げるのは、キャンバスが最小の幅を保てるところまで
-      const room = gridW - EDITOR_GAPS - CANVAS_MIN - (listOpen ? next.list : 32) - next.palette - next.props
+      const room = gridW - EDITOR_GAPS - CANVAS_MIN - next.palette - next.props
       return room >= 0 || sign * dx < 0 ? next : { ...next, [key]: Math.max(w[key], next[key] + room) }
     })
 
@@ -672,66 +630,28 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     : []
   const sameAs = others.find((x) => x.same)
 
-  /** 左の列: ほかのテンプレート(押すと、その下に大きく出して見比べる)。閉じると細い帯 */
-  const compareCol = () =>
-    listOpen ? (
-      <aside className={s.compareCol} aria-label={t('ほかのテンプレート', 'Other templates')}>
-        <div className={s.compareHead}>
-          <span className={s.paletteHead}>{t('ほかのテンプレート(似ている順。押すと見比べる)', 'Other templates (most similar first; click to compare)')}</span>
-          <Tooltip relationship="label" content={t('一覧を閉じる', 'Close the list')}>
-            <Button size="small" appearance="subtle" icon={<ChevronLeftRegular />} onClick={toggleList} />
-          </Tooltip>
-        </div>
-        {others.map(({ o, same, score }) => (
-          <div key={o.id} style={{ display: 'grid', rowGap: 4 }}>
-            <div
-              role="button"
-              tabIndex={0}
-              aria-pressed={compareId === o.id}
-              className={mergeClasses(s.compareItem, compareId === o.id && s.itemSelected)}
-              onClick={() => setCompareId((v) => (v === o.id ? null : o.id))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  setCompareId((v) => (v === o.id ? null : o.id))
-                }
-              }}
-            >
-              {o.push ? <PushThumb spec={o.push} width={64} /> : <TemplateThumb layout={o} maxHeight={110} />}
-              <span className={s.itemText}>
-                <span className={s.itemName}>{o.label}</span>
-                {same ? (
-                  <Badge size="small" appearance="tint" color="warning">
-                    {t('同じ構成', 'Same layout')}
-                  </Badge>
-                ) : (
-                  score >= 0.6 && (
-                    <Badge size="small" appearance="outline" color="informative">
-                      {t('似ている', 'Similar')}
-                    </Badge>
-                  )
-                )}
-              </span>
-            </div>
-            {/* 見比べる: 一覧の幅いっぱいに、大きく描く */}
-            {compareId === o.id && (
-              <div className={s.compareThumb}>
-                <TemplateThumb layout={o} width={Math.max(140, colW.list - 16)} />
-              </div>
-            )}
-          </div>
-        ))}
-      </aside>
-    ) : (
-      <aside className={s.rail}>
-        <Tooltip relationship="label" content={t('ほかのテンプレートを開いて見比べる', 'Open other templates to compare')}>
-          <Button appearance="subtle" className={s.railButton} onClick={toggleList}>
-            <ChevronRightRegular />
-            <span className={s.railLabel}>{t('テンプレート', 'Templates')}</span>
-          </Button>
-        </Tooltip>
-      </aside>
-    )
+  const optionOf = (id: string) => options.find((o) => o.id === id)
+  /** 相手のセクションを、新しい ID で今の下書きの末尾に足す(部品の ID も新しく。UTM・ピン・配信の中身が、相手のテンプレートの部品とつながらないように)。Ctrl+Z で戻せる */
+  const importSection = (sec: Section) => {
+    const copy = duplicateSection(sec)
+    setSections((list) => [...list, copy])
+    if (copy.id) window.setTimeout(() => editor.goSection(copy.id!), 0)
+  }
+  /** 似ているテンプレートを開く(編集をやめて、その詳しい欄へ。編集した内容があれば、捨ててよいか確かめる) */
+  const openOther = (id: string) => {
+    setCompareId(null)
+    choose(id)
+  }
+  /** 似ているテンプレートを複製して、新しく直し始める */
+  const duplicateOther = (id: string) => {
+    const o = optionOf(id)
+    if (!o) return
+    if (histCount.past > 0 && !window.confirm(t('編集中の内容を破棄して、複製から始めます。よろしいですか?', 'Discard the current edits and start from a copy?'))) return
+    duplicateFrom(o)
+  }
+  // 右のタブの「似ているテンプレート」の欄(状況の「同じ構成のテンプレート」から、そこへ動く)
+  const similarRef = useRef<HTMLDivElement>(null)
+  const compared = compareId ? others.find((x) => x.o.id === compareId) : undefined
 
   // 元に戻す・やり直す(入力欄の中では、ブラウザの元に戻すなどを、そのまま使う)。表の操作のキーは、表の編集(TemplateTableEditor)が受ける
   useEffect(() => {
@@ -1142,21 +1062,20 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
           {kv(
             t('同じ構成のテンプレート', 'Template with the same layout'),
             sameAs ? (
-              <Button
-                size="small"
-                appearance="transparent"
-                onClick={() => {
-                  setCompareId(sameAs.o.id)
-                  if (!listOpen) toggleList()
-                }}
-              >
-                {t(`「${sameAs.o.label}」を見比べる`, `Compare "${sameAs.o.label}"`)}
+              <Button size="small" appearance="transparent" onClick={() => similarRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
+                {t(`「${sameAs.o.label}」(似ているテンプレートへ)`, `"${sameAs.o.label}" (see similar templates)`)}
               </Button>
             ) : (
               <strong>{t('なし', 'None')}</strong>
             ),
           )}
         </div>
+
+        {!d.push && (
+          <div ref={similarRef} className={s.grp}>
+            <SimilarTemplates entries={others} onCompare={setCompareId} onImport={(_, sec) => importSection(sec)} onOpen={openOther} onDuplicate={duplicateOther} />
+          </div>
+        )}
 
         <div className={s.grp} style={{ borderBottom: 'none' }}>
           <span className={s.grpTitle}>{t('構成(押すと、そこへ)', 'Outline (click to go there)')}</span>
@@ -1264,11 +1183,9 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
                 </MessageBar>
               )}
               {draft ? (
-                // 一覧(たたむ) | パーツ | キャンバス | 右のタブ。境目はスプリッターで幅を変える(キャンバスは残りの幅)
-                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${listOpen ? colW.list : 32}px 1px ${colW.palette}px 1px minmax(${CANVAS_MIN}px, 1fr) 1px ${colW.props}px` }}>
-                  {compareCol()}
-                  {/* 列の境界。つかんで幅を変える(一覧を閉じているときは、一覧の幅は変えない) */}
-                  <div className={s.splitCell} style={{ gridArea: 's1' }}>{listOpen && <Splitter onDrag={resizeCol('list', 1)} />}</div>
+                // パーツ | キャンバス | 右のタブ。境目はスプリッターで幅を変える(キャンバスは残りの幅)
+                <div ref={gridRef} className={s.editor3} style={{ gridTemplateColumns: `${colW.palette}px 1px minmax(${CANVAS_MIN}px, 1fr) 1px ${colW.props}px` }}>
+                  {/* 列の境界。つかんで幅を変える */}
                   <div className={s.splitCell} style={{ gridArea: 's2' }}>
                     <Splitter onDrag={resizeCol('palette', 1)} />
                   </div>
@@ -1421,6 +1338,31 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
               <Button appearance="primary" onClick={() => void save()} disabled={!valid || busy}>{busy ? t('保存中...', 'Saving...') : t('保存', 'Save')}</Button>
             </div>
           )}
+      {draft && mine && compared && (
+        <TemplateCompareFloat
+          onClose={() => setCompareId(null)}
+          items={[
+            { key: 'mine', label: draft.name || t('新しいテンプレート', 'New template'), layout: mine, note: draft.id ? t('編集中', 'Editing') : t('編集中(新規)', 'Editing (new)') },
+            {
+              key: compared.o.id,
+              label: compared.o.label,
+              layout: compared.o,
+              note: compared.same ? t('同じ構成', 'Same layout') : t(`似ている度 ${Math.round(compared.score * 100)}%`, `${Math.round(compared.score * 100)}% similar`),
+              actions: (
+                <>
+                  <ImportSectionMenu layout={compared.o} onImport={importSection} />
+                  <Button size="small" appearance="subtle" onClick={() => openOther(compared.o.id)}>
+                    {t('開く', 'Open')}
+                  </Button>
+                  <Button size="small" appearance="subtle" onClick={() => duplicateOther(compared.o.id)}>
+                    {t('複製して直す', 'Duplicate and edit')}
+                  </Button>
+                </>
+              ),
+            },
+          ]}
+        />
+      )}
       {aiOpen && (
         <TemplateAiDialog
           options={options.filter((o) => !o.hidden)}

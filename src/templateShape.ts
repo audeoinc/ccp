@@ -24,3 +24,10 @@ export const similarity = (a: TemplateLayout, b: TemplateLayout) => {
 
 /** 商品の枠(箱)の数。以前の種類のテンプレートも、表に直して数える */
 export const boxCount = (l: TemplateLayout): number => toTableLayout(l).sections.reduce((n, sec) => n + boxesOf(sec).length, 0)
+
+/** この似ている度から上を「よく似ている」として、編集中の「似ているテンプレート」の知らせに出す */
+export const VERY_SIMILAR = 0.8
+
+/** セクションの呼び名(編集の構成の一覧と同じ形: S1 主役 · 2 × 2 · 商品 4) */
+export const sectionTitle = (sec: Section, i: number, t: (ja: string, en: string) => string) =>
+  `S${i + 1}${sec.name?.trim() ? ` ${sec.name.trim()}` : ''} · ${(sec.rows ?? 0) > 0 ? `${sec.cols} × ${sec.rows}` : t('空', 'empty')} · ${t(`商品 ${sec.slots}`, `${sec.slots} items`)}`
