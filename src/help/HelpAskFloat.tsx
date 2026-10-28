@@ -22,13 +22,14 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { DismissRegular, LightbulbRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
+import { DismissRegular, LightbulbRegular, OpenRegular, SendRegular, TargetArrowRegular } from '@fluentui/react-icons'
 import { ResizableSurface } from '../ResizableSurface'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
 import { startDevRequestAt } from '../devRequestPlace'
 import { focusSoon } from '../ContextMenu'
 import { HelpFaqList } from './HelpFaqList'
+import { namesInAnswer, setSpotlight } from './spotlight'
 import { askHelp, labelChecker, loadMaterial, openAnswer, recordTellDev, tellDevDraft, type HelpPart, type HelpTurn } from './helpAsk'
 
 const useStyles = makeStyles({
@@ -150,6 +151,8 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
 
   const answerBox = (turn: HelpTurn, key: number) => {
     const a = turn.answer
+    // 光らせる名前: 答えと手順の [[名前]] のうち、画面の文言の一覧にあるもの
+    const names = namesInAnswer([a.reply, ...a.steps]).filter((n) => !isLabel || isLabel(n))
     return (
     <div key={key} className={s.answer}>
       {turn.part && <span className={s.partOn}>{t(`この部品について: ${turn.part.label}`, `About: ${turn.part.label}`)}</span>}
@@ -163,9 +166,26 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
       )}
       <div className={s.actions}>
         {a.open && (
-          <Button size="small" appearance="primary" icon={<OpenRegular />} onClick={() => openAnswer(a.open!)}>
+          <Button
+            size="small"
+            appearance="primary"
+            icon={<OpenRegular />}
+            onClick={() => {
+              openAnswer(a.open!)
+              // 開いた画面の中の、手順にあるボタン・欄を光らせる(X83)
+              setSpotlight(names)
+            }}
+          >
             {a.openLabel ? t(`ここを開く: ${a.openLabel}`, `Open: ${a.openLabel}`) : t('ここを開く', 'Open this')}
           </Button>
+        )}
+        {/* いまの画面の中で、手順にあるボタン・欄を光らせる(画面を移らずに場所だけ知りたいとき。X83) */}
+        {names.length > 0 && (
+          <Tooltip content={t('手順にあるボタン・欄を、いまの画面の中で光らせます', 'Highlight the buttons and fields from the steps on the current screen')} relationship="description">
+            <Button size="small" appearance="outline" icon={<TargetArrowRegular />} onClick={() => setSpotlight(names)}>
+              {t('画面で示す', 'Show on screen')}
+            </Button>
+          </Tooltip>
         )}
         {/* 答えで足りない・画面を変えてほしいときは、そのまま開発へのリクエストに(質問と答えを添える) */}
         <Tooltip content={t('質問と答えを添えて、開発へのリクエストを書き始めます', 'Start a request to developers with this question and answer')} relationship="description">
@@ -207,7 +227,7 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
   return (
     // 手順を見ながら画面を触れるよう、ほかの所を押せる形(non-modal)にする
     <Dialog open={open} modalType="non-modal" onOpenChange={(_, d) => !d.open && onClose()}>
-      <ResizableSurface sizeKey="helpAsk" className={s.surface} aria-label={t('使い方を聞く', 'Ask how to use')}>
+      <ResizableSurface sizeKey="helpAsk" className={s.surface} aria-label={t('使い方を聞く', 'Ask how to use')} data-help-float>
         <DialogBody className={s.body}>
           <div className={s.head}>
             <DialogTitle className={s.grow}>{t('使い方を聞く', 'Ask how to use')}</DialogTitle>

@@ -520,6 +520,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `help/faq.ts` | 145 | 質問と答えの保存と、FAQ のまとめ直し(20 件たまったら、聞いた人の画面が裏で `askAgent` で束ね、答えを作る。サーバーでは AI を呼ばない) |
 | `help/HelpFaqList.tsx` / `help/HelpFaqAdmin.tsx` | 58 / 191 | フロートの最初の画面のよく聞かれる質問(押すと、作ってある答えを出す)/ ⚙ の開発・管理の一覧(回数・開発に伝えた数の多い順・隠す・まとめ直す・質問の記録) |
 | `data/help.ts` | 84 | 保存と FAQ の窓口(表ではなくサーバーの `/api/help`。`server/ccp/help.py`)。表の型は `models/helpQuestions.ts`・`models/helpFaqs.ts`・`models/helpFaqBuilds.ts`、撮影用の身代わりは `mock/help.ts` |
+| `help/spotlight.ts` / `help/SpotlightLayer.tsx` | 80 / 110 | スポットライト(X83): 手順の [[名前]] に当たるボタン・欄を、見えている名前で探して光らせる(上の帯が層を持つ) |
 
 ### 3.9 データの出入り口
 

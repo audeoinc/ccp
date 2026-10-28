@@ -39,6 +39,7 @@ import { channelOptions, countryOptions, statusOptions } from './status'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
 import { Z } from './layers'
 import { HelpAskFloat } from './help/HelpAskFloat'
+import { SpotlightLayer } from './help/SpotlightLayer'
 import { captureHelpPart, type HelpPart } from './help/helpAsk'
 import { setGlobalMenuItems } from './ContextMenu'
 import { capturePlace } from './devRequestPlace'
@@ -291,6 +292,8 @@ export function AppToolbar({
           {t('聞く', 'Ask')}
         </Button>
       </Tooltip>
+      {/* 「？ 聞く」の答えのボタン・欄を光らせる層(フロートを閉じても、少しのあいだ残す。X83) */}
+      <SpotlightLayer />
       {helpOpen && (
         <HelpAskFloat
           open
