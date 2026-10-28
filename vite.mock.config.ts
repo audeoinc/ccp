@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
+import { helpMaterial } from './helpMaterial'
 
 // 画面の版(ビルドしたときのコミットと日付)。開発へのリクエストを「対応済み」にしたときに残す(どの版で直ったかが、書いた人に分かるように)。
 // Git がない所でビルドしたときは、日付だけ
@@ -55,7 +56,7 @@ const mockServices = (): Plugin => ({
 })
 
 export default defineConfig({
-  plugins: [mockServices(), react()],
+  plugins: [mockServices(), react(), helpMaterial(fileURLToPath(new URL('.', import.meta.url)))],
   define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId()) },
   server: { port: 5190, strictPort: true },
 })

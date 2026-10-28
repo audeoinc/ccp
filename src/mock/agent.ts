@@ -46,6 +46,28 @@ export function mockAgent(message: string): string {
     return { mode: 'update', reply: hasJa(last) ? jaDefault : enDefault }
   }
 
+  // 使い方の質問(「？ 聞く」X82)。渡された画面の文言の上の 2 つを手順に使い、文書の最初の節を根拠にする(作り物の答え。中身は本番で確かめる)
+  if (task === 'help_ask') {
+    const labels = ((p.labels as string[] | undefined) ?? []).map((l) => l.split(' | '))
+    const docs = (p.docs as { doc: string; title: string }[] | undefined) ?? []
+    if (labels.length === 0) return J({ known: false, reply: en ? "I couldn't find this in the docs or on-screen labels." : '文書と画面の文言からは、分かりませんでした。' })
+    const name = (l: string[] | undefined) => (l ? (en ? l[1] : l[0]) : '')
+    return J({
+      known: true,
+      reply: en ? `(Demo answer) You can do this from [[${name(labels[0])}]].` : `(見本の答え)[[${name(labels[0])}]] から行えます。`,
+      steps: [
+        en ? 'Open the week view.' : '週の表示を開きます。',
+        en ? `Press [[${name(labels[0])}]].` : `[[${name(labels[0])}]] を押します。`,
+        ...(labels[1] ? [en ? `Then choose [[${name(labels[1])}]].` : `続けて [[${name(labels[1])}]] を選びます。`] : []),
+        en ? 'Press [[Make it up]] to finish (a name not on screen, to show the warning).' : '[[架空のボタン]] を押して終えます(画面にない名前の見本)。',
+      ],
+      open: { page: 'calendar', view: 'week' },
+      openLabel: en ? 'Week view' : '週の表示',
+      basis: docs.slice(0, 2).map((d) => ({ doc: d.doc, title: d.title })),
+      files: ['src/WeekView.tsx'],
+    })
+  }
+
   // 並べた配信の評価: 1 通あたりの売上の高い・低い配信と、ばらつきの大きい位置から、決まった形の文を作る
   if (task === 'compare_results') {
     type D = { id: string; date: string; name: string; slots?: string[]; kpis: { revenuePerRecipient?: number; clickRate?: number }; positions?: Record<string, number> }

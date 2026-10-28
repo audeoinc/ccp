@@ -53,7 +53,7 @@ const RULES = [
   // 撮影用(手元の Edge を使う開発の道具)
   ['exclude', /^scripts\/screenshots\.mjs$/],
   // 画面
-  ['include', /^(index\.html|vite\.config\.ts|vite\.mock\.config\.ts|eslint\.config\.js|tsconfig(\.app|\.node)?\.json|package(-lock)?\.json|\.gitattributes|\.gitignore)$/],
+  ['include', /^(index\.html|vite\.config\.ts|vite\.mock\.config\.ts|eslint\.config\.js|helpMaterial\.ts|tsconfig(\.app|\.node)?\.json|package(-lock)?\.json|\.gitattributes|\.gitignore)$/],
   ['include', /^(src|public)\//],
   // 開発用の画面の入り口(/dev/。docs/DEVTOOLS.md)
   ['include', /^dev\/index\.html$/],

@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
+import { helpMaterial } from './helpMaterial'
 
 // 画面の版(ビルドしたときのコミットと日付)。開発へのリクエストを「対応済み」にしたときに残す(どの版で直ったかが、書いた人に分かるように)。
 // Git がない所でビルドしたときは、日付だけ
@@ -19,7 +20,8 @@ const buildId = () => {
 //   ビルド: npm run build    (dist-gcp/ にできる。サーバーがこれを配信する)
 // 撮影・デモ用(サンプルデータで動かす)は、vite.mock.config.ts。
 export default defineConfig({
-  plugins: [react()],
+  // 「？ 聞く」の材料(画面の文言の索引と文書。helpMaterial.ts)を、ビルドのたびに作る
+  plugins: [react(), helpMaterial(fileURLToPath(new URL('.', import.meta.url)))],
   // 開いたときの初期値。国の絞り込みは US、画面の言語は English
   define: {
     'import.meta.env.VITE_DEFAULT_COUNTRY': JSON.stringify('US'),

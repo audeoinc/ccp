@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -25,6 +25,7 @@ import {
   GlobeRegular,
   LightbulbRegular as DevRequestIcon,
   PaintBrushRegular,
+  QuestionCircleRegular,
   SettingsRegular,
 } from '@fluentui/react-icons'
 import { AiIcon } from './AiMark'
@@ -36,6 +37,7 @@ import { optionLabel, useT } from './i18n'
 import { channelOptions, countryOptions, statusOptions } from './status'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
 import { Z } from './layers'
+import { HelpAskFloat } from './help/HelpAskFloat'
 import { noFilter, useFaceButtonStyles, type Filters, type Page } from './appToolbarParts'
 
 const useStyles = makeStyles({
@@ -228,6 +230,8 @@ export function AppToolbar({
   // 国はヘッダーの設定なので、絞り込みの「クリア」の対象にしない
   const filtering = filters.channel !== '' || filters.department !== '' || (page !== 'results' && filters.status !== '') || filters.person !== ''
   const setFilter = (k: keyof Filters) => (v: string) => onFilters({ ...filters, [k]: v })
+  // 「？ 聞く」(X82)。どの画面からも開けるよう、上の帯が持つ
+  const [helpOpen, setHelpOpen] = useState(false)
   return (
     <div className={styles.headerWrap}>
     <header className={styles.header}>
@@ -252,6 +256,13 @@ export function AppToolbar({
         </MenuPopover>
       </Menu>
       <span className={styles.headerSpacer} />
+      {/* 使い方を AI に聞く(X82)。機能の説明の文書と、画面にある文言をもとに、手順と開く場所を答える */}
+      <Tooltip content={t('使い方を AI に聞く(やりたいことを書くと、手順と開く場所を答えます)', 'Ask AI how to use this (describe what you want; get steps and where to go)')} relationship="description">
+        <Button appearance={helpOpen ? 'primary' : 'subtle'} size="small" icon={<QuestionCircleRegular />} onClick={() => setHelpOpen(true)}>
+          {t('聞く', 'Ask')}
+        </Button>
+      </Tooltip>
+      {helpOpen && <HelpAskFloat open onClose={() => setHelpOpen(false)} />}
       {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
       <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
         <Button

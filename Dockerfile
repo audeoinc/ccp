@@ -14,6 +14,9 @@ COPY public public
 COPY src src
 # 開発用の画面(/dev/)の入り口。vite.config.ts の input にあるので、ないとビルドが止まる(本番では CCP_DEVTOOLS を設定しないので、/dev/ は 404)
 COPY dev dev
+# 「？ 聞く」の材料(画面の文言の索引と文書)をビルドで作る(helpMaterial.ts。読む文書はこの 3 つ)
+COPY helpMaterial.ts ./
+COPY docs/FEATURES.md docs/SOURCE_MAP.md docs/FEATURE_REASONS.md docs/
 RUN npx vite build
 
 FROM python:3.12-slim
