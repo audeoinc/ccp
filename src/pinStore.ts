@@ -124,7 +124,10 @@ export function anchorLabel(anchor: string, productName?: string): string {
       const sec = sectionOfAnchor(anchor)
       const now = sec?.id && typeof document !== 'undefined' ? document.querySelector(`[data-section-id="${CSS.escape(sec.id)}"]`)?.getAttribute('data-anchor') : null
       const n = (now ? (sectionOfAnchor(now)?.index ?? sec?.index) : (sec?.index ?? Number(arg))) ?? 0
-      return tr(`セクション ${n + 1}`, `Section ${n + 1}`)
+      // プレビューが出ていれば、セクションの呼び名(名札と同じ。例: グリッド2)で。ピンは場所(番号と ID)だけを持つので、呼び名はいまのテンプレートから引く。
+      // プレビューがない所(一覧など)では、番号で
+      const block = typeof document !== 'undefined' ? findSectionBlock(document, anchor) : null
+      return block?.getAttribute('data-section-label') || tr(`セクション ${n + 1}`, `Section ${n + 1}`)
     }
     case 'product':
       return productName ? tr(`商品: ${productName}`, `Product: ${productName}`) : tr('商品', 'Product')

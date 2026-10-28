@@ -254,8 +254,8 @@ export function linkSlots(templateId: EmailTemplateId, items: Item[], products: 
       block.at === 0
         ? tr('メイン画像の下', 'Below the main image')
         : block.buttons.some((b) => inTable.has(b.id))
-          ? tr(`セクション ${block.at}`, `Section ${block.at}`)
-          : tr(`セクション ${block.at} の後`, `After section ${block.at}`)
+          ? (sections[block.at - 1]?.label ?? tr(`セクション ${block.at}`, `Section ${block.at}`))
+          : tr(`${sections[block.at - 1]?.label ?? `セクション ${block.at}`} の後`, `After ${sections[block.at - 1]?.label ?? `section ${block.at}`}`)
     block.buttons.forEach((b, i) => {
       const kind = b.link ?? 'campaign'
       const text = b.label?.trim() || (i === 0 ? tr('商品を見る', 'Shop now') : tr('もっと見る', 'See more'))

@@ -18,6 +18,7 @@ import { locale, useT } from './i18n'
 import { statusColor, statusLabel } from './status'
 import { ChannelBadge } from './ChannelBadge'
 import { ProductHeadImage } from './ProductHeadImage'
+import { cardSectionLabel } from './templates'
 
 const useStyles = makeStyles({
   page: { display: 'grid', rowGap: '12px' },
@@ -389,7 +390,7 @@ export function AlertsPage({ initialProductId, onSelectProduct, onOpenAlertCard,
                       <span className={styles.dot} style={{ backgroundColor: statusColor(d.card.status ?? 'not_started') }} />
                       {statusLabel(d.card.status ?? 'not_started')}
                     </td>
-                    <td className={styles.td}>{d.sections.map((s) => t(`セクション ${s + 1}`, `Section ${s + 1}`)).join('・')}</td>
+                    <td className={styles.td}>{d.sections.map((s) => cardSectionLabel(d.card, s)).join('・')}</td>
                     <td className={mergeClasses(styles.td, styles.num)}>
                       {`${n(Math.max(0, d.projected))}${d.weeksLeft !== undefined ? t(`(${d.weeksLeft.toFixed(1)} 週分)`, ` (${d.weeksLeft.toFixed(1)} wks)`) : ''}`}
                     </td>

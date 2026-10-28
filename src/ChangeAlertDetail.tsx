@@ -13,6 +13,7 @@ import { myName } from './history'
 import { locale, useT } from './i18n'
 import { statusColor, statusLabel } from './status'
 import { ChannelBadge } from './ChannelBadge'
+import { cardSectionLabel } from './templates'
 
 const useStyles = makeStyles({
   detail: { display: 'grid', rowGap: '12px', minWidth: 0 },
@@ -160,7 +161,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
                   </td>
                   <td className={styles.td}>
                     {policy
-                      ? d.sections.map((s) => t(`セクション ${s + 1}`, `Section ${s + 1}`)).join('・')
+                      ? d.sections.map((s) => cardSectionLabel(d.card, s)).join('・')
                       : d.note === 'moved'
                         ? t('移した配信', 'Moved')
                         : <span className={styles.warn}>{t('同じ日・同じチャネル', 'Same day, same channel')}</span>}

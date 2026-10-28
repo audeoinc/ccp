@@ -15,7 +15,7 @@ import { DND_HERO, DND_ITEM, scaled, yen, type Item } from './items'
 import { heroImage, productImage } from './images'
 import { heroCropStyle } from './heroRights'
 import { productMarket } from './market'
-import { buttonsAt, defaultButtonLabel, getTemplate, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
+import { buttonsAt, defaultButtonLabel, getTemplate, sectionsOf, gridColumns, placedButtons, type ButtonSpec, type EmailTemplateId, type BoxField, type Section, type TablePart, ratioValue } from './templates'
 import { SECTION_BG, SEP_COLOR, textDirStyle, boxFields, boxPlace, isSideBox, boxesOf, buttonColor, buttonRadius, buttonText, lineLook, sectionIdsOf, sectionSpace } from './tables'
 import { cellRows, isTextView } from './cells'
 import { HEADLINE_FONT } from './fonts'
@@ -1057,13 +1057,15 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     const offset = tpl.sections.reduce((n, s) => n + s.slots, 0)
     // セクションの ID(data-section-id)。ピンは番号と ID で場所を持ち、テンプレートの構成を変えた版でも、ID で同じセクションを探す(X65 (d))
     const sectionIds = sectionIdsOf(tpl)
+    // セクションの呼び名(ピンの場所の名前が、名札と同じ呼び名を読む)
+    const sectionLabels = sectionsOf(template)
     const overflow = items.slice(offset)
     body = (
       <>
         {sections.map(({ sec, start, list }, si) => {
           const category = sec.categoryHeading ? byId.get(filled(list)[0]?.productId ?? '')?.category_name : undefined
           return (
-            <div key={start} data-anchor={`section:${si}`} data-section-id={sectionIds[si]} style={sectionStyle(sec)}>
+            <div key={start} data-anchor={`section:${si}`} data-section-id={sectionIds[si]} data-section-label={sectionLabels[si]?.label} style={sectionStyle(sec)}>
               {sec.categoryHeading && editableHeading(si, category ? optionLabel(category) : `CATEGORY ${si + 1}`)}
               {sec.copy !== false && sectionCopyEl(si, !!sec.categoryHeading)}
               {sectionBody(sec, start, list)}

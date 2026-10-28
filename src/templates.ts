@@ -884,6 +884,11 @@ export function sectionsOf(id: EmailTemplateId): SectionInfo[] {
   })
 }
 
+/** 配信カードの i 番目(0 から)のセクションの呼び名(アラートの一覧など。番号だけの呼び名は使わない。テンプレートが読めないときだけ番号で) */
+export function cardSectionLabel(card: Parameters<typeof templateKeyOfCard>[0], i: number): string {
+  return sectionsOf(templateKeyOfCard(card))[i]?.label ?? tr(`セクション ${i + 1}`, `Section ${i + 1}`)
+}
+
 /** 選定済みの並びの位置 idx が、どのセクションに属するか(枠を超えた分は最後のセクション) */
 export function sectionIndexAt(sections: SectionInfo[], idx: number): number {
   const found = sections.find((s) => idx >= s.start && idx < s.start + s.slots)
