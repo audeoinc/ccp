@@ -97,6 +97,8 @@ export interface HelpTurn {
   answer: HelpAnswer
   /** 右クリックの「ここについて聞く」から聞いたときの部品 */
   part?: HelpPart
+  /** 記録に渡した日時(「開発に伝える」で、同じ記録をもう一度渡すときに同じ値を使う) */
+  at?: string
 }
 
 export interface HelpAnswer {
@@ -211,9 +213,11 @@ export function captureHelpPart(x: number, y: number, place: { anchor: string; p
 }
 
 /** 「開発に伝える」に進んだことを、記録を受け取る所に知らせる */
-export function recordTellDev(question: string, answer: HelpAnswer, part?: HelpPart) {
+export function recordTellDev(turn: HelpTurn) {
+  const { question, answer, part } = turn
   try {
-    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at: new Date().toISOString(), tellDev: true })
+    // 聞いたときと同じ記録(question と at が同じ)に、tellDev を付けて渡す(保存の側が同じ行を見つけられるように)
+    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at: turn.at ?? new Date().toISOString(), tellDev: true })
   } catch {
     // 保存の失敗で、開発へのリクエストを書くのを止めない
   }
@@ -234,7 +238,7 @@ export function setHelpRecorder(fn: ((r: HelpRecord) => void) | null) {
 }
 
 /** 質問する。材料を選んで askAgent に渡し、答えを決まった形にして返す */
-export async function askHelp(question: string, history: HelpTurn[], part?: HelpPart): Promise<{ answer: HelpAnswer; stats: { docChars: number; labelCount: number; ms: number } }> {
+export async function askHelp(question: string, history: HelpTurn[], part?: HelpPart): Promise<{ answer: HelpAnswer; at: string; stats: { docChars: number; labelCount: number; ms: number } }> {
   const m = await loadMaterial()
   const picked = pickMaterial(m, question, history, part)
   const started = performance.now()
@@ -250,12 +254,13 @@ export async function askHelp(question: string, history: HelpTurn[], part?: Help
     labels: picked.labels,
   })
   const answer = normalizeAnswer(raw)
+  const at = new Date().toISOString()
   try {
-    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at: new Date().toISOString() })
+    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at })
   } catch {
     // 保存の失敗で、答えを見せるのを止めない
   }
-  return { answer, stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
+  return { answer, at, stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
 }
 
 /** 「ここを開く」: いまの画面の状態を保ったまま、答えの画面へ移る(App は「戻る」と同じ道で URL を読み直す) */

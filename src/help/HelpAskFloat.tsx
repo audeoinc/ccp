@@ -1,6 +1,6 @@
 // 「？ 聞く」のフロート(X82 の段 ②)。使い方を、いまのコードと文書を材料に、AI に聞ける(チャットの形)。
 // 答えは ① 手順(画面にある実際の名前で)② 「ここを開く」(ディープリンク)③ 根拠(どの機能の説明か。ファイル名は畳む)。
-// やり取りは保存しない(閉じると消える。いまの決まり「チャットの会話は保存しない」のまま。質問の保存と FAQ は段 ④)
+// 質問と答えは、よく聞かれる質問(FAQ)を作るために段 ④ が保存する(setHelpRecorder。だれが聞いたかは残さない)。画面のやり取りは、閉じると消える
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Accordion,
@@ -27,6 +27,7 @@ import { ResizableSurface } from '../ResizableSurface'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
 import { startDevRequestAt } from '../devRequestPlace'
+import { HelpFaqList } from './HelpFaqList'
 import { askHelp, labelChecker, loadMaterial, openAnswer, recordTellDev, tellDevDraft, type HelpPart, type HelpTurn } from './helpAsk'
 
 const useStyles = makeStyles({
@@ -105,8 +106,8 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
     setError('')
     setAsking(question)
     try {
-      const { answer } = await askHelp(question, turns, part ?? undefined)
-      setTurns((list) => [...list, { question, answer, part: part ?? undefined }])
+      const { answer, at } = await askHelp(question, turns, part ?? undefined)
+      setTurns((list) => [...list, { question, answer, part: part ?? undefined, at }])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setText(question)
@@ -134,7 +135,7 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
 
   /** 答えの下の「開発に伝える」: 質問と答えを書きかけにして、開発へのリクエストを書き始める(右クリックから聞いたなら、その点にピン) */
   const tellDev = (turn: HelpTurn) => {
-    recordTellDev(turn.question, turn.answer, turn.part)
+    recordTellDev(turn)
     const x = turn.part?.x ?? Math.round(window.innerWidth / 2)
     const y = turn.part?.y ?? Math.round(window.innerHeight / 2)
     // ピンのフロートを書けるように、こちらは閉じる(開いたままだと重なる)
@@ -219,6 +220,8 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
                       </Button>
                     ))}
                   </div>
+                  {/* よく聞かれる質問(段 ④。回数の多い順)。押すと、その答えを、聞いたときと同じ形で出す */}
+                  <HelpFaqList onPick={(turn) => setTurns([turn])} />
                   <span className={s.caption}>{t('質問と答えは、よく聞かれる質問を作るために保存します(だれが聞いたかは残しません)。', 'Questions and answers are saved to build frequently asked questions (who asked is not kept).')}</span>
                 </div>
               )}
