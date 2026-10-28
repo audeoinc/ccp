@@ -123,12 +123,16 @@ async def add_question(request: Request):
     async with db(write=True) as conn:
         asked = sc.coerce("timestamptz", rec["asked_at"]) if rec["asked_at"] else None
         done = False
-        if rec["tell_dev"] and asked is not None:
-            # 「開発に伝える」に進んだ: 同じ質問の記録(聞いた日時と文で見る)に印を付ける。もうまとめた質問なら、FAQ の数にも足す
+        if rec["tell_dev"]:
+            # 「開発に伝える」に進んだ: 同じ質問の記録に印を付ける(別の行にすると、聞かれた回数を 2 回に数えてしまう)。もうまとめた質問なら、FAQ の数にも足す。
+            # 同じ記録は、質問の文と答えが同じもので見る(もう一度渡されるときの at は押した時刻で、聞いた時刻と違うため。ask-interface.md)。印のまだない新しい行から
             row = (
                 await conn.execute(
-                    text("SELECT id, sent_to_dev_at, help_faq_id FROM help_questions WHERE asked_at = :a AND question = :q ORDER BY created_on DESC LIMIT 1"),
-                    {"a": asked, "q": rec["question"]},
+                    text(
+                        "SELECT id, sent_to_dev_at, help_faq_id FROM help_questions WHERE question = :q AND answer = :ans "
+                        "ORDER BY (sent_to_dev_at IS NULL) DESC, created_on DESC LIMIT 1"
+                    ),
+                    {"q": rec["question"], "ans": rec["answer"]},
                 )
             ).mappings().first()
             if row is not None:

@@ -65,7 +65,8 @@ const sorted = (rows: HelpFaq[]) => [...rows].sort((a, b) => (b.ask_count ?? 0) 
 
 export const HelpService = {
   addQuestion: async (r: HelpRecord & { tellDev?: boolean }) => {
-    const same = r.tellDev ? questions.find((q) => q.asked_at === r.at && q.question === r.question) : undefined
+    // 「開発に伝える」は、同じ質問の記録(文と答えが同じもの)に印を付ける(もう一度渡されるときの at は押した時刻のため。help.py と同じ)
+    const same = r.tellDev ? questions.find((q) => q.question === r.question && q.answer === JSON.stringify(r.answer)) : undefined
     if (same) {
       if (!same.sent_to_dev_at) {
         same.sent_to_dev_at = now()
