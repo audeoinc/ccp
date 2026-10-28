@@ -1,5 +1,6 @@
 // 試す → 確定の帯(trial.ts の useTrial と組で使う)
-import { useEffect, useRef } from 'react'
+import { useContext, useEffect, useRef } from 'react'
+import { DrawerCloseContext } from './drawerClose'
 import { Button, makeStyles, tokens } from '@fluentui/react-components'
 import { typo } from './typo'
 import { ArrowRightRegular, CheckmarkRegular } from '@fluentui/react-icons'
@@ -30,7 +31,15 @@ const useStyles = makeStyles({
 export function TrialBar({ state }: { state: ReturnType<typeof useTrial> }) {
   const s = useStyles()
   const t = useT()
-  const { trial, confirm, cancel } = state
+  const { trial, confirm, cancel, applied } = state
+  const closeDrawer = useContext(DrawerCloseContext)
+  // 確定したら、帯を入れている引き出しを閉じる(帯のボタン・Enter・同じ候補の押し直しのどれでも)
+  const seen = useRef(applied)
+  useEffect(() => {
+    if (applied === seen.current) return
+    seen.current = applied
+    closeDrawer?.()
+  }, [applied, closeDrawer])
   const keys = useRef({ confirm, cancel })
   useEffect(() => {
     keys.current = { confirm, cancel }

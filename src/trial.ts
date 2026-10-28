@@ -53,6 +53,8 @@ export const hasPendingTrial = () => pending !== null
 /** 試す・確定・やめるの状態。帯(bar)を、候補の一覧の上に置く */
 export function useTrial() {
   const [trial, setTrial] = useState<Trial | null>(null)
+  // 確定した回数(帯がこれを見て、引き出しを閉じる。確定の道は、帯のボタン・Enter・同じ候補の押し直しの 3 つあるので、数で知らせる)
+  const [applied, setApplied] = useState(0)
   const ref = useRef<Trial | null>(null)
   // 画面全体の「試している候補」が、この一覧のものか(描くたびに関数が変わるので、印で見分ける)
   const [owner] = useState(() => ({}))
@@ -82,6 +84,7 @@ export function useTrial() {
     if (!t) return
     clear()
     t.apply()
+    setApplied((n) => n + 1)
   }
   const cancel = () => {
     const t = ref.current
@@ -95,6 +98,6 @@ export function useTrial() {
     cancelRef.current = cancel
   })
   useEffect(() => () => cancelRef.current(), [])
-  return { trial, tryIt, confirm, cancel }
+  return { trial, tryIt, confirm, cancel, applied }
 }
 

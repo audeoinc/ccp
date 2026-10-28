@@ -1,4 +1,5 @@
-import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { useCallback, useId, useState, type ReactElement, type ReactNode } from 'react'
+import { DrawerCloseContext } from './drawerClose'
 import { Button, Tab, TabList, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChevronUpRegular, DismissRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
@@ -135,6 +136,7 @@ export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon
   const s = useStyles()
   const t = useT()
   const id = useId()
+  const close = useCallback(() => onOpenChange(false), [onOpenChange])
   if (!closable) return open ? <ChoosePanel {...panel} /> : null
   return (
     <div className={s.drawer}>
@@ -154,7 +156,10 @@ export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon
       </ToggleButton>
       {open && (
         <div className={s.drawerPanel}>
-          <ChoosePanel {...panel} id={id} attached onClose={() => onOpenChange(false)} />
+          {/* 中の帯で「確定」したら、引き出しを閉じる(TrialBar。どの引き出しでも同じ動き) */}
+          <DrawerCloseContext.Provider value={close}>
+            <ChoosePanel {...panel} id={id} attached onClose={close} />
+          </DrawerCloseContext.Provider>
         </div>
       )}
     </div>
