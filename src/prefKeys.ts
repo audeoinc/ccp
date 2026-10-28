@@ -25,6 +25,8 @@ export const PREF = {
   pinsShowResolved: 'pins.showResolved',
   /** 開発へのリクエストのピンを出すか(X69 (b)。既定は出す) */
   devRequestPinsVisible: 'devRequests.pinsVisible',
+  /** 開発者が「一般の人として見る」をオンにしているか(X87。ブラウザごと) */
+  featuresViewAsUser: 'features.viewAsUser',
   // ---- 配信カード
   /** 開いたときの自動下書き('on' / 'off'。文字のまま) */
   autoDraft: 'cardDetail.autoDraft',

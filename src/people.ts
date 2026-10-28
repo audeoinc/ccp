@@ -51,6 +51,9 @@ const subscribe = (f: () => void) => {
 }
 
 export const usePeople = (): People => useSyncExternalStore(subscribe, state.get)
+/** React の外から読む(機能の判定の、開発者の印。X87)。読み込む前は空 */
+export const peopleNow = (): People => state.get()
+export const subscribePeople = subscribe
 
 /** 選べるユーザー(有効な人だけ) */
 export const activeUsers = (p: People) => p.users.filter((u) => (u.status ?? 'active') === 'active')

@@ -39,7 +39,7 @@ import { PREF } from './prefKeys'
 export interface SettingsAction {
   id: string
   /** 置き場所。country = 国ごとに決める / company = 全部の国で共通 / requests = 開発へのリクエスト(だれでも使うので畳まない) / data・samples・shop・help = 開発・管理(畳む) */
-  section: 'country' | 'company' | 'requests' | 'data' | 'samples' | 'shop' | 'help'
+  section: 'country' | 'company' | 'requests' | 'data' | 'samples' | 'shop' | 'help' | 'features'
   label: ReactNode
   description?: string
   icon: ReactElement
@@ -98,7 +98,7 @@ interface Props {
   actions: SettingsAction[]
 }
 
-const ADMIN = ['data', 'samples', 'shop', 'help'] as const
+const ADMIN = ['features', 'data', 'samples', 'shop', 'help'] as const
 
 export function SettingsDialog({ open, onClose, country: headerCountry, lang, onLang, autoDraft, onAutoDraft, actions }: Props) {
   const s = useStyles()
@@ -115,7 +115,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   const panes = usePaneWidths(PREF.settingsPaneWidths, [240, 0], 1, { min: 180, max: 400 })
   const shown = actions.filter((a) => !a.hidden)
   const of = (section: SettingsAction['section']) => shown.filter((a) => a.section === section)
-  const adminName = { data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), shop: t('見本の商品ページ', 'Sample product pages'), help: t('「？ 聞く」のよく聞かれる質問', 'Help: frequently asked questions') }
+  const adminName = { features: t('使える機能', 'Features'), data: t('取り込み・書き出し', 'Import and export'), samples: t('見本のデータ', 'Sample data'), shop: t('見本の商品ページ', 'Sample product pages'), help: t('「？ 聞く」のよく聞かれる質問', 'Help: frequently asked questions') }
   const countryHead = t(`国: ${countryName}`, `Country: ${countryName}`)
 
   const actionRow = (a: SettingsAction) => (

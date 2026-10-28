@@ -78,6 +78,8 @@ export const tables: Record<string, Row[]> = {
   // 開発へのリクエスト(画面のどこでも右クリックで打つピン)。見本では空から
   DevRequestsService: [],
   DevRequestVotesService: [],
+  // 機能の公開・非公開(X87)。サーバーが起動のときに入れるのと同じ「行のない機能は公開」だけ
+  FeatureSettingsService: [{ id: guid('feature:*'), feature_id: '*', enabled: 1, changed_by: 'system' }],
   WeeksService: structuredClone(weeks),
   // 月の振り返り(表 months)の見本: 前月の計画の面に「前月の振り返り」が出るように、9 月分を 1 つ
   MonthsService: [{ id: guid('month:2026-09'), month_start: '2026-09-01', retro: 'Weather-led emails beat last year in most weeks — keep one per week in October. Push taps fell on evening sends; move flash deals to noon.' }],

@@ -170,6 +170,8 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
 # 開発へのリクエストは、使っている環境で書かれるので、本番のパックで入れ替えても残す(参照先の配信が消えると、配信への参照だけが空になる)
 # 「？ 聞く」の質問とよく聞かれる質問も、その環境で聞かれたものなので残す(Workbench の FAQ は Workbench で積む。2026-10-28 利用者)
 KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes", "help_questions", "help_faqs", "help_faq_builds"}
+# その環境だけのもの(取り込まない・消さない)。機能の公開・非公開(X87)は、本番と Workbench で別々に決めるので、パックの値で変えない
+ENV_ONLY = {"feature_settings"}
 # 人の設定(user_prefs。ST6)は残さない: ユーザー(users)と一緒に置き換わり、消えたユーザーの設定は参照先がなくなるため
 
 
@@ -217,10 +219,12 @@ async def replace_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
     async with cli_conn() as conn:
         order = schema.creation_order()
         for t in reversed(order):
-            if t.name in KEEP_ON_REPLACE:
+            if t.name in KEEP_ON_REPLACE or t.name in ENV_ONLY:
                 continue
             await conn.execute(text(f"DELETE FROM {t.pg}"))
         for t in order:
+            if t.name in ENV_ONLY:
+                continue
             keep = t.name in KEEP_ON_REPLACE
             rows = newest_per_unique(t, tables.get(t.name, []))
             conflict = " ON CONFLICT (id) DO NOTHING" if keep else ""
@@ -240,7 +244,7 @@ async def add_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, tuple
     async with cli_conn() as conn:
         for t in schema.creation_order():
             rows = tables.get(t.name, [])
-            if not rows:
+            if not rows or t.name in ENV_ONLY:
                 continue
             have = {str(r[0]) for r in (await conn.execute(text(f"SELECT id FROM {t.pg}"))).all()}
             added = skipped = failed = 0

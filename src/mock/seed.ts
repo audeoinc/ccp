@@ -727,6 +727,8 @@ export const users: Row[] = PEOPLE.map(([name, mail, role]) => ({
   email: `${mail}@example.com`,
   role,
   status: 'active',
+  // 見本では管理者の 1 人を開発者に(機能の公開・非公開の画面を見せるため。X87)
+  ...(mail === 'mika.tanaka' ? { is_developer: 1 } : {}),
   created_on: '2026-10-01T00:00:00.000Z',
 }))
 const userId = (mail: string) => guid(`user:${mail}`)

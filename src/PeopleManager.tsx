@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogTitle,
   Dropdown,
+  InfoLabel,
   Input,
   MessageBar,
   MessageBarBody,
@@ -44,7 +46,7 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   scroll: { overflowY: 'auto', minHeight: '240px', display: 'grid', rowGap: '8px', alignContent: 'start' },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.4fr) 120px 100px', columnGap: '8px', rowGap: '6px', alignItems: 'center' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.4fr) 120px 100px 72px', columnGap: '8px', rowGap: '6px', alignItems: 'center' },
   colHead: typo.label,
   // 見出しの「＋ ○○を足す」で開く足す欄(一覧の上)
   addRow: { display: 'flex', columnGap: '8px', alignItems: 'center', flexWrap: 'wrap', padding: '8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
@@ -63,6 +65,8 @@ const useStyles = makeStyles({
 type TabKey = 'users' | 'groups' | 'rules' | 'history'
 
 const roleOptions = Object.entries(UserRole) as [keyof typeof UserRole, string][]
+/** 文字で直す列(開発者の印は、別の操作) */
+type TextField = Exclude<keyof UserFields, 'is_developer'>
 const statusOptions = Object.entries(UserStatus) as [keyof typeof UserStatus, string][]
 const groupStatusOptions = Object.entries(ApprovalGroupStatus) as [keyof typeof ApprovalGroupStatus, string][]
 const ruleOptions = Object.entries(ApprovalRuleRule) as [keyof typeof ApprovalRuleRule, string][]
@@ -87,6 +91,9 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
   const meId = useSyncExternalStore(onMeChange, myUserId)
   const meName = useSyncExternalStore(onMeChange, myName)
   const canEdit = !lock || people.users.find((u) => u.id === meId)?.role === 'admin'
+  // 開発者の印(X87)を付け外しできるのは、開発者か管理者だけ(開発者には非公開の機能も出るため。ログインがなくても、選んだ「あなた」で決める)
+  const meUser = people.users.find((u) => u.id === meId)
+  const canSetDeveloper = !!meUser && (meUser.role === 'admin' || meUser.is_developer === 1)
   const busy = working || !canEdit
   const [error, setError] = useState<string | null>(null)
   const [log, setLog] = useState<CardEvent[] | null>(null)
@@ -159,8 +166,14 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
     }
   }
 
+  /** 開発者の印を付け外しする(X87) */
+  const setDeveloper = (u: User, on: boolean) => {
+    if ((u.is_developer === 1) === on) return
+    void run(() => UsersService.update(u.id, { is_developer: on ? 1 : 0 }), 'user_change', on ? tr(`${u.name} を開発者にした`, `Made ${u.name} a developer`) : tr(`${u.name} の開発者の印を外した`, `Removed developer from ${u.name}`))
+  }
+
   /** ユーザーの 1 項目を変える(入力欄は、離れたときに保存する) */
-  const updateUser = (u: User, field: keyof UserFields, value: string) => {
+  const updateUser = (u: User, field: TextField, value: string) => {
     const v = value.trim()
     if ((u[field] ?? '') === v) return
     if (field === 'name' && !v) return setError(t('名前は空にできません', 'The name cannot be empty'))
@@ -275,10 +288,13 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
         <span className={s.colHead}>{t('メールアドレス', 'Email')}</span>
         <span className={s.colHead}>{t('役割', 'Role')}</span>
         <span className={s.colHead}>{t('状態', 'Status')}</span>
+        <InfoLabel className={s.colHead} size="small" info={t('開発者には、非公開の機能も出ます(X87)。付け外しできるのは、開発者か管理者だけです', 'Developers also see features that are not public. Only developers and admins can change this')}>
+          {t('開発者', 'Developer')}
+        </InfoLabel>
         {justAdded.order(people.users, (u) => u.id).map((u) => (
           // key に更新の時刻を含め、保存し直したら入力欄を、保存した値で作り直す(入れかけの値が残らないように)
           <div key={`${u.id}:${u.modified_on ?? ''}:${u.name}:${u.email ?? ''}`} className={mergeClasses(s.userRow, justAdded.freshClass(u.id))}>
-            <UserRow user={u} disabled={busy} onChange={(f, v) => updateUser(u, f, v)} />
+            <UserRow user={u} disabled={busy} onChange={(f, v) => updateUser(u, f, v)} developerDisabled={busy || !canSetDeveloper} onDeveloper={(on) => setDeveloper(u, on)} />
           </div>
         ))}
       </div>
@@ -520,7 +536,7 @@ export function PeopleManager({ inline }: { /** 設定の画面(ST10)の中に�
 }
 
 /** ユーザー 1 人の行。名前・メールアドレスは、入力欄を離れたときに保存する(1 文字ごとに保存・履歴が増えないように) */
-function UserRow({ user, disabled, onChange }: { user: User; disabled: boolean; onChange: (field: keyof UserFields, value: string) => void }) {
+function UserRow({ user, disabled, onChange, developerDisabled, onDeveloper }: { user: User; disabled: boolean; onChange: (field: TextField, value: string) => void; developerDisabled: boolean; onDeveloper: (on: boolean) => void }) {
   const s = useStyles()
   const t = useT()
   const inactive = (user.status ?? 'active') === 'inactive'
@@ -538,6 +554,7 @@ function UserRow({ user, disabled, onChange }: { user: User; disabled: boolean; 
           <option key={v} value={v}>{optionLabel(l)}</option>
         ))}
       </Select>
+      <Checkbox checked={user.is_developer === 1} disabled={developerDisabled} aria-label={t('開発者', 'Developer')} onChange={(_, d) => onDeveloper(!!d.checked)} />
     </>
   )
 }

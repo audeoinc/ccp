@@ -18,6 +18,7 @@ import {
   SendRegular,
   ShieldCheckmarkRegular,
   QuestionCircleRegular,
+  ToggleLeftRegular,
 } from '@fluentui/react-icons'
 import type { SettingsAction } from './SettingsDialog'
 import {
@@ -27,6 +28,7 @@ import {
   CountryPoliciesPanel,
   CountryTemplatesPanel,
   DevRequestsDialog,
+  FeaturesManager,
   HelpFaqAdmin,
   HeroLibrary,
   Later,
@@ -485,6 +487,14 @@ export function useSettingsActions(ctx: {
       label: t('見本の商品ページと画像', 'Sample product pages and photos'),
       icon: <ImageMultipleRegular />,
       render: () => <Later spin><SampleShopPanel products={products} /></Later>,
+    },
+    {
+      // 使える機能(X87)。機能ごとの公開・非公開と、版をまとめて当てる
+      id: 'features',
+      section: 'features',
+      label: t('使える機能', 'Features'),
+      icon: <ToggleLeftRegular />,
+      render: () => <Later spin><FeaturesManager /></Later>,
     },
     {
       // 「？ 聞く」の質問からまとめた、よく聞かれる質問(X82 段 ④)。回数・開発に伝えた数の多い順・隠す・まとめ直す

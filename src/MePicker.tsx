@@ -14,6 +14,7 @@ import {
   MenuGroup,
   MenuGroupHeader,
   MenuItem,
+  MenuItemCheckbox,
   MenuItemRadio,
   MenuList,
   MenuPopover,
@@ -24,6 +25,7 @@ import {
   Tooltip,
 } from '@fluentui/react-components'
 import { ChevronDownRegular, PersonRegular, SignOutRegular } from '@fluentui/react-icons'
+import { isDeveloper, setViewingAsUser, useFeatureVersion, viewingAsUser } from './featureFlags'
 import { useT } from './i18n'
 import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, groupsOf, usePeople, type People } from './people'
@@ -73,6 +75,8 @@ export function MePicker({ className, ariaLabel }: Props) {
   const styles = useStyles()
   const t = useT()
   const scale = useUiScale()
+  // 開発者の印・「一般の人として見る」が変わったら描き直す(X87)
+  useFeatureVersion()
   const people = usePeople()
   const name = useSyncExternalStore(subscribe, myName)
   const userId = useSyncExternalStore(subscribe, myUserId)
@@ -123,9 +127,14 @@ export function MePicker({ className, ariaLabel }: Props) {
   }
   return (
     <Menu
-      checkedValues={{ me: picked ? [picked.id] : [], scale: [String(scale)] }}
+      checkedValues={{ me: picked ? [picked.id] : [], scale: [String(scale)], view: viewingAsUser() ? ['user'] : [] }}
       onCheckedValueChange={(_, d) => {
         // 表示の大きさ(X60)
+        // 開発者の「一般の人として見る」(X87)
+        if (d.name === 'view') {
+          setViewingAsUser(d.checkedItems.includes('user'))
+          return
+        }
         if (d.name === 'scale') {
           const v = Number(d.checkedItems[0])
           if ((UI_SCALES as readonly number[]).includes(v)) setUiScale(v as UiScale)
@@ -168,6 +177,15 @@ export function MePicker({ className, ariaLabel }: Props) {
               </MenuItemRadio>
             ))}
           </MenuGroup>
+          {/* 開発者には非公開の機能も出るので、一般の人の見え方を確かめる切り替え(X87。開発者だけに出す。このブラウザで覚える) */}
+          {isDeveloper() && (
+            <>
+              <MenuDivider />
+              <MenuItemCheckbox name="view" value="user">
+                {t('一般の人として見る', 'View as a general user')}
+              </MenuItemCheckbox>
+            </>
+          )}
           <MenuDivider />
           {/* ログアウト(デモ): 覚えている人を消し、最初の「だれでログインしますか?」をもう一度出す */}
           <MenuItem icon={<SignOutRegular />} disabled={!picked} onClick={() => setMe(undefined)}>

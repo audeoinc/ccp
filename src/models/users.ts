@@ -21,6 +21,8 @@ export interface UserFields {
   role?: UserRole
   /** やめた人は、消さずに無効にする(履歴・承認の記録に名前が残るように) */
   status?: UserStatus
+  /** 開発者(1)。開発者には、非公開の機能も出す(X87。付け外しは、開発者か管理者だけ) */
+  is_developer?: number
 }
 
 /** 読んだ 1 行 */

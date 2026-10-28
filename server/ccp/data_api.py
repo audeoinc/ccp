@@ -68,6 +68,9 @@ async def apply_schema(conn: AsyncConnection, force: bool = False) -> bool:
                 return False
     for stmt in schema.ddl():
         await conn.execute(text(stmt))
+    # 機能の公開・非公開(X87): 行のない機能の扱い('*')を、はじめは「公開」で入れる。表を足した反映で、いまの見え方を変えないため
+    # (「設定のない機能は非公開」は、管理の画面で版を当てたときに '*' を非公開にして効かせる)
+    await conn.execute(text("INSERT INTO feature_settings (feature_id, enabled, changed_by) SELECT '*', 1, 'system' WHERE NOT EXISTS (SELECT 1 FROM feature_settings WHERE feature_id = '*')"))
     await conn.execute(
         text("INSERT INTO ccp_schema_state (id, ddl_hash, applied_at) VALUES (1, :h, now()) ON CONFLICT (id) DO UPDATE SET ddl_hash = :h, applied_at = now()"),
         {"h": want},

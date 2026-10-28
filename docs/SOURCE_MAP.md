@@ -284,6 +284,7 @@ flowchart TD
 | `ProductImagePicker.tsx` | 453 | この配信で使う商品の画像を、商品ページから選ぶフロート(X64。ページの画像の一覧・AI のおすすめとアングル・貼り付け / ファイル / URL)。窓口は `data/productPages.ts`(撮影用の身代わりは `mock/productPages.ts`) |
 | `target.ts` | 57 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
 | `ApprovalBar.tsx` | 419 | 承認の依頼・承認・差し戻し |
+| `features.ts` / `featureFlags.ts` / `FeaturesManager.tsx` / `FeatureBadge.tsx` | 227 / 132 / 216 / 34 | 機能の公開・非公開(X87): 機能の一覧(大・中・小・版・前提)/ 判定 `isOn`・開発者・「一般の人として見る」/ ⚙ の「使える機能」/ 開発者に出す「非公開」の印 |
 | `LearningsBar.tsx` | 392 | 「これまでの学び」(過去の結果から) |
 | `Splitter.tsx` / `ResizeHandles.tsx` | 105 / 75 | ペインの幅の変更 / フロートの大きさの変更 |
 

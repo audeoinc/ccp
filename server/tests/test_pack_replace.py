@@ -55,6 +55,17 @@ class ReplaceTablesTest(unittest.TestCase):
         # 開発へのリクエストは消さず、まだない行だけを足す(すでにある行は、この環境のまま)
         self.assertEqual(sorted(r["body"] for r in s.rows("dev_requests")), ["この環境で書いた", "パックだけ"])
 
+    def test_feature_settings_stay_as_this_environment(self) -> None:
+        """機能の公開・非公開(X87)は、その環境のもの。置き換えでも消さず、パックの値も取り込まない"""
+        s = self.store
+        s.add("feature_settings", feature_id="*", enabled=1)
+        s.add("feature_settings", feature_id="face.results", enabled=0)
+        tables = {"feature_settings": [{"id": "00000000-0000-0000-0000-0000000000f1", "feature_id": "face.results", "enabled": 1}]}
+        quiet(pack.replace_tables(tables))
+        self.assertEqual(sorted((r["feature_id"], r["enabled"]) for r in s.rows("feature_settings")), [("*", 1), ("face.results", 0)])
+        quiet(pack.add_tables(tables))
+        self.assertEqual(sorted((r["feature_id"], r["enabled"]) for r in s.rows("feature_settings")), [("*", 1), ("face.results", 0)])
+
     def test_duplicate_prefs_keep_newest(self) -> None:
         tables = {
             "users": [{"id": U1, "name": "人"}],

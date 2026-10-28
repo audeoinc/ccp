@@ -26,6 +26,7 @@ export const CountryLearningsPanel = lazy(() => loadChunk(() => import('./Countr
 export const CountryPoliciesPanel = lazy(() => loadChunk(() => import('./CountryPoliciesPanel')).then((m) => ({ default: m.CountryPoliciesPanel })))
 export const PeopleManager = lazy(() => loadChunk(() => import('./PeopleManager')).then((m) => ({ default: m.PeopleManager })))
 export const HeroLibrary = lazy(() => loadChunk(() => import('./HeroLibrary')).then((m) => ({ default: m.HeroLibrary })))
+export const FeaturesManager = lazy(() => loadChunk(() => import('./FeaturesManager')).then((m) => ({ default: m.FeaturesManager })))
 export const HelpFaqAdmin = lazy(() => loadChunk(() => import('./help/HelpFaqAdmin')).then((m) => ({ default: m.HelpFaqAdmin })))
 export const SampleShopPanel = lazy(() => loadChunk(() => import('./SampleShopPanel')).then((m) => ({ default: m.SampleShopPanel })))
 export const BrandPanel = lazy(() => loadChunk(() => import('./BrandPanel')).then((m) => ({ default: m.BrandPanel })))

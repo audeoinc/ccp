@@ -477,7 +477,8 @@
     ["name", "text", {"required": true}],
     ["email", "text", {"index": true}],
     ["role", "choice"],
-    ["status", "choice"]
+    ["status", "choice"],
+    ["is_developer", "int"]
    ],
    "lookups": [
    ]
@@ -493,6 +494,19 @@
    ],
    "unique": [
     ["user_id", "name"]
+   ]
+  },
+  "feature_settings": {
+   "_comment": "機能の公開・非公開(X87。2026-10-29)。機能の ID(src/features.ts)ごとに 1 行。enabled 1 = 公開 / 0 = 非公開。feature_id '*' の行は、行のない機能の扱い(起動のときに、なければ公開で入れる。data_api.py の seed)。環境ごとに持つので、import-pack では取り込まない(pack.py の ENV_ONLY)",
+   "columns": [
+    ["feature_id", "text", {"required": true}],
+    ["enabled", "int"],
+    ["changed_by", "text"]
+   ],
+   "lookups": [
+   ],
+   "unique": [
+    ["feature_id"]
    ]
   },
   "approval_groups": {
