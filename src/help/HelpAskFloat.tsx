@@ -186,7 +186,7 @@ export function HelpAskFloat({ open, onClose }: Props) {
                       </Button>
                     ))}
                   </div>
-                  <span className={s.caption}>{t('やり取りは保存しません(閉じると消えます)。', 'The conversation is not saved (it is cleared when you close this).')}</span>
+                  <span className={s.caption}>{t('質問と答えは、よく聞かれる質問を作るために保存します(だれが聞いたかは残しません)。', 'Questions and answers are saved to build frequently asked questions (who asked is not kept).')}</span>
                 </div>
               )}
               {turns.map((turn, i) => [
