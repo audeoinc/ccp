@@ -22,7 +22,7 @@
 - 2026-10-28: **T13 テンプレートを AI で直す(✨ AI に頼む)**(見本で利用者の OK。main に入れて本番に反映: deployed-gcp/20261028-152333、main 3b0a46f。本物の Gemini はまだ確かめていない): task `edit_template`、返答の検査 `templateEdit.ts`(ID を残す・付け直しの救い)、試す → 確定の帯と点線の印。TEMPLATE_OBJECTS.md の 11 章
 - 2026-10-28: **機能の公開・非公開の管理の要件** [FEATURE_FLAGS.md](FEATURE_FLAGS.md)(MVP〜FULL の版・大中小の分類・開発規模。決定: 版は定義だけで公開は機能ごと・開発者だけ全部見える・完全に隠す・画面だけ・MVP にアプリと AI で全体を下書き・詳しい配信カードは消す)。まだ作っていない
 - 2026-10-28 UI 1: 詳しい配信カード(ClassicCardLayout など 13 ファイル)と「シンプル | 詳しい」の切り替えを消した(ブランチ claude/ui1-remove-full。利用者の OK 待ち)。配信カードはいつもシンプル。CLAUDE.md の「どちらの画面も」の直しは連絡係
-- 2026-10-28 UI 2: セクションの枠(`src/slots.ts`・`Item.gap`)・X81 の 7〜9・セクションの全体を選ぶ(名札 `SectionTagLayer`・パンくず・部品 `section`。呼び名の番号をやめた `sectionsOf`。ピン・アラート・リンク先には残る)は main。X82「？ 聞く」の段 ①②(材料はビルドで作る `helpMaterial.ts`・`src/help/`。質問に近い所だけを渡す。保存の口 `setHelpRecorder`)・段 ③(右クリックの「ここについて聞く」・答えの「開発に伝える」 `startDevRequestAt`・右クリックの共通の項目は鍵ごと)も main。④ は UI 3、次は X83
+- 2026-10-28 UI 2: セクションの枠(`src/slots.ts`・`Item.gap`)・X81 の 7〜9・セクションの全体を選ぶ(名札 `SectionTagLayer`・パンくず・部品 `section`。呼び名の番号をやめた `sectionsOf`。ピン・アラート・リンク先には残る)は main。X82「？ 聞く」の段 ①②(材料はビルドで作る `helpMaterial.ts`・`src/help/`。質問に近い所だけを渡す。保存の口 `setHelpRecorder`)・段 ③(右クリックの「ここについて聞く」・答えの「開発に伝える」 `startDevRequestAt`・右クリックの共通の項目は鍵ごと)も main・X83 スポットライト(`help/spotlight.ts`・`SpotlightLayer`。見えている名前で探す)も main。④ は UI 3
 - 2026-10-28 UI 3: 配信カードの上を 1 行に詰めた(キャンペーンの帯・承認の札 `ApprovalChip`・面のタブ・配信の情報)。きょうだいの切り替えは窓の動きなし(`instant`)。切り口の欄・utm は ⚙ の店の見せ方へ(依頼の写しに固定)。X82 ④ = 質問の保存と FAQ(`server/ccp/help.py`・`src/help/faq.ts`。20 件で聞いた人の画面がまとめ直す。生の記録は 90 日。管理は ⚙ の開発・管理)。④ の SQL は本番で初めて走る
 
 ## 3. 次にやること
