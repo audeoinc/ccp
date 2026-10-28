@@ -162,7 +162,8 @@ export async function runAutoDraft(input: AutoDraftInput, onStep: AutoDraftProgr
   const excluded = new Set<string>(input.avoidProductIds ?? [])
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? ''
   for (const sec of sections) {
-    const proposal = await step(tr(`セクション ${sec.index + 1} / ${sections.length} を選んでいます`, `Choosing section ${sec.index + 1} / ${sections.length}`), () =>
+    // 進み具合は、名札と同じセクションの呼び名で(番号だけでは、どこのことか分からない。2026-10-28 利用者)
+    const proposal = await step(tr(`${sec.label} を選んでいます(${sec.index + 1} / ${sections.length})`, `Choosing ${sec.label} (${sec.index + 1} / ${sections.length})`), () =>
       proposeSection({
         card: withCopy,
         section: { slots: Number.isFinite(sec.slots) ? sec.slots : FREE_DEFAULT_SLOTS, wantTitle: sec.wantTitle, kind: sec.kind },
