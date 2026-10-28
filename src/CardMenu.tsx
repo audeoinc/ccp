@@ -48,7 +48,7 @@ interface Props {
   onDeleted: () => Promise<void>
   /** 複製のあと(新しい配信カードを開く) */
   onDuplicated: (id: string) => Promise<void>
-  /** メニューの先頭に足す項目(シンプルな配信カードの「すべて AI で下書き」「詳しい画面へ」など。SU1) */
+  /** メニューの先頭に足す項目(配信カードの「すべて AI で下書き」「保存して次へ」など。SU1) */
   extra?: ReactNode
 }
 

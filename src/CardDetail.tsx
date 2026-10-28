@@ -11,11 +11,10 @@ import {
   MessageBarActions,
   MessageBarBody,
   ProgressBar,
-  Slider,
   Spinner,
   Text,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowNextRegular, DataBarVerticalRegular, DismissRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { ArrowNextRegular, DataBarVerticalRegular, DismissRegular, SaveRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { EmptyDraftCta } from './EmptyDraftCta'
@@ -33,25 +32,21 @@ import { progressOf } from './progress'
 import { ResizableSurface } from './ResizableSurface'
 import { campaignId, campaignSlug, productLinks, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
 import { useCountrySettings, utmFixedFor } from './countrySettings'
-import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
+import { loadAutoDraft, loadPref, savePref } from './settings'
 import { PREF } from './prefKeys'
 import { runAutoDraft, type AutoDraftInput, type AutoDraftResult } from './autoDraft'
 import { useAiDrafts } from './useAiDrafts'
 import { useCardEditor, type Snapshot } from './useCardEditor'
-import { ClassicCardLayout } from './ClassicCardLayout'
 import { useCardDetailStyles } from './cardDetailStyles'
 import { useCardAlerts } from './useCardAlerts'
 import type { Form } from './cardForm'
 import type { WeekRow } from './data/weeks'
 import { myName } from './history'
-import { type TalkTab } from './ProcessPane'
-import type { TopTab } from './ContentPane'
 import { CHANNEL_PUSH } from './status'
 import { LearningsBar } from './LearningsBar'
 import { LearningEffectFloat, Later } from './lazyViews'
 import type { LearningCardData } from './learningCards'
 import { CardMenu } from './CardMenu'
-import { CardAlertsBar } from './CardAlertsBar'
 import { HeroUploadDialog } from './HeroUploadDialog'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
@@ -67,9 +62,7 @@ import { CANDIDATE_DETAIL, simpleEditorOf, type AiPreview } from './simple/edito
 import { settlePendingTrial } from './trial'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
-import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
-import { usePreviewPins } from './usePreviewPins'
 import { CampaignBand, type CampaignBandSlots } from './CampaignBand'
 import { CampaignApprove } from './CampaignApprove'
 import { AddCampaignCardDialog } from './CampaignDialogs'
@@ -127,10 +120,6 @@ interface Props {
   stageNav?: ReactNode
   /** 同じ段階の帯の、タブの見せ方(シンプルな配信カードの上の帯の 2 段目。StageHeader) */
   stageTabs?: ReactNode
-  /** 最初に開く工程のタブ(リンクから開いたとき。X36) */
-  initialTab?: string
-  /** 工程のタブが変わったとき(URL に持たせる) */
-  onTabChange?: (tab: string) => void
   /** 「保存して次へ」で開く配信(同じ週、または週の確認の項目で選んだ配信の、次の 1 本)。null は次がない。undefined はボタンを出さない */
   next?: { name: string; position: string } | null
   /** 保存したあとに、次の配信を開く(閉じる代わりに呼ぶ) */
@@ -164,30 +153,20 @@ const autoDrafted = new Set<string>()
 
 // ダイアログの大きさ(辺・角のドラッグで変える。ResizableSurface。鍵は以前からの cardDetail.size)
 const MIN_DIALOG = { w: 900, h: 560 }
-// 右端のプロセスのペイン(状態・承認・やり取り)の開閉。既定は開く
-const PROCESS_KEY = PREF.cardProcessOpen
-
-
-const loadOpen = (key: string): boolean => readRaw(key) !== 'closed'
 
 
 
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext, onSwitchCard, alertsOf, instant }: Props) {
+
+
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, next, onNext, onSwitchCard, alertsOf, instant }: Props) {
   const t = useT()
   const styles = useCardDetailStyles()
-  // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
+  // 配信カードは、いつもシンプルな配信カード(SU1)で描く(詳しい配信カードは 2026-10-28 に消した)。
   // まとめて作った、まだ保存していない案(draft)もシンプルで開く(2026-10-26 利用者)。案のあいだは自動では保存せず、上の帯の「この案で作る」を押したときだけ配信を作る
-  const [simpleView, setSimpleView] = useState(loadSimpleCard)
-  const simpleOn = simpleView && (!!card || !!draft)
-  /** 見せ方を替える。remember が false のとき(次にやることのボタンで、承認・依頼のために詳しい画面へ移るとき)は、次に開くときの見せ方を変えない */
-  const changeView = (v: boolean, remember = true) => {
-    setSimpleView(v)
-    if (remember) saveSimpleCard(v)
-  }
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
-  const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext })
-  const { form, setForm, items, setItems, candidates, setCandidates, original, selectedKey, setSelectedKey, justSaved, language, template, setTemplate, pushLink, setPushLink, audience, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, groupByCategory, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndStay, saveAndNext, buildContent, committedSnap, approvedBefore, isDirty, changed, coreDirty, canReview, save, savingAfter, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
+  const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, next, onSaved, onCreated, onReopen, onBack, onNext })
+  const { form, setForm, items, setItems, candidates, setCandidates, original, setSelectedKey, language, template, setTemplate, pushLink, setPushLink, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, removeVariant, abAiBusy, comparing, setComparing, stopAbTest, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndNext, buildContent, committedSnap, isDirty, changed, coreDirty, save, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
   // AB テストの B・C 案を開いていて、商品が全案で共通なら、商品の画像だけはその案のもの(ab_test の images。A と違う分。X64 の e)。
   // 保存する商品の行(items)は A のまま。プレビュー・商品のフロートには、その案の画像を重ねた並びを渡す
   const variantImages = !!ab && active !== 'A' && ownsImages(ab)
@@ -195,7 +174,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // プレビューは、配信カードのチャネルに合わせる(配信カードはチャネルごとに分けるので、切り替えは置かない)。
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
-  const [showHeadings, setShowHeadings] = useState(true)
+  const showHeadings = true
   // プレビューの倍率(15〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
   const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
   // メールのプレビューの幅(X3。スマホ / PC。ブラウザごとに覚える)
@@ -215,23 +194,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 持っている画像を上げる(X59)
   // true = 空で開く、File = そのファイルを上げながら開く(シンプルの「アップロード」のタブに落としたとき)
   const [heroUpload, setHeroUpload] = useState<boolean | File>(false)
-  // プロセスのペインのタブを開く頼み(左の「制作への引き継ぎ」を押すと、「引き継ぎ」のタブを開く)
-  const [tabRequest, setTabRequest] = useState<{ tab: TalkTab; seq: number } | undefined>(undefined)
-  // プレビュー上の場所を指して書き込む(ピン)。選んでいる間は、プレビューを押しても編集しない
-  // 打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す(右のやり取りの欄は、全部の流れとして残す)
-  const { placing: placingPin, setPlacing: setPlacingPin, endPlacing: endPlacingPin, target: pinTarget, setTarget: setPinTarget, openThreads: openPinThreads, close: closePin } = usePreviewPins()
-  // 中ペインの工程のタブを開く頼み(プロセスのペインの「⑥ で直す」で、制作指示を開く)
-  // リンクから開いたときは、そのタブで始める(seq 1 で、最初に 1 回だけ開く)
-  const [stepRequest, setStepRequest] = useState<{ tab: TopTab; seq: number } | undefined>(() => (initialTab ? { tab: initialTab as TopTab, seq: 1 } : undefined))
   const surfaceRef = useRef<HTMLDivElement>(null)
   // 商品情報の行にマウスが乗っている商品(プレビューで光らせる)と、商品情報ペインの開閉
   const [hoverKey, setHoverKey] = useState<string | null>(null)
-  const [processOpen, setProcessOpen] = useState<boolean>(() => loadOpen(PROCESS_KEY))
-  const toggleProcess = () =>
-    setProcessOpen((open) => {
-      writeRaw(PROCESS_KEY, open ? 'closed' : 'open')
-      return !open
-    })
   // 使ったテンプレートが見つからなかった配信(見せるテンプレートの名前と、AI で下書きし直したか)
   const [missingTemplate, setMissingTemplate] = useState<{ key: string; redrafted: boolean } | null>(null)
   // テンプレートの読み込みが済んだら、下の自動の下書きの判定をし直す
@@ -269,7 +234,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       ro.disconnect()
       inner.style.zoom = ''
     }
-  }, [zoom, previewTab, simpleOn])
+  }, [zoom, previewTab])
 
   const shownZoom = zoom === 'fit' ? fitZoom : zoom
 
@@ -517,17 +482,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </MessageBar>
     )}
 
-    {/* 承認済みの配信: シンプルな画面は、題の行の承認の札(simple/ApprovalBadge の ApprovalChip)で「直すと承認待ちに戻ります」を知らせる(2026-10-28 帯から札へ) */}
-    {approvedBefore && lockedWeeks.length === 0 && !simpleOn && coreDirty && (
-      <MessageBar layout="multiline" intent="info" className={styles.locked}>
-        <MessageBarBody>
-          {t(
-            '承認済みの配信の内容を変えています。保存すると「承認待ち」に戻り、承認の依頼からやり直しになります。',
-            'You are changing an approved delivery. Saving puts it back to awaiting approval and needs a new approval request.',
-          )}
-        </MessageBarBody>
-      </MessageBar>
-    )}
     {lockedWeeks.length > 0 && changed && (
       <MessageBar layout="multiline" intent="warning" className={styles.locked}>
         <MessageBarBody>
@@ -634,23 +588,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     })()}
     </>
   )
-  const alertsNode = (
-    <>
-    {/* この配信のアラート(在庫・方針・日程)。ふだんは 1 行にたたむ。アラートの画面から開いたときは、開いておく */}
-    {liveAlerts.length > 0 && (
-      <CardAlertsBar
-        alerts={liveAlerts}
-        onAct={alertCard ? setActAlert : undefined}
-        defaultOpen={!!focusProductId}
-        selectedProductId={items.find((i) => i.key === selectedKey)?.productId}
-        onSelectProduct={(pid) => {
-          const it = items.find((i) => i.productId === pid)
-          if (it) setSelectedKey(it.key)
-        }}
-      />
-    )}
-    </>
-  )
   const heroUploadNode = (
     <>
     {heroUpload && (
@@ -671,33 +608,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     </>
   )
 
-  const zoomBox = (
-    <div className={styles.zoomBox}>
-      <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
-      <Slider
-        size="small"
-        className={styles.slider}
-        min={ZOOM_MIN * 100}
-        max={ZOOM_MAX * 100}
-        step={5}
-        value={Math.round(shownZoom * 100)}
-        onChange={(_, d) => setZoom(d.value / 100)}
-        aria-label={t('プレビューの倍率', 'Preview zoom')}
-      />
-      <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
-      <Caption1 className={styles.zoomLabel}>{Math.round(shownZoom * 100)}%</Caption1>
-      {/* ボタンの文字は、押したときの動きを表す: 全体表示にする前は「全体」、全体表示のときは「100%」(押すと100%に戻る) */}
-      <Button
-        type="button"
-        size="small"
-        appearance={zoom === 'fit' ? 'primary' : 'outline'}
-        onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')}
-        aria-label={zoom === 'fit' ? t('100% の倍率に戻す', 'Reset to 100%') : t('メール全体を表示', 'Fit the whole email')}
-      >
-        {zoom === 'fit' ? '100%' : t('全体', 'Fit')}
-      </Button>
-    </div>
-  )
   const abCompareNode = (
     <>
       {ab && comparing === 'live' && (
@@ -812,7 +722,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               <>
                 <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
                 {/* 閉じる ×: フロートのいちばん上の右の角(キャンペーンの帯の 1 段目の右の端。2026-10-27 利用者)。ボタンなので、題の行でつかんで動かす動き(floatMove)には入らない */}
-                <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => (simpleOn ? void closeSimple() : onBack())} aria-label={t('閉じる', 'Close')} />
+                <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => void closeSimple()} aria-label={t('閉じる', 'Close')} />
               </>
             }
             onAddCard={() => setAddingCard(true)}
@@ -838,12 +748,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // シンプルな配信カードは、入力が止まって約 1.5 秒で保存する(Notion などと同じ。部品を選び直すまで保存しないと、タブを閉じたときに消えるため)。
   // 確定した週の配信は、理由が要るので自動では保存しない(上の帯の保存のボタンで)。保存中に書き換えた分は、保存が終わってから、また待って保存する
   useEffect(() => {
-    if (!simpleOn || !card || locked || !changed || saving || draftPending || currentKey === draftKey || saveError?.key === currentKey) return
+    if (!card || locked || !changed || saving || draftPending || currentKey === draftKey || saveError?.key === currentKey) return
     const id = window.setTimeout(() => void commitSimple(), 1500)
     return () => window.clearTimeout(id)
     // 待つのは、中身が変わるたびに数え直す(commitSimple は、その描画の中身で保存する)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentKey, simpleOn, locked, changed, saving, draftPending, draftKey, saveError])
+  }, [currentKey, locked, changed, saving, draftPending, draftKey, saveError])
   // 保存していない変更がある間は、タブを閉じる・読み直すときに、ブラウザに確かめてもらう
   useEffect(() => {
     if (!changed) return
@@ -857,8 +767,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // ほかの人が先に保存していたとき: 上書きする(確定した週なら、入れた理由で)か、閉じて読み直す(閉じると一覧を読み直すので、開き直すと、ほかの人の中身)
   const overwriteSave = () => {
     const reason = lockedWeeks.length > 0 && changeReason?.trim() ? changeReason : undefined
-    if (simpleOn) void saveStaying(reason, true, true)
-    else void save({ after: 'stay', reason, force: true })
+    void saveStaying(reason, true, true)
   }
   const conflictTime = saveError?.conflict?.at ? new Date(saveError.conflict.at).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
   const applySimple = () => {
@@ -902,26 +811,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }, [pendingUndoSave])
   /** 確定した週の、理由の欄の保存のボタン */
   const saveWithReason = (reason: string) => {
-    if (!simpleOn) {
-      void save({ after: pendingSave?.after ?? 'close', reason })
-      return
-    }
     void saveStaying(reason, pendingSave?.recordUndo ?? true)
   }
   const nextStep = nextStepOf({ status: form.status, handedOff: !!form.handedOffAt })
-  /** 詳しい画面(今の配信カード)で続ける。コミュニケーションの段階(d)ができるまで、承認・制作への依頼はこちらで */
-  const openDetailed = (tab?: TalkTab) => {
-    changeView(false, false)
-    if (!processOpen) toggleProcess()
-    if (tab) setTabRequest((r) => ({ tab, seq: (r?.seq ?? 0) + 1 }))
-  }
+  // 次にやること: 承認・制作への依頼は、シンプルな配信カードの中(左のバーの承認・渡すもの)で済む。ここに来るのは、制作のページを開くときだけ
   const runNext = (step: NextStep) => {
-    if (step === 'openProduction') {
-      if (card) {
-        void commitSimple()
-        onOpenProduction?.(card.id)
-      }
-    } else openDetailed(step === 'requestProduction' ? 'handoff' : undefined)
+    if (step === 'openProduction' && card) {
+      void commitSimple()
+      onOpenProduction?.(card.id)
+    }
   }
   /** 閉じる: 変更があれば反映してから閉じる(確定した週の配信は、捨てるかを聞く) */
   // 試している候補を確定したあとに閉じる(確定した中身を保存してから閉じるため、描き直したあとの値で閉じ直す)
@@ -973,7 +871,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     moveItem(i, i + d)
   })
   const previewDropAt = useStableCallback(dropAt)
-  // 詳しい画面とシンプルな画面のプレビューに、同じく渡すもの(違うのは、商品・選んだ枠・テンプレート・画像・押したとき・部品を選ぶ見せ方)
+  // プレビューに渡すもの(違うのは、商品・選んだ枠・テンプレート・画像・押したとき・部品を選ぶ見せ方)
   const previewCommon = {
     channel: previewTab,
     country: form.country,
@@ -1032,7 +930,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </div>
     </>
   )
-  // 確定した週の、変えた理由の入力欄(詳しい画面はフッター、シンプルな画面は上の帯の保存のボタンの下の Popover)
+  // 確定した週の、変えた理由の入力欄(上の帯の保存のボタンの下の Popover)
   const reasonForm = changeReason !== null && (
     <>
       <Field label={t('確定後の変更の理由', 'Reason for changing a confirmed week')} required size="small">
@@ -1105,36 +1003,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         <MessageBarBody>{error}</MessageBarBody>
       </MessageBar>
     )}
-    {/* 保存の失敗(シンプルな配信カードは、上の帯に出す) */}
-    {saveError && !simpleOn && !saveError.conflict && (
-      <MessageBar layout="multiline" intent="error" className={styles.error}>
-        <MessageBarBody>{saveError.message}</MessageBarBody>
-      </MessageBar>
-    )}
-    {/* ほかの人が先に保存していた(黙って上書きしない) */}
-    {saveError?.conflict && !simpleOn && (
-      <MessageBar layout="multiline" intent="warning" className={styles.error}>
-        <MessageBarBody>
-          {t(
-            `ほかの人が、この配信を先に保存しました${conflictTime ? `(${conflictTime})` : ''}。上書きすると、その変更は消えます。`,
-            `Someone else saved this delivery first${conflictTime ? ` (${conflictTime})` : ''}. Overwriting discards their changes.`,
-          )}
-        </MessageBarBody>
-        <MessageBarActions>
-          <Button size="small" disabled={saving} onClick={overwriteSave}>
-            {t('上書きする', 'Overwrite')}
-          </Button>
-          <Button size="small" appearance="primary" disabled={saving} onClick={onBack}>
-            {t('閉じて読み直す', 'Close and reload')}
-          </Button>
-        </MessageBarActions>
-      </MessageBar>
-    )}
-    {/* 確定した週の、変えた理由の入力(シンプルな配信カードは、上の帯の保存のボタンの下に出す) */}
-    {changeReason !== null && lockedWeeks.length > 0 && !simpleOn && <div className={styles.reasonBox}>{reasonForm}</div>}
     </>
   )
-  // 商品の枠のアラートの印(押すと、その商品のアラートへの対応を開く)。詳しい画面とシンプルな画面で同じ
+  // 商品の枠のアラートの印(押すと、その商品のアラートへの対応を開く)
   const itemAlertOverlay = (
     <ItemAlertOverlay
       boxRef={previewBoxRef}
@@ -1279,7 +1150,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         stageNav: stageTabs ?? stageNav,
         campaignBand,
         campaignName,
-        viewSwitch: <ViewSwitch simple onChange={changeView} />,
         preview: simplePreview,
         device: previewDevice,
         setDevice: pickDevice,
@@ -1329,20 +1199,10 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             </div>
           )}
           {emptyDraftNode}
-          {simpleOn ? (
-            <>
-              {productFloat}
-              {heroUploadNode}
-              {abCompareNode}
-              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
-            </>
-          ) : (
-          <>
-          <ClassicCardLayout
-            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items: viewItems, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
-          />
-          </>
-          )}
+          {productFloat}
+          {heroUploadNode}
+          {abCompareNode}
+          {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
         </form>
         {addCardDialog}
         {effectOf && (

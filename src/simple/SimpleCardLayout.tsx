@@ -910,7 +910,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 }
               />
             )}
-            {e.viewSwitch}
             {/* この配信カードを開くリンクをコピー(詳しい配信カードにあったもの。2026-10-28 利用者)。まだ保存していない新しいカードには URL がないので出さない */}
             {e.card.id && <CopyLinkButton iconOnly />}
             {e.menu}

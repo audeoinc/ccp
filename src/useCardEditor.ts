@@ -1,5 +1,5 @@
 // 配信カードの中身(入力欄・商品・候補・テンプレート・見出し・メイン画像・リンク・案)と、開いてから変えたかの判定・保存。
-// 状態と保存は、配信カードでこの 1 か所だけ(CLAUDE.md。詳しい画面とシンプルな画面は、ここが返すものを、そのまま使って描く)。
+// 状態と保存は、配信カードでこの 1 か所だけ(CLAUDE.md。シンプルな配信カードは、ここが返すものを、そのまま使って描く)。
 // AB テストの案の出し入れ(useAbVariants)も、ここで呼ぶ(保存する中身が、案の中身に依るため)。整理 第3段 ①
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { tr } from './i18n'
@@ -85,8 +85,6 @@ export interface CardEditorDeps {
   heroes: HeroImage[]
   weeks: WeekRow[]
   focusProductId?: string
-  /** シンプルな配信カードで描いているか */
-  simpleOn: boolean
   next?: { name: string; position: string } | null
   onSaved: () => Promise<void>
   onCreated?: (id: string) => void
@@ -110,7 +108,7 @@ function abWithoutImages(json?: string | null): string {
   }
 }
 
-export function useCardEditor({ card, defaults, draft, products, heroes, weeks, focusProductId, simpleOn, next, onSaved, onCreated, onReopen, onBack, onNext }: CardEditorDeps) {
+export function useCardEditor({ card, defaults, draft, products, heroes, weeks, focusProductId, next, onSaved, onCreated, onReopen, onBack, onNext }: CardEditorDeps) {
   const [form, setForm] = useState<Form>(() => (card ? toForm(card) : draft ? toForm(draft.card) : { ...toForm(), ...defaults }))
 
   const [items, setItems] = useState<Item[]>(() => draft?.items ?? [])
@@ -182,7 +180,7 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
   // AB テスト(X55)・案から選ぶ(X57)・シンプルな画面の AB テスト(SU2)の、案の中身と操作(useAbVariants.ts)
   const { ab, setAb, active, stash, setStash, itemsOf, heroOf, textsOf, templateOfV, abForSave, switchVariant, startAbTest, addVariant, removeVariant, abAiBusy, comparing, setComparing, draftActiveVariant, stopAbTest, changeTarget, asTarget, decision, decideVariant, abAuto, saveTarget, savedTargetAb, abAddSimple, abUpgradedRef, abDiff } = useAbVariants({
     card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent,
-    template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, simpleOn, original,
+    template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, original,
     // 押したときに呼ぶので、この下で作る関数でよい
     buildAiCard: () => buildAiCard(),
   })

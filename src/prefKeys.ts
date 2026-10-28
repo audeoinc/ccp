@@ -26,12 +26,8 @@ export const PREF = {
   // ---- 配信カード
   /** 開いたときの自動下書き('on' / 'off'。文字のまま) */
   autoDraft: 'cardDetail.autoDraft',
-  simpleCard: 'simpleCard.on',
   cardPreviewZoom: 'cardDetail.previewZoom.v2',
-  cardPaneWidths: 'cardDetail.paneWidths.v6',
   cardSize: 'cardDetail.size',
-  cardInfoOpen: 'cardDetail.infoOpen.v2',
-  cardProcessOpen: 'cardDetail.processOpen.v1',
   cardPreviewDevice: 'cardDetail.previewDevice',
   // キャンペーンの帯(X79)のテーマ・目的を開いているか(既定は畳む)
   campaignBandOpen: 'cardDetail.campaignBandOpen',

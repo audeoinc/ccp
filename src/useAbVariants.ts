@@ -56,8 +56,6 @@ export interface AbDeps {
   poolHeroes: HeroImage[]
   language: CopyLanguage
   templateChannel: TemplateChannel
-  /** シンプルな配信カードで描いているか */
-  simpleOn: boolean
   /** 読み込み時点の配信商品(null = まだ読んでいない) */
   original: object | null
   buildAiCard: () => AiCard
@@ -66,7 +64,7 @@ export interface AbDeps {
 /** 保存する案の文言(部品の中身を、その案のテンプレートの書き換えてよい部品の分に絞る) */
 const withParts = (x: VariantText, template: EmailTemplateId): VariantText => (x.parts ? { ...x, parts: prunePartContent(x.parts, template) } : x)
 
-export function useAbVariants({ card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, simpleOn, original, buildAiCard }: AbDeps) {
+export function useAbVariants({ card, draft, form, setForm, items, setItems, heroId, setHeroId, heroReason, setHeroReason, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, template, setTemplate, setCandidates, setSelectedKey, setError, setAlertNotes, poolProducts, poolHeroes, language, templateChannel, original, buildAiCard }: AbDeps) {
   // AB テスト(X55)。ab = 設定(null = しない)、active = いま編集している案、stash = 編集していない案の中身(A を含む)
   const [ab, setAb] = useState<AbTest | null>(() => parseAbTest(card?.ab_test ?? draft?.card.ab_test))
   const [active, setActive] = useState<VariantKey>('A')
@@ -412,13 +410,13 @@ export function useAbVariants({ card, draft, form, setForm, items, setItems, her
   // 開いただけで「変えた」にならないよう、変えたあとの中身を基準にし直す
   const abUpgradedRef = useRef(false)
   useEffect(() => {
-    if (!simpleOn || !ab || abAuto || original === null) return
+    if (!ab || abAuto || original === null) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (ab.target !== 'all') changeTarget('all')
     setAbAuto(true)
     abUpgradedRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simpleOn, ab, abAuto, original])
+  }, [ab, abAuto, original])
 
   // A を直したら、B・C でまだ直していない部品(A の前の中身と同じ所)も、A に合わせる(SU2 ⑥。「B は A とこの部分だけが違う」を保つ)
   const prevA = useRef<{ texts: VariantText; heroId?: string; productIds: string[]; images: string[]; template: string } | null>(null)

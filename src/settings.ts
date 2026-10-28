@@ -46,6 +46,3 @@ export function loadPref<T>(key: string, fallback: T): T {
 
 export const savePref = <T>(key: string, value: T) => writeRaw(key, JSON.stringify(value))
 
-/** シンプルな配信カード(SU1)で開くか。人の設定(当面はブラウザごと。ST1 の人の設定ができたら、そちらへ)。既定はオフ(今の配信カード) */
-export const loadSimpleCard = (): boolean => loadPref<boolean>(PREF.simpleCard, false)
-export const saveSimpleCard = (on: boolean) => savePref(PREF.simpleCard, on)

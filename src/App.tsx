@@ -272,8 +272,6 @@ function App() {
     setInstantId(id)
     setSelectedId(id)
   }
-  // 配信カードで開いている工程のタブ(URL に持たせる)
-  const [cardTab, setCardTab] = useState<string | undefined>(link.tab)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
   const [creating, setCreating] = useState<NewCardDefaults | null>(null)
   // まとめて作る作業画面の、まだ保存していない案を、配信カードで開いているとき(保存すると新規作成になる)
@@ -722,7 +720,6 @@ function App() {
     from: range.from,
     to: range.to,
     card: selectedId ?? undefined,
-    tab: selectedId ? cardTab : undefined,
     result: page === 'results' ? (resultDetail ?? undefined) : undefined,
     production: productionOpen ?? undefined,
     alerts: alertsOpen ? (alertsFocus ?? '') : undefined,
@@ -1509,8 +1506,6 @@ function App() {
           }}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           stageTabs={selected ? stageNav(selected, 'calendar', 'tabs') : undefined}
-          initialTab={selected && selected.id === link.card ? link.tab : undefined}
-          onTabChange={setCardTab}
           next={nextOf === undefined ? undefined : nextOf && { name: nextOf.name, position: nextOf.position }}
           onNext={() => {
             if (!nextOf) return

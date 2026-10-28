@@ -698,7 +698,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                             <MarkdownLite text={instructions} />
                           </div>
                         ) : (
-                          <span className={s.note}>{t('制作指示がありません(企画の配信カードの ⑥ で作ります)', 'No production notes (create them in step 6 of the plan card)')}</span>
+                          <span className={s.note}>{t('制作指示がありません(企画の配信カードの「渡すもの」で書きます)', 'No production notes (write them under "Handoff" on the plan card)')}</span>
                         )}
                         {!frozen && <span className={s.note}>{t('渡す前は、いまの配信カードの中身を出しています。直すときは、企画の配信カードで直します(渡したあとは、ここで直せます)。', 'Before the handoff, this shows the current card. Edit it in the plan card (after the handoff, you can edit here).')}</span>}
                       </div>

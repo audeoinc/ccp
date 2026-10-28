@@ -13,9 +13,8 @@ export interface LinkState {
   view?: LinkView
   /** 表示中の期間(週は日曜日、月・一覧はその月の 1 日)。YYYY-MM-DD */
   date?: string
-  /** 開いている配信カード(配信の id)と、開いている工程のタブ */
+  /** 開いている配信カード(配信の id)。以前のリンクの tab=(詳しい配信カードの工程のタブ)は、読み捨てる(2026-10-28 詳しい配信カードを消した) */
   card?: string
-  tab?: string
   /** 詳しい結果(配信の id) */
   result?: string
   /** アラートのフロート。'' = 開いて、商品は選ばない / 商品の id = その商品を選んで開く / undefined = 閉じている */
@@ -47,7 +46,7 @@ export function parseLink(search: string): Partial<LinkState> {
     const v = q.get(k)
     if (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) out[k] = v
   }
-  for (const k of ['card', 'tab', 'result', 'production'] as const) {
+  for (const k of ['card', 'result', 'production'] as const) {
     const v = q.get(k)
     if (v) out[k] = v
   }
@@ -68,7 +67,6 @@ export function linkSearch(s: LinkState): string {
   }
   if (s.country !== undefined) q.set('country', s.country || 'all')
   if (s.card) q.set('card', s.card)
-  if (s.card && s.tab) q.set('tab', s.tab)
   if (s.result) q.set('result', s.result)
   if (s.production) q.set('production', s.production)
   if (s.alerts !== undefined) q.set('alerts', s.alerts || '1')

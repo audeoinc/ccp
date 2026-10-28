@@ -859,7 +859,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
 
 /**
  * 計測用のパラメーター(utm)つきの、実際に送る URL(X81 の 8)。utm は自動で付き、手で変えると計測が壊れるので、読むだけ。
- * 値を変える欄は詳しい画面の ⑤ リンク先にだけ置く(ふだんは変えないため)
+ * 決まった値(utm_source・utm_medium)を変える欄は、⚙ の設定にだけ置く(ふだんは変えないため)
  */
 function TrackedUrl({ url }: { url: string }) {
   const t = useT()

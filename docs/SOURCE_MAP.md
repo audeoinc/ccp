@@ -50,7 +50,7 @@ flowchart TD
 
     subgraph authoring["配信カード(内容づくり)"]
         card["配信カード<br/>CardDetail.tsx"]
-        content["コンテンツ生成のペイン<br/>ContentPane.tsx"]
+        content["シンプルな配信カード<br/>simple/SimpleCardLayout.tsx"]
         preview["プレビュー<br/>Preview.tsx"]
         drafts["AI の下書きの流れ<br/>useAiDrafts.ts・autoDraft.ts"]
         aidraft["案(テーマ・コピー・制作指示)<br/>aiDraft.ts"]
@@ -260,12 +260,12 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `CardDetail.tsx` | 1,338 | **配信カードの本体**。読み込み・保存の入口、AI の下書きの起動、承認・差し戻し。描き方は `ClassicCardLayout.tsx`(詳しい)と `simple/SimpleCardLayout.tsx`(シンプル) |
+| `CardDetail.tsx` | 1,224 | **配信カードの本体**。読み込み・保存の入口、AI の下書きの起動、承認・差し戻し。描き方は `simple/SimpleCardLayout.tsx`(詳しい配信カード `ClassicCardLayout` は 2026-10-28 に消した) |
 | `useCardEditor.ts` | 744 | 配信カードの中身(入力欄・商品・候補・テンプレート・見出し・メイン画像・リンク・案)と、変えたかの判定・保存。**状態と保存は、ここ 1 か所だけ** |
-| `ClassicCardLayout.tsx` / `cardDetailStyles.ts` | 606 / 125 | 詳しい画面(5 ペイン)の描き方と、この画面だけのペインの幅・開閉 / 配信カードの見た目(2 つの画面で共通の部品も) |
+| `cardDetailStyles.ts` | 44 | 配信カードの枠・知らせ・AI の下書きの重ね(CardDetail の見た目) |
 | `cardForm.ts` / `saveFlow.ts` | 78 / 105 | 入力欄の値(画面の state)と、行からの作り方 / 保存の流れ(決める `planSave` と、決まった順に行う `runSave`。`scripts/check-save.mjs` が確かめる) |
 | `useAbVariants.ts` / `useCardAlerts.ts` | 513 / 106 | AB テスト・案から選ぶの、案の中身と出し入れ / アラートへの対応と商品の差し替え(理由は保存で配信のメモに) |
-| `DeliveryInfoFields.tsx` | 169 | 配信の情報の入力欄(配信名・日時・状態・対象・担当。詳しい画面の左のペインとシンプルな画面で共通) |
+| `DeliveryInfoFields.tsx` | 169 | 配信の情報の入力欄(配信名・日時・状態・対象・担当。シンプルな配信カードの配信の情報で使う) |
 | `CardHistory.tsx` | 192 | 変更の履歴(X1。項目の変更・ステータスの変化・差し替えの理由を、新しい順に 1 本に) |
 | `EmptyDraftCta.tsx` | 56 | 空の配信カードの、プレビューの真ん中の「AI で下書きする」(押したときだけ下書きする) |
 | `slots.ts` | 146 | 選定済みの商品の並びと、セクションの枠の対応(空いた枠の行。保存済みの位置をずらさない。`scripts/check-slots.mjs`) |
@@ -279,12 +279,12 @@ flowchart TD
 | `ImpactView.tsx` / `impact.ts` / `useDeliveryImpact.ts` | 906 / 376 / 74 | 結果の面の見せ方「効果」(増えた売上・リフト率、学びの記録と評価)/ その計算と見本 / 詳しい結果に出す、配信 1 本の効果 |
 | `SwipePager.tsx` | 158 | 週・月の表示を、地の部分をつかんで横に引く(トラックパッドの横スワイプ)と、前後の週・月へ |
 | `AbBadge.tsx` / `AbCompare.tsx` / `abAi.ts` | 74 / 131 / 149 | AB テストの印(月・週・一覧・時刻の格子)/ 案のプレビューを並べて比べる / 「B 案を AI で作る」(画像・商品と、比べる要素なら文言・件名も) |
-| `abTest.ts` / `AbTestBar.tsx` | 245 / 265 | AB テスト(X55)の型・既定・配分・制作に渡す文 / 配信カードの題名の下の、案の切り替えとテストの設定の帯 |
+| `abTest.ts` | 245 | AB テスト(X55)の型・既定・配分・制作に渡す文(設定の画面は `simple/AbSettings.tsx`) |
 | `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 324 / 131 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
 | `ProductFloat.tsx` / `ProductMarks.tsx` | 35 / 64 | 商品の行の開き口(中の「選定済み」・右の商品情報の行を押すと、商品の対応のフロートを開く。行の中のボタン・入力欄は除く)/ 商品の行の札(アラートの種類の札・「残少」。商品情報と中の選定済みの行で共通) |
 | `ProductImagePicker.tsx` | 453 | この配信で使う商品の画像を、商品ページから選ぶフロート(X64。ページの画像の一覧・AI のおすすめとアングル・貼り付け / ファイル / URL)。窓口は `data/productPages.ts`(撮影用の身代わりは `mock/productPages.ts`) |
 | `target.ts` | 57 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
-| `ProcessPane.tsx` / `ApprovalBar.tsx` | 317 / 419 | 右端のプロセスのペイン(状態・承認・引き継ぎ・制作の依頼の札)/ 承認の依頼・承認・差し戻し |
+| `ApprovalBar.tsx` | 419 | 承認の依頼・承認・差し戻し |
 | `LearningsBar.tsx` | 392 | 「これまでの学び」(過去の結果から) |
 | `Splitter.tsx` / `ResizeHandles.tsx` | 105 / 75 | ペインの幅の変更 / フロートの大きさの変更 |
 
@@ -292,18 +292,14 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `ContentPane.tsx` | 495 | **中ペインの本体**。テーマ・テンプレート・メイン画像・セクション・制作指示のタブと、リンク先・引き継ぎ |
-| `HeroTab.tsx` / `SectionsTab.tsx` | 312 / 411 | 「③ ヒーロー」(メイン画像・見出し・コピー・件名・プリヘッダー)/ 「④ セクション」(セクションごとの見出し・コピー・商品) |
-| `contentPaneParts.tsx` / `contentPaneStyles.ts` / `contentPaneUtil.ts` | 185 / 154 / 18 | 中ペインとそのタブで共通の部品 / 見た目 / 小道具と型 |
+| `contentPaneStyles.ts` | 154 | テンプレートの使われ方の行(`TemplateUseLine`)の見た目 |
 | `PartContentFields.tsx` / `partContent.ts` | 114 / 138 | テンプレートの部品の、配信ごとの中身を直す欄(テンプレートで許した所だけ。2 つの画面で共通)/ その持ち方(列 `part_content`。`scripts/check-parts.mjs`) |
 | `TemplateUseLine.tsx` | 52 | テンプレートを選ぶ所の、使われ方の行と、版・無効・国で使わないの知らせ(2 つの画面で共通) |
-| `useSelection.ts` | 166 | 選定した商品・候補の操作(昇格・降格・並べ替え・ドラッグ&ドロップ) |
 | `ProductRow.tsx` / `Candidates.tsx` | 177 / 161 | 選定した商品の行 / 候補の一覧(大量でも重くならないように) |
 | `HeroCandidates.tsx` | 110 | メイン画像の候補(すべての画像から探して設定) |
 | `ChatPanel.tsx` | 247 | AI チャット |
 | `NotesEditor.tsx` / `MarkdownLite.tsx` | 124 / 52 | 制作指示の入力(Markdown)/ その表示 |
-| `LinksEditor.tsx` / `links.ts` | 184 / 345 | リンク先の入力 / 配信ごとのリンク先(JSON で保存)と、計測用のパラメーター(UTM)の決まり(utm_campaign・utm_content。X67) |
-| `HandoffPanel.tsx` | 83 | 制作への引き継ぎ |
+| `links.ts` | 345 | 配信ごとのリンク先(JSON で保存)と、計測用のパラメーター(UTM)の決まり(utm_campaign・utm_content。X67) |
 | `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 254 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `TasksPanel.tsx` | 196 | タスク(プロセスのペインの「タスク」タブ) |
 | `assetSeed.ts` | 230 | ⚙ の「素材の見本を作る / 消す」(画面の中で描いたイラスト・PDF と公開の URL を、制作の依頼のある配信に。名前の先頭が「見本:」) |
@@ -326,7 +322,6 @@ flowchart TD
 |---|---|---|
 | `Preview.tsx` | 1,337 | **メール・プッシュのプレビュー**(受信側の見た目。色の直書きは、ここだけ例外) |
 | `FitPreview.tsx` | 31 | プレビューを、スクロールせずに全体が見える大きさに縮める |
-| `LinkOverlay.tsx` | 188 | プレビューの上に、リンク先の番号・枠・URL の吹き出しを重ねる |
 | `PreviewPins.tsx` / `pinStore.ts` | 296 / 147 | プレビューの任意の場所に書き込む(ピン。X65)。ピンの層と、場所を選ぶ間の覆い / 置こうとしている場所・光らせるスレッドを、プレビューとやり取りの欄で共有する |
 | `PinFloat.tsx` / `PinThreadView.tsx` | 258 / 156 | ピンのフロート(スレッドを読む・書く)/ その中身の見た目(題の行で動かせ、大きさを変えられる) |
 | `usePreviewPins.ts` / `pinAnchor.ts` / `pinActions.ts` / `pinMenu.tsx` | 31 / 47 / 31 / 16 | 画面ごとのピンの状態(配信カード・シンプル・制作のページで共通)/ フロートを付ける先を探す / フロートと右クリックで共通の操作 / ピンの上の右クリックの項目 |
@@ -361,7 +356,7 @@ flowchart TD
 | `CommPane.tsx` | 604 | やり取りのペイン(状態の道のりと次に動く人・書き込み / タスク / 承認の 1 本の流れ・書く欄。承認・差し戻しも) |
 | `HandoffSheet.tsx` / `ProductionMemo.tsx` / `assetDrop.ts` | 327 / 78 / 35 | 制作に渡すもの(担当・締め切り・文章・素材・「制作に渡す」)/ 部品から 1 行で渡すものに書き留める「制作へのメモ」/ 画像・資料・URL のドラッグ |
 | `AbSettings.tsx` | 86 | AB テストの設定(SU2。案のタブの横の ⚙) |
-| `StageHeader.tsx` / `ViewSwitch.tsx` / `NextAction.tsx` / `nextStep.ts` | 40 / 21 / 78 / 24 | 上の帯(題名と PLAN \| PRODUCTION \| RESULTS のタブ。制作のシンプルな画面でも使う)/ シンプル \| 詳しい の切り替え / 次にやることのボタン |
+| `StageHeader.tsx` / `NextAction.tsx` / `nextStep.ts` | 40 / 78 / 24 | 上の帯(題名と PLAN \| PRODUCTION \| RESULTS のタブ。制作のシンプルな画面でも使う)/ 次にやることのボタン |
 | `PreviewMarks.tsx` | 78 | プレビューの上の目印(A と違う) |
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 128 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
 | `ProductSwap.tsx` / `floatSwap.tsx` | 113 / 45 | 商品の入れ替えの引き出し(SU9。どの入口からも、ここを開く。中身は `ProductChooser`)/ 商品のフロートの中に、同じ引き出しを出す |
@@ -618,13 +613,13 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | データの列・テーブルを足す | `server/schema.json`(サーバーが起動後に自動で足す)。型は `src/models/`、新しいテーブルは `src/data/` にサービスを足す |
 | AI の指示文・選定のしかたを変える | `src/aiSelect.ts`(選定)・`src/aiDraft.ts`(案)・`src/autoDraft.ts`(すべて下書き)。呼び出しは `askAgent` だけを通す |
 | AI のモデル・考える量を変える | 環境変数 `GEMINI_MODEL` / `GEMINI_THINKING`(`server/ccp/ai.py`) |
-| 配信カードの中ペインにタブ・機能を足す | `src/ContentPane.tsx`・`src/HeroTab.tsx`・`src/SectionsTab.tsx`(中身の状態と保存は `src/useCardEditor.ts`) |
+| 配信カードに部品・機能を足す | `src/simple/PartPane.tsx`(選んだ部品のペイン)・`src/simple/SimpleCardLayout.tsx`(中身の状態と保存は `src/useCardEditor.ts`) |
 | 配信カードの保存の流れを変える | `src/saveFlow.ts`(例は `scripts/check-save.mjs`)・`src/useCardEditor.ts` |
 | シンプルな配信カードの部品・ペインを変える | `src/simple/`(部品の型は `parts.ts`、ペインは `PartPane.tsx`、並びは `SimpleCardLayout.tsx`) |
 | 国・全社の設定の項目を足す | `src/SettingsDialog.tsx`・`src/settingsActions.tsx`(国の値は `src/countrySettings.ts`、国で使うかは `src/countryApply.ts`) |
 | プレビューの見た目を変える | `src/Preview.tsx`(テンプレートの定義は `src/templates.ts`) |
 | 在庫のアラートの計算を変える | `src/alerts.ts`(条件は `src/alertSettings.ts`) |
-| AB テスト(案の持ち方・設定)を変える | `src/abTest.ts`・`src/AbTestBar.tsx`、案の出し入れは `src/useAbVariants.ts`、保存は `src/useCardEditor.ts` |
+| AB テスト(案の持ち方・設定)を変える | `src/abTest.ts`・`src/simple/AbSettings.tsx`、案の出し入れは `src/useAbVariants.ts`、保存は `src/useCardEditor.ts` |
 | 商品の対応のフロート(差し替え・詳しい情報)を変える | `src/ProductActionFloat.tsx`(中身は `src/ProductDetail.tsx`、開き口は `src/ProductFloat.tsx`) |
 | 商品・カテゴリの指標の項目を足す | `src/metrics.ts`・`server/ccp/metrics.py` |
 | 週の確認の項目を足す | `src/reviewChecks.ts` と `src/weekLabels.ts` |
