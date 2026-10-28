@@ -1,4 +1,4 @@
-import { useRef, type ReactNode, type RefObject } from 'react'
+import { useRef, type ClipboardEvent, type ReactNode, type RefObject } from 'react'
 import { Avatar, Button, Popover, PopoverSurface, Spinner, makeStyles, mergeClasses, tokens, type PositioningImperativeRef, type PositioningVirtualElement } from '@fluentui/react-components'
 import { DismissRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
@@ -41,6 +41,8 @@ export interface ThreadEntry {
   /** 名前と時刻のあいだに足す文(宛先など) */
   extra?: string
   isReply?: boolean
+  /** 本文の下に出す添付(開発へのリクエストの画像・URL。X69 (g)) */
+  attachments?: ReactNode
 }
 
 interface Props {
@@ -60,6 +62,12 @@ interface Props {
   dimmed?: boolean
   /** 入力欄の上(宛先・書く人の名前など) */
   composerTop?: ReactNode
+  /** 書く欄のすぐ下(添付を付ける操作と、これから送る添付) */
+  composerBelow?: ReactNode
+  /** 書く欄への貼り付け(画像を添付にする) */
+  onPaste?: (ev: ClipboardEvent) => void
+  /** 文字がなくても送れる(添付だけのとき) */
+  canSend?: boolean
   text: string
   onText: (v: string) => void
   placeholder: string
@@ -118,6 +126,7 @@ export function PinThreadView(p: Props) {
                       <div style={{ minWidth: 0 }}>
                         <div className={s.meta}>{[n.author || t('(名前なし)', '(no name)'), n.extra ?? '', when(n.at)].filter(Boolean).join(' · ')}</div>
                         <div className={mergeClasses(s.body, !!p.dimmed && s.done)}><Linkify text={n.body} /></div>
+                        {n.attachments}
                       </div>
                     </div>
                   ))}
@@ -134,6 +143,7 @@ export function PinThreadView(p: Props) {
                 disabled={p.working}
                 placeholder={p.placeholder}
                 onChange={(_, d) => p.onText(d.value)}
+                onPaste={p.onPaste}
                 onKeyDown={(ev) => {
                   if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
                     ev.preventDefault()
@@ -141,8 +151,9 @@ export function PinThreadView(p: Props) {
                   }
                 }}
               />
-              <Button size="small" appearance="primary" icon={p.working ? <Spinner size="extra-tiny" /> : <SendRegular />} disabled={p.working || !p.text.trim()} onClick={p.onSend} aria-label={p.sendLabel} />
+              <Button size="small" appearance="primary" icon={p.working ? <Spinner size="extra-tiny" /> : <SendRegular />} disabled={p.working || !(p.text.trim() || p.canSend)} onClick={p.onSend} aria-label={p.sendLabel} />
             </div>
+            {p.composerBelow}
             <div className={s.actions}>
               {p.footer}
               <span className={s.hint}>{t('Ctrl + Enter で送る', 'Ctrl + Enter to send')}</span>

@@ -31,6 +31,7 @@ import {
 import { AiIcon } from './AiMark'
 import { MePicker } from './MePicker'
 import { InboxButton } from './InboxButton'
+import { DevPinsToggle } from './DevPinsToggle'
 import type { ApprovalInbox } from './useApprovalInbox'
 import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
 import { optionLabel, useT } from './i18n'
@@ -286,6 +287,8 @@ export function AppToolbar({
           {t('リクエスト', 'Dev requests')}
         </Button>
       </Tooltip>
+      {/* リクエストのピンを出す / 出さない(X69 (b)。人ごとに覚える) */}
+      <DevPinsToggle />
       {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
       <InboxButton inbox={inbox} onOpenCard={onOpenCard} />
       {/* 作る操作は、ここにまとめる。ボタンの本体で 1 本を新規作成、▾ で、この週の枠を作る(W14。週の表示のときだけ選べる) */}

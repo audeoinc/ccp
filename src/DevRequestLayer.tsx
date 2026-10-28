@@ -12,7 +12,11 @@ import {
   bumpDevRequests,
   capturePlace,
   deleteDevRequest,
+  devPinsVisible,
   devRequestName,
+  isActiveStatus,
+  statusColor,
+  statusName,
   devRequestsVersion,
   forgetLinkedRequest,
   linkedRequest,
@@ -30,6 +34,8 @@ import {
 import { usePinAnchor } from './pinAnchor'
 import { PinThreadView } from './PinThreadView'
 import { PinThenImage } from './PinThenImage'
+import { AttachDraftView, AttachmentList } from './DevAttachmentViews'
+import { readAttachments, useAttachDraft, writeAttachments } from './devRequestAttachments'
 import { attachCapture, startCaptureAt } from './pinSnapshot'
 import { locale, tr, useT } from './i18n'
 import { Z } from './layers'
@@ -126,9 +132,7 @@ interface Props {
 const statusText = (q: DevRequest) =>
   q.status === 'done'
     ? tr(`対応済み(${q.done_at ? new Date(q.done_at).toLocaleDateString(locale(), { month: 'numeric', day: 'numeric' }) : ''}${q.done_version ? `・版 ${q.done_version}` : ''})`, `Done (${q.done_at ? new Date(q.done_at).toLocaleDateString(locale()) : ''}${q.done_version ? `, build ${q.done_version}` : ''})`)
-    : q.status === 'declined'
-      ? tr('見送り', 'Declined')
-      : tr('未対応', 'Open')
+    : statusName(q.status)
 
 /**
  * 開発へのリクエスト(2026-10-23 利用者: 使っている人が、画面のどこでも、直したい所に右クリックでピンを打って要望を書き、要件が CCP の中に貯まるように)。
@@ -164,11 +168,11 @@ export function DevRequestLayer({ link, cardName }: Props) {
   }, [version])
 
   const roots = rows.filter((q) => !q.source_request)
-  // 画面に出すのは未対応だけ(対応済み・見送りは一覧にだけ残す。2026-10-24 利用者: 対象がないのにピンが残っているのが不思議だった)。
-  // 一覧の「この画面を開く」で開いたものは、状態によらず出す(人が開きに来たもの)
-  const isOpen = (q: DevRequest) => !q.status || q.status === 'open'
+  // 画面に出すのは、まだ済んでいないもの(未対応・検討中・対応中)だけ(対応済み・見送りは一覧にだけ残す。2026-10-24 利用者: 対象がないのにピンが残っているのが不思議だった)。
+  // ヘッダーでピンを消しているときは出さない(X69 (b))。一覧の「この画面を開く」で開いたものは、状態・切り替えによらず出す(人が開きに来たもの)
+  const visible = devPinsVisible()
   const linked = target && 'id' in target ? target.id : null
-  const here = roots.filter((q) => q.screen === screen && (isOpen(q) || q.id === linked))
+  const here = roots.filter((q) => q.screen === screen && ((visible && isActiveStatus(q.status)) || q.id === linked))
   const pending = target && 'pending' in target ? target.pending : null
 
   // 位置は、画面の中身・スクロール・大きさが変わるたびに変わるので、間隔を空けて測り直す(プレビューのピンと同じ)
@@ -340,6 +344,8 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
   const name = useSyncExternalStore(onDevRequestName, devRequestName)
   const [nameEdit, setNameEdit] = useState<string | null>(name ? null : '')
   const [text, setText] = useState('')
+  // これから送る添付(画像・URL。X69 (g))
+  const attach = useAttachDraft()
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const id = 'id' in target ? target.id : null
@@ -374,7 +380,7 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
 
   const send = async () => {
     const body = text.trim()
-    if (!body) return
+    if ((!body && attach.items.length === 0) || attach.uploading) return
     if (!author) {
       setError(tr('名前を入れてください(次からは聞きません)', 'Enter your name (asked only once)'))
       return
@@ -401,17 +407,20 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
           view_x: p.view_x,
           view_y: p.view_y,
           delivery_card_id: cardOf(p.screen),
+          attachments: writeAttachments(attach.items),
         })
         if (!r.success || !r.data) throw new Error(r.error?.message ?? tr('保存できませんでした', 'Could not save'))
         const created = r.data.id
         attachCapture(devCaptureKey(p.view_x, p.view_y), (stored) => DevRequestsService.update(created, { anchor_image: stored }), bumpDevRequests)
         setText('')
+        attach.clear()
         bumpDevRequests()
         onTarget({ id: r.data.id })
       } else if (root) {
-        const r = await DevRequestsService.create({ source_request: root.id, body, author_name: author })
+        const r = await DevRequestsService.create({ source_request: root.id, body, author_name: author, attachments: writeAttachments(attach.items) })
         if (!r.success) throw new Error(r.error?.message ?? tr('保存できませんでした', 'Could not save'))
         setText('')
+        attach.clear()
         bumpDevRequests()
       }
     } catch (e) {
@@ -465,7 +474,7 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
       }
       state={id && !root ? (rows.length ? 'gone' : 'loading') : 'ok'}
       goneText={t('このリクエストは消されました', 'This request was deleted')}
-      entries={root ? [root, ...replies].map((q) => ({ id: q.id, author: q.author_name, body: q.body, at: q.created_on, isReply: q !== root })) : []}
+      entries={root ? [root, ...replies].map((q) => ({ id: q.id, author: q.author_name, body: q.body, at: q.created_on, isReply: q !== root, attachments: <AttachmentList items={readAttachments(q.attachments)} /> })) : []}
       dimmed={root?.status === 'done' || root?.status === 'declined'}
       composerTop={
         <>
@@ -477,7 +486,7 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
           )}
           {root && (
             <span className={s.status}>
-              <Badge appearance="tint" color={root.status === 'done' ? 'success' : root.status === 'declined' ? 'subtle' : 'important'} size="small">
+              <Badge appearance="tint" color={statusColor(root.status)} size="small">
                 {statusText(root)}
               </Badge>
               {/* 賛同(いいね)。1 人 1 回、もう一度押すと取り消す */}
@@ -503,6 +512,9 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
       }
       text={text}
       onText={setText}
+      onPaste={attach.onPaste}
+      canSend={attach.items.length > 0 && !attach.uploading}
+      composerBelow={<AttachDraftView draft={attach} disabled={working} />}
       placeholder={root ? t('返信', 'Reply') : t('直してほしいこと・足してほしいこと', 'What should be fixed or added')}
       sendLabel={root ? t('返信する', 'Send reply') : t('開発に伝える', 'Send to developers')}
       working={working}

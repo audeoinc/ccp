@@ -1,8 +1,11 @@
 // 表 dev_requests(開発へのリクエスト。画面のどこでも右クリックで打つピン)の、1 行の型と選択肢。列を変えたら、server/schema.json と一緒に直す。
 // 返信も同じ表に入れ、source_request で元のリクエストにつなぐ(元のリクエストだけが、場所・状態を持つ)
 
+// 並びは進む順(一覧の選択肢・絞り込みもこの順)。検討中・対応中は 2026-10-28 に足した(X69 (c))
 export const DevRequestStatus = {
   open: '未対応',
+  considering: '検討中',
+  in_progress: '対応中',
   done: '対応済み',
   declined: '見送り',
 } as const
@@ -33,6 +36,8 @@ export interface DevRequestFields {
   /** 対応済みにした日時と、そのときの画面の版(ビルドのコミット) */
   done_at?: string
   done_version?: string
+  /** 添付(画像・URL)。JSON の配列の文字(devRequestAttachments.ts の DevAttachment[])。返信にも付けられる(X69 (g)) */
+  attachments?: string
   delivery_card_id?: string
 }
 

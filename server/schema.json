@@ -681,7 +681,8 @@
     ["view_y", "numeric"],
     ["anchor_image", "text"],
     ["done_at", "timestamptz"],
-    ["done_version", "text"]
+    ["done_version", "text"],
+    ["attachments", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "SET NULL"}]
@@ -881,7 +882,7 @@
   "notifications.status": ["pending", "sent", "skipped"],
   "production_requests.status": ["requested", "in_progress", "done", "checked", "sent", "stale", "withdrawn"],
   "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"],
-  "dev_requests.status": ["open", "done", "declined"],
+  "dev_requests.status": ["open", "considering", "in_progress", "done", "declined"],
   "ad_spends.market": ["JP", "US"],
   "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"],
   "ai_runs.adoption": ["as_is", "edited", "rejected"],

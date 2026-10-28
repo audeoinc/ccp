@@ -189,6 +189,23 @@ export const onOpenDevRequestList = (f: () => void) => {
   }
 }
 
+// ---- 状態(X69 (c))。ピン・フロート・一覧で同じ名前と色にする
+/** まだ済んでいない(未対応・検討中・対応中)。画面にピンを出すのは、これだけ */
+export const isActiveStatus = (v?: string) => !v || v === 'open' || v === 'considering' || v === 'in_progress'
+export const statusName = (v?: string) =>
+  v === 'considering' ? tr('検討中', 'Considering') : v === 'in_progress' ? tr('対応中', 'In progress') : v === 'done' ? tr('対応済み', 'Done') : v === 'declined' ? tr('見送り', 'Declined') : tr('未対応', 'Open')
+export const statusColor = (v?: string): 'important' | 'warning' | 'brand' | 'success' | 'subtle' =>
+  v === 'considering' ? 'warning' : v === 'in_progress' ? 'brand' : v === 'done' ? 'success' : v === 'declined' ? 'subtle' : 'important'
+
+// ---- ピンを出すか(X69 (b)。ヘッダーで切り替え、人ごとに覚える。消しても一覧と右クリックの「開発に伝える」は使える)
+let pinsVisible = loadPref<boolean>(PREF.devRequestPinsVisible, true)
+export const devPinsVisible = () => pinsVisible
+export function setDevPinsVisible(v: boolean) {
+  pinsVisible = v
+  savePref(PREF.devRequestPinsVisible, v)
+  bumpDevRequests()
+}
+
 // ---- 書いた・状態を変えたら、ピンの層・フロート・一覧が読み直す(離れた部品なので、ここで知らせる)
 let version = 0
 const listeners = new Set<() => void>()

@@ -5,8 +5,10 @@ import { CheckmarkRegular, CopyRegular, DeleteRegular, DismissRegular, OpenRegul
 import { DevRequestsService } from './data/devRequests'
 import { DevRequestVotesService } from './data/devRequestVotes'
 import type { DevRequestVote } from './models/devRequestVotes'
-import type { DevRequest, DevRequestStatus } from './models/devRequests'
-import { buildId, bumpDevRequests, deleteDevRequest, devRequestName, devRequestsVersion, onDevRequestName, setDevRequestName, subscribeDevRequests, toggleVote, votesOf } from './devRequestPlace'
+import { DevRequestStatus, type DevRequest } from './models/devRequests'
+import { buildId, bumpDevRequests, deleteDevRequest, devRequestName, devRequestsVersion, isActiveStatus, onDevRequestName, setDevRequestName, statusName, subscribeDevRequests, toggleVote, votesOf } from './devRequestPlace'
+import { attachmentLines, readAttachments } from './devRequestAttachments'
+import { AttachmentList } from './DevAttachmentViews'
 import { copyText } from './clipboard'
 import { Linkify } from './LinkText'
 import { locale, tr, useT, when } from './i18n'
@@ -30,7 +32,9 @@ const useStyles = makeStyles({
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
-const statusName = (v?: string) => (v === 'done' ? tr('対応済み', 'Done') : v === 'declined' ? tr('見送り', 'Declined') : tr('未対応', 'Open'))
+/** 状態の並び(進む順。絞り込みのタブ・状態の選択肢) */
+const STATUSES = Object.keys(DevRequestStatus) as (keyof typeof DevRequestStatus)[]
+type Filter = 'active' | 'all' | keyof typeof DevRequestStatus
 
 /** まとめてコピーの文(連絡係に貼って、要件として整理できる形。画面の場所・配信カードの ID・書いた人・時刻・本文・返信・状態) */
 function copyTextOf(list: DevRequest[], repliesOf: (id: string) => DevRequest[], votersOf: (id: string) => string[]): string {
@@ -43,7 +47,12 @@ function copyTextOf(list: DevRequest[], repliesOf: (id: string) => DevRequest[],
       ...(q.delivery_card_id ? [`   ${tr('配信カードの ID', 'Delivery card ID')}: ${q.delivery_card_id}`] : []),
       `   ${tr('画面', 'Screen')}: ${q.screen ?? ''}${q.url ? ` (${q.url})` : ''}`,
       `   ${tr('本文', 'Text')}: ${(q.body ?? '').replace(/\n/g, '\n     ')}`,
-      ...repliesOf(q.id).map((r) => `   - ${r.author_name || tr('(名前なし)', '(no name)')}(${when(r.created_on)}): ${(r.body ?? '').replace(/\n/g, ' ')}`),
+      // 添付の画像は、開ける URL で(X69 (g))
+      ...attachmentLines(readAttachments(q.attachments)).map((l) => `   ${l}`),
+      ...repliesOf(q.id).flatMap((r) => [
+        `   - ${r.author_name || tr('(名前なし)', '(no name)')}(${when(r.created_on)}): ${(r.body ?? '').replace(/\n/g, ' ')}`,
+        ...attachmentLines(readAttachments(r.attachments)).map((l) => `     ${l}`),
+      ]),
     ]
     return lines.join('\n')
   })
@@ -59,7 +68,8 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
   const t = useT()
   const version = useSyncExternalStore(subscribeDevRequests, devRequestsVersion)
   const [rows, setRows] = useState<DevRequest[] | null>(null)
-  const [filter, setFilter] = useState<'open' | 'all'>('open')
+  // 既定は、まだ済んでいないもの(未対応・検討中・対応中)
+  const [filter, setFilter] = useState<Filter>('active')
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [votes, setVotes] = useState<DevRequestVote[]>([])
@@ -86,7 +96,7 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
   const all = rows ?? []
   const roots = all.filter((q) => !q.source_request)
   const votersOf = (id: string) => votesOf(votes, id).map((v) => v.voter_name ?? '')
-  const filtered = filter === 'open' ? roots.filter((q) => (q.status ?? 'open') === 'open') : roots
+  const filtered = filter === 'all' ? roots : filter === 'active' ? roots.filter((q) => isActiveStatus(q.status)) : roots.filter((q) => (q.status ?? 'open') === filter)
   // 賛同の多い順(同じ数なら新しい順)。新しい順は、読んだ順(created_on の新しい順)のまま
   const shown = order === 'votes' ? [...filtered].sort((a, b) => votersOf(b.id).length - votersOf(a.id).length || (b.created_on ?? '').localeCompare(a.created_on ?? '')) : filtered
   const vote = async (q: DevRequest) => {
@@ -98,9 +108,9 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
     }
   }
   const repliesOf = (id: string) => all.filter((q) => q.source_request === id).sort((a, b) => (a.created_on ?? '').localeCompare(b.created_on ?? ''))
-  const openCount = roots.filter((q) => (q.status ?? 'open') === 'open').length
+  const countOf = (f: Filter) => (f === 'all' ? roots.length : f === 'active' ? roots.filter((q) => isActiveStatus(q.status)).length : roots.filter((q) => (q.status ?? 'open') === f).length)
 
-  const setStatus = async (q: DevRequest, status: DevRequestStatus) => {
+  const setStatus = async (q: DevRequest, status: keyof typeof DevRequestStatus) => {
     setError(null)
     const r = await DevRequestsService.update(q.id, status === 'done' ? { status, done_at: new Date().toISOString(), done_version: buildId() } : { status, done_at: null as never, done_version: '' })
     if (!r.success) setError(r.error?.message ?? tr('保存できませんでした', 'Could not save'))
@@ -131,9 +141,12 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
               )}
             </span>
             <div className={s.bar}>
-              <TabList size="small" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as 'open' | 'all')}>
-                <Tab value="open">{t(`未対応(${openCount})`, `Open (${openCount})`)}</Tab>
-                <Tab value="all">{t(`すべて(${roots.length})`, `All (${roots.length})`)}</Tab>
+              <TabList size="small" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as Filter)}>
+                <Tab value="active">{t(`まだ済んでいない(${countOf('active')})`, `Not done (${countOf('active')})`)}</Tab>
+                {STATUSES.map((v) => (
+                  <Tab key={v} value={v}>{`${statusName(v)}(${countOf(v)})`}</Tab>
+                ))}
+                <Tab value="all">{t(`すべて(${countOf('all')})`, `All (${countOf('all')})`)}</Tab>
               </TabList>
               <Select size="small" value={order} onChange={(_, d) => setOrder(d.value as 'new' | 'votes')} aria-label={t('並べ方', 'Order')}>
                 <option value="new">{t('新しい順', 'Newest first')}</option>
@@ -174,7 +187,7 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
             {rows === null ? (
               <Spinner size="tiny" />
             ) : shown.length === 0 ? (
-              <span className={s.caption}>{filter === 'open' ? t('未対応のリクエストはありません。', 'No open requests.') : t('まだリクエストはありません。', 'No requests yet.')}</span>
+              <span className={s.caption}>{filter === 'all' ? t('まだリクエストはありません。', 'No requests yet.') : t('この状態のリクエストはありません。', 'No requests with this status.')}</span>
             ) : (
               <div className={s.list}>
                 {shown.map((q) => (
@@ -182,9 +195,15 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
                     <div style={{ display: 'grid', rowGap: 4, minWidth: 0 }}>
                       <span className={s.place}>{q.place_text}</span>
                       <span className={s.text}><Linkify text={q.body} /></span>
+                      <AttachmentList items={readAttachments(q.attachments)} small />
                       <span className={s.meta}>{[q.author_name || t('(名前なし)', '(no name)'), when(q.created_on), q.delivery_card_id ? t(`配信カード ${q.delivery_card_id}`, `Card ${q.delivery_card_id}`) : ''].filter(Boolean).join(' ・ ')}</span>
+                      {/* 返信の本文の URL も押せるように(X69 (g)) */}
                       {repliesOf(q.id).map((r) => (
-                        <span key={r.id} className={s.reply}>{`${r.author_name || t('(名前なし)', '(no name)')}(${when(r.created_on)}): ${r.body ?? ''}`}</span>
+                        <span key={r.id} className={s.reply}>
+                          {`${r.author_name || t('(名前なし)', '(no name)')}(${when(r.created_on)}): `}
+                          <Linkify text={r.body} />
+                          <AttachmentList items={readAttachments(r.attachments)} small />
+                        </span>
                       ))}
                     </div>
                     <div className={s.side}>
@@ -201,10 +220,10 @@ export function DevRequestsDialog({ onClose, inline }: { onClose?: () => void; i
                       >
                         {t(`賛同 ${votersOf(q.id).length}`, `Agree ${votersOf(q.id).length}`)}
                       </Button>
-                      <Select size="small" value={q.status ?? 'open'} onChange={(_, d) => void setStatus(q, d.value as DevRequestStatus)} aria-label={t('状態', 'Status')}>
-                        <option value="open">{t('未対応', 'Open')}</option>
-                        <option value="done">{t('対応済み', 'Done')}</option>
-                        <option value="declined">{t('見送り', 'Declined')}</option>
+                      <Select size="small" value={q.status ?? 'open'} onChange={(_, d) => void setStatus(q, d.value as keyof typeof DevRequestStatus)} aria-label={t('状態', 'Status')}>
+                        {STATUSES.map((v) => (
+                          <option key={v} value={v}>{statusName(v)}</option>
+                        ))}
                       </Select>
                       {q.status === 'done' && (
                         <Badge appearance="tint" color="success" size="small">

@@ -64,6 +64,19 @@ def image_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]
     return sorted(refs)
 
 
+def attachment_images(rows: list[dict[str, Any]]) -> list[str]:
+    """開発へのリクエストの添付(attachments の JSON の配列。X69 (g))の画像の置き場所の名前。読めない行は飛ばす"""
+    out: list[str] = []
+    for r in rows:
+        try:
+            items = json.loads(r.get("attachments") or "[]")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(items, list):
+            out += [str(a["stored"]) for a in items if isinstance(a, dict) and a.get("kind") == "image" and a.get("stored")]
+    return out
+
+
 def file_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
     """パックに入れるファイル(種類・名前): /img/… の画像と、素材の置き場所のファイル"""
     # 素材のファイル・URL の見本カードの画像(preview_image)と、ピンを書いたときの様子の画像(配信カードのコメント card_notes と、
@@ -71,7 +84,8 @@ def file_refs(tables: dict[str, list[dict[str, Any]]]) -> list[tuple[str, str]]:
     refs = [(r, k) for r in tables.get("card_assets", []) for k in ("stored", "preview_image")] + [
         (r, "anchor_image") for t in ("card_notes", "dev_requests") for r in tables.get(t, [])
     ]
-    stored = sorted({str(r[k]) for r, k in refs if r.get(k) and creative.STORED.match(str(r[k]))})
+    names = {str(r[k]) for r, k in refs if r.get(k)} | set(attachment_images(tables.get("dev_requests", [])))
+    stored = sorted(n for n in names if creative.STORED.match(n))
     return [*image_refs(tables), *((creative.KIND, n) for n in stored)]
 
 

@@ -56,6 +56,20 @@ class WritePackTest(unittest.TestCase):
         rows = {"card_notes": [{"id": "n1", "anchor_image": note}, {"id": "n2"}], "dev_requests": [{"id": "d1", "anchor_image": dev}, {"id": "d2", "anchor_image": None}]}
         self.assertEqual(sorted(pack.file_refs(rows)), [("creative", note), ("creative", dev)])
 
+    def test_file_refs_include_dev_request_attachments(self) -> None:
+        """開発へのリクエスト(返信も)の添付の画像も、パックに入れる。URL の添付・読めない JSON は飛ばす(X69 (g))"""
+        a = "33333333333333333333333333333333.png"
+        b = "44444444444444444444444444444444.jpg"
+        rows = {
+            "dev_requests": [
+                {"id": "d1", "attachments": json.dumps([{"kind": "image", "stored": a, "name": "x.png"}, {"kind": "url", "url": "https://example.com"}])},
+                {"id": "r1", "source_request": "d1", "attachments": json.dumps([{"kind": "image", "stored": b, "name": "y.jpg"}])},
+                {"id": "d2", "attachments": "not json"},
+                {"id": "d3"},
+            ]
+        }
+        self.assertEqual(sorted(pack.file_refs(rows)), [("creative", a), ("creative", b)])
+
     def test_large_export_is_chunked_without_length_and_removes_file(self) -> None:
         """32MiB を超える ZIP でも、大きさ(Content-Length)を付けずに分けて返す(応答の大きさの上限に当たらないように)"""
         big = os.urandom(1024 * 1024)

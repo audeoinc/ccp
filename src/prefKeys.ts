@@ -23,6 +23,8 @@ export const PREF = {
   chatHeight: 'chat.paneHeight',
   hintsDismissed: 'hints.dismissed',
   pinsShowResolved: 'pins.showResolved',
+  /** 開発へのリクエストのピンを出すか(X69 (b)。既定は出す) */
+  devRequestPinsVisible: 'devRequests.pinsVisible',
   // ---- 配信カード
   /** 開いたときの自動下書き('on' / 'off'。文字のまま) */
   autoDraft: 'cardDetail.autoDraft',
