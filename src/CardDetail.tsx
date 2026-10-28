@@ -383,6 +383,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [draftPending, setDraftPending] = useState(false)
   const [draftKey, setDraftKey] = useState<string | null>(null)
   const [adoptDraft, setAdoptDraft] = useState(false)
+  // 空のカードの「AI で下書きする」を「やめる」で消したカード(その鍵)
+  const [emptyDismissed, setEmptyDismissed] = useState<string | null>(null)
   const [draftDone, setDraftDone] = useState(false)
   useEffect(() => {
     if (!draftPending || auto !== null) return
@@ -1053,8 +1055,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </div>
     </>
   )
-  // 空のカード: プレビューの真ん中に出す(シンプル・詳しいの両方の画面。シンプルには、すべてAIで下書きのボタンがないため)
-  const emptyDraftNode = !hasContent && !auto && !missingTemplate?.redrafted ? <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={() => startAdoptedDraft()} /> : null
+  // 空のカード: 配信カード全体の真ん中に出す(シンプル・詳しいの両方の画面。2026-10-28 利用者: プレビューの欄の中だと、ずれて見えるため)。
+  // 「やめる」で消したら、同じカードを開いている間は、また出さない(手で作り始めたいとき、中身を足すまで出続けて邪魔になるため)
+  const emptyKey = card?.id ?? draft?.card.id ?? ''
+  const emptyDraftNode =
+    !hasContent && !auto && !missingTemplate?.redrafted && emptyDismissed !== emptyKey ? (
+      <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={() => startAdoptedDraft()} onCancel={() => setEmptyDismissed(emptyKey)} />
+    ) : null
   const footerNode = (
     <>
     {missingTemplate && (
@@ -1316,17 +1323,18 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               </Button>
             </div>
           )}
+          {emptyDraftNode}
           {simpleOn ? (
             <>
               {productFloat}
               {heroUploadNode}
               {abCompareNode}
-              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} empty={emptyDraftNode} />}
+              {simpleEditor && <SimpleCardLayout editor={simpleEditor} boxRef={previewBoxRef} isDirty={isDirty} onCommit={commitSimple} onApply={applySimple} onUndo={undoSimple} onRunNext={runNext} onClose={closeSimple} />}
             </>
           ) : (
           <>
           <ClassicCardLayout
-            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items: viewItems, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, emptyDraftNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
+            {...{ editor, ab, abAiBusy, active, addVariant, asTarget, audience, buildContent, canReview, changeReason, changeTarget, comparing, decideVariant, decision, draftActiveVariant, form, groupByCategory, heroId, isDirty, items: viewItems, justSaved, lockedWeeks, productById, removeItem, removeVariant, saveAndNext, saveAndStay, savingAfter, saving, sectionTitles, selectedKey, set, setAb, setAudience, setComparing, setForm, setSelectedKey, startAbTest, stopAbTest, switchVariant, template, templateChannel, alertCard, itemAlertKinds, openAlertFor, productAlertKinds, setActAlert, setProductOpen, setSlotAction, abCompareNode, alertsNode, footerNode, heroUploadNode, itemAlertOverlay, noticesNode, productFloat, zoomBox, auto, cardMenu, changeTemplate, changeView, placingPin, setPlacingPin, endPlacingPin, pinTarget, setPinTarget, openPinThreads, closePin, drafts, hero, linkSpots, linkUrlOf, productLinkOf, linkVariant, pickDevice, previewBoxRef, previewInnerRef, previewCommon, previewDevice, previewTab, processOpen, toggleProcess, progress, runAllManual, setHeroUpload, setHoverKey, showHeadings, setShowHeadings, stepRequest, setStepRequest, tabRequest, setTabRequest, templateUseMap, utmCampaign, zoom, card, draft, heroes, products, owners, next, stageNav, onBack, onSaved, onOpenResults, onOpenProduction, onTabChange, campaignBand, campaignName }}
           />
           </>
           )}
