@@ -104,6 +104,15 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
       return true
     })
 
+  /** テーマの案を出して返す(「AI で変える」の案のタブ。busy は使う側が持つ) */
+  const askThemes = async (): Promise<ThemeSuggestion[]> => {
+    const card = inputs.buildCard()
+    if (!card.scheduledAt) throw new Error(tr('テーマ案を出すには、先に配信日時を入力してください', 'Enter the send date and time before requesting theme ideas'))
+    const ideas = await suggestThemes({ card, otherThemes: inputs.otherThemes, products: inputs.products })
+    setThemeIdeas(ideas)
+    return ideas
+  }
+
   const runCopy = () =>
     withBusy('copy', async () => {
       const ctx = context()
@@ -251,6 +260,7 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     sectionCopyCandidates,
     busy,
     runTheme,
+    askThemes,
     runCopy,
     runInstructions,
     runPush,

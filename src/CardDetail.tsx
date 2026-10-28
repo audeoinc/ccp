@@ -1055,7 +1055,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         loaded: original !== null,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
-        themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme() },
+        themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme(), ask: drafts.askThemes },
         templateUse: templateUseMap,
         sectionAi: {
           run: drafts.runSectionProducts,

@@ -50,8 +50,8 @@ interface Props {
   value: string
   /** 頼む(count = ほしい案の数。history は「指示して直す」のこれまでのやり取り) */
   ask: (request: string, count: number, history: PartTurn[]) => Promise<PartAnswer>
-  /** 案を仮にプレビューに写す(null で元に戻す) */
-  onPreview: (value: string | null) => void
+  /** 案を仮にプレビューに写す(null で元に戻す。idea = 試している案そのもの。理由も見せたいとき) */
+  onPreview: (value: string | null, idea?: PartIdea) => void
   onAdopt: (idea: PartIdea) => void
   /**
    * 長い文の部品(渡す文章など)のための差し替え。案の見せ方(既定は文のまま)・帯に出す短い形(既定は文のまま)・
@@ -63,17 +63,19 @@ interface Props {
   ideasCount?: number
   samplesKind?: 'text' | 'part'
   placeholder?: string
+  /** すでにある案(開いたときの自動の下書きで作った案など)。あれば、案のタブを開いたときに頼まず、これを出す */
+  initialIdeas?: PartIdea[]
 }
 
 /** 案のタブで頼むときの文(画面には出さない) */
 const IDEAS_REQUEST = 'この部品の文言の候補を、テーマと切り口に合わせて、それぞれ違う方向で考えてください'
 const IDEAS_COUNT = 4
 
-export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt, renderIdea, short = (v) => v, ideasRequest = IDEAS_REQUEST, ideasCount = IDEAS_COUNT, samplesKind = 'text', placeholder }: Props) {
+export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt, renderIdea, short = (v) => v, ideasRequest = IDEAS_REQUEST, ideasCount = IDEAS_COUNT, samplesKind = 'text', placeholder, initialIdeas }: Props) {
   const t = useT()
   const s = useStyles()
   const [open, setOpen] = useState(false)
-  const [ideas, setIdeas] = useState<PartIdea[] | null>(null)
+  const [ideas, setIdeas] = useState<PartIdea[] | null>(initialIdeas?.length ? initialIdeas : null)
   // 指示して直すのやり取り(続けて頼めるように。部品を選び直すと消える)
   const [turns, setTurns] = useState<PartTurn[]>([])
   const [draft, setDraft] = useState('')
@@ -88,7 +90,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt, rende
       key: keyOf(idea),
       from: short(value),
       to: short(idea.value),
-      preview: () => onPreview(idea.value),
+      preview: () => onPreview(idea.value, idea),
       unpreview: () => onPreview(null),
       apply: () => onAdopt(idea),
     })
@@ -122,6 +124,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt, rende
   const askIdeasOnce = () => {
     if (asked.current) return
     asked.current = true
+    if (ideas !== null) return
     void run('ideas', ideasRequest)
   }
 

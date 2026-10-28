@@ -163,7 +163,9 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
     try {
       const request = why
         ? tr(`いまの商品を、次の理由で入れ替えます: ${why}。代わりになる、この配信に合う商品を 3 点おすすめしてください。`, `Replacing the current product because: ${why}. Recommend 3 products that could replace it and fit the delivery.`)
-        : tr('この枠の商品の代わりになる、この配信に合う商品を 3〜4 点おすすめしてください。', 'Recommend 3 or 4 products that could replace this one and fit the delivery.')
+        : current
+          ? tr('この枠の商品の代わりになる、この配信に合う商品を 3〜4 点おすすめしてください。', 'Recommend 3 or 4 products that could replace this one and fit the delivery.')
+          : tr('この空いた枠に入れる、この配信に合う商品を 3〜4 点おすすめしてください(同じセクションのほかの商品と重ならないものを)。', 'Recommend 3 or 4 products for this empty slot that fit the delivery (not overlapping the other products in the section).')
       const r = await ask(request, [])
       setPicks({ key: '', ideas: r.ideas, busy: false, error: r.ideas.length ? undefined : r.reply || tr('おすすめが見つかりませんでした', 'No recommendations found') })
     } catch (err) {
@@ -216,7 +218,9 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       icon: <SparkleRegular />,
       content: (
         <AiPicks
-          hint={why ? t(`入れ替える理由(${why})に合わせて、AI が候補を挙げます。押すとプレビューで試せます`, `AI suggests replacements for: ${why}. Click one to try it in the preview`) : t('この枠の代わりになりそうな商品を、AI が挙げます。押すとプレビューで試せます', 'AI suggests products to replace this one. Click one to try it in the preview')}
+          hint={why ? t(`入れ替える理由(${why})に合わせて、AI が候補を挙げます。押すとプレビューで試せます`, `AI suggests replacements for: ${why}. Click one to try it in the preview`) : current
+                ? t('この枠の代わりになりそうな商品を、AI が挙げます。押すとプレビューで試せます', 'AI suggests products to replace this one. Click one to try it in the preview')
+                : t('この空いた枠に合いそうな商品を、AI が挙げます。押すとプレビューで試せます', 'AI suggests products for this empty slot. Click one to try it in the preview')}
           picks={picks ?? undefined}
           hasFallback={fallback.length > 0}
           onAsk={() => void recommend()}
@@ -232,7 +236,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       content: (
         <PartAiChat
           kind="product"
-          label={t('この枠の商品', 'This product')}
+          label={current ? t('この枠の商品', 'This product') : t('空いた枠', 'Empty slot')}
           turns={turns}
           setTurns={setTurns}
           placeholder={t('例: 2 万円以下のアウターで、在庫の多いもの', 'e.g. Outerwear under $150 with plenty of stock')}
@@ -299,7 +303,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
             pick()
           }}
         >
-          {t('この商品と入れ替える', 'Replace with this product')}
+          {current ? t('この商品と入れ替える', 'Replace with this product') : t('この枠に入れる', 'Put in this slot')}
         </Button>
       </span>
       <ProductDetail key={shown.id} product={shown} />

@@ -2,9 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
 import { InfoLabel, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
+import { AddRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
-import { Candidates } from '../Candidates'
 import { ChooseDrawer } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
@@ -43,9 +42,9 @@ import { PartAiChat } from './PartAiChat'
 import { TextAiPanel } from './TextAiPanel'
 import { Hint } from '../Hint'
 import { ProductionMemo } from './ProductionMemo'
-import { askHeroPick, askPartRewrite, askProductPick, type PartAnswer, type PartTurn, type WholeTexts } from './partAi'
+import { askHeroPick, askPartRewrite, type PartAnswer, type PartTurn, type WholeTexts } from './partAi'
 import { ProductSwap, type SwapAt } from './ProductSwap'
-import { AiPicks, type Picks } from '../ProductChooser'
+import { AiPicks, ProductChooser, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
 import { confirmDialog } from '../confirm'
 import { AudienceRow, ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
@@ -259,50 +258,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   }
   // 空いた枠に入れるときの位置(押した枠のセクションに入る。src/slots.ts)
   const slotAt = part?.kind === 'slot' ? part.index : e.items.length
-  /** 商品の枠(載せた商品 itemKey / 空いた枠)を AI に頼む欄 */
-  const productChat = (itemKey: string | null) =>
-    part && (
-      <PartAiChat
-        key={partKey(part)}
-        kind={itemKey ? 'product' : 'slot'}
-        label={itemKey ? t('この枠の商品', 'This product') : t('空いた枠', 'Empty slot')}
-        {...chatOf(part)}
-        placeholder={t('例: 2 万円以下のアウターで、在庫の多いもの', 'e.g. Outerwear under $150 with plenty of stock')}
-        ask={(request, history) => {
-          const it = itemKey ? e.items.find((i) => i.key === itemKey) : undefined
-          return askProductPick({
-            card: e.aiCard(),
-            angle: e.form.copyAngle,
-            current: it ? byId.get(it.productId) : undefined,
-            products: e.poolProducts,
-            inCard: e.items.flatMap((i) => byId.get(i.productId) ?? []),
-            request,
-            history,
-          })
-        }}
-        renderIdea={(idea) => productLine(byId.get(idea.value))}
-        isCurrent={(idea) => e.items.some((i) => i.productId === idea.value)}
-        nowText={itemKey ? (byId.get(e.items.find((i) => i.key === itemKey)?.productId ?? '')?.name ?? '') : t('(空いた枠)', '(empty slot)')}
-        ideaText={(idea) => byId.get(idea.value)?.name ?? idea.value}
-        onPreview={(idea) => e.setAiPreview(idea ? { item: { key: itemKey ?? '', productId: idea.value, at: slotAt } } : null)}
-        onAdopt={(idea) => {
-          e.setAiPreview(null)
-          if (itemKey) e.replaceItem(itemKey, idea.value, idea.why)
-          else e.addProduct(idea.value, slotAt)
-        }}
-      />
-    )
-  /** 案の商品の 1 行(写真・名前・コード・価格・在庫) */
-  const productLine = (p: Product | undefined) =>
-    p ? (
-      <span className={s.ideaRow}>
-        <ImageThumb src={productImage(p)} alt={p.name} width={36} height={44} />
-        <span style={{ display: 'grid', minWidth: 0 }}>
-          <span className={s.name}>{p.name}</span>
-          <span className={s.meta}>{`${p.product_code ?? ''} ・ ${yen(p.price, productMarket(p))} ・ ${t(`在庫 ${p.stock ?? '—'}`, `Stock ${p.stock ?? '—'}`)}`}</span>
-        </span>
-      </span>
-    ) : null
   const text = (k: SimpleField, label: string, opts: { rows?: number; placeholder?: string; hint?: string; max?: number } = {}) => (
     <>
       <Field
@@ -325,6 +280,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {aiChat(k, label, e.form[k], (v) => e.setField(k, v), (v) => ({ [k]: v }))}
     </>
   )
+
 
   const productBox = (p: Product | undefined, extra?: ReactNode, image?: string, tall = false) =>
     p ? (
@@ -666,31 +622,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           </>
         )
       }
-      case 'slot': {
-        const sec = sectionIndexAt(sections, Math.max(0, part.index))
-        const cands = e.candidates.filter((c) => c.section === sec)
-        return (
-          <>
-            <span className={s.caption}>{t('空いた枠に商品を入れます(空いた枠は、前から埋まります)。', 'Put a product in an empty slot (empty slots fill from the front).')}</span>
-            {productChat(null)}
-            {cands.length > 0 && (
-              <>
-                <span className={s.label}>{t(`このセクションの残りの候補(${cands.length})`, `Remaining candidates for this section (${cands.length})`)}</span>
-                {cands.map((c) => {
-                  const p = byId.get(c.productId)
-                  return p ? (
-                    <div key={c.key}>
-                      {productBox(p, <Button size="small" appearance="primary" disabled={e.saving} onClick={() => e.addProduct(p.id, slotAt)}>{t('この枠に入れる', 'Put in this slot')}</Button>)}
-                    </div>
-                  ) : null
-                })}
-              </>
-            )}
-            <span className={s.label}>{t('ほかの商品を探す', 'Search other products')}</span>
-            <Candidates products={e.poolProducts} usedIds={new Set(e.items.map((i) => i.productId))} onAdd={(id) => e.addProduct(id, slotAt)} />
-          </>
-        )
-      }
+      case 'slot':
+        // 空いた枠も、商品の枠の「入れ替える」と同じ引き出し(AI のおすすめ・AI に頼む・すべての商品)を「入れる」として開く(2026-10-29 利用者)。
+        // このセクションの残りの候補は、AI のおすすめのタブに、AI に頼むまでのはじめの候補として出す
+        return <SlotFill key={partKey(part)} editor={e} at={slotAt} chat={chatOf(part)} />
       case 'button': {
         const slot = e.linkSpots.find((x) => x.kind === 'button' && x.key === part.id)
         const tp = findPart(getTemplate(e.template), part.id)
@@ -1127,6 +1062,35 @@ function Aim({ editor: e, onChange }: { editor: SimpleEditor; /** 「変える�
   )
 }
 
+/** 空いた枠に商品を入れる引き出し(商品の枠の入れ替えと同じ ProductChooser。押すとプレビューで試し、「確定」で入れる) */
+function SlotFill({ editor: e, at, chat }: { editor: SimpleEditor; at: number; chat: { turns: PartTurn[]; setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => void } }) {
+  const t = useT()
+  const s = useStyles()
+  // この画面に来たのは入れるためなので、はじめから開いておく(閉じれば、ボタンだけになる)
+  const [open, setOpen] = useState(true)
+  const byId = new Map(e.products.map((p) => [p.id, p]))
+  const sec = sectionIndexAt(sectionsOf(e.template), Math.max(0, at))
+  const cands = e.candidates.filter((c) => c.section === sec)
+  return (
+    <>
+      <span className={s.caption}>{t('空いた枠に商品を入れます(空いた枠は、前から埋まります)。', 'Put a product in an empty slot (empty slots fill from the front).')}</span>
+      <ProductChooser
+        title={t('この枠に入れる商品', 'Product for this slot')}
+        frame={{ kind: 'drawer', open, onOpenChange: setOpen, label: t('入れる', 'Add'), icon: <AddRegular /> }}
+        card={e.aiCard()}
+        angle={e.form.copyAngle}
+        products={e.poolProducts}
+        inCard={e.items.flatMap((i) => (i.gap ? [] : (byId.get(i.productId) ?? [])))}
+        fallback={cands.map((c) => ({ key: c.key, productId: c.productId, reason: c.reason, onPick: () => e.addProduct(c.productId, at) }))}
+        onPick={(productId) => e.addProduct(productId, at)}
+        onPreview={(productId) => e.setAiPreview(productId ? { item: { key: '', productId, at } } : null)}
+        chat={chat}
+        disabled={e.saving}
+      />
+    </>
+  )
+}
+
 /**
  * テーマを直す欄(配信の情報の中。テーマを変えるのはここだけ)。
  * AI のテーマの案は、押すとこの欄にだけ仮に写し(テーマはメールに出ないので、プレビューは変わらない)、帯の「確定」で採用する(X81 の 4)。
@@ -1135,27 +1099,11 @@ function Aim({ editor: e, onChange }: { editor: SimpleEditor; /** 「変える�
 function ThemeField({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
-  // 案の一覧を広げているか(開いたときの自動の下書きで作った案もあるが、押したときだけ広げる)
-  const [ideasOpen, setIdeasOpen] = useState(false)
   // 試している案(欄にだけ仮に写す。保存する中身は変えない)
-  const [trying, setTrying] = useState<ThemeSuggestion | null>(null)
-  const trial = useTrial()
-  const { ideas, busy, run } = e.themeAi
-  const keyOf = (idea: ThemeSuggestion) => `${idea.theme}
-${idea.reason}`
-  const pick = (idea: ThemeSuggestion) =>
-    trial.tryIt({
-      key: keyOf(idea),
-      from: e.form.theme || t('(テーマなし)', '(No theme)'),
-      to: idea.theme,
-      preview: () => setTrying(idea),
-      unpreview: () => setTrying(null),
-      apply: () => {
-        setTrying(null)
-        e.adoptTheme(idea.theme, idea.reason)
-      },
-    })
+  const [trying, setTrying] = useState<{ theme: string; reason: string } | null>(null)
   const reason = trying ? trying.reason : e.form.themeReason
+  // 案のタブは、テーマの案の AI(商品・ほかの配信のテーマを踏まえる)。開いたときの自動の下書きで作った案があれば、それを出す
+  const fromThemes = (list: ThemeSuggestion[]) => list.map((x) => ({ value: x.theme, why: x.reason }))
   return (
     <div data-field="theme" className={s.aimWrap}>
       <Field label={t('テーマ', 'Theme')} hint={t('配信全体の前提。メールには出ません', 'Premise for the whole delivery; not in the email')} size="small">
@@ -1164,46 +1112,39 @@ ${idea.reason}`
       </Field>
       {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
       {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
-      <Tooltip content={ideas.length > 0 ? t('テーマの案を作り直す(押すと試して、確定で採用)', 'Regenerate theme ideas (click one to try, then apply)') : t('AI でテーマの案を出す(押すと試して、確定で採用)', 'Get theme ideas from AI (click one to try, then apply)')} relationship="label">
-        <Button
-          type="button"
-          size="small"
-          appearance="subtle"
-          className={s.themeIdeasClose}
-          icon={busy ? <Spinner size="extra-tiny" /> : <SparkleRegular />}
-          disabled={busy}
-          onClick={() => {
-            setIdeasOpen(true)
-            run()
-          }}
-        >
-          {ideas.length > 0 ? t('テーマの案を作り直す', 'Regenerate theme ideas') : t('AI でテーマの案を出す', 'AI theme ideas')}
-        </Button>
-      </Tooltip>
-      {ideasOpen && (ideas.length > 0 || busy) && (
-        <div className={s.themeIdeas}>
-          <TrialBar state={trial} />
-          {ideas.map((idea) => {
-            const on = trial.trial?.key === keyOf(idea)
-            const used = !trial.trial && idea.theme === e.form.theme
-            return (
-              <button key={keyOf(idea)} type="button" aria-pressed={on} className={mergeClasses(s.pickRow, on && s.heroCandOn)} onClick={() => pick(idea)} title={t('押すと試します(上の「確定」で採用)', 'Click to try it (apply with "Apply" above)')}>
-                <span className={s.themeIdeaHead}>
-                  <span className={s.aimTheme}>{idea.theme}</span>
-                  <span className={s.caption} style={{ justifySelf: 'end' }}>{used ? t('採用中', 'In use') : on ? t('試している', 'Trying') : t('試す', 'Try')}</span>
-                </span>
-                {idea.reason && <span className={s.caption}>{idea.reason}</span>}
-              </button>
-            )
-          })}
-          <Button type="button" size="small" appearance="subtle" className={s.themeIdeasClose} onClick={() => setIdeasOpen(false)}>
-            {t('案をしまう', 'Hide ideas')}
-          </Button>
-        </div>
-      )}
+      {/* 見出し・件名と同じ「AI で変える」(案 = テーマの案と理由 / 指示して直す)。テーマはメールに出ないので、試している案は上の欄にだけ写す(2026-10-29 利用者) */}
+      <TextAiPanel
+        kind="theme"
+        label={t('テーマ', 'Theme')}
+        value={e.form.theme}
+        ideasRequest={THEME_IDEAS}
+        initialIdeas={fromThemes(e.themeAi.ideas)}
+        renderIdea={(idea) => <span className={s.aimTheme}>{idea.value}</span>}
+        placeholder={t('自分で書く(例: もっと季節感を出して)', 'Write your own (e.g. More seasonal)')}
+        ask={async (request, count, history) => {
+          if (request === THEME_IDEAS) return { reply: '', answered: false, ideas: fromThemes(await e.themeAi.ask()) }
+          return askPartRewrite({
+            card: e.aiCard(),
+            angle: e.form.copyAngle,
+            part: { kind: 'theme', label: t('テーマ', 'Theme'), current: e.form.theme },
+            context: { subject: e.form.subject || e.form.name, headline: e.form.headline, copy: e.form.copy },
+            request,
+            history,
+            count,
+          })
+        }}
+        onPreview={(v, idea) => setTrying(v === null ? null : { theme: v, reason: idea?.why ?? '' })}
+        onAdopt={(idea) => {
+          setTrying(null)
+          e.adoptTheme(idea.value, idea.why)
+        }}
+      />
     </div>
   )
 }
+
+/** テーマの案のタブで頼むときの印(画面には出さない。この印のときはテーマの案の AI を使う) */
+const THEME_IDEAS = '__theme_ideas__'
 
 /**
  * 配信の管理の項目(種類・国・ターゲット・担当)。文言を直すときには使わないので、配信の情報の中に置く。

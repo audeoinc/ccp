@@ -98,7 +98,7 @@ export interface SimpleExtras {
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
   /** テーマの AI の案(詳しい画面の ① テーマと同じ useAiDrafts。案は保存しない。X81 の 4) */
-  themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void }
+  themeAi: { ideas: ThemeSuggestion[]; busy: boolean; run: () => void; ask: () => Promise<ThemeSuggestion[]> }
   /** テンプレートごとの最近の使われ方(詳しい画面の ② テンプレートと同じ templateUse。全部の配信が読めるまでは undefined。X81 の 7) */
   templateUse?: Map<string, TemplateUse>
   /** セクションの商品をまとめて AI で選ぶ(詳しい画面の ③ セクションの「AIで選ぶ / 選び直す」と同じ。見出し・コピーを踏まえる)。apply で採用する(X81 の 9) */
