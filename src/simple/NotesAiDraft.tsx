@@ -8,7 +8,8 @@ import type { PartIdea } from './partAi'
 // 渡す文章(制作指示)の AI(2026-10-29 利用者): 「AI で書く」を押す → 欄の真下に案が並ぶ → 押した案がそのまま入る、の 2 つの操作だけにする。
 // ほかの部品の「試す → 確定」(引き出し・帯)にしないのは、渡す文章がプレビューに出ない長い文で、AI に書かせてから人が直すものだから
 // (プレビューで見比べるものがなく、入れたあとに欄で直す。入れたあとも「元に戻す」で戻せるので、確定の一手間を省く)。
-// 案にマウスを乗せている間は、欄に仮に見せる(onPreview)
+// 案にマウスを乗せても、欄には仮に見せない(仮に入れると欄の高さが変わって案の並びが動き、カーソルから外れて戻る、を繰り返して
+// ちかちかした。案の並びに全文が出ているので、見比べはそこでできる。2026-10-29 利用者)
 const useStyles = makeStyles({
   bar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   request: { flexGrow: 1, minWidth: '160px' },
@@ -35,14 +36,12 @@ interface Props {
   value: string
   /** 案を作る(request = 頼み。空ならいつもの頼み) */
   ask: (request: string) => Promise<PartIdea[]>
-  /** 案にマウスを乗せている間、欄に仮に見せる(null で戻す) */
-  onPreview: (value: string | null) => void
   /** 押した案を入れる */
   onAdopt: (idea: PartIdea) => void
   disabled?: boolean
 }
 
-export function NotesAiDraft({ value, ask, onPreview, onAdopt, disabled }: Props) {
+export function NotesAiDraft({ value, ask, onAdopt, disabled }: Props) {
   const t = useT()
   const s = useStyles()
   const [request, setRequest] = useState('')
@@ -66,13 +65,11 @@ export function NotesAiDraft({ value, ask, onPreview, onAdopt, disabled }: Props
     }
   }
   const adopt = (idea: PartIdea) => {
-    onPreview(null)
     onAdopt(idea)
     setIdeas(null)
     setRequest('')
   }
   const close = () => {
-    onPreview(null)
     setIdeas(null)
   }
 
@@ -101,10 +98,10 @@ export function NotesAiDraft({ value, ask, onPreview, onAdopt, disabled }: Props
       </div>
       {busy && <span className={s.note}>{t('AI が書いています…', 'AI is writing…')}</span>}
       {ideas && ideas.length > 0 && (
-        <div className={s.list} onMouseLeave={() => onPreview(null)}>
+        <div className={s.list}>
           <span className={s.note}>{t('押すと、その案が入ります(あとで直せます。元に戻すでも戻せます)', 'Click a draft to use it (you can edit it afterwards, or undo)')}</span>
           {ideas.map((idea) => (
-            <button key={`${idea.value}\n${idea.why}`} type="button" className={s.idea} disabled={disabled} onMouseEnter={() => onPreview(idea.value)} onFocus={() => onPreview(idea.value)} onClick={() => adopt(idea)}>
+            <button key={`${idea.value}\n${idea.why}`} type="button" className={s.idea} disabled={disabled} onClick={() => adopt(idea)}>
               <MarkdownLite text={idea.value} />
               {idea.why && <span className={s.why}>{idea.why}</span>}
             </button>

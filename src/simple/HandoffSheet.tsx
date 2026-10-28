@@ -103,7 +103,6 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSeq])
   // 渡す文章の AI の案を、マウスを乗せている間だけ欄に見せる(本物の値は変えない。自動保存で案が保存されないように。UX 10)
-  const [previewing, setPreviewing] = useState<string | null>(null)
   // 参考の素材(制作指示に名前を挙げる・AI に渡すため。畳んでいても読む)
   const [assets, setAssets] = useState<CardAsset[]>([])
   useEffect(() => {
@@ -217,8 +216,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         {/* 箇条書き・見出しつきで書ける欄(詳しい配信カードの制作指示と同じ。保存は Markdown の文字のまま。2026-10-28 利用者) */}
         <NotesEditor
           minHeight="96px"
-          value={previewing ?? e.form.instructions}
-          readOnly={previewing !== null}
+          value={e.form.instructions}
           insertRef={insertRef}
           placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。「- 」で箇条書き、「### 」で見出し', 'e.g. Feature the model large in the main image; headline below it. Type "- " for bullets, "### " for a heading')}
           onChange={(v) => e.setField('instructions', v)}
@@ -259,7 +257,6 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
             })
             return res.ideas
           }}
-          onPreview={setPreviewing}
           onAdopt={(idea) => e.setField('instructions', idea.value)}
         />
       </div>
