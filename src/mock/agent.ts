@@ -52,6 +52,24 @@ export function mockAgent(message: string): string {
     const docs = (p.docs as { doc: string; title: string }[] | undefined) ?? []
     if (labels.length === 0) return J({ known: false, reply: en ? "I couldn't find this in the docs or on-screen labels." : '文書と画面の文言からは、分かりませんでした。' })
     const name = (l: string[] | undefined) => (l ? (en ? l[1] : l[0]) : '')
+    // 右クリックの「ここについて聞く」から聞いたときは、押した部品の名前を使った答え(見本でも、部品について聞けたことが分かるように)
+    const part = p.part as { label?: string; near?: string[] } | undefined
+    if (part?.label) {
+      const near = (part.near ?? []).filter((n) => n !== part.label).slice(0, 2)
+      return J({
+        known: true,
+        reply: en ? `(Demo answer) "${part.label}" is edited from the pane on the right after you click it.` : `(見本の答え)「${part.label}」は、押して選ぶと、右のペインで直せます。`,
+        steps: [
+          en ? `Click "${part.label}".` : `「${part.label}」を押して選びます。`,
+          en ? 'Edit it in the pane on the right.' : '右のペインで直します。',
+          ...near.map((n) => (en ? `If needed, use [[${n}]] nearby.` : `必要なら、近くの [[${n}]] を使います。`)),
+        ],
+        open: null,
+        openLabel: '',
+        basis: docs.slice(0, 1).map((d) => ({ doc: d.doc, title: d.title })),
+        files: [],
+      })
+    }
     return J({
       known: true,
       reply: en ? `(Demo answer) You can do this from [[${name(labels[0])}]].` : `(見本の答え)[[${name(labels[0])}]] から行えます。`,

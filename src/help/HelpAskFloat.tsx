@@ -27,6 +27,7 @@ import { ResizableSurface } from '../ResizableSurface'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
 import { startDevRequestAt } from '../devRequestPlace'
+import { focusSoon } from '../ContextMenu'
 import { HelpFaqList } from './HelpFaqList'
 import { askHelp, labelChecker, loadMaterial, openAnswer, recordTellDev, tellDevDraft, type HelpPart, type HelpTurn } from './helpAsk'
 
@@ -94,6 +95,10 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
     if (!open) return
     void loadMaterial().then((m) => setIsLabel(() => labelChecker(m)))
   }, [open])
+  // 開いたら、すぐ書けるよう入力欄へ(右クリックの「ここについて聞く」で、開いているフロートに札が付いたときも。2026-10-28 利用者)
+  useEffect(() => {
+    if (open) window.setTimeout(() => focusSoon('[data-help-input] textarea'), 0)
+  }, [open, part])
   // 新しい答え・考えている途中を、見える所までスクロール
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' })
@@ -252,7 +257,7 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
                 <MessageBarBody>{error}</MessageBarBody>
               </MessageBar>
             )}
-            <div className={s.inputRow}>
+            <div className={s.inputRow} data-help-input>
               <AutoTextarea
                 className={s.grow}
                 heightKey="helpAsk.question"
