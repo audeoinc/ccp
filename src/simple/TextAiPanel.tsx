@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Button, Spinner, Tab, TabList, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { useEffect, useRef, useState } from 'react'
+import { Button, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ChooseDrawer } from '../ChoosePanel'
 import { CheckmarkRegular, SendRegular } from '@fluentui/react-icons'
 import { AiIcon } from '../AiMark'
 import { AutoTextarea } from '../AutoTextarea'
@@ -9,12 +10,10 @@ import { TrialBar } from '../TrialBar'
 import { textRequestSamples, type PartAnswer, type PartIdea, type PartTurn } from './partAi'
 
 // 文の部品(見出し・コピー・件名・プリヘッダー・通知の文・セクションの見出しとコピー)の AI(2026-10-27 利用者)。
-// 入力欄に直接書くのがいちばん多いので、ふだんは「AI」のボタンだけにして、押したときだけペインの中でタブを開く(引き出しにしない)。
+// 入力欄に直接書くのがいちばん多いので、ふだんは「AI で変える」のボタンだけにして、押したときだけ、その真下から引き出しを開く
+// (商品の「入れ替える」と同じ ChooseDrawer。2026-10-28 利用者: ボタンと開く所の関係を、入れ替えと同じ動き・見た目に)。
 // 「案」= 候補をいくつか、「指示して直す」= 頼んだとおりに 1 つ。どちらも、押すとプレビューにだけ仮に写し、帯の「確定」で入れ替える(試す → 確定)
 const useStyles = makeStyles({
-  root: { display: 'grid', rowGap: '8px' },
-  toggle: { justifySelf: 'start' },
-  panel: { display: 'grid', rowGap: '8px', padding: '8px 10px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2 },
   row: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
   samples: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
   sample: { minWidth: 'auto', height: '26px', padding: '0 10px', fontWeight: tokens.fontWeightRegular },
@@ -64,7 +63,6 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
   const t = useT()
   const s = useStyles()
   const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<TabId>('ideas')
   const [ideas, setIdeas] = useState<PartIdea[] | null>(null)
   // 指示して直すのやり取り(続けて頼めるように。部品を選び直すと消える)
   const [turns, setTurns] = useState<PartTurn[]>([])
@@ -109,12 +107,12 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
     }
   }
 
-  const openTab = (which: TabId) => {
-    setTab(which)
-    trial.cancel()
-    setError(null)
-    // 案のタブは、初めて開いたときに 1 回だけ頼む(押すたびに AI を呼ばないように)
-    if (which === 'ideas' && ideas === null) void run('ideas', IDEAS_REQUEST)
+  // 案のタブは、初めて開いたときに 1 回だけ頼む(開くたびに AI を呼ばないように。開発の StrictMode の 2 回の描画でも 1 回)
+  const asked = useRef(false)
+  const askIdeasOnce = () => {
+    if (asked.current) return
+    asked.current = true
+    void run('ideas', IDEAS_REQUEST)
   }
 
   const ideaRow = (idea: PartIdea) => {
@@ -131,87 +129,89 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
     )
   }
 
-  return (
-    <div className={s.root}>
-      <ToggleButton
-        className={s.toggle}
-        size="small"
-        icon={<AiIcon size={14} />}
-        checked={open}
-        onClick={() => {
-          if (open) {
-            trial.cancel()
-            setOpen(false)
-          } else {
-            setOpen(true)
-            openTab(tab)
-          }
-        }}
-      >
-        {t('AI', 'AI')}
-      </ToggleButton>
-      {open && (
-        <div className={s.panel}>
-          <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => openTab(d.value as TabId)}>
-            <Tab value="ideas">{t('案', 'Ideas')}</Tab>
-            <Tab value="instruct">{t('指示して直す', 'Edit by instruction')}</Tab>
-          </TabList>
-          <TrialBar state={trial} />
-          {tab === 'ideas' ? (
-            <>
-              <div className={s.row}>
-                <span className={s.note}>{t('押すと、プレビューで試せます(上の「確定」で入れ替え)', 'Click one to try it in the preview (apply with "Apply" above)')}</span>
-                {ideas !== null && (
-                  <Button size="small" appearance="subtle" disabled={!!busy} onClick={() => void run('ideas', IDEAS_REQUEST)}>
-                    {t('出し直す', 'More ideas')}
-                  </Button>
-                )}
-              </div>
-              {busy === 'ideas' && <Spinner size="tiny" label={t('AI が案を考えています', 'AI is thinking')} labelPosition="after" />}
-              {ideas && ideas.length > 0 && busy !== 'ideas' && <div className={s.list}>{ideas.map(ideaRow)}</div>}
-              {ideas && ideas.length === 0 && busy !== 'ideas' && <span className={s.note}>{t('案を出せませんでした。「出し直す」を押してください', 'No ideas came back. Click "More ideas" to try again')}</span>}
-            </>
-          ) : (
-            <>
-              <div className={s.samples}>
-                {textRequestSamples(kind).map((x) => (
-                  <Button key={x} size="small" shape="circular" className={s.sample} disabled={!!busy} onClick={() => void run('instruct', x)}>
-                    {x}
-                  </Button>
-                ))}
-              </div>
-              <div className={s.input}>
-                <AutoTextarea
-                  heightKey="TextAiPanel.draft"
-                  size="small"
-                  rows={1}
-                  value={draft}
-                  disabled={!!busy}
-                  placeholder={t('自分で書く(例: 20 文字以内で、数字を入れて)', 'Write your own (e.g. Under 40 characters, include a number)')}
-                  aria-label={t(`AI への指示(${label})`, `Instruction for AI (${label})`)}
-                  onChange={(_, d) => setDraft(d.value)}
-                  onKeyDown={(ev) => {
-                    // Enter で送る(Shift + Enter は改行。日本語の変換の確定では送らない)
-                    if (ev.key === 'Enter' && !ev.shiftKey && !ev.nativeEvent.isComposing && draft.trim()) {
-                      ev.preventDefault()
-                      void run('instruct', draft.trim())
-                    }
-                  }}
-                />
-                <Button size="small" appearance="primary" icon={<SendRegular />} disabled={!!busy || !draft.trim()} onClick={() => void run('instruct', draft.trim())} aria-label={t('送る', 'Send')} />
-              </div>
-              {busy === 'instruct' && <Spinner size="tiny" label={t('AI が直しています', 'AI is editing')} labelPosition="after" />}
-              {last && busy !== 'instruct' && (
-                <>
-                  {last.text && <span className={s.note}>{last.text}</span>}
-                  {last.ideas?.[0] && <div className={s.list}>{ideaRow(last.ideas[0])}</div>}
-                </>
-              )}
-            </>
-          )}
-          {error && <span className={s.error}>{error}</span>}
-        </div>
-      )}
-    </div>
+  const ideasTab = (
+    <>
+      <OnShow run={askIdeasOnce} />
+      <div className={s.row}>
+        <span className={s.note}>{t('押すと、プレビューで試せます(上の「確定」で入れ替え)', 'Click one to try it in the preview (apply with "Apply" above)')}</span>
+        {ideas !== null && (
+          <Button size="small" appearance="subtle" disabled={!!busy} onClick={() => void run('ideas', IDEAS_REQUEST)}>
+            {t('出し直す', 'More ideas')}
+          </Button>
+        )}
+      </div>
+      {busy === 'ideas' && <Spinner size="tiny" label={t('AI が案を考えています', 'AI is thinking')} labelPosition="after" />}
+      {ideas && ideas.length > 0 && busy !== 'ideas' && <div className={s.list}>{ideas.map(ideaRow)}</div>}
+      {ideas && ideas.length === 0 && busy !== 'ideas' && <span className={s.note}>{t('案を出せませんでした。「出し直す」を押してください', 'No ideas came back. Click "More ideas" to try again')}</span>}
+      {error && <span className={s.error}>{error}</span>}
+    </>
   )
+  const instructTab = (
+    <>
+      <div className={s.samples}>
+        {textRequestSamples(kind).map((x) => (
+          <Button key={x} size="small" shape="circular" className={s.sample} disabled={!!busy} onClick={() => void run('instruct', x)}>
+            {x}
+          </Button>
+        ))}
+      </div>
+      <div className={s.input}>
+        <AutoTextarea
+          heightKey="TextAiPanel.draft"
+          size="small"
+          rows={1}
+          value={draft}
+          disabled={!!busy}
+          placeholder={t('自分で書く(例: 20 文字以内で、数字を入れて)', 'Write your own (e.g. Under 40 characters, include a number)')}
+          aria-label={t(`AI への指示(${label})`, `Instruction for AI (${label})`)}
+          onChange={(_, d) => setDraft(d.value)}
+          onKeyDown={(ev) => {
+            // Enter で送る(Shift + Enter は改行。日本語の変換の確定では送らない)
+            if (ev.key === 'Enter' && !ev.shiftKey && !ev.nativeEvent.isComposing && draft.trim()) {
+              ev.preventDefault()
+              void run('instruct', draft.trim())
+            }
+          }}
+        />
+        <Button size="small" appearance="primary" icon={<SendRegular />} disabled={!!busy || !draft.trim()} onClick={() => void run('instruct', draft.trim())} aria-label={t('送る', 'Send')} />
+      </div>
+      {busy === 'instruct' && <Spinner size="tiny" label={t('AI が直しています', 'AI is editing')} labelPosition="after" />}
+      {last && busy !== 'instruct' && (
+        <>
+          {last.text && <span className={s.note}>{last.text}</span>}
+          {last.ideas?.[0] && <div className={s.list}>{ideaRow(last.ideas[0])}</div>}
+        </>
+      )}
+      {error && <span className={s.error}>{error}</span>}
+    </>
+  )
+
+  // 開くボタンと引き出しは、商品の「入れ替える」と同じ部品(ChooseDrawer)。見た目・開き方・閉じ方・開いている間のボタンをそろえる(2026-10-28 利用者)
+  return (
+    <ChooseDrawer<TabId>
+      open={open}
+      onOpenChange={(o) => {
+        // 閉じたら、試していた案はやめたことにする(プレビューを元に戻す)
+        if (!o) trial.cancel()
+        setOpen(o)
+      }}
+      label={t('AI で変える', 'Change with AI')}
+      icon={<AiIcon size={14} tone="white" />}
+      title={t('AI で変える', 'Change with AI')}
+      top={<TrialBar state={trial} />}
+      tabs={[
+        { value: 'ideas', label: t('案', 'Ideas'), content: ideasTab },
+        { value: 'instruct', label: t('指示して直す', 'Edit by instruction'), content: instructTab },
+      ]}
+    />
+  )
+}
+
+/** タブを開いたとき(中身が描かれたとき)に 1 回だけ呼ぶ */
+function OnShow({ run }: { run: () => void }) {
+  useEffect(() => {
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いたときの 1 回だけ
+  }, [])
+  return null
 }
