@@ -1236,6 +1236,10 @@ function MetaFields({ editor: e, focus }: { editor: SimpleEditor; focus?: string
     <div ref={ref} className={s.root}>
       <NameField value={e.form.name} onChange={(v) => e.setField('name', v)} size="small" field="name" />
       <ThemeField editor={e} />
+      {/* 切り口(見出し・コピーの方向)。AI の案を採用すると入るが、手でも直せるように(詳しい画面を消す前の移し替え。2026-10-28 利用者) */}
+      <Field label={t('切り口(見出し・コピー)', 'Angle (headline & copy)')} hint={t('見出し・コピーをどの方向で書くか。AI の案にも渡します', 'Which direction to write the headline and copy in. Also passed to AI ideas')} size="small">
+        <Input size="small" value={e.form.copyAngle} placeholder={t('例: 寒くなる前の準備', 'e.g. Get ready before it gets cold')} onChange={(_, d) => e.setField('copyAngle', d.value)} data-field="copyAngle" />
+      </Field>
       <ScheduledAtField value={e.form.scheduledAt} onChange={(v) => e.setField('scheduledAt', v)} size="small" field="scheduledAt" />
       <ChoiceField label={t('チャネル', 'Channel')} value={e.form.channel} options={channelOptions} onChange={(v) => e.setField('channel', v)} hint={t('変えると、テンプレートもそのチャネルのものになります', 'Changing it also switches the template to that channel')} size="small" field="channel" />
       <StatusField value={e.form.status} onChange={(v) => e.setField('status', v)} size="small" field="status" />

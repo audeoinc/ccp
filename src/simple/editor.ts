@@ -36,6 +36,7 @@ export type SimpleField =
   | 'subject'
   | 'preheader'
   | 'theme'
+  | 'copyAngle'
   | 'headline'
   | 'copy'
   | 'instructions'
