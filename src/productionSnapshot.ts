@@ -8,6 +8,7 @@ import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import type { Item } from './items'
 import { HEADER_LINKS, UTM_SCHEME, campaignId, headerLinkUrl, campaignSlug, encodeLinks, productLinks, utmFor, variantCampaign, fcmText, linkSlots, parseLinks, productUrl, screenOf, withUtm } from './links'
+import { utmFixedFor } from './countrySettings'
 import { parsePushLink } from './pushLink'
 import { CHANNEL_PUSH } from './status'
 import { getTemplate, sectionRange, sectionsOf, splitTemplateKey, type EmailTemplateId, templateKeyOfCard } from './templates'
@@ -77,6 +78,11 @@ export interface SnapshotVariant {
 /** variantIds: B・C 案の商品 ID(メールの並び順。AB テストで商品を比べるとき) */
 export function buildSnapshot(card: DeliveryCard, productIds: string[], products: Product[], heroes: HeroImage[], variantIds?: Partial<Record<VariantKey, string[]>>): Snapshot {
   const picked = Object.fromEntries(CARD_KEYS.map((k) => [k, card[k]])) as Snapshot['card']
+  // utm_source・utm_medium は、依頼したときの設定の値を写しに入れておく(あとで設定を変えても、依頼した配信の URL が黙って変わらないように。
+  // 配信カードの上書きがあれば、そちらのまま。値の入っていない古い写しは、設定に移す前の値で出す)
+  const fixed = utmFixedFor(card.country, card.channel)
+  const ownLinks = parseLinks(card.links)
+  picked.links = encodeLinks({ ...ownLinks, utm: { source: fixed.source, medium: fixed.medium, ...Object.fromEntries(Object.entries(ownLinks.utm ?? {}).filter(([, v]) => v)) } })
   const hero = heroes.find((h) => h.id === card.hero_image_id) ?? null
   const ab = parseAbTest(card.ab_test)
   const variants: SnapshotVariant[] | undefined = ab?.variants.map((k) => ({

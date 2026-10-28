@@ -153,9 +153,12 @@ export const defaultUtm = (campaign: string) => ({ source: 'newsletter', medium:
  */
 export const variantCampaign = (campaign: string, variant?: string | null) => (variant && campaign ? `${campaign}-${variant.toLowerCase()}` : campaign)
 
-/** 計測用のパラメーター(決まった値に、手で入れた値を重ね、AB テストなら campaign に案を付ける) */
-export function utmFor(links: Links, campaign: string, variant?: string | null) {
-  const base = { ...defaultUtm(campaign), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
+/**
+ * 計測用のパラメーター(決まった値に、配信カードの上書きを重ね、AB テストなら campaign に案を付ける)。
+ * fixed = 設定の utm_source・utm_medium(countrySettings の utmFixedFor)。渡さないときは、設定に移す前の値(制作の依頼の古い写しのため)
+ */
+export function utmFor(links: Links, campaign: string, variant?: string | null, fixed?: { source: string; medium: string }) {
+  const base = { ...defaultUtm(campaign), ...(fixed ?? {}), ...Object.fromEntries(Object.entries(links.utm ?? {}).filter(([, v]) => v)) }
   return { ...base, campaign: variantCampaign(base.campaign, variant) }
 }
 

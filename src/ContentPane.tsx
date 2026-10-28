@@ -476,6 +476,8 @@ export function ContentPane(props: Props) {
           products={props.products}
           campaign={props.utmCampaign}
           variant={props.linkVariant}
+          country={form.country}
+          channel={form.channel}
           onFocusSlot={props.onLinkFocus}
         />
       )}

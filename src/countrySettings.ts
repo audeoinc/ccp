@@ -90,6 +90,12 @@ export interface Brand {
   senderName?: string
   /** 店の URL(リンクの既定・商品のページの URL の元) */
   shopUrl?: string
+  /** 計測用の utm_source(すべてのリンクに付ける。2026-10-28 配信カードの ⑤ から設定に移した) */
+  utmSource?: string
+  /** 計測用の utm_medium(メールの配信) */
+  utmMediumEmail?: string
+  /** 計測用の utm_medium(アプリの配信) */
+  utmMediumApp?: string
 }
 
 export interface BrandEntry {
@@ -99,13 +105,14 @@ export interface BrandEntry {
 }
 
 /** 見本の値(決めていないときに使う。本物の店の名前・URL は、コードに書かない) */
-export const SAMPLE_BRAND: Required<Brand> = { senderName: 'SHOP', shopUrl: 'https://shop.example.com' }
+// utm の値は、設定に移す前にコードで決めていた値(newsletter / email)をそのまま既定にする(GA の見え方を変えないため)。アプリの medium は、チャネルに合う app
+export const SAMPLE_BRAND: Required<Brand> = { senderName: 'SHOP', shopUrl: 'https://shop.example.com', utmSource: 'newsletter', utmMediumEmail: 'email', utmMediumApp: 'app' }
 
 const parseBrand = (v?: string): Brand => {
   try {
     const o = JSON.parse(v ?? '{}') as Brand
     const str = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : undefined)
-    return { senderName: str(o.senderName), shopUrl: str(o.shopUrl)?.replace(/\/+$/, '') }
+    return { senderName: str(o.senderName), shopUrl: str(o.shopUrl)?.replace(/\/+$/, ''), utmSource: str(o.utmSource), utmMediumEmail: str(o.utmMediumEmail), utmMediumApp: str(o.utmMediumApp) }
   } catch {
     return {}
   }
@@ -121,7 +128,16 @@ export function brandFor(country?: string | null): Required<Brand> {
   return {
     senderName: own.senderName || company.senderName || SAMPLE_BRAND.senderName,
     shopUrl: own.shopUrl || company.shopUrl || SAMPLE_BRAND.shopUrl,
+    utmSource: own.utmSource || company.utmSource || SAMPLE_BRAND.utmSource,
+    utmMediumEmail: own.utmMediumEmail || company.utmMediumEmail || SAMPLE_BRAND.utmMediumEmail,
+    utmMediumApp: own.utmMediumApp || company.utmMediumApp || SAMPLE_BRAND.utmMediumApp,
   }
+}
+
+/** その国・チャネルの配信のリンクに付ける utm_source・utm_medium(国の値 → 全社の値 → 既定の値。配信カードの上書きは、links.ts の utmFor が上に重ねる) */
+export function utmFixedFor(country?: string | null, channel?: string | null): { source: string; medium: string } {
+  const b = brandFor(country)
+  return { source: b.utmSource, medium: channel === 'app' ? b.utmMediumApp : b.utmMediumEmail }
 }
 
 /** 全社('')か国の、変えた記録(新しい順) */

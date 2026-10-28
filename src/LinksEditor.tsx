@@ -6,7 +6,8 @@ import type { Product } from './models/products'
 import type { Item } from './items'
 import { useT } from './i18n'
 import { OpenLink } from './LinkText'
-import { type LinkSlot, type Links, defaultUtm, isUrl, productLinks, productUrl, variantCampaign, withUtm } from './links'
+import { type LinkSlot, type Links, defaultUtm, isUrl, productLinks, productUrl, utmFor, withUtm } from './links'
+import { useCountrySettings, utmFixedFor } from './countrySettings'
 import { linkKindLabel, type EmailTemplateId } from './templates'
 
 const useStyles = makeStyles({
@@ -57,21 +58,26 @@ interface Props {
   /** AB テストの、いま編集している案(campaign の末尾に付ける。X55) */
   variant?: string | null
   /** 欄にマウスを重ねた・入力欄を選んだ場所(プレビューで、その場所を光らせる。W12) */
+  /** 配信の国・チャネル(⚙ の設定の utm_source・utm_medium を引く) */
+  country?: string | null
+  channel?: string | null
   onFocusSlot?: (key: string | null) => void
 }
 
 /** 制作指示のタブの下に置く、リンク先の設定(メイン画像・ボタンごとの URL、計測用のパラメーター、商品のリンクの一覧) */
-export function LinksEditor({ links, onLinks, slots, template, items, products, campaign, variant, onFocusSlot }: Props) {
+export function LinksEditor({ links, onLinks, slots, template, items, products, campaign, variant, country, channel, onFocusSlot }: Props) {
   const styles = useStyles()
   const t = useT()
   const [showProducts, setShowProducts] = useState(false)
   const dflt = defaultUtm(campaign)
-  const utm = { source: links.utm?.source || dflt.source, medium: links.utm?.medium || dflt.medium, campaign: variantCampaign(links.utm?.campaign || dflt.campaign, variant) }
+  // utm_source・utm_medium は ⚙ の設定(店の見せ方)の値。配信カードに前からの上書きがあれば、そちら(プレビューと同じ決め方)
+  useCountrySettings()
+  const utm = utmFor(links, campaign, variant, utmFixedFor(country, channel))
 
   const valueOf = (s: LinkSlot) => (s.kind === 'hero' ? links.hero : links.buttons?.[s.key]) ?? ''
   const setSlot = (s: LinkSlot, v: string) =>
     s.kind === 'hero' ? onLinks({ ...links, hero: v }) : onLinks({ ...links, buttons: { ...links.buttons, [s.key]: v } })
-  const setUtm = (k: 'source' | 'medium' | 'campaign', v: string) => onLinks({ ...links, utm: { ...links.utm, [k]: v } })
+  const setUtm = (k: 'campaign', v: string) => onLinks({ ...links, utm: { ...links.utm, [k]: v } })
 
   return (
     <div className={styles.root}>
@@ -119,11 +125,12 @@ export function LinksEditor({ links, onLinks, slots, template, items, products, 
       <div className={styles.slot}>
         <div className={styles.slotHead}>{t('計測用のパラメーター(すべてのリンクに付けます)', 'Tracking parameters (added to every link)')}</div>
         <div className={styles.utm}>
-          <Field label="utm_source" size="small">
-            <Input size="small" value={links.utm?.source ?? ''} placeholder={dflt.source} onChange={(_, d) => setUtm('source', d.value)} />
+          {/* utm_source・utm_medium は、配信カードではなく ⚙ の設定で決める(2026-10-28 利用者)。ここは読むだけ */}
+          <Field label="utm_source" hint={t('⚙ の設定で変えます', 'Change in ⚙ Settings')} size="small">
+            <Input size="small" value={utm.source} readOnly />
           </Field>
-          <Field label="utm_medium" size="small">
-            <Input size="small" value={links.utm?.medium ?? ''} placeholder={dflt.medium} onChange={(_, d) => setUtm('medium', d.value)} />
+          <Field label="utm_medium" hint={t('⚙ の設定で変えます', 'Change in ⚙ Settings')} size="small">
+            <Input size="small" value={utm.medium} readOnly />
           </Field>
           <Field label="utm_campaign" size="small">
             <Input size="small" value={links.utm?.campaign ?? ''} placeholder={dflt.campaign} onChange={(_, d) => setUtm('campaign', d.value)} />

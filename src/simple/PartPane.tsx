@@ -877,8 +877,8 @@ function TrackedUrl({ url }: { url: string }) {
       <InfoLabel
         size="small"
         info={t(
-          'utm_source・utm_medium は決まった値(詳しい画面の ⑤ リンク先で変えられます)。utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から、自動で決まります。AB テストの配信は、utm_campaign の末尾に案の印(-a・-b・-c)が自動で付きます。GA で、どの配信のどのリンクが押されたかを見分けるためです。まだ保存していない配信は、保存すると ID が付きます。',
-          'utm_source and utm_medium are fixed values (change them in ⑤ Links on the detailed view). utm_campaign comes from the send date and delivery card ID, and utm_content from the link spot, automatically. For A/B tests, the variant (-a, -b, -c) is added to the end of utm_campaign automatically. This lets GA tell which link in which delivery was clicked. An unsaved delivery gets its ID when saved.',
+          'utm_source・utm_medium は決まった値(⚙ の設定の「差出人の名前・店の URL・計測用の値」で、全社・国ごとに変えられます。メールとアプリで medium が違います)。utm_campaign は配信日と配信カードの ID から、utm_content はリンクの場所から、自動で決まります。AB テストの配信は、utm_campaign の末尾に案の印(-a・-b・-c)が自動で付きます。GA で、どの配信のどのリンクが押されたかを見分けるためです。まだ保存していない配信は、保存すると ID が付きます。',
+          'utm_source and utm_medium are fixed values (change them per company or country in ⚙ Settings, Sender name, shop URL, and tracking values; email and app use different mediums). utm_campaign comes from the send date and delivery card ID, and utm_content from the link spot, automatically. For A/B tests, the variant (-a, -b, -c) is added to the end of utm_campaign automatically. This lets GA tell which link in which delivery was clicked. An unsaved delivery gets its ID when saved.',
         )}
       >
         {t('計測用のパラメーターつき', 'With tracking')}

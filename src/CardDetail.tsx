@@ -32,6 +32,7 @@ import { SOURCE_AI, type Candidate, type Item } from './items'
 import { progressOf } from './progress'
 import { ResizableSurface } from './ResizableSurface'
 import { campaignId, campaignSlug, productLinks, fcmText, linkSlots, linksComplete, productUrl, screenOf, withUtm, type LinkSlot, utmFor, variantCampaign } from './links'
+import { useCountrySettings, utmFixedFor } from './countrySettings'
 import { loadAutoDraft, loadPref, loadSimpleCard, readRaw, savePref, saveSimpleCard, writeRaw } from './settings'
 import { PREF } from './prefKeys'
 import { runAutoDraft, type AutoDraftInput, type AutoDraftResult } from './autoDraft'
@@ -279,7 +280,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const linkVariant = ab ? active : null
   // utm_campaign の既定値は、配信日 + 配信カードの ID(links.ts の「UTM の決まり」)。リンク先のページの名前(linkCampaign)とは分ける
   const utmCampaign = campaignId(card?.id, form.scheduledAt)
-  const linkUtm = utmFor(links, utmCampaign, linkVariant)
+  // utm_source・utm_medium は、設定(店の見せ方)の国・チャネルの値。配信カードに上書きがあれば、そちら(設定を変えたら描き直す)
+  useCountrySettings()
+  const linkUtm = utmFor(links, utmCampaign, linkVariant, utmFixedFor(form.country, form.channel))
   const fcmCampaign = variantCampaign(linkCampaign, linkVariant)
   // アプリの配信は、URL の代わりに、開く画面(FCM の data)を出す
   const linkUrlOf = (slot: LinkSlot) => {

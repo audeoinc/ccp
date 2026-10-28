@@ -200,7 +200,7 @@ export function useSettingsActions(ctx: {
     {
       id: 'countryBrand',
       section: 'country',
-      label: t('差出人の名前と店の URL', 'Sender name and shop URL'),
+      label: t('差出人の名前・店の URL・計測用の値(utm)', 'Sender name, shop URL, and tracking values (utm)'),
       description: t('全社の既定を、この国だけ変えるときに入れます。空の欄は全社の値を使います。', 'Override the company defaults for this country. Empty fields use the company values.'),
       icon: <SendRegular />,
       render: (co, name) => <Later spin><BrandPanel country={co} countryName={name} /></Later>,
@@ -208,8 +208,8 @@ export function useSettingsActions(ctx: {
     {
       id: 'brand',
       section: 'company',
-      label: t('差出人の名前と店の URL', 'Sender name and shop URL'),
-      description: t('受信箱・メールの上の帯・アプリの通知に出す差出人の名前と、リンクの既定・商品のページの元になる店の URL。国で上書きできます。', 'The sender name shown in the inbox, the email header and app notifications, and the shop URL used for default links and product pages. Countries can override them.'),
+      label: t('差出人の名前・店の URL・計測用の値(utm)', 'Sender name, shop URL, and tracking values (utm)'),
+      description: t('受信箱・メールの上の帯・アプリの通知に出す差出人の名前と、リンクの既定・商品のページの元になる店の URL、すべてのリンクに付ける utm_source・utm_medium(メール・アプリ)。国で上書きできます。', 'The sender name shown in the inbox, the email header and app notifications, the shop URL used for default links and product pages, and the utm_source and utm_medium (email and app) added to every link. Countries can override them.'),
       icon: <SendRegular />,
       render: () => <Later spin><BrandPanel country="" /></Later>,
     },
