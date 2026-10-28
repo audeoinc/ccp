@@ -23,6 +23,7 @@
 - 2026-10-28: **機能の公開・非公開の管理の要件** [FEATURE_FLAGS.md](FEATURE_FLAGS.md)(MVP〜FULL の版・大中小の分類・開発規模。決定: 版は定義だけで公開は機能ごと・開発者だけ全部見える・完全に隠す・画面だけ・MVP にアプリと AI で全体を下書き・詳しい配信カードは消す)。まだ作っていない
 - 2026-10-29 UI 1: X87 段 ①(機能の公開・非公開の土台: features.ts・isOn・表 feature_settings と '*'・users.is_developer・⚙「使える機能」・「一般の人として見る」)をブランチ claude/ui1-x87-flags に。入口への判定(段 ②)はまだ。詳しくは FEATURE_FLAGS.md の 3 章の囲み
 - 2026-10-28 UI 2: セクションの枠(`src/slots.ts`・`Item.gap`)・X81 の 7〜9・セクションの全体を選ぶ(名札 `SectionTagLayer`・パンくず・部品 `section`。呼び名の番号をやめた `sectionsOf`。ピン・アラート・リンク先には残る)は main。X82「？ 聞く」の段 ①②(材料はビルドで作る `helpMaterial.ts`・`src/help/`。質問に近い所だけを渡す。保存の口 `setHelpRecorder`)・段 ③(右クリックの「ここについて聞く」・答えの「開発に伝える」 `startDevRequestAt`・右クリックの共通の項目は鍵ごと)も main・X83 スポットライト(`help/spotlight.ts`・`SpotlightLayer`。見えている名前で探す)も main。④ は UI 3
+- 2026-10-29 UI 2: シンプルな配信カードの AI の入口をそろえた(渡す文章は「AI で書く → 案を押すと入る」`NotesAiDraft`・空いた枠は「入れる」の引き出し・テーマは「AI で変える」・引き出しは確定で閉じる `drawerClose.ts`)。開いたときはアラートがあればアラート、商品情報は閉じる
 - 2026-10-28 UI 3: 配信カードの上を 1 行に詰めた(キャンペーンの帯・承認の札 `ApprovalChip`・面のタブ・配信の情報)。きょうだいの切り替えは窓の動きなし(`instant`)。切り口の欄・utm は ⚙ の店の見せ方へ(依頼の写しに固定)。X82 ④ = 質問の保存と FAQ(`server/ccp/help.py`・`src/help/faq.ts`。20 件で聞いた人の画面がまとめ直す。生の記録は 90 日。管理は ⚙ の開発・管理)。④ の SQL は本番で初めて走る
 
 ## 3. 次にやること
