@@ -92,6 +92,8 @@ export interface SimpleExtras {
   card: DeliveryCard
   /** まとめて作った、まだ保存していない案(card は ID のない仮のもの)。自動では保存せず、上の帯の「この案で作る」で配信を作る */
   unsaved: boolean
+  /** 載せた商品まで読み終わった(アラートの数が決まった。開いたときに左のペインを開くかを決めるため) */
+  loaded: boolean
   /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void

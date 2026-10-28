@@ -72,11 +72,10 @@ const DEFAULT_WIDTHS: Widths = { mobile: 470, pc: 760, list: 300, comm: 320, han
 // 左のバーと、開くパネル(SU4。2026-10-24 利用者と決めた。以前は右端にあり、気づかれなかった)。
 // 配信の全体にかかわる情報とメニュー(やり取り・承認の様子・素材・渡すもの・変更の記録)をここにまとめ、真ん中は作業する場所にする。
 // VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。幅は人ごとに覚える。
-// 配信カードを開いたときは、いつも「アラート」を開いた状態から始める(直さないといけないものを最初に見せる。2026-10-29 利用者。
+// 配信カードを開いたときは、アラートがあれば「アラート」を開き、なければ何も開かない(直さないといけないものを最初に見せる。2026-10-29 利用者。
 // 以前は最後に開いていたものを覚えて開いていたが、承認を開いたまま次のカードを開くと承認から始まっていた)
 type Side = CommSection | 'alerts' | 'learn' | 'assets' | 'handoff' | null
 const isComm = (v: Side): v is CommSection => v === 'talk' || v === 'approval' || v === 'history'
-const START_SIDE: Side = 'alerts'
 const SIDE_W = 56
 // 覚えた幅が数でなければ(壊れた設定)、既定の幅に戻す
 const clampPreview = (v: number) => (Number.isFinite(v) ? Math.min(1200, Math.max(360, v)) : DEFAULT_WIDTHS.mobile)
@@ -396,12 +395,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const resizePreview = (dx: number) => setWidths((w) => ({ ...w, [widthKey]: clampPreview(w[widthKey] + dx) }))
   const resizeList = (dx: number) => setWidths((w) => ({ ...w, list: clampList(w.list - dx) }))
   // まだ保存していない案(e.unsaved)は、配信カードの ID を使うパネル(やり取り・承認・素材・渡すもの・履歴・学び)を出さない。開けるのはアラートだけ
-  const [side, setSide] = useState<Side>(START_SIDE)
+  const [side, setSide] = useState<Side>(null)
+  // 開いたときの左のペインは、載せた商品まで読み終わってから決める(アラートの数は商品で決まるので、読む前に決めると一瞬開いて閉じる)。
   // きょうだいの配信カードに切り替えたとき(この画面は作り直されない)も、開いたときと同じ始まり方にする
-  const [shownCard, setShownCard] = useState(e.card.id)
-  if (shownCard !== e.card.id) {
-    setShownCard(e.card.id)
-    setSide(START_SIDE)
+  const [decided, setDecided] = useState<string | null>(null)
+  if (decided !== e.card.id && e.loaded) {
+    setDecided(e.card.id)
+    setSide(e.alerts.length > 0 ? 'alerts' : null)
     setProductsOpen(false)
   }
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */

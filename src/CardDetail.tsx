@@ -1052,6 +1052,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         // まだ保存していない案は、ID のない仮のカード(ID を使う所 = やり取り・素材・ピンなどは、unsaved のときに出さない)
         card: card ?? { ...draft!.card, id: '', name: form.name, status: form.status as DeliveryCard['status'], owner: form.owner, country: form.country as DeliveryCard['country'] },
         unsaved: !card,
+        loaded: original !== null,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
         themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme() },
