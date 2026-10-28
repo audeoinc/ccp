@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { filled } from '../slots'
 import { Button, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular } from '@fluentui/react-icons'
 import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
 import { SideRail, type RailItem } from './SideRail'
+import { PreviewZoomBar } from './PreviewZoomBar'
 import { useStableCallback } from '../useStableCallback'
 import { PreviewPins } from '../PreviewPins'
 import { ResolvedPinsToggle } from '../ResolvedPinsToggle'
@@ -220,20 +221,6 @@ const useStyles = makeStyles({
   boxPanning: { cursor: 'grabbing', userSelect: 'none', '& [data-part], & [data-item-key]': { cursor: 'grabbing' } },
   boxSpace: { cursor: 'grab', '& [data-part], & [data-item-key]': { cursor: 'grab' } },
   // 倍率の箱: 画像を見るソフトと同じく、プレビューの右下に重ねる
-  zoomBox: {
-    position: 'absolute',
-    right: '14px',
-    bottom: '10px',
-    zIndex: 5,
-    display: 'flex',
-    alignItems: 'center',
-    columnGap: '2px',
-    padding: '2px',
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow8,
-  },
-  zoomLabel: { minWidth: '44px', padding: '0 2px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, cursor: 'pointer', textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
   commPane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
   // 押せる所は 24px(見える点は 10px のまま。WCAG 2.5.8。レビューの 13)。点の色は --dot
   railDot: {
@@ -587,7 +574,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           : undefined,
     })
   }
-  const stepZoom = e.zoom.step
   const toggleProducts = () => {
     // 自動で畳んでいるときは、覚えている開閉(開く)はそのままで、開き直す
     if (fit.auto) {
@@ -1226,26 +1212,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {e.channel === 'email' && <SectionTagLayer boxRef={boxRef} sections={sectionsOf(e.template)} selected={part} onSelect={onPick} disabled={e.saving || placing} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} lead={META_PART} leadOn={metaOn} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} />
           </div>
-          {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
-          <div className={s.zoomBox}>
-            {/* キーの操作の一覧(案内の 3 つの置き方の 2: ⓘ に入れる) */}
-            <InfoLabel
-              size="small"
-              info={t(
-                'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。選んだ商品は Alt + 矢印で上下左右に動かす、Delete で外す。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
-                'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. For a selected product, Alt + arrow keys move it up, down, left or right, and Delete removes it. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
-              )}
-            >
-              {t('キー', 'Keys')}
-            </InfoLabel>
-            <Button type="button" size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => stepZoom(-0.1)} aria-label={t('縮小', 'Zoom out')} />
-            <Tooltip content={e.zoom.mode === 'fit' ? t('100% にする', 'Set to 100%') : t('全体を表示', 'Fit the whole email')} relationship="description">
-              <button type="button" className={s.zoomLabel} onClick={() => e.zoom.set(e.zoom.mode === 'fit' ? 1 : 'fit')}>
-                {e.zoom.mode === 'fit' ? t('全体', 'Fit') : `${Math.round(e.zoom.shown * 100)}%`}
-              </button>
-            </Tooltip>
-            <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={() => stepZoom(0.1)} aria-label={t('拡大', 'Zoom in')} />
-          </div>
+          {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する)。キーの操作の一覧は ⓘ に(案内の 3 つの置き方の 2) */}
+          <PreviewZoomBar
+            zoom={e.zoom}
+            keysInfo={t(
+              'プレビュー: ↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる、Tab でプレビューの外へ。選んだ商品は Alt + 矢印で上下左右に動かす、Delete で外す。Ctrl + S で保存、Ctrl + Z で元に戻す(入力欄の外で)。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
+              'Preview: ↑ ↓ for the previous or next part, Enter to edit, Esc to stop, Tab to leave the preview. For a selected product, Alt + arrow keys move it up, down, left or right, and Delete removes it. Ctrl + S saves, Ctrl + Z undoes (outside text fields). Ctrl + wheel zooms; hold Space and drag to pan.',
+            )}
+          />
           </div>
         </div>
 

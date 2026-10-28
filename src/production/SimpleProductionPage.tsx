@@ -41,6 +41,9 @@ import { day, locale, useT, when } from '../i18n'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
 import { StageHeader } from '../simple/StageHeader'
 import { partElement, type PartRef } from '../simple/parts'
+import { usePreviewZoom } from '../simple/usePreviewZoom'
+import { usePreviewNav } from '../simple/usePreviewNav'
+import { PreviewZoomBar } from '../simple/PreviewZoomBar'
 import {
   buildSnapshot,
   downloadText,
@@ -62,15 +65,18 @@ import {
 const useStyles = makeStyles({
   surface: { position: 'fixed', inset: 0, margin: 'auto', width: 'min(1600px, (97vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(92vh / var(--ui-zoom, 1))', maxHeight: 'calc(92vh / var(--ui-zoom, 1))', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   name: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '420px' },
+  hint: { fontSize: '12px', color: tokens.colorNeutralForeground4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
   state: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
   dot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   panes: { flexGrow: 1, minHeight: 0, display: 'grid' },
   // 左のバーで開いた欄(1 つだけ。しまうと幅 0)
   sidePane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground1, borderRight: `1px solid ${tokens.colorNeutralStroke2}` },
   sideHead: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 6px 6px 12px', ...typo.heading, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, whiteSpace: 'nowrap', overflow: 'hidden' },
-  sideBody: { minHeight: 0, overflowY: 'auto' },
+  // 中身は配信カードの左の欄と同じ余白(境目に貼りつかないように。2026-10-29 利用者)
+  sideBody: { minHeight: 0, overflowY: 'auto', padding: '12px 12px 16px' },
   bar: { padding: '6px 16px 0' },
-  previewPane: { display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, backgroundColor: tokens.colorNeutralBackground3 },
+  // 右下の倍率の操作(PreviewZoomBar)を重ねるので relative
+  previewPane: { position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, backgroundColor: tokens.colorNeutralBackground3 },
   previewBar: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '6px 12px' },
   grow: { flexGrow: 1 },
   // プレビューの箱(部品を選ぶ層の基準。スクロールする)
@@ -201,7 +207,11 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     setPart(p)
   }
   const boxRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
   const offscreenRef = useRef<HTMLDivElement>(null)
+  // 倍率(− ・倍率・＋・全体。配信カードと同じ部品。倍率は制作の画面の鍵で覚える)と、Ctrl + ホイール・つかんで移動
+  const zoom = usePreviewZoom(boxRef, innerRef, PREF.productionSimpleZoom, `${card.id}:${device}`)
+  usePreviewNav(boxRef, zoom)
   const meId = useSyncExternalStore(onMeChange, myUserId)
   const meName = useSyncExternalStore(onMeChange, myName)
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
@@ -431,6 +441,11 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                   {productionLabel(view)}
                 </span>
               </Tooltip>
+              {/* 青いボタンがないときの理由(2026-10-29 利用者「青いボタンが分からなかった」): 渡す前・ほかの人の番 */}
+              {flow.current === 0 && <span className={s.hint}>{t('制作に渡すと、ここに「受け取る」などの進めるボタンが出ます', 'Once handed off, buttons such as "Receive" appear here')}</span>}
+              {flow.now && flow.current > 0 && !myStep && flow.current < 5 && (
+                <span className={s.hint}>{t(`いまは ${flow.now.who || (flow.now.side === 'planner' ? '企画' : '制作')} の番です(左のバーの「工程」からも進められます)`, `It is ${flow.now.who || (flow.now.side === 'planner' ? 'the planner' : 'production')}'s turn (you can also proceed from Steps in the left bar)`)}</span>
+              )}
             </>
           }
           tabs={stageTabs}
@@ -522,9 +537,12 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               </TabList>
             </div>
             <div ref={boxRef} className={s.previewBox} tabIndex={-1}>
-              <CardPreview card={previewCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} device={device} />
+              <div ref={innerRef} style={{ zoom: zoom.mode === 'fit' ? undefined : zoom.mode }}>
+                <CardPreview card={previewCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} device={device} />
+              </div>
               <PreviewPartPicker boxRef={boxRef} selected={part} onSelect={pick} />
             </div>
+            <PreviewZoomBar zoom={zoom} />
           </div>
           <Splitter onDrag={panes.onDrag(1)} onDone={panes.onDone} />
           <div className={mergeClasses(s.side)}>{part ? partPane(part) : givenPane}</div>

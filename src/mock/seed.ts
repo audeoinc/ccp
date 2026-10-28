@@ -782,8 +782,35 @@ export const approvalReviewers: Row[] = [
 // ---- 通知の送る箱(U5)。見本はなし(承認の操作で、撮影用の身代わりが積む)
 export const notifications: Row[] = []
 
-// ---- 制作の依頼・やり取りのリアクション(PR2・PR6)。見本はなし(制作のページの操作で積む)
-export const productionRequests: Row[] = []
+// ---- 制作の依頼(PR2)。制作のシンプルな画面の工程のボタンを見本で試せるように、渡したあとの配信を 2 つ(受け取る前・制作している。2026-10-29 利用者)。
+// 制作の担当は、配信カードの制作の担当(右上でその人を選ぶと、題の行に自分の番の青いボタンが出る)。写しは空にして、いまの配信カードから作った下書きを見せる
+export const productionRequests: Row[] = (
+  [
+    ['Member Week', 'requested'],
+    ['Weekend Sale', 'in_progress'],
+  ] as const
+).flatMap(([name, status]) => {
+  const c = cards.find((x) => x.name === name && x.channel === 'email')
+  if (!c) return []
+  const at = String(c.handed_off_at ?? `${c.production_due}T01:00:00.000Z`)
+  return [
+    {
+      id: guid(`production:${c.id}`),
+      delivery_card_id: c.id,
+      version: 1,
+      status,
+      snapshot: '',
+      instructions: c.instructions ?? '',
+      production_owner: c.production_owner ?? PRODUCTION[0],
+      production_due: c.production_due,
+      requested_at: at,
+      requested_by_name: c.owner,
+      ...(status === 'in_progress' ? { received_at: at, received_by_name: c.production_owner ?? PRODUCTION[0] } : {}),
+      created_on: at,
+    },
+  ]
+})
+// やり取りのリアクション(PR6)。見本はなし
 export const noteReactions: Row[] = []
 
 /**

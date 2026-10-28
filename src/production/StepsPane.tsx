@@ -7,7 +7,8 @@ import { StepAction } from './StepAction'
 import type { ProductionFlow } from './useProductionFlow'
 
 const useStyles = makeStyles({
-  root: { display: 'grid', rowGap: '8px', padding: '12px', alignContent: 'start' },
+  // 余白は、置く欄(左のバーで開いた欄)の側で付ける
+  root: { display: 'grid', rowGap: '8px', alignContent: 'start' },
   step: { display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: '8px', padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorNeutralStroke2}`, color: tokens.colorNeutralForeground3 },
   current: { borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1, backgroundColor: tokens.colorBrandBackground2, color: tokens.colorNeutralForeground1 },
   done: { color: tokens.colorNeutralForeground2 },

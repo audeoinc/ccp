@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { filled, insertAt, joinSections, replaceSection } from './slots'
 import { useStableCallback } from './useStableCallback'
 import {
@@ -64,6 +64,7 @@ import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { AbSettings } from './simple/AbSettings'
 import { CampaignBand, type CampaignBandSlots } from './CampaignBand'
+import { usePreviewZoom } from './simple/usePreviewZoom'
 import { CampaignApprove } from './CampaignApprove'
 import { AddCampaignCardDialog, CampaignMenu } from './CampaignDialogs'
 import { useCampaignOf } from './useCampaignOf'
@@ -135,20 +136,6 @@ interface Props {
 }
 
 
-// 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない(鍵は prefKeys.ts)
-const ZOOM_KEY = PREF.cardPreviewZoom
-const ZOOM_MIN = 0.15  // 長いテンプレートも、「全体」で収まるように、小さくできる
-const ZOOM_MAX = 1.2
-
-/** プレビューの倍率: 数値(1 = 現在のサイズ)または 'fit'(メール全体を画面の高さに収める) */
-function loadZoom(): number | 'fit' {
-  // 読めなければ既定値を使う
-  const v = loadPref<unknown>(ZOOM_KEY, null)
-  if (v === 'fit') return 'fit'
-  if (typeof v === 'number' && v >= ZOOM_MIN && v <= ZOOM_MAX) return v
-  // 既定は、メール全体が見える倍率(作り始めに、構成の全体を見渡せるように)
-  return 'fit'
-}
 
 /** 自動下書きを済ませたカード(同じカードを開き直しても、再実行しない) */
 const autoDrafted = new Set<string>()
@@ -182,15 +169,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // チャネルが未設定のときは、メールで表示する
   const previewTab: 'email' | 'push' = form.channel === String(CHANNEL_PUSH) ? 'push' : 'email'
   const showHeadings = true
-  // プレビューの倍率(15〜120%)。'fit' は、メール全体が画面の高さに収まる倍率に自動で合わせる
-  const [zoom, setZoom] = useState<number | 'fit'>(loadZoom)
   // メールのプレビューの幅(X3。スマホ / PC。ブラウザごとに覚える)
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'pc'>(() => loadPref<'mobile' | 'pc'>(PREF.cardPreviewDevice, 'mobile'))
   const pickDevice = (d: 'mobile' | 'pc') => {
     setPreviewDevice(d)
     savePref(PREF.cardPreviewDevice, d)
   }
-  const [fitZoom, setFitZoom] = useState(1)
   // 「すべてAIで下書き」の進み具合(実行中だけ、画面全体に「推論中」を出す)
   const [autoEnabled] = useState(loadAutoDraft) // 設定は、画面上部のバーで切り替える
   const [auto, setAuto] = useState<{ label: string; done: number; total: number } | null>(null)
@@ -210,40 +194,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const templatesVersion = useTemplates()
 
 
-  useEffect(() => {
-    savePref(ZOOM_KEY, zoom)
-  }, [zoom])
-
-  // 全体表示: 倍率 1 での高さを測り、プレビューの枠に収まる倍率を求める(内容や窓の大きさが変わったら、測り直す)。
-  // 内容の変化は、中身の大きさの変化で知る(文言・商品などを effect の依存に並べると、打つたびに測り直し、並べ忘れると測り直さないため)
-  useLayoutEffect(() => {
-    const box = previewBoxRef.current
-    const inner = previewInnerRef.current
-    if (zoom !== 'fit' || !box || !inner) return
-    const calc = () => {
-      inner.style.zoom = '1'
-      const h = inner.offsetHeight
-      // 高さだけでなく、幅にも収める(ペインを狭めたとき、横にはみ出さないように)
-      const w = (inner.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0
-      const byHeight = h > 0 ? (box.clientHeight - 16) / h : 1
-      const byWidth = w > 0 ? (box.clientWidth - 8) / w : 1
-      const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, byHeight, byWidth))
-      inner.style.zoom = String(z)
-      setFitZoom(z)
-    }
-    calc()
-    const ro = new ResizeObserver(calc)
-    ro.observe(box)
-    // 中身(倍率をかける前のメール)の大きさ。倍率を変えても、この大きさは変わらないので、測り直しが続くことはない
-    const content = inner.firstElementChild
-    if (content) ro.observe(content)
-    return () => {
-      ro.disconnect()
-      inner.style.zoom = ''
-    }
-  }, [zoom, previewTab])
-
-  const shownZoom = zoom === 'fit' ? fitZoom : zoom
+  // プレビューの倍率(15〜120%。'fit' はメール全体が枠に収まる倍率。simple/usePreviewZoom.ts。制作のシンプルな画面と同じ)。
+  // 既定を「全体(fit)」に変えたので、キーの版を上げて、以前に保存した倍率は使わない(鍵は prefKeys.ts)
+  const zoom = usePreviewZoom(previewBoxRef, previewInnerRef, PREF.cardPreviewZoom, previewTab)
 
   // プレビューのリンクの場所と、その URL(リンク先の設定の欄と同じ決め方。W12)
   const linkCampaign = campaignSlug(form.name, form.scheduledAt)
@@ -274,7 +227,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     // 表の箱は、押せる要素ごとにリンクが分かれる(UTM の版 3)。ここには、いちばん上の要素(ふつうは写真)のリンクを出す
     return { name: p.name, url: withUtm(productUrl(p), linkUtm, productLinks(template, index, itemKey, p.product_code)[0]?.content) }
   }
-  const stepZoom = (d: number) => setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((shownZoom + d) * 20) / 20)))
 
 
 
@@ -922,7 +874,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     : {}
   const simplePreview = (
     <>
-      <div ref={previewInnerRef} style={{ zoom: zoom === 'fit' ? undefined : zoom }}>
+      <div ref={previewInnerRef} style={{ zoom: zoom.mode === 'fit' ? undefined : zoom.mode }}>
         <Preview
           {...previewCommon}
           {...shownTexts}
@@ -1170,7 +1122,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         preview: simplePreview,
         device: previewDevice,
         setDevice: pickDevice,
-        zoom: { mode: zoom, shown: shownZoom, set: setZoom, min: ZOOM_MIN, max: ZOOM_MAX, step: stepZoom },
+        zoom,
         // アラートは左のバーの「アラート」に出す(SU6。上の帯に置くと、作業する場所を狭めるため)
         notices: noticesNode,
         footer: footerNode,

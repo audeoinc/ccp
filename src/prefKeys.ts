@@ -47,6 +47,7 @@ export const PREF = {
   // 制作の面のシンプルな画面(X86): ペインの幅と、シンプル / 詳しいのどちらで開くか(消すまでは並べて残す)
   productionSimplePaneWidths: 'productionSimple.paneWidths.v1',
   productionSimple: 'productionPage.simple',
+  productionSimpleZoom: 'productionSimple.previewZoom',
   productionPreviewZoom: 'productionPage.previewZoom',
   bulkPaneWidths: 'bulkWorkspace.paneWidths.v1',
   templateListWidth: 'templateManager.paneWidths.v1',
