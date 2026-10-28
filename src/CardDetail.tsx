@@ -136,6 +136,8 @@ interface Props {
   onNext?: () => void
   /** 同じキャンペーンの、ほかの配信カードに切り替える(キャンペーンの帯のタブ。X79)。保存していない変更は、ここで先に保存してから呼ぶ */
   onSwitchCard?: (id: string) => void
+  /** 開いていた配信カードから続けて開いた(きょうだいの切り替え・保存して次へ・保存して開き直す)。窓の出てくる動きを付けない(暗い背景がいったん消えて、チカっと見えるため。2026-10-28 利用者) */
+  instant?: boolean
   /** ほかの配信カードのアラート(キャンペーンのまとめて承認の、送る前の確かめに使う。X79 段 ④) */
   alertsOf?: (cardId: string) => CardAlert[] | undefined
 }
@@ -170,7 +172,7 @@ const loadOpen = (key: string): boolean => readRaw(key) !== 'closed'
 
 
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext, onSwitchCard, alertsOf }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, initialTab, onTabChange, next, onNext, onSwitchCard, alertsOf, instant }: Props) {
   const t = useT()
   const styles = useCardDetailStyles()
   // シンプルな配信カード(SU1)で描くか。上の帯の「シンプル | 詳しい」で切り替え、最後に選んだ方を次も使う(人の設定)。
@@ -1297,8 +1299,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     : null
 
   return (
-    <Dialog open onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
-      <ResizableSurface ref={surfaceRef} sizeKey="cardDetail" prefKey={PREF.cardSize} min={MIN_DIALOG} className={styles.surface} aria-label={card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}>
+    <Dialog open surfaceMotion={instant ? null : undefined} onOpenChange={(_, d) => { if (!d.open && !saving) onBack() }}>
+      <ResizableSurface ref={surfaceRef} backdropMotion={instant ? null : undefined} sizeKey="cardDetail" prefKey={PREF.cardSize} min={MIN_DIALOG} className={styles.surface} aria-label={card ? card.name : draft ? draft.card.name : t('配信カードの新規作成', 'New delivery card')}>
         <form onSubmit={submit} className={styles.form}>
           {auto && (
             <div className={styles.overlay}>

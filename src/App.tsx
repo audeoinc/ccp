@@ -266,6 +266,12 @@ function App() {
     return { from: dateText(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 27)), to: dateText(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14)) }
   })
   const [selectedId, setSelectedId] = useState<string | null>(link.card ?? null)
+  // 開いていた配信カードから続けて開いたカード(きょうだいの切り替えなど)。窓を付け直すときに、出てくる動きを付けない(CardDetail の instant)
+  const [instantId, setInstantId] = useState<string | null>(null)
+  const openNext = (id: string) => {
+    setInstantId(id)
+    setSelectedId(id)
+  }
   // 配信カードで開いている工程のタブ(URL に持たせる)
   const [cardTab, setCardTab] = useState<string | undefined>(link.tab)
   // 新規作成中なら、最初に入れておく値(null は新規作成していない)
@@ -1457,7 +1463,7 @@ function App() {
           onReopen={(id) => {
             setCreating(null)
             setDraftOpen(null)
-            setSelectedId(id)
+            openNext(id)
           }}
           onCreated={(id) => {
             if (draftOpen) bulk.markSaved(draftOpen.day, id)
@@ -1471,6 +1477,7 @@ function App() {
           owners={owners}
           onBack={() => {
             setFocusProduct(undefined)
+            setInstantId(null)
             setSelectedId(null)
             setCreating(null)
             setDraftOpen(null)
@@ -1508,13 +1515,14 @@ function App() {
           onNext={() => {
             if (!nextOf) return
             setFocusProduct(undefined)
-            setSelectedId(nextOf.id)
+            openNext(nextOf.id)
           }}
           // キャンペーンの帯のタブで、きょうだいの配信に切り替える(X79)
           onSwitchCard={(id) => {
             setFocusProduct(undefined)
-            setSelectedId(id)
+            openNext(id)
           }}
+          instant={!!selected && selected.id === instantId}
           alertsOf={(id) => cardAlerts.get(id)}
         />
         </ErrorBoundary>
