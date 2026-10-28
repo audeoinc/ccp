@@ -212,6 +212,8 @@ const useStyles = makeStyles({
   evenPlus: { padding: 0, fontSize: '12px', border: `1px dashed ${tokens.colorNeutralStroke1}`, borderRadius: '3px', backgroundColor: 'transparent', color: tokens.colorNeutralForeground3, cursor: 'pointer', ':hover': { color: tokens.colorBrandForeground1, border: `1px dashed ${tokens.colorBrandStroke1}` }, ':disabled': { opacity: 0.4, cursor: 'default' } },
   cellSel: { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px' },
   peek: { boxShadow: `0 0 0 3px ${tokens.colorPaletteYellowBorderActive}` },
+  // AI の直しを試しているとき、変わった・足したマス(点線。マスの中身が上に描かれて隠れないように、マスの外側に引く)
+  aiMark: { outline: `2px dashed ${tokens.colorPaletteMarigoldBorderActive}`, outlineOffset: '2px', zIndex: 1 },
   hot: { boxShadow: `inset 0 0 0 2px ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   eTop: { boxShadow: `inset 0 4px 0 ${tokens.colorBrandBackground}` },
   eBottom: { boxShadow: `inset 0 -4px 0 ${tokens.colorBrandBackground}` },
@@ -314,13 +316,15 @@ export interface TableEditorArgs {
   samples?: { src: string; name: string; price: string; regular?: string }[]
   /** ヒーローを押した(右のテンプレートのタブの、全体の見た目へ) */
   onSelectHero: () => void
+  /** 印を付けるマス(部品の ID)。AI の直しを試しているときの、変わった・足した部品(TEMPLATE_OBJECTS.md の 11 章) */
+  marks?: ReadonlySet<string>
 }
 
 /**
  * 表の編集。パーツの列・キャンバス・右のタブ(テンプレート / セクションと部品)を返す(並べ方とスプリッターは、呼ぶ側が決める)。
  * テンプレートのタブの中身は、呼ぶ側が作って rightPane に渡す
  */
-export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroStyle, heroText, topBar, samples = [], onSelectHero }: TableEditorArgs) {
+export function useTableEditor({ active, sections, setSections, heroTable, setHeroTable, hero, heroStyle, heroText, topBar, samples = [], onSelectHero, marks }: TableEditorArgs) {
   const t = useT()
   const s = useStyles()
   const [sel, setSel] = useState<Sel>(null)
@@ -1393,7 +1397,7 @@ export function useTableEditor({ active, sections, setSections, heroTable, setHe
         key={p.id}
         data-cell={p.id}
         data-type={p.type}
-        className={mergeClasses(s.cell, peek === p.id && s.peek, edgeClass(p.id), extra)}
+        className={mergeClasses(s.cell, peek === p.id && s.peek, marks?.has(p.id) && s.aiMark, edgeClass(p.id), extra)}
         style={place}
         onPointerDown={(e) => startSelect(e, sec, p)}
         onDoubleClick={() => (p.type === 'box' || p.type === 'media' ? setQuickId(p.id) : startEdit(p))}

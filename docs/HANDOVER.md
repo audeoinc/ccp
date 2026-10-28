@@ -19,6 +19,7 @@
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-20_21.md](handover-archive/2026-10-20_21.md) の末尾。「HANDOVER から移した行(10KB に縮めたとき)」に、それまでの行がある)
 
 - 2026-10-28: **テンプレートの編集の「似ているテンプレート」**(ブランチ claude/t10-similar-templates。見本で利用者の OK 待ち): 左の帯をやめ、右のタブに似ている順・同じ構成の知らせ・見比べる(`TemplateCompareFloat`)・セクションを取り込む・開く・複製して直す。TEMPLATE_OBJECTS.md の 10 章
+- 2026-10-28: **T13 テンプレートを AI で直す(✨ AI に頼む)**(ブランチ claude/t13-ai-edit-template。見本で画面を見てもらってから main に入れて、本物の Gemini を本番で確かめる): task `edit_template`、返答の検査 `templateEdit.ts`(ID を残す・付け直しの救い)、試す → 確定の帯と点線の印。TEMPLATE_OBJECTS.md の 11 章
 - 2026-10-28: **機能の公開・非公開の管理の要件** [FEATURE_FLAGS.md](FEATURE_FLAGS.md)(MVP〜FULL の版・大中小の分類・開発規模。決定: 版は定義だけで公開は機能ごと・開発者だけ全部見える・完全に隠す・画面だけ・MVP にアプリと AI で全体を下書き・詳しい配信カードは消す)。まだ作っていない
 - 2026-10-27: **T9 テンプレートを AI で作る**(main に入れて本番に反映: deployed-gcp/20261027-230835、main 336b834。本物の Gemini での返答はまだ確かめていない): テンプレートの管理の「✨ AI で作る」→ 目的・商品の数・切り口・雰囲気 → 近いテンプレートを知らせる → AI の下書き(`askAgent`、task `design_template`。返答は `parsePart`・`normalizeTable` で検査)→ 編集(新規)に入れる(保存は人)。TEMPLATE_OBJECTS.md の 9 章
 - 2026-10-27: **AI の置き場の比較の資料** [AI_PLATFORMS.md](AI_PLATFORMS.md)(Gemini と Azure OpenAI・Foundry・Copilot Studio・AI Builder・M365 Copilot。接続の図は `ai-platform-images/`。利用先に渡す。Workbench の ZIP には入れない)
