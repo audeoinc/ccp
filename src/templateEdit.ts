@@ -1,4 +1,4 @@
-// テンプレートを AI で直す(✨ AI に頼む。設計は docs/TEMPLATE_OBJECTS.md の 11 章)。AI に渡す形と、返答の検査。
+// テンプレートを AI で直す(入口「AI で直す」。設計は docs/TEMPLATE_OBJECTS.md の 11 章)。AI に渡す形と、返答の検査。
 // 残す部品の ID は、そのまま残す(UTM・ピン・配信カードの part_content が、部品の ID でつながっているため)。
 // React と AI の呼び出しを持たない(確かめのスクリプトから読めるように。呼び出しは templateAi.ts)
 import { toStored } from './layoutTemplates'

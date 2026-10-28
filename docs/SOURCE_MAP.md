@@ -432,7 +432,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `TemplateFloat.tsx` / `BigFloat.tsx` | 55 / 54 | 設定の画面の「テンプレート」から、管理・編集を別の大きなフロートで開く / 大きな作業のフロート(題の行・閉じる・画面いっぱいの切り替え) |
 | `TemplateAiDialog.tsx` / `templateAi.ts` / `templateDraft.ts` | 177 / 57 / 134 | 「AI でテンプレートを作る」のフロート(T9。近いテンプレートを知らせる。案は保存しない)/ AI に頼む所(作る・直す)/ 返答を表の形に直して検査し、近いテンプレートを探す所(`scripts/check-template-ai.mjs`) |
 | `templateShape.ts` | 33 | テンプレートの構成の形と、似ている度(管理の「同じ構成」・AI で作るときの「近いテンプレート」) |
-| `TemplateAiEditDialog.tsx` / `templateEdit.ts` | 120 / 185 | テンプレートを AI で直す(✨ AI に頼む。T13)の、頼むフロート(返答はキャンバスに仮に当てて、確定・やめる)/ AI に渡す形と返答の検査(残す部品の ID はそのまま。`scripts/check-template-ai.mjs`) |
+| `TemplateAiEditDialog.tsx` / `templateEdit.ts` | 120 / 185 | テンプレートを AI で直す(入口「AI で直す」。T13)の、頼むフロート(返答はキャンバスに仮に当てて、確定・やめる)/ AI に渡す形と返答の検査(残す部品の ID はそのまま。`scripts/check-template-ai.mjs`) |
 | `SimilarTemplates.tsx` / `TemplateCompare.tsx` | 138 / 94 | 編集中の右のタブの「似ているテンプレート」(同じ構成の知らせ・見比べる・セクションを取り込む・開く・複製して直す。T10)/ テンプレートを左右に並べて比べるフロート |
 | `SelBar.tsx` | 60 | 編集のキャンバスで、選んだマスに付ける操作の帯 |
 | `elements.ts` / `swatches.ts` | 102 / 100 | 部品の中の要素(写真・名前・価格・ボタンの文言など)と、その ID(計測・ピン・分析で数える)/ 箱の要素「カラーチップ」「レビュー」 |
