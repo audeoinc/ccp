@@ -28,6 +28,8 @@ const RULES = [
   ['exclude', /^(Dockerfile|\.dockerignore|\.gcloudignore|cloudbuild\.yaml)$/],
   // 見本の画面(デモのビルドを URL で開く。開発元だけで使う)
   ['exclude', /^(cloudbuild-preview\.yaml|preview\/)/],
+  // 見本の画面の使い方(開発元の本番だけの仕組みなので、ZIP に入れない)
+  ['exclude', /^docs\/PREVIEW\.md$/],
   ['exclude', /^scripts\/(deploy-gcp|gcp-smoke|release-workbench)\.mjs$/],
   ['exclude', /^server\/ccp\/hosted\//],
   ['exclude', /^server\/requirements-hosted\.txt$/],
