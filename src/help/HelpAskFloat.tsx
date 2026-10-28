@@ -230,7 +230,10 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
       <ResizableSurface sizeKey="helpAsk" className={s.surface} aria-label={t('使い方を聞く', 'Ask how to use')} data-help-float>
         <DialogBody className={s.body}>
           <div className={s.head}>
-            <DialogTitle className={s.grow}>{t('使い方を聞く', 'Ask how to use')}</DialogTitle>
+            {/* non-modal のフロートでは、DialogTitle が閉じる × を自分で足すので、出さない(右の × と 2 つ並んでいた。ほかの non-modal のフロートと同じ) */}
+            <DialogTitle className={s.grow} action={null}>
+              {t('使い方を聞く', 'Ask how to use')}
+            </DialogTitle>
             <Button appearance="subtle" size="small" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
           </div>
           <DialogContent className={s.content}>
