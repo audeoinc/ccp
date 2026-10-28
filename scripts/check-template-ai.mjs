@@ -78,7 +78,38 @@ export async function checkTemplateAi(server) {
   const after = td.nearTemplates(opts, { itemCount: 4, hero: 'standard' }, tb.toTableLayout(std))
   same(problems, '作ったあとの近い: 同じ構成を先に', [after[0]?.id, after[0]?.same], ['standard4', true])
 
-  return { problems, ok: 'template ai OK(返答の読み方・近いテンプレート)', title: 'テンプレートを AI で作る所が、例と合いません' }
+  // AI で直す(11 章): 残す部品の ID はそのまま。知らない ID・種類の変わった ID は新しく。付け直してしまった ID は救う
+  const te = await server.ssrLoadModule('/src/templateEdit.ts')
+  const base = tb.toTableLayout(std)
+  const cur = { sections: base.sections, heroTable: base.heroTable }
+  const idsOf = (l) => [...(l.heroTable ? [l.heroTable] : []), ...l.sections].flatMap((s) => s.parts.filter((p) => p.type !== 'empty').map((p) => p.id))
+  const oldIds = idsOf(cur)
+  const ask = (request) => te.parseTemplateEdit(JSON.parse(mock.mockAgent(`直す ${JSON.stringify({ task: 'edit_template', request, template: te.layoutForAi(cur) })}`)), cur)
+  {
+    const b = ask('全部の箱にセールのバッジ')
+    same(problems, '直す(バッジ): 部品の ID は変わらない', b && idsOf(b).sort(), [...oldIds].sort())
+    same(problems, '直す(バッジ): 変わったのは箱だけ', b && [b.diff.changed.length, b.diff.added.length, b.diff.removed.length], [boxes(cur), 0, 0])
+    const c = ask('2 列のグリッドを 3 列に')
+    same(problems, '直す(3 列): もとの部品の ID は残る', c && oldIds.every((id) => idsOf(c).includes(id)), true)
+    same(problems, '直す(3 列): 足した箱は新しい ID', c && c.diff.added.length > 0 && c.diff.added.every((id) => !oldIds.includes(id)), true)
+    const d = ask('最後に行を足して')
+    same(problems, '直す(行を足す): 足したのは 1 つ・消したものはない', d && [d.diff.added.length, d.diff.removed.length], [1, 0])
+  }
+  {
+    // 崩れた返答: すべての ID を付け直し・知らない ID・同じ ID を二度。中身が同じものは元の ID に戻り、二度目は新しくなる
+    const secs = te.layoutForAi(cur).sections
+    const renamed = secs.map((s) => ({ ...s, id: 'sec_zzz', parts: s.parts.map((p) => ({ ...p, id: `x_${p.id}` })) }))
+    const r = te.parseTemplateEdit({ sections: renamed }, cur)
+    same(problems, '崩れた返答(付け直し): 元の ID に戻る', r && idsOf(r).sort(), [...oldIds].sort())
+    same(problems, '崩れた返答(付け直し): 救った数', r?.diff.healed, oldIds.length - (cur.heroTable ? cur.heroTable.parts.filter((p) => p.type !== 'empty').length : 0))
+    const first = secs[0].parts[0]
+    const dup = te.parseTemplateEdit({ sections: [{ ...secs[0], parts: [first, { ...first, c: first.c, r: secs[0].rows, w: 1 }] , rows: secs[0].rows + 1 }] }, cur)
+    const got = dup && dup.sections[0].parts.filter((p) => p.type === first.type)
+    same(problems, '崩れた返答(同じ ID を二度): 一つ目だけ元の ID', got && got.filter((p) => p.id === first.id).length, 1)
+    same(problems, '読めない返答(直す)は null', [te.parseTemplateEdit({}, cur), te.parseTemplateEdit({ sections: [{ parts: [{ type: 'x' }] }] }, cur)], [null, null])
+  }
+
+  return { problems, ok: 'template ai OK(作る: 返答の読み方・近いテンプレート / 直す: ID を残す)', title: 'テンプレートを AI で作る・直す所が、例と合いません' }
 }
 
 // 単独で流したとき

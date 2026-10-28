@@ -428,6 +428,33 @@ export function mockAgent(message: string): string {
     })
   }
 
+  // テンプレートを AI で直す(11 章): 「バッジ」→ 全部の箱にバッジ、「列」→ 最初の 2 列の表を 3 列に(各行の右に箱を足す)、ほかは最後にボタンの行。
+  // どれも、残す部品の ID はそのまま返す(本物の AI に求める決まりと同じ)
+  if (task === 'edit_template') {
+    const req = String(p.request ?? '')
+    const ja = hasJa(req) || !en
+    type P = { id?: string; type: string; c: number; r: number; w: number; h: number; fields?: string[]; badge?: string; label?: string; style?: string }
+    type S = { id?: string; cols: number; rows: number; parts: P[] }
+    const tpl = (p.template ?? {}) as { heroTable?: S; sections?: S[] }
+    const sections: S[] = JSON.parse(JSON.stringify(tpl.sections ?? []))
+    if (/バッジ|badge/i.test(req)) {
+      for (const sec of sections) for (const x of sec.parts) if (x.type === 'box') Object.assign(x, { fields: [...new Set([...(x.fields ?? ['name', 'price']), 'badge'])], badge: 'SALE' })
+      return J({ summary: ja ? '全部の箱に「SALE」のバッジを付けました。' : 'Added a SALE badge to every box.', sections })
+    }
+    const two = sections.find((sec) => sec.cols === 2)
+    if (/列|column/i.test(req) && two) {
+      two.cols = 3
+      for (let r = 0; r < two.rows; r++) if (two.parts.some((x) => x.type === 'box' && x.r === r && x.w === 1 && x.h === 1)) two.parts.push({ type: 'box', c: 2, r, w: 1, h: 1 })
+      return J({ summary: ja ? '2 列のグリッドを 3 列にし、各行の右に箱を 1 つずつ足しました。' : 'Changed the 2-column grid to 3 columns and added a box at the end of each row.', sections })
+    }
+    const last = sections[sections.length - 1]
+    if (last) {
+      last.parts.push({ type: 'button', c: 0, r: last.rows, w: last.cols, h: 1, label: ja ? 'もっと見る' : 'See more', style: 'outline' })
+      last.rows += 1
+    }
+    return J({ summary: ja ? '最後のセクションの下に「もっと見る」のボタンの行を足しました。' : 'Added a "See more" button row below the last section.', sections })
+  }
+
   if (task === 'suggest_template') {
     return en
       ? J({ template: 'cat2', reason: 'The theme calls for two angles (outerwear and knits) shown side by side.' })

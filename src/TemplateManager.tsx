@@ -6,6 +6,7 @@ import {
   Field,
   Input,
   MessageBar,
+  MessageBarActions,
   MessageBarBody,
   Select,
   Slider,
@@ -21,6 +22,10 @@ import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, Chev
 import { AutoTextarea } from './AutoTextarea'
 import { shapeOf, similarity } from './templateShape'
 import { TemplateAiDialog } from './TemplateAiDialog'
+import { TemplateAiEditDialog } from './TemplateAiEditDialog'
+import type { TemplateEditOut } from './templateEdit'
+import { LabeledValue } from './LabeledValue'
+import { typo } from './typo'
 import type { TemplateDraftOut } from './templateDraft'
 import { locale, useT } from './i18n'
 import { MAX_BUTTON_LABEL, deleteTemplate, resetBuiltin, restoreVersion, saveTemplate, setTemplateHidden } from './layoutTemplates'
@@ -310,6 +315,12 @@ const useStyles = makeStyles({
   paletteThumb: { display: 'grid', placeItems: 'center', padding: '2px', backgroundColor: '#fff', borderRadius: tokens.borderRadiusSmall, maxHeight: '64px', overflow: 'hidden' },
   paletteName: { fontSize: '12px', overflowWrap: 'anywhere' },
   canvasHead: { display: 'flex', alignItems: 'center', columnGap: '2px', width: '100%' },
+  // AI の直しを試しているときの帯(キャンバスのすぐ上)
+  // キャンバスを下に送っても、確定・やめるが見えるように、上に貼り付ける
+  trialBar: { marginBottom: '8px', position: 'sticky', top: 0, zIndex: 3 },
+  trialHead: { ...typo.heading, display: 'block' },
+  trialText: { display: 'block', marginTop: '2px' },
+  trialFacts: { display: 'flex', flexWrap: 'wrap', columnGap: '16px', rowGap: '2px', marginTop: '4px' },
   toast: { display: 'flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', padding: '2px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground3 },
   toolCount: { fontSize: '12px', minWidth: '14px', textAlign: 'center' },
   // 部品のパレット(ドラッグして構成に入れる)
@@ -417,6 +428,9 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
   // 詳しい欄で見ている過去の版の鍵(null は、いまの版)
   const [viewKey, setViewKey] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null) // 編集中(新規・複製・編集)
+  // AI で直す(✨ AI に頼む)の、頼むフロートと、試している直し。編集を始めるたびに捨てる(前の編集で試していた直しを、持ち越さない)
+  const [aiEditOpen, setAiEditOpen] = useState(false)
+  const [aiTrial, setAiTrial] = useState<{ before: Draft; out: TemplateEditOut; request: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -549,6 +563,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
   }
 
   const startNew = () => {
+    setAiTrial(null)
     setError(null)
     setSelectedId('')
     setCompareId(null)
@@ -556,6 +571,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
   }
   /** そのテンプレートを複製して、編集(新規)を始める(一覧で選んだもの・AI で作るの「近いテンプレート」) */
   const duplicateFrom = (o: (typeof options)[number]) => {
+    setAiTrial(null)
     setError(null)
     setCompareId(null)
     setDraft({
@@ -578,15 +594,20 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
   // AI でテンプレートを作る(T9)。AI の下書きは保存せず、編集(新規)に入れるだけ(保存は人が確かめてから)
   const [aiOpen, setAiOpen] = useState(false)
   const startFromAi = (d: TemplateDraftOut) => {
+    setAiTrial(null)
     setAiOpen(false)
     setError(null)
     setCompareId(null)
     setSelectedId('')
     setDraft({ name: d.name, description: d.description, hero: d.hero, heroText: d.heroText, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}) })
   }
+  // AI で直す(✨ AI に頼む。TEMPLATE_OBJECTS.md の 11 章)。返答はキャンバスに仮に当て(元に戻すの履歴には乗せない)、「確定」で取り込む
+  // 印を付けるマス: 設定が変わった・足した部品(動いただけのものには付けない。行を足すと下の行がすべて動くため)
+  const aiMarks = useMemo(() => (aiTrial ? new Set([...aiTrial.out.diff.changed, ...aiTrial.out.diff.added]) : undefined), [aiTrial])
   // 自由な並び(free)は、決まった構成がないので、編集するものがない
   const canEdit = (o?: { id: string }) => !!o && o.id !== 'free'
   const startEdit = () => {
+    setAiTrial(null)
     if (!selected || !canEdit(selected)) return
     setError(null)
     setCompareId(null)
@@ -632,6 +653,31 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     h.skip = true
     setDraft(fwd)
   }
+  /** AI の直しを、キャンバスに仮に当てる(元に戻すの履歴には乗せない) */
+  const tryAiEdit = (out: TemplateEditOut, request: string) => {
+    if (!draft) return
+    setAiEditOpen(false)
+    const before = aiTrial?.before ?? draft
+    setAiTrial({ before, out, request })
+    hist.current.skip = true
+    setDraft({ ...before, sections: out.sections, heroTable: out.heroTable })
+  }
+  /** やめる: 直す前の形に戻す */
+  const cancelAiEdit = () => {
+    if (!aiTrial) return
+    hist.current.skip = true
+    setDraft(aiTrial.before)
+    setAiTrial(null)
+  }
+  /** 確定: 今の形(AI の直し)のまま、元に戻すの履歴に直す前の形を 1 つ足す(Ctrl+Z で戻せる) */
+  const confirmAiEdit = () => {
+    if (!aiTrial) return
+    const h = hist.current
+    h.past = [...h.past.slice(-99), aiTrial.before]
+    h.future = []
+    setHistCount({ past: h.past.length, future: 0 })
+    setAiTrial(null)
+  }
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d))
   const setSections = (fn: (list: Section[]) => Section[]) => setDraft((d) => (d ? { ...d, sections: fn(d.sections) } : d))
   const setHeroTable = (sec: Section | undefined) => setDraft((d) => (d ? { ...d, heroTable: sec } : d))
@@ -649,7 +695,9 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     }))
   }, [products, country])
   const editor = useTableEditor({
-    active: editing,
+    // AI の直しを試しているあいだは、キャンバスのキー操作を受けない(確定・やめるのどちらかを選んでから)
+    active: editing && !aiTrial,
+    marks: aiMarks,
     sections: draft?.sections ?? [],
     heroTable: draft?.heroTable,
     setHeroTable,
@@ -738,6 +786,8 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     if (!draft) return
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return
+      // AI の直しを試しているあいだは、元に戻さない(「やめる」で戻す)
+      if (aiTrial) return
       const mod = e.ctrlKey || e.metaKey
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
@@ -1285,14 +1335,46 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
                       <span className={s.grow} />
                       {editor.samplesToggle}
                       {editor.zoomBar}
+                      {!draft.push && (
+                        <Button size="small" appearance="subtle" icon={<SparkleRegular />} onClick={() => setAiEditOpen(true)} disabled={!!aiTrial}>
+                          {t('AI に頼む', 'Ask AI')}
+                        </Button>
+                      )}
                       <Tooltip relationship="label" content={t('元に戻す(Ctrl+Z)', 'Undo (Ctrl+Z)')}>
-                        <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0} onClick={undo} />
+                        <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0 || !!aiTrial} onClick={undo} />
                       </Tooltip>
                       <Tooltip relationship="label" content={t('やり直す(Ctrl+Shift+Z)', 'Redo (Ctrl+Shift+Z)')}>
-                        <Button size="small" appearance="subtle" icon={<ArrowRedoRegular />} disabled={histCount.future === 0} onClick={redo} />
+                        <Button size="small" appearance="subtle" icon={<ArrowRedoRegular />} disabled={histCount.future === 0 || !!aiTrial} onClick={redo} />
                       </Tooltip>
                     </div>
-                    {editor.canvas}
+                    {/* AI の直しを試しているとき: 何を変えたかと、確定・やめる(試す → 確定。保存はいつもの「保存」) */}
+                    {aiTrial && (
+                      <MessageBar intent="info" layout="multiline" className={s.trialBar}>
+                        <MessageBarBody>
+                          <span className={s.trialHead}>{t('AI の直しを試しています(まだ取り込んでいません)', 'Trying the AI change (not applied yet)')}</span>
+                          {aiTrial.out.summary && <span className={s.trialText}>{aiTrial.out.summary}</span>}
+                          <span className={s.trialFacts}>
+                            <LabeledValue label={t('変えた部品', 'Changed')}>{aiTrial.out.diff.changed.length}</LabeledValue>
+                            <LabeledValue label={t('足した部品', 'Added')}>{aiTrial.out.diff.added.length}</LabeledValue>
+                            <LabeledValue label={t('消した部品', 'Removed')}>{aiTrial.out.diff.removed.length}</LabeledValue>
+                            {aiTrial.out.diff.reordered && <LabeledValue label={t('セクションの並び', 'Section order')}>{t('変わった', 'Changed')}</LabeledValue>}
+                          </span>
+                        </MessageBarBody>
+                        <MessageBarActions>
+                          <Button size="small" appearance="primary" onClick={confirmAiEdit}>
+                            {t('確定', 'Confirm')}
+                          </Button>
+                          <Button size="small" onClick={cancelAiEdit}>
+                            {t('やめる', 'Cancel')}
+                          </Button>
+                          <Button size="small" appearance="subtle" onClick={() => setAiEditOpen(true)}>
+                            {t('頼み直す', 'Ask again')}
+                          </Button>
+                        </MessageBarActions>
+                      </MessageBar>
+                    )}
+                    {/* 試しているあいだは、キャンバスを触れない(確定・やめるのどちらかを選んでから直す) */}
+                    <div inert={!!aiTrial || undefined}>{editor.canvas}</div>
                   </div>
                   <div className={s.propsCol}>{editor.rightPane(templateTab(draft))}</div>
                 </div>
@@ -1418,9 +1500,18 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
             <div className={s.actions}>
               <span className={s.grow} />
               <Button appearance="secondary" onClick={() => { setDraft(null); setError(null) }} disabled={busy}>{t('キャンセル', 'Cancel')}</Button>
-              <Button appearance="primary" onClick={() => void save()} disabled={!valid || busy}>{busy ? t('保存中...', 'Saving...') : t('保存', 'Save')}</Button>
+              <Button appearance="primary" onClick={() => void save()} disabled={!valid || busy || !!aiTrial}>{busy ? t('保存中...', 'Saving...') : t('保存', 'Save')}</Button>
             </div>
           )}
+      {aiEditOpen && draft && (
+        <TemplateAiEditDialog
+          // 頼み直すときも、直す前の形に頼む(試している形に重ねて直さない)
+          current={aiTrial?.before ?? draft}
+          initial={aiTrial?.request}
+          onResult={tryAiEdit}
+          onClose={() => setAiEditOpen(false)}
+        />
+      )}
       {aiOpen && (
         <TemplateAiDialog
           options={options.filter((o) => !o.hidden)}
