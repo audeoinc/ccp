@@ -6,6 +6,7 @@ import { Button, MessageBar, MessageBarActions, MessageBarBody } from '@fluentui
 import { DismissRegular } from '@fluentui/react-icons'
 import { dismissHint, dismissedHints, getHintsVersion, subscribeHints } from './hints'
 import { useT } from './i18n'
+import { useFeature } from './featureFlags'
 
 /** hintKey: ヒントの種類ごとの名前(閉じたことを覚える鍵。文言を変えても同じ鍵なら、閉じたまま) */
 export function Hint({ hintKey, children }: { hintKey: string; children: ReactNode }) {
@@ -13,7 +14,9 @@ export function Hint({ hintKey, children }: { hintKey: string; children: ReactNo
   // 設定の画面で戻したら(版が上がる)、出し直す
   const v = useSyncExternalStore(subscribeHints, getHintsVersion)
   const [closedAt, setClosedAt] = useState<number | null>(null)
-  if (closedAt === v || dismissedHints().includes(hintKey)) return null
+  // 機能の公開・非公開(X87)
+  const on = useFeature('common.hints')
+  if (!on || closedAt === v || dismissedHints().includes(hintKey)) return null
   return (
     <MessageBar intent="info" layout="multiline">
       <MessageBarBody>{children}</MessageBarBody>

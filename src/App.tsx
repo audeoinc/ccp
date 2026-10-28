@@ -101,6 +101,8 @@ import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
 import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, SimpleProductionPage, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
+import { isOn, useFeature, useFeatureVersion } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 const weekLabel = (start: Date) => {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
@@ -460,6 +462,15 @@ function App() {
     if (p !== 'results' && RESULTS_ONLY.includes(view)) setView('month')
     setPage(p)
   }
+  // 機能の公開・非公開(X87): 非公開の面(制作・結果)を開こうとしたら(リンク・「戻る」・開いたあとに非公開にした)、計画の面で開く
+  const productionFaceOn = useFeature('face.production')
+  const resultsFaceOn = useFeature('face.results')
+  useEffect(() => {
+    // 公開の設定は、描いたあとに読み込まれて分かるので、描いてから移す
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if ((page === 'production' && !productionFaceOn) || (page === 'results' && !resultsFaceOn)) showFace('calendar')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 面と公開の設定が変わったときだけ
+  }, [page, productionFaceOn, resultsFaceOn])
   const [lens, setLens] = useState<WeekLens>(() => loadPref<WeekLens>(LENS_KEY, 'products'))
   // 最初は計画の面なので、「比べる」を覚えていても、月で始める
   const [view, setView] = useState<View>(() => {
@@ -656,6 +667,25 @@ function App() {
   }
   // 週の見方(商品 / 進み具合)は、計画の面の、週の表示だけで使う
   const lensOn = page === 'calendar' && view === 'week'
+  // 機能の公開・非公開(X87)。見せ方・週の見方・計画の面の操作
+  const viewFeature: Record<View, string> = { month: 'plan.month', week: 'plan.week', list: 'plan.list', products: 'plan.byproduct', compare: 'results.compare', impact: 'results.effect', learnings: 'results.learnings' }
+  useFeatureVersion()
+  const viewOn = (v: View) => isOn(viewFeature[v])
+  const lensFeature: Record<WeekLens, string> = { products: 'plan.week.products', progress: 'plan.week.progress', time: 'plan.week.time', compare: 'plan.week.compare' }
+  const quickNew = isOn('plan.quicknew') ? (day: string) => setCreating(newCardDefaults(`${day}T10:00`)) : undefined
+  const swipeOn = isOn('plan.swipe')
+  // 非公開の見せ方・見方を選んでいたら(覚えていた・リンク・あとから非公開にした)、出ている最初のものにする
+  const fallbackView = viewOn(view) ? null : ((['month', 'week', 'list'] as View[]).find(viewOn) ?? null)
+  const fallbackLens = isOn(lensFeature[lens]) ? null : ((['progress', 'products', 'time', 'compare'] as WeekLens[]).find((l) => isOn(lensFeature[l])) ?? null)
+  useEffect(() => {
+    // 公開の設定は、描いたあとに読み込まれて分かるので、描いてから移す
+    if (fallbackView) setView(fallbackView)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fallbackLens) setLens(fallbackLens)
+  }, [fallbackView, fallbackLens])
+  const screenMenuHasItems =
+    (page === 'calendar' && (isOn('ai.weekslots') || isOn('plan.export.csv') || (view === 'week' && (isOn('plan.export.pdf') || isOn('approval.history'))) || view === 'list')) ||
+    (page === 'results' && !!resultsData)
   const changeView = (v: View) => {
     // 週の表示に切り替えたら: 表示中の月に今日があれば今週、なければ、その月の最初の週
     if (v === 'week' && view !== 'week' && month) {
@@ -846,7 +876,7 @@ function App() {
     }
     return { cards: inMonth, sundays, confirmed: sundays.filter(isConfirmed).length, firstOpen: sundays.find((d) => !isConfirmed(d)) }
   }, [month, activeCards, weeks, inScope, weekScope])
-  const monthBar = monthSummary && (
+  const monthBar = monthSummary && isOn('plan.month.summary') && (
     <MonthSummaryBar
       counts={statusOptions.map((o) => ({ label: optionLabel(o.label), color: statusColor(o.value), n: monthSummary.cards.filter((c) => statusView(c.status) === o.value).length }))}
       total={monthSummary.cards.length}
@@ -1019,7 +1049,7 @@ function App() {
               <Button appearance="subtle" size="small" icon={<ChevronRightRegular />} disabled={RESULTS_ONLY.includes(view)} onClick={() => shift(1)} aria-label={view === 'week' ? t('次の週', 'Next week') : t('次の月', 'Next month')} />
               {/* 結果の面の「先週を振り返る」: 振り返りは先週から始まるので、1 回で先週の週表示へ(FLOWS の C-7)。
                   「前週」だけでは、比べる相手の切り替えにも見えるので、何が起きるかを名前にする */}
-              {page === 'results' && (
+              {page === 'results' && isOn('results.review') && (
                 <Button
                   size="small"
                   appearance="subtle"
@@ -1064,7 +1094,7 @@ function App() {
                     ],
                   ] as const
                 )
-                  .filter(([, , off]) => !off)
+                  .filter(([v, , off]) => !off && viewOn(v))
                   .map(([v, label, off, title]) => (
                   <button
                     key={v}
@@ -1078,6 +1108,7 @@ function App() {
                     onClick={() => changeView(v)}
                   >
                     {label}
+                    <FeatureBadge id={viewFeature[v]} />
                   </button>
                 ))}
               </div>
@@ -1085,6 +1116,7 @@ function App() {
               <span className={styles.toolbarDivider} aria-hidden />
               <span ref={setToolbarSlot} className={styles.toolbarSlot} />
               {/* この画面 ▾: いま見ているものへの操作(書き出し・取り込み・列・週の資料と履歴)。どの面・見せ方でも、右端の同じ位置。システム全体の設定は ⚙ */}
+              {screenMenuHasItems && (
               <span className={styles.viewMenu}>
                 <Menu
                   checkedValues={{ columns }}
@@ -1104,12 +1136,12 @@ function App() {
                   <MenuPopover>
                     <MenuList>
                       {/* 週の配信をまとめて作る(W14)。週は表示中の週、月・一覧は「この月の空いている週から」。開くのは作業画面(「新規作成 ▾」の「まとめて作る」と同じ) */}
-                      {page === 'calendar' && view === 'week' && (
+                      {page === 'calendar' && view === 'week' && isOn('ai.weekslots') && (
                         <MenuItem icon={<AiIcon size={16} />} disabled={!canBulk} onClick={() => bulk.openFor(weekStart)} secondaryContent={canBulkReason || t('表示中の週', 'This week')}>
                           {t('この週の配信をまとめて作る', 'Create this week\'s deliveries in bulk')}
                         </MenuItem>
                       )}
-                      {page === 'calendar' && view !== 'week' && (
+                      {page === 'calendar' && view !== 'week' && isOn('ai.weekslots') && (
                         <MenuItem
                           icon={<AiIcon size={16} />}
                           disabled={!monthBulkWeek}
@@ -1127,8 +1159,8 @@ function App() {
                           {t('この月の空いている週から、まとめて作る', 'Create in bulk from an open week in this month')}
                         </MenuItem>
                       )}
-                      {page === 'calendar' && <MenuDivider />}
-                      {page === 'calendar' && (
+                      {page === 'calendar' && isOn('ai.weekslots') && isOn('plan.export.csv') && <MenuDivider />}
+                      {page === 'calendar' && isOn('plan.export.csv') && (
                         <MenuItem
                           icon={<ArrowDownloadRegular />}
                           disabled={(view === 'week' ? weekRows : monthRows).length === 0}
@@ -1141,12 +1173,16 @@ function App() {
                       {/* 週の表示のときだけ: いま見ている週の資料(PDF)と、承認の履歴 */}
                       {page === 'calendar' && view === 'week' && (
                         <>
-                          <MenuItem icon={<DocumentPdfRegular />} disabled={weekCards.length === 0} onClick={() => setPrintingWeek(true)} secondaryContent={t('表示中の週', 'This week')}>
-                            {t('週の資料を PDF で書き出す', 'Export the week handout (PDF)')}
-                          </MenuItem>
-                          <MenuItem icon={<HistoryRegular />} onClick={() => setHistoryOpen(true)} secondaryContent={t(`${weekEvents.length} 件`, `${weekEvents.length}`)}>
-                            {t('この週の承認の履歴', 'Approval history for this week')}
-                          </MenuItem>
+                          {isOn('plan.export.pdf') && (
+                            <MenuItem icon={<DocumentPdfRegular />} disabled={weekCards.length === 0} onClick={() => setPrintingWeek(true)} secondaryContent={t('表示中の週', 'This week')}>
+                              {t('週の資料を PDF で書き出す', 'Export the week handout (PDF)')}
+                            </MenuItem>
+                          )}
+                          {isOn('approval.history') && (
+                            <MenuItem icon={<HistoryRegular />} onClick={() => setHistoryOpen(true)} secondaryContent={t(`${weekEvents.length} 件`, `${weekEvents.length}`)}>
+                              {t('この週の承認の履歴', 'Approval history for this week')}
+                            </MenuItem>
+                          )}
                         </>
                       )}
                       {page === 'results' && resultsData && (
@@ -1154,15 +1190,19 @@ function App() {
                           <MenuItem icon={<ArrowDownloadRegular />} disabled={!resultsData.canExport} onClick={resultsData.exportCsv} secondaryContent={t('表示中の結果', 'Results shown')}>
                             {t('結果を CSV で書き出す', 'Export results as CSV')}
                           </MenuItem>
-                          <MenuItem icon={<ArrowUploadRegular />} onClick={resultsData.importCsv}>
-                            {t('結果を取り込む(CSV)', 'Import results (CSV)')}
-                          </MenuItem>
-                          <MenuItem onClick={resultsData.downloadSample} secondaryContent={resultsData.sampleColumns + t(' 列', ' columns')}>
-                            {t('取り込みの見本を書き出す', 'Download a sample CSV')}
-                          </MenuItem>
-                          <MenuItem icon={<AiIcon size={16} />} disabled={resultsData.classifying || resultsData.untyped === 0} onClick={resultsData.classify} secondaryContent={resultsData.classifying ? t('分けています…', 'Sorting…') : t(`${resultsData.untyped} 件`, `${resultsData.untyped}`)}>
+                          {isOn('results.import') && (
+                            <>
+                              <MenuItem icon={<ArrowUploadRegular />} onClick={resultsData.importCsv}>
+                                {t('結果を取り込む(CSV)', 'Import results (CSV)')}
+                              </MenuItem>
+                              <MenuItem onClick={resultsData.downloadSample} secondaryContent={resultsData.sampleColumns + t(' 列', ' columns')}>
+                                {t('取り込みの見本を書き出す', 'Download a sample CSV')}
+                              </MenuItem>
+                            </>
+                          )}
+                          {isOn('results.classify') && <MenuItem icon={<AiIcon size={16} />} disabled={resultsData.classifying || resultsData.untyped === 0} onClick={resultsData.classify} secondaryContent={resultsData.classifying ? t('分けています…', 'Sorting…') : t(`${resultsData.untyped} 件`, `${resultsData.untyped}`)}>
                             {t('AI でテーマの種類を分ける', 'Sort theme types with AI')}
-                          </MenuItem>
+                          </MenuItem>}
                         </>
                       )}
                       {page === 'calendar' && view === 'list' && (
@@ -1182,6 +1222,7 @@ function App() {
                   </MenuPopover>
                 </Menu>
               </span>
+              )}
             </div>
             </>
             )}
@@ -1226,7 +1267,7 @@ function App() {
               </>
             ) : page === 'results' ? (
               // 結果の面も、週・月なら、つかんで前後へ(一覧・比べるは動かさない)
-              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={view === 'week' || view === 'month'}>
+              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={swipeOn && (view === 'week' || view === 'month')}>
               <Later spin><ResultsPage
                 stageNav={(c) => stageNav(c, 'results')}
                 country={filters.country}
@@ -1335,7 +1376,7 @@ function App() {
               )}
               {/* 週の見方「時刻」(X46): 横 = 曜日・縦 = 時刻の格子。計画の面だけ */}
               {/* 地の部分をつかんで横に引くと、前後の週へ(SwipePager) */}
-              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
+              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={swipeOn}>
               {/* 週の見方「前週と比べる」(C1): 当週と前週を上下に、縮小のプレビューで並べる。絞り込み済みの配信を渡し、週で分けるのは中で */}
               {lens === 'compare' && !onProduction ? (
                 <WeekCompare start={weekStart} cards={filtered} cardProducts={cardProducts} products={products} heroes={heroes} onSelect={openCard} />
@@ -1374,7 +1415,7 @@ function App() {
                 stateOf={onProduction ? productionState : undefined}
                 renderMeta={onProduction ? productionMeta : undefined}
                 // 下書きモードでは、日の「＋」で、その日に下書きを足す
-                onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
+                onCreate={quickNew}
               />
               )}
               </SwipePager>
@@ -1383,7 +1424,7 @@ function App() {
               <>
               {monthBar}
               {/* 計画の面の月の表示に、前月の振り返り(結果の面の月の表示で書いたもの)を出す */}
-              {!onProduction && month && (
+              {!onProduction && month && isOn('plan.prevreview') && isOn('results.review') && (
                 <PrevMonthRetro
                   month={month}
                   country={filters.country}
@@ -1393,14 +1434,14 @@ function App() {
                   }}
                 />
               )}
-              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)}>
+              <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={swipeOn}>
               <Calendar
                 month={month}
                 cards={filtered}
                 dueSoon={dueSoon}
                 alertKinds={alertKinds}
                 onSelect={openCard}
-                onCreate={(day) => setCreating(newCardDefaults(`${day}T10:00`))}
+                onCreate={quickNew}
                 onOpenWeek={(d) => goTo('week', d)}
                 // 制作の面: 箱の色は制作の状態、2 行目は状態と締め切り(PR4)
                 chipTone={onProduction ? productionTone : undefined}

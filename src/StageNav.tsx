@@ -8,6 +8,7 @@ import { statusLabel } from './status'
 import { canGoProduction } from './productionGate'
 import { FACE_COLOR, FACE_TINT, type Face } from './faces'
 import { tr, useT } from './i18n'
+import { useFeature } from './featureFlags'
 
 const useStyles = makeStyles({
   root: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', flexShrink: 0 },
@@ -86,6 +87,9 @@ export function StageNav({ face, card, production, onGo, variant = 'chips' }: Pr
   const s = useStyles()
   const t = useT()
   const pv = productionView(card, production)
+  const stagebarOn = useFeature('common.stagebar')
+  const productionOn = useFeature('face.production')
+  const resultsOn = useFeature('face.results')
   // いまの時刻は、開いたときに 1 回だけ測る(描くたびに変わらないように)
   const [now] = useState(() => Date.now())
   const sent = !!card.scheduled_at && new Date(card.scheduled_at).getTime() <= now
@@ -100,7 +104,10 @@ export function StageNav({ face, card, production, onGo, variant = 'chips' }: Pr
     },
     { face: 'results', name: 'RESULTS', state: sent ? t('結果を見る', 'See results') : t('配信の前', 'Not sent yet'), enabled: sent, why: t('配信日のあとに、結果を見られます', 'Results are available after the send date') },
   ]
-  const shown = onGo ? stages : stages.filter((x) => x.face === face)
+  // 機能の公開・非公開(X87): 非公開の面のタブは出さない(いまいる面は出す)
+  const faceOn = { calendar: true, production: productionOn, results: resultsOn }
+  const shown = (onGo ? stages : stages.filter((x) => x.face === face)).filter((x) => x.face === face || faceOn[x.face])
+  if (!stagebarOn) return null
   // タブ: 配信(題名)が主役で、面はその見方なので、題名の下に並べる。矢印は付けない(順に進む道のりではなく、見方の切り替え)
   if (variant === 'tabs')
     return (

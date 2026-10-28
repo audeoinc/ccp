@@ -25,7 +25,7 @@ import {
   Tooltip,
 } from '@fluentui/react-components'
 import { ChevronDownRegular, PersonRegular, SignOutRegular } from '@fluentui/react-icons'
-import { isDeveloper, setViewingAsUser, useFeatureVersion, viewingAsUser } from './featureFlags'
+import { isDeveloper, isOn, setViewingAsUser, useFeatureVersion, viewingAsUser } from './featureFlags'
 import { useT } from './i18n'
 import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, groupsOf, usePeople, type People } from './people'
@@ -168,7 +168,8 @@ export function MePicker({ className, ariaLabel }: Props) {
             ))}
           </MenuGroup>
           <MenuDivider />
-          {/* 表示の大きさ(X60。ノート PC など、画面が狭いときに縮める。このブラウザで覚える) */}
+          {/* 表示の大きさ(X60。ノート PC など、画面が狭いときに縮める。このブラウザで覚える)。非公開なら出さない(X87) */}
+          {isOn('common.zoom') && (
           <MenuGroup>
             <MenuGroupHeader>{t('表示の大きさ(このブラウザ)', 'Display size (this browser)')}</MenuGroupHeader>
             {UI_SCALES.map((v) => (
@@ -177,6 +178,7 @@ export function MePicker({ className, ariaLabel }: Props) {
               </MenuItemRadio>
             ))}
           </MenuGroup>
+          )}
           {/* 開発者には非公開の機能も出るので、一般の人の見え方を確かめる切り替え(X87。開発者だけに出す。このブラウザで覚える) */}
           {isDeveloper() && (
             <>

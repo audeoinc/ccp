@@ -62,7 +62,8 @@ interface Props {
   weekUse?: Map<string, number>
   onSelect: (id: string) => void
   /** その日付で新規作成する(値は YYYY-MM-DD) */
-  onCreate: (day: string) => void
+  /** 日の見出しの + で新規作成(渡さなければ + を出さない。機能の公開・非公開 X87 の plan.quicknew) */
+  onCreate?: (day: string) => void
   /** 配信の描き方を差し替える(中身のない配信(週の枠)を、その場で入力できる形で出す。W14)。null なら、ふつうに描く */
   renderCard?: (c: DeliveryCard) => ReactNode | null
   /** 配信の状態の色と名前を差し替える(制作の面では、制作の状態。なければ計画のステータス) */
@@ -450,9 +451,11 @@ export function WeekView({ start, cards, cardProducts, questionCounts, taskCount
           <div key={k} className={styles.col}>
             <div className={mergeClasses(styles.head, k === today && styles.today)}>
               <span>{d.toLocaleDateString(locale(), { weekday: 'short', month: 'numeric', day: 'numeric' })}</span>
-              <button type="button" className={styles.add} onClick={() => onCreate(k)} aria-label={t('この日に新規作成', 'New delivery on this day')} title={t('この日に新規作成', 'New delivery on this day')}>
-                <AddRegular />
-              </button>
+              {onCreate && (
+                <button type="button" className={styles.add} onClick={() => onCreate(k)} aria-label={t('この日に新規作成', 'New delivery on this day')} title={t('この日に新規作成', 'New delivery on this day')}>
+                  <AddRegular />
+                </button>
+              )}
             </div>
             <div className={styles.body}>
               {(byDay.get(k) ?? []).map((c) => renderCard?.(c) ?? card(c))}

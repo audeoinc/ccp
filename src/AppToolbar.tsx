@@ -31,6 +31,8 @@ import {
 import { AiIcon } from './AiMark'
 import { MePicker } from './MePicker'
 import { InboxButton } from './InboxButton'
+import { isOn, useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 import { DevPinsToggle } from './DevPinsToggle'
 import type { ApprovalInbox } from './useApprovalInbox'
 import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
@@ -230,6 +232,12 @@ export function AppToolbar({
   const styles = useStyles()
   const faceBtn = useFaceButtonStyles()
   const t = useT()
+  // 機能の公開・非公開(X87)。非公開の面・ボタンは出さない(開発者には出し、横に「非公開」の印)
+  const productionOn = useFeature('face.production')
+  const resultsOn = useFeature('face.results')
+  const alertsOn = useFeature('common.alerts') && isOn('alert')
+  const requestsOn = useFeature('common.requests')
+  const filterOn = useFeature('plan.filter')
   // 面の色・帯に使う面(アラートは面ではないので、計画の色)
   const face: Face = page === 'production' || page === 'results' ? page : 'calendar'
   // 国はヘッダーの設定なので、絞り込みの「クリア」の対象にしない
@@ -306,6 +314,7 @@ export function AppToolbar({
         />
       )}
       {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
+      {alertsOn && (
       <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
         <Button
           appearance={alertsOpen ? 'primary' : 'subtle'}
@@ -319,8 +328,10 @@ export function AppToolbar({
               {alertCount}
             </Badge>
           )}
+          <FeatureBadge id="common.alerts" />
         </Button>
       </Tooltip>
+      )}
       {/* 開発へのリクエスト(画面のどこでも右クリック →「開発に伝える」で書いたもの)の一覧 */}
       <Tooltip content={t('開発へのリクエストの一覧(画面のどこでも、右クリック →「開発に伝える」で書けます)', 'Requests to developers (write one anywhere: right-click → "Tell the developers")')} relationship="label">
         <Button appearance="subtle" size="small" icon={<DevRequestIcon />} onClick={onOpenDevRequests}>
@@ -331,7 +342,8 @@ export function AppToolbar({
       {/* リクエストのピンを出す / 出さない(X69 (b)。人ごとに覚える) */}
       <DevPinsToggle />
       {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
-      <InboxButton inbox={inbox} onOpenCard={onOpenCard} />
+      {requestsOn && <InboxButton inbox={inbox} onOpenCard={onOpenCard} />}
+      {requestsOn && <FeatureBadge id="common.requests" />}
       {/* 作る操作は、ここにまとめる。ボタンの本体で 1 本を新規作成、▾ で、この週の枠を作る(W14。週の表示のときだけ選べる) */}
       <Menu positioning="below-end">
         <MenuTrigger disableButtonEnhancement>
@@ -376,21 +388,28 @@ export function AppToolbar({
             ['production', t('制作', 'Production'), <PaintBrushRegular key="i" />],
             ['results', t('結果', 'Results'), <DataBarVerticalRegular key="i" />],
           ] as const
-        ).map(([p, label, icon]) => (
+        )
+          .filter(([p]) => (p === 'production' ? productionOn : p === 'results' ? resultsOn : true))
+          .map(([p, label, icon]) => (
           <button key={p} type="button" role="tab" aria-selected={page === p} className={mergeClasses(faceBtn.faceBtn, page === p && faceBtn.faceBtnOn)} style={page === p ? { color: FACE_COLOR[p] } : undefined} onClick={() => onFace(p)}>
             {icon}
             {label}
+            {p !== 'calendar' && <FeatureBadge id={p === 'production' ? 'face.production' : 'face.results'} />}
           </button>
         ))}
       </div>
+      {filterOn && (
+      <>
       <span className={styles.filterBarDivider} aria-hidden />
-      <span className={styles.filterBarLabel}>{t('絞り込み', 'Filters')}</span>
+      <span className={styles.filterBarLabel}>{t('絞り込み', 'Filters')}<FeatureBadge id="plan.filter" /></span>
         <FilterSelect label={t('チャネル', 'Channel')} value={filters.channel} options={channelOptions} onChange={setFilter('channel')} />
         <FilterSelect label={t('種類', 'Type')} value={filters.department} options={THEME_TYPES.map((v) => ({ value: v, label: themeTypeLabel(v) }))} onChange={setFilter('department')} />
         {/* ステータス(未起案・承認待ち・承認済み)は計画の面だけ。結果の面は送ったあとの配信なので、絞り込みも効かせない */}
         {page !== 'results' && <FilterSelect label={t('ステータス', 'Status')} value={filters.status} options={statusOptions} onChange={setFilter('status')} />}
         <FilterSelect label={t('担当', 'Owner')} value={filters.person} options={personOptions} onChange={setFilter('person')} />
         {filtering && <Button size="small" appearance="subtle" onClick={() => onFilters({ ...noFilter, country: filters.country })}>{t('クリア', 'Clear')}</Button>}
+      </>
+      )}
       </div>
     {/* 面の帯(X38): いまどの面にいるかを、面の色の線とロゴ風の名前で示す */}
     <div className={styles.faceBand} style={{ backgroundColor: FACE_TINT[face], borderBottomColor: FACE_COLOR[face] }}>

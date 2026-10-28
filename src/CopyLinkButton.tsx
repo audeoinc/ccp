@@ -3,6 +3,8 @@ import { Button } from '@fluentui/react-components'
 import { CheckmarkRegular, LinkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { copyText } from './clipboard'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 /**
  * 「リンクをコピー」(X36)。いま開いている画面(URL に持たせた状態)の URL を写す。
@@ -10,7 +12,10 @@ import { copyText } from './clipboard'
  */
 export function CopyLinkButton({ iconOnly = false }: { /** 文字を出さず、印だけ(詰めた題の行。コピーしたあとだけ「コピーしました」と出す) */ iconOnly?: boolean } = {}) {
   const t = useT()
+  const on = useFeature('common.deeplink')
   const [copied, setCopied] = useState(false)
+  // 機能の公開・非公開(X87)
+  if (!on) return null
   return (
       <Button
         type="button"
@@ -28,6 +33,7 @@ export function CopyLinkButton({ iconOnly = false }: { /** 文字を出さず、
         }}
       >
         {copied ? t('コピーしました', 'Copied') : iconOnly ? undefined : t('リンクをコピー', 'Copy link')}
+        <FeatureBadge id="common.deeplink" />
       </Button>
   )
 }

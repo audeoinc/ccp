@@ -3,6 +3,8 @@ import { Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
 import type { WeekLens } from './WeekView'
 import { useUiScale } from './uiScale'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 const useStyles = makeStyles({
   // 週の表示の中身のいちばん上の段。上の帯には段を足さない(週とほかの表示で、帯の高さが変わらないように)
@@ -31,6 +33,14 @@ export function WeekLensTabs({ anchor, lens, onChange }: { anchor: HTMLElement |
   const [pos, setPos] = useState<{ x: number; rise: number } | null>(null)
   // 表示の大きさ(画面全体に CSS の zoom。X60)を変えたら、測り直す
   const uiScale = useUiScale()
+  // 機能の公開・非公開(X87)
+  const lensOn: Record<WeekLens, boolean> = {
+    products: useFeature('plan.week.products'),
+    progress: useFeature('plan.week.progress'),
+    time: useFeature('plan.week.time'),
+    compare: useFeature('plan.week.compare'),
+  }
+  const shownCount = Object.values(lensOn).filter(Boolean).length
   useLayoutEffect(() => {
     const row = rowRef.current
     if (!anchor || !row) return
@@ -53,15 +63,17 @@ export function WeekLensTabs({ anchor, lens, onChange }: { anchor: HTMLElement |
       window.removeEventListener('resize', measure)
     }
   }, [anchor, uiScale])
+  // 見方が 1 つしかなければ、切り替える物がないので出さない
+  if (shownCount < 2) return null
   return (
     <div ref={rowRef} className={s.row}>
       {pos && <span className={s.stem} aria-hidden style={{ left: pos.x - 1, top: -pos.rise, height: pos.rise }} />}
       <div className={s.box} style={{ marginLeft: pos ? Math.max(0, pos.x - STEM_X) : 0 }}>
         <TabList size="small" selectedValue={lens} onTabSelect={(_, d) => onChange(d.value as WeekLens)} aria-label={t('週の見方', 'Week lens')}>
-          <Tab value="products">{t('商品', 'Products')}</Tab>
-          <Tab value="progress">{t('進み具合', 'Progress')}</Tab>
-          <Tab value="time">{t('時刻', 'Time')}</Tab>
-          <Tab value="compare">{t('前週と比べる', 'vs last week')}</Tab>
+          {lensOn.products && <Tab value="products">{t('商品', 'Products')}<FeatureBadge id="plan.week.products" /></Tab>}
+          {lensOn.progress && <Tab value="progress">{t('進み具合', 'Progress')}<FeatureBadge id="plan.week.progress" /></Tab>}
+          {lensOn.time && <Tab value="time">{t('時刻', 'Time')}<FeatureBadge id="plan.week.time" /></Tab>}
+          {lensOn.compare && <Tab value="compare">{t('前週と比べる', 'vs last week')}<FeatureBadge id="plan.week.compare" /></Tab>}
         </TabList>
       </div>
     </div>
