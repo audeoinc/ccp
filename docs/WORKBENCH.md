@@ -347,6 +347,7 @@ cd server
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
 | `npm ci` / `pip install` が止まる | パッケージの取得先(インターネット)にアクセスできない | 2 の「パッケージの取得について」 |
 | 8082 が使えない(`address already in use`) | 前に起動したサーバーが残っている | `pkill -f "uvicorn ccp.main:app"` で止めてから起動 |
+| 商品の「この配信で使う画像」で「ページを読めませんでした」 | 本物の商品ページは、CCP のサーバーが読みに行く。Workbench は外に出られない | 画像をコピーして貼る・ファイルを上げる、で選ぶ。読めるようにできるかは 6 章で試す |
 
 ---
 
@@ -392,6 +393,121 @@ BigQuery を使わないなら、「■ BigQuery」の [注意] はそのまま�
 | `database "…" does not exist` | DB の名前の違い、まだ作っていない(3.4 の「CCP 用の DB を作る」) |
 | `ASSET_DIR=… に写真がありません` | 3.7 の `import-pack … --yes` をする。`ASSET_DIR` を展開先と同じにする |
 | `ビルドがありません` | リポジトリのルートで `npm ci` → `npm run build` |
+
+## 6. 商品ページを読めるかを試す(商品ページから画像を選ぶ)
+
+配信カードの商品の「この配信で使う画像」では、商品ページの URL を読み、そのページの画像を候補に並べて、AI が配信に合う画像を勧めます(バックログ X64)。
+この節は、**利用先の本物の商品ページを、Workbench から読めるか**を試す手順です。結果を開発の担当に伝えると、Workbench で使える読み方に作り足すかを決められます。
+
+### 6.1 いまの作り(どこで読んでいるか)
+
+商品ページと画像を読むのは、**CCP のサーバー自身**です(Gemini の「URL を読む機能」は、いまは使っていません)。
+
+| 画面の操作 | サーバーの窓口 | 何を読むか | Workbench では |
+|---|---|---|---|
+| 「ページを読む」(画像の候補を並べる) | `POST /api/product-pages/images` | 商品ページの HTML(サーバーが HTTP で取りに行き、`<img>` などから画像を拾う) | **外に出られないので失敗する**(「ページを読めませんでした」) |
+| 「AI に選んでもらう」 | `POST /api/product-pages/suggest` | 候補の画像そのもの(サーバーが取りに行き、Gemini に画像として渡す。Gemini は `/api/ask` と同じく Vertex AI の Gemini) | 外の画像は**失敗する**。CCP の中にある画像(`/img/products/…`)は読める |
+| 「この画像を使う」 | `POST /api/product-pages/adopt` | 選んだ画像(サーバーが取りに行き、CCP の素材の置き場所に写す) | 外の画像は**失敗する** |
+
+- サーバーが外を読むときは、安全のため、URL のホスト名を**Workbench の中で名前解決**し、公開のアドレスだけを読みます。名前解決ができない環境では、ここで止まります(プロキシがあっても、この確かめで止まる)。
+- 見本の EC サイト(`https://shop.example.com/p/<商品コード>` と `/sample-shop/`)は、通信せずに CCP の中で作るので、Workbench でも最後まで動きます。止まるのは本物の URL だけです。
+
+そこで、次の 2 つを試します。**A** は「いまの作りのまま、外に出られるか」、**B** は「Gemini の URL を読む機能(URL context)なら読めるか」です。B は、ページを読むのが Google の側なので、Workbench から外に出られなくても、Vertex AI に届けば動く見込みがあります。
+
+### 6.2 用意
+
+- 試す商品ページの URL を 1 つ決める(利用先の EC サイトの、ふつうの商品ページ。ログインの要らないもの)。以下では `<商品ページの URL>` と書きます。
+- Workbench の**ターミナル**で、CCP のフォルダに入り、設定を読み込む(AI の設定 `GOOGLE_CLOUD_PROJECT` などを使うため):
+
+```bash
+cd ~/ccp/server
+set -a; source workbench.env; set +a
+```
+
+### 6.3 試し A: Workbench から外に出られるか
+
+```bash
+# プロキシの設定があるか(あれば、名前と値の先頭だけ出る)
+env | grep -i -E '^(https?|no)_proxy=' | cut -c1-40
+# 名前解決ができるか
+getent hosts <商品ページのホスト名>
+# ページを取れるか(最後に HTTP の番号が出る)
+curl -sS -m 10 -o /dev/null -w '%{http_code}\n' '<商品ページの URL>'
+```
+
+| 結果 | 意味 |
+|---|---|
+| `getent` が何も出さない、`curl` が `Could not resolve host` | 名前解決ができない。**いまの作りでは読めない**(B を試す) |
+| `curl` が `Connection timed out` / `Failed to connect` | 外に出られない。**いまの作りでは読めない**(B を試す) |
+| プロキシがあり、`curl` が `200` | プロキシ経由なら外に出られる。ただし、いまの作りは名前解決で止まるので、**開発の担当に「プロキシあり・名前解決なし/あり」を伝える**(作りを直せば読める見込み) |
+| プロキシなしで `200` | 外に出られる。CCP の画面の「ページを読む」も動くはず(動かなければ、画面の赤い文字をそのまま伝える) |
+
+CCP のサーバーが動いているなら、サーバーの窓口でも同じことを確かめられます(画面のパスワード `APP_PASSWORD` を設定していれば `-u :<パスワード>` を付ける):
+
+```bash
+curl -sS -X POST "http://localhost:${CCP_PORT:-8082}/api/product-pages/images" \
+  -H 'Content-Type: application/json' -d '{"url": "<商品ページの URL>"}' | head -c 600; echo
+```
+
+`"success": true` と画像の一覧が出れば読めています。`"code": "blocked"` や `"fetch_failed"` なら読めていません(続く文が理由)。
+
+### 6.4 試し B: Gemini の URL を読む機能(URL context)が使えるか
+
+CCP のコードは変えずに、サーバーの Python から Vertex AI の Gemini を直接呼んで試します。料金は、ふつうの AI の呼び出し 1〜2 回分です。
+
+```bash
+cd ~/ccp/server
+set -a; source workbench.env; set +a
+TEST_URL='<商品ページの URL>' .venv/bin/python - <<'PY'
+import os
+from google import genai
+from google.genai import types
+
+client = genai.Client(vertexai=True, project=os.environ["GOOGLE_CLOUD_PROJECT"],
+                      location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"))
+model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+url = os.environ["TEST_URL"]
+prompt = (f"次の商品ページを読んで、商品名と、ページに載っている商品の画像の URL(あれば最大 10 個)を、"
+          f"JSON で返してください。読めなかったら、その理由を書いてください。\n{url}")
+try:
+    r = client.models.generate_content(
+        model=model, contents=prompt,
+        config=types.GenerateContentConfig(tools=[types.Tool(url_context=types.UrlContext())]))
+except Exception as e:  # 機能がない・権限がない など
+    print("呼び出しに失敗:", type(e).__name__, str(e)[:500])
+    raise SystemExit(1)
+print("モデル:", model)
+meta = r.candidates[0].url_context_metadata if r.candidates else None
+for m in (meta.url_metadata if meta and meta.url_metadata else []):
+    print("読んだ URL:", m.retrieved_url, "→", m.url_retrieval_status)
+if not meta:
+    print("url_context_metadata がありません(URL を読まずに答えた)")
+print("---- 返答 ----")
+print((r.text or "")[:2000])
+PY
+```
+
+返答の中の画像の URL が本物かは、手元のブラウザで 1 つ開いて確かめます。
+
+| 結果 | 意味 | 次にすること |
+|---|---|---|
+| `URL_RETRIEVAL_STATUS_SUCCESS`、返答に商品名と画像の URL が並ぶ | **URL context が使える**。Workbench から外に出られなくても、Google の側でページを読める | 開発の担当に「B は成功」と、出た画像の URL の数・正しさを伝える。CCP の「ページを読む」を、この機能でも読めるように作り足す判断になる |
+| `URL_RETRIEVAL_STATUS_SUCCESS` だが、画像の URL が出ない・でたらめ | ページの文は読めるが、画像の URL は拾えていない(ページの作りによる) | 結果をそのまま伝える。画像の一覧は別の方法で集める道を検討する |
+| `URL_RETRIEVAL_STATUS_ERROR` | Google の側からも、そのページを読めなかった(サイトが外からの読み込みを断っている、など) | 別の商品ページでも試す。同じなら、その結果を伝える |
+| `URL_RETRIEVAL_STATUS_PAYWALL` / `UNSAFE` | ログインが要るページ / 安全でないと判定されたページ | ログインの要らないページで試す |
+| 「呼び出しに失敗」で `INVALID_ARGUMENT` や `not supported` | そのモデル・場所では URL context が使えない | `GEMINI_MODEL` や `GOOGLE_CLOUD_LOCATION` を、URL context に対応したモデル・場所に変えて試す(変えたモデル名を伝える) |
+| 「呼び出しに失敗」で `PERMISSION_DENIED` や、組織の制限(VPC Service Controls など)の文 | 組織の設定で、この機能が止められている | 利用先の GCP の管理者に確かめる。結果を伝える |
+| `url_context_metadata がありません` | モデルが URL を読まずに答えた | もう一度試す。毎回なら、そのモデルで機能が効いていない |
+
+### 6.5 Workbench で足りないもの(試しの結果と合わせて伝える)
+
+- **ページを読む**: いまの作りは、Workbench の中から外に出る必要があります。B が成功なら、外に出なくても読めるように作り足せます(開発側の作業)。
+- **AI に画像を見せる・画像を写す**: どちらも、いまはサーバーが画像を取りに行きます。B が成功しても、**画像そのものは別の取り方が要る**(外の画像の URL を、Gemini に URL のまま渡せるか、を開発側で確かめる)。
+- 手で回避する方法: 画像をコピーして貼る・ファイルを上げる、でも候補にできます(画面の「ページを読めませんでした」の文にも出ます)。
+
+伝えてほしいこと(まとめ): 試した日・モデル名(`GEMINI_MODEL`)・場所(`GOOGLE_CLOUD_LOCATION`)・A の 3 つの結果・B の `url_retrieval_status` と返答の要約(画像の URL の数・正しかったか)。**ページの URL・利用先のサイトの名前は、開発のリポジトリには書かずに**、担当に直接伝えてください。
+
+---
 
 ## 付録 A. 環境変数の一覧
 
