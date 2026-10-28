@@ -69,7 +69,7 @@ import { useUndo } from './simple/useUndo'
 import { ViewSwitch } from './simple/ViewSwitch'
 import { AbSettings } from './simple/AbSettings'
 import { usePreviewPins } from './usePreviewPins'
-import { CampaignBand } from './CampaignBand'
+import { CampaignBand, type CampaignBandSlots } from './CampaignBand'
 import { CampaignApprove } from './CampaignApprove'
 import { AddCampaignCardDialog } from './CampaignDialogs'
 import { useCampaignOf } from './useCampaignOf'
@@ -512,7 +512,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       </MessageBar>
     )}
 
-    {/* 承認済みの配信: シンプルな画面は、上の承認の帯(simple/ApprovalBadge の ApprovalBand)で「直すと承認待ちに戻ります」を知らせる(2026-10-26 帯にまとめた) */}
+    {/* 承認済みの配信: シンプルな画面は、題の行の承認の札(simple/ApprovalBadge の ApprovalChip)で「直すと承認待ちに戻ります」を知らせる(2026-10-28 帯から札へ) */}
     {approvedBefore && lockedWeeks.length === 0 && !simpleOn && coreDirty && (
       <MessageBar layout="multiline" intent="info" className={styles.locked}>
         <MessageBarBody>
@@ -795,13 +795,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   }
   const campaignBand =
     card && campaign && onSwitchCard
-      ? (variants: ReactNode) => (
+      ? (slots: CampaignBandSlots) => (
           <CampaignBand
             campaign={campaign}
             card={card}
             allCards={allCards ?? []}
             onSwitch={(id) => void switchCard(id)}
-            variants={variants}
+            slots={slots}
             busy={saving}
             actions={
               <>

@@ -27,7 +27,7 @@ import { Row, productMeta } from '../ProductRow'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
 import { locale, optionLabel, useT } from '../i18n'
-import { audienceLabel, audienceSet, targetText } from '../target'
+import { audienceSet } from '../target'
 import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
 import { getTemplate, slotsOf } from '../templates'
@@ -37,7 +37,7 @@ import { ApprovalBar } from '../ApprovalBar'
 import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
 import { NextAction } from './NextAction'
 import { myNextStep, type NextStep } from './nextStep'
-import { ApprovalBand } from './ApprovalBadge'
+import { ApprovalChip } from './ApprovalBadge'
 import { PartPane } from './PartPane'
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { useFloatSwap } from './floatSwap'
@@ -137,6 +137,7 @@ const useStyles = makeStyles({
   saveFailedText: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
   reasonPop: { display: 'grid', rowGap: '8px', width: '320px' },
   saved: { color: tokens.colorPaletteGreenForeground1 },
+  saveState: { fontSize: '12px', color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap', flexShrink: 0 },
   notices: { display: 'grid', rowGap: '4px' },
   panes: {
     flexGrow: 1,
@@ -161,10 +162,8 @@ const useStyles = makeStyles({
   // 配信の情報の帯(プレビューの上の部品)。メールの中身ではないので、受信箱の見え方(白い札)と違う、薄い灰色の点線の帯にする
   metaBand: {
     display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'baseline',
-    columnGap: '20px',
-    rowGap: '2px',
+    alignItems: 'center',
+    columnGap: '16px',
     width: '100%',
     minWidth: 0,
     padding: '5px 10px',
@@ -179,12 +178,12 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     ':hover': { backgroundColor: tokens.colorNeutralBackground3Hover },
   },
-  // 配信日時・国は短いので縮めない(対象・送る相手が長いときは、そちらを … にする)
+  // 配信日時・国は短いので縮めない(テーマが長いときは、そちらを … にする)
   metaFixed: { flexShrink: 0 },
-  // 配信・国・対象・送る相手の 1 行。入りきらないときだけ、対象・送る相手を … にする(空の値は短いので、ふつうは切れない)
-  metaMain: { display: 'flex', alignItems: 'baseline', columnGap: '20px', minWidth: 0, maxWidth: '100%' },
-  // テーマは長くなりやすいので、ほかの組を縮めずに、入りきらなければ 2 行目に回す(2 行目でも入りきらなければ …。2026-10-27 利用者)
-  metaTheme: { display: 'flex', minWidth: 0, maxWidth: '100%', overflow: 'hidden' },
+  // テーマは長くなりやすいので、1 行に収まらなければ …(全文はマウスを載せると出る)
+  metaTheme: { display: 'flex', minWidth: 0, flexShrink: 1, overflow: 'hidden' },
+  // 受信者には見えないことの印(以前は帯の上の見出し。1 行に詰めたので、帯の中の左の端に)
+  metaIcon: { display: 'inline-flex', flexShrink: 0, color: tokens.colorNeutralForeground3, fontSize: '14px' },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -603,22 +602,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const metaOn = part?.kind === 'meta'
   const tpl = getTemplate(e.template)
   // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
+  // 配信の情報の帯は 1 行(2026-10-28 利用者: 対象・送る相手は、押すと開く右のペインの配信の情報で見る。中身が重なっていたため)
   const metaSummary = (
     <>
-      <span className={s.metaMain}>
-        <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
-          {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-        </LabeledValue>
-        <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
-          {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
-        </LabeledValue>
-        <LabeledValue label={t('対象', 'Target')} emptyText={t('指定なし', 'Not specified')} truncate>
-          {targetText({ gender: e.form.targetGender, ages: e.form.targetAges })}
-        </LabeledValue>
-        <LabeledValue label={t('送る相手', 'Send to')} truncate>
-          {audienceSet(e.audience, e.channel) ? audienceLabel(e.audience, e.channel) : ''}
-        </LabeledValue>
+      <span className={s.metaIcon} aria-hidden>
+        <InfoRegular />
       </span>
+      <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
+        {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+      </LabeledValue>
+      <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
+        {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
+      </LabeledValue>
       {/* テーマもここに並べる(テーマを直すのは、この帯から開く配信の情報だけなので、在りかが分かるように。2026-10-27 利用者)。… にした値の全文は、マウスを載せると出る(LabeledValue の truncate) */}
       <span className={s.metaTheme}>
         <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')} truncate>
@@ -664,6 +659,18 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
    * 案が 1 つのときは「＋ AB テストの案を足す」だけ、2 つ以上のときは「案 A | 案 B」のタブ(押すと、プレビューと中身がその案になる)。
    * アイコンに頼らず文字で書き、何をするものかは ⓘ(InfoLabel)に
    */
+  const addVariantItems = (
+    <>
+      {(e.ab?.keys ?? ['A']).map((k) => (
+        <MenuItem key={k} onClick={() => (void onCommit(), e.abAdd(k))}>
+          {t(`案 ${k} を写して直す`, `Copy variant ${k} and edit`)}
+        </MenuItem>
+      ))}
+      <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
+        {t('AI で別の案を作る', 'Let AI make another variant')}
+      </MenuItem>
+    </>
+  )
   const addVariantMenu = (
     <Menu>
       <MenuTrigger disableButtonEnhancement>
@@ -672,16 +679,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         </Button>
       </MenuTrigger>
       <MenuPopover>
-        <MenuList>
-          {(e.ab?.keys ?? ['A']).map((k) => (
-            <MenuItem key={k} onClick={() => (void onCommit(), e.abAdd(k))}>
-              {t(`案 ${k} を写して直す`, `Copy variant ${k} and edit`)}
-            </MenuItem>
-          ))}
-          <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
-            {t('AI で別の案を作る', 'Let AI make another variant')}
-          </MenuItem>
-        </MenuList>
+        <MenuList>{addVariantItems}</MenuList>
       </MenuPopover>
     </Menu>
   )
@@ -772,36 +770,22 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }, [applyKey, undoKey])
   // 受信箱の行に出す文言(AI の案を写している間は、その案。保存する中身は変えない)
   const shown = { ...e.form, ...(e.previewTexts ?? {}) }
+  // 保存の様子(入力が止まって約 1.5 秒で自動で保存する)。題の行の、状態の札の横に
+  const saveState = e.saving ? (
+    t('保存中…', 'Saving…')
+  ) : e.unsaved ? (
+    // まだ配信になっていない案(自動では保存しない。「この案で作る」で作る)
+    t('まだ保存していません', 'Not saved yet')
+  ) : e.dirty ? (
+    t('未保存', 'Unsaved')
+  ) : e.savedAt ? (
+    <span className={mergeClasses(e.justSaved && s.saved)}>{t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}</span>
+  ) : null
   return (
     <div className={s.root}>
       {/* キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案)。承認の帯より上に置く(承認の帯は、ここで選んだ配信の状態なので) */}
-      {e.campaignBand?.(abBar)}
-      {/* 承認の状態の帯(2026-10-26 利用者と決めた)。題の行の札の代わりに、フロートのいちばん上(題の行の上)に、幅いっぱいに。右の端に保存の様子(入力が止まって約 1.5 秒で自動で保存する) */}
-      <ApprovalBand
-        status={e.form.status}
-        waiting={counts.waiting}
-        changesRequested={counts.changesRequested}
-        reviewers={counts.reviewers}
-        approved={counts.approved}
-        pendingNames={counts.pendingNames}
-        changeReason={counts.changeReason}
-        dirty={e.revokesApproval}
-        // 閉じる ×: フロートのいちばん上の右の角に。キャンペーンの帯があれば、その 1 段目の右の端(CardDetail が入れる)
-        close={e.campaignBand ? undefined : <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
-        save={
-          e.saving ? (
-            t('保存中…', 'Saving…')
-          ) : e.unsaved ? (
-            // まだ配信になっていない案(自動では保存しない。上の帯の「この案で作る」で作る)
-            t('まだ保存していません', 'Not saved yet')
-          ) : e.dirty ? (
-            t('未保存', 'Unsaved')
-          ) : e.savedAt ? (
-            <span className={mergeClasses(e.justSaved && s.saved)}>{t(`保存済み · ${savedTime(e.savedAt)}`, `Saved · ${savedTime(e.savedAt)}`)}</span>
-          ) : null
-        }
-        onOpen={() => !e.unsaved && showSide('approval', true)}
-      />
+      {/* AB テストをしていないときは、案の段を出さず、「AB テストを足す」は配信のタブの ＋ のメニューに(2026-10-28 利用者) */}
+      {e.campaignBand?.({ variants: e.ab || e.abDecided ? abBar : undefined, addVariantItems: e.ab || e.abDecided || e.saving ? undefined : addVariantItems })}
       <StageHeader
         title={
           <>
@@ -814,11 +798,24 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               <span className={mergeClasses(s.name, s.nameField)}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>
             )}
             <span>{when}</span>
+            {/* 承認の状態と保存の様子は、題の行の中の小さな札と文字に(2026-10-28 利用者: 以前の幅いっぱいの帯をやめ、上を詰める)。札を押すと承認のパネル */}
+            <ApprovalChip
+              status={e.form.status}
+              waiting={counts.waiting}
+              changesRequested={counts.changesRequested}
+              reviewers={counts.reviewers}
+              approved={counts.approved}
+              pendingNames={counts.pendingNames}
+              changeReason={counts.changeReason}
+              dirty={e.revokesApproval}
+              onOpen={() => !e.unsaved && showSide('approval', true)}
+            />
+            {saveState && <span className={s.saveState}>{saveState}</span>}
           </>
         }
         actions={
           <>
-            {/* 保存の様子(保存中… / 未保存 / 保存済み)は、承認の帯の右の端。ここには、手を打つことがあるとき(先に保存された・失敗)だけ */}
+            {/* 保存の様子(保存中… / 未保存 / 保存済み)は、題の行の左の状態の札の横。ここには、手を打つことがあるとき(先に保存された・失敗)だけ */}
             {e.saveConflict ? (
               // ほかの人が先に保存していた: 黙って上書きせず、どうするかを聞く
               <span className={s.saveFailed}>
@@ -913,6 +910,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             )}
             {e.viewSwitch}
             {e.menu}
+            {/* 閉じる ×: キャンペーンの帯があれば、その右の端(CardDetail が入れる)。なければ、この行の右の端 */}
+            {!e.campaignBand && <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
           </>
         }
         // 面のタブ(PLAN | PRODUCTION | RESULTS)。配信が主役で、面はその見方なので、題名の下に
@@ -1080,12 +1079,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {e.ab && e.ab.purpose === 'test' && e.ab.active !== 'A' && e.abDiffParts.length < 3 && e.abDiffParts.length > 1 && e.abDiffParts.some((p) => p.kind === 'template') && (
             <span className={s.abWarn}>{t('テンプレートと、ほかの所も A と違います。結果がテンプレートの差か中身の差か、分けにくくなります', 'Both the template and other parts differ from A. It will be hard to tell which caused the result.')}</span>
           )}
-          {/* 配信の情報(配信日時・国・対象・送る相手)。受信者には見えないので、プレビューの枠の外に、薄い灰色の帯で置く。押すと右のペインが配信の情報になる */}
+          {/* 配信の情報(配信日時・国・テーマ)。受信者には見えないので、プレビューの枠の外に、薄い灰色の 1 行の帯で置く。押すと右のペインが配信の情報になる(対象・送る相手も、そこで見る) */}
           <div className={s.inboxWrap}>
-            <span className={s.inboxHead}>
-              <InfoRegular />
-              {t('配信の情報(受信者には見えません)', 'Delivery info (not shown to recipients)')}
-            </span>
             <button
               type="button"
               className={mergeClasses(s.metaBand, metaOn && s.on)}
@@ -1098,7 +1093,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 box.focus({ preventScroll: true })
                 box.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
               }}
-              title={t('配信の情報を直す', 'Edit the delivery info')}
+              title={t('配信の情報(受信者には見えません)。押すと、対象・送る相手も見て直せます', 'Delivery info (not shown to recipients). Click to see and edit the target and recipients too')}
             >
               {metaSummary}
             </button>

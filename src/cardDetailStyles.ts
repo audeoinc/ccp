@@ -40,7 +40,8 @@ export const useCardDetailStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
   },
   overlayBar: { width: '320px' },
-  titleRow: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '12px 12px 12px 24px', backgroundColor: tokens.colorNeutralBackground1 },
+  // 上下は詰める(プレビューを広く見せるため。2026-10-28 利用者)
+  titleRow: { display: 'flex', alignItems: 'center', columnGap: '10px', padding: '6px 12px 6px 24px', backgroundColor: tokens.colorNeutralBackground1 },
   titleText: { flexGrow: 1, minWidth: 0 },
   panes: {
     flexGrow: 1,

@@ -33,7 +33,7 @@ export const PREF = {
   cardInfoOpen: 'cardDetail.infoOpen.v2',
   cardProcessOpen: 'cardDetail.processOpen.v1',
   cardPreviewDevice: 'cardDetail.previewDevice',
-  // キャンペーンの帯(X79)の 1 段目を開いているか
+  // キャンペーンの帯(X79)のテーマ・目的を開いているか(既定は畳む)
   campaignBandOpen: 'cardDetail.campaignBandOpen',
   simplePaneWidths: 'simpleCard.paneWidths.v2',
   simpleProductsOpen: 'simpleCard.productsOpen',

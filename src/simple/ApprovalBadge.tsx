@@ -1,37 +1,34 @@
-import { makeStyles, tokens } from '@fluentui/react-components'
-import type { CSSProperties, ReactNode } from 'react'
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import type { CSSProperties } from 'react'
 import { ArrowUndoRegular, CheckmarkCircleRegular, ClockRegular, EditRegular } from '@fluentui/react-icons'
 import { statusRank } from '../status'
 import { useT } from '../i18n'
 
-const useBandStyles = makeStyles({
-  // カードの幅いっぱいの 1 行。高さは状態で変えない(長い文は … で切る)。押すと承認のパネルが開く
-  // 閉じる × を並べるときの行(帯と同じ地の色。× は帯の文字の色)
-  withClose: { display: 'flex', alignItems: 'center', backgroundColor: 'var(--band-bg)', flexShrink: 0 },
-  close: { display: 'flex', alignItems: 'center', paddingRight: '8px', color: 'var(--band-fg)', '& button': { color: 'inherit' } },
-  band: {
-    display: 'flex',
+const useChipStyles = makeStyles({
+  // 題の行の中の小さな札(2026-10-28 利用者: 黒い帯をやめ、上を詰める)。押すと承認のパネルが開く
+  chip: {
+    display: 'inline-flex',
     alignItems: 'center',
-    columnGap: '6px',
-    height: '34px',
+    columnGap: '4px',
+    height: '24px',
     boxSizing: 'border-box',
-    width: '100%',
-    padding: '0 16px 0 12px',
-    border: 'none',
-    borderLeft: '4px solid var(--band-line)',
+    padding: '0 10px 0 8px',
+    border: '1px solid var(--band-line)',
+    borderRadius: tokens.borderRadiusCircular,
     backgroundColor: 'var(--band-bg)',
+    color: 'var(--band-fg)',
     fontFamily: 'inherit',
     fontSize: '12px',
-    textAlign: 'left',
+    fontWeight: tokens.fontWeightSemibold,
+    whiteSpace: 'nowrap',
     cursor: 'pointer',
     flexShrink: 0,
-    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
+    '& svg': { fontSize: '14px' },
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '1px' },
   },
-  // 状態の文字は 13px(添える文・保存の様子は 12px)。弱く見えたので強めた(2026-10-26 利用者)
-  state: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: '13px', fontWeight: tokens.fontWeightSemibold, color: 'var(--band-fg)', whiteSpace: 'nowrap', flexShrink: 0, '& svg': { fontSize: '16px' } },
-  dot: { color: 'var(--band-sub)', flexShrink: 0 },
-  note: { color: 'var(--band-sub)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1 },
-  save: { color: 'var(--band-sub)', whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 'auto' },
+  // 差し戻しの理由・承認済みを直したときの案内は、見落とすと困るので、札の横に短く(長い文は … で切り、全文は札のツールチップ)
+  note: { fontSize: '12px', color: tokens.colorNeutralForeground3, minWidth: 0, maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  warn: { color: tokens.colorStatusWarningForeground3 },
 })
 
 /**
@@ -46,11 +43,11 @@ const BAND_COLORS = {
 }
 
 /**
- * 承認の状態の帯(2026-10-26 利用者と決めた。以前の題の行の札 SU11 の代わり): 配信カード(フロート)のいちばん上に、幅いっぱいの帯を 1 本。
- * 左に状態(印と短い言葉)と、添える文(だれを待っているか・差し戻しの理由など)、右の端に保存の状態。
- * 承認済みの案内(直すと承認待ちに戻る)も、この帯にまとめる
+ * 承認の状態の札(2026-10-28 利用者: 以前の幅いっぱいの帯 ApprovalBand をやめ、題の行の中に小さく)。
+ * 状態(印と短い言葉)を札に、添える文(だれを待っているか・差し戻しの理由など)はツールチップに。
+ * 差し戻しの理由と、承認済みを直したときの案内(保存すると承認待ちに戻る)だけは、札の横にも短く出す
  */
-export function ApprovalBand({
+export function ApprovalChip({
   status,
   waiting,
   changesRequested,
@@ -59,9 +56,7 @@ export function ApprovalBand({
   pendingNames,
   changeReason,
   dirty,
-  save,
   onOpen,
-  close,
 }: {
   status: string
   waiting: boolean
@@ -71,12 +66,9 @@ export function ApprovalBand({
   pendingNames: string[]
   changeReason: string
   dirty: boolean
-  save: ReactNode
   onOpen: () => void
-  /** 配信カードの閉じる ×。帯がフロートのいちばん上のとき(キャンペーンの帯がないとき)、帯の右の端に置く(フロートの右上の角に閉じるがあるように。2026-10-27 利用者) */
-  close?: ReactNode
 }) {
-  const s = useBandStyles()
+  const s = useChipStyles()
   const t = useT()
   const rank = statusRank(status)
   const names = pendingNames.filter(Boolean)
@@ -109,30 +101,21 @@ export function ApprovalBand({
         : { kind: 'draft' as const, icon: <EditRegular />, label: t('未起案', 'Draft'), note: t('まだ承認を依頼していません', 'Approval not requested yet') }
   const c = BAND_COLORS[spec.kind]
   const vars = { '--band-line': c.line, '--band-bg': c.bg, '--band-fg': c.fg, '--band-sub': c.sub } as CSSProperties
-  const band = (
-    <button
-      type="button"
-      className={s.band}
-      style={vars}
-      onClick={onOpen}
-      title={spec.note}
-      aria-label={t(`承認の状態: ${spec.label}。${spec.note}。承認のパネルを開く`, `Approval: ${spec.label}. ${spec.note}. Open the approval panel`)}
-    >
-      <span className={s.state}>
+  const inline = spec.kind === 'changes' || (spec.kind === 'approved' && dirty)
+  return (
+    <>
+      <button
+        type="button"
+        className={s.chip}
+        style={vars}
+        onClick={onOpen}
+        title={spec.note}
+        aria-label={t(`承認の状態: ${spec.label}。${spec.note}。承認のパネルを開く`, `Approval: ${spec.label}. ${spec.note}. Open the approval panel`)}
+      >
         {spec.icon}
         {spec.label}
-      </span>
-      <span className={s.dot}>·</span>
-      <span className={s.note}>{spec.note}</span>
-      <span className={s.save}>{save}</span>
-    </button>
-  )
-  if (!close) return band
-  // 帯はボタンなので、閉じるのボタンは中に入れず、同じ地の色の行に並べる
-  return (
-    <div className={s.withClose} style={vars}>
-      {band}
-      <span className={s.close}>{close}</span>
-    </div>
+      </button>
+      {inline && <span className={mergeClasses(s.note, spec.kind === 'approved' && s.warn)} title={spec.note}>{spec.note}</span>}
+    </>
   )
 }

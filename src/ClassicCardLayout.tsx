@@ -2,11 +2,13 @@
 // 状態と保存は配信カード(CardDetail・useCardEditor)の 1 か所だけ。ここは受け取ったものを描き、この画面だけのペインの幅・開閉を持つ
 import { filled } from './slots'
 import { useRef, useState, type ReactNode } from 'react'
+import type { CampaignBandSlots } from './CampaignBand'
 import {
   Badge,
   Button,
   Caption1,
   Field,
+  MenuItem,
   Switch,
   Text,
   ToggleButton,
@@ -151,7 +153,7 @@ export type ClassicCardLayoutProps = Pick<CardEditor, 'ab' | 'abAiBusy' | 'activ
     onOpenProduction: ((cardId: string, opts?: { request?: boolean }) => void) | undefined
     onTabChange: ((tab: string) => void) | undefined
     /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。引数は 3 段目に置く AB の案の帯。あるときは、AB の帯を題の下に置かない */
-    campaignBand?: (variants: ReactNode) => ReactNode
+    campaignBand?: (slots: CampaignBandSlots) => ReactNode
     /** 配信の画面に出す名前(キャンペーンに入っている配信は「キャンペーン名 + チャネル」) */
     campaignName?: string
   }
@@ -247,7 +249,20 @@ export function ClassicCardLayout({ editor, ab, abAiBusy, active, addVariant, au
   return (
     <>
             {/* キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案) */}
-            {campaignBand?.(abNode ?? <Caption1 className={styles.caption}>{t('AB テストはしていません', 'No A/B test')}</Caption1>)}
+            {/* AB テストをしていないときは、案の段を出さず、AB テストを始める入口は配信のタブの ＋ のメニューに(2026-10-28 利用者) */}
+            {campaignBand?.({
+              variants: abNode ?? undefined,
+              addVariantItems: abNode || saving ? undefined : (
+                <>
+                  <MenuItem icon={<BeakerRegular />} onClick={() => startAbTest('test')}>
+                    {t('AB テストにする', 'Make it an A/B test')}
+                  </MenuItem>
+                  <MenuItem icon={<CheckmarkCircleRegular />} onClick={() => startAbTest('choose')}>
+                    {t('案を出して選ぶ', 'Make variants to choose from')}
+                  </MenuItem>
+                </>
+              ),
+            })}
             <div className={styles.titleRow}>
               {/* メールかアプリかを、開いた瞬間に分かるように、題名の左に札を置く */}
               {stageNav ?? <FaceBadge face="calendar" />}

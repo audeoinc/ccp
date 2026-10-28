@@ -16,6 +16,7 @@ import type { ProductSelection } from '../aiSelect'
 import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
+import type { CampaignBandSlots } from '../CampaignBand'
 
 type CardEditor = ReturnType<typeof useCardEditor>
 
@@ -172,8 +173,8 @@ export interface SimpleExtras {
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る・詳しい画面へ + 複製・取りやめ・削除) */
   menu: ReactNode
   stageNav?: ReactNode
-  /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。引数は 3 段目に置く AB の案の切り替え。あるときは、AB の案を上の帯の 2 段目に置かない */
-  campaignBand?: (variants: ReactNode) => ReactNode
+  /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。引数は、案の段に置く AB の案の切り替えと、＋ のメニューに入れる「AB テストを足す」。帯があるときは、AB の案を題の帯に置かない */
+  campaignBand?: (slots: CampaignBandSlots) => ReactNode
   /** 配信の画面に出す名前(キャンペーンに入っている配信は「キャンペーン名 + チャネル」で、直せない) */
   campaignName?: string
   /** 「シンプル | 詳しい」の切り替え */

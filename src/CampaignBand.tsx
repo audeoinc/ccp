@@ -1,10 +1,10 @@
-// キャンペーンの帯(X79 の段 ③)。配信カードのいちばん上に、親・子・孫を 3 段で見せる(Braze の形)。
-//   1 段目: キャンペーン(名前・配信日・国・テーマ・目的)。畳める(中身を広く使えるように。畳んだかは人ごとに覚える)
-//   2 段目: そのキャンペーンの配信カードのタブ(チャネル・時刻・状態)。押すと、そのカードに切り替わる
-//   3 段目: 開いているカードの AB の案(中身は、それぞれの配信カードの AB の切り替えをそのまま渡す)
-// 下の段ほど字下げし、左の線でつないで、親子孫が見て分かるようにする。シンプル・詳しい、どちらの配信カードでも同じものを使う
+// キャンペーンの帯(X79 の段 ③。2026-10-28 利用者: プレビューを広く見せるため 1 行に詰めた)。配信カードのいちばん上に、親・子・孫を見せる(Braze の形)。
+//   1 行目: キャンペーン(名前・配信日・国)と、そのキャンペーンの配信カードのタブ(チャネル・時刻・状態。押すと、そのカードに切り替わる)。
+//           テーマ・目的は、名前にマウスを乗せたとき・∨ で開いたときだけ(開いたかは人ごとに覚える)。＋ のメニューで、配信カード・AB テストを足す
+//   案の段: 開いているカードの AB の案(AB テストをしているときだけ。中身は、それぞれの配信カードの AB の切り替えをそのまま渡す)
+// シンプル・詳しい、どちらの配信カードでも同じものを使う
 import { useState, type ReactNode } from 'react'
-import { Button, InfoLabel, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, InfoLabel, Menu, MenuDivider, MenuGroup, MenuGroupHeader, MenuItem, MenuList, MenuPopover, MenuTrigger, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, ChevronDownRegular, ChevronRightRegular } from '@fluentui/react-icons'
 import type { Campaign } from './models/campaigns'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -24,45 +24,52 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     flexShrink: 0,
-    padding: '6px 16px 4px 12px',
+    padding: '0 12px 0 8px',
     backgroundColor: tokens.colorNeutralBackground2,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     fontSize: '12px',
   },
-  tier: { display: 'flex', alignItems: 'center', columnGap: '8px', minHeight: '30px', minWidth: 0 },
-  // 2 段目・3 段目の字下げと、上の段からつなぐ線(└)
-  child: { paddingLeft: '22px', position: 'relative' },
-  // 3 段目は、詳しい画面の AB の帯のように高いものも入るので、上にそろえる(段の名前が、帯の真ん中に浮かないように)
-  grandchild: { paddingLeft: '44px', position: 'relative', alignItems: 'flex-start' },
+  tier: { display: 'flex', alignItems: 'center', columnGap: '8px', minHeight: '40px', minWidth: 0 },
+  // 案の段は字下げし、上の行からつなぐ線(└)で、配信の子だと見て分かるようにする。詳しい画面の AB の帯のように高いものも入るので、上にそろえる
+  grandchild: { paddingLeft: '40px', position: 'relative', alignItems: 'flex-start', minHeight: '32px' },
   variants: { display: 'flex', alignItems: 'center', minHeight: '30px', flexGrow: 1, minWidth: 0 },
   labelTop: { lineHeight: '30px' },
   elbow: {
     position: 'absolute',
-    top: '-4px',
-    width: '12px',
-    height: '19px',
+    top: '-6px',
+    left: '28px',
+    width: '8px',
+    height: '21px',
     borderLeft: `1px solid ${tokens.colorNeutralStroke1}`,
     borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
     borderBottomLeftRadius: '4px',
   },
-  elbowChild: { left: '8px' },
-  elbowGrandchild: { left: '30px' },
-  // 段の名前(ラベル 11px・薄いグレー。値と見分けられるように。src/typo.ts)
-  label: { ...typo.label, whiteSpace: 'nowrap', flexShrink: 0, minWidth: '64px' },
+  // 段の名前(ラベル・薄いグレー。値と見分けられるように。src/typo.ts)
+  label: { ...typo.label, whiteSpace: 'nowrap', flexShrink: 0 },
   // キャンペーンの名前は、いちばん大事な値なので太く
-  name: { ...typo.valueStrong, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+  name: { ...typo.valueStrong, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: '40px', maxWidth: '280px', flexShrink: 1 },
   meta: { ...typo.value, whiteSpace: 'nowrap', flexShrink: 0 },
   sep: { color: tokens.colorNeutralForeground4, flexShrink: 0 },
-  // 畳んでいないときの 2 行目(テーマ・目的)
-  detail: { display: 'flex', alignItems: 'baseline', columnGap: '24px', paddingLeft: '96px', paddingBottom: '4px', minWidth: 0 },
-  pairValue: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+  // キャンペーンと配信のタブの間の区切り
+  divider: { width: '1px', height: '20px', backgroundColor: tokens.colorNeutralStroke2, flexShrink: 0, marginLeft: '4px' },
+  // 開いたときの 2 行目(テーマ・目的)
+  detail: { display: 'flex', alignItems: 'baseline', columnGap: '24px', paddingLeft: '40px', paddingBottom: '6px', minWidth: 0 },
+  hoverDetail: { display: 'grid', rowGap: '4px' },
   actions: { marginLeft: 'auto', display: 'flex', alignItems: 'center', columnGap: '4px', flexShrink: 0 },
-  tabs: { minWidth: 0, overflowX: 'auto' },
+  tabs: { minWidth: 0, overflowX: 'auto', flexShrink: 1 },
   tab: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', whiteSpace: 'nowrap' },
   dot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   state: { color: tokens.colorNeutralForeground3 },
   cancelled: { textDecorationLine: 'line-through', color: tokens.colorNeutralForeground4 },
 })
+
+/** 配信カードの側から帯に渡すもの */
+export interface CampaignBandSlots {
+  /** 案の段: 開いているカードの AB の案の切り替え(AB テストをしているとき・案に決めたあとだけ。ないときは段ごと出さない) */
+  variants?: ReactNode
+  /** ＋ のメニューに入れる「AB テストを足す」(MenuItem。AB テストをしていないときだけ) */
+  addVariantItems?: ReactNode
+}
 
 interface Props {
   campaign: Campaign
@@ -72,11 +79,11 @@ interface Props {
   allCards: DeliveryCard[]
   /** きょうだいのカードに切り替える(保存していない変更は、呼ぶ側が先に保存する) */
   onSwitch: (id: string) => void
-  /** 3 段目: 開いているカードの AB の案の切り替え(それぞれの配信カードの部品をそのまま) */
-  variants: ReactNode
-  /** 1 段目の右の端(まとめて承認など。X79 の段 ④) */
+  /** 案の段と、＋ のメニューの AB テスト(CampaignBandSlots) */
+  slots: CampaignBandSlots
+  /** 右の端(まとめて承認・閉じる など。X79 の段 ④) */
   actions?: ReactNode
-  /** 「＋ 配信カード」(このキャンペーンにカードを足す。X79 の段 ④)。ないときは、押せないボタンで置き場所だけ見せる */
+  /** ＋ のメニューの「配信カードを足す」(このキャンペーンにカードを足す。X79 の段 ④)。ないときは、押せない項目で置き場所だけ見せる */
   onAddCard?: () => void
   /** 切り替えを止める(保存中など) */
   busy?: boolean
@@ -85,10 +92,11 @@ interface Props {
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) : '')
 const dateText = (ymd: string) => (ymd ? new Date(`${ymd}T00:00:00`).toLocaleDateString(locale(), { month: 'short', day: 'numeric', weekday: 'short' }) : '')
 
-export function CampaignBand({ campaign, card, allCards, onSwitch, variants, actions, onAddCard, busy }: Props) {
+export function CampaignBand({ campaign, card, allCards, onSwitch, slots, actions, onAddCard, busy }: Props) {
   const s = useStyles()
   const t = useT()
-  const [open, setOpen] = useState(() => loadPref<boolean>(PREF.campaignBandOpen, true))
+  // 既定は畳む(テーマ・目的は、名前にマウスを乗せれば見える。2026-10-28 利用者)
+  const [open, setOpen] = useState(() => loadPref<boolean>(PREF.campaignBandOpen, false))
   const toggle = () => {
     setOpen(!open)
     savePref(PREF.campaignBandOpen, !open)
@@ -101,6 +109,20 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, variants, act
   const country = optionLabel(countryOptions.find((o) => o.value === campaign.country)?.label ?? campaign.country ?? '')
   const theme = [campaign.theme_type ? themeTypeLabel(campaign.theme_type as ThemeType) : '', campaign.theme ?? ''].filter(Boolean).join(' · ')
   const channelText = (ch?: string) => (ch === 'app' ? t('アプリ', 'App') : t('メール', 'Email'))
+  const themeAndGoal = (
+    <>
+      <LabeledValue label={t('テーマ', 'Theme')} truncate>
+        {theme && (
+          <Tooltip content={campaign.theme_reason || theme} relationship="description">
+            <span>{theme}</span>
+          </Tooltip>
+        )}
+      </LabeledValue>
+      <LabeledValue label={t('目的', 'Goal')} truncate>
+        {campaign.purpose}
+      </LabeledValue>
+    </>
+  )
   return (
     <div className={s.root} role="group" aria-label={t('キャンペーン', 'Campaign')}>
       <div className={s.tier}>
@@ -117,13 +139,20 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, variants, act
           size="small"
           className={s.label}
           info={t(
-            'いくつかの配信(メール・アプリ)をまとめる親です。同じ国・同じ配信日の配信が入ります。下の段で配信を切り替え、その下の段で配信の AB の案を切り替えます',
-            'The parent that groups deliveries (email and app). Deliveries in it share the country and send date. Switch deliveries on the row below, and their A/B variants on the row under that.',
+            'いくつかの配信(メール・アプリ)をまとめる親です。同じ国・同じ配信日の配信が入ります。右のタブで配信を切り替え、＋ で配信や AB テストを足します',
+            'The parent that groups deliveries (email and app). Deliveries in it share the country and send date. Switch deliveries with the tabs on the right, and add deliveries or A/B tests with +.',
           )}
         >
           {t('キャンペーン', 'Campaign')}
         </InfoLabel>
-        <span className={s.name}>{campaign.name}</span>
+        {/* テーマ・目的は、畳んでいるときは名前にマウスを乗せたときだけ(開いているときは下の行にあるので出さない) */}
+        {open ? (
+          <span className={s.name}>{campaign.name}</span>
+        ) : (
+          <Tooltip relationship="description" content={<div className={s.hoverDetail}>{themeAndGoal}</div>}>
+            <span className={s.name} tabIndex={0}>{campaign.name}</span>
+          </Tooltip>
+        )}
         {day && <span className={s.meta}>{dateText(day)}</span>}
         {country && (
           <>
@@ -131,32 +160,8 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, variants, act
             <span className={s.meta}>{country}</span>
           </>
         )}
-        {!open && theme && (
-          <>
-            <span className={s.sep}>·</span>
-            <span className={mergeClasses(s.meta, s.pairValue)}>{theme}</span>
-          </>
-        )}
-        <span className={s.actions}>{actions}</span>
-      </div>
-      {open && (
-        <div className={s.detail}>
-          <LabeledValue label={t('テーマ', 'Theme')} truncate>
-            {theme && (
-              <Tooltip content={campaign.theme_reason || theme} relationship="description">
-                <span>{theme}</span>
-              </Tooltip>
-            )}
-          </LabeledValue>
-          <LabeledValue label={t('目的', 'Goal')} truncate>
-            {campaign.purpose}
-          </LabeledValue>
-        </div>
-      )}
-      <div className={mergeClasses(s.tier, s.child)}>
-        <span className={mergeClasses(s.elbow, s.elbowChild)} aria-hidden />
-        <span className={s.label}>{t('配信', 'Deliveries')}</span>
-        <TabList className={s.tabs} size="small" selectedValue={card.id} disabled={busy} onTabSelect={(_, d) => d.value !== card.id && onSwitch(String(d.value))}>
+        <span className={s.divider} aria-hidden />
+        <TabList className={s.tabs} size="small" selectedValue={card.id} disabled={busy} onTabSelect={(_, d) => d.value !== card.id && onSwitch(String(d.value))} aria-label={t('配信', 'Deliveries')}>
           {siblings.map((c) => (
             <Tab key={c.id} value={c.id} aria-label={cardDisplayName(c, [campaign])}>
               <span className={mergeClasses(s.tab, isCancelled(c) && s.cancelled)}>
@@ -169,17 +174,39 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, variants, act
             </Tab>
           ))}
         </TabList>
-        <Tooltip content={onAddCard ? t('このキャンペーンに配信を足す', 'Add a delivery to this campaign') : t('準備中です', 'Coming soon')} relationship="description">
-          <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} disabled={!onAddCard || busy} onClick={onAddCard}>
-            {t('配信カードを足す', 'Add a delivery card')}
-          </Button>
-        </Tooltip>
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <Tooltip content={t('配信カード・AB テストを足す', 'Add a delivery card or an A/B test')} relationship="label">
+              <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} disabled={busy} />
+            </Tooltip>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<AddRegular />} disabled={!onAddCard} onClick={onAddCard}>
+                {onAddCard ? t('配信カードを足す', 'Add a delivery card') : t('配信カードを足す(準備中)', 'Add a delivery card (coming soon)')}
+              </MenuItem>
+              {slots.addVariantItems && (
+                <>
+                  <MenuDivider />
+                  <MenuGroup>
+                    <MenuGroupHeader>{t('この配信の AB テスト', 'A/B test for this delivery')}</MenuGroupHeader>
+                    {slots.addVariantItems}
+                  </MenuGroup>
+                </>
+              )}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+        <span className={s.actions}>{actions}</span>
       </div>
-      <div className={mergeClasses(s.tier, s.grandchild)}>
-        <span className={mergeClasses(s.elbow, s.elbowGrandchild)} aria-hidden />
-        <span className={mergeClasses(s.label, s.labelTop)}>{t('案', 'Variants')}</span>
-        <div className={s.variants}>{variants}</div>
-      </div>
+      {open && <div className={s.detail}>{themeAndGoal}</div>}
+      {slots.variants && (
+        <div className={mergeClasses(s.tier, s.grandchild)}>
+          <span className={s.elbow} aria-hidden />
+          <span className={mergeClasses(s.label, s.labelTop)}>{t('案', 'Variants')}</span>
+          <div className={s.variants}>{slots.variants}</div>
+        </div>
+      )}
     </div>
   )
 }
