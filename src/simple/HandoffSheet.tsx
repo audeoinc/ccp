@@ -15,8 +15,8 @@ import type { ProductionRequest } from '../models/productionRequests'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
 import { typo } from '../typo'
 import { useT } from '../i18n'
-import { PartAiChat } from './PartAiChat'
-import { askPartRewrite, type PartTurn } from './partAi'
+import { TextAiPanel } from './TextAiPanel'
+import { askPartRewrite } from './partAi'
 import type { SimpleEditor } from './editor'
 import { ReadinessList } from './ReadinessList'
 import { readinessBlocked, type ReadinessItem, type ReadinessTarget } from './readiness'
@@ -72,7 +72,6 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
-  const [turns, setTurns] = useState<PartTurn[]>([])
   const [busy, setBusy] = useState(false)
   // 「制作に渡す」を押したあと、依頼ができたかを読み直す回数(制作のページで HTML を作ってから依頼するので、少し遅れる)
   const [poll, setPoll] = useState(0)
@@ -242,13 +241,19 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
             </Menu>
           </div>
         )}
-        <PartAiChat
+        {/* 渡す文章の AI(見出し・件名と同じ「AI で変える」の形。空でも「案」で下書きが出る。案を試している間は、上の欄に写して読むだけにする。2026-10-29 利用者) */}
+        <TextAiPanel
           kind="instructions"
           label={t('渡す文章', 'Production notes')}
-          turns={turns}
-          setTurns={setTurns}
+          value={e.form.instructions}
+          samplesKind="part"
+          ideasRequest="制作に渡す文章(制作指示)を、テーマ・件名・見出し・コピー・参考の素材をもとに書いてください。いまの文章があれば、それを生かして整えてください。案ごとに、書き方(まとめ方・詳しさ)を変えてください"
+          ideasCount={2}
           placeholder={t('例: 画像の指示を足して、箇条書きに', 'e.g. Add image directions, as bullet points')}
-          ask={(request, history) =>
+          renderIdea={(idea) => <MarkdownLite text={idea.value} />}
+          // 帯には、長い文章の頭だけを出す
+          short={(v) => v.split('\n')[0]}
+          ask={(request, count, history) =>
             askPartRewrite({
               card: e.aiCard(),
               angle: e.form.copyAngle,
@@ -257,14 +262,10 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
               assets: assets.map((a) => ({ name: a.name, kind: a.kind, note: a.note || a.preview_description || undefined, url: a.kind === 'url' ? a.url : undefined })),
               request,
               history,
+              count,
             })
           }
-          renderIdea={(idea) => <MarkdownLite text={idea.value} />}
-          isCurrent={(idea) => idea.value === e.form.instructions}
-          // 帯には、長い文章の頭だけを出す
-          nowText={e.form.instructions.split('\n')[0]}
-          ideaText={(idea) => idea.value.split('\n')[0]}
-          onPreview={(idea) => setPreviewing(idea ? idea.value : null)}
+          onPreview={(v) => setPreviewing(v)}
           onAdopt={(idea) => {
             setPreviewing(null)
             e.setField('instructions', idea.value)

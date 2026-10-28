@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ChooseDrawer } from '../ChoosePanel'
 import { CheckmarkRegular, SendRegular } from '@fluentui/react-icons'
@@ -7,7 +7,7 @@ import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
-import { textRequestSamples, type PartAnswer, type PartIdea, type PartTurn } from './partAi'
+import { requestSamples, textRequestSamples, type PartAnswer, type PartIdea, type PartTurn } from './partAi'
 
 // 文の部品(見出し・コピー・件名・プリヘッダー・通知の文・セクションの見出しとコピー)の AI(2026-10-27 利用者)。
 // 入力欄に直接書くのがいちばん多いので、ふだんは「AI で変える」のボタンだけにして、押したときだけ、その真下から引き出しを開く
@@ -53,13 +53,23 @@ interface Props {
   /** 案を仮にプレビューに写す(null で元に戻す) */
   onPreview: (value: string | null) => void
   onAdopt: (idea: PartIdea) => void
+  /**
+   * 長い文の部品(渡す文章など)のための差し替え。案の見せ方(既定は文のまま)・帯に出す短い形(既定は文のまま)・
+   * 案のタブで頼む文と数・指示の例(既定は文の部品の例)
+   */
+  renderIdea?: (idea: PartIdea) => ReactNode
+  short?: (value: string) => string
+  ideasRequest?: string
+  ideasCount?: number
+  samplesKind?: 'text' | 'part'
+  placeholder?: string
 }
 
 /** 案のタブで頼むときの文(画面には出さない) */
 const IDEAS_REQUEST = 'この部品の文言の候補を、テーマと切り口に合わせて、それぞれ違う方向で考えてください'
 const IDEAS_COUNT = 4
 
-export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Props) {
+export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt, renderIdea, short = (v) => v, ideasRequest = IDEAS_REQUEST, ideasCount = IDEAS_COUNT, samplesKind = 'text', placeholder }: Props) {
   const t = useT()
   const s = useStyles()
   const [open, setOpen] = useState(false)
@@ -76,8 +86,8 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
   const pick = (idea: PartIdea) =>
     trial.tryIt({
       key: keyOf(idea),
-      from: value,
-      to: idea.value,
+      from: short(value),
+      to: short(idea.value),
       preview: () => onPreview(idea.value),
       unpreview: () => onPreview(null),
       apply: () => onAdopt(idea),
@@ -90,7 +100,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
     setError(null)
     try {
       if (which === 'ideas') {
-        const res = await ask(request, IDEAS_COUNT, [])
+        const res = await ask(request, ideasCount, [])
         setIdeas(res.ideas)
       } else {
         const history = turns
@@ -112,7 +122,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
   const askIdeasOnce = () => {
     if (asked.current) return
     asked.current = true
-    void run('ideas', IDEAS_REQUEST)
+    void run('ideas', ideasRequest)
   }
 
   const ideaRow = (idea: PartIdea) => {
@@ -121,7 +131,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
     return (
       <button key={keyOf(idea)} type="button" aria-pressed={trying} className={mergeClasses(s.idea, trying && s.ideaTrying)} onClick={() => pick(idea)} title={t('押すと、プレビューで試します(上の「確定」で入れ替え)', 'Click to try it in the preview (apply with "Apply" above)')}>
         <span style={{ display: 'grid', rowGap: 2, minWidth: 0 }}>
-          <span className={s.ideaText}>{idea.value}</span>
+          {renderIdea ? renderIdea(idea) : <span className={s.ideaText}>{idea.value}</span>}
           {idea.why && <span className={s.note}>{idea.why}</span>}
         </span>
         {used ? <CheckmarkRegular color={tokens.colorPaletteGreenForeground1} /> : <span className={s.note}>{trying ? t('試している', 'Trying') : t('試す', 'Try')}</span>}
@@ -135,7 +145,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
       <div className={s.row}>
         <span className={s.note}>{t('押すと、プレビューで試せます(上の「確定」で入れ替え)', 'Click one to try it in the preview (apply with "Apply" above)')}</span>
         {ideas !== null && (
-          <Button size="small" appearance="subtle" disabled={!!busy} onClick={() => void run('ideas', IDEAS_REQUEST)}>
+          <Button size="small" appearance="subtle" disabled={!!busy} onClick={() => void run('ideas', ideasRequest)}>
             {t('出し直す', 'More ideas')}
           </Button>
         )}
@@ -149,7 +159,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
   const instructTab = (
     <>
       <div className={s.samples}>
-        {textRequestSamples(kind).map((x) => (
+        {(samplesKind === 'part' ? requestSamples(kind) : textRequestSamples(kind)).map((x) => (
           <Button key={x} size="small" shape="circular" className={s.sample} disabled={!!busy} onClick={() => void run('instruct', x)}>
             {x}
           </Button>
@@ -162,7 +172,7 @@ export function TextAiPanel({ kind, label, value, ask, onPreview, onAdopt }: Pro
           rows={1}
           value={draft}
           disabled={!!busy}
-          placeholder={t('自分で書く(例: 20 文字以内で、数字を入れて)', 'Write your own (e.g. Under 40 characters, include a number)')}
+          placeholder={placeholder ?? t('自分で書く(例: 20 文字以内で、数字を入れて)', 'Write your own (e.g. Under 40 characters, include a number)')}
           aria-label={t(`AI への指示(${label})`, `Instruction for AI (${label})`)}
           onChange={(_, d) => setDraft(d.value)}
           onKeyDown={(ev) => {

@@ -336,6 +336,22 @@ export function mockAgent(message: string): string {
     const cur = String(part.current ?? '')
     const ja = hasJa(cur) || (!cur && hasJa(req))
     if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? 'テーマに合っていて読みやすいです。もう少し短くすると、スマホでも 1 行に収まります。' : 'It fits the theme and reads well. A bit shorter would fit on one line on mobile.' })
+    // 渡す文章(制作指示)は、空でも下書きを返す(見本。箇条書き・見出しつき)
+    if (part.kind === 'instructions') {
+      const en = !hasJa(req + cur) && /[a-z]/i.test(req + cur)
+      const drafts = en
+        ? [
+            { text: '### Main image\n- Feature the model large, facing left\n- Headline below the image\n\n### Products\n- Keep product photos on a white background', why: 'Split by part with short bullets.' },
+            { text: 'Make the main image bright and seasonal, with the headline under it. Keep product photos consistent (white background, same angle).', why: 'One short paragraph.' },
+          ]
+        : [
+            { text: '### メイン画像\n- 人物を大きく、左向きで\n- 見出しは画像の下に\n\n### 商品\n- 商品の写真は白い背景にそろえる', why: '部品ごとに見出しを分け、短い箇条書きにしました。' },
+            { text: 'メイン画像は明るく季節感のあるものにし、見出しは画像の下に置いてください。商品の写真は、白い背景・同じ角度にそろえてください。', why: '短い文 1 段落にまとめました。' },
+          ]
+      const n = Math.max(1, Math.min(drafts.length, Number(p.count ?? 2) || 2))
+      const picked = n === 1 ? [drafts[req.length % drafts.length]] : drafts.slice(0, n)
+      return J({ mode: 'update', reply: en ? 'Here is a draft.' : '下書きしました。', ideas: picked })
+    }
     const words = cur.split(/(?<=[、。,.])\s*/).filter(Boolean)
     const short = words[0] ?? cur
     const ideas = ja
