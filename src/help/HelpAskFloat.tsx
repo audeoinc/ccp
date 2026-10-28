@@ -15,16 +15,19 @@ import {
   MessageBar,
   MessageBarBody,
   Spinner,
+  Tag,
+  TagGroup,
   Text,
   Tooltip,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { DismissRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
+import { DismissRegular, LightbulbRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
 import { ResizableSurface } from '../ResizableSurface'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
-import { askHelp, labelChecker, loadMaterial, openAnswer, type HelpAnswer, type HelpTurn } from './helpAsk'
+import { startDevRequestAt } from '../devRequestPlace'
+import { askHelp, labelChecker, loadMaterial, openAnswer, recordTellDev, tellDevDraft, type HelpPart, type HelpTurn } from './helpAsk'
 
 const useStyles = makeStyles({
   surface: { width: '520px', height: '640px', display: 'flex', flexDirection: 'column', padding: 0 },
@@ -60,14 +63,22 @@ const useStyles = makeStyles({
   basis: { margin: 0, paddingLeft: '18px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   files: { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
   inputRow: { display: 'flex', alignItems: 'flex-end', columnGap: '6px' },
+  actions: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' },
+  // 右クリックの「ここについて聞く」から始めたときの、どの部品のことかの札
+  partTag: { alignSelf: 'flex-start', maxWidth: '100%' },
+  partOn: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
 
 interface Props {
   open: boolean
   onClose: () => void
+  /** 右クリックの「ここについて聞く」で押した所(段 ③)。あれば、その部品について聞く */
+  part?: HelpPart | null
+  /** 部品の札を外す(ふつうの質問に戻す) */
+  onClearPart?: () => void
 }
 
-export function HelpAskFloat({ open, onClose }: Props) {
+export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
   const s = useStyles()
   const t = useT()
   const [turns, setTurns] = useState<HelpTurn[]>([])
@@ -94,8 +105,8 @@ export function HelpAskFloat({ open, onClose }: Props) {
     setError('')
     setAsking(question)
     try {
-      const { answer } = await askHelp(question, turns)
-      setTurns((list) => [...list, { question, answer }])
+      const { answer } = await askHelp(question, turns, part ?? undefined)
+      setTurns((list) => [...list, { question, answer, part: part ?? undefined }])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setText(question)
@@ -121,8 +132,21 @@ export function HelpAskFloat({ open, onClose }: Props) {
       )
     })
 
-  const answerBox = (a: HelpAnswer, key: number) => (
+  /** 答えの下の「開発に伝える」: 質問と答えを書きかけにして、開発へのリクエストを書き始める(右クリックから聞いたなら、その点にピン) */
+  const tellDev = (turn: HelpTurn) => {
+    recordTellDev(turn.question, turn.answer, turn.part)
+    const x = turn.part?.x ?? Math.round(window.innerWidth / 2)
+    const y = turn.part?.y ?? Math.round(window.innerHeight / 2)
+    // ピンのフロートを書けるように、こちらは閉じる(開いたままだと重なる)
+    onClose()
+    window.setTimeout(() => startDevRequestAt(x, y, tellDevDraft(turn.question, turn.answer)), 0)
+  }
+
+  const answerBox = (turn: HelpTurn, key: number) => {
+    const a = turn.answer
+    return (
     <div key={key} className={s.answer}>
+      {turn.part && <span className={s.partOn}>{t(`この部品について: ${turn.part.label}`, `About: ${turn.part.label}`)}</span>}
       {a.reply && <Text>{withNames(a.reply)}</Text>}
       {a.steps.length > 0 && (
         <ol className={s.steps}>
@@ -131,13 +155,19 @@ export function HelpAskFloat({ open, onClose }: Props) {
           ))}
         </ol>
       )}
-      {a.open && (
-        <div>
+      <div className={s.actions}>
+        {a.open && (
           <Button size="small" appearance="primary" icon={<OpenRegular />} onClick={() => openAnswer(a.open!)}>
             {a.openLabel ? t(`ここを開く: ${a.openLabel}`, `Open: ${a.openLabel}`) : t('ここを開く', 'Open this')}
           </Button>
-        </div>
-      )}
+        )}
+        {/* 答えで足りない・画面を変えてほしいときは、そのまま開発へのリクエストに(質問と答えを添える) */}
+        <Tooltip content={t('質問と答えを添えて、開発へのリクエストを書き始めます', 'Start a request to developers with this question and answer')} relationship="description">
+          <Button size="small" appearance="subtle" icon={<LightbulbRegular />} onClick={() => tellDev(turn)}>
+            {t('開発に伝える', 'Tell the developers')}
+          </Button>
+        </Tooltip>
+      </div>
       {(a.basis.length > 0 || a.files.length > 0) && (
         // 根拠は畳んでおく(ふだんは手順とボタンだけで足りる。確かめたい人・開発する人が開く)
         <Accordion collapsible>
@@ -157,13 +187,16 @@ export function HelpAskFloat({ open, onClose }: Props) {
         </Accordion>
       )}
     </div>
-  )
+    )
+  }
 
-  const samples = [
+  const samples = part
+    ? [t('これは何?', 'What is this?'), t('ここで何ができる?', 'What can I do here?'), t('ここを変えたい', 'I want to change this')]
+    : [
     t('承認を依頼するには?', 'How do I request approval?'),
     t('商品を入れ替えるには?', 'How do I swap a product?'),
     t('テンプレートを直すには?', 'How do I edit a template?'),
-  ]
+      ]
 
   return (
     // 手順を見ながら画面を触れるよう、ほかの所を押せる形(non-modal)にする
@@ -193,7 +226,7 @@ export function HelpAskFloat({ open, onClose }: Props) {
                 <div key={`q${i}`} className={s.question}>
                   {turn.question}
                 </div>,
-                answerBox(turn.answer, i),
+                answerBox(turn, i),
               ])}
               {asking && (
                 <>
@@ -202,6 +235,15 @@ export function HelpAskFloat({ open, onClose }: Props) {
                 </>
               )}
             </div>
+            {part && (
+              <Tooltip content={t('右クリックした所について聞きます。✕ で外すと、ふつうの質問に戻ります', 'You are asking about the spot you right-clicked. Remove it with ✕ to ask in general')} relationship="description">
+                <TagGroup className={s.partTag} onDismiss={() => onClearPart?.()}>
+                  <Tag size="small" shape="circular" dismissible dismissIcon={{ 'aria-label': t('外す', 'Remove') }} value="part">
+                    {t(`この部品について: ${part.label || '(名前なし)'}`, `About: ${part.label || '(no name)'}`)}
+                  </Tag>
+                </TagGroup>
+              </Tooltip>
+            )}
             {error && (
               <MessageBar intent="error" layout="multiline">
                 <MessageBarBody>{error}</MessageBarBody>

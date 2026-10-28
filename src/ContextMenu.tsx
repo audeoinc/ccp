@@ -27,14 +27,18 @@ export function keepBrowserMenu(e: { shiftKey: boolean; target: EventTarget | nu
 }
 
 /**
- * どの右クリックのメニューにも、最後に足す項目(開発へのリクエスト「開発に伝える」など)。押した画面の点を受け取り、項目を返す。
- * 足す側(DevRequestLayer)が、画面を開いている間だけ置く
+ * どの右クリックのメニューにも、最後に足す項目(「ここについて聞く」・開発へのリクエスト「開発に伝える」など)。押した画面の点を受け取り、項目を返す。
+ * 足す側(上の帯・DevRequestLayer)が、画面を開いている間だけ置く。並びは order の小さい順(聞く → 開発に伝える)
  */
 type GlobalItems = (x: number, y: number) => ContextItem[]
-let globalItems: GlobalItems | null = null
-export function setGlobalMenuItems(f: GlobalItems | null) {
-  globalItems = f
+const globalItems = new Map<string, { order: number; f: GlobalItems }>()
+/** 足す項目を置く(f = null で外す)。key ごとに 1 つ */
+export function setGlobalMenuItems(f: GlobalItems | null, key = 'dev-request', order = 100) {
+  if (f) globalItems.set(key, { order, f })
+  else globalItems.delete(key)
 }
+const allGlobalItems = (x: number, y: number) =>
+  [...globalItems.values()].sort((a, b) => a.order - b.order).flatMap((g) => g.f(x, y))
 
 interface At {
   x: number
@@ -49,7 +53,7 @@ interface At {
 export function useContextMenu(): { openAt: (x: number, y: number, items: ContextItem[]) => void; close: () => void; menu: ReactNode } {
   const [at, setAt] = useState<At | null>(null)
   const openAt = useCallback((x: number, y: number, items: ContextItem[]) => {
-    const extra = globalItems?.(x, y) ?? []
+    const extra = allGlobalItems(x, y)
     const all = [...items, ...extra.map((it, i) => (i === 0 && items.length ? { ...it, divider: true } : it))]
     setAt(all.length ? { x, y, items: all } : null)
   }, [])

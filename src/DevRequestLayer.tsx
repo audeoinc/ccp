@@ -23,6 +23,7 @@ import {
   locate,
   uncovered,
   onDevRequestName,
+  onStartDevRequest,
   screenKey,
   screenLabel,
   setDevRequestName,
@@ -121,7 +122,7 @@ const useStyles = makeStyles({
 })
 
 /** いま開いているフロート: 刺さっているリクエスト(ID)か、打ったばかり(場所だけ) */
-type Target = { id: string } | { pending: CapturedPlace & { screen: string; url: string; place_text: string } }
+type Target = { id: string } | { pending: CapturedPlace & { screen: string; url: string; place_text: string; /** 書きかけの本文(「？ 聞く」から始めたとき) */ draft?: string } }
 
 interface Props {
   /** いまの画面(App の URL の状態) */
@@ -234,14 +235,16 @@ export function DevRequestLayer({ link, cardName }: Props) {
   useEffect(() => {
     linkRef.current = { link, cardName, hostClass: s.host }
   })
-  const begin = useCallback((x: number, y: number) => {
+  const begin = useCallback((x: number, y: number, draft?: string) => {
     const { link: l, cardName: name, hostClass } = linkRef.current
     const place = capturePlace(x, y, name)
     const head = screenLabel(l, name)
     // 書いたときの様子を残す(画像は、書くまでの間に作っておく。開発へのリクエストのピンの層は写さない)
     startCaptureAt(devCaptureKey(place.view_x, place.view_y), x, y, place.anchor ? document.querySelector(place.anchor) : null, (el) => el.classList.contains(hostClass))
-    setTarget({ pending: { ...place, screen: screenKey(l), url: window.location.search, place_text: [head, place.partLabel].filter(Boolean).join(' > ') } })
+    setTarget({ pending: { ...place, screen: screenKey(l), url: window.location.search, place_text: [head, place.partLabel].filter(Boolean).join(' > '), draft } })
   }, [])
+  // 「？ 聞く」の答えの「開発に伝える」(質問と答えを書きかけにして、ピンを打つ)
+  useEffect(() => onStartDevRequest(begin), [begin])
   useEffect(() => {
     setGlobalMenuItems((x, y) => [{ key: 'dev-request', label: tr('ピンを打って、開発へのリクエストを書く', 'Pin here and write a request to developers'), icon: <LightbulbRegular />, onSelect: () => begin(x, y) }])
     return () => setGlobalMenuItems(null)
@@ -343,7 +346,7 @@ function DevRequestFloat({ target, rows, votes, onTarget, onClose }: { target: T
   const t = useT()
   const name = useSyncExternalStore(onDevRequestName, devRequestName)
   const [nameEdit, setNameEdit] = useState<string | null>(name ? null : '')
-  const [text, setText] = useState('')
+  const [text, setText] = useState(() => ('pending' in target ? (target.pending.draft ?? '') : ''))
   // これから送る添付(画像・URL。X69 (g))
   const attach = useAttachDraft()
   const [working, setWorking] = useState(false)

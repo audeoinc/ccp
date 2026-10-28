@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   Badge,
   Button,
@@ -34,11 +34,14 @@ import { InboxButton } from './InboxButton'
 import { DevPinsToggle } from './DevPinsToggle'
 import type { ApprovalInbox } from './useApprovalInbox'
 import { FACE_COLOR, FACE_LOGO, FACE_TINT, type Face } from './faces'
-import { optionLabel, useT } from './i18n'
+import { optionLabel, tr, useT } from './i18n'
 import { channelOptions, countryOptions, statusOptions } from './status'
 import { THEME_TYPES, themeTypeLabel } from './themeTypes'
 import { Z } from './layers'
 import { HelpAskFloat } from './help/HelpAskFloat'
+import { captureHelpPart, type HelpPart } from './help/helpAsk'
+import { setGlobalMenuItems } from './ContextMenu'
+import { capturePlace } from './devRequestPlace'
 import { noFilter, useFaceButtonStyles, type Filters, type Page } from './appToolbarParts'
 
 const useStyles = makeStyles({
@@ -233,6 +236,28 @@ export function AppToolbar({
   const setFilter = (k: keyof Filters) => (v: string) => onFilters({ ...filters, [k]: v })
   // 「？ 聞く」(X82)。どの画面からも開けるよう、上の帯が持つ
   const [helpOpen, setHelpOpen] = useState(false)
+  // 右クリックの「ここについて聞く」(X82 の段 ③)。どの右クリックのメニューにも、「開発に伝える」の前に足す
+  const [helpPart, setHelpPart] = useState<HelpPart | null>(null)
+  useEffect(() => {
+    // 配信カードの目印(data-card-id)の名前は、画面に出ている文字から(ここでは配信の一覧を持たないため)
+    const cardName = (id: string) => document.querySelector(`[data-card-id="${CSS.escape(id)}"]`)?.textContent?.trim().slice(0, 30) ?? ''
+    setGlobalMenuItems(
+      (x, y) => [
+        {
+          key: 'help-ask',
+          label: tr('ここについて聞く', 'Ask about this'),
+          icon: <QuestionCircleRegular />,
+          onSelect: () => {
+            setHelpPart(captureHelpPart(x, y, capturePlace(x, y, cardName)))
+            setHelpOpen(true)
+          },
+        },
+      ],
+      'help-ask',
+      10,
+    )
+    return () => setGlobalMenuItems(null, 'help-ask')
+  }, [])
   return (
     <div className={styles.headerWrap}>
     <header className={styles.header}>
@@ -259,11 +284,24 @@ export function AppToolbar({
       <span className={styles.headerSpacer} />
       {/* 使い方を AI に聞く(X82)。機能の説明の文書と、画面にある文言をもとに、手順と開く場所を答える */}
       <Tooltip content={t('使い方を AI に聞く(やりたいことを書くと、手順と開く場所を答えます)', 'Ask AI how to use this (describe what you want; get steps and where to go)')} relationship="description">
-        <Button appearance={helpOpen ? 'primary' : 'subtle'} size="small" icon={<QuestionCircleRegular />} onClick={() => setHelpOpen(true)}>
+        <Button appearance={helpOpen ? 'primary' : 'subtle'} size="small" icon={<QuestionCircleRegular />} onClick={() => {
+          setHelpPart(null)
+          setHelpOpen(true)
+        }}>
           {t('聞く', 'Ask')}
         </Button>
       </Tooltip>
-      {helpOpen && <HelpAskFloat open onClose={() => setHelpOpen(false)} />}
+      {helpOpen && (
+        <HelpAskFloat
+          open
+          part={helpPart}
+          onClearPart={() => setHelpPart(null)}
+          onClose={() => {
+            setHelpOpen(false)
+            setHelpPart(null)
+          }}
+        />
+      )}
       {/* アラート: 配信に影響する変更(いまは在庫)。件数は、どの画面からも見えるように、ヘッダーに出す */}
       <Tooltip content={t('配信に影響する変更(在庫切れ・在庫僅少・MD 方針の変更・日程の変更)', 'Changes that affect deliveries (stock, MD policy, dates)')} relationship="description">
         <Button

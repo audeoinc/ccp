@@ -206,6 +206,16 @@ export function setDevPinsVisible(v: boolean) {
   bumpDevRequests()
 }
 
+// ---- ほかの所から、書き始める(「？ 聞く」の答えの「開発に伝える」。X82 の段 ③)。点 (x, y) にピンを打ち、本文を書きかけにして開く
+const startListeners = new Set<(x: number, y: number, draft: string) => void>()
+export const startDevRequestAt = (x: number, y: number, draft: string) => startListeners.forEach((f) => f(x, y, draft))
+export const onStartDevRequest = (f: (x: number, y: number, draft: string) => void) => {
+  startListeners.add(f)
+  return () => {
+    startListeners.delete(f)
+  }
+}
+
 // ---- 書いた・状態を変えたら、ピンの層・フロート・一覧が読み直す(離れた部品なので、ここで知らせる)
 let version = 0
 const listeners = new Set<() => void>()
