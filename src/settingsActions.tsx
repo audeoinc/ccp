@@ -17,6 +17,7 @@ import {
   PeopleTeamRegular,
   SendRegular,
   ShieldCheckmarkRegular,
+  QuestionCircleRegular,
 } from '@fluentui/react-icons'
 import type { SettingsAction } from './SettingsDialog'
 import {
@@ -26,6 +27,7 @@ import {
   CountryPoliciesPanel,
   CountryTemplatesPanel,
   DevRequestsDialog,
+  HelpFaqAdmin,
   HeroLibrary,
   Later,
   PatternPanel,
@@ -483,6 +485,14 @@ export function useSettingsActions(ctx: {
       label: t('見本の商品ページと画像', 'Sample product pages and photos'),
       icon: <ImageMultipleRegular />,
       render: () => <Later spin><SampleShopPanel products={products} /></Later>,
+    },
+    {
+      // 「？ 聞く」の質問からまとめた、よく聞かれる質問(X82 段 ④)。回数・開発に伝えた数の多い順・隠す・まとめ直す
+      id: 'helpFaqs',
+      section: 'help',
+      label: t('よく聞かれる質問', 'Frequently asked questions'),
+      icon: <QuestionCircleRegular />,
+      render: () => <Later spin><HelpFaqAdmin /></Later>,
     },
     {
       id: 'devRequests',

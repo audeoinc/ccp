@@ -68,6 +68,26 @@ export function mockAgent(message: string): string {
     })
   }
 
+  // よく聞かれる質問のまとめ直し(X82 段 ④)。見本は、同じ文の質問を 1 つに束ね、いまの FAQ と同じ文ならそこに足す(作り物。束ね方は本番で確かめる)
+  if (task === 'help_faq_group') {
+    const faqs = (p.faqs as { id: string; question?: string }[] | undefined) ?? []
+    const qs = (p.questions as { id: string; question: string }[] | undefined) ?? []
+    const by = new Map<string, string[]>()
+    for (const q of qs) by.set(q.question.trim(), [...(by.get(q.question.trim()) ?? []), q.id])
+    return J({
+      groups: [...by.entries()].map(([text, ids]) => {
+        const same = faqs.find((f) => (f.question ?? '').trim() === text)
+        return same ? { faq_id: same.id, question_ids: ids } : { faq_id: null, question_ids: ids, question_ja: hasJa(text) ? text : `(見本)${text}`, question_en: hasJa(text) ? `(Demo) ${text}` : text }
+      }),
+    })
+  }
+  // FAQ の答えをもう一方の言葉に(見本は、印を付けてそのまま返す)
+  if (task === 'help_faq_translate') {
+    const a = (p.answer ?? {}) as Obj
+    const mark = p.to === 'en' ? '(Demo translation) ' : '(見本の訳)'
+    return J({ ...a, reply: `${mark}${String(a.reply ?? '')}` })
+  }
+
   // 並べた配信の評価: 1 通あたりの売上の高い・低い配信と、ばらつきの大きい位置から、決まった形の文を作る
   if (task === 'compare_results') {
     type D = { id: string; date: string; name: string; slots?: string[]; kpis: { revenuePerRecipient?: number; clickRate?: number }; positions?: Record<string, number> }

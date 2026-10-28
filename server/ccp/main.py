@@ -23,6 +23,7 @@ from .approvals import router as approvals_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
 from . import devimages, devtools
+from .help import router as help_router
 from .identity import router as me_router
 from .prefs import router as prefs_router
 from .production import router as production_router
@@ -121,6 +122,7 @@ app.include_router(metrics_router)
 app.include_router(stock_cover_router)
 app.include_router(approvals_router)
 app.include_router(me_router)
+app.include_router(help_router)
 app.include_router(prefs_router)
 app.include_router(production_router)
 app.include_router(ads_router)

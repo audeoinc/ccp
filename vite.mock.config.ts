@@ -24,6 +24,8 @@ const mockServices = (): Plugin => ({
   resolveId(source, importer) {
     // 承認の窓口(src/data/approvals。表ではなくサーバーの API)は、同じ判定をメモリ上で行う身代わりに差し替える
     if (/(?:^|\/)data\/approvals$/.test(source)) return fileURLToPath(new URL('./src/mock/approvals.ts', import.meta.url))
+    // 「？ 聞く」の保存と FAQ の窓口(src/data/help。サーバーの API)も、ブラウザの中だけで同じ動きをする身代わりに
+    if (/(?:^|\/)data\/help$/.test(source)) return fileURLToPath(new URL('./src/mock/help.ts', import.meta.url))
     // 制作の依頼の窓口(src/data/production)も、同じ流れをメモリ上で行う身代わりに
     if (/(?:^|\/)data\/production$/.test(source)) return fileURLToPath(new URL('./src/mock/production.ts', import.meta.url))
     // 指標の CSV の取り込み(src/data/metricsImport。表ではなくサーバーの API)は、メモリ上で置き換える身代わりに

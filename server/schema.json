@@ -696,6 +696,53 @@
     ["dev_request_id", "dev_requests", {"onDelete": "CASCADE"}]
    ]
   },
+  "help_faqs": {
+   "_comment": "「？ 聞く」のよく聞かれる質問(X82 段 ④)。AI が質問(help_questions)を束ねて作った行で、消さない(回数・日付はここに残る)。AI の文を保存して見せる例外(CLAUDE.md)。人は選ばず、まちがったものを hidden_at で隠せるだけ。読み書きは /api/help(server/ccp/help.py)だけ。import-pack の入れ替えでも消さない(pack.py の KEEP_ON_REPLACE)",
+   "columns": [
+    ["question_ja", "text"],
+    ["question_en", "text"],
+    ["answer_ja", "text"],
+    ["answer_en", "text"],
+    ["ask_count", "int"],
+    ["dev_count", "int"],
+    ["first_asked_at", "timestamptz"],
+    ["last_asked_at", "timestamptz"],
+    ["places", "text"],
+    ["hidden_at", "timestamptz"],
+    ["built_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
+  "help_questions": {
+   "_comment": "「？ 聞く」の質問と答えの生の記録(X82 段 ④)。だれが聞いたかは残さない。利用者には見せず、開発の画面(/dev/)だけで見る。まとめに入れた(summarized_at)あと 90 日で消す(help.py の purge。質問の保存・まとめ直しの終わり・FAQ の一覧を開いたときに毎回)。チャットの会話を保存しない決まりの例外(CLAUDE.md)。読み書きは /api/help だけ。import-pack の入れ替えでも消さない",
+   "columns": [
+    ["question", "text", {"required": true}],
+    ["answer", "text"],
+    ["lang", "text"],
+    ["screen", "text"],
+    ["element", "text"],
+    ["element_label", "text"],
+    ["asked_at", "timestamptz"],
+    ["sent_to_dev_at", "timestamptz"],
+    ["summarized_at", "timestamptz", {"index": true}]
+   ],
+   "lookups": [
+    ["help_faq_id", "help_faqs", {"onDelete": "SET NULL"}]
+   ]
+  },
+  "help_faq_builds": {
+   "_comment": "よく聞かれる質問のまとめ直しの記録(X82 段 ④)。status が running の行は、同時に 2 つ走らないための札(10 分で切れる)。読み書きは /api/help だけ。import-pack の入れ替えでも消さない",
+   "columns": [
+    ["status", "text"],
+    ["question_count", "int"],
+    ["faq_count", "int"],
+    ["error", "text"],
+    ["finished_at", "timestamptz"]
+   ],
+   "lookups": [
+   ]
+  },
   "ad_spends": {
    "columns": [
     ["date", "date", {"index": true}],

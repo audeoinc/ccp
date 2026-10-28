@@ -154,7 +154,8 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
 
 # 入れ替えでも消さない表(その環境で書いたものを残す)。パックの行は、まだない行(id で見る)だけを足す。
 # 開発へのリクエストは、使っている環境で書かれるので、本番のパックで入れ替えても残す(参照先の配信が消えると、配信への参照だけが空になる)
-KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes"}
+# 「？ 聞く」の質問とよく聞かれる質問も、その環境で聞かれたものなので残す(Workbench の FAQ は Workbench で積む。2026-10-28 利用者)
+KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes", "help_questions", "help_faqs", "help_faq_builds"}
 # 人の設定(user_prefs。ST6)は残さない: ユーザー(users)と一緒に置き換わり、消えたユーザーの設定は参照先がなくなるため
 
 
