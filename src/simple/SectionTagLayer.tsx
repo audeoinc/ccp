@@ -20,9 +20,7 @@ const useStyles = makeStyles({
     paddingLeft: '6px',
     paddingRight: '6px',
     boxSizing: 'border-box',
-    // 本文に付く右側は角を立て、外側(左)だけ丸める(本文の縁に貼った札に見えるように)
-    borderRadius: `${tokens.borderRadiusMedium} 0 0 ${tokens.borderRadiusMedium}`,
-    borderRightWidth: 0,
+    borderRadius: tokens.borderRadiusMedium,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground3,
@@ -51,6 +49,8 @@ interface Rect {
 // 乗せている札は濃く(青の枠線)、選んでいる札は青で塗る。Button の見た目の決まり(appearance)より確実に勝たせるため、style で当てる
 const TAG_HOVER = { opacity: 1, borderColor: tokens.colorBrandStroke1, backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, boxShadow: tokens.shadow4 }
 const TAG_ON = { opacity: 1, borderColor: tokens.colorBrandBackground, backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand }
+// 札をセクションの上端からどれだけ上に出すか(札の高さ 18px のうち、ほとんどをセクションの間の余白に)
+const TAG_RISE = 14
 // マウスが離れてから札を戻すまで(札へ動かす途中で消えないように)
 const LEAVE_MS = 500
 
@@ -124,8 +124,10 @@ export function SectionTagLayer({ boxRef, sections, selected, onSelect, disabled
         const sec = sections[n]
         if (!sec) return null
         const label = Number.isFinite(sec.slots) ? t(`${sec.label}・${sec.slots} 枠`, `${sec.label} · ${sec.slots} ${sec.slots === 1 ? 'slot' : 'slots'}`) : sec.label
-        // 本文の左の境界の外に、セクションの上端にそろえて貼る(付箋・タブのように)。左に余白が足りないとき(拡大した・幅が狭い)は、切れないよう左端に寄せる
-        const left = Math.max(r.edge, r.tagW)
+        // 本文の左の縁をまたいで貼る(半分は外、半分は本文の上。全部を外に出すと、はみ出し過ぎに見えた。2026-10-28 利用者)。
+        // 本文に重なる側が中身の文字を隠さないよう、セクションの上端より上(セクションの間の余白)に寄せる。左に余白が足りないときは、切れないよう左端に寄せる
+        const left = Math.max(r.edge - r.tagW / 2, 0)
+        const top = Math.max(r.top - TAG_RISE, 0)
         return (
           <Button
             key={n}
@@ -134,7 +136,7 @@ export function SectionTagLayer({ boxRef, sections, selected, onSelect, disabled
             data-section-tag={n}
             data-no-pick
             className={s.tag}
-            style={{ left, top: r.top, transform: 'translateX(-100%)', ...(n === on ? TAG_ON : n === hover ? TAG_HOVER : undefined) }}
+            style={{ left, top, ...(n === on ? TAG_ON : n === hover ? TAG_HOVER : undefined) }}
             title={t('押すと、このセクションの全体を選びます', 'Click to select this whole section')}
             onClick={() => onSelect({ kind: 'section', index: n })}
           >
