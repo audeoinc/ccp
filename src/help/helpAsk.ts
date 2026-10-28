@@ -157,6 +157,28 @@ export function labelChecker(m: Material) {
   return (name: string) => names.has(name.trim().toLowerCase())
 }
 
+/**
+ * 1 回の質問と答えの記録(X82 の段 ④ の「質問をためる」に渡す形。だれが聞いたかは持たない)。
+ * 保存は段 ④ の担当が setHelpRecorder で受け取って行う(ここでは保存しない。受け取る所がなければ何もしない)
+ */
+export interface HelpRecord {
+  question: string
+  answer: HelpAnswer
+  /** 画面の言葉 */
+  lang: 'ja' | 'en'
+  /** 聞いたときの画面 */
+  screen: HelpScreen
+  /** 右クリックの「ここについて聞く」から始めたときの部品(段 ③。data-el など) */
+  part?: { el?: string; label?: string }
+  /** 聞いた日時(ISO) */
+  at: string
+}
+let recorder: ((r: HelpRecord) => void) | null = null
+/** 質問と答えを受け取る所を決める(段 ④ の保存。null で外す) */
+export function setHelpRecorder(fn: ((r: HelpRecord) => void) | null) {
+  recorder = fn
+}
+
 /** 質問する。材料を選んで askAgent に渡し、答えを決まった形にして返す */
 export async function askHelp(question: string, history: HelpTurn[]): Promise<{ answer: HelpAnswer; stats: { docChars: number; labelCount: number; ms: number } }> {
   const m = await loadMaterial()
@@ -172,7 +194,13 @@ export async function askHelp(question: string, history: HelpTurn[]): Promise<{ 
     docs: picked.docs,
     labels: picked.labels,
   })
-  return { answer: normalizeAnswer(raw), stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
+  const answer = normalizeAnswer(raw)
+  try {
+    recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), at: new Date().toISOString() })
+  } catch {
+    // 保存の失敗で、答えを見せるのを止めない
+  }
+  return { answer, stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
 }
 
 /** 「ここを開く」: いまの画面の状態を保ったまま、答えの画面へ移る(App は「戻る」と同じ道で URL を読み直す) */
