@@ -986,6 +986,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 section={commSection}
                 card={e.card}
                 part={part}
+                sectionLabel={(i) => sectionsOf(e.template)[i]?.label ?? ''}
                 onPick={select}
                 items={e.items}
                 productName={(id) => productById.get(id)?.name ?? ''}

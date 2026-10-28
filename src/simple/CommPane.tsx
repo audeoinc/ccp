@@ -74,7 +74,7 @@ const useStyles = makeStyles({
   empty: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, padding: '8px 2px' },
 })
 
-const partName = (p: PartRef | null): string => {
+const partName = (p: PartRef | null, sectionLabel?: (i: number) => string): string => {
   if (!p) return tr('配信の全体', 'Whole delivery')
   switch (p.kind) {
     case 'hero': return tr('メイン画像', 'Main image')
@@ -84,9 +84,10 @@ const partName = (p: PartRef | null): string => {
     case 'preheader': return tr('プリヘッダー', 'Preheader')
     case 'pushTitle':
     case 'pushBody': return tr('通知', 'Notification')
+    // セクションは、名札・パンくずと同じ呼び名で(番号だけでは、どこのことか分からない)
     case 'sectionTitle':
     case 'sectionCopy':
-    case 'section': return tr(`セクション ${p.index + 1}`, `Section ${p.index + 1}`)
+    case 'section': return sectionLabel?.(p.index) || tr('セクション', 'Section')
     case 'product': return tr('商品', 'Product')
     case 'button': return tr('ボタン', 'Button')
     default: return tr('配信の全体', 'Whole delivery')
@@ -129,6 +130,8 @@ interface Props {
   /** 制作への引き継ぎ(状態の道のり・次に動く人を決めるために読む。決めるのは「渡すもの」) */
   handoff: { productionOwner: string; handedOffAt: string; productionDue: string }
   people: string[]
+  /** セクションの呼び名(書き込みの場所の名前。名札・パンくずと同じ) */
+  sectionLabel?: (i: number) => string
   /** 承認・依頼の前に、直した中身を反映(保存)する */
   onCommit: () => Promise<void>
   isDirty: () => boolean
@@ -551,7 +554,7 @@ export function CommPane(props: Props) {
           <Tooltip content={place ? t('プレビューで選んでいる部品に書きます(番号の点が付きます)', 'Posts on the part selected in the preview (adds a numbered dot)') : t('部品を選ばずに書くと、配信の全体への書き込みです', 'With no part selected, it is about the whole delivery')} relationship="description">
             <span className={mergeClasses(s.chip, !!place && s.chipOn)}>
               <LocationRegular />
-              {place ? partName(props.part) : t('全体', 'Whole')}
+              {place ? partName(props.part, props.sectionLabel) : t('全体', 'Whole')}
             </span>
           </Tooltip>
           <Popover positioning="above-start">

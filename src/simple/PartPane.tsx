@@ -430,7 +430,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         const i = part.index
         const isTitle = part.kind === 'sectionTitle'
         const value = (isTitle ? e.sectionTitles[i] : e.sectionCopies[i]) ?? ''
-        const label = isTitle ? t(`セクション ${i + 1} の見出し`, `Section ${i + 1} heading`) : t(`セクション ${i + 1} のコピー`, `Section ${i + 1} copy`)
+        const name = sections[i]?.label ?? ''
+        const label = isTitle ? t(`${name} の見出し`, `${name} heading`) : t(`${name} のコピー`, `${name} copy`)
         const setValue = (v: string) => (isTitle ? e.setSectionTitle(i, v) : e.setSectionCopy(i, v))
         return (
           <>
@@ -774,9 +775,9 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'headline': return t('ヘッドライン', 'Headline')
       case 'copy': return t('コピー', 'Copy')
       case 'hero': return t('メイン画像', 'Main image')
-      case 'sectionTitle': return t(`セクション ${p.index + 1} の見出し`, `Section ${p.index + 1} heading`)
-      case 'sectionCopy': return t(`セクション ${p.index + 1} のコピー`, `Section ${p.index + 1} copy`)
-      case 'section': return sectionName(p.index) || t(`セクション ${p.index + 1}`, `Section ${p.index + 1}`)
+      case 'sectionTitle': return t(`${sections[p.index]?.label ?? ''} の見出し`, `${sections[p.index]?.label ?? ''} heading`)
+      case 'sectionCopy': return t(`${sections[p.index]?.label ?? ''} のコピー`, `${sections[p.index]?.label ?? ''} copy`)
+      case 'section': return sectionName(p.index) || t('セクション', 'Section')
       case 'product': return t('商品', 'Product')
       case 'slot': return t('空いた枠', 'Empty slot')
       case 'button': return t('ボタン', 'Button')
