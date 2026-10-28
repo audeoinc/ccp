@@ -85,7 +85,8 @@ const partName = (p: PartRef | null): string => {
     case 'pushTitle':
     case 'pushBody': return tr('通知', 'Notification')
     case 'sectionTitle':
-    case 'sectionCopy': return tr(`セクション ${p.index + 1}`, `Section ${p.index + 1}`)
+    case 'sectionCopy':
+    case 'section': return tr(`セクション ${p.index + 1}`, `Section ${p.index + 1}`)
     case 'product': return tr('商品', 'Product')
     case 'button': return tr('ボタン', 'Button')
     default: return tr('配信の全体', 'Whole delivery')

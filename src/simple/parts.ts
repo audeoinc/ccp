@@ -17,6 +17,8 @@ export type PartRef =
   | { kind: 'hero' }
   | { kind: 'sectionTitle'; index: number }
   | { kind: 'sectionCopy'; index: number }
+  // セクションの全体(プレビューの名札・ペインのパンくずから選ぶ。セクションの中を押しただけでは選ばれない)
+  | { kind: 'section'; index: number }
   | { kind: 'product'; itemKey: string }
   // 空いた枠。index は、商品の並び全体の中の位置(そこへ入れると、その位置の商品になる)
   | { kind: 'slot'; index: number }
@@ -33,6 +35,7 @@ export function partKey(p: PartRef): string {
   switch (p.kind) {
     case 'sectionTitle':
     case 'sectionCopy':
+    case 'section':
       return `${p.kind}:${p.index}`
     case 'slot':
       return `slot:${p.index}`
@@ -66,7 +69,7 @@ export function parsePart(v: string | null | undefined): PartRef | null {
   const head = v.slice(0, at)
   const rest = v.slice(at + 1)
   const n = Number(rest)
-  if ((head === 'sectionTitle' || head === 'sectionCopy') && Number.isInteger(n)) return { kind: head, index: n }
+  if ((head === 'sectionTitle' || head === 'sectionCopy' || head === 'section') && Number.isInteger(n)) return { kind: head, index: n }
   if (head === 'slot' && Number.isInteger(n)) return { kind: 'slot', index: n }
   if (head === 'product' && rest) return { kind: 'product', itemKey: rest }
   if (head === 'button' && rest) return { kind: 'button', id: rest }
@@ -106,6 +109,8 @@ export function partFromElement(el: Element | null, root: Element): PartRef | nu
 /** 部品の要素を探す(最初の 1 つ) */
 export function partElement(root: Element, p: PartRef): Element | null {
   if (p.kind === 'product') return root.querySelector(`[data-item-key="${CSS.escape(p.itemKey)}"]`)
+  // セクションの全体は、ピンの目印(data-anchor="section:N")の箱がそのまま外形になる
+  if (p.kind === 'section') return root.querySelector(`[data-anchor="section:${p.index}"]`)
   return root.querySelector(`[data-part="${CSS.escape(partKey(p))}"]`)
 }
 
@@ -140,7 +145,8 @@ export function anchorOfPart(p: PartRef | null, productIdOf: (itemKey: string) =
     case 'pushBody':
       return { anchor: 'push' }
     case 'sectionTitle':
-    case 'sectionCopy': {
+    case 'sectionCopy':
+    case 'section': {
       // セクションの ID も添える(構成を変えた版でも同じセクションに付くように。X65 (d))。ID はプレビューの目印から読む
       const block = typeof document !== 'undefined' ? document.querySelector(`[data-anchor="section:${p.index}"]`) : null
       return { anchor: block ? anchorOfBlock(block) : `section:${p.index}` }

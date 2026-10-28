@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, Badge, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { Candidates } from '../Candidates'
@@ -58,6 +58,9 @@ const useStyles = makeStyles({
   head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
   title: typo.heading,
   deselect: { marginLeft: 'auto' },
+  // パンくずは長いセクション名でも折り返して、閉じるボタンを押し出さない
+  crumbs: { minWidth: 0, '& ol': { flexWrap: 'wrap' } },
+  sectionParts: { display: 'grid', rowGap: '4px', justifyItems: 'start' },
   warn: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteMarigoldForeground2 },
   grow: { flexGrow: 1, minWidth: 0 },
   // 名前・直す・開くは縮めず、URL の文だけを省略する
@@ -376,25 +379,20 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     )
   })()
 
-  // 選んでいる部品が、どのセクションのものか(メールで、セクションがあるときだけ)。
-  // セクションの商品を AI で選ぶボタンは、セクションの見出し・コピー・空いた枠を選んだときだけ出す(商品を選んだときは、その商品の操作だけにする。
-  // 商品のペインの「位置(セクション名)」を押すと、セクションを選んだ状態に移れる)
-  const sectionOfPart = (() => {
+  // 選んでいる部品が、どのセクションのものか(メールで、セクションがあるときだけ。パンくずの真ん中に出す)
+  const inSection = (() => {
     if (!part || e.channel !== 'email' || sections.length === 0) return null
-    if (part.kind === 'sectionTitle' || part.kind === 'sectionCopy') return part.index
+    if (part.kind === 'sectionTitle' || part.kind === 'sectionCopy' || part.kind === 'section') return part.index
     if (part.kind === 'slot') return sectionIndexAt(sections, Math.max(0, part.index))
+    if (part.kind === 'product') {
+      const at = e.items.findIndex((i) => i.key === part.itemKey)
+      return at < 0 ? null : sectionIndexAt(sections, at)
+    }
     return null
   })()
-  /** セクション i を選ぶときに選ぶ部品(見出し → コピー → そのセクションの空いた枠。どれもなければ null) */
-  const sectionPartOf = (i: number): PartRef | null => {
-    const sec = sections[i]
-    if (!sec) return null
-    if (sec.wantTitle) return { kind: 'sectionTitle', index: i }
-    if (getTemplate(e.template).sections[i]?.copy !== false) return { kind: 'sectionCopy', index: i }
-    const end = Number.isFinite(sec.slots) ? sec.start + sec.slots : e.items.length + 1
-    for (let at = sec.start; at < end; at++) if (!e.items[at] || e.items[at].gap) return { kind: 'slot', index: at }
-    return null
-  }
+  // セクションの商品を AI で選ぶボタンは、セクションの全体・見出し・コピー・空いた枠を選んだときだけ出す(商品を選んだときは、その商品の操作だけにする。
+  // パンくずのセクション名を押すと、セクションの全体を選んだ状態に移れる)
+  const sectionOfPart = part && part.kind !== 'product' ? inSection : null
   /** セクションの呼び名(右の商品の一覧と同じ名前。見出しがあれば添える。例: Grid2(秋の小物)) */
   const sectionName = (i: number) => {
     const sec = sections[i]
@@ -445,6 +443,46 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               list[i] = v
               return isTitle ? { sectionTitles: list } : { sectionCopies: list }
             })}
+          </>
+        )
+      }
+      case 'section': {
+        // セクションの全体(プレビューの名札・パンくずから)。中の部品へ移る入口と、枠の埋まり具合。商品をまとめて選ぶのは下の AI のボタン
+        const sec = sections[part.index]
+        if (!sec) return <span className={s.caption}>{t('このセクションは、いまのテンプレートにありません', 'This section is not in the current template')}</span>
+        const end = Number.isFinite(sec.slots) ? sec.start + sec.slots : Math.max(e.items.length, sec.start + 1)
+        const slots = Array.from({ length: Math.max(0, end - sec.start) }, (_, j) => sec.start + j)
+        const used = slots.filter((at) => e.items[at] && !e.items[at].gap).length
+        const heading = (e.sectionTitles[part.index] ?? '').trim()
+        return (
+          <>
+            <LabeledValue label={t('セクション', 'Section')}>{sectionName(part.index)}</LabeledValue>
+            <LabeledValue label={t('商品の枠', 'Product slots')}>
+              {Number.isFinite(sec.slots) ? t(`${used} / ${sec.slots} 枠`, `${used} / ${sec.slots} slots`) : t(`${used} 点(上限なし)`, `${used} items (no limit)`)}
+            </LabeledValue>
+            <span className={s.label}>{t('このセクションの部品', 'Parts in this section')}</span>
+            <div className={s.sectionParts}>
+              {sec.wantTitle && (
+                <Link as="button" onClick={() => onPick({ kind: 'sectionTitle', index: part.index })}>
+                  {heading ? t(`見出し: ${heading}`, `Heading: ${heading}`) : t('見出し', 'Heading')}
+                </Link>
+              )}
+              {getTemplate(e.template).sections[part.index]?.copy !== false && (
+                <Link as="button" onClick={() => onPick({ kind: 'sectionCopy', index: part.index })}>
+                  {t('コピー', 'Copy')}
+                </Link>
+              )}
+              {slots.map((at) => {
+                const it = e.items[at]
+                const p = it && !it.gap ? byId.get(it.productId) : undefined
+                const n = at - sec.start + 1
+                return (
+                  <Link key={at} as="button" onClick={() => onPick(it && !it.gap ? { kind: 'product', itemKey: it.key } : { kind: 'slot', index: at })}>
+                    {p ? t(`${n} 枠目: ${p.name}`, `Slot ${n}: ${p.name}`) : t(`${n} 枠目(空き)`, `Slot ${n} (empty)`)}
+                  </Link>
+                )
+              })}
+            </div>
           </>
         )
       }
@@ -595,8 +633,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'product': {
         const it = e.items.find((i) => i.key === part.itemKey)
         if (!it) return <span className={s.caption}>{t('この商品は、もう載っていません', 'This product is no longer in the delivery')}</span>
-        const idx = e.items.indexOf(it)
-        const sec = sections[sectionIndexAt(sections, idx)]
         return (
           <>
             {/* 箱を押すと、詳しい情報・この配信で使う画像のフロート */}
@@ -622,23 +658,6 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               setChat={setChat}
               onDone={(k) => onSwapped(it.key, k)}
             />
-            {(() => {
-              // セクションの名前を押すと、そのセクションを選んだ状態に移る(セクションの商品を AI で選ぶボタンが出る)
-              const target = sec ? sectionPartOf(sec.index) : null
-              const name = sec && target ? (
-                <Link as="button" onClick={() => onPick(target)}>
-                  {sectionName(sec.index)}
-                </Link>
-              ) : sec ? (
-                sectionName(sec.index)
-              ) : null
-              return (
-                <span className={s.caption}>
-                  {t(`${idx + 1} 番目`, `Position ${idx + 1}`)}
-                  {name && <>{t('(', ' (')}{name}{t(')', ')')}</>}
-                </span>
-              )
-            })()}
             {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
                 (商品は上下左右に並ぶので、前後の矢印では向きを表せない。外すは、外したい商品の上で。2026-10-26 利用者) */}
@@ -757,6 +776,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       case 'hero': return t('メイン画像', 'Main image')
       case 'sectionTitle': return t(`セクション ${p.index + 1} の見出し`, `Section ${p.index + 1} heading`)
       case 'sectionCopy': return t(`セクション ${p.index + 1} のコピー`, `Section ${p.index + 1} copy`)
+      case 'section': return sectionName(p.index) || t(`セクション ${p.index + 1}`, `Section ${p.index + 1}`)
       case 'product': return t('商品', 'Product')
       case 'slot': return t('空いた枠', 'Empty slot')
       case 'button': return t('ボタン', 'Button')
@@ -768,11 +788,43 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
     }
   }
 
+  // パンくずの最後(いま選んでいる部品)。セクションの中の部品は、セクションの中での呼び名にする(例: 7 枠目・見出し)
+  const crumbOf = (p: PartRef): string => {
+    const sec = inSection !== null ? sections[inSection] : undefined
+    if (sec) {
+      if (p.kind === 'sectionTitle') return t('見出し', 'Heading')
+      if (p.kind === 'sectionCopy') return t('コピー', 'Copy')
+      if (p.kind === 'slot') return t(`${p.index - sec.start + 1} 枠目(空き)`, `Slot ${p.index - sec.start + 1} (empty)`)
+      if (p.kind === 'product') {
+        const n = e.items.findIndex((i) => i.key === p.itemKey) - sec.start + 1
+        return t(`${n} 枠目`, `Slot ${n}`)
+      }
+    }
+    return titleOf(p)
+  }
+
   return (
     <div className={s.root}>
       <div className={s.head}>
         {part ? (
-          <span className={s.title}>{titleOf(part)}</span>
+          // どこを選んでいるか: 配信の全体 › セクション › 部品。上の段を押すと、そこを選び直す(2026-10-28 利用者)
+          <Breadcrumb size="small" aria-label={t('選んでいる部品の場所', 'Where the selected part is')} className={s.crumbs}>
+            <BreadcrumbItem>
+              <BreadcrumbButton onClick={() => onPick(null)}>{t('配信の全体', 'Whole delivery')}</BreadcrumbButton>
+            </BreadcrumbItem>
+            {inSection !== null && part.kind !== 'section' && (
+              <>
+                <BreadcrumbDivider />
+                <BreadcrumbItem>
+                  <BreadcrumbButton onClick={() => onPick({ kind: 'section', index: inSection })}>{sectionName(inSection)}</BreadcrumbButton>
+                </BreadcrumbItem>
+              </>
+            )}
+            <BreadcrumbDivider />
+            <BreadcrumbItem>
+              <BreadcrumbButton current>{crumbOf(part)}</BreadcrumbButton>
+            </BreadcrumbItem>
+          </Breadcrumb>
         ) : (
           <InfoLabel
             className={s.title}

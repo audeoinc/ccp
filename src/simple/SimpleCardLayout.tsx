@@ -30,7 +30,7 @@ import { locale, optionLabel, useT } from '../i18n'
 import { audienceSet } from '../target'
 import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
-import { getTemplate, slotsOf } from '../templates'
+import { getTemplate, sectionsOf, slotsOf } from '../templates'
 import { countryOptions, statusRank } from '../status'
 import { ReadinessList } from './ReadinessList'
 import { ApprovalBar } from '../ApprovalBar'
@@ -52,6 +52,7 @@ import { myName, onMeChange } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
 import { SectionGlowLayer } from './SectionGlowLayer'
+import { SectionTagLayer } from './SectionTagLayer'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
 import { SenderName } from '../SenderName'
@@ -1202,6 +1203,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}
             {/* セクションの商品を AI で選ぶボタンに載せている・案を試しているセクションを光らせる(X81 の 9) */}
             <SectionGlowLayer boxRef={boxRef} />
+            {/* セクションの名札: 乗せると左上に名前と枠の数、押すとセクションの全体を選ぶ(2026-10-28 利用者) */}
+            {e.channel === 'email' && <SectionTagLayer boxRef={boxRef} sections={sectionsOf(e.template)} selected={part} onSelect={onPick} disabled={e.saving || placing} />}
             <PreviewPartPicker boxRef={boxRef} selected={part && part.kind !== 'meta' && part.kind !== 'overview' ? part : null} lead={META_PART} leadOn={metaOn} onSelect={onPick} disabled={e.saving || placing} onSwap={onSwapBadge} onRemove={onRemoveBadge} onMove={onMoveKey} onEnter={focusPane} />
           </div>
           {/* 倍率(Ctrl + ホイールでも。数字を押すと、全体表示と 100% を行き来する) */}
