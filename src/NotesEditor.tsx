@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type MutableRefObject } from 'react'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -52,6 +52,10 @@ interface Props {
   placeholder?: string
   /** 入力欄の最小の高さ(CSS の値) */
   minHeight?: string
+  /** 読むだけ(AI の案を仮に写しているあいだなど) */
+  readOnly?: boolean
+  /** カーソルの位置に文字を差し込む関数を受け取る(「素材を挿入」のように、欄の外のメニューから差し込むため) */
+  insertRef?: MutableRefObject<((text: string) => void) | null>
 }
 
 /**
@@ -59,7 +63,7 @@ interface Props {
  * 「- 」で箇条書き、「1. 」で番号つき、「### 」で見出し、「**文字**」で太字に、その場で変わる(TipTap の入力ルール)。
  * 保存が文字のままなので、AI への受け渡しや、CSV の書き出し、以前に保存した内容は、そのまま使える。
  */
-export function NotesEditor({ value, onChange, placeholder, minHeight }: Props) {
+export function NotesEditor({ value, onChange, placeholder, minHeight, readOnly, insertRef }: Props) {
   const styles = useStyles()
   const t = useT()
   const editor = useEditor({
@@ -81,6 +85,17 @@ export function NotesEditor({ value, onChange, placeholder, minHeight }: Props) 
     editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false })
   }, [editor, value])
 
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.setEditable(!readOnly, false)
+  }, [editor, readOnly])
+  // 差し込みは、最後にカーソルがあった所へ(メニューを押すと欄から焦点が外れるが、TipTap は選択範囲を覚えている)
+  useEffect(() => {
+    if (!insertRef) return
+    insertRef.current = (text) => editor?.chain().focus().insertContent(text).run()
+    return () => {
+      insertRef.current = null
+    }
+  }, [editor, insertRef])
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { filled } from '../slots'
 import { Button, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { AttachRegular, ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
-import { AutoTextarea } from '../AutoTextarea'
+import { NotesEditor } from '../NotesEditor'
 import { CreativeAssets } from '../CreativeAssets'
 import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
@@ -114,14 +114,12 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
       alive = false
     }
   }, [e.card.id, assetsVersion, assetCount])
-  // 「素材を挿入」で差し込む位置(欄を離れたときのカーソルの位置。メニューを押すと欄から離れるため)
-  const caret = useRef<number | null>(null)
+  // 「素材を挿入」は、制作指示の欄の、最後にカーソルがあった所へ差し込む(欄が渡す関数。メニューを押すと欄から焦点が外れるため)
+  const insertRef = useRef<((text: string) => void) | null>(null)
   const insertAsset = (a: CardAsset) => {
-    const text = e.form.instructions
-    const at = Math.min(caret.current ?? text.length, text.length)
     const piece = t(`素材「${a.name}」`, `asset "${a.name}"`)
-    e.setField('instructions', text.slice(0, at) + piece + text.slice(at))
-    caret.current = at + piece.length
+    if (insertRef.current) insertRef.current(piece)
+    else e.setField('instructions', e.form.instructions + piece)
   }
 
   useEffect(() => {
@@ -215,15 +213,14 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
             <MessageBarBody>{t('渡したあとに直しました。制作に知らせるには、制作のページで渡し直してください。', 'Edited after handoff. To let production know, hand off again on the production page.')}</MessageBarBody>
           </MessageBar>
         )}
-        <AutoTextarea
-          heightKey="HandoffSheet.e_form_instructions"
-          size="small"
-          rows={4}
+        {/* 箇条書き・見出しつきで書ける欄(詳しい配信カードの制作指示と同じ。保存は Markdown の文字のまま。2026-10-28 利用者) */}
+        <NotesEditor
+          minHeight="96px"
           value={previewing ?? e.form.instructions}
           readOnly={previewing !== null}
-          placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。セールの期間を目立たせる', 'e.g. Feature the model large in the main image; headline below it; make the sale period stand out')}
-          onChange={(_, d) => e.setField('instructions', d.value)}
-          onBlur={(ev) => (caret.current = ev.currentTarget.selectionStart)}
+          insertRef={insertRef}
+          placeholder={t('例: メイン画像は人物を大きく。見出しは画像の下に。「- 」で箇条書き、「### 」で見出し', 'e.g. Feature the model large in the main image; headline below it. Type "- " for bullets, "### " for a heading')}
+          onChange={(v) => e.setField('instructions', v)}
         />
         {assets.length > 0 && (
           <div className={s.tools}>
