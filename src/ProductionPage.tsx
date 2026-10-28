@@ -137,6 +137,8 @@ interface Props {
   autoRequest?: boolean
   /** 題名の左に出す、配信の段階の帯(計画・制作・結果を行き来する。StageNav) */
   stageNav?: ReactNode
+  /** シンプルな制作の画面に切り替える(X86。消すまでは並べて残す) */
+  onSimpleView?: () => void
 }
 
 const subscribeMe = (f: () => void) => onMeChange(f)
@@ -150,7 +152,7 @@ const TALK_KEY = PREF.productionTalkOpen
  * 状態と操作は、題名のすぐ下の行に、いつも出す(2026-10-19、利用者と決めた: 材料を見る → 書く → 確かめる → 相談する、の順。左のコピーを隣のエディタに貼れる)。
  * 中身は、依頼した時点の写し(依頼する前は、いまの配信カードから作った下書き)
  */
-export function ProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onOpenCard, onChanged, stageNav, autoRequest }: Props) {
+export function ProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onOpenCard, onChanged, stageNav, autoRequest, onSimpleView }: Props) {
   const s = useStyles()
   const t = useT()
   const meId = useSyncExternalStore(subscribeMe, myUserId)
@@ -548,6 +550,11 @@ export function ProductionPage({ card, productIds, variantIds, products, product
             {t('企画を見る', 'Open the plan')}
           </Button>
           <CopyLinkButton />
+          {onSimpleView && (
+            <Button size="small" appearance="subtle" onClick={onSimpleView}>
+              {t('シンプルで開く', 'Open simple view')}
+            </Button>
+          )}
           <DevRequestMoreMenu />
           <Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} />
         </div>

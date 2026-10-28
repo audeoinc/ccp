@@ -99,7 +99,7 @@ import { useUrlSync } from './useUrlSync'
 import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
-import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, SimpleProductionPage, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 
 const weekLabel = (start: Date) => {
@@ -328,6 +328,13 @@ function App() {
   const [productionKey, setProductionKey] = useState(0)
   // 制作のページを開いたら、そのまま制作に依頼するか(シンプルな配信カードの「制作に渡す」)
   const [productionAuto, setProductionAuto] = useState(false)
+  // 制作のページを、シンプル(X86)と詳しいのどちらで開くか(人ごとに覚える。詳しいほうは消すまで並べて残す)。
+  // 「制作に渡す」から開くときは、渡す処理が詳しいほうにあるので、詳しいほうで開く(渡すのを配信カードへ移すのは、詳しいほうを消す段)
+  const [productionSimple, setProductionSimple] = useState(() => loadPref<boolean>(PREF.productionSimple, true))
+  const switchProductionView = (simple: boolean) => {
+    savePref(PREF.productionSimple, simple)
+    setProductionSimple(simple)
+  }
   const goStage = (id: string, f: Face) => {
     // ほかの道から開いたときは、そのまま依頼しない(「制作に渡す」だけが、下でもう一度立てる)
     setProductionAuto(false)
@@ -1543,7 +1550,22 @@ function App() {
         <Later><ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} /></Later>
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
-      {productionOpen && cards.find((c) => c.id === productionOpen) && (
+      {productionOpen && cards.find((c) => c.id === productionOpen) && productionSimple && !productionAuto && (
+        <Later><SimpleProductionPage
+          key={`${productionOpen}:${productionKey}`}
+          card={cards.find((c) => c.id === productionOpen)!}
+          productIds={cardProducts.get(productionOpen) ?? []}
+          variantIds={variantProducts.get(productionOpen)}
+          products={products}
+          productImages={cardImages.get(productionOpen)}
+          heroes={heroes}
+          people={owners}
+          onClose={() => setProductionOpen(null)}
+          onFullView={() => switchProductionView(false)}
+          stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
+        /></Later>
+      )}
+      {productionOpen && cards.find((c) => c.id === productionOpen) && (!productionSimple || productionAuto) && (
         <Later><ProductionPage
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
@@ -1561,6 +1583,10 @@ function App() {
           onChanged={() => void production.reload()}
           autoRequest={productionAuto}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
+          onSimpleView={() => {
+            setProductionAuto(false)
+            switchProductionView(true)
+          }}
         /></Later>
       )}
     </>

@@ -11,6 +11,7 @@ export const LearningEffectFloat = lazy(() => loadChunk(() => import('./Learning
 export const LearningHand = lazy(() => loadChunk(() => import('./LearningHand')).then((m) => ({ default: m.LearningHand })))
 export const ProductsView = lazy(() => loadChunk(() => import('./ProductsView')).then((m) => ({ default: m.ProductsView })))
 export const ResultPeek = lazy(() => loadChunk(() => import('./ResultPeek')).then((m) => ({ default: m.ResultPeek })))
+export const SimpleProductionPage = lazy(() => loadChunk(() => import('./production/SimpleProductionPage')).then((m) => ({ default: m.SimpleProductionPage })))
 export const ProductionPage = lazy(() => loadChunk(() => import('./ProductionPage')).then((m) => ({ default: m.ProductionPage })))
 export const AlertsPage = lazy(() => loadChunk(() => import('./AlertsPage')).then((m) => ({ default: m.AlertsPage })))
 export const BulkWorkspace = lazy(() => loadChunk(() => import('./BulkWorkspace')).then((m) => ({ default: m.BulkWorkspace })))
