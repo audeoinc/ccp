@@ -879,7 +879,7 @@ export function sectionsOf(id: EmailTemplateId): SectionInfo[] {
     const name = kindName[sec.kind]?.() ?? sec.kind
     // 表は、テンプレートで付けた名前があれば、それを使う(テンプレートの編集画面の札と同じ呼び名に)。
     // 「セクション 5」のような番号だけの呼び名は使わない(どこのことか分からない。2026-10-28 利用者)。見出しのあるセクションも種類の名前で呼ぶ
-    const label = sec.name?.trim() ? sec.name.trim() : countOf(sec.kind) > 1 ? `${name}${countOf(sec.kind, i + 1)}` : name
+    const label = sec.name?.trim() ? sec.name.trim() : countOf(sec.kind) > 1 ? tr(`${name}${countOf(sec.kind, i + 1)}`, `${name} ${countOf(sec.kind, i + 1)}`) : name
     return { index: i, start, slots: sec.slots, kind: sec.kind, wantTitle: !!sec.categoryHeading, label, note: tableNote(sec) }
   })
 }

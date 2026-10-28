@@ -20,7 +20,9 @@ const useStyles = makeStyles({
     paddingLeft: '6px',
     paddingRight: '6px',
     boxSizing: 'border-box',
-    borderRadius: tokens.borderRadiusSmall,
+    // 本文に付く右側は角を立て、外側(左)だけ丸める(本文の縁に貼った札に見えるように)
+    borderRadius: `${tokens.borderRadiusMedium} 0 0 ${tokens.borderRadiusMedium}`,
+    borderRightWidth: 0,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground3,
@@ -40,9 +42,12 @@ interface Rect {
   top: number
   width: number
   height: number
+  /** メールの本文の左の境界(札の右端をここに付ける) */
+  edge: number
+  /** 札の幅(左に余白が足りないときに、切れないよう寄せるため) */
+  tagW: number
 }
 
-const TAG_H = 20
 // 乗せている札は濃く(青の枠線)、選んでいる札は青で塗る。Button の見た目の決まり(appearance)より確実に勝たせるため、style で当てる
 const TAG_HOVER = { opacity: 1, borderColor: tokens.colorBrandStroke1, backgroundColor: tokens.colorNeutralBackground1, color: tokens.colorBrandForeground1, boxShadow: tokens.shadow4 }
 const TAG_ON = { opacity: 1, borderColor: tokens.colorBrandBackground, backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand }
@@ -96,7 +101,11 @@ export function SectionTagLayer({ boxRef, sections, selected, onSelect, disabled
           const n = Number(el.getAttribute('data-anchor')?.split(':')[1])
           const r = el.getBoundingClientRect()
           if (!Number.isInteger(n) || next.has(n) || (r.width === 0 && r.height === 0)) continue
-          next.set(n, { left: (r.left - b.left) / k + box.scrollLeft, top: (r.top - b.top) / k + box.scrollTop, width: r.width / k, height: r.height / k })
+          // 札は、メールの本文(白い枠)の左の境界の外に貼る。本文は、セクションを囲む、はみ出しを隠す箱
+          let body: Element | null = el.parentElement
+          while (body && body !== box && getComputedStyle(body).overflow !== 'hidden') body = body.parentElement
+          const edge = body && body !== box ? body.getBoundingClientRect().left : r.left
+          next.set(n, { left: (r.left - b.left) / k + box.scrollLeft, top: (r.top - b.top) / k + box.scrollTop, width: r.width / k, height: r.height / k, edge: (edge - b.left) / k + box.scrollLeft, tagW: (box.querySelector(`[data-section-tag="${n}"]`) as HTMLElement | null)?.offsetWidth ?? 0 })
         }
       }
       setRects((old) => (JSON.stringify([...old]) === JSON.stringify([...next]) ? old : next))
@@ -110,13 +119,13 @@ export function SectionTagLayer({ boxRef, sections, selected, onSelect, disabled
   const hoverRect = hover !== null && hover !== on ? rects.get(hover) : undefined
   return (
     <div className={s.layer}>
-      {hoverRect && <div className={s.outline} style={hoverRect} aria-hidden />}
+      {hoverRect && <div className={s.outline} style={{ left: hoverRect.left, top: hoverRect.top, width: hoverRect.width, height: hoverRect.height }} aria-hidden />}
       {[...rects].map(([n, r]) => {
         const sec = sections[n]
         if (!sec) return null
-        const label = Number.isFinite(sec.slots) ? t(`${sec.label}・${sec.slots} 枠`, `${sec.label} · ${sec.slots} slots`) : sec.label
-        // 枠の上の外側に出す(中の見出しに重ねない)。上に余白がなければ、枠の内側に
-        const top = r.top >= TAG_H ? r.top - TAG_H : r.top + 2
+        const label = Number.isFinite(sec.slots) ? t(`${sec.label}・${sec.slots} 枠`, `${sec.label} · ${sec.slots} ${sec.slots === 1 ? 'slot' : 'slots'}`) : sec.label
+        // 本文の左の境界の外に、セクションの上端にそろえて貼る(付箋・タブのように)。左に余白が足りないとき(拡大した・幅が狭い)は、切れないよう左端に寄せる
+        const left = Math.max(r.edge, r.tagW)
         return (
           <Button
             key={n}
@@ -125,7 +134,7 @@ export function SectionTagLayer({ boxRef, sections, selected, onSelect, disabled
             data-section-tag={n}
             data-no-pick
             className={s.tag}
-            style={{ left: r.left, top, ...(n === on ? TAG_ON : n === hover ? TAG_HOVER : undefined) }}
+            style={{ left, top: r.top, transform: 'translateX(-100%)', ...(n === on ? TAG_ON : n === hover ? TAG_HOVER : undefined) }}
             title={t('押すと、このセクションの全体を選びます', 'Click to select this whole section')}
             onClick={() => onSelect({ kind: 'section', index: n })}
           >

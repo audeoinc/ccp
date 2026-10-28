@@ -459,7 +459,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           <>
             <LabeledValue label={t('セクション', 'Section')}>{sectionName(part.index)}</LabeledValue>
             <LabeledValue label={t('商品の枠', 'Product slots')}>
-              {Number.isFinite(sec.slots) ? t(`${used} / ${sec.slots} 枠`, `${used} / ${sec.slots} slots`) : t(`${used} 点(上限なし)`, `${used} items (no limit)`)}
+              {Number.isFinite(sec.slots) ? t(`${used} / ${sec.slots} 枠`, `${used} / ${sec.slots} ${sec.slots === 1 ? 'slot' : 'slots'}`) : t(`${used} 点(上限なし)`, `${used} items (no limit)`)}
             </LabeledValue>
             <span className={s.label}>{t('このセクションの部品', 'Parts in this section')}</span>
             <div className={s.sectionParts}>
@@ -1038,7 +1038,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
                 {o.description && <span className={s.caption}>{o.description}</span>}
                 <span className={s.row}>
                   {on && <Badge size="small" appearance="filled" color="brand">{t('いまのテンプレート', 'Current')}</Badge>}
-                  {Number.isFinite(slots) && <span className={s.caption}>{t(`商品の枠 ${slots}`, `${slots} product slots`)}</span>}
+                  {Number.isFinite(slots) && <span className={s.caption}>{t(`商品の枠 ${slots}`, `${slots} product ${slots === 1 ? 'slot' : 'slots'}`)}</span>}
                   {over > 0 && <Badge size="small" appearance="tint" color="warning">{t(`${over} 件が枠外(メールに載らない)`, `${over} out of slots (not in the email)`)}</Badge>}
                 </span>
                 {e.templateUse && <TemplateUseLine u={e.templateUse.get(o.id)} />}
