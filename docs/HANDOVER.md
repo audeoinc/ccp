@@ -27,7 +27,7 @@
 - 2026-10-26 T8 段階 6・8.8〜8.10・T11 の一部・テンプレートの編集の帯(`SelBar`): 本番に反映済み。TEMPLATE_OBJECTS.md
 - 2026-10-26 まとめて作る: ブラッシュアップと ② の案のプレビュー(`BulkPreviewFloat`)。本番に反映済み
 - 2026-10-28 UI 1: 詳しい配信カード(ClassicCardLayout など 13 ファイル)と「シンプル | 詳しい」の切り替えを消した(ブランチ claude/ui1-remove-full。利用者の OK 待ち)。配信カードはいつもシンプル。CLAUDE.md の「どちらの画面も」の直しは連絡係
-- 2026-10-28 UI 2: セクションの枠(`src/slots.ts`・`Item.gap`)・X81 の 7〜9・セクションの全体を選ぶ(名札 `SectionTagLayer`・パンくず・部品 `section`。呼び名の番号をやめた `sectionsOf`。ピン・アラート・リンク先には残る)は main。X82「？ 聞く」の段 ①②(材料はビルドで作る `helpMaterial.ts`・`src/help/`。質問に近い所だけを渡す。保存の口 `setHelpRecorder`)も main、③ は UI 2・④ は UI 3
+- 2026-10-28 UI 2: セクションの枠(`src/slots.ts`・`Item.gap`)・X81 の 7〜9・セクションの全体を選ぶ(名札 `SectionTagLayer`・パンくず・部品 `section`。呼び名の番号をやめた `sectionsOf`。ピン・アラート・リンク先には残る)は main。X82「？ 聞く」の段 ①②(材料はビルドで作る `helpMaterial.ts`・`src/help/`。質問に近い所だけを渡す。保存の口 `setHelpRecorder`)・段 ③(右クリックの「ここについて聞く」・答えの「開発に伝える」 `startDevRequestAt`・右クリックの共通の項目は鍵ごと)も main。④ は UI 3、次は X83
 - 2026-10-27 UI 3: **見本の画面(ccp-preview)ができた**。push のたびに約 2 分で、`/b/main/`・`/b/<ブランチ>/` のデモが新しくなる(本番と同じパスワード)。作り・権限・手で流すときは GCP.md の「見本の画面」
 - 2026-10-28 UI 3: 配信カードの上を 1 行に詰めた(キャンペーンの帯・承認の札 `ApprovalChip`・面のタブ・配信の情報)。きょうだいの切り替えは窓の動きなし(`instant`)。切り口の欄・utm は ⚙ の店の見せ方へ(依頼の写しに固定)。X82 ④ = 質問の保存と FAQ(`server/ccp/help.py`・`src/help/faq.ts`。20 件で聞いた人の画面がまとめ直す。生の記録は 90 日。管理は ⚙ の開発・管理)。④ の SQL は本番で初めて走る
 
