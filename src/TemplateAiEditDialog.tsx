@@ -1,8 +1,9 @@
-// テンプレートを AI で直す(✨ AI に頼む)の、頼むフロート(設計は docs/TEMPLATE_OBJECTS.md の 11 章)。
+// テンプレートを AI で直すの、頼むフロート(設計は docs/TEMPLATE_OBJECTS.md の 11 章)。
 // 返答は、ここではキャンバスに当てない。呼ぶ側が受け取り、キャンバスに仮に当てて「確定」「やめる」を出す(試す → 確定)
 import { useState } from 'react'
 import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, InfoLabel, MessageBar, MessageBarBody, Spinner, makeStyles } from '@fluentui/react-components'
-import { DismissRegular, SparkleRegular } from '@fluentui/react-icons'
+import { DismissRegular } from '@fluentui/react-icons'
+import { AiIcon } from './AiMark'
 import { ResizableSurface } from './ResizableSurface'
 import { AutoTextarea } from './AutoTextarea'
 import { askTemplateEdit } from './templateAi'
@@ -65,8 +66,8 @@ export function TemplateAiEditDialog({ current, initial = '', onResult, onClose 
             action={<Button appearance="subtle" icon={<DismissRegular />} aria-label={t('閉じる', 'Close')} onClick={onClose} disabled={busy} />}
           >
             <span className={s.titleRow}>
-              <SparkleRegular />
-              {t('AI に頼む', 'Ask AI')}
+              <AiIcon />
+              {t('AI で直す', 'Edit with AI')}
               <InfoLabel
                 size="large"
                 info={t(
@@ -109,7 +110,8 @@ export function TemplateAiEditDialog({ current, initial = '', onResult, onClose 
             <Button appearance="secondary" onClick={onClose} disabled={busy}>
               {t('閉じる', 'Close')}
             </Button>
-            <Button appearance="primary" icon={busy ? <Spinner size="tiny" /> : <SparkleRegular />} onClick={() => void ask()} disabled={!text.trim() || busy}>
+            {/* 塗りのボタンでは白い印。押せないとき(塗りが薄くなる)は、白では見えないので文字の色に */}
+            <Button appearance="primary" icon={busy ? <Spinner size="tiny" /> : <AiIcon tone={text.trim() ? 'white' : 'accent'} />} onClick={() => void ask()} disabled={!text.trim() || busy}>
               {busy ? t('AI が直しています…', 'AI is working…') : t('頼む', 'Ask')}
             </Button>
           </DialogActions>

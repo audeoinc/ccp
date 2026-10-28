@@ -18,7 +18,8 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular, SparkleRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowRedoRegular, ArrowResetRegular, ArrowUndoRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DeleteRegular, EditRegular, EyeOffRegular, EyeRegular, MailRegular, PhoneRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AiButton } from './AiButton'
 import { AutoTextarea } from './AutoTextarea'
 import { shapeOf, similarity } from './templateShape'
 import { ImportSectionMenu, SimilarTemplates } from './SimilarTemplates'
@@ -290,7 +291,10 @@ const useStyles = makeStyles({
   },
   paletteThumb: { display: 'grid', placeItems: 'center', padding: '2px', backgroundColor: '#fff', borderRadius: tokens.borderRadiusSmall, maxHeight: '64px', overflow: 'hidden' },
   paletteName: { fontSize: '12px', overflowWrap: 'anywhere' },
-  canvasHead: { display: 'flex', alignItems: 'center', columnGap: '2px', width: '100%' },
+  // 狭いときは、文字を縦に折らずに、行を折り返す(「キャ / ン / バ / ス」「AI / で / 直 / す」のように細く並ぶと、読めず、ボタンにも見えないため。2026-10-28 利用者)
+  canvasHead: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '2px', rowGap: '2px', width: '100%', whiteSpace: 'nowrap' },
+  // 「AI で直す」は、直す相手(キャンバス)の見出しの先頭に、文字のすぐ右に置く(ほかの AI のボタンと同じく、直す相手のすぐそば)
+  canvasAi: { marginLeft: '8px', marginRight: '4px' },
   // AI の直しを試しているときの帯(キャンバスのすぐ上)
   // キャンバスを下に送っても、確定・やめるが見えるように、上に貼り付ける
   trialBar: { marginBottom: '8px', position: 'sticky', top: 0, zIndex: 3 },
@@ -403,7 +407,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
   // 詳しい欄で見ている過去の版の鍵(null は、いまの版)
   const [viewKey, setViewKey] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null) // 編集中(新規・複製・編集)
-  // AI で直す(✨ AI に頼む)の、頼むフロートと、試している直し。編集を始めるたびに捨てる(前の編集で試していた直しを、持ち越さない)
+  // AI で直すの、頼むフロートと、試している直し。編集を始めるたびに捨てる(前の編集で試していた直しを、持ち越さない)
   const [aiEditOpen, setAiEditOpen] = useState(false)
   const [aiTrial, setAiTrial] = useState<{ before: Draft; out: TemplateEditOut; request: string } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -559,7 +563,7 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
     setSelectedId('')
     setDraft({ name: d.name, description: d.description, hero: d.hero, heroText: d.heroText, sections: d.sections, ...(d.heroTable ? { heroTable: d.heroTable } : {}) })
   }
-  // AI で直す(✨ AI に頼む。TEMPLATE_OBJECTS.md の 11 章)。返答はキャンバスに仮に当て(元に戻すの履歴には乗せない)、「確定」で取り込む
+  // AI で直す(TEMPLATE_OBJECTS.md の 11 章)。返答はキャンバスに仮に当て(元に戻すの履歴には乗せない)、「確定」で取り込む
   // 印を付けるマス: 設定が変わった・足した部品(動いただけのものには付けない。行を足すと下の行がすべて動くため)
   const aiMarks = useMemo(() => (aiTrial ? new Set([...aiTrial.out.diff.changed, ...aiTrial.out.diff.added]) : undefined), [aiTrial])
   // 自由な並び(free)は、決まった構成がないので、編集するものがない
@@ -1191,9 +1195,9 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
                 <Button size="small" appearance="primary" icon={<AddRegular />} onClick={startNew}>{t('新規作成', 'New')}</Button>
                 <Button size="small" appearance="outline" icon={<CopyRegular />} onClick={startDuplicate} disabled={!selected || (editing && !draft?.id && selectedId === '')}>{t('複製', 'Duplicate')}</Button>
                 {channel === 'email' && (
-                  <Button size="small" appearance="outline" icon={<SparkleRegular />} onClick={() => setAiOpen(true)} disabled={editing}>
+                  <AiButton busy={false} onClick={() => setAiOpen(true)} disabled={editing}>
                     {t('AI で作る', 'Create with AI')}
-                  </Button>
+                  </AiButton>
                 )}
               </div>
               <span className={mergeClasses(s.groupLabel, s.fullRow)}>{t('作成したテンプレート', 'Your templates')}</span>
@@ -1248,15 +1252,17 @@ export function TemplateManager({ cards, products = [], country, onChanged, onOp
                   <div className={s.areaCanvas}>
                     <div className={s.canvasHead}>
                       <Text size={200} weight="semibold">{t('キャンバス', 'Canvas')}</Text>
+                      {!draft.push && (
+                        <span className={s.canvasAi}>
+                          <AiButton busy={false} onClick={() => setAiEditOpen(true)} disabled={!!aiTrial}>
+                            {t('AI で直す', 'Edit with AI')}
+                          </AiButton>
+                        </span>
+                      )}
                       <span className={s.caption} style={{ marginLeft: 8 }}>{t(`商品の枠 ${boxCount} 点`, `${boxCount} product slots`)}</span>
                       <span className={s.grow} />
                       {editor.samplesToggle}
                       {editor.zoomBar}
-                      {!draft.push && (
-                        <Button size="small" appearance="subtle" icon={<SparkleRegular />} onClick={() => setAiEditOpen(true)} disabled={!!aiTrial}>
-                          {t('AI に頼む', 'Ask AI')}
-                        </Button>
-                      )}
                       <Tooltip relationship="label" content={t('元に戻す(Ctrl+Z)', 'Undo (Ctrl+Z)')}>
                         <Button size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={histCount.past === 0 || !!aiTrial} onClick={undo} />
                       </Tooltip>
