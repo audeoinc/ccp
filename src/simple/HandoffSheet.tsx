@@ -6,7 +6,6 @@ import { NotesEditor } from '../NotesEditor'
 import { CreativeAssets } from '../CreativeAssets'
 import { loadPref, savePref } from '../settings'
 import { PREF } from '../prefKeys'
-import { MarkdownLite } from '../MarkdownLite'
 import { CardAssetsService } from '../data/cardAssets'
 import { DeliveryCardsService } from '../data/deliveryCards'
 import type { CardAsset } from '../models/cardAssets'
@@ -15,11 +14,14 @@ import type { ProductionRequest } from '../models/productionRequests'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
 import { typo } from '../typo'
 import { useT } from '../i18n'
-import { TextAiPanel } from './TextAiPanel'
+import { NotesAiDraft } from './NotesAiDraft'
 import { askPartRewrite } from './partAi'
 import type { SimpleEditor } from './editor'
 import { ReadinessList } from './ReadinessList'
 import { readinessBlocked, type ReadinessItem, type ReadinessTarget } from './readiness'
+
+// 「AI で書く」で頼みを書かなかったときの頼み(画面には出さない)
+const DRAFT_REQUEST = '制作に渡す文章(制作指示)を、テーマ・件名・見出し・コピー・参考の素材をもとに書いてください。いまの文章があれば、それを生かして整えてください。案ごとに、書き方(まとめ方・詳しさ)を変えてください'
 
 // 参考の素材の欄の開閉(人の設定)
 const ASSETS_KEY = PREF.simpleHandoffAssetsOpen
@@ -241,35 +243,24 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
             </Menu>
           </div>
         )}
-        {/* 渡す文章の AI(見出し・件名と同じ「AI で変える」の形。空でも「案」で下書きが出る。案を試している間は、上の欄に写して読むだけにする。2026-10-29 利用者) */}
-        <TextAiPanel
-          kind="instructions"
-          label={t('渡す文章', 'Production notes')}
+        {/* 渡す文章の AI: 「AI で書く」→ 案を押すとそのまま入る(2 つの操作。試す → 確定にしない理由は NotesAiDraft。2026-10-29 利用者) */}
+        <NotesAiDraft
           value={e.form.instructions}
-          samplesKind="part"
-          ideasRequest="制作に渡す文章(制作指示)を、テーマ・件名・見出し・コピー・参考の素材をもとに書いてください。いまの文章があれば、それを生かして整えてください。案ごとに、書き方(まとめ方・詳しさ)を変えてください"
-          ideasCount={2}
-          placeholder={t('例: 画像の指示を足して、箇条書きに', 'e.g. Add image directions, as bullet points')}
-          renderIdea={(idea) => <MarkdownLite text={idea.value} />}
-          // 帯には、長い文章の頭だけを出す
-          short={(v) => v.split('\n')[0]}
-          ask={(request, count, history) =>
-            askPartRewrite({
+          ask={async (request) => {
+            const res = await askPartRewrite({
               card: e.aiCard(),
               angle: e.form.copyAngle,
               part: { kind: 'instructions', label: t('制作指示', 'Production notes'), current: e.form.instructions },
               context: { subject: e.form.subject || e.form.name, headline: e.form.headline, copy: e.form.copy, theme: e.form.theme },
               assets: assets.map((a) => ({ name: a.name, kind: a.kind, note: a.note || a.preview_description || undefined, url: a.kind === 'url' ? a.url : undefined })),
-              request,
-              history,
-              count,
+              request: request || DRAFT_REQUEST,
+              history: [],
+              count: 2,
             })
-          }
-          onPreview={(v) => setPreviewing(v)}
-          onAdopt={(idea) => {
-            setPreviewing(null)
-            e.setField('instructions', idea.value)
+            return res.ideas
           }}
+          onPreview={setPreviewing}
+          onAdopt={(idea) => e.setField('instructions', idea.value)}
         />
       </div>
 
