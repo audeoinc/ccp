@@ -89,8 +89,12 @@ pac copilot list --environment <環境の ID>   # その環境のエージェン
 - 個人情報や社外秘の内容は出しません。
 ```
 
-6. 右上の「作成」または「保存」。**公開はまだしない**(公開は 8 章で、Direct Line を開くとき)。
-7. 作れたかを確かめる: `pac copilot list --environment <環境の ID>` に `CCP AI 出口の検証` が出る。
+6. **モデルを、既定に任せずにはっきり選ぶ**(エージェントの「概要」→「モデル」)。既定のモデルは、環境や時期で変わる。Claude になっていることもある(2026-10-29 の検証の環境では、既定は Claude Opus 5.5 だった)。既定のままだと、モデルが知らないうちに替わり、測った結果を比べられなくなる。
+   - まず、既定と同じ段(Versatile)の GPT のモデルで測る。速さを比べるときは、速い段のモデルでも測る。
+   - Anthropic のモデルを選ぶ前に、13 章を確かめる。
+   - **選んだモデルの名前を、記録に書く**(10 章。測るプログラムは設定の `MODEL_LABEL`)。モデルを替えたら、頼みを測り直す。
+7. 右上の「作成」または「保存」。**公開はまだしない**(公開は 8 章で、Direct Line を開くとき)。
+8. 作れたかを確かめる: `pac copilot list --environment <環境の ID>` に `CCP AI 出口の検証` が出る。
 
 メモ: 名前の欄が選ばれた状態で開く。画面の写しが古く見えても、中身は入っていることがある。
 
@@ -263,6 +267,7 @@ Direct Line の呼び方(層の中で行うこと):
 
 | 項目 | 見方 |
 |---|---|
+| モデル | エージェントに選んだモデルの名前(5 章の 6)。既定のままにしない |
 | JSON | 答えがそのまま JSON として読めたか(○)。```` ``` ```` の囲みや前置きを外せば読めたか(△)。読めない(×) |
 | 決まり | 7 章の表の決まりを守れたか |
 | 出典 | 答えに Web のリンク・出典の番号が付いたか(6 章で検索を外せたか) |
@@ -273,6 +278,7 @@ Direct Line の呼び方(層の中で行うこと):
 
 | 項目 | 方式 1 | 方式 2 | 方式 3 | 方式 4 |
 |---|---|---|---|---|
+| モデル | | | | |
 | 認証の形 | | | | |
 | 人のサインインが要るか | | 要る(12.1) | | |
 | データの地域 | | | | |
@@ -331,9 +337,9 @@ Microsoft のサンプル `microsoft/Agents` の `samples/nodejs/copilotstudio-c
 | `%USERPROFILE%\.ccp\ms-verify\measure.mjs` | 送って測る本体 |
 | `%USERPROFILE%\.ccp\ms-verify\tests.mjs` | T1〜T5 の頼みと、決まりの確かめ(7 章と同じ中身。直すときは両方) |
 | `%USERPROFILE%\.ccp\ms-verify\package.json` | 使う部品(`@microsoft/agents-copilotstudio-client`・`@microsoft/agents-activity`・`@azure/msal-node`・`open`) |
-| `%USERPROFILE%\.ccp\ms-verify.env` | 設定(下の 4 つ)。リポジトリに入れない |
+| `%USERPROFILE%\.ccp\ms-verify.env` | 設定(下の 5 つ)。リポジトリに入れない |
 | `%USERPROFILE%\.ccp\ms-verify\.token-cache.json` | サインインのトークン(プログラムが作る)。消すと、次はサインインし直し |
-| `%USERPROFILE%\.ccp\ms-verify\results\` | 測った表(`<日時>.md`)と、答えの全文(`<日時>.json`) |
+| `%USERPROFILE%\.ccp\ms-verify\results\` | 測った表(`<日時>_<モデル>.md`)と、答えの全文(同じ名前の `.json`) |
 
 設定(`ms-verify.env`):
 
@@ -342,6 +348,7 @@ COPILOT_ENVIRONMENT_ID=<環境の ID>          # エージェントの「設定 
 COPILOT_AGENT_SCHEMA_NAME=<スキーマ名>       # 同じ所
 TENANT_ID=<テナント ID>                     # Entra のアプリの登録の「概要」
 APP_CLIENT_ID=<アプリ(クライアント)ID>     # 同じ所
+MODEL_LABEL=<モデルの名前>                  # エージェントの「概要」→「モデル」で選んだもの(記録に書く)
 ```
 
 動かし方:
@@ -352,7 +359,26 @@ npm install
 node measure.mjs --self-test   # つながずに、確かめの仕組みだけを試す(5 つとも OK になる)
 node measure.mjs               # T1〜T5 を送る。最初の 1 回だけブラウザが開くので、人がサインインする
 node measure.mjs --only T3 --runs 5
+node measure.mjs --model "<別のモデルの名前>"   # エージェントのモデルを替えたあと。MODEL_LABEL より優先
 ```
 
 - 頼みごとに新しい会話を始める(CCP の呼び出しは 1 回ずつ独立しているため)。会話を始める秒数は、別の列に書く。
 - 秒数は 3 つ: 最初に何かが届くまで(入力中の印など)・本文が届くまで・終わりまで。
+- モデルの名前は、SDK からは分からないので、設定か `--model` で渡す。渡さないと止まる。表の先頭と、ファイルの名前(`<日時>_<モデル>.md`)に入る。
+
+## 13. 確かめること: Copilot Studio で Anthropic のモデル(Claude)を使うとき(未確認)
+
+Copilot Studio では、Microsoft の GPT のほかに、Anthropic などの外のモデルも選べる。外のモデルは、扱いが GPT と違う。下は 2026-10-29 に Microsoft Learn を読んだ内容で、**利用先の組織の契約と設定では、まだ確かめていない**。使う前に、組織の管理者と、データの扱いの担当に確かめる。
+
+| 確かめること | 文書に書かれていたこと |
+|---|---|
+| 使えるようにする設定 | 管理者が 2 か所で許す: Power Platform の管理センターで、環境(または環境のグループ)に外のモデルを許す。Microsoft 365 の管理センターで、Anthropic を許す(Microsoft の「サブプロセッサ」として) |
+| データの行き先 | Claude のモデルは、日本を含む多くの地域で「cross-geo」(**その地域の外で処理されることがある**)。Anthropic のモデルは、EU のデータ境界の約束から外れる、とも書かれている |
+| 契約の条件 | いまは、Anthropic は Microsoft のサブプロセッサとして、Microsoft の製品の条件とデータ保護の付属書に従う、とされる。以前の文書では「Microsoft の契約が及ばない(独立した処理者)」とされていた(2026-05 に変わった)。古い文書と新しい文書が混ざっているので、最新のものを確かめる |
+| 既定のモデル | 「既定」のモデルは、新しいモデルが出るたびに替わる。選んだモデルが使えなくなったときも、既定に戻って動く(知らないうちにモデルが替わることがある) |
+| 試験中・プレビューのモデル | 本番に使わない。データが組織の地域の外で処理・保存されることがある。地域をまたぐデータの移動は、管理者が切り替える |
+
+- **CCP の頼みには、配信の企画の中身(テーマ・商品の名前・在庫など)が入る。** Anthropic のモデルを使うと、その中身が Microsoft の外の会社で処理される扱いになりうる。使うかどうかは、利用先の組織が決める。
+- 検証の環境で、既定が Claude になっていたのは、その環境で外のモデルがすでに許されていたためと考えられる(未確認)。
+
+出典: Microsoft Learn「Select a primary AI model for your agent」(Copilot Studio)・「Choose an external model as the primary AI model」・「Allow external language models for generative responses」(Power Platform)・「Copilot in Microsoft 365 apps with Anthropic models」。
