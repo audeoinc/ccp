@@ -1,6 +1,19 @@
-# Microsoft の AI(Copilot Studio)を CCP から呼ぶ検証の手順
+# Microsoft の AI を CCP から呼ぶ検証の手順
 
 2026-10-29 作成。検証が進むたびに足す。CCP の AI を外の層に頼む作りは [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)、Gemini と Microsoft の候補の比較は [AI_PLATFORMS.md](AI_PLATFORMS.md)。
+
+## 検証する方式
+
+どの方式も、CCP の外の層が呼ぶ(CCP のコードには Microsoft のつなぎを入れない)。同じ頼み(CCP の実際の頼み数件と、画像 1 件)で比べる。
+
+| # | 方式 | 層の認証 | 状態 |
+|---|---|---|---|
+| 1 | Copilot Studio + Direct Line | Direct Line の鍵 → 短い期限のトークン | 比べる基準。8・9 章 |
+| 2 | Copilot Studio + Microsoft 365 Agents SDK | Entra ID(**人のサインインが要る**。12 章) | 優先。下調べ済み |
+| 3 | AI Builder のプロンプトを Dataverse の窓口で呼ぶ | Entra ID のアプリ | 未着手 |
+| 4 | Azure OpenAI | API の鍵 または Entra ID のアプリ | 参考。あとで |
+
+比べる項目: 認証の形・人のサインインが要るか・データの地域・会話の記録が残るか・待ち時間・JSON の形・画像・費用の形・用意の手間(10 章)。
 
 Copilot Studio の画面の名前(6・8 章のメニューの場所など)は、画面の版で変わることがある。**「(未確認)」の印がある所は、実際の画面でまだ確かめていない。**確かめたら印を消す。
 
@@ -158,3 +171,35 @@ Direct Line の呼び方(層の中で行うこと):
 - 8 章の鍵を置いたファイルを消す。
 - pac のサインインを消す: `pac auth clear`。
 - pac を外す: `winget uninstall --id Microsoft.PowerAppsCLI`。
+
+## 12. 方式 2: Copilot Studio + Microsoft 365 Agents SDK
+
+### 12.1 下調べ(2026-10-29。公式の文書とサンプルを読んだ。動かしてはいない)
+
+| 調べたこと | 分かったこと |
+|---|---|
+| 人のサインインなしに、サーバーがアプリの名前で呼べるか | **できない。** サンプルの説明に「S2S is not currently supported for Copilot Studio」とある。クライアントは人のトークンが要る。アプリだけの認証は「予定にある」とされるが、時期は書かれていない |
+| Entra のアプリの登録 | 公開クライアント(ネイティブ)のアプリ。リダイレクト URI は `http://localhost`。クライアントのシークレットは持たない |
+| API の権限 | Power Platform API の**委任された権限** `CopilotStudio.Copilots.Invoke`(Python のサンプルは、ほかに Microsoft Graph の `User.Read`)。管理者の同意は組織の決まりに従う |
+| エージェントの側の設定 | 公開したエージェントが要る。「設定 → セキュリティ → 認証」は、SDK を使うだけなら「認証なし」にしなくてよい。つなぐ値は「チャネル → Web アプリ」の接続文字列、または「設定 → 詳細 → メタデータ」の環境の ID とスキーマ名 |
+| 言語 | .NET・JavaScript・Python のサンプルがある(Python は 3.10 以上) |
+| 答えを届いた分から受け取れるか | できる(届いた順に読む仕組みがある、と Microsoft のチームのブログ。サンプルの説明には書かれていない) |
+| 画像を渡せるか | **分からない。** エージェントの「生成 AI」の設定で画像の入力を許す項目はあるが、SDK で画像を付けて送れるかは文書に書かれていない。試して確かめる |
+| 会話の記録 | (未確認)Copilot Studio は会話の記録を環境に残す。期間と、残さない設定ができるかは調べる |
+
+出典: Microsoft Learn「Integrate web or native apps with Microsoft 365 Agents SDK」、GitHub `microsoft/Agents` の `samples/*/copilotstudio-client` の説明、Copilot Studio のチームのブログ「Every Path to Integrating Your Copilot Studio Agent」。
+
+### 12.2 人のサインインが要るときの形(案)
+
+| 形 | 中身 | 問題 |
+|---|---|---|
+| A. 利用者ごとのサインイン | CCP の利用者が、Microsoft にサインインする。層は、その人のトークンでエージェントを呼ぶ | CCP の画面にサインインの流れを足す必要がある(CCP の作りが大きく変わる)。利用者全員に Microsoft のアカウントと Copilot Studio を使う権限が要る |
+| B. 共用のアカウント | 層が、AI 用の 1 つのアカウントでサインインしたトークンを持ち、それで呼ぶ | 人のアカウントを機械に使わせる形で、組織の決まりに触れやすい。多要素認証・パスワードの期限でトークンが切れ、人がサインインし直す必要がある。だれが使ったかが残らない |
+| C. 待つ | アプリだけの認証が出るまで、方式 1 か 3 で検証する | 時期が分からない |
+
+### 12.3 試すときの段取り(人の指示のあと)
+
+1. Entra に、公開クライアントのアプリを登録する(12.1 の権限)。テナント ID・アプリ ID はリポジトリの外のファイルに置く。
+2. エージェントを公開する(5 章で作ったもの)。
+3. Python のサンプルを、リポジトリの外のフォルダで動かす。サインインは人が行う(トークンはそのフォルダの `.local_token_cache.json` に残るので、リポジトリに入れない)。
+4. 7 章の頼みを送り、10 章の項目を測る。
