@@ -7,7 +7,8 @@ import { DevRequestsService } from './data/devRequests'
 import { DevRequestVotesService } from './data/devRequestVotes'
 import type { DevRequestVote } from './models/devRequestVotes'
 import type { DevRequest } from './models/devRequests'
-import { keepBrowserMenu, setGlobalMenuItems, useContextMenu } from './ContextMenu'
+import { hasGlobalMenuItems, keepBrowserMenu, setGlobalMenuItems, useContextMenu } from './ContextMenu'
+import { useFeature } from './featureFlags'
 import {
   bumpDevRequests,
   capturePlace,
@@ -171,8 +172,10 @@ export function DevRequestLayer({ link, cardName }: Props) {
   const roots = rows.filter((q) => !q.source_request)
   // 画面に出すのは、まだ済んでいないもの(未対応・検討中・対応中)だけ(対応済み・見送りは一覧にだけ残す。2026-10-24 利用者: 対象がないのにピンが残っているのが不思議だった)。
   // ヘッダーでピンを消しているときは出さない(X69 (b))。一覧の「この画面を開く」で開いたものは、状態・切り替えによらず出す(人が開きに来たもの)
-  const visible = devPinsVisible()
-  const linked = target && 'id' in target ? target.id : null
+  // 開発へのリクエストを公開していなければ、ピンも右クリックの「開発に伝える」も出さない(X87。一覧はヘッダー・「⋯」の側で隠す)
+  const devOn = useFeature('dev.requests')
+  const visible = devOn && devPinsVisible()
+  const linked = devOn && target && 'id' in target ? target.id : null
   const here = roots.filter((q) => q.screen === screen && ((visible && isActiveStatus(q.status)) || q.id === linked))
   const pending = target && 'pending' in target ? target.pending : null
 
@@ -246,9 +249,10 @@ export function DevRequestLayer({ link, cardName }: Props) {
   // 「？ 聞く」の答えの「開発に伝える」(質問と答えを書きかけにして、ピンを打つ)
   useEffect(() => onStartDevRequest(begin), [begin])
   useEffect(() => {
+    if (!devOn) return
     setGlobalMenuItems((x, y) => [{ key: 'dev-request', label: tr('ピンを打って、開発へのリクエストを書く', 'Pin here and write a request to developers'), icon: <LightbulbRegular />, onSelect: () => begin(x, y) }])
     return () => setGlobalMenuItems(null)
-  }, [begin])
+  }, [begin, devOn])
   // メニューのない所の右クリック: 「開発に伝える」だけのメニュー。ほかの右クリックが受けたもの・ブラウザのメニューの逃げ道は、そのまま
   // (window で受けて、document で受けるほかのメニューのあとに動かす)
   const ctx = useContextMenu()
@@ -257,6 +261,8 @@ export function DevRequestLayer({ link, cardName }: Props) {
     const on = (e: MouseEvent) => {
       if (e.defaultPrevented || keepBrowserMenu(e)) return
       if ((e.target as Element | null)?.closest?.('[role="menu"], [role="dialog"] [role="menuitem"]')) return
+      // 足す項目がどれも置かれていない(「開発に伝える」も「ここについて聞く」も非公開)なら、ブラウザのメニューのまま
+      if (!hasGlobalMenuItems()) return
       e.preventDefault()
       openAt(e.clientX, e.clientY, [])
     }
@@ -269,7 +275,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
     forgetLinkedRequest()
     setTarget(null)
   }
-  const lost = [...missing.map((id) => byId.get(id)).filter((q): q is DevRequest => !!q), ...(openedElsewhere && opened ? [opened] : [])]
+  const lost = devOn ? [...missing.map((id) => byId.get(id)).filter((q): q is DevRequest => !!q), ...(openedElsewhere && opened ? [opened] : [])] : []
   // 一覧から開いたリクエストの場所が見つからない(画面の作りが変わった・別の画面のもの)ときは、置き場を開いて、そこにフロートを付ける
   const trayShown = trayOpen || (!!openId && (missing.includes(openId) || openedElsewhere))
 
@@ -278,7 +284,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
     <Portal mountNode={{ className: s.host }}>
     <div ref={layerRef} className={s.layer}>
       {ctx.menu}
-      {spots.map((p) => {
+      {devOn && spots.map((p) => {
         if (p.id === 'pending')
           return (
             <span key="pending" data-pin-id="dr:pending" className={mergeClasses(s.pin, s.pinNew)} style={{ left: p.left, top: p.top }}>
@@ -334,7 +340,7 @@ export function DevRequestLayer({ link, cardName }: Props) {
           </Popover>
         </div>
       )}
-      {target && <DevRequestFloat key={'id' in target ? target.id : 'pending'} target={target} rows={rows} votes={votes} onTarget={setTarget} onClose={close} />}
+      {devOn && target && <DevRequestFloat key={'id' in target ? target.id : 'pending'} target={target} rows={rows} votes={votes} onTarget={setTarget} onClose={close} />}
     </div>
     </Portal>
   )

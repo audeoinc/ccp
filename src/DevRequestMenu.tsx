@@ -2,6 +2,7 @@ import { Button, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger } from '@flu
 import { LightbulbRegular, MoreHorizontalRegular } from '@fluentui/react-icons'
 import { openDevRequestList } from './devRequestPlace'
 import { useT } from './i18n'
+import { useFeature } from './featureFlags'
 
 /**
  * 「⋯」のメニューの「開発へのリクエストの一覧」(X69。2026-10-24 利用者)。ヘッダーの「リクエスト」は、配信カード・制作のページ・結果・アラートの
@@ -9,6 +10,8 @@ import { useT } from './i18n'
  */
 export function DevRequestMenuItem() {
   const t = useT()
+  // 開発へのリクエストを公開していなければ出さない(X87)
+  if (!useFeature('dev.requests')) return null
   return (
     <MenuItem icon={<LightbulbRegular />} onClick={openDevRequestList}>
       {t('開発へのリクエストの一覧', 'Requests to developers')}
@@ -19,6 +22,8 @@ export function DevRequestMenuItem() {
 /** 「⋯」のメニューがないフロート(制作のページ・結果・アラート)に置く、この項目だけの「⋯」 */
 export function DevRequestMoreMenu() {
   const t = useT()
+  // この「⋯」は開発へのリクエストの項目だけなので、公開していなければ「⋯」ごと出さない(X87)
+  if (!useFeature('dev.requests')) return null
   return (
     <Menu positioning="below-end">
       <MenuTrigger disableButtonEnhancement>

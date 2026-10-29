@@ -238,6 +238,9 @@ export function AppToolbar({
   const alertsOn = useFeature('common.alerts') && isOn('alert')
   const requestsOn = useFeature('common.requests')
   const filterOn = useFeature('plan.filter')
+  // 「？ 聞く」(右クリックの「ここについて聞く」・スポットライトも)と、開発へのリクエスト(一覧・ピンの切り替え)
+  const askOn = useFeature('dev.ask')
+  const devRequestsOn = useFeature('dev.requests')
   // 面の色・帯に使う面(アラートは面ではないので、計画の色)
   const face: Face = page === 'production' || page === 'results' ? page : 'calendar'
   // 国はヘッダーの設定なので、絞り込みの「クリア」の対象にしない
@@ -248,6 +251,7 @@ export function AppToolbar({
   // 右クリックの「ここについて聞く」(X82 の段 ③)。どの右クリックのメニューにも、「開発に伝える」の前に足す
   const [helpPart, setHelpPart] = useState<HelpPart | null>(null)
   useEffect(() => {
+    if (!askOn) return
     // 配信カードの目印(data-card-id)の名前は、画面に出ている文字から(ここでは配信の一覧を持たないため)
     const cardName = (id: string) => document.querySelector(`[data-card-id="${CSS.escape(id)}"]`)?.textContent?.trim().slice(0, 30) ?? ''
     setGlobalMenuItems(
@@ -266,7 +270,7 @@ export function AppToolbar({
       10,
     )
     return () => setGlobalMenuItems(null, 'help-ask')
-  }, [])
+  }, [askOn])
   return (
     <div className={styles.headerWrap}>
     <header className={styles.header}>
@@ -292,17 +296,20 @@ export function AppToolbar({
       </Menu>
       <span className={styles.headerSpacer} />
       {/* 使い方を AI に聞く(X82)。機能の説明の文書と、画面にある文言をもとに、手順と開く場所を答える */}
+      {askOn && (
       <Tooltip content={t('使い方を AI に聞く(やりたいことを書くと、手順と開く場所を答えます)', 'Ask AI how to use this (describe what you want; get steps and where to go)')} relationship="description">
         <Button appearance={helpOpen ? 'primary' : 'subtle'} size="small" icon={<QuestionCircleRegular />} onClick={() => {
           setHelpPart(null)
           setHelpOpen(true)
         }}>
           {t('聞く', 'Ask')}
+          <FeatureBadge id="dev.ask" />
         </Button>
       </Tooltip>
+      )}
       {/* 「？ 聞く」の答えのボタン・欄を光らせる層(フロートを閉じても、少しのあいだ残す。X83) */}
-      <SpotlightLayer />
-      {helpOpen && (
+      {askOn && <SpotlightLayer />}
+      {askOn && helpOpen && (
         <HelpAskFloat
           open
           part={helpPart}
@@ -333,14 +340,17 @@ export function AppToolbar({
       </Tooltip>
       )}
       {/* 開発へのリクエスト(画面のどこでも右クリック →「開発に伝える」で書いたもの)の一覧 */}
+      {devRequestsOn && (
       <Tooltip content={t('開発へのリクエストの一覧(画面のどこでも、右クリック →「開発に伝える」で書けます)', 'Requests to developers (write one anywhere: right-click → "Tell the developers")')} relationship="label">
         <Button appearance="subtle" size="small" icon={<DevRequestIcon />} onClick={onOpenDevRequests}>
           {/* 依頼の InboxButton も英語は Requests なので、こちらは Dev requests にして見分ける */}
           {t('リクエスト', 'Dev requests')}
+          <FeatureBadge id="dev.requests" />
         </Button>
       </Tooltip>
+      )}
       {/* リクエストのピンを出す / 出さない(X69 (b)。人ごとに覚える) */}
-      <DevPinsToggle />
+      {devRequestsOn && <DevPinsToggle />}
       {/* 自分宛ての承認の依頼(U5)。メールが届かない段階でも、依頼に気づけるように、ヘッダーに出す */}
       {requestsOn && <InboxButton inbox={inbox} onOpenCard={onOpenCard} />}
       {requestsOn && <FeatureBadge id="common.requests" />}

@@ -37,6 +37,8 @@ export function setGlobalMenuItems(f: GlobalItems | null, key = 'dev-request', o
   if (f) globalItems.set(key, { order, f })
   else globalItems.delete(key)
 }
+/** どの右クリックにも足す項目が 1 つでも置かれているか(どれも非公開なら、メニューのない所ではブラウザのメニューのままにする。X87) */
+export const hasGlobalMenuItems = () => globalItems.size > 0
 const allGlobalItems = (x: number, y: number) =>
   [...globalItems.values()].sort((a, b) => a.order - b.order).flatMap((g) => g.f(x, y))
 

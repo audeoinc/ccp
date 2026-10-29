@@ -27,6 +27,7 @@ import { ResizableSurface } from '../ResizableSurface'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
 import { startDevRequestAt } from '../devRequestPlace'
+import { useFeature } from '../featureFlags'
 import { focusSoon } from '../ContextMenu'
 import { HelpFaqList } from './HelpFaqList'
 import { namesInAnswer, setSpotlight } from './spotlight'
@@ -89,6 +90,8 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
   const [asking, setAsking] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [isLabel, setIsLabel] = useState<((name: string) => boolean) | null>(null)
+  // 答えの「開発に伝える」は、開発へのリクエストを公開しているときだけ(X87)
+  const devRequestsOn = useFeature('dev.requests')
   const logRef = useRef<HTMLDivElement>(null)
 
   // 開いたら、材料を先に読み込んでおく(最初の質問を待たせないように)
@@ -188,11 +191,13 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
           </Tooltip>
         )}
         {/* 答えで足りない・画面を変えてほしいときは、そのまま開発へのリクエストに(質問と答えを添える) */}
+        {devRequestsOn && (
         <Tooltip content={t('質問と答えを添えて、開発へのリクエストを書き始めます', 'Start a request to developers with this question and answer')} relationship="description">
           <Button size="small" appearance="subtle" icon={<LightbulbRegular />} onClick={() => tellDev(turn)}>
             {t('開発に伝える', 'Tell the developers')}
           </Button>
         </Tooltip>
+        )}
       </div>
       {(a.basis.length > 0 || a.files.length > 0) && (
         // 根拠は畳んでおく(ふだんは手順とボタンだけで足りる。確かめたい人・開発する人が開く)

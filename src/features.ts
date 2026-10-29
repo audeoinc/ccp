@@ -226,6 +226,6 @@ export const FEATURES: FeatureDef[] = [
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
   { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'v4', size: 'M' },
-  { id: 'dev.ask', group: 'area.devtools.ask', ...named('「？ 聞く」(使い方を AI に聞ける機能。要件は決めたが、まだ作っていない)', '"? Ask" (ask AI how to use CCP)'), version: 'v1', size: 'M' },
+  { id: 'dev.ask', group: 'area.devtools.ask', ...named('「？ 聞く」(使い方を AI に聞く・右クリックの「ここについて聞く」・スポットライト)', '"? Ask" (ask AI how to use CCP, "Ask about this" on right-click, spotlight)'), version: 'v1', size: 'M' },
   { id: 'dev.tools', group: 'area.devtools.devscreen', ...named('`/dev/`', 'Developer screen (/dev/)'), version: 'dev', size: 'S' },
 ]
