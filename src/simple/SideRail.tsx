@@ -2,6 +2,7 @@
 // アイコンの下に短い名前、数は数の丸、気づいてほしいことは点。押すと、その欄を 1 つだけ開く(もう一度押すとしまう。開け閉めは使う側が持つ)
 import type { DragEvent, ReactElement, ReactNode } from 'react'
 import { CounterBadge, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { FeatureBadge } from '../FeatureBadge'
 
 const useStyles = makeStyles({
   rail: { display: 'flex', flexDirection: 'column', alignItems: 'center', rowGap: '4px', paddingTop: '8px', borderRight: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground2, overflowY: 'auto' },
@@ -29,6 +30,8 @@ export interface RailItem<V extends string> {
   gap?: boolean
   /** 画像・URL を落とせる(落とし方は drop で渡す) */
   drop?: boolean
+  /** 機能の ID(X87)。開発者だから見えているときは、名前の下に「非公開」の印。出すかどうかは、使う側が isOn で決める */
+  feature?: string
 }
 
 interface Props<V extends string> {
@@ -66,6 +69,7 @@ export function SideRail<V extends string>({ items, selected, onPick, ariaLabel,
                 {r.dot && <span className={s.dot} style={r.dot === 'amber' ? { backgroundColor: tokens.colorPaletteMarigoldBackground3 } : undefined} />}
               </span>
               <span className={s.label}>{r.label}</span>
+              {r.feature && <FeatureBadge id={r.feature} />}
             </button>
           </Tooltip>
         </span>

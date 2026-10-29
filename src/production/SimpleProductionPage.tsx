@@ -42,6 +42,8 @@ import { productionColor, productionLabel, productionView } from '../useProducti
 import { StageHeader } from '../simple/StageHeader'
 import { partElement, type PartRef } from '../simple/parts'
 import { usePreviewZoom } from '../simple/usePreviewZoom'
+import { useFeature } from '../featureFlags'
+import { FeatureBadge } from '../FeatureBadge'
 import { usePreviewNav } from '../simple/usePreviewNav'
 import { PreviewZoomBar } from '../simple/PreviewZoomBar'
 import {
@@ -212,6 +214,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 倍率(− ・倍率・＋・全体。配信カードと同じ部品。倍率は制作の画面の鍵で覚える)と、Ctrl + ホイール・つかんで移動
   const zoom = usePreviewZoom(boxRef, innerRef, PREF.productionSimpleZoom, `${card.id}:${device}`)
   usePreviewNav(boxRef, zoom)
+  // 機能の公開・非公開(X87。FEATURE_FLAGS.md)。非公開の入口は出さない(開発者には出し、「非公開」の印)
+  const stepsOn = useFeature('prod.steps')
+  const resultOn = useFeature('prod.result')
+  const sampleOn = useFeature('prod.samplehtml')
+  const threadOn = useFeature('collab.thread')
+  const tasksOn = useFeature('collab.tasks')
+  const assetsOn = useFeature('collab.assets')
   const meId = useSyncExternalStore(onMeChange, myUserId)
   const meName = useSyncExternalStore(onMeChange, myName)
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
@@ -270,7 +279,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     await load()
     onChanged?.()
   } })
-  const myStep = flow.now && flow.now.key !== 'request' && flow.isMine(flow.now) ? flow.now : undefined
+  const myStep = stepsOn && flow.now && flow.now.key !== 'request' && flow.isMine(flow.now) ? flow.now : undefined
 
   // 企画の見本の HTML(詳しい制作のページと同じ作り方: 見えないプレビューから、書式を直接書いた形にする)。押したときに作る
   const sampleHtml = () => (offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : '')
@@ -340,22 +349,25 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           </div>
         )}
       </div>
-      <div className={s.section}>
-        <div className={s.head}>
-          <span className={s.heading}>{t('企画の見本の HTML', 'Plan sample HTML')}</span>
+      {sampleOn && (
+        <div className={s.section}>
+          <div className={s.head}>
+            <span className={s.heading}>{t('企画の見本の HTML', 'Plan sample HTML')}</span>
+            <FeatureBadge id="prod.samplehtml" />
+          </div>
+          <div className={s.actions}>
+            <Button size="small" icon={<CopyRegular />} onClick={copyHtml}>
+              {copied ? t('コピーしました', 'Copied') : t('HTML をコピー', 'Copy HTML')}
+            </Button>
+            <Button size="small" icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, sampleHtml())}>
+              {t('.html で保存', 'Save as .html')}
+            </Button>
+          </div>
+          <span className={s.note}>{t('プレビューと同じ見た目の HTML です(リンクには計測用のパラメーターが付いています)', 'HTML that looks like the preview (links include tracking parameters).')}</span>
         </div>
-        <div className={s.actions}>
-          <Button size="small" icon={<CopyRegular />} onClick={copyHtml}>
-            {copied ? t('コピーしました', 'Copied') : t('HTML をコピー', 'Copy HTML')}
-          </Button>
-          <Button size="small" icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, sampleHtml())}>
-            {t('.html で保存', 'Save as .html')}
-          </Button>
-        </div>
-        <span className={s.note}>{t('プレビューと同じ見た目の HTML です(リンクには計測用のパラメーターが付いています)', 'HTML that looks like the preview (links include tracking parameters).')}</span>
-      </div>
+      )}
       {/* 参考の素材(企画が配信カードで置いたもの。制作の面からも見られる) */}
-      <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} title={t('参考の素材', 'Reference materials')} compactAdd />
+      {assetsOn && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} title={t('参考の素材', 'Reference materials')} compactAdd />}
       <span className={s.note}>{t('プレビューの部品を押すと、その部品の材料だけを出します', 'Click a part in the preview to see only its materials.')}</span>
     </>
   )
@@ -416,12 +428,15 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     )
   }
 
-  const rails: RailItem<Side>[] = [
-    { v: 'talk', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
-    { v: 'tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
-    { v: 'assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
-    { v: 'steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
+  const allRails: (RailItem<Side> & { on: boolean })[] = [
+    { v: 'talk', on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
+    { v: 'tasks', on: tasksOn, feature: 'collab.tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
+    { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
+    { v: 'steps', on: stepsOn, feature: 'prod.steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
   ]
+  // 非公開の欄はバーに出さない。開いていた欄が非公開になったら、しまったのと同じに見せる
+  const rails = allRails.filter((r) => r.on)
+  const openSide = side && rails.some((r) => r.v === side) ? side : null
 
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
@@ -442,8 +457,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                 </span>
               </Tooltip>
               {/* 青いボタンがないときの理由(2026-10-29 利用者「青いボタンが分からなかった」): 渡す前・ほかの人の番 */}
-              {flow.current === 0 && <span className={s.hint}>{t('制作に渡すと、ここに「受け取る」などの進めるボタンが出ます', 'Once handed off, buttons such as "Receive" appear here')}</span>}
-              {flow.now && flow.current > 0 && !myStep && flow.current < 5 && (
+              {stepsOn && flow.current === 0 && <span className={s.hint}>{t('制作に渡すと、ここに「受け取る」などの進めるボタンが出ます', 'Once handed off, buttons such as "Receive" appear here')}</span>}
+              {stepsOn && flow.now && flow.current > 0 && !myStep && flow.current < 5 && (
                 <span className={s.hint}>{t(`いまは ${flow.now.who || (flow.now.side === 'planner' ? '企画' : '制作')} の番です(左のバーの「工程」からも進められます)`, `It is ${flow.now.who || (flow.now.side === 'planner' ? 'the planner' : 'production')}'s turn (you can also proceed from Steps in the left bar)`)}</span>
               )}
             </>
@@ -452,26 +467,32 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           actions={
             <>
               {/* 仕上がりを見る [prod.result]: 制作が終わったあと(④ 以降) */}
-              {live && flow.current >= 3 && (
+              {resultOn && live && flow.current >= 3 && (
                 <Button size="small" appearance="subtle" icon={<EyeRegular />} onClick={() => setFinishedOpen(true)}>
                   {t('仕上がりを見る', 'View result')}
+                  <FeatureBadge id="prod.result" />
                 </Button>
               )}
               {/* 自分の番のときだけの青いボタン [prod.steps](2026-10-28 利用者。だれの番でも押せるのは左のバーの「工程」) */}
-              {myStep && <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' ? undefined : () => setFinishedOpen(true)} needMe={needMe} />}
+              {myStep && <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' || !resultOn ? undefined : () => setFinishedOpen(true)} needMe={needMe} />}
+              {myStep && <FeatureBadge id="prod.steps" />}
               <Menu>
                 <MenuTrigger disableButtonEnhancement>
                   <Button appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('そのほかの操作', 'More actions')} />
                 </MenuTrigger>
                 <MenuPopover>
                   <MenuList>
-                    <MenuItem icon={<CopyRegular />} onClick={copyHtml}>
-                      {t('企画の見本の HTML をコピー', 'Copy the plan sample HTML')}
-                    </MenuItem>
-                    <MenuItem icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, sampleHtml())}>
-                      {t('企画の見本を .html で保存', 'Save the plan sample as .html')}
-                    </MenuItem>
-                    {flow.canUndo && (
+                    {sampleOn && (
+                      <>
+                        <MenuItem icon={<CopyRegular />} onClick={copyHtml}>
+                          {t('企画の見本の HTML をコピー', 'Copy the plan sample HTML')} <FeatureBadge id="prod.samplehtml" />
+                        </MenuItem>
+                        <MenuItem icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, sampleHtml())}>
+                          {t('企画の見本を .html で保存', 'Save the plan sample as .html')} <FeatureBadge id="prod.samplehtml" />
+                        </MenuItem>
+                      </>
+                    )}
+                    {stepsOn && flow.canUndo && (
                       <>
                         <MenuDivider />
                         {/* いちばん新しく終えた段を戻す [prod.steps] */}
@@ -499,24 +520,24 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             </MessageBar>
           </div>
         )}
-        <div className={s.panes} style={{ gridTemplateColumns: `auto ${side ? `${panes.widths[0]}px 1px` : '0px 0px'} minmax(280px, 1fr) 1px ${panes.widths[2]}px` }}>
-          <SideRail items={rails} selected={side} onPick={(v) => setSide((o) => (o === v ? null : v))} ariaLabel={t('制作のメニュー', 'Production menus')} />
+        <div className={s.panes} style={{ gridTemplateColumns: `${rails.length ? 'auto' : '0px'} ${openSide ? `${panes.widths[0]}px 1px` : '0px 0px'} minmax(280px, 1fr) 1px ${panes.widths[2]}px` }}>
+          {rails.length > 0 ? <SideRail items={rails} selected={openSide} onPick={(v) => setSide((o) => (o === v ? null : v))} ariaLabel={t('制作のメニュー', 'Production menus')} /> : <span />}
           {/* 開いている欄(1 つ)。しまっても列には残し、幅 0 にする(グリッドの列がずれないように。配信カードと同じ) */}
-          <div className={s.sidePane} inert={!side} aria-hidden={!side}>
+          <div className={s.sidePane} inert={!openSide} aria-hidden={!openSide}>
             <div className={s.sideHead}>
-              <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{rails.find((r) => r.v === side)?.tip}</span>
+              <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{rails.find((r) => r.v === openSide)?.tip}</span>
               <Tooltip content={t('欄をしまう(バーのアイコンをもう一度押しても、しまえます)', 'Collapse the panel (or click its icon in the bar again)')} relationship="label">
                 <Button type="button" size="small" appearance="subtle" icon={<ChevronDoubleLeftRegular />} onClick={() => setSide(null)} />
               </Tooltip>
             </div>
             <div className={s.sideBody}>
-              {side === 'talk' && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
-              {side === 'tasks' && <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />}
-              {side === 'assets' && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />}
-              {side === 'steps' && <StepsPane flow={flow} onViewResult={() => setFinishedOpen(true)} needMe={needMe} />}
+              {openSide === 'talk' && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
+              {openSide === 'tasks' && <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />}
+              {openSide === 'assets' && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />}
+              {openSide === 'steps' && <StepsPane flow={flow} onViewResult={resultOn ? () => setFinishedOpen(true) : undefined} needMe={needMe} />}
             </div>
           </div>
-          {side ? <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} /> : <span />}
+          {openSide ? <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} /> : <span />}
           <div className={s.previewPane}>
             <div className={s.previewBar}>
               {keys.length > 1 && (
