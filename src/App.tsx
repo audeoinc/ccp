@@ -337,9 +337,27 @@ function App() {
     savePref(PREF.productionSimple, simple)
     setProductionSimple(simple)
   }
-  const goStage = (id: string, f: Face) => {
+  // 配信カードの、同じ窓で制作の画面に移る前の確かめ(CardDetail が入れる)
+  const cardLeaveRef = useRef<(() => Promise<boolean>) | null>(null)
+  const goStage = async (id: string, f: Face) => {
     // ほかの道から開いたときは、そのまま依頼しない(「制作に渡す」だけが、下でもう一度立てる)
     setProductionAuto(false)
+    // シンプルな制作の画面とは、同じ窓のまま中身だけを入れ替える(2026-10-29 利用者: 上にもう 1 つ開かず、× で全部閉じる)。
+    // 窓の出てくる動きは付けない(きょうだいの切り替えと同じ instant。チカつかないように)
+    if (f === 'calendar' && productionSimple && productionOpen === id && selectedId !== id) {
+      setPeekResult(null)
+      setProductionOpen(null)
+      openNext(id)
+      return
+    }
+    if (f === 'production' && productionSimple && selectedId === id) {
+      if (!(await (cardLeaveRef.current?.() ?? Promise.resolve(true)))) return
+      setPeekResult(null)
+      setSelectedId(null)
+      setInstantId(id)
+      setProductionOpen(id)
+      return
+    }
     if (f === 'calendar') {
       setPeekResult(null)
       // 配信カードが制作のページの下にあれば、制作のページを閉じて見せる。なければ、上に重ねて開く(閉じると制作のページに戻る)
@@ -355,7 +373,7 @@ function App() {
       setPeekResult(id)
     }
   }
-  const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => goStage(c.id, to)} variant={variant} />
+  const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => void goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
   // 週・月・一覧の配信の右クリック: 開く・複製…・制作のページ・結果。押したときと、配信カードの「…」・段階の帯と同じ処理を呼ぶ
@@ -377,8 +395,8 @@ function App() {
       cardMenu.openAt(e.clientX, e.clientY, [
         { key: 'open', label: tr('開く', 'Open'), icon: <CtxOpenRegular />, onSelect: () => openCard(c.id) },
         { key: 'duplicate', label: tr('複製…', 'Duplicate…'), icon: <CtxCopyRegular />, onSelect: () => setDupCard(c) },
-        { key: 'production', label: tr('制作のページを開く', 'Open the production page'), icon: <CtxProductionRegular />, divider: true, onSelect: () => goStage(c.id, 'production') },
-        { key: 'results', label: tr('結果を見る', 'See results'), icon: <CtxResultsRegular />, onSelect: () => goStage(c.id, 'results') },
+        { key: 'production', label: tr('制作のページを開く', 'Open the production page'), icon: <CtxProductionRegular />, divider: true, onSelect: () => void goStage(c.id, 'production') },
+        { key: 'results', label: tr('結果を見る', 'See results'), icon: <CtxResultsRegular />, onSelect: () => void goStage(c.id, 'results') },
       ])
     }
   })
@@ -1549,9 +1567,15 @@ function App() {
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
           onOpenProduction={(id, opts) => {
-            // シンプルな配信カードの「制作に渡す」は、開いた制作のページで、そのまま依頼まで進める
-            goStage(id, 'production')
-            setProductionAuto(!!opts?.request)
+            // シンプルな配信カードの「制作に渡す」は、開いた(詳しい)制作のページで、そのまま依頼まで進める。
+            // 渡す処理は詳しいほうにあるので、配信カードの上に重ねて開く(同じ窓の切り替えにしない。渡すのを配信カードへ移す段で変える)
+            if (opts?.request) {
+              setPeekResult(null)
+              setProductionAuto(true)
+              setProductionOpen(id)
+              return
+            }
+            void goStage(id, 'production')
           }}
           stageNav={selected ? stageNav(selected, 'calendar') : undefined}
           stageTabs={selected ? stageNav(selected, 'calendar', 'tabs') : undefined}
@@ -1567,6 +1591,7 @@ function App() {
             openNext(id)
           }}
           instant={!!selected && selected.id === instantId}
+          leaveRef={cardLeaveRef}
           alertsOf={(id) => cardAlerts.get(id)}
         />
         </ErrorBoundary>
@@ -1604,6 +1629,7 @@ function App() {
           people={owners}
           onClose={() => setProductionOpen(null)}
           onFullView={() => switchProductionView(false)}
+          instant={productionOpen === instantId}
           onChanged={() => void production.reload()}
           stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
         /></Later>
@@ -1622,7 +1648,7 @@ function App() {
             setProductionOpen(null)
             setProductionAuto(false)
           }}
-          onOpenCard={(id) => goStage(id, 'calendar')}
+          onOpenCard={(id) => void goStage(id, 'calendar')}
           onChanged={() => void production.reload()}
           autoRequest={productionAuto}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}

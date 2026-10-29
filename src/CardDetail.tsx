@@ -129,6 +129,8 @@ interface Props {
   onNext?: () => void
   /** 同じキャンペーンの、ほかの配信カードに切り替える(キャンペーンの帯のタブ。X79)。保存していない変更は、ここで先に保存してから呼ぶ */
   onSwitchCard?: (id: string) => void
+  /** 同じ窓で制作の画面に切り替える前に呼ぶ確かめ(保存していない変更を先に保存する。だめなら false)。App が段階のタブで使う */
+  leaveRef?: { current: (() => Promise<boolean>) | null }
   /** 開いていた配信カードから続けて開いた(きょうだいの切り替え・保存して次へ・保存して開き直す)。窓の出てくる動きを付けない(暗い背景がいったん消えて、チカっと見えるため。2026-10-28 利用者) */
   instant?: boolean
   /** ほかの配信カードのアラート(キャンペーンのまとめて承認の、送る前の確かめに使う。X79 段 ④) */
@@ -148,7 +150,7 @@ const MIN_DIALOG = { w: 900, h: 560 }
 
 
 
-export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, next, onNext, onSwitchCard, alertsOf, instant }: Props) {
+export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroesChanged, weekUse, products, heroes, otherThemes, allCards, owners = [], weeks = [], onBack, onSaved, onOpenResults, alerts = [], focusProductId, stockModel, onOpenAlerts, onOpenProduction, stageNav, stageTabs, next, onNext, onSwitchCard, alertsOf, instant, leaveRef }: Props) {
   const t = useT()
   const styles = useCardDetailStyles()
   // 配信カードは、いつもシンプルな配信カード(SU1)で描く(詳しい配信カードは 2026-10-28 に消した)。
@@ -644,17 +646,28 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const campaign = useCampaignOf(card?.campaign_id)
   const campaignName = card && campaign ? cardDisplayName(card, [campaign]) : undefined
   /** きょうだいの配信に切り替える。保存していない変更は、先に保存する(「保存して次へ」と同じ決まり)。確定した週の配信は、理由を入れて保存してから、もう一度押してもらう */
-  const switchCard = async (id: string) => {
-    if (!onSwitchCard || saving) return
-    if (isDirty()) {
-      if (locked) {
-        askReason('stay')
-        return
-      }
-      if (!(await save({ after: 'stay' }))) return
+  /** この配信カードを離れてよいか。保存していない変更は先に保存する(確定した週の配信は、理由を入れて保存してから、もう一度押してもらう) */
+  const readyToLeave = async () => {
+    if (saving) return false
+    if (!isDirty()) return true
+    if (locked) {
+      askReason('stay')
+      return false
     }
+    return save({ after: 'stay' })
+  }
+  const switchCard = async (id: string) => {
+    if (!onSwitchCard || !(await readyToLeave())) return
     onSwitchCard(id)
   }
+  // 段階のタブで、同じ窓のまま制作の画面に切り替えるとき(App)も、同じ確かめを通す
+  useEffect(() => {
+    if (!leaveRef) return
+    leaveRef.current = readyToLeave
+    return () => {
+      leaveRef.current = null
+    }
+  })
   // キャンペーンに配信カードを足す窓(帯の「＋ 配信カードを足す」。X79 段 ④)
   const [addingCard, setAddingCard] = useState(false)
   // 依頼・承認の前に、開いているカードの変更を保存する(確定した週の配信は、理由を聞くので先に保存してもらう)

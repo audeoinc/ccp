@@ -14,6 +14,7 @@ import type { VariantKey } from '../abTest'
 import { ProductionRequestsService } from '../data/productionRequests'
 import { CardPreview } from '../CardPreview'
 import { PreviewHints } from '../Preview'
+import { useCardDetailStyles } from '../cardDetailStyles'
 import { ChannelBadge } from '../ChannelBadge'
 import { CreativeAssets } from '../CreativeAssets'
 import { CommentsPanel } from '../CommentsPanel'
@@ -65,7 +66,8 @@ import {
 } from '../productionSnapshot'
 
 const useStyles = makeStyles({
-  surface: { position: 'fixed', inset: 0, margin: 'auto', width: 'min(1600px, (97vw / var(--ui-zoom, 1)))', maxWidth: 'none', height: 'calc(92vh / var(--ui-zoom, 1))', maxHeight: 'calc(92vh / var(--ui-zoom, 1))', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  // 大きさ・置き方は配信カードの窓(cardDetailStyles の surface)と同じ。中は縦に並べる
+  surface: { display: 'flex', flexDirection: 'column' },
   name: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '420px' },
   hint: { fontSize: '12px', color: tokens.colorNeutralForeground4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
   state: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
@@ -118,6 +120,8 @@ interface Props {
   stageTabs?: ReactNode
   /** 段を進めたあとに、外の一覧(制作の面の箱・段のタブの状態)を読み直す */
   onChanged?: () => void
+  /** 配信カードから同じ窓のまま切り替えて開いた(窓の出てくる動きを付けない。CardDetail の instant と同じ) */
+  instant?: boolean
 }
 
 // 依頼として生きている状態(この状態の版の写しを見せる。ほかは、いまの配信カードからの下書き)
@@ -191,7 +195,8 @@ function textFieldsOf(p: PartRef): (f: TextField) => boolean {
   }
 }
 
-export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged }: Props) {
+export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant }: Props) {
+  const cardStyles = useCardDetailStyles()
   const s = useStyles()
   const t = useT()
   // 左のバーの欄 | プレビュー(伸び縮み) | 右のペイン
@@ -224,8 +229,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const meId = useSyncExternalStore(onMeChange, myUserId)
   const meName = useSyncExternalStore(onMeChange, myName)
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
-  type Side = 'talk' | 'tasks' | 'assets' | 'steps'
-  const [side, setSide] = useState<Side | null>(null)
+  // 開いたときは「渡されたもの」(2026-10-29 利用者: プレビューを見る → 申し送りを読む → 素材でイメージを持つ → HTML を確かめる、の順に進めるように)
+  type Side = 'given' | 'talk' | 'tasks' | 'assets' | 'steps'
+  const [side, setSide] = useState<Side | null>('given')
   const [finishedOpen, setFinishedOpen] = useState(false)
   // バーの数(未解決の制作のやり取り・未完了のタスク・素材)。欄の中で増減したら、開け閉めのたびに数え直す
   const [counts, setCounts] = useState({ talk: 0, tasks: 0, assets: 0 })
@@ -304,12 +310,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     </div>
   )
 
-  /** 何も選んでいないとき: 渡されたもの(制作の人が最初に読むもの) */
-  const givenPane = (
-    <>
-      <div className={s.head}>
-        <span className={s.heading}>{t('渡されたもの', 'Handed over')}</span>
-      </div>
+  /** 左のバーの「渡されたもの」(開いたときに開いている欄): 担当・締め切り・制作指示・参考の素材。制作の人が最初に読むもの */
+  const handoffPane = (
+    <div className={s.section}>
       <div className={s.meta}>
         <LabeledValue label={t('制作の担当', 'Production owner')}>{owner}</LabeledValue>
         <LabeledValue label={t('締め切り', 'Due')}>{due ? day(due) : ''}</LabeledValue>
@@ -322,6 +325,17 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           {instructions && <CopyButton text={instructions} label={t('制作指示をコピー', 'Copy production notes')} />}
         </div>
         {instructions ? <div className={s.instructions}><MarkdownLite text={instructions} /></div> : <span className={s.note}>{t('制作指示はありません', 'No production notes')}</span>}
+      </div>
+      {/* 参考の素材(企画が配信カードで置いたもの)。制作指示を読んだあと、素材でイメージを持てるように、開いたまま並べる */}
+      {assetsOn && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} title={t('参考の素材', 'Reference materials')} compactAdd />}
+    </div>
+  )
+
+  /** 何も選んでいないときの右: まとめて写すもの(テキスト・商品・リンク先・計測の対応表・企画の見本の HTML)。部品を押すと、その部品の材料だけになる */
+  const givenPane = (
+    <>
+      <div className={s.head}>
+        <span className={s.heading}>{t('まとめて写す', 'Copy in bulk')}</span>
       </div>
       <div className={s.section}>
         <div className={s.head}>
@@ -366,9 +380,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           <span className={s.note}>{t('プレビューと同じ見た目の HTML です(リンクには計測用のパラメーターが付いています)', 'HTML that looks like the preview (links include tracking parameters).')}</span>
         </div>
       )}
-      {/* 参考の素材(企画が配信カードで置いたもの。制作の面からも見られる) */}
-      {assetsOn && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} title={t('参考の素材', 'Reference materials')} compactAdd />}
-      <span className={s.note}>{t('プレビューの部品を押すと、その部品の材料だけを出します', 'Click a part in the preview to see only its materials.')}</span>
+      <span className={s.note}>{t('プレビューの部品を押すと、その部品の材料だけを出します。制作指示・参考の素材は、左のバーの「渡されたもの」に', 'Click a part in the preview to see only its materials. Production notes and reference materials are under Handoff in the left bar.')}</span>
     </>
   )
 
@@ -389,7 +401,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
         <div className={s.head}>
           <span className={s.heading}>{title}</span>
           <Button size="small" appearance="subtle" onClick={() => pick(null)}>
-            {t('渡されたものに戻る', 'Back to handed over')}
+            {t('まとめて写すに戻る', 'Back to bulk copy')}
           </Button>
         </div>
         {trs.map((r) => copyRow(r.label, getText(vs, r.field), r.id))}
@@ -429,7 +441,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   }
 
   const allRails: (RailItem<Side> & { on: boolean })[] = [
-    { v: 'talk', on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
+    { v: 'given', on: true, icon: <DocumentTextRegular />, label: t('渡された', 'Handoff'), tip: t('渡されたもの(制作指示・担当・締め切り・参考の素材)', 'Handed over (notes, owner, due date, reference materials)'), count: 0 },
+    { v: 'talk', gap: true, on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
     { v: 'tasks', on: tasksOn, feature: 'collab.tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
     { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
     { v: 'steps', on: stepsOn, feature: 'prod.steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
@@ -439,8 +452,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const openSide = side && rails.some((r) => r.v === side) ? side : null
 
   return (
-    <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
-      <ResizableSurface sizeKey="productionSimple" min={{ w: 720, h: 480 }} className={s.surface} aria-label={card.name ?? ''}>
+    <Dialog open surfaceMotion={instant ? null : undefined} onOpenChange={(_, d) => !d.open && onClose()}>
+      {/* 配信カードと同じ窓(大きさの鍵も同じ)。段階のタブで計画 ↔ 制作を同じ窓のまま入れ替えるため(2026-10-29 利用者) */}
+      <ResizableSurface backdropMotion={instant ? null : undefined} sizeKey="cardDetail" prefKey={PREF.cardSize} min={{ w: 900, h: 560 }} className={mergeClasses(cardStyles.surface, s.surface)} aria-label={card.name ?? ''}>
         {/* 空欄の案内(「(ヘッドライン未入力)」など)は企画で作るときのものなので、制作の画面では出さない(2026-10-28 利用者) */}
         <PreviewHints value={false}>
         <StageHeader
@@ -531,6 +545,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               </Tooltip>
             </div>
             <div className={s.sideBody}>
+              {openSide === 'given' && handoffPane}
               {openSide === 'talk' && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
               {openSide === 'tasks' && <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />}
               {openSide === 'assets' && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />}
