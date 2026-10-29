@@ -68,6 +68,8 @@ import { CampaignApprove } from './CampaignApprove'
 import { AddCampaignCardDialog } from './CampaignDialogs'
 import { useCampaignOf } from './useCampaignOf'
 import { cardDisplayName } from './campaigns'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 /** 新規作成のときに、最初から入れておく値(カレンダーで押した日付、絞り込み中の国・チャネル・種別。まとめて作った下書きを開くときは、名前も) */
 export type NewCardDefaults = Partial<Pick<Form, 'name' | 'scheduledAt' | 'country' | 'channel' | 'themeType'>>
@@ -165,6 +167,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 配信カードは、いつもシンプルな配信カード(SU1)で描く(詳しい配信カードは 2026-10-28 に消した)。
   // まとめて作った、まだ保存していない案(draft)もシンプルで開く(2026-10-26 利用者)。案のあいだは自動では保存せず、上の帯の「この案で作る」を押したときだけ配信を作る
   // 配信カードの中身(入力欄・商品・テンプレート・メイン画像・リンク・案)と、変えたかの判定・保存(useCardEditor.ts)。状態と保存は、ここの 1 か所
+  // 公開していない機能のメニューの項目は出さない(X87)
+  const draftOn = useFeature('ai.draft')
+  const nextOn = useFeature('card.next')
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, next, onSaved, onCreated, onReopen, onBack, onNext })
   const { form, setForm, items, setItems, candidates, setCandidates, original, setSelectedKey, language, template, setTemplate, pushLink, setPushLink, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, removeVariant, abAiBusy, comparing, setComparing, stopAbTest, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndNext, buildContent, committedSnap, isDirty, changed, coreDirty, save, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
   // AB テストの B・C 案を開いていて、商品が全案で共通なら、商品の画像だけはその案のもの(ab_test の images。A と違う分。X64 の e)。
@@ -1133,12 +1138,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         nextStep,
         menu: cardMenu(
           <>
-            <MenuItem icon={<AiIcon size={16} />} disabled={!!auto || saving} onClick={runAllManual}>
-              {t('すべて AI で下書き', 'Draft everything with AI')}
-            </MenuItem>
-            {next !== undefined && (
+            {draftOn && (
+              <MenuItem icon={<AiIcon size={16} />} disabled={!!auto || saving} onClick={runAllManual}>
+                {t('すべて AI で下書き', 'Draft everything with AI')}
+                <FeatureBadge id="ai.draft" />
+              </MenuItem>
+            )}
+            {nextOn && next !== undefined && (
               <MenuItem icon={<ArrowNextRegular />} disabled={saving || !next} onClick={saveAndNext}>
                 {next ? t(`保存して次へ(${next.name})`, `Save and next (${next.name})`) : t('保存して次へ(次の配信はありません)', 'Save and next (no next delivery)')}
+                <FeatureBadge id="card.next" />
               </MenuItem>
             )}
             {onOpenResults && card?.scheduled_at && new Date(card.scheduled_at) < new Date() && (

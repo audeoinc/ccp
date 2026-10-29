@@ -31,6 +31,8 @@ import { confirmedWeekOf, scopeOfCard } from './weekLock'
 import { logEvent } from './history'
 import { useT } from './i18n'
 import { DevRequestMenuItem } from './DevRequestMenu'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 import { CardHistoryDialog } from './CardHistory'
 
 const useStyles = makeStyles({
@@ -60,6 +62,10 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
   const styles = useStyles()
   const t = useT()
   const [dialog, setDialog] = useState<'duplicate' | 'cancel' | 'delete' | 'history' | null>(null)
+  // 公開していない機能の項目は出さない(X87)
+  const duplicateOn = useFeature('card.duplicate')
+  const cancelOn = useFeature('card.cancel')
+  const historyOn = useFeature('card.history')
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,21 +105,31 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
                 <MenuDivider />
               </>
             )}
-            <MenuItem icon={<CopyRegular />} onClick={() => setDialog('duplicate')}>
-              {t('複製…', 'Duplicate…')}
-            </MenuItem>
+            {duplicateOn && (
+              <MenuItem icon={<CopyRegular />} onClick={() => setDialog('duplicate')}>
+                {t('複製…', 'Duplicate…')}
+                <FeatureBadge id="card.duplicate" />
+              </MenuItem>
+            )}
+            {/* 取りやめた配信の「取り消す」は、機能を非公開にしても出す(取りやめたままで戻せなくならないように) */}
             {cancelled ? (
               <MenuItem icon={<ArrowUndoRegular />} onClick={() => void run(() => undoCancel(card), onChanged)}>
                 {t('取りやめを取り消す', 'Undo cancellation')}
               </MenuItem>
             ) : (
-              <MenuItem icon={<ProhibitedRegular />} onClick={() => { setReason(''); setError(null); setDialog('cancel') }}>
-                {t('取りやめにする…', 'Cancel delivery…')}
+              cancelOn && (
+                <MenuItem icon={<ProhibitedRegular />} onClick={() => { setReason(''); setError(null); setDialog('cancel') }}>
+                  {t('取りやめにする…', 'Cancel delivery…')}
+                  <FeatureBadge id="card.cancel" />
+                </MenuItem>
+              )
+            )}
+            {historyOn && (
+              <MenuItem icon={<HistoryRegular />} onClick={() => setDialog('history')}>
+                {t('変更の履歴…', 'Change history…')}
+                <FeatureBadge id="card.history" />
               </MenuItem>
             )}
-            <MenuItem icon={<HistoryRegular />} onClick={() => setDialog('history')}>
-              {t('変更の履歴…', 'Change history…')}
-            </MenuItem>
             <MenuItem icon={<DeleteRegular className={styles.danger} />} onClick={() => { setError(null); setDialog('delete') }}>
               <span className={styles.danger}>{t('削除…', 'Delete…')}</span>
             </MenuItem>
