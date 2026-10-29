@@ -73,7 +73,9 @@ pac copilot list --environment <環境の ID>   # その環境のエージェン
 
 - 検証は、自分の **Developer** の環境で行う。ほかの人の Developer の環境・Default の環境は使わない。
 - 環境の ID を設定のファイルに書くときは、画面に出さずに取り出す(PowerShell で `pac env list` の表示名の行から取り出して、そのまま `ms-verify.env` に書く)。
-- `pac copilot list` には、エージェントの名前・ID・状態(`Published` など)が出る。**スキーマ名は出ない**ので、エージェントの「設定 → 詳細 → メタデータ」で見る(未確認)。
+- `pac copilot list` には、エージェントの名前・ID・状態が出る。**スキーマ名は出ない**ので、エージェントの「設定 → 詳細 → メタデータ」で見る(未確認)。
+- **`pac copilot list` の `Component State` の `Published` は、画面の「公開」とは別のもの。** 画面で保存しただけ(下書き)のエージェントでも `Published` と出た(2026-10-29)。エージェントの記録が環境の中で使える状態になった、という意味らしい(未確認)。**公開したかは、Copilot Studio の画面(エージェントの状態・公開の日時)で確かめる。** pac 2.14.1 には、公開の日時を読むコマンドはない(`list` は環境の指定だけ、`status` はエラーで止まる)。
+  - 公開の日時は、Dataverse の表 `bot` の列 `publishedon` にあるはず(未確認)。読むには Dataverse の Web API とそのトークンが要るので、この検証では画面で見る。
 - `pac copilot status` は、pac 2.14.1 では `componentstate_Property` のエラーで止まった。
 - `pac copilot extract-template` は、指定したファイルのほかに、**いま居るフォルダにも** `kickStartTemplate-1.0.0.json` を作る。リポジトリの中で流さない。中身にスキーマ名・モデルは入っていなかった。
 
