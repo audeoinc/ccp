@@ -85,7 +85,7 @@
 
 - **URL は開けるように**(2026-10-23 利用者): URL を出す所には、新しいタブで開く `OpenLink`(アイコンのボタン)を添え、コメント・メッセージ・AI の文など本文の中の URL は `Linkify` で押せるようにする(`src/LinkText.tsx`。`MarkdownLite` も通す)。押しても、まわりの行・カードは押したことにしない。行そのものがボタンの所(素材の一覧など)は、中に `Linkify` を入れず、行の横に `OpenLink` を置く。
 
-- **機能の公開・非公開(X87)**: 機能の入口(ボタン・メニュー・右クリック・ディープリンク・キーの操作など)を出す所は、`isOn('ID')`(`src/featureFlags.ts`。部品の中は `useFeature`)を通す。機能の一覧は `src/features.ts` が正で、新しい機能を足したら 1 行足す。公開の設定は表 `feature_settings`(環境ごと。行のない機能は `'*'` の値)、開発者は `users.is_developer`(非公開の機能も出し、入口の横に `FeatureBadge`)。管理の画面は ⚙「開発・管理」の「使える機能」。決まりの全体は [FEATURE_FLAGS.md](FEATURE_FLAGS.md)。
+- **機能の公開・非公開(X87)**: 機能の入口(ボタン・メニュー・右クリック・ディープリンク・キーの操作など)を出す所は、`isOn('ID')`(`src/featureFlags.ts`。部品の中は `useFeature`)を通す。機能の一覧は `src/features.ts` が正で、新しい機能を足したら 1 行足す。公開は、版ごとの公開(表 `feature_versions`)と機能ごとの上書き(表 `feature_settings`。版の付け替え・止める・先に出す)、記録は `feature_logs`(どれも環境ごと)、開発者は `users.is_developer`(非公開の機能も出し、入口の横に `FeatureBadge`)。管理の画面は ⚙「開発・管理」の「使える機能」。決まりの全体は [FEATURE_FLAGS.md](FEATURE_FLAGS.md)。
 
 ## 4. データの読み書き(`CardDetail.tsx`)
 

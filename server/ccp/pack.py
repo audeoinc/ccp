@@ -171,7 +171,7 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
 # 「？ 聞く」の質問とよく聞かれる質問も、その環境で聞かれたものなので残す(Workbench の FAQ は Workbench で積む。2026-10-28 利用者)
 KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes", "help_questions", "help_faqs", "help_faq_builds"}
 # その環境だけのもの(取り込まない・消さない)。機能の公開・非公開(X87)は、本番と Workbench で別々に決めるので、パックの値で変えない
-ENV_ONLY = {"feature_settings"}
+ENV_ONLY = {"feature_settings", "feature_versions", "feature_logs"}
 # 人の設定(user_prefs。ST6)は残さない: ユーザー(users)と一緒に置き換わり、消えたユーザーの設定は参照先がなくなるため
 
 

@@ -58,13 +58,18 @@ class ReplaceTablesTest(unittest.TestCase):
     def test_feature_settings_stay_as_this_environment(self) -> None:
         """機能の公開・非公開(X87)は、その環境のもの。置き換えでも消さず、パックの値も取り込まない"""
         s = self.store
-        s.add("feature_settings", feature_id="*", enabled=1)
-        s.add("feature_settings", feature_id="face.results", enabled=0)
-        tables = {"feature_settings": [{"id": "00000000-0000-0000-0000-0000000000f1", "feature_id": "face.results", "enabled": 1}]}
-        quiet(pack.replace_tables(tables))
-        self.assertEqual(sorted((r["feature_id"], r["enabled"]) for r in s.rows("feature_settings")), [("*", 1), ("face.results", 0)])
-        quiet(pack.add_tables(tables))
-        self.assertEqual(sorted((r["feature_id"], r["enabled"]) for r in s.rows("feature_settings")), [("*", 1), ("face.results", 0)])
+        s.add("feature_settings", feature_id="face.results", mode="stop")
+        s.add("feature_versions", version="v1", published=0)
+        tables = {
+            "feature_settings": [{"id": "00000000-0000-0000-0000-0000000000f1", "feature_id": "face.results", "mode": "follow"}],
+            "feature_versions": [{"id": "00000000-0000-0000-0000-0000000000f2", "version": "v1", "published": 1}],
+            "feature_logs": [{"id": "00000000-0000-0000-0000-0000000000f3", "feature_id": "face.results", "action": "stop"}],
+        }
+        for f in (pack.replace_tables, pack.add_tables):
+            quiet(f(tables))
+            self.assertEqual([(r["feature_id"], r["mode"]) for r in s.rows("feature_settings")], [("face.results", "stop")])
+            self.assertEqual([(r["version"], r["published"]) for r in s.rows("feature_versions")], [("v1", 0)])
+            self.assertEqual(s.rows("feature_logs"), [])
 
     def test_duplicate_prefs_keep_newest(self) -> None:
         tables = {

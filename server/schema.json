@@ -500,16 +500,45 @@
    ]
   },
   "feature_settings": {
-   "_comment": "機能の公開・非公開(X87。2026-10-29)。機能の ID(src/features.ts)ごとに 1 行。enabled 1 = 公開 / 0 = 非公開。feature_id '*' の行は、行のない機能の扱い(起動のときに、なければ公開で入れる。data_api.py の seed)。環境ごとに持つので、import-pack では取り込まない(pack.py の ENV_ONLY)",
+   "_comment": "機能の公開・非公開の、機能ごとの上書き(X87。2026-10-29 の 3.1 で作り替え)。機能の ID(src/features.ts。大・中の id も)ごとに 1 行。行がなければ、コードの版・版に従う。version = 付け替えた版(空ならコードの値)、mode = follow 版に従う / stop 止める / early 先に出す、reason = 止める・先に出すときの理由。enabled と feature_id '*' の行は段 ① の形の名残で、読まない(消さない)。環境ごとに持つので、import-pack では取り込まない(pack.py の ENV_ONLY)",
    "columns": [
     ["feature_id", "text", {"required": true}],
     ["enabled", "int"],
-    ["changed_by", "text"]
+    ["changed_by", "text"],
+    ["version", "text"],
+    ["mode", "choice"],
+    ["reason", "text"]
    ],
    "lookups": [
    ],
    "unique": [
     ["feature_id"]
+   ]
+  },
+  "feature_versions": {
+   "_comment": "版ごとの公開(X87 の 3.1)。版(MVP / v1 / v2 / v3 / v4)ごとに 1 行、published 1 = 公開。版が公開なら、その版の機能(付け替えた機能も)が見える。起動のときに空なら、全部の版を公開で入れる(data_api.py の seed。いまの見え方を変えないため)。環境ごとに持つ(ENV_ONLY)",
+   "columns": [
+    ["version", "text", {"required": true}],
+    ["published", "int"],
+    ["changed_by", "text"]
+   ],
+   "lookups": [
+   ],
+   "unique": [
+    ["version"]
+   ]
+  },
+  "feature_logs": {
+   "_comment": "機能の公開・非公開の記録(X87 の 3.1)。だれが・いつ・何を・なぜ。feature_id は機能の ID か、版の公開なら version:v1 の形。action = retarget 版の付け替え / publish 版の公開 / unpublish 版の非公開 / stop 止める / early 先に出す / follow 版に従うに戻す。環境ごとに持つ(ENV_ONLY)",
+   "columns": [
+    ["feature_id", "text", {"required": true, "index": true}],
+    ["action", "text"],
+    ["before_value", "text"],
+    ["after_value", "text"],
+    ["reason", "text"],
+    ["actor", "text"]
+   ],
+   "lookups": [
    ]
   },
   "approval_groups": {
@@ -900,6 +929,7 @@
   "notifications.status": ["pending", "sent", "skipped"],
   "production_requests.status": ["requested", "in_progress", "done", "checked", "sent", "stale", "withdrawn"],
   "note_reactions.kind": ["ok", "looking", "doing", "thanks", "question"],
+  "feature_settings.mode": ["follow", "stop", "early"],
   "dev_requests.status": ["open", "considering", "in_progress", "done", "declined"],
   "ad_spends.market": ["JP", "US"],
   "ad_spends.media": ["google_shopping", "google_search", "meta", "tiktok"],
