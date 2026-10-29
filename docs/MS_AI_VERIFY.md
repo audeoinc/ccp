@@ -9,7 +9,7 @@
 | # | 方式 | 層の認証 | 状態 |
 |---|---|---|---|
 | 1 | Copilot Studio + Direct Line | Direct Line の鍵 → 短い期限のトークン | 比べる基準。8・9 章 |
-| 2 | Copilot Studio + Microsoft 365 Agents SDK | Entra ID(**人のサインインが要る**。12 章) | 優先。下調べ済み |
+| 2 | Copilot Studio + Microsoft 365 Agents SDK | Entra ID(**人のサインインが要る**。12 章) | 優先。下調べ済み。環境のクレジットの用意(管理者)待ちで、測るのは保留(1 章) |
 | 3 | AI Builder のプロンプトを Dataverse の窓口で呼ぶ | Entra ID のアプリ | 未着手 |
 | 4 | Azure OpenAI | API の鍵 または Entra ID のアプリ | 参考。あとで |
 
@@ -33,8 +33,17 @@ Copilot Studio の画面の名前(6・8 章のメニューの場所など)は、
 |---|---|
 | Microsoft のアカウント | Copilot Studio を使えるもの。サインインは人が行う |
 | Power Platform の Developer の環境 | 個人の検証用の環境。会社全体の既定の環境(Default)は使わない |
+| 環境の Copilot のクレジット | 環境に、Copilot のクレジットの割り当てか、従量課金の課金プラン(Azure のサブスクリプション)のつなぎが要る。**Developer の環境でも要る。テストの欄で試すだけでもクレジットを使う。** Power Platform の管理者が管理センターで行う(方式 1・2。方式 3 も同じになる見込み) |
 | Windows の PC | winget が使えるもの |
 | CCP の開発の環境 | サーバーを手元で動かせるもの(3 章以降で CCP から呼ぶとき) |
+
+### つまずき: 「This environment is out of credits」
+
+テストの欄で頼みを送ると「This environment is out of credits. Contact your admin to add more credits. Error code: EnforcementUsageCredits.」と出て止まる(2026-10-29。保存しただけの下書きのエージェントでも出た)。環境に使えるクレジットがない。Power Platform の管理者に、次のどれかを頼む(未確認。管理センターのメニューの名前は版で変わる)。
+
+1. 従量課金の課金プランを作り、環境につなぐ(Azure のサブスクリプションに請求される)。
+2. 組織が買った Copilot のクレジット(容量)を、環境に割り当てる。
+3. Copilot Studio の個人の試用が組織で許されていれば、それを使う。
 
 ## 2. Power Platform CLI(pac)を入れる
 
@@ -292,8 +301,8 @@ Direct Line の呼び方(層の中で行うこと):
 | 待ち時間(T1 の中央値) | | | | |
 | JSON の形(○ の数 / 全体) | | | | |
 | 画像 | | | | |
-| 費用の形 | | | | |
-| 用意の手間 | | | | |
+| 費用の形 | Copilot のクレジット(環境に割り当て、または従量課金) | 方式 1 と同じ | Copilot のクレジット(2026-11 から。AI Builder のクレジットが移る見込み。未確認) | Azure の従量課金(使ったトークンの分)。Copilot のクレジットは要らない |
+| 用意の手間 | 環境にクレジットを用意する(管理者)+ Direct Line を開く | 環境にクレジットを用意する(管理者)+ Entra のアプリの登録 + 人のサインイン | 環境にクレジットを用意する(管理者)+ Entra のアプリの登録 | Azure のリソースとモデルの用意(Azure の管理者) |
 
 ## 11. 後片付け(人が行う)
 
