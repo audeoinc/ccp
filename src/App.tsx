@@ -1632,6 +1632,12 @@ function App() {
           instant={productionOpen === instantId}
           onChanged={() => void production.reload()}
           stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
+          allCards={cards}
+          // キャンペーンの帯のタブで、きょうだいの配信の制作の画面へ(窓の出てくる動きなし。配信カードのきょうだいの切り替えと同じ)
+          onSwitchCard={(id) => {
+            setInstantId(id)
+            setProductionOpen(id)
+          }}
         /></Later>
       )}
       {productionOpen && cards.find((c) => c.id === productionOpen) && (!productionSimple || productionAuto) && (

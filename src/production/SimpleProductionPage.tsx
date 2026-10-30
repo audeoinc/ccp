@@ -3,8 +3,8 @@
 // MVP は「開く・読む・コピー」まで(直す・工程・やり取り・ピンは v1、制作した HTML の編集・AI は FULL)。
 // 中身は、渡した写し(制作が直していれば、その写し)。渡す前は、いまの配信カードから作った下書き。写しの作り・コピーの値は、
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Badge, Button, Dialog, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Tab, TabList, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { Badge, Button, Dialog, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Tab, TabList, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownloadRegular, ArrowUndoRegular, AttachRegular, ChevronDoubleLeftRegular, CommentRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, EyeRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular, TaskListLtrRegular, TimelineRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
@@ -15,7 +15,6 @@ import { ProductionRequestsService } from '../data/productionRequests'
 import { CardPreview } from '../CardPreview'
 import { PreviewHints } from '../Preview'
 import { useCardDetailStyles } from '../cardDetailStyles'
-import { ChannelBadge } from '../ChannelBadge'
 import { CreativeAssets } from '../CreativeAssets'
 import { CommentsPanel } from '../CommentsPanel'
 import { TasksPanel } from '../TasksPanel'
@@ -41,6 +40,12 @@ import { typo } from '../typo'
 import { day, locale, useT, when } from '../i18n'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
 import { StageHeader } from '../simple/StageHeader'
+import { DeliveryMetaBand } from '../simple/DeliveryMetaBand'
+import { CampaignBand } from '../CampaignBand'
+import { CopyLinkButton } from '../CopyLinkButton'
+import { useCampaignOf } from '../useCampaignOf'
+import { cardDisplayName } from '../campaigns'
+import { getTemplate, templateKeyOfCard } from '../templates'
 import { partElement, type PartRef } from '../simple/parts'
 import { usePreviewZoom } from '../simple/usePreviewZoom'
 import { useFeature } from '../featureFlags'
@@ -68,9 +73,23 @@ import {
 const useStyles = makeStyles({
   // 大きさ・置き方は配信カードの窓(cardDetailStyles の surface)と同じ。中は縦に並べる
   surface: { display: 'flex', flexDirection: 'column' },
-  name: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '420px' },
-  hint: { fontSize: '12px', color: tokens.colorNeutralForeground4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
-  state: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
+  // 制作の状態の札(計画の承認の札 ApprovalChip と同じ形・大きさ。色は制作の状態の色)。長い説明は横の ⓘ に(2026-10-30 利用者)
+  chip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    columnGap: '6px',
+    height: '24px',
+    boxSizing: 'border-box',
+    padding: '0 10px 0 8px',
+    border: '1px solid var(--chip-line)',
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: 'color-mix(in srgb, var(--chip-line) 14%, var(--colorNeutralBackground1))',
+    color: tokens.colorNeutralForeground1,
+    fontSize: '12px',
+    fontWeight: tokens.fontWeightSemibold,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
   dot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   panes: { flexGrow: 1, minHeight: 0, display: 'grid' },
   // 左のバーで開いた欄(1 つだけ。しまうと幅 0)
@@ -82,6 +101,10 @@ const useStyles = makeStyles({
   // 右下の倍率の操作(PreviewZoomBar)を重ねるので relative
   previewPane: { position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, backgroundColor: tokens.colorNeutralBackground3 },
   previewBar: { display: 'flex', alignItems: 'center', columnGap: '8px', padding: '6px 12px' },
+  // 配信の情報の帯(見るだけ。計画のプレビューの上と同じ帯)
+  metaBar: { padding: '0 12px 6px' },
+  abBar: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, flexShrink: 0 },
+  chipLabel: { display: 'inline-flex', alignItems: 'center', flexShrink: 0 },
   grow: { flexGrow: 1 },
   // プレビューの箱(部品を選ぶ層の基準。スクロールする)
   previewBox: { position: 'relative', flexGrow: 1, minHeight: 0, overflow: 'auto', padding: '8px 16px 24px', outline: 'none' },
@@ -122,6 +145,10 @@ interface Props {
   onChanged?: () => void
   /** 配信カードから同じ窓のまま切り替えて開いた(窓の出てくる動きを付けない。CardDetail の instant と同じ) */
   instant?: boolean
+  /** すべての配信カード(キャンペーンの帯のきょうだいを、ここから選ぶ) */
+  allCards?: DeliveryCard[]
+  /** キャンペーンの帯のタブで、きょうだいの配信の制作の画面に切り替える */
+  onSwitchCard?: (id: string) => void
 }
 
 // 依頼として生きている状態(この状態の版の写しを見せる。ほかは、いまの配信カードからの下書き)
@@ -195,7 +222,7 @@ function textFieldsOf(p: PartRef): (f: TextField) => boolean {
   }
 }
 
-export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant }: Props) {
+export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant, allCards, onSwitchCard }: Props) {
   const cardStyles = useCardDetailStyles()
   const s = useStyles()
   const t = useT()
@@ -297,7 +324,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
       setTimeout(() => setCopied(false), 1200)
     })
 
-  const when_ = card.scheduled_at ? new Date(card.scheduled_at).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
+  // 題の日時(配信カードの題と同じ書き方。面を切り替えても、題の幅が変わらないように)
+  const when_ = card.scheduled_at ? new Date(card.scheduled_at).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
+  const campaign = useCampaignOf(card.campaign_id)
 
   const copyRow = (label: string, value: string, key: string, extra?: ReactNode) => (
     <div key={key} className={s.row}>
@@ -440,6 +469,30 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     )
   }
 
+  // 案の切り替え(AB テスト)。計画と同じく、キャンペーンの帯の案の段(キャンペーンに入っていなければ、題の帯の 2 段目)に置く
+  // 計画の案の段と同じく「AB テスト ⓘ」を前に置き、案のタブが計画と同じ位置に来るようにする(案を足す・⋯ は計画だけ)
+  const variantTabs = (
+    <div className={s.abBar}>
+      <InfoLabel size="small" info={t('同じ配信を、見出しや画像を変えて複数作り、どれがよいかを比べます。タブを押すと、見本と材料がその案に切り替わります', 'Several versions of the same delivery are compared. Pick a tab to switch the sample and materials to that variant.')}>
+        {t('AB テスト', 'A/B test')}
+      </InfoLabel>
+      <TabList size="small" selectedValue={cur} onTabSelect={(_, d) => (setVariant(d.value as VariantKey), pick(null))}>
+        {keys.map((k) => (
+          <Tab key={k} value={k}>
+            {t(`案 ${k}`, `Variant ${k}`)}
+          </Tab>
+        ))}
+      </TabList>
+    </div>
+  )
+  // 状態の札の ⓘ に出す説明(以前は札の横に長い文で出していた。2026-10-29 利用者「青いボタンが分からなかった」への答えは、ここに残す)
+  const stateHint =
+    stepsOn && flow.current === 0
+      ? t('制作に渡すと、右上に「受け取る」などの進めるボタンが出ます', 'Once handed off, buttons such as "Receive" appear at the top right')
+      : stepsOn && flow.now && flow.current > 0 && !myStep && flow.current < 5
+        ? t(`いまは ${flow.now.who || (flow.now.side === 'planner' ? '企画' : '制作')} の番です(左のバーの「工程」からも進められます)`, `It is ${flow.now.who || (flow.now.side === 'planner' ? 'the planner' : 'production')}'s turn (you can also proceed from Steps in the left bar)`)
+        : t('制作の状態です。進め方は、左のバーの「工程」で見られます', 'Production status. See Steps in the left bar for how it proceeds')
+
   const allRails: (RailItem<Side> & { on: boolean })[] = [
     { v: 'given', on: true, icon: <DocumentTextRegular />, label: t('渡された', 'Handoff'), tip: t('渡されたもの(制作指示・担当・締め切り・参考の素材)', 'Handed over (notes, owner, due date, reference materials)'), count: 0 },
     { v: 'talk', gap: true, on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
@@ -457,26 +510,32 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
       <ResizableSurface backdropMotion={instant ? null : undefined} sizeKey="cardDetail" prefKey={PREF.cardSize} min={{ w: 900, h: 560 }} className={mergeClasses(cardStyles.surface, s.surface)} aria-label={card.name ?? ''}>
         {/* 空欄の案内(「(ヘッドライン未入力)」など)は企画で作るときのものなので、制作の画面では出さない(2026-10-28 利用者) */}
         <PreviewHints value={false}>
+        {/* キャンペーンの帯(計画と同じ。きょうだいのタブで、その配信の制作の画面に切り替える)。まとめて承認は計画だけ。× は帯の右の端(計画と同じ場所) */}
+        {campaign && (
+          <CampaignBand
+            campaign={campaign}
+            card={card}
+            allCards={allCards ?? []}
+            onSwitch={(id) => onSwitchCard?.(id)}
+            slots={{ variants: keys.length > 1 ? variantTabs : undefined }}
+            actions={<Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
+          />
+        )}
+        {/* 上の帯は、配信カード(計画)と同じ部品。題とタブの位置は、面を切り替えても動かない。状態の札だけ、同じ場所で中身を替える(2026-10-30 利用者) */}
         <StageHeader
-          title={
-            <>
-              <ChannelBadge channel={card.channel} />
-              <span className={s.name}>{card.name}</span>
-              <span>{when_}</span>
-              {/* 制作の状態(読むだけ)。進めるボタンは右に、自分の番のときだけ */}
-              <Tooltip content={t('制作の状態', 'Production status')} relationship="label">
-                <span className={s.state}>
-                  <span className={s.dot} style={{ backgroundColor: productionColor(view) }} aria-hidden />
-                  {productionLabel(view)}
-                </span>
-              </Tooltip>
-              {/* 青いボタンがないときの理由(2026-10-29 利用者「青いボタンが分からなかった」): 渡す前・ほかの人の番 */}
-              {stepsOn && flow.current === 0 && <span className={s.hint}>{t('制作に渡すと、ここに「受け取る」などの進めるボタンが出ます', 'Once handed off, buttons such as "Receive" appear here')}</span>}
-              {stepsOn && flow.now && flow.current > 0 && !myStep && flow.current < 5 && (
-                <span className={s.hint}>{t(`いまは ${flow.now.who || (flow.now.side === 'planner' ? '企画' : '制作')} の番です(左のバーの「工程」からも進められます)`, `It is ${flow.now.who || (flow.now.side === 'planner' ? 'the planner' : 'production')}'s turn (you can also proceed from Steps in the left bar)`)}</span>
-              )}
-            </>
+          channel={card.channel}
+          name={campaign ? cardDisplayName(card, [campaign]) : card.name}
+          when={when_}
+          status={
+            <InfoLabel size="small" info={stateHint} className={s.chipLabel}>
+              <span className={s.chip} style={{ '--chip-line': productionColor(view) } as CSSProperties}>
+                <span className={s.dot} style={{ backgroundColor: productionColor(view) }} aria-hidden />
+                {productionLabel(view)}
+              </span>
+            </InfoLabel>
           }
+          // キャンペーンに入っていない配信の AB の案は、計画と同じく帯の 2 段目に
+          tabsExtra={!campaign && keys.length > 1 ? variantTabs : undefined}
           tabs={stageTabs}
           actions={
             <>
@@ -490,6 +549,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               {/* 自分の番のときだけの青いボタン [prod.steps](2026-10-28 利用者。だれの番でも押せるのは左のバーの「工程」) */}
               {myStep && <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' || !resultOn ? undefined : () => setFinishedOpen(true)} needMe={needMe} />}
               {myStep && <FeatureBadge id="prod.steps" />}
+              {/* この画面を開くリンク(計画と同じ場所。右の端の ⋯ の左) */}
+              <CopyLinkButton iconOnly />
               <Menu>
                 <MenuTrigger disableButtonEnhancement>
                   <Button appearance="subtle" icon={<MoreHorizontalRegular />} aria-label={t('そのほかの操作', 'More actions')} />
@@ -523,7 +584,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                   </MenuList>
                 </MenuPopover>
               </Menu>
-              <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
+              {/* 閉じる ×: キャンペーンの帯があれば、その右の端。なければ、この行の右の端(計画と同じ) */}
+              {!campaign && <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
             </>
           }
         />
@@ -555,15 +617,6 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           {openSide ? <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} /> : <span />}
           <div className={s.previewPane}>
             <div className={s.previewBar}>
-              {keys.length > 1 && (
-                <TabList size="small" selectedValue={cur} onTabSelect={(_, d) => (setVariant(d.value as VariantKey), pick(null))}>
-                  {keys.map((k) => (
-                    <Tab key={k} value={k}>
-                      {t(`案 ${k}`, `Variant ${k}`)}
-                    </Tab>
-                  ))}
-                </TabList>
-              )}
               <Text size={200}>{t('企画の見本(部品を押すと、その材料を右に出します)', 'Plan sample (click a part to see its materials on the right)')}</Text>
               <span className={s.grow} />
               {edited && <Badge appearance="tint" color="warning">{t('制作が直した写し', 'Edited in production')}</Badge>}
@@ -571,6 +624,16 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                 <Tab value="mobile" icon={<PhoneRegular />} aria-label={t('スマホ', 'Phone')} />
                 <Tab value="pc" icon={<DesktopRegular />} aria-label={t('PC', 'Desktop')} />
               </TabList>
+            </div>
+            {/* 配信の情報(配信日時・国・テーマ・テンプレート)。計画のプレビューの上と同じ帯を、見るだけで(「変える」は出さない。2026-10-30 利用者) */}
+            <div className={s.metaBar}>
+              <DeliveryMetaBand
+                scheduledAt={previewCard.scheduled_at}
+                country={previewCard.country}
+                theme={previewCard.theme}
+                template={previewCard.channel === 'email' ? getTemplate(templateKeyOfCard(previewCard)).label : undefined}
+                title={t('配信の情報(受信者には見えません。直すのは計画の配信カードで)', 'Delivery info (not shown to recipients; edit it in the plan delivery card)')}
+              />
             </div>
             <div ref={boxRef} className={s.previewBox} tabIndex={-1}>
               <div ref={innerRef} style={{ zoom: zoom.mode === 'fit' ? undefined : zoom.mode }}>

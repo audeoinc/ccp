@@ -123,10 +123,12 @@ export function StageNav({ face, card, production, onGo, variant = 'chips' }: Pr
               disabled={!here && !x.enabled}
               aria-current={here ? 'page' : undefined}
               onClick={() => !here && onGo?.(x.face)}
+              // 段の状態は、マウスを載せると出す(いまの面の状態は、タブの右の札で見える)
+              title={here || x.enabled ? `${x.name}: ${x.state}` : undefined}
             >
+              {/* タブは段階の名前だけ(2026-10-30 利用者: 計画 ↔ 制作で上の帯が動かないように。状態を添えると、いまの面だけ隠すぶん幅が変わり、右の札がずれた)。
+                  いまの面の状態は、タブの右の札(計画 = 承認の札、制作 = 制作の状態の札)で出す */}
               <span className={s.name}>{x.name}</span>
-              {/* 企画の面では、承認の状態を上の帯の札(ApprovalBadge)で出すので、タブは段階の名前だけ(SU11) */}
-              {!(here && x.face === 'calendar') && <span className={s.state}>{x.state}</span>}
             </button>
           )
           return !here && !x.enabled && x.why ? (

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { filled } from '../slots'
 import { Button, InfoLabel, MessageBar, MessageBarBody, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, AlertRegular, ArrowUndoRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, CommentAddRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronDoubleLeftRegular, ChevronRightRegular, DesktopRegular, DismissRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, PhoneRegular, SaveRegular } from '@fluentui/react-icons'
-import { ChannelBadge } from '../ChannelBadge'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -23,17 +22,17 @@ import { neighborItem, type MoveDir } from './gridMove'
 import { usePreviewPins } from '../usePreviewPins'
 import { heroImage } from '../images'
 import { productUrl } from '../links'
-import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular, ArrowClockwiseRegular, InfoRegular } from '@fluentui/react-icons'
+import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular, ArrowClockwiseRegular } from '@fluentui/react-icons'
 import { Splitter } from '../Splitter'
 import { useStoredWidths } from '../floatLayout'
 import { Row, productMeta } from '../ProductRow'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
-import { locale, optionLabel, useT } from '../i18n'
+import { locale, useT } from '../i18n'
 import { audienceSet } from '../target'
 import { PREF } from '../prefKeys'
 import { getTemplate, sectionsOf, slotsOf } from '../templates'
-import { countryOptions, statusRank } from '../status'
+import { statusRank } from '../status'
 import { ReadinessList } from './ReadinessList'
 import { ApprovalBar } from '../ApprovalBar'
 import { readinessIssues, readinessOf, type ReadinessTarget } from './readiness'
@@ -47,6 +46,7 @@ import { placeInPart } from './actions'
 import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { usePreviewNav } from './usePreviewNav'
 import { StageHeader } from './StageHeader'
+import { DeliveryMetaBand } from './DeliveryMetaBand'
 import { HandoffSheet } from './HandoffSheet'
 import { CreativeAssets } from '../CreativeAssets'
 import { addDroppedAssets, canDropAsset } from './assetDrop'
@@ -61,7 +61,6 @@ import { SenderName } from '../SenderName'
 import { confirmDialog } from '../confirm'
 import { PaneRail } from '../PaneRail'
 import { typo } from '../typo'
-import { LabeledValue } from '../LabeledValue'
 import { hasPendingTrial, settlePendingTrial } from '../trial'
 import { tapComplete } from '../pushLink'
 import { useFeature, isOn as featureOn } from '../featureFlags'
@@ -128,9 +127,6 @@ const useStyles = makeStyles({
     ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover, borderTopColor: tokens.colorNeutralStroke2, borderRightColor: tokens.colorNeutralStroke2, borderBottomColor: tokens.colorNeutralStroke2, borderLeftColor: tokens.colorNeutralStroke2 },
   },
   on: { backgroundColor: tokens.colorBrandBackground2, borderTopColor: tokens.colorBrandStroke1, borderRightColor: tokens.colorBrandStroke1, borderBottomColor: tokens.colorBrandStroke1, borderLeftColor: tokens.colorBrandStroke1 },
-  name: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '360px' },
-  // 配信名だけは、狭いときに縮めて「…」にする(ほかの項目とボタンは、縮めない)
-  nameField: { flexShrink: 1, minWidth: '80px' },
   grow: { flexGrow: 1 },
   state: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   saveFailed: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', whiteSpace: 'nowrap' },
@@ -159,31 +155,6 @@ const useStyles = makeStyles({
   // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
   // 受信箱・通知での見え方(SU5)。ラベルは並べない(行が長くうるさくなるため)。アプリの通知は 1 行(左に差出人を太字、右に「タイトル ― 本文」をうすく)
   inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
-  // 配信の情報の帯(プレビューの上の部品)。メールの中身ではないので、受信箱の見え方(白い札)と違う、薄い灰色の点線の帯にする
-  metaBand: {
-    display: 'flex',
-    alignItems: 'center',
-    columnGap: '16px',
-    width: '100%',
-    minWidth: 0,
-    padding: '5px 10px',
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px dashed ${tokens.colorNeutralStroke1}`,
-    backgroundColor: tokens.colorNeutralBackground3,
-    color: tokens.colorNeutralForeground2,
-    fontFamily: 'inherit',
-    textAlign: 'left',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground3Hover },
-  },
-  // 配信日時・国は短いので縮めない(テーマが長いときは、そちらを … にする)
-  metaFixed: { flexShrink: 0 },
-  // テーマは長くなりやすいので、1 行に収まらなければ …(全文はマウスを載せると出る)
-  metaTheme: { display: 'flex', minWidth: 0, flexShrink: 1, overflow: 'hidden' },
-  // 受信者には見えないことの印(以前は帯の上の見出し。1 行に詰めたので、帯の中の左の端に)
-  metaIcon: { display: 'inline-flex', flexShrink: 0, color: tokens.colorNeutralForeground3, fontSize: '14px' },
   inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
   inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
   sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -615,25 +586,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const tpl = getTemplate(e.template)
   // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
   // 配信の情報の帯は 1 行(2026-10-28 利用者: 対象・送る相手は、押すと開く右のペインの配信の情報で見る。中身が重なっていたため)
-  const metaSummary = (
-    <>
-      <span className={s.metaIcon} aria-hidden>
-        <InfoRegular />
-      </span>
-      <LabeledValue label={t('配信', 'Send')} className={s.metaFixed}>
-        {e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-      </LabeledValue>
-      <LabeledValue label={t('国', 'Country')} className={s.metaFixed}>
-        {optionLabel(countryOptions.find((o) => String(o.value) === e.form.country)?.label ?? '')}
-      </LabeledValue>
-      {/* テーマもここに並べる(テーマを直すのは、この帯から開く配信の情報だけなので、在りかが分かるように。2026-10-27 利用者)。… にした値の全文は、マウスを載せると出る(LabeledValue の truncate) */}
-      <span className={s.metaTheme}>
-        <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')} truncate>
-          {e.form.theme}
-        </LabeledValue>
-      </span>
-    </>
-  )
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
@@ -803,19 +755,17 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       {/* キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案)。承認の帯より上に置く(承認の帯は、ここで選んだ配信の状態なので) */}
       {/* AB テストをしていないときは、案の段を出さず、「AB テストを足す」は配信のタブの ＋ のメニューに(2026-10-28 利用者) */}
       {e.campaignBand?.({ variants: e.ab || e.abDecided ? abBar : undefined, addVariantItems: e.ab || e.abDecided || e.saving || !abOn ? undefined : addVariantItems })}
+      {/* 上の帯は、制作の画面と同じ部品(StageHeader)。題(チャネル・配信名・日時)とタブの位置は、面を切り替えても動かない(2026-10-30 利用者) */}
       <StageHeader
-        title={
+        channel={e.form.channel}
+        // キャンペーンに入っている配信の名前は「キャンペーン名 + チャネル」で決まるので、直す入口を出さない。
+        // 題の行は表示だけ。直す入口は、プレビューの上の配信の情報の帯 1 つ(内容の変更は、すべてプレビューで選んで右のペインで直す。2026-10-27 利用者の決め)
+        name={e.campaignName ?? (e.form.name || t('(配信名未入力)', '(No name)'))}
+        when={when}
+        status={
           <>
-            <ChannelBadge channel={e.form.channel} />
-            {/* キャンペーンに入っている配信の名前は「キャンペーン名 + チャネル」で決まるので、直す入口を出さない */}
-            {e.campaignName ? (
-              <span className={s.name}>{e.campaignName}</span>
-            ) : (
-              // 題の行は表示だけ。直す入口は、プレビューの上の配信の情報の帯 1 つ(内容の変更は、すべてプレビューで選んで右のペインで直す。2026-10-27 利用者の決め)
-              <span className={mergeClasses(s.name, s.nameField)}>{e.form.name || t('(配信名未入力)', '(No name)')}</span>
-            )}
-            <span>{when}</span>
-            {/* 承認の状態と保存の様子は、題の行の中の小さな札と文字に(2026-10-28 利用者: 以前の幅いっぱいの帯をやめ、上を詰める)。札を押すと承認のパネル */}
+            {/* 承認の状態と保存の様子は、タブの右の小さな札と文字に(2026-10-28 利用者: 以前の幅いっぱいの帯をやめ、上を詰める)。札を押すと承認のパネル。
+                制作の画面では、同じ場所に制作の状態の札(2026-10-30 利用者) */}
             <ApprovalChip
               status={e.form.status}
               waiting={counts.waiting}
@@ -1087,9 +1037,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           )}
           {/* 配信の情報(配信日時・国・テーマ)。受信者には見えないので、プレビューの枠の外に、薄い灰色の 1 行の帯で置く。押すと右のペインが配信の情報になる(対象・送る相手も、そこで見る) */}
           <div className={s.inboxWrap}>
-            <button
-              type="button"
-              className={mergeClasses(s.metaBand, metaOn && s.on)}
+            <DeliveryMetaBand
+              scheduledAt={e.form.scheduledAt}
+              country={e.form.country}
+              theme={e.form.theme}
+              selected={metaOn}
               onClick={() => select(META_PART)}
               // ↓ で、プレビューの最初の部品へ(↑ ↓ の並びの先頭がこの帯。並びはプレビューの部品を選ぶ層が持つので、そこへキーを渡す)
               onKeyDown={(ev) => {
@@ -1100,9 +1052,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
                 box.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
               }}
               title={t('配信の情報(受信者には見えません)。押すと、対象・送る相手も見て直せます', 'Delivery info (not shown to recipients). Click to see and edit the target and recipients too')}
-            >
-              {metaSummary}
-            </button>
+            />
           </div>
           {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。差出人の名前は、設定の画面の全社の既定か国の上書き(ST10) */}
           {e.channel === 'email' ? (
