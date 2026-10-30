@@ -20,6 +20,7 @@
 
 - 2026-10-29 UI 1: X87 段 ①(機能の公開・非公開の土台: features.ts・isOn・表 feature_settings と '*'・users.is_developer・⚙「使える機能」・「一般の人として見る」)をブランチ claude/ui1-x87-flags に。入口への判定(段 ②)はまだ。詳しくは FEATURE_FLAGS.md の 3 章の囲み
 - 2026-10-29 UI 2: シンプルな配信カードの AI の入口をそろえた(渡す文章は「AI で書く → 案を押すと入る」`NotesAiDraft`・空いた枠は「入れる」の引き出し・テーマは「AI で変える」・引き出しは確定で閉じる `drawerClose.ts`)。開いたときはアラートがあればアラート、商品情報は閉じる
+- 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証(ブランチ claude/ai-outlet-b3c4ae の MS_AI_VERIFY.md)。Direct Line なら人のサインインなしで呼べ、T1〜T6 は JSON ○。Agents SDK は利用者ごとのサインインが要る。AI Builder の検証はこれから。MS_AI_VERIFY.md は Workbench の ZIP の検査で止まる言葉を含むので、main に入れる前に RULES で外すかを決める
 
 ## 3. 次にやること
 
