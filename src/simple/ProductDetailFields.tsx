@@ -11,9 +11,9 @@ import { typo } from '../typo'
 import type { Item } from '../items'
 
 const useStyles = makeStyles({
-  toggle: { display: 'flex', alignItems: 'center', columnGap: '4px' },
-  // 添える説明は小さく薄く(LabeledValue のラベルと同じ決まり)
-  label: { ...typo.label, whiteSpace: 'nowrap' },
+  toggle: { display: 'flex', alignItems: 'center', columnGap: '2px' },
+  // 補足は、スイッチの名前の書き出しにそろえる(スイッチの印のぶん字下げ)。上の行に詰める
+  sub: { ...typo.label, marginTop: '-8px', paddingLeft: '60px' },
   fields: { display: 'grid', rowGap: '8px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   count: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, justifySelf: 'end' },
@@ -75,7 +75,7 @@ export function ProductDetailFields({ item, onChange, detailCount }: { item: Ite
       <div className={s.toggle}>
         <Switch
           checked={!!item.detail}
-          label={t('詳しく見せる', 'Show in detail')}
+          label={t('素材・機能を詳しく見せる', 'Show materials and features in detail')}
           onChange={(_, d) => onChange(d.checked ? { title: item.detail?.title ?? '', body: item.detail?.body ?? '' } : null)}
         />
         {/* 何に使うか・どう見えるかを ⓘ に(2026-10-30 利用者: 素材や機能をアピールする枠なので、そういう内容と、見た目のイメージを) */}
@@ -99,10 +99,10 @@ export function ProductDetailFields({ item, onChange, detailCount }: { item: Ite
               <span>{t('枠の数・順番は変わりません。この枠だけが横いっぱいの行になります。', 'The number and order of slots stay the same; only this slot becomes a full-width row.')}</span>
             </div>
           }
-        >
-          <span className={s.label}>{t('写真 + 長い説明', 'Photo + long description')}</span>
-        </InfoLabel>
+        />
       </div>
+      {/* 名前だけでは分かりにくいので、名前の下に小さく薄く補足(2026-10-30 利用者) */}
+      <span className={s.sub}>{t('この枠だけ横いっぱいに、写真と説明文で', 'Just this slot, full width, with a photo and description')}</span>
       {item.detail && (
         <div className={s.fields}>
           <Field label={t('見出し', 'Heading')} size="small">
