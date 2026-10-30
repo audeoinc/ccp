@@ -1,4 +1,4 @@
-import { ArrowDownRegular, ArrowLeftRegular, ArrowRightRegular, ArrowSwapRegular, ArrowUpRegular, DismissRegular, EditRegular, OpenRegular, SparkleRegular, TextBulletListSquareRegular } from '@fluentui/react-icons'
+import { ArrowDownRegular, ArrowLeftRegular, ArrowRightRegular, ArrowSwapRegular, ArrowUpRegular, DismissRegular, EditRegular, OpenRegular, SparkleRegular, TextBulletListSquareRegular, ImageEditRegular } from '@fluentui/react-icons'
 import type { ContextItem } from './ContextMenu'
 import { tr } from './i18n'
 
@@ -19,6 +19,8 @@ export interface PreviewMenuSpec {
     url?: string
     swap: () => void
     remove: () => void
+    /** この商品の画像を替える(部品のペインの「画像を替える」を開く) */
+    image?: () => void
     /** 枠の見せ方「詳しく」の切り替え(X80)。detail = いま詳しくか */
     detail?: { on: boolean; toggle: () => void }
     /** 見たままの向き(格子の上下左右)に動かす(シンプルな画面)。その向きに動けないときは undefined(押せなくする) */
@@ -36,6 +38,7 @@ export function previewMenuItems({ busy, edit, ai, product, hero }: PreviewMenuS
     const { url } = product
     list.push(
       { key: 'swap', label: product.swapLabel, icon: <ArrowSwapRegular />, divider: true, disabled: busy, onSelect: product.swap },
+      ...(product.image ? [{ key: 'image', label: tr('この商品の画像を替える', 'Change this product’s image'), icon: <ImageEditRegular />, disabled: busy, onSelect: product.image }] : []),
       { key: 'page', label: tr('商品ページを開く', 'Open the product page'), icon: <OpenRegular />, disabled: !url, onSelect: () => window.open(url, '_blank', 'noreferrer') },
       { key: 'remove', label: tr('この商品を外す', 'Remove this product'), icon: <DismissRegular />, disabled: busy, onSelect: product.remove },
     )

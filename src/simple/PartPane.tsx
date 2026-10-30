@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular } from '@fluentui/react-icons'
+import { InfoLabel, ToggleButton, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AddRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular, ChevronUpRegular, ImageEditRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { ChooseDrawer } from '../ChoosePanel'
 import { DropZone } from '../DropZone'
@@ -45,11 +45,13 @@ import { ProductionMemo } from './ProductionMemo'
 import { askHeroPick, askPartRewrite, type PartAnswer, type PartTurn, type WholeTexts } from './partAi'
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { ProductDetailFields } from './ProductDetailFields'
+import { ProductImageSwap } from './ProductImageSwap'
 import { AiPicks, ProductChooser, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
 import { confirmDialog } from '../confirm'
 import { AudienceRow, ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
 import { useFeature } from '../featureFlags'
+import { FeatureBadge } from '../FeatureBadge'
 
 const useStyles = makeStyles({
   // テンプレートで決まっている部品の知らせ(鍵の印 + 文 + テンプレートの管理へのリンク)
@@ -135,6 +137,9 @@ interface Props {
   /** 商品の入れ替えの引き出しを開いている所(SU9。入口がいくつあっても、開くのは 1 か所) */
   swapAt: SwapAt | null
   onSwapAt: (at: SwapAt | null) => void
+  /** 「画像を替える」の引き出しを開いている商品の枠(「商品を入れ替える」とは同時に開かない) */
+  imageAt: string | null
+  onImageAt: (itemKey: string | null) => void
   /** 入れ替えで、行の鍵が変わったとき(候補と入れ替えたとき) */
   onSwapped: (from: string, to: string) => void
   /** 商品のフロートの「入れ替える」で、フロートの中に出す引き出し(画面の側が作る。どの入口でも同じもの) */
@@ -159,7 +164,7 @@ function TemplateLocked({ text }: { text: string }) {
 }
 
 /** 選んだ部品のペイン(SU1 ⑨)。選んだものによって中身が替わる。入力は、そのまま配信カードの状態に書くので、反映の前からプレビューに写る */
-export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, onSwapped, swapInFloat }: Props) {
+export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, onPick, chats, setChat, heroReplace, swapAt, onSwapAt, imageAt, onImageAt, onSwapped, swapInFloat }: Props) {
   const t = useT()
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
@@ -170,6 +175,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   const productsAiOn = useFeature('ai.products')
   const heroUploadOn = useFeature('content.hero.upload')
   const heroPickOn = useFeature('content.hero.pick')
+  // 商品の画像を替える(X87 の content.products.pageimage。非公開なら「画像を替える」を出さない)
+  const pageImageOn = useFeature('content.products.pageimage')
 
   // メイン画像を変える欄を開いている部品(部品を移ると畳む。まだ画像がなければ、はじめから開く)
   const [heroOpenKey, setHeroOpenKey] = useState<string | null>(null)
@@ -615,15 +622,37 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                 </span>
               ))}
             {/* 入れ替えは、箱の真下のボタンから開く(どの商品を替えるのかが、ひと目で分かるように。メイン画像の「入れ替える」と同じ形。SU9) */}
+            {/* 箱の真下に「商品を入れ替える」と「画像を替える」を並べる(言葉で見分けられるように。2026-10-30 利用者)。2 つは同時に開かない */}
             <ProductSwap
               editor={e}
               itemKey={it.key}
+              label={t('商品を入れ替える', 'Replace product')}
               open={swapAt?.at === 'pane' && swapAt.itemKey === it.key}
-              onOpenChange={(o) => onSwapAt(o ? { itemKey: it.key, at: 'pane' } : null)}
+              onOpenChange={(o) => {
+                if (o) onImageAt(null)
+                onSwapAt(o ? { itemKey: it.key, at: 'pane' } : null)
+              }}
               chats={chats}
               setChat={setChat}
               onDone={(k) => onSwapped(it.key, k)}
+              rowExtra={
+                pageImageOn && <ToggleButton
+                  size="small"
+                  appearance={imageAt === it.key ? 'secondary' : 'primary'}
+                  checked={imageAt === it.key}
+                  icon={imageAt === it.key ? <ChevronUpRegular /> : <ImageEditRegular />}
+                  aria-expanded={imageAt === it.key}
+                  onClick={() => {
+                    onSwapAt(null)
+                    onImageAt(imageAt === it.key ? null : it.key)
+                  }}
+                >
+                  {t('画像を替える', 'Change image')}
+                  <FeatureBadge id="content.products.pageimage" />
+                </ToggleButton>
+              }
             />
+            {pageImageOn && <ProductImageSwap editor={e} itemKey={it.key} open={imageAt === it.key} onOpenChange={(o) => onImageAt(o ? it.key : null)} hideTrigger />}
             {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 枠の見せ方「詳しく」(X80): その枠だけ写真 + 見出し + 長い説明に */}
             <ProductDetailFields item={it} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />

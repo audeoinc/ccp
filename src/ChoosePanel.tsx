@@ -25,6 +25,8 @@ const useStyles = makeStyles({
   attached: { borderTopLeftRadius: 0, border: `1px solid ${tokens.colorBrandStroke1}` },
   drawer: { display: 'grid', justifyItems: 'start', minWidth: 0 },
   drawerPanel: { justifySelf: 'stretch' },
+  // 開くボタンと、隣の引き出しのボタン(rowExtra)を 1 行に
+  triggerRow: { display: 'flex', alignItems: 'flex-end', columnGap: '8px', flexWrap: 'wrap' },
   // 開いている間のボタン: 押されたままの見た目で、下の線をなくして枠の見出しと同じ色にし、枠の上の線に 1px 重ねてつなぐ
   triggerOpen: {
     position: 'relative',
@@ -128,13 +130,17 @@ interface DrawerProps<V extends string> extends Omit<Props<V>, 'attached' | 'id'
   disabled?: boolean
   /** 閉じられない(まだ何も選んでいない)ときは false。ボタンも × も出さず、枠だけを出す */
   closable?: boolean
+  /** 開くボタンの右に並べるもの(隣の引き出しのボタン。商品の「商品を入れ替える」と「画像を替える」を 1 行に並べる) */
+  rowExtra?: ReactNode
+  /** 開くボタンを出さず、開いているときの枠だけ(ボタンは、隣の引き出しの rowExtra に置いたとき) */
+  hideTrigger?: boolean
 }
 
 /**
  * 対象の真下に置く「選び直す」のボタンと、そこから引き出す枠(SU3)。同じボタンをもう一度押すか、枠の × で閉じる。
  * 開いている間は、ボタンが押されたままの見た目(▲)で、枠とつながる
  */
-export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon, disabled, closable = true, ...panel }: DrawerProps<V>) {
+export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon, disabled, closable = true, rowExtra, hideTrigger = false, ...panel }: DrawerProps<V>) {
   const s = useStyles()
   const t = useT()
   const id = useId()
@@ -142,6 +148,8 @@ export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon
   if (!closable) return open ? <ChoosePanel {...panel} /> : null
   return (
     <div className={s.drawer}>
+      {!hideTrigger && (
+      <span className={s.triggerRow}>
       <ToggleButton
         size="small"
         appearance={open ? 'secondary' : 'primary'}
@@ -156,6 +164,9 @@ export function ChooseDrawer<V extends string>({ open, onOpenChange, label, icon
       >
         {label}
       </ToggleButton>
+      {rowExtra}
+      </span>
+      )}
       {open && (
         <div className={s.drawerPanel}>
           {/* 中の帯で「確定」したら、引き出しを閉じる(TrialBar。どの引き出しでも同じ動き) */}

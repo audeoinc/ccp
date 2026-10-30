@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useSyncExternalStore } from 'react'
 import { ArrowSwapRegular } from '@fluentui/react-icons'
 import { ProductChooser } from '../ProductChooser'
@@ -32,10 +33,14 @@ interface Props {
   trigger?: boolean
   /** 枠と題・× を出さない(商品のフロートの中。フロートが題を持ち、戻るのは「← 詳しい情報に戻る」だけ。2026-10-26 利用者の決め) */
   bare?: boolean
+  /** 開くボタンの文言(部品のペインでは「商品を入れ替える」。「画像を替える」と並べて、言葉で見分けられるように) */
+  label?: string
+  /** 開くボタンの右に並べるもの(「画像を替える」のボタン) */
+  rowExtra?: ReactNode
 }
 
 /** 商品の入れ替えの引き出し。trigger のときは「入れ替える」のボタンと、その真下から引き出す枠 */
-export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, setChat, onDone, trigger = true, bare = false }: Props) {
+export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, setChat, onDone, trigger = true, bare = false, label, rowExtra }: Props) {
   const t = useT()
   const key = partKey({ kind: 'product', itemKey })
   const it = e.items.find((i) => i.key === itemKey)
@@ -53,7 +58,7 @@ export function ProductSwap({ editor: e, itemKey, open, onOpenChange, chats, set
     <ProductChooser
       key={key}
       title={current ? t(`「${current.name}」を入れ替える`, `Replace "${current.name}"`) : t('この枠の商品を入れ替える', 'Replace this product')}
-      frame={trigger ? { kind: 'drawer', open, onOpenChange, label: t('入れ替える', 'Replace'), icon: <ArrowSwapRegular /> } : { kind: 'panel', onClose: () => onOpenChange(false), bare }}
+      frame={trigger ? { kind: 'drawer', open, onOpenChange, label: label ?? t('入れ替える', 'Replace'), icon: <ArrowSwapRegular />, rowExtra } : { kind: 'panel', onClose: () => onOpenChange(false), bare }}
       card={e.aiCard()}
       angle={e.form.copyAngle}
       current={current}

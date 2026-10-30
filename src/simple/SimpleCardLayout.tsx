@@ -62,7 +62,7 @@ import { typo } from '../typo'
 import { LabeledValue } from '../LabeledValue'
 import { hasPendingTrial, settlePendingTrial } from '../trial'
 import { tapComplete } from '../pushLink'
-import { useFeature } from '../featureFlags'
+import { useFeature, isOn as featureOn } from '../featureFlags'
 import { FeatureBadge } from '../FeatureBadge'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
@@ -375,7 +375,15 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   /** その商品を選び、選んだ部品のペインの箱の真下の引き出しを開く(プレビューの ⇄・右クリック・商品のフロートから) */
   const openSwap = (itemKey: string) => {
     select({ kind: 'product', itemKey })
+    setImageAt(null)
     setSwapAt({ itemKey, at: 'pane' })
+  }
+  // 「画像を替える」の引き出しを開いている商品の枠(部品のペイン。右クリックの「この商品の画像を替える」からも開く)
+  const [imageAt, setImageAt] = useState<string | null>(null)
+  const openImage = (itemKey: string) => {
+    select({ kind: 'product', itemKey })
+    setSwapAt(null)
+    setImageAt(itemKey)
   }
   const openSwapRef = useRef(openSwap)
   useEffect(() => {
@@ -557,6 +565,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               swap: () => openSwap(p.itemKey),
               // プレビューの × と同じ
               remove: () => removeProduct(p.itemKey),
+              // 画像を替える(部品のペインの「画像を替える」の引き出しを開く。メイン画像の「画像を入れ替える」と同じ形。2026-10-30 利用者)
+              image: featureOn('content.products.pageimage') ? () => openImage(p.itemKey) : undefined,
               // 枠の見せ方「詳しく」(X80)。詳しくにしたら、見出し・説明文を書けるように部品のペインを開く
               detail: it
                 ? {
@@ -1265,7 +1275,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
 
         {/* 選んだ部品のペイン */}
         <div className={s.pane} key={part ? partKey(part) : 'none'} ref={paneRef}>
-          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} onSwapped={swapped} swapInFloat={swapInFloat} />
+          <PartPane editor={e} part={part} compareKey={compareKey} onPlace={(key) => part && placed(part, key)} onCompareDone={() => setCompareKey(null)} onPick={select} chats={chats} setChat={setChat} heroReplace={heroReplace} swapAt={swapAt} onSwapAt={setSwapAt} imageAt={imageAt} onImageAt={setImageAt} onSwapped={swapped} swapInFloat={swapInFloat} />
           {e.footer}
         </div>
 

@@ -281,7 +281,6 @@ flowchart TD
 | `abTest.ts` | 245 | AB テスト(X55)の型・既定・配分・制作に渡す文(設定の画面は `simple/AbSettings.tsx`) |
 | `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 324 / 131 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
 | `ProductFloat.tsx` / `ProductMarks.tsx` | 35 / 64 | 商品の行の開き口(中の「選定済み」・右の商品情報の行を押すと、商品の対応のフロートを開く。行の中のボタン・入力欄は除く)/ 商品の行の札(アラートの種類の札・「残少」。商品情報と中の選定済みの行で共通) |
-| `ProductImagePicker.tsx` | 453 | この配信で使う商品の画像を、商品ページから選ぶフロート(X64。ページの画像の一覧・AI のおすすめとアングル・貼り付け / ファイル / URL)。窓口は `data/productPages.ts`(撮影用の身代わりは `mock/productPages.ts`) |
 | `target.ts` | 57 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
 | `ApprovalBar.tsx` | 419 | 承認の依頼・承認・差し戻し |
 | `features.ts` / `featureFlags.ts` / `FeaturesManager.tsx` / `FeatureBadge.tsx` | 231 / 132 / 254 / 34 | 機能の公開・非公開(X87): 機能の一覧(大・中・小・版・前提)/ 判定 `isOn`・開発者・「一般の人として見る」/ ⚙ の「使える機能」(あいまいな検索つき)/ 開発者に出す「非公開」の印。表は `data/featureSettings.ts`(型は `models/featureSettings.ts`。`'*'` の行は、行のない機能の扱い) |

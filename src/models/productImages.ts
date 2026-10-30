@@ -18,7 +18,7 @@ export interface ProductImageFields {
   sha256?: string
   /** 商品ページで画像に添える説明の文(素材の強み・ディテールなど) */
   caption?: string
-  /** アングル(front / texture / detail / worn / scene など。ProductImagePicker の angleName) */
+  /** アングル(front / texture / detail / worn / scene など。simple/ProductImageSwap の angleName) */
   angle?: string
   /** AI が見た、写っているもの(画像の案 X64 で一度だけ判断して残す。angle と一緒に、次からは画像を読ませずに文字で渡す) */
   angle_note?: string

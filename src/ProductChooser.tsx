@@ -108,7 +108,7 @@ export function ProductLine({ product: p, fact, onDetail }: { product?: Product;
 
 type Frame =
   /** 対象の真下のボタンから引き出す(シンプルな配信カード) */
-  | { kind: 'drawer'; open: boolean; onOpenChange: (open: boolean) => void; label: ReactNode; icon?: ReactElement }
+  | { kind: 'drawer'; open: boolean; onOpenChange: (open: boolean) => void; label: ReactNode; icon?: ReactElement; rowExtra?: ReactNode }
   /** 枠だけ(開くボタンは呼ぶ側。onClose がなければ × を出さない。bare = 枠と見出しも出さない) */
   | { kind: 'panel'; onClose?: () => void; bare?: boolean }
 
@@ -314,5 +314,5 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
   )
   const top = <TrialBar state={trial} />
   if (frame.kind === 'panel') return <ChoosePanel title={title} tabs={tabs} defaultTab={defaultTab} onClose={frame.onClose} bare={frame.bare} override={override || undefined} top={top} />
-  return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} override={override || undefined} top={top} />
+  return <ChooseDrawer open={frame.open} onOpenChange={frame.onOpenChange} label={frame.label} icon={frame.icon} rowExtra={frame.rowExtra} disabled={disabled} title={title} tabs={tabs} defaultTab={defaultTab} override={override || undefined} top={top} />
 }

@@ -49,7 +49,7 @@ export interface AiPreview {
   /** テンプレートの選び直しで、乗せているテンプレート */
   templateId?: EmailTemplateId
   /** 枠の商品の案。key が空なら空いた枠への案で、at の位置(押した空いた枠)に写す */
-  item?: { key: string; productId: string; at?: number }
+  item?: { key: string; productId: string; at?: number; imageUrl?: string }
   /** セクションの商品をまとめて AI で選んだ案(そのセクションの商品の並びを、この商品に置き換えて写す。X81 の 9) */
   section?: { index: number; productIds: string[] }
 }
@@ -97,6 +97,8 @@ export interface SimpleExtras {
   /** AI に渡す、配信のいまの入力(国・チャネルは名前で) */
   aiCard: () => AiCard
   setField: (k: SimpleField, v: string) => void
+  /** 商品の枠の画像を、この配信だけ替える(空 = 商品のマスタの画像に戻す)。AB テストで画像だけ案ごとのときは、いま開いている案の画像 */
+  setItemImage: (itemKey: string, url: string, source: string) => void
   /** 商品の枠の見せ方「詳しく」と、その見出し・説明文(X80。null でふつうに戻す) */
   setItemDetail: (itemKey: string, detail: { title: string; body: string } | null) => void
   /** テーマの AI の案(詳しい画面の ① テーマと同じ useAiDrafts。案は保存しない。X81 の 4) */

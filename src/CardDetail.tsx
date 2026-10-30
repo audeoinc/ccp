@@ -499,6 +499,13 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     )}
     </>
   )
+  // 商品の枠の画像を替える(部品のペインの「画像を替える」)。B・C 案を開いていて、商品が全案で共通なら、画像はその案のもの(X64 の e)
+  const setItemImageAb = (itemKey: string, url: string, source: string) => {
+    const item = items.find((i) => i.key === itemKey)
+    if (!item) return
+    if (variantImages) setAb((a) => (a ? setVariantImage(a, active, item.productId, url, item.imageUrl ?? '') : a))
+    else setItemImage(itemKey, url, source)
+  }
   const productFloat = (
     <>
     {/* 商品の対応のフロート(X54): アラートの札・商品の行の、どこから開いても、これ 1 つ */}
@@ -539,14 +546,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           options={options}
           image={shownImage}
           delivery={{ theme: form.theme, headline: form.headline, copy: form.copy, themeType: form.themeType ? themeTypeLabel(form.themeType as ThemeType) : '', cardId: card?.id, variant: ab && active !== 'A' ? active : undefined }}
-          onImage={
-            item
-              ? (url, source) =>
-                  variantImages
-                    ? setAb((a) => (a ? setVariantImage(a, active, item.productId, url, item.imageUrl ?? '') : a))
-                    : setItemImage(item.key, url, source)
-              : undefined
-          }
           onSwapCandidate={
             item
               ? (candKey, reason) => {
@@ -663,7 +662,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const previewSection = aiPreview?.section
   const shownItems = previewItem
     ? previewItem.key
-      ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: undefined } : i))
+      ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: previewItem.imageUrl } : i))
       : insertAt(viewItems, sectionsOf(template), previewItem.at ?? viewItems.length, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI })
     : previewSection
       ? replaceSection(viewItems, sectionsOf(template), previewSection.index, previewSection.productIds.map((productId, n) => ({ key: `__ai_section_${n}`, productId, reason: '', source: SOURCE_AI })))
@@ -1060,6 +1059,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         loaded: original !== null,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
+        setItemImage: (itemKey, url, source) => setItemImageAb(itemKey, url, source),
         setItemDetail: (itemKey, detail) => setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, detail: detail ?? undefined } : i))),
         themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme(), ask: drafts.askThemes },
         templateUse: templateUseMap,

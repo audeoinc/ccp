@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogBody, makeStyles, tokens } from '@fluentui/react-components'
 import { ResizableSurface } from './ResizableSurface'
-import { ArrowLeftRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, ImageEditRegular, OpenRegular } from '@fluentui/react-icons'
+import { ArrowLeftRegular, ArrowSwapRegular, CalendarArrowRightRegular, DismissRegular, OpenRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { DeliveryProductSource as Source } from './models/deliveryProducts'
@@ -18,9 +18,7 @@ import { num, tr, useT } from './i18n'
 import { OpenLink } from './LinkText'
 import { productUrl } from './links'
 import { weeklyLimit } from './weeklyLimit'
-import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 import { typo } from './typo'
-import { useFeature } from './featureFlags'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
 // どこから開いても同じ形: いまの商品の詳しい情報。題の行の「入れ替える」を押すと、同じフロートの中が入れ替えの部品(AI のおすすめ・AI に頼む・すべての商品)に
@@ -62,6 +60,18 @@ const useStyles = makeStyles({
   imageText: { display: 'grid', rowGap: '4px', justifyItems: 'start', minWidth: 0 },
 })
 
+/** 配信で伝えたいこと(配信カードで書き換え中の値) */
+export interface DeliveryGist {
+  theme?: string
+  headline?: string
+  copy?: string
+  themeType?: string
+  /** 配信カードの id */
+  cardId?: string
+  /** AB テストの B・C 案を開いているとき、その案(商品は全案で共通で、画像だけ案ごと。X64 の e) */
+  variant?: string
+}
+
 interface Props {
   /** 対応する商品(配信に載っている商品)。日程の変更など、商品のないアラートでは、ない */
   product?: Product
@@ -89,10 +99,8 @@ interface Props {
   onReplace?: (to: Product, reason: string) => void
   /** この配信で使う、この商品の画像(空 = 商品のマスタの画像。X64) */
   image?: string
-  /** 画像を選ぶときに AI に渡す、配信で伝えたいこと */
+  /** 配信で伝えたいこと(AI の差し替え案に渡す)と、AB テストの案(B・C 案の画像を見せるとき) */
   delivery?: DeliveryGist
-  /** この配信で使う画像を替える(url が空なら、商品のマスタの画像に戻す) */
-  onImage?: (url: string, source: string) => void
   /** 配信日を変える(左の配信日時の欄へ) */
   onPostpone?: () => void
   /** アラートの画面で詳しく見る */
@@ -117,11 +125,9 @@ interface Props {
 export type SwapRender = (back: () => void, close: () => void) => ReactNode
 
 /** 商品の対応のフロート(X54) */
-export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, onPreviewProduct, aiCard, angle, onClose }: Props) {
+export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, onPreviewProduct, aiCard, angle, onClose }: Props) {
   const s = useStyles()
   const t = useT()
-  const pageImageOn = useFeature('content.products.pageimage')
-  const [picking, setPicking] = useState(false)
 
   // AI の差し替え案(在庫・週の上限のアラートから開いたとき。開いたときに 1 回だけ)
   const overLimit = alert?.kind === 'overLimit'
@@ -272,8 +278,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
             {product && view === 'detail' && (
               // 詳しい情報(いまの商品)。左の欄はやめ、横幅はこちらに回す
               <div className={s.pane}>
-                {/* この配信で使う画像(X64)。商品のマスタの画像は変えない。公開していなければ出さない(X87) */}
-                {onImage && pageImageOn && (
+                {/* この配信で使う画像(X64)。見せるだけ(替えるのは、部品のペインの「画像を替える」。2026-10-30 利用者: このフロートは商品を知る所に戻した) */}
+                {image && (
                   <div className={s.imageBox}>
                     <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
                     <span className={s.imageText}>
@@ -284,22 +290,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                             {t(`${delivery.variant} 案だけ`, `Variant ${delivery.variant} only`)}
                           </Badge>
                         )}
-                        {image && !delivery?.variant && (
-                          <Badge size="small" appearance="tint" color="brand">
-                            {t('この配信で選んだ画像', 'Chosen for this delivery')}
-                          </Badge>
-                        )}
                       </span>
-                      <span className={s.caption}>
-                        {delivery?.variant
-                          ? t(`${delivery.variant} 案だけに使う画像です。ほかの案は変わりません(A 案と同じ画像なら、A 案に合わせます)`, `Used only in variant ${delivery.variant}; other variants are unchanged (same as A means it follows A).`)
-                          : image
-                            ? t('商品のマスタの画像は変えていません(ほかの配信は元のまま)', 'The product master image is unchanged (other deliveries keep it).')
-                            : t('いまは商品のマスタの画像。強みが伝わる画像に、この配信だけ替えられます', 'Uses the product master image. You can change it for this delivery only.')}
-                      </span>
-                      <Button size="small" icon={<ImageEditRegular />} onClick={() => setPicking(true)}>
-                        {t('商品ページから画像を選ぶ…', 'Choose an image from the product page…')}
-                      </Button>
+                      <span className={s.caption}>{t('商品のマスタの画像は変えていません。替えるときは、部品のペインの「画像を替える」で', 'The product master image is unchanged. To change it, use Change image in the part pane')}</span>
                     </span>
                   </div>
                 )}
@@ -309,18 +301,6 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
           </DialogBody>
         </ResizableSurface>
       </Dialog>
-      {picking && product && onImage && pageImageOn && (
-        <ProductImagePicker
-          product={product}
-          current={image}
-          delivery={delivery ?? {}}
-          onPick={(url, source) => {
-            onImage(url, source)
-            setPicking(false)
-          }}
-          onClose={() => setPicking(false)}
-        />
-      )}
     </>
   )
 }
