@@ -302,6 +302,8 @@ Direct Line の呼び方(層の中で行うこと):
 | 2026-10-30 | 同上 | テストの欄 | GPT 6.1 Sol | T1 | 3 | ○ | ○ | なし | 未記録 | 同上 | 7・13・9 文字 |
 
 | 2026-10-30 | 2 | 測るプログラム(Agents SDK) | GPT 6.1 Sol | T1 | 1 | × | × | — | 会話を始める 0.90・本文 0.41 | — | **断られた**: 「This action doesn't support agents built with the GitHub Copilot harness.」(12.6) |
+| 2026-10-30 | 2(標準のハーネスで作り直したエージェント) | テストの欄 | GPT Chat Latest | T1 | 1 | ○ | ○ | なし | 未記録 | — | 7・8・8 文字 |
+| 2026-10-30 | 2(同上) | 測るプログラム(Agents SDK) | GPT Chat Latest | T1 | 1 | ○ | ○ | なし | 会話を始める 0.77・最初に届く 0.12・本文 4.50・終わり 4.50 | — | **疎通できた**。7・9・11 文字。入力中の印が先に届き、本文は 1 通でまとめて届いた |
 
 - T1 の 3 回: どれも JSON だけで返り、`ideas` は 3 つ、元の見出しより短く、入力にない事実はなかった。3 回の案はほぼ同じ(「秋の新作ニット」「新作ニットで秋支度」は 3 回とも同じ文)で、ばらつきは小さい。判定は、測るプログラムの確かめ(`tests.mjs`)にも通した。
 - T2〜T6 は、方式 2 の疎通(12.5)のあとに回す(2026-10-30 利用者)。
@@ -339,7 +341,7 @@ Direct Line の呼び方(層の中で行うこと):
 | API の権限 | Power Platform API の**委任された権限** `CopilotStudio.Copilots.Invoke`(Python のサンプルは、ほかに Microsoft Graph の `User.Read`)。管理者の同意は組織の決まりに従う |
 | エージェントの側の設定 | 公開したエージェントが要る。「設定 → セキュリティ → 認証」は、SDK を使うだけなら「認証なし」にしなくてよい。つなぐ値は「チャネル → Web アプリ」の接続文字列、または「設定 → 詳細 → メタデータ」の環境の ID とスキーマ名 |
 | 言語 | .NET・JavaScript・Python のサンプルがある(Python は 3.10 以上) |
-| 答えを届いた分から受け取れるか | できる(届いた順に読む仕組みがある、と Microsoft のチームのブログ。サンプルの説明には書かれていない) |
+| 答えを届いた分から受け取れるか | 届いた順に読む仕組みはある(Microsoft のチームのブログ)。ただし 2026-10-30 の T1 では、入力中の印のあと、本文は 1 通でまとめて届いた(文が少しずつ届くことはなかった) |
 | 画像を渡せるか | **分からない。** エージェントの「生成 AI」の設定で画像の入力を許す項目はあるが、SDK で画像を付けて送れるかは文書に書かれていない。試して確かめる |
 | 会話の記録 | (未確認)Copilot Studio は会話の記録を環境に残す。期間と、残さない設定ができるかは調べる |
 
@@ -420,6 +422,9 @@ node measure.mjs --only T1 --runs 1
   - GitHub Copilot ハーネス: 目標を受けて手順を組み、ツールを使い分ける、重い仕事向け。名前に GitHub Copilot とあるが、GitHub Copilot のサービスにデータは行かない。費用は使った分(Copilot のクレジット)。
   - 標準のハーネス: 決まった話題・頼みに、決まった形で答える向け。チャネル・つなぎ方は、こちらのほうが揃っている。
 - Microsoft Learn で確かめられたのは、Power Automate の Copilot Studio のつなぎが GitHub Copilot ハーネスに対応していないこと。Agents SDK・Direct Line については文書に書かれていないが、**Agents SDK は、今回の答えのとおり対応していない**。Direct Line も同じおそれがある(未確認)。
+- **標準のハーネスで作り直したエージェントは、Agents SDK から呼べた**(2026-10-30。T1 を 1 回、本文まで 4.5 秒。10.1)。
+- 標準のハーネスでは、選べるモデルが違う(GPT Chat Latest・GPT-5.5 Chat・GPT-5 Chat・GPT-4.1・GPT-5 Auto / Reasoning(プレビュー)・Claude Sonnet 4.6・Opus 4.6〜4.8)。固定の GPT のモデルは 2026-10-31〜11-12 に終わり、GPT Chat Latest に移されるので、**GPT Chat Latest** を選ぶ。中身の版は知らないうちに新しくなるので、測った日を記録に残す。
+- 標準のハーネスの「オーケストレーション」は「はい(生成 AI オーケストレーション)」のままにする。「いいえ(クラシック)」だと、決めたトピックにしか答えない。
 - **CCP から呼ぶ検証には、標準のハーネスでエージェントを作り直す**(ハーネスを後から切り替える方法は、文書では見つからなかった。Microsoft は「移すのは作り直し」としている)。作り方は 5 章の手順 3(「Other ways to build」の「エージェント [標準]」)。名前・指示・外すもの・モデルは 5・6 章と同じにする。
 
 出典: Microsoft Learn「Call a Copilot Studio agent from Power Automate」・「Harnesses overview」・「Choose a harness」・「Access standard harness agents and agent flows」(Copilot Studio)。
