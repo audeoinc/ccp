@@ -3,6 +3,7 @@ import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-ic
 import { useT } from '../i18n'
 import { allVariants, metricLabel, splitOf, targetLabel, type AbMetric, type AbMode, type AbPurpose, type AbTarget, type AbTest, type VariantKey } from '../abTest'
 import { confirmDialog } from '../confirm'
+import { useFeature } from '../featureFlags'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '10px', width: '340px' },
@@ -18,6 +19,9 @@ const useStyles = makeStyles({
  * 比べる要素は選ばせない(A と違う所から自動で決める。saveTarget)。いま決まっている比べる要素は、読むだけで出す
  */
 export function AbSettings({ ab, active, target, onChange, onDecide, onStop }: { ab: AbTest; active: VariantKey; target: AbTarget; onChange: (ab: AbTest) => void; onDecide: (k: VariantKey) => void; onStop: () => void }) {
+  // 選べる目的は、公開している機能だけ(X87。いま選んでいる目的は、非公開でも出したまま。いまの案が崩れないように)
+  const testOn = useFeature('card.abtest')
+  const chooseOn = useFeature('card.variants')
   const t = useT()
   const s = useStyles()
   const choose = ab.purpose === 'choose'
@@ -26,7 +30,7 @@ export function AbSettings({ ab, active, target, onChange, onDecide, onStop }: {
   return (
     <div className={s.root}>
       <div className={s.row}>
-        {(['test', 'choose'] as AbPurpose[]).map((x) => (
+        {(['test', 'choose'] as AbPurpose[]).filter((x) => x === (ab.purpose ?? 'test') || (x === 'test' ? testOn : chooseOn)).map((x) => (
           <Button key={x} type="button" size="small" shape="circular" className={s.chip} appearance={(ab.purpose ?? 'test') === x ? 'primary' : 'outline'} onClick={() => set('purpose', x)}>
             {x === 'test' ? t('AB テスト(全案を送る)', 'A/B test (send all)') : t('案から選ぶ(1 案だけ送る)', 'Choose one (send one)')}
           </Button>

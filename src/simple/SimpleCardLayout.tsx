@@ -62,6 +62,8 @@ import { typo } from '../typo'
 import { LabeledValue } from '../LabeledValue'
 import { hasPendingTrial, settlePendingTrial } from '../trial'
 import { tapComplete } from '../pushLink'
+import { useFeature } from '../featureFlags'
+import { FeatureBadge } from '../FeatureBadge'
 
 // プレビュー(スマホ / PC の幅ごと)・商品の一覧のペインの幅と、商品の一覧の開閉(人の設定。ARCHITECTURE の 8 章)。
 // プレビューは、メールの幅に合わせた幅にし、余りは選んだ部品のペインに回す(AI の入力欄と案を置くため。v2 で、プレビューを残りの幅から固定の幅に改めた)
@@ -334,6 +336,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 自動で畳んだ商品の一覧を、人が開き直した(幅が足りるようになるまで、自動では畳まない)
   const [insist, setInsist] = useState(false)
   const [abSettingsOpen, setAbSettingsOpen] = useState(false)
+  // 案を足す入口は、AB テストか案から選ぶのどちらかを公開しているときだけ(X87)。すでに案のある配信は、タブ・設定をそのまま出す(データは消さない)
+  const abTestOn = useFeature('card.abtest')
+  const variantsOn = useFeature('card.variants')
+  const abOn = abTestOn || variantsOn
+  const abAiOn = useFeature('ai.abvariant')
   // 商品の入れ替えの引き出しを開いている所(SU9)。入口(プレビューの ⇄・右クリック・選んだ部品のペイン・真ん中の行・右の行・商品のフロート)は違っても、引き出しは 1 つ
   const [swapAt, setSwapAt] = useState<SwapAt | null>(null)
 
@@ -666,9 +673,12 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {t(`案 ${k} を写して直す`, `Copy variant ${k} and edit`)}
         </MenuItem>
       ))}
-      <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
-        {t('AI で別の案を作る', 'Let AI make another variant')}
-      </MenuItem>
+      {abAiOn && (
+        <MenuItem icon={<AiIcon size={16} />} onClick={() => (void onCommit(), e.abAdd('ai'))}>
+          {t('AI で別の案を作る', 'Let AI make another variant')}
+          <FeatureBadge id="ai.abvariant" />
+        </MenuItem>
+      )}
     </>
   )
   const addVariantMenu = (
@@ -707,7 +717,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           {t(`${e.abDecided} 案に決めた · 並べて見る`, `Went with variant ${e.abDecided} · Compare`)}
         </Button>
       )}
-      {(!e.ab || e.ab.canAdd) && addVariantMenu}
+      {abOn && (!e.ab || e.ab.canAdd) && addVariantMenu}
       {e.ab && (
         <Menu>
           <MenuTrigger disableButtonEnhancement>
@@ -785,7 +795,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     <div className={s.root}>
       {/* キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案)。承認の帯より上に置く(承認の帯は、ここで選んだ配信の状態なので) */}
       {/* AB テストをしていないときは、案の段を出さず、「AB テストを足す」は配信のタブの ＋ のメニューに(2026-10-28 利用者) */}
-      {e.campaignBand?.({ variants: e.ab || e.abDecided ? abBar : undefined, addVariantItems: e.ab || e.abDecided || e.saving ? undefined : addVariantItems })}
+      {e.campaignBand?.({ variants: e.ab || e.abDecided ? abBar : undefined, addVariantItems: e.ab || e.abDecided || e.saving || !abOn ? undefined : addVariantItems })}
       <StageHeader
         title={
           <>
