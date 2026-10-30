@@ -4,7 +4,7 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-10-29
+- 最終更新: 2026-10-30
 
 ---
 
@@ -20,7 +20,6 @@
 
 - 2026-10-30 UI 1: X87 の 3.1 は本番済み(e062962)。X79 の (e) キャンペーンのまとめての取りやめ・(f) まとめて作るの配信をキャンペーンに入れる は見本 OK で main に(e285b94。反映は連絡係。(f) は本番で利用者が確認)。続きは X87 段 ② の UI 1 の残り。詳しくは archive の末尾
 - 2026-10-30 UI 3: X80 段 ①(商品の枠を「詳しく」。スイッチ「素材・機能を詳しく見せる」+ ⓘ、7878e85)・X88(商品の画像を替える)・X86 段 ①(制作の画面の上の部分を計画と共通・Fit・ちらつきの直し、5606505)は main・本番済み。次は ① シンプルな制作の画面の MVP の追加分(共有メモ req-production-simple.md の 2b 章と追記 1・2: AI の手直し・制作した HTML・要素を直す・工程 ②〜④・ピン。ProductionChat / productionRevise を使い回す。区切りごとに見本)→ ② X80 段 ②(商品ページの本文を残す)→ ③ 結果のシンプルな画面(共有メモ req-results-simple.md。要件は 10-30 に決定)
-- 2026-10-29 UI 2: シンプルな配信カードの AI の入口をそろえた(渡す文章は「AI で書く → 案を押すと入る」`NotesAiDraft`・空いた枠は「入れる」の引き出し・テーマは「AI で変える」・引き出しは確定で閉じる `drawerClose.ts`)。開いたときはアラートがあればアラート、商品情報は閉じる
 - 2026-10-30 UI 2: X87 段 ② の UI 2 の分は、残りの 5 つ(ai.autoredraft・ai.learnings・ai.describe・ai.pageimage・content.products.pagefetch)も入れて main に(10-30 利用者: 例外を作らず版に従って止める)。approval.history は UI 1。次は「？ 聞く」の材料を公開している機能だけに絞る。詳しくはアーカイブ 2026-10-28_ の末尾
 - 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ
 - 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証の手順と結果 docs/MS_AI_VERIFY.md を main に(ブランチ claude/ai-outlet-b3c4ae。Azure OpenAI は想定しない)。Direct Line なら人のサインインなしで呼べ、T1〜T6 は JSON ○。Agents SDK は利用者ごとのサインインが要る(標準のハーネスのエージェントでだけ呼べる)。AI Builder の検証はこれから。Workbench の ZIP には入る(共同作業者が 96237dc で Power Platform・Copilot の言葉を許した)

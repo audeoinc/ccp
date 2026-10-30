@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-10-29(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-10-30(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -68,6 +68,7 @@ flowchart TD
 
     subgraph production["制作の面"]
         prod["制作のページ<br/>ProductionPage.tsx・productionSnapshot.ts"]
+        sprod["制作のシンプルな画面<br/>production/SimpleProductionPage.tsx・useProductionFlow.ts"]
     end
 
     subgraph data["データの出入り口(画面)"]
@@ -104,6 +105,8 @@ flowchart TD
     app -->|アラート| alerts
     app -->|制作の面| prod
     card -.->|制作に依頼| prod
+    card -.->|PRODUCTION のタブ| sprod
+    sprod --> preview
     cal & week & list -->|配信を開く| card
     results --> resdetail
     resdetail -.->|制作の詳細を重ねる| card
@@ -201,7 +204,7 @@ flowchart TD
 | `settings.ts` | 48 | アプリ全体の設定(自動下書きのオン・オフなど。ブラウザごと) |
 | `AppToolbar.tsx` / `appToolbarParts.ts` | 423 / 41 | 上に留めるヘッダーと面の帯(狭い画面ではアプリ名を隠し、絞り込みの札は収まらないときだけ 2 段目)/ App と共有する、絞り込みと面の切り替えのボタンの形 |
 | `useAppData.ts` / `useUrlSync.ts` | 306 / 30 | 画面全体が使う表の読み込みと読み直し(変わった表だけ選べる)・上の帯の知らせ / 画面の状態を URL に持たせ、「戻る」「進む」で戻す(どちらも App から分けた) |
-| `lazyViews.tsx` / `chunkReload.ts` | 38 / 43 | 開いたときに読み込む画面(最初の読み込みを軽くする)/ 分けたファイルが読めなかったとき(古い版のまま開いていたタブ)に、一度だけ読み直す |
+| `lazyViews.tsx` / `simpleProductionChunk.ts` / `chunkReload.ts` | 47 / 10 / 43 | 開いたときに読み込む画面(最初の読み込みを軽くする。`SimpleProductionView` は読み終わっていれば lazy を通さずに描く)/ 制作のシンプルな画面のプログラムを、配信カードを開いたときに裏で先に読む(PLAN → PRODUCTION の最初の切り替えで、後ろのカレンダーが見えないように)/ 分けたファイルが読めなかったとき(古い版のまま開いていたタブ)に、一度だけ読み直す |
 | `ErrorBoundary.tsx` | 71 | 画面の一部が落ちたときの受け皿(画面・配信を移ると描き直す。重ねて開く画面は閉じられる) |
 | `SettingsDialog.tsx` / `settingsActions.tsx` | 272 / 530 | 設定の画面(ST10。⚙ はこの入口だけ。左に 自分 / 国 / 全社 / 開発・管理、右に中身)/ そこに並べる操作(国・全社の設定の欄、取り込み・書き出し・見本の作成) |
 | `userPrefs.ts` / `prefKeys.ts` | 82 / 71 | 人の設定(ペインの幅・フロートの大きさ・言語など)を、ログインした人ごとにサーバーへ写す(ST6。`/api/prefs`)/ ブラウザに覚える設定の鍵の一覧 |
@@ -259,8 +262,8 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `CardDetail.tsx` | 1,225 | **配信カードの本体**。読み込み・保存の入口、AI の下書きの起動、承認・差し戻し。描き方は `simple/SimpleCardLayout.tsx` の 1 つだけ(2026-10-28 に、詳しい配信カードと、その切り替えを消した) |
-| `useCardEditor.ts` | 742 | 配信カードの中身(入力欄・商品・候補・テンプレート・見出し・メイン画像・リンク・案)と、変えたかの判定・保存。**状態と保存は、ここ 1 か所だけ** |
+| `CardDetail.tsx` | 1,206 | **配信カードの本体**。読み込み・保存の入口、AI の下書きの起動、承認・差し戻し。描き方は `simple/SimpleCardLayout.tsx` の 1 つだけ(2026-10-28 に、詳しい配信カードと、その切り替えを消した) |
+| `useCardEditor.ts` | 755 | 配信カードの中身(入力欄・商品・候補・テンプレート・見出し・メイン画像・リンク・案)と、変えたかの判定・保存。**状態と保存は、ここ 1 か所だけ** |
 | `cardDetailStyles.ts` | 44 | 配信カードの枠・知らせ・AI の下書きの重ね(CardDetail の見た目) |
 | `cardForm.ts` / `saveFlow.ts` | 78 / 105 | 入力欄の値(画面の state)と、行からの作り方 / 保存の流れ(決める `planSave` と、決まった順に行う `runSave`。`scripts/check-save.mjs` が確かめる) |
 | `useAbVariants.ts` / `useCardAlerts.ts` | 511 / 106 | AB テスト・案から選ぶの、案の中身と出し入れ / アラートへの対応と商品の差し替え(理由は保存で配信のメモに) |
@@ -279,11 +282,11 @@ flowchart TD
 | `SwipePager.tsx` | 158 | 週・月の表示を、地の部分をつかんで横に引く(トラックパッドの横スワイプ)と、前後の週・月へ |
 | `AbBadge.tsx` / `AbCompare.tsx` / `abAi.ts` | 74 / 131 / 149 | AB テストの印(月・週・一覧・時刻の格子)/ 案のプレビューを並べて比べる / 「B 案を AI で作る」(画像・商品と、比べる要素なら文言・件名も) |
 | `abTest.ts` | 245 | AB テスト(X55)の型・既定・配分・制作に渡す文(設定の画面は `simple/AbSettings.tsx`) |
-| `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 324 / 131 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる)/ プレビューの商品の枠に重ねるアラートの札 |
+| `ProductActionFloat.tsx` / `ItemAlertOverlay.tsx` | 306 / 131 | 商品の対応のフロート(アラートへの対応と、商品の詳しい情報・差し替えを 1 つに。つかんで動かせる。画像はいまのものを見せるだけで、替えるのは部品のペインの「画像を替える」)/ プレビューの商品の枠に重ねるアラートの札 |
 | `ProductFloat.tsx` / `ProductMarks.tsx` | 35 / 64 | 商品の行の開き口(中の「選定済み」・右の商品情報の行を押すと、商品の対応のフロートを開く。行の中のボタン・入力欄は除く)/ 商品の行の札(アラートの種類の札・「残少」。商品情報と中の選定済みの行で共通) |
 | `target.ts` | 57 | 配信の対象(性別・年代・アプリの送る相手)の値と表示、AI に渡す文、商品の性別での絞り込み |
 | `ApprovalBar.tsx` | 419 | 承認の依頼・承認・差し戻し |
-| `features.ts` / `featureFlags.ts` / `FeaturesManager.tsx` / `FeatureBadge.tsx` | 231 / 132 / 254 / 34 | 機能の公開・非公開(X87): 機能の一覧(大・中・小・版・前提)/ 判定 `isOn`・開発者・「一般の人として見る」/ ⚙ の「使える機能」(あいまいな検索つき)/ 開発者に出す「非公開」の印。表は `data/featureSettings.ts`(型は `models/featureSettings.ts`。`'*'` の行は、行のない機能の扱い) |
+| `features.ts` / `featureFlags.ts` / `FeaturesManager.tsx` / `FeatureBadge.tsx` | 236 / 152 / 446 / 34 | 機能の公開・非公開(X87。3.1 の作り替え): 機能の一覧(大・中・小・コードの版・前提)/ 判定 `isOn`(版が always ならいつも公開、dev は開発者だけ。機能ごとの上書き 止める / 先に出す / 版に従う → 付け替えた版かコードの版の公開。親を止めると子も非公開)・開発者・「一般の人として見る」/ ⚙ の「使える機能」(版ごとの公開の切り替え、行ごとの版の付け替えと上書き(理由つき)、隠れる機能の知らせ、変えたことの記録。あいまいな検索つき)/ 開発者に出す「非公開」の印。表は `data/featureSettings.ts`(機能ごとの版・上書き・理由)・`data/featureVersions.ts`(版ごとの公開)・`data/featureLogs.ts`(だれ・いつ・何を・なぜの記録)。型は `models/` の同じ名前のファイル |
 | `LearningsBar.tsx` | 392 | 「これまでの学び」(過去の結果から) |
 | `Splitter.tsx` / `ResizeHandles.tsx` | 105 / 75 | ペインの幅の変更 / フロートの大きさの変更 |
 
@@ -347,21 +350,26 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `SimpleCardLayout.tsx` | 1,336 | 画面の並び(左のバーのアラート / 学び / やり取り / 承認 / 素材 / 渡すもの / 変更 + 開くパネル \| プレビュー \| 選んだ部品のペイン \| 商品の一覧)、幅と開閉 |
+| `SimpleCardLayout.tsx` | 1,283 | 画面の並び(左のバーのアラート / 学び / やり取り / 承認 / 素材 / 渡すもの / 変更 + 開くパネル \| プレビュー \| 選んだ部品のペイン \| 商品の一覧)、幅と開閉 |
+| `SideRail.tsx` | 80 | 左のバー(縦の帯。アイコンと短い名前・数の丸・点。押すと欄を 1 つだけ開く。項目に機能の ID を持たせ、非公開の印を出せる)。配信カードと制作のシンプルな画面で共通 |
+| `DeliveryMetaBand.tsx` | 100 | プレビューの上の、配信の情報の帯(配信日時・国・テーマ)。配信カードでは押すと右のペインが配信の情報に、制作の画面では見るだけ |
 | `parts.ts` | 188 | 「部品」の型(プレビューの上で押して選ぶ単位)と、プレビューの目印(`data-part`・`data-anchor`)との読み替え |
-| `PartPane.tsx` | 1,205 | 選んだ部品のペイン(文言・メイン画像・商品・空いた枠・リンク先など、部品ごとの欄) |
+| `PartPane.tsx` | 1,259 | 選んだ部品のペイン(文言・メイン画像・商品・空いた枠・リンク先など、部品ごとの欄。商品の箱の真下に「商品を入れ替える」と「画像を替える」) |
+| `ProductDetailFields.tsx` | 121 | 商品の枠の「素材・機能を詳しく見せる」(X80)のスイッチ(部品のペインのいちばん上)と、オンのときの見出し・説明文の欄(その枠だけ横いっぱいの、写真 + 見出し + 長い説明の行) |
 | `PartAiChat.tsx` / `partAi.ts` | 202 / 328 | 選んだ部品を AI に頼む(指示の例の札・案 3 つ・乗せると仮に写る・押すと採用。何も選んでいないときは配信の全体) |
 | `editor.ts` | 211 | シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部) |
 | `CommPane.tsx` | 608 | やり取りのペイン(状態の道のりと次に動く人・書き込み / タスク / 承認の 1 本の流れ・書く欄。承認・差し戻しも) |
 | `HandoffSheet.tsx` / `ProductionMemo.tsx` / `assetDrop.ts` | 313 / 78 / 35 | 制作に渡すもの(担当・締め切り・文章・素材・「制作に渡す」)/ 部品から 1 行で渡すものに書き留める「制作へのメモ」/ 画像・資料・URL のドラッグ |
 | `NotesAiDraft.tsx` | 119 | 渡す文章(制作指示)の AI(「AI で書く」→ 欄の真下に案 → 押した案がそのまま入る。プレビューに出ない長い文なので、試す → 確定にしない) |
 | `AbSettings.tsx` | 86 | AB テストの設定(SU2。案のタブの横の ⚙) |
-| `StageHeader.tsx` / `NextAction.tsx` / `nextStep.ts` | 36 / 78 / 24 | 上の帯(題名と PLAN \| PRODUCTION \| RESULTS のタブ。制作のシンプルな画面でも使う)/ 次にやることのボタン |
+| `StageHeader.tsx` / `NextAction.tsx` / `nextStep.ts` | 46 / 78 / 24 | 上の帯(チャネル・配信名・日時を自分で描き、「題 → 段階のタブ PLAN \| PRODUCTION \| RESULTS → その面の状態の札 → 右の操作」の並び。計画と制作で同じ形で、上の部分が動かないように)/ 次にやることのボタン |
 | `PreviewMarks.tsx` | 78 | プレビューの上の目印(A と違う) |
 | `SectionTagLayer.tsx` | 149 | プレビューのセクションの名札(枠の左上の「グリッド・4 枠」。押すとセクションの全体を選ぶ) |
 | `SectionGlowLayer.tsx` / `sectionGlow.ts` | 49 / 19 | セクションに重ねる光の枠 / 光らせるセクション(「○○の商品を AI で選ぶ」に乗せたとき・案を試しているあいだ。X81) |
+| `usePreviewZoom.ts` / `PreviewZoomBar.tsx` | 67 / 45 | プレビューの倍率(15〜120% と「全体」。画面ごとの鍵で覚える)/ 右下の倍率の操作(− ・倍率・＋)。配信カードと制作のシンプルな画面で共通 |
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 128 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
-| `ProductSwap.tsx` / `floatSwap.tsx` | 113 / 45 | 商品の入れ替えの引き出し(SU9。どの入口からも、ここを開く。中身は `ProductChooser`)/ 商品のフロートの中に、同じ引き出しを出す |
+| `ProductSwap.tsx` / `floatSwap.tsx` | 118 / 45 | 商品の入れ替えの引き出し(SU9。どの入口からも、ここを開く。中身は `ProductChooser`)/ 商品のフロートの中に、同じ引き出しを出す |
+| `ProductImageSwap.tsx` | 421 | 商品の「画像を替える」の引き出し(その商品のページの画像・AI に選んでもらう・貼り付け・ファイル・URL。試す → 確定。AB で商品が共通なら開いている案だけ。「詳しく」の枠の写真も。以前の `ProductImagePicker.tsx` の窓はやめて、中身をここへ移した) |
 | `TextAiPanel.tsx` | 230 | 文の部品(見出し・コピー・件名など)の AI(「案」と「指示して直す」。試す → 確定) |
 | `readiness.ts` / `ReadinessList.tsx` | 142 / 88 | 送る前の確認(止めるのは、制作に渡すときの担当・締め切りが空のときだけ。ほかは警告。`scripts/check-readiness.mjs`)/ その一覧(行を押すと、その部品を選ぶ) |
 | `ApprovalBadge.tsx` | 121 | 承認の状態の帯(押すと承認のパネルが開く) |
@@ -475,7 +483,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | ファイル | 行数 | 役割 |
 |---|---|---|
 | `ProductionPage.tsx` | 1,012 | **制作のページ**(フロート。要素の情報・HTML のエディタ・プレビュー・やり取り、工程の帯。全案を送る AB テストは案ごとに切り替え) |
-| `production/SimpleProductionPage.tsx` | 443 | 制作の面のシンプルな画面(X86。左に企画の見本のプレビュー(部品を押せる)、右に部品のペイン。何も選んでいないときは「渡されたもの」。MVP は開く・読む・コピーまで。写しとコピーの値は `productionSnapshot.ts` と同じ) |
+| `production/SimpleProductionPage.tsx` | 665 | 制作の面のシンプルな画面(X86。配信カードと同じ窓で PLAN ↔ PRODUCTION を切り替える。上は計画と同じ題の行・キャンペーンの帯・AB の案の段、左のバー(渡されたもの・やり取り・タスク・素材・工程)、企画の見本のプレビュー(部品を押せる。上に配信の情報の帯)、右に部品のペイン。題の行に、自分の番のときだけ工程の青いボタンと「仕上がりを見る」。写しとコピーの値は `productionSnapshot.ts` と同じ) |
+| `production/useProductionFlow.ts` / `production/StepAction.tsx` / `production/StepsPane.tsx` | 114 / 99 / 58 | 制作の工程(X86 の ①。`prod.steps`・`prod.result`): 段の決め方と進める操作(① 渡す → ② 受け取る → ③ 制作する → ④ 仕上がりの確認 → ⑤ 送る。⑤ は `prod.export` が公開のときだけ)/ 段を進めるボタン(題の行と左のバーで共通)/ 左のバーの「工程」(道のり・済んだ段のだれがいつ・だれの番でも押せるボタン・やり直す / 取り下げる) |
 | `ProductionInfoPane.tsx` | 469 | 制作のページの左のペイン(要素の情報。コピー・直す・企画の値に戻す) |
 | `HtmlEditor.tsx` / `HtmlPreviewFrame.tsx` | 78 / 114 | HTML のエディタ(開いたときに読み込む)/ HTML をそのまま描くプレビュー(縮小・拡大・全体) |
 | `productionSnapshot.ts` | 527 | 配信カードの写し(制作に要る中身を固める)、コピー用の行、プレビューの HTML の書き出し |
@@ -568,7 +577,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|---|
 | `ccp/main.py` | 142 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
 | `ccp/data_api.py` | 368 | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
-| `ccp/schema.py` | 402 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
+| `ccp/schema.py` | 356 | `schema.json` の読み込み、値の変換、選択肢の確かめ(以前の名前の対応表 `legacy_names.json` と、選択肢の数 → 文字の値の置き換えは、2026-10-30 に消した) |
 | `schema.json` | — | **データ定義**(テーブル・列・選択肢の値)。列を足すときはここ |
 | `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`) |
 | `ccp/dbready.py` | — | DB が使えるかどうか(DB を必要なときだけ起動する環境のための、差し込み口)。使えないときの `DbNotReady` |
@@ -590,7 +599,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/ranking_dummy.py` | 81 | 商品の販売順位(`product_rankings`)のダミーを作る運用ツール(`ccp.cli ranking-dummy`。BigQuery から取り込んだ行があれば何もしない) |
 | `ccp/assets.py` | — | `/img/…`。商品・メイン画像を、GCS か `ASSET_DIR` のフォルダから配る |
 | `ccp/creds.py` | — | Google の認証(サービスアカウント) |
-| `ccp/pack.py` | 267 | 引っ越し用のパック(すべてのデータと画像の ZIP)の書き出し・取り込み |
+| `ccp/pack.py` | 263 | 引っ越し用のパック(すべてのデータと画像の ZIP)の書き出し・取り込み(古い版 1 のパックは「対応していません」で止める) |
 | `ccp/cli.py` | — | 運用のコマンド(`migrate` / `seed` / `counts` / `check` / `import-pack` / `import-metrics` / `import-images` / `bq-check` / `bq-dummy` / `ranking-dummy` / `sample-model-expiry`) |
 | `ccp/check.py` | 172 | 動かす前の確認(設定・DB・写真・画面のビルド) |
 | `ccp/importer.py` | — | 画像から、デモ用の商品・メイン画像のデータを作って取り込む運用ツール |
@@ -641,7 +650,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | 配信カードの保存の流れを変える | `src/saveFlow.ts`(例は `scripts/check-save.mjs`)・`src/useCardEditor.ts` |
 | シンプルな配信カードの部品・ペインを変える | `src/simple/`(部品の型は `parts.ts`、ペインは `PartPane.tsx`、並びは `SimpleCardLayout.tsx`) |
 | 国・全社の設定の項目を足す | `src/SettingsDialog.tsx`・`src/settingsActions.tsx`(国の値は `src/countrySettings.ts`、国で使うかは `src/countryApply.ts`) |
-| 機能の公開・非公開(X87)の項目を足す | `src/features.ts`(一覧)・`src/featureFlags.ts`(判定 `isOn`)。設定の画面は `src/FeaturesManager.tsx` |
+| 機能の公開・非公開(X87)の項目を足す | `src/features.ts`(一覧)・`src/featureFlags.ts`(判定 `isOn`)。設定の画面は `src/FeaturesManager.tsx`(表は `src/data/featureSettings.ts`・`featureVersions.ts`・`featureLogs.ts`) |
+| 制作のシンプルな画面・工程を変える | `src/production/SimpleProductionPage.tsx`(工程の段は `useProductionFlow.ts`、ボタンは `StepAction.tsx`、左のバーの工程は `StepsPane.tsx`。左のバー・倍率・配信の情報の帯は配信カードと共通の `src/simple/SideRail.tsx`・`usePreviewZoom.ts`・`DeliveryMetaBand.tsx`) |
 | プレビューの見た目を変える | `src/Preview.tsx`(テンプレートの定義は `src/templates.ts`) |
 | 在庫のアラートの計算を変える | `src/alerts.ts`(条件は `src/alertSettings.ts`) |
 | AB テスト(案の持ち方・設定)を変える | `src/abTest.ts`・`src/simple/AbSettings.tsx`、案の出し入れは `src/useAbVariants.ts`、保存は `src/useCardEditor.ts` |
