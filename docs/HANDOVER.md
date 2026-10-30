@@ -18,7 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
-- 2026-10-30 UI 1: X84 と「確かめ」→「確認」は本番済み。X87 の 3.1(版の付け替え・止める / 先に出す)はブランチ claude/ui1-x87-versions で見本の確認待ち(main より古いので rebase が要る。prod.export.ab の前提は返事待ち)。続きは X87 段 ② の UI 1 の残り。詳しくは archive の末尾
+- 2026-10-30 UI 1: X84 と「確かめ」→「確認」は本番済み。X87 の 3.1(版の付け替え・止める / 先に出す)は見本 OK で main に(e062962。本番への反映は連絡係。prod.export.ab の前提は返事待ち)。続きは X87 段 ② の UI 1 の残り(approval.history も)。詳しくは archive の末尾
 - 2026-10-29 UI 2: シンプルな配信カードの AI の入口をそろえた(渡す文章は「AI で書く → 案を押すと入る」`NotesAiDraft`・空いた枠は「入れる」の引き出し・テーマは「AI で変える」・引き出しは確定で閉じる `drawerClose.ts`)。開いたときはアラートがあればアラート、商品情報は閉じる
 - 2026-10-30 UI 2: X87 段 ② の UI 2 の分(聞く・開発へのリクエスト・カードの⋯・AB・部品ごとの AI・左のバー・ピン・版の知らせ・タスク・リアクション)を本番に(deployed-gcp/20261030-113207)。残り(ai.autoredraft・ai.learnings・ai.describe・ai.pageimage・content.products.pagefetch)は MVP で決めるまで待ち、approval.history は UI 1。詳しくはアーカイブ 2026-10-28_ の末尾
 - 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ
