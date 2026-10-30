@@ -183,7 +183,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'approval.week.bulk', group: 'area.approval.week', ...named('まとめて依頼', 'Request in bulk'), version: 'MVP', size: 'S' },
   { id: 'approval.history', group: 'area.approval.week', ...named('承認の履歴', 'Approval history'), version: 'MVP', size: 'S' },
   { id: 'collab.thread', group: 'area.collab.thread', ...named('書き込み・宛先・返事', 'Posts, recipients and replies'), version: 'v1', size: 'M' },
-  { id: 'collab.pins', group: 'area.collab.thread', ...named('プレビューの場所へのピン', 'Pins on the preview'), version: 'v1', size: 'M' },
+  { id: 'collab.pins', group: 'area.collab.thread', ...named('プレビューの場所へのピン', 'Pins on the preview'), version: 'MVP', size: 'M' },
   { id: 'collab.reactions', group: 'area.collab.thread', ...named('リアクション', 'Reactions'), version: 'v1', size: 'S' },
   { id: 'collab.tasks', group: 'area.collab.tasks', ...named('タスク(AI の案・担当・期日)', 'Tasks (AI ideas, owner, due date)'), version: 'v1', size: 'M' },
   { id: 'collab.assets', group: 'area.collab.assets', ...named('素材(ファイル・URL)', 'Assets (files, URLs)'), version: 'MVP', size: 'S' },
@@ -193,7 +193,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'prod.htmledit', group: 'area.prod.page', ...named('制作した HTML の編集・版・貼り付けて置き換える', 'Edit produced HTML, versions, paste to replace'), version: 'MVP', size: 'M' },
   { id: 'prod.ai', group: 'area.prod.page', ...named('AI チャット(制作物の手直し)', 'AI chat (touch up the production)'), version: 'MVP', size: 'M' },
   { id: 'prod.steps', group: 'area.prod.steps', ...named('工程の帯(受け取る・制作する・仕上がりの確認・送る)', 'Step bar (receive, produce, review, send)'), version: 'v1', size: 'M' },
-  { id: 'prod.result', group: 'area.prod.steps', ...named('仕上がりを見る', 'View the finished result'), version: 'v1', size: 'S' },
+  { id: 'prod.result', group: 'area.prod.steps', ...named('仕上がりを見る', 'View the finished result'), version: 'MVP', size: 'S' },
   // 外部の配信システムへの連携(2026-10-29 利用者。渡す条件・渡したあとに直したときの扱いは未決。FEATURE_FLAGS.md の 7 章)
   { id: 'prod.export', group: 'area.prod.external', ...named('仕上がった HTML を、外部の配信システムに渡す(相手の API か MCP)', 'Send the finished HTML to the external delivery system (its API or MCP)'), version: 'v1', size: 'L' },
   { id: 'prod.deliveryid', group: 'area.prod.external', ...named('配信の ID(相手側の ID を配信カードに持ち、結果もこの ID でつなぐ)', 'Delivery ID (keep the external ID on the card and link results by it)'), version: 'v1', size: 'M' },
@@ -230,7 +230,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'v4', size: 'S' },
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
-  { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'v4', size: 'M' },
+  { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'MVP', size: 'M' },
   { id: 'dev.ask', group: 'area.devtools.ask', ...named('「？ 聞く」(使い方を AI に聞く・右クリックの「ここについて聞く」・スポットライト)', '"? Ask" (ask AI how to use CCP, "Ask about this" on right-click, spotlight)'), version: 'v1', size: 'M' },
   { id: 'dev.tools', group: 'area.devtools.devscreen', ...named('`/dev/`', 'Developer screen (/dev/)'), version: 'dev', size: 'S' },
 ]
