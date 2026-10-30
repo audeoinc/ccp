@@ -2,7 +2,7 @@
 // 入力 → (近いテンプレートを知らせる)→ AI の下書き → (近いテンプレートを知らせる)→ この下書きで編集を始める / 近いものを使う・複製して直す。
 // AI の案は保存しない(決まり)。保存は、テンプレートの編集の「保存」で人が確かめてから
 import { useState } from 'react'
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, InfoLabel, Input, MessageBar, MessageBarBody, Radio, RadioGroup, SpinButton, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, Field, InfoLabel, Input, MessageBar, MessageBarBody, Radio, RadioGroup, SpinButton, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { SparkleRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
 import { ResizableSurface } from './ResizableSurface'
@@ -16,7 +16,13 @@ import type { HeroKind, TemplateLayout } from './templates'
 import { boxCount } from './templateShape'
 
 const useStyles = makeStyles({
-  surface: { width: '760px', maxWidth: 'calc(94vw / var(--ui-zoom, 1))' },
+  // 高さは開いたときから決めておく(中身の高さに合わせると、商品の数を変えるたびに下の「近いテンプレート」の行数が変わって窓の高さが変わり、
+  // 上下の真ん中に置かれた窓ごと動いて、矢印を続けて押せなかった。2026-10-29 利用者のリクエスト)。人が広げた高さは ResizableSurface が覚えて、こちらより優先する
+  surface: { width: '760px', maxWidth: 'calc(94vw / var(--ui-zoom, 1))', height: 'min(600px, calc(88vh / var(--ui-zoom, 1)))' },
+  // 窓の高さの中で、題と下のボタンは動かさず、間の中身だけを縦にスクロールする
+  body: { height: '100%', maxHeight: '100%', minHeight: 0 },
+  // 行は上に詰める(高さを決めた枠の中で、グリッドが余った高さを行に配ると、一覧の行数で上の欄の位置がずれるため)
+  scroll: { minHeight: 0, overflowY: 'auto', alignContent: 'start' },
   // ボタンの文言を折り返さない(4 つ並ぶと、縦に長くなって読みにくいため)
   actions: { '& button': { whiteSpace: 'nowrap', flexShrink: 0 } },
   content: { display: 'grid', rowGap: '12px' },
@@ -29,6 +35,8 @@ const useStyles = makeStyles({
   nearRow: { display: 'flex', alignItems: 'center', columnGap: '12px', flexWrap: 'wrap' },
   // テンプレートの名前は、行のいちばん大事な値なので太く
   nearName: { ...typo.valueStrong, flexGrow: 1, minWidth: 0 },
+  // 近いテンプレートがないとき(探したことが分かるように、薄い 1 行だけ)
+  nearNone: typo.caption,
   result: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '16px', alignItems: 'start' },
   info: { display: 'grid', rowGap: '10px', minWidth: 0 },
 })
@@ -66,8 +74,10 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
   }
   const before = nearTemplates(options, input)
   const after = draft ? nearTemplates(options, input, layoutOfDraft(draft)) : []
-  const nearBox = (list: NearTemplate[], title: string) =>
-    list.length > 0 && (
+  const nearBox = (list: NearTemplate[], title: string, empty?: string) =>
+    list.length === 0 ? (
+      empty ? <span className={s.nearNone}>{empty}</span> : null
+    ) : (
       <div className={s.near}>
         <span className={s.nearTitle}>{title}</span>
         {list.map((n) => (
@@ -89,7 +99,7 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
   return (
     <Dialog open onOpenChange={(_, d) => !d.open && onClose()}>
       <ResizableSurface sizeKey="templateAi" min={{ w: 560, h: 420 }} className={s.surface}>
-        <DialogBody>
+        <DialogBody className={s.body}>
           <DialogTitle>
             <span className={s.titleRow}>
               {t('AI でテンプレートを作る', 'Create a template with AI')}
@@ -99,7 +109,7 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
               />
             </span>
           </DialogTitle>
-          <DialogContent className={s.content}>
+          <DialogContent className={mergeClasses(s.content, s.scroll)}>
             {!draft ? (
               <>
                 <Field label={t('目的(何のための配信か)', 'Purpose (what the email is for)')} size="small" required>
@@ -120,7 +130,7 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
                 <Field label={t('切り口・構成のメモ(任意)', 'Angle / layout notes (optional)')} size="small">
                   <AutoTextarea heightKey="TemplateAiDialog.angle" size="small" rows={2} value={input.angle} placeholder={t('例: 主役を 1 点大きく、残りはグリッド。最後に「もっと見る」', 'e.g. One hero product large, the rest in a grid, then “See more”')} maxLength={400} onChange={(_, d) => set({ angle: d.value })} />
                 </Field>
-                {nearBox(before, t('同じ商品の数・雰囲気のテンプレートがあります。使い回すこともできます', 'Templates with the same number of products and tone exist. You can reuse one.'))}
+                {nearBox(before, t('同じ商品の数・雰囲気のテンプレートがあります。使い回すこともできます', 'Templates with the same number of products and tone exist. You can reuse one.'), t('同じ商品の数・雰囲気のテンプレートは、まだありません', 'No templates with the same number of products and tone yet'))}
               </>
             ) : (
               <>
