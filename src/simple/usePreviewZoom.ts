@@ -33,12 +33,19 @@ export function usePreviewZoom(boxRef: RefObject<HTMLDivElement | null>, innerRe
     const inner = innerRef.current
     if (zoom !== 'fit' || !box || !inner) return
     const calc = () => {
-      inner.style.zoom = '1'
+      // いちばん小さい倍率で測る(倍率 1 で測ると、枠の幅でメールが細くなり、そのぶん背も低く測れる。小さい倍率をかけると、
+      // メールは本来の幅(PC 640px など)に広がって背が伸び、収まらずにスクロールが出ていた。2026-10-30 制作の画面で利用者が見つけた)。
+      // offsetHeight / offsetWidth は、自分にかけた zoom を含まない大きさなので、そのまま使える
+      inner.style.zoom = String(ZOOM_MIN)
       const h = inner.offsetHeight
       // 高さだけでなく、幅にも収める(ペインを狭めたとき、横にはみ出さないように)
       const w = (inner.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0
-      const byHeight = h > 0 ? (box.clientHeight - 16) / h : 1
-      const byWidth = w > 0 ? (box.clientWidth - 8) / w : 1
+      // 枠の余白は画面ごとに違うので、決め打ちせず、枠の実際の余白を引く(制作の画面は上下 32px で、決め打ちの 16px ではスクロールが出た)
+      const cs = getComputedStyle(box)
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+      const byHeight = h > 0 ? (box.clientHeight - padY - 4) / h : 1
+      const byWidth = w > 0 ? (box.clientWidth - padX - 4) / w : 1
       const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, byHeight, byWidth))
       inner.style.zoom = String(z)
       setFitZoom(z)
