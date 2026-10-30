@@ -440,15 +440,20 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     const p = byId.get(it.productId)
     const title = it.detail?.title ?? ''
     const body = it.detail?.body ?? ''
+    // 見出し・説明文が空のとき(「詳しく」にした直後・商品を入れ替えた直後): 書く人の画面(pickMode)でだけ薄い案内を出し、
+    // ほかの所(一覧の縮小など)では出さずに、写真・名前・価格・ボタンだけで崩れずに見せる
+    const ph = (text: string) => (pickMode ? <span style={{ color: SUB, fontWeight: 400, fontStyle: 'italic' }}>{text}</span> : null)
     return (
       <div key={it.key} {...dragProps(it, idx)} data-detail="1" className={classes.frame} style={{ ...frameStyle(it, idx), padding: compact ? 6 : 10, gridColumn: '1 / -1' }}>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '38% minmax(0, 1fr)' : '42% minmax(0, 1fr)', gap: compact ? 10 : 16, alignItems: 'start' }}>
           <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', aspectRatio: '4 / 5' }} />
           <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
-            <div style={{ fontSize: compact ? '0.9rem' : '1.05rem', fontWeight: 700, color: INK, lineHeight: 1.35 }}>{title || t('(見出し)', '(Heading)')}</div>
-            <div style={{ fontSize: compact ? '0.74rem' : '0.82rem', color: INK, lineHeight: 1.7, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-              {body || t('(説明文。部品のペインで書くか、AI に下書きしてもらいます)', '(Description. Write it in the part pane or let AI draft it)')}
-            </div>
+            {(title || pickMode) && <div style={{ fontSize: compact ? '0.9rem' : '1.05rem', fontWeight: 700, color: INK, lineHeight: 1.35 }}>{title || ph(t('(見出し)', '(Heading)'))}</div>}
+            {(body || pickMode) && (
+              <div style={{ fontSize: compact ? '0.74rem' : '0.82rem', color: INK, lineHeight: 1.7, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                {body || ph(t('(説明文。部品のペインで書きます)', '(Description. Write it in the part pane)'))}
+              </div>
+            )}
             <div style={{ fontSize: '0.78rem', color: SUB }}>{p?.name}</div>
             {priceEl(p?.price, productMarket(p))}
             {cta}

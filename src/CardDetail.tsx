@@ -664,7 +664,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const previewSection = aiPreview?.section
   const shownItems = previewItem
     ? previewItem.key
-      ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: previewItem.imageUrl } : i))
+      ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: previewItem.imageUrl, detail: i.detail && previewItem.productId !== i.productId ? { title: '', body: '' } : i.detail } : i))
       : insertAt(viewItems, sectionsOf(template), previewItem.at ?? viewItems.length, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI })
     : previewSection
       ? replaceSection(viewItems, sectionsOf(template), previewSection.index, previewSection.productIds.map((productId, n) => ({ key: `__ai_section_${n}`, productId, reason: '', source: SOURCE_AI })))

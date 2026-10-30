@@ -608,6 +608,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
         if (!it) return <span className={s.caption}>{t('この商品は、もう載っていません', 'This product is no longer in the delivery')}</span>
         return (
           <>
+            {/* 枠の見せ方「詳しく見せる」(X80)。商品を決める前に決める枠の設定なので、いちばん上に。オンのときだけ、すぐ下に見出し・説明文の欄。
+                商品を入れ替えても「詳しく」のまま(見出し・説明文は空になる)(2026-10-30 利用者) */}
+            <ProductDetailFields item={it} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />
+            <Divider />
             {/* 箱を押すと、詳しい情報・この配信で使う画像のフロート */}
             <div role="button" tabIndex={0} className={s.productOpen} title={t('押すと、詳しい情報・画像', 'Click for details and image')} onClick={() => openFloat(it.key)} onKeyDown={(ev) => ev.key === 'Enter' && openFloat(it.key)}>
               {productBox(byId.get(it.productId), it.reason ? <span className={s.caption}>{it.reason}</span> : undefined, it.imageUrl)}
@@ -653,9 +657,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               }
             />
             {pageImageOn && <ProductImageSwap editor={e} itemKey={it.key} open={imageAt === it.key} onOpenChange={(o) => onImageAt(o ? it.key : null)} hideTrigger />}
-            {/* 枠の見せ方「詳しく見せる」(X80)。入れ替え・画像の行のすぐ下に、商品とひとまとまりに。オンのときだけ、見出し・説明文の欄(2026-10-30 利用者) */}
-            <ProductDetailFields item={it} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />
-            {/* ここから下はリンク先・計測(商品の見せ方の設定の続きに見えないように、線で分ける) */}
+            {/* ここから下はリンク先・計測(商品の設定の続きに見えないように、線で分ける) */}
             <Divider />
             {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
