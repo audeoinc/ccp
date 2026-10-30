@@ -4,6 +4,7 @@ import { Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeSt
 import { CheckmarkRegular, HandRightRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
+import { useFeature } from '../featureFlags'
 import type { ProductionFlow, StepInfo } from './useProductionFlow'
 
 const useStyles = makeStyles({
@@ -19,6 +20,8 @@ const useStyles = makeStyles({
 export function StepAction({ flow, step, onViewResult, needMe }: { flow: ProductionFlow; step: StepInfo; onViewResult?: () => void; needMe?: string | null }): ReactNode {
   const s = useStyles()
   const t = useT()
+  // ⑤ 送るは、外部の配信システムへの連携(prod.export)。非公開なら、工程は ④ の OK で終わり(MVP の終点。2026-10-30 利用者)
+  const exportOn = useFeature('prod.export')
   const [doneNote, setDoneNote] = useState('')
   const [doneLink, setDoneLink] = useState('')
   const [reviseNote, setReviseNote] = useState('')
@@ -84,6 +87,7 @@ export function StepAction({ flow, step, onViewResult, needMe }: { flow: Product
         </span>
       )
     case 'send':
+      if (!exportOn) return null
       return (
         <Tooltip content={needMe ?? t('HTML と、テキスト・リンク先を、配信のしくみに送ります(いまは送り先が仮です)', 'Sends the HTML, text and links to the delivery system (the destination is a placeholder for now)')} relationship="description">
           <Button size="small" appearance="primary" icon={<SendRegular />} disabled={off} onClick={() => void flow.act.send()}>

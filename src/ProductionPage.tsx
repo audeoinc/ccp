@@ -33,6 +33,7 @@ import { usePaneWidths } from './floatLayout'
 import type { VariantKey } from './abTest'
 import { buildSnapshot, downloadText, htmlLinks, parseSnapshot, parseVariantHtml, previewHtml, productionVariants, snapshotOf, type Snapshot } from './productionSnapshot'
 import { myName, myUserId, onMeChange } from './history'
+import { useFeature } from './featureFlags'
 import { day, locale, tr, useT, when } from './i18n'
 import { loadPref, savePref } from './settings'
 import { canGoProduction } from './productionGate'
@@ -156,6 +157,7 @@ const TALK_KEY = PREF.productionTalkOpen
 export function ProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onOpenCard, onChanged, stageNav, autoRequest, onSimpleView }: Props) {
   const s = useStyles()
   const t = useT()
+  const exportOn = useFeature('prod.export')
   const meId = useSyncExternalStore(subscribeMe, myUserId)
   const meName = useSyncExternalStore(subscribeMe, myName)
   // 既定の幅: プレビューに、メールの幅(600px 前後)が収まるよう残す
@@ -503,7 +505,8 @@ export function ProductionPage({ card, productIds, variantIds, products, product
       name: t('配信のしくみに送る', 'Send to delivery system'),
       who: t('企画', 'Planner'),
       info: live?.sent_by_name ? t(`${live.sent_by_name} ${when(live.sent_at)}(送り先は、まだ仮)`, `${live.sent_by_name} ${when(live.sent_at)} (placeholder destination)`) : undefined,
-      action: live && (
+      // ⑤ 送るは prod.export(非公開なら押せる所を出さない。シンプルな制作の画面と同じ)
+      action: exportOn && live && (
         <Tooltip content={needMe ?? t('エディタの HTML と、テキスト・リンク先を、配信のしくみに送ります(いまは送り先が仮です)', 'Sends the editor HTML, text and links to the delivery system (the destination is a placeholder for now)')} relationship="description">
           <Button
             size="small"

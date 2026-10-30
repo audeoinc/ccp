@@ -4,6 +4,7 @@ import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-compon
 import { ArrowUndoRegular, CheckmarkRegular } from '@fluentui/react-icons'
 import { useT } from '../i18n'
 import { StepAction } from './StepAction'
+import { useFeature } from '../featureFlags'
 import type { ProductionFlow } from './useProductionFlow'
 
 const useStyles = makeStyles({
@@ -25,11 +26,14 @@ export function StepsPane({ flow, onViewResult, needMe }: { flow: ProductionFlow
   const s = useStyles()
   const t = useT()
   const roleName = (side: 'planner' | 'production') => (side === 'planner' ? t('企画', 'Planner') : t('制作', 'Production'))
+  // ⑤ 送るは prod.export。非公開なら、まだ送っていない配信では ⑤ の段を出さない(工程は ④ の OK で終わり。送ったあとの記録は残して見せる)
+  const exportOn = useFeature('prod.export')
   return (
     <div className={s.root}>
       {!flow.approved && <span className={s.note}>{t('承認されたら、① から始めます', 'Start from step 1 after approval')}</span>}
       {flow.steps.map((st, i) => {
         const at = st.skipped ? 'skipped' : i < flow.current ? 'done' : i === flow.current ? 'current' : 'todo'
+        if (st.key === 'send' && !exportOn && at !== 'done') return null
         return (
           <div key={st.key} className={mergeClasses(s.step, at === 'current' && s.current, (at === 'done' || at === 'skipped') && s.done)}>
             <span className={mergeClasses(s.dot, at === 'current' && s.dotCurrent, at === 'done' && s.dotDone)}>{at === 'done' ? <CheckmarkRegular /> : i + 1}</span>

@@ -192,7 +192,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'prod.samplehtml', group: 'area.prod.page', ...named('企画の見本の HTML(見る・コピー)', 'Sample HTML from the plan (view, copy)'), version: 'MVP', size: 'S' },
   { id: 'prod.htmledit', group: 'area.prod.page', ...named('制作した HTML の編集・版・貼り付けて置き換える', 'Edit produced HTML, versions, paste to replace'), version: 'MVP', size: 'M' },
   { id: 'prod.ai', group: 'area.prod.page', ...named('AI チャット(制作物の手直し)', 'AI chat (touch up the production)'), version: 'MVP', size: 'M' },
-  { id: 'prod.steps', group: 'area.prod.steps', ...named('工程の帯(受け取る・制作する・仕上がりの確認・送る)', 'Step bar (receive, produce, review, send)'), version: 'v1', size: 'M' },
+  { id: 'prod.steps', group: 'area.prod.steps', ...named('工程の帯(受け取る・制作する・仕上がりの確認・送る)', 'Step bar (receive, produce, review, send)'), version: 'MVP', size: 'M' },
   { id: 'prod.result', group: 'area.prod.steps', ...named('仕上がりを見る', 'View the finished result'), version: 'MVP', size: 'S' },
   // 外部の配信システムへの連携(2026-10-29 利用者。渡す条件・渡したあとに直したときの扱いは未決。FEATURE_FLAGS.md の 7 章)
   { id: 'prod.export', group: 'area.prod.external', ...named('仕上がった HTML を、外部の配信システムに渡す(相手の API か MCP)', 'Send the finished HTML to the external delivery system (its API or MCP)'), version: 'v1', size: 'L' },

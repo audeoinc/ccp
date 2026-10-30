@@ -249,6 +249,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 機能の公開・非公開(X87。FEATURE_FLAGS.md)。非公開の入口は出さない(開発者には出し、「非公開」の印)
   const stepsOn = useFeature('prod.steps')
   const resultOn = useFeature('prod.result')
+  // ⑤ 送る(prod.export)が非公開なら、工程は ④ の OK で終わり(MVP の終点。2026-10-30 利用者)
+  const exportOn = useFeature('prod.export')
   const sampleOn = useFeature('prod.samplehtml')
   const threadOn = useFeature('collab.thread')
   const tasksOn = useFeature('collab.tasks')
@@ -312,7 +314,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     await load()
     onChanged?.()
   } })
-  const myStep = stepsOn && flow.now && flow.now.key !== 'request' && flow.isMine(flow.now) ? flow.now : undefined
+  const myStep = stepsOn && flow.now && flow.now.key !== 'request' && (exportOn || flow.now.key !== 'send') && flow.isMine(flow.now) ? flow.now : undefined
 
   // 企画の見本の HTML(詳しい制作のページと同じ作り方: 見えないプレビューから、書式を直接書いた形にする)。押したときに作る
   const sampleHtml = () => (offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : '')
@@ -489,7 +491,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const stateHint =
     stepsOn && flow.current === 0
       ? t('制作に渡すと、右上に「受け取る」などの進めるボタンが出ます', 'Once handed off, buttons such as "Receive" appear at the top right')
-      : stepsOn && flow.now && flow.current > 0 && !myStep && flow.current < 5
+      : stepsOn && !exportOn && flow.now?.key === 'send'
+        ? t('仕上がりの確認まで済みました', 'The result has been checked')
+        : stepsOn && flow.now && flow.current > 0 && !myStep && flow.current < 5
         ? t(`いまは ${flow.now.who || (flow.now.side === 'planner' ? '企画' : '制作')} の番です(左のバーの「工程」からも進められます)`, `It is ${flow.now.who || (flow.now.side === 'planner' ? 'the planner' : 'production')}'s turn (you can also proceed from Steps in the left bar)`)
         : t('制作の状態です。進め方は、左のバーの「工程」で見られます', 'Production status. See Steps in the left bar for how it proceeds')
 
