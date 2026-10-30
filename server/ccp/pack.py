@@ -11,7 +11,7 @@
 
 ZIP の中身:
   data.json                 {"version": 2, "exportedAt": ..., "tables": {テーブル名: [行, ...]}}
-                            (版 1 は、2026-10-16 より前の形。以前の名前(cr854_…)と選択肢の数。取り込むときに、いまの形に直す)
+                            (版 1 は、2026-10-16 より前の形。取り込めない(2026-10-30 に、以前の名前の対応表を消した))
   images/<種類>/<ファイル名>  商品(products)・ヒーロー画像(heroes)・部品の画像(parts)の画像。DB の画像 URL(/img/<種類>/<名前>)のもの
   images/creative/<名前>    素材(Creative Assets。表 card_assets)のファイルと、ピンを書いたときの様子の画像(ccp/creative.py。取り込み先のフォルダの creative/ が、そのまま置き場所になる)
 """
@@ -156,12 +156,8 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
     """パックを読む。返すのは、data.json の中身と、画像(ZIP の中の名前・中身)"""
     with zipfile.ZipFile(path) as z:
         data = json.loads(z.read("data.json").decode("utf-8"))
-        if data.get("version") == 1:
-            # 以前の形のパック: 名前と選択肢の値を、いまの形に直す
-            data["tables"] = dict(sc.convert_legacy_rows(name, rows) for name, rows in data["tables"].items())
-            data["version"] = PACK_VERSION
         if data.get("version") != PACK_VERSION:
-            raise SystemExit(f"このパックの形式({data.get('version')})には対応していません(対応: 1、{PACK_VERSION})")
+            raise SystemExit(f"このパックの形式({data.get('version')})には対応していません(対応: {PACK_VERSION})")
         images = [(n, z.read(n)) for n in z.namelist() if n.startswith("images/") and not n.endswith("/")]
     return data, images
 

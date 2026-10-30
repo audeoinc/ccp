@@ -569,7 +569,6 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/main.py` | 142 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
 | `ccp/data_api.py` | 368 | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
 | `ccp/schema.py` | 402 | `schema.json` の読み込み、値の変換、選択肢の確かめ、以前の名前・値からの移行 |
-| `ccp/legacy_names.json` | — | 以前の名前(`cr854_…`)・値から、いまの名前への対応(`schema.py` の移行が読む) |
 | `schema.json` | — | **データ定義**(テーブル・列・選択肢の値)。列を足すときはここ |
 | `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`) |
 | `ccp/dbready.py` | — | DB が使えるかどうか(DB を必要なときだけ起動する環境のための、差し込み口)。使えないときの `DbNotReady` |

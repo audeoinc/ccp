@@ -76,18 +76,6 @@ class SchemaTest(unittest.TestCase):
             with self.assertRaises(sc.BadRequest, msg=str(bad)):
                 t.to_db(bad)
 
-    def test_legacy_values_are_converted_in_ddl(self) -> None:
-        ddl = " ".join(self.s.table("delivery_cards").ddl())
-        self.assertIn("ALTER COLUMN channel TYPE text", ddl)
-        self.assertIn("WHEN '588230001' THEN 'app'", ddl)
-        events = " ".join(self.s.table("events").ddl())
-        self.assertIn("WHEN '588230003' THEN 'confirmed'", events)
-
-    def test_convert_legacy_rows(self) -> None:
-        name, rows = sc.convert_legacy_rows("cr854_deliverycards", [{"cr854_deliverycardid": GUID, "cr854_name": "n", "cr854_channel": 588230001, "_cr854_heroimage_value": GUID, "createdon": "2026-10-01T00:00:00Z", "statecode": 0}])
-        self.assertEqual(name, "delivery_cards")
-        self.assertEqual(rows, [{"id": GUID, "name": "n", "channel": "app", "hero_image_id": GUID, "created_on": "2026-10-01T00:00:00Z", "state_code": 0}])
-
     def test_numbers_serialize_as_int_or_float(self) -> None:
         self.assertEqual(sc.serialize(Decimal("9800.00")), 9800)
         self.assertEqual(sc.serialize(Decimal("4.70")), 4.7)

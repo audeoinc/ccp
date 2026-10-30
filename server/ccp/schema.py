@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.json"
-LEGACY_PATH = Path(__file__).resolve().parent / "legacy_names.json"
 
 SQL_TYPES = {
     "text": "text",
@@ -144,7 +143,6 @@ class Table:
         for c in self.columns:
             sql.append(f"ALTER TABLE {self.pg} ADD COLUMN IF NOT EXISTS {c.pg} {SQL_TYPES[c.type]}")
             sql.append(f"ALTER TABLE {self.pg} ALTER COLUMN {c.pg} TYPE {SQL_TYPES[c.type]}")  # 型を変えたときに、既存のテーブルにも反映
-        sql += self.legacy_value_sql()
         for lk in self.lookups:
             ref = _schema().tables[lk.ref].pg
             sql.append(f"ALTER TABLE {self.pg} ADD COLUMN IF NOT EXISTS {lk.pg} uuid REFERENCES {ref}(id) ON DELETE {lk.on_delete}")
@@ -160,21 +158,6 @@ class Table:
             sql.append(f"DELETE FROM {self.pg} AS a USING {self.pg} AS b WHERE {same} AND (a.modified_on, a.id) < (b.modified_on, b.id)")
             sql.append(f"CREATE UNIQUE INDEX IF NOT EXISTS ux_{self.pg}_{'_'.join(pg)} ON {self.pg}({', '.join(pg)})")
         return sql
-
-    def legacy_value_sql(self) -> list[str]:
-        """以前の選択肢の値(588230000 などの数)を、文字の値に置き換える SQL。
-
-        2026-10-16 に、選択肢を数から文字にした。それより前のデータベースも、サーバーが最初につないだときに、
-        ここで置き換わる(数の値の行だけを書き換えるので、何度実行しても同じ)。
-        """
-        out = []
-        for c in self.columns:
-            old = legacy().get("choices", {}).get(f"{self.pg}.{c.pg}")
-            if not old:
-                continue
-            cases = " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in old.items())
-            out.append(f"UPDATE {self.pg} SET {c.pg} = CASE {c.pg} {cases} ELSE {c.pg} END WHERE {c.pg} ~ '^[0-9]+$'")
-        return out
 
 
 @dataclass
@@ -222,7 +205,6 @@ class Schema:
 
 
 _cache: Schema | None = None
-_legacy: dict[str, Any] | None = None
 
 
 def _schema() -> Schema:
@@ -241,34 +223,6 @@ def _schema() -> Schema:
 
 def load() -> Schema:
     return _schema()
-
-
-def legacy() -> dict[str, Any]:
-    """以前の名前(cr854_…)・選択肢の数 → いまの名前・値の対応(引っ越し用のパックの版 1 を読むときと、DB の値の置き換えに使う)"""
-    global _legacy
-    if _legacy is None:
-        _legacy = json.loads(LEGACY_PATH.read_text(encoding="utf-8"))
-    return _legacy
-
-
-def convert_legacy_rows(old_table: str, rows: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
-    """以前の名前の行を、いまの名前・値に直す(引っ越し用のパックの版 1 用)"""
-    lg = legacy()
-    name = lg["tables"][old_table]
-    pk = lg["pk"][old_table]
-    cols = lg["columns"][old_table]
-    out = []
-    for r in rows:
-        n: dict[str, Any] = {}
-        for k, v in r.items():
-            if k == pk:
-                n["id"] = v
-            elif k in cols:
-                col = cols[k]
-                mapping = lg["choices"].get(f"{name}.{col}")
-                n[col] = mapping.get(str(v), v) if mapping and v is not None else v
-        out.append(n)
-    return name, out
 
 
 # ---- 値の変換
