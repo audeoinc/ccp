@@ -11,3 +11,8 @@ declare module 'virtual:help-material' {
   }
   export default material
 }
+// ソースの目録(X84): src/ からの位置 → そのファイルの中身を読む関数(長いファイルは頭だけ)
+declare module 'virtual:help-source' {
+  const files: Record<string, () => Promise<string>>
+  export default files
+}

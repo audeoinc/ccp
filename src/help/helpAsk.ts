@@ -18,6 +18,9 @@ export const loadMaterial = () => (loading ??= import('virtual:help-material').t
 
 const DOC_BUDGET = 24_000
 const LABEL_MAX = 300
+// ソースの中身を渡すとき(X84。案 C)の上限: 多くても 4 ファイル・合わせて 約 4.5 万字(1 ファイルは頭の 1.5 万字まで。helpMaterial.ts)
+const SOURCE_FILES = 4
+const SOURCE_BUDGET = 45_000
 // 英語の、意味の薄い言葉(当たりの数えに入れない)
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'on', 'for', 'and', 'or', 'is', 'are', 'how', 'do', 'i', 'can', 'what', 'where', 'my', 'it', 'this', 'that', 'with', 'want', 'which'])
 
@@ -89,7 +92,45 @@ export function pickMaterial(m: Material, question: string, history: HelpTurn[],
     .map(({ l }) => `${l[0]} | ${l[1]} | ${screenName(l[4])} | ${l[3] || '-'}(${l[2]})`)
   // 目次: 文書と見出しの一覧(同じ題の続きは 1 つに)
   const toc = [...new Set(m.sections.map((s) => `${s.doc}: ${s.title}`))]
-  return { docs, labels, toc, stats: { docChars: used, labelCount: labels.length } }
+  // ソースの当たり(X84): 渡す文書の節(とくに SOURCE_MAP)に出てくるファイルと、当たった画面の文言のファイル。上から近い順
+  const fileScore = new Map<string, number>()
+  const bump = (f: string, n: number) => fileScore.set(f, (fileScore.get(f) ?? 0) + n)
+  docs.forEach((d, i) => {
+    const weight = (d.doc === 'SOURCE_MAP.md' ? 3 : 1) * Math.max(1, 10 - i)
+    for (const f of d.text.match(/[A-Za-z0-9_/.-]+\.tsx?\b/g) ?? []) bump(f.replace(/^src\//, ''), weight)
+  })
+  m.labels
+    .map((l) => ({ file: l[2], score: scoreOf(`${l[0]} ${l[1]} ${l[3]} ${screenName(l[4])}`, terms) }))
+    .filter((x) => x.score > 0)
+    .forEach((x) => bump(x.file, x.score))
+  const files = [...fileScore.entries()].sort((a, b) => b[1] - a[1]).map(([f]) => f)
+  return { docs, labels, toc, files, stats: { docChars: used, labelCount: labels.length } }
+}
+
+/**
+ * ソースの中身を読む(X84。案 C)。当たりのファイルの名前を、ソースの目録の位置に直し(SOURCE_MAP は「PartPane.tsx」のように名前だけのことがある)、
+ * 上から 4 ファイルまで・合わせて 約 4.5 万字まで。読めないファイルは飛ばす
+ */
+async function loadSources(candidates: string[]): Promise<{ file: string; text: string }[]> {
+  const index = (await import('virtual:help-source')).default
+  const all = Object.keys(index)
+  const resolve = (f: string) => (index[f] ? f : all.find((p) => p === f || p.endsWith(`/${f}`)))
+  const out: { file: string; text: string }[] = []
+  let used = 0
+  for (const c of candidates) {
+    if (out.length >= SOURCE_FILES) break
+    const file = resolve(c)
+    if (!file || out.some((o) => o.file === file)) continue
+    try {
+      const text = await index[file]()
+      if (used + text.length > SOURCE_BUDGET && out.length > 0) continue
+      out.push({ file, text })
+      used += text.length
+    } catch {
+      // 読めなければ、そのファイルは渡さない
+    }
+  }
+  return out
 }
 
 export interface HelpTurn {
@@ -128,6 +169,7 @@ const PROMPT = `あなたは、配信の企画・制作・結果を扱う業務�
 4. open: 答えの画面を開くためのリンク。page は calendar(計画)・production(制作)・results(結果)・alerts(アラート)のどれか。view は month・week・list・compare・products・impact・learnings のどれか(要らなければ書かない)。開く画面がなければ null。openLabel はそのボタンに出す短い名前(例: 週の表示を開く)。
 5. basis: 答えの根拠にした docs の節(doc と title をそのまま)。files: 関係するファイル(開発する人向け。docs の SOURCE_MAP にあるものだけ)。
 6. steps は 1 つの手順を 1 文で、多くても 7 つ。reply は 1〜2 文の短い答え。
+7. sources があれば、docs で答えられなかったので渡した、画面のソースの中身(src/ からの位置と中身)。画面の動き・条件・ボタンの出る所を読み取って答えてよい。ただし、関数・変数の名前などコードの言葉は答えに書かず、画面の言葉(labels)で説明する。ソースから読み取ったときは、files にそのファイルを入れる。ソースでも分からなければ known を false のままにする。
 【出力】JSON だけ: {"known": true, "reply": "…", "steps": ["…"], "open": {"page": "calendar", "view": "week"}, "openLabel": "…", "basis": [{"doc": "FEATURES.md", "title": "…"}], "files": ["src/…"]}
 `
 
@@ -238,7 +280,7 @@ export function setHelpRecorder(fn: ((r: HelpRecord) => void) | null) {
 }
 
 /** 質問する。材料を選んで askAgent に渡し、答えを決まった形にして返す */
-export async function askHelp(question: string, history: HelpTurn[], part?: HelpPart): Promise<{ answer: HelpAnswer; at: string; stats: { docChars: number; labelCount: number; ms: number } }> {
+export async function askHelp(question: string, history: HelpTurn[], part?: HelpPart): Promise<{ answer: HelpAnswer; at: string; stats: { docChars: number; labelCount: number; sourceChars: number; ms: number } }> {
   const m = await loadMaterial()
   const picked = pickMaterial(m, question, history, part)
   const started = performance.now()
@@ -253,14 +295,38 @@ export async function askHelp(question: string, history: HelpTurn[], part?: Help
     docs: picked.docs,
     labels: picked.labels,
   })
-  const answer = normalizeAnswer(raw)
+  let answer = normalizeAnswer(raw)
+  // 文書で答えられなかったときだけ、当たりを付けたソースの中身も渡して、もう一度聞く(X84。案 C。ふだんは 1 回で済むので、ソースは読まない)
+  let sourceChars = 0
+  if (!answer.known && picked.files.length > 0) {
+    const sources = await loadSources(picked.files)
+    if (sources.length > 0) {
+      sourceChars = sources.reduce((n, x) => n + x.text.length, 0)
+      const again = normalizeAnswer(
+        await askAgent(PROMPT, {
+          task: 'help_ask',
+          question,
+          lang: getLang(),
+          screen: currentScreen(),
+          ...(part ? { part: { el: part.el, label: part.label, near: part.near } } : {}),
+          history: history.slice(-3).map((h) => ({ question: h.question, reply: h.answer.reply, steps: h.answer.steps })),
+          toc: picked.toc,
+          docs: picked.docs,
+          labels: picked.labels,
+          sources,
+        }),
+      )
+      // ソースを読んでも分からなければ、はじめの答え(近い機能の名前など)を見せる
+      if (again.known) answer = { ...again, files: [...new Set([...again.files, ...sources.map((x) => `src/${x.file}`)])] }
+    }
+  }
   const at = new Date().toISOString()
   try {
     recorder?.({ question, answer, lang: getLang(), screen: currentScreen(), part: part && { el: part.el, label: part.label }, at })
   } catch {
     // 保存の失敗で、答えを見せるのを止めない
   }
-  return { answer, at, stats: { ...picked.stats, ms: Math.round(performance.now() - started) } }
+  return { answer, at, stats: { ...picked.stats, sourceChars, ms: Math.round(performance.now() - started) } }
 }
 
 /** 「ここを開く」: いまの画面の状態を保ったまま、答えの画面へ移る(App は「戻る」と同じ道で URL を読み直す) */

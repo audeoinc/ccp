@@ -10,6 +10,21 @@ import type { Plugin } from 'vite'
 
 const VIRTUAL = 'virtual:help-material'
 const RESOLVED = '\0' + VIRTUAL
+// ソースの中身(X84。案 C): 文書で答えられないときだけ、当たりを付けたファイルの中身を AI に渡す。
+// サーバーの置き場所にはソースがないので、ビルドに入れる。1 ファイル 1 つの小さな塊に分け、要るファイルだけを読む(ふだんは読まない)
+const SOURCE = 'virtual:help-source'
+const SOURCE_RESOLVED = '\0' + SOURCE
+const SOURCE_FILE = SOURCE + ':'
+// 1 ファイルで渡す長さの上限(大きなファイルの頭だけ。部品の作りと、なぜそうしているかのコメントは頭に多い)
+const SOURCE_MAX = 15000
+
+/** 使う人の画面のソース(撮影用の差し替え・開発用の画面は入れない)。src/ からの位置 */
+export function sourceFiles(srcDir: string): string[] {
+  return walk(srcDir)
+    .map((p) => relative(srcDir, p).split(sep).join('/'))
+    .filter((f) => !/^(mock|dev)\//.test(f))
+    .sort()
+}
 const DOCS = ['FEATURES.md', 'SOURCE_MAP.md', 'FEATURE_REASONS.md']
 // 長い節は分ける(当たりを付けて渡すときに、関係のない所までまとめて渡さないように)
 const SECTION_MAX = 3000
@@ -147,10 +162,20 @@ export function buildHelpMaterial(root: string): { labels: HelpLabel[]; sections
 export function helpMaterial(root: string): Plugin {
   return {
     name: 'help-material',
-    resolveId: (id) => (id === VIRTUAL ? RESOLVED : null),
+    resolveId: (id) => (id === VIRTUAL ? RESOLVED : id === SOURCE ? SOURCE_RESOLVED : id.startsWith(SOURCE_FILE) ? '\0' + id : null),
     load(id) {
-      if (id !== RESOLVED) return null
-      return `export default ${JSON.stringify(buildHelpMaterial(root))}`
+      if (id === RESOLVED) return `export default ${JSON.stringify(buildHelpMaterial(root))}`
+      // ソースの目録: ファイル → そのファイルの中身を読む関数(読んだときに、そのファイルの塊だけが届く)
+      if (id === SOURCE_RESOLVED) {
+        const files = sourceFiles(join(root, 'src'))
+        return `export default {\n${files.map((f) => `  ${JSON.stringify(f)}: () => import(${JSON.stringify(SOURCE_FILE + f)}).then((m) => m.default),`).join('\n')}\n}`
+      }
+      if (id.startsWith('\0' + SOURCE_FILE)) {
+        const file = id.slice(1 + SOURCE_FILE.length)
+        const text = readFileSync(join(root, 'src', file), 'utf8')
+        return `export default ${JSON.stringify(text.length > SOURCE_MAX ? `${text.slice(0, SOURCE_MAX)}\n// …(長いので、ここまで)` : text)}`
+      }
+      return null
     },
     // 開発中は、文書・ソースを直したら、次に読み込んだときに作り直す
     handleHotUpdate({ server, file }) {

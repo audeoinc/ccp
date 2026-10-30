@@ -50,6 +50,20 @@ export function mockAgent(message: string): string {
   if (task === 'help_ask') {
     const labels = ((p.labels as string[] | undefined) ?? []).map((l) => l.split(' | '))
     const docs = (p.docs as { doc: string; title: string }[] | undefined) ?? []
+    // ソースの中身を渡す 2 回目(X84)を見本で試せるように: 質問に「仕組み」「how it works」があると、文書だけでは分からないことにする
+    const sources = (p.sources as { file: string }[] | undefined) ?? []
+    const deep = /仕組み|how it works/i.test(String(p.question ?? ''))
+    if (deep && sources.length === 0) return J({ known: false, reply: en ? "The docs don't say." : '文書には書いてありませんでした。' })
+    if (deep)
+      return J({
+        known: true,
+        reply: en ? `(Demo answer) Read from the source: ${sources.map((x) => x.file).join(', ')}.` : `(見本の答え)ソース(${sources.map((x) => x.file).join('、')})を読んで答えました。`,
+        steps: [],
+        open: null,
+        openLabel: '',
+        basis: [],
+        files: sources.map((x) => `src/${x.file}`),
+      })
     if (labels.length === 0) return J({ known: false, reply: en ? "I couldn't find this in the docs or on-screen labels." : '文書と画面の文言からは、分かりませんでした。' })
     const name = (l: string[] | undefined) => (l ? (en ? l[1] : l[0]) : '')
     // 右クリックの「ここについて聞く」から聞いたときは、押した部品の名前を使った答え(見本でも、部品について聞けたことが分かるように)
