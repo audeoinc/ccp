@@ -1,6 +1,6 @@
 # ms-verify(Copilot Studio を CCP から呼ぶ検証の道具)
 
-CCP の頼み T1〜T6 を、Copilot Studio のエージェントに送って、速さと答えの形を測る。**検証の道具で、CCP の画面・サーバーには入れない。** 手順・結果・エージェントの作り方は [docs/MS_AI_VERIFY.md](../../docs/MS_AI_VERIFY.md)(12.4 にこの道具の使い方)。
+CCP の頼み T1〜T6 を、Copilot Studio のエージェントに送って、速さと答えの形を測る。**検証の道具で、CCP の画面・サーバーには入れない。** 手順・結果・エージェントの作り方は `docs/MS_AI_VERIFY.md`(12.4 にこの道具の使い方)。リポジトリでは最上位の `docs/` に、ZIP では同じフォルダの `docs/` に入っている。
 
 ## 使い方
 
