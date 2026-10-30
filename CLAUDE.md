@@ -2,7 +2,7 @@
 
 React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサーバー。Cloud Run で動く。全体像は [README.md](README.md)、設計の約束事は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、サーバー・DB・AI は [docs/GCP.md](docs/GCP.md)。**作業の前に必ず読むのは、[docs/HANDOVER.md](docs/HANDOVER.md)(要約: いまどこにいるか・次にやること・落とし穴)と、[docs/BACKLOG.md](docs/BACKLOG.md) の冒頭の「機能のバックログ」(まだ済んでいない項目の一覧と順番)だけ。** README・ARCHITECTURE・GCP、ほかの `docs/`、記録のアーカイブ(`docs/handover-archive/`・`docs/backlog-archive/`)は、その作業に関係するときに、関係する所だけを読む(大きい文書は、まるごと読まずに、ID や見出しで grep する)。**利用先の Vertex AI Workbench で作業しているなら、下の「Vertex AI Workbench で作業するとき」と [docs/WORKBENCH.md](docs/WORKBENCH.md) を先に読む。**作業を終える前に、HANDOVER.md を更新する。**HANDOVER は短く保つ(目安 10KB 以下)**: 詳しい記録は `docs/handover-archive/` のいちばん新しいファイルの末尾に足し、HANDOVER には 1 行だけ書く。古くなった行は消す(記録はアーカイブにある)。BACKLOG で済んだ・外した行は `docs/backlog-archive/DONE.md` へ移す。
 
-**Power Apps 版は、2026-10-16 に廃止した(ソースも削除済み)。** Power Apps・Dataverse・Power Automate・Copilot Studio のコードや設定を、足し直さない。データの列・テーブルは `server/schema.json` に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。
+**Power Apps 版は、2026-10-16 に廃止した(ソースも削除済み)。** Power Apps・Dataverse・Power Automate・Copilot Studio のコードや設定を、足し直さない(Copilot・Power Platform を使った検証の文書は、書いてよい。2026-10-30)。データの列・テーブルは `server/schema.json` に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。
 
 ## クラウドのセッションで作業するとき
 
@@ -58,7 +58,7 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 
 - **利用先には、Workbench 版の ZIP(`npm run release:workbench`)だけを渡す**(手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
   開発元の本番(Cloud Run + Cloud SQL)だけの処理は `server/ccp/hosted/` に置き、外のコードは `hosted/` がなくても動くようにする(DB の準備中は `ccp/dbready.py` を通す)。
-  ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)には、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・Power Apps・開発元の名前などを書かない(検査で止まる)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release-workbench.mjs` の `RULES` にも足す。
+  ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)には、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・開発元の名前などを書かない(検査で止まる)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release-workbench.mjs` の `RULES` にも足す。
 - **1 日の終わり**(利用者が「今日の作業を終える」などと言ったとき。言われなければ 21:00 の予約が行う): 文書(FEATURES・SOURCE_MAP・FEATURE_REASONS・BACKLOG)を直して push し、Workbench 版を Releases に公開する。手順は [docs/RELEASE.md](docs/RELEASE.md) の 7 章。
 
 - 標準のテンプレート 10 種はコードに持ち、ユーザーが作ったものはテーブル `layout_templates`。`getTemplate(id)` で求める(`EMAIL_TEMPLATES` のような固定の一覧はない)。以前からある標準の 6 種は、**コードの定義のセクションの構成(種類・枠の数・順番)を変えない**(保存済みのカードの、見出し・商品の位置がずれるため。見た目の設定だけ変えてよい)。テンプレートは**版で持つ**(表 `layout_template_versions`。保存するたびに新しい版。配信カードは `layout_key` と、使った版の番号 `layout_version` を持ち、描画は `templateKeyOfCard` の鍵「ID@v版」で、その版の中身を引く)ので、画面から構成を変えても、すでにある配信は崩れない。

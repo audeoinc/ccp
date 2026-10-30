@@ -53,7 +53,6 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 | 分類 | 言葉 |
 |---|---|
 | 開発元の名前 | `audeo`(リポジトリ名 `audeoinc/ccp` も) |
-| Power Platform 版 | Power Apps・Power Automate・Power Platform・Dataverse・Copilot Studio |
 | Cloud Run | Cloud Run・`run.app`・kaniko |
 | Cloud SQL | Cloud SQL(`cloud-sql`・`CLOUD_SQL_INSTANCE` も)・`sqladmin` |
 | 本番の反映 | `deploy:gcp`・`deploy-gcp`・`gcp-smoke`・`cloudbuild`・Cloud Build・`gcloud`・Dockerfile・`gcloudignore` |
@@ -64,6 +63,8 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 あわせて、文書の中の相対リンク(`[…](パス)`)の先が ZIP にあるかも確かめる(外した文書へのリンクが残らないように)。
 
 「GCP」「Google Cloud」「Vertex AI」「BigQuery」「GCS」、`src/gcp/` のような名前は、残してよい(利用先の Workbench も GCP の上で動くため)。
+
+Power Apps・Power Automate・Power Platform・Dataverse・Copilot(Copilot Studio も)は、2026-10-30 から残してよい(利用者の指示。Copilot・Power Platform を使った検証の文書を ZIP に入れるため)。それまでは「Power Platform 版」として禁止していた。開発元の名前は、これまでどおり禁止。
 
 ## 5. 文書の中の、本番だけの説明(印)
 

@@ -42,8 +42,8 @@ const RULES = [
   // HANDOVER の作業の記録(開発元の本番の話を含む)。BACKLOG の済んだ項目(docs/backlog-archive/)は、BACKLOG と同じく入れる
   ['exclude', /^docs\/handover-archive\//],
   ['exclude', /^docs\/font-compare\.html$/],
-  // AI の置き場の比較(利用先に別に渡した資料。Copilot Studio などの名前を含むので ZIP に入れない)
-  ['exclude', /^docs\/(AI_PLATFORMS\.md|AI_OUTLET_PLAN\.md|ai-platform-images\/)/],
+  // AI の置き場の比較(AI_PLATFORMS・AI_OUTLET_PLAN・ai-platform-images)は、2026-10-30 から ZIP に入れる
+  // (Copilot・Power Platform の名前を書いてよくなったため。利用者)
   // 商品ページの画像を、リストを渡してまとめてダウンロードする道具(B11)と、その手順書は、当面 ZIP に入れない
   // (利用者の指示 2026-10-23。取り込み(ccp.cli import-images)・画像を選ぶ窓は入れる)
   ['exclude', /^(docs\/PRODUCT_IMAGES\.md|scripts\/collect-product-images\.py)$/],
@@ -73,7 +73,7 @@ const DROP_SCRIPTS = ['deploy:gcp', 'screenshots']
 // ---- 残してはいけない言葉(大文字小文字は区別しない)。足すときは docs/RELEASE.md の表も直す
 const BANNED = [
   ['開発元の名前', /audeo/i],
-  ['Power Platform 版', /power\s*apps|power\s*automate|power\s*platform|dataverse|copilot\s*studio/i],
+  // Power Apps・Power Platform・Copilot などは、2026-10-30 から書いてよい(その検証の文書を入れるため。利用者)
   ['Cloud Run', /cloud\s*run|run\.app|\bkaniko\b/i],
   ['Cloud SQL', /cloud[\s_-]*sql|sqladmin/i],
   ['本番の反映', /deploy[:-]gcp|gcp-smoke|cloudbuild|cloud\s*build|\bgcloud\b|dockerfile|gcloudignore/i],
