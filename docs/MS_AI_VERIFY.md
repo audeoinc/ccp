@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|
 | **1. Copilot Studio + Direct Line** | **疎通・T1〜T6 済み** | **要らない**(鍵 → 短い期限のトークン) | 3.0〜4.6 秒 | 6 / 6 ○ | ○(upload の入口) |
 | 2. Copilot Studio + Agents SDK | 疎通・T1〜T6 済み | **要る** | 3.3〜6.1 秒 | 6 / 6 ○ | ○(添付の `data:` の URL) |
-| 3. AI Builder を Dataverse から呼ぶ | 未着手(これから検証する) | — | — | — | — |
+| 3. AI Builder を Dataverse から呼ぶ | 下調べ済み(15 章)。まだ動かしていない | 要らない見込み(アプリだけの認証) | — | — | 入力にできるが、API での渡し方は未確認 |
 
 Azure OpenAI は、いまは想定していない(2026-10-29 利用者)。
 
@@ -510,3 +510,46 @@ Copilot Studio では、Microsoft の GPT のほかに、Anthropic などの外�
 - 検証の環境で、GitHub Copilot ハーネスの既定が Claude になっていたのは、その環境で外のモデルがすでに許されていたためと考えられる(未確認)。
 
 出典: Microsoft Learn「Select a primary AI model for your agent」(Copilot Studio)・「Choose an external model as the primary AI model」・「Allow external language models for generative responses」(Power Platform)・「Copilot in Microsoft 365 apps with Anthropic models」。
+
+## 15. 方式 3: AI Builder のプロンプトを Dataverse から呼ぶ(下調べ。2026-10-30)
+
+公式の文書を読んだだけで、まだ動かしていない。
+
+### 15.1 分かったこと
+
+| 調べたこと | 分かったこと |
+|---|---|
+| 呼び方 | プロンプトは、環境の表 `msdyn_aimodel` の 1 行になる。Dataverse の Web API で `POST <環境の URL>/api/data/v9.2/msdyn_aimodels(<プロンプトの ID>)/Microsoft.Dynamics.CRM.Predict` に `{"version":"2.0","requestv2":{"@odata.type":"#Microsoft.Dynamics.CRM.expando","<入力の名前>":"…"}}` を送る |
+| 答えの形 | `responsev2.predictionOutput.text`(と `structuredOutput`)に答えが入る。まだできていなければ `overrideHttpStatusCode` が 202 で、`overrideLocation` を取りに行く |
+| プロンプトの ID | `GET <環境の URL>/api/data/v9.2/msdyn_aimodels?$select=msdyn_name&$filter=startswith(msdyn_name,'…')` で名前から探す |
+| プロンプトの作り方 | 画面(AI ハブ → プロンプト、または Copilot Studio)で作る。API では作れない |
+| **人のサインインなしに呼べるか** | **呼べる見込み。** Dataverse は、アプリだけの認証(サーバー同士。クライアントのシークレットか証明書)を受け付ける。Entra にアプリを登録し、環境に「アプリケーション ユーザー」(ライセンス不要)を作って、セキュリティ ロールを付ける。**どのロールで Predict を呼べるかは、文書に書かれていない**(試して確かめる) |
+| 入力 | 文・画像・文書を入力にできる(画像・文書は PNG・JPG・JPEG・PDF、合わせて 25MB まで、処理は 100 秒まで)。**API で画像をどう渡すか(base64 か URL かなど)は、文書に書かれていない**(試して確かめる) |
+| JSON の答え | プロンプトの画面で、答えの形を JSON にできる。ただし**保存したときの形に固定され、あとから形を変えられない**。キーのない配列(`["abc","def"]`)は使えない |
+| モデル | Azure OpenAI の GPT。使える地域は限られる。地域をまたぐかは、文書に書かれていない |
+| 費用 | Copilot のクレジットで、**トークンの量で払う**(1,000 トークンあたり: 基本のモデル 0.1・標準 1.5・高い 10。1 クレジット = 0.01 ドル)。作る・試すだけなら払わない。AI Builder のクレジットは 2026-11-01 で終わり(契約の期間中は使える)、そのあとは Copilot のクレジット。**API から呼んだとき、どちらで払うかは文書に書かれていない** |
+| クレジットがないとき | 403 の `EntitlementNotAvailable`(`NoCapacity`) |
+
+### 15.2 CCP から使うときの形(案)
+
+- CCP の頼みは、所ごとに答えの形(JSON のキー)が違う。プロンプトの JSON の形は固定なので、**「頼みの文をそのまま 1 つの入力で受け、答えを文で返す」中継のプロンプトを 1 つ作る**のが手軽(答えの文の中身は、方式 1・2 と同じく CCP の指示文が JSON を求める)。画像の所だけ、画像の入力を持つ別のプロンプトにする。
+- 呼ぶのは CCP の外の層(CCP のコードには Dataverse を入れない)。層はアプリだけの認証で Dataverse のトークンを取り、Predict を呼ぶ。
+
+### 15.3 方式 1 と比べたときの見込み
+
+| | 方式 1(Direct Line) | 方式 3(AI Builder) |
+|---|---|---|
+| 人のサインイン | 要らない | 要らない(見込み) |
+| 鍵 | Direct Line のシークレット | Entra のアプリのシークレット(または証明書) |
+| エージェントの設定 | 「認証なし」+「鍵を必須」にする | 要らない(会話の仕組みがない) |
+| 費用 | 1 回あたり約 1 クレジット(試した頼みで) | トークンの量。CCP の頼みは長い(商品の一覧などで 1 回 6,000 トークンほど)ので、標準のモデルだと 1 回 10 クレジットほどになりうる。基本のモデルなら 1 回 1 クレジットほど |
+| 答えの形 | エージェントの答え(会話) | プロンプトの答え(会話の仕組みがない分、余計な文が混ざりにくい見込み) |
+
+### 15.4 試すときの段取り(人の指示のあと)
+
+1. 画面(AI ハブ → プロンプト)で、中継のプロンプトを作る: 入力は文 1 つ(例: `request`)、指示は「入力の指示に従い、指示された形の答えだけを返す」、答えは文。モデルを選んで記録する。画像用に、画像の入力を持つプロンプトをもう 1 つ。
+2. Entra に、**シークレットを持つアプリ**を登録する(方式 2 の公開クライアントとは別)。シークレットはリポジトリの外。
+3. 環境に「アプリケーション ユーザー」を作り、ロールを付ける(Power Platform の管理センター → 環境 → 設定 → ユーザーとアクセス許可 → アプリケーション ユーザー)。まずは最小のロールで試し、断られたら足す。
+4. 測るプログラムに `--via aib` を足し、T1〜T6 を送る(画像の渡し方は試して決める)。
+
+出典: Microsoft Learn「Code interpreter for developers」(Predict の呼び方)・「PredictByReference Action」・「Use single-tenant server-to-server authentication」・「Manage application users」・「Add inputs to your prompt」・「JSON output」・「Overview of licensing」(AI Builder)・「End of AI Builder credits」。
