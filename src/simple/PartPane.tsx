@@ -653,9 +653,9 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               }
             />
             {pageImageOn && <ProductImageSwap editor={e} itemKey={it.key} open={imageAt === it.key} onOpenChange={(o) => onImageAt(o ? it.key : null)} hideTrigger />}
-            {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
-            {/* 枠の見せ方「詳しく」(X80): その枠だけ写真 + 見出し + 長い説明に */}
+            {/* 枠の見せ方「ふつう | 詳しく」(X80)。入れ替え・画像の行のすぐ下に小さく。「詳しく」のときだけ、見出し・説明文の欄(2026-10-30 利用者) */}
             <ProductDetailFields item={it} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />
+            {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
                 (商品は上下左右に並ぶので、前後の矢印では向きを表せない。外すは、外したい商品の上で。2026-10-26 利用者) */}
             <Hint hintKey="simpleCard.productSlot">{t('箱を押すと、詳しい情報・画像。右の一覧で別の商品を押すと、この枠の商品と見比べて入れ替えられます。並べ替えは、プレビューでつかんで動かすか、Alt + 矢印。外すときは、プレビューの商品の × か Delete。', 'Click the box for details and image. Click another product in the list on the right to compare and swap. To reorder, drag in the preview or press Alt + arrow keys. To remove, use the × on the product in the preview or press Delete.')}</Hint>
