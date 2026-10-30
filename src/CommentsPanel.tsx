@@ -15,6 +15,7 @@ import { anchorLabel, bumpNotes, focusPin, focusedPin, pinNumbers, subscribePins
 import { confirmDialog } from './confirm'
 import { PersonInput } from './PersonInput'
 import { typo } from './typo'
+import { useFeature } from './featureFlags'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -590,7 +591,13 @@ const subscribeReactMe = (f: () => void) => onMeChange(f)
  * 書き込み 1 件のリアクション(バックログ PR6)。押した数と、押した人(マウスを重ねると出る)。自分が押したものは、もう一度押すと外れる。
  * 「受け取った」のような状態を進めるものは、ここではなく、制作のページのボタン
  */
-function ReactionBar({ noteId, reactions, onChanged }: { noteId: string; reactions: NoteReaction[]; onChanged: () => void }) {
+function ReactionBar(props: { noteId: string; reactions: NoteReaction[]; onChanged: () => void }) {
+  // リアクションは、公開しているときだけ(X87)
+  if (!useFeature('collab.reactions')) return null
+  return <ReactionBarBody {...props} />
+}
+
+function ReactionBarBody({ noteId, reactions, onChanged }: { noteId: string; reactions: NoteReaction[]; onChanged: () => void }) {
   const t = useT()
   const styles = useReactionStyles()
   const meId = useSyncExternalStore(subscribeReactMe, myUserId)

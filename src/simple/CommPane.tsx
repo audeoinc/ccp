@@ -36,6 +36,7 @@ import { statusRank } from '../status'
 import { weekKeyOf } from '../weekLock'
 import { anchorOfPart, partOfAnchor, type PartRef } from './parts'
 import { Linkify } from '../LinkText'
+import { useFeature } from '../featureFlags'
 
 const useStyles = makeStyles({
   // やり取り: 絞り込み・流れ・書く欄(承認の様子・変更の記録は、描くときに行を替える)
@@ -197,6 +198,8 @@ export function CommPane(props: Props) {
   const [text, setText] = useState('')
   const [assignee, setAssignee] = useState('')
   const [asTask, setAsTask] = useState(false)
+  // タスクとして書くのは、タスクを公開しているときだけ(X87。書いたタスクは、そのまま並べる)
+  const tasksOn = useFeature('collab.tasks')
   const [replyText, setReplyText] = useState('')
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -575,10 +578,12 @@ export function CommPane(props: Props) {
               </div>
             </PopoverSurface>
           </Popover>
-          <button type="button" className={mergeClasses(s.chip, asTask && s.chipOn)} onClick={() => setAsTask(!asTask)}>
-            <TaskListSquareLtrRegular />
-            {t('タスク', 'Task')}
-          </button>
+          {tasksOn && (
+            <button type="button" className={mergeClasses(s.chip, asTask && s.chipOn)} onClick={() => setAsTask(!asTask)}>
+              <TaskListSquareLtrRegular />
+              {t('タスク', 'Task')}
+            </button>
+          )}
         </div>
         {error && (
           <MessageBar intent="error" layout="multiline">
