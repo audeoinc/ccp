@@ -20,6 +20,7 @@ import { productUrl } from './links'
 import { weeklyLimit } from './weeklyLimit'
 import { ProductImagePicker, type DeliveryGist } from './ProductImagePicker'
 import { typo } from './typo'
+import { useFeature } from './featureFlags'
 
 // 商品の対応のフロート(X54)。「このアラートへの対応」(X30)と「商品のフロート」(X47)を 1 つにしたもの。
 // どこから開いても同じ形: いまの商品の詳しい情報。題の行の「入れ替える」を押すと、同じフロートの中が入れ替えの部品(AI のおすすめ・AI に頼む・すべての商品)に
@@ -119,6 +120,7 @@ export type SwapRender = (back: () => void, close: () => void) => ReactNode
 export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, products, poolProducts, model, weekUse, alertKinds, options, image, delivery, onImage, onSwapCandidate, onReplace, onPostpone, onOpenAlerts, slotAction, renderSwap, onPreviewProduct, aiCard, angle, onClose }: Props) {
   const s = useStyles()
   const t = useT()
+  const pageImageOn = useFeature('content.products.pageimage')
   const [picking, setPicking] = useState(false)
 
   // AI の差し替え案(在庫・週の上限のアラートから開いたとき。開いたときに 1 回だけ)
@@ -270,8 +272,8 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
             {product && view === 'detail' && (
               // 詳しい情報(いまの商品)。左の欄はやめ、横幅はこちらに回す
               <div className={s.pane}>
-                {/* この配信で使う画像(X64)。商品のマスタの画像は変えない */}
-                {onImage && (
+                {/* この配信で使う画像(X64)。商品のマスタの画像は変えない。公開していなければ出さない(X87) */}
+                {onImage && pageImageOn && (
                   <div className={s.imageBox}>
                     <ImageThumb src={productImage(product, image)} alt={product.name} width={56} height={70} />
                     <span className={s.imageText}>
@@ -307,7 +309,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
           </DialogBody>
         </ResizableSurface>
       </Dialog>
-      {picking && product && onImage && (
+      {picking && product && onImage && pageImageOn && (
         <ProductImagePicker
           product={product}
           current={image}

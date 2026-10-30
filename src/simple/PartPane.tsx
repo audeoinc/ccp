@@ -933,6 +933,8 @@ function SectionAiPick({ editor: e, index, name }: { editor: SimpleEditor; index
  */
 function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
+  // 版の知らせ・「いまの版にする」・使われ方は、公開しているときだけ(X87)
+  const versionOn = useFeature('content.template.version')
   const s = useStyles()
   const slotsOf = (sections?: { slots: number }[]) => (sections ?? []).reduce((n, x) => n + x.slots, 0)
   const keyState = templateKeyState(e.template, e.card.country)
@@ -946,7 +948,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
   return (
     <>
       <Hint hintKey="simpleCard.templatePick">{t('マウスを乗せると、この配信の中身のままプレビューに写します。押すと替えます(元に戻すで戻せます)。', 'Hover to preview with this delivery’s content; click to switch (Undo works).')}</Hint>
-      {keyState && (
+      {versionOn && keyState && (
         <div className={mergeClasses(s.tplCard, s.tplOn, s.tplNote)}>
           {keyState.cur.push ? <PushThumb spec={keyState.cur.push} width={72} /> : <TemplateThumb layout={keyState.cur} maxHeight={110} />}
           <span style={{ display: 'grid', rowGap: 4, minWidth: 0 }}>
@@ -984,7 +986,7 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
                   {Number.isFinite(slots) && <span className={s.caption}>{t(`商品の枠 ${slots}`, `${slots} product ${slots === 1 ? 'slot' : 'slots'}`)}</span>}
                   {over > 0 && <Badge size="small" appearance="tint" color="warning">{t(`${over} 件が枠外(メールに載らない)`, `${over} out of slots (not in the email)`)}</Badge>}
                 </span>
-                {e.templateUse && <TemplateUseLine u={e.templateUse.get(o.id)} />}
+                {versionOn && e.templateUse && <TemplateUseLine u={e.templateUse.get(o.id)} />}
               </span>
             </div>
           )

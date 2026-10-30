@@ -337,6 +337,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const [insist, setInsist] = useState(false)
   const [abSettingsOpen, setAbSettingsOpen] = useState(false)
   // 案を足す入口は、AB テストか案から選ぶのどちらかを公開しているときだけ(X87)。すでに案のある配信は、タブ・設定をそのまま出す(データは消さない)
+  const alertOn = useFeature('alert')
+  const learnOn = useFeature('results.learnings')
+  const threadOn = useFeature('collab.thread')
+  const pinsOn = useFeature('collab.pins')
+  const approvalOn = useFeature('approval.card')
+  const assetsOn = useFeature('collab.assets')
+  const handoffOn = useFeature('prod.handoff')
+  const historyOn = useFeature('card.history')
   const abTestOn = useFeature('card.abtest')
   const variantsOn = useFeature('card.variants')
   const abOn = abTestOn || variantsOn
@@ -408,7 +416,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const [decided, setDecided] = useState<string | null>(null)
   if (decided !== e.card.id && e.loaded) {
     setDecided(e.card.id)
-    setSide(e.alerts.length > 0 ? 'alerts' : null)
+    setSide(alertOn && e.alerts.length > 0 ? 'alerts' : null)
     setProductsOpen(false)
   }
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
@@ -659,7 +667,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     },
     { v: 'history', icon: <HistoryRegular />, label: t('履歴', 'History'), tip: t('変更の履歴(入れ替えの理由・ステータスの変化)', 'Change history (replacement reasons, status changes)'), count: 0, gap: true },
   ]
-  const rails = e.unsaved ? allRails.filter((r) => r.v === 'alerts') : allRails
+  // 公開していない機能のパネルは、左のバーに出さない(X87)
+  const railOn: Record<Exclude<Side, null>, boolean> = { alerts: alertOn, learn: learnOn, talk: threadOn, approval: approvalOn, assets: assetsOn, handoff: handoffOn, history: historyOn }
+  const rails = (e.unsaved ? allRails.filter((r) => r.v === 'alerts') : allRails).filter((r) => railOn[r.v])
 
   /**
    * AB テストの案(SU8。2026-10-24 利用者と決めた)。AB に分けるのは配信の大前提で、プレビュー(1 つの案)の話ではないので、上の帯に置く。
@@ -1165,7 +1175,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             </div>
           )}
           {/* ピン(コメント)は配信カードの ID に付くので、まだ保存していない案では出さない */}
-          {!e.unsaved && (
+          {!e.unsaved && pinsOn && (
           <div className={s.pinBox}>
             {/* バルーンは 2 行(X73。1 行目に何ができるか、2 行目に打ち方。右クリックでも打てることを知らせる) */}
             <Tooltip
@@ -1194,7 +1204,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           <div ref={boxRef} className={mergeClasses(s.box, nav.spaceDown && s.boxSpace, nav.panning && s.boxPanning)} tabIndex={0} aria-label={t('プレビュー(押した部品を直します。↑ ↓ で前・次の部品、Enter で直す欄へ、Esc で選ぶのをやめる)', 'Preview (click a part to edit it; ↑ ↓ for the previous or next part, Enter to edit, Esc to stop)')}>
             {e.preview}
             {e.alertOverlay}
-            {!e.unsaved && <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} />}
+            {!e.unsaved && <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} pinsOn={pinsOn} />}
             {pinTarget && !e.unsaved && (
               <PinFloat
                 cardId={e.card.id}

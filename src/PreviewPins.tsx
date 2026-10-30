@@ -67,6 +67,8 @@ interface Props {
    * 部品を直す・商品を差し替えるなど、その画面のボタンと同じ処理を呼ぶ)
    */
   menuItems?: (under: Element) => ContextItem[]
+  /** ピン(書き込み)の機能を出すか(X87。出さないときも、右クリックの部品の操作 menuItems は出す) */
+  pinsOn?: boolean
 }
 
 interface Spot {
@@ -82,7 +84,7 @@ interface Spot {
  * その中の割合の位置にピンを重ねる。プレビューの部品はほかの画面とも共通なので、目印を読むだけにする(アラートの印と同じやり方)。
  * 場所を選ぶ間は、プレビューを覆う層で押した点を受け取り、その下のブロックを目印にする
  */
-export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd, onOpenThreads, menuItems }: Props) {
+export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd, onOpenThreads, menuItems, pinsOn = true }: Props) {
   const s = useStyles()
   const t = useT()
   const version = useSyncExternalStore(subscribePins, notesVersion)
@@ -217,9 +219,9 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
   const { openAt } = ctx
   const me = useSyncExternalStore(onMeChange, myName).trim()
   // 右クリックの処理は、いまの値(ピン・書き込み・画面の項目)で動かす(登録し直さないよう、ref で持つ)
-  const live = useRef({ placeAt, notes, menuItems, me })
+  const live = useRef({ placeAt, notes, menuItems, me, pinsOn })
   useEffect(() => {
-    live.current = { placeAt, notes, menuItems, me }
+    live.current = { placeAt, notes, menuItems, me, pinsOn }
   })
   useEffect(() => {
     const box = boxRef.current
@@ -239,8 +241,15 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
       // 場所の目印のない所(プレビューの外の余白)では出さない
       const under = document.elementsFromPoint(x, y).find((el) => box.contains(el) && !layerRef.current?.contains(el))
       if (!under?.closest('[data-item-key], [data-anchor]')) return
-      e.preventDefault()
       const extra = live.current.menuItems?.(under) ?? []
+      // ピンを出さないときは、部品の操作だけ(なければ、ブラウザのメニューのまま)
+      if (!live.current.pinsOn) {
+        if (extra.length === 0) return
+        e.preventDefault()
+        openAt(x, y, extra)
+        return
+      }
+      e.preventDefault()
       openAt(x, y, [
         { key: 'pin', label: t('ここにピンを打って、コメントを書く', 'Pin here and write a comment'), icon: <CommentAddRegular />, onSelect: () => void live.current.placeAt(x, y) },
         {
@@ -261,7 +270,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     <div ref={layerRef} className={s.layer}>
       {ctx.menu}
       {placing && <div className={s.catcher} style={{ width: size.w, height: size.h }} onClick={place} role="presentation" />}
-      {spots.map((p) => {
+      {pinsOn && spots.map((p) => {
         if (!p.id)
           return (
             <span key="pending" data-pin-id="pending" className={mergeClasses(s.pin, s.pending)} style={{ left: p.left, top: p.top }} aria-label={t('ここに書き込みます', 'Posting here')}>
