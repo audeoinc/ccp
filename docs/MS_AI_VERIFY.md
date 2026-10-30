@@ -164,7 +164,7 @@ CCP の実際の指示文(`src/aiSelect.ts`・`src/simple/partAi.ts`)を縮め�
 | T6 | 画像の説明 | `description`(60 文字以内)・`tags`(3〜5 個)・`season`(春夏 / 秋冬 / 通年)の JSON だけ。写っていないことを書かない |
 
 - テストの欄では、頼みごとに ↻(会話をリセット)を押して新しい会話にしてから貼る。前の答えが混ざらないように。
-- T6 は、商品の写真(自分で撮ったもの・自由に使ってよい見本)を 1 枚付けてから貼る。お客さまや利用先の本物の商品の写真は使わない。
+- T6 は、各自で用意した服の写真を 1 枚付けてから貼る。人の顔・社外秘の写る写真は使わない(png・jpeg・webp)。方式やモデルを比べるときは同じ写真を使い、どの写真で試したか(何が写っているか・大きさ)を記録に書く。写真はリポジトリ・ZIP に入れない。
 
 ### T1 部品の文言の言い換え
 
@@ -429,8 +429,6 @@ Node(22 以上)のプログラム。7 章の T1〜T6 を送り、秒数と答え
 | `tools/ms-verify/measure.mjs` | 送って測る本体 |
 | `tools/ms-verify/tests.mjs` | T1〜T6 の頼みと、決まりの確かめ(7 章と同じ中身。直すときは両方) |
 | `tools/ms-verify/check-token-endpoint.mjs` | 鍵を必須にしたエージェントが、鍵なしの入口を断るかを確かめる(8 章)。Agents SDK 用の接続先の URL を入れたときは、Direct Line のトークン エンドポイントを組み立てて試す |
-| `tools/ms-verify/make-sample-image.mjs` | T6 の見本の図を描く |
-| `tools/ms-verify/images/t6-sample.png` | T6 の見本の図(緑の長袖のセーター。写真ではなく、プログラムで塗った図) |
 | `tools/ms-verify/package.json` | 使う部品(`@microsoft/agents-copilotstudio-client`・`@microsoft/agents-activity`・`@azure/msal-node`・`open`) |
 | `scripts/pack-ms-verify.mjs` | 道具を ZIP に固める(下) |
 
@@ -440,6 +438,7 @@ Node(22 以上)のプログラム。7 章の T1〜T6 を送り、秒数と答え
 |---|---|
 | `%USERPROFILE%\.ccp\ms-verify.env` | 設定(下)。鍵・環境の ID などを書く |
 | `tools/ms-verify/.token-cache.json` | 方式 2 のサインインのトークン(プログラムが作る。.gitignore で外す)。消すと、次はサインインし直し |
+| `tools/ms-verify/images/` | T6 の写真(各自で用意する。.gitignore で外す) |
 | `tools/ms-verify/results/` | 測った表(`<日時>_<方式>_<モデル>.md`)と、答えの全文(同じ名前の `.json`)。.gitignore で外す |
 
 設定(`ms-verify.env`):
@@ -464,7 +463,7 @@ npm install
 node measure.mjs --self-test                 # つながずに、確かめの仕組みだけを試す
 node measure.mjs --runs 1                    # 方式 2 で T1〜T5 を 1 回ずつ。最初の 1 回だけブラウザが開く
 node measure.mjs --via dl --runs 1           # 方式 1(Direct Line)で T1〜T5 を 1 回ずつ。サインインしない
-node measure.mjs --via dl --only T6 --image images\t6-sample.png   # T6 を、画像を付けて送る(png・jpeg・webp)
+node measure.mjs --via dl --only T6 --image images\<写真>.jpg   # T6 を、画像を付けて送る(写真は各自で用意する。下)
 node measure.mjs --only T3 --runs 5          # T3 だけ 5 回
 node measure.mjs --model "<別のモデルの名前>"   # エージェントのモデルを替えたあと。MODEL_LABEL より優先
 node check-token-endpoint.mjs                # 鍵なしの入口で断られるか(8 章)
@@ -474,7 +473,7 @@ node check-token-endpoint.mjs                # 鍵なしの入口で断られる
 - 秒数は 4 つ: 会話を始めるまで・最初に何かが届くまで(入力中の印など)・本文が届くまで・終わりまで。
 - モデルの名前は、つなぎ方からは分からないので、設定か `--model` で渡す。渡さないと止まる。
 - 鍵・トークン・ID・URL は画面に出さない(つまずきの理由も 200 文字までにし、ID は伏せる)。
-- 本番に近い写真で試すときは、自分で撮った写真などを、リポジトリの外に置いて `--image` で渡す(商品の写真はリポジトリに入れない)。
+- **T6 の写真は、各自で用意する**(リポジトリ・ZIP には入れない)。服の写真を 1 枚、`tools/ms-verify/images/` に置いて `--image` で渡す(このフォルダは .gitignore で Git に入らない)。人の顔・社外秘の写る写真は使わない。形は png・jpeg・webp。方式やモデルを比べるときは同じ写真を使い、どの写真で試したか(何が写っているか・大きさ)を記録に書く。
 
 #### ZIP にして渡す・受け取る
 
@@ -485,7 +484,7 @@ npm run pack:ms-verify                  # リポジトリの最上位で。relea
 ```
 
 - 入るもの: コミット済みの `tools/ms-verify/` と、この手順書の写し(`docs/MS_AI_VERIFY.md`)。コミットしていない変更は入らない。
-- 必ず外すもの: `node_modules/`・`*.env`・`.token-cache.json`・`results/`(コミットされていなくても、名前で外す)。
+- 必ず外すもの: `node_modules/`・`*.env`・`.token-cache.json`・`results/`・`images/`(コミットされていなくても、名前で外す)。
 - 検査: 作った ZIP を読み直し、中身の一覧を出して、環境の ID(GUID の形)・メール・テナントのドメイン・環境のホスト・開発元の名前と、手元の `ms-verify.env` の値(と `FORBIDDEN_WORDS`)が入っていないかを確かめる。見つかったら止まる(値は出さない)。
 - GitHub の Releases への公開: `npm run pack:ms-verify -- --publish`(タグ `ms-verify-<日付>-<コミット>`)。**公開は利用者の承認のあとだけ**(連絡係が流す)。
 - 受け取った人: ZIP を展開し、中の `README.md` のとおり `npm install` から始める。設定は、各自の `%USERPROFILE%\.ccp\ms-verify.env` に書く(ZIP には入っていない)。

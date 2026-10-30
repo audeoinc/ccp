@@ -4,7 +4,7 @@
 //                                          公開は利用者の承認のあとだけ行う(連絡係が流す)
 //
 // 入れるのは、コミット済みの tools/ms-verify/ と docs/MS_AI_VERIFY.md の写し(ほかのセッションの作業中の変更が混ざらないように)。
-// 部品(node_modules)・設定(*.env)・サインインのトークン・測った結果は、コミットされていなくても、名前で必ず外す。
+// 部品(node_modules)・設定(*.env)・サインインのトークン・測った結果・写真は、コミットされていなくても、名前で必ず外す。
 // 検査: 環境の ID・メール・環境のホストなどの形と、手元の設定(%USERPROFILE%\.ccp\ms-verify.env)の値が、ZIP に入っていないか。
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -19,8 +19,8 @@ const TOOL = 'tools/ms-verify/'
 const DOC = 'docs/MS_AI_VERIFY.md'
 const ENV_FILE = join(homedir(), '.ccp', 'ms-verify.env')
 
-// 名前で必ず外すもの(.gitignore で Git に入らないはずのものも、念のため)
-const NEVER = [/(^|\/)node_modules\//, /(^|\/)\.token-cache\.json$/, /(^|\/)results\//, /\.env$/]
+// 名前で必ず外すもの(.gitignore で Git に入らないはずのものも、念のため)。写真は各自で用意するので、ZIP にも入れない
+const NEVER = [/(^|\/)node_modules\//, /(^|\/)\.token-cache\.json$/, /(^|\/)results\//, /(^|\/)images\//, /\.(env|png|jpe?g|webp|gif)$/]
 // 入っていてはいけない形(値そのものは画面に出さない)
 const PATTERNS = [
   ['GUID(環境・テナント・アプリの ID の形)', /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i],

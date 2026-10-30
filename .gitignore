@@ -54,3 +54,5 @@ dist-preview/
 tools/ms-verify/.token-cache.json
 tools/ms-verify/results/
 tools/ms-verify/*.env
+# T6 の写真は、各自で用意してここに置く(リポジトリ・ZIP には入れない。人の顔・社外秘は使わない)
+tools/ms-verify/images/

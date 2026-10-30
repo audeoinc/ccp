@@ -7,7 +7,7 @@
 //   node measure.mjs --runs 5     どれも 5 回ずつ送る
 //   node measure.mjs --only T3    T3 だけ
 //   node measure.mjs --model "GPT Chat Latest"   記録に書くモデルの名前(設定の MODEL_LABEL より優先)
-//   node measure.mjs --only T6 --image images/t6-sample.png   T6 を、画像を付けて送る
+//   node measure.mjs --only T6 --image images/<写真>.jpg   T6 を、画像を付けて送る(写真は各自で用意する。リポジトリには入れない)
 //   node measure.mjs --self-test  つながずに、確かめの仕組みだけを試す
 //
 // モデルはエージェントの画面で選ぶ(つなぎ方からは分からない)。選んだ名前を MODEL_LABEL か --model で渡し、記録に残す。
