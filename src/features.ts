@@ -156,7 +156,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'content.hero.pick', group: 'area.content.hero', ...named('ライブラリから選ぶ', 'Pick from the library'), version: 'MVP', size: 'S' },
   { id: 'content.hero.upload', group: 'area.content.hero', ...named('持っている画像を上げる', 'Upload your own image'), version: 'MVP', size: 'S' },
   { id: 'content.products', group: 'area.content.products', ...named('商品を探して入れる・入れ替える・外す・並べ替える', 'Find, add, replace, remove and reorder products'), version: 'MVP' },
-  { id: 'content.products.pageimage', group: 'area.content.products', ...named('商品の画像を選ぶ(取り込んだ画像・BigQuery の画像・貼り付け・ファイル・画像の URL から)', 'Choose product images (imported, BigQuery, paste, file, image URL)'), version: 'v1', size: 'S' },
+  { id: 'content.products.pageimage', group: 'area.content.products', ...named('商品の画像を選ぶ(取り込んだ画像・BigQuery の画像・貼り付け・ファイル・画像の URL から)', 'Choose product images (imported, BigQuery, paste, file, image URL)'), version: 'MVP', size: 'S' },
   { id: 'content.products.pagefetch', group: 'area.content.products', ...named('商品ページの URL を読んで、画像を拾ってくる', 'Read a product page URL and collect its images'), version: 'v2', size: 'M' },
   { id: 'content.parts', group: 'area.content.parts', ...named('配信ごとに書き換える・テンプレートに戻す', 'Rewrite per delivery / back to the template'), version: 'MVP', size: 'S' },
   { id: 'content.links', group: 'area.content.links', ...named('送る URL を直す・utm を見る', 'Edit send URLs and see utm'), version: 'MVP', size: 'S' },
