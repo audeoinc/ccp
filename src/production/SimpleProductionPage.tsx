@@ -596,7 +596,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             </MessageBar>
           </div>
         )}
-        <div className={s.panes} style={{ gridTemplateColumns: `${rails.length ? 'auto' : '0px'} ${openSide ? `${panes.widths[0]}px 1px` : '0px 0px'} minmax(280px, 1fr) 1px ${panes.widths[2]}px` }}>
+        {/* 制作の依頼を読み終わるまで、上の帯より下を見せない(読む前は、いまの配信カードからの下書きで描くので、読み終わって渡した写しに替わると中身が入れ替わってチラついた。2026-10-30 利用者) */}
+        <div className={s.panes} style={{ visibility: requests === null ? 'hidden' : undefined, gridTemplateColumns: `${rails.length ? 'auto' : '0px'} ${openSide ? `${panes.widths[0]}px 1px` : '0px 0px'} minmax(280px, 1fr) 1px ${panes.widths[2]}px` }}>
           {rails.length > 0 ? <SideRail items={rails} selected={openSide} onPick={(v) => setSide((o) => (o === v ? null : v))} ariaLabel={t('制作のメニュー', 'Production menus')} /> : <span />}
           {/* 開いている欄(1 つ)。しまっても列には残し、幅 0 にする(グリッドの列がずれないように。配信カードと同じ) */}
           <div className={s.sidePane} inert={!openSide} aria-hidden={!openSide}>

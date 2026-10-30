@@ -371,8 +371,13 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 開いたときの左のペインは、載せた商品まで読み終わってから決める(アラートの数は商品で決まるので、読む前に決めると一瞬開いて閉じる)。
   // きょうだいの配信カードに切り替えたとき(この画面は作り直されない)も、開いたときと同じ始まり方にする
   const [decided, setDecided] = useState<string | null>(null)
+  // 開いた直後は、載せた商品を読み終わって左のペインを決めるまで、上の帯より下を見せない(見えないまま並べておく)。
+  // 読む前の空の枠を描いてから、商品が入り、アラートの欄が開いてプレビューが動く、のがチラついて見えた(2026-10-30 利用者)。
+  // きょうだいの切り替えのときは、これまでどおり(前の中身を出したまま入れ替える)
+  const [ready, setReady] = useState(false)
   if (decided !== e.card.id && e.loaded) {
     setDecided(e.card.id)
+    setReady(true)
     setSide(alertOn && e.alerts.length > 0 ? 'alerts' : null)
     setProductsOpen(false)
   }
@@ -891,7 +896,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         {e.notices}
       </div>
 
-      <div ref={panesRef} className={mergeClasses(s.panes, moving && s.panesMoving)} style={{ '--wv': `${fit.preview}px`, '--wl': `${fit.listOpen ? widths.list : RAIL_W}px`, '--ws': `${fit.overlay ? 0 : sideW}px` } as React.CSSProperties}>
+      <div ref={panesRef} className={mergeClasses(s.panes, moving && s.panesMoving)} style={{ '--wv': `${fit.preview}px`, '--wl': `${fit.listOpen ? widths.list : RAIL_W}px`, '--ws': `${fit.overlay ? 0 : sideW}px`, visibility: ready ? undefined : 'hidden' } as React.CSSProperties}>
         {/* 左のバー。上から、プロセスの順(承認者とのやり取り → 承認 → 素材 → 制作へ渡すもの)、線の下に記録。数と点で、開かなくても様子が分かる */}
         <SideRail
           items={rails}
