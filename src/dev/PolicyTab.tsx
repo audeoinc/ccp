@@ -249,7 +249,7 @@ export function PolicyTab({ settings, onSettings, model }: { settings: Settings;
     const lines = drafts
       .filter((d) => d.preview?.problems.length || d.previewError)
       .map((d) => `### ${d.filename}\n${d.previewError ? `- ${d.previewError}` : d.preview!.problems.map((p) => `- ${p.line} 行め${p.where ? `(${p.where})` : ''}: ${p.message}`).join('\n')}`)
-    if (lines.length) void send(`CCP の取り込みの確かめで、次の決まり・行が読めませんでした。直した全文をください。\n\n${lines.join('\n\n')}`)
+    if (lines.length) void send(`CCP の取り込みの確認で、次の決まり・行が読めませんでした。直した全文をください。\n\n${lines.join('\n\n')}`)
   }
 
   const crumbs = prefix.split('/').filter(Boolean)
@@ -329,7 +329,7 @@ export function PolicyTab({ settings, onSettings, model }: { settings: Settings;
             <span className={mergeClasses(s.heading, s.grow)}>
               <DocumentTextRegular /> 選んだ文書({picked.length})
             </span>
-            <Button size="small" icon={<CloudArrowDownRegular />} disabled={!picked.length || docsBusy} onClick={() => void extract()} title="中身を文字にして見る(AI に渡すものを確かめる)">
+            <Button size="small" icon={<CloudArrowDownRegular />} disabled={!picked.length || docsBusy} onClick={() => void extract()} title="中身を文字にして見る(AI に渡すものを確認する)">
               中身を見る
             </Button>
             <Button size="small" appearance="primary" icon={<SparkleRegular />} disabled={!picked.length || busy} onClick={() => void send(input)} title="POLICY_FORMAT の形(ルールは Markdown、販売系は CSV)に書き直す">
@@ -456,7 +456,7 @@ export function PolicyTab({ settings, onSettings, model }: { settings: Settings;
             <div className={s.row}>
               <span className={mergeClasses(s.heading, s.grow)}>取り込むファイル({drafts.length})</span>
               <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => drafts.forEach((_, i) => void check(i))}>
-                すべて確かめる
+                すべて確認する
               </Button>
               {hasProblems && (
                 <Button size="small" disabled={busy} onClick={askFix}>
@@ -464,7 +464,7 @@ export function PolicyTab({ settings, onSettings, model }: { settings: Settings;
                 </Button>
               )}
             </div>
-            <span className={s.muted}>直接直してもかまいません。「確かめる」は CCP の取り込みと同じ読み分けで、何も変えません。</span>
+            <span className={s.muted}>直接直してもかまいません。「確認する」は CCP の取り込みと同じ読み分けで、何も変えません。</span>
             {drafts.map((d, i) => (
               <div key={i} className={s.draft}>
                 <div className={s.row}>
@@ -473,9 +473,9 @@ export function PolicyTab({ settings, onSettings, model }: { settings: Settings;
                   </Badge>
                   <Input size="small" className={s.grow} value={d.filename} onChange={(_, v) => updateDraft(i, { filename: v.value, preview: undefined, imported: undefined })} />
                   <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => void check(i)}>
-                    確かめる
+                    確認する
                   </Button>
-                  <Button size="small" appearance="primary" disabled={!d.preview || d.preview.count === 0} onClick={() => void importDraft(i)} title={!d.preview ? '先に確かめてください' : ''}>
+                  <Button size="small" appearance="primary" disabled={!d.preview || d.preview.count === 0} onClick={() => void importDraft(i)} title={!d.preview ? '先に確認してください' : ''}>
                     取り込む
                   </Button>
                   <CopyButton text={() => d.content} />

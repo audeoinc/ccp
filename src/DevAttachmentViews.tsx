@@ -118,7 +118,7 @@ export function AttachDraftView({ draft, disabled }: { draft: AttachDraft; disab
       {hasImage && (
         <span className={s.warn}>
           <WarningRegular />
-          {t('個人情報・機密(お客様の名前・メールアドレス・社外秘の数字など)が写っていないか、確かめてから送ってください', 'Check that no personal or confidential information (customer names, emails, internal figures) is visible before sending')}
+          {t('個人情報・機密(お客様の名前・メールアドレス・社外秘の数字など)が写っていないか、確認してから送ってください', 'Check that no personal or confidential information (customer names, emails, internal figures) is visible before sending')}
         </span>
       )}
       {draft.error && <span className={s.warn}>{draft.error}</span>}

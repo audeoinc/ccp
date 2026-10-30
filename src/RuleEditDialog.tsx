@@ -192,7 +192,7 @@ export function RuleEditDialog({ rule, initial, markets, onDone, onClose }: Prop
                 </Field>
               </div>
               <div className={s.checkRow}>
-                <Field label={t('確かめ方(機械で確かめる。must だけ)', 'Check (machine-checked; must only)')} size="small">
+                <Field label={t('確かめ方(機械で確認する。must だけ)', 'Check (machine-checked; must only)')} size="small">
                   <Select size="small" value={checkKind} onChange={(_, d) => setCheckKind(d.value as CheckKind)}>
                     {CHECK_KINDS.map((k) => (
                       <option key={k || 'none'} value={k}>{checkLabel(k)}</option>

@@ -70,7 +70,7 @@ const LINK: Record<LinkState, { label: string; color: 'success' | 'danger' | 'in
   missing: { label: '壊れたリンク', color: 'danger' },
   external: { label: '外の URL', color: 'informative' },
   empty: { label: '画像なし', color: 'subtle' },
-  unknown: { label: '確かめられない', color: 'warning' },
+  unknown: { label: '確認できない', color: 'warning' },
 }
 const ROLE: Record<string, string> = { main: 'メイン', sub: 'サブ', master: '控え', master_main: 'マスタのメイン' }
 type StateFilter = 'all' | 'missing' | 'external' | 'empty' | 'unused'

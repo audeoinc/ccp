@@ -235,7 +235,7 @@ export function CampaignTab() {
                 {plan?.groups.length ?? 0} 組・{total} 枚を、キャンペーンにまとめて AI で作り直します。カードは未起案に戻し、承認の依頼・制作の依頼の行を {clearedRows} 件消します。元に戻せません(控えのパックから戻すだけです)。
               </span>
               <span className={s.note}>引っ越し用のパックで控えを取りましたか? 進めるときは、下に「実行する」と打ち込んでください。</span>
-              <Field label="確かめ">
+              <Field label="確認">
                 <Input value={typed} onChange={(_, d) => setTyped(d.value)} placeholder="実行する" />
               </Field>
             </DialogContent>

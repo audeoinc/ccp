@@ -222,7 +222,7 @@ export function AlertsPage({ initialProductId, onSelectProduct, onOpenAlertCard,
                   <th className={styles.th}>{t('種類', 'Kind')}</th>
                   <th className={styles.th}>{t('対象', 'Target')}</th>
                   <th className={styles.th}>{t('変更', 'Change')}</th>
-                  <th className={styles.th}>{t('確かめた結果', 'Note')}</th>
+                  <th className={styles.th}>{t('確認した結果', 'Note')}</th>
                 </tr>
               </thead>
               <tbody>

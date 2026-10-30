@@ -95,7 +95,7 @@ export function ProductionChat({ current, original, editable, html, htmlCustom, 
         }
         if (a.html.failed) parts.push(tr(`HTML の ${a.html.failed} か所は、場所が見つからず当てられませんでした。`, `${a.html.failed} change(s) could not be placed in the HTML.`))
       }
-      if (a.edits.length) parts.push(editable ? tr('文言などの直しは、下のボタンから確かめて入れてください。', 'Check and apply the text and other changes with the buttons below.') : tr('文言などの直しは、渡したあとの A 案でだけ入れられます。', 'Text and other changes can only be applied to variant A after the handoff.'))
+      if (a.edits.length) parts.push(editable ? tr('文言などの直しは、下のボタンから確認して入れてください。', 'Check and apply the text and other changes with the buttons below.') : tr('文言などの直しは、渡したあとの A 案でだけ入れられます。', 'Text and other changes can only be applied to variant A after the handoff.'))
       if (!a.answered && !a.html && !a.edits.length && !a.reply) parts.push(tr('直す所が見つかりませんでした。もう少し具体的に頼んでみてください。', 'Nothing to change was found. Try asking more specifically.'))
       next = { role: 'assistant', text: parts.filter(Boolean).join('\n'), edits: a.edits, warnings: a.html?.warnings }
     } catch (e) {
@@ -146,7 +146,7 @@ export function ProductionChat({ current, original, editable, html, htmlCustom, 
         suggestions={revisionSuggestions(revisionNote)}
         appendSuggestions
         intro={t(
-          '直したいことを頼めます。下の例は、いくつ選んでもかまいません(選ぶと入力欄に足され、書き足してから送れます)。見た目は右のプレビューで見比べて採用し、文言・画像・商品・リンク先は、返事のボタンから確かめて入れます。',
+          '直したいことを頼めます。下の例は、いくつ選んでもかまいません(選ぶと入力欄に足され、書き足してから送れます)。見た目は右のプレビューで見比べて採用し、文言・画像・商品・リンク先は、返事のボタンから確認して入れます。',
           'Ask for changes. Pick as many examples below as you like (they are added to the input, and you can edit before sending). Layout changes are compared in the preview before you adopt them; text, image, product and link changes are applied from the buttons in the reply.',
         )}
         onSend={(text) => void send(text)}

@@ -254,7 +254,7 @@ export function useSettingsActions(ctx: {
       id: 'bq',
       section: 'data',
       label: bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery'),
-      description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確かめます)。', 'Re-read stock and product data now (also checked automatically on open).'),
+      description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確認します)。', 'Re-read stock and product data now (also checked automatically on open).'),
       icon: <ArrowSyncRegular />,
       disabled: bqBusy,
       secondary: (bq && bqStockTime(bq)) ?? '',

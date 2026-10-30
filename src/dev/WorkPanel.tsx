@@ -194,14 +194,14 @@ export function WorkPanel({ output, onOutput, sql, onLoadSql, onAsk }: Props) {
             <Button size="small" appearance="subtle" icon={<BranchCompareRegular />} disabled={(out?.versions.length ?? 0) < 1} onClick={() => setDiffOpen(true)}>
               違い
             </Button>
-            <Button size="small" appearance="subtle" icon={<ClipboardTaskListLtrRegular />} disabled={!sql.trim() || !!busy} onClick={() => void runCheck(false)} title="全件を流して、CCP の取り込みと同じ確かめにかける(先に、読む量と料金を見せる)">
+            <Button size="small" appearance="subtle" icon={<ClipboardTaskListLtrRegular />} disabled={!sql.trim() || !!busy} onClick={() => void runCheck(false)} title="全件を流して、CCP の取り込みと同じ確認にかける(先に、読む量と料金を見せる)">
               答え合わせ
             </Button>
             <Button size="small" appearance="subtle" icon={<TableSimpleRegular />} disabled={!sql.trim()} onClick={() => setDdlOpen(true)}>
               表を作る SQL
             </Button>
             {dirty && <span className={s.dirty}>v{current?.v} から変更あり(保存すると新しい版)</span>}
-            {busy && <Spinner size="extra-tiny" label={busy === 'check' ? '全件を流して確かめています' : busy === 'estimate' ? '読む量を見ています' : '保存しています'} />}
+            {busy && <Spinner size="extra-tiny" label={busy === 'check' ? '全件を流して確認しています' : busy === 'estimate' ? '読む量を見ています' : '保存しています'} />}
           </>
         )}
         {!output && <span className={s.muted}>出力を選ぶと、版を残す・答え合わせ・表を作る SQL が使えます</span>}
@@ -217,14 +217,14 @@ export function WorkPanel({ output, onOutput, sql, onLoadSql, onAsk }: Props) {
         <MessageBar intent={check.error ? 'error' : check.missing.length ? 'error' : 'info'} layout="multiline">
           <MessageBarBody>
             {check.error ?? (check.missing.length ? `必須の列がありません: ${check.missing.join(', ')}` : `全件を流すと、読む量 ${bytesLabel(check.bytes)}・概算 ${usd(check.cost_usd)}(${check.weight})です。`)}
-            {check.context.length > 0 && <div>結びつきも確かめます: {check.context.join(', ')} の採用の版を流します(読む量に含む)</div>}
+            {check.context.length > 0 && <div>結びつきも確認します: {check.context.join(', ')} の採用の版を流します(読む量に含む)</div>}
             {check.missing_optional.length > 0 && <div>あると使う列がない: {check.missing_optional.join(', ')}</div>}
             {!check.error && !check.missing.length && (
               <div className={s.row} style={{ marginTop: '4px' }}>
                 <Button size="small" appearance="primary" icon={<CheckmarkStarburstRegular />} onClick={() => void runCheck(true)} disabled={!!busy}>
                   全件で答え合わせ
                 </Button>
-                <Checkbox label="結びつき(SKU → SPU など)も確かめる" checked={withContext} onChange={(_, d) => setWithContext(!!d.checked)} />
+                <Checkbox label="結びつき(SKU → SPU など)も確認する" checked={withContext} onChange={(_, d) => setWithContext(!!d.checked)} />
               </div>
             )}
           </MessageBarBody>
@@ -241,7 +241,7 @@ export function WorkPanel({ output, onOutput, sql, onLoadSql, onAsk }: Props) {
               注意 {check.warn}
             </Badge>
             <span className={s.muted}>
-              {check.rows?.toLocaleString()} 行を確かめました{version ? `(v${version} に記録)` : '(保存していない SQL なので、記録はしない)'}
+              {check.rows?.toLocaleString()} 行を確認しました{version ? `(v${version} に記録)` : '(保存していない SQL なので、記録はしない)'}
             </span>
             {!!check.issues?.length && (
               <Button size="small" onClick={askFix}>

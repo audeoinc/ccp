@@ -264,10 +264,10 @@ export function PolicyManager({ open, onClose, onImported, inline }: { open: boo
           <div className={styles.row}>
             <input ref={inputRef} type="file" accept=".md,.markdown,.txt,.csv" hidden onChange={(e) => void pick(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
             <Button appearance="primary" size="small" icon={<ArrowUploadRegular />} disabled={busy !== null} onClick={() => inputRef.current?.click()}>
-              {t('ファイルを選んで確かめる', 'Choose a file to check')}
+              {t('ファイルを選んで確認する', 'Choose a file to check')}
             </Button>
             <Text className={styles.small}>
-              {t('ルール系の決まりは Markdown、販売系の方針は CSV(書き方は docs/POLICY_FORMAT.md)。取り込む前に、読めた件数と、読めなかった行を確かめます。', 'Rules: Markdown. Sales policies: CSV (see docs/POLICY_FORMAT.md). Review the parsed counts and skipped lines before importing.')}
+              {t('ルール系の決まりは Markdown、販売系の方針は CSV(書き方は docs/POLICY_FORMAT.md)。取り込む前に、読めた件数と、読めなかった行を確認します。', 'Rules: Markdown. Sales policies: CSV (see docs/POLICY_FORMAT.md). Review the parsed counts and skipped lines before importing.')}
             </Text>
           </div>
           {error && (

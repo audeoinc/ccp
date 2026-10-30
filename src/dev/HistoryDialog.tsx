@@ -64,7 +64,7 @@ export function HistoryDialog({ open, onClose, onUseSql }: { open: boolean; onCl
           <DialogContent>
             <div className={s.row} style={{ marginBottom: '8px' }}>
               <SearchBox size="small" style={{ minWidth: '320px' }} value={q} placeholder="SQL・エラーの文字で探す(表の名前 など)" onChange={(_, d) => setQ(d.value)} />
-              <span className={s.muted}>画面で流したもの・AI が値を確かめるために流したもの・列を調べたものが、成功も失敗も残ります(Workbench の server/devwork/history.jsonl)。</span>
+              <span className={s.muted}>画面で流したもの・AI が値を確認するために流したもの・列を調べたものが、成功も失敗も残ります(Workbench の server/devwork/history.jsonl)。</span>
             </div>
             {!runs ? (
               <Spinner size="tiny" />

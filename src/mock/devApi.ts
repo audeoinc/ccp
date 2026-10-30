@@ -118,12 +118,12 @@ export const DevApi = {
       { type: 'step', text: `表を探した(${DS}、3 件)` },
       { type: 'step', text: `表の列を見た(${DS}.m_item)` },
       { type: 'thought', text: '**CCP の列に当てる**\nSPU のキーは market と product_code。item_cd が品番、country_cd は JPN/USA なので JP/US に直す。dept_nm がカテゴリに近い。\n' },
-      { type: 'step', text: 'SQL を確かめた(通った。読む量 52,428,800 バイト)' },
+      { type: 'step', text: 'SQL を確認した(通った。読む量 52,428,800 バイト)' },
       {
         type: 'final',
         reply: `**m_item** の列を見ました(見本の返事です。いまの発言: 「${ask.slice(0, 40)}」)。\n\n### CCP の列への当て方の案\n- \`item_cd\` → \`product_code\`(品番)\n- \`country_cd\` → \`market\`(JPN → JP、USA → US に直す)\n- \`dept_nm\` → \`category\`(部門 2 が CCP のカテゴリに近い)\n- \`price\` → \`price\`\n\n| 元の列 | CCP の列 | 変換 |\n|---|---|---|\n| \`item_cd\` | \`product_code\` | そのまま |\n| \`country_cd\` | \`market\` | JPN → JP |\n\n念のため、件数も見てください:\n\n\`\`\`sql\nSELECT COUNT(*) AS n\nFROM \`${DS}.m_item\`\n\`\`\``,
         sqls: [
-          { title: '国のコードの値を確かめる', sql: `SELECT country_cd, COUNT(*) AS n\nFROM \`${DS}.m_item\`\nGROUP BY country_cd` },
+          { title: '国のコードの値を確認する', sql: `SELECT country_cd, COUNT(*) AS n\nFROM \`${DS}.m_item\`\nGROUP BY country_cd` },
           {
             title: 'SPU の形にする',
             sql: `SELECT\n  CASE country_cd WHEN 'JPN' THEN 'JP' WHEN 'USA' THEN 'US' END AS market,\n  item_cd AS product_code,\n  ANY_VALUE(item_nm) AS name,\n  ANY_VALUE(dept_nm) AS category,\n  MAX(price) AS price\nFROM \`${DS}.m_item\`\nWHERE on_sale_flg\nGROUP BY market, product_code`,

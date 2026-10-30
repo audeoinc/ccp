@@ -62,7 +62,7 @@ export function AbSettings({ ab, active, target, onChange, onDecide, onStop }: {
             {allVariants(ab).map((k) => `${k} ${split[k]}%`).join(' / ')}
             {ab.mode === 'winner' ? t(` ・ 残り ${100 - ab.testShare}% に勝った案`, ` · winner to the remaining ${100 - ab.testShare}%`) : ''}
           </span>
-          <Field label={t('仮説(何を確かめたいか)', 'Hypothesis')} size="small">
+          <Field label={t('仮説(何を確認したいか)', 'Hypothesis')} size="small">
             <Input size="small" value={ab.hypothesis} onChange={(_, d) => set('hypothesis', d.value)} placeholder={t('例: 着用画像のほうがクリックされる', 'e.g. A lifestyle photo gets more clicks')} />
           </Field>
         </>

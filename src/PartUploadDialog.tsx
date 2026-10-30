@@ -219,7 +219,7 @@ export function PartUploadDialog({ market, me, onDone, onClose, part, file: firs
                     </Button>
                   </div>
                 ) : (
-                  <span className={s.note}>{t('名前・種類・タグ・説明・代替テキストは、AI が画像を見て下書きします。確かめて直してください。', 'AI drafts the name, kind, tags, description and alt text from the image. Check and edit them.')}</span>
+                  <span className={s.note}>{t('名前・種類・タグ・説明・代替テキストは、AI が画像を見て下書きします。確認して直してください。', 'AI drafts the name, kind, tags, description and alt text from the image. Check and edit them.')}</span>
                 )}
                 <Field label={t('名前', 'Name')} required size="small">
                   <Input size="small" value={form.name} onChange={(_, d) => set('name')(d.value)} />

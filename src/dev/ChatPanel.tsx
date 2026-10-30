@@ -565,7 +565,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
             )}
             <span className={s.label}>表を足さなくても、AI が自分で探して列を見ます(ビューは参照先の表までたどります)。</span>
             <Checkbox label="表の先頭の数行も渡す(名前・住所・レビューなどの列は外す)" checked={sampleRows} onChange={(_, d) => setSampleRows(!!d.checked)} />
-            <Checkbox label="AI に SELECT を流させる(値の確かめ。読む量の上限つき)" checked={allowRun} onChange={(_, d) => setAllowRun(!!d.checked)} />
+            <Checkbox label="AI に SELECT を流させる(値の確認。読む量の上限つき)" checked={allowRun} onChange={(_, d) => setAllowRun(!!d.checked)} />
             <Checkbox label="いまの SQL と、流した結果・エラーを渡す" checked={withSql} onChange={(_, d) => setWithSql(!!d.checked)} />
             <div className={s.row}>
               <span className={s.label}>いつも渡すファイル</span>

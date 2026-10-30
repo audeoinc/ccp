@@ -215,7 +215,7 @@ function App() {
     () =>
       onPolicyWarning((w) =>
         setPolicyWarning(
-          tr('AI の案が、必ず守る決まりを破っています(作り直しても直りませんでした)。案を確かめて、直してから保存してください: ', 'An AI suggestion breaks a must rule (still broken after one retry). Check and fix it before saving: ') +
+          tr('AI の案が、必ず守る決まりを破っています(作り直しても直りませんでした)。案を確認して、直してから保存してください: ', 'An AI suggestion breaks a must rule (still broken after one retry). Check and fix it before saving: ') +
             w.violations.map((v) => `${v.ruleId}「${v.title}」(${v.detail})`).join(' / '),
         ),
       ),

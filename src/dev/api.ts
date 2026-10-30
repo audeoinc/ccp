@@ -371,7 +371,7 @@ async function policyCall(path: string, body: unknown): Promise<PolicyPreview | 
     const res = await fetch(appPath(`/api/policies${path}`), post(body))
     const json = (await res.json().catch(() => null)) as { success: boolean; data?: PolicyPreview; error?: { message: string } } | null
     if (!json) return { ok: false, error: `サーバーの返事を読めませんでした(${res.status})` }
-    if (!json.success || !json.data) return { ok: false, error: json.error?.message ?? '確かめに失敗しました' }
+    if (!json.success || !json.data) return { ok: false, error: json.error?.message ?? '確認に失敗しました' }
     return json.data
   } catch (e) {
     return { ok: false, error: `サーバーにつながりません(${e instanceof Error ? e.message : String(e)})` }

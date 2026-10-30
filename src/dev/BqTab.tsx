@@ -364,7 +364,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
           <ResizeBar height={editorH} onHeight={setEditorH} min={120} reset={260} />
           <div className={s.row}>
             <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => void dryRun()} disabled={!sql.trim() || !!busy} title="BigQuery の dry-run。料金はかかりません">
-              料金なしで確かめる
+              料金なしで確認する
             </Button>
             {busy === 'run' ? (
               <Button size="small" icon={<StopRegular />} onClick={() => void stop()} disabled={stopped} title="BigQuery の問い合わせを止める(止まるまでに読んだ分は、課金されることがある)">
@@ -407,7 +407,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
                 <Option key={n} value={String(n)}>{`先頭 ${n} 行`}</Option>
               ))}
             </Dropdown>
-            {(busy === 'dry' || busy === 'run') && <Spinner size="tiny" label={busy === 'dry' ? '確かめています' : '流しています'} />}
+            {(busy === 'dry' || busy === 'run') && <Spinner size="tiny" label={busy === 'dry' ? '確認しています' : '流しています'} />}
           </div>
           {sqlError && (
             <MessageBar intent="error" layout="multiline">

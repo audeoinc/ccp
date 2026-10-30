@@ -248,7 +248,7 @@ flowchart TD
 | `campaigns.ts` | 99 | キャンペーンの決まり(入れる条件は同じ国・同じ配信日)。表は `data/campaigns.ts` |
 | `useCampaigns.ts` / `useCampaignOf.ts` | 22 / 27 | キャンペーンを読む(月のカレンダー・時間帯別)/ 開いたカードの親を読む |
 | `CampaignBand.tsx` | 212 | 配信カードのいちばん上の帯(キャンペーン / そのキャンペーンのカードのタブ / AB の案 の 3 段) |
-| `CampaignApprove.tsx` / `campaignOps.ts` | 181 / 210 | 子のカードをまとめて承認を依頼する・承認する(送る前の確かめで止まるカードだけ止める)/ キャンペーンの操作(まとめての承認・作る・足す) |
+| `CampaignApprove.tsx` / `campaignOps.ts` | 181 / 210 | 子のカードをまとめて承認を依頼する・承認する(送る前の確認で止まるカードだけ止める)/ キャンペーンの操作(まとめての承認・作る・足す) |
 | `CampaignDialogs.tsx` | 249 | キャンペーンを作る窓と、カードを足す窓 |
 | `campaignLook.ts` | 32 | 時間帯別の札の名前と、同じキャンペーンのカードをそろえる線の色 |
 | `campaignMigrate.ts` | 219 | いまの配信カードを、キャンペーンにまとめて作り直す(開発用の画面 `dev/CampaignTab.tsx` から回す) |
@@ -364,7 +364,7 @@ flowchart TD
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 128 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
 | `ProductSwap.tsx` / `floatSwap.tsx` | 113 / 45 | 商品の入れ替えの引き出し(SU9。どの入口からも、ここを開く。中身は `ProductChooser`)/ 商品のフロートの中に、同じ引き出しを出す |
 | `TextAiPanel.tsx` | 230 | 文の部品(見出し・コピー・件名など)の AI(「案」と「指示して直す」。試す → 確定) |
-| `readiness.ts` / `ReadinessList.tsx` | 142 / 88 | 送る前の確かめ(止めるのは、制作に渡すときの担当・締め切りが空のときだけ。ほかは警告。`scripts/check-readiness.mjs`)/ その一覧(行を押すと、その部品を選ぶ) |
+| `readiness.ts` / `ReadinessList.tsx` | 142 / 88 | 送る前の確認(止めるのは、制作に渡すときの担当・締め切りが空のときだけ。ほかは警告。`scripts/check-readiness.mjs`)/ その一覧(行を押すと、その部品を選ぶ) |
 | `ApprovalBadge.tsx` | 121 | 承認の状態の帯(押すと承認のパネルが開く) |
 | `gridMove.ts` | 44 | プレビューの商品を、見たままの向き(上下左右)に動かす |
 
@@ -623,7 +623,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `check-approvals.mjs` | 承認の判定(`src/approvals.ts`)が、サーバーと同じ例(`server/tests/approval_cases.json`)で同じ結果になるかの確かめ(`npm run verify`) |
 | `check-policy.mjs` | must の決まりの確かめ(`src/policyCheck.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
 | `check-parts.mjs` / `check-slots.mjs` / `check-save.mjs` | 部品の配信ごとの中身(`src/partContent.ts`)/ 商品の並びとセクションの枠(`src/slots.ts`)/ 配信カードの保存の流れ(`src/saveFlow.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
-| `check-readiness.mjs` / `check-utm.mjs` / `check-template-ai.mjs` | 送る前の確かめ(`src/simple/readiness.ts`)/ 計測用の utm_content(`src/links.ts`)/ AI で作る・直すテンプレートの返答の読み方(`src/templateDraft.ts`・`src/templateEdit.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
+| `check-readiness.mjs` / `check-utm.mjs` / `check-template-ai.mjs` | 送る前の確認(`src/simple/readiness.ts`)/ 計測用の utm_content(`src/links.ts`)/ AI で作る・直すテンプレートの返答の読み方(`src/templateDraft.ts`・`src/templateEdit.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
 | `gcp-smoke.mjs` | 本番・手元のサーバーの動作確認(画面を開いて、カードが出るか) | <!-- hosted -->
 | `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) | <!-- hosted -->

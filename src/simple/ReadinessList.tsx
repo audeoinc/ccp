@@ -46,20 +46,20 @@ export function ReadinessList({ items, onPick }: { items: ReadinessItem[]; onPic
   const shown = issues > 0 || open
   const icon = (i: ReadinessItem) =>
     i.level === 'block' ? <ErrorCircleRegular className={mergeClasses(s.icon, s.block)} /> : i.level === 'warn' ? <WarningRegular className={mergeClasses(s.icon, s.warn)} /> : <CheckmarkCircleRegular className={mergeClasses(s.icon, s.ok)} />
-  const levelText = (i: ReadinessItem) => (i.level === 'block' ? t('入れないと進めません', 'Required') : i.level === 'warn' ? t('確かめてください', 'Check this') : t('済み', 'Done'))
+  const levelText = (i: ReadinessItem) => (i.level === 'block' ? t('入れないと進めません', 'Required') : i.level === 'warn' ? t('確認してください', 'Check this') : t('済み', 'Done'))
   return (
-    <div className={s.root} role="group" aria-label={t('送る前の確かめ', 'Pre-send checks')}>
+    <div className={s.root} role="group" aria-label={t('送る前の確認', 'Pre-send checks')}>
       {issues === 0 ? (
         <button type="button" className={s.head} onClick={() => setOpen(!open)} aria-expanded={open}>
           <CheckmarkCircleRegular className={mergeClasses(s.icon, s.ok)} />
-          <span className={s.grow}>{t('すべて確かめました', 'All checks passed')}</span>
+          <span className={s.grow}>{t('すべて確認しました', 'All checks passed')}</span>
           {open ? <ChevronUpRegular /> : <ChevronDownRegular />}
         </button>
       ) : (
         <span className={s.head} style={{ cursor: 'default' }}>
           <WarningRegular className={mergeClasses(s.icon, items.some((i) => i.level === 'block') ? s.block : s.warn)} />
           <span className={s.grow}>
-            {t('送る前の確かめ', 'Before you send')} <span className={s.count}>{t(`${issues} 件`, `${issues}`)}</span>
+            {t('送る前の確認', 'Before you send')} <span className={s.count}>{t(`${issues} 件`, `${issues}`)}</span>
           </span>
         </span>
       )}

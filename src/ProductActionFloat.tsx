@@ -199,7 +199,7 @@ export function ProductActionFloat({ product, alert, card, scheduledAt, inCard, 
                     {product && stockAlert && t(` ・ いまの在庫 ${num(product.stock)}`, ` · Stock now ${num(product.stock)}`)}
                   </span>
                   {imageAlert && <span className={s.alertDetail}>{t('この配信で使う画像を、期限のない(まだ切れない)画像に替えるか、商品を入れ替えてください', 'Switch to an image without this expiry, or replace the product')}</span>}
-                  {!stockAlert && !imageAlert && <span className={s.alertDetail}>{t('この変更は、確かめて「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
+                  {!stockAlert && !imageAlert && <span className={s.alertDetail}>{t('この変更は、確認して「対応済み」にするものです(記録を残すため、アラートの画面で行います)', 'This change needs to be checked and marked as handled (done on the Alerts screen, where it is recorded).')}</span>}
                 </span>
                 <span className={s.others}>
                   {stockAlert && onPostpone && (

@@ -124,11 +124,11 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
       <div className={styles.sub}>
         {policy
           ? alert.deliveries.length > 0
-            ? t('この商品を載せている、まだ送っていない配信。新しい位置づけ・方針に合っているかを確かめ、合わなければ入れ替えます', 'Upcoming deliveries that include this product. Check that they still fit the new role; replace the product if not.')
+            ? t('この商品を載せている、まだ送っていない配信。新しい位置づけ・方針に合っているかを確認し、合わなければ入れ替えます', 'Upcoming deliveries that include this product. Check that they still fit the new role; replace the product if not.')
             : isLeadStage(stage?.after)
               ? t('主力になりましたが、まだ送っていない配信には、どれにも載っていません。販促の期間の配信に載せることを検討してください', 'It is now a core product but is not in any upcoming delivery. Consider adding it during its promotion period.')
               : ''
-          : t('移した配信と、移した先の日の、同じ国・チャネルの配信(重なっていないかを確かめる)', 'The moved delivery, and same-day deliveries in the same country and channel (check for overlap).')}
+          : t('移した配信と、移した先の日の、同じ国・チャネルの配信(重なっていないかを確認する)', 'The moved delivery, and same-day deliveries in the same country and channel (check for overlap).')}
       </div>
 
       {alert.deliveries.length > 0 && (
@@ -217,7 +217,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
       )}
 
       <div className={styles.resolve}>
-        <Field label={t('確かめた結果(対応済みにするときのメモ。任意)', 'What you checked (note when marking as handled, optional)')} size="small">
+        <Field label={t('確認した結果(対応済みにするときのメモ。任意)', 'What you checked (note when marking as handled, optional)')} size="small">
           <Textarea value={note} onChange={(_, d) => setNote(d.value)} rows={2} placeholder={t('例: 2 本とも入れ替えた / このままでよいと判断した', 'e.g. Replaced in both / Decided to keep as is')} />
         </Field>
         <div className={styles.resolveRow}>

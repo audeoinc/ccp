@@ -26,7 +26,7 @@ const TEXT = {
 const UNREACHABLE = {
   ja: {
     title: 'データベースにつながりません',
-    hint: 'サーバーを起動したターミナルで、DB の設定(DATABASE_URL など)が読み込まれているかを確かめてください。同じターミナルで python -m ccp.cli check を実行すると、原因がわかります(手順書 docs/WORKBENCH.md)。直したら、サーバーを起動し直してください。この画面は、つながると自動で読み込み直します。',
+    hint: 'サーバーを起動したターミナルで、DB の設定(DATABASE_URL など)が読み込まれているかを確認してください。同じターミナルで python -m ccp.cli check を実行すると、原因がわかります(手順書 docs/WORKBENCH.md)。直したら、サーバーを起動し直してください。この画面は、つながると自動で読み込み直します。',
   },
   en: {
     title: 'Cannot connect to the database',

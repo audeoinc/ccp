@@ -284,7 +284,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero, fi
               </div>
               <div className={s.form}>
                 {busy === 'ai' && <Spinner size="tiny" label={t('AI が画像を見て、下書きを作っています…', 'AI is reading the image and drafting…')} />}
-                {!editing && <span className={s.note}>{t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確かめて直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}</span>}
+                {!editing && <span className={s.note}>{t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確認して直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}</span>}
                 {editing && (
                   <div>
                     <Button size="small" icon={<SparkleRegular />} disabled={!!busy || !url} onClick={() => void redraft()} title={t('いまの画像を AI に見せ直して、名前・用途・季節・タグ・説明を作り直します(焦点は変えません。保存で確定)', 'Show the image to AI again and redraft the name, purpose, season, tags and description (focal point unchanged; saved on Save)')}>

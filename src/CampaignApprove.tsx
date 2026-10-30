@@ -143,7 +143,7 @@ export function CampaignApprove({ campaign, cards, alertsOf, beforeRun, onChange
               <div className={s.rows}>
                 <span>
                   {t(
-                    '次の配信は、送る前の確かめで止まるものがあるので、依頼していません。直してから、もう一度依頼してください',
+                    '次の配信は、送る前の確認で止まるものがあるので、依頼していません。直してから、もう一度依頼してください',
                     'These deliveries have items that block sending, so they were not requested. Fix them, then request again.',
                   )}
                 </span>

@@ -95,7 +95,7 @@ export function TemplateAiDialog({ options, onUse, onDuplicate, onDraft, onClose
               {t('AI でテンプレートを作る', 'Create a template with AI')}
               <InfoLabel
                 size="large"
-                info={t('目的と商品の数を伝えると、AI がセクションと部品(箱・ボタン・テキスト・画像・区切り線)の並びを組み立てて、下書きにします。下書きは保存されません。編集の画面で確かめてから、いつもの「保存」で保存します。', 'Tell the AI the purpose and number of products; it arranges sections and parts (boxes, buttons, text, images, dividers) into a draft. The draft is not saved; check it in the editor, then save as usual.')}
+                info={t('目的と商品の数を伝えると、AI がセクションと部品(箱・ボタン・テキスト・画像・区切り線)の並びを組み立てて、下書きにします。下書きは保存されません。編集の画面で確認してから、いつもの「保存」で保存します。', 'Tell the AI the purpose and number of products; it arranges sections and parts (boxes, buttons, text, images, dividers) into a draft. The draft is not saved; check it in the editor, then save as usual.')}
               />
             </span>
           </DialogTitle>

@@ -206,7 +206,7 @@ export function TableDetail({ refName, info, error, loading, onOpenTable, onUseS
                       <td className={s.td}>{c.description}</td>
                       <td className={s.td}>
                         {c.type !== 'RECORD' && c.type !== 'STRUCT' && (
-                          <Button size="small" appearance="subtle" disabled={!!profileBusy} onClick={() => void runProfile(c.name)} title="空の数・値の種類・最小・最大・よく出る値を調べる(この列を全件読む。多いときは先に確かめる)">
+                          <Button size="small" appearance="subtle" disabled={!!profileBusy} onClick={() => void runProfile(c.name)} title="空の数・値の種類・最小・最大・よく出る値を調べる(この列を全件読む。多いときは先に確認する)">
                             {profileBusy === c.name ? '調べています…' : '調べる'}
                           </Button>
                         )}

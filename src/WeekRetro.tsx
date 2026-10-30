@@ -178,7 +178,7 @@ export function WeekRetro(props: Props) {
           value={draft}
           onChange={(_, d) => setDraft(d.value)}
         />
-        {fromAi && <span className={s.caption}>{t('AI の下書きです。数字と言い回しを確かめて、直してから保存してください(保存するまでは残りません)', 'This is an AI draft. Check the numbers and wording, edit, then save (nothing is kept until you save)')}</span>}
+        {fromAi && <span className={s.caption}>{t('AI の下書きです。数字と言い回しを確認して、直してから保存してください(保存するまでは残りません)', 'This is an AI draft. Check the numbers and wording, edit, then save (nothing is kept until you save)')}</span>}
         {draftError && <span className={s.error}>{draftError}</span>}
       </div>
       <span className={s.actions}>
