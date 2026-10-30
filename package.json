@@ -14,7 +14,8 @@
     "dev:gcp": "vite",
     "build:gcp": "vite build",
     "seed:export": "node scripts/export-seed.mjs",
-    "release:workbench": "node scripts/release-workbench.mjs"
+    "release:workbench": "node scripts/release-workbench.mjs",
+    "pack:ms-verify": "node scripts/pack-ms-verify.mjs"
   },
   "dependencies": {
     "@codemirror/lang-html": "6.4.12",

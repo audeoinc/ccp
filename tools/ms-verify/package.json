@@ -1,0 +1,22 @@
+{
+  "name": "ccp-ms-verify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CCP の頼みを Copilot Studio のエージェントに送って測る検証の道具(Direct Line・Microsoft 365 Agents SDK)",
+  "type": "module",
+  "scripts": {
+    "measure": "node measure.mjs",
+    "measure:dl": "node measure.mjs --via dl",
+    "self-test": "node measure.mjs --self-test",
+    "check-token-endpoint": "node check-token-endpoint.mjs"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.5.0",
+    "@microsoft/agents-activity": "1.9.1",
+    "@microsoft/agents-copilotstudio-client": "1.9.1",
+    "open": "^11.0.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

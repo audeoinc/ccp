@@ -379,9 +379,10 @@ Direct Line の窓口は、既定の `https://directline.botframework.com` で�
 | エージェント | Copilot Studio で、`CCP AI 出口の検証`(GitHub Copilot ハーネス)・`CCP AI 出口の検証 標準`・`CCP AI 出口の検証 DL` を消す(エージェントの一覧 → … → 削除) |
 | Direct Line の鍵 | エージェントを消さないなら、「Web チャネルのセキュリティ」でシークレットを再生成して、古い鍵を無効にする |
 | Entra のアプリ | 「CCP AI 出口の検証 SDK」の登録を消す(Entra の管理センター)。承諾だけを取り消すなら `https://myapps.microsoft.com` から |
-| サインインのトークン | `%USERPROFILE%\.ccp\ms-verify\.token-cache.json` を消す(アクセストークンと更新用のトークンが入っている) |
+| サインインのトークン | `tools/ms-verify/.token-cache.json` を消す(アクセストークンと更新用のトークンが入っている。2026-10-30 より前に道具をリポジトリの外で動かしていたなら、`%USERPROFILE%\.ccp\ms-verify\.token-cache.json` も) |
+| 測った結果 | `tools/ms-verify/results/` を消す(答えの全文が入っている) |
 | 設定のファイル | `%USERPROFILE%\.ccp\ms-verify.env` を消す(鍵・環境の ID・トークン エンドポイントの URL が入っている) |
-| 書き出したテンプレート | `%USERPROFILE%\.ccp\ms-verify\template\` を消す(組織の識別子が入っている) |
+| 書き出したテンプレート・古い道具 | `%USERPROFILE%\.ccp\ms-verify\` を消す(2026-10-30 より前の道具の置き場。書き出したテンプレートには組織の識別子が入っている) |
 | pac | サインインを消す: `pac auth clear`。外す: `winget uninstall --id Microsoft.PowerAppsCLI` |
 
 ## 12. 方式 2: Copilot Studio + Microsoft 365 Agents SDK
@@ -416,23 +417,30 @@ Direct Line の窓口は、既定の `https://directline.botframework.com` で�
 
 1. Entra に、公開クライアントのアプリを登録する(12.1 の権限)。テナント ID・アプリ ID はリポジトリの外のファイルに置く。
 2. エージェントを公開する(5 章)。
-3. 測るプログラム(12.4)に設定を入れて動かす。最初の 1 回だけブラウザが開くので、人がサインインして承諾する。
+3. 測るプログラム(12.4。`tools/ms-verify/`)に設定を入れて動かす。最初の 1 回だけブラウザが開くので、人がサインインして承諾する。
 4. 表(`results/<日時>_<方式>_<モデル>.md`)を 10.1 に写す。
 
-### 12.4 測るプログラム(リポジトリの外に置く)
+### 12.4 測るプログラム(`tools/ms-verify/`)
 
-Microsoft のサンプル `microsoft/Agents` の `samples/nodejs/copilotstudio-client` を元にした、Node(22 以上)のプログラム。7 章の T1〜T6 を送り、秒数と答えの形を表に書き出す。方式 1(Direct Line)と方式 2(Agents SDK)の両方で送れる。
+Node(22 以上)のプログラム。7 章の T1〜T6 を送り、秒数と答えの形を表に書き出す。方式 1(Direct Line)と方式 2(Agents SDK)の両方で送れる。方式 2 の部分は、Microsoft のサンプル `microsoft/Agents` の `samples/nodejs/copilotstudio-client` を元にした。**検証の道具で、CCP の画面・サーバーには入れない**(Workbench 版の ZIP にも入らない)。
 
 | ファイル | 中身 |
 |---|---|
-| `%USERPROFILE%\.ccp\ms-verify\measure.mjs` | 送って測る本体 |
-| `%USERPROFILE%\.ccp\ms-verify\tests.mjs` | T1〜T6 の頼みと、決まりの確かめ(7 章と同じ中身。直すときは両方) |
-| `%USERPROFILE%\.ccp\ms-verify\check-token-endpoint.mjs` | 鍵なしの入口で断られるかを確かめる(8 章) |
-| `%USERPROFILE%\.ccp\ms-verify\package.json` | 使う部品(`@microsoft/agents-copilotstudio-client`・`@microsoft/agents-activity`・`@azure/msal-node`・`open`) |
-| `%USERPROFILE%\.ccp\ms-verify\images\` | T6 の写真 |
-| `%USERPROFILE%\.ccp\ms-verify.env` | 設定(下)。リポジトリに入れない |
-| `%USERPROFILE%\.ccp\ms-verify\.token-cache.json` | 方式 2 のサインインのトークン(プログラムが作る)。消すと、次はサインインし直し |
-| `%USERPROFILE%\.ccp\ms-verify\results\` | 測った表(`<日時>_<方式>_<モデル>.md`)と、答えの全文(同じ名前の `.json`) |
+| `tools/ms-verify/measure.mjs` | 送って測る本体 |
+| `tools/ms-verify/tests.mjs` | T1〜T6 の頼みと、決まりの確かめ(7 章と同じ中身。直すときは両方) |
+| `tools/ms-verify/check-token-endpoint.mjs` | 鍵を必須にしたエージェントが、鍵なしの入口を断るかを確かめる(8 章)。Agents SDK 用の接続先の URL を入れたときは、Direct Line のトークン エンドポイントを組み立てて試す |
+| `tools/ms-verify/make-sample-image.mjs` | T6 の見本の図を描く |
+| `tools/ms-verify/images/t6-sample.png` | T6 の見本の図(緑の長袖のセーター。写真ではなく、プログラムで塗った図) |
+| `tools/ms-verify/package.json` | 使う部品(`@microsoft/agents-copilotstudio-client`・`@microsoft/agents-activity`・`@azure/msal-node`・`open`) |
+| `scripts/pack-ms-verify.mjs` | 道具を ZIP に固める(下) |
+
+**リポジトリの外に置くもの**(Git にも ZIP にも入れない):
+
+| ファイル | 中身 |
+|---|---|
+| `%USERPROFILE%\.ccp\ms-verify.env` | 設定(下)。鍵・環境の ID などを書く |
+| `tools/ms-verify/.token-cache.json` | 方式 2 のサインインのトークン(プログラムが作る。.gitignore で外す)。消すと、次はサインインし直し |
+| `tools/ms-verify/results/` | 測った表(`<日時>_<方式>_<モデル>.md`)と、答えの全文(同じ名前の `.json`)。.gitignore で外す |
 
 設定(`ms-verify.env`):
 
@@ -445,17 +453,18 @@ MODEL_LABEL=<モデルの名前>                  # エージェントの「概�
 DIRECT_LINE_SECRET=<シークレット 1>          # 方式 1。「Web チャネルのセキュリティ」
 DIRECT_LINE_ENDPOINT=<窓口>                 # 方式 1。なくてよい(既定の窓口)
 COPILOT_TOKEN_ENDPOINT=<URL>                # 鍵なしの入口の確かめ。同じ環境のホストとスキーマ名が入った URL
+FORBIDDEN_WORDS=<言葉>,<言葉>               # なくてよい。ZIP の検査で、入っていないことを確かめる言葉(テナント・環境の名前など)
 ```
 
 動かし方:
 
 ```powershell
-cd $env:USERPROFILE\.ccp\ms-verify
+cd tools\ms-verify
 npm install
 node measure.mjs --self-test                 # つながずに、確かめの仕組みだけを試す
 node measure.mjs --runs 1                    # 方式 2 で T1〜T5 を 1 回ずつ。最初の 1 回だけブラウザが開く
 node measure.mjs --via dl --runs 1           # 方式 1(Direct Line)で T1〜T5 を 1 回ずつ。サインインしない
-node measure.mjs --via dl --only T6 --image images\t6.png   # T6 を、画像を付けて送る(png・jpeg・webp)
+node measure.mjs --via dl --only T6 --image images\t6-sample.png   # T6 を、画像を付けて送る(png・jpeg・webp)
 node measure.mjs --only T3 --runs 5          # T3 だけ 5 回
 node measure.mjs --model "<別のモデルの名前>"   # エージェントのモデルを替えたあと。MODEL_LABEL より優先
 node check-token-endpoint.mjs                # 鍵なしの入口で断られるか(8 章)
@@ -465,6 +474,21 @@ node check-token-endpoint.mjs                # 鍵なしの入口で断られる
 - 秒数は 4 つ: 会話を始めるまで・最初に何かが届くまで(入力中の印など)・本文が届くまで・終わりまで。
 - モデルの名前は、つなぎ方からは分からないので、設定か `--model` で渡す。渡さないと止まる。
 - 鍵・トークン・ID・URL は画面に出さない(つまずきの理由も 200 文字までにし、ID は伏せる)。
+- 本番に近い写真で試すときは、自分で撮った写真などを、リポジトリの外に置いて `--image` で渡す(商品の写真はリポジトリに入れない)。
+
+#### ZIP にして渡す・受け取る
+
+手で 1 つずつ落とさずに済むように、道具を 1 つの ZIP に固める。
+
+```powershell
+npm run pack:ms-verify                  # リポジトリの最上位で。release-out\ccp-ms-verify-<日付>-<コミット>.zip
+```
+
+- 入るもの: コミット済みの `tools/ms-verify/` と、この手順書の写し(`docs/MS_AI_VERIFY.md`)。コミットしていない変更は入らない。
+- 必ず外すもの: `node_modules/`・`*.env`・`.token-cache.json`・`results/`(コミットされていなくても、名前で外す)。
+- 検査: 作った ZIP を読み直し、中身の一覧を出して、環境の ID(GUID の形)・メール・テナントのドメイン・環境のホスト・開発元の名前と、手元の `ms-verify.env` の値(と `FORBIDDEN_WORDS`)が入っていないかを確かめる。見つかったら止まる(値は出さない)。
+- GitHub の Releases への公開: `npm run pack:ms-verify -- --publish`(タグ `ms-verify-<日付>-<コミット>`)。**公開は利用者の承認のあとだけ**(連絡係が流す)。
+- 受け取った人: ZIP を展開し、中の `README.md` のとおり `npm install` から始める。設定は、各自の `%USERPROFILE%\.ccp\ms-verify.env` に書く(ZIP には入っていない)。
 
 ### 12.5 疎通を先に確かめる
 

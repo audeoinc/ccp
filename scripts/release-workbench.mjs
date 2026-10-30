@@ -35,6 +35,8 @@ const RULES = [
   ['exclude', /^server\/requirements-hosted\.txt$/],
   ['exclude', /^server\/tests\/test_hosted_/],
   ['exclude', /^\.github\//],
+  // Copilot Studio を CCP から呼ぶ検証の道具と、それを ZIP に固めるスクリプト(開発側で使う。手順と結果の docs/MS_AI_VERIFY.md は入れる)
+  ['exclude', /^(tools\/|scripts\/pack-ms-verify\.mjs$)/],
   // 開発用の文書(開発の進め方・本番の運用。利用先には、release/workbench/files の版を渡す)
   ['exclude', /^(README|CLAUDE)\.md$/],
   // UPDATE.md(利用先の Git への入れ方)は ZIP に入れない(利用者の指示 2026-10-20。手順は別に渡す)
@@ -67,8 +69,8 @@ const RULES = [
   ['include', /^docs\//],
 ]
 
-// package.json から消すスクリプト(開発元の本番への反映・撮影)
-const DROP_SCRIPTS = ['deploy:gcp', 'screenshots']
+// package.json から消すスクリプト(開発元の本番への反映・撮影・検証の道具の ZIP)
+const DROP_SCRIPTS = ['deploy:gcp', 'screenshots', 'pack:ms-verify']
 
 // ---- 残してはいけない言葉(大文字小文字は区別しない)。足すときは docs/RELEASE.md の表も直す
 const BANNED = [
