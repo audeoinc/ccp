@@ -95,7 +95,7 @@ pac copilot list --environment <環境の ID>   # その環境のエージェン
 
 1. Copilot Studio を開き、サインインする。
 2. 右上の環境の切り替えで、4 章で選んだ Developer の環境を選ぶ。
-3. 「エージェント」→「新しいエージェント」(会話で作る画面が出たら、「構成」のタブに切り替える)。
+3. **標準(standard)のハーネスで作る。** ホームの「Other ways to build」(ほかの作り方)か、以前の画面(左の列の下の「…」→「Open classic experience」)から「新しいエージェント」(未確認)。新しい画面の「新しいエージェント」で作ると GitHub Copilot ハーネスになり、CCP から呼べない(12.6)。会話で作る画面が出たら、「構成」のタブに切り替える。
 4. 名前: `CCP AI 出口の検証`
 5. 指示の欄を押してから、次をそのまま貼る。
 
@@ -301,6 +301,8 @@ Direct Line の呼び方(層の中で行うこと):
 | 2026-10-30 | 同上 | テストの欄 | GPT 6.1 Sol | T1 | 2 | ○ | ○ | なし | 未記録 | 同上 | 7・14・9 文字 |
 | 2026-10-30 | 同上 | テストの欄 | GPT 6.1 Sol | T1 | 3 | ○ | ○ | なし | 未記録 | 同上 | 7・13・9 文字 |
 
+| 2026-10-30 | 2 | 測るプログラム(Agents SDK) | GPT 6.1 Sol | T1 | 1 | × | × | — | 会話を始める 0.90・本文 0.41 | — | **断られた**: 「This action doesn't support agents built with the GitHub Copilot harness.」(12.6) |
+
 - T1 の 3 回: どれも JSON だけで返り、`ideas` は 3 つ、元の見出しより短く、入力にない事実はなかった。3 回の案はほぼ同じ(「秋の新作ニット」「新作ニットで秋支度」は 3 回とも同じ文)で、ばらつきは小さい。判定は、測るプログラムの確かめ(`tests.mjs`)にも通した。
 - T2〜T6 は、方式 2 の疎通(12.5)のあとに回す(2026-10-30 利用者)。
 
@@ -409,6 +411,18 @@ node measure.mjs --model "<別のモデルの名前>"   # エージェントの�
 cd $env:USERPROFILE\.ccp\ms-verify
 node measure.mjs --only T1 --runs 1
 ```
+
+### 12.6 つまずき: 「GitHub Copilot harness」のエージェントは SDK から呼べない
+
+2026-10-30、12.5 の手順で T1 を送ると、サインイン・つなぎは通ったが、エージェントから「This action doesn't support agents built with the GitHub Copilot harness.」とだけ返った(0.4 秒。頼みは処理されていない)。
+
+- Copilot Studio のエージェントには「ハーネス」(エージェントを動かす仕組み)が 2 つある。**新しい画面で「新しいエージェント」から作ると、GitHub Copilot ハーネスになる**(今回のもの。既定のモデルが Claude だったのも、このため らしい。未確認)。もう 1 つは、以前からある **標準(standard)のハーネス**。
+  - GitHub Copilot ハーネス: 目標を受けて手順を組み、ツールを使い分ける、重い仕事向け。名前に GitHub Copilot とあるが、GitHub Copilot のサービスにデータは行かない。費用は使った分(Copilot のクレジット)。
+  - 標準のハーネス: 決まった話題・頼みに、決まった形で答える向け。チャネル・つなぎ方は、こちらのほうが揃っている。
+- Microsoft Learn で確かめられたのは、Power Automate の Copilot Studio のつなぎが GitHub Copilot ハーネスに対応していないこと。Agents SDK・Direct Line については文書に書かれていないが、**Agents SDK は、今回の答えのとおり対応していない**。Direct Line も同じおそれがある(未確認)。
+- **CCP から呼ぶ検証には、標準のハーネスでエージェントを作り直す**(ハーネスを後から切り替える方法は、文書では見つからなかった。Microsoft は「移すのは作り直し」としている)。作り方は、Copilot Studio のホームで「Other ways to build」(ほかの作り方)を選ぶか、左の列の下の「…」→「Open classic experience」(以前の画面)から作る(未確認)。名前・指示・外すもの・モデルは 5・6 章と同じにする。
+
+出典: Microsoft Learn「Call a Copilot Studio agent from Power Automate」・「Harnesses overview」・「Choose a harness」・「Access standard harness agents and agent flows」(Copilot Studio)。
 
 ## 13. 確かめること: Copilot Studio で Anthropic のモデル(Claude)を使うとき(未確認)
 
