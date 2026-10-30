@@ -95,7 +95,7 @@ pac copilot list --environment <環境の ID>   # その環境のエージェン
 
 1. Copilot Studio を開き、サインインする。
 2. 右上の環境の切り替えで、4 章で選んだ Developer の環境を選ぶ。
-3. **標準(standard)のハーネスで作る。** ホームの「Other ways to build」(ほかの作り方)か、以前の画面(左の列の下の「…」→「Open classic experience」)から「新しいエージェント」(未確認)。新しい画面の「新しいエージェント」で作ると GitHub Copilot ハーネスになり、CCP から呼べない(12.6)。会話で作る画面が出たら、「構成」のタブに切り替える。
+3. **標準(standard)のハーネスで作る。** 作る種類を選ぶ画面で、「Other ways to build」の下の **「エージェント [標準]」**(事前に定義したトピックとフローを使う、ルールベースの会話エージェント)を選ぶ(2026-10-30 確かめた)。いちばん上の「エージェント [GitHub Copilot]」で作ると、CCP から呼べない(12.6)。「エージェント [会話型 AI]」は、チャット・音声の顧客対応向けの別の種類なので選ばない。会話で作る画面が出たら、「構成」のタブに切り替える。
 4. 名前: `CCP AI 出口の検証`
 5. 指示の欄を押してから、次をそのまま貼る。
 
@@ -420,7 +420,7 @@ node measure.mjs --only T1 --runs 1
   - GitHub Copilot ハーネス: 目標を受けて手順を組み、ツールを使い分ける、重い仕事向け。名前に GitHub Copilot とあるが、GitHub Copilot のサービスにデータは行かない。費用は使った分(Copilot のクレジット)。
   - 標準のハーネス: 決まった話題・頼みに、決まった形で答える向け。チャネル・つなぎ方は、こちらのほうが揃っている。
 - Microsoft Learn で確かめられたのは、Power Automate の Copilot Studio のつなぎが GitHub Copilot ハーネスに対応していないこと。Agents SDK・Direct Line については文書に書かれていないが、**Agents SDK は、今回の答えのとおり対応していない**。Direct Line も同じおそれがある(未確認)。
-- **CCP から呼ぶ検証には、標準のハーネスでエージェントを作り直す**(ハーネスを後から切り替える方法は、文書では見つからなかった。Microsoft は「移すのは作り直し」としている)。作り方は、Copilot Studio のホームで「Other ways to build」(ほかの作り方)を選ぶか、左の列の下の「…」→「Open classic experience」(以前の画面)から作る(未確認)。名前・指示・外すもの・モデルは 5・6 章と同じにする。
+- **CCP から呼ぶ検証には、標準のハーネスでエージェントを作り直す**(ハーネスを後から切り替える方法は、文書では見つからなかった。Microsoft は「移すのは作り直し」としている)。作り方は 5 章の手順 3(「Other ways to build」の「エージェント [標準]」)。名前・指示・外すもの・モデルは 5・6 章と同じにする。
 
 出典: Microsoft Learn「Call a Copilot Studio agent from Power Automate」・「Harnesses overview」・「Choose a harness」・「Access standard harness agents and agent flows」(Copilot Studio)。
 
