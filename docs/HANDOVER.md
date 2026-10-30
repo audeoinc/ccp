@@ -20,6 +20,8 @@
 
 - 2026-10-29 UI 1: X87 段 ①(機能の公開・非公開の土台: features.ts・isOn・表 feature_settings と '*'・users.is_developer・⚙「使える機能」・「一般の人として見る」)をブランチ claude/ui1-x87-flags に。入口への判定(段 ②)はまだ。詳しくは FEATURE_FLAGS.md の 3 章の囲み
 - 2026-10-29 UI 2: シンプルな配信カードの AI の入口をそろえた(渡す文章は「AI で書く → 案を押すと入る」`NotesAiDraft`・空いた枠は「入れる」の引き出し・テーマは「AI で変える」・引き出しは確定で閉じる `drawerClose.ts`)。開いたときはアラートがあればアラート、商品情報は閉じる
+- 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ
+- 2026-10-30 連絡係: CCP の AI を Microsoft の AI に替える検証(方式 2: Copilot Studio + Agents SDK を優先。Azure OpenAI は想定しない)を、専用の作業チャットでブランチ claude/ai-outlet-b3c4ae に。手順書 docs/MS_AI_VERIFY.md(main には未。入れるなら Workbench の ZIP から外す)。テストの欄の T1 は合格、疎通は Entra のアプリの登録待ち
 
 ## 3. 次にやること
 
