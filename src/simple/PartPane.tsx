@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, ToggleButton, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Divider, ToggleButton, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular, ChevronUpRegular, ImageEditRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { ChooseDrawer } from '../ChoosePanel'
@@ -653,8 +653,10 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
               }
             />
             {pageImageOn && <ProductImageSwap editor={e} itemKey={it.key} open={imageAt === it.key} onOpenChange={(o) => onImageAt(o ? it.key : null)} hideTrigger />}
-            {/* 枠の見せ方「ふつう | 詳しく」(X80)。入れ替え・画像の行のすぐ下に小さく。「詳しく」のときだけ、見出し・説明文の欄(2026-10-30 利用者) */}
+            {/* 枠の見せ方「詳しく見せる」(X80)。入れ替え・画像の行のすぐ下に、商品とひとまとまりに。オンのときだけ、見出し・説明文の欄(2026-10-30 利用者) */}
             <ProductDetailFields item={it} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />
+            {/* ここから下はリンク先・計測(商品の見せ方の設定の続きに見えないように、線で分ける) */}
+            <Divider />
             {e.channel === 'email' && <TrackedUrl url={e.productLinkOf(it.key)?.url ?? ''} />}
             {/* 並べ替え・外すは、プレビューの上で(つかんで動かす・Alt + 矢印・右クリック・×・Delete)。ここの「前へ・後ろへ・外す」の行はやめた
                 (商品は上下左右に並ぶので、前後の矢印では向きを表せない。外すは、外したい商品の上で。2026-10-26 利用者) */}

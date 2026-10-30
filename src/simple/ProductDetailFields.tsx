@@ -1,16 +1,16 @@
-// 商品の枠の見せ方「ふつう | 詳しく」(X80)。部品のペインの「商品を入れ替える」「画像を替える」の行のすぐ下に、小さく薄い切り替えで置く
-// (2026-10-30 利用者: 横長のボタンは分かりにくかった。いまの見せ方が見えるので「ふつうに戻す」は置かない)。
-// 「詳しく」にすると、その枠だけ横いっぱいの行(写真 + 見出し + 長い説明)になり、すぐ下に見出し・説明文の欄が出る。ふつうに戻すと、見出し・説明文も消える。
+// 商品の枠の見せ方「詳しく見せる」(X80)。部品のペインの「商品を入れ替える」「画像を替える」の行のすぐ下に、スイッチ 1 つで置く
+// (2026-10-30 利用者: 横長のボタン・2 つのタブは、ほかの欄の設定に見えて分かりにくかった。オン / オフなら 2 択とすぐ分かる)。
+// オンにすると、その枠だけ横いっぱいの行(写真 + 見出し + 長い説明)になり、すぐ下に見出し・説明文の欄が出る。ふつうに戻すと、見出し・説明文も消える。
 // 枠の数・順番は変えない。説明文を商品ページから AI に下書きしてもらうのは段 ③(ページの本文を残す段 ② のあと)
-import { Field, Input, Tab, TabList, makeStyles, tokens } from '@fluentui/react-components'
+import { Field, Input, Switch, makeStyles, tokens } from '@fluentui/react-components'
 import { AutoTextarea } from '../AutoTextarea'
 import { useT } from '../i18n'
 import { typo } from '../typo'
 import type { Item } from '../items'
 
 const useStyles = makeStyles({
-  toggle: { display: 'flex', alignItems: 'center', columnGap: '8px' },
-  // ラベルは値に付く目印として小さく薄く(LabeledValue と同じ決まり)
+  toggle: { display: 'flex', alignItems: 'center', columnGap: '4px' },
+  // 添える説明は小さく薄く(LabeledValue のラベルと同じ決まり)
   label: { ...typo.label, whiteSpace: 'nowrap' },
   fields: { display: 'grid', rowGap: '8px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -28,22 +28,14 @@ export function ProductDetailFields({ item, onChange, detailCount }: { item: Ite
   return (
     <>
       <div className={s.toggle}>
-        <span className={s.label}>{t('見せ方', 'Display')}</span>
-        <TabList
-          size="small"
-          appearance="subtle"
-          selectedValue={item.detail ? 'detail' : 'normal'}
-          onTabSelect={(_, d) => {
-            if (d.value === 'detail' && !item.detail) onChange({ title: '', body: '' })
-            if (d.value === 'normal' && item.detail) onChange(null)
-          }}
-          aria-label={t('この商品の見せ方', 'How this product is shown')}
-        >
-          <Tab value="normal">{t('ふつう', 'Normal')}</Tab>
-          <Tab value="detail" title={t('この枠だけ横いっぱいの行にして、写真と見出し・長い説明でしっかり見せます(枠の数・順番は変わりません)', 'Make just this slot a full-width row with a photo, heading and long description (slot count and order do not change)')}>
-            {t('詳しく', 'Detailed')}
-          </Tab>
-        </TabList>
+        <Switch
+          checked={!!item.detail}
+          label={t('詳しく見せる', 'Show in detail')}
+          onChange={(_, d) => onChange(d.checked ? { title: item.detail?.title ?? '', body: item.detail?.body ?? '' } : null)}
+        />
+        <span className={s.label} title={t('この枠だけ横いっぱいの行にして、写真と見出し・長い説明でしっかり見せます(枠の数・順番は変わりません)', 'Make just this slot a full-width row with a photo, heading and long description (slot count and order do not change)')}>
+          {t('写真 + 長い説明', 'Photo + long description')}
+        </span>
       </div>
       {item.detail && (
         <div className={s.fields}>
