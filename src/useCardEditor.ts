@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { tr } from './i18n'
 import { cardMarket, heroMarket, productMarket } from './market'
 import { DeliveryCardsService } from './data/deliveryCards'
-import type { DeliveryCard } from './models/deliveryCards'
+import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import { filled, insertAt, joinSections, moveTo, removeKey, selectedSlots, splitSections } from './slots'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Product } from './models/products'
@@ -85,7 +85,7 @@ export interface CardEditorDeps {
   /** undefined のときは新規作成 */
   card?: DeliveryCard
   defaults?: Partial<Form>
-  draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[] }
+  draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[]; joinFields?: () => Promise<Partial<DeliveryCardFields>> }
   products: Product[]
   heroes: HeroImage[]
   weeks: WeekRow[]
@@ -650,7 +650,9 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
               }
             : null,
         writeCard: async () => {
-          const res = card ? await DeliveryCardsService.update(card.id, fields) : await DeliveryCardsService.create({ ...fields, state_code: 0 })
+          // 作業画面の案を新しく保存するときは、同じ国・同じ配信日のキャンペーンに入れる(X79 の (f)。joinFields が入れ先を決める)
+          const join = !card && draft?.joinFields ? await draft.joinFields() : {}
+          const res = card ? await DeliveryCardsService.update(card.id, fields) : await DeliveryCardsService.create({ ...fields, ...join, state_code: 0 })
           if (!res.success) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
           const id = card?.id ?? res.data?.id
           if (!id) throw new Error(tr('配信カードのIDを取得できませんでした', 'Could not get the delivery card ID'))

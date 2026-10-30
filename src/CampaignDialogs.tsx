@@ -1,5 +1,5 @@
-// キャンペーン(X79)を作る窓と、キャンペーンに配信カードを足す窓(段 ④ の 6)。
-// どちらも小さい確かめの窓なので、複製の窓(CardMenu の DuplicateDialog)と同じ形で、大きさは固定
+// キャンペーン(X79)を作る窓と、キャンペーンに配信カードを足す窓(段 ④ の 6)、キャンペーンの「⋯」とまとめての取りやめの窓((e))。
+// どれも小さい確かめの窓なので、複製の窓・取りやめの窓(CardMenu)と同じ形で、大きさは固定
 import { useState } from 'react'
 import {
   Button,
@@ -13,23 +13,34 @@ import {
   Dropdown,
   Field,
   Input,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   MessageBar,
   MessageBarBody,
   Option,
   Radio,
   RadioGroup,
+  Textarea,
+  Tooltip,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { AddRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowUndoRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Campaign } from './models/campaigns'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { WeekRow } from './data/weeks'
-import { addCardToCampaign, createCampaignWithCard, liveChildren, nextChannel } from './campaignOps'
-import { campaignDateOf, cardDisplayName, cardNameFor } from './campaigns'
+import { addCardToCampaign, cancelCampaign, createCampaignWithCard, lastCancelledBatch, liveChildren, nextChannel, undoCampaignCancel } from './campaignOps'
+import { campaignDateOf, cardDisplayName, cardNameFor, cardsOfCampaign } from './campaigns'
+import { isCancelled } from './cancel'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 import { toLocalInput } from './duplicate'
 import { locale, optionLabel, useT } from './i18n'
-import { CHANNEL_PUSH, countryOptions } from './status'
+import { CHANNEL_PUSH, countryOptions, statusRank } from './status'
+import { STATUS_APPROVED } from './cardForm'
 import { confirmedWeekOf } from './weekLock'
 import { saveLastNewCountry } from './settings'
 
@@ -37,6 +48,7 @@ const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '10px' },
   hint: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   copyFrom: { display: 'grid', rowGap: '4px', paddingLeft: '28px' },
+  list: { margin: 0, paddingLeft: '20px' },
 })
 
 /** チャネルの選び方(メール / アプリ)。横に並べる */
@@ -245,5 +257,159 @@ export function AddCampaignCardDialog({ campaign, cards, weeks, onClose, onCreat
         </DialogBody>
       </DialogSurface>
     </Dialog>
+  )
+}
+
+/**
+ * キャンペーンの帯の「⋯」(X79 の (e)。2026-10-30 利用者): キャンペーンをまとめて取りやめる / まとめての取りやめを取り消す。
+ * 言葉と窓は、カードの「⋯」の取りやめ(CardMenu)にそろえる。取りやめの公開・非公開も、カードと同じ card.cancel で決める。
+ * 取り消すほうは、カードと同じく、非公開でも出す(取りやめたままで戻せなくならないように)
+ */
+export function CampaignMenu({ campaign, cards, weeks, beforeRun, onChanged, busy }: {
+  campaign: Campaign
+  /** すべての配信カード(取りやめたものも含む。子を、ここから選ぶ) */
+  cards: DeliveryCard[]
+  weeks: WeekRow[]
+  /** 取りやめる前に、開いているカードの変更を保存する(保存できなければ false で止める) */
+  beforeRun: () => Promise<boolean>
+  /** 取りやめ・取り消しのあと(配信を読み直す) */
+  onChanged: () => Promise<void>
+  busy?: boolean
+}) {
+  const s = useStyles()
+  const t = useT()
+  const cancelOn = useFeature('card.cancel')
+  const [dialog, setDialog] = useState<'cancel' | 'undo' | null>(null)
+  const [reason, setReason] = useState('')
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const children = cardsOfCampaign(campaign.id, cards)
+  const live = children.filter((c) => !isCancelled(c))
+  const batch = lastCancelledBatch(children)
+  const nameOf = (c: DeliveryCard) => cardDisplayName(c, [campaign])
+  // 制作に渡した・承認した配信も止めない(カードの取りやめと同じ)。窓で名前を見せ、制作の担当に知らせてもらう
+  const handedOff = live.filter((c) => !!c.handed_off_at)
+  const approved = live.filter((c) => !c.handed_off_at && statusRank(c.status) >= statusRank(STATUS_APPROVED))
+  if (!(live.length && cancelOn) && !batch.length) return null
+  const open = (d: 'cancel' | 'undo') => {
+    setReason('')
+    setError(null)
+    setDialog(d)
+  }
+  const run = async (fn: () => Promise<void>) => {
+    setRunning(true)
+    setError(null)
+    try {
+      if (!(await beforeRun())) return
+      await fn()
+      setDialog(null)
+      await onChanged()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      // 途中で止まっても、そこまでに取りやめたカードを画面に出す
+      await onChanged()
+    } finally {
+      setRunning(false)
+    }
+  }
+  const names = (list: DeliveryCard[]) => (
+    <ul className={s.list}>
+      {list.map((c) => (
+        <li key={c.id}>{nameOf(c)}</li>
+      ))}
+    </ul>
+  )
+  return (
+    <>
+      <Menu>
+        <MenuTrigger disableButtonEnhancement>
+          <Tooltip content={t('キャンペーンの操作', 'Campaign actions')} relationship="label">
+            <Button type="button" size="small" appearance="subtle" icon={<MoreHorizontalRegular />} disabled={busy || running} />
+          </Tooltip>
+        </MenuTrigger>
+        <MenuPopover>
+          <MenuList>
+            {live.length > 0 && cancelOn && (
+              <MenuItem icon={<ProhibitedRegular />} onClick={() => open('cancel')}>
+                {t('キャンペーンを取りやめにする…', 'Cancel the campaign…')}
+                <FeatureBadge id="card.cancel" />
+              </MenuItem>
+            )}
+            {batch.length > 0 && (
+              <MenuItem icon={<ArrowUndoRegular />} onClick={() => open('undo')}>
+                {t('キャンペーンの取りやめを取り消す…', 'Undo the campaign cancellation…')}
+              </MenuItem>
+            )}
+          </MenuList>
+        </MenuPopover>
+      </Menu>
+
+      <Dialog open={dialog === 'cancel'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{t(`「${campaign.name}」を取りやめにする`, `Cancel "${campaign.name}"`)}</DialogTitle>
+            <DialogContent className={s.body}>
+              <span>
+                {t(
+                  `このキャンペーンの配信 ${live.length} 本を、まとめて取りやめにします。取りやめた配信は、消さずに残ります(カレンダーに薄く出て、アラート・週の確認・件数からは外れます)。確定した週の配信なら、週の確定は解けます`,
+                  `Cancels all ${live.length} deliveries in this campaign. They are kept (shown faded in the calendar, and left out of alerts, week checks and counts). If the week is confirmed, it goes back to review.`,
+                )}
+              </span>
+              {names(live)}
+              {(handedOff.length > 0 || approved.length > 0) && (
+                <MessageBar intent="warning" layout="multiline">
+                  <MessageBarBody>
+                    {handedOff.length > 0 &&
+                      t(
+                        `制作に渡した配信があります(${handedOff.map(nameOf).join('、')})。取りやめても、制作の作業は止まりません。制作の担当にも知らせてください。`,
+                        `Some deliveries were handed off to production (${handedOff.map(nameOf).join(', ')}). Cancelling does not stop the production work, so let the production owner know. `,
+                      )}
+                    {approved.length > 0 &&
+                      t(`承認済みの配信があります(${approved.map(nameOf).join('、')})。`, `Some deliveries are already approved (${approved.map(nameOf).join(', ')}).`)}
+                  </MessageBarBody>
+                </MessageBar>
+              )}
+              <Field label={t('取りやめの理由', 'Reason')} required size="small">
+                <Textarea value={reason} onChange={(_, d) => setReason(d.value)} rows={3} />
+              </Field>
+              <ErrorBar error={error} />
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setDialog(null)}>{t('やめる', 'Back')}</Button>
+              <Button appearance="primary" disabled={running || !reason.trim()} onClick={() => void run(() => cancelCampaign(live, reason, weeks))}>
+                {t('取りやめにする', 'Cancel campaign')}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      <Dialog open={dialog === 'undo'} onOpenChange={(_, d) => !d.open && setDialog(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{t(`「${campaign.name}」の取りやめを取り消す`, `Undo cancelling "${campaign.name}"`)}</DialogTitle>
+            <DialogContent className={s.body}>
+              <span>{t('まとめて取りやめにした、次の配信を元に戻します', 'Restores these deliveries that were cancelled together')}</span>
+              {names(batch)}
+              {batch.length < children.length && (
+                <span className={s.hint}>
+                  {t(
+                    'その前に 1 本ずつ取りやめにした配信は、取りやめのまま残ります(戻すときは、その配信カードの「⋯」から)',
+                    'Deliveries cancelled one by one before that stay cancelled (restore them from "…" on each card).',
+                  )}
+                </span>
+              )}
+              <ErrorBar error={error} />
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setDialog(null)}>{t('やめる', 'Back')}</Button>
+              <Button appearance="primary" icon={<ArrowUndoRegular />} disabled={running} onClick={() => void run(() => undoCampaignCancel(batch))}>
+                {t('取りやめを取り消す', 'Undo cancellation')}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+    </>
   )
 }

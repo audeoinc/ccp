@@ -544,6 +544,7 @@ function App() {
     weeks,
     patterns,
     defaults: { country: filters.country, channel: filters.channel },
+    campaigns,
     onChanged: reloadCards,
   })
   // 以前の「週の枠」(W14 の最初の作り。中身のない配信カードを保存していた)が残っていれば、その配信。

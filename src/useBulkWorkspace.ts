@@ -22,6 +22,8 @@ import type { CardAlert } from './cardAlerts'
 import { SOURCE_AI, type Candidate, type Item } from './items'
 import { BULK_PARALLEL, BULK_TIME, createDraft, createPlainDraft, generateFor, overusedInWeek, previewCard, productIdsOf, slotItemsOf, weekDays, type DraftBase } from './bulkDraft'
 import type { DeliveryPattern } from './models/deliveryPatterns'
+import type { Campaign } from './models/campaigns'
+import { campaignForBulk } from './campaignOps'
 import { dayKeyOf } from './weekLock'
 import { confirmDialog } from './confirm'
 
@@ -36,6 +38,8 @@ interface Ctx {
   patterns: DeliveryPattern[]
   /** 国・チャネル・種別の既定(画面の絞り込み) */
   defaults: { country?: string; channel?: string; department?: string }
+  /** キャンペーン(id → 行)。保存する配信を、同じ国・同じ配信日のキャンペーンに入れるため(X79 の (f)) */
+  campaigns: ReadonlyMap<string, Campaign>
   /** 保存したら、配信を読み直す */
   onChanged: () => Promise<void>
 }
@@ -65,6 +69,8 @@ export interface BulkDraft {
   card: DeliveryCard
   items: Item[]
   candidates: Candidate[]
+  /** 配信カードで保存するときに一緒に書く、キャンペーンの列(X79 の (f)) */
+  joinFields: () => Promise<Partial<DeliveryCardFields>>
 }
 
 /** ③ で確かめる 1 本。保存する前は、仮の id の配信カード(previewCard) */
@@ -107,8 +113,13 @@ const hhmm = (iso: string) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks, patterns, defaults, onChanged }: Ctx) {
+export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks, patterns, defaults, campaigns, onChanged }: Ctx) {
   const [open, setOpen] = useState(false)
+  // この作業画面で作ったキャンペーン(国|配信日 → 行)。一覧を読み直す前に同じ日の 2 本目を保存しても、同じキャンペーンに入れるため
+  const madeCampaigns = useRef(new Map<string, Campaign>())
+  /** 保存する配信と一緒に書く、キャンペーンの列(同じ国・同じ配信日のメールとアプリを 1 つのキャンペーンに。X79 の (f)) */
+  const campaignOf = (base: DraftBase, r?: AutoDraftResult) =>
+    campaignForBulk(base, { theme: r?.theme, theme_reason: r?.themeIdeas[0]?.reason }, cards, campaigns, madeCampaigns.current)
   const [step, setStep] = useState<Step>(1)
   const [weekStart, setWeekStart] = useState(() => sundayOf(new Date()))
   const [country, setCountryRaw] = useState('')
@@ -384,7 +395,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     try {
       for (const day of list) {
         if (plain.has(day)) continue
-        const card = await createPlainDraft(baseOf(day))
+        const base = baseOf(day)
+        const card = await createPlainDraft(base, await campaignOf(base))
         setPlain((m) => new Map(m).set(day, card.id))
       }
       await onChanged()
@@ -507,7 +519,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     setError(null)
     setSavingDay(day)
     try {
-      const card = await createDraft(baseOf(day), r, products)
+      const base = baseOf(day)
+      const card = await createDraft(base, r, products, await campaignOf(base, r))
       setSavedIds((m) => new Map(m).set(day, card.id))
       setDiscarded((s) => {
         const n = new Set(s)
@@ -533,7 +546,8 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
       if (!r) continue
       setSavingDay(day)
       try {
-        const card = await createDraft(baseOf(day), r, products)
+        const base = baseOf(day)
+        const card = await createDraft(base, r, products, await campaignOf(base, r))
         setSavedIds((m) => new Map(m).set(day, card.id))
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -582,7 +596,7 @@ export function useBulkWorkspace({ cards, cardProducts, products, heroes, weeks,
     if (!r) return null
     const items: Item[] = slotItemsOf(baseOf(day), r, (i) => `ai-${day}-${i}`)
     const candidates: Candidate[] = r.sections.flatMap((s, si) => s.candidates.map((x, i) => ({ key: `ai-${day}-c${si}-${i}`, productId: x.productId, reason: x.reason, source: SOURCE_AI, section: si })))
-    return { card: previewCard(draftId(day), baseOf(day), r, products), items, candidates }
+    return { card: previewCard(draftId(day), baseOf(day), r, products), items, candidates, joinFields: () => campaignOf(baseOf(day), r) }
   }
   /** 配信カードで保存された(その案は、保存済みにする) */
   function markSaved(day: string, id: string) {

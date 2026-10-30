@@ -20,7 +20,7 @@ import { AiIcon } from './AiMark'
 import { EmptyDraftCta } from './EmptyDraftCta'
 import { cardMarket } from './market'
 import { AutoTextarea } from './AutoTextarea'
-import type { DeliveryCard } from './models/deliveryCards'
+import type { DeliveryCard, DeliveryCardFields } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { themeTypeLabel, type ThemeType } from './themeTypes'
@@ -65,7 +65,7 @@ import { useUndo } from './simple/useUndo'
 import { AbSettings } from './simple/AbSettings'
 import { CampaignBand, type CampaignBandSlots } from './CampaignBand'
 import { CampaignApprove } from './CampaignApprove'
-import { AddCampaignCardDialog } from './CampaignDialogs'
+import { AddCampaignCardDialog, CampaignMenu } from './CampaignDialogs'
 import { useCampaignOf } from './useCampaignOf'
 import { cardDisplayName } from './campaigns'
 import { useFeature } from './featureFlags'
@@ -86,7 +86,7 @@ interface Props {
    * 新規作成で、中身まで入れて開く(まとめて作る作業画面の、まだ保存していない AI の案)。
    * 保存すると新しい配信カードになり、onCreated で id を返す(作業画面が、その案を保存済みにする)
    */
-  draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[] }
+  draft?: { card: DeliveryCard; items: Item[]; candidates: Candidate[]; joinFields?: () => Promise<Partial<DeliveryCardFields>> }
   onCreated?: (id: string) => void
   /** 新しい配信を「保存」(閉じない)したとき、保存した配信として開き直す(X52) */
   onReopen?: (id: string) => void
@@ -727,6 +727,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             actions={
               <>
                 <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
+                <CampaignMenu campaign={campaign} cards={allCards ?? []} weeks={weeks} beforeRun={saveBeforeBulk} onChanged={onSaved} busy={saving} />
                 {/* 閉じる ×: フロートのいちばん上の右の角(キャンペーンの帯の 1 段目の右の端。2026-10-27 利用者)。ボタンなので、題の行でつかんで動かす動き(floatMove)には入らない */}
                 <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => void closeSimple()} aria-label={t('閉じる', 'Close')} />
               </>

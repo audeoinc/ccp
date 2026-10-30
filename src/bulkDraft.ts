@@ -122,9 +122,9 @@ const slotsByTemplate = (template: string, r: AutoDraftResult, keyOf: (n: number
 
 /**
  * 作業画面(BulkWorkspace)で作った中身を、新しい配信カードとして保存する。
- * 中身のない枠は作らず、1 本ずつ新規作成した下書きと同じ「未起案」で保存する
+ * 中身のない枠は作らず、1 本ずつ新規作成した下書きと同じ「未起案」で保存する。extra は一緒に書く列(campaign_id と控えの名前。campaignForBulk)
  */
-export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[]): Promise<DeliveryCard> {
+export async function createDraft(base: DraftBase, r: AutoDraftResult, products: Product[], extra: Partial<DeliveryCardFields> = {}): Promise<DeliveryCard> {
   const res = await DeliveryCardsService.create({
     name: base.name,
     scheduled_at: base.scheduled_at,
@@ -135,6 +135,7 @@ export async function createDraft(base: DraftBase, r: AutoDraftResult, products:
     status: 'not_started',
     state_code: 0,
     ...contentFields(base, r, products),
+    ...extra,
   })
   if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
   const card = res.data
@@ -157,7 +158,7 @@ export async function replaceContent(card: DeliveryCard, r: AutoDraftResult, pro
 }
 
 /** 作業画面で、中身を作らずに保存する(配信名・日時・国・チャネル・種類だけの「未起案」。1 本ずつ新規作成して、中身を入れずに保存したのと同じ) */
-export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
+export async function createPlainDraft(base: DraftBase, extra: Partial<DeliveryCardFields> = {}): Promise<DeliveryCard> {
   // 配信の型(ST9)でテンプレートが決まっていれば、それも入れる(作るときの最新の版)
   const tpl = base.layout_key && hasTemplate(baseTemplateId(base.layout_key)) && channelOf(base.layout_key) === (isPush(base) ? 'push' : 'email') ? base.layout_key : undefined
   const res = await DeliveryCardsService.create({
@@ -170,6 +171,7 @@ export async function createPlainDraft(base: DraftBase): Promise<DeliveryCard> {
     status: 'not_started',
     state_code: 0,
     ...(tpl ? { email_template: TEMPLATE_VALUES[tpl], layout_key: tpl, layout_version: currentVersion(tpl) } : {}),
+    ...extra,
   })
   if (!res.success || !res.data?.id) throw new Error(res.error?.message ?? tr('保存に失敗しました', 'Failed to save'))
   return res.data

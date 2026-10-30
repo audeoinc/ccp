@@ -23,8 +23,9 @@ const fail = (res: { success: boolean; error?: { message: string } }, ja: string
  * 配信を取りやめる。理由は、配信の列(cancel_reason)と、配信のメモ(種類 change)の両方に残す。
  * 確定した週の配信なら、週をレビュー中に戻し、承認の履歴に残す(確定した計画が変わるため)
  */
-export async function cancelDelivery(card: DeliveryCard, reason: string, weeks: WeekRow[]) {
-  const now = new Date().toISOString()
+export async function cancelDelivery(card: DeliveryCard, reason: string, weeks: WeekRow[], at?: string) {
+  // at: キャンペーンをまとめて取りやめるときは、子に同じ時刻を書く(まとめての取り消しで、一緒に取りやめたカードだけを戻すため)
+  const now = at ?? new Date().toISOString()
   fail(await DeliveryCardsService.update(card.id, { cancelled_at: now, cancel_reason: reason.trim() }), '取りやめにできませんでした', 'Could not cancel the delivery')
   fail(
     await CardNotesService.create({

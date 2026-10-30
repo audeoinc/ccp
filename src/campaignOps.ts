@@ -1,4 +1,4 @@
-// キャンペーン(X79)の操作: まとめての承認(段 ④ の 5)と、作る・足す(段 ④ の 6)。
+// キャンペーン(X79)の操作: まとめての承認(段 ④ の 5)と、作る・足す(段 ④ の 6)、まとめての取りやめ((e))、まとめて作るときの入れ先((f))。
 // 承認は、週の帯のまとめての承認(weekApprovals.ts)と同じ関数を、キャンペーンの子のカードに絞って呼ぶだけ(窓口と決まりを複製しない)。
 // 送る前の確かめは、開いているカードと同じ readinessOf を、保存した中身から組み立てて使う
 import type { Campaign } from './models/campaigns'
@@ -7,9 +7,10 @@ import { CampaignsService } from './data/campaigns'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { DeliveryProductsService } from './data/deliveryProducts'
 import type { Actor } from './data/approvals'
+import type { WeekRow } from './data/weeks'
 import type { CardAlert } from './cardAlerts'
 import { campaignDateOf, cardDisplayName, cardNameFor, cardsOfCampaign } from './campaigns'
-import { isCancelled } from './cancel'
+import { cancelDelivery, isCancelled, undoCancel } from './cancel'
 import { duplicateDelivery } from './duplicate'
 import { STATE_SELECTED } from './items'
 import { tr } from './i18n'
@@ -21,7 +22,8 @@ import { CHANNEL_PUSH } from './status'
 import { slotsOf, templateKeyOfCard } from './templates'
 import type { InboxItem } from './useApprovalInbox'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
-import { weekKeyOf } from './weekLock'
+import { scopeOfCard, weekKeyOf } from './weekLock'
+import { localDate } from './dates'
 
 const fail = (res: { success: boolean; error?: { message: string } }, ja: string, en: string) => {
   if (!res.success) throw new Error(res.error?.message ?? tr(ja, en))
@@ -207,4 +209,75 @@ export async function addCardToCampaign(campaign: Campaign, cards: DeliveryCard[
   const id = res.data?.id
   if (!id) throw new Error(tr('新しい配信カードの ID を取得できませんでした', 'Could not get the new delivery card ID'))
   return id
+}
+
+/**
+ * キャンペーンをまとめて取りやめる(X79 の (e)。2026-10-30 利用者)。取りやめていない子を、カードの取りやめ(cancelDelivery)と同じ決まりで、
+ * すべて取りやめる。すでに送った・制作に渡したカードも止めない(カードの取りやめと同じ。窓で名前を見せて、制作の担当に知らせてもらう)。
+ * 子には同じ時刻を書く(まとめての取り消しで、一緒に取りやめたカードだけを戻すため)。
+ * 確定した週を戻すのは、国・チャネルごとに 1 回だけ(同じ週の行を 2 回書きに行かないように)
+ */
+export async function cancelCampaign(children: DeliveryCard[], reason: string, weeks: WeekRow[]): Promise<void> {
+  const at = new Date().toISOString()
+  const reopened = new Set<string>()
+  for (const c of children.filter((x) => !isCancelled(x))) {
+    const scope = scopeOfCard(c)
+    const key = `${scope.country}|${scope.channel}`
+    await cancelDelivery(c, reason, reopened.has(key) ? [] : weeks, at)
+    reopened.add(key)
+  }
+}
+
+/**
+ * まとめての取り消しで戻すカード: 子がすべて取りやめのとき、いちばん新しい取りやめと同じ時刻のカード
+ * (キャンペーンをまとめて取りやめた組。その前に 1 枚ずつ取りやめていたカードは、取りやめのまま残す)。
+ * 取りやめていない子があれば、キャンペーンは取りやめではないので空
+ */
+export function lastCancelledBatch(children: DeliveryCard[]): DeliveryCard[] {
+  if (!children.length || children.some((c) => !isCancelled(c))) return []
+  const last = children.map((c) => c.cancelled_at ?? '').reduce((a, b) => (b > a ? b : a), '')
+  return children.filter((c) => c.cancelled_at === last)
+}
+
+/** まとめての取りやめを取り消す(lastCancelledBatch のカードを、カードの取り消しと同じ undoCancel で戻す) */
+export async function undoCampaignCancel(batch: DeliveryCard[]): Promise<void> {
+  for (const c of batch) await undoCancel(c)
+}
+
+/**
+ * まとめて作る(W14・BulkWorkspace)で保存する配信を入れるキャンペーン(X79 の (f)。2026-10-30 利用者)。
+ * 同じ国・同じ配信日のメールとアプリを 1 つのキャンペーンにまとめる: その国・その日の、取りやめていないカードが入っている
+ * キャンペーンがあれば、そこに入れる(メールの回で作り、あとのアプリの回で同じキャンペーンに入る)。なければ、
+ * 配信名をキャンペーン名にして新しく作る(テーマは作った中身のもの)。
+ * made は、この作業画面で作ったキャンペーン(国|配信日 → id)。一覧を読み直す前に、同じ日の 2 本目を保存しても、同じキャンペーンに入れるため。
+ * 返すのは、カードに一緒に書く列(campaign_id と、控えの名前「キャンペーン名 + チャネル」)
+ */
+export async function campaignForBulk(
+  base: Pick<DeliveryCard, 'name' | 'country' | 'channel' | 'scheduled_at' | 'theme_type'>,
+  theme: { theme?: string; theme_reason?: string },
+  cards: DeliveryCard[],
+  campaigns: ReadonlyMap<string, Campaign>,
+  made: Map<string, Campaign>,
+): Promise<Partial<DeliveryCardFields>> {
+  const country = String(base.country ?? '')
+  const day = localDate(base.scheduled_at)
+  const key = `${country}|${day}`
+  const joined = cards.find((c) => c.campaign_id && !isCancelled(c) && String(c.country ?? '') === country && localDate(c.scheduled_at) === day)
+  // キャンペーンの行をまだ読めていなくても(一覧の読み直しの前)、カードの campaign_id があれば、そこに入れる(2 つ目を作らない)
+  if (joined?.campaign_id) return { campaign_id: joined.campaign_id, name: cardNameFor(campaigns.get(joined.campaign_id)?.name ?? base.name ?? '', base.channel) }
+  const found = made.get(key)
+  if (found) return { campaign_id: found.id, name: cardNameFor(found.name, base.channel) }
+  const name = (base.name ?? '').trim()
+  const res = await CampaignsService.create({
+    name,
+    country,
+    ...(theme.theme ? { theme: theme.theme } : {}),
+    ...(theme.theme && theme.theme_reason ? { theme_reason: theme.theme_reason } : {}),
+    ...(base.theme_type ? { theme_type: base.theme_type } : {}),
+    state_code: 0,
+  })
+  fail(res, 'キャンペーンを作れませんでした', 'Could not create the campaign')
+  if (!res.data?.id) throw new Error(tr('キャンペーンの ID を取得できませんでした', 'Could not get the campaign ID'))
+  made.set(key, res.data)
+  return { campaign_id: res.data.id, name: cardNameFor(name, base.channel) }
 }
