@@ -34,6 +34,8 @@ import { countryOptions } from './status'
 import { dismissedHintCount, getHintsVersion, resetHints, subscribeHints } from './hints'
 import { optionLabel, useT } from './i18n'
 import { PREF } from './prefKeys'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 /** 設定の画面に並べる 1 つの操作(これまでの ⚙ のメニューの 1 項目) */
 export interface SettingsAction {
@@ -107,6 +109,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
   // 戻したら(版が上がる)数を数え直す。閉じたときは版が上がらないが、窓を開くたびに描き直すので、数は新しい
   useSyncExternalStore(subscribeHints, getHintsVersion)
   const hintCount = dismissedHintCount()
+  const autoRedraftOn = useFeature('ai.autoredraft')
   // ヘッダーが「すべての国」のときに、国の項目で使う国(ヘッダーで国を選んでいれば、そちらを使う)
   const [picked, setPicked] = useState(String(countryOptions[0]?.value ?? ''))
   const country = headerCountry || picked
@@ -147,10 +150,16 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
               <Radio value="en" label="English" />
             </RadioGroup>
           </div>
-          <div className={s.sub}>
-            <span className={s.subHead}>{t('AI', 'AI')}</span>
-            <Switch checked={autoDraft} onChange={(_, d) => onAutoDraft(d.checked)} label={t('テンプレートが見つからない配信カードを開いたとき、自動で下書きし直す', 'Auto-redraft a delivery card when its template is missing')} />
-          </div>
+          {/* AI の項目は、自動の下書きし直しの切り替えだけ。それを公開していなければ、見出しごと出さない(X87) */}
+          {autoRedraftOn && (
+            <div className={s.sub}>
+              <span className={s.subHead}>{t('AI', 'AI')}</span>
+              <span>
+                <Switch checked={autoDraft} onChange={(_, d) => onAutoDraft(d.checked)} label={t('テンプレートが見つからない配信カードを開いたとき、自動で下書きし直す', 'Auto-redraft a delivery card when its template is missing')} />
+                <FeatureBadge id="ai.autoredraft" />
+              </span>
+            </div>
+          )}
           <div className={s.sub}>
             <span className={s.subHead}>{t('ヒント', 'Tips')}</span>
             {/* 閉じた案内(Hint)を戻す(X72 の具体例 2)。閉じたものがないときは押せない(押しても何も起きないため) */}

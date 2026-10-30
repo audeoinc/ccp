@@ -170,6 +170,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 公開していない機能のメニューの項目は出さない(X87)
   const draftOn = useFeature('ai.draft')
   const nextOn = useFeature('card.next')
+  // テンプレートが見つからないときの自動の下書きし直しも、版に従って止める(止めたら、⚙ の切り替えによらず走らせない)
+  const autoRedraftOn = useFeature('ai.autoredraft')
   const editor = useCardEditor({ card, draft, defaults, products, heroes, weeks, focusProductId, next, onSaved, onCreated, onReopen, onBack, onNext })
   const { form, setForm, items, setItems, candidates, setCandidates, original, setSelectedKey, language, template, setTemplate, pushLink, setPushLink, setAudience, templateChannel, sectionTitles, setSectionTitles, sectionCopies, setSectionCopies, partContent, setPartContent, setHeroCandidates, heroId, setHeroId, heroReason, setHeroReason, links, setLinks, saving, changeReason, setChangeReason, error, setError, setAlertNotes, poolProducts, poolHeroes, ab, setAb, active, itemsOf, heroOf, textsOf, templateOfV, switchVariant, removeVariant, abAiBusy, comparing, setComparing, stopAbTest, asTarget, decision, decideVariant, saveTarget, abAddSimple, abDiff, set, productById, dropAt, moveItem, buildAiCard, applyTemplate, setSectionTitle, setSectionCopy, removeItem, lockedWeeks, submit, saveAndNext, buildContent, committedSnap, isDirty, changed, coreDirty, save, pendingSave, askReason, cancelReason, currentKey, saveError } = editor
   // AB テストの B・C 案を開いていて、商品が全案で共通なら、商品の画像だけはその案のもの(ab_test の images。A と違う分。X64 の e)。
@@ -437,9 +439,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
       const { id, version: v } = splitTemplateKey(templateKeyOfCard(card))
       const label = !templateMissing(id) && v !== undefined ? t(`${getTemplate(id).label} の版 ${v}`, `${getTemplate(id).label}, version ${v}`) : id
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMissingTemplate({ key: label, redrafted: autoEnabled })
+      setMissingTemplate({ key: label, redrafted: autoEnabled && autoRedraftOn })
     }
-    if (autoEnabled && missing) void startAutoDraft()
+    if (autoEnabled && autoRedraftOn && missing) void startAutoDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card, original, products.length, heroes.length, templatesVersion])
 
@@ -985,7 +987,9 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
               )}
         </MessageBarBody>
         {/* 自動の下書きを切っているときは、ここから作り直す(シンプルな配信カードには「すべてAIで下書き」のボタンがないため) */}
-        {!missingTemplate.redrafted && (
+        {missingTemplate.redrafted && <FeatureBadge id="ai.autoredraft" />}
+        {/* 手で押す下書きし直しは「AI で全体を下書き」と同じ入口(ai.draft を止めたら出さない。知らせの文は残す) */}
+        {!missingTemplate.redrafted && draftOn && (
           <MessageBarActions>
             <Button
               size="small"
@@ -998,6 +1002,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             >
               {t('AI で下書きし直す', 'Redraft with AI')}
             </Button>
+            <FeatureBadge id="ai.draft" />
           </MessageBarActions>
         )}
       </MessageBar>

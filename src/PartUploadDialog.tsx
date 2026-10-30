@@ -8,6 +8,8 @@ import { PartUpload, type PartDraft } from './data/partUpload'
 import { rasterize, toUploadable } from './imageConvert'
 import { imgSrc, partImage } from './images'
 import { getLang, optionLabel, tr, useT } from './i18n'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 import { PartImageKind, type PartImage } from './models/partImages'
 
 const useStyles = makeStyles({
@@ -66,6 +68,8 @@ interface Props {
 export function PartUploadDialog({ market, me, onDone, onClose, part, file: firstFile }: Props) {
   const s = useStyles()
   const t = useT()
+  // 画像の名前・説明の AI の下書き(ai.describe。X87)。公開していなければ、上げても空のまま、手で書く
+  const describeOn = useFeature('ai.describe')
   const fileRef = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState<'' | 'upload' | 'ai' | 'save'>('')
@@ -201,7 +205,7 @@ export function PartUploadDialog({ market, me, onDone, onClose, part, file: firs
                           const img = e.currentTarget
                           const next = { w: img.naturalWidth, h: img.naturalHeight }
                           // 上げたばかりの画像は、大きさを測ってから AI に見せる(1 回だけ)
-                          if (!size && !editing) void draft(src)
+                          if (!size && !editing && describeOn) void draft(src)
                           setSize(next)
                         }}
                       />
@@ -212,14 +216,18 @@ export function PartUploadDialog({ market, me, onDone, onClose, part, file: firs
               </div>
               <div className={s.form}>
                 {busy === 'ai' && <Spinner size="tiny" label={t('AI が画像を見て、下書きを作っています…', 'AI is reading the image and drafting…')} />}
-                {editing ? (
+                {!describeOn ? null : editing ? (
                   <div>
                     <Button size="small" icon={<SparkleRegular />} disabled={!!busy || !url} onClick={() => void draft(src)}>
                       {t('AI で下書きし直す', 'Redraft with AI')}
                     </Button>
+                    <FeatureBadge id="ai.describe" />
                   </div>
                 ) : (
-                  <span className={s.note}>{t('名前・種類・タグ・説明・代替テキストは、AI が画像を見て下書きします。確認して直してください。', 'AI drafts the name, kind, tags, description and alt text from the image. Check and edit them.')}</span>
+                  <span className={s.note}>
+                    {t('名前・種類・タグ・説明・代替テキストは、AI が画像を見て下書きします。確認して直してください。', 'AI drafts the name, kind, tags, description and alt text from the image. Check and edit them.')}
+                    <FeatureBadge id="ai.describe" />
+                  </span>
                 )}
                 <Field label={t('名前', 'Name')} required size="small">
                   <Input size="small" value={form.name} onChange={(_, d) => set('name')(d.value)} />

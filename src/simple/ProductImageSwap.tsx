@@ -16,6 +16,8 @@ import { productUrl } from '../links'
 import { getLang, optionLabel, useT } from '../i18n'
 import { AiIcon } from '../AiMark'
 import type { SimpleEditor } from './editor'
+import { useFeature } from '../featureFlags'
+import { FeatureBadge } from '../FeatureBadge'
 
 /** AI の依頼の記録(ai_runs)の種類。画像の案は学びを使わないので、結果の面の「学びあり / なし」の比べには入れない(src/impact.ts) */
 export const IMAGE_SUGGEST_TASK = 'suggest_product_image'
@@ -52,6 +54,10 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
   // B・C 案を開いていて、画像だけ案ごと(商品は全案で共通)のとき(X64 の e)
   const variant = e.ab && e.ab.active !== 'A' ? e.ab.active : undefined
   const trial = useTrial()
+  // 版に従って止める(X87): AI のおすすめ(ai.pageimage)と、商品ページの URL を読んで画像を拾うこと(content.products.pagefetch)。
+  // 取り込んだ画像(product_images)は、どちらを止めても並べる(すでにあるデータは隠さない)
+  const aiOn = useFeature('ai.pageimage')
+  const fetchOn = useFeature('content.products.pagefetch')
 
   const [url, setUrl] = useState(() => (product ? productUrl(product) : ''))
   const [loading, setLoading] = useState(false)
@@ -119,7 +125,7 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
       if (imgs.length) {
         setStored(imgs)
         showStored(imgs)
-      } else await read(url)
+      } else if (fetchOn) await read(url)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, product?.id])
@@ -242,31 +248,39 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
   if (!item || !product) return null
   const pageTab = (
     <div className={s.body}>
-      <div className={s.row}>
-        <Field label={t('商品ページの URL', 'Product page URL')} size="small" className={s.grow}>
-          <Input size="small" value={url} onChange={(_, d) => setUrl(d.value)} onKeyDown={(ev) => ev.key === 'Enter' && void read(url)} />
-        </Field>
-        <Button size="small" icon={<ArrowDownloadRegular />} disabled={loading || !url.trim()} onClick={() => void read(url)}>
-          {t('ページを読む', 'Read the page')}
-        </Button>
-        {stored.length > 0 && !page?.stored && (
-          <Button size="small" appearance="subtle" onClick={() => showStored(stored)}>
-            {t(`取り込んだ画像に戻す(${stored.length})`, `Back to imported images (${stored.length})`)}
+      {fetchOn && (
+        <div className={s.row}>
+          <Field label={t('商品ページの URL', 'Product page URL')} size="small" className={s.grow}>
+            <Input size="small" value={url} onChange={(_, d) => setUrl(d.value)} onKeyDown={(ev) => ev.key === 'Enter' && void read(url)} />
+          </Field>
+          <Button size="small" icon={<ArrowDownloadRegular />} disabled={loading || !url.trim()} onClick={() => void read(url)}>
+            {t('ページを読む', 'Read the page')}
           </Button>
-        )}
-        {page && !page.stored && (
-          <Button size="small" appearance="subtle" icon={<OpenRegular />} as="a" href={page.sample ? ProductPages.pageUrl(page.page) : page.page} target="_blank" rel="noreferrer">
-            {t('ページを開く', 'Open the page')}
-          </Button>
-        )}
-      </div>
+          <FeatureBadge id="content.products.pagefetch" />
+          {stored.length > 0 && !page?.stored && (
+            <Button size="small" appearance="subtle" onClick={() => showStored(stored)}>
+              {t(`取り込んだ画像に戻す(${stored.length})`, `Back to imported images (${stored.length})`)}
+            </Button>
+          )}
+          {page && !page.stored && (
+            <Button size="small" appearance="subtle" icon={<OpenRegular />} as="a" href={page.sample ? ProductPages.pageUrl(page.page) : page.page} target="_blank" rel="noreferrer">
+              {t('ページを開く', 'Open the page')}
+            </Button>
+          )}
+        </div>
+      )}
       <div className={s.row}>
         {page?.stored && <Badge appearance="tint" color="success">{t('取り込んだ画像', 'Imported images')}</Badge>}
         {page?.sample && <Badge appearance="tint" color="informative">{t('見本のページ', 'Sample page')}</Badge>}
-        <Button size="small" appearance="primary" icon={<AiIcon tone="white" size={14} />} disabled={!page?.images.length || asking} onClick={() => void askAi()}>
-          {picks ? t('AI にもう一度選んでもらう', 'Ask AI again') : t('AI に選んでもらう', 'Ask AI to choose')}
-        </Button>
-        {asking && <Spinner size="tiny" label={t('AI が画像を見ています', 'AI is looking at the images')} />}
+        {aiOn && (
+          <>
+            <Button size="small" appearance="primary" icon={<AiIcon tone="white" size={14} />} disabled={!page?.images.length || asking} onClick={() => void askAi()}>
+              {picks ? t('AI にもう一度選んでもらう', 'Ask AI again') : t('AI に選んでもらう', 'Ask AI to choose')}
+            </Button>
+            <FeatureBadge id="ai.pageimage" />
+            {asking && <Spinner size="tiny" label={t('AI が画像を見ています', 'AI is looking at the images')} />}
+          </>
+        )}
       </div>
       {error && (
         <MessageBar intent="warning" layout="multiline">
@@ -305,9 +319,17 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
           })}
         </div>
       ) : (
-        <div className={s.empty}>{t('ページの画像がありません。「ほかの画像」のタブからも選べます', 'No images from the page. You can also use the Other image tab.')}</div>
+        <div className={s.empty}>
+          {fetchOn
+            ? t('ページの画像がありません。「ほかの画像」のタブからも選べます', 'No images from the page. You can also use the Other image tab.')
+            : t('取り込んだ画像がありません。「ほかの画像」のタブから選べます', 'No imported images. Use the Other image tab.')}
+        </div>
       )}
-      <span className={s.caption}>{t('押すとプレビューで試せます(確定で入れ替え)。AI は、画像ごとのアングルを見分け、配信のテーマ・見出し・コピーに合う画像を勧めます', 'Click to try it in the preview (Apply to switch). AI tells each image’s angle and recommends ones that fit the theme, headline and copy.')}</span>
+      <span className={s.caption}>
+        {aiOn
+          ? t('押すとプレビューで試せます(確定で入れ替え)。AI は、画像ごとのアングルを見分け、配信のテーマ・見出し・コピーに合う画像を勧めます', 'Click to try it in the preview (Apply to switch). AI tells each image’s angle and recommends ones that fit the theme, headline and copy.')
+          : t('押すとプレビューで試せます(確定で入れ替え)', 'Click to try it in the preview (Apply to switch)')}
+      </span>
     </div>
   )
   const ownTab = (

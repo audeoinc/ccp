@@ -6,6 +6,7 @@ import { policyUsableIn } from './countryApply'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
+import { isOn } from './featureFlags'
 import type { SectionKind } from './templates'
 import { localDate } from './results'
 import { createStore } from './store'
@@ -236,7 +237,8 @@ function recordRun(task: unknown, learningIds: string[]) {
   if (!activeCardId || typeof task !== 'string') return
   AiRunsService.create({ delivery_card_id: activeCardId, task, learning_ids: JSON.stringify(learningIds) }).catch(() => undefined)
 }
-const usesLearnings = (task: unknown) => typeof task === 'string' && (task.startsWith('suggest_') || task.startsWith('select_')) && task !== 'suggest_tasks'
+// 下書きに学びを渡すのを公開していなければ(ai.learnings。X87)、どの依頼にも渡さない。学びの帯は、参考に読むものとして出したまま
+const usesLearnings = (task: unknown) => isOn('ai.learnings') && typeof task === 'string' && (task.startsWith('suggest_') || task.startsWith('select_')) && task !== 'suggest_tasks'
 const LEARNINGS_NOTE =
   '【これまでの学び】入力の learnings は、同じテンプレートか同じテーマの種類の、過去の配信の振り返りメモ(新しい順)。' +
   '案を考えるときの参考にする。うまくいったことは生かし、悪かったことは繰り返さない。ただし、learnings に合わせるために、ほかのルールを破らない。\n\n'

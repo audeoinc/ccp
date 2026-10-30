@@ -339,6 +339,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   // 案を足す入口は、AB テストか案から選ぶのどちらかを公開しているときだけ(X87)。すでに案のある配信は、タブ・設定をそのまま出す(データは消さない)
   const alertOn = useFeature('alert')
   const learnOn = useFeature('results.learnings')
+  const learnAiOn = useFeature('ai.learnings')
   const threadOn = useFeature('collab.thread')
   const pinsOn = useFeature('collab.pins')
   const approvalOn = useFeature('approval.card')
@@ -665,7 +666,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const allRails: { v: Exclude<Side, null>; icon: React.ReactElement; label: string; tip: string; count: number; color?: 'danger' | 'informative'; dot?: 'red' | 'amber'; drop?: boolean; gap?: boolean }[] = [
     // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
     { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
-    { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learn'), tip: t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)'), count: e.learnCount, color: 'informative' },
+    { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learn'), tip: learnAiOn ? t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)') : t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの)', 'Learnings for this delivery (notes from past deliveries, for reference)'), count: e.learnCount, color: 'informative' },
     { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
     {
       v: 'approval',

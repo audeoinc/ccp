@@ -17,6 +17,8 @@ import type { DeliveryCard } from './models/deliveryCards'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 import { weekKeyOf } from './weekLock'
 import { confirmDialog } from './confirm'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 import { todayYmd } from './dates'
 
 const useStyles = makeStyles({
@@ -64,6 +66,8 @@ interface Props {
 export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, inline }: Props) {
   const s = useStyles()
   const t = useT()
+  // 空の項目を AI で埋めるのも、画像の説明の AI の下書き(ai.describe。X87)。公開していなければ出さない
+  const describeOn = useFeature('ai.describe')
   // メイン画像 / 部品の画像(X59 ③)
   const [tab, setTab] = useState<'heroes' | 'parts'>('heroes')
   // 部品の画像の件数(タブの見出しに出す。X75 のタブの決まり。部品のタブを開く前から数を見せるため、先に数える)
@@ -212,10 +216,13 @@ export function HeroLibrary({ heroes, cards, country, me, onChanged, onClose, in
                 <Button size="small" appearance="subtle" onClick={() => (stopRef.current = true)}>{t('やめる', 'Stop')}</Button>
               </>
             ) : (
-              <Button size="small" icon={<SparkleRegular />} disabled={!toFill.length || !!busy} onClick={() => void fillEmpty()} title={t('名前(コードのまま)・タグ・説明が空の画像を、AI が画像を見て埋めます。入っている項目は変えません。いま絞り込んでいる画像だけが対象です', 'AI fills the empty name (code only), tags and description from each image. Filled fields stay. Only the images currently listed')}>
-                {t(`空の項目を AI で埋める(${toFill.length} 点)`, `Fill empty fields with AI (${toFill.length})`)}
-              </Button>
+              describeOn && (
+                <Button size="small" icon={<SparkleRegular />} disabled={!toFill.length || !!busy} onClick={() => void fillEmpty()} title={t('名前(コードのまま)・タグ・説明が空の画像を、AI が画像を見て埋めます。入っている項目は変えません。いま絞り込んでいる画像だけが対象です', 'AI fills the empty name (code only), tags and description from each image. Filled fields stay. Only the images currently listed')}>
+                  {t(`空の項目を AI で埋める(${toFill.length} 点)`, `Fill empty fields with AI (${toFill.length})`)}
+                </Button>
+              )
             )}
+            <FeatureBadge id="ai.describe" />
           </div>
           {error && <span className={s.error}>{error}</span>}
           <div className={s.grid}>

@@ -20,6 +20,8 @@ import { ResizableSurface } from './ResizableSurface'
 import { PaneSpinner } from './PaneSpinner'
 import { typo } from './typo'
 import { useJustAdded } from './useJustAdded'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 const useStyles = makeStyles({
   root: {
@@ -102,6 +104,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
   // 読み込み中は、空の案内ではなく読み込み中の印を出す(simple-ui-review-2 の 24)
   const [loaded, setLoaded] = useState(false)
   const justAdded = useJustAdded()
+  // 下書きに学びを渡すのを公開していなければ(ai.learnings)、「AI に渡す」の説明を出さない(学びは参考に読むものとして出す)
+  const toAi = useFeature('ai.learnings')
   const [open, setOpen] = useState(false)
   const [deciding, setDeciding] = useState<string | null>(null)
   const [overrides, setOverrides] = useState<EquipOverrides>(new Map())
@@ -228,14 +232,20 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     </span>
   )
   // 見出しの下に長い説明を並べない。説明は見出しの横の ⓘ に(X72。simple-ui-review-2 の 21)
-  const info = t(
-    '同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学びを自動で足します。足した学びは、この配信の AI の下書きに渡します。× で外すと、この配信だけ渡しません',
-    'Learnings from past deliveries on the same channel with the same template or theme type are added automatically and passed to AI drafts for this delivery. × removes one for this delivery only.',
-  )
+  const info = toAi
+    ? t(
+        '同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学びを自動で足します。足した学びは、この配信の AI の下書きに渡します。× で外すと、この配信だけ渡しません',
+        'Learnings from past deliveries on the same channel with the same template or theme type are added automatically and passed to AI drafts for this delivery. × removes one for this delivery only.',
+      )
+    : t(
+        '同じチャネルで、同じテンプレートか同じテーマの種類の、過去の配信の学びを自動で足します。× で外すと、この配信だけ外します',
+        'Learnings from past deliveries on the same channel with the same template or theme type are added automatically. × removes one for this delivery only.',
+      )
   // パネルでは、パネルの題(「この配信に使う学び」)と重なるので、見出しの代わりに件数だけ(2026-10-26 利用者)
   const title = (
     <InfoLabel label={{ className: panel ? styles.label : styles.heading }} info={info}>
       {panel ? t(`${learnings.length} 件`, `${learnings.length}`) : t('この配信に使う学び', 'Learnings for this delivery')}
+      <FeatureBadge id="ai.learnings" />
     </InfoLabel>
   )
   const empty = (
@@ -253,7 +263,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
           onOpenSource={panel ? onOpenSource : undefined}
           onOpenImpact={panel ? onOpenImpact : undefined}
           actions={
-            <Button size="small" appearance="subtle" icon={<DismissRegular />} disabled={busy === l.id} onClick={() => void equip(l, false)} aria-label={t(`「${l.title}」を外す`, `Remove "${l.title}"`)} title={t('この配信では外す(AI に渡さない)', 'Remove for this delivery (not passed to AI)')} />
+            <Button size="small" appearance="subtle" icon={<DismissRegular />} disabled={busy === l.id} onClick={() => void equip(l, false)} aria-label={t(`「${l.title}」を外す`, `Remove "${l.title}"`)} title={toAi ? t('この配信では外す(AI に渡さない)', 'Remove for this delivery (not passed to AI)') : t('この配信では外す', 'Remove for this delivery')} />
           }
         />
       ))}
@@ -265,8 +275,8 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
         className={styles.otherHead}
         size="small"
         info={t(
-          `国で客層が違うので、${countryName(country)}で使うかを決めてください。使うと決めたものだけ、AI に渡します`,
-          `Audiences differ by country, so decide whether to use each in ${countryName(country)}. Only the ones you use are passed to AI.`,
+          `国で客層が違うので、${countryName(country)}で使うかを決めてください。${toAi ? '使うと決めたものだけ、AI に渡します' : ''}`,
+          `Audiences differ by country, so decide whether to use each in ${countryName(country)}.${toAi ? ' Only the ones you use are passed to AI.' : ''}`,
         )}
       >
         {t('ほかの国の学び(使えるかもしれない)', 'Learnings from other countries (may apply)')}
@@ -304,7 +314,7 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
               <InfoLabel
                 size="large"
                 weight="semibold"
-                info={t(`${countryName(country)}で使う学びから選びます(強い順)。足すと、この配信の AI の下書きに渡します`, `Choose from learnings used in ${countryName(country)} (strongest first). Added learnings are passed to AI drafts for this delivery.`)}
+                info={t(`${countryName(country)}で使う学びから選びます(強い順)。${toAi ? '足すと、この配信の AI の下書きに渡します' : ''}`, `Choose from learnings used in ${countryName(country)} (strongest first).${toAi ? ' Added learnings are passed to AI drafts for this delivery.' : ''}`)}
               >
                 {t('学びを足す', 'Add a learning')}
               </InfoLabel>

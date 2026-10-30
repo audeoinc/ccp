@@ -9,6 +9,8 @@ import { heroImage, imgSrc } from './images'
 import { cropStyle } from './heroRights'
 import { rasterize, toUploadable } from './imageConvert'
 import { getLang, optionLabel, tr, useT } from './i18n'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
 const useStyles = makeStyles({
@@ -72,6 +74,8 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero, fi
   const [busy, setBusy] = useState<'' | 'upload' | 'ai' | 'save'>('')
   const [error, setError] = useState<string | null>(null)
   const editing = !!hero
+  // 画像の名前・説明の AI の下書き(ai.describe。X87)。公開していなければ、上げても空のまま、手で書く
+  const describeOn = useFeature('ai.describe')
   const [url, setUrl] = useState(hero ? (heroImage(hero) ?? '') : '')
   // 表示に使う URL(保存するのは url = サーバーが返したパスのまま。Workbench の中継の下でも出るように)
   const src = imgSrc(url)
@@ -135,6 +139,7 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero, fi
       const up = await HeroUpload.upload(file)
       setUrl(up.image_url)
       setForm((f) => ({ ...f, name: f.name || file.name.replace(/\.[^.]+$/, '') }))
+      if (!describeOn) return
       setBusy('ai')
       // AI の下書き(失敗しても、手で入れれば登録できる)
       try {
@@ -284,12 +289,18 @@ export function HeroUploadDialog({ market, cardId, me, onDone, onClose, hero, fi
               </div>
               <div className={s.form}>
                 {busy === 'ai' && <Spinner size="tiny" label={t('AI が画像を見て、下書きを作っています…', 'AI is reading the image and drafting…')} />}
-                {!editing && <span className={s.note}>{t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確認して直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}</span>}
-                {editing && (
+                {!editing && describeOn && (
+                  <span className={s.note}>
+                    {t('名前・用途・季節・タグ・説明は、AI が画像を見て下書きします。確認して直してください。', 'AI drafts the name, purpose, season, tags and description from the image. Check and edit them.')}
+                    <FeatureBadge id="ai.describe" />
+                  </span>
+                )}
+                {editing && describeOn && (
                   <div>
                     <Button size="small" icon={<SparkleRegular />} disabled={!!busy || !url} onClick={() => void redraft()} title={t('いまの画像を AI に見せ直して、名前・用途・季節・タグ・説明を作り直します(焦点は変えません。保存で確定)', 'Show the image to AI again and redraft the name, purpose, season, tags and description (focal point unchanged; saved on Save)')}>
                       {t('AI で下書きし直す', 'Redraft with AI')}
                     </Button>
+                    <FeatureBadge id="ai.describe" />
                   </div>
                 )}
                 <Field label={t('名前', 'Name')} required size="small">
