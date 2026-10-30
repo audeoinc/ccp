@@ -99,7 +99,8 @@ import { useUrlSync } from './useUrlSync'
 import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
-import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, SimpleProductionPage, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { loadSimpleProduction } from './simpleProductionChunk'
+import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 import { isOn, useFeature, useFeatureVersion } from './featureFlags'
 import { FeatureBadge } from './FeatureBadge'
@@ -352,6 +353,8 @@ function App() {
     }
     if (f === 'production' && productionSimple && selectedId === id) {
       if (!(await (cardLeaveRef.current?.() ?? Promise.resolve(true)))) return
+      // 制作の画面のプログラムを読み終わってから入れ替える(読む間に配信カードだけ閉じて、カレンダーが見えないように)
+      await loadSimpleProduction()
       setPeekResult(null)
       setSelectedId(null)
       setInstantId(id)
@@ -373,6 +376,10 @@ function App() {
       setPeekResult(id)
     }
   }
+  // 配信カードを開いたら、制作の画面のプログラムを裏で読んでおく(PRODUCTION のタブで、すぐ切り替えられるように)
+  useEffect(() => {
+    if (selectedId && productionSimple) void loadSimpleProduction()
+  }, [selectedId, productionSimple])
   const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => void goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
@@ -1618,7 +1625,7 @@ function App() {
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
       {productionOpen && cards.find((c) => c.id === productionOpen) && productionSimple && !productionAuto && (
-        <Later><SimpleProductionPage
+        <Later><SimpleProductionView
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}

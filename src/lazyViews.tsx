@@ -1,6 +1,7 @@
-import { Suspense, lazy, type ReactNode } from 'react'
+import { Suspense, lazy, useState, type ComponentProps, type ReactNode } from 'react'
 import { Spinner } from '@fluentui/react-components'
 import { loadChunk } from './chunkReload'
+import { loadSimpleProduction, loadedSimpleProduction } from './simpleProductionChunk'
 
 // 開いたときに読み込む画面(整理 第2段 ④)。最初に開くときに、使わないかもしれない画面のプログラムまで読まないため。
 // ここから読み込む(画面のファイルを、ほかのファイルから直接 import すると、分かれない)
@@ -11,7 +12,15 @@ export const LearningEffectFloat = lazy(() => loadChunk(() => import('./Learning
 export const LearningHand = lazy(() => loadChunk(() => import('./LearningHand')).then((m) => ({ default: m.LearningHand })))
 export const ProductsView = lazy(() => loadChunk(() => import('./ProductsView')).then((m) => ({ default: m.ProductsView })))
 export const ResultPeek = lazy(() => loadChunk(() => import('./ResultPeek')).then((m) => ({ default: m.ResultPeek })))
-export const SimpleProductionPage = lazy(() => loadChunk(() => import('./production/SimpleProductionPage')).then((m) => ({ default: m.SimpleProductionPage })))
+export const SimpleProductionPage = lazy(() => loadSimpleProduction().then((m) => ({ default: m.SimpleProductionPage })))
+/**
+ * 制作のシンプルな画面。読み終わっていれば、lazy を通さずに描く(lazy は、読み終わっていても最初の 1 回は待つので、その間なにも出ない)。
+ * どちらで描くかは、出したときに決めて変えない(途中で替えると、作り直しになるため)
+ */
+export function SimpleProductionView(props: ComponentProps<typeof SimpleProductionPage>) {
+  const [Loaded] = useState(loadedSimpleProduction)
+  return Loaded ? <Loaded {...props} /> : <SimpleProductionPage {...props} />
+}
 export const ProductionPage = lazy(() => loadChunk(() => import('./ProductionPage')).then((m) => ({ default: m.ProductionPage })))
 export const AlertsPage = lazy(() => loadChunk(() => import('./AlertsPage')).then((m) => ({ default: m.AlertsPage })))
 export const BulkWorkspace = lazy(() => loadChunk(() => import('./BulkWorkspace')).then((m) => ({ default: m.BulkWorkspace })))
