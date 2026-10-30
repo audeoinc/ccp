@@ -19,6 +19,7 @@ import { askPartRewrite } from './partAi'
 import type { SimpleEditor } from './editor'
 import { ReadinessList } from './ReadinessList'
 import { readinessBlocked, type ReadinessItem, type ReadinessTarget } from './readiness'
+import { useFeature } from '../featureFlags'
 
 // 「AI で書く」で頼みを書かなかったときの頼み(画面には出さない)
 const DRAFT_REQUEST = '制作に渡す文章(制作指示)を、テーマ・件名・見出し・コピー・参考の素材をもとに書いてください。いまの文章があれば、それを生かして整えてください。案ごとに、書き方(まとめ方・詳しさ)を変えてください'
@@ -70,6 +71,8 @@ interface Props {
  * 依頼そのもの(HTML を固める)は制作のページで行うので、ボタンは保存してから制作のページを開き、そこで依頼まで進める
  */
 export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0, assetCount = 0, onAssetCount, checks, onPickCheck, focusField }: Props) {
+  // 渡す文章の AI は、公開しているときだけ(X87)
+  const briefAiOn = useFeature('ai.brief')
   const t = useT()
   const s = useStyles()
   const [req, setReq] = useState<ProductionRequest | undefined>(undefined)
@@ -242,6 +245,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           </div>
         )}
         {/* 渡す文章の AI: 「AI で書く」→ 案を押すとそのまま入る(2 つの操作。試す → 確定にしない理由は NotesAiDraft。2026-10-29 利用者) */}
+        {briefAiOn && (
         <NotesAiDraft
           value={e.form.instructions}
           ask={async (request) => {
@@ -259,6 +263,7 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
           }}
           onAdopt={(idea) => e.setField('instructions', idea.value)}
         />
+        )}
       </div>
 
       {/* 3. 参考の画像・資料・URL(縦に長くなりやすいので畳める。足すのは「＋」から。右の帯の「素材」でも同じものを開ける) */}

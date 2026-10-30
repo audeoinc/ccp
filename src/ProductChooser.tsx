@@ -18,6 +18,7 @@ import type { ReplacementCandidate } from './alertActions'
 import type { Product } from './models/products'
 import { PartAiChat } from './simple/PartAiChat'
 import { askProductPick, type PartIdea, type PartTurn } from './simple/partAi'
+import { useFeature } from './featureFlags'
 
 /*
  * 商品を選び直す枠(2026-10-24 の整理)。シンプルな配信カードの入れ替えの引き出し(simple/ProductSwap)・
@@ -211,6 +212,8 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
       {why2 && <span className={s.caption}>{why2}</span>}
     </div>
   )
+  // AI のおすすめ・AI に頼むのタブは、商品の AI を公開しているときだけ(X87)。すべての商品はいつも
+  const aiOn = useFeature('ai.products')
   const tabs: ChooseTab<string>[] = [
     {
       value: 'recommend',
@@ -283,7 +286,7 @@ export function ProductChooser({ title, frame, card, angle, current, products, i
         />
       ),
     },
-  ]
+  ].filter((tab) => aiOn || (tab.value !== 'recommend' && tab.value !== 'ask'))
   // 候補の詳しい情報: いまの商品と同じ画面(ProductDetail)に、「候補に戻る」と「この商品と入れ替える」
   const shown = detail ? byId.get(detail.productId) : undefined
   const override = detail && shown && (

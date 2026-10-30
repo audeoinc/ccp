@@ -967,7 +967,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   // 「やめる」で消したら、同じカードを開いている間は、また出さない(手で作り始めたいとき、中身を足すまで出続けて邪魔になるため)
   const emptyKey = card?.id ?? draft?.card.id ?? ''
   const emptyDraftNode =
-    !hasContent && !auto && !missingTemplate?.redrafted && emptyDismissed !== emptyKey ? (
+    draftOn && !hasContent && !auto && !missingTemplate?.redrafted && emptyDismissed !== emptyKey ? (
       <EmptyDraftCta disabled={saving} saves={!!card && !locked} onDraft={() => startAdoptedDraft()} onCancel={() => setEmptyDismissed(emptyKey)} />
     ) : null
   const footerNode = (

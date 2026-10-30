@@ -48,6 +48,7 @@ import { AiPicks, ProductChooser, type Picks } from '../ProductChooser'
 import type { SimpleEditor, SimpleField } from './editor'
 import { confirmDialog } from '../confirm'
 import { AudienceRow, ChoiceField, NameField, OwnerField, ScheduledAtField, StatusField, TargetField } from '../DeliveryInfoFields'
+import { useFeature } from '../featureFlags'
 
 const useStyles = makeStyles({
   // テンプレートで決まっている部品の知らせ(鍵の印 + 文 + テンプレートの管理へのリンク)
@@ -162,6 +163,12 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   const s = useStyles()
   const byId = new Map(e.products.map((p) => [p.id, p]))
   const sections = sectionsOf(e.template)
+  // 公開していない AI の入口は出さない(X87)。文の部品の AI・メイン画像の AI・セクションの商品の AI と、メイン画像の選び方
+  const textAiOn = useFeature('ai.text')
+  const heroAiOn = useFeature('ai.hero')
+  const productsAiOn = useFeature('ai.products')
+  const heroUploadOn = useFeature('content.hero.upload')
+  const heroPickOn = useFeature('content.hero.pick')
 
   // メイン画像を変える欄を開いている部品(部品を移ると畳む。まだ画像がなければ、はじめから開く)
   const [heroOpenKey, setHeroOpenKey] = useState<string | null>(null)
@@ -230,7 +237,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
    * (shown が、その案を写した文言。自動の保存で、試しただけの案が保存されないように)。「確定」で入れ替える
    */
   const aiChat = (kind: string, label: string, value: string, onChange: (v: string) => void, shown: (v: string) => WholeTexts) => {
-    if (!part) return null
+    if (!part || !textAiOn) return null
     return (
       <TextAiPanel
         key={partKey(part)}
@@ -559,7 +566,8 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                     icon: <ImageMultipleRegular />,
                     content: <HeroCandidates heroes={e.poolHeroes} selectedId={heroTrial.trial?.key ?? e.hero?.id} onSelect={(id) => tryHero(id, '')} />,
                   },
-                ]}
+                  // 公開していない入口のタブは出さない(X87。AI のおすすめ・AI に頼む = ai.hero、上げる = content.hero.upload、すべての画像 = content.hero.pick)
+                ].filter((tab) => (tab.value === 'recommend' || tab.value === 'ask' ? heroAiOn : tab.value === 'upload' ? heroUploadOn : tab.value === 'all' ? heroPickOn : true))}
               />
             )}
             {e.channel === 'push' && heroSlot && (
@@ -785,7 +793,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       {compareBlock}
       {body}
       {/* セクションの部品(見出し・コピー・商品・空いた枠)では、そのセクションの商品をまとめて AI で選べる(X81 の 9) */}
-      {sectionOfPart !== null && <SectionAiPick key={sectionOfPart} editor={e} index={sectionOfPart} name={sectionName(sectionOfPart)} />}
+      {productsAiOn && sectionOfPart !== null && <SectionAiPick key={sectionOfPart} editor={e} index={sectionOfPart} name={sectionName(sectionOfPart)} />}
       {/* 制作へのメモ: 直しながら思いついたイメージを、その部品の名前つきで渡すものに書き留める(配信の情報・テンプレートは除く) */}
       {part && part.kind !== 'meta' && part.kind !== 'overview' && part.kind !== 'template' && <ProductionMemo editor={e} label={titleOf(part)} />}
     </div>
@@ -993,6 +1001,8 @@ function TemplatePicker({ editor: e }: { editor: SimpleEditor }) {
 function WholePane({ editor: e, onEdit }: { editor: SimpleEditor; onEdit: () => void }) {
   const t = useT()
   const s = useStyles()
+  // AI で全体を下書きする(X87。MVP で公開)
+  const draftOn = useFeature('ai.draft')
   // どう作るか(任意)。下書きのたびに書き直すものなので、覚えない
   const [request, setRequest] = useState('')
   const f = e.form
@@ -1016,6 +1026,7 @@ function WholePane({ editor: e, onEdit }: { editor: SimpleEditor; onEdit: () => 
         </LabeledValue>
         {f.themeReason && <span className={s.caption}>{t(`理由: ${f.themeReason}`, `Why: ${f.themeReason}`)}</span>}
       </div>
+      {draftOn && (
       <div className={s.aimWrap}>
         <Field
           size="small"
@@ -1028,6 +1039,7 @@ function WholePane({ editor: e, onEdit }: { editor: SimpleEditor; onEdit: () => 
           {t('AI で下書きする', 'Draft with AI')}
         </Button>
       </div>
+      )}
       {/* 部品ごとに直すときの入口(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
       <span className={s.caption}>{t('直したい所は、プレビューで押してください', 'Click what you want to change in the preview')}</span>
     </>
@@ -1099,6 +1111,8 @@ function SlotFill({ editor: e, at, chat }: { editor: SimpleEditor; at: number; c
 function ThemeField({ editor: e }: { editor: SimpleEditor }) {
   const t = useT()
   const s = useStyles()
+  // テーマの案(AI)は、公開しているときだけ(X87。手で書く欄はいつも)
+  const themeAiOn = useFeature('ai.theme')
   // 試している案(欄にだけ仮に写す。保存する中身は変えない)
   const [trying, setTrying] = useState<{ theme: string; reason: string } | null>(null)
   const reason = trying ? trying.reason : e.form.themeReason
@@ -1113,6 +1127,7 @@ function ThemeField({ editor: e }: { editor: SimpleEditor }) {
       {reason && <span className={s.caption}>{t(`理由: ${reason}`, `Why: ${reason}`)}</span>}
       {e.ab && <span className={s.caption}>{t('テーマは全部の案で共通', 'The theme is shared by all variants')}</span>}
       {/* 見出し・件名と同じ「AI で変える」(案 = テーマの案と理由 / 指示して直す)。テーマはメールに出ないので、試している案は上の欄にだけ写す(2026-10-29 利用者) */}
+      {themeAiOn && (
       <TextAiPanel
         kind="theme"
         label={t('テーマ', 'Theme')}
@@ -1139,6 +1154,7 @@ function ThemeField({ editor: e }: { editor: SimpleEditor }) {
           e.adoptTheme(idea.value, idea.why)
         }}
       />
+      )}
     </div>
   )
 }

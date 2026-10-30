@@ -91,8 +91,10 @@ interface Props<V extends string> {
 export function ChoosePanel<V extends string>({ title, tabs, defaultTab, onClose, attached, bare, override, top, id }: Props<V>) {
   const s = useStyles()
   const t = useT()
-  const [tab, setTab] = useState<V>(defaultTab ?? tabs[0].value)
+  const [tab, setTab] = useState<V | undefined>(defaultTab ?? tabs[0]?.value)
+  // 公開していない機能のタブを外すと(X87)、最初に開くタブがないことがある。そのときは残っている最初のタブ
   const current = tabs.find((x) => x.value === tab) ?? tabs[0]
+  if (!current) return null
   return (
     <section id={id} className={mergeClasses(s.root, attached && s.attached, bare && s.bare)} aria-label={typeof title === 'string' ? title : undefined}>
       {!bare && (
