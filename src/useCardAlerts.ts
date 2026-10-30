@@ -55,7 +55,7 @@ export function useCardAlerts({ alerts, items, setItems, candidates, setCandidat
   const replaceForAlert = (alert: CardAlert, to: Product, reason = '') => {
     const from = productById.get(alert.productId ?? '')
     // 保存では、行の商品 ID は書き換えない(並び・理由だけを直す)ので、差し替えた枠は行 ID を外して、新しい行として保存する(元の行は消える)
-    setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
+    setItems((prev) => prev.map((i) => (i.productId === alert.productId ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, detail: undefined, productId: to.id, reason: tr(`${alert.label} の代わり(アラートへの対応)`, `Replaces ${alert.label} (alert)`), source: SOURCE_MANUAL } : i)))
     setAlertNotes((prev) => [...prev, swapNote(from?.name ?? alert.label, to.name, { detail: alert.detail, why: reason })])
     setActAlert(null)
   }
@@ -82,7 +82,7 @@ export function useCardAlerts({ alerts, items, setItems, candidates, setCandidat
     if (!it) return
     const from = productById.get(it.productId)
     const why = reason.trim()
-    setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
+    setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, rowId: undefined, imageUrl: undefined, imageSource: undefined, detail: undefined, productId: to.id, reason: why || tr(`${from?.name ?? ''} の代わり(人が選んだ)`, `Replaces ${from?.name ?? ''} (chosen by hand)`), source: SOURCE_MANUAL } : i)))
     setAlertNotes((prev) => [...prev, swapNote(from?.name ?? '', to.name, { why })])
   }
   // 商品 ID → いちばん強いアラートの種類(中ペインの選定済みの行と、商品情報の行の札)

@@ -1060,6 +1060,7 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
         loaded: original !== null,
         aiCard: buildAiCard,
         setField: (k, v) => set(k)(v),
+        setItemDetail: (itemKey, detail) => setItems((prev) => prev.map((i) => (i.key === itemKey ? { ...i, detail: detail ?? undefined } : i))),
         themeAi: { ideas: drafts.themeIdeas, busy: !!drafts.busy.theme, run: () => void drafts.runTheme(), ask: drafts.askThemes },
         templateUse: templateUseMap,
         sectionAi: {

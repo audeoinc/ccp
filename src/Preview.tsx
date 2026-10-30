@@ -434,6 +434,33 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
     )
   }
 
+  // 枠の見せ方「詳しく」(X80): その枠だけ横いっぱいの行にし、左に写真、右に見出し + 長い説明(EC の商品ページの「素材・機能の説明」のように)。
+  // 写真と「詳しく見る」から商品ページへ(リンクは、ふつうの枠と同じ data-item-key の場所)。見出し・説明が空なら、空欄の案内を出す
+  const detailTile = (it: Item, idx: number) => {
+    const p = byId.get(it.productId)
+    const title = it.detail?.title ?? ''
+    const body = it.detail?.body ?? ''
+    return (
+      <div key={it.key} {...dragProps(it, idx)} data-detail="1" className={classes.frame} style={{ ...frameStyle(it, idx), padding: compact ? 6 : 10, gridColumn: '1 / -1' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: compact ? '38% minmax(0, 1fr)' : '42% minmax(0, 1fr)', gap: compact ? 10 : 16, alignItems: 'start' }}>
+          <img className={classes.img} draggable={false} src={productImage(p, it.imageUrl)} alt={p?.name} style={{ width: '100%', aspectRatio: '4 / 5' }} />
+          <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+            <div style={{ fontSize: compact ? '0.9rem' : '1.05rem', fontWeight: 700, color: INK, lineHeight: 1.35 }}>{title || t('(見出し)', '(Heading)')}</div>
+            <div style={{ fontSize: compact ? '0.74rem' : '0.82rem', color: INK, lineHeight: 1.7, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {body || t('(説明文。部品のペインで書くか、AI に下書きしてもらいます)', '(Description. Write it in the part pane or let AI draft it)')}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: SUB }}>{p?.name}</div>
+            {priceEl(p?.price, productMarket(p))}
+            {cta}
+          </div>
+        </div>
+        {controls(it, idx)}
+      </div>
+    )
+  }
+  // 枠を描く: 「詳しく」にした枠は、どの見せ方のテンプレートでも detailTile で描く(枠の数・順番は変えない)
+  const withDetail = (tile: (it: Item, idx: number) => React.ReactNode) => (it: Item, idx: number) => (it.detail ? detailTile(it, idx) : tile(it, idx))
+
   // ---- 表の箱(T8): テンプレートで決めた「出すもの」・価格の見せ方・バッジで描く(以前の種類のタイルは、そのまま)
   const boxTile = (it: Item, idx: number, part: TablePart, j: number) => {
     const p = byId.get(it.productId)
@@ -798,7 +825,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
   const sectionBody = (sec: Section, start: number, list: Item[]) => {
     const slot = (j: number, tile: (it: Item, idx: number) => React.ReactNode, shape?: React.CSSProperties, feature = false) =>
       // 空いた枠の行(gap。商品のない行)は、空きの枠として描く
-      list[j] && !isGap(list[j]) && list[j].productId ? tile(list[j], start + j) : emptySlot(`e${start + j}`, feature, shape, start + j)
+      list[j] && !isGap(list[j]) && list[j].productId ? withDetail(tile)(list[j], start + j) : emptySlot(`e${start + j}`, feature, shape, start + j)
     const slots = Array.from({ length: sec.slots }, (_, j) => j)
     const cols = gridColumns(sec)
     switch (sec.kind) {
@@ -1028,7 +1055,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
         {runs.map((run, ri) => (
           <div key={run.start} data-anchor={`section:${ri}`} style={{ padding: '0 16px 16px' }}>
             {showHeadings && run.category && headingEl(optionLabel(run.category))}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{run.items.map((it, j) => gridTile(it, run.start + j))}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{run.items.map((it, j) => withDetail(gridTile)(it, run.start + j))}</div>
           </div>
         ))}
         <div style={{ padding: '0 16px 24px' }}>
@@ -1079,7 +1106,7 @@ function EmailPreview({ country, subject, subjectLine, preheader, device, headli
               {t(`枠外(${overflow.length}件): このテンプレートの枠を超えているため、メールには載りません`, `Out of slots (${overflow.length}): these exceed the template's slots and won't appear in the email`)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, opacity: 0.55 }}>
-              {overflow.map((it, j) => gridTile(it, offset + j))}
+              {overflow.map((it, j) => withDetail(gridTile)(it, offset + j))}
             </div>
           </div>
         )}

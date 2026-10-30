@@ -12,6 +12,13 @@ export const DeliveryProductState = {
 } as const
 export type DeliveryProductState = keyof typeof DeliveryProductState
 
+/** 枠の見せ方(X80)。detail = その枠だけ横いっぱいの行にして、写真 + 見出し + 長い説明 */
+export const DeliveryProductDisplay = {
+  normal: 'ふつう',
+  detail: '詳しく',
+} as const
+export type DeliveryProductDisplay = keyof typeof DeliveryProductDisplay
+
 /** 書き込める列 */
 export interface DeliveryProductFields {
   name: string
@@ -28,6 +35,12 @@ export interface DeliveryProductFields {
   image_source?: string
   /** 載る箱の部品 ID(表のテンプレートのときだけ。分析のために書くだけで、画面はテンプレートと並び順から求める。T8 段階 6) */
   part_id?: string
+  /** 枠の見せ方(X80。空 = ふつう)。テンプレートの箱全体の見せ方(cells.ts の detail)とは別の、枠ごと・カードごとの上書き */
+  display?: DeliveryProductDisplay
+  /** 「詳しく」の見出し(1 行) */
+  detail_title?: string
+  /** 「詳しく」の説明文(200〜400 字くらい。人が直した、採用した文だけを保存する) */
+  detail_body?: string
   /** delivery_cards の id(参照を外すときは null) */
   delivery_card_id?: string | null
   /** products の id(参照を外すときは null) */

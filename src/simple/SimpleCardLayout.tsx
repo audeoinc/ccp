@@ -557,6 +557,16 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               swap: () => openSwap(p.itemKey),
               // プレビューの × と同じ
               remove: () => removeProduct(p.itemKey),
+              // 枠の見せ方「詳しく」(X80)。詳しくにしたら、見出し・説明文を書けるように部品のペインを開く
+              detail: it
+                ? {
+                    on: !!it.detail,
+                    toggle: () => {
+                      e.setItemDetail(p.itemKey, it.detail ? null : { title: '', body: '' })
+                      if (!it.detail) select(p)
+                    },
+                  }
+                : undefined,
               move: (() => {
                 const box = boxRef.current
                 const at = (d: MoveDir) => (box && neighborItem(box, p.itemKey, d) ? () => moveProduct(p.itemKey, d) : undefined)

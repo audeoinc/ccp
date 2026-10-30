@@ -74,7 +74,10 @@
     ["variant", "text"],
     ["image_url", "text"],
     ["image_source", "text"],
-    ["part_id", "text"]
+    ["part_id", "text"],
+    ["display", "choice"],
+    ["detail_title", "text"],
+    ["detail_body", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}],
@@ -871,6 +874,7 @@
   "delivery_cards.status": ["not_started", "reviewing", "approved", "confirmed"],
   "delivery_products.source": ["ai", "manual"],
   "delivery_products.state": ["selected", "candidate"],
+  "delivery_products.display": ["normal", "detail"],
   "products.category": ["outer", "tops", "bottoms", "shoes", "accessories", "bags", "home"],
   "products.season": ["autumn", "winter", "autumn_winter", "all_year"],
   "products.sales_trend": ["up", "flat", "down"],

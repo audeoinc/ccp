@@ -16,6 +16,8 @@ export interface Item {
   imageUrl?: string
   /** その画像を選んだ元(商品ページの URL など) */
   imageSource?: string
+  /** 枠の見せ方「詳しく」(X80。その枠だけ横いっぱいの行にし、写真 + 見出し + 長い説明)。なければ、ふつう */
+  detail?: { title: string; body: string }
   /** 空いた枠(商品のない行。前のセクションが埋まっていないのに後ろのセクションへ置いたときの、枠の場所取り。保存しない。src/slots.ts) */
   gap?: boolean
 }

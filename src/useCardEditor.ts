@@ -32,6 +32,9 @@ import { STATUS_APPROVED, STATUS_NOT_STARTED, toForm, type Form } from './cardFo
 import { SaveConflictError, isStale, planSave, runSave, type SaveAfter } from './saveFlow'
 
 /** 読み込み時点の配信商品の行(保存時の差分判定用) */
+/** 枠の見せ方「詳しく」の比べる鍵(X80。ふつうなら空) */
+const detailKey = (it: { detail?: { title: string; body: string } }) => (it.detail ? JSON.stringify([it.detail.title, it.detail.body]) : '')
+
 export interface RowSnap {
   reason: string
   source: string
@@ -44,6 +47,8 @@ export interface RowSnap {
   image: string
   /** 載る箱の部品 ID(T8 段階 6) */
   part: string
+  /** 枠の見せ方「詳しく」と見出し・説明文(X80。ふつうなら空) */
+  detail: string
 }
 
 
@@ -209,9 +214,10 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
             reason: r.reason ?? '',
             source: r.source ?? SOURCE_MANUAL,
             ...(r.image_url ? { imageUrl: r.image_url, imageSource: r.image_source ?? '' } : {}),
+            ...(r.display === 'detail' ? { detail: { title: r.detail_title ?? '', body: r.detail_body ?? '' } } : {}),
           }
           const variant = r.variant ?? ''
-          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '', part: r.part_id ?? '' })
+          snap.set(base.rowId!, { reason: base.reason, source: base.source, state, section, order: r.sort_order ?? 0, variant, image: r.image_url ?? '', part: r.part_id ?? '', detail: detailKey(base) })
           if (state === STATE_CANDIDATE) cands.push({ ...base, section })
           else {
             byId.set(r.id, base)
@@ -401,13 +407,17 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
         variant: d.variant,
         image_url: d.it.imageUrl ?? '',
         image_source: d.it.imageUrl ? (d.it.imageSource ?? '') : '',
+        // 枠の見せ方(X80)。ふつうに戻したら、見出し・説明文も空にする(戻した枠に古い文を残さない)
+        display: d.it.detail ? ('detail' as const) : ('normal' as const),
+        detail_title: d.it.detail?.title ?? '',
+        detail_body: d.it.detail?.body ?? '',
         // 載る箱の部品 ID(表のテンプレートの選定だけ。分析のために書くだけで、画面はテンプレートと並び順から求める。T8 段階 6)
         part_id: d.state === STATE_SELECTED ? (boxAt(getTemplate(templateOfV(d.variant ? (d.variant as VariantKey) : 'A')), d.order - 1)?.id ?? '') : '',
       }
       let res
       if (d.it.rowId) {
         const old = before.get(d.it.rowId)
-        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant && old.image === (d.it.imageUrl ?? '') && old.part === fields.part_id) continue
+        if (old && old.reason === d.it.reason && old.source === d.it.source && old.state === d.state && old.section === d.section && old.order === d.order && old.variant === d.variant && old.image === (d.it.imageUrl ?? '') && old.part === fields.part_id && old.detail === detailKey(d.it)) continue
         res = await DeliveryProductsService.update(d.it.rowId, fields)
       } else {
         res = await DeliveryProductsService.create({
@@ -524,7 +534,8 @@ export function useCardEditor({ card, defaults, draft, products, heroes, weeks, 
     // B・C 案の商品の画像(ab_test の images。X64 の e)も、画像の側に入れる
     return JSON.stringify({ ...rest, ab_test: abWithoutImages(ab_test), items: a.map((i) => i.productId), variants: variants.map((list) => list.map((i) => i.productId)) })
   }
-  const imagesKey = () => JSON.stringify([savedItemsOf().map((list) => list.map((i) => i.imageUrl ?? '')), abForSave()?.images ?? {}])
+  // 商品の画像と、枠の見せ方「詳しく」(X80)も、変えたら「変えた」にする
+  const imagesKey = () => JSON.stringify([savedItemsOf().map((list) => list.map((i) => `${i.imageUrl ?? ''}${KEY_SEP}${detailKey(i)}`)), abForSave()?.images ?? {}])
   const contentKey = () => `${coreKey()}${KEY_SEP}${imagesKey()}`
   /** 商品の画像を替えた枠(変更の履歴に残す文。保存済みの行だけ。新しく入れた商品は、商品が変わったので、ほかの変更として残る) */
   const imageNotes = () =>
