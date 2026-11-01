@@ -59,6 +59,7 @@ import { classifyThemeTypes } from './themeTypes'
 import { myName } from './history'
 import { confirmDialog } from './confirm'
 import { locale, tr, useT } from './i18n'
+import { useFeature } from './featureFlags'
 
 const useStyles = makeStyles({
   exportDone: { color: tokens.colorPaletteGreenForeground1 },
@@ -100,6 +101,9 @@ export function useSettingsActions(ctx: {
   const { cards, activeCards, products, heroes, country, bq, bqBusy, runBqSync, loadProducts, loadPatterns, loadMarketingPolicies, load, loadParts, reloadHeroes, notify: setBqNotice, onImpactChanged, onOpenCard: setSelectedId } = ctx
   const styles = useStyles()
   const t = useT()
+  // 国の項目の公開・非公開(X87)。使う学びは学び(v3)が前提なので、決まり・アラートの基準(v1)と別の ID
+  const rulesOn = useFeature('settings.country.rules')
+  const learningsOn = useFeature('settings.country.learnings')
   // ⚙ の「データと画像を書き出す」の様子(作っている間は何も届かないので、押したことと進み具合を、その行に出す)
   const [exportState, setExportState] = useState<{ kind: 'working'; bytes: number } | { kind: 'done'; bytes: number } | { kind: 'error'; message: string } | null>(null)
   // 見本の SKU を作っている間(X63。数千行になることがあるので、終わるまで押せなくする)
@@ -152,6 +156,7 @@ export function useSettingsActions(ctx: {
         'Marketing rules are shared across countries. Undecided rules follow their Market column (empty = brand-wide, used everywhere; otherwise only those countries). Changing a check affects this country’s AI requests and weekly limits (applies to everyone on this country). Rules whose content differs by country cannot be expressed here — add them as separate rules in Company → Marketing policies.',
       ),
       render: (co, name) => <Later spin><CountryPoliciesPanel country={co} countryName={name} /></Later>,
+      hidden: !rulesOn,
     },
     {
       id: 'criteria',
@@ -164,6 +169,7 @@ export function useSettingsActions(ctx: {
         'The country’s criteria for what counts as a problem. Changes apply to everyone working on this country (who and when are recorded). Which alerts you personally see (types, owners…) is set per person in the Alerts page “Conditions”.',
       ),
       render: (co, name) => <Later spin><CountryCriteriaPanel country={co} countryName={name} /></Later>,
+      hidden: !rulesOn,
     },
     {
       id: 'countryTemplates',
@@ -188,6 +194,7 @@ export function useSettingsActions(ctx: {
         'Learnings are shared across countries. This country’s own learnings are used unless you decide otherwise. Learnings from other countries are not used unless you check them, since audiences differ. Only checked learnings appear in this country’s delivery cards and AI drafts (applies to everyone on this country). Keep / watch / retire is decided per country in Results → Impact → Evaluate learnings.',
       ),
       render: (co, name) => <Later spin><CountryLearningsPanel country={co} countryName={name} cards={cards} /></Later>,
+      hidden: !learningsOn,
     },
     {
       id: 'patterns',

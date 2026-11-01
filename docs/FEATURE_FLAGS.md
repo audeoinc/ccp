@@ -119,7 +119,7 @@
 |  | 週の見方: 時刻(格子・動かす) | `plan.week.time` |  |  | 〇 |  |  |  | 中 |  |
 |  | 週の見方: 前週と比べる | `plan.week.compare` |  |  |  | 〇 |  |  | 小 |  |
 |  | 一覧 | `plan.list` |  | 〇 |  |  |  |  | 小 |  |
-|  | 商品別 | `plan.byproduct` |  |  |  |  | 〇 |  | 中 | 結果の面と共通 |
+|  | 商品別 | `plan.byproduct` |  |  | 〇 |  |  |  | 中 | 結果の面と共通。2026-11-02 利用者: 結果の面の見せ方(`results.views`)に合わせて v1 |
 | 操作 | 絞り込み(チャネル・種類・ステータス・担当) | `plan.filter` |  | 〇 |  |  |  |  | 小 |  |
 |  | 日付のマスを押して新規作成 | `plan.quicknew` |  | 〇 |  |  |  |  | 小 |  |
 |  | 横に引いて前後へ | `plan.swipe` |  |  | 〇 |  |  |  | 小 |  |
@@ -261,7 +261,8 @@
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
 | 自分の設定 | 言語・ヒント | `settings.me` | 〇 |  |  |  |  |  | − |  |
 | 国 | 使うテンプレート | `settings.country.templates` |  | 〇 |  |  |  |  | 小 |  |
-|  | 使う決まり・使う学び・アラートの基準 | `settings.country.rules` |  |  | 〇 |  |  |  | 小 | 使う学びは `results.learnings` が前提 |
+|  | 使う決まり・アラートの基準 | `settings.country.rules` |  |  | 〇 |  |  |  | 小 | 2026-11-02 利用者: 使う学びを `settings.country.learnings` に分けた |
+|  | 使う学び | `settings.country.learnings` |  |  |  |  | 〇 |  | 小 | `results.learnings` が前提。2026-11-02 利用者: 決まり・アラートの基準(v1)から分けた |
 | 全社 | 差出人の名前と店の URL | `settings.sender` |  | 〇 |  |  |  |  | 小 |  |
 |  | 計測用のパラメーター(utm)の決まった値 | `settings.utm` |  | 〇 |  |  |  |  | 小 | 詳しい配信カードの ⑤ から移す(9 章の 11) |
 |  | ユーザー・承認グループ | `settings.users` |  | 〇 |  |  |  |  | 小 |  |
