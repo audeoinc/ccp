@@ -22,7 +22,7 @@
 - 2026-10-30 UI 3: X80 段 ①(商品の枠を「詳しく」。スイッチ「素材・機能を詳しく見せる」+ ⓘ、7878e85)・X88(商品の画像を替える)・X86 段 ①(制作の画面の上の部分を計画と共通・Fit・ちらつきの直し、5606505)は main・本番済み。次は ① シンプルな制作の画面の MVP の追加分(共有メモ req-production-simple.md の 2b 章と追記 1・2: AI の手直し・制作した HTML・要素を直す・工程 ②〜④・ピン。ProductionChat / productionRevise を使い回す。区切りごとに見本)→ ② X80 段 ②(商品ページの本文を残す)→ ③ 結果のシンプルな画面(共有メモ req-results-simple.md。要件は 10-30 に決定)
 - 2026-10-30 UI 2: X87 段 ② の UI 2 の分は、残りの 5 つ(ai.autoredraft・ai.learnings・ai.describe・ai.pageimage・content.products.pagefetch)も入れて main に(10-30 利用者: 例外を作らず版に従って止める)。approval.history は UI 1。次は「？ 聞く」の材料を公開している機能だけに絞る。詳しくはアーカイブ 2026-10-28_ の末尾
 - 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ
-- 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証の手順と結果 docs/MS_AI_VERIFY.md を main に(ブランチ claude/ai-outlet-b3c4ae。Azure OpenAI は想定しない)。Direct Line なら人のサインインなしで呼べ、T1〜T6 は JSON ○。Agents SDK は利用者ごとのサインインが要る(標準のハーネスのエージェントでだけ呼べる)。AI Builder の検証はこれから。Workbench の ZIP には入る(共同作業者が 96237dc で Power Platform・Copilot の言葉を許した)
+- 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証の手順と結果 docs/MS_AI_VERIFY.md を main に(ブランチ claude/ai-outlet-b3c4ae。Azure OpenAI は想定しない)。Direct Line なら人のサインインなしで呼べ、T1〜T6 は JSON ○。Agents SDK は利用者ごとのサインインが要る(標準のハーネスのエージェントでだけ呼べる)。AI Builder の検証はこれから。Workbench の ZIP には入る(共同作業者が 96237dc で Power Platform・Copilot の言葉を許した)。測るプログラムは tools/ms-verify/(ブランチのみ。設定はリポジトリの外。npm run pack:ms-verify で ZIP。Workbench の ZIP には入らない)
 
 ## 3. 次にやること
 

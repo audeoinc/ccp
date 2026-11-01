@@ -49,3 +49,10 @@ release-out/
 # 開発用の画面(/dev/)の作業ファイル(利用先の表の名前を含む。docs/DEVTOOLS.md)
 server/devwork/
 dist-preview/
+
+# 検証の道具 tools/ms-verify/ が作るもの(サインインのトークン・測った結果)と、設定のファイル(鍵を含む。置くのはリポジトリの外)
+tools/ms-verify/.token-cache.json
+tools/ms-verify/results/
+tools/ms-verify/*.env
+# T6 の写真は、各自で用意してここに置く(リポジトリ・ZIP には入れない。人の顔・社外秘は使わない)
+tools/ms-verify/images/

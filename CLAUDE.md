@@ -2,7 +2,7 @@
 
 React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサーバー。Cloud Run で動く。全体像は [README.md](README.md)、設計の約束事は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、サーバー・DB・AI は [docs/GCP.md](docs/GCP.md)。**作業の前に必ず読むのは、[docs/HANDOVER.md](docs/HANDOVER.md)(要約: いまどこにいるか・次にやること・落とし穴)と、[docs/BACKLOG.md](docs/BACKLOG.md) の冒頭の「機能のバックログ」(まだ済んでいない項目の一覧と順番)だけ。** README・ARCHITECTURE・GCP、ほかの `docs/`、記録のアーカイブ(`docs/handover-archive/`・`docs/backlog-archive/`)は、その作業に関係するときに、関係する所だけを読む(大きい文書は、まるごと読まずに、ID や見出しで grep する)。**利用先の Vertex AI Workbench で作業しているなら、下の「Vertex AI Workbench で作業するとき」と [docs/WORKBENCH.md](docs/WORKBENCH.md) を先に読む。**作業を終える前に、HANDOVER.md を更新する。**HANDOVER は短く保つ(目安 10KB 以下)**: 詳しい記録は `docs/handover-archive/` のいちばん新しいファイルの末尾に足し、HANDOVER には 1 行だけ書く。古くなった行は消す(記録はアーカイブにある)。BACKLOG で済んだ・外した行は `docs/backlog-archive/DONE.md` へ移す。
 
-**Power Apps 版は、2026-10-16 に廃止した(ソースも削除済み)。** Power Apps・Dataverse・Power Automate・Copilot Studio のコードや設定を、足し直さない(Copilot・Power Platform を使った検証の文書は、書いてよい。2026-10-30)。データの列・テーブルは `server/schema.json` に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。
+**Power Apps 版は、2026-10-16 に廃止した(ソースも削除済み)。** Power Apps・Dataverse・Power Automate・Copilot Studio のコードや設定を、足し直さない(Copilot・Power Platform を使った検証の文書は、書いてよい。2026-10-30)。**例外: 検証の道具 `tools/ms-verify/`(CCP の外の層を試すもの)は置いてよい。CCP の画面・サーバーには入れない**(2026-10-30)。データの列・テーブルは `server/schema.json` に足す。作る機能の一覧と順番は、[docs/BACKLOG.md](docs/BACKLOG.md) 冒頭の「機能のバックログ」。
 
 ## クラウドのセッションで作業するとき
 
