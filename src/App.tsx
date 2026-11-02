@@ -332,7 +332,7 @@ function App() {
   // 制作のページを開いたら、そのまま制作に依頼するか(シンプルな配信カードの「制作に渡す」)
   const [productionAuto, setProductionAuto] = useState(false)
   // 制作のページを、シンプル(X86)と詳しいのどちらで開くか(人ごとに覚える。詳しいほうは消すまで並べて残す)。
-  // 「制作に渡す」から開くときは、渡す処理が詳しいほうにあるので、詳しいほうで開く(渡すのを配信カードへ移すのは、詳しいほうを消す段)
+  // 「制作に渡す」から開くときは、どちらを選んでいてもシンプルで開いて渡す(K1。詳しいほうを消す前に、渡すのをシンプルへ移した)
   const [productionSimple, setProductionSimple] = useState(() => loadPref<boolean>(PREF.productionSimple, true))
   const switchProductionView = (simple: boolean) => {
     savePref(PREF.productionSimple, simple)
@@ -1574,8 +1574,8 @@ function App() {
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
           onOpenProduction={(id, opts) => {
-            // シンプルな配信カードの「制作に渡す」は、開いた(詳しい)制作のページで、そのまま依頼まで進める。
-            // 渡す処理は詳しいほうにあるので、配信カードの上に重ねて開く(同じ窓の切り替えにしない。渡すのを配信カードへ移す段で変える)
+            // 配信カードの「制作に渡す」は、開いた制作の画面で、そのまま渡すまで進める(K1。シンプルな制作の画面が渡す)。
+            // 配信カードの上に重ねて開く(詳しい制作のページで渡していたときと同じ見え方)
             if (opts?.request) {
               setPeekResult(null)
               setProductionAuto(true)
@@ -1624,31 +1624,8 @@ function App() {
         <Later><ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} /></Later>
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
-      {productionOpen && cards.find((c) => c.id === productionOpen) && productionSimple && !productionAuto && (
+      {productionOpen && cards.find((c) => c.id === productionOpen) && (productionSimple || productionAuto) && (
         <Later><SimpleProductionView
-          key={`${productionOpen}:${productionKey}`}
-          card={cards.find((c) => c.id === productionOpen)!}
-          productIds={cardProducts.get(productionOpen) ?? []}
-          variantIds={variantProducts.get(productionOpen)}
-          products={products}
-          productImages={cardImages.get(productionOpen)}
-          heroes={heroes}
-          people={owners}
-          onClose={() => setProductionOpen(null)}
-          onFullView={() => switchProductionView(false)}
-          instant={productionOpen === instantId}
-          onChanged={() => void production.reload()}
-          stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
-          allCards={cards}
-          // キャンペーンの帯のタブで、きょうだいの配信の制作の画面へ(窓の出てくる動きなし。配信カードのきょうだいの切り替えと同じ)
-          onSwitchCard={(id) => {
-            setInstantId(id)
-            setProductionOpen(id)
-          }}
-        /></Later>
-      )}
-      {productionOpen && cards.find((c) => c.id === productionOpen) && (!productionSimple || productionAuto) && (
-        <Later><ProductionPage
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}
@@ -1661,14 +1638,39 @@ function App() {
             setProductionOpen(null)
             setProductionAuto(false)
           }}
+          onFullView={() => {
+            setProductionAuto(false)
+            switchProductionView(false)
+          }}
+          autoRequest={productionAuto}
+          onAutoRequested={() => setProductionAuto(false)}
+          instant={productionOpen === instantId}
+          onChanged={() => void production.reload()}
+          stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
+          allCards={cards}
+          // キャンペーンの帯のタブで、きょうだいの配信の制作の画面へ(窓の出てくる動きなし。配信カードのきょうだいの切り替えと同じ)
+          onSwitchCard={(id) => {
+            setProductionAuto(false)
+            setInstantId(id)
+            setProductionOpen(id)
+          }}
+        /></Later>
+      )}
+      {productionOpen && cards.find((c) => c.id === productionOpen) && !productionSimple && !productionAuto && (
+        <Later><ProductionPage
+          key={`${productionOpen}:${productionKey}`}
+          card={cards.find((c) => c.id === productionOpen)!}
+          productIds={cardProducts.get(productionOpen) ?? []}
+          variantIds={variantProducts.get(productionOpen)}
+          products={products}
+          productImages={cardImages.get(productionOpen)}
+          heroes={heroes}
+          people={owners}
+          onClose={() => setProductionOpen(null)}
           onOpenCard={(id) => void goStage(id, 'calendar')}
           onChanged={() => void production.reload()}
-          autoRequest={productionAuto}
           stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
-          onSimpleView={() => {
-            setProductionAuto(false)
-            switchProductionView(true)
-          }}
+          onSimpleView={() => switchProductionView(true)}
         /></Later>
       )}
     </>

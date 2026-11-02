@@ -90,8 +90,25 @@ export function useProductionFlow({ card, live, actor, html, variantHtml, onChan
     }
   }
   const input = { actor, week_start: weekStart }
+  // 渡す・近道で、いまの中身と HTML を固める入力(詳しい制作のページの requestInput と同じ中身)
+  const freezeInput = (snapshot: string, html: string, variantHtml?: string) => ({
+    delivery_card_id: card.id,
+    actor,
+    snapshot,
+    instructions: card.instructions ?? '',
+    production_owner: card.production_owner ?? '',
+    production_due: card.production_due ?? '',
+    html,
+    variant_html: variantHtml,
+    week_start: weekStart,
+  })
   const act = {
-    receive: () => live && run(() => ProductionService.receive(live.id, input), tr('受け取りました', 'Received')),
+    /**
+     * ① 制作に渡す(K1。prod.handoff)。配信カードの「制作に渡す」から開いたときに、画面が裏で 1 回だけ呼ぶ。
+     * snapshot は、いまの配信カードから作った写し。html は見本の HTML(AB テストは B・C 案も variantHtml で一緒に固める)
+     */
+    request: (snapshot: string, html: string, variantHtml?: string) => run(() => ProductionService.request(freezeInput(snapshot, html, variantHtml)), tr('制作に渡しました', 'Handed off to production')),
+    receive:() => live && run(() => ProductionService.receive(live.id, input), tr('受け取りました', 'Received')),
     done: (note: string, link: string) => live && run(() => ProductionService.done(live.id, { ...input, note, link }), tr('制作が終わりました', 'Marked as done')),
     check: () => live && run(() => ProductionService.check(live.id, input), tr('仕上がりを確認しました', 'Checked the result')),
     revise: (note: string) => (live ? run(() => ProductionService.revise(live.id, { ...input, note }), tr('制作に戻しました', 'Sent back to production')) : Promise.resolve(false)),
@@ -105,21 +122,7 @@ export function useProductionFlow({ card, live, actor, html, variantHtml, onChan
      */
     sendDirect: async (snapshot: string) => {
       if (!(await confirmDialog(tr('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?')))) return
-      void run(
-        () =>
-          ProductionService.send({
-            delivery_card_id: card.id,
-            actor,
-            snapshot,
-            instructions: card.instructions ?? '',
-            production_owner: card.production_owner ?? '',
-            production_due: card.production_due ?? '',
-            html: html(),
-            variant_html: variantHtml,
-            week_start: weekStart,
-          }),
-        tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'),
-      )
+      void run(() => ProductionService.send(freezeInput(snapshot, html(), variantHtml)), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
     },
     /** いちばん新しく終えた段を、まだ終えていない状態に戻す(渡した段なら、取り下げる) */
     undo: async () => {

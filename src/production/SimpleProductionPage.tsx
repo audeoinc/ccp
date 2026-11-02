@@ -69,6 +69,7 @@ import { STAGE_ZOOM_KEY, useStageLayout } from '../simple/stageLayout'
 import { PaneCrumbs, PaneHint } from '../simple/PaneCrumbs'
 import { InboxLines, type InboxPart } from '../simple/InboxLines'
 import { PreviewMarks, type Mark } from '../simple/PreviewMarks'
+import { themeTypeLabel, themeTypeOf } from '../themeTypes'
 import { LinkMaterialRows, PartImageRows, ProductMaterialRows } from './MaterialRows'
 import { ProductionChanges } from './ProductionChanges'
 import { snapshotChanges, type ChangeRow } from './changeRows'
@@ -189,6 +190,10 @@ interface Props {
   allCards?: DeliveryCard[]
   /** キャンペーンの帯のタブで、きょうだいの配信の制作の画面に切り替える */
   onSwitchCard?: (id: string) => void
+  /** 開いたら、そのまま制作に渡す(配信カードの「制作に渡す」から開いたとき。K1) */
+  autoRequest?: boolean
+  /** そのまま渡すのを試し終えた(開き直し・きょうだいへの切り替えで、もう一度渡さないように、外で止める) */
+  onAutoRequested?: () => void
 }
 
 // 依頼として生きている状態(この状態の版の写しを見せる。ほかは、いまの配信カードからの下書き)
@@ -265,7 +270,7 @@ function textFieldsOf(p: PartRef): (f: TextField) => boolean {
 // 打ち始めの判定に使う時刻(描画の中では呼ばない。保存の処理の中だけ)
 const nowMs = () => Date.now()
 
-export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant, allCards, onSwitchCard }: Props) {
+export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant, allCards, onSwitchCard, autoRequest, onAutoRequested }: Props) {
   const cardStyles = useCardDetailStyles()
   const s = useStyles()
   const t = useT()
@@ -658,6 +663,35 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
 
   // 企画の見本の HTML(詳しい制作のページと同じ作り方: 見えないプレビューから、書式を直接書いた形にする)。押したときに作る
   const sampleHtml = () => (offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : '')
+  // 配信カードの「制作に渡す」から開いたとき(K1): 見本の HTML ができたら、1 回だけ渡す(詳しい制作のページの autoRequest と同じ)。
+  // 渡すのは、いまの配信カードから作った写し(draft)と、その見本の HTML。AB テストは B・C 案の HTML も、案ごとの見えないプレビューから作って一緒に固める
+  const autoRefs = useRef<Partial<Record<VariantKey, HTMLDivElement | null>>>({})
+  const choosing = !live && !!draft.ab?.choose
+  const autoWaiting = !!autoRequest && !live && requests !== null
+  const autoReady = autoWaiting && flow.approved && !!meId && !choosing && !flow.busy && !!generated
+  const autoDone = useRef(false)
+  useEffect(() => {
+    if (!autoReady || autoDone.current) return
+    const htmlOf = (k: VariantKey) => {
+      const el = autoRefs.current[k]
+      return el ? previewHtml(el, card.name ?? '', htmlLinks(snapshotOf(draft, k), k)) : ''
+    }
+    const html = htmlOf('A')
+    if (!html) return
+    autoDone.current = true
+    const dk = productionVariants(draft)
+    const variantHtml = dk.length > 1 ? JSON.stringify(Object.fromEntries(dk.filter((k) => k !== 'A').map((k) => [k, { html: htmlOf(k) }]))) : undefined
+    void flow.act.request(JSON.stringify(draft), html, variantHtml).then(() => onAutoRequested?.())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoReady])
+  // そのまま渡せないときの理由(案から選ぶ配信で 1 案に決まっていない・承認されていない・だれか選んでいない)
+  const autoBlocked = !autoWaiting
+    ? null
+    : choosing
+      ? t('案から選ぶ配信で、まだ 1 案に決まっていません。配信カードの上の帯で「この案に決める」を押して保存してから、制作に渡してください', 'This delivery is still choosing between variants. Choose one in the bar at the top of the delivery card and save before handing off.')
+      : !flow.approved
+        ? t('配信カードが承認されていないので、まだ制作に渡せません', 'The delivery card is not approved yet, so it cannot be handed off.')
+        : needMe
   const fileName = `${(card.name ?? 'delivery').replace(/[\\/:*?"<>|]/g, '_')}${keys.length > 1 ? `-${cur}` : ''}.html`
   const [copied, setCopied] = useState(false)
   const copyHtml = () =>
@@ -771,6 +805,10 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
         <LabeledValue label={t('制作の担当', 'Production owner')}>{owner}</LabeledValue>
         <LabeledValue label={t('締め切り', 'Due')}>{due ? day(due) : ''}</LabeledValue>
         <LabeledValue label={t('渡した日時', 'Handed off')}>{live?.requested_at ? when(live.requested_at) : ''}</LabeledValue>
+        {/* 種類(テーマの型。K2・P22)。どんな配信かを、制作指示を読む前に分かるように */}
+        <LabeledValue label={t('種類', 'Type')}>{themeTypeLabel(themeTypeOf(card).type)}</LabeledValue>
+        {/* 写しを作った日時。ふつうは渡した日時と同じなので、違うときだけ出す(詳しい制作のページの「写し」) */}
+        {frozen?.takenAt && live?.requested_at && when(frozen.takenAt) !== when(live.requested_at) && <LabeledValue label={t('写し', 'Snapshot')}>{when(frozen.takenAt)}</LabeledValue>}
       </div>
       {!live && <span className={s.note}>{t('まだ制作に渡していません。中身は、いまの配信カードから作った下書きです', 'Not handed off yet. This is a draft built from the current delivery card.')}</span>}
       <div className={s.section}>
@@ -799,7 +837,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
       </div>
       {/* 商品(P10)・リンク先と計測の対応表(P11)は行ごとにコピー。行を押すと、その部品を選ぶ */}
       <ProductMaterialRows snapshot={vs} variant={cur} onSelect={(at) => pickProductAt(at)} />
-      <LinkMaterialRows snapshot={vs} variant={cur} onSelect={(slotKey) => slotKey === 'hero' && pick({ kind: 'hero' })} />
+      {/* 行を押すと、その場所の部品(メイン画像・ボタン)を選ぶ。リンク先は選んだ部品のペインで直す(K3) */}
+      <LinkMaterialRows snapshot={vs} variant={cur} onSelect={(slotKey) => pick(slotKey === 'hero' ? { kind: 'hero' } : { kind: 'button', id: slotKey })} />
       {/* 部品の画像(P21。ボタン・バナー・ロゴ。URL か img のタグをコピー) */}
       <PartImageRows market={cardMarket(vs.card.country ?? '')} />
       {sampleOn && (
@@ -1190,8 +1229,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             // キャンペーンに入っていない配信の AB の案は、計画と同じく帯の 2 段目に
             tabsExtra={!campaign && keys.length > 1 ? variantTabs : undefined}
             notices={
-              (staleLatest || flow.error || flow.notice || workNotice) && (
+              (staleLatest || autoBlocked || flow.error || flow.notice || workNotice) && (
                 <div className={s.bar}>
+                  {autoBlocked && (
+                    <MessageBar intent="warning" layout="multiline">
+                      <MessageBarBody>{autoBlocked}</MessageBarBody>
+                    </MessageBar>
+                  )}
                   {/* 企画が変わりました(P6。古い版の写しで作り続けないように) */}
                   {staleLatest && !live && (
                     <MessageBar intent="warning" layout="multiline">
@@ -1450,6 +1494,21 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             <div ref={offscreenRef}>
               <CardPreview card={savedCard} productIds={vs.productIds} details={vs.details ?? []} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
             </div>
+            {/* そのまま渡すときだけ、案ごとに描く(渡す HTML は、いま見ている案によらず A・B・C を固めるため) */}
+            {autoWaiting &&
+              productionVariants(draft).map((k) => {
+                const dvs = snapshotOf(draft, k)
+                return (
+                  <div
+                    key={k}
+                    ref={(el) => {
+                      autoRefs.current[k] = el
+                    }}
+                  >
+                    <CardPreview card={{ ...card, ...dvs.card } as DeliveryCard} productIds={dvs.productIds} details={dvs.details ?? []} products={dvs.products} heroes={dvs.hero ? [dvs.hero] : []} />
+                  </div>
+                )
+              })}
           </div>
           {finishedOpen && live && <FinishedFloat card={card} request={live} people={people} productIds={vs.productIds.filter(Boolean)} products={vs.products} onClose={() => setFinishedOpen(false)} />}
           {/* 制作した HTML を貼り付けて置き換える [prod.htmledit]。置き換えはプレビューで試してから、帯の「確定」で保存する */}
