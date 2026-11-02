@@ -6,8 +6,8 @@ import { useState, type SyntheticEvent } from 'react'
 import { Link, makeStyles, tokens } from '@fluentui/react-components'
 import { useT } from '../i18n'
 
-/** 短い辺がこれより小さい画像は、アイコン・ロゴとみなして隠す */
-export const SMALL_PX = 200
+/** 短い辺がこれより小さい画像は、アイコン・ロゴとみなして隠す(極端に小さいものだけ。200×200 の商品画像は残す。2026-11-02 利用者) */
+export const SMALL_PX = 100
 
 const useStyles = makeStyles({
   hidden: { display: 'none' },

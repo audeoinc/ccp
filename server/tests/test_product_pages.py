@@ -50,6 +50,13 @@ class ExtractTest(unittest.TestCase):
         self.assertEqual([f["src"] for f in found], ["https://cdn.example.com/a.jpg", "https://www.example.com/s-1200.jpg", "https://www.example.com/lazy.jpg"])
         self.assertEqual(found[1]["alt"], "Side")
 
+    def test_skips_color_swatches_but_not_chips_products(self):
+        html = """<img src="/img/swatch/red.jpg"><img src="/p/1_colorchip.jpg"><img src="/p/1-color-chips.png"><img src="/p/chip_navy.jpg">
+        <img src="/p/2.jpg" alt="カラーチップ ネイビー"><img src="/p/3.jpg" alt="Swatches">
+        <img src="/p/potato-chips.jpg" alt="ポテトチップス"><img src="/p/chipmunk-tee.jpg"><img src="/p/main.jpg">"""
+        found = pp.extract(html, "https://www.example.com/item/1")
+        self.assertEqual([f["src"] for f in found], ["https://www.example.com/p/potato-chips.jpg", "https://www.example.com/p/chipmunk-tee.jpg", "https://www.example.com/p/main.jpg"])
+
 
 if __name__ == "__main__":
     unittest.main()
