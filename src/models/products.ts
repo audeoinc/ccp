@@ -65,6 +65,8 @@ export interface ProductFields {
   /** メイン画像(image_url)の説明の文(商品ページの画像の description。取り込みでメイン画像を設定するときに入る。B12) */
   image_caption?: string | null
   market?: ProductMarket
+  /** 商品ページの URL(settings.shopurl)。取り込みで実際の URL が手に入るときに入る。空なら、設定の形で組む(links.ts の productUrl) */
+  page_url?: string
   // ここから下は、BigQuery の SPU の出力から取り込む列(docs/BIGQUERY_EXPORT.md の 2 章)。画面からは書かない
   /** カテゴリの階層(上の段から ' > ' でつないだもの) */
   category_path?: string

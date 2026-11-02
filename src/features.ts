@@ -230,6 +230,8 @@ export const FEATURES: FeatureDef[] = [
   // 使う学びは、学び(results.learnings。v3)を前提にするので、決まり・アラートの基準(v1)から分けた(2026-11-02 利用者)
   { id: 'settings.country.learnings', group: 'area.settings.country', ...named('使う学び', 'Learnings to use'), version: 'v3', size: 'S', requires: ['results.learnings'] },
   { id: 'settings.sender', group: 'area.settings.company', ...named('差出人の名前と店の URL', 'Sender name and shop URL'), version: 'MVP', size: 'S' },
+  // 店の URL の形(商品・カテゴリ・配信のページ)。差出人の名前と店の URL の欄の下に出す。商品の page_url の優先・写しに固めるのは作りなので、ID を分けない(2026-11-02 利用者)
+  { id: 'settings.shopurl', group: 'area.settings.company', ...named('店の URL の形', 'Shop URL patterns'), version: 'v1', size: 'M' },
   { id: 'settings.utm', group: 'area.settings.company', ...named('計測用のパラメーター(utm)の決まった値', 'Fixed values for tracking parameters (utm)'), version: 'MVP', size: 'S' },
   { id: 'settings.users', group: 'area.settings.company', ...named('ユーザー・承認グループ', 'Users and approval groups'), version: 'MVP', size: 'S' },
   { id: 'settings.templates', group: 'area.settings.company', ...named('テンプレートの管理・編集・AI で作る', 'Manage, edit and AI-create templates'), version: 'v4', size: 'L' },

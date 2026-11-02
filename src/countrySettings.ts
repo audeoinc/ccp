@@ -96,6 +96,12 @@ export interface Brand {
   utmMediumEmail?: string
   /** 計測用の utm_medium(アプリの配信) */
   utmMediumApp?: string
+  /** 商品ページの URL の形(settings.shopurl。{shop}・{product_code}・{country}。links.ts の fillUrl で埋める。商品に page_url があれば、そちらが先) */
+  productUrlPattern?: string
+  /** カテゴリのページの URL の形({shop}・{category}・{country}) */
+  categoryUrlPattern?: string
+  /** 配信(キャンペーン)のページの URL の形({shop}・{campaign}・{country}) */
+  campaignUrlPattern?: string
 }
 
 export interface BrandEntry {
@@ -106,13 +112,32 @@ export interface BrandEntry {
 
 /** 見本の値(決めていないときに使う。本物の店の名前・URL は、コードに書かない) */
 // utm の値は、設定に移す前にコードで決めていた値(newsletter / email)をそのまま既定にする(GA の見え方を変えないため)。アプリの medium は、チャネルに合う app
-export const SAMPLE_BRAND: Required<Brand> = { senderName: 'SHOP', shopUrl: 'https://shop.example.com', utmSource: 'newsletter', utmMediumEmail: 'email', utmMediumApp: 'app' }
+// URL の形の既定は、設定に移す前にコードで組んでいた形(見本の EC サイトも /p/<商品コード> で動く)
+export const SAMPLE_BRAND: Required<Brand> = {
+  senderName: 'SHOP',
+  shopUrl: 'https://shop.example.com',
+  utmSource: 'newsletter',
+  utmMediumEmail: 'email',
+  utmMediumApp: 'app',
+  productUrlPattern: '{shop}/p/{product_code}',
+  categoryUrlPattern: '{shop}/c/{category}',
+  campaignUrlPattern: '{shop}/campaign/{campaign}',
+}
 
 const parseBrand = (v?: string): Brand => {
   try {
     const o = JSON.parse(v ?? '{}') as Brand
     const str = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : undefined)
-    return { senderName: str(o.senderName), shopUrl: str(o.shopUrl)?.replace(/\/+$/, ''), utmSource: str(o.utmSource), utmMediumEmail: str(o.utmMediumEmail), utmMediumApp: str(o.utmMediumApp) }
+    return {
+      senderName: str(o.senderName),
+      shopUrl: str(o.shopUrl)?.replace(/\/+$/, ''),
+      utmSource: str(o.utmSource),
+      utmMediumEmail: str(o.utmMediumEmail),
+      utmMediumApp: str(o.utmMediumApp),
+      productUrlPattern: str(o.productUrlPattern),
+      categoryUrlPattern: str(o.categoryUrlPattern),
+      campaignUrlPattern: str(o.campaignUrlPattern),
+    }
   } catch {
     return {}
   }
@@ -121,17 +146,15 @@ const parseBrand = (v?: string): Brand => {
 /** 全社('')か国の、決めた値(上書きの元の値。空の項目は決めていない) */
 export const brandOwn = (country: string): Brand => brandHistory.get(country)?.[0]?.brand ?? {}
 
+/** 上書きの順に重ねる(前にあるものほど強い。空の項目は次へ) */
+export function layerBrand(...layers: Brand[]): Required<Brand> {
+  const pick = (k: keyof Brand) => layers.map((b) => b[k]).find((v) => !!v) || SAMPLE_BRAND[k]
+  return Object.fromEntries((Object.keys(SAMPLE_BRAND) as (keyof Brand)[]).map((k) => [k, pick(k)])) as Required<Brand>
+}
+
 /** その国で使う値(国の値 → 全社の値 → 見本の値)。描画の中で変わりを受け取るときは useCountrySettings も呼ぶ */
 export function brandFor(country?: string | null): Required<Brand> {
-  const own = country ? brandOwn(country) : {}
-  const company = brandOwn('')
-  return {
-    senderName: own.senderName || company.senderName || SAMPLE_BRAND.senderName,
-    shopUrl: own.shopUrl || company.shopUrl || SAMPLE_BRAND.shopUrl,
-    utmSource: own.utmSource || company.utmSource || SAMPLE_BRAND.utmSource,
-    utmMediumEmail: own.utmMediumEmail || company.utmMediumEmail || SAMPLE_BRAND.utmMediumEmail,
-    utmMediumApp: own.utmMediumApp || company.utmMediumApp || SAMPLE_BRAND.utmMediumApp,
-  }
+  return layerBrand(country ? brandOwn(country) : {}, brandOwn(''))
 }
 
 /** その国・チャネルの配信のリンクに付ける utm_source・utm_medium(国の値 → 全社の値 → 既定の値。配信カードの上書きは、links.ts の utmFor が上に重ねる) */

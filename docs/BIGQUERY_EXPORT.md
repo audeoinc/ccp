@@ -48,6 +48,7 @@ CCP が利用先の BigQuery から取り込むデータの、**列の名前・�
 | `name` | STRING | × | 商品名(その市場の言語) |
 | `category` | STRING | ○ | カテゴリ(※1)。CCP が商品をまとめるときに使う段(1 つ) |
 | `category_path` | STRING | ○ | カテゴリの階層を、上の段から ` > ` でつないだもの(例: `WOMEN > TOPS > KNIT`)。段の数は自由(※4) |
+| `page_url` | STRING | ○ | 商品ページの URL(例: `https://www.example.com/item?id=ABC123`)。あれば、配信の商品のリンクに、この URL をそのまま使う。空なら、CCP の設定(⚙ の「店の URL の形」)で組み立てる(2026-11-02) |
 | `gender` | STRING | ○ | 商品の性別(`mens` / `womens` / `unisex`。`men`・`women`・`female`・`ladies`・`m`・`w` なども読み替える。空・読めない値は「どの対象にも出す」) |
 | `season` | STRING | ○ | 季節(春 / 夏 / 秋 / 冬 / 通年 など。※1) |
 | `price` | NUMERIC | ○ | 代表の価格(SKU で価格が違うなら、最も多い価格か最安値。どちらかに決める) |

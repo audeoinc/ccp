@@ -94,7 +94,7 @@ def _values(table: str, row: dict[str, Any], cols: list[str]) -> dict[str, Any]:
     return {c: sc.coerce(t.by_name[c].type, row.get(c)) for c in cols}
 
 
-SPU_COLS = ["name", "product_code", "market", "category", "category_path", "season", "price", "description", "sales_trend", "rating",
+SPU_COLS = ["name", "product_code", "market", "category", "category_path", "page_url", "season", "price", "description", "sales_trend", "rating",
             "units_4w", "revenue_4w", "revenue_yoy", "views_4w", "cvr_4w", "review_count", "last_review_at", "review_texts",
             "lift_hot", "lift_cold", "lift_rain", "hot_days", "cold_days", "rain_days", "weather_basis", "as_of"]
 

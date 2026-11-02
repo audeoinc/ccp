@@ -100,6 +100,7 @@
     ["image_url", "text"],
     ["image_caption", "text"],
     ["market", "choice"],
+    ["page_url", "text"],
     ["category_path", "text"],
     ["gender", "choice"],
     ["units_4w", "int"],

@@ -116,5 +116,20 @@ class InspectTest(unittest.TestCase):
         self.assertTrue(any("jobs.create denied" in n for n in r.notes))
 
 
+
+class PageUrlTest(unittest.TestCase):
+    """商品ページの URL(settings.shopurl): SPU にあれば取り込む。なくても取り込める(空なら、画面が設定の形で組む)"""
+
+    def test_page_url_is_optional_and_imported(self) -> None:
+        from ccp import bq_import
+
+        self.assertIn("page_url", SPU.optional)
+        self.assertNotIn("page_url", SPU.required)
+        self.assertIn("page_url", bq_import.SPU_COLS)
+        v = bq_import._values("products", {"page_url": "https://www.example.com/item?id=1"}, bq_import.SPU_COLS)
+        self.assertEqual(v["page_url"], "https://www.example.com/item?id=1")
+        self.assertIsNone(bq_import._values("products", {}, bq_import.SPU_COLS)["page_url"])
+
+
 if __name__ == "__main__":
     unittest.main()
