@@ -446,6 +446,10 @@ Direct Line の窓口は、既定の `https://directline.botframework.com` で�
 | エージェント | Copilot Studio で、`CCP AI 出口の検証`(GitHub Copilot ハーネス)・`CCP AI 出口の検証 標準`・`CCP AI 出口の検証 DL` を消す(エージェントの一覧 → … → 削除) |
 | Direct Line の鍵 | エージェントを消さないなら、「Web チャネルのセキュリティ」でシークレットを再生成して、古い鍵を無効にする |
 | Entra のアプリ | 「CCP AI 出口の検証 SDK」の登録を消す(Entra の管理センター)。承諾だけを取り消すなら `https://myapps.microsoft.com` から |
+| AI Builder のプロンプト | `CCP AI 出口の検証 中継`・`CCP AI 出口の検証 画像` を消す(AI ハブ → プロンプト)。画像の方には、試しの写真が保存されている |
+| Power Automate の流れ | `CCP AI 出口の検証 流れ`・`CCP AI 出口の検証 画像の流れ` を消す(流れの URL に署名の鍵が入っている) |
+| Entra のアプリ(方式 3) | 「CCP AI 出口の検証 AIB」の登録を消す(クライアント シークレットは 90 日で切れる) |
+| アプリケーション ユーザー | Power Platform 管理センター → sato_dev → 設定 → アプリケーション ユーザーで、「CCP AI 出口の検証 AIB」を消す |
 | サインインのトークン | `tools/ms-verify/.token-cache.json` を消す(アクセストークンと更新用のトークンが入っている。2026-10-30 より前に道具をリポジトリの外で動かしていたなら、`%USERPROFILE%\.ccp\ms-verify\.token-cache.json` も) |
 | 測った結果 | `tools/ms-verify/results/` を消す(答えの全文が入っている) |
 | 設定のファイル | `%USERPROFILE%\.ccp\ms-verify.env` を消す(鍵・環境の ID・トークン エンドポイントの URL が入っている) |
