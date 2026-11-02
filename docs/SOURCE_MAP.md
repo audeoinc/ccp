@@ -372,7 +372,8 @@ flowchart TD
 | `SectionGlowLayer.tsx` / `sectionGlow.ts` | 49 / 19 | セクションに重ねる光の枠 / 光らせるセクション(「○○の商品を AI で選ぶ」に乗せたとき・案を試しているあいだ。X81) |
 | `usePreviewZoom.ts` / `PreviewZoomBar.tsx` | 67 / 45 | プレビューの倍率(15〜120% と「全体」。画面ごとの鍵で覚える)/ 右下の倍率の操作(− ・倍率・＋)。配信カードと制作のシンプルな画面で共通 |
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 128 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
-| `UrlImagePicker.tsx` | 147 | URL を貼って、そのページの画像を並べて選ぶ(content.hero.fromurl。メイン画像の引き出しのタブと、制作の HeroPicker で使う) |
+| `UrlImagePicker.tsx` | 142 | URL を貼って、そのページの画像を並べて選ぶ(content.hero.fromurl。メイン画像の引き出しのタブと、制作の HeroPicker で使う) |
+| `smallImages.tsx` | 48 | ページから拾った画像のうち、小さい画像(短い辺 200px 未満)を並びから外し、「N 枚を隠しています(見る)」を出す(`UrlImagePicker` と `ProductImageSwap` で同じ判定) |
 | `ProductSwap.tsx` / `floatSwap.tsx` | 118 / 45 | 商品の入れ替えの引き出し(SU9。どの入口からも、ここを開く。中身は `ProductChooser`)/ 商品のフロートの中に、同じ引き出しを出す |
 | `ProductImageSwap.tsx` | 421 | 商品の「画像を替える」の引き出し(その商品のページの画像・AI に選んでもらう・貼り付け・ファイル・URL。試す → 確定。AB で商品が共通なら開いている案だけ。「詳しく」の枠の写真も。以前の `ProductImagePicker.tsx` の窓はやめて、中身をここへ移した) |
 | `TextAiPanel.tsx` | 230 | 文の部品(見出し・コピー・件名など)の AI(「案」と「指示して直す」。試す → 確定) |

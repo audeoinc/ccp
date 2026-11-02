@@ -10,6 +10,7 @@ import { appPath } from '../appRoot'
 import { isImageUrl } from '../heroFromUrl'
 import { useT } from '../i18n'
 import { FeatureBadge } from '../FeatureBadge'
+import { useSmallImages } from './smallImages'
 
 const useStyles = makeStyles({
   body: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -18,17 +19,12 @@ const useStyles = makeStyles({
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: '8px', alignContent: 'start', padding: '2px' },
   tile: { display: 'grid', rowGap: '4px', padding: '4px', border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   tileOn: { outline: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
-  // アイコン・ロゴのような小さい画像は、並べたまま薄く出す(大きさはサーバーが返さないので、読み込んだ大きさで決める)
-  tileSmall: { opacity: 0.45 },
   // 画像は切らずに全体を見せる
   thumb: { width: '100%', aspectRatio: '4 / 3', objectFit: 'contain', backgroundColor: tokens.colorNeutralBackground3, borderRadius: tokens.borderRadiusSmall },
   name: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   caption: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   empty: { display: 'grid', placeItems: 'center', minHeight: '80px', color: tokens.colorNeutralForeground3, border: `1px dashed ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, textAlign: 'center', padding: '12px' },
 })
-
-/** 1 辺がこれより小さい画像は、アイコン・ロゴとみなして薄く出す */
-const SMALL_PX = 200
 
 export interface UrlImagePick {
   src: string
@@ -55,14 +51,15 @@ export function UrlImagePicker({ selected, onPick, fallbackHint, caption }: Prop
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState<{ sample: boolean; page: string; images: PageImage[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [small, setSmall] = useState<Set<string>>(new Set())
+  // アイコン・ロゴのような小さい画像は、並びから外す(下の一言で見られる)
+  const small = useSmallImages()
 
   const read = async () => {
     const target = url.trim()
     if (!target) return
     setError(null)
     setPage(null)
-    setSmall(new Set())
+    small.reset()
     // 画像そのものの URL: ページを読まずに、その 1 枚
     if (isImageUrl(target)) {
       setPage({ sample: false, page: target, images: [{ src: target, alt: '' }] })
@@ -119,8 +116,8 @@ export function UrlImagePicker({ selected, onPick, fallbackHint, caption }: Prop
               <button
                 key={img.src}
                 type="button"
-                className={mergeClasses(s.tile, small.has(img.src) && s.tileSmall, selected === img.src && s.tileOn)}
-                title={small.has(img.src) ? t(`${name}(小さい画像。アイコン・ロゴかもしれません)`, `${name} (small; may be an icon or logo)`) : name}
+                className={mergeClasses(s.tile, selected === img.src && s.tileOn, small.hiddenClass(img.src, selected === img.src))}
+                title={small.isSmall(img.src) ? t(`${name}(小さい画像。アイコン・ロゴかもしれません)`, `${name} (small; may be an icon or logo)`) : name}
                 onClick={() => onPick({ src: img.src, name: img.alt, page: page.page })}
               >
                 <img
@@ -128,10 +125,7 @@ export function UrlImagePicker({ selected, onPick, fallbackHint, caption }: Prop
                   src={appPath(img.src)}
                   alt={img.alt}
                   draggable={false}
-                  onLoad={(ev) => {
-                    const el = ev.currentTarget
-                    if (el.naturalWidth < SMALL_PX || el.naturalHeight < SMALL_PX) setSmall((m) => new Set(m).add(img.src))
-                  }}
+                  onLoad={small.onLoad(img.src)}
                 />
                 <span className={s.name}>{name}</span>
               </button>
@@ -141,6 +135,7 @@ export function UrlImagePicker({ selected, onPick, fallbackHint, caption }: Prop
       ) : (
         !error && <div className={s.empty}>{t('ページの URL を貼って「画像を読む」を押すと、そのページの画像が並びます。画像そのものの URL なら、その 1 枚が出ます', 'Paste a page URL and press Load images to list the images on it. An image URL shows just that image.')}</div>
       )}
+      {!loading && small.note}
       <span className={s.caption}>{caption ?? t('押すとプレビューで試せます(確定で入れ替え)。確定した画像は、メイン画像のライブラリにも入ります', 'Click to try it in the preview (Apply to switch). The applied image is also added to the main image library.')}</span>
     </div>
   )
