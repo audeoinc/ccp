@@ -9,7 +9,7 @@
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TaskListLtrRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
+import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, CheckmarkRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, ErrorCircleRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -45,6 +45,7 @@ import { CardAssetsService } from '../data/cardAssets'
 import { isThreadRoot, stageOf } from '../notesStage'
 import { myName, myUserId, onMeChange } from '../history'
 import { SideRail, type RailItem } from '../simple/SideRail'
+import { addDroppedAssets, canDropAsset } from '../simple/assetDrop'
 import { StepAction } from './StepAction'
 import { useProductionFlow } from './useProductionFlow'
 import { StepsPane } from './StepsPane'
@@ -151,6 +152,9 @@ const useStyles = makeStyles({
   rowLabel: { ...typo.label },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   // この配信のねらい(部品のペインの上の、控えめな箱。計画の部品のペインと同じ置き方)
+  dropNote: { fontSize: '16px' },
+  // やり取りの下のタスクの区切り
+  taskSec: { marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   aim: { display: 'grid', rowGap: '2px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   hero: { maxWidth: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
   thumb: { width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground1 },
@@ -314,7 +318,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const meName = useSyncExternalStore(onMeChange, myName)
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
   // 開いたときは「渡されたもの」(2026-10-29 利用者: プレビューを見る → 申し送りを読む → 素材でイメージを持つ → HTML を確かめる、の順に進めるように)
-  type Side = 'given' | 'talk' | 'tasks' | 'assets' | 'steps' | 'html' | 'changes'
+  type Side = 'given' | 'talk' | 'assets' | 'steps' | 'html' | 'changes'
   const [side, setSide] = useState<Side | null>('given')
   // しまう動きの間も、最後に開いた欄の中身を描いておく(計画と同じ)
   const [lastSide, setLastSide] = useState<Side>('given')
@@ -331,6 +335,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const [finishedOpen, setFinishedOpen] = useState(false)
   // バーの数(未解決の制作のやり取り・未完了のタスク・素材)。欄の中で増減したら、開け閉めのたびに数え直す
   const [counts, setCounts] = useState({ talk: 0, tasks: 0, assets: 0 })
+  // タスクを足した・済みにしたとき(やり取りを開いたまま)も、バーの数を合わせる
+  const [countsVersion, setCountsVersion] = useState(0)
   useEffect(() => {
     let alive = true
     void Promise.all([CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] }), CardAssetsService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on desc'] })])
@@ -343,7 +349,25 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     return () => {
       alive = false
     }
-  }, [card.id, side])
+  }, [card.id, side, countsVersion])
+  // 左のバーの「渡されたもの」「素材」に、画像・資料・URL を落として、参考の素材に入れる(計画と同じ。Plan と Production の差の 19)
+  const [assetsVersion, setAssetsVersion] = useState(0)
+  const [dropOver, setDropOver] = useState<Side | null>(null)
+  const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const dropAssets = async (dt: DataTransfer) => {
+    setDropOver(null)
+    try {
+      const r = await addDroppedAssets(card.id, myName() || owner || '', dt)
+      setDropNote(r.error ? { ok: false, text: r.error } : { ok: true, text: t(`${r.added} 件を参考の素材に入れました`, `Added ${r.added} to reference assets`) })
+      if (r.added > 0) {
+        setAssetsVersion((v) => v + 1)
+        setCountsVersion((v) => v + 1)
+      }
+    } catch (err) {
+      setDropNote({ ok: false, text: err instanceof Error ? err.message : String(err) })
+    }
+    window.setTimeout(() => setDropNote(null), 4000)
+  }
 
   const load = useCallback(async () => {
     const r = await ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${card.id}'` })
@@ -757,7 +781,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
       {/* AB テストの欄(P40。AB でない配信では何も出さない) */}
       <AbHandoffSection snapshot={snap} />
       {/* 参考の素材(企画が配信カードで置いたもの)。制作指示を読んだあと、素材でイメージを持てるように、開いたまま並べる */}
-      {assetsOn && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} title={t('参考の素材', 'Reference materials')} compactAdd />}
+      {assetsOn && <CreativeAssets key={assetsVersion} cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} title={t('参考の素材', 'Reference materials')} compactAdd />}
     </div>
   )
 
@@ -1014,7 +1038,6 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     ({
       given: t('渡されたもの', 'Handoff'),
       talk: t('やり取り(制作の段)', 'Conversation (production)'),
-      tasks: t('タスク', 'Tasks'),
       assets: t('素材', 'Assets'),
       html: 'HTML',
       changes: t('企画から変えた所', 'Changes from the plan'),
@@ -1022,10 +1045,10 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     })[v]
   // 並びの型は計画と同じ: その面の主(渡されたもの)→(線)やり取り・素材 → 直したもの(HTML・変更)→(線)その面の記録(工程)。Plan と Production の差の 14
   const allRails: (RailItem<Side> & { on: boolean })[] = [
-    { v: 'given', on: true, icon: <DocumentTextRegular />, label: t('渡されたもの', 'Handoff'), tip: t('渡されたもの(制作指示・担当・締め切り・参考の素材)', 'Handed over (notes, owner, due date, reference materials)'), count: 0 },
-    { v: 'talk', gap: true, on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
-    { v: 'tasks', on: tasksOn, feature: 'collab.tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
-    { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <ImageMultipleRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
+    { v: 'given', on: true, icon: <DocumentTextRegular />, label: t('渡されたもの', 'Handoff'), tip: t('渡されたもの(制作指示・担当・締め切り・参考の素材。画像・資料・URL を落としても足せる)', 'Handed over (notes, owner, due date, reference materials; drop to add)'), count: 0, drop: assetsOn },
+    // タスクは、計画と同じく「やり取り」の中(Plan と Production の差の 14)。数も、未解決の書き込み + タスク
+    { v: 'talk', gap: true, on: threadOn || tasksOn, feature: threadOn ? 'collab.thread' : 'collab.tasks', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: tasksOn ? t('やり取り(制作の段。企画と制作で。書き込み・タスク)', 'Conversation (production stage, between planner and production: comments and tasks)') : t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: (threadOn ? counts.talk : 0) + (tasksOn ? counts.tasks : 0) },
+    { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <ImageMultipleRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL。落としても足せる)', 'Assets (reference images, files, URLs; drop to add)'), count: counts.assets, drop: true },
     { v: 'html', on: htmlCodeOn, feature: 'prod.htmlcode', icon: <CodeRegular />, label: 'HTML', tip: t('HTML(いまプレビューに出している方のソース)', 'HTML (source of what the preview shows)'), count: 0 },
     { v: 'changes', on: editOn && !!live, feature: 'prod.page', icon: <EditRegular />, label: t('変更', 'Changes'), tip: t('企画から変えた所(だれが直したか・戻す)', 'Changes from the plan (who edited, revert)'), count: changes.length },
     { v: 'steps', on: stepsOn, feature: 'prod.steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
@@ -1035,7 +1058,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const openSide = side && rails.some((r) => r.v === side) ? side : null
   const panel = openSide ?? lastSide
   // 列の幅と、狭いときの割り振り(面の枠。幅は計画と同じ鍵。Plan と Production の差の 39)。アプリの配信は、スマホの幅
-  const layout = useStageLayout({ device: card.channel === 'email' ? device : 'mobile', side: openSide === 'talk' || openSide === 'tasks' ? 'comm' : openSide ? 'hand' : null })
+  const layout = useStageLayout({ device: card.channel === 'email' ? device : 'mobile', side: openSide === 'talk' ? 'comm' : openSide ? 'hand' : null })
 
   return (
     <Dialog open surfaceMotion={instant ? null : undefined} onOpenChange={(_, d) => !d.open && void close()}>
@@ -1178,7 +1201,36 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               moving={moving}
               // 制作の依頼を読み終わるまで、上の帯より下を見せない(読む前は、いまの配信カードからの下書きで描くので、読み終わって渡した写しに替わると中身が入れ替わってチラついた。2026-10-30 利用者)
               hidden={requests === null}
-              rail={<SideRail items={rails} selected={openSide} onPick={(v) => showSide(v)} ariaLabel={t('制作のメニュー', 'Production menus')} />}
+              rail={
+                <SideRail
+                  items={rails}
+                  selected={openSide}
+                  onPick={(v) => showSide(v)}
+                  ariaLabel={t('制作のメニュー', 'Production menus')}
+                  drop={{
+                    over: dropOver,
+                    onOver: (v, ev) => {
+                      if (!canDropAsset(ev.dataTransfer)) return
+                      ev.preventDefault()
+                      setDropOver(v)
+                    },
+                    onLeave: () => setDropOver(null),
+                    onDrop: (_, ev) => {
+                      ev.preventDefault()
+                      void dropAssets(ev.dataTransfer)
+                    },
+                  }}
+                >
+                  {/* 落としたものを入れた・入れられなかったを、バーの下に短く知らせる */}
+                  {dropNote && (
+                    <Tooltip content={dropNote.text} relationship="label" positioning="after" visible>
+                      <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
+                        {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
+                      </span>
+                    </Tooltip>
+                  )}
+                </SideRail>
+              }
               side={{
                 open: !!openSide,
                 title: sideTitle(panel),
@@ -1188,17 +1240,18 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                     {panel === 'given' && <StagePane>{handoffPane}</StagePane>}
                     {panel === 'talk' && (
                       <StagePane>
-                        <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />
-                      </StagePane>
-                    )}
-                    {panel === 'tasks' && (
-                      <StagePane>
-                        <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => showSide('talk', true)} onChanged={() => undefined} />
+                        {threadOn && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
+                        {/* タスク(担当・期日)は、やり取りの下に。書き込みから AI で出したタスクも、ここに入る */}
+                        {tasksOn && (
+                          <div className={mergeClasses(threadOn && s.taskSec)}>
+                            <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => undefined} onChanged={() => setCountsVersion((v) => v + 1)} />
+                          </div>
+                        )}
                       </StagePane>
                     )}
                     {panel === 'assets' && (
                       <StagePane>
-                        <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />
+                        <CreativeAssets key={assetsVersion} cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />
                       </StagePane>
                     )}
                     {/* HTML のソース(2026-11-02 利用者)。いまプレビューに出している方(企画の見本 / 制作した HTML)を、色分けのエディタで。
