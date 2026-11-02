@@ -2,7 +2,7 @@
 // 直しは、どれも試す → 確定(プレビューに仮に当てはめ、上の帯の「確定」で保存する。配信カードと同じ。2026-10-30 利用者: 要素を直すのも MVP)。
 // 写しの直し方(setText など)・選ぶ部品(HeroPicker・ProductPicker)・AI(partAi)は、詳しい制作のページ・配信カードのものを使い回す
 import { useMemo, useState } from 'react'
-import { Button, Input, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { Badge, Button, Input, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ArrowResetRegular, ArrowSwapRegular } from '@fluentui/react-icons'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -11,9 +11,10 @@ import { AutoTextarea } from '../AutoTextarea'
 import { HeroUploadDialog } from '../HeroUploadDialog'
 import { HeroPicker, ProductPicker } from '../ProductionInfoPane'
 import { PartAiChat } from '../simple/PartAiChat'
+import { TextAiPanel } from '../simple/TextAiPanel'
 import { askHeroPick, askPartRewrite, askProductPick, type PartTurn } from '../simple/partAi'
 import { aiCardOfSaved } from '../bulkDraft'
-import { getText, linkRows, setHero, setLink, setProducts, setText, type Snapshot, type TextField, type TextRow } from '../productionSnapshot'
+import { getText, linkRows, setHero, setLink, setProducts, setText, type Snapshot, type TextRow } from '../productionSnapshot'
 import { heroImage, productImage } from '../images'
 import { cardMarket, heroMarket, productMarket } from '../market'
 import { myName } from '../history'
@@ -59,6 +60,8 @@ interface Props {
   onTry: (next: Snapshot, label: { key: string; from: string; to: string }) => void
   /** 文言・リンク先を打ったとき(そのまま入れ、画面の側が自動で保存する。計画と同じ) */
   onEdit: (next: Snapshot) => void
+  /** 文の AI の案を、プレビューにだけ写す(null で戻す。確定は AI の欄の中で。計画の TextAiPanel と同じ) */
+  onPreview: (next: Snapshot | null) => void
   /** すぐ入れる(企画の値に戻す) */
   onCommit: (next: Snapshot) => void
   /** 部品ごとの AI のやり取り(部品を選び直しても残るよう、画面の側が持つ) */
@@ -66,7 +69,7 @@ interface Props {
   setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => void
 }
 
-export function ProductionPartEdit({ part, current, trying, original, rows, productIndex, linkKey, card, products, heroes, aiOn, onTry, onEdit, onCommit, turns, setTurns }: Props) {
+export function ProductionPartEdit({ part, current, trying, original, rows, productIndex, linkKey, card, products, heroes, aiOn, onTry, onEdit, onPreview, onCommit, turns, setTurns }: Props) {
   const s = useStyles()
   const t = useT()
   const [uploading, setUploading] = useState(false)
@@ -96,46 +99,45 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
       <div key={r.id} className={s.field}>
         <span className={s.label}>
           {r.label}
-          {was !== now && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
+          {was !== now && <Badge size="small" appearance="tint" color="warning">{t('企画から変更', 'Changed')}</Badge>}
         </span>
         {/* 打てばそのまま入り、画面の側が自動で保存する(計画と同じ。試す → 確定は AI と入れ替えだけ) */}
         <TextEdit value={getText(trying ?? current, r.field)} onChange={(v) => onEdit(setText(current, r.field, v))} />
         {wasRow(was, now, () => setText(current, r.field, was))}
+        {/* 文の AI(案 / 指示して直す)。計画の部品のペインと同じ部品(どの文の部品も同じ。Plan と Production の差の 47) */}
+        {aiOn && (
+          <TextAiPanel
+            key={r.id}
+            kind={part.kind}
+            label={r.label}
+            value={now}
+            ask={(request, count, history) =>
+              askPartRewrite({
+                card: aiCard(),
+                angle,
+                part: { kind: part.kind, label: r.label, current: now },
+                context: { subject: current.card.subject ?? '', preheader: current.card.preheader ?? '', headline: current.card.headline ?? '', copy: current.card.copy ?? '', pushTitle: current.card.push_title ?? '', pushBody: current.card.push_body ?? '' },
+                request,
+                history,
+                count,
+              })
+            }
+            onPreview={(v) => onPreview(v === null ? null : setText(current, r.field, v))}
+            onAdopt={(idea) => {
+              onPreview(null)
+              onCommit(setText(current, r.field, idea.value))
+            }}
+          />
+        )}
       </div>
     )
   }
-
-  // 文の部品が 1 つだけのとき、その文を AI に頼める(セクションの全体のように 2 つあるときは、見出し・コピーをそれぞれ選ぶ)
-  const one = rows.length === 1 ? rows[0] : undefined
-  const textAi = one && aiOn && (
-    <PartAiChat
-      kind={part.kind}
-      label={one.label}
-      turns={turns}
-      setTurns={setTurns}
-      ask={(request, history) =>
-        askPartRewrite({
-          card: aiCard(),
-          angle,
-          part: { kind: part.kind, label: one.label, current: getText(current, one.field) },
-          context: { subject: current.card.subject ?? '', headline: current.card.headline ?? '', copy: current.card.copy ?? '' },
-          request,
-          history,
-        })
-      }
-      renderIdea={(idea) => <span>{idea.value}</span>}
-      isCurrent={(idea) => idea.value === getText(current, one.field)}
-      onPreview={() => undefined}
-      onAdopt={() => undefined}
-      onTry={(idea) => onTry(setText(current, one.field as TextField, idea.value), { key: `ai:${one.id}:${idea.value}`, from: getText(current, one.field), to: idea.value })}
-    />
-  )
 
   const hero = part.kind === 'hero' && (
     <div className={s.field}>
       <span className={s.label}>
         {t('メイン画像', 'Main image')}
-        {(current.hero?.id ?? '') !== (original.hero?.id ?? '') && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
+        {(current.hero?.id ?? '') !== (original.hero?.id ?? '') && <Badge size="small" appearance="tint" color="warning">{t('企画から変更', 'Changed')}</Badge>}
       </span>
       <span className={s.row}>
         {current.hero && <img className={s.thumb} src={heroImage(current.hero) ?? ''} alt="" />}
@@ -187,7 +189,7 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
     <div className={s.field}>
       <span className={s.label}>
         {t('商品', 'Product')}
-        {nowProduct?.id !== wasProduct?.id && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
+        {nowProduct?.id !== wasProduct?.id && <Badge size="small" appearance="tint" color="warning">{t('企画から変更', 'Changed')}</Badge>}
       </span>
       <span className={s.row}>
         {/* 空いた枠(P14 の足す)は「入れる」。どちらも試す → 確定 */}
@@ -227,7 +229,7 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
     <div className={s.field}>
       <span className={s.label}>
         {t('リンク先(計測用のパラメーターは自動で付きます)', 'Link (tracking parameters are added automatically)')}
-        {linkNow !== linkWas && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
+        {linkNow !== linkWas && <Badge size="small" appearance="tint" color="warning">{t('企画から変更', 'Changed')}</Badge>}
       </span>
       <LinkEdit value={trying ? (linkRows(trying).find((r) => r.slotKey === linkKey)?.base ?? '') : linkNow} onChange={(v) => onEdit(setLink(current, linkKey, v))} />
       {wasRow(linkWas, linkNow, () => setLink(current, linkKey, linkWas))}
@@ -239,7 +241,6 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
     <div className={s.root}>
       <span className={s.head}>{t('直す', 'Edit')}</span>
       {rows.map(textField)}
-      {textAi}
       {hero}
       {product}
       {link}

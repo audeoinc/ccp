@@ -150,6 +150,8 @@ const useStyles = makeStyles({
   rowValue: { display: 'grid', rowGap: '2px', flexGrow: 1, minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', fontSize: tokens.fontSizeBase300 },
   rowLabel: { ...typo.label },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  // この配信のねらい(部品のペインの上の、控えめな箱。計画の部品のペインと同じ置き方)
+  aim: { display: 'grid', rowGap: '2px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   hero: { maxWidth: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
   thumb: { width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground1 },
   instructions: { padding: '8px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2, fontSize: tokens.fontSizeBase300 },
@@ -373,7 +375,11 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const vs = snapshotOf(snap, cur)
   // 試している写し(直し・AI の案を、プレビューにだけ当てはめる。確定するまで保存しない)。直せるのは A 案の要素だけ(B・C 案は配信カードで直す)
   const [trialSnap, setTrialSnap] = useState<Snapshot | null>(null)
-  const pvs = trialSnap && cur === 'A' ? trialSnap : vs
+  const trial = useTrial()
+  // 文の AI の案を試している部品(AI の欄の中で試す。別の部品を選んだら、プレビューを元に戻す)
+  const [aiPreviewKey, setAiPreviewKey] = useState<string | null>(null)
+  const shownTrial = trialSnap && (trial.trial || (part && aiPreviewKey === partKey(part))) ? trialSnap : null
+  const pvs = shownTrial && cur === 'A' ? shownTrial : vs
   const view = productionView(card, latest)
   const instructions = live ? (live.instructions ?? '') : (card.instructions ?? '')
   const owner = live ? (live.production_owner ?? '') : (card.production_owner ?? '')
@@ -437,10 +443,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 並べて比べる(compare): 左に企画の見本、右に制作した HTML(仕上がりの確認で見比べる。P28)
   const [surface, setSurface] = useState<'plan' | 'made' | 'compare'>('plan')
   // 要素の直しを試している間は、制作した HTML の同じ場所も書き換えて見せる(確定すると、同じように保存する)
-  const madeShown = trialHtml ?? (trialSnap && made && cur === 'A' ? syncHtml(made, vs, trialSnap).html : made)
+  const madeShown = trialHtml ?? (shownTrial && made && cur === 'A' ? syncHtml(made, vs, shownTrial).html : made)
   const onMade = htmlEditOn && surface === 'made' && !!madeShown
   const onCompare = htmlEditOn && surface === 'compare' && !!madeShown
-  const trial = useTrial()
   // 案・版を切り替えたら、試しているものはやめる
   useEffect(() => {
     trial.cancel()
@@ -872,6 +877,16 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     return (
       <>
         <PaneCrumbs trail={[{ key: 'all', label: t('配信の全体', 'Whole delivery'), onClick: deselect }, { key: partKey(p), label: title }]} onDeselect={deselect} />
+        {/* この配信のねらい(テーマ・切り口)。読むだけ(テーマを変えるのは計画の配信カード)。制作も、ねらいを見ながら直せるように(Plan と Production の差の 48) */}
+        {(card.theme || card.copy_angle) && (
+          <div className={s.aim}>
+            <LabeledValue label={t('テーマ', 'Theme')} emptyText={t('テーマなし', 'No theme')}>
+              {card.theme ?? ''}
+            </LabeledValue>
+            {card.theme_reason && <span className={s.note}>{t(`理由: ${card.theme_reason}`, `Why: ${card.theme_reason}`)}</span>}
+            {card.copy_angle && <span className={s.note}>{t(`切り口(見出し・コピー): ${card.copy_angle}`, `Angle (headline & copy): ${card.copy_angle}`)}</span>}
+          </div>
+        )}
         {trs.map((r) => copyRow(r.label, getText(vs, r.field), r.id))}
         {imgUrl && (p.kind === 'hero' || p.kind === 'image') && (
           <div className={s.section}>
@@ -929,7 +944,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           <ProductionPartEdit
             part={p}
             current={vs}
-            trying={trialSnap}
+            trying={shownTrial}
             original={original}
             rows={trs}
             productIndex={p.kind === 'slot' ? p.index : prod?.at}
@@ -940,6 +955,12 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             aiOn={aiOn}
             onTry={trySnap}
             onEdit={editSnap}
+            onPreview={(next) => {
+              // 文の AI の案は、AI の欄の中で試して確定する(上の帯の試すとは別。計画と同じ)
+              trial.cancel()
+              setTrialSnap(next)
+              setAiPreviewKey(next ? partKey(p) : null)
+            }}
             onCommit={(next) => void commitSnap(next)}
             turns={turnsByPart[partKey(p)] ?? []}
             setTurns={(f) => setTurnsByPart((m) => ({ ...m, [partKey(p)]: f(m[partKey(p)] ?? []) }))}
