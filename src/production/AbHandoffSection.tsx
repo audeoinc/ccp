@@ -7,8 +7,7 @@ import { linkRows, productRows, rowsText, variantSnapshot, variantUtmCampaign, t
 import { heroImage } from '../images'
 import { useT } from '../i18n'
 import { typo } from '../typo'
-// コピーのボタン: いまは ProductionInfoPane のもの。src/CopyButton.tsx(同じ形)が main に入ったら、そちらに寄せる
-import { CopyButton } from '../ProductionInfoPane'
+import { CopyButton } from '../CopyButton'
 import { LabeledValue } from '../LabeledValue'
 import { useFeature } from '../featureFlags'
 import { FeatureBadge } from '../FeatureBadge'
@@ -26,9 +25,6 @@ const useStyles = makeStyles({
   name: typo.valueStrong,
   summary: { ...typo.value, whiteSpace: 'pre-line', overflowWrap: 'anywhere' },
   caption: typo.caption,
-  // utm_campaign とコピーのボタン。値は長いので、ラベルの下に行の幅いっぱいで折り返す(狭いパネルで 1 文字ずつ折れないように)
-  pair: { display: 'flex', alignItems: 'center', columnGap: '2px', minWidth: 0 },
-  pairValue: { flexGrow: 1 },
 })
 
 /** AB テストの欄。AB の配信でなければ、何も出さない */
@@ -78,17 +74,14 @@ export function AbHandoffSection({ snapshot }: { snapshot: Snapshot }) {
             <span className={s.body}>
               <span className={s.name}>{t(`${v.key} 案`, `Variant ${v.key}`)}</span>
               {'texts' in v && v.texts && <LabeledValue label={t('見出し', 'Headline')}>{v.texts.headline}</LabeledValue>}
-              <LabeledValue label={t('商品', 'Products')} emptyText="—">
+              <LabeledValue label={t('商品', 'Products')} empty="none">
                 {v.productIds.map(productName).filter(Boolean).join(' / ')}
               </LabeledValue>
               {!ab.choose && (
-                // コピーのボタンは、LabeledValue の copy(UI 2 の塊 B)が main に入ったら、そちらに寄せる
-                <span className={s.pair}>
-                  <LabeledValue label="utm_campaign" layout="stacked" className={s.pairValue}>
-                    {campaign}
-                  </LabeledValue>
-                  <CopyButton text={campaign} label={t('utm_campaign をコピー', 'Copy utm_campaign')} />
-                </span>
+                // 値は長いので、ラベルの下に行の幅いっぱいで折り返す(狭いパネルで 1 文字ずつ折れないように)
+                <LabeledValue label="utm_campaign" layout="stacked" copy>
+                  {campaign}
+                </LabeledValue>
               )}
             </span>
             <CopyButton text={rowsText(urls)} label={t('この案のリンクをコピー', 'Copy this variant’s links')} />
