@@ -223,6 +223,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'product.policy', group: 'area.alerts.product', ...named('販売方針・販促', 'Sales policy and promotions'), version: 'v1', size: 'S' },
   { id: 'product.ads', group: 'area.alerts.ads', ...named('商品別の外部広告の列・印', 'External ad columns and marks by product'), version: 'v4', size: 'S' },
   { id: 'settings.me', group: 'area.settings.me', ...named('言語・ヒント', 'Language and hints'), version: 'always' },
+  { id: 'settings.me.autoscale', group: 'area.settings.me', ...named('開いたときの画面の大きさを、画面に合わせて決める', 'Fit the display size to the screen when opening'), version: 'MVP', size: 'S' },
   { id: 'settings.country.templates', group: 'area.settings.country', ...named('使うテンプレート', 'Templates to use'), version: 'MVP', size: 'S' },
   { id: 'settings.country.rules', group: 'area.settings.country', ...named('使う決まり・アラートの基準', 'Rules and alert criteria to use'), version: 'v1', size: 'S' },
   // 使う学びは、学び(results.learnings。v3)を前提にするので、決まり・アラートの基準(v1)から分けた(2026-11-02 利用者)

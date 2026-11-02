@@ -17,6 +17,7 @@ import { checkUtm } from './check-utm.mjs'
 import { checkParts } from './check-parts.mjs'
 import { checkSlots } from './check-slots.mjs'
 import { checkTemplateAi } from './check-template-ai.mjs'
+import { checkScale } from './check-scale.mjs'
 
 const run = (cmd, args) => {
   console.log(`\n> ${[cmd, ...args].join(' ')}`)
@@ -78,6 +79,7 @@ run('node', ['scripts/check-schema.mjs'])
     report(await checkParts(server))
     report(await checkSlots(server))
     report(await checkTemplateAi(server))
+    report(await checkScale(server))
   } finally {
     await server.close()
   }

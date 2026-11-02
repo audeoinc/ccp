@@ -100,6 +100,7 @@ import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
 import { loadSimpleProduction } from './simpleProductionChunk'
+import { UiScaleNotice } from './UiScaleNotice'
 import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 import { isOn, useFeature, useFeatureVersion } from './featureFlags'
@@ -992,6 +993,8 @@ function App() {
             <MessageBarBody>{error}</MessageBarBody>
           </MessageBar>
         )}
+        {/* 表示の大きさを画面に合わせて決めたときの、最初の 1 回のお知らせ(settings.me.autoscale) */}
+        <UiScaleNotice className={styles.alert} />
         {policyWarning && (
           <MessageBar layout="multiline" intent="warning" className={styles.alert}>
             <MessageBarBody>{policyWarning}</MessageBarBody>

@@ -304,7 +304,8 @@ flowchart TD
 | `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 254 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `TasksPanel.tsx` | 196 | タスク(プロセスのペインの「タスク」タブ) |
 | `assetSeed.ts` | 230 | ⚙ の「素材の見本を作る / 消す」(画面の中で描いたイラスト・PDF と公開の URL を、制作の依頼のある配信に。名前の先頭が「見本:」) |
-| `uiScale.ts` | 40 | 画面全体の表示の大きさ(X60。zoom と --ui-zoom、viewWidth / viewHeight、getUiScale) |
+| `uiScale.ts` | 86 | 画面全体の表示の大きさ(X60。zoom と --ui-zoom、viewWidth / viewHeight、getUiScale)。自動(`settings.me.autoscale`): `autoScaleFor`(幅・高さから倍率。境目は `scripts/check-scale.mjs`)・`startUiScale`(起動のとき)・`setUiScaleAuto` |
+| `UiScaleNotice.tsx` | 35 | 自動で 100% 以外にしたときの、最初の 1 回のお知らせの帯。自動が非公開と分かったら 100% に戻す |
 | `weeklyLimit.ts` | 75 | 週の上限(C3。マーケティングの決まりの「上限 週 N 回」→ なければアラートの条件の値) |
 | `HeroLibrary.tsx` | 312 | ⚙ の「画像のライブラリ」(メイン画像の一覧・絞り込み・上げる・直す・消す・期限を切る・空の項目を AI で埋める。タブで部品の画像。X59) |
 | `PartLibrary.tsx` / `PartUploadDialog.tsx` / `PartPicker.tsx` | 195 / 273 / 84 | 部品の画像(ボタン・バナー・ロゴ・アイコン。X59 ③)のライブラリ / 上げる・直す(AI の下書き・代替テキスト)/ 制作のページの左の欄(URL・`<img>` のタグをコピー)。窓口は `data/partUpload.ts`、表は `data/partImages.ts`、サーバーは `server/ccp/parts.py` |

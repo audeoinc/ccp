@@ -29,7 +29,7 @@ import { isDeveloper, isOn, setViewingAsUser, useFeatureVersion, viewingAsUser }
 import { useT } from './i18n'
 import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, groupsOf, usePeople, type People } from './people'
-import { UI_SCALES, setUiScale, useUiScale, type UiScale } from './uiScale'
+import { UI_SCALES, setUiScale, setUiScaleAuto, useUiScale, useUiScaleAuto, type UiScale } from './uiScale'
 
 const useStyles = makeStyles({
   // アカウントの見た目(頭文字の顔 + 名前)。幅は置き場所が決めるので、長い名前は省略する
@@ -75,6 +75,8 @@ export function MePicker({ className, ariaLabel }: Props) {
   const styles = useStyles()
   const t = useT()
   const scale = useUiScale()
+  const scaleAuto = useUiScaleAuto()
+  const autoScaleOn = isOn('settings.me.autoscale')
   // 開発者の印・「一般の人として見る」が変わったら描き直す(X87)
   useFeatureVersion()
   const people = usePeople()
@@ -127,7 +129,7 @@ export function MePicker({ className, ariaLabel }: Props) {
   }
   return (
     <Menu
-      checkedValues={{ me: picked ? [picked.id] : [], scale: [String(scale)], view: viewingAsUser() ? ['user'] : [] }}
+      checkedValues={{ me: picked ? [picked.id] : [], scale: [scaleAuto ? 'auto' : String(scale)], view: viewingAsUser() ? ['user'] : [] }}
       onCheckedValueChange={(_, d) => {
         // 表示の大きさ(X60)
         // 開発者の「一般の人として見る」(X87)
@@ -136,6 +138,10 @@ export function MePicker({ className, ariaLabel }: Props) {
           return
         }
         if (d.name === 'scale') {
+          if (d.checkedItems[0] === 'auto') {
+            setUiScaleAuto()
+            return
+          }
           const v = Number(d.checkedItems[0])
           if ((UI_SCALES as readonly number[]).includes(v)) setUiScale(v as UiScale)
           return
@@ -172,6 +178,12 @@ export function MePicker({ className, ariaLabel }: Props) {
           {isOn('common.zoom') && (
           <MenuGroup>
             <MenuGroupHeader>{t('表示の大きさ(このブラウザ)', 'Display size (this browser)')}</MenuGroupHeader>
+            {/* 自動(settings.me.autoscale): 開いたときに画面に合わせて決める。いま決まっている値も見せる */}
+            {autoScaleOn && (
+              <MenuItemRadio name="scale" value="auto" secondaryContent={scaleAuto ? `${Math.round(scale * 100)}%` : undefined}>
+                {t('自動(おすすめ)', 'Auto (recommended)')}
+              </MenuItemRadio>
+            )}
             {UI_SCALES.map((v) => (
               <MenuItemRadio key={v} name="scale" value={String(v)}>
                 {v === 0.7 ? t('とても小さめ(70%)', 'Smallest (70%)') : v === 0.8 ? t('小さめ(80%)', 'Small (80%)') : v === 0.9 ? t('やや小さめ(90%)', 'Smaller (90%)') : v === 1 ? t('標準(100%)', 'Standard (100%)') : t('大きめ(110%)', 'Large (110%)')}
