@@ -161,6 +161,7 @@
 |  | テーマを手で書く | `content.theme` |  | 〇 |  |  |  |  | − |  |
 | メイン画像 | ライブラリから選ぶ | `content.hero.pick` |  | 〇 |  |  |  |  | 小 |  |
 |  | 持っている画像を上げる | `content.hero.upload` |  | 〇 |  |  |  |  | 小 |  |
+|  | URL を指定して、そのページの画像から選ぶ(確定でライブラリにも入れる) | `content.hero.fromurl` |  |  | 〇 |  |  |  | 小〜中 | 2026-11-02 利用者。サーバーの読み込みは商品の画像と同じ(`/api/product-pages/images`・`adopt`)。権利の扱いは一旦なし。外に出られない環境では読めない(上げるを案内)。`content.products.pagefetch`(v2)と版が違う |
 | 商品 | 商品を探して入れる・入れ替える・外す・並べ替える | `content.products` |  | 〇 |  |  |  |  | − |  |
 |  | 商品の画像を選ぶ(取り込んだ画像・BigQuery の画像・貼り付け・ファイル・画像の URL から) | `content.products.pageimage` |  | 〇 |  |  |  |  | 小 | 2026-10-28 利用者: 3 つに分けた。2026-10-30 利用者: MVP に(ai.pageimage の入口がこの引き出しの中のため。URL を読んで拾う pagefetch は v2 のまま) |
 |  | 商品ページの URL を読んで、画像を拾ってくる | `content.products.pagefetch` |  |  |  | 〇 |  |  | 中 | 2026-10-28 利用者が v2・中と決めた。サーバーがページを読む(外に出られない環境では読めない) |
