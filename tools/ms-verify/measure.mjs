@@ -267,10 +267,17 @@ async function askOnceAib(dv, prompt, images) {
 }
 
 // ---- 方式 3 の窓口: Power Automate の流れ。流れの URL には署名の鍵が入ることがあるので、URL は画面に出さない
+// 画像は、Power Automate のファイルの形({"$content-type", "$content": base64})で image に入れる。
+// 画像は別の流れ(画像の入力を持つプロンプト)に送るので、URL は AIB_FLOW_IMAGE_URL。プロンプトの画像の入力は 1 つなので、1 枚だけ
 async function askOnceFlow(url, prompt, images) {
-  if (images.length) throw new Error('流れで画像を送る形は、まだ作っていない')
+  if (images.length > 1) throw new Error('流れで送れる画像は 1 枚まで(プロンプトの画像の入力が 1 つのため)')
+  const payload = { request: prompt }
+  if (images.length) {
+    const [, mime, b64] = images[0].contentUrl.match(/^data:([^;]+);base64,(.*)$/)
+    payload.image = { '$content-type': mime, '$content': b64 }
+  }
   const t0 = performance.now()
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: prompt }) })
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   const body = await res.text()
   const tEnd = performance.now()
   if (!res.ok) throw new Error(`流れ ${res.status}: ${body.replace(/https?:\/\/\S+/g, '<URL>').slice(0, 300)}`)
@@ -290,7 +297,10 @@ const model = opt('--model') ?? env.MODEL_LABEL ?? ''
 if (!model) throw new Error(`モデルの名前がありません。エージェントで選んだモデルを ${ENV_FILE} の MODEL_LABEL か --model で渡してください`)
 let ask
 if (via === 'flow') {
-  ask = (prompt, images) => askOnceFlow(env.AIB_FLOW_URL, prompt, images)
+  ask = (prompt, images) => {
+    if (images.length && !env.AIB_FLOW_IMAGE_URL) throw new Error(`画像の流れの URL がありません(${ENV_FILE} の AIB_FLOW_IMAGE_URL)`)
+    return askOnceFlow(images.length ? env.AIB_FLOW_IMAGE_URL : env.AIB_FLOW_URL, prompt, images)
+  }
 } else if (via === 'aib') {
   // トークンとプロンプトの ID は 1 度だけ取る(層でも使い回す形)。表の「会話を始める」は 0 にし、取った秒数はここに出す
   const t0 = performance.now()
