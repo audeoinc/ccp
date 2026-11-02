@@ -312,6 +312,26 @@ export const IMAGE_TESTS = [
   },
 ]
 
+// T10: 縮めた写真で、素材・編み方などの細かい特徴を読み取れるかを見る(層で写真を縮めてよい大きさを決めるため)。
+// CCP の頼みそのものではなく、確かめのための頼み。読み取れたかは、答えを人が写真と見比べて判断する(ここでは形だけを確かめる)
+const T10 = `次の画像は、ファッション通販の商品の写真です(何枚かあるときは、同じ商品の全体と寄りの写真)。写真から読み取れることだけを、次の JSON だけで返してください。説明文や前置き、コードフェンスは付けない。
+{"item": "商品の種類", "knit": "編み方・織り方(例: 透かし編み・ケーブル編み・リブ編み・天竺・デニムの綾織り。見分けられなければ「不明」)", "surface": "表面の特徴(起毛・毛足・光沢・凹凸など)", "material_guess": "写真から推測できる素材(見分けられなければ「不明」)", "details": ["見える細部(ボタン・リブ・ポケットなど)"], "confidence": "high" | "medium" | "low"}
+写っていないことは書かない。`
+
+IMAGE_TESTS.push({
+  id: 'T10',
+  name: '素材・編み方の読み取り',
+  runs: 1,
+  images: 'many',
+  prompt: () => T10,
+  check: (text) =>
+    judge(text, (o, n) => {
+      for (const k of ['item', 'knit', 'surface', 'material_guess']) if (!o[k]) n.push(`${k} が空`)
+      if (!Array.isArray(o.details)) n.push('details が配列でない')
+      if (!['high', 'medium', 'low'].includes(o.confidence)) n.push(`confidence が 3 択の外(${o.confidence})`)
+    }),
+})
+
 // 確かめの仕組みそのものを、つながずに試す見本の答え(node measure.mjs --self-test)
 export const SAMPLES = {
   T1: ['{"mode":"update","reply":"短くしました","ideas":[{"text":"秋のニットで温もりを","why":"短く"},{"text":"肌寒い朝にニット","why":"場面"},{"text":"新作ニット、届きました","why":"新作"}]}', true],
