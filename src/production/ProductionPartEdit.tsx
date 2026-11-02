@@ -177,7 +177,11 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
     if (productIndex === undefined) return
     const p = products.find((x) => x.id === id)
     if (!p) return
-    onTry(setProducts(current, current.productIds.map((x, i) => (i === productIndex ? id : x)), products), { key: `product:${productIndex}:${id}`, from: nowProduct?.name ?? '', to: p.name })
+    // 空いた枠は、並びの長さより後ろのこともある(そこまで空で埋めてから入れる)
+    const ids = [...current.productIds]
+    while (ids.length <= productIndex) ids.push('')
+    ids[productIndex] = id
+    onTry(setProducts(current, ids, products), { key: `product:${productIndex}:${id}`, from: nowProduct?.name ?? '', to: p.name })
   }
   const product = productIndex !== undefined && (
     <div className={s.field}>
@@ -186,8 +190,9 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
         {nowProduct?.id !== wasProduct?.id && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
       </span>
       <span className={s.row}>
-        <span className={s.note} style={{ flexGrow: 1 }}>{t('ほかの商品に入れ替える', 'Swap for another product')}</span>
-        <ProductPicker trigger={<Button size="small" appearance="subtle" icon={<ArrowSwapRegular />}>{t('入れ替える', 'Swap')}</Button>} products={poolProducts} onPick={swapTo} />
+        {/* 空いた枠(P14 の足す)は「入れる」。どちらも試す → 確定 */}
+        <span className={s.note} style={{ flexGrow: 1 }}>{nowProduct ? t('ほかの商品に入れ替える', 'Replace with another product') : t('この枠に商品を入れる', 'Put a product in this slot')}</span>
+        <ProductPicker trigger={<Button size="small" appearance="subtle" icon={<ArrowSwapRegular />}>{nowProduct ? t('入れ替える', 'Replace') : t('入れる', 'Add')}</Button>} products={poolProducts} onPick={swapTo} />
       </span>
       {wasProduct && nowProduct?.id !== wasProduct.id && wasRow(wasProduct.name, nowProduct?.name ?? '', () => setProducts(current, current.productIds.map((x, i) => (i === productIndex ? wasProduct.id : x)), [...products, wasProduct]))}
       {aiOn && (

@@ -9,7 +9,7 @@
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TaskListLtrRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
+import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TaskListLtrRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -53,7 +53,12 @@ import { MarkdownLite } from '../MarkdownLite'
 import { PreviewPartPicker } from '../PreviewPartPicker'
 import { ResizableSurface } from '../ResizableSurface'
 import { CopyButton } from '../ProductionInfoPane'
-import { slotIdsOf } from '../slots'
+import { idsToItems, itemsToIds, removeKey, slotIdsOf } from '../slots'
+import { neighborItem, type MoveDir } from '../simple/gridMove'
+import { partFromElement } from '../simple/parts'
+import { previewMenuItems } from '../previewMenu'
+import { heroImage } from '../images'
+import type { ContextItem } from '../ContextMenu'
 import { PREF } from '../prefKeys'
 import { typo } from '../typo'
 import { day, locale, tr, useT, when } from '../i18n'
@@ -73,7 +78,7 @@ import { CampaignBand } from '../CampaignBand'
 import { CopyLinkButton } from '../CopyLinkButton'
 import { useCampaignOf } from '../useCampaignOf'
 import { cardDisplayName } from '../campaigns'
-import { getTemplate, templateKeyOfCard } from '../templates'
+import { getTemplate, sectionsOf, templateKeyOfCard } from '../templates'
 import { partElement, partKey, partOfAnchor, type PartRef } from '../simple/parts'
 import { usePreviewZoom } from '../simple/usePreviewZoom'
 import { useFeature } from '../featureFlags'
@@ -91,7 +96,9 @@ import {
   productRows,
   productionVariants,
   rowsText,
+  setProducts,
   snapshotOf,
+  templateOf,
   textRows,
   trackingRows,
   type Snapshot,
@@ -644,6 +651,51 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     </div>
   )
 
+  // 商品の並べ替え・外す(P14)。配信カードと同じ動き: 選んだ商品を Alt + 矢印で見たままの向きに動かす・Delete で外す(すぐ入れて自動で保存。↶ で戻す)。
+  // 直せるのは渡したあとの A 案だけ。試している間は動かさない(試している中身と混ざらないように)
+  const canArrange = editOn && canWork && cur === 'A' && !trial.trial
+  const atOfKey = (itemKey: string) => snap.productIds.findIndex((pid, i) => `${pid}-${i}` === itemKey)
+  const moveProduct = (itemKey: string, to: number) => {
+    const from = atOfKey(itemKey)
+    if (!canArrange || from < 0 || to < 0 || to >= snap.productIds.length || from === to) return
+    const ids = [...snap.productIds]
+    ;[ids[from], ids[to]] = [ids[to], ids[from]]
+    void commitSnap(setProducts(snap, ids, shownProducts))
+    // 動かした商品を選んだままにする(枠の鍵は位置で変わる)
+    setPart({ kind: 'product', itemKey: `${ids[to]}-${to}` })
+  }
+  const moveProductDir = (itemKey: string, dir: MoveDir) => {
+    const other = boxRef.current ? neighborItem(boxRef.current, itemKey, dir) : null
+    if (other) moveProduct(itemKey, atOfKey(other))
+  }
+  // 外すと、そのセクションの中だけ詰める(ほかのセクションの商品は動かさない。配信カードと同じ)
+  const removeProduct = (itemKey: string) => {
+    const at = atOfKey(itemKey)
+    if (!canArrange || at < 0) return
+    const list = idsToItems(snap.productIds)
+    void commitSnap(setProducts(snap, itemsToIds(removeKey(list, sectionsOf(templateOf(snap)), list[at].key)), shownProducts))
+    deselect()
+  }
+  // 右クリックの項目(ピンのあと)。配信カードと同じ並び・文言で、制作の面でできること(直す・AI・入れ替える・外す・動かす)だけ(Plan と Production の差の 36)
+  const previewMenu = (under: Element): ContextItem[] => {
+    const root = boxRef.current
+    const p = root ? partFromElement(under, root) : null
+    if (!p) return []
+    const at = p.kind === 'product' ? atOfKey(p.itemKey) : -1
+    const dirs = ['up', 'down', 'left', 'right'] as const
+    const move = p.kind === 'product' && root ? Object.fromEntries(dirs.map((d) => [d, neighborItem(root, p.itemKey, d) ? () => moveProductDir(p.itemKey, d) : undefined])) as Record<MoveDir, (() => void) | undefined> : undefined
+    const editable = editOn && canWork && cur === 'A'
+    return previewMenuItems({
+      busy: busy || !!trial.trial,
+      edit: () => pick(p),
+      ai: aiOn && editable && p.kind !== 'slot' ? () => pick(p) : undefined,
+      product:
+        p.kind === 'product' && canArrange
+          ? { swapLabel: t('入れ替える', 'Replace'), url: prows.find((r) => r.at === at)?.url, swap: () => pick(p), remove: () => removeProduct(p.itemKey), move }
+          : undefined,
+      hero: p.kind === 'hero' && editable ? { src: heroImage(vs.hero ?? undefined), replace: () => pick(p) } : undefined,
+    })
+  }
   /** 商品の並びの位置から、その商品の部品を選ぶ(材料の行・変更の一覧から) */
   const pickProductAt = (at: number) => {
     const pid = vs.productIds[at]
@@ -851,6 +903,26 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
         {links.map((r, i) => copyRow(t(`リンク先: ${r.label}`, `Link: ${r.label}`), r.value, `link${i}`))}
         {prodTracking.map((r) => copyRow(`utm_content: ${r.content}`, r.url, `trk-${r.content}-${r.url}`, <span className={s.note}>{r.desc}</span>))}
         {p.kind === 'slot' && <span className={s.note}>{t('この枠には、商品が入っていません', 'This slot has no product.')}</span>}
+        {/* 並べ替え・外す(P14)。プレビューで選んで Alt + 矢印・Delete でも */}
+        {prod && canArrange && (
+          <div className={s.actions}>
+            <Tooltip content={t('前の枠と入れ替える(Alt + 矢印でも、見たままの向きに動かせます)', 'Swap with the previous slot (or Alt + arrow keys)')} relationship="label">
+              <Button size="small" appearance="subtle" icon={<ArrowUpRegular />} disabled={prod.at === 0} onClick={() => moveProduct(p.kind === 'product' ? p.itemKey : '', prod.at - 1)}>
+                {t('前へ', 'Earlier')}
+              </Button>
+            </Tooltip>
+            <Tooltip content={t('次の枠と入れ替える', 'Swap with the next slot')} relationship="label">
+              <Button size="small" appearance="subtle" icon={<ArrowDownRegular />} disabled={prod.at >= vs.productIds.length - 1} onClick={() => moveProduct(p.kind === 'product' ? p.itemKey : '', prod.at + 1)}>
+                {t('次へ', 'Later')}
+              </Button>
+            </Tooltip>
+            <Tooltip content={t('この商品を外す(セクションの中で詰めます。Delete でも)', 'Remove this product (the section closes up; or press Delete)')} relationship="label">
+              <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => removeProduct(p.kind === 'product' ? p.itemKey : '')}>
+                {t('外す', 'Remove')}
+              </Button>
+            </Tooltip>
+          </div>
+        )}
         {!trs.length && !imgUrl && !prod && !links.length && !prodTracking.length && p.kind !== 'slot' && <span className={s.note}>{t('この部品に、コピーする材料はありません(中身はテンプレートで決まっています)', 'Nothing to copy for this part (its content comes from the template).')}</span>}
         {/* 直す [prod.page](渡したあと・送る前の、A 案だけ。B・C 案の中身は配信カードで直す) */}
         {editOn && canWork && cur === 'A' && (
@@ -860,7 +932,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             trying={trialSnap}
             original={original}
             rows={trs}
-            productIndex={prod?.at}
+            productIndex={p.kind === 'slot' ? p.index : prod?.at}
             linkKey={linkKey}
             card={card}
             products={shownProducts}
@@ -1224,7 +1296,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                     )}
                   </div>
                   {/* ピン [collab.pins]: 企画の見本の上の、制作の段階の書き込み。右クリックの「ここにピンを打つ」・開発へのリクエストも、ここで受ける */}
-                  {!onMade && <PreviewPins boxRef={boxRef} cardId={card.id} view={pinView('html-plan', '', cur)} items={pinItems} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} pinsOn={pinsOn} stage="production" />}
+                  {!onMade && <PreviewPins boxRef={boxRef} cardId={card.id} view={pinView('html-plan', '', cur)} items={pinItems} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} pinsOn={pinsOn} stage="production" />}
                   {!onMade && pinsOn && pinTarget && (
                     <PinFloat cardId={card.id} cardOwner={owner} stage="production" root={() => boxRef.current} target={pinTarget} productName={(id) => vs.products.find((p) => p.id === id)?.name ?? ''} onTarget={setPinTarget} onClose={closePin} editSpot={(anchor, productId) => {
                       // ピンの場所の部品を選ぶ(その部品の材料・直すを右に出す。配信カードと同じ)
@@ -1234,7 +1306,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                   )}
                   {/* 企画から変えた所の印(P17。押すと、その部品を選ぶ) */}
                   {!onMade && changeMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={changeMarks} onSelect={pick} />}
-                  {!onMade && <PreviewPartPicker boxRef={boxRef} selected={part && !inboxSelected ? part : null} onSelect={pick} disabled={placing} />}
+                  {!onMade && <PreviewPartPicker boxRef={boxRef} selected={part && !inboxSelected ? part : null} onSelect={pick} disabled={placing} onRemove={canArrange ? removeProduct : undefined} onMove={canArrange ? moveProductDir : undefined} />}
                 </PreviewFrame>
               }
               pane={
