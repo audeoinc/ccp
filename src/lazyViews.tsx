@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, type ComponentProps, type ReactNode } from 'r
 import { Spinner } from '@fluentui/react-components'
 import { loadChunk } from './chunkReload'
 import { loadSimpleProduction, loadedSimpleProduction } from './simpleProductionChunk'
+import { loadCardDetail, loadedCardDetail } from './cardDetailChunk'
 
 // 開いたときに読み込む画面(整理 第2段 ④)。最初に開くときに、使わないかもしれない画面のプログラムまで読まないため。
 // ここから読み込む(画面のファイルを、ほかのファイルから直接 import すると、分かれない)
@@ -21,6 +22,15 @@ export const SimpleProductionPage = lazy(() => loadSimpleProduction().then((m) =
 export function SimpleProductionView(props: ComponentProps<typeof SimpleProductionPage>) {
   const [Loaded] = useState(loadedSimpleProduction)
   return Loaded ? <Loaded {...props} /> : <SimpleProductionPage {...props} />
+}
+const CardDetailLazy = lazy(() => loadCardDetail().then((m) => ({ default: m.CardDetail })))
+/**
+ * 配信カード。読み終わっていれば、lazy を通さずに描く(制作の画面と同じ。lazy は、読み終わっていても最初の 1 回は待つので、その間なにも出ない)。
+ * 読み終わる前に開いたときだけ、読み込みを待つ(その間は Later の外の窓を出さない)
+ */
+export function CardDetailView(props: ComponentProps<typeof CardDetailLazy>) {
+  const [Loaded] = useState(loadedCardDetail)
+  return Loaded ? <Loaded {...props} /> : <CardDetailLazy {...props} />
 }
 export const AlertsPage = lazy(() => loadChunk(() => import('./AlertsPage')).then((m) => ({ default: m.AlertsPage })))
 export const BulkWorkspace = lazy(() => loadChunk(() => import('./BulkWorkspace')).then((m) => ({ default: m.BulkWorkspace })))

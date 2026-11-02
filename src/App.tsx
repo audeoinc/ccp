@@ -72,7 +72,8 @@ import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { markTemplatesLoadFailed, useTemplateManagerOpen, useTemplates } from './templates'
 import { useOpenedOnce } from './useOpenedOnce'
-import { CardDetail, type NewCardDefaults } from './CardDetail'
+import type { NewCardDefaults } from './CardDetail'
+import { loadCardDetail } from './cardDetailChunk'
 import { NewCampaignDialog } from './CampaignDialogs'
 import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
@@ -102,7 +103,7 @@ import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
 import { loadSimpleProduction } from './simpleProductionChunk'
 import { UiScaleNotice } from './UiScaleNotice'
-import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, SimpleResultsPage, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { CardDetailView, Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, SimpleResultsPage, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 import { isOn, useFeature, useFeatureVersion } from './featureFlags'
 import { FeatureBadge } from './FeatureBadge'
@@ -383,6 +384,11 @@ function App() {
       else setProductionOpen(id)
     }
   }
+  // 配信カードのプログラムは、最初の画面を出したあとに裏で読んでおく(押したときに待たないように。読み終わる前に押したら、そのとき読む)
+  useEffect(() => {
+    const id = window.setTimeout(() => void loadCardDetail().catch(() => undefined), 1500)
+    return () => window.clearTimeout(id)
+  }, [])
   // 配信カードを開いたら、制作の画面のプログラムを裏で読んでおく(PRODUCTION のタブで、すぐ切り替えられるように)
   useEffect(() => {
     if (selectedId) void loadSimpleProduction()
@@ -1544,7 +1550,7 @@ function App() {
             setDraftOpen(null)
           }}
         >
-        <CardDetail
+        <Later><CardDetailView
           key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
           draft={selected ? undefined : draftOpen?.draft}
@@ -1617,7 +1623,7 @@ function App() {
           instant={!!selected && selected.id === instantId}
           leaveRef={cardLeaveRef}
           alertsOf={(id) => cardAlerts.get(id)}
-        />
+        /></Later>
         </ErrorBoundary>
       )}
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
