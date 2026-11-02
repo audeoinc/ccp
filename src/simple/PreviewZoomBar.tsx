@@ -2,7 +2,7 @@
 // 真ん中はいつも実際の倍率を出し、押すと 100%。全体を表示は別のボタン(以前は真ん中に「全体」と出していて、押すと全体になると読めてしまった。2026-11-02 利用者)。
 // 配信カード(SimpleCardLayout)と制作のシンプルな画面(X86)で同じものを使う。左に、その画面のキーの操作の ⓘ を添えられる
 import { Button, InfoLabel, ToggleButton, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
-import { AddRegular, ScaleFitRegular, SubtractRegular } from '@fluentui/react-icons'
+import { AddRegular, ArrowExpandRegular, SubtractRegular } from '@fluentui/react-icons'
 import { useT } from '../i18n'
 import type { PreviewZoom } from './usePreviewNav'
 
@@ -43,7 +43,7 @@ export function PreviewZoomBar({ zoom, keysInfo }: { zoom: PreviewZoom; keysInfo
       <Button type="button" size="small" appearance="subtle" icon={<AddRegular />} onClick={() => zoom.step(0.1)} aria-label={t('拡大', 'Zoom in')} />
       {/* 全体を表示している間は、押された状態にする(いまどちらかが、ボタンを見れば分かるように) */}
       <Tooltip content={t('全体を表示', 'Fit the whole email')} relationship="label">
-        <ToggleButton type="button" size="small" appearance="subtle" icon={<ScaleFitRegular />} checked={zoom.mode === 'fit'} onClick={() => zoom.set('fit')} />
+        <ToggleButton type="button" size="small" appearance="subtle" icon={<ArrowExpandRegular />} checked={zoom.mode === 'fit'} onClick={() => zoom.set('fit')} />
       </Tooltip>
     </div>
   )
