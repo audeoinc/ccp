@@ -20,6 +20,8 @@ CSV の列(1 行目は列名):
 (取り込むと product_images.model_usable_until。配信日より前に切れる画像を載せると、配信カードにアラートが出る)。
 画像の URL の大きさの指定 ?width= は外して、元の大きさで取る)。
 直すときは、両方を合わせる。
+ページの本文(ナビ・フッターなどを除いた <main> / <article> の文と、JSON-LD の Product の description)も、目録の page(title・text)に入れる
+(取り込むと product_page_texts。「詳しく」にした商品の枠の説明文を、AI がページの内容から書く材料。X80。処理は server/ccp/page_text.py と同じ)。
 
 Python の標準の機能だけで動く(追加のインストールは要らない)。
 URL の決まり(どのページか・どの画像か)は、CSV と引数(--include / --exclude)にだけ持ち、このファイルには書かない。
@@ -299,6 +301,143 @@ def safe(name: str) -> str:
     return re.sub(r"[^\w.-]+", "_", name)[:80] or "_"
 
 
+# ---- ページの本文(X80 段 ②。server/ccp/page_text.py と同じ処理。直すときは、両方を合わせる) ----
+
+# 残す本文の長さの上限(AI に渡す材料。長い説明でも、素材・機能の説明はこの中に収まる)
+MAX_TEXT = 8000
+
+SKIP = {"head", "title", "script", "style", "noscript", "template", "svg", "nav", "header", "footer", "form", "button", "select", "iframe", "figcaption"}
+BLOCK = {"p", "div", "section", "article", "main", "li", "ul", "ol", "dl", "dt", "dd", "tr", "table", "figure", "h1", "h2", "h3", "h4", "h5", "h6", "br", "hr", "blockquote"}
+VOID = {"br", "hr", "img", "meta", "link", "input", "source", "wbr", "area", "base", "col", "embed", "param", "track"}
+
+
+class TextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []  # ページ全体の文
+        self.main: list[str] | None = None  # 最初の <main> / <article> の文
+        self.main_depth = 0
+        self.skip_depth = 0
+        self.stack: list[tuple[str, bool, bool]] = []  # (タグ, 読まない所の始まりか, 本文の範囲を数えたか)
+        self.title: list[str] | None = None
+        self.title_text = ""
+        self.ld: list[str] = []
+        self.in_ld = False
+
+    def _out(self, s: str) -> None:
+        self.parts.append(s)
+        if self.main is not None and self.main_depth > 0:
+            self.main.append(s)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        a = {k: (v or "") for k, v in attrs}
+        if tag == "script" and a.get("type", "").lower() == "application/ld+json":
+            self.in_ld = True
+            self.ld.append("")
+        if tag == "title" and self.title is None:
+            self.title = []
+        if tag in VOID:
+            if tag in BLOCK and self.skip_depth == 0:
+                self._out("\n")
+            return
+        hidden = tag in SKIP or a.get("aria-hidden") == "true" or "data-nosnippet" in a or "hidden" in a
+        if hidden:
+            self.skip_depth += 1
+        # 本文の範囲: 最初の <main> / <article>(中に入れ子があっても、最初のものが閉じるまで)
+        counted = False
+        if tag in ("main", "article") and self.skip_depth == 0 and (self.main is None or self.main_depth > 0):
+            if self.main is None:
+                self.main = []
+            self.main_depth += 1
+            counted = True
+        self.stack.append((tag, hidden, counted))
+        if tag in BLOCK and self.skip_depth == 0:
+            self._out("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script":
+            self.in_ld = False
+        if tag == "title" and self.title is not None and not self.title_text:
+            self.title_text = " ".join("".join(self.title).split())
+        if tag in VOID:
+            return
+        # 閉じ忘れのタグがあっても崩れないよう、同じ名前のタグまで戻る(開いていないタグを閉じるのは無視する)
+        if not any(t == tag for t, _, _ in self.stack):
+            return
+        while self.stack:
+            t, hidden, counted = self.stack.pop()
+            if hidden:
+                self.skip_depth -= 1
+            if counted:
+                self.main_depth -= 1
+            if t == tag:
+                break
+        if tag in BLOCK and self.skip_depth == 0:
+            self._out("\n")
+
+    def handle_data(self, data: str) -> None:
+        if self.in_ld and self.ld:
+            self.ld[-1] += data
+            return
+        if self.title is not None and not self.title_text:
+            self.title.append(data)
+        if self.skip_depth == 0 and not self.in_ld:
+            self._out(data)
+
+
+def _tidy(parts: list[str]) -> str:
+    lines = [" ".join(line.split()) for line in "".join(parts).split("\n")]
+    out: list[str] = []
+    for line in lines:
+        if line and (not out or out[-1] != line):
+            out.append(line)
+    return "\n".join(out)
+
+
+def ld_description(blocks: list[str]) -> str:
+    """JSON-LD の Product の description(最初のもの)"""
+    found = ""
+
+    def walk(o: Any) -> None:
+        nonlocal found
+        if found:
+            return
+        if isinstance(o, list):
+            for x in o:
+                walk(x)
+        elif isinstance(o, dict):
+            kind = o.get("@type")
+            kinds = kind if isinstance(kind, list) else [kind]
+            if "Product" in kinds and isinstance(o.get("description"), str) and o["description"].strip():
+                found = " ".join(o["description"].split())
+                return
+            for v in o.values():
+                if isinstance(v, (list, dict)):
+                    walk(v)
+
+    for b in blocks:
+        try:
+            walk(json.loads(b))
+        except Exception:  # noqa: BLE001 — 壊れた JSON-LD は飛ばす
+            continue
+    return found
+
+
+def page_text(html: str) -> dict[str, str]:
+    """ページの題(title)と本文(text)。読めなければ空の文字"""
+    p = TextParser()
+    try:
+        p.feed(html)
+        p.close()
+    except Exception:  # noqa: BLE001 — 壊れた HTML でも、読めたところまで使う
+        pass
+    body = _tidy(p.main if p.main else p.parts)
+    desc = ld_description(p.ld)
+    if desc and desc not in " ".join(body.split()):
+        body = f"{desc}\n{body}" if body else desc
+    return {"title": p.title_text[:300], "text": body[:MAX_TEXT].strip()}
+
+
 def collect(row: dict, out: Path, args) -> dict:
     """商品 1 つ分を集める。商品のフォルダに画像と result.json を置く"""
     code, page = row["product_code"], row["page_url"]
@@ -311,7 +450,10 @@ def collect(row: dict, out: Path, args) -> dict:
         result["final_url"] = final
         if "html" not in ctype and not data.lstrip()[:15].lower().startswith((b"<!doctype", b"<html")):
             raise ValueError(f"HTML のページではありません({ctype})")
-        found = extract(decode(data, charset), final)
+        html = decode(data, charset)
+        found = extract(html, final)
+        # ページの本文(「詳しく」の枠の説明文を AI が書く材料。取り込むと product_page_texts)
+        result["page"] = page_text(html)
     except Exception as e:  # 読めなかったページは、理由を残して次へ
         result["error"] = f"{type(e).__name__}: {e}"[:500]
         return result

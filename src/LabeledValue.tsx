@@ -6,7 +6,9 @@
 import type { ReactNode } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { useT } from './i18n'
+import { emptyValueText } from './emptyValue'
 import { typo } from './typo'
+import { CopyButton } from './CopyButton'
 
 const useStyles = makeStyles({
   inline: { display: 'inline-flex', alignItems: 'baseline', columnGap: '10px', minWidth: 0 },
@@ -19,7 +21,11 @@ const useStyles = makeStyles({
   empty: { ...typo.empty, fontWeight: tokens.fontWeightRegular },
   // 帯の中など、1 行に収めたいとき
   truncate: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', overflowWrap: 'normal' },
+  // コピーのボタンつき: 値とボタンを 1 行に。ボタンは値の行の高さに収め、ラベルとの並び(baseline)を崩さない
+  withCopy: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', minWidth: 0 },
+  copy: { minWidth: 'auto', height: '20px', padding: '0 2px', flexShrink: 0, alignSelf: 'center' },
 })
+
 
 const isEmpty = (v: ReactNode) => v === null || v === undefined || v === false || (typeof v === 'string' && v.trim() === '')
 
@@ -27,8 +33,17 @@ interface Props {
   label: ReactNode
   /** 値。空(null・undefined・空の文字)のときは emptyText を、ラベルと同じ薄さで出す */
   children?: ReactNode
-  /** 空のときの文言(省くと「未設定」) */
+  /** 空のときの文言(省くと empty の決まった文言) */
   emptyText?: string
+  /** 空のときの決まった文言の種類(省くと「未設定」。値がないのが正しいものは 'none' で「—」) */
+  empty?: 'unset' | 'none'
+  /**
+   * 値の横にコピーのボタンを出す。文字を渡すとそれを、true なら値(文字のとき)をコピーする。
+   * 空の値には出さない(制作が写すもの・URL など、写す値に使う)
+   */
+  copy?: string | boolean
+  /** コピーのボタンの説明(省くと「ラベル をコピー」。ラベルが文字でないときは「コピー」) */
+  copyLabel?: string
   /** 横並び(既定)か、縦並び */
   layout?: 'inline' | 'stacked'
   /** いちばん大事な値(名前など)だけ太く */
@@ -41,19 +56,30 @@ interface Props {
   valueClassName?: string
 }
 
-export function LabeledValue({ label, children, emptyText, layout = 'inline', strong, truncate, labelWidth, className, valueClassName }: Props) {
+export function LabeledValue({ label, children, emptyText, empty: emptyKind, copy, copyLabel, layout = 'inline', strong, truncate, labelWidth, className, valueClassName }: Props) {
   const s = useStyles()
   const t = useT()
   const empty = isEmpty(children)
+  const copyValue = empty ? '' : typeof copy === 'string' ? copy : copy && typeof children === 'string' ? children : ''
+  // … にする値は、マウスを載せると全文が出るように(切れたままでは読めないため。2026-10-27 利用者)
+  const value = (
+    <span className={mergeClasses(s.value, strong && !empty && s.strong, empty && s.empty, truncate && s.truncate, valueClassName)} title={truncate && !empty && typeof children === 'string' ? children : undefined}>
+      {empty ? (emptyText ?? emptyValueText(emptyKind)) : children}
+    </span>
+  )
   return (
     <span className={mergeClasses(layout === 'stacked' ? s.stacked : s.inline, className)}>
       <span className={s.label} style={labelWidth ? { width: labelWidth } : undefined}>
         {label}
       </span>
-      {/* … にする値は、マウスを載せると全文が出るように(切れたままでは読めないため。2026-10-27 利用者) */}
-      <span className={mergeClasses(s.value, strong && !empty && s.strong, empty && s.empty, truncate && s.truncate, valueClassName)} title={truncate && !empty && typeof children === 'string' ? children : undefined}>
-        {empty ? (emptyText ?? t('未設定', 'Not set')) : children}
-      </span>
+      {copyValue ? (
+        <span className={s.withCopy}>
+          {value}
+          <CopyButton className={s.copy} text={copyValue} label={copyLabel ?? (typeof label === 'string' ? t(`${label} をコピー`, `Copy ${label}`) : undefined)} />
+        </span>
+      ) : (
+        value
+      )}
     </span>
   )
 }

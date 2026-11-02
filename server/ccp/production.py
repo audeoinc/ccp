@@ -80,6 +80,26 @@ def merge_variant_html(raw: Any, key: str, html: str, saved_at: str | None, by: 
     return json.dumps(data, ensure_ascii=False)
 
 
+HTML_HISTORY_MAX = 20
+
+
+def push_html_history(raw: Any, variant: str, html: str, saved_at: Any, by: Any) -> str:
+    """保存で置き換わる前の HTML を、版の履歴(列 html_history。新しい順の [{"variant", "html", "saved_at", "saved_by_name"}] の JSON)の先頭に足す。
+    シンプルな制作の画面の「前の版に戻す」のため(AI の手直し・貼り付けで上書きしても、戻れるように)。案ごとに新しい 20 個まで残す"""
+    try:
+        data = json.loads(raw) if isinstance(raw, str) and raw else []
+    except ValueError:
+        data = []
+    items = [x for x in data if isinstance(x, dict) and isinstance(x.get("html"), str)] if isinstance(data, list) else []
+    at = saved_at.isoformat() if hasattr(saved_at, "isoformat") else saved_at
+    items.insert(0, {"variant": variant, "html": html, "saved_at": at, "saved_by_name": by})
+    kept: list[dict[str, Any]] = []
+    for x in items:
+        if sum(1 for k in kept if k.get("variant", "A") == x.get("variant", "A")) < HTML_HISTORY_MAX:
+            kept.append(x)
+    return json.dumps(kept, ensure_ascii=False)
+
+
 def _variant_html_in(body: dict[str, Any]) -> str | None:
     """依頼・送信のときに画面が送る、B・C 案の HTML(なければ None)"""
     data = parse_variant_html(body.get("variant_html"))
@@ -201,8 +221,15 @@ async def save_html(request_id: str, request: Request):
         now = repo.now()
         if variant == "A":
             fields: dict[str, Any] = {"html": html, "html_saved_at": now, "html_saved_by_name": actor["name"]}
+            prev = (req.get("html"), req.get("html_saved_at"), req.get("html_saved_by_name"))
         else:
             fields = {"variant_html": merge_variant_html(req.get("variant_html"), variant, html, now.isoformat(), actor["name"])}
+            pv = parse_variant_html(req.get("variant_html")).get(variant, {})
+            prev = (pv.get("html"), pv.get("saved_at"), pv.get("saved_by_name"))
+        # 保存したことのある HTML(渡したときの下書きは除く)が置き換わるときは、版の履歴に残す。
+        # 画面のエディタで打っている間の自動保存は history = false で送る(打つたびに版が増えて、前の版を押し出さないように。打ち始めの 1 回だけ残す)
+        if prev[0] and prev[1] and prev[0] != html and body.get("history") is not False:
+            fields["html_history"] = push_html_history(req.get("html_history"), variant, prev[0], prev[1], prev[2])
         row = await repo.update(conn, "production_requests", request_id, fields) or req
     return ok(row)
 

@@ -4,7 +4,7 @@ AI が選んだ商品の画像は、最初は商品のマスタの 1 枚(product
 商品ページの画像を集めて並べ、AI がアングル(正面・着用・ディテール など)を見分けて、この配信に合うものを勧める。
 選んだ画像は、配信に載せた商品の行(delivery_products.image_url)に入れる(商品のマスタは変えない。配信ごと・AB テストの案ごと)。
 
-  POST /api/product-pages/images    {"url": "..."}           ページを読み、載っている画像の一覧を返す
+  POST /api/product-pages/images    {"url": "..."}           ページを読み、載っている画像の一覧と、ページの題・本文(title・text。X80 段 ②)を返す
   POST /api/product-pages/suggest   {"images": [...], ...}   画像を Gemini に見せ、アングルと、この配信に合う画像(理由つき)を返す
                                                              取り込んだ画像のアングルは、一度見分けたら product_images に残し、次からは画像を読ませずに文字で渡す
   POST /api/product-pages/adopt     {"src": "..."}           選んだ画像を、素材の置き場所(ccp/creative.py)に写し、その URL を返す
@@ -47,6 +47,7 @@ from . import assets, creative, linkpreview
 from . import schema as sc
 from .ai import get_client
 from .data_api import db, fail, ok
+from .page_text import page_text
 
 log = logging.getLogger("ccp.product_pages")
 router = APIRouter()
@@ -161,8 +162,8 @@ h1{{font-size:22px;font-weight:500;margin:8px 0}}.price{{font-size:20px;margin:8
 @media (max-width:720px){{.top,.f{{grid-template-columns:1fr;gap:16px}}.f:nth-of-type(even) figure{{order:0}}}}
 </style>
 </head><body>
-<div class="bar"><span>SAMPLE SHOP</span><span class="tag" title="{label[1]}">{label[0]}</span></div>
-<div class="wrap">
+<div class="bar" data-nosnippet><span>SAMPLE SHOP</span><span class="tag" title="{label[1]}">{label[0]}</span></div>
+<main class="wrap">
   <div class="top">
     <div><img class="main" src="{src(main)}" alt="{escape(desc_of(main))}" width="600" height="800"{exp_attr(main)}>{exp_note(main)}<div class="th">{thumbs}</div></div>
     <div>
@@ -171,12 +172,12 @@ h1{{font-size:22px;font-weight:500;margin:8px 0}}.price{{font-size:20px;margin:8
       <div class="price">{_price(product)}</div>
       <p class="desc">{desc}</p>
       <button class="btn" type="button" disabled>{'Add to bag' if en else 'カートに入れる'}</button>
-      <p class="note">{label[1]}</p>
+      <p class="note" data-nosnippet>{label[1]}</p>
     </div>
   </div>
   <h2>{'FEATURES' if en else '特長'}</h2>
 {feats}
-</div>
+</main>
 </body></html>"""
 
 
@@ -191,13 +192,15 @@ def svg_html(code: str, product: dict[str, Any] | None) -> str:
 <meta property="og:title" content="{name}"><meta property="og:image" content="../img/{escape(code)}/front.svg"><meta property="og:site_name" content="Sample shop">
 <style>body{{font-family:sans-serif;margin:24px;background:#fafafa;color:#222}}.note{{padding:8px 12px;background:#fff4ce;border-radius:6px;font-size:13px}}.g{{display:flex;flex-wrap:wrap;gap:12px}}figure{{margin:0;background:#fff;padding:6px;border:1px solid #ddd}}figcaption{{font-size:12px;color:#666}}img{{display:block;width:240px;height:auto}}</style>
 </head><body>
-  <p class="note">This is a sample product page made by CCP (not a real shop).</p>
+  <p class="note" data-nosnippet>This is a sample product page made by CCP (not a real shop).</p>
   <header><img src="../logo.svg" alt="logo" width="40" height="40" style="width:40px"></header>
+  <main>
   <h1>{name}</h1>
   <p>{desc}</p>
   <div class="g">
 {imgs}
   </div>
+  </main>
 </body></html>"""
 
 
@@ -449,7 +452,8 @@ async def images(body: ImagesIn):
         html = sample_html(code, product)
         # 見本の写真の説明の文は、ページの alt・figcaption・JSON-LD に書いてあり、本物のページと同じ処理で description に入る
         found = [{**i, "src": urlparse(i["src"]).path} for i in extract(html, f"https://{SAMPLE_HOST}/sample-shop/p/{code}")]
-        return ok({"sample": True, "page": f"/sample-shop/p/{code}", "images": found})
+        # ページの本文(X80 段 ②。「詳しく」の枠の説明文を AI が書く材料)。見本のページは、ここで作ったページから取り出す
+        return ok({"sample": True, "page": f"/sample-shop/p/{code}", "images": found, **page_text(html)})
     try:
         final, data, ctype = await asyncio.to_thread(linkpreview.fetch, url, linkpreview.MAX_PAGE, "text/html,application/xhtml+xml")
     except linkpreview.Blocked as e:
@@ -458,7 +462,8 @@ async def images(body: ImagesIn):
         return fail(502, f"ページを読めませんでした(画像をコピーして貼る・ファイルを上げる、でも選べます): {type(e).__name__}", "fetch_failed")
     if "html" not in ctype and not data.lstrip()[:15].lower().startswith((b"<!doctype", b"<html")):
         return fail(400, "HTML のページではありません", "not_html")
-    return ok({"sample": False, "page": final, "images": extract(data.decode("utf-8", errors="replace"), final)})
+    html = data.decode("utf-8", errors="replace")
+    return ok({"sample": False, "page": final, "images": extract(html, final), **page_text(html)})
 
 
 # ---- 画像の中身を読む(AI に見せる・写す) ----

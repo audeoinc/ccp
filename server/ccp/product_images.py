@@ -12,6 +12,8 @@ Workbench のサーバーは、利用先の EC サイトを読めない。手元
 - 商品は、商品コード(と、ZIP に市場があれば市場)で探す。マスタにない商品は、飛ばして件数を出す
 - 商品のマスタのメイン画像(products.image_url)は、空のときだけ、取り込んだメイン画像で埋める(--main-to-master なら置き換える)
 - 画像ごとの説明(ページの description。目録の caption)は product_images.caption に、メイン画像を埋めるときは products.image_caption にも入れる
+- ページの本文(目録の page。title・text。X80 段 ②)は、表 product_page_texts に商品ごとに 1 行(ZIP に本文がある商品の行は、入れ替える)。
+  本文だけで画像がない商品も取り込む(そのときは、画像の行は変えない)
 
 見本の写真(AI で作った。scripts/sample-photos.py が作る ZIP。目録に "sample": true)も、同じ入口で取り込む:
 - 行に source = sample と、見出し(alt)・説明の文(caption)・アングル(angle)を入れる。見本の ZIP は見本の行だけを、本物の ZIP は本物の行だけを入れ替える
@@ -113,14 +115,16 @@ def plan(manifest: dict[str, Any], products: list[dict[str, Any]]) -> dict[str, 
             errors.append(f"{r.get('product_code')}: {r['error']}")
         imgs = [i for i in r.get("images", []) if i.get("content_type") in SERVED]
         unsupported += len(r.get("images", [])) - len(imgs)
-        if not imgs:
+        # ページの本文(X80 段 ②)。本文だけの商品も取り込む
+        page = r.get("page") if isinstance(r.get("page"), dict) and str((r.get("page") or {}).get("text") or "").strip() else None
+        if not imgs and not page:
             continue
         targets = [p for p in by_code.get(str(r["product_code"]), []) if not r.get("market") or p.get("market") == r["market"]]
         if not targets:
             missing.append(f"{r.get('market') or ''}{'/' if r.get('market') else ''}{r['product_code']}")
             continue
         for p in targets:
-            items.append({"product": p, "images": imgs})
+            items.append({"product": p, "images": imgs, "page": page, "page_url": r.get("final_url") or r.get("page_url"), "collected_at": r.get("collected_at")})
     return {"items": items, "missing": missing, "unsupported": unsupported, "errors": errors}
 
 
@@ -145,9 +149,15 @@ def local_put(images: Path) -> Callable[[str, bytes, str], bool]:
 
 async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[[str, bytes, str], bool], main_to_master: bool, sample: bool = False) -> dict[str, int]:
     """取り込む。画像を置き(put)、商品ごとに product_images を入れ替え、空のメイン画像を埋める"""
-    placed = rows = mains = 0
+    placed = rows = mains = texts = 0
     for it in p["items"]:
         prod = it["product"]
+        if it.get("page"):
+            await put_page_text(conn, prod, it, sample)
+            texts += 1
+        if not it["images"]:
+            # 本文だけの商品は、画像の行を変えない(消さない)
+            continue
         # 見本の ZIP は見本の行だけ、本物の ZIP は本物の行(source が空)だけを入れ替える。元のメイン画像の控え(master)は残す
         scope = "source = :s" if sample else "source IS NULL"
         # AI が画像の案(X64)で見分けたアングルは、同じ画像(中身の sha256 が同じ)なら引き継ぐ(取り込み直すたびに、画像を読ませ直さないため)
@@ -188,7 +198,27 @@ async def apply(conn: Any, z: zipfile.ZipFile, p: dict[str, Any], put: Callable[
             await conn.execute(text("UPDATE products SET image_url = :u, image_caption = :c, modified_on = now() WHERE id = :id"),
                                {"u": main_url, "c": main_caption, "id": prod["id"]})
             mains += 1
-    return {"placed": placed, "rows": rows, "mains": mains}
+    return {"placed": placed, "rows": rows, "mains": mains, "texts": texts}
+
+
+# 残すページの本文の長さの上限(page_text.MAX_TEXT と同じ。手元の収集が古い版でも、長すぎる本文を入れない)
+MAX_PAGE_TEXT = 8000
+
+
+async def put_page_text(conn: Any, prod: dict[str, Any], it: dict[str, Any], sample: bool) -> None:
+    """商品ページの本文を、商品ごとに 1 行で入れ替える(見本の ZIP は見本の行、本物の ZIP は本物の行だけ)"""
+    scope = "source = :s" if sample else "source IS NULL"
+    await conn.execute(text(f"DELETE FROM product_page_texts WHERE product_id = :id AND {scope}"), {"id": prod["id"], "s": SAMPLE})
+    page = it["page"]
+    await conn.execute(
+        text("INSERT INTO product_page_texts (name, product_code, market, source_url, body, source, fetched_at, product_id) "
+             "VALUES (:name, :code, :market, :url, :body, :source, CAST(:at AS timestamptz), :pid)"),
+        {"name": (str(page.get("title") or "") or str(prod["product_code"]))[:300], "code": prod["product_code"], "market": prod.get("market"),
+         "url": it.get("page_url"), "body": str(page.get("text") or "")[:MAX_PAGE_TEXT], "source": SAMPLE if sample else None,
+         # 集めた日時(目録の collected_at)。読めない形なら空
+         "at": it.get("collected_at") if re.fullmatch(r"\d{4}-\d{2}-\d{2}T[\d:.+-]+", str(it.get("collected_at") or "")) else None,
+         "pid": prod["id"]},
+    )
 
 
 async def import_images(path: Path, images: Path, yes: bool, main_to_master: bool = False) -> None:
@@ -222,7 +252,8 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
         products = [dict(r) for r in (await conn.execute(text("SELECT id, product_code, market, image_url FROM products WHERE product_code IS NOT NULL"))).mappings().all()]
     p = plan(manifest, products)
     n_img = sum(len(i["images"]) for i in p["items"])
-    print(f"  取り込む: 商品 {len(p['items'])} 件・画像 {n_img} 枚")
+    n_text = sum(1 for i in p["items"] if i.get("page"))
+    print(f"  取り込む: 商品 {len(p['items'])} 件・画像 {n_img} 枚・ページの本文 {n_text} 件")
     if p["missing"]:
         print(f"  マスタにない商品(飛ばす): {len(p['missing'])} 件(例: {', '.join(p['missing'][:5])})")
     if p["unsupported"]:
@@ -236,7 +267,7 @@ async def import_images(path: Path, images: Path, yes: bool, main_to_master: boo
     sample = bool(manifest.get("sample"))
     async with cli_conn() as conn:
         r = await apply(conn, z, p, local_put(images), main_to_master, sample)
-    print(f"取り込みました: 画像のファイル {r['placed']} 点を {images / 'products'} に置き、行 {r['rows']} 件。商品のメイン画像を {r['mains']} 件埋めました")
+    print(f"取り込みました: 画像のファイル {r['placed']} 点を {images / 'products'} に置き、行 {r['rows']} 件。商品のメイン画像を {r['mains']} 件埋めました。ページの本文 {r['texts']} 件")
     print(f"サーバーは、環境変数 ASSET_DIR={images} で起動してください(画像をこのフォルダから配る)")
 
 
@@ -249,7 +280,7 @@ def remote_put(name: str, data: bytes, content_type: str) -> bool:
 
 
 def summary(manifest: dict[str, Any], p: dict[str, Any]) -> dict[str, Any]:
-    return {"sample": bool(manifest.get("sample")), "products": len(p["items"]), "images": sum(len(i["images"]) for i in p["items"]),
+    return {"sample": bool(manifest.get("sample")), "products": len(p["items"]), "images": sum(len(i["images"]) for i in p["items"]), "texts": sum(1 for i in p["items"] if i.get("page")),
             "missing": p["missing"], "unsupported": p["unsupported"], "errors": p["errors"][:20]}
 
 

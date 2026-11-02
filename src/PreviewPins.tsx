@@ -4,6 +4,7 @@ import { CardNotesService, type CardNote } from './data/cardNotes'
 import type { Item } from './items'
 import { CommentAddRegular, CommentCheckmarkRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
+import type { NoteStage } from './notesStage'
 import { captureKey, changedSince, snapshotOf, startCapture } from './pinSnapshot'
 import { keepBrowserMenu, useContextMenu, type ContextItem } from './ContextMenu'
 import { pinMenuItems } from './pinMenu'
@@ -69,6 +70,8 @@ interface Props {
   menuItems?: (under: Element) => ContextItem[]
   /** ピン(書き込み)の機能を出すか(X87。出さないときも、右クリックの部品の操作 menuItems は出す) */
   pinsOn?: boolean
+  /** どの段階の書き込みか(既定は計画。シンプルな制作の画面は、企画の見本の上に制作の段階のピンを置く) */
+  stage?: NoteStage
 }
 
 interface Spot {
@@ -84,7 +87,7 @@ interface Spot {
  * その中の割合の位置にピンを重ねる。プレビューの部品はほかの画面とも共通なので、目印を読むだけにする(アラートの印と同じやり方)。
  * 場所を選ぶ間は、プレビューを覆う層で押した点を受け取り、その下のブロックを目印にする
  */
-export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd, onOpenThreads, menuItems, pinsOn = true }: Props) {
+export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd, onOpenThreads, menuItems, pinsOn = true, stage = 'plan' }: Props) {
   const s = useStyles()
   const t = useT()
   const version = useSyncExternalStore(subscribePins, notesVersion)
@@ -108,10 +111,10 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     }
   }, [cardId, version])
 
-  const numbers = pinNumbers(notes)
+  const numbers = pinNumbers(notes, stage)
   // 出すのは、同じチャネル・案の、未解決のもの。解決したものも、いま光らせているもの・「解決したピンも出す」のときは出す(X65 (c))
-  const shown = notes.filter((n) => isPinned(n) && sameSurface(n.anchor_view, view) && (!n.resolved || withResolved || focus?.noteId === n.id))
-  const myPending = pending && pending.cardId === cardId ? pending : null
+  const shown = notes.filter((n) => isPinned(n, stage) && sameSurface(n.anchor_view, view) && (!n.resolved || withResolved || focus?.noteId === n.id))
+  const myPending = pending && pending.cardId === cardId && pending.stage === stage ? pending : null
 
   /** 目印のブロックを探す。商品は、その商品の最初の枠(並べ替えても、商品について行く) */
   const findBlock = useCallback(
@@ -123,6 +126,8 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
         return it ? root.querySelector(`[data-item-key="${CSS.escape(it.key)}"]`) : null
       }
       if (anchor.startsWith('section:')) return findSectionBlock(root, anchor)
+      // 詳しい制作のページ(HtmlPins)で打った、ページ全体の中の割合のピン。プレビューの中身の全体を目印にする
+      if (anchor === 'page') return root.firstElementChild
       return root.querySelector(`[data-anchor="${CSS.escape(anchor)}"]`)
     },
     [boxRef, items],
@@ -207,7 +212,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
     const anchor = productId ? 'product' : anchorOfBlock(block)
     // 書いたときの様子を残す(画像は、書くまでの間に作っておく。X65 (b))
     startCapture(captureKey(cardId, anchor, x, y), block as HTMLElement)
-    setPendingPin({ cardId, stage: 'plan', anchor, x, y, view, productId, snapshot: snapshotOf(block) })
+    setPendingPin({ cardId, stage, anchor, x, y, view, productId, snapshot: snapshotOf(block) })
     onPlacingEnd()
     onOpenThreads()
     return true

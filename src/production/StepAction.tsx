@@ -3,25 +3,38 @@ import { useState, type ReactNode } from 'react'
 import { Button, Input, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { CheckmarkRegular, HandRightRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
-import { useT } from '../i18n'
+import { useT, when } from '../i18n'
 import { useFeature } from '../featureFlags'
+import type { VariantKey } from '../abTest'
 import type { ProductionFlow, StepInfo } from './useProductionFlow'
 
 const useStyles = makeStyles({
   box: { display: 'grid', rowGap: '8px', width: '320px' },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   row: { display: 'flex', columnGap: '6px', flexWrap: 'wrap', alignItems: 'center' },
+  variant: { display: 'flex', columnGap: '8px', alignItems: 'baseline', fontSize: tokens.fontSizeBase200 },
+  pending: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
 })
+
+/** AB テストの案ごとの、制作した HTML の保存の様子(③ の窓に出す。P4) */
+export interface VariantSave {
+  key: VariantKey
+  by?: string | null
+  at?: string | null
+  /** 打っている・保存している途中 */
+  pending?: boolean
+}
 
 /**
  * その段を進めるボタン(題の行の青いボタンと、左のバーの工程の両方で使う)。
  * ② 受け取る・③ 制作が終わった(ひとこと・リンク)・④ これで OK / 直してほしい(理由)・⑤ 送る。① は配信カードで渡す
  */
-export function StepAction({ flow, step, onViewResult, needMe }: { flow: ProductionFlow; step: StepInfo; onViewResult?: () => void; needMe?: string | null }): ReactNode {
+export function StepAction({ flow, step, onViewResult, needMe, variants }: { flow: ProductionFlow; step: StepInfo; onViewResult?: () => void; needMe?: string | null; variants?: VariantSave[] }): ReactNode {
   const s = useStyles()
   const t = useT()
   // ⑤ 送るは、外部の配信システムへの連携(prod.export)。非公開なら、工程は ④ の OK で終わり(MVP の終点。2026-10-30 利用者)
   const exportOn = useFeature('prod.export')
+  const abOn = useFeature('card.abtest')
   const [doneNote, setDoneNote] = useState('')
   const [doneLink, setDoneLink] = useState('')
   const [reviseNote, setReviseNote] = useState('')
@@ -45,6 +58,24 @@ export function StepAction({ flow, step, onViewResult, needMe }: { flow: Product
           </PopoverTrigger>
           <PopoverSurface>
             <div className={s.box}>
+              {/* AB テストは、全案の HTML がそろってから終わりにする(詳しい制作のページと同じ。P4) [card.abtest] */}
+              {abOn && variants && variants.length > 1 && (
+                <>
+                  <span className={s.note}>{t('AB テストの全案の HTML がそろってから、終わりにします', 'Mark as done once every variant’s HTML is ready')}</span>
+                  {variants.map((v) => (
+                    <span key={v.key} className={s.variant}>
+                      <b>{t(`${v.key} 案`, `Variant ${v.key}`)}</b>
+                      {v.pending ? (
+                        <span className={s.pending}>{t('保存しています…', 'Saving…')}</span>
+                      ) : v.by ? (
+                        <span className={s.note}>{t(`保存: ${v.by} ${when(v.at ?? undefined)}`, `Saved by ${v.by} ${when(v.at ?? undefined)}`)}</span>
+                      ) : (
+                        <span className={s.note}>{t('まだ(渡したときの HTML のまま)', 'Not yet (still the HTML from the handoff)')}</span>
+                      )}
+                    </span>
+                  ))}
+                </>
+              )}
               <span className={s.note}>{t('ひとこと・できたもののリンクを添えられます(どちらも任意)', 'You can add a note and a link to the result (both optional)')}</span>
               <AutoTextarea heightKey="ProductionSimple.doneNote" rows={1} size="small" value={doneNote} onChange={(_, d) => setDoneNote(d.value)} placeholder={t('ひとこと', 'Note')} />
               <Input size="small" value={doneLink} onChange={(_, d) => setDoneLink(d.value)} placeholder="https://" />

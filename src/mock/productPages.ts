@@ -2,6 +2,7 @@
 // 絵の型は、サーバーと同じもの(server/ccp/sample_shop/*.svg)を使う。色の決め方は、サーバーと同じでなくてよい(商品ごとに決まった色になればよい)
 import type { ImageAngle, ImagePick, PageImage } from '../data/productPages'
 import { getLang } from '../i18n'
+import { tables } from './db'
 
 export type { ImageAngle, ImagePick, PageImage }
 
@@ -20,12 +21,21 @@ const codeOf = (url: string) => url.match(/\/p\/([A-Za-z0-9_-]{1,40})/)?.[1]
 const angleOf = (src: string) => ANGLES.find((a) => src.includes(`#${a}`)) ?? 'other'
 
 export const ProductPages = {
-  async images(url: string): Promise<{ sample: boolean; page: string; images: PageImage[] }> {
+  async images(url: string): Promise<{ sample: boolean; page: string; images: PageImage[]; title?: string; text?: string }> {
     await new Promise((r) => setTimeout(r, 400))
     const code = /shop\.example\.com|\/sample-shop\//.test(url) ? codeOf(url) : undefined
     if (!code) throw new Error('ページを読めませんでした(撮影用の画面では、見本のサイトの URL だけ読めます)')
     // 画像の種類を、あとで身代わりの AI が分かるように、URL の末尾(#…)に残す
-    return { sample: true, page: code, images: ANGLES.map((a) => ({ src: `${svg(code, a)}#${a}`, alt: a === 'front' ? '' : ALTS[a] })) }
+    // ページの本文(X80 段 ②): 見本のページと同じく、商品の名前と説明(サーバーは見本のページから取り出す)
+    const product = tables.ProductsService.find((p) => p.product_code === code)
+    const name = String(product?.name ?? code)
+    return {
+      sample: true,
+      page: code,
+      images: ANGLES.map((a) => ({ src: `${svg(code, a)}#${a}`, alt: a === 'front' ? '' : ALTS[a] })),
+      title: `${name} | Sample shop`,
+      text: [code, name, String(product?.description ?? '')].filter(Boolean).join('\n'),
+    }
   },
   async suggest(input: { images: PageImage[] }): Promise<{ images: ImageAngle[]; picks: ImagePick[] }> {
     await new Promise((r) => setTimeout(r, 900))

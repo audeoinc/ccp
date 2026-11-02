@@ -61,13 +61,20 @@ interface Props {
   onProposal: (html: string) => void
   /** 要素の直しを入れる(左のペインで直したのと同じ。保存は左のペインの「保存」) */
   onApplyEdit: (next: Snapshot) => void
+  /**
+   * シンプルな制作の画面(X86): 返事のボタンを押したら、フロートを開かずに、この関数で試す(プレビューに仮に当てはめ、帯の「確定」で入る)。
+   * AI が画像・商品を選べなかった直し(選び直しが要る)は false を返し、いつものフロートで選ぶ
+   */
+  onTryEdit?: (edit: ElementEdit) => boolean
+  /** 題(既定は「制作物の手直し」) */
+  title?: string
 }
 
 /**
  * 制作のページの AI チャット。よく使う頼み方を選んで(いくつでも)頼める。
  * 見た目の直しは HTML の案としてプレビューで見比べ、文言・画像・商品・リンク先の直しは、返事のボタンから、左のペインのその行だけのフロートで確かめて入れる(2026-10-21、利用者と決めた)
  */
-export function ProductionChat({ current, original, editable, html, htmlCustom, products, heroes, revisionNote, onProposal, onApplyEdit }: Props) {
+export function ProductionChat({ current, original, editable, html, htmlCustom, products, heroes, revisionNote, onProposal, onApplyEdit, onTryEdit, title }: Props) {
   const s = useStyles()
   const t = useT()
   const [msgs, setMsgs] = useState<Msg[]>([])
@@ -91,11 +98,11 @@ export function ProductionChat({ current, original, editable, html, htmlCustom, 
       if (a.html) {
         if (a.html.html !== html) {
           onProposal(a.html.html)
-          parts.push(tr('見た目の案を、右のプレビューに並べました。よければ「採用」を押してください。', 'The layout proposal is shown side by side in the preview. Press "Adopt" if it looks good.'))
+          parts.push(onTryEdit ? tr('見た目の案を、プレビューに仮に当てはめました。よければ「確定」を押してください。', 'The layout proposal is tried in the preview. Press "Apply" if it looks good.') : tr('見た目の案を、右のプレビューに並べました。よければ「採用」を押してください。', 'The layout proposal is shown side by side in the preview. Press "Adopt" if it looks good.'))
         }
         if (a.html.failed) parts.push(tr(`HTML の ${a.html.failed} か所は、場所が見つからず当てられませんでした。`, `${a.html.failed} change(s) could not be placed in the HTML.`))
       }
-      if (a.edits.length) parts.push(editable ? tr('文言などの直しは、下のボタンから確認して入れてください。', 'Check and apply the text and other changes with the buttons below.') : tr('文言などの直しは、渡したあとの A 案でだけ入れられます。', 'Text and other changes can only be applied to variant A after the handoff.'))
+      if (a.edits.length) parts.push(editable ? (onTryEdit ? tr('文言などの直しは、下のボタンを押すとプレビューに仮に当てはめます(「確定」で入ります)。', 'Press a button below to try the text and other changes in the preview (they apply on "Apply").') : tr('文言などの直しは、下のボタンから確認して入れてください。', 'Check and apply the text and other changes with the buttons below.')) : tr('文言などの直しは、渡したあとの A 案でだけ入れられます。', 'Text and other changes can only be applied to variant A after the handoff.'))
       if (!a.answered && !a.html && !a.edits.length && !a.reply) parts.push(tr('直す所が見つかりませんでした。もう少し具体的に頼んでみてください。', 'Nothing to change was found. Try asking more specifically.'))
       next = { role: 'assistant', text: parts.filter(Boolean).join('\n'), edits: a.edits, warnings: a.html?.warnings }
     } catch (e) {
@@ -126,7 +133,10 @@ export function ProductionChat({ current, original, editable, html, htmlCustom, 
                 const key = `${i}:${e.id}`
                 const done = applied.has(key)
                 return (
-                  <Button key={key} size="small" appearance={done ? 'subtle' : 'secondary'} icon={done ? <CheckmarkRegular /> : <EditRegular />} disabled={!editable} className={mergeClasses(done && s.done)} onClick={() => setOpen({ edit: e, key })}>
+                  <Button key={key} size="small" appearance={done ? 'subtle' : 'secondary'} icon={done ? <CheckmarkRegular /> : <EditRegular />} disabled={!editable} className={mergeClasses(done && s.done)} onClick={() => {
+                    if (onTryEdit?.(e)) setApplied((prev) => new Set(prev).add(key))
+                    else setOpen({ edit: e, key })
+                  }}>
                     {editLabel(e)}
                   </Button>
                 )
@@ -140,12 +150,15 @@ export function ProductionChat({ current, original, editable, html, htmlCustom, 
   return (
     <>
       <ChatPanel
-        title={t('制作物の手直し', 'Revise the creative')}
+        title={title ?? t('制作物の手直し', 'Revise the creative')}
         messages={messages}
         busy={busy}
         suggestions={revisionSuggestions(revisionNote)}
         appendSuggestions
-        intro={t(
+        intro={onTryEdit ? t(
+          '直したいことを頼めます。下の例は、いくつ選んでもかまいません(選ぶと入力欄に足され、書き足してから送れます)。AI の案は、プレビューに仮に当てはめて見せ、「確定」で入ります。',
+          'Ask for changes. Pick as many examples below as you like (they are added to the input, and you can edit before sending). AI proposals are tried in the preview and apply when you press "Apply".',
+        ) : t(
           '直したいことを頼めます。下の例は、いくつ選んでもかまいません(選ぶと入力欄に足され、書き足してから送れます)。見た目は右のプレビューで見比べて採用し、文言・画像・商品・リンク先は、返事のボタンから確認して入れます。',
           'Ask for changes. Pick as many examples below as you like (they are added to the input, and you can edit before sending). Layout changes are compared in the preview before you adopt them; text, image, product and link changes are applied from the buttons in the reply.',
         )}

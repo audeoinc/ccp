@@ -3,7 +3,7 @@
 import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowUndoRegular, CheckmarkRegular } from '@fluentui/react-icons'
 import { useT } from '../i18n'
-import { StepAction } from './StepAction'
+import { StepAction, type VariantSave } from './StepAction'
 import { useFeature } from '../featureFlags'
 import type { ProductionFlow } from './useProductionFlow'
 
@@ -22,7 +22,7 @@ const useStyles = makeStyles({
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
 })
 
-export function StepsPane({ flow, onViewResult, needMe }: { flow: ProductionFlow; onViewResult?: () => void; needMe?: string | null }) {
+export function StepsPane({ flow, onViewResult, needMe, variants }: { flow: ProductionFlow; onViewResult?: () => void; needMe?: string | null; variants?: VariantSave[] }) {
   const s = useStyles()
   const t = useT()
   const roleName = (side: 'planner' | 'production') => (side === 'planner' ? t('企画', 'Planner') : t('制作', 'Production'))
@@ -40,7 +40,7 @@ export function StepsPane({ flow, onViewResult, needMe }: { flow: ProductionFlow
             <span className={s.body}>
               <span className={s.name}>{st.name}</span>
               <span className={s.note}>{at === 'skipped' ? t('飛ばした(制作を通さずに送った)', 'Skipped (sent without production)') : st.info || [roleName(st.side), st.who].filter(Boolean).join(' · ')}</span>
-              {at === 'current' && <StepAction flow={flow} step={st} onViewResult={onViewResult} needMe={needMe} />}
+              {at === 'current' && <StepAction flow={flow} step={st} onViewResult={onViewResult} needMe={needMe} variants={variants} />}
               {i === flow.current - 1 && flow.canUndo && (
                 <span>
                   <Button size="small" appearance="transparent" icon={<ArrowUndoRegular />} disabled={flow.busy || !!needMe} onClick={() => void flow.act.undo()}>

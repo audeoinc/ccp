@@ -116,6 +116,68 @@ export async function askPartRewrite(args: {
   return finish(out, readIdeas(out, 'text').filter((x) => x.value && x.value !== args.part.current), args.count ?? 3)
 }
 
+const DETAIL_PROMPT = `あなたは、メールマガジンの商品の枠「詳しく」の文を書く手伝いをする。「詳しく」は、素材や機能の強み(撥水・保温・肌ざわり など)を、写真と長めの説明でしっかり伝える枠。
+入力の page が商品ページから取り出した文(title・text)、product が商品のマスタ(name・category・price・description など)、image が枠に使う写真の説明(alt・caption。なければ省く)、current がいまの見出し(title)と説明文(body)。
+${COMMON}
+次の JSON だけを返す:
+{"mode":"update","reply":"依頼にどう応えたかを 1 文で","ideas":[{"title":"見出し","body":"説明文","why":"どこを強みとして選んだかを 1 文で"}]}
+
+決まり:
+1. いちばん大事: page・product・image に書いてあることだけを書く。素材の名前・割合・機能・数字・産地・手入れの仕方・受賞などを、入力にないのに作らない。分からないことは書かない(「〜と言われています」のようにぼかして足すこともしない)。
+2. 見出しは 1 行(日本語は 20 文字、英語は 40 字くらいまで)。説明文は 200〜400 字(英語は 60〜120 語)。箇条書き(「- 」で始まる行)を混ぜてもよい。依頼が長さを決めていれば、それに従う。
+3. 素材・機能の強みを 1〜3 つに絞り、それが着る人・使う人に何をもたらすかを書く。価格・割引・在庫・期限には触れない(ほかの部品の役目)。
+4. 文は、配信の国に合わせる(US は英語、JP は日本語)。テーマと切り口から外れない。page の文をそのまま長く写さず、メールの読み手に向けて書き直す。
+5. ideas は count の数(count がなければ 2 つ)。2 つ以上のときは、強みの選び方か書き方を変える。page に強みになる内容がほとんどなければ、ideas を空にして、reply にそう書く。
+
+入力:
+`
+
+/** 「詳しく」の案の value は「見出し + 改行 + 説明文」(案の引き出し TextAiPanel が 1 つの文で扱うため)。見出しは 1 行 */
+export const joinDetail = (d: { title: string; body: string }) => `${d.title.replace(/\s*\n\s*/g, ' ').trim()}\n${d.body.trim()}`
+export function splitDetail(value: string): { title: string; body: string } {
+  const at = value.indexOf('\n')
+  return at < 0 ? { title: value.trim(), body: '' } : { title: value.slice(0, at).trim(), body: value.slice(at + 1).trim() }
+}
+
+/**
+ * 「詳しく」にした商品の枠の、見出しと説明文の案をもらう(X80 段 ③)。材料は、商品ページの本文・商品のマスタ・枠に使う写真の説明だけ。
+ * ページにない事実を書かせない(指示文の決まり 1)。案の value は joinDetail の形
+ */
+export async function askProductDetail(args: {
+  card: AiCard
+  angle: string
+  product: Product
+  page: { title: string; text: string } | null
+  image?: { alt?: string; caption?: string }
+  current: { title: string; body: string }
+  request: string
+  history: PartTurn[]
+  count?: number
+}): Promise<PartAnswer> {
+  const image = args.image && (args.image.alt?.trim() || args.image.caption?.trim()) ? { alt: args.image.alt?.trim() || undefined, caption: args.image.caption?.trim() || undefined } : undefined
+  // 在庫・売れ行き・MD 方針は、説明文の材料にしない(書いてほしくないため渡さない)
+  const p = productPayload(args.product)
+  const product = { code: p.code, name: p.name, category: p.category, price: p.price, season: p.season, description: p.description }
+  const out = await askAgent(DETAIL_PROMPT, {
+    task: 'write_product_detail',
+    card: { ...args.card, angle: args.angle },
+    product,
+    page: args.page ?? { title: '', text: '' },
+    ...(image ? { image } : {}),
+    current: args.current,
+    request: args.request,
+    ...(args.count ? { count: args.count } : {}),
+    chat: historyOf(args.history, (v) => v),
+  })
+  const ideas = (Array.isArray(out.ideas) ? (out.ideas as Record<string, unknown>[]) : [])
+    .map((x) => ({
+      value: joinDetail({ title: typeof x?.title === 'string' ? x.title : '', body: typeof x?.body === 'string' ? x.body : '' }),
+      why: typeof x?.why === 'string' ? x.why.trim() : '',
+    }))
+    .filter((x) => splitDetail(x.value).body && x.value !== joinDetail(args.current))
+  return finish(out, ideas, args.count ?? 2)
+}
+
 /** メイン画像を、頼んだとおりに選び直した案をもらう(案の value は画像の id) */
 export async function askHeroPick(args: { card: AiCard; angle: string; current?: HeroImage; heroes: HeroImage[]; productNames: string[]; request: string; history: PartTurn[] }): Promise<PartAnswer> {
   const pool = args.heroes.filter((h) => h.id !== args.current?.id).slice(0, MAX_HEROES)
@@ -314,6 +376,9 @@ export function requestSamples(kind: string): string[] {
  * 文の部品の「指示して直す」の例(札で出す。押すとそのまま頼む)。どの文の部品にも効く、よく使うものを先に並べ、部品ごとのものを 1 つ足す(2026-10-27 利用者)
  */
 export function textRequestSamples(kind: string): string[] {
+  // 「詳しく」の説明文は、ページにない事実を足させない。「数字を入れる」「急ぎ感」は出さない
+  if (kind === 'productDetail')
+    return [tr('短く', 'Shorter'), tr('箇条書きに', 'As bullet points'), tr('素材の話を先に', 'Lead with the material'), tr('使う場面を書く', 'Describe when to use it'), tr('カジュアルに', 'More casual')]
   const common = [tr('短く', 'Shorter'), tr('カジュアルに', 'More casual'), tr('数字を入れる', 'Add a number'), tr('急ぎ感を出す', 'Add urgency')]
   switch (kind) {
     case 'subject':
