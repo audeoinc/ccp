@@ -48,6 +48,7 @@ import { LearningEffectFloat, Later } from './lazyViews'
 import type { LearningCardData } from './learningCards'
 import { CardMenu } from './CardMenu'
 import { HeroUploadDialog } from './HeroUploadDialog'
+import { addHeroFromUrl } from './heroFromUrl'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
 import { allVariants, nextVariant, ownsAnyText, ownsHero, ownsImages, ownsProducts, ownsSubject, setVariantImage, withVariantImages } from './abTest'
@@ -613,7 +614,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [aiPreview, setAiPreview] = useState<AiPreview | null>(null)
   // これまでの学びの件数(シンプルな画面の「目印」に出す)
   const [learnCount, setLearnCount] = useState(0)
-  const shownHero = aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
+  // URL から選んで試している画像は、まだライブラリにないので、その場の形で写す(確定で写してライブラリに入れる)
+  const shownHero = aiPreview?.heroUrl ? ({ id: `url:${aiPreview.heroUrl.src}`, name: aiPreview.heroUrl.name, image_url: aiPreview.heroUrl.src } as HeroImage) : aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
   const previewItem = aiPreview?.item
   const previewSection = aiPreview?.section
   const previewDetail = aiPreview?.detail
@@ -1064,6 +1066,16 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           setHeroReason(reason)
         },
         uploadHero: (file?: File) => setHeroUpload(file ?? true),
+        heroFromUrl: async (pick) => {
+          try {
+            const h = await addHeroFromUrl({ ...pick, market: cardMarket(form.country), me: myName() || form.owner, cardId: card?.id })
+            await onHeroesChanged?.()
+            setHeroId(h.id)
+            setHeroReason(tr('URL のページから選んだ', 'Picked from a page URL'))
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
+          }
+        },
         applyTexts: (x) => {
           setForm((f) => ({
             ...f,

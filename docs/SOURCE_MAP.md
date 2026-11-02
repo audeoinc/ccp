@@ -310,6 +310,7 @@ flowchart TD
 | `HeroLibrary.tsx` | 312 | ⚙ の「画像のライブラリ」(メイン画像の一覧・絞り込み・上げる・直す・消す・期限を切る・空の項目を AI で埋める。タブで部品の画像。X59) |
 | `PartLibrary.tsx` / `PartUploadDialog.tsx` / `PartPicker.tsx` | 195 / 273 / 84 | 部品の画像(ボタン・バナー・ロゴ・アイコン。X59 ③)のライブラリ / 上げる・直す(AI の下書き・代替テキスト)/ 制作のページの左の欄(URL・`<img>` のタグをコピー)。窓口は `data/partUpload.ts`、表は `data/partImages.ts`、サーバーは `server/ccp/parts.py` |
 | `imageConvert.ts` | 62 | AVIF を JPEG・PNG に変える、画面の画像を AI に見せる JPEG にする(X59) |
+| `heroFromUrl.ts` | 37 | URL のページから選んだ画像を写して、メイン画像のライブラリに入れる(content.hero.fromurl。配信カードと制作の HeroPicker から) |
 | `HeroUploadDialog.tsx` / `heroRights.ts` | 371 / 22 | 持っている画像をメイン画像のライブラリに上げる・直す(AI の下書き・焦点と拡大・出どころ・期限。X59)/ 使える期限と、焦点・拡大の切り出し。窓口は `data/heroUpload.ts` |
 | `FinishedFloat.tsx` | 142 | 仕上がりを見る(X58。制作した HTML・制作からのひとこととリンク・直してほしいこと・制作指示・素材を 1 つのフロートで) |
 | `CreativeAssets.tsx` / `creativeConst.ts` | 647 / 7 | 素材(Creative Assets。X58): 配信ごとの参考のファイル・URL の一覧・追加・素材のフロート(大きく見る・素材へのやり取り)/ 添付できる種類と大きさ。ファイルの窓口は `data/creativeFiles.ts`、表は `data/cardAssets.ts` |
@@ -371,6 +372,7 @@ flowchart TD
 | `SectionGlowLayer.tsx` / `sectionGlow.ts` | 49 / 19 | セクションに重ねる光の枠 / 光らせるセクション(「○○の商品を AI で選ぶ」に乗せたとき・案を試しているあいだ。X81) |
 | `usePreviewZoom.ts` / `PreviewZoomBar.tsx` | 67 / 45 | プレビューの倍率(15〜120% と「全体」。画面ごとの鍵で覚える)/ 右下の倍率の操作(− ・倍率・＋)。配信カードと制作のシンプルな画面で共通 |
 | `usePreviewNav.ts` / `useUndo.ts` / `actions.ts` | 128 / 25 / 19 | プレビューの倍率と移動(Ctrl + ホイール・つかんで移動)/ 元に戻す / 商品の一覧で押した商品を枠に置く |
+| `UrlImagePicker.tsx` | 147 | URL を貼って、そのページの画像を並べて選ぶ(content.hero.fromurl。メイン画像の引き出しのタブと、制作の HeroPicker で使う) |
 | `ProductSwap.tsx` / `floatSwap.tsx` | 118 / 45 | 商品の入れ替えの引き出し(SU9。どの入口からも、ここを開く。中身は `ProductChooser`)/ 商品のフロートの中に、同じ引き出しを出す |
 | `ProductImageSwap.tsx` | 421 | 商品の「画像を替える」の引き出し(その商品のページの画像・AI に選んでもらう・貼り付け・ファイル・URL。試す → 確定。AB で商品が共通なら開いている案だけ。「詳しく」の枠の写真も。以前の `ProductImagePicker.tsx` の窓はやめて、中身をここへ移した) |
 | `TextAiPanel.tsx` | 230 | 文の部品(見出し・コピー・件名など)の AI(「案」と「指示して直す」。試す → 確定) |

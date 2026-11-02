@@ -142,7 +142,7 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
       <span className={s.row}>
         {current.hero && <img className={s.thumb} src={heroImage(current.hero) ?? ''} alt="" />}
         <span className={s.note} style={{ flexGrow: 1 }}>{current.hero?.name ?? t('(なし)', '(none)')}</span>
-        <HeroPicker heroes={poolHeroes} onPick={(h) => onTry(setHero(current, h), { key: `hero:${h.id}`, from: current.hero?.name ?? '', to: h.name })} onUpload={() => setUploading(true)} />
+        <HeroPicker heroes={poolHeroes} onPick={(h) => onTry(setHero(current, h), { key: `hero:${h.id}`, from: current.hero?.name ?? '', to: h.name })} onUpload={() => setUploading(true)} fromUrl={{ market, cardId: current.card.id, me: myName() }} />
       </span>
       {(current.hero?.id ?? '') !== (original.hero?.id ?? '') && wasRow(original.hero?.name ?? '', current.hero?.name ?? '', () => setHero(current, original.hero ?? null))}
       {aiOn && (

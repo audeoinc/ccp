@@ -155,6 +155,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'content.theme', group: 'area.content.text', ...named('テーマを手で書く', 'Write the theme by hand'), version: 'MVP' },
   { id: 'content.hero.pick', group: 'area.content.hero', ...named('ライブラリから選ぶ', 'Pick from the library'), version: 'MVP', size: 'S' },
   { id: 'content.hero.upload', group: 'area.content.hero', ...named('持っている画像を上げる', 'Upload your own image'), version: 'MVP', size: 'S' },
+  { id: 'content.hero.fromurl', group: 'area.content.hero', ...named('URL を指定して、そのページの画像から選ぶ', 'Pick from the images on a page URL'), version: 'v1', size: 'M' },
   { id: 'content.products', group: 'area.content.products', ...named('商品を探して入れる・入れ替える・外す・並べ替える', 'Find, add, replace, remove and reorder products'), version: 'MVP' },
   { id: 'content.products.pageimage', group: 'area.content.products', ...named('商品の画像を選ぶ(取り込んだ画像・BigQuery の画像・貼り付け・ファイル・画像の URL から)', 'Choose product images (imported, BigQuery, paste, file, image URL)'), version: 'MVP', size: 'S' },
   { id: 'content.products.pagefetch', group: 'area.content.products', ...named('商品ページの URL を読んで、画像を拾ってくる', 'Read a product page URL and collect its images'), version: 'v1', size: 'M' },

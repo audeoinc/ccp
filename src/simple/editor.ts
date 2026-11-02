@@ -46,6 +46,8 @@ export interface AiPreview {
   /** 文言の案(件名・見出し・セクションなど)。保存する中身は変えず、プレビューと受信箱の行にだけ写す(dirty にしない) */
   texts?: WholeTexts
   heroId?: string
+  /** URL から選んだ画像(content.hero.fromurl)。まだライブラリにないので、画像の URL と名前で写す */
+  heroUrl?: { src: string; name: string }
   /** テンプレートの選び直しで、乗せているテンプレート */
   templateId?: EmailTemplateId
   /** 枠の商品の案。key が空なら空いた枠への案で、at の位置(押した空いた枠)に写す */
@@ -132,6 +134,8 @@ export interface SimpleExtras {
   setHero: (id: string | undefined, reason: string) => void
   /** 持っている画像を上げる(file を渡すと、そのファイルを上げながら開く) */
   uploadHero: (file?: File) => void
+  /** URL のページから選んだ画像を、写してライブラリに入れ、メイン画像にする(content.hero.fromurl。確定のとき) */
+  heroFromUrl: (pick: { src: string; name: string; page: string }) => Promise<void>
   /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
   applyTexts: (t: WholeTexts) => void
   linkSpots: LinkSlot[]
