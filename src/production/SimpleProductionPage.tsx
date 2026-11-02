@@ -1,17 +1,37 @@
 // 制作の面のシンプルな画面(X86。2026-10-28 利用者が案 A に決めた。要件: 共有メモ req-production-simple.md)。
-// 配信カードのシンプルと同じ形: 左に企画の見本のプレビュー(部品を押せる)、右に部品のペイン。何も選んでいないときは「渡されたもの」。
-// MVP は「開く・読む・コピー」まで(直す・工程・やり取り・ピンは v1、制作した HTML の編集・AI は FULL)。
+// 配信カードのシンプルと同じ形: 左に企画の見本のプレビュー(部品を押せる)、右に部品のペイン。何も選んでいないときは「まとめて写す」。
+// MVP(2026-10-30 の再定義。req-production-simple.md の 2b 章): 開く・読む・コピーに加えて、AI の手直し(全体のペインの「見た目を AI に頼む」・
+// 部品のペインの「AI に頼む」)・制作した HTML(見本との切り替え・コピー・保存・版に戻す・貼り付けて置き換える)・要素を直す(企画から変更の印・戻す)・
+// 工程 ②〜④・ピン・仕上がりを見る。直しと AI の案は、どれも試す → 確定(プレビューに仮に当てはめ、上の帯の「確定」で保存する)。
+// AI は詳しい制作のページの ProductionChat / productionRevise と、配信カードの部品の AI(PartAiChat)を使い回す。やり取りの欄・タスクは v1。
 // 中身は、渡した写し(制作が直していれば、その写し)。渡す前は、いまの配信カードから作った下書き。写しの作り・コピーの値は、
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
-import { Badge, Button, Dialog, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Tab, TabList, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowUndoRegular, AttachRegular, ChevronDoubleLeftRegular, CommentRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, EyeRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular, TaskListLtrRegular, TimelineRegular } from '@fluentui/react-icons'
+import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, ChevronDoubleLeftRegular, ClipboardPasteRegular, CommentAddRegular, CommentRegular, HistoryRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, EyeRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular, TaskListLtrRegular, TimelineRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
 import type { ProductionRequest } from '../models/productionRequests'
 import type { VariantKey } from '../abTest'
 import { ProductionRequestsService } from '../data/productionRequests'
+import { ProductionService } from '../data/production'
+import { ProductionChat } from '../ProductionChat'
+import { applyEdit, syncHtml, type ElementEdit } from '../productionRevise'
+import { HtmlPreviewFrame } from '../HtmlPreviewFrame'
+import { HtmlPins } from '../HtmlPins'
+import { PreviewPins } from '../PreviewPins'
+import { PinFloat } from '../PinFloat'
+import { usePreviewPins } from '../usePreviewPins'
+import { focusedPin, pinView, subscribePins } from '../pinStore'
+import { ResolvedPinsToggle } from '../ResolvedPinsToggle'
+import { DevRequestMenuItem } from '../DevRequestMenu'
+import { AutoTextarea } from '../AutoTextarea'
+import { useTrial } from '../trial'
+import { TrialBar } from '../TrialBar'
+import { weekKeyOf } from '../weekLock'
+import { ProductionPartEdit } from './ProductionPartEdit'
+import type { PartTurn } from '../simple/partAi'
 import { CardPreview } from '../CardPreview'
 import { PreviewHints } from '../Preview'
 import { useCardDetailStyles } from '../cardDetailStyles'
@@ -37,7 +57,7 @@ import { usePaneWidths } from '../floatLayout'
 import { slotIdsOf } from '../slots'
 import { PREF } from '../prefKeys'
 import { typo } from '../typo'
-import { day, locale, useT, when } from '../i18n'
+import { day, locale, tr, useT, when } from '../i18n'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
 import { StageHeader } from '../simple/StageHeader'
 import { DeliveryMetaBand } from '../simple/DeliveryMetaBand'
@@ -46,7 +66,7 @@ import { CopyLinkButton } from '../CopyLinkButton'
 import { useCampaignOf } from '../useCampaignOf'
 import { cardDisplayName } from '../campaigns'
 import { getTemplate, templateKeyOfCard } from '../templates'
-import { partElement, type PartRef } from '../simple/parts'
+import { partElement, partKey, partOfAnchor, type PartRef } from '../simple/parts'
 import { usePreviewZoom } from '../simple/usePreviewZoom'
 import { useFeature } from '../featureFlags'
 import { FeatureBadge } from '../FeatureBadge'
@@ -58,7 +78,9 @@ import {
   getText,
   htmlLinks,
   linkRows,
+  parseHtmlHistory,
   parseSnapshot,
+  parseVariantHtml,
   previewHtml,
   productRows,
   productionVariants,
@@ -108,7 +130,16 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1 },
   // プレビューの箱(部品を選ぶ層の基準。スクロールする)
   previewBox: { position: 'relative', flexGrow: 1, minHeight: 0, overflow: 'auto', padding: '8px 16px 24px', outline: 'none' },
-  side: { minWidth: 0, minHeight: 0, overflowY: 'auto', padding: '12px 16px 24px', display: 'grid', rowGap: '14px', alignContent: 'start' },
+  // 右のペイン: 上がスクロールする中身、下(何も選んでいないとき)が「見た目を AI に頼む」
+  rightCol: { display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 },
+  side: { flexGrow: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', padding: '12px 16px 24px', display: 'grid', rowGap: '14px', alignContent: 'start' },
+  // 試す → 確定の帯(プレビューの上。どの入口で試しても、ここで確定する)
+  trialBar: { padding: '0 12px 6px' },
+  // プレビューの右上の、書き込み(ピン)の操作
+  pinBar: { display: 'flex', alignItems: 'center', columnGap: '2px' },
+  // 制作した HTML を描く枠(ピンの層の基準)
+  madeBox: { position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '8px 16px 16px' },
+  pasteBox: { width: '100%', minHeight: 'calc(40vh / var(--ui-zoom, 1))', fontFamily: 'Consolas, Menlo, monospace', fontSize: '12px' },
   head: { display: 'flex', alignItems: 'center', columnGap: '8px' },
   heading: { ...typo.heading, flexGrow: 1, minWidth: 0 },
   section: { display: 'grid', rowGap: '6px' },
@@ -240,6 +271,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     setPartImg(src ? new URL(src, location.href).href : '')
     setPart(p)
   }
+  // 部品ごとの AI のやり取り(部品を選び直しても残す)
+  const [turnsByPart, setTurnsByPart] = useState<Record<string, PartTurn[]>>({})
   const boxRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const offscreenRef = useRef<HTMLDivElement>(null)
@@ -255,6 +288,11 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const threadOn = useFeature('collab.thread')
   const tasksOn = useFeature('collab.tasks')
   const assetsOn = useFeature('collab.assets')
+  // MVP に入れたもの(2026-10-30 利用者): 要素を直す [prod.page]・制作した HTML [prod.htmledit]・AI の手直し [prod.ai]・ピン [collab.pins]
+  const editOn = useFeature('prod.page')
+  const htmlEditOn = useFeature('prod.htmledit')
+  const aiOn = useFeature('prod.ai')
+  const pinsOn = useFeature('collab.pins')
   const meId = useSyncExternalStore(onMeChange, myUserId)
   const meName = useSyncExternalStore(onMeChange, myName)
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
@@ -294,10 +332,17 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   const frozen = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
   const edited = useMemo(() => parseSnapshot(live?.edited_snapshot), [live?.edited_snapshot])
-  const snap: Snapshot = edited ?? frozen ?? draft
+  // 確定して保存している間は、保存した写しを先に出す(読み直すまで、前の中身に戻って見えないように)
+  const [savingSnap, setSavingSnap] = useState<Snapshot | null>(null)
+  const snap: Snapshot = savingSnap ?? edited ?? frozen ?? draft
+  // 企画から渡された写し(「企画から変更」の印と、戻す先)
+  const original: Snapshot = frozen ?? draft
   const keys = productionVariants(snap)
   const cur: VariantKey = keys.includes(variant) ? variant : 'A'
   const vs = snapshotOf(snap, cur)
+  // 試している写し(直し・AI の案を、プレビューにだけ当てはめる。確定するまで保存しない)。直せるのは A 案の要素だけ(B・C 案は配信カードで直す)
+  const [trialSnap, setTrialSnap] = useState<Snapshot | null>(null)
+  const pvs = trialSnap && cur === 'A' ? trialSnap : vs
   const view = productionView(card, latest)
   const instructions = live ? (live.instructions ?? '') : (card.instructions ?? '')
   const owner = live ? (live.production_owner ?? '') : (card.production_owner ?? '')
@@ -307,7 +352,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const prows = productRows(vs, cur)
   const lrows = linkRows(vs, cur)
   const trows = trackingRows(vs, cur)
-  const previewCard = { ...card, ...vs.card } as DeliveryCard
+  const previewCard = { ...card, ...pvs.card } as DeliveryCard
+  // 見本の HTML を作る見えないプレビューは、保存した中身で描く(試している中身を、コピー・保存の HTML に混ぜない)
+  const savedCard = { ...card, ...vs.card } as DeliveryCard
   const needMe = !meId ? t('右上で、だれでログインするかを選んでください', 'Choose who is signed in at the top right') : null
   // 工程(prod.steps)。送る HTML は、制作が保存した HTML があればそれ、なければ企画の見本
   const flow = useProductionFlow({ card, live, actor: { id: meId, name: meName }, html: () => live?.html || sampleHtml(), variantHtml: live?.variant_html ?? undefined, onChanged: async () => {
@@ -315,6 +362,154 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     onChanged?.()
   } })
   const myStep = stepsOn && flow.now && flow.now.key !== 'request' && (exportOn || flow.now.key !== 'send') && flow.isMine(flow.now) ? flow.now : undefined
+
+  // ---- 直す・制作した HTML・AI(MVP の追加分。2026-10-30 利用者) ----
+  // 直せるのは、渡したあと・送る前の版(詳しい制作のページと同じ)
+  const canWork = !!live && live.status !== 'sent'
+  const actor = { id: meId, name: meName }
+  const weekStart = card.scheduled_at ? weekKeyOf(new Date(card.scheduled_at)) : undefined
+  const [busy, setBusy] = useState(false)
+  const [workError, setWorkError] = useState<string | null>(null)
+  const [workNotice, setWorkNotice] = useState<string | null>(null)
+  const call = async (f: () => Promise<{ success: boolean; error?: { message: string } }>) => {
+    setBusy(true)
+    setWorkError(null)
+    try {
+      const r = await f()
+      if (!r.success) throw new Error(r.error?.message ?? tr('うまくいきませんでした', 'Something went wrong'))
+      return true
+    } catch (e) {
+      setWorkError(e instanceof Error ? e.message : String(e))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+  // 制作した HTML: 保存したことのあるものだけ(渡したときに一緒に固めた見本の HTML は、保存した日時がないので、制作した HTML とみなさない)
+  const savedVariants = useMemo(() => parseVariantHtml(live?.variant_html), [live?.variant_html])
+  const [savingHtml, setSavingHtml] = useState<{ variant: VariantKey; html: string } | null>(null)
+  const madeOf = (k: VariantKey): string => {
+    if (savingHtml?.variant === k) return savingHtml.html
+    if (k === 'A') return live?.html_saved_at ? (live.html ?? '') : ''
+    const v = savedVariants[k]
+    return v?.saved_at ? v.html : ''
+  }
+  const made = madeOf(cur)
+  const madeBy = cur === 'A' ? { by: live?.html_saved_by_name, at: live?.html_saved_at } : { by: savedVariants[cur]?.saved_by_name, at: savedVariants[cur]?.saved_at }
+  const history = useMemo(() => parseHtmlHistory(live?.html_history).filter((h) => h.variant === cur), [live?.html_history, cur])
+  // 試している HTML(AI の見た目の案・前の版・貼り付けたもの)
+  const [trialHtml, setTrialHtml] = useState<string | null>(null)
+  // プレビューで見るもの: 企画の見本(部品を押せる)/ 制作した HTML(ピンだけ。決定 5)
+  const [surface, setSurface] = useState<'plan' | 'made'>('plan')
+  // 要素の直しを試している間は、制作した HTML の同じ場所も書き換えて見せる(確定すると、同じように保存する)
+  const madeShown = trialHtml ?? (trialSnap && made && cur === 'A' ? syncHtml(made, vs, trialSnap).html : made)
+  const onMade = htmlEditOn && surface === 'made' && !!madeShown
+  const trial = useTrial()
+  // 案・版を切り替えたら、試しているものはやめる
+  useEffect(() => {
+    trial.cancel()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur, live?.id])
+
+  /** 直した写しを保存する(制作した HTML があれば、その同じ場所も書き換えて保存する。詳しい制作のページの applyChatEdit と同じ考え) */
+  const commitSnap = async (next: Snapshot) => {
+    if (!live) return
+    if (needMe) return setWorkError(needMe)
+    const strip = (x: Snapshot) => JSON.stringify({ ...x, takenAt: '' })
+    setSavingSnap(next)
+    setWorkNotice(null)
+    let ok = await call(() => ProductionService.saveEdits(live.id, { actor, edited_snapshot: strip(next) !== strip(original) ? JSON.stringify(next) : '', week_start: weekStart }))
+    const madeA = madeOf('A')
+    if (ok && madeA) {
+      const r = syncHtml(madeA, snap, next)
+      if (r.replaced) {
+        setSavingHtml({ variant: 'A', html: r.html })
+        ok = await call(() => ProductionService.saveHtml(live.id, { actor, html: r.html, variant: 'A' }))
+      }
+      if (r.missing) setWorkNotice(tr(`制作した HTML の中で、場所が見つからなかったものが ${r.missing} つあります(HTML は手で直すか、貼り付けて置き換えてください)`, `${r.missing} item(s) could not be found in the production HTML (edit it by hand, or paste to replace).`))
+    }
+    await load()
+    setSavingSnap(null)
+    setSavingHtml(null)
+  }
+  /** 制作した HTML を保存する(空 = 企画の見本に戻す)。前の HTML は、サーバーが版の履歴に残す */
+  const commitHtml = async (html: string) => {
+    if (!live) return
+    if (needMe) return setWorkError(needMe)
+    setSavingHtml({ variant: cur, html })
+    setWorkNotice(null)
+    if (await call(() => ProductionService.saveHtml(live.id, { actor, html, variant: cur }))) setSurface(html ? 'made' : 'plan')
+    await load()
+    setSavingHtml(null)
+  }
+  /** 写しの直しを試す(プレビューにだけ当てはめ、帯の「確定」で保存) */
+  const trySnap = (next: Snapshot, label: { key: string; from: string; to: string }) =>
+    trial.tryIt({
+      ...label,
+      preview: () => setTrialSnap(next),
+      unpreview: () => setTrialSnap(null),
+      apply: () => {
+        setTrialSnap(null)
+        void commitSnap(next)
+      },
+    })
+  /** HTML を試す(制作した HTML の見え方で、プレビューに当てはめる) */
+  const tryHtml = (html: string, key: string, to: string) =>
+    trial.tryIt({
+      key,
+      from: made ? t('いまの制作した HTML', 'Current production HTML') : t('企画の見本', 'Plan sample'),
+      to,
+      preview: () => {
+        setTrialHtml(html)
+        setSurface('made')
+      },
+      unpreview: () => setTrialHtml(null),
+      apply: () => {
+        setTrialHtml(null)
+        void commitHtml(html)
+      },
+    })
+  /** AI の要素の直し(全体のペインのチャットの返事のボタン)を試す。AI が画像・商品を選べなかったものは、いつものフロートで選ぶ */
+  const tryEdit = (e: ElementEdit): boolean => {
+    if ((e.kind === 'hero' && !e.heroId) || (e.kind === 'product' && !e.productId)) return false
+    const hero = e.kind === 'hero' ? (heroes.find((h) => h.id === e.heroId) ?? null) : undefined
+    const next = applyEdit(vs, e, { text: e.kind === 'text' || e.kind === 'link' ? e.value : undefined, hero, productId: e.kind === 'product' ? e.productId : undefined }, shownProducts)
+    const from =
+      e.kind === 'text' ? getText(vs, e.field) : e.kind === 'link' ? (linkRows(vs).find((r) => r.slotKey === e.slotKey)?.base ?? '') : e.kind === 'hero' ? (vs.hero?.name ?? '') : (productRows(vs)[e.index]?.product.name ?? '')
+    const to = e.kind === 'text' || e.kind === 'link' ? e.value : e.kind === 'hero' ? (hero?.name ?? '') : (shownProducts.find((p) => p.id === e.productId)?.name ?? '')
+    trySnap(next, { key: `chat:${e.id}:${to}`, from, to })
+    return true
+  }
+  const [pasting, setPasting] = useState<string | null>(null)
+  // 見本の HTML(AI に渡す・制作した HTML がないときのもと)。見えないプレビューを描いたあとに作る(詳しい制作のページと同じ)
+  const [generated, setGenerated] = useState('')
+  useEffect(() => {
+    const id = setTimeout(() => setGenerated(offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : ''), 600)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snap, cur, requests, card.name])
+
+  // ピン(コメント)。企画の見本の上は部品の目印に、制作した HTML の上はページの中の割合に置く(詳しい制作のページと同じ見た目の名前 html-plan / html-made)
+  const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
+  const [madeFrame, setMadeFrame] = useState<HTMLIFrameElement | null>(null)
+  const pinIds = pvs.productIds
+  const pinItems = useMemo(() => pinIds.flatMap((pid, i) => (pid ? [{ key: `${pid}-${i}`, productId: pid, reason: '', source: 'manual' as const }] : [])), [pinIds])
+  // やり取りの札・ピンのリンクで開いたとき、その書き込みを打った見せ方(見本 / 制作した HTML)と案に切り替える(詳しい制作のページと同じ)
+  const focus = useSyncExternalStore(subscribePins, focusedPin)
+  useEffect(() => {
+    if (!focus) return
+    let alive = true
+    void CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] }).then((r) => {
+      const n = r.success ? (r.data ?? []).find((x) => x.id === focus.noteId) : undefined
+      if (!alive || !n?.anchor || stageOf(n) !== 'production') return
+      const [ch, , v] = (n.anchor_view ?? '').split('|')
+      if (ch === 'html-plan' || ch === 'html-made') setSurface(ch === 'html-made' ? 'made' : 'plan')
+      if (v === 'A' || v === 'B' || v === 'C') setVariant(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [focus, card.id])
 
   // 企画の見本の HTML(詳しい制作のページと同じ作り方: 見えないプレビューから、書式を直接書いた形にする)。押したときに作る
   const sampleHtml = () => (offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : '')
@@ -411,6 +606,72 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           <span className={s.note}>{t('プレビューと同じ見た目の HTML です(リンクには計測用のパラメーターが付いています)', 'HTML that looks like the preview (links include tracking parameters).')}</span>
         </div>
       )}
+      {htmlEditOn && (
+        <div className={s.section}>
+          <div className={s.head}>
+            <span className={s.heading}>{t('制作した HTML', 'Production HTML')}</span>
+            <FeatureBadge id="prod.htmledit" />
+            {/* 版: 前に保存した HTML に戻す(試す → 確定)・企画の見本に戻す */}
+            {canWork && (history.length > 0 || made) && (
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  <Button size="small" appearance="subtle" icon={<HistoryRegular />}>
+                    {t(`版(${history.length})`, `Versions (${history.length})`)}
+                  </Button>
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    {history.map((h, i) => (
+                      <MenuItem key={`${h.saved_at}-${i}`} onClick={() => tryHtml(h.html, `ver:${h.saved_at}:${i}`, t(`前の版(${when(h.saved_at ?? '')} ${h.saved_by_name ?? ''})`, `Earlier version (${when(h.saved_at ?? '')} ${h.saved_by_name ?? ''})`))}>
+                        {t(`${when(h.saved_at ?? '')} ${h.saved_by_name ?? ''} の版に戻す`, `Back to ${when(h.saved_at ?? '')} by ${h.saved_by_name ?? ''}`)}
+                      </MenuItem>
+                    ))}
+                    {history.length === 0 && <MenuItem disabled>{t('前の版はまだありません', 'No earlier versions yet')}</MenuItem>}
+                    {made && (
+                      <>
+                        <MenuDivider />
+                        <MenuItem
+                          icon={<ArrowResetRegular />}
+                          onClick={() =>
+                            trial.tryIt({
+                              key: 'reset-to-plan',
+                              from: t('いまの制作した HTML', 'Current production HTML'),
+                              to: t('企画の見本', 'Plan sample'),
+                              preview: () => setSurface('plan'),
+                              unpreview: () => setSurface('made'),
+                              apply: () => void commitHtml(''),
+                            })
+                          }
+                        >
+                          {t('企画の見本に戻す(制作した HTML を外す)', 'Back to the plan sample (drop the production HTML)')}
+                        </MenuItem>
+                      </>
+                    )}
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            )}
+          </div>
+          {made ? (
+            <span className={s.note}>{madeBy.by ? t(`保存: ${madeBy.by} ${when(madeBy.at ?? '')}`, `Saved by ${madeBy.by} ${when(madeBy.at ?? '')}`) : t('保存した HTML があります', 'Saved HTML exists')}</span>
+          ) : (
+            <span className={s.note}>{t('まだありません(AI で見た目を直す・貼り付けて置き換えると、ここに入ります。それまでは企画の見本を使います)', 'None yet (it is created when you revise the look with AI or paste HTML; until then the plan sample is used).')}</span>
+          )}
+          <div className={s.actions}>
+            {made && <CopyButton text={made} label={t('HTML をコピー', 'Copy HTML')} />}
+            {made && (
+              <Button size="small" icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, made)}>
+                {t('.html で保存', 'Save as .html')}
+              </Button>
+            )}
+            <Tooltip content={canWork ? t('制作ツールなどで作った HTML を貼り付けて、制作した HTML と置き換えます(プレビューで試してから確定)', 'Paste HTML made elsewhere to replace the production HTML (try it in the preview, then apply)') : t('制作に渡したあとに貼り付けられます', 'You can paste after the handoff')} relationship="description">
+              <Button size="small" icon={<ClipboardPasteRegular />} disabled={!canWork} onClick={() => setPasting('')}>
+                {t('貼り付けて置き換える', 'Paste to replace')}
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
+      )}
       <span className={s.note}>{t('プレビューの部品を押すと、その部品の材料だけを出します。制作指示・参考の素材は、左のバーの「渡されたもの」に', 'Click a part in the preview to see only its materials. Production notes and reference materials are under Handoff in the left bar.')}</span>
     </>
   )
@@ -467,6 +728,28 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
         {prodTracking.map((r) => copyRow(`utm_content: ${r.content}`, r.url, `trk-${r.content}-${r.url}`, <span className={s.note}>{r.desc}</span>))}
         {p.kind === 'slot' && <span className={s.note}>{t('この枠には、商品が入っていません', 'This slot has no product.')}</span>}
         {!trs.length && !imgUrl && !prod && !links.length && !prodTracking.length && p.kind !== 'slot' && <span className={s.note}>{t('この部品に、コピーする材料はありません(中身はテンプレートで決まっています)', 'Nothing to copy for this part (its content comes from the template).')}</span>}
+        {/* 直す [prod.page](渡したあと・送る前の、A 案だけ。B・C 案の中身は配信カードで直す) */}
+        {editOn && canWork && cur === 'A' && (
+          <ProductionPartEdit
+            part={p}
+            current={vs}
+            trying={trialSnap}
+            original={original}
+            rows={trs}
+            productIndex={prod?.at}
+            linkKey={linkKey}
+            card={card}
+            products={shownProducts}
+            heroes={heroes}
+            aiOn={aiOn}
+            onTry={trySnap}
+            onCommit={(next) => void commitSnap(next)}
+            turns={turnsByPart[partKey(p)] ?? []}
+            setTurns={(f) => setTurnsByPart((m) => ({ ...m, [partKey(p)]: f(m[partKey(p)] ?? []) }))}
+          />
+        )}
+        {editOn && canWork && cur !== 'A' && <span className={s.note}>{t(`${cur} 案の中身は、計画の配信カードで直します`, `Edit variant ${cur} in the plan delivery card`)}</span>}
+        {editOn && !live && <span className={s.note}>{t('制作に渡したあとに、ここで直したり AI に頼んだりできます', 'After the handoff you can edit here and ask AI')}</span>}
       </>
     )
   }
@@ -580,11 +863,24 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                         </MenuItem>
                       </>
                     )}
+                    {htmlEditOn && made && (
+                      <>
+                        <MenuDivider />
+                        <MenuItem icon={<CopyRegular />} onClick={() => void navigator.clipboard?.writeText(made)}>
+                          {t('制作した HTML をコピー', 'Copy the production HTML')} <FeatureBadge id="prod.htmledit" />
+                        </MenuItem>
+                        <MenuItem icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, made)}>
+                          {t('制作した HTML を .html で保存', 'Save the production HTML as .html')} <FeatureBadge id="prod.htmledit" />
+                        </MenuItem>
+                      </>
+                    )}
                     {onFullView && (
                       <MenuItem icon={<DocumentTextRegular />} onClick={onFullView}>
                         {t('詳しい制作のページで開く', 'Open the full production page')}
                       </MenuItem>
                     )}
+                    {/* 開発へのリクエストの一覧 [dev.requests](配信カード・結果と同じ「⋯」から) */}
+                    <DevRequestMenuItem />
                   </MenuList>
                 </MenuPopover>
               </Menu>
@@ -597,6 +893,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           <div className={s.bar}>
             <MessageBar intent={flow.error ? 'error' : 'success'} layout="multiline">
               <MessageBarBody>{flow.error ?? flow.notice}</MessageBarBody>
+            </MessageBar>
+          </div>
+        )}
+        {(workError || workNotice) && (
+          <div className={s.bar}>
+            <MessageBar intent={workError ? 'error' : 'warning'} layout="multiline">
+              <MessageBarBody>{workError ?? workNotice}</MessageBarBody>
             </MessageBar>
           </div>
         )}
@@ -622,14 +925,41 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           {openSide ? <Splitter onDrag={panes.onDrag(0)} onDone={panes.onDone} /> : <span />}
           <div className={s.previewPane}>
             <div className={s.previewBar}>
-              <Text size={200}>{t('企画の見本(部品を押すと、その材料を右に出します)', 'Plan sample (click a part to see its materials on the right)')}</Text>
+              {/* 見本 | 制作した HTML [prod.htmledit]。制作した HTML があるとき(試しているときも)だけ切り替えを出す */}
+              {htmlEditOn && madeShown ? (
+                <TabList size="small" selectedValue={onMade ? 'made' : 'plan'} onTabSelect={(_, d) => setSurface(d.value as 'plan' | 'made')}>
+                  <Tab value="plan">{t('企画の見本', 'Plan sample')}</Tab>
+                  <Tab value="made">{t('制作した HTML', 'Production HTML')}</Tab>
+                </TabList>
+              ) : (
+                <Text size={200}>{t('企画の見本(部品を押すと、その材料を右に出します)', 'Plan sample (click a part to see its materials on the right)')}</Text>
+              )}
+              {busy && <Spinner size="tiny" label={t('保存しています', 'Saving')} />}
               <span className={s.grow} />
               {edited && <Badge appearance="tint" color="warning">{t('制作が直した写し', 'Edited in production')}</Badge>}
-              <TabList size="small" selectedValue={device} onTabSelect={(_, d) => setDevice(d.value as 'mobile' | 'pc')}>
-                <Tab value="mobile" icon={<PhoneRegular />} aria-label={t('スマホ', 'Phone')} />
-                <Tab value="pc" icon={<DesktopRegular />} aria-label={t('PC', 'Desktop')} />
-              </TabList>
+              {!onMade && (
+                <TabList size="small" selectedValue={device} onTabSelect={(_, d) => setDevice(d.value as 'mobile' | 'pc')}>
+                  <Tab value="mobile" icon={<PhoneRegular />} aria-label={t('スマホ', 'Phone')} />
+                  <Tab value="pc" icon={<DesktopRegular />} aria-label={t('PC', 'Desktop')} />
+                </TabList>
+              )}
+              {/* ピンを打って、コメントを書く [collab.pins](配信カードと同じ場所・同じ形。右クリックでも打てる) */}
+              {pinsOn && trialHtml === null && (
+                <span className={s.pinBar}>
+                  <Tooltip content={placing ? t('コメントを書く場所を押してください(Esc でやめる)', 'Click where to comment (Esc to cancel)') : t('ピンを打って、コメントを書く(右クリックでも打てます)', 'Pin and write a comment (right-click also works)')} relationship="label">
+                    <ToggleButton size="small" appearance={placing ? 'primary' : 'subtle'} checked={placing} icon={<CommentAddRegular />} onClick={() => setPlacing(!placing)} />
+                  </Tooltip>
+                  <ResolvedPinsToggle />
+                </span>
+              )}
             </div>
+            {/* 試す → 確定(直し・AI の案・前の版・貼り付けたもの。どの入口で試しても、ここで確定する) */}
+            {trial.trial && (
+              <div className={s.trialBar}>
+                <TrialBar state={trial} />
+              </div>
+            )}
+
             {/* 配信の情報(配信日時・国・テーマ・テンプレート)。計画のプレビューの上と同じ帯を、見るだけで(「変える」は出さない。2026-10-30 利用者) */}
             <div className={s.metaBar}>
               <DeliveryMetaBand
@@ -640,24 +970,90 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                 title={t('配信の情報(受信者には見えません。直すのは計画の配信カードで)', 'Delivery info (not shown to recipients; edit it in the plan delivery card)')}
               />
             </div>
-            <div ref={boxRef} className={s.previewBox} tabIndex={-1}>
-              <div ref={innerRef} style={{ zoom: zoom.mode === 'fit' ? undefined : zoom.mode }}>
-                <CardPreview card={previewCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} device={device} />
+            {/* 制作した HTML: そのまま枠に描く(部品は押せない。ピンだけ。決定 5)。企画の見本は、押せる部品のプレビューのまま残す(切り替えても選んだ部品が消えないように) */}
+            {onMade && (
+              <div className={s.madeBox}>
+                <HtmlPreviewFrame html={madeShown} title={t('制作した HTML のプレビュー', 'Production HTML preview')} heading={trialHtml !== null ? t('試している HTML', 'HTML being tried') : t('制作した HTML', 'Production HTML')} onFrame={setMadeFrame} />
+                {pinsOn && trialHtml === null && <HtmlPins frame={madeFrame} cardId={card.id} view={pinView('html-made', '', cur)} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} />}
+                {pinsOn && pinTarget && (
+                  <PinFloat cardId={card.id} cardOwner={owner} stage="production" root={() => madeFrame?.contentDocument ?? null} target={pinTarget} productName={(id) => vs.products.find((p) => p.id === id)?.name ?? ''} onTarget={setPinTarget} onClose={closePin} />
+                )}
               </div>
-              <PreviewPartPicker boxRef={boxRef} selected={part} onSelect={pick} />
+            )}
+            <div ref={boxRef} className={s.previewBox} tabIndex={-1} style={onMade ? { display: 'none' } : undefined}>
+              <div ref={innerRef} style={{ zoom: zoom.mode === 'fit' ? undefined : zoom.mode }}>
+                <CardPreview card={previewCard} productIds={pvs.productIds} products={pvs.products} heroes={pvs.hero ? [pvs.hero] : []} device={device} />
+              </div>
+              {/* ピン [collab.pins]: 企画の見本の上の、制作の段階の書き込み。右クリックの「ここにピンを打つ」・開発へのリクエストも、ここで受ける */}
+              {!onMade && <PreviewPins boxRef={boxRef} cardId={card.id} view={pinView('html-plan', '', cur)} items={pinItems} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} pinsOn={pinsOn} stage="production" />}
+              {!onMade && pinsOn && pinTarget && (
+                <PinFloat cardId={card.id} cardOwner={owner} stage="production" root={() => boxRef.current} target={pinTarget} productName={(id) => vs.products.find((p) => p.id === id)?.name ?? ''} onTarget={setPinTarget} onClose={closePin} editSpot={(anchor, productId) => {
+                  // ピンの場所の部品を選ぶ(その部品の材料・直すを右に出す。配信カードと同じ)
+                  const p = partOfAnchor(anchor, (pid) => pinItems.find((i) => i.productId === pid)?.key, productId)
+                  return p ? () => pick(p) : null
+                }} />
+              )}
+              <PreviewPartPicker boxRef={boxRef} selected={part} onSelect={pick} disabled={placing} />
             </div>
-            <PreviewZoomBar zoom={zoom} />
+            {!onMade && <PreviewZoomBar zoom={zoom} />}
           </div>
           <Splitter onDrag={panes.onDrag(1)} onDone={panes.onDone} />
-          <div className={mergeClasses(s.side)}>{part ? partPane(part) : givenPane}</div>
+          <div className={s.rightCol}>
+            <div className={s.side}>{part ? partPane(part) : givenPane}</div>
+            {/* 見た目を AI に頼む [prod.ai](何も選んでいないとき。詳しい制作のページの AI チャットを、試す → 確定の形で使い回す) */}
+            {!part && aiOn && canWork && (
+              <ProductionChat
+                title={t('見た目を AI に頼む', 'Ask AI to revise the look')}
+                current={vs}
+                original={snapshotOf(original, cur)}
+                editable={cur === 'A'}
+                html={made || generated}
+                htmlCustom={!!made}
+                products={shownProducts}
+                heroes={heroes}
+                revisionNote={live?.revision_note ?? undefined}
+                onProposal={(h) => tryHtml(h, `ai:${h.length}:${Date.now()}`, t('AI の見た目の案', 'AI layout proposal'))}
+                onApplyEdit={(next) => trySnap(next, { key: `chat:${Date.now()}`, from: '', to: t('AI の直し', 'AI edit') })}
+                onTryEdit={tryEdit}
+              />
+            )}
+            {!part && aiOn && !canWork && <span className={s.note} style={{ padding: '8px 16px' }}>{t('制作に渡したあとに、見た目を AI に頼めます', 'After the handoff, you can ask AI to revise the look')}</span>}
+          </div>
         </div>
         {/* 見本の HTML を作るためだけの、見えないプレビュー(画面の大きさ・スマホの切り替えに左右されないように、別に描く) */}
         <div className={s.offscreen} aria-hidden>
           <div ref={offscreenRef}>
-            <CardPreview card={previewCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
+            <CardPreview card={savedCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
           </div>
         </div>
         {finishedOpen && live && <FinishedFloat card={card} request={live} people={people} productIds={vs.productIds.filter(Boolean)} products={vs.products} onClose={() => setFinishedOpen(false)} />}
+        {/* 制作した HTML を貼り付けて置き換える [prod.htmledit]。置き換えはプレビューで試してから、帯の「確定」で保存する */}
+        {pasting !== null && (
+          <Dialog open onOpenChange={(_, d) => !d.open && setPasting(null)}>
+            <ResizableSurface sizeKey="pasteHtml" min={{ w: 480, h: 320 }}>
+              <DialogBody>
+                <DialogTitle>{t('制作した HTML を貼り付ける', 'Paste the production HTML')}</DialogTitle>
+                <DialogContent>
+                  <AutoTextarea heightKey="SimpleProductionPage.pasteHtml" className={s.pasteBox} value={pasting} onChange={(_, d) => setPasting(d.value)} placeholder={t('ここに HTML を貼り付けます(<html> から </html> まで、まるごと)', 'Paste the whole HTML here (from <html> to </html>)')} />
+                  <span className={s.note}>{t('プレビューで試してから、上の帯の「確定」で、制作した HTML と置き換わります(前の HTML は版に残ります)。', 'It is tried in the preview first, and replaces the production HTML when you press "Apply" in the bar above (the previous HTML is kept as a version).')}</span>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setPasting(null)}>{t('やめる', 'Cancel')}</Button>
+                  <Button
+                    appearance="primary"
+                    disabled={!pasting.trim()}
+                    onClick={() => {
+                      tryHtml(pasting, `paste:${Date.now()}`, t('貼り付けた HTML', 'Pasted HTML'))
+                      setPasting(null)
+                    }}
+                  >
+                    {t('プレビューで試す', 'Try in the preview')}
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            </ResizableSurface>
+          </Dialog>
+        )}
         </PreviewHints>
       </ResizableSurface>
     </Dialog>

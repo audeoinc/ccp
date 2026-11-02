@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ccp.production import merge_variant_html, parse_variant_html  # noqa: E402
+from ccp.production import HTML_HISTORY_MAX, merge_variant_html, parse_variant_html, push_html_history  # noqa: E402
 
 
 class VariantHtmlTest(unittest.TestCase):
@@ -32,6 +32,24 @@ class VariantHtmlTest(unittest.TestCase):
     def test_merge_from_empty(self) -> None:
         out = json.loads(merge_variant_html(None, "C", "<p>c</p>", None, None))
         self.assertEqual(list(out), ["C"])
+
+
+class HtmlHistoryTest(unittest.TestCase):
+    def test_push_newest_first(self) -> None:
+        raw = push_html_history(None, "A", "<p>1</p>", "2026-11-01T00:00:00+00:00", "Ken")
+        raw = push_html_history(raw, "A", "<p>2</p>", "2026-11-02T00:00:00+00:00", "Aki")
+        out = json.loads(raw)
+        self.assertEqual([x["html"] for x in out], ["<p>2</p>", "<p>1</p>"])
+        self.assertEqual(out[0]["saved_by_name"], "Aki")
+
+    def test_cap_per_variant(self) -> None:
+        raw = push_html_history("not json", "B", "b", None, None)
+        for i in range(HTML_HISTORY_MAX + 5):
+            raw = push_html_history(raw, "A", f"a{i}", None, None)
+        out = json.loads(raw)
+        self.assertEqual(sum(1 for x in out if x["variant"] == "A"), HTML_HISTORY_MAX)
+        # ほかの案の履歴は、A の分に押し出されない
+        self.assertEqual([x["html"] for x in out if x["variant"] == "B"], ["b"])
 
 
 if __name__ == "__main__":

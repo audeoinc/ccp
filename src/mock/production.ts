@@ -1,7 +1,7 @@
 // 撮影・デモ用の、制作の依頼の窓口(/api/production)の身代わり。src/data/production.ts と同じ形で呼べる(vite.mock.config.ts が差し替える)。
 // 流れは本番のサーバー(server/ccp/production.py)と同じ。表はメモリ上(src/mock/db.ts の tables)
 import type { Actor } from '../data/approvals'
-import { parseVariantHtml } from '../productionSnapshot'
+import { parseHtmlHistory, parseVariantHtml } from '../productionSnapshot'
 import type { RequestInput } from '../data/production'
 import type { ProductionRequest } from '../models/productionRequests'
 import { tables } from './db'
@@ -83,6 +83,12 @@ export const ProductionService = {
     if (!r) return ng<ProductionRequest>('制作の依頼が見つかりません')
     if (r.status === 'stale') return ng<ProductionRequest>('古い版には保存できません(企画が変わりました)')
     const v = (input.variant ?? 'A').toUpperCase()
+    // 保存したことのある HTML が置き換わるときは、版の履歴に残す(サーバーの push_html_history と同じ。案ごとに 20 個まで)
+    const pv = v === 'A' ? { html: r.html as string | undefined, saved_at: r.html_saved_at as string | undefined, saved_by_name: r.html_saved_by_name as string | undefined } : parseVariantHtml(r.variant_html as string | undefined)[v as 'B' | 'C']
+    if (pv?.html && pv.saved_at && pv.html !== input.html) {
+      const list = [{ variant: v, html: pv.html, saved_at: pv.saved_at, saved_by_name: pv.saved_by_name }, ...parseHtmlHistory(r.html_history as string | undefined)]
+      r.html_history = JSON.stringify(list.filter((x, i) => list.slice(0, i).filter((y) => y.variant === x.variant).length < 20))
+    }
     if (v === 'A') Object.assign(r, { html: input.html, html_saved_at: now(), html_saved_by_name: input.actor.name, modified_on: now() })
     else Object.assign(r, { variant_html: JSON.stringify({ ...parseVariantHtml(r.variant_html as string | undefined), [v]: { html: input.html, saved_at: now(), saved_by_name: input.actor.name } }), modified_on: now() })
     return { success: true, data: structuredClone(r) as unknown as ProductionRequest }

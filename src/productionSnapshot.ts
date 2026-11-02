@@ -233,6 +233,22 @@ export function parseVariantHtml(json?: string | null): VariantHtml {
     return {}
   }
 }
+/** 制作した HTML の版の履歴(制作の依頼の列 html_history。新しい順)。保存で置き換わった前の HTML を、サーバーが足す */
+export interface HtmlHistoryItem {
+  variant: VariantKey
+  html: string
+  saved_at?: string | null
+  saved_by_name?: string | null
+}
+export function parseHtmlHistory(json?: string | null): HtmlHistoryItem[] {
+  if (!json) return []
+  try {
+    const v = JSON.parse(json) as unknown
+    return Array.isArray(v) ? v.filter((x): x is HtmlHistoryItem => !!x && typeof x === 'object' && typeof (x as { html?: unknown }).html === 'string').map((x) => ({ ...x, variant: x.variant || 'A' })) : []
+  } catch {
+    return []
+  }
+}
 /** 制作のページで案ごとに切り替えるか(全案を送る AB テストだけ。案から選ぶは、決めた 1 案だけを作る) */
 export const productionVariants = (s: Snapshot): VariantKey[] => (s.ab && !s.ab.choose ? ['A', ...s.ab.variants.map((v) => v.key)] : ['A'])
 /** その案の写し(A はそのまま) */

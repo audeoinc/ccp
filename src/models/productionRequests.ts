@@ -48,6 +48,8 @@ export interface ProductionRequestFields {
   html_saved_by_name?: string
   /** AB テスト(全案を送る)の B・C 案の HTML。{"B": {html, saved_at, saved_by_name}} の JSON。A 案は html */
   variant_html?: string
+  /** 保存で置き換わった前の HTML(新しい順。[{variant, html, saved_at, saved_by_name}] の JSON。案ごとに 20 個まで)。シンプルな制作の画面の「前の版に戻す」 */
+  html_history?: string
   /** 制作のページの左で直した中身(写しと同じ形の JSON。空なら snapshot のまま)。承認された snapshot と配信カードは書き換えず、こちらに持つ(何を変えたかが分かるように)。直した日時・人 */
   edited_snapshot?: string
   edited_at?: string
