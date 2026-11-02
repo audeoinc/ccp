@@ -24,7 +24,6 @@ import {
   Select,
   Spinner,
   Switch,
-  Textarea,
   Tooltip,
   Tree,
   TreeItem,
@@ -33,6 +32,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { ArrowUndoRegular, LockClosedRegular } from '@fluentui/react-icons'
 import { FEATURES, FEATURE_AREAS, FEATURE_GROUPS, VERSION_ORDER, type FeatureDef, type FeatureVersion } from './features'
 import {
@@ -404,7 +404,7 @@ export function FeaturesManager() {
                 </MessageBar>
               )}
               <Field label={t('理由(記録に残ります)', 'Reason (kept in the log)')} required>
-                <Textarea value={reason} onChange={(_, d) => setReason(d.value)} placeholder={pending?.mode === 'stop' ? t('例: 保存できない不具合のため、直るまで止める', 'e.g. A save bug; stop until fixed') : t('例: 一部の担当者に先に使ってもらうため', 'e.g. Let some team members try it first')} />
+                <AutoTextarea heightKey="FeaturesManager.reason" rows={2} value={reason} onChange={(_, d) => setReason(d.value)} placeholder={pending?.mode === 'stop' ? t('例: 保存できない不具合のため、直るまで止める', 'e.g. A save bug; stop until fixed') : t('例: 一部の担当者に先に使ってもらうため', 'e.g. Let some team members try it first')} />
               </Field>
             </DialogContent>
             <DialogActions>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Button, Spinner, Textarea, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, Spinner, makeStyles, tokens } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { ArrowRightRegular, EditRegular, LightbulbRegular, SaveRegular, SparkleRegular } from '@fluentui/react-icons'
 import { useT } from './i18n'
 import { MonthsService, type MonthRow } from './data/months'
@@ -165,9 +166,8 @@ export function WeekRetro(props: Props) {
         {title}
       </span>
       <div className={s.body}>
-        <Textarea
+        <AutoTextarea heightKey="WeekRetro.text"
           size="small"
-          resize="vertical"
           // AI の下書きは 10 行ほどになるので、入れたときは広げて全体が見えるように
           rows={fromAi ? 10 : 2}
           placeholder={

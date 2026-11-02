@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button, Field, MessageBar, MessageBarBody, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Field, MessageBar, MessageBarBody, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { typo } from './typo'
 import { ArrowSwapRegular, CalendarArrowRightRegular, CheckmarkCircleRegular, OpenRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Product } from './models/products'
@@ -218,7 +219,7 @@ export function ChangeAlertDetail({ alert, products, heroes, cardProducts, place
 
       <div className={styles.resolve}>
         <Field label={t('確認した結果(対応済みにするときのメモ。任意)', 'What you checked (note when marking as handled, optional)')} size="small">
-          <Textarea value={note} onChange={(_, d) => setNote(d.value)} rows={2} placeholder={t('例: 2 本とも入れ替えた / このままでよいと判断した', 'e.g. Replaced in both / Decided to keep as is')} />
+          <AutoTextarea heightKey="ChangeAlertDetail.note" value={note} onChange={(_, d) => setNote(d.value)} rows={2} placeholder={t('例: 2 本とも入れ替えた / このままでよいと判断した', 'e.g. Replaced in both / Decided to keep as is')} />
         </Field>
         <div className={styles.resolveRow}>
           <Button appearance="primary" size="small" icon={<CheckmarkCircleRegular />} disabled={busy} onClick={() => void resolve()}>

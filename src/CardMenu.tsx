@@ -17,10 +17,10 @@ import {
   MenuTrigger,
   MessageBar,
   MessageBarBody,
-  Textarea,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { ArrowUndoRegular, CopyRegular, DeleteRegular, HistoryRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from './models/deliveryCards'
 import { DeliveryCardsService } from './data/deliveryCards'
@@ -154,7 +154,7 @@ export function CardMenu({ card, weeks, onChanged, onDeleted, onDuplicated, extr
                 )}
               </span>
               <Field label={t('取りやめの理由', 'Reason')} required size="small">
-                <Textarea value={reason} onChange={(_, d) => setReason(d.value)} rows={3} />
+                <AutoTextarea heightKey="CardMenu.cancelReason" value={reason} onChange={(_, d) => setReason(d.value)} rows={3} />
               </Field>
               {error && (
                 <MessageBar intent="error" layout="multiline">
