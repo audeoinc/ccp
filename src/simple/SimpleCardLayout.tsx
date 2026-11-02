@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { filled } from '../slots'
 import { Button, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, AlertRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, CheckmarkRegular, ErrorCircleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
+import { AddRegular, AlertRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, CheckmarkRegular, ErrorCircleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -43,6 +43,7 @@ import { PreviewFrame, StageFrame, StagePane, StagePanes } from './StageFrame'
 import { useStageLayout } from './stageLayout'
 import { DeliveryMetaBand } from './DeliveryMetaBand'
 import { HandoffSheet } from './HandoffSheet'
+import { LinksPanel } from './LinksPanel'
 import { CreativeAssets } from '../CreativeAssets'
 import { addDroppedAssets, canDropAsset } from './assetDrop'
 import { myName, onMeChange } from '../history'
@@ -66,7 +67,7 @@ import { FeatureBadge } from '../FeatureBadge'
 // VS Code の左のアイコンの並びと同じく、押したものを 1 つだけ開き、同じものをもう一度押すと閉じる。幅は人ごとに覚える。
 // 配信カードを開いたときは、アラートがあれば「アラート」を開き、なければ何も開かない(直さないといけないものを最初に見せる。2026-10-29 利用者。
 // 以前は最後に開いていたものを覚えて開いていたが、承認を開いたまま次のカードを開くと承認から始まっていた)
-type Side = CommSection | 'alerts' | 'learn' | 'assets' | 'handoff' | null
+type Side = CommSection | 'alerts' | 'learn' | 'links' | 'assets' | 'handoff' | null
 const isComm = (v: Side): v is CommSection => v === 'talk' || v === 'approval' || v === 'history'
 const useStyles = makeStyles({
   topField: {
@@ -189,6 +190,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const assetsOn = useFeature('collab.assets')
   const handoffOn = useFeature('prod.handoff')
   const historyOn = useFeature('card.history')
+  const linksOn = useFeature('content.links.list')
   const abTestOn = useFeature('card.abtest')
   const variantsOn = useFeature('card.variants')
   const abOn = abTestOn || variantsOn
@@ -474,12 +476,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
 
   const sideTitle = (v: Exclude<Side, null>) =>
-    ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
+    ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), links: t('この配信のリンク', 'Links in this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
   /** 左のバーの並び(アイコンの下に名前(English も 48px に収まる短い言葉)。数は数の丸、気づいてほしいことは点。drop: 画像・URL を落として素材に入れられる。gap: この上に線) */
   const allRails: RailItem<Exclude<Side, null>>[] = [
     // アラート = 直さないといけないもの(赤い数の丸。0 件なら出さない)、学び = 参考にするもの(灰色の数の丸)。性質が違うので、別のアイコンにする(SU6)
     { v: 'alerts', icon: <WarningRegular />, label: t('アラート', 'Alerts'), tip: t('アラート(在庫切れ・在庫が少ない・方針・日程など、直さないといけないもの)', 'Alerts (out of stock, low stock, policy, dates: things to fix)'), count: e.alerts.length, color: 'danger' },
     { v: 'learn', icon: <LightbulbRegular />, label: t('学び', 'Learn'), tip: learnAiOn ? t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの。AI の下書きにも渡す)', 'Learnings for this delivery (notes from past deliveries, for reference; also passed to AI drafts)') : t('この配信に使う学び(過去の配信の「次に生かすメモ」。参考にするもの)', 'Learnings for this delivery (notes from past deliveries, for reference)'), count: e.learnCount, color: 'informative' },
+    // リンク = 配信の全部のリンクを一度に見る・まとめて直す(G1・G2)。部品ごとに開かなくても、リンク先の入れ忘れ・まちがいに気づけるように
+    { v: 'links', icon: <LinkMultipleRegular />, label: t('リンク', 'Links'), tip: t('この配信のリンク(全部を一度に見て、まとめて直す)', 'Links in this delivery (see all at once and edit together)'), count: 0, feature: 'content.links.list' },
     { v: 'talk', gap: true, icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(承認者と。書き込み・タスク)', 'Conversation (with approvers: comments and tasks)'), count: counts.open + counts.tasks, dot: counts.mine ? 'red' : undefined },
     {
       v: 'approval',
@@ -502,8 +506,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     { v: 'history', icon: <HistoryRegular />, label: t('履歴', 'History'), tip: t('変更の履歴(入れ替えの理由・ステータスの変化)', 'Change history (replacement reasons, status changes)'), count: 0, gap: true },
   ]
   // 公開していない機能のパネルは、左のバーに出さない(X87)
-  const railOn: Record<Exclude<Side, null>, boolean> = { alerts: alertOn, learn: learnOn, talk: threadOn, approval: approvalOn, assets: assetsOn, handoff: handoffOn, history: historyOn }
-  const rails = (e.unsaved ? allRails.filter((r) => r.v === 'alerts') : allRails).filter((r) => railOn[r.v])
+  const railOn: Record<Exclude<Side, null>, boolean> = { alerts: alertOn, learn: learnOn, talk: threadOn, approval: approvalOn, links: linksOn, assets: assetsOn, handoff: handoffOn, history: historyOn }
+  // リンクは配信カードの ID を使わないので、まだ保存していない案でも開ける
+  const rails = (e.unsaved ? allRails.filter((r) => r.v === 'alerts' || r.v === 'links') : allRails).filter((r) => railOn[r.v])
 
   /**
    * AB テストの案(SU8。2026-10-24 利用者と決めた)。AB に分けるのは配信の大前提で、プレビュー(1 つの案)の話ではないので、上の帯に置く。
@@ -979,6 +984,11 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
               )}
               {/* 学びは、閉じていても描く(AI の依頼に学びを渡すのは、この部品の役目のため) */}
               <div style={panel === 'learn' ? { minHeight: 0, overflowY: 'auto' } : { display: 'none' }}>{e.learnings}</div>
+              {panel === 'links' && (
+                <StagePane>
+                  <LinksPanel editor={e} part={part} onPick={select} />
+                </StagePane>
+              )}
               {panel === 'assets' && (
                 // 素材: 承認のときのイメージにも、制作の参考にも使う(渡すものの中の素材と同じもの)
                 <StagePane>

@@ -160,6 +160,8 @@ export const FEATURES: FeatureDef[] = [
   { id: 'content.products.pagefetch', group: 'area.content.products', ...named('商品ページの URL を読んで、画像を拾ってくる', 'Read a product page URL and collect its images'), version: 'v2', size: 'M' },
   { id: 'content.parts', group: 'area.content.parts', ...named('配信ごとに書き換える・テンプレートに戻す', 'Rewrite per delivery / back to the template'), version: 'MVP', size: 'S' },
   { id: 'content.links', group: 'area.content.links', ...named('送る URL を直す・utm を見る', 'Edit send URLs and see utm'), version: 'MVP', size: 'S' },
+  // 配信カードの左のバーの「リンク」(G1・G2。部品ごとに開かずに、全部のリンクを一度に見て、まとめて直す。2026-11-02)
+  { id: 'content.links.list', group: 'area.content.links', ...named('リンクの一覧(全部を一度に見る・まとめて直す)', 'Link list (see all at once, edit together)'), version: 'v1', size: 'S', requires: ['content.links'] },
   { id: 'content.preview', group: 'area.content.preview', ...named('メールのプレビュー(スマホ / PC・倍率・キー操作)', 'Email preview (mobile / PC, zoom, keys)'), version: 'always' },
   { id: 'content.inbox', group: 'area.content.preview', ...named('受信箱での見え方', 'How it looks in the inbox'), version: 'MVP', size: 'S' },
   { id: 'content.memo', group: 'area.content.memo', ...named('部品から 1 行で書き留める', 'Jot a note from a part'), version: 'MVP', size: 'S' },
