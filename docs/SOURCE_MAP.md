@@ -67,7 +67,6 @@ flowchart TD
     end
 
     subgraph production["制作の面"]
-        prod["制作のページ<br/>ProductionPage.tsx・productionSnapshot.ts"]
         sprod["制作のシンプルな画面<br/>production/SimpleProductionPage.tsx・useProductionFlow.ts"]
     end
 
@@ -103,8 +102,8 @@ flowchart TD
     app -->|週のレビュー・承認| review
     app -->|結果の面| results
     app -->|アラート| alerts
-    app -->|制作の面| prod
-    card -.->|制作に依頼| prod
+    app -->|制作の面| sprod
+    card -.->|制作に渡す| sprod
     card -.->|PRODUCTION のタブ| sprod
     sprod --> preview
     cal & week & list -->|配信を開く| card
@@ -485,11 +484,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `ProductionPage.tsx` | 1,012 | **制作のページ**(フロート。要素の情報・HTML のエディタ・プレビュー・やり取り、工程の帯。全案を送る AB テストは案ごとに切り替え) |
 | `production/SimpleProductionPage.tsx` | 1,546 | 制作の面のシンプルな画面(X86。配信カードと同じ窓で PLAN ↔ PRODUCTION を切り替える。上は計画と同じ題の行・キャンペーンの帯・AB の案の段、左のバー(渡されたもの・やり取り・タスク・素材・工程)、企画の見本のプレビュー(部品を押せる。上に配信の情報の帯)、右に部品のペイン。題の行に、自分の番のときだけ工程の青いボタンと「仕上がりを見る」。写しとコピーの値は `productionSnapshot.ts` と同じ) |
 | `production/useProductionFlow.ts` / `production/StepAction.tsx` / `production/StepsPane.tsx` | 114 / 99 / 58 | 制作の工程(X86 の ①。`prod.steps`・`prod.result`): 段の決め方と進める操作(① 渡す → ② 受け取る → ③ 制作する → ④ 仕上がりの確認 → ⑤ 送る。⑤ は `prod.export` が公開のときだけ)/ 段を進めるボタン(題の行と左のバーで共通)/ 左のバーの「工程」(道のり・済んだ段のだれがいつ・だれの番でも押せるボタン・やり直す / 取り下げる) |
 | `production/AbHandoffSection.tsx` | 108 | 渡されたものの「AB テスト」の欄(P40。AB の配信のときだけ): まとめ・案ごとのメイン画像・見出し・商品・utm_campaign(コピー)・この案のリンクをコピー・計測の注意。見るだけ。判定は `card.abtest`(案から選ぶは `card.variants`)。差し込むのはシンプルな制作の画面の「渡された」 |
-| `ProductionInfoPane.tsx` | 469 | 制作のページの左のペイン(要素の情報。コピー・直す・企画の値に戻す) |
 | `HtmlEditor.tsx` / `HtmlPreviewFrame.tsx` | 78 / 114 | HTML のエディタ(開いたときに読み込む)/ HTML をそのまま描くプレビュー(縮小・拡大・全体) |
 | `productionSnapshot.ts` | 527 | 配信カードの写し(制作に要る中身を固める)、コピー用の行、プレビューの HTML の書き出し |
 | `useProductionRequests.ts` / `notesStage.ts` | 67 / 11 | 制作の依頼の読み込み(制作の面・札)/ やり取りの段階(企画 / 制作) |

@@ -1,6 +1,6 @@
 // 押すと文字をコピーする小さいボタン(印だけ)。値の横・行の右端に置く。
 // 配信カード(Plan)と制作(Production)で、コピーのボタンの形・言葉・押したあとの印をそろえるため、ここに 1 つにする
-// (制作の詳しい画面の ProductionInfoPane にも同じ形のものがある。こちらは http の中継でも写せる copyText を使う)
+// (http の中継でも写せる copyText を使う)
 import { useEffect, useRef, useState } from 'react'
 import { Button, Tooltip } from '@fluentui/react-components'
 import { CheckmarkRegular, CopyRegular } from '@fluentui/react-icons'

@@ -18,7 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
-- 2026-11-02 UI 1: X90 の塊 A(面の枠 `simple/StageFrame.tsx`・`stageLayout.ts`)を作り、Plan を載せて main に(見た目は前後で一致)。Production の載せ方はアーカイブ 2026-10-28_ の末尾。X87 段 ② の UI 1 の残りは続き
+- 2026-11-02 UI 1: X90 の塊 A(面の枠)・E(P40・G1/G2)・F(K1〜K3。「制作に渡す」はシンプルな制作の画面が渡す)を main に。**K5: 詳しい制作のページ(`ProductionPage.tsx`・`ProductionInfoPane.tsx`)を消した**(⋯ の入口・`PREF.productionSimple` も)。詳しくはアーカイブ 2026-10-28_ の末尾。X87 段 ② の UI 1 の残りは続き
 - 2026-11-02 UI 3: X86 シンプルな制作の画面の追加分を main に(b046f54。AI の手直し・制作した HTML の版・要素を直す・ピン・左のバーの HTML の欄 `prod.htmlcode`(v1)・保存の流れを計画にそろえた: 打てば入る・自動で保存・↶)。未決: `prod.htmlcode` は FEATURE_FLAGS では「プレビューの切り替え・試す → 確定」、作ったのは「左のバー・自動で保存」(連絡係が確認中)。次は D(面の枠に載せる・AbHandoffSection・MaterialRows / ProductionChanges / PaneCrumbs・「渡されたもの」・件名とプリヘッダー・「企画が変わりました」・simple-finish.md の制作の穴)→ X89
 - 2026-11-02 UI 2: 塊 B(ペインの共通の部品)・C(制作の材料の部品。P11 LinkMaterialRows を含む)は main(利用者の OK)。X80 段 ②(商品ページの本文を残す。表 product_page_texts・ccp/page_text.py・productPageText.ts)は main。X80 段 ③(「詳しく」の文を AI が商品ページから書く・ページと重なる所の薄い印)も main(利用者の OK)。X80 段 ④(制作の写し・材料に詳しくの文とコピー、書き出す HTML は table で横 1 行・スマホで縦に積む)も main(利用者の OK。X80 は済み)。詳しくはアーカイブ 2026-10-28_ の末尾
 - 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ

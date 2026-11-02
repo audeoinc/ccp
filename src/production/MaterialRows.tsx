@@ -1,7 +1,7 @@
 // 制作の材料を 1 行ずつ写す欄(P10・P11・P21。2026-11-02 Plan と Production のシンプル版を仕上げる)。
 // シンプルな制作の画面の、何も選んでいないときのペイン(配信の全体)に差し込む: 商品(画像・コード・価格・URL)、リンク先と計測の対応表(utm_content)、部品の画像。
 // 制作がいちばん写すものなので、行ごとにコピーのボタン(CopyButton。配信カードと同じ形)、見出しの右に「すべてコピー」(表計算に貼れるタブ区切り)。
-// 詳しい制作の画面の ProductionInfoPane と同じ中身を、シンプルの見た目(LabeledValue・見出し 13px)で出す。直すのは部品のペインで(ここは写すだけ)
+// 詳しい制作の画面(2026-11-02 に消した)と同じ中身を、シンプルの見た目(LabeledValue・見出し 13px)で出す。直すのは部品のペインで(ここは写すだけ)
 import type { ReactNode } from 'react'
 import { InfoLabel, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { linkRows, productRows, rowsText, trackingRows, type Snapshot } from '../productionSnapshot'
@@ -197,7 +197,7 @@ export function LinkMaterialRows({ snapshot, variant, onSelect }: RowsProps & { 
 
 /**
  * 部品の画像(P21): 配信の国のライブラリにある、期限内のボタン・バナー・ロゴ・アイコン。URL か <img> のタグをコピーして HTML に貼る。
- * 中身は詳しい制作の画面と同じ PartPicker(コピーの 2 つのボタン・タグの作り方を 1 つにしておくため)
+ * 中身は配信カードと同じ PartPicker(コピーの 2 つのボタン・タグの作り方を 1 つにしておくため)
  */
 export function PartImageRows({ market }: { market: 'US' | 'JP' | null }) {
   const t = useT()

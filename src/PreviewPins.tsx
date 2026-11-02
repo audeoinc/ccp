@@ -126,7 +126,7 @@ export function PreviewPins({ boxRef, cardId, view, items, placing, onPlacingEnd
         return it ? root.querySelector(`[data-item-key="${CSS.escape(it.key)}"]`) : null
       }
       if (anchor.startsWith('section:')) return findSectionBlock(root, anchor)
-      // 詳しい制作のページ(HtmlPins)で打った、ページ全体の中の割合のピン。プレビューの中身の全体を目印にする
+      // 詳しい制作のページ(2026-11-02 に消した。HtmlPins)で打った、ページ全体の中の割合のピン。プレビューの中身の全体を目印にする
       if (anchor === 'page') return root.firstElementChild
       return root.querySelector(`[data-anchor="${CSS.escape(anchor)}"]`)
     },

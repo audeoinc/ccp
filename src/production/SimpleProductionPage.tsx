@@ -4,9 +4,9 @@
 // MVP(2026-10-30 の再定義。req-production-simple.md の 2b 章): 開く・読む・コピーに加えて、AI の手直し(全体のペインの「見た目を AI に頼む」・
 // 部品のペインの「AI に頼む」)・制作した HTML(見本との切り替え・コピー・保存・版に戻す・貼り付けて置き換える)・要素を直す(企画から変更の印・戻す)・
 // 工程 ②〜④・ピン・仕上がりを見る。保存の流れは計画と同じ: 文言は打てば入り自動で保存、↶ で戻す。AI の案と入れ替えは試す → 確定。
-// AI は詳しい制作のページの ProductionChat / productionRevise と、配信カードの部品の AI(PartAiChat)を使い回す。やり取りの欄・タスクは v1。
+// AI は制作のチャット(ProductionChat / productionRevise)と、配信カードの部品の AI(PartAiChat)を使い回す。やり取りの欄・タスクは v1。
 // 中身は、渡した写し(制作が直していれば、その写し)。渡す前は、いまの配信カードから作った下書き。写しの作り・コピーの値は、
-// 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
+// 写しの作り方・材料の行は productionSnapshot.ts にまとめ、ここでは並べ方だけを持つ(詳しい制作のページは 2026-11-02 に消した。K5)
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, CheckmarkRegular, SendRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, ErrorCircleRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
@@ -178,8 +178,6 @@ interface Props {
   heroes: HeroImage[]
   people: string[]
   onClose: () => void
-  /** 詳しい制作のページに切り替える(消すまでは並べて残す。決定 6) */
-  onFullView?: () => void
   /** 題の行の面のタブ(PLAN | PRODUCTION | RESULTS。StageNav の tabs) */
   stageTabs?: ReactNode
   /** 段を進めたあとに、外の一覧(制作の面の箱・段のタブの状態)を読み直す */
@@ -270,7 +268,7 @@ function textFieldsOf(p: PartRef): (f: TextField) => boolean {
 // 打ち始めの判定に使う時刻(描画の中では呼ばない。保存の処理の中だけ)
 const nowMs = () => Date.now()
 
-export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant, allCards, onSwitchCard, autoRequest, onAutoRequested }: Props) {
+export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, stageTabs, onChanged, instant, allCards, onSwitchCard, autoRequest, onAutoRequested }: Props) {
   const cardStyles = useCardDetailStyles()
   const s = useStyles()
   const t = useT()
@@ -383,7 +381,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     void load()
   }, [load])
 
-  // 写し: 渡したあとは固めたもの(制作が直していれば、その写し)、渡す前はいまの配信カードから作った下書き(詳しい制作のページと同じ決め方)
+  // 写し: 渡したあとは固めたもの(制作が直していれば、その写し)、渡す前はいまの配信カードから作った下書き
   const latest = requests?.[0]
   const live = latest && LIVE.has(latest.status ?? '') ? latest : undefined
   const shownProducts = useMemo(() => (productImages?.size ? products.map((p) => (productImages.has(p.id) ? { ...p, image_url: productImages.get(p.id) } : p)) : products), [products, productImages])
@@ -430,7 +428,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const myStep = stepsOn && flow.now && flow.now.key !== 'request' && (exportOn || flow.now.key !== 'send') && flow.isMine(flow.now) ? flow.now : undefined
 
   // ---- 直す・制作した HTML・AI(MVP の追加分。2026-10-30 利用者) ----
-  // 直せるのは、渡したあと・送る前の版(詳しい制作のページと同じ)
+  // 直せるのは、渡したあと・送る前の版
   const canWork = !!live && live.status !== 'sent'
   const actor = { id: meId, name: meName }
   const weekStart = card.scheduled_at ? weekKeyOf(new Date(card.scheduled_at)) : undefined
@@ -490,7 +488,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // HTML を打っている間の自動保存は、打ち始めの 1 回だけ版の履歴に残す(打つたびに版が増えて、前の版を押し出さないように)
   const typedAt = useRef(0)
 
-  /** 直した写しを保存する(制作した HTML があれば、その同じ場所も書き換えて保存する。詳しい制作のページの applyChatEdit と同じ考え) */
+  /** 直した写しを保存する(制作した HTML があれば、その同じ場所も書き換えて保存する。作り直すと、手で直した見た目が消えるため) */
   const commitSnap = async (next: Snapshot, opts: { undo?: boolean } = {}) => {
     if (!live) return
     if (needMe) return setWorkError(needMe)
@@ -627,7 +625,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     return true
   }
   const [pasting, setPasting] = useState<string | null>(null)
-  // 見本の HTML(AI に渡す・制作した HTML がないときのもと)。見えないプレビューを描いたあとに作る(詳しい制作のページと同じ)
+  // 見本の HTML(AI に渡す・制作した HTML がないときのもと)。見えないプレビューを描いたあとに作る
   const [generated, setGenerated] = useState('')
   useEffect(() => {
     const id = setTimeout(() => setGenerated(offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : ''), 600)
@@ -639,12 +637,12 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // HTML の欄で書けるのは [prod.htmledit] が公開・渡したあと・試していない間(書くと、制作した HTML になる)
   const htmlCanEdit = htmlCodeOn && htmlEditOn && canWork && trialHtml === null && !!meId
 
-  // ピン(コメント)。企画の見本の上は部品の目印に、制作した HTML の上はページの中の割合に置く(詳しい制作のページと同じ見た目の名前 html-plan / html-made)
+  // ピン(コメント)。企画の見本の上は部品の目印に、制作した HTML の上はページの中の割合に置く(見せ方の名前は html-plan / html-made)
   const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
   const [madeFrame, setMadeFrame] = useState<HTMLIFrameElement | null>(null)
   const pinIds = pvs.productIds
   const pinItems = useMemo(() => pinIds.flatMap((pid, i) => (pid ? [{ key: `${pid}-${i}`, productId: pid, reason: '', source: 'manual' as const }] : [])), [pinIds])
-  // やり取りの札・ピンのリンクで開いたとき、その書き込みを打った見せ方(見本 / 制作した HTML)と案に切り替える(詳しい制作のページと同じ)
+  // やり取りの札・ピンのリンクで開いたとき、その書き込みを打った見せ方(見本 / 制作した HTML)と案に切り替える
   const focus = useSyncExternalStore(subscribePins, focusedPin)
   useEffect(() => {
     if (!focus) return
@@ -661,9 +659,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     }
   }, [focus, card.id])
 
-  // 企画の見本の HTML(詳しい制作のページと同じ作り方: 見えないプレビューから、書式を直接書いた形にする)。押したときに作る
+  // 企画の見本の HTML(見えないプレビューから、書式を直接書いた形にする)。押したときに作る
   const sampleHtml = () => (offscreenRef.current ? previewHtml(offscreenRef.current, card.name ?? '', htmlLinks(vs, cur)) : '')
-  // 配信カードの「制作に渡す」から開いたとき(K1): 見本の HTML ができたら、1 回だけ渡す(詳しい制作のページの autoRequest と同じ)。
+  // 配信カードの「制作に渡す」から開いたとき(K1): 見本の HTML ができたら、1 回だけ渡す。
   // 渡すのは、いまの配信カードから作った写し(draft)と、その見本の HTML。AB テストは B・C 案の HTML も、案ごとの見えないプレビューから作って一緒に固める
   const autoRefs = useRef<Partial<Record<VariantKey, HTMLDivElement | null>>>({})
   const choosing = !live && !!draft.ab?.choose
@@ -807,7 +805,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
         <LabeledValue label={t('渡した日時', 'Handed off')}>{live?.requested_at ? when(live.requested_at) : ''}</LabeledValue>
         {/* 種類(テーマの型。K2・P22)。どんな配信かを、制作指示を読む前に分かるように */}
         <LabeledValue label={t('種類', 'Type')}>{themeTypeLabel(themeTypeOf(card).type)}</LabeledValue>
-        {/* 写しを作った日時。ふつうは渡した日時と同じなので、違うときだけ出す(詳しい制作のページの「写し」) */}
+        {/* 写しを作った日時。ふつうは渡した日時と同じなので、違うときだけ出す */}
         {frozen?.takenAt && live?.requested_at && when(frozen.takenAt) !== when(live.requested_at) && <LabeledValue label={t('写し', 'Snapshot')}>{when(frozen.takenAt)}</LabeledValue>}
       </div>
       {!live && <span className={s.note}>{t('まだ制作に渡していません。中身は、いまの配信カードから作った下書きです', 'Not handed off yet. This is a draft built from the current delivery card.')}</span>}
@@ -1212,11 +1210,6 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                         </MenuItem>
                       </>
                     )}
-                    {onFullView && (
-                      <MenuItem icon={<DocumentTextRegular />} onClick={onFullView}>
-                        {t('詳しい制作のページで開く', 'Open the full production page')}
-                      </MenuItem>
-                    )}
                     {/* 開発へのリクエストの一覧 [dev.requests](配信カード・結果と同じ「⋯」から) */}
                     <DevRequestMenuItem />
                   </MenuList>
@@ -1467,7 +1460,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                       </div>
                     </StagePane>
                   </div>
-                  {/* 見た目を AI に頼む [prod.ai](何も選んでいないとき。詳しい制作のページの AI チャットを、試す → 確定の形で使い回す) */}
+                  {/* 見た目を AI に頼む [prod.ai](何も選んでいないとき。制作のチャットを、試す → 確定の形で使う) */}
                   {!part && aiOn && canWork && (
                     <ProductionChat
                       title={t('見た目を AI に頼む', 'Ask AI to revise the look')}

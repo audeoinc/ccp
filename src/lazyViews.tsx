@@ -21,7 +21,6 @@ export function SimpleProductionView(props: ComponentProps<typeof SimpleProducti
   const [Loaded] = useState(loadedSimpleProduction)
   return Loaded ? <Loaded {...props} /> : <SimpleProductionPage {...props} />
 }
-export const ProductionPage = lazy(() => loadChunk(() => import('./ProductionPage')).then((m) => ({ default: m.ProductionPage })))
 export const AlertsPage = lazy(() => loadChunk(() => import('./AlertsPage')).then((m) => ({ default: m.AlertsPage })))
 export const BulkWorkspace = lazy(() => loadChunk(() => import('./BulkWorkspace')).then((m) => ({ default: m.BulkWorkspace })))
 export const TemplateManager = lazy(() => loadChunk(() => import('./TemplateManager')).then((m) => ({ default: m.TemplateManager })))

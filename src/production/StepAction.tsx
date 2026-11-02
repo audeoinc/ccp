@@ -58,7 +58,7 @@ export function StepAction({ flow, step, onViewResult, needMe, variants }: { flo
           </PopoverTrigger>
           <PopoverSurface>
             <div className={s.box}>
-              {/* AB テストは、全案の HTML がそろってから終わりにする(詳しい制作のページと同じ。P4) [card.abtest] */}
+              {/* AB テストは、全案の HTML がそろってから終わりにする(P4) [card.abtest] */}
               {abOn && variants && variants.length > 1 && (
                 <>
                   <span className={s.note}>{t('AB テストの全案の HTML がそろってから、終わりにします', 'Mark as done once every variant’s HTML is ready')}</span>

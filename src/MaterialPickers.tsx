@@ -1,5 +1,5 @@
 // 制作で商品・メイン画像を選ぶ小さいポップアップ(ProductPicker・HeroPicker)。
-// 詳しい制作の画面(ProductionInfoPane)の中にあったものを、シンプルな制作(ProductionPartEdit)・制作のチャットでも使うので、ここに出した(K4。見た目は前と同じ)
+// もとは詳しい制作の画面(2026-11-02 に消した)の中にあったものを、シンプルな制作(ProductionPartEdit)・制作のチャットでも使うので、ここに出した(K4。見た目は前と同じ)
 import { useMemo, useState, type ReactNode } from 'react'
 import { Button, Popover, PopoverSurface, PopoverTrigger, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ArrowSwapRegular, ImageAddRegular } from '@fluentui/react-icons'
