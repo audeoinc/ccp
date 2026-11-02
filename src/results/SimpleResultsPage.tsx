@@ -3,8 +3,8 @@
 // 形も同じ: 上の帯(面の枠)・左のバー・プレビュー(送った中身に、クリックのヒートマップを重ねる)・右のペイン。
 // 何も選ばないと「この配信の結果」(数字の札・AB の結果・次に生かすメモ)、プレビューのリンク・件名を押すと「その部品の数字」
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Button, Dialog, InfoLabel, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Spinner, Tab, TabList, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowSwapRegular, BoxRegular, CommentRegular, DataBarVerticalRegular, DismissRegular, DocumentPdfRegular, LinkRegular, MoreHorizontalRegular, TrophyRegular } from '@fluentui/react-icons'
+import { Button, Dialog, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Spinner, ToggleButton, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { ArrowSwapRegular, BoxRegular, CommentRegular, DataBarVerticalRegular, DocumentPdfRegular, LinkRegular, MoreHorizontalRegular, TrophyRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -26,7 +26,6 @@ import { PreviewHints } from '../Preview'
 import { useCardDetailStyles } from '../cardDetailStyles'
 import { AutoTextarea } from '../AutoTextarea'
 import { LabeledValue } from '../LabeledValue'
-import { CampaignBand } from '../CampaignBand'
 import { CopyLinkButton } from '../CopyLinkButton'
 import { DevRequestMenuItem } from '../DevRequestMenu'
 import { FeatureBadge } from '../FeatureBadge'
@@ -44,6 +43,11 @@ import { sendWhenText } from '../dates'
 import { useSidePanel } from '../simple/useSidePanel'
 import { PaneCrumbs, PaneHint } from '../simple/PaneCrumbs'
 import { InboxLines, type InboxPart } from '../simple/InboxLines'
+import { DeliveryMetaBand } from '../simple/DeliveryMetaBand'
+import { StageChip } from '../simple/StageChip'
+import { VariantTabs } from '../simple/VariantTabs'
+import { useDebouncedSave } from '../simple/useDebouncedSave'
+import { getTemplate, templateKeyOfCard } from '../templates'
 import { usePreviewZoom } from '../simple/usePreviewZoom'
 import { CampaignResultsTable } from './CampaignResultsTable'
 import { productWeekOf, sumOf } from './resultSums'
@@ -55,17 +59,13 @@ import { StageTalkPanel } from '../simple/StageTalkPanel'
 
 const useStyles = makeStyles({
   surface: { padding: 0 },
-  // 状態の札(計画の承認の札・制作の状態の札と同じ場所・同じ形)
-  chip: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', height: '24px', padding: '0 10px', borderRadius: tokens.borderRadiusCircular, border: `1px solid ${tokens.colorNeutralStroke1}`, fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
-  dot: { width: '8px', height: '8px', borderRadius: '50%' },
   paneBody: { display: 'grid', rowGap: '14px', alignContent: 'start' },
   section: { display: 'grid', rowGap: '6px' },
   h3: { ...typo.heading, margin: 0 },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   nums: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', columnGap: '12px', rowGap: '10px' },
   empty: { display: 'grid', rowGap: '8px', padding: '12px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
-  // 案の段(キャンペーンの帯の 3 段目): 案ごとの数字と、勝ち案の印
-  abBar: { display: 'flex', alignItems: 'center', columnGap: '8px', flexWrap: 'wrap' },
+  // 案のタブの中の、案ごとの数字と、勝ち案の印
   tabNum: { marginLeft: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, fontVariantNumeric: 'tabular-nums' },
   win: { marginLeft: '4px', color: tokens.colorPaletteMarigoldForeground1, verticalAlign: '-2px' },
   // 左のパネルの表(リンクごとのクリック)
@@ -212,17 +212,10 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
       setSaving(false)
     }
   }
-  const pending = useRef<string | null>(null)
-  useEffect(() => {
-    if (!dirty || notes === null) return
-    pending.current = notes
-    const id = window.setTimeout(() => void saveNotes(notes), 1500)
-    return () => window.clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes, dirty])
+  const notesSave = useDebouncedSave(dirty ? notes : null, saveNotes)
   // 閉じる・段を切り替える前に、打ちかけのメモを保存する
   const close = async () => {
-    if (dirty && notes !== null) await saveNotes(notes)
+    await notesSave.flush()
     onClose()
   }
   // AB の結果の「メモに入れる」: 次に生かすメモの末尾に足す
@@ -242,24 +235,32 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
   const metricOf = (r?: ResultRow) => (r ? pct(r.clickRate) : '—')
   const variantTabs =
     keys.length > 1 ? (
-      <div className={s.abBar}>
-        <InfoLabel size="small" info={t('案を押すと、プレビューと数字がその案に切り替わります。「全体」は配信の合計(プレビューは A 案)', 'Pick a variant to switch the preview and numbers to it. "All" is the total (the preview shows variant A).')}>
-          {t('AB テスト', 'A/B test')}
-        </InfoLabel>
-        <TabList size="small" selectedValue={cur} onTabSelect={(_, d) => (setVariant(d.value as VariantKey | 'all'), deselect())}>
-          <Tab value="all">
-            {t('全体', 'All')}
-            <span className={s.tabNum}>{metricOf(row)}</span>
-          </Tab>
-          {keys.map((k) => (
-            <Tab key={k} value={k}>
-              {t(`案 ${k}`, `Variant ${k}`)}
-              <span className={s.tabNum}>{metricOf(variantRow(k))}</span>
-              {verdict?.winner?.key === k && verdict.confidence !== 'tooFew' && <TrophyRegular className={s.win} aria-label={t('勝ち案', 'Winner')} />}
-            </Tab>
-          ))}
-        </TabList>
-      </div>
+      <VariantTabs
+        info={t('案を押すと、プレビューと数字がその案に切り替わります。「全体」は配信の合計(プレビューは A 案)', 'Pick a variant to switch the preview and numbers to it. "All" is the total (the preview shows variant A).')}
+        selected={cur}
+        onSelect={(v) => (setVariant(v as VariantKey | 'all'), deselect())}
+        tabs={[
+          {
+            value: 'all',
+            label: (
+              <>
+                {t('全体', 'All')}
+                <span className={s.tabNum}>{metricOf(row)}</span>
+              </>
+            ),
+          },
+          ...keys.map((k) => ({
+            value: k,
+            label: (
+              <>
+                {t(`案 ${k}`, `Variant ${k}`)}
+                <span className={s.tabNum}>{metricOf(variantRow(k))}</span>
+                {verdict?.winner?.key === k && verdict.confidence !== 'tooFew' && <TrophyRegular className={s.win} aria-label={t('勝ち案', 'Winner')} />}
+              </>
+            ),
+          })),
+        ]}
+      />
     ) : undefined
 
   // 選んだ部品の名前と数字
@@ -451,36 +452,30 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
       <ResizableSurface backdropMotion={instant ? null : undefined} sizeKey="cardDetail" prefKey={PREF.cardSize} min={{ w: 900, h: 560 }} className={mergeClasses(cardStyles.surface, s.surface)} aria-label={card.name ?? ''} data-print-report>
         <PreviewHints value={false}>
           <StageFrame
-            band={
-              campaign && (
-                <CampaignBand
-                  campaign={campaign}
-                  card={card}
-                  allCards={allCards}
-                  onSwitch={(id) => onSwitchCard?.(id)}
-                  slots={{ variants: variantTabs }}
-                  // 帯の札に小さな数字(状態の代わり)と、1 段目にキャンペーンの合計。名前を押すと、右のペインがキャンペーンの合計
-                  cardMeta={(c) => {
-                    const r = history.find((x) => x.card.id === c.id)
-                    return r ? `${pct(r.clickRate)} · ${money(c)(r.revenue)}` : t('結果なし', 'No results')
-                  }}
-                  campaignMeta={siblings.length > 0 ? t(`合計 ${pct(ratio(total.clicks, total.recipients))} · ${fmt(total.revenue)}`, `Total ${pct(ratio(total.clicks, total.recipients))} · ${fmt(total.revenue)}`) : undefined}
-                  onCampaign={{ on: campaignView, select: () => (setCampaignView(!campaignView), deselect()) }}
-                  actions={<Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => void close()} aria-label={t('閉じる', 'Close')} />}
-                />
-              )
+            campaign={
+              campaign
+                ? {
+                    campaign,
+                    card,
+                    allCards,
+                    onSwitch: (id) => onSwitchCard?.(id),
+                    // 帯の札に小さな数字(状態の代わり)と、1 段目にキャンペーンの合計。名前を押すと、右のペインがキャンペーンの合計
+                    cardMeta: (c) => {
+                      const r = history.find((x) => x.card.id === c.id)
+                      return r ? `${pct(r.clickRate)} · ${money(c)(r.revenue)}` : t('結果なし', 'No results')
+                    },
+                    campaignMeta: siblings.length > 0 ? t(`合計 ${pct(ratio(total.clicks, total.recipients))} · ${fmt(total.revenue)}`, `Total ${pct(ratio(total.clicks, total.recipients))} · ${fmt(total.revenue)}`) : undefined,
+                    onCampaign: { on: campaignView, select: () => (setCampaignView(!campaignView), deselect()) },
+                  }
+                : undefined
             }
+            variants={variantTabs}
             channel={card.channel}
             name={campaign ? cardDisplayName(card, [campaign]) : card.name}
             when={when_}
             tabs={stageTabs}
-            tabsExtra={!campaign ? variantTabs : undefined}
-            status={
-              <span className={s.chip}>
-                <span className={s.dot} style={{ backgroundColor: row ? tokens.colorPaletteGreenBackground3 : tokens.colorNeutralStroke1 }} aria-hidden />
-                {resultHint}
-              </span>
-            }
+            // 状態の札(計画の承認の札・制作の状態の札と同じ場所・同じ形の StageChip)
+            status={<StageChip color={row ? tokens.colorPaletteGreenBackground3 : tokens.colorNeutralStroke1}>{resultHint}</StageChip>}
             save={row ? { saving, dirty, savedAt } : undefined}
             saveProblem={saveError ? { error: saveError } : undefined}
             tools={<CopyLinkButton iconOnly />}
@@ -501,7 +496,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
                 </MenuPopover>
               </Menu>
             }
-            onClose={campaign ? undefined : () => void close()}
+            onClose={() => void close()}
           >
             <StagePanes
               layout={layout}
@@ -546,6 +541,15 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
                     </ToggleButton>
                   }
                   above={
+                    <>
+                    {/* 配信の情報(配信日時・国・テーマ・テンプレート)。計画・制作のプレビューの上と同じ帯を、見るだけで */}
+                    <DeliveryMetaBand
+                      scheduledAt={sent}
+                      country={card.country}
+                      theme={card.theme}
+                      template={card.channel === 'email' ? getTemplate(templateKeyOfCard(card)).label : undefined}
+                      title={t('配信の情報(受信者には見えません。直すのは計画の配信カードで)', 'Delivery info (not shown to recipients; edit it in the plan delivery card)')}
+                    />
                     <InboxLines
                       channel={card.channel}
                       country={card.country}
@@ -563,6 +567,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
                         pushBody: t('押すと、タップ率を右に出します', 'Click to see the tap rate'),
                       }}
                     />
+                    </>
                   }
                   boxLabel={t('プレビュー(色の付いた所を押すと、その部品の数字を右に出します)', 'Preview (click a highlighted part to see its numbers)')}
                 >

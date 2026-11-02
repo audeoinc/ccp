@@ -3,26 +3,17 @@ import type { CSSProperties } from 'react'
 import { ArrowUndoRegular, CheckmarkCircleRegular, ClockRegular, EditRegular } from '@fluentui/react-icons'
 import { statusRank } from '../status'
 import { useT } from '../i18n'
+import { chipBase } from './chipBase'
 
 const useChipStyles = makeStyles({
   // 題の行の中の小さな札(2026-10-28 利用者: 黒い帯をやめ、上を詰める)。押すと承認のパネルが開く
+  // 形(高さ・丸み・文字)は、制作・結果の状態の札(StageChip)と同じ。色だけ承認の色
   chip: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    columnGap: '4px',
-    height: '24px',
-    boxSizing: 'border-box',
-    padding: '0 10px 0 8px',
+    ...chipBase,
     border: '1px solid var(--band-line)',
-    borderRadius: tokens.borderRadiusCircular,
     backgroundColor: 'var(--band-bg)',
     color: 'var(--band-fg)',
-    fontFamily: 'inherit',
-    fontSize: '12px',
-    fontWeight: tokens.fontWeightSemibold,
-    whiteSpace: 'nowrap',
     cursor: 'pointer',
-    flexShrink: 0,
     '& svg': { fontSize: '14px' },
     ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '1px' },
   },

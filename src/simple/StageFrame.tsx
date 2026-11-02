@@ -3,7 +3,7 @@
 // 帯の下のお知らせ、左のバーと開いたパネル、プレビュー(道具の行・スマホ / PC・ピン・ピンを打つ間の帯・倍率・つかんで動かす)、右のペインの枠と幅。
 // 面ごとに差し込むのは「左のバーの項目」「道具の行の左」「ペインの中身」「主のボタン」「⋯ の中身」だけにする(1 つずつ直すと、また離れるため)。
 // 倍率と幅は、面で 1 つの鍵(面を切り替えても、同じ倍率・同じ幅のまま)
-import type { ReactNode, RefObject } from 'react'
+import type { ComponentProps, ReactNode, RefObject } from 'react'
 import { Button, MessageBar, MessageBarBody, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowClockwiseRegular, ArrowUndoRegular, ChevronDoubleLeftRegular, CommentAddRegular, DesktopRegular, DismissRegular, PhoneRegular } from '@fluentui/react-icons'
 import { locale, useT } from '../i18n'
@@ -14,6 +14,7 @@ import { StageHeader } from './StageHeader'
 import { PreviewZoomBar } from './PreviewZoomBar'
 import { usePreviewNav, type PreviewZoom } from './usePreviewNav'
 import { RAIL_W, SIDE_W, type StageLayout } from './stageLayout'
+import { CampaignBand } from '../CampaignBand'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
@@ -153,17 +154,23 @@ function SaveProblemBar({ problem }: { problem: SaveProblem }) {
   return null
 }
 
+/**
+ * キャンペーンの帯(X79)に渡すもの。案の段(variants)と右の端の × は、枠が入れる(3 つの面で同じ場所に出すため)。
+ * actions は × の前に置くもの(計画: まとめて承認・キャンペーンのメニュー)、addVariantItems は ＋ のメニューの「AB テストを足す」
+ */
+export type StageCampaign = Omit<ComponentProps<typeof CampaignBand>, 'slots'> & { addVariantItems?: ReactNode }
+
 interface FrameProps {
-  /** キャンペーンの帯(X79。上の帯より上) */
-  band?: ReactNode
+  /** キャンペーンの帯(X79。上の帯より上)。キャンペーンに入っていない配信は省く(× は題の行の右の端、案は題の帯の 2 段目) */
+  campaign?: StageCampaign
+  /** AB テストの案の切り替え(VariantTabs)。キャンペーンの帯があれば案の段、なければ題の帯の 2 段目 */
+  variants?: ReactNode
   channel?: string
   /** 題(キャンペーン名か配信名) */
   name: ReactNode
   when: ReactNode
   /** 面のタブ(PLAN | PRODUCTION | RESULTS) */
   tabs?: ReactNode
-  /** タブの右の 2 段目(AB テストの案など) */
-  tabsExtra?: ReactNode
   /** その面の状態の札(計画 = 承認、制作 = 制作の状態)。押すと、その面の状態のパネルを開く */
   status?: ReactNode
   save?: SaveInfo
@@ -178,8 +185,8 @@ interface FrameProps {
   tools?: ReactNode
   /** ⋯(その面のほかの操作) */
   menu?: ReactNode
-  /** 閉じる ×(キャンペーンの帯の右の端に × があるときは省く) */
-  onClose?: () => void
+  /** 閉じる ×(キャンペーンの帯があれば帯の右の端、なければ題の行の右の端) */
+  onClose: () => void
   /** 帯の下のお知らせ */
   notices?: ReactNode
   /** 列の並び(StagePanes) */
@@ -190,12 +197,26 @@ interface FrameProps {
  * 面の枠の外側: キャンペーンの帯・上の帯(StageHeader)・お知らせ・列の並び。
  * 上の帯の右の並びは、保存の問題 → (lead) → ↶ → 主のボタン → (tools) → ⋯ → × で、どの面も同じ
  */
-export function StageFrame({ band, channel, name, when, tabs, tabsExtra, status, save, saveProblem, lead, undo, primary, tools, menu, onClose, notices, children }: FrameProps) {
+export function StageFrame({ campaign, variants, channel, name, when, tabs, status, save, saveProblem, lead, undo, primary, tools, menu, onClose, notices, children }: FrameProps) {
   const t = useT()
   const s = useStyles()
+  // 閉じる ×: フロートのいちばん上の右の角(2026-10-27 利用者)。ボタンなので、題の行でつかんで動かす動き(floatMove)には入らない
+  const close = <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />
+  const { addVariantItems, actions: bandActions, ...band } = campaign ?? {}
   return (
     <div className={s.root}>
-      {band}
+      {campaign && (
+        <CampaignBand
+          {...(band as Omit<StageCampaign, 'addVariantItems' | 'actions'>)}
+          slots={{ variants, addVariantItems }}
+          actions={
+            <>
+              {bandActions}
+              {close}
+            </>
+          }
+        />
+      )}
       <StageHeader
         channel={channel}
         name={name}
@@ -221,11 +242,11 @@ export function StageFrame({ band, channel, name, when, tabs, tabsExtra, status,
             {primary}
             {tools}
             {menu}
-            {onClose && <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
+            {!campaign && close}
           </>
         }
         tabs={tabs}
-        tabsExtra={tabsExtra}
+        tabsExtra={campaign ? undefined : variants}
       />
       <div className={s.notices}>{notices}</div>
       {children}

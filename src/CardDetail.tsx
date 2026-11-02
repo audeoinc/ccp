@@ -14,7 +14,7 @@ import {
   Spinner,
   Text,
 } from '@fluentui/react-components'
-import { ArrowNextRegular, DataBarVerticalRegular, DismissRegular, SaveRegular } from '@fluentui/react-icons'
+import { ArrowNextRegular, DataBarVerticalRegular, SaveRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { EmptyDraftCta } from './EmptyDraftCta'
@@ -64,7 +64,7 @@ import { settlePendingTrial } from './trial'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { AbSettings } from './simple/AbSettings'
-import { CampaignBand, type CampaignBandSlots } from './CampaignBand'
+import type { StageCampaign } from './simple/StageFrame'
 import { usePreviewZoom } from './simple/usePreviewZoom'
 import { CampaignApprove } from './CampaignApprove'
 import { AddCampaignCardDialog, CampaignMenu } from './CampaignDialogs'
@@ -683,27 +683,23 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     return save({ after: 'stay' })
   }
-  const campaignBand =
+  // キャンペーンの帯の中身(案の段・× は、面の枠 StageFrame が入れる)
+  const campaignBand: StageCampaign | undefined =
     card && campaign && onSwitchCard
-      ? (slots: CampaignBandSlots) => (
-          <CampaignBand
-            campaign={campaign}
-            card={card}
-            allCards={allCards ?? []}
-            onSwitch={(id) => void switchCard(id)}
-            slots={slots}
-            busy={saving}
-            actions={
-              <>
-                <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
-                <CampaignMenu campaign={campaign} cards={allCards ?? []} weeks={weeks} beforeRun={saveBeforeBulk} onChanged={onSaved} busy={saving} />
-                {/* 閉じる ×: フロートのいちばん上の右の角(キャンペーンの帯の 1 段目の右の端。2026-10-27 利用者)。ボタンなので、題の行でつかんで動かす動き(floatMove)には入らない */}
-                <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => void closeSimple()} aria-label={t('閉じる', 'Close')} />
-              </>
-            }
-            onAddCard={() => setAddingCard(true)}
-          />
-        )
+      ? {
+          campaign,
+          card,
+          allCards: allCards ?? [],
+          onSwitch: (id) => void switchCard(id),
+          busy: saving,
+          actions: (
+            <>
+              <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
+              <CampaignMenu campaign={campaign} cards={allCards ?? []} weeks={weeks} beforeRun={saveBeforeBulk} onChanged={onSaved} busy={saving} />
+            </>
+          ),
+          onAddCard: () => setAddingCard(true),
+        }
       : undefined
   const addCardDialog = addingCard && campaign && (
     <AddCampaignCardDialog

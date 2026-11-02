@@ -365,8 +365,9 @@ flowchart TD
 | `LinksPanel.tsx` | 137 | 左のバーの「リンク」(G1・G2。`content.links.list`): 配信の全部のリンクを一度に見て、メイン画像・ボタンのリンク先をその場でまとめて直す(アプリは開く画面)。計測用のパラメーターつきの URL を行ごと・すべてコピー。場所の名前を押すと、その部品を選ぶ。商品のリンク先は見る・写すだけ |
 | `NotesAiDraft.tsx` | 119 | 渡す文章(制作指示)の AI(「AI で書く」→ 欄の真下に案 → 押した案がそのまま入る。プレビューに出ない長い文なので、試す → 確定にしない) |
 | `AbSettings.tsx` | 86 | AB テストの設定(SU2。案のタブの横の ⚙) |
-| `StageFrame.tsx` / `stageLayout.ts` | 373 / 90 | 面の枠(X90 の塊 A)。計画・制作・結果のシンプルな画面が載る共通の枠: 上の帯(`StageFrame`: 題・タブ・状態の札・保存の様子・保存の問題・↶・主のボタン・⋯・×)・帯の下のお知らせ・列の並び(`StagePanes`: 左のバーと開いたパネル・境目・右のペイン・右端の列)・プレビュー(`PreviewFrame`: 道具の行・スマホ / PC・ピン・ピンを打つ間の帯・倍率・つかんで動かす)・右のペイン(`StagePane`)。列の幅と狭いときの割り振り(`useStageLayout`)、倍率の鍵 `STAGE_ZOOM_KEY` は面で 1 つ |
+| `StageFrame.tsx` / `stageLayout.ts` | 373 / 90 | 面の枠(X90 の塊 A)。計画・制作・結果のシンプルな画面が載る共通の枠: 上の帯(`StageFrame`: キャンペーンの帯・案の段・題・タブ・状態の札・保存の様子・保存の問題・↶・主のボタン・⋯・×)・帯の下のお知らせ・列の並び(`StagePanes`: 左のバーと開いたパネル・境目・右のペイン・右端の列)・プレビュー(`PreviewFrame`: 道具の行・スマホ / PC・ピン・ピンを打つ間の帯・倍率・つかんで動かす)・右のペイン(`StagePane`)。列の幅と狭いときの割り振り(`useStageLayout`)、倍率の鍵 `STAGE_ZOOM_KEY` は面で 1 つ |
 | `useSidePanel.ts` / `useStageNoteCounts.ts` / `useAssetDrop.tsx` / `StageTalkPanel.tsx` | 22 / 31 / 52 / 65 | 計画・制作・結果の面で同じ形のもの(2026-11-02 にまとめた): 左のバーの欄の開け閉め(しまう動きの間の中身・moving)/ やり取りの欄の数(その段の未解決の書き込み・タスク)/ 左のバーに落とした画像・資料・URL を素材に入れる(SideRail の drop と知らせの印)/ やり取りの欄(書き込み + タスク。制作・結果) |
+| `StageChip.tsx` / `chipBase.ts` / `VariantTabs.tsx` / `StagePins.tsx` / `useDebouncedSave.ts` | 35 / 17 / 40 / 59 / 24 | 計画・制作・結果の面で同じ形のもの(2026-11-03 にまとめた): 上の帯の状態の札(色の点と短い言葉。承認の札 `ApprovalChip` も形 `chipBase` は同じ)/ AB テストの案のタブ(キャンペーンの帯の案の段か、題の帯の 2 段目)/ プレビューのピンとピンのフロート(計画と、制作の企画の見本の上)/ 入力が止まって 1.5 秒で自動で保存し、閉じる前に打ちかけを保存する(flush)。キャンペーンの帯と × は `StageFrame` の `campaign` が置く |
 | `StageHeader.tsx` / `NextAction.tsx` / `nextStep.ts` | 46 / 78 / 24 | 上の帯(チャネル・配信名・日時を自分で描き、「題 → 段階のタブ PLAN \| PRODUCTION \| RESULTS → その面の状態の札 → 右の操作」の並び。計画と制作で同じ形で、上の部分が動かないように)/ 次にやることのボタン |
 | `PreviewMarks.tsx` | 78 | プレビューの上の目印(A と違う) |
 | `SectionTagLayer.tsx` | 149 | プレビューのセクションの名札(枠の左上の「グリッド・4 枠」。押すとセクションの全体を選ぶ) |
