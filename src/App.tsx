@@ -102,8 +102,9 @@ import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
 import { loadSimpleProduction } from './simpleProductionChunk'
+import { loadSimpleResults } from './simpleResultsChunk'
 import { UiScaleNotice } from './UiScaleNotice'
-import { CardDetailView, Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, SimpleResultsPage, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { CardDetailView, Later, LoadingWindow, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, SimpleResultsView, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 import { isOn, useFeature, useFeatureVersion } from './featureFlags'
 import { FeatureBadge } from './FeatureBadge'
@@ -341,13 +342,15 @@ function App() {
     // シンプルな制作の画面とは、同じ窓のまま中身だけを入れ替える(2026-10-29 利用者: 上にもう 1 つ開かず、× で全部閉じる)。
     // 窓の出てくる動きは付けない(きょうだいの切り替えと同じ instant。チカつかないように)
     if (f === 'calendar' && productionOpen === id && selectedId !== id) {
+      // 配信カードのプログラムを読み終わってから入れ替える(読む間に前の窓だけ閉じて、カレンダーが見えないように)
+      await loadCardDetail()
       setProductionOpen(null)
       openNext(id)
       return
     }
     // 結果のシンプルな画面から、同じ窓のまま計画・制作へ
     if (resultsOpen === id && f !== 'results') {
-      if (f === 'production') await loadSimpleProduction()
+      await (f === 'production' ? loadSimpleProduction() : loadCardDetail())
       setResultsOpen(null)
       if (f === 'calendar') openNext(id)
       else {
@@ -359,6 +362,8 @@ function App() {
     // 計画・制作のシンプルな画面から、同じ窓のまま結果へ
     if (f === 'results') {
       if (selectedId === id && !(await (cardLeaveRef.current?.() ?? Promise.resolve(true)))) return
+      // 結果の画面のプログラムを読み終わってから入れ替える(制作と同じ。読む間に前の窓だけ閉じて、カレンダーが見えないように)
+      await loadSimpleResults()
       if (selectedId === id) setSelectedId(null)
       if (productionOpen === id) setProductionOpen(null)
       setInstantId(selectedId === id || productionOpen === id ? id : null)
@@ -389,9 +394,11 @@ function App() {
     const id = window.setTimeout(() => void loadCardDetail().catch(() => undefined), 1500)
     return () => window.clearTimeout(id)
   }, [])
-  // 配信カードを開いたら、制作の画面のプログラムを裏で読んでおく(PRODUCTION のタブで、すぐ切り替えられるように)
+  // 配信カードを開いたら、制作・結果の画面のプログラムを裏で読んでおく(PRODUCTION・RESULTS のタブで、すぐ切り替えられるように)
   useEffect(() => {
-    if (selectedId) void loadSimpleProduction()
+    if (!selectedId) return
+    void loadSimpleProduction().catch(() => undefined)
+    void loadSimpleResults().catch(() => undefined)
   }, [selectedId])
   const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => void goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
@@ -1550,7 +1557,7 @@ function App() {
             setDraftOpen(null)
           }}
         >
-        <Later><CardDetailView
+        <Later fallback={<LoadingWindow instant={!!selected && selected.id === instantId} />}><CardDetailView
           key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
           draft={selected ? undefined : draftOpen?.draft}
@@ -1644,7 +1651,7 @@ function App() {
         />
       )}
       {resultsOpen && cards.find((c) => c.id === resultsOpen) && (
-        <Later><SimpleResultsPage
+        <Later fallback={<LoadingWindow instant={resultsOpen === instantId} />}><SimpleResultsView
           key={resultsOpen}
           card={cards.find((c) => c.id === resultsOpen)!}
           allCards={cards}
@@ -1666,7 +1673,7 @@ function App() {
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
       {productionOpen && cards.find((c) => c.id === productionOpen) && (
-        <Later><SimpleProductionView
+        <Later fallback={<LoadingWindow instant={productionOpen === instantId} />}><SimpleProductionView
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}

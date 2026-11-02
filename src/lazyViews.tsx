@@ -1,8 +1,12 @@
 import { Suspense, lazy, useState, type ComponentProps, type ReactNode } from 'react'
-import { Spinner } from '@fluentui/react-components'
+import { Dialog, Spinner, makeStyles } from '@fluentui/react-components'
 import { loadChunk } from './chunkReload'
 import { loadSimpleProduction, loadedSimpleProduction } from './simpleProductionChunk'
 import { loadCardDetail, loadedCardDetail } from './cardDetailChunk'
+import { loadSimpleResults, loadedSimpleResults } from './simpleResultsChunk'
+import { ResizableSurface } from './ResizableSurface'
+import { useCardDetailStyles } from './cardDetailStyles'
+import { PREF } from './prefKeys'
 
 // 開いたときに読み込む画面(整理 第2段 ④)。最初に開くときに、使わないかもしれない画面のプログラムまで読まないため。
 // ここから読み込む(画面のファイルを、ほかのファイルから直接 import すると、分かれない)
@@ -12,8 +16,12 @@ export const ImpactView = lazy(() => loadChunk(() => import('./ImpactView')).the
 export const LearningEffectFloat = lazy(() => loadChunk(() => import('./LearningEffectFloat')).then((m) => ({ default: m.LearningEffectFloat })))
 export const LearningHand = lazy(() => loadChunk(() => import('./LearningHand')).then((m) => ({ default: m.LearningHand })))
 export const ProductsView = lazy(() => loadChunk(() => import('./ProductsView')).then((m) => ({ default: m.ProductsView })))
-// 結果のシンプルな画面(X89)
-export const SimpleResultsPage = lazy(() => loadChunk(() => import('./results/SimpleResultsPage')).then((m) => ({ default: m.SimpleResultsPage })))
+const SimpleResultsLazy = lazy(() => loadSimpleResults().then((m) => ({ default: m.SimpleResultsPage })))
+/** 結果のシンプルな画面(X89)。読み終わっていれば、lazy を通さずに描く(制作の画面と同じ) */
+export function SimpleResultsView(props: ComponentProps<typeof SimpleResultsLazy>) {
+  const [Loaded] = useState(loadedSimpleResults)
+  return Loaded ? <Loaded {...props} /> : <SimpleResultsLazy {...props} />
+}
 export const SimpleProductionPage = lazy(() => loadSimpleProduction().then((m) => ({ default: m.SimpleProductionPage })))
 /**
  * 制作のシンプルな画面。読み終わっていれば、lazy を通さずに描く(lazy は、読み終わっていても最初の 1 回は待つので、その間なにも出ない)。
@@ -51,7 +59,29 @@ export const SampleShopPanel = lazy(() => loadChunk(() => import('./SampleShopPa
 export const BrandPanel = lazy(() => loadChunk(() => import('./BrandPanel')).then((m) => ({ default: m.BrandPanel })))
 export const DevRequestsDialog = lazy(() => loadChunk(() => import('./DevRequestsDialog')).then((m) => ({ default: m.DevRequestsDialog })))
 
+const useWindowStyles = makeStyles({
+  body: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+})
+
+/**
+ * 配信カード・制作・結果の窓を、プログラムを読み終える前に開いたときの、読み込み中の窓(枠だけ)。
+ * 何も出さないと、後ろのカレンダーが一瞬見えてから窓が出るので、同じ大きさの窓を先に出しておく(2026-11-02 利用者)
+ */
+export function LoadingWindow({ instant }: { instant?: boolean }) {
+  const s = useWindowStyles()
+  const cardStyles = useCardDetailStyles()
+  return (
+    <Dialog open surfaceMotion={instant ? null : undefined}>
+      <ResizableSurface backdropMotion={instant ? null : undefined} sizeKey="cardDetail" prefKey={PREF.cardSize} min={{ w: 900, h: 560 }} className={cardStyles.surface} data-loading-window>
+        <div className={s.body}>
+          <Spinner size="small" />
+        </div>
+      </ResizableSurface>
+    </Dialog>
+  )
+}
+
 /** 分けて読み込む画面を、読み込み終えるまで待つ所。画面ごとに置く(ヘッダーなど、ほかの所は消さない) */
-export function Later({ children, spin }: { children: ReactNode; /** 待つ間に、くるくるを出す(ページ・設定の欄。窓は出さない) */ spin?: boolean }) {
-  return <Suspense fallback={spin ? <Spinner size="small" /> : null}>{children}</Suspense>
+export function Later({ children, spin, fallback }: { children: ReactNode; /** 待つ間に、くるくるを出す(ページ・設定の欄。窓は出さない) */ spin?: boolean; /** 待つ間に出すもの(配信カード・制作・結果の窓は LoadingWindow) */ fallback?: ReactNode }) {
+  return <Suspense fallback={fallback ?? (spin ? <Spinner size="small" /> : null)}>{children}</Suspense>
 }
