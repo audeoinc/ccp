@@ -150,7 +150,7 @@ pac copilot list --environment <環境の ID>   # その環境のエージェン
 
 GitHub Copilot ハーネスのエージェントには、最初から「ツール: Work IQ」と「ナレッジ: すべての Web サイトを検索」が入っていた(外す)。
 
-## 7. 頼み T1〜T6
+## 7. 頼み T1〜T9
 
 CCP の実際の指示文(`src/aiSelect.ts`・`src/simple/partAi.ts`)を縮めた頼み。商品は架空。Copilot Studio の画面の右の「テスト」の欄に貼って試すか、測るプログラム(12.4)で送る。
 
