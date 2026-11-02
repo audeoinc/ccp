@@ -266,6 +266,7 @@
 |  | 使う決まり・アラートの基準 | `settings.country.rules` |  |  | 〇 |  |  |  | 小 | 2026-11-02 利用者: 使う学びを `settings.country.learnings` に分けた |
 |  | 使う学び | `settings.country.learnings` |  |  |  |  | 〇 |  | 小 | `results.learnings` が前提。2026-11-02 利用者: 決まり・アラートの基準(v1)から分けた |
 | 全社 | 差出人の名前と店の URL | `settings.sender` |  | 〇 |  |  |  |  | 小 |  |
+|  | 店の URL の形(商品ページ・カテゴリ・キャンペーンを `{shop}`・`{product_code}` などで組み立てる。見本の URL を出す) | `settings.shopurl` |  |  | 〇 |  |  |  | 小〜中 | 2026-11-02 利用者。会社 → 国で上書き(`shopUrl` と同じ)。商品に `page_url` があればそれを優先。制作に渡すとき、商品の URL を写しに固める。アプリの開く画面は入れない |
 |  | 計測用のパラメーター(utm)の決まった値 | `settings.utm` |  | 〇 |  |  |  |  | 小 | 詳しい配信カードの ⑤ から移す(9 章の 11) |
 |  | ユーザー・承認グループ | `settings.users` |  | 〇 |  |  |  |  | 小 |  |
 |  | テンプレートの管理・編集・AI で作る | `settings.templates` |  |  |  |  |  | 〇 | 大 | 大きな作業のフロート。配信カードからの入口も隠す |
