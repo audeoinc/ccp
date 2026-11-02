@@ -402,6 +402,7 @@ Direct Line の窓口は、既定の `https://directline.botframework.com` で�
 | 2026-11-02 | 1 | 測るプログラム(Direct Line) | GPT Chat Latest | T7 | 1 | ○ | ○ | なし | 始める 0.60・本文 10.53 | — | 小さい写真 1 枚(11KB。緑の長袖の上着)。focal・選択肢の値・数の決まりも守れた。文だけの頼みより遅い |
 | 2026-11-02 | 1 | 測るプログラム(Direct Line) | GPT Chat Latest | T8 | 1 | ○ | ○ | なし | 始める 0.40・本文 6.64 | — | 同じ写真(部品の画像ではないので、`kind` は other) |
 | 2026-11-02 | 1 | 測るプログラム(Direct Line) | GPT Chat Latest | T9 | 1 | ○ | ○ | なし | 始める 0.42・本文 7.56 | — | **upload の入口に画像を 3 枚まとめて送れた**(同じ写真を 3 枚)。3 枚ともアングル(front)が返った。picks は添付の 3 枚を選び、判断済みの画像(番号 3)は選ばなかった |
+| 2026-11-02 | 1 | 測るプログラム(Direct Line) | GPT Chat Latest | T9 | 1 | ○ | ○ | なし | 始める 0.73・本文 11.15 | — | **本物の商品ページの写真 7 枚**(ジーンズ。着用の後ろ姿・正面・後ろ・別の色の正面・ポケットの寄り・生地の寄り・ボタンの寄り。1 枚 68〜127KB、400×533 ほど。人の顔の写るものは外した)。配信と商品を写真に合わせた(`--theme`・`--product`・`--strengths`)。**7 枚ともアングルが写真のとおり**(worn・front・back・front・detail・texture・detail)。picks は強み(生地の質感・作り込み)に合う生地・ボタン・ポケットの寄りの 3 枚 |
 
 ### 10.2 方式ごとの比べ方
 
@@ -512,7 +513,7 @@ node measure.mjs --runs 1                    # 方式 2 で T1〜T5 を 1 回ず
 node measure.mjs --via dl --runs 1           # 方式 1(Direct Line)で T1〜T5 を 1 回ずつ。サインインしない
 node measure.mjs --via dl --only T6 --image images\<写真>.jpg   # T6 を、画像を付けて送る(写真は各自で用意する。下)
 node measure.mjs --via dl --only T7 --image images<写真>.jpg   # T7(メイン画像の説明)。T8 も同じ形
-node measure.mjs --via dl --only T9 --image imagesa.jpg --image images.jpg   # T9 は --image を並べる(最大 8 枚)
+node measure.mjs --via dl --only T9 --image imagesa.jpg --image images.jpg   # T9 は --image を並べる(最大 8 枚)。写真に合わせて --theme・--product・--strengths で配信と商品を変えられる
 node measure.mjs --only T3 --runs 5          # T3 だけ 5 回
 node measure.mjs --model "<別のモデルの名前>"   # エージェントのモデルを替えたあと。MODEL_LABEL より優先
 node check-token-endpoint.mjs                # 鍵なしの入口で断られるか(8 章)

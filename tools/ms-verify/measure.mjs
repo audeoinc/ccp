@@ -9,6 +9,7 @@
 //   node measure.mjs --model "GPT Chat Latest"   記録に書くモデルの名前(設定の MODEL_LABEL より優先)
 //   node measure.mjs --only T6 --image images/<写真>.jpg   T6 を、画像を付けて送る(写真は各自で用意する。リポジトリには入れない)
 //   node measure.mjs --only T9 --image a.jpg --image b.jpg …   T9 は画像を何枚も付ける(--image を並べる。最大 8 枚)。T6〜T8 は 1 枚
+//   node measure.mjs --only T9 --image … --theme "…" --product "…" --strengths "…"   T9 の配信と商品を、写真に合わせる
 //   node measure.mjs --self-test  つながずに、確かめの仕組みだけを試す
 //
 // モデルはエージェントの画面で選ぶ(つなぎ方からは分からない)。選んだ名前を MODEL_LABEL か --model で渡し、記録に残す。
@@ -250,7 +251,7 @@ for (const t of tests) {
   for (let i = 1; i <= (runsOverride ?? t.runs); i++) {
     let r
     try {
-      r = await ask(typeof t.prompt === 'function' ? t.prompt(images.length) : t.prompt, sent)
+      r = await ask(typeof t.prompt === 'function' ? t.prompt(images.length, { theme: opt('--theme'), product: opt('--product'), strengths: opt('--strengths') }) : t.prompt, sent)
     } catch (e) {
       r = { startSec: '', firstSec: '', firstTextSec: '', endSec: '', messages: 0, types: '', text: '', error: String(e?.message ?? e) }
     }

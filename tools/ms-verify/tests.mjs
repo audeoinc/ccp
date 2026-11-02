@@ -233,11 +233,12 @@ images には、画像を渡したものだけを書く(判断済みの画像は
 文字は 日本語 で書く。人物を特定する情報(名前など)は書かない。
 `
 // Gemini では画像と文を交互に並べられるが、Direct Line・Agents SDK では画像は添付にまとまるので、番号と添付の順の対応を文で伝える
-const t9Prompt = (count) =>
+// 配信と商品は、写真に合わせて --theme・--product・--strengths で変えられる(既定は架空のニット)
+const t9Prompt = (count, o = {}) =>
   [
     T9_HEAD,
-    '配信: ' + JSON.stringify({ theme: '秋の新作ニット', headline: '素材にこだわった、あたたかいニット', copy: 'やわらかな編み地で、肌寒い朝も心地よく' }),
-    '商品: ' + JSON.stringify({ code: 'P01', name: 'ケーブル編みニット', category: 'ニット', strengths: '素材(ウール混)のやわらかさ・立体的な編み地' }),
+    '配信: ' + JSON.stringify(o.theme ? { theme: o.theme } : { theme: '秋の新作ニット', headline: '素材にこだわった、あたたかいニット', copy: 'やわらかな編み地で、肌寒い朝も心地よく' }),
+    '商品: ' + JSON.stringify(o.product ? { code: 'P01', name: o.product, strengths: o.strengths ?? '' } : { code: 'P01', name: 'ケーブル編みニット', category: 'ニット', strengths: '素材(ウール混)のやわらかさ・立体的な編み地' }),
     `画像は、添付の順に 画像 0〜画像 ${count - 1} です(${count} 枚)。`,
     `画像 ${count}(判断済み: アングル detail・袖口のボタンの寄り)(ページの説明: 袖口のアップ)`,
   ].join('\n')
@@ -290,7 +291,7 @@ export const IMAGE_TESTS = [
     name: '商品ページの画像の提案',
     runs: 1,
     images: 'many',
-    prompt: (count) => t9Prompt(count),
+    prompt: (count, o) => t9Prompt(count, o),
     // count = 添付した枚数。判断済みの画像は番号 count
     check: (text, count) =>
       judge(text, (o, n) => {
