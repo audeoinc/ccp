@@ -52,6 +52,8 @@ export const tables: Record<string, Row[]> = {
   ProductImagesService: products
     .filter((p) => p.product_code === 'U05')
     .map((p) => ({ id: guid('pimg:U05'), name: `${p.name}`, product_id: p.id, product_code: p.product_code, market: p.market, image_url: p.image_url, is_main: 1, source: 'sample', alt: `${p.name}`, caption: 'Sample photo for trying the sample shop page (X76).', model_usable_until: '2026-09-30' })),
+  // 商品ページの本文(X80 段 ②)。見本では空(見本のページを読む窓口が、その場で本文を作る)
+  ProductPageTextsService: [],
   // 国ごとの設定(ST2)。見本では空(既定の値)
   CountrySettingsService: [],
   // 国ごとの適用(ST7)。見本では空(すべての国で、すべてのテンプレートを使う)

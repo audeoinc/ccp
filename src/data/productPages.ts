@@ -38,8 +38,11 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const ProductPages = {
-  /** ページを読み、載っている画像の一覧を返す。sample = 見本の EC サイトのページ。page = ブラウザで開くときの URL */
-  images: (url: string) => post<{ sample: boolean; page: string; images: PageImage[] }>('/api/product-pages/images', { url }),
+  /**
+   * ページを読み、載っている画像の一覧を返す。sample = 見本の EC サイトのページ。page = ブラウザで開くときの URL。
+   * title・text = ページの題と本文(ナビ・フッターなどを除いた文。X80 段 ②。「詳しく」の枠の説明文を AI が書く材料)
+   */
+  images: (url: string) => post<{ sample: boolean; page: string; images: PageImage[]; title?: string; text?: string }>('/api/product-pages/images', { url }),
   /** 画像を AI に見せ、アングルと、この配信に合う画像(理由つき)を返す。judged = もうアングルを見分けてあった(画像を読ませなかった)取り込んだ画像の数 */
   suggest: (input: { images: PageImage[]; product: Record<string, unknown>; delivery: Record<string, unknown>; language: 'ja' | 'en' }) =>
     post<{ images: ImageAngle[]; picks: ImagePick[]; judged?: number }>('/api/product-pages/suggest', input),

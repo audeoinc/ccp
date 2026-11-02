@@ -197,6 +197,21 @@
     ["product_id", "products", {"onDelete": "CASCADE"}]
    ]
   },
+  "product_page_texts": {
+   "_comment": "商品ページの本文(X80 段 ②。商品ごとに 1 行)。「詳しく」にした商品の枠の説明文を、AI が商品ページの内容から書くときの材料(段 ③)。画像ごとの説明は product_images の alt・caption にあり、ここはページの本文(ナビ・フッターなどを除いた、<main> / <article> の文と JSON-LD の Product の description。ccp/page_text.py)。Workbench は外のページを読めないので、手元の PC で集める ZIP(scripts/collect-product-images.py → ccp.cli import-images)で入れる。ZIP に入っている商品の行は入れ替える。見本の商品ページ(B12)は、行がなくても、ページを読む窓口(/api/product-pages/images の text)がその場で作る。source は product_images と同じ(sample = 見本の ZIP。空 = 本物)",
+   "columns": [
+    ["name", "text", {"required": true}],
+    ["product_code", "text", {"index": true}],
+    ["market", "text"],
+    ["source_url", "text"],
+    ["body", "text"],
+    ["source", "text"],
+    ["fetched_at", "timestamptz"]
+   ],
+   "lookups": [
+    ["product_id", "products", {"onDelete": "CASCADE"}]
+   ]
+  },
   "country_settings": {
    "_comment": "国ごとの設定(ST2。BACKLOG 13 章)。変えるたびに 1 行足す(いちばん新しい行が、いまの値。前の行は、変えた人・日時の履歴)。name は設定の種類(criteria = アラートの基準: 在庫僅少の週数・週の上限・販売順位の上位の線 / brand = 差出人の名前と店の URL。ST10。国が空の行が全社の既定、国の行は上書き)。value は JSON",
    "columns": [
