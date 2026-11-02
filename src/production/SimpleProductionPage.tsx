@@ -8,7 +8,7 @@
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Text, ToggleButton, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, ChevronDoubleLeftRegular, ClipboardPasteRegular, CommentAddRegular, CommentRegular, HistoryRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, EyeRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular, TaskListLtrRegular, TimelineRegular } from '@fluentui/react-icons'
+import { ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, AttachRegular, ChevronDoubleLeftRegular, ClipboardPasteRegular, CommentAddRegular, CommentRegular, HistoryRegular, CopyRegular, DesktopRegular, DismissRegular, DocumentTextRegular, EyeRegular, MoreHorizontalRegular, OpenRegular, PhoneRegular, TaskListLtrRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -27,6 +27,7 @@ import { focusedPin, pinView, subscribePins } from '../pinStore'
 import { ResolvedPinsToggle } from '../ResolvedPinsToggle'
 import { DevRequestMenuItem } from '../DevRequestMenu'
 import { AutoTextarea } from '../AutoTextarea'
+import { HtmlEditor } from '../HtmlEditor'
 import { useTrial } from '../trial'
 import { TrialBar } from '../TrialBar'
 import { weekKeyOf } from '../weekLock'
@@ -133,6 +134,8 @@ const useStyles = makeStyles({
   // 右のペイン: 上がスクロールする中身、下(何も選んでいないとき)が「見た目を AI に頼む」
   rightCol: { display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 },
   side: { flexGrow: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', padding: '12px 16px 24px', display: 'grid', rowGap: '14px', alignContent: 'start' },
+  // 左のバーの「HTML」: エディタを欄の高さいっぱいに
+  htmlPane: { display: 'flex', flexDirection: 'column', rowGap: '6px', height: '100%', minHeight: 0 },
   // 試す → 確定の帯(プレビューの上。どの入口で試しても、ここで確定する)
   trialBar: { padding: '0 12px 6px' },
   // プレビューの右上の、書き込み(ピン)の操作
@@ -269,8 +272,12 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     const el = p && boxRef.current ? partElement(boxRef.current, p) : null
     const src = el instanceof HTMLImageElement ? el.getAttribute('src') : (el?.querySelector('img')?.getAttribute('src') ?? null)
     setPartImg(src ? new URL(src, location.href).href : '')
+    // 左のバーの「HTML」で、押した部品の場所へ送るための目印(画像は src、文は頭の数文字。HTML の中の書き方に合わせて & < > を書き換える)
+    const text = (el?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 16).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    setPartMarks(src ? [src, new URL(src, location.href).href] : text ? [text] : [])
     setPart(p)
   }
+  const [partMarks, setPartMarks] = useState<string[]>([])
   // 部品ごとの AI のやり取り(部品を選び直しても残す)
   const [turnsByPart, setTurnsByPart] = useState<Record<string, PartTurn[]>>({})
   const boxRef = useRef<HTMLDivElement>(null)
@@ -297,7 +304,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const meName = useSyncExternalStore(onMeChange, myName)
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
   // 開いたときは「渡されたもの」(2026-10-29 利用者: プレビューを見る → 申し送りを読む → 素材でイメージを持つ → HTML を確かめる、の順に進めるように)
-  type Side = 'given' | 'talk' | 'tasks' | 'assets' | 'steps'
+  type Side = 'given' | 'talk' | 'tasks' | 'assets' | 'steps' | 'html'
   const [side, setSide] = useState<Side | null>('given')
   const [finishedOpen, setFinishedOpen] = useState(false)
   // バーの数(未解決の制作のやり取り・未完了のタスク・素材)。欄の中で増減したら、開け閉めのたびに数え直す
@@ -488,6 +495,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     return () => clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, cur, requests, card.name])
+  // 左のバーの「HTML」に出すソース(いまプレビューに出している方)
+  const sourceHtml = onMade ? madeShown : generated
 
   // ピン(コメント)。企画の見本の上は部品の目印に、制作した HTML の上はページの中の割合に置く(詳しい制作のページと同じ見た目の名前 html-plan / html-made)
   const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
@@ -785,6 +794,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     { v: 'talk', gap: true, on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
     { v: 'tasks', on: tasksOn, feature: 'collab.tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
     { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
+    { v: 'html', on: sampleOn || htmlEditOn, icon: <CodeRegular />, label: 'HTML', tip: t('HTML(いまプレビューに出している方のソース。読むだけ)', 'HTML (source of what the preview shows; read-only)'), count: 0 },
     { v: 'steps', on: stepsOn, feature: 'prod.steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
   ]
   // 非公開の欄はバーに出さない。開いていた欄が非公開になったら、しまったのと同じに見せる
@@ -919,6 +929,17 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               {openSide === 'talk' && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
               {openSide === 'tasks' && <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => setSide('talk')} onChanged={() => undefined} />}
               {openSide === 'assets' && <CreativeAssets cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />}
+              {/* HTML のソース(2026-11-02 利用者「HTML 自体を見ることができる機能は欲しい」)。いまプレビューに出している方(企画の見本 / 制作した HTML)を、
+                  詳しい制作のページと同じ色分けのエディタで読むだけで出す。欄の幅は境目をつかんで広げられる。部品を押すと、その場所へ送る */}
+              {openSide === 'html' && (
+                <div className={s.htmlPane}>
+                  <div className={s.head}>
+                    <span className={s.note} style={{ flexGrow: 1 }}>{onMade ? (trialHtml !== null ? t('試している HTML', 'HTML being tried') : t('制作した HTML', 'Production HTML')) : t('企画の見本の HTML', 'Plan sample HTML')}</span>
+                    {sourceHtml && <CopyButton text={sourceHtml} label={t('コピー', 'Copy')} />}
+                  </div>
+                  {sourceHtml ? <HtmlEditor value={sourceHtml} onChange={() => undefined} readOnly reveal={onMade ? undefined : partMarks.find((m) => sourceHtml.includes(m))} ariaLabel={t('HTML(読むだけ)', 'HTML (read-only)')} /> : <Spinner size="tiny" label={t('プレビューから HTML を作っています…', 'Building HTML from the preview…')} />}
+                </div>
+              )}
               {openSide === 'steps' && <StepsPane flow={flow} onViewResult={resultOn ? () => setFinishedOpen(true) : undefined} needMe={needMe} />}
             </div>
           </div>
