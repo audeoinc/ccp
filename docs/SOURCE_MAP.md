@@ -299,7 +299,7 @@ flowchart TD
 | `ProductRow.tsx` / `Candidates.tsx` | 177 / 161 | 選定した商品の行 / 候補の一覧(大量でも重くならないように) |
 | `HeroCandidates.tsx` | 110 | メイン画像の候補(すべての画像から探して設定) |
 | `ChatPanel.tsx` | 247 | AI チャット |
-| `NotesEditor.tsx` / `MarkdownLite.tsx` | 139 / 52 | 制作指示の入力(Markdown。箇条書き・見出しつき。配信カードでは渡すものの欄)/ その表示 |
+| `NotesEditor.tsx` / `NotesEditorLazy.tsx` / `MarkdownLite.tsx` | 139 / 33 / 52 | 制作指示の入力(Markdown。箇条書き・見出しつき。配信カードでは渡すものの欄)/ それを使うときに読み込む入口(TipTap が大きいので、最初の読み込みから外す)/ その表示 |
 | `links.ts` | 348 | 配信ごとのリンク先(JSON で保存)と、計測用のパラメーター(UTM)の決まり(utm_campaign・utm_content。X67) |
 | `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 254 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `TasksPanel.tsx` | 196 | タスク(プロセスのペインの「タスク」タブ) |
