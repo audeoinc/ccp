@@ -226,8 +226,9 @@ async def save_html(request_id: str, request: Request):
             fields = {"variant_html": merge_variant_html(req.get("variant_html"), variant, html, now.isoformat(), actor["name"])}
             pv = parse_variant_html(req.get("variant_html")).get(variant, {})
             prev = (pv.get("html"), pv.get("saved_at"), pv.get("saved_by_name"))
-        # 保存したことのある HTML(渡したときの下書きは除く)が置き換わるときは、版の履歴に残す
-        if prev[0] and prev[1] and prev[0] != html:
+        # 保存したことのある HTML(渡したときの下書きは除く)が置き換わるときは、版の履歴に残す。
+        # 画面のエディタで打っている間の自動保存は history = false で送る(打つたびに版が増えて、前の版を押し出さないように。打ち始めの 1 回だけ残す)
+        if prev[0] and prev[1] and prev[0] != html and body.get("history") is not False:
             fields["html_history"] = push_html_history(req.get("html_history"), variant, prev[0], prev[1], prev[2])
         row = await repo.update(conn, "production_requests", request_id, fields) or req
     return ok(row)

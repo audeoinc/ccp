@@ -38,7 +38,7 @@ export const ProductionService = {
   /** 制作が「制作が終わった」 */
   done: (requestId: string, input: { actor: Actor; note?: string; link?: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/done`, input),
   /** 制作のページで直した HTML を保存する */
-  saveHtml: (requestId: string, input: { actor: Actor; html: string; variant?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/html`, input),
+  saveHtml: (requestId: string, input: { actor: Actor; html: string; variant?: string; history?: boolean }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/html`, input),
   /** 制作のページの左で直した中身(写しと同じ形の JSON)を保存する。空の文字で、承認された写しに戻す */
   saveEdits: (requestId: string, input: { actor: Actor; edited_snapshot: string; week_start?: string }) => post<ProductionRequest>(`/requests/${encodeURIComponent(requestId)}/edits`, input),
   /** 企画が仕上がりを確かめて OK にする(PR7) */

@@ -256,6 +256,9 @@ function textFieldsOf(p: PartRef): (f: TextField) => boolean {
   }
 }
 
+// 打ち始めの判定に使う時刻(描画の中では呼ばない。保存の処理の中だけ)
+const nowMs = () => Date.now()
+
 export function SimpleProductionPage({ card, productIds, variantIds, products, productImages, heroes, people, onClose, onFullView, stageTabs, onChanged, instant, allCards, onSwitchCard }: Props) {
   const cardStyles = useCardDetailStyles()
   const s = useStyles()
@@ -339,9 +342,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   const frozen = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
   const edited = useMemo(() => parseSnapshot(live?.edited_snapshot), [live?.edited_snapshot])
-  // 確定して保存している間は、保存した写しを先に出す(読み直すまで、前の中身に戻って見えないように)
+  // 保存の流れは計画の配信カードにそろえる(2026-11-02 利用者「揃えてください」): 文言は打てばそのまま入り、1.5 秒で自動で保存、↶ で前の保存に戻す。
+  // 試す → 確定は、AI の案と入れ替え(画像・商品・前の版・貼り付け)だけ。
+  // 打っている中身(まだ保存していない)と、保存している間の中身(読み直すまで、前の中身に戻って見えないように)
+  const [editingSnap, setEditingSnap] = useState<Snapshot | null>(null)
   const [savingSnap, setSavingSnap] = useState<Snapshot | null>(null)
-  const snap: Snapshot = savingSnap ?? edited ?? frozen ?? draft
+  const savedSnap: Snapshot = savingSnap ?? edited ?? frozen ?? draft
+  const snap: Snapshot = editingSnap ?? savedSnap
   // 企画から渡された写し(「企画から変更」の印と、戻す先)
   const original: Snapshot = frozen ?? draft
   const keys = productionVariants(snap)
@@ -395,7 +402,10 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 制作した HTML: 保存したことのあるものだけ(渡したときに一緒に固めた見本の HTML は、保存した日時がないので、制作した HTML とみなさない)
   const savedVariants = useMemo(() => parseVariantHtml(live?.variant_html), [live?.variant_html])
   const [savingHtml, setSavingHtml] = useState<{ variant: VariantKey; html: string } | null>(null)
-  const madeOf = (k: VariantKey): string => {
+  // 左のバーの「HTML」で打っている HTML(まだ保存していない)
+  const [editingHtml, setEditingHtml] = useState<{ variant: VariantKey; html: string } | null>(null)
+  const madeOf = (k: VariantKey): string => (editingHtml?.variant === k ? editingHtml.html : savedMadeOf(k))
+  const savedMadeOf = (k: VariantKey): string => {
     if (savingHtml?.variant === k) return savingHtml.html
     if (k === 'A') return live?.html_saved_at ? (live.html ?? '') : ''
     const v = savedVariants[k]
@@ -418,20 +428,32 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur, live?.id])
 
+  // ↶ 元に戻す: 開いている間の、保存の前の中身(計画の配信カードと同じ。写しの直しと、制作した HTML の保存の両方)
+  type UndoStep = { kind: 'snap'; snap: Snapshot } | { kind: 'html'; variant: VariantKey; html: string }
+  const [undoStack, setUndoStack] = useState<UndoStep[]>([])
+  const pushUndo = (u: UndoStep) => setUndoStack((st) => [...st.slice(-29), u])
+  // HTML を打っている間の自動保存は、打ち始めの 1 回だけ版の履歴に残す(打つたびに版が増えて、前の版を押し出さないように)
+  const typedAt = useRef(0)
+
   /** 直した写しを保存する(制作した HTML があれば、その同じ場所も書き換えて保存する。詳しい制作のページの applyChatEdit と同じ考え) */
-  const commitSnap = async (next: Snapshot) => {
+  const commitSnap = async (next: Snapshot, opts: { undo?: boolean } = {}) => {
     if (!live) return
     if (needMe) return setWorkError(needMe)
     const strip = (x: Snapshot) => JSON.stringify({ ...x, takenAt: '' })
+    const before = savedSnap
+    // 保存している間に打ったものは残す(次の自動保存で入る)
+    setEditingSnap((e) => (e === next ? null : e))
+    if (strip(before) === strip(next)) return
+    if (!opts.undo) pushUndo({ kind: 'snap', snap: before })
     setSavingSnap(next)
     setWorkNotice(null)
     let ok = await call(() => ProductionService.saveEdits(live.id, { actor, edited_snapshot: strip(next) !== strip(original) ? JSON.stringify(next) : '', week_start: weekStart }))
-    const madeA = madeOf('A')
+    const madeA = savedMadeOf('A')
     if (ok && madeA) {
-      const r = syncHtml(madeA, snap, next)
+      const r = syncHtml(madeA, before, next)
       if (r.replaced) {
         setSavingHtml({ variant: 'A', html: r.html })
-        ok = await call(() => ProductionService.saveHtml(live.id, { actor, html: r.html, variant: 'A' }))
+        ok = await call(() => ProductionService.saveHtml(live.id, { actor, html: r.html, variant: 'A', history: false }))
       }
       if (r.missing) setWorkNotice(tr(`制作した HTML の中で、場所が見つからなかったものが ${r.missing} つあります(HTML は手で直すか、貼り付けて置き換えてください)`, `${r.missing} item(s) could not be found in the production HTML (edit it by hand, or paste to replace).`))
     }
@@ -439,15 +461,77 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     setSavingSnap(null)
     setSavingHtml(null)
   }
-  /** 制作した HTML を保存する(空 = 企画の見本に戻す)。前の HTML は、サーバーが版の履歴に残す */
-  const commitHtml = async (html: string) => {
+  /** 制作した HTML を保存する(空 = 企画の見本に戻す)。前の HTML は、サーバーが版の履歴に残す(打っている間の自動保存は、打ち始めだけ) */
+  const commitHtml = async (html: string, opts: { undo?: boolean; typing?: boolean; variant?: VariantKey } = {}) => {
     if (!live) return
     if (needMe) return setWorkError(needMe)
-    setSavingHtml({ variant: cur, html })
+    const k = opts.variant ?? cur
+    const before = savedMadeOf(k)
+    setEditingHtml((e) => (e?.variant === k && e.html === html ? null : e))
+    if (before === html) return
+    if (!opts.undo) pushUndo({ kind: 'html', variant: k, html: before })
+    const history = !(opts.typing && nowMs() - typedAt.current < 120_000)
+    if (opts.typing) typedAt.current = nowMs()
+    setSavingHtml({ variant: k, html })
     setWorkNotice(null)
-    if (await call(() => ProductionService.saveHtml(live.id, { actor, html, variant: cur }))) setSurface(html ? 'made' : 'plan')
+    if ((await call(() => ProductionService.saveHtml(live.id, { actor, html, variant: k, history }))) && !opts.typing) setSurface(html ? 'made' : 'plan')
     await load()
     setSavingHtml(null)
+  }
+  /** 文言・リンク先を打ったとき: そのまま入れ、1.5 秒たったら自動で保存する(計画と同じ) */
+  const editSnap = (next: Snapshot) => {
+    trial.cancel()
+    setEditingSnap(next)
+  }
+  /** 左のバーの「HTML」で打ったとき: そのまま制作した HTML に入れ、1.5 秒たったら自動で保存する */
+  const editHtml = (html: string) => {
+    if (trialHtml !== null) return
+    setEditingHtml({ variant: cur, html })
+    setSurface('made')
+  }
+  useEffect(() => {
+    if (!editingSnap) return
+    const id = setTimeout(() => void commitSnap(editingSnap), 1500)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingSnap])
+  useEffect(() => {
+    if (!editingHtml) return
+    const id = setTimeout(() => void commitHtml(editingHtml.html, { typing: true, variant: editingHtml.variant }), 1500)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingHtml])
+  const pendingSave = !!editingSnap || !!editingHtml
+  /** ↶: いちばん新しい保存の前に戻す(戻したことも保存する) */
+  const undo = () => {
+    const last = undoStack[undoStack.length - 1]
+    if (!last || busy || pendingSave) return
+    setUndoStack((st) => st.slice(0, -1))
+    trial.cancel()
+    if (last.kind === 'snap') void commitSnap(last.snap, { undo: true })
+    else void commitHtml(last.html, { undo: true, variant: last.variant })
+  }
+  const undoKey = useRef(undo)
+  useEffect(() => {
+    undoKey.current = undo
+  })
+  // Ctrl + Z で元に戻す(入力欄・HTML の欄の中では、ふつうの文字の取り消し。計画と同じ)
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.isComposing || ev.key.toLowerCase() !== 'z') return
+      const el = document.activeElement as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      ev.preventDefault()
+      undoKey.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  /** 閉じる前に、打ちかけのものを保存する(保存しないまま閉じて、消えないように) */
+  const close = async () => {
+    if (editingSnap) await commitSnap(editingSnap)
+    if (editingHtml) await commitHtml(editingHtml.html, { typing: true, variant: editingHtml.variant })
+    onClose()
   }
   /** 写しの直しを試す(プレビューにだけ当てはめ、帯の「確定」で保存) */
   const trySnap = (next: Snapshot, label: { key: string; from: string; to: string }) =>
@@ -497,6 +581,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   }, [snap, cur, requests, card.name])
   // 左のバーの「HTML」に出すソース(いまプレビューに出している方)
   const sourceHtml = onMade ? madeShown : generated
+  // HTML の欄で書けるのは [prod.htmledit] が公開・渡したあと・試していない間(書くと、制作した HTML になる)
+  const htmlCanEdit = htmlEditOn && canWork && trialHtml === null && !!meId
 
   // ピン(コメント)。企画の見本の上は部品の目印に、制作した HTML の上はページの中の割合に置く(詳しい制作のページと同じ見た目の名前 html-plan / html-made)
   const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
@@ -752,6 +838,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             heroes={heroes}
             aiOn={aiOn}
             onTry={trySnap}
+            onEdit={editSnap}
             onCommit={(next) => void commitSnap(next)}
             turns={turnsByPart[partKey(p)] ?? []}
             setTurns={(f) => setTurnsByPart((m) => ({ ...m, [partKey(p)]: f(m[partKey(p)] ?? []) }))}
@@ -794,7 +881,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     { v: 'talk', gap: true, on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
     { v: 'tasks', on: tasksOn, feature: 'collab.tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
     { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
-    { v: 'html', on: sampleOn || htmlEditOn, icon: <CodeRegular />, label: 'HTML', tip: t('HTML(いまプレビューに出している方のソース。読むだけ)', 'HTML (source of what the preview shows; read-only)'), count: 0 },
+    { v: 'html', on: sampleOn || htmlEditOn, icon: <CodeRegular />, label: 'HTML', tip: t('HTML(いまプレビューに出している方のソース)', 'HTML (source of what the preview shows)'), count: 0 },
     { v: 'steps', on: stepsOn, feature: 'prod.steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
   ]
   // 非公開の欄はバーに出さない。開いていた欄が非公開になったら、しまったのと同じに見せる
@@ -802,7 +889,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const openSide = side && rails.some((r) => r.v === side) ? side : null
 
   return (
-    <Dialog open surfaceMotion={instant ? null : undefined} onOpenChange={(_, d) => !d.open && onClose()}>
+    <Dialog open surfaceMotion={instant ? null : undefined} onOpenChange={(_, d) => !d.open && void close()}>
       {/* 配信カードと同じ窓(大きさの鍵も同じ)。段階のタブで計画 ↔ 制作を同じ窓のまま入れ替えるため(2026-10-29 利用者) */}
       <ResizableSurface backdropMotion={instant ? null : undefined} sizeKey="cardDetail" prefKey={PREF.cardSize} min={{ w: 900, h: 560 }} className={mergeClasses(cardStyles.surface, s.surface)} aria-label={card.name ?? ''}>
         {/* 空欄の案内(「(ヘッドライン未入力)」など)は企画で作るときのものなので、制作の画面では出さない(2026-10-28 利用者) */}
@@ -815,7 +902,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
             allCards={allCards ?? []}
             onSwitch={(id) => onSwitchCard?.(id)}
             slots={{ variants: keys.length > 1 ? variantTabs : undefined }}
-            actions={<Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
+            actions={<Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => void close()} aria-label={t('閉じる', 'Close')} />}
           />
         )}
         {/* 上の帯は、配信カード(計画)と同じ部品。題とタブの位置は、面を切り替えても動かない。状態の札だけ、同じ場所で中身を替える(2026-10-30 利用者) */}
@@ -846,6 +933,12 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               {/* 自分の番のときだけの青いボタン [prod.steps](2026-10-28 利用者。だれの番でも押せるのは左のバーの「工程」) */}
               {myStep && <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' || !resultOn ? undefined : () => setFinishedOpen(true)} needMe={needMe} />}
               {myStep && <FeatureBadge id="prod.steps" />}
+              {/* ↶ 元に戻す(計画と同じ。開いている間の、保存の前の中身へ) */}
+              {canWork && (editOn || htmlEditOn) && (
+                <Tooltip content={t('元に戻す: 前に保存した中身に戻します(開いている間の履歴)', 'Undo: go back to the content before the last save (history while open)')} relationship="description">
+                  <Button type="button" size="small" appearance="subtle" icon={<ArrowUndoRegular />} disabled={!undoStack.length || busy || pendingSave} onClick={undo} aria-label={t('元に戻す', 'Undo')} />
+                </Tooltip>
+              )}
               {/* この画面を開くリンク(計画と同じ場所。右の端の ⋯ の左) */}
               <CopyLinkButton iconOnly />
               <Menu>
@@ -895,7 +988,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                 </MenuPopover>
               </Menu>
               {/* 閉じる ×: キャンペーンの帯があれば、その右の端。なければ、この行の右の端(計画と同じ) */}
-              {!campaign && <Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} aria-label={t('閉じる', 'Close')} />}
+              {!campaign && <Button appearance="subtle" icon={<DismissRegular />} onClick={() => void close()} aria-label={t('閉じる', 'Close')} />}
             </>
           }
         />
@@ -934,10 +1027,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               {openSide === 'html' && (
                 <div className={s.htmlPane}>
                   <div className={s.head}>
-                    <span className={s.note} style={{ flexGrow: 1 }}>{onMade ? (trialHtml !== null ? t('試している HTML', 'HTML being tried') : t('制作した HTML', 'Production HTML')) : t('企画の見本の HTML', 'Plan sample HTML')}</span>
+                    <span className={s.note} style={{ flexGrow: 1 }}>
+                      {onMade ? (trialHtml !== null ? t('試している HTML', 'HTML being tried') : t('制作した HTML', 'Production HTML')) : t('企画の見本の HTML', 'Plan sample HTML')}
+                      {htmlCanEdit ? t('(書き換えると制作した HTML になり、自動で保存します)', ' (edits become the production HTML and save automatically)') : t('(読むだけ)', ' (read-only)')}
+                    </span>
                     {sourceHtml && <CopyButton text={sourceHtml} label={t('コピー', 'Copy')} />}
                   </div>
-                  {sourceHtml ? <HtmlEditor value={sourceHtml} onChange={() => undefined} readOnly reveal={onMade ? undefined : partMarks.find((m) => sourceHtml.includes(m))} ariaLabel={t('HTML(読むだけ)', 'HTML (read-only)')} /> : <Spinner size="tiny" label={t('プレビューから HTML を作っています…', 'Building HTML from the preview…')} />}
+                  {sourceHtml ? <HtmlEditor value={sourceHtml} onChange={editHtml} readOnly={!htmlCanEdit} reveal={onMade ? undefined : partMarks.find((m) => sourceHtml.includes(m))} ariaLabel={t('HTML(読むだけ)', 'HTML (read-only)')} /> : <Spinner size="tiny" label={t('プレビューから HTML を作っています…', 'Building HTML from the preview…')} />}
                 </div>
               )}
               {openSide === 'steps' && <StepsPane flow={flow} onViewResult={resultOn ? () => setFinishedOpen(true) : undefined} needMe={needMe} />}
@@ -955,7 +1051,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               ) : (
                 <Text size={200}>{t('企画の見本(部品を押すと、その材料を右に出します)', 'Plan sample (click a part to see its materials on the right)')}</Text>
               )}
-              {busy && <Spinner size="tiny" label={t('保存しています', 'Saving')} />}
+              {busy ? <Spinner size="tiny" label={t('保存しています', 'Saving')} /> : pendingSave && <Text size={200}>{t('未保存', 'Unsaved')}</Text>}
               <span className={s.grow} />
               {edited && <Badge appearance="tint" color="warning">{t('制作が直した写し', 'Edited in production')}</Badge>}
               {!onMade && (

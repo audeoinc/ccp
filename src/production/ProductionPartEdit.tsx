@@ -57,6 +57,8 @@ interface Props {
   aiOn: boolean
   /** 試す(プレビューに仮に当てはめ、上の帯の「確定」で保存する)。key が同じなら、押し直しで確定 */
   onTry: (next: Snapshot, label: { key: string; from: string; to: string }) => void
+  /** 文言・リンク先を打ったとき(そのまま入れ、画面の側が自動で保存する。計画と同じ) */
+  onEdit: (next: Snapshot) => void
   /** すぐ入れる(企画の値に戻す) */
   onCommit: (next: Snapshot) => void
   /** 部品ごとの AI のやり取り(部品を選び直しても残るよう、画面の側が持つ) */
@@ -64,7 +66,7 @@ interface Props {
   setTurns: (f: (prev: PartTurn[]) => PartTurn[]) => void
 }
 
-export function ProductionPartEdit({ part, current, trying, original, rows, productIndex, linkKey, card, products, heroes, aiOn, onTry, onCommit, turns, setTurns }: Props) {
+export function ProductionPartEdit({ part, current, trying, original, rows, productIndex, linkKey, card, products, heroes, aiOn, onTry, onEdit, onCommit, turns, setTurns }: Props) {
   const s = useStyles()
   const t = useT()
   const [uploading, setUploading] = useState(false)
@@ -96,8 +98,8 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
           {r.label}
           {was !== now && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
         </span>
-        {/* 書いている間はプレビューに仮に写し、上の帯の「確定」で保存する(書くたびに保存しない。試す → 確定) */}
-        <TextEdit value={getText(trying ?? current, r.field)} onChange={(v) => onTry(setText(current, r.field, v), { key: `text:${r.id}:${v}`, from: now, to: v })} />
+        {/* 打てばそのまま入り、画面の側が自動で保存する(計画と同じ。試す → 確定は AI と入れ替えだけ) */}
+        <TextEdit value={getText(trying ?? current, r.field)} onChange={(v) => onEdit(setText(current, r.field, v))} />
         {wasRow(was, now, () => setText(current, r.field, was))}
       </div>
     )
@@ -222,7 +224,7 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
         {t('リンク先(計測用のパラメーターは自動で付きます)', 'Link (tracking parameters are added automatically)')}
         {linkNow !== linkWas && <span className={s.changed}>{t('企画から変更', 'Changed')}</span>}
       </span>
-      <LinkEdit value={trying ? (linkRows(trying).find((r) => r.slotKey === linkKey)?.base ?? '') : linkNow} onChange={(v) => onTry(setLink(current, linkKey, v), { key: `link:${linkKey}:${v}`, from: linkNow, to: v })} />
+      <LinkEdit value={trying ? (linkRows(trying).find((r) => r.slotKey === linkKey)?.base ?? '') : linkNow} onChange={(v) => onEdit(setLink(current, linkKey, v))} />
       {wasRow(linkWas, linkNow, () => setLink(current, linkKey, linkWas))}
     </div>
   )
@@ -236,7 +238,7 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
       {hero}
       {product}
       {link}
-      <span className={s.note}>{t('直すと、プレビューに仮に当てはめます。上の帯の「確定」で保存します(配信カードは変わりません。承認はやり直しません)。', 'Edits are tried in the preview and saved with "Apply" in the bar above (the delivery card does not change; no re-approval).')}</span>
+      <span className={s.note}>{t('文言・リンク先は打てばそのまま入り、自動で保存します(↶ で戻せます)。画像・商品の入れ替えと AI の案は、プレビューで試してから、上の帯の「確定」で入ります。配信カードは変わらず、承認もやり直しません。', 'Text and links apply as you type and save automatically (undo with ↶). Image/product swaps and AI ideas are tried in the preview and applied with "Apply" in the bar above. The delivery card does not change; no re-approval.')}</span>
       {uploading && (
         <HeroUploadDialog
           market={market}
@@ -253,12 +255,12 @@ export function ProductionPartEdit({ part, current, trying, original, rows, prod
   )
 }
 
-/** 文の欄(値は、試している写しから出す。やめると、保存した値に戻る) */
+/** 文の欄(AI の案を試している間は、その値を出す) */
 function TextEdit({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return <AutoTextarea heightKey="ProductionPartEdit.text" size="small" rows={1} value={value} onChange={(_, d) => onChange(d.value)} />
 }
 
-/** リンク先の欄(打ち終えたら試す。1 文字ごとに試さない) */
+/** リンク先の欄(打ち終えたら入れる。打ちかけの URL でプレビューのリンクを崩さないように) */
 function LinkEdit({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null)
   const commit = () => {
