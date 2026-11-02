@@ -1,7 +1,7 @@
 // 制作の材料を 1 行ずつ写す欄(P10・P11・P21。2026-11-02 Plan と Production のシンプル版を仕上げる)。
 // シンプルな制作の画面の、何も選んでいないときのペイン(配信の全体)に差し込む: 商品(画像・コード・価格・URL)、リンク先と計測の対応表(utm_content)、部品の画像。
 // 制作がいちばん写すものなので、行ごとにコピーのボタン(CopyButton。配信カードと同じ形)、見出しの右に「すべてコピー」(表計算に貼れるタブ区切り)。
-// 詳しい制作の画面の ProductionInfoPane と同じ中身を、シンプルの見た目(LabeledValue・見出し 13px)で出す。直すのは部品のペインで(ここは写すだけ)
+// 詳しい制作の画面(2026-11-02 に消した)と同じ中身を、シンプルの見た目(LabeledValue・見出し 13px)で出す。直すのは部品のペインで(ここは写すだけ)
 import type { ReactNode } from 'react'
 import { InfoLabel, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { linkRows, productRows, rowsText, trackingRows, type Snapshot } from '../productionSnapshot'
@@ -31,6 +31,9 @@ const useStyles = makeStyles({
   meta: { display: 'flex', flexWrap: 'wrap', columnGap: '12px', rowGap: '2px', minWidth: 0 },
   url: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
   caption: typo.caption,
+  // 「詳しく」の見出し・説明文(X80 段 ④)。制作がそのまま HTML に入れるので、全文を見せてコピーできるように
+  detail: { display: 'grid', rowGap: '4px', marginTop: '4px', paddingTop: '4px', borderTop: `1px dashed ${tokens.colorNeutralStroke2}`, minWidth: 0 },
+  detailBody: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontWeight: tokens.fontWeightRegular },
 })
 
 /** 見出し(題・数・ⓘ)と、右に「すべてコピー」 */
@@ -73,13 +76,16 @@ export function ProductMaterialRows({ snapshot, variant, onSelect }: RowsProps &
   const on = useFeature('prod.page')
   if (!on) return null
   const rows = productRows(snapshot, variant)
-  const line = (r: (typeof rows)[number]) => [r.section, r.product.name, r.product.product_code, r.price, r.url].filter(Boolean).join('\t')
+  // 表計算に貼る形なので、説明文の改行・タブは空白にする
+  const cell = (v?: string) => (v ?? '').replace(/\s+/g, ' ').trim()
+  const hasDetail = rows.some((r) => r.detail)
+  const line = (r: (typeof rows)[number]) => [r.section, r.product.name, r.product.product_code, r.price, r.url, ...(hasDetail ? [cell(r.detail?.title), cell(r.detail?.body)] : [])].join('\t')
   return (
     <MaterialSection
       title={t('商品', 'Products')}
       count={rows.length}
       badge={<FeatureBadge id="prod.page" />}
-      copyAll={rows.length ? ['section\tname\tproduct_code\tprice\turl', ...rows.map(line)].join('\n') : undefined}
+      copyAll={rows.length ? [`section\tname\tproduct_code\tprice\turl${hasDetail ? '\tdetail_title\tdetail_body' : ''}`, ...rows.map(line)].join('\n') : undefined}
       copyAllLabel={t('商品をすべてコピー(表計算に貼れる形)', 'Copy all products (for a spreadsheet)')}
     >
       {rows.length ? (
@@ -101,6 +107,16 @@ export function ProductMaterialRows({ snapshot, variant, onSelect }: RowsProps &
                   {r.section && <LabeledValue label={t('セクション', 'Section')}>{r.section}</LabeledValue>}
                 </span>
                 {r.url && <span className={s.url}>{r.url}</span>}
+                {r.detail && (
+                  <span className={s.detail}>
+                    <LabeledValue label={t('詳しくの見出し', 'Detail heading')} layout="stacked" empty="unset" copy>
+                      {r.detail.title}
+                    </LabeledValue>
+                    <LabeledValue label={t('詳しくの説明文', 'Detail description')} layout="stacked" empty="unset" copy valueClassName={s.detailBody}>
+                      {r.detail.body}
+                    </LabeledValue>
+                  </span>
+                )}
               </span>
               <CopyButton text={r.url} label={t('商品ページの URL をコピー(計測用のパラメーターつき)', 'Copy the product page URL (with tracking)')} />
             </div>
@@ -181,7 +197,7 @@ export function LinkMaterialRows({ snapshot, variant, onSelect }: RowsProps & { 
 
 /**
  * 部品の画像(P21): 配信の国のライブラリにある、期限内のボタン・バナー・ロゴ・アイコン。URL か <img> のタグをコピーして HTML に貼る。
- * 中身は詳しい制作の画面と同じ PartPicker(コピーの 2 つのボタン・タグの作り方を 1 つにしておくため)
+ * 中身は配信カードと同じ PartPicker(コピーの 2 つのボタン・タグの作り方を 1 つにしておくため)
  */
 export function PartImageRows({ market }: { market: 'US' | 'JP' | null }) {
   const t = useT()

@@ -1,6 +1,7 @@
 """商品ページから、配信で使う商品の画像を選ぶ(server/ccp/product_pages.py。X64)"""
 import unittest
 
+from ccp import ai
 from ccp import product_pages as pp
 
 
@@ -165,7 +166,7 @@ class JudgedAngleTest(unittest.TestCase):
 
         body = pp.SuggestIn(images=[pp.SuggestImage(src="/img/products/a.jpg"), pp.SuggestImage(src="/img/products/b.jpg")])
         with mock.patch.object(pp, "judged_angles", judged), mock.patch.object(pp, "save_angles", save), \
-                mock.patch.object(pp, "get_client", lambda: client), mock.patch.object(pp, "_read", lambda src: (b"jpg", "image/jpeg")):
+                mock.patch.object(ai, "get_client", lambda: client), mock.patch.object(pp, "_read", lambda src: (b"jpg", "image/jpeg")):
             out = asyncio.run(pp.suggest(body))["data"]
         # 判断済みの画像は、文字だけ(画像の中身は 1 枚だけ渡す)
         self.assertTrue(any(isinstance(c, str) and "判断済み: アングル texture・生地の寄り" in c for c in sent))

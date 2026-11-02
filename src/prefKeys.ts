@@ -8,6 +8,8 @@ export const PREF = {
   lang: 'ui.lang',
   /** 表示の大きさ(数を文字で) */
   uiScale: 'ui.scale',
+  // 自動で 100% 以外にしたことを知らせたか(最初の 1 回だけ出す。settings.me.autoscale)
+  uiScaleAutoNoticed: 'ui.scale.autoNoticed',
   /** 国(X33。どの国の仕事をしているか。'' = すべての国) */
   country: 'ccp.country',
   /** 新規作成・一括作成で最後に選んだ国(ヘッダーが「すべての国」のときの、国の初期値。2026-10-27 利用者) */
@@ -46,7 +48,6 @@ export const PREF = {
   productionPaneWidths: 'productionPage.paneWidths.v1',
   // 制作の面のシンプルな画面(X86): ペインの幅と、シンプル / 詳しいのどちらで開くか(消すまでは並べて残す)
   productionSimplePaneWidths: 'productionSimple.paneWidths.v1',
-  productionSimple: 'productionPage.simple',
   productionSimpleZoom: 'productionSimple.previewZoom',
   productionPreviewZoom: 'productionPage.previewZoom',
   bulkPaneWidths: 'bulkWorkspace.paneWidths.v1',

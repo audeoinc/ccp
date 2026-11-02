@@ -35,6 +35,8 @@ const RULES = [
   ['exclude', /^server\/requirements-hosted\.txt$/],
   ['exclude', /^server\/tests\/test_hosted_/],
   ['exclude', /^\.github\//],
+  // AI の出口の見本の層(docs/AI_OUTLET.md。CCP を動かす環境が、層を作る出発点にする)。下の tools/ を外すより先に入れる
+  ['include', /^tools\/ai-outlet\/sample_layer\.py$/],
   // Copilot Studio を CCP から呼ぶ検証の道具と、それを ZIP に固めるスクリプト(開発側で使う。手順と結果の docs/MS_AI_VERIFY.md は入れる)
   ['exclude', /^(tools\/|scripts\/pack-ms-verify\.mjs$)/],
   // 開発用の文書(開発の進め方・本番の運用。利用先には、release/workbench/files の版を渡す)
@@ -64,7 +66,7 @@ const RULES = [
   ['include', /^server\/tests\//],
   ['include', /^server\/(requirements(-tools)?\.txt|schema\.json|seed\.json|workbench\.env\.example)$/],
   // 道具(Workbench の操作・npm run verify の確認・初期データ・文書の生成)
-  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts|slots|template-ai)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
+  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts|slots|template-ai|scale)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
   // 文書(Workbench の手引き・設計・機能・開発の経緯・バックログ・ソースマップ)
   ['include', /^docs\//],
 ]

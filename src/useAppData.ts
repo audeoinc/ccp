@@ -162,7 +162,12 @@ export function useAppData(opts: {
           // (rows は、候補と B・C 案を除いた行。selectedSlots でも、候補の 1000 番台の行は枠に置かない)
           const rowsByCard = new Map<string, typeof rows>()
           for (const r of rows) if (r.product_id) rowsByCard.set(r.delivery_card_id!, [...(rowsByCard.get(r.delivery_card_id!) ?? []), r])
-          setCardSlots(new Map([...rowsByCard].map(([id, list]) => [id, selectedSlots(list, '', (r) => ({ key: r.id, productId: r.product_id!, reason: '', source: SOURCE_MANUAL })).map((i) => (i.gap ? '' : i.productId))])))
+          // 「詳しく」の見出し・説明文も、同じ並びで(制作の写し・プレビューで、その枠を詳しくの形で描くため。X80 段 ④)
+          const slotsByCard = [...rowsByCard].map(([id, list]) => [id, selectedSlots(list, '', (r) => ({ key: r.id, productId: r.product_id!, reason: '', source: SOURCE_MANUAL, ...(r.display === 'detail' ? { detail: { title: r.detail_title ?? '', body: r.detail_body ?? '' } } : {}) }))] as const)
+          setCardSlots(
+            new Map(slotsByCard.map(([id, items]) => [id, items.map((i) => (i.gap ? '' : i.productId))])),
+            new Map(slotsByCard.filter(([, items]) => items.some((i) => i.detail)).map(([id, items]) => [id, items.map((i) => i.detail ?? null)])),
+          )
           const byVariant = new Map<string, Partial<Record<VariantKey, string[]>>>()
           for (const r of (res.data ?? []).filter((x) => x.delivery_card_id && x.variant && x.product_id && x.state !== STATE_CANDIDATE).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))) {
             const m = byVariant.get(r.delivery_card_id!) ?? {}

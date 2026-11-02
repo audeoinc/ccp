@@ -1,7 +1,7 @@
 // 制作の工程(X86 の ①。FEATURE_FLAGS の prod.steps・prod.result)。制作のシンプルな画面で使う、段の決め方と、段を進める操作(ボタンは StepAction.tsx)。
-// 段は詳しい制作のページ(ProductionPage の工程の帯)と同じ: ① 制作に渡す(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 仕上がりの確認(企画)→ ⑤ 配信のしくみに送る(企画)。
+// 段: ① 制作に渡す(企画)→ ② 受け取る(制作)→ ③ 制作する(制作)→ ④ 仕上がりの確認(企画)→ ⑤ 配信のしくみに送る(企画)。
 // シンプルでは、題の行に「自分の番のときだけ」青いボタンを出し(2026-10-28 利用者)、段の道のりと、だれの番でも押せるボタンは左のバーの「工程」に置く。
-// ① の「制作に渡す」は、配信カードの「渡すもの」で行う(詳しい制作のページを消す段で、配信カードの中だけで済むようにする)
+// ① の「制作に渡す」は、配信カードの「渡すもの」から開いたシンプルな制作の画面が、裏で 1 回だけ行う(act.request。K1)
 import { useState } from 'react'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { ProductionRequest } from '../models/productionRequests'
@@ -41,7 +41,7 @@ export function useProductionFlow({ card, live, actor, html, variantHtml, onChan
   const [notice, setNotice] = useState<string | null>(null)
   const approved = canGoProduction(card)
   const status = live?.status
-  // いまの段(詳しい制作のページと同じ数え方。-1 = 承認の前・0 = 渡す前 … 5 = 送った)
+  // いまの段(-1 = 承認の前・0 = 渡す前 … 5 = 送った)
   const current = !approved ? -1 : !live ? 0 : status === 'requested' ? 1 : status === 'in_progress' ? 2 : status === 'done' ? 3 : status === 'checked' ? 4 : 5
   // 近道(制作を通さずに送った)は ② ③ を、確認を作る前に送った版は ④ を「飛ばした」にする
   const skipped = status === 'sent' && !live?.received_at && !live?.done_at
@@ -90,8 +90,25 @@ export function useProductionFlow({ card, live, actor, html, variantHtml, onChan
     }
   }
   const input = { actor, week_start: weekStart }
+  // 渡す・近道で、いまの中身と HTML を固める入力
+  const freezeInput = (snapshot: string, html: string, variantHtml?: string) => ({
+    delivery_card_id: card.id,
+    actor,
+    snapshot,
+    instructions: card.instructions ?? '',
+    production_owner: card.production_owner ?? '',
+    production_due: card.production_due ?? '',
+    html,
+    variant_html: variantHtml,
+    week_start: weekStart,
+  })
   const act = {
-    receive: () => live && run(() => ProductionService.receive(live.id, input), tr('受け取りました', 'Received')),
+    /**
+     * ① 制作に渡す(K1。prod.handoff)。配信カードの「制作に渡す」から開いたときに、画面が裏で 1 回だけ呼ぶ。
+     * snapshot は、いまの配信カードから作った写し。html は見本の HTML(AB テストは B・C 案も variantHtml で一緒に固める)
+     */
+    request: (snapshot: string, html: string, variantHtml?: string) => run(() => ProductionService.request(freezeInput(snapshot, html, variantHtml)), tr('制作に渡しました', 'Handed off to production')),
+    receive:() => live && run(() => ProductionService.receive(live.id, input), tr('受け取りました', 'Received')),
     done: (note: string, link: string) => live && run(() => ProductionService.done(live.id, { ...input, note, link }), tr('制作が終わりました', 'Marked as done')),
     check: () => live && run(() => ProductionService.check(live.id, input), tr('仕上がりを確認しました', 'Checked the result')),
     revise: (note: string) => (live ? run(() => ProductionService.revise(live.id, { ...input, note }), tr('制作に戻しました', 'Sent back to production')) : Promise.resolve(false)),
@@ -105,21 +122,7 @@ export function useProductionFlow({ card, live, actor, html, variantHtml, onChan
      */
     sendDirect: async (snapshot: string) => {
       if (!(await confirmDialog(tr('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?')))) return
-      void run(
-        () =>
-          ProductionService.send({
-            delivery_card_id: card.id,
-            actor,
-            snapshot,
-            instructions: card.instructions ?? '',
-            production_owner: card.production_owner ?? '',
-            production_due: card.production_due ?? '',
-            html: html(),
-            variant_html: variantHtml,
-            week_start: weekStart,
-          }),
-        tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'),
-      )
+      void run(() => ProductionService.send(freezeInput(snapshot, html(), variantHtml)), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
     },
     /** いちばん新しく終えた段を、まだ終えていない状態に戻す(渡した段なら、取り下げる) */
     undo: async () => {

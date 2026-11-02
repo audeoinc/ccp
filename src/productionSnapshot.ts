@@ -2,7 +2,7 @@
 // 「この内容で制作に依頼する」を押した時点の配信の中身を固めて保存し、制作のページはそれを見る(あとで配信カードを変えても、黙って変わらない)。
 // 依頼する前(下書き)は、いまの配信カードの中身から同じ形を作って見せる。
 // コピーしやすい行(テキスト・商品・リンク先)と、プレビューの HTML の書き出しも、ここにまとめる(React を使わない)
-import { idsToItems } from './slots'
+import { idsToItems, slotDetailsOf, type SlotDetail } from './slots'
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -63,6 +63,11 @@ export interface Snapshot {
   utm?: number
   /** AB テスト(X55)。B・C 案の商品とメイン画像(比べる要素でないものは A と同じ)。制作のページでは見るだけ(直すのは配信カードで) */
   ab?: { summary: string; variants: SnapshotVariant[]; /** 案から選ぶ(まだ決まっていない。X57) */ choose?: boolean }
+  /**
+   * 「詳しく」にした枠の見出し・説明文(X80 段 ④。productIds と同じ並び。詳しくでない枠は null)。制作は、この文をそのまま HTML に入れる。
+   * 詳しくの枠がない写し・古い写しは、ない
+   */
+  details?: (SlotDetail | null)[]
 }
 
 export interface SnapshotVariant {
@@ -101,9 +106,12 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     products: products.filter((p) => used.has(p.id)),
     hero,
     utm: UTM_SCHEME,
+    ...withDetails(slotDetailsOf(card.id, productIds)),
     ...(ab && variants ? { ab: { summary: abSummary(ab), variants, ...(isChoose(ab) ? { choose: true } : {}) } } : {}),
   }
 }
+
+const withDetails = (details?: (SlotDetail | null)[]) => (details?.some(Boolean) ? { details } : {})
 
 export function parseSnapshot(json?: string | null): Snapshot | null {
   if (!json) return null
@@ -118,7 +126,7 @@ export function parseSnapshot(json?: string | null): Snapshot | null {
 const isPushCard = (s: Snapshot) => s.card.channel === CHANNEL_PUSH
 export const templateOf = (s: Snapshot): EmailTemplateId => templateKeyOfCard(s.card)
 // 商品の並びは枠の位置のまま(空いた枠は ''。前のセクションを空けて後ろのセクションに置いた商品を、その枠に描く。src/slots.ts)
-const items = (s: Snapshot): Item[] => idsToItems(s.productIds)
+const items = (s: Snapshot): Item[] => idsToItems(s.productIds, s.details)
 const parseCopies = (v?: string): string[] => {
   if (!v) return []
   try {
@@ -276,7 +284,9 @@ export const variantSnapshot = (s: Snapshot, v: SnapshotVariant): Snapshot => {
         part_content: v.texts.parts ? encodePartContent(v.texts.parts) : s.card.part_content,
       }
     : {}
-  return { ...s, productIds: v.productIds, hero: v.hero, card: { ...s.card, ...layout, ...texts } }
+  // 「詳しく」は A 案の枠のもの。商品やテンプレートが A と違う案には付けない(枠がずれるため)
+  const sameSlots = !v.template && v.productIds.length === s.productIds.length && v.productIds.every((x, i) => x === s.productIds[i])
+  return { ...s, productIds: v.productIds, hero: v.hero, card: { ...s.card, ...layout, ...texts }, details: sameSlots ? s.details : undefined }
 }
 
 export interface ProductRow {
@@ -287,6 +297,8 @@ export interface ProductRow {
   price: string
   /** 商品ページの URL(計測用のパラメーター付き)。アプリは開く画面 */
   url: string
+  /** 「詳しく」にした枠の見出し・説明文(X80 段 ④) */
+  detail?: SlotDetail
 }
 
 /** 選定された商品(セクションごと、メールの並び順) */
@@ -306,7 +318,8 @@ export function productRows(s: Snapshot, variant?: VariantKey): ProductRow[] {
         : ''
       : // 表の箱は、押せる要素ごとにリンクが分かれる(版 3)。ここには、いちばん上の要素(ふつうは写真)のリンクを出す。全部は計測の対応表(trackingRows)に
         withUtm(productUrl(product), utm, productLinks(templateOf(s), i, `${pid}-${i}`, product.product_code, schemeOf(s))[0]?.content)
-    return [{ section: sec?.label ?? '', product, at: i, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url }]
+    const detail = s.details?.[i] ?? undefined
+    return [{ section: sec?.label ?? '', product, at: i, price: priceText(product.price, product.market === 'US' ? 'US' : 'JP'), url, ...(detail ? { detail } : {}) }]
   })
 }
 
@@ -417,7 +430,27 @@ export function setProducts(s: Snapshot, productIds: string[], all: Product[]): 
     const p = all.find((x) => x.id === id)
     if (p) known.set(id, p)
   }
-  return { ...s, productIds, products: productIds.map((id) => known.get(id)).filter((p): p is Product => !!p).filter((p, i, a) => a.indexOf(p) === i) }
+  return { ...s, productIds, products: productIds.map((id) => known.get(id)).filter((p): p is Product => !!p).filter((p, i, a) => a.indexOf(p) === i), details: moveDetails(s, productIds) }
+}
+
+/**
+ * 並びを替えたあとの「詳しく」。動かした商品には、その商品の見出し・説明文が付いていく。
+ * 入れ替えた枠(前の商品がいなくなった)は、配信カードと同じく「詳しく」のまま、見出し・説明文を空にする
+ */
+function moveDetails(s: Snapshot, productIds: string[]): (SlotDetail | null)[] | undefined {
+  const old = s.details
+  if (!old?.some(Boolean)) return undefined
+  const used = new Set<number>()
+  const out = productIds.map((pid, i) => {
+    const from = s.productIds.findIndex((x, j) => x === pid && !!pid && !used.has(j))
+    if (from >= 0) {
+      used.add(from)
+      return old[from] ?? null
+    }
+    const gone = s.productIds[i] && !productIds.includes(s.productIds[i])
+    return pid && gone && old[i] ? { title: '', body: '' } : null
+  })
+  return out.some(Boolean) ? out : undefined
 }
 
 /** 項目をまとめてコピーするときの文字(見出し: 値 を 1 行ずつ) */
@@ -446,9 +479,12 @@ export function previewHtml(root: HTMLElement, title: string, links: Record<stri
   const dst = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))]
   // リンクの場所(メイン画像・ボタン・商品の枠)を、あとで <a> で包む(印は下で外すので、先に拾う)
   const wraps: { out: HTMLElement; href: string }[] = []
+  // 「詳しく」の枠(X80 段 ④)。書式を写したあとで、表の 1 行に組み直す(印は下で外すので、先に拾う)
+  const details: { el: HTMLElement; out: HTMLElement }[] = []
   src.forEach((el, i) => {
     const out = dst[i]
     if (!out) return
+    if (el.dataset.detail === '1') details.push({ el, out })
     // 表の箱(UTM の版 3)は、枠まるごとではなく、押せる要素(data-el)ごとにリンクが来る。リンクの来ている目印を使う
     const at = el.dataset.link === 'hero' ? 'hero' : el.dataset.link === 'button' ? el.dataset.linkId : [el.dataset.itemKey, el.dataset.el, el.dataset.headerLink].find((k) => k && links[k])
     const href = at ? links[at] : undefined
@@ -468,6 +504,7 @@ export function previewHtml(root: HTMLElement, title: string, links: Record<stri
     if (el.dataset.asImage) out.before(document.createComment(tr(' 制作へ: この文字は画像にしてください(縦の文字は、メールで崩れやすいため) ', ' To production: render this text as an image (vertical text breaks in many email clients) ')))
   })
   clone.querySelectorAll('button, input, textarea, select, svg').forEach((n) => n.remove())
+  for (const d of details) detailTable(d.el, d.out)
   // <a> の中に <a> は置けないので、ほかのリンクの場所を含む場所(ボタンを中に持つメイン画像など)は包まない(中のリンクを生かす)
   const hasInner = (w: { out: HTMLElement }) => wraps.some((x) => x !== w && w.out.contains(x.out))
   for (const w of wraps.filter((x) => !hasInner(x))) {
@@ -480,8 +517,47 @@ export function previewHtml(root: HTMLElement, title: string, links: Record<stri
   }
   const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return prettyHtml(
-    `<!doctype html>\n<html lang="${navigator.language.startsWith('ja') ? 'ja' : 'en'}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)}</title>\n</head>\n<body style="margin:0;background:#ffffff">\n${clone.outerHTML}\n</body>\n</html>\n`,
+    `<!doctype html>\n<html lang="${navigator.language.startsWith('ja') ? 'ja' : 'en'}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)}</title>\n${details.length ? DETAIL_CSS : ''}</head>\n<body style="margin:0;background:#ffffff">\n${clone.outerHTML}\n</body>\n</html>\n`,
   )
+}
+
+// 「詳しく」の枠を、スマホでは写真と説明を縦に積む(メールのしくみの多くは、<style> の @media を読む。読まないものでは、横並びのまま)
+const DETAIL_CSS = '<style>\n@media only screen and (max-width: 480px) {\n  .ccp-detail-photo, .ccp-detail-text { display: block !important; width: 100% !important; padding: 0 !important; }\n  .ccp-detail-photo { padding-bottom: 12px !important; }\n}\n</style>\n'
+
+/**
+ * 「詳しく」の枠(画面では CSS の grid で、左に写真・右に見出しと説明)を、メールで崩れにくい表(table)の横いっぱいの 1 行にする。
+ * 写真の幅の割合と間の幅は、画面に描いたものから取る。スマホで縦に積むのは DETAIL_CSS
+ */
+function detailTable(el: HTMLElement, out: HTMLElement) {
+  const grid = el.firstElementChild as HTMLElement | null
+  const gridOut = out.firstElementChild as HTMLElement | null
+  const photo = gridOut?.children[0] as HTMLElement | undefined
+  const text = gridOut?.children[1] as HTMLElement | undefined
+  if (!grid || !gridOut || !photo || !text) return
+  const whole = grid.getBoundingClientRect().width
+  const left = (grid.children[0] as HTMLElement | undefined)?.getBoundingClientRect().width ?? 0
+  const pct = whole > 0 ? Math.round((left / whole) * 100) : 42
+  const gap = parseFloat(getComputedStyle(grid).columnGap) || 16
+  const doc = out.ownerDocument
+  const table = doc.createElement('table')
+  for (const [k, v] of [['role', 'presentation'], ['width', '100%'], ['cellpadding', '0'], ['cellspacing', '0'], ['border', '0']]) table.setAttribute(k, v)
+  table.setAttribute('style', 'width:100%;border-collapse:collapse')
+  const tr = doc.createElement('tr')
+  const cell = (cls: string, style: string, child: HTMLElement, width?: string) => {
+    const td = doc.createElement('td')
+    td.setAttribute('class', cls)
+    td.setAttribute('valign', 'top')
+    if (width) td.setAttribute('width', width)
+    td.setAttribute('style', style)
+    td.appendChild(child)
+    return td
+  }
+  // 写真は、枠の幅に合わせて縮む形に(画面の px の幅・高さのままだと、スマホで縦に積んだときにはみ出す)
+  if (photo instanceof HTMLImageElement) photo.setAttribute('style', `${photo.getAttribute('style') ?? ''};display:block;width:100%;max-width:100%;height:auto`)
+  tr.appendChild(cell('ccp-detail-photo', `width:${pct}%;vertical-align:top;padding:0 ${gap}px 0 0`, photo, `${pct}%`))
+  tr.appendChild(cell('ccp-detail-text', 'vertical-align:top', text))
+  table.appendChild(tr)
+  gridOut.replaceWith(table)
 }
 
 // 中身のない要素(閉じタグを書かない)と、中の空白をそのまま残す要素

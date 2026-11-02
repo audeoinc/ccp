@@ -157,7 +157,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'content.hero.upload', group: 'area.content.hero', ...named('持っている画像を上げる', 'Upload your own image'), version: 'MVP', size: 'S' },
   { id: 'content.products', group: 'area.content.products', ...named('商品を探して入れる・入れ替える・外す・並べ替える', 'Find, add, replace, remove and reorder products'), version: 'MVP' },
   { id: 'content.products.pageimage', group: 'area.content.products', ...named('商品の画像を選ぶ(取り込んだ画像・BigQuery の画像・貼り付け・ファイル・画像の URL から)', 'Choose product images (imported, BigQuery, paste, file, image URL)'), version: 'MVP', size: 'S' },
-  { id: 'content.products.pagefetch', group: 'area.content.products', ...named('商品ページの URL を読んで、画像を拾ってくる', 'Read a product page URL and collect its images'), version: 'v2', size: 'M' },
+  { id: 'content.products.pagefetch', group: 'area.content.products', ...named('商品ページの URL を読んで、画像を拾ってくる', 'Read a product page URL and collect its images'), version: 'v1', size: 'M' },
   { id: 'content.parts', group: 'area.content.parts', ...named('配信ごとに書き換える・テンプレートに戻す', 'Rewrite per delivery / back to the template'), version: 'MVP', size: 'S' },
   { id: 'content.links', group: 'area.content.links', ...named('送る URL を直す・utm を見る', 'Edit send URLs and see utm'), version: 'MVP', size: 'S' },
   // 配信カードの左のバーの「リンク」(G1・G2。部品ごとに開かずに、全部のリンクを一度に見て、まとめて直す。2026-11-02)
@@ -223,6 +223,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'product.policy', group: 'area.alerts.product', ...named('販売方針・販促', 'Sales policy and promotions'), version: 'v1', size: 'S' },
   { id: 'product.ads', group: 'area.alerts.ads', ...named('商品別の外部広告の列・印', 'External ad columns and marks by product'), version: 'v4', size: 'S' },
   { id: 'settings.me', group: 'area.settings.me', ...named('言語・ヒント', 'Language and hints'), version: 'always' },
+  { id: 'settings.me.autoscale', group: 'area.settings.me', ...named('開いたときの画面の大きさを、画面に合わせて決める', 'Fit the display size to the screen when opening'), version: 'MVP', size: 'S' },
   { id: 'settings.country.templates', group: 'area.settings.country', ...named('使うテンプレート', 'Templates to use'), version: 'MVP', size: 'S' },
   { id: 'settings.country.rules', group: 'area.settings.country', ...named('使う決まり・アラートの基準', 'Rules and alert criteria to use'), version: 'v1', size: 'S' },
   // 使う学びは、学び(results.learnings。v3)を前提にするので、決まり・アラートの基準(v1)から分けた(2026-11-02 利用者)

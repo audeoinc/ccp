@@ -1,5 +1,5 @@
 import type { DeliveryCard } from './models/deliveryCards'
-import { idsToItems, slotIdsOf } from './slots'
+import { idsToItems, slotDetailsOf, slotIdsOf, type SlotDetail } from './slots'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import type { Item } from './items'
@@ -30,6 +30,8 @@ interface Props {
   heroes: HeroImage[]
   /** メールの幅(スマホ / PC)。渡さなければ、これまでどおりの幅 */
   device?: 'mobile' | 'pc'
+  /** 枠ごとの「詳しく」(productIds と同じ並び。制作の写しの details)。渡さなければ、読み込んだ配信の並びのときだけ、その配信のもの */
+  details?: (SlotDetail | null)[]
 }
 
 /**
@@ -37,12 +39,13 @@ interface Props {
  * 週の表示・一覧のマウスを重ねたときのプレビュー、配信結果の画面、まとめて作るの案のプレビューで使う。
  * 商品の枠には data-item-key(`商品ID-並び順`)が付くので、外から位置を探せる
  */
-export function CardPreview({ card: c, productIds, products, heroes, device }: Props) {
+export function CardPreview({ card: c, productIds, products, heroes, device, details }: Props) {
   const isPush = c.channel === CHANNEL_PUSH
   // 使った版の形で描く
   const templateId = templateKeyOfCard(c)
   // 空いた枠('')は、空きの枠として描く(前のセクションを空けて後ろのセクションに置いた商品を、その枠に描くため。src/slots.ts)
-  const items: Item[] = idsToItems(slotIdsOf(c.id, productIds))
+  const ids = slotIdsOf(c.id, productIds)
+  const items: Item[] = idsToItems(ids, details ?? slotDetailsOf(c.id, ids))
   return (
     <Preview
       channel={isPush ? 'push' : 'email'}

@@ -100,7 +100,8 @@ import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
 import { loadSimpleProduction } from './simpleProductionChunk'
-import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, ProductionPage, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { UiScaleNotice } from './UiScaleNotice'
+import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 import { isOn, useFeature, useFeatureVersion } from './featureFlags'
 import { FeatureBadge } from './FeatureBadge'
@@ -331,13 +332,6 @@ function App() {
   const [productionKey, setProductionKey] = useState(0)
   // 制作のページを開いたら、そのまま制作に依頼するか(シンプルな配信カードの「制作に渡す」)
   const [productionAuto, setProductionAuto] = useState(false)
-  // 制作のページを、シンプル(X86)と詳しいのどちらで開くか(人ごとに覚える。詳しいほうは消すまで並べて残す)。
-  // 「制作に渡す」から開くときは、渡す処理が詳しいほうにあるので、詳しいほうで開く(渡すのを配信カードへ移すのは、詳しいほうを消す段)
-  const [productionSimple, setProductionSimple] = useState(() => loadPref<boolean>(PREF.productionSimple, true))
-  const switchProductionView = (simple: boolean) => {
-    savePref(PREF.productionSimple, simple)
-    setProductionSimple(simple)
-  }
   // 配信カードの、同じ窓で制作の画面に移る前の確かめ(CardDetail が入れる)
   const cardLeaveRef = useRef<(() => Promise<boolean>) | null>(null)
   const goStage = async (id: string, f: Face) => {
@@ -345,13 +339,13 @@ function App() {
     setProductionAuto(false)
     // シンプルな制作の画面とは、同じ窓のまま中身だけを入れ替える(2026-10-29 利用者: 上にもう 1 つ開かず、× で全部閉じる)。
     // 窓の出てくる動きは付けない(きょうだいの切り替えと同じ instant。チカつかないように)
-    if (f === 'calendar' && productionSimple && productionOpen === id && selectedId !== id) {
+    if (f === 'calendar' && productionOpen === id && selectedId !== id) {
       setPeekResult(null)
       setProductionOpen(null)
       openNext(id)
       return
     }
-    if (f === 'production' && productionSimple && selectedId === id) {
+    if (f === 'production' && selectedId === id) {
       if (!(await (cardLeaveRef.current?.() ?? Promise.resolve(true)))) return
       // 制作の画面のプログラムを読み終わってから入れ替える(読む間に配信カードだけ閉じて、カレンダーが見えないように)
       await loadSimpleProduction()
@@ -378,8 +372,8 @@ function App() {
   }
   // 配信カードを開いたら、制作の画面のプログラムを裏で読んでおく(PRODUCTION のタブで、すぐ切り替えられるように)
   useEffect(() => {
-    if (selectedId && productionSimple) void loadSimpleProduction()
-  }, [selectedId, productionSimple])
+    if (selectedId) void loadSimpleProduction()
+  }, [selectedId])
   const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => void goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
   const openCard = (id: string) => (onProduction ? setProductionOpen(id) : setSelectedId(id))
@@ -999,6 +993,8 @@ function App() {
             <MessageBarBody>{error}</MessageBarBody>
           </MessageBar>
         )}
+        {/* 表示の大きさを画面に合わせて決めたときの、最初の 1 回のお知らせ(settings.me.autoscale) */}
+        <UiScaleNotice className={styles.alert} />
         {policyWarning && (
           <MessageBar layout="multiline" intent="warning" className={styles.alert}>
             <MessageBarBody>{policyWarning}</MessageBarBody>
@@ -1574,8 +1570,8 @@ function App() {
           }}
           // 制作のページは、配信カードの上に重ねて開く(PR4)
           onOpenProduction={(id, opts) => {
-            // シンプルな配信カードの「制作に渡す」は、開いた(詳しい)制作のページで、そのまま依頼まで進める。
-            // 渡す処理は詳しいほうにあるので、配信カードの上に重ねて開く(同じ窓の切り替えにしない。渡すのを配信カードへ移す段で変える)
+            // 配信カードの「制作に渡す」は、開いた制作の画面で、そのまま渡すまで進める(K1。シンプルな制作の画面が渡す)。
+            // 配信カードの上に重ねて開く(渡したあと、× で配信カードに戻れるように)
             if (opts?.request) {
               setPeekResult(null)
               setProductionAuto(true)
@@ -1624,31 +1620,8 @@ function App() {
         <Later><ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} /></Later>
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
-      {productionOpen && cards.find((c) => c.id === productionOpen) && productionSimple && !productionAuto && (
+      {productionOpen && cards.find((c) => c.id === productionOpen) && (
         <Later><SimpleProductionView
-          key={`${productionOpen}:${productionKey}`}
-          card={cards.find((c) => c.id === productionOpen)!}
-          productIds={cardProducts.get(productionOpen) ?? []}
-          variantIds={variantProducts.get(productionOpen)}
-          products={products}
-          productImages={cardImages.get(productionOpen)}
-          heroes={heroes}
-          people={owners}
-          onClose={() => setProductionOpen(null)}
-          onFullView={() => switchProductionView(false)}
-          instant={productionOpen === instantId}
-          onChanged={() => void production.reload()}
-          stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
-          allCards={cards}
-          // キャンペーンの帯のタブで、きょうだいの配信の制作の画面へ(窓の出てくる動きなし。配信カードのきょうだいの切り替えと同じ)
-          onSwitchCard={(id) => {
-            setInstantId(id)
-            setProductionOpen(id)
-          }}
-        /></Later>
-      )}
-      {productionOpen && cards.find((c) => c.id === productionOpen) && (!productionSimple || productionAuto) && (
-        <Later><ProductionPage
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}
@@ -1661,13 +1634,17 @@ function App() {
             setProductionOpen(null)
             setProductionAuto(false)
           }}
-          onOpenCard={(id) => void goStage(id, 'calendar')}
-          onChanged={() => void production.reload()}
           autoRequest={productionAuto}
-          stageNav={stageNav(cards.find((c) => c.id === productionOpen)!, 'production')}
-          onSimpleView={() => {
+          onAutoRequested={() => setProductionAuto(false)}
+          instant={productionOpen === instantId}
+          onChanged={() => void production.reload()}
+          stageTabs={stageNav(cards.find((c) => c.id === productionOpen)!, 'production', 'tabs')}
+          allCards={cards}
+          // キャンペーンの帯のタブで、きょうだいの配信の制作の画面へ(窓の出てくる動きなし。配信カードのきょうだいの切り替えと同じ)
+          onSwitchCard={(id) => {
             setProductionAuto(false)
-            switchProductionView(true)
+            setInstantId(id)
+            setProductionOpen(id)
           }}
         /></Later>
       )}

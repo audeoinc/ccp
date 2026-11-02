@@ -67,7 +67,6 @@ flowchart TD
     end
 
     subgraph production["制作の面"]
-        prod["制作のページ<br/>ProductionPage.tsx・productionSnapshot.ts"]
         sprod["制作のシンプルな画面<br/>production/SimpleProductionPage.tsx・useProductionFlow.ts"]
     end
 
@@ -103,8 +102,8 @@ flowchart TD
     app -->|週のレビュー・承認| review
     app -->|結果の面| results
     app -->|アラート| alerts
-    app -->|制作の面| prod
-    card -.->|制作に依頼| prod
+    app -->|制作の面| sprod
+    card -.->|制作に渡す| sprod
     card -.->|PRODUCTION のタブ| sprod
     sprod --> preview
     cal & week & list -->|配信を開く| card
@@ -191,7 +190,7 @@ flowchart TD
 |---|---|---|
 | `main.tsx` | 28 | 起動。フォント・CSS を読み、`Root` を描く |
 | `Root.tsx` | 16 | Fluent UI のテーマで `App` を包む |
-| `App.tsx` | 1,637 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
+| `App.tsx` | 1,680 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
 | `deepLink.ts` / `CopyLinkButton.tsx` | 88 / 39 | 画面の状態(面・見せ方・期間・国・開いているフロート)を URL のクエリと行き来させる / 「リンクをコピー」 |
 | `faces.ts` / `FaceBadge.tsx` / `StageNav.tsx` | 28 / 36 / 174 | 面(計画・制作・結果)の色と名前 / フロートの面の札 / フロートの段階の帯(PLAN → PRODUCTION → RESULTS) |
 | `floatLayout.ts` | 74 | フロートの大きさとペインの幅を変えて覚える、共通の部品 |
@@ -305,7 +304,8 @@ flowchart TD
 | `pushLink.ts` / `AppLinksEditor.tsx` | 46 / 254 | 通知を押したときに開く画面 / アプリのリンク先の入力 |
 | `TasksPanel.tsx` | 196 | タスク(プロセスのペインの「タスク」タブ) |
 | `assetSeed.ts` | 230 | ⚙ の「素材の見本を作る / 消す」(画面の中で描いたイラスト・PDF と公開の URL を、制作の依頼のある配信に。名前の先頭が「見本:」) |
-| `uiScale.ts` | 40 | 画面全体の表示の大きさ(X60。zoom と --ui-zoom、viewWidth / viewHeight、getUiScale) |
+| `uiScale.ts` | 86 | 画面全体の表示の大きさ(X60。zoom と --ui-zoom、viewWidth / viewHeight、getUiScale)。自動(`settings.me.autoscale`): `autoScaleFor`(幅・高さから倍率。境目は `scripts/check-scale.mjs`)・`startUiScale`(起動のとき)・`setUiScaleAuto` |
+| `UiScaleNotice.tsx` | 35 | 自動で 100% 以外にしたときの、最初の 1 回のお知らせの帯。自動が非公開と分かったら 100% に戻す |
 | `weeklyLimit.ts` | 75 | 週の上限(C3。マーケティングの決まりの「上限 週 N 回」→ なければアラートの条件の値) |
 | `HeroLibrary.tsx` | 312 | ⚙ の「画像のライブラリ」(メイン画像の一覧・絞り込み・上げる・直す・消す・期限を切る・空の項目を AI で埋める。タブで部品の画像。X59) |
 | `PartLibrary.tsx` / `PartUploadDialog.tsx` / `PartPicker.tsx` | 195 / 273 / 84 | 部品の画像(ボタン・バナー・ロゴ・アイコン。X59 ③)のライブラリ / 上げる・直す(AI の下書き・代替テキスト)/ 制作のページの左の欄(URL・`<img>` のタグをコピー)。窓口は `data/partUpload.ts`、表は `data/partImages.ts`、サーバーは `server/ccp/parts.py` |
@@ -485,11 +485,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `ProductionPage.tsx` | 1,012 | **制作のページ**(フロート。要素の情報・HTML のエディタ・プレビュー・やり取り、工程の帯。全案を送る AB テストは案ごとに切り替え) |
-| `production/SimpleProductionPage.tsx` | 665 | 制作の面のシンプルな画面(X86。配信カードと同じ窓で PLAN ↔ PRODUCTION を切り替える。上は計画と同じ題の行・キャンペーンの帯・AB の案の段、左のバー(渡されたもの・やり取り・タスク・素材・工程)、企画の見本のプレビュー(部品を押せる。上に配信の情報の帯)、右に部品のペイン。題の行に、自分の番のときだけ工程の青いボタンと「仕上がりを見る」。写しとコピーの値は `productionSnapshot.ts` と同じ) |
+| `production/SimpleProductionPage.tsx` | 1,546 | 制作の面のシンプルな画面(X86。配信カードと同じ窓で PLAN ↔ PRODUCTION を切り替える。上は計画と同じ題の行・キャンペーンの帯・AB の案の段、左のバー(渡されたもの・やり取り・タスク・素材・工程)、企画の見本のプレビュー(部品を押せる。上に配信の情報の帯)、右に部品のペイン。題の行に、自分の番のときだけ工程の青いボタンと「仕上がりを見る」。写しとコピーの値は `productionSnapshot.ts` と同じ) |
 | `production/useProductionFlow.ts` / `production/StepAction.tsx` / `production/StepsPane.tsx` | 114 / 99 / 58 | 制作の工程(X86 の ①。`prod.steps`・`prod.result`): 段の決め方と進める操作(① 渡す → ② 受け取る → ③ 制作する → ④ 仕上がりの確認 → ⑤ 送る。⑤ は `prod.export` が公開のときだけ)/ 段を進めるボタン(題の行と左のバーで共通)/ 左のバーの「工程」(道のり・済んだ段のだれがいつ・だれの番でも押せるボタン・やり直す / 取り下げる) |
 | `production/AbHandoffSection.tsx` | 108 | 渡されたものの「AB テスト」の欄(P40。AB の配信のときだけ): まとめ・案ごとのメイン画像・見出し・商品・utm_campaign(コピー)・この案のリンクをコピー・計測の注意。見るだけ。判定は `card.abtest`(案から選ぶは `card.variants`)。差し込むのはシンプルな制作の画面の「渡された」 |
-| `ProductionInfoPane.tsx` | 469 | 制作のページの左のペイン(要素の情報。コピー・直す・企画の値に戻す) |
 | `HtmlEditor.tsx` / `HtmlPreviewFrame.tsx` | 78 / 114 | HTML のエディタ(開いたときに読み込む)/ HTML をそのまま描くプレビュー(縮小・拡大・全体) |
 | `productionSnapshot.ts` | 527 | 配信カードの写し(制作に要る中身を固める)、コピー用の行、プレビューの HTML の書き出し |
 | `useProductionRequests.ts` / `notesStage.ts` | 67 / 11 | 制作の依頼の読み込み(制作の面・札)/ やり取りの段階(企画 / 制作) |
@@ -650,6 +648,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | データの列・テーブルを足す | `server/schema.json`(サーバーが起動後に自動で足す)。型は `src/models/`、新しいテーブルは `src/data/` にサービスを足す |
 | AI の指示文・選定のしかたを変える | `src/aiSelect.ts`(選定)・`src/aiDraft.ts`(案)・`src/autoDraft.ts`(すべて下書き)。呼び出しは `askAgent` だけを通す |
 | AI のモデル・考える量を変える | 環境変数 `GEMINI_MODEL` / `GEMINI_THINKING`(`server/ccp/ai.py`) |
+| AI をほかの AI(外の層)に頼む | 環境変数 `AI_OUTLET_URL` ほか(`server/ccp/ai.py` の `generate`。約束は `docs/AI_OUTLET.md`、見本の層は `tools/ai-outlet/sample_layer.py`) |
 | 配信カードに部品・機能を足す | `src/simple/PartPane.tsx`(選んだ部品のペイン)・`src/simple/SimpleCardLayout.tsx`(中身の状態と保存は `src/useCardEditor.ts`) |
 | 配信カードの保存の流れを変える | `src/saveFlow.ts`(例は `scripts/check-save.mjs`)・`src/useCardEditor.ts` |
 | シンプルな配信カードの部品・ペインを変える | `src/simple/`(部品の型は `parts.ts`、ペインは `PartPane.tsx`、並びは `SimpleCardLayout.tsx`) |

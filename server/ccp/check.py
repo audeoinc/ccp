@@ -32,6 +32,31 @@ def _db_target() -> tuple[str, str | None, int | None]:
     return "なし", None, None
 
 
+def check_outlet() -> int:
+    """AI の出口(AI_OUTLET_URL)。入っていれば、その URL の窓口に届くかを見る(つなぐだけ。AI は呼ばない。合言葉は出さない)。NG の数を返す"""
+    from urllib.parse import urlsplit
+
+    url = os.getenv("AI_OUTLET_URL", "").strip()
+    if not url:
+        _line(OK, "AI_OUTLET_URL なし(AI は Gemini を使う)")
+        return 0
+    u = urlsplit(url)
+    if u.scheme not in ("http", "https") or not u.hostname:
+        _line(NG, "AI_OUTLET_URL は http:// か https:// で始まる URL にしてください")
+        return 1
+    # 表示は、URL の中の利用者名・パスワード・問い合わせの部分を除く
+    shown = f"{u.scheme}://{u.hostname}{f':{u.port}' if u.port else ''}{u.path}"
+    token = "あり" if os.getenv("AI_OUTLET_TOKEN", "").strip() else "なし"
+    port = u.port or (443 if u.scheme == "https" else 80)
+    try:
+        socket.create_connection((u.hostname, port), timeout=3).close()
+    except OSError as e:
+        _line(NG, f"AI の出口 {shown} に届きません({type(e).__name__})。層が動いているか、URL とポートを確かめてください。Gemini に戻すなら、AI_OUTLET_URL を空にして起動し直す")
+        return 1
+    _line(OK, f"AI の出口 {shown} に届きます(合言葉: {token}、待ち時間 {os.getenv('AI_OUTLET_TIMEOUT') or 120} 秒)。AI はすべて、この層に頼みます")
+    return 0
+
+
 async def _db_query() -> tuple[bool, str]:
     from sqlalchemy import text
 
@@ -127,7 +152,8 @@ def run() -> int:
             _line(OK if ok else NG, detail)
             ng += 0 if ok else 1
 
-    print("■ AI(Vertex AI の Gemini)")
+    print("■ AI(Vertex AI の Gemini。出口があれば、その層)")
+    ng += check_outlet()
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     if project:
         _line(OK, f"GOOGLE_CLOUD_PROJECT={project} / GOOGLE_CLOUD_LOCATION={os.getenv('GOOGLE_CLOUD_LOCATION', 'global')} / GEMINI_MODEL={os.getenv('GEMINI_MODEL', 'gemini-3.5-flash')}")

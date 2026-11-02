@@ -1,6 +1,6 @@
 // 渡されたものの「AB テスト」の欄(P40。2026-11-02 Plan と Production のシンプル版を仕上げる)。
 // 制作は、案ごとの違い(メイン画像・見出し・商品)と計測の決まり(案ごとの utm_campaign)を知らないと作れないので、AB の配信のときだけ出す。
-// 詳しい制作の画面の ProductionInfoPane の AB の欄と同じ中身を、シンプルの見た目(見出し 13px・LabeledValue・行ごとのコピー)で出す。
+// 詳しい制作の画面(2026-11-02 に消した)の AB の欄と同じ中身を、シンプルの見た目(見出し 13px・LabeledValue・行ごとのコピー)で出す。
 // 見るだけ(案の中身を直すのは配信カード)。シンプルな制作の画面の「渡された」のパネルに差し込む
 import { InfoLabel, MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
 import { linkRows, productRows, rowsText, variantSnapshot, variantUtmCampaign, type Snapshot, type SnapshotVariant } from '../productionSnapshot'
