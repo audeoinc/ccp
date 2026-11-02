@@ -323,7 +323,6 @@ export const TASK_TARGETS: Record<string, string[]> = {
   suggest_part_rewrite: ['headline', 'copy'],
   suggest_part_hero: ['hero'],
   suggest_part_product: ['selection'],
-  suggest_whole_rewrite: ['headline', 'copy', 'hero'],
   // 「詳しく」にした商品の枠の見出し・説明文(X80 段 ③)
   write_product_detail: ['headline', 'copy'],
 }

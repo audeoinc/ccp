@@ -12,7 +12,7 @@ import { useFeature } from './featureFlags'
 
 const useStyles = makeStyles({
   root: { display: 'inline-flex', alignItems: 'center', columnGap: '2px', flexShrink: 0 },
-  // 段の札。いまの段は面の色の枠と地(FaceBadge と同じ見た目)、ほかは薄い文字のボタン
+  // 段の札。いまの段は面の色の枠と地、ほかは薄い文字のボタン
   stage: {
     display: 'inline-flex',
     alignItems: 'baseline',

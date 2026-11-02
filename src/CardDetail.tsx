@@ -1076,19 +1076,6 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
             setError(err instanceof Error ? err.message : String(err))
           }
         },
-        applyTexts: (x) => {
-          setForm((f) => ({
-            ...f,
-            ...(x.subject !== undefined ? { subject: x.subject } : {}),
-            ...(x.preheader !== undefined ? { preheader: x.preheader } : {}),
-            ...(x.headline !== undefined ? { headline: x.headline } : {}),
-            ...(x.copy !== undefined ? { copy: x.copy } : {}),
-            ...(x.pushTitle !== undefined ? { pushTitle: x.pushTitle } : {}),
-            ...(x.pushBody !== undefined ? { pushBody: x.pushBody } : {}),
-          }))
-          if (x.sectionTitles) setSectionTitles(x.sectionTitles)
-          if (x.sectionCopies) setSectionCopies(x.sectionCopies)
-        },
         linkSpots,
         linkUrlOf,
         productLinkOf,

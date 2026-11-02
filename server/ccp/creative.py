@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import re
 import uuid
-from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
@@ -44,11 +43,6 @@ TYPES = {
 # 保存する名前(uuid + 拡張子)。これ以外の名前では読まない・消さない
 STORED = re.compile(r"^[0-9a-f]{32}\.[a-z0-9]{2,5}$")
 KIND = "creative"
-
-
-def local_dir() -> Path | None:
-    """フォルダに置くときの場所(ASSET_DIR、なければバケットもないときの server/images)。バケットに置くときは None"""
-    return assets.local_folder(KIND)
 
 
 def ext_of(name: str) -> str:

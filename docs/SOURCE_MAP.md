@@ -192,7 +192,7 @@ flowchart TD
 | `Root.tsx` | 16 | Fluent UI のテーマで `App` を包む |
 | `App.tsx` | 1,680 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
 | `deepLink.ts` / `CopyLinkButton.tsx` | 88 / 39 | 画面の状態(面・見せ方・期間・国・開いているフロート)を URL のクエリと行き来させる / 「リンクをコピー」 |
-| `faces.ts` / `FaceBadge.tsx` / `StageNav.tsx` | 28 / 36 / 174 | 面(計画・制作・結果)の色と名前 / フロートの面の札 / フロートの段階の帯(PLAN → PRODUCTION → RESULTS) |
+| `faces.ts` / `StageNav.tsx` | 28 / 174 | 面(計画・制作・結果)の色と名前 / フロートの段階の帯(PLAN → PRODUCTION → RESULTS) |
 | `floatLayout.ts` | 74 | フロートの大きさとペインの幅を変えて覚える、共通の部品 |
 | `MePicker.tsx` / `InboxButton.tsx` | 256 / 61 | 右上の「あなた」(選んでログイン・切り替え・ログアウト。最初の「だれでログインしますか?」) / 右上の「依頼」(自分宛ての承認の依頼) |
 | `theme.ts` | 70 | Fluent UI のテーマ(色・書体) |

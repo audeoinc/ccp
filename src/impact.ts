@@ -279,15 +279,6 @@ export function evaluateLearnings(
   return out.sort((a, b) => b.used.length - a.used.length || b.sourceAt.localeCompare(a.sourceAt))
 }
 
-/**
- * その国で外した学び(配信カードの「これまでの学び」と AI への依頼から除く)。判定は学びと国の組ごと(ST5)。
- * originOf: 学びの出元の国(国を分ける前の判定を、出元の国の判定として読むため)。country が空なら、出元の国の判定を見る
- */
-export function retiredLearningIds(reviews: LearningReview[], country: string, originOf: (id: string) => string): Set<string> {
-  const ids = new Set(reviews.map((r) => r.learning_id).filter((x): x is string => !!x))
-  return new Set([...ids].filter((id) => reviewIn(reviews, id, country || originOf(id), originOf(id))?.status === 'retired'))
-}
-
 // ---- 見本(撮影用のビルドの初期データ。サーバーの server/ccp/impact.py と同じ考え方)
 
 /** AI の依頼の種類(見本で、配信ごとに 1 回ずつ頼んだことにする) */

@@ -447,26 +447,6 @@ export function mockAgent(message: string): string {
     return J({ mode: 'update', reply: ja ? `「${req}」に合う候補を 3 つ選びました。` : `Here are three picks for "${req}".`, ideas: picks.map((x) => ({ code: x.code, why: why(x) })) })
   }
 
-  // シンプルな配信カードで、配信の全体を AI に頼む(SU1 段階 b)。見出し・コピーと、あればセクションの見出しを替えた案を 2 つ
-  if (task === 'suggest_whole_rewrite') {
-    const req = String(p.request ?? '')
-    const cur = (p.current ?? {}) as { headline?: string; copy?: string; subject?: string; section_titles?: string[] }
-    const ja = hasJa(cur.headline ?? '') || hasJa(req)
-    if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? '全体としてテーマに沿っています。見出しをもう少し短くすると、メリハリが出ます。' : 'It follows the theme well. A shorter headline would add punch.' })
-    const heroes = (p.heroes as { code?: string }[] | undefined) ?? []
-    const titles = (cur.section_titles ?? []).filter(Boolean)
-    const ideas = ja
-      ? [
-          { title: 'やわらかく', why: `「${req}」に合わせ、語りかける言い方にそろえました。`, changes: { headline: '今年の秋も、重ね着で', copy: '肌寒い朝も、ふわっと軽いニットで気分よく。', ...(cur.subject ? { subject: '秋の重ね着、そろいました' } : {}), ...(titles.length ? { section_titles: titles.map((x) => `${x}をゆるっと`) } : {}) } },
-          { title: '季節を前に', why: '季節の言葉を先に出し、画像も明るいものにしました。', changes: { headline: '秋、はじまる', copy: '色づく季節に、いちばん似合う一枚を。', ...(heroes[0]?.code ? { hero_code: heroes[0].code } : {}) } },
-        ]
-      : [
-          { title: 'Laid-back', why: `Rewritten in a relaxed voice for "${req}".`, changes: { headline: 'Easy Layers for Fall', copy: 'Soft knits and light jackets for those cool mornings.', ...(cur.subject ? { subject: 'Your easy fall layers are here' } : {}), ...(titles.length ? { section_titles: titles.map((x) => `Easy ${x}`) } : {}) } },
-          { title: 'Season first', why: 'Leads with the season and uses a brighter image.', changes: { headline: 'Fall Starts Here', copy: 'The one layer that suits the season best.', ...(heroes[0]?.code ? { hero_code: heroes[0].code } : {}) } },
-        ]
-    return J({ mode: 'update', reply: ja ? `「${req}」の方向で、全体を直す案を 2 つ考えました。` : `Two ways to rework the whole delivery for "${req}".`, ideas })
-  }
-
   if (task === 'suggest_push') {
     const name = String(card.name ?? '')
     return en

@@ -136,8 +136,6 @@ export interface SimpleExtras {
   uploadHero: (file?: File) => void
   /** URL のページから選んだ画像を、写してライブラリに入れ、メイン画像にする(content.hero.fromurl。確定のとき) */
   heroFromUrl: (pick: { src: string; name: string; page: string }) => Promise<void>
-  /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
-  applyTexts: (t: WholeTexts) => void
   linkSpots: LinkSlot[]
   /** リンクの場所の、計測用のパラメーター(utm)つきの URL(⑤ リンク先・プレビューのリンクと同じ。AB の案の印つき。X81 の 8) */
   linkUrlOf: (slot: LinkSlot) => string

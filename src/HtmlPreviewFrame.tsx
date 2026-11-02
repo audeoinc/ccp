@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button, Caption1, Slider, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Button, Caption1, Slider, makeStyles, tokens } from '@fluentui/react-components'
 import { AddRegular, SubtractRegular } from '@fluentui/react-icons'
 import { loadPref, savePref } from './settings'
 import { useT } from './i18n'
@@ -30,7 +30,7 @@ function loadZoom(): number | 'fit' {
  * 倍率は枠の中の文書に zoom を掛ける(枠の外から測るので、sandbox は allow-same-origin だけ。HTML の中のスクリプトは動かない)
  */
 /** heading は、操作と同じ行の左に出す見出し(ペインの見出しの行を 1 行にまとめる)。onFrame は、枠(iframe)を外へ渡す(制作のページのピンが、枠の中に印を足すため) */
-export function HtmlPreviewFrame({ html, title, heading, headingClassName, onFrame }: { html: string; title: string; heading?: ReactNode; headingClassName?: string; onFrame?: (el: HTMLIFrameElement | null) => void }) {
+export function HtmlPreviewFrame({ html, title, heading, onFrame }: { html: string; title: string; heading?: ReactNode; onFrame?: (el: HTMLIFrameElement | null) => void }) {
   const s = useStyles()
   const t = useT()
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -84,7 +84,7 @@ export function HtmlPreviewFrame({ html, title, heading, headingClassName, onFra
   return (
     <div className={s.root}>
       <div className={s.bar}>
-        <span className={mergeClasses(headingClassName, s.heading)}>{heading}</span>
+        <span className={s.heading}>{heading}</span>
         <Button size="small" appearance="subtle" icon={<SubtractRegular />} onClick={() => step(-0.1)} aria-label={t('縮小', 'Zoom out')} />
         <Slider
           size="small"

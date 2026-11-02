@@ -1,7 +1,6 @@
 // テンプレートの部品の、配信ごとの中身を直す欄(T8 段階 6。src/partContent.ts)。
 // シンプルな配信カードの部品のペインと、詳しい配信カードのタブ(③ ヒーロー・④ セクション)の両方で、この部品を使う(処理を複製しない)。
 // 直せるのは、テンプレートで許した所だけ: テキストの文・ボタンの文言(canRewrite)、画像・動画と画像のボタンの画像(canSwapImage)
-import type { ReactNode } from 'react'
 import { Button, Field, Input, makeStyles, tokens } from '@fluentui/react-components'
 import { AutoTextarea } from './AutoTextarea'
 import { PartImagePick } from './PartImagePick'
@@ -89,26 +88,6 @@ export function PartContentFields({ part: p, value, onChange, variants, autoFocu
           )}
         </>
       )}
-    </div>
-  )
-}
-
-/**
- * 詳しい配信カードのタブに置く、テンプレートの部品の一覧(書き換え・差し替えを許した部品だけ)。部品ごとに、説明(S1 テキスト など)と欄。
- * 許した部品がなければ何も出さない
- */
-export function TemplatePartsList({ parts, label, value, onChange, variants }: { parts: TablePart[]; label: (p: TablePart) => ReactNode; value: PartContent; onChange: Props['onChange']; variants?: boolean }) {
-  const s = useStyles()
-  const list = parts.filter(hasPartFields)
-  if (list.length === 0) return null
-  return (
-    <div className={s.root}>
-      {list.map((p) => (
-        <div key={p.id} className={s.item}>
-          <span className={s.label}>{label(p)}</span>
-          <PartContentFields part={p} value={value} onChange={onChange} variants={variants} />
-        </div>
-      ))}
     </div>
   )
 }

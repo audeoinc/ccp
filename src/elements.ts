@@ -52,9 +52,6 @@ export function partElements(p: TablePart): PartElement[] {
   return []
 }
 
-/** ヒーローの要素(ヒーローのセクション sec_hero の中。ヒーローの下の表の部品は、それぞれの部品 ID で数える) */
-export const heroElements = (): PartElement[] => [el(HERO_TABLE_ID, 'image', 'image', true), el(HERO_TABLE_ID, 'headline', 'text', false), el(HERO_TABLE_ID, 'copy', 'text', false)]
-
 /** 要素の説明(書いていなければ、場所から自動で作る。例「S1 箱 1 の写真」) */
 export const elementDesc = (p: TablePart, e: PartElement, where: string): string => p.els?.[e.key]?.desc || tr(`${where} の${elementLabel(e.key)}`, `${where} ${elementLabel(e.key)}`)
 

@@ -46,9 +46,6 @@ export function joinSections(lists: Item[][], sections: SectionInfo[]): Item[] {
   return out
 }
 
-/** 決まりの形にそろえる(セクションの中の空いた枠を後ろへ寄せ、要らない空いた枠を消す) */
-export const compactSlots = (items: Item[], sections: SectionInfo[]): Item[] => joinSections(splitSections(items, sections), sections)
-
 /** 並びの位置 at が、どのセクションの何番目か(at は空いた枠の位置でもよい。範囲の外は最後のセクションの末尾) */
 function sectionOfPosition(sections: SectionInfo[], lists: Item[][], at: number): { s: number; offset: number } {
   if (sections.length === 0) return { s: 0, offset: Math.max(0, Math.min(at, lists[0]?.length ?? 0)) }
