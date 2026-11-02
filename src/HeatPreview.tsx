@@ -182,8 +182,8 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
 
   return (
     <>
-      {/* 外の枠で倍率を決めるときは、中身の幅に合わせる(枠いっぱいに広がると、幅で収める倍率が小さくなりすぎるため) */}
-      <div ref={box} className={styles.box} style={fit ? undefined : { width: 'fit-content' }}>
+      {/* 外の枠で倍率を決めるときは、中身の幅に合わせる(枠いっぱいに広がると、幅で収める倍率が小さくなりすぎるため)。計画・制作のプレビューと同じく、枠の真ん中に置く */}
+      <div ref={box} className={styles.box} style={fit ? undefined : { width: 'fit-content', marginInline: 'auto' }}>
         {fit ? (
           <FitPreview maxWidth={width} maxHeight={maxHeight}>
             {previewEl}

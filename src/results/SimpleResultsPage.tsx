@@ -535,6 +535,10 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
                 <PreviewFrame
                   boxRef={boxRef}
                   zoom={zoom}
+                  keysInfo={t(
+                    'プレビュー: 色の付いた所を押すと、その部品の数字を右に出します。Ctrl + ホイールで拡大・縮小、スペースを押しながらつかんで移動。',
+                    'Preview: click a highlighted part to see its numbers on the right. Ctrl + wheel zooms; hold Space and drag to pan.',
+                  )}
                   device={push ? undefined : { value: device, set: setDevice }}
                   toolbar={
                     <ToggleButton size="small" appearance={overlay ? 'primary' : 'subtle'} checked={overlay} onClick={() => setOverlay(!overlay)}>
