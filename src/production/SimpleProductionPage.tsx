@@ -301,6 +301,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // MVP に入れたもの(2026-10-30 利用者): 要素を直す [prod.page]・制作した HTML [prod.htmledit]・AI の手直し [prod.ai]・ピン [collab.pins]
   const editOn = useFeature('prod.page')
   const htmlEditOn = useFeature('prod.htmledit')
+  // 左のバーの HTML の欄(見る・書く)。書けるのは prod.htmledit も公開のとき(2026-11-02 利用者)
+  const htmlCodeOn = useFeature('prod.htmlcode')
   const aiOn = useFeature('prod.ai')
   const pinsOn = useFeature('collab.pins')
   const meId = useSyncExternalStore(onMeChange, myUserId)
@@ -582,7 +584,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 左のバーの「HTML」に出すソース(いまプレビューに出している方)
   const sourceHtml = onMade ? madeShown : generated
   // HTML の欄で書けるのは [prod.htmledit] が公開・渡したあと・試していない間(書くと、制作した HTML になる)
-  const htmlCanEdit = htmlEditOn && canWork && trialHtml === null && !!meId
+  const htmlCanEdit = htmlCodeOn && htmlEditOn && canWork && trialHtml === null && !!meId
 
   // ピン(コメント)。企画の見本の上は部品の目印に、制作した HTML の上はページの中の割合に置く(詳しい制作のページと同じ見た目の名前 html-plan / html-made)
   const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
@@ -881,7 +883,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     { v: 'talk', gap: true, on: threadOn, feature: 'collab.thread', icon: <CommentRegular />, label: t('やり取り', 'Chat'), tip: t('やり取り(制作の段。企画と制作で)', 'Conversation (production stage, between planner and production)'), count: counts.talk },
     { v: 'tasks', on: tasksOn, feature: 'collab.tasks', icon: <TaskListLtrRegular />, label: t('タスク', 'Tasks'), tip: t('タスク(担当・期日)', 'Tasks (assignee and due date)'), count: counts.tasks },
     { v: 'assets', on: assetsOn, feature: 'collab.assets', icon: <AttachRegular />, label: t('素材', 'Assets'), tip: t('素材(参考の画像・資料・URL)', 'Assets (reference images, files, URLs)'), count: counts.assets },
-    { v: 'html', on: sampleOn || htmlEditOn, icon: <CodeRegular />, label: 'HTML', tip: t('HTML(いまプレビューに出している方のソース)', 'HTML (source of what the preview shows)'), count: 0 },
+    { v: 'html', on: htmlCodeOn, icon: <CodeRegular />, label: 'HTML', tip: t('HTML(いまプレビューに出している方のソース)', 'HTML (source of what the preview shows)'), count: 0 },
     { v: 'steps', on: stepsOn, feature: 'prod.steps', gap: true, icon: <TimelineRegular />, label: t('工程', 'Steps'), tip: t('工程(渡す → 受け取る → 制作する → 確認 → 送る)', 'Steps (hand off → receive → produce → check → send)'), count: 0, dot: myStep ? 'red' : undefined },
   ]
   // 非公開の欄はバーに出さない。開いていた欄が非公開になったら、しまったのと同じに見せる
