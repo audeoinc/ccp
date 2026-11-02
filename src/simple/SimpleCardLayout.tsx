@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { filled } from '../slots'
 import { Button, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, AlertRegular, MailRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, CheckmarkRegular, ErrorCircleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
+import { AddRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, CheckmarkRegular, ErrorCircleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -53,7 +53,7 @@ import { SectionGlowLayer } from './SectionGlowLayer'
 import { SectionTagLayer } from './SectionTagLayer'
 import type { SimpleEditor } from './editor'
 import type { PartTurn } from './partAi'
-import { SenderName } from '../SenderName'
+import { InboxLines, type InboxPart } from './InboxLines'
 import { confirmDialog } from '../confirm'
 import { PaneRail } from '../PaneRail'
 import { typo } from '../typo'
@@ -90,24 +90,8 @@ const useStyles = makeStyles({
   grow: { flexGrow: 1 },
   state: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   reasonPop: { display: 'grid', rowGap: '8px', width: '320px' },
-  // 受信箱の 1 行(差出人・件名・プリヘッダー)。プレビューに写らないものを押して直せるように
-  // 受信箱・通知での見え方(SU5)。ラベルは並べない(行が長くうるさくなるため)。アプリの通知は 1 行(左に差出人を太字、右に「タイトル ― 本文」をうすく)
+  // 配信の情報の帯の包み(受信箱の行(InboxLines)と同じ間隔)
   inboxWrap: { display: 'grid', rowGap: '2px', minWidth: 0 },
-  inboxHead: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3 },
-  inbox: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
-  sender: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, flexShrink: 0, width: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  inboxDash: { color: tokens.colorNeutralForeground4, flexShrink: 0 },
-  // 入れ忘れの印(押すと、その欄を開いて、すぐ書ける)
-  inboxMissing: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightSemibold, textDecorationLine: 'underline', textDecorationStyle: 'dashed', textUnderlineOffset: '3px' },
-  // アプリの通知の 1 行(スマホの通知の見た目)
-  pushIcon: { width: '20px', height: '20px', borderRadius: '5px', display: 'grid', placeItems: 'center', flexShrink: 0, color: tokens.colorNeutralForegroundOnBrand, backgroundColor: tokens.colorBrandBackground, fontSize: '12px' },
-  inboxPart: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: tokens.borderRadiusSmall, border: '1px solid transparent', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase300, cursor: 'pointer', textAlign: 'left', color: tokens.colorNeutralForeground1, ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
-  inboxSub: { color: tokens.colorNeutralForeground3, flexShrink: 1 },
-  // メールの受信箱は、スマホのメールのアプリの 3 行(差出人 / 件名 / プリヘッダー。SU10)。1 行に並べると長いと両方切れるので、行を分けて折り返し、全部読めるようにする
-  inboxMail: { display: 'grid', justifyItems: 'start', rowGap: '1px', padding: '6px 4px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`, boxShadow: tokens.shadow2, minWidth: 0 },
-  mailSender: { padding: '0 6px', fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  mailLine: { maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', overflow: 'visible' },
-  mailPre: { fontSize: tokens.fontSizeBase200 },
   commPane: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
   // 押せる所は 24px(見える点は 10px のまま。WCAG 2.5.8。レビューの 13)。点の色は --dot
   railDot: {
@@ -629,6 +613,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }, [applyKey, undoKey])
   // 受信箱の行に出す文言(AI の案を写している間は、その案。保存する中身は変えない)
   const shown = { ...e.form, ...(e.previewTexts ?? {}) }
+  const inboxParts: InboxPart[] = ['subject', 'preheader', 'pushTitle', 'pushBody']
   // 道具の行とプレビューのあいだ: A との違いの知らせ・配信の情報の帯・受信箱での見え方
   const above = (
     <>
@@ -659,49 +644,25 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           title={t('配信の情報(受信者には見えません)。押すと、対象・送る相手も見て直せます', 'Delivery info (not shown to recipients). Click to see and edit the target and recipients too')}
         />
       </div>
-      {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。差出人の名前は、設定の画面の全社の既定か国の上書き(ST10) */}
-      {e.channel === 'email' ? (
-        <div className={s.inboxWrap}>
-          <span className={s.inboxHead}>
-            <MailRegular />
-            {t('受信箱での見え方', 'How it looks in the inbox')}
-          </span>
-          {/* スマホのメールのアプリの 3 行: 差出人(太字)/ 件名 / プリヘッダー(うすく)。入れ忘れの点線は、その行に出す(SU10) */}
-          <div className={s.inboxMail}>
-            <span className={s.mailSender} title={t('差出人の名前(設定の画面で決める)', 'Sender name (set in Settings)')}>
-              <SenderName country={e.form.country} />
-            </span>
-            <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, isOn({ kind: 'subject' }) && s.on, e.abDiffParts.some((p) => p.kind === 'subject') && s.abDiff, !(shown.subject || e.form.name) && s.inboxMissing)} onClick={() => select({ kind: 'subject' })} title={t('件名を直す', 'Edit the subject')}>
-              {shown.subject || e.form.name || t('件名未入力', 'No subject')}
-            </button>
-            <button type="button" className={mergeClasses(s.inboxPart, s.mailLine, s.mailPre, shown.preheader ? s.inboxSub : s.inboxMissing, isOn({ kind: 'preheader' }) && s.on, e.abDiffParts.some((p) => p.kind === 'preheader') && s.abDiff)} onClick={() => select({ kind: 'preheader' })} title={shown.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の下に出る文)', 'No preheader yet. Click to write it (shown below the subject in the inbox)')}>
-              {shown.preheader || t('プリヘッダー未入力', 'No preheader')}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className={s.inboxWrap}>
-          <span className={s.inboxHead}>
-            <AlertRegular />
-            {t('スマホの通知での見え方', 'How it looks as a phone notification')}
-          </span>
-          <div className={s.inbox}>
-            <span className={s.pushIcon} aria-hidden>
-              <SenderName country={e.form.country} initial />
-            </span>
-            <span className={s.sender} style={{ width: 'auto' }}>
-              <SenderName country={e.form.country} />
-            </span>
-            <button type="button" className={mergeClasses(s.inboxPart, isOn({ kind: 'pushTitle' }) && s.on, !shown.pushTitle && s.inboxMissing)} style={{ flexShrink: 0, maxWidth: '50%', fontWeight: 600 }} onClick={() => select({ kind: 'pushTitle' })} title={t('通知のタイトルを直す', 'Edit the notification title')}>
-              {shown.pushTitle || t('タイトル未入力', 'No title')}
-            </button>
-            <span className={s.inboxDash}>―</span>
-            <button type="button" className={mergeClasses(s.inboxPart, shown.pushBody ? s.inboxSub : s.inboxMissing, isOn({ kind: 'pushBody' }) && s.on)} onClick={() => select({ kind: 'pushBody' })} title={t('通知の本文を直す', 'Edit the notification body')}>
-              {shown.pushBody || t('本文未入力', 'No body')}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 受信箱・通知での見え方(SU5)。プレビューに写らない件名・プリヘッダーを、押して直せるように。制作の画面と同じ部品 */}
+      <InboxLines
+        channel={e.channel}
+        country={e.form.country}
+        subject={shown.subject}
+        preheader={shown.preheader}
+        pushTitle={shown.pushTitle}
+        pushBody={shown.pushBody}
+        subjectFallback={e.form.name}
+        selected={inboxParts.find((p) => isOn({ kind: p })) ?? null}
+        diff={inboxParts.filter((p) => e.abDiffParts.some((d) => d.kind === p))}
+        onSelect={(p) => select({ kind: p })}
+        tips={{
+          subject: t('件名を直す', 'Edit the subject'),
+          preheader: shown.preheader ? t('プリヘッダーを直す', 'Edit the preheader') : t('プリヘッダーが入っていません。押すと入力できます(受信箱で件名の下に出る文)', 'No preheader yet. Click to write it (shown below the subject in the inbox)'),
+          pushTitle: t('通知のタイトルを直す', 'Edit the notification title'),
+          pushBody: t('通知の本文を直す', 'Edit the notification body'),
+        }}
+      />
     </>
   )
   // 右端の商品の一覧(畳める)。畳んでいても、商品ごとの点とアラートの色を出す

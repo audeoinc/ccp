@@ -22,6 +22,8 @@ const useStyles = makeStyles({
   mailSender: { padding: '0 6px', fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase300, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mailLine: { maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', overflow: 'visible' },
   mailPre: { fontSize: tokens.fontSizeBase200 },
+  // AB の B・C 案で、A と違う所の下線(配信カードの部品の印と同じ)
+  diff: { boxShadow: `inset 0 -2px 0 ${tokens.colorPaletteDarkOrangeBorder2}` },
 })
 
 export type InboxPart = 'subject' | 'preheader' | 'pushTitle' | 'pushBody'
@@ -37,12 +39,14 @@ interface Props {
   subjectFallback?: string
   /** 選んでいる行 */
   selected?: InboxPart | null
+  /** A と違う行(AB の B・C 案を開いているとき) */
+  diff?: InboxPart[]
   onSelect: (p: InboxPart) => void
   /** 行の上に出す説明(押すと何が起きるか)。面ごとに言葉が違う */
   tips: Record<InboxPart, string>
 }
 
-export function InboxLines({ channel, country, subject, preheader, pushTitle, pushBody, subjectFallback, selected, onSelect, tips }: Props) {
+export function InboxLines({ channel, country, subject, preheader, pushTitle, pushBody, subjectFallback, selected, diff, onSelect, tips }: Props) {
   const s = useStyles()
   const t = useT()
   if (channel === 'email') {
@@ -57,10 +61,10 @@ export function InboxLines({ channel, country, subject, preheader, pushTitle, pu
           <span className={s.mailSender} title={t('差出人の名前(設定の画面で決める)', 'Sender name (set in Settings)')}>
             <SenderName country={country} />
           </span>
-          <button type="button" className={mergeClasses(s.part, s.mailLine, selected === 'subject' && s.on, !subj && s.missing)} onClick={() => onSelect('subject')} title={tips.subject}>
+          <button type="button" className={mergeClasses(s.part, s.mailLine, selected === 'subject' && s.on, diff?.includes('subject') && s.diff, !subj && s.missing)} onClick={() => onSelect('subject')} title={tips.subject}>
             {subj || t('件名未入力', 'No subject')}
           </button>
-          <button type="button" className={mergeClasses(s.part, s.mailLine, s.mailPre, preheader ? s.sub : s.missing, selected === 'preheader' && s.on)} onClick={() => onSelect('preheader')} title={tips.preheader}>
+          <button type="button" className={mergeClasses(s.part, s.mailLine, s.mailPre, preheader ? s.sub : s.missing, selected === 'preheader' && s.on, diff?.includes('preheader') && s.diff)} onClick={() => onSelect('preheader')} title={tips.preheader}>
             {preheader || t('プリヘッダー未入力', 'No preheader')}
           </button>
         </div>
