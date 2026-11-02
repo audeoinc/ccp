@@ -616,13 +616,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const shownHero = aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
   const previewItem = aiPreview?.item
   const previewSection = aiPreview?.section
-  const shownItems = previewItem
+  const previewDetail = aiPreview?.detail
+  const swappedItems = previewItem
     ? previewItem.key
       ? viewItems.map((i) => (i.key === previewItem.key ? { ...i, productId: previewItem.productId, imageUrl: previewItem.imageUrl, detail: i.detail && previewItem.productId !== i.productId ? { title: '', body: '' } : i.detail } : i))
       : insertAt(viewItems, sectionsOf(template), previewItem.at ?? viewItems.length, { key: '__ai_preview', productId: previewItem.productId, reason: '', source: SOURCE_AI })
     : previewSection
       ? replaceSection(viewItems, sectionsOf(template), previewSection.index, previewSection.productIds.map((productId, n) => ({ key: `__ai_section_${n}`, productId, reason: '', source: SOURCE_AI })))
       : viewItems
+  const shownItems = previewDetail ? swappedItems.map((i) => (i.key === previewDetail.key ? { ...i, detail: { title: previewDetail.title, body: previewDetail.body } } : i)) : swappedItems
   const [pendingUndoSave, setPendingUndoSave] = useState(false)
   const locked = lockedWeeks.length > 0
   /** 反映(保存して開いたまま)。成功したら、反映の前の中身を、元に戻すの履歴に積む */

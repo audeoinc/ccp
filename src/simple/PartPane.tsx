@@ -608,7 +608,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
           <>
             {/* 枠の見せ方「詳しく見せる」(X80)。商品を決める前に決める枠の設定なので、いちばん上に。オンのときだけ、すぐ下に見出し・説明文の欄。
                 商品を入れ替えても「詳しく」のまま(見出し・説明文は空になる)(2026-10-30 利用者) */}
-            <ProductDetailFields item={it} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />
+            <ProductDetailFields item={it} product={byId.get(it.productId)} e={e} onChange={(d) => e.setItemDetail(it.key, d ?? null)} detailCount={e.items.filter((x) => x.detail).length} />
             <Divider />
             {/* 箱を押すと、詳しい情報・この配信で使う画像のフロート */}
             <div role="button" tabIndex={0} className={s.productOpen} title={t('押すと、詳しい情報・画像', 'Click for details and image')} onClick={() => openFloat(it.key)} onKeyDown={(ev) => ev.key === 'Enter' && openFloat(it.key)}>

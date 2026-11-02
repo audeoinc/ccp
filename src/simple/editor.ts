@@ -52,6 +52,8 @@ export interface AiPreview {
   item?: { key: string; productId: string; at?: number; imageUrl?: string }
   /** セクションの商品をまとめて AI で選んだ案(そのセクションの商品の並びを、この商品に置き換えて写す。X81 の 9) */
   section?: { index: number; productIds: string[] }
+  /** 「詳しく」の枠の見出し・説明文の案(X80 段 ③)。key の枠の detail を、この文に置き換えて写す */
+  detail?: { key: string; title: string; body: string }
 }
 
 /** 商品のフロートを、入れ替えの候補(配信に載っていない商品)の詳しい情報として開くときの鍵の頭(openProduct の key に「pid:商品 ID」) */

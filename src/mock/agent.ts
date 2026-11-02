@@ -343,6 +343,29 @@ export function mockAgent(message: string): string {
         ] })
   }
 
+  // 「詳しく」の枠の見出し・説明文(X80 段 ③)。ページの文だけを並べ直す(本物の AI と同じく、ページにないことは書かない)
+  if (task === 'write_product_detail') {
+    const page = (p.page ?? {}) as { text?: string }
+    const product = (p.product ?? {}) as { name?: string; description?: string }
+    const image = (p.image ?? {}) as { caption?: string }
+    const req = String(p.request ?? '')
+    const lines = [String(product.description ?? ''), ...String(page.text ?? '').split('\n'), String(image.caption ?? '')]
+      .map((x) => x.trim())
+      .filter((x, n, a) => x.length > 8 && a.indexOf(x) === n && x !== product.name)
+    // 本物の AI と同じく、文は配信の国に合わせる(画面の言葉ではなく)
+    const country = String(((p.card ?? {}) as { country?: string }).country ?? '')
+    const ja = country ? country === 'JP' : hasJa(lines.join('') + req)
+    if (lines.length === 0) return J({ mode: 'update', reply: ja ? '商品ページに、強みになる内容が見つかりませんでした。' : 'The product page has little to build on.', ideas: [] })
+    const name = String(product.name ?? '')
+    const title = ja ? `${name}の、ここがいい` : `Why we love the ${name}`
+    const ideas = [
+      { title, body: lines.join(ja ? '' : ' ').slice(0, 400), why: ja ? 'ページの説明を、そのままの順でまとめました。' : 'Kept the page description in its order.' },
+      { title: ja ? `素材と作りに注目` : 'A closer look at the make', body: lines.map((x) => `- ${x}`).join('\n').slice(0, 400), why: ja ? 'ページの内容を箇条書きにしました。' : 'Turned the page into bullet points.' },
+    ]
+    const n = Math.max(1, Math.min(ideas.length, Number(p.count ?? 2) || 2))
+    return J({ mode: 'update', reply: ja ? 'ページの内容から書きました。' : 'Written from the page.', ideas: n === 1 ? [ideas[req.length % 2]] : ideas.slice(0, n) })
+  }
+
   // シンプルな配信カードの、部品の文言を直す(SU1 段階 b)。依頼の言葉から、それらしい直し方を 3 つ
   if (task === 'suggest_part_rewrite') {
     const part = (p.part ?? {}) as { kind?: string; current?: string }
