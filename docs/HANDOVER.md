@@ -18,7 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
-- 2026-11-02 UI 1: X90 の塊 A(面の枠)・E(P40・G1/G2)・F(K1〜K3。「制作に渡す」はシンプルな制作の画面が渡す)を main に。**K5: 詳しい制作のページ(`ProductionPage.tsx`・`ProductionInfoPane.tsx`)を消した**(⋯ の入口・`PREF.productionSimple` も)。詳しくはアーカイブ 2026-10-28_ の末尾。X87 段 ② の UI 1 の残りは続き
+- 2026-11-02 UI 1: X90 の塊 A(面の枠)・E(P40・G1/G2)・F(K1〜K3。「制作に渡す」はシンプルな制作の画面が渡す)を main に。**K5: 詳しい制作のページ(`ProductionPage.tsx`・`ProductionInfoPane.tsx`)を消した**(⋯ の入口・`PREF.productionSimple` も)。詳しくはアーカイブ 2026-10-28_ の末尾。X93(開いたときの表示の大きさを自動で決める。`settings.me.autoscale`)も main に。X87 段 ② の UI 1 の残りは続き
 - 2026-11-02 UI 3: X86 シンプルな制作の画面の追加分を main に(b046f54。AI の手直し・制作した HTML の版・要素を直す・ピン・左のバーの HTML の欄 `prod.htmlcode`(v1)・保存の流れを計画にそろえた: 打てば入る・自動で保存・↶)。未決: `prod.htmlcode` は FEATURE_FLAGS では「プレビューの切り替え・試す → 確定」、作ったのは「左のバー・自動で保存」(連絡係が確認中)。次は D(面の枠に載せる・AbHandoffSection・MaterialRows / ProductionChanges / PaneCrumbs・「渡されたもの」・件名とプリヘッダー・「企画が変わりました」・simple-finish.md の制作の穴)→ X89
 - 2026-11-02 UI 2: AI の出口(AI_OUTLET_PLAN の 7 章 1〜4)を main に。AI を呼ぶ 4 か所は `ccp/ai.py` の `generate` を通り、`AI_OUTLET_URL` があれば外の層(約束 版 1、失敗しても Gemini に回さない、同時の上限も効く)。文書 docs/AI_OUTLET.md・見本の層 tools/ai-outlet/sample_layer.py(ZIP に入る)・check の行・test_ai_outlet.py。塊 G(K4)の ProductPicker・HeroPicker は src/MaterialPickers.tsx に
 - 2026-11-02 UI 2: 塊 B(ペインの共通の部品)・C(制作の材料の部品。P11 LinkMaterialRows を含む)は main(利用者の OK)。X80 段 ②(商品ページの本文を残す。表 product_page_texts・ccp/page_text.py・productPageText.ts)は main。X80 段 ③(「詳しく」の文を AI が商品ページから書く・ページと重なる所の薄い印)も main(利用者の OK)。X80 段 ④(制作の写し・材料に詳しくの文とコピー、書き出す HTML は table で横 1 行・スマホで縦に積む)も main(利用者の OK。X80 は済み)。詳しくはアーカイブ 2026-10-28_ の末尾
