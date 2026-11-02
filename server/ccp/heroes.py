@@ -15,16 +15,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import uuid
 
 from fastapi import APIRouter, Request
-from google.genai import types
 from pydantic import BaseModel
 
 from . import assets
-from .ai import get_client
+from . import ai
 from .data_api import fail, ok
 
 log = logging.getLogger("ccp.heroes")
@@ -65,15 +63,10 @@ PROMPT = """あなたは、EC のメール・アプリの配信で使うメイ�
 async def _describe(data: bytes, content_type: str, language: str):
     prompt = PROMPT.replace("%LANG%", "英語" if language == "en" else "日本語")
     try:
-        resp = await get_client().aio.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=[types.Part.from_bytes(data=data, mime_type=content_type), prompt],
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        draft = json.loads((resp.text or "").strip() or "{}")
+        draft = json.loads(await ai.generate("hero_describe", [ai.Image(data, content_type), prompt]) or "{}")
     except Exception as e:  # noqa: BLE001 — 下書きがなくても、人が書けば登録できる
         log.exception("画像の読み取りに失敗しました")
-        return fail(502, f"AI で画像を読み取れませんでした(手で入れて登録できます): {type(e).__name__}", "ai_failed")
+        return fail(502, f"AI で画像を読み取れませんでした(手で入れて登録できます): {ai.reason(e)}", "ai_failed")
     return ok(draft if isinstance(draft, dict) else {})
 
 

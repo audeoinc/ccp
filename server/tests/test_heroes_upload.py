@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from ccp import heroes, parts
+from ccp import ai, heroes, parts
 
 
 class FakeRequest:
@@ -56,7 +56,7 @@ class DescribeImageTest(unittest.TestCase):
         models = Models()
         client = mock.Mock()
         client.aio.models = models
-        with mock.patch.object(heroes, "get_client", return_value=client):
+        with mock.patch.object(ai, "get_client", return_value=client):
             res = asyncio.run(heroes.describe_image(FakeRequest(b"JPEG", "image/jpeg; charset=binary"), "en"))
         self.assertEqual(res["data"], {"name": "秋の公園", "tags": "秋, 公園"})
         self.assertIn("英語", models.kw["contents"][1])

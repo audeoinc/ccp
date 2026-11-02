@@ -647,6 +647,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | データの列・テーブルを足す | `server/schema.json`(サーバーが起動後に自動で足す)。型は `src/models/`、新しいテーブルは `src/data/` にサービスを足す |
 | AI の指示文・選定のしかたを変える | `src/aiSelect.ts`(選定)・`src/aiDraft.ts`(案)・`src/autoDraft.ts`(すべて下書き)。呼び出しは `askAgent` だけを通す |
 | AI のモデル・考える量を変える | 環境変数 `GEMINI_MODEL` / `GEMINI_THINKING`(`server/ccp/ai.py`) |
+| AI をほかの AI(外の層)に頼む | 環境変数 `AI_OUTLET_URL` ほか(`server/ccp/ai.py` の `generate`。約束は `docs/AI_OUTLET.md`、見本の層は `tools/ai-outlet/sample_layer.py`) |
 | 配信カードに部品・機能を足す | `src/simple/PartPane.tsx`(選んだ部品のペイン)・`src/simple/SimpleCardLayout.tsx`(中身の状態と保存は `src/useCardEditor.ts`) |
 | 配信カードの保存の流れを変える | `src/saveFlow.ts`(例は `scripts/check-save.mjs`)・`src/useCardEditor.ts` |
 | シンプルな配信カードの部品・ペインを変える | `src/simple/`(部品の型は `parts.ts`、ペインは `PartPane.tsx`、並びは `SimpleCardLayout.tsx`) |

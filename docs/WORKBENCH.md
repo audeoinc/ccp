@@ -525,7 +525,8 @@ PY
 | `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` | BigQuery を使うとき | 出力の場所 `<プロジェクト>.<データセット>.<表>`(ジョブのプロジェクトは `BQ_PROJECT`)。ビューなら、更新を見る元の表を `BQ_<名前>_WATCH` に | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
-| `GEMINI_CONCURRENCY` | — | Gemini への同時の呼び出しの上限(既定 4) | 設定しない |
+| `GEMINI_CONCURRENCY` | — | AI への同時の呼び出しの上限(既定 4。AI の出口を使うときも効く) | 設定しない |
+| `AI_OUTLET_URL` / `AI_OUTLET_TOKEN` / `AI_OUTLET_TIMEOUT` | ほかの AI を使うとき | AI の出口: 入っていれば、AI をすべて外の層に頼む(空なら Gemini)。層に送る合言葉・1 回の待ち時間(既定 120 秒)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
 | `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` / `DEVTOOLS_GEMINI_MODEL` / `DEVTOOLS_THINKING` / `DEVTOOLS_PRICE_PER_TIB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。AI のモデル(既定は一覧でいちばん賢い Gemini)・考える量(既定 high)・料金の概算の単価(既定 $6.25/TiB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
 
 ## 付録 B. 引っ越し用のパックの中身

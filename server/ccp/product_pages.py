@@ -39,13 +39,12 @@ from urllib.parse import urljoin, urlparse
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, Response
-from google.genai import types
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import assets, creative, linkpreview
 from . import schema as sc
-from .ai import get_client
+from . import ai
 from .data_api import db, fail, ok
 from .page_text import page_text
 
@@ -556,7 +555,7 @@ async def suggest(body: SuggestIn):
     picked = body.images[:MAX_SUGGEST]
     judged = await judged_angles([img.src for img in picked])
     prompt = PROMPT.replace("%ANGLES%", ANGLE_NAMES).replace("%LANG%", "英語" if body.language == "en" else "日本語")
-    contents: list[Any] = [prompt, "配信: " + json.dumps(body.delivery, ensure_ascii=False), "商品: " + json.dumps(body.product, ensure_ascii=False)]
+    contents: list[ai.Part] = [prompt, "配信: " + json.dumps(body.delivery, ensure_ascii=False), "商品: " + json.dumps(body.product, ensure_ascii=False)]
     shown = 0
     for i, img in enumerate(picked):
         known = judged.get(img.src)
@@ -573,7 +572,7 @@ async def suggest(body: SuggestIn):
         note = img.description or img.alt
         label = f"画像 {i}" + (f"(ページの説明: {note})" if note else "")
         if ctype in RASTER:
-            contents += [label, types.Part.from_bytes(data=data, mime_type=ctype)]
+            contents += [label, ai.Image(data, ctype)]
         elif ctype == "image/svg+xml":
             contents.append(f"{label}(SVG のソース):\n{data.decode('utf-8', errors='replace')[:6000]}")
         else:
@@ -582,15 +581,10 @@ async def suggest(body: SuggestIn):
     if shown == 0:
         return fail(502, "画像を読めませんでした", "no_images")
     try:
-        resp = await get_client().aio.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        out = json.loads((resp.text or "").strip() or "{}")
+        out = json.loads(await ai.generate("product_image_suggest", contents) or "{}")
     except Exception as e:  # noqa: BLE001 — 案がなくても、人が選べる
         log.exception("画像の案を作れませんでした")
-        return fail(502, f"AI で画像の案を作れませんでした(一覧から選べます): {type(e).__name__}", "ai_failed")
+        return fail(502, f"AI で画像の案を作れませんでした(一覧から選べます): {ai.reason(e)}", "ai_failed")
     if not isinstance(out, dict):
         out = {}
     n = len(picked)
