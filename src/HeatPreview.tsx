@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -12,6 +12,8 @@ const useStyles = makeStyles({
   // 重ねる枠: いちばん押されたリンクを最も濃くして、少ないリンクは、ほとんど色を付けない(色と線の濃さは、描くときに決める)
   spot: { position: 'absolute', boxSizing: 'border-box', borderRadius: '4px', cursor: 'default' },
   spotOn: { outline: `3px solid ${tokens.colorBrandStroke1}`, outlineOffset: '1px' },
+  // 押して、その部品の数字を見られる(結果のシンプルな画面)
+  spotPick: { cursor: 'pointer' },
   // 週の一覧に並べるとき: 押すと、配信の詳しい結果を開く(枠は押せないようにして、下の部品に任せる)
   spotPassive: { pointerEvents: 'none' },
   tag: {
@@ -56,6 +58,11 @@ export interface LinkRow {
   placed: boolean
 }
 
+/** リンク 1 つの結果と、その割合(結果のシンプルな画面の、左のバーの表・部品のペインに渡す) */
+export interface HeatRow extends LinkRow {
+  share: number
+}
+
 /** 表など、プレビューの横に並べるものに渡す */
 export interface HeatInfo {
   rows: LinkRow[]
@@ -80,13 +87,23 @@ interface Props {
   overlay?: boolean
   /** プレビューの横に並べるもの(リンクの表など) */
   side?: (info: HeatInfo) => ReactNode
+  /** false: 縮めずに、本来の大きさで描く(倍率は外の枠で決める。結果のシンプルな画面) */
+  fit?: boolean
+  /** メールの幅(スマホ / PC。fit が false のとき) */
+  device?: 'mobile' | 'pc'
+  /** 選んでいるリンク(枠を強調する) */
+  selected?: string | null
+  /** 枠を押したとき(その部品の数字を出す)。なければ押せない */
+  onPick?: (key: string) => void
+  /** リンクごとの結果が変わったとき(左のバーの表・部品のペインに出すため) */
+  onRows?: (rows: HeatRow[]) => void
 }
 
 /**
  * 配信のプレビューの上に、リンクごとのクリック(メイン画像・ボタン・商品。アプリは通知のタップも)を重ねる。
  * 色の濃さは、いちばん押されたリンクに対する割合。どこに載せた何が押されたかを、見た目のまま確かめるため
  */
-export function HeatPreview({ row, productIds, products, heroes, width, maxHeight = 100000, compact = false, overlay = true, side }: Props) {
+export function HeatPreview({ row, productIds, products, heroes, width, maxHeight = 100000, compact = false, overlay = true, side, fit = true, device, selected, onPick, onRows }: Props) {
   const styles = useStyles()
   const t = useT()
   const { card, result } = row
@@ -126,7 +143,7 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
       el.removeEventListener('load', measure, true)
       window.clearTimeout(timer)
     }
-  }, [card.id, width])
+  }, [card.id, width, fit, device])
 
   // リンクごとのクリック。商品は、商品ごとの結果のクリック。アプリは、通知のタップ(開封の数)
   const links = parseLinkResults(result.links)
@@ -151,13 +168,29 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
   const rel = (r: LinkRow) => (r.key === 'push' ? 0.5 : r.clicks / maxClicks)
   const byKey = new Map(rows.map((r) => [r.key, r]))
   const n = (v: number) => v.toLocaleString(locale())
+  // 外に渡す行は、中身が変わったときだけ知らせる(毎回知らせると、受け取る側の描き直しで回り続けるため)
+  const heatRows: HeatRow[] = rows.map((r) => ({ ...r, share: share(r) }))
+  const rowsKey = JSON.stringify(heatRows)
+  const onRowsRef = useRef(onRows)
+  useLayoutEffect(() => {
+    onRowsRef.current = onRows
+  })
+  useEffect(() => {
+    onRowsRef.current?.(JSON.parse(rowsKey) as HeatRow[])
+  }, [rowsKey])
+  const previewEl = <CardPreview card={card} productIds={productIds} products={products} heroes={heroes} device={device} />
 
   return (
     <>
-      <div ref={box} className={styles.box}>
-        <FitPreview maxWidth={width} maxHeight={maxHeight}>
-          <CardPreview card={card} productIds={productIds} products={products} heroes={heroes} />
-        </FitPreview>
+      {/* 外の枠で倍率を決めるときは、中身の幅に合わせる(枠いっぱいに広がると、幅で収める倍率が小さくなりすぎるため) */}
+      <div ref={box} className={styles.box} style={fit ? undefined : { width: 'fit-content' }}>
+        {fit ? (
+          <FitPreview maxWidth={width} maxHeight={maxHeight}>
+            {previewEl}
+          </FitPreview>
+        ) : (
+          previewEl
+        )}
         {overlay && spots.map((s, i) => {
           const r = byKey.get(s.key)
           if (!r) return null
@@ -167,7 +200,7 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
           return (
             <div
               key={`${s.key}-${i}`}
-              className={mergeClasses(styles.spot, hover === s.key && styles.spotOn, compact && styles.spotPassive)}
+              className={mergeClasses(styles.spot, (hover === s.key || selected === s.key) && styles.spotOn, compact && styles.spotPassive, onPick && styles.spotPick)}
               style={{
                 left: s.x,
                 top: s.y,
@@ -179,6 +212,7 @@ export function HeatPreview({ row, productIds, products, heroes, width, maxHeigh
               title={compact ? undefined : `${r.label}: ${n(r.clicks)}`}
               onMouseEnter={compact ? undefined : () => setHover(s.key)}
               onMouseLeave={compact ? undefined : () => setHover(null)}
+              onClick={onPick ? () => onPick(s.key) : undefined}
             >
               <span className={mergeClasses(styles.tag, compact && styles.tagSmall, k >= 0.6 && styles.tagTop, s.h < (compact ? 16 : 40) && styles.tagOut)}>
                 {compact ? pctText : `${n(r.clicks)} · ${pctText}`}

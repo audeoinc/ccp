@@ -34,7 +34,7 @@ export interface CardNote {
   /** task: 生まれた元のメモ(質問)の ID */
   source_note?: string
   /** やり取りが、どの段階の話か(PR6。plan = 何を配信するか(計画の配信カード)/ production = どう見せるか(制作のページ))。空は種類から決める(質問 = 制作、コメント = 企画) */
-  stage?: 'plan' | 'production'
+  stage?: 'plan' | 'production' | 'results'
   /** プレビュー上の場所(書き込みのピン)。どのブロックか(hero / section:2 / button:… / product など。product は product_id の商品の枠) */
   anchor?: string
   /** ブロックの中での位置(0〜1 の割合。ブロックの左上から) */

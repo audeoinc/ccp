@@ -370,6 +370,16 @@
    "lookups": [
    ]
   },
+  "week_retros": {
+   "columns": [
+    ["week_start", "date", {"index": true}],
+    ["country", "text", {"index": true}],
+    ["channel", "text"],
+    ["retro", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "delivery_results": {
    "columns": [
     ["sent_at", "timestamptz"],

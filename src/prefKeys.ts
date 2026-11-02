@@ -53,7 +53,6 @@ export const PREF = {
   bulkPaneWidths: 'bulkWorkspace.paneWidths.v1',
   templateListWidth: 'templateManager.paneWidths.v1',
   assetPaneWidths: 'assetFloat.paneWidths.v1',
-  resultPaneWidths: 'resultDetail.paneWidths.v1',
   settingsPaneWidths: 'settings.paneWidths.v1',
   pinFloatSize: 'float.pin.size',
   // ---- 人を見分ける記録(サーバーには写さない)

@@ -11,7 +11,8 @@ export const ImpactView = lazy(() => loadChunk(() => import('./ImpactView')).the
 export const LearningEffectFloat = lazy(() => loadChunk(() => import('./LearningEffectFloat')).then((m) => ({ default: m.LearningEffectFloat })))
 export const LearningHand = lazy(() => loadChunk(() => import('./LearningHand')).then((m) => ({ default: m.LearningHand })))
 export const ProductsView = lazy(() => loadChunk(() => import('./ProductsView')).then((m) => ({ default: m.ProductsView })))
-export const ResultPeek = lazy(() => loadChunk(() => import('./ResultPeek')).then((m) => ({ default: m.ResultPeek })))
+// 結果のシンプルな画面(X89)
+export const SimpleResultsPage = lazy(() => loadChunk(() => import('./results/SimpleResultsPage')).then((m) => ({ default: m.SimpleResultsPage })))
 export const SimpleProductionPage = lazy(() => loadSimpleProduction().then((m) => ({ default: m.SimpleProductionPage })))
 /**
  * 制作のシンプルな画面。読み終わっていれば、lazy を通さずに描く(lazy は、読み終わっていても最初の 1 回は待つので、その間なにも出ない)。

@@ -1,5 +1,5 @@
-// 詳しい結果に出す、配信 1 本の効果(ホールドアウトとの比べ・AI に渡した学び。X56)。
-// 詳しい結果(ResultDetail)で 1 回だけ読み、主な数字(ResultKpis)と右の列(ResultInsights)に渡す(部品ごとに読むと、読み込みが増えるため)
+// 結果のシンプルな画面に出す、配信 1 本の効果(ホールドアウトとの比べ・AI に渡した学び。X56)。
+// 画面で 1 回だけ読み、要る所に渡す(部品ごとに読むと、読み込みが増えるため)
 import { useEffect, useState } from 'react'
 import { AiRunsService } from './data/aiRuns'
 import { DeliveryLiftsService } from './data/deliveryLifts'

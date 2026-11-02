@@ -192,6 +192,22 @@ export function mockAgent(message: string): string {
     })
   }
 
+  // 結果の AI の読み(X89): いちばん押された部品と、AB の勝ち案から、決まった形の文を作る
+  if (task === 'read_result') {
+    const k = (p.kpis ?? {}) as { clickRate?: number | null; revenue?: number }
+    const top = ((p.clicks as { name: string; share: number }[] | undefined) ?? [])[0]
+    const ab = p.ab as { winner?: string | null; lift?: number | null; confidence?: string } | null
+    const pct = (v?: number | null) => `${((v ?? 0) * 100).toFixed(1)}%`
+    const reading = [
+      top ? (en ? `${top.name} drew ${pct(top.share)} of clicks; click rate ${pct(k.clickRate)}.` : `${top.name}がクリックの ${pct(top.share)} を集めた(クリック率 ${pct(k.clickRate)})。`) : en ? `Click rate ${pct(k.clickRate)}.` : `クリック率は ${pct(k.clickRate)}。`,
+      ...(ab?.winner
+        ? [ab.confidence === 'sure' || ab.confidence === 'likely' ? (en ? `Variant ${ab.winner} leads by ${pct(ab.lift)}.` : `案 ${ab.winner} が ${pct(ab.lift)} 上回った。`) : en ? `Variant ${ab.winner} leads, but too early to call.` : `案 ${ab.winner} が上だが、まだ決められない。`]
+        : []),
+    ]
+    const next = [top ? (en ? `Put a similar element where ${top.name} sits in the next delivery.` : `次の配信でも、${top.name}の位置に同じ種類の要素を置く。`) : en ? 'Add a clear button near the top.' : '上のほうに、目立つボタンを置く。']
+    return J({ reading, next })
+  }
+
   // 結果の振り返り: 過去の平均との差が大きい位置・数字から、決まった形の文を作る
   if (task === 'review_results') {
     type Pos = { key: string; now: number; past: number }

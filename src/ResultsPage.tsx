@@ -11,12 +11,9 @@ import {
 import type { DeliveryCard } from './models/deliveryCards'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
-import type { WeeklyPerformance } from './models/weeklyPerformances'
-import { WeeklyPerformancesService } from './data/weeklyPerformances'
 import { DeliveryResultsService, type DeliveryResult } from './data/deliveryResults'
 import { locale, priceText, useT, type Market } from './i18n'
 import { COUNTRY_US, IMPORT_COLUMNS, downloadTable, groupRows, isPush, localDate, parseProductResults, parseResultsCsv, pct, productRows, sentAtOf, templateName, toResultRows, type GroupRow } from './results'
-import { ResultDetail } from './ResultDetail'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { classifyThemeTypes, themeTypeLabel, themeTypeOf } from './themeTypes'
 import { ResultsMonth, ResultsWeek } from './ResultsCalendar'
@@ -26,11 +23,16 @@ import { ChannelBadge } from './ChannelBadge'
 import { ResultsSummaryBar } from './ResultsSummaryBar'
 import { WeekRetro } from './WeekRetro'
 import { MonthsService, type MonthRow } from './data/months'
+import { WeekRetrosService } from './data/weekRetros'
 import { WeeksService } from './data/weeks'
 import { monthRowOf, scopeLabel } from './weekLock'
 import { draftRetro } from './aiRetro'
 import { ym, ymd } from './dates'
 import { PaneSpinner } from './PaneSpinner'
+import { CampaignResultsTable } from './results/CampaignResultsTable'
+import { useCampaigns } from './useCampaigns'
+import { useFeature } from './featureFlags'
+import { FeatureBadge } from './FeatureBadge'
 
 const useStyles = makeStyles({
   root: { minWidth: 0 },
@@ -49,7 +51,7 @@ const useStyles = makeStyles({
   hidden: { display: 'none' },
 })
 
-type GroupBy = 'delivery' | 'theme' | 'themeType' | 'template' | 'product'
+type GroupBy = 'delivery' | 'campaign' | 'theme' | 'themeType' | 'template' | 'product'
 
 interface Props {
   /** 配信(計画の面と同じ絞り込みをかけたもの。期間は、この中で絞る) */
@@ -64,9 +66,10 @@ interface Props {
   weekStart: Date
   /** 結果の面の操作を差し込む、共通のツールバーの場所 */
   toolbarSlot: HTMLElement | null
-  /** 詳しい結果を開いている配信(App が持つ。配信カードの「配信結果」からも開く) */
-  detailId: string | null
-  onDetail: (id: string | null) => void
+  /** 結果のシンプルな画面で開いている配信(App が持つ。一覧の行に印を付け、閉じたら結果を読み直す) */
+  openId: string | null
+  /** 配信の結果を、結果のシンプルな画面で開く(X89) */
+  onOpenResult: (id: string) => void
   /** 配信カードを開く */
   onOpenCard: (id: string) => void
   /** 配信カードを書き換えたあと(テーマの種類など)、読み直す */
@@ -79,8 +82,8 @@ interface Props {
   country?: string
   /** 結果のデータの操作(書き出し・取り込み・AI で分ける)。App が ⚙ のメニューの「データ」に並べる */
   onDataActions?: (a: ResultsDataActions | null) => void
-  /** 詳しい結果の題名の左に出す段階の帯(PLAN → PRODUCTION → RESULTS。配信カード・制作のページとそろえる) */
-  stageNav?: (card: DeliveryCard) => ReactNode
+  /** 一覧の中の「並べて比べる」を切り替える(X89。比べるは、見せ方ではなく一覧の中に置く) */
+  onCompare?: (on: boolean) => void
 }
 
 /** 結果の面のデータの操作(⚙ のメニューに並べる) */
@@ -101,14 +104,16 @@ const monthKey = (iso?: string) => localDate(iso).slice(0, 7)
  * 配信結果(振り返り)の画面。配信のあとに取り込んだ結果を、配信・テーマ・テンプレート・商品ごとに見て、次の計画に生かす。
  * 行を選ぶと、右に、その配信の数字・商品の売れ方・採用した AI の提案・次に生かすメモを出す
  */
-export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, detailId, onDetail, onOpenCard, onCardsChanged, onOpenWeek, retro, country = '', onDataActions, stageNav }: Props) {
+export function ResultsPage({ cards, products, heroes, cardProducts, view, month: monthStart, weekStart, toolbarSlot, openId, onOpenResult, onOpenCard, onCardsChanged, onOpenWeek, retro, country = '', onDataActions, onCompare }: Props) {
   const styles = useStyles()
   const t = useT()
   const [results, setResults] = useState<DeliveryResult[] | null>(null)
-  const [weekly, setWeekly] = useState<WeeklyPerformance[]>([])
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('delivery')
+  const compareOn = useFeature('results.compare')
+  // キャンペーンのまとめ方(c-2)に使う、キャンペーンの名前
+  const campaigns = useCampaigns(cards)
   // 月の振り返り(表 months)。月の表示でだけ使うので、App ではなく、ここで持つ
   const [months, setMonths] = useState<MonthRow[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -121,13 +126,20 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
     }
     setResults(res.data ?? [])
   }
+  // 結果のシンプルな画面を閉じたら、読み直す(そこで書いた次に生かすメモを、一覧・比べるにも出すため)
+  const wasOpen = useRef(openId)
+  useEffect(() => {
+    if (wasOpen.current && !openId) {
+      DeliveryResultsService.getAll()
+        .then((res) => res.success && setResults(res.data ?? []))
+        .catch(() => undefined)
+    }
+    wasOpen.current = openId
+  }, [openId])
   useEffect(() => {
     DeliveryResultsService.getAll()
       .then((res) => (res.success ? setResults(res.data ?? []) : setError(res.error?.message ?? 'Could not load results')))
       .catch((e: unknown) => setError(String(e)))
-    WeeklyPerformancesService.getAll()
-      .then((res) => res.success && setWeekly(res.data ?? []))
-      .catch(() => undefined)
     MonthsService.getAll()
       .then((res) => res.success && setMonths(res.data ?? []))
       .catch(() => undefined)
@@ -148,7 +160,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   const periodCards = cards.filter((c) => inPeriod(c.scheduled_at))
   const resultByCard = new Map(allRows.map((r) => [r.card.id, r]))
   // 押した配信: 結果があれば詳しい結果、なければ配信カード
-  const openDelivery = (id: string) => (resultByCard.has(id) ? onDetail(id) : onOpenCard(id))
+  const openDelivery = (id: string) => (resultByCard.has(id) ? onOpenResult(id) : onOpenCard(id))
   // 金額は、配信の国の通貨で。まとめた数字は、期間の配信がすべて同じ国のときだけ通貨を付ける(国が混ざると足せないため)
   const marketOf = (c: DeliveryCard): Market => (c.country === COUNTRY_US ? 'US' : 'JP')
   const markets = new Set(rows.map((r) => marketOf(r.card)))
@@ -185,8 +197,12 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       return ym(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1 - i, 1))
     })
     // その月の各週の振り返り(週の初めがこの月にある週)も渡す。担当者の気づきを、月のまとめに生かすため
-    const weeks = await WeeksService.getAll().catch(() => null)
-    const weekRetros = (weeks?.success ? (weeks.data ?? []) : [])
+    // 週の振り返りは表 week_retros(X89)。その前に週の行(weeks)に書いたものも、同じ週・国・チャネルの新しい行がなければ使う
+    const [weeks, retros] = await Promise.all([WeeksService.getAll().catch(() => null), WeekRetrosService.getAll().catch(() => null)])
+    const newRows = retros?.success ? (retros.data ?? []) : []
+    const keyOf = (w: { week_start?: string; country?: string; channel?: string }) => `${w.week_start?.slice(0, 10)}|${w.country ?? ''}|${w.channel ?? ''}`
+    const has = new Set(newRows.map(keyOf))
+    const weekRetros = [...newRows, ...(weeks?.success ? (weeks.data ?? []) : []).filter((w) => !has.has(keyOf(w)))]
       // その国の週(国を分ける前の行も)の振り返りだけ。ほかの国の気づきを混ぜない
       .filter((w) => w.week_start?.slice(0, 7) === month && w.retro?.trim() && (!w.country || w.country === country))
       .sort((a, b) => (a.week_start ?? '').localeCompare(b.week_start ?? ''))
@@ -330,7 +346,8 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
   ]
 
   const exportCsv = () => {
-    if (groupBy === 'delivery') {
+    // キャンペーンのまとめ方は、配信ごとの行で書き出す(木の形は CSV にしにくいため)
+    if (groupBy === 'delivery' || groupBy === 'campaign') {
       downloadTable(
         ['Date', 'Delivery', 'Channel', 'Theme', 'Template', 'Recipients', 'Opens', 'Clicks', 'Orders', 'Open rate', 'Click rate', 'Revenue', 'vs prev week', 'vs last year'],
         rows.map((r) => [
@@ -418,9 +435,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
       'results-import-sample.csv',
     )
 
-  // 詳しい結果(フロート)を開いている配信
-  const detail = detailId ? resultByCard.get(detailId) : undefined
-
   // 共通のツールバーに差し込む、結果の面の操作(まとめ方は、一覧のときだけ)
   // データの操作を App に渡す(⚙ のメニューの「データ」に並べる)。関数は、毎回作り直されるので、最新のものを ref で呼ぶ
   const handlers = useRef({ exportCsv, downloadSample, classify })
@@ -443,12 +457,20 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
 
   const tools = (
     <>
+      {/* 比べるは、一覧の中の「並べて比べる」(X89。見せ方を 7 → 3 に) [results.compare] */}
+      {compareOn && onCompare && (view === 'list' || view === 'compare') && (
+        <ToggleButton size="small" checked={view === 'compare'} appearance={view === 'compare' ? 'primary' : 'subtle'} onClick={() => onCompare(view !== 'compare')}>
+          {t('並べて比べる', 'Compare side by side')}
+          <FeatureBadge id="results.compare" />
+        </ToggleButton>
+      )}
       {view === 'list' && (
         <div className={styles.group} role="group" aria-label={t('まとめ方', 'Group by')}>
           <span className={styles.groupLabel}>{t('まとめ方', 'Group by')}</span>
           {(
             [
               ['delivery', t('配信', 'Delivery')],
+              ['campaign', t('キャンペーン', 'Campaign')],
               ['theme', t('テーマ', 'Theme')],
               ['themeType', t('テーマの種類', 'Theme type')],
               ['template', t('テンプレート', 'Template')],
@@ -508,7 +530,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
               <MessageBarBody>{t('月の振り返りは、国ごとに書きます。上で国を選んでください', 'Monthly retrospectives are per country. Choose a country above.')}</MessageBarBody>
             </MessageBar>
           )}
-          <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} onOpenWeek={onOpenWeek} />
+          <ResultsMonth month={monthStart} cards={periodCards} results={resultByCard} money={money} onOpen={openDelivery} onOpenWeek={onOpenWeek} campaigns={campaigns} />
           </>
         ) : view === 'compare' ? (
           <ResultsCompareView
@@ -517,7 +539,7 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
             products={products}
             heroes={heroes}
             money={money}
-            onOpen={onDetail}
+            onOpen={onOpenResult}
             onAdopt={async (r, text) => {
               const now = r.result.notes?.trim()
               const res = await DeliveryResultsService.update(r.result.id, { notes: now ? `${now}\n${text}` : text })
@@ -537,7 +559,10 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
         ) : (
           <>
             {monthBar}
-            {groupBy === 'delivery' ? (
+            {groupBy === 'campaign' ? (
+              // キャンペーン → 配信 → 案の木の形(X79 (c) の c-2)
+              <CampaignResultsTable rows={rows} campaigns={campaigns} money={money} onOpen={onOpenResult} />
+            ) : groupBy === 'delivery' ? (
               // 配信ごと: 計画の面の一覧と同じ表(DataTable)。左にサムネイル(マウスを重ねるとプレビュー)。行を押すと、詳しい結果をフロートで開く
               <DataTable
                 rows={rows}
@@ -545,8 +570,8 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
                 rowKey={(r) => r.card.id}
                 ariaLabel={t('配信の結果の一覧', 'Delivery results')}
                 empty={t('この条件の配信結果はまだありません', 'No results for these filters yet')}
-                onRowClick={(r) => onDetail(r.card.id)}
-                selectedKey={detailId ?? undefined}
+                onRowClick={(r) => onOpenResult(r.card.id)}
+                selectedKey={openId ?? undefined}
                 defaultSort={{ key: 'date', dir: 'ascending' }}
                 tieBreak={(a, b) => (sentAtOf(a) ?? '').localeCompare(sentAtOf(b) ?? '')}
               />
@@ -563,24 +588,6 @@ export function ResultsPage({ cards, products, heroes, cardProducts, view, month
           </>
         )}
       </div>
-      {detail && (
-        <ResultDetail
-          key={detailId}
-          row={detail}
-          stageNav={stageNav?.(detail.card)}
-          history={allRows}
-          cardProducts={cardProducts}
-          onOpenOther={onDetail}
-          productIds={cardProducts.get(detail.card.id) ?? []}
-          products={products}
-          heroes={heroes}
-          weekly={weekly}
-          money={(v) => money(v, detail.card)}
-          onClose={() => onDetail(null)}
-          onOpenCard={onOpenCard}
-          onSaved={load}
-        />
-      )}
     </div>
   )
 }

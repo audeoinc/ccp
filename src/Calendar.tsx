@@ -37,6 +37,9 @@ interface Props {
    * (中に、子のカードのチャネルの印と状態の点。AB のあるカードには AB の印)。入っていないカードは、今のまま 1 枚ずつ
    */
   campaigns?: Map<string, Campaign>
+  /** キャンペーンの箱の色と 2 行目(結果の面: 子のカードの合計の売上・クリック率と、前年比の色。X89)。既定は、状態の色と子のカードの印 */
+  campaignTone?: (children: DeliveryCard[]) => { line: string; background: string }
+  renderCampaignMeta?: (children: DeliveryCard[]) => React.ReactNode
 }
 
 /** マスに並べるもの: 1 枚のカードか、キャンペーン(子のカードを配信時刻の順に) */
@@ -193,7 +196,7 @@ const useStyles = makeStyles({
   },
 })
 
-export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone, onOpenWeek, campaigns }: Props) {
+export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate, renderMeta, chipTone, onOpenWeek, campaigns, campaignTone, renderCampaignMeta }: Props) {
   const styles = useStyles()
   const t = useT()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -238,7 +241,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
   const campaignPill = (item: Extract<DayItem, { kind: 'campaign' }>) => {
     const first = item.children[0]
     const status = campaignStatusOf(item.children) ?? 'not_started'
-    const tone = { line: statusColor(status), background: `color-mix(in srgb, ${statusColor(status)} 16%, var(--colorNeutralBackground1))` }
+    const tone = campaignTone ? campaignTone(item.children) : { line: statusColor(status), background: `color-mix(in srgb, ${statusColor(status)} 16%, var(--colorNeutralBackground1))` }
     const name = item.campaign?.name || first.name || t('(名前のないキャンペーン)', '(unnamed campaign)')
     const allCancelled = item.children.every((c) => isCancelled(c))
     const due = item.children.some((c) => dueSoon?.has(c.id))
@@ -263,6 +266,7 @@ export function Calendar({ month, cards, dueSoon, alertKinds, onSelect, onCreate
           {due && <WarningFilled className={styles.warn} aria-label={t('配信が近いのに未着手', 'Due soon — not started')} />}
           {name}
         </span>
+        {renderCampaignMeta && <span className={styles.pillMetaAlways}>{renderCampaignMeta(item.children)}</span>}
         <span className={styles.kids}>
           {item.children.map((c) => (
             <span key={c.id} className={styles.kid} style={isCancelled(c) ? CANCELLED_STYLE : undefined} aria-label={kidText(c)}>

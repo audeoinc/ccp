@@ -62,7 +62,7 @@ flowchart TD
 
     subgraph insight["結果とアラート"]
         results["結果<br/>ResultsPage.tsx・ResultsCalendar.tsx"]
-        resdetail["詳しい結果・比べる<br/>ResultDetail.tsx・ResultsCompareView.tsx"]
+        resdetail["結果のシンプルな画面・比べる<br/>results/SimpleResultsPage.tsx・ResultsCompareView.tsx"]
         alerts["アラート<br/>AlertsPage.tsx・alerts.ts"]
     end
 
@@ -416,11 +416,10 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ResultsCalendar.tsx` | 187 | 結果の月・週の表示 |
 | `ResultsCompareView.tsx` | 376 | 条件で絞り込んだ配信を並べて比べる |
 | `ProductsView.tsx` | 385 | 見せ方「商品別」(X49。期間の中で、商品(SPU / カテゴリ)ごとに、載せた配信と回数・結果・週ごとの実績・外部広告の出稿を並べる) |
-| `ResultDetail.tsx` | 226 | 詳しい結果のフロート(段階の帯、載せた商品の販売チャネルごとの順位を含む) |
 | `ProductRankings.tsx` | 178 | 詳しい結果の「販売チャネルごとの順位」(R17。全社 / EC / 配信経由。配信前 4 週で Top N に入った週の数と、配信の週・翌週の順位)。「上位」とみなす線 Top N は、国の「アラートの基準」(`countrySettings.ts`) |
-| `ResultSummary.tsx` | 262 | 主な数字と、メモ・商品の売れ方・AI の案 |
+| `ResultSummary.tsx` | 101 | 主な数字の札と、採用した AI の提案 |
+| `results/SimpleResultsPage.tsx` / `results/CampaignResultsTable.tsx` / `results/resultSums.ts` | 606 / 149 / 53 | 結果のシンプルな画面(X89。配信カード・制作と同じ窓で RESULTS に切り替え、ヒートマップの部品を押して数字)/ 結果の一覧のキャンペーンのまとめ方(木の形の表)/ キャンペーンの合計・商品の週の売れ方の計算 |
 | `ResultCompare.tsx` | 324 | 過去の配信と比べる・AI の振り返り |
-| `ResultPeek.tsx` | 86 | 計画の面で、配信カードの上に結果を重ねる |
 | `HeatPreview.tsx` | 193 | プレビューの上に、リンクごとのクリックを重ねる |
 | `results.ts` | 425 | 結果の計算(前週比・前年比・まとめ)と、CSV の読み書き |
 | `printReport.ts` | 35 | 配信 1 本のレポートの印刷 |

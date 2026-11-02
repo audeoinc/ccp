@@ -48,6 +48,9 @@ const useStyles = makeStyles({
   label: { ...typo.label, whiteSpace: 'nowrap', flexShrink: 0 },
   // キャンペーンの名前は、いちばん大事な値なので太く
   name: { ...typo.valueStrong, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: '40px', maxWidth: '280px', flexShrink: 1 },
+  // 結果の面: 名前を押すと、右のペインがキャンペーンの合計になる(X89・c-1)
+  nameBtn: { border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', padding: '2px 6px', borderRadius: tokens.borderRadiusMedium, cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
+  nameOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, ':hover': { backgroundColor: tokens.colorBrandBackground2Hover } },
   meta: { ...typo.value, whiteSpace: 'nowrap', flexShrink: 0 },
   sep: { color: tokens.colorNeutralForeground4, flexShrink: 0 },
   // キャンペーンと配信のタブの間の区切り
@@ -87,12 +90,18 @@ interface Props {
   onAddCard?: () => void
   /** 切り替えを止める(保存中など) */
   busy?: boolean
+  /** 結果の面(X89・X79 (c) の c-1): 配信のタブの状態の代わりに出す数字 */
+  cardMeta?: (card: DeliveryCard) => ReactNode
+  /** 結果の面: 1 段目の、キャンペーンの合計の数字 */
+  campaignMeta?: ReactNode
+  /** 結果の面: キャンペーンの名前を押したとき(右のペインをキャンペーンの合計に)。on = いま合計を見ている */
+  onCampaign?: { on: boolean; select: () => void }
 }
 
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) : '')
 const dateText = (ymd: string) => (ymd ? new Date(`${ymd}T00:00:00`).toLocaleDateString(locale(), { month: 'short', day: 'numeric', weekday: 'short' }) : '')
 
-export function CampaignBand({ campaign, card, allCards, onSwitch, slots, actions, onAddCard, busy }: Props) {
+export function CampaignBand({ campaign, card, allCards, onSwitch, slots, actions, onAddCard, busy, cardMeta, campaignMeta, onCampaign }: Props) {
   const s = useStyles()
   const t = useT()
   // 既定は畳む(テーマ・目的は、名前にマウスを乗せれば見える。2026-10-28 利用者)
@@ -146,7 +155,13 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, slots, action
           {t('キャンペーン', 'Campaign')}
         </InfoLabel>
         {/* テーマ・目的は、畳んでいるときは名前にマウスを乗せたときだけ(開いているときは下の行にあるので出さない) */}
-        {open ? (
+        {onCampaign ? (
+          <Tooltip relationship="description" content={t('押すと、右にキャンペーンの合計を出します', 'Click to see the campaign totals on the right')}>
+            <button type="button" className={mergeClasses(s.name, s.nameBtn, onCampaign.on && s.nameOn)} aria-pressed={onCampaign.on} onClick={onCampaign.select}>
+              {campaign.name}
+            </button>
+          </Tooltip>
+        ) : open ? (
           <span className={s.name}>{campaign.name}</span>
         ) : (
           <Tooltip relationship="description" content={<div className={s.hoverDetail}>{themeAndGoal}</div>}>
@@ -160,6 +175,12 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, slots, action
             <span className={s.meta}>{country}</span>
           </>
         )}
+        {campaignMeta && (
+          <>
+            <span className={s.sep}>·</span>
+            <span className={s.meta}>{campaignMeta}</span>
+          </>
+        )}
         <span className={s.divider} aria-hidden />
         <TabList className={s.tabs} size="small" selectedValue={card.id} disabled={busy} onTabSelect={(_, d) => d.value !== card.id && onSwitch(String(d.value))} aria-label={t('配信', 'Deliveries')}>
           {siblings.map((c) => (
@@ -168,8 +189,14 @@ export function CampaignBand({ campaign, card, allCards, onSwitch, slots, action
                 <ChannelBadge channel={c.channel} size="icon" />
                 {channelText(c.channel)}
                 <span>{time(c.scheduled_at)}</span>
-                <span className={s.dot} style={{ backgroundColor: statusColor(c.status) }} aria-hidden />
-                <span className={s.state}>{isCancelled(c) ? t('取りやめ', 'Cancelled') : statusLabel(c.status)}</span>
+                {cardMeta ? (
+                  <span className={s.state}>{cardMeta(c)}</span>
+                ) : (
+                  <>
+                    <span className={s.dot} style={{ backgroundColor: statusColor(c.status) }} aria-hidden />
+                    <span className={s.state}>{isCancelled(c) ? t('取りやめ', 'Cancelled') : statusLabel(c.status)}</span>
+                  </>
+                )}
               </span>
             </Tab>
           ))}
