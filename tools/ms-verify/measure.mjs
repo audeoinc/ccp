@@ -4,6 +4,10 @@
 //
 //   node measure.mjs              方式 2 で T1〜T5 を、それぞれ決めた回数ずつ送る
 //   node measure.mjs --via dl     方式 1(Direct Line)で送る。設定の DIRECT_LINE_SECRET を使い、サインインはしない
+//   node measure.mjs --via aib    方式 3(AI Builder のプロンプトを Dataverse の Predict で呼ぶ)。アプリだけの認証(AIB_CLIENT_ID・AIB_CLIENT_SECRET)。
+//                                 プロンプトは名前(AIB_PROMPT_NAME。既定「CCP AI 出口の検証 中継」)で探し、頼みの文を入力 request に入れる
+//                                 (Predict は外から直接呼べず「Source is null」で断られた。手順書 15.5)
+//   node measure.mjs --via flow   方式 3 を、Power Automate の流れを窓口にして呼ぶ(AIB_FLOW_URL に {"request": …} を POST し、{"text": …} を受け取る)
 //   node measure.mjs --runs 5     どれも 5 回ずつ送る
 //   node measure.mjs --only T3    T3 だけ
 //   node measure.mjs --model "GPT Chat Latest"   記録に書くモデルの名前(設定の MODEL_LABEL より優先)
@@ -50,7 +54,7 @@ if (args.includes('--self-test')) {
 }
 
 const via = opt('--via') ?? 'sdk'
-if (!['sdk', 'dl'].includes(via)) throw new Error(`--via は sdk か dl です: ${via}`)
+if (!['sdk', 'dl', 'aib', 'flow'].includes(via)) throw new Error(`--via は sdk・dl・aib・flow です: ${via}`)
 
 function readEnv() {
   if (!fs.existsSync(ENV_FILE)) throw new Error(`設定のファイルがありません: ${ENV_FILE}`)
@@ -59,7 +63,8 @@ function readEnv() {
     const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/)
     if (m) env[m[1]] = m[2]
   }
-  const need = via === 'dl' ? ['DIRECT_LINE_SECRET'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
+  const need =
+    via === 'dl' ? ['DIRECT_LINE_SECRET'] : via === 'flow' ? ['AIB_FLOW_URL'] : via === 'aib' ? ['TENANT_ID', 'AIB_CLIENT_ID', 'AIB_CLIENT_SECRET', 'DATAVERSE_URL'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
   const missing = need.filter((k) => !env[k])
   if (missing.length) throw new Error(`設定が空です: ${missing.join(', ')}(${ENV_FILE})`)
   return env
@@ -211,11 +216,99 @@ async function askOnceDl(dl, prompt, images) {
   }
 }
 
+// ---- 方式 3: AI Builder。人のサインインなしに、アプリの鍵(クライアント シークレット)で Dataverse のトークンを取る
+async function aibToken(env) {
+  const body = new URLSearchParams({ grant_type: 'client_credentials', client_id: env.AIB_CLIENT_ID, client_secret: env.AIB_CLIENT_SECRET, scope: `${env.DATAVERSE_URL.replace(/\/+$/, '')}/.default` })
+  const res = await fetch(`https://login.microsoftonline.com/${env.TENANT_ID}/oauth2/v2.0/token`, { method: 'POST', body })
+  const json = await res.json().catch(() => ({}))
+  // 失敗の理由(AADSTS の番号と文)だけを出す。鍵・トークンは出さない
+  if (!res.ok || !json.access_token) throw new Error(`トークンを取れません ${res.status}: ${String(json.error_description ?? json.error ?? '').split(/\r?\n/)[0].slice(0, 200)}`)
+  return json.access_token
+}
+
+async function dvFetch(dv, url, body) {
+  const res = await fetch(url.startsWith('http') ? url : `${dv.base}/api/data/v9.2/${url}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { Authorization: `Bearer ${dv.token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'OData-MaxVersion': '4.0', 'OData-Version': '4.0' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`Dataverse ${res.status}: ${text.replace(/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}/g, '<ID>').slice(0, 300)}`)
+  return text ? JSON.parse(text) : {}
+}
+
+// プロンプト(表 msdyn_aimodel の 1 行)を名前で探す。ID は画面に出さない
+async function aibPromptId(dv, name) {
+  const got = await dvFetch(dv, `msdyn_aimodels?$select=msdyn_aimodelid,msdyn_name&$filter=msdyn_name eq '${name.replace(/'/g, "''")}'`)
+  const rows = got.value ?? []
+  if (rows.length !== 1) throw new Error(`プロンプト「${name}」が ${rows.length} 件見つかりました(1 件のはず)`)
+  return rows[0].msdyn_aimodelid
+}
+
+async function askOnceAib(dv, prompt, images) {
+  if (images.length) throw new Error('方式 3 で画像を送る形は、まだ作っていない(画像の入力を持つプロンプトが要る)')
+  const t0 = performance.now()
+  let out = await dvFetch(dv, `msdyn_aimodels(${dv.promptId})/Microsoft.Dynamics.CRM.Predict`, {
+    version: '2.0',
+    requestv2: { '@odata.type': '#Microsoft.Dynamics.CRM.expando', request: prompt },
+  })
+  // まだできていなければ 202 と、取りに行く先が返る
+  const deadline = t0 + 120_000
+  while (out.overrideHttpStatusCode === 202 && out.overrideLocation && performance.now() < deadline) {
+    await sleep(Math.max(500, Number(out.overrideRetryAfter ?? 1) * 1000))
+    out = await dvFetch(dv, out.overrideLocation)
+  }
+  const tEnd = performance.now()
+  const r = out.responsev2 ?? {}
+  if (r.operationStatus && r.operationStatus !== 'Success') throw new Error(`Predict の結果: ${r.operationStatus}`)
+  const text = r.predictionOutput?.text ?? r.predictionOutput?.structuredOutput?.text ?? ''
+  const s = ((tEnd - t0) / 1000).toFixed(2)
+  return { startSec: '0.00', firstSec: s, firstTextSec: s, endSec: s, messages: text ? 1 : 0, types: `predict(${r.operationStatus ?? '?'}${r.predictionOutput?.finishReason ? '・' + r.predictionOutput.finishReason : ''})`, text }
+}
+
+// ---- 方式 3 の窓口: Power Automate の流れ。流れの URL には署名の鍵が入ることがあるので、URL は画面に出さない
+// 画像は、Power Automate のファイルの形({"$content-type", "$content": base64})で image に入れる。
+// 画像は別の流れ(画像の入力を持つプロンプト)に送るので、URL は AIB_FLOW_IMAGE_URL。プロンプトの画像の入力は 1 つなので、1 枚だけ
+async function askOnceFlow(url, prompt, images) {
+  if (images.length > 1) throw new Error('流れで送れる画像は 1 枚まで(プロンプトの画像の入力が 1 つのため)')
+  const payload = { request: prompt }
+  if (images.length) {
+    const [, mime, b64] = images[0].contentUrl.match(/^data:([^;]+);base64,(.*)$/)
+    payload.image = { '$content-type': mime, '$content': b64 }
+  }
+  const t0 = performance.now()
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  const body = await res.text()
+  const tEnd = performance.now()
+  if (!res.ok) throw new Error(`流れ ${res.status}: ${body.replace(/https?:\/\/\S+/g, '<URL>').slice(0, 300)}`)
+  let text = body
+  try {
+    const j = JSON.parse(body)
+    if (typeof j?.text === 'string') text = j.text
+  } catch {
+    /* 文のまま返す流れ */
+  }
+  const s = ((tEnd - t0) / 1000).toFixed(2)
+  return { startSec: '0.00', firstSec: s, firstTextSec: s, endSec: s, messages: text ? 1 : 0, types: `flow(${res.status})`, text }
+}
+
 const env = readEnv()
 const model = opt('--model') ?? env.MODEL_LABEL ?? ''
 if (!model) throw new Error(`モデルの名前がありません。エージェントで選んだモデルを ${ENV_FILE} の MODEL_LABEL か --model で渡してください`)
 let ask
-if (via === 'dl') {
+if (via === 'flow') {
+  ask = (prompt, images) => {
+    if (images.length && !env.AIB_FLOW_IMAGE_URL) throw new Error(`画像の流れの URL がありません(${ENV_FILE} の AIB_FLOW_IMAGE_URL)`)
+    return askOnceFlow(images.length ? env.AIB_FLOW_IMAGE_URL : env.AIB_FLOW_URL, prompt, images)
+  }
+} else if (via === 'aib') {
+  // トークンとプロンプトの ID は 1 度だけ取る(層でも使い回す形)。表の「会話を始める」は 0 にし、取った秒数はここに出す
+  const t0 = performance.now()
+  const dv = { base: env.DATAVERSE_URL.replace(/\/+$/, ''), token: await aibToken(env) }
+  dv.promptId = await aibPromptId(dv, env.AIB_PROMPT_NAME || 'CCP AI 出口の検証 中継')
+  console.log(`トークンとプロンプトの ID を取った: ${((performance.now() - t0) / 1000).toFixed(2)} 秒`)
+  ask = (prompt, images) => askOnceAib(dv, prompt, images)
+} else if (via === 'dl') {
   // 窓口は、チャネルの画面に出る URL(地域ごとに違うことがある)。なければ既定の窓口
   const dl = { base: `${(env.DIRECT_LINE_ENDPOINT || 'https://directline.botframework.com').replace(/\/+$/, '').replace(/\/v3\/directline$/, '')}/v3/directline`, secret: env.DIRECT_LINE_SECRET }
   ask = (prompt, images) => askOnceDl(dl, prompt, images)
@@ -265,7 +358,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true })
 // ファイルの名前にもモデルを入れる(モデルを替えて測った表を並べて見比べやすいように)
 const stamp = `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}_${via}_${model.replace(/[^\w.-]+/g, '-')}`
 const md = [
-  `方式: ${via === 'dl' ? '1(Direct Line。取りに行く間隔 ' + POLL_MS + 'ms)' : '2(Agents SDK)'} / モデル: ${model}`,
+  `方式: ${via === 'dl' ? '1(Direct Line。取りに行く間隔 ' + POLL_MS + 'ms)' : via === 'aib' ? '3(AI Builder の Predict)' : via === 'flow' ? '3(AI Builder を Power Automate の流れから)' : '2(Agents SDK)'} / モデル: ${model}`,
   '',
   '| 頼み | 回 | 画像 | 会話を始める(秒) | 最初に届く(秒) | 本文が届く(秒) | 終わり(秒) | 届いた種類 | JSON | 決まり | 守れなかった所 |',
   '|---|---|---|---|---|---|---|---|---|---|---|',
