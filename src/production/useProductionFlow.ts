@@ -99,6 +99,28 @@ export function useProductionFlow({ card, live, actor, html, variantHtml, onChan
       if (!live || !(await confirmDialog(tr('配信のしくみに送ります。よろしいですか?', 'Send to the delivery system?')))) return
       void run(() => ProductionService.sendRequest(live.id, { ...input, html: html(), variant_html: variantHtml }), tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'))
     },
+    /**
+     * 制作を通さずに、配信のしくみに送る近道(P5。prod.export)。制作がない配信もあるため。
+     * 新しい版を「送った」で作る(渡していた版は古い版になる)。snapshot は、いまの中身(渡したあとなら直した写し)
+     */
+    sendDirect: async (snapshot: string) => {
+      if (!(await confirmDialog(tr('制作を通さず、いまの中身と HTML を、配信のしくみに送ります。よろしいですか?', 'Send the current content and HTML to the delivery system without production?')))) return
+      void run(
+        () =>
+          ProductionService.send({
+            delivery_card_id: card.id,
+            actor,
+            snapshot,
+            instructions: card.instructions ?? '',
+            production_owner: card.production_owner ?? '',
+            production_due: card.production_due ?? '',
+            html: html(),
+            variant_html: variantHtml,
+            week_start: weekStart,
+          }),
+        tr('送りました(送り先は、まだ仮です)', 'Sent (placeholder destination)'),
+      )
+    },
     /** いちばん新しく終えた段を、まだ終えていない状態に戻す(渡した段なら、取り下げる) */
     undo: async () => {
       if (!live) return

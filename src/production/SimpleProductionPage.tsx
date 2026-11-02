@@ -9,7 +9,7 @@
 // 詳しい制作のページ(ProductionPage)と同じもの(productionSnapshot.ts)を使い、ここでは並べ方だけを変える
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, CheckmarkRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, ErrorCircleRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
+import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, CheckmarkRegular, SendRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, ErrorCircleRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -459,6 +459,8 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
     return v?.saved_at ? v.html : ''
   }
   const made = madeOf(cur)
+  // ③ の窓に出す、AB テストの案ごとの保存の様子(P4)
+  const variantSaves = keys.length > 1 ? keys.map((k) => ({ key: k, by: k === 'A' ? live?.html_saved_by_name : savedVariants[k]?.saved_by_name, at: k === 'A' ? live?.html_saved_at : savedVariants[k]?.saved_at, pending: editingHtml?.variant === k || savingHtml?.variant === k })) : undefined
   const madeBy = cur === 'A' ? { by: live?.html_saved_by_name, at: live?.html_saved_at } : { by: savedVariants[cur]?.saved_by_name, at: savedVariants[cur]?.saved_at }
   const history = useMemo(() => parseHtmlHistory(live?.html_history).filter((h) => h.variant === cur), [live?.html_history, cur])
   // 試している HTML(AI の見た目の案・前の版・貼り付けたもの)
@@ -1102,7 +1104,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
               // 自分の番のときだけの青いボタン [prod.steps](2026-10-28 利用者。だれの番でも押せるのは左のバーの「工程」)
               myStep && (
                 <>
-                  <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' || !resultOn ? undefined : () => setFinishedOpen(true)} needMe={needMe} />
+                  <StepAction flow={flow} step={myStep} onViewResult={myStep.key === 'check' || !resultOn ? undefined : () => setFinishedOpen(true)} needMe={needMe} variants={variantSaves} />
                   <FeatureBadge id="prod.steps" />
                 </>
               )
@@ -1143,6 +1145,20 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                         {/* いちばん新しく終えた段を戻す [prod.steps] */}
                         <MenuItem icon={<ArrowUndoRegular />} disabled={flow.busy || !!needMe} onClick={() => void flow.act.undo()}>
                           {flow.current - 1 === 0 ? t('渡したのを取り下げる', 'Withdraw the handoff') : t(`「${flow.steps[flow.current - 1]?.name}」をやり直す`, `Redo "${flow.steps[flow.current - 1]?.name}"`)}
+                        </MenuItem>
+                      </>
+                    )}
+                    {/* 制作を通さずに、配信のしくみに送る近道(P5。制作がない配信もある)。承認のあと、仕上がりの確認より前まで [prod.export] */}
+                    {exportOn && flow.approved && flow.current < 4 && (
+                      <>
+                        <MenuDivider />
+                        <MenuItem
+                          icon={<SendRegular />}
+                          disabled={flow.busy || !!needMe || (!live && !!draft.ab?.choose)}
+                          title={needMe ?? (!live && draft.ab?.choose ? t('案から選ぶ配信で、まだ 1 案に決まっていません(配信カードで決めてから送れます)', 'Still choosing between variants (choose one in the delivery card first)') : undefined)}
+                          onClick={() => void flow.act.sendDirect(JSON.stringify(live ? snap : draft))}
+                        >
+                          {t('制作を通さずに、配信のしくみに送る', 'Send to the delivery system without production')} <FeatureBadge id="prod.export" />
                         </MenuItem>
                       </>
                     )}
@@ -1289,7 +1305,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                     )}
                     {panel === 'steps' && (
                       <StagePane>
-                        <StepsPane flow={flow} onViewResult={resultOn ? () => setFinishedOpen(true) : undefined} needMe={needMe} />
+                        <StepsPane flow={flow} onViewResult={resultOn ? () => setFinishedOpen(true) : undefined} needMe={needMe} variants={variantSaves} />
                       </StagePane>
                     )}
                   </>
