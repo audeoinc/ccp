@@ -9,7 +9,7 @@
 // 写しの作り方・材料の行は productionSnapshot.ts にまとめ、ここでは並べ方だけを持つ(詳しい制作のページは 2026-11-02 に消した。K5)
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogTitle, InfoLabel, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, Tab, TabList, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, CheckmarkRegular, SendRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, ErrorCircleRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
+import { ArrowDownRegular, ArrowUpRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUndoRegular, SendRegular, ClipboardPasteRegular, CommentRegular, HistoryRegular, CopyRegular, DismissRegular, DocumentTextRegular, EditRegular, EyeRegular, ImageMultipleRegular, MoreHorizontalRegular, OpenRegular, TimelineRegular, CodeRegular } from '@fluentui/react-icons'
 import type { DeliveryCard } from '../models/deliveryCards'
 import type { Product } from '../models/products'
 import type { HeroImage } from '../models/heroImages'
@@ -37,15 +37,12 @@ import { CardPreview } from '../CardPreview'
 import { PreviewHints } from '../Preview'
 import { useCardDetailStyles } from '../cardDetailStyles'
 import { CreativeAssets } from '../CreativeAssets'
-import { CommentsPanel } from '../CommentsPanel'
-import { TasksPanel } from '../TasksPanel'
 import { FinishedFloat } from '../FinishedFloat'
 import { CardNotesService } from '../data/cardNotes'
 import { CardAssetsService } from '../data/cardAssets'
-import { isThreadRoot, stageOf } from '../notesStage'
+import { stageOf } from '../notesStage'
 import { myName, myUserId, onMeChange } from '../history'
 import { SideRail, type RailItem } from '../simple/SideRail'
-import { addDroppedAssets, canDropAsset } from '../simple/assetDrop'
 import { StepAction } from './StepAction'
 import { useProductionFlow } from './useProductionFlow'
 import { StepsPane } from './StepsPane'
@@ -62,10 +59,16 @@ import { heroImage } from '../images'
 import type { ContextItem } from '../ContextMenu'
 import { PREF } from '../prefKeys'
 import { typo } from '../typo'
-import { day, locale, tr, useT, when } from '../i18n'
+import { day, tr, useT, when } from '../i18n'
 import { productionColor, productionLabel, productionView } from '../useProductionRequests'
 import { PreviewFrame, StageFrame, StagePane, StagePanes } from '../simple/StageFrame'
 import { STAGE_ZOOM_KEY, useStageLayout } from '../simple/stageLayout'
+import { useStageNoteCounts } from '../simple/useStageNoteCounts'
+import { StageTalkPanel } from '../simple/StageTalkPanel'
+import { useAssetDrop } from '../simple/useAssetDrop'
+import { sendWhenText } from '../dates'
+import { copyText } from '../clipboard'
+import { useSidePanel } from '../simple/useSidePanel'
 import { PaneCrumbs, PaneHint } from '../simple/PaneCrumbs'
 import { InboxLines, type InboxPart } from '../simple/InboxLines'
 import { PreviewMarks, type Mark } from '../simple/PreviewMarks'
@@ -103,6 +106,7 @@ import {
   templateOf,
   textRows,
   trackingRows,
+  withCardImages,
   type Snapshot,
   type TextField,
 } from '../productionSnapshot'
@@ -153,9 +157,7 @@ const useStyles = makeStyles({
   rowLabel: { ...typo.label },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   // この配信のねらい(部品のペインの上の、控えめな箱。計画の部品のペインと同じ置き方)
-  dropNote: { fontSize: '16px' },
   // やり取りの下のタスクの区切り
-  taskSec: { marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   aim: { display: 'grid', rowGap: '2px', padding: '6px 10px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground2 },
   hero: { maxWidth: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
   thumb: { width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0, borderRadius: tokens.borderRadiusSmall, backgroundColor: tokens.colorNeutralBackground1 },
@@ -322,55 +324,36 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 左のバーで開いている欄(やり取り [collab.thread]・タスク [collab.tasks]・素材 [collab.assets]・工程 [prod.steps])
   // 開いたときは「渡されたもの」(2026-10-29 利用者: プレビューを見る → 申し送りを読む → 素材でイメージを持つ → HTML を確かめる、の順に進めるように)
   type Side = 'given' | 'talk' | 'assets' | 'steps' | 'html' | 'changes'
-  const [side, setSide] = useState<Side | null>('given')
-  // しまう動きの間も、最後に開いた欄の中身を描いておく(計画と同じ)
-  const [lastSide, setLastSide] = useState<Side>('given')
-  const [moving, setMoving] = useState(false)
-  const showSide = (v: Side, open = false) => {
-    const next = !open && side === v ? null : v
-    setSide(next)
-    if (next) setLastSide(next)
-    if (next !== side) {
-      setMoving(true)
-      window.setTimeout(() => setMoving(false), 260)
-    }
-  }
+  // しまう動きの間も、最後に開いた欄の中身を描いておく(計画・結果と同じ useSidePanel)
+  const { side, lastSide, moving, show: showSide } = useSidePanel<Side>('given', 'given')
   const [finishedOpen, setFinishedOpen] = useState(false)
-  // バーの数(未解決の制作のやり取り・未完了のタスク・素材)。欄の中で増減したら、開け閉めのたびに数え直す
-  const [counts, setCounts] = useState({ talk: 0, tasks: 0, assets: 0 })
-  // タスクを足した・済みにしたとき(やり取りを開いたまま)も、バーの数を合わせる
-  const [countsVersion, setCountsVersion] = useState(0)
+  // バーの数(未解決の制作のやり取り・未完了のタスク・素材)。欄の中で増減したら、開け閉めのたびに数え直す。
+  // やり取り・タスクは結果の面と同じ数え方(useStageNoteCounts)、素材はここで数える
+  const noteCounts = useStageNoteCounts(card.id, 'production', [side])
+  const [assetCount, setAssetCount] = useState(0)
+  const [assetsCountVersion, setAssetsCountVersion] = useState(0)
   useEffect(() => {
     let alive = true
-    void Promise.all([CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] }), CardAssetsService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on desc'] })])
-      .then(([n, a]) => {
-        if (!alive) return
-        const notes = n.success ? (n.data ?? []) : []
-        setCounts({ talk: notes.filter((x) => !x.resolved && isThreadRoot(x) && stageOf(x) === 'production').length, tasks: notes.filter((x) => !x.resolved && x.kind === 'task').length, assets: a.success ? (a.data ?? []).length : 0 })
+    CardAssetsService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on desc'] })
+      .then((a) => {
+        if (alive) setAssetCount(a.success ? (a.data ?? []).length : 0)
       })
       .catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [card.id, side, countsVersion])
+  }, [card.id, side, assetsCountVersion])
+  const counts = { ...noteCounts.counts, assets: assetCount }
   // 左のバーの「渡されたもの」「素材」に、画像・資料・URL を落として、参考の素材に入れる(計画と同じ。Plan と Production の差の 19)
   const [assetsVersion, setAssetsVersion] = useState(0)
-  const [dropOver, setDropOver] = useState<Side | null>(null)
-  const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
-  const dropAssets = async (dt: DataTransfer) => {
-    setDropOver(null)
-    try {
-      const r = await addDroppedAssets(card.id, myName() || owner || '', dt)
-      setDropNote(r.error ? { ok: false, text: r.error } : { ok: true, text: t(`${r.added} 件を参考の素材に入れました`, `Added ${r.added} to reference assets`) })
-      if (r.added > 0) {
-        setAssetsVersion((v) => v + 1)
-        setCountsVersion((v) => v + 1)
-      }
-    } catch (err) {
-      setDropNote({ ok: false, text: err instanceof Error ? err.message : String(err) })
-    }
-    window.setTimeout(() => setDropNote(null), 4000)
-  }
+  const assetDrop = useAssetDrop<Side>({
+    cardId: card.id,
+    me: () => myName() || owner || '',
+    onAdded: () => {
+      setAssetsVersion((v) => v + 1)
+      setAssetsCountVersion((v) => v + 1)
+    },
+  })
 
   const load = useCallback(async () => {
     const r = await ProductionRequestsService.getAll({ filter: `delivery_card_id eq '${card.id}'` })
@@ -384,7 +367,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   // 写し: 渡したあとは固めたもの(制作が直していれば、その写し)、渡す前はいまの配信カードから作った下書き
   const latest = requests?.[0]
   const live = latest && LIVE.has(latest.status ?? '') ? latest : undefined
-  const shownProducts = useMemo(() => (productImages?.size ? products.map((p) => (productImages.has(p.id) ? { ...p, image_url: productImages.get(p.id) } : p)) : products), [products, productImages])
+  const shownProducts = useMemo(() => withCardImages(products, productImages), [products, productImages])
   const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   const frozen = useMemo(() => parseSnapshot(live?.snapshot), [live?.snapshot])
   const edited = useMemo(() => parseSnapshot(live?.edited_snapshot), [live?.edited_snapshot])
@@ -693,13 +676,13 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
   const fileName = `${(card.name ?? 'delivery').replace(/[\\/:*?"<>|]/g, '_')}${keys.length > 1 ? `-${cur}` : ''}.html`
   const [copied, setCopied] = useState(false)
   const copyHtml = () =>
-    void navigator.clipboard?.writeText(sampleHtml()).then(() => {
+    void copyText(sampleHtml()).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1200)
     })
 
   // 題の日時(配信カードの題と同じ書き方。面を切り替えても、題の幅が変わらないように)
-  const when_ = card.scheduled_at ? new Date(card.scheduled_at).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
+  const when_ = sendWhenText(card.scheduled_at)
   const campaign = useCampaignOf(card.campaign_id)
 
   // 写す値の 1 行(ラベルと値の組は LabeledValue。空の値は「—」。Plan と Production の差の 42・43)
@@ -1202,7 +1185,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                     {htmlEditOn && made && (
                       <>
                         <MenuDivider />
-                        <MenuItem icon={<CopyRegular />} onClick={() => void navigator.clipboard?.writeText(made)}>
+                        <MenuItem icon={<CopyRegular />} onClick={() => void copyText(made)}>
                           {t('制作した HTML をコピー', 'Copy the production HTML')} <FeatureBadge id="prod.htmledit" />
                         </MenuItem>
                         <MenuItem icon={<ArrowDownloadRegular />} onClick={() => downloadText(fileName, made)}>
@@ -1260,28 +1243,9 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                   selected={openSide}
                   onPick={(v) => showSide(v)}
                   ariaLabel={t('制作のメニュー', 'Production menus')}
-                  drop={{
-                    over: dropOver,
-                    onOver: (v, ev) => {
-                      if (!canDropAsset(ev.dataTransfer)) return
-                      ev.preventDefault()
-                      setDropOver(v)
-                    },
-                    onLeave: () => setDropOver(null),
-                    onDrop: (_, ev) => {
-                      ev.preventDefault()
-                      void dropAssets(ev.dataTransfer)
-                    },
-                  }}
+                  drop={assetDrop.drop}
                 >
-                  {/* 落としたものを入れた・入れられなかったを、バーの下に短く知らせる */}
-                  {dropNote && (
-                    <Tooltip content={dropNote.text} relationship="label" positioning="after" visible>
-                      <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
-                        {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
-                      </span>
-                    </Tooltip>
-                  )}
+                  {assetDrop.note}
                 </SideRail>
               }
               side={{
@@ -1293,18 +1257,12 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                     {panel === 'given' && <StagePane>{handoffPane}</StagePane>}
                     {panel === 'talk' && (
                       <StagePane>
-                        {threadOn && <CommentsPanel cardId={card.id} stage="production" productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} onOpenCount={(n) => setCounts((c) => ({ ...c, talk: n }))} />}
-                        {/* タスク(担当・期日)は、やり取りの下に。書き込みから AI で出したタスクも、ここに入る */}
-                        {tasksOn && (
-                          <div className={mergeClasses(threadOn && s.taskSec)}>
-                            <TasksPanel cardId={card.id} productionOwner={owner} productionDue={due} onOpenSource={() => undefined} onChanged={() => setCountsVersion((v) => v + 1)} />
-                          </div>
-                        )}
+                        <StageTalkPanel cardId={card.id} stage="production" cardName={card.name ?? ''} productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} owner={owner} due={due} onOpenCount={noteCounts.setTalk} onTasksChanged={noteCounts.bump} />
                       </StagePane>
                     )}
                     {panel === 'assets' && (
                       <StagePane>
-                        <CreativeAssets key={assetsVersion} cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={(n) => setCounts((c) => ({ ...c, assets: n }))} />
+                        <CreativeAssets key={assetsVersion} cardId={card.id} stage="production" people={people} cardName={card.name ?? ''} productionOwner={owner} productionDue={due} productIds={vs.productIds.filter(Boolean)} products={vs.products} onCount={setAssetCount} />
                       </StagePane>
                     )}
                     {/* HTML のソース(2026-11-02 利用者)。いまプレビューに出している方(企画の見本 / 制作した HTML)を、色分けのエディタで。

@@ -81,6 +81,10 @@ export interface SnapshotVariant {
 }
 
 /** variantIds: B・C 案の商品 ID(メールの並び順。AB テストで商品を比べるとき) */
+/** この配信で替えた商品の画像(商品の id → 画像の URL)を、商品に当てる。写しを作る前に通す(制作・結果の面で、計画と同じ画像で見せるため) */
+export const withCardImages = (products: Product[], images?: Map<string, string>): Product[] =>
+  images?.size ? products.map((p) => (images.has(p.id) ? { ...p, image_url: images.get(p.id) } : p)) : products
+
 export function buildSnapshot(card: DeliveryCard, productIds: string[], products: Product[], heroes: HeroImage[], variantIds?: Partial<Record<VariantKey, string[]>>): Snapshot {
   const picked = Object.fromEntries(CARD_KEYS.map((k) => [k, card[k]])) as Snapshot['card']
   // utm_source・utm_medium は、依頼したときの設定の値を写しに入れておく(あとで設定を変えても、依頼した配信の URL が黙って変わらないように。

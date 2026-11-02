@@ -18,7 +18,7 @@ import { ResultCompare } from '../ResultCompare'
 import { abVerdict } from '../abResults'
 import { parseAbTest } from '../abTest'
 import { COUNTRY_US, isPush, parseProductResults, pct, sentAtOf, toResultRows, type ResultRow } from '../results'
-import { buildSnapshot, productionVariants, snapshotOf } from '../productionSnapshot'
+import { buildSnapshot, productionVariants, snapshotOf, withCardImages } from '../productionSnapshot'
 import { slotIdsOf } from '../slots'
 import { printReport } from '../printReport'
 import { ResizableSurface } from '../ResizableSurface'
@@ -39,6 +39,9 @@ import { useFeature } from '../featureFlags'
 import { SideRail, type RailItem } from '../simple/SideRail'
 import { PreviewFrame, StageFrame, StagePane, StagePanes } from '../simple/StageFrame'
 import { STAGE_ZOOM_KEY, useStageLayout } from '../simple/stageLayout'
+import { useStageNoteCounts } from '../simple/useStageNoteCounts'
+import { sendWhenText } from '../dates'
+import { useSidePanel } from '../simple/useSidePanel'
 import { PaneCrumbs, PaneHint } from '../simple/PaneCrumbs'
 import { InboxLines, type InboxPart } from '../simple/InboxLines'
 import { usePreviewZoom } from '../simple/usePreviewZoom'
@@ -48,9 +51,7 @@ import { WeeklyPerformancesService } from '../data/weeklyPerformances'
 import type { WeeklyPerformance } from '../models/weeklyPerformances'
 import { useDeliveryImpact } from '../useDeliveryImpact'
 import { ResultsAiPanel } from './ResultsAiPanel'
-import { ResultsTalkPanel } from './ResultsTalkPanel'
-import { CardNotesService } from '../data/cardNotes'
-import { isThreadRoot, stageOf } from '../notesStage'
+import { StageTalkPanel } from '../simple/StageTalkPanel'
 
 const useStyles = makeStyles({
   surface: { padding: 0 },
@@ -144,7 +145,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
   const row = history.find((r) => r.card.id === card.id)
 
   // 送った中身(案ごと)。制作の画面と同じ写しの作り方で、案の見出し・画像・商品を引く
-  const shownProducts = useMemo(() => (productImages?.size ? products.map((p) => (productImages.has(p.id) ? { ...p, image_url: productImages.get(p.id) } : p)) : products), [products, productImages])
+  const shownProducts = useMemo(() => withCardImages(products, productImages), [products, productImages])
   const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   const ab = parseAbTest(card.ab_test)
   const keys = abOn && row && row.parts.some((p) => p.variant) ? productionVariants(draft) : (['A'] as VariantKey[])
@@ -174,24 +175,10 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
   const ratio = (a: number, b: number) => (b ? a / b : undefined)
 
   // 左のバーの「やり取り」の数(結果の段の、まだ済んでいない書き込みと、済んでいないタスク)。開け閉めとタスクの変更で数え直す
-  const [talkCounts, setTalkCounts] = useState({ talk: 0, tasks: 0 })
-  const [countsVersion, setCountsVersion] = useState(0)
   // 左のバー(1 つだけ開く。もう一度押すとしまう)
-  const [side, setSide] = useState<Side | null>(null)
-  const [lastSide, setLastSide] = useState<Side>('links')
-  useEffect(() => {
-    let alive = true
-    CardNotesService.getAll({ filter: `delivery_card_id eq ${card.id}`, orderBy: ['created_on asc'] })
-      .then((r) => {
-        if (!alive) return
-        const notes = r.success ? (r.data ?? []) : []
-        setTalkCounts({ talk: notes.filter((x) => !x.resolved && isThreadRoot(x) && stageOf(x) === 'results').length, tasks: notes.filter((x) => !x.resolved && x.kind === 'task').length })
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [card.id, side, countsVersion])
+  const { side, setSide, lastSide, show } = useSidePanel<Side>(null, 'links')
+  const noteCounts = useStageNoteCounts(card.id, 'results', [side])
+  const talkCounts = noteCounts.counts
   const showSide = (v: Side) => {
     // 「この配信の結果」は、パネルを開かずに、右のペインを全体に戻す
     if (v === 'summary') {
@@ -199,8 +186,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
       setSide(null)
       return
     }
-    setLastSide(v)
-    setSide(side === v ? null : v)
+    show(v)
   }
 
   // 次に生かすメモ(= 学び)。打てば入り、1.5 秒で自動で保存(計画・制作と同じ保存の流れ)
@@ -250,7 +236,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
   const zoom = usePreviewZoom(boxRef, innerRef, STAGE_ZOOM_KEY, `${card.id}:${device}:${cur}`)
   const campaign = useCampaignOf(card.campaign_id)
   const sent = row ? sentAtOf(row) : card.scheduled_at
-  const when_ = sent ? new Date(sent).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
+  const when_ = sendWhenText(sent)
 
   // 案の段(キャンペーンの帯の 3 段目。X79 (c) の c-1): 案ごとの数字と、勝ち案に 🏆
   const metricOf = (r?: ResultRow) => (r ? pct(r.clickRate) : '—')
@@ -534,7 +520,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
                     )}
                     {panel === 'talk' && (
                       <StagePane>
-                        <ResultsTalkPanel cardId={card.id} cardName={card.name ?? ''} productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} owner={card.owner ?? ''} onOpenCount={(n) => setTalkCounts((c) => ({ ...c, talk: n }))} onTasksChanged={() => setCountsVersion((v) => v + 1)} />
+                        <StageTalkPanel cardId={card.id} stage="results" cardName={card.name ?? ''} productIds={vs.productIds.filter(Boolean)} products={vs.products} people={people} owner={card.owner ?? ''} onOpenCount={noteCounts.setTalk} onTasksChanged={noteCounts.bump} />
                       </StagePane>
                     )}
                     {panel === 'compare' && (

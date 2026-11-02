@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { filled } from '../slots'
 import { Button, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, CheckmarkRegular, ErrorCircleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
+import { AddRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
@@ -24,7 +24,7 @@ import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular } from '@fluentu
 import { Row, productMeta } from '../ProductRow'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
-import { locale, useT } from '../i18n'
+import { useT } from '../i18n'
 import { audienceSet } from '../target'
 import { getTemplate, sectionsOf, slotsOf } from '../templates'
 import { statusRank } from '../status'
@@ -41,11 +41,13 @@ import { placeInPart } from './actions'
 import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
 import { PreviewFrame, StageFrame, StagePane, StagePanes } from './StageFrame'
 import { useStageLayout } from './stageLayout'
+import { useSidePanel } from './useSidePanel'
+import { sendWhenText } from '../dates'
+import { useAssetDrop } from './useAssetDrop'
 import { DeliveryMetaBand } from './DeliveryMetaBand'
 import { HandoffSheet } from './HandoffSheet'
 import { LinksPanel } from './LinksPanel'
 import { CreativeAssets } from '../CreativeAssets'
-import { addDroppedAssets, canDropAsset } from './assetDrop'
 import { myName, onMeChange } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
@@ -108,7 +110,6 @@ const useStyles = makeStyles({
   },
   listHead: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '-6px' },
   colTitle: { ...typo.heading, marginBottom: '10px' },
-  dropNote: { fontSize: '16px' },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
   // 候補の行と、マウスを乗せたときの「⇄ 入れる」(SU9)
   // 「入れる」は、マウスを乗せたとき・フォーカスがあるときだけ見せる(一覧をうるさくしない)
@@ -246,7 +247,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const swapInFloat = useFloatSwap({ editor: e, chats, setChat, onSwapped: swapped })
 
   // まだ保存していない案(e.unsaved)は、配信カードの ID を使うパネル(やり取り・承認・素材・渡すもの・履歴・学び)を出さない。開けるのはアラートだけ
-  const [side, setSide] = useState<Side>(null)
+  // 左のバーの欄の開け閉め(制作・結果の面と同じ useSidePanel)
+  const sidePanel = useSidePanel<Exclude<Side, null>>(null, 'alerts')
+  const { side, setSide, panel, moving } = sidePanel
   // 開いたときの左のペインは、載せた商品まで読み終わってから決める(アラートの数は商品で決まるので、読む前に決めると一瞬開いて閉じる)。
   // きょうだいの配信カードに切り替えたとき(この画面は作り直されない)も、開いたときと同じ始まり方にする
   const [decided, setDecided] = useState<string | null>(null)
@@ -262,14 +265,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
   const showSide = (v: Exclude<Side, null>, open = false) => {
-    const next = !open && side === v ? null : v
-    setSide(next)
+    const next = sidePanel.show(v, open)
     if (isComm(next)) setCommSection(next)
-    if (next) setLastSide(next)
-    if (next !== side) {
-      setMoving(true)
-      window.setTimeout(() => setMoving(false), 260)
-    }
   }
   // 送る前の確かめ(承認を依頼する・制作に渡す の前の一覧。中身は readiness.ts。2026-10-25 利用者と決めた)
   const checkInput = {
@@ -303,10 +300,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       setHandoffFocus((f) => ({ field: target.field, seq: (f?.seq ?? 0) + 1 }))
     } else select(target)
   }
-  // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
-  const [lastSide, setLastSide] = useState<Exclude<Side, null>>('alerts')
-  const panel = side ?? lastSide
-  const [moving, setMoving] = useState(false)
   // 列の幅と、狭いときの割り振り(面の枠。幅は面で 1 つの鍵で覚える)。アプリの配信は、スマホの幅
   const layout = useStageLayout({ device: e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile', side: isComm(side) ? 'comm' : side ? 'hand' : null, list: { open: productsOpen, insist } })
   const fit = layout.fit
@@ -325,19 +318,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const myStep = myNextStep(e.nextStep, { author, myTurn: counts.myTurn, changesRequested: counts.changesRequested })
   // 左のバーの「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
   const [assetsVersion, setAssetsVersion] = useState(0)
-  const [dropOver, setDropOver] = useState<'assets' | 'handoff' | null>(null)
-  const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
-  const dropAssets = async (dt: DataTransfer) => {
-    setDropOver(null)
-    try {
-      const r = await addDroppedAssets(e.card.id, myName() || e.form.owner || '', dt)
-      setDropNote(r.error ? { ok: false, text: r.error } : { ok: true, text: t(`${r.added} 件を参考の素材に入れました`, `Added ${r.added} to reference assets`) })
-      if (r.added > 0) setAssetsVersion((v) => v + 1)
-    } catch (err) {
-      setDropNote({ ok: false, text: err instanceof Error ? err.message : String(err) })
-    }
-    window.setTimeout(() => setDropNote(null), 4000)
-  }
+  const assetDrop = useAssetDrop<Exclude<Side, null>>({ cardId: e.card.id, me: () => myName() || e.form.owner || '', onAdded: () => setAssetsVersion((v) => v + 1) })
   // 帯に出す、参考の素材の数(帯の数を合わせるため、開いていなくても数える)
   const [assetCount, setAssetCount] = useState(0)
   useEffect(() => {
@@ -457,7 +438,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const tpl = getTemplate(e.template)
   // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
   // 配信の情報の帯は 1 行(2026-10-28 利用者: 対象・送る相手は、押すと開く右のペインの配信の情報で見る。中身が重なっていたため)
-  const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
+  const when = sendWhenText(e.form.scheduledAt)
 
   const sideTitle = (v: Exclude<Side, null>) =>
     ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), links: t('この配信のリンク', 'Links in this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
@@ -870,28 +851,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             selected={side}
             onPick={(v) => showSide(v)}
             ariaLabel={t('配信の全体の情報とメニュー', 'Delivery info and menus')}
-            drop={{
-              over: dropOver,
-              onOver: (v, ev) => {
-                if (!canDropAsset(ev.dataTransfer)) return
-                ev.preventDefault()
-                setDropOver(v === 'assets' ? 'assets' : 'handoff')
-              },
-              onLeave: () => setDropOver(null),
-              onDrop: (_, ev) => {
-                ev.preventDefault()
-                void dropAssets(ev.dataTransfer)
-              },
-            }}
+            drop={assetDrop.drop}
           >
-            {/* 落としたものを入れた・入れられなかったを、バーの下に短く知らせる */}
-            {dropNote && (
-              <Tooltip content={dropNote.text} relationship="label" positioning="after" visible>
-                <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
-                  {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
-                </span>
-              </Tooltip>
-            )}
+            {assetDrop.note}
           </SideRail>
         }
         // 開いているパネル(1 つ)。やり取りの部品は、バーの数を合わせるため、いつも描く

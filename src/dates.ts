@@ -1,5 +1,7 @@
 // 日付の小道具(整理 第2段 ⑧)。日付は、ブラウザの時刻の「年-月-日」(YYYY-MM-DD)の文字で比べ・覚える。
 // toISOString は UTC なので、日本の朝 9 時前は前の日になる。日付の文字を作るときは、ここの関数を使う
+import { locale, tr } from './i18n'
+
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /** その日の「年-月-日」(YYYY-MM-DD。ブラウザの時刻) */
@@ -17,3 +19,7 @@ export const localDate = (iso?: string): string => (iso ? ymd(new Date(iso)) : '
 export const weekStartSunday = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay())
 /** 販売系の方針・週ごとの実績の週の始まり(月曜) */
 export const weekStartMonday = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
+
+/** 面の題に出す配信日時(例「10月2日(金) 10:00」)。計画・制作・結果の題で同じ書き方にする(面を切り替えても、題の幅が変わらないように) */
+export const sendWhenText = (iso?: string | null): string =>
+  iso ? new Date(iso).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : tr('配信日時(未設定)', 'No send date')

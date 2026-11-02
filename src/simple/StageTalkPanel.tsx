@@ -1,6 +1,6 @@
-// シンプルな結果の窓(X89)の左のバーの「やり取り」。制作の画面と同じ形: 書き込み(結果の段のスレッド)の下に、タスクを入れる。
-// 書き込みは段 results に分ける(計画・制作のやり取りと混ぜない。結果を見ての相談・次の配信への申し送り)。タスクは配信カードのものを全部出す(制作と同じ)。
-// 公開・非公開は collab.thread・collab.tasks(制作と同じ判定)
+// 制作・結果の面の左のバーの「やり取り」。書き込み(その段のスレッド)の下に、タスクを入れる(2026-11-02 に、制作の画面にその場で書いていたものと 1 つにした)。
+// 書き込みは段ごとに分ける(計画・制作・結果のやり取りを混ぜない)。タスクは配信カードのものを全部出す。
+// 公開・非公開は collab.thread・collab.tasks
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { CommentsPanel } from '../CommentsPanel'
 import { TasksPanel } from '../TasksPanel'
@@ -15,6 +15,8 @@ const useStyles = makeStyles({
 
 interface Props {
   cardId: string
+  /** やり取りの段 */
+  stage: 'production' | 'results'
   /** 配信名(AI にタスクの案を頼むときに渡す) */
   cardName: string
   /** 載せた商品(メールの並び順の商品 ID)。書き込みの対象に選べる */
@@ -23,7 +25,7 @@ interface Props {
   products: Product[]
   /** 宛先の候補 */
   people: string[]
-  /** タスクの担当・期日の既定値(結果では、ふつう企画の担当と空の期日) */
+  /** タスクの担当・期日の既定値(制作では制作の担当と締め切り。結果では、ふつう企画の担当と空の期日) */
   owner: string
   due?: string
   /** 左のバーの数(未解決の書き込み・未完了のタスク)を合わせるため */
@@ -31,7 +33,7 @@ interface Props {
   onTasksChanged?: () => void
 }
 
-export function ResultsTalkPanel({ cardId, cardName, productIds, products, people, owner, due = '', onOpenCount, onTasksChanged }: Props) {
+export function StageTalkPanel({ cardId, stage, cardName, productIds, products, people, owner, due = '', onOpenCount, onTasksChanged }: Props) {
   const s = useStyles()
   const threadOn = useFeature('collab.thread')
   const tasksOn = useFeature('collab.tasks')
@@ -41,7 +43,7 @@ export function ResultsTalkPanel({ cardId, cardName, productIds, products, peopl
       {threadOn && (
         <CommentsPanel
           cardId={cardId}
-          stage="results"
+          stage={stage}
           productIds={productIds}
           products={products}
           people={people}
