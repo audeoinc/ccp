@@ -45,7 +45,9 @@ const useStyles = makeStyles({
   sideTitle: { flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' },
   sideBody: { display: 'grid', minHeight: 0, minWidth: 0, overflow: 'hidden' },
   // 上から 道具の行・(知らせ)・受信箱の 1 行・プレビュー。行の数が変わってもプレビューが残りの高さを取るよう、縦の flex
-  previewPane: { display: 'flex', flexDirection: 'column', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2 },
+  // isolation: プレビューの上に浮かべたもの(スマホ / PC・ピン・倍率。zIndex 5)の重なりを、この枠の中に閉じる。
+  // 閉じないと、狭い画面でプレビューに重ねて出す左のパネル(sideOverlay。zIndex 3)より上に出ていた(2026-11-02 UI 3 が見つけた)
+  previewPane: { display: 'flex', flexDirection: 'column', rowGap: '6px', minHeight: 0, minWidth: 0, padding: '8px 12px 10px', backgroundColor: tokens.colorNeutralBackground2, isolation: 'isolate' },
   toolbar: { display: 'flex', alignItems: 'center', columnGap: '6px', flexWrap: 'wrap' },
   // プレビューの枠。ピン・印と同じく、重ねる層の基準にする(position: relative)
   boxWrap: { position: 'relative', flexGrow: 1, minHeight: 0, display: 'grid' },
