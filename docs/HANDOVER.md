@@ -20,7 +20,7 @@
 
 - 2026-11-02 UI 1: X90 の塊 A(面の枠 `simple/StageFrame.tsx`・`stageLayout.ts`)を作り、Plan を載せて main に(見た目は前後で一致)。Production の載せ方はアーカイブ 2026-10-28_ の末尾。X87 段 ② の UI 1 の残りは続き
 - 2026-11-02 UI 3: X86 シンプルな制作の画面の追加分を main に(b046f54。AI の手直し・制作した HTML の版・要素を直す・ピン・左のバーの HTML の欄 `prod.htmlcode`(v1)・保存の流れを計画にそろえた: 打てば入る・自動で保存・↶)。未決: `prod.htmlcode` は FEATURE_FLAGS では「プレビューの切り替え・試す → 確定」、作ったのは「左のバー・自動で保存」(連絡係が確認中)。次は D(面の枠に載せる・AbHandoffSection・MaterialRows / ProductionChanges / PaneCrumbs・「渡されたもの」・件名とプリヘッダー・「企画が変わりました」・simple-finish.md の制作の穴)→ X89
-- 2026-11-02 UI 2: 塊 B(ペインの共通の部品)・C(制作の材料の部品。P11 LinkMaterialRows を含む)は main(利用者の OK)。X80 段 ②(商品ページの本文を残す。表 product_page_texts・ccp/page_text.py・productPageText.ts)は main。X80 段 ③(「詳しく」の文を AI が商品ページから書く・ページと重なる所の薄い印)も main(利用者の OK)。段 ④ の未決は連絡係が利用者に聞く。詳しくはアーカイブ 2026-10-28_ の末尾
+- 2026-11-02 UI 2: 塊 B(ペインの共通の部品)・C(制作の材料の部品。P11 LinkMaterialRows を含む)は main(利用者の OK)。X80 段 ②(商品ページの本文を残す。表 product_page_texts・ccp/page_text.py・productPageText.ts)は main。X80 段 ③(「詳しく」の文を AI が商品ページから書く・ページと重なる所の薄い印)も main(利用者の OK)。X80 段 ④(制作の写し・材料に詳しくの文とコピー、書き出す HTML は table で横 1 行・スマホで縦に積む)はブランチ ui2-x80-handoff で利用者の確認待ち。詳しくはアーカイブ 2026-10-28_ の末尾
 - 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ
 - 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証の手順と結果 docs/MS_AI_VERIFY.md を main に(ブランチ claude/ai-outlet-b3c4ae。Azure OpenAI は想定しない)。Direct Line なら人のサインインなしで呼べ、T1〜T6 は JSON ○。Agents SDK は利用者ごとのサインインが要る(標準のハーネスのエージェントでだけ呼べる)。AI Builder の検証はこれから。Workbench の ZIP には入る(共同作業者が 96237dc で Power Platform・Copilot の言葉を許した)。測るプログラムは tools/ms-verify/(ブランチのみ。設定はリポジトリの外。npm run pack:ms-verify で ZIP。Workbench の ZIP には入らない)
 

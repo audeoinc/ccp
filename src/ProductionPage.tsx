@@ -973,7 +973,7 @@ export function ProductionPage({ card, productIds, variantIds, products, product
                       offscreenRefs.current[k] = el
                     }}
                   >
-                    <CardPreview card={{ ...card, ...vs.card } as DeliveryCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
+                    <CardPreview card={{ ...card, ...vs.card } as DeliveryCard} productIds={vs.productIds} details={vs.details ?? []} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
                   </div>
                 )
               })}

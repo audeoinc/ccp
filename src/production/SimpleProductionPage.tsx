@@ -1372,7 +1372,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
                   <div className={onCompare ? s.compare : undefined}>
                     {/* 企画の見本(部品を押せる)。制作した HTML を見ている間も描いたままにする(切り替えても選んだ部品が消えないように) */}
                     <div ref={innerRef} style={{ zoom: zoom.mode === 'fit' ? undefined : zoom.mode, display: onMade ? 'none' : undefined }}>
-                      <CardPreview card={previewCard} productIds={pvs.productIds} products={pvs.products} heroes={pvs.hero ? [pvs.hero] : []} device={device} />
+                      <CardPreview card={previewCard} productIds={pvs.productIds} details={pvs.details ?? []} products={pvs.products} heroes={pvs.hero ? [pvs.hero] : []} device={device} />
                     </div>
                     {/* 制作した HTML: そのまま描く(部品は押せない。ピンだけ。決定 5)。並べて比べるときは右に */}
                     {(onMade || onCompare) && (
@@ -1448,7 +1448,7 @@ export function SimpleProductionPage({ card, productIds, variantIds, products, p
           {/* 見本の HTML を作るためだけの、見えないプレビュー(画面の大きさ・スマホの切り替えに左右されないように、別に描く) */}
           <div className={s.offscreen} aria-hidden>
             <div ref={offscreenRef}>
-              <CardPreview card={savedCard} productIds={vs.productIds} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
+              <CardPreview card={savedCard} productIds={vs.productIds} details={vs.details ?? []} products={vs.products} heroes={vs.hero ? [vs.hero] : []} />
             </div>
           </div>
           {finishedOpen && live && <FinishedFloat card={card} request={live} people={people} productIds={vs.productIds.filter(Boolean)} products={vs.products} onClose={() => setFinishedOpen(false)} />}

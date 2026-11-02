@@ -117,9 +117,13 @@ export function slotsFromRows<R extends { sort_order?: number | null }>(rows: R[
 // ---- 開いていない配信の、枠の位置つきの商品の並び(一覧ののぞき見・週・結果・制作などのプレビュー用)
 // 配信ごとの商品(cardProducts)は、数える・アラートに使うので、商品だけの並びのまま。プレビューを描くときだけ、ここから空いた枠('')つきの並びを引く
 let positional = new Map<string, string[]>()
+// 枠ごとの「詳しく」の見出し・説明文(X80 段 ④。並びは positional と同じ。詳しくでない枠は null)
+let positionalDetails = new Map<string, (SlotDetail | null)[]>()
+export type SlotDetail = NonNullable<Item['detail']>
 /** 読み込んだ行から作った、配信ごとの枠の位置つきの並び(useAppData が入れる) */
-export const setCardSlots = (m: Map<string, string[]>) => {
+export const setCardSlots = (m: Map<string, string[]>, details: Map<string, (SlotDetail | null)[]> = new Map()) => {
   positional = m
+  positionalDetails = details
 }
 /**
  * 配信 cardId の、プレビュー用の並び(空いた枠は '')。productIds が、読み込んだ配信の商品と同じときだけ、枠の位置つきにする
@@ -132,8 +136,21 @@ export function slotIdsOf(cardId: string | undefined, productIds: string[]): str
   return real.length === productIds.length && real.every((x, i) => x === productIds[i]) ? p : productIds
 }
 
+/** 配信 cardId の、枠ごとの「詳しく」(slotIdsOf と同じ並び)。ids が読み込んだ配信の並びでなければ(AB の案など)、ない */
+export function slotDetailsOf(cardId: string | undefined, ids: string[]): (SlotDetail | null)[] | undefined {
+  const p = cardId ? positional.get(cardId) : undefined
+  const d = cardId ? positionalDetails.get(cardId) : undefined
+  return p && d && p.length === ids.length && p.every((x, i) => x === ids[i]) ? d : undefined
+}
+
 // ---- 商品 ID の並び(空いた枠は '')と、行の並びの行き来(制作の写し・プレビューなど、ID だけで持つ所)
-export const idsToItems = (ids: string[]): Item[] => ids.map((pid, i) => (pid ? { key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL } : { key: `gap-${i}`, productId: '', reason: '', source: SOURCE_MANUAL, gap: true }))
+/** details は、枠ごとの「詳しく」(ids と同じ並び。制作の写しの details など) */
+export const idsToItems = (ids: string[], details?: (SlotDetail | null)[]): Item[] =>
+  ids.map((pid, i) => {
+    if (!pid) return { key: `gap-${i}`, productId: '', reason: '', source: SOURCE_MANUAL, gap: true }
+    const detail = details?.[i]
+    return { key: `${pid}-${i}`, productId: pid, reason: '', source: SOURCE_MANUAL, ...(detail ? { detail } : {}) }
+  })
 export const itemsToIds = (items: Item[]): string[] => items.map((i) => (isGap(i) ? '' : i.productId))
 
 /**
