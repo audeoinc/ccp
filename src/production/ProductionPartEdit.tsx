@@ -1,6 +1,6 @@
 // シンプルな制作の画面(X86)の、部品のペインの「直す」。文言・メイン画像・商品・リンク先を直し、企画の値に戻す。
 // 直しは、どれも試す → 確定(プレビューに仮に当てはめ、上の帯の「確定」で保存する。配信カードと同じ。2026-10-30 利用者: 要素を直すのも MVP)。
-// 写しの直し方(setText など)・選ぶ部品(HeroPicker・ProductPicker)・AI(partAi)は、詳しい制作のページ・配信カードのものを使い回す
+// 写しの直し方(setText など)・選ぶ部品(MaterialPickers の HeroPicker・ProductPicker)・AI(partAi)は、詳しい制作のページ・配信カードのものを使い回す
 import { useMemo, useState } from 'react'
 import { Badge, Button, Input, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
 import { ArrowResetRegular, ArrowSwapRegular } from '@fluentui/react-icons'
@@ -9,7 +9,7 @@ import type { HeroImage } from '../models/heroImages'
 import type { DeliveryCard } from '../models/deliveryCards'
 import { AutoTextarea } from '../AutoTextarea'
 import { HeroUploadDialog } from '../HeroUploadDialog'
-import { HeroPicker, ProductPicker } from '../ProductionInfoPane'
+import { HeroPicker, ProductPicker } from '../MaterialPickers'
 import { PartAiChat } from '../simple/PartAiChat'
 import { TextAiPanel } from '../simple/TextAiPanel'
 import { askHeroPick, askPartRewrite, askProductPick, type PartTurn } from '../simple/partAi'
