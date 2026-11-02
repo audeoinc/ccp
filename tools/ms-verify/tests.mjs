@@ -204,6 +204,134 @@ export const T6_TEST = {
     }),
 }
 
+// ---- T7〜T9: CCP のサーバーの画像の頼み(指示文はサーバーからそのまま写す。%LANG% は日本語にした)。--image を付けたときだけ送る
+// T7 = server/ccp/heroes.py の PROMPT(メイン画像の説明の下書き。画像 1 枚)
+const T7 = `あなたは、EC のメール・アプリの配信で使うメイン画像のライブラリの担当です。この画像を見て、ライブラリに登録するための下書きを作ってください。
+返すのは JSON だけ: {"name": 画像の名前(短く。例「秋の公園で重ね着の女性」), "purpose": "new" | "feature" | "sale" | "member" | "event" のどれか(新作 / 特集 / セール / 会員 / イベント),
+"season": "autumn" | "winter" | "autumn_winter" | "all_year" のどれか, "tags": カンマ区切りのタグ(5〜8 個), "description": 2 文までの説明(雰囲気・構図・どんな配信に合うか),
+"colors": 主な色の名前(3 つまで、カンマ区切り), "subjects": 写っているもの(人・商品の種類など。カンマ区切り), "focal": {"x": 0〜1, "y": 0〜1}(いちばん見せたい場所。左上が 0,0)}
+文字は 日本語 で書く。人物を特定する情報(名前など)は書かない。`
+
+// T8 = server/ccp/parts.py の PROMPT(部品の画像の説明の下書き。画像 1 枚)
+const T8 = `あなたは、EC のメールで使う部品の画像(ボタン・バナー・ロゴ・アイコンなど)のライブラリの担当です。この画像を見て、ライブラリに登録するための下書きを作ってください。
+返すのは JSON だけ: {"name": 画像の名前(短く。例「黒の『今すぐ見る』ボタン」), "kind": "button" | "banner" | "logo" | "icon" | "other" のどれか,
+"tags": カンマ区切りのタグ(色・形・文言・用途。3〜6 個), "description": 1〜2 文の説明(見た目と、どんな場面で使うか),
+"alt_text": メールの代替テキスト(画像が出ないときに代わりに出る文。画像の中の文字があればそれ。なければ短い説明)}
+文字は 日本語 で書く。`
+
+// T9 = server/ccp/product_pages.py の PROMPT(商品ページの画像の提案。画像は最大 8 枚)
+const ANGLE_KEYS = ['front', 'back', 'side', 'worn', 'detail', 'texture', 'scene', 'flat', 'package', 'other']
+const ANGLE_NAMES = 'front(正面)・back(後ろ)・side(横)・worn(着用・人が身に着けている)・detail(ディテールの寄り: ボタン・縫い目・ポケットなど)・texture(素材の寄り)・scene(使っている場面・背景つき)・flat(平置き)・package(箱・付属品)・other'
+const T9_HEAD = `あなたは、EC のメール・アプリの配信で、商品の見せ方を決める担当です。
+下に、ある商品の商品ページに載っている画像を、番号つきで並べます(写真のほか、SVG のソースで渡す絵もあります。SVG はソースから絵を思い浮かべて判断してください)。
+1. それぞれの画像のアングルを、次から 1 つ選ぶ: ${ANGLE_NAMES}
+2. この配信で伝えたいこと(下の「配信」。テーマ・見出し・コピー)と、商品の強み(下の「商品」)から、この配信の商品画像に合う画像を、よい順に最大 3 つ選び、理由を 1 文で書く。
+   強みが素材なら素材の寄り、着たときの形ならシルエットが分かる着用、のように、伝えたいことが見て分かる画像を選ぶ。
+「判断済み」と書いた画像は、前にアングルを見分けた画像なので、画像は渡さず、アングルと写っているものを文字で渡します。それも選ぶ候補に入れる。
+返すのは JSON だけ: {"images": [{"index": 番号, "angle": 上の英語の値, "note": 写っているものを短く}], "picks": [{"index": 番号, "reason": 理由}]}
+images には、画像を渡したものだけを書く(判断済みの画像は書かなくてよい)。
+文字は 日本語 で書く。人物を特定する情報(名前など)は書かない。
+`
+// Gemini では画像と文を交互に並べられるが、Direct Line・Agents SDK では画像は添付にまとまるので、番号と添付の順の対応を文で伝える
+// 配信と商品は、写真に合わせて --theme・--product・--strengths で変えられる(既定は架空のニット)
+const t9Prompt = (count, o = {}) =>
+  [
+    T9_HEAD,
+    '配信: ' + JSON.stringify(o.theme ? { theme: o.theme } : { theme: '秋の新作ニット', headline: '素材にこだわった、あたたかいニット', copy: 'やわらかな編み地で、肌寒い朝も心地よく' }),
+    '商品: ' + JSON.stringify(o.product ? { code: 'P01', name: o.product, strengths: o.strengths ?? '' } : { code: 'P01', name: 'ケーブル編みニット', category: 'ニット', strengths: '素材(ウール混)のやわらかさ・立体的な編み地' }),
+    `画像は、添付の順に 画像 0〜画像 ${count - 1} です(${count} 枚)。`,
+    `画像 ${count}(判断済み: アングル detail・袖口のボタンの寄り)(ページの説明: 袖口のアップ)`,
+  ].join('\n')
+
+const commaList = (v) => (Array.isArray(v) ? v : String(v ?? '').split(/[,、]/)).map((s) => String(s).trim()).filter(Boolean)
+const sentences = (s) => String(s ?? '').split(/[。.!?！？]/).filter((x) => x.trim()).length
+const in01 = (v) => typeof v === 'number' && v >= 0 && v <= 1
+
+export const IMAGE_TESTS = [
+  T6_TEST,
+  {
+    id: 'T7',
+    name: 'メイン画像の説明の下書き',
+    runs: 1,
+    images: 1,
+    prompt: () => T7,
+    check: (text) =>
+      judge(text, (o, n) => {
+        if (!o.name) n.push('name が空')
+        if (!['new', 'feature', 'sale', 'member', 'event'].includes(o.purpose)) n.push(`purpose が 5 択の外(${o.purpose})`)
+        if (!['autumn', 'winter', 'autumn_winter', 'all_year'].includes(o.season)) n.push(`season が 4 択の外(${o.season})`)
+        const tags = commaList(o.tags)
+        if (tags.length < 5 || tags.length > 8) n.push(`tags が 5〜8 個でない(${tags.length})`)
+        if (typeof o.tags !== 'string') n.push('tags がカンマ区切りの文でない')
+        if (!o.description || sentences(o.description) > 2) n.push('description が空か 2 文を超えた')
+        if (commaList(o.colors).length > 3) n.push('colors が 3 つを超えた')
+        if (!commaList(o.subjects).length) n.push('subjects が空')
+        if (!o.focal || !in01(o.focal.x) || !in01(o.focal.y)) n.push('focal が 0〜1 の数でない')
+      }),
+  },
+  {
+    id: 'T8',
+    name: '部品の画像の説明の下書き',
+    runs: 1,
+    images: 1,
+    prompt: () => T8,
+    check: (text) =>
+      judge(text, (o, n) => {
+        if (!o.name) n.push('name が空')
+        if (!['button', 'banner', 'logo', 'icon', 'other'].includes(o.kind)) n.push(`kind が 5 択の外(${o.kind})`)
+        const tags = commaList(o.tags)
+        if (tags.length < 3 || tags.length > 6) n.push(`tags が 3〜6 個でない(${tags.length})`)
+        if (typeof o.tags !== 'string') n.push('tags がカンマ区切りの文でない')
+        if (!o.description || sentences(o.description) > 2) n.push('description が空か 2 文を超えた')
+        if (!o.alt_text) n.push('alt_text が空')
+      }),
+  },
+  {
+    id: 'T9',
+    name: '商品ページの画像の提案',
+    runs: 1,
+    images: 'many',
+    prompt: (count, o) => t9Prompt(count, o),
+    // count = 添付した枚数。判断済みの画像は番号 count
+    check: (text, count) =>
+      judge(text, (o, n) => {
+        if (!Array.isArray(o.images)) return n.push('images がない')
+        const seen = new Set()
+        for (const x of o.images) {
+          if (!Number.isInteger(x.index) || x.index < 0 || x.index > count) n.push(`images の index が範囲の外(${x.index})`)
+          else seen.add(x.index)
+          if (!ANGLE_KEYS.includes(x.angle)) n.push(`images の angle が 10 択の外(${x.angle})`)
+        }
+        for (let i = 0; i < count; i++) if (!seen.has(i)) n.push(`画像 ${i} のアングルがない`)
+        if (!Array.isArray(o.picks) || o.picks.length === 0 || o.picks.length > 3) n.push(`picks が 1〜3 個でない(${o.picks?.length ?? 0})`)
+        for (const x of o.picks ?? []) {
+          if (!Number.isInteger(x.index) || x.index < 0 || x.index > count) n.push(`picks の index が範囲の外(${x.index})`)
+          if (!x.reason) n.push('picks の reason が空')
+        }
+      }),
+  },
+]
+
+// T10: 縮めた写真で、素材・編み方などの細かい特徴を読み取れるかを見る(層で写真を縮めてよい大きさを決めるため)。
+// CCP の頼みそのものではなく、確かめのための頼み。読み取れたかは、答えを人が写真と見比べて判断する(ここでは形だけを確かめる)
+const T10 = `次の画像は、ファッション通販の商品の写真です(何枚かあるときは、同じ商品の全体と寄りの写真)。写真から読み取れることだけを、次の JSON だけで返してください。説明文や前置き、コードフェンスは付けない。
+{"item": "商品の種類", "knit": "編み方・織り方(例: 透かし編み・ケーブル編み・リブ編み・天竺・デニムの綾織り。見分けられなければ「不明」)", "surface": "表面の特徴(起毛・毛足・光沢・凹凸など)", "material_guess": "写真から推測できる素材(見分けられなければ「不明」)", "details": ["見える細部(ボタン・リブ・ポケットなど)"], "confidence": "high" | "medium" | "low"}
+写っていないことは書かない。`
+
+IMAGE_TESTS.push({
+  id: 'T10',
+  name: '素材・編み方の読み取り',
+  runs: 1,
+  images: 'many',
+  prompt: () => T10,
+  check: (text) =>
+    judge(text, (o, n) => {
+      for (const k of ['item', 'knit', 'surface', 'material_guess']) if (!o[k]) n.push(`${k} が空`)
+      if (!Array.isArray(o.details)) n.push('details が配列でない')
+      if (!['high', 'medium', 'low'].includes(o.confidence)) n.push(`confidence が 3 択の外(${o.confidence})`)
+    }),
+})
+
 // 確かめの仕組みそのものを、つながずに試す見本の答え(node measure.mjs --self-test)
 export const SAMPLES = {
   T1: ['{"mode":"update","reply":"短くしました","ideas":[{"text":"秋のニットで温もりを","why":"短く"},{"text":"肌寒い朝にニット","why":"場面"},{"text":"新作ニット、届きました","why":"新作"}]}', true],
@@ -211,4 +339,8 @@ export const SAMPLES = {
   T3: ['{"products":[{"code":"P01","reason":"在庫 420"},{"code":"P04","reason":"在庫 310"},{"code":"P02","reason":"在庫が 35 と少ない"},{"code":"P06","reason":"通年"}]}', true],
   T4: ['{"error":"テーマが空です"}', true],
   T5: ['{"copies":[{"copy":"Cozy knits for crisp fall mornings","angle":"朝の場面"},{"copy":"Soft cable knits, made to layer","angle":"重ね着"},{"copy":"Warm up your fall with new knits","angle":"新作"}]}', true],
+  T7: ['{"name":"緑のニット","purpose":"new","season":"autumn","tags":"ニット,緑,秋,長袖,新作","description":"緑のニットを正面から写した写真。秋の新作の配信に合う。","colors":"緑,白","subjects":"ニット","focal":{"x":0.5,"y":0.4}}', true],
+  T8: ['{"name":"ボタン","kind":"buttons","tags":"黒","description":"","alt_text":""}', false],
+  // T9 は 3 枚を添付した見込み(判断済みは番号 3)
+  T9: ['{"images":[{"index":0,"angle":"front","note":"正面"},{"index":1,"angle":"back","note":"後ろ"},{"index":2,"angle":"texture","note":"編み地"}],"picks":[{"index":2,"reason":"素材が分かる"},{"index":3,"reason":"ボタン"}]}', true, 3],
 }
