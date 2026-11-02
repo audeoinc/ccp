@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|
 | **1. Copilot Studio + Direct Line** | **疎通・T1〜T6 済み** | **要らない**(鍵 → 短い期限のトークン) | 3.0〜4.6 秒 | 6 / 6 ○ | ○(upload の入口) |
 | 2. Copilot Studio + Agents SDK | 疎通・T1〜T6 済み | **要る** | 3.3〜6.1 秒 | 6 / 6 ○ | ○(添付の `data:` の URL) |
-| 3. AI Builder を Dataverse から呼ぶ | 下調べ済み(15 章)。まだ動かしていない | 要らない見込み(アプリだけの認証) | — | — | 入力にできるが、API での渡し方は未確認 |
+| 3. AI Builder を Dataverse から呼ぶ | **直接は呼べなかった**(`Predict` が「Source is null」。15.5)。Power Automate の流れを窓口にして試す(15.6) | 要らない(アプリだけの認証でトークンは取れた) | — | — | — |
 
 Azure OpenAI は、いまは想定していない(2026-10-29 利用者)。
 
@@ -643,6 +643,33 @@ Copilot Studio では、Microsoft の GPT のほかに、Anthropic などの外�
 4. 測るプログラムに `--via aib` を足し、T1〜T6 を送る(画像の渡し方は試して決める)。
 
 出典: Microsoft Learn「Code interpreter for developers」(Predict の呼び方)・「PredictByReference Action」・「Use single-tenant server-to-server authentication」・「Manage application users」・「Add inputs to your prompt」・「JSON output」・「Overview of licensing」(AI Builder)・「End of AI Builder credits」。
+
+### 15.5 試した結果: 直接は呼べなかった(2026-11-02)
+
+| 段 | 結果 |
+|---|---|
+| Entra に機密クライアントのアプリ(シークレット付き)を登録し、sato_dev にアプリケーション ユーザー(ロール: Basic User)を作った | 済み。API のアクセス許可は足していない |
+| アプリだけでトークンを取る(`client_credentials`。人のサインインなし) | ○(0.56 秒) |
+| Dataverse に入る(`WhoAmI`) | ○ |
+| プロンプトを名前で探す | 共有する前は 0 件(Basic User では、人が作ったプロンプトが見えない)。**プロンプトをアプリケーション ユーザーに共有すると見えた** |
+| `Predict` で呼ぶ | **×**。500・`InvalidRequest`「Source is null」 |
+
+- プロンプトの中身(`msdyn_aiconfiguration` の `msdyn_customconfiguration`)で、入力の名前が `request`、答えはテキスト、モデルは `gpt-5-chat` であることを確かめた。入力を `inputs` の下に置くと「`request` がない」と別のエラーになるので、入力の置き方(`requestv2` の直下)は合っている。`source` という項目を足しても変わらなかった。
+- `pac copilot model predict`(人のサインイン)は、入力を `text` という名前で送る作りで、入力の名前が `request` のプロンプトは呼べなかった(比べられなかった)。
+- 外の作者の報告(GitHub の dataverse-document-intelligence。Microsoft の文書ではない)に、「Power Apps の画面の外から `Predict` を呼ぶと『Source is null』で失敗する」とあり、同じ症状。**プロンプトの `Predict` は、外のプログラムから直接は呼べない見込み**(未確認)。
+- 測るプログラムの `--via aib` は、この段まで(トークン・プロンプトを探す・`Predict`)を行う。
+
+### 15.6 Power Automate の流れを窓口にする(試す)
+
+`Predict` を外から直接呼べないので、Power Automate の流れを窓口にする。層は、流れの URL に頼みの文を送り、流れがプロンプトを実行して答えを返す。
+
+```
+層 → POST <流れの URL>({"request": "…"}) → 流れ: 「HTTP 要求の受信時」→「プロンプトを実行する」→「応答」({"text": "…"})→ 層
+```
+
+- 流れの「HTTP 要求の受信時」は、プレミアムのコネクタ(Power Automate のライセンスが要る見込み。未確認)。
+- 流れの URL には、だれでも呼べる形(URL に署名の鍵が入る)と、組織のサインインを求める形がある(未確認)。署名の鍵が入る形なら、URL そのものを秘密として扱い、リポジトリの外に置く(`ms-verify.env` の `AIB_FLOW_URL`)。
+- 測るプログラムは `--via flow` で呼ぶ。
 
 ## 16. 利用者から見て差が出ないために、層(と出口)で気をつけること
 
