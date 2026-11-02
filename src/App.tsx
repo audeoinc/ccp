@@ -1646,6 +1646,7 @@ function App() {
           productIds={cardProducts.get(resultsOpen) ?? []}
           variantIds={variantProducts.get(resultsOpen)}
           products={products}
+          productImages={cardImages.get(resultsOpen)}
           heroes={heroes}
           people={owners}
           onClose={() => setResultsOpen(null)}

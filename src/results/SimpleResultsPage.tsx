@@ -90,6 +90,8 @@ interface Props {
   productIds: string[]
   variantIds?: Partial<Record<VariantKey, string[]>>
   products: Product[]
+  /** この配信で替えた商品の画像(商品の id → 画像の URL)。計画・制作と同じ画像で見せる */
+  productImages?: Map<string, string>
   heroes: HeroImage[]
   /** やり取りの宛先・タスクの担当の候補 */
   people: string[]
@@ -104,7 +106,7 @@ interface Props {
 
 const money = (card: DeliveryCard) => (v?: number) => priceText(v === undefined ? undefined : Math.round(v), card.country === COUNTRY_US ? 'US' : 'JP')
 
-export function SimpleResultsPage({ card, allCards, cardProducts, productIds, variantIds, products, heroes, people, onClose, instant, stageTabs, onSwitchCard }: Props) {
+export function SimpleResultsPage({ card, allCards, cardProducts, productIds, variantIds, products, productImages, heroes, people, onClose, instant, stageTabs, onSwitchCard }: Props) {
   const s = useStyles()
   const cardStyles = useCardDetailStyles()
   const t = useT()
@@ -142,7 +144,8 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
   const row = history.find((r) => r.card.id === card.id)
 
   // 送った中身(案ごと)。制作の画面と同じ写しの作り方で、案の見出し・画像・商品を引く
-  const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), products, heroes, variantIds), [card, productIds, products, heroes, variantIds])
+  const shownProducts = useMemo(() => (productImages?.size ? products.map((p) => (productImages.has(p.id) ? { ...p, image_url: productImages.get(p.id) } : p)) : products), [products, productImages])
+  const draft = useMemo(() => buildSnapshot(card, slotIdsOf(card.id, productIds), shownProducts, heroes, variantIds), [card, productIds, shownProducts, heroes, variantIds])
   const ab = parseAbTest(card.ab_test)
   const keys = abOn && row && row.parts.some((p) => p.variant) ? productionVariants(draft) : (['A'] as VariantKey[])
   // 案の段: 'all' = 配信の全体(プレビューは A 案)。案を選ぶと、プレビューも数字もその案
@@ -339,7 +342,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
     <>
       <section className={s.section}>
         <span className={s.h3}>{cur === 'all' ? t('主な数字', 'Key numbers') : t(`主な数字(案 ${cur})`, `Key numbers (variant ${cur})`)}</span>
-        {shownRow ? <ResultKpis row={shownRow} money={fmt} /> : <span className={s.note}>{t('この案の数字はありません', 'No numbers for this variant')}</span>}
+        {shownRow ? <ResultKpis row={shownRow} money={fmt} lift={impact?.lift} /> : <span className={s.note}>{t('この案の数字はありません', 'No numbers for this variant')}</span>}
       </section>
       {/* AB の結果(勝ち案と、差が偶然の範囲か)。全体を見ているときだけ [card.abtest] */}
       {abOn && cur === 'all' && row.parts.length > 0 && <AbResult row={row} heroes={heroes} money={fmt} onAdopt={adopt} />}
