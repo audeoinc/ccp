@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
-import { InfoLabel, Divider, ToggleButton, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { InfoLabel, Divider, ToggleButton, Badge, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { AddRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular, ChevronUpRegular, ImageEditRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { ChooseDrawer } from '../ChoosePanel'
@@ -16,6 +16,8 @@ import { locale, optionLabel, tr, useT } from '../i18n'
 import { audienceLabel, audienceSet, targetText } from '../target'
 import { typo } from '../typo'
 import { LabeledValue } from '../LabeledValue'
+import { PaneCrumbs, PaneHint } from './PaneCrumbs'
+import { CopyButton } from '../CopyButton'
 import { OpenLink } from '../LinkText'
 import { productUrl } from '../links'
 import { productMarket } from '../market'
@@ -58,18 +60,14 @@ const useStyles = makeStyles({
   lockedNote: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: '6px', alignItems: 'start', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   lockedIcon: { marginTop: '2px' },
   root: { display: 'grid', alignContent: 'start', rowGap: '12px', minWidth: 0 },
-  head: { display: 'flex', alignItems: 'center', columnGap: '8px', minWidth: 0 },
-  title: typo.heading,
-  deselect: { marginLeft: 'auto' },
-  // パンくずは長いセクション名でも折り返して、閉じるボタンを押し出さない
-  crumbs: { minWidth: 0, '& ol': { flexWrap: 'wrap' } },
   sectionParts: { display: 'grid', rowGap: '4px', justifyItems: 'start' },
   warn: { display: 'flex', alignItems: 'center', columnGap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteMarigoldForeground2 },
   grow: { flexGrow: 1, minWidth: 0 },
   // 名前・直す・開くは縮めず、URL の文だけを省略する
   linkLine: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, '& > *:not(:nth-child(2))': { flexShrink: 0, whiteSpace: 'nowrap' } },
   trackedUrl: { display: 'grid', rowGap: '2px', minWidth: 0 },
-  trackedText: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere' },
+  trackedLine: { display: 'flex', alignItems: 'start', columnGap: '2px', minWidth: 0 },
+  trackedText: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, overflowWrap: 'anywhere', flexGrow: 1, minWidth: 0, paddingTop: '3px' },
   sectionAi: { display: 'grid', rowGap: '6px', paddingTop: '8px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   sectionAiList: { display: 'grid', rowGap: '4px' },
   sectionAiRow: { display: 'grid', rowGap: '1px', minWidth: 0 },
@@ -785,45 +783,24 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
 
   return (
     <div className={s.root}>
-      <div className={s.head}>
-        {part ? (
-          // どこを選んでいるか: 配信の全体 › セクション › 部品。上の段を押すと、そこを選び直す(2026-10-28 利用者)
-          <Breadcrumb size="small" aria-label={t('選んでいる部品の場所', 'Where the selected part is')} className={s.crumbs}>
-            <BreadcrumbItem>
-              <BreadcrumbButton onClick={() => onPick(null)}>{t('配信の全体', 'Whole delivery')}</BreadcrumbButton>
-            </BreadcrumbItem>
-            {inSection !== null && part.kind !== 'section' && (
-              <>
-                <BreadcrumbDivider />
-                <BreadcrumbItem>
-                  <BreadcrumbButton onClick={() => onPick({ kind: 'section', index: inSection })}>{sectionName(inSection)}</BreadcrumbButton>
-                </BreadcrumbItem>
-              </>
-            )}
-            <BreadcrumbDivider />
-            <BreadcrumbItem>
-              <BreadcrumbButton current>{crumbOf(part)}</BreadcrumbButton>
-            </BreadcrumbItem>
-          </Breadcrumb>
-        ) : (
-          <InfoLabel
-            className={s.title}
-            size="medium"
-            weight="semibold"
-            info={t(
-              '何も選んでいないときは、配信の全体を扱います(配信の情報を見る・AI で全体を下書きする)。プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。',
-              'With nothing selected, this pane is about the whole delivery (view the delivery info, draft everything with AI). Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops.',
-            )}
-          >
-            {titleOf(part)}
-          </InfoLabel>
+      {/* どこを選んでいるか: 配信の全体 › セクション › 部品(PaneCrumbs。制作の画面と同じ見出し) */}
+      <PaneCrumbs
+        trail={
+          part
+            ? [
+                { key: 'whole', label: t('配信の全体', 'Whole delivery'), onClick: () => onPick(null) },
+                ...(inSection !== null && part.kind !== 'section' ? [{ key: 'section', label: sectionName(inSection), onClick: () => onPick({ kind: 'section', index: inSection }) }] : []),
+                { key: 'part', label: crumbOf(part) },
+              ]
+            : []
+        }
+        title={titleOf(part)}
+        info={t(
+          '何も選んでいないときは、配信の全体を扱います(配信の情報を見る・AI で全体を下書きする)。プレビューの部品(見出し・画像・商品の枠など)を押すと、ここでその部品だけを直せます。Tab で次の部品、Esc で選ぶのをやめます。',
+          'With nothing selected, this pane is about the whole delivery (view the delivery info, draft everything with AI). Click a part in the preview (headline, image, product slot...) to edit just that part here. Tab moves to the next part, Esc stops.',
         )}
-        {part && (
-          <Tooltip content={t('選ぶのをやめる(Esc)', 'Deselect (Esc)')} relationship="label">
-            <Button className={s.deselect} size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => onPick(null)} />
-          </Tooltip>
-        )}
-      </div>
+        onDeselect={() => onPick(null)}
+      />
       {/* 文言・画像・商品を直すときの手がかり(この配信のねらい)。配信の情報を直すときは出さない */}
       {part && part.kind !== 'meta' && part.kind !== 'overview' && <Aim editor={e} onChange={() => onPick({ kind: 'meta', field: 'theme' })} />}
       {compareBlock}
@@ -862,9 +839,13 @@ function TrackedUrl({ url }: { url: string }) {
       >
         {t('計測用のパラメーターつき', 'With tracking')}
       </InfoLabel>
-      <span className={s.trackedText}>{url}</span>
+      {/* 計測のつく URL は、制作・確認でそのまま写して使うので、コピーできるように(LabeledValue のコピーと同じボタン) */}
+      <span className={s.trackedLine}>
+        <span className={s.trackedText}>{url}</span>
+        <CopyButton text={url} label={t('計測用のパラメーターつきの URL をコピー', 'Copy the URL with tracking')} />
+      </span>
       {params.map(([k, v]) => (
-        <LabeledValue key={k} label={k} labelWidth="96px">
+        <LabeledValue key={k} label={k} labelWidth="96px" copy>
           {v}
         </LabeledValue>
       ))}
@@ -1079,7 +1060,7 @@ function WholePane({ editor: e, onEdit }: { editor: SimpleEditor; onEdit: () => 
       </div>
       )}
       {/* 部品ごとに直すときの入口(X72 の案内の置き方 1)。キーの操作などの詳しい説明は、見出しの ⓘ */}
-      <span className={s.caption}>{t('直したい所は、プレビューで押してください', 'Click what you want to change in the preview')}</span>
+      <PaneHint>{t('直したい所は、プレビューで押してください', 'Click what you want to change in the preview')}</PaneHint>
     </>
   )
 }
