@@ -44,6 +44,8 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 
 ## Vertex AI Workbench(利用先の実行環境)で作業するとき
 
+(2026-11-03 から、稼働の対象は AWS。Workbench 版の ZIP は停止したが、この章は念のため残す。利用者)
+
 このリポジトリは、利用先の **Vertex AI Workbench** にも clone して動かしている(チームメンバーが運用。Workbench の上の Claude も、この文書を読む)。
 Workbench で作業するときは、上の「作業の約束」に加えて、次を守る。
 
@@ -58,10 +60,11 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 
 ## 触る前に知っておくこと
 
-- **利用先には、Workbench 版の ZIP(`npm run release:workbench`)だけを渡す**(手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
+- **Workbench 版の ZIP は停止した**(2026-11-03 利用者)。これからは、稼働の環境に向けた **AWS 版**を、同じように開発元の GCP の本番の仕組みを消した形で作る(作っている途中。それまでは下の約束事を、AWS 版にも当てはめる)。GCP 版(開発元の本番の形)は残す(ARCHITECTURE の 0.5 章)。
+- **利用先には、ZIP だけを渡す**(作り方は、いまは Workbench 版の `npm run release:workbench`。AWS 版もこれにならう。手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
   開発元の本番(Cloud Run + Cloud SQL)だけの処理は `server/ccp/hosted/` に置き、外のコードは `hosted/` がなくても動くようにする(DB の準備中は `ccp/dbready.py` を通す)。
   ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)には、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・開発元の名前などを書かない(検査で止まる)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release-workbench.mjs` の `RULES` にも足す。
-- **1 日の終わり**(利用者が「今日の作業を終える」などと言ったとき。言われなければ 21:00 の予約が行う): 文書(FEATURES・SOURCE_MAP・FEATURE_REASONS・BACKLOG)を直して push し、Workbench 版を Releases に公開する。手順は [docs/RELEASE.md](docs/RELEASE.md) の 7 章。
+- **1 日の終わり**(利用者が「今日の作業を終える」などと言ったとき。言われなければ 21:00 の予約が行う): 文書(FEATURES・SOURCE_MAP・FEATURE_REASONS・BACKLOG)を直して push する。Workbench 版の Releases への公開は停止した(2026-11-03)。AWS 版ができたら、それを公開する。手順は [docs/RELEASE.md](docs/RELEASE.md) の 7 章。
 
 - 標準のテンプレート 10 種はコードに持ち、ユーザーが作ったものはテーブル `layout_templates`。`getTemplate(id)` で求める(`EMAIL_TEMPLATES` のような固定の一覧はない)。以前からある標準の 6 種は、**コードの定義のセクションの構成(種類・枠の数・順番)を変えない**(保存済みのカードの、見出し・商品の位置がずれるため。見た目の設定だけ変えてよい)。テンプレートは**版で持つ**(表 `layout_template_versions`。保存するたびに新しい版。配信カードは `layout_key` と、使った版の番号 `layout_version` を持ち、描画は `templateKeyOfCard` の鍵「ID@v版」で、その版の中身を引く)ので、画面から構成を変えても、すでにある配信は崩れない。
 - AI の案(テーマ・コピー・制作指示の案、見出し・コピーの候補)は保存しない。保存するのは、採用した内容と、その補足(理由・切り口)。週の枠からまとめて中身を作る(W14)ときは、「中身を作る」を押すことを採用とみなして保存する。配信カードの「AI で下書きする」も、押したことを採用とみなして保存する(元に戻せる。2026-10-27)。人の確認は承認で担う(承認された = 人が確かめた。2026-10-24 SU7 で「AI 下書き・未確認」の印 `ai_unchecked_at` はやめた)。**例外は、よく聞かれる質問(FAQ)**: AI が「？ 聞く」の質問を束ねて作った文(代表の聞き方・答え)を保存して、「？ 聞く」の最初の画面に出す(表 `help_faqs`。人は選ばず、まちがったものを開発・管理の画面で隠せるだけ。2026-10-28)。
