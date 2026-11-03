@@ -516,6 +516,28 @@ PY
 
 ---
 
+## 7. Workbench 以外の Linux のサーバー(AWS など)で動かすとき
+
+この手順書の「Workbench」は、**CCP を動かしているそのサーバー**と読み替えれば、そのまま使えます。
+仕組みは同じです。サーバーが PostgreSQL につなぎ、BigQuery と Gemini(Vertex AI)を呼びます。
+違うのは、次の 4 点だけです。
+
+| 点 | Workbench | AWS などのサーバー |
+|---|---|---|
+| **Google Cloud への入り方** | ノートブックに付いたサービスアカウントが、自動で使われる(設定は要らない) | その機械には Google のサービスアカウントがない。**環境変数や秘密の置き場所(Secrets など)から、Google の認証情報を渡す**。方法は 2 つ: <br>① AWS から Google Cloud への鍵なしのつなぎ(Workload Identity 連携) <br>② サービスアカウントの鍵のファイル(`GOOGLE_APPLICATION_CREDENTIALS`) <br>CCP は、その機械の標準の認証(`google.auth.default`)で入るので、どちらでも動く |
+| **サービスアカウントの権限** | 同じ | BigQuery を読む権限と、Vertex AI を使う権限が要る |
+| **外への通信** | 外のサイトを読めないことがある(6 章) | 外に出られれば、**商品ページを読む・URL の画像から選ぶ機能が、そのまま動く**。6 章の試しは要らない |
+| **画面の開き方** | Jupyter の中継 `https://<ノートブックの URL>/proxy/<ポート>/` | ロードバランサーなどで直接開く。CCP は置かれた場所に合わせて動くので、パスの設定は要らない。**外から開けるなら、HTTPS と、画面のパスワード(`APP_PASSWORD`)か手前の認証を、必ず付ける**(Workbench は Jupyter の認証の内側にあった) |
+
+そのほかの点:
+
+- **PostgreSQL**: 同じ機械で動かすなら、`DATABASE_URL` のホストは `localhost`。マネージドの DB(RDS など)を使うなら、そのつなぎ先にする。
+- **操作のスクリプト**: `scripts/workbench.sh`(起動・停止・状態・確認)は、Linux ならそのまま使える。画面の URL の案内(`/proxy/…`)だけ、読み替える。
+- **困ったときの確認**: Workbench と同じく、最初に `python -m ccp.cli check` を実行する。
+- **通信料**: BigQuery から AWS へ読み出すと、Google Cloud の外への通信料がかかる。行数が数千なので、ほとんど気にしなくてよい額。
+
+---
+
 ## 付録 A. 環境変数の一覧
 
 | 環境変数 | 必須 | 中身 | Workbench での値 |
