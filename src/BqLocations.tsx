@@ -1,145 +1,99 @@
-// BigQuery の表の場所(⚙ →「データの取り込み」の「表の場所」。管理する人だけ。2026-11-03 利用者「できるだけ DB に」)。
-// ジョブのプロジェクトと、出力ごとの場所・更新を見る元の表(ビューのとき)を入れ、「接続を確認」(保存の前の値で、読んで確かめるだけ)を通してから保存する。
-// 前の版の環境変数(BQ_SPU など)は、サーバーが最初に一度だけ DB に写す(写したことと、変えた記録を下に出す)。サーバーは server/ccp/appsettings.py
-import { useEffect, useState } from 'react'
+// BigQuery の表の場所(⚙ →「データの取り込み」。管理する人だけ。2026-11-03 利用者「できるだけ DB に」)。
+// 出力ごとの場所・更新を見る元の表(ビューのとき)は、表の行の詳しい所(OutputLocation)で、ジョブのプロジェクトと変えた記録は表の下(BqProject)で変える。
+// 「接続を確認」は保存の前の値で読んで確かめるだけ(何も書かない)。前の版の環境変数(BQ_SPU など)は、サーバーが最初に一度だけ DB に写す。
+// 値と保存は useBqLocations の 1 つだけを使い、行ごとに持たない(どの行で保存しても、ほかの行の値を巻き戻さないように)。サーバーは server/ccp/appsettings.py
 import { Badge, Button, Field, Input, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { PlugConnectedRegular, SaveRegular } from '@fluentui/react-icons'
-import { AppSettingsService, type SettingsView } from './data/appSettings'
 import type { ImportCheck } from './data/dataImport'
 import { bqOutputLabel } from './gcp/bq'
 import { CopiedFromEnv, SettingsHistory } from './SettingsChanges'
+import type { BqLocationsState } from './useBqLocations'
 import { locale, useT } from './i18n'
 import { typo } from './typo'
 
 const useStyles = makeStyles({
-  root: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalM, minWidth: 0 },
-  // 出力ごとに 1 行: 名前・場所・元の表(ビューのとき)
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(120px, auto) minmax(0, 2fr) minmax(0, 1.4fr)', columnGap: tokens.spacingHorizontalM, rowGap: tokens.spacingVerticalS, alignItems: 'start' },
-  colHead: { ...typo.pairLabel },
-  name: { ...typo.heading, paddingTop: '6px' },
-  cell: { display: 'flex', flexDirection: 'column', rowGap: '2px', minWidth: 0 },
+  root: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalS, minWidth: 0 },
+  pair: { display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', columnGap: tokens.spacingHorizontalM, rowGap: tokens.spacingVerticalXS },
   issue: { fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   actions: { display: 'flex', alignItems: 'center', columnGap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
+  note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   sub: { ...typo.heading },
+  end: { alignSelf: 'flex-end' },
 })
 
-const OUTPUTS = ['spu', 'sku', 'sku_stock', 'weekly', 'forecast', 'ranking']
-
-export function BqLocations({ onSaved }: { /** 保存したら、取り込みの状態を読み直す(設定した出力が変わるため) */ onSaved: () => void }) {
+function TryResult({ c }: { c: ImportCheck['outputs'][number] }) {
   const s = useStyles()
   const t = useT()
-  const [view, setView] = useState<SettingsView | null>(null)
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState<'try' | 'save' | null>(null)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
-  const [tried, setTried] = useState<Record<string, ImportCheck['outputs'][number]> | null>(null)
+  return (
+    <>
+      <span className={s.issue}>
+        {c.ok ? <Badge size="small" appearance="tint" color="success">{t('読める', 'Readable')}</Badge> : <Badge size="small" appearance="filled" color="danger">{t('読めない・NG', 'Not readable / NG')}</Badge>}{' '}
+        {c.rows != null && t(`${c.rows.toLocaleString(locale())} 行`, `${c.rows.toLocaleString(locale())} rows`)}
+      </span>
+      {c.issues.map((i, k) => (
+        <span key={k} className={s.issue}>
+          <Badge size="small" appearance="outline" color={i.level === 'NG' ? 'danger' : 'warning'}>{i.level === 'NG' ? 'NG' : t('注意', 'Warning')}</Badge> {i.text}
+        </span>
+      ))}
+    </>
+  )
+}
 
-  const take = (v: SettingsView) => {
-    setView(v)
-    setForm(Object.fromEntries(Object.entries(v.values).map(([k, x]) => [k, String(x ?? '')])))
-  }
-  useEffect(() => {
-    let alive = true
-    void AppSettingsService.get('bq').then((r) => {
-      if (!alive) return
-      if (r.data) take(r.data)
-      else setError(r.error ?? '')
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const label = (key: string) => (key === 'project' ? t('ジョブのプロジェクト', 'Job project') : key.endsWith('_watch') ? `${bqOutputLabel(key.slice(0, -6))}(${t('元の表', 'source table')})` : bqOutputLabel(key))
-  const dirty = !!view && Object.keys(form).some((k) => form[k] !== String(view.values[k] ?? ''))
-  const set = (key: string, v: string) => {
-    setForm((f) => ({ ...f, [key]: v }))
-    setSaved(false)
-  }
-
-  const tryNow = async () => {
-    setBusy('try')
-    setError('')
-    const r = await AppSettingsService.tryBq(form)
-    setBusy(null)
-    if (!r.data) return setError(r.error ?? '')
-    setTried(Object.fromEntries(r.data.outputs.map((o) => [o.name, o])))
-  }
-  const save = async () => {
-    setBusy('save')
-    setError('')
-    const r = await AppSettingsService.save('bq', form)
-    setBusy(null)
-    if (!r.data) return setError(r.error ?? '')
-    take(r.data)
-    setSaved(true)
-    onSaved()
-  }
-
-  if (!view) return error ? <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar> : <Spinner size="tiny" />
+/** 行の詳しい所に出す、その出力の表の場所 */
+export function OutputLocation({ name, loc }: { name: string; loc: BqLocationsState }) {
+  const s = useStyles()
+  const t = useT()
+  if (!loc.view) return loc.error ? <div className={s.issue}>{loc.error}</div> : <Spinner size="extra-tiny" />
+  const watch = `${name}_watch`
+  const keys = [name, watch]
+  const working = loc.busy?.includes(name)
   return (
     <div className={s.root}>
-      <CopiedFromEnv view={view} />
-      <Field label={t('ジョブのプロジェクト(問い合わせを走らせる。空なら AI と同じプロジェクト)', 'Job project (runs the queries; blank = same project as AI)')}>
-        <Input value={form.project ?? ''} placeholder="<project>" onChange={(_, d) => set('project', d.value)} />
-      </Field>
-      <div className={s.grid}>
-        <span className={s.colHead}>{t('出力', 'Output')}</span>
-        <span className={s.colHead}>{t('表の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)', 'Location (<project>.<dataset>.<table or view>)')}</span>
-        <span className={s.colHead}>{t('更新を見る元の表(出力がビューのとき)', 'Source table to watch (when the output is a view)')}</span>
-        {OUTPUTS.map((n) => (
-          <OutputRow key={n} name={n} form={form} env={view.env} tried={tried?.[n]} onChange={set} />
-        ))}
+      <div className={s.pair}>
+        <Field size="small" label={t('表の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)', 'Location (<project>.<dataset>.<table or view>)')}>
+          <Input size="small" value={loc.form[name] ?? ''} placeholder={loc.view.env[name]} onChange={(_, d) => loc.set(name, d.value)} />
+        </Field>
+        <Field size="small" label={t('更新を見る元の表(出力がビューのとき)', 'Source table to watch (when it is a view)')}>
+          <Input size="small" value={loc.form[watch] ?? ''} placeholder={loc.view.env[watch]} onChange={(_, d) => loc.set(watch, d.value)} />
+        </Field>
       </div>
-      {error && (
-        <MessageBar intent="error" layout="multiline">
-          <MessageBarBody>{error}</MessageBarBody>
-        </MessageBar>
-      )}
-      {saved && (
-        <MessageBar intent="success">
-          <MessageBarBody>{t('保存しました。次の取り込みから、この場所を読みます。', 'Saved. The next import reads these locations.')}</MessageBarBody>
-        </MessageBar>
-      )}
+      {loc.tried[name] && <TryResult c={loc.tried[name]} />}
       <div className={s.actions}>
-        {busy && <Spinner size="extra-tiny" />}
-        <Button size="small" icon={<PlugConnectedRegular />} disabled={!!busy} onClick={() => void tryNow()}>
+        {working && <Spinner size="extra-tiny" />}
+        <Button size="small" icon={<PlugConnectedRegular />} disabled={!!loc.busy || !(loc.form[name] ?? '').trim()} onClick={() => void loc.tryOutputs([name])}>
           {t('接続を確認', 'Test connection')}
         </Button>
-        <Button size="small" appearance="primary" icon={<SaveRegular />} disabled={!!busy || !dirty} onClick={() => void save()}>
+        <Button size="small" appearance="primary" icon={<SaveRegular />} disabled={!!loc.busy || !loc.dirty(keys)} onClick={() => void loc.save(keys)}>
           {t('保存', 'Save')}
         </Button>
-        {tried && <span className={s.issue}>{t('接続の確認は、読んで確かめるだけです(何も書き込んでいません)。', 'The test only reads (nothing was written).')}</span>}
+        {loc.savedKeys.includes(name) && <span className={s.note}>{t('保存しました。次の取り込みから、この場所を読みます。', 'Saved. The next import reads this location.')}</span>}
+        {loc.tried[name] && <span className={s.note}>{t('接続の確認は、読んで確かめるだけです(何も書き込んでいません)。', 'The test only reads (nothing was written).')}</span>}
       </div>
-      <span className={s.sub}>{t('変えた記録', 'Change history')}</span>
-      <SettingsHistory view={view} label={label} />
+      {loc.error && <span className={s.issue}>{loc.error}</span>}
     </div>
   )
 }
 
-function OutputRow(p: { name: string; form: Record<string, string>; env: Record<string, string>; tried?: ImportCheck['outputs'][number]; onChange: (key: string, v: string) => void }) {
+/** 表の下: ジョブのプロジェクトと、環境変数から写したこと・変えた記録 */
+export function BqProject({ loc }: { loc: BqLocationsState }) {
   const s = useStyles()
   const t = useT()
-  const watch = `${p.name}_watch`
+  if (!loc.view) return loc.error ? <MessageBar intent="error"><MessageBarBody>{loc.error}</MessageBarBody></MessageBar> : <Spinner size="tiny" />
+  const label = (key: string) => (key === 'project' ? t('ジョブのプロジェクト', 'Job project') : key.endsWith('_watch') ? `${bqOutputLabel(key.slice(0, -6))}(${t('元の表', 'source table')})` : bqOutputLabel(key))
   return (
-    <>
-      <span className={s.name}>{bqOutputLabel(p.name)}</span>
-      <div className={s.cell}>
-        <Input value={p.form[p.name] ?? ''} placeholder={p.env[p.name]} aria-label={bqOutputLabel(p.name)} onChange={(_, d) => p.onChange(p.name, d.value)} />
-        {p.tried && (
-          <span className={s.issue}>
-            {p.tried.ok ? <Badge size="small" appearance="tint" color="success">{t('読める', 'Readable')}</Badge> : <Badge size="small" appearance="filled" color="danger">{t('読めない・NG', 'Not readable / NG')}</Badge>}{' '}
-            {p.tried.rows != null && t(`${p.tried.rows.toLocaleString(locale())} 行`, `${p.tried.rows.toLocaleString(locale())} rows`)}
-          </span>
-        )}
-        {p.tried?.issues.map((i, k) => (
-          <span key={k} className={s.issue}>
-            <Badge size="small" appearance="outline" color={i.level === 'NG' ? 'danger' : 'warning'}>{i.level === 'NG' ? 'NG' : t('注意', 'Warning')}</Badge> {i.text}
-          </span>
-        ))}
+    <div className={s.root}>
+      <CopiedFromEnv view={loc.view} />
+      <div className={s.actions}>
+        <Field size="small" label={t('ジョブのプロジェクト(問い合わせを走らせる。空なら AI と同じプロジェクト)', 'Job project (runs the queries; blank = same project as AI)')}>
+          <Input size="small" value={loc.form.project ?? ''} placeholder={loc.view.env.project} onChange={(_, d) => loc.set('project', d.value)} />
+        </Field>
+        <Button size="small" appearance="primary" icon={<SaveRegular />} disabled={!!loc.busy || !loc.dirty(['project'])} className={s.end} onClick={() => void loc.save(['project'])}>
+          {t('保存', 'Save')}
+        </Button>
+        {loc.savedKeys.includes('project') && <span className={s.note}>{t('保存しました', 'Saved')}</span>}
       </div>
-      <Input value={p.form[watch] ?? ''} placeholder={p.env[watch]} aria-label={`${bqOutputLabel(p.name)} ${t('元の表', 'source table')}`} onChange={(_, d) => p.onChange(watch, d.value)} />
-    </>
+      <span className={s.sub}>{t('表の場所を変えた記録', 'Location change history')}</span>
+      <SettingsHistory view={loc.view} label={label} />
+    </div>
   )
 }
