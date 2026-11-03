@@ -27,6 +27,7 @@ import asyncio
 import base64
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -169,22 +170,39 @@ def reason(e: Exception) -> str:
 # 一覧を読めないとき(権限がない・外に出られない環境)に出す、コードに持つ一覧。古くなっても「そのほか」で書けるので止まらない
 DEFAULT_MODELS = ("gemini-3.5-flash", "gemini-3.5-pro", "gemini-2.5-flash", "gemini-2.5-pro")
 MODELS_TTL_S = 24 * 3600
-# 文章を作れないモデル(埋め込み・画像・音声など)は、名前で外す(一覧に「何に使えるか」が来ない環境もあるため)
-_NOT_TEXT = ("embedding", "image", "tts", "audio", "live", "vision")
+# 文章を作れないモデル(埋め込み・画像・音声・文字起こしなど)は、名前で外す。
+# Vertex AI の一覧は「何に使えるか」(supported_actions)を返さないので、名前だけが手がかり(2026-11-03 本番で確かめた)
+_NOT_TEXT = ("embedding", "image", "tts", "audio", "live", "vision", "transcribe", "translate", "banana", "omni", "computer-use", "robotics")
+# 呼べないことがある古い試験版: 日付つきの試験版・プレビュー(-exp-・-preview-MM-DD)と、1.x の版
+_OLD = re.compile(r"-exp(-|$)|-preview-\d{2}-\d{2}|^gemini-1\.")
+_VERSION = re.compile(r"^gemini-(\d+(?:\.\d+)?)-?(.*)$")
 _models: dict = {"models": [], "at": None, "live": False, "error": ""}
 
 
+def model_order(name: str) -> tuple:
+    """版の大きい順。同じ版の中は flash・pro・flash-lite・そのほかの順で、プレビューは後ろ(名前の逆順だと、変わった名前が先頭に来るため)"""
+    m = _VERSION.match(name)
+    if not m:
+        return (1, 0.0, 1, 9, name)
+    rest = m.group(2)
+    kind = 2 if rest.startswith("flash-lite") else 0 if rest.startswith("flash") else 1 if rest.startswith("pro") else 3
+    return (0, -float(m.group(1)), 1 if "preview" in rest else 0, kind, name)
+
+
+def text_models(names: list[str]) -> list[str]:
+    """文章を作れて、いま呼べそうな Gemini だけを、選びやすい順に"""
+    keep = {n for n in names if n.startswith("gemini") and not any(x in n for x in _NOT_TEXT) and not _OLD.search(n)}
+    return sorted(keep, key=model_order)
+
+
 def _read_models() -> list[str]:
-    got: set[str] = set()
+    names: list[str] = []
     for m in get_client().models.list(config={"query_base": True}):
-        base = (m.name or "").rsplit("/", 1)[-1]
         actions = getattr(m, "supported_actions", None)
-        if not base.startswith("gemini") or any(x in base for x in _NOT_TEXT):
-            continue
         if actions and "generateContent" not in actions:
             continue
-        got.add(base)
-    return sorted(got, reverse=True)
+        names.append((m.name or "").rsplit("/", 1)[-1])
+    return text_models(names)
 
 
 async def list_models(refresh: bool = False) -> dict:

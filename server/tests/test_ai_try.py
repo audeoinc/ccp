@@ -56,6 +56,16 @@ class ModelsTest(Base):
         self.assertEqual(reader.call_count, 1)
 
 
+class OrderTest(unittest.TestCase):
+    def test_only_current_text_models_newest_first(self) -> None:
+        got = ai.text_models([
+            "gemini-nano-banana-2.1", "gemini-omni-1.1-flash-preview", "gemini-3.5-transcribe", "gemini-3.5-transcribe-preview",
+            "gemini-2.5-pro-exp-03-25", "gemini-2.5-flash-preview-04-17", "gemini-1.5-pro-002", "text-embedding-005",
+            "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.5-pro", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.8-flash-preview", "gemini-4-argon",
+        ])
+        self.assertEqual(got, ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.8-flash-preview", "gemini-3.5-flash", "gemini-3.5-pro", "gemini-3.5-flash-lite", "gemini-2.5-flash"])
+
+
 class TryTest(Base):
     def test_ok_uses_values_being_tried(self) -> None:
         seen: list[str] = []
