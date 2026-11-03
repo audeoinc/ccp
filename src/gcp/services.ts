@@ -2,6 +2,7 @@
 // サーバーの /api/data/{テーブル} を呼ぶ。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、テーブルごとのサービスの読み込みを、サンプルデータに差し替える。
 import { showDbWake } from './dbWake'
+import { showLoginExpired } from './loginExpired'
 import { dropSharedReads, shareRead } from './readShare'
 
 // 書き換えた人(画面で入れた名前。src/history.ts の myName と同じ記録を読む)。サーバーは、変更の記録(配信日時・商品の方針)に残す。
@@ -74,6 +75,8 @@ export async function callApi<T>(method: string, url: string, body?: unknown): P
     if (!json.success && (json.error?.code === 'db_starting' || json.error?.code === 'db_unavailable')) showDbWake()
     // DB の自動起動を使わない環境(Workbench など)で、つながらないときは、理由と直し方を出す(待っても起動しないため)
     if (!json.success && json.error?.code === 'db_unreachable') showDbWake(json.error.message.replace(/^データベースにつながりません: /, ''))
+    // ログイン(OIDC)が切れたら、別のタブでログインし直す案内を出す(書きかけを消さないため、ページは開き直さない)
+    if (!json.success && json.error?.code === 'login') showLoginExpired()
     return json
   } catch (e) {
     return { success: false, error: { message: e instanceof Error ? e.message : String(e) } }
