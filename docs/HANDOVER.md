@@ -14,13 +14,13 @@
 - 何人か・何セッションかが、同じ `main` に push している(UI・結果・承認プロセス・BigQuery・文書などのセッション)。
 - 済んだ範囲: 一覧(L)・制作指示(P)・週(W。W8 は保留)・アラート(A)・結果(R)・承認(U1〜U6)・制作の依頼(PR)・X の多く(AB テスト・案から選ぶ・素材・画像のライブラリ・テンプレートの版・表示の大きさ・件名など)。状態の正は [BACKLOG.md](BACKLOG.md)。
 - 本番: どこまで反映したかは、印のタグ `deployed-gcp/*` で見る。本番の画面での操作・表と列の追加は、多くが未確認。
-- リリース ZIP: AWS 版は作れるが、まだ公開していない(利用者の確認のあと)。Workbench 版の最後の公開は 5 章。
+- リリース ZIP: AWS 版の最新の公開は `20261103-a638168`(Releases のタグ `aws-<版>`。入口の認証の抜け道の直し cfed7df を含む)。Workbench 版の最後の公開は 5 章。
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
 - 2026-11-03 UI 1: W2 の抜け道を直した: 入口の認証がないとき、中継の印(X-Forwarded-*・Forwarded・X-Real-IP)がある依頼は「中から」とみなさず 503(同じ機械の nginx から通っていた)。**Workbench は `workbench.env` に `CCP_AUTH=none` が要る**(example に入れた・`workbench.sh` が起動の前に注意・check は「足りない」)
 - 2026-11-03 UI 1: W2 Entra の SSO のサーバー側は main(`identity.py`・`oidc.py`・`test_auth_port.py`。手順は WORKBENCH.md 7.2)。**画面(ログアウト・切れたときの案内)は見本の ui1-sso で利用者の確認待ち**
-- 2026-11-03 W6 AWS 版の ZIP: `release.mjs`(`npm run release:aws`)・`docs/AWS.md` は main。**公開は利用者の確認待ち**。GCS・IAP は残す(11-03 決定)
+- 2026-11-03 W6 AWS 版の ZIP: `release.mjs`(`npm run release:aws`)・`docs/AWS.md` は main。Releases に公開済み(5 章)
 - 2026-11-03 最適化(optimize-survey の 1〜6)が済んだ: 89675b8・c472ad1・83a4795・2b96f67・adcd6f3・f063157。X95 も本番済み(3250961・c8104ee)。
 - 2026-11-02 UI 1: X90 の塊 A・E・F、K5(詳しい制作のページを消した)、X93・X94 は main。X87 段 ② の UI 1 の残りは続き(詳しくはアーカイブ 2026-10-28_ の末尾)
 - 2026-11-02 UI 3: X86 の追加分は main(b046f54)。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)。次は D(面の枠に載せる・simple-finish.md の制作の穴)
@@ -62,9 +62,13 @@ BACKLOG の ☐ / ❓ / ▶ の行が正。
 - **本番のビルドは `cloudbuild.yaml`(層のキャッシュ)。** 画面のビルドがほかの場所のファイルを読むようにしたら、Dockerfile の COPY に足す。ほかの人の Cloud Build が動いていれば、終わってから反映する。
 - BigQuery の取り込みを手元で試すときの PGlite の手順は、記録の 2026-10-20_21.md の末尾(7 章)。
 
-## 5. 公開した Workbench 版(2026-11-03 に停止)
+## 5. 公開した版
 
-最後は `20261030-dfd1abf`(10-30 の締め。Releases のタグ `workbench-<版>`)。それより前の版と経緯は記録の 6.23 と末尾。AWS 版は BACKLOG の X102。新しく公開したら、ここを書き換える。
+- AWS 版: 最新は `20261103-a638168`(2026-11-03。初めての公開)。新しく公開したら、ここを書き換える。
+
+### Workbench 版(2026-11-03 に停止)
+
+最後は `20261030-dfd1abf`(10-30 の締め。Releases のタグ `workbench-<版>`)。それより前の版と経緯は記録の 6.23 と末尾。
 
 ## 6. 動かし方・確かめ方
 
