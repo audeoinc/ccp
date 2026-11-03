@@ -7,7 +7,7 @@ import { policyUsableIn } from './countryApply'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { getLang, tr } from './i18n'
-import { isOn } from './featureFlags'
+import { isOn, switchOn, switchValue } from './featureFlags'
 import type { SectionKind } from './templates'
 import { localDate } from './results'
 import { createStore } from './store'
@@ -241,11 +241,49 @@ export function setActiveAiCard(cardId: string | null) {
  * 案を作る依頼の記録を残す(学びを渡さなかった依頼も残す。比べる相手になるため)。記録に失敗しても、AI の依頼は止めない。
  * 配信カードの中身になる案には、比べるための指紋を付ける(案そのものは残さない。案の扱いは、承認・制作に渡したときに aiAdoption が決める)
  */
-function recordRun(task: unknown, learningIds: string[], out: Record<string, unknown>) {
+function recordRun(task: unknown, learningIds: string[], withheldIds: string[], out: Record<string, unknown>) {
   if (!activeCardId || typeof task !== 'string') return
   if (!usesLearnings(task) && !isContentTask(task)) return
-  AiRunsService.create({ delivery_card_id: activeCardId, task, learning_ids: JSON.stringify(learningIds), fingerprint: fingerprintOf(task, out) }).catch(() => undefined)
+  AiRunsService.create({
+    delivery_card_id: activeCardId,
+    task,
+    learning_ids: JSON.stringify(learningIds),
+    ...(withheldIds.length ? { withheld_ids: JSON.stringify(withheldIds) } : {}),
+    fingerprint: fingerprintOf(task, out),
+  }).catch(() => undefined)
 }
+
+/** 0〜1 の、決まった値(配信 × 学びの組で、いつも同じ) */
+function unitHash(s: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0
+  // 末尾だけ違う id どうしで値が偏らないよう、ビットを混ぜる(MurmurHash3 の仕上げ)
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0
+  h = (h ^ (h >>> 16)) >>> 0
+  return h / 4294967296
+}
+/**
+ * この依頼に渡す学びを決める。スイッチ ai.learnings.holdout が入っていれば、学びごとに決まった割合で、わざと渡さない(X56 の (c))。
+ * 渡さないかは配信 × 学びの組で決める(同じ配信の依頼では、いつも同じ学びを渡さない。配信の単位で、渡した配信と比べるため)
+ */
+function pickLearnings(task: unknown): { lines: string[] | null; passed: string[]; withheld: string[] } {
+  if (!usesLearnings(task) || activeLearnings.length === 0) return { lines: null, passed: [], withheld: [] }
+  const rate = activeCardId && switchOn(HOLDOUT) ? switchValue(HOLDOUT) / 100 : 0
+  const lines: string[] = []
+  const passed: string[] = []
+  const withheld: string[] = []
+  activeLearnings.forEach((line, i) => {
+    const id = activeLearningIds[i]
+    if (id && rate > 0 && unitHash(`${activeCardId}:${id}`) < rate) withheld.push(id)
+    else {
+      lines.push(line)
+      if (id) passed.push(id)
+    }
+  })
+  return { lines: lines.length ? lines : null, passed, withheld }
+}
+const HOLDOUT = 'ai.learnings.holdout'
 // 下書きに学びを渡すのを公開していなければ(ai.learnings。X87)、どの依頼にも渡さない。学びの帯は、参考に読むものとして出したまま
 const usesLearnings = (task: unknown) => isOn('ai.learnings') && typeof task === 'string' && (task.startsWith('suggest_') || task.startsWith('select_')) && task !== 'suggest_tasks'
 const LEARNINGS_NOTE =
@@ -492,9 +530,10 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
   const task = (payload as { task?: unknown })?.task
   const ctx = inputs.get()
   const mustRules = rulesFor(task, cardOf(payload), ctx.rules).filter((r) => r.strength === 'must' && r.checkSpec)
+  const picked = pickLearnings(task)
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
-    const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
+    const learnings = picked.lines
     const base = { ...(payload as object), ...(chat && chat.length > 0 ? { chat } : {}), ...(learnings ? { learnings } : {}) }
     // マーケティングの決まり・今週の方針(M3・M4)を、この依頼に効く分だけ足す
     const { body, notes: policyNotes } = withPolicies(base, (payload as { task?: unknown })?.task, cardOf(payload), ctx)
@@ -523,7 +562,7 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
         if (violations.length) for (const fn of policyListeners) fn({ task: String(task ?? ''), violations })
       }
       // 記録は、案が返ってきたときだけ(失敗した依頼は、案がないので比べられない)
-      recordRun(task, learnings ? activeLearningIds : [], parsed)
+      recordRun(task, picked.passed, picked.withheld, parsed)
       return parsed
     } catch (e) {
       if (!(e instanceof SyntaxError)) throw e

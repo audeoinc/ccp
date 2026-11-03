@@ -20,6 +20,8 @@ export interface FeatureSettingFields {
   mode?: FeatureMode
   /** 止める・先に出すときの理由 */
   reason?: string
+  /** スイッチの機能(features の switch)の数。学びを渡さない割合(%)など。空 = 既定の値 */
+  value?: string
 }
 
 /** 読んだ 1 行 */

@@ -20,6 +20,8 @@ export interface AiRunFields {
   adoption?: AiRunAdoption
   /** 案の指紋(JSON。文のハッシュと MinHash、コードのハッシュ。案そのものではない)。承認・制作に渡したときに、いまの中身と比べて adoption を決める。空 = 比べない依頼 */
   fingerprint?: string
+  /** わざと渡さなかった学びの id(JSON の配列。X56 の (c)。学びごとに、渡した配信と比べるため)。空 = 渡さないことはしていない */
+  withheld_ids?: string
   /** 1 = 見本の行(見本を作り直すときに、この行だけを消す) */
   sample?: number
 }

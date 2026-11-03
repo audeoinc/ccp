@@ -329,7 +329,7 @@ export function SimpleResultsPage({ card, allCards, cardProducts, productIds, va
     <>
       <section className={s.section}>
         <span className={s.h3}>{cur === 'all' ? t('主な数字', 'Key numbers') : t(`主な数字(案 ${cur})`, `Key numbers (variant ${cur})`)}</span>
-        {shownRow ? <ResultKpis row={shownRow} money={fmt} lift={impact?.lift} /> : <span className={s.note}>{t('この案の数字はありません', 'No numbers for this variant')}</span>}
+        {shownRow ? <ResultKpis row={shownRow} money={fmt} lift={cur === 'all' ? impact?.lift : impact?.liftByVariant[cur]} /> : <span className={s.note}>{t('この案の数字はありません', 'No numbers for this variant')}</span>}
       </section>
       {/* AB の結果(勝ち案と、差が偶然の範囲か)。全体を見ているときだけ [card.abtest] */}
       {abOn && cur === 'all' && row.parts.length > 0 && <AbResult row={row} heroes={heroes} money={fmt} onAdopt={adopt} />}

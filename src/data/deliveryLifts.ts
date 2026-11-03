@@ -20,6 +20,8 @@ export interface DeliveryLiftFields {
   holdout_revenue?: number
   /** 1 = 見本の行 */
   sample?: number
+  /** AB テストの案(A・B・C。X56 の (d))。空 = 配信全体の行。案の行の送った群は、その案を送った人、送らなかった群は配信で共通 */
+  variant?: string
 }
 
 export interface DeliveryLift extends DeliveryLiftFields {

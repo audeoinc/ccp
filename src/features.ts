@@ -29,6 +29,11 @@ export interface FeatureDef extends Named {
   size?: FeatureSize
   /** この機能を使うのに要る機能(公開するときに、非公開なら知らせる) */
   requires?: string[]
+  /**
+   * 入り切りのスイッチ(画面の入口ではなく、動きを変えるもの)。版・開発者かどうかに関わらず、⚙ で入れたときだけ動く(featureFlags の switchOn)。
+   * param は、スイッチと一緒に決める数(割合など。featureFlags の switchValue)
+   */
+  switch?: { param?: { label: () => string; default: number; min: number; max: number; unit: string } }
 }
 
 /** 版の並び(まとめて当てるときは、選んだ版までを公開する) */
@@ -180,6 +185,16 @@ export const FEATURES: FeatureDef[] = [
   { id: 'ai.weekslots', group: 'area.ai.bulk', ...named('週の枠と、まとめて中身を作る', 'Week slots and bulk content'), version: 'MVP', size: 'M' },
   { id: 'ai.abvariant', group: 'area.ai.ab', ...named('B 案を AI で作る', 'Make variant B with AI'), version: 'v2', size: 'S', requires: ['card.abtest'] },
   { id: 'ai.learnings', group: 'area.ai.learnings', ...named('下書きに学びを渡す', 'Pass learnings to the draft'), version: 'v3', size: 'S', requires: ['results.learnings'] },
+  // 学びごとの効き目を比べるために、配信ごとに一部の学びをわざと渡さない(X56 の (c))。最初は切っておく
+  {
+    id: 'ai.learnings.holdout',
+    group: 'area.ai.learnings',
+    ...named('学びをときどき AI に渡さない(学びごとに効き目を比べる)', 'Sometimes withhold learnings from AI (to compare each learning)'),
+    version: 'dev',
+    size: 'S',
+    requires: ['ai.learnings'],
+    switch: { param: { label: () => tr('渡さない割合', 'Share withheld'), default: 20, min: 5, max: 50, unit: '%' } },
+  },
   { id: 'approval.card', group: 'area.approval.card', ...named('承認を依頼する・承認する・差し戻す', 'Request approval / approve / send back'), version: 'MVP', size: 'M' },
   { id: 'approval.week', group: 'area.approval.week', ...named('週の帯・週の確定・確定後の変更の理由', 'Week band, confirm the week, reasons for changes after confirming'), version: 'MVP', size: 'L' },
   { id: 'approval.week.checklist', group: 'area.approval.week', ...named('確定の前に直すこと(確認の一覧)', 'Things to fix before confirming'), version: 'MVP', size: 'M' },

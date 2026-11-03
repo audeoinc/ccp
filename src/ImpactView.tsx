@@ -785,8 +785,8 @@ function LearningsTab({ evals, onChanged, onOpenResult }: { evals: LearningEval[
     <div className={s.section}>
       <span className={s.intro}>
         {t(
-          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「この配信に使う学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。判定は国ごとです(上で国を選ぶと、その国の学びと、その国で使うと決めたほかの国の学びを、その国の配信で比べ、その国での扱いを決めます)。',
-          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Select a row to see where it was used on the right. Learnings that are always passed together cannot be told apart. Decisions are per country (choose a country above to compare its own learnings, and those from other countries it uses, on its deliveries).',
+          '学び(過去の配信の「次に生かすメモ」)ごとに、その学びを渡した配信と、同じ国・チャネルで、その学びができたあとに送り、その学びを渡さなかった配信の、リフト率を比べます。効いていない学び・逆効果の学びは「外す」と、配信カードの「この配信に使う学び」にも、AI への依頼にも渡さなくなります。おすすめは数字だけから出した目安で、決めるのは人です。行を選ぶと、右に、その学びを渡した配信と比べた相手が出ます。いつも一緒に渡している学びどうしは、どちらが効いたのか切り分けられません。⚙ の「学びをときどき AI に渡さない」を入れると、配信ごとに一部の学びをわざと渡さないので、わざと渡さなかった配信が 3 本以上ある学びは、その配信と比べます(渡したかだけが違うので、学びごとに切り分けられます)。判定は国ごとです(上で国を選ぶと、その国の学びと、その国で使うと決めたほかの国の学びを、その国の配信で比べ、その国での扱いを決めます)。',
+          'For each learning, compare lift between deliveries that received it and later deliveries in the same country and channel that did not. Retired learnings are no longer shown on delivery cards or passed to AI. Suggestions are hints from the numbers; people decide. Select a row to see where it was used on the right. Learnings that are always passed together cannot be told apart. Turn on "Sometimes withhold learnings from AI" in ⚙ to withhold some learnings per delivery; a learning withheld from 3 or more deliveries is compared with those deliveries instead. Decisions are per country (choose a country above to compare its own learnings, and those from other countries it uses, on its deliveries).',
         )}
       </span>
       <div className={s.bar}>
@@ -855,7 +855,11 @@ export function LearningEffect({ on, onOpenResult }: { on: LearningEval; onOpenR
         onOpen={onOpenResult}
       />
       <PaneDeliveries
-        label={t(`比べた相手: 渡さなかった配信(${on.baseline.length})`, `Compared with: deliveries without it (${on.baseline.length})`)}
+        label={
+          on.baselineKind === 'withheld'
+            ? t(`比べた相手: わざと渡さなかった配信(${on.baseline.length})`, `Compared with: deliveries where it was withheld (${on.baseline.length})`)
+            : t(`比べた相手: 渡さなかった配信(${on.baseline.length})`, `Compared with: deliveries without it (${on.baseline.length})`)
+        }
         avg={on.lift.b.mean}
         rows={on.baseline}
         empty={t('比べる相手の配信が、まだありません', 'No comparison deliveries yet')}

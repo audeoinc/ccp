@@ -10,14 +10,28 @@ import type { LearningReview, LearningReviewStatus } from './data/learningReview
 // 撮影用のビルドでは、このファイルを src/mock/db.ts が読む。表のサービスを読むファイル(cancel.ts など)を import すると、読み込みが循環するので、型だけを読む
 const isCancelled = (c: Pick<DeliveryCard, 'cancelled_at'>) => !!c.cancelled_at
 
-/** 渡した学びの id の一覧(壊れた値は、渡さなかったとみなす) */
-export function learningIdsOf(run: Pick<AiRun, 'learning_ids'>): string[] {
+const idList = (json?: string): string[] => {
   try {
-    const v = JSON.parse(run.learning_ids ?? '[]') as unknown
+    const v = JSON.parse(json || '[]') as unknown
     return Array.isArray(v) ? v.map(String) : []
   } catch {
     return []
   }
+}
+/** 渡した学びの id の一覧(壊れた値は、渡さなかったとみなす) */
+export const learningIdsOf = (run: Pick<AiRun, 'learning_ids'>): string[] => idList(run.learning_ids)
+/** わざと渡さなかった学びの id の一覧(X56 の (c)) */
+export const withheldIdsOf = (run: Pick<AiRun, 'withheld_ids'>): string[] => idList(run.withheld_ids)
+
+/**
+ * 配信全体のホールドアウトとの比べ(X56 の (d))。案(variant)のない行があればそれ。なければ案の行を合わせる
+ * (送った群は案ごとの人を足し、送らなかった群は配信で共通なので 1 つ分だけ数える)
+ */
+export function cardLiftOf(rows: DeliveryLift[]): DeliveryLift | undefined {
+  const whole = rows.find((l) => !l.variant)
+  if (whole || rows.length === 0) return whole
+  const sum = (k: 'treated_users' | 'treated_orders' | 'treated_revenue') => rows.reduce((a, l) => a + (l[k] ?? 0), 0)
+  return { ...rows[0], variant: undefined, treated_users: sum('treated_users'), treated_orders: sum('treated_orders'), treated_revenue: sum('treated_revenue') }
 }
 
 export type Market = 'JP' | 'US'
@@ -34,6 +48,8 @@ export interface DeliveryImpact {
   runs: AiRun[]
   /** 渡した学びの id(すべての依頼を合わせたもの) */
   learningIds: string[]
+  /** わざと渡さなかった学びの id(どの依頼でも渡していないもの。X56 の (c)) */
+  withheldIds: string[]
   /** 学びを渡したか。null = AI の依頼の記録がない */
   withLearnings: boolean | null
   /** AI の案の扱い(依頼の中でいちばん多かった扱い。同じ数なら 直した → そのまま → 使わず の順。分からなければ null) */
@@ -99,7 +115,7 @@ export function takePendingImpactLearning(): string | null {
 export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], runs: AiRun[], lifts: DeliveryLift[]): DeliveryImpact[] {
   const byCard = new Map(cards.map((c) => [c.id, c]))
   const runsBy = groupBy(runs, (r) => r.delivery_card_id ?? '')
-  const liftBy = new Map(lifts.map((l) => [l.delivery_card_id ?? '', l]))
+  const liftBy = new Map([...groupBy(lifts, (l) => l.delivery_card_id ?? '')].map(([id, rows]) => [id, cardLiftOf(rows)]))
   // AB テストの配信は、案ごとに結果の行が分かれる。効果は配信の単位で見るので、送った数・クリック・売上を足し合わせる
   const resultBy = new Map<string, DeliveryResult>()
   for (const r of results) {
@@ -118,6 +134,7 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
     if (!card || isCancelled(card) || !r.recipients) continue
     const cardRuns = runsBy.get(id) ?? []
     const ids = [...new Set(cardRuns.flatMap(learningIdsOf))]
+    const withheld = [...new Set(cardRuns.flatMap(withheldIdsOf))].filter((x) => !ids.includes(x))
     // 学びを渡さない依頼(商品の画像の案。X64)は、学びあり / なし と、案の扱いの比べには入れない(入れると「学びなし」の配信に見えるため)
     const learnRuns = cardRuns.filter((r) => !NO_LEARNING_TASKS.has(r.task ?? ''))
     const adoption = mainAdoption(learnRuns)
@@ -131,6 +148,7 @@ export function buildImpacts(cards: DeliveryCard[], results: DeliveryResult[], r
       sentAt: r.sent_at ?? card.scheduled_at ?? '',
       runs: cardRuns,
       learningIds: ids,
+      withheldIds: withheld,
       withLearnings: learnRuns.length ? ids.length > 0 : null,
       adoption,
       recipients: r.recipients,
@@ -190,8 +208,11 @@ export interface Diff {
   verdict: Verdict
 }
 
+/** 比べるのに要る本数(これより少ないと「材料不足」) */
+const MIN_N = 3
+
 /** a − b の差。幅は Welch の方法のおおよそ(t 値は 1.96 + 2.4 / 自由度 で近似。目安として出すだけなので、厳密さより分かりやすさ) */
-export function compare(a: (number | null)[], b: (number | null)[], minN = 3): Diff {
+export function compare(a: (number | null)[], b: (number | null)[], minN = MIN_N): Diff {
   const sa = stat(a)
   const sb = stat(b)
   if (sa.mean == null || sb.mean == null || sa.n < minN || sb.n < minN) return { a: sa, b: sb, diff: sa.mean != null && sb.mean != null ? sa.mean - sb.mean : null, low: null, high: null, verdict: 'few' }
@@ -220,8 +241,13 @@ export interface LearningEval {
   foreign: boolean
   /** この学びを渡した配信(評価する国の配信) */
   used: DeliveryImpact[]
-  /** 比べる相手: 評価する国の、出元と同じチャネルで、この学びができたあとに送り、この学びを渡さなかった配信(ほかの学びは渡していてもよい) */
+  /**
+   * 比べる相手。わざと渡さなかった配信(X56 の (c))が 3 本以上あれば、それ(同じ条件で、渡したかだけが違う)。
+   * なければ、評価する国の、出元と同じチャネルで、この学びができたあとに送り、この学びを渡さなかった配信(ほかの学びは渡していてもよい)
+   */
   baseline: DeliveryImpact[]
+  /** 比べる相手の種類: withheld = わざと渡さなかった配信、later = あとで送った、渡さなかった配信 */
+  baselineKind: 'withheld' | 'later'
   lift: Diff
   ctr: Diff
   /** この国での判定 */
@@ -264,7 +290,12 @@ export function evaluateLearnings(
     if (country && origin !== country && !usableIn(r.id, origin, country)) continue
     const used = impacts.filter((d) => d.learningIds.includes(r.id) && String(d.card.country ?? '') === at)
     const sentAt = r.sent_at ?? source.scheduled_at ?? ''
-    const baseline = impacts.filter((d) => d.withLearnings != null && !d.learningIds.includes(r.id) && d.sentAt > sentAt && String(d.card.country ?? '') === at && d.card.channel === source.channel)
+    const withheld = impacts.filter((d) => d.withheldIds.includes(r.id) && String(d.card.country ?? '') === at)
+    const baselineKind = withheld.length >= MIN_N ? 'withheld' : 'later'
+    const baseline =
+      baselineKind === 'withheld'
+        ? withheld
+        : impacts.filter((d) => d.withLearnings != null && !d.learningIds.includes(r.id) && d.sentAt > sentAt && String(d.card.country ?? '') === at && d.card.channel === source.channel)
     const lift = compare(
       used.map((d) => d.liftRate),
       baseline.map((d) => d.liftRate),
@@ -274,7 +305,7 @@ export function evaluateLearnings(
       baseline.map((d) => d.ctr),
     )
     const suggestion: LearningReviewStatus = lift.verdict === 'up' ? 'keep' : lift.verdict === 'down' ? 'retired' : lift.verdict === 'flat' && lift.a.n >= 6 ? 'retired' : 'watch'
-    out.push({ id: r.id, notes: r.notes.trim(), source, sourceAt: sentAt, country: at, foreign: at !== origin, used, baseline, lift, ctr, review: reviewIn(reviews, r.id, at, origin), suggestion })
+    out.push({ id: r.id, notes: r.notes.trim(), source, sourceAt: sentAt, country: at, foreign: at !== origin, used, baseline, baselineKind, lift, ctr, review: reviewIn(reviews, r.id, at, origin), suggestion })
   }
   return out.sort((a, b) => b.used.length - a.used.length || b.sourceAt.localeCompare(a.sourceAt))
 }
@@ -335,12 +366,14 @@ export function sampleImpact(cards: DeliveryCard[], results: DeliveryResult[]): 
     const pass = candidates.length > 0 && rng() < 0.7
     const picked = candidates.filter(() => rng() < 0.7)
     const ids = pass ? (picked.length ? picked : candidates.slice(0, 1)).map((n) => n.id) : []
+    // 渡せたのに選ばなかった学びは、わざと渡さなかったことにする(学びごとの比べ。X56 の (c))。乱数は引かない(ほかの見本の値を変えないため)
+    const withheld = pass ? candidates.map((n) => n.id).filter((id) => !ids.includes(id)) : []
     let edited = 0
     for (const task of SAMPLE_TASKS) {
       const x = rng()
       const adoption: AiRunAdoption = x < 0.45 ? 'as_is' : x < 0.85 ? 'edited' : 'rejected'
       if (adoption === 'edited') edited++
-      runs.push({ delivery_card_id: card.id, task, learning_ids: JSON.stringify(ids), adoption, sample: 1 })
+      runs.push({ delivery_card_id: card.id, task, learning_ids: JSON.stringify(ids), ...(withheld.length ? { withheld_ids: JSON.stringify(withheld) } : {}), adoption, sample: 1 })
     }
     // 学びの効き目は足し合わせる(効く学びが多いほど、増分が増える。逆効果の学びは減らす)
     const quality = ids.reduce((a, id) => a + learningQuality(id), 0)
@@ -350,7 +383,7 @@ export function sampleImpact(cards: DeliveryCard[], results: DeliveryResult[]): 
     const holdoutUsers = Math.round((recipients * 0.1) / 0.9)
     const holdoutRpu = (treatedRevenue / recipients) * (1 - share)
     const treatedOrders = Math.round(orders * (2.5 + rng()))
-    lifts.push({
+    const whole: DeliveryLiftFields = {
       delivery_card_id: card.id,
       holdout_rate: 0.1,
       window_days: 7,
@@ -361,7 +394,20 @@ export function sampleImpact(cards: DeliveryCard[], results: DeliveryResult[]): 
       treated_revenue: Math.round(treatedRevenue * 100) / 100,
       holdout_revenue: Math.round(holdoutRpu * holdoutUsers * 100) / 100,
       sample: 1,
-    })
+    }
+    lifts.push(whole)
+    // AB テストの配信は、案ごとの行も作る(X56 の (d))。送った群は案を送った人で、売上・注文は配信を通った売上の割合で分ける。送らなかった群は共通。
+    // 同じ案の結果の行が 2 つ(テストと、勝ち案を残りに送った分)あれば、1 つの案として足す
+    for (const [variant, vs] of groupBy(rows.filter((x) => x.variant && x.recipients), (x) => String(x.variant))) {
+      const vSum = (k: 'recipients' | 'orders' | 'revenue') => vs.reduce((a, x) => a + (x[k] ?? 0), 0)
+      lifts.push({
+        ...whole,
+        variant,
+        treated_users: vSum('recipients'),
+        treated_orders: Math.round(treatedOrders * (orders ? vSum('orders') / orders : 0)),
+        treated_revenue: Math.round(treatedRevenue * (revenue ? vSum('revenue') / revenue : 0) * 100) / 100,
+      })
+    }
   }
   return { runs, lifts }
 }

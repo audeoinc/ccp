@@ -6,7 +6,8 @@ import { DeliveryLiftsService } from './data/deliveryLifts'
 import { DeliveryResultsService } from './data/deliveryResults'
 import { DeliveryCardsService } from './data/deliveryCards'
 import { LearningReviewsService } from './data/learningReviews'
-import { learningIdsOf, liftOf, reviewIn } from './impact'
+import { cardLiftOf, learningIdsOf, liftOf, reviewIn } from './impact'
+import type { DeliveryLift } from './data/deliveryLifts'
 
 export interface UsedLearning {
   /** 学びの id(配信結果の id) */
@@ -19,9 +20,18 @@ export interface UsedLearning {
   retired: boolean
 }
 
+export interface LiftInfo {
+  incremental: number
+  liftRate: number | null
+  windowDays?: number
+  holdoutRate?: number
+}
+
 export interface DeliveryImpactInfo {
-  /** ホールドアウトとの比べ(なければ null) */
-  lift: { incremental: number; liftRate: number | null; windowDays?: number; holdoutRate?: number } | null
+  /** ホールドアウトとの比べ(配信全体。なければ null) */
+  lift: LiftInfo | null
+  /** AB テストの案ごとの比べ(X56 の (d)。案の行があるものだけ) */
+  liftByVariant: Record<string, LiftInfo>
   /** AI の依頼の記録があるか(ない配信は、学びを渡したかが分からない) */
   recorded: boolean
   learnings: UsedLearning[]
@@ -36,8 +46,17 @@ export function useDeliveryImpact(cardId: string, country: string): DeliveryImpa
     void (async () => {
       try {
         const [lifts, runs, reviews] = await Promise.all([DeliveryLiftsService.getAll({ filter }), AiRunsService.getAll({ filter }), LearningReviewsService.getAll()])
-        const liftRow = lifts.success ? lifts.data?.[0] : undefined
-        const l = liftOf(liftRow)
+        const liftRows = lifts.success ? (lifts.data ?? []) : []
+        const infoOf = (row?: DeliveryLift): LiftInfo | null => {
+          const l = liftOf(row)
+          return l ? { incremental: l.incRevenue, liftRate: l.liftRate, windowDays: row?.window_days, holdoutRate: row?.holdout_rate } : null
+        }
+        // 案ごと。同じ案の行がいくつかあれば(テストと、勝ち案を残りに送った分など)、送った群を足して 1 つにする
+        const liftByVariant: Record<string, LiftInfo> = {}
+        for (const v of new Set(liftRows.map((r) => r.variant).filter((x): x is string => !!x))) {
+          const info = infoOf(cardLiftOf(liftRows.filter((r) => r.variant === v)))
+          if (info) liftByVariant[v] = info
+        }
         const runRows = runs.success ? (runs.data ?? []) : []
         const ids = [...new Set(runRows.flatMap(learningIdsOf))]
         const reviewRows = reviews.success ? (reviews.data ?? []) : []
@@ -61,7 +80,7 @@ export function useDeliveryImpact(cardId: string, country: string): DeliveryImpa
             }),
           )
         ).filter((x): x is UsedLearning => !!x)
-        if (alive) setInfo({ lift: l ? { incremental: l.incRevenue, liftRate: l.liftRate, windowDays: liftRow?.window_days, holdoutRate: liftRow?.holdout_rate } : null, recorded: runRows.length > 0, learnings })
+        if (alive) setInfo({ lift: infoOf(cardLiftOf(liftRows)), liftByVariant, recorded: runRows.length > 0, learnings })
       } catch {
         if (alive) setInfo(null)
       }

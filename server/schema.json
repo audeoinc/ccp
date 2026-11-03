@@ -530,14 +530,15 @@
    ]
   },
   "feature_settings": {
-   "_comment": "機能の公開・非公開の、機能ごとの上書き(X87。2026-10-29 の 3.1 で作り替え)。機能の ID(src/features.ts。大・中の id も)ごとに 1 行。行がなければ、コードの版・版に従う。version = 付け替えた版(空ならコードの値)、mode = follow 版に従う / stop 止める / early 先に出す、reason = 止める・先に出すときの理由。enabled と feature_id '*' の行は段 ① の形の名残で、読まない(消さない)。環境ごとに持つので、import-pack では取り込まない(pack.py の ENV_ONLY)",
+   "_comment": "機能の公開・非公開の、機能ごとの上書き(X87。2026-10-29 の 3.1 で作り替え)。機能の ID(src/features.ts。大・中の id も)ごとに 1 行。行がなければ、コードの版・版に従う。version = 付け替えた版(空ならコードの値)、mode = follow 版に従う / stop 止める / early 先に出す、reason = 止める・先に出すときの理由、value = スイッチの機能(features の switch)の数(学びを渡さない割合など)。enabled と feature_id '*' の行は段 ① の形の名残で、読まない(消さない)。環境ごとに持つので、import-pack では取り込まない(pack.py の ENV_ONLY)",
    "columns": [
     ["feature_id", "text", {"required": true}],
     ["enabled", "int"],
     ["changed_by", "text"],
     ["version", "text"],
     ["mode", "choice"],
-    ["reason", "text"]
+    ["reason", "text"],
+    ["value", "text"]
    ],
    "lookups": [
    ],
@@ -559,7 +560,7 @@
    ]
   },
   "feature_logs": {
-   "_comment": "機能の公開・非公開の記録(X87 の 3.1)。だれが・いつ・何を・なぜ。feature_id は機能の ID か、版の公開なら version:v1 の形。action = retarget 版の付け替え / publish 版の公開 / unpublish 版の非公開 / stop 止める / early 先に出す / follow 版に従うに戻す。環境ごとに持つ(ENV_ONLY)",
+   "_comment": "機能の公開・非公開の記録(X87 の 3.1)。だれが・いつ・何を・なぜ。feature_id は機能の ID か、版の公開なら version:v1 の形。action = retarget 版の付け替え / publish 版の公開 / unpublish 版の非公開 / stop 止める / early 先に出す(スイッチの機能では、入れる) / follow 版に従うに戻す(スイッチでは、切る) / value スイッチの数を変える。環境ごとに持つ(ENV_ONLY)",
    "columns": [
     ["feature_id", "text", {"required": true, "index": true}],
     ["action", "text"],
@@ -879,7 +880,8 @@
     ["learning_ids", "text"],
     ["adoption", "choice"],
     ["sample", "int"],
-    ["fingerprint", "text"]
+    ["fingerprint", "text"],
+    ["withheld_ids", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
@@ -917,7 +919,8 @@
     ["holdout_orders", "int"],
     ["treated_revenue", "numeric"],
     ["holdout_revenue", "numeric"],
-    ["sample", "int"]
+    ["sample", "int"],
+    ["variant", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]
