@@ -72,12 +72,14 @@ class DueTest(unittest.TestCase):
 class TickTest(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = bq_import.parse_settings({"enabled": True})
+        self.loaded = True
         self.sync = mock.AsyncMock(return_value={})
         patches = [
             mock.patch.dict(bq_import._checked, {"spu": NOW - timedelta(minutes=10), "sku_stock": NOW - timedelta(minutes=10)}, clear=True),
             mock.patch.dict("os.environ", {"BQ_AUTO_SYNC": ""}),
             mock.patch.object(bq, "configured", return_value=[SPU, STOCK]),
-            mock.patch.object(bq_import, "load_settings", mock.AsyncMock(side_effect=lambda: self.settings)),
+            mock.patch.object(bq_import.appsettings, "loaded", side_effect=lambda: self.loaded),
+            mock.patch.object(bq_import.appsettings, "raw", side_effect=lambda name: self.settings if name == bq_import.SETTINGS_NAME else None),
             mock.patch.object(bq_import, "latest", mock.AsyncMock(return_value={})),
             mock.patch.object(bq_import, "_now", return_value=NOW),
             mock.patch.object(bq_import, "sync", self.sync),
@@ -106,12 +108,30 @@ class TickTest(unittest.TestCase):
     def test_env_off_does_not_even_read_settings(self) -> None:
         with mock.patch.dict("os.environ", {"BQ_AUTO_SYNC": "0"}):
             self.assertEqual(self.tick(), [])
-        bq_import.load_settings.assert_not_awaited()  # type: ignore[attr-defined]
+        bq_import.appsettings.ensure.assert_not_awaited()  # type: ignore[attr-defined]
+
+    def test_off_does_not_read_db(self) -> None:
+        # 自動が切のあいだは、覚えた設定だけを見る(DB が止まる環境で、見回りが DB を起こさないように)
+        self.settings = bq_import.parse_settings({"enabled": False})
+        self.assertEqual(self.tick(), [])
+        bq_import.appsettings.ensure.assert_not_awaited()  # type: ignore[attr-defined]
+
+    def test_waits_for_screen_where_db_can_stop(self) -> None:
+        self.loaded = False
+        with mock.patch.object(bq_import.dbready, "controller", return_value=object()):
+            self.assertIsNone(self.tick("startup"))
+        bq_import.appsettings.ensure.assert_not_awaited()  # type: ignore[attr-defined]
+
+    def test_reads_by_itself_where_db_stays_up(self) -> None:
+        self.loaded = False
+        with mock.patch.object(bq_import.dbready, "controller", return_value=None):
+            self.assertIsNone(self.tick("startup"))  # 読んでも、まだ読めていない(身代わり)ので次の回へ
+        bq_import.appsettings.ensure.assert_awaited()  # type: ignore[attr-defined]
 
     def test_unconfigured_does_nothing(self) -> None:
         with mock.patch.object(bq, "configured", return_value=[]):
             self.assertEqual(self.tick(), [])
-        bq_import.load_settings.assert_not_awaited()  # type: ignore[attr-defined]
+        self.sync.assert_not_awaited()
 
 
 class AdminTest(unittest.TestCase):

@@ -549,16 +549,27 @@ async def _settings_changes(source: str | None, limit: int) -> list[dict[str, An
 # ---- 定期の取り込み
 
 
-async def tick(trigger: str = "auto") -> list[str]:
-    """1 回分の定期の取り込み。間隔がたった出力を確かめ、変わっていれば取り込む。確かめた出力の名前を返す(何もしなければ空)"""
+async def tick(trigger: str = "auto") -> list[str] | None:
+    """1 回分の定期の取り込み。間隔がたった出力を確かめ、変わっていれば取り込む。確かめた出力の名前を返す(何もしなければ空)。
+    まだ動き出せない(設定をまだ読んでいない)ときは None(起動のときの 1 回を、次の回に回す)。
+    自動が「切」のあいだは DB を読まない(このプロセスが覚えた設定だけを見る。画面で変えたら、保存と一緒に覚え直す)。
+    使われないあいだ DB が止まる環境でも、見回りが DB を起こし続けないように(BQ_AUTO_SYNC=0 に頼らずに済むように)"""
     if env_disabled():
         return []
-    # 表の場所は DB にある(appsettings)。覚えた値が古ければ読み直す(TTL ごと。毎回は読まない)
-    await appsettings.ensure()
-    if not bq.configured():
+    if not appsettings.loaded():
+        # DB の起動を受け持つ仕組みがない環境(Workbench など。DB は止まらない)は、自分で読む。
+        # 止まる DB の環境は、画面・窓口が読むのを待つ(人が使い始めれば、DB は起きている)
+        if dbready.controller() is not None:
+            return None
+        await appsettings.ensure()
+        if not appsettings.loaded():
+            return None
+    if not parse_settings(appsettings.raw(SETTINGS_NAME))["enabled"]:
         return []
-    settings = await load_settings()
-    if not settings["enabled"]:
+    # 入のあいだは、表の場所・間隔を、覚えた時間(TTL)ごとに読み直す
+    await appsettings.ensure()
+    settings = parse_settings(appsettings.raw(SETTINGS_NAME))
+    if not settings["enabled"] or not bq.configured():
         return []
     if _lock.locked():
         return []  # 取り込み中(ボタン・開いたとき)なら、この回は飛ばす
@@ -570,12 +581,12 @@ async def tick(trigger: str = "auto") -> list[str]:
 
 
 async def run_scheduler() -> None:
-    """サーバーが動いている間、回し続ける。起動したらすぐ 1 回(止めていた間に古くなったデータで動かないように)、そのあとは TICK_S ごと"""
+    """サーバーが動いている間、回し続ける。動き出したらすぐ 1 回(止めていた間に古くなったデータで動かないように)、そのあとは TICK_S ごと"""
     first = True
     while True:
         try:
-            await tick("startup" if first else "auto")
-            first = False
+            got = await tick("startup" if first else "auto")
+            first = first and got is None
         except dbready.DbNotReady:
             pass  # DB の起動中。次の回に確かめる(起動のときの 1 回も、次の回に回す)
         except Exception:  # noqa: BLE001 — 認証が取れない など。止めずに、次の回も確かめる(記録は sync が残す)

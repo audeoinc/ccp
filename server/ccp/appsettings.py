@@ -127,6 +127,11 @@ class trying:
         _trial.reset(self.token)
 
 
+def loaded() -> bool:
+    """DB から一度でも読めたか(読めていなければ、覚えた値は環境変数の代わり)"""
+    return _rows_ok or bool(_rows)
+
+
 def forget() -> None:
     """覚えた値を捨てる(保存したあと。次の get の前の ensure で読み直す)"""
     global _loaded_at
@@ -278,7 +283,9 @@ async def save(name: str, value: dict[str, Any], by: str, changes: list[str]) ->
         await conn.execute(text(
             "INSERT INTO app_settings (name, value, changed_by, source, changes) VALUES (:name, :value, :by, 'screen', :changes)"
         ), {"name": name, "value": json.dumps(value, ensure_ascii=False), "by": by[:100], "changes": json.dumps(changes)})
+    # すぐ読み直す(定期の取り込みは、自動が切のあいだ DB を読まないので、ここで覚え直した値が次の見回りに効く)
     forget()
+    await ensure()
 
 
 async def history(name: str, limit: int = 20) -> list[dict[str, Any]]:
