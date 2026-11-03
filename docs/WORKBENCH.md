@@ -597,7 +597,7 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
 
 | 前の版の環境変数 | いまの置き場所 |
 |---|---|
-| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` / `BQ_<名前>_WATCH` | ⚙ →「データの取り込み」の「表の場所」(場所の形は [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)。「接続を確認」で、保存の前に確かめられる) |
+| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` / `BQ_<名前>_WATCH` | ⚙ →「データの取り込み」で出力の行を開いた所。`BQ_<名前>` は「読む場所(BigQuery の表かビュー)」、`BQ_<名前>_WATCH` は「更新の合図に見る表(BigQuery。読む場所がビューのときだけ)」、`BQ_PROJECT` は表の下の「BigQuery の共通の設定」。どちらも BigQuery の場所で、写す先の CCP の DB の表(`products`・`sku`・`sku_stock`・`weekly_performances`・`weather_forecast`・`product_rankings`)は決まっていて変えられない(場所の形は [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)。「接続を確認」で、保存の前に確かめられる) |
 | `GEMINI_MODEL` / `GEMINI_THINKING` / `GEMINI_CONCURRENCY` | ⚙ →「AI の設定」(モデル・考える量・同時の上限。既定 `gemini-3.5-flash` / `low` / 4) |
 | `AI_OUTLET_URL` / `AI_OUTLET_TIMEOUT` | ⚙ →「AI の設定」(AI の出口の URL・待ち時間。合言葉 `AI_OUTLET_TOKEN` は環境変数のまま) |
 

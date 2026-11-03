@@ -224,7 +224,7 @@ function Detail({ o, check, loc }: { o: Row; check?: ImportCheck['outputs'][numb
       )}
       <div className={s.section}>
         <span className={s.sub}>{t('表の場所', 'Table location')}</span>
-        <OutputLocation name={o.name} loc={loc} />
+        <OutputLocation name={o.name} dest={o.dest} loc={loc} />
       </div>
       {!o.unset && (
         <div className={s.section}>
@@ -317,7 +317,7 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
   if (!status) return <Spinner size="small" />
   const rows: Row[] = [
     ...status.outputs,
-    ...status.unconfigured.map((u) => ({ name: u.name, label: u.label, env: u.env, status: 'never', message: '', intervalMin: status.auto.intervals[u.name] ?? 60, stale: false, unset: true })),
+    ...status.unconfigured.map((u) => ({ name: u.name, label: u.label, env: u.env, dest: u.dest, status: 'never', message: '', intervalMin: status.auto.intervals[u.name] ?? 60, stale: false, unset: true })),
   ]
   const envOff = status.auto.envDisabled
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()

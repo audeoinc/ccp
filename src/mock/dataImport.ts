@@ -9,8 +9,9 @@ const later = (iso: string | null | undefined, min: number) => (iso ? new Date(n
 
 const settings = { enabled: true, intervals: { spu: 60, sku: 60, sku_stock: 5, weekly: 60, forecast: 60, ranking: 60 } as Record<string, number> }
 
+const DEST: Record<string, string> = { spu: 'products', sku: 'sku', sku_stock: 'sku_stock', weekly: 'weekly_performances', forecast: 'weather_forecast', ranking: 'product_rankings' }
 const base = (name: string, label: string, env: string, o: Partial<ImportOutput>): ImportOutput => ({
-  name, label, env, status: 'ok', message: '', intervalMin: 60, stale: false, trigger: 'auto', actor: null, repeat: 1, ...o,
+  name, label, env, dest: DEST[name], status: 'ok', message: '', intervalMin: 60, stale: false, trigger: 'auto', actor: null, repeat: 1, ...o,
 })
 
 const outputs: ImportOutput[] = [
@@ -23,7 +24,7 @@ const outputs: ImportOutput[] = [
   base('weekly', '週ごとの実績', 'BQ_WEEKLY', { dataAsOf: ago(3 * 24 * 60), importedAt: ago(3 * 24 * 60 - 30), rows: 5120, rowsBefore: 4980, triedAt: ago(3 * 24 * 60 - 30), sourceModified: ago(3 * 24 * 60), checkedAt: ago(40) }),
   base('forecast', '天気予報', 'BQ_FORECAST', { dataAsOf: ago(2 * 24 * 60), importedAt: ago(2 * 24 * 60 - 10), rows: 336, rowsBefore: 336, triedAt: ago(2 * 24 * 60 - 10), sourceModified: ago(2 * 24 * 60), checkedAt: ago(30), stale: true }),
 ]
-const unconfigured = [{ name: 'ranking', label: '販売チャネルごとの順位', env: 'BQ_RANKING' }]
+const unconfigured = [{ name: 'ranking', label: '販売チャネルごとの順位', env: 'BQ_RANKING', dest: DEST.ranking }]
 
 const records: ImportRecord[] = [
   { source: 'sku_stock', status: 'ok', dataAsOf: ago(8), sourceModified: ago(8), rows: 8790, message: '8790 行', importedAt: ago(3), checkedAt: ago(3), repeat: 1, trigger: 'auto' },
