@@ -185,6 +185,7 @@ async def _ai(out: _Out, full: bool, google_ok: bool) -> None:
 
 async def _bq(out: _Out, full: bool, db_ok: bool) -> None:
     from . import bq
+    from .bq_import import DEST
 
     outputs = bq.configured()
     if not outputs:
@@ -205,7 +206,7 @@ async def _bq(out: _Out, full: bool, db_ok: bool) -> None:
         for o in outputs:
             r = await asyncio.to_thread(bq.inspect, o, client)
             if r.error:
-                out.add("bq", "failed", f"{o.label}: {r.where} を読めません({r.error})", "⚙ →「データの取り込み」で行を開き、表の場所を直して「接続を確認」", "dataimport")
+                out.add("bq", "failed", f"{o.label}: BigQuery の {r.where} を読めません({r.error})", "⚙ →「データの取り込み」で行を開き、表の場所を直して「接続を確認」", "dataimport")
                 continue
             notes = [n for n in r.notes if not ("通りました" in n or "で見ます" in n)]
             if r.missing:
@@ -213,7 +214,7 @@ async def _bq(out: _Out, full: bool, db_ok: bool) -> None:
             elif not r.ok:
                 out.add("bq", "failed", f"{o.label}: {'。'.join(notes) or '仕様どおりではありません'}", "python -m ccp.cli bq-check で、くわしく見る", "dataimport")
             else:
-                out.add("bq", "ok", f"{o.label}: {r.where}(列は仕様どおり)")
+                out.add("bq", "ok", f"{o.label}: BigQuery の {r.where} → CCP の DB の表 {DEST[o.name]}(列は仕様どおり)")
             if r.missing_optional:
                 out.add("bq", "warn", f"{o.label}: あると使う列がありません({', '.join(r.missing_optional)})")
     if unset:

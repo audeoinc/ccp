@@ -241,6 +241,10 @@ async def _replace(conn: AsyncConnection, table: str, rows: list[dict[str, Any]]
     return f"{len(values)} 行"
 
 
+# 出力ごとの、写す先の CCP の DB の表(画面にも「BigQuery の場所 → この表」と出す。変えられない)
+DEST = {"spu": "products", "sku": "sku", "sku_stock": "sku_stock", "weekly": "weekly_performances", "forecast": "weather_forecast", "ranking": "product_rankings"}
+
+
 async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -> str:
     if name == "spu":
         return await _write_spu(conn, rows)
@@ -252,17 +256,17 @@ async def _write(conn: AsyncConnection, name: str, rows: list[dict[str, Any]]) -
               AND sku_code IN (SELECT sku_code FROM sku WHERE source = :sample AND product_code = ANY(:codes))
         """), {"sample": SAMPLE, "codes": codes})
         await conn.execute(text("DELETE FROM sku WHERE source = :sample AND product_code = ANY(:codes)"), {"sample": SAMPLE, "codes": codes})
-        return await _replace(conn, "sku", rows, ["market", "sku_code", "product_code", "color", "color_hex", "size", "length", "price", "units_4w", "as_of"], keep_sample=True)
+        return await _replace(conn, DEST["sku"], rows, ["market", "sku_code", "product_code", "color", "color_hex", "size", "length", "price", "units_4w", "as_of"], keep_sample=True)
     if name == "sku_stock":
-        return await _replace(conn, "sku_stock", rows, ["market", "sku_code", "stock", "as_of"], keep_sample=True)
+        return await _replace(conn, DEST["sku_stock"], rows, ["market", "sku_code", "stock", "as_of"], keep_sample=True)
     if name == "weekly":
         # name は、いまの画面・初期データと同じ「商品コード 週の始まり」
-        return await _replace(conn, "weekly_performances", rows, ["market", "product_code", "week_start", "units", "revenue", "stock"],
+        return await _replace(conn, DEST["weekly"], rows, ["market", "product_code", "week_start", "units", "revenue", "stock"],
                               lambda r: {"name": f"{r['product_code']} {str(r['week_start'])[:10]}"}, scope="product_code")
     if name == "ranking":
         # 週ごとの実績と同じく、取り込む商品の行だけを入れ替える(BigQuery にない商品の行は残す)
-        return await _replace(conn, "product_rankings", rows, ["market", "product_code", "week_start", "channel", "rank", "units", "as_of"], scope="product_code")
-    return await _replace(conn, "weather_forecast", rows, ["market", "date", "temp_max", "temp_min", "precip_prob", "weather", "issued_at"])
+        return await _replace(conn, DEST["ranking"], rows, ["market", "product_code", "week_start", "channel", "rank", "units", "as_of"], scope="product_code")
+    return await _replace(conn, DEST["forecast"], rows, ["market", "date", "temp_max", "temp_min", "precip_prob", "weather", "issued_at"])
 
 
 async def _sum_stock(conn: AsyncConnection) -> None:
@@ -329,7 +333,7 @@ async def status() -> dict[str, Any]:
     settings = await load_settings() if outputs else parse_settings(None)
     auto = {"enabled": settings["enabled"], "envDisabled": env_disabled(), "active": auto_on(settings), "intervals": settings["intervals"], "choices": list(INTERVAL_CHOICES)}
     # 設定していない出力も、名前と環境変数の名前だけ返す(管理の画面の「未設定」。表の場所は利用先の名前を含むので返さない)
-    unconfigured = [{"name": o.name, "label": o.label, "env": o.env} for o in bq.OUTPUTS if o not in outputs]
+    unconfigured = [{"name": o.name, "label": o.label, "env": o.env, "dest": DEST[o.name]} for o in bq.OUTPUTS if o not in outputs]
     if not outputs:
         return {"configured": False, "outputs": [], "unconfigured": unconfigured, "auto": auto}
     last = await latest()
@@ -343,7 +347,7 @@ async def status() -> dict[str, Any]:
         checked = last_checked(o.name, r)
         interval = settings["intervals"].get(o.name, 60)
         out.append({
-            "name": o.name, "label": o.label, "env": o.env, "status": r.get("status") or "never", "message": r.get("message") or "",
+            "name": o.name, "label": o.label, "env": o.env, "dest": DEST[o.name], "status": r.get("status") or "never", "message": r.get("message") or "",
             "dataAsOf": _iso(ok.get("data_as_of")), "importedAt": _iso(ok.get("imported_at")), "rows": ok.get("row_count"),
             "rowsBefore": r.get("rows_before"),
             "triedAt": _iso(r.get("imported_at")), "sourceModified": _iso(r.get("source_modified")),
@@ -497,7 +501,13 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
     prev = await latest()
     rows: dict[str, list[dict[str, Any]]] = {}
     result: dict[str, dict[str, Any]] = {}
+    kinds: dict[str, str] = {}
     for o in outputs:
+        # 表かビューか(ビューのときだけ、更新の合図に見る元の表が要る。画面で「要りません」と言えるように)
+        try:
+            kinds[o.name] = getattr(await asyncio.to_thread(client.get_table, bq.location(o)), "table_type", "") or ""
+        except Exception:  # noqa: BLE001 — 読めないなら、下の読み込みが理由を出す
+            pass
         try:
             rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
         except Exception as e:  # noqa: BLE001
@@ -512,7 +522,7 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
         issues = _judge(name, rows[name], prev.get(name) or {}, _ctx_for(name, context), existing, now)
         stamp = "issued_at" if name == "forecast" else "as_of"
         times = [t for t in (bv.as_ts(r.get(stamp)) for r in rows[name]) if t]
-        result[name] = {"name": name, "label": next(o.label for o in bq.OUTPUTS if o.name == name), "ok": not bv.has_ng(issues), "rows": len(rows[name]),
+        result[name] = {"name": name, "label": next(o.label for o in bq.OUTPUTS if o.name == name), "ok": not bv.has_ng(issues), "rows": len(rows[name]), "kind": kinds.get(name, ""),
                         "dataAsOf": _iso(max(times)) if times else None, "issues": [{"level": i.level, "text": i.text()} for i in issues]}
     return {"configured": True, "checkedAt": _iso(now), "outputs": [result[o.name] for o in outputs if o.name in result]}
 

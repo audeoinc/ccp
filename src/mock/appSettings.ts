@@ -72,6 +72,8 @@ export const AppSettingsService: typeof Real = {
         label: n,
         ok: found,
         rows: found ? 1000 : null,
+        // 見本: 在庫だけビュー(更新の合図に見る元の表が要る)、ほかは表
+        kind: found ? (n === 'sku_stock' ? 'VIEW' : 'TABLE') : undefined,
         dataAsOf: found ? ago(30) : null,
         issues: found ? [] : [{ level: 'NG', text: `BigQuery を読めません(NotFound: 表 ${v} が見つかりません)` }],
       }
