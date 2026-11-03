@@ -591,7 +591,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/ai.py` | 91 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
 | `ccp/approvals.py` | 307 | 承認の依頼・承認・差し戻し・やり直し(`/api/approvals`) |
 | `ccp/production.py` | 346 | 制作の依頼(`/api/production`。依頼・受け取る・終わった・仕上がりの確認(OK / 直してほしい)・送る・やり直す・HTML・要素の直し) |
-| `ccp/identity.py` | 116 | ログインしている人(`/api/me`) |
+| `ccp/identity.py` | 268 | 入口の認証の差し込み口(入ってよいか・ログインしている人。`/api/me`) |
+| `ccp/oidc.py` | 331 | 入口の認証の OIDC のアダプター(Entra ID などの SSO。`/auth/login`・`/auth/callback`・`/auth/logout`) |
 | `ccp/policies.py` | 504 | 方針と決まりの取り込みと、AI への渡し方 |
 | `ccp/metrics.py` | 171 | 商品・カテゴリの週の指標の取り込み(`/api/metrics/import` と `ccp.cli import-metrics`。CSV の週 × 市場の行を置き換える) |
 | `ccp/heroes.py` | 119 | メイン画像を上げる・AI で画像を読んで下書き(`/api/heroes/upload`・`/api/heroes/describe`。X59) |

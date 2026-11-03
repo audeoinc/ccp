@@ -276,14 +276,42 @@ def _assets(out: _Out) -> None:
         out.add("assets", "warn", "写真の場所(ASSET_DIR)がありません。写真の代わりにイラストが出ます", "引っ越し用のパックを取り込んだら、ASSET_DIR を設定する")
 
 
-def _guard(out: _Out) -> None:
-    if os.getenv("APP_PASSWORD"):
-        out.add("guard", "ok", "画面のパスワード(APP_PASSWORD)があります")
-    elif os.getenv("CCP_IAP_AUDIENCE"):
-        out.add("guard", "ok", "画面は、手前のログインで守られています")
+async def _guard(out: _Out) -> None:
+    """入口の認証(差し込み口 identity.py)。どのアダプターか・ログインの発行元に届くか"""
+    from . import identity, oidc
+
+    mode = identity.auth_mode()
+    if mode == "oidc":
+        cfg = oidc.config()
+        if cfg is None:
+            out.add("guard", "missing", f"入口の認証: ログイン(OIDC)の設定が足りません({', '.join(oidc.missing())})。いまは、だれも画面を開けません", "アプリの登録の発行元・クライアント ID・クライアントシークレットを環境変数に入れて、起動し直す(docs/WORKBENCH.md の 7.1)")
+            return
+        try:
+            await oidc.discover(cfg, fresh=True)
+        except Exception as e:  # noqa: BLE001
+            out.add("guard", "failed", f"入口の認証: ログイン(OIDC)の発行元に届きません({cfg.issuer}: {e})", "OIDC_ISSUER の綴り(Entra は https://login.microsoftonline.com/<テナント ID>/v2.0)と、サーバーから外へ出られるかを見る")
+            return
+        back = (cfg.public_url or "<画面のアドレス>") + "/auth/callback"
+        out.add("guard", "ok", f"入口の認証: ログイン(OIDC。{cfg.issuer})。発行元に届きます。戻り先の URL: {back}")
+        if os.getenv("APP_PASSWORD"):
+            out.add("guard", "warn", "画面のパスワード(APP_PASSWORD)は、ログインを使っているので効いていません", "要らなければ消す")
+        if not cfg.public_url:
+            out.add("guard", "warn", "画面のアドレス(CCP_PUBLIC_URL)がないので、戻り先の URL を、届いた依頼から作ります", "手前の機械が X-Forwarded-Proto・Host を付けないなら、CCP_PUBLIC_URL に https://… を設定する")
+    elif mode == "basic":
+        if os.getenv("APP_PASSWORD"):
+            out.add("guard", "ok", "入口の認証: 画面のパスワード(APP_PASSWORD)があります(人は分かりません)")
+        else:
+            out.add("guard", "missing", "入口の認証: CCP_AUTH=basic なのに、画面のパスワード(APP_PASSWORD)がありません。いまは、だれも画面を開けません", "APP_PASSWORD を設定する")
+    elif mode == "iap":
+        out.add("guard", "ok", "入口の認証: 手前のログイン(IAP)で守られています")
+    elif mode == "none":
+        if os.getenv("CCP_AUTH", "").strip().lower() == "none":
+            out.add("guard", "warn", "入口の認証: なし(CCP_AUTH=none)。だれでも画面を開けます", "外から開ける置き先なら、ログイン(OIDC_ISSUER など)か APP_PASSWORD を設定して、CCP_AUTH を消す")
+        else:
+            # 外から開ける状態で黙って動き出さないように、このサーバーの中からだけ開ける(identity.admit)
+            out.add("guard", "warn", "入口の認証がありません。このサーバーの中(localhost・中継)からだけ開けます", "外から開くなら、ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。守りなしで外から開くと決めたなら CCP_AUTH=none")
     else:
-        # 外から開けるかは、サーバーからは分からない。中継の内側なら、このままでよい
-        out.add("guard", "warn", "画面にパスワードも、手前のログインもありません", "Workbench の中継など、内側からしか開けないなら、このままでよい。外から開けるなら APP_PASSWORD を設定する")
+        out.add("guard", "missing", f"入口の認証: CCP_AUTH の値({mode})が分かりません。いまは、だれも画面を開けません", "oidc / basic / iap / none のどれかにする")
 
 
 def _static(out: _Out) -> None:
@@ -301,7 +329,7 @@ async def diagnose(full: bool = True) -> list[Item]:
     await _ai(out, full, google_ok)
     await _bq(out, full, db_ok)
     _assets(out)
-    _guard(out)
+    await _guard(out)
     _static(out)
     return list(out)
 
