@@ -275,6 +275,8 @@ class OidcFlowTest(unittest.TestCase):
         self.assertEqual(oidc._b64(hashlib.sha256(sent["code_verifier"].encode()).digest()), q["code_challenge"])
         self.assertEqual(sent["code"], "c1")
         self.assertEqual(self.client.get("/api/who").json(), {"email": "mika.tanaka@example.com"})
+        # 画面の「ログインが切れました」から、別のタブでログインし直したときに着く所(ログインの確かめの対象外)
+        self.assertEqual(self.client.get("/auth/done").status_code, 200)
         out = self.client.get("/auth/logout", follow_redirects=False)
         self.assertTrue(out.headers["location"].startswith(DOC["end_session_endpoint"]))
         self.assertEqual(self.client.get("/api/who").status_code, 401)
