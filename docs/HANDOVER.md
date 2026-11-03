@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-03 最適化(optimize-survey の 1〜6)が済んだ: 89675b8・c472ad1・83a4795・2b96f67・adcd6f3・f063157。X95 も本番済み(3250961・c8104ee)。
 - 2026-11-02 UI 1: X90 の塊 A(面の枠)・E(P40・G1/G2)・F(K1〜K3。「制作に渡す」はシンプルな制作の画面が渡す)を main に。**K5: 詳しい制作のページ(`ProductionPage.tsx`・`ProductionInfoPane.tsx`)を消した**(⋯ の入口・`PREF.productionSimple` も)。詳しくはアーカイブ 2026-10-28_ の末尾。X93(開いたときの表示の大きさを自動で決める。`settings.me.autoscale`)も main に。X94(メイン画像を URL のページから選ぶ。`content.hero.fromurl`・`UrlImagePicker`)も main に。続けて、ページの画像の小さいもの(短い辺 100px 未満)を並びから外し、色見本をサーバーで外す(`simple/smallImages.tsx`・`product_pages.py` の `SWATCH`)。プレビューの倍率のバーは、真ん中がいつも実際の倍率で、「全体を表示」は別のボタン(`PreviewZoomBar`)。X87 段 ② の UI 1 の残りは続き
 - 2026-11-02 UI 3: X86 シンプルな制作の画面の追加分を main に(b046f54。AI の手直し・制作した HTML の版・要素を直す・ピン・左のバーの HTML の欄 `prod.htmlcode`(v1)・保存の流れを計画にそろえた: 打てば入る・自動で保存・↶)。未決: `prod.htmlcode` は FEATURE_FLAGS では「プレビューの切り替え・試す → 確定」、作ったのは「左のバー・自動で保存」(連絡係が確認中)。次は D(面の枠に載せる・AbHandoffSection・MaterialRows / ProductionChanges / PaneCrumbs・「渡されたもの」・件名とプリヘッダー・「企画が変わりました」・simple-finish.md の制作の穴)
 - 2026-11-02 UI 2: X92 settings.shopurl(店の URL の形。実際の URL を 1 つ貼って形を作る・`products.page_url` を優先・制作の写しに商品の URL を固める)を main に。X89 の部品(ResultsAiPanel・ResultsTalkPanel)はブランチ ui2-results-panels で UI 3 が差し込む
