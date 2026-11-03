@@ -60,7 +60,7 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 
 ## 触る前に知っておくこと
 
-- **Workbench 版の ZIP は停止した**(2026-11-03 利用者)。これからは、稼働の環境に向けた **AWS 版**を、同じように開発元の GCP の本番の仕組みを消した形で作る(作っている途中。それまでは下の約束事を、AWS 版にも当てはめる)。GCP 版(開発元の本番の形)は残す(ARCHITECTURE の 0.5 章)。
+- **Workbench 版の ZIP は停止した**(2026-11-03 利用者)。これからは、稼働の環境に向けた **AWS 版**を、同じように、開発元の本番(Cloud Run・Cloud SQL)で動かしていることが分かるものだけを消した形で作る(BigQuery・Gemini・GCS・IAP のアダプターは残す。作っている途中。それまでは下の約束事を、AWS 版にも当てはめる)。GCP 版(開発元の本番の形)は残す(ARCHITECTURE の 0.5 章)。
 - **利用先には、ZIP だけを渡す**(作り方は、いまは Workbench 版の `npm run release:workbench`。AWS 版もこれにならう。手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
   開発元の本番(Cloud Run + Cloud SQL)だけの処理は `server/ccp/hosted/` に置き、外のコードは `hosted/` がなくても動くようにする(DB の準備中は `ccp/dbready.py` を通す)。
   ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)には、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・開発元の名前などを書かない(検査で止まる)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release-workbench.mjs` の `RULES` にも足す。
