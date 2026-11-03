@@ -35,6 +35,9 @@ server/images/
 
 # Workbench の接続の設定(パスワードを含む。見本は server/workbench.env.example)
 server/workbench.env
+# サーバーの設定のファイル(初期設定の画面が書く。秘密を含む。server/ccp/envfile.py)
+server/ccp.env
+server/ccp.env.tmp
 # Workbench のスクリプト(scripts/workbench.sh)が作る、サーバーの記録とログ
 server/.ccp-server.pid
 server/ccp-server.log

@@ -228,7 +228,8 @@ class BasicAuthTest(unittest.TestCase):
         from ccp import main
 
         self.main = main
-        p = mock.patch.object(main, "APP_PASSWORD", "secret-for-test")
+        # パスワードは、届くたびに環境変数から読む(初期設定の画面で入れたら、起動し直さずに効かせるため)
+        p = mock.patch.dict("os.environ", {"APP_PASSWORD": "secret-for-test"})
         p.start()
         self.addCleanup(p.stop)
         self.client = TestClient(main.app)

@@ -48,6 +48,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/dataImport$/.test(source)) return fileURLToPath(new URL('./src/mock/dataImport.ts', import.meta.url))
     // 仕事の設定(src/data/appSettings。BigQuery の表の場所・AI のモデル)も、メモリ上に持つ身代わりに
     if (/(?:^|\/)data\/appSettings$/.test(source)) return fileURLToPath(new URL('./src/mock/appSettings.ts', import.meta.url))
+    // 初期設定の画面(src/data/setup)は、?setup=1 のときだけ「初期設定が要る」を返す身代わりに
+    if (/(?:^|\/)data\/setup$/.test(source)) return fileURLToPath(new URL('./src/mock/setup.ts', import.meta.url))
     // 設定の健康診断(src/data/health)も、見本の結果を返す身代わりに
     if (/(?:^|\/)data\/health$/.test(source)) return fileURLToPath(new URL('./src/mock/health.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに

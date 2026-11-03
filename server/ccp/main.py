@@ -14,14 +14,20 @@ import asyncio
 import logging
 
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import dbready
+# サーバーの設定のファイル(初期設定の画面が書く)を、ほかのモジュールが設定を読む前に読み込む。環境から渡された値は上書きしない
+from . import envfile
+
+envfile.load()
+
+from . import dbready, setup  # noqa: E402
 from .ai import router as ai_router
 from .approvals import router as approvals_router
 from .appsettings import router as appsettings_router
 from .health import router as health_router
+from .setup import router as setup_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
 from . import devimages, devtools
@@ -51,7 +57,6 @@ hosted_router = optional.hosted("routes", "router")
 
 logging.basicConfig(level=logging.INFO)  # DB の状態の記録などを、サーバーのログに出す
 
-APP_PASSWORD = os.getenv("APP_PASSWORD")
 STATIC_DIR = Path(os.getenv("STATIC_DIR") or Path(__file__).resolve().parents[2] / "dist-gcp")
 
 app = FastAPI(title="CCP", docs_url=None, redoc_url=None)
@@ -70,6 +75,8 @@ async def start_bq_scheduler() -> None:
     from .health import at_startup
 
     # 設定の健康診断も、起動を待たせずに裏で(足りない設定をログに出し、管理する人の ⚙ に赤い点)
+    # 初期設定が要るか(設定が足りない・DB につながらない)を先に決める。要るなら、画面は初期設定だけを出す
+    await setup.at_startup()
     for job in (run_scheduler(), at_startup()):
         task = asyncio.create_task(job)
         _bg.add(task)  # 参照を持っておかないと、途中で片づけられることがある
@@ -89,17 +96,21 @@ async def basic_auth(request: Request, call_next):
     # 開発用の画面(/dev/)と API は、CCP_DEVTOOLS=1 のときだけ見せる(ccp/devtools/)
     if devtools.blocks(path):
         return PlainTextResponse("Not Found", status_code=404)
-    if APP_PASSWORD and path != "/ping" and not path.startswith("/internal/"):
+    # 画面のパスワードは、初期設定の画面で入れることがあるので、そのつど読む(起動し直さずに効かせる)
+    app_password = os.getenv("APP_PASSWORD")
+    if app_password and path != "/ping" and not path.startswith("/internal/"):
         header = request.headers.get("authorization", "")
         ok = False
         if header.startswith("Basic "):
             try:
                 _, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
-                ok = secrets.compare_digest(pw.encode(), APP_PASSWORD.encode())
+                ok = secrets.compare_digest(pw.encode(), app_password.encode())
             except Exception:  # noqa: BLE001 — 壊れた認証ヘッダーは、不一致として扱う
                 ok = False
         if not ok:
             return PlainTextResponse("Unauthorized", status_code=401, headers={"WWW-Authenticate": 'Basic realm="ccp"'})
+    if (closed := await setup.gate(path)) is not None:
+        return JSONResponse(closed, status_code=503)
     return await call_next(request)
 
 
@@ -145,6 +156,7 @@ app.include_router(product_images_router)
 app.include_router(bq_router)
 # 設定の状態は /api/settings/health。/api/settings/{まとめ} より先に置く(health をまとめの名前と読ませない)
 app.include_router(health_router)
+app.include_router(setup_router)
 app.include_router(appsettings_router)
 app.include_router(policies_router)
 app.include_router(metrics_router)
